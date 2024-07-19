@@ -560,6 +560,84 @@ const ProductDetails = ({ user, users }) => {
                     >
                       Buy Now
                     </Button>
+                  {/* TODO:- Remove Comment to show the Add-to-Cart Button */}
+                  {/* {ownerSameAsUser() ?
+                      <Button
+                        icon={<div className="flex justify-center items-center">
+                          <img src={Images.Cart} alt={`${assetName} | Image`} title={`${assetName} | Image`} width={18} height={18} className="object-contain" />
+                        </div>}
+                        className={`!w-9 h-9 border border-primary ${isAvailableForSale ? '!bg-[#808080]' : '!bg-[#13188A]'} rounded-md`}
+                        disabled={true}
+                        id="addToCart"
+                        onClick={async () => {
+                          window.LOQ.push(['ready', async LO => {
+                            // Track an event
+                            await LO.$internal.ready('events')
+                            LO.events.track('Add to Cart (from Product Details)', {
+                              product: details.name,
+                              category: details.category,
+                              productId: details.productId
+                            })
+                          }])
+                          TagManager.dataLayer({
+                            dataLayer: {
+                              event: 'add_to_cart_from_product_details',
+                              product_name: details?.name,
+                              category: details?.category,
+                              productId: details?.productId
+                            },
+                          });
+                          const checkQuantity = await orderActions.fetchSaleQuantity(orderDispatch, [details.saleAddress], [qty])
+                          if (checkQuantity === true) {
+                            addItemToCart();
+                          } else {
+                            if (checkQuantity[0].availableQuantity === 0) {
+                              openToast("bottom", true, TOAST_MSG.OUT_OF_STOCK(details));
+                            } else { // Case 2: We are trying to add too much quantity
+                              openToast("bottom", true, TOAST_MSG.TOO_MUCH_QUANTITY(checkQuantity, details));
+                            }
+                          }
+                        }}
+                      />
+                      :
+                      <Button
+                        icon={<div className="flex justify-center items-center">
+                          <img src={Images.Cart} alt={`${assetName} | Image`} title={`${assetName} | Image`} width={18} height={18} className="object-contain" />
+                        </div>}
+                        className={`!w-9 h-9 rounded-md  ${isAvailableForSale ? '!bg-[#808080]' : '!bg-[#13188A]'}  `}
+                        disabled={isAvailableForSale}
+                        onClick={async () => {
+                          window.LOQ.push(['ready', async LO => {
+                            // Track an event
+                            await LO.$internal.ready('events')
+                            LO.events.track('Add to Cart (from Product Details)', {
+                              product: details?.name,
+                              category: details?.category,
+                              productId: details?.productId
+                            })
+                          }])
+                          TagManager.dataLayer({
+                            dataLayer: {
+                              event: 'add_to_cart_from_product_details',
+                              product_name: details?.name,
+                              category: details?.category,
+                              productId: details?.productId
+                            },
+                          });
+                          const checkQuantity = await orderActions.fetchSaleQuantity(orderDispatch, [details.saleAddress], [qty])
+                          if (checkQuantity === true) {
+                            addItemToCart();
+                          } else {
+                            if (checkQuantity[0].availableQuantity === 0) {
+                              openToast("bottom", true, TOAST_MSG.OUT_OF_STOCK(details));
+                            } else { // Case 2: We are trying to add too much quantity
+                              openToast("bottom", true, TOAST_MSG.TOO_MUCH_QUANTITY(checkQuantity, details));
+                            }
+                          }
+                        }}
+                      />
+
+                    } */}
                   </div>
                   :
                   <div className="flex ">

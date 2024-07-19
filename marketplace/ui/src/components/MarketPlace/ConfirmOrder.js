@@ -261,7 +261,7 @@ const ConfirmOrder = ({ paymentProviders = [], data, columns }) => {
                 <div className="mr-4">
                   <Select
                     value={selectedProvider?.serviceName}
-                    className="w-[250px] text-center selected-payment-option"
+                    className="w-[250px] text-center selected-payment-option items-select"
                     onChange={handleChange}
                     placeholder="Select Payment Option"
                   >
