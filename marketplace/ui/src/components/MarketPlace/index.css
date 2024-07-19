@@ -210,7 +210,7 @@ img.ant-image-preview-img {
 }
 
 .selected-payment-option > .ant-select-selector > .ant-select-selection-placeholder {
-  color: black;
+  color: white;
   font-weight: 600;
 }
 

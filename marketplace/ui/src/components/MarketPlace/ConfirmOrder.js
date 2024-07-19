@@ -243,15 +243,15 @@ const ConfirmOrder = ({ paymentProviders = [], data, columns }) => {
                 <div className="w-max flex flex-col gap-[10px]">
                   <Row className="justify-between items-center ">
                     <p className="text-base text-[#6A6A6A]">Sub Total:</p>
-                    <p className="text-xl text-[#202020] md:ml-5 text-right">${total} <span className="ml-1">({total * 100} STRATS)</span></p>
+                    <p className="text-base text-[#202020] md:ml-5 text-right">${total} <span className="ml-1">({total * 100} STRATS)</span></p>
                   </Row>
                   <Row className="justify-start items-center ">
                     <p className="text-base text-[#6A6A6A]">Tax:</p>
-                    <p className="text-xl text-[#202020] md:ml-16 text-left">${tax}</p>
+                    <p className="text-base text-[#202020] md:ml-16 text-left">${tax}</p>
                   </Row>
                   <Row className="justify-between items-center">
                     <p className="text-base text-[#6A6A6A]">Total:</p>
-                    <p id="totalPrice" className="text-xl text-[#202020] md:ml-5 text-right">
+                    <p id="totalPrice" className="text-base text-[#202020] md:ml-5 text-right">
                       ${total + tax} <span className="ml-1">({(total + tax) * 100} STRATS)</span>
                     </p>
                   </Row>
@@ -261,7 +261,7 @@ const ConfirmOrder = ({ paymentProviders = [], data, columns }) => {
                 <div className="mr-4">
                   <Select
                     value={selectedProvider?.serviceName}
-                    className="w-[250px] text-center selected-payment-option"
+                    className="w-[250px] text-center selected-payment-option items-select"
                     onChange={handleChange}
                     placeholder="Select Payment Option"
                   >
