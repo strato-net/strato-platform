@@ -3,6 +3,8 @@ require("dotenv").config();
 const sgMail = require("@sendgrid/mail");
 sgMail.setApiKey(process.env.SENDGRID_API_KEY);
 
+const env = process.env.NODE_ENV || "development";
+
 // Function to send email
 const sendEmail = async (emails, message) => {
   const { subject, htmlContent } = message;
@@ -12,8 +14,11 @@ const sendEmail = async (emails, message) => {
     from: { email: "no_reply@blockapps.net", name: "BlockApps.net" },
     subject,
     html: htmlContent,
-    // Remove sales from these emails for testnet testing. This needs to be included for production.
-    // bcc: "sales@blockapps.net",
+  };
+
+  // Remove sales from these emails for testnet testing. This needs to be included for production.
+  if (env === "production") {
+    msg.bcc = "sales@blockapps.net";
     // attachments: [
     //   {
     //     content: pdf.toString('base64'),
@@ -22,7 +27,7 @@ const sendEmail = async (emails, message) => {
     //     disposition: 'attachment',
     //   },
     // ],
-  };
+  }
 
   try {
     await sgMail.sendMultiple(msg);
