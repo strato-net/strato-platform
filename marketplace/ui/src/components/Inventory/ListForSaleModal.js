@@ -1,5 +1,5 @@
 import { Button, Input, InputNumber, Modal, Select, Spin, Tag, Table, Typography } from "antd";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { actions } from "../../contexts/inventory/actions";
 import { useInventoryDispatch, useInventoryState } from "../../contexts/inventory";
 import { usePaymentServiceDispatch, usePaymentServiceState } from "../../contexts/payment";
@@ -26,6 +26,8 @@ const ListForSaleModal = ({ open, handleCancel, inventory, categoryName, limit, 
         areNotOnboardedLoading
     } = usePaymentServiceState();
     const paymentServiceDispatch = usePaymentServiceDispatch();
+    const inputPriceDesktopRef = useRef(null);
+    const inputPriceMobileRef = useRef(null);
 
     useEffect(() => {
         paymentServiceActions.getPaymentServices(paymentServiceDispatch);
@@ -60,6 +62,43 @@ const ListForSaleModal = ({ open, handleCancel, inventory, categoryName, limit, 
         setPaymentTypes(selectedPaymentServiceIndices);
 
     }, [paymentServices, notOnboarded, inventory.paymentProviders]);
+
+    useEffect(() => {
+        const handleInput = (event) => {
+            let value = event.target.value;
+            value = value.replace(/[^0-9.]/g, ''); // remove any non-numeric characters
+
+            const parts = value.split('.');
+            if (parts.length > 2) {
+                value = parts[0] + '.' + parts.slice(1).join('');
+            } else if (parts.length === 2 && parts[1].length > 2) {
+                parts[1] = parts[1].substring(0, 2);
+                value = parts.join('.');
+            }
+            event.target.value = value;
+            if (value) {
+                setpricePerUnit(parseFloat(value));
+            } else {
+                setpricePerUnit(0);
+            }
+        };
+
+        const inputElements = [inputPriceDesktopRef.current, inputPriceMobileRef.current];
+        
+        inputElements.forEach(inputElement => {
+            if (inputElement) {
+                inputElement.addEventListener('input', handleInput);
+            }
+        });
+
+        return () => {
+            inputElements.forEach(inputElement => {
+                if (inputElement) {
+                    inputElement.removeEventListener('input', handleInput);
+                }
+            });
+        };
+    }, [inputPriceDesktopRef, inputPriceMobileRef]);
 
     const renderImg = (service) => {
         return service.imageURL && service.imageURL !== ''
@@ -148,12 +187,14 @@ const ListForSaleModal = ({ open, handleCancel, inventory, categoryName, limit, 
                 align: "center",
                 render: () => (
                     <InputNumber
+                        ref={inputPriceDesktopRef}
                         value={pricePerUnit}
                         controls={false}
                         min={0.01}
                         onChange={(value) => {
-                            if (value && value > 0) {
-                                setpricePerUnit(parseFloat(value.toFixed(2)));
+                            const stringValue = value ? value.toString() : '';
+                            if (/^\d+(\.\d{0,2})?$/.test(stringValue)) {
+                                setpricePerUnit(value);
                             }
                         }}
                     />
@@ -256,11 +297,13 @@ const ListForSaleModal = ({ open, handleCancel, inventory, categoryName, limit, 
                     <InputNumber
                         className="w-full h-9"
                         value={pricePerUnit}
+                        ref={inputPriceMobileRef}
                         controls={false}
                         min={.01}
                         onChange={(value) => {
-                            if (value && value > 0) {
-                                setpricePerUnit(parseFloat(value.toFixed(2)));
+                            const stringValue = value ? value.toString() : '';
+                            if (/^\d+(\.\d{0,2})?$/.test(stringValue)) {
+                                setpricePerUnit(value);
                             }
                         }}
                     />
