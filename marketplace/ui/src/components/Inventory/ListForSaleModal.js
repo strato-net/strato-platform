@@ -166,7 +166,7 @@ const ListForSaleModal = ({ open, handleCancel, inventory, categoryName, limit, 
 
     const handleSubmit = async () => {
         let body = {
-            paymentProviders: paymentTypes.map((p) => availablePaymentProviders[p].address),
+            paymentProviders: paymentTypes.filter((p) => availablePaymentProviders[p]).map((p) => availablePaymentProviders[p].address),
             price: pricePerUnit,
         };
         if (inventory.saleAddress) {
