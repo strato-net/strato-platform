@@ -218,7 +218,8 @@ const NewTrendingCard = ({ topSellingProduct, addItemToCart, parent = "", api, c
                     >
                         Buy Now
                     </Button>
-                    <Button
+                    {/* TODO:- Remove Comment to show the Add-to-Cart Button */}
+                    {/* <Button
                         className={`h-9 w-9 flex items-center justify-center ${isAvailableForSale ? '!bg-[#808080]' : '!bg-[#13188A]'} ${ownerSameAsUser() ? 'cursor-not-allowed' : 'cursor-pointer'}`}
                         disabled={isAvailableForSale || ownerSameAsUser()}
                         onClick={() => {
@@ -244,7 +245,7 @@ const NewTrendingCard = ({ topSellingProduct, addItemToCart, parent = "", api, c
                     >
 
                         <img alt={imgMeta} title={imgMeta} src={Images.Cart} width={18} height={18} className='max-w-[18px]' />
-                    </Button>
+                    </Button> */}
                 </div>
             </div>
             <LoginModal

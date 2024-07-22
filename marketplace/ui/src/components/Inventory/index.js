@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { Button, Pagination, Spin, Select, Tabs } from "antd";
+import { CheckCircleOutlined } from '@ant-design/icons';
 import InventoryCard from "./InventoryCard";
 import CreateInventoryModal from "./CreateInventoryModal";
 // Actions
@@ -60,6 +61,25 @@ const Inventory = ({ user }) => {
   const [category, setCategory] = useState(undefined);
   const linkUrl = window.location.href;
 
+  const [sortedPaymentServices, setSortedPaymentServices] = useState([]);
+
+  const isNotOnboarded = (service) => notOnboarded.some(n => n.serviceName === service.serviceName);
+
+  useEffect(() => {
+    // Create a set of not onboarded service names for quick lookup
+    const notOnboardedNames = new Set(notOnboarded.map(n => n.serviceName));
+
+    // Sort paymentServices array so that not onboarded services come first
+    const sortedServices = [...paymentServices].sort((a, b) => {
+      return isNotOnboarded(a) - isNotOnboarded(b);
+    }).map(service => ({
+      ...service,
+      isNotOnboarded: notOnboardedNames.has(service.serviceName),
+    }));
+
+    setSortedPaymentServices(sortedServices);
+  }, [paymentServices, notOnboarded]);
+
   
   useEffect(() => {
     if (user && user.commonName) {
@@ -110,7 +130,7 @@ const Inventory = ({ user }) => {
 
   const handleChange = value => {
     const service = notOnboarded.find(service => service.serviceName === value);
-    setSelectedService(service);
+    handleOnboard(service);
   };
 
   const handleReqModCancel = () => setReqModOpen(false);
@@ -164,39 +184,32 @@ const Inventory = ({ user }) => {
             <div className="flex gap-3 items-center">
               {!areNotOnboardedLoading ? (
                 <Select
-                  style={{ width: 200, height: 40 }}
+                  className="items-select"
+                  style={{ width: 250, height: 40 }}
                   onChange={handleChange}
-                  defaultValue={notOnboarded[0]?.serviceName}
-                  value={selectedService?.serviceName}
+                  value={'Connect to Payment Provider'}
                   disabled={notOnboarded.length === 0}
                 >
-                  {paymentServices.map(service => (
+                  {sortedPaymentServices.map(service => (
                     <Option 
                       key={service.serviceName} 
                       value={service.serviceName}
-                      disabled={!notOnboarded.some(n => n.serviceName === service.serviceName)}
+                      disabled={!service.isNotOnboarded}
                     >
-                      {service.onboardingText || service.data.onboardingText}
+                      {service.serviceName}
+                      {!service.isNotOnboarded && <CheckCircleOutlined style={{ color: '#28a745',position: 'absolute', right: '10px' }} />}
                     </Option>
                   ))}
                 </Select>
               ) : (
                 <Spin size="large" />
               )}
-              <Button
-                type="primary"
-                style={{ height: 40 }}
-                disabled={!selectedService}
-                onClick={() => handleOnboard(selectedService)}
-              >
-                {selectedService ? `Connect to ${selectedService.serviceName}` : "Select a service"}
-              </Button>
             </div>
             <div className="flex gap-3 items-center">
               <Button
                 type="primary"
                 id="createItem"
-                className="w-40 flex items-center justify-center gap-[6px]"
+                className="w-[250px] sm:w-40 flex items-center justify-center gap-[6px]"
                 style={{ height: 40 }}
                 onClick={() => {
                   if (hasChecked && !isAuthenticated && loginUrl !== undefined) {

@@ -519,7 +519,7 @@ export const BREADCRUMB_VALUES = {
   'profile' : 'My Profile',
   'c' : 'Category',
   'dp' : 'Product Detail',
-  'checkout' : 'My Cart',
+  'checkout' : 'Checkout',
   'sold-orders' : 'Orders (Sold)',
   'bought-orders' : 'Orders (Bought)',
   'sold' : 'Sold',
@@ -596,3 +596,4 @@ export const CLOTHING_TYPES = [
   {label: "Shoes", value: "Shoes"},
   {label: "Accessories", value: "Accessories"},
 ]
+

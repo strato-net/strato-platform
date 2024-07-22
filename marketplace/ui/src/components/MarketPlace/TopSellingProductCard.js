@@ -72,7 +72,7 @@ const TopSellingProductCard = () => {
       );
       if (checkQuantity === true) {
         // Quantity check passed, add new item to the cart
-        items.push({ product, qty: quantity });
+        items = [{ product, qty: quantity }]
         marketplaceActions.addItemToCart(marketplaceDispatch, items);
         showToast({
           message: TOAST_MSG.ITEM_ADDED_TO_CART,
@@ -105,7 +105,7 @@ const TopSellingProductCard = () => {
       const checkQuantity = await orderActions.fetchSaleQuantity(
         orderDispatch,
         [product.saleAddress],
-        [quantity]
+        [potentialNewQty]
       );
       if (checkQuantity === true) {
         // Quantity check passed, update item quantity in the cart

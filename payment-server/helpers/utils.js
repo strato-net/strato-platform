@@ -2,7 +2,7 @@ import client from '../db/index.js';
 import { rest, util } from "blockapps-rest";
 import { 
   DEFAULT_OPTIONS, 
-  ORDER_EVENT_TABLE, 
+  ASSET_LOCKED_EVENT_TABLE,
   SELLER_ONBOARDED_TABLE, 
   TABLE_PREFIX, 
   STRIPE_CONTRACT_ADDRESS } from "./constants.js";
@@ -135,7 +135,7 @@ const emitOnboardSeller = async (address, args) => {
 
 const getOrderEvent = async (orderHash) => {
   const tableArgs = {
-    name: ORDER_EVENT_TABLE,
+    name: ASSET_LOCKED_EVENT_TABLE,
   };
   
   const searchOptions = {
@@ -249,8 +249,20 @@ const cancelOrder = async (address, args) => {
     method: "cancelOrder",
     args: util.usc({ ...args }),
   };
-  const completeOrderStatus = await rest.call(ADMIN.getUser(), callArgs, DEFAULT_OPTIONS);
-  return completeOrderStatus;
+  const cancelOrderStatus = await rest.call(ADMIN.getUser(), callArgs, DEFAULT_OPTIONS);
+  return cancelOrderStatus;
+}
+
+const discardOrder = async (address, args) => {
+  // Make the call and return results
+  const contract = { name: "PaymentService", address };
+  const callArgs = {
+    contract,
+    method: "discardOrder",
+    args: util.usc({ ...args }),
+  };
+  const discardOrderStatus = await rest.call(ADMIN.getUser(), callArgs, DEFAULT_OPTIONS);
+  return discardOrderStatus;
 }
 
 export {
@@ -272,4 +284,5 @@ export {
   completeOrder,
   initializePayment,
   cancelOrder,
+  discardOrder,
 }

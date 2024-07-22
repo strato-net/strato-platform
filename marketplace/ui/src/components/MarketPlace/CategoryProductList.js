@@ -269,7 +269,8 @@ const CategoryProductList = ({ user }) => {
       const checkQuantity = await orderActions.fetchSaleQuantity(orderDispatch, [product.saleAddress], [quantity]);
       if (checkQuantity === true) {
         // Quantity check passed, add new item to the cart
-        items.push({ product, qty: quantity });
+        // Adding single object to keep single product in cart
+        items = [{ product, qty: quantity }];
         marketplaceActions.addItemToCart(marketplaceDispatch, items);
 
         showToast({
@@ -301,7 +302,7 @@ const CategoryProductList = ({ user }) => {
     } else {
       // Product found, prepare to update quantity after check
       const potentialNewQty = items[foundIndex].qty + quantity;
-      const checkQuantity = await orderActions.fetchSaleQuantity(orderDispatch, [product.saleAddress], [quantity]);
+      const checkQuantity = await orderActions.fetchSaleQuantity(orderDispatch, [product.saleAddress], [potentialNewQty]);
       if (checkQuantity === true) {
         // Quantity check passed, update item quantity in the cart
         items[foundIndex].qty = potentialNewQty;
