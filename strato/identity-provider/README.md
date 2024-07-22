@@ -9,6 +9,11 @@ This project is meant to help with the registration flow on STRATO. The identity
 To utilize this functionality, you call the PUT /identity endpoint. You must also provide an Authorization header with the user's bearer token, and you can optionally specify the `company` as a query parameter. Whenever possible, the bearer token will be used as the source of truth for information about the user. The common name for the cert will either come from the token's `preferred_username` claim, if one exists, or the `name` claim. Similarly, if there is a `company` claim within the token, that will be used for the cert's organization field. If no claim `company` is found, the identity server will use the `company` query param value instead. Note that if both the `company` claim and query param are empty, the identity server will NOT issue a cert with an empty organization name. Instead, it will use the default naming behavior for Mercata users with no org:
 `Mercata Acount <first initial><last name><first 8 chars of uuid>`
 
+### What other services does the identity server talk to?
+The identity server is connected to vault so that it can create a keypair for an incoming user if they don't already have one.
+
+You can optionally also connect the identity server to a notification server so that it can automatically subscribe users for notifications. To indicate you want to subscribe, add `subscribe=true` as a query parameter when calling PUT /identity. **Please note:** the identity server will only attempt to subscribe a user if it detects that an account is being created for the first time. If an existing account (has keypair and cert) tries to call PUT /identity with `subscribe=true`, the identity server will ignore this and make no call to the notification server.
+
 ### Notes to the server admin
 
 1. Like Vault, there are four folder directories associated with the identity server to be aware of:

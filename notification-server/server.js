@@ -21,8 +21,8 @@ app.use(bodyParser.json()); // To parse JSON bodies
 app.use(bodyParser.urlencoded({ extended: true })); // To parse URL-encoded bodies
 
 // Routes
-app.use("/api", subscriptionRoutes);
-app.use("/api", notifyRoutes);
+app.use("/", subscriptionRoutes);
+app.use("/", notifyRoutes);
 
 app.listen(port, () => {
   console.log(`Server is running on port ${port}`);
