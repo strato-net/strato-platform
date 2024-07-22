@@ -173,9 +173,8 @@ async function get(user, args, options) {
   let searchArgs = {
     limit: 1,
     queryOptions: {
+      order: 'status.desc',
       transaction_hash: `eq.${address}`,
-      status: 'not.in.(1,5)',
-      select: 'id:id.max(),*',
     }
   }
   order = await searchAllWithQueryArgs(paymentTableName, searchArgs, newOptions, user);
@@ -240,7 +239,6 @@ async function getAll(admin, args = {}, options) {
     const uniqueOrderArgs = {
       ...args,
       queryOptions: {
-        status: 'not.in.(1,5)',
         select: 'id:id.max(),orderHash,createdDate',
       }
     };

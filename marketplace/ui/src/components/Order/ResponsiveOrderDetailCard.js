@@ -5,7 +5,9 @@ import image_placeholder from "../../images/resources/image_placeholder.png";
 export const ResponsiveOrderDetailCard = ({data}) => {
     return (
         <div className="flex flex-col md:hidden shadow-card_shadow p-3 py-4 mt-1 rounded-md">
-            {data?.productImage !== image_placeholder && <img src={data?.productImage} alt="" className="w-full h-36" />}
+           {data?.productImage !== image_placeholder && (
+                <img src={data?.productImage} alt="" className="w-full h-36 object-contain" />
+            )}
             <div className="flex justify-between py-2">
                 <Typography className="text-[#6A6A6A]">Product Name</Typography>
                 <Typography className="font-semibold">{data?.name || "N/A"}</Typography>

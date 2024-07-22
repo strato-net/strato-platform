@@ -73,11 +73,6 @@ img.ant-image-preview-img {
   border: 2px solid #181eac;
 }
 
-:where(.css-dev-only-do-not-override-9ntgx0).ant-input-number
-  .ant-input-number-input {
-  padding: 0;
-}
-
 .confirm-order-body {
   position: sticky;
   top: 200px;
@@ -215,8 +210,8 @@ img.ant-image-preview-img {
 }
 
 .selected-payment-option > .ant-select-selector > .ant-select-selection-placeholder {
-   color: black;
-   font-weight: 600;
+  color: white;
+  font-weight: 600;
 }
 
 @media (min-width: 1600px) {

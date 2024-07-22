@@ -1,6 +1,7 @@
 import {
     Form,
     Input,
+    InputNumber,
     Select
 } from "antd";
 import { CLOTHING_TYPES, spiritTypes } from "../../helpers/constants";

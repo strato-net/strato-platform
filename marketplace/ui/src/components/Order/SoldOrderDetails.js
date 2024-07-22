@@ -69,7 +69,7 @@ const SoldOrderDetails = ({ user, users }) => {
       if (statusInt === 3) {
         setPaid("Paid");
       } else if (statusInt === 4) {
-        setPaid("Canceled");
+        setPaid("Payment Failed");
       }
       setComment(orderDetails.order.comments);
       // Order Close Date is represented by block_timestamp when the Order Status is 3(CLOSED) or 4(CANCELED). This is consistent across legacy orders and new orders as there wouldn't be updates/methods invoked when the Order Status reaches Closed.
@@ -147,7 +147,11 @@ const SoldOrderDetails = ({ user, users }) => {
     return (
       <div className={className}>
         <Text className="block text-[#6A6A6A] text-[12px] mb-1">{title}</Text>
-        <Text className="block text-[#202020] text-[13px] font-semibold">{value}</Text>
+        { (status === getStatus(3) || status === getStatus(4)) && title === "Order Close Date" ? 
+        (<Text className="block text-[#202020] text-[13px] font-semibold">{value}</Text>):
+        title !== "Order Close Date" &&
+        (<Text className="block text-[#202020] text-[13px] font-semibold">{value}</Text>)
+        }
       </div>
     );
   };
@@ -329,38 +333,12 @@ const SoldOrderDetails = ({ user, users }) => {
                       <div className="flex flex-col md:flex-row md:justify-between">
                         <div className="flex flex-col">
                           <div className="flex">
-                            <Text className="bg-[#E9E9E9] md:bg-white py-2 px-3 md:w-2/5 w-full md:bg-none font-semibold text-sm md:text-lg text-primaryB flex gap-4 items-center">Order Details</Text>
+                            <Text className="bg-[#E9E9E9] md:bg-white py-2 px-3 md:w-3.5/5 w-full md:bg-none font-semibold text-sm md:text-lg text-primaryB flex gap-4 items-center">Order Details</Text>
                             <Text className="hidden md:flex mt-2">{statusComponentForPayment(paid)}</Text>
                           </div>
-                          <Text className="text-[#6A6A6A] md:text-black px-3 my-2 text-xs md:text-sm md:font-semibold">Please enter the fulfillment date to close the order</Text>
 
                         </div>
-                        <Button
-                          id="save-button"
-                          type="primary"
-                          loading={isCreateOrderSubmitting || isUpdatingOrderComment}
-                          disabled={status === getStatus(3) || status === getStatus(4) || (!comment && !selectedDate)}
-                          onClick={() => {
-                            if (!selectedDate && comment) {
-                              handleUpdateComment();
-                            }
-                            else if (selectedDate) {
-                              handleCloseOrder()
-                            }
-                            window.LOQ.push(['ready', async LO => {
-                              await LO.$internal.ready('events')
-                              LO.events.track('Order Details: Save Button')
-                            }])
-                            TagManager.dataLayer({
-                              dataLayer: {
-                                event: 'orderDetails_sold_save_click',
-                              },
-                            });
-                          }}
-                          className="min-w-max w-max h-9 px-[3%] ml-2 bg-primary !hover:bg-primaryHover"
-                        >
-                          Save
-                        </Button>
+
                       </div>
                       <Row className="hidden md:flex my-6 justify-between bg-[#F6F6F6] p-4 pb-2 rounded">
                         <OrderData title="Order Number" value={`#${`${details.order.orderId}`.substring(0,6)}`} />
@@ -445,13 +423,18 @@ const SoldOrderDetails = ({ user, users }) => {
                           <Text className="block text-primaryC text-[13px]">
                             Order Close Date
                           </Text>
+                          { (status === getStatus(3) || status === getStatus(4)) &&
+                        
                           <DatePicker
                             value={
                               selectedDate
                             }
                             onChange={onDateChange}
-                            disabled={status === getStatus(3) || status === getStatus(4)}
+                            disabled={ true }
                           />
+                        
+                          
+                          }
                         </div>
                       </Row>
                       <Row className="my-2 md:hidden flex-col gap-[6px] justify-between p-4 rounded">
@@ -470,8 +453,11 @@ const SoldOrderDetails = ({ user, users }) => {
                               <DatePicker
                                 value={selectedDate}
                                 onChange={onDateChange}
-                                disabled={status === getStatus(3) || status === getStatus(4)}
-                              />} />
+                                disabled={true}
+                                />} 
+                              />
+                              
+                            
                         </div>
                         <div className="flex justify-between">
                           <NewOrderData className="w-2/4" title="Status" value={statusComponent(status)} />
@@ -487,9 +473,7 @@ const SoldOrderDetails = ({ user, users }) => {
                             rows={2}
                             placeholder="Enter Comments"
                             value={decodeURIComponent(comment)}
-                            disabled={
-                              status === getStatus(3) || status === getStatus(4)
-                            }
+                            disabled={true}
                             onChange={(event) => {
                               setComment(encodeURIComponent(event.target.value));
                             }}
