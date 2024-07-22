@@ -37,9 +37,12 @@ const subscribe = async (username, email) => {
 const getEmailsByUsernames = async (usernames) => {
   try {
     const result = await client.query(
-      "SELECT email FROM contact_info WHERE username = ANY($1)",
+      "SELECT email FROM contact_info WHERE username = ANY($1::text[])",
       [usernames]
     );
+    if (result.rows.length !== usernames.length) {
+      throw new Error("Emails not found for all/some usernames");
+    }
     return result.rows.map((row) => row.email);
   } catch (error) {
     console.error("Error retrieving emails by usernames:", error);
