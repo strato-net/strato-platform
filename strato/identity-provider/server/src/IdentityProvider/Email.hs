@@ -1,5 +1,6 @@
 {-# LANGUAGE DeriveAnyClass #-}
 {-# LANGUAGE DeriveGeneric #-}
+{-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE TemplateHaskell #-}
 
@@ -8,12 +9,15 @@
 module IdentityProvider.Email where
 
 import BlockApps.Logging
+import Control.Monad.Change.Modify (access)
+import Control.Monad.Composable.Notification
 import Control.Monad.IO.Class
 import Data.Aeson
 import Data.ByteString
+import Data.Proxy
 import qualified Data.Text as T
 import GHC.Generics
-import Network.HTTP.Client
+import Network.HTTP.Client hiding (Proxy)
 import Network.HTTP.Client.TLS
 import Network.HTTP.Types.Header (hAuthorization, hContentType)
 import NotificationServer.API
@@ -70,12 +74,10 @@ sendWelcomeEmail email' name uuid key = do
   $logInfoS "sendWelcomeEmail" $ T.pack $ "Sendgrid response for welcome email was " <> show (responseStatus response)
   return ()
 
-subscribeUser :: (MonadIO m, MonadLogger m) => T.Text -> T.Text -> String -> m ()
-subscribeUser auth user url = do
-  -- this is wrong; make a HasNotificationServer monad
-  mgr <- liftIO $ newManager defaultManagerSettings -- this is wrong; do https
-  notificationServerUrl <- liftIO $ parseBaseUrl url
-  eResp <- liftIO $ runClientM (putSubscribe auth (Username user)) (mkClientEnv mgr notificationServerUrl)
+subscribeUser :: (MonadIO m, MonadLogger m, HasNotification m) => T.Text -> T.Text -> m ()
+subscribeUser auth user = do
+  NotificationData url mgr <- access Proxy
+  eResp <- liftIO $ runClientM (putSubscribe auth (Username user)) (mkClientEnv mgr url)
   case eResp of 
     Right _ -> $logInfoS "subscribeUser" $ "Successfully subscribed user " <> user
     Left err -> $logErrorS "subscribeUser" . T.pack $ "Error while trying to subscribe: " <> show err

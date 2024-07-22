@@ -35,6 +35,7 @@ import Control.Monad (void, when)
 import qualified Control.Monad.Change.Alter as A
 import Control.Monad.Change.Modify
 import Control.Monad.Composable.Vault
+import Control.Monad.Composable.Notification
 import Control.Monad.Reader
 import Control.Monad.Trans.Except
 import Data.Aeson hiding (Success)
@@ -170,6 +171,9 @@ instance Monad m => Accessible VaultData (VaultM m) where
 instance (Monad m, Accessible VaultData m) => Accessible VaultData (ReaderT IdentityServerData m) where
   access = lift . access
 
+instance Monad m => Accessible NotificationData (NotificationM m) where
+  access _ = ask
+
 getPingIdentity :: (MonadIO m) => m Int
 getPingIdentity = return 1
 
@@ -232,7 +236,7 @@ putIdentity accessToken uuid idProv name mEmail mCo mSub = do
                   registerUserWalletAsync realmToken rd name' realm uuid' a
                   -- subscribe if can and should
                   case (realmNoficicationServerUrl rd, mSub) of 
-                    (Just url, Just True) -> subscribeUser accessToken (T.pack name') url
+                    (Just url, Just True) -> runNotificationM url $ subscribeUser accessToken (T.pack name')
                     (_, _) -> return ()
                 -- User has a cert but no wallet, create wallet using cert's common name. This is for backwards compatibility with existing users.
                 [cert] -> do
@@ -253,7 +257,7 @@ putIdentity accessToken uuid idProv name mEmail mCo mSub = do
               registerUserWalletAsync realmToken rd name' realm uuid' a
               -- subscribe if can and should
               _ <- case (realmNoficicationServerUrl rd, mSub) of 
-                (Just url, Just True) -> subscribeUser accessToken (T.pack name') url
+                (Just url, Just True) -> runNotificationM url $ subscribeUser accessToken (T.pack name')
                 (_, _) -> return ()
               return a
         (_, Nothing) -> do

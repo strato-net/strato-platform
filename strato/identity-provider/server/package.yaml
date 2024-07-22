@@ -43,6 +43,7 @@ library:
   - lrucache
   - monad-alter
   - mtl
+  - notification-monad
   - servant-client
   - servant-server
   - solid-vm-model
