@@ -71,6 +71,7 @@ executables:
     - servant-client
     - strato-model
     - warp
+    - wai-cors
     - x509-certs
     - yaml
 
