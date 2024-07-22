@@ -43,6 +43,7 @@ import qualified Data.ByteString.Lazy as BL
 import qualified Data.Cache.LRU as LRU
 import Data.List (elemIndex)
 import qualified Data.Map as M
+import Data.Maybe (fromMaybe)
 import Data.Text (Text)
 import qualified Data.Text as T
 import Data.Text.Encoding (decodeUtf8, encodeUtf8)
@@ -235,8 +236,8 @@ putIdentity accessToken uuid idProv name mEmail mCo mSub = do
                   createAndRegisterCert name' (T.unpack <$> mEmail) org uuid' realmToken rd k
                   registerUserWalletAsync realmToken rd name' realm uuid' a
                   -- subscribe if can and should
-                  case (realmNoficicationServerUrl rd, mSub) of 
-                    (Just url, Just True) -> runNotificationM url $ subscribeUser accessToken (T.pack name')
+                  case (realmNoficicationServerUrl rd, fromMaybe True mSub) of 
+                    (Just url, True) -> runNotificationM url $ subscribeUser accessToken (T.pack name')
                     (_, _) -> return ()
                 -- User has a cert but no wallet, create wallet using cert's common name. This is for backwards compatibility with existing users.
                 [cert] -> do
@@ -256,8 +257,8 @@ putIdentity accessToken uuid idProv name mEmail mCo mSub = do
               createAndRegisterCert name' (T.unpack <$> mEmail) org uuid' realmToken rd k
               registerUserWalletAsync realmToken rd name' realm uuid' a
               -- subscribe if can and should
-              _ <- case (realmNoficicationServerUrl rd, mSub) of 
-                (Just url, Just True) -> runNotificationM url $ subscribeUser accessToken (T.pack name')
+              _ <- case (realmNoficicationServerUrl rd, fromMaybe True mSub) of 
+                (Just url, True) -> runNotificationM url $ subscribeUser accessToken (T.pack name')
                 (_, _) -> return ()
               return a
         (_, Nothing) -> do
