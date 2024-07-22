@@ -48,6 +48,7 @@ import Control.Monad.Extra
 import Control.Monad.IO.Class
 import Control.Monad.Trans.Class (lift)
 import Control.Monad.Trans.Except
+import Data.Maybe (fromMaybe)
 import qualified Data.Binary as Bin
 import qualified Data.ByteString as BS
 import qualified Data.ByteString.Lazy as BL
@@ -569,7 +570,7 @@ buildFromMiningCache = do
   let stateRoot = B.lastExecutedStateRoot cache
   let txs = (trrTransaction <$> B.lastExecutedTxs cache) ++ (DL.toList $ B.privateHashes cache)
   --let parentNum    = number parentHeader
-  let parentDiff = difficulty parentHeader
+  let parentDiff = fromMaybe 1 $ getBlockDifficulty parentHeader
   -- let parentTS     = timestamp parentHeader
   let time = B.startTimestamp cache
   let nextDiff = 1 --nextDifficulty flags_difficultyBomb flags_testnet parentNum parentDiff parentTS time

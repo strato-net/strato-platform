@@ -54,7 +54,8 @@ bootstrapSequencer
             obReceiptTransactions = map kludge txs
           }
       hash = blockHeaderHash bd
-      difficulty' = difficulty bd
+      -- difficulty' = difficulty bd
+      difficulty' = fromMaybe 1 $ getBlockDifficulty bd
       kludge t = fromMaybe fallback (wrapIngestBlockTransactionUnanchored hash t)
         where
           fallback =

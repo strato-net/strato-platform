@@ -30,6 +30,7 @@ import Blockchain.Verification
 import Control.Monad
 import qualified Control.Monad.Change.Alter as A
 import Data.Maybe (fromMaybe)
+import qualified Data.ByteString as B
 
 {-
 nextGasLimit::Integer->Integer->Integer
@@ -86,7 +87,7 @@ verifyTransactionRoot OutputBlock {obBlockData = bd, obReceiptTransactions = txs
   return (transactionsRoot bd == sr, sr)
 
 verifyOmmersRoot :: HasStateDB m => OutputBlock -> m Bool
-verifyOmmersRoot OutputBlock {obBlockData = bd, obBlockUncles = bu} = return $ ommersHash bd == hash (rlpSerialize $ RLPArray $ map rlpEncode $ bu)
+verifyOmmersRoot OutputBlock {obBlockData = bd, obBlockUncles = bu} = return $ (fromMaybe (unsafeCreateKeccak256FromByteString $ B.replicate 32 0)(getBlockOmmersHash bd)) == hash (rlpSerialize $ RLPArray $ map rlpEncode $ bu)
 
 checkValidity :: (MonadFail m, HasStateDB m) => Bool -> BlockSummary -> OutputBlock -> m (Maybe String)
 checkValidity isHomestead parentBSum b = do

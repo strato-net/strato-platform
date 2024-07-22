@@ -12,7 +12,10 @@ module Blockchain.Data.BlockHeader
     extraData2TxsLen,
     mixHashlens,
     extraDataLens,
-    txsLen2ExtraData
+    txsLen2ExtraData,
+    getBlockDifficulty,
+    getBlockGasLimit,
+    getBlockOmmersHash
   )
 where
 
@@ -91,6 +94,18 @@ instance Binary UTCTime where
 instance Binary BlockHeader
 
 instance NFData BlockHeader
+
+getBlockDifficulty :: BlockHeader -> Maybe Integer
+getBlockDifficulty BlockHeader {..} = Just difficulty
+getBlockDifficulty BlockHeaderV2 {} = Nothing
+
+getBlockGasLimit :: BlockHeader -> Maybe Integer
+getBlockGasLimit BlockHeader {..} = Just gasLimit
+getBlockGasLimit BlockHeaderV2 {} = Nothing
+
+getBlockOmmersHash :: BlockHeader -> Maybe Keccak256
+getBlockOmmersHash BlockHeader {..} = Just ommersHash
+getBlockOmmersHash BlockHeaderV2 {} = Nothing
 
 makeLensesFor [("extraData", "extraDataLens"), ("mixHash", "mixHashlens")] ''BlockHeader
 
