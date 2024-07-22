@@ -17,7 +17,7 @@ async function sendEmail(to, subject, htmlContent, token) {
   };
 
   try {
-    const response = await fetch(`${endpointUrl}/api/notify?method=email`, {
+    const response = await fetch(`${endpointUrl}/notify?method=email`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
