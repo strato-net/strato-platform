@@ -133,12 +133,18 @@ gen-hie: build_formatter develop
 	@echo generating hie.yaml file...
 	docker run --rm -v .:/strato-platform strato-formatter:${STACK_RESOLVER} `cd strato && gen-hie > hie.yaml`
 
-hoogle: build_buildbase
-	@echo generating and serving STRATO documentation...
+hoogle_generate: build_buildbase
+	@echo generating STRATO documentation...
 	cd strato && \
-		stack build --haddock && \
-		stack hoogle generate --rebuild -- --local && \
+		stack haddock --haddock-internal && \
+		stack hoogle generate -- --local
+	
+hoogle_serve:
+	@echo serving the pregenerated STRATO documentation...
+	cd strato && \
 		stack hoogle -- server --local
+
+hoogle: hoogle_generate hoogle_serve
 
 highway: build_common 
 	@echo Now building highway...

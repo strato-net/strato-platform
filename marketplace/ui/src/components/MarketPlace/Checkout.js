@@ -96,8 +96,8 @@ const Checkout = () => {
           item: {
             name: item.product.name,
             image: (item.product["BlockApps-Mercata-Asset-images"] && item.product["BlockApps-Mercata-Asset-images"].length > 0)
-            ? item.product["BlockApps-Mercata-Asset-images"][0].value
-            : image_placeholder,
+              ? item.product["BlockApps-Mercata-Asset-images"][0].value
+              : image_placeholder,
             status: "Active",
           },
           category: parts[parts.length - 1],
@@ -109,8 +109,8 @@ const Checkout = () => {
           saleAddress: item.product.saleAddress,
           tax: calculateTax(item),
           amount:
-            item.product.price * item.qty +
-            calculateTax(item),
+            parseFloat((item.product.price * item.qty +
+              calculateTax(item)).toFixed(2)),
           action: item.product.address,
           qty: item.qty,
         });
@@ -380,15 +380,16 @@ const Checkout = () => {
               </ClickableCell>
             </Breadcrumb.Item>
             <Breadcrumb.Item href="" onClick={(e) => e.preventDefault()}>
-              <p className="text-sm text-[#202020] font-medium">My Cart</p>
+              <p className="text-sm text-[#202020] font-medium">Checkout</p>
             </Breadcrumb.Item>
           </Breadcrumb>
 
-          <div className="pt-[18px] lg:pt-6">
+          {/* Title for Cart Page: My Cart */}
+          {/* <div className="pt-[18px] lg:pt-6">
             <p className="text-base md:text-xl lg:text-2xl font-bold lg:font-semibold leading-9">
               My Cart
             </p>
-          </div>
+          </div> */}
           <div className="grid grid-cols-1 sm:place-items-center gap-3 lg:block">
             {mapData.length === 0 ? (
               <div className="flex flex-col items-center">

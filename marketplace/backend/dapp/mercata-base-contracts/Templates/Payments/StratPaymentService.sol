@@ -17,9 +17,9 @@ contract StratPaymentService is PaymentService {
         decimal _secondaySaleFeePercentage,
         address _feeRecipient
     ) PaymentService(
-        "STRAT",
+        "STRATS",
         _imageURL,
-        "Checkout with STRAT",
+        "Checkout with STRATS",
         _primarySaleFeePercentage,
         _secondaySaleFeePercentage
     ) public {
@@ -43,8 +43,8 @@ contract StratPaymentService is PaymentService {
         decimal totalAmountNet = 0.0;
         decimal totalFee = 0.0;
         string seller;
-        string err = "Your STRAT balance is not high enough to cover the purchase.";
-        string feeErr = "Your STRAT balance is not high enough to cover the fee.";
+        string err = "Your STRATS balance is not high enough to cover the purchase.";
+        string feeErr = "Your STRATS balance is not high enough to cover the fee.";
         purchasersAddress = msg.sender; // Support for legacy sales
         purchasersCommonName = getCommonName(tx.origin);
 
@@ -66,7 +66,7 @@ contract StratPaymentService is PaymentService {
                     address(s).call("lockQuantity", quantity);
                 }
             }
-            emit Order(
+            emit AssetLocked(
                 _orderHash,
                 _orderId,
                 _purchaser,
@@ -78,7 +78,7 @@ contract StratPaymentService is PaymentService {
                 0,
                 0,
                 _unitsPerDollar(),
-                "STRAT",
+                "STRATS",
                 PaymentStatus.AWAITING_FULFILLMENT,
                 _createdDate,
                 _comments
@@ -97,7 +97,7 @@ contract StratPaymentService is PaymentService {
             totalAmountNet += net;
             totalFee += fee;
 
-            // Calculate net and fee amounts in STRATs
+            // Calculate net and fee amounts in STRATS
             uint stratAmountNet = uint(net * stratsPerDollar * 100);
             uint stratFee = uint(fee * stratsPerDollar * 100);
 
@@ -130,7 +130,7 @@ contract StratPaymentService is PaymentService {
             0,
             totalFee,
             _unitsPerDollar(),
-            "STRAT",
+            "STRATS",
             PaymentStatus.CLOSED,
             _createdDate,
             _comments
@@ -157,7 +157,7 @@ contract StratPaymentService is PaymentService {
         uint _createdDate,
         string _comments
     ) internal override returns (address[]) {
-        require(false, "Cannot call initializePayment for STRAT payments.");
+        require(false, "Cannot call initializePayment for STRATS payments.");
         return [];
     }
 
@@ -172,7 +172,7 @@ contract StratPaymentService is PaymentService {
         uint _createdDate,
         string _comments
     ) internal override returns (address[]) {
-        require(false, "Cannot call completeOrder for STRAT payments.");
+        require(false, "Cannot call completeOrder for STRATS payments.");
         return [];
     }
 
@@ -187,7 +187,7 @@ contract StratPaymentService is PaymentService {
         uint _createdDate,
         string _comments
     ) internal override {
-        require(false, "Cannot call cancelOrder for STRAT payments.");
+        require(false, "Cannot call cancelOrder for STRATS payments.");
     }
 
     function _unitsPerDollar() internal override returns (decimal) {

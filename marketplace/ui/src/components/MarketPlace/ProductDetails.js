@@ -39,6 +39,19 @@ import { STRATS_CONVERSION } from "../../helpers/constants";
 import { TOAST_MSG } from "../../helpers/msgConstants";
 
 
+import { Swiper, SwiperSlide } from 'swiper/react';
+
+// Import Swiper styles
+import 'swiper/css';
+import 'swiper/css/effect-fade';
+import 'swiper/css/navigation';
+import 'swiper/css/pagination';
+import 'swiper/css/autoplay';
+
+// import required modules
+import { EffectFade, Navigation, Pagination, Autoplay } from 'swiper/modules';
+
+
 const ProductDetails = ({ user, users }) => {
   const [api, contextHolder] = notification.useNotification();
   const { Text, Paragraph, Title } = Typography;
@@ -248,7 +261,7 @@ const ProductDetails = ({ user, users }) => {
     }
     let items = [];
     if (!found) {
-      items = [...cartList, { product: details, qty }];
+      items = [{ product: details, qty }];
 
       marketPlaceActions.addItemToCart(marketplaceDispatch, items);
       setQty(1);
@@ -401,23 +414,34 @@ const ProductDetails = ({ user, users }) => {
           </Row>
           <div className="flex w-full flex-col lg:leading-12 px-4 sm:px-8 md:px-0  items-center lg:items-start  md:w-[750px] lg:w-[835px] xl:w-[858px]  md:mx-auto ">
             <div className="flex md:justify-center gap-[15px] lg:gap-6 flex-col lg:flex-row   ">
-              <Carousel showIndicators={
-                details["BlockApps-Mercata-Asset-images"].length > 1 ? true : false
-              } className="product_detail w-full  sm:w-[417px]   lg:h-[348px] md:w-[343px] lg:w-[417px]" showStatus={false} showArrows swipeable emulateTouch infiniteLoop >
-                {details["BlockApps-Mercata-Asset-images"].length > 0 ? details["BlockApps-Mercata-Asset-images"].map((element, index) => {
-                  return (<><div key={index} className="sm:w-[343px ] h-[212px] lg:h-[348px]   md:h-[250px] lg:w-[417px] w-full rounded-md ">
+              { details["BlockApps-Mercata-Asset-images"].length > 0 
+              ?  <Swiper
+                spaceBetween={30}
+                effect={'fade'}
+                navigation={true}
+                centeredSlides={true}
+                pagination={{
+                  clickable: true,
+                }}
+                modules={[Autoplay, EffectFade, Navigation, Pagination]}
+                className="product-detail-swiper"
+              >    
+                {details["BlockApps-Mercata-Asset-images"].length > 0 && details["BlockApps-Mercata-Asset-images"].map((element, index) => {
+                  return (<SwiperSlide><div key={index} className="mx-auto sm:w-[343px ] h-[212px] lg:h-[348px]  md:h-[250px] lg:w-[417px] w-full rounded-md ">
                     <img width={"100%"}
                       alt={`${assetName} | Image ${index}`}
                       title={`${assetName} | Image ${index}`}
-                      className="object-contain rounded-md h-full " src={element.value ? element.value : image_placeholder} />
-                  </div></>)
-                }) : <><div className="sm:w-[343px ] sm:h-[212px] lg:h-[348px]   md:h-[250px] lg:w-[417px] w-full rounded-md ">
-                  <img width={"100%"}
-                    alt={`${assetName} | Image`}
-                    title={`${assetName} | Image`}
-                    className="object-contain rounded-md h-full " src={image_placeholder} />
-                </div></>}
-              </Carousel>
+                      className="object-contain rounded-md h-full" src={element.value ? element.value : image_placeholder} />
+                  </div></SwiperSlide>)
+                })}
+              </Swiper>
+              : <div className="sm:w-[343px ] sm:h-[212px] lg:h-[348px]   md:h-[250px] lg:w-[417px] w-full rounded-md ">
+              <img width={"100%"}
+                alt={`${assetName} | Image`}
+                title={`${assetName} | Image`}
+                className="object-contain rounded-md h-full " src={image_placeholder} />
+            </div>
+              }
               <div className=" w-full lg:w-1/2">
                 {!ownerSameAsUser() &&
                   <div className="flex justify-end">
@@ -499,7 +523,7 @@ const ProductDetails = ({ user, users }) => {
                   <div className="flex gap-4 justify-between lg:justify-start  pt-4 w-full">
                     <Button
                       type="primary"
-                      className={`w-[90%] md:w-[365px] h-9  ${isAvailableForSale ? '!bg-[#808080]' : '!bg-[#13188A]'} !hover:bg-primaryHover !text-white`}
+                      className={`w-[100%]  h-9  ${isAvailableForSale ? '!bg-[#808080]' : '!bg-[#13188A]'} !hover:bg-primaryHover !text-white`}
                       onClick={async () => {
                         window.LOQ.push(['ready', async LO => {
                           // Track an event
@@ -536,8 +560,8 @@ const ProductDetails = ({ user, users }) => {
                     >
                       Buy Now
                     </Button>
-
-                    {ownerSameAsUser() ?
+                  {/* TODO:- Remove Comment to show the Add-to-Cart Button */}
+                  {/* {ownerSameAsUser() ?
                       <Button
                         icon={<div className="flex justify-center items-center">
                           <img src={Images.Cart} alt={`${assetName} | Image`} title={`${assetName} | Image`} width={18} height={18} className="object-contain" />
@@ -613,7 +637,7 @@ const ProductDetails = ({ user, users }) => {
                         }}
                       />
 
-                    }
+                    } */}
                   </div>
                   :
                   <div className="flex ">
@@ -691,7 +715,7 @@ const ProductDetails = ({ user, users }) => {
                         </div>
                       ) : (
                         <div className="text-center p-4">
-                          <p>Please{' '}
+                          <p>Please
                             <span
                               className="text-blue hover:text-blue cursor-pointer hover:underline"
                               onClick={() => {
@@ -701,7 +725,7 @@ const ProductDetails = ({ user, users }) => {
                             >
                               login
                             </span>
-                            {' '}to view ownership history.
+                            to view ownership history.
                           </p>
                         </div>
                       ),

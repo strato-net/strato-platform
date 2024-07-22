@@ -1,6 +1,7 @@
 import {
     Form,
     Input,
+    InputNumber,
     Select
 } from "antd";
 import { spiritTypes } from "../../helpers/constants";
@@ -39,9 +40,24 @@ export const categoricalProperties = (form, handleClothingTypeChange, clothingTy
                                 required: true,
                                 message: 'Please enter a quantity',
                             },
+                            {
+                                type: 'number',
+                                min: 1,
+                                message: 'Quantity must be greater than or equal to 1',
+                            },
+                            {
+                                validator: (_, value) =>
+                                  value && Number.isInteger(value)
+                                    ? Promise.resolve()
+                                    : Promise.reject(new Error('Quantity must be an integer')),
+                            },
                         ]}
                     >
-                        <Input placeholder="Enter Quantity" />
+                        <InputNumber 
+                            style={{ width: '100%', height: '42px', display: 'flex', alignItems: 'center' }}  
+                            min={1} 
+                            placeholder="Enter Quantity" 
+                        />
                     </Form.Item>
                 </div>
             );
@@ -57,9 +73,24 @@ export const categoricalProperties = (form, handleClothingTypeChange, clothingTy
                                 required: true,
                                 message: 'Please enter a quantity',
                             },
+                            {
+                                type: 'number',
+                                min: 1,
+                                message: 'Quantity must be greater than or equal to 1',
+                            },
+                            {
+                                validator: (_, value) =>
+                                  value && Number.isInteger(value)
+                                    ? Promise.resolve()
+                                    : Promise.reject(new Error('Quantity must be an integer')),
+                            },
                         ]}
                     >
-                        <Input placeholder="Enter Quantity" />
+                        <InputNumber 
+                            style={{ width: '100%', height: '42px', display: 'flex', alignItems: 'center' }}  
+                            min={1} 
+                            placeholder="Enter Quantity" 
+                        />
                     </Form.Item>
                 </div>
             );
@@ -75,9 +106,24 @@ export const categoricalProperties = (form, handleClothingTypeChange, clothingTy
                                 required: true,
                                 message: 'Please enter a quantity',
                             },
+                            {
+                                type: 'number',
+                                min: 1,
+                                message: 'Quantity must be greater than or equal to 1',
+                            },
+                            {
+                                validator: (_, value) =>
+                                  value && Number.isInteger(value)
+                                    ? Promise.resolve()
+                                    : Promise.reject(new Error('Quantity must be an integer')),
+                            },
                         ]}
                     >
-                        <Input placeholder="Enter Quantity" />
+                        <InputNumber 
+                            style={{ width: '100%', height: '42px', display: 'flex', alignItems: 'center' }}  
+                            min={1} 
+                            placeholder="Enter Quantity" 
+                        />
                     </Form.Item>
                 </div>
             );
@@ -176,9 +222,24 @@ export const categoricalProperties = (form, handleClothingTypeChange, clothingTy
                                 required: true,
                                 message: 'Please enter a quantity',
                             },
+                            {
+                                type: 'number',
+                                min: 1,
+                                message: 'Quantity must be greater than or equal to 1',
+                            },
+                            {
+                                validator: (_, value) =>
+                                  value && Number.isInteger(value)
+                                    ? Promise.resolve()
+                                    : Promise.reject(new Error('Quantity must be an integer')),
+                            },
                         ]}
                     >
-                        <Input placeholder="Enter Quantity" />
+                        <InputNumber 
+                            style={{ width: '100%', height: '42px', display: 'flex', alignItems: 'center' }}  
+                            min={1} 
+                            placeholder="Enter Quantity" 
+                        />
                     </Form.Item>
                 </div>
             );
@@ -211,9 +272,24 @@ export const categoricalProperties = (form, handleClothingTypeChange, clothingTy
                                 required: true,
                                 message: 'Please enter a quantity',
                             },
+                            {
+                                type: 'number',
+                                min: 1,
+                                message: 'Quantity must be greater than or equal to 1',
+                            },
+                            {
+                                validator: (_, value) =>
+                                  value && Number.isInteger(value)
+                                    ? Promise.resolve()
+                                    : Promise.reject(new Error('Quantity must be an integer')),
+                            },
                         ]}
                     >
-                        <Input placeholder="Enter Quantity" />
+                        <InputNumber 
+                            style={{ width: '100%', height: '42px', display: 'flex', alignItems: 'center' }}  
+                            min={1} 
+                            placeholder="Enter Quantity" 
+                        />
                     </Form.Item>
                 </div>
             );
@@ -296,9 +372,24 @@ export const categoricalProperties = (form, handleClothingTypeChange, clothingTy
                                 required: true,
                                 message: 'Please enter a quantity',
                             },
+                            {
+                                type: 'number',
+                                min: 1,
+                                message: 'Quantity must be greater than or equal to 1',
+                            },
+                            {
+                                validator: (_, value) =>
+                                  value && Number.isInteger(value)
+                                    ? Promise.resolve()
+                                    : Promise.reject(new Error('Quantity must be an integer')),
+                            },
                         ]}
                     >
-                        <Input placeholder="Enter Quantity" />
+                        <InputNumber 
+                            style={{ width: '100%', height: '42px', display: 'flex', alignItems: 'center' }}  
+                            min={1} 
+                            placeholder="Enter Quantity" 
+                        />
                     </Form.Item>
                 </div>
             </div>);
@@ -327,9 +418,24 @@ export const categoricalProperties = (form, handleClothingTypeChange, clothingTy
                                 required: true,
                                 message: 'Please enter a quantity',
                             },
+                            {
+                                type: 'number',
+                                min: 1,
+                                message: 'Quantity must be greater than or equal to 1',
+                            },
+                            {
+                                validator: (_, value) =>
+                                  value && Number.isInteger(value)
+                                    ? Promise.resolve()
+                                    : Promise.reject(new Error('Quantity must be an integer')),
+                            },
                         ]}
                     >
-                        <Input placeholder="Enter Quantity" />
+                        <InputNumber 
+                            style={{ width: '100%', height: '42px', display: 'flex', alignItems: 'center' }}  
+                            min={1} 
+                            placeholder="Enter Quantity" 
+                        />
                     </Form.Item>
                 </div>);
         case "Spirits":
@@ -389,9 +495,24 @@ export const categoricalProperties = (form, handleClothingTypeChange, clothingTy
                             required: true,
                             message: 'Please enter a quantity',
                         },
+                        {
+                            type: 'number',
+                            min: 1,
+                            message: 'Quantity must be greater than or equal to 1',
+                        },
+                        {
+                            validator: (_, value) =>
+                              value && Number.isInteger(value)
+                                ? Promise.resolve()
+                                : Promise.reject(new Error('Quantity must be an integer')),
+                        },
                     ]}
                 >
-                    <Input placeholder="Enter Quantity" />
+                    <InputNumber 
+                            style={{ width: '100%', height: '42px', display: 'flex', alignItems: 'center' }}  
+                            min={1} 
+                            placeholder="Enter Quantity" 
+                    />
                 </Form.Item>
             </div>);
         default:

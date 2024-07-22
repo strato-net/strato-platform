@@ -133,14 +133,24 @@ if __name__ == "__main__":
     discrepancies_sale, count_sale_discrepancy = check_table("BlockApps-Mercata-Order")
     discrepancies_order, count_order_discrepancy = check_table("BlockApps-Mercata-Sale")
 
+    #Event tables
+    discrepancies_asset_its, count_asset_its_discrepancy = check_table("BlockApps-Mercata-Asset.ItemTransfers")
+
+    #Colletion tables
+    discrepancies_asset_files, count_asset_files_discrepancy = check_table("BlockApps-Mercata-Asset-files")
+
     # Print the results
     print("\nFinal check summary:")
     print(f"Asset Discrepancies: {'Yes' if discrepancies_asset else 'No'}")
     print(f"Order Discrepancies: {'Yes' if discrepancies_order else 'No'}")
     print(f"Sale Discrepancies: {'Yes' if discrepancies_sale else 'No'}")
+    print(f"Asset.ItemTransfers Discrepancies: {'Yes' if discrepancies_asset_its else 'No'}")
+    print(f"Asset-files Discrepancies: {'Yes' if discrepancies_asset_files else 'No'}")
     print(f"Asset Count Match Discrepancies: {'Yes' if count_asset_discrepancy else 'No'}")
     print(f"Order Count Match Discrepancies: {'Yes' if count_order_discrepancy else 'No'}")
     print(f"Sale Count Match Discrepancies: {'Yes' if  count_sale_discrepancy else 'No'}")
+    print(f"Asset.ItemTransfers Count Match Discrepancies: {'Yes' if  count_asset_its_discrepancy else 'No'}")
+    print(f"Asset-files Count Match Discrepancies: {'Yes' if  count_asset_files_discrepancy else 'No'}")
 
-    if discrepancies_asset or discrepancies_sale or discrepancies_order or count_asset_discrepancy or count_sale_discrepancy or count_order_discrepancy:
+    if discrepancies_asset or discrepancies_sale or discrepancies_order or count_asset_discrepancy or count_sale_discrepancy or count_order_discrepancy or discrepancies_asset_its or count_asset_its_discrepancy or discrepancies_asset_files or count_asset_files_discrepancy:
         sys.exit(1)
