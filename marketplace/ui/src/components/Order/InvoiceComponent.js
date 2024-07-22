@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Document, Page, Text, View, StyleSheet, Image } from '@react-pdf/renderer';
+// Other
 import { getStringDate } from '../../helpers/utils';
 import { US_DATE_FORMAT } from '../../helpers/constants';
 import { Images } from "../../images";

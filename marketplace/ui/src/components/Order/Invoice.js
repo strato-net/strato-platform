@@ -1,27 +1,29 @@
 import React, { useState, useEffect } from 'react';
 import { PDFViewer } from '@react-pdf/renderer';
-import InvoiceComponent from './InvoiceComponent';
-import { actions } from "../../contexts/order/actions";
-import { useOrderDispatch, useOrderState } from "../../contexts/order";
-import routes from "../../helpers/routes";
 import { useMatch } from "react-router-dom";
 import { Spin } from "antd";
+// Actions
+import { actions as orderActions } from "../../contexts/order/actions";
+// Dispatch and States
+import { useOrderDispatch, useOrderState } from "../../contexts/order";
+// Components
+import InvoiceComponent from './InvoiceComponent';
+// Other
+import routes from "../../helpers/routes";
 
 
 const Invoice = () => {
-  const [Id, setId] = useState(undefined);
-
+  // Dispatch
   const dispatch = useOrderDispatch();
-  const {
-    orderDetails,
-    isorderDetailsLoading,
-  } = useOrderState();
+  // States
+  const { orderDetails, isorderDetailsLoading } = useOrderState();
+  // useStates
+  const [Id, setId] = useState(undefined);
 
   const routeMatch = useMatch({
     path: routes.Invoice.url,
     strict: true,
   });
-
 
   useEffect(() => {
     setId(routeMatch?.params?.id);
@@ -29,7 +31,7 @@ const Invoice = () => {
 
   useEffect(() => {
     if (Id !== undefined ) {
-      actions.fetchOrderDetails(dispatch, Id);
+      orderActions.fetchOrderDetails(dispatch, Id);
     }
   }, [Id, dispatch]);
 

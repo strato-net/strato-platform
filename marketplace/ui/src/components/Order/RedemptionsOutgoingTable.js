@@ -1,31 +1,39 @@
 import React, { useEffect, useState } from "react";
-import DataTableComponent from "../DataTableComponent";
-import { actions } from "../../contexts/redemption/actions";
-import { REDEMPTION_STATUS } from "../../helpers/constants";
-import { Input, Pagination, Dropdown, Button, Space } from "antd";
-import "./ordersTable.css"
 import { DownOutlined, SearchOutlined, UpOutlined, DownloadOutlined } from "@ant-design/icons";
-import { ResponsiveRedemptionsCard } from "./ResponsiveRedemptionsCard";
-import { useRedemptionDispatch, useRedemptionState } from "../../contexts/redemption";
 import { useLocation, useNavigate, useParams } from "react-router-dom";
+import { Input, Pagination, Dropdown, Button, Space } from "antd";
+// Actions
+import { actions as redemptionActions } from "../../contexts/redemption/actions";
+// Dispatch and States
+import { useRedemptionDispatch, useRedemptionState } from "../../contexts/redemption";
+// Components
+import DataTableComponent from "../DataTableComponent";
+import { ResponsiveRedemptionsCard } from "./ResponsiveRedemptionsCard";
+// Other
+import { REDEMPTION_STATUS } from "../../helpers/constants";
 import routes from "../../helpers/routes";
 import classNames from "classnames";
+import "./ordersTable.css"
+import { MENU_ITEMS, STATUS_CLASSES } from "./constant";
 
+const limit = 10;
 
 const RedemptionsOutgoingTable = ({ user, download, isAllOrdersLoading }) => {
     const navigate = useNavigate();
     const params = useParams();
     const location = useLocation();
+    // Dispatch
+    const dispatch = useRedemptionDispatch();
+    // States
+    const { outgoingRedemptions, isFetchingOutgoingRedemptions } = useRedemptionState();
+    
     const searchParams = new URLSearchParams(location.search);
     const searchVal = searchParams.get('search');
     const pageVal = searchParams.get('page');
     const pageNo = pageVal ? parseInt(pageVal) : 1;
     const { type } = params;
-
-    const dispatch = useRedemptionDispatch();
-    const limit = 10;
+    // useStates
     const offset = ((pageNo - 1) * limit);
-    const { outgoingRedemptions, isFetchingOutgoingRedemptions } = useRedemptionState();
     const [order, setOrder] = useState("DESC");
     const [search, setSearch] = useState("");
     const [data, setData] = useState([]);
@@ -33,7 +41,7 @@ const RedemptionsOutgoingTable = ({ user, download, isAllOrdersLoading }) => {
 
     useEffect(() => {
         if (user?.commonName) {  // add type in conditional
-            actions.fetchOutgoingRedemptionRequests(dispatch, order, search);
+            redemptionActions.fetchOutgoingRedemptionRequests(dispatch, order, search);
         }
     }, [dispatch, user, order, search]);
 
@@ -76,22 +84,8 @@ const RedemptionsOutgoingTable = ({ user, download, isAllOrdersLoading }) => {
     }, [outgoingRedemptions]);
 
     const statusComponent = (status) => {
-        const statusClasses = {
-            [REDEMPTION_STATUS.PENDING]: {
-                textClass: "bg-[#FF8C0033]",
-                bgClass: "bg-[#FF8C00]"
-            },
-            [REDEMPTION_STATUS.REJECTED]: {
-                textClass: "bg-[#FFF0F0]",
-                bgClass: "bg-[#FF0000]"
-            },
-            [REDEMPTION_STATUS.FULFILLED]: {
-                textClass: "bg-[#119B2D33]",
-                bgClass: "bg-[#119B2D]"
-            }
-        };
 
-        const { textClass, bgClass } = statusClasses[status] || {};
+        const { textClass, bgClass } = STATUS_CLASSES[status] || {};
         return (
             <div className="flex justify-center">
                 <div className={classNames(textClass, "w-max py-1 rounded-xl flex items-center gap-1 p-3")}>
@@ -186,7 +180,6 @@ const RedemptionsOutgoingTable = ({ user, download, isAllOrdersLoading }) => {
         },
     ];
 
-
     const onPageChange = (page) => {
         const baseUrl = new URL(`/order/${type}`, window.location.origin);
         if (searchVal) {
@@ -212,17 +205,6 @@ const RedemptionsOutgoingTable = ({ user, download, isAllOrdersLoading }) => {
         setSearch(value)
     }
 
-    const menuItems = [
-        {
-            key: 'xls',
-            label: 'Excel',
-        },
-        {
-            key: 'csv',
-            label: 'CSV',
-        },
-    ];
-
     return (
         <div>
             <div className="flex gap-2 items-center mb-5">
@@ -234,7 +216,7 @@ const RedemptionsOutgoingTable = ({ user, download, isAllOrdersLoading }) => {
                     placeholder="Search Redemptions by Redemption #" />
                 <Dropdown
                     className="md:hidden customButton"
-                    menu={{ items: menuItems, onClick: (e) => download(e.key) }}
+                    menu={{ items: MENU_ITEMS, onClick: (e) => download(e.key) }}
                     disabled={isAllOrdersLoading}
                     trigger={['click']}
                 >

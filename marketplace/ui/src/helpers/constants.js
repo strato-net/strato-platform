@@ -527,7 +527,7 @@ export const BREADCRUMB_VALUES = {
   'transfers' : 'Transfers',
   'redemptions-outgoing' : 'Redemptions (Outgoing)',
   'redemptions-incoming' : 'Redemptions (Incoming)',
-
+  
 }
 
 export const BREADCRUMB_ROUTES = {
@@ -554,7 +554,6 @@ export const BREADCRUMB_ROUTES = {
   'redemptions-outgoing' : '/order/redemptions-outgoing',
   'redemptions-incoming' : '/order/redemptions-incoming',
 }
-
 
 export const FAQS = [
   {
@@ -588,7 +587,6 @@ export const FAQS = [
   }, 
 ];
 
-
 export const CLOTHING_TYPES = [
   {label: "Shirt", value: "Shirt"},
   {label: "Jacket", value: "Jacket"},
@@ -597,3 +595,25 @@ export const CLOTHING_TYPES = [
   {label: "Accessories", value: "Accessories"},
 ]
 
+export const STRATS_TRANSACTION_HISTORY_TABLE_COLUMN = [
+  {
+      title: 'Date',
+      dataIndex: 'timestamp',
+      align: 'center'
+  },
+  {
+      title: 'Sender',
+      dataIndex: 'from',
+      align: 'center'
+  },
+  {
+      title: 'Recipient',
+      dataIndex: 'to',
+      align: 'center'
+  },
+  {
+      title: 'Value',
+      dataIndex: 'value',
+      align: 'center'
+  },
+] 

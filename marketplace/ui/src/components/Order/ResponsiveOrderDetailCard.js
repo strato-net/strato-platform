@@ -1,5 +1,5 @@
-import { Typography } from "antd";
 import React from "react";
+import { Typography } from "antd";
 import image_placeholder from "../../images/resources/image_placeholder.png";
 
 export const ResponsiveOrderDetailCard = ({data}) => {

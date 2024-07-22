@@ -1,62 +1,46 @@
 import React, { useState, useEffect } from "react";
-import {
-  Card,
-  Row,
-  Col,
-  Typography,
-  Divider,
-  DatePicker,
-  Select,
-  Input,
-  Button,
-  Spin,
-  Tabs,
-} from "antd";
-import { useLocation, useMatch } from "react-router-dom";
-import { actions } from "../../contexts/order/actions";
-import { useOrderDispatch, useOrderState } from "../../contexts/order";
-import routes from "../../helpers/routes";
+import { Card, Row, Col, Typography, Divider, DatePicker, Select, Input, Button, Spin, Tabs } from "antd";
+import { useMatch, useNavigate } from "react-router-dom";
 import classNames from "classnames";
-import { getStringDate } from "../../helpers/utils";
-import { useNavigate } from "react-router-dom";
-import DataTableComponent from "../DataTableComponent";
-import { getStatus, getStatusByName } from "./constant";
 import dayjs from "dayjs";
-import { US_DATE_FORMAT } from "../../helpers/constants";
-import { apiUrl, HTTP_METHODS } from "../../helpers/constants";
-import RestStatus from "http-status-codes";
-import TagManager from "react-gtm-module";
-import image_placeholder from "../../images/resources/image_placeholder.png";
-import BoughtOrdersTable from "./BoughtOrdersTable";
-import TransfersTable from "./TransfersTable";
+// Actions
+import { actions as orderActions } from "../../contexts/order/actions";
+// Dispatch and States
+import { useOrderDispatch, useOrderState } from "../../contexts/order";
+// Components
+import { ResponsiveOrderDetailCard } from "./ResponsiveOrderDetailCard";
 import RedemptionsOutgoingTable from "./RedemptionsOutgoingTable";
 import RedemptionsIncomingTable from "./RedemptionsIncomingTable";
-import { ResponsiveOrderDetailCard } from "./ResponsiveOrderDetailCard";
-import { LeftArrow } from "../../images/SVGComponents";
 import { showToast } from "../Notification/ToastComponent";
+import DataTableComponent from "../DataTableComponent";
+import BoughtOrdersTable from "./BoughtOrdersTable";
 import BreadcrumbComponent from "../BreadCrumb";
+import TransfersTable from "./TransfersTable";
+// Other
+import { US_DATE_FORMAT } from "../../helpers/constants";
+import { LeftArrow } from "../../images/SVGComponents";
+import { getStringDate } from "../../helpers/utils";
+import routes from "../../helpers/routes";
+import { STATUS_CLASSES, getStatus } from "./constant";
+import image_placeholder from "../../images/resources/image_placeholder.png";
+
 
 const SoldOrderDetails = ({ user, users }) => {
-  const [Id, setId] = useState(undefined);
-  const [data, setdata] = useState([]);
-  const dispatch = useOrderDispatch();
   const { Text } = Typography;
+  const { TextArea } = Input;
+  const navigate = useNavigate();
+  // Dispatch
+  const dispatch = useOrderDispatch();
+  // States
+  const { orderDetails, isorderDetailsLoading, ordersAudit, message, success } = useOrderState();
+  // useStates
   const [selectedDate, setSelectedDate] = useState("");
   const [status, setStatus] = useState(getStatus(1));
   const [paid, setPaid] = useState("Processing");
   const [comment, setComment] = useState("");
-  const { TextArea } = Input;
-  const state = useLocation()
-
-  const {
-    orderDetails,
-    isorderDetailsLoading,
-    ordersAudit,
-    message,
-    success,
-    isCreateOrderSubmitting,
-    isUpdatingOrderComment
-  } = useOrderState();
+  const [Id, setId] = useState(undefined);
+  const [data, setdata] = useState([]);
+  
   const routeMatch = useMatch({
     path: routes.SoldOrderDetails.url,
     strict: true,
@@ -112,7 +96,7 @@ const SoldOrderDetails = ({ user, users }) => {
   }, [Id, dispatch, status]);
 
   const getData = async () => {
-    await actions.fetchOrderDetails(dispatch, Id);
+    await orderActions.fetchOrderDetails(dispatch, Id);
   };
 
   const details = orderDetails;
@@ -170,7 +154,7 @@ const SoldOrderDetails = ({ user, users }) => {
       comments: comment,
     };
 
-    isDone = await actions.executeSale(dispatch, body);
+    isDone = await orderActions.executeSale(dispatch, body);
     if (isDone) {
       setStatus(getStatus(3));
     }
@@ -182,34 +166,12 @@ const SoldOrderDetails = ({ user, users }) => {
       comments: comment
     }
 
-    await actions.updateOrderComment(dispatch, body)
+    await orderActions.updateOrderComment(dispatch, body)
   }
 
   const statusComponent = (status) => {
-    const statusClasses = {
-      ["Awaiting Shipment"]: {
-        textClass: "bg-[#EBF7FF]",
-        bgClass: "bg-[#13188A]"
-      },
-      ["Awaiting Fulfillment"]: {
-        textClass: "bg-[#FF8C0033]",
-        bgClass: "bg-[#FF8C00]"
-      },
-      ["Payment Pending"]: {
-        textClass: "bg-[#FF8C0033]",
-        bgClass: "bg-[#FF8C00]"
-      },
-      ["Closed"]: {
-        textClass: "bg-[#119B2D33]",
-        bgClass: "bg-[#119B2D]"
-      },
-      ["Canceled"]: {
-        textClass: "bg-[#FFF0F0]",
-        bgClass: "bg-[#FF0000]"
-      },
-    };
 
-    const { textClass, bgClass } = statusClasses[status] || { textClass: "bg-[#FFF6EC]", bgClass: "bg-[#119B2D]" };
+    const { textClass, bgClass } = STATUS_CLASSES[status] || { textClass: "bg-[#FFF6EC]", bgClass: "bg-[#119B2D]" };
     return (
       <div className={classNames(textClass, "status_contain w-max text-center py-1 px-2 rounded-md md:rounded-xl flex justify-start items-center gap-1 p-1")}>
         <div className={classNames(bgClass, "h-3 w-3 rounded-sm")}></div>
@@ -219,26 +181,8 @@ const SoldOrderDetails = ({ user, users }) => {
   };
 
   const statusComponentForPayment = (status) => {
-    const statusClasses = {
-      ["Processing"]: {
-        textClass: "bg-[#FF8C0033]",
-        bgClass: "bg-[#FF8C00]"
-      },
-      ["Paid"]: {
-        textClass: "bg-[#119B2D33]",
-        bgClass: "bg-[#119B2D]"
-      },
-      ["Payment Failed"]: {
-        textClass: "bg-[#FFF0F0]",
-        bgClass: "bg-[#FF0000]"
-      },
-      ["Canceled"]: {
-        textClass: "bg-[#FFF0F0]",
-        bgClass: "bg-[#FF0000]"
-      }
-    };
 
-    const { textClass, bgClass } = statusClasses[status] || { textClass: "bg-[#FFF6EC]", bgClass: "bg-[#119B2D]" };
+    const { textClass, bgClass } = STATUS_CLASSES[status] || { textClass: "bg-[#FFF6EC]", bgClass: "bg-[#119B2D]" };
     return (
       <div className={classNames(textClass, "status_contain w-max h-max text-center py-1 px-2 rounded-md md:rounded-xl flex justify-start items-center gap-1 p-1")}>
         <div className={classNames(bgClass, "h-3 w-3 rounded-sm")}></div>
@@ -252,7 +196,7 @@ const SoldOrderDetails = ({ user, users }) => {
     navigate(routes.Orders.url.replace(':type', key))
   };
 
-  const navigate = useNavigate();
+  
 
   let column = [
     {
@@ -521,7 +465,7 @@ const SoldOrderDetails = ({ user, users }) => {
         </div>
       {message && showToast({
           message: message,
-          onClose: actions.resetMessage(dispatch),
+          onClose: orderActions.resetMessage(dispatch),
           success: success,
           placement: 'bottom',
         })}

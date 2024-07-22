@@ -1,27 +1,15 @@
 import React, { useState, useEffect } from "react";
-import {
-    Card,
-    Row,
-    Col,
-    Typography,
-    Divider,
-    Select,
-    Input,
-    Button,
-    Spin,
-    Tabs,
-} from "antd";
-import { useMatch } from "react-router-dom";
-import { actions } from "../../contexts/redemption/actions";
+import { Card, Row, Col, Typography, Divider, Input, Button, Spin, Tabs } from "antd";
+import { useMatch, useNavigate } from "react-router-dom";
+import classNames from "classnames";
+import dayjs from "dayjs";
+// Actions
+import { actions as redemptionActions } from "../../contexts/redemption/actions";
 import { actions as inventoryActions } from "../../contexts/inventory/actions";
+// Dispatch and States
 import { useRedemptionDispatch, useRedemptionState } from "../../contexts/redemption";
 import { useInventoryDispatch, useInventoryState } from "../../contexts/inventory";
-import routes from "../../helpers/routes";
-import { REDEMPTION_STATUS } from "../../helpers/constants";
-import classNames from "classnames";
-import { useNavigate } from "react-router-dom";
-import DataTableComponent from "../DataTableComponent";
-import dayjs from "dayjs";
+// Components
 import BoughtOrdersTable from "./BoughtOrdersTable";
 import SoldOrdersTable from "./SoldOrdersTable";
 import TransfersTable from "./TransfersTable";
@@ -29,20 +17,28 @@ import RedemptionsOutgoingTable from "./RedemptionsOutgoingTable";
 import { ResponsiveOrderDetailCard } from "./ResponsiveOrderDetailCard";
 import { showToast } from "../Notification/ToastComponent";
 import BreadcrumbComponent from "../BreadCrumb";
+// Other
+import { REDEMPTION_STATUS } from "../../helpers/constants";
+import DataTableComponent from "../DataTableComponent";
+import routes from "../../helpers/routes";
+import { STATUS_CLASSES } from "./constant";
 
 const RedemptionsIncomingDetails = ({ user }) => {
-    const [id, setId] = useState(undefined);
-    const [redemptionService, setRedemptionService] = useState(undefined);
-    const [data, setdata] = useState([]);
+    const navigate = useNavigate();
+    const { Text } = Typography;
+    const { TextArea } = Input;
+    // Dispatch
     const dispatch = useRedemptionDispatch();
     const inventoryDispatch = useInventoryDispatch();
-    const { Text } = Typography;
-    const [selectedDate, setSelectedDate] = useState("");
-    const navigate = useNavigate();
-    const [comments, setComments] = useState("");
-    const { TextArea } = Input;
-    const { redemption, isFetchingRedemptionDetails, isClosingRedemption, message, success, } = useRedemptionState();
+    // States
+    const { redemption, isFetchingRedemptionDetails, isClosingRedemption, message, success } = useRedemptionState();
     let { inventoryDetails, isInventoryDetailsLoading } = useInventoryState();
+    // useStates
+    const [redemptionService, setRedemptionService] = useState(undefined);
+    const [selectedDate, setSelectedDate] = useState("");
+    const [comments, setComments] = useState("");
+    const [id, setId] = useState(undefined);
+    const [data, setdata] = useState([]);
 
     const routeMatch = useMatch({
         path: routes.RedemptionsIncomingDetails.url,
@@ -57,7 +53,7 @@ const RedemptionsIncomingDetails = ({ user }) => {
     useEffect(() => {
         if (id !== undefined && redemptionService !== undefined) {
             const getData = async () => {
-                await actions.fetchRedemptionDetail(dispatch, redemptionService, id)
+                await redemptionActions.fetchRedemptionDetail(dispatch, redemptionService, id)
             };
             getData();
         }
@@ -91,22 +87,8 @@ const RedemptionsIncomingDetails = ({ user }) => {
     };
 
     const statusComponent = (status) => {
-        const statusClasses = {
-            [REDEMPTION_STATUS.PENDING]: {
-                textClass: "bg-[#FF8C0033]",
-                bgClass: "bg-[#FF8C00]"
-            },
-            [REDEMPTION_STATUS.REJECTED]: {
-                textClass: "bg-[#FFF0F0]",
-                bgClass: "bg-[#FF0000]"
-            },
-            [REDEMPTION_STATUS.FULFILLED]: {
-                textClass: "bg-[#119B2D33]",
-                bgClass: "bg-[#119B2D]"
-            }
-        };
 
-        const { textClass, bgClass } = statusClasses[status] || {};
+        const { textClass, bgClass } = STATUS_CLASSES[status] || {};
         return (
             <div className={classNames(textClass, "status_contain w-max text-center py-1 px-2 rounded-md md:rounded-xl flex justify-start items-center gap-1 p-1")}>
                 <div className={classNames(bgClass, "h-3 w-3 rounded-sm")}></div>
@@ -160,10 +142,10 @@ const RedemptionsIncomingDetails = ({ user }) => {
             redemptionService
         }
 
-        const isDone = await actions.closeRedemption(dispatch, body);
+        const isDone = await redemptionActions.closeRedemption(dispatch, body);
 
         if (isDone) {
-            await actions.fetchRedemptionDetail(dispatch, redemptionService, id)
+            await redemptionActions.fetchRedemptionDetail(dispatch, redemptionService, id)
         }
     }
 
@@ -238,30 +220,15 @@ const RedemptionsIncomingDetails = ({ user }) => {
                                                     </div>}
                                             </div>
                                             <Row className="hidden md:flex my-6 justify-between bg-[#F6F6F6] py-4 px-12 rounded">
-                                                <OrderData
-                                                    title="Redemption Number"
-                                                    value={`#${redemption.redemption_id}`}
-                                                />
+                                                <OrderData title="Redemption Number" value={`#${redemption.redemption_id}`} />
                                                 <Divider type="vertical" className="h-14 bg-secondryD" />
-                                                <OrderData
-                                                    title="Requestor"
-                                                    value={redemption.ownerCommonName}
-                                                />
+                                                <OrderData title="Requestor" value={redemption.ownerCommonName} />
                                                 <Divider type="vertical" className="h-14 bg-secondryD" />
-                                                <OrderData
-                                                    title="Quantity"
-                                                    value={redemption.quantity}
-                                                />
+                                                <OrderData title="Quantity" value={redemption.quantity} />
                                                 <Divider type="vertical" className="h-14 bg-secondryD" />
-                                                <OrderData
-                                                    title="Date"
-                                                    value={redemption.createdDate}
-                                                />
+                                                <OrderData title="Date" value={redemption.createdDate} />
                                                 <Divider type="vertical" className="h-14 bg-secondryD" />
-                                                <OrderData
-                                                    title="Status"
-                                                    value={statusComponent(redemption.status)}
-                                                />
+                                                <OrderData title="Status" value={statusComponent(redemption.status)} />
                                             </Row>
                                             <Row className="my-2 md:hidden flex-col gap-[6px] justify-between p-4 rounded">
                                                 <div className="flex gap-4">
@@ -326,7 +293,7 @@ const RedemptionsIncomingDetails = ({ user }) => {
             )}
             {message && showToast({
                 message: message,
-                onClose: actions.resetMessage(dispatch),
+                onClose: redemptionActions.resetMessage(dispatch),
                 success: success,
                 placement: 'bottom',
             })}

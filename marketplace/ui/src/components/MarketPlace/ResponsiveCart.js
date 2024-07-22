@@ -161,6 +161,7 @@ const ResponsiveCart = ({
               <div className="flex justify-between">
                 <div className="flex gap-x-3">
                   <img
+                    alt=""
                     src={element?.item?.image}
                     className="w-12 h-12 rounded-[4px]"
                   />

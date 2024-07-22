@@ -1,39 +1,47 @@
-import { Tabs, DatePicker, Button, Dropdown, Space, notification } from "antd";
-import { DownloadOutlined } from '@ant-design/icons';
 import React, { useEffect, useState } from "react";
+import { Tabs, DatePicker, Button, Dropdown, Space, notification } from "antd";
 import { useNavigate, useParams } from "react-router-dom";
-import SoldOrdersTable from "./SoldOrdersTable";
-import BoughtOrdersTable from "./BoughtOrdersTable";
-import TransfersTable from "./TransfersTable";
-import RedemptionsOutgoingTable from "./RedemptionsOutgoingTable";
-import RedemptionsIncomingTable from "./RedemptionsIncomingTable";
-import dayjs from "dayjs";
-import routes from "../../helpers/routes";
-import { Images } from "../../images";
+import { DownloadOutlined } from '@ant-design/icons';
+import startCase from 'lodash/startCase';
 import { saveAs } from 'file-saver';
 import * as XLSX from 'xlsx';
-import { actions } from "../../contexts/order/actions";
-import { useOrderDispatch, useOrderState } from "../../contexts/order";
+import dayjs from "dayjs";
+// Actions
 import { actions as categoryActions } from "../../contexts/category/actions";
+import { actions as orderActions } from "../../contexts/order/actions";
+// Dispatch and States
 import { useCategoryState, useCategoryDispatch } from "../../contexts/category";
-import startCase from 'lodash/startCase';
-import { epochToDate } from "../../helpers/utils";
+import { useOrderDispatch, useOrderState } from "../../contexts/order";
+// Components
+import RedemptionsOutgoingTable from "./RedemptionsOutgoingTable";
+import RedemptionsIncomingTable from "./RedemptionsIncomingTable";
+import BoughtOrdersTable from "./BoughtOrdersTable";
+import SoldOrdersTable from "./SoldOrdersTable";
+import TransfersTable from "./TransfersTable";
+// Other
 import { ORDER_STATUS } from "../../helpers/constants";
+import { epochToDate } from "../../helpers/utils";
 import BreadcrumbComponent from "../BreadCrumb";
+import { Images } from "../../images";
+import { MENU_ITEMS } from "./constant";
 const INVERTED_ORDER_STATUS = Object.fromEntries(Object.entries(ORDER_STATUS).map(([key, value]) => [value, key]));
 
 const Order = ({ user }) => {
-
+  const [api, contextHolder] = notification.useNotification();
   const navigate = useNavigate();
   const params = useParams();
   const { type } = params;
+  // Dispatch
   const dispatch = useOrderDispatch();
   const categoryDispatch = useCategoryDispatch();
-  const [callExcel, setCallExcel] = useState(false);
-  const [callCSV, setCallCSV] = useState(false);
+  // States and Actions
   const { allOrders, isAllOrdersLoading } = useOrderState();
   const { categorys } = useCategoryState();
-  const [api, contextHolder] = notification.useNotification();
+  // useStates  
+  const [selectedDate, setSelectedDate] = useState("");
+  const [callExcel, setCallExcel] = useState(false);
+  const [callCSV, setCallCSV] = useState(false);
+  
   useEffect(() => {
     categoryActions.fetchCategories(categoryDispatch);
   }, [categoryDispatch]);
@@ -42,12 +50,17 @@ const Order = ({ user }) => {
     navigate(`/order/${key}`)
   };
 
-  const [selectedDate, setSelectedDate] = useState("");
-
-
   const onDateChange = (date) => {
     setSelectedDate(date);
   };
+
+  const errorToast = () => {
+    api.error({
+      message: 'Data Processing Error',
+      description: 'Failed to process order data. Please contact support.',
+      placement: 'bottom'
+    });
+  }
 
   // --------------------- EXPORT TO EXCEL AND CSV START ---------------------
   function getCategoryAndSubcategory(contractName) {
@@ -87,7 +100,6 @@ const Order = ({ user }) => {
         // Extract Quantities
         const orderQuantities = order["BlockApps-Mercata-Order-quantities"].map(item => item.value);
   
-        
         return order.assets.map((asset, index) => {
           const { category, subCategory } = getCategoryAndSubcategory(asset.contract_name);
   
@@ -147,33 +159,21 @@ const Order = ({ user }) => {
       try {
         sold = mapOrderData(allOrders.bodySold)
       } catch (error) {
-        api.error({
-          message: 'Data Processing Error',
-          description: 'Failed to process order data. Please contact support.',
-          placement: 'bottom'
-        });
+        errorToast()
         return;
       }
       const wsSold = XLSX.utils.json_to_sheet(sold ? sold : []);
       try {
         bought = mapOrderData(allOrders.bodyBought)
       } catch (error) {
-        api.error({
-          message: 'Data Processing Error',
-          description: 'Failed to process order data. Please contact support.',
-          placement: 'bottom'
-        });
+        errorToast()
         return;
       }
       const wsBought = XLSX.utils.json_to_sheet(bought ? bought : []);
       try {
         transferred = mapTransfersData(allOrders.bodyTransfers)
       } catch (error) {
-        api.error({
-          message: 'Data Processing Error',
-          description: 'Failed to process order data. Please contact support.',
-          placement: 'bottom'
-        });
+        errorToast()
         return;
       }
       const wsTransferred = XLSX.utils.json_to_sheet(transferred ? transferred : []);
@@ -201,31 +201,19 @@ const Order = ({ user }) => {
       try {
         sold = mapOrderData(allOrders.bodySold)
       } catch (error) {
-        api.error({
-          message: 'Data Processing Error',
-          description: 'Failed to process order data. Please contact support.',
-          placement: 'bottom'
-        });
+        errorToast()
         return;
       }
       try {
         bought = mapOrderData(allOrders.bodyBought)
       } catch (error) {
-        api.error({
-          message: 'Data Processing Error',
-          description: 'Failed to process order data. Please contact support.',
-          placement: 'bottom'
-        });
+        errorToast()
         return;
       }
       try {
         transferred = mapTransfersData(allOrders.bodyTransfers)
       } catch (error) {
-        api.error({
-          message: 'Data Processing Error',
-          description: 'Failed to process order data. Please contact support.',
-          placement: 'bottom'
-        });
+        errorToast()
         return;
       }
       const soldData = addTypeColumn(sold ? sold : [], 'Sold');
@@ -247,7 +235,7 @@ const Order = ({ user }) => {
 
   const download = async (format) => {
     if (user?.commonName) {
-      await actions.fetchAllOrders(
+      await orderActions.fetchAllOrders(
         dispatch
       );
       if (format === 'xls') {
@@ -270,18 +258,6 @@ const Order = ({ user }) => {
     return buf;
   }
 
-  const menuItems = [
-    {
-      key: 'xls',
-      label: 'Excel',
-      disabled: isAllOrdersLoading,
-    },
-    {
-      key: 'csv',
-      label: 'CSV',
-      disabled: isAllOrdersLoading,
-    },
-  ];
   // --------------------- EXPORT TO EXCEL AND CSV END ---------------------
 
   return (
@@ -299,7 +275,7 @@ const Order = ({ user }) => {
           <div className="text-xs md:flex items-center orders_page">
             <Dropdown
               className="md:flex hidden customButton"
-              menu={{ items: menuItems, onClick: (e) => download(e.key) }}
+              menu={{ items: MENU_ITEMS, onClick: (e) => download(e.key) }}
               disabled={isAllOrdersLoading}
               trigger={['click']}
             >

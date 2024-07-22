@@ -1,38 +1,47 @@
 import React, { useEffect, useState } from "react";
-import DataTableComponent from "../DataTableComponent";
-import { getStringDate } from "../../helpers/utils";
-import { actions } from "../../contexts/inventory/actions";
-import { US_DATE_FORMAT } from "../../helpers/constants";
-import { Input, Pagination, Dropdown, Button, Space } from "antd";
-import "./ordersTable.css"
 import { DownOutlined, SearchOutlined, UpOutlined, DownloadOutlined } from "@ant-design/icons";
-import { ResponsiveOrderCard } from "./ResponsiveOrdersCard";
-import { ResponsiveTransferOrderCard } from "./ResponsiveTransferOrdersCard";
-import { useInventoryDispatch, useInventoryState } from "../../contexts/inventory";
 import { useLocation, useNavigate, useParams } from "react-router-dom";
+import { Input, Pagination, Dropdown, Button, Space } from "antd";
+// Actions
+import { actions as inventoryActions } from "../../contexts/inventory/actions";
+// Dispatch and States
+import { useInventoryDispatch, useInventoryState } from "../../contexts/inventory";
+// Components
+import { ResponsiveTransferOrderCard } from "./ResponsiveTransferOrdersCard";
+import DataTableComponent from "../DataTableComponent";
+// Other
+import { US_DATE_FORMAT } from "../../helpers/constants";
+import { getStringDate } from "../../helpers/utils";
 import routes from "../../helpers/routes";
+import { MENU_ITEMS } from "./constant";
+import "./ordersTable.css"
 
+const limit = 10;
 
 const TransfersTable = ({ user, selectedDate, download, isAllOrdersLoading }) => {
   const navigate = useNavigate();
   const params = useParams();
   const location = useLocation();
+  // Dispatch
+  const dispatch = useInventoryDispatch();
+  // States
+  const { itemTransfers, totalItemsTransfered, isFetchingItemTransfers } = useInventoryState();
+
   const searchParams = new URLSearchParams(location.search);
   const searchVal = searchParams.get('search');
   const pageVal = searchParams.get('page');
   const pageNo = pageVal ? parseInt(pageVal) : 1;
   const { type } = params;
-
-  const dispatch = useInventoryDispatch();
-  const limit = 10;
+  
   const offset = ((pageNo - 1) * limit);
-  const { itemTransfers, totalItemsTransfered, isFetchingItemTransfers } = useInventoryState();
+  // useStates
   const [order, setOrder] = useState("desc");
   const [search, setSearch] = useState("");
+  const [data, setdata] = useState([]);
 
   useEffect(() => {
     if (user?.commonName && type === 'transfers') {
-      actions.fetchItemTransfers(dispatch, limit, offset, user?.commonName, order, selectedDate, searchVal);
+      inventoryActions.fetchItemTransfers(dispatch, limit, offset, user?.commonName, order, selectedDate, searchVal);
     }
   }, [dispatch, limit, offset, user, order, selectedDate, searchVal]);
 
@@ -48,8 +57,7 @@ const TransfersTable = ({ user, selectedDate, download, isAllOrdersLoading }) =>
       clearTimeout(timeout)
     }
   }, [search])
-
-  const [data, setdata] = useState([]);
+  
   useEffect(() => {
     let items = [];
     if (itemTransfers) {
@@ -72,7 +80,6 @@ const TransfersTable = ({ user, selectedDate, download, isAllOrdersLoading }) =>
     }
     setdata(items);
   }, [itemTransfers]);
-
 
   const column = [
     {
@@ -170,7 +177,6 @@ const TransfersTable = ({ user, selectedDate, download, isAllOrdersLoading }) =>
     },
   ];
 
-
   const onPageChange = (page) => {
     const baseUrl = new URL(`/order/${type}`, window.location.origin);
     if (searchVal) {
@@ -190,22 +196,10 @@ const TransfersTable = ({ user, selectedDate, download, isAllOrdersLoading }) =>
     }
   };
 
-
   const handleChangeSearch = (e) => {
     const value = e.target.value;
     setSearch(value)
   }
-
-  const menuItems = [
-    {
-      key: 'xls',
-      label: 'Excel',
-    },
-    {
-      key: 'csv',
-      label: 'CSV',
-    },
-  ];
   
   return (
     <div>
@@ -218,7 +212,7 @@ const TransfersTable = ({ user, selectedDate, download, isAllOrdersLoading }) =>
           placeholder="Search Transfers by Buyer or Transfer #" />
         <Dropdown
           className="md:hidden customButton"
-          menu={{ items: menuItems, onClick: (e) => download(e.key) }}
+          menu={{ items: MENU_ITEMS, onClick: (e) => download(e.key) }}
           disabled={isAllOrdersLoading}
           trigger={['click']}
         >

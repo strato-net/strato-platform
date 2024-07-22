@@ -1,75 +1,54 @@
 import React, { useState, useEffect } from "react";
-import {
-  Card,
-  Row,
-  Col,
-  Typography,
-  Divider,
-  Input,
-  Button,
-  Spin,
-  Image,
-  Tabs,
-  DatePicker,
-} from "antd";
-import { useLocation, useMatch } from "react-router-dom";
-import { actions } from "../../contexts/order/actions";
-import { useOrderDispatch, useOrderState } from "../../contexts/order";
-import routes from "../../helpers/routes";
-import classNames from "classnames";
+import { Card, Row, Col, Typography, Divider, Input, Button, Spin, Tabs } from "antd";
+import { useMatch, useNavigate } from "react-router-dom";
 import { EyeOutlined } from "@ant-design/icons";
-import DataTableComponent from "../DataTableComponent";
-import { getStringDate } from "../../helpers/utils";
-import { getStatus, getStatusByName } from "./constant";
-import { useNavigate } from "react-router-dom";
-import { US_DATE_FORMAT } from "../../helpers/constants";
-import { apiUrl, HTTP_METHODS } from "../../helpers/constants";
-import RestStatus from "http-status-codes";
-import TagManager from "react-gtm-module";
-import image_placeholder from "../../images/resources/image_placeholder.png";
+import classNames from "classnames";
 import dayjs from "dayjs";
-import TransfersTable from "./TransfersTable";
-import SoldOrdersTable from "./SoldOrdersTable";
+// Actions
+import { actions as OrderActions } from "../../contexts/order/actions";
+// Dispatch and States
+import { useOrderDispatch, useOrderState } from "../../contexts/order";
+// Components
+import { ResponsiveOrderDetailCard } from "./ResponsiveOrderDetailCard";
 import RedemptionsOutgoingTable from "./RedemptionsOutgoingTable";
 import RedemptionsIncomingTable from "./RedemptionsIncomingTable";
-import { ResponsiveOrderDetailCard } from "./ResponsiveOrderDetailCard";
-import { LeftArrow } from "../../images/SVGComponents";
 import { showToast } from "../Notification/ToastComponent";
+import DataTableComponent from "../DataTableComponent";
+import SoldOrdersTable from "./SoldOrdersTable";
 import BreadcrumbComponent from "../BreadCrumb";
+import TransfersTable from "./TransfersTable";
+// Other
+import image_placeholder from "../../images/resources/image_placeholder.png";
+import { US_DATE_FORMAT } from "../../helpers/constants";
+import { LeftArrow } from "../../images/SVGComponents";
+import { getStringDate } from "../../helpers/utils";
+import routes from "../../helpers/routes";
+import { STATUS_CLASSES, getStatus } from "./constant";
 
 
 const BoughtOrderDetails = ({ user, users }) => {
+  const dispatch = useOrderDispatch();
+  const navigate = useNavigate();
+  const { TextArea } = Input;
+  const { Text } = Typography;
+  // States
+  const { orderDetails, isorderDetailsLoading, ordersAudit, isbuyerDetailsUpdating,
+    success, message } = useOrderState();
+  // useStates
   const [comment, setcomment] = useState("");
   const [Id, setId] = useState(undefined);
   const [data, setdata] = useState([]);
-  const dispatch = useOrderDispatch();
-  const { Text } = Typography;
   const [status, setStatus] = useState(getStatus(0));
-  const { TextArea } = Input;
   const [paid, setPaid] = useState("Processing");
   const [selectedDate, setSelectedDate] = useState("");
-  const { state } = useLocation()
-
-  const navigate = useNavigate();
-
-  const {
-    orderDetails,
-    isorderDetailsLoading,
-    ordersAudit,
-    isbuyerDetailsUpdating,
-    success,
-    message,
-  } = useOrderState();
 
   const routeMatch = useMatch({
     path: routes.BoughtOrderDetails.url,
     strict: true,
   });
 
-
   useEffect(() => {
     setId(routeMatch?.params?.id);
-
   }, [routeMatch]);
 
   useEffect(() => {
@@ -79,7 +58,7 @@ const BoughtOrderDetails = ({ user, users }) => {
   }, [Id, dispatch]);
 
   const getData = async () => {
-    await actions.fetchOrderDetails(dispatch, Id);
+    await OrderActions.fetchOrderDetails(dispatch, Id);
   };
 
   useEffect(() => {
@@ -146,30 +125,7 @@ const BoughtOrderDetails = ({ user, users }) => {
   };
 
   const statusComponent = (status) => {
-    const statusClasses = {
-      ["Awaiting Shipment"]: {
-        textClass: "bg-[#EBF7FF]",
-        bgClass: "bg-[#13188A]"
-      },
-      ["Awaiting Fulfillment"]: {
-        textClass: "bg-[#FF8C0033]",
-        bgClass: "bg-[#FF8C00]"
-      },
-      ["Payment Pending"]: {
-        textClass: "bg-[#FF8C0033]",
-        bgClass: "bg-[#FF8C00]"
-      },
-      ["Closed"]: {
-        textClass: "bg-[#119B2D33]",
-        bgClass: "bg-[#119B2D]"
-      },
-      ["Canceled"]: {
-        textClass: "bg-[#FFF0F0]",
-        bgClass: "bg-[#FF0000]"
-      },
-    };
-
-    const { textClass, bgClass } = statusClasses[status] || { textClass: "bg-[#FFF6EC]", bgClass: "bg-[#119B2D]" };
+    const { textClass, bgClass } = STATUS_CLASSES[status] || { textClass: "bg-[#FFF6EC]", bgClass: "bg-[#119B2D]" };
     return (
       <div className={classNames(textClass, "status_contain w-max h-max text-center py-1 px-3 rounded-md md:rounded-xl flex justify-start items-center gap-1 p-1")}>
         <div className={classNames(bgClass, "h-3 w-3 rounded-sm")}></div>
@@ -179,26 +135,7 @@ const BoughtOrderDetails = ({ user, users }) => {
   };
 
   const statusComponentForPayment = (status) => {
-    const statusClasses = {
-      ["Processing"]: {
-        textClass: "bg-[#FF8C0033]",
-        bgClass: "bg-[#FF8C00]"
-      },
-      ["Paid"]: {
-        textClass: "bg-[#119B2D33]",
-        bgClass: "bg-[#119B2D]"
-      },
-      ["Payment Failed"]: {
-        textClass: "bg-[#FFF0F0]",
-        bgClass: "bg-[#FF0000]"
-      },
-      ["Canceled"]: {
-        textClass: "bg-[#FFF0F0]",
-        bgClass: "bg-[#FF0000]"
-      },
-    };
-
-    const { textClass, bgClass } = statusClasses[status] || { textClass: "bg-[#FFF6EC]", bgClass: "bg-[#119B2D]" };
+    const { textClass, bgClass } = STATUS_CLASSES[status] || { textClass: "bg-[#FFF6EC]", bgClass: "bg-[#119B2D]" };
     return (
       <div className={classNames(textClass, "status_contain w-max h-max text-center py-1 px-3 rounded-md md:rounded-xl flex justify-start items-center gap-1 p-1")}>
         <div className={classNames(bgClass, "h-3 w-3 rounded-sm")}></div>
@@ -313,42 +250,42 @@ const BoughtOrderDetails = ({ user, users }) => {
       currency: details.order.currency,
       createdDate: details.order.createdDate,
     };
-    let isDone = await actions.cancelSale(dispatch, body);
+    let isDone = await OrderActions.cancelSale(dispatch, body);
     if (isDone) {
       setStatus("Canceled");
     }
   };
 
-  const order_id = `${details?.order?.orderId || ''}`.substring(0,6)
+  const order_id = `${details?.order?.orderId || ''}`.substring(0, 6)
   return (
     <div>
-        <div>
-          {order_id && <div className="relative md:left-6"> <BreadcrumbComponent idNum={order_id} /> </div>}
-          <Tabs
-            className="mx-4 md:mx-20 mt-5"
-            onChange={onChange}
-            defaultActiveKey={"bought"}
-            items={[
-              {
-                label: <p id="sold-tab" className="font-semibold text-sm md:text-base">Orders (Sold)</p>,
-                key: "sold",
-                children: <SoldOrdersTable user={user} selectedDate={dayjs(selectedDate).startOf('day').unix()} />
+      <div>
+        {order_id && <div className="relative md:left-6"> <BreadcrumbComponent idNum={order_id} /> </div>}
+        <Tabs
+          className="mx-4 md:mx-20 mt-5"
+          onChange={onChange}
+          defaultActiveKey={"bought"}
+          items={[
+            {
+              label: <p id="sold-tab" className="font-semibold text-sm md:text-base">Orders (Sold)</p>,
+              key: "sold",
+              children: <SoldOrdersTable user={user} selectedDate={dayjs(selectedDate).startOf('day').unix()} />
 
-              },
-              {
-                label: <p id="bought-tab" className="font-semibold text-sm md:text-base">Orders (Bought)</p>,
-                key: "bought",
-                children:
-                  <div className="mb-10">
-                    <Button type="ghost" onClick={() => onChange('Bought')} className="cursor-pointer mb-1 px-2 flex md:hidden items-center gap-2 text-sm font-semibold"><LeftArrow /> Back</Button>
-                    {details === null || isorderDetailsLoading || isbuyerDetailsUpdating ? (
-                      <div className="h-screen flex justify-center items-center">
-                        <Spin
-                          spinning={isorderDetailsLoading || isbuyerDetailsUpdating}
-                          size="large"
-                        />
-                      </div>
-                    ) : (
+            },
+            {
+              label: <p id="bought-tab" className="font-semibold text-sm md:text-base">Orders (Bought)</p>,
+              key: "bought",
+              children:
+                <div className="mb-10">
+                  <Button type="ghost" onClick={() => onChange('Bought')} className="cursor-pointer mb-1 px-2 flex md:hidden items-center gap-2 text-sm font-semibold"><LeftArrow /> Back</Button>
+                  {details === null || isorderDetailsLoading || isbuyerDetailsUpdating ? (
+                    <div className="h-screen flex justify-center items-center">
+                      <Spin
+                        spinning={isorderDetailsLoading || isbuyerDetailsUpdating}
+                        size="large"
+                      />
+                    </div>
+                  ) : (
                     <Card className="md:p-2 mb-4 md:mb-14 md:shadow-card_shadow order_detail_card">
                       <div className="flex flex-col md:flex-row md:justify-between">
                         <div className="flex flex-col">
@@ -360,7 +297,7 @@ const BoughtOrderDetails = ({ user, users }) => {
 
                       </div>
                       <Row className="hidden md:flex my-6 justify-between bg-[#F6F6F6] p-4 pb-2 rounded">
-                        <OrderData title="Order Number" value={`#${`${details.order.orderId}`.substring(0,6)}`} />
+                        <OrderData title="Order Number" value={`#${`${details.order.orderId}`.substring(0, 6)}`} />
                         <Divider type="vertical" className="h-14 bg-secondryD" />
                         <OrderData
                           title="Buyer"
@@ -388,7 +325,7 @@ const BoughtOrderDetails = ({ user, users }) => {
                       </Row>
                       <Row className="my-2 md:hidden flex-col gap-[6px] justify-between p-4 pb-0 rounded">
                         <div className="flex gap-4">
-                          <NewOrderData className="w-2/4" title="Order Number" value={'#' + `${details.order.orderId}`.substring(0,6)} />
+                          <NewOrderData className="w-2/4" title="Order Number" value={'#' + `${details.order.orderId}`.substring(0, 6)} />
                           <NewOrderData className="w-2/4" title="Buyer" value={details.order.purchasersCommonName} />
                         </div>
                         <div className="flex gap-4">
@@ -425,38 +362,38 @@ const BoughtOrderDetails = ({ user, users }) => {
                           scrollX="100%"
                         /></div>
                     </Card>
-                    )}
-                    {data?.length > 0 && data?.map((item) => {
-                      return (
-                        <ResponsiveOrderDetailCard data={item} />)
-                    })}
-                  </div>
-              },
-              {
-                label: <p id="transfers-tab" className="font-semibold text-sm md:text-base">Transfers</p>,
-                key: "transfers",
-                children: <TransfersTable user={user} selectedDate={dayjs(selectedDate).startOf('day').unix()} />
-              },
-              {
-                label: <p id="redemptions-outgoing-tab" className="font-semibold text-sm md:text-base">Redemptions (Outgoing)</p>,
-                key: "redemptions-outgoing",
-                children: <RedemptionsOutgoingTable user={user} selectedDate={dayjs(selectedDate).startOf('day').unix()} />
-              },
-              {
-                label: <p id="redemptions-incoming-tab" className="font-semibold text-sm md:text-base">Redemptions (Incoming)</p>,
-                key: "redemptions-incoming",
-                children: <RedemptionsIncomingTable user={user} selectedDate={dayjs(selectedDate).startOf('day').unix()} />
-              }
-            ]}
-          />
-        </div>
+                  )}
+                  {data?.length > 0 && data?.map((item) => {
+                    return (
+                      <ResponsiveOrderDetailCard data={item} />)
+                  })}
+                </div>
+            },
+            {
+              label: <p id="transfers-tab" className="font-semibold text-sm md:text-base">Transfers</p>,
+              key: "transfers",
+              children: <TransfersTable user={user} selectedDate={dayjs(selectedDate).startOf('day').unix()} />
+            },
+            {
+              label: <p id="redemptions-outgoing-tab" className="font-semibold text-sm md:text-base">Redemptions (Outgoing)</p>,
+              key: "redemptions-outgoing",
+              children: <RedemptionsOutgoingTable user={user} selectedDate={dayjs(selectedDate).startOf('day').unix()} />
+            },
+            {
+              label: <p id="redemptions-incoming-tab" className="font-semibold text-sm md:text-base">Redemptions (Incoming)</p>,
+              key: "redemptions-incoming",
+              children: <RedemptionsIncomingTable user={user} selectedDate={dayjs(selectedDate).startOf('day').unix()} />
+            }
+          ]}
+        />
+      </div>
 
       {message && showToast({
-          message: message,
-          onClose: actions.resetMessage(dispatch),
-          success: success,
-          placement: 'bottom',
-        })}
+        message: message,
+        onClose: OrderActions.resetMessage(dispatch),
+        success: success,
+        placement: 'bottom',
+      })}
     </div>
   );
 };

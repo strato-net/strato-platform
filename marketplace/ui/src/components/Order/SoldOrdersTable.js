@@ -1,53 +1,60 @@
 import React, { useEffect, useState } from "react";
-import classNames from "classnames";
 import { EyeOutlined, DownOutlined, UpOutlined, DownloadOutlined, SearchOutlined } from "@ant-design/icons";
-import routes from "../../helpers/routes";
-import DataTableComponent from "../DataTableComponent";
-import { getStatus, getStatusByName } from "./constant";
-import { getStringDate } from "../../helpers/utils";
+import { Pagination, Button, Dropdown, DatePicker, Space, Typography, Input } from "antd";
 import { useNavigate, Link, useParams, useLocation } from "react-router-dom";
-import { actions } from "../../contexts/order/actions";
-import { useOrderDispatch, useOrderState } from "../../contexts/order";
-import useDebounce from "../UseDebounce";
-import { apiUrl, HTTP_METHODS, US_DATE_FORMAT } from "../../helpers/constants";
-import { Pagination, Button, Dropdown, Menu, DatePicker, Space, Typography, Input } from "antd";
 import TagManager from "react-gtm-module";
-import "./ordersTable.css"
-import { FilterIcon } from "../../images/SVGComponents";
-import { ResponsiveOrderCard } from "./ResponsiveOrdersCard";
+import classNames from "classnames";
 import dayjs from "dayjs";
+// Actions
+import { actions as orderActions } from "../../contexts/order/actions";
+// Dispatch and State
+import { useOrderDispatch, useOrderState } from "../../contexts/order";
+// Components
 import { ResponsiveSoldOrderCard } from "./ResponsiveSoldOrdersCard";
-import RestStatus from "http-status-codes";
+import DataTableComponent from "../DataTableComponent";
+// Other
+import { MENU_ITEMS, SORT_OPTIONS, STATUS_CLASSES, getStatus } from "./constant";
+import { US_DATE_FORMAT } from "../../helpers/constants";
+import { FilterIcon } from "../../images/SVGComponents";
+import { getStringDate } from "../../helpers/utils";
+import routes from "../../helpers/routes";
+import useDebounce from "../UseDebounce";
 import { Images } from "../../images";
+import "./ordersTable.css"
 
+const limit = 10;
 
 const SoldOrdersTable = ({ user, selectedDate, onDateChange, download, isAllOrdersLoading }) => {
   const navigate = useNavigate();
   const params = useParams();
   const location = useLocation();
+
   const searchParams = new URLSearchParams(location.search);
   const searchVal = searchParams.get('search');
   const pageVal = searchParams.get('page');
   const pageNo = pageVal ? parseInt(pageVal) : 1;
   const { type } = params;
+  // Dispatch
   const dispatch = useOrderDispatch();
-  const debouncedSearchTerm = useDebounce("", 1000);
-  const limit = 10;
-  const offset = ((pageNo - 1) * limit)
-  const [order, setOrder] = useState("createdDate.desc");
-  const [filter, setFilter] = useState(0)
-  const [selectedValue, setSelectedValue] = useState(null);
-  const [search, setSearch] = useState("")
-  const [dropdownVisible, setDropdownVisible] = useState(false);
-  const [mDropdownVisible, setMDropdownVisible] = useState(false);
-  const [isLoading, setIsLoading] = useState(false);
-  const [shouldRefetch, setShouldRefetch] = useState(true);
-
+  // States
   const { ordersSold, isordersSoldLoading, orderSoldTotal } = useOrderState();
+  // useStates
+  const debouncedSearchTerm = useDebounce("", 1000);
+
+  const offset = ((pageNo - 1) * limit)
+  const [mDropdownVisible, setMDropdownVisible] = useState(false);
+  const [dropdownVisible, setDropdownVisible] = useState(false);
+  const [selectedValue, setSelectedValue] = useState(null);
+  const [shouldRefetch, setShouldRefetch] = useState(true);
+  const [order, setOrder] = useState("createdDate.desc");
+  const [isLoading, setIsLoading] = useState(false);
+  const [search, setSearch] = useState("")
+  const [filter, setFilter] = useState(0)
+  const [data, setdata] = useState([]);
 
   useEffect(() => {
     if (user?.commonName && type === 'sold') {
-      actions.fetchOrderSold(
+      orderActions.fetchOrderSold(
         dispatch,
         limit,
         offset,
@@ -72,8 +79,6 @@ const SoldOrdersTable = ({ user, selectedDate, onDateChange, download, isAllOrde
       clearTimeout(timeout)
     }
   }, [search])
-
-  const [data, setdata] = useState([]);
 
   useEffect(() => {
     const fetchData = async () => {
@@ -107,12 +112,7 @@ const SoldOrdersTable = ({ user, selectedDate, onDateChange, download, isAllOrde
   const Sorting = (classes) => {
     return (
       <div className={classes.className}>
-        <Typography onClick={() => handleSort(0)}>All</Typography>
-        <Typography onClick={() => handleSort(1)}>Awaiting Fulfillment</Typography>
-        <Typography onClick={() => handleSort(2)}>Awaiting Shipment</Typography>
-        <Typography onClick={() => handleSort(3)}>Closed</Typography>
-        <Typography onClick={() => handleSort(4)}>Canceled</Typography>
-        <Typography onClick={() => handleSort(5)}>Payment Pending</Typography>
+        {SORT_OPTIONS.map(({ id, label }) => <Typography onClick={() => handleSort(id)}>{label}</Typography>)}
       </div>
     )
   }
@@ -132,7 +132,7 @@ const SoldOrdersTable = ({ user, selectedDate, onDateChange, download, isAllOrde
           }}
           className="text-[#13188A] hover:text-primaryHover cursor-pointer"
         >
-          {`#${`${order.orderId}`.substring(0,6)}`}
+          {`#${`${order.orderId}`.substring(0, 6)}`}
         </p>
       ),
     },
@@ -142,18 +142,18 @@ const SoldOrdersTable = ({ user, selectedDate, onDateChange, download, isAllOrde
       key: "buyersCommonName",
       // render: (text) => <p onClick={()=>{navigate(`${routes.MarketplaceUserProfile.url.replace(":commonName", text)}`, { state: { from: location.pathname } })}}>{text}</p>,
       render: (text) => (
-        <a 
+        <a
           href={`${window.location.origin}/profile/${encodeURIComponent(text)}`}
           onClick={(e) => {
             e.preventDefault();
             const userProfileUrl = `/profile/${encodeURIComponent(text)}`;
-      
+
             if (e.ctrlKey || e.metaKey) {
               // Open in a new tab if Ctrl/Cmd is pressed
               window.open(`${window.location.origin}${userProfileUrl}`, '_blank');
             } else {
               // Use navigate for a normal click, without Ctrl/Cmd
-              navigate(routes.MarketplaceUserProfile.url.replace(':commonName',text), { state: { from: location.pathname } });
+              navigate(routes.MarketplaceUserProfile.url.replace(':commonName', text), { state: { from: location.pathname } });
             }
           }}
           style={{ textDecoration: 'underline', color: 'black', cursor: 'pointer' }}
@@ -161,7 +161,7 @@ const SoldOrdersTable = ({ user, selectedDate, onDateChange, download, isAllOrde
           {text}
         </a>
       ),
-      
+
     },
     {
       title: "Order Total ($)",
@@ -232,30 +232,8 @@ const SoldOrdersTable = ({ user, selectedDate, onDateChange, download, isAllOrde
   ];
 
   const statusComponent = (status) => {
-    const statusClasses = {
-      ["Awaiting Shipment"]: {
-        textClass: "bg-[#EBF7FF]",
-        bgClass: "bg-[#13188A]"
-      },
-      ["Awaiting Fulfillment"]: {
-        textClass: "bg-[#FF8C0033]",
-        bgClass: "bg-[#FF8C00]"
-      },
-      ["Payment Pending"]: {
-        textClass: "bg-[#FF8C0033]",
-        bgClass: "bg-[#FF8C00]"
-      },
-      ["Closed"]: {
-        textClass: "bg-[#119B2D33]",
-        bgClass: "bg-[#119B2D]"
-      },
-      ["Canceled"]: {
-        textClass: "bg-[#FFF0F0]",
-        bgClass: "bg-[#FF0000]"
-      },
-    };
 
-    const { textClass, bgClass } = statusClasses[status] || { textClass: "bg-[#FFF6EC]", bgClass: "bg-[#119B2D]" };
+    const { textClass, bgClass } = STATUS_CLASSES[status] || { textClass: "bg-[#FFF6EC]", bgClass: "bg-[#119B2D]" };
     return (
       <div className={classNames(textClass, "w-max text-center py-1 rounded-xl flex justify-start items-center gap-1 p-3")}>
         <div className={classNames(bgClass, "h-3 w-3 rounded-sm")}></div>
@@ -269,7 +247,7 @@ const SoldOrdersTable = ({ user, selectedDate, onDateChange, download, isAllOrde
     if (searchVal) {
       baseUrl.searchParams.set("search", searchVal);
     }
-  
+
     baseUrl.searchParams.set("page", page);
     const url = baseUrl.pathname + baseUrl.search;
     navigate(url, { new: true });
@@ -279,17 +257,6 @@ const SoldOrdersTable = ({ user, selectedDate, onDateChange, download, isAllOrde
     const value = e.target.value;
     setSearch(value)
   }
-
-  const menuItems = [
-    {
-      key: 'xls',
-      label: 'Excel',
-    },
-    {
-      key: 'csv',
-      label: 'CSV',
-    },
-  ];
 
   return (
     <div>
@@ -302,7 +269,7 @@ const SoldOrdersTable = ({ user, selectedDate, onDateChange, download, isAllOrde
           placeholder="Search Sold Orders by Buyer or Order #" />
         <Dropdown
           className="md:hidden customButton"
-          menu={{ items: menuItems, onClick: (e) => download(e.key) }}
+          menu={{ items: MENU_ITEMS, onClick: (e) => download(e.key) }}
           disabled={isAllOrdersLoading}
           trigger={['click']}
         >

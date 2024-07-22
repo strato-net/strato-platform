@@ -1,6 +1,6 @@
-import { Button, Spin, Typography } from "antd";
 import React from "react";
 import { useLocation, useNavigate } from "react-router-dom";
+import { Button, Spin, Typography } from "antd";
 import routes from "../../helpers/routes";
 
 export const ResponsiveBoughtOrderCard = ({ data, isLoading }) => {

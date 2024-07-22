@@ -9,6 +9,8 @@ import { useMarketplaceDispatch, useMarketplaceState } from "../../contexts/mark
 import { useUsersDispatch, useUsersState } from "../../contexts/users";
 // Components
 import DataTableComponent from "../DataTableComponent";
+// Other
+import { STRATS_TRANSACTION_HISTORY_TABLE_COLUMN } from "../../helpers/constants";
 
 
 const StratsTransactionHistoryModal = ({ visible, onCancel }) => {
@@ -47,29 +49,6 @@ const StratsTransactionHistoryModal = ({ visible, onCancel }) => {
         }
     }).reverse()
 
-    const columns = [
-        {
-            title: 'Date',
-            dataIndex: 'timestamp',
-            align: 'center'
-        },
-        {
-            title: 'Sender',
-            dataIndex: 'from',
-            align: 'center'
-        },
-        {
-            title: 'Recipient',
-            dataIndex: 'to',
-            align: 'center'
-        },
-        {
-            title: 'Value',
-            dataIndex: 'value',
-            align: 'center'
-        },
-    ]
-
     return (
         <Modal
             title="STRATS Transaction History"
@@ -84,7 +63,7 @@ const StratsTransactionHistoryModal = ({ visible, onCancel }) => {
                 size='large'
             >
                 <DataTableComponent
-                    columns={columns}
+                    columns={STRATS_TRANSACTION_HISTORY_TABLE_COLUMN}
                     data={data}
                     isLoading={isFetchingStratsTransactionHistory}
                     pagination={false}

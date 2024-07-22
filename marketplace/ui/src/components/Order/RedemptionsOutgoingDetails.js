@@ -1,46 +1,43 @@
 import React, { useState, useEffect } from "react";
-import {
-    Card,
-    Row,
-    Col,
-    Typography,
-    Divider,
-    Select,
-    Input,
-    Button,
-    Spin,
-    Tabs,
-} from "antd";
-import { useMatch } from "react-router-dom";
-import { actions } from "../../contexts/redemption/actions";
-import { useRedemptionDispatch, useRedemptionState } from "../../contexts/redemption";
-import { actions as inventoryActions } from "../../contexts/inventory/actions";
-import { useInventoryDispatch, useInventoryState } from "../../contexts/inventory";
-import routes from "../../helpers/routes";
-import { REDEMPTION_STATUS } from "../../helpers/constants";
+import { Card, Row, Col, Typography, Divider, Input, Spin, Tabs } from "antd";
+import { useMatch, useNavigate } from "react-router-dom";
 import classNames from "classnames";
-import { useNavigate } from "react-router-dom";
-import DataTableComponent from "../DataTableComponent";
 import dayjs from "dayjs";
+// Actions
+import { actions as redemptionActions } from "../../contexts/redemption/actions";
+import { actions as inventoryActions } from "../../contexts/inventory/actions";
+// Dispatch and States
+import { useRedemptionDispatch, useRedemptionState } from "../../contexts/redemption";
+import { useInventoryDispatch, useInventoryState } from "../../contexts/inventory";
+// Components.
+import { ResponsiveOrderDetailCard } from "./ResponsiveOrderDetailCard";
+import RedemptionsIncomingTable from "./RedemptionsIncomingTable";
+import DataTableComponent from "../DataTableComponent";
 import BoughtOrdersTable from "./BoughtOrdersTable";
+import BreadcrumbComponent from "../BreadCrumb";
 import SoldOrdersTable from "./SoldOrdersTable";
 import TransfersTable from "./TransfersTable";
-import RedemptionsIncomingTable from "./RedemptionsIncomingTable";
-import { ResponsiveOrderDetailCard } from "./ResponsiveOrderDetailCard";
-import BreadcrumbComponent from "../BreadCrumb";
+// Other
+import routes from "../../helpers/routes";
+import { REDEMPTION_STATUS } from "../../helpers/constants";
+import { STATUS_CLASSES } from "./constant";
 
 
 const RedemptionsOutgoingDetails = ({ user }) => {
+    const navigate = useNavigate();
+    const { Text } = Typography;
+    const { TextArea } = Input;
+   // Dispatch
+    const inventoryDispatch = useInventoryDispatch();
+    const dispatch = useRedemptionDispatch();
+   // States
+    const { redemption, isFetchingRedemptionDetails } = useRedemptionState();
+    let { inventoryDetails, isInventoryDetailsLoading } = useInventoryState();
+   // useStates
     const [id, setId] = useState(undefined);
     const [redemptionService, setRedemptionService] = useState(undefined);
     const [data, setdata] = useState([]);
-    const dispatch = useRedemptionDispatch();
-    const { Text } = Typography;
     const [selectedDate, setSelectedDate] = useState("");
-    const { TextArea } = Input;
-    const { redemption, isFetchingRedemptionDetails } = useRedemptionState();
-    const inventoryDispatch = useInventoryDispatch();
-    let { inventoryDetails, isInventoryDetailsLoading } = useInventoryState();
 
     const routeMatch = useMatch({
         path: routes.RedemptionsOutgoingDetails.url,
@@ -55,7 +52,7 @@ const RedemptionsOutgoingDetails = ({ user }) => {
     useEffect(() => {
         if (id !== undefined && redemptionService !== undefined) {
             const getData = async () => {
-                await actions.fetchRedemptionDetail(dispatch, redemptionService, id)
+                await redemptionActions.fetchRedemptionDetail(dispatch, redemptionService, id)
             };
             getData();
         }
@@ -89,22 +86,8 @@ const RedemptionsOutgoingDetails = ({ user }) => {
     };
 
     const statusComponent = (status) => {
-        const statusClasses = {
-            [REDEMPTION_STATUS.PENDING]: {
-                textClass: "bg-[#FF8C0033]",
-                bgClass: "bg-[#FF8C00]"
-            },
-            [REDEMPTION_STATUS.REJECTED]: {
-                textClass: "bg-[#FFF0F0]",
-                bgClass: "bg-[#FF0000]"
-            },
-            [REDEMPTION_STATUS.FULFILLED]: {
-                textClass: "bg-[#119B2D33]",
-                bgClass: "bg-[#119B2D]"
-            }
-        };
 
-        const { textClass, bgClass } = statusClasses[status] || {};
+        const { textClass, bgClass } = STATUS_CLASSES[status] || {};
         return (
             <div className={classNames(textClass, "status_contain w-max text-center py-1 px-2 rounded-md md:rounded-xl flex justify-start items-center gap-1 p-1")}>
                 <div className={classNames(bgClass, "h-3 w-3 rounded-sm")}></div>
@@ -116,8 +99,6 @@ const RedemptionsOutgoingDetails = ({ user }) => {
     const onChange = (key) => {
         navigate(routes.Orders.url.replace(':type', key))
     };
-
-    const navigate = useNavigate();
 
     inventoryDetails={...inventoryDetails, images: inventoryDetails && Array.isArray(inventoryDetails["BlockApps-Mercata-Asset-images"]) ? inventoryDetails["BlockApps-Mercata-Asset-images"][0].value: []}
 
