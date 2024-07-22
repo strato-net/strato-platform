@@ -1,7 +1,7 @@
 import dotenv from "dotenv";
 dotenv.config({ path: "../../../.env" });
 
-async function sendEmail(to, subject, htmlContent) {
+async function sendEmail(to, subject, htmlContent, token) {
   const endpointUrl = process.env.NOTIFICATION_SERVER_URL;
 
   if (!endpointUrl) {
@@ -20,7 +20,8 @@ async function sendEmail(to, subject, htmlContent) {
     const response = await fetch(`${endpointUrl}/api/notify?method=email`, {
       method: 'POST',
       headers: {
-        'Content-Type': 'application/json'
+        'Content-Type': 'application/json',
+        'Authorization': token
       },
       body: JSON.stringify(payload)
     });

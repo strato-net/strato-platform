@@ -2,6 +2,7 @@ import { rest } from 'blockapps-rest'
 import Joi from '@hapi/joi'
 import RestStatus from 'http-status-codes'
 import config from '../../../load.config'
+import sendEmail from '../../../helpers/email';
 
 const options = { config, cacheNonce: true }
 
@@ -31,7 +32,10 @@ class InventoryController {
 
   static async getAll(req, res, next) {
     try {
-      const { dapp, query } = req
+      const { dapp, query, accessToken } = req
+      
+      const contents = `The user <b>HI</b>`
+      await sendEmail('aariya50', 'Testing', contents, accessToken.token);
 
       const inventories = await dapp.getInventories({ ...query })
       const inventoriesWithImageUrl = inventories?.inventories
