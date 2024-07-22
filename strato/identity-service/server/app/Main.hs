@@ -16,6 +16,7 @@ import Data.Maybe (fromMaybe)
 import HFlags
 import IdentityService.Server
 import Network.Wai.Handler.Warp (run)
+import Network.Wai.Middleware.Cors
 import Servant.Client
 import Options
 
@@ -52,4 +53,6 @@ main = do
                    userRegCodeHash = stringKeccak256 $ flags_userRegistryCodeHash,
                    userTableName = flags_userContractName
                  }
-  run p $ identityServiceApp idData
+  run p
+    $ cors (const $ Just simpleCorsResourcePolicy {corsRequestHeaders = ["Content-Type"]})
+    $ identityServiceApp idData
