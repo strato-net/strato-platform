@@ -13,6 +13,36 @@ const { get } = lodash;
 import sgMail from "@sendgrid/mail";
 sgMail.setApiKey(SENDGRID_ENV.API_KEY);
 
+// Fetches Asset Name based on sale address
+const getAssetName = async(saleAddress)=>{
+
+
+  //fetch asset address
+  const assetToBeSold= await rest.search(
+                                        ADMIN.getUser()
+                                      , {name : `${TABLE_PREFIX}Sale`}
+                                      , {
+                                        ...DEFAULT_OPTIONS,
+                                        query: {
+                                          limit: 1
+                                        ,  ['address']: `eq.${saleAddress}`
+                                        ,  select:"assetToBeSold"
+                                        }
+                                    });
+  //fetch asset name
+  const tableArgs = { name: `${TABLE_PREFIX}Asset` };
+
+  const searchOptions = {
+    ...DEFAULT_OPTIONS,
+    query: {
+      limit: 1,
+      ['address']: `eq.${assetToBeSold}`,
+      select:"name"
+    }
+  }
+
+  return await rest.search(ADMIN.getUser(), tableArgs, searchOptions);
+}
 
 const sendEmail = async(to, subject, htmlContent) => {
 
@@ -317,4 +347,6 @@ export {
   initializePayment,
   cancelOrder,
   discardOrder,
+  getAssetName,
+  sendEmail,
 }

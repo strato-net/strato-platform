@@ -1,5 +1,5 @@
 import { Button, Row, Typography, InputNumber, Select, Spin } from "antd";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { Images } from "../../images";
 import { useMarketplaceDispatch } from "../../contexts/marketplace";
 import { useAuthenticateState } from "../../contexts/authentication";
@@ -30,6 +30,25 @@ const ResponsiveCart = ({
   const userOrganization = user?.organization;
   const [cartData, setCartData] = useState(data);
   const [faqOpenState, setFaqOpenState] = useState(Array(cartData.length).fill(false));
+
+  const storedConfirmOrderList = useMemo(() => {
+    const confirmOrderListData = window.localStorage.getItem("confirmOrderList");
+    let confirmOrderList = [];
+
+    try {
+      if (confirmOrderListData) {
+        // Attempt to parse the stored data as JSON
+        confirmOrderList = JSON.parse(confirmOrderListData);
+      }
+    } catch (error) {
+      // Handle JSON parsing error
+      console.error("Error parsing confirmOrderList data:", error);
+    }
+
+    return confirmOrderList;
+  }, []);
+  console.log("CONFIRM ORDER LIST",storedConfirmOrderList)
+  
 
   useEffect(() => {
     setCartData(data);
@@ -75,6 +94,8 @@ const ResponsiveCart = ({
       tax: tax,
       user: user.commonName,
       email: user.email,
+      confirmOrderList: storedConfirmOrderList[0],
+      //htmlContents: 
     };
 
     window.LOQ.push(['ready', async LO => {

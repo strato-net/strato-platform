@@ -50,7 +50,20 @@ const ConfirmOrder = ({ paymentProviders = [], data, columns }) => {
   }, [data]);
   
   const storedConfirmOrderList = useMemo(() => {
-    return JSON.parse(window.localStorage.getItem("confirmOrderList") ?? []);
+    const confirmOrderListData = window.localStorage.getItem("confirmOrderList");
+    let confirmOrderList = [];
+
+    try {
+      if (confirmOrderListData) {
+        // Attempt to parse the stored data as JSON
+        confirmOrderList = JSON.parse(confirmOrderListData);
+      }
+    } catch (error) {
+      // Handle JSON parsing error
+      console.error("Error parsing confirmOrderList data:", error);
+    }
+
+    return confirmOrderList;
   }, []);
   console.log("CONFIRM ORDER LIST",storedConfirmOrderList)
 
@@ -107,11 +120,12 @@ const ConfirmOrder = ({ paymentProviders = [], data, columns }) => {
     }
   };
 
-// TWEAK FN
-  const handleOrderConfirm = async (cartData) => {
-    let htmlContents = [];
+// Generating Email Confirmation HTML
+  let htmlContents = [];
+  const generate_HTML_Content = async (username) => {
+    htmlContents = [];
     
-    let customerFirstName = cartData.user.split(" ")[0];
+    let customerFirstName = username;
     
     // Construct Email with order details
     let concatenatedOrderString = "";
@@ -125,18 +139,18 @@ const ConfirmOrder = ({ paymentProviders = [], data, columns }) => {
   
       concatenatedOrderString += `${itemName}:\n`; 
       concatenatedOrderString += `$${itemTotal} <br>`; 
-      concatenatedOrderString += `Qty: ${itemQty} &nbsp; $${itemPrice} each <br><br>`; 
+      concatenatedOrderString += `Qty: ${itemQty} &nbsp; $${itemPrice} each (${itemPrice*100} STRATS)<br><br>`; 
       orderTotal += parseFloat(itemTotal); 
       if (i === storedConfirmOrderList.length - 1) {
         concatenatedOrderString += `<hr style="border-top: 1px dotted #0A1B71; min-width: 80%; max-width: 80%; margin-left: 15px;">`;
-        concatenatedOrderString += `Sales Tax: $${parseFloat(cartData.tax).toFixed(2)} <br>`;
+        concatenatedOrderString += `Sales Tax: $${parseFloat(tax).toFixed(2)} <br>`;
         concatenatedOrderString += `Shipping Fee: <i><strong>Free</strong></i><br><br>`;
         concatenatedOrderString += `Order Total: $${orderTotal.toFixed(2)} <br>`;
       }
     }
     
 
-    htmlContents.push(generateHtmlContent(customerFirstName, concatenatedOrderString));
+     htmlContents.push(generateHtmlContent(customerFirstName, concatenatedOrderString));
   };
 
   const openToastMarketplace = (placement) => {
@@ -160,7 +174,6 @@ const ConfirmOrder = ({ paymentProviders = [], data, columns }) => {
 
 
   const handlePaymentConfirm = async (paymentProvider, storedConfirmOrderList) => {
-    console.log("CLICKED")
     actions.addItemToConfirmOrder(marketplaceDispatch, cartData);
     let orderList = [];
     cartData.forEach((item) => {
@@ -172,6 +185,8 @@ const ConfirmOrder = ({ paymentProviders = [], data, columns }) => {
       });
     });
 
+    generate_HTML_Content(user.commonName)
+
     let body = {
       paymentProvider: { address: paymentProvider.address },
       buyerOrganization: userOrganization,
@@ -180,9 +195,9 @@ const ConfirmOrder = ({ paymentProviders = [], data, columns }) => {
       tax: tax,
       user: user.commonName,
       email: user.email,
-      confirmOrderList: {...storedConfirmOrderList},
+      confirmOrderList: storedConfirmOrderList[0],
+      htmlContents: htmlContents,
     };
-    console.log("BODY CREATED",body)
 
 
     window.LOQ.push(['ready', async LO => {
@@ -195,7 +210,6 @@ const ConfirmOrder = ({ paymentProviders = [], data, columns }) => {
         event: 'pay_now_button',
       },
     });
-    console.log("CHECK")
     let orderHashAndAssets = await orderActions.createPayment(orderDispatch, body);
     if(!orderHashAndAssets){
       setSelectedProvider('')
@@ -209,8 +223,7 @@ const ConfirmOrder = ({ paymentProviders = [], data, columns }) => {
             && checkoutRoute
             && checkoutRoute !== ''
          ) {
-        const url = `${serviceURL}${checkoutRoute}?orderHash=${orderHash}&redirectUrl=${window.location.protocol}//${window.location.host}/order/status`;
-        console.log("WHYYYY")
+        const url = `${serviceURL}${checkoutRoute}?email=${user.email}orderHash=${orderHash}&redirectUrl=${window.location.protocol}//${window.location.host}/order/status`;
         window.location.replace(url);
       } else {
         window.location.replace(`/order/status?assets=${assets}`);

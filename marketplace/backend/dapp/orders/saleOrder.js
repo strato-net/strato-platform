@@ -429,5 +429,5 @@ export default {
   marshalIn,
   marshalOut,
   getHistory,
-  getOrderEvent,
+  getOrderEventClosedOrPending,
 };

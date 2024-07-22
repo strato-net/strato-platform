@@ -14,7 +14,8 @@ import {
   completeOrder,
   initializePayment,
   cancelOrder,
-  discardOrder
+  discardOrder,
+  getAssetName
 } from '../helpers/utils.js';
 import { PAYMENT_STATUS, STRIPE_CONTRACT_ADDRESS, PAYMENT_RECEIVED_MESSAGE } from '../helpers/constants.js';
 
@@ -117,7 +118,7 @@ class StripeServiceController {
     try {
       // Validation
       StripeServiceController.validateStripeCheckoutArgs(req.query);
-      const { orderHash, redirectUrl } = req.query;
+      const { orderHash, redirectUrl, email } = req.query;
 
       // Check if the payment session already exists for the token
       const paymentDetails = await getStripePaymentFromToken(orderHash);
@@ -158,7 +159,7 @@ class StripeServiceController {
       }
 
       // Create checkout session and store in DB
-      const session = await stripeService.initiatePayment(redirectUrl, orderHash, orderDetails, sellerAccount);
+      const session = await stripeService.initiatePayment(redirectUrl, orderHash, orderDetails, email, sellerAccount);
       const insertResult = await insertStripePayment(orderHash, session.id, sellerCommonName);
 
       // Redirect to Stripe payment session
@@ -173,7 +174,7 @@ class StripeServiceController {
     try {
       // Validation
       StripeServiceController.validateStripeCheckoutConfirmArgs(req.query);
-      const { orderHash, redirectUrl } = req.query;
+      const { orderHash, redirectUrl, email } = req.query;
 
       // Retrieve the session
       const paymentDetails = await getStripePaymentFromToken(orderHash);
@@ -184,6 +185,7 @@ class StripeServiceController {
       if (session.payment_status === 'paid') {
         // Get the payment event from Cirrus
         const orderEvent = await getOrderEvent(orderHash);
+        console.log("Order Details",orderEvent)
 
         // Call completeOrder
         const callArgs = {
@@ -200,6 +202,11 @@ class StripeServiceController {
 
         // Update payment status in DB
         const updateResult = await updateStripePayment(orderHash, "PAID");
+
+        const purchasedAssetName = await getAssetName(orderEvent[0].saleAddresses[0]);
+
+        
+
       } else if (session.payment_status === 'unpaid' && session.status === 'complete') {
         // ACH payment
         // Get the payment event from Cirrus

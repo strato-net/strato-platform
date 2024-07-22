@@ -5,6 +5,7 @@ dotenv.config({ path: "../../../.env" });
 sgMail.setApiKey(process.env.SENDGRID_API_KEY);
 
 async function sendEmail(to, subject, htmlContent) {
+  console.log("INSIDE EMAIL YOOO")
 
   const msg = {
     to: to,
