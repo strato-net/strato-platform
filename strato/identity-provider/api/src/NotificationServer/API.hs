@@ -21,7 +21,7 @@ newtype Username = Username {username :: Text} deriving (Show, Generic)
 instance ToJSON Username where
 instance FromJSON Username where
 
-data NotifyBody = NotifyBody {recipients :: [Text], message :: Text} -- recipients [Username] instead?
+data NotifyBody = NotifyBody {recipients :: [Text], message :: Text}
     deriving (Show, Generic)
 instance ToJSON NotifyBody where
 instance FromJSON NotifyBody where
