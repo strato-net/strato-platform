@@ -1044,7 +1044,9 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
         comments: DEFAULT_COMMENT,
       }
       const orderHashAndAssets = await paymentProviderJs.createPayment(rawAdmin, paymentParameters, options);
-      return orderHashAndAssets;
+      const [orderHash, assetList] = orderHashAndAssets;
+      const orderEvent = await saleOrderJs.getOrderEventClosedOrPending(rawAdmin, {orderHash}, options);
+      return {orderHashAndAssets, orderEvent};
 
     } catch (error) {
       console.log(error);

@@ -5,10 +5,42 @@ import {
   ASSET_LOCKED_EVENT_TABLE,
   SELLER_ONBOARDED_TABLE, 
   TABLE_PREFIX, 
-  STRIPE_CONTRACT_ADDRESS } from "./constants.js";
+  STRIPE_CONTRACT_ADDRESS,
+  SENDGRID_ENV } from "./constants.js";
 import ADMIN from './oauth.js';
 import lodash from 'lodash';
 const { get } = lodash;
+import sgMail from "@sendgrid/mail";
+sgMail.setApiKey(SENDGRID_ENV.API_KEY);
+
+
+const sendEmail = async(to, subject, htmlContent) => {
+
+  const msg = {
+    to: to,
+    from: { email: "no_reply@blockapps.net", name: "BlockApps.net" },
+    subject: subject,
+    html: htmlContent,
+    // Remove sales from these emails for testnet testing. This needs to be included for production. 
+    bcc: 'sales@blockapps.net',
+    // attachments: [
+    //   {
+    //     content: pdf.toString("base64"),
+    //     filename: "certificate.pdf",
+    //     type: "application/pdf",
+    //     disposition: "attachment",
+    //   },
+    // ],
+  };
+
+  try {
+    await sgMail.send(msg);
+    console.log("Email sent successfully!");
+  } catch (error) {
+    console.error("Error sending email:", error);
+    throw error;
+  }
+}
 
 const clientErrorHandler = (err, req, res, next) => {
   const statusCode = get(err, 'statusCode');

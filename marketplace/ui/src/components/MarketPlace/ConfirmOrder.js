@@ -10,6 +10,7 @@ import {
   useMarketplaceState,
   useMarketplaceDispatch,
 } from "../../contexts/marketplace";
+import { useMemo } from "react";
 import { useOrderState, useOrderDispatch } from "../../contexts/order";
 import { useAuthenticateState } from "../../contexts/authentication";
 import { actions } from "../../contexts/marketplace/actions";
@@ -25,6 +26,7 @@ import "./index.css";
 import { HTTP_METHODS, PAYMENT_LIST } from "../../helpers/constants";
 import TagManager from "react-gtm-module";
 import { setCookie } from "../../helpers/cookie";
+import { generateHtmlContent } from "../../helpers/emailTemplate";
 
 const { Option } = Select;
 
@@ -46,6 +48,11 @@ const ConfirmOrder = ({ paymentProviders = [], data, columns }) => {
   useEffect(() => {
     setCartData(data);
   }, [data]);
+  
+  const storedConfirmOrderList = useMemo(() => {
+    return JSON.parse(window.localStorage.getItem("confirmOrderList") ?? []);
+  }, []);
+  console.log("CONFIRM ORDER LIST",storedConfirmOrderList)
 
   const countDown = () => {
     modal.info({
@@ -100,6 +107,38 @@ const ConfirmOrder = ({ paymentProviders = [], data, columns }) => {
     }
   };
 
+// TWEAK FN
+  const handleOrderConfirm = async (cartData) => {
+    let htmlContents = [];
+    
+    let customerFirstName = cartData.user.split(" ")[0];
+    
+    // Construct Email with order details
+    let concatenatedOrderString = "";
+    let orderTotal = 0; 
+    for (let i = 0; i < storedConfirmOrderList.length; i++) {
+      let orderItem = storedConfirmOrderList[i];
+      let itemName = decodeURIComponent(orderItem.item.name);
+      let itemPrice = parseFloat(orderItem.unitPrice).toFixed(2); 
+      let itemQty = orderItem.qty;
+      let itemTotal = (itemPrice * itemQty).toFixed(2); 
+  
+      concatenatedOrderString += `${itemName}:\n`; 
+      concatenatedOrderString += `$${itemTotal} <br>`; 
+      concatenatedOrderString += `Qty: ${itemQty} &nbsp; $${itemPrice} each <br><br>`; 
+      orderTotal += parseFloat(itemTotal); 
+      if (i === storedConfirmOrderList.length - 1) {
+        concatenatedOrderString += `<hr style="border-top: 1px dotted #0A1B71; min-width: 80%; max-width: 80%; margin-left: 15px;">`;
+        concatenatedOrderString += `Sales Tax: $${parseFloat(cartData.tax).toFixed(2)} <br>`;
+        concatenatedOrderString += `Shipping Fee: <i><strong>Free</strong></i><br><br>`;
+        concatenatedOrderString += `Order Total: $${orderTotal.toFixed(2)} <br>`;
+      }
+    }
+    
+
+    htmlContents.push(generateHtmlContent(customerFirstName, concatenatedOrderString));
+  };
+
   const openToastMarketplace = (placement) => {
     if (marketplaceSuccess) {
       api.success({
@@ -118,7 +157,10 @@ const ConfirmOrder = ({ paymentProviders = [], data, columns }) => {
     }
   };
 
-  const handlePaymentConfirm = async (paymentProvider) => {
+
+
+  const handlePaymentConfirm = async (paymentProvider, storedConfirmOrderList) => {
+    console.log("CLICKED")
     actions.addItemToConfirmOrder(marketplaceDispatch, cartData);
     let orderList = [];
     cartData.forEach((item) => {
@@ -138,7 +180,10 @@ const ConfirmOrder = ({ paymentProviders = [], data, columns }) => {
       tax: tax,
       user: user.commonName,
       email: user.email,
+      confirmOrderList: {...storedConfirmOrderList},
     };
+    console.log("BODY CREATED",body)
+
 
     window.LOQ.push(['ready', async LO => {
       // Track an event
@@ -150,6 +195,7 @@ const ConfirmOrder = ({ paymentProviders = [], data, columns }) => {
         event: 'pay_now_button',
       },
     });
+    console.log("CHECK")
     let orderHashAndAssets = await orderActions.createPayment(orderDispatch, body);
     if(!orderHashAndAssets){
       setSelectedProvider('')
@@ -164,6 +210,7 @@ const ConfirmOrder = ({ paymentProviders = [], data, columns }) => {
             && checkoutRoute !== ''
          ) {
         const url = `${serviceURL}${checkoutRoute}?orderHash=${orderHash}&redirectUrl=${window.location.protocol}//${window.location.host}/order/status`;
+        console.log("WHYYYY")
         window.location.replace(url);
       } else {
         window.location.replace(`/order/status?assets=${assets}`);
@@ -186,7 +233,7 @@ const ConfirmOrder = ({ paymentProviders = [], data, columns }) => {
       });
       const checkQuantity = await orderActions.fetchSaleQuantity(orderDispatch, saleAddresses, quantities);
       if (checkQuantity === true) {
-        handlePaymentConfirm(provider);
+        await handlePaymentConfirm(provider, storedConfirmOrderList);
       } else {
         let insufficientQuantityMessage = "";
         let outOfStockMessage = "";

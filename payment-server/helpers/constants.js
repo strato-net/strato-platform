@@ -11,6 +11,8 @@ const STRIPE_ENV = {
   }
 }
 
+const SENDGRID_ENV = { API_KEY: process.env.SENDGRID_API_KEY }
+
 const DEFAULT_OPTIONS = { ...OPTIONS, chainIds: [], cacheNonce: true };
 
 const STRIPE_CONTRACT_ADDRESS = process.env.STRIPE_CONTRACT_ADDRESS;
@@ -51,4 +53,5 @@ export {
   PAYMENT_STATUS,
   TABLE_PREFIX,
   PAYMENT_RECEIVED_MESSAGE,
+  SENDGRID_ENV,
 }

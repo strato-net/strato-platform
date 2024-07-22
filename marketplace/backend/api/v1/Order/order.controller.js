@@ -63,10 +63,24 @@ class OrderController {
     try {
       const { dapp, body, accessToken } = req
       const originUrl = req.headers.origin || config.serverHost;
-      OrderController.validatePaymentArgs(body)
+      const {confirmOrderList, ...restArgs} = body;
+      OrderController.validatePaymentArgs(restArgs)
 
-      const result = await dapp.paymentCheckout(originUrl, body, options, accessToken)
-      rest.response.status200(res, result)
+      const result = await dapp.paymentCheckout(originUrl, restArgs, options, accessToken)
+      const {orderHashAndAssets, orderEvent} = result;
+      //TODO: check orderEvent.status= 2 || 3 and sendEmail
+       // Only send email if order is created successfully
+      //  if (res.statusMessage === "OK") {
+      //   //for every item in htmlContents, send email
+      //   for (let i = 0; i < htmlContents.length; i++) {
+      //     await sendEmail(to, subject, htmlContents[i]);
+      //   }
+      // }
+
+      // console.log("*Buyer placed order*");
+
+      console.log("CONTROLLER BODY:",body)
+      rest.response.status200(res, orderHashAndAssets)
     } catch (e) {
       return next(e)
     }
