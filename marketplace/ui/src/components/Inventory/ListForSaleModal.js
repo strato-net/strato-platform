@@ -4,7 +4,7 @@ import { actions } from "../../contexts/inventory/actions";
 import { useInventoryDispatch, useInventoryState } from "../../contexts/inventory";
 import { usePaymentServiceDispatch, usePaymentServiceState } from "../../contexts/payment";
 import { actions as paymentServiceActions } from "../../contexts/payment/actions";
-import { handlePriceInput } from "../../helpers/utils";
+import { handlePriceInput, handleQuantityInput } from "../../helpers/utils";
 
 const { Option } = Select;
 
@@ -29,6 +29,8 @@ const ListForSaleModal = ({ open, handleCancel, inventory, categoryName, limit, 
     const paymentServiceDispatch = usePaymentServiceDispatch();
     const inputPriceDesktopRef = useRef(null);
     const inputPriceMobileRef = useRef(null);
+    const inputQuantityDesktopRef = useRef(null);
+    const inputQuantityMobileRef = useRef(null);
 
     useEffect(() => {
         paymentServiceActions.getPaymentServices(paymentServiceDispatch);
@@ -65,22 +67,35 @@ const ListForSaleModal = ({ open, handleCancel, inventory, categoryName, limit, 
     }, [paymentServices, notOnboarded, inventory.paymentProviders]);
 
     useEffect(() => {
-        const inputElements = [inputPriceDesktopRef.current, inputPriceMobileRef.current];
+        const priceInputElements = [inputPriceDesktopRef.current, inputPriceMobileRef.current];
+        const quantityInputElements = [inputQuantityDesktopRef.current, inputQuantityMobileRef.current];
         
-        inputElements.forEach(inputElement => {
+        priceInputElements.forEach(inputElement => {
             if (inputElement) {
                 inputElement.addEventListener('input', handlePriceInput(setpricePerUnit));
             }
         });
 
+        quantityInputElements.forEach(inputElement => {
+            if (inputElement) {
+                inputElement.addEventListener('input', handleQuantityInput(setQuantity));
+            }
+        });
+
         return () => {
-            inputElements.forEach(inputElement => {
+            priceInputElements.forEach(inputElement => {
                 if (inputElement) {
                     inputElement.removeEventListener('input', handlePriceInput(setpricePerUnit));
                 }
             });
+
+            quantityInputElements.forEach(inputElement => {
+                if (inputElement) {
+                    inputElement.removeEventListener('input', handleQuantityInput(setQuantity));
+                }
+            });
         };
-    }, [inputPriceDesktopRef, inputPriceMobileRef]);
+    }, [inputPriceDesktopRef, inputPriceMobileRef, inputQuantityDesktopRef, inputQuantityMobileRef]);
 
     const renderImg = (service) => {
         return service.imageURL && service.imageURL !== ''
@@ -154,6 +169,7 @@ const ListForSaleModal = ({ open, handleCancel, inventory, categoryName, limit, 
                 render: () => (
                     <InputNumber
                         value={quantity}
+                        ref={inputQuantityDesktopRef}
                         controls={false}
                         min={1}
                         onChange={(value) => {
@@ -265,6 +281,7 @@ const ListForSaleModal = ({ open, handleCancel, inventory, categoryName, limit, 
                     <InputNumber
                         className="w-full h-9"
                         value={quantity}
+                        ref={inputQuantityMobileRef}
                         controls={false}
                         min={1}
                         onChange={(value) => {

@@ -69,3 +69,14 @@ export const handlePriceInput  = (setpricePerUnit) => (event) => {
       setpricePerUnit(0);
   }
 };
+
+export const handleQuantityInput = (setQuantity) => (event) => {
+  let value = event.target.value;
+  value = value.replace(/[^0-9]/g, ''); // remove any non-numeric characters and decimal points
+  event.target.value = value;
+  if (value) {
+      setQuantity(value);
+  } else {
+      setQuantity(0);
+  }
+};
