@@ -30,6 +30,7 @@ library:
   - bloc2api
   - bloc2client
   - blockapps-identity-provider-api
+  - blockapps-identity-provider-client
   - blockapps-vault-wrapper-client
   - blockapps-vault-wrapper-api
   - bytestring

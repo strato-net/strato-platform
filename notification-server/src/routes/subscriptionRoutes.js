@@ -10,6 +10,9 @@ router.put('/subscribe', async (req, res) => {
     const email = req.headers.authorization;
     const { username } = req.body;
 
+    // respond with text/plain content-type
+    res.type('txt');
+
     // Validate email and username
     if (!email || !username) {
       return res.status(400).send('Bad Request: Missing email or username');
@@ -26,7 +29,7 @@ router.put('/subscribe', async (req, res) => {
     const success = await subscribe(username, email);
 
     if (success) {
-      return res.status(201).send('User subscribed successfully');
+      return res.status(200).send('User subscribed successfully');
     }
 
     return res.status(500).send('Internal Server Error: Error subscribing user');
