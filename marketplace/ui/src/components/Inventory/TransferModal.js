@@ -1,11 +1,12 @@
 import { Button, Select, InputNumber, Modal, Table } from "antd";
-import { useEffect, useState } from "react";
+import { useEffect, useRef,useState } from "react";
 import { actions } from "../../contexts/inventory/actions";
 import { actions as userActions } from "../../contexts/users/actions";
 import { useInventoryDispatch, useInventoryState } from "../../contexts/inventory";
 import { useUsersDispatch, useUsersState } from "../../contexts/users";
 import { useAuthenticateState } from "../../contexts/authentication";
 import { SearchOutlined } from '@ant-design/icons';
+import { handlePriceInput } from "../../helpers/utils";
 
 const TransferModal = ({ open, handleCancel, inventory, categoryName, limit, offset }) => {
     const [data, setData] = useState([inventory]);
@@ -24,6 +25,8 @@ const TransferModal = ({ open, handleCancel, inventory, categoryName, limit, off
     const {
         isTransferring
     } = useInventoryState();
+    const inputPriceDesktopRef = useRef(null);
+    const inputPriceMobileRef = useRef(null);
 
     const filterDuplicateUserAddresses = (arr) => {
         return [...new Map(arr.map((u) => [u.value, u])).values()];
@@ -48,7 +51,7 @@ const TransferModal = ({ open, handleCancel, inventory, categoryName, limit, off
 
     useEffect(() => {
         userActions.fetchUsers(userDispatch);
-    }, [])
+    }, []);
 
     useEffect(() => {
         if (quantity > inventory.quantity || quantity <= 0 || !userAddress) {
@@ -57,7 +60,25 @@ const TransferModal = ({ open, handleCancel, inventory, categoryName, limit, off
         else {
             setCanTransfer(true);
         };
-    }, [quantity, userAddress])
+    }, [quantity, userAddress]);
+
+    useEffect(() => {
+        const inputElements = [inputPriceDesktopRef.current, inputPriceMobileRef.current];
+        
+        inputElements.forEach(inputElement => {
+            if (inputElement) {
+                inputElement.addEventListener('input', handlePriceInput(setPrice));
+            }
+        });
+
+        return () => {
+            inputElements.forEach(inputElement => {
+                if (inputElement) {
+                    inputElement.removeEventListener('input', handlePriceInput(setPrice));
+                }
+            });
+        };
+    }, [inputPriceDesktopRef, inputPriceMobileRef]);
 
     const filteredOptions = searchInput
         ? filteredUsersList.filter(option =>
@@ -93,12 +114,14 @@ const TransferModal = ({ open, handleCancel, inventory, categoryName, limit, off
             align: "center",
             render: () => (
                 <InputNumber
+                    ref={inputPriceDesktopRef}
                     value={price}
                     controls={false}
                     min={0.01}
                     onChange={(value) => {
-                        if (value && value > 0) {
-                            setPrice(parseFloat(value.toFixed(2)));
+                        const stringValue = value ? value.toString() : '';
+                        if (/^\d+(\.\d{0,2})?$/.test(stringValue)) {
+                            setPrice(value);
                         }
                     }}
                 />
@@ -197,11 +220,13 @@ const TransferModal = ({ open, handleCancel, inventory, categoryName, limit, off
                         <InputNumber
                             className="w-full h-9"
                             value={price}
+                            ref={inputPriceMobileRef}
                             controls={false}
                             min={.01}
                             onChange={(value) => {
-                                if (value && value > 0) {
-                                    setPrice(parseFloat(value.toFixed(2)));
+                                const stringValue = value ? value.toString() : '';
+                                if (/^\d+(\.\d{0,2})?$/.test(stringValue)) {
+                                    setPrice(value);
                                 }
                             }}
                         />

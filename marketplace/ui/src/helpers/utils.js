@@ -49,3 +49,23 @@ export const downloadSample = () => {
 export function epochToDate(epoch) {
   return dayjs.unix(epoch).format(US_DATE_FORMAT);
 }
+
+
+export const handlePriceInput  = (setpricePerUnit) => (event) => {
+  let value = event.target.value;
+  value = value.replace(/[^0-9.]/g, ''); // remove any non-numeric characters
+
+  const parts = value.split('.');
+  if (parts.length > 2) {
+      value = parts[0] + '.' + parts.slice(1).join('');
+  } else if (parts.length === 2 && parts[1].length > 2) {
+      parts[1] = parts[1].substring(0, 2);
+      value = parts.join('.');
+  }
+  event.target.value = value;
+  if (value) {
+      setpricePerUnit(parseFloat(value));
+  } else {
+      setpricePerUnit(0);
+  }
+};

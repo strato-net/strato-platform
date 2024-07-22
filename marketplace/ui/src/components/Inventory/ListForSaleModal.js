@@ -4,6 +4,7 @@ import { actions } from "../../contexts/inventory/actions";
 import { useInventoryDispatch, useInventoryState } from "../../contexts/inventory";
 import { usePaymentServiceDispatch, usePaymentServiceState } from "../../contexts/payment";
 import { actions as paymentServiceActions } from "../../contexts/payment/actions";
+import { handlePriceInput } from "../../helpers/utils";
 
 const { Option } = Select;
 
@@ -64,37 +65,18 @@ const ListForSaleModal = ({ open, handleCancel, inventory, categoryName, limit, 
     }, [paymentServices, notOnboarded, inventory.paymentProviders]);
 
     useEffect(() => {
-        const handleInput = (event) => {
-            let value = event.target.value;
-            value = value.replace(/[^0-9.]/g, ''); // remove any non-numeric characters
-
-            const parts = value.split('.');
-            if (parts.length > 2) {
-                value = parts[0] + '.' + parts.slice(1).join('');
-            } else if (parts.length === 2 && parts[1].length > 2) {
-                parts[1] = parts[1].substring(0, 2);
-                value = parts.join('.');
-            }
-            event.target.value = value;
-            if (value) {
-                setpricePerUnit(parseFloat(value));
-            } else {
-                setpricePerUnit(0);
-            }
-        };
-
         const inputElements = [inputPriceDesktopRef.current, inputPriceMobileRef.current];
         
         inputElements.forEach(inputElement => {
             if (inputElement) {
-                inputElement.addEventListener('input', handleInput);
+                inputElement.addEventListener('input', handlePriceInput(setpricePerUnit));
             }
         });
 
         return () => {
             inputElements.forEach(inputElement => {
                 if (inputElement) {
-                    inputElement.removeEventListener('input', handleInput);
+                    inputElement.removeEventListener('input', handlePriceInput(setpricePerUnit));
                 }
             });
         };
