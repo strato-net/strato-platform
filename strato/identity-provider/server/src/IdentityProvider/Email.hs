@@ -16,6 +16,9 @@ import GHC.Generics
 import Network.HTTP.Client
 import Network.HTTP.Client.TLS
 import Network.HTTP.Types.Header (hAuthorization, hContentType)
+import NotificationServer.API
+import NotificationServer.Client
+import Servant.Client hiding (manager)
 
 newtype SendgridAPIKey = SendgridAPIKey {apiKey :: ByteString} deriving (Show)
 
@@ -66,3 +69,13 @@ sendWelcomeEmail email' name uuid key = do
   response <- liftIO $ httpLbs request manager
   $logInfoS "sendWelcomeEmail" $ T.pack $ "Sendgrid response for welcome email was " <> show (responseStatus response)
   return ()
+
+subscribeUser :: (MonadIO m, MonadLogger m) => T.Text -> T.Text -> String -> m ()
+subscribeUser auth user url = do
+  -- this is wrong; make a HasNotificationServer monad
+  mgr <- liftIO $ newManager defaultManagerSettings -- this is wrong; do https
+  notificationServerUrl <- liftIO $ parseBaseUrl url
+  eResp <- liftIO $ runClientM (putSubscribe auth (Username user)) (mkClientEnv mgr notificationServerUrl)
+  case eResp of 
+    Right _ -> $logInfoS "subscribeUser" $ "Successfully subscribed user " <> user
+    Left err -> $logErrorS "subscribeUser" . T.pack $ "Error while trying to subscribe: " <> show err
