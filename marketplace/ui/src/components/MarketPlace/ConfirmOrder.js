@@ -36,6 +36,7 @@ const ConfirmOrder = ({ paymentProviders = [], data, columns }) => {
   const userOrganization = user?.organization;
   const { isCreateOrderSubmitting, message, success, isCreatePaymentSubmitting } = useOrderState();
   const [tax, setTax] = useState(0);
+  const [subTotal, setSubTotal] = useState(0);
   const [total, setTotal] = useState(0);
   const inventoryDispatch = useInventoryDispatch();
   const { success: marketplaceSuccess, message: marketplaceMessage } = useMarketplaceState();
@@ -74,12 +75,13 @@ const ConfirmOrder = ({ paymentProviders = [], data, columns }) => {
     cartData.forEach((item) => {
       t += item.tax;
     });
-    setTax(t);
+    setTax(t.toFixed(2));
     let sum = 0;
     cartData.forEach((item) => {
       sum += item.amount;
     });
-    setTotal(sum);
+    setSubTotal(sum.toFixed(2));
+    setTotal((sum + t).toFixed(2));
   }, [marketplaceDispatch, cartData]);
 
   const openToastOrder = (placement, message) => {
@@ -134,7 +136,7 @@ const ConfirmOrder = ({ paymentProviders = [], data, columns }) => {
       paymentProvider: { address: paymentProvider.address },
       buyerOrganization: userOrganization,
       orderList,
-      orderTotal: total + tax,
+      orderTotal: total,
       tax: tax,
       user: user.commonName,
       email: user.email,
@@ -151,7 +153,7 @@ const ConfirmOrder = ({ paymentProviders = [], data, columns }) => {
       },
     });
     let orderHashAndAssets = await orderActions.createPayment(orderDispatch, body);
-    if(!orderHashAndAssets){
+    if (!orderHashAndAssets) {
       setSelectedProvider('')
     }
     if (orderHashAndAssets && orderHashAndAssets !== false) {
@@ -159,10 +161,10 @@ const ConfirmOrder = ({ paymentProviders = [], data, columns }) => {
       let serviceURL = paymentProvider.serviceURL || paymentProvider.data.serviceURL;
       let checkoutRoute = paymentProvider.checkoutRoute || paymentProvider.data.checkoutRoute;
       if (serviceURL
-            && serviceURL !== ''
-            && checkoutRoute
-            && checkoutRoute !== ''
-         ) {
+        && serviceURL !== ''
+        && checkoutRoute
+        && checkoutRoute !== ''
+      ) {
         const url = `${serviceURL}${checkoutRoute}?orderHash=${orderHash}&redirectUrl=${window.location.protocol}//${window.location.host}/order/status`;
         window.location.replace(url);
       } else {
@@ -243,7 +245,7 @@ const ConfirmOrder = ({ paymentProviders = [], data, columns }) => {
                 <div className="w-max flex flex-col gap-[10px]">
                   <Row className="justify-between items-center ">
                     <p className="text-base text-[#6A6A6A]">Sub Total:</p>
-                    <p className="text-base text-[#202020] md:ml-5 text-right">${total} <span className="ml-1">({total * 100} STRATS)</span></p>
+                    <p className="text-base text-[#202020] md:ml-5 text-right">${subTotal} <span className="ml-1">({(subTotal * 100).toFixed(0)} STRATS)</span></p>
                   </Row>
                   <Row className="justify-start items-center ">
                     <p className="text-base text-[#6A6A6A]">Tax:</p>
@@ -252,7 +254,7 @@ const ConfirmOrder = ({ paymentProviders = [], data, columns }) => {
                   <Row className="justify-between items-center">
                     <p className="text-base text-[#6A6A6A]">Total:</p>
                     <p id="totalPrice" className="text-base text-[#202020] md:ml-5 text-right">
-                      ${total + tax} <span className="ml-1">({(total + tax) * 100} STRATS)</span>
+                      ${total} <span className="ml-1">({(total * 100).toFixed(0)} STRATS)</span>
                     </p>
                   </Row>
                 </div>
