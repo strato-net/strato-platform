@@ -449,8 +449,7 @@ blockHashBS :: SequencedBlock -> BS.ByteString
 blockHashBS = B.toStrict . encode . sbHash
 
 sequencedBlockDifficulty :: SequencedBlock -> Integer
--- sequencedBlockDifficulty = difficulty . sbBlockData
-sequencedBlockDifficulty sb = fromMaybe 1 $ getBlockDifficulty (sbBlockData sb)
+sequencedBlockDifficulty = getBlockDifficulty . sbBlockData
 
 outputBlockHash :: OutputBlock -> Keccak256
 outputBlockHash = blockHeaderHash . obBlockData

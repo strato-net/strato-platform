@@ -288,10 +288,14 @@ addTransactions ::
   ConduitT a VmOutEvent m ()
 addTransactions blockData txs =
   timeit ("addTransactions, " ++ show (length txs) ++ " TXs") (Just vmBlockInsertionMined) $ do
-    trrs <- lift $ go (gasLimit blockData) txs DL.empty
+    trrs <- lift $ go (gasLimit' blockData) txs DL.empty
     mapM_ (outputTransactionResult blockData blockHeaderHash) trrs
     yield . OutASM $ foldr (flip M.union) M.empty $ map trrAfterMap trrs
   where
+    gasLimit' :: BlockHeader -> Integer
+    gasLimit' BlockHeader { gasLimit } = gasLimit
+    gasLimit' BlockHeaderV2 {} = 100000000000000 -- TODO change this to maxBound? - fromIntegral (maxBound :: Int)
+
     go _ [] trrs = return $ DL.toList trrs
     go blockGas (t : rest) trrs = do
       let bt = fromMaybe (otBaseTx t) (otPrivatePayload t)

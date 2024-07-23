@@ -1,6 +1,7 @@
 {-# LANGUAGE DeriveDataTypeable #-}
 {-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
+{-# LANGUAGE NamedFieldPuns #-}
 {-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 
@@ -95,17 +96,17 @@ instance Binary BlockHeader
 
 instance NFData BlockHeader
 
-getBlockDifficulty :: BlockHeader -> Maybe Integer
-getBlockDifficulty BlockHeader {..} = Just difficulty
-getBlockDifficulty BlockHeaderV2 {} = Nothing
+getBlockDifficulty :: BlockHeader -> Integer
+getBlockDifficulty BlockHeader { difficulty } = difficulty
+getBlockDifficulty BlockHeaderV2 {} = -1
 
-getBlockGasLimit :: BlockHeader -> Maybe Integer
-getBlockGasLimit BlockHeader {..} = Just gasLimit
-getBlockGasLimit BlockHeaderV2 {} = Nothing
+getBlockGasLimit :: BlockHeader -> Integer
+getBlockGasLimit BlockHeader { gasLimit } = gasLimit
+getBlockGasLimit BlockHeaderV2 {} = 22500000000000000000000000000000 -- arbitrary as FUCK
 
-getBlockOmmersHash :: BlockHeader -> Maybe Keccak256
-getBlockOmmersHash BlockHeader {..} = Just ommersHash
-getBlockOmmersHash BlockHeaderV2 {} = Nothing
+getBlockOmmersHash :: BlockHeader -> Keccak256
+getBlockOmmersHash BlockHeader { ommersHash } = ommersHash
+getBlockOmmersHash BlockHeaderV2 {} = (hash . rlpSerialize . RLPArray) []
 
 makeLensesFor [("extraData", "extraDataLens"), ("mixHash", "mixHashlens")] ''BlockHeader
 

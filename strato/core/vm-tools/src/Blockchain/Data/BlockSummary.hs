@@ -19,7 +19,6 @@ import qualified Blockchain.Database.MerklePatricia as MP
 import Blockchain.Strato.Model.Keccak256
 import Data.Time
 import Data.Time.Clock.POSIX
-import Data.Maybe (fromMaybe)
 
 data BlockSummary = BlockSummary
   { bSumParentHash :: Keccak256,
@@ -36,10 +35,10 @@ blockHeaderToBSum :: BlockHeader -> Difficulty -> Integer -> BlockSummary
 blockHeaderToBSum b totalDiff txCount =
   BlockSummary
     { bSumParentHash = parentHash b,
-      bSumDifficulty = fromMaybe 1 $ getBlockDifficulty b,
+      bSumDifficulty = getBlockDifficulty b,
       bSumTotalDifficulty = totalDiff,
       bSumStateRoot = stateRoot b,
-      bSumGasLimit = fromMaybe 100000000000000 $ getBlockGasLimit b,
+      bSumGasLimit = getBlockGasLimit b,
       bSumTimestamp = timestamp b,
       bSumNumber = number b,
       bSumTxCount = txCount
