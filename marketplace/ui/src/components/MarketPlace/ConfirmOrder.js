@@ -72,14 +72,12 @@ const ConfirmOrder = ({ paymentProviders = [], data, columns }) => {
 
   useEffect(() => {
     let t = 0;
-    cartData.forEach((item) => {
-      t += item.tax;
-    });
-    setTax(t.toFixed(2));
     let sum = 0;
     cartData.forEach((item) => {
+      t += item.tax;
       sum += item.amount;
     });
+    setTax(t.toFixed(2));
     setSubTotal(sum.toFixed(2));
     setTotal((sum + t).toFixed(2));
   }, [marketplaceDispatch, cartData]);

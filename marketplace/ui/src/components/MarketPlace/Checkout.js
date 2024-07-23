@@ -267,7 +267,7 @@ const Checkout = () => {
       align: "center",
       render: (text) => (
         <p className=" text-sm text-[#202020] font-semibold font-sans">
-          {"$" + text}
+          {"$" + text.toFixed(2)}
         </p>
       ),
     },
@@ -319,7 +319,7 @@ const Checkout = () => {
       dataIndex: "tax",
       align: "center",
       render: (text) => (
-        <p className="text-sm font-semibold text-[#202020]">{"$" + text}</p>
+        <p className="text-sm font-semibold text-[#202020]">{"$" + text.toFixed(2)}</p>
       ),
     },
     {
@@ -331,7 +331,7 @@ const Checkout = () => {
       dataIndex: "amount",
       align: "center",
       render: (text) => (
-        <p className="text-sm font-semibold text-[#202020]">{"$" + text}</p>
+        <p className="text-sm font-semibold text-[#202020]">{"$" + text.toFixed(2)}</p>
       ),
     },
     {
