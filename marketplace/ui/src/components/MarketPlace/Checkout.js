@@ -46,26 +46,26 @@ const Checkout = () => {
     return (item.product.price * CHARGES.TAX) / 100;
   };
 
-  const storedData = useMemo(() => {
-    const cartListData = window.localStorage.getItem("cartList");
-    let cartList = [];
+  // const storedData = useMemo(() => {
+  //   const cartListData = window.localStorage.getItem("cartList");
+  //   let cartList = [];
 
-    try {
-      if (cartListData) {
-        // Attempt to parse the stored data as JSON
-        cartList = JSON.parse(cartListData);
-      }
-    } catch (error) {
-      // Handle JSON parsing error
-      console.error("Error parsing cartList data:", error);
-    }
+  //   try {
+  //     if (cartListData) {
+  //       // Attempt to parse the stored data as JSON
+  //       cartList = JSON.parse(cartListData);
+  //     }
+  //   } catch (error) {
+  //     // Handle JSON parsing error
+  //     console.error("Error parsing cartList data:", error);
+  //   }
 
-    return cartList;
-  }, []);
+  //   return cartList;
+  // }, []);
 
   useEffect(() => {
-    actions.fetchCartItems(marketplaceDispatch, storedData);
-  }, [marketplaceDispatch, storedData]);
+    actions.fetchCartItems(marketplaceDispatch, cartList);
+  }, [marketplaceDispatch, cartList]);
 
   useEffect(() => {
     paymentServiceActions.getPaymentServices(paymentServiceDispatch);
