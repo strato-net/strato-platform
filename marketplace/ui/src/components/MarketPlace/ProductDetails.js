@@ -251,61 +251,67 @@ const ProductDetails = ({ user, users }) => {
     }
   };
 
-  const addItemToCart = async () => {
-    let found = false;
-    for (var i = 0; i < cartList.length; i++) {
-      if (cartList[i].product.address === details.address) {
-        found = true;
-        break;
-      }
-    }
-    let items = [];
-    if (!found) {
-      items = [{ product: details, qty }];
+  // const addItemToCart = async () => {
+  //   let found = false;
+  //   for (var i = 0; i < cartList.length; i++) {
+  //     if (cartList[i].product.address === details.address) {
+  //       found = true;
+  //       break;
+  //     }
+  //   }
+  //   let items = [];
+  //   if (!found) {
+  //     items = [{ product: details, qty }];
 
-      marketPlaceActions.addItemToCart(marketplaceDispatch, items);
-      setQty(1);
-      openToast("bottom", false, TOAST_MSG.ITEM_ADDED_TO_CART);
-      setTimeout(() => {
-        navigate('/checkout')
-      }, 2000);
-    } else {
-      items = [...cartList];
-      const quantity = cartList[0].qty + qty;
-      const checkQuantity = await orderActions.fetchSaleQuantity(orderDispatch, [details.saleAddress], [quantity])
-      cartList.forEach((element, index) => {
-        if (element.product.address === details.address) {
-          if(checkQuantity[0].availableQuantity > quantity){
-            items[index].qty += qty;
-            marketPlaceActions.addItemToCart(marketplaceDispatch, items);
-            setQty(1);
-            openToast("bottom", false, TOAST_MSG.ITEM_UPDATED_IN_CART);
-            setTimeout(() => {
-              navigate('/checkout')
-            }, 2000);
-          }else{
-            if (checkQuantity[0].availableQuantity === 0) {
-              openToast(
-                "bottom",
-                true,
-                `Unfortunately, ${details.name} is currently out of stock. We recommend checking back soon or browsing similar items available now.`
-              );
-            } else {
-              // Case 2: We are trying to add too much quantity
-              openToast(
-                "bottom",
-                true,
-                `Unfortunately, only ${checkQuantity[0].availableQuantity} units of ${details.name} are available. Please update your cart quantity accordingly.`
-              );
-              setTimeout(() => {
-                navigate('/checkout')
-              }, 2000);
-            }
-          }
-        }
-      });
-    }
-  };
+  //     marketPlaceActions.addItemToCart(marketplaceDispatch, items);
+  //     setQty(1);
+  //     openToast("bottom", false, TOAST_MSG.ITEM_ADDED_TO_CART);
+  //     setTimeout(() => {
+  //       navigate('/checkout')
+  //     }, 2000);
+  //   } else {
+  //     items = [...cartList];
+  //     const quantity = cartList[0].qty + qty;
+  //     const checkQuantity = await orderActions.fetchSaleQuantity(orderDispatch, [details.saleAddress], [quantity])
+  //     cartList.forEach((element, index) => {
+  //       if (element.product.address === details.address) {
+  //         if(checkQuantity[0].availableQuantity > quantity){
+  //           items[index].qty += qty;
+  //           marketPlaceActions.addItemToCart(marketplaceDispatch, items);
+  //           setQty(1);
+  //           openToast("bottom", false, TOAST_MSG.ITEM_UPDATED_IN_CART);
+  //           setTimeout(() => {
+  //             navigate('/checkout')
+  //           }, 2000);
+  //         }else{
+  //           if (checkQuantity[0].availableQuantity === 0) {
+  //             openToast(
+  //               "bottom",
+  //               true,
+  //               `Unfortunately, ${details.name} is currently out of stock. We recommend checking back soon or browsing similar items available now.`
+  //             );
+  //           } else {
+  //             // Case 2: We are trying to add too much quantity
+  //             openToast(
+  //               "bottom",
+  //               true,
+  //               `Unfortunately, only ${checkQuantity[0].availableQuantity} units of ${details.name} are available. Please update your cart quantity accordingly.`
+  //             );
+  //             setTimeout(() => {
+  //               navigate('/checkout')
+  //             }, 2000);
+  //           }
+  //         }
+  //       }
+  //     });
+  //   }
+  // };
+
+  const addItemToCart = async () =>{
+    const items = [{ product: details, qty }];
+    marketPlaceActions.addItemToCart(marketplaceDispatch, items);
+    navigate('/checkout')
+  }
 
   const ownershipDetailColumn = [
     {

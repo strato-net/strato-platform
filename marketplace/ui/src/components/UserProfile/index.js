@@ -244,54 +244,60 @@ const UserProfile = ({user}) => {
     };
 
     //helper
+    // const addItemToCart = async (product, quantity) => {
+    //   if (product.ownerCommonName === user?.commonName) {
+    //     openToast("bottom", false, "Cannot buy your own item");
+    //     return false;
+    //   }
+
+    //   // Search for the product in the cart
+    //   let foundIndex = cartList.findIndex((item) => item.product.address === product.address);
+    //   let items = [...cartList]; 
+
+    //   if (foundIndex === -1) {
+    //     // Product not found, check quantity before adding
+    //     const checkQuantity = await orderActions.fetchSaleQuantity(orderDispatch, [product.saleAddress], [quantity]);
+    //     if (checkQuantity === true) {
+    //       // Quantity check passed, add new item to the cart
+    //       // Adding single object to keep single product in cart
+    //       items = [{ product, qty: quantity }];
+    //       marketplaceActions.addItemToCart(marketplaceDispatch, items);
+    //       openToast("bottom", true, "Item added to cart");
+    //       return true;
+    //     } else {
+    //       // Not enough quantity, inform the user
+    //       openToast("bottom", false, `Currently available quantity for ${product.name}: ${checkQuantity[0].availableQuantity}. Try lowering the quantity to continue.`);
+    //       setTimeout(() => {
+    //         navigate('/checkout')
+    //       }, 2000);
+    //       return false;
+    //     }
+    //   } else {
+    //     // Product found, prepare to update quantity after check
+    //     const potentialNewQty = items[foundIndex].qty + quantity;
+    //     const checkQuantity = await orderActions.fetchSaleQuantity(orderDispatch, [product.saleAddress], [potentialNewQty]);
+    //     if (checkQuantity === true) {
+    //       // Quantity check passed, update item quantity in the cart
+    //       items[foundIndex].qty = potentialNewQty;
+    //       marketplaceActions.addItemToCart(marketplaceDispatch, items);
+    //       openToast("bottom", true, "Item updated in cart");
+    //       return true;
+    //     } else {
+    //       // Not enough quantity, inform the user
+    //       openToast("bottom", false, `Currently available quantity for ${product.name}: ${checkQuantity[0].availableQuantity}. Try lowering the quantity to continue.`);
+    //       setTimeout(() => {
+    //         navigate('/checkout')
+    //       }, 2000);
+    //       return false;
+    //     }
+    //   }
+    // };
+
     const addItemToCart = async (product, quantity) => {
-      if (product.ownerCommonName === user?.commonName) {
-        openToast("bottom", false, "Cannot buy your own item");
-        return false;
-      }
-
-      // Search for the product in the cart
-      let foundIndex = cartList.findIndex((item) => item.product.address === product.address);
-      let items = [...cartList]; 
-
-      if (foundIndex === -1) {
-        // Product not found, check quantity before adding
-        const checkQuantity = await orderActions.fetchSaleQuantity(orderDispatch, [product.saleAddress], [quantity]);
-        if (checkQuantity === true) {
-          // Quantity check passed, add new item to the cart
-          // Adding single object to keep single product in cart
-          items = [{ product, qty: quantity }];
+          const items = [{ product, qty: quantity }];
           marketplaceActions.addItemToCart(marketplaceDispatch, items);
-          openToast("bottom", true, "Item added to cart");
-          return true;
-        } else {
-          // Not enough quantity, inform the user
-          openToast("bottom", false, `Currently available quantity for ${product.name}: ${checkQuantity[0].availableQuantity}. Try lowering the quantity to continue.`);
-          setTimeout(() => {
-            navigate('/checkout')
-          }, 2000);
-          return false;
-        }
-      } else {
-        // Product found, prepare to update quantity after check
-        const potentialNewQty = items[foundIndex].qty + quantity;
-        const checkQuantity = await orderActions.fetchSaleQuantity(orderDispatch, [product.saleAddress], [potentialNewQty]);
-        if (checkQuantity === true) {
-          // Quantity check passed, update item quantity in the cart
-          items[foundIndex].qty = potentialNewQty;
-          marketplaceActions.addItemToCart(marketplaceDispatch, items);
-          openToast("bottom", true, "Item updated in cart");
-          return true;
-        } else {
-          // Not enough quantity, inform the user
-          openToast("bottom", false, `Currently available quantity for ${product.name}: ${checkQuantity[0].availableQuantity}. Try lowering the quantity to continue.`);
-          setTimeout(() => {
-            navigate('/checkout')
-          }, 2000);
-          return false;
-        }
-      }
-    };
+          navigate('/checkout')
+    }
 
 /**************************************************************************************************************************************************************************************
                                                    RENDER UI
