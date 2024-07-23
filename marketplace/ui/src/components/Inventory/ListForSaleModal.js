@@ -30,6 +30,8 @@ const ListForSaleModal = ({ open, handleCancel, inventory, categoryName, limit, 
     const paymentServiceDispatch = usePaymentServiceDispatch();
     const inputPriceDesktopRef = useRef(null);
     const inputPriceMobileRef = useRef(null);
+    const inputCostDesktopRef = useRef(null);
+    const inputCostMobileRef = useRef(null);
     const inputQuantityDesktopRef = useRef(null);
     const inputQuantityMobileRef = useRef(null);
 
@@ -72,10 +74,17 @@ const ListForSaleModal = ({ open, handleCancel, inventory, categoryName, limit, 
     useEffect(() => {
         const priceInputElements = [inputPriceDesktopRef.current, inputPriceMobileRef.current];
         const quantityInputElements = [inputQuantityDesktopRef.current, inputQuantityMobileRef.current];
+        const costInputElements = [inputCostDesktopRef.current, inputCostMobileRef.current]
         
         priceInputElements.forEach(inputElement => {
             if (inputElement) {
                 inputElement.addEventListener('input', handlePriceInput(setpricePerUnit));
+            }
+        });
+
+        costInputElements.forEach(inputElement => {
+            if (inputElement) {
+                inputElement.addEventListener('input', handlePriceInput(setCostPerUnit));
             }
         });
 
@@ -89,6 +98,12 @@ const ListForSaleModal = ({ open, handleCancel, inventory, categoryName, limit, 
             priceInputElements.forEach(inputElement => {
                 if (inputElement) {
                     inputElement.removeEventListener('input', handlePriceInput(setpricePerUnit));
+                }
+            });
+
+            costInputElements.forEach(inputElement => {
+                if (inputElement) {
+                    inputElement.removeEventListener('input', handlePriceInput(setCostPerUnit));
                 }
             });
 
@@ -180,6 +195,25 @@ const ListForSaleModal = ({ open, handleCancel, inventory, categoryName, limit, 
                         onChange={(value) => {
                             if (value) {
                                 setQuantity(parseInt(value, 10));
+                            }
+                        }}
+                    />
+                )
+            },
+            {
+                title: "Unit Cost ($)",
+                align: "center",
+                render: () => (
+                    <InputNumber
+                        value={costPerUnit}
+                        ref={inputCostDesktopRef}
+                        controls={false}
+                        min={0.01}
+                        disabled={isCostFieldDisabled}
+                        onChange={(value) => {
+                            const stringValue = value ? value.toString() : '';
+                            if (/^\d+(\.\d{0,2})?$/.test(stringValue)) {
+                                setCostPerUnit(value);
                             }
                         }}
                     />
@@ -300,6 +334,23 @@ const ListForSaleModal = ({ open, handleCancel, inventory, categoryName, limit, 
                         }}
                     />
                 </div>
+                <div>
+                    <Typography className="text-[#202020] text-sm font-medium">Unit Cost ($)</Typography>
+                    <InputNumber
+                        className="w-full h-9"
+                        value={costPerUnit}
+                        ref={inputCostMobileRef}
+                        controls={false}
+                        min={.01}
+                        disabled={isCostFieldDisabled}
+                        onChange={(value) => {
+                            const stringValue = value ? value.toString() : '';
+                            if (/^\d+(\.\d{0,2})?$/.test(stringValue)) {
+                                setCostPerUnit(value);
+                            }
+                        }}
+                    />
+                </div >
                 <div>
                     <Typography className="text-[#202020] text-sm font-medium">Unit Price ($)</Typography>
                     <InputNumber
