@@ -310,7 +310,8 @@ const ProductDetails = ({ user, users }) => {
   const addItemToCart = async () =>{
     const items = [{ product: details, qty }];
     marketPlaceActions.addItemToCart(marketplaceDispatch, items);
-    navigate('/checkout')
+    navigate('/checkout');
+    window.scrollTo(0, 0);
   }
 
   const ownershipDetailColumn = [

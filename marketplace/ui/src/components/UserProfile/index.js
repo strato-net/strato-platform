@@ -296,7 +296,8 @@ const UserProfile = ({user}) => {
     const addItemToCart = async (product, quantity) => {
           const items = [{ product, qty: quantity }];
           marketplaceActions.addItemToCart(marketplaceDispatch, items);
-          navigate('/checkout')
+          navigate('/checkout');
+          window.scrollTo(0, 0);
     }
 
 /**************************************************************************************************************************************************************************************
