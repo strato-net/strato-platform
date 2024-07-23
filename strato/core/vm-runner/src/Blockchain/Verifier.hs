@@ -55,7 +55,7 @@ checkParentChildValidity _ OutputBlock {obBlockData = c} parentBSum = do
         ++ ", should be less than "
         ++ show (bSumGasLimit parentBSum - nextGasLimitDelta (bSumGasLimit parentBSum))
   unless (getBlockGasLimit c >= minGasLimit flags_testnet) $
-    fail $ "Block gasLimit is lower than minGasLimit: got " ++ show (gasLimit c) ++ ", should be larger than " ++ show (minGasLimit flags_testnet :: Integer)
+    fail $ "Block gasLimit is lower than minGasLimit: got " ++ show (getBlockGasLimit c) ++ ", should be larger than " ++ show (minGasLimit flags_testnet :: Integer)
   return ()
 
 verifyTransactionRoot' :: OutputBlock -> (Bool, MP.StateRoot)

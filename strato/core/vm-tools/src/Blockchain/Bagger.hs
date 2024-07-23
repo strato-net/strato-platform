@@ -250,17 +250,13 @@ processNewBestBlock bh bd txShas = do
       hashMap = DL.fromList . filter f $ DL.toList pHashes
       thisStateRoot = stateRoot bd
 
-      nextGasLimit' :: BlockHeader -> Integer
-      nextGasLimit' bd'@(BlockHeader {}) = nextGasLimit $ gasLimit bd'
-      nextGasLimit' BlockHeaderV2 {} = 100000000000000
-
       newMiningCache =
         B.MiningCache
           { B.bestBlockSHA = bh,
             B.bestBlockHeader = bd,
             B.bestBlockTxHashes = txShas,
             B.lastExecutedStateRoot = thisStateRoot,
-            B.remainingGas = nextGasLimit' bd,
+            B.remainingGas = nextGasLimit . getBlockGasLimit $ bd,
             B.lastExecutedTxs = [],
             B.promotedTransactions = [],
             B.privateHashes = hashMap,
