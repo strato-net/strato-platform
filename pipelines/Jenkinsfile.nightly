@@ -53,6 +53,7 @@ pipeline {
           cp strato-worktree/docker-compose.highway.yml strato-getting-started/
           cp strato-worktree/docker-compose.identity.yml strato-getting-started/
           cp strato-worktree/docker-compose.payment.yml strato-getting-started/
+          cp strato-worktree/docker-compose.notification.yml strato-getting-started/
         '''
 
         dir("strato-getting-started") {
@@ -216,12 +217,14 @@ pipeline {
                       docker compose -f docker-compose.identity.push.yml push 2>&1
                       docker compose -f docker-compose.highway.push.yml push 2>&1
                       docker compose -f docker-compose.payment.push.yml push 2>&1
+                      docker compose -f docker-compose.notification.push.yml push 2>&1
                       AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID} AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY} AWS_DEFAULT_REGION="us-east-1" aws ecr get-login-password --region us-east-1 | docker login --username AWS --password-stdin 406773134706.dkr.ecr.us-east-1.amazonaws.com
                       docker compose -f docker-compose.push.ecr.yml push 2>&1
                       docker compose -f docker-compose.vault.push.ecr.yml push 2>&1
                       docker compose -f docker-compose.identity.push.ecr.yml push 2>&1
                       docker compose -f docker-compose.highway.push.ecr.yml push 2>&1
                       docker compose -f docker-compose.payment.push.ecr.yml push 2>&1
+                      docker compose -f docker-compose.notification.push.ecr.yml push 2>&1
                     '''
                   }
                   stash includes: 'strato-getting-started/**', name: 'stratoGettingStarted'
@@ -242,11 +245,13 @@ pipeline {
                       aws s3 cp docker-compose.identity.yml s3://blockapps-build-artifacts/${version}/
                       aws s3 cp docker-compose.highway.yml s3://blockapps-build-artifacts/${version}/
                       aws s3 cp docker-compose.payment.yml s3://blockapps-build-artifacts/${version}/
+                      aws s3 cp docker-compose.notification.yml s3://blockapps-build-artifacts/${version}/
                       aws s3 cp docker-compose.ecr.yml s3://blockapps-build-artifacts/${version}/
                       aws s3 cp docker-compose.vault.ecr.yml s3://blockapps-build-artifacts/${version}/
                       aws s3 cp docker-compose.identity.ecr.yml s3://blockapps-build-artifacts/${version}/
                       aws s3 cp docker-compose.highway.ecr.yml s3://blockapps-build-artifacts/${version}/
                       aws s3 cp docker-compose.payment.ecr.yml s3://blockapps-build-artifacts/${version}/
+                      aws s3 cp docker-compose.notification.ecr.yml s3://blockapps-build-artifacts/${version}/
 
                     '''
                   }
