@@ -1,5 +1,5 @@
 import { Button, InputNumber, Modal, Table, Input, Spin } from "antd";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { actions } from "../../contexts/inventory/actions";
 import { useInventoryDispatch } from "../../contexts/inventory";
 import { actions as redemptionActions } from "../../contexts/redemption/actions";
@@ -13,6 +13,7 @@ import AddAddressModal from "../MarketPlace/AddAddressModal";
 import ResponsiveAddAddress from "../MarketPlace/ResponsiveAddAddress"
 import { Images } from "../../images";
 import { REDEMPTION_STATUS } from "../../helpers/constants";
+import { handleQuantityInput } from "../../helpers/utils";
 
 const RedeemModal = ({ open, handleCancel, inventory, categoryName, limit, offset }) => {
     const [data, setData] = useState([inventory]);
@@ -29,6 +30,8 @@ const RedeemModal = ({ open, handleCancel, inventory, categoryName, limit, offse
     const { isRequestingRedemption } = useRedemptionState();
     const { userAddresses, isLoadingUserAddresses } = useMarketplaceState();
     const { TextArea } = Input;
+    const inputQuantityDesktopRef = useRef(null);
+    const inputQuantityMobileRef = useRef(null);
 
     const closeAddressModel = () => {
         setshowModal(false);
@@ -40,7 +43,7 @@ const RedeemModal = ({ open, handleCancel, inventory, categoryName, limit, offse
 
     useEffect(() => {
         marketplaceActions.fetchUserAddresses(marketplaceDispatch, inventory.data.redemptionService);
-    }, [marketplaceDispatch])
+    }, [marketplaceDispatch]);
 
     useEffect(() => {
         if (quantity > inventory.quantity || quantity <= 0) {
@@ -49,7 +52,25 @@ const RedeemModal = ({ open, handleCancel, inventory, categoryName, limit, offse
         else {
             setCanRedeem(true);
         };
-    }, [quantity])
+    }, [quantity]);
+
+    useEffect(() => {
+        const quantityInputElements = [inputQuantityDesktopRef.current, inputQuantityMobileRef.current];
+
+        quantityInputElements.forEach(inputElement => {
+            if (inputElement) {
+                inputElement.addEventListener('input', handleQuantityInput(setQuantity));
+            }
+        });
+
+        return () => {
+            quantityInputElements.forEach(inputElement => {
+                if (inputElement) {
+                    inputElement.removeEventListener('input', handleQuantityInput(setQuantity));
+                }
+            });
+        };
+    }, [inputQuantityDesktopRef, inputQuantityMobileRef]);
 
     const columns = [
         {
@@ -63,6 +84,7 @@ const RedeemModal = ({ open, handleCancel, inventory, categoryName, limit, offse
             render: () => (
                 <InputNumber
                     value={quantity}
+                    ref={inputQuantityDesktopRef}
                     controls={false}
                     min={1}
                     onChange={(value) => {
@@ -189,6 +211,7 @@ const RedeemModal = ({ open, handleCancel, inventory, categoryName, limit, offse
                         <InputNumber
                             className="w-full h-9"
                             value={quantity}
+                            ref={inputQuantityMobileRef}
                             controls={false}
                             min={1}
                             onChange={(value) => {
