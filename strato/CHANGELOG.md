@@ -17,6 +17,7 @@ so that they could be properly moved to their respective version's subsection.
 ## [Unreleased] 
 ### Added
 - Added `pragma safeExternalCalls` for contracts that want to enforce extra type safety on external calls from other contracts
+- Added `pragma solidvm 11.4` that includes all existing pragmas and their features
 
 ### Changed
 
