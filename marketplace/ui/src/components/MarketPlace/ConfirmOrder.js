@@ -267,7 +267,7 @@ const ConfirmOrder = ({ paymentProviders = [], data, columns }) => {
                   >
                     {paymentProviders && paymentProviders.map(provider => (
                       provider && <Option className='payment-dropdown' key={provider?.serviceName} value={provider?.serviceName}>
-                        {provider?.checkoutText}
+                        Checkout with {provider?.serviceName}
                         <img src={provider?.imageURL} alt={provider?.serviceName} style={{ width: 20, height: 20, marginRight: 8 }} />
                       </Option>
                     ))}
