@@ -39,7 +39,7 @@ abstract contract Asset is Utils {
         uint minItemNumber,
         uint maxItemNumber,
         address newAssetAddress,
-        uint price,
+        decimal price,
         uint quantity,
         bool isPurchase,
         uint referenceNumber

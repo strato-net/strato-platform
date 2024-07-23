@@ -74,20 +74,18 @@ const ListForSaleModal = ({ open, handleCancel, inventory, categoryName, limit, 
     useEffect(() => {
         const priceInputElements = [inputPriceDesktopRef.current, inputPriceMobileRef.current];
         const quantityInputElements = [inputQuantityDesktopRef.current, inputQuantityMobileRef.current];
-        const costInputElements = [inputCostDesktopRef.current, inputCostMobileRef.current]
+        const costInputElements = [inputCostDesktopRef.current, inputCostMobileRef.current];
         
         priceInputElements.forEach(inputElement => {
             if (inputElement) {
                 inputElement.addEventListener('input', handlePriceInput(setpricePerUnit));
             }
         });
-
         costInputElements.forEach(inputElement => {
             if (inputElement) {
                 inputElement.addEventListener('input', handlePriceInput(setCostPerUnit));
             }
         });
-
         quantityInputElements.forEach(inputElement => {
             if (inputElement) {
                 inputElement.addEventListener('input', handleQuantityInput(setQuantity));
@@ -100,13 +98,11 @@ const ListForSaleModal = ({ open, handleCancel, inventory, categoryName, limit, 
                     inputElement.removeEventListener('input', handlePriceInput(setpricePerUnit));
                 }
             });
-
             costInputElements.forEach(inputElement => {
                 if (inputElement) {
                     inputElement.removeEventListener('input', handlePriceInput(setCostPerUnit));
                 }
             });
-
             quantityInputElements.forEach(inputElement => {
                 if (inputElement) {
                     inputElement.removeEventListener('input', handleQuantityInput(setQuantity));

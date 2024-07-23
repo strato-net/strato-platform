@@ -265,7 +265,7 @@ class InventoryController {
       updates: Joi.object({
         status: Joi.number().min(1).required(),
         price: Joi.number().positive().min(1).required(),
-        cost: Joi.number().positive().min(0).required()
+        cost: Joi.number().greater(0).precision(2).required()
       }).required()
     });
 
@@ -286,7 +286,7 @@ class InventoryController {
       ).required(),
       price: Joi.number().greater(0).precision(2).required(),
       quantity: Joi.number().integer().greater(0).optional(),
-      cost: Joi.number().min(0).required(),
+      cost: Joi.number().greater(0).precision(2).required(),
     });
 
     const validation = listItemSchema.validate(args);
@@ -355,8 +355,7 @@ class InventoryController {
       assetAddress: Joi.string().required(),
       newOwner: Joi.string().required(),
       quantity: Joi.number().integer().greater(0).required(),
-      price: Joi.number().greater(0).precision(2).required(),
-      cost: Joi.number().greater(0).precision(2).required(),
+      price: Joi.number().greater(0).precision(2).required()
     });
 
     const validation = transferItemSchema.validate(args);
@@ -377,7 +376,7 @@ class InventoryController {
       ).optional(),
       price: Joi.number().greater(0).precision(2).optional(),
       quantity: Joi.number().integer().greater(0).optional(),
-      cost: Joi.number().integer().min(0).optional(),
+      cost: Joi.number().greater(0).precision(2).optional(),
     });
 
     const validation = updateSaleItemSchema.validate(args);

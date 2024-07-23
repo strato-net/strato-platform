@@ -9,7 +9,7 @@ contract SimpleSale is Sale {
         decimal _price,
         uint _quantity,
         address[] _paymentProviders,
-        uint _cost
+        decimal _cost
     ) Sale(_assetToBeSold, _price, _quantity, _paymentProviders, _cost) {
     }
 }

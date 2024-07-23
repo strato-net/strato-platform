@@ -11,7 +11,7 @@ abstract contract Sale is Utils {
     decimal public price;
     uint public quantity;
     address[] public paymentProviders;
-    uint public cost;
+    decimal public cost;
     mapping (address => uint) paymentProvidersMap;
     mapping (string => uint) lockedQuantity;
     uint totalLockedQuantity;
@@ -22,7 +22,7 @@ abstract contract Sale is Utils {
         decimal _price,
         uint _quantity,
         address[] _paymentProviders,
-        uint _cost
+        decimal _cost
     ) {    
         assetToBeSold = Asset(_assetToBeSold);
         price = _price;
@@ -103,7 +103,7 @@ abstract contract Sale is Utils {
         price=_price;
     }
 
-    function changeCost(uint _cost) public requireCreator("change cost") returns (uint) {
+    function changeCost(decimal _cost) public requireCreator("change cost") returns (uint) {
         cost=_cost;
         return RestStatus.OK;
     }
