@@ -1,7 +1,7 @@
 require("dotenv").config();
 const fs = require("fs");
 const { Client } = require("pg");
-console.log("POSTGRES_PASSWORD:", process.env.POSTGRES_PASSWORD);
+
 const host = process.env.POSTGRES_SERVER_URL || "localhost";
 const port = process.env.POSTGRES_PORT || "5432";
 const user = process.env.POSTGRES_USER || "postgres";

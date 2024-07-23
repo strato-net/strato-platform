@@ -8,7 +8,7 @@ OAUTH_DISCOVERY_URL=${OAUTH_DISCOVERY_URL:-NULL}
 OAUTH_CLIENT_ID=${OAUTH_CLIENT_ID:-NULL}
 OAUTH_CLIENT_SECRET=${OAUTH_CLIENT_SECRET:-NULL}
 OAUTH_SCOPE=${OAUTH_SCOPE:-openid email profile}
-STRIPE_PS_HOST=payment-server:8018
+NOTIFICATION_SERVER_HOST='notification-server:8019'
 
 # If container is running for the first time - generate config:
 if [ ! -f /usr/local/openresty/nginx/conf/nginx.conf ]; then
@@ -27,14 +27,14 @@ if [ ! -f /usr/local/openresty/nginx/conf/nginx.conf ]; then
   fi
 
   # Replacing HOST PLACEHOLDERS
-  sed -i "s/__STRIPE_PS_HOST__/$STRIPE_PS_HOST/g" /tmp/nginx.conf
+  sed -i "s/__NOTIFICATION_SERVER_HOST__/$NOTIFICATION_SERVER_HOST/g" /tmp/nginx.conf
 
 #  ########
 #  ### Generate .lua scripts from templates according to configuration provided
 #  ########
  cp /tmp/openid.tpl.lua /tmp/openid.lua
 
- sed -i "s/<OAUTH_DISCOVERY_URL_PLACEHOLDER>/$OAUTH_DISCOVERY_URL/" /tmp/openid.lua
+ sed -i "s*<OAUTH_DISCOVERY_URL_PLACEHOLDER>*$OAUTH_DISCOVERY_URL*" /tmp/openid.lua
  sed -i 's*<CLIENT_ID_PLACEHOLDER>*'"$OAUTH_CLIENT_ID"'*g' /tmp/openid.lua
  sed -i 's*<CLIENT_SECRET_PLACEHOLDER>*'"$OAUTH_CLIENT_SECRET"'*g' /tmp/openid.lua
  sed -i 's*<OAUTH_SCOPE_PLACEHOLDER>*'"$OAUTH_SCOPE"'*g' /tmp/openid.lua
@@ -52,7 +52,7 @@ if [ ! -f /usr/local/openresty/nginx/conf/nginx.conf ]; then
   ########
   mv /tmp/nginx.conf /usr/local/openresty/nginx/conf/nginx.conf
 
-#  mv /tmp/openid.lua /usr/local/openresty/nginx/lua/openid.lua
+  mv /tmp/openid.lua /usr/local/openresty/nginx/lua/openid.lua
 
   if [ "$ssl" = true ] ; then
     cp -r /tmp/ssl/* /etc/ssl/

@@ -6,6 +6,7 @@ const bodyParser = require('body-parser');
 
 const subscriptionRoutes = require("./src/routes/subscriptionRoutes");
 const notifyRoutes = require("./src/routes/notifyRoutes");
+const utilityRoutes = require("./src/routes/utilityRoutes");
 
 const app = express();
 const port = process.env.PORT || 3000;
@@ -23,6 +24,7 @@ app.use(bodyParser.urlencoded({ extended: true })); // To parse URL-encoded bodi
 // Routes
 app.use("/", subscriptionRoutes);
 app.use("/", notifyRoutes);
+app.use("/", utilityRoutes);
 
 app.listen(port, () => {
   console.log(`Server is running on port ${port}`);
