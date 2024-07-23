@@ -14,8 +14,12 @@ module Blockchain.Data.BlockHeader
     mixHashlens,
     extraDataLens,
     txsLen2ExtraData,
+    getBlockBeneficiary,
     getBlockDifficulty,
     getBlockGasLimit,
+    getBlockGasUsed,
+    getBlockMixHash,
+    getBlockNonce,
     getBlockOmmersHash
   )
 where
@@ -104,9 +108,25 @@ getBlockGasLimit :: BlockHeader -> Integer
 getBlockGasLimit BlockHeader { gasLimit } = gasLimit
 getBlockGasLimit BlockHeaderV2 {} = 22500000000000000000000000000000 -- arbitrary as FUCK
 
+getBlockGasUsed :: BlockHeader -> Integer
+getBlockGasUsed BlockHeader { gasUsed } = gasUsed
+getBlockGasUsed BlockHeaderV2 {} = 0
+
 getBlockOmmersHash :: BlockHeader -> Keccak256
 getBlockOmmersHash BlockHeader { ommersHash } = ommersHash
 getBlockOmmersHash BlockHeaderV2 {} = (hash . rlpSerialize . RLPArray) []
+
+getBlockBeneficiary :: BlockHeader -> ChainMemberParsedSet
+getBlockBeneficiary BlockHeader { beneficiary } = beneficiary
+getBlockBeneficiary BlockHeaderV2 {} = Everyone False
+
+getBlockMixHash :: BlockHeader -> Keccak256
+getBlockMixHash BlockHeader { mixHash } = mixHash
+getBlockMixHash BlockHeaderV2 {} = zeroHash
+
+getBlockNonce :: BlockHeader -> Word64
+getBlockNonce BlockHeader { nonce } = nonce
+getBlockNonce BlockHeaderV2 {} = 0
 
 makeLensesFor [("extraData", "extraDataLens"), ("mixHash", "mixHashlens")] ''BlockHeader
 
