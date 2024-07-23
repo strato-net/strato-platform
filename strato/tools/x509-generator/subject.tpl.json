@@ -1,0 +1,6 @@
+{ "commonName": "Test",
+  "organization": "BlockApps",
+  "organizationUnit": "Engineering",
+  "country": "USA",
+  "pubKey": "<PUBKEY>"
+}
