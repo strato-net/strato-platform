@@ -26,6 +26,7 @@ import image_placeholder from "../../images/resources/image_placeholder.png";
 import ResponsiveCart from "./ResponsiveCart";
 import { usePaymentServiceDispatch, usePaymentServiceState } from "../../contexts/payment";
 import { actions as paymentServiceActions } from "../../contexts/payment/actions";
+import Decimal from 'decimal.js';
 
 const { Title, Text } = Typography;
 
@@ -38,18 +39,27 @@ const Checkout = () => {
   const { cartList } = useMarketplaceState();
   const { isCreateOrderSubmitting, message, success } = useOrderState();
 
-  const [tax, setTax] = useState(0);
-  const [total, setTotal] = useState(0);
   const [mapData, setmapData] = useState([]);
 
   const calculateTax = (item) => {
-    return (item.product.price * CHARGES.TAX) / 100;
+    let price = new Decimal(item.product.price);
+    let tax = new Decimal(CHARGES.TAX);
+    let result = price.mul(tax).div(100);
+
+    return parseFloat(result);
   };
+
+  const calculateAmount = (item) => {
+    let price = new Decimal(item.product.price);
+    let tax = calculateTax(item);
+    let result = price.mul(item.qty).plus(tax);
+
+    return parseFloat(result);
+  }
 
   // const storedData = useMemo(() => {
   //   const cartListData = window.localStorage.getItem("cartList");
   //   let cartList = [];
-
   //   try {
   //     if (cartListData) {
   //       // Attempt to parse the stored data as JSON
@@ -90,6 +100,7 @@ const Checkout = () => {
       let modifiedValue = [];
       items.forEach((item) => {
         const parts = item.product.contract_name.split("-");
+        let amount = calculateAmount(item)
 
         modifiedValue.push({
           key: item.product.address,
@@ -108,9 +119,7 @@ const Checkout = () => {
           quantity: item.product.saleQuantity,
           saleAddress: item.product.saleAddress,
           tax: calculateTax(item),
-          amount:
-            parseFloat((item.product.price * item.qty +
-              calculateTax(item)).toFixed(2)),
+          amount: amount,
           action: item.product.address,
           qty: item.qty,
         });
@@ -120,17 +129,6 @@ const Checkout = () => {
       return { key: key, value: { paymentProviders: [...paymentProviders], items: modifiedValue } };
     });
     setmapData(mapDataArray);
-    let t = 0;
-    cartList.forEach((item) => {
-      t += calculateTax(item);
-    });
-    setTax(t);
-    let s = 0;
-    let sum = 0;
-    cartList.forEach((item) => {
-      sum += item.product.price;
-    });
-    setTotal(sum);
   }, [marketplaceDispatch, cartList]);
 
   const MinusQty = (qty, product) => {
@@ -268,7 +266,7 @@ const Checkout = () => {
       align: "center",
       render: (text) => (
         <p className=" text-sm text-[#202020] font-semibold font-sans">
-          {"$" + text}
+          {"$" + text.toFixed(2)}
         </p>
       ),
     },
@@ -320,7 +318,7 @@ const Checkout = () => {
       dataIndex: "tax",
       align: "center",
       render: (text) => (
-        <p className="text-sm font-semibold text-[#202020]">{"$" + text}</p>
+        <p className="text-sm font-semibold text-[#202020]">{"$" + text.toFixed(2)}</p>
       ),
     },
     {
@@ -332,7 +330,7 @@ const Checkout = () => {
       dataIndex: "amount",
       align: "center",
       render: (text) => (
-        <p className="text-sm font-semibold text-[#202020]">{"$" + text}</p>
+        <p className="text-sm font-semibold text-[#202020]">{"$" + text.toFixed(2)}</p>
       ),
     },
     {
