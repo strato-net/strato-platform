@@ -1239,7 +1239,7 @@ boolArgs x =
       :| [ boolType' x
          ]
 
-byteArgs :: SourceAnnotation Text -> Type'
+byteArgs :: SourceAnnotation Text -> Type's
 byteArgs x = intType' x
 
 keccak256Args :: SourceAnnotation Text -> Type'
