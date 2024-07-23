@@ -1588,8 +1588,32 @@ statementHelper (Throw e x) = do
   et <- tcExpr e
   pure $ reduceType' x [et]
 statementHelper (ModifierExecutor x) = pure $ topType' x
-statementHelper (EmitStatement _ vals x) =
+statementHelper (EmitStatement eventName vals x) =
   reduceType' x <$> traverse (tcExpr . snd) vals
+  {-
+       
+    data StatementF a
+    = EmitStatement String [(Maybe String, (ExpressionF a))] a
+
+    data ContractF a = Contract
+    {
+     _events :: Map SolidString (SolidVM.EventF a)
+    }
+
+    data EventF a = Event
+    { _eventAnonymous :: Bool,
+      _eventLogs :: [(Text, SolidVM.IndexedType)],
+      _eventContext :: a
+    }
+    
+    usage:
+      event EventName(dataType y); 
+      emit EventName(expression)
+    
+    Typecheck: 
+      1. Look for EventName in events (in contractF.events) and error out if it does not exist
+      2. Ensure that the type for each argument in EventName matches with the dataType (also have to be in the same order)
+  -}
 statementHelper (RevertStatement _ (NamedArgs vals) x) =
   reduceType' x <$> traverse (tcExpr . snd) vals
 statementHelper (RevertStatement _ (OrderedArgs vals) x) =
