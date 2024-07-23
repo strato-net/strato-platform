@@ -289,7 +289,7 @@ const CategoryProductList = ({ user }) => {
           openToast("bottom", true, TOAST_MSG.TOO_MUCH_QUANTITY(checkQuantity, product));
           setTimeout(() => {
             navigate('/checkout')
-          }, 1000); 
+          }, 2000); 
         }
         return false;
       }
@@ -311,7 +311,7 @@ const CategoryProductList = ({ user }) => {
           openToast("bottom", true, TOAST_MSG.TOO_MUCH_QUANTITY(checkQuantity, product));
           setTimeout(() => {
             navigate('/checkout')
-          }, 1000); 
+          }, 2000); 
         }
         return false;
       }

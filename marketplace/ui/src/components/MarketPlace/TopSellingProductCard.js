@@ -103,7 +103,7 @@ const TopSellingProductCard = () => {
           );
           setTimeout(() => {
             navigate('/checkout')
-          }, 1000);
+          }, 2000);
         }
         return false;
       }
@@ -138,7 +138,7 @@ const TopSellingProductCard = () => {
           );
           setTimeout(() => {
             navigate('/checkout')
-          }, 1000);
+          }, 2000);
         }
         return false;
       }

@@ -268,7 +268,7 @@ const ProductDetails = ({ user, users }) => {
       openToast("bottom", false, TOAST_MSG.ITEM_ADDED_TO_CART);
       setTimeout(() => {
         navigate('/checkout')
-      }, 1000);
+      }, 2000);
     } else {
       items = [...cartList];
       const quantity = cartList[0].qty + qty;
@@ -282,7 +282,7 @@ const ProductDetails = ({ user, users }) => {
             openToast("bottom", false, TOAST_MSG.ITEM_UPDATED_IN_CART);
             setTimeout(() => {
               navigate('/checkout')
-            }, 1000);
+            }, 2000);
           }else{
             if (checkQuantity[0].availableQuantity === 0) {
               openToast(
@@ -299,7 +299,7 @@ const ProductDetails = ({ user, users }) => {
               );
               setTimeout(() => {
                 navigate('/checkout')
-              }, 1000);
+              }, 2000);
             }
           }
         }

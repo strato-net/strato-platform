@@ -269,7 +269,7 @@ const UserProfile = ({user}) => {
           openToast("bottom", false, `Currently available quantity for ${product.name}: ${checkQuantity[0].availableQuantity}. Try lowering the quantity to continue.`);
           setTimeout(() => {
             navigate('/checkout')
-          }, 1000);
+          }, 2000);
           return false;
         }
       } else {
@@ -287,7 +287,7 @@ const UserProfile = ({user}) => {
           openToast("bottom", false, `Currently available quantity for ${product.name}: ${checkQuantity[0].availableQuantity}. Try lowering the quantity to continue.`);
           setTimeout(() => {
             navigate('/checkout')
-          }, 1000);
+          }, 2000);
           return false;
         }
       }
