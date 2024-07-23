@@ -225,7 +225,7 @@ const UserProfile = ({user}) => {
     };
 
     //helper
-    const openToast = (placement) => {
+    const openToast = (placement,success,message) => {
       if (success) {
         api.success({
           message: message,
@@ -246,7 +246,7 @@ const UserProfile = ({user}) => {
     //helper
     const addItemToCart = async (product, quantity) => {
       if (product.ownerCommonName === user?.commonName) {
-        openToast("bottom", true, "Cannot buy your own item");
+        openToast("bottom", false, "Cannot buy your own item");
         return false;
       }
 
@@ -262,11 +262,14 @@ const UserProfile = ({user}) => {
           // Adding single object to keep single product in cart
           items = [{ product, qty: quantity }];
           marketplaceActions.addItemToCart(marketplaceDispatch, items);
-          openToast("bottom", false, "Item added to cart");
+          openToast("bottom", true, "Item added to cart");
           return true;
         } else {
           // Not enough quantity, inform the user
-          openToast("bottom", true, `Currently available quantity for ${product.name}: ${checkQuantity[0].availableQuantity}. Try lowering the quantity to continue.`);
+          openToast("bottom", false, `Currently available quantity for ${product.name}: ${checkQuantity[0].availableQuantity}. Try lowering the quantity to continue.`);
+          setTimeout(() => {
+            navigate('/checkout')
+          }, 1000);
           return false;
         }
       } else {
@@ -277,11 +280,14 @@ const UserProfile = ({user}) => {
           // Quantity check passed, update item quantity in the cart
           items[foundIndex].qty = potentialNewQty;
           marketplaceActions.addItemToCart(marketplaceDispatch, items);
-          openToast("bottom", false, "Item updated in cart");
+          openToast("bottom", true, "Item updated in cart");
           return true;
         } else {
           // Not enough quantity, inform the user
-          openToast("bottom", true, `Currently available quantity for ${product.name}: ${checkQuantity[0].availableQuantity}. Try lowering the quantity to continue.`);
+          openToast("bottom", false, `Currently available quantity for ${product.name}: ${checkQuantity[0].availableQuantity}. Try lowering the quantity to continue.`);
+          setTimeout(() => {
+            navigate('/checkout')
+          }, 1000);
           return false;
         }
       }
@@ -294,6 +300,7 @@ const UserProfile = ({user}) => {
   return (
     
     <div className="container mx-auto">
+      {contextHolder}
         {/* Bread Crumb Navigation */}
       <div className="px-6 md:px-5 lg:py-1 lg:mt-3 orders">
         <Breadcrumb>
@@ -602,7 +609,7 @@ const UserProfile = ({user}) => {
       </Tabs>
 
       {/* TABS End */}
-      {message && openToast("bottom")}
+      {message && openToast("bottom", success, message)}
       {itemMsg && itemToast("bottom")}
     </div>
   );

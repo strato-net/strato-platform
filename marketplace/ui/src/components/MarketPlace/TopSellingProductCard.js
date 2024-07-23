@@ -101,6 +101,9 @@ const TopSellingProductCard = () => {
             true,
             `Unfortunately, only ${checkQuantity[0].availableQuantity} units of ${product.name} are available. Please update your cart quantity accordingly.`
           );
+          setTimeout(() => {
+            navigate('/checkout')
+          }, 1000);
         }
         return false;
       }
@@ -133,6 +136,9 @@ const TopSellingProductCard = () => {
             true,
             `Unfortunately, only ${checkQuantity[0].availableQuantity} units of ${product.name} are available. Please update your cart quantity accordingly.`
           );
+          setTimeout(() => {
+            navigate('/checkout')
+          }, 1000);
         }
         return false;
       }

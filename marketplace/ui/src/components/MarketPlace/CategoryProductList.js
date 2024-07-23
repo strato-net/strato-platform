@@ -287,6 +287,9 @@ const CategoryProductList = ({ user }) => {
           openToast("bottom", true, TOAST_MSG.OUT_OF_STOCK(product));
         } else { // Case 2: We are trying to add too much quantity
           openToast("bottom", true, TOAST_MSG.TOO_MUCH_QUANTITY(checkQuantity, product));
+          setTimeout(() => {
+            navigate('/checkout')
+          }, 1000); 
         }
         return false;
       }
@@ -306,6 +309,9 @@ const CategoryProductList = ({ user }) => {
           openToast("bottom", true, TOAST_MSG.OUT_OF_STOCK(product));
         } else { // Case 2: We are trying to add too much quantity
           openToast("bottom", true, TOAST_MSG.TOO_MUCH_QUANTITY(checkQuantity, product));
+          setTimeout(() => {
+            navigate('/checkout')
+          }, 1000); 
         }
         return false;
       }
