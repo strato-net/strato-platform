@@ -206,7 +206,7 @@ async function getAll(admin, args = {}, options) {
   const newOptions = { ...options, org: 'BlockApps', app: 'Mercata' }
   const newCountArgs = {
     ...args,
-    status: '1',
+    // status: '1',
     limit: undefined,
     offset: 0,
     order: undefined,
