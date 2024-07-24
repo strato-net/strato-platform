@@ -1,5 +1,8 @@
+{-# LANGUAGE RankNTypes #-}
+
 module Blockchain.Strato.Model.Class where
 
+-- import BlockApps.X509.Certificate
 import Blockchain.Blockstanbul.Model.Authentication (scrubCommitmentSeals, scrubConsensus)
 import Blockchain.Data.RLP
 import Blockchain.Strato.Model.Address
@@ -7,6 +10,8 @@ import Blockchain.Strato.Model.ChainMember
 import Blockchain.Strato.Model.Code
 import Blockchain.Strato.Model.ExtendedWord
 import Blockchain.Strato.Model.Keccak256
+import Blockchain.Strato.Model.Secp256k1 (Signature)
+import Blockchain.Strato.Model.Validator (Validator)
 import qualified Data.ByteString as B
 import Data.Map.Strict (Map)
 import Data.Text (Text)
@@ -50,6 +55,11 @@ class RLPSerializable h => BlockHeaderLike h where
   blockHeaderExtraData :: h -> B.ByteString -- todo: extradata newtype
   blockHeaderTimestamp :: h -> UTCTime
   blockHeaderMixHash :: h -> Keccak256
+  blockHeaderNewValidators :: h -> [Validator]
+  blockHeaderRemovedValidators :: h -> [Validator]
+  blockHeaderNewCerts :: h -> [X509Certificate]
+  blockHeaderRevokedCerts :: h -> [DummyCertRevocation]
+  blockHeaderSignatures :: h -> [Signature]
 
   -- This should be Lens' h B.ByteString, except that the RedisHeader cannot
   -- derive it.
@@ -74,6 +84,11 @@ class RLPSerializable h => BlockHeaderLike h where
     blockHeaderTimestamp,
     blockHeaderMixHash,
     blockHeaderModifyExtra,
+    blockHeaderNewValidators,
+    blockHeaderRemovedValidators,
+    blockHeaderNewCerts,
+    blockHeaderRevokedCerts,
+    blockHeaderSignatures,
     morphBlockHeader
     #-}
 

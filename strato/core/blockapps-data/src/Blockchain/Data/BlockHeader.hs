@@ -1,3 +1,4 @@
+{-# LANGUAGE DataKinds #-}
 {-# LANGUAGE DeriveDataTypeable #-}
 {-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
@@ -20,7 +21,12 @@ module Blockchain.Data.BlockHeader
     getBlockGasUsed,
     getBlockMixHash,
     getBlockNonce,
-    getBlockOmmersHash
+    getBlockOmmersHash,
+    getBlockNewCerts,
+    getBlockRevokedCerts,
+    getBlockSignatures,
+    getBlockAddValidators,
+    getBlockRemovedValidators
   )
 where
 
@@ -100,6 +106,9 @@ instance Binary BlockHeader
 
 instance NFData BlockHeader
 
+-- These getters are meant to be used in `instance BlockHeaderLike BlockHeader`
+-- so that the class may handle both V1 and V2
+
 getBlockDifficulty :: BlockHeader -> Integer
 getBlockDifficulty BlockHeader { difficulty } = difficulty
 getBlockDifficulty BlockHeaderV2 {} = -1
@@ -127,6 +136,26 @@ getBlockMixHash BlockHeaderV2 {} = zeroHash
 getBlockNonce :: BlockHeader -> Word64
 getBlockNonce BlockHeader { nonce } = nonce
 getBlockNonce BlockHeaderV2 {} = 0
+
+getBlockNewValidators :: BlockHeader -> [Validator]
+getBlockNewValidators BlockHeader {} = []
+getBlockNewValidators BlockHeaderV2 { newValidators } = newValidators
+
+getBlockRemovedValidators :: BlockHeader -> [Validator]
+getBlockRemovedValidators BlockHeader {} = []
+getBlockRemovedValidators BlockHeaderV2 { removedValidators } = removedValidators
+
+getBlockNewCerts :: BlockHeader -> [X509Certificate]
+getBlockNewCerts BlockHeader {} = []
+getBlockNewCerts BlockHeaderV2 { newCerts } = newCerts
+
+getBlockRevokedCerts :: BlockHeader -> [DummyCertRevocation]
+getBlockRevokedCerts BlockHeader {} = []
+getBlockRevokedCerts BlockHeaderV2 { revokedCerts } = revokedCerts
+
+getBlockSignatures :: BlockHeader -> [Signature]
+getBlockSignatures BlockHeader {} = []
+getBlockSignatures BlockHeaderV2 { signatures } = signatures
 
 makeLensesFor [("extraData", "extraDataLens"), ("mixHash", "mixHashlens")] ''BlockHeader
 
@@ -241,39 +270,42 @@ instance RLPSerializable BlockHeader where
 instance BlockHeaderLike BlockHeader where
   blockHeaderBlockNumber = number
   blockHeaderParentHash = parentHash
-  blockHeaderOmmersHash = ommersHash
-  blockHeaderBeneficiary = beneficiary
+  blockHeaderOmmersHash = getBlockOmmersHash
+  blockHeaderBeneficiary = getBlockBeneficiary
   blockHeaderStateRoot = MP.unboxStateRoot . stateRoot
   blockHeaderTransactionsRoot = MP.unboxStateRoot . transactionsRoot
   blockHeaderReceiptsRoot = MP.unboxStateRoot . receiptsRoot
   blockHeaderLogsBloom = logsBloom
-  blockHeaderGasLimit = gasLimit
-  blockHeaderGasUsed = gasUsed
-  blockHeaderDifficulty = difficulty
-  blockHeaderNonce = nonce
+  blockHeaderGasLimit = getBlockGasLimit
+  blockHeaderGasUsed = getBlockGasUsed
+  blockHeaderDifficulty = getBlockDifficulty
+  blockHeaderNonce = getBlockNonce
   blockHeaderExtraData = extraData
   blockHeaderTimestamp = timestamp
-  blockHeaderMixHash = mixHash
+  blockHeaderMixHash = getBlockMixHash
+  blockHeaderNewValidators = getBlockNewValidators
+  blockHeaderRemovedValidators = getBlockRemovedValidators
+  blockHeaderNewCerts = getBlockNewCerts
+  blockHeaderRevokedCerts = getBlockRevokedCerts
+  blockHeaderSignatures = getBlockSignatures
 
   blockHeaderModifyExtra f h = h {extraData = f (extraData h)}
 
   morphBlockHeader b =
-    BlockHeader
+    BlockHeaderV2
       { number = blockHeaderBlockNumber b,
         parentHash = blockHeaderParentHash b,
-        ommersHash = blockHeaderOmmersHash b,
-        beneficiary = blockHeaderBeneficiary b,
         stateRoot = MP.StateRoot $ blockHeaderStateRoot b,
         transactionsRoot = MP.StateRoot $ blockHeaderTransactionsRoot b,
         receiptsRoot = MP.StateRoot $ blockHeaderReceiptsRoot b,
         logsBloom = blockHeaderLogsBloom b,
-        gasLimit = blockHeaderGasLimit b,
-        gasUsed = blockHeaderGasUsed b,
-        difficulty = blockHeaderDifficulty b,
-        nonce = blockHeaderNonce b,
         extraData = blockHeaderExtraData b,
         timestamp = blockHeaderTimestamp b,
-        mixHash = blockHeaderMixHash b
+        newValidators = blockHeaderNewValidators b,
+        removedValidators = blockHeaderRemovedValidators b,
+        newCerts = blockHeaderNewCerts b,
+        revokedCerts = blockHeaderRevokedCerts b,
+        signatures = blockHeaderSignatures b
       }
 
 headerHash :: BlockHeader -> Keccak256
