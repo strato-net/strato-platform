@@ -2,10 +2,11 @@
 
 set -e
 
-ssl=${ssl:-false}
-sslCertFileType=${sslCertFileType:-pem}
-OAUTH_DISCOVERY_URL=${OAUTH_DISCOVERY_URL:-NULL}
 NOTIFICATION_SERVER_HOST='notification-server:8019'
+OAUTH_DISCOVERY_URL=${OAUTH_DISCOVERY_URL:-NULL}
+ssl=${ssl:-true}
+sslCertFileType=${sslCertFileType:-pem}
+
 
 # If container is running for the first time - generate config:
 if [ ! -f /usr/local/openresty/nginx/conf/nginx.conf ]; then
