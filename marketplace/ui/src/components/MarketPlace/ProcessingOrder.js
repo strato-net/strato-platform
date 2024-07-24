@@ -63,7 +63,7 @@ const ProcessingOrder = ({ user }) => {
       if (assetAddresses) {
         let updatedCart = [];
         storedConfirmList.forEach(cart => {
-          if (!assetAddresses.includes(cart.product.address)) {
+          if (!assetAddresses.includes(cart.action)) {
             updatedCart.push(cart);
           }
         });
