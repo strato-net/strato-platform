@@ -3,6 +3,7 @@ const express = require('express');
 const cors = require('cors');
 const helmet = require('helmet');
 const bodyParser = require('body-parser');
+const validateSignature = require("./src/middleware/validateSignature");
 
 const subscriptionRoutes = require("./src/routes/subscriptionRoutes");
 const notifyRoutes = require("./src/routes/notifyRoutes");
@@ -20,6 +21,9 @@ app.use(cors());
 // Use body-parser middleware
 app.use(bodyParser.json()); // To parse JSON bodies
 app.use(bodyParser.urlencoded({ extended: true })); // To parse URL-encoded bodies
+
+// Validiate signature-message pair
+app.use(validateSignature);
 
 // Routes
 app.use("/", subscriptionRoutes);
