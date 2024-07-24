@@ -25,7 +25,7 @@ module Blockchain.Data.BlockHeader
     getBlockNewCerts,
     getBlockRevokedCerts,
     getBlockSignatures,
-    getBlockAddValidators,
+    getBlockNewValidators,
     getBlockRemovedValidators
   )
 where
@@ -43,12 +43,12 @@ import Blockchain.Strato.Model.Validator
 import Control.DeepSeq
 import Control.Lens
 import Control.Monad
-import Data.Aeson
+-- import Data.Aeson
 import Data.Binary
 import Data.Bits (shiftL, shiftR)
 import qualified Data.ByteString as B
 import Data.ByteString.Arbitrary
-import Data.Data
+-- import Data.Data
 import Data.Time
 import Data.Time.Clock.POSIX
 import GHC.Generics
@@ -57,11 +57,6 @@ import Test.QuickCheck
 import qualified Text.Colors as CL
 import Text.Format
 import Text.Tools
-
-newtype DummyCertRevocation = DummyCertRevocation String deriving (Show, Read, Eq, Generic, Data, ToJSON, RLPSerializable)
-
-instance Binary DummyCertRevocation
-instance NFData DummyCertRevocation
 
 data BlockHeader =
   BlockHeader {
@@ -105,6 +100,10 @@ instance Binary UTCTime where
 instance Binary BlockHeader
 
 instance NFData BlockHeader
+
+instance Binary DummyCertRevocation
+
+instance NFData DummyCertRevocation
 
 -- These getters are meant to be used in `instance BlockHeaderLike BlockHeader`
 -- so that the class may handle both V1 and V2

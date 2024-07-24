@@ -86,7 +86,6 @@ library:
     - time
     - transformers
     - unliftio
-    - x509-certs
 
 
 

@@ -1,5 +1,4 @@
 {-# LANGUAGE ConstraintKinds #-}
-{-# LANGUAGE DeriveAnyClass #-}
 {-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE FlexibleInstances #-}
@@ -145,7 +144,11 @@ data X509CertInfoState = X509CertInfoState
     orgUnit :: Maybe String,
     commonName :: String
   }
-  deriving (Show, Eq, Generic, Binary)
+  deriving (Show, Eq, Generic)
+
+instance Binary X509CertInfoState where
+    put = (put :: C8.ByteString -> Put) <$> certToBytes . certificate
+    get = x509CertToCertInfoState <$> (fromRight (error "The certificate couldn't be decoded") . bsToCert) <$> (get :: Get C8.ByteString)
 
 instance Format X509CertInfoState where
   format = show

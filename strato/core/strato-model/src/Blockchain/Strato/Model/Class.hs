@@ -1,8 +1,9 @@
-{-# LANGUAGE RankNTypes #-}
+{-# LANGUAGE DeriveDataTypeable #-}
+{-# LANGUAGE DeriveGeneric #-}
 
 module Blockchain.Strato.Model.Class where
 
--- import BlockApps.X509.Certificate
+import BlockApps.X509.Certificate
 import Blockchain.Blockstanbul.Model.Authentication (scrubCommitmentSeals, scrubConsensus)
 import Blockchain.Data.RLP
 import Blockchain.Strato.Model.Address
@@ -12,11 +13,14 @@ import Blockchain.Strato.Model.ExtendedWord
 import Blockchain.Strato.Model.Keccak256
 import Blockchain.Strato.Model.Secp256k1 (Signature)
 import Blockchain.Strato.Model.Validator (Validator)
+import Data.Aeson
 import qualified Data.ByteString as B
+import Data.Data
 import Data.Map.Strict (Map)
 import Data.Text (Text)
 import Data.Time
 import Data.Word
+import GHC.Generics
 
 class (RLPSerializable b, BlockHeaderLike h, TransactionLike t) => BlockLike h t b | b -> h t where
   blockHeader :: b -> h
@@ -38,6 +42,8 @@ class (RLPSerializable b, BlockHeaderLike h, TransactionLike t) => BlockLike h t
 
   morphBlock :: (BlockLike h2 t2 b2) => b2 -> b
   morphBlock b2 = buildBlock' (blockHeader b2) (blockTransactions b2) (blockUncleHeaders b2)
+
+newtype DummyCertRevocation = DummyCertRevocation String deriving (Show, Read, Eq, Generic, Data, ToJSON, RLPSerializable)
 
 class RLPSerializable h => BlockHeaderLike h where
   blockHeaderBlockNumber :: h -> Integer

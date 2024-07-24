@@ -86,7 +86,6 @@ library:
     - unliftio-core
     - unliftio 
     - warp
-    - x509-certs
 
 #removing p2p tests for now, it is more work to keep updating this than the reward it is giving
 #tests:
