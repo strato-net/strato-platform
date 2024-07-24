@@ -187,7 +187,6 @@ class StripeServiceController {
       let returnStatus;
       if (session.payment_status === 'paid') {
         // Get the payment event from Cirrus
-        //should be renamed, assetLocked event should not have orderId-but can use orderHash
         const orderEvent = await getOrderEvent(orderHash);
 
         // Call completeOrder

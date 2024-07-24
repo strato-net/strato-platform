@@ -223,7 +223,6 @@ async function createPayment(user, args, options) {
       args: util.usc({ ...restArgs }),
     };
     const token = await rest.call(user, callArgs, options);
-    console.log(token,":BA REST CALL- ORDER")
   
     return token;
 }
