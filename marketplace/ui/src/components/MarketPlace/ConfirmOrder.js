@@ -49,23 +49,6 @@ const ConfirmOrder = ({ paymentProviders = [], data, columns }) => {
   useEffect(() => {
     setCartData(data);
   }, [data]);
-  
-  const storedConfirmOrderList = useMemo(() => {
-    const confirmOrderListData = window.localStorage.getItem("confirmOrderList");
-    let confirmOrderList = [];
-
-    try {
-      if (confirmOrderListData) {
-        // Attempt to parse the stored data as JSON
-        confirmOrderList = JSON.parse(confirmOrderListData);
-      }
-    } catch (error) {
-      // Handle JSON parsing error
-      console.error("Error parsing confirmOrderList data:", error);
-    }
-
-    return confirmOrderList;
-  }, []);
 
   const countDown = () => {
     modal.info({
@@ -129,8 +112,8 @@ const ConfirmOrder = ({ paymentProviders = [], data, columns }) => {
     // Construct Email with order details
     let concatenatedOrderString = "";
     let orderTotal = 0; 
-    for (let i = 0; i < storedConfirmOrderList.length; i++) {
-      let orderItem = storedConfirmOrderList[i];
+    for (let i = 0; i < cartData.length; i++) {
+      let orderItem = cartData[i];
       let itemName = decodeURIComponent(orderItem.item.name);
       let itemPrice = parseFloat(orderItem.unitPrice).toFixed(2); 
       let itemQty = orderItem.qty;
@@ -140,7 +123,7 @@ const ConfirmOrder = ({ paymentProviders = [], data, columns }) => {
       concatenatedOrderString += `$${itemTotal} <br>`; 
       concatenatedOrderString += `Qty: ${itemQty} &nbsp; $${itemPrice} each (${itemPrice*100} STRATS)<br><br>`; 
       orderTotal += parseFloat(itemTotal); 
-      if (i === storedConfirmOrderList.length - 1) {
+      if (i === cartData.length - 1) {
         concatenatedOrderString += `<hr style="border-top: 1px dotted #0A1B71; min-width: 80%; max-width: 80%; margin-left: 15px;">`;
         concatenatedOrderString += `Sales Tax: $${parseFloat(tax).toFixed(2)} <br>`;
         concatenatedOrderString += `Shipping Fee: <i><strong>Free</strong></i><br><br>`;
