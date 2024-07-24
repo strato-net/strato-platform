@@ -77,7 +77,7 @@ sendWelcomeEmail email' name uuid key = do
 subscribeUser :: (MonadIO m, MonadLogger m, HasNotification m) => T.Text -> T.Text -> m ()
 subscribeUser auth user = do
   NotificationData url mgr <- access Proxy
-  eResp <- liftIO $ runClientM (putSubscribe auth (Username user)) (mkClientEnv mgr url)
+  eResp <- liftIO $ runClientM (putSubscribe ("Bearer " <> auth) (Username user)) (mkClientEnv mgr url)
   case eResp of 
     Right _ -> $logInfoS "subscribeUser" $ "Successfully subscribed user " <> user
     Left err -> $logErrorS "subscribeUser" . T.pack $ "Error while trying to subscribe: " <> show err
