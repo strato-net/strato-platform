@@ -5,7 +5,7 @@ import routes from "../../helpers/routes";
 import { actions as orderActions } from "../../contexts/order/actions";
 import { useOrderDispatch, useOrderState } from "../../contexts/order";
 import { actions } from "../../contexts/marketplace/actions";
-import { useMarketplaceDispatch } from "../../contexts/marketplace";
+import { useMarketplaceDispatch, useMarketplaceState } from "../../contexts/marketplace";
 
 function useQuery() {
   const { search } = useLocation();
@@ -23,11 +23,11 @@ const ProcessingOrder = ({ user }) => {
   const { message, success } = useOrderState();
   const [api, contextHolder] = notification.useNotification();
   const [called, setCalled] = useState(false);
+  const { cartList } = useMarketplaceState();
 
-
-  const storedData = useMemo(() => {
-    return JSON.parse(window.localStorage.getItem("cartList") ?? []);
-  }, []);
+  // const storedData = useMemo(() => {
+  //   return JSON.parse(window.localStorage.getItem("cartList") ?? []);
+  // }, []);
 
   const storedConfirmList = useMemo(() => {
     return JSON.parse(window.localStorage.getItem("confirmOrderList") ?? []);
