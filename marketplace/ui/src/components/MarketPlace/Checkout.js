@@ -193,7 +193,10 @@ const Checkout = () => {
     cartList.forEach((element, index) => {
       if (element.product.address === product.key) {
         const availableQuantity = product.quantity ? product.quantity : 1;
-        if (e <= availableQuantity) {
+        if (!e || e === "" || e === 0) {
+          items[index].qty = 1;
+          actions.addItemToCart(marketplaceDispatch, items);
+        } else if (e <= availableQuantity) {
           items[index].qty = e;
           actions.addItemToCart(marketplaceDispatch, items);
         } else {
