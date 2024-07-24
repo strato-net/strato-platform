@@ -22,8 +22,6 @@ services:
     depends_on:
     - notification-server
     environment:
-    - OAUTH_CLIENT_ID=${OAUTH_CLIENT_ID}
-    - OAUTH_CLIENT_SECRET=${OAUTH_CLIENT_SECRET}
     - OAUTH_DISCOVERY_URL=${OAUTH_DISCOVERY_URL}
     - ssl=${ssl}
     - sslCertFileType=${sslCertFileType}
