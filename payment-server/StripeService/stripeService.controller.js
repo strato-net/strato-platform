@@ -15,8 +15,11 @@ import {
   initializePayment,
   cancelOrder,
   discardOrder,
-  getAssetName
+  getAssetName,
+  prepareOrderData,
+  sendEmail,
 } from '../helpers/utils.js';
+import { buildConcatenatedOrderString } from '../helpers/emailTemplate.js';
 import { PAYMENT_STATUS, STRIPE_CONTRACT_ADDRESS, PAYMENT_RECEIVED_MESSAGE } from '../helpers/constants.js';
 
 class StripeServiceController {
@@ -184,8 +187,8 @@ class StripeServiceController {
       let returnStatus;
       if (session.payment_status === 'paid') {
         // Get the payment event from Cirrus
+        //should be renamed, assetLocked event should not have orderId-but can use orderHash
         const orderEvent = await getOrderEvent(orderHash);
-        console.log("Order Details",orderEvent)
 
         // Call completeOrder
         const callArgs = {
@@ -203,7 +206,15 @@ class StripeServiceController {
         // Update payment status in DB
         const updateResult = await updateStripePayment(orderHash, "PAID");
 
-        const purchasedAssetName = await getAssetName(orderEvent[0].saleAddresses[0]);
+        // EMAIL CONFIRMATION
+        // Prepare HTML content and sendEmail
+        const assetName = await getAssetName(orderEvent[0].saleAddresses[0])
+        const orderString = prepareOrderData(orderEvent, assetName);
+        const htmlContents = buildConcatenatedOrderString(orderEvent[0].purchasersCommonName, orderString)
+
+        await sendEmail(email, "Your Order Confirmation", htmlContents);
+        
+        console.log("*Buyer placed order*");
 
         
 
@@ -227,6 +238,17 @@ class StripeServiceController {
 
         // Update payment status in DB
         const updateResult = await updateStripePayment(orderHash, "INITIALIZED");
+        
+        // EMAIL CONFIRMATION
+        // Prepare HTML content and sendEmail
+        const assetName = await getAssetName(orderEvent[0].saleAddresses[0])
+        const orderString = prepareOrderData(orderEvent, assetName);
+        const htmlContents = buildConcatenatedOrderString(orderEvent[0].purchasersCommonName, orderString)
+
+        await sendEmail(email, "Your Order Confirmation", htmlContents);
+        console.log("*Buyer placed order*",);
+
+
       } else {
         throw new Error(`Payment has not been processed. Failed to confirm purchase. Please contact an Admin or the Payment Server Admin.`);
       }
@@ -392,6 +414,7 @@ class StripeServiceController {
     const stripeCheckoutSchema = Joi.object({
       orderHash: Joi.string().required(),
       redirectUrl: Joi.string().required(),
+      email: Joi.string().required(),
     });
 
     const validation = stripeCheckoutSchema.validate(args);
@@ -405,6 +428,7 @@ class StripeServiceController {
     const stripeCheckoutConfirmSchema = Joi.object({
       orderHash: Joi.string().required(),
       redirectUrl: Joi.string().required(),
+      email: Joi.string().required(),
     });
 
     const validation = stripeCheckoutConfirmSchema.validate(args);

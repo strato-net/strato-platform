@@ -63,12 +63,12 @@ class OrderController {
     try {
       const { dapp, body, accessToken } = req
       const originUrl = req.headers.origin || config.serverHost;
-      const {confirmOrderList, htmlContents, ...restArgs} = body;
+      const { htmlContents, ...restArgs} = body;
       OrderController.validatePaymentArgs(restArgs)
 
       const result = await dapp.paymentCheckout(originUrl, restArgs, options, accessToken)
       const {orderHashAndAssets, orderEvent} = result;
-      // check orderEvent.status= 2 || 3 and sendEmail
+      // check orderEvent.status = 2 || 3 and sendEmail
       // Only send email if order is created successfully(STRATS Orders)
        if(orderEvent.length === 1 && (orderEvent[0].status === "2" || orderEvent[0].status === "3"))
       {

@@ -65,7 +65,6 @@ const ConfirmOrder = ({ paymentProviders = [], data, columns }) => {
 
     return confirmOrderList;
   }, []);
-  console.log("CONFIRM ORDER LIST",storedConfirmOrderList)
 
   const countDown = () => {
     modal.info({
@@ -173,7 +172,7 @@ const ConfirmOrder = ({ paymentProviders = [], data, columns }) => {
 
 
 
-  const handlePaymentConfirm = async (paymentProvider, storedConfirmOrderList) => {
+  const handlePaymentConfirm = async (paymentProvider) => {
     actions.addItemToConfirmOrder(marketplaceDispatch, cartData);
     let orderList = [];
     cartData.forEach((item) => {
@@ -195,9 +194,9 @@ const ConfirmOrder = ({ paymentProviders = [], data, columns }) => {
       tax: tax,
       user: user.commonName,
       email: user.email,
-      confirmOrderList: storedConfirmOrderList[0],
       htmlContents: htmlContents,
     };
+    
 
 
     window.LOQ.push(['ready', async LO => {
@@ -223,7 +222,7 @@ const ConfirmOrder = ({ paymentProviders = [], data, columns }) => {
             && checkoutRoute
             && checkoutRoute !== ''
          ) {
-        const url = `${serviceURL}${checkoutRoute}?email=${user.email}orderHash=${orderHash}&redirectUrl=${window.location.protocol}//${window.location.host}/order/status`;
+        const url = `${serviceURL}${checkoutRoute}?email=${encodeURIComponent(user.email)}&orderHash=${orderHash}&redirectUrl=${window.location.protocol}//${window.location.host}/order/status`;
         window.location.replace(url);
       } else {
         window.location.replace(`/order/status?assets=${assets}`);
@@ -246,7 +245,7 @@ const ConfirmOrder = ({ paymentProviders = [], data, columns }) => {
       });
       const checkQuantity = await orderActions.fetchSaleQuantity(orderDispatch, saleAddresses, quantities);
       if (checkQuantity === true) {
-        await handlePaymentConfirm(provider, storedConfirmOrderList);
+        await handlePaymentConfirm(provider);
       } else {
         let insufficientQuantityMessage = "";
         let outOfStockMessage = "";

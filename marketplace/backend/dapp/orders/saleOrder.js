@@ -214,8 +214,7 @@ async function getOrderEventClosedOrPending(user, args, options) {
   }
   order = await searchAllWithQueryArgs(paymentTableName, searchArgs, newOptions, user);
 
-  if (order.length === 0) {console.log("Order event not found")}
-  console.log("EYY ORDERS",order)
+  if (order.length === 0) { console.log("Order event not found") }
   return order;
 }
 

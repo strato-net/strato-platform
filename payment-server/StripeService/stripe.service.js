@@ -36,8 +36,8 @@ class StripeService {
                     // },
                 },
                 mode: "payment",
-                success_url: `${SERVER_CONFIRM_URL}?email=${email}&orderHash=${orderHash}&redirectUrl=${marketplaceUrl}`,
-                cancel_url: `${SERVER_CANCEL_URL}?email=${email}&orderHash=${orderHash}&redirectUrl=${marketplaceUrl}`,
+                success_url: `${SERVER_CONFIRM_URL}?email=${encodeURIComponent(email)}&orderHash=${orderHash}&redirectUrl=${marketplaceUrl}`,
+                cancel_url: `${SERVER_CANCEL_URL}?orderHash=${orderHash}&redirectUrl=${marketplaceUrl}`,
             }, {
                 stripeAccount: CONNECTED_ACCOUNT_ID
             })

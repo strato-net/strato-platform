@@ -7,6 +7,7 @@ import TagManager from "react-gtm-module";
 import { actions } from "../../contexts/marketplace/actions";
 import { actions as orderActions } from "../../contexts/order/actions";
 import { useOrderDispatch, useOrderState } from "../../contexts/order";
+import { generateHtmlContent } from "../../helpers/emailTemplate";
 
 const { Option } = Select;
 
@@ -47,7 +48,6 @@ const ResponsiveCart = ({
 
     return confirmOrderList;
   }, []);
-  console.log("CONFIRM ORDER LIST",storedConfirmOrderList)
   
 
   useEffect(() => {
@@ -74,6 +74,39 @@ const ResponsiveCart = ({
     });
   };
 
+  // Generating Email Confirmation HTML
+  let htmlContents = [];
+  const generate_HTML_Content = async (username) => {
+    htmlContents = [];
+    
+    let customerFirstName = username;
+    
+    // Construct Email with order details
+    let concatenatedOrderString = "";
+    let orderTotal = 0; 
+    for (let i = 0; i < storedConfirmOrderList.length; i++) {
+      let orderItem = storedConfirmOrderList[i];
+      let itemName = decodeURIComponent(orderItem.item.name);
+      let itemPrice = parseFloat(orderItem.unitPrice).toFixed(2); 
+      let itemQty = orderItem.qty;
+      let itemTotal = (itemPrice * itemQty).toFixed(2); 
+  
+      concatenatedOrderString += `${itemName}:\n`; 
+      concatenatedOrderString += `$${itemTotal} <br>`; 
+      concatenatedOrderString += `Qty: ${itemQty} &nbsp; $${itemPrice} each (${itemPrice*100} STRATS)<br><br>`; 
+      orderTotal += parseFloat(itemTotal); 
+      if (i === storedConfirmOrderList.length - 1) {
+        concatenatedOrderString += `<hr style="border-top: 1px dotted #0A1B71; min-width: 80%; max-width: 80%; margin-left: 15px;">`;
+        concatenatedOrderString += `Sales Tax: $${parseFloat(tax).toFixed(2)} <br>`;
+        concatenatedOrderString += `Shipping Fee: <i><strong>Free</strong></i><br><br>`;
+        concatenatedOrderString += `Order Total: $${orderTotal.toFixed(2)} <br>`;
+      }
+    }
+    
+
+     htmlContents.push(generateHtmlContent(customerFirstName, concatenatedOrderString));
+  };
+
   const handlePaymentConfirm = async (paymentProvider) => {
     actions.addItemToConfirmOrder(marketplaceDispatch, cartData);
     let orderList = [];
@@ -85,6 +118,8 @@ const ResponsiveCart = ({
         unitPrice: item.unitPrice
       });
     });
+  
+    generate_HTML_Content(user.commonName)
 
     let body = {
       paymentProvider: { address: paymentProvider.address },
@@ -94,8 +129,7 @@ const ResponsiveCart = ({
       tax: tax,
       user: user.commonName,
       email: user.email,
-      confirmOrderList: storedConfirmOrderList[0],
-      //htmlContents: 
+      htmlContents: htmlContents,
     };
 
     window.LOQ.push(['ready', async LO => {
@@ -114,7 +148,7 @@ const ResponsiveCart = ({
       let serviceURL = paymentProvider.serviceURL || paymentProvider.data.serviceURL;
       let checkoutRoute = paymentProvider.checkoutRoute || paymentProvider.data.checkoutRoute;
       if (serviceURL && serviceURL !== '' && checkoutRoute && checkoutRoute !== '') {
-        const url = `${serviceURL}${checkoutRoute}?orderHash=${orderHash}&redirectUrl=${window.location.protocol}//${window.location.host}/order/status`;
+        const url = `${serviceURL}${checkoutRoute}?email=${encodeURIComponent(user.email)}&orderHash=${orderHash}&redirectUrl=${window.location.protocol}//${window.location.host}/order/status`;
         window.location.replace(url);
       } else {
         window.location.replace(`/order/status?assets=${assets}`);
@@ -137,7 +171,7 @@ const ResponsiveCart = ({
       });
       const checkQuantity = await orderActions.fetchSaleQuantity(orderDispatch, saleAddresses, quantities);
       if (checkQuantity === true) {
-        handlePaymentConfirm(provider);
+        await handlePaymentConfirm(provider);
         setSelectedProvider("");
       } else {
         let insufficientQuantityMessage = "";

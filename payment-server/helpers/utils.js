@@ -15,8 +15,6 @@ sgMail.setApiKey(SENDGRID_ENV.API_KEY);
 
 // Fetches Asset Name based on sale address
 const getAssetName = async(saleAddress)=>{
-
-
   //fetch asset address
   const assetToBeSold= await rest.search(
                                         ADMIN.getUser()
@@ -36,13 +34,26 @@ const getAssetName = async(saleAddress)=>{
     ...DEFAULT_OPTIONS,
     query: {
       limit: 1,
-      ['address']: `eq.${assetToBeSold}`,
+      ['address']: `eq.${assetToBeSold[0].assetToBeSold}`,
       select:"name"
     }
   }
 
   return await rest.search(ADMIN.getUser(), tableArgs, searchOptions);
 }
+
+// Prepare the orderData array
+const prepareOrderData = (orderDetails, assetData) => {
+  return orderDetails.map((order, index) => {
+    const unitPrice = order.amount / order.quantities[0];
+    return {
+      name: assetData[index].name,
+      unitPrice: unitPrice,
+      qty: order.quantities[0],
+      tax: order.tax
+    };
+  });
+};
 
 const sendEmail = async(to, subject, htmlContent) => {
 
@@ -349,4 +360,5 @@ export {
   discardOrder,
   getAssetName,
   sendEmail,
+  prepareOrderData,
 }
