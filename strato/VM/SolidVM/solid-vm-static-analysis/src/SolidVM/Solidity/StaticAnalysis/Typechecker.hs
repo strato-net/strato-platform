@@ -36,7 +36,6 @@ import SolidVM.Model.Type (Type)
 import qualified SolidVM.Model.Type as SVMType
 import SolidVM.Solidity.StaticAnalysis.Types
 import Text.Read (readMaybe)
-
 --import qualified Text.Colors                          as C
 --import           Control.Monad.IO.Class
 --import Debug.Trace
@@ -1239,7 +1238,7 @@ boolArgs x =
       :| [ boolType' x
          ]
 
-byteArgs :: SourceAnnotation Text -> Type's
+byteArgs :: SourceAnnotation Text -> Type'
 byteArgs x = intType' x
 
 keccak256Args :: SourceAnnotation Text -> Type'
@@ -1588,8 +1587,8 @@ statementHelper (Throw e x) = do
   et <- tcExpr e
   pure $ reduceType' x [et]
 statementHelper (ModifierExecutor x) = pure $ topType' x
-statementHelper (EmitStatement eventName vals x) =
-  reduceType' x <$> traverse (tcExpr . snd) vals
+statementHelper (EmitStatement eventName vals x) = do
+  
   {-
        
     data StatementF a
@@ -1605,6 +1604,9 @@ statementHelper (EmitStatement eventName vals x) =
       _eventLogs :: [(Text, SolidVM.IndexedType)],
       _eventContext :: a
     }
+
+
+    data IndexedType = IndexedType {indexedTypeIndex :: Int32, indexedTypeType :: Type}
     
     usage:
       event EventName(dataType y); 
@@ -1614,6 +1616,23 @@ statementHelper (EmitStatement eventName vals x) =
       1. Look for EventName in events (in contractF.events) and error out if it does not exist
       2. Ensure that the type for each argument in EventName matches with the dataType (also have to be in the same order)
   -}
+  cc <- asks codeCollection
+  c  <- asks contract
+  case M.lookup eventName (_events c) of 
+    Just event -> do
+      let vals' =     fmap (\(_,b) -> let r = R cc c Nothing "Nothing" []
+                                        in runReader (evalStateT (tcExpr b) ((Nothing, M.empty) :| [])) r
+                          ) vals
+      let vals'' = map (\y -> case y of
+                                Static s _ -> s
+                                _          -> error "Type is not static"
+                       ) vals'
+      if [indexedTypeType it | (_,it) <- _eventLogs event] /= vals''
+        then pure . bottom $ "Type is not Static" <$ x
+        else reduceType' x <$> traverse (tcExpr . snd) vals
+    Nothing -> pure . bottom $ "Event does not exist" <$ x 
+
+
 statementHelper (RevertStatement _ (NamedArgs vals) x) =
   reduceType' x <$> traverse (tcExpr . snd) vals
 statementHelper (RevertStatement _ (OrderedArgs vals) x) =
