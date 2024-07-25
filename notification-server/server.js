@@ -22,12 +22,9 @@ app.use(cors());
 app.use(bodyParser.json()); // To parse JSON bodies
 app.use(bodyParser.urlencoded({ extended: true })); // To parse URL-encoded bodies
 
-// Validiate signature-message pair
-app.use(validateSignature);
-
 // Routes
 app.use("/", subscriptionRoutes);
-app.use("/", notifyRoutes);
+app.use("/", validateSignature, notifyRoutes);
 app.use("/", utilityRoutes);
 
 app.listen(port, () => {

@@ -1,5 +1,6 @@
 const crypto = require("crypto");
 const secp256k1 = require("secp256k1");
+const { keccak256 } = require('js-sha3');
 
 /**
  * Converts a hexadecimal string to a Uint8Array.
@@ -69,10 +70,21 @@ const validateSignature = (req, res, next) => {
     // Recover the public key from the signature
     const publicKey = secp256k1.ecdsaRecover(signatureArray, recid, msgHashArray);
     console.log("Recovered public key: ", publicKey);
-    
-    // Verify the signature with the public key
-    const isValid = secp256k1.ecdsaVerify(signatureArray, msgHashArray, publicKey);
-    console.log("Signature valid: ", isValid);
+    const publicKeyString = Array.from(publicKey)
+                             .map(byte => byte.toString(16).padStart(2, '0'))
+                             .join('');
+    console.log("Recovered public key (hex): ", publicKeyString);
+    // Convert the public key string to a buffer
+    const publicKeyBuffer = Buffer.from(publicKeyString, 'hex');
+
+    // Hash the public key using Keccak-256
+    const hash = keccak256(publicKeyBuffer);
+
+    // Take the last 20 bytes of the hash
+    const address = '0x' + hash.slice(-40);
+    console.log("Recovered address: ", address);
+    const isValid = true;
+    // Verify the address with validator addresses or marketplace address.
 
     if (!isValid) {
       return res.status(400).send("Bad Request: Invalid signature");
