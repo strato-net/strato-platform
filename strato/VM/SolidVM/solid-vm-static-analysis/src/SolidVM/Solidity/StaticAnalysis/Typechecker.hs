@@ -1624,18 +1624,21 @@ statementHelper (EmitStatement eventName vals x) = do
                           let r = R cc c Nothing "Nothing" []
                           in runReader (evalStateT (tcExpr b) ((Nothing, M.empty) :| [])) r
                        ) vals
+          -- Debugging: Print evaluated types
           valsDebug = trace ("Evaluated types: " ++ show vals') vals'
       
       let vals'' = map (\y -> case y of
                                 Static s _ -> s
                                 _          -> error "Type is not static"
                        ) valsDebug
+          -- Debugging: Print static types
           valsStaticDebug = trace ("Static types: " ++ show vals'') vals''
       
       let expectedTypes = [indexedTypeType it | (_, it) <- _eventLogs event]
+          -- Debugging: Print expected types
           expectedTypesDebug = trace ("Expected types: " ++ show expectedTypes) expectedTypes
       
-      if expectedTypesDebug /= valsStaticDebug
+      if not (and $ zipWith isSameType expectedTypesDebug valsStaticDebug)
         then pure . bottom $ "Type mismatch in event arguments" <$ x
         else reduceType' x <$> traverse (tcExpr . snd) vals
     Nothing -> pure . bottom $ "Event does not exist" <$ x
@@ -1649,6 +1652,28 @@ statementHelper (UncheckedStatement body x) =
   statementsHelper' x body
 statementHelper (AssemblyStatement _ x) = pure $ topType' x
 statementHelper (SimpleStatement stmt x) = simpleStatementHelper x stmt
+
+-----idk if this is right but it is what it is----
+isSameType :: Type -> Type -> Bool
+isSameType (SVMType.Int _ _) (SVMType.Int _ _) = True
+isSameType (SVMType.String _) (SVMType.String _) = True
+isSameType (SVMType.Bytes _ _) (SVMType.Bytes _ _) = True
+isSameType SVMType.Decimal SVMType.Decimal = True
+isSameType SVMType.Bool SVMType.Bool = True
+isSameType (SVMType.Address _) (SVMType.Address _) = True
+isSameType (SVMType.Account _) (SVMType.Account _) = True
+isSameType (SVMType.UnknownLabel s1 _) (SVMType.UnknownLabel s2 _) = s1 == s2
+isSameType (SVMType.Struct _ t1) (SVMType.Struct _ t2) = t1 == t2
+isSameType (SVMType.UserDefined a1 _) (SVMType.UserDefined a2 _) = a1 == a2
+isSameType (SVMType.Enum _ t1 _) (SVMType.Enum _ t2 _) = t1 == t2
+isSameType (SVMType.Error _ t1) (SVMType.Error _ t2) = t1 == t2
+isSameType (SVMType.Array e1 _) (SVMType.Array e2 _) = isSameType e1 e2
+isSameType (SVMType.Contract t1) (SVMType.Contract t2) = t1 == t2
+isSameType (SVMType.Mapping _ k1 v1) (SVMType.Mapping _ k2 v2) = isSameType k1 k2 && isSameType v1 v2
+isSameType SVMType.Variadic SVMType.Variadic = True
+isSameType _ _ = False
+
+
 
 simpleStatementHelper :: SourceAnnotation Text -> Annotated SimpleStatementF -> SSS Type'
 simpleStatementHelper x (VariableDefinition vdefs mExpr) = do
