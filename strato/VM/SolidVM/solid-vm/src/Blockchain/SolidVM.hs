@@ -102,6 +102,10 @@ import qualified Data.Vector as V
 import Debugger
 import GHC.Exts hiding (breakpoint)
 import qualified LabeledError
+import Blockchain.DB.RawStorageDB
+import Blockchain.Data.BlockSummary
+import Blockchain.DB.MemAddressStateDB
+import Data.Default
 
 import Network.Haskoin.Crypto.BigWord ()
 import qualified Numeric (readHex)
@@ -443,7 +447,7 @@ call _ _ _ isRCC _ blockData _ _ codeAddress sender' _ _ _ availableGas origin' 
         }
 
 call' ::
-  MonadSM m =>
+ ( MonadSM m) =>
   Account ->
   Account ->
   CC.FunctionCallType ->
@@ -622,10 +626,54 @@ call' from to' fnCalltype mContract functionName isRCC argExps = do
         case M.lookup functionName $ contract ^. CC.storageDefs of
           Just CC.VariableDecl {..} -> do
             let args' = case (_varType, argExps) of
+                          --((SVMType.Array _ _), CC.OrderedArgs oa) -> nestedCall' oa 
+
+
                           ((SVMType.Array _ _), CC.OrderedArgs oa) -> case all (\case (CC.NumberLiteral _ _ Nothing) -> True; _ -> False) oa of
                                                                         True -> map (\case (CC.NumberLiteral _ n Nothing) -> MS.ArrayIndex $ fromIntegral n; _ -> internalError "should never happen" oa) oa
                                                                         False -> []
+                                                                 
+                            
+                      
+                            
+                            --case all (\case (CC.NumberLiteral _ _ Nothing) -> True; _ -> False) oa of
+                              --                                          True -> map (\case (CC.NumberLiteral _ n Nothing) -> MS.ArrayIndex $ fromIntegral n; _ -> internalError "should never happen" oa) oa
+                                --                                        False -> []
+
+                                                                        ---edit with iteration
+
+                          --(SVMType.Mapping _ _ _), CC.OrderedArgs oa) -> case oa of
+--
+  --                                                                          (CC.NumberLiteral _ n Nothing) -> MS.MapIndex $ MS.INum $ fromIntegral n
+                                                                        --(CC.StringLiteral _ s) -> MS.StringIndex s
+
+                                                                        --True -> map (\case (CC.NumberLiteral _ n Nothing) -> MS.ArrayIndex $ fromIntegral n; _ -> internalError "should never happen" oa) oa
+                                                                            --_ -> []
+
+                          ((SVMType.Mapping _ _ _), CC.OrderedArgs oa) -> do
+                            oa' <- for oa $ \currentoa ->
+                                              nestedCall' currentoa
+
+                            --oa'' <- sequence oa'
+                            
+                            case convertListOfMaybeValuesToStoragePathPieces oa' of
+                              Nothing -> []
+                              Just x  -> concat x
+                              {-
+                          ((SVMType.Mapping _ _ _), CC.OrderedArgs oa) -> do
+                            oa' <- nestedCall' oa
+                            case convertListOfMaybeValuesToStoragePathPieces oa' of 
+                                                                            Nothing -> []
+                                                                            Just x -> x 
+                               -}                                 
                           _ -> []
+
+
+--end, list of map indexes 
+--oa :: expression
+--exptovar getvar
+--define new func and iterate on all of the oas
+-- list of values, storage 
             let isForbidden = not _varIsPublic -- TODO: Stop being lazy and give VariableDecls the full visibility treatment!
             when ((from /= to) && isForbidden) $
               unknownFunction "logFunctionCall" (functionName, contract ^. CC.contractName)
@@ -671,6 +719,71 @@ call' from to' fnCalltype mContract functionName isRCC argExps = do
   where
     flattenVals (x : xs) = [x] ++ flattenVals xs
     flattenVals x = x
+{-
+    nestedCall' :: ( MonadSM m
+                   , A.Selectable (Address, T.Text) X509CertificateField []
+                   , A.Selectable Word256 ParentChainIds []
+                   , A.Selectable Account AddressState []
+                   , A.Selectable Address X509Certificate []
+                   , A.Alters Blockchain.DB.RawStorageDB.RawStorageKey Blockchain.DB.RawStorageDB.RawStorageValue []
+                   , A.Alters (Maybe Word256) MP.StateRoot []
+                   , A.Alters Account AddressState []
+                   , A.Alters MP.StateRoot MP.NodeData []
+                   , A.Alters Keccak256 DBCode []
+                   , A.Alters Keccak256 Blockchain.Data.BlockSummary.BlockSummary []
+                   , Blockchain.DB.MemAddressStateDB.HasMemAddressStateDB []
+                   , HasMemRawStorageDB []
+                   , Mod.Accessible Env.Environment []
+                   , Mod.Modifiable [CallInfo] []
+                   , Mod.Modifiable (Q.Seq Event) []
+                   , Mod.Modifiable (Q.Seq Action.Delegatecall) []
+                   , Mod.Modifiable (Maybe DebugSettings) []
+                   , Mod.Modifiable GasInfo []
+                   , Mod.Modifiable MemDBs []
+                   , Mod.Modifiable Env.Sender []
+                   , Mod.Modifiable Action []
+                   , MonadUnliftIO []
+                   , EUnsafe.MonadCatch []
+                   , MonadLogger []
+                   ) => [CC.ExpressionF a] -> [Value]
+                   -}
+    nestedCall' :: (MonadSM m) => CC.ExpressionF a ->  m Value
+    nestedCall' x = do let x' = def <$ x
+                       x'' <- expToVar' x'
+                       getVar x''
+                       --x''' <- getVar x''
+                       --return x'''
+
+    {-
+    nestedCall' [] = []
+    nestedCall' (x:xs) = do
+      --let x' = CC.extractExpression x
+      --let annotation = emptySourceAnnotation
+      --let x' = x (SourceAnnotation (initialPosition "") (initialPosition "") ()) :: Positioned CC.ExpressionF
+      --let x' = x annotation :: Positioned CC.ExpressionF
+      let x' = def <$ x
+      x'' <- expToVar' x'
+      x''' <- getVar x''
+      rest <- nestedCall' xs
+      --let rest = nestedCall' xs
+      ((return x''') : return(rest))
+      --[x'''] ++ (nestedCall' xs)
+      --(return [x''']) ++ (nestedCall' xs)
+      --return $ [getVar x''] ++ (nestedCall' xs)
+    -}
+
+    convertValueToStoragePathPiece :: Value -> Maybe MS.StoragePathPiece
+    convertValueToStoragePathPiece v = 
+      case v of
+        SInteger i -> Just $ MS.MapIndex $ MS.INum i
+        SString s -> Just $ MS.MapIndex $ MS.IText $ UTF8.fromString s
+        SAccount a _ -> Just $ MS.MapIndex $ MS.IAccount a
+        SBool b -> Just $ MS.MapIndex $ MS.IBool b
+        _ -> Nothing
+
+
+    convertListOfMaybeValuesToStoragePathPieces :: [Value] -> Maybe [MS.StoragePathPiece]
+    convertListOfMaybeValuesToStoragePathPieces mVals = traverse (convertValueToStoragePathPiece) mVals
 
 callWithResult :: MonadSM m => Account -> Account -> CC.FunctionCallType -> Maybe SolidString -> SolidString -> Bool -> CC.ArgList -> m (Maybe Value)
 callWithResult from to fnCalltype mContract functionName isRCC argExps = snd <$> call' from to fnCalltype mContract functionName isRCC argExps
@@ -1363,8 +1476,8 @@ getIndexType (AccountPath addr (MS.StoragePath path)) = case path of
           SVMType.Mapping {SVMType.value = t'} -> loop ps t'
           SVMType.Array {SVMType.entry = t'} -> loop ps t'
           -- TODO lookup struct typos, this seems to be the case when there is a global struct reference
-          SVMType.UnknownLabel def _ -> do
-            t' <- getTypeOfName def
+          SVMType.UnknownLabel def' _ -> do
+            t' <- getTypeOfName def'
             case t' of
               StructTypo fs -> case p of
                 MS.Field f -> case UTF8.toString f `M.lookup` M.fromList fs of
@@ -1447,7 +1560,7 @@ decrementGas !gas = do
       tooMuchGas (show (_gasInitialAllotment gasInfo')) gasInfo'
     else do
       return ()
-
+--use to create variable. from array and map
 expToVar' :: MonadSM m => CC.Expression -> m Variable
 expToVar' (CC.NumberLiteral _ v Nothing) = return . Constant $ SInteger v
 expToVar' (CC.NumberLiteral _ v (Just nu)) =
@@ -1646,7 +1759,7 @@ expToVar' x@(CC.MemberAccess _ expr name) = do
     (SReference p, itemName) -> return . Constant . SReference $ apSnoc p $ MS.Field $ BC.pack $ labelToString itemName
     ((SUserDefined alias notSure actualType), "wrap") -> return . Constant $ (SUserDefined alias notSure actualType) -- return $ Constant . SUserDefined alias val actualType
     m -> typeError ("illegal member access: " ++ (unparseExpression x)) ("parsed as " ++ show m ++ "with full exp" ++ show x)
-
+--use this case for exptovar
 expToVar' x@(CC.IndexAccess _ _ (Nothing)) = missingField "index value cannot be empty" (unparseExpression x)
 -- TODO(tim): When this is a string constant, we can index into the string directly for SInteger
 expToVar' x@(CC.IndexAccess _ parent (Just mIndex)) = do
