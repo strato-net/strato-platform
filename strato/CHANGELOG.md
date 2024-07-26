@@ -16,10 +16,10 @@ so that they could be properly moved to their respective version's subsection.
 
 ## [Unreleased] 
 ### Added
-- `strictDecimal` pragma for decimal precision strictness
 - `truncate(uint)` built-in method for decimal numbers
 - Added `pragma safeExternalCalls` for contracts that want to enforce extra type safety on external calls from other contracts
 - Added `pragma solidvm 11.4` that includes all existing pragmas and their features
+- Added decimal precision strictness to `pragma solidvm 11.4`
 
 ### Changed
 

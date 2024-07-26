@@ -2369,7 +2369,7 @@ expToVarArith :: MonadSM m =>
   m Variable
 expToVarArith intOp decOp expr1 expr2 valType = do
   (_, parentCC) <- getCurrentCodeCollection
-  let pragmaCheck = isJust $ find ((== "strictDecimals") . fst) $ CC._pragmas parentCC
+  let pragmaCheck = CC.resolvePragmaFeature (CC._pragmas parentCC) "strictDecimals"
   i1 <- getVar =<< expToVar expr1 Nothing
   i2 <- getVar =<< expToVar expr2 Nothing
   let valType' = fromMaybe (SVMType.Int (Just True) Nothing) valType 
@@ -2399,7 +2399,7 @@ expToVarDivide :: MonadSM m =>
   m Variable
 expToVarDivide intOp decOp expr1 expr2 valType = do
   (_, parentCC) <- getCurrentCodeCollection
-  let pragmaCheck = isJust $ find ((== "strictDecimals") . fst) $ CC._pragmas parentCC
+  let pragmaCheck = CC.resolvePragmaFeature (CC._pragmas parentCC) "strictDecimals"
   i1 <- getVar =<< expToVar expr1 Nothing
   i2 <- getVar =<< expToVar expr2 Nothing
   let valType' = fromMaybe (SVMType.Int (Just True) Nothing) valType 
@@ -2436,7 +2436,7 @@ binopAssign' :: MonadSM m =>
   m Variable
 binopAssign' intOp decOp lhs rhs valType = do
   (_, parentCC) <- getCurrentCodeCollection
-  let pragmaCheck = isJust $ find ((== "strictDecimals") . fst) $ CC._pragmas parentCC
+  let pragmaCheck = CC.resolvePragmaFeature (CC._pragmas parentCC) "strictDecimals"
   let readVal e = getVar =<< expToVar e Nothing
   delta <- readVal rhs
   curValue <- readVal lhs
@@ -2470,7 +2470,7 @@ binopDivide :: MonadSM m =>
   m Variable
 binopDivide intOp decOp lhs rhs valType = do
   (_, parentCC) <- getCurrentCodeCollection
-  let pragmaCheck = isJust $ find ((== "strictDecimals") . fst) $ CC._pragmas parentCC
+  let pragmaCheck = CC.resolvePragmaFeature (CC._pragmas parentCC) "strictDecimals"
   let readVal e = getVar =<< expToVar e Nothing
   delta <- readVal rhs
   curValue <- readVal lhs
