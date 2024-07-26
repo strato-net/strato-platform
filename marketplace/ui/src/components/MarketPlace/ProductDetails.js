@@ -251,33 +251,68 @@ const ProductDetails = ({ user, users }) => {
     }
   };
 
-  const addItemToCart = () => {
-    let found = false;
-    for (var i = 0; i < cartList.length; i++) {
-      if (cartList[i].product.address === details.address) {
-        found = true;
-        break;
-      }
-    }
-    let items = [];
-    if (!found) {
-      items = [...cartList, { product: details, qty }];
+  // const addItemToCart = async () => {
+  //   let found = false;
+  //   for (var i = 0; i < cartList.length; i++) {
+  //     if (cartList[i].product.address === details.address) {
+  //       found = true;
+  //       break;
+  //     }
+  //   }
+  //   let items = [];
+  //   if (!found) {
+  //     items = [{ product: details, qty }];
 
-      marketPlaceActions.addItemToCart(marketplaceDispatch, items);
-      setQty(1);
-      openToast("bottom", false, TOAST_MSG.ITEM_ADDED_TO_CART);
-    } else {
-      items = [...cartList];
-      cartList.forEach((element, index) => {
-        if (element.product.address === details.address) {
-          items[index].qty += qty;
-          marketPlaceActions.addItemToCart(marketplaceDispatch, items);
-          setQty(1);
-          openToast("bottom", false, TOAST_MSG.ITEM_UPDATED_IN_CART);
-        }
-      });
-    }
-  };
+  //     marketPlaceActions.addItemToCart(marketplaceDispatch, items);
+  //     setQty(1);
+  //     openToast("bottom", false, TOAST_MSG.ITEM_ADDED_TO_CART);
+  //     setTimeout(() => {
+  //       navigate('/checkout')
+  //     }, 2000);
+  //   } else {
+  //     items = [...cartList];
+  //     const quantity = cartList[0].qty + qty;
+  //     const checkQuantity = await orderActions.fetchSaleQuantity(orderDispatch, [details.saleAddress], [quantity])
+  //     cartList.forEach((element, index) => {
+  //       if (element.product.address === details.address) {
+  //         if(checkQuantity[0].availableQuantity > quantity){
+  //           items[index].qty += qty;
+  //           marketPlaceActions.addItemToCart(marketplaceDispatch, items);
+  //           setQty(1);
+  //           openToast("bottom", false, TOAST_MSG.ITEM_UPDATED_IN_CART);
+  //           setTimeout(() => {
+  //             navigate('/checkout')
+  //           }, 2000);
+  //         }else{
+  //           if (checkQuantity[0].availableQuantity === 0) {
+  //             openToast(
+  //               "bottom",
+  //               true,
+  //               `Unfortunately, ${details.name} is currently out of stock. We recommend checking back soon or browsing similar items available now.`
+  //             );
+  //           } else {
+  //             // Case 2: We are trying to add too much quantity
+  //             openToast(
+  //               "bottom",
+  //               true,
+  //               `Unfortunately, only ${checkQuantity[0].availableQuantity} units of ${details.name} are available. Please update your cart quantity accordingly.`
+  //             );
+  //             setTimeout(() => {
+  //               navigate('/checkout')
+  //             }, 2000);
+  //           }
+  //         }
+  //       }
+  //     });
+  //   }
+  // };
+
+  const addItemToCart = async () =>{
+    const items = [{ product: details, qty }];
+    marketPlaceActions.addItemToCart(marketplaceDispatch, items);
+    navigate('/checkout');
+    window.scrollTo(0, 0);
+  }
 
   const ownershipDetailColumn = [
     {
@@ -523,7 +558,7 @@ const ProductDetails = ({ user, users }) => {
                   <div className="flex gap-4 justify-between lg:justify-start  pt-4 w-full">
                     <Button
                       type="primary"
-                      className={`w-[90%] md:w-[365px] h-9  ${isAvailableForSale ? '!bg-[#808080]' : '!bg-[#13188A]'} !hover:bg-primaryHover !text-white`}
+                      className={`w-[100%]  h-9  ${isAvailableForSale ? '!bg-[#808080]' : '!bg-[#13188A]'} !hover:bg-primaryHover !text-white`}
                       onClick={async () => {
                         window.LOQ.push(['ready', async LO => {
                           // Track an event
@@ -546,7 +581,6 @@ const ProductDetails = ({ user, users }) => {
                         const checkQuantity = await orderActions.fetchSaleQuantity(orderDispatch, [details.saleAddress], [qty])
                         if (checkQuantity === true) {
                           addItemToCart();
-                          navigate("/checkout");
                         } else {
                           if (checkQuantity[0].availableQuantity === 0) {
                             openToast("bottom", true, TOAST_MSG.OUT_OF_STOCK(details));
@@ -560,8 +594,8 @@ const ProductDetails = ({ user, users }) => {
                     >
                       Buy Now
                     </Button>
-
-                    {ownerSameAsUser() ?
+                  {/* TODO:- Remove Comment to show the Add-to-Cart Button */}
+                  {/* {ownerSameAsUser() ?
                       <Button
                         icon={<div className="flex justify-center items-center">
                           <img src={Images.Cart} alt={`${assetName} | Image`} title={`${assetName} | Image`} width={18} height={18} className="object-contain" />
@@ -637,7 +671,7 @@ const ProductDetails = ({ user, users }) => {
                         }}
                       />
 
-                    }
+                    } */}
                   </div>
                   :
                   <div className="flex ">

@@ -2806,7 +2806,7 @@ callBuiltin "create" args@[SString contractName', SString contractSrc, SString a
   -- will still work but will have incorrect codeptrs.
   -- Thus, when the testnet wipes, this pragma can largely be removed because the old contracts on the
   -- testnet won't exist anymore and the stateroot mismatches will be fixed.
-  let pragmaCheck = isJust $ find ((== "builtinCreates") . fst) $ CC._pragmas parentCC
+  let pragmaCheck = CC.resolvePragmaFeature (CC._pragmas parentCC) "builtinCreates"
   (hsh, cc) <- codeCollectionFromSource True $ BC.pack contractSrc
   newAddress <- getNewAddress creator
   let constructorArgs = case runParser parseArgs initialParserState "" argString of
@@ -2851,7 +2851,7 @@ callBuiltin "create2" args@[salt, SString contractName', SString contractSrc, SS
   -- will still work but will have incorrect codeptrs.
   -- Thus, when the testnet wipes, this pragma can largely be removed because the old contracts on the
   -- testnet won't exist anymore and the stateroot mismatches will be fixed.
-  let pragmaCheck = isJust $ find ((== "builtinCreates") . fst) $ CC._pragmas parentCC
+  let pragmaCheck = CC.resolvePragmaFeature (CC._pragmas parentCC) "builtinCreates"
   (hsh, cc) <- codeCollectionFromSource True $ BC.pack contractSrc
   let constructorArgs = case runParser parseArgs initialParserState "" argString of
         Right parsedArgs -> parsedArgs
@@ -3011,7 +3011,7 @@ runTheConstructors from to hsh cc contractName' argExps = do
           for_ (toBasic defVal) $ markDiffForAction to (MS.StoragePath [MS.Field $ BC.pack $ labelToString n])
     -- SVMType.Bool -> markDiffForAction to (MS.StoragePath [MS.Field $ BC.pack $ labelToString n]) $ MS.BBool False
 
-    let isStrict = isJust $ find ((== "strict") . fst) $ CC._pragmas cc
+    let isStrict = CC.resolvePragmaFeature (CC._pragmas cc) "strict"
     forM_ (reverse $ contract' ^. CC.parents) $ \parent -> do
       if isStrict
         then for_ (M.lookup parent . CC._funcConstructorCalls =<< contract' ^. CC.constructor) $ \args'' -> do
@@ -3099,7 +3099,7 @@ runTheCall address' contract' funcName hsh cc theFunction argVals ro ff = do
 
   -- 'pragma safeExternalCalls' is used for contracts that may receive external calls
   -- and want to enforce a typecheck on arguments given by other contracts
-  let pragmaCheck = isJust $ find ((== "safeExternalCalls") . fst) $ CC._pragmas cc
+  let pragmaCheck = CC.resolvePragmaFeature (CC._pragmas cc) "safeExternalCalls"
   when pragmaCheck $ do
    unlessM (validateFunctionArguments theFunction argVals) $
     typeError

@@ -1,11 +1,12 @@
 import { Button, Select, InputNumber, Modal, Table } from "antd";
-import { useEffect, useState } from "react";
+import { useEffect, useRef,useState } from "react";
 import { actions } from "../../contexts/inventory/actions";
 import { actions as userActions } from "../../contexts/users/actions";
 import { useInventoryDispatch, useInventoryState } from "../../contexts/inventory";
 import { useUsersDispatch, useUsersState } from "../../contexts/users";
 import { useAuthenticateState } from "../../contexts/authentication";
 import { SearchOutlined } from '@ant-design/icons';
+import { handlePriceInput, handleQuantityInput } from "../../helpers/utils";
 
 const TransferModal = ({ open, handleCancel, inventory, categoryName, limit, offset }) => {
     const [data, setData] = useState([inventory]);
@@ -24,11 +25,15 @@ const TransferModal = ({ open, handleCancel, inventory, categoryName, limit, off
     const {
         isTransferring
     } = useInventoryState();
+    const inputPriceDesktopRef = useRef(null);
+    const inputPriceMobileRef = useRef(null);
+    const inputQuantityDesktopRef = useRef(null);
+    const inputQuantityMobileRef = useRef(null);
 
     const filterDuplicateUserAddresses = (arr) => {
         return [...new Map(arr.map((u) => [u.value, u])).values()];
     };
-    
+
     const [searchInput, setSearchInput] = useState('');
     const [dropdownOpen, setDropdownOpen] = useState(false);
 
@@ -48,7 +53,7 @@ const TransferModal = ({ open, handleCancel, inventory, categoryName, limit, off
 
     useEffect(() => {
         userActions.fetchUsers(userDispatch);
-    }, [])
+    }, []);
 
     useEffect(() => {
         if (quantity > inventory.quantity || quantity <= 0 || !userAddress) {
@@ -57,13 +62,44 @@ const TransferModal = ({ open, handleCancel, inventory, categoryName, limit, off
         else {
             setCanTransfer(true);
         };
-    }, [quantity, userAddress])
-    
+    }, [quantity, userAddress]);
+
+    useEffect(() => {
+        const priceInputElements = [inputPriceDesktopRef.current, inputPriceMobileRef.current];
+        const quantityInputElements = [inputQuantityDesktopRef.current, inputQuantityMobileRef.current];
+        
+        priceInputElements.forEach(inputElement => {
+            if (inputElement) {
+                inputElement.addEventListener('input', handlePriceInput(setPrice));
+            }
+        });
+
+        quantityInputElements.forEach(inputElement => {
+            if (inputElement) {
+                inputElement.addEventListener('input', handleQuantityInput(setQuantity));
+            }
+        });
+
+        return () => {
+            priceInputElements.forEach(inputElement => {
+                if (inputElement) {
+                    inputElement.removeEventListener('input', handlePriceInput(setPrice));
+                }
+            });
+
+            quantityInputElements.forEach(inputElement => {
+                if (inputElement) {
+                    inputElement.removeEventListener('input', handleQuantityInput(setQuantity));
+                }
+            });
+        };
+    }, [inputPriceDesktopRef, inputPriceMobileRef, inputQuantityDesktopRef, inputQuantityMobileRef]);
+
     const filteredOptions = searchInput
-    ? filteredUsersList.filter(option =>
-        option.label && option.label.toLowerCase().includes(searchInput.toLowerCase())
-      )
-    : [];
+        ? filteredUsersList.filter(option =>
+            option.label && option.label.toLowerCase().includes(searchInput.toLowerCase())
+        )
+        : [];
 
 
     const columns = [
@@ -76,14 +112,35 @@ const TransferModal = ({ open, handleCancel, inventory, categoryName, limit, off
             title: "Set Quantity",
             align: "center",
             render: () => (
-                <InputNumber value={quantity} controls={false} min={1} onChange={(value) => setQuantity(value)} />
+                <InputNumber
+                    value={quantity}
+                    ref={inputQuantityDesktopRef}
+                    controls={false}
+                    min={1}
+                    onChange={(value) => {
+                        if (value) {
+                            setQuantity(parseInt(value, 10));
+                        }
+                    }}
+                />
             )
         },
         {
-            title: "Set Price",
+            title: "Unit Price ($)",
             align: "center",
             render: () => (
-                <InputNumber value={price} controls={false} min={1} onChange={(value) => setPrice(value)} />
+                <InputNumber
+                    ref={inputPriceDesktopRef}
+                    value={price}
+                    controls={false}
+                    min={0.01}
+                    onChange={(value) => {
+                        const stringValue = value ? value.toString() : '';
+                        if (/^\d+(\.\d{0,2})?$/.test(stringValue)) {
+                            setPrice(value);
+                        }
+                    }}
+                />
             )
         },
         {
@@ -134,7 +191,7 @@ const TransferModal = ({ open, handleCancel, inventory, categoryName, limit, off
             open={open}
             onCancel={handleCancel}
             title={`Transfer - ${decodeURIComponent(inventory.name)}`}
-            width={825}
+            width={1000}
             footer={[
                 <div className="flex justify-center md:block">
                     <Button type="primary" className="w-32 h-9" onClick={handleSubmit} disabled={!canTransfer} loading={isTransferring}>
@@ -153,21 +210,43 @@ const TransferModal = ({ open, handleCancel, inventory, categoryName, limit, off
             </div>
             <div className="flex flex-col gap-[18px] md:hidden mt-5">
                 <div> <p className="text-[#202020] font-medium text-sm">Quantity Available</p>
-                    <div className="border border-[#d9d9d9] h-[42px] rounded-md flex items-center ">
-
-                        <p className="px-5 "> {inventory?.quantity}</p>
+                    <div className="border border-[#d9d9d9] h-[42px] rounded-md flex items-center justify-center">
+                        <p> {inventory?.quantity}</p>
                     </div>
                 </div>
                 <div>
                     <p className="text-[#202020] font-medium text-sm">Set Quantity</p>
-                    <div className="inventory_card">
-                        <InputNumber className="w-full pl-5" value={quantity} controls={false} min={1} onChange={(value) => setQuantity(value)} />
+                    <div>
+                        <InputNumber
+                            className="w-full h-9"
+                            value={quantity}
+                            ref={inputQuantityMobileRef}
+                            controls={false}
+                            min={1}
+                            onChange={(value) => {
+                                if (value) {
+                                    setQuantity(parseInt(value, 10));
+                                }
+                            }}
+                        />
                     </div>
                 </div>
                 <div>
-                    <p className="text-[#202020] font-medium text-sm">Set Price</p>
-                    <div className="inventory_card">
-                        <InputNumber className="w-full pl-5" value={price} controls={false} min={1} onChange={(value) => setPrice(value)} />
+                    <p className="text-[#202020] font-medium text-sm">Unit Price ($)</p>
+                    <div>
+                        <InputNumber
+                            className="w-full h-9"
+                            value={price}
+                            ref={inputPriceMobileRef}
+                            controls={false}
+                            min={.01}
+                            onChange={(value) => {
+                                const stringValue = value ? value.toString() : '';
+                                if (/^\d+(\.\d{0,2})?$/.test(stringValue)) {
+                                    setPrice(value);
+                                }
+                            }}
+                        />
                     </div>
                 </div>
                 <div>
