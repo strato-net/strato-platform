@@ -1590,8 +1590,37 @@ statementHelper (Throw e x) = do
 statementHelper (ModifierExecutor x) = pure $ topType' x
 statementHelper (EmitStatement _ vals x) =
   reduceType' x <$> traverse (tcExpr . snd) vals
-statementHelper (RevertStatement _ (NamedArgs vals) x) =
-  reduceType' x <$> traverse (tcExpr . snd) vals
+statementHelper (RevertStatement errorName (NamedArgs vals) x) =
+
+  -- _errors :: Map SolidString [(SolidString, SolidVM.IndexedType, a)],
+  --   _events :: Map SolidString (SolidVM.EventF a),
+  cc <- asks codeCollection
+  let solidVMVersion = maybe "" snd $ find ((== "solidvm") . fst) $ _pragmas cc
+  case solidVMVersion of
+    "11.4" -> do
+      c  <- asks contract
+      case M.lookup errorName (_errors c) of 
+        Just error -> do
+          let vals' = fmap (\(_, b) -> 
+                              let r = R cc c Nothing "Nothing" []
+                              in runReader (evalStateT (tcExpr b) ((Nothing, M.empty) :| [])) r
+                           ) vals
+              -- valsDebug = trace ("Evaluated types: " ++ show vals') vals'
+          let vals'' = map (\y -> case y of
+                                    Static s _ -> s
+                                    _          -> error "Internal Error: Type is not static"
+                           ) vals'
+              -- valsStaticDebug = trace ("Static types: " ++ show vals'') vals''
+          let expectedTypes = [indexedTypeType it | (_, it) <- _eventLogs event]
+              -- expectedTypesDebug = trace ("Expected types: " ++ show expectedTypes) expectedTypes
+          if length expectedTypes /= length vals''
+            then pure . bottom $ "Wrong number of arguments provided" <$ x
+            else if not (and $ zipWith isSameType expectedTypes vals'')
+              then pure . bottom $ "Type mismatch in error arguments" <$ x
+              else reduceType' x <$> traverse (tcExpr . snd) vals 
+        Nothing -> pure . bottom $ "Error does not exist" <$ x
+    _    ->
+      reduceType' x <$> traverse (tcExpr . snd) vals
 statementHelper (RevertStatement _ (OrderedArgs vals) x) =
   reduceType' x <$> traverse tcExpr vals
 statementHelper (UncheckedStatement body x) =
