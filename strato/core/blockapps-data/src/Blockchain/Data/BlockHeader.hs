@@ -110,7 +110,7 @@ instance NFData DummyCertRevocation
 
 getBlockDifficulty :: BlockHeader -> Integer
 getBlockDifficulty BlockHeader { difficulty } = difficulty
-getBlockDifficulty BlockHeaderV2 {} = -1
+getBlockDifficulty BlockHeaderV2 {} = 8193
 
 getBlockGasLimit :: BlockHeader -> Integer
 getBlockGasLimit BlockHeader { gasLimit } = gasLimit
@@ -187,7 +187,7 @@ instance Format BlockHeader where
             ++ "newValidators: " ++ show newValidators ++ "\n"
             ++ "removedValidators: " ++ show removedValidators ++ "\n"
             ++ "newCerts: " ++ show newCerts ++ "\n"
-            ++ "revokedCerts: " ++ show revokedCerts ++ "\n"
+            ++ "revokedCerts: instance blockheaderlike" ++ show revokedCerts ++ "\n"
             ++ "signatures: " ++ show signatures ++ "\n"
         )
 
