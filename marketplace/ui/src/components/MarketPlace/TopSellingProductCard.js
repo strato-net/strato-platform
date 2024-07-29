@@ -60,84 +60,98 @@ const TopSellingProductCard = () => {
     }
   };
 
+  // const addItemToCart = async (product, quantity) => {
+  //   if (product.ownerCommonName === user?.commonName) {
+  //     openToast("bottom", true, "Cannot buy your own item");
+  //     return false;
+  //   }
+
+  //   // Search for the product in the cart
+  //   let foundIndex = cartList.findIndex(
+  //     (item) => item.product.address === product.address
+  //   );
+  //   let items = [...cartList];
+
+  //   // Found index returns -1 if nothing is found in the cartlist
+  //   if (foundIndex === -1) {
+  //     // Product not found, check quantity before adding
+  //     const checkQuantity = await orderActions.fetchSaleQuantity(
+  //       orderDispatch,
+  //       [product.saleAddress],
+  //       [quantity]
+  //     );
+  //     if (checkQuantity === true) {
+  //       // Quantity check passed, add new item to the cart
+  //       items = [{ product, qty: quantity }]
+  //       actions.addItemToCart(marketplaceDispatch, items);
+  //       openToast("bottom", false, "Item added to cart");
+  //       return true;
+  //     } else {
+  //       // Not enough quantity, inform the user
+  //       if (checkQuantity[0].availableQuantity === 0) {
+  //         openToast(
+  //           "bottom",
+  //           true,
+  //           `Unfortunately, ${product.name} is currently out of stock. We recommend checking back soon or browsing similar items available now.`
+  //         );
+  //       } else {
+  //         // Case 2: We are trying to add too much quantity
+  //         openToast(
+  //           "bottom",
+  //           true,
+  //           `Unfortunately, only ${checkQuantity[0].availableQuantity} units of ${product.name} are available. Please update your cart quantity accordingly.`
+  //         );
+  //         setTimeout(() => {
+  //           navigate('/checkout')
+  //         }, 2000);
+  //       }
+  //       return false;
+  //     }
+  //   } else {
+  //     // Product found, prepare to update quantity after check
+  //     const potentialNewQty = items[foundIndex].qty + quantity;
+  //     const checkQuantity = await orderActions.fetchSaleQuantity(
+  //       orderDispatch,
+  //       [product.saleAddress],
+  //       [potentialNewQty]
+  //     );
+  //     if (checkQuantity === true) {
+  //       // Quantity check passed, update item quantity in the cart
+  //       items[foundIndex].qty = potentialNewQty;
+  //       actions.addItemToCart(marketplaceDispatch, items);
+  //       openToast("bottom", false, "Item updated in cart");
+  //       return true;
+  //     } else {
+  //       // Not enough quantity, inform the user
+  //       if (checkQuantity[0].availableQuantity === 0) {
+  //         openToast(
+  //           "bottom",
+  //           true,
+  //           `Unfortunately, ${product.name} is currently out of stock. We recommend checking back soon or browsing similar items available now.`
+  //         );
+  //       } else {
+  //         // Case 2: We are trying to add too much quantity
+  //         openToast(
+  //           "bottom",
+  //           true,
+  //           `Unfortunately, only ${checkQuantity[0].availableQuantity} units of ${product.name} are available. Please update your cart quantity accordingly.`
+  //         );
+  //         setTimeout(() => {
+  //           navigate('/checkout')
+  //         }, 2000);
+  //       }
+  //       return false;
+  //     }
+  //   }
+  // };
+
+
   const addItemToCart = async (product, quantity) => {
-    if (product.ownerCommonName === user?.commonName) {
-      openToast("bottom", true, "Cannot buy your own item");
-      return false;
-    }
-
-    // Search for the product in the cart
-    let foundIndex = cartList.findIndex(
-      (item) => item.product.address === product.address
-    );
-    let items = [...cartList];
-
-    // Found index returns -1 if nothing is found in the cartlist
-    if (foundIndex === -1) {
-      // Product not found, check quantity before adding
-      const checkQuantity = await orderActions.fetchSaleQuantity(
-        orderDispatch,
-        [product.saleAddress],
-        [quantity]
-      );
-      if (checkQuantity === true) {
-        // Quantity check passed, add new item to the cart
-        items = [{ product, qty: quantity }]
+        const  items = [{ product, qty: quantity }]
         actions.addItemToCart(marketplaceDispatch, items);
-        openToast("bottom", false, "Item added to cart");
-        return true;
-      } else {
-        // Not enough quantity, inform the user
-        if (checkQuantity[0].availableQuantity === 0) {
-          openToast(
-            "bottom",
-            true,
-            `Unfortunately, ${product.name} is currently out of stock. We recommend checking back soon or browsing similar items available now.`
-          );
-        } else {
-          // Case 2: We are trying to add too much quantity
-          openToast(
-            "bottom",
-            true,
-            `Unfortunately, only ${checkQuantity[0].availableQuantity} units of ${product.name} are available. Please update your cart quantity accordingly.`
-          );
-        }
-        return false;
-      }
-    } else {
-      // Product found, prepare to update quantity after check
-      const potentialNewQty = items[foundIndex].qty + quantity;
-      const checkQuantity = await orderActions.fetchSaleQuantity(
-        orderDispatch,
-        [product.saleAddress],
-        [potentialNewQty]
-      );
-      if (checkQuantity === true) {
-        // Quantity check passed, update item quantity in the cart
-        items[foundIndex].qty = potentialNewQty;
-        actions.addItemToCart(marketplaceDispatch, items);
-        openToast("bottom", false, "Item updated in cart");
-        return true;
-      } else {
-        // Not enough quantity, inform the user
-        if (checkQuantity[0].availableQuantity === 0) {
-          openToast(
-            "bottom",
-            true,
-            `Unfortunately, ${product.name} is currently out of stock. We recommend checking back soon or browsing similar items available now.`
-          );
-        } else {
-          // Case 2: We are trying to add too much quantity
-          openToast(
-            "bottom",
-            true,
-            `Unfortunately, only ${checkQuantity[0].availableQuantity} units of ${product.name} are available. Please update your cart quantity accordingly.`
-          );
-        }
-        return false;
-      }
-    }
-  };
+        navigate('/checkout');
+        window.scrollTo(0, 0);
+  }
 
   const [prevVisible, setPrevVisible] = useState(false);
   const [nextVisible, setNextVisible] = useState(true);

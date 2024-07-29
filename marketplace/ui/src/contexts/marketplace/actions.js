@@ -76,7 +76,7 @@ const actions = {
   addItemToCart: (dispatch, cartList) => {
     dispatch({ type: actionDescriptors.addItemToCart });
     try {
-      window.localStorage.setItem("cartList", JSON.stringify(cartList));
+      // window.localStorage.setItem("cartList", JSON.stringify(cartList));
       dispatch({
         type: actionDescriptors.addItemToCartSuccessful,
         payload: cartList,
@@ -92,7 +92,7 @@ const actions = {
   deleteCartItem: (dispatch, cartList) => {
     dispatch({ type: actionDescriptors.deleteCartItem });
     try {
-      window.localStorage.setItem("cartList", JSON.stringify(cartList));
+      // window.localStorage.setItem("cartList", JSON.stringify(cartList));
       dispatch({
         type: actionDescriptors.deleteCartItemSuccesful,
         payload: cartList,

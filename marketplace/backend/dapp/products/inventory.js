@@ -385,6 +385,7 @@ async function get(user, args, options) {
             price: sale.price,
             saleAddress: sale.address,
             saleQuantity: sale.quantity,
+            paymentProviders: sale ? (sale['BlockApps-Mercata-Sale-paymentProviders'] ? sale['BlockApps-Mercata-Sale-paymentProviders'] : null) : null
         }
     }
 
