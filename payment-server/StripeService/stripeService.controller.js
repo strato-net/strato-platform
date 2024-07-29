@@ -8,13 +8,13 @@ import {
   insertStripePayment,
   updateStripePayment,
   emitOnboardSeller,
-  getOrderEvent, 
+  getCheckoutEvent, 
   checkSellerOnboarded,
   validateAndGetOrderDetails ,
   completeOrder,
-  initializePayment,
+  generateIntermediateOrder,
   cancelOrder,
-  discardOrder
+  discardCheckoutQuantity
 } from '../helpers/utils.js';
 import { PAYMENT_STATUS, STRIPE_CONTRACT_ADDRESS, PAYMENT_RECEIVED_MESSAGE } from '../helpers/constants.js';
 
@@ -117,10 +117,10 @@ class StripeServiceController {
     try {
       // Validation
       StripeServiceController.validateStripeCheckoutArgs(req.query);
-      const { orderHash, redirectUrl } = req.query;
+      const { checkoutHash, redirectUrl } = req.query;
 
       // Check if the payment session already exists for the token
-      const paymentDetails = await getStripePaymentFromToken(orderHash);
+      const paymentDetails = await getStripePaymentFromToken(checkoutHash);
 
       // Skip all the extra work if the session already exists
       if (paymentDetails && paymentDetails.status === "OPEN") {
@@ -132,15 +132,15 @@ class StripeServiceController {
       }
 
       // Get the payment event from Cirrus
-      const orderEvent = await getOrderEvent(orderHash);
+      const checkoutEvent = await getCheckoutEvent(checkoutHash);
 
-      if (!orderEvent) {
-        throw new Error(`Cannot find order with hash ${orderHash}.`);
+      if (!checkoutEvent) {
+        throw new Error(`Cannot find checkout event with hash ${checkoutHash}.`);
       }
 
       // Get and validate the order details
-      const saleAddresses = orderEvent[0].saleAddresses;
-      const quantities = orderEvent[0].quantities;
+      const saleAddresses = checkoutEvent[0].saleAddresses;
+      const quantities = checkoutEvent[0].quantitiesToBePurchased;
       const { sellerCommonName, orderDetails } = await validateAndGetOrderDetails(quantities, saleAddresses);
 
       // Seller account verification
@@ -158,8 +158,8 @@ class StripeServiceController {
       }
 
       // Create checkout session and store in DB
-      const session = await stripeService.initiatePayment(redirectUrl, orderHash, orderDetails, sellerAccount);
-      const insertResult = await insertStripePayment(orderHash, session.id, sellerCommonName);
+      const session = await stripeService.initiatePayment(redirectUrl, checkoutHash, orderDetails, sellerAccount);
+      const insertResult = await insertStripePayment(checkoutHash, session.id, sellerCommonName);
 
       // Redirect to Stripe payment session
       res.redirect(`${session.url}`);
@@ -173,53 +173,53 @@ class StripeServiceController {
     try {
       // Validation
       StripeServiceController.validateStripeCheckoutConfirmArgs(req.query);
-      const { orderHash, redirectUrl } = req.query;
+      const { checkoutHash, redirectUrl } = req.query;
 
       // Retrieve the session
-      const paymentDetails = await getStripePaymentFromToken(orderHash);
+      const paymentDetails = await getStripePaymentFromToken(checkoutHash);
       const session = await stripeService.getPaymentSession(paymentDetails.paymentsessionid, paymentDetails.accountid);
 
       // Verify payment and perform onchain transfer
       let returnStatus;
       if (session.payment_status === 'paid') {
         // Get the payment event from Cirrus
-        const orderEvent = await getOrderEvent(orderHash);
+        const checkoutEvent = await getCheckoutEvent(checkoutHash);
 
         // Call completeOrder
         const callArgs = {
-          orderHash: orderEvent[0].orderHash,
-          orderId: orderEvent[0].orderId,
-          purchaser: orderEvent[0].purchaser,
-          saleAddresses: orderEvent[0].saleAddresses,
-          quantities: orderEvent[0].quantities,
+          orderHash: checkoutEvent[0].checkoutHash,
+          orderId: checkoutEvent[0].checkoutId,
+          purchaser: checkoutEvent[0].purchaser,
+          saleAddresses: checkoutEvent[0].saleAddresses,
+          quantities: checkoutEvent[0].quantitiesToBePurchased,
           currency: 'USD',
-          createdDate: orderEvent[0].createdDate,
+          createdDate:  Math.floor(Date.now() / 1000),
           comments: PAYMENT_RECEIVED_MESSAGE,
         } 
         returnStatus = await completeOrder(STRIPE_CONTRACT_ADDRESS, callArgs);
 
         // Update payment status in DB
-        const updateResult = await updateStripePayment(orderHash, "PAID");
+        const updateResult = await updateStripePayment(checkoutHash, "PAID");
       } else if (session.payment_status === 'unpaid' && session.status === 'complete') {
         // ACH payment
         // Get the payment event from Cirrus
-        const orderEvent = await getOrderEvent(orderHash);
+        const checkoutEvent = await getCheckoutEvent(checkoutHash);
 
-        // Call initializePayment
+        // Call generateIntermediateOrder
         const callArgs = {
-          orderHash: orderEvent[0].orderHash,
-          orderId: orderEvent[0].orderId,
-          purchaser: orderEvent[0].purchaser,
-          saleAddresses: orderEvent[0].saleAddresses,
-          quantities: orderEvent[0].quantities,
+          checkoutHash: checkoutEvent[0].checkoutHash,
+          checkoutId: checkoutEvent[0].checkoutId,
+          purchaser: checkoutEvent[0].purchaser,
+          saleAddresses: checkoutEvent[0].saleAddresses,
+          quantities: checkoutEvent[0].quantitiesToBePurchased,
           currency: 'USD',
-          createdDate: orderEvent[0].createdDate,
-          comments: orderEvent[0].comments,
+          createdDate:  Math.floor(Date.now() / 1000),
+          comments: "",
         } 
-        returnStatus = await initializePayment(STRIPE_CONTRACT_ADDRESS, callArgs);
+        returnStatus = await generateIntermediateOrder(STRIPE_CONTRACT_ADDRESS, callArgs);
 
         // Update payment status in DB
-        const updateResult = await updateStripePayment(orderHash, "INITIALIZED");
+        const updateResult = await updateStripePayment(checkoutHash, "INITIALIZED");
       } else {
         throw new Error(`Payment has not been processed. Failed to confirm purchase. Please contact an Admin or the Payment Server Admin.`);
       }
@@ -238,28 +238,25 @@ class StripeServiceController {
     try {
       // Validation
       StripeServiceController.validateStripeCheckoutCancelArgs(req.query);
-      const { orderHash, redirectUrl } = req.query;
+      const { checkoutHash, redirectUrl } = req.query;
 
       // Get the payment event from Cirrus
-      const orderEvent = await getOrderEvent(orderHash);
+      const checkoutEvent = await getCheckoutEvent(checkoutHash);
 
       // Construct cancelOrder args to discard the order
       const callArgs = {
-        orderHash: orderEvent[0].orderHash,
-        orderId: orderEvent[0].orderId,
-        purchaser: orderEvent[0].purchaser,
-        saleAddresses: orderEvent[0].saleAddresses,
-        quantities: orderEvent[0].quantities,
-        currency: 'USD',
-        createdDate: orderEvent[0].createdDate,
-        comments: orderEvent[0].comments,
+        checkoutHash: checkoutEvent[0].checkoutHash,
+        checkoutId: checkoutEvent[0].checkoutId,
+        purchaser: checkoutEvent[0].purchaser,
+        saleAddresses: checkoutEvent[0].saleAddresses,
+        quantities: checkoutEvent[0].quantitiesToBePurchased,
       } 
 
-      const cancelOrderStatus = await discardOrder(STRIPE_CONTRACT_ADDRESS, callArgs);
+      const cancelOrderStatus = await discardCheckoutQuantity(STRIPE_CONTRACT_ADDRESS, callArgs);
       console.log("cancelOrderStatus", cancelOrderStatus);
 
       // Update payment status in DB
-      const updateResult = await updateStripePayment(orderHash, "DISCARDED");
+      const updateResult = await updateStripePayment(checkoutHash, "DISCARDED");
 
       // Redirect back to marketplace
       res.redirect(`${redirectUrl}`);
@@ -282,17 +279,17 @@ class StripeServiceController {
           const session = await stripeService.getPaymentSession(p.paymentsessionid, p.accountid);
           if (session.payment_status === 'paid') {
             // Get the payment event from Cirrus
-            const orderEvent = await getOrderEvent(p.orderhash);
+            const checkoutEvent = await getCheckoutEvent(p.orderhash);
 
             // Call completeOrder
             const callArgs = {
-              orderHash: orderEvent[0].orderHash,
-              orderId: orderEvent[0].orderId,
-              purchaser: orderEvent[0].purchaser,
-              saleAddresses: orderEvent[0].saleAddresses,
-              quantities: orderEvent[0].quantities,
+              orderHash: checkoutEvent[0].checkoutHash,
+              orderId: checkoutEvent[0].checkoutId,
+              purchaser: checkoutEvent[0].purchaser,
+              saleAddresses: checkoutEvent[0].saleAddresses,
+              quantities: checkoutEvent[0].quantitiesToBePurchased,
               currency: 'USD',
-              createdDate: orderEvent[0].createdDate,
+              createdDate: Math.floor(Date.now() / 1000),
               comments: PAYMENT_RECEIVED_MESSAGE,
             } 
             const returnStatus = await completeOrder(STRIPE_CONTRACT_ADDRESS, callArgs);
@@ -311,16 +308,16 @@ class StripeServiceController {
 
           if(paymentErrorAndRequiresPaymentMethod)
             {
-              const orderEvent = await getOrderEvent(p.orderhash);
+              const checkoutEvent = await getCheckoutEvent(p.orderhash);
               
               const callArgs = {
-                orderHash: orderEvent[0].orderHash,
-                orderId: orderEvent[0].orderId,
-                purchaser: orderEvent[0].purchaser,
-                saleAddresses: orderEvent[0].saleAddresses,
-                quantities: orderEvent[0].quantities,
+                orderHash: checkoutEvent[0].checkoutHash,
+                orderId: checkoutEvent[0].checkoutId,
+                purchaser: checkoutEvent[0].purchaser,
+                saleAddresses: checkoutEvent[0].saleAddresses,
+                quantities: checkoutEvent[0].quantitiesToBePurchased,
                 currency: 'USD',
-                createdDate: orderEvent[0].createdDate,
+                createdDate: Math.floor(Date.now() / 1000),
                 comments: ERROR_MESSAGE,
               } 
         
@@ -383,7 +380,7 @@ class StripeServiceController {
 
   static validateStripeCheckoutArgs(args) {
     const stripeCheckoutSchema = Joi.object({
-      orderHash: Joi.string().required(),
+      checkoutHash: Joi.string().required(),
       redirectUrl: Joi.string().required(),
     });
 
@@ -396,7 +393,7 @@ class StripeServiceController {
 
   static validateStripeCheckoutConfirmArgs(args) {
     const stripeCheckoutConfirmSchema = Joi.object({
-      orderHash: Joi.string().required(),
+      checkoutHash: Joi.string().required(),
       redirectUrl: Joi.string().required(),
     });
 
@@ -409,7 +406,7 @@ class StripeServiceController {
 
   static validateStripeCheckoutCancelArgs(args) {
     const stripeCheckoutCancelSchema = Joi.object({
-      orderHash: Joi.string().required(),
+      checkoutHash: Joi.string().required(),
       redirectUrl: Joi.string().required(),
     });
 
