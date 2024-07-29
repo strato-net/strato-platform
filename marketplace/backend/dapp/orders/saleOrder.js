@@ -204,9 +204,9 @@ async function getAll(admin, args = {}, options) {
   let saleOrders;
   const { offset, limit, order } = args;
   const newOptions = { ...options, org: 'BlockApps', app: 'Mercata' }
+
   const newCountArgs = {
     ...args,
-    status: '1',
     limit: undefined,
     offset: 0,
     order: undefined,
@@ -235,14 +235,17 @@ async function getAll(admin, args = {}, options) {
   let totalCount = newCount[0] ? newCount[0].count : 0;
 
   // Get the latest payment event for each sale token
-  if (totalCount !== 0 && !(offset && (totalCount < offset))) {
+  if (totalCount !== 0) {
     const uniqueOrderArgs = {
       ...args,
+      limit: undefined,
+      offset: 0,
       queryOptions: {
         select: 'id:id.max(),orderHash,createdDate',
       }
     };
     const uniqueOrders = await searchAllWithQueryArgs(paymentTableName, uniqueOrderArgs, newOptions, admin);
+
     const idArgs = {
       id: uniqueOrders.map((uo) => uo.id),
       order: order,
@@ -296,23 +299,18 @@ async function getAll(admin, args = {}, options) {
 
   let oldCount = 0;
   try {
-    if (!saleOrders || !limit || saleOrders.length < limit) {
-      let oldLimit = saleOrders && limit ? limit - saleOrders.length : limit;
-      let oldOffset = 0;
-      if (offset)
-        oldOffset = offset - (saleOrders ? saleOrders.length : 0);
-      // Legacy orders need to join array tables.
-      let oldArgs = { ...args, limit: oldLimit, offset: oldOffset, queryOptions: { select: constants.attach_saleAddresses_Quantities_completedSales_onOrder }};
-      const oldSaleOrders = await searchAllWithQueryArgs(constants.orderTableName, oldArgs, newOptions, admin);
-      saleOrders = saleOrders ? [...saleOrders, ...oldSaleOrders] : [...oldSaleOrders];
-    }
+    // Legacy orders need to join array tables.
+    let oldArgs = { ...args, limit: undefined, offset: 0, queryOptions: { select: constants.attach_saleAddresses_Quantities_completedSales_onOrder } };
+    const oldSaleOrders = await searchAllWithQueryArgs(constants.orderTableName, oldArgs, newOptions, admin);
+    saleOrders = saleOrders ? [...saleOrders, ...oldSaleOrders] : [...oldSaleOrders];
+
     oldCount = await searchAllWithQueryArgs(
       constants.orderTableName,
       countArgs,
       newOptions,
       admin
     );
-  } catch(err) {
+  } catch (err) {
     console.log("Legacy order table does not exist.", err, JSON.stringify(err));
   }
 
@@ -322,6 +320,8 @@ async function getAll(admin, args = {}, options) {
     saleOrders.sort((a, b) => a.createdDate - b.createdDate);
   else
     saleOrders.sort((a, b) => b.createdDate - a.createdDate);
+
+  saleOrders = saleOrders.slice(offset, offset + limit)
 
   return saleOrders ? { orders: saleOrders.map((order) => marshalOut(order)), total: totalCount } : undefined;
 }

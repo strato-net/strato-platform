@@ -1,11 +1,12 @@
 import { Button, Select, InputNumber, Modal, Table } from "antd";
-import { useEffect, useState } from "react";
+import { useEffect, useRef,useState } from "react";
 import { actions } from "../../contexts/inventory/actions";
 import { actions as userActions } from "../../contexts/users/actions";
 import { useInventoryDispatch, useInventoryState } from "../../contexts/inventory";
 import { useUsersDispatch, useUsersState } from "../../contexts/users";
 import { useAuthenticateState } from "../../contexts/authentication";
 import { SearchOutlined } from '@ant-design/icons';
+import { handlePriceInput, handleQuantityInput } from "../../helpers/utils";
 
 const TransferModal = ({ open, handleCancel, inventory, categoryName, limit, offset }) => {
     const [data, setData] = useState([inventory]);
@@ -24,6 +25,10 @@ const TransferModal = ({ open, handleCancel, inventory, categoryName, limit, off
     const {
         isTransferring
     } = useInventoryState();
+    const inputPriceDesktopRef = useRef(null);
+    const inputPriceMobileRef = useRef(null);
+    const inputQuantityDesktopRef = useRef(null);
+    const inputQuantityMobileRef = useRef(null);
 
     const filterDuplicateUserAddresses = (arr) => {
         return [...new Map(arr.map((u) => [u.value, u])).values()];
@@ -48,7 +53,7 @@ const TransferModal = ({ open, handleCancel, inventory, categoryName, limit, off
 
     useEffect(() => {
         userActions.fetchUsers(userDispatch);
-    }, [])
+    }, []);
 
     useEffect(() => {
         if (quantity > inventory.quantity || quantity <= 0 || !userAddress) {
@@ -57,7 +62,38 @@ const TransferModal = ({ open, handleCancel, inventory, categoryName, limit, off
         else {
             setCanTransfer(true);
         };
-    }, [quantity, userAddress])
+    }, [quantity, userAddress]);
+
+    useEffect(() => {
+        const priceInputElements = [inputPriceDesktopRef.current, inputPriceMobileRef.current];
+        const quantityInputElements = [inputQuantityDesktopRef.current, inputQuantityMobileRef.current];
+        
+        priceInputElements.forEach(inputElement => {
+            if (inputElement) {
+                inputElement.addEventListener('input', handlePriceInput(setPrice));
+            }
+        });
+
+        quantityInputElements.forEach(inputElement => {
+            if (inputElement) {
+                inputElement.addEventListener('input', handleQuantityInput(setQuantity));
+            }
+        });
+
+        return () => {
+            priceInputElements.forEach(inputElement => {
+                if (inputElement) {
+                    inputElement.removeEventListener('input', handlePriceInput(setPrice));
+                }
+            });
+
+            quantityInputElements.forEach(inputElement => {
+                if (inputElement) {
+                    inputElement.removeEventListener('input', handleQuantityInput(setQuantity));
+                }
+            });
+        };
+    }, [inputPriceDesktopRef, inputPriceMobileRef, inputQuantityDesktopRef, inputQuantityMobileRef]);
 
     const filteredOptions = searchInput
         ? filteredUsersList.filter(option =>
@@ -78,6 +114,7 @@ const TransferModal = ({ open, handleCancel, inventory, categoryName, limit, off
             render: () => (
                 <InputNumber
                     value={quantity}
+                    ref={inputQuantityDesktopRef}
                     controls={false}
                     min={1}
                     onChange={(value) => {
@@ -93,12 +130,14 @@ const TransferModal = ({ open, handleCancel, inventory, categoryName, limit, off
             align: "center",
             render: () => (
                 <InputNumber
+                    ref={inputPriceDesktopRef}
                     value={price}
                     controls={false}
                     min={0.01}
                     onChange={(value) => {
-                        if (value && value > 0) {
-                            setPrice(parseFloat(value.toFixed(2)));
+                        const stringValue = value ? value.toString() : '';
+                        if (/^\d+(\.\d{0,2})?$/.test(stringValue)) {
+                            setPrice(value);
                         }
                     }}
                 />
@@ -181,6 +220,7 @@ const TransferModal = ({ open, handleCancel, inventory, categoryName, limit, off
                         <InputNumber
                             className="w-full h-9"
                             value={quantity}
+                            ref={inputQuantityMobileRef}
                             controls={false}
                             min={1}
                             onChange={(value) => {
@@ -197,11 +237,13 @@ const TransferModal = ({ open, handleCancel, inventory, categoryName, limit, off
                         <InputNumber
                             className="w-full h-9"
                             value={price}
+                            ref={inputPriceMobileRef}
                             controls={false}
                             min={.01}
                             onChange={(value) => {
-                                if (value && value > 0) {
-                                    setPrice(parseFloat(value.toFixed(2)));
+                                const stringValue = value ? value.toString() : '';
+                                if (/^\d+(\.\d{0,2})?$/.test(stringValue)) {
+                                    setPrice(value);
                                 }
                             }}
                         />
