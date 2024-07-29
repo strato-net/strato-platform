@@ -150,12 +150,12 @@ const ConfirmOrder = ({ paymentProviders = [], data, columns }) => {
         event: 'pay_now_button',
       },
     });
-    let orderHashAndAssets = await orderActions.createPayment(orderDispatch, body);
-    if (!orderHashAndAssets) {
+    let checkoutHashAndAssets = await orderActions.createPayment(orderDispatch, body);
+    if (!checkoutHashAndAssets) {
       setSelectedProvider('')
     }
-    if (orderHashAndAssets && orderHashAndAssets !== false) {
-      const [orderHash, assets] = orderHashAndAssets;
+    if (checkoutHashAndAssets && checkoutHashAndAssets !== false) {
+      const [checkoutHash, assets] = checkoutHashAndAssets;
       let serviceURL = paymentProvider.serviceURL || paymentProvider.data.serviceURL;
       let checkoutRoute = paymentProvider.checkoutRoute || paymentProvider.data.checkoutRoute;
       if (serviceURL
@@ -163,7 +163,7 @@ const ConfirmOrder = ({ paymentProviders = [], data, columns }) => {
         && checkoutRoute
         && checkoutRoute !== ''
       ) {
-        const url = `${serviceURL}${checkoutRoute}?orderHash=${orderHash}&redirectUrl=${window.location.protocol}//${window.location.host}/order/status`;
+        const url = `${serviceURL}${checkoutRoute}?checkoutHash=${checkoutHash}&redirectUrl=${window.location.protocol}//${window.location.host}/order/status`;
         window.location.replace(url);
       } else {
         window.location.replace(`/order/status?assets=${assets}`);

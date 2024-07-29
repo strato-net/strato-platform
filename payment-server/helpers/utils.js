@@ -2,7 +2,7 @@ import client from '../db/index.js';
 import { rest, util } from "blockapps-rest";
 import { 
   DEFAULT_OPTIONS, 
-  ASSET_LOCKED_EVENT_TABLE,
+  CHECKOUT_EVENT_TABLE,
   SELLER_ONBOARDED_TABLE, 
   TABLE_PREFIX, 
   STRIPE_CONTRACT_ADDRESS } from "./constants.js";
@@ -133,16 +133,16 @@ const emitOnboardSeller = async (address, args) => {
   return onboardSellerStatus;
 }
 
-const getOrderEvent = async (orderHash) => {
+const getCheckoutEvent = async (checkoutHash) => {
   const tableArgs = {
-    name: ASSET_LOCKED_EVENT_TABLE,
+    name: CHECKOUT_EVENT_TABLE,
   };
   
   const searchOptions = {
     ...DEFAULT_OPTIONS,
     query: {
       limit: 1,
-      ['orderHash']: `eq.${orderHash}`,
+      ['checkoutHash']: `eq.${checkoutHash}`,
     }
   };
 
@@ -229,12 +229,12 @@ const completeOrder = async (address, args) => {
   return completeOrderStatus;
 }
 
-const initializePayment = async (address, args) => {
+const generateIntermediateOrder = async (address, args) => {
   // Make the call and return results
   const contract = { name: "PaymentService", address };
   const callArgs = {
     contract,
-    method: "initializePayment",
+    method: "generateIntermediateOrder",
     args: util.usc({ ...args }),
   };
   const completeOrderStatus = await rest.call(ADMIN.getUser(), callArgs, DEFAULT_OPTIONS);
@@ -253,12 +253,12 @@ const cancelOrder = async (address, args) => {
   return cancelOrderStatus;
 }
 
-const discardOrder = async (address, args) => {
+const discardCheckoutQuantity = async (address, args) => {
   // Make the call and return results
   const contract = { name: "PaymentService", address };
   const callArgs = {
     contract,
-    method: "discardOrder",
+    method: "discardCheckoutQuantity",
     args: util.usc({ ...args }),
   };
   const discardOrderStatus = await rest.call(ADMIN.getUser(), callArgs, DEFAULT_OPTIONS);
@@ -278,11 +278,11 @@ export {
   validatePaymentServiceContract,
   validateRedemptionServiceContract,
   emitOnboardSeller,
-  getOrderEvent,
+  getCheckoutEvent,
   checkSellerOnboarded,
   validateAndGetOrderDetails,
   completeOrder,
-  initializePayment,
+  generateIntermediateOrder,
   cancelOrder,
-  discardOrder,
+  discardCheckoutQuantity,
 }

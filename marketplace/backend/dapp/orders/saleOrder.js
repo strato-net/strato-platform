@@ -244,12 +244,30 @@ async function getAll(admin, args = {}, options) {
         select: 'id:id.max(),orderHash,createdDate',
       }
     };
-    const uniqueOrders = await searchAllWithQueryArgs(paymentTableName, uniqueOrderArgs, newOptions, admin);
+
+    let uniqueOrders = await searchAllWithQueryArgs(paymentTableName, uniqueOrderArgs, newOptions, admin);
+
+    uniqueOrders = uniqueOrders.reduce((acc, order) => {
+      // Find if the orderHash already exists in the accumulator
+      const existingOrderIndex = acc.findIndex(existingOrder => existingOrder.orderHash === order.orderHash);
+
+      if (existingOrderIndex === -1) {
+        // If the orderHash does not exist, add the order to the accumulator
+        acc.push(order);
+      } else {
+        // If the orderHash exists, compare createdDate and keep the latest one
+        if (new Date(order.createdDate) > new Date(acc[existingOrderIndex].createdDate)) {
+          acc[existingOrderIndex] = order;
+        }
+      }
+
+      return acc;
+    }, []);
 
     const idArgs = {
       id: uniqueOrders.map((uo) => uo.id),
       order: order,
-    }
+    };
     saleOrders = await searchAllWithQueryArgs(paymentTableName, idArgs, newOptions, admin);
   }
 
