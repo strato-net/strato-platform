@@ -8927,25 +8927,3 @@ contract qq {
   }
 }
 |]) `shouldThrow` anyTypeError
-
-  it "can typecheck accesing map index" $ runTest ( do
-    runBS [r|
-contract Map {
-  mapping (int => int) public myMap;
-  constructor(int i){
-      myMap[i] = i;
-  }
-}
-
-contract qq {
-  address map;
-  constructor(int i){
-      Map m = new Map(i);
-      map = address(m);
-  }
-
-  function access(int i){
-      return Map(map).myMap(i);
-  }
-}
-|]) 

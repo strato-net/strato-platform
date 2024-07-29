@@ -255,10 +255,25 @@ lookupContractFunction x cName fName = do
                                           in case f of
                                               Function (Product args _) ret _ _ _ _ -> Function (Product ((intType' y):args) y) ret y [] [] True
                                               _ -> error "errror"
+                                              --should be bottom
     nestedType' y (SVMType.Mapping _ k v) = let f = nestedType' y v
                                               in case f of
                                                   Function (Product args _) ret _ _ _ _ -> Function (Product ((Static k y):args) y) ret y [] [] False
                                                   _ -> error "errror"
+                                                  
+      
+      {-}
+      nestedType'' y k v
+      where
+        nestedType'' y (SVM.Type.Mapping _ k v) (SVMType.Mapping _ k v) = 
+        nestedType'' y (SVMType.Array t _)      (SVMType.Mapping _ k v) =
+        nestedType'' y (SVM.Type.Mapping _ k v) (SVMType.Array t _)     =
+        nestedType'' y (SVMType.Array t _)      (SVMType.Array t' _)    =
+        nestedType'' y t'                       t''                     =
+
+          -}
+          
+
     nestedType' y t = Function (Product [] y) (Static t y) y [] [] False
 
 
