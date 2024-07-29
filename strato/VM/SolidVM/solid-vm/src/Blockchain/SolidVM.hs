@@ -1947,9 +1947,14 @@ expToVar' theFullExp@(CC.FunctionCall _ e args) _ = do
                 Just a -> return $ Constant a
                 Nothing -> return $ Constant SNULL
             (SAccount addr _, itemName) -> regularFunctionCall $ Just (return $ Constant $ SContractItem addr itemName)
-            (SDecimal v, "truncate") -> case convertedFirstArg of
-              SInteger n -> return . Constant $ SDecimal $ roundTo (fromInteger n) v
-              _ -> invalidArguments ("truncate() called with non-integer value as argument") convertedFirstArg
+            (SDecimal v, "truncate") -> do
+              (_, parentCC) <- getCurrentCodeCollection
+              contract <- getCurrentContract
+              let pragmaCheck = CC.resolvePragmaFeature (CC._pragmas parentCC) "strictDecimals"
+              case (pragmaCheck, convertedFirstArg) of
+                (True, SInteger n) -> return . Constant $ SDecimal $ roundTo (fromInteger n) v
+                (False, _) -> unknownFunction "truncate" (contract ^. CC.contractName)
+                _ -> invalidArguments ("truncate() called with non-integer value as argument") convertedFirstArg
             _ -> regularFunctionCall Nothing
         _ -> regularFunctionCall Nothing
       where

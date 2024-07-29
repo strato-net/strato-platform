@@ -8975,6 +8975,7 @@ contract qq {
 
   it "can use built-in truncate functions on decimals" $ runTest ( do
     runBS [r|
+pragma solidvm 11.4;
 contract qq {
   decimal a = 5.2825;
   decimal b = 5.2825;
