@@ -2,7 +2,7 @@ const {
   handleCertificateRegistered,
 } = require("./handleCertificateRegistered");
 
-async function handleMessage(message) {
+async function handleMessage(message, token) {
   const messageData = message.data.toString();
   console.log("Received message:", messageData);
 
@@ -15,7 +15,7 @@ async function handleMessage(message) {
   try {
     const event = JSON.parse(messageData);
     if (event?.eventEvent?.eventName === "CertificateRegistered") {
-      await handleCertificateRegistered(event);
+      await handleCertificateRegistered(event, token);
       // Handle successful event processing
       console.log("Successfully processed CertificateRegistered event");
     }

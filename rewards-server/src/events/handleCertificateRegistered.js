@@ -1,39 +1,28 @@
-const { NODE, prodStratsAddress, testnetStratsAddress } = require("../config");
-// const contractName = 'ERC20Dapp';
-// // includes the org+app for cirrus namespacing (helpers/utils.js will prepend to cirrus queries)
-// const defaultOptions = { ..._defaultOptions, app: "Mercata", chainIds: [], cacheNonce: true };
+const { createTransactionPayload } = require("../helper/transferSTRATS");
 
-// async function transferStrats(admin, args, options = defaultOptions) {
-//   const address = getStratsAddress();
-//   const contract = {
-//     name: contractName,
-//     address,
-//   }
-//   const callArgs = {
-//     contract,
-//     method: 'transfer',
-//     args: util.usc(args),
-//   };
-//   return rest.call(admin, callArgs, options);
-// }
+async function handleCertificateRegistered(event, token) {
+  let response = await createTransactionPayload(token);
 
-function getStratsAddress() {
-  if (NODE === "prod") {
-    return prodStratsAddress
-  } else if (NODE === "testnet") {
-    return testnetStratsAddress
-  } else {
-    return prodStratsAddress
+  if (!response.ok) {
+    const errorText = await response.text();
+    console.error(`Error: ${response.status} ${response.statusText}`);
+    console.error(`Response body: ${errorText}`);
+    throw new Error(
+      `Request failed with status ${response.status}: ${response.statusText}`
+    );
   }
-}
 
-async function handleCertificateRegistered(event) {
-  console.log("OwnershipTransfer event received:", event);
-  const payload = {
-    to: receiverAddress,
-    value: amount !== undefined ? amount * 100 : 0
-  };
-  // await transferStrats(admin, payload, options);
+  let body;
+  try {
+    body = await response.json();
+  } catch (error) {
+    const errorText = await response.text();
+    console.error(`Failed to parse JSON response: ${error.message}`);
+    console.error(`Response body: ${errorText}`);
+    throw new Error(`Failed to parse JSON response: ${error.message}`);
+  }
+
+  console.log("Transfer STRATS response:", body);
 }
 
 module.exports = { handleCertificateRegistered };

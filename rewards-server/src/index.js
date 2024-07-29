@@ -21,7 +21,7 @@ async function connectWebSocket() {
 
   ws.on("message", (data) => {
     try {
-      handleMessage({ data });
+      handleMessage({ data }, token);
     } catch (error) {
       console.error("Error handling message:", error);
       // Do not close the connection if handleMessage fails
