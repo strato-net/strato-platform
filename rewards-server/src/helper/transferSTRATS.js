@@ -1,16 +1,18 @@
-const { getStratsAddress, contractName } = require("../config");
+const {
+  contractName,
+  NODE,
+  prodStratsAddress,
+  testnetStratsAddress,
+} = require("../config");
 
-async function createTransactionPayload(
-  token,
-  toAddress = "313d092740e9b662166bc3a614113cb65aae9078",
-  value = 100
-) {
+async function createTransactionPayload(token, toAddress, value) {
   const payload = {
     txs: [
       {
         payload: {
           contractName,
-          contractAddress: getStratsAddress(),
+          contractAddress:
+            NODE === "prod" ? prodStratsAddress : testnetStratsAddress,
           method: "transfer",
           args: {
             _to: toAddress,

@@ -1,14 +1,21 @@
-// src/auth/index.js
-const { baUsername, baPassword, clientSecret } = require("../config");
+const {
+  baUsername,
+  baPassword,
+  testnetClientSecret,
+  prodClientSecret,
+  NODE,
+} = require("../config");
 const { oauthUtil } = require("blockapps-rest");
 
+// OAuth configuration
 const oauthInit = {
   appTokenCookieName: "asset_framework_session",
   appTokenCookieMaxAge: 7776000000,
-  openIdDiscoveryUrl:
-    "https://keycloak.blockapps.net/auth/realms/mercata-testnet2/.well-known/openid-configuration",
+  openIdDiscoveryUrl: `https://keycloak.blockapps.net/auth/realms/${
+    NODE === "prod" ? "mercata" : "mercata-testnet2"
+  }/.well-known/openid-configuration`,
   clientId: "localhost",
-  clientSecret: clientSecret,
+  clientSecret: NODE === "prod" ? prodClientSecret : testnetClientSecret,
   scope: "email openid",
   serviceOAuthFlow: null,
   redirectUri: "http://localhost/api/v1/authentication/callback",
@@ -36,14 +43,13 @@ const getUserToken = async () => {
   const currentTime = Math.floor(Date.now() / 1000);
 
   // Check if a valid cached token exists
-  if (userTokenData && userTokenData.token && userTokenData.expiresAt) {
-    if (
-      userTokenData.expiresAt >
-      currentTime + TOKEN_LIFETIME_RESERVE_SECONDS
-    ) {
-      console.log("Returning cached token");
-      return userTokenData.token;
-    }
+  if (
+    userTokenData &&
+    userTokenData.token &&
+    userTokenData.expiresAt > currentTime + TOKEN_LIFETIME_RESERVE_SECONDS
+  ) {
+    console.log("Returning cached token");
+    return userTokenData.token;
   }
 
   try {
@@ -55,7 +61,6 @@ const getUserToken = async () => {
       baUsername,
       baPassword
     );
-
     const token = tokenObj.token[oauthInit.tokenField];
     const expiresAt = Math.floor(tokenObj.token.expires_at / 1000);
 

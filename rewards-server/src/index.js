@@ -2,11 +2,13 @@
 const WebSocket = require("ws");
 const { getUserToken } = require("./auth");
 const { handleMessage } = require("./events/handleMessage");
+const { NODE, prodMarketplaceUrl, testnetMarketplaceUrl } = require("./config");
 
 async function connectWebSocket() {
   const token = await getUserToken();
+  const wsUrl = NODE === "prod" ? prodMarketplaceUrl : testnetMarketplaceUrl;
   const ws = new WebSocket(
-    "wss://marketplace.mercata-testnet2.blockapps.net/eventstream",
+    `wss://${wsUrl}/eventstream`,
     {
       headers: {
         Authorization: `Bearer ${token}`,
