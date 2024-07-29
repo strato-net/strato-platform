@@ -22,7 +22,7 @@ import classNames from "classnames";
 import { getStringDate } from "../../helpers/utils";
 import { useNavigate } from "react-router-dom";
 import DataTableComponent from "../DataTableComponent";
-import { getStatus, getStatusByName } from "./constant";
+import { getStatus } from "./constant";
 import dayjs from "dayjs";
 import { US_DATE_FORMAT, STRATS_CONVERSION } from "../../helpers/constants";
 import ClickableCell from "../ClickableCell";
@@ -159,31 +159,6 @@ const SoldOrderDetails = ({ user, users }) => {
     setSelectedDate(date);
   };
 
-  const handleCloseOrder = async () => {
-    let body = {};
-    let isDone = false;
-
-    body = {
-      orderAddress: details.order.address,
-      fulfillmentDate: dayjs(selectedDate).unix(),
-      comments: comment,
-    };
-
-    isDone = await actions.executeSale(dispatch, body);
-    if (isDone) {
-      setStatus(getStatus(3));
-    }
-  };
-
-  const handleUpdateComment = async () => {
-    let body = {
-      saleOrderAddress: orderDetails.order.address,
-      comments: comment
-    }
-
-    await actions.updateOrderComment(dispatch, body)
-  }
-
   const statusComponent = (status) => {
     const statusClasses = {
       ["Awaiting Shipment"]: {
@@ -288,7 +263,7 @@ const SoldOrderDetails = ({ user, users }) => {
       render: (text) => <p>{text}</p>,
     },
     {
-      title: <Text className="text-primaryC text-[13px]">Tax($)</Text>,
+      title: <Text className="text-primaryC text-[13px]">Tax</Text>,
       dataIndex: "tax",
       key: "tax",
       align: "center",
