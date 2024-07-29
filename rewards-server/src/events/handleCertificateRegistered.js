@@ -1,28 +1,84 @@
 const { createTransactionPayload } = require("../helper/transferSTRATS");
+const {
+  NODE,
+  prodMarketplaceUrl,
+  testnetMarketplaceUrl,
+} = require("../config");
 
 async function handleCertificateRegistered(event, token) {
-  let response = await createTransactionPayload(token, event.eventTxSender, 100);
-
-  if (!response.ok) {
-    const errorText = await response.text();
-    console.error(`Error: ${response.status} ${response.statusText}`);
-    console.error(`Response body: ${errorText}`);
-    throw new Error(
-      `Request failed with status ${response.status}: ${response.statusText}`
-    );
-  }
-
-  let body;
   try {
-    body = await response.json();
-  } catch (error) {
-    const errorText = await response.text();
-    console.error(`Failed to parse JSON response: ${error.message}`);
-    console.error(`Response body: ${errorText}`);
-    throw new Error(`Failed to parse JSON response: ${error.message}`);
-  }
+    const { eventTxHash } = event;
+    const targetCertificateEntry = event.eventEvent.eventArgs.find(
+      (arg) => arg[0] === "certificate"
+    );
+    const targetCertificateString = targetCertificateEntry
+      ? targetCertificateEntry[1]
+      : null;
 
-  console.log("Transfer STRATS response:", body);
+    if (!targetCertificateString) {
+      console.error("No certificate string found in the event.");
+      return;
+    }
+
+    // Fetch certificates based on transaction hash
+    const queryResponse = await fetch(
+      `https://${
+        NODE === "prod" ? prodMarketplaceUrl : testnetMarketplaceUrl
+      }/cirrus/search/Certificate?transaction_hash=eq.${eventTxHash}`,
+      {
+        method: "GET",
+        credentials: "same-origin",
+        headers: {
+          Accept: "application/json",
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+      }
+    );
+
+    if (!queryResponse.ok) {
+      const errorText = await queryResponse.text();
+      console.error(
+        `Error: ${queryResponse.status} ${queryResponse.statusText}`
+      );
+      console.error(`Response body: ${errorText}`);
+      throw new Error(
+        `Request failed with status ${queryResponse.status}: ${queryResponse.statusText}`
+      );
+    }
+
+    const queryBody = await queryResponse.json();
+
+    const matchedObject = queryBody.find((obj) =>
+      obj.certificateString.includes(targetCertificateString)
+    );
+
+    if (!matchedObject) {
+      console.log("No match found.");
+      return;
+    }
+
+    // Create transaction payload
+    const response = await createTransactionPayload(
+      token,
+      matchedObject.userAddress,
+      100
+    );
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error(`Error: ${response.status} ${response.statusText}`);
+      console.error(`Response body: ${errorText}`);
+      throw new Error(
+        `Request failed with status ${response.status}: ${response.statusText}`
+      );
+    }
+
+    const body = await response.json();
+    console.log("Transfer STRATS response:", body);
+  } catch (error) {
+    console.error("Error handling CertificateRegistered event:", error);
+  }
 }
 
 module.exports = { handleCertificateRegistered };

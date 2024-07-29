@@ -3,6 +3,8 @@ const {
   NODE,
   prodStratsAddress,
   testnetStratsAddress,
+  prodMarketplaceUrl,
+  testnetMarketplaceUrl,
 } = require("../config");
 
 async function createTransactionPayload(token, toAddress, value) {
@@ -29,7 +31,9 @@ async function createTransactionPayload(token, toAddress, value) {
   };
 
   const response = await fetch(
-    `https://marketplace.mercata-testnet2.blockapps.net/strato/v2.3/transaction`,
+    `https://${
+      NODE === "prod" ? prodMarketplaceUrl : testnetMarketplaceUrl
+    }/strato/v2.3/transaction`,
     {
       method: "POST",
       credentials: "same-origin",
