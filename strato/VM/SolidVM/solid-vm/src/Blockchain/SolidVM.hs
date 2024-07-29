@@ -626,16 +626,16 @@ call' from to' fnCalltype mContract functionName isRCC argExps = do
         case M.lookup functionName $ contract ^. CC.storageDefs of
           Just CC.VariableDecl {..} -> do
             args' <- case (_varType, argExps) of
-                          ((SVMType.Array _ _), CC.OrderedArgs oa) -> pure $ case all (\case (CC.NumberLiteral _ _ Nothing) -> True; _ -> False) oa of
-                                                                        True -> map (\case (CC.NumberLiteral _ n Nothing) -> MS.ArrayIndex $ fromIntegral n; _ -> internalError "should never happen" oa) oa
-                                                                        False -> []
-                          ((SVMType.Mapping _ _ _), CC.OrderedArgs oa) -> do
-                            oa' <- for oa $ \currentoa ->
-                                     nestedCall' currentoa
-                            return $ case convertListOfMaybeValuesToStoragePathPieces oa' of
-                              Nothing -> []
-                              Just x  -> x
-                          _ -> pure []
+                       ((SVMType.Array _ _), CC.OrderedArgs oa) -> pure $ case all (\case (CC.NumberLiteral _ _ Nothing) -> True; _ -> False) oa of
+                                                                            True -> map (\case (CC.NumberLiteral _ n Nothing) -> MS.ArrayIndex $ fromIntegral n; _ -> internalError "should never happen" oa) oa
+                                                                            False -> []
+                       ((SVMType.Mapping _ _ _), CC.OrderedArgs oa) -> do
+                         oa' <- for oa $ \currentoa ->
+                                  nestedCall' currentoa
+                         return $ case convertListOfMaybeValuesToStoragePathPieces oa' of
+                           Nothing -> []
+                           Just x  -> x
+                       _ -> pure []
 
 
 --end, list of map indexes 
