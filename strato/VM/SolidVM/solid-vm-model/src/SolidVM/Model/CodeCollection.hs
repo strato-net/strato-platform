@@ -22,6 +22,7 @@ module SolidVM.Model.CodeCollection (
   imports,
   usesStrictModifiers,
   getContractsBySolidString,
+  resolvePragmaFeature,
   module SolidVM.Model.CodeCollection.Contract,
   --module SolidVM.Model.CodeCollection.Def,
   module SolidVM.Model.CodeCollection.Function,
@@ -156,8 +157,21 @@ instance Arbitrary CodeCollection where
       ]
 
 usesStrictModifiers :: CodeCollectionF a -> Bool
-usesStrictModifiers = isJust . find ((== "strict") . fst) . _pragmas
+usesStrictModifiers = flip resolvePragmaFeature "strict" . _pragmas
 
 -- Function to get all ContractF values matching a SolidString
 getContractsBySolidString :: SolidString -> CodeCollectionF a -> Maybe (ContractF a)
 getContractsBySolidString solidStr codeCollection = M.lookup solidStr (_contracts codeCollection)
+
+resolvePragmaFeature :: [(String, String)] -> String -> Bool
+resolvePragmaFeature pragmaList feature = 
+  let solidVMVersion = maybe "" snd $ find ((== "solidvm") . fst) pragmaList
+  in case (solidVMVersion) of
+      ("11.4") -> 
+        case feature of
+          "es6" -> True
+          "strict" -> True
+          "builtinCreates" -> True
+          "safeExternalCalls" -> True
+          _ -> False
+      (_) -> isJust $ find ((== feature) . fst) pragmaList

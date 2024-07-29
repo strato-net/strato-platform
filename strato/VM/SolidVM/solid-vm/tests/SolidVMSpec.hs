@@ -185,6 +185,10 @@ anyImmutableError :: Selector HandledException
 anyImmutableError (HE Blockchain.SolidVM.Exception.ImmutableError {}) = True
 anyImmutableError _ = False
 
+specificTypeError :: String -> Selector HandledException
+specificTypeError str (HE (Blockchain.SolidVM.Exception.TypeError _ mes)) = mes == str
+specificTypeError _ _ = False 
+
 failedToAttainRunTimCodeError :: Selector HandledException
 failedToAttainRunTimCodeError (HE Blockchain.SolidVM.Exception.FailedToAttainRunTimCode {}) = True
 failedToAttainRunTimCodeError _ = False
@@ -8934,6 +8938,95 @@ contract qq {
 
     res <- runBS' [r|
 pragma safeExternalCalls;
+contract qq {
+    bool public myVal;
+
+    function changeMyVal(bool b){
+        myVal = b;
+    }
+}|]
+
+    case getAddressFromResult res of
+      Nothing -> error "No address returned"
+      Just address -> runCall' "changeMyValOfTest" (T.pack $ "(0x"++ formatAddressWithoutColor address ++", 3 )" ) [r|
+contract Test {
+    int public myVal;
+
+    function changeMyVal(int b){
+        myVal = b;
+    }
+}
+contract qq {
+    function changeMyValOfTest(address a, int v) returns (int) {
+        Test(a).changeMyVal(v);
+        return Test(a).myVal();
+    }
+}|]) `shouldThrow` anyTypeError
+
+  it "can use es6 imports with solidvm 11.4 pragma" $ runTest ( do
+    runBS [r|
+pragma solidvm 11.4;
+import { someFunc } from <123>;
+
+contract qq {
+  int x = 0;
+
+  constructor() {
+    x = 5;
+  }
+}
+|]) `shouldThrow` specificTypeError "\"Could not find file <0000000000000000000000000000000000000123>\""
+
+  it "can use strict modifiers with solidvm 11.4 pragma" $ runTest ( do
+    runBS [r|
+pragma solidvm 11.4;
+
+contract A {
+  int y = 5;
+  
+  function getY() private returns (int) {
+    return y;
+  }
+}
+
+contract qq is A {
+  A a = new A();
+  int x = 0;
+
+  constructor() {
+    x = a.getY();
+  }
+}
+|]) `shouldThrow` specificTypeError "\" (line 17, column 9) - (line 17, column 10): \\\"Missing label: ABottom ( (line 17, column 9) - (line 17, column 10): \\\\\\\"cannot access function getY because it is marked as private\\\\\\\"  :| []) is not a known enum, struct, or contract.\\\" \""
+
+  it "can use create and create2 built-in function calls with solidvm 11.4 pragma" . runTest $ do
+    runBS
+      [r|
+pragma solidvm 11.4;
+
+contract qq {
+  account a;
+  account b;
+
+  constructor() {
+    a = create("A", "contract A {\n uint x = 1;\n string y;\n constructor (uint _x, string _y) {\n  x = _x;\n  y = _y;\n }\n}", "(3, 'hi')");
+    b = create2("salt", "B", "contract B {\n uint x = 2;\n constructor (uint _x) {\n  x = _x;\n }\n}", "(4)");
+  }
+}|]
+    getFields ["b"]
+      `shouldReturn` [BAccount $ NamedAccount (deriveAddressWithSalt (stringAddress "e8279be14e9fe2ad2d8e52e42ca96fb33a813bbe") "salt" (Just . hash $ BC.pack "contract B {\n uint x = 2;\n constructor (uint _x) {\n  x = _x;\n }\n}") (Just "OrderedVals [SInteger 4]")) UnspecifiedChain]
+    [BAccount a] <- getFields ["a"]
+    [BAccount b] <- getFields ["b"]
+    getSolidStorageKeyVal' (namedAccountToAccount Nothing a) (singleton "x") `shouldReturn` BInteger 3
+    getSolidStorageKeyVal' (namedAccountToAccount Nothing a) (singleton "y") `shouldReturn` BString "hi"
+    getSolidStorageKeyVal' (namedAccountToAccount Nothing b) (singleton "x") `shouldReturn` BInteger 4
+
+  it "can error handle improperly referenced overloaded contracts using solidvm 11.4 pragma" $ runTest ( do 
+    let getAddressFromResult :: ExecResults -> Maybe Address 
+        getAddressFromResult res = _accountAddress <$> erNewContractAccount res
+
+    res <- runBS' [r|
+pragma solidvm 11.4;
 contract qq {
     bool public myVal;
 
