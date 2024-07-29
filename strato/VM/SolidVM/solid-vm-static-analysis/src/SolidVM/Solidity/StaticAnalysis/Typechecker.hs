@@ -19,6 +19,7 @@ import Control.Monad.Trans.State
 import Data.Bool (bool)
 import Data.Foldable (traverse_)
 -- import           Data.Functor.Identity (runIdentity)
+import Data.List (find)
 import Data.List.NonEmpty (NonEmpty (..))
 import qualified Data.List.NonEmpty as NE
 import qualified Data.Map.Strict as M
@@ -1589,27 +1590,32 @@ statementHelper (Throw e x) = do
 statementHelper (ModifierExecutor x) = pure $ topType' x
 statementHelper (EmitStatement eventName vals x) = do
   cc <- asks codeCollection
-  c  <- asks contract
-  case M.lookup eventName (_events c) of 
-    Just event -> do
-      let vals' = fmap (\(_, b) -> 
-                          let r = R cc c Nothing "Nothing" []
-                          in runReader (evalStateT (tcExpr b) ((Nothing, M.empty) :| [])) r
-                       ) vals
-          -- valsDebug = trace ("Evaluated types: " ++ show vals') vals'
-      let vals'' = map (\y -> case y of
-                                Static s _ -> s
-                                _          -> error "Internal Error: Type is not static"
-                       ) vals'
-          -- valsStaticDebug = trace ("Static types: " ++ show vals'') vals''
-      let expectedTypes = [indexedTypeType it | (_, it) <- _eventLogs event]
-          -- expectedTypesDebug = trace ("Expected types: " ++ show expectedTypes) expectedTypes
-      if length expectedTypes /= length vals''
-        then pure . bottom $ "Wrong number of arguments provided" <$ x
-        else if not (and $ zipWith isSameType expectedTypes vals'')
-          then pure . bottom $ "Type mismatch in event arguments" <$ x
-          else reduceType' x <$> traverse (tcExpr . snd) vals 
-    Nothing -> pure . bottom $ "Event does not exist" <$ x
+  let solidVMVersion = maybe "" snd $ find ((== "solidvm") . fst) $ _pragmas cc
+  case solidVMVersion of
+    "11.4" -> do
+      c  <- asks contract
+      case M.lookup eventName (_events c) of 
+        Just event -> do
+          let vals' = fmap (\(_, b) -> 
+                              let r = R cc c Nothing "Nothing" []
+                              in runReader (evalStateT (tcExpr b) ((Nothing, M.empty) :| [])) r
+                           ) vals
+              -- valsDebug = trace ("Evaluated types: " ++ show vals') vals'
+          let vals'' = map (\y -> case y of
+                                    Static s _ -> s
+                                    _          -> error "Internal Error: Type is not static"
+                           ) vals'
+              -- valsStaticDebug = trace ("Static types: " ++ show vals'') vals''
+          let expectedTypes = [indexedTypeType it | (_, it) <- _eventLogs event]
+              -- expectedTypesDebug = trace ("Expected types: " ++ show expectedTypes) expectedTypes
+          if length expectedTypes /= length vals''
+            then pure . bottom $ "Wrong number of arguments provided" <$ x
+            else if not (and $ zipWith isSameType expectedTypes vals'')
+              then pure . bottom $ "Type mismatch in event arguments" <$ x
+              else reduceType' x <$> traverse (tcExpr . snd) vals 
+        Nothing -> pure . bottom $ "Event does not exist" <$ x
+    _    ->
+      reduceType' x <$> traverse (tcExpr . snd) vals
 statementHelper (RevertStatement _ (NamedArgs vals) x) =
   reduceType' x <$> traverse (tcExpr . snd) vals
 statementHelper (RevertStatement _ (OrderedArgs vals) x) =
