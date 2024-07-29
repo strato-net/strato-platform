@@ -1,4 +1,9 @@
 const { createTransactionPayload } = require("../helper/transferSTRATS");
+const {
+  NODE,
+  prodMarketplaceUrl,
+  testnetMarketplaceUrl,
+} = require("../config");
 
 async function handleFirstOrder(event, token) {
   const purchaser = event.eventEvent.eventArgs.find(
@@ -12,7 +17,9 @@ async function handleFirstOrder(event, token) {
 
   // Check if the purchaser has made a first order before
   const queryResponse = await fetch(
-    `https://marketplace.mercata-testnet2.blockapps.net/cirrus/search/BlockApps-Mercata-PaymentService.Order?purchaser=eq.${purchaser}&status=eq.3&select=count`,
+    `https://${
+      NODE === "prod" ? prodMarketplaceUrl : testnetMarketplaceUrl
+    }/cirrus/search/BlockApps-Mercata-PaymentService.Order?purchaser=eq.${purchaser}&status=eq.3&select=count`,
     {
       method: "GET",
       credentials: "same-origin",
@@ -33,11 +40,7 @@ async function handleFirstOrder(event, token) {
   }
 
   // Create a transaction payload with 100 STRATS and send it to eventTxSender
-  const response = await createTransactionPayload(
-    token,
-    purchaser,
-    100
-  );
+  const response = await createTransactionPayload(token, purchaser, 100);
 
   if (!response.ok) {
     const errorText = await response.text();
