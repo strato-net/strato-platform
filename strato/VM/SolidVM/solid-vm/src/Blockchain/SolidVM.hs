@@ -102,9 +102,9 @@ import qualified Data.Vector as V
 import Debugger
 import GHC.Exts hiding (breakpoint)
 import qualified LabeledError
-import Blockchain.DB.RawStorageDB
-import Blockchain.Data.BlockSummary
-import Blockchain.DB.MemAddressStateDB
+--import Blockchain.DB.RawStorageDB
+--import Blockchain.Data.BlockSummary
+--import Blockchain.DB.MemAddressStateDB
 import Data.Default
 
 import Network.Haskoin.Crypto.BigWord ()
@@ -625,17 +625,17 @@ call' from to' fnCalltype mContract functionName isRCC argExps = do
       _ -> do
         case M.lookup functionName $ contract ^. CC.storageDefs of
           Just CC.VariableDecl {..} -> do
-            let args' = case (_varType, argExps) of
-                          ((SVMType.Array _ _), CC.OrderedArgs oa) -> case all (\case (CC.NumberLiteral _ _ Nothing) -> True; _ -> False) oa of
+            args' <- case (_varType, argExps) of
+                          ((SVMType.Array _ _), CC.OrderedArgs oa) -> pure $ case all (\case (CC.NumberLiteral _ _ Nothing) -> True; _ -> False) oa of
                                                                         True -> map (\case (CC.NumberLiteral _ n Nothing) -> MS.ArrayIndex $ fromIntegral n; _ -> internalError "should never happen" oa) oa
                                                                         False -> []
                           ((SVMType.Mapping _ _ _), CC.OrderedArgs oa) -> do
                             oa' <- for oa $ \currentoa ->
                                      nestedCall' currentoa
-                            case convertListOfMaybeValuesToStoragePathPieces oa' of
+                            return $ case convertListOfMaybeValuesToStoragePathPieces oa' of
                               Nothing -> []
                               Just x  -> x
-                          _ -> []
+                          _ -> pure []
 
 
 --end, list of map indexes 
