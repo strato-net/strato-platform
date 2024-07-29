@@ -222,28 +222,6 @@ class OrderController {
     }
   }
 
-  static validateCancelSaleOrderArgs(args) {
-    const cancelSaleOrderSchema = Joi.object({
-      paymentProvider: Joi.object({
-        address: Joi.string().required(),
-      }).required(),
-      orderHash: Joi.string().required(),
-      orderId: Joi.string().required(),
-      purchaser: Joi.string().required(),
-      saleAddresses: Joi.array().min(1).items(Joi.string().required()).required(),
-      quantities: Joi.array().min(1).items(Joi.number().required()).required(),
-      currency: Joi.string().allow('').required(),
-      createdDate: Joi.number().required(),
-    }).required();
-
-    const validation = cancelSaleOrderSchema.validate(args);
-
-    if (validation.error) {
-      throw new rest.RestError(RestStatus.BAD_REQUEST, 'Cancel Sale Order Argument Validation Error', {
-        message: `Missing args or bad format: ${validation.error.message}`,
-      })
-    }
-  }
 
   static validateUpdateOrderCommentArgs(args) {
     const updateOrderCommentSchema = Joi.object({
