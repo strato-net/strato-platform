@@ -30,7 +30,7 @@ const CACHED_DATA = {
   serviceTokenExpiresAt: null,
 };
 
-const TOKEN_LIFETIME_RESERVE_SECONDS = 30; // Reserve 30 seconds for token expiration check
+const TOKEN_LIFETIME_RESERVE_SECONDS = 120; // Reserve 2 minutes for token expiration check
 
 /**
  * Retrieves the user token, either from cache or by requesting a new one.
@@ -63,7 +63,7 @@ const getUserToken = async () => {
     );
     const token = tokenObj.token[oauthInit.tokenField];
     const expiresAt = Math.floor(tokenObj.token.expires_at / 1000);
-
+    console.log("New OAuth token expires at:", new Date(expiresAt * 1000));
     // Cache the new token
     CACHED_DATA[cacheKey] = { token, expiresAt };
 
