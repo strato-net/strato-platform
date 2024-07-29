@@ -447,7 +447,7 @@ call _ _ _ isRCC _ blockData _ _ codeAddress sender' _ _ _ availableGas origin' 
         }
 
 call' ::
- ( MonadSM m) =>
+  MonadSM m =>
   Account ->
   Account ->
   CC.FunctionCallType ->
@@ -626,46 +626,15 @@ call' from to' fnCalltype mContract functionName isRCC argExps = do
         case M.lookup functionName $ contract ^. CC.storageDefs of
           Just CC.VariableDecl {..} -> do
             let args' = case (_varType, argExps) of
-                          --((SVMType.Array _ _), CC.OrderedArgs oa) -> nestedCall' oa 
-
-
                           ((SVMType.Array _ _), CC.OrderedArgs oa) -> case all (\case (CC.NumberLiteral _ _ Nothing) -> True; _ -> False) oa of
                                                                         True -> map (\case (CC.NumberLiteral _ n Nothing) -> MS.ArrayIndex $ fromIntegral n; _ -> internalError "should never happen" oa) oa
                                                                         False -> []
-                                                                 
-                            
-                      
-                            
-                            --case all (\case (CC.NumberLiteral _ _ Nothing) -> True; _ -> False) oa of
-                              --                                          True -> map (\case (CC.NumberLiteral _ n Nothing) -> MS.ArrayIndex $ fromIntegral n; _ -> internalError "should never happen" oa) oa
-                                --                                        False -> []
-
-                                                                        ---edit with iteration
-
-                          --(SVMType.Mapping _ _ _), CC.OrderedArgs oa) -> case oa of
---
-  --                                                                          (CC.NumberLiteral _ n Nothing) -> MS.MapIndex $ MS.INum $ fromIntegral n
-                                                                        --(CC.StringLiteral _ s) -> MS.StringIndex s
-
-                                                                        --True -> map (\case (CC.NumberLiteral _ n Nothing) -> MS.ArrayIndex $ fromIntegral n; _ -> internalError "should never happen" oa) oa
-                                                                            --_ -> []
-
                           ((SVMType.Mapping _ _ _), CC.OrderedArgs oa) -> do
                             oa' <- for oa $ \currentoa ->
-                                              nestedCall' currentoa
-
-                            --oa'' <- sequence oa'
-                            
+                                     nestedCall' currentoa
                             case convertListOfMaybeValuesToStoragePathPieces oa' of
                               Nothing -> []
-                              Just x  -> concat x
-                              {-
-                          ((SVMType.Mapping _ _ _), CC.OrderedArgs oa) -> do
-                            oa' <- nestedCall' oa
-                            case convertListOfMaybeValuesToStoragePathPieces oa' of 
-                                                                            Nothing -> []
-                                                                            Just x -> x 
-                               -}                                 
+                              Just x  -> x
                           _ -> []
 
 
@@ -719,59 +688,12 @@ call' from to' fnCalltype mContract functionName isRCC argExps = do
   where
     flattenVals (x : xs) = [x] ++ flattenVals xs
     flattenVals x = x
-{-
-    nestedCall' :: ( MonadSM m
-                   , A.Selectable (Address, T.Text) X509CertificateField []
-                   , A.Selectable Word256 ParentChainIds []
-                   , A.Selectable Account AddressState []
-                   , A.Selectable Address X509Certificate []
-                   , A.Alters Blockchain.DB.RawStorageDB.RawStorageKey Blockchain.DB.RawStorageDB.RawStorageValue []
-                   , A.Alters (Maybe Word256) MP.StateRoot []
-                   , A.Alters Account AddressState []
-                   , A.Alters MP.StateRoot MP.NodeData []
-                   , A.Alters Keccak256 DBCode []
-                   , A.Alters Keccak256 Blockchain.Data.BlockSummary.BlockSummary []
-                   , Blockchain.DB.MemAddressStateDB.HasMemAddressStateDB []
-                   , HasMemRawStorageDB []
-                   , Mod.Accessible Env.Environment []
-                   , Mod.Modifiable [CallInfo] []
-                   , Mod.Modifiable (Q.Seq Event) []
-                   , Mod.Modifiable (Q.Seq Action.Delegatecall) []
-                   , Mod.Modifiable (Maybe DebugSettings) []
-                   , Mod.Modifiable GasInfo []
-                   , Mod.Modifiable MemDBs []
-                   , Mod.Modifiable Env.Sender []
-                   , Mod.Modifiable Action []
-                   , MonadUnliftIO []
-                   , EUnsafe.MonadCatch []
-                   , MonadLogger []
-                   ) => [CC.ExpressionF a] -> [Value]
-                   -}
-    nestedCall' :: (MonadSM m) => CC.ExpressionF a ->  m Value
+    nestedCall' :: MonadSM m
+                => CC.ExpressionF a
+                -> m Value
     nestedCall' x = do let x' = def <$ x
                        x'' <- expToVar' x'
                        getVar x''
-                       --x''' <- getVar x''
-                       --return x'''
-
-    {-
-    nestedCall' [] = []
-    nestedCall' (x:xs) = do
-      --let x' = CC.extractExpression x
-      --let annotation = emptySourceAnnotation
-      --let x' = x (SourceAnnotation (initialPosition "") (initialPosition "") ()) :: Positioned CC.ExpressionF
-      --let x' = x annotation :: Positioned CC.ExpressionF
-      let x' = def <$ x
-      x'' <- expToVar' x'
-      x''' <- getVar x''
-      rest <- nestedCall' xs
-      --let rest = nestedCall' xs
-      ((return x''') : return(rest))
-      --[x'''] ++ (nestedCall' xs)
-      --(return [x''']) ++ (nestedCall' xs)
-      --return $ [getVar x''] ++ (nestedCall' xs)
-    -}
-
     convertValueToStoragePathPiece :: Value -> Maybe MS.StoragePathPiece
     convertValueToStoragePathPiece v = 
       case v of
@@ -780,8 +702,6 @@ call' from to' fnCalltype mContract functionName isRCC argExps = do
         SAccount a _ -> Just $ MS.MapIndex $ MS.IAccount a
         SBool b -> Just $ MS.MapIndex $ MS.IBool b
         _ -> Nothing
-
-
     convertListOfMaybeValuesToStoragePathPieces :: [Value] -> Maybe [MS.StoragePathPiece]
     convertListOfMaybeValuesToStoragePathPieces mVals = traverse (convertValueToStoragePathPiece) mVals
 
