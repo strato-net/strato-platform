@@ -1,7 +1,7 @@
 const { createTransactionPayload } = require("../helper/transferSTRATS");
 
 async function handleCertificateRegistered(event, token) {
-  let response = await createTransactionPayload(token);
+  let response = await createTransactionPayload(token, event.eventTxSender, 100);
 
   if (!response.ok) {
     const errorText = await response.text();
