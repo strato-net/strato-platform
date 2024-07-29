@@ -3,6 +3,7 @@ const WebSocket = require("ws");
 const { getUserToken } = require("./auth");
 const { handleMessage } = require("./events/handleMessage");
 const { NODE, prodMarketplaceUrl, testnetMarketplaceUrl } = require("./config");
+const { filterMessages } = require("./helper/eventFilter");
 
 async function connectWebSocket() {
   const token = await getUserToken();
@@ -21,9 +22,12 @@ async function connectWebSocket() {
     setInterval(() => ws.send("ping"), 50000); // Send ping every 50 seconds to keep connection alive
   });
 
-  ws.on("message", (data) => {
+  ws.on("message", async (data) => {
     try {
-      handleMessage({ data }, token);
+      const messageData = data.toString();
+      if (await filterMessages(messageData)) {
+        await handleMessage(messageData, token);
+      }
     } catch (error) {
       console.error("Error handling message:", error);
       // Do not close the connection if handleMessage fails

@@ -1,23 +1,24 @@
 const {
   handleCertificateRegistered,
 } = require("./handleCertificateRegistered");
+const { handleFirstOrder } = require("./orderHandler");
 
-async function handleMessage(message, token) {
-  const messageData = message.data.toString();
+async function handleMessage(messageData, token) {
   console.log("Received message:", messageData);
-
-  if (messageData === "pong") {
-    // Handle the pong message
-    console.log("Received pong message");
-    return;
-  }
 
   try {
     const event = JSON.parse(messageData);
-    if (event?.eventEvent?.eventName === "CertificateRegistered") {
-      await handleCertificateRegistered(event, token);
-      // Handle successful event processing
-      console.log("Successfully processed CertificateRegistered event");
+    switch (event?.eventEvent?.eventName) {
+      case "CertificateRegistered":
+        await handleCertificateRegistered(event, token);
+        break;
+
+      case "Order":
+        await handleFirstOrder(event, token);
+        break;
+
+      default:
+        console.warn(`Unhandled event type: ${event?.eventEvent?.eventName}`);
     }
   } catch (error) {
     console.error("Failed to process message:", messageData, error);
