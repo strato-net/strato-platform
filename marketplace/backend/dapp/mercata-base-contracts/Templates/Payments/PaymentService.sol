@@ -26,23 +26,15 @@ abstract contract PaymentService is Utils {
 
     enum PaymentStatus { NULL, AWAITING_FULFILLMENT, PAYMENT_PENDING, CLOSED, CANCELED }
 
-    event AssetLocked (
-        string orderHash,             /* Unique hash of the order details for payment server lookup to
-                                         avoid having to send all the order details in the request. */
-        string orderId,               // Same orderId funtionality as the current marketplace
-        address purchaser,            // Purchaser address on the blockchain for ownershipTransfer
-        string purchasersCommonName,  // Purchaser common name for lookup purposes
-        string sellersCommonName,     // Seller common name for lookup purposes
-        address[] saleAddresses,      // List of the sale contracts for the assets in the order
-        uint[] quantities,            // List of quantities for each asset being bought
-        decimal amount,               // Total price of the order
-        decimal tax,                  // Tax
-        decimal fee,                  // Fee payment (in dollar value)
-        decimal unitsPerDollar,       // Amount of units per dollar for the currency (Ex: STRAT is 100 units per dollar)
-        string currency,              // The type of currency used for the purchase
-        PaymentStatus status,         // Status of the payment
-        uint createdDate,              // Date at the time of fresh order creation
-        string comments               // Comments for the order
+    event Checkout (
+        string checkoutHash,                /* Unique hash of the order details for payment server lookup to
+                                               avoid having to send all the order details in the request. */
+        string checkoutId,                  // checkoutId 
+        address purchaser,                  // Purchaser address on the blockchain for ownershipTransfer
+        string purchasersCommonName,        // Purchaser common name for lookup purposes
+        address[] saleAddresses,            // List of the sale contracts for the assets in the checkout
+        uint[] quantitiesToBePurchased,     // List of quantities for each asset being bought
+        decimal amount                      // Total price of the checkout
     );
 
     event Order (
@@ -167,19 +159,19 @@ abstract contract PaymentService is Utils {
         return RestStatus.OK;
     }
 
-    function createOrder (
-        string _orderId,
+    function checkoutInitialized (
+        string _checkoutId,
         address[] _saleAddresses,
         uint[] _quantities,
         uint _createdDate,
         string _comments
-    ) requireActive("create order") external returns (string, address[]) {
+    ) requireActive("create ckeckout") external returns (string, address[]) {
         require(_saleAddresses.length == _quantities.length, "Number of sale addresses does not match number of quantities given");
         string _purchasersCommonName = getCommonName(msg.sender);
-        string orderHash = getOrderHash(_orderId, _purchasersCommonName, _saleAddresses, _quantities);
-        return _createOrder(
-            orderHash,
-            _orderId,
+        string checkoutHash = getOrderHash(_checkoutId, _purchasersCommonName, _saleAddresses, _quantities);
+        return _checkoutInitialized(
+            checkoutHash,
+            _checkoutId,
             msg.sender,
             _purchasersCommonName,
             _saleAddresses,
@@ -189,9 +181,9 @@ abstract contract PaymentService is Utils {
         );
     }
 
-    function _createOrder (
-        string _orderHash,
-        string _orderId,
+    function _checkoutInitialized (
+        string _checkoutHash,
+        string _checkoutId,
         address _purchaser,
         string _purchasersCommonName,
         address[] _saleAddresses,
@@ -210,7 +202,7 @@ abstract contract PaymentService is Utils {
             totalAmount += s.price() * decimal(quantity);
             seller = getCommonName(a.owner());
             try {
-                s.lockQuantity(quantity, _orderHash, _purchaser);
+                s.lockQuantity(quantity, _checkoutHash, _purchaser);
             } catch { // Support for legacy sales
                 try {
                     _saleAddresses[i].call("lockQuantity", quantity, _purchaser);
@@ -219,43 +211,35 @@ abstract contract PaymentService is Utils {
                 }
             }
         }
-        emit AssetLocked(
-            _orderHash,
-            _orderId,
+        emit Checkout (
+            _checkoutHash,              
+            _checkoutId,
             _purchaser,
             _purchasersCommonName,
-            seller,
             _saleAddresses,
             _quantities,
-            totalAmount,
-            0,
-            0,
-            _unitsPerDollar(),
-            "",
-            PaymentStatus.AWAITING_FULFILLMENT,
-            _createdDate,
-            ""
+            totalAmount
         );
-        return (_orderHash, assets);
+        return (_checkoutHash, assets);
     }
 
-    function initializePayment (
-        string _orderHash,
-        string _orderId,
+    function generateIntermediateOrder (
+        string _checkoutHash,
+        string _checkoutId,
         address _purchaser,
         address[] _saleAddresses,
         uint[] _quantities,
         string _currency,
         uint _createdDate,
         string _comments
-    ) requireActive("initialize payment") requireOwner("initialize payment") external returns (address[]){
+    ) requireActive("generate intermediate order") requireOwner("generate intermediate order") external returns (address[]){
         require(_saleAddresses.length == _quantities.length, "Number of sale addresses does not match number of quantities given");
         string _purchasersCommonName = getCommonName(_purchaser);
-        string orderHash = getOrderHash(_orderId, _purchasersCommonName, _saleAddresses, _quantities);
-        require(orderHash == _orderHash, "Invalid order data");
-        return _initializePayment(
-            _orderHash,
-            _orderId,
+        string orderHash = getOrderHash(_checkoutId, _purchasersCommonName, _saleAddresses, _quantities);
+        require(orderHash == _checkoutHash, "Invalid checkout data to create order");
+        return _generateIntermediateOrder(
+            _checkoutHash,
+            _checkoutId,
             _purchaser,
             _purchasersCommonName,
             _saleAddresses,
@@ -266,7 +250,7 @@ abstract contract PaymentService is Utils {
         );
     }
 
-    function _initializePayment (
+    function _generateIntermediateOrder (
         string _orderHash,
         string _orderId,
         address _purchaser,
@@ -391,58 +375,41 @@ abstract contract PaymentService is Utils {
         return assets;
     }
 
-    function discardOrder (
-        string _orderHash,
-        string _orderId,
+    function discardCheckoutQuantity (
+        string _checkoutHash,
+        string _checkoutId,
         address _purchaser,
         address[] _saleAddresses,
-        uint[] _quantities,
-        string _currency,
-        uint _createdDate,
-        string _comments
-    ) requireActive("discard order") external {
+        uint[] _quantities
+    ) requireActive("discard checkout") external {
         require(_saleAddresses.length == _quantities.length, "Number of sale addresses does not match number of quantities given");
         string _purchasersCommonName = getCommonName(_purchaser);
-        string orderHash = getOrderHash(_orderId, _purchasersCommonName, _saleAddresses, _quantities);
-        require(orderHash == _orderHash, "Invalid order data to discard");
-        string err = "Only the purchaser or owner can dicard the order.";
+        string orderHash = getOrderHash(_checkoutId, _purchasersCommonName, _saleAddresses, _quantities);
+        require(orderHash == _checkoutHash, "Invalid checkout data to discard");
+        string err = "Only the owner can dicard the checkout data.";
         string commonName = getCommonName(msg.sender);
         require(commonName == ownerCommonName, err);
-        return _discardOrder(
-            _orderHash,
-            _orderId,
+        return _discardCheckoutQuantity(
+            _checkoutHash,
             _purchaser,
-            _purchasersCommonName,
             _saleAddresses,
-            _quantities,
-            _currency,
-            _createdDate,
-            _comments
+            _quantities
         );
     }
     
-    function _discardOrder (
-        string _orderHash,
-        string _orderId,
+    function _discardCheckoutQuantity (
+        string _checkoutHash,
         address _purchaser,
-        string _purchasersCommonName,
         address[] _saleAddresses,
-        uint[] _quantities,
-        string _currency,
-        uint _createdDate,
-        string _comments
+        uint[] _quantities
     ) internal virtual {
         decimal totalAmount = 0;
-        string seller;
-        address[] assets;
         for (uint i = 0; i < _saleAddresses.length; i++) {
             Sale s = Sale(_saleAddresses[i]);
             totalAmount += s.price() * _quantities[i];
             Asset a = s.assetToBeSold();
-            assets.push(address(a));
-            seller = getCommonName(a.owner());
             try {
-                s.unlockQuantity(_orderHash, _purchaser);
+                s.unlockQuantity(_checkoutHash, _purchaser);
             } catch { // Support for legacy sales
                 try {
                     address(a).call("unlockQuantity", _purchaser);
@@ -451,23 +418,6 @@ abstract contract PaymentService is Utils {
                 }
             }
         }
-        emit AssetLocked(
-            _orderHash,
-            _orderId,
-            _purchaser,
-            _purchasersCommonName,
-            seller,
-            _saleAddresses,
-            _quantities,
-            totalAmount,
-            0,
-            0,
-            _unitsPerDollar(),
-            "",
-            PaymentStatus.CANCELED,
-            _createdDate,
-            "Order has been discarded"
-        );
     }
 
     function cancelOrder (
@@ -484,7 +434,7 @@ abstract contract PaymentService is Utils {
         string _purchasersCommonName = getCommonName(_purchaser);
         string orderHash = getOrderHash(_orderId, _purchasersCommonName, _saleAddresses, _quantities);
         require(orderHash == _orderHash, "Invalid order data");
-        string err = "Only the purchaser or owner can cancel the order.";
+        string err = "Only the owner can cancel the order.";
         string commonName = getCommonName(msg.sender);
         require(commonName == ownerCommonName, err);
         return _cancelOrder(
