@@ -37,7 +37,7 @@ import qualified SolidVM.Model.Type as SVMType
 import SolidVM.Solidity.StaticAnalysis.Types
 import Text.Read (readMaybe)
 import Blockchain.VM.SolidException
-import qualified SolidVM.Model.CodeCollection as CC
+-- import qualified SolidVM.Model.CodeCollection as CC
 import Data.List (find)
 --import qualified Text.Colors                          as C
 --import           Control.Monad.IO.Class
@@ -887,8 +887,8 @@ contractHelper ::
   Annotated ContractF ->
   Type'
 contractHelper cc c = do
-  let isStrict = isJust $ find ((== "strict") . fst) $ CC._pragmas cc
-  if isStrict 
+  let solidVMVersion = maybe "" snd $ find ((== "solidvm") . fst) $ _pragmas cc
+  if solidVMVersion == "11.4" 
     then
       let constr = maybe M.empty (M.singleton "constructor") $ _constructor c
           funcsAndConstr = constr <> _functions c 

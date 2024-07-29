@@ -6117,7 +6117,7 @@ contract qq {
     ( runTest $ do
         ( runBS
             [r|
-pragma strict;
+pragma solidvm 11.4;
 contract qq {
   modifier myModifier() {  // line 4
     return 7;
