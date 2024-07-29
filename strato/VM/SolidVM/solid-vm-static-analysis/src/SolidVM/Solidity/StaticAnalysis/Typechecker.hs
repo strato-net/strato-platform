@@ -1660,8 +1660,8 @@ statementHelper (Break x) = pure $ topType' x
 statementHelper (Return mExpr x) = do
   cc <- asks codeCollection
   mf <- asks function
-  let isStrict = isJust $ find ((== "strict") . fst) $ CC._pragmas cc
-  if isStrict
+  let solidVMVersion = maybe "" snd $ find ((== "solidvm") . fst) $ _pragmas cc
+  if solidVMVersion == "11.4"
     then do 
       fm <- asks modifier
       case (fm,mf) of
