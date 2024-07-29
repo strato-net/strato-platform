@@ -266,7 +266,7 @@ async function getAll(admin, args = {}, options) {
 
     const idArgs = {
       id: uniqueOrders.map((uo) => uo.id),
-      order: order, // assuming 'order' is defined elsewhere in your code
+      order: order,
     };
     saleOrders = await searchAllWithQueryArgs(paymentTableName, idArgs, newOptions, admin);
   }
