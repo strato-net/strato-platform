@@ -254,7 +254,7 @@ const TransferModal = ({ open, handleCancel, inventory, categoryName, limit, off
             width={825}
             footer={null}
         >
-            {inventory.address === "72599614549ffe3a0f7e86caf2c25d29590f3b7c" ? (
+            {inventory.root === "72599614549ffe3a0f7e86caf2c25d29590f3b7c" ? (
                 view === "options" ? renderOptions() : view === "transfer" ? renderTransfer() : renderBridge()
             ) : (
                 renderTransfer()
