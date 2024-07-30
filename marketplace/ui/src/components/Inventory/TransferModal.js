@@ -6,6 +6,7 @@ import { useInventoryDispatch, useInventoryState } from "../../contexts/inventor
 import { useUsersDispatch, useUsersState } from "../../contexts/users";
 import { useAuthenticateState } from "../../contexts/authentication";
 import { SearchOutlined } from '@ant-design/icons';
+import { handlePriceInput, handleQuantityInput } from "../../helpers/utils";
 
 const TransferModal = ({ open, handleCancel, inventory, categoryName, limit, offset }) => {
     const [view, setView] = useState("options");
@@ -26,6 +27,10 @@ const TransferModal = ({ open, handleCancel, inventory, categoryName, limit, off
     const {
         isTransferring
     } = useInventoryState();
+    const inputPriceDesktopRef = useRef(null);
+    const inputPriceMobileRef = useRef(null);
+    const inputQuantityDesktopRef = useRef(null);
+    const inputQuantityMobileRef = useRef(null);
 
     const filterDuplicateUserAddresses = (arr) => {
         return [...new Map(arr.map((u) => [u.value, u])).values()];
@@ -50,7 +55,7 @@ const TransferModal = ({ open, handleCancel, inventory, categoryName, limit, off
 
     useEffect(() => {
         userActions.fetchUsers(userDispatch);
-    }, [])
+    }, []);
 
     useEffect(() => {
         if (quantity > inventory.quantity || quantity <= 0 || !userAddress) {
@@ -59,7 +64,38 @@ const TransferModal = ({ open, handleCancel, inventory, categoryName, limit, off
         else {
             setCanTransfer(true);
         };
-    }, [quantity, userAddress])
+    }, [quantity, userAddress]);
+
+    useEffect(() => {
+        const priceInputElements = [inputPriceDesktopRef.current, inputPriceMobileRef.current];
+        const quantityInputElements = [inputQuantityDesktopRef.current, inputQuantityMobileRef.current];
+        
+        priceInputElements.forEach(inputElement => {
+            if (inputElement) {
+                inputElement.addEventListener('input', handlePriceInput(setPrice));
+            }
+        });
+
+        quantityInputElements.forEach(inputElement => {
+            if (inputElement) {
+                inputElement.addEventListener('input', handleQuantityInput(setQuantity));
+            }
+        });
+
+        return () => {
+            priceInputElements.forEach(inputElement => {
+                if (inputElement) {
+                    inputElement.removeEventListener('input', handlePriceInput(setPrice));
+                }
+            });
+
+            quantityInputElements.forEach(inputElement => {
+                if (inputElement) {
+                    inputElement.removeEventListener('input', handleQuantityInput(setQuantity));
+                }
+            });
+        };
+    }, [inputPriceDesktopRef, inputPriceMobileRef, inputQuantityDesktopRef, inputQuantityMobileRef]);
 
     const filteredOptions = searchInput
         ? filteredUsersList.filter(option =>

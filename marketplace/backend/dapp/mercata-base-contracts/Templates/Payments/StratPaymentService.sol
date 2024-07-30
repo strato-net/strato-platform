@@ -28,9 +28,9 @@ contract StratPaymentService is PaymentService {
         feeRecipient = _feeRecipient;
     }
 
-    function _createOrder (
-        string _orderHash,
-        string _orderId,
+    function _checkoutInitialized (
+        string _checkoutHash,
+        string _checkoutId,
         address _purchaser,
         string _purchasersCommonName,
         address[] _saleAddresses,
@@ -58,7 +58,7 @@ contract StratPaymentService is PaymentService {
 
             // Lock assets
             try {
-                s.lockQuantity(quantity, _orderHash, _purchaser);
+                s.lockQuantity(quantity, _checkoutHash, _purchaser);
             } catch { // Support for legacy sales
                 try {
                     address(s).call("lockQuantity", quantity, _purchaser);
@@ -66,23 +66,6 @@ contract StratPaymentService is PaymentService {
                     address(s).call("lockQuantity", quantity);
                 }
             }
-            emit AssetLocked(
-                _orderHash,
-                _orderId,
-                _purchaser,
-                _purchasersCommonName,
-                seller,
-                _saleAddresses,
-                _quantities,
-                totalAmountGross,
-                0,
-                0,
-                _unitsPerDollar(),
-                "STRATS",
-                PaymentStatus.AWAITING_FULFILLMENT,
-                _createdDate,
-                _comments
-            );
 
             // Calculate gross, net, and fee amounts in dollars
             decimal gross = s.price() * decimal(quantity); 
@@ -97,6 +80,19 @@ contract StratPaymentService is PaymentService {
             totalAmountNet += net;
             totalFee += fee;
 
+            if(i == _saleAddresses.length -1)
+            {
+                emit Checkout(
+                    _checkoutHash,
+                    _checkoutId,
+                    _purchaser,
+                    _purchasersCommonName,
+                    _saleAddresses,
+                    _quantities,
+                    totalAmountGross
+                );
+            }
+
             // Calculate net and fee amounts in STRATS
             uint stratAmountNet = uint(net * stratsPerDollar * 100);
             uint stratFee = uint(fee * stratsPerDollar * 100);
@@ -109,7 +105,7 @@ contract StratPaymentService is PaymentService {
 
             // Transfer assets
             try {
-                s.completeSale(_orderHash, _purchaser);
+                s.completeSale(_checkoutHash, _purchaser);
             } catch {
                 try {
                     address(s).call("completeSale", _purchaser);
@@ -119,8 +115,8 @@ contract StratPaymentService is PaymentService {
             }
         }
         emit Order(
-            _orderHash,
-            _orderId,
+            _checkoutHash,
+            _checkoutId,
             _purchaser,
             _purchasersCommonName,
             seller,
@@ -137,7 +133,7 @@ contract StratPaymentService is PaymentService {
         );
         purchasersAddress = address(0); // Support for legacy sales
         purchasersCommonName = "";
-        return (_orderHash, assets);
+        return (_checkoutHash, assets);
     }
 
     function updateFeeRecipient(
@@ -146,8 +142,8 @@ contract StratPaymentService is PaymentService {
         feeRecipient = _feeRecipient;
     }
 
-    function _initializePayment (
-        string _orderHash,
+    function _generateIntermediateOrder (
+        string _checkoutHash,
         string _orderId,
         address _purchaser,
         string _purchasersCommonName,
@@ -157,7 +153,7 @@ contract StratPaymentService is PaymentService {
         uint _createdDate,
         string _comments
     ) internal override returns (address[]) {
-        require(false, "Cannot call initializePayment for STRATS payments.");
+        require(false, "Cannot call generateIntermediateOrder for STRATS payments.");
         return [];
     }
 

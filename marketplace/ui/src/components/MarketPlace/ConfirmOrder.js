@@ -36,6 +36,7 @@ const ConfirmOrder = ({ paymentProviders = [], data, columns }) => {
   const userOrganization = user?.organization;
   const { isCreateOrderSubmitting, message, success, isCreatePaymentSubmitting } = useOrderState();
   const [tax, setTax] = useState(0);
+  const [subTotal, setSubTotal] = useState(0);
   const [total, setTotal] = useState(0);
   const inventoryDispatch = useInventoryDispatch();
   const { success: marketplaceSuccess, message: marketplaceMessage } = useMarketplaceState();
@@ -71,15 +72,14 @@ const ConfirmOrder = ({ paymentProviders = [], data, columns }) => {
 
   useEffect(() => {
     let t = 0;
-    cartData.forEach((item) => {
-      t += item.tax;
-    });
-    setTax(t);
     let sum = 0;
     cartData.forEach((item) => {
+      t += item.tax;
       sum += item.amount;
     });
-    setTotal(sum);
+    setTax(t.toFixed(2));
+    setSubTotal(sum.toFixed(2));
+    setTotal((sum + t).toFixed(2));
   }, [marketplaceDispatch, cartData]);
 
   const openToastOrder = (placement, message) => {
@@ -134,7 +134,7 @@ const ConfirmOrder = ({ paymentProviders = [], data, columns }) => {
       paymentProvider: { address: paymentProvider.address },
       buyerOrganization: userOrganization,
       orderList,
-      orderTotal: total + tax,
+      orderTotal: total,
       tax: tax,
       user: user.commonName,
       email: user.email,
@@ -150,20 +150,20 @@ const ConfirmOrder = ({ paymentProviders = [], data, columns }) => {
         event: 'pay_now_button',
       },
     });
-    let orderHashAndAssets = await orderActions.createPayment(orderDispatch, body);
-    if(!orderHashAndAssets){
+    let checkoutHashAndAssets = await orderActions.createPayment(orderDispatch, body);
+    if (!checkoutHashAndAssets) {
       setSelectedProvider('')
     }
-    if (orderHashAndAssets && orderHashAndAssets !== false) {
-      const [orderHash, assets] = orderHashAndAssets;
+    if (checkoutHashAndAssets && checkoutHashAndAssets !== false) {
+      const [checkoutHash, assets] = checkoutHashAndAssets;
       let serviceURL = paymentProvider.serviceURL || paymentProvider.data.serviceURL;
       let checkoutRoute = paymentProvider.checkoutRoute || paymentProvider.data.checkoutRoute;
       if (serviceURL
-            && serviceURL !== ''
-            && checkoutRoute
-            && checkoutRoute !== ''
-         ) {
-        const url = `${serviceURL}${checkoutRoute}?orderHash=${orderHash}&redirectUrl=${window.location.protocol}//${window.location.host}/order/status`;
+        && serviceURL !== ''
+        && checkoutRoute
+        && checkoutRoute !== ''
+      ) {
+        const url = `${serviceURL}${checkoutRoute}?checkoutHash=${checkoutHash}&redirectUrl=${window.location.protocol}//${window.location.host}/order/status`;
         window.location.replace(url);
       } else {
         window.location.replace(`/order/status?assets=${assets}`);
@@ -243,16 +243,16 @@ const ConfirmOrder = ({ paymentProviders = [], data, columns }) => {
                 <div className="w-max flex flex-col gap-[10px]">
                   <Row className="justify-between items-center ">
                     <p className="text-base text-[#6A6A6A]">Sub Total:</p>
-                    <p className="text-xl text-[#202020] md:ml-5 text-right">${total} <span className="ml-1">({total * 100} STRATS)</span></p>
+                    <p className="text-base text-[#202020] md:ml-5 text-right">${subTotal} <span className="ml-1">({(subTotal * 100).toFixed(0)} STRATS)</span></p>
                   </Row>
                   <Row className="justify-start items-center ">
                     <p className="text-base text-[#6A6A6A]">Tax:</p>
-                    <p className="text-xl text-[#202020] md:ml-16 text-left">${tax}</p>
+                    <p className="text-base text-[#202020] md:ml-16 text-left">${tax}</p>
                   </Row>
                   <Row className="justify-between items-center">
                     <p className="text-base text-[#6A6A6A]">Total:</p>
-                    <p id="totalPrice" className="text-xl text-[#202020] md:ml-5 text-right">
-                      ${total + tax} <span className="ml-1">({(total + tax) * 100} STRATS)</span>
+                    <p id="totalPrice" className="text-base text-[#202020] md:ml-5 text-right">
+                      ${total} <span className="ml-1">({(total * 100).toFixed(0)} STRATS)</span>
                     </p>
                   </Row>
                 </div>
@@ -261,13 +261,13 @@ const ConfirmOrder = ({ paymentProviders = [], data, columns }) => {
                 <div className="mr-4">
                   <Select
                     value={selectedProvider?.serviceName}
-                    className="w-[250px] text-center selected-payment-option"
+                    className="w-[250px] text-center selected-payment-option items-select"
                     onChange={handleChange}
                     placeholder="Select Payment Option"
                   >
                     {paymentProviders && paymentProviders.map(provider => (
                       provider && <Option className='payment-dropdown' key={provider?.serviceName} value={provider?.serviceName}>
-                        {provider?.checkoutText}
+                        Checkout with {provider?.serviceName}
                         <img src={provider?.imageURL} alt={provider?.serviceName} style={{ width: 20, height: 20, marginRight: 8 }} />
                       </Option>
                     ))}
