@@ -173,5 +173,6 @@ resolvePragmaFeature pragmaList feature =
           "strict" -> True
           "builtinCreates" -> True
           "safeExternalCalls" -> True
+          "strictDecimals" -> True
           _ -> False
       (_) -> isJust $ find ((== feature) . fst) pragmaList
