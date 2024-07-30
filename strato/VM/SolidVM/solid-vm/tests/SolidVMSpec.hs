@@ -8970,10 +8970,17 @@ contract qq {
 --edge case should be handled
   fit "can typecheck operations assigned to decimals" $ runTest ( do
     runBS [r|
+pragma solidvm 11.4;
 contract qq {
   decimal d;
+  decimal e;
+  decimal f;
+  decimal g;
   constructor() {
-    d = 1 / 3 * 3;
+    e = 1;
+    f = 3;
+    g = 3;
+    d = e / f * g;
 
   }
 }
