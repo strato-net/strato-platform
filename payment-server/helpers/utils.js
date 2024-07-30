@@ -2,7 +2,7 @@ import client from '../db/index.js';
 import { rest, util } from "blockapps-rest";
 import { 
   DEFAULT_OPTIONS, 
-  ORDER_EVENT_TABLE, 
+  CHECKOUT_EVENT_TABLE,
   SELLER_ONBOARDED_TABLE, 
   TABLE_PREFIX, 
   STRIPE_CONTRACT_ADDRESS } from "./constants.js";
@@ -18,17 +18,20 @@ const clientErrorHandler = (err, req, res, next) => {
     res.redirect(`${req.query.redirectUrl}?error=${encodeURIComponent(err.message)}`);
 
     console.log(`Unhandled API error. Status: ${JSON.stringify(statusCode)}. Message: ${JSON.stringify(message)}`);
-    return res.status(statusCode).json({ success: false, error: message });
   }
 
   return next(err)
 }
 
 const commonErrorHandler = (err, req, res, next) => {
-  console.log(err.stack);
   res.redirect(`${req.query.redirectUrl}?error=${encodeURIComponent(err.message)}`);
-  res.status(400).json({ success: false, error: err.message });
   return next(err);
+}
+
+const verifyDatabaseConnection = async () => {
+  const query = 'SELECT * FROM stripe_accounts LIMIT 1';
+  const result = await client.query(query);
+  console.log(result);
 }
 
 const getStripeAccountForUser = async (commonName) => {
@@ -130,16 +133,16 @@ const emitOnboardSeller = async (address, args) => {
   return onboardSellerStatus;
 }
 
-const getOrderEvent = async (orderHash) => {
+const getCheckoutEvent = async (checkoutHash) => {
   const tableArgs = {
-    name: ORDER_EVENT_TABLE,
+    name: CHECKOUT_EVENT_TABLE,
   };
   
   const searchOptions = {
     ...DEFAULT_OPTIONS,
     query: {
       limit: 1,
-      ['orderHash']: `eq.${orderHash}`,
+      ['checkoutHash']: `eq.${checkoutHash}`,
     }
   };
 
@@ -226,12 +229,12 @@ const completeOrder = async (address, args) => {
   return completeOrderStatus;
 }
 
-const initializePayment = async (address, args) => {
+const generateIntermediateOrder = async (address, args) => {
   // Make the call and return results
   const contract = { name: "PaymentService", address };
   const callArgs = {
     contract,
-    method: "initializePayment",
+    method: "generateIntermediateOrder",
     args: util.usc({ ...args }),
   };
   const completeOrderStatus = await rest.call(ADMIN.getUser(), callArgs, DEFAULT_OPTIONS);
@@ -246,13 +249,26 @@ const cancelOrder = async (address, args) => {
     method: "cancelOrder",
     args: util.usc({ ...args }),
   };
-  const completeOrderStatus = await rest.call(ADMIN.getUser(), callArgs, DEFAULT_OPTIONS);
-  return completeOrderStatus;
+  const cancelOrderStatus = await rest.call(ADMIN.getUser(), callArgs, DEFAULT_OPTIONS);
+  return cancelOrderStatus;
+}
+
+const discardCheckoutQuantity = async (address, args) => {
+  // Make the call and return results
+  const contract = { name: "PaymentService", address };
+  const callArgs = {
+    contract,
+    method: "discardCheckoutQuantity",
+    args: util.usc({ ...args }),
+  };
+  const discardOrderStatus = await rest.call(ADMIN.getUser(), callArgs, DEFAULT_OPTIONS);
+  return discardOrderStatus;
 }
 
 export {
   clientErrorHandler,
   commonErrorHandler,
+  verifyDatabaseConnection,
   getStripeAccountForUser,
   getStripePaymentFromToken,
   getStripePaymentsFromTokens,
@@ -262,10 +278,11 @@ export {
   validatePaymentServiceContract,
   validateRedemptionServiceContract,
   emitOnboardSeller,
-  getOrderEvent,
+  getCheckoutEvent,
   checkSellerOnboarded,
   validateAndGetOrderDetails,
   completeOrder,
-  initializePayment,
+  generateIntermediateOrder,
   cancelOrder,
+  discardCheckoutQuantity,
 }

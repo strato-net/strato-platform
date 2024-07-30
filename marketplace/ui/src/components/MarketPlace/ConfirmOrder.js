@@ -36,12 +36,13 @@ const ConfirmOrder = ({ paymentProviders = [], data, columns }) => {
   const userOrganization = user?.organization;
   const { isCreateOrderSubmitting, message, success, isCreatePaymentSubmitting } = useOrderState();
   const [tax, setTax] = useState(0);
+  const [subTotal, setSubTotal] = useState(0);
   const [total, setTotal] = useState(0);
   const inventoryDispatch = useInventoryDispatch();
   const { success: marketplaceSuccess, message: marketplaceMessage } = useMarketplaceState();
   const [modal, contextHolderForModal] = Modal.useModal();
   const [cartData, setCartData] = useState(data);
-  const [selectedProvider, setSelectedProvider] = useState(paymentProviders.find(provider => provider?.serviceName === 'Stripe') || paymentProviders[0]);
+  const [selectedProvider, setSelectedProvider] = useState('');
 
   useEffect(() => {
     setCartData(data);
@@ -71,15 +72,14 @@ const ConfirmOrder = ({ paymentProviders = [], data, columns }) => {
 
   useEffect(() => {
     let t = 0;
-    cartData.forEach((item) => {
-      t += item.tax;
-    });
-    setTax(t);
     let sum = 0;
     cartData.forEach((item) => {
+      t += item.tax;
       sum += item.amount;
     });
-    setTotal(sum);
+    setTax(t.toFixed(2));
+    setSubTotal(sum.toFixed(2));
+    setTotal((sum + t).toFixed(2));
   }, [marketplaceDispatch, cartData]);
 
   const openToastOrder = (placement, message) => {
@@ -134,7 +134,7 @@ const ConfirmOrder = ({ paymentProviders = [], data, columns }) => {
       paymentProvider: { address: paymentProvider.address },
       buyerOrganization: userOrganization,
       orderList,
-      orderTotal: total + tax,
+      orderTotal: total,
       tax: tax,
       user: user.commonName,
       email: user.email,
@@ -150,17 +150,20 @@ const ConfirmOrder = ({ paymentProviders = [], data, columns }) => {
         event: 'pay_now_button',
       },
     });
-    let orderHashAndAssets = await orderActions.createPayment(orderDispatch, body);
-    if (orderHashAndAssets && orderHashAndAssets !== false) {
-      const [orderHash, assets] = orderHashAndAssets;
+    let checkoutHashAndAssets = await orderActions.createPayment(orderDispatch, body);
+    if (!checkoutHashAndAssets) {
+      setSelectedProvider('')
+    }
+    if (checkoutHashAndAssets && checkoutHashAndAssets !== false) {
+      const [checkoutHash, assets] = checkoutHashAndAssets;
       let serviceURL = paymentProvider.serviceURL || paymentProvider.data.serviceURL;
       let checkoutRoute = paymentProvider.checkoutRoute || paymentProvider.data.checkoutRoute;
       if (serviceURL
-            && serviceURL !== ''
-            && checkoutRoute
-            && checkoutRoute !== ''
-         ) {
-        const url = `${serviceURL}${checkoutRoute}?orderHash=${orderHash}&redirectUrl=${window.location.protocol}//${window.location.host}/order/status`;
+        && serviceURL !== ''
+        && checkoutRoute
+        && checkoutRoute !== ''
+      ) {
+        const url = `${serviceURL}${checkoutRoute}?checkoutHash=${checkoutHash}&redirectUrl=${window.location.protocol}//${window.location.host}/order/status`;
         window.location.replace(url);
       } else {
         window.location.replace(`/order/status?assets=${assets}`);
@@ -168,9 +171,46 @@ const ConfirmOrder = ({ paymentProviders = [], data, columns }) => {
     }
   };
 
-  const handleChange = value => {
+  const handleChange = async (value) => {
     const provider = paymentProviders.find(provider => provider?.serviceName === value);
     setSelectedProvider(provider);
+
+    if (hasChecked && !isAuthenticated && loginUrl !== undefined) {
+      countDown();
+    } else {
+      const saleAddresses = [];
+      const quantities = [];
+      cartData.forEach((item) => {
+        saleAddresses.push(item.saleAddress);
+        quantities.push(item.qty);
+      });
+      const checkQuantity = await orderActions.fetchSaleQuantity(orderDispatch, saleAddresses, quantities);
+      if (checkQuantity === true) {
+        handlePaymentConfirm(provider);
+      } else {
+        let insufficientQuantityMessage = "";
+        let outOfStockMessage = "";
+
+        checkQuantity.forEach(detail => {
+          if (detail.availableQuantity === 0) {
+            outOfStockMessage += `Product ${detail.assetName}\n`;
+          } else {
+            insufficientQuantityMessage += `Product ${detail.assetName}: ${detail.availableQuantity}\n`;
+          }
+        });
+
+        let errorMessage = "";
+        if (insufficientQuantityMessage) {
+          errorMessage += `The following item(s) in your cart have limited quantity available and will need to be adjusted. Please reduce the quantity to proceed:\n${insufficientQuantityMessage}`;
+        }
+        if (outOfStockMessage) {
+          if (errorMessage) errorMessage += "\n"; // Add a new line if there's already an error message
+          errorMessage += `The following item(s) are temporarily out of stock and should be removed:\n${outOfStockMessage}`;
+        }
+        openToastOrder("bottom", errorMessage);
+        setSelectedProvider('')
+      }
+    }
   };
 
   return (
@@ -200,19 +240,19 @@ const ConfirmOrder = ({ paymentProviders = [], data, columns }) => {
             </div>
             <div className="flex justify-between bg-[#EEEFFA]">
               <div className="rounded-b-md py-[15px] px-4 ml-4 hidden lg:flex lg:justify-end ">
-                <div className="w-[235px] flex flex-col gap-[10px]">
-                  <Row className="justify-between ">
+                <div className="w-max flex flex-col gap-[10px]">
+                  <Row className="justify-between items-center ">
                     <p className="text-base text-[#6A6A6A]">Sub Total:</p>
-                    <p className="text-xl text-[#202020]   text-right">${total}</p>
+                    <p className="text-base text-[#202020] md:ml-5 text-right">${subTotal} <span className="ml-1">({(subTotal * 100).toFixed(0)} STRATS)</span></p>
                   </Row>
-                  <Row className="justify-between ">
+                  <Row className="justify-start items-center ">
                     <p className="text-base text-[#6A6A6A]">Tax:</p>
-                    <p className="text-xl text-[#202020]   text-right">${tax}</p>
+                    <p className="text-base text-[#202020] md:ml-16 text-left">${tax}</p>
                   </Row>
-                  <Row className="justify-between">
+                  <Row className="justify-between items-center">
                     <p className="text-base text-[#6A6A6A]">Total:</p>
-                    <p id="totalPrice" className="text-xl text-[#202020] text-right">
-                      ${total + tax}
+                    <p id="totalPrice" className="text-base text-[#202020] md:ml-5 text-right">
+                      ${total} <span className="ml-1">({(total * 100).toFixed(0)} STRATS)</span>
                     </p>
                   </Row>
                 </div>
@@ -220,67 +260,19 @@ const ConfirmOrder = ({ paymentProviders = [], data, columns }) => {
               <div id="review-and-submit" className="flex md:pb-2 items-center mr-4">
                 <div className="mr-4">
                   <Select
-                    defaultValue={selectedProvider?.serviceName}
-                    style={{ width: 200, height: 40 }}
+                    value={selectedProvider?.serviceName}
+                    className="w-[250px] text-center selected-payment-option items-select"
                     onChange={handleChange}
+                    placeholder="Select Payment Option"
                   >
-                    {paymentProviders.map(provider => (
-                      <Option key={provider?.serviceName} value={provider?.serviceName}>
-                        {provider?.checkoutText}
+                    {paymentProviders && paymentProviders.map(provider => (
+                      provider && <Option className='payment-dropdown' key={provider?.serviceName} value={provider?.serviceName}>
+                        Checkout with {provider?.serviceName}
+                        <img src={provider?.imageURL} alt={provider?.serviceName} style={{ width: 20, height: 20, marginRight: 8 }} />
                       </Option>
                     ))}
                   </Select>
                 </div>
-                <Button
-                  id="pay-now-button"
-                  style={{ height: 40, padding: '0 16px' }}
-                  className="rounded-lg border border-primary bg-primary hover:bg-primaryHover text-white flex items-center"
-                  loading={isCreatePaymentSubmitting}
-                  onClick={async () => {
-                    if (hasChecked && !isAuthenticated && loginUrl !== undefined) {
-                      countDown();
-                    } else {
-                      const saleAddresses = [];
-                      const quantities = [];
-                      cartData.forEach((item) => {
-                        saleAddresses.push(item.saleAddress);
-                        quantities.push(item.qty);
-                      });
-                      const checkQuantity = await orderActions.fetchSaleQuantity(orderDispatch, saleAddresses, quantities);
-                      if (checkQuantity === true) {
-                        handlePaymentConfirm(selectedProvider);
-                      } else {
-                        let insufficientQuantityMessage = "";
-                        let outOfStockMessage = "";
-
-                        checkQuantity.forEach(detail => {
-                          if (detail.availableQuantity === 0) {
-                            outOfStockMessage += `Product ${detail.assetName}\n`;
-                          } else {
-                            insufficientQuantityMessage += `Product ${detail.assetName}: ${detail.availableQuantity}\n`;
-                          }
-                        });
-
-                        let errorMessage = "";
-                        if (insufficientQuantityMessage) {
-                          errorMessage += `The following item(s) in your cart have limited quantity available and will need to be adjusted. Please reduce the quantity to proceed:\n${insufficientQuantityMessage}`;
-                        }
-                        if (outOfStockMessage) {
-                          if (errorMessage) errorMessage += "\n"; // Add a new line if there's already an error message
-                          errorMessage += `The following item(s) are temporarily out of stock and should be removed:\n${outOfStockMessage}`;
-                        }
-                        openToastOrder("bottom", errorMessage);
-                      }
-                    }
-                  }}
-                >
-                  <div className="flex items-center mr-1">
-                    {selectedProvider?.checkoutText}&nbsp; 
-                    {selectedProvider?.imageURL && selectedProvider?.imageURL !== '' ? (
-                      <img src={selectedProvider?.imageURL} alt={selectedProvider?.serviceName} height="16px" width="16px" />
-                    ) : ''}
-                  </div>
-                </Button>
               </div>
             </div>
           </div>

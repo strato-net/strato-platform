@@ -66,9 +66,9 @@ const HeaderComponent = ({ user, loginUrl, showMenu, handleSubMenu, handleMenuTa
   const { categorys } = useCategoryState();
   let { isAuthenticated } = useAuthenticateState();
 
-  const storedData = useMemo(() => {
-    return window.localStorage.getItem("cartList") == null ? [] : JSON.parse(window.localStorage.getItem("cartList"));
-  }, []);
+  // const storedData = useMemo(() => {
+  //   return window.localStorage.getItem("cartList") == null ? [] : JSON.parse(window.localStorage.getItem("cartList"));
+  // }, []);
 
   useEffect(() => {
     if (user) {
@@ -77,8 +77,8 @@ const HeaderComponent = ({ user, loginUrl, showMenu, handleSubMenu, handleMenuTa
   }, [user]);
 
   useEffect(() => {
-    marketplaceActions.fetchCartItems(marketplaceDispatch, storedData);
-  }, [marketplaceDispatch, storedData]);
+    marketplaceActions.fetchCartItems(marketplaceDispatch, cartList);
+  }, [marketplaceDispatch, cartList]);
 
   const [selectedTab, setSelectedTab] = useState("0");
   const [roleIndex, setRoleIndex] = useState();
@@ -415,7 +415,9 @@ const HeaderComponent = ({ user, loginUrl, showMenu, handleSubMenu, handleMenuTa
           {<div className="flex md:hidden mx-2" onClick={() => handleSearchShow(true)}>
             <img src={Images.Responsive_search} alt={IMG_META} title={IMG_META} className="w-6 h-6" />
           </div>}
-          <Badge
+          
+          {/* TODO: uncomment the code to show the cart */}
+          {/* <Badge
             className="cursor-pointer mr-3 md:mr-1"
             count={cartList.length}
             onClick={() => {
@@ -438,7 +440,7 @@ const HeaderComponent = ({ user, loginUrl, showMenu, handleSubMenu, handleMenuTa
                 icon={<img src={Images.Header_cart} alt={IMG_META} title={IMG_META} className="w-6 h-6" />}
               />
             </div>
-          </Badge>
+          </Badge> */}
 
           {(roleIndex !== undefined && roleIndex !== 1)
             && <Dropdown menu={{ items: stratsItem }} placement="bottomRight" trigger={["click"]} className="xs:mt-5 md:mt-0" overlayStyle={{ position: 'fixed' }}>
