@@ -89,9 +89,9 @@ const SoldOrderDetails = ({ user, users }) => {
           productImage: prod["BlockApps-Mercata-Asset-images"].length > 0 ? prod["BlockApps-Mercata-Asset-images"][0].value : image_placeholder,
           productName: prod,
           name: prod.name,
-          unitPrice: orderDetails.order.currency === "STRATS" ? (prod.price * STRATS_CONVERSION).toFixed(0) : prod.price,
+          unitPrice: orderDetails.order.currency === "STRATS" ? (prod.price * STRATS_CONVERSION).toFixed(0) : prod.price.toFixed(2),
           quantity: parseInt(orderQuantities[index]),
-          amount: (orderDetails.order.currency === "STRATS" ? (prod.price * STRATS_CONVERSION).toFixed(0) : prod.price) * parseInt(orderQuantities[index]),
+          amount: (orderDetails.order.currency === "STRATS" ? (prod.price * STRATS_CONVERSION * parseInt(orderQuantities[index])).toFixed(0) : (prod.price * parseInt(orderQuantities[index])).toFixed(2)),
           serialNumber: prod,
           tax: prod.tax ? prod.tax : 0,
         });
