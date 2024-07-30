@@ -193,10 +193,10 @@ addBlocks unfiltered = do
           when didReplaceBest' $ do
             $logInfoS "addBlocks" "done inserting, now will emit stateDiff if necessary"
             nbb <- readIORef replacedBest
-            yield . OutIndexEvent $ NewBestBlock nbb
             when flags_sqlDiff $
               timeit "calculateAndEmitStateDiffs" timerToUse $
                 calculateAndEmitStateDiffs srLog oldHeader
+            yield . OutIndexEvent $ NewBestBlock nbb
           when (flags_sqlDiff && not (M.null ranPrivateTxs')) $ calculateAndEmitChainDiffs ranPrivateTxs'
 
 setParentStateRoot ::
@@ -330,7 +330,7 @@ mineTransactions' header remGas ran unran@(tx : txs) = do
   trr <- setNewAddresses $ TxRunResult tx result time' beforeMap afterMap []
   case result of
     Right execResult ->
-      let supportedPragmas = [("es6", ""), ("strict", ""), ("builtinCreates", "")]
+      let supportedPragmas = [("es6", ""), ("strict", ""), ("builtinCreates", ""), ("safeExternalCalls", ""), ("solidvm", "11.4")]
           findInvalidPragmas pragma = if fst pragma == "solidity" || pragma `elem` supportedPragmas then id else (pragma :) -- include solidity pragma for backwards compatibility
           invalidPragmasUsed = foldr findInvalidPragmas [] (erPragmas execResult)
        in if not $ null invalidPragmasUsed

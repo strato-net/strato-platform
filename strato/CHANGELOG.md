@@ -16,11 +16,27 @@ so that they could be properly moved to their respective version's subsection.
 
 ## [Unreleased] 
 ### Added
+- Added `pragma safeExternalCalls` for contracts that want to enforce extra type safety on external calls from other contracts
+- Added `pragma solidvm 11.4` that includes all existing pragmas and their features
+- Added decimal precision strictness to `pragma solidvm 11.4`
+- Added `truncate(uint)` built-in method for decimal numbers to `pragma solidvm 11.4`
+
+### Changed
+
+### Fixed
+- patched rare race condition where node updates sync status to true before running the last few blocks left in the sync
+
+### Removed
+
+
+## [11.3.1] - 7/10/2024 
+### Added
 
 ### Changed
 - In Slipstream, index arrays in event tables within the event table, otherwise index them in a separate array table.
 
 ### Fixed
+- try-catch exception handler in solidVM will throw excpetion in all cases instead of potentially `error`ing so node does not crash
 
 ### Removed
 - Removed strato-api paymentServerUrl flag
