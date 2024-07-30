@@ -10,9 +10,7 @@ import {
   Input,
   Button,
   Spin,
-  Image,
   Tabs,
-  DatePicker,
 } from "antd";
 import { useLocation, useMatch } from "react-router-dom";
 import { actions } from "../../contexts/order/actions";
@@ -22,13 +20,10 @@ import classNames from "classnames";
 import { EyeOutlined } from "@ant-design/icons";
 import DataTableComponent from "../DataTableComponent";
 import { getStringDate } from "../../helpers/utils";
-import { getStatus, getStatusByName } from "./constant";
+import { getStatus } from "./constant";
 import { useNavigate } from "react-router-dom";
-import { US_DATE_FORMAT } from "../../helpers/constants";
+import { US_DATE_FORMAT, STRATS_CONVERSION} from "../../helpers/constants";
 import ClickableCell from "../ClickableCell";
-import { apiUrl, HTTP_METHODS } from "../../helpers/constants";
-import RestStatus from "http-status-codes";
-import TagManager from "react-gtm-module";
 import image_placeholder from "../../images/resources/image_placeholder.png";
 import dayjs from "dayjs";
 import TransfersTable from "./TransfersTable";
@@ -122,9 +117,9 @@ const BoughtOrderDetails = ({ user, users }) => {
           productImage: prod["BlockApps-Mercata-Asset-images"].length > 0 ? prod["BlockApps-Mercata-Asset-images"][0].value : image_placeholder,
           productName: prod,
           name: prod.name,
-          unitPrice: prod.price,
+          unitPrice: orderDetails.order.currency === "STRATS" ? (prod.price * STRATS_CONVERSION).toFixed(0) : prod.price,
           quantity: parseInt(orderQuantities[index]),
-          amount: prod.price * parseInt(orderQuantities[index]),
+          amount: (orderDetails.order.currency === "STRATS" ? (prod.price * STRATS_CONVERSION).toFixed(0) : prod.price) * parseInt(orderQuantities[index]),
           serialNumber: prod,
           tax: prod.tax ? prod.tax : 0,
         });
@@ -287,7 +282,7 @@ const BoughtOrderDetails = ({ user, users }) => {
       ),
     },
     {
-      title: <Text className="text-primaryC text-[13px]">Unit Price($)</Text>,
+      title: <Text className="text-primaryC text-[13px]">Unit Price</Text>,
       dataIndex: "unitPrice",
       key: "unitPrice",
       align: "center",
@@ -301,14 +296,14 @@ const BoughtOrderDetails = ({ user, users }) => {
       render: (text) => <p>{text}</p>,
     },
     {
-      title: <Text className="text-primaryC text-[13px]">Tax($)</Text>,
+      title: <Text className="text-primaryC text-[13px]">Tax</Text>,
       dataIndex: "tax",
       key: "tax",
       align: "center",
       render: (text) => <p>{text}</p>,
     },
     {
-      title: <Text className="text-primaryC text-[13px]">Amount($)</Text>,
+      title: <Text className="text-primaryC text-[13px]">Amount</Text>,
       dataIndex: "amount",
       key: "amount",
       align: "center",
@@ -381,7 +376,7 @@ const BoughtOrderDetails = ({ user, users }) => {
                 key: "bought",
                 children:
                   <div className="mb-10">
-                    <Button type="ghost" onClick={() => onChange('Bought')} className="cursor-pointer mb-1 px-2 flex md:hidden items-center gap-2 text-sm font-semibold"><LeftArrow /> Back</Button>
+                    <Button type="ghost" onClick={() => onChange('bought')} className="cursor-pointer mb-1 px-2 flex md:hidden items-center gap-2 text-sm font-semibold"><LeftArrow /> Back</Button>
                     {details === null || isorderDetailsLoading || isbuyerDetailsUpdating ? (
                       <div className="h-screen flex justify-center items-center">
                         <Spin
@@ -413,7 +408,9 @@ const BoughtOrderDetails = ({ user, users }) => {
                           value={details.order.sellersCommonName}
                         />
                         <Divider type="vertical" className="h-14 bg-secondryD" />
-                        <OrderData title="Total($)" value={details.order.totalPrice} />
+                        <OrderData title="Currency" value={details.order.currency ? details.order.currency : "USD"} />
+                        <Divider type="vertical" className="h-14 bg-secondryD" />
+                        <OrderData title="Total" value={details.order.currency === "STRATS" ? (details.order.totalPrice * STRATS_CONVERSION).toFixed(0) : details.order.totalPrice} />
                         <Divider type="vertical" className="h-14 bg-secondryD" />
                         <OrderData
                           title="Date"
@@ -434,11 +431,15 @@ const BoughtOrderDetails = ({ user, users }) => {
                         </div>
                         <div className="flex gap-4">
                           <NewOrderData className="w-2/4" title="Seller" value={details.order.sellersCommonName} />
-                          <NewOrderData className="w-2/4" title="Total($)" value={'$' + details.order.totalPrice} />
+                          <NewOrderData className="w-2/4" title="Currency" value={details.order.currency ? details.order.currency : "USD"} />
                         </div>
-                        <div className="flex justify-between">
-                          <NewOrderData className="w-2/4" title="Status" value={statusComponent(status)} />
+                        <div className="flex gap-4">
+                          <NewOrderData className="w-2/4" title="Total" value={details.order.currency === "STRATS" ? (details.order.totalPrice * STRATS_CONVERSION).toFixed(0) : details.order.totalPrice} />
+                          <NewOrderData className="w-2/4" title="Date" value={getStringDate(details.order.createdDate, US_DATE_FORMAT)} />  
+                        </div>
+                        <div className="flex gap-4">
                           <NewOrderData className="w-2/4" title="Payment Status" value={statusComponentForPayment(paid)} />
+                          <NewOrderData className="w-2/4" title="Status" value={statusComponent(status)} />
                         </div>
                       </Row>
                       <Row className="flex-nowrap items-center justify-between mb-2 md:mb-6 p-2">

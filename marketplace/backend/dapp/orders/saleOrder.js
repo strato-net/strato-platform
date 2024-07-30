@@ -339,7 +339,7 @@ async function getAll(admin, args = {}, options) {
   else
     saleOrders.sort((a, b) => b.createdDate - a.createdDate);
 
-  saleOrders = saleOrders.slice(offset, offset + limit)
+  saleOrders = saleOrders.slice(offset, parseInt(offset) + parseInt(limit))
 
   return saleOrders ? { orders: saleOrders.map((order) => marshalOut(order)), total: totalCount } : undefined;
 }

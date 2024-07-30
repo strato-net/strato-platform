@@ -29,12 +29,10 @@ import BoughtOrdersTable from "./BoughtOrdersTable";
 import SoldOrdersTable from "./SoldOrdersTable";
 import TransfersTable from "./TransfersTable";
 import RedemptionsOutgoingTable from "./RedemptionsOutgoingTable";
-import { ResponsiveOrderDetailCard } from "./ResponsiveOrderDetailCard";
 
 const RedemptionsIncomingDetails = ({ user }) => {
     const [id, setId] = useState(undefined);
     const [redemptionService, setRedemptionService] = useState(undefined);
-    const [data, setdata] = useState([]);
     const dispatch = useRedemptionDispatch();
     const inventoryDispatch = useInventoryDispatch();
     const { Text } = Typography;
@@ -348,10 +346,6 @@ const RedemptionsIncomingDetails = ({ user }) => {
                                                 />
                                             </div>
                                         </Card>
-                                        {data?.length > 0 && data?.map((item) => {
-                                            return (
-                                                <ResponsiveOrderDetailCard data={item} />)
-                                        })}
                                     </div>
                             },
                         ]}
