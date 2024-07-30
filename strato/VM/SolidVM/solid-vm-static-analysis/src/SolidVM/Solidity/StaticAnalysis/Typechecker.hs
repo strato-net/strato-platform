@@ -1590,8 +1590,37 @@ statementHelper (Throw e x) = do
 statementHelper (ModifierExecutor x) = pure $ topType' x
 statementHelper (EmitStatement _ vals x) =
   reduceType' x <$> traverse (tcExpr . snd) vals
-statementHelper (RevertStatement _ (NamedArgs vals) x) =
+statementHelper (RevertStatement errorName (NamedArgs vals) x) = do
   reduceType' x <$> traverse (tcExpr . snd) vals
+  cc <- asks codecollection
+  let solidVMVersion = maybe "" snd $ find ((== "solidvm") . fst) $ _pragmas cc
+  case solidVMVersion of
+    "11.4" ->
+      case errorName of
+        Just erName -> do
+          c <- asks contract
+          case M.lookup erName (_errors c) of
+            Just err ->
+              case allDifferent $ map fst err of
+                False -> pure . bottom $ "Same parameter name used in error" <$ x
+                True  -> 
+                  case allDifferent $ map fst vals of
+                    False -> pure . bottom $ "Same parameter name used in revertStatement" <$ x
+                    True  -> do
+                      let errKeys = map (\(en, _, _) -> en) err
+                      if all (\(en, _) -> en `elem` errKeys) vals
+                        then do
+                          let matched = [(b,c) | (a, b) <- vals, (a', c, d) <- err, a == a']
+                          for matched $ \(valB, errC) -> do
+                            -- TODO, convert valB to to the type using the tcexpr and make sure it matches the expected type from errC
+                        else pure . bottom $ "Parameter does not exist" <$ x
+
+            Nothihng -> pure . bottom $ "Error does not exist" <$ x           
+        Nothing -> pure . bottom $ "Cannot have arguments without custom error" <$ x
+    _    ->
+        reduceType' x <$> traverse tcExpr vals
+      
+
 statementHelper (RevertStatement errorName (OrderedArgs vals) x) = do
   
   {-
@@ -1611,9 +1640,12 @@ statementHelper (RevertStatement errorName (OrderedArgs vals) x) = do
 
   usage ex:
 
-    error errorName(string x,string y);
+    error errorName(string y,int y);
     revert()
     revert("some string")
+    revert someError("blah")
+
+    revert errorName({y : "somestring", x : "some other string"})
   -}
 
     cc <- asks codeCollection
@@ -1650,6 +1682,10 @@ statementHelper (UncheckedStatement body x) =
   statementsHelper' x body
 statementHelper (AssemblyStatement _ x) = pure $ topType' x
 statementHelper (SimpleStatement stmt x) = simpleStatementHelper x stmt
+
+allDifferent :: (Eq a) => [a] -> Bool
+allDifferent []     = True
+allDifferent (x:xs) = x `notElem` xs && allDifferent xs
 
 isSameType :: Type -> Type -> Bool
 isSameType (SVMType.Int _ _) (SVMType.Int _ _) = True
