@@ -1590,7 +1590,7 @@ statementHelper (Throw e x) = do
 statementHelper (ModifierExecutor x) = pure $ topType' x
 statementHelper (EmitStatement _ vals x) =
   reduceType' x <$> traverse (tcExpr . snd) vals
-statementHelper (RevertStatement errorName (NamedArgs vals) x) =
+statementHelper (RevertStatement _ (NamedArgs vals) x) =
   reduceType' x <$> traverse (tcExpr . snd) vals
 statementHelper (RevertStatement errorName (OrderedArgs vals) x) = do
   
@@ -1621,9 +1621,9 @@ statementHelper (RevertStatement errorName (OrderedArgs vals) x) = do
     case solidVMVersion of
       "11.4" -> do
         case errorName of 
-          Just errorName -> do
+          Just erName -> do
             c  <- asks contract
-            case M.lookup errorName (_errors c) of 
+            case M.lookup erName (_errors c) of 
               Just err -> do
                 let vals' = fmap (\b -> 
                                     let r = R cc c Nothing "Nothing" []
@@ -1641,11 +1641,11 @@ statementHelper (RevertStatement errorName (OrderedArgs vals) x) = do
                   then pure . bottom $ "Wrong number of arguments provided" <$ x
                   else if not (and $ zipWith isSameType expectedTypes vals'')
                     then pure . bottom $ "Type mismatch in error arguments" <$ x
-                    else reduceType' x <$> traverse $ tcExpr vals
+                    else reduceType' x <$> traverse tcExpr vals
               Nothing -> pure . bottom $ "Error does not exist" <$ x
-          Nothing -> reduceType' x <$> traverse $ tcExpr vals
+          Nothing -> reduceType' x <$> traverse tcExpr vals
       _    ->
-        reduceType' x <$> traverse $ tcExpr vals
+        reduceType' x <$> traverse tcExpr vals
 statementHelper (UncheckedStatement body x) =
   statementsHelper' x body
 statementHelper (AssemblyStatement _ x) = pure $ topType' x
