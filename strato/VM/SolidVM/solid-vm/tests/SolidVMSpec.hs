@@ -80,7 +80,7 @@ import qualified LabeledError
 import qualified Numeric (readHex, showHex)
 import SolidVM.Model.SolidString
 import SolidVM.Model.Storable as MS
-import Test.Hspec (Selector, Spec, anyException,fit, it, pendingWith, shouldThrow, xdescribe, xit)
+import Test.Hspec (Selector, Spec, anyException, it, pendingWith, shouldThrow, xdescribe, xit)
 import Test.Hspec.Expectations.Lifted
 import Text.Printf
 import Text.RawString.QQ
@@ -8968,7 +8968,7 @@ contract qq {
 }
 |]) `shouldThrow` anyTypeError
 --edge case should be handled
-  fit "can typecheck operations assigned to decimals" $ runTest ( do
+  it "can typecheck operations assigned to decimals" $ runTest ( do
     runBS [r|
 pragma solidvm 11.4;
 contract qq {
