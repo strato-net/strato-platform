@@ -8927,3 +8927,29 @@ contract qq {
   }
 }
 |]) `shouldThrow` anyTypeError
+
+  it "can access maps" $ runTest ( do
+    runBS [r| 
+
+contract Map {
+  mapping(uint => uint) public myMap;
+
+  constructor(uint i) {
+      myMap[i] = i;
+  }
+}
+
+contract qq {
+  address map;
+  uint x;
+  constructor() {
+      uint i = 5;
+      Map m = new Map(i);
+      map = address(m);
+      x = Map(map).myMap(i);
+  }
+}
+|]
+    getFields ["x"]
+      `shouldReturn` [BInteger 5])
+
