@@ -122,21 +122,22 @@ export const calculatePriceFluctuation = (records) => {
 }
 
 export const calculateVolumeTraded = (records) => {
-  // Omit Locked Quantity
-  const filteredRecords = records.filter(record => record.totalLockedQuantity === 0);
   
-  // Create a map to track the latest quantity for each address
+  // Create a map to track the latest combined quantity for each address
   const addressQuantityMap = new Map();
 
-  return filteredRecords.reduce((acc, record) => {
-    // Get the previous quantity for this address, if any
-    const previousQuantity = addressQuantityMap.get(record.address) || record.quantity;
+  return records.reduce((acc, record) => {
+    // Calculate the combined quantity of quantity and totalLockedQuantity
+    const currentCombinedQuantity = record.quantity + record.totalLockedQuantity;
 
-    // Update the map with the current quantity
-    addressQuantityMap.set(record.address, record.quantity);
+    // Get the previous combined quantity for this address, if any
+    const previousCombinedQuantity = addressQuantityMap.get(record.address) || currentCombinedQuantity;
+
+    // Update the map with the current combined quantity
+    addressQuantityMap.set(record.address, currentCombinedQuantity);
 
     // Calculate the quantity decrease
-    const quantityDecrease = previousQuantity - record.quantity;
+    const quantityDecrease = previousCombinedQuantity - currentCombinedQuantity;
 
     // Only add to the accumulator if there's a decrease in quantity
     if (quantityDecrease > 0) {
