@@ -94,7 +94,7 @@ const InvoiceComponent = ({ invoice }) => {
     if (invoice.order.currency === "STRATS") {
       setSubtotal(((invoice.order.totalPrice - tax) * STRATS_CONVERSION).toFixed(0));
     } else {
-      setSubtotal(invoice.order.totalPrice - tax)
+      setSubtotal((invoice.order.totalPrice - tax).toFixed(2))
     }
   }, [invoice])
   const orderQuantities = invoice.order["BlockApps-Mercata-Order-quantities"] ?
@@ -128,10 +128,10 @@ const InvoiceComponent = ({ invoice }) => {
             <View style={styles.tableRow} key={asset.address}>
               <Text style={[styles.value, styles.tableRowColumn]}>{decodeURIComponent(asset.name)}</Text>
               <Text style={[styles.value, styles.tableRowColumn]}>{invoice.order.currency ? invoice.order.currency : "USD"}</Text>
-              <Text style={[styles.value, styles.tableRowColumn]}>{invoice.order.currency === "STRATS" ? (asset.price * STRATS_CONVERSION).toFixed(0) : asset.price}</Text>
+              <Text style={[styles.value, styles.tableRowColumn]}>{invoice.order.currency === "STRATS" ? (asset.price * STRATS_CONVERSION).toFixed(0) : asset.price.toFixed(2)}</Text>
               <Text style={[styles.value, styles.tableRowColumn]}>{orderQuantities[index]}</Text>
               <Text style={[styles.value, styles.tableRowColumn]}>{asset.tax ? asset.tax : 0}</Text>
-              <Text style={[styles.value, styles.tableRowColumn]}>{invoice.order.currency === "STRATS" ? (asset.price * STRATS_CONVERSION).toFixed(0) * orderQuantities[index] : asset.price * orderQuantities[index]}</Text>
+              <Text style={[styles.value, styles.tableRowColumn]}>{invoice.order.currency === "STRATS" ? (asset.price * STRATS_CONVERSION).toFixed(0) * orderQuantities[index] : (asset.price * orderQuantities[index]).toFixed(2)}</Text>
             </View>
           ))}
         </View>
@@ -147,7 +147,7 @@ const InvoiceComponent = ({ invoice }) => {
             </View>
             <View style={styles.textSection}>
               <Text style={styles.bottomLabel}>Total</Text>
-              <Text style={styles.bottomLabel}>{invoice.order.currency === "STRATS" ? (invoice.order.totalPrice * STRATS_CONVERSION).toFixed(0) : invoice.order.totalPrice}</Text>
+              <Text style={styles.bottomLabel}>{invoice.order.currency === "STRATS" ? (invoice.order.totalPrice * STRATS_CONVERSION).toFixed(0) : (invoice.order.totalPrice).toFixed(2)}</Text>
             </View>
           </View>
         </View>
