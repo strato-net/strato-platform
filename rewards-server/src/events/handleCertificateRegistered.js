@@ -4,6 +4,12 @@ const {
   prodMarketplaceUrl,
   testnetMarketplaceUrl,
 } = require("../config");
+const { authenticateGoogleSheet, getSTRATSAmount  } = require("../helper/sheet");
+
+async function getRewardAmount() {
+  const { googleSheets, spreadsheetId } = await authenticateGoogleSheet();
+  return await getSTRATSAmount(googleSheets, spreadsheetId, "handleFirstOrder");
+}
 
 async function handleCertificateRegistered(event, token) {
   try {
@@ -58,11 +64,13 @@ async function handleCertificateRegistered(event, token) {
       return;
     }
 
+    const rewardAmount = await getRewardAmount()
+    
     // Create transaction payload
     const response = await createTransactionPayload(
       token,
       matchedObject.userAddress,
-      100
+      rewardAmount
     );
 
     if (!response.ok) {
