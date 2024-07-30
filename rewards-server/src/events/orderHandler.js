@@ -4,6 +4,12 @@ const {
   prodMarketplaceUrl,
   testnetMarketplaceUrl,
 } = require("../config");
+const { authenticateGoogleSheet, getSTRATSAmount  } = require("../helper/sheet");
+
+async function getRewardAmount() {
+  const { googleSheets, spreadsheetId } = await authenticateGoogleSheet();
+  return await getSTRATSAmount(googleSheets, spreadsheetId, "handleFirstOrder");
+}
 
 async function handleFirstOrder(event, token) {
   const purchaser = event.eventEvent.eventArgs.find(
@@ -38,9 +44,11 @@ async function handleFirstOrder(event, token) {
     console.log("User has already made a first order");
     return;
   }
+  
+  const rewardAmount = await getRewardAmount();
 
   // Create a transaction payload with 100 STRATS and send it to eventTxSender
-  const response = await createTransactionPayload(token, purchaser, 100);
+  const response = await createTransactionPayload(token, purchaser, rewardAmount);
 
   if (!response.ok) {
     const errorText = await response.text();

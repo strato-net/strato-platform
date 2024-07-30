@@ -11,4 +11,6 @@ module.exports = {
   prodStratsAddress: "b220195543f652f735b7847c4af399d0323e1ff6",
   testnetStratsAddress: "488cd3909d94606051e0684cf6caa5763fb78613",
   contractName: "ERC20Dapp",
+  googleSheetId: "1kN0VtQPIGbAG5AtW63T0XQWvW4HvLHnfyqiNa_dBQck",
+  googleCredentials: process.env.GOOGLE_APPLICATION_CREDENTIALS,
 };
