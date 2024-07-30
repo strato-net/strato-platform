@@ -8,7 +8,7 @@ const { authenticateGoogleSheet, getSTRATSAmount  } = require("../helper/sheet")
 
 async function getRewardAmount() {
   const { googleSheets, spreadsheetId } = await authenticateGoogleSheet();
-  return await getSTRATSAmount(googleSheets, spreadsheetId, "handleFirstOrder");
+  return await getSTRATSAmount(googleSheets, spreadsheetId, "handleCertificateRegistered");
 }
 
 async function handleCertificateRegistered(event, token) {
