@@ -36,7 +36,7 @@ import SolidVM.Model.Type (Type)
 import qualified SolidVM.Model.Type as SVMType
 import SolidVM.Solidity.StaticAnalysis.Types
 import Text.Read (readMaybe)
-
+import Data.List (find)
 --import qualified Text.Colors                          as C
 --import           Control.Monad.IO.Class
 --import Debug.Trace
@@ -1591,42 +1591,84 @@ statementHelper (ModifierExecutor x) = pure $ topType' x
 statementHelper (EmitStatement _ vals x) =
   reduceType' x <$> traverse (tcExpr . snd) vals
 statementHelper (RevertStatement errorName (NamedArgs vals) x) =
+  reduceType' x <$> traverse (tcExpr . snd) vals
+statementHelper (RevertStatement errorName (OrderedArgs vals) x) = do
+  
+  {-
+  data StatementF a = 
+    | EmitStatement String [(Maybe String, (ExpressionF a))] a
+    | RevertStatement (Maybe String) (ArgListF a) a
 
-  -- _errors :: Map SolidString [(SolidString, SolidVM.IndexedType, a)],
-  --   _events :: Map SolidString (SolidVM.EventF a),
-  cc <- asks codeCollection
-  let solidVMVersion = maybe "" snd $ find ((== "solidvm") . fst) $ _pragmas cc
-  case solidVMVersion of
-    "11.4" -> do
-      c  <- asks contract
-      case M.lookup errorName (_errors c) of 
-        Just error -> do
-          let vals' = fmap (\(_, b) -> 
-                              let r = R cc c Nothing "Nothing" []
-                              in runReader (evalStateT (tcExpr b) ((Nothing, M.empty) :| [])) r
-                           ) vals
-              -- valsDebug = trace ("Evaluated types: " ++ show vals') vals'
-          let vals'' = map (\y -> case y of
-                                    Static s _ -> s
-                                    _          -> error "Internal Error: Type is not static"
-                           ) vals'
-              -- valsStaticDebug = trace ("Static types: " ++ show vals'') vals''
-          let expectedTypes = [indexedTypeType it | (_, it) <- _eventLogs event]
-              -- expectedTypesDebug = trace ("Expected types: " ++ show expectedTypes) expectedTypes
-          if length expectedTypes /= length vals''
-            then pure . bottom $ "Wrong number of arguments provided" <$ x
-            else if not (and $ zipWith isSameType expectedTypes vals'')
-              then pure . bottom $ "Type mismatch in error arguments" <$ x
-              else reduceType' x <$> traverse (tcExpr . snd) vals 
-        Nothing -> pure . bottom $ "Error does not exist" <$ x
-    _    ->
-      reduceType' x <$> traverse (tcExpr . snd) vals
-statementHelper (RevertStatement _ (OrderedArgs vals) x) =
-  reduceType' x <$> traverse tcExpr vals
+  data ArgListF a = OrderedArgs [ExpressionF a] | NamedArgs [(SolidString, (ExpressionF a))]
+
+
+  data ContractF a = Contract
+    _events :: Map SolidString (SolidVM.EventF a)
+    _errors :: Map SolidString [(SolidString, SolidVM.IndexedType, a)],
+
+  data IndexedType = IndexedType {indexedTypeIndex :: Int32, indexedTypeType :: Type}
+
+
+  usage ex:
+
+    error errorName(string x,string y);
+    revert()
+    revert("some string")
+  -}
+
+    cc <- asks codeCollection
+    let solidVMVersion = maybe "" snd $ find ((== "solidvm") . fst) $ _pragmas cc
+    case solidVMVersion of
+      "11.4" -> do
+        case errorName of 
+          Just errorName -> do
+            c  <- asks contract
+            case M.lookup errorName (_errors c) of 
+              Just err -> do
+                let vals' = fmap (\b -> 
+                                    let r = R cc c Nothing "Nothing" []
+                                    in runReader (evalStateT (tcExpr b) ((Nothing, M.empty) :| [])) r
+                                 ) vals
+                    -- valsDebug = trace ("Evaluated types: " ++ show vals') vals'
+                let vals'' = map (\y -> case y of
+                                          Static s _ -> s
+                                          _          -> error "Internal Error: Type is not static"
+                                 ) vals'
+                    -- valsStaticDebug = trace ("Static types: " ++ show vals'') vals''
+                let expectedTypes = [indexedTypeType it | (_, it, _) <- err]
+                    -- expectedTypesDebug = trace ("Expected types: " ++ show expectedTypes) expectedTypes
+                if length expectedTypes /= length vals''
+                  then pure . bottom $ "Wrong number of arguments provided" <$ x
+                  else if not (and $ zipWith isSameType expectedTypes vals'')
+                    then pure . bottom $ "Type mismatch in error arguments" <$ x
+                    else reduceType' x <$> traverse $ tcExpr vals
+              Nothing -> pure . bottom $ "Error does not exist" <$ x
+          Nothing -> reduceType' x <$> traverse $ tcExpr vals
+      _    ->
+        reduceType' x <$> traverse $ tcExpr vals
 statementHelper (UncheckedStatement body x) =
   statementsHelper' x body
 statementHelper (AssemblyStatement _ x) = pure $ topType' x
 statementHelper (SimpleStatement stmt x) = simpleStatementHelper x stmt
+
+isSameType :: Type -> Type -> Bool
+isSameType (SVMType.Int _ _) (SVMType.Int _ _) = True
+isSameType (SVMType.String _) (SVMType.String _) = True
+isSameType (SVMType.Bytes _ _) (SVMType.Bytes _ _) = True
+isSameType SVMType.Decimal SVMType.Decimal = True
+isSameType SVMType.Bool SVMType.Bool = True
+isSameType (SVMType.Address _) (SVMType.Address _) = True
+isSameType (SVMType.Account _) (SVMType.Account _) = True
+isSameType (SVMType.UnknownLabel s1 _) (SVMType.UnknownLabel s2 _) = s1 == s2
+isSameType (SVMType.Struct _ t1) (SVMType.Struct _ t2) = t1 == t2
+isSameType (SVMType.UserDefined a1 _) (SVMType.UserDefined a2 _) = a1 == a2
+isSameType (SVMType.Enum _ t1 _) (SVMType.Enum _ t2 _) = t1 == t2
+isSameType (SVMType.Error _ t1) (SVMType.Error _ t2) = t1 == t2
+isSameType (SVMType.Array e1 _) (SVMType.Array e2 _) = isSameType e1 e2
+isSameType (SVMType.Contract t1) (SVMType.Contract t2) = t1 == t2
+isSameType (SVMType.Mapping _ k1 v1) (SVMType.Mapping _ k2 v2) = isSameType k1 k2 && isSameType v1 v2
+isSameType SVMType.Variadic SVMType.Variadic = True
+isSameType _ _ = False
 
 simpleStatementHelper :: SourceAnnotation Text -> Annotated SimpleStatementF -> SSS Type'
 simpleStatementHelper x (VariableDefinition vdefs mExpr) = do
