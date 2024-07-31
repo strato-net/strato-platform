@@ -76,7 +76,7 @@ async function handleCertificateRegistered(event, token) {
     const response = await createTransactionPayload(
       token,
       matchedObject.userAddress,
-      rewardAmount
+      rewardAmount * 100
     );
 
     if (!response.ok) {
