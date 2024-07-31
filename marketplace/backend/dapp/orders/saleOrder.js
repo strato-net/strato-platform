@@ -200,7 +200,7 @@ async function get(user, args, options) {
   return marshalOut(order['0'] ? { ...order['0'] } : { ...order });
 }
 
-async function getOrderEventClosedOrPending(user, args, options) {
+async function getOrderEventForSTRATS(user, args, options) {
   const { orderHash, ...restArgs } = args;
   const newOptions = { ...options, org: 'BlockApps', app: 'Mercata' }
   let order;
@@ -208,7 +208,7 @@ async function getOrderEventClosedOrPending(user, args, options) {
   let searchArgs = {
     limit: 1,
     queryOptions: {
-      status: 'in.(2,3)',
+      currency: "eq.STRATS",
       orderHash: `eq.${orderHash}`,
     }
   }
@@ -446,5 +446,5 @@ export default {
   marshalIn,
   marshalOut,
   getHistory,
-  getOrderEventClosedOrPending,
+  getOrderEventForSTRATS,
 };

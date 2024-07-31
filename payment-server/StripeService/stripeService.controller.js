@@ -207,13 +207,16 @@ class StripeServiceController {
 
         // EMAIL CONFIRMATION
         // Prepare HTML content and sendEmail
-        const assetName = await getAssetName(checkoutEvent[0].saleAddresses[0])
-        const orderString = prepareOrderData(checkoutEvent, assetName);
-        const htmlContents = buildConcatenatedOrderString(checkoutEvent[0].purchasersCommonName, orderString)
-
-        await sendEmail(email, "Your Order Confirmation", htmlContents);
-        
-        console.log("*Buyer placed order*");
+        try {
+          const assetName = await getAssetName(checkoutEvent[0].saleAddresses[0]);
+          const orderString = prepareOrderData(checkoutEvent, assetName);
+          const htmlContents = buildConcatenatedOrderString(checkoutEvent[0].purchasersCommonName, orderString);
+      
+          await sendEmail(email, "Your Order Confirmation", htmlContents);
+          console.log("*Buyer placed order*");
+        } catch (emailError) {
+          console.error("Error sending email confirmation for credit card:", emailError);
+        }
 
         
 
@@ -240,12 +243,16 @@ class StripeServiceController {
         
         // EMAIL CONFIRMATION
         // Prepare HTML content and sendEmail
-        const assetName = await getAssetName(checkoutEvent[0].saleAddresses[0])
-        const orderString = prepareOrderData(checkoutEvent, assetName);
-        const htmlContents = buildConcatenatedOrderString(checkoutEvent[0].purchasersCommonName, orderString)
-
-        await sendEmail(email, "Your Order Confirmation", htmlContents);
-        console.log("*Buyer placed order*",);
+        try {
+          const assetName = await getAssetName(checkoutEvent[0].saleAddresses[0]);
+          const orderString = prepareOrderData(checkoutEvent, assetName);
+          const htmlContents = buildConcatenatedOrderString(checkoutEvent[0].purchasersCommonName, orderString);
+      
+          await sendEmail(email, "Your Order Confirmation", htmlContents);
+          console.log("*Buyer placed order*");
+        } catch (emailError) {
+          console.error("Error sending email confirmation for ACH:", emailError);
+        }
 
 
       } else {
