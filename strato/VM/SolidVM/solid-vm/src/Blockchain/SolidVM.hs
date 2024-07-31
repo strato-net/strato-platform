@@ -636,13 +636,6 @@ call' from to' fnCalltype mContract functionName isRCC argExps = do
                            Nothing -> []
                            Just x  -> x
                        _ -> pure []
-
-
---end, list of map indexes 
---oa :: expression
---exptovar getvar
---define new func and iterate on all of the oas
--- list of values, storage 
             let isForbidden = not _varIsPublic -- TODO: Stop being lazy and give VariableDecls the full visibility treatment!
             when ((from /= to) && isForbidden) $
               unknownFunction "logFunctionCall" (functionName, contract ^. CC.contractName)

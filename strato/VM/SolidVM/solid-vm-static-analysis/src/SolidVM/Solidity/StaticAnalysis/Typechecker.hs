@@ -64,7 +64,6 @@ data TypeF' a
       { staticType :: Type,
         staticContext :: a
       }
---defn of type needed ?
   | Product
       { productTypes :: [TypeF' a],
         productContext :: a
@@ -229,12 +228,6 @@ lookupContractFunction x cName fName = do
             if _varIsPublic
               then do 
                 nestedType' x _varType
-
-                --case _varType of
-                    --SVMType.Array t _ -> Function (Product [intType' x, variadicType' x] x) (Static t x) x [] [] True
-                    --
-                    --SVMType.Mapping _ k v -> Function (Product [Static k x] x) (Static v x) x [] [] False
-                      --_ -> Function (Product [] x) (Static _varType x) x [] [] False
               else
                 bottom $
                   ( T.concat
@@ -254,36 +247,13 @@ lookupContractFunction x cName fName = do
     nestedType' y (SVMType.Array t _) = let f = nestedType' y t
                                           in case f of
                                               Function (Product args _) ret _ _ _ _ -> Function (Product ((intType' y):args) y) ret y [] [] True
-                                              _ -> error "errror"
-                                              --should be bottom
+                                              _ -> bottom $ "A maximum one layer nesting of arrays is supported" <$ y
     nestedType' y (SVMType.Mapping _ k v) = let f = nestedType' y v
                                               in case f of
                                                   Function (Product args _) ret _ _ _ _ -> Function (Product ((Static k y):args) y) ret y [] [] False
-                                                  _ -> error "errror"
-                                                  
-      
-      {-}
-      nestedType'' y k v
-      where
-        nestedType'' y (SVM.Type.Mapping _ k v) (SVMType.Mapping _ k v) = 
-        nestedType'' y (SVMType.Array t _)      (SVMType.Mapping _ k v) =
-        nestedType'' y (SVM.Type.Mapping _ k v) (SVMType.Array t _)     =
-        nestedType'' y (SVMType.Array t _)      (SVMType.Array t' _)    =
-        nestedType'' y t'                       t''                     =
-
-          -}
-          
-
+                                                  _ -> bottom $ "A maximum one layer nesting of mappings is supported" <$ y
     nestedType' y t = Function (Product [] y) (Static t y) y [] [] False
 
-
-  {-  
-    nestedType' :: SourceAnnotation Text -> SVMType.Type ->  Type' 
-    nestedType' a (SVMType.Array t _) = nestedType' a t
-    nestedType' a (SVMType.UserDefined _ t) = nestedType' a t
-    nestedType' a (SVMType.Mapping _ k v) = (nestedType' a k) `sumType'` (nestedType' a v)
-    nestedType' a b = Function (Product [] a) (Static b a) a [] [] False
--}
 {-
 lookupContractFunction :: SourceAnnotation Text -> SolidString -> SolidString -> SSS Type'
 lookupContractFunction x cName fName = do
@@ -490,7 +460,7 @@ context' Product {..} = productContext
 context' Function {..} = functionContext
 context' (Sum (a :| _)) = context' a
 context' MultiVariate {..} = multiVariateContext
---need to add case that absorbs mapping 
+
 typecheck' :: Monad m => (SourceAnnotation Text -> SolidString -> Type -> m Type') -> Type' -> Type' -> m Type'
 typecheck' unify r1 r2 = case (r1, r2) of
   (Bottom e1, Bottom e2) -> pure $ Bottom (e1 <> e2)
@@ -523,8 +493,6 @@ typecheck' unify r1 r2 = case (r1, r2) of
       (Bottom es, _) -> Bottom es
       (_, Bottom ess) -> Bottom ess
       _ -> Function a v x [] [] False
---add pattern on mapping 
-
   (a, b) ->
     pure . bottom $
       ( T.concat
