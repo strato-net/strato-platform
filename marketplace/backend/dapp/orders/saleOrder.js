@@ -200,23 +200,6 @@ async function get(user, args, options) {
   return marshalOut(order['0'] ? { ...order['0'] } : { ...order });
 }
 
-async function getOrderEventForSTRATS(user, args, options) {
-  const { orderHash, ...restArgs } = args;
-  const newOptions = { ...options, org: 'BlockApps', app: 'Mercata' }
-  let order;
-
-  let searchArgs = {
-    limit: 1,
-    queryOptions: {
-      currency: "eq.STRATS",
-      orderHash: `eq.${orderHash}`,
-    }
-  }
-  order = await searchAllWithQueryArgs(paymentTableName, searchArgs, newOptions, user);
-
-  if (order.length === 0) { console.log("Order event not found") }
-  return order;
-}
 
 
 async function getAll(admin, args = {}, options) {
@@ -446,5 +429,4 @@ export default {
   marshalIn,
   marshalOut,
   getHistory,
-  getOrderEventForSTRATS,
 };

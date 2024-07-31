@@ -1010,6 +1010,7 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
     try {
 
       const { paymentProvider, orderList, orderTotal: recievedOrderTotal } = args;
+      console.log("HEY ppp",paymentProvider)
 
       const assetAddresses = orderList.map(o => o.assetAddress);
       const quantities = orderList.map(o => o.quantity);
@@ -1044,9 +1045,8 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
         comments: DEFAULT_COMMENT,
       }
       const checkoutHashAndAssets = await paymentProviderJs.createPayment(rawAdmin, paymentParameters, options);
-      const [checkoutHash, assetList] = checkoutHashAndAssets;
-      const orderEvent = await saleOrderJs.getOrderEventForSTRATS(rawAdmin, {orderHash: checkoutHash}, options);
-      return {checkoutHashAndAssets, orderEvent};
+      
+      return checkoutHashAndAssets;
 
     } catch (error) {
       console.log(error);
@@ -1056,6 +1056,29 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
       throw new rest.RestError(RestStatus.BAD_REQUEST, "Error while updating the order");
     }
   };
+
+  contract.getStratsOrderEvent = async function (args, options = defaultOptions) {
+
+    const currentPaymentProvider = await paymentProviderJs.getAll(rawAdmin, {address: args.paymentProvider}, options);
+
+    if(currentPaymentProvider[0].contract_name === 'BlockApps-StratsPaymentService')
+    {
+    const orderEvent = await rest.searchUntil(
+      rawAdmin,
+      { name: "BlockApps-Mercata-PaymentService.Order" },
+      (r) => r.length === 1,
+      {
+        ...options,
+        query:{
+        limit:1,
+        orderHash: `eq.${args.orderHash}`,
+        currency: 'status.desc',
+        }
+    }
+    );
+    return orderEvent;
+  }
+  }
 
   contract.createUserAddress = async function (args, options = defaultOptions) {
     const { redemptionService, ...restArgs } = args;
