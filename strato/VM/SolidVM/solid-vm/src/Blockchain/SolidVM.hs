@@ -102,6 +102,10 @@ import qualified Data.Vector as V
 import Debugger
 import GHC.Exts hiding (breakpoint)
 import qualified LabeledError
+--import Blockchain.DB.RawStorageDB
+--import Blockchain.Data.BlockSummary
+--import Blockchain.DB.MemAddressStateDB
+import Data.Default
 
 import Network.Haskoin.Crypto.BigWord ()
 import qualified Numeric (readHex)
@@ -620,11 +624,17 @@ call' from to' fnCalltype mContract functionName isRCC argExps = do
       _ -> do
         case M.lookup functionName $ contract ^. CC.storageDefs of
           Just CC.VariableDecl {..} -> do
-            let args' = case (_varType, argExps) of
-                          ((SVMType.Array _ _), CC.OrderedArgs oa) -> case all (\case (CC.NumberLiteral _ _ Nothing) -> True; _ -> False) oa of
-                                                                        True -> map (\case (CC.NumberLiteral _ n Nothing) -> MS.ArrayIndex $ fromIntegral n; _ -> internalError "should never happen" oa) oa
-                                                                        False -> []
-                          _ -> []
+            args' <- case (_varType, argExps) of
+                       ((SVMType.Array _ _), CC.OrderedArgs oa) -> pure $ case all (\case (CC.NumberLiteral _ _ Nothing) -> True; _ -> False) oa of
+                                                                            True -> map (\case (CC.NumberLiteral _ n Nothing) -> MS.ArrayIndex $ fromIntegral n; _ -> internalError "should never happen" oa) oa
+                                                                            False -> []
+                       ((SVMType.Mapping _ _ _), CC.OrderedArgs oa) -> do
+                         oa' <- for oa $ \currentoa ->
+                                  nestedCall' currentoa
+                         return $ case convertListOfMaybeValuesToStoragePathPieces oa' of
+                           Nothing -> []
+                           Just x  -> x
+                       _ -> pure []
             let isForbidden = not _varIsPublic -- TODO: Stop being lazy and give VariableDecls the full visibility treatment!
             when ((from /= to) && isForbidden) $
               unknownFunction "logFunctionCall" (functionName, contract ^. CC.contractName)
@@ -670,6 +680,22 @@ call' from to' fnCalltype mContract functionName isRCC argExps = do
   where
     flattenVals (x : xs) = [x] ++ flattenVals xs
     flattenVals x = x
+    nestedCall' :: MonadSM m
+                => CC.ExpressionF a
+                -> m Value
+    nestedCall' x = do let x' = def <$ x
+                       x'' <- expToVar' x' Nothing
+                       getVar x''
+    convertValueToStoragePathPiece :: Value -> Maybe MS.StoragePathPiece
+    convertValueToStoragePathPiece v = 
+      case v of
+        SInteger i -> Just $ MS.MapIndex $ MS.INum i
+        SString s -> Just $ MS.MapIndex $ MS.IText $ UTF8.fromString s
+        SAccount a _ -> Just $ MS.MapIndex $ MS.IAccount a
+        SBool b -> Just $ MS.MapIndex $ MS.IBool b
+        _ -> Nothing
+    convertListOfMaybeValuesToStoragePathPieces :: [Value] -> Maybe [MS.StoragePathPiece]
+    convertListOfMaybeValuesToStoragePathPieces mVals = traverse (convertValueToStoragePathPiece) mVals
 
 callWithResult :: MonadSM m => Account -> Account -> CC.FunctionCallType -> Maybe SolidString -> SolidString -> Bool -> CC.ArgList -> m (Maybe Value)
 callWithResult from to fnCalltype mContract functionName isRCC argExps = snd <$> call' from to fnCalltype mContract functionName isRCC argExps
@@ -1365,8 +1391,8 @@ getIndexType (AccountPath addr (MS.StoragePath path)) = case path of
           SVMType.Mapping {SVMType.value = t'} -> loop ps t'
           SVMType.Array {SVMType.entry = t'} -> loop ps t'
           -- TODO lookup struct typos, this seems to be the case when there is a global struct reference
-          SVMType.UnknownLabel def _ -> do
-            t' <- getTypeOfName def
+          SVMType.UnknownLabel def' _ -> do
+            t' <- getTypeOfName def'
             case t' of
               StructTypo fs -> case p of
                 MS.Field f -> case UTF8.toString f `M.lookup` M.fromList fs of
@@ -1449,7 +1475,6 @@ decrementGas !gas = do
       tooMuchGas (show (_gasInitialAllotment gasInfo')) gasInfo'
     else do
       return ()
-
 expToVar' :: MonadSM m => CC.Expression -> Maybe SVMType.Type -> m Variable
 expToVar' (CC.NumberLiteral _ v Nothing) _ = return . Constant $ SInteger v
 expToVar' (CC.NumberLiteral _ v (Just nu)) _ =
@@ -1648,7 +1673,6 @@ expToVar' x@(CC.MemberAccess _ expr name) _ = do
     (SReference p, itemName) -> return . Constant . SReference $ apSnoc p $ MS.Field $ BC.pack $ labelToString itemName
     ((SUserDefined alias notSure actualType), "wrap") -> return . Constant $ (SUserDefined alias notSure actualType) -- return $ Constant . SUserDefined alias val actualType
     m -> typeError ("illegal member access: " ++ (unparseExpression x)) ("parsed as " ++ show m ++ "with full exp" ++ show x)
-
 expToVar' x@(CC.IndexAccess _ _ (Nothing)) _ = missingField "index value cannot be empty" (unparseExpression x)
 -- TODO(tim): When this is a string constant, we can index into the string directly for SInteger
 expToVar' x@(CC.IndexAccess _ parent (Just mIndex)) _ = do

@@ -237,9 +237,8 @@ lookupContractFunction x cName fName = do
                 <$ x
           Just VariableDecl {..} ->
             if _varIsPublic
-              then case _varType of
-                    SVMType.Array _ _ -> Function (Product [intType' x, variadicType' x] x) (Static _varType x) x [] [] True
-                    _ -> Function (Product [] x) (Static _varType x) x [] [] False
+              then do 
+                nestedType' x _varType
               else
                 bottom $
                   ( T.concat
@@ -253,7 +252,68 @@ lookupContractFunction x cName fName = do
                     <$ x
         Just ConstantDecl {..} -> Static _constType x
       Just f -> filterFuncs cc x fName f [Internal, Private]
+      
+  where 
+    nestedType' :: SourceAnnotation Text -> SVMType.Type -> Type'
+    nestedType' y (SVMType.Array t _) = let f = nestedType' y t
+                                          in case f of
+                                              Function (Product args _) ret _ _ _ _ -> Function (Product ((intType' y):args) y) ret y [] [] True
+                                              _ -> bottom $ "A maximum one layer nesting of arrays is supported" <$ y
+    nestedType' y (SVMType.Mapping _ k v) = let f = nestedType' y v
+                                              in case f of
+                                                  Function (Product args _) ret _ _ _ _ -> Function (Product ((Static k y):args) y) ret y [] [] False
+                                                  _ -> bottom $ "A maximum one layer nesting of mappings is supported" <$ y
+    nestedType' y t = Function (Product [] y) (Static t y) y [] [] False
 
+{-
+lookupContractFunction :: SourceAnnotation Text -> SolidString -> SolidString -> SSS Type'
+lookupContractFunction x cName fName = do
+  cc@CodeCollection {..} <- asks codeCollection
+  pure $ case M.lookup cName _contracts of
+    Nothing -> bottom $ ("Unknown contract: " <> labelToText cName) <$ x
+    Just c -> case M.lookup fName (_functions c) of
+      Nothing -> case M.lookup fName (_constants c) of
+        Nothing -> case M.lookup fName (_storageDefs c) of
+          Nothing ->
+            bottom $
+              ( T.concat
+                  [ "Unknown contract function: ",
+                    labelToText cName,
+                    ".",
+                    labelToText fName
+                  ]
+              )
+                <$ x
+          Just Con.VariableDecl {..} ->            if _varIsPublic
+              then case _varType of
+                    SVMType.Array t _ -> Function (Product (getNestedArrayTypes x t) x) (Static t x) x [] [] True
+                    --
+                    --SVMType.Mapping _ k v -> Function (Product [Static k x] x) (Static v x) x [] [] False
+                    _ -> Function (Product [] x) (Static _varType x) x [] [] False
+              else
+                bottom $
+                  ( T.concat
+                      [ "Contract variable ",
+                        labelToText cName,
+                        ".",
+                        labelToText fName,
+                        " is not public."
+                      ]
+                  )
+                    <$ x
+        Just Con.ConstantDecl {..} -> Static _constType x
+      Just f -> filterFuncs cc x fName f [Internal, Private]
+
+-- Helper function to get types for nested arrays
+getNestedArrayTypes :: SourceAnnotation Text -> Type -> [Type']
+getNestedArrayTypes x (SVMType.Array t _) = intType' x : getNestedArrayTypes x t
+getNestedArrayTypes _ _ = []
+
+-- Helper function to get static type for arrays
+getStaticArrayType :: SourceAnnotation Text -> Type -> Type'
+getStaticArrayType x (SVMType.Array t _) = Static t x
+getStaticArrayType x t = Static t x
+-}
 productType' :: SourceAnnotation Text -> [Type'] -> Type'
 productType' _ [Bottom es] = Bottom es
 productType' _ [t] = t
@@ -365,8 +425,8 @@ contractType' = Static (SVMType.Contract "")
 certType' :: SourceAnnotation Text -> Type'
 certType' x = Static (SVMType.Mapping Nothing (SVMType.String Nothing) (SVMType.String Nothing)) x
 
-variadicType' :: SourceAnnotation Text -> Type'
-variadicType' = Static (SVMType.Variadic)
+--variadicType' :: SourceAnnotation Text -> Type'
+--variadicType' = Static (SVMType.Variadic)
 
 topType' :: SourceAnnotation Text -> Type'
 topType' = Top S.empty
