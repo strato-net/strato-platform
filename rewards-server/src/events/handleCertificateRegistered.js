@@ -66,6 +66,12 @@ async function handleCertificateRegistered(event, token) {
 
     const rewardAmount = await getRewardAmount()
     
+      
+  if (!rewardAmount || rewardAmount <= 0) {
+    console.error("Failed to get reward amount from Google Sheet");
+    return;
+  }
+    
     // Create transaction payload
     const response = await createTransactionPayload(
       token,

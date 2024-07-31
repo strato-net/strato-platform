@@ -46,7 +46,11 @@ async function handleFirstOrder(event, token) {
   }
   
   const rewardAmount = await getRewardAmount();
-
+  
+  if (!rewardAmount || rewardAmount <= 0) {
+    console.error("Failed to get reward amount from Google Sheet");
+    return;
+  }
   // Create a transaction payload with 100 STRATS and send it to eventTxSender
   const response = await createTransactionPayload(token, purchaser, rewardAmount);
 
