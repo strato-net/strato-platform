@@ -19,6 +19,7 @@ import Control.Monad.Trans.State
 import Data.Bool (bool)
 import Data.Foldable (traverse_)
 -- import           Data.Functor.Identity (runIdentity)
+import Data.List (find)
 import Data.List.NonEmpty (NonEmpty (..))
 import qualified Data.List.NonEmpty as NE
 import qualified Data.Map.Strict as M
@@ -36,10 +37,9 @@ import SolidVM.Model.Type (Type)
 import qualified SolidVM.Model.Type as SVMType
 import SolidVM.Solidity.StaticAnalysis.Types
 import Text.Read (readMaybe)
-
 --import qualified Text.Colors                          as C
 --import           Control.Monad.IO.Class
---import Debug.Trace
+-- import Debug.Trace
 
 emptyAnnotation :: SourceAnnotation Text
 emptyAnnotation = (SourceAnnotation (initialPosition "") (initialPosition "") "")
@@ -1591,8 +1591,34 @@ statementHelper (Throw e x) = do
   et <- tcExpr e
   pure $ reduceType' x [et]
 statementHelper (ModifierExecutor x) = pure $ topType' x
-statementHelper (EmitStatement _ vals x) =
-  reduceType' x <$> traverse (tcExpr . snd) vals
+statementHelper (EmitStatement eventName vals x) = do
+  cc <- asks codeCollection
+  let solidVMVersion = maybe "" snd $ find ((== "solidvm") . fst) $ _pragmas cc
+  case solidVMVersion of
+    "11.4" -> do
+      c  <- asks contract
+      case M.lookup eventName (_events c) of 
+        Just event -> do
+          let vals' = fmap (\(_, b) -> 
+                              let r = R cc c Nothing "Nothing" []
+                              in runReader (evalStateT (tcExpr b) ((Nothing, M.empty) :| [])) r
+                           ) vals
+              -- valsDebug = trace ("Evaluated types: " ++ show vals') vals'
+          let vals'' = map (\y -> case y of
+                                    Static s _ -> s
+                                    _          -> error "Internal Error: Type is not static"
+                           ) vals'
+              -- valsStaticDebug = trace ("Static types: " ++ show vals'') vals''
+          let expectedTypes = [indexedTypeType it | (_, it) <- _eventLogs event]
+              -- expectedTypesDebug = trace ("Expected types: " ++ show expectedTypes) expectedTypes
+          if length expectedTypes /= length vals''
+            then pure . bottom $ "Wrong number of arguments provided" <$ x
+            else if not (and $ zipWith isSameType expectedTypes vals'')
+              then pure . bottom $ "Type mismatch in event arguments" <$ x
+              else reduceType' x <$> traverse (tcExpr . snd) vals 
+        Nothing -> pure . bottom $ "Event does not exist" <$ x
+    _    ->
+      reduceType' x <$> traverse (tcExpr . snd) vals
 statementHelper (RevertStatement _ (NamedArgs vals) x) =
   reduceType' x <$> traverse (tcExpr . snd) vals
 statementHelper (RevertStatement _ (OrderedArgs vals) x) =
@@ -1601,6 +1627,25 @@ statementHelper (UncheckedStatement body x) =
   statementsHelper' x body
 statementHelper (AssemblyStatement _ x) = pure $ topType' x
 statementHelper (SimpleStatement stmt x) = simpleStatementHelper x stmt
+
+isSameType :: Type -> Type -> Bool
+isSameType (SVMType.Int _ _) (SVMType.Int _ _) = True
+isSameType (SVMType.String _) (SVMType.String _) = True
+isSameType (SVMType.Bytes _ _) (SVMType.Bytes _ _) = True
+isSameType SVMType.Decimal SVMType.Decimal = True
+isSameType SVMType.Bool SVMType.Bool = True
+isSameType (SVMType.Address _) (SVMType.Address _) = True
+isSameType (SVMType.Account _) (SVMType.Account _) = True
+isSameType (SVMType.UnknownLabel s1 _) (SVMType.UnknownLabel s2 _) = s1 == s2
+isSameType (SVMType.Struct _ t1) (SVMType.Struct _ t2) = t1 == t2
+isSameType (SVMType.UserDefined a1 _) (SVMType.UserDefined a2 _) = a1 == a2
+isSameType (SVMType.Enum _ t1 _) (SVMType.Enum _ t2 _) = t1 == t2
+isSameType (SVMType.Error _ t1) (SVMType.Error _ t2) = t1 == t2
+isSameType (SVMType.Array e1 _) (SVMType.Array e2 _) = isSameType e1 e2
+isSameType (SVMType.Contract t1) (SVMType.Contract t2) = t1 == t2
+isSameType (SVMType.Mapping _ k1 v1) (SVMType.Mapping _ k2 v2) = isSameType k1 k2 && isSameType v1 v2
+isSameType SVMType.Variadic SVMType.Variadic = True
+isSameType _ _ = False
 
 simpleStatementHelper :: SourceAnnotation Text -> Annotated SimpleStatementF -> SSS Type'
 simpleStatementHelper x (VariableDefinition vdefs mExpr) = do
