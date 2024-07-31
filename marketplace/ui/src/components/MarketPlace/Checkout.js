@@ -356,12 +356,12 @@ const Checkout = () => {
     },
   ];
 
-  const filterPaymentServices = (es) => {
-    const ps = es.map(p => paymentServices.find(s => s.address === p.value));
-    if (ps.length === 0 || ps[0] === undefined) {
-      return paymentServices.filter((p) => p && p.serviceName === 'Stripe');
+  const filterPaymentServices = (e) => {
+    const filteredPaymentServices = e.map(assetPaymentServices => paymentServices.find(paymentService => paymentService.address === assetPaymentServices.value));
+    if (filteredPaymentServices.length === 0 || filteredPaymentServices[0] === undefined) {
+      return paymentServices.filter((paymentService) => paymentService && paymentService.serviceName === 'Stripe' && paymentService.isActive);
     } else {
-      return ps;
+      return filteredPaymentServices;
     }
   }
 
