@@ -684,7 +684,7 @@ call' from to' fnCalltype mContract functionName isRCC argExps = do
                 => CC.ExpressionF a
                 -> m Value
     nestedCall' x = do let x' = def <$ x
-                       x'' <- expToVar' x'
+                       x'' <- expToVar' x' Nothing
                        getVar x''
     convertValueToStoragePathPiece :: Value -> Maybe MS.StoragePathPiece
     convertValueToStoragePathPiece v = 
