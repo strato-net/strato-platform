@@ -79,7 +79,7 @@ createInsertsCollection :: OutputM m
 createInsertsCollection globalsIORef collections = do
   unless (null collections) $ do
     let collection = head collections
-    _ <- createCollectionTable globalsIORef (creator collection, application collection, contractname collection) (collectionname collection)
+    _ <- createMappingTable globalsIORef (creator collection, application collection, contractname collection) (collectionname collection)
     insertCollectionTable collections
 
 createInsertsAbstract :: OutputM m
