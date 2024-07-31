@@ -1010,7 +1010,6 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
     try {
 
       const { paymentProvider, orderList, orderTotal: recievedOrderTotal } = args;
-      console.log("HEY ppp",paymentProvider)
 
       const assetAddresses = orderList.map(o => o.assetAddress);
       const quantities = orderList.map(o => o.quantity);
