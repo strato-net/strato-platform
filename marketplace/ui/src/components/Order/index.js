@@ -20,6 +20,7 @@ import { useCategoryState, useCategoryDispatch } from "../../contexts/category";
 import startCase from 'lodash/startCase';
 import { epochToDate } from "../../helpers/utils";
 import { ORDER_STATUS } from "../../helpers/constants";
+import TransactionTable from "./TransactionTable";
 const INVERTED_ORDER_STATUS = Object.fromEntries(Object.entries(ORDER_STATUS).map(([key, value]) => [value, key]));
 
 const Order = ({ user }) => {
@@ -298,12 +299,13 @@ const Order = ({ user }) => {
           </Breadcrumb.Item>
           <Breadcrumb.Item href="" onClick={e => e.preventDefault()}>
             <p className=" text-sm text-[#202020] font-medium">
-              {'Orders (' + type + ')'}
+              Transaction
             </p>
           </Breadcrumb.Item>
         </Breadcrumb>
       </div>
-      <Tabs
+      <TransactionTable user={user} selectedDate={dayjs(selectedDate).startOf('day').unix()} onDateChange={onDateChange} download={download} isAllOrdersLoading={isAllOrdersLoading} />
+      {/* <Tabs
         className="mx-4 md:mx-20 lg:mt-[10px]"
         key={type}
         defaultActiveKey={type}
@@ -368,7 +370,7 @@ const Order = ({ user }) => {
             children: <RedemptionsIncomingTable user={user} selectedDate={dayjs(selectedDate).startOf('day').unix()} download={download} isAllOrdersLoading={isAllOrdersLoading} />
           }
         ]}
-      />
+      /> */}
     </div>
   );
 };
