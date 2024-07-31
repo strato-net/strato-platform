@@ -67,7 +67,7 @@ class OrderController {
       OrderController.validatePaymentArgs(restArgs)
 
       const result = await dapp.paymentCheckout(originUrl, restArgs, options, accessToken)
-      const {orderHashAndAssets, orderEvent} = result;
+      const {checkoutHashAndAssets, orderEvent} = result;
       // check orderEvent.status = 2 || 3 and sendEmail
       // Only send email if order is created successfully(STRATS Orders)
        if(orderEvent.length === 1 && (orderEvent[0].status === "2" || orderEvent[0].status === "3"))
@@ -76,7 +76,7 @@ class OrderController {
             console.log("*Buyer placed order*",orderEvent);
       }
 
-      rest.response.status200(res, orderHashAndAssets)
+      rest.response.status200(res, checkoutHashAndAssets)
     } catch (e) {
       return next(e)
     }
@@ -232,28 +232,6 @@ class OrderController {
     }
   }
 
-  static validateCancelSaleOrderArgs(args) {
-    const cancelSaleOrderSchema = Joi.object({
-      paymentProvider: Joi.object({
-        address: Joi.string().required(),
-      }).required(),
-      orderHash: Joi.string().required(),
-      orderId: Joi.string().required(),
-      purchaser: Joi.string().required(),
-      saleAddresses: Joi.array().min(1).items(Joi.string().required()).required(),
-      quantities: Joi.array().min(1).items(Joi.number().required()).required(),
-      currency: Joi.string().allow('').required(),
-      createdDate: Joi.number().required(),
-    }).required();
-
-    const validation = cancelSaleOrderSchema.validate(args);
-
-    if (validation.error) {
-      throw new rest.RestError(RestStatus.BAD_REQUEST, 'Cancel Sale Order Argument Validation Error', {
-        message: `Missing args or bad format: ${validation.error.message}`,
-      })
-    }
-  }
 
   static validateUpdateOrderCommentArgs(args) {
     const updateOrderCommentSchema = Joi.object({

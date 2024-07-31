@@ -2,7 +2,7 @@ import client from '../db/index.js';
 import { rest, util } from "blockapps-rest";
 import { 
   DEFAULT_OPTIONS, 
-  ASSET_LOCKED_EVENT_TABLE,
+  CHECKOUT_EVENT_TABLE,
   SELLER_ONBOARDED_TABLE, 
   TABLE_PREFIX, 
   STRIPE_CONTRACT_ADDRESS,
@@ -45,12 +45,12 @@ const getAssetName = async(saleAddress)=>{
 // Prepare the orderData array
 const prepareOrderData = (orderDetails, assetData) => {
   return orderDetails.map((order, index) => {
-    const unitPrice = order.amount / order.quantities[0];
+    const unitPrice = order.amount / order.quantitiesToBePurchased[0];
     return {
       name: assetData[index].name,
       unitPrice: unitPrice,
-      qty: order.quantities[0],
-      tax: order.tax
+      qty: order.quantitiesToBePurchased[0],
+      tax: 0
     };
   });
 };
@@ -206,16 +206,16 @@ const emitOnboardSeller = async (address, args) => {
   return onboardSellerStatus;
 }
 
-const getOrderEvent = async (orderHash) => {
+const getCheckoutEvent = async (checkoutHash) => {
   const tableArgs = {
-    name: ASSET_LOCKED_EVENT_TABLE,
+    name: CHECKOUT_EVENT_TABLE,
   };
   
   const searchOptions = {
     ...DEFAULT_OPTIONS,
     query: {
       limit: 1,
-      ['orderHash']: `eq.${orderHash}`,
+      ['checkoutHash']: `eq.${checkoutHash}`,
     }
   };
 
@@ -302,12 +302,12 @@ const completeOrder = async (address, args) => {
   return completeOrderStatus;
 }
 
-const initializePayment = async (address, args) => {
+const generateIntermediateOrder = async (address, args) => {
   // Make the call and return results
   const contract = { name: "PaymentService", address };
   const callArgs = {
     contract,
-    method: "initializePayment",
+    method: "generateIntermediateOrder",
     args: util.usc({ ...args }),
   };
   const completeOrderStatus = await rest.call(ADMIN.getUser(), callArgs, DEFAULT_OPTIONS);
@@ -326,12 +326,12 @@ const cancelOrder = async (address, args) => {
   return cancelOrderStatus;
 }
 
-const discardOrder = async (address, args) => {
+const discardCheckoutQuantity = async (address, args) => {
   // Make the call and return results
   const contract = { name: "PaymentService", address };
   const callArgs = {
     contract,
-    method: "discardOrder",
+    method: "discardCheckoutQuantity",
     args: util.usc({ ...args }),
   };
   const discardOrderStatus = await rest.call(ADMIN.getUser(), callArgs, DEFAULT_OPTIONS);
@@ -351,13 +351,13 @@ export {
   validatePaymentServiceContract,
   validateRedemptionServiceContract,
   emitOnboardSeller,
-  getOrderEvent,
+  getCheckoutEvent,
   checkSellerOnboarded,
   validateAndGetOrderDetails,
   completeOrder,
-  initializePayment,
+  generateIntermediateOrder,
   cancelOrder,
-  discardOrder,
+  discardCheckoutQuantity,
   getAssetName,
   sendEmail,
   prepareOrderData,

@@ -180,7 +180,7 @@ async function get(user, args, defaultOptions) {
 
 async function getAll(admin, args = {}, baseOptions) {
     const options = { ...baseOptions, org: 'BlockApps', app: 'Mercata' };
-    const searchArgs = setSearchQueryOptions(args, [{ key: 'isActive', value: 'true' }])
+    const searchArgs = setSearchQueryOptions(args, {})
     const paymentProviders = await searchAllWithQueryArgs(contractName, searchArgs, options, admin);
     return paymentProviders.map((paymentProvider) => marshalOut(paymentProvider));
 }
@@ -219,7 +219,7 @@ async function createPayment(user, args, options) {
     const contract = { name: contractName, address }
     const callArgs = {
       contract,
-      method: "createOrder",
+      method: "checkoutInitialized",
       args: util.usc({ ...restArgs }),
     };
     const token = await rest.call(user, callArgs, options);
