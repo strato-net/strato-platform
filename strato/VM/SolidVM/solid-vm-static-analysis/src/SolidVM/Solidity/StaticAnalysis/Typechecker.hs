@@ -1857,6 +1857,29 @@ statementHelper (UncheckedStatement body x) =
   statementsHelper' x body
 statementHelper (AssemblyStatement _ x) = pure $ topType' x
 statementHelper (SimpleStatement stmt x) = simpleStatementHelper x stmt
+
+isSameType :: Type -> Type -> Bool
+isSameType (SVMType.Int _ _) (SVMType.Int _ _) = True
+isSameType (SVMType.String _) (SVMType.String _) = True
+isSameType (SVMType.Bytes _ _) (SVMType.Bytes _ _) = True
+isSameType SVMType.Decimal SVMType.Decimal = True
+isSameType SVMType.Bool SVMType.Bool = True
+isSameType (SVMType.Address _) (SVMType.Address _) = True
+isSameType (SVMType.Account _) (SVMType.Account _) = True
+isSameType (SVMType.UnknownLabel s1 _) (SVMType.UnknownLabel s2 _) = s1 == s2
+isSameType (SVMType.Struct _ t1) (SVMType.Struct _ t2) = t1 == t2
+isSameType (SVMType.UserDefined a1 _) (SVMType.UserDefined a2 _) = a1 == a2
+isSameType (SVMType.Enum _ t1 _) (SVMType.Enum _ t2 _) = t1 == t2
+isSameType (SVMType.Error _ t1) (SVMType.Error _ t2) = t1 == t2
+isSameType (SVMType.Array e1 _) (SVMType.Array e2 _) = isSameType e1 e2
+isSameType (SVMType.Contract t1) (SVMType.Contract t2) = t1 == t2
+isSameType (SVMType.Mapping _ k1 v1) (SVMType.Mapping _ k2 v2) = isSameType k1 k2 && isSameType v1 v2
+isSameType SVMType.Variadic SVMType.Variadic = True
+isSameType _ _ = False
+
+allDifferent :: (Eq a) => [a] -> Bool
+allDifferent []     = True
+allDifferent (x:xs) = x `notElem` xs && allDifferent xs
 simpleStatementHelper :: SourceAnnotation Text -> Annotated SimpleStatementF -> SSS Type'
 simpleStatementHelper x (VariableDefinition vdefs mExpr) = do
   pushLocalVariables vdefs
