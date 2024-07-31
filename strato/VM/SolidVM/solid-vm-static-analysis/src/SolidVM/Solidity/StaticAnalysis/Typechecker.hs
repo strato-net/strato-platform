@@ -38,7 +38,6 @@ import qualified SolidVM.Model.Type as SVMType
 import SolidVM.Solidity.StaticAnalysis.Types
 import Text.Read (readMaybe)
 import Blockchain.VM.SolidException
-import Data.List (find)
 --import qualified Text.Colors                          as C
 --import           Control.Monad.IO.Class
 -- import Debug.Trace
@@ -1706,7 +1705,7 @@ statementHelper (EmitStatement eventName vals x) = do
       case M.lookup eventName (_events c) of 
         Just event -> do
           let vals' = fmap (\(_, b) -> 
-                              let r = R cc c Nothing "Nothing" []
+                              let r = R cc c Nothing Nothing Nothing []
                               in runReader (evalStateT (tcExpr b) ((Nothing, M.empty) :| [])) r
                            ) vals
               -- valsDebug = trace ("Evaluated types: " ++ show vals') vals'
