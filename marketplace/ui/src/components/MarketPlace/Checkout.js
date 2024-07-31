@@ -78,7 +78,7 @@ const Checkout = () => {
   }, [marketplaceDispatch, cartList]);
 
   useEffect(() => {
-    paymentServiceActions.getPaymentServices(paymentServiceDispatch);
+    paymentServiceActions.getPaymentServices(paymentServiceDispatch, false);
   }, [paymentServiceDispatch]);
 
   useEffect(() => {
