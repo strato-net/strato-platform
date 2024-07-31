@@ -4,7 +4,6 @@ import {
   Spin,
   Modal,
   Select,
-  Button
 } from "antd";
 import {
   useMarketplaceState,
@@ -15,14 +14,8 @@ import { useAuthenticateState } from "../../contexts/authentication";
 import { actions } from "../../contexts/marketplace/actions";
 import { actions as orderActions } from "../../contexts/order/actions";
 import { useState, useEffect } from "react";
-import { actions as inventoryAction } from "../../contexts/inventory/actions";
-import {
-  useInventoryDispatch,
-  useInventoryState,
-} from "../../contexts/inventory";
 import DataTableComponent from "../DataTableComponent";
 import "./index.css";
-import { HTTP_METHODS, PAYMENT_LIST } from "../../helpers/constants";
 import TagManager from "react-gtm-module";
 import { setCookie } from "../../helpers/cookie";
 
@@ -38,7 +31,6 @@ const ConfirmOrder = ({ paymentProviders = [], data, columns }) => {
   const [tax, setTax] = useState(0);
   const [subTotal, setSubTotal] = useState(0);
   const [total, setTotal] = useState(0);
-  const inventoryDispatch = useInventoryDispatch();
   const { success: marketplaceSuccess, message: marketplaceMessage } = useMarketplaceState();
   const [modal, contextHolderForModal] = Modal.useModal();
   const [cartData, setCartData] = useState(data);
@@ -188,7 +180,12 @@ const ConfirmOrder = ({ paymentProviders = [], data, columns }) => {
       });
       const checkQuantity = await orderActions.fetchSaleQuantity(orderDispatch, saleAddresses, quantities);
       if (checkQuantity === true) {
-        handlePaymentConfirm(provider);
+        if (provider.serviceName === "Stripe" && total < 0.50) {
+          openToastOrder("bottom", "The minimum order amount is $0.50. Please increase the item quantity to account for this.");
+          setSelectedProvider('');
+        } else {
+          handlePaymentConfirm(provider);
+        }
       } else {
         let insufficientQuantityMessage = "";
         let outOfStockMessage = "";
