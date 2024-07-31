@@ -30,13 +30,14 @@ import Data.String (IsString, fromString)
 import Data.Text (Text)
 import qualified Data.Text as T
 import Data.Traversable (for)
-import SolidVM.Model.CodeCollection
+import SolidVM.Model.CodeCollection hiding (modifierContext)
 import qualified SolidVM.Model.CodeCollection.Contract as Con
 import SolidVM.Model.SolidString
 import SolidVM.Model.Type (Type)
 import qualified SolidVM.Model.Type as SVMType
 import SolidVM.Solidity.StaticAnalysis.Types
 import Text.Read (readMaybe)
+import Blockchain.VM.SolidException
 --import qualified Text.Colors                          as C
 --import           Control.Monad.IO.Class
 -- import Debug.Trace
@@ -48,7 +49,8 @@ data R = R
   { codeCollection :: Annotated CodeCollectionF,
     contract :: Annotated ContractF,
     function :: Maybe (Annotated FuncF),
-    functName :: String,
+    functName :: Maybe String,
+    modifier :: Maybe (Annotated ModifierF),
     immutableValNames :: [(String, Bool)]
   }
 
@@ -82,6 +84,12 @@ data TypeF' a
         functionOverloads :: [TypeF' a],
         functionArgNames :: [Maybe SolidString],
         functionArrayGetter :: Bool
+      }
+  | Modifier
+      { modifierArgs :: M.Map Text IndexedType,
+        modifierSelector :: Text,
+        modifierContents :: Maybe [StatementF a],
+        modifierContext :: a
       }
   deriving (Eq, Show, Functor)
 
@@ -150,6 +158,9 @@ showType' (MultiVariate a _) =
       showType' a,
       ")"
     ]
+showType' (SolidVM.Solidity.StaticAnalysis.Typechecker.Modifier _ _ _ _) =
+  T.empty
+
 
 varDefsToType' :: Annotated VarDefEntryF -> Type' -> Type'
 varDefsToType' BlankEntry t = Product [topType' (context' t), t] (context' t)
@@ -400,6 +411,7 @@ context' Product {..} = productContext
 context' Function {..} = functionContext
 context' (Sum (a :| _)) = context' a
 context' MultiVariate {..} = multiVariateContext
+context' (SolidVM.Solidity.StaticAnalysis.Typechecker.Modifier _ _ _ a) = a
 
 typecheck' :: Monad m => (SourceAnnotation Text -> SolidString -> Type -> m Type') -> Type' -> Type' -> m Type'
 typecheck' unify r1 r2 = case (r1, r2) of
@@ -874,14 +886,26 @@ contractHelper ::
   Annotated CodeCollectionF ->
   Annotated ContractF ->
   Type'
-contractHelper cc c =
-  let constr = maybe M.empty (M.singleton "constructor") $ _constructor c
-      funcsAndConstr = constr <> _functions c
-      varTypes' = reduceType' (_contractContext c) $ varDeclHelper cc c <$> M.elems (_storageDefs c)
-      constTypes' = reduceType' (_contractContext c) $ constDeclHelper cc c <$> M.elems (_constants c)
-      constTypes'' = reduceType' (_contractContext c) $ constDeclHelper cc c <$> M.elems (_flConstants cc)
-      funcTypes' = reduceType' (_contractContext c) $ uncurry (functionHelper cc c) <$> M.toList funcsAndConstr
-   in reduceType' (_contractContext c) [varTypes', constTypes', funcTypes', constTypes'']
+contractHelper cc c = do
+  let solidVMVersion = maybe "" snd $ find ((== "solidvm") . fst) $ _pragmas cc
+  if solidVMVersion == "11.4" 
+    then
+      let constr = maybe M.empty (M.singleton "constructor") $ _constructor c
+          funcsAndConstr = constr <> _functions c 
+          varTypes' = reduceType' (_contractContext c) $ varDeclHelper cc c <$> M.elems (_storageDefs c)
+          constTypes' = reduceType' (_contractContext c) $ constDeclHelper cc c <$> M.elems (_constants c)
+          constTypes'' = reduceType' (_contractContext c) $ constDeclHelper cc c <$> M.elems (_flConstants cc)
+          funcTypes' = reduceType' (_contractContext c) $ uncurry (functionHelper cc c) <$> M.toList funcsAndConstr
+          modifierTypes' = reduceType' (_contractContext c) $ modifierHelper cc c <$> M.elems (_modifiers c)
+      in reduceType' (_contractContext c) [varTypes', constTypes', funcTypes', constTypes'', modifierTypes']
+    else 
+      let constr = maybe M.empty (M.singleton "constructor") $ _constructor c
+          funcsAndConstr = constr <> _functions c 
+          varTypes' = reduceType' (_contractContext c) $ varDeclHelper cc c <$> M.elems (_storageDefs c)
+          constTypes' = reduceType' (_contractContext c) $ constDeclHelper cc c <$> M.elems (_constants c)
+          constTypes'' = reduceType' (_contractContext c) $ constDeclHelper cc c <$> M.elems (_flConstants cc)
+          funcTypes' = reduceType' (_contractContext c) $ uncurry (functionHelper cc c) <$> M.toList funcsAndConstr
+      in reduceType' (_contractContext c) [varTypes', constTypes', funcTypes', constTypes'']
 
 varDeclHelper ::
   Annotated CodeCollectionF ->
@@ -893,7 +917,7 @@ varDeclHelper cc c VariableDecl {..} =
    in case _varInitialVal of
         Nothing -> ty
         Just e ->
-          let r = R cc c Nothing "Nothing" []
+          let r = R cc c Nothing (Just "Nothing") Nothing []
            in runReader (evalStateT (ty ~> tcExpr e) ((Nothing, M.empty) :| [])) r
 
 constDeclHelper ::
@@ -903,7 +927,7 @@ constDeclHelper ::
   Type'
 constDeclHelper cc c ConstantDecl {..} =
   let ty = Static _constType _constContext
-      r = R cc c Nothing "Nothing" []
+      r = R cc c Nothing (Just "Nothing") Nothing []
    in runReader (evalStateT (ty ~> tcExpr _constInitialVal) ((Nothing, M.empty) :| [])) r
 
 checkOverrides ::
@@ -997,6 +1021,30 @@ checkOverrides cc c funcName f =
                             <> bool eMsg "" (null es)
                             <$ ctx
 
+modifierHelper ::
+  Annotated CodeCollectionF ->
+  Annotated ContractF ->
+  Annotated ModifierF ->
+  Type'
+modifierHelper cc c m@SolidVM.Model.CodeCollection.Modifier {..} = 
+  let r =
+        R cc c Nothing Nothing (Just m) $
+          map
+            (fmap $ isJust . _varInitialVal)
+            (filter (_isImmutable . snd) . M.toList $ _storageDefs c)
+      swap = uncurry $ flip (,)
+      args =
+        ( \(it, n) ->
+            ( T.unpack n,
+              VarDefEntry (Just $ indexedTypeType it) Nothing (T.unpack n) _modifierContext
+            )
+        )
+          <$> (swap <$> M.toList _modifierArgs)
+      contents' = case m ^. SolidVM.Model.CodeCollection.modifierContents of
+                    Nothing       -> []
+                    Just contents -> contents
+    in runReader (statementsHelperM (M.fromList args) contents') r
+
 functionHelper ::
   Annotated CodeCollectionF ->
   Annotated ContractF ->
@@ -1015,7 +1063,7 @@ functionHelper cc c funcName f@Func {..} =
             then case (_funcArgs, _funcVals, _funcStateMutability, _funcVisibility) of
               ([], [], Just Payable, Just External) ->
                 let r =
-                      R cc c (Just f) funcName $
+                      R cc c (Just f) (Just funcName) Nothing $
                         map
                           (fmap $ isJust . _varInitialVal)
                           (filter (_isImmutable . snd) . M.toList $ _storageDefs c)
@@ -1058,7 +1106,7 @@ functionHelper cc c funcName f@Func {..} =
                 then case (_funcArgs, _funcVals, _funcVisibility) of
                   ([], [], Just External) ->
                     let r =
-                          R cc c (Just f) funcName $
+                          R cc c (Just f) (Just funcName) Nothing $
                             map
                               (fmap $ isJust . _varInitialVal)
                               (filter (_isImmutable . snd) . M.toList $ _storageDefs c)
@@ -1096,29 +1144,65 @@ functionHelper cc c funcName f@Func {..} =
                       )
                         <$ _funcContext
                   _ -> bottom $ "Function `fallback` must be External, but has not been declared so " <$ _funcContext
-                else
-                  let r =
-                        R cc c (Just f) funcName $
-                          map
-                            (fmap $ isJust . _varInitialVal)
-                            (filter (_isImmutable . snd) . M.toList $ _storageDefs c)
-                      swap = uncurry $ flip (,)
-                      args =
-                        ( \(it, n) ->
-                            ( n,
-                              VarDefEntry (Just $ indexedTypeType it) Nothing n _funcContext
-                            )
+            else
+              let r =
+                    R cc c (Just f) (Just funcName) Nothing $
+                      map
+                        (fmap $ isJust . _varInitialVal)
+                        (filter (_isImmutable . snd) . M.toList $ _storageDefs c)
+                  swap = uncurry $ flip (,)
+                  args =
+                    ( \(it, n) ->
+                        ( n,
+                          VarDefEntry (Just $ indexedTypeType it) Nothing n _funcContext
                         )
-                          <$> (catMaybes $ sequence . swap <$> _funcArgs)
-                      vals =
-                        ( \(it, n) ->
-                            ( n,
-                              VarDefEntry (Just $ indexedTypeType it) Nothing n _funcContext
-                            )
+                    )
+                      <$> (catMaybes $ sequence . swap <$> _funcArgs)
+                  vals =
+                    ( \(it, n) ->
+                        ( n,
+                          VarDefEntry (Just $ indexedTypeType it) Nothing n _funcContext
                         )
-                          <$> (catMaybes $ sequence . swap <$> _funcVals)
-                      argVals = M.fromList $ args ++ vals
-                   in runReader (statementsHelper argVals stmts) r
+                    )
+                      <$> (catMaybes $ sequence . swap <$> _funcVals)
+                  argVals = M.fromList $ args ++ vals
+               in runReader (statementsHelper argVals stmts) r
+
+statementsHelperM ::
+  (M.Map SolidString (Annotated VarDefEntryF)) ->
+  [Annotated StatementF] ->
+  Reader R Type'
+statementsHelperM args ss = do
+  fm <- asks modifier
+  case fm of
+    Nothing -> do
+      x <- asks $ _contractContext . contract
+      modifierError "you cannot return a value as part of a modifier" (x)
+    Just m -> do
+      let x = _modifierContext m
+      ~(ts', s) <- flip runStateT ((Nothing, args) :| []) $ do
+        stmts' <- traverse statementHelper ss
+        pure stmts'
+      let ret = case fst $ NE.head s of
+            Nothing -> Product [] x
+            Just (Sum rs) ->
+              runIdentity $
+                foldr
+                  ( \a mb ->
+                      mb >>= \b -> case (a, b) of
+                        (Bottom es, Bottom ess) -> pure $ Bottom (es <> ess)
+                        (Bottom es, _) -> pure $ Bottom es
+                        (_, Bottom ess) -> pure $ Bottom ess
+                        _ -> do
+                          t' <- typecheck' ignoreTops a b
+                          case t' of
+                            Bottom _ -> pure . bottom $ "not all paths return a value." <$ x
+                            _ -> pure t'
+                  )
+                  (pure $ topType' x)
+                  (NE.toList rs)
+            Just r -> r
+      pure $ reduceType' x $ ret : ts'   
 
 statementsHelper ::
   (M.Map SolidString (Annotated VarDefEntryF)) ->
@@ -1576,17 +1660,38 @@ statementHelper (DoWhileStatement body cond x) = do
 statementHelper (Continue x) = pure $ topType' x
 statementHelper (Break x) = pure $ topType' x
 statementHelper (Return mExpr x) = do
+  cc <- asks codeCollection
   mf <- asks function
-  case mf of
-    Nothing -> pure . bottom $ "Cannot use keyword 'return' outside of a function" <$ x
-    Just f -> do
-      let fRets = flip Product x $ flip Static x . indexedTypeType . snd <$> _funcVals f
-      t' <- fRets ~> maybe (pure $ Product [] x) tcExpr mExpr
-      modify $ \((ret, locals) :| rest) -> case ret of
-        Nothing -> (Just t', locals) :| rest
-        Just (Sum _) -> (Just t', locals) :| rest
-        _ -> (ret, locals) :| rest
-      pure t'
+  let solidVMVersion = maybe "" snd $ find ((== "solidvm") . fst) $ _pragmas cc
+  if solidVMVersion == "11.4"
+    then do 
+      fm <- asks modifier
+      case (fm,mf) of
+        (Nothing,Nothing) -> pure . bottom $ "Cannot use keyword 'return' outside of a function" <$ x
+        (Nothing,Just f) -> do
+          let fRets = flip Product x $ flip Static x . indexedTypeType . snd <$> _funcVals f
+          t' <- fRets ~> maybe (pure $ Product [] x) tcExpr mExpr
+          modify $ \((ret, locals) :| rest) -> case ret of
+            Nothing -> (Just t', locals) :| rest
+            Just (Sum _) -> (Just t', locals) :| rest
+            _ -> (ret, locals) :| rest
+          pure t'
+        (Just _,Nothing) ->
+          pure . bottom $ "Cannot use keyword 'return' inside of a modifier." <$ x       
+        (Just _,Just _)  -> 
+          pure . bottom $ "Cannot use keyword 'return' inside of a modifier." <$ x
+    else
+      case mf of 
+        Nothing -> pure . bottom $ "Cannot use keyword 'return' inside of a modifier." <$ x
+        Just f -> do
+          let fRets = flip Product x $ flip Static x . indexedTypeType . snd <$> _funcVals f
+          t' <- fRets ~> maybe (pure $ Product [] x) tcExpr mExpr
+          modify $ \((ret, locals) :| rest) -> case ret of
+            Nothing -> (Just t', locals) :| rest
+            Just (Sum _) -> (Just t', locals) :| rest
+            _ -> (ret, locals) :| rest
+          pure t'
+
 statementHelper (Throw e x) = do
   et <- tcExpr e
   pure $ reduceType' x [et]
@@ -1600,7 +1705,7 @@ statementHelper (EmitStatement eventName vals x) = do
       case M.lookup eventName (_events c) of 
         Just event -> do
           let vals' = fmap (\(_, b) -> 
-                              let r = R cc c Nothing "Nothing" []
+                              let r = R cc c Nothing Nothing Nothing []
                               in runReader (evalStateT (tcExpr b) ((Nothing, M.empty) :| [])) r
                            ) vals
               -- valsDebug = trace ("Evaluated types: " ++ show vals') vals'
@@ -1671,8 +1776,8 @@ checkIfImmuteOperationValid (Variable y a) = do
     else do
       thisFuncName <- asks functName
       let namesOfImmutesOnly = map (\x -> fst x) lstImmutNames
-      let notConstructAndImmuteAissgnedValue = (thisFuncName /= "constructor") && (a `elem` namesOfImmutesOnly)
-      let constructorAndImmuteValueOverwritten = (thisFuncName == "constructor") && ((a, True) `elem` lstImmutNames)
+      let notConstructAndImmuteAissgnedValue = ((fromMaybe "" thisFuncName) /= "constructor") && (a `elem` namesOfImmutesOnly)
+      let constructorAndImmuteValueOverwritten = ((fromMaybe "" thisFuncName) == "constructor") && ((a, True) `elem` lstImmutNames)
       if notConstructAndImmuteAissgnedValue || constructorAndImmuteValueOverwritten
         then pure . bottom $ "Immutable assignment error at" <$ y
         else tcExpr (Variable y a)

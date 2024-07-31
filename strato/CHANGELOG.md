@@ -20,6 +20,8 @@ so that they could be properly moved to their respective version's subsection.
 - Added `pragma solidvm 11.4` that includes all existing pragmas and their features
 - Added decimal precision strictness to `pragma solidvm 11.4`
 - Added `truncate(uint)` built-in method for decimal numbers to `pragma solidvm 11.4`
+- Added typechecking to emit statements
+- Added typechecking to modifier definitions
 
 ### Changed
 

@@ -6121,7 +6121,7 @@ contract qq {
     ( runTest $ do
         ( runBS
             [r|
-
+pragma solidvm 11.4;
 contract qq {
   modifier myModifier() {  // line 4
     return 7;
@@ -6136,7 +6136,7 @@ contract qq {
 }|]
           )
     )
-      `shouldThrow` anyModifierError
+      `shouldThrow` anyTypeError
 
   it "can use a modifier as part of a function" . runTest $ do
     runCall'
