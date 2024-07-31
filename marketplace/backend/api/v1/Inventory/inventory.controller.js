@@ -1,4 +1,5 @@
 import { rest } from 'blockapps-rest'
+import axios from 'axios';
 import Joi from '@hapi/joi'
 import RestStatus from 'http-status-codes'
 import config from '../../../load.config'
@@ -182,20 +183,14 @@ class InventoryController {
           transferNumber: result.transferNumber,
           mercataAddress: body.mercataAddress,
       };
-      const response = await fetch(`${TOKEN_SERVER_URL}/api/bridgeMercata`, {
-          method: "POST",
-          headers: {
-              Accept: "application/json",
-              "Content-Type": "application/json",
-          },
-          body: JSON.stringify(payload),
+      const response = await axios.post(`${TOKEN_SERVER_URL}/api/bridgeMercata`, payload, {
+        headers: {
+          Accept: "application/json",
+          "Content-Type": "application/json",
+        },
       });
 
-      if (!response.ok) {
-          throw new Error("Bridge API call failed");
-      }
-
-      rest.response.status200(res, await response.json());
+      rest.response.status200(res, response.data);
 
       return next();
     } catch (e) {
