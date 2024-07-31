@@ -52,7 +52,7 @@ async function handleFirstOrder(event, token) {
     return;
   }
   // Create a transaction payload with 100 STRATS and send it to eventTxSender
-  const response = await createTransactionPayload(token, purchaser, rewardAmount);
+  const response = await createTransactionPayload(token, purchaser, rewardAmount * 100);
 
   if (!response.ok) {
     const errorText = await response.text();
