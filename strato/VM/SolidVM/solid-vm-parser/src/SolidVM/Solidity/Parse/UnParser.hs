@@ -165,7 +165,8 @@ unparseVarType (SVMType.Array t Nothing) = (unparseVarType t) <> "[]"
 unparseVarType (SVMType.Mapping _ key val) = "mapping (" <> (unparseVarType key) <> " => " <> (unparseVarType val) <> ")"
 unparseVarType (SVMType.Contract contractName') = labelToString contractName'
 unparseVarType (SVMType.Struct _ n) = "struct " ++ labelToString n
-unparseVarType _ = "TYPE_NOT_IMPLEMENED"
+unparseVarType (SVMType.Decimal) = "decimal"
+unparseVarType _ = "TYPE_NOT_IMPLEMENTED"
 
 unparseFuncOverload :: SolidString -> [Func] -> String
 unparseFuncOverload name funcs = unlines $ map (unparseFunc . (name,)) funcs
@@ -345,7 +346,7 @@ unparseExpression (NumberLiteral _ x _) = show x
 --unparseExpression (NumberLiteral _ x (Just _)) = show x
 unparseExpression (BoolLiteral _ False) = "false"
 unparseExpression (BoolLiteral _ True) = "true"
-unparseExpression (DecimalLiteral _ v) = show v
+unparseExpression (DecimalLiteral _ v) = show $ unwrapDecimal v
 unparseExpression (StringLiteral _ s) = ('"' :) . (++ "\"") $ s
 unparseExpression (AccountLiteral _ a) = ('<' :) . (++ ">") $ show a
 unparseExpression (HexaLiteral _ a) = "hex\"" ++ (labelToString a) ++ "\""

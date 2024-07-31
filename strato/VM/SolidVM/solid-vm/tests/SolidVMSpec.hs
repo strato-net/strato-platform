@@ -8932,6 +8932,77 @@ contract qq {
 }
 |]) `shouldThrow` anyTypeError
 
+  it "respects the number of decimal places during arithmetic operations" $ runTest ( do
+    runBS [r|
+pragma solidvm 11.4;
+contract qq {
+  decimal a;
+  decimal b;
+  decimal c;
+  decimal d;
+  decimal e;
+  decimal f;
+  decimal g;
+  decimal h;
+  decimal i;
+  decimal j;
+
+  constructor() {
+    a = 1 + 1;
+    b = 1 + 1.0;
+    c = 1 - 0.1;
+    d = 1 - 0.10;
+    e = 1 * 2.00;
+    f = 1.0 * 2.00;
+    g = 3.14159 * 2.5;
+    h = 1.0 / 3;
+    i = 1.00 / 3;
+    j = 1 / 3;
+  }
+}
+|]
+    getFields ["a", "b", "c", "d", "e", "f", "g", "h", "i", "j"]
+      `shouldReturn` [BInteger 2, 
+                      BDecimal "2.0",
+                      BDecimal "0.9",
+                      BDecimal "0.90",
+                      BDecimal "2.00",
+                      BDecimal "2.00",
+                      BDecimal "7.85398",
+                      BDecimal "0.3",
+                      BDecimal "0.33",
+                      BDefault])
+
+  it "can use built-in truncate functions on decimals" $ runTest ( do
+    runBS [r|
+pragma solidvm 11.4;
+contract qq {
+  decimal a = 5.2825;
+  decimal b = 5.2825;
+  decimal c;
+  decimal d;
+  decimal e;
+  decimal f;
+  uint g = 1;
+
+  constructor() {
+    a = a.truncate(3);
+    b = b.truncate(g);
+    c = decimal(3.256).truncate(2);
+    d = decimal(6.27).truncate(g);
+    e = decimal(3.24).truncate(5);
+    f = decimal(3.24).truncate(300);
+  }
+}
+|]
+    getFields ["a", "b", "c", "d", "e", "f"]
+      `shouldReturn` [BDecimal "5.282", 
+                      BDecimal "5.3", 
+                      BDecimal "3.26", 
+                      BDecimal "6.3",
+                      BDecimal "3.24000",
+                      BDecimal "3.24000000000000000000000000000000000000000000"])
+
   it "can error handle improperly referenced overloaded contracts" $ runTest ( do 
     let getAddressFromResult :: ExecResults -> Maybe Address 
         getAddressFromResult res = _accountAddress <$> erNewContractAccount res
