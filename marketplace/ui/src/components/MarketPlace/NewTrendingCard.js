@@ -133,7 +133,7 @@ const NewTrendingCard = ({ topSellingProduct, addItemToCart, parent = "", api, c
                 <div style={{ display: 'flex', justifyContent: 'space-between' }}>
                     {topSellingProduct?.price &&
                         <Typography className="font-semibold">
-                        {`$${topSellingProduct?.price} `} <span className="font-normal text-xs mr-2 text-primary"><b> {`(${topSellingProduct?.price * STRATS_CONVERSION} STRATS)`} </b></span>
+                        {`$${topSellingProduct?.price} `} <span className="font-normal text-xs mr-2 text-primary"><b> {`(${(topSellingProduct?.price * STRATS_CONVERSION).toFixed(0)} STRATS)`} </b></span>
                     </Typography>
                     
                     }
@@ -218,7 +218,8 @@ const NewTrendingCard = ({ topSellingProduct, addItemToCart, parent = "", api, c
                     >
                         Buy Now
                     </Button>
-                    <Button
+                    {/* TODO:- Remove Comment to show the Add-to-Cart Button */}
+                    {/* <Button
                         className={`h-9 w-9 flex items-center justify-center ${isAvailableForSale ? '!bg-[#808080]' : '!bg-[#13188A]'} ${ownerSameAsUser() ? 'cursor-not-allowed' : 'cursor-pointer'}`}
                         disabled={isAvailableForSale || ownerSameAsUser()}
                         onClick={() => {
@@ -244,7 +245,7 @@ const NewTrendingCard = ({ topSellingProduct, addItemToCart, parent = "", api, c
                     >
 
                         <img alt={imgMeta} title={imgMeta} src={Images.Cart} width={18} height={18} className='max-w-[18px]' />
-                    </Button>
+                    </Button> */}
                 </div>
             </div>
             <LoginModal

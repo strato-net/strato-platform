@@ -185,6 +185,10 @@ anyImmutableError :: Selector HandledException
 anyImmutableError (HE Blockchain.SolidVM.Exception.ImmutableError {}) = True
 anyImmutableError _ = False
 
+specificTypeError :: String -> Selector HandledException
+specificTypeError str (HE (Blockchain.SolidVM.Exception.TypeError _ mes)) = mes == str
+specificTypeError _ _ = False 
+
 failedToAttainRunTimCodeError :: Selector HandledException
 failedToAttainRunTimCodeError (HE Blockchain.SolidVM.Exception.FailedToAttainRunTimCode {}) = True
 failedToAttainRunTimCodeError _ = False
@@ -8209,7 +8213,7 @@ contract qq {
 }
 |]
     getFields ["x"] `shouldReturn` [BInteger 4]
-
+    
   it "can use libraries" . runTest $ do
     runBS
       [r|
@@ -8515,6 +8519,7 @@ contract qq {
       SomeContract p = new SomeContract();
       b = p.x()[0];
   }
+
 }
 |]) `shouldThrow` anyTypeError
 
@@ -8534,7 +8539,6 @@ contract qq {
     delete arr2;
     delete xyz;
     delete b;
-    delete yy;
   }
 }|]
       getFields ["res", "arr2"] `shouldReturn` [BDefault, BDefault]) 
@@ -8928,6 +8932,197 @@ contract qq {
 }
 |]) `shouldThrow` anyTypeError
 
+  it "respects the number of decimal places during arithmetic operations" $ runTest ( do
+    runBS [r|
+pragma solidvm 11.4;
+contract qq {
+  decimal a;
+  decimal b;
+  decimal c;
+  decimal d;
+  decimal e;
+  decimal f;
+  decimal g;
+  decimal h;
+  decimal i;
+  decimal j;
+
+  constructor() {
+    a = 1 + 1;
+    b = 1 + 1.0;
+    c = 1 - 0.1;
+    d = 1 - 0.10;
+    e = 1 * 2.00;
+    f = 1.0 * 2.00;
+    g = 3.14159 * 2.5;
+    h = 1.0 / 3;
+    i = 1.00 / 3;
+    j = 1 / 3;
+  }
+}
+|]
+    getFields ["a", "b", "c", "d", "e", "f", "g", "h", "i", "j"]
+      `shouldReturn` [BInteger 2, 
+                      BDecimal "2.0",
+                      BDecimal "0.9",
+                      BDecimal "0.90",
+                      BDecimal "2.00",
+                      BDecimal "2.00",
+                      BDecimal "7.85398",
+                      BDecimal "0.3",
+                      BDecimal "0.33",
+                      BDefault])
+
+  it "can use built-in truncate functions on decimals" $ runTest ( do
+    runBS [r|
+pragma solidvm 11.4;
+contract qq {
+  decimal a = 5.2825;
+  decimal b = 5.2825;
+  decimal c;
+  decimal d;
+  decimal e;
+  decimal f;
+  uint g = 1;
+
+  constructor() {
+    a = a.truncate(3);
+    b = b.truncate(g);
+    c = decimal(3.256).truncate(2);
+    d = decimal(6.27).truncate(g);
+    e = decimal(3.24).truncate(5);
+    f = decimal(3.24).truncate(300);
+  }
+}
+|]
+    getFields ["a", "b", "c", "d", "e", "f"]
+      `shouldReturn` [BDecimal "5.282", 
+                      BDecimal "5.3", 
+                      BDecimal "3.26", 
+                      BDecimal "6.3",
+                      BDecimal "3.24000",
+                      BDecimal "3.24000000000000000000000000000000000000000000"])
+
+  it "can error handle improperly referenced overloaded contracts" $ runTest ( do 
+    let getAddressFromResult :: ExecResults -> Maybe Address 
+        getAddressFromResult res = _accountAddress <$> erNewContractAccount res
+
+    res <- runBS' [r|
+pragma safeExternalCalls;
+contract qq {
+    bool public myVal;
+
+    function changeMyVal(bool b){
+        myVal = b;
+    }
+}|]
+
+    case getAddressFromResult res of
+      Nothing -> error "No address returned"
+      Just address -> runCall' "changeMyValOfTest" (T.pack $ "(0x"++ formatAddressWithoutColor address ++", 3 )" ) [r|
+contract Test {
+    int public myVal;
+
+    function changeMyVal(int b){
+        myVal = b;
+    }
+}
+contract qq {
+    function changeMyValOfTest(address a, int v) returns (int) {
+        Test(a).changeMyVal(v);
+        return Test(a).myVal();
+    }
+}|]) `shouldThrow` anyTypeError
+
+  it "can use es6 imports with solidvm 11.4 pragma" $ runTest ( do
+    runBS [r|
+pragma solidvm 11.4;
+import { someFunc } from <123>;
+
+contract qq {
+  int x = 0;
+
+  constructor() {
+    x = 5;
+  }
+}
+|]) `shouldThrow` specificTypeError "\"Could not find file <0000000000000000000000000000000000000123>\""
+
+  it "can use strict modifiers with solidvm 11.4 pragma" $ runTest ( do
+    runBS [r|
+pragma solidvm 11.4;
+
+contract A {
+  int y = 5;
+  
+  function getY() private returns (int) {
+    return y;
+  }
+}
+
+contract qq is A {
+  A a = new A();
+  int x = 0;
+
+  constructor() {
+    x = a.getY();
+  }
+}
+|]) `shouldThrow` specificTypeError "\" (line 17, column 9) - (line 17, column 10): \\\"Missing label: ABottom ( (line 17, column 9) - (line 17, column 10): \\\\\\\"cannot access function getY because it is marked as private\\\\\\\"  :| []) is not a known enum, struct, or contract.\\\" \""
+
+  it "can use create and create2 built-in function calls with solidvm 11.4 pragma" . runTest $ do
+    runBS
+      [r|
+pragma solidvm 11.4;
+
+contract qq {
+  account a;
+  account b;
+
+  constructor() {
+    a = create("A", "contract A {\n uint x = 1;\n string y;\n constructor (uint _x, string _y) {\n  x = _x;\n  y = _y;\n }\n}", "(3, 'hi')");
+    b = create2("salt", "B", "contract B {\n uint x = 2;\n constructor (uint _x) {\n  x = _x;\n }\n}", "(4)");
+  }
+}|]
+    getFields ["b"]
+      `shouldReturn` [BAccount $ NamedAccount (deriveAddressWithSalt (stringAddress "e8279be14e9fe2ad2d8e52e42ca96fb33a813bbe") "salt" (Just . hash $ BC.pack "contract B {\n uint x = 2;\n constructor (uint _x) {\n  x = _x;\n }\n}") (Just "OrderedVals [SInteger 4]")) UnspecifiedChain]
+    [BAccount a] <- getFields ["a"]
+    [BAccount b] <- getFields ["b"]
+    getSolidStorageKeyVal' (namedAccountToAccount Nothing a) (singleton "x") `shouldReturn` BInteger 3
+    getSolidStorageKeyVal' (namedAccountToAccount Nothing a) (singleton "y") `shouldReturn` BString "hi"
+    getSolidStorageKeyVal' (namedAccountToAccount Nothing b) (singleton "x") `shouldReturn` BInteger 4
+
+  it "can error handle improperly referenced overloaded contracts using solidvm 11.4 pragma" $ runTest ( do 
+    let getAddressFromResult :: ExecResults -> Maybe Address 
+        getAddressFromResult res = _accountAddress <$> erNewContractAccount res
+
+    res <- runBS' [r|
+pragma solidvm 11.4;
+contract qq {
+    bool public myVal;
+
+    function changeMyVal(bool b){
+        myVal = b;
+    }
+}|]
+
+    case getAddressFromResult res of
+      Nothing -> error "No address returned"
+      Just address -> runCall' "changeMyValOfTest" (T.pack $ "(0x"++ formatAddressWithoutColor address ++", 3 )" ) [r|
+contract Test {
+    int public myVal;
+
+    function changeMyVal(int b){
+        myVal = b;
+    }
+}
+contract qq {
+    function changeMyValOfTest(address a, int v) returns (int) {
+        Test(a).changeMyVal(v);
+        return Test(a).myVal();
+    }
+}|]) `shouldThrow` anyTypeError
+
   it "can access maps" $ runTest ( do
     runBS [r| 
 
@@ -8952,4 +9147,3 @@ contract qq {
 |]
     getFields ["x"]
       `shouldReturn` [BInteger 5])
-

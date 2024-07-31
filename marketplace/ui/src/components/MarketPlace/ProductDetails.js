@@ -39,6 +39,19 @@ import { STRATS_CONVERSION } from "../../helpers/constants";
 import { TOAST_MSG } from "../../helpers/msgConstants";
 
 
+import { Swiper, SwiperSlide } from 'swiper/react';
+
+// Import Swiper styles
+import 'swiper/css';
+import 'swiper/css/effect-fade';
+import 'swiper/css/navigation';
+import 'swiper/css/pagination';
+import 'swiper/css/autoplay';
+
+// import required modules
+import { EffectFade, Navigation, Pagination, Autoplay } from 'swiper/modules';
+
+
 const ProductDetails = ({ user, users }) => {
   const [api, contextHolder] = notification.useNotification();
   const { Text, Paragraph, Title } = Typography;
@@ -238,33 +251,68 @@ const ProductDetails = ({ user, users }) => {
     }
   };
 
-  const addItemToCart = () => {
-    let found = false;
-    for (var i = 0; i < cartList.length; i++) {
-      if (cartList[i].product.address === details.address) {
-        found = true;
-        break;
-      }
-    }
-    let items = [];
-    if (!found) {
-      items = [...cartList, { product: details, qty }];
+  // const addItemToCart = async () => {
+  //   let found = false;
+  //   for (var i = 0; i < cartList.length; i++) {
+  //     if (cartList[i].product.address === details.address) {
+  //       found = true;
+  //       break;
+  //     }
+  //   }
+  //   let items = [];
+  //   if (!found) {
+  //     items = [{ product: details, qty }];
 
-      marketPlaceActions.addItemToCart(marketplaceDispatch, items);
-      setQty(1);
-      openToast("bottom", false, TOAST_MSG.ITEM_ADDED_TO_CART);
-    } else {
-      items = [...cartList];
-      cartList.forEach((element, index) => {
-        if (element.product.address === details.address) {
-          items[index].qty += qty;
-          marketPlaceActions.addItemToCart(marketplaceDispatch, items);
-          setQty(1);
-          openToast("bottom", false, TOAST_MSG.ITEM_UPDATED_IN_CART);
-        }
-      });
-    }
-  };
+  //     marketPlaceActions.addItemToCart(marketplaceDispatch, items);
+  //     setQty(1);
+  //     openToast("bottom", false, TOAST_MSG.ITEM_ADDED_TO_CART);
+  //     setTimeout(() => {
+  //       navigate('/checkout')
+  //     }, 2000);
+  //   } else {
+  //     items = [...cartList];
+  //     const quantity = cartList[0].qty + qty;
+  //     const checkQuantity = await orderActions.fetchSaleQuantity(orderDispatch, [details.saleAddress], [quantity])
+  //     cartList.forEach((element, index) => {
+  //       if (element.product.address === details.address) {
+  //         if(checkQuantity[0].availableQuantity > quantity){
+  //           items[index].qty += qty;
+  //           marketPlaceActions.addItemToCart(marketplaceDispatch, items);
+  //           setQty(1);
+  //           openToast("bottom", false, TOAST_MSG.ITEM_UPDATED_IN_CART);
+  //           setTimeout(() => {
+  //             navigate('/checkout')
+  //           }, 2000);
+  //         }else{
+  //           if (checkQuantity[0].availableQuantity === 0) {
+  //             openToast(
+  //               "bottom",
+  //               true,
+  //               `Unfortunately, ${details.name} is currently out of stock. We recommend checking back soon or browsing similar items available now.`
+  //             );
+  //           } else {
+  //             // Case 2: We are trying to add too much quantity
+  //             openToast(
+  //               "bottom",
+  //               true,
+  //               `Unfortunately, only ${checkQuantity[0].availableQuantity} units of ${details.name} are available. Please update your cart quantity accordingly.`
+  //             );
+  //             setTimeout(() => {
+  //               navigate('/checkout')
+  //             }, 2000);
+  //           }
+  //         }
+  //       }
+  //     });
+  //   }
+  // };
+
+  const addItemToCart = async () =>{
+    const items = [{ product: details, qty }];
+    marketPlaceActions.addItemToCart(marketplaceDispatch, items);
+    navigate('/checkout');
+    window.scrollTo(0, 0);
+  }
 
   const ownershipDetailColumn = [
     {
@@ -401,23 +449,34 @@ const ProductDetails = ({ user, users }) => {
           </Row>
           <div className="flex w-full flex-col lg:leading-12 px-4 sm:px-8 md:px-0  items-center lg:items-start  md:w-[750px] lg:w-[835px] xl:w-[858px]  md:mx-auto ">
             <div className="flex md:justify-center gap-[15px] lg:gap-6 flex-col lg:flex-row   ">
-              <Carousel showIndicators={
-                details["BlockApps-Mercata-Asset-images"].length > 1 ? true : false
-              } className="product_detail w-full  sm:w-[417px]   lg:h-[348px] md:w-[343px] lg:w-[417px]" showStatus={false} showArrows swipeable emulateTouch infiniteLoop >
-                {details["BlockApps-Mercata-Asset-images"].length > 0 ? details["BlockApps-Mercata-Asset-images"].map((element, index) => {
-                  return (<><div key={index} className="sm:w-[343px ] h-[212px] lg:h-[348px]   md:h-[250px] lg:w-[417px] w-full rounded-md ">
+              { details["BlockApps-Mercata-Asset-images"].length > 0 
+              ?  <Swiper
+                spaceBetween={30}
+                effect={'fade'}
+                navigation={true}
+                centeredSlides={true}
+                pagination={{
+                  clickable: true,
+                }}
+                modules={[Autoplay, EffectFade, Navigation, Pagination]}
+                className="product-detail-swiper"
+              >    
+                {details["BlockApps-Mercata-Asset-images"].length > 0 && details["BlockApps-Mercata-Asset-images"].map((element, index) => {
+                  return (<SwiperSlide><div key={index} className="mx-auto sm:w-[343px ] h-[212px] lg:h-[348px]  md:h-[250px] lg:w-[417px] w-full rounded-md ">
                     <img width={"100%"}
                       alt={`${assetName} | Image ${index}`}
                       title={`${assetName} | Image ${index}`}
-                      className="object-contain rounded-md h-full " src={element.value ? element.value : image_placeholder} />
-                  </div></>)
-                }) : <><div className="sm:w-[343px ] sm:h-[212px] lg:h-[348px]   md:h-[250px] lg:w-[417px] w-full rounded-md ">
-                  <img width={"100%"}
-                    alt={`${assetName} | Image`}
-                    title={`${assetName} | Image`}
-                    className="object-contain rounded-md h-full " src={image_placeholder} />
-                </div></>}
-              </Carousel>
+                      className="object-contain rounded-md h-full" src={element.value ? element.value : image_placeholder} />
+                  </div></SwiperSlide>)
+                })}
+              </Swiper>
+              : <div className="sm:w-[343px ] sm:h-[212px] lg:h-[348px]   md:h-[250px] lg:w-[417px] w-full rounded-md ">
+              <img width={"100%"}
+                alt={`${assetName} | Image`}
+                title={`${assetName} | Image`}
+                className="object-contain rounded-md h-full " src={image_placeholder} />
+            </div>
+              }
               <div className=" w-full lg:w-1/2">
                 {!ownerSameAsUser() &&
                   <div className="flex justify-end">
@@ -459,7 +518,7 @@ const ProductDetails = ({ user, users }) => {
                   <Paragraph level={4} id="price" className=" text-[#13188A] text-xl font-bold lg:text-2xl lg:font-semibold">
                     {details?.price ? (
                       <>
-                        ${details?.price} <span className="font-normal text-xs mr-2 text-primary"><b>({details?.price * STRATS_CONVERSION} STRATS)</b></span>
+                        ${details?.price} <span className="font-normal text-xs mr-2 text-primary"><b>({(details?.price * STRATS_CONVERSION).toFixed(0)} STRATS)</b></span>
                       </>
                     ) : (
                       "No Price Available"
@@ -499,7 +558,7 @@ const ProductDetails = ({ user, users }) => {
                   <div className="flex gap-4 justify-between lg:justify-start  pt-4 w-full">
                     <Button
                       type="primary"
-                      className={`w-[90%] md:w-[365px] h-9  ${isAvailableForSale ? '!bg-[#808080]' : '!bg-[#13188A]'} !hover:bg-primaryHover !text-white`}
+                      className={`w-[100%]  h-9  ${isAvailableForSale ? '!bg-[#808080]' : '!bg-[#13188A]'} !hover:bg-primaryHover !text-white`}
                       onClick={async () => {
                         window.LOQ.push(['ready', async LO => {
                           // Track an event
@@ -522,7 +581,6 @@ const ProductDetails = ({ user, users }) => {
                         const checkQuantity = await orderActions.fetchSaleQuantity(orderDispatch, [details.saleAddress], [qty])
                         if (checkQuantity === true) {
                           addItemToCart();
-                          navigate("/checkout");
                         } else {
                           if (checkQuantity[0].availableQuantity === 0) {
                             openToast("bottom", true, TOAST_MSG.OUT_OF_STOCK(details));
@@ -536,8 +594,8 @@ const ProductDetails = ({ user, users }) => {
                     >
                       Buy Now
                     </Button>
-
-                    {ownerSameAsUser() ?
+                  {/* TODO:- Remove Comment to show the Add-to-Cart Button */}
+                  {/* {ownerSameAsUser() ?
                       <Button
                         icon={<div className="flex justify-center items-center">
                           <img src={Images.Cart} alt={`${assetName} | Image`} title={`${assetName} | Image`} width={18} height={18} className="object-contain" />
@@ -613,7 +671,7 @@ const ProductDetails = ({ user, users }) => {
                         }}
                       />
 
-                    }
+                    } */}
                   </div>
                   :
                   <div className="flex ">
@@ -691,7 +749,7 @@ const ProductDetails = ({ user, users }) => {
                         </div>
                       ) : (
                         <div className="text-center p-4">
-                          <p>Please{' '}
+                          <p>Please
                             <span
                               className="text-blue hover:text-blue cursor-pointer hover:underline"
                               onClick={() => {
@@ -701,7 +759,7 @@ const ProductDetails = ({ user, users }) => {
                             >
                               login
                             </span>
-                            {' '}to view ownership history.
+                            to view ownership history.
                           </p>
                         </div>
                       ),
