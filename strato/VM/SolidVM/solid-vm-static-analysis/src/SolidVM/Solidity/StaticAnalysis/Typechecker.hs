@@ -1591,63 +1591,44 @@ statementHelper (ModifierExecutor x) = pure $ topType' x
 statementHelper (EmitStatement _ vals x) =
   reduceType' x <$> traverse (tcExpr . snd) vals
 statementHelper (RevertStatement errorName (NamedArgs vals) x) = do
-  reduceType' x <$> traverse (tcExpr . snd) vals
-  cc <- asks codecollection
+  cc <- asks codeCollection
   let solidVMVersion = maybe "" snd $ find ((== "solidvm") . fst) $ _pragmas cc
   case solidVMVersion of
     "11.4" ->
       case errorName of
+        Nothing -> pure . bottom $ "Cannot have arguments without custom error" <$ x
         Just erName -> do
           c <- asks contract
           case M.lookup erName (_errors c) of
+            Nothing -> pure . bottom $ "Error does not exist" <$ x  
             Just err ->
-              case allDifferent $ map fst err of
-                False -> pure . bottom $ "Same parameter name used in error" <$ x
+              case allDifferent $ map (\(a,_,_) -> a) err of
+                False -> pure . bottom $ "Multiple use of same parameter name in error statement" <$ x
                 True  -> 
                   case allDifferent $ map fst vals of
-                    False -> pure . bottom $ "Same parameter name used in revertStatement" <$ x
+                    False -> pure . bottom $ "Same parameter name used in revert statement" <$ x
                     True  -> do
                       let errKeys = map (\(en, _, _) -> en) err
-                      if all (\(en, _) -> en `elem` errKeys) vals
-                        then do
-                          let matched = [(b,c) | (a, b) <- vals, (a', c, d) <- err, a == a']
-                          for matched $ \(valB, errC) -> do
-                            -- TODO, convert valB to to the type using the tcexpr and make sure it matches the expected type from errC
-                        else pure . bottom $ "Parameter does not exist" <$ x
-
-            Nothihng -> pure . bottom $ "Error does not exist" <$ x           
-        Nothing -> pure . bottom $ "Cannot have arguments without custom error" <$ x
+                      case all (\(en, _) -> en `elem` errKeys) vals of 
+                        False -> pure . bottom $ "Parameter does not exist" <$ x
+                        True  -> do
+                          let matched = [(b,d) | (a, b) <- vals, (a', d, _) <- err, a == a']
+                          let matched' = map (\(valB, errC) -> do
+                                                 let valB' = runReader (evalStateT (tcExpr valB) ((Nothing, M.empty) :| [])) (R cc c Nothing "Nothing" [])
+                                                 let valB'' = case valB' of
+                                                                Static s _ -> s
+                                                                _          -> error "Internal Error: Type is not static"
+                                                 let expectedType = indexedTypeType errC
+                                                 case isSameType expectedType valB'' of
+                                                   False -> False
+                                                   True  -> True
+                                             ) matched
+                          case all (==True) matched' of 
+                            False -> pure . bottom $ "Type mismatch in error arguments" <$ x
+                            True  -> reduceType' x <$> traverse (tcExpr . snd) vals 
     _    ->
-        reduceType' x <$> traverse tcExpr vals
-      
-
+        reduceType' x <$> traverse (tcExpr . snd) vals
 statementHelper (RevertStatement errorName (OrderedArgs vals) x) = do
-  
-  {-
-  data StatementF a = 
-    | EmitStatement String [(Maybe String, (ExpressionF a))] a
-    | RevertStatement (Maybe String) (ArgListF a) a
-
-  data ArgListF a = OrderedArgs [ExpressionF a] | NamedArgs [(SolidString, (ExpressionF a))]
-
-
-  data ContractF a = Contract
-    _events :: Map SolidString (SolidVM.EventF a)
-    _errors :: Map SolidString [(SolidString, SolidVM.IndexedType, a)],
-
-  data IndexedType = IndexedType {indexedTypeIndex :: Int32, indexedTypeType :: Type}
-
-
-  usage ex:
-
-    error errorName(string y,int y);
-    revert()
-    revert("some string")
-    revert someError("blah")
-
-    revert errorName({y : "somestring", x : "some other string"})
-  -}
-
     cc <- asks codeCollection
     let solidVMVersion = maybe "" snd $ find ((== "solidvm") . fst) $ _pragmas cc
     case solidVMVersion of
