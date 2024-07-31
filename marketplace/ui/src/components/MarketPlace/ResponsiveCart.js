@@ -1,4 +1,4 @@
-import { Button, Row, Typography, InputNumber, Select, Spin } from "antd";
+import { Button, Row, Typography, InputNumber, Select, Spin, Col } from "antd";
 import { useState, useEffect } from "react";
 import { Images } from "../../images";
 import { useMarketplaceDispatch } from "../../contexts/marketplace";
@@ -303,8 +303,10 @@ const ResponsiveCart = ({
               >
                 {paymentProviders && paymentProviders.map(provider => (
                   provider && <Option className='payment-dropdown' key={provider?.serviceName} value={provider?.serviceName}>
-                    Checkout with {provider?.serviceName}
-                    <img src={provider?.imageURL} alt={provider?.serviceName} style={{ width: 20, height: 20, marginRight: 8 }} />
+                    <Row className="w-full">
+                        <Col span={22} className="text-left">Checkout with {provider?.serviceName}</Col>
+                        <Col span={2} className="flex justify-end"><img src={provider?.imageURL} alt={provider?.serviceName} style={{ width: 20, height: 20, marginRight: 2 }} /> </Col>
+                    </Row>
                   </Option>
                 ))}
               </Select>
