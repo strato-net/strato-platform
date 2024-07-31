@@ -224,7 +224,7 @@ const TransferModal = ({ open, handleCancel, inventory, categoryName, limit, off
             rootAddress: inventory.root,
             assetAddress: inventory.address,
             quantity,
-            price,
+            price: 1,
             baseAddress: bridgeAddress,
             mercataAddress: inventory.owner
         };

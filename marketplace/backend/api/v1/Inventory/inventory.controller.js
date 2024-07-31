@@ -180,7 +180,7 @@ class InventoryController {
           tokenSymbol: body.rootAddress,
           quantity: body.quantity,
           baseAddress: body.baseAddress,
-          transferNumber: result.transferNumber,
+          transferNumber: result.transferNumber.toString(),
           mercataAddress: body.mercataAddress,
       };
       const response = await axios.post(`${TOKEN_SERVER_URL}/api/bridgeMercata`, payload, {
