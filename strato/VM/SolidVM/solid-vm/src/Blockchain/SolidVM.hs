@@ -1999,7 +1999,7 @@ expToVar' theFullExp@(CC.FunctionCall _ e args) _ = do
               contract <- getCurrentContract
               let pragmaCheck = CC.resolvePragmaFeature (CC._pragmas parentCC) "strictDecimals"
               case (pragmaCheck, convertedFirstArg) of
-                (True, SInteger n) -> return . Constant $ SDecimal $ roundTo (fromInteger n) v
+                (True, SInteger n) -> return . Constant $ SDecimal $ roundTo' truncate (fromInteger n) v
                 (False, _) -> unknownFunction "truncate" (contract ^. CC.contractName)
                 _ -> invalidArguments ("truncate() called with non-integer value as argument") convertedFirstArg
             _ -> regularFunctionCall Nothing
