@@ -511,7 +511,7 @@ codeOrDataLength t =
 
 codeLength :: Code -> Int
 codeLength (Code bytes) = B.length bytes
-codeLength (PtrToCode _) = error "codeLength: called with PtrToCode"
+codeLength (PtrToCode _) = 20
 
 zeroBytesLength :: OutputTx -> Int
 zeroBytesLength t =

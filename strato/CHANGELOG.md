@@ -16,6 +16,8 @@ so that they could be properly moved to their respective version's subsection.
 
 ## [Unreleased] 
 ### Added
+- CodePtr transactions can be made
+- RawTransaction now stores CodePtr information
 - Added `pragma safeExternalCalls` for contracts that want to enforce extra type safety on external calls from other contracts
 - Added `pragma solidvm 11.4` that includes all existing pragmas and their features
 - Added decimal precision strictness to `pragma solidvm 11.4`
@@ -48,6 +50,7 @@ so that they could be properly moved to their respective version's subsection.
 - <address>.nonce accessor in SolidVM
 - Upgraded PostgREST to version 12.0
 - Support for `decimal` numbers type
+- Arrays in events are stored as is i.e without tables
 
 ### Changed
 - Allow public keys to be passed to x509-generator in PEM format

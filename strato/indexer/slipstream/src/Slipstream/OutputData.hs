@@ -109,6 +109,7 @@ data ProcessedCollectionRow = ProcessedCollectionRow
   { address :: Address,
     codehash :: CodePtr,
     creator :: Text,
+    cc_creator :: Maybe Text,
     root :: Text,
     application :: Text,
     contractname :: Text,
@@ -1013,7 +1014,13 @@ insertIndexTableQuery :: (E.ProcessedContract, [T.Text]) -> Text -- does not acc
 insertIndexTableQuery cs = 
     let cs' = (\(c@E.ProcessedContract {contractData = contractData}, fkeys) -> ((c, Map.toList $ Map.mapMaybe valueToSQLTextFilterContract $ contractData), fkeys)) cs
         processContract ((contract, list), fkeys) =
-            let tableName = indexTableName (E.creator contract) (E.application contract) (E.contractName contract)
+            let tableName = 
+                  indexTableName 
+                    (case (E.cc_creator contract) of 
+                      Just cc_creator' -> cc_creator' 
+                      Nothing -> (E.creator contract)) 
+                    (E.application contract)
+                    (E.contractName contract)
                 fkeyColumns = [T.pack ((T.unpack k) ++ "_fkey") | k <- fkeys]
                 keysForSQL = map fst list ++ fkeyColumns
                 keySt = wrapAndEscapeDouble . map escapeQuotes $ baseColumns ++ keysForSQL
@@ -1065,7 +1072,9 @@ insertMappingTableQuery ms =
           mappings@((x, list) : _) ->
             let tableName =
                   collectionTableName
-                    (creator x)
+                    (case (cc_creator x) of 
+                      Just cc_creator' -> cc_creator'
+                      Nothing -> (creator x))
                     (application x)
                     (contractname x)
                     (collectionname x)
@@ -1324,7 +1333,9 @@ insertHistoryTableQuery cs =
           contracts@((x, list) : _) ->
             let tableName =
                   historyTableName
-                    (E.creator x)
+                    (case (E.cc_creator x) of 
+                      Just cc_creator' -> cc_creator'
+                      Nothing -> (E.creator x))
                     (E.application x)
                     (E.contractName x)
                 keySt = wrapAndEscapeDouble . map escapeQuotes $ baseTableColumns ++ map fst (fillFirstEmptyEntries list)
@@ -1432,13 +1443,12 @@ expandEventTable globalsIORef (creator, a, n) evName ev cc = do
 
 insertEventTables :: 
   OutputM m =>
-  IORef Globals ->
   [AggregateEvent] ->
   ConduitM () Text m ()
-insertEventTables globalsIORef evs = do
+insertEventTables evs = do
   let processedEvents = concatMap getAllEvents evs
   $logInfoS "insertEventTables/processedEvents" . T.pack $ show processedEvents
-  yieldMany . catMaybes =<< lift (mapM (insertEventTable globalsIORef) processedEvents)
+  yieldMany =<< lift (mapM (insertEventTable) processedEvents)
   where
     getAllEvents :: 
       AggregateEvent -> 
@@ -1455,7 +1465,10 @@ insertEventTables globalsIORef evs = do
           ((Account, Text), (Text, Text)) -> AggregateEvent
         createNewEvent ((_, n'), (c, a)) =
           ae { eventEvent = (eventEvent ae) {
-            Action.evContractCreator = T.unpack c,
+            Action.evContractCreator = 
+              if (Action.evContractApplication (eventEvent ae)) == "" 
+              then T.unpack c
+              else Action.evContractCreator (eventEvent ae),
             Action.evContractApplication = T.unpack a,
             Action.evContractName = T.unpack n'
               }
@@ -1463,23 +1476,12 @@ insertEventTables globalsIORef evs = do
 
 insertEventTable ::
   OutputM m =>
-  IORef Globals ->
   AggregateEvent ->
-  m (Maybe Text)
-insertEventTable globalsIORef agEv@AggregateEvent {eventEvent = ev} = do
-  let (creator, a, cname) =
-        constructTableNameParameters
-          (T.pack $ Action.evContractCreator ev)
-          (T.pack $ Action.evContractApplication ev)
-          (T.pack $ Action.evContractName ev)
-      eventTable = EventTableName creator a cname (escapeQuotes $ T.pack $ Action.evName ev)
-
-  eventExists <- isTableCreated globalsIORef eventTable
+  m (Text)
+insertEventTable agEv = do
   let q = insertEventTableQuery agEv
   multilineDebugLog "insertEventTable/SQL" $ T.unpack q
-  if eventExists
-    then return (Just q)
-    else return Nothing
+  return q
 
 insertEventTableQuery :: AggregateEvent -> Text
 insertEventTableQuery agEv@AggregateEvent {eventEvent = ev} =
