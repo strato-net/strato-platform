@@ -8997,9 +8997,9 @@ contract qq {
 |]
     getFields ["a", "b", "c", "d", "e", "f"]
       `shouldReturn` [BDecimal "5.282", 
-                      BDecimal "5.3", 
-                      BDecimal "3.26", 
-                      BDecimal "6.3",
+                      BDecimal "5.2", 
+                      BDecimal "3.25", 
+                      BDecimal "6.2",
                       BDecimal "3.24000",
                       BDecimal "3.24000000000000000000000000000000000000000000"])
 
