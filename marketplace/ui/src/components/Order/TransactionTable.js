@@ -1,22 +1,21 @@
 import React, { useEffect, useState } from "react";
+import { Pagination, Button, Dropdown, Menu, DatePicker, Space, Typography, Input, Row, Col } from "antd";
+import { DownOutlined, UpOutlined, DownloadOutlined, SearchOutlined } from "@ant-design/icons";
+import { useNavigate, Link, useParams, useLocation } from "react-router-dom";
 import classNames from "classnames";
-import { EyeOutlined, DownOutlined, UpOutlined, DownloadOutlined, SearchOutlined } from "@ant-design/icons";
-import routes from "../../helpers/routes";
 import DataTableComponent from "../DataTableComponent";
 import { dummyData, getStatus } from "./constant";
 import { getStringDate } from "../../helpers/utils";
-import { useNavigate, Link, useParams, useLocation } from "react-router-dom";
 import { actions } from "../../contexts/order/actions";
 import { useOrderDispatch, useOrderState } from "../../contexts/order";
 import useDebounce from "../UseDebounce";
 import { US_DATE_FORMAT, STRATS_CONVERSION } from "../../helpers/constants";
-import { Pagination, Button, Dropdown, Menu, DatePicker, Space, Typography, Input, Row, Col } from "antd";
-import TagManager from "react-gtm-module";
-import "./ordersTable.css"
 import { FilterIcon } from "../../images/SVGComponents";
-import dayjs from "dayjs";
-import { ResponsiveSoldOrderCard } from "./ResponsiveSoldOrdersCard";
+import "./ordersTable.css"
+import routes from "../../helpers/routes";
 import { Images } from "../../images";
+import dayjs from "dayjs";
+import TransactionResponsive from "./TransactionResponsive";
 
 const limit = 10;
 
@@ -127,7 +126,7 @@ const TransactionTable = ({ user, selectedDate, onDateChange, download, isAllOrd
 
   const column = [
     {
-      title: "(£)",
+      title: "#",
       dataIndex: "reference",
       key: "reference",
       render: (reference) => (
@@ -147,13 +146,14 @@ const TransactionTable = ({ user, selectedDate, onDateChange, download, isAllOrd
       render: (text) => ( <span style={{background:typeColor[text]}} className={`bg-${typeColor[text]} min-w-12 px-2 py-2 rounded-lg text-white`}>{text}</span>),
     },
     {
-      title: "Item",
+      title: "Asset",
       dataIndex: "Item",
       key: "Item",
+      // align: "center",
       render : (data, {imageURL, assetName}) => <div className="flex items-center"> <img src={imageURL[0]} alt={assetName} width={24} height={30} className="border border-indigo-600 rounded-md"  /> <span className="ml-1"> {assetName} </span> </div>
     },
     {
-      title: "Qty",
+      title: "Quantity",
       dataIndex: "qty",
       key: "qty",
       align: "center",
@@ -171,19 +171,19 @@ const TransactionTable = ({ user, selectedDate, onDateChange, download, isAllOrd
       title: "From",
       dataIndex: "from",
       key: "from",
-      align: "center",
+      align: "left",
     },
     {
       title: "To",
       dataIndex: "to",
       key: "to",
-      align: "center",
+      align: "left",
     },
     {
-      title: "# Hash",
+      title: "Hash",
       dataIndex: "hash",
       key: "hash",
-      align: "center",
+      align: "left",
       render: (data, {block_hash}) => <p className="text-[#13188A] hover:text-primaryHover cursor-pointer " >{`# ${block_hash.slice(0, 8)}..`}</p>
     },
     {
@@ -288,10 +288,10 @@ const TransactionTable = ({ user, selectedDate, onDateChange, download, isAllOrd
 
   return (
     <Row>
-      <Col span={4}></Col>
-      <Col span={20}>
+      {/* <Col span={4}></Col> */}
+      <Col span={22} className="mx-auto">
       <div className="flex items-center justify-between">
-      <h2> My Transactions </h2>
+      <h2 className="hidden md:block"> My Transactions </h2>
       <div className="flex gap-2 items-center mb-5">
         <Input className="text-base orders_searchbar md:p-3 rounded-full bg-[#F6F6F6]"
           key={searchVal}
@@ -305,26 +305,12 @@ const TransactionTable = ({ user, selectedDate, onDateChange, download, isAllOrd
           disabled={isAllOrdersLoading}
           trigger={['click']}
         >
-          <Button loading={isAllOrdersLoading} className="h-[32px] w-[33px] rounded-md border border-[#6A6A6A] flex md:hidden justify-center items-center">
+          <Button loading={isAllOrdersLoading} className="h-[32px] w-[33px] rounded-md border border-[#6A6A6A] flex justify-center items-center">
             <Space>
               <DownloadOutlined />
             </Space>
           </Button>
         </Dropdown>
-        <div className="text-xs flex items-center md:hidden">
-          <DatePicker
-            className="h-[32px] w-[33px] custom-picker"
-            disabledDate={(current) => {
-              const currentDate = dayjs().startOf('day'); // Get the start of today
-              const selectedDate = dayjs(current).startOf('day');
-
-              return selectedDate.isAfter(currentDate);
-            }}
-            onChange={onDateChange}
-            disabled={false}
-            suffixIcon={<img src={Images.calender} alt="calender" className="w-5 h-5" style={{ maxWidth: "none" }} />}
-          />
-        </div>
         <div className="relative">
           <div onClick={() => setMDropdownVisible(!mDropdownVisible)} className="h-[32px] w-[33px] rounded-md border border-[#6A6A6A] flex md:hidden justify-center items-center">
             <FilterIcon />
@@ -334,10 +320,11 @@ const TransactionTable = ({ user, selectedDate, onDateChange, download, isAllOrd
       </div>
       </div>
       <div className="flex md:hidden order_responsive">
-        <ResponsiveSoldOrderCard
+        {/* <ResponsiveSoldOrderCard
           data={data}
           isLoading={isordersSoldLoading || isLoading}
-        />
+        /> */}
+        <TransactionResponsive />
       </div>
       <div className="hidden md:block">
         <DataTableComponent
@@ -348,13 +335,13 @@ const TransactionTable = ({ user, selectedDate, onDateChange, download, isAllOrd
           scrollX="100%"
         />
       </div>
-      <Pagination
+      {/* <Pagination
         current={pageNo}
         onChange={onPageChange}
         total={orderSoldTotal}
         showSizeChanger={false}
         className="flex justify-center my-5"
-      />
+      /> */}
       </Col>
     </Row>
   );

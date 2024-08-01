@@ -25,6 +25,12 @@ export const getStatusByValue = (value) => {
   return Object.keys(status).find((key) => status[key] === value);
 };
 
+export const TYPE_COLOR = {
+    Order:"#2A53FF",
+    Transfer:"#FF0000",
+    Redemption:"#001C76"
+    }
+
 
 export const dummyData = [ //TODO: Remove this Transaction_Dummy_Data after UI Design
   {
