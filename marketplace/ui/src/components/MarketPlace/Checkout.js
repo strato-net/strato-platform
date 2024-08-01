@@ -358,11 +358,8 @@ const Checkout = () => {
 
   const filterPaymentServices = (e) => {
     const filteredPaymentServices = e.map(assetPaymentServices => paymentServices.find(paymentService => paymentService.address === assetPaymentServices.value));
-    if (filteredPaymentServices.length === 0 || filteredPaymentServices[0] === undefined) {
-      return paymentServices.filter((paymentService) => paymentService && paymentService.serviceName === 'Stripe' && paymentService.isActive);
-    } else {
-      return filteredPaymentServices;
-    }
+
+    return filteredPaymentServices;
   }
 
   return (
