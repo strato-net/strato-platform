@@ -1,5 +1,5 @@
 import { Button, InputNumber, Modal, Table, Input, Spin } from "antd";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { actions } from "../../contexts/inventory/actions";
 import { useInventoryDispatch } from "../../contexts/inventory";
 import { actions as redemptionActions } from "../../contexts/redemption/actions";
@@ -13,6 +13,7 @@ import AddAddressModal from "../MarketPlace/AddAddressModal";
 import ResponsiveAddAddress from "../MarketPlace/ResponsiveAddAddress"
 import { Images } from "../../images";
 import { REDEMPTION_STATUS } from "../../helpers/constants";
+import { handleQuantityInput } from "../../helpers/utils";
 
 const RedeemModal = ({ open, handleCancel, inventory, categoryName, limit, offset }) => {
     const [data, setData] = useState([inventory]);
@@ -29,6 +30,8 @@ const RedeemModal = ({ open, handleCancel, inventory, categoryName, limit, offse
     const { isRequestingRedemption } = useRedemptionState();
     const { userAddresses, isLoadingUserAddresses } = useMarketplaceState();
     const { TextArea } = Input;
+    const inputQuantityDesktopRef = useRef(null);
+    const inputQuantityMobileRef = useRef(null);
 
     const closeAddressModel = () => {
         setshowModal(false);
@@ -39,8 +42,8 @@ const RedeemModal = ({ open, handleCancel, inventory, categoryName, limit, offse
     }
 
     useEffect(() => {
-        marketplaceActions.fetchUserAddresses(marketplaceDispatch);
-    }, [marketplaceDispatch])
+        marketplaceActions.fetchUserAddresses(marketplaceDispatch, inventory.data.redemptionService);
+    }, [marketplaceDispatch]);
 
     useEffect(() => {
         if (quantity > inventory.quantity || quantity <= 0) {
@@ -49,7 +52,25 @@ const RedeemModal = ({ open, handleCancel, inventory, categoryName, limit, offse
         else {
             setCanRedeem(true);
         };
-    }, [quantity])
+    }, [quantity]);
+
+    useEffect(() => {
+        const quantityInputElements = [inputQuantityDesktopRef.current, inputQuantityMobileRef.current];
+
+        quantityInputElements.forEach(inputElement => {
+            if (inputElement) {
+                inputElement.addEventListener('input', handleQuantityInput(setQuantity));
+            }
+        });
+
+        return () => {
+            quantityInputElements.forEach(inputElement => {
+                if (inputElement) {
+                    inputElement.removeEventListener('input', handleQuantityInput(setQuantity));
+                }
+            });
+        };
+    }, [inputQuantityDesktopRef, inputQuantityMobileRef]);
 
     const columns = [
         {
@@ -61,7 +82,17 @@ const RedeemModal = ({ open, handleCancel, inventory, categoryName, limit, offse
             title: "Set Quantity",
             align: "center",
             render: () => (
-                <InputNumber value={quantity} controls={false} min={1} onChange={(value) => setQuantity(value)} />
+                <InputNumber
+                    value={quantity}
+                    ref={inputQuantityDesktopRef}
+                    controls={false}
+                    min={1}
+                    onChange={(value) => {
+                        if (value) {
+                            setQuantity(parseInt(value, 10));
+                        }
+                    }}
+                />
             )
         },
         {
@@ -76,6 +107,7 @@ const RedeemModal = ({ open, handleCancel, inventory, categoryName, limit, offse
     const handleSubmit = async () => {
         const body = {
             assetAddresses: [inventory.address],
+            redemptionService: inventory.data.redemptionService,
             assetName: inventory.name,
             status: REDEMPTION_STATUS.PENDING,
             quantity: quantity,
@@ -134,7 +166,7 @@ const RedeemModal = ({ open, handleCancel, inventory, categoryName, limit, offse
                         </>
                     }
                 </div>
-                {showModal && <AddAddressModal open={showModal} close={closeAddressModel} />}
+                {showModal && <AddAddressModal open={showModal} close={closeAddressModel} redemptionService={inventory.data.redemptionService} />}
                 {isLoadingUserAddresses ?
                     <div className="h-80 flex justify-center items-center">
                         <Spin spinning={isLoadingUserAddresses} size="large" />
@@ -164,20 +196,36 @@ const RedeemModal = ({ open, handleCancel, inventory, categoryName, limit, offse
             <div className="flex flex-col gap-[18px] md:hidden mt-5">
                 <div>
                     <p className="text-[#202020] font-medium text-sm">Quantity Available</p>
-                    <div className="inventory_card">
-                        <InputNumber className="w-full pl-5" value={data[0].quantity} min={1} disabled />
+                    <div>
+                        <InputNumber
+                            className="w-full h-9"
+                            value={data[0].quantity}
+                            min={1}
+                            disabled
+                        />
                     </div>
                 </div>
                 <div>
                     <p className="text-[#202020] font-medium text-sm">Set Quantity</p>
-                    <div className="inventory_card">
-                        <InputNumber className="w-full pl-5" value={quantity} controls={false} min={1} onChange={(value) => setQuantity(value)} />
+                    <div>
+                        <InputNumber
+                            className="w-full h-9"
+                            value={quantity}
+                            ref={inputQuantityMobileRef}
+                            controls={false}
+                            min={1}
+                            onChange={(value) => {
+                                if (value) {
+                                    setQuantity(parseInt(value, 10));
+                                }
+                            }}
+                        />
                     </div>
                 </div>
                 <div>
                     <p className="text-[#202020] font-medium text-sm">Additional comments</p>
-                    <div className="inventory_card">
-                        <TextArea className="w-full pl-5" value={comments} onChange={(e) => setComments(e.target.value)} />
+                    <div>
+                        <TextArea className="w-full" value={comments} onChange={(e) => setComments(e.target.value)} />
                     </div>
                 </div>
                 {isLoadingUserAddresses ?
@@ -228,7 +276,7 @@ const RedeemModal = ({ open, handleCancel, inventory, categoryName, limit, offse
                         </div>
                     </>
                 }
-                {showResponsiveForm && <ResponsiveAddAddress open={showResponsiveForm} close={closeResponsiveAddressModel}/>}
+                {showResponsiveForm && <ResponsiveAddAddress open={showResponsiveForm} close={closeResponsiveAddressModel} redemptionService={inventory.data.redemptionService} />}
             </div>
         </Modal>
     )

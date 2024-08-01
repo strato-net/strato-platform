@@ -34,21 +34,25 @@ contract Metals is Mintable, UnitOfMeasurement{
         string _description,
         string[] _images,
         string[] _files,
+        string[] _fileNames,
         uint _createdDate,
         uint _quantity,
         UnitOfMeasurement _unitOfMeasurement,
         uint _leastSellableUnits,
         string _source,
         string _purity,
-        AssetStatus _status
+        AssetStatus _status,
+        address _redemptionService
     ) Mintable (
         _name,
         _description,
         _images,
         _files,
+        _fileNames,
         _createdDate,
         _quantity,
-        _status
+        _status,
+        _redemptionService
         ) 
     {
         unitOfMeasurement = _unitOfMeasurement;
@@ -62,13 +66,15 @@ contract Metals is Mintable, UnitOfMeasurement{
                               description, 
                               images, 
                               files, 
+                              fileNames,
                               createdDate, 
                               splitQuantity,
                               unitOfMeasurement,
                               leastSellableUnits,
                               source,
                               purity,
-                              status
+                              status,
+                              address(redemptionService)
                               );
         return UTXO(address(newAsset)); 
 }

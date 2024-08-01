@@ -24,12 +24,16 @@ import ConfirmOrder from "./ConfirmOrder";
 import TagManager from "react-gtm-module";
 import image_placeholder from "../../images/resources/image_placeholder.png";
 import ResponsiveCart from "./ResponsiveCart";
+import { usePaymentServiceDispatch, usePaymentServiceState } from "../../contexts/payment";
+import { actions as paymentServiceActions } from "../../contexts/payment/actions";
 
 const { Title, Text } = Typography;
 
 const Checkout = () => {
   const marketplaceDispatch = useMarketplaceDispatch();
   const orderDispatch = useOrderDispatch();
+  const { paymentServices, arePaymentServicesLoading } = usePaymentServiceState();
+  const paymentServiceDispatch = usePaymentServiceDispatch();
   const [api, contextHolder] = notification.useNotification();
   const { cartList } = useMarketplaceState();
   const { isCreateOrderSubmitting, message, success } = useOrderState();
@@ -64,29 +68,36 @@ const Checkout = () => {
   }, [marketplaceDispatch, storedData]);
 
   useEffect(() => {
+    paymentServiceActions.getPaymentServices(paymentServiceDispatch);
+  }, [paymentServiceDispatch]);
+
+  useEffect(() => {
     const map = new Map();
     for (const obj of cartList) {
       const org = obj.product.ownerCommonName;
+      const newPPs = new Set(obj.product.paymentProviders)
       if (!map.has(org)) {
-        map.set(org, []);
+        map.set(org, { paymentProviders: newPPs, items: [] });
       }
-      map.get(org).push(obj);
+      const oldPPs = map.get(org).paymentProviders;
+      map.get(org).items.push(obj);
+      map.get(org).paymentProviders = new Set([...oldPPs].filter(x => newPPs.has(x)))
     }
     const mapDataArray = Array.from(map, (entry, index) => {
       // Modify the values and keys as needed
       const [key, value] = entry;
+      const { paymentProviders, items } = value;
       let modifiedValue = [];
-      value.forEach((item) => {
+      items.forEach((item) => {
         const parts = item.product.contract_name.split("-");
 
         modifiedValue.push({
           key: item.product.address,
           item: {
             name: item.product.name,
-            image:
-              item.product.images && item.product.images.length > 0
-                ? item.product.images[0]
-                : image_placeholder,
+            image: (item.product["BlockApps-Mercata-Asset-images"] && item.product["BlockApps-Mercata-Asset-images"].length > 0)
+              ? item.product["BlockApps-Mercata-Asset-images"][0].value
+              : image_placeholder,
             status: "Active",
           },
           category: parts[parts.length - 1],
@@ -98,15 +109,15 @@ const Checkout = () => {
           saleAddress: item.product.saleAddress,
           tax: calculateTax(item),
           amount:
-            item.product.price * item.qty +
-            calculateTax(item),
+            parseFloat((item.product.price * item.qty +
+              calculateTax(item)).toFixed(2)),
           action: item.product.address,
           qty: item.qty,
         });
       });
 
       // Return the new object
-      return { key: key, value: modifiedValue };
+      return { key: key, value: { paymentProviders: [...paymentProviders], items: modifiedValue } };
     });
     setmapData(mapDataArray);
     let t = 0;
@@ -344,10 +355,19 @@ const Checkout = () => {
     },
   ];
 
+  const filterPaymentServices = (es) => {
+    const ps = es.map(p => paymentServices.find(s => s.address === p.value));
+    if (ps.length === 0) {
+      return paymentServices.filter((p) => p && p.serviceName === 'Stripe');
+    } else {
+      return ps;
+    }
+  }
+
   return (
     <div className="mx-4 my-2 lg:mx-8 xl:mx-14">
       {contextHolder}
-      {isCreateOrderSubmitting ? (
+      {isCreateOrderSubmitting || arePaymentServicesLoading ? (
         <div className="flex justify-center items-center min-h-screen">
           <Spin spinning={isCreateOrderSubmitting} size="large" />
         </div>
@@ -360,15 +380,16 @@ const Checkout = () => {
               </ClickableCell>
             </Breadcrumb.Item>
             <Breadcrumb.Item href="" onClick={(e) => e.preventDefault()}>
-              <p className="text-sm text-[#202020] font-medium">My Cart</p>
+              <p className="text-sm text-[#202020] font-medium">Checkout</p>
             </Breadcrumb.Item>
           </Breadcrumb>
 
-          <div className="pt-[18px] lg:pt-6">
+          {/* Title for Cart Page: My Cart */}
+          {/* <div className="pt-[18px] lg:pt-6">
             <p className="text-base md:text-xl lg:text-2xl font-bold lg:font-semibold leading-9">
               My Cart
             </p>
-          </div>
+          </div> */}
           <div className="grid grid-cols-1 sm:place-items-center gap-3 lg:block">
             {mapData.length === 0 ? (
               <div className="flex flex-col items-center">
@@ -381,11 +402,16 @@ const Checkout = () => {
               mapData.map((e, index) => (
                 <React.Fragment key={e.key}>
                   <div className={`hidden lg:block`}>
-                    <ConfirmOrder data={e.value} columns={columns} />
+                    <ConfirmOrder
+                      paymentProviders={filterPaymentServices(e.value.paymentProviders)}
+                      data={e.value.items}
+                      columns={columns}
+                    />
                   </div>
                   <div className="lg:hidden">
                     <ResponsiveCart
-                      data={e.value}
+                      paymentProviders={filterPaymentServices(e.value.paymentProviders)}
+                      data={e.value.items}
                       AddQty={AddQty}
                       MinusQty={MinusQty}
                       ValueQty={ValueQty}

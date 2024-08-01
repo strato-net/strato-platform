@@ -484,6 +484,7 @@ getVariableOfName name = do
                        "account",
                        "uint",
                        "int",
+                       "decimal",
                        "bool",
                        "byte",
                        "bytes",
@@ -791,7 +792,7 @@ getCurrentCodeCollection = do
   cs <- Mod.get (Mod.Proxy @[CallInfo])
   case cs of
     (currentCallInfo : _) -> return (collectionHash currentCallInfo, codeCollection currentCallInfo)
-    _ -> internalError "getCurrentContract called with an empty stack" ()
+    _ -> internalError "getCurrentCodeCollection called with an empty stack" ()
 
 hintFromType :: MonadSM m => SVMType.Type -> m BasicType
 hintFromType = \case
@@ -801,6 +802,7 @@ hintFromType = \case
   SVMType.Bytes {} -> return TString
   SVMType.Int {} -> return TInteger
   SVMType.String {} -> return TString
+  SVMType.Decimal {} -> return TDecimal
   (SVMType.UserDefined _ SVMType.Bool {}) -> return TBool
   (SVMType.UserDefined _ SVMType.Int {}) -> return TString
   SVMType.UnknownLabel s _ -> do
@@ -982,13 +984,13 @@ getMapNamesFromContract c =
       listOfMappingsWithRecords = filter (\(_, vd) -> CC._isRecord vd) listOfMappings
    in T.pack . fst <$> listOfMappingsWithRecords
 
+--also needs to be changed for testnet3 to be only record
 getArrayNamesFromContract :: CC.Contract -> [T.Text]
 getArrayNamesFromContract c =
   let storageDefs' = c ^. CC.storageDefs
       storageDefsList = M.toList storageDefs'
       listOfArrays = filter (\(_, vd) -> case (CC._varType vd) of SVMType.Array _ _ -> True; _ -> False) storageDefsList
-      listOfArraysWithRecords = filter (\(_, vd) -> CC._isRecord vd) listOfArrays
-   in T.pack . fst <$> listOfArraysWithRecords
+   in T.pack . fst <$> listOfArrays -- we need to change this to filter on _isRecord on testnet3
 
 resolveNameParts ::
   MonadSM m =>

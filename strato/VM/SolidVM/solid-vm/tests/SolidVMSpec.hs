@@ -8209,7 +8209,7 @@ contract qq {
 }
 |]
     getFields ["x"] `shouldReturn` [BInteger 4]
-
+    
   it "can use libraries" . runTest $ do
     runBS
       [r|
@@ -8515,6 +8515,7 @@ contract qq {
       SomeContract p = new SomeContract();
       b = p.x()[0];
   }
+
 }
 |]) `shouldThrow` anyTypeError
 
@@ -8534,7 +8535,6 @@ contract qq {
     delete arr2;
     delete xyz;
     delete b;
-    delete yy;
   }
 }|]
       getFields ["res", "arr2"] `shouldReturn` [BDefault, BDefault]) 
@@ -8574,3 +8574,387 @@ contract qq {
   string hsh = blockhash(900000);
   constructor() {}
 }|]) `shouldThrow` anyInvalidArgumentsError
+
+  it "can use decimal numbers" $ runTest ( do
+    runBS [r|
+contract qq {
+  decimal x = 1.123123;
+  decimal negativeX = -1.123123;
+  decimal y = 0.0000003;
+  decimal z;
+  decimal copyOfX;
+  decimal funcResult;
+  decimal[] decimalArray;
+  decimal elementOne;
+  decimal elementTwo;
+  
+  constructor() {
+    copyOfX = x;
+    funcResult = test(x);
+    decimalArray.push(3.2);
+    decimalArray.push(2.1);
+    elementOne = decimalArray[0];
+    elementTwo = decimalArray[1];
+  }
+
+  function test(decimal _x) returns (decimal) {
+    return _x;
+  }
+}
+|]
+    getFields ["x", "negativeX", "y", "z", "copyOfX", "funcResult", "elementOne", "elementTwo"]
+      `shouldReturn` [BDecimal "1.123123",
+                      BDecimal "-1.123123",
+                      BDecimal "0.0000003",
+                      BDefault,
+                      BDecimal "1.123123",
+                      BDecimal "1.123123",
+                      BDecimal "3.2",
+                      BDecimal "2.1"
+                    ])
+
+  it "can use decimal numbers with arithmetic operators" $ runTest ( do
+    runBS [r|
+contract qq {
+  decimal x = 1.123123;
+  decimal y = 2.0;
+  decimal sum;
+  decimal diff;
+  decimal product;
+  decimal quotient;
+  decimal negative;
+
+  constructor() {
+    sum = x + y;
+    diff = x - y;
+    product = x * y;
+    quotient = x / y;
+    negative = -y;
+  }
+}
+|]
+    getFields ["x", "y", "sum", "diff", "product", "quotient", "negative"] 
+      `shouldReturn` [BDecimal "1.123123",
+                      BDecimal "2.0",
+                      BDecimal "3.123123",
+                      BDecimal "-0.876877",
+                      BDecimal "2.246246",
+                      BDecimal "0.5615615",
+                      BDecimal "-2"
+                     ])
+
+  it "can use decimal numbers with assignment operators" $ runTest ( do
+    runBS [r|
+contract qq {
+  decimal x = 2.0;
+  decimal sum = 3.3;
+  decimal diff = 3.3;
+  decimal product = 3.3;
+  decimal quotient = 3.3;
+
+  constructor() {
+    sum += x;
+    diff -= x;
+    product *= x;
+    quotient /= x;
+  }
+}
+|]
+    getFields ["x", "sum", "diff", "product", "quotient"] 
+      `shouldReturn` [BDecimal "2.0",
+                      BDecimal "5.3",
+                      BDecimal "1.3",
+                      BDecimal "6.6",
+                      BDecimal "1.65"
+                     ])
+
+  it "can use decimal literals in expressions" $ runTest ( do
+    runBS [r|
+contract qq {
+  decimal x = 2;
+  decimal sum;
+  decimal sumTwo;
+  decimal sumThree;
+  decimal diff;
+  decimal diffTwo;
+  decimal product;
+  decimal productTwo;
+  decimal quotient;
+  decimal quotientTwo;
+  decimal quotientThree;
+
+  constructor() {
+    sum = x + 3.3;
+    sumTwo = 1.0 + 3.3;
+    sumThree += 2.8;
+    diff = x - 1.2;
+    diffTwo = 3.3 - 1.2;
+    product = x * 3.2;
+    productTwo = -1.2 * 2.3;
+    quotient = x / 2.3;
+    quotientTwo = 4.6 / 2.3;
+    quotientThree = quotientTwo / 0.32;
+  }
+}
+|]
+    getFields ["x", "sum", "sumTwo", "sumThree", "diff", "diffTwo", "product", "productTwo", "quotient", "quotientTwo", "quotientThree"] 
+      `shouldReturn` [BInteger 2,
+                      BDecimal "5.3",
+                      BDecimal "4.3",
+                      BDecimal "2.8",
+                      BDecimal "0.8",
+                      BDecimal "2.1",
+                      BDecimal "6.4",
+                      BDecimal "-2.76",
+                      BDecimal "0.869565217391304347826086956521739130434782608695652173913043478260869565217391304347826086956521739130434782608695652173913043478260869565217391304347826086956521739130434782608695652173913043478260869565217391304347826086956521739130434782608695652173913",
+                      BDecimal "2",
+                      BDecimal "6.25"
+                     ])
+
+  it "can use comparison operators with decimal numbers" $ runTest ( do
+    runBS [r|
+contract qq {
+  decimal x = 2.1;
+  decimal y = 3.2;
+  bool testOne;
+  bool testTwo;
+  bool testThree;
+  bool testFour;
+  bool testFive;
+  bool testSix;
+
+  constructor() {
+    testOne = x <= y;
+    testTwo = x < y;
+    testThree = x == y;
+    testFour = x != y;
+    testFive = x >= y;
+    testSix = x > y;
+  }
+}
+|]
+    getFields ["x", "y", "testOne", "testTwo", "testThree", "testFour", "testFive", "testSix"] 
+      `shouldReturn` [BDecimal "2.1",
+                      BDecimal "3.2",
+                      BBool True,
+                      BBool True,
+                      BDefault,
+                      BBool True,
+                      BDefault,
+                      BDefault
+                     ])
+
+  it "cannot divide by zero using decimal numbers" $ runTest ( do
+    runBS [r|
+contract qq {
+  decimal x;
+
+  constructor() {
+    x = 3.0 / 0.0;
+  }
+}
+|])
+    `shouldThrow` anyDivideByZeroError
+
+  it "can do arithmetics with decimal and integer literals" $ runTest ( do
+    runBS [r|
+contract qq {
+  decimal x;
+
+  constructor() {
+    x = 3.2 + 6 + 6.2;
+  }
+}
+|]
+    getFields ["x"] 
+      `shouldReturn` [BDecimal "15.4"])
+
+  it "cannot use int without casting in arithmetic expressions involving decimals" $ runTest ( do
+    runBS [r|
+contract qq {
+  decimal x;
+  uint y = 6;
+
+  constructor() {
+    x = 5.2 + y;
+  }
+}
+|])
+    `shouldThrow` anyTypeError
+
+  it "can use int with casting in arithmetic expressions involving decimals" $ runTest ( do
+    runBS [r|
+contract qq {
+  decimal x;
+  uint y = 6;
+
+  constructor() {
+    x = 5.2 + decimal(y);
+  }
+}
+|]
+    getFields ["x"]
+      `shouldReturn` [BDecimal "11.2"])
+
+  it "can cast string to decimal" $ runTest ( do
+    runBS [r|
+contract qq {
+  decimal x;
+
+  constructor() {
+    x = decimal("3.5");
+  }
+}
+|]
+    getFields ["x"]
+      `shouldReturn` [BDecimal "3.5"])
+
+  it "should throw an error when casting bad string to decimal" $ runTest ( do
+    runBS [r|
+contract qq {
+  decimal x;
+
+  constructor() {
+    x = decimal("hey");
+  }
+}
+|]) `shouldThrow` anyTypeError
+
+
+  it "can externally return decimals" . runTest $ do
+    runCall'
+      "f"
+      "()"
+      [r|
+contract qq {
+  function f() returns (decimal) {
+    decimal k = 0.5;
+    return k;
+  }
+}|]
+      `shouldReturn` Just "(0.5)"
+      
+  it "can use decimal numbers with the modulo operator" $ runTest ( do
+    runBS [r|
+contract qq {
+  decimal x = 1.123123;
+  decimal y = 2.0;
+  decimal modulo;
+
+  constructor() {
+    modulo = x % y;
+  }
+}
+|]
+    getFields ["x", "y", "modulo"] 
+      `shouldReturn` [BDecimal "1.123123",
+                      BDecimal "2.0",
+                      BDecimal "1.123123"])
+--test for modulo 
+  it "can use different numbers with the modulo operator" $ runTest ( do
+    runBS [r|
+contract qq {
+  decimal xDec = 5.75;
+  decimal yDec = 1.5;
+  decimal moduloDec;
+
+  int xInt = 7;
+  int yInt = 3;
+  int moduloInt;
+
+  constructor() {
+    moduloDec = xDec % yDec;
+    moduloInt = xInt % yInt;
+  }
+}
+|]
+    getFields ["xDec", "yDec", "moduloDec", "xInt", "yInt", "moduloInt"] 
+      `shouldReturn` [BDecimal "5.75",
+                      BDecimal "1.5",
+                      BDecimal "1.25",
+                      BInteger 7,
+                      BInteger 3,
+                      BInteger 1])
+--test for modulo assign                      
+  it "can use different numbers with the modulo assign operator" $ runTest ( do
+    runBS [r|
+contract qq {
+  decimal xDec = 5.75;
+  decimal yDec = 1.5;
+  decimal moduloDec;
+
+  int xInt = 7;
+  int yInt = 3;
+  int moduloInt;
+
+  constructor() {
+    xDec %= yDec;
+    xInt %= yInt;
+    moduloDec = xDec;
+    moduloInt = xInt;
+  }
+}
+|]
+    getFields ["xDec", "yDec", "moduloDec", "xInt", "yInt", "moduloInt"] 
+      `shouldReturn` [BDecimal "1.25",
+                      BDecimal "1.5",
+                      BDecimal "1.25",
+                      BInteger 1,
+                      BInteger 3,
+                      BInteger 1])
+                      
+  it "can cast decimals to int or uint" $ runTest ( do
+    runBS [r|
+contract qq {
+  decimal x = 5.2;
+  uint y;
+  int z;
+
+  constructor() {
+    y = uint(x);
+    z = int(x);
+  }
+}
+|]
+    getFields ["y", "z"]
+      `shouldReturn` [BInteger 5, BInteger 5])
+
+  it "can't assign decimals to int or uint" $ runTest ( do
+    runBS [r|
+contract qq {
+  constructor() {
+    int d = 5.5 + 5;
+  }
+}
+|]) `shouldThrow` anyTypeError
+
+  it "can error handle improperly referenced overloaded contracts" $ runTest ( do 
+    let getAddressFromResult :: ExecResults -> Maybe Address 
+        getAddressFromResult res = _accountAddress <$> erNewContractAccount res
+
+    res <- runBS' [r|
+pragma safeExternalCalls;
+contract qq {
+    bool public myVal;
+
+    function changeMyVal(bool b){
+        myVal = b;
+    }
+}|]
+
+    case getAddressFromResult res of
+      Nothing -> error "No address returned"
+      Just address -> runCall' "changeMyValOfTest" (T.pack $ "(0x"++ formatAddressWithoutColor address ++", 3 )" ) [r|
+contract Test {
+    int public myVal;
+
+    function changeMyVal(int b){
+        myVal = b;
+    }
+}
+contract qq {
+    function changeMyValOfTest(address a, int v) returns (int) {
+        Test(a).changeMyVal(v);
+        return Test(a).myVal();
+    }
+}|]) `shouldThrow` anyTypeError

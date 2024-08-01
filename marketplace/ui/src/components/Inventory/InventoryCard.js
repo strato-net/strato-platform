@@ -21,7 +21,7 @@ import image_placeholder from "../../images/resources/image_placeholder.png";
 import "react-responsive-carousel/lib/styles/carousel.min.css";
 import { SEO } from "../../helpers/seoConstant";
 
-const InventoryCard = ({ inventory, category, debouncedSearchTerm, id, paymentProviderAddress, allSubcategories, limit, offset }) => {
+const InventoryCard = ({ inventory, category, debouncedSearchTerm, id, allSubcategories, limit, offset, user }) => {
   const textRef = useRef(null);
   const [isOverflowing, setIsOverflowing] = useState(false);
   const [open, setOpen] = useState(false);
@@ -105,7 +105,7 @@ const InventoryCard = ({ inventory, category, debouncedSearchTerm, id, paymentPr
    * @returns {boolean} True if the button should be disabled, false otherwise.
    */
   function isEditSellDisabled() {
-    return !paymentProviderAddress || (getCategory() === "Carbon Offset" && !(itemData.isMint && itemData.isMint === "True"));
+    return (getCategory() === "Carbon Offset" && !(itemData.isMint && itemData.isMint === "True"));
   }
 
   /**
@@ -207,8 +207,8 @@ const InventoryCard = ({ inventory, category, debouncedSearchTerm, id, paymentPr
               alt={imgMeta}
               title={imgMeta}
               src={
-                inventory.images && inventory.images.length > 0
-                  ? inventory.images[0]
+                inventory["BlockApps-Mercata-Asset-images"] && inventory["BlockApps-Mercata-Asset-images"].length > 0
+                  ? inventory["BlockApps-Mercata-Asset-images"][0].value
                   : image_placeholder}
 
             />
@@ -291,8 +291,8 @@ const InventoryCard = ({ inventory, category, debouncedSearchTerm, id, paymentPr
           limit={limit}
           offset={offset}
           inventory={inventory}
-          paymentProviderAddress={paymentProviderAddress}
           categoryName={category}
+          user={user}
         />
       )}
       {unlistModalOpen && (

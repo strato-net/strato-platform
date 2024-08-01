@@ -49,9 +49,7 @@ const BoughtOrderDetails = ({ user, users }) => {
   const [status, setStatus] = useState(getStatus(0));
   const { TextArea } = Input;
   const [paid, setPaid] = useState("Processing");
-  const [isLoadingPaymentStatus, setisLoadingPaymentStatus] = useState(false);
   const [selectedDate, setSelectedDate] = useState("");
-  const [shouldCheckPaymentStatus, setShouldCheckPaymentStatus] = useState(false);
   const { state } = useLocation()
 
   const navigate = useNavigate();
@@ -81,8 +79,6 @@ const BoughtOrderDetails = ({ user, users }) => {
     isbuyerDetailsUpdating,
     success,
     message,
-    // paymentStatus,
-    // isLoadingPaymentStatus,
   } = useOrderState();
 
   const routeMatch = useMatch({
@@ -103,108 +99,32 @@ const BoughtOrderDetails = ({ user, users }) => {
   }, [Id, dispatch]);
 
   const getData = async () => {
-    const data = await actions.fetchOrderDetails(dispatch, Id);
-    if (data != null) {
-      setShouldCheckPaymentStatus(true);
-    }
+    await actions.fetchOrderDetails(dispatch, Id);
   };
-
-  useEffect(() => {
-    if (shouldCheckPaymentStatus && orderDetails) {
-      getPaymentStatus(orderDetails.order.paymentSessionId, orderDetails.order.sellersCommonName);
-      setShouldCheckPaymentStatus(false);
-    }
-  }, [shouldCheckPaymentStatus, orderDetails]);
-
-
-  const validatePayment = async (paymentSessionId) => {
-    if (!paymentSessionId || !orderDetails) return;
-
-    const currentStatus = getStatus(parseInt(orderDetails.order.status));
-    const isPending = currentStatus === getStatusByName("Payment Pending");
-    const isCanceled = currentStatus === getStatusByName("Canceled");
-
-    if (isCanceled) {
-      setPaid("Payment Failed");
-      setcomment(orderDetails.order.comments);
-    }
-
-    if (isPending) {
-      try {
-        const response = await fetch(
-          `${apiUrl}/order/payment/intent/${paymentSessionId}/${orderDetails.order.sellersCommonName}`,
-          { method: HTTP_METHODS.GET }
-        );
-        const intentBody = await response.json();
-        const paymentErrorAndRequiresMethod = intentBody.data.last_payment_error?.message && intentBody.data.status === 'requires_payment_method';
-
-        if (paymentErrorAndRequiresMethod && !isCanceled) {
-          setisLoadingPaymentStatus(true)
-          const body = {
-            saleOrderAddress: orderDetails.order.address,
-            comments: encodeURIComponent('Stripe: ' + intentBody.data.last_payment_error.message),
-          };
-          //Update Order Details and change the Order Status to 'Canceled' from 'Payment Pending'
-          let isDone = await actions.cancelSale(dispatch, body);
-          setcomment(`Stripe: ${orderDetails.order.comments}`);
-          if (isDone) {
-            setStatus("Canceled");
-            setPaid("Payment Failed");
-            await actions.fetchOrderDetails(dispatch, Id);
-            setisLoadingPaymentStatus(false);
-          }
-        }
-
-      } catch (err) {
-        console.error(`Error: ${err}`);
-      }
-    }
-  };
-
-  const getPaymentStatus = async (paymentSessionId, sellersCommonName) => {
-    if (!paymentSessionId) return;
-
-    setisLoadingPaymentStatus(true);
-    try {
-      const response = await fetch(
-        `${apiUrl}/order/payment/session/${paymentSessionId}/${sellersCommonName}`,
-        { method: HTTP_METHODS.GET }
-      );
-
-      const body = await response.json();
-      if (response.status === RestStatus.OK) {
-        if (body.data["payment_status"] === "paid") {
-          setPaid("Paid");
-        } else {
-          await validatePayment(paymentSessionId);
-        }
-      }
-    } catch (err) {
-      console.error(`Error: ${err}`);
-    } finally {
-      setisLoadingPaymentStatus(false);
-    }
-  };
-
-
 
   useEffect(() => {
     if (orderDetails) {
-      setStatus(getStatus(parseInt(orderDetails.order.status)));
+      const statusInt = parseInt(orderDetails.order.status);
+      setStatus(getStatus(statusInt));
+      if (statusInt === 3) {
+        setPaid("Paid");
+      } else if (statusInt === 4) {
+        setPaid("Canceled");
+      }
       setcomment(orderDetails.order.comments);
-
+      const orderQuantities = orderDetails.order.quantities ? orderDetails.order.quantities : orderDetails.order["BlockApps-Mercata-Order-quantities"].map(item => item.value);
       let items = [];
       orderDetails.assets.forEach((prod, index) => {
         items.push({
           address: prod.address,
           chainId: prod.chainId,
           key: prod.address,
-          productImage: prod.images && prod.images.length > 0 ? prod.images[0] : image_placeholder,
+          productImage: prod["BlockApps-Mercata-Asset-images"].length > 0 ? prod["BlockApps-Mercata-Asset-images"][0].value : image_placeholder,
           productName: prod,
           name: prod.name,
           unitPrice: prod.price,
-          quantity: parseInt(orderDetails.order.quantities[index]),
-          amount: prod.price * parseInt(orderDetails.order.quantities[index]),
+          quantity: parseInt(orderQuantities[index]),
+          amount: prod.price * parseInt(orderQuantities[index]),
           serialNumber: prod,
           tax: prod.tax ? prod.tax : 0,
         });
@@ -289,6 +209,10 @@ const BoughtOrderDetails = ({ user, users }) => {
         bgClass: "bg-[#119B2D]"
       },
       ["Payment Failed"]: {
+        textClass: "bg-[#FFF0F0]",
+        bgClass: "bg-[#FF0000]"
+      },
+      ["Canceled"]: {
         textClass: "bg-[#FFF0F0]",
         bgClass: "bg-[#FF0000]"
       },
@@ -398,8 +322,16 @@ const BoughtOrderDetails = ({ user, users }) => {
 
   const handleCancelOrder = async () => {
     const body = {
-      saleOrderAddress: details.order.address,
-      comments: comment,
+      paymentProvider: {
+        address: details.order.address,
+      },
+      orderHash: details.order.orderHash,
+      orderId: details.order.orderId,
+      purchaser: details.order.purchaser,
+      saleAddresses: details.order.saleAddresses,
+      quantities: details.order.quantities,
+      currency: details.order.currency,
+      createdDate: details.order.createdDate,
     };
     let isDone = await actions.cancelSale(dispatch, body);
     if (isDone) {
@@ -410,14 +342,6 @@ const BoughtOrderDetails = ({ user, users }) => {
   return (
     <div>
       {contextHolder}
-      {details === null || isorderDetailsLoading || isbuyerDetailsUpdating || isLoadingPaymentStatus ? (
-        <div className="h-screen flex justify-center items-center">
-          <Spin
-            spinning={isorderDetailsLoading || isbuyerDetailsUpdating || isLoadingPaymentStatus}
-            size="large"
-          />
-        </div>
-      ) : (
         <div>
           <Breadcrumb className="text-sm ml-4 md:ml-20 mt-4 md:mt-5 mb-2">
             <Breadcrumb.Item href="" onClick={e => e.preventDefault()}>
@@ -437,7 +361,7 @@ const BoughtOrderDetails = ({ user, users }) => {
               </div>
             </Breadcrumb.Item>
             <Breadcrumb.Item className="text-sm font-medium text-[#202020]">
-              {details.order.orderId}
+              {`#${`${details?.order?.orderId || ''}`.substring(0,6)}`}
             </Breadcrumb.Item>
           </Breadcrumb>
 
@@ -458,38 +382,26 @@ const BoughtOrderDetails = ({ user, users }) => {
                 children:
                   <div className="mb-10">
                     <Button type="ghost" onClick={() => onChange('Bought')} className="cursor-pointer mb-1 px-2 flex md:hidden items-center gap-2 text-sm font-semibold"><LeftArrow /> Back</Button>
+                    {details === null || isorderDetailsLoading || isbuyerDetailsUpdating ? (
+                      <div className="h-screen flex justify-center items-center">
+                        <Spin
+                          spinning={isorderDetailsLoading || isbuyerDetailsUpdating}
+                          size="large"
+                        />
+                      </div>
+                    ) : (
                     <Card className="md:p-2 mb-4 md:mb-14 md:shadow-card_shadow order_detail_card">
                       <div className="flex flex-col md:flex-row md:justify-between">
                         <div className="flex flex-col">
                           <div className="flex">
-                            <Text className="bg-[#E9E9E9] md:bg-white py-2 px-3 w-full md:w-2/5 md:bg-none font-semibold text-sm md:text-lg text-primaryB flex gap-4 items-center">Order Details</Text>
+                            <Text className="bg-[#E9E9E9] md:bg-white py-2 px-3 w-full md:w-3.5/5 md:bg-none font-semibold text-sm md:text-lg text-primaryB flex gap-4 items-center">Order Details</Text>
                             <Text className="hidden md:flex mt-2">{statusComponentForPayment(paid)}</Text>
                           </div>
-                          <Text className="text-[#6A6A6A] md:text-black px-3 my-2 text-xs md:text-sm md:font-semibold">Please enter the fulfillment date to close the order</Text>
                         </div>
-                        <Button
-                          id="cancel-order-button"
-                          type="primary"
-                          className="min-w-max w-max h-9 px-[2%] ml-2 bg-primary !hover:bg-primaryHover"
-                          disabled={status !== getStatus(1) || comment === "" || details.order.paymentSessionId !== ""}
-                          onClick={() => {
-                            handleCancelOrder()
-                            window.LOQ.push(['ready', async LO => {
-                              await LO.$internal.ready('events')
-                              LO.events.track('Order Details: Cancel Order')
-                            }])
-                            TagManager.dataLayer({
-                              dataLayer: {
-                                event: 'orderDetails_bought_cancel_click',
-                              },
-                            });
-                          }}
-                        >
-                          Cancel Order
-                        </Button>
+
                       </div>
                       <Row className="hidden md:flex my-6 justify-between bg-[#F6F6F6] p-4 pb-2 rounded">
-                        <OrderData title="Order Number" value={`#${details.order.orderId}`} />
+                        <OrderData title="Order Number" value={`#${`${details.order.orderId}`.substring(0,6)}`} />
                         <Divider type="vertical" className="h-14 bg-secondryD" />
                         <OrderData
                           title="Buyer"
@@ -517,7 +429,7 @@ const BoughtOrderDetails = ({ user, users }) => {
                       </Row>
                       <Row className="my-2 md:hidden flex-col gap-[6px] justify-between p-4 pb-0 rounded">
                         <div className="flex gap-4">
-                          <NewOrderData className="w-2/4" title="Order Number" value={'#' + details.order.orderId} />
+                          <NewOrderData className="w-2/4" title="Order Number" value={'#' + `${details.order.orderId}`.substring(0,6)} />
                           <NewOrderData className="w-2/4" title="Buyer" value={details.order.purchasersCommonName} />
                         </div>
                         <div className="flex gap-4">
@@ -538,7 +450,7 @@ const BoughtOrderDetails = ({ user, users }) => {
                             rows={2}
                             placeholder="Enter Comments"
                             value={decodeURIComponent(comment)}
-                            disabled={status !== getStatus(1) || details.order.paymentSessionId !== ""}
+                            disabled={true}
                             onChange={(event) => {
                               setcomment(event.target.value);
                             }}
@@ -554,6 +466,7 @@ const BoughtOrderDetails = ({ user, users }) => {
                           scrollX="100%"
                         /></div>
                     </Card>
+                    )}
                     {data?.length > 0 && data?.map((item) => {
                       return (
                         <ResponsiveOrderDetailCard data={item} />)
@@ -578,7 +491,6 @@ const BoughtOrderDetails = ({ user, users }) => {
             ]}
           />
         </div>
-      )}
 
       {message && openToastOrder("bottom")}
     </div>

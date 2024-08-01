@@ -14,23 +14,27 @@ import {
   Col
 } from "antd";
 import { ArrowLeftOutlined, LogoutOutlined } from "@ant-design/icons";
-import { Images } from "../../images";
-import "./header.css";
 import { useLocation, useNavigate } from "react-router-dom";
-import routes from "../../helpers/routes";
-import {
-  useMarketplaceState,
-  useMarketplaceDispatch,
-} from "../../contexts/marketplace";
-import { actions } from "../../contexts/marketplace/actions";
+import TagManager from "react-gtm-module";
+// actions
+import { actions as marketplaceActions } from "../../contexts/marketplace/actions";
 import { actions as categoryActions } from "../../contexts/category/actions";
 import { actions as userActions } from "../../contexts/authentication/actions";
+// Dispatches
+import { useMarketplaceState, useMarketplaceDispatch, } from "../../contexts/marketplace";
 import { useAuthenticateDispatch, useAuthenticateState } from "../../contexts/authentication";
-import TagManager from "react-gtm-module";
-import { SEO } from "../../helpers/seoConstant";
 import { useCategoryDispatch, useCategoryState } from "../../contexts/category";
+// other
+import { SEO } from "../../helpers/seoConstant";
 import LoginModal from "../MarketPlace/LoginModal"
 import { setCookie } from "../../helpers/cookie";
+import TransferStratsModal from "../MarketPlace/TransferStratsModal";
+import StratsTransactionHistoryModal from "../MarketPlace/StratsTransactionHistoryModal";
+
+import { navItems } from "../../helpers/constants";
+import routes from "../../helpers/routes";
+import { Images } from "../../images";
+import "./header.css";
 
 const { Header } = Layout;
 
@@ -68,32 +72,28 @@ const HeaderComponent = ({ user, loginUrl, showMenu, handleSubMenu, handleMenuTa
 
   useEffect(() => {
     if (user) {
-      actions.fetchStratsBalance(marketplaceDispatch);
+      marketplaceActions.fetchStratsBalance(marketplaceDispatch);
     }
   }, [user]);
 
   useEffect(() => {
-    actions.fetchCartItems(marketplaceDispatch, storedData);
+    marketplaceActions.fetchCartItems(marketplaceDispatch, storedData);
   }, [marketplaceDispatch, storedData]);
 
   const [selectedTab, setSelectedTab] = useState("0");
-  const [initials, setInitials] = useState("");
   const [roleIndex, setRoleIndex] = useState();
   const [showSearch, setShowSearch] = useState(false);
   const [categories, setCategories] = useState([]);
   const [selectedCategory, setSelectedCategory] = useState(categoryQueryValue);
   const [isModalVisible, setIsModalVisible] = useState(false);
+  const [isTransferStratsModalVisible, setIsTransferStratsModalVisible] = useState(false);
+  const [isStratsTransactionHistoryModalVisible, setIsStratsTransactionHistoryModalVisible] = useState(false);
 
   const stratsBalance = (Object.keys(strats).length > 0) ? strats : 0
 
   useEffect(() => {
     setSelectedCategory(categoryQueryValue)
   }, [categoryQueryValue])
-
-  const navItems = [
-    { label: <div id="Orders">Orders</div>, key: '0' },
-    { label: <div id="Inventory">My Items</div>, key: '1' }
-  ];
 
   const navUrls = [
     routes.Orders.url.replace(':type', 'sold'),
@@ -183,30 +183,49 @@ const HeaderComponent = ({ user, loginUrl, showMenu, handleSubMenu, handleMenuTa
     },
   ];
 
-  const stratsItem = [{
-    key: '2',
-    label: (
-      <div>
-        {user &&
-          <p className="text-xs mt-1">
-            STRATs: {stratsBalance}
-          </p>
+  const stratsItem = [
+    {
+      key: '1',
+      type: 'group',
+      label: (
+        <div>
+          {user &&
+            <p className="text-xs mt-1">
+              STRATS: {stratsBalance}
+            </p>
+          }
+        </div>
+      ),
+      children: [
+        {
+          key: '2',
+          onClick: () => setIsTransferStratsModalVisible(true),
+          label: (
+            <div>
+              {user &&
+                <p className="text-xs mt-1">
+                  Transfer
+                </p>
+              }
+            </div>
+          ),
+        },
+        {
+          key: '3',
+          onClick: () => setIsStratsTransactionHistoryModalVisible(true),
+          label: (
+            <div>
+              {user &&
+                <p className="text-xs mt-1">
+                  Transaction History
+                </p>
+              }
+            </div>
+          ),
         }
-      </div>
-    ),
-  }]
-
-  useEffect(() => {
-    let temp = "";
-    if (user != null) {
-      if (user.commonName.split(" ").length > 1) {
-        temp = user.commonName.split(" ")[0].substring(0, 1) + user.commonName.split(" ")[1].substring(0, 1);
-      } else {
-        temp = user.commonName.split(" ")[0].substring(0, 1);
-      }
+      ],
     }
-    setInitials(temp);
-  }, [user])
+  ]
 
   useEffect(() => {
     if (user) setRoleIndex(0)
@@ -219,11 +238,7 @@ const HeaderComponent = ({ user, loginUrl, showMenu, handleSubMenu, handleMenuTa
     user ? {
       value: "my-profile",
       path: routes.MarketplaceUserProfile.url.replace(':commonName', user.commonName),
-      label: (
-        <div>
-          <p className="!mb-0">My Profile</p>
-        </div>
-      )
+      label: (<div> <p className="!mb-0"> My Profile </p> </div>)
     } : null,
     user ? {
       value: "logout",
@@ -242,10 +257,10 @@ const HeaderComponent = ({ user, loginUrl, showMenu, handleSubMenu, handleMenuTa
   const handleIntMenuTab = (data) => {
     if (roleIndex === 1) {
       // User is not logged in
-      data.value == 'orders' ? setSelectedTab(0) : setSelectedTab(1)
+      data.value === 'orders' ? setSelectedTab(0) : setSelectedTab(1)
       setIsModalVisible(true);
     } else {
-      data.value == 'logout' ? logout() : data.value == 'orders' ? navigate(routes.Orders.url.replace(':type', 'sold'), { state: { defaultKey: "Sold" } }) : navigate(data.path)
+      data.value === 'logout' ? logout() : data.value === 'orders' ? navigate(routes.Orders.url.replace(':type', 'sold'), { state: { defaultKey: "Sold" } }) : navigate(data.path)
       handleMenuTab(data)
     }
   }
@@ -310,18 +325,26 @@ const HeaderComponent = ({ user, loginUrl, showMenu, handleSubMenu, handleMenuTa
     setIsModalVisible(false);
   };
 
+  const handleCloseTransferStratsModal = () => {
+    setIsTransferStratsModalVisible(false);
+  };
+
+  const handleCloseStratsTransactionHistoryModal = () => {
+    setIsStratsTransactionHistoryModalVisible(false);
+  };
+
   return (
     <>
       <Header className={`fixed z-[100] !bg-[#ffffff] !pl-2 w-full !pr-4 md:px-12 flex md:!mb-10 ${showMenu ? '' : 'shadow-header'} items-center justify-between md:justify-start`}>
         <Row className="relative flex-grow-0 md:flex-1 ml-2 md:ml-5">
           <Col xs={20} md={10} lg={4}
-            className="mt-4 mr-5 md:mt-0 cursor-pointer flex-grow-0 w-max md:w-[170px] h-[44px]"
+            className="mt-4 mr-5 md:mt-0 cursor-pointer flex-grow-0 w-max md:w-[170px] h-[44px] logo"
             onClick={() => {
               navigate(routes.Marketplace.url)
               window.scrollTo(0, 0);
             }}
           >
-            <img src={Images.newLogo} alt={IMG_META} title={IMG_META} className="h-[31px] w-[120px] md:w-[170px] md:h-[44px]" preview={false} />
+            <img src={Images.newLogo} alt={IMG_META} title={IMG_META} className="h-[31px] w-[120px] md:w-[120px] lg:w-[150px] md:h-[44px] logo-image" preview={false} />
           </Col>
           <Col xs={showSearch ? 24 : 4} md={12} lg={18} className={`lg:ml-4 mf:ml-20 md:ml-1 bg-[#F6F6F6] shadow-md flex-1 header-search ${showSearch ? ' fixed top-[13px] left-0 flex w-[100vw] z-50 mb-2' : 'hidden md:flex '}`}>
             <Select
@@ -392,7 +415,9 @@ const HeaderComponent = ({ user, loginUrl, showMenu, handleSubMenu, handleMenuTa
           {<div className="flex md:hidden mx-2" onClick={() => handleSearchShow(true)}>
             <img src={Images.Responsive_search} alt={IMG_META} title={IMG_META} className="w-6 h-6" />
           </div>}
-          <Badge
+          
+          {/* TODO: uncomment the code to show the cart */}
+          {/* <Badge
             className="cursor-pointer mr-3 md:mr-1"
             count={cartList.length}
             onClick={() => {
@@ -415,11 +440,11 @@ const HeaderComponent = ({ user, loginUrl, showMenu, handleSubMenu, handleMenuTa
                 icon={<img src={Images.Header_cart} alt={IMG_META} title={IMG_META} className="w-6 h-6" />}
               />
             </div>
-          </Badge>
+          </Badge> */}
 
           {(roleIndex !== undefined && roleIndex !== 1)
-            && <Dropdown menu={{ items: stratsItem }} placement="bottomRight" trigger={["hover", "click"]} className="xs:mt-5 md:mt-0" overlayStyle={{ position: 'fixed' }}>
-              <a onClick={(e) => e.preventDefault()} className="md:flex mx-1 text-base text-white" id="strats-dropdown">
+            && <Dropdown menu={{ items: stratsItem }} placement="bottomRight" trigger={["click"]} className="xs:mt-5 md:mt-0" overlayStyle={{ position: 'fixed' }}>
+              <a className="md:flex mx-1 text-base text-white" id="strats-dropdown">
                 <Badge
                   style={{ backgroundColor: "#13188A" }}
                   className="cursor-pointer mt-7 md:mt-0 mx-2"
@@ -472,6 +497,17 @@ const HeaderComponent = ({ user, loginUrl, showMenu, handleSubMenu, handleMenuTa
         onCancel={handleClose}
         onLogin={handleLogin}
       />
+      {isTransferStratsModalVisible &&
+        <TransferStratsModal
+          visible={isTransferStratsModalVisible}
+          onCancel={handleCloseTransferStratsModal}
+          balance={stratsBalance}
+        />}
+      {isStratsTransactionHistoryModalVisible &&
+        <StratsTransactionHistoryModal
+          visible={isStratsTransactionHistoryModalVisible}
+          onCancel={handleCloseStratsTransactionHistoryModal}
+        />}
     </>
 
   );

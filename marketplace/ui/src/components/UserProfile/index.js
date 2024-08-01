@@ -43,7 +43,7 @@ const UserProfile = ({user}) => {
   const { cartList } = useMarketplaceState();
   const [api, contextHolder] = notification.useNotification();
   const marketplaceDispatch = useMarketplaceDispatch();
-  const { userInventories, isUserInventoriesLoading, inventories, isInventoriesLoading, message, success, isLoadingStripeStatus, stripeStatus, inventoriesTotal } = useInventoryState();
+  const { userInventories, isUserInventoriesLoading, inventories, isInventoriesLoading, message, success, inventoriesTotal } = useInventoryState();
   let { hasChecked, isAuthenticated, loginUrl } = useAuthenticateState();
   const { TabPane } = Tabs;
   const orderDispatch = useOrderDispatch();
@@ -127,13 +127,6 @@ const UserProfile = ({user}) => {
         }
       }, [dispatch, limit, offset, category, isOwner]);
 
-    // Seller Stripe Status fetch to preview options of listing
-    useEffect(() => {
-      if(isAuthenticated && hasChecked)
-        {
-          inventoryActions.sellerStripeStatus(dispatch, commonName);
-        }
-    }, [dispatch, category, user, commonName]);
 
     // Fetch Categories
     useEffect(() => {
@@ -266,7 +259,8 @@ const UserProfile = ({user}) => {
         const checkQuantity = await orderActions.fetchSaleQuantity(orderDispatch, [product.saleAddress], [quantity]);
         if (checkQuantity === true) {
           // Quantity check passed, add new item to the cart
-          items.push({ product, qty: quantity });
+          // Adding single object to keep single product in cart
+          items = [{ product, qty: quantity }];
           marketplaceActions.addItemToCart(marketplaceDispatch, items);
           openToast("bottom", false, "Item added to cart");
           return true;
@@ -408,7 +402,7 @@ const UserProfile = ({user}) => {
                 label: "All",
                 key: undefined,
                 children: (
-                  <div className="my-4 grid grid-cols-1 md:grid-cols-2 gap-6 lg:grid-cols-3 3xl:grid-cols-4 5xl:grid-cols-5 sm:place-items-center md:place-items-start  inventoryCard max-w-full">
+                  <div className="my-4 grid grid-cols-1 md:grid-cols-2 gap-6 lg:grid-cols-2 xl:grid-cols-3 3xl:grid-cols-4 5xl:grid-cols-5 sm:place-items-center md:place-items-start  inventoryCard max-w-full">
                     {!isInventoriesLoading ? (
                       inventories.map((inventory, index) => {
                         return (
@@ -418,9 +412,6 @@ const UserProfile = ({user}) => {
                             category={category}
                             key={index}
                             // debouncedSearchTerm={debouncedSearchTerm}
-                            paymentProviderAddress={
-                              stripeStatus ? stripeStatus.paymentProviderAddress : undefined
-                            }
                             allSubcategories={allSubcategories}
                           />
                         );
@@ -447,9 +438,6 @@ const UserProfile = ({user}) => {
                             category={category}
                             key={index}
                             // debouncedSearchTerm={debouncedSearchTerm}
-                            paymentProviderAddress={
-                              stripeStatus ? stripeStatus.paymentProviderAddress : undefined
-                            }
                             allSubcategories={allSubcategories}
                           />
                         );
@@ -476,9 +464,6 @@ const UserProfile = ({user}) => {
                             category={category}
                             key={index}
                             // debouncedSearchTerm={debouncedSearchTerm}
-                            paymentProviderAddress={
-                              stripeStatus ? stripeStatus.paymentProviderAddress : undefined
-                            }
                             allSubcategories={allSubcategories}
                           />
                         );
