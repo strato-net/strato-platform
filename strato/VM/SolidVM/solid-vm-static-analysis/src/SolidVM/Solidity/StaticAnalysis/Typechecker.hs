@@ -1784,10 +1784,75 @@ statementHelper (EmitStatement eventName vals x) = do
         Nothing -> pure . bottom $ "Event does not exist" <$ x
     _    ->
       reduceType' x <$> traverse (tcExpr . snd) vals
-statementHelper (RevertStatement _ (NamedArgs vals) x) =
-  reduceType' x <$> traverse (tcExpr . snd) vals
-statementHelper (RevertStatement _ (OrderedArgs vals) x) =
-  reduceType' x <$> traverse tcExpr vals
+statementHelper (RevertStatement errorName (NamedArgs vals) x) = do
+  cc <- asks codeCollection
+  let solidVMVersion = maybe "" snd $ find ((== "solidvm") . fst) $ _pragmas cc
+  case solidVMVersion of
+    "11.4" ->
+      case errorName of
+        Nothing -> pure . bottom $ "Cannot have arguments without custom error" <$ x
+        Just erName -> do
+          c <- asks contract
+          case M.lookup erName (_errors c) of
+            Nothing -> pure . bottom $ "Error does not exist" <$ x  
+            Just err ->
+              case allDifferent $ map (\(a,_,_) -> a) err of
+                False -> pure . bottom $ "Multiple use of same parameter name in error statement" <$ x
+                True  -> 
+                  case allDifferent $ map fst vals of
+                    False -> pure . bottom $ "Same parameter name used in revert statement" <$ x
+                    True  -> do
+                      let errKeys = map (\(en, _, _) -> en) err
+                      case all (\(en, _) -> en `elem` errKeys) vals of 
+                        False -> pure . bottom $ "Parameter does not exist" <$ x
+                        True  -> do
+                          let matched = [(b,d) | (a, b) <- vals, (a', d, _) <- err, a == a']
+                          let matched' = map (\(valB, errC) -> do
+                                                 let valB' = runReader (evalStateT (tcExpr valB) ((Nothing, M.empty) :| [])) (R cc c Nothing Nothing Nothing [])
+                                                 let valB'' = case valB' of
+                                                                Static s _ -> s
+                                                                _          -> error "Internal Error: Type is not static"
+                                                 let expectedType = indexedTypeType errC
+                                                 case isSameType expectedType valB'' of
+                                                   False -> False
+                                                   True  -> True
+                                             ) matched
+                          case all (==True) matched' of 
+                            False -> pure . bottom $ "Type mismatch in error arguments" <$ x
+                            True  -> reduceType' x <$> traverse (tcExpr . snd) vals 
+    _    ->
+        reduceType' x <$> traverse (tcExpr . snd) vals
+statementHelper (RevertStatement errorName (OrderedArgs vals) x) = do
+    cc <- asks codeCollection
+    let solidVMVersion = maybe "" snd $ find ((== "solidvm") . fst) $ _pragmas cc
+    case solidVMVersion of
+      "11.4" -> do
+        case errorName of 
+          Just erName -> do
+            c  <- asks contract
+            case M.lookup erName (_errors c) of 
+              Just err -> do
+                let vals' = fmap (\b -> 
+                                    let r = R cc c Nothing Nothing Nothing []
+                                    in runReader (evalStateT (tcExpr b) ((Nothing, M.empty) :| [])) r
+                                 ) vals
+                    -- valsDebug = trace ("Evaluated types: " ++ show vals') vals'
+                let vals'' = map (\y -> case y of
+                                          Static s _ -> s
+                                          _          -> error "Internal Error: Type is not static"
+                                 ) vals'
+                    -- valsStaticDebug = trace ("Static types: " ++ show vals'') vals''
+                let expectedTypes = [indexedTypeType it | (_, it, _) <- err]
+                    -- expectedTypesDebug = trace ("Expected types: " ++ show expectedTypes) expectedTypes
+                if length expectedTypes /= length vals''
+                  then pure . bottom $ "Wrong number of arguments provided" <$ x
+                  else if not (and $ zipWith isSameType expectedTypes vals'')
+                    then pure . bottom $ "Type mismatch in error arguments" <$ x
+                    else reduceType' x <$> traverse tcExpr vals
+              Nothing -> pure . bottom $ "Error does not exist" <$ x
+          Nothing -> reduceType' x <$> traverse tcExpr vals
+      _    ->
+        reduceType' x <$> traverse tcExpr vals
 statementHelper (UncheckedStatement body x) =
   statementsHelper' x body
 statementHelper (AssemblyStatement _ x) = pure $ topType' x
@@ -1812,6 +1877,9 @@ isSameType (SVMType.Mapping _ k1 v1) (SVMType.Mapping _ k2 v2) = isSameType k1 k
 isSameType SVMType.Variadic SVMType.Variadic = True
 isSameType _ _ = False
 
+allDifferent :: (Eq a) => [a] -> Bool
+allDifferent []     = True
+allDifferent (x:xs) = x `notElem` xs && allDifferent xs
 simpleStatementHelper :: SourceAnnotation Text -> Annotated SimpleStatementF -> SSS Type'
 simpleStatementHelper x (VariableDefinition vdefs mExpr) = do
   pushLocalVariables vdefs

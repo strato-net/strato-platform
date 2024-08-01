@@ -7538,7 +7538,7 @@ contract qq {
   function randomFunction(uint checker)
   {
     if(a==checker)
-      revert({x:"logic flag"});
+      revert("logic flag");
   }
 }|]
       )
