@@ -7,7 +7,7 @@ import constants from '../../helpers/constants';
 import saleJs from "../orders/sale";
 
 const contractName = constants.assetTableName;
-const transferContractName = `${contractName}.ItemTransfers`;
+const transferContractName = `${contractName}-ItemTransfers`;
 const contractFilename = `${util.cwd}/dapp/products/contracts/Inventory.sol`;
 const saleContractName = 'SimpleSale';
 const saleContract = constants.saleTableName;
