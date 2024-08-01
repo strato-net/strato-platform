@@ -4,14 +4,16 @@ const {
   prodMarketplaceUrl,
   testnetMarketplaceUrl,
 } = require("../config");
-const { authenticateGoogleSheet, getSTRATSAmount  } = require("../helper/sheet");
+const { authenticateGoogleSheet, getSTRATSAmount } = require("../helper/googleSheet.js");
 
-async function getRewardAmount() {
+async function getRewardAmount(event) {
   const { googleSheets, spreadsheetId } = await authenticateGoogleSheet();
-  return await getSTRATSAmount(googleSheets, spreadsheetId, "handleFirstOrder");
+  return await getSTRATSAmount(googleSheets, spreadsheetId, event);
 }
 
-async function handleFirstOrder(event, token) {
+async function handleOrderRewards(event, token) {
+  console.log("Handling order event:", event);
+
   const purchaser = event.eventEvent.eventArgs.find(
     (arg) => arg[0] === "purchaser"
   )?.[1];
@@ -21,8 +23,21 @@ async function handleFirstOrder(event, token) {
     return;
   }
 
+  const orderAmount = parseFloat(
+    event.eventEvent.eventArgs.find((arg) => arg[0] === "amount")?.[1] || 0
+  );
+  const tax = parseFloat(
+    event.eventEvent.eventArgs.find((arg) => arg[0] === "tax")?.[1] || 0
+  );
+  const fee = parseFloat(
+    event.eventEvent.eventArgs.find((arg) => arg[0] === "fee")?.[1] || 0
+  );
+  const totalAmount = orderAmount + tax + fee;
+
+  console.log("totalAmount:", totalAmount, "tax:", tax, "fee:", fee);
+
   // Check if the purchaser has made a first order before
-  const queryResponse = await fetch(
+  const checkFirstPurchase = await fetch(
     `https://${
       NODE === "prod" ? prodMarketplaceUrl : testnetMarketplaceUrl
     }/cirrus/search/BlockApps-Mercata-PaymentService.Order?purchaser=eq.${purchaser}&status=eq.3&select=count`,
@@ -37,22 +52,46 @@ async function handleFirstOrder(event, token) {
     }
   );
 
-  const queryBody = await queryResponse.json();
-  console.log("First Order queryBody:", queryBody);
 
-  if (queryBody[0].count > 1) {
-    console.log("User has already made a first order");
+  const queryBody = await checkFirstPurchase.json();
+  console.log("Order queryBody:", queryBody);
+
+  let eventKey = "RegularOrder";
+
+  if (queryBody[0].count === 0) {
+    console.log("User's first order");
+    eventKey = "FirstOrder";
+  }
+
+  const rewardPercentageStr = await getRewardAmount(eventKey);
+
+  if (!rewardPercentageStr) {
+    console.error("Failed to get valid reward percentage.");
     return;
   }
-  
-  const rewardAmount = await getRewardAmount();
-  
-  if (!rewardAmount || rewardAmount <= 0) {
-    console.error("Failed to get reward amount from Google Sheet");
+
+  let rewardPercentage;
+  if (rewardPercentageStr.includes('%')) {
+    rewardPercentage = parseFloat(rewardPercentageStr.replace('%', '')) / 100;
+  } else {
+    rewardPercentage = parseFloat(rewardPercentageStr);
+  }
+
+  if (isNaN(rewardPercentage)) {
+    console.error("Failed to get valid reward percentage.");
     return;
   }
-  // Create a transaction payload with 100 STRATS and send it to eventTxSender
-  const response = await createTransactionPayload(token, purchaser, rewardAmount * 100);
+
+  let rewardAmount = totalAmount * rewardPercentage;
+
+  rewardAmount *= 10000; // Multiply by 1000 to handle decimal errors and then strats conversion. 
+
+  // Round the reward amount to ensure it's an integer
+  rewardAmount = Math.round(rewardAmount);
+  console.log("Reward amount:", rewardAmount);
+
+  // Create a transaction payload and send it to the purchaser
+  const response = await createTransactionPayload(token, purchaser, rewardAmount);
 
   if (!response.ok) {
     const errorText = await response.text();
@@ -74,4 +113,4 @@ async function handleFirstOrder(event, token) {
   }
 }
 
-module.exports = { handleFirstOrder };
+module.exports = { handleOrderRewards };

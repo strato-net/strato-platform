@@ -16,14 +16,14 @@ async function authenticateGoogleSheet() {
 }
 
 /**
- * Check for duplicates in Google Sheet.
+ * Get the STRATS amount for a given event from Google Sheets.
  * @param {object} googleSheets - Google Sheets client.
  * @param {string} spreadsheetId - ID of the spreadsheet.
- * @param {string|number} id - ID to check for duplicates.
- * @returns {Promise<boolean>} True if duplicate exists, false otherwise.
+ * @param {string} event - Event name to find the associated amount.
+ * @returns {Promise<string|null>} The amount associated with the event, or null if not found.
  */
 async function getSTRATSAmount(googleSheets, spreadsheetId, event) {
-  const range = "Sheet1!A2:C"; // Adjust the range if necessary to match the columns
+  const range = "Sheet1!A1:Z"; // Adjust the range to cover all potential columns
   try {
     const response = await googleSheets.spreadsheets.values.get({
       spreadsheetId,
@@ -36,9 +36,19 @@ async function getSTRATSAmount(googleSheets, spreadsheetId, event) {
       return null;
     }
 
-    for (const row of rows) {
+    // Find the column index for "Amount"
+    const headerRow = rows[0];
+    const amountColumnIndex = headerRow.findIndex((header) => header === "Amount");
+
+    if (amountColumnIndex === -1) {
+      console.log("'Amount' column not found.");
+      return null;
+    }
+
+    // Find the row for the specified event
+    for (const row of rows.slice(1)) { // Start from the second row to skip the header
       if (row[0] === event) {
-        return row[2]; // Assuming Amount is in the 3rd column (index 2)
+        return row[amountColumnIndex]; // Return the amount from the "Amount" column
       }
     }
 
@@ -49,6 +59,7 @@ async function getSTRATSAmount(googleSheets, spreadsheetId, event) {
     throw error;
   }
 }
+
 
 
 module.exports = {

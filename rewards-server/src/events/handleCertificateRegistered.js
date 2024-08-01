@@ -4,11 +4,11 @@ const {
   prodMarketplaceUrl,
   testnetMarketplaceUrl,
 } = require("../config");
-const { authenticateGoogleSheet, getSTRATSAmount  } = require("../helper/sheet");
+const { authenticateGoogleSheet, getSTRATSAmount  } = require("../helper/googleSheet");
 
 async function getRewardAmount() {
   const { googleSheets, spreadsheetId } = await authenticateGoogleSheet();
-  return await getSTRATSAmount(googleSheets, spreadsheetId, "handleCertificateRegistered");
+  return await getSTRATSAmount(googleSheets, spreadsheetId, "CertificateRegistered");
 }
 
 async function handleCertificateRegistered(event, token) {
