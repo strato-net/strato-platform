@@ -12,6 +12,7 @@ import Control.Lens
 import Control.Monad (join)
 import Control.Monad.Reader
 import Control.Monad.Trans.State
+import Data.Decimal
 import Data.Functor.Compose
 import Data.Map as M
 import Data.Maybe (fromMaybe)
@@ -48,12 +49,12 @@ varDeclHelper ::
   VariableDecl ->
   VariableDecl
 varDeclHelper cc c v = case _varType v of
-  (SVMType.UserDefined _ actua) -> v {_varType = actua, _varInitialVal = run <$> _varInitialVal v}
-  _ -> v {_varInitialVal = run <$> _varInitialVal v}
+  (SVMType.UserDefined _ actua) -> v {_varType = actua, _varInitialVal = flip run actua <$> _varInitialVal v}
+  _ -> v {_varInitialVal = flip run (_varType v) <$> _varInitialVal v}
   where
-    run e =
+    run e t =
       let r = R cc c
-       in runReader (evalStateT (optimizeExpression e) M.empty) r
+       in runReader (evalStateT (optimizeExpression e (Just t)) M.empty) r
 
 constDeclHelper ::
   CodeCollection ->
@@ -67,7 +68,7 @@ constDeclHelper cc c v =
   where
     run e =
       let r = R cc c
-       in runReader (evalStateT (optimizeExpression e) M.empty) r
+       in runReader (evalStateT (optimizeExpression e Nothing) M.empty) r
 
 -- TODO clean this code up
 functionHelper ::
@@ -101,7 +102,7 @@ functionHelperForUserDefined f = f {_funcArgs = tForm $ _funcArgs f, _funcVals =
 optimizeStatements :: [Statement] -> Reader R [Statement]
 optimizeStatements [] = pure $ []
 optimizeStatements ((IfStatement cond thens mElse x) : ss) = do
-  cond' <- (evalStateT (optimizeExpression cond) M.empty)
+  cond' <- (evalStateT (optimizeExpression cond Nothing) M.empty)
   case cond' of
     BoolLiteral _ True -> do
       thens' <- optimizeStatements thens
@@ -118,19 +119,19 @@ optimizeStatements ((TryCatchStatement tryStatements catchMap x) : ss) = do
   catchMap' <- getCompose <$> traverse optimizeStatements (Compose catchMap)
   (TryCatchStatement tryStatements' catchMap' x :) <$> optimizeStatements ss
 optimizeStatements ((SolidityTryCatchStatement expr mtpl successStatements catchMap x) : ss) = do
-  expr' <- (evalStateT (optimizeExpression expr) M.empty)
+  expr' <- (evalStateT (optimizeExpression expr Nothing) M.empty)
   successStatements' <- optimizeStatements successStatements
   catchMap' <- getCompose <$> traverse optimizeStatements (Compose catchMap)
   (SolidityTryCatchStatement expr' mtpl successStatements' catchMap' x :) <$> optimizeStatements ss
 optimizeStatements ((WhileStatement cond body x) : ss) = do
-  cond' <- (evalStateT (optimizeExpression cond) M.empty)
+  cond' <- (evalStateT (optimizeExpression cond Nothing) M.empty)
   case cond' of
     BoolLiteral _ False -> optimizeStatements ss
     _ -> do
       body' <- optimizeStatements body
       (WhileStatement cond' body' x :) <$> optimizeStatements ss
 optimizeStatements ((ForStatement mInit mCond mPost body x) : ss) = do
-  let getExpression = (\xxx -> (evalStateT (optimizeExpression xxx) M.empty))
+  let getExpression = (\xxx -> (evalStateT (optimizeExpression xxx Nothing) M.empty))
   mCond' <- traverse getExpression mCond
   mPost' <- traverse getExpression mPost
   body' <- optimizeStatements body
@@ -138,7 +139,7 @@ optimizeStatements ((ForStatement mInit mCond mPost body x) : ss) = do
 optimizeStatements ((Block _) : ss) = optimizeStatements ss
 optimizeStatements ((DoWhileStatement body cond x) : ss) = do
   body' <- optimizeStatements body
-  cond' <- (evalStateT (optimizeExpression cond) M.empty)
+  cond' <- (evalStateT (optimizeExpression cond Nothing) M.empty)
   case cond' of
     BoolLiteral _ False -> (body' ++) <$> optimizeStatements ss
     _ -> (DoWhileStatement body' cond' x :) <$> optimizeStatements ss
@@ -163,7 +164,7 @@ optimizeStatements (s@(Return _ _) : _) = pure [s]
 -- 2. ExpressionStatement (ExpressionF a)
 simpleStatementFHelper' :: Statement -> SSS (Statement)
 simpleStatementFHelper' (SimpleStatement (ExpressionStatement xpr) b) = do
-  x <- optimizeExpression xpr
+  x <- optimizeExpression xpr Nothing
   _ <- case x of -- Double check this logic -- This needs to be fixed Not 100% sure what this should be?
     (Binary _ "= " (Variable _ var) xprOptimized) -> modify (M.insert var xprOptimized)
     _ -> pure ()
@@ -172,14 +173,14 @@ simpleStatementFHelper' (SimpleStatement (VariableDefinition [(VarDefEntry typ l
   mExpr <- case maybeExpression of
     Nothing -> pure $ maybeExpression
     Just xpr -> do
-      x <- optimizeExpression xpr
+      x <- optimizeExpression xpr Nothing
       pure $ Just $ x
   let resVdef = case typ of Just (SVMType.UserDefined _ actual) -> Just actual; _ -> typ --- Unwarp Userdefined types to original type
   -- _ <- case x of --- WTF IS THIS? Oh it puts it in the stack
   --   (Binary _ "= " (Variable _ var) xprOptimized) -> modify (M.insert var xprOptimized); _ -> pure ()
   pure $ (SimpleStatement (VariableDefinition [(VarDefEntry resVdef loc nam a)] mExpr) b)
 simpleStatementFHelper' (Return (Just expr) b) = do
-  x <- optimizeExpression expr
+  x <- optimizeExpression expr Nothing
   pure $ Return (Just x) b
 simpleStatementFHelper' a = pure $ a
 
@@ -206,67 +207,72 @@ getVariableByName name = do
         Nothing -> pure $ Nothing
         _ -> pure $ mVar
 
-optimizeExpression :: Expression -> SSS Expression
-optimizeExpression (Binary x "=" a b) = do
-  b' <- optimizeExpression b
+optimizeExpression :: Expression -> Maybe SVMType.Type -> SSS Expression
+optimizeExpression (Binary x "=" a b) t = do
+  b' <- optimizeExpression b t
   pure $ Binary x "=" a b'
 --pure $ Binary x "=" a' b' ---TODO maybe for later fix
 --   case (a', b') of
 --     (NumberLiteral y valA w, NumberLiteral z valB _) -> pure $ NumberLiteral (y <> z) (valA + valB) w
 --     (StringLiteral y valA, StringLiteral z valB) -> pure $ StringLiteral (y <> z) (valA <> valB)
 --     _ -> pure $ Binary x "=" a' b'
-optimizeExpression (Binary x "+" a b) = do
-  a' <- optimizeExpression a
-  b' <- optimizeExpression b
+optimizeExpression (Binary x "+" a b) t = do
+  a' <- optimizeExpression a t
+  b' <- optimizeExpression b t
   case (a', b') of
     (NumberLiteral y valA w, NumberLiteral z valB _) -> pure $ NumberLiteral (y <> z) (valA + valB) w
     (StringLiteral y valA, StringLiteral z valB) -> pure $ StringLiteral (y <> z) (valA <> valB)
     _ -> pure $ Binary x "+" a' b'
-optimizeExpression (Binary x "-" a b) = do
-  a' <- optimizeExpression a
-  b' <- optimizeExpression b
+optimizeExpression (Binary x "-" a b) t = do
+  a' <- optimizeExpression a t
+  b' <- optimizeExpression b t
   case (a', b') of
     (NumberLiteral y valA w, NumberLiteral z valB _) -> pure $ NumberLiteral (y <> z) (valA - valB) w
     _ -> pure $ Binary x "-" a' b'
-optimizeExpression (Binary x "*" a b) = do
-  a' <- optimizeExpression a
-  b' <- optimizeExpression b
+optimizeExpression (Binary x "*" a b) t = do
+  a' <- optimizeExpression a t
+  b' <- optimizeExpression b t
   case (a', b') of
     (NumberLiteral y valA w, NumberLiteral z valB _) -> pure $ NumberLiteral (y <> z) (valA * valB) w
     _ -> pure $ Binary x "*" a' b'
-optimizeExpression (Binary x "/" a b) = do
-  a' <- optimizeExpression a
-  b' <- optimizeExpression b
-  case (a', b') of
-    (NumberLiteral y valA w, NumberLiteral z valB _) ->
+optimizeExpression (Binary x "/" a b) t = do
+  a' <- optimizeExpression a t
+  b' <- optimizeExpression b t
+  let varType' = fromMaybe (SVMType.Int Nothing Nothing) t 
+  case (a', b', varType') of
+    (NumberLiteral y valA _, NumberLiteral z valB _, SVMType.Decimal) ->
+      if valB == 0
+        then pure $ Binary x "/" a' b'
+        else pure $ DecimalLiteral (y <> z) $ WrappedDecimal $ roundTo 0 ((Decimal 0 valA) / (Decimal 0 valB))
+    (NumberLiteral y valA w, NumberLiteral z valB _, _) ->
       if valB == 0
         then pure $ Binary x "/" a' b'
         else pure $ NumberLiteral (y <> z) (valA `div` valB) w
     _ -> pure $ Binary x "/" a' b'
-optimizeExpression (Binary x "%" a b) = do
-  a' <- optimizeExpression a
-  b' <- optimizeExpression b
+optimizeExpression (Binary x "%" a b) t = do
+  a' <- optimizeExpression a t
+  b' <- optimizeExpression b t
   case (a', b') of
     (NumberLiteral y valA w, NumberLiteral z valB _) -> pure $ NumberLiteral (y <> z) (valA `mod` valB) w
     _ -> pure $ Binary x "%" a' b'
-optimizeExpression (FunctionCall x1 (MemberAccess x2 (Variable x3 nam) "wrap") args) = do
+optimizeExpression (FunctionCall x1 (MemberAccess x2 (Variable x3 nam) "wrap") args) _ = do
   mc <- asks contract
   case mc of
     Nothing -> pure $ FunctionCall x1 (MemberAccess x2 (Variable x3 nam) "wrap") args
     Just c -> case args of
-      OrderedArgs [x] | M.member nam (_userDefined c) -> optimizeExpression x
+      OrderedArgs [x] | M.member nam (_userDefined c) -> optimizeExpression x Nothing
       _ -> pure (FunctionCall x1 (MemberAccess x2 (Variable x3 nam) "wrap") args)
-optimizeExpression (FunctionCall x1 (MemberAccess x2 (Variable x3 nam) "unwrap") args) = do
+optimizeExpression (FunctionCall x1 (MemberAccess x2 (Variable x3 nam) "unwrap") args) _ = do
   mc <- asks contract
   case mc of
     Just c -> case args of
-      OrderedArgs [x] | M.member nam (_userDefined c) -> optimizeExpression x
+      OrderedArgs [x] | M.member nam (_userDefined c) -> optimizeExpression x Nothing
       _ -> pure $ FunctionCall x1 (MemberAccess x2 (Variable x3 nam) "unwrap") args
     Nothing -> pure $ FunctionCall x1 (MemberAccess x2 (Variable x3 nam) "unwrap") args
 
 --This needs further research before letting loose on the code base
 --This function as of now is neutured
-optimizeExpression (Variable x name) = do
+optimizeExpression (Variable x name) _ = do
   var <- getVariableByName name
   case var of _ -> pure $ (Variable x name)
 --case var  of Just y -> optimizeExpression y; Nothing -> pure $ (Variable x name )
@@ -400,4 +406,4 @@ optimizeExpression (Variable x name) = do
 --     _ -> t'
 -- optimizeExpression (Variable x name) = getVarType' (labelToString name) x
 -- optimizeExpression (ObjectLiteral x _) = pure . bottom $ "Cannot use object literals within contract definitions" <$ x
-optimizeExpression e = pure e
+optimizeExpression e _ = pure e

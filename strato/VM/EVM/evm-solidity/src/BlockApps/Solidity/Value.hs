@@ -46,7 +46,7 @@ valueInt256 = ValueInt False (Just 32)
 
 valueBytes :: ByteString -> SimpleValue
 valueBytes = ValueBytes Nothing
-
+---use this, then wrap in mapping 
 data Value
   = SimpleValue SimpleValue
   | ValueArrayDynamic (I.IntMap Value) -- A sparse representation makes updates more efficient than O(n)

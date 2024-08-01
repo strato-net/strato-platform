@@ -1037,14 +1037,14 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
       const createdDate = Math.floor(Date.now() / 1000);
       const paymentParameters = {
         address: paymentProvider.address,
-        orderId: util.uid(),
+        checkoutId: util.uid(),
         saleAddresses,
         quantities,
         createdDate,
         comments: DEFAULT_COMMENT,
       }
-      const orderHashAndAssets = await paymentProviderJs.createPayment(rawAdmin, paymentParameters, options);
-      return orderHashAndAssets;
+      const checkoutHashAndAssets = await paymentProviderJs.createPayment(rawAdmin, paymentParameters, options);
+      return checkoutHashAndAssets;
 
     } catch (error) {
       console.log(error);
