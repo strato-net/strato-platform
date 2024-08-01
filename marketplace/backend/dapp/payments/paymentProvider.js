@@ -219,7 +219,7 @@ async function createPayment(user, args, options) {
     const contract = { name: contractName, address }
     const callArgs = {
       contract,
-      method: "createOrder",
+      method: "checkoutInitialized",
       args: util.usc({ ...restArgs }),
     };
     const token = await rest.call(user, callArgs, options);

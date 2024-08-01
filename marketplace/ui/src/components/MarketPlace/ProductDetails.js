@@ -518,7 +518,7 @@ const ProductDetails = ({ user, users }) => {
                   <Paragraph level={4} id="price" className=" text-[#13188A] text-xl font-bold lg:text-2xl lg:font-semibold">
                     {details?.price ? (
                       <>
-                        ${details?.price} <span className="font-normal text-xs mr-2 text-primary"><b>({details?.price * STRATS_CONVERSION} STRATS)</b></span>
+                        ${details?.price} <span className="font-normal text-xs mr-2 text-primary"><b>({(details?.price * STRATS_CONVERSION).toFixed(0)} STRATS)</b></span>
                       </>
                     ) : (
                       "No Price Available"
