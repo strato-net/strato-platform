@@ -6,9 +6,13 @@ import {
   notification,
   Spin,
   Select,
-  Tabs
+  Tabs,
+  Avatar,
+  Space,
+  Typography,
 } from "antd";
 import { CheckCircleOutlined } from '@ant-design/icons';
+import { UserOutlined } from '@ant-design/icons';
 import InventoryCard from "./InventoryCard";
 import CreateInventoryModal from "./CreateInventoryModal";
 import { actions as categoryActions } from "../../contexts/category/actions";
@@ -53,6 +57,7 @@ const Inventory = ({ user }) => {
   const [category, setCategory] = useState(undefined);
   const linkUrl = window.location.href;
   let { hasChecked, isAuthenticated, loginUrl } = useAuthenticateState();
+  const { Title, Text } = Typography;
 
   const categoryDispatch = useCategoryDispatch();
   const { categorys } = useCategoryState();
@@ -255,6 +260,11 @@ const Inventory = ({ user }) => {
 
   const metaImg = category ? category : SEO.IMAGE_META;
 
+  const userName = user.commonName || "";
+  const userLetter = userName[0].toUpperCase() || "";
+
+  // const stratsBalance = (Object.keys(strats).length > 0) ? strats : 0
+
   const renderImg = (service) => {
     return service.imageURL && service.imageURL !== ''
         ? <img src={service.imageURL} alt={service.serviceName} height="16px" width="16px"/>
@@ -270,31 +280,46 @@ const Inventory = ({ user }) => {
       />
       {contextHolder}
       <>
-        <Breadcrumb className="mx-5 md:mx-14 mt-2 lg:mt-4">
-          <Breadcrumb.Item href="" onClick={e => e.preventDefault()}>
-            <ClickableCell href={routes.Marketplace.url}>
-              <p className="text-sm text-[#13188A] font-semibold">
-                Home
-              </p>
-            </ClickableCell>
-          </Breadcrumb.Item>
-          <Breadcrumb.Item>
-            <p className="text-sm text-[#202020] font-medium">
-              My Items
-            </p>
-          </Breadcrumb.Item>
-        </Breadcrumb>
-        <div className="w-full h-[160px] py-4 px-4 md:h-[96px] bg-[#F6F6F6] flex flex-col md:flex-row md:px-14 justify-between items-center mt-6 lg:mt-8">
+      <div className="w-full h-[200px] py-4 px-4 md:h-[250px] bg-[#ADA0E2] bg-opacity-20 flex flex-col justify-between mt-0 lg:-mt-8" style={{ borderColor: '#13188A' }}>
+      <Breadcrumb className="mx-5 md:mx-14 mt-2 lg:mt-4">
+        <Breadcrumb.Item href="" onClick={(e) => e.preventDefault()}>
+          <ClickableCell href={routes.Marketplace.url}>
+            <p className="text-sm text-[#13188A] font-semibold">Home</p>
+          </ClickableCell>
+        </Breadcrumb.Item>
+        <Breadcrumb.Item>
+          <p className="text-sm text-[#202020] font-medium">My Wallet</p>
+        </Breadcrumb.Item>
+      </Breadcrumb>
+
+      <div className="flex flex-col md:flex-row items-start w-full md:px-14 mt-4 lg:mt-8 mb-8">
+        <div className="flex flex-col items-center gap-3">
+          <Avatar size={70} style={{ backgroundColor: '#373B9C', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            <span style={{ fontSize: '40px', fontWeight: 'bold' }}>{userLetter}</span>
+          </Avatar>
+          <Text style={{ fontSize: '18px', color: '#373B9C', fontWeight: '600', textAlign: 'center' }} className="mt-2">{userName}</Text>
+        </div>
+        <div className="flex flex-col items-start ml-0 md:ml-20 mt-4 md:mt-0">
+          <Title style={{ color: '#373B9C', marginBottom: '0' }} level={5}>Balance:</Title>
+          <Text style={{ fontSize: '40px', color: '#373B9C', fontWeight: 'bold', marginBottom: '0', marginTop: '7px' }} className="mt-1">$1,044.43</Text>
+          <div className="flex items-center mt-1">
+            <img src={Images.logo} alt="Small" style={{ width: '15px', height: '15px', marginRight: '10px' }} />
+            <Text style={{ fontSize: '16px', color: '#747474' }}>104,443{}</Text>
+          </div>
+        </div>
+      </div>
+    </div>
+        
           <div className="flex justify-between w-full">
-            <Button className="!px-1 md:!px-0 flex items-center flex-row-reverse gap-[6px] text-lg md:text-2xl font-semibold !text-[#13188A] " 
+            {/* <Button className="!px-1 md:!px-0 flex items-center flex-row-reverse gap-[6px] text-lg md:text-2xl font-semibold !text-[#13188A] " 
               type="link" 
               icon={<img src={Images.ForwardIcon} 
               alt={metaImg} 
               title={metaImg}
-              className="hidden md:block w-6 h-6" />}> My Items
-            </Button>
+              className="hidden md:block w-6 h-6" />}> My Wallet
+            </Button> */}
           </div>
-          <div className="flex flex-col md:flex-row gap-3 items-center my-2 md:my-0">
+          {/* <div className="flex flex-col md:flex-row gap-3 items-center my-2 md:my-0">
             <div className="flex gap-3 items-center">
               {!areNotOnboardedLoading ? (
                 <Select
@@ -343,8 +368,8 @@ const Inventory = ({ user }) => {
                 </div>
               </Button>
             </div>
-          </div>
-        </div>
+          </div> */}
+
         <div className="pt-6 mx-6 md:mx-5 md:px-10 mb-5">
           <Tabs
             defaultActiveKey={category ? category : "All"}
