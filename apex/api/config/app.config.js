@@ -16,9 +16,13 @@ module.exports = {
     retentionHours: 1 * 24,
     stallCheckFrequency: 5 * 60 * 1000,
     memoryUsedAlertLevel: 80, // Alert when used memory (RAM) >= N%
+    memoryUsedCloseLevel: 75,
     diskspaceUsedAlertLevel: 80, // Alert when used diskspace >= N%
+    dispaceUsedAlertCloseLevel: 75,
     cpuAvgLoadAlertLevel: 97, // Alert when cpu avg load > N%
+    cpuAvgLoadCloseLevel: 90,
     cpuCurrentLoadAlertLevel: 99, // Alert when cpu current load > N%,
+    cpuCurrentLoadCloseLevel: 90,
     maxStalledIntervals: 80, //max number of failed stall checks before reporting stalled: 1200 seconds / poll freq (15) = 80, set to 20 minutess
   },
   networkHealthCheck: {
