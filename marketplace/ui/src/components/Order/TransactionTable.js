@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from "react";
-import { Pagination, Button, Dropdown, Menu, DatePicker, Space, Typography, Input, Row, Col } from "antd";
+import { Button, Dropdown, Space, Typography, Input, Row, Col, Popover, Card } from "antd";
 import { DownOutlined, UpOutlined, DownloadOutlined, SearchOutlined } from "@ant-design/icons";
-import { useNavigate, Link, useParams, useLocation } from "react-router-dom";
+import { useNavigate, useParams, useLocation } from "react-router-dom";
 import classNames from "classnames";
 import DataTableComponent from "../DataTableComponent";
 import { dummyData, getStatus } from "./constant";
@@ -20,6 +20,7 @@ import TransactionResponsive from "./TransactionResponsive";
 const limit = 10;
 
 const TransactionTable = ({ user, selectedDate, onDateChange, download, isAllOrdersLoading }) => {
+  const StratsIcon = <img src={Images.logo} alt="" className="mx-1 w-3 h-3" />
   const navigate = useNavigate();
   const location = useLocation();
   const params = useParams();
@@ -119,10 +120,30 @@ const TransactionTable = ({ user, selectedDate, onDateChange, download, isAllOrd
   }
 
   const typeColor = {
-  Order:"#2A53FF",
-  Transfer:"#FF0000",
-  Redemption:"#001C76"
+    Order: "#2A53FF",
+    Transfer: "#FF0000",
+    Redemption: "#001C76"
   }
+
+  const Content = ({ data }) => {
+    return <div style={{ width: '460px', height: '160px' }}>
+      <Card>
+        <Row>
+          <Col span={6}>
+            <img src={data.imageURL[0]} alt={data.assetName}  className="border w-88 h-88 border-indigo-600 rounded-md" />
+          </Col>
+          <Col span={8} offset={1}>
+            <p className="text-base font-bold">{data.assetName}</p>
+            <p style={{ color: '#827474' }} className="font-medium"> Lorem ipsum dolor sit amet, consectetur adipiscing elit</p>
+          </Col>
+          <Col span={8} offset={1}>
+            <p className="text-right flex justify-end items-center"> <b>$ {data.totalPrice} </b> &nbsp; ({data.totalPrice * 100} {StratsIcon}) </p>
+            <p className="text-bold text-right mt-2">Sold Out</p>
+          </Col>
+        </Row>
+      </Card>
+    </div>
+  };
 
   const column = [
     {
@@ -132,7 +153,7 @@ const TransactionTable = ({ user, selectedDate, onDateChange, download, isAllOrd
       render: (reference) => (
         <p
           id={reference}
-          onClick={() => {  }}
+          onClick={() => { }}
           className="text-[#13188A] hover:text-primaryHover cursor-pointer"
         >
           {`#${`${reference}`.substring(0, 6)}`}
@@ -143,14 +164,21 @@ const TransactionTable = ({ user, selectedDate, onDateChange, download, isAllOrd
       title: "Type",
       dataIndex: "type",
       key: "type",
-      render: (text) => ( <span style={{background:typeColor[text]}} className={`bg-${typeColor[text]} min-w-12 px-2 py-2 rounded-lg text-white`}>{text}</span>),
+      render: (text) => (<span style={{ background: typeColor[text] }} className={`bg-${typeColor[text]} min-w-[80px] cursor-default px-2 py-2 rounded-lg text-white`}>{text}</span>),
     },
     {
       title: "Asset",
       dataIndex: "Item",
       key: "Item",
       // align: "center",
-      render : (data, {imageURL, assetName}) => <div className="flex items-center"> <img src={imageURL[0]} alt={assetName} width={24} height={30} className="border border-indigo-600 rounded-md"  /> <span className="ml-1"> {assetName} </span> </div>
+      render: (asset, data) => <>
+        <Popover content={<Content data={data} />} trigger="hover">
+          <div className="flex items-center">
+            <img src={data.imageURL[0]} alt={data.assetName} width={24} height={30} className="border border-indigo-600 rounded-md" />
+            <span className="ml-1"> {data.assetName} </span>
+          </div>
+        </Popover>
+      </>
     },
     {
       title: "Quantity",
@@ -158,14 +186,14 @@ const TransactionTable = ({ user, selectedDate, onDateChange, download, isAllOrd
       key: "qty",
       align: "center",
       // render : (data, {quantities, BlockApps-Mercata-Order-quantities}) => <span>{quantities[0] || BlockApps-Mercata-Order-quantities.value}</span>
-       render : (data, {qty}) => <span>{qty}</span>
+      render: (data, { qty }) => <span>{qty}</span>
     },
     {
       title: "Price ($)",
       dataIndex: "price",
       key: "price",
       align: "center",
-      render : (data, {totalPrice}) => <span>{totalPrice}</span>
+      render: (data, { totalPrice }) => <span>{totalPrice}</span>
     },
     {
       title: "From",
@@ -184,12 +212,12 @@ const TransactionTable = ({ user, selectedDate, onDateChange, download, isAllOrd
       dataIndex: "hash",
       key: "hash",
       align: "left",
-      render: (data, {block_hash}) => <p className="text-[#13188A] hover:text-primaryHover cursor-pointer " >{`# ${block_hash.slice(0, 8)}..`}</p>
+      render: (data, { block_hash }) => <p className="text-[#13188A] hover:text-primaryHover cursor-pointer " >{`# ${block_hash.slice(0, 8)}..`}</p>
     },
     {
       dataIndex: "date",
       key: "date",
-      render: (text, {block_timestamp}) => <p>{block_timestamp}</p>,
+      render: (text, { block_timestamp }) => <p>{block_timestamp}</p>,
       title: (
         <div style={{ display: "flex" }}>
           <div className="mt-1.5">{"Date"}</div>
@@ -243,11 +271,11 @@ const TransactionTable = ({ user, selectedDate, onDateChange, download, isAllOrd
     };
 
     const statusName = {
-      1 : 'payment Pending',
-      2 : 'closed',
-      3 : 'cancelled',
-      4 : 'awaiting',
-      5 : 'awaiting shipment'
+      1: 'payment Pending',
+      2: 'closed',
+      3: 'cancelled',
+      4: 'awaiting',
+      5: 'awaiting shipment'
     }
 
     const { textClass, bgClass } = statusClasses[status] || { textClass: "bg-[#FFF6EC]", bgClass: "bg-[#119B2D]" };
@@ -290,52 +318,52 @@ const TransactionTable = ({ user, selectedDate, onDateChange, download, isAllOrd
     <Row>
       {/* <Col span={4}></Col> */}
       <Col span={22} className="mx-auto">
-      <div className="flex items-center justify-between">
-      <h2 className="hidden md:block"> My Transactions </h2>
-      <div className="flex gap-2 items-center mb-5">
-        <Input className="text-base orders_searchbar md:p-3 rounded-full bg-[#F6F6F6]"
-          key={searchVal}
-          onChange={(e) => { handleChangeSearch(e) }}
-          defaultValue={searchVal}
-          prefix={<SearchOutlined />}
-          placeholder="Search Transactions #" />
-        <Dropdown
-          className="md:hidden customButton"
-          menu={{ items: menuItems, onClick: (e) => download(e.key) }}
-          disabled={isAllOrdersLoading}
-          trigger={['click']}
-        >
-          <Button loading={isAllOrdersLoading} className="h-[32px] w-[33px] rounded-md border border-[#6A6A6A] flex justify-center items-center">
-            <Space>
-              <DownloadOutlined />
-            </Space>
-          </Button>
-        </Dropdown>
-        <div className="relative">
-          <div onClick={() => setMDropdownVisible(!mDropdownVisible)} className="h-[32px] w-[33px] rounded-md border border-[#6A6A6A] flex md:hidden justify-center items-center">
-            <FilterIcon />
+        <div className="flex items-center justify-between">
+          <h2 className="hidden md:block"> My Transactions </h2>
+          <div className="flex gap-2 items-center mb-5">
+            <Input className="text-base orders_searchbar md:p-3 rounded-full bg-[#F6F6F6]"
+              key={searchVal}
+              onChange={(e) => { handleChangeSearch(e) }}
+              defaultValue={searchVal}
+              prefix={<SearchOutlined />}
+              placeholder="Search Transactions #" />
+            <Dropdown
+              className="md:hidden customButton"
+              menu={{ items: menuItems, onClick: (e) => download(e.key) }}
+              disabled={isAllOrdersLoading}
+              trigger={['click']}
+            >
+              <Button loading={isAllOrdersLoading} className="h-[32px] w-[33px] rounded-md border border-[#6A6A6A] flex justify-center items-center">
+                <Space>
+                  <DownloadOutlined />
+                </Space>
+              </Button>
+            </Dropdown>
+            <div className="relative">
+              <div onClick={() => setMDropdownVisible(!mDropdownVisible)} className="h-[32px] w-[33px] rounded-md border border-[#6A6A6A] flex md:hidden justify-center items-center">
+                <FilterIcon />
+              </div>
+              {mDropdownVisible && <Sorting className="md:hidden flex flex-col gap-1 absolute right-0 top-10 w-max shadow-card_shadow z-[99999] bg-white sort_conatiner py-1" />}
+            </div>
           </div>
-          {mDropdownVisible && <Sorting className="md:hidden flex flex-col gap-1 absolute right-0 top-10 w-max shadow-card_shadow z-[99999] bg-white sort_conatiner py-1" />}
         </div>
-      </div>
-      </div>
-      <div className="flex md:hidden order_responsive">
-        {/* <ResponsiveSoldOrderCard
+        <div className="flex md:hidden order_responsive">
+          {/* <ResponsiveSoldOrderCard
           data={data}
           isLoading={isordersSoldLoading || isLoading}
         /> */}
-        <TransactionResponsive />
-      </div>
-      <div className="hidden md:block">
-        <DataTableComponent
-          columns={column}
-          data={dummyData}
-          isLoading={isordersSoldLoading || isLoading}
-          pagination={false}
-          scrollX="100%"
-        />
-      </div>
-      {/* <Pagination
+          <TransactionResponsive />
+        </div>
+        <div className="hidden md:block">
+          <DataTableComponent
+            columns={column}
+            data={dummyData}
+            isLoading={isordersSoldLoading || isLoading}
+            pagination={false}
+            scrollX="100%"
+          />
+        </div>
+        {/* <Pagination
         current={pageNo}
         onChange={onPageChange}
         total={orderSoldTotal}
