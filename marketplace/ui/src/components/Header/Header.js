@@ -234,7 +234,7 @@ const HeaderComponent = ({ user, loginUrl, showMenu, handleSubMenu, handleMenuTa
 
   const subMenuItems = [
     { value: "orders", path: routes.Orders.url.replace(':type', 'sold'), label: "Orders" },
-    { value: "myitems", path: "/myitems", label: "My Items" },
+    { value: "myitems", path: "/myitems", label: "My Wallet" },
     user ? {
       value: "my-profile",
       path: routes.MarketplaceUserProfile.url.replace(':commonName', user.commonName),
