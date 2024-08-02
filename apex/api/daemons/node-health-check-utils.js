@@ -441,8 +441,8 @@ async function checkSystemInfo() {
     // MEMORY
     const useLevel = (1 - memdata.available / memdata.total) * 100;
     const previousMemoryAlert = prevSysInfo.memory?.use?.isHealthy === false;
-    const memoryAlert = useLevel >= config.sysInfo.memoryUsedAlertLevel ||
-      (previousMemoryAlert && useLevel >= config.sysInfo.memoryUsedCloseLevel);
+    const memoryAlert = useLevel >= config.healthCheck.memoryUsedAlertLevel ||
+      (previousMemoryAlert && useLevel >= config.healthCheck.memoryUsedCloseLevel);
 
     sysInfoCollected.memory = {
       active: memdata.active,
@@ -465,11 +465,11 @@ async function checkSystemInfo() {
     const previousCpuCurrentLoadAlert = prevSysInfo.cpu?.currentLoad?.isHealthy === false;
     const previousCpuAvgLoadAlert = prevSysInfo.cpu?.avgLoad?.isHealthy === false;
 
-    const cpuCurrentLoadAlert = currentLoad >= config.sysInfo.cpuCurrentLoadAlertLevel ||
-                                (previousCpuCurrentLoadAlert && currentLoad >= config.sysInfo.cpuCurrentLoadCloseLevel);
+    const cpuCurrentLoadAlert = currentLoad >= config.healthCheck.cpuCurrentLoadAlertLevel ||
+                                (previousCpuCurrentLoadAlert && currentLoad >= config.healthCheck.cpuCurrentLoadCloseLevel);
 
-    const cpuAvgLoadAlert = avgLoad >= config.sysInfo.cpuAvgLoadAlertLevel ||
-                            (previousCpuAvgLoadAlert && avgLoad >= config.sysInfo.cpuAvgLoadCloseLevel);
+    const cpuAvgLoadAlert = avgLoad >= config.healthCheck.cpuAvgLoadAlertLevel ||
+                            (previousCpuAvgLoadAlert && avgLoad >= config.healthCheck.cpuAvgLoadCloseLevel);
 
     // CPU
     sysInfoCollected.cpu = {
@@ -505,8 +505,8 @@ async function checkSystemInfo() {
       if (fs.fs !== "overlay") {
         const prevFsInfo = prevSysInfo.filesystem?.find(f => f.name === fs.fs);
         const prevFsAlert = prevFsInfo?.use?.isHealthy === false;
-        const diskSpaceAlert = fs.use >= config.sysInfo.diskspaceUsedAlertLevel ||
-                               (prevFsAlert && fs.use >= config.sysInfo.diskspaceUsedCloseLevel);
+        const diskSpaceAlert = fs.use >= config.healthCheck.diskspaceUsedAlertLevel ||
+                               (prevFsAlert && fs.use >= config.healthCheck.diskspaceUsedCloseLevel);
         
         fsData.push({
           name: fs.fs,
