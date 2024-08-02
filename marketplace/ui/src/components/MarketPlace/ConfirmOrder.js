@@ -4,7 +4,7 @@ import {
   Spin,
   Modal,
   Select,
-  Button
+  Col,
 } from "antd";
 import {
   useMarketplaceState,
@@ -15,14 +15,8 @@ import { useAuthenticateState } from "../../contexts/authentication";
 import { actions } from "../../contexts/marketplace/actions";
 import { actions as orderActions } from "../../contexts/order/actions";
 import { useState, useEffect } from "react";
-import { actions as inventoryAction } from "../../contexts/inventory/actions";
-import {
-  useInventoryDispatch,
-  useInventoryState,
-} from "../../contexts/inventory";
 import DataTableComponent from "../DataTableComponent";
 import "./index.css";
-import { HTTP_METHODS, PAYMENT_LIST } from "../../helpers/constants";
 import TagManager from "react-gtm-module";
 import { setCookie } from "../../helpers/cookie";
 
@@ -38,11 +32,12 @@ const ConfirmOrder = ({ paymentProviders = [], data, columns }) => {
   const [tax, setTax] = useState(0);
   const [subTotal, setSubTotal] = useState(0);
   const [total, setTotal] = useState(0);
-  const inventoryDispatch = useInventoryDispatch();
   const { success: marketplaceSuccess, message: marketplaceMessage } = useMarketplaceState();
   const [modal, contextHolderForModal] = Modal.useModal();
   const [cartData, setCartData] = useState(data);
   const [selectedProvider, setSelectedProvider] = useState('');
+
+  const activePaymentProviders = (paymentProviders[0] !== undefined) ? paymentProviders.filter(paymentProvider => paymentProvider.isActive) : [];
 
   useEffect(() => {
     setCartData(data);
@@ -172,7 +167,7 @@ const ConfirmOrder = ({ paymentProviders = [], data, columns }) => {
   };
 
   const handleChange = async (value) => {
-    const provider = paymentProviders.find(provider => provider?.serviceName === value);
+    const provider = activePaymentProviders.find(provider => provider?.serviceName === value);
     setSelectedProvider(provider);
 
     if (hasChecked && !isAuthenticated && loginUrl !== undefined) {
@@ -186,7 +181,12 @@ const ConfirmOrder = ({ paymentProviders = [], data, columns }) => {
       });
       const checkQuantity = await orderActions.fetchSaleQuantity(orderDispatch, saleAddresses, quantities);
       if (checkQuantity === true) {
-        handlePaymentConfirm(provider);
+        if (provider.serviceName === "Stripe" && total < 0.50) {
+          openToastOrder("bottom", "The minimum order amount is $0.50. Please increase the item quantity to account for this.");
+          setSelectedProvider('');
+        } else {
+          handlePaymentConfirm(provider);
+        }
       } else {
         let insufficientQuantityMessage = "";
         let outOfStockMessage = "";
@@ -264,11 +264,14 @@ const ConfirmOrder = ({ paymentProviders = [], data, columns }) => {
                     className="w-[250px] text-center selected-payment-option items-select"
                     onChange={handleChange}
                     placeholder="Select Payment Option"
+                    disabled={activePaymentProviders.length === 0}
                   >
-                    {paymentProviders && paymentProviders.map(provider => (
+                    {activePaymentProviders && activePaymentProviders.map(provider => (
                       provider && <Option className='payment-dropdown' key={provider?.serviceName} value={provider?.serviceName}>
-                        Checkout with {provider?.serviceName}
-                        <img src={provider?.imageURL} alt={provider?.serviceName} style={{ width: 20, height: 20, marginRight: 8 }} />
+                        <Row className="w-full">
+                        <Col span={22} className="text-left">Checkout with {provider?.serviceName}</Col>
+                        <Col span={2} className="flex justify-end"><img src={provider?.imageURL} alt={provider?.serviceName} style={{ width: 20, height: 20, marginRight: 2 }} /> </Col>
+                        </Row>
                       </Option>
                     ))}
                   </Select>

@@ -179,8 +179,14 @@ async function get(user, args, defaultOptions) {
 }
 
 async function getAll(admin, args = {}, baseOptions) {
+    const { onlyActive, ...restArgs } = args;
     const options = { ...baseOptions, org: 'BlockApps', app: 'Mercata' };
-    const searchArgs = setSearchQueryOptions(args, [{ key: 'isActive', value: 'true' }])
+    let searchArgs;
+    if (onlyActive) {
+      searchArgs = setSearchQueryOptions(restArgs, [{ key: 'isActive', value: 'true' }]) 
+    } else {
+      searchArgs = setSearchQueryOptions(restArgs, {})
+    }
     const paymentProviders = await searchAllWithQueryArgs(contractName, searchArgs, options, admin);
     return paymentProviders.map((paymentProvider) => marshalOut(paymentProvider));
 }

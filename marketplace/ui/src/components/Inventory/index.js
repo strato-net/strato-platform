@@ -86,7 +86,7 @@ const Inventory = ({ user }) => {
 
   useEffect(() => {
     if (user && user.commonName) {
-      paymentServiceActions.getPaymentServices(paymentServiceDispatch);
+      paymentServiceActions.getPaymentServices(paymentServiceDispatch, true);
       paymentServiceActions.getNotOnboarded(paymentServiceDispatch, user.commonName, 10, 0);
     }
   }, [paymentServiceDispatch, user]);

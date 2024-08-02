@@ -272,27 +272,15 @@ parseEvents = concatMap parseEvent
           eventEvent = e
         }
 
-getMappingNamesFromContract :: ContractF () -> [Text]
-getMappingNamesFromContract c =
+getCollectionNamesFromContract :: ContractF () -> [Text]
+getCollectionNamesFromContract c =
   let storageDefs' = c ^. storageDefs
       storageDefsList = Map.toList storageDefs'
+      listOfArrays = filter (\(_, vd) -> case (_varType vd) of SVMType.Array _ _-> True; _ -> False) storageDefsList
       listOfMappings = filter (\(_, vd) -> case (_varType vd) of SVMType.Mapping _ _ _-> True; _ -> False) storageDefsList
       listOfMappingsWithRecords = filter (\(_, vd) -> _isRecord vd) listOfMappings
-      listOfCollections = listOfMappingsWithRecords
+      listOfCollections = listOfArrays ++ listOfMappingsWithRecords
    in T.pack . fst <$> listOfCollections
-
-getArrayNamesFromContract :: ContractF () -> Map.Map T.Text T.Text
-getArrayNamesFromContract c =
-  let storageDefs' = c ^. storageDefs
-      storageDefsList = Map.toList storageDefs'
-      listOfArraysWithTypename = map (\(name, vd) -> case (_varType vd) of
-                                                       SVMType.Array entry _ -> Just (T.pack name, extractLabelOrEntry entry)
-                                                       _ -> Nothing) storageDefsList
-   in Map.fromList $ catMaybes listOfArraysWithTypename
-
-extractLabelOrEntry :: SVMType.Type -> T.Text
-extractLabelOrEntry (SVMType.UnknownLabel solidString _) = T.pack solidString
-extractLabelOrEntry entry = T.pack (show entry)
 
 getContractsFromPC :: E.ProcessedContract -> [Text]
 getContractsFromPC pc = Map.keys $ Map.filter isValueContract (E.contractData pc)
@@ -341,26 +329,20 @@ processTheMessages env conn messages = do
             -- Here we will get the storageDefs attribute of the contract (c) and iterate through the Map of (Text, VariableDecl) and look for VariableDecls that have the last attribute (isRecord) true and thetype are mappings
             -- We will then create a table for each of these collections and add a foreign key to the main table
 
-            let mappingNames = getMappingNamesFromContract c  
-                arrayNamesAndTypes = Map.toList $ getArrayNamesFromContract c
+            let collectionNames = getCollectionNamesFromContract c              
             let historyTableNames = map (historyTableName cr ap) hl
-            $logInfoS "processTheMessages/arrayNamesAndTypes" $ T.pack $ show arrayNamesAndTypes
             $logDebugS "processTheMessages/historyTableNames" $ T.pack $ show historyTableNames
 
             let nameParts@(cr', ap',  n'') = (cr, ap, T.pack $ _contractName c)
             $logInfoS "processTheMessages/Contract Added" $ "ccreator=" <> cr' <> ", app=" <> ap' <> ", name=" <> n''
             multilineLog "processTheMessages/fields" $ boringBox $ map (show) $ Map.toList $ fmap _varType $ c ^. storageDefs
 
-            --Create mapping tables
-            deferredForeignKeysForMappings <- fmap concat $
-              forM mappingNames $ \m -> do
-                outputData conn $ createMappingTable g nameParts m
+            --Create collection tables
+            deferredForeignKeysForCollections <- fmap concat $
+              forM collectionNames $ \m -> do
+                outputData conn $ createCollectionTable g nameParts m --Tables are created
+            -- mark
 
-            --Create array tables
-            deferredForeignKeysForArrays <- fmap concat $
-              forM arrayNamesAndTypes $ \anat -> do
-                outputData conn $ createArrayTable g nameParts anat
-            
             deferredForeignKeys <- case (_contractType c) of
               AbstractType -> do
                 abstractfkeys <- outputData conn $ createExpandAbstractTable g c nameParts abstracts' cc
@@ -374,13 +356,11 @@ processTheMessages env conn messages = do
                 return indexfkeys
 
             $logInfoS "processTheMessages/deferredForeignKeys" $ T.pack $ show deferredForeignKeys
-            $logInfoS "processTheMessages/deferredForeignKeysForMappings" $ T.pack $ show deferredForeignKeysForMappings
-            $logInfoS "processTheMessages/deferredForeignKeysForArrays" $ T.pack $ show deferredForeignKeysForArrays
 
 
             outputData conn $ createExpandEventTables g c cc nameParts
 
-            return $ deferredForeignKeys ++ deferredForeignKeysForMappings ++ deferredForeignKeysForArrays
+            return $ deferredForeignKeys ++ deferredForeignKeysForCollections
 
         -- forM_ deferredForeignKeys $ \deferredForeignKey -> do
         --   outputData conn $ createForeignIndexesForJoins deferredForeignKey
@@ -486,7 +466,6 @@ processTheMessages env conn messages = do
   forM_ insertsByCodeHash $ \ins -> do
     outputData conn $ updateForeignKeysFromNULLAbstract (abstractInserts ins) -- not historic
     outputData conn $ updateForeignKeysFromNULLIndex (indexInsert ins)
-    unless ((length (collectionInserts ins) < 1)) $ outputData conn $ updateForeignKeysFromNULLArray (collectionInserts ins)
 
   forM_ concatFkeys $ \deferredForeignKey -> do
     outputData conn $ createForeignIndexesForJoins deferredForeignKey
