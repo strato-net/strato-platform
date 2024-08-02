@@ -200,6 +200,8 @@ async function get(user, args, options) {
   return marshalOut(order['0'] ? { ...order['0'] } : { ...order });
 }
 
+
+
 async function getAll(admin, args = {}, options) {
   let saleOrders;
   const { offset, limit, order } = args;
