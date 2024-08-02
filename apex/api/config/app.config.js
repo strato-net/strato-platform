@@ -18,7 +18,7 @@ module.exports = {
     memoryUsedAlertLevel: 80, // Alert when used memory (RAM) >= N%
     memoryUsedCloseLevel: 75,
     diskspaceUsedAlertLevel: 80, // Alert when used diskspace >= N%
-    dispaceUsedAlertCloseLevel: 75,
+    diskpaceUsedCloseLevel: 75,
     cpuAvgLoadAlertLevel: 97, // Alert when cpu avg load > N%
     cpuAvgLoadCloseLevel: 90,
     cpuCurrentLoadAlertLevel: 99, // Alert when cpu current load > N%,
