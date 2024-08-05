@@ -6,6 +6,7 @@ pipeline {
   parameters {
     string(name: 'GIT_TAG', defaultValue: 'tags/10.0-rc0', description: 'The strato-platform git tag to build as a release candidate. Use `tags/<tag_name>` format. NOTE: Other Refspec types are not supported.')
     string(name: 'RELEASE_VERSION', defaultValue: '10.0', description: 'The version tag for the future release')
+    booleanParam(name: 'MARKETPLACE_RELEASE', defaultValue: false, description: 'Enable to do a marketplace release')
   }
   stages {
     stage('Prepare') {
