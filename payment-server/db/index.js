@@ -1,6 +1,7 @@
 import dotenv from 'dotenv';
 import pg from 'pg';
 import fs from 'fs';
+import path from 'path';
 const { Client } = pg;
 dotenv.config();
 
@@ -14,7 +15,7 @@ const ssl = (process.env.POSTGRES_SERVER_URL !== 'postgres') ?
     {
         require: true,
         rejectUnauthorized: true,
-        ca: fs.readFileSync("./payment-server/dbCert/us-east-1-bundle.cer").toString(),
+        ca: fs.readFileSync(path.join(__dirname, '../dbCert/us-east-1-bundle.cer')).toString()
     } 
     : false
 
