@@ -9,7 +9,13 @@ const port = process.env.POSTGRES_PORT || '5432';
 const user = process.env.POSTGRES_USER || 'postgres';
 const password = process.env.POSTGRES_PASSWORD;
 const database = process.env.POSTGRES_DBNAME || 'postgres';
-const ssl = (process.env.POSTGRES_SERVER_URL !== 'postgres')
+const ssl = (process.env.POSTGRES_SERVER_URL !== 'postgres') ?
+    {
+        require: true,
+        rejectUnauthorized: true,
+        ca: fs.readFileSync("./payment-server/dbCert/us-east-1-bundle.cer").toString(),
+    } 
+    : false
 
 let client;
 
@@ -20,7 +26,6 @@ const connectToDB = async () => {
         user,
         password,
         database,
-        ssl
     });
     await client.connect()
         .then(() => {
