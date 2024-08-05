@@ -5,6 +5,11 @@ import path from 'path';
 const { Client } = pg;
 dotenv.config();
 
+import { fileURLToPath } from 'url';
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+
+
 
 const host = process.env.POSTGRES_SERVER_URL || 'postgres';
 const port = process.env.POSTGRES_PORT || '5432';
@@ -15,7 +20,7 @@ const ssl = (process.env.POSTGRES_SERVER_URL !== 'postgres') ?
     {
         require: true,
         rejectUnauthorized: true,
-        ca: fs.readFileSync(path.join(__dirname, '../dbCert/us-east-1-bundle.cer')).toString()
+        ca: fs.readFileSync(path.join(__dirname,'../dbCert/us-east-1-bundle.cer')).toString()
     } 
     : false
 
