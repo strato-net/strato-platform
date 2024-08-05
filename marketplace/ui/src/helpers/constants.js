@@ -387,3 +387,61 @@ export const BANNER = [
     mobileImg: Images.HowX394,
   }
 ];
+
+
+export const TRANSACTION_STATUS = {
+  1: 'payment Pending',
+  2: 'closed',
+  3: 'cancelled',
+  4: 'awaiting',
+  5: 'awaiting shipment'
+}
+
+export const TRANSACTION_STATUS_COLOR = {
+  Order: "#2A53FF",
+  Transfer: "#FF0000",
+  Redemption: "#001C76",
+};
+
+export const TRANSACTION_STATUS_CLASSES = {
+  1: {
+    textClass: "bg-[#EBF7FF]",
+    bgClass: "bg-[#13188A]"
+  },
+  2: {
+    textClass: "bg-[#FF8C0033]",
+    bgClass: "bg-[#FF8C00]"
+  },
+  3: {
+    textClass: "bg-[#FF8C0033]",
+    bgClass: "bg-[#FF8C00]"
+  },
+  4: {
+    textClass: "bg-[#119B2D33]",
+    bgClass: "bg-[#119B2D]"
+  },
+  5: {
+    textClass: "bg-[#FFF0F0]",
+    bgClass: "bg-[#FF0000]"
+  },
+}
+
+export const TRANSACTION_SORT = [
+  {label:'All', value:'0'},
+  {label:'Awaiting Fulfillment', value:'1'},
+  {label:'Awaiting Shipment', value:'2'},
+  {label:'Closed', value:'3'},
+  {label:'Cancelled', value:'4'},
+  {label:'Payment Pending', value:'5'},
+]
+
+export const DOWNLOAD_OPTIONS = [
+  {
+    key: 'xls',
+    label: 'Excel',
+  },
+  {
+    key: 'csv',
+    label: 'CSV',
+  },
+];

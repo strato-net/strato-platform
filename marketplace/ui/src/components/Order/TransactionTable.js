@@ -1,15 +1,16 @@
 import React, { useEffect, useState } from "react";
-import { Button, Dropdown, Space, Typography, Input, Row, Col, Popover, Card } from "antd";
+import { Button, Dropdown, Space, Typography, Input, Row, Col, Popover, Card, Tooltip, Select } from "antd";
 import { DownOutlined, UpOutlined, DownloadOutlined, SearchOutlined } from "@ant-design/icons";
 import { useNavigate, useParams, useLocation } from "react-router-dom";
 import classNames from "classnames";
+// Components
 import DataTableComponent from "../DataTableComponent";
 import { dummyData, getStatus } from "./constant";
 import { getStringDate } from "../../helpers/utils";
 import { actions } from "../../contexts/order/actions";
 import { useOrderDispatch, useOrderState } from "../../contexts/order";
 import useDebounce from "../UseDebounce";
-import { US_DATE_FORMAT, STRATS_CONVERSION } from "../../helpers/constants";
+import { US_DATE_FORMAT, STRATS_CONVERSION, TRANSACTION_STATUS, TRANSACTION_STATUS_CLASSES, TRANSACTION_SORT, TRANSACTION_STATUS_COLOR, DOWNLOAD_OPTIONS } from "../../helpers/constants";
 import { FilterIcon } from "../../images/SVGComponents";
 import "./ordersTable.css"
 import routes from "../../helpers/routes";
@@ -109,32 +110,21 @@ const TransactionTable = ({ user, selectedDate, onDateChange, download, isAllOrd
   const Sorting = (classes) => {
     return (
       <div className={classes.className}>
-        <Typography onClick={() => handleSort(0)}>All</Typography>
-        <Typography onClick={() => handleSort(1)}>Awaiting Fulfillment</Typography>
-        <Typography onClick={() => handleSort(2)}>Awaiting Shipment</Typography>
-        <Typography onClick={() => handleSort(3)}>Closed</Typography>
-        <Typography onClick={() => handleSort(4)}>Canceled</Typography>
-        <Typography onClick={() => handleSort(5)}>Payment Pending</Typography>
+        {TRANSACTION_SORT.map(({ label, value }) => <Typography onClick={() => handleSort(value)}>{label}</Typography>)}
       </div>
     )
   }
 
-  const typeColor = {
-    Order: "#2A53FF",
-    Transfer: "#FF0000",
-    Redemption: "#001C76"
-  }
-
   const Content = ({ data }) => {
-    return <div style={{ width: '460px', height: '160px' }}>
+    return <div style={{ width: '460px', height: '170px' }}>
       <Card>
         <Row>
           <Col span={6}>
-            <img src={data.imageURL[0]} alt={data.assetName}  className="border w-88 h-88 border-indigo-600 rounded-md" />
+            <img src={data.imageURL[0]} alt={data.assetName} className="border w-88 h-88 border-indigo-600 rounded-md" />
           </Col>
           <Col span={8} offset={1}>
             <p className="text-base font-bold">{data.assetName}</p>
-            <p style={{ color: '#827474' }} className="font-medium"> Lorem ipsum dolor sit amet, consectetur adipiscing elit</p>
+            <p style={{ color: '#827474' }} className="font-medium"><Tooltip placement="topRight" title={"description......."}> Lorem ipsum dolor sit amet, consectetur adipiscing elit </Tooltip></p>
           </Col>
           <Col span={8} offset={1}>
             <p className="text-right flex justify-end items-center"> <b>$ {data.totalPrice} </b> &nbsp; ({data.totalPrice * 100} {StratsIcon}) </p>
@@ -150,6 +140,7 @@ const TransactionTable = ({ user, selectedDate, onDateChange, download, isAllOrd
       title: "#",
       dataIndex: "reference",
       key: "reference",
+      responsive: ['sm'],
       render: (reference) => (
         <p
           id={reference}
@@ -161,19 +152,20 @@ const TransactionTable = ({ user, selectedDate, onDateChange, download, isAllOrd
       ),
     },
     {
-      title: "Type",
+      title: <p className="text-center font-bold">Type</p>,
       dataIndex: "type",
       key: "type",
-      render: (text) => (<span style={{ background: typeColor[text] }} className={`bg-${typeColor[text]} min-w-[80px] cursor-default px-2 py-2 rounded-lg text-white`}>{text}</span>),
+      responsive: ['sm'],
+      render: (text) => (<p style={{ background: TRANSACTION_STATUS_COLOR[text] }} className={`bg-${TRANSACTION_STATUS_COLOR[text]} min-w-[80px] text-center cursor-default px-2 py-2 rounded-lg text-white`}>{text}</p>),
     },
     {
       title: "Asset",
       dataIndex: "Item",
       key: "Item",
-      // align: "center",
+      align: "center",
       render: (asset, data) => <>
-        <Popover content={<Content data={data} />} trigger="hover">
-          <div className="flex items-center">
+        <Popover className="flex justify-center items-center" content={<Content data={data} />} trigger="hover">
+          <div >
             <img src={data.imageURL[0]} alt={data.assetName} width={24} height={30} className="border border-indigo-600 rounded-md" />
             <span className="ml-1"> {data.assetName} </span>
           </div>
@@ -185,6 +177,7 @@ const TransactionTable = ({ user, selectedDate, onDateChange, download, isAllOrd
       dataIndex: "qty",
       key: "qty",
       align: "center",
+      width: '100px',
       // render : (data, {quantities, BlockApps-Mercata-Order-quantities}) => <span>{quantities[0] || BlockApps-Mercata-Order-quantities.value}</span>
       render: (data, { qty }) => <span>{qty}</span>
     },
@@ -192,27 +185,30 @@ const TransactionTable = ({ user, selectedDate, onDateChange, download, isAllOrd
       title: "Price ($)",
       dataIndex: "price",
       key: "price",
-      align: "center",
-      render: (data, { totalPrice }) => <span>{totalPrice}</span>
+      align: "right",
+      width: '100px',
+      render: (data, { totalPrice }) => <p>{totalPrice}</p>
     },
     {
       title: "From",
       dataIndex: "from",
       key: "from",
-      align: "left",
+      align: "center",
     },
     {
       title: "To",
       dataIndex: "to",
       key: "to",
-      align: "left",
+      align: "center",
     },
     {
       title: "Hash",
       dataIndex: "hash",
       key: "hash",
       align: "left",
-      render: (data, { block_hash }) => <p className="text-[#13188A] hover:text-primaryHover cursor-pointer " >{`# ${block_hash.slice(0, 8)}..`}</p>
+      render: (data, { block_hash }) => <Tooltip placement="topRight" title={block_hash}>
+        <p className="text-[#13188A] hover:text-primaryHover cursor-pointer " >{`# ${block_hash.slice(0, 5)}..`}</p>
+      </Tooltip>
     },
     {
       dataIndex: "date",
@@ -247,72 +243,31 @@ const TransactionTable = ({ user, selectedDate, onDateChange, download, isAllOrd
   ];
 
   const statusComponent = (status) => {
-    const statusClasses = {
-      1: {
-        textClass: "bg-[#EBF7FF]",
-        bgClass: "bg-[#13188A]"
-      },
-      2: {
-        textClass: "bg-[#FF8C0033]",
-        bgClass: "bg-[#FF8C00]"
-      },
-      3: {
-        textClass: "bg-[#FF8C0033]",
-        bgClass: "bg-[#FF8C00]"
-      },
-      4: {
-        textClass: "bg-[#119B2D33]",
-        bgClass: "bg-[#119B2D]"
-      },
-      5: {
-        textClass: "bg-[#FFF0F0]",
-        bgClass: "bg-[#FF0000]"
-      },
-    };
 
-    const statusName = {
-      1: 'payment Pending',
-      2: 'closed',
-      3: 'cancelled',
-      4: 'awaiting',
-      5: 'awaiting shipment'
-    }
-
-    const { textClass, bgClass } = statusClasses[status] || { textClass: "bg-[#FFF6EC]", bgClass: "bg-[#119B2D]" };
+    const { textClass, bgClass } = TRANSACTION_STATUS_CLASSES[status] || { textClass: "bg-[#FFF6EC]", bgClass: "bg-[#119B2D]" };
     return (
       <div className={classNames(textClass, "w-max text-center py-1 rounded-xl flex justify-start items-center gap-1 p-3")}>
         <div className={classNames(bgClass, "h-3 w-3 rounded-sm")}></div>
-        <p>{statusName[status].slice(0, 12)}</p>
+        <p>{TRANSACTION_STATUS[status]}</p>
       </div>
     );
   };
 
-  const onPageChange = (page) => {
-    const baseUrl = new URL(`/order/${type}`, window.location.origin);
-    if (searchVal) {
-      baseUrl.searchParams.set("search", searchVal);
-    }
+  // const onPageChange = (page) => {
+  //   const baseUrl = new URL(`/order/${type}`, window.location.origin);
+  //   if (searchVal) {
+  //     baseUrl.searchParams.set("search", searchVal);
+  //   }
 
-    baseUrl.searchParams.set("page", page);
-    const url = baseUrl.pathname + baseUrl.search;
-    navigate(url, { new: true });
-  };
+  //   baseUrl.searchParams.set("page", page);
+  //   const url = baseUrl.pathname + baseUrl.search;
+  //   navigate(url, { new: true });
+  // };
 
   const handleChangeSearch = (e) => {
     const value = e.target.value;
     setSearch(value)
   }
-
-  const menuItems = [
-    {
-      key: 'xls',
-      label: 'Excel',
-    },
-    {
-      key: 'csv',
-      label: 'CSV',
-    },
-  ];
 
   return (
     <Row>
@@ -320,7 +275,12 @@ const TransactionTable = ({ user, selectedDate, onDateChange, download, isAllOrd
       <Col span={22} className="mx-auto">
         <div className="flex items-center justify-between">
           <h2 className="hidden md:block"> My Transactions </h2>
-          <div className="flex gap-2 items-center mb-5">
+          <div className="flex gap-2 items-center mb-5 mt-4">
+            <Select className="hidden lg:block" defaultValue={"Redemption"}>
+              <Select.Option value="Order" > Order </Select.Option>
+              <Select.Option value="Transfer" > Transfer </Select.Option>
+              <Select.Option value="Redemption" > Redemption </Select.Option>
+            </Select>
             <Input className="text-base orders_searchbar md:p-3 rounded-full bg-[#F6F6F6]"
               key={searchVal}
               onChange={(e) => { handleChangeSearch(e) }}
@@ -329,7 +289,7 @@ const TransactionTable = ({ user, selectedDate, onDateChange, download, isAllOrd
               placeholder="Search Transactions #" />
             <Dropdown
               className="md:hidden customButton"
-              menu={{ items: menuItems, onClick: (e) => download(e.key) }}
+              menu={{ items: DOWNLOAD_OPTIONS, onClick: (e) => download(e.key) }}
               disabled={isAllOrdersLoading}
               trigger={['click']}
             >
@@ -347,14 +307,14 @@ const TransactionTable = ({ user, selectedDate, onDateChange, download, isAllOrd
             </div>
           </div>
         </div>
-        <div className="flex md:hidden order_responsive">
+        <div className="flex lg:hidden order_responsive">
           {/* <ResponsiveSoldOrderCard
           data={data}
           isLoading={isordersSoldLoading || isLoading}
         /> */}
           <TransactionResponsive />
         </div>
-        <div className="hidden md:block">
+        <div className="hidden lg:block">
           <DataTableComponent
             columns={column}
             data={dummyData}

@@ -4,13 +4,9 @@ import classNames from "classnames";
 import { dummyData } from "./constant";
 import { Images } from "../../images";
 import "./ordersTable.css";
+import { TRANSACTION_STATUS, TRANSACTION_STATUS_CLASSES, TRANSACTION_STATUS_COLOR } from "../../helpers/constants";
 
 const TransactionResponsive = () => {
-  const typeColor = {
-    Order: "#2A53FF",
-    Transfer: "#FF0000",
-    Redemption: "#001C76",
-  };
 
   const StratsIcon = <img src={Images.logo} alt="" className="mx-1 w-3 h-3" />;
 
@@ -24,42 +20,12 @@ const TransactionResponsive = () => {
   };
 
   const statusComponent = (status) => {
-    const statusClasses = {
-      1: {
-        textClass: "bg-[#EBF7FF]",
-        bgClass: "bg-[#13188A]"
-      },
-      2: {
-        textClass: "bg-[#FF8C0033]",
-        bgClass: "bg-[#FF8C00]"
-      },
-      3: {
-        textClass: "bg-[#FF8C0033]",
-        bgClass: "bg-[#FF8C00]"
-      },
-      4: {
-        textClass: "bg-[#119B2D33]",
-        bgClass: "bg-[#119B2D]"
-      },
-      5: {
-        textClass: "bg-[#FFF0F0]",
-        bgClass: "bg-[#FF0000]"
-      },
-    };
 
-    const statusName = {
-      1: 'payment Pending',
-      2: 'closed',
-      3: 'cancelled',
-      4: 'awaiting',
-      5: 'awaiting shipment'
-    }
-
-    const { textClass, bgClass } = statusClasses[status] || { textClass: "bg-[#FFF6EC]", bgClass: "bg-[#119B2D]" };
+    const { textClass, bgClass } = TRANSACTION_STATUS_CLASSES[status] || { textClass: "bg-[#FFF6EC]", bgClass: "bg-[#119B2D]" };
     return (
       <div className={classNames(textClass, "w-max text-center py-1 rounded-xl flex justify-start items-center gap-1 p-3")}>
         <div className={classNames(bgClass, "h-3 w-3 rounded-sm")}></div>
-        <p>{statusName[status].slice(0, 12)}</p>
+        <p>{TRANSACTION_STATUS[status]}</p>
       </div>
     );
   };
@@ -80,6 +46,7 @@ const TransactionResponsive = () => {
       title: 'Hash',
       dataIndex: 'hash',
       key: 'hash',
+      render: (text) => <p className="text-[#13188A]">{text}</p>
     },
     {
       title: 'Status',
@@ -94,21 +61,21 @@ const TransactionResponsive = () => {
       key: '1',
       from: 'Tanuj Soni',
       to: 'Hadi',
-      hash: '45353434',
+      hash: '#45353434',
       status: 1,
     },
     {
       key: '2',
       from: 'Hadi',
       to: 'Tanuj Soni',
-      hash: '45353434',
+      hash: '#45353434',
       status: 2,
     },
     {
       key: '3',
       from: 'Maya',
       to: 'Hadi',
-      hash: '45353434',
+      hash: '#45353434',
       status: 3,
     },
   ];
@@ -140,7 +107,7 @@ const TransactionResponsive = () => {
               </p>
               <span
                 style={{ color: "#13188A" }}
-                className="font-semibold"
+                className="font-semibold cursor-pointer"
                 onClick={() => handleMore(assetName)}
               >
                 {isExpanded ? "(Less -)" : "(More +)"}
@@ -150,7 +117,7 @@ const TransactionResponsive = () => {
               <Button
                 className="block ml-auto text-white"
                 size="middle"
-                style={{ backgroundColor: `${typeColor[type]}` }}
+                style={{ backgroundColor: `${TRANSACTION_STATUS_COLOR[type]}` }}
               >
                 {type}
               </Button>
@@ -161,7 +128,7 @@ const TransactionResponsive = () => {
               <p className="text-right">10/12/2024</p>
             </Col>
             {isExpanded && <Col span={24}>
-            <Table className="mt-6" columns={columns} dataSource={data} />
+              <Table className="mt-6" columns={columns} dataSource={data} pagination={false} />
             </Col>}
           </Row>
         );
