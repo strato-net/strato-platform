@@ -28,6 +28,7 @@ const connectToDB = async () => {
         user,
         password,
         database,
+        ssl
     });
     await client.connect()
         .then(() => {
