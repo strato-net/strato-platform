@@ -1,14 +1,15 @@
 import dotenv from 'dotenv';
-import fs from 'fs';
 import pg from 'pg';
 const { Client } = pg;
 dotenv.config();
+
 
 const host = process.env.POSTGRES_SERVER_URL || 'postgres';
 const port = process.env.POSTGRES_PORT || '5432';
 const user = process.env.POSTGRES_USER || 'postgres';
 const password = process.env.POSTGRES_PASSWORD;
 const database = process.env.POSTGRES_DBNAME || 'postgres';
+const ssl = (process.env.POSTGRES_SERVER_URL !== 'postgres')
 
 let client;
 
@@ -18,7 +19,8 @@ const connectToDB = async () => {
         port,
         user,
         password,
-        database
+        database,
+        ssl
     });
     await client.connect()
         .then(() => {
