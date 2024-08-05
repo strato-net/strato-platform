@@ -302,7 +302,6 @@ const Inventory = ({ user }) => {
                   style={{ width: 250, height: 40 }}
                   onChange={handleChange}
                   value={'Connect to Payment Provider'}
-                  disabled={notOnboarded.length === 0}
                 >
                   {sortedPaymentServices.map(service => (
                     <Option 
