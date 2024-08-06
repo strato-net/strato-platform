@@ -1,8 +1,6 @@
 timeout: 600000
 VM: SolidVM
 configDirPath: <configDirPath_value>
-contractDirPath: <contractDirPath_value>
-deployFilename: <deployFilename_value>
 serverHost: <serverHost_value>
 dockerized: true
 

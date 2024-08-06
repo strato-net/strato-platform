@@ -6,7 +6,7 @@ import oauthHelper from "./helpers/oauthHelper.js";
 import { yamlWrite, yamlSafeDumpSync } from "./helpers/config.js";
 import { replaceInFiles } from './helpers/replaceInFiles.js';
 
-const contractDir = config.contractDirPath || '../marketplace/backend/dapp/mercata-base-contracts/Templates';
+const contractDir = config.contractDirPath || '/usr/src/payment-server/contracts/Templates';
 
 async function uploadContract(token, type, args) {
   const contractName = `External${type}Service`;
@@ -32,7 +32,6 @@ async function uploadContract(token, type, args) {
 }
 
 function deploy(args) {
-  console.log(config)
   // author the deployment
   const { deployFilePath, ...restArgs } = args;
 
@@ -41,10 +40,8 @@ function deploy(args) {
     contracts: restArgs
   };
 
-  if (config.apiDebug) {
-    console.log("deploy filename:", deployFilePath);
-    console.log(yamlSafeDumpSync(deployment));
-  }
+  console.log("deploy filename:", deployFilePath);
+  console.log(yamlSafeDumpSync(deployment));
 
   yamlWrite(deployment, deployFilePath);
 
@@ -63,10 +60,6 @@ describe("Payment Server - deploy contracts", function () {
     assert.isDefined(
       config.configDirPath,
       "configDirPath is  missing. Set in config"
-    )
-    assert.isDefined(
-      config.deployFilename,
-      "deployFilename is missing. Set in config"
     )
     assert.isDefined(
       process.env.BASE_CODE_COLLECTION,
@@ -107,7 +100,7 @@ describe("Payment Server - deploy contracts", function () {
 
   it('Create deploy.yaml', async () => {
     const deployArgs = {
-      deployFilePath: `${config.configDirPath}/${process.env.CONFIG ? `${process.env.CONFIG}.` : '' }${config.deployFilename}`,
+      deployFilePath: `${config.configDirPath}/deploy.yaml`,
       stripe,
       metamask,
       redemption
