@@ -34,3 +34,4 @@ config/*.deploy.json
 temp
 coverage
 config.yaml
+deploy.yaml
