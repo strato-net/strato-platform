@@ -57,29 +57,28 @@ const Checkout = () => {
     return parseFloat(result);
   }
 
-  const storedData = useMemo(() => {
-    const cartListData = window.localStorage.getItem("cartList");
-    let cartList = [];
+  // const storedData = useMemo(() => {
+  //   const cartListData = window.localStorage.getItem("cartList");
+  //   let cartList = [];
+  //   try {
+  //     if (cartListData) {
+  //       // Attempt to parse the stored data as JSON
+  //       cartList = JSON.parse(cartListData);
+  //     }
+  //   } catch (error) {
+  //     // Handle JSON parsing error
+  //     console.error("Error parsing cartList data:", error);
+  //   }
 
-    try {
-      if (cartListData) {
-        // Attempt to parse the stored data as JSON
-        cartList = JSON.parse(cartListData);
-      }
-    } catch (error) {
-      // Handle JSON parsing error
-      console.error("Error parsing cartList data:", error);
-    }
-
-    return cartList;
-  }, []);
-
-  useEffect(() => {
-    actions.fetchCartItems(marketplaceDispatch, storedData);
-  }, [marketplaceDispatch, storedData]);
+  //   return cartList;
+  // }, []);
 
   useEffect(() => {
-    paymentServiceActions.getPaymentServices(paymentServiceDispatch);
+    actions.fetchCartItems(marketplaceDispatch, cartList);
+  }, [marketplaceDispatch, cartList]);
+
+  useEffect(() => {
+    paymentServiceActions.getPaymentServices(paymentServiceDispatch, false);
   }, [paymentServiceDispatch]);
 
   useEffect(() => {
@@ -194,7 +193,10 @@ const Checkout = () => {
     cartList.forEach((element, index) => {
       if (element.product.address === product.key) {
         const availableQuantity = product.quantity ? product.quantity : 1;
-        if (e <= availableQuantity) {
+        if (!e || e === "" || e === 0) {
+          items[index].qty = 1;
+          actions.addItemToCart(marketplaceDispatch, items);
+        } else if (e <= availableQuantity) {
           items[index].qty = e;
           actions.addItemToCart(marketplaceDispatch, items);
         } else {
@@ -354,13 +356,10 @@ const Checkout = () => {
     },
   ];
 
-  const filterPaymentServices = (es) => {
-    const ps = es.map(p => paymentServices.find(s => s.address === p.value));
-    if (ps.length === 0) {
-      return paymentServices.filter((p) => p && p.serviceName === 'Stripe');
-    } else {
-      return ps;
-    }
+  const filterPaymentServices = (e) => {
+    const filteredPaymentServices = e.map(assetPaymentServices => paymentServices.find(paymentService => paymentService.address === assetPaymentServices.value));
+
+    return filteredPaymentServices;
   }
 
   return (

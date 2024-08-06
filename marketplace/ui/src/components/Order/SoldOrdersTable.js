@@ -3,21 +3,19 @@ import classNames from "classnames";
 import { EyeOutlined, DownOutlined, UpOutlined, DownloadOutlined, SearchOutlined } from "@ant-design/icons";
 import routes from "../../helpers/routes";
 import DataTableComponent from "../DataTableComponent";
-import { getStatus, getStatusByName } from "./constant";
+import { getStatus } from "./constant";
 import { getStringDate } from "../../helpers/utils";
 import { useNavigate, Link, useParams, useLocation } from "react-router-dom";
 import { actions } from "../../contexts/order/actions";
 import { useOrderDispatch, useOrderState } from "../../contexts/order";
 import useDebounce from "../UseDebounce";
-import { apiUrl, HTTP_METHODS, US_DATE_FORMAT } from "../../helpers/constants";
+import { US_DATE_FORMAT, STRATS_CONVERSION } from "../../helpers/constants";
 import { Pagination, Button, Dropdown, Menu, DatePicker, Space, Typography, Input } from "antd";
 import TagManager from "react-gtm-module";
 import "./ordersTable.css"
 import { FilterIcon } from "../../images/SVGComponents";
-import { ResponsiveOrderCard } from "./ResponsiveOrdersCard";
 import dayjs from "dayjs";
 import { ResponsiveSoldOrderCard } from "./ResponsiveSoldOrdersCard";
-import RestStatus from "http-status-codes";
 import { Images } from "../../images";
 
 
@@ -84,10 +82,11 @@ const SoldOrdersTable = ({ user, selectedDate, onDateChange, download, isAllOrde
           key: order.id ? order.transaction_hash : order.address,
           orderNumber: order,
           buyersCommonName: order.purchasersCommonName,
-          orderTotal: order.totalPrice,
+          orderTotal: order.currency === "STRATS" ? (order.totalPrice * STRATS_CONVERSION).toFixed(0) : order.totalPrice,
           date: getStringDate(order.createdDate, US_DATE_FORMAT),
           status: getStatus(parseInt(order.status)),
           invoice: order.id ? order.transaction_hash : order.address,
+          currency: order.currency ? order.currency : "USD"
         };
       });
       setIsLoading(false);
@@ -132,7 +131,7 @@ const SoldOrdersTable = ({ user, selectedDate, onDateChange, download, isAllOrde
           }}
           className="text-[#13188A] hover:text-primaryHover cursor-pointer"
         >
-          {`#${`${order.orderId}`.substring(0,6)}`}
+          {`#${`${order.orderId}`.substring(0, 6)}`}
         </p>
       ),
     },
@@ -142,18 +141,18 @@ const SoldOrdersTable = ({ user, selectedDate, onDateChange, download, isAllOrde
       key: "buyersCommonName",
       // render: (text) => <p onClick={()=>{navigate(`${routes.MarketplaceUserProfile.url.replace(":commonName", text)}`, { state: { from: location.pathname } })}}>{text}</p>,
       render: (text) => (
-        <a 
+        <a
           href={`${window.location.origin}/profile/${encodeURIComponent(text)}`}
           onClick={(e) => {
             e.preventDefault();
             const userProfileUrl = `/profile/${encodeURIComponent(text)}`;
-      
+
             if (e.ctrlKey || e.metaKey) {
               // Open in a new tab if Ctrl/Cmd is pressed
               window.open(`${window.location.origin}${userProfileUrl}`, '_blank');
             } else {
               // Use navigate for a normal click, without Ctrl/Cmd
-              navigate(routes.MarketplaceUserProfile.url.replace(':commonName',text), { state: { from: location.pathname } });
+              navigate(routes.MarketplaceUserProfile.url.replace(':commonName', text), { state: { from: location.pathname } });
             }
           }}
           style={{ textDecoration: 'underline', color: 'black', cursor: 'pointer' }}
@@ -161,13 +160,19 @@ const SoldOrdersTable = ({ user, selectedDate, onDateChange, download, isAllOrde
           {text}
         </a>
       ),
-      
+
     },
     {
-      title: "Order Total ($)",
+      title: "Currency",
+      dataIndex: "currency",
+      key: "currency",
+      align: "center",
+    },
+    {
+      title: "Order Total",
       dataIndex: "orderTotal",
       key: "orderTotal",
-      render: (text) => <p className="sm:w-20 lg:w-28 lg:pr-5 text-right">{text}</p>,
+      align: "center",
     },
     {
       dataIndex: "date",
@@ -269,7 +274,7 @@ const SoldOrdersTable = ({ user, selectedDate, onDateChange, download, isAllOrde
     if (searchVal) {
       baseUrl.searchParams.set("search", searchVal);
     }
-  
+
     baseUrl.searchParams.set("page", page);
     const url = baseUrl.pathname + baseUrl.search;
     navigate(url, { new: true });

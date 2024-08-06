@@ -66,9 +66,9 @@ const HeaderComponent = ({ user, loginUrl, showMenu, handleSubMenu, handleMenuTa
   const { categorys } = useCategoryState();
   let { isAuthenticated } = useAuthenticateState();
 
-  const storedData = useMemo(() => {
-    return window.localStorage.getItem("cartList") == null ? [] : JSON.parse(window.localStorage.getItem("cartList"));
-  }, []);
+  // const storedData = useMemo(() => {
+  //   return window.localStorage.getItem("cartList") == null ? [] : JSON.parse(window.localStorage.getItem("cartList"));
+  // }, []);
 
   useEffect(() => {
     if (user) {
@@ -77,8 +77,8 @@ const HeaderComponent = ({ user, loginUrl, showMenu, handleSubMenu, handleMenuTa
   }, [user]);
 
   useEffect(() => {
-    marketplaceActions.fetchCartItems(marketplaceDispatch, storedData);
-  }, [marketplaceDispatch, storedData]);
+    marketplaceActions.fetchCartItems(marketplaceDispatch, cartList);
+  }, [marketplaceDispatch, cartList]);
 
   const [selectedTab, setSelectedTab] = useState("0");
   const [roleIndex, setRoleIndex] = useState();

@@ -87,9 +87,9 @@ constructor (
         }
     }
 
-    function _createOrder (
-        string _orderHash,
-        string _orderId,
+    function _checkoutInitialized (
+        string _checkoutHash,
+        string _checkoutId,
         address _purchaser,
         string _purchasersCommonName,
         address[] _saleAddresses,
@@ -116,7 +116,7 @@ constructor (
 
             // Lock assets
             try {
-                s.lockQuantity(quantity, _orderHash, _purchaser);
+                s.lockQuantity(quantity, _checkoutHash, _purchaser);
             } catch { // Support for legacy sales
                 try {
                     address(s).call("lockQuantity", quantity, _purchaser);
@@ -124,23 +124,7 @@ constructor (
                     address(s).call("lockQuantity", quantity);
                 }
             }
-            emit AssetLocked(
-                _orderHash,
-                _orderId,
-                _purchaser,
-                _purchasersCommonName,
-                seller,
-                _saleAddresses,
-                _quantities,
-                totalAmountGross,
-                0,
-                0,
-                _unitsPerDollar(),
-                serviceName,
-                PaymentStatus.AWAITING_FULFILLMENT,
-                _createdDate,
-                _comments
-            );
+
 
             // Calculate gross, net, and fee amounts in dollars
             decimal gross = s.price() * decimal(quantity); 
@@ -154,6 +138,17 @@ constructor (
             decimal net = gross - fee;
             totalAmountNet += net;
             totalFee += fee;
+
+            emit Checkout(
+                _checkoutHash,
+                _checkoutId,
+                _purchaser,
+                _purchasersCommonName,
+                seller,
+                _saleAddresses,
+                _quantities,
+                totalAmountGross
+            );
 
             // Calculate net and fee amounts in tokens
             uint tokenAmountNet = uint(net * tokensPerDollar * (10 ** decimals));
@@ -177,8 +172,8 @@ constructor (
             }
         }
         emit Order(
-            _orderHash,
-            _orderId,
+            _checkoutHash,
+            _checkoutId,
             _purchaser,
             _purchasersCommonName,
             seller,
@@ -195,12 +190,12 @@ constructor (
         );
         purchasersAddress = address(0); // Support for legacy sales
         purchasersCommonName = "";
-        return (_orderHash, assets);
+        return (_checkoutHash, assets);
     }
 
-    function _initializePayment (
-        string _orderHash,
-        string _orderId,
+    function _generateIntermediateOrder (
+        string _checkoutHash,
+        string _checkoutId,
         address _purchaser,
         string _purchaserCommonName,
         address[] _saleAddresses,
@@ -209,7 +204,7 @@ constructor (
         uint _createdDate,
         string _comments
     ) internal override returns (address[]) {
-        require(false, "Cannot call initializePayment for token payments.");
+        require(false, "Cannot call generateIntermediateOrder for token payments.");
         return [];
     }
 
