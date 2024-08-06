@@ -16,9 +16,9 @@ const SENDGRID_ENV = { API_KEY: process.env.SENDGRID_API_KEY }
 
 const DEFAULT_OPTIONS = { ...OPTIONS, chainIds: [], cacheNonce: true };
 
-const STRIPE_CONTRACT_ADDRESS = process.env.STRIPE_CONTRACT_ADDRESS || deployment.contracts.stripe;
-const METAMASK_CONTRACT_ADDRESS = process.env.METAMASK_CONTRACT_ADDRESS || deployment.contracts.metamask;
-const REDEMPTION_CONTRACT_ADDRESS = process.env.REDEMPTION_CONTRACT_ADDRESS || deployment.contracts.redemption;
+const STRIPE_CONTRACT_ADDRESS = deployment.contracts.stripe.address;
+const METAMASK_CONTRACT_ADDRESS = deployment.contracts.metamask.address;
+const REDEMPTION_CONTRACT_ADDRESS = deployment.contracts.redemption.address;
 
 const SERVER_URL = `${config.serverHost}`;
 const TABLE_PREFIX = `${process.env.TABLE_PREFIX ? process.env.TABLE_PREFIX : 'BlockApps-Mercata-'}`;

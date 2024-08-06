@@ -32,6 +32,7 @@ config/*.deploy.json
 
 # temp directories
 temp
+contracts
 coverage
 config.yaml
 deploy.yaml
