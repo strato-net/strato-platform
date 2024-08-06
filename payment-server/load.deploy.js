@@ -10,7 +10,11 @@ if (!deploy) {
   } catch (e) {
     console.log('Loading deploy.yaml failed', JSON.stringify(e))
     deploy = {
-      contracts: {}
+      contracts: {
+        stripe: {},
+        metamask: {},
+        redemption: {}
+      }
     }
   }
 }
