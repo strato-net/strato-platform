@@ -200,6 +200,8 @@ async function get(user, args, options) {
   return marshalOut(order['0'] ? { ...order['0'] } : { ...order });
 }
 
+
+
 async function getAll(admin, args = {}, options) {
   let saleOrders;
   const { offset, limit, order } = args;
@@ -244,12 +246,30 @@ async function getAll(admin, args = {}, options) {
         select: 'id:id.max(),orderHash,createdDate',
       }
     };
-    const uniqueOrders = await searchAllWithQueryArgs(paymentTableName, uniqueOrderArgs, newOptions, admin);
+
+    let uniqueOrders = await searchAllWithQueryArgs(paymentTableName, uniqueOrderArgs, newOptions, admin);
+
+    uniqueOrders = uniqueOrders.reduce((acc, order) => {
+      // Find if the orderHash already exists in the accumulator
+      const existingOrderIndex = acc.findIndex(existingOrder => existingOrder.orderHash === order.orderHash);
+
+      if (existingOrderIndex === -1) {
+        // If the orderHash does not exist, add the order to the accumulator
+        acc.push(order);
+      } else {
+        // If the orderHash exists, compare createdDate and keep the latest one
+        if (new Date(order.createdDate) > new Date(acc[existingOrderIndex].createdDate)) {
+          acc[existingOrderIndex] = order;
+        }
+      }
+
+      return acc;
+    }, []);
 
     const idArgs = {
       id: uniqueOrders.map((uo) => uo.id),
       order: order,
-    }
+    };
     saleOrders = await searchAllWithQueryArgs(paymentTableName, idArgs, newOptions, admin);
   }
 
@@ -321,7 +341,7 @@ async function getAll(admin, args = {}, options) {
   else
     saleOrders.sort((a, b) => b.createdDate - a.createdDate);
 
-  saleOrders = saleOrders.slice(offset, offset + limit)
+  saleOrders = saleOrders.slice(offset, parseInt(offset) + parseInt(limit))
 
   return saleOrders ? { orders: saleOrders.map((order) => marshalOut(order)), total: totalCount } : undefined;
 }

@@ -67,8 +67,8 @@ parseLabel theLabel =
   case splitOn "/" theLabel of
     [v1] -> ParsedLabel "" v1 Nothing
     [v1, v2] -> ParsedLabel v1 v2 Nothing
-    [v1, v2, v3] -> ParsedLabel v1 v2 (Just v3)
-    _ -> error $ "error in parsePeerLabel, label isn't formatted correctly: " ++ show theLabel
+    (v1 : v2 : vrest) -> ParsedLabel v1 v2 (Just $ intercalate "/" vrest)
+    [] -> ParsedLabel "" "" Nothing -- not sure if this is proper, but don't want to error
 
 getPeersByThreads :: IO [(String, String)]
 getPeersByThreads = do

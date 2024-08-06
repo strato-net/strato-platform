@@ -86,7 +86,7 @@ const Inventory = ({ user }) => {
 
   useEffect(() => {
     if (user && user.commonName) {
-      paymentServiceActions.getPaymentServices(paymentServiceDispatch);
+      paymentServiceActions.getPaymentServices(paymentServiceDispatch, true);
       paymentServiceActions.getNotOnboarded(paymentServiceDispatch, user.commonName, 10, 0);
     }
   }, [paymentServiceDispatch, user]);
@@ -302,7 +302,6 @@ const Inventory = ({ user }) => {
                   style={{ width: 250, height: 40 }}
                   onChange={handleChange}
                   value={'Connect to Payment Provider'}
-                  disabled={notOnboarded.length === 0}
                 >
                   {sortedPaymentServices.map(service => (
                     <Option 

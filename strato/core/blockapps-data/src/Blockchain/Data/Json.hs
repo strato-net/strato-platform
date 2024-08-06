@@ -47,7 +47,7 @@ instance ToSchema RawTransaction' where
       NamedSchema (Just "RawTransaction'") mempty
 
 instance ToJSON RawTransaction' where
-  toJSON (RawTransaction' rt@(RawTransaction t fa non gp gl (Just ta) val cod cid r s v md bn h o) next) =
+  toJSON (RawTransaction' rt@(RawTransaction t fa non gp gl (Just ta) val cod cName cpa cid r s v md bn h o) next) =
     object $
       [ "next" .= next,
         "from" .= fa,
@@ -57,6 +57,8 @@ instance ToJSON RawTransaction' where
         "to" .= ta,
         "value" .= show val,
         "codeOrData" .= cod,
+        "cName".= cName,
+        "cpa".= cpa,
         "r" .= showHex r "",
         "s" .= showHex s "",
         "v" .= showHex v "",
@@ -68,7 +70,7 @@ instance ToJSON RawTransaction' where
       ]
         ++ (("chainId" .=) <$> maybeToList (ChainId <$> if (0 == cid) then Nothing else Just cid))
         ++ (("metadata" .=) <$> maybeToList (M.fromList <$> md))
-  toJSON (RawTransaction' rt@(RawTransaction t fa non gp gl Nothing val cod cid r s v md bn h o) next) =
+  toJSON (RawTransaction' rt@(RawTransaction t fa non gp gl Nothing val cod cName cpa cid r s v md bn h o) next) =
     object $
       [ "next" .= next,
         "from" .= fa,
@@ -77,6 +79,8 @@ instance ToJSON RawTransaction' where
         "gasLimit" .= gl,
         "value" .= show val,
         "codeOrData" .= cod,
+        "cName".= cName,
+        "cpa".= cpa,
         "r" .= showHex r "",
         "s" .= showHex s "",
         "v" .= showHex v "",
@@ -103,7 +107,9 @@ instance FromJSON RawTransaction' where
     tgl <- t .:? "gasLimit" .!= 0
     tto <- t .:? "to"
     tval <- LabeledError.read "FromJSON/RawTransaction'" <$> t .:? "value" .!= "0"
-    tcd <- t .:? "codeOrData" .!= Code ""
+    tcd <- t .:? "codeOrData"
+    cName <- t .:? "cName" 
+    cpa <- t .:? "cpa"
     cid <- fmap (\(ChainId c) -> c) <$> (t .:? "chainId")
     (tr :: Integer) <- parseHexStr (t .: "r")
     (ts :: Integer) <- parseHexStr (t .: "s")
@@ -129,7 +135,9 @@ instance FromJSON RawTransaction' where
               (tgl :: Integer)
               (tto :: Maybe Address)
               (tval :: Integer)
-              (tcd :: Code)
+              (tcd :: Maybe B.ByteString)
+              (cName :: Maybe String)
+              (cpa :: Maybe Address)
               (fromMaybe 0 (cid :: Maybe Word256))
               (tr :: Integer)
               (ts :: Integer)
@@ -149,24 +157,28 @@ instance ToSchema UnsignedRawTransaction' where
       NamedSchema (Just "UnsignedRawTransaction'") mempty
 
 instance ToJSON UnsignedRawTransaction' where
-  toJSON (UnsignedRawTransaction' (RawTransaction _ _ non gp gl (Just ta) val cod cid _ _ _ md _ _ _)) =
+  toJSON (UnsignedRawTransaction' (RawTransaction _ _ non gp gl (Just ta) val cod cname cpa cid _ _ _ md _ _ _)) =
     object $
       [ "nonce" .= non,
         "gasPrice" .= gp,
         "gasLimit" .= gl,
         "to" .= ta,
         "value" .= show val,
-        "codeOrData" .= cod
+        "codeOrData" .= cod,
+        "contractName" .= cname,
+        "codePtrAddress" .= cpa
       ]
         ++ (("chainId" .=) <$> maybeToList (ChainId <$> if (0 == cid) then Nothing else Just cid))
         ++ (("metadata" .=) <$> maybeToList (M.fromList <$> md))
-  toJSON (UnsignedRawTransaction' (RawTransaction _ _ non gp gl Nothing val cod cid _ _ _ md _ _ _)) =
+  toJSON (UnsignedRawTransaction' (RawTransaction _ _ non gp gl Nothing val cod cname cpa cid _ _ _ md _ _ _)) =
     object $
       [ "nonce" .= non,
         "gasPrice" .= gp,
         "gasLimit" .= gl,
         "value" .= show val,
-        "codeOrData" .= cod
+        "codeOrData" .= cod,
+        "contractName" .= cname,
+        "codePtrAddress" .= cpa
       ]
         ++ (("chainId" .=) <$> maybeToList (ChainId <$> if (0 == cid) then Nothing else Just cid))
         ++ (("metadata" .=) <$> maybeToList (M.fromList <$> md))
@@ -179,7 +191,9 @@ instance FromJSON UnsignedRawTransaction' where
     tgl <- t .:? "gasLimit" .!= 0
     tto <- t .:? "to"
     tval <- LabeledError.read "FromJSON/UnsignedRawTransaction'" <$> t .:? "value" .!= "0"
-    tcd <- t .:? "codeOrData" .!= Code ""
+    tcd <- t .:? "codeOrData" 
+    cName <- t .:? "contractName"
+    cpa <- t .:? "codePtrAddress"
     cid <- fmap (\(ChainId c) -> c) <$> (t .:? "chainId")
     (tr :: Integer) <- parseHexStr (t .: "r")
     (ts :: Integer) <- parseHexStr (t .: "s")
@@ -204,7 +218,9 @@ instance FromJSON UnsignedRawTransaction' where
               (tgl :: Integer)
               (tto :: Maybe Address)
               (tval :: Integer)
-              (tcd :: Code)
+              (tcd :: Maybe B.ByteString)
+              (cName :: Maybe String)
+              (cpa :: Maybe Address)
               (fromMaybe 0 (cid :: Maybe Word256))
               (tr :: Integer)
               (ts :: Integer)
@@ -562,12 +578,12 @@ isAddr a = case a of
   Nothing -> False
 
 rawTransactionSemantics :: RawTransaction -> TransactionType
-rawTransactionSemantics (RawTransaction _ _ _ _ _ ta _ code _ _ _ _ _ _ _ _) = work
+rawTransactionSemantics rawtx = work
   where
     work
-      | (not (isAddr ta)) = Contract
-      | (isAddr ta) && ((B.length cod) > 0) = FunctionCall
+      | (not (isAddr (rawTransactionToAddress rawtx))) = Contract
+      | (isAddr (rawTransactionToAddress rawtx)) && ((B.length cod) > 0) = FunctionCall
       | otherwise = Transfer
-    cod = case code of
-      Code c -> c
+    cod = case (rawTransactionCodeOrData rawtx) of
+      Just c -> c
       _ -> ""
