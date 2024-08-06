@@ -8,7 +8,7 @@ const router = express.Router();
 router.post("/notify", async (req, res) => {
   try {
     // Get method from query string
-    const { method } = req.query;
+    const method = req.query.method ? req.query.method : "email"; // if no method specified, use email by default
 
     // Validate method
     if (!["email", "sms", "both"].includes(method)) {
