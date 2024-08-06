@@ -6,7 +6,7 @@ import {
   SendOutlined,
   PieChartOutlined,
   StopOutlined,
-  SwapOutlined,
+  SwapOutlined
 } from "@ant-design/icons";
 import PreviewInventoryModal from "./PreviewInventoryModal";
 import { useNavigate } from "react-router-dom";
@@ -21,16 +21,7 @@ import image_placeholder from "../../images/resources/image_placeholder.png";
 import "react-responsive-carousel/lib/styles/carousel.min.css";
 import { SEO } from "../../helpers/seoConstant";
 
-const InventoryCard = ({
-  inventory,
-  category,
-  debouncedSearchTerm,
-  id,
-  allSubcategories,
-  limit,
-  offset,
-  user,
-}) => {
+const InventoryCard = ({ inventory, category, debouncedSearchTerm, id, allSubcategories, limit, offset, user }) => {
   const textRef = useRef(null);
   const [isOverflowing, setIsOverflowing] = useState(false);
   const [open, setOpen] = useState(false);
@@ -41,7 +32,7 @@ const InventoryCard = ({
   const [redeemModalOpen, setRedeemModalOpen] = useState(false);
   const navigate = useNavigate();
   const naviroute = routes.InventoryDetail.url;
-  const imgMeta = category ? category : SEO.TITLE_META;
+  const imgMeta = category ? category : SEO.TITLE_META
 
   const itemData = inventory.data;
 
@@ -90,65 +81,49 @@ const InventoryCard = ({
   };
 
   const callDetailPage = () => {
-    navigate(
-      `${naviroute
-        .replace(":id", inventory.address)
-        .replace(":name", encodeURIComponent(inventory.name))}`,
-      {
-        state: { isCalledFromInventory: true },
-      }
-    );
+    navigate(`${naviroute.replace(":id", inventory.address).replace(":name", encodeURIComponent(inventory.name))}`, {
+      state: { isCalledFromInventory: true },
+    });
   };
 
   const getCategory = () => {
-    const parts = inventory.contract_name.split("-");
+    const parts = inventory.contract_name.split('-');
     const contractName = parts[parts.length - 1];
 
-    return allSubcategories?.find((c) => c.contract === contractName)?.name;
+    return allSubcategories?.find(c => c.contract === contractName)?.name
   };
 
   /**
    * Determines if the Edit or Sell button should be disabled.
-   *
+   * 
    * The button is disabled if:
    * - No payment provider address is set, meaning no transactions can be processed.
    * - The item is categorized as "Carbon Offset" and either:
    *   - isMint is not set to "True", or
    *   - isMint is missing, which means the item isn't allowed to be minted.
-   *
+   * 
    * @returns {boolean} True if the button should be disabled, false otherwise.
    */
   function isEditSellDisabled() {
-    return (
-      getCategory() === "Carbon Offset" &&
-      !(itemData.isMint && itemData.isMint === "True")
-    );
+    return (getCategory() === "Carbon Offset" && !(itemData.isMint && itemData.isMint === "True"));
   }
 
   /**
    * Determines if the Transfer button should be disabled.
-   *
+   * 
    * The button is disabled if any of the following conditions are true:
    * - inventory.quantity is not set or is zero, meaning there is nothing to transfer.
    * - inventory.saleAddress is set but inventory.saleQuantity is not greater than zero, indicating
    *   there are no available items left to transfer that are not already committed to a sale.
-   *
+   * 
    * @returns {boolean} True if the button should be disabled, false otherwise.
    */
   function isTransferDisabled() {
-    return !(
-      inventory.quantity &&
-      parseInt(inventory.quantity) > 0 &&
-      (!inventory.saleAddress ||
-        (inventory.saleAddress && parseInt(inventory.saleQuantity) > 0))
-    );
+    return !(inventory.quantity && parseInt(inventory.quantity) > 0 && (!inventory.saleAddress || (inventory.saleAddress && parseInt(inventory.saleQuantity) > 0)));
   }
 
   function isActive() {
-    if (
-      inventory.status == ASSET_STATUS.PENDING_REDEMPTION ||
-      inventory.status == ASSET_STATUS.RETIRED
-    ) {
+    if (inventory.status == ASSET_STATUS.PENDING_REDEMPTION || inventory.status == ASSET_STATUS.RETIRED) {
       return false;
     } else {
       return true;
@@ -169,38 +144,26 @@ const InventoryCard = ({
 
     // Check overflow on mount and window resize
     checkOverflow();
-    window.addEventListener("resize", checkOverflow);
+    window.addEventListener('resize', checkOverflow);
 
-    return () => window.removeEventListener("resize", checkOverflow);
+    return () => window.removeEventListener('resize', checkOverflow);
   }, []);
 
   return (
-    <div
-      id={`asset-${inventory?.name}`}
-      className="p-3 md:p-[18px] border border-[#BABABA] md:border-[#E9E9E9] rounded-lg sm:w-[343px] md:w-full  "
-    >
+    <div id={`asset-${inventory?.name}`} className="p-3 md:p-[18px] border border-[#BABABA] md:border-[#E9E9E9] rounded-lg sm:w-[343px] md:w-full  ">
       <div className="bg-[#F2F2F9] rounded-md px-[14px] flex flex-col justify-between items-center pb-[13px] pt-2 w-full">
         <div className="w-full">
           <div className="flex flex-col lg:flex-row w-full">
             <div className="flex-grow min-w-0">
-              <p
-                className="text-lg lg:text-xl font-semibold text-[#202020] hover:text-[#4285F4] cursor-pointer"
-                onClick={callDetailPage}
-              >
+              <p className="text-lg lg:text-xl font-semibold text-[#202020] hover:text-[#4285F4] cursor-pointer" onClick={callDetailPage}>
                 {isOverflowing ? (
                   <Tooltip title={inventory?.name}>
-                    <span
-                      ref={textRef}
-                      className="whitespace-nowrap overflow-hidden text-ellipsis block"
-                    >
+                    <span ref={textRef} className="whitespace-nowrap overflow-hidden text-ellipsis block">
                       {inventory?.name}
                     </span>
                   </Tooltip>
                 ) : (
-                  <span
-                    ref={textRef}
-                    className="whitespace-nowrap overflow-hidden text-ellipsis block"
-                  >
+                  <span ref={textRef} className="whitespace-nowrap overflow-hidden text-ellipsis block">
                     {inventory?.name}
                   </span>
                 )}
@@ -209,83 +172,30 @@ const InventoryCard = ({
             <div className="flex flex-row space-x-2 lg:justify-self-end whitespace-nowrap">
               <Typography className="lg:pt-1">{`(${getCategory()})`}</Typography>
               {inventory?.contract_name.toLowerCase().includes("clothing") && (
-                <Typography className="lg:pt-1">
-                  {"Size: " + inventory?.data?.size || "N/A"}
-                </Typography>
+                <Typography className='lg:pt-1'>{'Size: ' + inventory?.data?.size || "N/A"}</Typography>
               )}
             </div>
           </div>
           <div className="mt-3">
-            {((itemData.isMint === "True" && inventory.quantity === 0) ||
-              inventory.quantity > 0) && (
+            {((itemData.isMint === "True" && inventory.quantity === 0) || inventory.quantity > 0) &&
               <div className="grid grid-cols-3 gap-1 w-full">
-                <Button
-                  id="sell-listing-btn"
-                  type="link"
-                  className="text-[#13188A] text-left px-0 font-semibold text-sm h-6"
-                  onClick={showListModal}
-                  disabled={isEditSellDisabled() || !isActive()}
-                >
-                  {inventory.price ? (
-                    <>
-                      <EditOutlined /> Edit
-                    </>
-                  ) : (
-                    <>
-                      <DollarOutlined /> Sell
-                    </>
-                  )}
+                <Button id="sell-listing-btn" type="link" className="text-[#13188A] text-left px-0 font-semibold text-sm h-6" onClick={showListModal} disabled={isEditSellDisabled() || !isActive()}>
+                  {inventory.price ? <><EditOutlined /> Edit</> : <><DollarOutlined /> Sell</>}
                 </Button>
-                <Button
-                  id="asset-card-unlist-btn"
-                  type="link"
-                  className="text-[#13188A] text-left px-0 font-semibold text-sm h-6"
-                  onClick={showUnlistModal}
-                  disabled={!inventory.price || !isActive()}
-                >
-                  <>
-                    <StopOutlined /> Unlist
-                  </>
+                <Button id="asset-card-unlist-btn" type="link" className="text-[#13188A] text-left px-0 font-semibold text-sm h-6" onClick={showUnlistModal} disabled={!inventory.price || !isActive()}>
+                  <><StopOutlined /> Unlist</>
                 </Button>
-                <Button
-                  type="link"
-                  className="text-[#13188A] text-left px-0 font-semibold text-sm h-6"
-                  onClick={showResellModal}
-                  disabled={
-                    !(itemData.isMint && itemData.isMint == "True") ||
-                    !isActive()
-                  }
-                >
-                  <>
-                    <PieChartOutlined /> Mint
-                  </>
+                <Button type="link" className="text-[#13188A] text-left px-0 font-semibold text-sm h-6" onClick={showResellModal} disabled={!(itemData.isMint && itemData.isMint == "True") || !isActive()}>
+                  <><PieChartOutlined /> Mint</>
                 </Button>
-                <Button
-                  type="link"
-                  className="text-[#13188A] text-left px-0 font-semibold text-sm h-6"
-                  onClick={showTransferModal}
-                  disabled={isTransferDisabled() || !isActive()}
-                >
-                  <>
-                    <SwapOutlined /> Transfer
-                  </>
+                <Button type="link" className="text-[#13188A] text-left px-0 font-semibold text-sm h-6" onClick={showTransferModal} disabled={isTransferDisabled() || !isActive()}>
+                  <><SwapOutlined /> Transfer</>
                 </Button>
-                <Button
-                  type="link"
-                  className="text-[#13188A] text-left px-0 font-semibold text-sm h-6"
-                  onClick={showRedeemModal}
-                  disabled={
-                    inventory.price ||
-                    inventory.address === inventory.originAddress ||
-                    !isActive()
-                  }
-                >
-                  <>
-                    <SendOutlined /> Redeem
-                  </>
+                <Button type="link" className="text-[#13188A] text-left px-0 font-semibold text-sm h-6" onClick={showRedeemModal} disabled={inventory.price || inventory.address === inventory.originAddress || !isActive()}>
+                  <><SendOutlined /> Redeem</>
                 </Button>
               </div>
-            )}
+            }
           </div>
         </div>
       </div>
@@ -293,93 +203,78 @@ const InventoryCard = ({
         <div className="inline-block text-center">
           <div>
             <img
-              className={`rounded-md w-[161px] ${
-                inventory.status == ASSET_STATUS.PENDING_REDEMPTION
-                  ? "h-[140px]"
-                  : "h-[161px]"
-              }  md:object-contain`}
+              className={`rounded-md w-[161px] ${inventory.status == ASSET_STATUS.PENDING_REDEMPTION ? "h-[140px]" : "h-[161px]"}  md:object-contain`}
               alt={imgMeta}
               title={imgMeta}
               src={
-                inventory["BlockApps-Mercata-Asset-images"] &&
-                inventory["BlockApps-Mercata-Asset-images"].length > 0
+                inventory["BlockApps-Mercata-Asset-images"] && inventory["BlockApps-Mercata-Asset-images"].length > 0
                   ? inventory["BlockApps-Mercata-Asset-images"][0].value
-                  : image_placeholder
-              }
+                  : image_placeholder}
+
             />
           </div>
 
+
           <div className="pt-[7px] lg:pt-0 items-center gap-[5px]">
-            {inventory.price ? (
+            {inventory.price ?
               <div className="flex items-center justify-center gap-2 bg-[#1548C329] p-[6px] rounded-md">
                 <div className="w-[7px] h-[7px] rounded-full bg-[#119B2D]"></div>
                 <p className="text-[#4D4D4D] text-[13px]">Published</p>
               </div>
-            ) : inventory.status == ASSET_STATUS.PENDING_REDEMPTION ? (
-              <div className="flex items-center justify-center gap-2 bg-[#FFA50029] p-[6px] rounded-md">
-                <div className="w-[7px] sm:w-[12px] h-[7px] rounded-full bg-[#FFA500]"></div>
-                <p className="text-[#4D4D4D] text-[13px]">Pending Redemption</p>
-              </div>
-            ) : inventory.status == ASSET_STATUS.RETIRED ? (
-              <div className="flex items-center justify-center gap-2 bg-[#c3152129] p-[6px] rounded-md">
-                <div className="w-[7px] h-[7px] rounded-full bg-[#ff4d4f]"></div>
-                <p className="text-[#4D4D4D] text-[13px]">Retired</p>
-              </div>
-            ) : (inventory.data.isMint &&
-                inventory.data.isMint === "False" &&
-                inventory.quantity === 0) ||
-              (!inventory.data.isMint && inventory.quantity === 0) ? (
-              <div className="flex items-center justify-center gap-2 bg-[#FFA50029] p-[6px] rounded-md">
-                <div className="w-[7px] h-[7px] rounded-full bg-[#FFA500]"></div>
-                <p className="text-[#4D4D4D] text-[13px]">Sold Out</p>
-              </div>
-            ) : (
-              <div className="flex items-center justify-center gap-2 bg-[#1548C329] p-[6px] rounded-md">
-                <div className="w-[7px] h-[7px] rounded-full bg-[#ff4d4f]"></div>
-                <p className="text-[#4D4D4D] text-[13px]">Unpublished</p>
-              </div>
-            )}
+              :
+              (inventory.status == ASSET_STATUS.PENDING_REDEMPTION) ?
+                <div className="flex items-center justify-center gap-2 bg-[#FFA50029] p-[6px] rounded-md">
+                  <div className="w-[7px] sm:w-[12px] h-[7px] rounded-full bg-[#FFA500]"></div>
+                  <p className="text-[#4D4D4D] text-[13px]">Pending Redemption</p>
+                </div>
+                :
+                (inventory.status == ASSET_STATUS.RETIRED) ?
+                  <div className="flex items-center justify-center gap-2 bg-[#c3152129] p-[6px] rounded-md">
+                    <div className="w-[7px] h-[7px] rounded-full bg-[#ff4d4f]"></div>
+                    <p className="text-[#4D4D4D] text-[13px]">Retired</p>
+                  </div>
+                  :
+                  (inventory.data.isMint && inventory.data.isMint === "False" && inventory.quantity === 0) || (!inventory.data.isMint && inventory.quantity === 0) ?
+                    <div className="flex items-center justify-center gap-2 bg-[#FFA50029] p-[6px] rounded-md">
+                      <div className="w-[7px] h-[7px] rounded-full bg-[#FFA500]"></div>
+                      <p className="text-[#4D4D4D] text-[13px]">Sold Out</p>
+                    </div>
+                    :
+                    <div className="flex items-center justify-center gap-2 bg-[#1548C329] p-[6px] rounded-md">
+                      <div className="w-[7px] h-[7px] rounded-full bg-[#ff4d4f]"></div>
+                      <p className="text-[#4D4D4D] text-[13px]">Unpublished</p>
+                    </div>
+            }
           </div>
         </div>
+
 
         <div className="flex flex-col justify-between gap-4 px-[18px] py-4 border border-[#E9E9E9] rounded-md w-full ">
           <div className="flex justify-between  ">
             <p className="text-[#6A6A6A]">Quantity Owned</p>
-            <p className="text-[#202020] font-semibold">
-              {inventory.quantity || "N/A"}
-            </p>
-          </div>{" "}
-          <div className="flex justify-between  ">
+            <p className="text-[#202020] font-semibold">{inventory.quantity || "N/A"}</p>
+          </div> <div className="flex justify-between  ">
             <p className="text-[#6A6A6A]">Quantity Available for Sale </p>
-            <p className="text-[#202020] font-semibold">
-              {inventory.quantity -
-                (inventory.totalLockedQuantity
-                  ? inventory.totalLockedQuantity
-                  : 0) || "N/A"}
-            </p>
-          </div>{" "}
-          <div className="flex justify-between  ">
+            <p className="text-[#202020] font-semibold">{(inventory.quantity - (inventory.totalLockedQuantity ? inventory.totalLockedQuantity : 0)) || "N/A"}</p>
+          </div> <div className="flex justify-between  ">
             <p className="text-[#6A6A6A]">Quantity Listed for Sale</p>
-            <p className="text-[#202020] font-semibold">
-              {inventory.saleQuantity || "N/A"}
-            </p>
+            <p className="text-[#202020] font-semibold">{inventory.saleQuantity || "N/A"}</p>
           </div>
           <div className="flex justify-between  ">
             <p className="text-[#6A6A6A]">Price</p>
             <p className="text-[#202020] font-semibold">
               {inventory?.price ? (
                 <>
-                  ${inventory?.price}{" "}
-                  <span className="text-xs">
-                    ({inventory?.price * STRATS_CONVERSION} STRATS)
-                  </span>
+                  ${inventory?.price} <span className="text-xs">({inventory?.price * STRATS_CONVERSION} STRATS)</span>
                 </>
               ) : (
                 "N/A"
               )}
             </p>
           </div>
+
         </div>
+
       </div>
       {open && (
         <PreviewInventoryModal
@@ -419,6 +314,7 @@ const InventoryCard = ({
           offset={offset}
           inventory={inventory}
           categoryName={category}
+
         />
       )}
       {transferModalOpen && (
@@ -443,6 +339,7 @@ const InventoryCard = ({
       )}
     </div>
   );
-};
+
+}
 
 export default InventoryCard;
