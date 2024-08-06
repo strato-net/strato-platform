@@ -20,15 +20,17 @@ import Data.Text as T
 import GHC.Generics
 import Network.HTTP.Client
 
+import Debug.Trace
+
 --This is the received information from the OpenId Connect response
 data VaultToken = VaultToken
   { accessToken :: T.Text,
     expiresIn :: Integer,
-    refreshExpiresIn :: Integer,
-    refreshToken :: T.Text,
+    refreshExpiresIn :: Maybe Integer,
+    refreshToken :: Maybe T.Text,
     tokenType :: T.Text,
-    notBeforePolicy :: Integer,
-    sessionState :: T.Text,
+    notBeforePolicy :: Maybe Integer,
+    sessionState :: Maybe T.Text,
     scone :: T.Text
   }
   deriving (Eq, Show)
@@ -36,14 +38,14 @@ data VaultToken = VaultToken
 -- makeLenses ''VaultToken
 
 instance FromJSON VaultToken where
-  parseJSON (Object o) = do
+  parseJSON (Object o) | trace ("parseJSON object is " ++ show o) True = do
     ao <- o .: DAK.fromString "access_token"
     ei <- o .: DAK.fromString "expires_in"
-    rei <- o .: DAK.fromString "refresh_expires_in"
-    rt <- o .: DAK.fromString "refresh_token"
+    rei <- o .:? DAK.fromString "refresh_expires_in"
+    rt <- o .:? DAK.fromString "refresh_token"
     tt <- o .: DAK.fromString "token_type"
-    nbp <- o .: DAK.fromString "not-before-policy"
-    ss <- o .: DAK.fromString "session_state"
+    nbp <- o .:? DAK.fromString "not-before-policy"
+    ss <- o .:? DAK.fromString "session_state"
     sc <- o .: DAK.fromString "scope"
     --Ensure the correct data types are coming into the system
     access_token <- case ao of
@@ -55,24 +57,28 @@ instance FromJSON VaultToken where
       (Object _) -> error $ "Expected a JSON String under the key \"access_token\", but got something different."
       _ -> error $ "Expected a JSON Number under the key \"expires_in\", but got something different."
     refreshexin <- case rei of
-      (Number n) -> pure n
-      (Object _) -> error $ "Expected a JSON String under the key \"access_token\", but got something different."
+      Nothing -> pure Nothing
+      (Just (Number n)) -> pure $ Just n
+      (Just (Object _)) -> error $ "Expected a JSON String under the key \"access_token\", but got something different."
       _ -> error $ "Expected a JSON Number under the key \"refresh_expires_in\", but got something different."
     refresh_token <- case rt of
-      (String s) -> pure s
-      (Object _) -> error $ "Expected a JSON String under the key \"access_token\", but got something different."
+      Nothing -> pure Nothing
+      (Just (String s)) -> pure $ Just s
+      (Just (Object _)) -> error $ "Expected a JSON String under the key \"access_token\", but got something different."
       _ -> error $ "Expected a JSON String under the key \"refresh_token\", but got something different."
     token_type <- case tt of
       (String s) -> pure s
       (Object _) -> error $ "Expected a JSON String under the key \"access_token\", but got something different."
       _ -> error $ "Expected a JSON String under the key \"token_type\", but got something different."
     notb4pol <- case nbp of
-      (Number n) -> pure n
-      (Object _) -> error $ "Expected a JSON String under the key \"access_token\", but got something different."
+      Nothing -> pure Nothing
+      Just ((Number n)) -> pure $ Just n
+      (Just (Object _)) -> error $ "Expected a JSON String under the key \"access_token\", but got something different."
       _ -> error $ "Expected a JSON Number under the key \"not-before-policy\", but got something different."
     session_state <- case ss of
-      (String s) -> pure s
-      (Object _) -> error $ "Expected a JSON String under the key \"access_token\", but got something different."
+      Nothing -> pure $ Nothing
+      (Just (String s)) -> pure $ Just s
+      (Just (Object _)) -> error $ "Expected a JSON String under the key \"access_token\", but got something different."
       _ -> error $ "Expected a JSON String under the key \"session_state\", but got something different."
     --can't call it scope, so I called it scone, bon appetit
     sconce <- case sc of
@@ -80,8 +86,8 @@ instance FromJSON VaultToken where
       (Object _) -> error $ "Expected a JSON String under the key \"access_token\", but got something different."
       _ -> error $ "Expected a JSON String under the key \"access_token\", but got something different."
     --Put the scientific numbers into regular ints
-    let not_before_policy = Scientific.coefficient notb4pol
-        refresh_expires_in = Scientific.coefficient refreshexin
+    let not_before_policy = fmap Scientific.coefficient notb4pol
+        refresh_expires_in = fmap Scientific.coefficient refreshexin
         expires_in = Scientific.coefficient exprin
     --   parseJSON wat = typeMismatch "Spec" wat
     return $ VaultToken access_token expires_in refresh_expires_in refresh_token token_type not_before_policy session_state sconce

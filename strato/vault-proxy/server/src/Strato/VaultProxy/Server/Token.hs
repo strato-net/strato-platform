@@ -37,13 +37,13 @@ instance HasVirginTokenCall IO where
     --Conver the token endpoint to a URI
     uri <- URI.mkURI $ token_endpoint additionalOauth
     --Encode all of the parameters, get ready to send to server
-    let (url, _) = fromJust (useHttpsURI $ uri)
+    let (url, options) = fromJust (useHttpsURI $ uri)
         authHeadr = R.header "Authorization" $ TE.encodeUtf8 $ T.concat [T.pack "Basic ", B64.encodeBase64 $ TE.encodeUtf8 $ T.concat [clientId, ":", clientSecret]]
         contType = R.header "Content-Type" $ TE.encodeUtf8 $ T.pack "application/x-www-form-urlencoded"
         urlEncodedPart = ReqBodyUrlEnc $ "grant_type" =: ("client_credentials" :: String)
     --Connect to the server
     makeHttpCall <- runReq defaultHttpConfig $ do
-      response <- R.req R.POST url urlEncodedPart (jsonResponse) (authHeadr <> contType)
+      response <- R.req R.POST url urlEncodedPart (jsonResponse) (options <> authHeadr <> contType)
       pure response
     --Convert the server response to the VaultToken type
     pure $ HTC.responseBody $ toVanillaResponse makeHttpCall

@@ -1,0 +1,22 @@
+serve:
+  cookies:
+    same_site_mode: Lax
+
+urls:
+  self:
+    issuer: https://${domainName}:4444
+  consent: https://${domainName}:4455/consent
+  login: https://${domainName}:4455/login
+  logout: https://${domainName}:4444/logout
+
+secrets:
+  system:
+    - youReallyNeedToChangeThis
+
+oidc:
+  subject_identifiers:
+    supported_types:
+      - pairwise
+      - public
+    pairwise:
+      salt: youReallyNeedToChangeThis

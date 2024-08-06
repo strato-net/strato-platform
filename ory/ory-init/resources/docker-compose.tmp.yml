@@ -1,0 +1,104 @@
+
+services:
+  hydra:
+    image: oryd/hydra:v2.2.0
+    command: serve -c /etc/config/hydra/hydra.yml all --dev
+    volumes:
+      - type: bind
+        source: .
+        target: /etc/config/hydra
+    environment:
+      - DSN=postgres://hydra:secret@postgresd:5432/hydra?sslmode=disable&max_conns=20&max_idle_conns=4
+      - STRATEGIES_ACCESS_TOKEN=jwt
+    restart: unless-stopped
+    depends_on:
+      - hydra-migrate
+  hydra-migrate:
+    image: oryd/hydra:v2.2.0
+    environment:
+      - DSN=postgres://hydra:secret@postgresd:5432/hydra?sslmode=disable&max_conns=20&max_idle_conns=4
+    command: migrate -c /etc/config/hydra/hydra.yml sql -e --yes
+    volumes:
+      - type: bind
+        source: .
+        target: /etc/config/hydra
+    restart: on-failure
+  postgresd:
+    image: postgres:11.8
+    ports:
+      - "5432:5432"
+    environment:
+      - POSTGRES_USER=hydra
+      - POSTGRES_PASSWORD=secret
+      - POSTGRES_DB=hydra
+  nginx:
+    depends_on:
+      - hydra
+      - kratos
+      - kratos-selfservice-ui-node
+    environment:
+    - ssl=true
+    - sslCertFileType=${sslCertFileType}
+    image: nginx
+    ports:
+    - "4444:4444"
+    - "4433:4433"
+    - "4455:4455"
+    volumes:
+    - ${sslDir}:/etc/ssl:ro
+    - ./nginx.conf:/etc/nginx/nginx.conf:ro
+    restart: unless-stopped
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "100m"
+        max-file: "3"
+  kratos-selfservice-ui-node:
+    image: oryd/kratos-selfservice-ui-node:v1.1.0
+    environment:
+      - PORT=4455
+      - HYDRA_ADMIN_URL=http://hydra:4445
+      - KRATOS_PUBLIC_URL=http://kratos:4433
+      - KRATOS_BROWSER_URL=https://${domainName}:4433
+      - COOKIE_SECRET=changeme
+      - CSRF_COOKIE_NAME=cookie_name
+      - CSRF_COOKIE_SECRET=changeme
+      - DANGEROUSLY_DISABLE_SECURE_CSRF_COOKIES=true
+    restart: on-failure
+  kratos-migrate:
+    image: oryd/kratos:v1.1.0
+    environment:
+      - DSN=postgres://kratos:secret@kpostgresd:5432/kratos?sslmode=disable&max_conns=20&max_idle_conns=4
+    volumes:
+      -
+        type: bind
+        source: .
+        target: /etc/config/kratos
+    command:
+      -c /etc/config/kratos/kratos.yml migrate sql -e --yes
+    restart: on-failure
+
+  kratos:
+    depends_on:
+      - kratos-migrate
+    image: oryd/kratos:v1.1.0
+    restart: unless-stopped
+    environment:
+      - DSN=postgres://kratos:secret@kpostgresd:5432/kratos?sslmode=disable&max_conns=20&max_idle_conns=4
+      - OAUTH2_PROVIDER_URL=http://hydra:4445/
+    command:
+      serve -c /etc/config/kratos/kratos.yml --dev
+    volumes:
+      -
+        type: bind
+        source: .
+        target: /etc/config/kratos
+
+  kpostgresd:
+    image: postgres:11.8
+    environment:
+      - POSTGRES_USER=kratos
+      - POSTGRES_PASSWORD=secret
+      - POSTGRES_DB=kratos
+
+
