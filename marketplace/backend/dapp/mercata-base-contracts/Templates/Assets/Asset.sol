@@ -88,15 +88,15 @@ abstract contract Asset is Utils {
         } catch {
             originAddress = address(this);
             itemNumber = 1;
-            // emit OwnershipTransfer(
-            //     originAddress,
-            //     address(0),
-            //     "",
-            //     owner,
-            //     ownerCommonName,
-            //     itemNumber,
-            //     itemNumber + _quantity - 1
-            // );
+            emit OwnershipTransfer(
+                originAddress,
+                address(0),
+                "",
+                owner,
+                ownerCommonName,
+                itemNumber,
+                itemNumber + _quantity - 1
+            );
         }
     }
 
