@@ -76,6 +76,12 @@ export const Redemption = {
   close: '/close'
 }
 
+export const Transaction = {
+  prefix: '/transaction',
+  get: '/',
+  // get: '/:id',
+}
+
 export const Item = {
   prefix: '/item',
   ownershipHistory: '/ownership/:address',

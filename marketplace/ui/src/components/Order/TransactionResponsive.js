@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import { Button, Row, Col, Table, Tag, Space } from "antd";
 import classNames from "classnames";
 import { dummyData } from "./constant";
@@ -18,6 +18,21 @@ const TransactionResponsive = () => {
       [assetName]: !prevExpandedRows[assetName], // Toggle expansion state
     }));
   };
+
+  useEffect(() => {
+    fetch('http://localhost/api/v1/transaction')
+      .then(response => {
+        if (!response.ok) {
+          throw new Error('Network response was not ok');
+        }
+        return response.json();
+      })
+      .then(data => {
+        console.log(data);
+      })
+      .catch(error => {
+        console.error('There')
+      })}, [])
 
   const statusComponent = (status) => {
 

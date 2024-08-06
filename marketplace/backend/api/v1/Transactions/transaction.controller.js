@@ -7,13 +7,40 @@ class TransactionController {
     static async getAllTransactions(req, res, next) {
         try {
             const { dapp, params, query } = req
-            const { id } = params
-            const { transactionService , userName } = query
+            
+            const user = 'tanujsoni53'
+            let transactionQuery = {
+                limit: '10',
+                offset: '0',
+                order: 'createdDate.desc',
+                or: `(sellersCommonName.eq.${user},purchasersCommonName.eq.${user})`
+            }
 
-            let args = { id, transactionService }
+            const redemptionQuery = {
+                limit:'10',
+                offset:'0',
+                order: 'DESC',
+                search: ''
+            }
 
-            const transaction = await dapp.getTransaction(args)
-            rest.response.status200(res, transaction)
+            const TransferQuery = {
+                limit:'10',
+                offset:'0',
+                or:'(oldOwnerCommonName.eq.tanujsoni53,newOwnerCommonName.eq.tanujsoni53)',
+                order:'transferDate.desc'
+                }
+
+            const { orders, total } = await dapp.getSaleOrders({ ...transactionQuery });
+            transactionQuery['or'] = `(oldOwnerCommonName.eq.${user},newOwnerCommonName.eq.${user})`
+            const itemTransfers = await dapp.getAllItemTransferEvents(TransferQuery);
+            const outgoingRedemptions = await dapp.getOutgoingRedemptionRequests(redemptionQuery)
+            const incomingRedemptions = await dapp.getIncomingRedemptionRequests(redemptionQuery)
+
+            console.log("itemTransfers",itemTransfers, "outgoingRedemptions",outgoingRedemptions, "incomingRedemptions", incomingRedemptions);
+
+            // rest.response.status200(res, transaction)
+            res.status(200).json({ success: true, message: "test successful" })
+
 
             return next()
         } catch (e) {
