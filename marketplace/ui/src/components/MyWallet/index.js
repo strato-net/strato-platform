@@ -50,6 +50,10 @@ import HelmetComponent from "../Helmet/HelmetComponent";
 import { SEO } from "../../helpers/seoConstant";
 import RequestBeAuthorizedIssuerModal from "./RequestBeAuthorizedIssuerModal";
 import { ISSUER_STATUS } from "../../helpers/constants";
+import {
+  useMarketplaceState,
+  useMarketplaceDispatch,
+} from "../../contexts/marketplace";
 
 const { Option } = Select;
 
@@ -68,6 +72,9 @@ const MyWallet = ({ user }) => {
   const linkUrl = window.location.href;
   let { hasChecked, isAuthenticated, loginUrl } = useAuthenticateState();
   const { Title, Text } = Typography;
+
+  const { cartList, strats } = useMarketplaceState();
+  const stratsBalance = Object.keys(strats).length > 0 ? strats : 0;
 
   const categoryDispatch = useCategoryDispatch();
   const { categorys } = useCategoryState();
@@ -296,8 +303,6 @@ const MyWallet = ({ user }) => {
   const userName = user.commonName || "";
   const userLetter = userName[0].toUpperCase() || "";
 
-  // const stratsBalance = (Object.keys(strats).length > 0) ? strats : 0
-
   const renderImg = (service) => {
     return service.imageURL && service.imageURL !== "" ? (
       <img
@@ -473,7 +478,7 @@ const MyWallet = ({ user }) => {
                   style={{ width: "12px", height: "12px", marginRight: "5px" }}
                 />
                 <Text style={{ fontSize: "14px", color: "#747474" }}>
-                  104,443{}
+                  {stratsBalance}
                 </Text>
               </div>
             </div>
@@ -517,21 +522,22 @@ const MyWallet = ({ user }) => {
                 key: "price",
                 render: (price, record) => (
                   <div>
-                    <div>{price}</div>
-                    <div className="flex items-center mt-1">
-                      <img
-                        src={Images.logo}
-                        alt="Small"
-                        style={{
-                          width: "15px",
-                          height: "15px",
-                          marginRight: "10px",
-                        }}
-                      />
-                      <Text style={{ fontSize: "12px", color: "#747474" }}>
-                        25,000
-                      </Text>
-                    </div>
+                    <div className="text-xs sm:text-sm">{price}</div>
+                    {record.key !== "1" && (
+                      <div className="flex items-center mt-1">
+                        <img
+                          src={Images.logo}
+                          alt="Small"
+                          className="w-3 h-3 sm:w-4 sm:h-4 mr-1 sm:mr-2"
+                        />
+                        <Text
+                          className="text-[10px] sm:text-xs"
+                          style={{ color: "#747474" }}
+                        >
+                          25,000
+                        </Text>
+                      </div>
+                    )}
                   </div>
                 ),
               },
@@ -540,9 +546,15 @@ const MyWallet = ({ user }) => {
                 dataIndex: "gainLoss",
                 key: "gainLoss",
                 render: (text) => {
+                  if (text === "---") {
+                    return <span className="text-xs sm:text-sm">{text}</span>;
+                  }
                   const isPositive = text.startsWith("+");
                   return (
-                    <span style={{ color: isPositive ? "#00A455" : "#C00000" }}>
+                    <span
+                      className="text-xs sm:text-sm"
+                      style={{ color: isPositive ? "#00A455" : "#C00000" }}
+                    >
                       {text}
                     </span>
                   );
@@ -554,21 +566,22 @@ const MyWallet = ({ user }) => {
                 key: "value",
                 render: (value, record) => (
                   <div>
-                    <div>{value}</div>
-                    <div className="flex items-center mt-1">
-                      <img
-                        src={Images.logo}
-                        alt="Small"
-                        style={{
-                          width: "15px",
-                          height: "15px",
-                          marginRight: "10px",
-                        }}
-                      />
-                      <Text style={{ fontSize: "12px", color: "#747474" }}>
-                        14,000
-                      </Text>
-                    </div>
+                    <div className="text-xs sm:text-sm">{value}</div>
+                    {record.key !== "1" && (
+                      <div className="flex items-center mt-1">
+                        <img
+                          src={Images.logo}
+                          alt="Small"
+                          className="w-3 h-3 sm:w-4 sm:h-4 mr-1 sm:mr-2"
+                        />
+                        <Text
+                          className="text-[10px] sm:text-xs"
+                          style={{ color: "#747474" }}
+                        >
+                          14,000
+                        </Text>
+                      </div>
+                    )}
                   </div>
                 ),
               },
@@ -578,10 +591,10 @@ const MyWallet = ({ user }) => {
                 key: "1",
                 asset: "STRATS",
                 image: Images.logo,
-                quantity: 30,
-                price: "$551",
+                quantity: stratsBalance,
+                price: "$0.01",
                 gainLoss: "---",
-                value: "$305.51",
+                value: `$${(stratsBalance * 0.01).toFixed(2)}`,
               },
               {
                 key: "2",
