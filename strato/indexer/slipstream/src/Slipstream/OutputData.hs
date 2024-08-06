@@ -85,7 +85,7 @@ import           Database.PostgreSQL.Typed.Protocol
 import           Database.PostgreSQL.Typed.Query
 import           Slipstream.Data.Action
 import qualified Slipstream.Events               as E
-import           Slipstream.Globals
+--import           Slipstream.Globals
 import           Slipstream.Metrics
 import           Slipstream.Options
 import           Slipstream.QueryFormatHelper
@@ -191,7 +191,7 @@ cirrusInfo =
       pgDBParams = [("Timezone", "UTC")]
     }
 
-dbQueryCatchError' :: (MonadLogger m, MonadUnliftIO m) => PGConnection -> (Text, Maybe (IORef Globals, TableName, TableColumns)) -> m ()
+dbQueryCatchError' :: (MonadLogger m, MonadUnliftIO m) => PGConnection -> (Text, Maybe (TableName, TableColumns)) -> m ()
 dbQueryCatchError' conn (insrt, b) = handle (handlePostgresError' b) $ dbQuery conn insrt
 
 dbQueryCatchError :: (MonadLogger m, MonadUnliftIO m) => PGConnection -> Text -> m ()
@@ -202,7 +202,7 @@ dbQuery conn insrt = do
   $logDebugS "outputData" insrt
   liftIO . void . pgQuery conn . rawPGSimpleQuery $! encodeUtf8 insrt
 
-handlePostgresError' :: (MonadLogger m, MonadIO m) => Maybe (IORef Globals, TableName, TableColumns) -> SomeException -> m ()
+handlePostgresError' :: (MonadLogger m, MonadIO m) => Maybe (TableName, TableColumns) -> SomeException -> m ()
 handlePostgresError' myStuff e =
   case myStuff of
     Nothing -> handlePostgresError e
@@ -221,7 +221,7 @@ handlePostgresError e =
 outputData' ::
   OutputM m =>
   PGConnection ->
-  ConduitM () (Text, Maybe (IORef Globals, TableName, TableColumns)) m a ->
+  ConduitM () (Text, Maybe ( TableName, TableColumns)) m a ->
   m a
 outputData' conn c = runConduit $ c `fuseUpstream` mapM_C (dbQueryCatchError' conn)
 
@@ -335,14 +335,14 @@ compareCollectionRows' x y =
 
 createExpandIndexTable ::
   OutputM m =>
-  IORef Globals ->
+  --IORef Globals ->
   ContractF () ->
   CodeCollectionF () ->
   (Text, Text, Text) ->
   ConduitM () Text m [ForeignKeyInfo]
-createExpandIndexTable g c cc nameParts = do
-  creationForeignKeys <- createIndexTable g c cc nameParts
-  expansionForeignKeys <- expandIndexTable g c cc nameParts
+createExpandIndexTable c cc nameParts = do
+  creationForeignKeys <- createIndexTable c cc nameParts
+  expansionForeignKeys <- expandIndexTable c cc nameParts
   return $ creationForeignKeys ++ expansionForeignKeys
 
 createExpandAbstractTable ::
@@ -429,7 +429,7 @@ createExpandHistoryTable ::
   ContractF () ->
   CodeCollectionF () ->
   (Text, Text, Text) ->
-  ConduitM () (Text, Maybe (IORef Globals, TableName, TableColumns)) m ()
+  ConduitM () (Text, Maybe ( TableName, TableColumns)) m ()
 createExpandHistoryTable isAbstract g c cc nameParts = do
   createHistoryTable' isAbstract g c cc nameParts
   expandHistoryTable isAbstract g c cc nameParts
@@ -505,14 +505,14 @@ getDeferredForeignKeysForArrayType tableName creator a arrType =
 
 createIndexTable ::
   OutputM m=>
-  IORef Globals ->
+  --IORef Globals ->
   ContractF () ->
   CodeCollectionF () ->
   (Text, Text, Text) ->
   ConduitM () Text m [ForeignKeyInfo]
-createIndexTable globalsIORef contract cc (creator, a, n) = do
+createIndexTable contract cc (creator, a, n) = do
   let tableName = indexTableName creator a n
-  tableExists <- isTableCreated globalsIORef tableName
+  tableExists <- isTableCreated tableName
 
   --When contract hasn't been written to "contract" table and indexing table doesn't exist
   $logDebugLS "createIndexTable/tableExists" ("Table Name: " ++ show tableName ++ ", contract already created: " ++ show tableExists)
@@ -639,14 +639,14 @@ createHistoryTable isAbstract globalsIORef contract cc (creator, a, n) = do
 -- Runs ALTER TABLE <name> [ADD COLUMN <column>] for any new fields added to a contract definition
 expandIndexTable ::
   OutputM m =>
-  IORef Globals ->
+  --IORef Globals ->
   ContractF () ->
   CodeCollectionF () ->
   (Text, Text, Text) ->
   ConduitM () Text m [ForeignKeyInfo]
-expandIndexTable globalsIORef contract cc (creator, a, n) = do
+expandIndexTable contract cc (creator, a, n) = do
   let tableName = indexTableName creator a n
-  expandContractTable globalsIORef contract cc tableName
+  expandContractTable contract cc tableName
 
 expandAbstractTable ::
   OutputM m =>
