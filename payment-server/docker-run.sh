@@ -12,6 +12,7 @@ export OAUTH_CLIENT_SECRET=${OAUTH_CLIENT_SECRET}
 export OAUTH_SCOPE=${OAUTH_SCOPE}
 export OAUTH_SERVICE_OAUTH_FLOW=${OAUTH_SERVICE_OAUTH_FLOW}
 export SKIP_CONTRACT_VALIDATION=${SKIP_CONTRACT_VALIDATION}
+export SKIP_DEPLOYMENT=${SKIP_DEPLOYMENT:-false}
 export BASE_CODE_COLLECTION=${BASE_CODE_COLLECTION}
 export UPGRADE_CONTRACTS=${UPGRADE_CONTRACTS:-false}
 export STRIPE_SERVICE_NAME_VALUE=${STRIPE_SERVICE_NAME_VALUE:-'Stripe'}
@@ -133,9 +134,11 @@ if [ -f "${CONFIG_DIR_PATH}/deploy.yaml" ]; then
     yarn deactivate
     yarn deploy
   fi
-else
+elif [ "${SKIP_DEPLOYMENT}" != "true" ]; then
   echo 'deploy.yaml does not exist. Deploying payment server contracts...'
   yarn deploy
+else
+  echo 'SKIP_DEPLOYMENT is true. Skipping deployment...'
 fi
 
 echo 'Starting payment server...'
