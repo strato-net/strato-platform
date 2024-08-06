@@ -7,6 +7,7 @@ import MarketPlace from "./components/MarketPlace";
 import Product from "./components/Product";
 import { ProductsProvider } from "./contexts/product";
 import Inventory from "./components/Inventory";
+import MyWallet from "./components/MyWallet";
 import { InventoriesProvider } from "./contexts/inventory";
 import { PaymentServicesProvider } from "./contexts/payment";
 import Item from "./components/Item";
@@ -83,7 +84,7 @@ const AuthenticatedRoutes = ({ user, users, isAuthenticated }) => {
               <OrdersProvider>
                 <InventoriesProvider>
                   <PaymentServicesProvider>
-                  <ConfirmOrder user={user} users={users} />
+                    <ConfirmOrder user={user} users={users} />
                   </PaymentServicesProvider>
                 </InventoriesProvider>
               </OrdersProvider>
@@ -132,17 +133,19 @@ const AuthenticatedRoutes = ({ user, users, isAuthenticated }) => {
           </UsersProvider>
         }
       />
-      {user?.isAdmin && (<Route
-        exact
-        path={routes.Admin.url}
-        element={
-          <UsersProvider>
-            <IssuerStatusProvider>
-              <AuthorizeIssuer/>
-            </IssuerStatusProvider>
-          </UsersProvider>
-        }
-      />)}
+      {user?.isAdmin && (
+        <Route
+          exact
+          path={routes.Admin.url}
+          element={
+            <UsersProvider>
+              <IssuerStatusProvider>
+                <AuthorizeIssuer />
+              </IssuerStatusProvider>
+            </UsersProvider>
+          }
+        />
+      )}
       <Route
         exact
         path={routes.MarketplaceProductDetail.url}
@@ -191,6 +194,31 @@ const AuthenticatedRoutes = ({ user, users, isAuthenticated }) => {
                         <PaymentServicesProvider>
                           <IssuerStatusProvider>
                             <Inventory user={user} users={users} />
+                          </IssuerStatusProvider>
+                        </PaymentServicesProvider>
+                      </RedemptionsProvider>
+                    </InventoriesProvider>
+                  </ProductsProvider>
+                </ItemsProvider>
+              </SubCategorysProvider>
+            </CategorysProvider>
+          </UsersProvider>
+        }
+      />
+      <Route
+        exact
+        path={routes.MyWallet.url}
+        element={
+          <UsersProvider>
+            <CategorysProvider>
+              <SubCategorysProvider>
+                <ItemsProvider>
+                  <ProductsProvider>
+                    <InventoriesProvider>
+                      <RedemptionsProvider>
+                        <PaymentServicesProvider>
+                          <IssuerStatusProvider>
+                            <MyWallet user={user} users={users} />
                           </IssuerStatusProvider>
                         </PaymentServicesProvider>
                       </RedemptionsProvider>
