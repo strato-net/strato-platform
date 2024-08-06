@@ -1349,18 +1349,37 @@ insertHistoryTableQuery cs =
                     E.creator,
                     E.root
                   ]
+                address = (tshow . E.address) x
                 vals = flip map contracts $ \(row, rowList) ->
-                  wrapAndEscape $ map (wrapSingleQuotes . ($ row)) baseVals ++ map snd rowList
+                  wrapAndEscape $ map (wrapSingleQuotes . wrapSingleQuotes . ($ row)) baseVals ++ map snd rowList
                 inserts = csv vals
              in (: []) . T.concat $
-                  [ "INSERT INTO ",
-                    tableNameToDoubleQuoteText tableName,
-                    " ",
-                    keySt,
-                    "\n  VALUES ",
-                    inserts,
-                    "\n  ON CONFLICT DO NOTHING;"
-                  ]
+                  ["DO $$\nDECLARE\n"
+                       , "    col_name RECORD;\n"
+                       , "    column_list TEXT := ' ';\n"
+                       , "    select_list TEXT := ' ';\n"
+                       , "BEGIN\n"
+                       , "    FOR col_name IN\n"
+                       , "        SELECT column_name\n"
+                       , "        FROM information_schema.columns\n"
+                       , "        WHERE table_name = ", tableNameToDoubleQuoteText tableName, "\n"
+                       , "        AND column_name NOT IN (", keySt,", 'address')\n"
+                       , "    LOOP\n"
+                       , "        column_list := column_list || col_name.column_name || ', ';\n"
+                       , "        select_list := select_list || col_name.column_name || ', ';\n"
+                       , "    END LOOP;\n"
+                       , "    column_list := rtrim(column_list, ', ');\n"
+                       , "    select_list := rtrim(select_list, ', ');\n"
+                       , "    EXECUTE 'WITH selected_row AS (\n"
+                       , "                SELECT ' || select_list || '\n"
+                       , "                FROM ", tableNameToDoubleQuoteText tableName, "\n"
+                       , "                WHERE address = ''", wrapSingleQuotes address, "''\n"
+                       , "                LIMIT 1\n"
+                       , "             )\n"
+                       , "             INSERT INTO ", tableNameToDoubleQuoteText tableName, " (", keySt, ", ' || column_list || ')\n"
+                       , "             SELECT ", inserts, ", ' || select_list || '\n"
+                       , "             FROM selected_row;';\n"
+                       , "END $$;"]
 
 -- Creates tables for all event declarations, stores table name in
 -- globals{createdEvents}
