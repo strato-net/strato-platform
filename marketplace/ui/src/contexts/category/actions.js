@@ -44,12 +44,6 @@ const actions = {
         });
         actions.setMessage(dispatch, "Category created successfully", true)
         return true;
-      } else if(response.status === RestStatus.UNAUTHORIZED) {
-        dispatch({ 
-          type: actionDescriptors.createCategoryFailed, 
-          error: "Unauthorized while creating category" 
-        });
-        window.location.href = body.error.loginUrl;
       }
 
       dispatch({ type: actionDescriptors.createCategoryFailed, error: 'Error while creating Category' });
@@ -85,7 +79,7 @@ const actions = {
       } else if(response.status === RestStatus.UNAUTHORIZED) {
         dispatch({ 
           type: actionDescriptors.fetchCategoryFailed, 
-          error: "Unauthorized while fetching category" 
+          error: "Unauthorized while fetching categories" 
         });
         window.location.href = body.error.loginUrl;
       }

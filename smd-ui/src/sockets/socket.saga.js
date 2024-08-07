@@ -23,6 +23,7 @@ import {
   GET_NODE_UPTIME,
   GET_SYSTEM_INFO,
   GET_SHARD_COUNT,
+  GET_NETWORK_HEALTH,
 } from './rooms';
 import {
   updateBlockNumber,
@@ -47,6 +48,8 @@ import {
   updateSystemInfo,
   preloadShardCount,
   updateShardCount,
+  preloadNetworkHealth,
+  updateNetworkHealth
 } from '../components/Dashboard/dashboard.action';
 import {
   updateCoinbase,
@@ -88,6 +91,7 @@ export function subscribe() {
     registerActions(emit, GET_NODE_UPTIME, preloadNodeUptime, updateNodeUptime)
     registerActions(emit, GET_SYSTEM_INFO, preloadSystemInfo, updateSystemInfo)
     registerActions(emit, GET_SHARD_COUNT, preloadShardCount, updateShardCount)
+    registerActions(emit, GET_NETWORK_HEALTH, preloadNetworkHealth, updateNetworkHealth )
     socket.on('disconnect', e => {
       // TODO: handle
     });

@@ -22,16 +22,15 @@ import classNames from "classnames";
 import { getStringDate } from "../../helpers/utils";
 import { useNavigate } from "react-router-dom";
 import DataTableComponent from "../DataTableComponent";
-import { getStatus, getStatusByName } from "./constant";
+import { getStatus } from "./constant";
 import dayjs from "dayjs";
-import { US_DATE_FORMAT } from "../../helpers/constants";
+import { US_DATE_FORMAT, STRATS_CONVERSION } from "../../helpers/constants";
 import ClickableCell from "../ClickableCell";
-import { apiUrl, HTTP_METHODS } from "../../helpers/constants";
-import RestStatus from "http-status-codes";
-import TagManager from "react-gtm-module";
 import image_placeholder from "../../images/resources/image_placeholder.png";
 import BoughtOrdersTable from "./BoughtOrdersTable";
 import TransfersTable from "./TransfersTable";
+import RedemptionsOutgoingTable from "./RedemptionsOutgoingTable";
+import RedemptionsIncomingTable from "./RedemptionsIncomingTable";
 import { ResponsiveOrderDetailCard } from "./ResponsiveOrderDetailCard";
 import { LeftArrow } from "../../images/SVGComponents";
 
@@ -43,7 +42,6 @@ const SoldOrderDetails = ({ user, users }) => {
   const [selectedDate, setSelectedDate] = useState("");
   const [status, setStatus] = useState(getStatus(1));
   const [paid, setPaid] = useState("Processing");
-  const [isLoadingPaymentStatus, setisLoadingPaymentStatus] = useState(false)
   const [comment, setComment] = useState("");
   const { TextArea } = Input;
   const [api, contextHolder] = notification.useNotification();
@@ -65,28 +63,35 @@ const SoldOrderDetails = ({ user, users }) => {
 
   useEffect(() => {
     if (orderDetails) {
-      setStatus(getStatus(parseInt(orderDetails.order.status)));
-      setComment(orderDetails.order.comments);
-      // Fulfillment date is sometimes coming in as 0. a unix of 0 sets the date to 1969. So we need to check for 0 and null, I added undefined just in case too. 
-      if (orderDetails.order.fulfillmentDate === 0 || orderDetails.order.fulfillmentDate === null || orderDetails.order.fulfillmentDate === undefined) {
-        setSelectedDate(null);
-      } else {
-        setSelectedDate(dayjs.unix(orderDetails.order.fulfillmentDate));
+      const statusInt = parseInt(orderDetails.order.status);
+      setStatus(getStatus(statusInt));
+      if (statusInt === 3) {
+        setPaid("Paid");
+      } else if (statusInt === 4) {
+        setPaid("Payment Failed");
       }
+      setComment(orderDetails.order.comments);
+      // Order Close Date is represented by block_timestamp when the Order Status is 3(CLOSED) or 4(CANCELED). This is consistent across legacy orders and new orders as there wouldn't be updates/methods invoked when the Order Status reaches Closed.
+      if (parseInt(orderDetails.order.status) === 3 || parseInt(orderDetails.order.status) === 4) {
+        const formattedDate = dayjs(orderDetails.order.block_timestamp);
+        setSelectedDate(formattedDate);
+      } else {
+        setSelectedDate(null);
+      } 
 
       let items = [];
+      const orderQuantities = orderDetails.order.quantities ? orderDetails.order.quantities : orderDetails.order["BlockApps-Mercata-Order-quantities"].map(item => item.value);
       orderDetails.assets.forEach((prod, index) => {
         items.push({
           address: prod.address,
           chainId: prod.chainId,
           key: prod.address,
-          productImage: prod.images && prod.images.length > 0 ? prod.images[0] : image_placeholder,
+          productImage: prod["BlockApps-Mercata-Asset-images"].length > 0 ? prod["BlockApps-Mercata-Asset-images"][0].value : image_placeholder,
           productName: prod,
           name: prod.name,
-          unitPrice: prod.price,
-          quantity: parseInt(orderDetails.order.quantities[index]),
-          shippingCharges: prod.shippingCharges ? prod.shippingCharges : 0,
-          amount: prod.price * parseInt(orderDetails.order.quantities[index]),
+          unitPrice: orderDetails.order.currency === "STRATS" ? (prod.price * STRATS_CONVERSION).toFixed(0) : prod.price.toFixed(2),
+          quantity: parseInt(orderQuantities[index]),
+          amount: (orderDetails.order.currency === "STRATS" ? (prod.price * STRATS_CONVERSION * parseInt(orderQuantities[index])).toFixed(0) : (prod.price * parseInt(orderQuantities[index])).toFixed(2)),
           serialNumber: prod,
           tax: prod.tax ? prod.tax : 0,
         });
@@ -106,81 +111,8 @@ const SoldOrderDetails = ({ user, users }) => {
   }, [Id, dispatch, status]);
 
   const getData = async () => {
-    const data = await actions.fetchOrderDetails(dispatch, Id);
-    if (data != null) {
-      getPaymentStatus(data.order.paymentSessionId, data.order.sellersCommonName);
-    }
+    await actions.fetchOrderDetails(dispatch, Id);
   };
-
-  const validatePayment = async (paymentSessionId) => {
-    if (!paymentSessionId || !orderDetails) return;
-
-    const currentStatus = getStatus(parseInt(orderDetails.order.status));
-    const isPending = currentStatus === getStatusByName("Payment Pending")
-    const isCanceled = currentStatus === getStatusByName("Canceled");
-
-    if (isCanceled) {
-      setPaid("Payment Failed");
-      setComment(orderDetails.order.comments);
-    }
-    if (isPending) {
-      try {
-        const response = await fetch(
-          `${apiUrl}/order/payment/intent/${paymentSessionId}/${orderDetails.order.sellersCommonName}`,
-          { method: HTTP_METHODS.GET }
-        );
-        const intentBody = await response.json();
-        const paymentErrorAndRequiresMethod = intentBody.data.last_payment_error?.message && intentBody.data.status === 'requires_payment_method';
-
-        if (paymentErrorAndRequiresMethod && !isCanceled) {
-          setisLoadingPaymentStatus(true)
-          const body = {
-            saleOrderAddress: orderDetails.order.address,
-            comments: encodeURIComponent('Stripe: ' + intentBody.data.last_payment_error.message),
-          };
-          //Update Order Details and change the Order Status to 'Canceled' from 'Payment Pending'
-          let isDone = await actions.cancelSale(dispatch, body);
-          setComment(`Stripe: ${orderDetails.order.comments}`);
-          if (isDone) {
-            setStatus("Canceled");
-            setPaid("Payment Failed");
-            await actions.fetchOrderDetails(dispatch, Id);
-            setisLoadingPaymentStatus(false);
-          }
-        }
-
-      } catch (err) {
-        console.error(`Error: ${err}`);
-      }
-    }
-  };
-
-  const getPaymentStatus = async (paymentSessionId, sellersCommonName) => {
-    if (!paymentSessionId) return;
-
-    setisLoadingPaymentStatus(true);
-    try {
-      const response = await fetch(
-        `${apiUrl}/order/payment/session/${paymentSessionId}/${sellersCommonName}`,
-        { method: HTTP_METHODS.GET }
-      );
-
-      const body = await response.json();
-      if (response.status === RestStatus.OK) {
-        if (body.data["payment_status"] === "paid") {
-          setPaid("Paid");
-        } else {
-          await validatePayment(paymentSessionId);
-        }
-      }
-    } catch (err) {
-      console.error(`Error: ${err}`);
-    } finally {
-      setisLoadingPaymentStatus(false);
-    }
-  };
-
-
 
   const details = orderDetails;
   const audits = ordersAudit;
@@ -214,7 +146,11 @@ const SoldOrderDetails = ({ user, users }) => {
     return (
       <div className={className}>
         <Text className="block text-[#6A6A6A] text-[12px] mb-1">{title}</Text>
-        <Text className="block text-[#202020] text-[13px] font-semibold">{value}</Text>
+        { (status === getStatus(3) || status === getStatus(4)) && title === "Order Close Date" ? 
+        (<Text className="block text-[#202020] text-[13px] font-semibold">{value}</Text>):
+        title !== "Order Close Date" &&
+        (<Text className="block text-[#202020] text-[13px] font-semibold">{value}</Text>)
+        }
       </div>
     );
   };
@@ -223,58 +159,31 @@ const SoldOrderDetails = ({ user, users }) => {
     setSelectedDate(date);
   };
 
-  const handleCloseOrder = async () => {
-    let body = {};
-    let isDone = false;
-
-    body = {
-      orderAddress: details.order.address,
-      fulfillmentDate: dayjs(selectedDate).unix(),
-      comments: comment,
+  const statusComponent = (status) => {
+    const statusClasses = {
+      ["Awaiting Shipment"]: {
+        textClass: "bg-[#EBF7FF]",
+        bgClass: "bg-[#13188A]"
+      },
+      ["Awaiting Fulfillment"]: {
+        textClass: "bg-[#FF8C0033]",
+        bgClass: "bg-[#FF8C00]"
+      },
+      ["Payment Pending"]: {
+        textClass: "bg-[#FF8C0033]",
+        bgClass: "bg-[#FF8C00]"
+      },
+      ["Closed"]: {
+        textClass: "bg-[#119B2D33]",
+        bgClass: "bg-[#119B2D]"
+      },
+      ["Canceled"]: {
+        textClass: "bg-[#FFF0F0]",
+        bgClass: "bg-[#FF0000]"
+      },
     };
 
-    isDone = await actions.executeSale(dispatch, body);
-    if (isDone) {
-      setStatus(getStatus(3));
-    }
-  };
-
-  const handleUpdateComment = async () => {
-    let body = {
-      saleOrderAddress: orderDetails.order.address,
-      comments: comment
-    }
-
-    await actions.updateOrderComment(dispatch, body)
-  }
-
-  const statusComponent = (status) => {
-    let textClass = "bg-[#FFF6EC]";
-    if (status === "Awaiting Shipment") {
-      textClass = "bg-[#EBF7FF]";
-    } else if (status === "Awaiting Fulfillment") {
-      textClass = "bg-[#FF8C0033]"
-    } else if (status === "Payment Pending") {
-      textClass = "bg-[#FF8C0033]"
-    } else if (status === "Closed") {
-      textClass = "bg-[#119B2D33]";
-    } else if (status === "Canceled") {
-      textClass = "bg-[#FFF0F0]";
-    }
-    let bgClass = "bg-[#119B2D]";
-    if (status === "Awaiting Shipment") {
-      bgClass = "bg-[#13188A]";
-    } else if (status === "Payment Pending") {
-      bgClass = "bg-[#FF8C00]"
-    } else if (status === "Awaiting Fulfillment") {
-      bgClass = "bg-[#FF8C00]"
-    } else if (status === "Closed") {
-      bgClass = "bg-[#119B2D]";
-    } else if (status === "Paid") {
-      textClass = "bg-[#119B2D]";
-    } else if (status === "Canceled") {
-      bgClass = "bg-[#FF0000]";
-    }
+    const { textClass, bgClass } = statusClasses[status] || { textClass: "bg-[#FFF6EC]", bgClass: "bg-[#119B2D]" };
     return (
       <div className={classNames(textClass, "status_contain w-max text-center py-1 px-2 rounded-md md:rounded-xl flex justify-start items-center gap-1 p-1")}>
         <div className={classNames(bgClass, "h-3 w-3 rounded-sm")}></div>
@@ -284,23 +193,26 @@ const SoldOrderDetails = ({ user, users }) => {
   };
 
   const statusComponentForPayment = (status) => {
-    let textClass = "bg-[#FFF6EC]";
-    if (status === "Processing") {
-      textClass = "bg-[#FF8C0033]"
-    } else if (status === "Paid") {
-      textClass = "bg-[#119B2D33]";
-    } else if (status === "Payment Failed") {
-      textClass = "bg-[#FFF0F0]";
-    }
-    let bgClass = "bg-[#119B2D]";
-    if (status === "Processing") {
-      bgClass = "bg-[#FF8C00]"
-    } else if (status === "Paid") {
-      bgClass = "bg-[#119B2D]";
-    } else if (status === "Payment Failed") {
-      bgClass = "bg-[#FF0000]";
-    }
+    const statusClasses = {
+      ["Processing"]: {
+        textClass: "bg-[#FF8C0033]",
+        bgClass: "bg-[#FF8C00]"
+      },
+      ["Paid"]: {
+        textClass: "bg-[#119B2D33]",
+        bgClass: "bg-[#119B2D]"
+      },
+      ["Payment Failed"]: {
+        textClass: "bg-[#FFF0F0]",
+        bgClass: "bg-[#FF0000]"
+      },
+      ["Canceled"]: {
+        textClass: "bg-[#FFF0F0]",
+        bgClass: "bg-[#FF0000]"
+      }
+    };
 
+    const { textClass, bgClass } = statusClasses[status] || { textClass: "bg-[#FFF6EC]", bgClass: "bg-[#119B2D]" };
     return (
       <div className={classNames(textClass, "status_contain w-max h-max text-center py-1 px-2 rounded-md md:rounded-xl flex justify-start items-center gap-1 p-1")}>
         <div className={classNames(bgClass, "h-3 w-3 rounded-sm")}></div>
@@ -311,7 +223,7 @@ const SoldOrderDetails = ({ user, users }) => {
 
 
   const onChange = (key) => {
-    navigate(routes.Orders.url.replace(':type', 'sold'))
+    navigate(routes.Orders.url.replace(':type', key))
   };
 
   const navigate = useNavigate();
@@ -329,16 +241,15 @@ const SoldOrderDetails = ({ user, users }) => {
       key: "productName",
       render: (text) => (
         <p
-          // href={routes.BoughtOrderDetails.url}
           className="text-primary text-[17px] cursor-pointer"
-          onClick={() => { navigate(`${routes.MarketplaceProductDetail.url.replace(":address", text.address)}`) }}
+          onClick={() => { navigate(`${routes.MarketplaceProductDetail.url.replace(":address", text.address).replace(":name", encodeURIComponent(text.name))}`) }}
         >
           {decodeURIComponent(text.name)}
         </p>
       ),
     },
     {
-      title: <Text className="text-primaryC text-[13px]">Unit Price($)</Text>,
+      title: <Text className="text-primaryC text-[13px]">Unit Price</Text>,
       dataIndex: "unitPrice",
       key: "unitPrice",
       align: "center",
@@ -352,23 +263,14 @@ const SoldOrderDetails = ({ user, users }) => {
       render: (text) => <p>{text}</p>,
     },
     {
-      title: (
-        <Text className="text-primaryC text-[13px]">Shipping Charges($)</Text>
-      ),
-      dataIndex: "shippingCharges",
-      key: "shippingCharges",
-      align: "center",
-      render: (text) => <p>{text}</p>,
-    },
-    {
-      title: <Text className="text-primaryC text-[13px]">Tax($)</Text>,
+      title: <Text className="text-primaryC text-[13px]">Tax</Text>,
       dataIndex: "tax",
       key: "tax",
       align: "center",
       render: (text) => <p>{text}</p>,
     },
     {
-      title: <Text className="text-primaryC text-[13px]">Amount($)</Text>,
+      title: <Text className="text-primaryC text-[13px]">Amount</Text>,
       dataIndex: "amount",
       key: "amount",
       align: "center",
@@ -397,14 +299,6 @@ const SoldOrderDetails = ({ user, users }) => {
   return (
     <div>
       {contextHolder}
-      {details === null || isorderDetailsLoading || isLoadingPaymentStatus ? (
-        <div className="h-screen flex justify-center items-center">
-          <Spin
-            spinning={isorderDetailsLoading || isLoadingPaymentStatus}
-            size="large"
-          />
-        </div>
-      ) : (
         <div>
           <Breadcrumb className="text-sm ml-4 md:ml-20  mt-0 md:mt-5 mb-2">
             <Breadcrumb.Item href="" onClick={e => e.preventDefault()}>
@@ -418,60 +312,42 @@ const SoldOrderDetails = ({ user, users }) => {
               </div>
             </Breadcrumb.Item>
             <Breadcrumb.Item className="text-sm text-[#202020] font-medium">
-              {details.order.orderId}
+              {`${details?.order?.orderId || ''}`.substring(0,6)}
             </Breadcrumb.Item>
           </Breadcrumb>
 
           <Tabs
             className="mx-4 md:mx-20 mt-0 md:mt-5"
-            defaultActiveKey={state == null ? "Sold" : state.defaultKey}
+            defaultActiveKey={"sold"}
             onChange={onChange}
             items={[
               {
                 label: <p id="sold-tab" className="font-semibold text-sm md:text-base">Orders (Sold)</p>,
-                key: "Sold",
+                key: "sold",
                 children:
                   <div className="mb-10">
-                    <Button type="ghost" onClick={() => onChange('Sold')} className="cursor-pointer px-2 flex md:hidden items-center gap-2 text-xs font-semibold"><LeftArrow /> Back</Button>
+                    <Button type="ghost" onClick={() => onChange('sold')} className="cursor-pointer px-2 flex md:hidden items-center gap-2 text-xs font-semibold"><LeftArrow /> Back</Button>
+                    {details === null || isorderDetailsLoading ? (
+                      <div className="h-screen flex justify-center items-center">
+                        <Spin
+                          spinning={isorderDetailsLoading}
+                          size="large"
+                        />
+                      </div>
+                    ) : (
                     <Card className="md:p-2 mb-4 md:mb-14 md:shadow-card_shadow order_detail_card">
                       <div className="flex flex-col md:flex-row md:justify-between">
                         <div className="flex flex-col">
                           <div className="flex">
-                            <Text className="bg-[#E9E9E9] md:bg-white py-2 px-3 md:w-2/5 w-full md:bg-none font-semibold text-sm md:text-lg text-primaryB flex gap-4 items-center">Order Details</Text>
+                            <Text className="bg-[#E9E9E9] md:bg-white py-2 px-3 md:w-3.5/5 w-full md:bg-none font-semibold text-sm md:text-lg text-primaryB flex gap-4 items-center">Order Details</Text>
                             <Text className="hidden md:flex mt-2">{statusComponentForPayment(paid)}</Text>
                           </div>
-                          <Text className="text-[#6A6A6A] md:text-black px-3 my-2 text-xs md:text-sm md:font-semibold">Please enter the fulfillment date to close the order</Text>
 
                         </div>
-                        <Button
-                          id="save-button"
-                          type="primary"
-                          loading={isCreateOrderSubmitting || isUpdatingOrderComment}
-                          disabled={status === getStatus(3) || status === getStatus(4) || (!comment && !selectedDate)}
-                          onClick={() => {
-                            if (!selectedDate && comment) {
-                              handleUpdateComment();
-                            }
-                            else if (selectedDate) {
-                              handleCloseOrder()
-                            }
-                            window.LOQ.push(['ready', async LO => {
-                              await LO.$internal.ready('events')
-                              LO.events.track('Order Details: Save Button')
-                            }])
-                            TagManager.dataLayer({
-                              dataLayer: {
-                                event: 'orderDetails_sold_save_click',
-                              },
-                            });
-                          }}
-                          className="min-w-max w-max h-9 px-[3%] ml-2 bg-primary !hover:bg-primaryHover"
-                        >
-                          Save
-                        </Button>
+
                       </div>
                       <Row className="hidden md:flex my-6 justify-between bg-[#F6F6F6] p-4 pb-2 rounded">
-                        <OrderData title="Order Number" value={`#${details.order.orderId}`} />
+                        <OrderData title="Order Number" value={`#${`${details.order.orderId}`.substring(0,6)}`} />
                         <Divider type="vertical" className="h-14 bg-secondryD" />
                         <OrderData
                           title="Buyer"
@@ -483,7 +359,9 @@ const SoldOrderDetails = ({ user, users }) => {
                           value={details.order.sellersCommonName}
                         />
                         <Divider type="vertical" className="h-14 bg-secondryD" />
-                        <OrderData title="Total($)" value={details.order.totalPrice} />
+                        <OrderData title="Currency" value={details.order.currency ? details.order.currency : "USD"} />
+                        <Divider type="vertical" className="h-14 bg-secondryD" />
+                        <OrderData title="Total" value={details.order.currency === "STRATS" ? (details.order.totalPrice * STRATS_CONVERSION).toFixed(0) : details.order.totalPrice} />
                         <Divider type="vertical" className="h-14 bg-secondryD" />
                         <OrderData
                           title="Date"
@@ -492,7 +370,7 @@ const SoldOrderDetails = ({ user, users }) => {
                         <Divider type="vertical" className="h-14 bg-secondryD" />
 
                         {
-                          status !== getStatus(1) || details.paymentSessionId !== "" ? <Col>
+                          status !== getStatus(1) ? <Col>
                             <Text className="block text-primaryC text-[13px] mb-2">
                               Status
                             </Text>
@@ -553,37 +431,46 @@ const SoldOrderDetails = ({ user, users }) => {
                           <Text className="block text-primaryC text-[13px]">
                             Order Close Date
                           </Text>
+                          { (status === getStatus(3) || status === getStatus(4)) &&
+                        
                           <DatePicker
                             value={
                               selectedDate
                             }
                             onChange={onDateChange}
-                            disabled={status === getStatus(3) || status === getStatus(4)}
+                            disabled={ true }
                           />
+                        
+                          
+                          }
                         </div>
                       </Row>
                       <Row className="my-2 md:hidden flex-col gap-[6px] justify-between p-4 rounded">
                         <div className="flex gap-4">
-                          <NewOrderData className="w-2/4" title="Order Number" value={'#' + details.order.orderId} />
+                          <NewOrderData className="w-2/4" title="Order Number" value={'#' + `${details.order.orderId}`.substring(0,6)} />
                           <NewOrderData className="w-2/4" title="Buyer" value={details.order.purchasersCommonName} />
                         </div>
                         <div className="flex gap-4">
                           <NewOrderData className="w-2/4" title="Seller" value={details.order.sellersCommonName} />
-                          <NewOrderData className="w-2/4" title="Total($)" value={'$' + details.order.totalPrice} />
+                          <NewOrderData className="w-2/4" title="Currency" value={details.order.currency ? details.order.currency : "USD"} />
                         </div>
-                        <div className="flex justify-between mobile_order_detail_card">
-                          <NewOrderData className="w-2/4" title="Date" value={getStringDate(details.order.createdDate, US_DATE_FORMAT)} />
+                        <div className="flex gap-4">
+                          <NewOrderData className="w-2/4" title="Total" value={details.order.currency === "STRATS" ? (details.order.totalPrice * STRATS_CONVERSION).toFixed(0) : details.order.totalPrice} />
+                          <NewOrderData className="w-2/4" title="Date" value={getStringDate(details.order.createdDate, US_DATE_FORMAT)} />  
+                        </div>
+                        <div className="flex gap-4">
+                          <NewOrderData className="w-2/4" title="Payment Status" value={statusComponentForPayment(paid)} />
+                          <NewOrderData className="w-2/4" title="Status" value={statusComponent(status)} />
+                        </div>
+                        <div className="flex justify-start">
                           <NewOrderData className="w-2/4" title="Order Close Date"
                             value={
                               <DatePicker
                                 value={selectedDate}
                                 onChange={onDateChange}
-                                disabled={status === getStatus(3) || status === getStatus(4)}
-                              />} />
-                        </div>
-                        <div className="flex justify-between">
-                          <NewOrderData className="w-2/4" title="Status" value={statusComponent(status)} />
-                          <NewOrderData className="w-2/4" title="Payment Status" value={statusComponentForPayment(paid)} />
+                                disabled={true}
+                                />} 
+                              />  
                         </div>
                       </Row>
                       <Row className="flex-nowrap items-center justify-between mb-2 md:mb-6 p-2">
@@ -595,9 +482,7 @@ const SoldOrderDetails = ({ user, users }) => {
                             rows={2}
                             placeholder="Enter Comments"
                             value={decodeURIComponent(comment)}
-                            disabled={
-                              status === getStatus(3) || status === getStatus(4)
-                            }
+                            disabled={true}
                             onChange={(event) => {
                               setComment(encodeURIComponent(event.target.value));
                             }}
@@ -613,6 +498,7 @@ const SoldOrderDetails = ({ user, users }) => {
                         />
                       </div>
                     </Card>
+                    )}
                     {data?.length > 0 && data?.map((item) => {
                       return (
                         <ResponsiveOrderDetailCard data={item} />)
@@ -621,19 +507,28 @@ const SoldOrderDetails = ({ user, users }) => {
               },
               {
                 label: <p id="bought-tab" className="font-semibold text-sm md:text-base">Orders (Bought)</p>,
-                key: "Bought",
+                key: "bought",
                 children: <BoughtOrdersTable user={user} selectedDate={dayjs(selectedDate).startOf('day').unix()} />
               },
               {
                 label: <p id="transfers-tab" className="font-semibold text-sm md:text-base">Transfers</p>,
-                key: "Transfers",
+                key: "transfers",
                 children: <TransfersTable user={user} selectedDate={dayjs(selectedDate).startOf('day').unix()} />
+              },
+              {
+                label: <p id="redemptions-outgoing-tab" className="font-semibold text-sm md:text-base">Redemptions (Outgoing)</p>,
+                key: "redemptions-outgoing",
+                children: <RedemptionsOutgoingTable user={user} selectedDate={dayjs(selectedDate).startOf('day').unix()} />
+              },
+              {
+                label: <p id="redemptions-incoming-tab" className="font-semibold text-sm md:text-base">Redemptions (Incoming)</p>,
+                key: "redemptions-incoming",
+                children: <RedemptionsIncomingTable user={user} selectedDate={dayjs(selectedDate).startOf('day').unix()} />
               }
             ]}
           />
 
         </div>
-      )}
       {message && openToastOrder("bottom")}
     </div>
   );

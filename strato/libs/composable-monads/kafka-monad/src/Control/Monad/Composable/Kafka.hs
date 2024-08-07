@@ -3,7 +3,9 @@
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TemplateHaskell #-}
+{-# LANGUAGE TupleSections #-}
 {-# LANGUAGE TypeSynonymInstances #-}
 
 module Control.Monad.Composable.Kafka (
@@ -19,6 +21,7 @@ module Control.Monad.Composable.Kafka (
   fetchSingleOffset,
   produceItems,
   consume,
+  runConsume,
   fetchItems,
   KafkaString(..),
   KafkaAddress,
@@ -37,7 +40,7 @@ import BlockApps.Logging
 import Blockchain.MilenaTools
 import Conduit
 import Control.Lens
-import Control.Monad (forever, forM_)
+import Control.Monad (forM_, void)
 import Control.Monad.Composable.Base
 import Control.Monad.Loops
 import Control.Monad.Reader
@@ -167,15 +170,23 @@ produceItems topicName events = do
 
 consume :: (Binary a, Binary md, MonadLogger m, HasKafka m) =>
            Text -> ConsumerGroup -> TopicName -> (md -> [a] -> m md) -> m ()
-consume name consumerGroup topicName f = 
-  forever $ do
-    $logInfoS name "About to fetch blocks"
-    (offset, md) <- getKafkaCheckpoint consumerGroup topicName
-    items <- fetchItems topicName offset
-    $logInfoS name . T.pack $ "Fetched " ++ show (length items) ++ " events starting from " ++ show offset
-    md' <- f (unpackMetadata md) items
-    let nextOffset' = offset + fromIntegral (length items)
-    setKafkaCheckpoint consumerGroup topicName nextOffset' $ packMetadata md'
+consume name consumerGroup topicName f = void $ runConsume name consumerGroup topicName (\md a -> (Nothing :: Maybe Void,) <$> f md a)
+
+runConsume :: (Binary a, Binary md, MonadLogger m, HasKafka m) =>
+              Text -> ConsumerGroup -> TopicName -> (md -> [a] -> m (Maybe b, md)) -> m b
+runConsume name consumerGroup topicName f = consumeOnce
+  where
+    consumeOnce = do
+      $logInfoS name "About to fetch blocks"
+      (offset, md) <- getKafkaCheckpoint consumerGroup topicName
+      items <- fetchItems topicName offset
+      $logInfoS name . T.pack $ "Fetched " ++ show (length items) ++ " events starting from " ++ show offset
+      (mReturnVal, md') <- f (unpackMetadata md) items
+      let nextOffset' = offset + fromIntegral (length items)
+      setKafkaCheckpoint consumerGroup topicName nextOffset' $ packMetadata md'
+      case mReturnVal of
+        Just returnVal -> pure returnVal
+        Nothing -> consumeOnce
 
 fetchItems :: (Binary a, HasKafka m) =>
               TopicName -> Offset -> m [a]

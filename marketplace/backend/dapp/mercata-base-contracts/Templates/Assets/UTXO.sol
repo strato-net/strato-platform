@@ -8,24 +8,30 @@ abstract contract UTXO is Asset {
         string _description,
         string[] _images,
         string[] _files,
+        string[] _fileNames,
         uint _createdDate,
-        uint _quantity
+        uint _quantity,
+        AssetStatus _status
     ) Asset(
         _name,
         _description,
         _images,
         _files,
+        _fileNames,
         _createdDate,
-        _quantity
+        _quantity,
+        _status
     ) {
     }
 
     function mint(uint _quantity) internal virtual returns (UTXO) {
-        return new UTXO(name, description, images, files, createdDate, _quantity);
+        return new UTXO(name, description, images, files, fileNames, createdDate, _quantity, status);
     }
 
     // Quantity is already checked by transferOwnership function
-    function _transfer(address _newOwner, uint _quantity, bool _isUserTransfer, uint _transferNumber) internal override {
+    function _transfer(address _newOwner, uint _quantity, bool _isUserTransfer, uint _transferNumber, decimal _price) internal override {
+        require(status != AssetStatus.PENDING_REDEMPTION, "Asset is not in ACTIVE state.");
+        require(status != AssetStatus.RETIRED, "Asset is not in ACTIVE state.");
         require(checkCondition(), "Condition is not met");
         // Create a new UTXO with a portion of the units
         try {
@@ -48,7 +54,8 @@ abstract contract UTXO is Asset {
                     itemNumber + _quantity - 1,
                     _quantity,
                     _transferNumber,
-                    block.timestamp
+                    block.timestamp,
+                    _price
                     );
             }
 
@@ -69,7 +76,7 @@ abstract contract UTXO is Asset {
 
     function _callMint(address _newOwner, uint _quantity) internal virtual{
         UTXO newAsset = mint(_quantity);
-        Asset(newAsset).transferOwnership(_newOwner, _quantity, false, 0);
+        Asset(newAsset).transferOwnership(_newOwner, _quantity, false, 0, 0);
     }
 
     function checkCondition() internal virtual returns (bool){

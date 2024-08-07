@@ -32,7 +32,7 @@ import Blockchain.Sequencer.CablePackage
 import Blockchain.Sequencer.Event
 import qualified Blockchain.Sequencer.Kafka as SK
 import Blockchain.Sequencer.Metrics
-import Blockchain.Strato.Model.ChainMember
+import Blockchain.Strato.Model.Validator
 import Control.Concurrent.Async.Lifted (race_)
 import Control.Concurrent.Extra (Lock, newLock, withLock)
 import Control.Concurrent.STM (flushTQueue)
@@ -151,7 +151,7 @@ runTheGregor cfg =
 -- When a checkpoint already exists, the arguments are ignored. They might
 -- be stale if the validator pool has expanded.
 initializeCheckpoint :: (MonadLogger m, HasKafka m, HasGregorContext m) =>
-                        [ChainMemberParsedSet] -> m Checkpoint
+                        [Validator] -> m Checkpoint
 initializeCheckpoint vals = do
   group <- getKafkaConsumerGroup
   meta <- snd <$> getNextOffsetAndMetadata group

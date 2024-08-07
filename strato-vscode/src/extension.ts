@@ -77,6 +77,7 @@ export async function activate(context: vscode.ExtensionContext) {
 		if (addressRegex.test(argInput)) {
 			try {
 				const user = await getApplicationUser();
+				if (!user) return;
 				const options = getOptions() || {}
 				// check if the contract exists, err out otherwise
 				const res = await rest.getContractsDetails(user, { address: argInput }, options)
@@ -99,6 +100,7 @@ export async function activate(context: vscode.ExtensionContext) {
 		if (Object.keys(tokens).length === 0) { return vscode.window.showErrorMessage('Please log in to STRATO Mercata to upload a contract.') }
 		const activeNode: number = await vscode.workspace.getConfiguration().get('strato-vscode.activeNode') || 0;
 		const user = await getApplicationUser(activeNode, tokens);
+		if (!user) return;
 		const nodeOptions = getOptions() || {}
 		if (vscode.window.activeTextEditor) {
 			vscode.window.activeTextEditor.document.save();
@@ -129,7 +131,7 @@ export async function activate(context: vscode.ExtensionContext) {
 					let args = {}
 					if (govXabi.constr) {
 						const constr = govXabi.constr;
-						const argNames = Object.keys(constr.args || {});
+						const argNames = Object.keys(constr.args || {}).sort((a,b) => constr.args[a].index - constr.args[b].index);
 						for (let i = 0; i < argNames.length; i++) {
 							const argInput = await vscode.window.showInputBox({
 								placeHolder: '',
@@ -140,10 +142,8 @@ export async function activate(context: vscode.ExtensionContext) {
 							});
 							if (!argInput && constr.args[argNames[i]].tag != 'Array') return;
 							args = { 
-								...args, 
-								[argNames[i]]: constr.args[argNames[i]].tag === 'Array' ? 
-								argInput?.split(',').map(c => c.trim()).filter(d => d != "") : 
-								argInput
+								...args,
+								[argNames[i]]: coerceType(constr.args[argNames[i]], argInput || "")
 							}
 						}
 					}
@@ -158,8 +158,8 @@ export async function activate(context: vscode.ExtensionContext) {
 					contractsProvider
 						.addContract(res.address)
 						.then(list => context.workspaceState.update('contractAddresses', list))
-				} catch (e) {
-					vscode.window.showErrorMessage(`${e?.response?.data|| e}`);
+				} catch (e: any) {
+					vscode.window.showErrorMessage(`${e.response.data|| e}`);
 				}
 			} else {
 				vscode.window.showErrorMessage(`Please open a Solidity file to begin uploading a contract.`);
@@ -178,6 +178,7 @@ export async function activate(context: vscode.ExtensionContext) {
 		if (Object.keys(tokens).length === 0) { return vscode.window.showErrorMessage('Please log in to STRATO Mercata to upload a contract.') }
 		const activeNode: number = await vscode.workspace.getConfiguration().get('strato-vscode.activeNode') || 0;
 		const user = await getApplicationUser(activeNode, tokens);
+		if (!user) return;
 		const nodeOptions = getOptions() || {}
 		const val = await rest.getContractsContract(user, contractName, contractAddress, chainId, nodeOptions);
 		const func = ((val || {})._functions || {})[variableName]
@@ -192,10 +193,7 @@ export async function activate(context: vscode.ExtensionContext) {
 							`Enter a value for ${argNames[i][0]}.`
 				});
 				if (!argInput && argNames[i][1].type.tag != 'Array') return;
-				args[argNames[i][0]] = 
-					argNames[i][1].type.tag === 'Array' ? 
-					argInput?.split(',').map(c => c.trim()).filter(d => d != '') : 
-					argInput 
+				args[argNames[i][0]] = coerceType(argNames[i][1].type, argInput || '')
 			}
 			try {
 				const contract = { name: contractName, address: contractAddress }
@@ -207,7 +205,7 @@ export async function activate(context: vscode.ExtensionContext) {
 				const res = await rest.call(user, callArgs, nodeOptions);
 				vscode.window.showInformationMessage(`Successfully called function ${variableName} on ${contractName} at address ${contractAddress}`);
 				contractsProvider.refresh()
-			} catch (e) {
+			} catch (e: any) {
 				vscode.window.showErrorMessage(`${e}`);
 			}
 		} else {
@@ -292,7 +290,6 @@ export async function activate(context: vscode.ExtensionContext) {
  */
 `# STRATO VS Code Extension Node Configuration
 
-VM: SolidVM
 nodes:
   - id: 0
     label: node1 # Call this node whatever you like
@@ -360,6 +357,17 @@ function runCommand(cmd: string) {
 	terminal.sendText(cmd, true)
 }
 
+function coerceType(argument: any, input: string) {
+	switch(argument.tag) {
+		case "Array": return input.split(',').map(c => {return coerceType(argument.entry, c)}) 
+		case "Int": return parseInt(input)
+		case "Contract": return parseInt(input)
+		case "UnknownLabel": return parseInt(input) // Enums are accessed through one-based indexing
+		case "Address": return input
+		case "String": return input
+		default: return input
+	}
+}
 
 // Helper function for copying data to user clipboard
 export function copyToClipboard(t: string) {

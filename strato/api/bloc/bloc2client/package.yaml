@@ -26,7 +26,6 @@ dependencies:
 - solid-vm-model
 - strato-model
 - text
-- x509-certs
 
 ghc-options:
 - -Wall

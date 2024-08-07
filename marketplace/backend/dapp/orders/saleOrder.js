@@ -8,9 +8,13 @@ import {
   waitForAddress
 } from "/helpers/utils";
 import constants from "../../helpers/constants";
+import axios from "axios";
+import paymentProvider from "../payments/paymentProvider";
 
 const contractName = "SimpleOrder";
 const contractFilename = `${util.cwd}/dapp/mercata-base-contracts/Templates/Orders/SimpleOrder.sol`;
+const paymentServiceContractName = "PaymentService";
+const paymentTableName = "PaymentService.Order";
 
 /**
  * Upload a new Sale Order
@@ -107,8 +111,12 @@ async function getHistory(user, chainId, address, options) {
  * @param _args - Contract state
  */
 function marshalOut(_args) {
+  const { unitsPerDollar, amount, totalPrice, createdDate, block_timestamp, status } = _args;
   const args = {
     ..._args,
+    totalPrice: totalPrice || (unitsPerDollar ? Math.round((amount * 100) / unitsPerDollar) / 100 : amount),
+    createdDate: createdDate || (new Date(block_timestamp)).getTime() / 1000,
+    status: status || 3,
   };
   return args;
 }
@@ -162,42 +170,180 @@ async function get(user, args, options) {
   const newOptions = { ...options, org: 'BlockApps', app: 'Mercata' }
   let order;
 
-  const searchArgs = setSearchQueryOptions(restArgs, {
-    key: "address",
-    value: address,
-  });
-  order = await searchOne(constants.orderTableName, searchArgs, newOptions, user);
+  let searchArgs = {
+    limit: 1,
+    queryOptions: {
+      order: 'status.desc',
+      transaction_hash: `eq.${address}`,
+    }
+  }
+  order = await searchAllWithQueryArgs(paymentTableName, searchArgs, newOptions, user);
+
+  if (order.length === 0) {
+
+    // Legacy orders need to join array tables. 
+    let legacyArgs = {
+      address: address,
+      limit: 1,
+      queryOptions: {
+        select: constants.attach_saleAddresses_Quantities_completedSales_onOrder
+      }
+    }
+    order = await searchAllWithQueryArgs(constants.orderTableName, legacyArgs, newOptions, user);
+  }
 
   if (!order) {
     return undefined;
   }
 
-  return marshalOut({
-    ...order,
-  });
+  // Flatten the order object
+  return marshalOut(order['0'] ? { ...order['0'] } : { ...order });
 }
+
+
 
 async function getAll(admin, args = {}, options) {
   let saleOrders;
+  const { offset, limit, order } = args;
   const newOptions = { ...options, org: 'BlockApps', app: 'Mercata' }
-  saleOrders = await searchAllWithQueryArgs(constants.orderTableName, args, newOptions, admin);
 
-  const count = await searchAllWithQueryArgs(
-    constants.orderTableName,
-    {
-      ...args,
-      limit: undefined,
-      offset: 0,
-      order: undefined,
-      queryOptions: {
-        select: "count",
-      }
-    },
+  const newCountArgs = {
+    ...args,
+    limit: undefined,
+    offset: 0,
+    order: undefined,
+    queryOptions: {
+      select: 'count',
+    }
+  };
+
+  const countArgs = {
+    ...args,
+    limit: undefined,
+    offset: 0,
+    order: undefined,
+    queryOptions: {
+      select: 'count',
+    }
+  };
+
+  const newCount = await searchAllWithQueryArgs(
+    paymentTableName,
+    newCountArgs,
     newOptions,
     admin
   );
 
-  return saleOrders ? { orders: saleOrders.map((order) => marshalOut(order)), total: count[0].count } : undefined;
+  let totalCount = newCount[0] ? newCount[0].count : 0;
+
+  // Get the latest payment event for each sale token
+  if (totalCount !== 0) {
+    const uniqueOrderArgs = {
+      ...args,
+      limit: undefined,
+      offset: 0,
+      queryOptions: {
+        select: 'id:id.max(),orderHash,createdDate',
+      }
+    };
+
+    let uniqueOrders = await searchAllWithQueryArgs(paymentTableName, uniqueOrderArgs, newOptions, admin);
+
+    uniqueOrders = uniqueOrders.reduce((acc, order) => {
+      // Find if the orderHash already exists in the accumulator
+      const existingOrderIndex = acc.findIndex(existingOrder => existingOrder.orderHash === order.orderHash);
+
+      if (existingOrderIndex === -1) {
+        // If the orderHash does not exist, add the order to the accumulator
+        acc.push(order);
+      } else {
+        // If the orderHash exists, compare createdDate and keep the latest one
+        if (new Date(order.createdDate) > new Date(acc[existingOrderIndex].createdDate)) {
+          acc[existingOrderIndex] = order;
+        }
+      }
+
+      return acc;
+    }, []);
+
+    const idArgs = {
+      id: uniqueOrders.map((uo) => uo.id),
+      order: order,
+    };
+    saleOrders = await searchAllWithQueryArgs(paymentTableName, idArgs, newOptions, admin);
+  }
+
+  // ACH status updates
+  let orderHashesToIndicies = {};
+  let paymentProvidersToOrderHashes = {};
+  let paymentServiceRes = {};
+
+  if (saleOrders) {
+    for (let i = 0; i < saleOrders.length; i++) {
+      const order = saleOrders[i];
+      if (order.status === '2') {
+        if (paymentProvidersToOrderHashes[order.address]) {
+          paymentProvidersToOrderHashes[order.address].push(order.orderHash);
+        }
+        else {
+          paymentProvidersToOrderHashes[order.address] = [order.orderHash];
+        }
+        orderHashesToIndicies[order.orderHash] = i;
+      }
+    }
+  }
+  if (Object.keys(paymentProvidersToOrderHashes).length > 0) {
+    const paymentProviderAddresses = Object.keys(paymentProvidersToOrderHashes);
+    const paymentProviders = await paymentProvider.getAll(admin, { address: paymentProviderAddresses }, options);
+    paymentProviders.map(async (ppro) => {
+      const serviceUrl = ppro.serviceURL || ppro.data.serviceURL;
+      const statusRoute = ppro.orderStatusRoute || ppro.data.orderStatusRoute;
+      const tokens = encodeURIComponent(JSON.stringify(paymentProvidersToOrderHashes[ppro.address]));
+      const statusRes = await axios.get(new URL(`${serviceUrl}${statusRoute}?orderHashes=${tokens}`).href).then(function (res) {
+        if (res.status === 200) {
+          paymentServiceRes = { ...paymentServiceRes, ...res.data }
+        }
+      })
+    });
+  }
+  if (Object.keys(paymentServiceRes).length > 0) {
+    Object.keys(paymentServiceRes)
+      .forEach(function (key) {
+        const index = orderHashesToIndicies[key];
+        saleOrders[index] = {
+          ...saleOrders[index],
+          status: paymentServiceRes[key],
+        }
+      });
+  }
+
+  let oldCount = 0;
+  try {
+    // Legacy orders need to join array tables.
+    let oldArgs = { ...args, limit: undefined, offset: 0, queryOptions: { select: constants.attach_saleAddresses_Quantities_completedSales_onOrder } };
+    const oldSaleOrders = await searchAllWithQueryArgs(constants.orderTableName, oldArgs, newOptions, admin);
+    saleOrders = saleOrders ? [...saleOrders, ...oldSaleOrders] : [...oldSaleOrders];
+
+    oldCount = await searchAllWithQueryArgs(
+      constants.orderTableName,
+      countArgs,
+      newOptions,
+      admin
+    );
+  } catch (err) {
+    console.log("Legacy order table does not exist.", err, JSON.stringify(err));
+  }
+
+  totalCount += oldCount[0] ? oldCount[0].count : 0;
+
+  if (order && order === 'createdDate.asc')
+    saleOrders.sort((a, b) => a.createdDate - b.createdDate);
+  else
+    saleOrders.sort((a, b) => b.createdDate - a.createdDate);
+
+  saleOrders = saleOrders.slice(offset, parseInt(offset) + parseInt(limit))
+
+  return saleOrders ? { orders: saleOrders.map((order) => marshalOut(order)), total: totalCount } : undefined;
 }
 
 /**
@@ -209,42 +355,14 @@ async function getState(user, contract, options) {
   return marshalOut(state);
 }
 
-async function cancelOrder(user, contract, options, comments = "") {
+async function cancelOrder(user, contract, args, options) {
   const callArgs = {
     contract,
     method: "cancelOrder",
-    args: util.usc({ comments }),
+    args: util.usc({ ...args }),
   };
   const cancelStatus = await rest.call(user, callArgs, options);
-
-  if (parseInt(cancelStatus, 10) !== RestStatus.OK) {
-    throw new rest.RestError(
-      cancelStatus,
-      "You cannot cancel an order you don't co-own",
-      {}
-    );
-  }
-
   return cancelStatus;
-}
-
-async function updateOrderStatus(user, contract, options, status) {
-  const callArgs = {
-    contract,
-    method: "updateOrderStatus",
-    args: util.usc({ status }),
-  };
-  const updateOrderStatusResponse = await rest.call(user, callArgs, options);
-
-  if (parseInt(updateOrderStatusResponse, 10) !== RestStatus.OK) {
-    throw new rest.RestError(
-      updateOrderStatusResponse,
-      "Order Cannot Be Updated",
-      {}
-    );
-  }
-
-  return updateOrderStatusResponse;
 }
 
 /**
@@ -301,11 +419,11 @@ export default {
   uploadContract,
   contractName,
   contractFilename,
+  paymentServiceContractName,
   bindAddress,
   get,
   getAll,
   cancelOrder,
-  updateOrderStatus,
   completeOrder,
   updateOrderComment,
   marshalIn,

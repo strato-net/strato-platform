@@ -23,9 +23,9 @@ import Blockchain.DB.StateDB
 import Blockchain.DB.StorageDB
 import Blockchain.Data.AddressStateDB
 import Blockchain.Data.Block
+import Blockchain.Data.BlockHeader
 import Blockchain.Data.BlockDB
 import Blockchain.Data.ChainInfo
-import Blockchain.Data.DataDefs
 import Blockchain.Data.Extra
 import Blockchain.Data.GenesisBlock
 import Blockchain.Data.GenesisInfo
@@ -55,6 +55,7 @@ import Blockchain.Strato.Model.Class
 import Blockchain.Strato.Model.ExtendedWord
 import Blockchain.Strato.Model.Keccak256
 import Blockchain.Strato.Model.Util
+import Blockchain.Strato.Model.Validator
 import qualified Blockchain.Strato.RedisBlockDB as RBDB
 import Blockchain.Strato.StateDiff hiding (StateDiff (blockHash, chainId, stateRoot))
 import qualified Blockchain.Strato.StateDiff as StateDiff (StateDiff (blockHash, chainId, stateRoot))
@@ -98,7 +99,7 @@ readSupplementaryAccounts genesisBlockName = do
             [] -> []
             "s" : _ -> []
             ["a", a, b] -> [NonContract (Ad.Address (parseHex a)) (read b)]
-            ["a", a, b, c] -> [ContractNoStorage (Ad.Address (parseHex a)) (read b) (EVMCode $ unsafeCreateKeccak256FromWord256 (parseHex c))]
+            ["a", a, b, c] -> [ContractNoStorage (Ad.Address (parseHex a)) (read b) (ExternallyOwned $ unsafeCreateKeccak256FromWord256 (parseHex c))]
             _ -> error $ "invalid AccountInfo line: " ++ line
       return . concatMap parseAccounts . lines $ accountInfoString
 
@@ -124,7 +125,7 @@ getGenesisBlockAndPopulateInitialMPs ::
     HasRedis m
   ) =>
   String ->
-  m ([(Ad.Address, X509CertInfoState)], [ChainMemberParsedSet], ([(AccountInfo, CodeInfo)], Block))
+  m ([(Ad.Address, X509CertInfoState)], [Validator], ([(AccountInfo, CodeInfo)], Block))
 getGenesisBlockAndPopulateInitialMPs genesisBlockName = do
   genesisInfo <- getGenesisInfoFromFile genesisBlockName
   let certs = readCertsFromGenesisInfo genesisInfo
@@ -177,7 +178,7 @@ initializeGenesisBlock genesisBlockName = do
   obGB <- liftIO $ bootstrapSequencer extraCertInfoStates genesisBlock
   putGenesisHash $ blockHash genesisBlock
   $logInfoS "initgen" "Initial merkle patricia tries successfully created"
-  void $ putBlocks [(genesisBlock, blockDataDifficulty (blockBlockData genesisBlock))] False
+  void $ putBlocks [(genesisBlock, difficulty (blockBlockData genesisBlock))] False
   $logInfoS "initgen" "Genesis Block put"
   $logInfoS "initgen" "State diff has been generated"
 
@@ -188,8 +189,8 @@ initializeGenesisBlock genesisBlockName = do
   void . execRedis $
     RBDB.forceBestBlockInfo
       (blockHash genesisBlock)
-      (blockDataNumber . blockBlockData $ genesisBlock)
-      (blockDataDifficulty . blockBlockData $ genesisBlock)
+      (number . blockBlockData $ genesisBlock)
+      (difficulty . blockBlockData $ genesisBlock)
   $logInfoS "initgen" "best block info inserted"
   liftIO $ bootstrapIndexer obGB
   $logInfoS "initgen" "indexer has been bootstrapped"
@@ -259,8 +260,9 @@ populateStorageDBs getMetadata genesisBlock genesisChainId = do
                     emptyCodeCollection
                     ""
                     ""
+                    ""
                     ( case codeHash d of
-                        EVMCode _ -> EVM
+                        ExternallyOwned _ -> EVM
                         SolidVMCode _ _ -> SolidVM
                         CodeAtAccount _ _ -> error "CodeAtAccount not supported in genesis block"
                     )
@@ -273,7 +275,7 @@ populateStorageDBs getMetadata genesisBlock genesisChainId = do
               A._metadata =
                 getMetadata
                   ( case codeHash d of
-                      EVMCode ch' -> ch'
+                      ExternallyOwned ch' -> ch'
                       SolidVMCode _ ch' -> ch'
                       CodeAtAccount _ _ -> error "TODO: Encountered CodeAtAccount in genesis block"
                   ),

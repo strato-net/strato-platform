@@ -7,31 +7,17 @@ import loadDapp from "../../middleware/loadDappHandler";
 const router = express.Router();
 
 router.get(
-    PaymentService.stripeOnboarding,
+    PaymentService.getAll,
     authHandler.authorizeRequest(),
     loadDapp,
-    PaymentServiceController.stripeOnboarding
+    PaymentServiceController.getAll
 );
 
 router.get(
-    PaymentService.stripeConnectStatus,
+    PaymentService.getNotOnboarded,
     authHandler.authorizeRequest(),
     loadDapp,
-    PaymentServiceController.stripeOnboardingStatus
-);
-
-router.post(
-    PaymentService.stripeWebhook,
-    authHandler.getDeployersTokenForWebhook(),
-    loadDapp,
-    PaymentServiceController.stripeWebhook
-);
-
-router.post(
-    PaymentService.stripeWebhookConnect,
-    authHandler.getDeployersTokenForWebhook(),
-    loadDapp,
-    PaymentServiceController.stripeWebhookConnect
+    PaymentServiceController.getNotOnboarded
 );
 
 export default router;

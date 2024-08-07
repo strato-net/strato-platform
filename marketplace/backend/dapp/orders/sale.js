@@ -4,6 +4,7 @@ import { setSearchQueryOptions, searchOne, searchAllWithQueryArgs } from '/helpe
 import constants from '../../helpers/constants';
 
 const contractName = constants.saleTableName;
+const saleAllTableContract = constants.saleAllTableName;
 
 /**
  * Augment contract arguments before they are used to post a contract.
@@ -109,9 +110,10 @@ async function get(user, args, options) {
     const newOptions = { ...options, org: 'BlockApps', app: 'Mercata' }
     let sale;
     let searchArgs;
+    const newArgs = { ...restArgs, queryOptions: { 'select': '*,BlockApps-Mercata-Sale-paymentProviders(*)' } }
 
     if (assetToBeSold) {
-        searchArgs = setSearchQueryOptions(restArgs,
+        searchArgs = setSearchQueryOptions(newArgs,
             [{
                 key: "assetToBeSold",
                 value: assetToBeSold,
@@ -123,7 +125,7 @@ async function get(user, args, options) {
             ]);
     }
     else {
-        searchArgs = setSearchQueryOptions(restArgs,
+        searchArgs = setSearchQueryOptions(newArgs,
             [{
                 key: "address",
                 value: address,
@@ -149,36 +151,55 @@ async function get(user, args, options) {
 
 async function getSaleHistory(user, args, options) {
     const { contract, ...restArgs } = args;
-    
+
     const newOptions = { ...options, org: undefined, app: undefined }
     let historySale = await searchAllWithQueryArgs(`history@${contract}`, restArgs, newOptions, user);
-        
-  
+
+
     if (!historySale) {
-      return undefined;
+        return undefined;
     }
-  
+
     return marshalOut({
-      ...historySale,
+        ...historySale,
     });
-  }
+}
+
+async function getAllSaleHistory(user, args, options) {
+
+    const newOptions = { ...options, org: undefined, app: undefined }
+    let historySale = await searchAllWithQueryArgs(`history@${saleAllTableContract}`, args, newOptions, user);
+
+    if (!historySale) {
+        return undefined;
+    }
+
+    return marshalOut({
+        ...historySale,
+    });
+}
 
 async function getAll(admin, args = {}, defaultOptions) {
     const { saleAddresses, assetAddresses, isOpen, range, saleGtField, saleGtValue, ...restArgs } = args;
     const options = { ...defaultOptions, org: 'BlockApps', app: 'Mercata' }
     let sales;
     if (assetAddresses) {
-        // console.log("")
         sales = await searchAllWithQueryArgs(contractName, {
             assetToBeSold: assetAddresses,
             gtField: saleGtField,
             gtValue: saleGtValue,
             isOpen: isOpen,
-            range: range
+            range: range,
+            queryOptions: { 'select': '*,BlockApps-Mercata-Sale-paymentProviders(*)' }
         }, options, admin);
     }
     else {
-        sales = await searchAllWithQueryArgs(contractName, { address: saleAddresses, isOpen: isOpen, ...restArgs }, options, admin);
+        sales = await searchAllWithQueryArgs(contractName, {
+            address: saleAddresses,
+            isOpen: isOpen,
+            queryOptions: { 'select': '*,BlockApps-Mercata-Sale-paymentProviders(*)' },
+            ...restArgs,
+        }, options, admin);
     }
 
     return sales ? sales.map((sale) => marshalOut(sale)) : undefined;
@@ -202,5 +223,6 @@ export default {
     marshalIn,
     marshalOut,
     getHistory,
-    getSaleHistory
+    getSaleHistory,
+    getAllSaleHistory
 }

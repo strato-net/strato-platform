@@ -20,6 +20,7 @@ library:
     - generic-arbitrary
     - kafka-monad
     - lens
+    - merkle-patricia-db
     - milena
     - monad-alter
     - prometheus-client

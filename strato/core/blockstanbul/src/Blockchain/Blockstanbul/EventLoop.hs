@@ -19,7 +19,7 @@ import Blockchain.Blockstanbul.Messages
 import Blockchain.Blockstanbul.Metrics
 import Blockchain.Blockstanbul.StateMachine
 import Blockchain.Data.Block
-import Blockchain.Data.DataDefs
+import Blockchain.Data.BlockHeader
 import Blockchain.Strato.Model.Address
 import Blockchain.Strato.Model.ChainMember
 import Blockchain.Strato.Model.Class (blockHash)
@@ -34,6 +34,7 @@ import Control.Monad.Extra (whenM)
 import Control.Monad.State.Strict
 import Control.Monad.Trans.Except
 import Crypto.Random.Entropy (getEntropy)
+import Data.List
 import qualified Data.Map.Strict as M
 import Data.Maybe
 import qualified Data.Set as S
@@ -56,7 +57,7 @@ yieldManyR = yieldMany . map Right
 authorize :: (StateMachineM m) => InEvent -> ExceptT String m ()
 authorize = \case
   IMsg (MsgAuth addr _) _ -> do
-    ret <- uses validators (S.member addr . unChainMembers)
+    ret <- uses validators $ S.member (chainMemberParsedSetToValidator addr)
     unless ret $ do
       let reason = "Rejecting message; sender not a validator: " ++ show addr
       $logWarnS "blockstanbul/auth" . T.pack $ reason
@@ -77,32 +78,29 @@ isAuthorized iev = fmap (either AuthFailure (const AuthSuccess)) . runExceptT $ 
   -- TODO(tim): RoundChange a Preprepare correctly signed by the proposer,
   -- but with incorrect extraData.
     IMsg _ (Preprepare _ pp) -> do
-      vals <- use validators -- this is _validators from bloctanbul context?
-      let valSet = unChainMembers vals
-      let payloadVals = getValidatorList pp -- getvalslsit::Block -> [Address] to word256 x 2
-          validatorsMatch = vals == payloadVals -- if validators match perform getvalslist
-          mSignatory = verifyProposerSeal pp =<< getProposerSeal pp -- same convention getProposerSeal :: Block -> Maybe Signature
+      valSet <- use validators -- this is _validators from bloctanbul context?
+      let mSignatory = verifyProposerSeal pp =<< getProposerSeal pp -- same convention getProposerSeal :: Block -> Maybe Signature
       case mSignatory of
         Nothing -> raiseInProd "Rejecting Preprepare; proposer seal could not be verified"
         Just signatory -> do
-          mChainMember <- lift $ fmap getChainMemberFromX509 <$> getX509FromAddress signatory
+          mChainMember <- lift $ fmap (chainMemberParsedSetToValidator . getChainMemberFromX509) <$> getX509FromAddress signatory
           let signerExists = maybe False (`S.member` valSet) mChainMember
           unless signerExists $
             raiseInProd $
               "Rejecting Preprepare; signer " ++ formatAddressWithoutColor signatory
                 ++ " is not a known validator"
-          unless validatorsMatch $
-            raiseInProd $
-              "Rejecting Preprepare; payload validators "
-                ++ show (S.map format $ unChainMembers payloadVals)
-                ++ " are not expected validators "
-                ++ show (S.map format valSet)
-    IMsg (MsgAuth addr _) (Commit _ di seal) -> case verifyCommitmentSeal di seal of
-      Nothing -> raiseInProd $ "Rejecting Commit; signature could not be recovered"
-      Just signatory -> do
-        mChainMember <- lift $ fmap getChainMemberFromX509 <$> getX509FromAddress signatory
-        let ret = Just addr == mChainMember
-        unless ret . raiseInProd $ "Rejecting Commit; bad seal"
+    IMsg (MsgAuth addr _) (Commit _ di seal) -> do
+      csOrError <- runExceptT $ verifyCommitmentSeal di seal 
+      case csOrError of
+        Left _ -> raiseInProd $ "Rejecting Commit; signature could not be recovered"
+        Right signatory -> do
+          mChainMember <- lift $ runExceptT $ fmap getChainMemberFromX509 <$> getX509FromAddress signatory
+          let ret =
+                case mChainMember of
+                  Left (_ :: String) -> False
+                  Right Nothing -> False
+                  Right (Just val) -> val == addr
+          unless ret . raiseInProd $ "Rejecting Commit; bad seal"
     _ -> return () -- No specific auth for any other messages
 
 -- I need to change most of the authentication.hs file becase it either uses block -> address or address -> signature
@@ -110,8 +108,8 @@ isAuthorized iev = fmap (either AuthFailure (const AuthSuccess)) . runExceptT $ 
 assertChainConsistency :: Word256 -> Maybe Keccak256 -> Block -> Either T.Text ()
 assertChainConsistency seqNo wantParent blk = do
   let blkData = blockBlockData blk
-      blkNo = fromIntegral . blockDataNumber $ blkData
-      gotParent = blockDataParentHash blkData
+      blkNo = fromIntegral . number $ blkData
+      gotParent = parentHash blkData
   unless (seqNo + 1 == blkNo)
     . Left
     . T.pack
@@ -128,8 +126,8 @@ hasSameHash di = uses proposal $ maybe False ((== di) . blockHash)
 
 createRoundChangeMessage :: MonadIO m => View -> m TrustedMessage
 createRoundChangeMessage vw = do
-  nonce <- bytesToWord256 <$> liftIO (getEntropy 32)
-  pure $ RoundChange vw nonce
+  nonce' <- bytesToWord256 <$> liftIO (getEntropy 32)
+  pure $ RoundChange vw nonce'
 
 roundChange :: (StateMachineM m) => ConduitM InEvent EOutEvent m ()
 roundChange = do
@@ -137,7 +135,8 @@ roundChange = do
   pendingRound .= Just (_round nextView)
   rawMsg <- createRoundChangeMessage nextView
   valB <- use validatorBehavior
-  when (valB) $ do
+  self <- use selfCert
+  when (isJust self && valB) $ do
     msg <- signMessage rawMsg
     yieldR msg
 
@@ -149,22 +148,22 @@ nextRound nt = do
       view . round .= r
       yieldR $ ResetTimer r
   use view >>= recordView
-  vals <- unChainMembers <$> use validators
+  vals <- use validators
   thisR <- use $ view . round
   when (S.null vals) . liftIO $
     die "All participants voted out, consensus is stuck."
   let leader = (fromIntegral thisR `mod` S.size vals) `S.elemAt` vals
   proposer .= leader
   proposal .= Nothing
-  self <- use selfAddr
-  when (leader == self) $ do
+  self <- use selfCert
+  when (Just leader == fmap chainMemberParsedSetToValidator self) $ do
     lock <- use blockLock
     case lock of
       Nothing -> yieldR MakeBlockCommand
       Just lb -> do
         v <- use view
         valB <- use validatorBehavior
-        when (valB) $ do
+        when (isJust self && valB) $ do
           msg <- signMessage (Preprepare v lb)
           yieldR msg
 
@@ -177,16 +176,21 @@ nextRound nt = do
   hasPrepared .= False
   pendingRound .= Nothing
 
-  isValidator .= (self `elem` vals)
+  when (isJust self) $ isValidator .= (chainMemberParsedSetToValidator (fromJust self) `elem` vals)
 
   yieldR . NewCheckpoint
     =<< liftA2
       Checkpoint
       (use view)
-      (uses validators (S.toList . unChainMembers))
+      (uses validators S.toList)
 
 instance A.Selectable Address X509CertInfoState m => A.Selectable Address X509CertInfoState (StateT BlockstanbulContext m) where
   select p = lift . A.select p
+
+instance A.Selectable Address X509CertInfoState m => A.Selectable Address X509CertInfoState (ExceptT String  m) where
+  select p = lift . A.select p
+
+
 
 eventLoop ::
   ( MonadIO m,
@@ -213,8 +217,8 @@ eventLoop ctx = execStateC ctx $
         ValidatorChange val dir -> do
           modify' $
             validators
-              %~ ( \(ChainMembers cm) ->
-                     let cm' = (if dir then S.insert else S.delete) val cm in ChainMembers cm'
+              %~ ( \cm ->
+                     let cm' = (if dir then S.insert else S.delete) val cm in cm'
                  )
           vals' <- use validators
           $logInfoLS "blockstanbul/ValidatorChange" . T.pack $
@@ -224,7 +228,7 @@ eventLoop ctx = execStateC ctx $
                 " was ",
                 if dir then "added" else "removed",
                 ". New validator set: ",
-                format vals'
+                show . map format . S.toList $ vals'
               ]
         ForcedConfigChange cc -> do
           $logWarnLS "blockstanbul/config_change" cc
@@ -235,11 +239,17 @@ eventLoop ctx = execStateC ctx $
                 else
                   $logErrorS "blockstanbul/config_change" . T.pack $
                     printf "Refusing to move round backwards in time %d to %d" (_round v) rn
+            ForcedSequence s ->
+              if s >= _sequence v
+                then nextRound (Sequence s)
+                else 
+                  $logErrorS "blockstanbul/config_change" . T.pack $
+                    printf "Refusing to move sequence backwards in time %d to %d" (_sequence v) s
         PreviousBlock blk -> do
           realValidators <- use validators
           seqNo <- use $ view . sequence
-          eNextSeqNo <- lift . lift $ replayHistoricBlock realValidators seqNo blk
-          let blockNo = blockDataNumber . blockBlockData $ blk
+          eNextSeqNo <- lift $ lift $ runExceptT $ replayHistoricBlock realValidators seqNo blk
+          let blockNo = number . blockBlockData $ blk
           recordMaxBlockNumber "pbft_previousblock" blockNo
           case eNextSeqNo of
             Left err -> do
@@ -249,6 +259,8 @@ eventLoop ctx = execStateC ctx $
                 $ err
               yieldR $ FailedHistoric blk
             Right _ -> do
+              network' <- use network
+              validatorTimingHack network' $ number (blockBlockData blk)
               acceptHistoric
               $logInfoS "blockstanbul" . T.pack . printf "Accepting historical block #%d" $ blockNo
               yieldR . ToCommit $ blk
@@ -256,10 +268,10 @@ eventLoop ctx = execStateC ctx $
           let blk = truncateExtra blk'
           ppl <- use proposal
           leader <- use proposer
-          self <- use selfAddr
-          when (isNothing ppl && leader == self) $ do
+          self <- use selfCert
+          when (isNothing ppl && Just leader == fmap chainMemberParsedSetToValidator self) $ do
             vs <- use validators
-            let blockWithVs = addValidators vs blk
+            let blockWithVs = addValidators (ChainMembers $ S.map validatorToChainMemberParsedSet vs) blk
             pseal <- proposerSeal blockWithVs
             let sealedBlk = addProposerSeal pseal blockWithVs
             mLocked <- use blockLock
@@ -279,17 +291,26 @@ eventLoop ctx = execStateC ctx $
                 hasPreprepared .= True
                 proposal .= Just realSealed
                 valB <- use validatorBehavior
-                when (valB) $ do
+                when (isJust self && valB) $ do
                   msg <- signMessage (Preprepare v realSealed)
                   yieldR msg
+                  yieldR $ RunPreprepare realSealed
+        PreprepareResponse decision -> case decision of 
+            AcceptPreprepare bh -> do 
+              self <- use selfCert
+              valB <- use validatorBehavior
+              when (isJust self && valB) $ do
+                msg <- signMessage (Prepare v bh)
+                yieldR msg
+            RejectPreprepare -> roundChange
         IMsg auth ppp@(Preprepare v' pp) -> do
           pr <- use proposer
           mBlockLock <- use blockLock
           case () of
             ()
-              | sender auth /= pr ->
+              | chainMemberParsedSetToValidator (sender auth) /= pr ->
                 $logWarnS "blockstanbul/ppl" . T.pack $
-                  "Rejecting proposal: proposer " ++ format (sender auth) ++ " is not " ++ format pr
+                  "Rejecting proposal: proposer " ++ format (chainMemberParsedSetToValidator $ sender auth) ++ " is not " ++ format pr
               | v /= v' -> do
                 $logInfoS "blockstanbul/roundchange" . T.pack $
                   "view mismatch (us, sender): " ++ format (v, v')
@@ -314,16 +335,17 @@ eventLoop ctx = execStateC ctx $
                     roundChange
                   Right () -> do
                     wasProposed <- isJust <$> use proposal
-                    unless wasProposed . yieldL $ OMsg auth ppp
-                    proposal .= Just pp
-                    valB <- use validatorBehavior
-                    when (valB) $ do
-                      msg <- signMessage (Prepare v (blockHash pp))
-                      yieldR msg
+                    unless wasProposed $ do
+                      yieldL $ OMsg auth ppp
+                      proposal .= Just pp
+                      self <- use selfCert
+                      valB <- use validatorBehavior
+                      -- run in vm before sending prepare
+                      when (isJust self && valB) . yieldR $ RunPreprepare pp
         IMsg auth ppp@(Prepare v' di) -> when (v <= v') $ do
           preparers <- use prepared
-          unless (M.member (sender auth) preparers) . yieldL $ OMsg auth ppp
-          ps <- prepared <%= M.insert (sender auth) di
+          unless (M.member (chainMemberParsedSetToValidator $ sender auth) preparers) . yieldL $ OMsg auth ppp
+          ps <- prepared <%= M.insert (chainMemberParsedSetToValidator $ sender auth) di
           total <- poolSize
           let sameVoteCount = M.size . M.filter (== di) $ ps
           sameHash <- hasSameHash di
@@ -332,14 +354,15 @@ eventLoop ctx = execStateC ctx $
             hasPrepared .= True
             setLock
             seal <- commitmentSeal di
+            self <- use selfCert
             valB <- use validatorBehavior
-            when (valB) $ do
+            when (isJust self && valB) $ do
               msg <- signMessage (Commit v di seal)
               yieldR msg
         IMsg auth ccc@(Commit v' di seal) -> when (v <= v') $ do
           committors <- use committed
-          unless (M.member (sender auth) committors) . yieldL $ OMsg auth ccc
-          cs <- committed <%= M.insert (sender auth) (di, seal)
+          unless (M.member (chainMemberParsedSetToValidator $ sender auth) committors) . yieldL $ OMsg auth ccc
+          cs <- committed <%= M.insert (chainMemberParsedSetToValidator $ sender auth) (di, seal)
           total <- poolSize
           let sameVoteCount = M.size . M.filter ((== di) . fst) $ cs
           sameHash <- hasSameHash di
@@ -352,16 +375,16 @@ eventLoop ctx = execStateC ctx $
               Nothing -> error "TODO(tim): Decide how to handle this"
               Just blk -> do
                 let seals = map snd . M.elems $ cs
-                let blockNo = blockDataNumber . blockBlockData $ blk
+                let blockNo = number . blockBlockData $ blk
                 recordMaxBlockNumber "pbft_commit" blockNo
                 yieldR . ToCommit . addCommitmentSeals seals $ blk
         IMsg auth (RoundChange vn _) -> when (_round v < _round vn) $ do
           let rn = _round vn
           mSigners <- use $ roundChanged . at rn
-          case S.member (sender auth) <$> mSigners of
+          case S.member (chainMemberParsedSetToValidator $ sender auth) <$> mSigners of
             Just True -> return ()
             _ -> do
-              rs <- roundChanged <%= M.alter (Just . S.insert (sender auth) . fromMaybe S.empty) rn
+              rs <- roundChanged <%= M.alter (Just . S.insert (chainMemberParsedSetToValidator $ sender auth) . fromMaybe S.empty) rn
               total <- poolSize
               sentRN <- use pendingRound
               let sameRNCount = maybe 0 S.size . M.lookup rn $ rs
@@ -370,7 +393,8 @@ eventLoop ctx = execStateC ctx $
                 pendingRound .= Just rn
                 $logInfoS "blockstanbul/roundchange" "agreed change"
                 valB <- use validatorBehavior
-                when (valB) $ do
+                self <- use selfCert
+                when (isJust self && valB) $ do
                   msg <- signMessage rawMsg
                   yieldR msg
               when (3 * sameRNCount > 2 * total) $ do
@@ -473,6 +497,7 @@ recordInEvent ev =
         CommitResult {} -> inc "commit_result"
         UnannouncedBlock {} -> inc "unannounced_block"
         PreviousBlock {} -> inc "previous_block"
+        PreprepareResponse {} -> inc "preprepare_response"
         ForcedConfigChange {} -> inc "forced_config_change"
         ValidatorBehaviorChange {} -> inc "validator_behavior_change"
         ValidatorChange {} -> inc "validator_change"
@@ -492,3 +517,55 @@ recordOutEvent eev =
         GapFound {} -> inc "gap_found"
         LeadFound {} -> inc "lead_found"
         NewCheckpoint {} -> inc "new_checkpoint"
+        RunPreprepare {} -> inc "run_preprepare"
+
+
+validatorTimingHack :: (MonadState BlockstanbulContext m)  =>
+                       String -> Integer -> m ()
+validatorTimingHack "mercata" blockNumber = validatorTimingHackMercata blockNumber
+validatorTimingHack "mercata-hydrogen" blockNumber = validatorTimingHackMercataHydrogen blockNumber
+validatorTimingHack _ _ = do
+  return ()
+
+
+validatorTimingHackMercata :: (MonadState BlockstanbulContext m)  =>
+                              Integer -> m ()
+validatorTimingHackMercata = \case
+  5255 -> modify' $ validators %~ S.insert "service-account-io-stratomercata-dnorwood"
+  5256 -> modify' $ validators %~ S.insert "service-account-io-stratomercata-witmk"
+  5257 -> modify' $ validators %~ S.insert "service-account-io-stratomercata-jpowell"
+  5258 -> modify' $ validators %~ S.insert "service-account-io-stratomercata-ChessGM9"
+  5259 -> modify' $ validators %~ S.insert "service-account-io-stratomercata-aaa"
+  5260 -> modify' $ validators %~ S.insert "service-account-io-stratomercata-trouble"
+  5261 -> modify' $ validators %~ S.insert "service-account-io-stratomercata-dsnallapu"
+  5271 -> modify' $ validators %~ S.insert "dustin-node"
+  5276 -> modify' $ validators %~ S.insert "service-account-io-stratomercata-kierensnode"
+  5277 -> modify' $ validators %~ S.insert "service-account-io-stratomercata-wongway"
+  5288 -> modify' $ validators %~ S.delete "service-account-io-stratomercata-dnorwood"
+  6099 -> modify' $ validators %~ S.insert "service-account-io-stratomercata-tyson"
+  7369 -> modify' $ validators %~ S.insert "service-account-io-stratomercata-neel"
+  7589 -> modify' $ validators %~ S.insert "service-account-io-stratomercata-drewbaby"
+  7673 -> modify' $ validators %~ S.insert "service-account-io-stratomercata-michael"
+  7683 -> modify' $ validators %~ S.insert "service-account-io-stratomercata-drebbel"
+  7893 -> modify' $ validators %~ S.insert "service-account-io-stratomercata-keepeth"
+  7915 -> modify' $ validators %~ S.insert "service-account-io-stratomercata-dgs"
+  7976 -> modify' $ validators %~ S.insert "service-account-io-mercata-dgs"
+  7977 -> modify' $ validators %~ S.insert "service-account-io-stratomercata-goldberg"
+  8171 -> modify' $ validators %~ S.insert "service-account-Io-stratomercata-hasanthevalidator"
+  8172 -> modify' $ validators %~ S.insert "service-account-Io-stratomercata-numbatwopencil"
+  8315 -> modify' $ validators %~ S.insert "service-account-io-stratomercata-jgonzo"
+  8317 -> modify' $ validators %~ S.insert "service-account-io-stratomercata-jacoguzo"
+  8320 -> modify' $ validators %~ S.insert "service-account-io-stratomercata-zeek"
+  8323 -> modify' $ validators %~ S.insert "service-account-io-stratomercata-mecmo4mopm"
+  8324 -> modify' $ validators %~ S.insert "service-account-io-stratomercata-goldbacktoken"
+  8325 -> modify' $ validators %~ S.insert "service-account-io-stratomercata-itaugmentation"
+  8575 -> modify' $ validators %~ S.insert "service-account-io-stratomercata-vinfra"
+  8576 -> modify' $ validators %~ S.insert "service-account-io-stratomercata-bible"
+  _ -> return ()
+  
+
+validatorTimingHackMercataHydrogen :: (MonadState BlockstanbulContext m)  =>
+                               Integer -> m ()
+validatorTimingHackMercataHydrogen _ = do
+  return ()
+

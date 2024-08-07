@@ -27,16 +27,14 @@ const InventoriesProvider = ({ children }) => {
     error: undefined,
     success: false,
     message: null,
-    isOnboardingSellerToStripe: false,
-    onboardedSeller: null,
-    stripeStatus: null,
-    isLoadingStripeStatus: false,
     uploadedImg : null,
     isUploadImageSubmitting: false,
     isTransferringItems: false,
     itemTransfers: [],
     totalItemsTransfered: 0,
-    isFetchingItemTransfers: false    
+    isFetchingItemTransfers: false,
+    isFetchingPriceHistory: false,
+    priceHistory: [],
   };
 
   const [state, dispatch] = useReducer(reducer, initialState);

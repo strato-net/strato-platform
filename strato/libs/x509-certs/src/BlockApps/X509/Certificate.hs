@@ -56,6 +56,7 @@ import Blockchain.Data.RLP
 import Blockchain.Strato.Model.Address
 import Blockchain.Strato.Model.ChainMember hiding (commonName, orgName, orgUnit)
 import Blockchain.Strato.Model.Secp256k1
+import Control.Applicative ((<|>))
 import Control.DeepSeq
 import qualified Control.Lens as Lens
 import Control.Lens.Operators hiding ((.=))
@@ -191,12 +192,12 @@ getAddressFromCM (Everyone _) (X509CertInfoState ua _ _ _ _ _ _) = Just ua
 getAddressFromCM (Org on _) (X509CertInfoState ua _ _ _ onx _ _) =
   if on == T.pack onx then Just ua else Nothing
 getAddressFromCM (OrgUnit on ou _) (X509CertInfoState ua _ _ _ onx oux _) =
-  if on == T.pack onx && ou == T.pack (fromMaybe " " oux) then Just ua else Nothing
+  if on == T.pack onx && ou == T.pack (fromMaybe "" oux) then Just ua else Nothing
 getAddressFromCM (CommonName on ou cmn _) (X509CertInfoState ua _ _ _ onx oux cnmx) =
-  if on == T.pack onx && ou == T.pack (fromMaybe " " oux) && cmn == T.pack cnmx then Just ua else Nothing
+  if on == T.pack onx && ou == T.pack (fromMaybe "" oux) && cmn == T.pack cnmx then Just ua else Nothing
 
 getChainMemberFromX509 :: X509CertInfoState -> ChainMemberParsedSet
-getChainMemberFromX509 (X509CertInfoState _ _ _ _ on ou cname) = (CommonName (T.pack $ on) (T.pack (fromMaybe " " ou)) (T.pack $ cname) True)
+getChainMemberFromX509 (X509CertInfoState _ _ _ _ on ou cname) = (CommonName (T.pack $ on) (T.pack (fromMaybe "" ou)) (T.pack $ cname) True)
 
 getX509FromAddress ::
   A.Selectable Address X509CertInfoState m =>
@@ -247,7 +248,7 @@ instance FromJSON Subject where
     o <- obj .: "organization"
     ou <- obj .:? "organizationUnit"
     c <- obj .:? "country"
-    pub <- obj .: "pubKey"
+    pub <- (either fail pure . bsToPub . C8.pack =<< (obj .: "pubKey")) <|> (obj .: "pubKey")
     return $ Subject cn o ou c pub
   parseJSON x = fail $ "could not decode JSON subject info: " ++ show x
 

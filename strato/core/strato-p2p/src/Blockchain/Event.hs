@@ -26,10 +26,10 @@ import BlockApps.X509.Certificate as XC
 import Blockchain.Blockstanbul (blockstanbulSender)
 import Blockchain.Context
 import Blockchain.Data.Block
-import Blockchain.Data.BlockHeader
+import Blockchain.Data.BlockHeader (BlockHeader)
+import qualified Blockchain.Data.BlockHeader as BlockHeader
 import Blockchain.Data.ChainInfo
 import Blockchain.Data.Control (P2PCNC (..))
-import Blockchain.Data.DataDefs
 import Blockchain.Data.Enode
 import Blockchain.Data.PubKey
 import qualified Blockchain.Data.TXOrigin as Origin
@@ -94,7 +94,7 @@ setTitleAndProduceBlocks blocks = do
   lastBlockHashes <- map blockHash <$> takeStack (Proxy @Block) 200
   let newBlocks = filter (not . (`elem` lastBlockHashes) . blockHash) blocks
   unless (null newBlocks) $ do
-    liftIO . setTitle $ "Block #" ++ show (maximum $ map (blockDataNumber . blockBlockData) newBlocks)
+    liftIO . setTitle $ "Block #" ++ show (maximum $ map (BlockHeader.number . blockBlockData) newBlocks)
     pushStack newBlocks
   return $ length newBlocks
 
@@ -145,7 +145,7 @@ handleEvents peer = awaitForever $ \case
     let parentHash' = blockHeaderParentHash header
     lift . Mod.put (Proxy @WorldBestBlock) . WorldBestBlock $
       BestBlock sha num tdiff
-    parentHeader <- lift $ lookup (Proxy @BlockData) parentHash'
+    parentHeader <- lift $ lookup (Proxy @BlockHeader) parentHash'
     case parentHeader of
       Nothing -> do
         bestBlock <- lift $ Mod.get (Proxy @BestBlock)
@@ -175,7 +175,7 @@ handleEvents peer = awaitForever $ \case
     -- 3/4s of the blocks will be dropped when creating the blockheaders
     -- so we overcompensate here.
     let count = (1 + skip') * min mrh max'
-    chain <- fmap M.toList . lift . selectMany (Proxy @(Canonical BlockData)) $ take count [start' ..]
+    chain <- fmap M.toList . lift . selectMany (Proxy @(Canonical BlockHeader)) $ take count [start' ..]
     when (null chain) $
       $logInfoS "handleEvents/GetBlockHeaders" $
         T.concat $
@@ -188,7 +188,7 @@ handleEvents peer = awaitForever $ \case
     yieldR . BlockHeaders . skipEntries skip' $ morphBlockHeader . unCanonical . snd <$> chain
   MsgEvt (GetBlockHeaders (BlockHash start) max' skip' dir) -> do
     lift stampActionTimestamp
-    maybeHeader <- lift $ lookup (Proxy @BlockData) start
+    maybeHeader <- lift $ lookup (Proxy @BlockHeader) start
     case maybeHeader of
       Nothing -> yieldR (BlockBodies [])
       Just head' -> do
@@ -201,15 +201,15 @@ handleEvents peer = awaitForever $ \case
                   else 1
         mrh <- lift $ unMaxReturnedHeaders <$> access (Proxy @MaxReturnedHeaders)
         let count = (1 + skip') * min mrh (fromIntegral max')
-        chain <- fmap M.toList . lift . selectMany (Proxy @(Canonical BlockData)) $ take count [start' ..]
+        chain <- fmap M.toList . lift . selectMany (Proxy @(Canonical BlockHeader)) $ take count [start' ..]
         yieldR . BlockHeaders . skipEntries skip' $ morphBlockHeader . unCanonical . snd <$> chain
   MsgEvt (BlockHeaders bHeaders) -> do
     let headers = morphBlockHeader <$> bHeaders
     lift stampActionTimestamp
     -- check if blockheaders we recieved have parents.
-    let parents = map blockDataParentHash headers
-    existingParents <- lift $ lookupMany (Proxy @BlockData) parents
-    let missingParents = S.fromList parents S.\\ M.keysSet existingParents
+    let parents = map BlockHeader.parentHash headers
+    existingParents <- lift $ lookupMany (Proxy @BlockHeader) parents
+    let missingParents = S.fromList parents S.\\ (M.keysSet existingParents `S.union` S.fromList (blockHeaderHash <$> bHeaders))
     unless (S.null missingParents) $ do
       bestBlock <- lift $ Mod.get (Proxy @BestBlock)
       let fetchNumber = numberFromBestBlock bestBlock + 1
@@ -223,7 +223,7 @@ handleEvents peer = awaitForever $ \case
     alreadyRequestedRemainingHeaders <- lift getRemainingBHeaders
     let headerHashes = map (blockHeaderHash &&& id) headers
         hashes = map fst headerHashes
-    headersInDB <- fmap M.keysSet . lift $ lookupMany (Proxy @BlockData) hashes
+    headersInDB <- fmap M.keysSet . lift $ lookupMany (Proxy @BlockHeader) hashes
     let neededHeaders = snd <$> filter (not . flip S.member headersInDB . fst) headerHashes
         (neededHeaders', remainingHeaders) = splitNeededHeaders neededHeaders
     case (alreadyRequestedHeaders, alreadyRequestedRemainingHeaders) of
@@ -302,7 +302,7 @@ handleEvents peer = awaitForever $ \case
                 pshas' = M.foldr (DL.append . DL.fromList . these id (const []) const) DL.empty filtered
             getUntilMissing hs (bodies `DL.snoc` body) (pshas `DL.append` pshas')
 
-      toBody :: OutputBlock -> ([Transaction], [BlockData])
+      toBody :: OutputBlock -> ([Transaction], [BlockHeader])
       toBody = ((map otBaseTx . obReceiptTransactions) &&& obBlockUncles)
 
   -- todo: support the "best effort" behavior that everyone uses for bodies they dont have (mentioned above
@@ -314,10 +314,10 @@ handleEvents peer = awaitForever $ \case
   MsgEvt (BlockBodies bodies) -> do
     lift stampActionTimestamp
     headers <- lift getBlockHeaders
-    let verified = and $ zipWith (\h b -> blockDataTransactionsRoot h == transactionsVerificationValue (fst b)) headers bodies
+    let verified = and $ zipWith (\h b -> BlockHeader.transactionsRoot h == transactionsVerificationValue (fst b)) headers bodies
     unless verified $ error "headers don't match bodies"
     $logInfoS "handleEvents/BlockBodies" $ T.pack $ "len headers is " ++ show (length headers) ++ ", len bodies is " ++ show (length bodies)
-    recordMaxBlockNumber "p2p_block_bodies" . maximum $ map blockDataNumber headers
+    recordMaxBlockNumber "p2p_block_bodies" . maximum $ map BlockHeader.number headers
     let blocks' = zipWith createBlockFromHeaderAndBody (morphBlockHeader <$> headers) bodies
     newCount <- lift $ setTitleAndProduceBlocks blocks'
     yieldL . ToUnseq $ IEBlock . blockToIngestBlock (Origin.PeerString $ peerString peer) <$> blocks'
@@ -362,6 +362,11 @@ handleEvents peer = awaitForever $ \case
     myX509 <- lift getMyX509
     let peerCheck (cId, _) = checkPeerIsMember myX509 peerX509 . fromMaybe def $ M.lookup cId mems
     yieldR . Transactions . map (morphTx . snd) $ filter peerCheck ptrs
+  MsgEvt (GetMPNodes srs) -> do
+    let txo = Origin.PeerString (peerString peer)
+    yieldL $ ToUnseq [IEGetMPNodesRequest txo srs]
+  MsgEvt (MPNodes nds) -> do
+    yieldL $ ToUnseq [IEMPNodesReceived nds]
   MsgEvt (Disconnect _) -> do
     $logInfoS "handleEvents/Disconnect" $ T.pack $ "Disconnect event received in Event handler"
     throwIO PeerDisconnected
@@ -371,7 +376,7 @@ handleEvents peer = awaitForever $ \case
         WorldBestBlock (BestBlock _ _ worldTDiff) <- lift $ Mod.get (Proxy @WorldBestBlock)
         $logInfoS "handleEvents/P2pBlock" . T.pack $ "World TDiff: " ++ show worldTDiff
         when (obTotalDifficulty b >= worldTDiff) $ do
-          $logInfoS "handleEvents/P2pBlock" . T.pack $ "yielding new block: " ++ show (blockDataNumber . blockBlockData . outputBlockToBlock $ b)
+          $logInfoS "handleEvents/P2pBlock" . T.pack $ "yielding new block: " ++ show (BlockHeader.number . blockBlockData . outputBlockToBlock $ b)
           yieldR $ NewBlock (outputBlockToBlock b) (obTotalDifficulty b)
     P2pTx tx -> do
       let mCid = txChainId tx
@@ -453,7 +458,7 @@ handleEvents peer = awaitForever $ \case
       when ss $ do
         mrh <- lift $ unMaxReturnedHeaders <$> access (Proxy @MaxReturnedHeaders)
         let count = min mrh . fromIntegral $ end - start + 1
-        chain <- fmap M.toList . lift . selectMany (Proxy @(Canonical BlockData)) $ take count [start ..]
+        chain <- fmap M.toList . lift . selectMany (Proxy @(Canonical BlockHeader)) $ take count [start ..]
         when (null chain) $
           $logErrorS "handleEvents/P2pPushBlocks" . T.pack $
             printf
@@ -463,6 +468,8 @@ handleEvents peer = awaitForever $ \case
         let outbound = BlockHeaders $ morphBlockHeader . unCanonical . snd <$> chain
         $logDebugS "handleEvents/P2pPushBlocks" . T.pack $ "Outgoing message: " ++ show outbound
         yieldR outbound
+    P2pGetMPNodes srs -> yieldR $ GetMPNodes srs
+    P2pMPNodesResponse o nds -> when (shouldRespond peer o) . yieldR $ MPNodes nds
   TimerEvt -> do
     maybeOldTS <- unActionTimestamp <$> lift getActionTimestamp
     case maybeOldTS of
@@ -545,6 +552,11 @@ syncFetch d num = do
   yieldR $ GetBlockHeaders (BlockNumber num) mrh 0 d
   lift stampActionTimestamp
 
+shouldRespond :: PPeer -> Origin.TXOrigin -> Bool
+shouldRespond peer txo = case txo of
+  Origin.PeerString ps -> ps == peerString peer
+  _ -> False
+
 shouldSend :: PPeer -> Origin.TXOrigin -> Bool
 shouldSend peer txo = case txo of
   Origin.PeerString ps -> ps /= peerString peer
@@ -582,7 +594,7 @@ x509CertInfoStateToCMPS (X509CertInfoState _ _ _ _ n u c) = CommonName (T.pack n
 {- to reduce redundant computations on dividing block chunks under txsLimit
 splitNeededHeaders :: [BlockHeader] -> [[BlockHeader]]
 splitNeededHeaders x =
-  let txsLens = extraData2TxsLen <$> extraData <$> neededHeaders
+  let txsLens = BlockHeader.extraData2TxsLen <$> extraData <$> neededHeaders
       txsLensInLimit =  scanl (\x y -> if ((x+y)>flags_maxHeadersTxsLens) then y else x+y) 0 txsLens
       indexToSplit :: Int -> [Int] -> [Int] -> [Int] -> [Int]
       indexToSplit index li (x:xs) (y:ys) =  indexToSplit (index++) li' xs ys
@@ -592,9 +604,9 @@ splitNeededHeaders x =
       indexToSplit _ li [] [] = li
   in splitAt -}
 
-splitNeededHeaders :: [BlockData] -> ([BlockData], [BlockData])
+splitNeededHeaders :: [BlockHeader] -> ([BlockHeader], [BlockHeader])
 splitNeededHeaders neededHeaders =
-  let txsLens = extraData2TxsLen <$> blockDataExtraData <$> neededHeaders
+  let txsLens = BlockHeader.extraData2TxsLen <$> BlockHeader.extraData <$> neededHeaders
       txsLensInSums = scanl (+) (0) $ fromMaybe flags_averageTxsPerBlock <$> txsLens
       txsLensInLimit = takeWhile (< flags_maxHeadersTxsLens) $ tail txsLensInSums
    in splitAt (length txsLensInLimit) neededHeaders

@@ -22,6 +22,7 @@ library:
   - blockapps-data
   - blockapps-datadefs
   - blockapps-mpdbs
+  - blockstanbul
   - bytestring
   - common-log
   - composable-monads-base

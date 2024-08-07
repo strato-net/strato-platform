@@ -18,15 +18,21 @@ module Blockchain.Event
   )
 where
 
+import Blockchain.Blockstanbul (PreprepareDecision(..))
 import Blockchain.DB.MemAddressStateDB
+import Blockchain.Data.Block (Block(..))
 import Blockchain.Data.ChainInfo
 import Blockchain.Data.DataDefs
 import Blockchain.Data.ExecResults
+import Blockchain.Database.MerklePatricia.NodeData (NodeData)
+import Blockchain.Data.TXOrigin
 import Blockchain.Sequencer.Event
+import Blockchain.StateRootMismatch (StateRootMismatch)
 import Blockchain.Strato.Indexer.Model (IndexEvent (..))
 import Blockchain.Strato.Model.Account
 import Blockchain.Strato.Model.ExtendedWord
 import Blockchain.Strato.Model.Keccak256
+import Blockchain.Strato.Model.StateRoot
 import Blockchain.Strato.StateDiff
 import Blockchain.Stream.Action (Action)
 import qualified Data.ByteString as B
@@ -43,11 +49,14 @@ data VmInEventBatch = InBatch
     blocksAndNewChains :: [Either OutputGenesis OutputBlock],
     bLen :: {-# UNPACK #-} !Int,
     createBlock :: !Bool,
-    privateTxs :: [OutputTx]
+    privateTxs :: [OutputTx],
+    mpNodesReqs :: [(TXOrigin, [StateRoot])],
+    mpNodesResps :: [[NodeData]],
+    preprepareBlock :: Maybe Block
   }
 
 newInBatch :: VmInEventBatch
-newInBatch = InBatch [] [] 0 [] 0 False []
+newInBatch = InBatch [] [] 0 [] 0 False [] [] [] Nothing
 
 insertInBatch :: VmInEvent -> VmInEventBatch -> VmInEventBatch
 insertInBatch e b = case e of
@@ -57,6 +66,9 @@ insertInBatch e b = case e of
   VmBlock ob -> b {blocksAndNewChains = (Right ob) : blocksAndNewChains b, bLen = bLen b + 1}
   VmCreateBlockCommand -> b {createBlock = True}
   VmPrivateTx otx -> b {privateTxs = otx : privateTxs b}
+  VmGetMPNodesRequest o srs -> b {mpNodesReqs = (o, srs) : mpNodesReqs b}
+  VmMPNodesReceived nds -> b {mpNodesResps = nds : mpNodesResps b}
+  VmRunPreprepare b' -> b {preprepareBlock = Just b'}
 
 data VmOutEvent
   = OutAction Action
@@ -69,6 +81,10 @@ data VmOutEvent
   | OutTXR TransactionResult
   | OutASM (Map Account AddressStateModification)
   | OutJSONRPC String B.ByteString
+  | OutStateRootMismatch StateRootMismatch
+  | OutGetMPNodes [StateRoot]
+  | OutMPNodesResponse TXOrigin [NodeData]
+  | OutPreprepareResponse PreprepareDecision
 
 data VmOutEventBatch = OutBatch
   { outActions :: DL.DList Action,
@@ -81,7 +97,11 @@ data VmOutEventBatch = OutBatch
     outEvents :: DL.DList EventDB,
     outTXRs :: DL.DList TransactionResult,
     outASMs :: DL.DList (Map Account AddressStateModification),
-    outJSONRPCs :: DL.DList (String, B.ByteString)
+    outJSONRPCs :: DL.DList (String, B.ByteString),
+    outStateRootMismatch :: Maybe StateRootMismatch,
+    outGetMPNodes :: DL.DList [StateRoot],
+    outMPNodesResponses :: DL.DList (TXOrigin, [NodeData]),
+    outPreprepareResponses :: DL.DList (PreprepareDecision)
   }
 
 newOutBatch :: VmOutEventBatch
@@ -98,6 +118,10 @@ newOutBatch =
     DL.empty
     DL.empty
     DL.empty
+    Nothing
+    DL.empty
+    DL.empty
+    DL.empty
 
 insertOutBatch :: VmOutEvent -> VmOutEventBatch -> VmOutEventBatch
 insertOutBatch e b = case e of
@@ -111,3 +135,7 @@ insertOutBatch e b = case e of
   OutTXR a -> b {outTXRs = outTXRs b `DL.snoc` a}
   OutASM a -> b {outASMs = outASMs b `DL.snoc` a}
   OutJSONRPC x y -> b {outJSONRPCs = outJSONRPCs b `DL.snoc` (x, y)}
+  OutStateRootMismatch srm -> b {outStateRootMismatch = Just srm}
+  OutGetMPNodes srs -> b {outGetMPNodes = outGetMPNodes b `DL.snoc` srs}
+  OutMPNodesResponse o nds -> b {outMPNodesResponses = outMPNodesResponses b `DL.snoc` (o, nds)}
+  OutPreprepareResponse p -> b {outPreprepareResponses = outPreprepareResponses b `DL.snoc` p}

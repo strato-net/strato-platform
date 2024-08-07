@@ -16,6 +16,7 @@ const buildOrderQueryOption = (args) => {
 
 export const waitForAddress = async (admin, contract, options) => {
   const org = options.org
+
   const app = options.app == contract.name ? undefined : options.app
 
   const tableName = org ?
@@ -285,10 +286,18 @@ export const setSearchQueryOptionsPrime = (args) => {
       const { notEqualsField, notEqualsValue } = args
       if (Array.isArray(args[key])) {
         notEqualsField.map((field, i) => {
-          result.push({ key: field, value: notEqualsValue[i], predicate: 'neq' })
+          if (Array.isArray(notEqualsValue[i])) {
+            result.push({ key: field, value: `(${notEqualsValue[i].join(',')})`, predicate: 'not.in' })
+          } else {
+            result.push({ key: field, value: notEqualsValue[i], predicate: 'neq' })
+          }
         })
       } else {
-        result.push({ key: notEqualsField, value: notEqualsValue, predicate: 'neq' })
+        if (Array.isArray(notEqualsField)) {
+          result.push({ key: notEqualsField, value: `(${notEqualsValue.join(',')})`, predicate: 'not.in' })
+        } else {
+          result.push({ key: notEqualsField, value: notEqualsValue, predicate: 'neq' })
+        }
       }
     }
     // Added to remove the unusable inventories when (isMint==true && quantity==0) OR  (quantity>0)
@@ -425,10 +434,18 @@ export const searchAllWithQueryArgs = async (contractName, args, options, user) 
       const { notEqualsField, notEqualsValue } = args
       if (Array.isArray(args[key])) {
         notEqualsField.map((field, i) => {
-          result.push({ key: field, value: notEqualsValue[i], predicate: 'neq' })
+          if (Array.isArray(notEqualsValue[i])) {
+            result.push({ key: field, value: `(${notEqualsValue[i].join(',')})`, predicate: 'not.in' })
+          } else {
+            result.push({ key: field, value: notEqualsValue[i], predicate: 'neq' })
+          }
         })
       } else {
-        result.push({ key: notEqualsField, value: notEqualsValue, predicate: 'neq' })
+        if (Array.isArray(notEqualsField)) {
+          result.push({ key: notEqualsField, value: `(${notEqualsValue.join(',')})`, predicate: 'not.in' })
+        } else {
+          result.push({ key: notEqualsField, value: notEqualsValue, predicate: 'neq' })
+        }
       }
     }
 

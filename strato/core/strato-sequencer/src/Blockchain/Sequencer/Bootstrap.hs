@@ -7,7 +7,7 @@ import BlockApps.Logging
 import BlockApps.X509.Certificate
 import Blockchain.Constants
 import Blockchain.Data.Block
-import Blockchain.Data.DataDefs
+import Blockchain.Data.BlockHeader
 import qualified Blockchain.Data.TXOrigin as TO
 import qualified Blockchain.Data.Transaction as TX
 import Blockchain.EthConf as EC
@@ -16,6 +16,7 @@ import Blockchain.Sequencer.CablePackage
 import Blockchain.Sequencer.Constants
 import Blockchain.Sequencer.DB.DependentBlockDB
 import Blockchain.Sequencer.Event
+import Blockchain.Sequencer.ExtraCertsHack
 import Blockchain.Sequencer.Gregor
 import Blockchain.Sequencer.Kafka (writeSeqVmEvents, writeSeqP2pEvents)
 import Blockchain.Sequencer.Monad
@@ -50,11 +51,11 @@ bootstrapSequencer
           { obOrigin = TO.Direct,
             obBlockData = bd,
             obBlockUncles = us,
-            obTotalDifficulty = difficulty,
+            obTotalDifficulty = difficulty',
             obReceiptTransactions = map kludge txs
           }
       hash = blockHeaderHash bd
-      difficulty = blockDataDifficulty bd
+      difficulty' = difficulty bd
       kludge t = fromMaybe fallback (wrapIngestBlockTransactionUnanchored hash t)
         where
           fallback =
@@ -90,9 +91,9 @@ bootstrapSequencer
                   kafkaClientId = KString $ C8.pack defaultKafkaClientId'
                 }
         runLoggingT . runSequencerM dummySequencerCfg Nothing $ do
-          bootstrapGenesisBlock hash difficulty
+          bootstrapGenesisBlock hash difficulty'
           A.insert (A.Proxy @EmittedBlock) hash alreadyEmittedBlock
-          for_ extraCerts . uncurry $ A.insert (A.Proxy @X509CertInfoState)
+          for_ (extraCerts ++ extraCertsHack) . uncurry $ A.insert (A.Proxy @X509CertInfoState)
           flushLdbBatchOps
       initKafka :: CablePackage -> IO ()
       initKafka _ = do

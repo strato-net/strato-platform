@@ -1,44 +1,5 @@
 // Jest Snapshot v1, https://goo.gl/fbAQLP
 
-exports[`OauthAccounts: reducer faucet account on failure 1`] = `
-Object {
-  "account": null,
-  "error": null,
-  "faucet": Object {
-    "accountAddress": null,
-    "status": false,
-  },
-  "filter": "",
-  "name": null,
-}
-`;
-
-exports[`OauthAccounts: reducer faucet account on request 1`] = `
-Object {
-  "account": null,
-  "error": null,
-  "faucet": Object {
-    "accountAddress": "quxb0hj4dzgqwg83c52w0jvja6ukk022893z0w0k",
-    "status": true,
-  },
-  "filter": "",
-  "name": null,
-}
-`;
-
-exports[`OauthAccounts: reducer faucet account on success 1`] = `
-Object {
-  "account": null,
-  "error": null,
-  "faucet": Object {
-    "accountAddress": null,
-    "status": false,
-  },
-  "filter": "",
-  "name": null,
-}
-`;
-
 exports[`OauthAccounts: reducer fetch Oauth account details on failure 1`] = `
 Object {
   "account": null,
@@ -133,10 +94,6 @@ exports[`OauthAccounts: reducer set initial state 1`] = `
 Object {
   "account": null,
   "error": null,
-  "faucet": Object {
-    "accountAddress": null,
-    "status": false,
-  },
   "filter": "",
   "name": null,
 }

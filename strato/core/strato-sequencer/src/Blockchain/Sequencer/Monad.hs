@@ -130,7 +130,6 @@ data SequencerContext = SequencerContext
     _chainHashRegistry :: !(Map Keccak256 (Modification ChainHashEntry)),
     _chainIdRegistry :: !(Map Word256 (Modification ChainIdEntry)),
     _chainInfoRegistry :: !(Map Word256 (Modification ChainInfo)),
-    _x509certRegistry :: !(Map Address (Modification Word256)),
     _x509certInfoState :: !(Map Address (Modification X509CertInfoState)), --map to pubkey
     _getChainsDB :: !GetChainsDB,
     _getTransactionsDB :: !GetTransactionsDB,
@@ -486,27 +485,26 @@ runSequencerM c mbc m = do
     depBlock <- LDB.open dbPath LDB.defaultOptions {LDB.createIfMissing = True, LDB.cacheSize = dbCS}
     loopCh <- atomically newTMChan
     latestRound <- liftIO $ newIORef 0
-    let sequencerContext =
-          SequencerContext
-          { _dependentBlockDB = depBlock,
-            _seenTransactionDB = mkSeenTxDB stxSize,
-            _dbeRegistry = M.empty,
-            _blockHashRegistry = M.empty,
-            _emittedBlockRegistry = initialEmittedBlockCache,
-            _txHashRegistry = M.empty,
-            _chainHashRegistry = M.empty,
-            _chainIdRegistry = M.empty,
-            _chainInfoRegistry = M.empty,
-            _x509certRegistry = M.empty,
-            _x509certInfoState = M.empty,
-            _getChainsDB = emptyGetChainsDB,
-            _getTransactionsDB = emptyGetTransactionsDB,
-            _ldbBatchOps = Q.empty,
-            _blockstanbulContext = mbc,
-            _loopTimeout = loopCh,
-            _latestRoundNumber = latestRound
-          }
-    runStateT m sequencerContext
+    runStateT
+      m
+      SequencerContext
+        { _dependentBlockDB = depBlock,
+          _seenTransactionDB = mkSeenTxDB stxSize,
+          _dbeRegistry = M.empty,
+          _blockHashRegistry = M.empty,
+          _emittedBlockRegistry = initialEmittedBlockCache,
+          _txHashRegistry = M.empty,
+          _chainHashRegistry = M.empty,
+          _chainIdRegistry = M.empty,
+          _chainInfoRegistry = M.empty,
+          _x509certInfoState = M.empty,
+          _getChainsDB = emptyGetChainsDB,
+          _getTransactionsDB = emptyGetTransactionsDB,
+          _ldbBatchOps = Q.empty,
+          _blockstanbulContext = mbc,
+          _loopTimeout = loopCh,
+          _latestRoundNumber = latestRound
+        }
 
   return $ fst a
 

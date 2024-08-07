@@ -20,8 +20,8 @@ import BlockApps.Logging
 import BlockApps.X509.Certificate
 import Blockchain.Blockstanbul
 import qualified Blockchain.Data.Block as BDB
+import Blockchain.Data.BlockHeader
 import Blockchain.Data.ChainInfo (chainInfo, creationBlock, parentChains)
-import qualified Blockchain.Data.DataDefs as BDB
 import qualified Blockchain.Data.RLP as RL
 import qualified Blockchain.Data.TXOrigin as TO
 import qualified Blockchain.Data.TransactionDef as TD
@@ -37,9 +37,11 @@ import Blockchain.Sequencer.Event
 import Blockchain.Sequencer.Kafka
 import Blockchain.Sequencer.Metrics
 import Blockchain.Sequencer.Monad
+import Blockchain.Strato.Model.ChainMember
 import Blockchain.Strato.Model.Class as BDB
 import Blockchain.Strato.Model.Keccak256
 import Blockchain.Strato.Model.Secp256k1
+import Blockchain.Strato.Model.Validator
 import ClassyPrelude (atomically)
 import Conduit
 import Control.Concurrent hiding (yield)
@@ -131,9 +133,24 @@ type MonadSequencer m =
     HasVault m
   )
 
-sequencer :: SequencerM ()
-sequencer = do
+sequencer :: [Validator] -> SequencerM ()
+sequencer validators = do
   let logF = logFF "sequencer"
+  hasPBFT <- isJust <$> getBlockstanbulContext
+  when (hasPBFT) $ do
+    ctx <- fromJust <$> getBlockstanbulContext
+    maybeCert <- A.lookup (A.Proxy @X509CertInfoState) (fromJust $ _selfAddr ctx)
+    case maybeCert of
+      Just cert -> do
+        let chainm = getChainMemberFromX509 cert
+        logF $ "Node identity verified: " ++ show chainm
+        case chainMemberParsedSetToValidator chainm `elem` validators of
+          True -> do
+            putBlockstanbulContext $ ctx { _selfCert = Just chainm, _isValidator = True }
+            logF "You are a validator in this network!"
+          False -> do
+            putBlockstanbulContext $ ctx { _selfCert = Just chainm }
+      Nothing -> logF "Awaiting node identity verification..."
   logF "Sequencer startup"
   source <- sealConduitT <$> fuseChannels
   bootstrapBlockstanbul
@@ -271,8 +288,7 @@ blockstanbulSend' msg = do
         bs -> error $ "can send at most 1 block at a time: " ++ show bs
   for_ resp $ \case
     ResetTimer rn -> createNewTimer rn
-    FailedHistoric blk ->
-      for_ (ingestBlockToSequencedBlock $ blockToIngestBlock TO.Blockstanbul blk) appendChildFailure
+    FailedHistoric blk -> A.delete (Proxy @DependentBlockEntry) (blockHash blk) -- First time using `delete`
     _ -> pure ()
   $logDebugS "seq/pbft/send" . T.pack $ "Pre-rewrite: " ++ format (map blockHash blocks)
 
@@ -315,6 +331,7 @@ blockstanbulSend' msg = do
         GapFound h l p -> (vms, (P2pAskForBlocks (h + 1) l p) : p2ps, ctxs)
         LeadFound h l p -> (vms, (P2pPushBlocks (l + 1) h p) : p2ps, ctxs)
         NewCheckpoint ck -> (vms, p2ps, ck : ctxs)
+        RunPreprepare b -> (VmRunPreprepare b : vms, p2ps, ctxs)
         _ -> (vms, p2ps, ctxs)
     vmEvenP2pCheckptFilterHelper [] = ([], [], [])
 
@@ -642,7 +659,18 @@ splitEvents es = forM_ (splitWith iEventType es) $ \(eventType, events) ->
           transformGenesis $ map (\(IEGenesis og) -> og) events
         IETNewCertRegistered -> do
           record "inevent_type_new_cert_registered" "IngestNewCertRegistered"
-          traverse_ (\(IENewCertRegistered a e) -> A.insert (A.Proxy @X509CertInfoState) a e) events --this is where we submit to ldb
+          hasPBFT <- isJust <$> getBlockstanbulContext
+          case hasPBFT of
+            True -> do
+              ctx <- fromJust <$> getBlockstanbulContext
+              traverse_ (\(IENewCertRegistered a e) -> do
+                  when ((_selfAddr ctx) == Just a) $ do
+                    let chainm = getChainMemberFromX509 e
+                    putBlockstanbulContext $ ctx { _selfCert = Just chainm }
+                    $logInfoS "sequencer" . T.pack $ "Node identity verified: " ++ show chainm
+                  A.insert (A.Proxy @X509CertInfoState) a e
+                ) events --this is where we submit to ldb
+            False -> traverse_ (\(IENewCertRegistered a e) -> A.insert (A.Proxy @X509CertInfoState) a e) events
         IETCertRevoked -> do
           record "inevent_type_cert_revoked" "IngestCertRevoked"
           traverse_ (\(IECertRevoked a) -> A.delete (A.Proxy @X509CertInfoState) a) events
@@ -673,24 +701,39 @@ splitEvents es = forM_ (splitWith iEventType es) $ \(eventType, events) ->
         IETDeleteDepBlock -> do
           record "inevent_type_delete_dep_block" "DeleteDepBlock"
           traverse_ (\(IEDeleteDepBlock k) -> A.delete (A.Proxy @DependentBlockEntry) k) events
+        IETGetMPNodes -> do
+          record "inevent_type_get_mp_nodes" "GetMPNodes"
+          yieldMany $ map (\(IEGetMPNodes srs) -> ToP2p $ P2pGetMPNodes srs) events
+        IETGetMPNodesRequest -> do
+          record "inevent_type_get_mp_nodes_request" "GetMPNodesRequest"
+          yieldMany $ map (\(IEGetMPNodesRequest o srs) -> ToVm $ VmGetMPNodesRequest o srs) events
+        IETMPNodesResponse -> do
+          record "inevent_type_mp_nodes_response" "MPNodesResponse"
+          yieldMany $ map (\(IEMPNodesResponse o nds) -> ToP2p $ P2pMPNodesResponse o nds) events
+        IETMPNodesReceived -> do
+          record "inevent_type_mp_nodes_received" "MPNodesReceived"
+          yieldMany $ map (\(IEMPNodesReceived nds) -> ToVm $ VmMPNodesReceived nds) events
+        IETPreprepareResponse -> do
+          record "inevent_type_preprepare_response" "PreprepareResponse"
+          blockstanbulSend $ map (\(IEPreprepareResponse decis) -> PreprepareResponse decis) events
 
 prettyIBlock :: IngestBlock -> String
 prettyIBlock IngestBlock {ibOrigin = o, ibBlockData = bd, ibReceiptTransactions = txs} = "Block #" ++ blockNonce ++ "/" ++ bHash ++ " (via " ++ format o ++ ", " ++ show (length txs) ++ " txs)"
   where
-    blockNonce = show . BDB.blockDataNumber $ bd
+    blockNonce = show . number $ bd
     bHash = format . BDB.blockHeaderHash $ bd
 
 prettyOBlock :: OutputBlock -> String
 prettyOBlock OutputBlock {obOrigin = o, obBlockData = bd, obReceiptTransactions = txs} = "Block #" ++ blockNonce ++ "/" ++ bHash ++ " (via " ++ format o ++ ", " ++ show (length txs) ++ " txs)"
   where
-    blockNonce = show . BDB.blockDataNumber $ bd
+    blockNonce = show . number $ bd
     bHash = format . BDB.blockHeaderHash $ bd
 
 prettyBlock :: SequencedBlock -> String
 prettyBlock SequencedBlock {sbOrigin = o, sbBlockData = bd, sbReceiptTransactions = txs} = "Block #" ++ blockNonce ++ "/" ++ bHash ++ " (via " ++ format o ++ ", " ++ show (length txs) ++ " txs)"
   where
-    blockNonce = show . BDB.blockDataNumber $ bd
-    bHash = format . BDB.blockHeaderHash $ bd
+    blockNonce = show . number $ bd
+    bHash = format . blockHeaderHash $ bd
 
 prettyTx :: IngestTx -> String
 prettyTx IngestTx {itOrigin = o, itTransaction = t} = prefix t ++ " via " ++ shortOrigin o

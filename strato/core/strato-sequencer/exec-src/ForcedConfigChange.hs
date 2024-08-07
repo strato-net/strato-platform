@@ -21,6 +21,10 @@ defineFlag
   \ This obviously is not ideal, and so this tool provides a way to circumvent the normal\
   \ PBFT controls in case of emergency. This tool is authenticated by being able to write\
   \ to the kafka topic instead of through signatures."
+defineFlag
+  "sequence_number"
+  (-1 :: Integer)
+  "Forced PBFT to transition to a specific sequence number."
 
 $(return [])
 
@@ -37,5 +41,15 @@ main = do
     resp <- runKafkaMConfigured (KString "forced-config-change") $ do
       execKafka $ writeUnseqEvents [msg]
     print resp
-    exitSuccess
-  die "no config change flags provided"
+  when (flags_sequence_number >= 0) $ do
+    let msg =
+          IEForcedConfigChange
+            . ForcedSequence
+            $ fromIntegral flags_sequence_number
+    print msg
+    resp <- runKafkaConfigured (KString "forced-config-change") $ do
+      writeUnseqEvents [msg]
+    print resp
+  if (flags_round_number >= 0 || flags_sequence_number >= 0)
+    then exitSuccess
+    else die "no config change flags provided"

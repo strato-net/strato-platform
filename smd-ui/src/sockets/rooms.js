@@ -14,3 +14,4 @@ export const GET_NODE_UPTIME = 'GET_NODE_UPTIME';
 export const GET_HEALTH = 'GET_HEALTH';
 export const GET_SYSTEM_INFO = 'GET_SYSTEM_INFO';
 export const GET_SHARD_COUNT = 'GET_SHARD_COUNT';
+export const GET_NETWORK_HEALTH = "GET_NETWORK_HEALTH";

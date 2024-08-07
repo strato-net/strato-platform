@@ -57,7 +57,7 @@ export const ResponsiveBoughtOrderCard = ({ data, isLoading }) => {
                                 onClick={(e) => {
                                     if (item?.sellersCommonName && item.sellersCommonName !== 'N/A') {
                                     e.preventDefault();
-                                    const userProfileUrl = `/marketplace/profile/${encodeURIComponent(item.sellersCommonName)}`;
+                                    const userProfileUrl = `/profile/${encodeURIComponent(item.sellersCommonName)}`;
                                     const fullUrl = `${window.location.origin}${userProfileUrl}`;
 
                                     if (e.ctrlKey || e.metaKey) {
@@ -74,8 +74,12 @@ export const ResponsiveBoughtOrderCard = ({ data, isLoading }) => {
                                 </Typography>
                         </div>
                         <div className={` px-4 w-full flex justify-between`}>
-                            <Typography>Order Total($)</Typography>
-                            <Typography className={`text-[#202020] font-semibold`}>{'$' + item?.orderTotal || 'N/A'}</Typography>
+                            <Typography>Currency</Typography>
+                            <Typography className={`text-[#202020] font-semibold`}>{item?.currency || 'N/A'}</Typography>
+                        </div>
+                        <div className={` px-4 w-full flex justify-between`}>
+                            <Typography>Order Total</Typography>
+                            <Typography className={`text-[#202020] font-semibold`}>{item?.orderTotal || 'N/A'}</Typography>
                         </div>
                         <div className={` px-4 w-full flex justify-between`}>
                             <Typography>Date</Typography>

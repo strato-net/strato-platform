@@ -5,10 +5,11 @@ import { setSearchQueryOptions, search, searchOne, searchAll, searchAllWithQuery
 // import dayjs from 'dayjs';
 
 
-const contractName = 'BasePaymentProvider';
-const stripeContractName = 'StripePaymentProvider';
-const paymentContractName = 'StripePaymentProvider.StripePaymentInitialized';
-const contractFilename = `${util.cwd}/dapp/mercata-base-contracts/Templates/Payments/StripePaymentProvider.sol`;
+const tablePrefix = 'BlockApps-Mercata-';
+const contractName = 'PaymentService';
+const externalContractName = 'ExternalPaymentService';
+const onboardedEventName = 'PaymentService.SellerOnboarded';
+const contractFilename = `${util.cwd}/dapp/mercata-base-contracts/Templates/Payments/ExternalPaymentService.sol`;
 
 /** 
  * Upload a new PaymentProvider 
@@ -21,7 +22,7 @@ async function uploadContract(user, _constructorArgs, options) {
     const constructorArgs = marshalIn(_constructorArgs);
 
     const contractArgs = {
-        name: stripeContractName,
+        name: externalContractName,
         source: await importer.combine(contractFilename),
         args: util.usc(constructorArgs),
     };
@@ -166,10 +167,6 @@ async function get(user, args, defaultOptions) {
         }
         const searchArgs = setSearchQueryOptions(restArgs, searchValues);
         paymentProvider = await search(contractName, searchArgs, options, user);
-    } else if (accountId) {
-
-        const searchArgs = setSearchQueryOptions(restArgs, [{ key: 'accountId', value: accountId }, { key: 'name', value: name }, {key: 'order', value: 'chargesEnabled.desc,block_timestamp.desc'}]);
-        paymentProvider = await search(contractName, searchArgs, options, user);
     } else if (transaction_sender) {
         const searchArgs = setSearchQueryOptions(restArgs, [{ key: 'transaction_sender', value: transaction_sender }, { key: 'name', value: name }, {key: 'order', value: 'chargesEnabled.desc,block_timestamp.desc'}]);
         paymentProvider = await search(contractName, searchArgs, options, user);
@@ -181,9 +178,37 @@ async function get(user, args, defaultOptions) {
     return paymentProvider.map((p) => marshalOut({ ...p, }));
 }
 
-async function getAll(admin, args = {}, options) {
-    const paymentProviders = await searchAllWithQueryArgs(contractName, args, options, admin);
+async function getAll(admin, args = {}, baseOptions) {
+    const { onlyActive, ...restArgs } = args;
+    const options = { ...baseOptions, org: 'BlockApps', app: 'Mercata' };
+    let searchArgs;
+    if (onlyActive) {
+      searchArgs = setSearchQueryOptions(restArgs, [{ key: 'isActive', value: 'true' }]) 
+    } else {
+      searchArgs = setSearchQueryOptions(restArgs, {})
+    }
+    const paymentProviders = await searchAllWithQueryArgs(contractName, searchArgs, options, admin);
     return paymentProviders.map((paymentProvider) => marshalOut(paymentProvider));
+}
+
+async function getNotOnboarded(admin, args = {}, baseOptions) {
+    const { sellersCommonName, ...restArgs } = args;
+    const eventContract = { name: `${tablePrefix}${onboardedEventName}` }
+    const onboardedQuery = {
+      sellersCommonName: `eq.${sellersCommonName}`,
+    }
+    const onboardedOptions = { ...baseOptions, query: onboardedQuery };
+    const onboardedEventsRes = await rest.search(admin, eventContract, onboardedOptions);
+    const onboardedAddresses = onboardedEventsRes.map((oe) => oe.address);
+    const contract = { name: `${tablePrefix}${contractName}` }
+    const notOnboardedQuery = {
+      isActive: 'eq.true',
+      contract_name: `like.*${externalContractName}`,
+      address: `not.in.(${onboardedAddresses.join(',')})`
+    }
+    const notOnboardedOptions = { ...baseOptions, query: notOnboardedQuery }
+    const paymentServices = await rest.search(admin, contract, notOnboardedOptions);
+    return paymentServices.map((paymentService) => marshalOut(paymentService));
 }
 
 /**
@@ -195,41 +220,22 @@ async function getState(user, contract, options) {
     return marshalOut(state);
 }
 
-async function getPaymentSession(user, args, defaultOptions) {
-    const { paymentSessionId, contractName, ...restArgs } = args;
-    const {app, ...defaultOptions1} = defaultOptions
-    const options = { ...defaultOptions1, org: contractName}
-    const searchArgs = setSearchQueryOptions(restArgs, { key: 'paymentSessionId', value: paymentSessionId });
-    const paymentProvider = await searchOne(paymentContractName, searchArgs, options, user);
-
-    return marshalOut({ ...paymentProvider, });
-}
-
-
 async function createPayment(user, args, options) {
     const { address, ...restArgs } = args;
-    const contract = { name: stripeContractName, address }
+    const contract = { name: contractName, address }
     const callArgs = {
       contract,
-      method: "initializePayment",
+      method: "checkoutInitialized",
       args: util.usc({ ...restArgs }),
     };
-    const createStatus = await rest.call(user, callArgs, options);
+    const token = await rest.call(user, callArgs, options);
   
-    if (parseInt(createStatus, 10) !== RestStatus.OK) {
-      throw new rest.RestError(
-        createStatus,
-        "You cannot initialize the payment because it's already been initialized",
-        { callArgs }
-      );
-    }
-  
-    return createStatus;
+    return token;
 }
 
 async function finalizePayment(user, args, options) {
     const { address, ...restArgs } = args;
-    const contract = { name: stripeContractName, ..._contract }
+    const contract = { name: contractName, ..._contract }
     const callArgs = {
       contract,
       method: "finalizePayment",
@@ -298,15 +304,14 @@ async function updatePaymentProvider(admin, contract, _args, baseOptions) {
 export default {
     uploadContract,
     contractName,
-    stripeContractName,
     contractFilename,
     bindAddress,
     get,
     getAll,
+    getNotOnboarded,
     marshalIn,
     marshalOut,
     getHistory,
-    getPaymentSession,
     createPayment,
     finalizePayment,
     updatePaymentProvider,

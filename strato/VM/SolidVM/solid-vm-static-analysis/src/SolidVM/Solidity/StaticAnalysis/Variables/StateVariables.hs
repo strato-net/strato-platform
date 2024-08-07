@@ -223,6 +223,7 @@ expressionHelper (Unitary _ _ a) = expressionHelper a
 expressionHelper (Ternary _ a b c) = concat <$> traverse expressionHelper [a, b, c]
 expressionHelper (BoolLiteral _ _) = pure []
 expressionHelper (NumberLiteral _ _ _) = pure []
+expressionHelper (DecimalLiteral _ _) = pure []
 expressionHelper (StringLiteral _ _) = pure []
 expressionHelper (AccountLiteral _ _) = pure []
 expressionHelper (TupleExpression _ es) =

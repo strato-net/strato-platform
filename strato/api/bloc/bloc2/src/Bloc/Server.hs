@@ -14,8 +14,6 @@ import Bloc.Server.Chain
 import Bloc.Server.Contracts
 import Bloc.Server.Transaction
 import Bloc.Server.TransactionResult
-import Bloc.Server.Users
-import Bloc.Server.X509
 import Blockchain.DB.CodeDB
 import Blockchain.Data.AddressStateDB
 import Blockchain.Data.CirrusDefs
@@ -48,8 +46,6 @@ bloc ::
   ServerT BlocAPI m
 bloc =
   return gitInfo
-    :<|> postUsersFill
-    :<|> createCertificate
     :<|> getContracts
     :<|> postContractsBatchStates
     :<|> getContractsData
@@ -70,14 +66,10 @@ bloc =
     :<|> postChainInfos
     :<|> getChainInfo
     :<|> postBlocTransactionParallel
-    :<|> postBlocTransactionRaw
     :<|> postBlocTransactionBody
     :<|> postBlocTransactionUnsigned
     :<|> postBlocTransaction
     :<|> postBlocTransactionParallelExternal
-
---serveBloc :: BlocEnv -> Server BlocAPI
---serveBloc env = hoistServer blocApi (enterBloc env) bloc
 
 blocSwagger :: Swagger
 blocSwagger =

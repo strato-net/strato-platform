@@ -73,7 +73,9 @@ import Data.Set (isSubsetOf)
 import Data.Source.Map
 import Data.Text (Text)
 import qualified Data.Text as Text
+import Data.Text.Encoding (encodeUtf8)
 import Data.Traversable
+import Handlers.AccountInfo
 import SQLM
 import SolidVM.Model.CodeCollection.Contract
 import SolidVM.Model.CodeCollection.Function
@@ -261,7 +263,7 @@ nth n
   | otherwise = Text.pack (show $ n + 1) <> "th"
 
 contractResult ::
-  MonadIO m =>
+  HasSQL m =>
   Integer ->
   Keccak256 ->
   TransactionResult ->
@@ -289,8 +291,27 @@ contractResult i txHash txResult@TransactionResult {..} mmd = do
           Nothing -> lift . throwIO . UserError $ "Transaction succeeded, but contract was neither created, nor destroyed"
       stratoMsg -> lift . throwIO . UserError $ Text.pack stratoMsg
     Just acct -> do
-      let details = UploadContractDetails {contractName = name, contractAccount = Just $ acct}
+      -- Checks if account exists in the address state ref table before returning results
+      details <- lift $ go acct name 0
       return $ BlocTransactionResult Success txHash (Just txResult) (Just $ Upload details)
+  where
+    go :: HasSQL m => Account -> Text -> Integer -> m UploadContractDetails
+    go acct name num = do
+      if num >= 100 
+        then throwIO . UserError $ "Transaction succeeded, but contract was neither created, nor destroyed"
+        else do
+          void . liftIO $ threadDelay 100000
+          addressRefs <- 
+            getAccount' 
+              accountsFilterParams
+                { _qaAddress = Just $ _accountAddress acct,
+                  _qaContractName = Just name,
+                  _qaIgnoreChain = Just True
+                }
+          case addressRefs of
+            [] -> go acct name (num + 1)
+            _ -> return $ UploadContractDetails {contractName = name, contractAccount = Just $ acct}
+
 
 functionResult ::
   ( A.Selectable Account AddressState m,
@@ -382,6 +403,7 @@ expressionToValue :: Expression -> Maybe Value
 expressionToValue (NumberLiteral _ n _) = Just $ SimpleValue $ ValueInt False Nothing n
 expressionToValue (BoolLiteral _ n) = Just $ SimpleValue $ ValueBool n
 expressionToValue (StringLiteral _ n) = Just $ SimpleValue $ ValueString $ Text.pack n
+expressionToValue (DecimalLiteral _ n) = Just $ SimpleValue $ ValueDecimal (encodeUtf8 $ Text.pack $ show $ unwrapDecimal n)
 expressionToValue (ArrayExpression _ n) = ValueArrayFixed (fromIntegral $ length n) <$> traverse expressionToValue n
 expressionToValue _ = Nothing
 
@@ -424,6 +446,7 @@ getArgValues argsMap argNamesTypes = do
               Xabi.Int (Just True) b -> Right . SimpleType . TypeInt True $ fmap toInteger b
               Xabi.Int _ b -> Right . SimpleType . TypeInt False $ fmap toInteger b
               Xabi.String _ -> Right . SimpleType $ TypeString
+              Xabi.Decimal -> Right . SimpleType $ TypeDecimal
               Xabi.Bytes _ b -> Right . SimpleType . TypeBytes $ fmap toInteger b
               Xabi.Bool -> Right . SimpleType $ TypeBool
               Xabi.Address -> Right . SimpleType $ TypeAddress
@@ -435,6 +458,7 @@ getArgValues argsMap argNamesTypes = do
                       Xabi.Int (Just True) b -> Right . SimpleType . TypeInt True $ fmap toInteger b
                       Xabi.Int _ b -> Right . SimpleType . TypeInt False $ fmap toInteger b
                       Xabi.String _ -> Right . SimpleType $ TypeString
+                      Xabi.Decimal -> Right . SimpleType $ TypeDecimal
                       Xabi.Bytes _ b -> Right . SimpleType . TypeBytes $ fmap toInteger b
                       Xabi.Bool -> Right . SimpleType $ TypeBool
                       Xabi.Address -> Right . SimpleType $ TypeAddress

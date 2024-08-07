@@ -15,7 +15,6 @@ import Blockchain.Sequencer
 import Blockchain.Sequencer.CablePackage
 import Blockchain.Sequencer.Gregor
 import Blockchain.Sequencer.Monad
-import Blockchain.Strato.Model.ChainMember
 import Blockchain.Strato.Model.Options (flags_network)
 import Control.Concurrent (threadDelay)
 import Control.Concurrent.Async as Async
@@ -23,10 +22,7 @@ import Control.Concurrent.STM
 import Control.Concurrent.STM.TMChan
 import Control.Monad
 import Control.Monad.Composable.Kafka
-import qualified Data.Aeson as Ae
-import Data.ByteString.Base64
 import qualified Data.ByteString.Char8 as C8
-import Data.Either.Extra
 import Data.String
 import Flags
 import HFlags
@@ -35,6 +31,8 @@ import Network.Wai.Handler.Warp
 import Network.Wai.Middleware.Prometheus
 import Safe
 import Servant.Client
+import qualified Strato.Strato23.API as VC
+import qualified Strato.Strato23.Client as VC
 
 waitOnVault :: (Show a) => IO (Either a b) -> IO b
 waitOnVault action = do
@@ -58,7 +56,6 @@ main = do
   putStrLn $ "strato-sequencer validators: " ++ show validators
   putStrLn $ "strato-sequencer vault-proxy URL: " ++ show flags_vaultWrapperUrl
   putStrLn $ "strato-sequencer validatorBehavior: " ++ show flags_validatorBehavior
-  putStrLn $ "strato-sequencer certInfo: " ++ show flags_certInfo
 
   pkg <- atomically newCablePackage
   let kafkaClientId' = KString $ C8.pack flags_kafkaclientid
@@ -79,21 +76,16 @@ main = do
   vaultWrapperUrl <- parseBaseUrl flags_vaultWrapperUrl
   let clientEnv = mkClientEnv mgr vaultWrapperUrl
 
-  --  Allow these flags to accept base64-encoded JSONs optionally
-  let b64decode inp = if isBase64 inp then (fromRight inp . decodeBase64) inp else inp
-      eSelf = (Ae.eitherDecodeStrict . b64decode) (C8.pack flags_certInfo) :: Either String ChainMemberParsedSet
-      !self = fromRight (error "invalid self cert info") eSelf
+  selfAddress <- do
+    addrAndKey <- waitOnVault $ runClientM (VC.getKey Nothing Nothing) clientEnv
+    return $ VC.unAddress addrAndKey
+
+  putStrLn $ "strato-sequencer nodeAddress: " ++ show selfAddress
 
   mCtx <-
     if not flags_blockstanbul
       then return Nothing
       else do
-        unless (self `elem` validators) . putStrLn $
-          "WARNING: NODEKEY does not correspond to a validator identity.\
-          \ This probably means that you are connecting to an existing network,\
-          \ and you are not one of the original validators of that network.\
-          \ If this is the case, please disregard this message. Otherwise,\
-          \ you may experience difficulty operating this node."
         unless (flags_blockstanbul_block_period_ms >= 0) . ioError . userError $
           "--blockstanbul_block_period_ms must be nonnegative"
         unless (flags_blockstanbul_round_period_s > 0) . ioError . userError $
@@ -104,7 +96,7 @@ main = do
         ckpt <- runGregorM gregorCfg $ initializeCheckpoint validators
         putStrLn $ "Checkpoint: " ++ show ckpt
 
-        return $ Just $ newContext ckpt self flags_validatorBehavior
+        return $ Just $ newContext flags_network ckpt (Just selfAddress) flags_validatorBehavior Nothing
 
   cht <- atomically newTMChan
 
@@ -124,6 +116,6 @@ main = do
             kafkaClientId = kafkaClientId'
           }
   race_ (runTheGregor gregorCfg)
-    . race_ (runLoggingT (runSequencerM seqCfg mCtx sequencer))
-    . run flags_blockstanbul_port
+    . race_ (runLoggingT (runSequencerM seqCfg mCtx (sequencer validators)))
+    . run 8050
     $ metricsApp

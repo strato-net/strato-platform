@@ -10,31 +10,23 @@ module Blockchain.Data.ValidatorRef where
 
 import Blockchain.DB.SQLDB
 import Blockchain.Data.DataDefs
-import Blockchain.Strato.Model.ChainMember
+import Blockchain.Strato.Model.Validator
 import Control.Monad (forM_)
 import qualified Database.Esqueleto.Legacy as E
 
 addRemoveValidator ::
   HasSQLDB m =>
-  ([ChainMemberParsedSet], [ChainMemberParsedSet]) ->
+  ([Validator], [Validator]) ->
   m ()
 addRemoveValidator (remove, add) = do
-  forM_ add $ \x -> do
-    let (o, u, c) = components x
-    sqlQuery . E.insert $ ValidatorRef o u c
-  forM_ remove $ \x -> do
-    let (o, u, c) = components x
+  forM_ add $ \(Validator c) -> do
+    sqlQuery . E.insert $ ValidatorRef "" "" c
+  forM_ remove $ \(Validator c) -> do
     sqlQuery $
       E.delete $
         E.from $ \vRef ->
           E.where_
-            ( (vRef E.^. ValidatorRefOrg E.==. E.val o)
-                E.&&. (vRef E.^. ValidatorRefOrgUnit E.==. E.val u)
+            ( (vRef E.^. ValidatorRefOrg E.==. E.val "")
+                E.&&. (vRef E.^. ValidatorRefOrgUnit E.==. E.val "")
                 E.&&. (vRef E.^. ValidatorRefCommonName E.==. E.val c)
             )
-  where
-    components = \case
-      Org o True -> (o, "", "")
-      OrgUnit o u True -> (o, u, "")
-      CommonName o u c True -> (o, u, c)
-      _ -> ("", "", "")

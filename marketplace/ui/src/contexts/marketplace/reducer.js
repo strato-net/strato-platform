@@ -174,11 +174,6 @@ const reducer = (state, action) => {
         error: action.error,
         isAddingShippingAddress: false,
       };
-    case actionDescriptors.fetchUserAddress:
-      return {
-        ...state,
-        isLoadingUserAddress: true,
-      };
     case actionDescriptors.fetchUserAddressSuccessful:
       return {
         ...state,
@@ -223,6 +218,39 @@ const reducer = (state, action) => {
       return {
         ...state,
         isFetchingStrats: false,
+      };
+    case actionDescriptors.fetchStratsTransactionHistory:
+      return {
+        ...state,
+        isFetchingStratsTransactionHistory: true,
+      };
+    case actionDescriptors.fetchStratsTransactionHistorySuccessful:
+      return {
+        ...state,
+        isFetchingStratsTransactionHistory: false,
+        stratsTransactionHistory: action.payload,
+      };
+    case actionDescriptors.fetchStratsTransactionHistoryFailed:
+      return {
+        ...state,
+        isFetchingStratsTransactionHistory: false,
+      };
+    case actionDescriptors.transferStrats:
+      return {
+        ...state,
+        isTransferringStrats: true,
+      };
+    case actionDescriptors.transferStratsSuccessful:
+      return {
+        ...state,
+        isTransferringStrats: false,
+        strats: action.payload,
+      };
+    case actionDescriptors.transferStratsFailed:
+      return {
+        ...state,
+        isTransferringStrats: false,
+        error: action.error
       };
     default:
       throw new Error(`Unhandled action: '${action.type}'`);
