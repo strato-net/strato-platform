@@ -73,6 +73,7 @@ import qualified Control.Monad.Change.Modify as Mod
 import Control.Monad.Extra (findM, fromMaybeM, unlessM)
 import Control.Monad.IO.Class
 import Control.Monad.Trans.Maybe
+import Control.Monad.Trans (lift)
 import qualified Crypto.Hash.RIPEMD160 as RIPEMD160
 import qualified Crypto.Hash.SHA256 as SHA256
 import Data.Bits
@@ -423,6 +424,8 @@ call _ _ _ isRCC _ blockData _ _ codeAddress sender' _ _ _ availableGas origin' 
     solidVMBreakpoint emptySourceAnnotation -- just to force a resume at the end of the transaction
     finalAct <- Mod.get (Mod.Proxy @Action)
     finalEvs <- Mod.get (Mod.Proxy @(Q.Seq Event))
+
+    lift $ putContextValidators (toList finalEvs)
 
     return $
       ExecResults
@@ -1304,6 +1307,7 @@ runStatement st@(CC.EmitStatement eventName exptups pos) = do
 
           bHash <- blockHeaderHash . Env.blockHeader <$> getEnv
           addEvent $ Event bHash ctrName parentName (labelToString $ CC._contractName curCnct) account eventName pairs
+          -- ? putContextValidators Event
           return Nothing
 runStatement (CC.UncheckedStatement code pos) = do
   solidVMBreakpoint pos

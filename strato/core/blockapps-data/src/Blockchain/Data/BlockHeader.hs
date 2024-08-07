@@ -187,7 +187,7 @@ instance Format BlockHeader where
             ++ "newValidators: " ++ show newValidators ++ "\n"
             ++ "removedValidators: " ++ show removedValidators ++ "\n"
             ++ "newCerts: " ++ show newCerts ++ "\n"
-            ++ "revokedCerts: instance blockheaderlike" ++ show revokedCerts ++ "\n"
+            ++ "revokedCerts: " ++ show revokedCerts ++ "\n"
             ++ "signatures: " ++ show signatures ++ "\n"
         )
 

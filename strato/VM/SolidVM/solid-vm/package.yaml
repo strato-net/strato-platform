@@ -31,6 +31,7 @@ library:
   - labeled-error
   - lens
   - merkle-patricia-db
+  - mtl
   - monad-alter
   - nibblestring
   - ordered-containers

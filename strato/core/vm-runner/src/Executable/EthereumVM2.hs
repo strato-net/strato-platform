@@ -105,6 +105,7 @@ handleVmEvents = awaitForever $ \InBatch {..} -> do
   yieldMany $ outputPrivateTransactions privateTxs
   processBlocksAndNewChains blocksAndNewChains
 
+
   mPreDec <- lift $ do
     case preprepareBlock of
       Nothing -> pure Nothing
@@ -119,13 +120,13 @@ handleVmEvents = awaitForever $ \InBatch {..} -> do
           Nothing -> pure Nothing
           Just summ -> do
             let bHeader' = case bHeader of
-                            BlockHeader {} -> bHeader { -- immitate parent block as closely as possible (most important is the stateroot)
+                            BlockHeader {} -> bHeader { -- imitate parent block as closely as possible (most important is the stateroot)
                               parentHash = bSumParentHash summ,
                               stateRoot = bSumStateRoot summ,
                               number = bSumNumber summ,
                               gasLimit = bSumGasLimit summ
                             }
-                            BlockHeaderV2 {} -> bHeader { -- immitate parent block as closely as possible (most important is the stateroot)
+                            BlockHeaderV2 {} -> bHeader { 
                               parentHash = bSumParentHash summ,
                               stateRoot = bSumStateRoot summ,
                               number = bSumNumber summ
@@ -185,9 +186,17 @@ handleVmEvents = awaitForever $ \InBatch {..} -> do
       then do
         $logInfoS "evm/loop/newBlock" "calling Bagger.makeNewBlock"
         newBlock <- Bagger.makeNewBlock mineTransactions
-        pure $ Just newBlock
+        pure $ Just newBlock 
       else pure Nothing
-  traverse_ (yield . OutBlock) mNewBlock
+    
+  case mNewBlock of 
+    Just b -> do 
+        ValidatorDelta !added !removed <- lift getContextValidators 
+        let bh = obBlockData b 
+            bh' = bh { newValidators = S.toList added, removedValidators = S.toList removed }
+        yield . OutBlock $ b { obBlockData = bh' }
+        flushContextValidators
+    Nothing -> pure ()
 
 groupEithers :: [Either a b] -> [Either [a] [b]]
 groupEithers = foldr f []

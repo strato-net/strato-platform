@@ -22,6 +22,7 @@ module Blockchain.VMContext
     ContextBestBlockInfo (..),
     ContextM,
     GasCap (..),
+    ValidatorDelta (..),
     stateDB,
     hashDB,
     codeDB,
@@ -43,6 +44,7 @@ module Blockchain.VMContext
     runningTests,
     txRunResultsCache,
     debugSettings,
+    validatorDelta,
     dbs,
     state,
     stateDiffQueue,
@@ -60,6 +62,9 @@ module Blockchain.VMContext
     purgeStorageMap,
     getContextBestBlockInfo,
     putContextBestBlockInfo,
+    getContextValidators,
+    putContextValidators,
+    flushContextValidators,
     checkIfRunningTests,
     lookupX509AddrFromCBHash,
     knownFailedTxs,
@@ -93,8 +98,10 @@ import Blockchain.Strato.Model.Account
 import Blockchain.Strato.Model.Address
 import Blockchain.Strato.Model.CodePtr ()
 import Blockchain.Strato.Model.ExtendedWord
+import Blockchain.Strato.Model.Event
 import Blockchain.Strato.Model.Gas
 import Blockchain.Strato.Model.Keccak256
+import Blockchain.Strato.Model.Validator
 import qualified Blockchain.Strato.RedisBlockDB as RBDB
 import Blockchain.Strato.StateDiff (StateDiff)
 -- import Blockchain.Stream.VMEvent
@@ -113,7 +120,9 @@ import Control.Monad.Trans.Resource
 import Data.Binary
 import qualified Data.ByteString as B
 import Data.Default
+import Data.List (find)
 import qualified Data.Map as M
+import Data.Maybe (fromJust)
 import qualified Data.NibbleString as N
 import qualified Data.Set as S
 import qualified Data.Text as T
@@ -251,6 +260,12 @@ instance Default MemDBs where
         _currentBlock = Nothing
       }
 
+data ValidatorDelta = ValidatorDelta 
+    { _addedValidators :: S.Set Validator,
+      _removedValidators :: S.Set Validator
+    }
+    deriving (Generic, NFData, Show)
+
 data ContextState = ContextState
   { _memDBs :: !MemDBs,
     _baggerState :: !BaggerState,
@@ -260,7 +275,8 @@ data ContextState = ContextState
     _blockRequested :: !Bool,
     _runningTests :: !Bool,
     _txRunResultsCache :: TRC.Cache,
-    _debugSettings :: !(Maybe DebugSettings)
+    _debugSettings :: !(Maybe DebugSettings),
+    _validatorDelta :: !ValidatorDelta
   }
   deriving (Generic, NFData)
 
@@ -277,7 +293,8 @@ instance Default ContextState where
         _blockRequested = False,
         _runningTests = False,
         _txRunResultsCache = error "Default ContextState: accessing uninitialized txRunResultsCache",
-        _debugSettings = Nothing
+        _debugSettings = Nothing,
+        _validatorDelta = ValidatorDelta S.empty S.empty
       }
 
 data QueueEvent
@@ -432,7 +449,8 @@ runTestContextM f = withSystemTempDirectory "test_evm_context" $ \tmpdir ->
               _blockRequested = False,
               _runningTests = True,
               _txRunResultsCache = cache,
-              _debugSettings = Nothing
+              _debugSettings = Nothing,
+              _validatorDelta = ValidatorDelta S.empty S.empty
             }
       que <- newTQueueIO
       let ctx =
@@ -583,3 +601,21 @@ putContextBestBlockInfo new = Mod.modifyStatefully_ Mod.Proxy $ assign bestBlock
 checkIfRunningTests :: (Functor m, Mod.Accessible ContextState m) => m Bool
 checkIfRunningTests = _runningTests <$> Mod.access Mod.Proxy
 
+getContextValidators :: (Functor m, Mod.Accessible ContextState m) => m ValidatorDelta
+getContextValidators = _validatorDelta <$> Mod.access Mod.Proxy
+
+putContextValidators :: (MonadLogger m, Mod.Accessible ContextState m, Mod.Modifiable ContextState m) => [Event] -> m ()
+putContextValidators events = do
+    ValidatorDelta added removed <- getContextValidators
+    let validatorsAdded      = [extractCommonName e | e <- events, evContractAccount e == Account 0x100 Nothing && evName e == "ValidatorAdded"]
+        validatorsRemoved    = [extractCommonName e | e <- events, evContractAccount e == Account 0x100 Nothing && evName e == "ValidatorRemoved"]
+        extractCommonName    = Validator . T.pack . snd . fromJust . find (\(x, _) -> x == "commonName") . evArgs
+        vd = ValidatorDelta {
+                _addedValidators = S.union added (S.fromList validatorsAdded),
+                _removedValidators = S.union removed (S.fromList validatorsRemoved)
+            }
+
+    Mod.modifyStatefully_ (Mod.Proxy @ContextState) $ validatorDelta .= vd
+
+flushContextValidators :: (Mod.Modifiable ContextState m) => m ()
+flushContextValidators = Mod.modifyStatefully_ (Mod.Proxy @ContextState) $ validatorDelta .= ValidatorDelta S.empty S.empty
