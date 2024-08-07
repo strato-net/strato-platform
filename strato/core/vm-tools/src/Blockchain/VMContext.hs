@@ -261,7 +261,7 @@ instance Default MemDBs where
       }
 
 data ValidatorDelta = ValidatorDelta 
-    { _addedValidators :: S.Set Validator,
+    { _newValidators     :: S.Set Validator,
       _removedValidators :: S.Set Validator
     }
     deriving (Generic, NFData, Show)
@@ -604,18 +604,17 @@ checkIfRunningTests = _runningTests <$> Mod.access Mod.Proxy
 getContextValidators :: (Functor m, Mod.Accessible ContextState m) => m ValidatorDelta
 getContextValidators = _validatorDelta <$> Mod.access Mod.Proxy
 
+-- | Takes a list of events and filters out the 'ValidatorAdded' and 'ValidatorRemoved'
+--   emitted by MercataGovernance at address 0x100
 putContextValidators :: (MonadLogger m, Mod.Accessible ContextState m, Mod.Modifiable ContextState m) => [Event] -> m ()
 putContextValidators events = do
-    ValidatorDelta added removed <- getContextValidators
-    let validatorsAdded      = [extractCommonName e | e <- events, evContractAccount e == Account 0x100 Nothing && evName e == "ValidatorAdded"]
-        validatorsRemoved    = [extractCommonName e | e <- events, evContractAccount e == Account 0x100 Nothing && evName e == "ValidatorRemoved"]
-        extractCommonName    = Validator . T.pack . snd . fromJust . find (\(x, _) -> x == "commonName") . evArgs
-        vd = ValidatorDelta {
-                _addedValidators = S.union added (S.fromList validatorsAdded),
-                _removedValidators = S.union removed (S.fromList validatorsRemoved)
-            }
+    ValidatorDelta new' removed' <- getContextValidators
+    let extractCommonName = Validator . T.pack . snd . fromJust . find (\(x, _) -> x == "commonName") . evArgs
+        new     = new' `S.union` S.fromList [extractCommonName e | e <- events, evContractAccount e == Account 0x100 Nothing && evName e == "ValidatorAdded"]
+        removed = removed' `S.union` S.fromList [extractCommonName e | e <- events, evContractAccount e == Account 0x100 Nothing && evName e == "ValidatorRemoved"]
+        delta   = ValidatorDelta new removed
 
-    Mod.modifyStatefully_ (Mod.Proxy @ContextState) $ validatorDelta .= vd
+    Mod.modifyStatefully_ (Mod.Proxy @ContextState) $ validatorDelta .= delta
 
 flushContextValidators :: (Mod.Modifiable ContextState m) => m ()
 flushContextValidators = Mod.modifyStatefully_ (Mod.Proxy @ContextState) $ validatorDelta .= ValidatorDelta S.empty S.empty

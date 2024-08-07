@@ -57,11 +57,13 @@ import Data.Maybe
 import Data.Proxy
 import qualified Data.Set as S
 import qualified Data.Text as T
+import Data.Tuple.Extra ((&&&))
 import Data.Time.Clock
 import Prometheus as P
 import qualified Text.Colors as CL
 import Text.Format
 import Text.Printf
+import Blockchain.Data.Block (Block(blockBlockData))
 
 instance MonadMonitor m => MonadMonitor (ConduitT i o m) where
   doIO = lift . doIO
@@ -283,7 +285,13 @@ blockstanbulSend' msg = do
         [] -> return []
         -- TODO(tim): Block insertion can potentially fail, so there
         -- should be feedback here
-        [b] -> sendAllMessages [CommitResult . Right . blockHash $ b]
+        [b] -> do 
+            -- Now that the block is being committed,
+            -- we can update the Blockstanbul validator context
+            let new'           = map (\v -> ValidatorChange v True)
+                removed'       = map (\v -> ValidatorChange v False)
+                (new, removed) = (new' . newValidators &&& removed' . removedValidators) (blockBlockData b)
+            sendAllMessages $ [CommitResult . Right . blockHash $ b] ++ new ++ removed
         bs -> error $ "can send at most 1 block at a time: " ++ show bs
   for_ resp $ \case
     ResetTimer rn -> createNewTimer rn

@@ -120,7 +120,8 @@ handleVmEvents = awaitForever $ \InBatch {..} -> do
           Nothing -> pure Nothing
           Just summ -> do
             let bHeader' = case bHeader of
-                            BlockHeader {} -> bHeader { -- imitate parent block as closely as possible (most important is the stateroot)
+                            -- imitate parent block as closely as possible (most important is the stateroot)
+                            BlockHeader {} -> bHeader { 
                               parentHash = bSumParentHash summ,
                               stateRoot = bSumStateRoot summ,
                               number = bSumNumber summ,
@@ -191,9 +192,9 @@ handleVmEvents = awaitForever $ \InBatch {..} -> do
     
   case mNewBlock of 
     Just b -> do 
-        ValidatorDelta !added !removed <- lift getContextValidators 
+        ValidatorDelta !new !removed <- lift getContextValidators 
         let bh = obBlockData b 
-            bh' = bh { newValidators = S.toList added, removedValidators = S.toList removed }
+            bh' = bh { newValidators = S.toList new, removedValidators = S.toList removed }
         yield . OutBlock $ b { obBlockData = bh' }
         flushContextValidators
     Nothing -> pure ()
