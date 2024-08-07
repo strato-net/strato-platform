@@ -7,6 +7,8 @@ HEALTHCHECK --interval=3s --timeout=2s --start-period=300s \
   CMD lsof -i :8019 || \
   exit 1
 
+ENV NODE_ENV=production
+
 COPY . /usr/src/notification-server
 
 WORKDIR /usr/src/notification-server
