@@ -4,27 +4,23 @@ import {
   Spin,
   Modal,
   Select,
-  Button
+  Col,
 } from "antd";
 import {
   useMarketplaceState,
   useMarketplaceDispatch,
 } from "../../contexts/marketplace";
+import { useMemo } from "react";
 import { useOrderState, useOrderDispatch } from "../../contexts/order";
 import { useAuthenticateState } from "../../contexts/authentication";
 import { actions } from "../../contexts/marketplace/actions";
 import { actions as orderActions } from "../../contexts/order/actions";
 import { useState, useEffect } from "react";
-import { actions as inventoryAction } from "../../contexts/inventory/actions";
-import {
-  useInventoryDispatch,
-  useInventoryState,
-} from "../../contexts/inventory";
 import DataTableComponent from "../DataTableComponent";
 import "./index.css";
-import { HTTP_METHODS, PAYMENT_LIST } from "../../helpers/constants";
 import TagManager from "react-gtm-module";
 import { setCookie } from "../../helpers/cookie";
+import { generateHtmlContent } from "../../helpers/emailTemplate";
 
 const { Option } = Select;
 
@@ -36,12 +32,14 @@ const ConfirmOrder = ({ paymentProviders = [], data, columns }) => {
   const userOrganization = user?.organization;
   const { isCreateOrderSubmitting, message, success, isCreatePaymentSubmitting } = useOrderState();
   const [tax, setTax] = useState(0);
+  const [subTotal, setSubTotal] = useState(0);
   const [total, setTotal] = useState(0);
-  const inventoryDispatch = useInventoryDispatch();
   const { success: marketplaceSuccess, message: marketplaceMessage } = useMarketplaceState();
   const [modal, contextHolderForModal] = Modal.useModal();
   const [cartData, setCartData] = useState(data);
   const [selectedProvider, setSelectedProvider] = useState('');
+
+  const activePaymentProviders = (paymentProviders[0] !== undefined) ? paymentProviders.filter(paymentProvider => paymentProvider.isActive) : [];
 
   useEffect(() => {
     setCartData(data);
@@ -71,15 +69,14 @@ const ConfirmOrder = ({ paymentProviders = [], data, columns }) => {
 
   useEffect(() => {
     let t = 0;
-    cartData.forEach((item) => {
-      t += item.tax;
-    });
-    setTax(t);
     let sum = 0;
     cartData.forEach((item) => {
+      t += item.tax;
       sum += item.amount;
     });
-    setTotal(sum);
+    setTax(t.toFixed(2));
+    setSubTotal(sum.toFixed(2));
+    setTotal((sum + t).toFixed(2));
   }, [marketplaceDispatch, cartData]);
 
   const openToastOrder = (placement, message) => {
@@ -100,6 +97,39 @@ const ConfirmOrder = ({ paymentProviders = [], data, columns }) => {
     }
   };
 
+// Generating Email Confirmation HTML
+  let htmlContents = [];
+  const generate_HTML_Content = async (username) => {
+    htmlContents = [];
+    
+    let customerFirstName = username;
+    
+    // Construct Email with order details
+    let concatenatedOrderString = "";
+    let orderTotal = 0; 
+    for (let i = 0; i < cartData.length; i++) {
+      let orderItem = cartData[i];
+      let itemName = decodeURIComponent(orderItem.item.name);
+      let itemPrice = parseFloat(orderItem.unitPrice).toFixed(2); 
+      let itemQty = orderItem.qty;
+      let itemTotal = (itemPrice * itemQty).toFixed(2); 
+  
+      concatenatedOrderString += `${itemName}:\n`; 
+      concatenatedOrderString += `$${itemTotal} (${itemTotal*100} STRATS)<br>`; 
+      concatenatedOrderString += `Qty: ${itemQty} &nbsp; $${itemPrice} each (${itemPrice*100} STRATS each)<br><br>`; 
+      orderTotal += parseFloat(itemTotal); 
+      if (i === cartData.length - 1) {
+        concatenatedOrderString += `<hr style="border-top: 1px dotted #0A1B71; min-width: 80%; max-width: 80%; margin-left: 15px;">`;
+        concatenatedOrderString += `Sales Tax: $${parseFloat(tax).toFixed(2)} (${parseFloat(tax).toFixed(2) * 100} STRATS)<br>`;
+        concatenatedOrderString += `Shipping Fee: <i><strong>Free</strong></i><br><br>`;
+        concatenatedOrderString += `Order Total: $${orderTotal.toFixed(2)} (${orderTotal.toFixed(2)*100} STRATS)<br>`;
+      }
+    }
+    
+
+     htmlContents.push(generateHtmlContent(customerFirstName, concatenatedOrderString));
+  };
+
   const openToastMarketplace = (placement) => {
     if (marketplaceSuccess) {
       api.success({
@@ -118,6 +148,8 @@ const ConfirmOrder = ({ paymentProviders = [], data, columns }) => {
     }
   };
 
+
+
   const handlePaymentConfirm = async (paymentProvider) => {
     actions.addItemToConfirmOrder(marketplaceDispatch, cartData);
     let orderList = [];
@@ -130,15 +162,20 @@ const ConfirmOrder = ({ paymentProviders = [], data, columns }) => {
       });
     });
 
+    generate_HTML_Content(user.commonName)
+
     let body = {
       paymentProvider: { address: paymentProvider.address },
       buyerOrganization: userOrganization,
       orderList,
-      orderTotal: total + tax,
+      orderTotal: total,
       tax: tax,
       user: user.commonName,
       email: user.email,
+      htmlContents: htmlContents,
     };
+    
+
 
     window.LOQ.push(['ready', async LO => {
       // Track an event
@@ -150,12 +187,12 @@ const ConfirmOrder = ({ paymentProviders = [], data, columns }) => {
         event: 'pay_now_button',
       },
     });
-    let orderHashAndAssets = await orderActions.createPayment(orderDispatch, body);
-    if(!orderHashAndAssets){
+    let checkoutHashAndAssets = await orderActions.createPayment(orderDispatch, body);
+    if (!checkoutHashAndAssets) {
       setSelectedProvider('')
     }
-    if (orderHashAndAssets && orderHashAndAssets !== false) {
-      const [orderHash, assets] = orderHashAndAssets;
+    if (checkoutHashAndAssets && checkoutHashAndAssets !== false) {
+      const [checkoutHash, assets] = checkoutHashAndAssets;
       let serviceURL = paymentProvider.serviceURL || paymentProvider.data.serviceURL;
       let checkoutRoute = paymentProvider.checkoutRoute || paymentProvider.data.checkoutRoute;
       if (serviceURL
@@ -163,7 +200,7 @@ const ConfirmOrder = ({ paymentProviders = [], data, columns }) => {
             && checkoutRoute
             && checkoutRoute !== ''
          ) {
-        const url = `${serviceURL}${checkoutRoute}?orderHash=${orderHash}&redirectUrl=${window.location.protocol}//${window.location.host}/order/status`;
+        const url = `${serviceURL}${checkoutRoute}?email=${encodeURIComponent(user.email)}&checkoutHash=${checkoutHash}&redirectUrl=${window.location.protocol}//${window.location.host}/order/status`;
         window.location.replace(url);
       } else {
         window.location.replace(`/order/status?assets=${assets}`);
@@ -172,7 +209,7 @@ const ConfirmOrder = ({ paymentProviders = [], data, columns }) => {
   };
 
   const handleChange = async (value) => {
-    const provider = paymentProviders.find(provider => provider?.serviceName === value);
+    const provider = activePaymentProviders.find(provider => provider?.serviceName === value);
     setSelectedProvider(provider);
 
     if (hasChecked && !isAuthenticated && loginUrl !== undefined) {
@@ -186,7 +223,12 @@ const ConfirmOrder = ({ paymentProviders = [], data, columns }) => {
       });
       const checkQuantity = await orderActions.fetchSaleQuantity(orderDispatch, saleAddresses, quantities);
       if (checkQuantity === true) {
-        handlePaymentConfirm(provider);
+        if (provider.serviceName === "Stripe" && total < 0.50) {
+          openToastOrder("bottom", "The minimum order amount is $0.50. Please increase the item quantity to account for this.");
+          setSelectedProvider('');
+        } else {
+          await handlePaymentConfirm(provider);
+        }
       } else {
         let insufficientQuantityMessage = "";
         let outOfStockMessage = "";
@@ -243,7 +285,7 @@ const ConfirmOrder = ({ paymentProviders = [], data, columns }) => {
                 <div className="w-max flex flex-col gap-[10px]">
                   <Row className="justify-between items-center ">
                     <p className="text-base text-[#6A6A6A]">Sub Total:</p>
-                    <p className="text-base text-[#202020] md:ml-5 text-right">${total} <span className="ml-1">({total * 100} STRATS)</span></p>
+                    <p className="text-base text-[#202020] md:ml-5 text-right">${subTotal} <span className="ml-1">({(subTotal * 100).toFixed(0)} STRATS)</span></p>
                   </Row>
                   <Row className="justify-start items-center ">
                     <p className="text-base text-[#6A6A6A]">Tax:</p>
@@ -252,7 +294,7 @@ const ConfirmOrder = ({ paymentProviders = [], data, columns }) => {
                   <Row className="justify-between items-center">
                     <p className="text-base text-[#6A6A6A]">Total:</p>
                     <p id="totalPrice" className="text-base text-[#202020] md:ml-5 text-right">
-                      ${total + tax} <span className="ml-1">({(total + tax) * 100} STRATS)</span>
+                      ${total} <span className="ml-1">({(total * 100).toFixed(0)} STRATS)</span>
                     </p>
                   </Row>
                 </div>
@@ -264,11 +306,14 @@ const ConfirmOrder = ({ paymentProviders = [], data, columns }) => {
                     className="w-[250px] text-center selected-payment-option items-select"
                     onChange={handleChange}
                     placeholder="Select Payment Option"
+                    disabled={activePaymentProviders.length === 0}
                   >
-                    {paymentProviders && paymentProviders.map(provider => (
+                    {activePaymentProviders && activePaymentProviders.map(provider => (
                       provider && <Option className='payment-dropdown' key={provider?.serviceName} value={provider?.serviceName}>
-                        {provider?.checkoutText}
-                        <img src={provider?.imageURL} alt={provider?.serviceName} style={{ width: 20, height: 20, marginRight: 8 }} />
+                        <Row className="w-full">
+                        <Col span={22} className="text-left">Checkout with {provider?.serviceName}</Col>
+                        <Col span={2} className="flex justify-end"><img src={provider?.imageURL} alt={provider?.serviceName} style={{ width: 20, height: 20, marginRight: 2 }} /> </Col>
+                        </Row>
                       </Option>
                     ))}
                   </Select>

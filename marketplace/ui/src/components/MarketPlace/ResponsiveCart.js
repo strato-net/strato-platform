@@ -1,4 +1,4 @@
-import { Button, Row, Typography, InputNumber, Select, Spin } from "antd";
+import { Button, Row, Typography, InputNumber, Select, Spin, Col } from "antd";
 import { useState, useEffect } from "react";
 import { Images } from "../../images";
 import { useMarketplaceDispatch } from "../../contexts/marketplace";
@@ -7,6 +7,7 @@ import TagManager from "react-gtm-module";
 import { actions } from "../../contexts/marketplace/actions";
 import { actions as orderActions } from "../../contexts/order/actions";
 import { useOrderDispatch, useOrderState } from "../../contexts/order";
+import { generateHtmlContent } from "../../helpers/emailTemplate";
 
 const { Option } = Select;
 
@@ -20,9 +21,10 @@ const ResponsiveCart = ({
   removeCartList,
   openToastOrder
 }) => {
-  const [tax, setTax] = useState(0);
   const [selectedProvider, setSelectedProvider] = useState("");
   const marketplaceDispatch = useMarketplaceDispatch();
+  const [tax, setTax] = useState(0);
+  const [subTotal, setSubTotal] = useState(0);
   const [total, setTotal] = useState(0);
   const orderDispatch = useOrderDispatch();
   let { hasChecked, isAuthenticated, loginUrl, user } = useAuthenticateState();
@@ -37,15 +39,15 @@ const ResponsiveCart = ({
 
   useEffect(() => {
     let t = 0;
-    let s = 0;
-    let tot = 0;
-    cartData.forEach((element) => {
-      t += element.tax;
-      tot += element.amount;
+    let sum = 0;
+    cartData.forEach((item) => {
+      t += item.tax;
+      sum += item.amount;
     });
-    setTax(t);
-    setTotal(tot);
-  }, [cartData]);
+    setTax(t.toFixed(2));
+    setSubTotal(sum.toFixed(2));
+    setTotal((sum + t).toFixed(2));
+  }, [marketplaceDispatch, cartData]);
 
   const toggleFaq = (index) => {
     setFaqOpenState((prev) => {
@@ -53,6 +55,39 @@ const ResponsiveCart = ({
       newState[index] = !newState[index];
       return newState;
     });
+  };
+
+  // Generating Email Confirmation HTML
+  let htmlContents = [];
+  const generate_HTML_Content = async (username) => {
+    htmlContents = [];
+    
+    let customerFirstName = username;
+    
+    // Construct Email with order details
+    let concatenatedOrderString = "";
+    let orderTotal = 0; 
+    for (let i = 0; i < cartData.length; i++) {
+      let orderItem = cartData[i];
+      let itemName = decodeURIComponent(orderItem.item.name);
+      let itemPrice = parseFloat(orderItem.unitPrice).toFixed(2); 
+      let itemQty = orderItem.qty;
+      let itemTotal = (itemPrice * itemQty).toFixed(2); 
+  
+      concatenatedOrderString += `${itemName}:\n`; 
+      concatenatedOrderString += `$${itemTotal} <br>`; 
+      concatenatedOrderString += `Qty: ${itemQty} &nbsp; $${itemPrice} each (${itemPrice*100} STRATS)<br><br>`; 
+      orderTotal += parseFloat(itemTotal); 
+      if (i === cartData.length - 1) {
+        concatenatedOrderString += `<hr style="border-top: 1px dotted #0A1B71; min-width: 80%; max-width: 80%; margin-left: 15px;">`;
+        concatenatedOrderString += `Sales Tax: $${parseFloat(tax).toFixed(2)} <br>`;
+        concatenatedOrderString += `Shipping Fee: <i><strong>Free</strong></i><br><br>`;
+        concatenatedOrderString += `Order Total: $${orderTotal.toFixed(2)} <br>`;
+      }
+    }
+    
+
+     htmlContents.push(generateHtmlContent(customerFirstName, concatenatedOrderString));
   };
 
   const handlePaymentConfirm = async (paymentProvider) => {
@@ -66,15 +101,18 @@ const ResponsiveCart = ({
         unitPrice: item.unitPrice
       });
     });
+  
+    generate_HTML_Content(user.commonName)
 
     let body = {
       paymentProvider: { address: paymentProvider.address },
       buyerOrganization: userOrganization,
       orderList,
-      orderTotal: total + tax,
+      orderTotal: total,
       tax: tax,
       user: user.commonName,
       email: user.email,
+      htmlContents: htmlContents,
     };
 
     window.LOQ.push(['ready', async LO => {
@@ -87,13 +125,13 @@ const ResponsiveCart = ({
         event: 'pay_now_button',
       },
     });
-    let orderHashAndAssets = await orderActions.createPayment(orderDispatch, body);
-    if (orderHashAndAssets && orderHashAndAssets !== false) {
-      const [orderHash, assets] = orderHashAndAssets;
+    let checkoutHashAndAssets = await orderActions.createPayment(orderDispatch, body);
+    if (checkoutHashAndAssets && checkoutHashAndAssets !== false) {
+      const [checkoutHash, assets] = checkoutHashAndAssets;
       let serviceURL = paymentProvider.serviceURL || paymentProvider.data.serviceURL;
       let checkoutRoute = paymentProvider.checkoutRoute || paymentProvider.data.checkoutRoute;
       if (serviceURL && serviceURL !== '' && checkoutRoute && checkoutRoute !== '') {
-        const url = `${serviceURL}${checkoutRoute}?orderHash=${orderHash}&redirectUrl=${window.location.protocol}//${window.location.host}/order/status`;
+        const url = `${serviceURL}${checkoutRoute}?email=${encodeURIComponent(user.email)}&checkoutHash=${checkoutHash}&redirectUrl=${window.location.protocol}//${window.location.host}/order/status`;
         window.location.replace(url);
       } else {
         window.location.replace(`/order/status?assets=${assets}`);
@@ -116,7 +154,7 @@ const ResponsiveCart = ({
       });
       const checkQuantity = await orderActions.fetchSaleQuantity(orderDispatch, saleAddresses, quantities);
       if (checkQuantity === true) {
-        handlePaymentConfirm(provider);
+        await handlePaymentConfirm(provider);
         setSelectedProvider("");
       } else {
         let insufficientQuantityMessage = "";
@@ -181,7 +219,7 @@ const ResponsiveCart = ({
               </div>
 
               <div className="flex justify-between ml-[20%] items-baseline">
-                <Typography className="font-semibold text-[#202020] text-sm">{`$${element?.unitPrice}`}</Typography>
+                <Typography className="font-semibold text-[#202020] text-sm">{`$${(element?.unitPrice).toFixed(2)}`}</Typography>
                 <div>
                   <div className="flex items-center justify-center mt-2">
                     <div
@@ -245,11 +283,11 @@ const ResponsiveCart = ({
                     </div>
                     <div className="flex justify-between">
                       <Typography className="text-sm text-[#202020] font-medium">Unit Price($):</Typography>
-                      <Typography className="text-sm text-[#202020] font-semibold">{`$${element?.unitPrice}`}</Typography>
+                      <Typography className="text-sm text-[#202020] font-semibold">{`$${(element?.unitPrice).toFixed(2)}`}</Typography>
                     </div>
                     <div className="flex justify-between">
                       <Typography className="text-sm text-[#202020] font-medium">Tax($):</Typography>
-                      <Typography className="text-sm text-[#202020] font-semibold">{'$' + element?.tax}</Typography>
+                      <Typography className="text-sm text-[#202020] font-semibold">{'$' + (element?.tax).toFixed(2)}</Typography>
                     </div>
                   </div>
                 </div>
@@ -260,7 +298,7 @@ const ResponsiveCart = ({
                   Amount($):
                 </Typography>
                 <Typography className="text-sm font-semibold text-[#202020]">
-                  {'$' + element?.amount}
+                  {'$' + (element?.amount).toFixed(2)}
                 </Typography>
               </div>
             </div>
@@ -272,7 +310,7 @@ const ResponsiveCart = ({
         <div className="flex flex-col gap-3">
           <div className="flex justify-between">
             <p className="text-sm font-medium">Sub Total:</p>
-            <p className="text-sm text-right font-semibold">${total} <span className="ml-1">({total * 100} STRATS)</span></p>
+            <p className="text-sm text-right font-semibold">${subTotal} <span className="ml-1">({(subTotal * 100).toFixed(0)} STRATS)</span></p>
           </div>
           <div className="flex justify-between">
             <p className="text-sm font-medium">Tax:</p>
@@ -282,7 +320,7 @@ const ResponsiveCart = ({
           <div className="flex justify-between">
             <p className="text-sm font-medium">Total:</p>
             <p className="text-sm font-semibold text-right">
-              ${total + tax} <span className="ml-1">({(total + tax) * 100} STRATS)</span>
+              ${total} <span className="ml-1">({(total * 100).toFixed(0)} STRATS)</span>
             </p>
           </div>
         </div>
@@ -302,8 +340,10 @@ const ResponsiveCart = ({
               >
                 {paymentProviders && paymentProviders.map(provider => (
                   provider && <Option className='payment-dropdown' key={provider?.serviceName} value={provider?.serviceName}>
-                    {provider?.checkoutText}
-                    <img src={provider?.imageURL} alt={provider?.serviceName} style={{ width: 20, height: 20, marginRight: 8 }} />
+                    <Row className="w-full">
+                        <Col span={22} className="text-left">Checkout with {provider?.serviceName}</Col>
+                        <Col span={2} className="flex justify-end"><img src={provider?.imageURL} alt={provider?.serviceName} style={{ width: 20, height: 20, marginRight: 2 }} /> </Col>
+                    </Row>
                   </Option>
                 ))}
               </Select>

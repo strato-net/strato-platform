@@ -265,7 +265,7 @@ const InventoryCard = ({ inventory, category, debouncedSearchTerm, id, allSubcat
             <p className="text-[#202020] font-semibold">
               {inventory?.price ? (
                 <>
-                  ${inventory?.price} <span className="text-xs">({inventory?.price * STRATS_CONVERSION} STRATS)</span>
+                  ${inventory?.price} <span className="text-xs">({(inventory?.price * STRATS_CONVERSION).toFixed(0)} STRATS)</span>
                 </>
               ) : (
                 "N/A"
