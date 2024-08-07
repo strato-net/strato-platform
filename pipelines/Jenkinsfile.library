@@ -1391,8 +1391,6 @@ def spinUpPaymentServer() {
         OAUTH_DISCOVERY_URL=https://keycloak.blockapps.net/auth/realms/strato-devel/.well-known/openid-configuration \\
         OAUTH_CLIENT_ID="${KEYCLOAK_STRATODEVEL_DEV_ID}" \\
         OAUTH_CLIENT_SECRET="${KEYCLOAK_STRATODEVEL_DEV_SECRET}" \\
-        STRIPE_CONTRACT_ADDRESS="358af3a0499239c00aad8eaa8e40cdd7f74dc293" \\
-        METAMASK_CONTRACT_ADDRESS="358af3a0499239c00aad8eaa8e40cdd7f74dc293" \\
         STRATO_HOST="http://172.17.0.1" \\
         STRIPE_SECRET_KEY='${STRIPE_SECRET_KEY_TESTNET2}' \\
         ssl=true \\
@@ -1403,6 +1401,7 @@ def spinUpPaymentServer() {
         POSTGRES_DBNAME=payments_dev \\
         TABLE_PREFIX="Test-Mercata-" \\
         SKIP_CONTRACT_VALIDATION="true" \\
+        SKIP_DEPLOYMENT="true" \\
         ./payment-server
     """
   }

@@ -14,14 +14,14 @@ contract StratPaymentService is PaymentService {
         decimal _stratsPerDollar,
         string _imageURL,
         decimal _primarySaleFeePercentage,
-        decimal _secondaySaleFeePercentage,
+        decimal _secondarySaleFeePercentage,
         address _feeRecipient
     ) PaymentService(
         "STRATS",
         _imageURL,
         "Checkout with STRATS",
         _primarySaleFeePercentage,
-        _secondaySaleFeePercentage
+        _secondarySaleFeePercentage
     ) public {
         stratAddress = _stratAddress;
         stratsPerDollar = _stratsPerDollar;
