@@ -12,7 +12,6 @@ async function getRewardAmount(event) {
 }
 
 async function handleOrderRewards(event, token) {
-  console.log("Handling order event:", event);
 
   const purchaser = event.eventEvent.eventArgs.find(
     (arg) => arg[0] === "purchaser"
@@ -23,18 +22,9 @@ async function handleOrderRewards(event, token) {
     return;
   }
 
-  const orderAmount = parseFloat(
+  const totalAmount = parseFloat(
     event.eventEvent.eventArgs.find((arg) => arg[0] === "amount")?.[1] || 0
   );
-  const tax = parseFloat(
-    event.eventEvent.eventArgs.find((arg) => arg[0] === "tax")?.[1] || 0
-  );
-  const fee = parseFloat(
-    event.eventEvent.eventArgs.find((arg) => arg[0] === "fee")?.[1] || 0
-  );
-  const totalAmount = orderAmount + tax + fee;
-
-  console.log("totalAmount:", totalAmount, "tax:", tax, "fee:", fee);
 
   // Check if the purchaser has made a first order before
   const checkFirstPurchase = await fetch(
