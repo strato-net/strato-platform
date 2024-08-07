@@ -11,7 +11,7 @@ async function sendEmail(to, subject, htmlContent, token) {
   }
 
   const payload = {
-    usernames: [to],
+    usernames: to instanceof Array ? to : [to],
     message: {
       subject: subject,
       htmlContent: htmlContent
