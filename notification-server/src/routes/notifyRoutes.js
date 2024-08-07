@@ -26,10 +26,15 @@ router.post("/notify", async (req, res) => {
     const emails = await getEmailsByUsernames(usernames);
     // const numbers = await getNumbersByUsernames(usernames);
 
+    let successResp;
     if (!emails.length) {
       return res
         .status(404)
         .send("Not Found: No users found with the given usernames");
+    } else if (emails.length !== usernames.length){
+      successResp = "Did best effort, but unable to find the emails of " + (usernames.length - emails.length) + " of the users";
+    } else {
+      successResp = "All notifications sent successfully";
     }
 
     // Prepare notification promises
@@ -47,7 +52,7 @@ router.post("/notify", async (req, res) => {
     // Send notifications
     await Promise.all(notificationPromises);
 
-    res.status(200).send("Notifications sent successfully");
+    res.status(200).send(successResp);
   } catch (error) {
     console.error("Error sending notifications:", error);
     res.status(500).send("Internal Server Error");
