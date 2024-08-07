@@ -532,7 +532,7 @@ async function getAll(admin, args = {}, defaultOptions) {
 async function getAllItemTransferEvents(admin, args = {}, defaultOptions) {
     const options = { ...defaultOptions, org: 'BlockApps', app: 'Mercata' }
     let itemTransferEvents = await searchAllWithQueryArgs(`${contractName}.${contractEvents.ITEM_TRANSFER}`, args, options, admin);
-
+    itemTransferEvents = itemTransferEvents.map((item)=>({...item, type: 'Transfer'}))
 
     const total = await searchAllWithQueryArgs(`${contractName}.${contractEvents.ITEM_TRANSFER}`,
         { ...args, limit: undefined, offset: 0, order: undefined, queryOptions: { select: "count" } }, options, admin);

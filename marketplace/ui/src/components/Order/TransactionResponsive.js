@@ -4,10 +4,11 @@ import classNames from "classnames";
 import { dummyData } from "./constant";
 import { Images } from "../../images";
 import "./ordersTable.css";
+import { actions as transactionAction } from "../../contexts/transaction/actions";
+import { useTransactionDispatch, useTransactionState } from "../../contexts/transaction";
 import { TRANSACTION_STATUS, TRANSACTION_STATUS_CLASSES, TRANSACTION_STATUS_COLOR } from "../../helpers/constants";
 
-const TransactionResponsive = () => {
-
+const TransactionResponsive = ({data}) => {
   const StratsIcon = <img src={Images.logo} alt="" className="mx-1 w-3 h-3" />;
 
   const [expandedRows, setExpandedRows] = useState({});
@@ -19,20 +20,6 @@ const TransactionResponsive = () => {
     }));
   };
 
-  useEffect(() => {
-    fetch('http://localhost/api/v1/transaction')
-      .then(response => {
-        if (!response.ok) {
-          throw new Error('Network response was not ok');
-        }
-        return response.json();
-      })
-      .then(data => {
-        console.log(data);
-      })
-      .catch(error => {
-        console.error('There')
-      })}, [])
 
   const statusComponent = (status) => {
 
@@ -71,34 +58,17 @@ const TransactionResponsive = () => {
     }
   ];
 
-  const data = [
-    {
-      key: '1',
-      from: 'Tanuj Soni',
-      to: 'Hadi',
-      hash: '#45353434',
-      status: 1,
-    },
-    {
-      key: '2',
-      from: 'Hadi',
-      to: 'Tanuj Soni',
-      hash: '#45353434',
-      status: 2,
-    },
-    {
-      key: '3',
-      from: 'Maya',
-      to: 'Hadi',
-      hash: '#45353434',
-      status: 3,
-    },
-  ];
-
   return (
     <div className="flex flex-col gap-y-10 w-full ">
-      {dummyData.map(({ imageURL, assetName, qty, reference, type, totalPrice }) => {
+      {data.map(({ imageURL, assetName, quantity,from, to, status, reference, type, price }, index) => {
         const isExpanded = expandedRows[assetName];
+        const tableData = [{
+          key: index,
+          from,
+          to,
+          hash: '#45353434',
+          status: 2,
+        }]
 
         return (
           <Row
@@ -107,7 +77,7 @@ const TransactionResponsive = () => {
           >
             <Col span={6} className="flex justify-center bg-grey-400">
               <img
-                src={imageURL[0]}
+                src={imageURL?.length >= 0 ? imageURL[0] : ""}
                 alt=""
                 className="rounded-xl shadow-2xl border-0"
               />
@@ -137,13 +107,13 @@ const TransactionResponsive = () => {
                 {type}
               </Button>
               <p className="text-right flex justify-end items-center">
-                $ {totalPrice} ({totalPrice * 100} {StratsIcon})
+                $ {price} ({price * 100} {StratsIcon})
               </p>
-              <p className="text-right">Qty: {qty}</p>
+              <p className="text-right">Qty: {quantity}</p>
               <p className="text-right">10/12/2024</p>
             </Col>
-            {isExpanded && <Col span={24}>
-              <Table className="mt-6" columns={columns} dataSource={data} pagination={false} />
+            {isExpanded && <Col span={24}> 
+              <Table className="mt-6" columns={columns} dataSource={tableData} pagination={false} />
             </Col>}
           </Row>
         );

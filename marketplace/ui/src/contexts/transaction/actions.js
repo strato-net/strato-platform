@@ -24,7 +24,7 @@ const actions = {
   fetchUserTransaction: async (dispatch, limit, offset, commonName, selectedDate, filter, order, search) => {
     dispatch({ type: actionDescriptors.fetchUserTransaction });
 
-    let query = "";
+    
     // if (selectedDate) {
     //   let end = selectedDate + 86400;
     //   query = selectedDate ? query.concat(`&range[]=createdDate,${selectedDate},${end}`) : query;
@@ -40,11 +40,24 @@ const actions = {
     //     query = search ? query.concat(`&queryValue=${searchValue}&queryFields=purchasersCommonName`) : query;
     //   }
     // }
+    let query = "";
+    if(limit){
+      query += `limit=${limit}`
+    }
+    if(offset){
+      query += `&offset=${offset}`
+    }
+    if(commonName){
+      query +=  `&user=${encodedCommonName}`
+    }
+    if(offset){
+      query += `&type=${order}`
+    }
 
     const encodedCommonName = encodeURIComponent(commonName);
     try {
       const response = await fetch(
-        `${apiUrl}/transaction?limit=${limit}&offset=${offset}&type=${order}&user=${encodedCommonName}${query}`,
+        `${apiUrl}/transaction?${query}`,
         {
           method: HTTP_METHODS.GET,
         }

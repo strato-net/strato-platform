@@ -1,16 +1,16 @@
 import { Tabs, DatePicker, Breadcrumb, Button, Dropdown, Space, notification } from "antd";
-import { DownloadOutlined } from '@ant-design/icons';
+// import { DownloadOutlined } from '@ant-design/icons';
 import React, { useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
-import SoldOrdersTable from "./SoldOrdersTable";
-import BoughtOrdersTable from "./BoughtOrdersTable";
-import TransfersTable from "./TransfersTable";
-import RedemptionsOutgoingTable from "./RedemptionsOutgoingTable";
-import RedemptionsIncomingTable from "./RedemptionsIncomingTable";
+// import SoldOrdersTable from "./SoldOrdersTable";
+// import BoughtOrdersTable from "./BoughtOrdersTable";
+// import TransfersTable from "./TransfersTable";
+// import RedemptionsOutgoingTable from "./RedemptionsOutgoingTable";
+// import RedemptionsIncomingTable from "./RedemptionsIncomingTable";
 import dayjs from "dayjs";
 import routes from "../../helpers/routes";
 import ClickableCell from "../ClickableCell";
-import { Images } from "../../images";
+// import { Images } from "../../images";
 import { saveAs } from 'file-saver';
 import * as XLSX from 'xlsx';
 import { actions } from "../../contexts/order/actions";
@@ -35,6 +35,7 @@ const Order = ({ user }) => {
   const { allOrders, isAllOrdersLoading } = useOrderState();
   const { categorys } = useCategoryState();
   const [api, contextHolder] = notification.useNotification();
+
   useEffect(() => {
     categoryActions.fetchCategories(categoryDispatch);
   }, [categoryDispatch]);
@@ -305,72 +306,6 @@ const Order = ({ user }) => {
         </Breadcrumb>
       </div>
       <TransactionTable user={user} selectedDate={dayjs(selectedDate).startOf('day').unix()} onDateChange={onDateChange} download={download} isAllOrdersLoading={isAllOrdersLoading} />
-      {/* <Tabs
-        className="mx-4 md:mx-20 lg:mt-[10px]"
-        key={type}
-        defaultActiveKey={type}
-        onChange={onChange}
-        tabBarExtraContent={
-          <div className="text-xs md:flex items-center orders_page">
-            <Dropdown
-              className="md:flex hidden customButton"
-              menu={{ items: menuItems, onClick: (e) => download(e.key) }}
-              disabled={isAllOrdersLoading}
-              trigger={['click']}
-            >
-              <Button loading={isAllOrdersLoading}>
-                <Space>
-                  <DownloadOutlined />
-                </Space>
-              </Button>
-            </Dropdown>
-
-            <DatePicker
-              className="md:flex hidden"
-              style={{ backgroundColor: "#F6F6F6" }}
-              value={
-                selectedDate
-              }
-              disabledDate={(current) => {
-                const currentDate = dayjs().startOf('day'); // Get the start of today
-                const selectedDate = dayjs(current).startOf('day');
-
-                return selectedDate.isAfter(currentDate);
-              }}
-              onChange={onDateChange}
-              disabled={false}
-              suffixIcon={<img src={Images.calender} alt="calender" className=" w-[18px] h-5" style={{ maxWidth: "none" }} />}
-            />
-          </div>
-        }
-        items={[
-          {
-            label: <p id="sold-tab" className="font-semibold text-sm md:text-base">Orders (Sold)</p>,
-            key: "sold",
-            children: <SoldOrdersTable user={user} selectedDate={dayjs(selectedDate).startOf('day').unix()} onDateChange={onDateChange} download={download} isAllOrdersLoading={isAllOrdersLoading} />
-          },
-          {
-            label: <p id="bought-tab" className="font-semibold text-sm md:text-base">Orders (Bought)</p>,
-            key: "bought",
-            children: <BoughtOrdersTable user={user} selectedDate={dayjs(selectedDate).startOf('day').unix()} onDateChange={onDateChange} download={download} isAllOrdersLoading={isAllOrdersLoading} />
-          },
-          {
-            label: <p id="transfers-tab" className="font-semibold text-sm md:text-base">Transfers</p>,
-            key: "transfers",
-            children: <TransfersTable user={user} selectedDate={dayjs(selectedDate).startOf('day').unix()} download={download} isAllOrdersLoading={isAllOrdersLoading} />
-          },
-          {
-            label: <p id="redemptions-outgoing-tab" className="font-semibold text-sm md:text-base">Redemptions (Outgoing)</p>,
-            key: "redemptions-outgoing",
-            children: <RedemptionsOutgoingTable user={user} selectedDate={dayjs(selectedDate).startOf('day').unix()} download={download} isAllOrdersLoading={isAllOrdersLoading} />
-          },
-          {
-            label: <p id="redemptions-incoming-tab" className="font-semibold text-sm md:text-base">Redemptions (Incoming)</p>,
-            key: "redemptions-incoming",
-            children: <RedemptionsIncomingTable user={user} selectedDate={dayjs(selectedDate).startOf('day').unix()} download={download} isAllOrdersLoading={isAllOrdersLoading} />
-          }
-        ]}
-      /> */}
     </div>
   );
 };

@@ -17,14 +17,18 @@ import routes from "../../helpers/routes";
 import { Images } from "../../images";
 import dayjs from "dayjs";
 import TransactionResponsive from "./TransactionResponsive";
+import { actions as transactionAction } from "../../contexts/transaction/actions";
+import { useTransactionDispatch, useTransactionState } from "../../contexts/transaction";
 
 const limit = 10;
 
 const TransactionTable = ({ user, selectedDate, onDateChange, download, isAllOrdersLoading }) => {
   const StratsIcon = <img src={Images.logo} alt="" className="mx-1 w-3 h-3" />
+  const { userTransactions, globalTransaction, isTransactionLoading } = useTransactionState();
   const navigate = useNavigate();
   const location = useLocation();
   const params = useParams();
+  const transactionDispatch = useTransactionDispatch();
 
   const searchParams = new URLSearchParams(location.search);
   const searchVal = searchParams.get('search');
@@ -46,6 +50,10 @@ const TransactionTable = ({ user, selectedDate, onDateChange, download, isAllOrd
   const [shouldRefetch, setShouldRefetch] = useState(true);
 
   const { ordersSold, isordersSoldLoading, orderSoldTotal } = useOrderState();
+
+  useEffect(() => {
+    transactionAction.fetchUserTransaction(transactionDispatch);
+  }, [])
 
   useEffect(() => {
     if (user?.commonName && type === 'sold') {
@@ -77,28 +85,28 @@ const TransactionTable = ({ user, selectedDate, onDateChange, download, isAllOrd
 
   const [data, setdata] = useState([]);
 
-  useEffect(() => {
-    const fetchData = async () => {
-      const updatedData = ordersSold.map((order) => {
-        return {
-          address: order?.id ? order?.transaction_hash : order?.address,
-          chainId: order?.chainId,
-          key: order?.id ? order?.transaction_hash : order?.address,
-          orderNumber: order,
-          buyersCommonName: order?.purchasersCommonName,
-          orderTotal: order?.currency === "STRATS" ? (order?.totalPrice * STRATS_CONVERSION).toFixed(0) : order?.totalPrice,
-          date: getStringDate(order?.createdDate, US_DATE_FORMAT),
-          status: getStatus(parseInt(order?.status)),
-          invoice: order?.id ? order?.transaction_hash : order?.address,
-          currency: order?.currency ? order?.currency : "USD"
-        };
-      });
-      setIsLoading(false);
-      setdata(updatedData);
-    };
+  // useEffect(() => {
+  //   const fetchData = async () => {
+  //     const updatedData = ordersSold.map((order) => {
+  //       return {
+  //         address: order?.id ? order?.transaction_hash : order?.address,
+  //         chainId: order?.chainId,
+  //         key: order?.id ? order?.transaction_hash : order?.address,
+  //         orderNumber: order,
+  //         buyersCommonName: order?.purchasersCommonName,
+  //         orderTotal: order?.currency === "STRATS" ? (order?.totalPrice * STRATS_CONVERSION).toFixed(0) : order?.totalPrice,
+  //         date: getStringDate(order?.createdDate, US_DATE_FORMAT),
+  //         status: getStatus(parseInt(order?.status)),
+  //         invoice: order?.id ? order?.transaction_hash : order?.address,
+  //         currency: order?.currency ? order?.currency : "USD"
+  //       };
+  //     });
+  //     setIsLoading(false);
+  //     setdata(updatedData);
+  //   };
 
-    fetchData();
-  }, [ordersSold]);
+  //   fetchData();
+  // }, [ordersSold]);
 
   const handleSort = (data) => {
     setSelectedValue(data)
@@ -120,14 +128,14 @@ const TransactionTable = ({ user, selectedDate, onDateChange, download, isAllOrd
       <Card>
         <Row>
           <Col span={6}>
-            <img src={data.imageURL[0]} alt={data.assetName} className="border w-88 h-88 border-indigo-600 rounded-md" />
+            <img src={data?.imageURL[0]} alt={data?.assetName} className="border w-88 h-88 border-indigo-600 rounded-md" />
           </Col>
           <Col span={8} offset={1}>
-            <p className="text-base font-bold">{data.assetName}</p>
+            <p className="text-base font-bold">{data?.assetName}</p>
             <p style={{ color: '#827474' }} className="font-medium"><Tooltip placement="topRight" title={"description......."}> Lorem ipsum dolor sit amet, consectetur adipiscing elit </Tooltip></p>
           </Col>
           <Col span={8} offset={1}>
-            <p className="text-right flex justify-end items-center"> <b>$ {data.totalPrice} </b> &nbsp; ({data.totalPrice * 100} {StratsIcon}) </p>
+            <p className="text-right flex justify-end items-center"> <b>$ {data?.totalPrice} </b> &nbsp; ({data?.totalPrice * 100} {StratsIcon}) </p>
             <p className="text-bold text-right mt-2">Sold Out</p>
           </Col>
         </Row>
@@ -151,35 +159,35 @@ const TransactionTable = ({ user, selectedDate, onDateChange, download, isAllOrd
         </p>
       ),
     },
-    {
-      title: <p className="text-center font-bold">Type</p>,
-      dataIndex: "type",
-      key: "type",
-      responsive: ['sm'],
-      render: (text) => (<p style={{ background: TRANSACTION_STATUS_COLOR[text] }} className={`bg-${TRANSACTION_STATUS_COLOR[text]} min-w-[80px] text-center cursor-default px-2 py-2 rounded-lg text-white`}>{text}</p>),
-    },
-    {
-      title: "Asset",
-      dataIndex: "Item",
-      key: "Item",
-      align: "center",
-      render: (asset, data) => <>
-        <Popover className="flex justify-center items-center" content={<Content data={data} />} trigger="hover">
-          <div >
-            <img src={data.imageURL[0]} alt={data.assetName} width={24} height={30} className="border border-indigo-600 rounded-md" />
-            <span className="ml-1"> {data.assetName} </span>
-          </div>
-        </Popover>
-      </>
-    },
+    // {
+    //   title: <p className="text-center font-bold">Type</p>,
+    //   dataIndex: "type",
+    //   key: "type",
+    //   responsive: ['sm'],
+    //   render: (text) => (<p style={{ background: TRANSACTION_STATUS_COLOR[text] }} className={`bg-${TRANSACTION_STATUS_COLOR[text]} min-w-[80px] text-center cursor-default px-2 py-2 rounded-lg text-white`}>{text}</p>),
+    // },
+    // {
+    //   title: "Asset",
+    //   dataIndex: "Item",
+    //   key: "Item",
+    //   align: "center",
+    //   render: (asset, data) => <>
+    //     <Popover className="flex justify-center items-center" content={<Content data={data} />} trigger="hover">
+    //       <div >
+    //         <img src={data?.imageURL[0]} alt={data?.assetName} width={24} height={30} className="border border-indigo-600 rounded-md" />
+    //         <span className="ml-1"> {data?.assetName} </span>
+    //       </div>
+    //     </Popover>
+    //   </>
+    // },
     {
       title: "Quantity",
-      dataIndex: "qty",
-      key: "qty",
+      dataIndex: "quantity",
+      key: "quantity",
       align: "center",
       width: '100px',
       // render : (data, {quantities, BlockApps-Mercata-Order-quantities}) => <span>{quantities[0] || BlockApps-Mercata-Order-quantities.value}</span>
-      render: (data, { qty }) => <span>{qty}</span>
+      render: (data, { quantity }) => <span>{quantity}</span>
     },
     {
       title: "Price ($)",
@@ -312,16 +320,16 @@ const TransactionTable = ({ user, selectedDate, onDateChange, download, isAllOrd
           data={data}
           isLoading={isordersSoldLoading || isLoading}
         /> */}
-          <TransactionResponsive />
+          <TransactionResponsive data={userTransactions} />
         </div>
         <div className="hidden lg:block">
-          <DataTableComponent
+           < DataTableComponent
             columns={column}
-            data={dummyData}
-            isLoading={isordersSoldLoading || isLoading}
+            data={userTransactions}
+            isLoading={isTransactionLoading}
             pagination={false}
             scrollX="100%"
-          />
+          /> 
         </div>
         {/* <Pagination
         current={pageNo}

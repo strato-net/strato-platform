@@ -271,6 +271,7 @@ async function getAll(admin, args = {}, options) {
       order: order,
     };
     saleOrders = await searchAllWithQueryArgs(paymentTableName, idArgs, newOptions, admin);
+    saleOrders = saleOrders.map((item)=>({...item, type: 'Order'}))
   }
 
   // ACH status updates
@@ -313,6 +314,7 @@ async function getAll(admin, args = {}, options) {
         saleOrders[index] = {
           ...saleOrders[index],
           status: paymentServiceRes[key],
+          type: 'Order'
         }
       });
   }
@@ -321,7 +323,8 @@ async function getAll(admin, args = {}, options) {
   try {
     // Legacy orders need to join array tables.
     let oldArgs = { ...args, limit: undefined, offset: 0, queryOptions: { select: constants.attach_saleAddresses_Quantities_completedSales_onOrder } };
-    const oldSaleOrders = await searchAllWithQueryArgs(constants.orderTableName, oldArgs, newOptions, admin);
+    let oldSaleOrders = await searchAllWithQueryArgs(constants.orderTableName, oldArgs, newOptions, admin);
+    oldSaleOrders = oldSaleOrders.map((item) => ({ ...item, type: 'Order' }));
     saleOrders = saleOrders ? [...saleOrders, ...oldSaleOrders] : [...oldSaleOrders];
 
     oldCount = await searchAllWithQueryArgs(

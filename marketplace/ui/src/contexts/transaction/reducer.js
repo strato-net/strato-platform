@@ -22,7 +22,7 @@ const reducer = (state, action) => {
     case actionDescriptors.fetchUserTransactionSuccessful:
       return {
         ...state,
-        userTransaction: action.payload,
+        userTransactions: action.payload,
         isTransactionLoading: false,
       };
     case actionDescriptors.fetchUserTransactionFailed:
@@ -39,7 +39,7 @@ const reducer = (state, action) => {
       case actionDescriptors.fetchGlobalTransactionSuccessful:
         return {
           ...state,
-          GlobalTransaction: action.payload,
+          globalTransaction: action.payload,
           isTransactionLoading: false,
         };
       case actionDescriptors.fetchGlobalTransactionFailed:
