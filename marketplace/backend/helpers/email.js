@@ -1,3 +1,5 @@
+import RestStatus from "http-status-codes";
+import axios from 'axios';
 import dotenv from "dotenv";
 dotenv.config({ path: "../../../.env" });
 
@@ -17,16 +19,14 @@ async function sendEmail(to, subject, htmlContent, token) {
   };
 
   try {
-    const response = await fetch(`${endpointUrl}/notify?method=email`, {
-      method: 'POST',
+    const response = await axios.post(`${endpointUrl}/notify`, payload, {
       headers: {
         'Content-Type': 'application/json',
         'Authorization': `Bearer ${token}`
-      },
-      body: JSON.stringify(payload)
+      }
     });
 
-    if (!response.ok) {
+    if (response.status !== RestStatus.OK) {
       throw new Error(`Error: ${response.statusText}`);
     }
     console.log("Email sent successfully!");
