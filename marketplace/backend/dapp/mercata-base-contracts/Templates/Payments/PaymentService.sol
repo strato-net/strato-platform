@@ -21,7 +21,9 @@ abstract contract PaymentService is Utils {
 
     event SellerOnboarded (
         string sellersCommonName,
-        bool isActive
+        bool isActive,
+        string ownerCommonName,
+        string serviceName
     );
 
     enum PaymentStatus { NULL, AWAITING_FULFILLMENT, PAYMENT_PENDING, CLOSED, CANCELED }
@@ -148,7 +150,7 @@ abstract contract PaymentService is Utils {
         string _sellersCommonName,
         bool _isActive
     ) requireOwner("onboard sellers") public returns (uint) {
-        emit SellerOnboarded(_sellersCommonName, _isActive);
+        emit SellerOnboarded(_sellersCommonName, _isActive, ownerCommonName, serviceName);
         return RestStatus.OK;
     }
 
