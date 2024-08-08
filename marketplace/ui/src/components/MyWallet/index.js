@@ -11,10 +11,13 @@ import {
   Space,
   Typography,
   Table,
+  Tooltip,
 } from "antd";
+import { QuestionCircleOutlined } from "@ant-design/icons";
 import { CheckCircleOutlined } from "@ant-design/icons";
 import { UserOutlined } from "@ant-design/icons";
 import InventoryCard from "./InventoryCard";
+import { ASSET_STATUS } from "../../helpers/constants";
 import CreateInventoryModal from "./CreateInventoryModal";
 import { actions as categoryActions } from "../../contexts/category/actions";
 import { useCategoryDispatch, useCategoryState } from "../../contexts/category";
@@ -75,6 +78,7 @@ const MyWallet = ({ user }) => {
 
   const { cartList, strats } = useMarketplaceState();
   const stratsBalance = Object.keys(strats).length > 0 ? strats : 0;
+  const [totalBalance, setTotalBalance] = useState(0);
 
   const categoryDispatch = useCategoryDispatch();
   const { categorys } = useCategoryState();
@@ -316,6 +320,75 @@ const MyWallet = ({ user }) => {
     );
   };
 
+  const [tableData, setTableData] = useState([]);
+
+  useEffect(() => {
+    const baseData = [
+      {
+        key: "1",
+        asset: "STRATS",
+        image: Images.logo,
+        quantity: stratsBalance,
+        price: "$0.01",
+        gainLoss: "---",
+        value: `$${(stratsBalance * 0.01).toFixed(2)}`,
+        status: null,
+      },
+    ];
+
+    if (!isInventoriesLoading && inventories.length > 0) {
+      const inventoryData = inventories.map((inventory, index) => ({
+        key: `inventory-${index + 2}`,
+        asset: inventory.name,
+        image:
+          inventory["BlockApps-Mercata-Asset-images"] &&
+          inventory["BlockApps-Mercata-Asset-images"].length > 0
+            ? inventory["BlockApps-Mercata-Asset-images"][0].value
+            : Images.image_placeholder,
+        quantity: inventory.quantity || 1,
+        price: `$${inventory.price || "0.00"}`,
+        gainLoss: inventory.gainLoss || "0%",
+        value: `$${inventory.value || "0.00"}`,
+        status: inventory.status,
+      }));
+
+      const newTableData = [...baseData, ...inventoryData];
+      setTableData(newTableData);
+
+      // Calculate total balance
+      const total = newTableData.reduce((sum, item) => {
+        const price = parseFloat(item.price.replace("$", ""));
+        return sum + price * item.quantity;
+      }, 0);
+      setTotalBalance(total.toFixed(2));
+    } else {
+      setTableData(baseData);
+      setTotalBalance((stratsBalance * 0.01).toFixed(2));
+    }
+  }, [isInventoriesLoading, inventories, stratsBalance]);
+
+  const CustomQuestionIcon = () => (
+    <svg
+      width="16"
+      height="16"
+      viewBox="0 0 16 16"
+      fill="none"
+      xmlns="http://www.w3.org/2000/svg"
+    >
+      <circle cx="8" cy="8" r="8" fill="#373B9C" />
+      <text
+        x="8"
+        y="12"
+        textAnchor="middle"
+        fill="white"
+        fontSize="12"
+        fontFamily="Arial, sans-serif"
+      >
+        ?
+      </text>
+    </svg>
+  );
+
   const columns = [
     {
       title: "Asset",
@@ -323,14 +396,25 @@ const MyWallet = ({ user }) => {
       key: "asset",
       render: (text, record) => (
         <div className="flex items-center">
-          <div className="mr-2 w-[50px] h-[35px] sm:w-[74px] sm:h-[52px] flex items-center justify-center">
+          <div className="mr-2 w-[74px] h-[52px] flex items-center justify-center">
             <img
               src={record.image}
               alt={text}
-              className="max-w-full max-h-full object-contain"
+              title={text}
+              className={`rounded-md w-[161px] ${
+                record.status === ASSET_STATUS.PENDING_REDEMPTION
+                  ? "h-[140px]"
+                  : "h-[161px]"
+              } md:object-contain max-w-full max-h-full object-contain`}
+              style={{
+                width: "auto",
+                height: "auto",
+                maxWidth: "100%",
+                maxHeight: "100%",
+              }}
             />
           </div>
-          <span className="text-xs sm:text-sm">{text}</span>
+          <span>{text}</span>
         </div>
       ),
     },
@@ -338,7 +422,6 @@ const MyWallet = ({ user }) => {
       title: "Quantity",
       dataIndex: "quantity",
       key: "quantity",
-      render: (text) => <span className="text-xs sm:text-sm">{text}</span>,
     },
     {
       title: "Price",
@@ -347,27 +430,41 @@ const MyWallet = ({ user }) => {
       render: (price, record) => (
         <div>
           <div className="text-xs sm:text-sm">{price}</div>
-          <div className="flex items-center mt-1">
-            <img
-              src={Images.logo}
-              alt="Small"
-              className="w-3 h-3 sm:w-4 sm:h-4 mr-1 sm:mr-2"
-            />
-            <Text
-              className="text-[10px] sm:text-xs"
-              style={{ color: "#747474" }}
-            >
-              25,000
-            </Text>
-          </div>
+          {record.key !== "1" && (
+            <div className="flex items-center mt-1">
+              <img
+                src={Images.logo}
+                alt="Small"
+                className="w-3 h-3 sm:w-4 sm:h-4 mr-1 sm:mr-2"
+              />
+              <Text
+                className="text-[10px] sm:text-xs"
+                style={{ color: "#747474" }}
+              >
+                25,000
+              </Text>
+            </div>
+          )}
         </div>
       ),
     },
     {
-      title: "Gain/Loss %",
+      title: (
+        <span className="flex items-center">
+          Gain/Loss %{" "}
+          <Tooltip title="Calculated as the percentage change between the current marketplace price and the original acquisition price of the asset.">
+            <span className="ml-1 cursor-pointer inline-flex items-center">
+              <CustomQuestionIcon />
+            </span>
+          </Tooltip>
+        </span>
+      ),
       dataIndex: "gainLoss",
       key: "gainLoss",
       render: (text) => {
+        if (text === "---") {
+          return <span className="text-xs sm:text-sm">{text}</span>;
+        }
         const isPositive = text.startsWith("+");
         return (
           <span
@@ -386,19 +483,21 @@ const MyWallet = ({ user }) => {
       render: (value, record) => (
         <div>
           <div className="text-xs sm:text-sm">{value}</div>
-          <div className="flex items-center mt-1">
-            <img
-              src={Images.logo}
-              alt="Small"
-              className="w-3 h-3 sm:w-4 sm:h-4 mr-1 sm:mr-2"
-            />
-            <Text
-              className="text-[10px] sm:text-xs"
-              style={{ color: "#747474" }}
-            >
-              14,000
-            </Text>
-          </div>
+          {record.key !== "1" && (
+            <div className="flex items-center mt-1">
+              <img
+                src={Images.logo}
+                alt="Small"
+                className="w-3 h-3 sm:w-4 sm:h-4 mr-1 sm:mr-2"
+              />
+              <Text
+                className="text-[10px] sm:text-xs"
+                style={{ color: "#747474" }}
+              >
+                14,000
+              </Text>
+            </div>
+          )}
         </div>
       ),
     },
@@ -469,7 +568,7 @@ const MyWallet = ({ user }) => {
                 }}
                 className="mt-1"
               >
-                $1,044.43
+                ${totalBalance}
               </Text>
               <div className="flex items-center mt-1">
                 <img
@@ -487,147 +586,69 @@ const MyWallet = ({ user }) => {
 
         <div className="pt-6 mx-6 md:mx-5 md:px-10 mb-5">
           <Table
-            columns={[
-              {
-                title: "Asset",
-                dataIndex: "asset",
-                key: "asset",
-                render: (text, record) => (
-                  <div className="flex items-center">
-                    <div className="mr-2 w-[74px] h-[52px] flex items-center justify-center">
-                      <img
-                        src={record.image}
-                        alt={text}
-                        className="max-w-full max-h-full object-contain"
-                        style={{
-                          width: "auto",
-                          height: "auto",
-                          maxWidth: "100%",
-                          maxHeight: "100%",
-                        }}
-                      />
-                    </div>
-                    <span>{text}</span>
-                  </div>
-                ),
-              },
-              {
-                title: "Quantity",
-                dataIndex: "quantity",
-                key: "quantity",
-              },
-              {
-                title: "Price",
-                dataIndex: "price",
-                key: "price",
-                render: (price, record) => (
-                  <div>
-                    <div className="text-xs sm:text-sm">{price}</div>
-                    {record.key !== "1" && (
-                      <div className="flex items-center mt-1">
-                        <img
-                          src={Images.logo}
-                          alt="Small"
-                          className="w-3 h-3 sm:w-4 sm:h-4 mr-1 sm:mr-2"
-                        />
-                        <Text
-                          className="text-[10px] sm:text-xs"
-                          style={{ color: "#747474" }}
-                        >
-                          25,000
-                        </Text>
-                      </div>
-                    )}
-                  </div>
-                ),
-              },
-              {
-                title: "Gain/Loss %",
-                dataIndex: "gainLoss",
-                key: "gainLoss",
-                render: (text) => {
-                  if (text === "---") {
-                    return <span className="text-xs sm:text-sm">{text}</span>;
-                  }
-                  const isPositive = text.startsWith("+");
-                  return (
-                    <span
-                      className="text-xs sm:text-sm"
-                      style={{ color: isPositive ? "#00A455" : "#C00000" }}
-                    >
-                      {text}
-                    </span>
-                  );
-                },
-              },
-              {
-                title: "Value",
-                dataIndex: "value",
-                key: "value",
-                render: (value, record) => (
-                  <div>
-                    <div className="text-xs sm:text-sm">{value}</div>
-                    {record.key !== "1" && (
-                      <div className="flex items-center mt-1">
-                        <img
-                          src={Images.logo}
-                          alt="Small"
-                          className="w-3 h-3 sm:w-4 sm:h-4 mr-1 sm:mr-2"
-                        />
-                        <Text
-                          className="text-[10px] sm:text-xs"
-                          style={{ color: "#747474" }}
-                        >
-                          14,000
-                        </Text>
-                      </div>
-                    )}
-                  </div>
-                ),
-              },
-            ]}
-            dataSource={[
-              {
-                key: "1",
-                asset: "STRATS",
-                image: Images.logo,
-                quantity: stratsBalance,
-                price: "$0.01",
-                gainLoss: "---",
-                value: `$${(stratsBalance * 0.01).toFixed(2)}`,
-              },
-              {
-                key: "2",
-                asset: "Yeezy Boost 350 V2 'Granite'",
-                image: Images.YeezyBoost,
-                quantity: 1,
-                price: "$250",
-                gainLoss: "+3.98%",
-                value: "$259.95",
-              },
-              {
-                key: "3",
-                asset: "MSCHF Super Normal 2 Common White",
-                image: Images.MSCHFSuperNormal,
-                quantity: 1,
-                price: "$75",
-                gainLoss: "+0.98%",
-                value: "$75.73",
-              },
-              {
-                key: "4",
-                asset: "Silver -Fractional 100 oz Bars",
-                image: Images.SilverBars,
-                quantity: 3,
-                price: "$99",
-                gainLoss: "-1.08%",
-                value: "$97.73",
-              },
-            ]}
+            columns={columns}
+            dataSource={tableData}
             pagination={false}
             className="custom-table"
+            loading={isInventoriesLoading}
           />
         </div>
+
+        {/* <div className="my-4 grid grid-cols-1 md:grid-cols-2 gap-6 lg:grid-cols-3 3xl:grid-cols-4 5xl:grid-cols-5 sm:place-items-center md:place-items-start inventoryCard max-w-full">
+          {!isInventoriesLoading ? (
+            inventories.map((inventory, index) => (
+              <div key={index} className="bg-white p-4 rounded-lg shadow-md">
+                <img
+                  className={`rounded-md w-full ${
+                    inventory.status === ASSET_STATUS.PENDING_REDEMPTION
+                      ? "h-[140px]"
+                      : "h-[161px]"
+                  } md:object-contain`}
+                  alt={inventory.name}
+                  title={inventory.name}
+                  src={
+                    inventory["BlockApps-Mercata-Asset-images"] &&
+                    inventory["BlockApps-Mercata-Asset-images"].length > 0
+                      ? inventory["BlockApps-Mercata-Asset-images"][0].value
+                      : Images.image_placeholder
+                  }
+                />
+                <h3 className="text-lg font-semibold mt-2">{inventory.name}</h3>
+                <p className="text-sm">Quantity: {inventory.quantity}</p>
+                <p className="text-sm">Price: ${inventory.price || "0.00"}</p>
+                <p className="text-sm">
+                  Gain/Loss: {inventory.gainLoss || "0%"}
+                </p>
+                <p className="text-sm">Value: ${inventory.value || "0.00"}</p>
+                <p className="text-sm">Status: {inventory.status}</p>
+                {Object.entries(inventory).map(([key, value]) => {
+                  // Skip rendering for already displayed fields and complex objects
+                  if (
+                    [
+                      "name",
+                      "quantity",
+                      "price",
+                      "gainLoss",
+                      "value",
+                      "status",
+                      "BlockApps-Mercata-Asset-images",
+                    ].includes(key) ||
+                    typeof value === "object"
+                  ) {
+                    return null;
+                  }
+                  return (
+                    <p key={key} className="text-sm">
+                      {key}: {value}
+                    </p>
+                  );
+                })}
+              </div>
+            ))
+          ) : (
+            <Spin size="large" />
+          )}
+        </div> */}
 
         <style jsx>{`
           .custom-table .ant-table-thead > tr > th {
