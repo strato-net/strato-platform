@@ -33,13 +33,13 @@ contract ExternalPaymentService is PaymentService {
         string _onboardingText,
         string _checkoutText,
         decimal _primarySaleFeePercentage,
-        decimal _secondaySaleFeePercentage
+        decimal _secondarySaleFeePercentage
     ) public PaymentService(
         _serviceName,
         _imageURL,
         _checkoutText,
         _primarySaleFeePercentage,
-        _secondaySaleFeePercentage
+        _secondarySaleFeePercentage
     ) {
         serviceURL = _serviceURL;
         onboardingRoute = _onboardingRoute;

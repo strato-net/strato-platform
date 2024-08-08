@@ -27,14 +27,14 @@ constructor (
         string _imageURL,
         string _checkoutText,
         decimal _primarySaleFeePercentage,
-        decimal _secondaySaleFeePercentage,
+        decimal _secondarySaleFeePercentage,
         string _feeRecipient
     ) PaymentService(
         _serviceName,
         _imageURL,
         _checkoutText,
         _primarySaleFeePercentage,
-        _secondaySaleFeePercentage
+        _secondarySaleFeePercentage
     ) public {
         decimals = _decimals;
         reserve = _supply * (10 ** decimals);

@@ -6,9 +6,10 @@ class PaymentServiceController {
 
   static async getAll(req, res, next) {
     try {
-      const { dapp, params } = req
+      const { dapp, query } = req
+      const { onlyActive } = query;
 
-      const result = await dapp.getPaymentServices(params)
+      const result = await dapp.getPaymentServices({ onlyActive: onlyActive })
       rest.response.status200(res, result)
 
       return next()

@@ -29,13 +29,11 @@ import BoughtOrdersTable from "./BoughtOrdersTable";
 import SoldOrdersTable from "./SoldOrdersTable";
 import TransfersTable from "./TransfersTable";
 import RedemptionsIncomingTable from "./RedemptionsIncomingTable";
-import { ResponsiveOrderDetailCard } from "./ResponsiveOrderDetailCard";
 
 
 const RedemptionsOutgoingDetails = ({ user }) => {
     const [id, setId] = useState(undefined);
     const [redemptionService, setRedemptionService] = useState(undefined);
-    const [data, setdata] = useState([]);
     const dispatch = useRedemptionDispatch();
     const { Text } = Typography;
     const [selectedDate, setSelectedDate] = useState("");
@@ -276,10 +274,6 @@ const RedemptionsOutgoingDetails = ({ user }) => {
                                                 />
                                             </div>
                                         </Card>
-                                        {data?.length > 0 && data?.map((item) => {
-                                            return (
-                                                <ResponsiveOrderDetailCard data={item} />)
-                                        })}
                                     </div>
                             },
                             {
