@@ -104,38 +104,6 @@ newtype First b a = First {unFirst :: (a, b)}
 instance Functor (First b) where
   fmap f (First (a, b)) = First (f a, b)
 
-data TableName
-  = IndexTableName
-      { itCreator :: T.Text,
-        itApplication :: T.Text,
-        itContractName :: T.Text
-      }
-  | HistoryTableName -- technically the same as index, but logically different
-      { htCreator :: T.Text,
-        htApplication :: T.Text,
-        htContractName :: T.Text
-      }
-  | EventTableName
-      { etCreator :: T.Text,
-        etApplication :: T.Text,
-        etContractName :: T.Text,
-        etEventName :: T.Text
-      }
-  | CollectionTableName
-      { mtCreator :: T.Text,
-        mtApplication :: T.Text,
-        mtContractName :: T.Text,
-        mtCollectionName :: T.Text
-      }
-  | AbstractTableName
-      { atCreator :: T.Text,
-        atApplication :: T.Text,
-        atContractName :: T.Text
-      }
-  deriving (Show, Eq, Ord)
-
-type TableColumns = [T.Text]
-
 
 data ProcessedCollectionRow = ProcessedCollectionRow
   { address :: Address,
