@@ -53,7 +53,8 @@ describe("Payment Server - deploy contracts", function () {
 
   let token
   let stripe
-  let metamask
+  // TODO: Disabled for initial payment server release
+  // let metamask
   let redemption
 
   before(async () => {
@@ -90,9 +91,10 @@ describe("Payment Server - deploy contracts", function () {
     stripe = await uploadContract(token, 'Payment', config.stripe)
   })
 
-  it('Deploy MetaMask ExternalPaymentService', async () => {
-    metamask = await uploadContract(token, 'Payment', config.metamask)
-  })
+  // TODO: Disabled for initial payment server release
+  // it('Deploy MetaMask ExternalPaymentService', async () => {
+  //   metamask = await uploadContract(token, 'Payment', config.metamask)
+  // })
 
   it('Deploy ExternalRedemptionService', async () => {
     redemption = await uploadContract(token, 'Redemption', config.redemption)
@@ -102,7 +104,7 @@ describe("Payment Server - deploy contracts", function () {
     const deployArgs = {
       deployFilePath: `${config.configDirPath}/deploy.yaml`,
       stripe,
-      metamask,
+      // metamask, // TODO: Disabled for initial payment server release
       redemption
     }
     const deployment = deploy(deployArgs, config)
