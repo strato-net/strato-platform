@@ -26,15 +26,10 @@ router.post("/notify", async (req, res) => {
     const emails = await getEmailsByUsernames(usernames);
     // const numbers = await getNumbersByUsernames(usernames);
 
-    let successResp;
     if (!emails.length) {
       return res
-        .status(404)
-        .send("Not Found: No users found with the given usernames");
-    } else if (emails.length !== usernames.length){
-      successResp = "Did best effort, but unable to find the emails of " + (usernames.length - emails.length) + " of the users";
-    } else {
-      successResp = "All notifications sent successfully";
+      .status(404)
+      .send("Not Found: No users found with the given usernames");
     }
 
     // Prepare notification promises
@@ -46,13 +41,18 @@ router.post("/notify", async (req, res) => {
 
     // Uncomment the following block to enable SMS notifications
     // if (method === "sms" || method === "both") {
-    //   notificationPromises.push(sendSMS(numbers, message));
-    // }
-
-    // Send notifications
-    await Promise.all(notificationPromises);
-
-    res.status(200).send(successResp);
+      //   notificationPromises.push(sendSMS(numbers, message));
+      // }
+      
+      // Send notifications
+      await Promise.all(notificationPromises);
+      
+    if (emails.length !== usernames.length){
+      res.status(207).send("Did best effort, but unable to find the emails of " + (usernames.length - emails.length) + " of the users");
+    } else {
+      res.status(200).send("All notifications sent successfully");
+    }
+    
   } catch (error) {
     console.error("Error sending notifications:", error);
     res.status(500).send("Internal Server Error");
