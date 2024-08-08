@@ -74,7 +74,7 @@ class OrderController {
       const orderEvent = await dapp.getStratsOrderEvent({orderHash: checkoutHash, paymentProvider: restArgs.paymentProvider.address}, options)
        if(orderEvent.length === 1 && orderEvent[0].status === "3" &&  orderEvent[0].currency === "STRATS")
       {
-            await sendEmail(body.user, "Your Order Confirmation", htmlContents[0], accessToken.token);
+            await sendEmail(body.email, "Your Order Confirmation", htmlContents[0]);
             console.log("*Buyer placed order*",orderEvent);
       }
       return next()
