@@ -250,17 +250,13 @@ main = do
   let urlMap = fromList
         [ ("vault", flags_vaultUrl),
           ("oauthDiscovery", flags_oauthDiscoveryUrl),
+          ("notificationServer", flags_notificationServerUrl),
           ( "fileServer",
             case (flags_fileServerUrl, computeNetworkID) of
               ("", 7596898649924658542) -> "https://fileserver.mercata-testnet2.blockapps.net/highway"
               ("", 6909499098523985262) -> "https://fileserver.mercata.blockapps.net/highway"
               ("", _) -> error "File server url was not provided and cannot be derived"
               (fileServer, _) -> fileServer
-          ),
-          ( "notificationServer",
-            case (flags_notificationServerUrl, computeNetworkID) of
-              ("", 6909499098523985262) -> "https://notifications.mercata.blockapps.net"
-              (notificationServer, _) -> notificationServer
           ),
           ( "monitor",
             case computeNetworkID of
