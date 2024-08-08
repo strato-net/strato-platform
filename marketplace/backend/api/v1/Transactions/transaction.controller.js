@@ -7,49 +7,59 @@ class TransactionController {
     static async getAllTransactions(req, res, next) {
         try {
             const { dapp, params, query } = req
-
-            const user = 'tanujsoni53'
+            const { limit='2000', offset='0', order, search='', type, user } = query;
             let transactionQuery = {
-                limit: '10',
-                offset: '0',
+                limit: limit,
+                offset: offset,
                 order: 'createdDate.desc',
-                or: `(sellersCommonName.eq.${user},purchasersCommonName.eq.${user})`
+                or: `(sellersCommonName.eq.${user},purchasersCommonName.eq.${user})`,
+                id: search
             }
 
             const redemptionQuery = {
-                limit: '10',
-                offset: '0',
+                limit: limit,
+                offset: offset,
                 order: 'DESC',
-                search: ''
+                search: search
             }
 
             const TransferQuery = {
-                limit: '10',
-                offset: '0',
+                limit: limit,
+                offset: offset,
                 or: `(oldOwnerCommonName.eq.${user},newOwnerCommonName.eq.${user})`,
-                order: 'transferDate.desc'
+                order: 'transferDate.desc',
+                id: search
+            }
+            let orderData,  itemTransfers,  outgoingRedemptions, incomingRedemptions
+            let data = []
+            if(type==='Order' || !type){
+                orderData = await dapp.getSaleOrders({ ...transactionQuery });
+                data = [...data, ...orderData.orders]
+            }
+            if(type==='Transfer' || !type){
+            itemTransfers = await dapp.getAllItemTransferEvents(TransferQuery);
+            data = [...data, ...itemTransfers.transfers]
+            }
+            if(type==='Redemption' || !type){
+                outgoingRedemptions = await dapp.getOutgoingRedemptionRequests(redemptionQuery)
+                incomingRedemptions = await dapp.getIncomingRedemptionRequests(redemptionQuery)
+                data = [...data, ...outgoingRedemptions, ...incomingRedemptions]
             }
 
-            const { orders, total } = await dapp.getSaleOrders({ ...transactionQuery });
-            transactionQuery['or'] = `(oldOwnerCommonName.eq.${user},newOwnerCommonName.eq.${user})`
-            const itemTransfers = await dapp.getAllItemTransferEvents(TransferQuery);
-            const outgoingRedemptions = await dapp.getOutgoingRedemptionRequests(redemptionQuery)
-            const incomingRedemptions = await dapp.getIncomingRedemptionRequests(redemptionQuery)
-            const data = [...orders, ...itemTransfers.transfers, ...outgoingRedemptions, ...incomingRedemptions]
-
-            const sortData = data.sort((a, b) => (b?.createdDate || b?.transferDate) - (a?.createdDate || a?.transferDate));
+            const sortData = data.sort((a, b) => (b?.createdDate || b?.transferDate || b?.redemptionDate) - (a?.createdDate || a?.transferDate || a?.redemptionDate));
             const newData = sortData.map((item)=>({ ...item,
-                from: item.oldOwnerCommonName || item.sellersCommonName , 
-                to: item.newOwnerCommonName || item.purchasersCommonName ,
-                price: item.price || item.totalPrice,
+                from: item.oldOwnerCommonName || item.sellersCommonName || item.ownerCommonName, 
+                to: item.newOwnerCommonName || item.purchasersCommonName || item.issuerCommonName,
+                price: item.price || item.totalPrice || 'null',
                 status: item.status || '1',
-                reference: item.id || item.orderId,
+                reference: item.id || item.orderId || item.redemption_id,
                 // quantity: item.quantity || item.BlockApps-Mercata-Order-quantities[0]?.value,
-                quantity: item.quantity || 'null', //TODO: remove the zero and use logic for this
+                quantity: item?.quantity || 'null'
+                // || (item?.quantities?.length !==0 && item?.quantities[0]) || (item['BlockApps-Mercata-Order-quantities'][0]?.value)   || 'null', //TODO: remove the zero and use logic for this
                 
             })) 
             // rest.response.status200(res, transaction)
-            res.status(200).json({ success: true, message: "test successful", data: newData })
+            res.status(200).json({ success: true, message: "Fetched Transactions successfully", data: newData })
             return next()
         } catch (e) {
             return next(e)

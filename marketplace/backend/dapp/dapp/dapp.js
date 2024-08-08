@@ -359,9 +359,13 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
       const redemptionPromises = redemptionServices.map(async (rs) => {
         const serviceUrl = rs.serviceURL || rs.data.serviceURL;
         const getOutgoingRedemptionRoute = rs.outgoingRedemptionsRoute || rs.data.outgoingRedemptionsRoute;
-        const res = await axios.get(new URL(`${serviceUrl}${getOutgoingRedemptionRoute}/${userCert.commonName}?${queryParams}`).href);
+        let res = await axios.get(new URL(`${serviceUrl}${getOutgoingRedemptionRoute}/${userCert.commonName}?${queryParams}`).href);
         if (res.status === 200)
-          return res.data.data;
+          return res.data.data.map((item) => {
+            const date = new Date(item.createdDate);
+            const unixTimestamp = Math.floor(date.getTime() / 1000);;
+            return { ...item, redemptionDate: unixTimestamp, type:'Redemption', block_timestamp: new Date(item.createdDate) }
+          })
         else
           return [];
       });
@@ -401,7 +405,11 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
         const getIncomingRedemptionRoute = rs.incomingRedemptionsRoute || rs.data.incomingRedemptionsRoute;
         const res = await axios.get(new URL(`${serviceUrl}${getIncomingRedemptionRoute}/${userCert.commonName}?${queryParams}`).href);
         if (res.status === 200) {
-          return res.data.data;
+          return res.data.data.map((item) => {
+            const date = new Date(item.createdDate);
+            const unixTimestamp = Math.floor(date.getTime() / 1000);;
+            return { ...item, redemptionDate: unixTimestamp, type: 'Redemption', block_timestamp: new Date(item.createdDate) }
+          })
         } else {
           return [];
         }

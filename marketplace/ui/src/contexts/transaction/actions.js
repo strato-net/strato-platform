@@ -21,25 +21,10 @@ const actions = {
     dispatch({ type: actionDescriptors.setMessage, message, success });
   },
 
-  fetchUserTransaction: async (dispatch, limit, offset, commonName, selectedDate, filter, order, search) => {
+  fetchUserTransaction: async (dispatch, limit, offset, commonName, type, search) => {
     dispatch({ type: actionDescriptors.fetchUserTransaction });
 
-    
-    // if (selectedDate) {
-    //   let end = selectedDate + 86400;
-    //   query = selectedDate ? query.concat(`&range[]=createdDate,${selectedDate},${end}`) : query;
-    // }
-    // if (filter) {
-    //   query = filter !== 0 ? query.concat(`&status=${filter}`) : query;
-    // }
-    // if (search) {
-    //   const searchValue = isNaN(search) ? search : parseInt(search);
-    //   if (!isNaN(searchValue)) {
-    //     query = search ? query.concat(`&orderId=${searchValue}`) : query;
-    //   } else {
-    //     query = search ? query.concat(`&queryValue=${searchValue}&queryFields=purchasersCommonName`) : query;
-    //   }
-    // }
+    const encodedCommonName = encodeURIComponent(commonName);
     let query = "";
     if(limit){
       query += `limit=${limit}`
@@ -50,11 +35,17 @@ const actions = {
     if(commonName){
       query +=  `&user=${encodedCommonName}`
     }
-    if(offset){
-      query += `&type=${order}`
+    if(type){
+      query += `&type=${type}`
+    }
+       if (search) {
+      const searchValue = isNaN(search) ? search : parseInt(search);
+      if (!isNaN(searchValue)) {
+        query = search ? query.concat(`&search=${searchValue}`) : query;
+      } 
     }
 
-    const encodedCommonName = encodeURIComponent(commonName);
+    
     try {
       const response = await fetch(
         `${apiUrl}/transaction?${query}`,

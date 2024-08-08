@@ -340,9 +340,9 @@ async function getAll(admin, args = {}, options) {
   totalCount += oldCount[0] ? oldCount[0].count : 0;
 
   if (order && order === 'createdDate.asc')
-    saleOrders.sort((a, b) => a.createdDate - b.createdDate);
+    saleOrders.sort((a, b) => a?.createdDate - b?.createdDate);
   else
-    saleOrders.sort((a, b) => b.createdDate - a.createdDate);
+    saleOrders.sort((a, b) => b?.createdDate - a?.createdDate);
 
   saleOrders = saleOrders.slice(offset, parseInt(offset) + parseInt(limit))
 

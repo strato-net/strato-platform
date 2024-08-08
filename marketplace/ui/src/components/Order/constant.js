@@ -31,6 +31,11 @@ export const TYPE_COLOR = {
     Redemption:"#001C76"
     }
 
+export const TRANSACTION_FILTER = [
+    {value:"", label:"All"},
+    {value:"Order", label:"Order"},
+    {value:"Transfer", label:"Transfer"}, 
+    {value:"Redemption", label:"Redemption"}] 
 
 export const dummyData = [ //TODO: Remove this Transaction_Dummy_Data after UI Design
   {

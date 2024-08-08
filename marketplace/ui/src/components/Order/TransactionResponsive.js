@@ -72,7 +72,7 @@ const TransactionResponsive = ({data}) => {
 
         return (
           <Row
-            key={assetName} // Use assetName as unique key
+            key={index} // Use assetName as unique key
             className={`bg-red-300 w-full min-h-32 rounded-xl px-4 py-2 shadow-2xl border-2 `}
           >
             <Col span={6} className="flex justify-center bg-grey-400">
