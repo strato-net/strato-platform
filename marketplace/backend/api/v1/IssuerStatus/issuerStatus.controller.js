@@ -6,11 +6,11 @@ import sendEmail from '../../../helpers/email';
 class IssuerStatusController {
   static async requestReview(req, res, next){
     try {
-      const {dapp, body, accessToken: { token } } = req;
+      const {dapp, body} = req;
       const {emailAddr, commonName} = body;
       try {
         const contents = `The user <b>${commonName}</b> is requesting to be an authorized issuer on Strato Mercata. You may get in contact with them by reaching out at ${emailAddr}. You may grant or deny issuer authorization at the admin dashboad: ${config.serverHost}/admin.`
-        await sendEmail('Victor Wong', commonName + ' Requesting Seller Status', contents, token);
+        await sendEmail('sales@blockapps.net', commonName + ' Requesting Seller Status', contents);
       } catch {
         throw new rest.RestError(RestStatus.BAD_GATEWAY,
           "Unable to send request; notify sales@blockapps.net for help"

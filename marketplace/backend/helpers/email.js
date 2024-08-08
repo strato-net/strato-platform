@@ -1,34 +1,30 @@
-import RestStatus from "http-status-codes";
-import axios from 'axios';
+import sgMail from "@sendgrid/mail";
 import dotenv from "dotenv";
+
 dotenv.config({ path: "../../../.env" });
+sgMail.setApiKey(process.env.SENDGRID_API_KEY);
 
-async function sendEmail(to, subject, htmlContent, token) {
-  const endpointUrl = process.env.NOTIFICATION_SERVER_URL;
+async function sendEmail(to, subject, htmlContent) {
 
-  if (!endpointUrl) {
-    throw new Error("Notification server URL is not set");
-  }
-
-  const payload = {
-    usernames: to instanceof Array ? to : [to],
-    message: {
-      subject: subject,
-      htmlContent: htmlContent
-    }
+  const msg = {
+    to: to,
+    from: { email: "no_reply@blockapps.net", name: "BlockApps.net" },
+    subject: subject,
+    html: htmlContent,
+    // Remove sales from these emails for testnet testing. This needs to be included for production. 
+    bcc: 'sales@blockapps.net',
+    // attachments: [
+    //   {
+    //     content: pdf.toString("base64"),
+    //     filename: "certificate.pdf",
+    //     type: "application/pdf",
+    //     disposition: "attachment",
+    //   },
+    // ],
   };
 
   try {
-    const response = await axios.post(`${endpointUrl}/notify`, payload, {
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${token}`
-      }
-    });
-
-    if (response.status !== RestStatus.OK) {
-      throw new Error(`Error: ${response.statusText}`);
-    }
+    await sgMail.send(msg);
     console.log("Email sent successfully!");
   } catch (error) {
     console.error("Error sending email:", error);
