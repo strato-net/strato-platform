@@ -1,122 +1,52 @@
 import React, { useState, useEffect } from "react";
 import {
   Breadcrumb,
-  Button,
-  Pagination,
   notification,
-  Spin,
-  Select,
-  Tabs,
   Avatar,
-  Space,
   Typography,
   Table,
   Tooltip,
 } from "antd";
-import { QuestionCircleOutlined } from "@ant-design/icons";
-import { CheckCircleOutlined } from "@ant-design/icons";
-import { UserOutlined } from "@ant-design/icons";
-import InventoryCard from "./InventoryCard";
 import { ASSET_STATUS } from "../../helpers/constants";
-import CreateInventoryModal from "./CreateInventoryModal";
 import { actions as categoryActions } from "../../contexts/category/actions";
-import { useCategoryDispatch, useCategoryState } from "../../contexts/category";
+import { useCategoryDispatch } from "../../contexts/category";
 import useDebounce from "../UseDebounce";
 import { actions } from "../../contexts/inventory/actions";
 import {
   useInventoryDispatch,
   useInventoryState,
 } from "../../contexts/inventory";
-import {
-  usePaymentServiceDispatch,
-  usePaymentServiceState,
-} from "../../contexts/payment";
+import { usePaymentServiceDispatch } from "../../contexts/payment";
 import { actions as paymentServiceActions } from "../../contexts/payment/actions";
 import { Images } from "../../images";
-import { useItemDispatch, useItemState } from "../../contexts/item";
-import { actions as itemActions } from "../../contexts/item/actions";
-import { actions as redemptionActions } from "../../contexts/redemption/actions";
-import { actions as issuerStatusActions } from "../../contexts/issuerStatus/actions";
-import {
-  useRedemptionDispatch,
-  useRedemptionState,
-} from "../../contexts/redemption";
-import {
-  useIssuerStatusState,
-  useIssuerStatusDispatch,
-} from "../../contexts/issuerStatus";
 import ClickableCell from "../ClickableCell";
 import routes from "../../helpers/routes";
-import { useNavigate } from "react-router-dom";
-import { useAuthenticateState } from "../../contexts/authentication";
 import HelmetComponent from "../Helmet/HelmetComponent";
 import { SEO } from "../../helpers/seoConstant";
-import RequestBeAuthorizedIssuerModal from "./RequestBeAuthorizedIssuerModal";
-import { ISSUER_STATUS } from "../../helpers/constants";
-import {
-  useMarketplaceState,
-  useMarketplaceDispatch,
-} from "../../contexts/marketplace";
-
-const { Option } = Select;
+import { useMarketplaceState } from "../../contexts/marketplace";
+import { useNavigate } from "react-router-dom";
 
 const MyWallet = ({ user }) => {
-  const [open, setOpen] = useState(false);
-  const [reqModOpen, setReqModOpen] = useState(false);
-  const [queryValue, setQueryValue] = useState("");
+  const [queryValue] = useState("");
   const debouncedSearchTerm = useDebounce(queryValue, 1000);
   const limit = 10;
-  const [offset, setOffset] = useState(0);
-  const [page, setPage] = useState(1);
+  const [offset] = useState(0);
   const dispatch = useInventoryDispatch();
+  // eslint-disable-next-line no-unused-vars
   const [api, contextHolder] = notification.useNotification();
-  const [isSearch, setIsSearch] = useState(false);
-  const [category, setCategory] = useState(undefined);
+  const [isSearch] = useState(false);
+  const [category] = useState(undefined);
   const linkUrl = window.location.href;
-  let { hasChecked, isAuthenticated, loginUrl } = useAuthenticateState();
   const { Title, Text } = Typography;
+  const navigate = useNavigate();
 
-  const { cartList, strats } = useMarketplaceState();
+  const { strats } = useMarketplaceState();
   const stratsBalance = Object.keys(strats).length > 0 ? strats : 0;
   const [totalBalance, setTotalBalance] = useState(0);
 
   const categoryDispatch = useCategoryDispatch();
-  const { categorys } = useCategoryState();
-  const {
-    inventories,
-    isInventoriesLoading,
-    message,
-    success,
-    inventoriesTotal,
-  } = useInventoryState();
-  const {
-    paymentServices,
-    arePaymentServicesLoading,
-    notOnboarded,
-    areNotOnboardedLoading,
-  } = usePaymentServiceState();
+  const { inventories, isInventoriesLoading } = useInventoryState();
   const paymentServiceDispatch = usePaymentServiceDispatch();
-  const [sortedPaymentServices, setSortedPaymentServices] = useState([]);
-
-  const isNotOnboarded = (service) =>
-    notOnboarded.some((n) => n.serviceName === service.serviceName);
-
-  useEffect(() => {
-    // Create a set of not onboarded service names for quick lookup
-    const notOnboardedNames = new Set(notOnboarded.map((n) => n.serviceName));
-
-    // Sort paymentServices array so that not onboarded services come first
-    const sortedServices = [...paymentServices]
-      .sort((a, b) => {
-        return isNotOnboarded(a) - isNotOnboarded(b);
-      })
-      .map((service) => ({
-        ...service,
-        isNotOnboarded: notOnboardedNames.has(service.serviceName),
-      }));
-
-    setSortedPaymentServices(sortedServices);
-  }, [paymentServices, notOnboarded]);
 
   useEffect(() => {
     if (user && user.commonName) {
@@ -129,21 +59,6 @@ const MyWallet = ({ user }) => {
       );
     }
   }, [paymentServiceDispatch, user]);
-
-  const itemDispatch = useItemDispatch();
-  const { message: itemMsg, success: itemSuccess } = useItemState();
-  const redemptionDispatch = useRedemptionDispatch();
-  const { message: redemptionMsg, success: redemptionSuccess } =
-    useRedemptionState();
-  const [issuerStatus, setIssuerStatus] = useState(user?.issuerStatus);
-
-  useEffect(() => {
-    setIssuerStatus(user?.issuerStatus);
-  }, [user]);
-
-  const issuerStatusDispatch = useIssuerStatusDispatch();
-  const { message: issuerStatusMsg, success: issuerStatusSuccess } =
-    useIssuerStatusState();
 
   useEffect(() => {
     categoryActions.fetchCategories(categoryDispatch);
@@ -158,167 +73,10 @@ const MyWallet = ({ user }) => {
         debouncedSearchTerm
       );
     } else actions.fetchInventory(dispatch, limit, offset, "", category);
-  }, [dispatch, limit, offset, debouncedSearchTerm, category]);
-
-  const showModal = () => {
-    setOpen(true);
-  };
-
-  const handleCancel = () => {
-    setOpen(false);
-  };
-
-  const handleOnboard = async (service) => {
-    if (hasChecked && !isAuthenticated && loginUrl !== undefined) {
-      window.location.href = loginUrl;
-    } else {
-      const serviceURL = service.serviceURL || service.data.serviceURL;
-      const onboardingRoute =
-        service.onboardingRoute || service.data.onboardingRoute;
-      if (serviceURL && onboardingRoute) {
-        const url = `${serviceURL}${onboardingRoute}?username=${user.commonName}&redirectUrl=${window.location.protocol}//${window.location.host}${window.location.pathname}`;
-        window.location.replace(url);
-      }
-    }
-  };
-
-  const handleChange = (value) => {
-    const service = notOnboarded.find(
-      (service) => service.serviceName === value
-    );
-    handleOnboard(service);
-  };
-
-  const showReqModModal = () => {
-    setReqModOpen(true);
-  };
-
-  const handleReqModCancel = () => {
-    setReqModOpen(false);
-  };
-
-  const openToast = (placement) => {
-    if (success) {
-      api.success({
-        message: message,
-        onClose: actions.resetMessage(dispatch),
-        placement,
-        key: 1,
-      });
-    } else {
-      api.error({
-        message: message,
-        onClose: actions.resetMessage(dispatch),
-        placement,
-        key: 2,
-      });
-    }
-  };
-
-  const queryHandle = (e) => {
-    setIsSearch(e.length > 0);
-    setQueryValue(e);
-    setOffset(0);
-    setPage(1);
-  };
-
-  const onPageChange = (page) => {
-    setOffset((page - 1) * limit);
-    setPage(page);
-  };
-
-  const itemToast = (placement) => {
-    if (itemSuccess) {
-      api.success({
-        message: itemMsg,
-        onClose: itemActions.resetMessage(itemDispatch),
-        placement,
-        key: 3,
-      });
-    } else {
-      api.error({
-        message: itemMsg,
-        onClose: itemActions.resetMessage(itemDispatch),
-        placement,
-        key: 4,
-      });
-    }
-  };
-
-  const redemptionToast = (placement) => {
-    if (redemptionSuccess) {
-      api.success({
-        message: redemptionMsg,
-        onClose: redemptionActions.resetMessage(redemptionDispatch),
-        placement,
-        key: 5,
-      });
-    } else {
-      api.error({
-        message: redemptionMsg,
-        onClose: redemptionActions.resetMessage(redemptionDispatch),
-        placement,
-        key: 6,
-      });
-    }
-  };
-
-  const issuerStatusToast = (placement) => {
-    if (issuerStatusSuccess) {
-      api.success({
-        message: issuerStatusMsg,
-        onClose: issuerStatusActions.resetMessage(issuerStatusDispatch),
-        placement,
-        key: 7,
-      });
-    } else {
-      api.error({
-        message: issuerStatusMsg,
-        onClose: issuerStatusActions.resetMessage(issuerStatusDispatch),
-        placement,
-        key: 8,
-      });
-    }
-  };
-
-  const navigate = useNavigate();
-
-  const getAllSubcategories = (categories) => {
-    let subcategories = [];
-    categories.forEach((category) => {
-      if (category.subCategories && category.subCategories.length > 0) {
-        subcategories = subcategories.concat(category.subCategories);
-      }
-    });
-    return subcategories;
-  };
-
-  const allSubcategories = getAllSubcategories(categorys);
-
-  const handleTabSelect = (key) => {
-    setCategory(key);
-    setOffset(0);
-    setPage(1);
-    return;
-  };
-
-  const metaImg = category ? category : SEO.IMAGE_META;
+  }, [dispatch, limit, offset, debouncedSearchTerm, category, isSearch]);
 
   const userName = user.commonName || "";
   const userLetter = userName[0].toUpperCase() || "";
-
-  const renderImg = (service) => {
-    return service.imageURL && service.imageURL !== "" ? (
-      <img
-        src={service.imageURL}
-        alt={service.serviceName}
-        height="16px"
-        width="16px"
-      />
-    ) : (
-      ""
-    );
-  };
 
   const [tableData, setTableData] = useState([]);
 
@@ -333,32 +91,39 @@ const MyWallet = ({ user }) => {
         gainLoss: "---",
         value: `$${(stratsBalance * 0.01).toFixed(2)}`,
         status: null,
+        address: null,
       },
     ];
 
     if (!isInventoriesLoading && inventories.length > 0) {
-      const inventoryData = inventories.map((inventory, index) => ({
-        key: `inventory-${index + 2}`,
-        asset: inventory.name,
-        image:
-          inventory["BlockApps-Mercata-Asset-images"] &&
-          inventory["BlockApps-Mercata-Asset-images"].length > 0
-            ? inventory["BlockApps-Mercata-Asset-images"][0].value
-            : Images.image_placeholder,
-        quantity: inventory.quantity || 1,
-        price: `$${inventory.price || "0.00"}`,
-        gainLoss: inventory.gainLoss || "0%",
-        value: `$${inventory.value || "0.00"}`,
-        status: inventory.status,
-      }));
+      const inventoryData = inventories.map((inventory, index) => {
+        const quantity = inventory.quantity || 1;
+        const price = parseFloat(inventory.price) || 0;
+        const value = quantity * price;
+        return {
+          key: `inventory-${index + 2}`,
+          asset: inventory.name,
+          image:
+            inventory["BlockApps-Mercata-Asset-images"] &&
+            inventory["BlockApps-Mercata-Asset-images"].length > 0
+              ? inventory["BlockApps-Mercata-Asset-images"][0].value
+              : Images.image_placeholder,
+          quantity: quantity,
+          price: `$${price.toFixed(2)}`,
+          gainLoss: inventory.gainLoss || "0%",
+          value: `$${value.toFixed(2)}`,
+          status: inventory.status,
+          address: inventory.address, // Make sure this line is present
+        };
+      });
 
       const newTableData = [...baseData, ...inventoryData];
       setTableData(newTableData);
 
       // Calculate total balance
       const total = newTableData.reduce((sum, item) => {
-        const price = parseFloat(item.price.replace("$", ""));
-        return sum + price * item.quantity;
+        const itemValue = parseFloat(item.value.replace("$", ""));
+        return sum + (isNaN(itemValue) ? 0 : itemValue);
       }, 0);
       setTotalBalance(total.toFixed(2));
     } else {
@@ -394,29 +159,43 @@ const MyWallet = ({ user }) => {
       title: "Asset",
       dataIndex: "asset",
       key: "asset",
-      render: (text, record) => (
-        <div className="flex items-center">
-          <div className="mr-2 w-[74px] h-[52px] flex items-center justify-center">
-            <img
-              src={record.image}
-              alt={text}
-              title={text}
-              className={`rounded-md w-[161px] ${
-                record.status === ASSET_STATUS.PENDING_REDEMPTION
-                  ? "h-[140px]"
-                  : "h-[161px]"
-              } md:object-contain max-w-full max-h-full object-contain`}
-              style={{
-                width: "auto",
-                height: "auto",
-                maxWidth: "100%",
-                maxHeight: "100%",
-              }}
-            />
+      render: (text, record) => {
+        const callDetailPage = () => {
+          if (record.key !== "1" && record.address) {
+            navigate(
+              `${routes.InventoryDetail.url
+                .replace(":id", record.address)
+                .replace(":name", encodeURIComponent(text))}`,
+              {
+                state: { isCalledFromInventory: true },
+              }
+            );
+          }
+        };
+
+        return (
+          <div className="flex items-center">
+            <div className="mr-2 w-[74px] h-[52px] flex items-center justify-center">
+              <img
+                src={record.image}
+                alt={text}
+                title={text}
+                className="rounded-md w-full h-full object-contain"
+              />
+            </div>
+            {record.key !== "1" ? (
+              <span
+                className="text-xs sm:text-sm text-[#13188A] hover:underline cursor-pointer"
+                onClick={callDetailPage}
+              >
+                {text}
+              </span>
+            ) : (
+              <span className="text-xs sm:text-sm">{text}</span>
+            )}
           </div>
-          <span>{text}</span>
-        </div>
-      ),
+        );
+      },
     },
     {
       title: "Quantity",
@@ -427,10 +206,42 @@ const MyWallet = ({ user }) => {
       title: "Price",
       dataIndex: "price",
       key: "price",
-      render: (price, record) => (
-        <div>
-          <div className="text-xs sm:text-sm">{price}</div>
-          {record.key !== "1" && (
+      render: (price, record) => {
+        if (record.key === "1") {
+          // For the first row (STRATS), keep the original display
+          return (
+            <div>
+              <div className="text-xs sm:text-sm">{price}</div>
+            </div>
+          );
+        }
+
+        const priceValue = parseFloat(price.replace("$", ""));
+
+        if (priceValue === 0 || isNaN(priceValue)) {
+          return (
+            <div>
+              <div className="text-xs sm:text-sm">-</div>
+              <div className="flex items-center mt-1">
+                <img
+                  src={Images.logo}
+                  alt="Small"
+                  className="w-3 h-3 sm:w-4 sm:h-4 mr-1 sm:mr-2"
+                />
+                <Text
+                  className="text-[10px] sm:text-xs"
+                  style={{ color: "#747474" }}
+                >
+                  -
+                </Text>
+              </div>
+            </div>
+          );
+        }
+
+        return (
+          <div>
+            <div className="text-xs sm:text-sm">{price}</div>
             <div className="flex items-center mt-1">
               <img
                 src={Images.logo}
@@ -441,12 +252,12 @@ const MyWallet = ({ user }) => {
                 className="text-[10px] sm:text-xs"
                 style={{ color: "#747474" }}
               >
-                25,000
+                {(priceValue / 0.01).toFixed(2)}
               </Text>
             </div>
-          )}
-        </div>
-      ),
+          </div>
+        );
+      },
     },
     {
       title: (
@@ -461,17 +272,32 @@ const MyWallet = ({ user }) => {
       ),
       dataIndex: "gainLoss",
       key: "gainLoss",
-      render: (text) => {
-        if (text === "---") {
-          return <span className="text-xs sm:text-sm">{text}</span>;
+      render: (text, record) => {
+        if (record.key === "1" || text === "---" || text === "-") {
+          return <span className="text-xs sm:text-sm">---</span>;
         }
-        const isPositive = text.startsWith("+");
+
+        // Remove any existing +/- signs and % symbol
+        const cleanedText = text.replace(/[+\-%]/g, "");
+        const percentage = parseFloat(cleanedText);
+
+        if (isNaN(percentage)) {
+          return <span className="text-xs sm:text-sm">---</span>;
+        }
+
+        const roundedPercentage = Math.round(percentage);
+
+        if (roundedPercentage === 0) {
+          return <span className="text-xs sm:text-sm">0%</span>;
+        }
+
+        const isPositive = roundedPercentage > 0;
+        const color = isPositive ? "#00A455" : "#C00000";
+        const sign = isPositive ? "+" : "-";
+
         return (
-          <span
-            className="text-xs sm:text-sm"
-            style={{ color: isPositive ? "#00A455" : "#C00000" }}
-          >
-            {text}
+          <span className="text-xs sm:text-sm" style={{ color: color }}>
+            {`${sign}${Math.abs(roundedPercentage)}%`}
           </span>
         );
       },
@@ -480,26 +306,40 @@ const MyWallet = ({ user }) => {
       title: "Value",
       dataIndex: "value",
       key: "value",
-      render: (value, record) => (
-        <div>
-          <div className="text-xs sm:text-sm">{value}</div>
-          {record.key !== "1" && (
-            <div className="flex items-center mt-1">
-              <img
-                src={Images.logo}
-                alt="Small"
-                className="w-3 h-3 sm:w-4 sm:h-4 mr-1 sm:mr-2"
-              />
-              <Text
-                className="text-[10px] sm:text-xs"
-                style={{ color: "#747474" }}
-              >
-                14,000
-              </Text>
+      render: (value, record) => {
+        if (record.key === "1") {
+          // For the first row (STRATS), keep the original value
+          return (
+            <div>
+              <div className="text-xs sm:text-sm">{value}</div>
             </div>
-          )}
-        </div>
-      ),
+          );
+        } else {
+          // For all other rows, calculate Value as Quantity * Price
+          const quantity = parseFloat(record.quantity);
+          const price = parseFloat(record.price.replace("$", ""));
+          const calculatedValue = (quantity * price).toFixed(2);
+
+          return (
+            <div>
+              <div className="text-xs sm:text-sm">${calculatedValue}</div>
+              <div className="flex items-center mt-1">
+                <img
+                  src={Images.logo}
+                  alt="Small"
+                  className="w-3 h-3 sm:w-4 sm:h-4 mr-1 sm:mr-2"
+                />
+                <Text
+                  className="text-[10px] sm:text-xs"
+                  style={{ color: "#747474" }}
+                >
+                  {(parseFloat(calculatedValue) / 0.01).toFixed(2)}
+                </Text>
+              </div>
+            </div>
+          );
+        }
+      },
     },
   ];
 
@@ -594,62 +434,6 @@ const MyWallet = ({ user }) => {
           />
         </div>
 
-        {/* <div className="my-4 grid grid-cols-1 md:grid-cols-2 gap-6 lg:grid-cols-3 3xl:grid-cols-4 5xl:grid-cols-5 sm:place-items-center md:place-items-start inventoryCard max-w-full">
-          {!isInventoriesLoading ? (
-            inventories.map((inventory, index) => (
-              <div key={index} className="bg-white p-4 rounded-lg shadow-md">
-                <img
-                  className={`rounded-md w-full ${
-                    inventory.status === ASSET_STATUS.PENDING_REDEMPTION
-                      ? "h-[140px]"
-                      : "h-[161px]"
-                  } md:object-contain`}
-                  alt={inventory.name}
-                  title={inventory.name}
-                  src={
-                    inventory["BlockApps-Mercata-Asset-images"] &&
-                    inventory["BlockApps-Mercata-Asset-images"].length > 0
-                      ? inventory["BlockApps-Mercata-Asset-images"][0].value
-                      : Images.image_placeholder
-                  }
-                />
-                <h3 className="text-lg font-semibold mt-2">{inventory.name}</h3>
-                <p className="text-sm">Quantity: {inventory.quantity}</p>
-                <p className="text-sm">Price: ${inventory.price || "0.00"}</p>
-                <p className="text-sm">
-                  Gain/Loss: {inventory.gainLoss || "0%"}
-                </p>
-                <p className="text-sm">Value: ${inventory.value || "0.00"}</p>
-                <p className="text-sm">Status: {inventory.status}</p>
-                {Object.entries(inventory).map(([key, value]) => {
-                  // Skip rendering for already displayed fields and complex objects
-                  if (
-                    [
-                      "name",
-                      "quantity",
-                      "price",
-                      "gainLoss",
-                      "value",
-                      "status",
-                      "BlockApps-Mercata-Asset-images",
-                    ].includes(key) ||
-                    typeof value === "object"
-                  ) {
-                    return null;
-                  }
-                  return (
-                    <p key={key} className="text-sm">
-                      {key}: {value}
-                    </p>
-                  );
-                })}
-              </div>
-            ))
-          ) : (
-            <Spin size="large" />
-          )}
-        </div> */}
-
         <style jsx>{`
           .custom-table .ant-table-thead > tr > th {
             background-color: white !important;
@@ -690,31 +474,6 @@ const MyWallet = ({ user }) => {
           }
         `}</style>
       </>
-      {open && (
-        <CreateInventoryModal
-          open={open}
-          handleCancel={handleCancel}
-          categorys={categorys}
-          debouncedSearchTerm={debouncedSearchTerm}
-          resetPage={onPageChange}
-          page={page}
-          categoryName={category}
-        />
-      )}
-      {reqModOpen && (
-        <RequestBeAuthorizedIssuerModal
-          open={reqModOpen}
-          handleCancel={handleReqModCancel}
-          commonName={user.commonName}
-          emailAddr={user.email}
-          issuerStatus={issuerStatus}
-          setIssuerStatus={setIssuerStatus}
-        />
-      )}
-      {message && openToast("bottom")}
-      {itemMsg && itemToast("bottom")}
-      {redemptionMsg && redemptionToast("bottom")}
-      {issuerStatusMsg && issuerStatusToast("bottom")}
     </>
   );
 };
