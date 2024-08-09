@@ -1,11 +1,8 @@
 import React, { useEffect, useState } from "react";
 import { Button, Row, Col, Table, Tag, Space } from "antd";
 import classNames from "classnames";
-import { dummyData } from "./constant";
 import { Images } from "../../images";
 import "./ordersTable.css";
-import { actions as transactionAction } from "../../contexts/transaction/actions";
-import { useTransactionDispatch, useTransactionState } from "../../contexts/transaction";
 import { TRANSACTION_STATUS, TRANSACTION_STATUS_CLASSES, TRANSACTION_STATUS_COLOR } from "../../helpers/constants";
 
 const TransactionResponsive = ({data}) => {
@@ -13,16 +10,14 @@ const TransactionResponsive = ({data}) => {
 
   const [expandedRows, setExpandedRows] = useState({});
 
-  const handleMore = (assetName) => {
+  const handleMore = (index) => {
     setExpandedRows((prevExpandedRows) => ({
       ...prevExpandedRows,
-      [assetName]: !prevExpandedRows[assetName], // Toggle expansion state
+      [index]: !prevExpandedRows[index], // Toggle expansion state
     }));
   };
 
-
   const statusComponent = (status) => {
-
     const { textClass, bgClass } = TRANSACTION_STATUS_CLASSES[status] || { textClass: "bg-[#FFF6EC]", bgClass: "bg-[#119B2D]" };
     return (
       <div className={classNames(textClass, "w-max text-center py-1 rounded-xl flex justify-start items-center gap-1 p-3")}>
@@ -48,7 +43,7 @@ const TransactionResponsive = ({data}) => {
       title: 'Hash',
       dataIndex: 'hash',
       key: 'hash',
-      render: (text) => <p className="text-[#13188A]">{text}</p>
+      render: (text) => <p className="text-[#13188A]">{`${text.slice(0,15)}..`}</p>
     },
     {
       title: 'Status',
@@ -60,45 +55,45 @@ const TransactionResponsive = ({data}) => {
 
   return (
     <div className="flex flex-col gap-y-10 w-full ">
-      {data.map(({ imageURL, assetName, quantity,from, to, status, reference, type, price }, index) => {
-        const isExpanded = expandedRows[assetName];
+      {data.map(({ address, assetImage, assetName, assetDescription, quantity,from, to, status, reference, type, price }, index) => {
+        const isExpanded = expandedRows[index];
         const tableData = [{
           key: index,
           from,
           to,
-          hash: '#45353434',
-          status: 2,
+          hash: address || '----',
+          status,
         }]
 
         return (
           <Row
             key={index} // Use assetName as unique key
-            className={`bg-red-300 w-full min-h-32 rounded-xl px-4 py-2 shadow-2xl border-2 `}
+            className={`bg-red-300 w-full ${isExpanded?'':'h-36'} rounded-xl px-2 py-2 shadow-2xl border-2 `}
           >
             <Col span={6} className="flex justify-center bg-grey-400">
               <img
-                src={imageURL?.length >= 0 ? imageURL[0] : ""}
+                src={assetImage}
                 alt=""
-                className="rounded-xl shadow-2xl border-0"
+                className="rounded-xl max-h-32 shadow-2xl border-0"
               />
             </Col>
-            <Col span={7} offset={1} className="flex flex-col justify-between">
-              <p className="text-base font-bold"> {assetName} </p>
+            <Col span={8} offset={1} className="flex flex-col justify-between">
+              <p className="text-base font-bold"> {`${assetName.slice(0,10)}..`} </p>
               <p style={{ color: "#13188A" }} className="font-semibold">
-                {reference}
+                #{reference}
               </p>
               <p style={{ color: "#827474" }} className="font-medium">
-                Token Description....
+                {`${assetDescription.replace(/<\/?[^>]+(>|$)/g, "")?.slice(0, 25)}..`}
               </p>
               <span
                 style={{ color: "#13188A" }}
                 className="font-semibold cursor-pointer"
-                onClick={() => handleMore(assetName)}
+                onClick={() => handleMore(index)}
               >
                 {isExpanded ? "(Less -)" : "(More +)"}
               </span>
             </Col>
-            <Col span={10} className="flex flex-col justify-between">
+            <Col span={9} className="flex flex-col justify-between">
               <Button
                 className="block ml-auto text-white"
                 size="middle"

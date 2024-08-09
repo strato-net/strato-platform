@@ -91,18 +91,18 @@ const TransactionTable = ({ user, selectedDate, onDateChange, download, isAllOrd
   }
 
   const Content = ({ data }) => {
-    return <div style={{ width: '460px', height: '170px' }}>
+    return <div className="min-h-44 h-full" style={{ width: '460px' }}>
       <Card>
         <Row>
           <Col span={6}>
-            <img src={data?.imageURL[0]} alt={data?.assetName} className="border w-88 h-88 border-indigo-600 rounded-md" />
+            <img src={data?.assetImage} alt={data?.assetName} className="border w-88 h-88 border-indigo-600 rounded-md" />
           </Col>
           <Col span={8} offset={1}>
             <p className="text-base font-bold">{data?.assetName}</p>
-            <p style={{ color: '#827474' }} className="font-medium"><Tooltip placement="topRight" title={"description......."}> Lorem ipsum dolor sit amet, consectetur adipiscing elit </Tooltip></p>
+            <p style={{ color: '#827474' }} className="font-medium"><Tooltip placement="topRight" title={"description"}> {`${data.assetDescription.replace(/<\/?[^>]+(>|$)/g, "")?.slice(0, 25)}...`} </Tooltip></p>
           </Col>
           <Col span={8} offset={1}>
-            <p className="text-right flex justify-end items-center"> <b>$ {data?.totalPrice} </b> &nbsp; ({data?.totalPrice * STRATS_CONVERSION} {StratsIcon}) </p>
+            <p className="text-right flex justify-end items-center"> <b>$ {data?.assetPrice} </b> &nbsp; ({data?.assetPrice * STRATS_CONVERSION} {StratsIcon}) </p>
             <p className="text-bold text-right mt-2">Sold Out</p>
           </Col>
         </Row>
@@ -110,15 +110,31 @@ const TransactionTable = ({ user, selectedDate, onDateChange, download, isAllOrd
     </div>
   };
 
+  const handleDetailRedirection = (type, Id) => {
+    let route;  
+    // if(type==='Order'){
+    //     route = `/order${routes.SoldOrderDetails.url.replace(":id", Id)}`
+    //   }
+    //   navigate(route)
+      // else if(type==='Transfer'){
+      //   route = `${routes.SoldOrderDetails.url.replace(":id", order.id ? order.transaction_hash : order.address)}`
+      // }else if(type==='Redemption'){
+      //   route = `${routes.SoldOrderDetails.url.replace(":id", order.id ? order.transaction_hash : order.address)}`
+      // }
+  }
+
   const column = [
     {
       title: "#",
       dataIndex: "reference",
       key: "reference",
-      render: (reference) => (
+      width: '80px',
+      render: (reference, data) => (
         <p
           id={reference}
-          onClick={() => { }}
+          onClick={() => {
+            handleDetailRedirection(data.type, reference)
+          }}
           className="text-[#13188A] hover:text-primaryHover cursor-pointer"
         >
           {`#${`${reference}`.substring(0, 6)}`}
@@ -129,28 +145,30 @@ const TransactionTable = ({ user, selectedDate, onDateChange, download, isAllOrd
       title: <p className="text-center font-bold">Type</p>,
       dataIndex: "type",
       key: "type",
-      responsive: ['sm'],
+      width: "150px", 
       render: (text) => (<p style={{ background: TRANSACTION_STATUS_COLOR[text] }} className={`bg-${TRANSACTION_STATUS_COLOR[text]} min-w-[80px] text-center cursor-default px-2 py-2 rounded-lg text-white`}>{text}</p>),
     },
-    // {
-    //   title: "Asset",
-    //   dataIndex: "Item",
-    //   key: "Item",
-    //   align: "center",
-    //   render: (asset, data) => <>
-    //     <Popover className="flex justify-center items-center" content={<Content data={data} />} trigger="hover">
-    //       <div >
-    //         <img src={data?.imageURL[0]} alt={data?.assetName} width={24} height={30} className="border border-indigo-600 rounded-md" />
-    //         <span className="ml-1"> {data?.assetName} </span>
-    //       </div>
-    //     </Popover>
-    //   </>
-    // },
+    {
+      title: "Asset",
+      dataIndex: "Item",
+      key: "Item",
+      align: "left",
+      width: '150px',
+      render: (asset, data) => <>
+        <Popover className="flex " content={<Content data={data} />} trigger="hover">
+          <div className="flex items-center">
+            <img src={data?.assetImage} alt={data?.assetName} width={24} height={30} className="border w-6 h-8 border-indigo-600 rounded-md" />
+            <span className="ml-1"> {data?.assetName.length>15 ?`${data?.assetName.slice(0, 15)}..`:data?.assetName} </span>
+          </div>
+        </Popover>
+      </>
+    },
     {
       title: "Quantity",
       dataIndex: "quantity",
       key: "quantity",
-      align: "center",
+      align: "right",
+      width: '100px',
       // render : (data, {quantities, BlockApps-Mercata-Order-quantities}) => <span>{quantities[0] || BlockApps-Mercata-Order-quantities.value}</span>
       render: (data, { quantity }) => <span>{quantity}</span>
     },
@@ -159,6 +177,7 @@ const TransactionTable = ({ user, selectedDate, onDateChange, download, isAllOrd
       dataIndex: "price",
       key: "price",
       align: "right",
+      width: '100px',
       render: (data, { price }) => <p>{price}</p>
     },
     {
@@ -166,25 +185,29 @@ const TransactionTable = ({ user, selectedDate, onDateChange, download, isAllOrd
       dataIndex: "from",
       key: "from",
       align: "center",
+      width: '150px',
     },
     {
       title: "To",
       dataIndex: "to",
       key: "to",
       align: "center",
+      width: '150px',
     },
     {
       title: "Hash",
       dataIndex: "hash",
       key: "hash",
       align: "left",
+      width: '150px',
       render: (data, { address }) => <Tooltip placement="topRight" title={address}>
-        <p className="text-[#13188A] hover:text-primaryHover cursor-pointer " >{`# ${address?.slice(0, 5)}..`}</p>
+        <p className="text-[#13188A] hover:text-primaryHover cursor-pointer " >{`# ${address?.slice(0, 10)}..`}</p>
       </Tooltip>
     },
     {
       dataIndex: "date",
       key: "date",
+      width: '150px',
       render: (text, { block_timestamp  }) => <p>{block_timestamp}</p>,
       title: (
         <div style={{ display: "flex" }}>
@@ -196,6 +219,7 @@ const TransactionTable = ({ user, selectedDate, onDateChange, download, isAllOrd
       title: "Status",
       dataIndex: "status",
       key: "status",
+      width: '150px',
       render: (text) => statusComponent(text),
     },
   ];
@@ -226,7 +250,7 @@ const TransactionTable = ({ user, selectedDate, onDateChange, download, isAllOrd
         <div className="flex items-center justify-between">
           <h2 className="hidden md:block"> My Transactions </h2>
           <div className="flex gap-2 items-center mb-5 mt-4">
-            <Select className="hidden lg:block w-80 rounded-md" onChange={(val)=>{handleFilter(val)}} placeholder="Select Type" defaultValue={type || ''}>
+            <Select className="block lg:block w-44 md:w-80 rounded-md" onChange={(val)=>{handleFilter(val)}} placeholder="Select Type" defaultValue={type || ''}>
               {TRANSACTION_FILTER.map(({label, value})=>
               <Select.Option value={value}> {label} </Select.Option>
                )}
@@ -249,18 +273,12 @@ const TransactionTable = ({ user, selectedDate, onDateChange, download, isAllOrd
                 </Space>
               </Button>
             </Dropdown>
-            <div className="relative">
-              <div onClick={() => setMDropdownVisible(!mDropdownVisible)} className="h-[32px] w-[33px] rounded-md border border-[#6A6A6A] flex md:hidden justify-center items-center">
-                <FilterIcon />
-              </div>
-              {mDropdownVisible && <Sorting className="md:hidden flex flex-col gap-1 absolute right-0 top-10 w-max shadow-card_shadow z-[99999] bg-white sort_conatiner py-1" />}
-            </div>
           </div>
         </div>
-        <div className="flex lg:hidden order_responsive">
+        <div className="flex md:hidden order_responsive">
           <TransactionResponsive data={userTransactions} />
         </div>
-        <div className="hidden lg:block">
+        <div className="hidden md:block">
            < DataTableComponent
             columns={column}
             data={userTransactions}
