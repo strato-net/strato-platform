@@ -76,7 +76,18 @@ setContractName cn =
 addPragma :: String -> String -> SolidityParser ()
 addPragma k v = do
   ParserState {..} <- getState
-  putState $ ParserState contractName pragmaVersion (M.insert k v pragmas) userDefinedTypes contractSrcLength
+  case k of
+    "solidvm" ->
+      let versionPragmaMap = resolveSolidVMVersion v
+          newPragmas = M.union versionPragmaMap pragmas
+      in putState $ ParserState contractName pragmaVersion newPragmas userDefinedTypes contractSrcLength
+    _ -> putState $ ParserState contractName pragmaVersion (M.insert k v pragmas) userDefinedTypes contractSrcLength
+  where
+    resolveSolidVMVersion :: String -> M.Map String String
+    resolveSolidVMVersion version =
+      case version of
+        "11.4" -> M.fromList $ [("es6", ""), ("strict", ""), ("builtinCreates", ""), ("safeExternalCalls", "")]
+        _ -> M.empty
 
 addUserDefinedType :: String -> String -> SolidityParser ()
 addUserDefinedType k v =

@@ -69,7 +69,7 @@ instance Format BasicValue where
   format (BContract n a) = labelToString n ++ "(" ++ format a ++ ")"
   format BMappingSentinel = "<MappingSentinel>"
   format BDefault = "<unknown>"
-
+--function that gives index type, wrap in map index 
 data IndexType
   = INum Integer
   | IText B.ByteString

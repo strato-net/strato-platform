@@ -151,7 +151,7 @@ setVal dst src = typeError "unknown case called in setVal (Probably tried to cha
 weakGetVar :: MonadIO m => Variable -> m Value
 weakGetVar (Constant c) = return c
 weakGetVar (Variable v) = liftIO $ readIORef v
-
+--fromm variable to value
 getVar :: MonadSM m => Variable -> m Value
 getVar (Constant (SReference addressedPath@(AccountPath addr key))) = do
   theValue <- getSolidStorageKeyVal' addr key
