@@ -4,7 +4,7 @@ const {
   prodMarketplaceUrl,
   testnetMarketplaceUrl,
 } = require("../config");
-const { getRewardsAmount } = require("../helper/googleSheet.js");
+const { getRewards } = require("../helper/googleSheet.js");
 
 async function handleOrderRewards(event, token) {
   const purchaser = event.eventEvent.eventArgs.find(
@@ -20,7 +20,7 @@ async function handleOrderRewards(event, token) {
     return;
   }
 
-  const totalAmount = parseFloat(
+  const orderTotal = parseFloat(
     event.eventEvent.eventArgs.find((arg) => arg[0] === "amount")?.[1] || 0
   );
 
@@ -49,59 +49,61 @@ async function handleOrderRewards(event, token) {
     eventKey = "FirstOrder";
   }
 
+  // Getting both rewards to reduce calls to Google API.
   const eventKeys = [eventKey, "RegularSale"];
-  const rewardAmounts = await getRewardsAmount(eventKeys);
+  const getRewards = await getRewards(eventKeys);
 
-  const buyerRewardPercentageStr = rewardAmounts[eventKey];
-  const sellerRewardPercentageStr = rewardAmounts["RegularSale"];
+  const buyerRewardStr = getRewards[eventKey];
+  const sellerRewardStr = getRewards["RegularSale"];
 
-  if (!buyerRewardPercentageStr || !sellerRewardPercentageStr) {
+  if (!buyerRewardStr || !sellerRewardStr) {
     console.error("Failed to get valid reward percentages.");
     return;
   }
 
-  let buyerRewardPercentage, sellerRewardPercentage;
-  // Adding support for percentage as a string or a number (e.g. "0.05" or "5%")
-  if (buyerRewardPercentageStr.includes("%")) {
-    buyerRewardPercentage =
-      parseFloat(buyerRewardPercentageStr.replace("%", "")) / 100;
+  // Adding support for percentage as a string or decimal (e.g. "0.05" or "5%")
+  let buyerRewardPercent, sellerRewardPercent;
+
+  if (buyerRewardStr.includes("%")) {
+    buyerRewardPercent =
+      parseFloat(buyerRewardStr.replace("%", "")) / 100;
   } else {
-    buyerRewardPercentage = parseFloat(buyerRewardPercentageStr);
+    buyerRewardPercent = parseFloat(buyerRewardStr);
   }
 
-  if (sellerRewardPercentageStr.includes("%")) {
-    sellerRewardPercentage =
-      parseFloat(sellerRewardPercentageStr.replace("%", "")) / 100;
+  if (sellerRewardStr.includes("%")) {
+    sellerRewardPercent =
+      parseFloat(sellerRewardStr.replace("%", "")) / 100;
   } else {
-    sellerRewardPercentage = parseFloat(sellerRewardPercentageStr);
+    sellerRewardPercent = parseFloat(sellerRewardStr);
   }
 
-  if (isNaN(buyerRewardPercentage) || isNaN(sellerRewardPercentage)) {
+  if (isNaN(buyerRewardPercent) || isNaN(sellerRewardPercent)) {
     console.error("Failed to get valid reward percentages.");
     return;
   }
 
-  let buyerRewardAmount = totalAmount * buyerRewardPercentage;
-  let sellerRewardAmount = totalAmount * sellerRewardPercentage;
+  let buyerReward = orderTotal * buyerRewardPercent;
+  let sellerReward = orderTotal * sellerRewardPercent;
 
-  buyerRewardAmount *= 10000; // Multiply by 10000 to handle decimal errors and then STRATS conversion.
-  sellerRewardAmount *= 10000; // Multiply by 10000 to handle decimal errors and then STRATS conversion.
+  buyerReward *= 10000; // Multiply by 10000 to handle rounding errors (1000) and then STRATS conversion (100).
+  sellerReward *= 10000; // Multiply by 10000 to handle rounding errors (1000) and then STRATS conversion (100).
 
   // Round the reward amounts to ensure they're integers
-  buyerRewardAmount = Math.round(buyerRewardAmount);
-  sellerRewardAmount = Math.round(sellerRewardAmount);
+  buyerReward = Math.round(buyerReward);
+  sellerReward = Math.round(sellerReward);
 
-  console.log("Buyer reward amount:", buyerRewardAmount);
-  console.log("Seller reward amount:", sellerRewardAmount);
+  handlePurchaserReward(purchaser, buyerReward, token)
+  handleSellerReward(seller, sellerReward, token)
 
-  // Create transaction payload and send it to the purchaser
-  let purchaserBody, sellerBody;
+}
 
+async function handlePurchaserReward(purchaser, reward, token) {
   try {
     const purchaserResponse = await createTransactionPayload(
       token,
       purchaser,
-      buyerRewardAmount
+      reward
     );
     if (!purchaserResponse.ok) {
       const errorText = await purchaserResponse.text();
@@ -114,37 +116,38 @@ async function handleOrderRewards(event, token) {
       );
     }
 
-    purchaserBody = await purchaserResponse.json();
-    console.log("Purchaser transfer response body:", purchaserBody);
+    const response = await purchaserResponse.json();
+    return response;
   } catch (error) {
     console.error("Error processing purchaser transaction:", error.message);
-    throw error; // Propagate the error to stop further processing if the purchaser transaction fails
+    throw error;
   }
+}
 
-  // Create transaction payload and send it to the seller
-  try {
-    const sellerResponse = await createTransactionPayload(
-      token,
-      seller,
-      sellerRewardAmount
-    );
-    if (!sellerResponse.ok) {
-      const errorText = await sellerResponse.text();
-      console.error(
-        `Error: ${sellerResponse.status} ${sellerResponse.statusText}`
+async function handleSellerReward(seller, reward, token) {
+    try {
+      const sellerResponse = await createTransactionPayload(
+        token,
+        seller,
+        reward
       );
-      console.error(`Response body: ${errorText}`);
-      throw new Error(
-        `Seller transaction failed with status ${sellerResponse.status}: ${sellerResponse.statusText}`
-      );
+      if (!sellerResponse.ok) {
+        const errorText = await sellerResponse.text();
+        console.error(
+          `Error: ${sellerResponse.status} ${sellerResponse.statusText}`
+        );
+        console.error(`Response body: ${errorText}`);
+        throw new Error(
+          `Seller transaction failed with status ${sellerResponse.status}: ${sellerResponse.statusText}`
+        );
+      }
+  
+      const response = await sellerResponse.json();
+      return response
+    } catch (error) {
+      console.error("Error processing seller transaction:", error.message);
+      throw error; 
     }
-
-    sellerBody = await sellerResponse.json();
-    console.log("Seller transfer response body:", sellerBody);
-  } catch (error) {
-    console.error("Error processing seller transaction:", error.message);
-    throw error; // Propagate the error if the seller transaction fails
-  }
 }
 
 module.exports = { handleOrderRewards };

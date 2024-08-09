@@ -1,7 +1,7 @@
 const {
   handleCertificateRegistered,
 } = require("./handleCertificateRegistered");
-const { handleFirstOrder } = require("./orderHandler");
+const { handleOrderRewards } = require("./orderHandler");
 
 async function handleMessage(messageData, token) {
   console.log("Received message:", messageData);
@@ -14,7 +14,7 @@ async function handleMessage(messageData, token) {
         break;
 
       case "Order":
-        await handleFirstOrder(event, token);
+        await handleOrderRewards(event, token);
         break;
 
       default:
