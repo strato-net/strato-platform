@@ -21,7 +21,9 @@ abstract contract PaymentService is Utils {
 
     event SellerOnboarded (
         string sellersCommonName,
-        bool isActive
+        bool isActive,
+        string ownerCommonName,
+        string serviceName
     );
 
     enum PaymentStatus { NULL, AWAITING_FULFILLMENT, PAYMENT_PENDING, CLOSED, CANCELED }
@@ -64,7 +66,7 @@ abstract contract PaymentService is Utils {
         string _imageURL,
         string _checkoutText,
         decimal _primarySaleFeePercentage,
-        decimal _secondaySaleFeePercentage
+        decimal _secondarySaleFeePercentage
     ) public {
         owner = msg.sender;
         ownerCommonName = getCommonName(msg.sender);
@@ -80,7 +82,7 @@ abstract contract PaymentService is Utils {
         }
 
         primarySaleFeePercentage = _primarySaleFeePercentage;
-        secondarySaleFeePercentage = _secondaySaleFeePercentage;
+        secondarySaleFeePercentage = _secondarySaleFeePercentage;
     }
 
     modifier requireOwner(string action) {
@@ -106,10 +108,10 @@ abstract contract PaymentService is Utils {
 
     function updateFees(
         decimal _primarySaleFeePercentage,
-        decimal _secondaySaleFeePercentage
+        decimal _secondarySaleFeePercentage
     ) requireOwner("update fee percentages") external {
         primarySaleFeePercentage = _primarySaleFeePercentage;
-        secondarySaleFeePercentage = _secondaySaleFeePercentage;
+        secondarySaleFeePercentage = _secondarySaleFeePercentage;
     }
 
     function deactivate() requireOwner("deactivate the payment service") external {
@@ -148,7 +150,7 @@ abstract contract PaymentService is Utils {
         string _sellersCommonName,
         bool _isActive
     ) requireOwner("onboard sellers") public returns (uint) {
-        emit SellerOnboarded(_sellersCommonName, _isActive);
+        emit SellerOnboarded(_sellersCommonName, _isActive, ownerCommonName, serviceName);
         return RestStatus.OK;
     }
 
