@@ -344,7 +344,7 @@ const HeaderComponent = ({ user, loginUrl, showMenu, handleSubMenu, handleMenuTa
               window.scrollTo(0, 0);
             }}
           >
-            <img src={Images.newLogo} alt={IMG_META} title={IMG_META} className="h-[31px] w-[120px] md:w-[120px] lg:w-[150px] md:h-[44px] logo-image" preview={false} />
+            <img src={Images.marketplaceLogo} alt={IMG_META} title={IMG_META} className="h-[31px] w-[120px] md:w-[150px] md:h-[44px] logo-image" preview={false} />
           </Col>
           <Col xs={showSearch ? 24 : 4} md={12} lg={18} className={`lg:ml-4 mf:ml-20 md:ml-1 bg-[#F6F6F6] shadow-md flex-1 header-search ${showSearch ? ' fixed top-[13px] left-0 flex w-[100vw] z-50 mb-2' : 'hidden md:flex '}`}>
             <Select
