@@ -15,7 +15,7 @@ async function handleOrderRewards(event, token) {
     (arg) => arg[0] === "sellerAddress"
   )?.[1];
 
-  if (!purchaser || !seller) {
+  if (!purchaser) {
     console.error("No purchaser or seller found in event args");
     return;
   }
@@ -51,10 +51,10 @@ async function handleOrderRewards(event, token) {
 
   // Getting both rewards to reduce calls to Google API.
   const eventKeys = [eventKey, "RegularSale"];
-  const getRewards = await getRewards(eventKeys);
+  const getAllRewards = await getRewards(eventKeys);
 
-  const buyerRewardStr = getRewards[eventKey];
-  const sellerRewardStr = getRewards["RegularSale"];
+  const buyerRewardStr = getAllRewards[eventKey];
+  const sellerRewardStr = getAllRewards["RegularSale"];
 
   if (!buyerRewardStr || !sellerRewardStr) {
     console.error("Failed to get valid reward percentages.");
