@@ -6,7 +6,7 @@ const { googleSheetId, googleCredentials } = require("../config");
  * @param {Array<string>} eventKeys - Array of event keys to fetch rewards for.
  * @returns {Promise<object>} Object containing reward amounts for the specified event keys.
  */
-async function getRewardsAmount(eventKeys) {
+async function getRewards(eventKeys) {
   const auth = new google.auth.GoogleAuth({
     keyFile: googleCredentials,
     scopes: "https://www.googleapis.com/auth/spreadsheets",
@@ -15,7 +15,7 @@ async function getRewardsAmount(eventKeys) {
   const googleSheets = google.sheets({ version: "v4", auth: client });
   const spreadsheetId = googleSheetId;
 
-  const range = "Sheet1!A1:Z"; // Adjust the range if necessary to match the columns
+  const range = "Sheet1!A1:G"; // Adjust the range if necessary to match the columns
   try {
     const response = await googleSheets.spreadsheets.values.get({
       spreadsheetId,
@@ -56,5 +56,5 @@ async function getRewardsAmount(eventKeys) {
 }
 
 module.exports = {
-  getRewardsAmount,
+  getRewards,
 };

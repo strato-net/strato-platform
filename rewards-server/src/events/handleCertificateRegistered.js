@@ -4,7 +4,7 @@ const {
   prodMarketplaceUrl,
   testnetMarketplaceUrl,
 } = require("../config");
-const { getRewardsAmount } = require("../helper/googleSheet.js");
+const { getRewards } = require("../helper/googleSheet.js");
 
 async function handleCertificateRegistered(event, token) {
   try {
@@ -59,10 +59,10 @@ async function handleCertificateRegistered(event, token) {
       return;
     }
 
-    const getReward = await getRewardsAmount(["handleCertificateRegistered"]);
-    const rewardAmount = getReward["handleCertificateRegistered"];
+    const getReward = await getRewards(["handleCertificateRegistered"]);
+    const reward = getReward["handleCertificateRegistered"];
     
-    if (!rewardAmount || rewardAmount <= 0) {
+    if (!reward || reward <= 0) {
       console.error("Failed to get reward amount from Google Sheet");
       return;
     }
@@ -71,7 +71,7 @@ async function handleCertificateRegistered(event, token) {
     const response = await createTransactionPayload(
       token,
       matchedObject.userAddress,
-      rewardAmount * 100 // Multiply by 100 for STRATS conversion
+      reward * 100 // Multiply by 100 for STRATS conversion
     );
 
     if (!response.ok) {
