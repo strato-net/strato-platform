@@ -4,6 +4,7 @@ version: '3'
 services:
   notification-server:
     environment:
+    - NODE_ENV=${NODE_ENV}
     - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
     - POSTGRES_SERVER_URL=${POSTGRES_SERVER_URL}
     - POSTGRES_PORT=${POSTGRES_PORT}
