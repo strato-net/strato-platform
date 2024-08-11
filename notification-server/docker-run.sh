@@ -35,5 +35,9 @@ if [ -z "${SENDGRID_API_KEY}" ]; then
   exit 16
 fi
 
+if [ -z "${NODE_ENV}" ]; then # default value for NODE_ENV is production
+  export NODE_ENV='production'
+fi
+
 echo 'Starting notification server...'
 yarn start
