@@ -370,7 +370,7 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
         if (res.status === 200)
           return res.data.data.map((item) => {
             const date = new Date(item.createdDate);
-            const unixTimestamp = Math.floor(date.getTime() / 1000);;
+            const unixTimestamp = Math.floor(date.getTime() / 1000);
             return { ...item, redemptionDate: unixTimestamp, type:'Redemption', block_timestamp: new Date(item.createdDate) }
           })
         else
@@ -414,7 +414,7 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
         if (res.status === 200) {
           return res.data.data.map((item) => {
             const date = new Date(item.createdDate);
-            const unixTimestamp = Math.floor(date.getTime() / 1000);;
+            const unixTimestamp = Math.floor(date.getTime() / 1000);
             return { ...item, redemptionDate: unixTimestamp, type: 'Redemption', block_timestamp: new Date(item.createdDate) }
           })
         } else {
@@ -839,7 +839,50 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
 
   contract.getSaleOrders = async function (args, options = defaultOptions) {
     const getOptions = { ...options, app: contractName, };
-    return saleOrderJs.getAll(rawAdmin, args, getOptions);
+
+
+   let data = await saleOrderJs.getAll(rawAdmin, args, getOptions);
+   let saleAddressArr = [];
+   data = data.orders.map((item)=> {
+    if(item?.saleAddresses?.length){
+      saleAddressArr.push(item?.saleAddresses[0])
+     return {...item,saleAddress:item?.saleAddresses[0]}
+    }else if(item["BlockApps-Mercata-Order-saleAddresses"]){
+      const address = item["BlockApps-Mercata-Order-saleAddresses"][0]?.value
+      saleAddressArr.push(address)
+     return {...item, saleAddress:address  }
+    }else{
+      saleAddressArr.push(item?.saleAddresses)
+      return {...item,saleAddress:item?.saleAddresses}
+    }
+  })
+
+
+  const sales = await saleJs.getAll(rawAdmin, { saleAddresses: saleAddressArr }, options);
+
+  let assets = [];
+  
+
+      for (const sale of sales) {
+        const history = await saleJs.getSaleHistory(rawAdmin, { contract: sale.contract_name, transaction_hash: sale.transaction_hash, assetToBeSold: sale.assetToBeSold }, options);
+        const price = history['0'] ? history['0'].price : null;
+
+        assets.push({
+          assetAddress: sale.assetToBeSold,
+          price: price,
+          assetPrice: sale?.price,
+          saleQuantity: sale.quantity,
+          saleAddress: sale.address,
+          amount: sale.quantity * price,
+        });
+      }
+
+      data = data.map((item)=>{
+        const saleData = assets.find((asset)=> asset.saleAddress === item.saleAddress) 
+        return {...item, ...saleData }
+      })
+
+  return data;
   }
 
   contract.checkSaleQuantity = async function (args, options = defaultOptions) {

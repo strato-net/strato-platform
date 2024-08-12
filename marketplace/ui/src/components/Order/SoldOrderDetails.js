@@ -77,7 +77,7 @@ const SoldOrderDetails = ({ user, users }) => {
         setSelectedDate(formattedDate);
       } else {
         setSelectedDate(null);
-      } 
+      }
 
       let items = [];
       const orderQuantities = orderDetails.order.quantities ? orderDetails.order.quantities : orderDetails.order["BlockApps-Mercata-Order-quantities"].map(item => item.value);
@@ -146,10 +146,10 @@ const SoldOrderDetails = ({ user, users }) => {
     return (
       <div className={className}>
         <Text className="block text-[#6A6A6A] text-[12px] mb-1">{title}</Text>
-        { (status === getStatus(3) || status === getStatus(4)) && title === "Order Close Date" ? 
-        (<Text className="block text-[#202020] text-[13px] font-semibold">{value}</Text>):
-        title !== "Order Close Date" &&
-        (<Text className="block text-[#202020] text-[13px] font-semibold">{value}</Text>)
+        {(status === getStatus(3) || status === getStatus(4)) && title === "Order Close Date" ?
+          (<Text className="block text-[#202020] text-[13px] font-semibold">{value}</Text>) :
+          title !== "Order Close Date" &&
+          (<Text className="block text-[#202020] text-[13px] font-semibold">{value}</Text>)
         }
       </div>
     );
@@ -299,24 +299,24 @@ const SoldOrderDetails = ({ user, users }) => {
   return (
     <div>
       {contextHolder}
-        <div>
-          <Breadcrumb className="text-sm ml-4 md:ml-20  mt-0 md:mt-5 mb-2">
-            <Breadcrumb.Item href="" onClick={e => e.preventDefault()}>
-              <ClickableCell href={routes.Marketplace.url}>
-                <p className="text-sm text-primary font-semibold">Home</p>
-              </ClickableCell>
-            </Breadcrumb.Item>
-            <Breadcrumb.Item href="" onClick={e => e.preventDefault()}>
-              <div onClick={() => { navigate(routes.Orders.url.replace(':type', 'sold')); }}>
-                <p className="text-sm text-primary font-semibold">Orders (sold)</p>
-              </div>
-            </Breadcrumb.Item>
-            <Breadcrumb.Item className="text-sm text-[#202020] font-medium">
-              {`${details?.order?.orderId || ''}`.substring(0,6)}
-            </Breadcrumb.Item>
-          </Breadcrumb>
+      <div>
+        <Breadcrumb className="text-sm ml-4 md:ml-20  mt-0 md:mt-5 mb-2">
+          <Breadcrumb.Item href="" onClick={e => e.preventDefault()}>
+            <ClickableCell href={routes.Marketplace.url}>
+              <p className="text-sm text-primary font-semibold">Home</p>
+            </ClickableCell>
+          </Breadcrumb.Item>
+          <Breadcrumb.Item href="" onClick={e => e.preventDefault()}>
+            <div onClick={() => { navigate(routes.Orders.url.replace(':type', 'sold')); }}>
+              <p className="text-sm text-primary font-semibold">Orders (sold)</p>
+            </div>
+          </Breadcrumb.Item>
+          <Breadcrumb.Item className="text-sm text-[#202020] font-medium">
+            {`${details?.order?.orderId || ''}`.substring(0, 6)}
+          </Breadcrumb.Item>
+        </Breadcrumb>
 
-          <Tabs
+        {/* <Tabs
             className="mx-4 md:mx-20 mt-0 md:mt-5"
             defaultActiveKey={"sold"}
             onChange={onChange}
@@ -526,9 +526,189 @@ const SoldOrderDetails = ({ user, users }) => {
                 children: <RedemptionsIncomingTable user={user} selectedDate={dayjs(selectedDate).startOf('day').unix()} />
               }
             ]}
-          />
+          /> */}
 
+        <div className="mb-10 lg:px-10">
+          <Button type="ghost" onClick={() => onChange('sold')} className="cursor-pointer px-2 flex md:hidden items-center gap-2 text-xs font-semibold"><LeftArrow /> Back</Button>
+          {details === null || isorderDetailsLoading ? (
+            <div className="h-screen flex justify-center items-center">
+              <Spin
+                spinning={isorderDetailsLoading}
+                size="large"
+              />
+            </div>
+          ) : (
+            <Card className="md:p-2 mb-4 md:mb-14 md:shadow-card_shadow order_detail_card">
+              <div className="flex flex-col md:flex-row md:justify-between">
+                <div className="flex flex-col">
+                  <div className="flex">
+                    <Text className="bg-[#E9E9E9] md:bg-white py-2 px-3 md:w-3.5/5 w-full md:bg-none font-semibold text-sm md:text-lg text-primaryB flex gap-4 items-center">Order Details</Text>
+                    <Text className="hidden md:flex mt-2">{statusComponentForPayment(paid)}</Text>
+                  </div>
+
+                </div>
+
+              </div>
+              <Row className="hidden md:flex my-6 justify-between bg-[#F6F6F6] p-4 pb-2 rounded">
+                <OrderData title="Order Number" value={`#${`${details.order.orderId}`.substring(0, 6)}`} />
+                <Divider type="vertical" className="h-14 bg-secondryD" />
+                <OrderData
+                  title="Buyer"
+                  value={details.order.purchasersCommonName}
+                />
+                <Divider type="vertical" className="h-14 bg-secondryD" />
+                <OrderData
+                  title="Seller"
+                  value={details.order.sellersCommonName}
+                />
+                <Divider type="vertical" className="h-14 bg-secondryD" />
+                <OrderData title="Currency" value={details.order.currency ? details.order.currency : "USD"} />
+                <Divider type="vertical" className="h-14 bg-secondryD" />
+                <OrderData title="Total" value={details.order.currency === "STRATS" ? (details.order.totalPrice * STRATS_CONVERSION).toFixed(0) : details.order.totalPrice} />
+                <Divider type="vertical" className="h-14 bg-secondryD" />
+                <OrderData
+                  title="Date"
+                  value={getStringDate(details.order.createdDate, US_DATE_FORMAT)}
+                />
+                <Divider type="vertical" className="h-14 bg-secondryD" />
+
+                {
+                  status !== getStatus(1) ? <Col>
+                    <Text className="block text-primaryC text-[13px] mb-2">
+                      Status
+                    </Text>
+                    {statusComponent(status)}
+                  </Col> :
+                    <div>
+                      <Row className="items-center mb-2 gap-1">
+                        <Select
+                          bordered={false}
+                          defaultValue=""
+                          value="STATUS"
+                          size="small"
+                          className="text-primaryC text-[13px]"
+                          style={{
+                            width: 120,
+                            color: "#4E4D4B",
+                          }}
+                          options={
+                            status === getStatus(1)
+                              ? [
+                                {
+                                  text: getStatus(1),
+                                  value: getStatus(1),
+                                },
+                                {
+                                  text: getStatus(4),
+                                  value: getStatus(4),
+                                },
+                              ]
+                              : status === getStatus(2)
+                                ? [
+                                  {
+                                    text: getStatus(2),
+                                    value: getStatus(2),
+                                  },
+                                ]
+                                : status === getStatus(4)
+                                  ? [
+                                    {
+                                      text: getStatus(4),
+                                      value: getStatus(4),
+                                    },
+                                  ]
+                                  : [
+                                    {
+                                      text: getStatus(3),
+                                      value: getStatus(3),
+                                    },
+                                  ]
+                          }
+                        />
+                      </Row>
+                      {statusComponent(status)}
+                    </div>
+                }
+                <Divider type="vertical" className="h-14 bg-secondryD" />
+                <div className="text-xs order_detail_date">
+                  <Text className="block text-primaryC text-[13px]">
+                    Order Close Date
+                  </Text>
+                  {(status === getStatus(3) || status === getStatus(4)) &&
+
+                    <DatePicker
+                      value={
+                        selectedDate
+                      }
+                      onChange={onDateChange}
+                      disabled={true}
+                    />
+
+
+                  }
+                </div>
+              </Row>
+              <Row className="my-2 md:hidden flex-col gap-[6px] justify-between p-4 rounded">
+                <div className="flex gap-4">
+                  <NewOrderData className="w-2/4" title="Order Number" value={'#' + `${details.order.orderId}`.substring(0, 6)} />
+                  <NewOrderData className="w-2/4" title="Buyer" value={details.order.purchasersCommonName} />
+                </div>
+                <div className="flex gap-4">
+                  <NewOrderData className="w-2/4" title="Seller" value={details.order.sellersCommonName} />
+                  <NewOrderData className="w-2/4" title="Currency" value={details.order.currency ? details.order.currency : "USD"} />
+                </div>
+                <div className="flex gap-4">
+                  <NewOrderData className="w-2/4" title="Total" value={details.order.currency === "STRATS" ? (details.order.totalPrice * STRATS_CONVERSION).toFixed(0) : details.order.totalPrice} />
+                  <NewOrderData className="w-2/4" title="Date" value={getStringDate(details.order.createdDate, US_DATE_FORMAT)} />
+                </div>
+                <div className="flex gap-4">
+                  <NewOrderData className="w-2/4" title="Payment Status" value={statusComponentForPayment(paid)} />
+                  <NewOrderData className="w-2/4" title="Status" value={statusComponent(status)} />
+                </div>
+                <div className="flex justify-start">
+                  <NewOrderData className="w-2/4" title="Order Close Date"
+                    value={
+                      <DatePicker
+                        value={selectedDate}
+                        onChange={onDateChange}
+                        disabled={true}
+                      />}
+                  />
+                </div>
+              </Row>
+              <Row className="flex-nowrap items-center justify-between mb-2 md:mb-6 p-2">
+                <div className="w-full">
+                  <Text className="block text-primaryC text-[13px] mb-2">
+                    Comments
+                  </Text>
+                  <TextArea
+                    rows={2}
+                    placeholder="Enter Comments"
+                    value={decodeURIComponent(comment)}
+                    disabled={true}
+                    onChange={(event) => {
+                      setComment(encodeURIComponent(event.target.value));
+                    }}
+                  />
+                </div>
+              </Row>
+              <div className="md:block hidden">
+                <DataTableComponent
+                  columns={column}
+                  data={data}
+                  scrollX="100%"
+                  isLoading={false}
+                />
+              </div>
+            </Card>
+          )}
+          {data?.length > 0 && data?.map((item) => {
+            return (
+              <ResponsiveOrderDetailCard data={item} />)
+          })}
         </div>
+
+      </div>
       {message && openToastOrder("bottom")}
     </div>
   );

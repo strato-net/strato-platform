@@ -390,11 +390,11 @@ export const BANNER = [
 
 
 export const TRANSACTION_STATUS = {
-  1: 'payment Pending',
-  2: 'closed',
-  3: 'cancelled',
-  4: 'awaiting',
-  5: 'awaiting shipment'
+  1: 'Awaiting Fulfillment',
+  2: 'Payment Pending',
+  3: 'Closed',
+  4: 'Cancelled',
+  5: 'Discarded'
 }
 
 export const TRANSACTION_STATUS_COLOR = {
@@ -405,24 +405,36 @@ export const TRANSACTION_STATUS_COLOR = {
 
 export const TRANSACTION_STATUS_CLASSES = {
   1: {
-    textClass: "bg-[#EBF7FF]",
-    bgClass: "bg-[#13188A]"
+    textClass: "bg-[#FF8C0033]",
+    bgClass: "bg-[#FF8C00]"
   },
   2: {
     textClass: "bg-[#FF8C0033]",
     bgClass: "bg-[#FF8C00]"
   },
   3: {
-    textClass: "bg-[#FF8C0033]",
-    bgClass: "bg-[#FF8C00]"
-  },
-  4: {
     textClass: "bg-[#119B2D33]",
     bgClass: "bg-[#119B2D]"
+  },
+  4: {
+    textClass: "bg-[#FFF0F0]",
+    bgClass: "bg-[#FF0000]"
   },
   5: {
     textClass: "bg-[#FFF0F0]",
     bgClass: "bg-[#FF0000]"
+  },
+}
+  
+
+export const REDEMPTION_STATUS_CLASSES = {
+  1: {
+    textClass: "bg-[#FF8C0033]",
+    bgClass: "bg-[#FF8C00]"
+  },
+  2: {
+    textClass: "bg-[#119B2D33]",
+    bgClass: "bg-[#119B2D]"
   },
 }
 

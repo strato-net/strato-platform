@@ -10,7 +10,7 @@ const getItemQuantity = (item) => {
     } else if (item['BlockApps-Mercata-Order-quantities']?.length) {
         return item['BlockApps-Mercata-Order-quantities'][0]?.value
     } else {
-        return 'null'
+        return ''
     }
 }
 class TransactionController {
@@ -45,7 +45,7 @@ class TransactionController {
             let data = []
             if (type === 'Order' || !type) {
                 orderData = await dapp.getSaleOrders({ ...transactionQuery });
-                data = [...data, ...orderData.orders]
+                data = [...data, ...orderData]
             }
             if (type === 'Transfer' || !type) {
                 itemTransfers = await dapp.getAllItemTransferEvents(TransferQuery);
@@ -75,35 +75,34 @@ class TransactionController {
             const newData = sortData.map((item) => {
 
                 const asset = inventoriesWithImageUrl.find((assetItem)=>{
-                    if(item.type==='Order'){}
-                      else{
                     return (assetItem.address === (item?.assetAddress || item?.assetAddresses[0]))
-                      }
                 });
 
-                const getImage=(asset)=> {
-                    if(asset && asset["BlockApps-Mercata-Asset-images"] ){
-                        return asset["BlockApps-Mercata-Asset-images"][0].value;
-                    }else {
+                const getImage=(assetItem)=> {
+                    if(assetItem && assetItem["BlockApps-Mercata-Asset-images"]?.length ){
+                        return assetItem["BlockApps-Mercata-Asset-images"][0].value;
+                    }else if (item.image){
+                        return item.image;
+                    }else{
                         return ''
                     }
                 }
 
                 return {
                 ...item,
-                from: item.oldOwnerCommonName || item.sellersCommonName || item.ownerCommonName,
-                to: item.newOwnerCommonName || item.purchasersCommonName || item.issuerCommonName,
-                price: item.price || item.totalPrice || 'null',
+                from: item.oldOwnerCommonName || item.sellersCommonName || item.issuerCommonName || item.sellerCommonName,
+                to: item.newOwnerCommonName || item.purchasersCommonName || item.ownerCommonName,
+                price: item.price || item.totalPrice || '',
                 status: item.status || '1',
-                reference: item.id || item.orderId || item.redemption_id,
+                reference: item.transferNumber || item.orderId || item.redemption_id,
                 quantity: getItemQuantity(item),
                 assetName:asset?.name || "null",
                 assetDescription:asset?.description || 'null',
                 assetImage:getImage(asset),
                 category:asset?.category || 'null',
-                assetPrice:'null'
+                assetPrice: item?.assetPrice
             }});
-            // rest.response.status200(res, transaction)
+
             res.status(200).json({ success: true, message: "Fetched Transactions successfully", data: newData })
             return next()
         } catch (e) {
