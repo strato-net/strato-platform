@@ -40,6 +40,10 @@ describe("Payment Server - deactivate contracts", function () {
   //   await deactivate(token, deployment.contracts.metamask)
   // })
 
+  it('Deactivate STRATS StratPaymentService', async () => {
+    await deactivate(token, deployment.contracts.strat)
+  })
+
   it('Deactivate ExternalRedemptionService', async () => {
     await deactivate(token, deployment.contracts.redemption)
   })

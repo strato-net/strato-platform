@@ -8,8 +8,8 @@ import { replaceInFiles } from './helpers/replaceInFiles.js';
 
 const contractDir = config.contractDirPath || '/usr/src/payment-server/contracts/Templates';
 
-async function uploadContract(token, type, args) {
-  const contractName = `External${type}Service`;
+async function uploadContract(token, location, type, args) {
+  const contractName = `${location}${type}Service`;
   const filename = `${contractDir}/${type}s/${contractName}.sol`
   const source = await importer.combine(filename);
   const contractArgs = {
@@ -55,6 +55,7 @@ describe("Payment Server - deploy contracts", function () {
   let stripe
   // TODO: Disabled for initial payment server release
   // let metamask
+  let strat
   let redemption
 
   before(async () => {
@@ -88,7 +89,7 @@ describe("Payment Server - deploy contracts", function () {
   })
 
   it('Deploy Stripe ExternalPaymentService', async () => {
-    stripe = await uploadContract(token, 'Payment', config.stripe)
+    stripe = await uploadContract(token, 'External', 'Payment', config.stripe)
   })
 
   // TODO: Disabled for initial payment server release
@@ -96,8 +97,12 @@ describe("Payment Server - deploy contracts", function () {
   //   metamask = await uploadContract(token, 'Payment', config.metamask)
   // })
 
+  it('Deploy STRATS StratPaymentService', async () => {
+    strat = await uploadContract(token, 'Strat', 'Payment', config.strat)
+  })
+
   it('Deploy ExternalRedemptionService', async () => {
-    redemption = await uploadContract(token, 'Redemption', config.redemption)
+    redemption = await uploadContract(token, 'External', 'Redemption', config.redemption)
   })
 
   it('Create deploy.yaml', async () => {
@@ -105,6 +110,7 @@ describe("Payment Server - deploy contracts", function () {
       deployFilePath: `${config.configDirPath}/deploy.yaml`,
       stripe,
       // metamask, // TODO: Disabled for initial payment server release
+      strat,
       redemption
     }
     const deployment = deploy(deployArgs, config)
