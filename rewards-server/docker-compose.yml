@@ -6,6 +6,9 @@ services:
     volumes:
       - ./.env:/usr/src/rewards-server/.env:ro
       - ./secrets.json:/usr/src/rewards-server/secrets.json:ro
+    ports:
+      - 80:80
+      - 443:443
     restart: unless-stopped
     logging:
       driver: "json-file"
