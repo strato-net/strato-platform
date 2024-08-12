@@ -513,20 +513,13 @@ createIndexTable ::
   ConduitM () Text m [ForeignKeyInfo]
 createIndexTable contract cc (creator, a, n) = do
   let tableName = indexTableName creator a n
-  tableExists <- isTableCreated tableName
 
-  --When contract hasn't been written to "contract" table and indexing table doesn't exist
-  $logDebugLS "createIndexTable/tableExists" ("Table Name: " ++ show tableName ++ ", contract already created: " ++ show tableExists)
-  if tableExists 
-    then return []
-    else do
-      incNumTables
-      let isEvent = False
-          list = getTableColumnAndType isEvent cc $ map (\(x, y) -> (labelToText x, y ^. varType)) $ Map.toList $ contract ^. storageDefs
-          listCombined = map (\(x,y)-> x <> " " <> y) list
-      yield $ createIndexTableQuery (creator, a, n) listCombined
-      setTableCreated tableName listCombined
-      getDeferredForeignKeys tableName contract cc creator a
+  let isEvent = False
+      list = getTableColumnAndType isEvent cc $ map (\(x, y) -> (labelToText x, y ^. varType)) $ Map.toList $ contract ^. storageDefs
+      listCombined = map (\(x,y)-> x <> " " <> y) list
+  yield $ createIndexTableQuery (creator, a, n) listCombined
+  --setTableCreated tableName listCombined
+  getDeferredForeignKeys tableName contract cc creator a
 
 createAbstractTable ::
   OutputM m =>
@@ -537,17 +530,13 @@ createAbstractTable ::
   ConduitM () Text m [ForeignKeyInfo]
 createAbstractTable contract (creator, a, n) abstracts' cc = do
   let tableName = abstractTableName creator a n
-  tableExists <- isTableCreated tableName
-  if tableExists
-    then return []
-    else do
-      let storageDefs' =  Map.toList $ contract ^. storageDefs
-          isEvent = False
-          list = getTableColumnAndType isEvent cc $ map (\(x, y) -> (labelToText x, y ^. varType)) $ storageDefs'
-          listCombined = map (\(x,y)-> x <> " " <> y) list
-      yield $ createAbstractTableQuery (creator, a, n) listCombined
-      setTableCreated tableName (listCombined ++ ["\"data\" jsonb"])
-      getDeferredForeignKeysAbstract tableName contract creator a abstracts' cc
+  let storageDefs' =  Map.toList $ contract ^. storageDefs
+      isEvent = False
+      list = getTableColumnAndType isEvent cc $ map (\(x, y) -> (labelToText x, y ^. varType)) $ storageDefs'
+      listCombined = map (\(x,y)-> x <> " " <> y) list
+  yield $ createAbstractTableQuery (creator, a, n) listCombined
+  --setTableCreated tableName (listCombined ++ ["\"data\" jsonb"])
+  getDeferredForeignKeysAbstract tableName contract creator a abstracts' cc
 
 -- if flag from solidvm that it is a record, vmevent
 createMappingTable ::
@@ -558,17 +547,12 @@ createMappingTable ::
   ConduitM () Text m [ForeignKeyInfo]
 createMappingTable (creator, a, n) m = do
   let tableName = collectionTableName creator a n m
-  tableExists <- isTableCreated tableName
 
-  $logDebugLS "createMappingTable/tableExists" ("Table Name: " ++ show tableName ++ ", table exists: " ++ formatBool tableExists)
-  if tableExists
-    then return []
-    else do
-      incNumMappingTables
-      yield $ (createMappingTableQuery (creator, a, n, m))
-      let list = ["key", "value"]
-      setTableCreated tableName list
-      return $ getDeferredForeignKeysForCollection tableName creator a
+  --incNumMappingTables
+  yield $ (createMappingTableQuery (creator, a, n, m))
+  let list = ["key", "value"]
+  --setTableCreated tableName list
+  return $ getDeferredForeignKeysForCollection tableName creator a
 
 createArrayTable ::
   OutputM m =>
@@ -578,18 +562,13 @@ createArrayTable ::
   ConduitM () Text m [ForeignKeyInfo]
 createArrayTable  (creator, a, n) (arr, arrType) = do
   let tableName = collectionTableName creator a n arr
-  tableExists <- isTableCreated  tableName
-  $logDebugLS "createArrayTable/tableExists" ("Table Name: " ++ show tableName ++ ", table exists: " ++ formatBool tableExists)
-  if tableExists
-    then return []
-    else do
-      incNumArrayTables
-      yield $ (createArrayTableQuery (creator, a, n, arr))
-      let list = ["key", "value"]
-      setTableCreated  tableName list
-      let fkeys1 = getDeferredForeignKeysForCollection tableName creator a
-          fkeys2 = getDeferredForeignKeysForArrayType tableName creator a arrType
-      return $ fkeys1 ++ fkeys2
+  incNumArrayTables
+  yield $ (createArrayTableQuery (creator, a, n, arr))
+  let list = ["key", "value"]
+  --setTableCreated  tableName list
+  let fkeys1 = getDeferredForeignKeysForCollection tableName creator a
+      fkeys2 = getDeferredForeignKeysForArrayType tableName creator a arrType
+  return $ fkeys1 ++ fkeys2
 
 createHistoryTable' ::
   OutputM m =>
@@ -601,18 +580,13 @@ createHistoryTable' ::
   ConduitM () (Text, Maybe ( TableName, TableColumns)) m ()
 createHistoryTable' isAbstract  contract cc (creator, a, n) = do
   let tableName = historyTableName creator a n
-  tableExists <- isTableCreated  tableName
-
-  $logDebugLS "createHistoryTable'/tableExists" ("Table Name: " ++ show tableName ++ ", table exists: " ++ formatBool tableExists)
-
-  when (not tableExists) $ do
-    incNumHistoryTables
-    let isEvent = False
-        list = getTableColumnAndType isEvent cc $ map (\(x, y) -> (labelToText x, y ^. varType)) $ Map.toList $ contract ^. storageDefs
-        listCombined = map (\(x,y)-> x <> " " <> y) list
-    yield $ ((createHistoryTableQuery isAbstract (creator, a, n) listCombined), Nothing)
-    yieldMany $ map (\x -> (x, Nothing)) (addHistoryUnique (creator, a, n))
-    setTableCreated  tableName listCombined
+  incNumHistoryTables
+  let isEvent = False
+      list = getTableColumnAndType isEvent cc $ map (\(x, y) -> (labelToText x, y ^. varType)) $ Map.toList $ contract ^. storageDefs
+      listCombined = map (\(x,y)-> x <> " " <> y) list
+  yield $ ((createHistoryTableQuery isAbstract (creator, a, n) listCombined), Nothing)
+  yieldMany $ map (\x -> (x, Nothing)) (addHistoryUnique (creator, a, n))
+  --setTableCreated  tableName listCombined
 
 createHistoryTable ::
   OutputM m =>
@@ -624,17 +598,15 @@ createHistoryTable ::
   ConduitM () Text m ()
 createHistoryTable isAbstract  contract cc (creator, a, n) = do
   let tableName = historyTableName creator a n
-  tableExists <- isTableCreated  tableName
-
-  $logDebugLS "createHistoryTable/tableExists" ("Table Name: " ++ show tableName ++ ", table exists: " ++ formatBool tableExists)
-
-  when (not tableExists) $ do
-    incNumHistoryTables
-    let list = getTableColumnAndType False cc $ map (\(x, y) -> (labelToText x, y ^. varType)) $ Map.toList $ contract ^. storageDefs
-        listCombined = map (\(x,y)-> x <> " " <> y) list
-    yield $ (createHistoryTableQuery isAbstract (creator, a, n) listCombined)
-    yieldMany $ addHistoryUnique (creator, a, n)
-    setTableCreated  tableName listCombined
+  --tableExists <- isTableCreated  tableName
+  
+  --when (not tableExists) $ do
+    --incNumHistoryTables
+  let list = getTableColumnAndType False cc $ map (\(x, y) -> (labelToText x, y ^. varType)) $ Map.toList $ contract ^. storageDefs
+      listCombined = map (\(x,y)-> x <> " " <> y) list
+  yield $ (createHistoryTableQuery isAbstract (creator, a, n) listCombined)
+  yieldMany $ addHistoryUnique (creator, a, n)
+    --setTableCreated  tableName listCombined
 
 -- Runs ALTER TABLE <name> [ADD COLUMN <column>] for any new fields added to a contract definition
 expandIndexTable ::
@@ -696,7 +668,7 @@ expandContractTable'  contract cc tableName = do
           " for the following fields: ",
           T.intercalate ", " colsCombined
         ]
-    setTableCreated  tableName $ colsCombined
+    --setTableCreated  tableName $ colsCombined
     yield $ ((expandTableQuery tableName colsCombined), Just (tableName, colsCombined))
   return $ []
 
@@ -721,7 +693,7 @@ expandContractTable  contract cc tableName = do
             " for the following fields: ",
             T.intercalate ", " colsCombined
           ]
-      setTableCreated  tableName $ colsCombined
+      --setTableCreated  tableName $ colsCombined
       yield $ expandTableQuery tableName colsCombined
     case tableName of
       IndexTableName creator a _ -> getDeferredForeignKeys tableName contract cc creator a
@@ -749,7 +721,7 @@ expandAbstractContractTable  contract tableName abstracts' cc = do
           " for the following new fields: ",
           T.intercalate ", " colsCombined
         ]
-    setTableCreated  tableName $ colsCombined
+    --setTableCreated  tableName $ colsCombined
     yield $ expandAbstractTableQuery tableName colsCombined
   case tableName of
     AbstractTableName creator a _ -> getDeferredForeignKeysAbstract tableName contract creator a abstracts' cc 
@@ -1391,10 +1363,10 @@ createEventTable  (creator, a, n) evName ev cc = do
       isEvent = True
       cols = getTableColumnAndType isEvent cc [(x, indexedTypeType y) | (x, y) <- fillFirstEmptyEntries $ ev ^. eventLogs]
       colsCombined = map (\(x,y)-> x <> " " <> y) cols
-  eventAlreadyCreated <- isTableCreated  eventTable
-  unless eventAlreadyCreated $ do
-    setTableCreated  eventTable $ colsCombined
-    yield $ createEventTableQuery eventTable colsCombined
+  --eventAlreadyCreated <- isTableCreated  eventTable
+  --unless eventAlreadyCreated $ do
+    --setTableCreated  eventTable $ colsCombined
+  yield $ createEventTableQuery eventTable colsCombined
 
 createEventTableQuery :: TableName -> TableColumns -> Text
 createEventTableQuery tableName cols =
@@ -1431,7 +1403,7 @@ expandEventTable  (creator, a, n) evName ev cc = do
       allTableColsCombined = map (\(x,y)-> x <> " " <> y) allTableCols
   unless (null allTableCols) $ do
     $logInfoS "expandEventTable" . T.pack $ "We just got new fields for a contract that already has a table!"
-    setTableCreated  tableName allTableColsCombined
+    --setTableCreated  tableName allTableColsCombined
     $logInfoS "expandEventTable" $
       T.concat
         [ "Adding columns to ",
