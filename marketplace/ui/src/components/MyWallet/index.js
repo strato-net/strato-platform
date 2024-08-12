@@ -7,7 +7,6 @@ import {
   Table,
   Tooltip,
 } from "antd";
-import { ASSET_STATUS } from "../../helpers/constants";
 import { actions as categoryActions } from "../../contexts/category/actions";
 import { useCategoryDispatch } from "../../contexts/category";
 import useDebounce from "../UseDebounce";
@@ -26,6 +25,23 @@ import { SEO } from "../../helpers/seoConstant";
 import { useMarketplaceState } from "../../contexts/marketplace";
 import { useNavigate } from "react-router-dom";
 
+// Custom hook for media query
+const useMediaQuery = (query) => {
+  const [matches, setMatches] = useState(false);
+
+  useEffect(() => {
+    const media = window.matchMedia(query);
+    if (media.matches !== matches) {
+      setMatches(media.matches);
+    }
+    const listener = () => setMatches(media.matches);
+    media.addListener(listener);
+    return () => media.removeListener(listener);
+  }, [matches, query]);
+
+  return matches;
+};
+
 const MyWallet = ({ user }) => {
   const [queryValue] = useState("");
   const debouncedSearchTerm = useDebounce(queryValue, 1000);
@@ -39,6 +55,7 @@ const MyWallet = ({ user }) => {
   const linkUrl = window.location.href;
   const { Title, Text } = Typography;
   const navigate = useNavigate();
+  const isMobile = useMediaQuery("(max-width: 767px)");
 
   const { strats } = useMarketplaceState();
   const stratsBalance = Object.keys(strats).length > 0 ? strats : 0;
@@ -366,6 +383,225 @@ const MyWallet = ({ user }) => {
     },
   ];
 
+  const renderMobileCard = (item, index, totalItems) => (
+    <div key={item.key}>
+      <div className="bg-white p-4">
+        <div className="grid grid-cols-2 gap-4">
+          <div className="col-span-1 flex items-center">
+            <img
+              src={item.image}
+              alt={item.asset}
+              className="w-12 h-12 object-contain mr-2"
+            />
+            <p className="text-sm font-semibold">{item.asset}</p>
+          </div>
+          <div className="col-span-1 text-right">
+            <p className="text-sm font-bold">{item.value}</p>
+            <p className="text-xs text-gray-500">
+              {item.gainLoss !== "---"
+                ? item.gainLoss
+                : (parseFloat(item.value.replace("$", "")) / 0.01).toFixed(2) +
+                  " STRATS"}
+            </p>
+          </div>
+          <div className="col-span-1">
+            <p className="text-xs">
+              <span style={{ color: "#373B9C", fontWeight: "bold" }}>
+                Unit Price:
+              </span>{" "}
+              <span style={{ color: "#3F4149" }}>{item.price}</span>
+            </p>
+          </div>
+          <div className="col-span-1 text-right">
+            <p className="text-xs">
+              <span style={{ color: "#373B9C", fontWeight: "bold" }}>
+                Quantity:
+              </span>{" "}
+              <span style={{ color: "#3F4149" }}>{item.quantity}</span>
+            </p>
+          </div>
+        </div>
+      </div>
+      {index !== totalItems - 1 && (
+        <div className="mx-4">
+          <div className="border-b border-[#D9D9D9]"></div>
+        </div>
+      )}
+    </div>
+  );
+
+  const renderMobileView = () => (
+    <div className="bg-gray-100 min-h-screen">
+      <div className="bg-[#ADA0E2] bg-opacity-20 p-4">
+        <Breadcrumb className="mb-4">
+          <Breadcrumb.Item>
+            <ClickableCell href={routes.Marketplace.url}>
+              <p className="text-sm text-[#13188A] font-semibold">Home</p>
+            </ClickableCell>
+          </Breadcrumb.Item>
+          <Breadcrumb.Item>
+            <p className="text-sm text-[#202020] font-medium">My Wallet</p>
+          </Breadcrumb.Item>
+        </Breadcrumb>
+
+        <div className="flex flex-col items-center mb-4">
+          <Avatar
+            size={50}
+            style={{
+              backgroundColor: "#373B9C",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+            }}
+          >
+            <span style={{ fontSize: "24px", fontWeight: "bold" }}>
+              {userLetter}
+            </span>
+          </Avatar>
+          <Typography.Text
+            style={{
+              fontSize: "16px",
+              color: "#373B9C",
+              fontWeight: "600",
+              textAlign: "center",
+            }}
+            className="mt-2"
+          >
+            {userName}
+          </Typography.Text>
+        </div>
+
+        <div className="text-center">
+          <Typography.Title
+            style={{ color: "#373B9C", marginBottom: "0" }}
+            level={5}
+          >
+            Balance:
+          </Typography.Title>
+          <Typography.Text
+            style={{
+              fontSize: "24px",
+              color: "#373B9C",
+              fontWeight: "bold",
+              marginBottom: "0",
+              marginTop: "7px",
+            }}
+            className="block"
+          >
+            ${totalBalance}
+          </Typography.Text>
+          <div className="flex items-center justify-center mt-1">
+            <img
+              src={Images.logo}
+              alt="STRATS"
+              style={{ width: "12px", height: "12px", marginRight: "5px" }}
+            />
+            <Typography.Text style={{ fontSize: "14px", color: "#747474" }}>
+              {stratsBalance}
+            </Typography.Text>
+          </div>
+        </div>
+      </div>
+
+      <div className="p-4">
+        <div className="border border-[#D9D9D9] rounded-lg overflow-hidden">
+          <h2 className="text-lg font-bold p-4" style={{ color: "#373B9C" }}>
+            Assets
+          </h2>
+          {tableData.map((item, index) =>
+            renderMobileCard(item, index, tableData.length)
+          )}
+        </div>
+      </div>
+    </div>
+  );
+
+  const renderDesktopView = () => (
+    <>
+      <div
+        className="w-full h-[200px] py-4 px-4 md:h-[250px] bg-[#ADA0E2] bg-opacity-20 flex flex-col justify-between mt-0 lg:-mt-8"
+        style={{ borderColor: "#13188A" }}
+      >
+        <Breadcrumb className="mx-5 md:mx-14 mt-2 lg:mt-4">
+          <Breadcrumb.Item href="" onClick={(e) => e.preventDefault()}>
+            <ClickableCell href={routes.Marketplace.url}>
+              <p className="text-sm text-[#13188A] font-semibold">Home</p>
+            </ClickableCell>
+          </Breadcrumb.Item>
+          <Breadcrumb.Item>
+            <p className="text-sm text-[#202020] font-medium">My Wallet</p>
+          </Breadcrumb.Item>
+        </Breadcrumb>
+
+        <div className="flex flex-col sm:flex-row items-center sm:items-start w-full sm:px-5 md:px-14 mt-4 mb-8">
+          <div className="flex flex-col items-center gap-3">
+            <Avatar
+              size={50}
+              style={{
+                backgroundColor: "#373B9C",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+              }}
+            >
+              <span style={{ fontSize: "24px", fontWeight: "bold" }}>
+                {userLetter}
+              </span>
+            </Avatar>
+            <Text
+              style={{
+                fontSize: "16px",
+                color: "#373B9C",
+                fontWeight: "600",
+                textAlign: "center",
+              }}
+              className="mt-2"
+            >
+              {userName}
+            </Text>
+          </div>
+          <div className="flex flex-col items-center sm:items-start ml-0 sm:ml-10 mt-4 sm:mt-0">
+            <Title style={{ color: "#373B9C", marginBottom: "0" }} level={5}>
+              Balance:
+            </Title>
+            <Text
+              style={{
+                fontSize: "24px",
+                color: "#373B9C",
+                fontWeight: "bold",
+                marginBottom: "0",
+                marginTop: "7px",
+              }}
+              className="mt-1"
+            >
+              ${totalBalance}
+            </Text>
+            <div className="flex items-center mt-1">
+              <img
+                src={Images.logo}
+                alt="Small"
+                style={{ width: "12px", height: "12px", marginRight: "5px" }}
+              />
+              <Text style={{ fontSize: "14px", color: "#747474" }}>
+                {stratsBalance}
+              </Text>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div className="pt-6 mx-6 md:mx-5 md:px-10 mb-5">
+        <Table
+          columns={columns}
+          dataSource={tableData}
+          pagination={false}
+          className="custom-table"
+          loading={isInventoriesLoading}
+        />
+      </div>
+    </>
+  );
+
   return (
     <>
       <HelmetComponent
@@ -374,129 +610,44 @@ const MyWallet = ({ user }) => {
         link={linkUrl}
       />
       {contextHolder}
-      <>
-        <div
-          className="w-full h-[200px] py-4 px-4 md:h-[250px] bg-[#ADA0E2] bg-opacity-20 flex flex-col justify-between mt-0 lg:-mt-8"
-          style={{ borderColor: "#13188A" }}
-        >
-          <Breadcrumb className="mx-5 md:mx-14 mt-2 lg:mt-4">
-            <Breadcrumb.Item href="" onClick={(e) => e.preventDefault()}>
-              <ClickableCell href={routes.Marketplace.url}>
-                <p className="text-sm text-[#13188A] font-semibold">Home</p>
-              </ClickableCell>
-            </Breadcrumb.Item>
-            <Breadcrumb.Item>
-              <p className="text-sm text-[#202020] font-medium">My Wallet</p>
-            </Breadcrumb.Item>
-          </Breadcrumb>
-
-          <div className="flex flex-col sm:flex-row items-center sm:items-start w-full sm:px-5 md:px-14 mt-4 mb-8">
-            <div className="flex flex-col items-center gap-3">
-              <Avatar
-                size={50}
-                style={{
-                  backgroundColor: "#373B9C",
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                }}
-              >
-                <span style={{ fontSize: "24px", fontWeight: "bold" }}>
-                  {userLetter}
-                </span>
-              </Avatar>
-              <Text
-                style={{
-                  fontSize: "16px",
-                  color: "#373B9C",
-                  fontWeight: "600",
-                  textAlign: "center",
-                }}
-                className="mt-2"
-              >
-                {userName}
-              </Text>
-            </div>
-            <div className="flex flex-col items-center sm:items-start ml-0 sm:ml-10 mt-4 sm:mt-0">
-              <Title style={{ color: "#373B9C", marginBottom: "0" }} level={5}>
-                Balance:
-              </Title>
-              <Text
-                style={{
-                  fontSize: "24px",
-                  color: "#373B9C",
-                  fontWeight: "bold",
-                  marginBottom: "0",
-                  marginTop: "7px",
-                }}
-                className="mt-1"
-              >
-                ${totalBalance}
-              </Text>
-              <div className="flex items-center mt-1">
-                <img
-                  src={Images.logo}
-                  alt="Small"
-                  style={{ width: "12px", height: "12px", marginRight: "5px" }}
-                />
-                <Text style={{ fontSize: "14px", color: "#747474" }}>
-                  {stratsBalance}
-                </Text>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        <div className="pt-6 mx-6 md:mx-5 md:px-10 mb-5">
-          <Table
-            columns={columns}
-            dataSource={tableData}
-            pagination={false}
-            className="custom-table"
-            loading={isInventoriesLoading}
-          />
-        </div>
-
-        <style jsx>{`
-          .custom-table .ant-table-thead > tr > th {
-            background-color: white !important;
-            color: #373b9c;
-            font-weight: bold;
-            border: none !important;
-          }
-          .custom-table .ant-table-tbody > tr > td {
-            color: #3f4149;
-            border: none !important;
-          }
-          .custom-table .ant-table {
-            border: none !important;
-          }
-          .custom-table .ant-table-container {
-            border: none !important;
-          }
-          /* Add a bottom border to each row except the last one */
-          .custom-table .ant-table-tbody > tr:not(:last-child) > td {
-            border-bottom: 1px solid #f0f0f0 !important;
-          }
-          /* Remove default table outline */
-          .custom-table
-            .ant-table-container
-            table
-            > thead
-            > tr:first-child
-            th:first-child {
-            border-top-left-radius: 0;
-          }
-          .custom-table
-            .ant-table-container
-            table
-            > thead
-            > tr:first-child
-            th:last-child {
-            border-top-right-radius: 0;
-          }
-        `}</style>
-      </>
+      {isMobile ? renderMobileView() : renderDesktopView()}
+      <style jsx>{`
+        .custom-table .ant-table-thead > tr > th {
+          background-color: white !important;
+          color: #373b9c;
+          font-weight: bold;
+          border: none !important;
+        }
+        .custom-table .ant-table-tbody > tr > td {
+          color: #3f4149;
+          border: none !important;
+        }
+        .custom-table .ant-table {
+          border: none !important;
+        }
+        .custom-table .ant-table-container {
+          border: none !important;
+        }
+        .custom-table .ant-table-tbody > tr:not(:last-child) > td {
+          border-bottom: 1px solid #f0f0f0 !important;
+        }
+        .custom-table
+          .ant-table-container
+          table
+          > thead
+          > tr:first-child
+          th:first-child {
+          border-top-left-radius: 0;
+        }
+        .custom-table
+          .ant-table-container
+          table
+          > thead
+          > tr:first-child
+          th:last-child {
+          border-top-right-radius: 0;
+        }
+      `}</style>
     </>
   );
 };
