@@ -121,7 +121,7 @@ const TransactionTable = ({ user, selectedDate, onDateChange, download, isAllOrd
           </Col>
           <Col span={8} offset={1}>
             <p className="text-base font-bold">{data?.assetName.length > 28 ? `${data?.assetName.slice(0, 28)}..` : data?.assetName}</p>
-            <p style={{ color: '#827474' }} className="font-medium"><Tooltip placement="topRight" title={"description"}> {data?.assetName.length > 28 ? `${data.assetDescription.replace(/<\/?[^>]+(>|$)/g, "")?.slice(0, 28)}...` : ''} </Tooltip></p>
+            <p style={{ color: '#827474' }} className="font-medium"><Tooltip placement="topRight" title={"description"}> {data?.assetDescription.length > 28 ? `${data.assetDescription.replace(/<\/?[^>]+(>|$)/g, "")?.slice(0, 28)}...` : data?.assetDescription.replace(/<\/?[^>]+(>|$)/g, "")} </Tooltip></p>
           </Col>
           <Col span={8} offset={1}>
            {price 
