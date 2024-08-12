@@ -1,0 +1,14 @@
+version: '3'
+services:
+  backend:
+    build: .
+    image: rewards-server:latest
+    volumes:
+      - ./.env:/usr/src/rewards-server/.env:ro
+      - ./secrets.json:/usr/src/rewards-server/secrets.json:ro
+    restart: unless-stopped
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "100m"
+        max-file: "3"
