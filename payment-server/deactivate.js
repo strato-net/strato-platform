@@ -35,9 +35,10 @@ describe("Payment Server - deactivate contracts", function () {
     await deactivate(token, deployment.contracts.stripe)
   })
 
-  it('Deactivate MetaMask ExternalPaymentService', async () => {
-    await deactivate(token, deployment.contracts.metamask)
-  })
+  // TODO: Disabled for initial payment server release
+  // it('Deactivate MetaMask ExternalPaymentService', async () => {
+  //   await deactivate(token, deployment.contracts.metamask)
+  // })
 
   it('Deactivate ExternalRedemptionService', async () => {
     await deactivate(token, deployment.contracts.redemption)
