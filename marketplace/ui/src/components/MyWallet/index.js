@@ -110,10 +110,13 @@ const MyWallet = ({ user }) => {
               : Images.image_placeholder,
           quantity: quantity,
           price: `$${price.toFixed(2)}`,
-          gainLoss: inventory.gainLoss || "0%",
+          purchasePrice:
+            inventory.data.isMint === "False" ? inventory.price : null,
+          creator: inventory.creator,
+          gainLoss: "0%", // This will be calculated in the column render function
           value: `$${value.toFixed(2)}`,
           status: inventory.status,
-          address: inventory.address, // Make sure this line is present
+          address: inventory.address,
         };
       });
 
@@ -130,7 +133,7 @@ const MyWallet = ({ user }) => {
       setTableData(baseData);
       setTotalBalance((stratsBalance * 0.01).toFixed(2));
     }
-  }, [isInventoriesLoading, inventories, stratsBalance]);
+  }, [isInventoriesLoading, inventories, stratsBalance, user.commonName]);
 
   const CustomQuestionIcon = () => (
     <svg
@@ -198,12 +201,7 @@ const MyWallet = ({ user }) => {
       },
     },
     {
-      title: "Quantity",
-      dataIndex: "quantity",
-      key: "quantity",
-    },
-    {
-      title: "Price",
+      title: "Unit Price",
       dataIndex: "price",
       key: "price",
       render: (price, record) => {
@@ -260,6 +258,11 @@ const MyWallet = ({ user }) => {
       },
     },
     {
+      title: "Quantity",
+      dataIndex: "quantity",
+      key: "quantity",
+    },
+    {
       title: (
         <span className="flex items-center">
           Gain/Loss %{" "}
@@ -273,19 +276,39 @@ const MyWallet = ({ user }) => {
       dataIndex: "gainLoss",
       key: "gainLoss",
       render: (text, record) => {
-        if (record.key === "1" || text === "---" || text === "-") {
+        if (record.key === "1") {
           return <span className="text-xs sm:text-sm">---</span>;
         }
 
-        // Remove any existing +/- signs and % symbol
-        const cleanedText = text.replace(/[+\-%]/g, "");
-        const percentage = parseFloat(cleanedText);
+        const currentPrice = parseFloat(record.price.replace("$", ""));
+        const purchasePrice = record.purchasePrice
+          ? parseFloat(record.purchasePrice)
+          : null;
 
-        if (isNaN(percentage)) {
-          return <span className="text-xs sm:text-sm">---</span>;
+        // Check if the item was created by the user
+        if (record.creator === user.commonName) {
+          return <span className="text-xs sm:text-sm">-</span>;
         }
 
-        const roundedPercentage = Math.round(percentage);
+        // Check if purchase price is missing or corrupted
+        if (!purchasePrice) {
+          return <span className="text-xs sm:text-sm">-</span>;
+        }
+
+        // Add this check after the current price and purchase price declarations
+        const transferPrice = record.transferPrice
+          ? parseFloat(record.transferPrice)
+          : null;
+        const priceToCompare = transferPrice || purchasePrice;
+
+        // Calculate percentage change
+        if (!priceToCompare) {
+          return <span className="text-xs sm:text-sm">-</span>;
+        }
+
+        const percentageChange =
+          ((currentPrice - priceToCompare) / priceToCompare) * 100;
+        const roundedPercentage = Math.round(percentageChange * 100) / 100;
 
         if (roundedPercentage === 0) {
           return <span className="text-xs sm:text-sm">0%</span>;
@@ -297,7 +320,7 @@ const MyWallet = ({ user }) => {
 
         return (
           <span className="text-xs sm:text-sm" style={{ color: color }}>
-            {`${sign}${Math.abs(roundedPercentage)}%`}
+            {`${sign}${Math.abs(roundedPercentage).toFixed(2)}%`}
           </span>
         );
       },
