@@ -44,7 +44,7 @@ async function handleOrderRewards(event, token) {
 
   let eventKey = "RegularOrder";
 
-  if (queryBody[0].count === 0) {
+  if (queryBody[0].count === 1) {
     console.log("User's first order");
     eventKey = "FirstOrder";
   }
