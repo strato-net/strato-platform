@@ -35,6 +35,7 @@ async function connectWebSocket() {
     const pingInterval = setInterval(async () => {
       try {
         ws.send("ping");
+        token = await getUserToken();
       } catch (error) {
         console.error("Error sending ping:", error);
       }
