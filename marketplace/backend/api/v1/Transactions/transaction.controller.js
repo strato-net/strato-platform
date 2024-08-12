@@ -70,8 +70,7 @@ class TransactionController {
             const queryData = {address: assetAddress, limit:2000, offset:0 }
             const inventories = await dapp.getAllInventories({ ...queryData })
             const inventoriesWithImageUrl = inventories?.inventories
-
-            const sortData = data.sort((a, b) => (b?.createdDate || b?.transferDate || b?.redemptionDate) - (a?.createdDate || a?.transferDate || a?.redemptionDate));
+            const sortData = data.sort((a, b) => ( b?.transferDate || b?.redemptionDate || b?.createdDate) - ( a?.transferDate || a?.redemptionDate || a?.createdDate));
             const newData = sortData.map((item) => {
 
                 const asset = inventoriesWithImageUrl.find((assetItem)=>{
