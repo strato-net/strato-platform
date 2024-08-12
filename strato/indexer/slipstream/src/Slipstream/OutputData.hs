@@ -97,7 +97,7 @@ import           Text.Printf
 import           Text.RawString.QQ
 import           Text.Tools                      
 import           UnliftIO.Exception              (SomeException, catch, handle)
-import           UnliftIO.IORef
+--import           UnliftIO.IORef
 
 newtype First b a = First {unFirst :: (a, b)}
 
@@ -204,12 +204,9 @@ dbQuery conn insrt = do
 
 handlePostgresError' :: (MonadLogger m, MonadIO m) => Maybe (TableName, TableColumns) -> SomeException -> m ()
 handlePostgresError' myStuff e =
-  handlePostgresError e
-  --case myStuff of
-    --Nothing -> handlePostgresError e
-    --Just (x, y, z) -> do
-      --setTableCreated x y z
-    --handlePostgresError e
+  case myStuff of
+    Nothing -> handlePostgresError e
+    Just (_, _) -> handlePostgresError e
 
 --setTableCreated  tableName $ cols
 
@@ -353,9 +350,9 @@ createExpandAbstractTable ::
   Map.Map (Account, Text) (Text, Text) ->
   CodeCollectionF () ->
   ConduitM () Text m [ForeignKeyInfo]
-createExpandAbstractTable nameParts abstracts cc = do
-  creationForeignKeys <- createAbstractTable nameParts abstracts cc
-  expansionForeignKeys <- expandAbstractTable nameParts abstracts cc
+createExpandAbstractTable c nameParts abstracts cc = do
+  creationForeignKeys <- createAbstractTable c nameParts abstracts cc
+  expansionForeignKeys <- expandAbstractTable c nameParts abstracts cc
   return $ creationForeignKeys ++ expansionForeignKeys
 
 
@@ -431,9 +428,9 @@ createExpandHistoryTable ::
   CodeCollectionF () ->
   (Text, Text, Text) ->
   ConduitM () (Text, Maybe ( TableName, TableColumns)) m ()
-createExpandHistoryTable isAbstractc cc nameParts = do
-  createHistoryTable' isAbstractc cc nameParts
-  expandHistoryTable isAbstractc cc nameParts
+createExpandHistoryTable isAbstract c cc nameParts = do
+  createHistoryTable' isAbstract c cc nameParts
+  expandHistoryTable isAbstract c cc nameParts
 
 getDeferredForeignKeys :: (MonadLogger m) => TableName -> ContractF () -> CodeCollectionF () -> Text -> Text -> m [ForeignKeyInfo] --circular dependancy only fixed for abstract tables
 getDeferredForeignKeys tableName c (CodeCollection ccs _ _ _ _ _ _ _) creator a = do
