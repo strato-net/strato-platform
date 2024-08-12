@@ -92,7 +92,7 @@ createInsertsAbstract globalsIORef abstract inherited = do
         cc = createDummyCodeCollection contract
     _ <- createAbstractTable globalsIORef (contract) (SE.creator $ fst abstract, SE.application $ fst abstract, SE.contractName $ fst abstract) M.empty cc
     unless (null inherited) $ do 
-      insertAbstractTable inherited False
+      insertAbstractTable inherited
 
 createDummyContract :: [(T.Text, SVMType.Type)] -> ContractF()
 createDummyContract v = 
