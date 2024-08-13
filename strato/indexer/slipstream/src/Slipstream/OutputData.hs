@@ -202,7 +202,7 @@ dbQuery conn insrt = do
   $logDebugS "outputData" insrt
   liftIO . void . pgQuery conn . rawPGSimpleQuery $! encodeUtf8 insrt
 
-handlePostgresError' :: (MonadLogger m, MonadIO m) => Maybe (TableName, TableColumns) -> SomeException -> m ()
+handlePostgresError' :: (MonadLogger m) => Maybe (TableName, TableColumns) -> SomeException -> m ()
 handlePostgresError' myStuff e =
   case myStuff of
     Nothing -> handlePostgresError e
@@ -547,7 +547,7 @@ createMappingTable (creator, a, n) m = do
 
   --incNumMappingTables
   yield $ (createMappingTableQuery (creator, a, n, m))
-  let list = ["key", "value"]
+  --let list = ["key", "value"]
   --setTableCreated tableName list
   return $ getDeferredForeignKeysForCollection tableName creator a
 
@@ -561,7 +561,7 @@ createArrayTable  (creator, a, n) (arr, arrType) = do
   let tableName = collectionTableName creator a n arr
   incNumArrayTables
   yield $ (createArrayTableQuery (creator, a, n, arr))
-  let list = ["key", "value"]
+  --let list = ["key", "value"]
   --setTableCreated  tableName list
   let fkeys1 = getDeferredForeignKeysForCollection tableName creator a
       fkeys2 = getDeferredForeignKeysForArrayType tableName creator a arrType
@@ -576,7 +576,7 @@ createHistoryTable' ::
   (Text, Text, Text) ->
   ConduitM () (Text, Maybe ( TableName, TableColumns)) m ()
 createHistoryTable' isAbstract  contract cc (creator, a, n) = do
-  let tableName = historyTableName creator a n
+  --let tableName = historyTableName creator a n
   incNumHistoryTables
   let isEvent = False
       list = getTableColumnAndType isEvent cc $ map (\(x, y) -> (labelToText x, y ^. varType)) $ Map.toList $ contract ^. storageDefs
@@ -594,7 +594,7 @@ createHistoryTable ::
   (Text, Text, Text) ->
   ConduitM () Text m ()
 createHistoryTable isAbstract  contract cc (creator, a, n) = do
-  let tableName = historyTableName creator a n
+  --let tableName = historyTableName creator a n
   --tableExists <- isTableCreated  tableName
   
   --when (not tableExists) $ do
