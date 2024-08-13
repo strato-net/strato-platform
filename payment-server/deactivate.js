@@ -32,19 +32,27 @@ describe("Payment Server - deactivate contracts", function () {
   })
 
   it('Deactivate Stripe ExternalPaymentService', async () => {
-    await deactivate(token, deployment.contracts.stripe)
+    if (deployment.contracts.stripe) {
+      await deactivate(token, deployment.contracts.stripe)
+    }
   })
 
   // TODO: Disabled for initial payment server release
   // it('Deactivate MetaMask ExternalPaymentService', async () => {
-  //   await deactivate(token, deployment.contracts.metamask)
+  //   if (deployment.contracts.metamask) {
+  //     await deactivate(token, deployment.contracts.metamask)
+  //   }
   // })
 
   it('Deactivate STRATS StratPaymentService', async () => {
-    await deactivate(token, deployment.contracts.strat)
+    if (deployment.contracts.strat) {
+      await deactivate(token, deployment.contracts.strat)
+    }
   })
 
   it('Deactivate ExternalRedemptionService', async () => {
-    await deactivate(token, deployment.contracts.redemption)
+    if (deployment.contracts.redemption) {
+      await deactivate(token, deployment.contracts.redemption)
+    }
   })
 })
