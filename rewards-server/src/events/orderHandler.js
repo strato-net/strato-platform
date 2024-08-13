@@ -93,13 +93,14 @@ async function handleOrderRewards(event, token) {
   buyerReward = Math.round(buyerReward);
   sellerReward = Math.round(sellerReward);
 
-  await handlePurchaserReward(purchaser, buyerReward, token)
+  await handlePurchaserReward(purchaser, buyerReward, token, eventKey);
   await handleSellerReward(seller, sellerReward, token)
 
 }
 
-async function handlePurchaserReward(purchaser, reward, token) {
+async function handlePurchaserReward(purchaser, reward, token, eventKey) {
   try {
+    console.log(`Sending ${eventKey} reward to , ${purchaser}, ${reward/100}STRATS`);
     const purchaserResponse = await createTransactionPayload(
       token,
       purchaser,
@@ -120,6 +121,7 @@ async function handlePurchaserReward(purchaser, reward, token) {
     console.log("Purchaser reward transaction successful:", response);
     return response;
   } catch (error) {
+    console.log(`Failed to send ${eventKey} reward to ${purchaser}, ${reward/100}STRATS`);
     console.error("Error processing purchaser transaction:", error.message);
     throw error;
   }
@@ -127,6 +129,7 @@ async function handlePurchaserReward(purchaser, reward, token) {
 
 async function handleSellerReward(seller, reward, token) {
     try {
+      console.log(`Sending sale reward to , ${seller}, ${reward/100}STRATS`);
       const sellerResponse = await createTransactionPayload(
         token,
         seller,
@@ -147,6 +150,7 @@ async function handleSellerReward(seller, reward, token) {
       console.log("Seller reward transaction successful:", response);
       return response
     } catch (error) {
+      console.log(`Failed to send sale reward to ${seller}, ${reward/100}STRATS`);
       console.error("Error processing seller transaction:", error.message);
       throw error; 
     }
