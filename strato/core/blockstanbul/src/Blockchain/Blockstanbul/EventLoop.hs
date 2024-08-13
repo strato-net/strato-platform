@@ -251,6 +251,7 @@ eventLoop ctx = execStateC ctx $
                   $logErrorS "blockstanbul/config_change" . T.pack $
                     printf "Refusing to move sequence backwards in time %d to %d" (_sequence v) s
         PreviousBlock blk -> do
+           -- nodes here will be syncing and looking to verify each block in the chain
           realValidators <- use validators
           seqNo <- use $ view . sequence
           eNextSeqNo <- lift $ lift $ runExceptT $ replayHistoricBlock realValidators seqNo blk
@@ -268,10 +269,13 @@ eventLoop ctx = execStateC ctx $
               $logInfoS "blockstanbul" . T.pack . printf "Accepting historical block #%d" $ blockNo
               yieldR . ToCommit $ blk
         UnannouncedBlock blk' -> do
+          -- this is for sending out a new block,
+          -- may be a good candidtate for sending newCerts
           let blk = truncateExtra blk'
           ppl <- use proposal
           leader <- use proposer
           self <- use selfCert
+          -- TODO(max, matt): Do look up of all Certificates and filter out for commonName, add to newCerts
           when (isNothing ppl && Just leader == fmap chainMemberParsedSetToValidator self) $ do
             vs <- use validators
             let blockWithVs = addValidators (ChainMembers $ S.map (validatorToChainMemberParsedSet . fst) vs) blk

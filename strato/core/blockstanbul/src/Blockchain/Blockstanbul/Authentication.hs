@@ -80,22 +80,9 @@ addProposerSeal sig =
 
 addCommitmentSeals :: [Signature] -> Block -> Block
 addCommitmentSeals sigs b = 
-    block 
-    where
-        header' = blockBlockData b
+    let header' = blockBlockData b
         header = header' { signatures = sigs }
-        block = b { blockBlockData = header }
-    
--- addCommitmentSeals sigs =
---   over extraLens $
---     uncookRawExtra
---       . over
---         istanbul
---         ( \i ->
---             fmap (set commitment sigs) i
---               <|> error "must set validators before commitment seals"
---         )
---       . cookRawExtra
+    in b { blockBlockData = header }
 
 scrubAllSeals :: RawExtraData -> RawExtraData
 scrubAllSeals =
