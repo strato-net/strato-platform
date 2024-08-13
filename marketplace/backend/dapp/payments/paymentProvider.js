@@ -196,15 +196,18 @@ async function getNotOnboarded(admin, args = {}, baseOptions) {
     const eventContract = { name: `${tablePrefix}${onboardedEventName}` }
     const onboardedQuery = {
       sellersCommonName: `eq.${sellersCommonName}`,
+      select: `ownerCommonName,serviceName`,
+      ownerCommonName: `neq.null`,
+      serviceName: `neq.null`,
     }
     const onboardedOptions = { ...baseOptions, query: onboardedQuery };
     const onboardedEventsRes = await rest.search(admin, eventContract, onboardedOptions);
-    const onboardedAddresses = onboardedEventsRes.map((oe) => oe.address);
+    const onboardedServices = onboardedEventsRes.map((oe) => `or(ownerCommonName.neq."${oe.ownerCommonName}",serviceName.neq."${oe.serviceName}")`);
     const contract = { name: `${tablePrefix}${contractName}` }
     const notOnboardedQuery = {
       isActive: 'eq.true',
       contract_name: `like.*${externalContractName}`,
-      address: `not.in.(${onboardedAddresses.join(',')})`
+      and: onboardedServices.length > 0 ? `(${onboardedAddresses.join(',')})` : undefined,
     }
     const notOnboardedOptions = { ...baseOptions, query: notOnboardedQuery }
     const paymentServices = await rest.search(admin, contract, notOnboardedOptions);

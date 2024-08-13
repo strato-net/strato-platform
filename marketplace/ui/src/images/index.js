@@ -26,6 +26,7 @@ export const Images = {
   'orderImg3': require('./resources/orderImages/orderImg3.png'),
   'role-request': require('./resources/request-role.png'),
   'newLogo': require('./resources/newLogo.png'),
+  'marketplaceLogo': require('./resources/marketplace.png'),
   'carousel_first': require('./resources/carousel_first_image.png'),
   'carousel_second': require('./resources/carousel_second_image.png'),
   'carousel_third': require('./resources/carousel_third_image.png'),

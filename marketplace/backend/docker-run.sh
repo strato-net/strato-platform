@@ -22,7 +22,9 @@ METADATA=$(curl --silent --fail ${ETH_ENDPOINT}/metadata)
 
 # Set env vars with values from metadata (exporting and declaring separately - see https://github.com/koalaman/shellcheck/wiki/SC2155)
 networkID=$(echo ${METADATA} | jq -r .networkID)
+NOTIFICATION_SERVER_URL=$(echo ${METADATA} | jq -r .urls.notificationServer)
 export networkID
+export NOTIFICATION_SERVER_URL
 if [ -z "${networkID}" ]; then
   echo "Could not get networkID from strato api, but it is a required value"
   exit 19

@@ -59,10 +59,10 @@ const Inventory = ({ user }) => {
   const { inventories, isInventoriesLoading, message, success, inventoriesTotal } =
     useInventoryState();
   const {
-      paymentServices,
-      arePaymentServicesLoading,
-      notOnboarded,
-      areNotOnboardedLoading
+    paymentServices,
+    arePaymentServicesLoading,
+    notOnboarded,
+    areNotOnboardedLoading
   } = usePaymentServiceState();
   const paymentServiceDispatch = usePaymentServiceDispatch();
   const [sortedPaymentServices, setSortedPaymentServices] = useState([]);
@@ -237,9 +237,9 @@ const Inventory = ({ user }) => {
   const getAllSubcategories = (categories) => {
     let subcategories = [];
     categories.forEach(category => {
-        if (category.subCategories && category.subCategories.length > 0) {
-            subcategories = subcategories.concat(category.subCategories);
-        }
+      if (category.subCategories && category.subCategories.length > 0) {
+        subcategories = subcategories.concat(category.subCategories);
+      }
     });
     return subcategories;
   }
@@ -257,16 +257,16 @@ const Inventory = ({ user }) => {
 
   const renderImg = (service) => {
     return service.imageURL && service.imageURL !== ''
-        ? <img src={service.imageURL} alt={service.serviceName} height="16px" width="16px"/>
-        : ''
+      ? <img src={service.imageURL} alt={service.serviceName} height="16px" width="16px" />
+      : ''
   };
 
   return (
     <>
-      <HelmetComponent 
-        title={`${category ? `${category} |` :''} ${SEO.TITLE_META} `}
-        description={SEO.DESCRIPTION_META} 
-        link={linkUrl} 
+      <HelmetComponent
+        title={`${category ? `${category} |` : ''} ${SEO.TITLE_META} `}
+        description={SEO.DESCRIPTION_META}
+        link={linkUrl}
       />
       {contextHolder}
       <>
@@ -286,12 +286,12 @@ const Inventory = ({ user }) => {
         </Breadcrumb>
         <div className="w-full h-[160px] py-4 px-4 md:h-[96px] bg-[#F6F6F6] flex flex-col md:flex-row md:px-14 justify-between items-center mt-6 lg:mt-8">
           <div className="flex justify-between w-full">
-            <Button className="!px-1 md:!px-0 flex items-center flex-row-reverse gap-[6px] text-lg md:text-2xl font-semibold !text-[#13188A] " 
-              type="link" 
-              icon={<img src={Images.ForwardIcon} 
-              alt={metaImg} 
-              title={metaImg}
-              className="hidden md:block w-6 h-6" />}> My Items
+            <Button className="!px-1 md:!px-0 flex items-center flex-row-reverse gap-[6px] text-lg md:text-2xl font-semibold !text-[#13188A] "
+              type="link"
+              icon={<img src={Images.ForwardIcon}
+                alt={metaImg}
+                title={metaImg}
+                className="hidden md:block w-6 h-6" />}> My Items
             </Button>
           </div>
           <div className="flex flex-col md:flex-row gap-3 items-center my-2 md:my-0">
@@ -302,16 +302,15 @@ const Inventory = ({ user }) => {
                   style={{ width: 250, height: 40 }}
                   onChange={handleChange}
                   value={'Connect to Payment Provider'}
-                  disabled={notOnboarded.length === 0}
                 >
                   {sortedPaymentServices.map(service => (
-                    <Option 
-                      key={service.serviceName} 
+                    <Option
+                      key={service.serviceName}
                       value={service.serviceName}
                       disabled={!service.isNotOnboarded}
                     >
                       {service.serviceName}
-                      {!service.isNotOnboarded && <CheckCircleOutlined style={{ color: '#28a745',position: 'absolute', right: '10px' }} />}
+                      {!service.isNotOnboarded && <CheckCircleOutlined style={{ color: '#28a745', position: 'absolute', right: '10px' }} />}
                     </Option>
                   ))}
                 </Select>
@@ -328,16 +327,19 @@ const Inventory = ({ user }) => {
                 onClick={() => {
                   if (hasChecked && !isAuthenticated && loginUrl !== undefined) {
                     window.location.href = loginUrl;
-                  } else {
+                  } else if (issuerStatus != ISSUER_STATUS.AUTHORIZED) {
+                    showReqModModal()
+                  }
+                  else {
                     showModal();
                   }
                 }}
               >
                 <div className="flex items-center justify-center gap-[6px]">
-                  <img src={Images.CreateInventory} 
+                  <img src={Images.CreateInventory}
                     alt={metaImg}
                     title={metaImg}
-                    className="w-[18px] h-[18px]" 
+                    className="w-[18px] h-[18px]"
                   />
                   Create Item
                 </div>

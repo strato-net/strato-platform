@@ -34,7 +34,7 @@ if [ ! -f /usr/local/openresty/nginx/conf/nginx.conf ]; then
 #  ########
 #  cp /tmp/openid.tpl.lua /tmp/openid.lua
 #
-#  sed -i "s/<OAUTH_DISCOVERY_URL_PLACEHOLDER>/$OAUTH_DISCOVERY_URL/" /tmp/openid.lua
+#  sed -i "s*<OAUTH_DISCOVERY_URL_PLACEHOLDER>*$OAUTH_DISCOVERY_URL*" /tmp/openid.lua
 #  sed -i 's*<CLIENT_ID_PLACEHOLDER>*'"$OAUTH_CLIENT_ID"'*g' /tmp/openid.lua
 #  sed -i 's*<CLIENT_SECRET_PLACEHOLDER>*'"$OAUTH_CLIENT_SECRET"'*g' /tmp/openid.lua
 #  sed -i 's*<OAUTH_SCOPE_PLACEHOLDER>*'"$OAUTH_SCOPE"'*g' /tmp/openid.lua
