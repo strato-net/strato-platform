@@ -432,82 +432,27 @@ const MyWallet = ({ user }) => {
 
   const renderMobileView = () => (
     <div className="bg-gray-100 min-h-screen">
-      <div className="bg-[#ADA0E2] bg-opacity-20 p-4">
-        <Breadcrumb className="mb-4">
-          <Breadcrumb.Item>
-            <ClickableCell href={routes.Marketplace.url}>
-              <p className="text-sm text-[#13188A] font-semibold">Home</p>
-            </ClickableCell>
-          </Breadcrumb.Item>
-          <Breadcrumb.Item>
-            <p className="text-sm text-[#202020] font-medium">My Wallet</p>
-          </Breadcrumb.Item>
-        </Breadcrumb>
-
-        <div className="flex flex-col items-center mb-4">
-          <Avatar
-            size={50}
-            style={{
-              backgroundColor: "#373B9C",
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-            }}
-          >
-            <span style={{ fontSize: "24px", fontWeight: "bold" }}>
-              {userLetter}
-            </span>
-          </Avatar>
-          <Typography.Text
-            style={{
-              fontSize: "16px",
-              color: "#373B9C",
-              fontWeight: "600",
-              textAlign: "center",
-            }}
-            className="mt-2"
-          >
-            {userName}
-          </Typography.Text>
-        </div>
-
-        <div className="text-center">
-          <Typography.Title
-            style={{ color: "#373B9C", marginBottom: "0" }}
-            level={5}
-          >
-            Balance:
-          </Typography.Title>
-          <Typography.Text
-            style={{
-              fontSize: "24px",
-              color: "#373B9C",
-              fontWeight: "bold",
-              marginBottom: "0",
-              marginTop: "7px",
-            }}
-            className="block"
-          >
-            ${totalBalance}
-          </Typography.Text>
-          <div className="flex items-center justify-center mt-1">
-            <img
-              src={Images.logo}
-              alt="STRATS"
-              style={{ width: "12px", height: "12px", marginRight: "5px" }}
-            />
-            <Typography.Text style={{ fontSize: "14px", color: "#747474" }}>
+      <div className="p-4">
+        <div className="rounded-lg overflow-hidden wallet-gradient p-4 flex justify-between items-center">
+          <div>
+            <Text className="text-white text-sm font-semibold">
+              Total Balance:
+            </Text>
+            <Text className="text-white text-xl font-bold block mt-1">
+              ${totalBalance}
+            </Text>
+          </div>
+          <div className="flex items-center">
+            <img src={Images.logo} alt="STRATS" className="w-4 h-4 mr-2" />
+            <Text className="text-white text-lg font-semibold">
               {stratsBalance}
-            </Typography.Text>
+            </Text>
           </div>
         </div>
       </div>
 
       <div className="p-4">
         <div className="border border-[#D9D9D9] rounded-lg overflow-hidden">
-          <h2 className="text-lg font-bold p-4" style={{ color: "#373B9C" }}>
-            Assets
-          </h2>
           {tableData.map((item, index) =>
             renderMobileCard(item, index, tableData.length)
           )}
@@ -617,6 +562,14 @@ const MyWallet = ({ user }) => {
           color: #373b9c;
           font-weight: bold;
           border: none !important;
+        }
+        .wallet-gradient {
+          background: linear-gradient(
+            135deg,
+            rgba(55, 59, 156, 1) 30%,
+            rgba(58, 71, 164, 0.94) 44%,
+            rgba(90, 189, 245, 0.3) 100%
+          );
         }
         .custom-table .ant-table-tbody > tr > td {
           color: #3f4149;

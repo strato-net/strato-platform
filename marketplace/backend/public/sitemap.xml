@@ -7,133 +7,133 @@
      
      <url>
        <loc>http://localhost/</loc>
-       <lastmod>2024-08-12T14:00:44.319Z</lastmod>
+       <lastmod>2024-08-13T14:01:04.241Z</lastmod>
        <changefreq>daily</changefreq>
        <priority>0.5</priority>
      </url>
 
      <url>
        <loc>http://localhost/c/All</loc>
-       <lastmod>2024-08-12T14:00:44.319Z</lastmod>
+       <lastmod>2024-08-13T14:01:04.242Z</lastmod>
        <changefreq>daily</changefreq>
        <priority>0.5</priority>
      </url>
 
      <url>
        <loc>http://localhost/c/Carbon?sc=CarbonOffset%2CCarbonDAO</loc>
-       <lastmod>2024-08-12T14:00:44.319Z</lastmod>
+       <lastmod>2024-08-13T14:01:04.242Z</lastmod>
        <changefreq>daily</changefreq>
        <priority>0.5</priority>
      </url>
 
      <url>
        <loc>http://localhost/c/Metals?sc=Metals</loc>
-       <lastmod>2024-08-12T14:00:44.319Z</lastmod>
+       <lastmod>2024-08-13T14:01:04.242Z</lastmod>
        <changefreq>daily</changefreq>
        <priority>0.5</priority>
      </url>
 
      <url>
        <loc>http://localhost/c/Clothing?sc=Clothing</loc>
-       <lastmod>2024-08-12T14:00:44.319Z</lastmod>
+       <lastmod>2024-08-13T14:01:04.242Z</lastmod>
        <changefreq>daily</changefreq>
        <priority>0.5</priority>
      </url>
 
      <url>
        <loc>http://localhost/c/Collectibles?sc=Collectibles</loc>
-       <lastmod>2024-08-12T14:00:44.319Z</lastmod>
+       <lastmod>2024-08-13T14:01:04.242Z</lastmod>
        <changefreq>daily</changefreq>
        <priority>0.5</priority>
      </url>
 
      <url>
        <loc>http://localhost/c/Art?sc=Art</loc>
-       <lastmod>2024-08-12T14:00:44.319Z</lastmod>
+       <lastmod>2024-08-13T14:01:04.242Z</lastmod>
        <changefreq>daily</changefreq>
        <priority>0.5</priority>
      </url>
 
      <url>
        <loc>http://localhost/c/Membership?sc=Membership</loc>
-       <lastmod>2024-08-12T14:00:44.319Z</lastmod>
+       <lastmod>2024-08-13T14:01:04.242Z</lastmod>
        <changefreq>daily</changefreq>
        <priority>0.5</priority>
      </url>
 
      <url>
        <loc>http://localhost/checkout</loc>
-       <lastmod>2024-08-12T14:00:44.319Z</lastmod>
-       <changefreq>daily</changefreq>
-       <priority>0.5</priority>
-     </url>
-
-     <url>
-       <loc>http://localhost/dp/9374b9f15f9554f58b96cc8ae8cbeb193807ae6f/Payment%20Server%20Deployment</loc>
-       <lastmod>2024-08-12T14:00:46.262Z</lastmod>
-       <changefreq>daily</changefreq>
-       <priority>0.5</priority>
-     </url>
-
-     <url>
-       <loc>http://localhost/dp/e264dba6c4bdfe81e22dbf4f81c8053337b163ec/Testing%20Rewards%20</loc>
-       <lastmod>2024-08-12T14:00:46.262Z</lastmod>
-       <changefreq>daily</changefreq>
-       <priority>0.5</priority>
-     </url>
-
-     <url>
-       <loc>http://localhost/dp/b51f8176e8f34fd2a15ef71b77074e414f9ad943/xpay3</loc>
-       <lastmod>2024-08-12T14:00:46.262Z</lastmod>
-       <changefreq>daily</changefreq>
-       <priority>0.5</priority>
-     </url>
-
-     <url>
-       <loc>http://localhost/dp/812aa0675d4d405f38a7aeda5392a3f9e8d1ec23/Sad%20Dog%20Kennel%20Club%20($SADDOGS)</loc>
-       <lastmod>2024-08-12T14:00:46.262Z</lastmod>
-       <changefreq>daily</changefreq>
-       <priority>0.5</priority>
-     </url>
-
-     <url>
-       <loc>http://localhost/dp/dc329654c59348c2af54a6b830b9ff5c155882e5/Sad%20Dog%20Kennel%20Club%20($SADDOGS)</loc>
-       <lastmod>2024-08-12T14:00:46.262Z</lastmod>
-       <changefreq>daily</changefreq>
-       <priority>0.5</priority>
-     </url>
-
-     <url>
-       <loc>http://localhost/dp/752a278d61114cc225314dada01b05c396277507/Sad%20Dog%20Kennel%20Club%20($SADDOGS)</loc>
-       <lastmod>2024-08-12T14:00:46.262Z</lastmod>
-       <changefreq>daily</changefreq>
-       <priority>0.5</priority>
-     </url>
-
-     <url>
-       <loc>http://localhost/dp/f9f4fb282e8ae79bd7d0d6cbf8f92156dfa6dea2/Sad%20Dog%20Kennel%20Club%20($SADDOGS)</loc>
-       <lastmod>2024-08-12T14:00:46.262Z</lastmod>
-       <changefreq>daily</changefreq>
-       <priority>0.5</priority>
-     </url>
-
-     <url>
-       <loc>http://localhost/dp/13383e820ce4511f6ea7c85eab8d62a8fe9b9867/Sad%20Dog%20Kennel%20Club%20($SADDOGS)</loc>
-       <lastmod>2024-08-12T14:00:46.262Z</lastmod>
+       <lastmod>2024-08-13T14:01:04.242Z</lastmod>
        <changefreq>daily</changefreq>
        <priority>0.5</priority>
      </url>
 
      <url>
        <loc>http://localhost/dp/d437f6313cc5f9519bfd205a1085096628711723/xpay3</loc>
-       <lastmod>2024-08-12T14:00:46.262Z</lastmod>
+       <lastmod>2024-08-13T14:01:06.539Z</lastmod>
+       <changefreq>daily</changefreq>
+       <priority>0.5</priority>
+     </url>
+
+     <url>
+       <loc>http://localhost/dp/72599614549ffe3a0f7e86caf2c25d29590f3b7c/Sad%20Dog%20Kennel%20Club%20($SADDOGS)</loc>
+       <lastmod>2024-08-13T14:01:06.540Z</lastmod>
+       <changefreq>daily</changefreq>
+       <priority>0.5</priority>
+     </url>
+
+     <url>
+       <loc>http://localhost/dp/dc329654c59348c2af54a6b830b9ff5c155882e5/Sad%20Dog%20Kennel%20Club%20($SADDOGS)</loc>
+       <lastmod>2024-08-13T14:01:06.540Z</lastmod>
+       <changefreq>daily</changefreq>
+       <priority>0.5</priority>
+     </url>
+
+     <url>
+       <loc>http://localhost/dp/9374b9f15f9554f58b96cc8ae8cbeb193807ae6f/Payment%20Server%20Deployment</loc>
+       <lastmod>2024-08-13T14:01:06.540Z</lastmod>
+       <changefreq>daily</changefreq>
+       <priority>0.5</priority>
+     </url>
+
+     <url>
+       <loc>http://localhost/dp/b51f8176e8f34fd2a15ef71b77074e414f9ad943/xpay3</loc>
+       <lastmod>2024-08-13T14:01:06.540Z</lastmod>
+       <changefreq>daily</changefreq>
+       <priority>0.5</priority>
+     </url>
+
+     <url>
+       <loc>http://localhost/dp/812aa0675d4d405f38a7aeda5392a3f9e8d1ec23/Sad%20Dog%20Kennel%20Club%20($SADDOGS)</loc>
+       <lastmod>2024-08-13T14:01:06.540Z</lastmod>
+       <changefreq>daily</changefreq>
+       <priority>0.5</priority>
+     </url>
+
+     <url>
+       <loc>http://localhost/dp/752a278d61114cc225314dada01b05c396277507/Sad%20Dog%20Kennel%20Club%20($SADDOGS)</loc>
+       <lastmod>2024-08-13T14:01:06.540Z</lastmod>
+       <changefreq>daily</changefreq>
+       <priority>0.5</priority>
+     </url>
+
+     <url>
+       <loc>http://localhost/dp/13383e820ce4511f6ea7c85eab8d62a8fe9b9867/Sad%20Dog%20Kennel%20Club%20($SADDOGS)</loc>
+       <lastmod>2024-08-13T14:01:06.540Z</lastmod>
        <changefreq>daily</changefreq>
        <priority>0.5</priority>
      </url>
 
      <url>
        <loc>http://localhost/dp/0b993dda60954f160d957ebb033c9b27403a092c/MSCHF%20Super%20Normal%202%20Common%20White</loc>
-       <lastmod>2024-08-12T14:00:46.262Z</lastmod>
+       <lastmod>2024-08-13T14:01:06.540Z</lastmod>
+       <changefreq>daily</changefreq>
+       <priority>0.5</priority>
+     </url>
+
+     <url>
+       <loc>http://localhost/dp/8a03824995ab4afc1c00938f6e2db73f6d8570e9/Silver%20-Fractional%20100%20oz%20Bars</loc>
+       <lastmod>2024-08-13T14:01:06.540Z</lastmod>
        <changefreq>daily</changefreq>
        <priority>0.5</priority>
      </url>
