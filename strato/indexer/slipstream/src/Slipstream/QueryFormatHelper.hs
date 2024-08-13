@@ -48,6 +48,9 @@ tshow = T.pack . show
 csv :: [T.Text] -> T.Text
 csv = T.intercalate ",\n    "
 
+csv' :: [T.Text] -> T.Text
+csv' = T.intercalate "dream,\n    "
+
 wrap :: T.Text -> T.Text -> T.Text -> T.Text
 wrap b e x = T.concat [b, x, e]
 
@@ -65,6 +68,9 @@ wrapParens = wrap "(" ")"
 
 wrapAndEscape :: [T.Text] -> T.Text
 wrapAndEscape = wrapParens . csv
+
+wrapAndEscapeSingle :: [T.Text] -> T.Text
+wrapAndEscapeSingle = wrapParens . csv . map wrapSingleQuotes
 
 wrapAndEscapeDouble :: [T.Text] -> T.Text
 wrapAndEscapeDouble = wrapParens . csv . map wrapDoubleQuotes

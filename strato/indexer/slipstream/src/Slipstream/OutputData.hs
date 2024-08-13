@@ -831,19 +831,18 @@ insertHistoryAbstractTable ::
 insertHistoryAbstractTable [] _ = pure ()
 insertHistoryAbstractTable abstracts hists = do 
   let historyAbstracts = [(history, fkeys, tableName, tableCols) | history <- hists, (_, fkeys, tableName, tableCols) <- abstracts]
-  yieldMany $ insertAbstractTableQuery historyAbstracts True
+  yieldMany $ insertHistoricAbstractTableQuery historyAbstracts
 
 insertAbstractTable ::
   OutputM m =>
   [(E.ProcessedContract, [T.Text], T.Text, TableColumns)] ->
-  Bool ->
   ConduitM () Text m ()
-insertAbstractTable [] _ = pure ()
-insertAbstractTable cs@((_, _,abTableName, _) : _) isHistoric = do
+insertAbstractTable [] = pure ()
+insertAbstractTable cs@((_, _, abTableName, _) : _) = do
   $logInfoS "insertAbstractTable" $ T.pack $ "Inserting row in abstract table for: " ++ show abTableName
   multilineLog "insertAbstractTable/processedContract" $ show cs
-  yieldMany $ insertAbstractTableQuery cs isHistoric
-  
+  yieldMany $ insertAbstractTableQuery (map (\(p, t, a, _) -> (p, t, a)) cs)
+
 updateForeignKeysFromNULLAbstract ::
   OutputM m =>
   [(E.ProcessedContract, [T.Text], T.Text, TableColumns)] ->
@@ -1142,20 +1141,20 @@ insertArrayTableQuery ms =
                       ";"
                     ]
 
-insertAbstractTableQuery :: [(E.ProcessedContract, [T.Text], T.Text, TableColumns)] -> Bool -> [Text]
-insertAbstractTableQuery [] _ = error "insertAbstractTableQuery: unhandled empty list"
-insertAbstractTableQuery cs isHistoric =
+insertAbstractTableQuery :: [(E.ProcessedContract, [T.Text], T.Text)] -> [Text]
+insertAbstractTableQuery [] = error "insertAbstractTableQuery: unhandled empty list"
+insertAbstractTableQuery cs =
   concat $
-    let cs' = (\(c@E.ProcessedContract {contractData = contractData}, fkeys, ab, abColumns) -> 
-                ((c, Map.mapMaybe valueToSQLTextFilterContract $ contractData), (ab, abColumns, fkeys))) <$> cs
-     in flip map (map snd $ partitionWith ((\(ab, _, _) -> ab) . snd) cs') $ \case
+    let cs' = (\(c@E.ProcessedContract {contractData = contractData}, fkeys, abTableName) -> 
+                ((c, Map.mapMaybe valueToSQLTextFilterContract $ contractData), (abTableName, fkeys))) <$> cs
+     in flip map (map snd $ partitionWith ((\(abTableName, _) -> abTableName) . snd) cs') $ \case
           [] -> []
-          contracts@(((x, list), (abTableName, abColumns, fkeys)) : _) ->
+          contracts@(((x, list), (abTableName, fkeys)) : _) ->
             let contractTableName =
                   abstractTableName (E.creator x) (E.application x) (E.contractName x)
-                list' = Map.toList $ Map.filterWithKey (\k _ -> k `elem` abColumns) list 
-                fkeyColumns = [T.pack ((T.unpack k) ++ "_fkey") | k <- fkeys, k `elem` abColumns]
-                keysForSQL = map fst list' ++ fkeyColumns
+                fkeyColumns = [T.pack ((T.unpack k) ++ "_fkey") | k <- fkeys]
+                keysForSQL = Map.keys list ++ fkeyColumns
+                -- Dynamic SQL to fetch columns and construct JSONB in PostgreSQL
                 keySt = wrapAndEscapeDouble . map escapeQuotes $ baseAbstractColumns ++ keysForSQL
                 baseVals =
                   [ tshow . E.address,
@@ -1170,39 +1169,189 @@ insertAbstractTableQuery cs isHistoric =
                 vals = flip map contracts $ \((row, contractColumns), _) ->
                   let baseRowVals = map (wrapSingleQuotes . ($ row)) baseVals
                       contractNameVal = [wrapSingleQuotes $ escapeQuotes (tableNameToText contractTableName)] 
+                      -- Build the dynamic SQL for the data column (JSONB)
+                      dataVals = T.concat [
+                          "(SELECT jsonb_object_agg(column_name, to_jsonb(value)) ",
+                          " FROM (",
+                          "   SELECT column_name, ",
+                          "          CASE ",
+                          "            WHEN column_name IN (",
+                          "              SELECT column_name FROM information_schema.columns WHERE table_name = '", abTableName, "'",
+                          "            ) THEN NULL ",  -- Exclude common columns
+                          "            ELSE ", 
+                          "              unnest(ARRAY[",
+                          "                SELECT value FROM unnest(hstore_to_jsonb(contractColumns) -> 'data') as data_columns(column_name, value) ",
+                          "                WHERE column_name NOT IN (SELECT column_name FROM information_schema.columns WHERE table_name = '", abTableName, "') ",
+                          "              ]) ",
+                          "          END as value ",
+                          "   FROM (SELECT * FROM unnest(ARRAY[",
+                          "     SELECT column_name FROM information_schema.columns WHERE table_name = '", abTableName, "'",
+                          "   ]) as col) as cols",
+                          "   LEFT JOIN unnest(hstore_to_jsonb(contractColumns) -> 'data') as data_columns(column_name, value) ON cols.column_name = data_columns.column_name",
+                          ") as json_pairs WHERE value IS NOT NULL)",
+                          " as jsonb"
+                        ]
+                      regularVals = [(snd kv) | kv@(k, _) <- Map.toList contractColumns, k `elem` baseAbstractColumns ++ fkeys]
+                      fkeyVals = ["NULL" | k <- fkeys, k `elem` baseAbstractColumns]  -- Avoid circular dependencies
+                      valsForSQL = baseRowVals ++ contractNameVal ++ [dataVals] ++ regularVals ++ fkeyVals
+                  in wrapAndEscape valsForSQL
+                inserts = csv vals
+            in (: []) $
+                  T.concat [
+                      "INSERT INTO ",
+                      abTableName,
+                      " ",
+                      keySt,
+                      "\n  VALUES ",
+                      inserts,
+                      " ON CONFLICT (address) DO UPDATE SET ",
+                      " block_hash = excluded.block_hash, ",
+                      " block_timestamp = excluded.block_timestamp, ",
+                      " block_number = excluded.block_number, ",
+                      " transaction_hash = excluded.transaction_hash, ",
+                      " transaction_sender = excluded.transaction_sender, ",
+                      " creator = excluded.creator, ",
+                      " root = excluded.root, ",
+                      " contract_name = excluded.contract_name, ",
+                      " data = excluded.data;",
+                      if null baseAbstractColumns then "" else ",\n    ",
+                      tableUpsert $ baseAbstractColumns ++ fkeys,
+                      ";"]
+
+insertHistoricAbstractTableQuery :: [(E.ProcessedContract, [T.Text], T.Text, TableColumns)] -> [Text]
+insertHistoricAbstractTableQuery [] = error "insertHistoricAbstractTableQuery: unhandled empty list"
+insertHistoricAbstractTableQuery cs =
+  concat $
+    let cs' = (\(c@E.ProcessedContract {contractData = contractData}, fkeys, ab, abColumns) -> 
+                ((c, Map.mapMaybe valueToSQLTextFilterContract $ contractData), (ab, abColumns, fkeys))) <$> cs
+     in flip map (map snd $ partitionWith ((\(ab, _, _) -> ab) . snd) cs') $ \case
+          [] -> []
+          contracts@(((x, list), (abTableName, abColumns, fkeys)) : _) ->
+            let contractTableName =
+                  abstractTableName (E.creator x) (E.application x) (E.contractName x)
+                list' = Map.toList $ Map.filterWithKey (\k _ -> k `elem` abColumns) list 
+                fkeyColumns = [T.pack ((T.unpack k) ++ "_fkey") | k <- fkeys, k `elem` abColumns]
+                keysForSQL = map fst list' ++ fkeyColumns
+                keySt = (csv . map wrapSingleQuotes) . map escapeQuotes $ baseAbstractColumns ++ keysForSQL
+                keySt' = csv . map escapeQuotes $ baseAbstractColumns ++ keysForSQL
+                baseVals =
+                  [ tshow . E.address,
+                    T.pack . keccak256ToHex . E.blockHash,
+                    tshow . E.blockTimestamp,
+                    tshow . E.blockNumber,
+                    T.pack . keccak256ToHex . E.transactionHash,
+                    tshow . E.transactionSender,
+                    E.creator,
+                    E.root
+                  ]
+                address = (tshow . E.address) x
+                tableNameSingle = (wrapSingleQuotes $ "history@" <> unwrapDoubleQuotes abTableName)
+                tableNameDouble = (wrapDoubleQuotes $ "history@" <> unwrapDoubleQuotes abTableName)
+                vals = flip map contracts $ \((row, contractColumns), _) ->
+                  let baseRowVals = map (wrapSingleQuotes . ($ row)) baseVals
+                      contractNameVal = [wrapSingleQuotes $ escapeQuotes (tableNameToText contractTableName)] 
                       dataVals = [wrapSingleQuotes . decodeUtf8 . BL.toStrict $ Aeson.encode $ MapWrapper $ aesonHelper $ Map.filterWithKey (\k _ -> k `notElem` abColumns) contractColumns] 
                       contractValEntries = Map.toList contractColumns
                       regularVals = [(snd kv) | kv@(k, _) <- contractValEntries, k `elem` keysForSQL]
                       fkeyVals = ["NULL" | k <- fkeyColumns, k `elem` keysForSQL]  -- This avoids circular dependancies as the inserts occur first and set fkeys=null
-                      valsForSQL = baseRowVals ++ contractNameVal ++ dataVals ++ regularVals ++ fkeyVals
-                  in wrapAndEscape valsForSQL
+                      valsForSQL = map wrapSingleQuotes $ baseRowVals ++ contractNameVal ++ dataVals ++ regularVals ++ fkeyVals
+                  in csv valsForSQL
                 inserts = csv vals
             in (: []) $
                   T.concat $
-                    [ "INSERT INTO ",
-                      (bool abTableName (wrapDoubleQuotes $ "history@" <> unwrapDoubleQuotes abTableName) isHistoric),
-                      " ",
-                      keySt,
-                      "\n  VALUES ",
-                      inserts
-                    ] ++
-                    if isHistoric
-                      then
-                        [[r| ON CONFLICT DO NOTHING;|]]
-                      else
-                          [[r|
-                          ON CONFLICT (address) DO UPDATE SET
-                            block_hash = excluded.block_hash,
-                            block_timestamp = excluded.block_timestamp,
-                            block_number = excluded.block_number,
-                            transaction_hash = excluded.transaction_hash,
-                            transaction_sender = excluded.transaction_sender,
-                            contract_name = excluded.contract_name,
-                            data = excluded.data
-                          |],
-                          if null keysForSQL then "" else ",\n    ",
-                          tableUpsert $ keysForSQL,
-                          ";"]
+                    ["DO $$\nDECLARE\n"
+                       , "    col_name RECORD;\n"
+                       , "    column_list TEXT := ' ';\n"
+                       , "    select_list TEXT := ' ';\n"
+                       , "BEGIN\n"
+                       , "    FOR col_name IN\n"
+                       , "        SELECT column_name\n"
+                       , "        FROM information_schema.columns\n"
+                       , "        WHERE table_name = ", tableNameSingle, "\n"
+                       , "        AND column_name NOT IN (", keySt,")\n"
+                       , "    LOOP\n"
+                       , "        column_list := column_list || col_name.column_name || ', ';\n"
+                       , "        select_list := select_list || col_name.column_name || ', ';\n"
+                       , "    END LOOP;\n"
+                       , "    column_list := rtrim(column_list, ', ');\n"
+                       , "    select_list := rtrim(select_list, ', ');\n"
+                       , "    IF column_list <> '' THEN\n"
+                       , "      EXECUTE 'WITH selected_row AS (\n"
+                       , "                SELECT ' || select_list || '\n"
+                       , "                FROM ", tableNameDouble, "\n"
+                       , "                WHERE address = '", wrapSingleQuotes address, "'\n"
+                       , "                LIMIT 1\n"
+                       , "             )\n"
+                       , "             INSERT INTO ", tableNameDouble, " (", keySt', ", ' || column_list || ')\n"
+                       , "             SELECT ", inserts, ", ' || select_list || '\n"
+                       , "             FROM selected_row;';\n"
+                       , "    ELSE\n"
+                       , "      EXECUTE 'INSERT INTO ", tableNameDouble, " (", keySt', ")\n  VALUES (", inserts, ")\n  ON CONFLICT DO NOTHING;';\n"
+                       , "    END IF;\n"
+                       , "END $$;"]
+
+insertHistoryTableQuery :: [E.ProcessedContract] -> [Text]
+insertHistoryTableQuery [] = error "insertHistoryTableQuery: unhandled empty list"
+insertHistoryTableQuery cs =
+  concat $
+    let cs' = (\c -> (c, Map.toList $ Map.mapMaybe valueToSQLText $ E.contractData c)) <$> cs
+     in flip map (map snd $ partitionWith (length . snd) cs') $ \case
+          [] -> []
+          contracts@((x, list) : _) ->
+            let tableName =
+                  historyTableName
+                    (case (E.cc_creator x) of 
+                      Just cc_creator' -> cc_creator'
+                      Nothing -> (E.creator x))
+                    (E.application x)
+                    (E.contractName x)
+                keySt = (csv . map wrapSingleQuotes) . map escapeQuotes $ baseTableColumns ++ map fst (fillFirstEmptyEntries list)
+                keySt' = csv . map escapeQuotes $ baseTableColumns ++ map fst (fillFirstEmptyEntries list)
+                baseVals =
+                  [ tshow . E.address,
+                    T.pack . keccak256ToHex . E.blockHash,
+                    tshow . E.blockTimestamp,
+                    tshow . E.blockNumber,
+                    T.pack . keccak256ToHex . E.transactionHash,
+                    tshow . E.transactionSender,
+                    E.creator,
+                    E.root
+                  ]
+                address = (tshow . E.address) x
+                vals = flip map contracts $ \(row, rowList) ->
+                  csv $ map (wrapSingleQuotes . wrapSingleQuotes . ($ row)) baseVals ++ map (wrapSingleQuotes . snd) rowList
+                inserts = csv vals
+             in (: []) . T.concat $
+                  ["DO $$\nDECLARE\n"
+                       , "    col_name RECORD;\n"
+                       , "    column_list TEXT := ' ';\n"
+                       , "    select_list TEXT := ' ';\n"
+                       , "BEGIN\n"
+                       , "    FOR col_name IN\n"
+                       , "        SELECT column_name\n"
+                       , "        FROM information_schema.columns\n"
+                       , "        WHERE table_name = ", tableNameToSingleQuoteText tableName, "\n"
+                       , "        AND column_name NOT IN (", keySt,")\n"
+                       , "    LOOP\n"
+                       , "        column_list := column_list || col_name.column_name || ', ';\n"
+                       , "        select_list := select_list || col_name.column_name || ', ';\n"
+                       , "    END LOOP;\n"
+                       , "    column_list := rtrim(column_list, ', ');\n"
+                       , "    select_list := rtrim(select_list, ', ');\n"
+                       , "    IF column_list <> '' THEN\n"
+                       , "      EXECUTE 'WITH selected_row AS (\n"
+                       , "                SELECT ' || select_list || '\n"
+                       , "                FROM ", tableNameToDoubleQuoteText tableName, "\n"
+                       , "                WHERE address = '", wrapSingleQuotes address, "'\n"
+                       , "                LIMIT 1\n"
+                       , "             )\n"
+                       , "             INSERT INTO ", tableNameToDoubleQuoteText tableName, " (", keySt', ", ' || column_list || ')\n"
+                       , "             SELECT ", inserts, ", ' || select_list || '\n"
+                       , "             FROM selected_row;';\n"
+                       , "    ELSE\n"
+                       , "      EXECUTE 'INSERT INTO ", tableNameToDoubleQuoteText tableName, " (", keySt', ")\n  VALUES (", inserts, ")\n  ON CONFLICT DO NOTHING;';\n"
+                       , "    END IF;\n"
+                       , "END $$;"]
 
 -- Result: UPDATE table SET (fkey1,fkey2, ...)=(val1,val2, ...) where (fkey1_fkey,fkey2_fkey, ...)=(val1,val2, ...);
 updateFkeysQueryAbstract :: [(E.ProcessedContract, [T.Text], T.Text, TableColumns)] -> [Text]
@@ -1291,45 +1440,6 @@ updateFkeysQueryArray rows = concatMap createUpdateQuery rows
         , value'
         , ";"
         ]]
-
-insertHistoryTableQuery :: [E.ProcessedContract] -> [Text]
-insertHistoryTableQuery [] = error "insertHistoryTableQuery: unhandled empty list"
-insertHistoryTableQuery cs =
-  concat $
-    let cs' = (\c -> (c, Map.toList $ Map.mapMaybe valueToSQLText $ E.contractData c)) <$> cs
-     in flip map (map snd $ partitionWith (length . snd) cs') $ \case
-          [] -> []
-          contracts@((x, list) : _) ->
-            let tableName =
-                  historyTableName
-                    (case (E.cc_creator x) of 
-                      Just cc_creator' -> cc_creator'
-                      Nothing -> (E.creator x))
-                    (E.application x)
-                    (E.contractName x)
-                keySt = wrapAndEscapeDouble . map escapeQuotes $ baseTableColumns ++ map fst (fillFirstEmptyEntries list)
-                baseVals =
-                  [ tshow . E.address,
-                    T.pack . keccak256ToHex . E.blockHash,
-                    tshow . E.blockTimestamp,
-                    tshow . E.blockNumber,
-                    T.pack . keccak256ToHex . E.transactionHash,
-                    tshow . E.transactionSender,
-                    E.creator,
-                    E.root
-                  ]
-                vals = flip map contracts $ \(row, rowList) ->
-                  wrapAndEscape $ map (wrapSingleQuotes . ($ row)) baseVals ++ map snd rowList
-                inserts = csv vals
-             in (: []) . T.concat $
-                  [ "INSERT INTO ",
-                    tableNameToDoubleQuoteText tableName,
-                    " ",
-                    keySt,
-                    "\n  VALUES ",
-                    inserts,
-                    "\n  ON CONFLICT DO NOTHING;"
-                  ]
 
 -- Creates tables for all event declarations, stores table name in
 -- globals{createdEvents}

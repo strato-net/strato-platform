@@ -44,7 +44,7 @@ import qualified Control.Monad.Change.Modify as Mod
 import Control.Monad.Composable.SQL
 import Control.Monad.IO.Unlift
 import Control.Monad.Trans.Reader
-import Control.Monad.Trans.State.Strict hiding (state)
+-- import Control.Monad.Trans.State.Strict hiding (state)
 import Data.Either (lefts, rights)
 import Data.Foldable (toList)
 import Data.Function
@@ -141,33 +141,44 @@ processedContract ABIID {..} state AggregateAction {..} =
       transactionSender = actionTxSender ^. accountAddress
     }
 
-readPreviousSolidVMState ::
-  MonadIO m =>
-  IORef Globals ->
-  Account ->
-  m [(Text, Value)]
-readPreviousSolidVMState gref acct = fromMaybe [] <$> getContractState gref acct
+-- readPreviousSolidVMState ::
+--   MonadIO m =>
+--   IORef Globals ->
+--   Account ->
+--   m [(Text, Value)]
+-- readPreviousSolidVMState gref acct = fromMaybe [] <$> getContractState gref acct
 
 rowToInsert ::
   MonadIO m =>
-  IORef Globals ->
   ABIID ->
   AggregateAction ->
   OLD.Contract ->
-  [(Text, Value)] ->
   m E.ProcessedContract
-rowToInsert gref abiid row cont oldState = do
+rowToInsert abiid row cont =
   let newState = case actionStorage row of
-        Action.EVMDiff mp -> SVR.decodeCacheValues cont (flip Map.lookup mp) oldState
-        Action.SolidVMDiff mp -> SolidVM.decodeCacheValues mp oldState
-  setContractState gref (actionAccount row) newState
-  return $ processedContract abiid (Map.fromList $ newState) row
+        Action.EVMDiff mp -> SVR.decodeCacheValues cont (flip Map.lookup mp) []
+        Action.SolidVMDiff mp -> SolidVM.decodeCacheValues mp
+  -- setContractState gref (actionAccount row) newState
+  in return $ processedContract abiid (Map.fromList $ newState) row
+
+rowToHistories ::
+  (MonadIO m) =>
+  ABIID ->
+  [AggregateAction] ->
+  OLD.Contract ->
+  m [E.ProcessedContract]
+rowToHistories abiId actions cont = do
+  forM actions $ \hRow -> do
+    let newMap = case actionStorage hRow of
+          Action.EVMDiff mp -> SVR.decodeCacheValues cont (flip Map.lookup mp) []
+          Action.SolidVMDiff mp -> SolidVM.decodeCacheValues mp
+    return $ processedContract abiId (Map.fromList newMap) hRow
 
 rowToCollections :: MonadIO m => AggregateAction -> m (Map.Map Text Value)
 rowToCollections row = do
   let newState = case actionStorage row of
         Action.SolidVMDiff mp -> SolidVM.decodeCacheValuesForCollections mp
-        _ -> []
+        _ -> [] 
   return $ (Map.fromList $ newState)
 
 processedContractToProcessedCollectionRows :: MonadIO m => Map.Map Text Value -> [Text] -> AggregateAction -> ABIID -> Maybe Text ->m [ProcessedCollectionRow]
@@ -197,22 +208,6 @@ processedContractToProcessedCollectionRows state mapAndArrayNames row abiid creg
               Right (Right intMapValues) -> 
                 map (processArrayDynamic mName row abiid cregator) (I.toList intMapValues)
       return result
-
-rowToHistories ::
-  (MonadIO m) =>
-  IORef Globals ->
-  ABIID ->
-  [AggregateAction] ->
-  OLD.Contract ->
-  [(Text, Value)] ->
-  m [E.ProcessedContract]
-rowToHistories _ abiId actions cont oldState = do
-  flip evalStateT oldState . forM actions $ \hRow -> do
-    modify $ case actionStorage hRow of
-      Action.EVMDiff mp -> SVR.decodeCacheValues cont (flip Map.lookup mp)
-      Action.SolidVMDiff mp -> SolidVM.decodeCacheValues mp
-    newMap <- gets Map.fromList
-    return $ processedContract abiId newMap hRow
 
 processedCollectionRow :: Text -> Text -> AggregateAction -> ABIID -> Maybe Text -> Value -> Value -> ProcessedCollectionRow
 processedCollectionRow collection ttype AggregateAction {..} ABIID {..} cregator k v =
@@ -418,7 +413,7 @@ processTheMessages env conn messages = do
       concatFkeys = concat fkeys
 
   inserts <- enterBloc2 env $ do
-    forM changes $ \(acct, actions) -> do
+    forM changes $ \(_, actions) -> do
       let row = combineActions actions
       mapM_ recordAction actions
       recordCombinedAction row
@@ -439,10 +434,10 @@ processTheMessages env conn messages = do
                   }
               cont = error "internal error: contract should be unused for SolidVM"
           $logInfoLS "Contract name is: " $ T.pack $ show name
-          oldState <- readPreviousSolidVMState g acct
-          indexContract <- rowToInsert g abiid row cont oldState
+          -- oldState <- readPreviousSolidVMState g acct
+          indexContract <- rowToInsert abiid row cont
           let fkeysForThisContract = getContractsFromPC indexContract
-          hs <- rowToHistories g abiid actions cont oldState
+          hs <- rowToHistories abiid actions cont
           let mapNames = actionMappings row --recorded mappings
               arrNames = actionArrays row --all
               collectionNames = mapNames ++ arrNames
@@ -456,8 +451,8 @@ processTheMessages env conn messages = do
             $logDebugLS "actionCCCreator" $ T.pack (show (actionCCCreator row))
             $logDebugLS "cregator" $ T.pack (show cregator)
             $logInfoS "Row will be inserted into abstract table: " tableNameText
-            mCols <- getTableColumns g tableName
-            pure $ (indexContract, fkeysForThisContract, tableNameText, (cr',ap',n'),) . map extractTextInsideQuotes <$> mCols
+            -- mCols <- getTableColumns g tableName
+            pure $ (indexContract, fkeysForThisContract, tableNameText, (cr',ap',n'),) . map extractTextInsideQuotes <$> (Just [])
           $logDebugLS "Globals: Recorded Map names are: " . T.pack $ show mapNames ++ " contract: " ++ show (E.contractName indexContract)
           $logDebugLS "Globals: Recorded Array names are: " . T.pack $ show arrNames ++ " contract: " ++ show (E.contractName indexContract)
           $logDebugLS "History inserts are: " $ T.pack $ show hs
@@ -478,7 +473,7 @@ processTheMessages env conn messages = do
   forM_ insertsByCodeHash $ \ins -> do
     outputData conn $ insertIndexTable $ indexInsert ins
     outputData conn $ insertHistoryTable $ historyInserts ins
-    outputData conn $ insertAbstractTable (abstractInserts ins) False -- not historic
+    outputData conn $ insertAbstractTable (abstractInserts ins) -- not historic
     unless ((length (collectionInserts ins) < 1)) $ outputData conn $ insertCollectionTable $ collectionInserts ins
     outputData conn $ insertHistoryAbstractTable (abstractInserts ins) (historyInserts ins)
 
