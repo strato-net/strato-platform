@@ -451,8 +451,8 @@ processTheMessages env conn messages = do
             $logDebugLS "actionCCCreator" $ T.pack (show (actionCCCreator row))
             $logDebugLS "cregator" $ T.pack (show cregator)
             $logInfoS "Row will be inserted into abstract table: " tableNameText
-            mCols <- getTableColumns g tableName
-            pure $ (indexContract, fkeysForThisContract, tableNameText, (cr',ap',n'),) . map extractTextInsideQuotes <$> mCols
+            -- mCols <- getTableColumns g tableName
+            pure $ (indexContract, fkeysForThisContract, tableNameText, (cr',ap',n'),) . map extractTextInsideQuotes <$> (Just [])
           $logDebugLS "Globals: Recorded Map names are: " . T.pack $ show mapNames ++ " contract: " ++ show (E.contractName indexContract)
           $logDebugLS "Globals: Recorded Array names are: " . T.pack $ show arrNames ++ " contract: " ++ show (E.contractName indexContract)
           $logDebugLS "History inserts are: " $ T.pack $ show hs
