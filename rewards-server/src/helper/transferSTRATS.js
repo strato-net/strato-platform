@@ -30,10 +30,11 @@ async function createTransactionPayload(token, toAddress, value) {
     },
   };
 
+  // This needs to use the parallel endpoint to resolve transactions that might go at the same time (i.e buyer and seller rewards)
   const response = await fetch(
     `https://${
       NODE === "prod" ? prodMarketplaceUrl : testnetMarketplaceUrl
-    }/strato/v2.3/transaction`,
+    }/strato/v2.3/transaction/parallel?resolve=true`,
     {
       method: "POST",
       credentials: "same-origin",
