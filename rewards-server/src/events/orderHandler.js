@@ -117,6 +117,7 @@ async function handlePurchaserReward(purchaser, reward, token) {
     }
 
     const response = await purchaserResponse.json();
+    console.log("Purchaser reward transaction successful:", response);
     return response;
   } catch (error) {
     console.error("Error processing purchaser transaction:", error.message);
@@ -141,8 +142,9 @@ async function handleSellerReward(seller, reward, token) {
           `Seller transaction failed with status ${sellerResponse.status}: ${sellerResponse.statusText}`
         );
       }
-  
+      
       const response = await sellerResponse.json();
+      console.log("Seller reward transaction successful:", response);
       return response
     } catch (error) {
       console.error("Error processing seller transaction:", error.message);

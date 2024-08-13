@@ -84,7 +84,7 @@ async function handleCertificateRegistered(event, token) {
     }
 
     const body = await response.json();
-    console.log("Transfer STRATS response:", body);
+    console.log("New registration reward successful:", body);
   } catch (error) {
     console.error("Error handling CertificateRegistered event:", error);
   }
