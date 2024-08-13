@@ -14,6 +14,7 @@ module Blockchain.Data.BlockHeader
     extraData2TxsLen,
     mixHashlens,
     extraDataLens,
+    signaturesLens,
     txsLen2ExtraData,
     getBlockBeneficiary,
     getBlockDifficulty,
@@ -43,12 +44,10 @@ import Blockchain.Strato.Model.Validator
 import Control.DeepSeq
 import Control.Lens
 import Control.Monad
--- import Data.Aeson
 import Data.Binary
 import Data.Bits (shiftL, shiftR)
 import qualified Data.ByteString as B
 import Data.ByteString.Arbitrary
--- import Data.Data
 import Data.Time
 import Data.Time.Clock.POSIX
 import GHC.Generics
@@ -156,7 +155,7 @@ getBlockSignatures :: BlockHeader -> [Signature]
 getBlockSignatures BlockHeader {} = []
 getBlockSignatures BlockHeaderV2 { signatures } = signatures
 
-makeLensesFor [("extraData", "extraDataLens"), ("mixHash", "mixHashlens")] ''BlockHeader
+makeLensesFor [("extraData", "extraDataLens"), ("mixHash", "mixHashlens"), ("signatures", "signaturesLens")] ''BlockHeader
 
 instance Format BlockHeader where
   format header@(BlockHeader ph oh b sr tr rr _ d number' gl gu ts ed _ nonce') =

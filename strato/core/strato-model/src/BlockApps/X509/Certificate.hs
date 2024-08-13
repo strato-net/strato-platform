@@ -146,6 +146,9 @@ data X509CertInfoState = X509CertInfoState
   }
   deriving (Show, Eq, Generic)
 
+instance Ord X509CertInfoState where
+    compare a b = compare (certificate a) (certificate b)
+
 instance Binary X509CertInfoState where
     put = (put :: C8.ByteString -> Put) <$> certToBytes . certificate
     get = x509CertToCertInfoState <$> (fromRight (error "The certificate couldn't be decoded") . bsToCert) <$> (get :: Get C8.ByteString)

@@ -56,10 +56,10 @@ yieldManyR = yieldMany . map Right
 
 authorize :: (StateMachineM m) => InEvent -> ExceptT String m ()
 authorize = \case
-  IMsg (MsgAuth addr _) _ -> do
-    ret <- uses validators $ S.member (chainMemberParsedSetToValidator addr)
+  IMsg (MsgAuth cm _) _ -> do
+    ret <- lift $ contextValidatorsContain (Just $ chainMemberParsedSetToValidator cm)
     unless ret $ do
-      let reason = "Rejecting message; sender not a validator: " ++ show addr
+      let reason = "Rejecting message; sender not a validator: " ++ show cm
       $logWarnS "blockstanbul/auth" . T.pack $ reason
       throwE reason
   _ -> return ()
@@ -78,13 +78,12 @@ isAuthorized iev = fmap (either AuthFailure (const AuthSuccess)) . runExceptT $ 
   -- TODO(tim): RoundChange a Preprepare correctly signed by the proposer,
   -- but with incorrect extraData.
     IMsg _ (Preprepare _ pp) -> do
-      valSet <- use validators -- this is _validators from bloctanbul context?
       let mSignatory = verifyProposerSeal pp =<< getProposerSeal pp -- same convention getProposerSeal :: Block -> Maybe Signature
       case mSignatory of
         Nothing -> raiseInProd "Rejecting Preprepare; proposer seal could not be verified"
         Just signatory -> do
           mChainMember <- lift $ fmap (chainMemberParsedSetToValidator . getChainMemberFromX509) <$> getX509FromAddress signatory
-          let signerExists = maybe False (`S.member` valSet) mChainMember
+          signerExists <- lift $ contextValidatorsContain mChainMember
           unless signerExists $
             raiseInProd $
               "Rejecting Preprepare; signer " ++ formatAddressWithoutColor signatory
@@ -149,10 +148,11 @@ nextRound nt = do
       yieldR $ ResetTimer r
   use view >>= recordView
   vals <- use validators
+  $logInfoS "nextRound/validators" . T.pack $ show vals
   thisR <- use $ view . round
   when (S.null vals) . liftIO $
     die "All participants voted out, consensus is stuck."
-  let leader = (fromIntegral thisR `mod` S.size vals) `S.elemAt` vals
+  let (leader, _) = (fromIntegral thisR `mod` S.size vals) `S.elemAt` vals
   proposer .= leader
   proposal .= Nothing
   self <- use selfCert
@@ -176,13 +176,13 @@ nextRound nt = do
   hasPrepared .= False
   pendingRound .= Nothing
 
-  when (isJust self) $ isValidator .= (chainMemberParsedSetToValidator (fromJust self) `elem` vals)
+  when (isJust self) $ isValidator .= (chainMemberParsedSetToValidator (fromJust self) `elem` (map fst . S.toList $ vals))
 
   yieldR . NewCheckpoint
     =<< liftA2
       Checkpoint
       (use view)
-      (uses validators S.toList)
+      (uses validators (map fst . S.toList))
 
 instance A.Selectable Address X509CertInfoState m => A.Selectable Address X509CertInfoState (StateT BlockstanbulContext m) where
   select p = lift . A.select p
@@ -214,11 +214,16 @@ eventLoop ctx = execStateC ctx $
             ForcedValidator fv -> modify' $ validatorBehavior .~ fv
           valB <- use validatorBehavior
           $logInfoLS "blockstanbul/ValidatorBehaviorChange" valB
-        ValidatorChange val dir -> do
+        ValidatorChange val cert dir -> do
           modify' $
             validators
               %~ ( \cm ->
-                     let cm' = (if dir then S.insert else S.delete) val cm in cm'
+                     let cm' = (if dir then S.insert else S.delete) (val, getCert) cm 
+                         getCert = 
+                            case cert of
+                                Just c -> c
+                                Nothing -> snd $ fromMaybe (error "how is this a validator with no certificate?") $ find (\(v', _) -> v' == val) $ S.toList cm
+                     in cm'
                  )
           vals' <- use validators
           $logInfoLS "blockstanbul/ValidatorChange" . T.pack $
@@ -259,8 +264,6 @@ eventLoop ctx = execStateC ctx $
                 $ err
               yieldR $ FailedHistoric blk
             Right _ -> do
-              network' <- use network
-              validatorTimingHack network' $ number (blockBlockData blk)
               acceptHistoric
               $logInfoS "blockstanbul" . T.pack . printf "Accepting historical block #%d" $ blockNo
               yieldR . ToCommit $ blk
@@ -271,7 +274,7 @@ eventLoop ctx = execStateC ctx $
           self <- use selfCert
           when (isNothing ppl && Just leader == fmap chainMemberParsedSetToValidator self) $ do
             vs <- use validators
-            let blockWithVs = addValidators (ChainMembers $ S.map validatorToChainMemberParsedSet vs) blk
+            let blockWithVs = addValidators (ChainMembers $ S.map (validatorToChainMemberParsedSet . fst) vs) blk
             pseal <- proposerSeal blockWithVs
             let sealedBlk = addProposerSeal pseal blockWithVs
             mLocked <- use blockLock
@@ -518,54 +521,3 @@ recordOutEvent eev =
         LeadFound {} -> inc "lead_found"
         NewCheckpoint {} -> inc "new_checkpoint"
         RunPreprepare {} -> inc "run_preprepare"
-
-
-validatorTimingHack :: (MonadState BlockstanbulContext m)  =>
-                       String -> Integer -> m ()
-validatorTimingHack "mercata" blockNumber = validatorTimingHackMercata blockNumber
-validatorTimingHack "mercata-hydrogen" blockNumber = validatorTimingHackMercataHydrogen blockNumber
-validatorTimingHack _ _ = do
-  return ()
-
-
-validatorTimingHackMercata :: (MonadState BlockstanbulContext m)  =>
-                              Integer -> m ()
-validatorTimingHackMercata = \case
-  5255 -> modify' $ validators %~ S.insert "service-account-io-stratomercata-dnorwood"
-  5256 -> modify' $ validators %~ S.insert "service-account-io-stratomercata-witmk"
-  5257 -> modify' $ validators %~ S.insert "service-account-io-stratomercata-jpowell"
-  5258 -> modify' $ validators %~ S.insert "service-account-io-stratomercata-ChessGM9"
-  5259 -> modify' $ validators %~ S.insert "service-account-io-stratomercata-aaa"
-  5260 -> modify' $ validators %~ S.insert "service-account-io-stratomercata-trouble"
-  5261 -> modify' $ validators %~ S.insert "service-account-io-stratomercata-dsnallapu"
-  5271 -> modify' $ validators %~ S.insert "dustin-node"
-  5276 -> modify' $ validators %~ S.insert "service-account-io-stratomercata-kierensnode"
-  5277 -> modify' $ validators %~ S.insert "service-account-io-stratomercata-wongway"
-  5288 -> modify' $ validators %~ S.delete "service-account-io-stratomercata-dnorwood"
-  6099 -> modify' $ validators %~ S.insert "service-account-io-stratomercata-tyson"
-  7369 -> modify' $ validators %~ S.insert "service-account-io-stratomercata-neel"
-  7589 -> modify' $ validators %~ S.insert "service-account-io-stratomercata-drewbaby"
-  7673 -> modify' $ validators %~ S.insert "service-account-io-stratomercata-michael"
-  7683 -> modify' $ validators %~ S.insert "service-account-io-stratomercata-drebbel"
-  7893 -> modify' $ validators %~ S.insert "service-account-io-stratomercata-keepeth"
-  7915 -> modify' $ validators %~ S.insert "service-account-io-stratomercata-dgs"
-  7976 -> modify' $ validators %~ S.insert "service-account-io-mercata-dgs"
-  7977 -> modify' $ validators %~ S.insert "service-account-io-stratomercata-goldberg"
-  8171 -> modify' $ validators %~ S.insert "service-account-Io-stratomercata-hasanthevalidator"
-  8172 -> modify' $ validators %~ S.insert "service-account-Io-stratomercata-numbatwopencil"
-  8315 -> modify' $ validators %~ S.insert "service-account-io-stratomercata-jgonzo"
-  8317 -> modify' $ validators %~ S.insert "service-account-io-stratomercata-jacoguzo"
-  8320 -> modify' $ validators %~ S.insert "service-account-io-stratomercata-zeek"
-  8323 -> modify' $ validators %~ S.insert "service-account-io-stratomercata-mecmo4mopm"
-  8324 -> modify' $ validators %~ S.insert "service-account-io-stratomercata-goldbacktoken"
-  8325 -> modify' $ validators %~ S.insert "service-account-io-stratomercata-itaugmentation"
-  8575 -> modify' $ validators %~ S.insert "service-account-io-stratomercata-vinfra"
-  8576 -> modify' $ validators %~ S.insert "service-account-io-stratomercata-bible"
-  _ -> return ()
-  
-
-validatorTimingHackMercataHydrogen :: (MonadState BlockstanbulContext m)  =>
-                               Integer -> m ()
-validatorTimingHackMercataHydrogen _ = do
-  return ()
-

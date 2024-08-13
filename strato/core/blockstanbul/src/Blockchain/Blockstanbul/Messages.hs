@@ -10,6 +10,7 @@
 
 module Blockchain.Blockstanbul.Messages where
 
+import BlockApps.X509
 import BlockApps.Logging
 import Blockchain.Data.ArbitraryInstances ()
 import Blockchain.Data.Block
@@ -161,7 +162,7 @@ data InEvent
   | PreprepareResponse PreprepareDecision
   | ForcedConfigChange ForcedConfigChange
   | ValidatorBehaviorChange ForcedValidatorChange
-  | ValidatorChange Validator Bool
+  | ValidatorChange Validator (Maybe X509CertInfoState) Bool 
   deriving (Eq, Show)
 
 instance Format InEvent where
@@ -174,7 +175,7 @@ instance Format InEvent where
   format (PreviousBlock blk) = "PreviousBlock " ++ format (blockHash blk)
   format (ForcedConfigChange cc) = "ForcedConfigChange " ++ format cc
   format (ValidatorBehaviorChange theBool) = "ValidatorBehaviorChange " ++ format theBool
-  format (ValidatorChange val theBool) = "ValidatorChange " ++ format val ++ if theBool then " added" else " removed"
+  format (ValidatorChange val _ theBool) = "ValidatorChange " ++ format val ++ if theBool then " added" else " removed"
 
 data OutEvent
   = OMsg {oAuth :: MsgAuth, oMessage :: TrustedMessage}
@@ -227,7 +228,7 @@ inShortLog loc iev = $logInfoS loc . pack $
     PreviousBlock blk -> CL.blue "PREVIOUS_BLOCK " ++ blkNum blk
     ForcedConfigChange cc -> CL.blue "FORCED_CONFIG_CHANGE " ++ format cc
     ValidatorBehaviorChange vc -> CL.blue "VALIDATOR_BEHAVIOR_CHANGE " ++ show vc
-    ValidatorChange val dir -> CL.blue "VALIDATOR_CHANGE " ++ format val ++ if dir then " ADDED" else " REMOVED"
+    ValidatorChange val _ dir -> CL.blue "VALIDATOR_CHANGE " ++ format val ++ if dir then " ADDED" else " REMOVED"
 
 outShortLog :: MonadLogger m => Text -> EOutEvent -> m ()
 outShortLog loc eoev = do

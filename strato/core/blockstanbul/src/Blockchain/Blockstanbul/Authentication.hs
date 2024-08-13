@@ -36,9 +36,8 @@ import Data.ByteString (ByteString)
 import qualified Data.ByteString as B
 import qualified Data.ByteString.Lazy as BL
 import Data.Either.Extra
-import Data.Maybe (catMaybes)
 import Data.List
-import Data.Maybe (fromJust)
+import Data.Maybe (catMaybes, fromJust)
 import Data.Set (Set)
 import qualified Data.Set as S
 import Test.QuickCheck
@@ -80,16 +79,23 @@ addProposerSeal sig =
       . cookRawExtra
 
 addCommitmentSeals :: [Signature] -> Block -> Block
-addCommitmentSeals sigs =
-  over extraLens $
-    uncookRawExtra
-      . over
-        istanbul
-        ( \i ->
-            fmap (set commitment sigs) i
-              <|> error "must set validators before commitment seals"
-        )
-      . cookRawExtra
+addCommitmentSeals sigs b = 
+    block 
+    where
+        header' = blockBlockData b
+        header = header' { signatures = sigs }
+        block = b { blockBlockData = header }
+    
+-- addCommitmentSeals sigs =
+--   over extraLens $
+--     uncookRawExtra
+--       . over
+--         istanbul
+--         ( \i ->
+--             fmap (set commitment sigs) i
+--               <|> error "must set validators before commitment seals"
+--         )
+--       . cookRawExtra
 
 scrubAllSeals :: RawExtraData -> RawExtraData
 scrubAllSeals =
@@ -98,13 +104,16 @@ scrubAllSeals =
     . set (istanbul . _Just . commitment) []
     . cookRawExtra
 
+scrubSignaturesFromBlock :: [Signature] -> [Signature]
+scrubSignaturesFromBlock _ = []
+
 proposalMessage :: Block -> B.ByteString
--- TODO(tim): Clear everything out of extraData except vanity and validators
 proposalMessage =
   keccak256ToByteString
     . hash
     . rlpSerialize
     . rlpEncode
+    . over signaturesLens scrubSignaturesFromBlock
     . over extraDataLens scrubAllSeals
     . blockBlockData
 
@@ -139,12 +148,12 @@ recoverPub' sig v =
     Nothing -> throwError "can't recover public key"
     Just val -> return val
 
-
 finalHash :: Block -> Keccak256
 finalHash =
   hash
     . rlpSerialize
     . rlpEncode
+    . over signaturesLens scrubSignaturesFromBlock
     . over extraDataLens scrubCommitmentSeals
     . blockBlockData
 
@@ -184,30 +193,23 @@ getX509FromAddress' address = do
   maybeCert <- getX509FromAddress address
 
   case maybeCert of
-    Nothing ->
---      error $ --will make this stricter once the full soln is in
-      throwError $
-        "Missing address in X509 certificate database: " ++ formatAddressWithoutColor address
+    Nothing -> throwError $ "Missing address in X509 certificate database: " ++ formatAddressWithoutColor address
     Just v -> return v
 
 replayHistoricBlock :: (MonadError String m, A.Selectable Address X509CertInfoState m) =>
-                       Set Validator -> Word256 -> Block -> m (Word256, Validator)
-replayHistoricBlock realValidators seqNo blk = do
+                       Set (Validator, X509CertInfoState) -> Word256 -> Block -> m (Word256, Validator)
+replayHistoricBlock validatorSet seqNo blk = do
   let ExtraData {..} = cookRawExtra . L.view extraLens $ blk
   IstanbulExtra {..} <- liftEither $ maybeToEither "no istanbul metadata" _istanbul
   let mProp = verifyProposerSeal blk =<< _proposedSig
       blockNo = fromIntegral . number . blockBlockData $ blk
+      realValidators = S.fromList . map fst . S.toList $ validatorSet 
 
-  signers <- sequence $ map (verifyCommitmentSeal (blockHash blk)) _commitment
+  signers <- sequence $ map (verifyCommitmentSeal (blockHash blk)) $ signatures $ blockBlockData blk
       
   noAddress <- sequence $ map getX509FromAddress signers
   
   let signerRes = S.fromList $ ((chainMemberParsedSetToValidator . getChainMemberFromX509) <$> (catMaybes noAddress))
-  
-  -- Will make this stricter once full soln in
-  --noAddress <- sequence $ map getX509FromAddress' (signers :: [Address])
-  --let signerRes = S.fromList $ (chainMemberParsedSetToValidator . getChainMemberFromX509) <$>  noAddreqss
-
   
   unless (seqNo + 1 == blockNo) $
     throwError $ printf "unexpected block number: have %d, wanted %d" blockNo (seqNo + 1)
@@ -218,7 +220,7 @@ replayHistoricBlock realValidators seqNo blk = do
 
   let propChainMember = chainMemberParsedSetToValidator $ getChainMemberFromX509 propCert
 
-  unless (propChainMember `S.member` realValidators) $
+  unless (propChainMember `elem` realValidators) $
     throwError $
 --    error $
       "proposer " ++ formatAddressWithoutColor prop ++ " (" ++ format propChainMember ++ ")  not a validator"
@@ -229,7 +231,6 @@ replayHistoricBlock realValidators seqNo blk = do
 
   unless (expectedValidatorList == realValidators) $
     throwError $
---    error $ --will make this stricter once the full soln is in
       "real validator list doesn't match expected validator list for block #" ++ show (number . blockBlockData $ blk)
       ++ "\nreal validator list: " ++ show (map format $ S.toList realValidators)
       ++ "\nblock validator list: " ++ show (map format $ S.toList expectedValidatorList)
@@ -239,7 +240,6 @@ replayHistoricBlock realValidators seqNo blk = do
         if (signerRes S.\\ realValidators) `S.isSubsetOf` futureValidatorsHack
           then throwError $ "future validators " ++ show unexplained ++ " jumped the gun, signed block #" ++ show blockNo ++ " before they were authorized to do so.  I'll throw the block away and wait for another validator to send me the properly signed block"
           else throwError $
---          else error $  --will make this stricter once the full soln is in
                "unknown signers in block #" ++ show blockNo ++ ": " ++ unexplained
                ++ "\nsignerRes: " ++ show (map format $ S.toList signerRes)
                ++ "\nreal validator list: " ++ show (map format $ S.toList realValidators)

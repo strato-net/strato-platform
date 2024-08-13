@@ -7,7 +7,9 @@ module Main where
 
 import BlockApps.Init
 import BlockApps.Logging
+import BlockApps.X509.Certificate
 import Blockchain.Blockstanbul
+import Blockchain.Blockstanbul.StateMachine (coupleValidatorWithX509s)
 import Blockchain.Data.GenesisInfo
 import qualified Blockchain.EthConf as EC
 import Blockchain.Generation
@@ -48,7 +50,11 @@ main :: IO ()
 main = do
   blockappsInit "seq_main"
   s <- $initHFlags "Block/Txn sequencer for the Haskell EVM"
-  validators <- readValidatorsFromGenesisInfo <$> getGenesisInfoFromFile flags_genesisBlockName
+  validators <- do
+    vs <- readValidatorsFromGenesisInfo <$> getGenesisInfoFromFile flags_genesisBlockName
+    x509s <- map x509CertToCertInfoState <$> readCertsFromGenesisInfo <$> getGenesisInfoFromFile flags_genesisBlockName
+    return $ coupleValidatorWithX509s vs x509s
+
   exportFlagsAsMetrics
   putStrLn $ "strato-sequencer ignoring unknown flags: " ++ show s
   putStrLn $ "strato-sequencer network: " ++ show flags_network
@@ -93,12 +99,10 @@ main = do
         unless (flags_blockstanbul_round_period_s > 0) . ioError . userError $
           "--blockstanbul_round_period_s must be positive"
 
-        putStrLn $ "ACTUAL validators list: " ++ show validators
-
-        ckpt <- runGregorM gregorCfg $ initializeCheckpoint validators
+        ckpt <- runGregorM gregorCfg $ initializeCheckpoint (map fst validators)
         putStrLn $ "Checkpoint: " ++ show ckpt
 
-        return $ Just $ newContext flags_network ckpt (Just selfAddress) flags_validatorBehavior Nothing
+        return $ Just $ newContext flags_network ckpt (Just selfAddress) flags_validatorBehavior Nothing validators
 
   cht <- atomically newTMChan
 

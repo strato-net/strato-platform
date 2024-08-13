@@ -27,7 +27,6 @@ import Blockchain.Strato.Model.ExtendedWord (Word256)
 import Blockchain.Strato.Model.Keccak256 (Keccak256)
 import Blockchain.Strato.Model.MicroTime
 import Blockchain.Strato.Model.StateRoot
-import Blockchain.Strato.Model.Validator
 import Control.DeepSeq
 import Control.Lens
 import Data.Aeson hiding (encode)
@@ -65,8 +64,6 @@ data IngestEvent
   | IENewCertRegistered A.Address X509CertInfoState
   | IECertRevoked A.Address
   | IENewChainOrgName Word256 ChainMemberParsedSet
-  | IEValidatorAdded Keccak256 Validator
-  | IEValidatorRemoved Keccak256 Validator
   | IEBlockstanbul PBFT.WireMessage
   | IEForcedConfigChange PBFT.ForcedConfigChange
   | IEValidatorBehavior PBFT.ForcedValidatorChange
@@ -86,8 +83,6 @@ data IngestEventType
   | IETNewCertRegistered
   | IETCertRevoked
   | IETNewChainOrgName
-  | IETValidatorAdded
-  | IETValidatorRemoved
   | IETBlockstanbul
   | IETForcedConfigChange
   | IETValidatorBehavior
@@ -106,8 +101,6 @@ iEventType = \case
   IENewCertRegistered {} -> IETNewCertRegistered
   IECertRevoked {} -> IETCertRevoked
   IENewChainOrgName {} -> IETNewChainOrgName
-  IEValidatorAdded {} -> IETValidatorAdded
-  IEValidatorRemoved {} -> IETValidatorRemoved
   IEBlockstanbul {} -> IETBlockstanbul
   IEForcedConfigChange {} -> IETForcedConfigChange
   IEValidatorBehavior {} -> IETValidatorBehavior
@@ -125,8 +118,6 @@ instance Format IngestEvent where
   format (IENewCertRegistered a e) = intercalate ", " [CL.yellow $ format a, show e]
   format (IECertRevoked a) = CL.yellow $ format a
   format (IENewChainOrgName c cm) = intercalate ", " [CL.yellow $ format c, format cm]
-  format (IEValidatorAdded b a) = intercalate ", " [CL.yellow $ format b, CL.yellow $ format a]
-  format (IEValidatorRemoved b a) = intercalate ", " [CL.yellow $ format b, CL.yellow $ format a]
   format (IEBlockstanbul o) = format o
   format (IEForcedConfigChange o) = format o
   format (IEValidatorBehavior o) = show o
@@ -144,8 +135,6 @@ instance ShowConstructor IngestEvent where
   showConstructor IENewCertRegistered{} =  "IENewCertRegistered"
   showConstructor IECertRevoked{} =  "IECertRevoked"
   showConstructor IENewChainOrgName{} = "IENewChainOrgName"
-  showConstructor IEValidatorAdded{} = "IEValidatorAdded"
-  showConstructor IEValidatorRemoved{} = "IEValidatorRemoved"
   showConstructor IEBlockstanbul{} = "IEBlockstanbul"
   showConstructor IEForcedConfigChange{} = "IEForcedConfigChange"
   showConstructor IEValidatorBehavior{} = "IEValidatorBehavior"
