@@ -93,8 +93,8 @@ async function handleOrderRewards(event, token) {
   buyerReward = Math.round(buyerReward);
   sellerReward = Math.round(sellerReward);
 
-  handlePurchaserReward(purchaser, buyerReward, token)
-  handleSellerReward(seller, sellerReward, token)
+  await handlePurchaserReward(purchaser, buyerReward, token)
+  await handleSellerReward(seller, sellerReward, token)
 
 }
 
