@@ -6,6 +6,7 @@ import {
   Typography,
   Table,
   Tooltip,
+  Spin,
 } from "antd";
 import { actions as categoryActions } from "../../contexts/category/actions";
 import { useCategoryDispatch } from "../../contexts/category";
@@ -56,6 +57,7 @@ const MyWallet = ({ user }) => {
   const { Title, Text } = Typography;
   const navigate = useNavigate();
   const isMobile = useMediaQuery("(max-width: 767px)");
+  const [isLoading, setIsLoading] = useState(true);
 
   const { strats } = useMarketplaceState();
   const stratsBalance = Object.keys(strats).length > 0 ? strats : 0;
@@ -66,14 +68,17 @@ const MyWallet = ({ user }) => {
   const paymentServiceDispatch = usePaymentServiceDispatch();
 
   useEffect(() => {
-    if (user && user.commonName) {
-      paymentServiceActions.getPaymentServices(paymentServiceDispatch, true);
-      paymentServiceActions.getNotOnboarded(
-        paymentServiceDispatch,
-        user.commonName,
-        10,
-        0
-      );
+    if (user?.commonName) {
+      setIsLoading(true);
+      Promise.all([
+        paymentServiceActions.getPaymentServices(paymentServiceDispatch, true),
+        paymentServiceActions.getNotOnboarded(
+          paymentServiceDispatch,
+          user.commonName,
+          10,
+          0
+        ),
+      ]).finally(() => setIsLoading(false));
     }
   }, [paymentServiceDispatch, user]);
 
@@ -92,8 +97,8 @@ const MyWallet = ({ user }) => {
     } else actions.fetchInventory(dispatch, limit, offset, "", category);
   }, [dispatch, limit, offset, debouncedSearchTerm, category, isSearch]);
 
-  const userName = user.commonName || "";
-  const userLetter = userName[0].toUpperCase() || "";
+  const userName = user?.commonName || "";
+  const userLetter = userName ? userName[0].toUpperCase() : "";
 
   const [tableData, setTableData] = useState([]);
 
@@ -150,7 +155,7 @@ const MyWallet = ({ user }) => {
       setTableData(baseData);
       setTotalBalance((stratsBalance * 0.01).toFixed(2));
     }
-  }, [isInventoriesLoading, inventories, stratsBalance, user.commonName]);
+  }, [isInventoriesLoading, inventories, stratsBalance]);
 
   const CustomQuestionIcon = () => (
     <svg
@@ -303,7 +308,7 @@ const MyWallet = ({ user }) => {
           : null;
 
         // Check if the item was created by the user
-        if (record.creator === user.commonName) {
+        if (user?.commonName && record.creator === user.commonName) {
           return <span className="text-xs sm:text-sm">-</span>;
         }
 
@@ -453,8 +458,14 @@ const MyWallet = ({ user }) => {
 
       <div className="p-4">
         <div className="border border-[#D9D9D9] rounded-lg overflow-hidden">
-          {tableData.map((item, index) =>
-            renderMobileCard(item, index, tableData.length)
+          {isLoading ? (
+            <div className="flex justify-center items-center h-40">
+              <Spin size="large" />
+            </div>
+          ) : (
+            tableData.map((item, index) =>
+              renderMobileCard(item, index, tableData.length)
+            )
           )}
         </div>
       </div>
@@ -541,7 +552,7 @@ const MyWallet = ({ user }) => {
           dataSource={tableData}
           pagination={false}
           className="custom-table"
-          loading={isInventoriesLoading}
+          loading={isLoading || isInventoriesLoading}
         />
       </div>
     </>
