@@ -57,33 +57,33 @@ const Checkout = () => {
     return parseFloat(result);
   }
 
-  // const storedData = useMemo(() => {
-  //   const cartListData = window.localStorage.getItem("cartList");
-  //   let cartList = [];
-  //   try {
-  //     if (cartListData) {
-  //       // Attempt to parse the stored data as JSON
-  //       cartList = JSON.parse(cartListData);
-  //     }
-  //   } catch (error) {
-  //     // Handle JSON parsing error
-  //     console.error("Error parsing cartList data:", error);
-  //   }
+  const storedData = useMemo(() => {
+    const cartListData = window.localStorage.getItem("cartList");
+    let cartList = [];
+    try {
+      if (cartListData) {
+        // Attempt to parse the stored data as JSON
+        cartList = JSON.parse(cartListData);
+      }
+    } catch (error) {
+      // Handle JSON parsing error
+      console.error("Error parsing cartList data:", error);
+    }
 
-  //   return cartList;
-  // }, []);
-
-  useEffect(() => {
-    actions.fetchCartItems(marketplaceDispatch, cartList);
-  }, [marketplaceDispatch, cartList]);
+    return cartList;
+  }, []);
 
   useEffect(() => {
-    paymentServiceActions.getPaymentServices(paymentServiceDispatch);
+    actions.fetchCartItems(marketplaceDispatch, storedData);
+  }, [marketplaceDispatch, storedData]);
+
+  useEffect(() => {
+    paymentServiceActions.getPaymentServices(paymentServiceDispatch, false);
   }, [paymentServiceDispatch]);
 
   useEffect(() => {
     const map = new Map();
-    for (const obj of cartList) {
+    for (const obj of storedData) {
       const org = obj.product.ownerCommonName;
       const newPPs = new Set(obj.product.paymentProviders)
       if (!map.has(org)) {
@@ -356,13 +356,10 @@ const Checkout = () => {
     },
   ];
 
-  const filterPaymentServices = (es) => {
-    const ps = es.map(p => paymentServices.find(s => s.address === p.value));
-    if (ps.length === 0 || ps[0] === undefined) {
-      return paymentServices.filter((p) => p && p.serviceName === 'Stripe');
-    } else {
-      return ps;
-    }
+  const filterPaymentServices = (e) => {
+    const filteredPaymentServices = e.map(assetPaymentServices => paymentServices.find(paymentService => paymentService.address === assetPaymentServices.value));
+
+    return filteredPaymentServices;
   }
 
   return (

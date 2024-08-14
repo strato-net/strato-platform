@@ -12,6 +12,7 @@ import NewTrendingCard from "./NewTrendingCard";
 import { actions as orderActions } from "../../contexts/order/actions";
 import { useOrderDispatch } from "../../contexts/order";
 import { Fade } from "react-awesome-reveal";
+import { setCookie } from "../../helpers/cookie";
 
 const { Title } = Typography;
 
@@ -149,6 +150,7 @@ const TopSellingProductCard = () => {
   const addItemToCart = async (product, quantity) => {
         const  items = [{ product, qty: quantity }]
         actions.addItemToCart(marketplaceDispatch, items);
+        setCookie('returnUrl', '/checkout', 10);
         navigate('/checkout');
         window.scrollTo(0, 0);
   }

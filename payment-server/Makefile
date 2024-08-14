@@ -9,5 +9,7 @@ endif
 all: build
 
 build:
+	mkdir -p contracts
+	cp -r ../marketplace/backend/dapp/mercata-base-contracts/Templates/ contracts/
 	docker build -t $(BASIL_DOCKER_TAG) .
 	docker tag $(BASIL_DOCKER_TAG) $(ECR_DOCKER_TAG)

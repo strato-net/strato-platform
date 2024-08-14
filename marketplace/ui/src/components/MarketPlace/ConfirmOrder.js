@@ -4,27 +4,23 @@ import {
   Spin,
   Modal,
   Select,
-  Button
+  Col,
 } from "antd";
 import {
   useMarketplaceState,
   useMarketplaceDispatch,
 } from "../../contexts/marketplace";
+import { useMemo } from "react";
 import { useOrderState, useOrderDispatch } from "../../contexts/order";
 import { useAuthenticateState } from "../../contexts/authentication";
 import { actions } from "../../contexts/marketplace/actions";
 import { actions as orderActions } from "../../contexts/order/actions";
 import { useState, useEffect } from "react";
-import { actions as inventoryAction } from "../../contexts/inventory/actions";
-import {
-  useInventoryDispatch,
-  useInventoryState,
-} from "../../contexts/inventory";
 import DataTableComponent from "../DataTableComponent";
 import "./index.css";
-import { HTTP_METHODS, PAYMENT_LIST } from "../../helpers/constants";
 import TagManager from "react-gtm-module";
 import { setCookie } from "../../helpers/cookie";
+import { generateHtmlContent } from "../../helpers/emailTemplate";
 
 const { Option } = Select;
 
@@ -38,11 +34,12 @@ const ConfirmOrder = ({ paymentProviders = [], data, columns }) => {
   const [tax, setTax] = useState(0);
   const [subTotal, setSubTotal] = useState(0);
   const [total, setTotal] = useState(0);
-  const inventoryDispatch = useInventoryDispatch();
   const { success: marketplaceSuccess, message: marketplaceMessage } = useMarketplaceState();
   const [modal, contextHolderForModal] = Modal.useModal();
   const [cartData, setCartData] = useState(data);
   const [selectedProvider, setSelectedProvider] = useState('');
+
+  const activePaymentProviders = (paymentProviders[0] !== undefined) ? paymentProviders.filter(paymentProvider => paymentProvider.isActive) : [];
 
   useEffect(() => {
     setCartData(data);
@@ -100,6 +97,39 @@ const ConfirmOrder = ({ paymentProviders = [], data, columns }) => {
     }
   };
 
+// Generating Email Confirmation HTML
+  let htmlContents = [];
+  const generate_HTML_Content = async (username) => {
+    htmlContents = [];
+    
+    let customerFirstName = username;
+    
+    // Construct Email with order details
+    let concatenatedOrderString = "";
+    let orderTotal = 0; 
+    for (let i = 0; i < cartData.length; i++) {
+      let orderItem = cartData[i];
+      let itemName = decodeURIComponent(orderItem.item.name);
+      let itemPrice = parseFloat(orderItem.unitPrice).toFixed(2); 
+      let itemQty = orderItem.qty;
+      let itemTotal = (itemPrice * itemQty).toFixed(2); 
+  
+      concatenatedOrderString += `${itemName}:\n`; 
+      concatenatedOrderString += `$${itemTotal} (${itemTotal*100} STRATS)<br>`; 
+      concatenatedOrderString += `Qty: ${itemQty} &nbsp; $${itemPrice} each (${(itemPrice*100).toFixed(0)} STRATS each)<br><br>`; 
+      orderTotal += parseFloat(itemTotal); 
+      if (i === cartData.length - 1) {
+        concatenatedOrderString += `<hr style="border-top: 1px dotted #0A1B71; min-width: 80%; max-width: 80%; margin-left: 15px;">`;
+        concatenatedOrderString += `Sales Tax: $${parseFloat(tax).toFixed(2)} (${(parseFloat(tax) * 100).toFixed(0)} STRATS)<br>`;
+        concatenatedOrderString += `Shipping Fee: <i><strong>Free</strong></i><br><br>`;
+        concatenatedOrderString += `Order Total: $${orderTotal.toFixed(2)} (${(orderTotal * 100).toFixed(0)} STRATS)<br>`;
+      }
+    }
+    
+
+     htmlContents.push(generateHtmlContent(customerFirstName, concatenatedOrderString));
+  };
+
   const openToastMarketplace = (placement) => {
     if (marketplaceSuccess) {
       api.success({
@@ -118,6 +148,8 @@ const ConfirmOrder = ({ paymentProviders = [], data, columns }) => {
     }
   };
 
+
+
   const handlePaymentConfirm = async (paymentProvider) => {
     actions.addItemToConfirmOrder(marketplaceDispatch, cartData);
     let orderList = [];
@@ -130,6 +162,8 @@ const ConfirmOrder = ({ paymentProviders = [], data, columns }) => {
       });
     });
 
+    generate_HTML_Content(user.commonName)
+
     let body = {
       paymentProvider: { address: paymentProvider.address },
       buyerOrganization: userOrganization,
@@ -138,7 +172,10 @@ const ConfirmOrder = ({ paymentProviders = [], data, columns }) => {
       tax: tax,
       user: user.commonName,
       email: user.email,
+      htmlContents: htmlContents,
     };
+    
+
 
     window.LOQ.push(['ready', async LO => {
       // Track an event
@@ -159,11 +196,11 @@ const ConfirmOrder = ({ paymentProviders = [], data, columns }) => {
       let serviceURL = paymentProvider.serviceURL || paymentProvider.data.serviceURL;
       let checkoutRoute = paymentProvider.checkoutRoute || paymentProvider.data.checkoutRoute;
       if (serviceURL
-        && serviceURL !== ''
-        && checkoutRoute
-        && checkoutRoute !== ''
-      ) {
-        const url = `${serviceURL}${checkoutRoute}?checkoutHash=${checkoutHash}&redirectUrl=${window.location.protocol}//${window.location.host}/order/status`;
+            && serviceURL !== ''
+            && checkoutRoute
+            && checkoutRoute !== ''
+         ) {
+        const url = `${serviceURL}${checkoutRoute}?email=${encodeURIComponent(user.email)}&checkoutHash=${checkoutHash}&redirectUrl=${window.location.protocol}//${window.location.host}/order/status`;
         window.location.replace(url);
       } else {
         window.location.replace(`/order/status?assets=${assets}`);
@@ -172,7 +209,7 @@ const ConfirmOrder = ({ paymentProviders = [], data, columns }) => {
   };
 
   const handleChange = async (value) => {
-    const provider = paymentProviders.find(provider => provider?.serviceName === value);
+    const provider = activePaymentProviders.find(provider => provider?.serviceName === value);
     setSelectedProvider(provider);
 
     if (hasChecked && !isAuthenticated && loginUrl !== undefined) {
@@ -186,7 +223,12 @@ const ConfirmOrder = ({ paymentProviders = [], data, columns }) => {
       });
       const checkQuantity = await orderActions.fetchSaleQuantity(orderDispatch, saleAddresses, quantities);
       if (checkQuantity === true) {
-        handlePaymentConfirm(provider);
+        if (provider.serviceName === "Stripe" && total < 0.50) {
+          openToastOrder("bottom", "The minimum order amount is $0.50. Please increase the item quantity to account for this.");
+          setSelectedProvider('');
+        } else {
+          await handlePaymentConfirm(provider);
+        }
       } else {
         let insufficientQuantityMessage = "";
         let outOfStockMessage = "";
@@ -264,11 +306,14 @@ const ConfirmOrder = ({ paymentProviders = [], data, columns }) => {
                     className="w-[250px] text-center selected-payment-option items-select"
                     onChange={handleChange}
                     placeholder="Select Payment Option"
+                    disabled={activePaymentProviders.length === 0}
                   >
-                    {paymentProviders && paymentProviders.map(provider => (
+                    {activePaymentProviders && activePaymentProviders.map(provider => (
                       provider && <Option className='payment-dropdown' key={provider?.serviceName} value={provider?.serviceName}>
-                        Checkout with {provider?.serviceName}
-                        <img src={provider?.imageURL} alt={provider?.serviceName} style={{ width: 20, height: 20, marginRight: 8 }} />
+                        <Row className="w-full">
+                        <Col span={22} className="text-left">Checkout with {provider?.serviceName}</Col>
+                        <Col span={2} className="flex justify-end"><img src={provider?.imageURL} alt={provider?.serviceName} style={{ width: 20, height: 20, marginRight: 2 }} /> </Col>
+                        </Row>
                       </Option>
                     ))}
                   </Select>

@@ -35,6 +35,7 @@ import Control.Monad (void, when)
 import qualified Control.Monad.Change.Alter as A
 import Control.Monad.Change.Modify
 import Control.Monad.Composable.Vault
+import Control.Monad.Composable.Notification
 import Control.Monad.Reader
 import Control.Monad.Trans.Except
 import Data.Aeson hiding (Success)
@@ -42,6 +43,7 @@ import qualified Data.ByteString.Lazy as BL
 import qualified Data.Cache.LRU as LRU
 import Data.List (elemIndex)
 import qualified Data.Map as M
+import Data.Maybe (fromMaybe)
 import Data.Text (Text)
 import qualified Data.Text as T
 import Data.Text.Encoding (decodeUtf8, encodeUtf8)
@@ -170,6 +172,9 @@ instance Monad m => Accessible VaultData (VaultM m) where
 instance (Monad m, Accessible VaultData m) => Accessible VaultData (ReaderT IdentityServerData m) where
   access = lift . access
 
+instance Monad m => Accessible NotificationData (NotificationM m) where
+  access _ = ask
+
 getPingIdentity :: (MonadIO m) => m Int
 getPingIdentity = return 1
 
@@ -191,8 +196,9 @@ putIdentity ::
   Text ->
   Maybe Text ->
   Maybe Text ->
+  Maybe Bool ->
   m Address
-putIdentity accessToken uuid idProv name mEmail mCo = do
+putIdentity accessToken uuid idProv name mEmail mCo mSub = do
   time' <- liftIO getCurrentTime
   $logInfoS "putIdentity" $ "User " <> uuid <> " called PUT /identity with username " <> name <> " and company " <> T.pack (show mCo)
   -- check if a user exists in vault
@@ -229,6 +235,10 @@ putIdentity accessToken uuid idProv name mEmail mCo = do
                 [] -> do
                   createAndRegisterCert name' (T.unpack <$> mEmail) org uuid' realmToken rd k
                   registerUserWalletAsync realmToken rd name' realm uuid' a
+                  -- subscribe if can and should
+                  case (realmNoficicationServerUrl rd, fromMaybe True mSub) of 
+                    (Just url, True) -> runNotificationM url $ subscribeUser accessToken (T.pack name')
+                    (_, _) -> return ()
                 -- User has a cert but no wallet, create wallet using cert's common name. This is for backwards compatibility with existing users.
                 [cert] -> do
                   hasWallet <- walletInCirrus accessToken rd (T.unpack $ certCommonName cert)
@@ -246,6 +256,10 @@ putIdentity accessToken uuid idProv name mEmail mCo = do
               AddressAndKey a k <- postVaultKey accessToken
               createAndRegisterCert name' (T.unpack <$> mEmail) org uuid' realmToken rd k
               registerUserWalletAsync realmToken rd name' realm uuid' a
+              -- subscribe if can and should
+              _ <- case (realmNoficicationServerUrl rd, fromMaybe True mSub) of 
+                (Just url, True) -> runNotificationM url $ subscribeUser accessToken (T.pack name')
+                (_, _) -> return ()
               return a
         (_, Nothing) -> do
           $logErrorS "putIdentity" "uh oh! We couldn't retrieve an access token for our realm"
@@ -273,6 +287,7 @@ putIdentityExternal ::
     ((String, String) `A.Alters` Address) m
   ) =>
   Text ->
+  Maybe Bool ->
   m Address
 putIdentityExternal bearerToken = putIdentity (T.replace "Bearer " "" bearerToken) "" "" "" Nothing Nothing
 
