@@ -3,7 +3,18 @@ import axios from 'axios';
 import Joi from '@hapi/joi'
 import RestStatus from 'http-status-codes'
 import config from '../../../load.config'
-import constants, { TOKEN_SERVER_URL } from "/helpers/constants";
+import constants from "/helpers/constants";
+
+function getTokenServerUrl() {
+  console.log("process.env.networkID", process.env.networkID);
+  if (process.env.networkID === constants.prodNetworkId) {
+    return constants.prodTokenServerUrl
+  } else if (process.env.networkID === constants.testnetNetworkId) {
+    return constants.testTokenServerUrl
+  } else {
+    return constants.prodTokenServerUrl
+  }
+}
 
 const options = { config, cacheNonce: true }
 
@@ -183,7 +194,9 @@ class InventoryController {
           transferNumber: result.transferNumber.toString(),
           mercataAddress: body.mercataAddress,
       };
-      const response = await axios.post(`${TOKEN_SERVER_URL}/api/bridgeMercata`, payload, {
+      const url = await getTokenServerUrl();
+      console.log("url", url);
+      const response = await axios.post(`${url}/api/bridgeMercata`, payload, {
         headers: {
           Accept: "application/json",
           "Content-Type": "application/json",

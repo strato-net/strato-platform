@@ -41,12 +41,10 @@ export default {
   attach_saleAddresses_Quantities_completedSales_onOrder: "*,BlockApps-Mercata-Order-saleAddresses(*),BlockApps-Mercata-Order-quantities(*),BlockApps-Mercata-Order-completedSales(*)",
   baUserNames: ['blockapps_carbon', 'blockapps_metals', 'blockapps_clothing', 'blockapps_collectibles', 'blockapps_memberships', 'blockapps_art', 'blockapps_spirits'],
   localHost: 'http://localhost',
-  burnAddress: '6ec8bbe4a5b87be18d443408df43a45e5972fa1b'
+  burnAddress: '6ec8bbe4a5b87be18d443408df43a45e5972fa1b',
+  testTokenServerUrl: 'https://campaigns-test.blockapps.net',
+  prodTokenServerUrl: 'https://campaigns.blockapps.net',
 };
-
-require('dotenv').config();
-export const STRIPE_PAYMENT_SERVER_URL = process.env.STRIPE_PAYMENT_SERVER_URL;
-export const TOKEN_SERVER_URL = process.env.TOKEN_SERVER_URL;
 
 export const unitOfMeasurement = {}
 unitOfMeasurement[unitOfMeasurement['LB'] = 1] = 'LB';
