@@ -39,7 +39,7 @@ const ConfirmOrder = ({ paymentProviders = [], data, columns }) => {
   const [cartData, setCartData] = useState(data);
   const [selectedProvider, setSelectedProvider] = useState('');
 
-  const activePaymentProviders = (paymentProviders[0] !== undefined) ? paymentProviders.filter(paymentProvider => paymentProvider.isActive) : [];
+  const activePaymentProviders = (paymentProviders[0] !== undefined) ? paymentProviders.filter(paymentProvider => paymentProvider?.isActive) : [];
 
   useEffect(() => {
     setCartData(data);
