@@ -170,6 +170,23 @@ const reducer = (state, action) => {
         error: action.error,
         isReselling: false
       };
+    case actionDescriptors.fetchSupportedTokens:
+      return {
+        ...state,
+        isFetchingTokens: true
+      };
+    case actionDescriptors.fetchSupportedTokensSuccessful:
+      return {
+        ...state,
+        supportedTokens: action.payload,
+        isFetchingTokens: false
+      };
+    case actionDescriptors.fetchSupportedTokensFailed:
+      return {
+        ...state,
+        error: action.error,
+        isFetchingTokens: false
+      };
     case actionDescriptors.bridgeInventory:
       return {
         ...state,

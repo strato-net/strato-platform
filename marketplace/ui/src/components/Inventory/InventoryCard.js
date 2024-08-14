@@ -23,7 +23,7 @@ import image_placeholder from "../../images/resources/image_placeholder.png";
 import "react-responsive-carousel/lib/styles/carousel.min.css";
 import { SEO } from "../../helpers/seoConstant";
 
-const InventoryCard = ({ inventory, category, debouncedSearchTerm, id, allSubcategories, limit, offset, user }) => {
+const InventoryCard = ({ inventory, category, debouncedSearchTerm, id, allSubcategories, limit, offset, user, supportedTokens }) => {
   const textRef = useRef(null);
   const [isOverflowing, setIsOverflowing] = useState(false);
   const [open, setOpen] = useState(false);
@@ -141,6 +141,11 @@ const InventoryCard = ({ inventory, category, debouncedSearchTerm, id, allSubcat
     }
   }
 
+  // Function to check if the inventory.root is within the supportedTokens array
+  const isTokenSupported = (inventoryRoot) => {
+    return supportedTokens.some(token => token.token_address === inventoryRoot);
+  };
+
   /**
    * Determines if the Tooltip of the asset name should be displayed.
    */
@@ -205,7 +210,7 @@ const InventoryCard = ({ inventory, category, debouncedSearchTerm, id, allSubcat
                 <Button type="link" className="text-[#13188A] text-left px-0 font-semibold text-sm h-6" onClick={showRedeemModal} disabled={inventory.price || inventory.address === inventory.originAddress || !isActive()}>
                   <><SendOutlined /> Redeem</>
                 </Button>
-                <Button type="link" className={`text-[#13188A] text-left px-0 font-semibold text-sm h-6 ${inventory.root !== '72599614549ffe3a0f7e86caf2c25d29590f3b7c' ? 'hidden' : ''}`} onClick={showBridgeModal}>
+                <Button type="link" className={`text-[#13188A] text-left px-0 font-semibold text-sm h-6 ${!isTokenSupported(inventory.root) ? 'hidden' : ''}`} onClick={showBridgeModal}>
                   <><RetweetOutlined /> Bridge</>
                 </Button>
               </div>

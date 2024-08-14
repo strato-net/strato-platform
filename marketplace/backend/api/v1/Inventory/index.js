@@ -69,6 +69,13 @@ router.post(
   InventoryController.transfer
 );
 
+router.get(
+  Inventory.supportedTokens,
+  authHandler.authorizeRequest(),
+  loadDapp,
+  InventoryController.getSupportedTokens
+);
+
 router.post(
   Inventory.bridge,
   authHandler.authorizeRequest(),

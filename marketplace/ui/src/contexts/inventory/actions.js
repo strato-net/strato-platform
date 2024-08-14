@@ -35,6 +35,9 @@ const actionDescriptors = {
   transferInventory: "transfer_inventory",
   transferInventorySuccessful: "transfer_inventory_successful",
   transferInventoryFailed: "transfer_inventory_failed",
+  fetchSupportedTokens: "fetch_supported_tokens",
+  fetchSupportedTokensSuccessful: "fetch_supported_tokens_successful",
+  fetchSupportedTokensFailed: "fetch_supported_tokens_failed",
   bridgeInventory: "transfer_inventory",
   bridgeInventorySuccessful: "transfer_inventory_successful",
   bridgeInventoryFailed: "transfer_inventory_failed",
@@ -527,6 +530,56 @@ const actions = {
         error: "Error while publishing Item",
       });
       actions.setMessage(dispatch, "Error while publishing Item");
+    }
+  },
+  
+  fetchSupportedTokens: async (dispatch) => {
+    dispatch({ type: actionDescriptors.fetchSupportedTokens });
+  
+    try {
+      const response = await fetch(`${apiUrl}/inventory/supportedTokens`, {
+        method: "GET",
+        credentials: "same-origin",
+        headers: {
+          Accept: "application/json",
+          "Content-Type": "application/json",
+        },
+      });
+  
+      const body = await response.json();
+  
+      if (response.status === RestStatus.OK) {
+        dispatch({
+          type: actionDescriptors.fetchSupportedTokensSuccessful,
+          payload: body.data,
+        });
+        return true;
+      } else if (response.status === RestStatus.CONFLICT) {
+        dispatch({ type: actionDescriptors.fetchSupportedTokensFailed, error: body.error.message });
+        return false;
+      } else if (response.status === RestStatus.INTERNAL_SERVER_ERROR) {
+        dispatch({ type: actionDescriptors.fetchSupportedTokensFailed, error: "Error while fetching supported tokens" });
+        return false;
+      } else if (response.status === RestStatus.UNAUTHORIZED) {
+        dispatch({
+          type: actionDescriptors.fetchSupportedTokensFailed,
+          error: "Unauthorized while fetching supported tokens"
+        });
+        window.location.href = body.error.loginUrl;
+        return false;
+      }
+  
+      dispatch({
+        type: actionDescriptors.fetchSupportedTokensFailed,
+        error: body.error,
+      });
+      return false;
+    } catch (err) {
+      dispatch({
+        type: actionDescriptors.fetchSupportedTokensFailed,
+        error: "Error while fetching supported tokens",
+      });
+      return false;
     }
   },
   

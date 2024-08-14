@@ -169,6 +169,32 @@ class InventoryController {
     }
   }
   
+  static async getSupportedTokens(req, res, next) {
+    try {
+      const url = await getTokenServerUrl();
+
+      // Making a GET request to the supported tokens endpoint
+      const response = await axios.get(`${url}/api/tokens/supportedTokens`, {
+        headers: {
+          Accept: "application/json",
+          "Content-Type": "application/json",
+        },
+      });
+
+      // Checking if the response is successful
+      if (response.status !== 200) {
+        throw new Error(`Failed to fetch supported tokens: ${response.status}`);
+      }
+
+      // Returning the supported tokens data
+      res.status(200).json(response.data);
+
+      return next();
+    } catch (e) {
+      return next(e);
+    }
+  }
+  
   static async bridge(req, res, next) {
     try {
       const { dapp, body } = req;
