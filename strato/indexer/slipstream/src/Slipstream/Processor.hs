@@ -40,15 +40,15 @@ import qualified Blockchain.Stream.Action as Action
 import qualified Blockchain.Stream.VMEvent as VME
 import Control.Lens ((^.))
 import Control.Monad (forM, forM_, unless, when)
-import qualified Control.Monad.Change.Modify as Mod
+-- import qualified Control.Monad.Change.Modify as Mod
 import Control.Monad.Composable.SQL
 import Control.Monad.IO.Unlift
-import Control.Monad.Trans.Reader
+-- import Control.Monad.Trans.Reader
 -- import Control.Monad.Trans.State.Strict hiding (state)
 import Data.Either (lefts, rights)
 import Data.Foldable (toList)
 import Data.Function
-import Data.IORef
+-- import Data.IORef
 import qualified Data.IntMap as I
 import qualified Data.Map.Ordered as OMap
 import Data.List (foldl', sortOn)
@@ -63,7 +63,7 @@ import Database.PostgreSQL.Typed (PGConnection)
 import SelectAccessible ()
 import Slipstream.Data.Action
 import qualified Slipstream.Events as E
-import Slipstream.Globals
+-- import Slipstream.Globals
 import Slipstream.Metrics
 import Slipstream.OutputData
 import Slipstream.QueryFormatHelper
@@ -305,15 +305,14 @@ duplicateForParentsAndIncludeOriginal collections parentz = concatMap duplicateF
 
 processTheMessages ::
   ( MonadLogger m,
-    HasSQL m,
-    Mod.Accessible (IORef Globals) m
+    HasSQL m
   ) =>
   BlocEnv ->
   PGConnection ->
   [VME.VMEvent] ->
   m [AggregateEvent]
 processTheMessages env conn messages = do
-  g <- Mod.access (Mod.Proxy @(IORef Globals))
+  --  <- Mod.access (Mod.Proxy @(IORef Globals))
 
   case length messages of
     0 -> return ()
@@ -349,23 +348,23 @@ processTheMessages env conn messages = do
             --Create mapping tables
             deferredForeignKeysForMappings <- fmap concat $
               forM mappingNames $ \m -> do
-                outputData conn $ createMappingTable g nameParts m
+                outputData conn $ createMappingTable  nameParts m
 
             --Create array tables
             deferredForeignKeysForArrays <- fmap concat $
               forM arrayNamesAndTypes $ \anat -> do
-                outputData conn $ createArrayTable g nameParts anat
+                outputData conn $ createArrayTable  nameParts anat
             
             deferredForeignKeys <- case (_contractType c) of
               AbstractType -> do
-                abstractfkeys <- outputData conn $ createExpandAbstractTable g c nameParts abstracts' cc
-                outputData' conn $ createExpandHistoryTable True g c cc nameParts
+                abstractfkeys <- outputData conn $ createExpandAbstractTable  c nameParts abstracts' cc
+                outputData' conn $ createExpandHistoryTable True  c cc nameParts
                 $logInfoS "processTheMessages/deferredForeignKeys/abstractfkeys" $ T.pack $ show abstractfkeys
                 return abstractfkeys
               _ -> do
-                indexfkeys <- outputData conn $ createExpandIndexTable g c cc nameParts
+                indexfkeys <- outputData conn $ createExpandIndexTable  c cc nameParts
                 $logInfoS "processTheMessages/deferredForeignKeys/indexfkeys" $ T.pack $ show indexfkeys
-                outputData' conn $ createExpandHistoryTable False g c cc nameParts
+                outputData' conn $ createExpandHistoryTable False  c cc nameParts
                 return indexfkeys
 
             $logInfoS "processTheMessages/deferredForeignKeys" $ T.pack $ show deferredForeignKeys
@@ -373,7 +372,7 @@ processTheMessages env conn messages = do
             $logInfoS "processTheMessages/deferredForeignKeysForArrays" $ T.pack $ show deferredForeignKeysForArrays
 
 
-            outputData conn $ createExpandEventTables g c cc nameParts
+            outputData conn $ createExpandEventTables  c cc nameParts
 
             return $ deferredForeignKeys ++ deferredForeignKeysForMappings ++ deferredForeignKeysForArrays
 
@@ -382,7 +381,7 @@ processTheMessages env conn messages = do
         pure $ Right deferredForeignKeys
   -- TODO: Add delegatecall indexing back in
   -- dfkeys' <- forM delegates $ \d@(Action.Delegatecall s c' o a) -> do
-  --   dels <- getDelegates g s
+  --   dels <- getDelegates  s
   --   $logInfoS "processTheMessages" $ "Got delegates for " <> T.pack (format s) <> ": " <> T.pack (show dels)
   --   if c' `elem` dels
   --     then do
@@ -400,13 +399,13 @@ processTheMessages env conn messages = do
   --           let c = cc {_contractName = _contractName sc}
   --               mapNames = getMapNamesFromContract c
   --           nameParts <- resolveNameParts o a c
-  --           forM_ mapNames $ outputData conn . createCollectionTable g nameParts
-  --           deferredForeignKeys <- outputData conn $ createExpandIndexTable g c nameParts
-  --           outputData' conn $ createExpandHistoryTable g c nameParts
-  --           outputData conn $ createExpandEventTables g c nameParts
+  --           forM_ mapNames $ outputData conn . createCollectionTable  nameParts
+  --           deferredForeignKeys <- outputData conn $ createExpandIndexTable  c nameParts
+  --           outputData' conn $ createExpandHistoryTable  c nameParts
+  --           outputData conn $ createExpandEventTables  c nameParts
   --           pure deferredForeignKeys
         -- forM_ deferredForeignKeys $ outputData conn . createForeignIndexesForJoins
-  --       addDelegate g s c'
+  --       addDelegate  s c'
   --       pure $ Right deferredForeignKeys
 
   let fkeys = rights $ fkeys' -- ++ dfkeys'
@@ -434,7 +433,7 @@ processTheMessages env conn messages = do
                   }
               cont = error "internal error: contract should be unused for SolidVM"
           $logInfoLS "Contract name is: " $ T.pack $ show name
-          -- oldState <- readPreviousSolidVMState g acct
+          -- oldState <- readPreviousSolidVMState  acct
           indexContract <- rowToInsert abiid row cont
           let fkeysForThisContract = getContractsFromPC indexContract
           hs <- rowToHistories abiid actions cont
@@ -451,7 +450,7 @@ processTheMessages env conn messages = do
             $logDebugLS "actionCCCreator" $ T.pack (show (actionCCCreator row))
             $logDebugLS "cregator" $ T.pack (show cregator)
             $logInfoS "Row will be inserted into abstract table: " tableNameText
-            -- mCols <- getTableColumns g tableName
+            -- mCols <- getTableColumns  tableName
             pure $ (indexContract, fkeysForThisContract, tableNameText, (cr',ap',n'),) . map extractTextInsideQuotes <$> (Just [])
           $logDebugLS "Globals: Recorded Map names are: " . T.pack $ show mapNames ++ " contract: " ++ show (E.contractName indexContract)
           $logDebugLS "Globals: Recorded Array names are: " . T.pack $ show arrNames ++ " contract: " ++ show (E.contractName indexContract)
@@ -497,7 +496,7 @@ processTheMessages env conn messages = do
 
   forM_ transactionResults $ putTransactionResult
 
-  flushPendingWrites g
+  -- flushPendingWrites 
 
   return events'
 
