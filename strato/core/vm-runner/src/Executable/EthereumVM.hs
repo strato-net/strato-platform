@@ -72,6 +72,7 @@ import Executable.EthereumVM2
 import Executable.EVMCheckpoint
 import Executable.EVMFlags
 import qualified Network.Kafka.Protocol as KP
+import SolidVM.Model.CodeCollection
 import Text.Format (format)
 
 -- newtype CertRoot = CertRoot { unCertRoot :: MP.StateRoot }
@@ -145,8 +146,8 @@ outputBlockToEvmCheckpoint block =
    in EVMCheckpoint sha header cbbi sr
 
 logEventSummaries :: MonadLogger m => [VmEvent] -> m ()
-logEventSummaries events = do
-  let names = map getNames events
+logEventSummaries evs = do
+  let names = map getNames evs
       numberedNames = map (\x -> numberIt (length x) (head x)) $ group $ sort names
 
   $logInfoS "logEventSummaries" . T.pack $
@@ -193,9 +194,14 @@ sendOutEvent (OutAction act) = do
                     else Nothing
                 cc = foldr (\ad b -> Action._actionDataCodeCollection ad <> b) mempty $ snd <$> actionDatas
                 abstracts' = foldr (\ad b -> Action._actionDataAbstracts ad <> b) mempty $ snd <$> actionDatas
+                contracts' = (cc ^. contracts) <&> ( (functions .~ M.empty)
+                                                   . (constructor .~ Nothing)
+                                                   . (modifiers .~ M.empty)
+                                                   )
+                cc' = emptyCodeCollection & contracts .~ contracts'
              in Just $
                   CodeCollectionAdded
-                    { codeCollection = const () <$> cc,
+                    { codeCollection = const () <$> cc',
                       codePtr = cp,
                       creator = cn,
                       application = n,
