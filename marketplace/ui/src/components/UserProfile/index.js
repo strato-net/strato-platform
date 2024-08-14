@@ -29,6 +29,7 @@ import { useItemDispatch, useItemState } from "../../contexts/item";
 import { actions as itemActions } from "../../contexts/item/actions";
 import ClickableCell from "../ClickableCell";
 import { homeUrl, soldOrderDetailssBaseUrl, soldOrdersBaseUrl, boughtOrderDetailssBaseUrl, boughtOrdersBaseUrl, transfersBaseUrl } from "../../helpers/constants";
+import { setCookie } from "../../helpers/cookie";
 
 
 
@@ -296,6 +297,7 @@ const UserProfile = ({user}) => {
     const addItemToCart = async (product, quantity) => {
           const items = [{ product, qty: quantity }];
           marketplaceActions.addItemToCart(marketplaceDispatch, items);
+          setCookie('returnUrl', '/checkout', 10)
           navigate('/checkout');
           window.scrollTo(0, 0);
     }
