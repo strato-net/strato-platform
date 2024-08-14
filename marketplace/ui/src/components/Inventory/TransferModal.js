@@ -1,5 +1,5 @@
-import { Button, Select, InputNumber, Modal, Table, Input, Typography, Progress, Spin } from "antd";
-import React, { useState, useEffect, useRef } from "react";
+import { Button, Select, InputNumber, Modal, Table } from "antd";
+import { useEffect, useRef,useState } from "react";
 import { actions } from "../../contexts/inventory/actions";
 import { actions as userActions } from "../../contexts/users/actions";
 import { useInventoryDispatch, useInventoryState } from "../../contexts/inventory";
@@ -9,15 +9,13 @@ import { SearchOutlined } from '@ant-design/icons';
 import { handlePriceInput, handleQuantityInput } from "../../helpers/utils";
 
 const TransferModal = ({ open, handleCancel, inventory, categoryName, limit, offset }) => {
-    const [view, setView] = useState("options");
+    const [data, setData] = useState([inventory]);
     const [quantity, setQuantity] = useState(1);
     const [price, setPrice] = useState(0);
     const [userAddress, setUserAddress] = useState("");
-    const [bridgeAddress, setBridgeAddress] = useState("");
     const inventoryDispatch = useInventoryDispatch();
     const userDispatch = useUsersDispatch();
     const [canTransfer, setCanTransfer] = useState(true);
-    const [canBridge, setCanBridge] = useState(true);
     const {
         user
     } = useAuthenticateState();
@@ -104,102 +102,71 @@ const TransferModal = ({ open, handleCancel, inventory, categoryName, limit, off
         : [];
 
 
-    const renderTransfer = () => (
-        <>
-            <Table
-                columns={[
-                    {
-                        title: "Quantity Available",
-                        dataIndex: "quantity",
-                        align: "center"
-                    },
-                    {
-                        title: "Set Quantity",
-                        align: "center",
-                        render: () => (
-                            <InputNumber value={quantity} controls={false} min={1} onChange={(value) => setQuantity(value)} />
-                        )
-                    },
-                    {
-                        title: "Set Price",
-                        align: "center",
-                        render: () => (
-                            <InputNumber value={price} controls={false} min={1} onChange={(value) => setPrice(value)} />
-                        )
-                    },
-                    {
-                        title: "Select recipient",
-                        align: "center",
-                        render: () => (
-                            <Select
-                                className="w-[390px]"
-                                showSearch
-                                onSelect={handleSelect}
-                                onSearch={handleSearchChange}
-                                options={filteredOptions}
-                                optionFilterProp="value"
-                                filterOption={(input, option) =>
-                                    (option?.label ?? '').toLowerCase().includes(input.toLowerCase())
-                                }
-                                open={dropdownOpen}
-                                suffixIcon={<SearchOutlined />}
-                                onFocus={() => setDropdownOpen(!!searchInput)}
-                                onBlur={() => setDropdownOpen(false)}
-                                popupClassName="custom-select-dropdown"
-                            />
-                        )
+    const columns = [
+        {
+            title: "Quantity Available",
+            dataIndex: "quantity",
+            align: "center"
+        },
+        {
+            title: "Set Quantity",
+            align: "center",
+            render: () => (
+                <InputNumber
+                    value={quantity}
+                    ref={inputQuantityDesktopRef}
+                    controls={false}
+                    min={1}
+                    onChange={(value) => {
+                        if (value) {
+                            setQuantity(parseInt(value, 10));
+                        }
+                    }}
+                />
+            )
+        },
+        {
+            title: "Unit Price ($)",
+            align: "center",
+            render: () => (
+                <InputNumber
+                    ref={inputPriceDesktopRef}
+                    value={price}
+                    controls={false}
+                    min={0.01}
+                    onChange={(value) => {
+                        const stringValue = value ? value.toString() : '';
+                        if (/^\d+(\.\d{0,2})?$/.test(stringValue)) {
+                            setPrice(value);
+                        }
+                    }}
+                />
+            )
+        },
+        {
+            title: "Select recipient",
+            align: "center",
+            render: () => (
+                <Select
+                    className="w-[390px]"
+                    showSearch
+                    onSelect={handleSelect}
+                    onSearch={handleSearchChange}
+                    options={filteredOptions}
+                    optionFilterProp="value"
+                    filterOption={(input, option) =>
+                        (option?.label ?? '').toLowerCase().includes(input.toLowerCase())
                     }
-                ]}
-                dataSource={[inventory]}
-                pagination={false}
-            />
-            <div className="flex justify-center md:block">
-                <Button type="primary" className="w-32 h-9" onClick={handleSubmit} disabled={!canTransfer} loading={isTransferring}>
-                    Transfer
-                </Button>
-            </div>
-        </>
-    );
-    
-    const renderBridge = () => (
-        <>
-            <Table
-                columns={[
-                    {
-                        title: "Quantity Available",
-                        dataIndex: "quantity",
-                        align: "center"
-                    },
-                    {
-                        title: "Set Quantity",
-                        align: "center",
-                        render: () => (
-                            <InputNumber value={quantity} controls={false} min={1} onChange={(value) => setQuantity(value)} />
-                        )
-                    },
-                    {
-                        title: "Base Chain Address",
-                        align: "center",
-                        render: () => (
-                            <Input 
-                                placeholder="Base Chain address" 
-                                value={bridgeAddress} 
-                                onChange={(e) => setBridgeAddress(e.target.value)} 
-                                className="mt-2"
-                            />
-                        )
-                    }
-                ]}
-                dataSource={[inventory]}
-                pagination={false}
-            />
-            <div className="flex justify-center md:block">
-                <Button type="primary" className="w-32 h-9" onClick={handleBridge} disabled={!canBridge} loading={isTransferring}>
-                    Bridge
-                </Button>
-            </div>
-        </>
-    );
+                    open={dropdownOpen}
+                    suffixIcon={<SearchOutlined />}
+                    onFocus={() => setDropdownOpen(!!searchInput)} // Open dropdown on focus if there is any input
+                    onBlur={() => setDropdownOpen(false)} // Close dropdown on blur
+                    popupClassName="custom-select-dropdown" // Add this line
+                />
+            )
+        }
+    ];
+
 
     const handleSubmit = async () => {
         const body = {
@@ -218,47 +185,91 @@ const TransferModal = ({ open, handleCancel, inventory, categoryName, limit, off
             }
         }
     }
-    
-    const handleBridge = async () => {
-        const body = {
-            rootAddress: inventory.root,
-            assetAddress: inventory.address,
-            quantity,
-            price: 1,
-            baseAddress: bridgeAddress,
-            mercataAddress: inventory.owner
-        };
-
-        if (quantity > 0 && quantity <= inventory.quantity && bridgeAddress) {
-            let isDone = await actions.bridgeInventory(inventoryDispatch, body);
-            if (isDone) {
-                await actions.fetchInventory(inventoryDispatch, limit, offset, "", categoryName);
-                await actions.fetchInventoryForUser(inventoryDispatch, user.commonName);
-                handleCancel();
-            }
-        }
-    }
-    
-    const renderOptions = () => (
-        <div className="flex justify-around">
-            <Button type="primary" onClick={() => setView("transfer")}>Transfer</Button>
-            <Button type="primary" onClick={() => setView("bridge")}>Bridge</Button>
-        </div>
-    );
 
     return (
         <Modal
             open={open}
             onCancel={handleCancel}
             title={`Transfer - ${decodeURIComponent(inventory.name)}`}
-            width={825}
-            footer={null}
+            width={1000}
+            footer={[
+                <div className="flex justify-center md:block">
+                    <Button type="primary" className="w-32 h-9" onClick={handleSubmit} disabled={!canTransfer} loading={isTransferring}>
+                        Transfer
+                    </Button>
+                </div>
+            ]}
         >
-            {inventory.root === "72599614549ffe3a0f7e86caf2c25d29590f3b7c" ? (
-                view === "options" ? renderOptions() : view === "transfer" ? renderTransfer() : renderBridge()
-            ) : (
-                renderTransfer()
-            )}
+            <div className="head hidden md:block">
+
+                <Table
+                    columns={columns}
+                    dataSource={data}
+                    pagination={false}
+                />
+            </div>
+            <div className="flex flex-col gap-[18px] md:hidden mt-5">
+                <div> <p className="text-[#202020] font-medium text-sm">Quantity Available</p>
+                    <div className="border border-[#d9d9d9] h-[42px] rounded-md flex items-center justify-center">
+                        <p> {inventory?.quantity}</p>
+                    </div>
+                </div>
+                <div>
+                    <p className="text-[#202020] font-medium text-sm">Set Quantity</p>
+                    <div>
+                        <InputNumber
+                            className="w-full h-9"
+                            value={quantity}
+                            ref={inputQuantityMobileRef}
+                            controls={false}
+                            min={1}
+                            onChange={(value) => {
+                                if (value) {
+                                    setQuantity(parseInt(value, 10));
+                                }
+                            }}
+                        />
+                    </div>
+                </div>
+                <div>
+                    <p className="text-[#202020] font-medium text-sm">Unit Price ($)</p>
+                    <div>
+                        <InputNumber
+                            className="w-full h-9"
+                            value={price}
+                            ref={inputPriceMobileRef}
+                            controls={false}
+                            min={.01}
+                            onChange={(value) => {
+                                const stringValue = value ? value.toString() : '';
+                                if (/^\d+(\.\d{0,2})?$/.test(stringValue)) {
+                                    setPrice(value);
+                                }
+                            }}
+                        />
+                    </div>
+                </div>
+                <div>
+                    <p className="text-[#202020] font-medium text-sm">Select recipient</p>
+                    <Select
+                        className="w-full"
+                        showSearch
+                        onSelect={handleSelect}
+                        onSearch={handleSearchChange}
+                        options={filteredOptions}
+                        optionFilterProp="value"
+                        filterOption={(input, option) =>
+                            (option?.label ?? '').toLowerCase().includes(input.toLowerCase())
+                        }
+                        open={dropdownOpen}
+                        suffixIcon={<SearchOutlined />}
+                        onFocus={() => setDropdownOpen(!!searchInput)} // Open dropdown on focus if there is any input
+                        onBlur={() => setDropdownOpen(false)} // Close dropdown on blur
+                        popupClassName="custom-select-dropdown"
+                    />
+                </div>
+
+            </div>
         </Modal>
     )
 }
