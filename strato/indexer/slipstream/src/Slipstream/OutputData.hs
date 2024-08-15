@@ -1395,9 +1395,16 @@ createEventTable globalsIORef (creator, a, n) evName ev cc = do
       colsCombined = map (\(x,y)-> x <> " " <> y) cols
   $logInfoS "hasan-keys" (T.pack $ show arrayKeys)
   eventAlreadyCreated <- isTableCreated globalsIORef eventTable
-  unless eventAlreadyCreated $ do
-    setTableCreated globalsIORef eventTable $ colsCombined
-    yield $ createEventTableQuery eventTable colsCombined
+  -- unless eventAlreadyCreated $ do
+  --   setTableCreated globalsIORef eventTable $ colsCombined
+  --   yield $ createEventTableQuery eventTable colsCombined
+  if eventAlreadyCreated
+    then return []
+    else do
+      setTableCreated globalsIORef eventTable $ colsCombined
+      eventArrayFkeys <- fmap concat . forM arrayKeys $ \key -> do
+        createCollectionTable globalsIORef (crtr, app, (cname <> (T.pack "-") <> (escapeQuotes $ labelToText evName))) key
+      yield $ createEventTableQuery eventTable colsCombined
 
 createEventTableQuery :: TableName -> TableColumns -> Text
 createEventTableQuery tableName cols =
