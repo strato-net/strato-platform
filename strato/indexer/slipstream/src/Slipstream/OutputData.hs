@@ -1404,7 +1404,7 @@ createEventTable globalsIORef (creator, a, n) evName ev cc = do
     else do
       setTableCreated globalsIORef eventTable $ colsCombined
       eventArrayFkeys <- fmap concat . forM arrayKeys $ \key -> do
-        createMappingTable globalsIORef (crtr, app, (cname <> (T.pack "-") <> (escapeQuotes $ labelToText evName))) key
+        createMappingTable globalsIORef (crtr, app, (cname <> (T.pack ".") <> (escapeQuotes $ labelToText evName))) key
       yield $ createEventTableQuery eventTable colsCombined
       return $ eventArrayFkeys
 
