@@ -135,6 +135,7 @@ if __name__ == "__main__":
 
     #Event tables
     discrepancies_asset_its, count_asset_its_discrepancy = check_table("BlockApps-Mercata-Asset.ItemTransfers")
+    discrepancies_asset_its, count_asset_its_discrepancy = check_table("BlockApps-Mercata-Asset.OwnershipTransfer")
 
     #Colletion tables
     discrepancies_asset_files, count_asset_files_discrepancy = check_table("BlockApps-Mercata-Asset-files")
