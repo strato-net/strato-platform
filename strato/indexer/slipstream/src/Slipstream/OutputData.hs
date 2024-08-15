@@ -71,12 +71,12 @@ import           Bloc.Server.Utils               (partitionWith)
 import           BlockApps.Logging
 import           Blockchain.Strato.Model.Account
 import           Blockchain.Strato.Model.Address
-import           Blockchain.Strato.Model.CodePtr
+-- import           Blockchain.Strato.Model.CodePtr
 import qualified Blockchain.Strato.Model.Event   as Action
 import           Blockchain.Strato.Model.Keccak256
-import           Data.Bifunctor                  (first)
+-- import           Data.Bifunctor                  (first)
 -- import           Data.Function                   (on)
-import           Data.List                       (groupBy, nubBy, sortBy)
+import           Data.List                       ( groupBy, nubBy, sortBy)
 import           Data.Ord (comparing)
 import           Data.Text.Encoding              (decodeUtf8, decodeUtf8', encodeUtf8)
 import           Data.Time
@@ -108,7 +108,7 @@ instance Functor (First b) where
 
 data ProcessedCollectionRow = ProcessedCollectionRow
   { address :: Address,
-    codehash :: CodePtr,
+    -- codehash :: Maybe CodePtr,
     creator :: Text,
     cc_creator :: Maybe Text,
     root :: Text,
@@ -1449,7 +1449,7 @@ createEventTable globalsIORef (creator, a, n) evName ev cc = do
     else do
       setTableCreated globalsIORef eventTable $ colsCombined
       eventArrayFkeys <- fmap concat . forM arrayNamesAndTypes $ \anat -> do
-        createEventArrayTable globalsIORef (crtr, app, (cname <> (T.pack ".") <> (escapeQuotes $ labelToText evName))) anat
+        createEventArrayTable globalsIORef (crtr, app, (cname <> (T.pack "-") <> (escapeQuotes $ labelToText evName))) anat
       yield $ createEventTableQuery eventTable colsCombined
       return $ eventArrayFkeys
 
@@ -1521,7 +1521,9 @@ aggEventToCollectionRow ae ev arrayName (index, value) =
       transactionHash = eventTxHash ae,
       transactionSender = _accountAddress $ eventTxSender ae,
       collectionDataKey = index,
-      collectionDataValue = value
+      collectionDataValue = value,
+      root = "",
+      cc_creator = Just ""
     }
 
 removeArrayEvArgs :: Action.Event -> Action.Event
@@ -1535,15 +1537,16 @@ getArraysFromEvents evArgs =
 
 insertEventTables :: 
   OutputM m =>
+  IORef Globals ->
   [AggregateEvent] ->
   ConduitM () Text m ()
-insertEventTables evs = do
+insertEventTables globalsIORef evs = do
   let processedEvents = concatMap getAllEvents evs
   -- $logInfoS "insertEventTables/processedEvents" . T.pack $ show processedEvents
   -- yieldMany =<< lift (mapM (insertEventTable) processedEvents)
       processedEventArrays = concatMap aggEventToCollectionRows processedEvents
       processedEventsWithoutArrays = map (\ae -> ae { eventEvent = removeArrayEvArgs (eventEvent ae) }) processedEvents
-  yieldMany . catMaybes =<< lift (mapM (insertEventTable) processedEventsWithoutArrays)
+  yieldMany . catMaybes =<< lift (mapM (insertEventTable globalsIORef) processedEventsWithoutArrays)
   when (not (null processedEventArrays)) $ insertCollectionTable processedEventArrays
   where
     getAllEvents :: 
@@ -1570,14 +1573,36 @@ insertEventTables evs = do
               }
           }
 
+-- insertEventTable ::
+--   OutputM m =>
+--   AggregateEvent ->
+--   m (Text)
+-- insertEventTable agEv = do
+--   let q = insertEventTableQuery agEv
+--   multilineDebugLog "insertEventTable/SQL" $ T.unpack q
+--   return q
+
+
 insertEventTable ::
   OutputM m =>
+  IORef Globals ->
   AggregateEvent ->
-  m (Text)
-insertEventTable agEv = do
+  m (Maybe Text)
+insertEventTable globalsIORef agEv@AggregateEvent {eventEvent = ev} = do
+  let (creator, a, cname) =
+        constructTableNameParameters
+          (T.pack $ Action.evContractCreator ev)
+          (T.pack $ Action.evContractApplication ev)
+          (T.pack $ Action.evContractName ev)
+      eventTable = EventTableName creator a cname (escapeQuotes $ T.pack $ Action.evName ev)
+
+  eventExists <- isTableCreated globalsIORef eventTable
   let q = insertEventTableQuery agEv
   multilineDebugLog "insertEventTable/SQL" $ T.unpack q
-  return q
+  if eventExists
+    then return (Just q)
+    else return Nothing
+
 
 insertEventTableQuery :: AggregateEvent -> Text
 insertEventTableQuery agEv@AggregateEvent {eventEvent = ev} =

@@ -28,7 +28,7 @@ import BlockApps.Logging
 import qualified BlockApps.Solidity.Value as V
 import Blockchain.Strato.Model.Account
 import Blockchain.Strato.Model.Address
-import Blockchain.Strato.Model.CodePtr
+-- import Blockchain.Strato.Model.CodePtr
 import Blockchain.Strato.Model.Keccak256 (hash)
 import qualified Slipstream.Events as SE
 import Slipstream.Globals
@@ -151,7 +151,7 @@ spec = do
       let input =
              ( SE.ProcessedContract
                   { SE.address = testAdd,
-                    SE.codehash = SolidVMCode "Vehicle" $ hash "<CODEHASH>",
+                    -- SE.codehash = SolidVMCode "Vehicle" $ hash "<CODEHASH>",
                     SE.creator = "",
                     SE.cc_creator = Nothing,
                     SE.root = "",
@@ -220,11 +220,11 @@ spec = do
   describe "Array serialization with history enabled" $ do
     it "should create JSON entries" $ do
       let testAdd = Address $ fst . head . readHex $ "ADDRESS"
-          cHash = SolidVMCode "Vehicle2" $ hash "<CODEHASH>"
+          -- cHash = SolidVMCode "Vehicle2" $ hash "<CODEHASH>"
       let input =
              ( SE.ProcessedContract
                   { SE.address = testAdd,
-                    SE.codehash = cHash,
+                    -- SE.codehash = cHash,
                     SE.creator = "",
                     SE.cc_creator = Nothing,
                     SE.root = "",
@@ -333,7 +333,7 @@ spec = do
       let input =
              ( SE.ProcessedContract
                   { SE.address = testAdd,
-                    SE.codehash = SolidVMCode "\"Vehicle''" $ hash "<CODEHASH>",
+                    -- SE.codehash = SolidVMCode "\"Vehicle''" $ hash "<CODEHASH>",
                     SE.creator = "",
                     SE.cc_creator = Nothing,
                     SE.root = "",
@@ -405,7 +405,7 @@ spec = do
         input =
            ( SE.ProcessedContract
                 { SE.address = testAdd,
-                  SE.codehash = SolidVMCode "SwissArmy" $ hash "<CODEHASH>",
+                  -- SE.codehash = SolidVMCode "SwissArmy" $ hash "<CODEHASH>",
                   SE.creator = "MyOrg",
                   SE.cc_creator =Nothing,
                   SE.root = "",
@@ -560,7 +560,7 @@ spec = do
         input =
           ( SE.ProcessedContract
               { SE.address = testAdd,
-                SE.codehash = SolidVMCode "SwissArmy" $ hash "<CODEHASH>",
+                -- SE.codehash = SolidVMCode "SwissArmy" $ hash "<CODEHASH>",
                 SE.creator = "MyOrg",
                 SE.cc_creator = Nothing,
                 SE.root = "",
@@ -619,7 +619,7 @@ spec = do
         input =
            ( SE.ProcessedContract
                 { SE.address = testAdd,
-                  SE.codehash = CodeAtAccount (Account (Address 0x1234567890) Nothing) "SwissArmy", -- hash "<CODEHASH>",
+                  -- SE.codehash = CodeAtAccount (Account (Address 0x1234567890) Nothing) "SwissArmy", -- hash "<CODEHASH>",
                   SE.creator = "",
                   SE.cc_creator = Nothing,
                   SE.root = "",
@@ -746,7 +746,7 @@ spec = do
     let testAdd = Address 0x98eaddede
         input = [ProcessedCollectionRow {
           address = testAdd,
-          codehash = CodeAtAccount (Account (Address 0x1234567890) Nothing) "SwissArmy", -- $ hash "<CODEHASH>",
+          -- codehash = CodeAtAccount (Account (Address 0x1234567890) Nothing) "SwissArmy", -- $ hash "<CODEHASH>",
           creator = "creator",
           cc_creator = Just "cc_creator",
           root = "groot",
@@ -824,7 +824,7 @@ spec = do
     let testAdd = Address 0x98eaddede
         input = (SE.ProcessedContract {
           SE.address = testAdd,
-          SE.codehash = CodeAtAccount (Account (Address 0x1234567890) Nothing) "SwissArmy", -- $ hash "<CODEHASH>",
+          -- SE.codehash = CodeAtAccount (Account (Address 0x1234567890) Nothing) "SwissArmy", -- $ hash "<CODEHASH>",
           SE.creator = "",
           SE.cc_creator = Nothing,
           SE.root = "",
@@ -844,7 +844,7 @@ spec = do
             ])
         inherited = [(SE.ProcessedContract {
           SE.address = testAdd,
-          SE.codehash = CodeAtAccount (Account (Address 0x1234567890) Nothing) "SwissArmyz", -- $ hash "<CODEHASH>",
+          -- SE.codehash = CodeAtAccount (Account (Address 0x1234567890) Nothing) "SwissArmyz", -- $ hash "<CODEHASH>",
           SE.creator = "",
           SE.cc_creator = Nothing,
           SE.root = "",

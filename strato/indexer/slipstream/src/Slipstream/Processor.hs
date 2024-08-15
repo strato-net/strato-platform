@@ -126,7 +126,7 @@ processedContract ::
 processedContract ABIID {..} state AggregateAction {..} =
   E.ProcessedContract
     { address = actionAccount ^. accountAddress,
-      codehash = actionCodeHash,
+      -- codehash = actionCodeHash,
       creator = actionCreator,
       cc_creator = actionCCCreator,
       root = actionRoot,
@@ -218,7 +218,7 @@ processedCollectionRow :: Text -> Text -> AggregateAction -> ABIID -> Maybe Text
 processedCollectionRow collection ttype AggregateAction {..} ABIID {..} cregator k v =
   ProcessedCollectionRow
     { address = actionAccount ^. accountAddress,
-      codehash = actionCodeHash,
+      -- codehash = actionCodeHash,
       creator = actionCreator,
       cc_creator = cregator,
       root = actionRoot,
@@ -497,7 +497,7 @@ processTheMessages env conn messages = do
     notifyPostgREST conn
 
   when (length events' > 0) $
-    outputData conn $ insertEventTables events'
+    outputData conn $ insertEventTables g events'
 
   $logInfoS "processTheMessages" . T.pack $ "Inserting " ++ show (length transactionResults) ++ " transaction results"
 
