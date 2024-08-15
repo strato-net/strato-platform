@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import {
   Breadcrumb,
   notification,
@@ -58,13 +58,19 @@ const MyWallet = ({ user }) => {
   const navigate = useNavigate();
   const isMobile = useMediaQuery("(max-width: 767px)");
   const [isLoading, setIsLoading] = useState(true);
+  const [isPriceHistoryLoaded, setIsPriceHistoryLoaded] = useState(false);
+  const priceHistoryLoadedCount = useRef(0);
 
   const { strats } = useMarketplaceState();
   const stratsBalance = Object.keys(strats).length > 0 ? strats : 0;
   const [totalBalance, setTotalBalance] = useState(0);
+  const [priceHistoryMap, setPriceHistoryMap] = useState({});
+  const priceHistoryUpdateCount = useRef(0);
 
   const categoryDispatch = useCategoryDispatch();
-  const { inventories, isInventoriesLoading } = useInventoryState();
+  const { inventories, isInventoriesLoading, priceHistory } =
+    useInventoryState();
+
   const paymentServiceDispatch = usePaymentServiceDispatch();
 
   useEffect(() => {
@@ -87,6 +93,70 @@ const MyWallet = ({ user }) => {
   }, [categoryDispatch]);
 
   useEffect(() => {
+    if (inventories.length > 0) {
+      priceHistoryLoadedCount.current = 0;
+      setIsPriceHistoryLoaded(false);
+      inventories.forEach((inventory) => {
+        if (inventory.address) {
+          actions.fetchPriceHistoryWithAddress(
+            dispatch,
+            inventory.address,
+            10,
+            0,
+            1
+          );
+        }
+      });
+    }
+  }, [inventories, dispatch]);
+
+  useEffect(() => {
+    if (priceHistory && priceHistory.data) {
+      setPriceHistoryMap((prevMap) => {
+        const updatedMap = { ...prevMap };
+        const key =
+          priceHistory.data.originRecords[0]?.block_timestamp ||
+          Date.now().toString();
+        updatedMap[key] = priceHistory;
+        return updatedMap;
+      });
+      priceHistoryLoadedCount.current += 1;
+      if (priceHistoryLoadedCount.current === inventories.length) {
+        setIsPriceHistoryLoaded(true);
+      }
+    }
+  }, [priceHistory, inventories.length]);
+
+  useEffect(() => {
+    setIsLoading(isInventoriesLoading || !isPriceHistoryLoaded);
+  }, [isInventoriesLoading, isPriceHistoryLoaded]);
+
+  const getUnitPrice = (inventory) => {
+    // Check if the item has an active listing
+    if (inventory.status === "1" && inventory.price) {
+      return parseFloat(inventory.price);
+    }
+
+    // If no active listing, get the last sold price from price history
+    const inventoryPriceHistory = Object.values(priceHistoryMap).find(
+      (history) => history.address === inventory.address
+    );
+
+    if (
+      inventoryPriceHistory &&
+      inventoryPriceHistory.data.originRecords.length > 0
+    ) {
+      // Get the most recent price from the originRecords (last item in the array)
+      const originRecords = inventoryPriceHistory.data.originRecords;
+      const mostRecentPrice = originRecords[originRecords.length - 1].price;
+      return parseFloat(mostRecentPrice);
+    }
+
+    // If no price history or price available, return 0
+    return 0;
+  };
+
+  useEffect(() => {
     if (isSearch) {
       actions.fetchInventorySearch(
         dispatch,
@@ -103,24 +173,10 @@ const MyWallet = ({ user }) => {
   const [tableData, setTableData] = useState([]);
 
   useEffect(() => {
-    const baseData = [
-      {
-        key: "1",
-        asset: "STRATS",
-        image: Images.logo,
-        quantity: stratsBalance,
-        price: "$0.01",
-        gainLoss: "---",
-        value: `$${(stratsBalance * 0.01).toFixed(2)}`,
-        status: null,
-        address: null,
-      },
-    ];
-
     if (!isInventoriesLoading && inventories.length > 0) {
       const inventoryData = inventories.map((inventory, index) => {
-        const quantity = inventory.quantity || 1;
-        const price = parseFloat(inventory.price) || 0;
+        const quantity = Math.round(inventory.quantity) || 1;
+        const price = getUnitPrice(inventory);
         const value = quantity * price;
         return {
           key: `inventory-${index + 2}`,
@@ -142,20 +198,45 @@ const MyWallet = ({ user }) => {
         };
       });
 
-      const newTableData = [...baseData, ...inventoryData];
+      const newTableData = [
+        {
+          key: "1",
+          asset: "STRATS",
+          image: Images.logo,
+          quantity: Math.round(stratsBalance),
+          price: "$0.01",
+          gainLoss: "---",
+          value: `$${(stratsBalance * 0.01).toFixed(2)}`,
+          status: null,
+          address: null,
+        },
+        ...inventoryData,
+      ];
+
       setTableData(newTableData);
 
-      // Calculate total balance
       const total = newTableData.reduce((sum, item) => {
         const itemValue = parseFloat(item.value.replace("$", ""));
         return sum + (isNaN(itemValue) ? 0 : itemValue);
       }, 0);
       setTotalBalance(total.toFixed(2));
     } else {
-      setTableData(baseData);
+      setTableData([
+        {
+          key: "1",
+          asset: "STRATS",
+          image: Images.logo,
+          quantity: Math.round(stratsBalance),
+          price: "$0.01",
+          gainLoss: "---",
+          value: `$${(stratsBalance * 0.01).toFixed(2)}`,
+          status: null,
+          address: null,
+        },
+      ]);
       setTotalBalance((stratsBalance * 0.01).toFixed(2));
     }
-  }, [isInventoriesLoading, inventories, stratsBalance]);
+  }, [isInventoriesLoading, inventories, stratsBalance, priceHistory]);
 
   const CustomQuestionIcon = () => (
     <svg
@@ -228,7 +309,6 @@ const MyWallet = ({ user }) => {
       key: "price",
       render: (price, record) => {
         if (record.key === "1") {
-          // For the first row (STRATS), keep the original display
           return (
             <div>
               <div className="text-xs sm:text-sm">{price}</div>
@@ -566,7 +646,15 @@ const MyWallet = ({ user }) => {
         link={linkUrl}
       />
       {contextHolder}
-      {isMobile ? renderMobileView() : renderDesktopView()}
+      {isLoading ? (
+        <div className="flex justify-center items-center h-screen">
+          <Spin size="large" />
+        </div>
+      ) : isMobile ? (
+        renderMobileView()
+      ) : (
+        renderDesktopView()
+      )}
       <style jsx>{`
         .custom-table .ant-table-thead > tr > th {
           background-color: white !important;
