@@ -65,7 +65,6 @@ const MyWallet = ({ user }) => {
   const stratsBalance = Object.keys(strats).length > 0 ? strats : 0;
   const [totalBalance, setTotalBalance] = useState(0);
   const [priceHistoryMap, setPriceHistoryMap] = useState({});
-  const priceHistoryUpdateCount = useRef(0);
 
   const categoryDispatch = useCategoryDispatch();
   const { inventories, isInventoriesLoading, priceHistory } =
@@ -154,6 +153,29 @@ const MyWallet = ({ user }) => {
 
     // If no price history or price available, return 0
     return 0;
+  };
+
+  const calculateGainLoss = (currentPrice, purchasePrice) => {
+    if (!purchasePrice) return null;
+    const percentageChange =
+      ((currentPrice - purchasePrice) / purchasePrice) * 100;
+    return Math.round(percentageChange * 100) / 100;
+  };
+
+  const renderGainLoss = (percentage) => {
+    if (percentage === null)
+      return <span className="text-xs sm:text-sm">-</span>;
+    if (percentage === 0) return <span className="text-xs sm:text-sm">0%</span>;
+
+    const isPositive = percentage > 0;
+    const color = isPositive ? "#00A455" : "#C00000";
+    const sign = isPositive ? "+" : "-";
+
+    return (
+      <span className="text-xs sm:text-sm" style={{ color: color }}>
+        {`${sign}${Math.abs(percentage).toFixed(2)}%`}
+      </span>
+    );
   };
 
   useEffect(() => {
@@ -378,53 +400,27 @@ const MyWallet = ({ user }) => {
       dataIndex: "gainLoss",
       key: "gainLoss",
       render: (text, record) => {
-        if (record.key === "1") {
+        if (record.key === "1")
           return <span className="text-xs sm:text-sm">---</span>;
-        }
 
         const currentPrice = parseFloat(record.price.replace("$", ""));
-        const purchasePrice = record.purchasePrice
-          ? parseFloat(record.purchasePrice)
-          : null;
 
-        // Check if the item was created by the user
-        if (user?.commonName && record.creator === user.commonName) {
-          return <span className="text-xs sm:text-sm">-</span>;
-        }
-
-        // Check if purchase price is missing or corrupted
-        if (!purchasePrice) {
-          return <span className="text-xs sm:text-sm">-</span>;
-        }
-
-        // Add this check after the current price and purchase price declarations
-        const transferPrice = record.transferPrice
-          ? parseFloat(record.transferPrice)
-          : null;
-        const priceToCompare = transferPrice || purchasePrice;
-
-        // Calculate percentage change
-        if (!priceToCompare) {
-          return <span className="text-xs sm:text-sm">-</span>;
-        }
-
-        const percentageChange =
-          ((currentPrice - priceToCompare) / priceToCompare) * 100;
-        const roundedPercentage = Math.round(percentageChange * 100) / 100;
-
-        if (roundedPercentage === 0) {
-          return <span className="text-xs sm:text-sm">0%</span>;
-        }
-
-        const isPositive = roundedPercentage > 0;
-        const color = isPositive ? "#00A455" : "#C00000";
-        const sign = isPositive ? "+" : "-";
-
-        return (
-          <span className="text-xs sm:text-sm" style={{ color: color }}>
-            {`${sign}${Math.abs(roundedPercentage).toFixed(2)}%`}
-          </span>
+        const itemPriceHistory = Object.values(priceHistoryMap).find(
+          (history) => history.address === record.address
         );
+
+        if (!itemPriceHistory || !itemPriceHistory.data.originRecords.length) {
+          return renderGainLoss(null);
+        }
+
+        const purchasePrice = itemPriceHistory.data.originRecords[0].price;
+
+        if (user?.commonName && record.creator === user.commonName) {
+          return renderGainLoss(null);
+        }
+
+        const percentage = calculateGainLoss(currentPrice, purchasePrice);
+        return renderGainLoss(percentage);
       },
     },
     {
@@ -483,8 +479,15 @@ const MyWallet = ({ user }) => {
           <div className="col-span-1 text-right">
             <p className="text-sm font-bold">{item.value}</p>
             <p className="text-xs text-gray-500">
-              {item.gainLoss !== "---"
-                ? item.gainLoss
+              {item.key !== "1"
+                ? renderGainLoss(
+                    calculateGainLoss(
+                      parseFloat(item.price.replace("$", "")),
+                      Object.values(priceHistoryMap).find(
+                        (h) => h.address === item.address
+                      )?.data.originRecords[0]?.price
+                    )
+                  )
                 : (parseFloat(item.value.replace("$", "")) / 0.01).toFixed(2) +
                   " STRATS"}
             </p>
