@@ -1370,12 +1370,13 @@ createExpandEventTables ::
   ContractF () ->
   CodeCollectionF () ->
   (Text, Text, Text) ->
-  ConduitM () Text m ()
-createExpandEventTables globalsIORef c cc nameParts = mapM_ go . Map.toList $ c ^. events
+  ConduitM () Text m [ForeignKeyInfo]
+createExpandEventTables globalsIORef c cc nameParts = fmap concat . mapM go . Map.toList $ c ^. events
   where
     go (evName, ev) = do
-      createEventTable globalsIORef nameParts evName ev cc
+      fkInfo <- createEventTable globalsIORef nameParts evName ev cc
       expandEventTable globalsIORef nameParts evName ev cc
+      return fkInfo
 
 createEventTable ::
   OutputM m =>
@@ -1384,7 +1385,7 @@ createEventTable ::
   SolidString ->
   EventF () ->
   CodeCollectionF () ->
-  ConduitM () Text m ()
+  ConduitM () Text m [ForeignKeyInfo]
 createEventTable globalsIORef (creator, a, n) evName ev cc = do
   $logInfoS "createEventTable" . T.pack $ show ev
   let (crtr, app, cname) = constructTableNameParameters creator a n
@@ -1403,8 +1404,9 @@ createEventTable globalsIORef (creator, a, n) evName ev cc = do
     else do
       setTableCreated globalsIORef eventTable $ colsCombined
       eventArrayFkeys <- fmap concat . forM arrayKeys $ \key -> do
-        createAbstractTable globalsIORef (crtr, app, (cname <> (T.pack "-") <> (escapeQuotes $ labelToText evName))) key
+        createMappingTable globalsIORef (crtr, app, (cname <> (T.pack "-") <> (escapeQuotes $ labelToText evName))) key
       yield $ createEventTableQuery eventTable colsCombined
+      return $ eventArrayFkeys
 
 createEventTableQuery :: TableName -> TableColumns -> Text
 createEventTableQuery tableName cols =
