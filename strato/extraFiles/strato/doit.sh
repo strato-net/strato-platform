@@ -271,6 +271,9 @@ function newnode {
       runBackgroundProcess $SLIPSTREAM_CMD &>> logs/slipstream
   fi
 
+  echo "Starting process monitoring..."
+  runBackgroundProcess process-monitor-exe &>> logs/process-monitoring
+
   echo "Configuring log rotation..."
   runBackgroundProcess logRotation
 
