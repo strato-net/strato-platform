@@ -98,6 +98,7 @@ import           Text.RawString.QQ
 import           Text.Tools                      
 import           UnliftIO.Exception              (SomeException, catch, handle)
 import           UnliftIO.IORef
+import qualified Data.Text.Encoding as TE
 
 newtype First b a = First {unFirst :: (a, b)}
 
@@ -1497,14 +1498,53 @@ expandEventTable globalsIORef (creator, a, n) evName ev cc = do
         ]
     yield $ expandTableQuery tableName allTableColsCombined
 
+-- Function to convert AggregateEvent to ProcessedCollectionRow
+aggEventToCollectionRows :: AggregateEvent -> [ProcessedCollectionRow]
+aggEventToCollectionRows ae =
+  let (arrayName, arrayElements) = getArraysFromEvents $ Action.evArgs ev
+  in map (aggEventToCollectionRow ae ev (T.pack arrayName)) arrayElements
+  where
+    ev = eventEvent ae
+
+aggEventToCollectionRow :: AggregateEvent -> Action.Event -> Text -> (Value, Value) -> ProcessedCollectionRow
+aggEventToCollectionRow ae ev arrayName (index, value) =
+  ProcessedCollectionRow
+    { address = (_accountAddress . Action.evContractAccount) ev,
+      creator = T.pack $ Action.evContractCreator ev,
+      application = T.pack $ Action.evContractApplication ev,
+      contractname = (T.pack $ Action.evContractName ev) <> "-" <> (T.pack $ Action.evName ev),
+      collectionname = arrayName,
+      collectiontype = "Event Array",
+      blockHash = eventBlockHash ae,
+      blockTimestamp = eventBlockTimestamp ae,
+      blockNumber = eventBlockNumber ae,
+      transactionHash = eventTxHash ae,
+      transactionSender = _accountAddress $ eventTxSender ae,
+      collectionDataKey = index,
+      collectionDataValue = value
+    }
+
+removeArrayEvArgs :: Action.Event -> Action.Event
+removeArrayEvArgs ev = ev { Action.evArgs = filter (\(_, _, c) -> c /= "Array") (Action.evArgs ev) }
+
+getArraysFromEvents :: [(String, String, String)] -> (String, [(Value, Value)])
+getArraysFromEvents evArgs =
+  let (arrayName, arrayStr) = head [(a, b) | (a, b, c) <- evArgs, c == "Array"]
+      elements = fromMaybe [] (Aeson.decode (BL.fromStrict $ TE.encodeUtf8 $ T.pack arrayStr) :: Maybe [String])
+  in (arrayName, zip (map (SimpleValue . ValueString . T.pack . show) [0 :: Int ..]) (map (SimpleValue . ValueString . T.pack) elements))
+
 insertEventTables :: 
   OutputM m =>
   [AggregateEvent] ->
   ConduitM () Text m ()
 insertEventTables evs = do
   let processedEvents = concatMap getAllEvents evs
-  $logInfoS "insertEventTables/processedEvents" . T.pack $ show processedEvents
-  yieldMany =<< lift (mapM (insertEventTable) processedEvents)
+  -- $logInfoS "insertEventTables/processedEvents" . T.pack $ show processedEvents
+  -- yieldMany =<< lift (mapM (insertEventTable) processedEvents)
+      processedEventArrays = concatMap aggEventToCollectionRows processedEvents
+      processedEventsWithoutArrays = map (\ae -> ae { eventEvent = removeArrayEvArgs (eventEvent ae) }) processedEvents
+  yieldMany . catMaybes =<< lift (mapM (insertEventTable globalsIORef) processedEventsWithoutArrays)
+  when (not (null processedEventArrays)) $ insertCollectionTable processedEventArrays
   where
     getAllEvents :: 
       AggregateEvent -> 
@@ -1547,7 +1587,7 @@ insertEventTableQuery agEv@AggregateEvent {eventEvent = ev} =
           (T.pack $ Action.evContractApplication ev)
           (T.pack $ Action.evContractName ev)
       tableName = EventTableName creator a cname (escapeQuotes $ T.pack $ Action.evName ev)
-      filledArgs = map fst . fillFirstEmptyEntries . map (first T.pack) $ Action.evArgs ev
+      filledArgs = map fst . fillFirstEmptyEntries . map (\(aa, bb, _) -> (T.pack aa, bb)) $ Action.evArgs ev
       keySt = wrapAndEscapeDouble . map escapeQuotes $ ("id" : baseTableColumnsForEvent) ++ filledArgs
       baseVals =
         [ tshow . _accountAddress . Action.evContractAccount . eventEvent,
@@ -1557,7 +1597,7 @@ insertEventTableQuery agEv@AggregateEvent {eventEvent = ev} =
           T.pack . keccak256ToHex . eventTxHash,
           tshow . eventTxSender
         ]
-      vals = csv $ map (wrapSingleQuotes . escapeQuotes . ($ agEv)) baseVals ++ map (wrapSingleQuotes . escapeSingleQuotes . T.pack . snd) (Action.evArgs ev)
+      vals = csv $ map (wrapSingleQuotes . escapeQuotes . ($ agEv)) baseVals ++ map (wrapSingleQuotes . escapeSingleQuotes . T.pack . (\(_, x, _) -> x)) (Action.evArgs ev)
    in T.concat $
         [ "INSERT INTO ",
           tableNameToDoubleQuoteText tableName,
