@@ -10,7 +10,7 @@ module.exports = {
   testnetMarketplaceUrl: process.env.TESTNET_MARKETPLACE_URL,
   prodStratsAddress: process.env.PROD_STRATS_ADDRESS,
   testnetStratsAddress: process.env.TESTNET_STRATS_ADDRESS,
-  contractName: "ERC20Dapp",
+  contractName: process.env.CONTRACT_NAME,
   googleSheetId: process.env.GOOGLE_SHEET_ID,
   googleCredentials: process.env.GOOGLE_APPLICATION_CREDENTIALS,
 };
