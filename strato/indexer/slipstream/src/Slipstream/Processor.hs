@@ -354,23 +354,23 @@ processTheMessages env conn messages = do
             --Create mapping tables
             deferredForeignKeysForMappings <- fmap concat $
               forM mappingNames $ \m -> do
-                outputData conn $ createMappingTable g nameParts m
+                outputData conn $ createMappingTable nameParts m
 
             --Create array tables
             deferredForeignKeysForArrays <- fmap concat $
               forM arrayNamesAndTypes $ \anat -> do
-                outputData conn $ createArrayTable g nameParts anat
+                outputData conn $ createArrayTable nameParts anat
             
             deferredForeignKeys <- case (_contractType c) of
               AbstractType -> do
-                abstractfkeys <- outputData conn $ createExpandAbstractTable g c nameParts abstracts' cc
-                outputData' conn $ createExpandHistoryTable True g c cc nameParts
+                abstractfkeys <- outputData conn $ createExpandAbstractTable c nameParts abstracts' cc
+                outputData' conn $ createExpandHistoryTable True c cc nameParts
                 $logInfoS "processTheMessages/deferredForeignKeys/abstractfkeys" $ T.pack $ show abstractfkeys
                 return abstractfkeys
               _ -> do
-                indexfkeys <- outputData conn $ createExpandIndexTable g c cc nameParts
+                indexfkeys <- outputData conn $ createExpandIndexTable c cc nameParts
                 $logInfoS "processTheMessages/deferredForeignKeys/indexfkeys" $ T.pack $ show indexfkeys
-                outputData' conn $ createExpandHistoryTable False g c cc nameParts
+                outputData' conn $ createExpandHistoryTable False c cc nameParts
                 return indexfkeys
 
             $logInfoS "processTheMessages/deferredForeignKeys" $ T.pack $ show deferredForeignKeys
@@ -378,7 +378,7 @@ processTheMessages env conn messages = do
             $logInfoS "processTheMessages/deferredForeignKeysForArrays" $ T.pack $ show deferredForeignKeysForArrays
 
 
-            outputData conn $ createExpandEventTables g c cc nameParts
+            outputData conn $ createExpandEventTables c cc nameParts
 
             return $ deferredForeignKeys ++ deferredForeignKeysForMappings ++ deferredForeignKeysForArrays
 
