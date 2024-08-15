@@ -60,10 +60,10 @@ const actions = {
   fetchCartItems: (dispatch, cartList) => {
     dispatch({ type: actionDescriptors.fetchCartItems });
     try {
-      let cartItems = window.localStorage.getItem("cartList") ?? [];
+      // let cartItems = window.localStorage.getItem("cartList") ?? [];
       dispatch({
         type: actionDescriptors.fetchCartItemsSuccessful,
-        payload: cartItems,
+        payload: cartList,
       });
     } catch (err) {
       dispatch({
@@ -76,7 +76,7 @@ const actions = {
   addItemToCart: (dispatch, cartList) => {
     dispatch({ type: actionDescriptors.addItemToCart });
     try {
-      window.localStorage.setItem("cartList", JSON.stringify(cartList));
+      // window.localStorage.setItem("cartList", JSON.stringify(cartList));
       dispatch({
         type: actionDescriptors.addItemToCartSuccessful,
         payload: cartList,
