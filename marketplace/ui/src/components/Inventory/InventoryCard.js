@@ -143,8 +143,8 @@ const InventoryCard = ({ inventory, category, debouncedSearchTerm, id, allSubcat
 
   // Function to check if the inventory.root is within the supportedTokens array
   const isTokenSupported = (inventoryRoot) => {
-    return supportedTokens.some(token => token.token_address === inventoryRoot);
-  };
+    return Array.isArray(supportedTokens) && supportedTokens.some(token => token.mercata_root_address === inventoryRoot);
+  };  
 
   /**
    * Determines if the Tooltip of the asset name should be displayed.
