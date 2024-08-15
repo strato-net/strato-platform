@@ -389,12 +389,15 @@ const Inventory = ({ user }) => {
                       inventories.map((inventory, index) => (
                         <InventoryCard
                           id={index}
+                          limit={limit}
+                          offset={offset}
                           inventory={inventory}
                           category={category}
                           key={index}
                           debouncedSearchTerm={debouncedSearchTerm}
                           allSubcategories={allSubcategories}
                           supportedTokens={supportedTokens}
+                          user={user}
                         />
                       ))
                     ) : (
