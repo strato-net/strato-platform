@@ -591,6 +591,27 @@ createArrayTable globalsIORef (creator, a, n) (arr, arrType) = do
           fkeys2 = getDeferredForeignKeysForArrayType tableName creator a arrType
       return $ fkeys1 ++ fkeys2
 
+createEventArrayTable ::
+  OutputM m =>
+  IORef Globals ->
+  (Text, Text, Text) ->
+  (Text, Text) ->
+  ConduitM () Text m [ForeignKeyInfo]
+createEventArrayTable globalsIORef (creator, a, n) (arr, arrType) = do
+  let tableName = collectionTableName creator a n arr
+  tableExists <- isTableCreated globalsIORef tableName
+  $logDebugLS "createEventArrayTable/tableExists" ("Table Name: " ++ show tableName ++ ", table exists: " ++ formatBool tableExists)
+  if tableExists
+    then return []
+    else do
+      incNumArrayTables
+      yield $ (createEventArrayTableQuery (creator, a, n, arr))
+      let list = ["key", "value"]
+      setTableCreated globalsIORef tableName list
+      let fkeys1 = getDeferredForeignKeysForCollection tableName creator a
+          fkeys2 = getDeferredForeignKeysForArrayType tableName creator a arrType
+      return $ fkeys1 ++ fkeys2
+
 createHistoryTable' ::
   OutputM m =>
   Bool ->
@@ -966,6 +987,25 @@ createArrayTableQuery (creator, a, n, arr) =
             ],
           ",\n  PRIMARY KEY (address, key));"
         ]
+
+createEventArrayTableQuery :: (Text, Text, Text, Text) -> Text
+createEventArrayTableQuery (creator, a, n, arr) =
+  let tableName = collectionTableName creator a n arr
+   in T.concat
+        [ "CREATE TABLE IF NOT EXISTS ",
+          tableNameToDoubleQuoteText tableName,
+          " (",
+          csv $ baseColumnsQuery ++
+            [ "id serial primary key",
+              "contract_name text",
+              "collectionname text",
+              "collectiontype text",
+              "key text",
+              "value text",
+              "value_fkey text);"
+            ]
+        ]
+
 
 createAbstractTableQuery :: (Text, Text, Text) -> TableColumns -> Text
 createAbstractTableQuery (creator, a, n) list =
@@ -1378,6 +1418,10 @@ createExpandEventTables globalsIORef c cc nameParts = fmap concat . mapM go . Ma
       expandEventTable globalsIORef nameParts evName ev cc
       return fkInfo
 
+extractLabelOrEntry :: SVMType.Type -> T.Text
+extractLabelOrEntry (SVMType.UnknownLabel solidString _) = T.pack solidString
+extractLabelOrEntry entry = T.pack (show entry)
+
 createEventTable ::
   OutputM m =>
   IORef Globals ->
@@ -1392,9 +1436,9 @@ createEventTable globalsIORef (creator, a, n) evName ev cc = do
       eventTable = EventTableName crtr app cname (escapeQuotes $ labelToText evName)
       isEvent = True
       cols = getTableColumnAndType isEvent cc [(x, indexedTypeType y) | (x, y) <- fillFirstEmptyEntries $ ev ^. eventLogs]
-      arrayKeys = [key | (key, IndexedType _ SVMType.Array{}) <- ev ^. eventLogs]
+      arrayNamesAndTypes = [(key, extractLabelOrEntry entry) | (key, IndexedType _ (SVMType.Array entry _)) <- ev ^. eventLogs]
       colsCombined = map (\(x,y)-> x <> " " <> y) cols
-  $logInfoS "hasan-keys" (T.pack $ show arrayKeys)
+  $logInfoS "hasan-keys" (T.pack $ show arrayNamesAndTypes)
   eventAlreadyCreated <- isTableCreated globalsIORef eventTable
   -- unless eventAlreadyCreated $ do
   --   setTableCreated globalsIORef eventTable $ colsCombined
@@ -1403,8 +1447,8 @@ createEventTable globalsIORef (creator, a, n) evName ev cc = do
     then return []
     else do
       setTableCreated globalsIORef eventTable $ colsCombined
-      eventArrayFkeys <- fmap concat . forM arrayKeys $ \key -> do
-        createMappingTable globalsIORef (crtr, app, (cname <> (T.pack ".") <> (escapeQuotes $ labelToText evName))) key
+      eventArrayFkeys <- fmap concat . forM arrayNamesAndTypes $ \anat -> do
+        createEventArrayTable globalsIORef (crtr, app, (cname <> (T.pack ".") <> (escapeQuotes $ labelToText evName))) anat
       yield $ createEventTableQuery eventTable colsCombined
       return $ eventArrayFkeys
 
