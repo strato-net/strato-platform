@@ -211,7 +211,6 @@ const NewTrendingCard = ({ topSellingProduct, addItemToCart, parent = "", api, c
                                 },
                             });
                             if (await addItemToCart(topSellingProduct, quantity) === true) {
-                                setCookie('returnUrl', '/checkout', 10)
                                 navigate("/checkout")
                                 window.scrollTo(0, 0);
                             }

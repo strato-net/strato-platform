@@ -57,25 +57,25 @@ const Checkout = () => {
     return parseFloat(result);
   }
 
-  const storedData = useMemo(() => {
-    const cartListData = window.localStorage.getItem("cartList");
-    let cartList = [];
-    try {
-      if (cartListData) {
-        // Attempt to parse the stored data as JSON
-        cartList = JSON.parse(cartListData);
-      }
-    } catch (error) {
-      // Handle JSON parsing error
-      console.error("Error parsing cartList data:", error);
-    }
+  // const storedData = useMemo(() => {
+  //   const cartListData = window.localStorage.getItem("cartList");
+  //   let cartList = [];
+  //   try {
+  //     if (cartListData) {
+  //       // Attempt to parse the stored data as JSON
+  //       cartList = JSON.parse(cartListData);
+  //     }
+  //   } catch (error) {
+  //     // Handle JSON parsing error
+  //     console.error("Error parsing cartList data:", error);
+  //   }
 
-    return cartList;
-  }, []);
+  //   return cartList;
+  // }, []);
 
   useEffect(() => {
-    actions.fetchCartItems(marketplaceDispatch, storedData);
-  }, [marketplaceDispatch, storedData]);
+    actions.fetchCartItems(marketplaceDispatch, cartList);
+  }, [marketplaceDispatch, cartList]);
 
   useEffect(() => {
     paymentServiceActions.getPaymentServices(paymentServiceDispatch, false);
@@ -83,7 +83,7 @@ const Checkout = () => {
 
   useEffect(() => {
     const map = new Map();
-    for (const obj of storedData) {
+    for (const obj of cartList) {
       const org = obj.product.ownerCommonName;
       const newPPs = new Set(obj.product.paymentProviders)
       if (!map.has(org)) {
