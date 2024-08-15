@@ -43,7 +43,7 @@ import Control.Monad (forM, forM_, unless, when)
 -- import qualified Control.Monad.Change.Modify as Mod
 import Control.Monad.Composable.SQL
 import Control.Monad.IO.Unlift
--- import Control.Monad.Trans.Reader
+import Control.Monad.Trans.Reader
 -- import Control.Monad.Trans.State.Strict hiding (state)
 import Data.Either (lefts, rights)
 import Data.Foldable (toList)
