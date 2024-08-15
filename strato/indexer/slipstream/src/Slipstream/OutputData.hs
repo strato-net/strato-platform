@@ -1386,11 +1386,14 @@ createEventTable ::
   CodeCollectionF () ->
   ConduitM () Text m ()
 createEventTable globalsIORef (creator, a, n) evName ev cc = do
+  $logInfoS "createEventTable" . T.pack $ show ev
   let (crtr, app, cname) = constructTableNameParameters creator a n
       eventTable = EventTableName crtr app cname (escapeQuotes $ labelToText evName)
       isEvent = True
       cols = getTableColumnAndType isEvent cc [(x, indexedTypeType y) | (x, y) <- fillFirstEmptyEntries $ ev ^. eventLogs]
+      arrayKeys = [key | (key, IndexedType _ SVMType.Array{}) <- ev ^. eventLogs]
       colsCombined = map (\(x,y)-> x <> " " <> y) cols
+  $logInfoS "hasan-keys" (T.pack $ show arrayKeys)
   eventAlreadyCreated <- isTableCreated globalsIORef eventTable
   unless eventAlreadyCreated $ do
     setTableCreated globalsIORef eventTable $ colsCombined
