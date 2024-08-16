@@ -23,7 +23,6 @@ library:
     - Blockchain.StateRootMismatch
     - Blockchain.Stream.Action
     - Blockchain.Stream.VMEvent
-    - Blockchain.Stream.VMOutput
     - Blockchain.Timing
     - Blockchain.TxRunResultCache
     - Blockchain.MemVMContext

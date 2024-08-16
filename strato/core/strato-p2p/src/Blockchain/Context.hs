@@ -1,35 +1,21 @@
-{-# LANGUAGE BangPatterns #-}
 {-# LANGUAGE ConstraintKinds #-}
 {-# LANGUAGE DataKinds #-}
-{-# LANGUAGE DeriveFunctor #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE OverloadedStrings #-}
-{-# LANGUAGE PolyKinds #-}
-{-# LANGUAGE RankNTypes #-}
-{-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE TypeApplications #-}
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE TypeOperators #-}
-{-# LANGUAGE TypeSynonymInstances #-}
-{-# LANGUAGE UndecidableInstances #-}
-
-{-# OPTIONS -fno-warn-orphans      #-}
-{-# OPTIONS -fno-warn-missing-methods #-}
 
 module Blockchain.Context
-    ( All
-    , All2
-    , Stacks(..)
-    , MonadP2P
-    , TcpPortNumber(..)
+    ( MonadP2P
     , IsValidator(..)
     , Context(..)
     , Config(..)
-    , ContextM
+--    , ContextM
     , P2pConduits(..)
     , peerSource
     , peerSink
@@ -43,7 +29,6 @@ module Blockchain.Context
     , ConnectionTimeout(..)
     , PeerAddress(..)
     , GenesisBlockHash(..)
-    , BestBlockNumber(..)
     , TrueOrgNameChains(..)
     , FalseOrgNameChains(..)
     , ChainInfo(..)
@@ -66,9 +51,6 @@ module Blockchain.Context
     , withCertifiedPeer
     , getPeerX509
     , getMyX509
-    , getPeerByParsedSet
-    , getPeersByParsedSets
-    , toMaybe
     ) where
 
 import           Conduit
@@ -118,11 +100,6 @@ import           Blockchain.Strato.Model.ChainMember
 import           Blockchain.Strato.Model.ExtendedWord
 import           Blockchain.Strato.Model.Keccak256
 import           Blockchain.Strato.Model.Secp256k1
-import           Blockchain.Stream.VMOutput            ( VMOutput(..)
-                                                       , fetchLastVMOutputs
-                                                       , getBestKafkaBlockNumber
-                                                       , produceVMOutputsM
-                                                       )
 
 import qualified Blockchain.Strato.RedisBlockDB        as RBDB
 import           Blockchain.Strato.RedisBlockDB.Models (RedisBestBlock(..))
@@ -157,12 +134,6 @@ type family All2' (k :: DK.Type -> DK.Type -> (DK.Type -> DK.Type) -> Constraint
 type family All2 (ks :: [DK.Type -> DK.Type -> (DK.Type -> DK.Type) -> Constraint]) (ts :: [(DK.Type, DK.Type)]) (m :: DK.Type -> DK.Type) :: Constraint where
   All2 (k ': '[]) ts m = All2' k ts m
   All2 (k ': ks) ts m = (All2' k ts m, All2 ks ts m)
-
-class Stacks a m where
-  takeStack :: Proxy a -> Int -> m [a]
-  pushStack :: [a] -> m ()
-
-newtype TcpPortNumber = TcpPortNumber {unTcpPortNumber :: Int}
 
 newtype IsValidator = IsValidator {unIsValidator :: Bool}
 
@@ -203,8 +174,6 @@ data Context = Context
 makeLenses ''Context
 
 newtype GenesisBlockHash = GenesisBlockHash {unGenesisBlockHash :: Keccak256}
-
-newtype BestBlockNumber = BestBlockNumber {unBestBlockNumber :: Integer}
 
 type ContextM = ReaderT Config (ResourceT (LoggingT IO))
 
@@ -362,9 +331,6 @@ instance
   where
   access _ = GenesisBlockHash <$> getGenesisBlockHash
 
-instance MonadIO m => Mod.Accessible BestBlockNumber (ReaderT Config m) where
-  access _ = BestBlockNumber <$> liftIO getBestKafkaBlockNumber
-
 instance MonadIO m => Mod.Modifiable Context (ReaderT Config m) where
   get _ = readIORef =<< asks configContext
   put _ c = asks configContext >>= flip atomicModifyIORef' (const (c, ()))
@@ -441,12 +407,6 @@ instance MonadIO m => Mod.Accessible SQLDB (ReaderT Config m) where
 instance {-# OVERLAPPING #-} MonadIO m => AccessibleEnv SQLDB (ReaderT Config m) where
   accessEnv = asks configSQLDB
 
-instance (MonadIO m, MonadLogger m) => Stacks Block (ReaderT Config m) where
-  takeStack _ n = do
-    vmEvents <- liftIO . fetchLastVMOutputs $ fromIntegral n
-    pure [b | ChainBlock b <- vmEvents]
-  pushStack b = void . produceVMOutputsM $ ChainBlock <$> b
-
 instance MonadUnliftIO m => A.Selectable IPAsText PPeer (ReaderT Config m) where
   select _ (IPAsText ip) =
     sqlQuery actions >>= \case
@@ -497,7 +457,6 @@ type MonadP2P m =
     MonadLogger m,
     MonadResource m,
     MonadUnliftIO m,
-    Stacks Block m,
     HasVault m,
     m `Mod.Outputs` [IngestEvent],
     All
@@ -513,7 +472,6 @@ type MonadP2P m =
       '[ MaxReturnedHeaders,
          ConnectionTimeout,
          GenesisBlockHash,
-         BestBlockNumber,
          AvailablePeers,
          BondedPeers,
          PublicKey
@@ -644,30 +602,6 @@ getMyX509 ::
   (A.Selectable Address X509CertInfoState m, Mod.Accessible PublicKey m) =>
   m (Maybe X509CertInfoState)
 getMyX509 = Mod.access (Mod.Proxy @PublicKey) >>= A.select (Proxy @X509CertInfoState) . fromPublicKey
-
-getPeersByParsedSets :: (MonadP2P m) => ChainMemberParsedSet -> m [Maybe PPeer]
-getPeersByParsedSets org = do
-  mems <- A.select (Proxy @[ChainMemberParsedSet]) org
-  case mems of
-    Nothing -> pure $ [Nothing]
-    Just c -> traverse getPeerByParsedSet c
-
-getPeerByParsedSet :: (MonadP2P m) => ChainMemberParsedSet -> m (Maybe PPeer)
-getPeerByParsedSet mem = do
-  cert <- A.select (Proxy @X509CertInfoState) mem
-  case cert of
-    Nothing -> pure $ Nothing
-    Just c -> do
-      let sub = getCertSubject $ certificate c
-      case sub of
-        Just s -> (getPeerByPubKey . secPubKeyToPoint . subPub) s
-        Nothing -> pure $ Nothing
-
-getPeerByPubKey ::
-  A.Selectable Point PPeer m =>
-  Point ->
-  m (Maybe PPeer)
-getPeerByPubKey = A.select (Proxy @PPeer)
 
 setPeerAddrIfUnset :: Mod.Modifiable PeerAddress m => ChainMemberParsedSet -> m ()
 setPeerAddrIfUnset addr = Mod.modify_ (Proxy @PeerAddress) $ pure . withPeerAddress (<|> Just addr)

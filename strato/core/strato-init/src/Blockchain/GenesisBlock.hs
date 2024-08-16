@@ -63,7 +63,6 @@ import Blockchain.Strato.StateDiff.Database
 import Blockchain.Strato.StateDiff.Kafka (assertTopicCreation)
 import qualified Blockchain.Stream.Action as A
 import Blockchain.Stream.VMEvent
-import Blockchain.Stream.VMOutput
 import Control.Monad
 import Control.Monad.Change.Alter (Alters, Selectable)
 import Control.Monad.Composable.Kafka
@@ -174,7 +173,6 @@ initializeGenesisBlock ::
 initializeGenesisBlock genesisBlockName = do
   $logInfoS "initgen" "Begin of initgen"
   (extraCertInfoStates, validators, (srcInfo, genesisBlock)) <- getGenesisBlockAndPopulateInitialMPs genesisBlockName
-  _ <- produceVMOutputs [ChainBlock genesisBlock]
   obGB <- liftIO $ bootstrapSequencer extraCertInfoStates genesisBlock
   putGenesisHash $ blockHash genesisBlock
   $logInfoS "initgen" "Initial merkle patricia tries successfully created"

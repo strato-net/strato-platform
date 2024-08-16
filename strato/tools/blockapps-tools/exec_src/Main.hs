@@ -5,7 +5,6 @@
 
 import BlockApps.Tools.Checkpoints
 import BlockApps.Tools.Code as Code
-import BlockApps.Tools.DumpKafkaBlocks
 import BlockApps.Tools.DumpKafkaRaw
 import BlockApps.Tools.DumpKafkaSequencer
 import BlockApps.Tools.DumpKafkaStateDiff
@@ -47,7 +46,6 @@ data Options
   | Checkpoints {service :: CheckpointService, operation :: CheckpointOperation, offset :: Maybe Int64, cp :: Maybe String}
   | Code {hash :: String}
   | DeleteDepBlock {valK :: String}
-  | DumpKafkaBlocks {startingBlock :: Int}
   | DumpKafkaVMEvents {startingBlock :: Int}
   | DumpKafkaSequencer {startingBlock :: Int}
   | DumpKafkaSequencerVM {startingBlock :: Int}
@@ -158,13 +156,6 @@ dumpKafkaUnSequencerOptions :: Annotate Ann
 dumpKafkaUnSequencerOptions =
   record
     DumpKafkaUnSequencer {startingBlock = undefined}
-    [ startingBlock := 0 += typ "INT"
-    ]
-
-dumpKafkaBlocksOptions :: Annotate Ann
-dumpKafkaBlocksOptions =
-  record
-    DumpKafkaBlocks {startingBlock = undefined}
     [ startingBlock := 0 += typ "INT"
     ]
 
@@ -360,7 +351,6 @@ options =
       chainHashOptions,
       checkpointOptions,
       codeOptions,
-      dumpKafkaBlocksOptions,
       dumpKafkaVMEventsOptions,
       dumpKafkaRawOptions,
       dumpKafkaSequencerOptions,
@@ -427,7 +417,6 @@ run DumpKafkaSequencer {..} = dumpKafkaSequencer (fromIntegral startingBlock)
 run DumpKafkaSequencerVM {..} = dumpKafkaSequencerVM (fromIntegral startingBlock)
 run DumpKafkaSequencerP2P {..} = dumpKafkaSequencerP2P (fromIntegral startingBlock)
 run DumpKafkaUnSequencer {..} = dumpKafkaUnSequencer (fromIntegral startingBlock)
-run DumpKafkaBlocks {..} = dumpKafkaBlocks (fromIntegral startingBlock)
 run DumpKafkaVMEvents {..} = dumpKafkaVMEvents (fromIntegral startingBlock)
 run DumpKafkaRaw {..} = dumpKafkaRaw streamName (fromIntegral startingBlock)
 run DumpKafkaStateDiff {..} = dumpKafkaStateDiff $ fromIntegral startingBlock
