@@ -269,7 +269,7 @@ async function transferItem(user, contract, args, options) {
         ...options,
         org: constants.blockAppsOrg,
         query: {
-            address: `eq.${callArgs.contract.address}`
+            transferNumber: `eq.${args.transferNumber}`
         }
     }
 
