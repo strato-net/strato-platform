@@ -266,6 +266,15 @@ data ValidatorDelta = ValidatorDelta
     }
     deriving (Generic, NFData, Show)
 
+makeLenses ''ValidatorDelta
+
+data CertsDelta = CertsDelta
+  { _newCerts     :: S.Set T.Text,
+    _removedCerts :: S.Set T.Text
+  } deriving (Generic, NFData, Show)
+
+makeLenses ''CertsDelta
+
 data ContextState = ContextState
   { _memDBs :: !MemDBs,
     _baggerState :: !BaggerState,
@@ -276,7 +285,8 @@ data ContextState = ContextState
     _runningTests :: !Bool,
     _txRunResultsCache :: TRC.Cache,
     _debugSettings :: !(Maybe DebugSettings),
-    _validatorDelta :: !ValidatorDelta
+    _validatorDelta :: !ValidatorDelta,
+    _certsDelta :: !CertsDelta
   }
   deriving (Generic, NFData)
 
@@ -294,7 +304,8 @@ instance Default ContextState where
         _runningTests = False,
         _txRunResultsCache = error "Default ContextState: accessing uninitialized txRunResultsCache",
         _debugSettings = Nothing,
-        _validatorDelta = ValidatorDelta S.empty S.empty
+        _validatorDelta = ValidatorDelta S.empty S.empty,
+        _certsDelta = CertsDelta S.empty S.empty
       }
 
 data QueueEvent
@@ -450,7 +461,8 @@ runTestContextM f = withSystemTempDirectory "test_evm_context" $ \tmpdir ->
               _runningTests = True,
               _txRunResultsCache = cache,
               _debugSettings = Nothing,
-              _validatorDelta = ValidatorDelta S.empty S.empty
+              _validatorDelta = ValidatorDelta S.empty S.empty,
+              _certsDelta = CertsDelta S.empty S.empty
             }
       que <- newTQueueIO
       let ctx =
@@ -610,11 +622,23 @@ putContextValidators :: (MonadLogger m, Mod.Accessible ContextState m, Mod.Modif
 putContextValidators events = do
     ValidatorDelta new' removed' <- getContextValidators
     let extractCommonName = Validator . T.pack . snd . fromJust . find (\(x, _) -> x == "commonName") . evArgs
-        new     = new' `S.union` S.fromList [extractCommonName e | e <- events, evContractAccount e == Account 0x100 Nothing && evName e == "ValidatorAdded"]
-        removed = removed' `S.union` S.fromList [extractCommonName e | e <- events, evContractAccount e == Account 0x100 Nothing && evName e == "ValidatorRemoved"]
-        delta   = ValidatorDelta new removed
-
+        new               = new' `S.union` S.fromList [extractCommonName e | e <- events, evContractAccount e == Account 0x100 Nothing && evName e == "ValidatorAdded"]
+        removed           = removed' `S.union` S.fromList [extractCommonName e | e <- events, evContractAccount e == Account 0x100 Nothing && evName e == "ValidatorRemoved"]
+        delta             = ValidatorDelta new removed
     Mod.modifyStatefully_ (Mod.Proxy @ContextState) $ validatorDelta .= delta
+
+getContextCerts :: (Functor m, Mod.Accessible ContextState m) => m CertsDelta
+getContextCerts = _certsDelta <$> Mod.access Mod.Proxy
+
+putContextCerts :: (MonadLogger m, Mod.Accessible ContextState m, Mod.Modifiable ContextState m) => [Event] -> m ()
+putContextCerts events = do
+  CertsDelta new' removed' <- getContextCerts
+  let extractCommonName = Validator . T.pack . snd . fromJust . find (\(x, _) -> x == "commonName") . evArgs
+      new               = new' `S.union` S.fromList [extractCommonName e | e <- events, evContractAccount e == Account 0x100 Nothing && evName e == "CertificateRegistered"]
+      removed           = removed' `S.union` S.fromList [extractCommonName e | e <- events, evContractAccount e == Account 0x100 Nothing && evName e == "CertificateRevoked"]
+      delta             = CertsDelta new removed
+  Mod.modifyStatefully_ (Mod.Proxy @ContextState) $ validatorDelta .= delta
+
 
 flushContextValidators :: (Mod.Modifiable ContextState m) => m ()
 flushContextValidators = Mod.modifyStatefully_ (Mod.Proxy @ContextState) $ validatorDelta .= ValidatorDelta S.empty S.empty
