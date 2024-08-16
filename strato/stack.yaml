@@ -73,6 +73,7 @@ packages:
 
 - tools/blockapps-tools
 - tools/debugger-tools
+- tools/process-monitor
 - tools/x509-tools
 
 - vault/api
