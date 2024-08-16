@@ -1,6 +1,6 @@
 const { createTransactionPayload } = require("../helper/transferSTRATS");
 const {
-  NODE,
+  NODE_ENV,
   prodMarketplaceUrl,
   testnetMarketplaceUrl,
 } = require("../config");
@@ -27,7 +27,7 @@ async function handleOrderRewards(event, token) {
   // Check if the purchaser has made a first order before
   const checkFirstPurchase = await fetch(
     `https://${
-      NODE === "prod" ? prodMarketplaceUrl : testnetMarketplaceUrl
+      NODE_ENV === "prod" ? prodMarketplaceUrl : testnetMarketplaceUrl
     }/cirrus/search/BlockApps-Mercata-PaymentService.Order?purchaser=eq.${purchaser}&status=eq.3&select=count`,
     {
       method: "GET",
