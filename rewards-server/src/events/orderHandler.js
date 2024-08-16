@@ -1,4 +1,4 @@
-const { createTransactionPayload } = require("../helper/transferSTRATS");
+const { createTwoTransactionPayload } = require("../helper/transferSTRATS");
 const {
   NODE_ENV,
   prodMarketplaceUrl,
@@ -93,67 +93,36 @@ async function handleOrderRewards(event, token) {
   buyerReward = Math.round(buyerReward);
   sellerReward = Math.round(sellerReward);
 
-  await handlePurchaserReward(purchaser, buyerReward, token, eventKey);
-  await handleSellerReward(seller, sellerReward, token)
-
+  await handleOrderReward(seller, sellerReward, purchaser, buyerReward, token, eventKey)
 }
 
-async function handlePurchaserReward(purchaser, reward, token, eventKey) {
+async function handleOrderReward(seller, sellerReward, purchaser, buyerReward, token, eventKey) {
   try {
-    console.log(`Sending ${eventKey} reward to , ${purchaser}, ${reward/100}STRATS`);
-    const purchaserResponse = await createTransactionPayload(
-      token,
-      purchaser,
-      reward
-    );
-    if (!purchaserResponse.ok) {
-      const errorText = await purchaserResponse.text();
+    console.log(`Sending ${eventKey} reward to , ${purchaser}, ${buyerReward/100}STRATS`);
+    console.log(`Sending sale reward to , ${seller}, ${sellerReward/100}STRATS`);
+   
+    const transactionResponse =  await createTwoTransactionPayload(token, purchaser, seller, buyerReward, sellerReward);
+    
+    if (!transactionResponse.ok) {
+      const errorText = await transactionResponse.text();
       console.error(
-        `Error: ${purchaserResponse.status} ${purchaserResponse.statusText}`
+        `Error: ${transactionResponse.status} ${transactionResponse.statusText}`
       );
       console.error(`Response body: ${errorText}`);
       throw new Error(
-        `Purchaser transaction failed with status ${purchaserResponse.status}: ${purchaserResponse.statusText}`
+        `Transaction failed with status ${transactionResponse.status}: ${transactionResponse.statusText}`
       );
     }
 
-    const response = await purchaserResponse.json();
-    console.log("Purchaser reward transaction successful:", response);
+    const response = await transactionResponse.json();
+    console.log("Reward transaction successful:", response);
     return response;
   } catch (error) {
     console.log(`Failed to send ${eventKey} reward to ${purchaser}, ${reward/100}STRATS`);
-    console.error("Error processing purchaser transaction:", error.message);
+    console.log(`Failed to send sale reward to ${seller}, ${reward/100}STRATS`);
+    console.error("Error processing transaction:", error.message);
     throw error;
   }
-}
-
-async function handleSellerReward(seller, reward, token) {
-    try {
-      console.log(`Sending sale reward to , ${seller}, ${reward/100}STRATS`);
-      const sellerResponse = await createTransactionPayload(
-        token,
-        seller,
-        reward
-      );
-      if (!sellerResponse.ok) {
-        const errorText = await sellerResponse.text();
-        console.error(
-          `Error: ${sellerResponse.status} ${sellerResponse.statusText}`
-        );
-        console.error(`Response body: ${errorText}`);
-        throw new Error(
-          `Seller transaction failed with status ${sellerResponse.status}: ${sellerResponse.statusText}`
-        );
-      }
-      
-      const response = await sellerResponse.json();
-      console.log("Seller reward transaction successful:", response);
-      return response
-    } catch (error) {
-      console.log(`Failed to send sale reward to ${seller}, ${reward/100}STRATS`);
-      console.error("Error processing seller transaction:", error.message);
-      throw error; 
-    }
 }
 
 module.exports = { handleOrderRewards };
