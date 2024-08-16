@@ -257,6 +257,7 @@ populateStorageDBs getMetadata genesisBlock genesisChainId = do
                     (codeHash d)
                     emptyCodeCollection
                     ""
+                    Nothing
                     ""
                     ""
                     ( case codeHash d of
