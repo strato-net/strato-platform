@@ -5,7 +5,8 @@ module.exports = {
   baPassword: process.env.BA_PASSWORD,
   testnetClientSecret: process.env.TESTNET_CLIENT_SECRET,
   prodClientSecret: process.env.PROD_CLIENT_SECRET,
-  NODE: process.env.NODE, // prod or testnet
+  NODE_ENV: process.env.NODE_ENV, // prod or testnet
+  CLIENT_ID: process.env.CLIENT_ID,
   prodMarketplaceUrl: process.env.PROD_MARKETPLACE_URL,
   testnetMarketplaceUrl: process.env.TESTNET_MARKETPLACE_URL,
   prodStratsAddress: process.env.PROD_STRATS_ADDRESS,

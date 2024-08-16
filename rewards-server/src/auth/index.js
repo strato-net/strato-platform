@@ -3,7 +3,8 @@ const {
   baPassword,
   testnetClientSecret,
   prodClientSecret,
-  NODE,
+  NODE_ENV,
+  CLIENT_ID
 } = require("../config");
 const { oauthUtil } = require("blockapps-rest");
 
@@ -12,10 +13,10 @@ const oauthInit = {
   appTokenCookieName: "asset_framework_session",
   appTokenCookieMaxAge: 7776000000,
   openIdDiscoveryUrl: `https://keycloak.blockapps.net/auth/realms/${
-    NODE === "prod" ? "mercata" : "mercata-testnet2"
+    NODE_ENV === "prod" ? "mercata" : "mercata-testnet2"
   }/.well-known/openid-configuration`,
-  clientId: "localhost",
-  clientSecret: NODE === "prod" ? prodClientSecret : testnetClientSecret,
+  clientId: CLIENT_ID,
+  clientSecret: NODE_ENV === "prod" ? prodClientSecret : testnetClientSecret,
   scope: "email openid",
   serviceOAuthFlow: null,
   redirectUri: "http://localhost/api/v1/authentication/callback",
