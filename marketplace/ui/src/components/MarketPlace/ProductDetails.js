@@ -310,7 +310,6 @@ const ProductDetails = ({ user, users }) => {
   const addItemToCart = async () =>{
     const items = [{ product: details, qty }];
     marketPlaceActions.addItemToCart(marketplaceDispatch, items);
-    setCookie('returnUrl', '/checkout', 10)
     navigate('/checkout');
     window.scrollTo(0, 0);
   }

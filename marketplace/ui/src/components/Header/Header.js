@@ -76,9 +76,9 @@ const HeaderComponent = ({ user, loginUrl, showMenu, handleSubMenu, handleMenuTa
     }
   }, [user]);
 
-  // useEffect(() => {
-  //   marketplaceActions.fetchCartItems(marketplaceDispatch, cartList);
-  // }, [marketplaceDispatch, cartList]);
+  useEffect(() => {
+    marketplaceActions.fetchCartItems(marketplaceDispatch, cartList);
+  }, [marketplaceDispatch, cartList]);
 
   const [selectedTab, setSelectedTab] = useState("0");
   const [roleIndex, setRoleIndex] = useState();

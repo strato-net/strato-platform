@@ -34,7 +34,6 @@ import ClickableCell from "../ClickableCell";
 import routes from "../../helpers/routes";
 import { Images } from "../../images";
 import './index.css'
-import { setCookie } from "../../helpers/cookie";
 
 const { Panel } = Collapse;
 const { Text } = Typography;
@@ -322,7 +321,6 @@ const CategoryProductList = ({ user }) => {
   const addItemToCart = async (product, quantity) =>{
     const items = [{ product, qty: quantity }];
     marketplaceActions.addItemToCart(marketplaceDispatch, items);
-    setCookie('returnUrl', '/checkout', 10)
     navigate('/checkout');
     window.scrollTo(0, 0);
   }
