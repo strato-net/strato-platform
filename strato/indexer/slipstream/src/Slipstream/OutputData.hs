@@ -15,6 +15,7 @@
 module Slipstream.OutputData (
   outputData,
   outputData',
+  outputDataDedup,
   OutputM,
   ProcessedCollectionRow(..),
   insertEventTables,
@@ -231,6 +232,20 @@ outputData ::
   ConduitM () Text m a ->
   m a
 outputData conn c = runConduit $ c `fuseUpstream` mapM_C (dbQueryCatchError conn)
+
+dedupC :: (Monad m, Ord a) => ConduitM a a m ()
+dedupC = go Set.empty
+  where go seen = await >>= \case
+          Just a | not (a `Set.member` seen) -> yield a >> go (Set.insert a seen)
+          Just _ -> go seen
+          Nothing -> pure ()
+
+outputDataDedup ::
+  OutputM m =>
+  PGConnection ->
+  ConduitM () Text m a ->
+  m a
+outputDataDedup conn c = runConduit $ c `fuseUpstream` (dedupC .| mapM_C (dbQueryCatchError conn))
 
 baseColumns :: TableColumns
 baseColumns =
@@ -1286,7 +1301,7 @@ updateFkeysQueryIndex (c@E.ProcessedContract {contractData = contractData}, fkey
         [ T.concat
             [ "UPDATE ",
               tableNameToDoubleQuoteText tableName,
-              "\n  SET",
+              "\n  SET ",
               keyStForFkeyColumnsWithPostFix,
               " = ",
               valsForSQL,
