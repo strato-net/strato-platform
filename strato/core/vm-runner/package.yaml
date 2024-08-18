@@ -69,6 +69,7 @@ executables:
       - common-log
       - debugger
       - hflags
+      - process-monitor
       - solid-vm-fuzzer
       - strato-model
       - vm-runner

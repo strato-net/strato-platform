@@ -21,3 +21,15 @@ memMetric =
     . vector "process"
     . gauge
     $ Info "strato_memory_usage" "Process memory usage"
+
+createRtsLiveBytesGauge :: Text -> IO Gauge
+createRtsLiveBytesGauge name =
+  register
+    . gauge
+    $ Info (name <> "_rts_live_bytes") (name <> " RTS live bytes")
+
+createRtsHeapSizeGauge :: Text -> IO Gauge
+createRtsHeapSizeGauge name =
+  register
+    . gauge
+    $ Info (name <> "_rts_heap_size") (name <> "RTS heap size")

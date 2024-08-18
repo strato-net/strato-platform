@@ -76,6 +76,7 @@ executables:
       - hflags
       - http-client
       - milena
+      - process-monitor
       - prometheus-client
       - safe
       - seqevents
