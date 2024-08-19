@@ -5,12 +5,13 @@ module.exports = {
   baPassword: process.env.BA_PASSWORD,
   testnetClientSecret: process.env.TESTNET_CLIENT_SECRET,
   prodClientSecret: process.env.PROD_CLIENT_SECRET,
-  NODE: process.env.NODE, // prod or testnet
-  prodMarketplaceUrl: "marketplace.mercata.blockapps.net",
-  testnetMarketplaceUrl: "marketplace.mercata-testnet2.blockapps.net",
-  prodStratsAddress: "b220195543f652f735b7847c4af399d0323e1ff6",
-  testnetStratsAddress: "488cd3909d94606051e0684cf6caa5763fb78613",
-  contractName: "ERC20Dapp",
-  googleSheetId: "1kN0VtQPIGbAG5AtW63T0XQWvW4HvLHnfyqiNa_dBQck",
+  NODE_ENV: process.env.NODE_ENV, // prod or testnet
+  CLIENT_ID: process.env.CLIENT_ID,
+  prodMarketplaceUrl: process.env.PROD_MARKETPLACE_URL,
+  testnetMarketplaceUrl: process.env.TESTNET_MARKETPLACE_URL,
+  prodStratsAddress: process.env.PROD_STRATS_ADDRESS,
+  testnetStratsAddress: process.env.TESTNET_STRATS_ADDRESS,
+  contractName: process.env.CONTRACT_NAME,
+  googleSheetId: process.env.GOOGLE_SHEET_ID,
   googleCredentials: process.env.GOOGLE_APPLICATION_CREDENTIALS,
 };

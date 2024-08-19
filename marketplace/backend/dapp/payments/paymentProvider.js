@@ -207,7 +207,7 @@ async function getNotOnboarded(admin, args = {}, baseOptions) {
     const notOnboardedQuery = {
       isActive: 'eq.true',
       contract_name: `like.*${externalContractName}`,
-      and: onboardedServices.length > 0 ? `(${onboardedAddresses.join(',')})` : undefined,
+      and: onboardedServices.length > 0 ? `(${onboardedServices.join(',')})` : undefined,
     }
     const notOnboardedOptions = { ...baseOptions, query: notOnboardedQuery }
     const paymentServices = await rest.search(admin, contract, notOnboardedOptions);

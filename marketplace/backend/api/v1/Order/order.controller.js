@@ -72,7 +72,7 @@ class OrderController {
       // check orderEvent.status is 3 and sendEmail
       // Only send email if order is created successfully(STRATS Orders)
       const orderEvent = await dapp.getStratsOrderEvent({orderHash: checkoutHash, paymentProvider: restArgs.paymentProvider.address}, options)
-       if(orderEvent.length === 1 && orderEvent[0].status === "3" &&  orderEvent[0].currency === "STRATS")
+       if(orderEvent && orderEvent.length === 1 && orderEvent[0].status === "3" &&  orderEvent[0].currency === "STRATS")
       {
             await sendEmail(body.email, "Your Order Confirmation", htmlContents[0]);
             console.log("*Buyer placed order*",orderEvent);
