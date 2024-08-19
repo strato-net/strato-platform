@@ -7,7 +7,6 @@ pipeline {
   environment {
     GIT_URL = 'https://github.com/blockapps/strato-platform'
     BRANCH_DEVELOP = 'develop'
-    BRANCH_DEVELOP = 'master'
     BRANCH_A = 'master'
     BRANCH_B = 'marketplace-master'
   }
@@ -53,27 +52,27 @@ pipeline {
     success {
       slackSend (
           color: 'good',
-          message: "Unmerged commits check success: Job '${env.JOB_NAME} [${env.BUILD_NUMBER}]' (${env.BUILD_URL})"
+          message: "Unmerged hotfixes check success: Job '${env.JOB_NAME} [${env.BUILD_NUMBER}]' (${env.BUILD_URL})"
       )
     }
 
     failure {
       slackSend (
           color: 'danger',
-          message: "Unmerged commits check failed: Job '${env.JOB_NAME} [${env.BUILD_NUMBER}]' (${env.BUILD_URL})"
+          message: "Unmerged hotfixes check failed: Job '${env.JOB_NAME} [${env.BUILD_NUMBER}]' (${env.BUILD_URL})"
       )
 
       slackSend(
           channel: '#ops-monitoring',
           color: 'danger',
-          message: "Unmerged commits check failed: Job '${env.JOB_NAME} [${env.BUILD_NUMBER}]' (${env.BUILD_URL}"
+          message: "Unmerged hotfixes check failed: Job '${env.JOB_NAME} [${env.BUILD_NUMBER}]' (${env.BUILD_URL}"
       )
     }
 
     unstable {
       slackSend (
           color: 'warning',
-          message: "Unmerged commits check is unstable: Job '${env.JOB_NAME} [${env.BUILD_NUMBER}]' (${env.BUILD_URL})"
+          message: "Unmerged hotfixes check is unstable: Job '${env.JOB_NAME} [${env.BUILD_NUMBER}]' (${env.BUILD_URL})"
       )
       
       script {
@@ -84,7 +83,7 @@ pipeline {
         slackSend(
             channel: '#ops-monitoring',
             color: 'warning',
-            message: "STRATO_check_unmerged discovered commit merge deviations: \nJob '${env.JOB_NAME} [${env.BUILD_NUMBER}]' (${env.BUILD_URL}" + """\n${WARNING_FULL}"""
+            message: "Unmerged hotfixes check discovered deviations: \nJob '${env.JOB_NAME} [${env.BUILD_NUMBER}]' (${env.BUILD_URL}" + """\n${WARNING_FULL}"""
         )
       }
     }
@@ -93,7 +92,7 @@ pipeline {
       slackSend(
           channel: '#ops-monitoring',
           color: 'good',
-          message: "STRATO_check_unmerged discovered no commit merge deviations after we had some: Job '${env.JOB_NAME} [${env.BUILD_NUMBER}]' (${env.BUILD_URL})"
+          message: "Unmerged hotfixes check discovered no more deviations: Job '${env.JOB_NAME} [${env.BUILD_NUMBER}]' (${env.BUILD_URL})"
       )
     }
   }
