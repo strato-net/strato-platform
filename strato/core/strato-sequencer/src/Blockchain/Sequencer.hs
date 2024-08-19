@@ -19,7 +19,7 @@ module Blockchain.Sequencer where
 import BlockApps.Logging
 import BlockApps.X509.Certificate
 import Blockchain.Blockstanbul 
-import Blockchain.Blockstanbul.StateMachine (coupleValidatorWithX509s)
+--import Blockchain.Blockstanbul.StateMachine (coupleValidatorWithX509s)
 import qualified Blockchain.Data.Block as BDB
 import Blockchain.Data.BlockHeader
 import Blockchain.Data.ChainInfo (chainInfo, creationBlock, parentChains)
@@ -58,13 +58,13 @@ import Data.Maybe
 import Data.Proxy
 import qualified Data.Set as S
 import qualified Data.Text as T
-import Data.Tuple.Extra ((&&&))
+--import Data.Tuple.Extra ((&&&))
 import Data.Time.Clock
 import Prometheus as P
 import qualified Text.Colors as CL
 import Text.Format
 import Text.Printf
-import Blockchain.Data.Block (Block(blockBlockData))
+--import Blockchain.Data.Block (Block(blockBlockData))
 
 instance MonadMonitor m => MonadMonitor (ConduitT i o m) where
   doIO = lift . doIO
@@ -286,14 +286,7 @@ blockstanbulSend' msg = do
         [] -> return []
         -- TODO(tim): Block insertion can potentially fail, so there
         -- should be feedback here
-        [b] -> do 
-            -- Now that the block is being committed,
-            -- we can update the Blockstanbul validator context
-            let (nVals, nCerts) = (newValidators &&& newCerts) (blockBlockData b)
-                valSet          = coupleValidatorWithX509s nVals (map x509CertToCertInfoState nCerts) 
-                new             = map (\(v, c) -> ValidatorChange v (Just c) True) valSet
-                removed         = map (\v -> ValidatorChange v Nothing False) (removedValidators $ blockBlockData b) -- TODO: dummyCertRevocation here?
-            sendAllMessages $ [CommitResult . Right . blockHash $ b] ++ new ++ removed
+        [b] -> sendAllMessages $ [CommitResult . Right . blockHash $ b]
         bs -> error $ "can send at most 1 block at a time: " ++ show bs
   for_ resp $ \case
     ResetTimer rn -> createNewTimer rn
@@ -686,6 +679,18 @@ splitEvents es = forM_ (splitWith iEventType es) $ \(eventType, events) ->
         IETNewChainOrgName -> do
           record "inevent_type_new_org_name" "IngestNewChainOrgName"
           yieldMany $ map (\(IENewChainOrgName c cm) -> ToP2p $ P2pNewOrgName c cm) events
+        IETValidatorAdded -> do
+          record "inevent_type_validator_added" "ValidatorChange"
+          let bs = map (\(IEValidatorAdded bHash vc) -> (bHash, vc)) events
+          blockstanbulSend $ map (\(_, vc) -> ValidatorChange vc Nothing True) bs
+          retries <- lift $ map (PreviousBlock . outputBlockToBlock) . join <$> traverse retryFailedChildren (fst <$> bs)
+          blockstanbulSend retries
+        IETValidatorRemoved -> do
+          record "inevent_type_validator_removed" "ValidatorChange"
+          let bs = map (\(IEValidatorRemoved bHash vc) -> (bHash, vc)) events
+          blockstanbulSend $ map (\(_, vc) -> ValidatorChange vc Nothing False) bs
+          retries <- lift $ map (PreviousBlock . outputBlockToBlock) . join <$> traverse retryFailedChildren (fst <$> bs)
+          blockstanbulSend retries
         IETBlockstanbul -> do
           record "inevent_type_blockstanbul" "IngestBlockstanbuls"
           blockstanbulSend $ map (\(IEBlockstanbul (WireMessage a m)) -> IMsg a m) events
