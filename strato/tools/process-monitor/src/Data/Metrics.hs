@@ -4,6 +4,7 @@
 module Data.Metrics where
 
 import Data.Text (Text)
+import qualified Data.Text as T
 import Prometheus
 
 {-# NOINLINE cpuMetric #-}
@@ -21,3 +22,15 @@ memMetric =
     . vector "process"
     . gauge
     $ Info "strato_memory_usage" "Process memory usage"
+
+createRtsLiveBytesGauge :: Text -> IO Gauge
+createRtsLiveBytesGauge name =
+  register
+    . gauge
+    $ Info (name <> "_rts_live_bytes") (name <> " RTS live bytes")
+
+createRtsHeapSizeGauge :: Text -> IO Gauge
+createRtsHeapSizeGauge name =
+  register
+    . gauge
+    $ Info (T.replace "-" "_" name <> "_rts_heap_size") (name <> "RTS heap size")
