@@ -115,7 +115,12 @@ async function handleOrderReward(seller, sellerReward, purchaser, buyerReward, t
     }
 
     const response = await transactionResponse.json();
-    console.log("Reward transaction successful:", response);
+    const allSuccessful = response.every(tx => tx.status === 'Success');
+    if (allSuccessful) {
+      console.log("All reward transactions were successful:", response);
+    } else {
+      console.log("Some reward transactions were not successful:", response);
+    }
     return response;
   } catch (error) {
     console.log(`Failed to send ${eventKey} reward to ${purchaser}, ${reward/100}STRATS`);
