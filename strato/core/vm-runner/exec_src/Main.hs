@@ -28,7 +28,7 @@ import SolidVM.Solidity.SourceTools
 main :: IO ()
 main = do
   blockappsInit "vm_main"
-  runInstrumentation "vm-runner"
+  runInstrumentation "vm"
   void $ $initHFlags "Ethereum VM"
   mDebugger <- initializeSolidVMDebuggerSimple
   let metricsRunner = run 8009 metricsApp

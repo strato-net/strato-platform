@@ -138,6 +138,10 @@ function newnode {
   then p2pMinLogLevel=LevelDebug
   fi
 
+  if [ -n "${INSTRUMENTATION}" ]; then
+      iFlag="+RTS -T -RTS"
+  fi
+
   echo "Starting ethereum-discover"
   runBackgroundProcess ethereum-discover  &>> logs/ethereum-discover
 
@@ -208,9 +212,6 @@ function newnode {
   fi
   if [ -n "${FILE_SERVER_URL}" ]; then
       fsFlag="--fileServerUrl=${FILE_SERVER_URL}"
-  fi
-  if [ -n "${INSTRUMENTATION}" ]; then
-      iFlag="+RTS -T -RTS"
   fi
 
   echo "Starting vm-runner"

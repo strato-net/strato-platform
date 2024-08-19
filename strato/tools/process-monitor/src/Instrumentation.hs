@@ -11,7 +11,7 @@ module Instrumentation where
 import Control.Concurrent (forkIO, threadDelay)
 import Control.Monad (forever, void, when)
 import Data.Metrics
-import Data.Text (Text)
+import Data.Text (Text, unpack)
 import GHC.Stats
 import Prometheus
 
@@ -25,6 +25,7 @@ runInstrumentation :: Text -> IO ()
 runInstrumentation name = do
   enabled <- getRTSStatsEnabled
   when enabled $ do
+    putStrLn . unpack $ "Instrumentation for " <> name <> " is enabled"
     heapSize <- createRtsHeapSizeGauge name
     liveBytes <- createRtsLiveBytesGauge name
     void . forkIO . forever $ do

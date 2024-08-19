@@ -33,7 +33,7 @@ main = runLoggingT initP2P
 initP2P :: LoggingT IO ()
 initP2P = labelTheThread "initP2P" $ do
   liftIO $ blockappsInit "strato_p2p"
-  liftIO $ runInstrumentation "strato-p2p"
+  liftIO $ runInstrumentation "p2p"
   liftIO $ resetPeers
   _ <- liftIO $ $initHFlags "Strato P2P"
   setParticipationMode flags_participationMode

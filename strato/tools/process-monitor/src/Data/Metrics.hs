@@ -4,6 +4,7 @@
 module Data.Metrics where
 
 import Data.Text (Text)
+import qualified Data.Text as T
 import Prometheus
 
 {-# NOINLINE cpuMetric #-}
@@ -32,4 +33,4 @@ createRtsHeapSizeGauge :: Text -> IO Gauge
 createRtsHeapSizeGauge name =
   register
     . gauge
-    $ Info (name <> "_rts_heap_size") (name <> "RTS heap size")
+    $ Info (T.replace "-" "_" name <> "_rts_heap_size") (name <> "RTS heap size")
