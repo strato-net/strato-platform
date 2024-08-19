@@ -483,10 +483,10 @@ processTheMessages env conn messages = do
     outputData conn $ insertHistoryAbstractTable (abstractInserts ins) (historyInserts ins)
 
 --updating the foreign keys from null
-  forM_ insertsByCodeHash $ \ins -> do
-    outputData conn $ updateForeignKeysFromNULLAbstract (abstractInserts ins) -- not historic
-    outputData conn $ updateForeignKeysFromNULLIndex (indexInsert ins)
-    unless ((length (collectionInserts ins) < 1)) $ outputData conn $ updateForeignKeysFromNULLArray (collectionInserts ins)
+  outputDataDedup conn . forM_ insertsByCodeHash $ \ins -> do
+    updateForeignKeysFromNULLAbstract (abstractInserts ins) -- not historic
+    updateForeignKeysFromNULLIndex (indexInsert ins)
+    unless ((length (collectionInserts ins) < 1)) $ updateForeignKeysFromNULLArray (collectionInserts ins)
 
   forM_ concatFkeys $ \deferredForeignKey -> do
     outputData conn $ createForeignIndexesForJoins deferredForeignKey
