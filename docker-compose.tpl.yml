@@ -156,6 +156,7 @@ services:
     - generateKey=${generateKey:-true}
     - genesis=${genesis}
     - idServerUrl=${idServerUrl}
+    - INSTRUMENTATION=${INSTRUMENTATION:-false}
     - kafkaHost=kafka
     - kafkaPort=9092
     - lazyBlocks=${lazyBlocks}
@@ -165,6 +166,7 @@ services:
     - minBlockDifficulty=${minBlockDifficulty}
     - network=${network}
     - networkID=${networkID}
+    - NOTIFICATION_SERVER_URL=${NOTIFICATION_SERVER_URL}
     - numMinPeers=${numMinPeers}
     - OAUTH_DISCOVERY_URL=${OAUTH_DISCOVERY_URL}
     - OAUTH_CLIENT_ID=${OAUTH_CLIENT_ID}

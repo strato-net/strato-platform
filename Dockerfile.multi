@@ -46,6 +46,7 @@ COPY \
   ./usr/local/bin/init-worker \
   ./usr/local/bin/strato-barometer \
   ./usr/local/bin/modifyDate \ 
+  ./usr/local/bin/process-monitor-exe \
   ./usr/local/bin/slipstream \
   ./usr/local/bin/strato-api \
   ./usr/local/bin/strato-api-indexer \

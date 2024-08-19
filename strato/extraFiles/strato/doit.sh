@@ -155,6 +155,10 @@ function newnode {
     then p2pMinLogLevel=LevelDebug
     fi
 
+    if [ -n "${INSTRUMENTATION}" ]; then
+        iFlag="+RTS -T -RTS"
+    fi
+
     echo "Starting ethereum-discover"
     runBackgroundProcess ethereum-discover  &>> logs/ethereum-discover
 
@@ -169,7 +173,7 @@ function newnode {
        --sqlPeers=true \
        --txGossipFanout=${txGossipFanount:-3} \
        --minLogLevel=$p2pMinLogLevel \
-       ${networkFlag} &>> logs/strato-p2p
+       ${networkFlag} ${iFlag} &>> logs/strato-p2p
 
     echo "Starting strato-sequencer"
     runBackgroundProcess strato-sequencer \
@@ -181,7 +185,7 @@ function newnode {
       --seq_max_events_per_iter=${seqMaxEventsPerIter:-500} \
       --seq_max_us_per_iter=${seqMaxUsPerIter:-50000} \
       --validatorBehavior=${validatorBehavior:-true} \
-      "${networkFlag}" \
+      "${networkFlag}" "${iFlag}" \
       +RTS "${seqRTSOPTs:-}" -N1 &>> logs/strato-sequencer
 
     echo "Starting strato-api-indexer"
@@ -252,6 +256,7 @@ function newnode {
         "${txsFlag}" \
         "${gasFlag}" \
         "${creatorFlag}" \
+        "${iFlag}" \
         +RTS "${vmRunnerRTSOPTs:-}" -I2 -N1 &>> logs/vm-runner
   fi
 
@@ -289,7 +294,8 @@ function newnode {
       --pgport=${postgres_port} \
       --pguser=${postgres_user} \
       --password=${postgres_password} \
-      --stratourl=http://localhost:3000/eth/v1.2"
+      --stratourl=http://localhost:3000/eth/v1.2" \
+      "${iFlag}"
 
       echo "Starting slipstream"
       if [ "${SLIPSTREAM_OPTIONAL}" = true ]; then
@@ -298,6 +304,9 @@ function newnode {
           runBackgroundProcess $SLIPSTREAM_CMD &>> logs/slipstream
       fi
   fi
+
+  echo "Starting process monitoring..."
+  runBackgroundProcess process-monitor-exe &>> logs/process-monitoring
 
   echo "Configuring log rotation..."
   runBackgroundProcess logRotation
