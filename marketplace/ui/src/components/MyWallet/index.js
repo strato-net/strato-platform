@@ -60,6 +60,7 @@ const MyWallet = ({ user }) => {
   const [isLoading, setIsLoading] = useState(true);
   const [isPriceHistoryLoaded, setIsPriceHistoryLoaded] = useState(false);
   const priceHistoryLoadedCount = useRef(0);
+  const naviroute = routes.MyWalletDetail.url;
 
   const { strats } = useMarketplaceState();
   const stratsBalance = Object.keys(strats).length > 0 ? strats : 0;
@@ -291,11 +292,11 @@ const MyWallet = ({ user }) => {
         const callDetailPage = () => {
           if (record.key !== "1" && record.address) {
             navigate(
-              `${routes.InventoryDetail.url
+              `${naviroute
                 .replace(":id", record.address)
-                .replace(":name", encodeURIComponent(text))}`,
+                .replace(":name", encodeURIComponent(record.asset))}`,
               {
-                state: { isCalledFromInventory: true },
+                state: { isCalledFromWallet: true },
               }
             );
           }
