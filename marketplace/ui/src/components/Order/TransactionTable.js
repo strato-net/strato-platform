@@ -121,7 +121,7 @@ const TransactionTable = ({ user, selectedDate, onDateChange, download, isAllOrd
           </Col>
           <Col span={8} offset={1}>
             <p className="text-base font-bold">{data?.assetName.length > 28 ? `${data?.assetName.slice(0, 28)}..` : data?.assetName}</p>
-            <p style={{ color: '#827474' }} className="font-medium"><Tooltip placement="topRight" title={"description"}> {data?.assetDescription.length > 28 ? `${data.assetDescription.replace(/<\/?[^>]+(>|$)/g, "")?.slice(0, 28)}...` : data?.assetDescription.replace(/<\/?[^>]+(>|$)/g, "")} </Tooltip></p>
+            <p style={{ color: '#827474' }} className="font-medium"><Tooltip placement="top" title={data.assetDescription.replace(/<\/?[^>]+(>|$)/g, "")}> {data?.assetDescription.length > 28 ? `${data.assetDescription.replace(/<\/?[^>]+(>|$)/g, "")?.slice(0, 28)}...` : data?.assetDescription.replace(/<\/?[^>]+(>|$)/g, "")} </Tooltip></p>
           </Col>
           <Col span={8} offset={1}>
            {price 
@@ -232,7 +232,7 @@ const TransactionTable = ({ user, selectedDate, onDateChange, download, isAllOrd
       key: "hash",
       align: "left",
       width: '150px',
-      render: (data, { redemptionService, address }) => <Tooltip placement="topRight" title={address}>
+      render: (data, { redemptionService, address }) => <Tooltip placement="top" title={address}>
         <p className="text-[#13188A] hover:text-primaryHover cursor-pointer " >{`# ${(redemptionService || address)?.slice(0, 10)}..`}</p>
       </Tooltip>
     },
@@ -282,13 +282,13 @@ const TransactionTable = ({ user, selectedDate, onDateChange, download, isAllOrd
       <Col span={22} className="mx-auto">
         <div className="flex items-center justify-between">
           <h2 className="hidden md:block"> My Transactions </h2>
-          <div className="flex gap-2 items-center mb-5 mt-4">
+          <div className="w-full md:w-auto  flex gap-2 justify-between md:justify-end items-center mb-5 mt-4">
             <Select className="block lg:block w-44 md:w-80 rounded-md" onChange={(val) => { handleFilter(val) }} placeholder="Select Type" defaultValue={type || ''}>
               {TRANSACTION_FILTER.map(({ label, value }) =>
                 <Select.Option value={value}> {label} </Select.Option>
               )}
             </Select>
-            <Input className="text-base orders_searchbar md:p-3 mr-3 rounded-full bg-[#F6F6F6]"
+            <Input className="text-base max-w-[400px] orders_searchbar md:p-3 mr-3 rounded-full bg-[#F6F6F6]"
               key={searchVal}
               onChange={(e) => { handleChangeSearch(e) }}
               defaultValue={searchVal}
@@ -312,7 +312,7 @@ const TransactionTable = ({ user, selectedDate, onDateChange, download, isAllOrd
           <TransactionResponsive data={transactions} />
         </div>
         <div className="hidden md:block">
-          < DataTableComponent
+          <DataTableComponent
             columns={column}
             data={transactions}
             isLoading={isTransactionLoading}
