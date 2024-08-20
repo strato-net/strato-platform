@@ -1,8 +1,10 @@
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE TypeOperators #-}
 
+{-# OPTIONS -fno-warn-unused-top-binds #-}
+
 module Blockchain.Sequencer.Kafka
-  ( assertTopicCreation,
+  ( assertSequencerTopicsCreation,
     unseqEventsTopicName,
     seqVmEventsTopicName,
     seqP2pEventsTopicName,
@@ -39,11 +41,11 @@ seqVmEventsTopicName = lookupTopic "seq_vm_events"
 seqP2pEventsTopicName :: TopicName
 seqP2pEventsTopicName = lookupTopic "seq_p2p_events"
 
-assertTopicCreation :: K.Kafka k => k ()
-assertTopicCreation = do
-  K.updateMetadata unseqEventsTopicName
-  K.updateMetadata seqVmEventsTopicName
-  K.updateMetadata seqP2pEventsTopicName
+assertSequencerTopicsCreation :: HasKafka m => m ()
+assertSequencerTopicsCreation = do
+  assertTopicCreation unseqEventsTopicName
+  assertTopicCreation seqVmEventsTopicName
+  assertTopicCreation seqP2pEventsTopicName
 
 readUnseqEvents :: HasKafka k => KP.Offset -> k [IngestEvent]
 readUnseqEvents off = do

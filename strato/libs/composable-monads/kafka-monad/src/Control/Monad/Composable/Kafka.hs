@@ -35,7 +35,8 @@ module Control.Monad.Composable.Kafka (
   unpackMetadata,
   conduitSource,
   conduitSourceUsingEnv,
-  createKafkaEnv
+  createKafkaEnv,
+  assertTopicCreation
   ) where
 
 import BlockApps.Logging
@@ -226,3 +227,7 @@ conduitSourceUsingEnv name env topicName = do
       $logInfoS name . T.pack $ "Fetched " ++ show (length items) ++ " events starting from " ++ show offset
       forM_ items yield
       return $ offset + fromIntegral (length items)
+
+assertTopicCreation :: HasKafka m => TopicName -> m ()
+assertTopicCreation theTopic = execKafka $ updateMetadata theTopic
+

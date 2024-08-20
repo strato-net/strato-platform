@@ -19,7 +19,7 @@ module Blockchain.Sequencer.Gregor
   ( GregorConfig (..),
     runTheGregor,
     runGregorM,
-    assertTopicCreation,
+    assertSequencerTopicsCreation,
     initializeCheckpoint,
     updateMetadata_locked
   )
@@ -107,8 +107,8 @@ readUnseqEvents' = do
   P.unsafeAddCounter gregorUnseqRead $ fromIntegral count
   return (offset + fromIntegral count, ret)
 
-assertTopicCreation :: HasKafka m => m ()
-assertTopicCreation = void $ execKafka SK.assertTopicCreation
+assertSequencerTopicsCreation :: HasKafka m => m ()
+assertSequencerTopicsCreation = void $ SK.assertSequencerTopicsCreation
 
 getNextIngestedOffset :: (MonadLogger m, HasKafka m, HasGregorContext m) =>
                          m Kafka.Offset

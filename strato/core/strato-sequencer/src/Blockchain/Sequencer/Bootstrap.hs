@@ -98,7 +98,7 @@ bootstrapSequencer
       initKafka :: CablePackage -> IO ()
       initKafka _ = do
         runKafkaMConfigured (KString $ C8.pack defaultKafkaClientId') $ do
-          assertTopicCreation
+          assertSequencerTopicsCreation
           _ <- writeSeqVmEvents [VmBlock shortCircuit] -- todo handle the error :)
           _ <- writeSeqP2pEvents [P2pBlock shortCircuit] -- todo handle the error :)
           return ()

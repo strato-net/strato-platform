@@ -17,7 +17,6 @@ import Blockchain.Sequencer.Kafka
 import Blockchain.Strato.Model.Keccak256
 import Blockchain.Strato.Model.MicroTime (getCurrentMicrotime)
 import Blockchain.TypeLits
-import Control.Monad.Composable.Kafka
 import Data.Aeson
 import qualified Data.ByteString.Char8 as C8
 import qualified Data.ByteString.Lazy.Char8 as BLC
@@ -29,7 +28,7 @@ insertSeq :: IngestEvent -> IO ()
 insertSeq iev = do
   printf "Inserting %s into unseqevents...\n" $ show iev
   resps <- runKafkaMConfigured "queryStrato" $ do
-    execKafka assertTopicCreation
+    assertSequencerTopicsCreation
     writeUnseqEvents [iev]
   mapM_ print resps
 
@@ -69,7 +68,7 @@ addBlocksFromFile fileName = do
       let bs = map bPrimeToB b
       printf "Inserting %d blocks into unseq_events...\n" (length bs)
       resps <- runKafkaMConfigured "queryStrato" $ do
-        execKafka assertTopicCreation
+        assertSequencerTopicsCreation
         writeUnseqEvents $
           map
             ( \(Block bd txs us) ->
@@ -86,7 +85,7 @@ addGenesisFromFile fileName = do
     Right bs -> do
       printf "Inserting %d chain infos into unseq_events...\n" (length bs)
       resps <- runKafkaMConfigured "queryStrato" $ do
-        execKafka assertTopicCreation
+        assertSequencerTopicsCreation
         writeUnseqEvents $
           map ((IEGenesis . IngestGenesis (TXO.PeerString "")) . unNamedTuple @"id" @"info") bs
       mapM_ print resps
@@ -101,7 +100,7 @@ addTxsFromFile fileName = do
       printf "Inserting %d transactions into unseq_events...\n" (length bs)
       t <- getCurrentMicrotime
       resps <- runKafkaMConfigured "queryStrato" $ do
-        execKafka assertTopicCreation
+        assertSequencerTopicsCreation
         writeUnseqEvents $
           map (IETx t . IngestTx (TXO.PeerString "")) bs
       mapM_ print resps

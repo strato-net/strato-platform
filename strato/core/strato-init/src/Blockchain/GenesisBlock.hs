@@ -60,7 +60,7 @@ import qualified Blockchain.Strato.RedisBlockDB as RBDB
 import Blockchain.Strato.StateDiff hiding (StateDiff (blockHash, chainId, stateRoot))
 import qualified Blockchain.Strato.StateDiff as StateDiff (StateDiff (blockHash, chainId, stateRoot))
 import Blockchain.Strato.StateDiff.Database
-import Blockchain.Strato.StateDiff.Kafka (assertTopicCreation)
+import Blockchain.Strato.StateDiff.Kafka (assertStateDiffTopicCreation)
 import qualified Blockchain.Stream.Action as A
 import Blockchain.Stream.VMEvent
 import Control.Monad
@@ -220,12 +220,8 @@ populateStorageDBs ::
   m ()
 populateStorageDBs getMetadata genesisBlock genesisChainId = do
   sr <- getStateRoot genesisChainId
-  res <- liftIO . runKafkaConfigured "strato-init" $ do
-    assertTopicCreation
-
-  case res of
-    Right () -> return ()
-    Left err -> error . show $ err
+  liftIO . runKafkaMConfigured "strato-init" $ do
+    assertStateDiffTopicCreation
 
   MP.forEach sr $ \keyHash value -> do
     address <- fmap (fromMaybe (error $ "missing key value in hash table: " ++ C8.unpack (B16.encode $ nibbleString2ByteString keyHash))) $ getAddressFromHash keyHash

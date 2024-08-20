@@ -22,7 +22,6 @@ import Control.Monad.Composable.SQL
 import Data.IORef
 import Data.String
 import Database.PostgreSQL.Typed
-import qualified Network.Kafka as K
 import Slipstream.Data.Action (AggregateEvent)
 import Slipstream.Globals
 import Slipstream.Metrics
@@ -39,7 +38,7 @@ getAndProcessMessages ::
   PGConnection ->
   m ()
 getAndProcessMessages env conn = do
-  _ <- execKafka assertTopicCreation
+  _ <- assertTopicCreation solidVmEventsTopicName
 
   consume "getAndProcessMessages'" "slipstream" "vmevents" $ \() messages -> do
     recordKafkaMessages messages
@@ -52,9 +51,6 @@ getAndProcessMessages env conn = do
 ------ solidvmevents indexer code here ------
 solidVmEventsTopicName :: TopicName
 solidVmEventsTopicName = fromString "solidvmevents"
-
-assertTopicCreation :: K.Kafka k => k ()
-assertTopicCreation = K.updateMetadata solidVmEventsTopicName
 
 produceSolidVmEvents :: MonadIO m =>
                         [AggregateEvent] -> m [ProduceResponse]
