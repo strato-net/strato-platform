@@ -1,13 +1,14 @@
 const WebSocket = require("ws");
 const { getUserToken } = require("./auth");
 const { handleMessage } = require("./events/handleMessage");
-const { NODE, prodMarketplaceUrl, testnetMarketplaceUrl } = require("./config");
+const { NODE_ENV, prodMarketplaceUrl, testnetMarketplaceUrl } = require("./config");
 const { filterMessages } = require("./helper/eventFilter");
 
 // Function to establish WebSocket connection
 async function connectWebSocket() {
   let token = await getUserToken();
-  const wsUrl = NODE === "prod" ? prodMarketplaceUrl : testnetMarketplaceUrl;
+
+  const wsUrl = NODE_ENV === "prod" ? prodMarketplaceUrl : testnetMarketplaceUrl;
 
   // Initialize WebSocket connection with authorization header
   const ws = new WebSocket(`wss://${wsUrl}/eventstream`, {
@@ -35,6 +36,7 @@ async function connectWebSocket() {
     const pingInterval = setInterval(async () => {
       try {
         ws.send("ping");
+        token = await getUserToken();
       } catch (error) {
         console.error("Error sending ping:", error);
       }

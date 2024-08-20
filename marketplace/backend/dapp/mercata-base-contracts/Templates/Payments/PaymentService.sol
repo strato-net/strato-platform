@@ -90,7 +90,7 @@ abstract contract PaymentService is Utils {
         string err = "Only the owner can "
                    + action
                    + ".";
-        require(getCommonName(msg.sender) == ownerCommonName, err);
+        require(msg.sender == owner || getCommonName(msg.sender) == ownerCommonName, err);
         _;
     }
 
@@ -158,7 +158,7 @@ abstract contract PaymentService is Utils {
     function offboardSeller(
         string _sellersCommonName
     ) requireOwner("offboard sellers") public returns (uint) {
-        emit SellerOnboard(_sellersCommonName, false);
+        emit SellerOnboarded(_sellersCommonName, false, ownerCommonName, serviceName);
         return RestStatus.OK;
     }
 

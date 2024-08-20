@@ -5,6 +5,7 @@ async function filterMessages(msg) {
     return false;
   }
   const event = JSON.parse(msg);
+  console.log("Received event:", event?.eventEvent?.eventName);
   const allowedEvents = ["CertificateRegistered", "Order"];
   return allowedEvents.includes(event?.eventEvent?.eventName);
 }

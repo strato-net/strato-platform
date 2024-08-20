@@ -1,6 +1,6 @@
-const { createTransactionPayload } = require("../helper/transferSTRATS");
+const { createTwoTransactionPayload } = require("../helper/transferSTRATS");
 const {
-  NODE,
+  NODE_ENV,
   prodMarketplaceUrl,
   testnetMarketplaceUrl,
 } = require("../config");
@@ -27,7 +27,7 @@ async function handleOrderRewards(event, token) {
   // Check if the purchaser has made a first order before
   const checkFirstPurchase = await fetch(
     `https://${
-      NODE === "prod" ? prodMarketplaceUrl : testnetMarketplaceUrl
+      NODE_ENV === "prod" ? prodMarketplaceUrl : testnetMarketplaceUrl
     }/cirrus/search/BlockApps-Mercata-PaymentService.Order?purchaser=eq.${purchaser}&status=eq.3&select=count`,
     {
       method: "GET",
@@ -44,7 +44,7 @@ async function handleOrderRewards(event, token) {
 
   let eventKey = "RegularOrder";
 
-  if (queryBody[0].count === 0) {
+  if (queryBody[0].count === 1) {
     console.log("User's first order");
     eventKey = "FirstOrder";
   }
@@ -93,61 +93,41 @@ async function handleOrderRewards(event, token) {
   buyerReward = Math.round(buyerReward);
   sellerReward = Math.round(sellerReward);
 
-  handlePurchaserReward(purchaser, buyerReward, token)
-  handleSellerReward(seller, sellerReward, token)
-
+  await handleOrderReward(seller, sellerReward, purchaser, buyerReward, token, eventKey)
 }
 
-async function handlePurchaserReward(purchaser, reward, token) {
+async function handleOrderReward(seller, sellerReward, purchaser, buyerReward, token, eventKey) {
   try {
-    const purchaserResponse = await createTransactionPayload(
-      token,
-      purchaser,
-      reward
-    );
-    if (!purchaserResponse.ok) {
-      const errorText = await purchaserResponse.text();
+    console.log(`Sending ${eventKey} reward to , ${purchaser}, ${buyerReward/100}STRATS`);
+    console.log(`Sending sale reward to , ${seller}, ${sellerReward/100}STRATS`);
+   
+    const transactionResponse =  await createTwoTransactionPayload(token, purchaser, seller, buyerReward, sellerReward);
+    
+    if (!transactionResponse.ok) {
+      const errorText = await transactionResponse.text();
       console.error(
-        `Error: ${purchaserResponse.status} ${purchaserResponse.statusText}`
+        `Error: ${transactionResponse.status} ${transactionResponse.statusText}`
       );
       console.error(`Response body: ${errorText}`);
       throw new Error(
-        `Purchaser transaction failed with status ${purchaserResponse.status}: ${purchaserResponse.statusText}`
+        `Transaction failed with status ${transactionResponse.status}: ${transactionResponse.statusText}`
       );
     }
 
-    const response = await purchaserResponse.json();
+    const response = await transactionResponse.json();
+    const allSuccessful = response.every(tx => tx.status === 'Success');
+    if (allSuccessful) {
+      console.log("All reward transactions were successful:", response);
+    } else {
+      console.log("Some reward transactions were not successful:", response);
+    }
     return response;
   } catch (error) {
-    console.error("Error processing purchaser transaction:", error.message);
+    console.log(`Failed to send ${eventKey} reward to ${purchaser}, ${reward/100}STRATS`);
+    console.log(`Failed to send sale reward to ${seller}, ${reward/100}STRATS`);
+    console.error("Error processing transaction:", error.message);
     throw error;
   }
-}
-
-async function handleSellerReward(seller, reward, token) {
-    try {
-      const sellerResponse = await createTransactionPayload(
-        token,
-        seller,
-        reward
-      );
-      if (!sellerResponse.ok) {
-        const errorText = await sellerResponse.text();
-        console.error(
-          `Error: ${sellerResponse.status} ${sellerResponse.statusText}`
-        );
-        console.error(`Response body: ${errorText}`);
-        throw new Error(
-          `Seller transaction failed with status ${sellerResponse.status}: ${sellerResponse.statusText}`
-        );
-      }
-  
-      const response = await sellerResponse.json();
-      return response
-    } catch (error) {
-      console.error("Error processing seller transaction:", error.message);
-      throw error; 
-    }
 }
 
 module.exports = { handleOrderRewards };

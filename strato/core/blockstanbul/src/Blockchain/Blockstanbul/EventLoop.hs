@@ -561,6 +561,9 @@ validatorTimingHackMercata = \case
   8325 -> modify' $ validators %~ S.insert "service-account-io-stratomercata-itaugmentation"
   8575 -> modify' $ validators %~ S.insert "service-account-io-stratomercata-vinfra"
   8576 -> modify' $ validators %~ S.insert "service-account-io-stratomercata-bible"
+  8743 -> modify' $ validators %~ S.insert "jamrose.stratomercata.io"
+  8914 -> modify' $ validators %~ S.insert "service-account-io-stratomercata-dttr1"
+  8921 -> modify' $ validators %~ S.insert "service-account-io-stratomercata-dttr2"
   _ -> return ()
   
 

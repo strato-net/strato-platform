@@ -1,6 +1,6 @@
 const { createTransactionPayload } = require("../helper/transferSTRATS");
 const {
-  NODE,
+  NODE_ENV,
   prodMarketplaceUrl,
   testnetMarketplaceUrl,
 } = require("../config");
@@ -24,7 +24,7 @@ async function handleCertificateRegistered(event, token) {
     // Fetch certificates based on transaction hash
     const queryResponse = await fetch(
       `https://${
-        NODE === "prod" ? prodMarketplaceUrl : testnetMarketplaceUrl
+        NODE_ENV === "prod" ? prodMarketplaceUrl : testnetMarketplaceUrl
       }/cirrus/search/Certificate?transaction_hash=eq.${eventTxHash}`,
       {
         method: "GET",
@@ -84,7 +84,7 @@ async function handleCertificateRegistered(event, token) {
     }
 
     const body = await response.json();
-    console.log("Transfer STRATS response:", body);
+    console.log("New registration reward successful:", body);
   } catch (error) {
     console.error("Error handling CertificateRegistered event:", error);
   }
