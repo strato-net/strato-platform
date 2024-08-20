@@ -475,7 +475,25 @@ const MyWallet = ({ user }) => {
               alt={item.asset}
               className="w-12 h-12 object-contain mr-2"
             />
-            <p className="text-sm font-semibold">{item.asset}</p>
+            {item.key !== "1" && item.address ? (
+              <p
+                className="text-sm font-semibold text-[#13188A] hover:underline cursor-pointer"
+                onClick={() =>
+                  navigate(
+                    `${routes.MyWalletDetail.url
+                      .replace(":id", item.address)
+                      .replace(":name", encodeURIComponent(item.asset))}`,
+                    {
+                      state: { isCalledFromWallet: true },
+                    }
+                  )
+                }
+              >
+                {item.asset}
+              </p>
+            ) : (
+              <p className="text-sm font-semibold">{item.asset}</p>
+            )}
           </div>
           <div className="col-span-1 text-right">
             <p className="text-sm font-bold">{item.value}</p>
@@ -559,72 +577,46 @@ const MyWallet = ({ user }) => {
   const renderDesktopView = () => (
     <>
       <div
-        className="w-full h-[200px] py-4 px-4 md:h-[250px] bg-[#ADA0E2] bg-opacity-20 flex flex-col justify-between mt-0 lg:-mt-8"
+        className="w-full h-[150px] py-4 bg-[#ADA0E2] bg-opacity-20 flex flex-col justify-between mt-0 lg:-mt-8"
         style={{ borderColor: "#13188A" }}
       >
-        <Breadcrumb className="mx-5 md:mx-14 mt-2 lg:mt-4">
-          <Breadcrumb.Item href="" onClick={(e) => e.preventDefault()}>
-            <ClickableCell href={routes.Marketplace.url}>
-              <p className="text-sm text-[#13188A] font-semibold">Home</p>
-            </ClickableCell>
-          </Breadcrumb.Item>
-          <Breadcrumb.Item>
-            <p className="text-sm text-[#202020] font-medium">My Wallet</p>
-          </Breadcrumb.Item>
-        </Breadcrumb>
+        <div className="mx-5 md:mx-14">
+          <Breadcrumb className="mt-2 lg:mt-4">
+            <Breadcrumb.Item href="" onClick={(e) => e.preventDefault()}>
+              <ClickableCell href={routes.Marketplace.url}>
+                <p className="text-sm text-[#13188A] font-semibold">Home</p>
+              </ClickableCell>
+            </Breadcrumb.Item>
+            <Breadcrumb.Item>
+              <p className="text-sm text-[#202020] font-medium">My Wallet</p>
+            </Breadcrumb.Item>
+          </Breadcrumb>
 
-        <div className="flex flex-col sm:flex-row items-center sm:items-start w-full sm:px-5 md:px-14 mt-4 mb-8">
-          <div className="flex flex-col items-center gap-3">
-            <Avatar
-              size={50}
-              style={{
-                backgroundColor: "#373B9C",
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-              }}
-            >
-              <span style={{ fontSize: "24px", fontWeight: "bold" }}>
-                {userLetter}
-              </span>
-            </Avatar>
-            <Text
-              style={{
-                fontSize: "16px",
-                color: "#373B9C",
-                fontWeight: "600",
-                textAlign: "center",
-              }}
-              className="mt-2"
-            >
-              {userName}
-            </Text>
-          </div>
-          <div className="flex flex-col items-center sm:items-start ml-0 sm:ml-10 mt-4 sm:mt-0">
+          <div className="mt-4">
             <Title style={{ color: "#373B9C", marginBottom: "0" }} level={5}>
               Balance:
             </Title>
-            <Text
-              style={{
-                fontSize: "24px",
-                color: "#373B9C",
-                fontWeight: "bold",
-                marginBottom: "0",
-                marginTop: "7px",
-              }}
-              className="mt-1"
-            >
-              ${totalBalance}
-            </Text>
-            <div className="flex items-center mt-1">
-              <img
-                src={Images.logo}
-                alt="Small"
-                style={{ width: "12px", height: "12px", marginRight: "5px" }}
-              />
-              <Text style={{ fontSize: "14px", color: "#747474" }}>
-                {stratsBalance}
+            <div className="flex items-center">
+              <Text
+                style={{
+                  fontSize: "24px",
+                  color: "#373B9C",
+                  fontWeight: "bold",
+                  marginRight: "10px",
+                }}
+              >
+                ${totalBalance}
               </Text>
+              <div className="flex items-center">
+                <img
+                  src={Images.logo}
+                  alt="STRATS"
+                  style={{ width: "12px", height: "12px", marginRight: "5px" }}
+                />
+                <Text style={{ fontSize: "14px", color: "#747474" }}>
+                  {Number(stratsBalance).toFixed(2)}
+                </Text>
+              </div>
             </div>
           </div>
         </div>
