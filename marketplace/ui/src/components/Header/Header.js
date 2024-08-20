@@ -387,17 +387,17 @@ const HeaderComponent = ({
             xs={20}
             md={10}
             lg={4}
-            className="mt-4 mr-5 md:mt-0 cursor-pointer flex-grow-0 w-max md:w-[170px] h-[44px] logo"
+            className="mt-2 mr-5 md:mt-0 cursor-pointer flex-grow-0 w-max md:w-[170px] h-[44px] logo"
             onClick={() => {
               navigate(routes.Marketplace.url);
               window.scrollTo(0, 0);
             }}
           >
             <img
-              src={Images.newLogo}
+              src={Images.marketplaceLogo}
               alt={IMG_META}
               title={IMG_META}
-              className="h-[31px] w-[120px] md:w-[120px] lg:w-[150px] md:h-[44px] logo-image"
+              className="h-[40px] w-[150px] md:w-[170px] md:h-[44px] object-contain logo-image"
               preview={false}
             />
           </Col>

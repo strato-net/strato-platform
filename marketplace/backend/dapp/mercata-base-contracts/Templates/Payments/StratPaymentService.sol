@@ -42,7 +42,8 @@ contract StratPaymentService is PaymentService {
         decimal totalAmountGross = 0.0;
         decimal totalAmountNet = 0.0;
         decimal totalFee = 0.0;
-        string seller;
+        string sellerCommonName;
+        address sellerAddress;
         string err = "Your STRATS balance is not high enough to cover the purchase.";
         string feeErr = "Your STRATS balance is not high enough to cover the fee.";
         purchasersAddress = msg.sender; // Support for legacy sales
@@ -52,8 +53,8 @@ contract StratPaymentService is PaymentService {
             Sale s = Sale(_saleAddresses[i]);
             Asset a = s.assetToBeSold();
             assets.push(address(a));
-            address sellerAddress = a.owner();
-            seller = getCommonName(sellerAddress);
+            sellerAddress = a.owner();
+            sellerCommonName = getCommonName(sellerAddress);
             uint quantity = _quantities[i];
 
             // Lock assets
@@ -119,7 +120,8 @@ contract StratPaymentService is PaymentService {
             _checkoutId,
             _purchaser,
             _purchasersCommonName,
-            seller,
+            sellerCommonName,
+            sellerAddress,
             _saleAddresses,
             _quantities,
             totalAmountGross,

@@ -101,7 +101,8 @@ constructor (
         decimal totalAmountGross = 0.0;
         decimal totalAmountNet = 0.0;
         decimal totalFee = 0.0;
-        string seller;
+        string sellerCommonName;
+        address sellerAddress;
         string err = "Your " + serviceName + " balance is not high enough to cover the purchase.";
         string feeErr = "Your " + serviceName + " balance is not high enough to cover the fee.";
         purchasersAddress = msg.sender; // Support for legacy sales
@@ -111,7 +112,8 @@ constructor (
             Sale s = Sale(_saleAddresses[i]);
             Asset a = s.assetToBeSold();
             assets.push(address(a));
-            seller = getCommonName(a.owner());
+            sellerCommonName = getCommonName(a.owner());
+            sellerAddress = a.owner();
             uint quantity = _quantities[i];
 
             // Lock assets
@@ -144,7 +146,7 @@ constructor (
                 _checkoutId,
                 _purchaser,
                 _purchasersCommonName,
-                seller,
+                sellerCommonName,
                 _saleAddresses,
                 _quantities,
                 totalAmountGross
@@ -176,7 +178,8 @@ constructor (
             _checkoutId,
             _purchaser,
             _purchasersCommonName,
-            seller,
+            sellerCommonName,
+            sellerAddress,
             _saleAddresses,
             _quantities,
             totalAmountGross,

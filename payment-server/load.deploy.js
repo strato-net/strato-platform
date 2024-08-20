@@ -12,7 +12,7 @@ if (!deploy) {
     deploy = {
       contracts: {
         stripe: {},
-        metamask: {},
+        // metamask: {}, // TODO: Disabled for initial payment server release
         redemption: {}
       }
     }

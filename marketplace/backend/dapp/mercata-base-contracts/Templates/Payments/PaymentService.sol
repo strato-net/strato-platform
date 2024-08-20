@@ -21,7 +21,9 @@ abstract contract PaymentService is Utils {
 
     event SellerOnboarded (
         string sellersCommonName,
-        bool isActive
+        bool isActive,
+        string ownerCommonName,
+        string serviceName
     );
 
     enum PaymentStatus { NULL, AWAITING_FULFILLMENT, PAYMENT_PENDING, CLOSED, CANCELED }
@@ -44,6 +46,7 @@ abstract contract PaymentService is Utils {
         address purchaser,            // Purchaser address on the blockchain for ownershipTransfer
         string purchasersCommonName,  // Purchaser common name for lookup purposes
         string sellersCommonName,     // Seller common name for lookup purposes
+        address sellerAddress,        // Seller address on the blockchain for ownershipTransfer. Asset Owner
         address[] saleAddresses,      // List of the sale contracts for the assets in the order
         uint[] quantities,            // List of quantities for each asset being bought
         decimal amount,               // Total price of the order
@@ -87,7 +90,7 @@ abstract contract PaymentService is Utils {
         string err = "Only the owner can "
                    + action
                    + ".";
-        require(getCommonName(msg.sender) == ownerCommonName, err);
+        require(msg.sender == owner || getCommonName(msg.sender) == ownerCommonName, err);
         _;
     }
 
@@ -148,14 +151,14 @@ abstract contract PaymentService is Utils {
         string _sellersCommonName,
         bool _isActive
     ) requireOwner("onboard sellers") public returns (uint) {
-        emit SellerOnboarded(_sellersCommonName, _isActive);
+        emit SellerOnboarded(_sellersCommonName, _isActive, ownerCommonName, serviceName);
         return RestStatus.OK;
     }
 
     function offboardSeller(
         string _sellersCommonName
     ) requireOwner("offboard sellers") public returns (uint) {
-        emit SellerOnboard(_sellersCommonName, false);
+        emit SellerOnboarded(_sellersCommonName, false, ownerCommonName, serviceName);
         return RestStatus.OK;
     }
 
@@ -263,12 +266,14 @@ abstract contract PaymentService is Utils {
     ) internal virtual returns (address[]){
         decimal totalAmount = 0;
         address[] assets;
-        string seller;
+        string sellerCommonName;
+        address sellerAddress;
         for (uint i = 0; i < _saleAddresses.length; i++) {
             Sale s = Sale(_saleAddresses[i]);
             Asset a = s.assetToBeSold();
             assets.push(address(a));
-            seller = getCommonName(a.owner());
+            sellerCommonName = getCommonName(a.owner());
+            sellerAddress = a.owner();
             totalAmount += s.price() * decimal(_quantities[i]);
         }
         emit Order(
@@ -276,7 +281,8 @@ abstract contract PaymentService is Utils {
             _orderId,
             _purchaser,
             _purchasersCommonName,
-            seller,
+            sellerCommonName,
+            sellerAddress,
             _saleAddresses,
             _quantities,
             totalAmount,
@@ -331,13 +337,15 @@ abstract contract PaymentService is Utils {
     ) internal virtual returns (address[]) {
         decimal totalAmount = 0;
         address[] assets;
-        string seller;
+        string sellerCommonName;
+        address sellerAddress;
         decimal totalFee = 0.0;
         for (uint i = 0; i < _saleAddresses.length; i++) {
             Sale s = Sale(_saleAddresses[i]);
             Asset a = s.assetToBeSold();
             assets.push(address(a));
-            seller = getCommonName(a.owner());
+            sellerCommonName = getCommonName(a.owner());
+            sellerAddress = a.owner();
             decimal saleAmount = s.price() * _quantities[i];
             totalAmount += saleAmount;
             if (address(a) == address(a.root)) {
@@ -360,7 +368,8 @@ abstract contract PaymentService is Utils {
             _orderId,
             _purchaser,
             _purchasersCommonName,
-            seller,
+            sellerCommonName,
+            sellerAddress,
             _saleAddresses,
             _quantities,
             totalAmount,
@@ -462,14 +471,16 @@ abstract contract PaymentService is Utils {
         string _comments
     ) internal virtual {
         decimal totalAmount = 0;
-        string seller;
+        string sellerCommonName;
+        address sellerAddress;
         address[] assets;
         for (uint i = 0; i < _saleAddresses.length; i++) {
             Sale s = Sale(_saleAddresses[i]);
             totalAmount += s.price() * _quantities[i];
             Asset a = s.assetToBeSold();
             assets.push(address(a));
-            seller = getCommonName(a.owner());
+            sellerCommonName = getCommonName(a.owner());
+            sellerAddress = a.owner();
             try {
                 s.unlockQuantity(_orderHash, _purchaser);
             } catch { // Support for legacy sales
@@ -485,7 +496,8 @@ abstract contract PaymentService is Utils {
             _orderId,
             _purchaser,
             _purchasersCommonName,
-            seller,
+            sellerCommonName,
+            sellerAddress,
             _saleAddresses,
             _quantities,
             totalAmount,

@@ -79,7 +79,7 @@ createInsertsCollection :: OutputM m
 createInsertsCollection globalsIORef collections = do
   unless (null collections) $ do
     let collection = head collections
-    _ <- createCollectionTable globalsIORef (creator collection, application collection, contractname collection) (collectionname collection)
+    _ <- createMappingTable globalsIORef (creator collection, application collection, contractname collection) (collectionname collection)
     insertCollectionTable collections
 
 createInsertsAbstract :: OutputM m
@@ -153,6 +153,7 @@ spec = do
                   { SE.address = testAdd,
                     SE.codehash = SolidVMCode "Vehicle" $ hash "<CODEHASH>",
                     SE.creator = "",
+                    SE.cc_creator = Nothing,
                     SE.root = "",
                     SE.application = "",
                     SE.contractName = "Vehicle",
@@ -225,6 +226,7 @@ spec = do
                   { SE.address = testAdd,
                     SE.codehash = cHash,
                     SE.creator = "",
+                    SE.cc_creator = Nothing,
                     SE.root = "",
                     SE.application = "",
                     SE.contractName = "Vehicle2",
@@ -333,6 +335,7 @@ spec = do
                   { SE.address = testAdd,
                     SE.codehash = SolidVMCode "\"Vehicle''" $ hash "<CODEHASH>",
                     SE.creator = "",
+                    SE.cc_creator = Nothing,
                     SE.root = "",
                     SE.application = "",
                     SE.contractName = "\"Vehicle''",
@@ -404,6 +407,7 @@ spec = do
                 { SE.address = testAdd,
                   SE.codehash = SolidVMCode "SwissArmy" $ hash "<CODEHASH>",
                   SE.creator = "MyOrg",
+                  SE.cc_creator =Nothing,
                   SE.root = "",
                   SE.application = "MyApp",
                   SE.contractName = "SwissArmy",
@@ -558,6 +562,7 @@ spec = do
               { SE.address = testAdd,
                 SE.codehash = SolidVMCode "SwissArmy" $ hash "<CODEHASH>",
                 SE.creator = "MyOrg",
+                SE.cc_creator = Nothing,
                 SE.root = "",
                 SE.application = "MyApp",
                 SE.contractName = "SwissArmy",
@@ -616,6 +621,7 @@ spec = do
                 { SE.address = testAdd,
                   SE.codehash = CodeAtAccount (Account (Address 0x1234567890) Nothing) "SwissArmy", -- hash "<CODEHASH>",
                   SE.creator = "",
+                  SE.cc_creator = Nothing,
                   SE.root = "",
                   SE.application = "",
                   SE.contractName = "SwissArmy",
@@ -742,6 +748,7 @@ spec = do
           address = testAdd,
           codehash = CodeAtAccount (Account (Address 0x1234567890) Nothing) "SwissArmy", -- $ hash "<CODEHASH>",
           creator = "creator",
+          cc_creator = Just "cc_creator",
           root = "groot",
           application = "",
           contractname = "SwissArmy",
@@ -775,7 +782,7 @@ spec = do
     value text,
   PRIMARY KEY (address, key));|]
 
-    swissArmyMappingRowInsert `shouldBe` [r|INSERT INTO "creator-SwissArmy-SwissArmyMapping" ("address",
+    swissArmyMappingRowInsert `shouldBe` [r|INSERT INTO "cc_creator-SwissArmy-SwissArmyMapping" ("address",
     "block_hash",
     "block_timestamp",
     "block_number",
@@ -819,6 +826,7 @@ spec = do
           SE.address = testAdd,
           SE.codehash = CodeAtAccount (Account (Address 0x1234567890) Nothing) "SwissArmy", -- $ hash "<CODEHASH>",
           SE.creator = "",
+          SE.cc_creator = Nothing,
           SE.root = "",
           SE.application = "",
           SE.contractName = "SwissArmy",
@@ -838,6 +846,7 @@ spec = do
           SE.address = testAdd,
           SE.codehash = CodeAtAccount (Account (Address 0x1234567890) Nothing) "SwissArmyz", -- $ hash "<CODEHASH>",
           SE.creator = "",
+          SE.cc_creator = Nothing,
           SE.root = "",
           SE.application = "",
           SE.contractName = "SwissArmyz",

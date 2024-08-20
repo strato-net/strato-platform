@@ -379,6 +379,7 @@ initializeChainDBs chainId (ChainInfo UnsignedChainInfo {..} _) crtr app = do
                     (codeHash d)
                     emptyCodeCollection
                     ""
+                    (Nothing)
                     ""
                     ""
                     vm
