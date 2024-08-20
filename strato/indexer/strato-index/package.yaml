@@ -46,6 +46,7 @@ executables:
       - evm-solidity
       - hflags
       - monad-alter
+      - process-monitor
       - redis-monad
       - seqevents
       - sql-monad
@@ -68,6 +69,7 @@ executables:
       - evm-solidity
       - hflags
       - monad-alter
+      - process-monitor
       - redis-monad
       - seqevents
       - strato-conf
@@ -89,6 +91,7 @@ executables:
       - evm-solidity
       - hflags
       - monad-alter
+      - process-monitor
       - redis-monad
       - seqevents
       - sql-monad

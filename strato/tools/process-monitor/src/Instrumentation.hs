@@ -15,19 +15,17 @@ import Data.Text (Text, unpack)
 import GHC.Stats
 import Prometheus
 
-takeRtsSample :: Gauge -> Gauge -> IO ()
-takeRtsSample heapSize liveBytes = do
+takeRtsSample :: Text -> IO ()
+takeRtsSample name = do
   rts <- getRTSStats
-  setGauge heapSize  . fromIntegral . gcdetails_mem_in_use_bytes $ gc rts
-  setGauge liveBytes . fromIntegral . gcdetails_live_bytes       $ gc rts
+  withLabel heapSizeMetric  name (flip setGauge . fromIntegral . gcdetails_mem_in_use_bytes $ gc rts)
+  withLabel liveBytesMetric name (flip setGauge . fromIntegral . gcdetails_live_bytes       $ gc rts)
 
 runInstrumentation :: Text -> IO ()
 runInstrumentation name = do
   enabled <- getRTSStatsEnabled
   when enabled $ do
     putStrLn . unpack $ "Instrumentation for " <> name <> " is enabled"
-    heapSize <- createRtsHeapSizeGauge name
-    liveBytes <- createRtsLiveBytesGauge name
     void . forkIO . forever $ do
       threadDelay 1000000
-      takeRtsSample heapSize liveBytes
+      takeRtsSample name

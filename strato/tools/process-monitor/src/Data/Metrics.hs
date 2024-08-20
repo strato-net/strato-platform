@@ -4,7 +4,6 @@
 module Data.Metrics where
 
 import Data.Text (Text)
-import qualified Data.Text as T
 import Prometheus
 
 {-# NOINLINE cpuMetric #-}
@@ -23,14 +22,16 @@ memMetric =
     . gauge
     $ Info "strato_memory_usage" "Process memory usage"
 
-createRtsLiveBytesGauge :: Text -> IO Gauge
-createRtsLiveBytesGauge name =
-  register
+liveBytesMetric :: Vector Text Gauge
+liveBytesMetric =
+  unsafeRegister
+    . vector "process"
     . gauge
-    $ Info (name <> "_rts_live_bytes") (name <> " RTS live bytes")
+    $ Info "strato_rts_live_bytes" "STRATO RTS live bytes"
 
-createRtsHeapSizeGauge :: Text -> IO Gauge
-createRtsHeapSizeGauge name =
-  register
+heapSizeMetric :: Vector Text Gauge
+heapSizeMetric =
+  unsafeRegister
+    . vector "process"
     . gauge
-    $ Info (T.replace "-" "_" name <> "_rts_heap_size") (name <> "RTS heap size")
+    $ Info "strato_rts_heap_size" "STRATO RTS heap size"

@@ -48,7 +48,7 @@ waitOnVault action = do
 main :: IO ()
 main = do
   blockappsInit "seq_main"
-  runInstrumentation "sequencer"
+  runInstrumentation "strato-sequencer"
   s <- $initHFlags "Block/Txn sequencer for the Haskell EVM"
   validators <- readValidatorsFromGenesisInfo <$> getGenesisInfoFromFile flags_genesisBlockName
   exportFlagsAsMetrics
