@@ -74,10 +74,10 @@ readSeqP2pEventsFromTopic :: HasKafka m => TopicName -> KP.Offset -> m [P2pEvent
 readSeqP2pEventsFromTopic = readFromTopic'
 {-# INLINE readSeqP2pEventsFromTopic #-}
 
-writeUnseqEvents :: K.Kafka k => [IngestEvent] -> k [KP.ProduceResponse]
+writeUnseqEvents :: HasKafka k => [IngestEvent] -> k [KP.ProduceResponse]
 writeUnseqEvents events = do
-  KW.produceMessagesAsSingletonSets $
-    (K.TopicAndMessage unseqEventsTopicName . KW.makeMessage . BL.toStrict . encode) <$> events
+  produceItems unseqEventsTopicName events
+
 
 writeSeqVmEvents :: HasKafka k => [VmEvent] -> k [KP.ProduceResponse]
 writeSeqVmEvents events = do

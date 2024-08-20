@@ -97,7 +97,7 @@ instance ( MonadUnliftIO m
   lookup _ k = lift (A.lookup (A.Proxy @MP.NodeData) k) >>= \case
     Just nd -> pure $ Just nd
     Nothing -> do
-      StateRootMismatchM . void . execKafka $ writeUnseqEvents [IEGetMPNodes [k]]
+      StateRootMismatchM . void $ writeUnseqEvents [IEGetMPNodes [k]]
       fmap (Just . fromMaybe MP.EmptyNodeData) . timeout 10000000 $
         runConsume "StateRootMismatchM/lookup" (lookupConsumerGroup "ethereum-vm") seqVmEventsTopicName $ \_ evs -> do
           let findND (VmMPNodesReceived [nd]) | k == MP.sha2StateRoot (rlpHash nd) = Just nd

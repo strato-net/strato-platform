@@ -229,11 +229,11 @@ sendOutEvent (OutASM asm) =
           | (theAccount, Mem.ASModification asMod) <- M.toList asm
         ]
 sendOutEvent (OutJSONRPC s b) = liftIO $ produceResponse s b
-sendOutEvent (OutBlock o) = void . execKafka $ writeUnseqEvents [IEBlock $ blockToIngestBlock TO.Quarry $ outputBlockToBlock o]
+sendOutEvent (OutBlock o) = void $ writeUnseqEvents [IEBlock $ blockToIngestBlock TO.Quarry $ outputBlockToBlock o]
 sendOutEvent (OutStateRootMismatch _) = pure ()
-sendOutEvent (OutGetMPNodes mpNodes) = void . execKafka $ writeUnseqEvents [IEGetMPNodes mpNodes]
-sendOutEvent (OutMPNodesResponse o nds) = void . execKafka $ writeUnseqEvents [IEMPNodesResponse o nds]
-sendOutEvent (OutPreprepareResponse dec) = void . execKafka $ writeUnseqEvents [IEPreprepareResponse dec]
+sendOutEvent (OutGetMPNodes mpNodes) = void $ writeUnseqEvents [IEGetMPNodes mpNodes]
+sendOutEvent (OutMPNodesResponse o nds) = void $ writeUnseqEvents [IEMPNodesResponse o nds]
+sendOutEvent (OutPreprepareResponse dec) = void $ writeUnseqEvents [IEPreprepareResponse dec]
 
 consumerGroup :: KP.ConsumerGroup
 consumerGroup = lookupConsumerGroup "ethereum-vm"

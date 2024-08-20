@@ -30,10 +30,12 @@ module Control.Monad.Composable.Kafka (
   Metadata(..),
   ConsumerGroup,
   KafkaError(..),
+  ProduceResponse,
   packMetadata,
   unpackMetadata,
   conduitSource,
-  conduitSourceUsingEnv
+  conduitSourceUsingEnv,
+  createKafkaEnv
   ) where
 
 import BlockApps.Logging

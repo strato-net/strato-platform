@@ -38,8 +38,7 @@ main = do
             . ForcedRound
             $ fromIntegral flags_round_number
     print msg
-    resp <- runKafkaMConfigured (KString "forced-config-change") $ do
-      execKafka $ writeUnseqEvents [msg]
+    resp <- runKafkaMConfigured (KString "forced-config-change") $ writeUnseqEvents [msg]
     print resp
   when (flags_sequence_number >= 0) $ do
     let msg =
@@ -47,8 +46,7 @@ main = do
             . ForcedSequence
             $ fromIntegral flags_sequence_number
     print msg
-    resp <- runKafkaConfigured (KString "forced-config-change") $ do
-      writeUnseqEvents [msg]
+    resp <- runKafkaMConfigured (KString "forced-config-change") $ writeUnseqEvents [msg]
     print resp
   if (flags_round_number >= 0 || flags_sequence_number >= 0)
     then exitSuccess

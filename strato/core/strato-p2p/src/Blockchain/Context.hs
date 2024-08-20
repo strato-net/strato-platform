@@ -60,6 +60,7 @@ import           Control.Exception                     hiding (bracket)
 import           Control.Lens                          hiding (Context)
 import qualified Control.Monad.Change.Alter            as A
 import qualified Control.Monad.Change.Modify           as Mod
+import           Control.Monad.Composable.Kafka
 import           Control.Monad.Reader
 import           Crypto.Types.PubKey.ECC
 import qualified Data.ByteString                       as B
@@ -72,6 +73,7 @@ import qualified Data.Map.Strict                       as M
 import           Data.Maybe
 import           Data.Proxy
 import           Data.Ranged
+import           Data.String
 import qualified Data.Text                             as T
 import           Data.Time.Clock
 import           GHC.Exts                              (Constraint)
@@ -107,8 +109,6 @@ import           Control.Monad                         (void, when)
 import           Control.Monad.Composable.Base
 import qualified Database.Persist.Sql                  as SQL
 import qualified Database.Redis                        as Redis
-import qualified Network.Kafka                         as K
-import qualified Blockchain.MilenaTools                as K
 import           Network.HTTP.Client                    (newManager, defaultManagerSettings)
 import           Network.Wai.Handler.Warp.Internal     (setSocketCloseOnExec)
 import           Servant.Client
@@ -164,7 +164,7 @@ withPeerAddress :: (Maybe ChainMemberParsedSet -> Maybe ChainMemberParsedSet) ->
 withPeerAddress f = PeerAddress . f . unPeerAddress
 
 data Context = Context
-  { contextKafkaState        :: K.KafkaState
+  { contextKafkaState        :: KafkaEnv
   , blockHeaders             :: ([BlockHeader], UTCTime) -- keep track when last updated global headers cache
   , remainingBlockHeaders    :: (RemainingBlockHeaders, UTCTime) -- keep track when last updated global headers cache
   , actionTimestamp          :: ActionTimestamp
@@ -335,7 +335,7 @@ instance MonadIO m => Mod.Modifiable Context (ReaderT Config m) where
   get _ = readIORef =<< asks configContext
   put _ c = asks configContext >>= flip atomicModifyIORef' (const (c, ()))
 
-instance MonadIO m => Mod.Modifiable K.KafkaState (ReaderT Config m) where
+instance MonadIO m => Mod.Modifiable KafkaEnv (ReaderT Config m) where
   get _ = contextKafkaState <$> Mod.get (Proxy @Context)
   put _ k = asks configContext >>= flip atomicModifyIORef' (\c -> (c {contextKafkaState = k}, ()))
 
@@ -423,8 +423,9 @@ instance MonadUnliftIO m => A.Selectable Point PPeer (ReaderT Config m) where
     where
       actions = SQL.selectList [PPeerPubkey SQL.==. (Just pk)] []
 
-instance (MonadIO m, MonadLogger m) => Mod.Outputs (ReaderT Config m) [IngestEvent] where
-  output = void . K.withKafkaRetry1s . SK.writeUnseqEvents
+instance MonadIO m => Mod.Outputs (ReaderT Config m) [IngestEvent] where
+  output = void . runKafkaMConfigured "strato-p2p" . SK.writeUnseqEvents
+
 
 instance (MonadIO m, MonadLogger m) => HasVault (ReaderT Config m) where
   sign bs = do
@@ -563,7 +564,7 @@ initConfig maxHeaders = do
     $logInfoS "HasVault" "Calling vault-wrapper to get the node's public key"
     fmap VC.unPubKey $ waitOnVault $ liftIO $ runClientM (VC.getKey Nothing Nothing) vaultClient
 
-  let initState  = initContext
+  initState <- initContext
   initStateF <- newIORef initState
   return $ Config
     { configSQLDB = sqlDB' dbs
@@ -575,14 +576,18 @@ initConfig maxHeaders = do
     , configPubKey = nodePubKey
     }
 
-initContext :: Context
-initContext =
-  Context { actionTimestamp = emptyActionTimestamp
-          , contextKafkaState = mkConfiguredKafkaState "strato-p2p"
-          , blockHeaders = ([], jamshidBirth)
-          , remainingBlockHeaders = (RemainingBlockHeaders [], jamshidBirth)
-          , _blockstanbulPeerAddr = PeerAddress Nothing
-          }
+initContext :: MonadIO m => m Context
+initContext = do
+  let k = kafkaConfig ethConf
+      address = (fromString $ kafkaHost k, fromIntegral $ kafkaPort k)
+  kafkaEnv <- createKafkaEnv "strato-p2p" address
+  return $
+    Context { actionTimestamp = emptyActionTimestamp
+            , contextKafkaState = kafkaEnv
+            , blockHeaders = ([], jamshidBirth)
+            , remainingBlockHeaders = (RemainingBlockHeaders [], jamshidBirth)
+            , _blockstanbulPeerAddr = PeerAddress Nothing
+            }
 
 getPeerByIP ::
   A.Selectable IPAsText PPeer m =>

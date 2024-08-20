@@ -62,8 +62,6 @@ library:
     - lifted-async
     - lifted-base
     - merkle-patricia-db
-    - milena
-    - milena-tools
     - monad-alter
     - mtl
     - network
