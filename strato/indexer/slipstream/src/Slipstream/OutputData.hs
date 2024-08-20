@@ -52,7 +52,6 @@ module Slipstream.OutputData (
 
 import           BlockApps.Solidity.Value as V
 import           Conduit
--- import           Control.Arrow                   ((***))
 import           Control.Lens ((^.))
 import           Control.Monad
 import qualified Data.Aeson                      as Aeson
@@ -75,7 +74,6 @@ import           Blockchain.Strato.Model.CodePtr
 import qualified Blockchain.Strato.Model.Event   as Action
 import           Blockchain.Strato.Model.Keccak256
 import           Data.Bifunctor                  (first)
--- import           Data.Function                   (on)
 import           Data.List                       (groupBy, nubBy, sortBy)
 import           Data.Ord (comparing)
 import           Data.Text.Encoding              (decodeUtf8, decodeUtf8', encodeUtf8)
@@ -85,7 +83,6 @@ import           Database.PostgreSQL.Typed.Protocol
 import           Database.PostgreSQL.Typed.Query
 import           Slipstream.Data.Action
 import qualified Slipstream.Events               as E
---import           Slipstream.Globals
 import           Slipstream.Metrics
 import           Slipstream.Options
 import           Slipstream.QueryFormatHelper
@@ -95,9 +92,8 @@ import           SolidVM.Model.SolidString
 import qualified SolidVM.Model.Type              as SVMType
 import           Text.Printf
 import           Text.RawString.QQ
-import           Text.Tools                      
+import           Text.Tools
 import           UnliftIO.Exception              (SomeException, catch, handle)
---import           UnliftIO.IORef
 
 newtype First b a = First {unFirst :: (a, b)}
 
@@ -374,26 +370,6 @@ instance Ord ForeignKeyInfo where
         compare (tableName x, columnName x, foreignTableName x)
                 (tableName y, columnName y, foreignTableName y)
 
--- dropFkeysBetween :: OutputM m =>
---   ForeignKeyInfo ->
---   ConduitM () Text m ()
--- dropFkeysBetween foreignKey = do
---   let srcTable = textToDoubleQuoteText $ tableNameToTextPostgres (tableName foreignKey)
---       -- srcColumn = wrapDoubleQuotes (columnName foreignKey)
---       targetTable = textToDoubleQuoteText $ tableNameToTextPostgres (foreignTableName foreignKey)
---       fkNameSrcToTarget = textToDoubleQuoteText $ tableNameToTextPostgres (tableName foreignKey) <> "_" <> tableNameToTextPostgres (foreignTableName foreignKey) <> "_fk"
---       fkNameTargetToSrc = textToDoubleQuoteText $ tableNameToTextPostgres (foreignTableName foreignKey) <> "_" <> tableNameToTextPostgres (tableName foreignKey) <> "_fk"
---       logMessage = 
---         "srcTable: " <> (T.pack $ show $ tableName foreignKey) <>
---         ", targetTable: " <> (T.pack $ show $ foreignTableName foreignKey) 
---   $logInfoS "dropFkeysBetween" logMessage
-
---   -- Drop existing foreign keys so theres no cyclical or old dependancy
---   yield $ "ALTER TABLE " <> srcTable 
---           <> " DROP CONSTRAINT IF EXISTS " <> fkNameSrcToTarget <> ";"
---   yield $ "ALTER TABLE " <> targetTable 
---           <> " DROP CONSTRAINT IF EXISTS " <> fkNameTargetToSrc <> ";"
-
 createForeignIndexesForJoins ::
   OutputM m =>
   ForeignKeyInfo ->
@@ -544,25 +520,17 @@ createMappingTable ::
   ConduitM () Text m [ForeignKeyInfo]
 createMappingTable (creator, a, n) m = do
   let tableName = collectionTableName creator a n m
-
-  --incNumMappingTables
   yield $ (createMappingTableQuery (creator, a, n, m))
-  --let list = ["key", "value"]
-  --setTableCreated tableName list
   return $ getDeferredForeignKeysForCollection tableName creator a
 
 createArrayTable ::
   OutputM m =>
-  
   (Text, Text, Text) ->
   (Text, Text) ->
   ConduitM () Text m [ForeignKeyInfo]
 createArrayTable  (creator, a, n) (arr, arrType) = do
   let tableName = collectionTableName creator a n arr
-  incNumArrayTables
   yield $ (createArrayTableQuery (creator, a, n, arr))
-  --let list = ["key", "value"]
-  --setTableCreated  tableName list
   let fkeys1 = getDeferredForeignKeysForCollection tableName creator a
       fkeys2 = getDeferredForeignKeysForArrayType tableName creator a arrType
   return $ fkeys1 ++ fkeys2
@@ -570,40 +538,30 @@ createArrayTable  (creator, a, n) (arr, arrType) = do
 createHistoryTable' ::
   OutputM m =>
   Bool ->
-  
   ContractF () ->
   CodeCollectionF () ->
   (Text, Text, Text) ->
   ConduitM () (Text, Maybe ( TableName, TableColumns)) m ()
 createHistoryTable' isAbstract  contract cc (creator, a, n) = do
-  --let tableName = historyTableName creator a n
   incNumHistoryTables
   let isEvent = False
       list = getTableColumnAndType isEvent cc $ map (\(x, y) -> (labelToText x, y ^. varType)) $ Map.toList $ contract ^. storageDefs
       listCombined = map (\(x,y)-> x <> " " <> y) list
   yield $ ((createHistoryTableQuery isAbstract (creator, a, n) listCombined), Nothing)
   yieldMany $ map (\x -> (x, Nothing)) (addHistoryUnique (creator, a, n))
-  --setTableCreated  tableName listCombined
 
 createHistoryTable ::
   OutputM m =>
   Bool ->
-  
   ContractF () ->
   CodeCollectionF () ->
   (Text, Text, Text) ->
   ConduitM () Text m ()
 createHistoryTable isAbstract  contract cc (creator, a, n) = do
-  --let tableName = historyTableName creator a n
-  --tableExists <- isTableCreated  tableName
-  
-  --when (not tableExists) $ do
-    --incNumHistoryTables
   let list = getTableColumnAndType False cc $ map (\(x, y) -> (labelToText x, y ^. varType)) $ Map.toList $ contract ^. storageDefs
       listCombined = map (\(x,y)-> x <> " " <> y) list
   yield $ (createHistoryTableQuery isAbstract (creator, a, n) listCombined)
   yieldMany $ addHistoryUnique (creator, a, n)
-    --setTableCreated  tableName listCombined
 
 -- Runs ALTER TABLE <name> [ADD COLUMN <column>] for any new fields added to a contract definition
 expandIndexTable ::
@@ -619,7 +577,6 @@ expandIndexTable contract cc (creator, a, n) = do
 
 expandAbstractTable ::
   OutputM m =>
-  
   ContractF () ->
   (Text, Text, Text) ->
   Map.Map (Account, Text) (Text, Text) ->
@@ -632,7 +589,6 @@ expandAbstractTable  contract (creator, a, n) abstracts' cc = do
 expandHistoryTable ::
   OutputM m =>
   Bool ->
-  
   ContractF () ->
   CodeCollectionF () ->
   (Text, Text, Text) ->
@@ -646,7 +602,6 @@ expandHistoryTable isAbstract  contract cc (creator, a, n) = do
 
 expandContractTable' ::
   OutputM m =>
-  
   ContractF () ->
   CodeCollectionF () ->
   TableName ->
@@ -665,13 +620,11 @@ expandContractTable'  contract cc tableName = do
           " for the following fields: ",
           T.intercalate ", " colsCombined
         ]
-    --setTableCreated  tableName $ colsCombined
     yield $ ((expandTableQuery tableName colsCombined), Just (tableName, colsCombined))
   return $ []
 
 expandContractTable ::
   OutputM m =>
-  
   ContractF () ->
   CodeCollectionF () ->
   TableName ->
@@ -698,7 +651,6 @@ expandContractTable  contract cc tableName = do
 
 expandAbstractContractTable ::
   OutputM m =>
-  
   ContractF () ->
   TableName ->
   Map.Map (Account, Text) (Text, Text) ->
@@ -825,7 +777,7 @@ insertHistoryTable contracts@(E.ProcessedContract {creator = crtr, application =
 
 insertHistoryAbstractTable :: 
   OutputM m => 
-  [(E.ProcessedContract, [T.Text], T.Text, TableColumns)] ->
+  [(E.ProcessedContract, [T.Text], TableName, TableColumns)] ->
   [E.ProcessedContract] ->
   ConduitM () Text m ()
 insertHistoryAbstractTable [] _ = pure ()
@@ -835,7 +787,7 @@ insertHistoryAbstractTable abstracts hists = do
 
 insertAbstractTable ::
   OutputM m =>
-  [(E.ProcessedContract, [T.Text], T.Text, TableColumns)] ->
+  [(E.ProcessedContract, [T.Text], TableName, TableColumns)] ->
   ConduitM () Text m ()
 insertAbstractTable [] = pure ()
 insertAbstractTable cs@((_, _, abTableName, _) : _) = do
@@ -845,7 +797,7 @@ insertAbstractTable cs@((_, _, abTableName, _) : _) = do
 
 updateForeignKeysFromNULLAbstract ::
   OutputM m =>
-  [(E.ProcessedContract, [T.Text], T.Text, TableColumns)] ->
+  [(E.ProcessedContract, [T.Text], TableName, TableColumns)] ->
   ConduitM () Text m ()
 updateForeignKeysFromNULLAbstract [] = pure ()
 updateForeignKeysFromNULLAbstract cs = do
@@ -1141,84 +1093,75 @@ insertArrayTableQuery ms =
                       ";"
                     ]
 
-insertAbstractTableQuery :: [(E.ProcessedContract, [T.Text], T.Text)] -> [Text]
+insertAbstractTableQuery :: [(E.ProcessedContract, [T.Text], TableName)] -> [Text]
 insertAbstractTableQuery [] = error "insertAbstractTableQuery: unhandled empty list"
 insertAbstractTableQuery cs =
-  concat $
-    let cs' = (\(c@E.ProcessedContract {contractData = contractData}, fkeys, abTableName) -> 
-                ((c, Map.mapMaybe valueToSQLTextFilterContract $ contractData), (abTableName, fkeys))) <$> cs
-     in flip map (map snd $ partitionWith ((\(abTableName, _) -> abTableName) . snd) cs') $ \case
+   concat $
+    let cs' = (\(c@E.ProcessedContract {contractData = contractData}, fkeys, ab) -> 
+                ((c, Map.mapMaybe valueToSQLTextFilterContract $ contractData), (ab, fkeys))) <$> cs
+     in flip map (map snd $ partitionWith ((\(ab, _) -> ab) . snd) cs') $ \case
           [] -> []
-          contracts@(((x, list), (abTableName, fkeys)) : _) ->
+          (((x, list), (abTableName, fkeys)) : _) ->
             let contractTableName =
                   abstractTableName (E.creator x) (E.application x) (E.contractName x)
-                fkeyColumns = [T.pack ((T.unpack k) ++ "_fkey") | k <- fkeys]
-                keysForSQL = Map.keys list ++ fkeyColumns
-                -- Dynamic SQL to fetch columns and construct JSONB in PostgreSQL
-                keySt = wrapAndEscapeDouble . map escapeQuotes $ baseAbstractColumns ++ keysForSQL
+                concreteCols = Map.keys list
+                concreteColsVals = Map.elems list
+                fkeyColumns = [T.pack ((T.unpack k) ++ "_fkey") | k <- fkeys, k `elem` concreteCols]
+                finalCols = baseColumns ++ concreteCols ++ fkeyColumns
                 baseVals =
-                  [ tshow . E.address,
-                    T.pack . keccak256ToHex . E.blockHash,
-                    tshow . E.blockTimestamp,
-                    tshow . E.blockNumber,
-                    T.pack . keccak256ToHex . E.transactionHash,
-                    tshow . E.transactionSender,
-                    E.creator,
-                    E.root
+                  [ (tshow . E.address) x,
+                    (T.pack . keccak256ToHex . E.blockHash) x,
+                    (tshow . E.blockTimestamp) x,
+                    (tshow . E.blockNumber) x,
+                    (T.pack . keccak256ToHex . E.transactionHash) x,
+                    (tshow . E.transactionSender) x,
+                    E.creator x,
+                    E.root x
                   ]
-                vals = flip map contracts $ \((row, contractColumns), _) ->
-                  let baseRowVals = map (wrapSingleQuotes . ($ row)) baseVals
-                      contractNameVal = [wrapSingleQuotes $ escapeQuotes (tableNameToText contractTableName)] 
-                      -- Build the dynamic SQL for the data column (JSONB)
-                      dataVals = T.concat [
-                          "(SELECT jsonb_object_agg(column_name, to_jsonb(value)) ",
-                          " FROM (",
-                          "   SELECT column_name, ",
-                          "          CASE ",
-                          "            WHEN column_name IN (",
-                          "              SELECT column_name FROM information_schema.columns WHERE table_name = '", abTableName, "'",
-                          "            ) THEN NULL ",  -- Exclude common columns
-                          "            ELSE ", 
-                          "              unnest(ARRAY[",
-                          "                SELECT value FROM unnest(hstore_to_jsonb(contractColumns) -> 'data') as data_columns(column_name, value) ",
-                          "                WHERE column_name NOT IN (SELECT column_name FROM information_schema.columns WHERE table_name = '", abTableName, "') ",
-                          "              ]) ",
-                          "          END as value ",
-                          "   FROM (SELECT * FROM unnest(ARRAY[",
-                          "     SELECT column_name FROM information_schema.columns WHERE table_name = '", abTableName, "'",
-                          "   ]) as col) as cols",
-                          "   LEFT JOIN unnest(hstore_to_jsonb(contractColumns) -> 'data') as data_columns(column_name, value) ON cols.column_name = data_columns.column_name",
-                          ") as json_pairs WHERE value IS NOT NULL)",
-                          " as jsonb"
-                        ]
-                      regularVals = [(snd kv) | kv@(k, _) <- Map.toList contractColumns, k `elem` baseAbstractColumns ++ fkeys]
-                      fkeyVals = ["NULL" | k <- fkeys, k `elem` baseAbstractColumns]  -- Avoid circular dependencies
-                      valsForSQL = baseRowVals ++ contractNameVal ++ [dataVals] ++ regularVals ++ fkeyVals
-                  in wrapAndEscape valsForSQL
-                inserts = csv vals
-            in (: []) $
-                  T.concat [
-                      "INSERT INTO ",
-                      abTableName,
-                      " ",
-                      keySt,
-                      "\n  VALUES ",
-                      inserts,
-                      " ON CONFLICT (address) DO UPDATE SET ",
-                      " block_hash = excluded.block_hash, ",
-                      " block_timestamp = excluded.block_timestamp, ",
-                      " block_number = excluded.block_number, ",
-                      " transaction_hash = excluded.transaction_hash, ",
-                      " transaction_sender = excluded.transaction_sender, ",
-                      " creator = excluded.creator, ",
-                      " root = excluded.root, ",
-                      " contract_name = excluded.contract_name, ",
-                      " data = excluded.data;",
-                      if null baseAbstractColumns then "" else ",\n    ",
-                      tableUpsert $ baseAbstractColumns ++ fkeys,
-                      ";"]
+                finalColsVals = baseVals ++ concreteColsVals ++ [T.intercalate ", " (replicate (length fkeyColumns) "NULL")]
+                postgQuery =
+                  T.concat $
+                    [ "DO $$\nDECLARE\n",
+                      "    abstract_cols text[];\n",
+                      "    concrete_cols text[] := '{", T.intercalate "," (map escapeQuotes finalCols), "}';\n",
+                      "    concrete_cols_vals text[] := '{", T.intercalate "," (map escapeQuotes finalColsVals), "}';\n",
+                      "    jsonb_data jsonb := '{}';\n",
+                      "    insert_cols text := '';\n",
+                      "    insert_vals text := '';\n",
+                      "    col_name text;\n",
+                      "    col_value text;\n",
+                      "    i int;\n",
+                      "BEGIN\n",
+                      --"    -- Step 1: Get all columns from the Abstract table\n",
+                      "    SELECT array_agg(column_name::text) INTO abstract_cols\n",
+                      "    FROM information_schema.columns WHERE table_name = '", tableNameToText abTableName, "';\n\n",
+                      --"    -- Step 2: Loop over concrete_cols and dynamically build the insert columns and values\n",
+                      "    FOR i IN array_lower(concrete_cols, 1) .. array_upper(concrete_cols, 1) LOOP\n",
+                      "        col_name := concrete_cols[i];\n",
+                      "        col_value := concrete_cols_vals[i];\n\n",
+                      "        IF col_name = ANY(abstract_cols) THEN\n",
+                      --"            -- Column is in both concrete_cols and abstract_cols, include it in the INSERT statement\n",
+                      "            insert_cols := insert_cols || col_name || ', ';\n",
+                      "            insert_vals := insert_vals || quote_literal(col_value) || ', ';\n",
+                      "        ELSE\n",
+                      --"            -- If the column is not in abstract_cols, add it to JSONB\n",
+                      "            jsonb_data := jsonb_data || jsonb_build_object(col_name, col_value);\n",
+                      "        END IF;\n",
+                      "    END LOOP;\n\n",
+                      "    -- Remove the trailing comma and space from insert_cols and insert_vals\n",
+                      "    insert_cols := rtrim(insert_cols, ', ');\n",
+                      "    insert_vals := rtrim(insert_vals, ', ');\n\n",
+                      --"    -- Step 4: Insert into Asset table using dynamically constructed columns and values, and update if conflict occurs\n",
+                      "    EXECUTE 'INSERT INTO \"", tableNameToText abTableName, "\" (' || insert_cols || ', contract_name, data) VALUES (' || insert_vals || ', ''",
+                      tableNameToText contractTableName,
+                      "'', ' || quote_literal(jsonb_data) || ') ON CONFLICT (address) DO UPDATE SET (' || insert_cols || ', contract_name, data) = (' || insert_vals || ', ''",
+                      tableNameToText contractTableName,
+                      "'', ' || quote_literal(jsonb_data) || ')';\n",
+                      "END $$;"
+                    ]
+              in (: []) postgQuery
 
-insertHistoricAbstractTableQuery :: [(E.ProcessedContract, [T.Text], T.Text, TableColumns)] -> [Text]
+insertHistoricAbstractTableQuery :: [(E.ProcessedContract, [T.Text], TableName, TableColumns)] -> [Text]
 insertHistoricAbstractTableQuery [] = error "insertHistoricAbstractTableQuery: unhandled empty list"
 insertHistoricAbstractTableQuery cs =
   concat $
@@ -1245,8 +1188,8 @@ insertHistoricAbstractTableQuery cs =
                     E.root
                   ]
                 address = (tshow . E.address) x
-                tableNameSingle = (wrapSingleQuotes $ "history@" <> unwrapDoubleQuotes abTableName)
-                tableNameDouble = (wrapDoubleQuotes $ "history@" <> unwrapDoubleQuotes abTableName)
+                tableNameSingle = (wrapSingleQuotes $ "history@" <> tableNameToText abTableName)
+                tableNameDouble = (wrapDoubleQuotes $ "history@" <> tableNameToText abTableName)
                 vals = flip map contracts $ \((row, contractColumns), _) ->
                   let baseRowVals = map (wrapSingleQuotes . ($ row)) baseVals
                       contractNameVal = [wrapSingleQuotes $ escapeQuotes (tableNameToText contractTableName)] 
@@ -1354,7 +1297,7 @@ insertHistoryTableQuery cs =
                        , "END $$;"]
 
 -- Result: UPDATE table SET (fkey1,fkey2, ...)=(val1,val2, ...) where (fkey1_fkey,fkey2_fkey, ...)=(val1,val2, ...);
-updateFkeysQueryAbstract :: [(E.ProcessedContract, [T.Text], T.Text, TableColumns)] -> [Text]
+updateFkeysQueryAbstract :: [(E.ProcessedContract, [T.Text], TableName, TableColumns)] -> [Text]
 updateFkeysQueryAbstract cs =
   concat $
     let cs' = (\(c@E.ProcessedContract {contractData = contractData}, fkeys, ab, abColumns) -> 
@@ -1376,7 +1319,7 @@ updateFkeysQueryAbstract cs =
                then (: []) $
                   T.concat $
                     [ "UPDATE ",
-                      abTableName,
+                      tableNameToDoubleQuoteText abTableName,
                       "\n  SET ",
                       keyStForFkeyColumnsWithPostFix,
                       " = ",
@@ -1442,7 +1385,6 @@ updateFkeysQueryArray rows = concatMap createUpdateQuery rows
         ]]
 
 -- Creates tables for all event declarations, stores table name in
--- globals{createdEvents}
 createExpandEventTables ::
   OutputM m =>
   

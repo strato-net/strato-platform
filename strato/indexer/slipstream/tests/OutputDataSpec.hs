@@ -35,11 +35,12 @@ import qualified Slipstream.Events as SE
 -- import Slipstream.GlobalsColdStorage (fakeHandle)
 import Slipstream.OutputData
 import Slipstream.SolidityValue
-
+import Slipstream.QueryFormatHelper
 import SolidVM.Model.CodeCollection hiding (contractName, contracts)
 import SolidVM.Model.SolidString
 import qualified SolidVM.Model.Type as SVMType
 import Blockchain.Data.AddressStateDB
+
 -- import Network.Haskoin.Crypto.BigWord
 -- import Blockchain.Data.ChainInfo
 -- import Blockchain.DB.CodeDB
@@ -82,7 +83,7 @@ createInsertsCollection collections = do
 
 createInsertsAbstract :: OutputM m
               => (SE.ProcessedContract, ContractF())
-              -> [(SE.ProcessedContract, [T.Text], T.Text, [T.Text])]
+              -> [(SE.ProcessedContract, [T.Text], TableName, [T.Text])]
               -> ConduitM () T.Text m ()
 createInsertsAbstract abstract inherited = do
     let contract = snd abstract
@@ -856,7 +857,7 @@ spec = do
           SE.contractData = M.fromList
             [ ("addr2", addr 0xdeadbeef)
             ]
-          }, [], T.pack "SwissArmy", [])]
+          }, [], (AbstractTableName (T.pack "") (T.pack "") (T.pack "SwissArmy")), [])]
 
 
      

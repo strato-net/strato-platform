@@ -84,7 +84,7 @@ mergeDiffs lhs rhs = error $ "Invalid diff combination: " ++ show (lhs, rhs)
 
 data BatchedInserts = BatchedInserts
   { indexInsert :: (E.ProcessedContract, [T.Text]),
-    abstractInserts :: [(E.ProcessedContract,[T.Text],T.Text, TableColumns)],
+    abstractInserts :: [(E.ProcessedContract,[T.Text],TableName, TableColumns)],
     historyInserts :: [E.ProcessedContract],
     collectionInserts :: [ProcessedCollectionRow]
   }
@@ -357,14 +357,14 @@ processTheMessages env conn messages = do
             
             deferredForeignKeys <- case (_contractType c) of
               AbstractType -> do
-                abstractfkeys <- outputData conn $ createExpandAbstractTable  c nameParts abstracts' cc
-                outputData' conn $ createExpandHistoryTable True  c cc nameParts
+                abstractfkeys <- outputData conn $ createExpandAbstractTable c nameParts abstracts' cc
+                outputData' conn $ createExpandHistoryTable True c cc nameParts
                 $logInfoS "processTheMessages/deferredForeignKeys/abstractfkeys" $ T.pack $ show abstractfkeys
                 return abstractfkeys
               _ -> do
-                indexfkeys <- outputData conn $ createExpandIndexTable  c cc nameParts
+                indexfkeys <- outputData conn $ createExpandIndexTable c cc nameParts
                 $logInfoS "processTheMessages/deferredForeignKeys/indexfkeys" $ T.pack $ show indexfkeys
-                outputData' conn $ createExpandHistoryTable False  c cc nameParts
+                outputData' conn $ createExpandHistoryTable False c cc nameParts
                 return indexfkeys
 
             $logInfoS "processTheMessages/deferredForeignKeys" $ T.pack $ show deferredForeignKeys
@@ -372,7 +372,7 @@ processTheMessages env conn messages = do
             $logInfoS "processTheMessages/deferredForeignKeysForArrays" $ T.pack $ show deferredForeignKeysForArrays
 
 
-            outputData conn $ createExpandEventTables  c cc nameParts
+            outputData conn $ createExpandEventTables c cc nameParts
 
             return $ deferredForeignKeys ++ deferredForeignKeysForMappings ++ deferredForeignKeysForArrays
 
@@ -400,9 +400,9 @@ processTheMessages env conn messages = do
   --               mapNames = getMapNamesFromContract c
   --           nameParts <- resolveNameParts o a c
   --           forM_ mapNames $ outputData conn . createCollectionTable  nameParts
-  --           deferredForeignKeys <- outputData conn $ createExpandIndexTable  c nameParts
-  --           outputData' conn $ createExpandHistoryTable  c nameParts
-  --           outputData conn $ createExpandEventTables  c nameParts
+  --           deferredForeignKeys <- outputData conn $ createExpandIndexTable c nameParts
+  --           outputData' conn $ createExpandHistoryTable c nameParts
+  --           outputData conn $ createExpandEventTables c nameParts
   --           pure deferredForeignKeys
         -- forM_ deferredForeignKeys $ outputData conn . createForeignIndexesForJoins
   --       addDelegate  s c'
@@ -451,7 +451,7 @@ processTheMessages env conn messages = do
             $logDebugLS "cregator" $ T.pack (show cregator)
             $logInfoS "Row will be inserted into abstract table: " tableNameText
             -- mCols <- getTableColumns  tableName
-            pure $ (indexContract, fkeysForThisContract, tableNameText, (cr',ap',n'),) . map extractTextInsideQuotes <$> (Just [])
+            pure $ (indexContract, fkeysForThisContract, tableName, (cr',ap',n'),) . map extractTextInsideQuotes <$> (Just [])
           $logDebugLS "Globals: Recorded Map names are: " . T.pack $ show mapNames ++ " contract: " ++ show (E.contractName indexContract)
           $logDebugLS "Globals: Recorded Array names are: " . T.pack $ show arrNames ++ " contract: " ++ show (E.contractName indexContract)
           $logDebugLS "History inserts are: " $ T.pack $ show hs
