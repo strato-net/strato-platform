@@ -502,9 +502,8 @@ registerCert cert token RealmDetails {associatedNodeUrl = nurl, associatedFallba
           throwIO $ IdentityError "Failed to register cert"
 
 txSuccess :: BlocChainOrTransactionResult -> Bool
--- txSuccess BlocTxResult (BlocTransactionResult{blocTransactionStatus = stat}) | stat /= Failure = True
--- instead of this?
-txSuccess (BlocTxResult BlocTransactionResult {blocTransactionStatus = Success}) = True
+txSuccess (BlocTxResult (BlocTransactionResult{blocTransactionStatus = stat})) | stat /= Failure = True
+-- txSuccess (BlocTxResult BlocTransactionResult {blocTransactionStatus = Success}) = True
 txSuccess _ = False
 
 registerUserWalletAsync ::
