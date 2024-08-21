@@ -2,7 +2,6 @@ import React, { useState, useEffect, useRef } from "react";
 import {
   Breadcrumb,
   notification,
-  Avatar,
   Typography,
   Table,
   Tooltip,
@@ -25,6 +24,8 @@ import HelmetComponent from "../Helmet/HelmetComponent";
 import { SEO } from "../../helpers/seoConstant";
 import { useMarketplaceState } from "../../contexts/marketplace";
 import { useNavigate } from "react-router-dom";
+import { getStringDate } from "../../helpers/utils";
+import { US_DATE_FORMAT } from "../../helpers/constants";
 
 // Custom hook for media query
 const useMediaQuery = (query) => {
@@ -66,6 +67,8 @@ const MyWallet = ({ user }) => {
   const stratsBalance = Object.keys(strats).length > 0 ? strats : 0;
   const [totalBalance, setTotalBalance] = useState(0);
   const [priceHistoryMap, setPriceHistoryMap] = useState({});
+  const [transfersData, setTransfersData] = useState([]);
+  const { itemTransfers } = useInventoryState();
 
   const categoryDispatch = useCategoryDispatch();
   const { inventories, isInventoriesLoading, priceHistory } =
@@ -131,13 +134,44 @@ const MyWallet = ({ user }) => {
     setIsLoading(isInventoriesLoading || !isPriceHistoryLoaded);
   }, [isInventoriesLoading, isPriceHistoryLoaded]);
 
+  useEffect(() => {
+    if (user?.commonName) {
+      actions.fetchItemTransfers(
+        dispatch,
+        limit,
+        offset,
+        user.commonName,
+        "desc"
+      );
+    }
+  }, [dispatch, user, limit, offset]);
+
+  useEffect(() => {
+    if (itemTransfers) {
+      const formattedTransfers = itemTransfers.map((transfer) => ({
+        address: transfer.address,
+        assetAddress: transfer.assetAddress,
+        assetName: decodeURIComponent(transfer.assetName),
+        newOwner: transfer.newOwner,
+        newOwnerCommonName: transfer.newOwnerCommonName,
+        oldOwner: transfer.oldOwner,
+        oldOwnerCommonName: transfer.oldOwnerCommonName,
+        quantity: transfer.quantity,
+        transferDate: getStringDate(transfer.transferDate, US_DATE_FORMAT),
+        transferNumber: transfer.transferNumber,
+        price: transfer?.price,
+      }));
+      setTransfersData(formattedTransfers);
+    }
+  }, [itemTransfers]);
+
   const getUnitPrice = (inventory) => {
     // Check if the item has an active listing
     if (inventory.status === "1" && inventory.price) {
       return parseFloat(inventory.price);
     }
 
-    // If no active listing, get the last sold price from price history
+    // Check price history
     const inventoryPriceHistory = Object.values(priceHistoryMap).find(
       (history) => history.address === inventory.address
     );
@@ -146,13 +180,21 @@ const MyWallet = ({ user }) => {
       inventoryPriceHistory &&
       inventoryPriceHistory.data.originRecords.length > 0
     ) {
-      // Get the most recent price from the originRecords (last item in the array)
       const originRecords = inventoryPriceHistory.data.originRecords;
       const mostRecentPrice = originRecords[originRecords.length - 1].price;
       return parseFloat(mostRecentPrice);
     }
 
-    // If no price history or price available, return 0
+    // If no price history, check transfers for price
+    const latestTransfer = transfersData.find((transfer) => {
+      return transfer.assetAddress === inventory.originAddress;
+    });
+
+    if (latestTransfer && latestTransfer.price) {
+      return parseFloat(latestTransfer.price);
+    }
+
+    // If no price history or transfer price available, return 0
     return 0;
   };
 
@@ -189,9 +231,6 @@ const MyWallet = ({ user }) => {
       );
     } else actions.fetchInventory(dispatch, limit, offset, "", category);
   }, [dispatch, limit, offset, debouncedSearchTerm, category, isSearch]);
-
-  const userName = user?.commonName || "";
-  const userLetter = userName ? userName[0].toUpperCase() : "";
 
   const [tableData, setTableData] = useState([]);
 
