@@ -827,6 +827,7 @@ processGroupedData :: [ProcessedCollectionRow] -> [Text]
 processGroupedData rows@(row:_) =
   case collectiontype row of
     "Array" -> insertArrayTableQuery rows
+    "Event Array" -> insertArrayTableQuery rows
     _ -> insertMappingTableQuery rows
 processGroupedData [] = []
 
