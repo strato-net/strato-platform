@@ -496,8 +496,18 @@ processTheMessages env conn messages = do
     $logDebugLS "processTheMessages" $ T.pack $ "Updating PostgREST schema cache for " ++ show (sum $ map length fkeys) ++ " foreign key relationships"
     notifyPostgREST conn
 
-  when (length events' > 0) $
-    outputData conn $ insertEventTables g events'
+  when (not (null events')) $ do
+    --Getting event entries that go into the parent abstract tables and event array inserts
+    let processedEvents = concatMap getAllEvents events'
+        processedEventArrays = concatMap aggEventToCollectionRows processedEvents
+        processedEventsWithoutArrays = map (\ae -> ae { eventEvent = removeArrayEvArgs (eventEvent ae) }) processedEvents
+        
+    -- Insert the events into the event tables
+    outputData conn $ insertEventTables g processedEventArrays processedEventsWithoutArrays
+    
+    -- If there are processed event arrays, update the foreign keys
+    unless (null processedEventArrays) $
+      outputData conn $ updateForeignKeysFromNULLArray processedEventArrays
 
   $logInfoS "processTheMessages" . T.pack $ "Inserting " ++ show (length transactionResults) ++ " transaction results"
 

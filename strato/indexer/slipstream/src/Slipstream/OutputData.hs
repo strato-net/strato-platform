@@ -46,7 +46,13 @@ module Slipstream.OutputData (
   updateForeignKeysFromNULLArray,
   cirrusInfo,
   historyTableName,
-  getTableColumnAndType
+  getTableColumnAndType,
+  aggEventToCollectionRow,
+  aggEventToCollectionRows,
+  removeArrayEvArgs,
+  getArraysFromEvents,
+  getAllEvents,
+  processParents
   ) where
 
 
@@ -601,7 +607,9 @@ createEventArrayTable ::
 createEventArrayTable globalsIORef (creator, a, n) (arr, arrType) = do
   let tableName = collectionTableName creator a n arr
   tableExists <- isTableCreated globalsIORef tableName
-  $logDebugLS "createEventArrayTable/tableExists" ("Table Name: " ++ show tableName ++ ", table exists: " ++ formatBool tableExists)
+  $logInfoS "createEventArrayTable/tableExists"  $ T.pack ( "Table Name: " ++ show tableName ++ ", table exists: " ++ formatBool tableExists)
+  $logInfoS "createEventArrayTable/(creator, a, n) " (T.pack $ show (creator, a, n))
+  $logInfoS "createEventArrayTable/(arr, arrType) " (T.pack $ show (creator, a, n))
   if tableExists
     then return []
     else do
@@ -1584,40 +1592,40 @@ getArraysFromEvents evArgs =
 insertEventTables :: 
   OutputM m =>
   IORef Globals ->
+  [ProcessedCollectionRow] ->
   [AggregateEvent] ->
   ConduitM () Text m ()
-insertEventTables globalsIORef evs = do
-  let processedEvents = concatMap getAllEvents evs
-  -- $logInfoS "insertEventTables/processedEvents" . T.pack $ show processedEvents
+insertEventTables globalsIORef processedEventArrays processedEventsWithoutArrays = do
+  $logInfoS "insertEventTables/processedEventArrays" . T.pack $ show processedEventArrays
+  $logInfoS "insertEventTables/processedEventsWithoutArrays" . T.pack $ show processedEventsWithoutArrays
   -- yieldMany =<< lift (mapM (insertEventTable) processedEvents)
-      processedEventArrays = concatMap aggEventToCollectionRows processedEvents
-      processedEventsWithoutArrays = map (\ae -> ae { eventEvent = removeArrayEvArgs (eventEvent ae) }) processedEvents
+      
   yieldMany . catMaybes =<< lift (mapM (insertEventTable globalsIORef) processedEventsWithoutArrays)
   when (not (null processedEventArrays)) $ insertCollectionTable processedEventArrays
-  where
-    getAllEvents :: 
-      AggregateEvent -> 
-      [AggregateEvent]
-    getAllEvents aggEvent = do
-      let newEvents = processParents aggEvent
-       in aggEvent : newEvents
+  
+getAllEvents :: 
+  AggregateEvent -> 
+  [AggregateEvent]
+getAllEvents aggEvent = do
+  let newEvents = processParents aggEvent
+    in aggEvent : newEvents
 
-    processParents :: 
-      AggregateEvent -> [AggregateEvent]
-    processParents ae = createNewEvent <$> Map.toList (eventAbstracts ae)
-      where
-        createNewEvent :: 
-          ((Account, Text), (Text, Text)) -> AggregateEvent
-        createNewEvent ((_, n'), (c, a)) =
-          ae { eventEvent = (eventEvent ae) {
-            Action.evContractCreator = 
-              if (Action.evContractApplication (eventEvent ae)) == "" 
-              then T.unpack c
-              else Action.evContractCreator (eventEvent ae),
-            Action.evContractApplication = T.unpack a,
-            Action.evContractName = T.unpack n'
-              }
+processParents :: 
+  AggregateEvent -> [AggregateEvent]
+processParents ae = createNewEvent <$> Map.toList (eventAbstracts ae)
+  where
+    createNewEvent :: 
+      ((Account, Text), (Text, Text)) -> AggregateEvent
+    createNewEvent ((_, n'), (c, a)) =
+      ae { eventEvent = (eventEvent ae) {
+        Action.evContractCreator = 
+          if (Action.evContractApplication (eventEvent ae)) == "" 
+          then T.unpack c
+          else Action.evContractCreator (eventEvent ae),
+        Action.evContractApplication = T.unpack a,
+        Action.evContractName = T.unpack n'
           }
+      }
 
 -- insertEventTable ::
 --   OutputM m =>
