@@ -1059,7 +1059,7 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
   contract.getStratsOrderEvent = async function (args, options = defaultOptions) {
 
     const currentPaymentProvider = await paymentProviderJs.getAll(rawAdmin, {address: args.paymentProvider}, options);
-    if(currentPaymentProvider[0].contract_name === 'BlockApps-StratPaymentService')
+    if(currentPaymentProvider[0].contract_name.includes('StratPaymentService'))
     {
     const orderEvent = await rest.searchUntil(
       rawAdmin,
