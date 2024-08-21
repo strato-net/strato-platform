@@ -126,13 +126,12 @@ const TransactionTable = ({ user, selectedDate, onDateChange, download, isAllOrd
           </Col>
           <Col span={8} offset={1}>
             <p className="text-base font-bold">{data?.assetName.length > 28 ? `${data?.assetName.slice(0, 28)}..` : data?.assetName}</p>
-            <p style={{ color: '#827474' }} className="font-medium"><Tooltip placement="top" title={data.assetDescription.replace(/<\/?[^>]+(>|$)/g, "")}> {data?.assetDescription.length > 28 ? `${data.assetDescription.replace(/<\/?[^>]+(>|$)/g, "")?.slice(0, 28)}...` : data?.assetDescription.replace(/<\/?[^>]+(>|$)/g, "")} </Tooltip></p>
+            <p style={{ color: '#827474' }} className="font-medium cursor-pointer"><Tooltip placement="top" title={data.assetDescription.replace(/<\/?[^>]+(>|$)/g, "")}> {data?.assetDescription.length > 28 ? `${data.assetDescription.replace(/<\/?[^>]+(>|$)/g, "")?.slice(0, 28)}...` : data?.assetDescription.replace(/<\/?[^>]+(>|$)/g, "")} </Tooltip></p>
           </Col>
           <Col span={8} offset={1}>
-           {price 
-           ?  <p className="text-right flex justify-end items-center"> <b>$ {price} </b> &nbsp;(<span className="text-[#13188A] font-bold"> {(data?.assetPrice || data?.price) * STRATS_CONVERSION} </span>{StratsIcon}) </p>
-           :  <p className="text-right text-[#13188A] font-bold text-sm"> No Price Available  </p>
-          }
+           {price
+              ? <p className="text-right flex justify-end items-center"> <b>$ {price} </b> &nbsp;(<span className="text-[#13188A] font-bold"> {(data?.assetPrice || data?.price) * STRATS_CONVERSION} </span>{StratsIcon}) </p>
+              : <p className="text-right text-[#13188A] font-bold text-sm"> No Price Available  </p>          }
             {/* <p className="text-bold text-right mt-2">Sold Out</p> */}
           </Col>
         </Row>
@@ -193,8 +192,8 @@ const TransactionTable = ({ user, selectedDate, onDateChange, download, isAllOrd
       width: '150px',
       render: (asset, data) => <>
         <Popover className="flex " content={<Content data={data} />} trigger="hover">
-          <div className="flex items-center">
-            <img src={data?.assetImage} alt={data?.assetName} width={24} height={30} className="border w-6 h-8 border-indigo-600 rounded-md" />
+          <div className="flex items-center cursor-default">
+            <img src={data?.assetImage} alt={data?.assetName} width={24} height={30} className="border w-6 h-8 border-indigo-600 rounded-md object-contain" />
             <span className="ml-1"> {data?.assetName.length > 15 ? `${data?.assetName.slice(0, 15)}..` : data?.assetName} </span>
           </div>
         </Popover>
@@ -265,7 +264,7 @@ const TransactionTable = ({ user, selectedDate, onDateChange, download, isAllOrd
     status = data.type === "Transfer" ? 3 : status
     const { textClass, bgClass } = data.type === "Redemption" ? REDEMPTION_STATUS_CLASSES[status] : TRANSACTION_STATUS_CLASSES[status] || { textClass: "bg-[#FFF6EC]", bgClass: "bg-[#119B2D]" };
     return (
-      <div className={classNames(textClass, "w-max text-center py-1 rounded-xl flex justify-start items-center gap-1 p-3")}>
+      <div className={classNames(textClass, "w-max text-center py-1 cursor-default rounded-xl flex justify-start items-center gap-1 p-3")}>
         <div className={classNames(bgClass, "h-3 w-3 rounded-sm")}></div>
         <p>{data.type === 'Redemption' ? REDEMPTION_STATUS[status] : TRANSACTION_STATUS[status]}</p>
       </div>
@@ -285,44 +284,61 @@ const TransactionTable = ({ user, selectedDate, onDateChange, download, isAllOrd
     <Row>
       {/* <Col span={4}></Col> */}
       <Col span={22} className="mx-auto">
-        <div className="flex items-center justify-between">
+        <Row className="flex items-center justify-between">
+          <Col xs={0} md={4}>
           <h2 className="hidden md:block"> My Transactions </h2>
-          <div className="w-full md:w-auto flex gap-2 justify-between md:justify-end items-center mb-5 mt-4">
-            <Select className="block lg:block w-44 md:w-80 rounded-md" onChange={(val) => { handleFilter(val) }} placeholder="Select Type" defaultValue={type || ''}>
-              {TRANSACTION_FILTER.map(({ label, value }) =>
-                <Select.Option value={value}> {label} </Select.Option>
-              )}
-            </Select>
-            <Input className="text-base max-w-[400px] orders_searchbar md:p-3 mr-3 rounded-full bg-[#F6F6F6]"
-              key={searchVal}
-              onChange={(e) => { handleChangeSearch(e) }}
-              defaultValue={searchVal}
-              prefix={<SearchOutlined />}
-              placeholder="Search Transactions #" />
-               <RangePicker 
-               onChange={onDateChange}
-               disabled={false}
-               value={[dayjs.unix(selectedDate[0]), dayjs.unix(selectedDate[1])]}
-                disabledDate={(current) => {
-                  const selectedDate = dayjs(current).startOf('day');
-                  return selectedDate.isAfter(currentDate);
-                }}
-               />
-         {/* suffixIcon={<img src={Images.calender} alt="calender" className="w-5 h-5" style={{ maxWidth: "none" }} />} */}
-            <Dropdown
-              className="customButton"
-              menu={{ items: DOWNLOAD_OPTIONS, onClick: (e) => download(e.key) }}
-              disabled={isAllOrdersLoading}
-              trigger={['click']}
-            >
-              <Button loading={isAllOrdersLoading} className="h-[32px] w-[33px] rounded-md border border-[#6A6A6A] flex justify-center items-center">
-                <Space>
-                  <DownloadOutlined />
-                </Space>
-              </Button>
-            </Dropdown>
-          </div>
-        </div>
+          </Col>
+          <Col xs={24} md={16}>
+          <Row className="w-full md:w-auto md:flex md:justify-between items-center mb-5 mt-4">
+            <Col xs={24} md={6} className="flex justify-center mt-2 md:mt-0">
+              <Select className="block lg:block w-full md:w-4/5 rounded-md mx-auto" onChange={(val) => { handleFilter(val) }} placeholder="Select Type" defaultValue={type || ''}>
+                {TRANSACTION_FILTER.map(({ label, value }) =>
+                  <Select.Option value={value}> {label} </Select.Option>
+                )}
+              </Select>
+              </Col>
+              <Col xs={24} md={8} className="flex justify-center mt-2 md:mt-0">
+              <Input className="text-base max-w-[400px] orders_searchbar mx-auto md:p-3 mr-3 rounded-full bg-[#F6F6F6]"
+                key={searchVal}
+                onChange={(e) => { handleChangeSearch(e) }}
+                defaultValue={searchVal}
+                // size="small"
+                prefix={<SearchOutlined />}
+                placeholder="Search Transactions #" />
+            
+            </Col>
+
+            <Col xs={20} md={6} className="mt-2 md:mt-0"> 
+              <div className="border border-slate-300 rounded-lg">
+                <RangePicker
+                  onChange={onDateChange}
+                  disabled={false}
+                  value={[dayjs.unix(selectedDate[0]), dayjs.unix(selectedDate[1])]}
+                  disabledDate={(current) => {
+                    const selectedDate = dayjs(current).startOf('day');
+                    return selectedDate.isAfter(currentDate);
+                  }}
+                />
+              </div>
+              </Col>
+              <Col xs={4} md={2} className="flex justify-center mt-2 md:mt-0">
+              {/* suffixIcon={<img src={Images.calender} alt="calender" className="w-5 h-5" style={{ maxWidth: "none" }} />} */}
+              <Dropdown
+                className="customButton"
+                menu={{ items: DOWNLOAD_OPTIONS, onClick: (e) => download(e.key) }}
+                disabled={isAllOrdersLoading}
+                trigger={['click']}
+              >
+                <Button loading={isAllOrdersLoading} className="h-[32px] w-[33px] rounded-md border border-[#6A6A6A] flex justify-center items-center">
+                  <Space>
+                    <DownloadOutlined />
+                  </Space>
+                </Button>
+              </Dropdown>
+            </Col>
+          </Row>
+          </Col>
+        </Row>
         <div className="flex md:hidden order_responsive">
           <TransactionResponsive data={transactions} />
         </div>
