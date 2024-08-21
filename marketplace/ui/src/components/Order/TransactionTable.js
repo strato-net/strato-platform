@@ -298,7 +298,7 @@ const TransactionTable = ({ user, selectedDate, onDateChange, download, isAllOrd
               </Select>
               </Col>
               <Col xs={24} md={8} className="flex justify-center mt-2 md:mt-0">
-              <Input className="text-base max-w-[400px] orders_searchbar mx-auto md:p-3 mr-3 rounded-full bg-[#F6F6F6]"
+              <Input className="text-base w-full md:max-w-[400px] orders_searchbar mx-auto md:p-3 md:mr-3 rounded-full bg-[#F6F6F6]"
                 key={searchVal}
                 onChange={(e) => { handleChangeSearch(e) }}
                 defaultValue={searchVal}
@@ -308,7 +308,7 @@ const TransactionTable = ({ user, selectedDate, onDateChange, download, isAllOrd
             
             </Col>
 
-            <Col xs={20} md={6} className="mt-2 md:mt-0"> 
+            <Col xs={21} md={8} className="mt-2 md:mt-0"> 
               <div className="border border-slate-300 rounded-lg">
                 <RangePicker
                   onChange={onDateChange}
@@ -321,7 +321,7 @@ const TransactionTable = ({ user, selectedDate, onDateChange, download, isAllOrd
                 />
               </div>
               </Col>
-              <Col xs={4} md={2} className="flex justify-center mt-2 md:mt-0">
+              <Col xs={2} offset={1} md={1} className="flex justify-center mt-2 md:mt-0">
               {/* suffixIcon={<img src={Images.calender} alt="calender" className="w-5 h-5" style={{ maxWidth: "none" }} />} */}
               <Dropdown
                 className="customButton"
