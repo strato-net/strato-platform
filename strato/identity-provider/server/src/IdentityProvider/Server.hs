@@ -233,12 +233,12 @@ putIdentity accessToken uuid idProv name mEmail mCo mSub = do
               certInCirrus accessToken rd a >>= \case
                 -- User has no cert, create cert and wallet.
                 [] -> do
-                  createAndRegisterCert name' (T.unpack <$> mEmail) org uuid' realmToken rd k
-                  registerUserWalletAsync realmToken rd name' realm uuid' a
                   -- subscribe if can and should
-                  case (realmNoficicationServerUrl rd, fromMaybe True mSub) of 
+                  _ <- case (realmNoficicationServerUrl rd, fromMaybe True mSub) of 
                     (Just url, True) -> runNotificationM url $ subscribeUser accessToken (T.pack name')
                     (_, _) -> return ()
+                  createAndRegisterCert name' (T.unpack <$> mEmail) org uuid' realmToken rd k
+                  registerUserWalletAsync realmToken rd name' realm uuid' a
                 -- User has a cert but no wallet, create wallet using cert's common name. This is for backwards compatibility with existing users.
                 [cert] -> do
                   hasWallet <- walletInCirrus accessToken rd (T.unpack $ certCommonName cert)
@@ -254,12 +254,12 @@ putIdentity accessToken uuid idProv name mEmail mCo mSub = do
             Nothing -> do
               -- no vault key, so make key and register cert
               AddressAndKey a k <- postVaultKey accessToken
-              createAndRegisterCert name' (T.unpack <$> mEmail) org uuid' realmToken rd k
-              registerUserWalletAsync realmToken rd name' realm uuid' a
               -- subscribe if can and should
               _ <- case (realmNoficicationServerUrl rd, fromMaybe True mSub) of 
                 (Just url, True) -> runNotificationM url $ subscribeUser accessToken (T.pack name')
                 (_, _) -> return ()
+              createAndRegisterCert name' (T.unpack <$> mEmail) org uuid' realmToken rd k
+              registerUserWalletAsync realmToken rd name' realm uuid' a
               return a
         (_, Nothing) -> do
           $logErrorS "putIdentity" "uh oh! We couldn't retrieve an access token for our realm"
