@@ -219,7 +219,7 @@ const getCheckoutEvent = async (checkoutHash) => {
     }
   };
 
-  return await rest.search(ADMIN.getUser(), (r) => r.length === 1, searchOptions);
+  return await rest.search(ADMIN.getUser(), tableArgs, (r) => r.length === 1, searchOptions);
 }
 
 const checkSellerOnboarded = async (commonName) => {
