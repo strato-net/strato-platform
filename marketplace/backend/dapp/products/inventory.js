@@ -389,6 +389,13 @@ async function get(user, args, options) {
         }
     }
 
+    // Sort the images and files by their order
+    if (inventory['BlockApps-Mercata-Asset-images']) {
+        inventory['BlockApps-Mercata-Asset-images'].sort((a, b) => {
+            return parseInt(a.key) - parseInt(b.key);
+        });
+    }
+
     return marshalOut({
         ...inventory,
     });
@@ -419,6 +426,17 @@ async function getAll(admin, args = {}, defaultOptions) {
                 order: 'block_timestamp.desc',
                 limit: '25',
             }, options, admin);
+
+        // Iterate over each inventory in the array
+        inventories.forEach(inventory => {
+            // Check if the inventory has images
+            if (inventory['BlockApps-Mercata-Asset-images']) {
+                // Sort the images by their key
+                inventory['BlockApps-Mercata-Asset-images'].sort((a, b) => {
+                    return parseInt(a.key) - parseInt(b.key);
+                });
+            }
+        });
 
         // Combine the inventories and sales data
         if (inventories) {
