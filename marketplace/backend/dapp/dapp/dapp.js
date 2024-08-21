@@ -355,7 +355,7 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
         }
       });
       const redemptionServices = await redemptionServiceJs.getAll(rawAdmin, { address: redemptionServiceAddresses }, options);
-      
+
       const redemptionPromises = redemptionServices.map(async (rs) => {
         const serviceUrl = rs.serviceURL || rs.data.serviceURL;
         const getOutgoingRedemptionRoute = rs.outgoingRedemptionsRoute || rs.data.outgoingRedemptionsRoute;
@@ -373,7 +373,7 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
         redemptions.sort((a, b) => a.createdDate - b.createdDate);
       else
         redemptions.sort((a, b) => b.createdDate - a.createdDate);
-      
+
       return redemptions;
     } catch (error) {
       if (error.response) {
@@ -395,7 +395,7 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
       const redemptionEvents = await redemptionServiceJs.getRedemptions(rawAdmin, { issuer: userCert.commonName }, options);
       const redemptionServiceAddresses = redemptionEvents.map(r => r.address);
       const redemptionServices = await redemptionServiceJs.getAll(rawAdmin, { address: redemptionServiceAddresses }, options);
-      
+
       const redemptionPromises = redemptionServices.map(async (rs) => {
         const serviceUrl = rs.serviceURL || rs.data.serviceURL;
         const getIncomingRedemptionRoute = rs.incomingRedemptionsRoute || rs.data.incomingRedemptionsRoute;
@@ -414,7 +414,7 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
         redemptions.sort((a, b) => a.createdDate - b.createdDate);
       else
         redemptions.sort((a, b) => b.createdDate - a.createdDate);
-      
+
 
       return redemptions;
     } catch (error) {
@@ -587,8 +587,7 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
         });
         const histories = await Promise.all(historyPromises);
 
-        if(shouldAggregate)
-        {
+        if (shouldAggregate) {
           // Flatten records, process them using accumulator hash map such that for a given date we fetch latest timestamp's sale record from history table
           return histories.flat().reduce((acc, recordContainer) => {
             Object.values(recordContainer).forEach(record => {
@@ -600,7 +599,7 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
             });
             return acc;
           }, {});
-        }else{
+        } else {
           //send the history data without processing
           return histories.flat().map(recordContainer => Object.values(recordContainer)).flat();
         }
@@ -997,13 +996,13 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
   // //-----------------------------PAYMENT starts here -------------------------------
 
   contract.getPaymentServices = async function (args, options = defaultOptions) {
-      const paymentServices = await paymentProviderJs.getAll(rawAdmin, args, options);
-      return paymentServices;
+    const paymentServices = await paymentProviderJs.getAll(rawAdmin, args, options);
+    return paymentServices;
   }
 
   contract.getNotOnboardedPaymentServices = async function (args, options = defaultOptions) {
-      const paymentServices = await paymentProviderJs.getNotOnboarded(rawAdmin, args, options);
-      return paymentServices;
+    const paymentServices = await paymentProviderJs.getNotOnboarded(rawAdmin, args, options);
+    return paymentServices;
   }
 
   contract.paymentCheckout = async function (originUrl, args, options = defaultOptions) {
@@ -1044,7 +1043,7 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
         comments: DEFAULT_COMMENT,
       }
       const checkoutHashAndAssets = await paymentProviderJs.createPayment(rawAdmin, paymentParameters, options);
-      
+
       return checkoutHashAndAssets;
 
     } catch (error) {
@@ -1058,24 +1057,23 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
 
   contract.getStratsOrderEvent = async function (args, options = defaultOptions) {
 
-    const currentPaymentProvider = await paymentProviderJs.getAll(rawAdmin, {address: args.paymentProvider}, options);
-    if(currentPaymentProvider[0].contract_name.includes('StratPaymentService'))
-    {
-    const orderEvent = await rest.searchUntil(
-      rawAdmin,
-      { name: "BlockApps-Mercata-PaymentService.Order" },
-      (r) => r.length === 1,
-      {
-        ...options,
-        query:{
-        limit:1,
-        orderHash: `eq.${args.orderHash}`,
-        currency: 'eq.STRATS',
+    const currentPaymentProvider = await paymentProviderJs.getAll(rawAdmin, { address: args.paymentProvider }, options);
+    if (currentPaymentProvider[0].contract_name.includes('StratPaymentService')) {
+      const orderEvent = await rest.searchUntil(
+        rawAdmin,
+        { name: "BlockApps-Mercata-PaymentService.Order" },
+        (r) => r.length === 1,
+        {
+          ...options,
+          query: {
+            limit: 1,
+            orderHash: `eq.${args.orderHash}`,
+            currency: 'eq.STRATS',
+          }
         }
+      );
+      return orderEvent;
     }
-    );
-    return orderEvent;
-  }
   }
 
   contract.createUserAddress = async function (args, options = defaultOptions) {
@@ -1099,6 +1097,26 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
     }
   };
 
+  contract.getUserAddress = async function (args, options = optionsNoChainIds) {
+    const { redemptionService, shippingAddressId } = args;
+    try {
+      const { serviceURL, getCustomerAddressRoute = '' } = await redemptionServiceJs.get(rawAdmin, { address: redemptionService }, options);
+      const userAddress = await axios.get(new URL(`${getCustomerAddressRoute}/id/${shippingAddressId}`, serviceURL).href).then(function (res) {
+        if (res.status === 200) {
+          return res.data.data;
+        } else {
+          throw new rest.RestError(RestStatus.BAD_REQUEST, `Payment server call failed: ${res.statusText}`);
+        }
+      });
+      return userAddress;
+    } catch (error) {
+      if (error.response) {
+        throw new rest.RestError(error.response.status, error.response.statusText);
+      }
+      throw new rest.RestError(RestStatus.BAD_REQUEST, `Error while fetching shipping address: ${JSON.stringify(error)} `);
+    }
+  };
+
   contract.getAllUserAddress = async function (args, options = optionsNoChainIds) {
     const { redemptionService } = args;
     try {
@@ -1115,7 +1133,7 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
       if (error.response) {
         throw new rest.RestError(error.response.status, error.response.statusText);
       }
-      throw new rest.RestError(RestStatus.BAD_REQUEST, `Error while fetching addresses: ${JSON.stringify(error)} `);
+      throw new rest.RestError(RestStatus.BAD_REQUEST, `Error while fetching shipping addresses: ${JSON.stringify(error)} `);
     }
   };
 
