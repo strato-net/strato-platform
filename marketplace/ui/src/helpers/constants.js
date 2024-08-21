@@ -436,6 +436,10 @@ export const REDEMPTION_STATUS_CLASSES = {
     textClass: "bg-[#119B2D33]",
     bgClass: "bg-[#119B2D]"
   },
+  3: {
+    textClass: "bg-[#FFF0F0]",
+    bgClass: "bg-[#FF0000]"
+  },
 }
 
 export const TRANSACTION_SORT = [
