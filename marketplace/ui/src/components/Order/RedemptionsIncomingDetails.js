@@ -351,7 +351,7 @@ const RedemptionsIncomingDetails = ({ user }) => {
                                                     isLoading={isInventoryDetailsLoading}
                                                 />
                                             </div>
-                                            <h1 className="font-semibold text-2xl mb-4"> Requestor's Address </h1>
+                                            <h1 className="text-md mb-2 ml-2"> Requestor's Address </h1>
                                             <div className={`w-[307px] h-[200px] overflow-x-auto hide-Scroll py-3 px-[14px] rounded-[4px] border border-[#0000002E]`}>
                                                 {userAddress && <AddressComponent userAddress={userAddress} />}
                                             </div>
