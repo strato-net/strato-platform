@@ -76,16 +76,16 @@ const TransactionResponsive = ({ data }) => {
               <img
                 src={assetImage}
                 alt=""
-                className="rounded-xl max-h-32 shadow-2xl border-0"
+                className="rounded-xl max-h-32 shadow-2xl border-0 object-contain"
               />
             </Col>
             <Col span={8} offset={1} className="flex flex-col justify-between">
-              <p className="text-base font-bold"> {`${assetName.slice(0, 10)}..`} </p>
+              <p className="text-base font-bold"> {assetName.length > 10 ? `${assetName.slice(0, 10)}..` : assetName} </p>
               <p style={{ color: "#13188A" }} className="font-semibold">
                 #{reference}
               </p>
               <p style={{ color: "#827474" }} className="font-medium">
-                {`${assetDescription.replace(/<\/?[^>]+(>|$)/g, "")?.slice(0, 25)}..`}
+              {assetDescription.length > 25 ? `${assetDescription.replace(/<\/?[^>]+(>|$)/g, "")?.slice(0, 25)}..` : assetDescription.replace(/<\/?[^>]+(>|$)/g, "") }
               </p>
               <span
                 style={{ color: "#13188A" }}
