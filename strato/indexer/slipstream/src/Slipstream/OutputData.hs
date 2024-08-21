@@ -609,7 +609,7 @@ createEventArrayTable globalsIORef (creator, a, n) (arr, arrType) = do
   tableExists <- isTableCreated globalsIORef tableName
   $logInfoS "createEventArrayTable/tableExists"  $ T.pack ( "Table Name: " ++ show tableName ++ ", table exists: " ++ formatBool tableExists)
   $logInfoS "createEventArrayTable/(creator, a, n) " (T.pack $ show (creator, a, n))
-  $logInfoS "createEventArrayTable/(arr, arrType) " (T.pack $ show (creator, a, n))
+  $logInfoS "createEventArrayTable/(arr, arrType) " (T.pack $ show (arr, arrType))
   if tableExists
     then return []
     else do
@@ -1503,7 +1503,7 @@ createEventTable globalsIORef (creator, a, n) evName ev cc = do
     else do
       setTableCreated globalsIORef eventTable $ colsCombined
       eventArrayFkeys <- fmap concat . forM arrayNamesAndTypes $ \anat -> do
-        createEventArrayTable globalsIORef (crtr, app, (cname <> (T.pack "-") <> (escapeQuotes $ labelToText evName))) anat
+        createEventArrayTable globalsIORef (crtr, cname, (escapeQuotes $ labelToText evName)) anat
       yield $ createEventTableQuery eventTable colsCombined
       return $ eventArrayFkeys
 
@@ -1602,7 +1602,7 @@ insertEventTables globalsIORef processedEventArrays processedEventsWithoutArrays
       
   yieldMany . catMaybes =<< lift (mapM (insertEventTable globalsIORef) processedEventsWithoutArrays)
   when (not (null processedEventArrays)) $ insertCollectionTable processedEventArrays
-  
+
 getAllEvents :: 
   AggregateEvent -> 
   [AggregateEvent]
