@@ -23,6 +23,7 @@ module Blockchain.VMContext
     ContextM,
     GasCap (..),
     ValidatorDelta (..),
+    CertsDelta (..),
     stateDB,
     hashDB,
     codeDB,
@@ -45,6 +46,7 @@ module Blockchain.VMContext
     txRunResultsCache,
     debugSettings,
     validatorDelta,
+    certsDelta,
     dbs,
     state,
     stateDiffQueue,
@@ -65,6 +67,9 @@ module Blockchain.VMContext
     getContextValidators,
     putContextValidators,
     flushContextValidators,
+    getContextCerts,
+    putContextCerts,
+    flushContextCerts,
     checkIfRunningTests,
     lookupX509AddrFromCBHash,
     knownFailedTxs,
@@ -96,6 +101,7 @@ import qualified Blockchain.Database.MerklePatricia as MP
 import Blockchain.EthConf
 import Blockchain.Strato.Model.Account
 import Blockchain.Strato.Model.Address
+import Blockchain.Strato.Model.Class (DummyCertRevocation (..))
 import Blockchain.Strato.Model.CodePtr ()
 import Blockchain.Strato.Model.ExtendedWord
 import Blockchain.Strato.Model.Event
@@ -266,6 +272,12 @@ data ValidatorDelta = ValidatorDelta
     }
     deriving (Generic, NFData, Show)
 
+data CertsDelta = CertsDelta
+  { _newCerts     :: S.Set X509Certificate,
+    _revokedCerts :: [DummyCertRevocation]
+  }
+  deriving (Generic, NFData, Show)
+
 data ContextState = ContextState
   { _memDBs :: !MemDBs,
     _baggerState :: !BaggerState,
@@ -276,7 +288,8 @@ data ContextState = ContextState
     _runningTests :: !Bool,
     _txRunResultsCache :: TRC.Cache,
     _debugSettings :: !(Maybe DebugSettings),
-    _validatorDelta :: !ValidatorDelta
+    _validatorDelta :: !ValidatorDelta,
+    _certsDelta :: !CertsDelta
   }
   deriving (Generic, NFData)
 
@@ -294,7 +307,8 @@ instance Default ContextState where
         _runningTests = False,
         _txRunResultsCache = error "Default ContextState: accessing uninitialized txRunResultsCache",
         _debugSettings = Nothing,
-        _validatorDelta = ValidatorDelta S.empty S.empty
+        _validatorDelta = ValidatorDelta S.empty S.empty,
+        _certsDelta = CertsDelta S.empty []
       }
 
 data QueueEvent
@@ -450,7 +464,8 @@ runTestContextM f = withSystemTempDirectory "test_evm_context" $ \tmpdir ->
               _runningTests = True,
               _txRunResultsCache = cache,
               _debugSettings = Nothing,
-              _validatorDelta = ValidatorDelta S.empty S.empty
+              _validatorDelta = ValidatorDelta S.empty S.empty,
+              _certsDelta = CertsDelta S.empty []
             }
       que <- newTQueueIO
       let ctx =
@@ -617,3 +632,24 @@ putContextValidators events = do
 
 flushContextValidators :: (Mod.Modifiable ContextState m) => m ()
 flushContextValidators = Mod.modifyStatefully_ (Mod.Proxy @ContextState) $ validatorDelta .= ValidatorDelta S.empty S.empty
+
+getContextCerts :: (Functor m, Mod.Accessible ContextState m) => m CertsDelta
+getContextCerts = _certsDelta <$> Mod.access Mod.Proxy
+
+-- | Takes a list of events and filters out the 'CertificateRegistered' and 'CertificateRevoked'
+putContextCerts :: (MonadLogger m, Mod.Accessible ContextState m, Mod.Modifiable ContextState m) => [Event] -> m ()
+putContextCerts events = do
+    CertsDelta new' revoked' <- getContextCerts
+    let extractCertificate e = case bsToCert $ Text.encodeUtf8 $ T.pack $ snd $ fromJust $ find (\(x, _) -> x == "certificate") (evArgs e) of
+                                 Left  err  -> error $ show err
+                                 Right cert -> cert
+        extractCommonName e  = case bsToCert $ Text.encodeUtf8 $ T.pack $ snd $ fromJust $ find (\(x, _) -> x == "certificate") (evArgs e) of
+                                 Left  err  -> error $ show err
+                                 Right cert -> DummyCertRevocation $ commonName $ x509CertToCertInfoState cert
+        new                  = new' `S.union` S.fromList [extractCertificate e | e <- events, evName e == "CertificateRegistered"]
+        revoked              = revoked' ++ [extractCommonName e | e <- events, evName e == "CertificateRevoked"]
+        delta                = CertsDelta new revoked
+    Mod.modifyStatefully_ (Mod.Proxy @ContextState) $ certsDelta .= delta
+
+flushContextCerts :: (Mod.Modifiable ContextState m) => m ()
+flushContextCerts = Mod.modifyStatefully_ (Mod.Proxy @ContextState) $ certsDelta .= CertsDelta S.empty []

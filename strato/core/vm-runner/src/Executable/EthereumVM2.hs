@@ -192,11 +192,13 @@ handleVmEvents = awaitForever $ \InBatch {..} -> do
     
   case mNewBlock of 
     Just b -> do 
-        ValidatorDelta !new !removed <- lift getContextValidators 
+        ValidatorDelta !newv !removedv <- lift getContextValidators
+        CertsDelta !newc !revokedc <- lift getContextCerts
         let bh = obBlockData b 
-            bh' = bh { newValidators = S.toList new, removedValidators = S.toList removed }
+            bh' = bh { newValidators = S.toList newv, removedValidators = S.toList removedv , newCerts = S.toList newc , revokedCerts = revokedc }
         yield . OutBlock $ b { obBlockData = bh' }
         flushContextValidators
+        flushContextCerts
     Nothing -> pure ()
 
 groupEithers :: [Either a b] -> [Either [a] [b]]

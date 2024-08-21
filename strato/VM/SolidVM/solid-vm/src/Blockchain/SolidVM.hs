@@ -362,7 +362,7 @@ create' creator originAddress issuerAcct issuerName newAccount ch cc contractNam
       }
 
 call ::
-  (SolidVMBase m) =>
+  SolidVMBase m =>
   Bool ->
   Bool ->
   Bool ->
@@ -426,6 +426,7 @@ call _ _ _ isRCC _ blockData _ _ codeAddress sender' _ _ _ availableGas origin' 
     finalEvs <- Mod.get (Mod.Proxy @(Q.Seq Event))
 
     lift $ putContextValidators (toList finalEvs)
+    lift $ putContextCerts (toList finalEvs)
 
     return $
       ExecResults
