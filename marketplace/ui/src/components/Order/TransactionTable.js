@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from "react";
-import { Button, Dropdown, Space, Typography, Input, Row, Col, Popover, Card, Tooltip, Select } from "antd";
-import { DownOutlined, UpOutlined, DownloadOutlined, SearchOutlined } from "@ant-design/icons";
-import { useNavigate, useParams, useLocation } from "react-router-dom";
+import { Button, Dropdown, Space, Typography, Input, Row, Col, Popover, Card, Tooltip, Select, DatePicker } from "antd";
+import { DownloadOutlined, SearchOutlined } from "@ant-design/icons";
+import { useNavigate, useLocation } from "react-router-dom";
 import classNames from "classnames";
 // Components
 import DataTableComponent from "../DataTableComponent";
@@ -17,6 +17,8 @@ import TransactionResponsive from "./TransactionResponsive";
 import { actions as transactionAction } from "../../contexts/transaction/actions";
 import { useTransactionDispatch, useTransactionState } from "../../contexts/transaction";
 
+const { RangePicker } = DatePicker;
+
 const limit = '', offset = '';
 
 const TransactionTable = ({ user, selectedDate, onDateChange, download, isAllOrdersLoading }) => {
@@ -25,6 +27,8 @@ const TransactionTable = ({ user, selectedDate, onDateChange, download, isAllOrd
   const navigate = useNavigate();
   const location = useLocation();
   const transactionDispatch = useTransactionDispatch();
+
+  const currentDate = dayjs().startOf('day'); // Get the start of today
 
   const searchParams = new URLSearchParams(location.search);
   const searchVal = searchParams.get('search');
@@ -49,11 +53,12 @@ const TransactionTable = ({ user, selectedDate, onDateChange, download, isAllOrd
         limit,
         offset,
         user?.commonName,
+        selectedDate
         // type,
         // searchVal
       );
     }
-  }, [user])
+  }, [user, selectedDate])
 
   useEffect(() => {
     let filteredData = userTransactions;
@@ -64,7 +69,7 @@ const TransactionTable = ({ user, selectedDate, onDateChange, download, isAllOrd
   
     if (search) {
       const searchString = String(search).toLowerCase();
-      filteredData = filteredData.filter((item) => 
+      filteredData = filteredData.filter((item) =>
         String(item.reference).toLowerCase().indexOf(searchString) !== -1
       );
     }
@@ -72,7 +77,7 @@ const TransactionTable = ({ user, selectedDate, onDateChange, download, isAllOrd
     setTransactions(filteredData);
   }, [userTransactions, type, search]);
   
-  
+
 
   useEffect(() => {
     const timeout = setTimeout(() => {
@@ -282,7 +287,7 @@ const TransactionTable = ({ user, selectedDate, onDateChange, download, isAllOrd
       <Col span={22} className="mx-auto">
         <div className="flex items-center justify-between">
           <h2 className="hidden md:block"> My Transactions </h2>
-          <div className="w-full md:w-auto  flex gap-2 justify-between md:justify-end items-center mb-5 mt-4">
+          <div className="w-full md:w-auto flex gap-2 justify-between md:justify-end items-center mb-5 mt-4">
             <Select className="block lg:block w-44 md:w-80 rounded-md" onChange={(val) => { handleFilter(val) }} placeholder="Select Type" defaultValue={type || ''}>
               {TRANSACTION_FILTER.map(({ label, value }) =>
                 <Select.Option value={value}> {label} </Select.Option>
@@ -294,6 +299,16 @@ const TransactionTable = ({ user, selectedDate, onDateChange, download, isAllOrd
               defaultValue={searchVal}
               prefix={<SearchOutlined />}
               placeholder="Search Transactions #" />
+               <RangePicker 
+               onChange={onDateChange}
+               disabled={false}
+               value={[dayjs.unix(selectedDate[0]), dayjs.unix(selectedDate[1])]}
+                disabledDate={(current) => {
+                  const selectedDate = dayjs(current).startOf('day');
+                  return selectedDate.isAfter(currentDate);
+                }}
+               />
+         {/* suffixIcon={<img src={Images.calender} alt="calender" className="w-5 h-5" style={{ maxWidth: "none" }} />} */}
             <Dropdown
               className="customButton"
               menu={{ items: DOWNLOAD_OPTIONS, onClick: (e) => download(e.key) }}

@@ -30,6 +30,11 @@ const Order = ({ user }) => {
   const { type } = params;
   const dispatch = useOrderDispatch();
   const categoryDispatch = useCategoryDispatch();
+
+  const currentDate = dayjs().startOf('day').unix(); // todays date
+  const startOfMonth = dayjs().startOf('month').unix(); // Starting date of the current month
+  const oneMonthBack = dayjs().subtract(1, 'month').unix(); // Date one month back (same day of the previous month)
+
   const [callExcel, setCallExcel] = useState(false);
   const [callCSV, setCallCSV] = useState(false);
   const { allOrders, isAllOrdersLoading } = useOrderState();
@@ -44,11 +49,13 @@ const Order = ({ user }) => {
     navigate(`/order/${key}`)
   };
 
-  const [selectedDate, setSelectedDate] = useState("");
+  const [selectedDate, setSelectedDate] = useState([startOfMonth, currentDate]);
 
 
   const onDateChange = (date) => {
-    setSelectedDate(date);
+    const startDate = dayjs(date[0]).startOf('day').unix()
+    const endDate = dayjs(date[1]).startOf('day').unix()
+    setSelectedDate([startDate, endDate]);
   };
 
   // --------------------- EXPORT TO EXCEL AND CSV START ---------------------
@@ -91,7 +98,7 @@ const Order = ({ user }) => {
          if(order["BlockApps-Mercata-Order-quantities"]?.length){
           orderQuantities = order["BlockApps-Mercata-Order-quantities"].map(item => item.value)
          }else if(order.quantities?.length){
-          orderQuantities = order.quantities[0] 
+          orderQuantities = order.quantities[0]
          }
          else{
           orderQuantities = [0]
@@ -124,7 +131,6 @@ const Order = ({ user }) => {
       throw new Error("Failed to map order data");
     }
   }
-  
 
   function mapTransfersData(transfers) {
     try {
@@ -280,18 +286,6 @@ const Order = ({ user }) => {
     return buf;
   }
 
-  const menuItems = [
-    {
-      key: 'xls',
-      label: 'Excel',
-      disabled: isAllOrdersLoading,
-    },
-    {
-      key: 'csv',
-      label: 'CSV',
-      disabled: isAllOrdersLoading,
-    },
-  ];
   // --------------------- EXPORT TO EXCEL AND CSV END ---------------------
 
   return (
@@ -308,12 +302,12 @@ const Order = ({ user }) => {
           </Breadcrumb.Item>
           <Breadcrumb.Item href="" onClick={e => e.preventDefault()}>
             <p className=" text-sm text-[#202020] font-medium">
-             My Transaction
+              My Transaction
             </p>
           </Breadcrumb.Item>
         </Breadcrumb>
       </div>
-      <TransactionTable user={user} selectedDate={dayjs(selectedDate).startOf('day').unix()} onDateChange={onDateChange} download={download} isAllOrdersLoading={isAllOrdersLoading} />
+      <TransactionTable user={user} selectedDate={selectedDate} onDateChange={onDateChange} download={download} isAllOrdersLoading={isAllOrdersLoading} />
     </div>
   );
 };

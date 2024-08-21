@@ -2,14 +2,14 @@ import RestStatus from "http-status-codes";
 import { apiUrl, HTTP_METHODS } from "../../helpers/constants";
 
 const actionDescriptors = {
-     fetchUserTransaction: "fetch_users_transaction",
-     fetchUserTransactionSuccessful: "fetch_users_transaction_successful",
-     fetchUserTransactionFailed: "fetch_users_transaction_failed",
-     fetchGlobalTransaction: "fetch_global_transaction",
-     fetchGlobalTransactionSuccessful: "fetch_global_transaction_successful",
-     fetchGlobalTransactionFailed: "fetch_global_transaction_failed",
-     resetMessage: "reset_message",
-     setMessage: "set_message",
+  fetchUserTransaction: "fetch_users_transaction",
+  fetchUserTransactionSuccessful: "fetch_users_transaction_successful",
+  fetchUserTransactionFailed: "fetch_users_transaction_failed",
+  fetchGlobalTransaction: "fetch_global_transaction",
+  fetchGlobalTransactionSuccessful: "fetch_global_transaction_successful",
+  fetchGlobalTransactionFailed: "fetch_global_transaction_failed",
+  resetMessage: "reset_message",
+  setMessage: "set_message",
 };
 
 const actions = {
@@ -21,31 +21,37 @@ const actions = {
     dispatch({ type: actionDescriptors.setMessage, message, success });
   },
 
-  fetchUserTransaction: async (dispatch, limit, offset, commonName, type, search) => {
+  fetchUserTransaction: async (dispatch, limit, offset, commonName, dateRange) => {
     dispatch({ type: actionDescriptors.fetchUserTransaction });
 
     const encodedCommonName = encodeURIComponent(commonName);
     let query = "";
-    if(limit){
+    if (limit) {
       query += `limit=${limit}`
     }
-    if(offset){
+    if (offset) {
       query += `&offset=${offset}`
     }
-    if(commonName){
-      query +=  `&user=${encodedCommonName}`
+    if (commonName) {
+      query += `&user=${encodedCommonName}`
     }
-    if(type){
-      query += `&type=${type}`
-    }
-       if (search) {
-      const searchValue = isNaN(search) ? search : parseInt(search);
-      if (!isNaN(searchValue)) {
-        query = search ? query.concat(`&search=${searchValue}`) : query;
-      } 
+    // if (type) {
+    //   query += `&type=${type}`
+    // }
+    // if (search) {
+    //   const searchValue = isNaN(search) ? search : parseInt(search);
+    //   if (!isNaN(searchValue)) {
+    //     query = search ? query.concat(`&search=${searchValue}`) : query;
+    //   }
+    // }
+  //  console.log(dateRange);
+    if(dateRange){
+      query += `&startDate=${dateRange[0]}&endDate=${dateRange[1]}`
+      // query += `&range[]=createdDate,${dateRange[0]},${dateRange[1]}`
+      // query = dateRange ? query.concat(`&range[]=createdDate,${dateRange[0]},${dateRange[1]}`) : query;
     }
 
-    
+
     try {
       const response = await fetch(
         `${apiUrl}/transaction?${query}`,

@@ -18,13 +18,13 @@ class TransactionController {
     static async getAllTransactions(req, res, next) {
         try {
             const { dapp, params, query } = req
-            const { limit = '2000', offset = '0', order, search = '', type, user } = query;
+            const { limit = '2000', offset = '0', order, search = '', type, user, startDate, endDate } = query;
             let transactionQuery = {
                 limit: limit,
                 offset: offset,
                 order: 'createdDate.desc',
                 or: `(sellersCommonName.eq.${user},purchasersCommonName.eq.${user})`,
-                id: search
+                id: search,
             }
 
             const redemptionQuery = {
@@ -41,6 +41,12 @@ class TransactionController {
                 order: 'transferDate.desc',
                 id: search
             }
+            if(startDate && endDate){
+                transactionQuery['range'] = [`createdDate,${startDate},${endDate}`]
+                redemptionQuery['range'] = [`redemptionDate,${startDate},${endDate}`]
+                TransferQuery['range'] = [`transferDate,${startDate},${endDate}`]
+            }
+
             let orderData, itemTransfers, outgoingRedemptions, incomingRedemptions
             let data = []
             if (type === 'Order' || !type) {
