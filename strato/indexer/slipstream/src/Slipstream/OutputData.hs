@@ -1194,6 +1194,7 @@ insertArrayTableQuery ms =
              in (: []) $
                   T.concat
                     [ "INSERT INTO ",
+                      T.pack $ show x, 
                       tableNameToDoubleQuoteText tableName,
                       " ",
                       keySt,
