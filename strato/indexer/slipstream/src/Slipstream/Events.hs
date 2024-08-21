@@ -8,7 +8,7 @@ module Slipstream.Events where
 
 import qualified BlockApps.Solidity.Value as V
 import Blockchain.Strato.Model.Address
--- import Blockchain.Strato.Model.CodePtr
+import Blockchain.Strato.Model.CodePtr
 import Blockchain.Strato.Model.Keccak256
 import Data.Map (Map)
 import Data.Text (Text)
@@ -20,7 +20,7 @@ data Detail = Incremental | Eventual
 
 data ProcessedContract = ProcessedContract
   { address :: Address,
-    -- codehash :: CodePtr,
+    codehash :: CodePtr,
     creator :: Text,
     cc_creator :: Maybe Text,
     root :: Text,

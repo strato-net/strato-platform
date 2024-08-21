@@ -827,7 +827,7 @@ processGroupedData :: [ProcessedCollectionRow] -> [Text]
 processGroupedData rows@(row:_) =
   case collectiontype row of
     "Array" -> insertArrayTableQuery rows
-    "Event Array" -> insertArrayTableQuery rows
+    "Event Array" -> insertEventArrayTableQuery rows
     _ -> insertMappingTableQuery rows
 processGroupedData [] = []
 
@@ -1195,7 +1195,6 @@ insertArrayTableQuery ms =
              in (: []) $
                   T.concat
                     [ "INSERT INTO ",
-                      T.pack $ show x, 
                       tableNameToDoubleQuoteText tableName,
                       " ",
                       keySt,
@@ -1216,6 +1215,51 @@ insertArrayTableQuery ms =
                       ";"
                     ]
 
+insertEventArrayTableQuery :: [ProcessedCollectionRow] -> [Text]
+insertEventArrayTableQuery [] = []
+insertEventArrayTableQuery ms =
+  concat $
+    let ms' = (\m -> (m, Map.toList $ Map.mapMaybe valueToSQLText $ Map.fromList [("key", collectionDataKey m), ("value", collectionDataValue m)])) <$> ms
+     in flip map (map snd $ partitionWith (length . snd) ms') $ \case
+          [] -> []
+          arrays@((x, list) : _) ->
+            let tableName =
+                  collectionTableName
+                    (creator x)
+                    (application x)
+                    (contractname x)
+                    (collectionname x)
+                keySt = wrapAndEscapeDouble . map escapeQuotes $ baseMappingTableColumns ++ map fst (fillFirstEmptyEntries list) ++ [T.pack "value_fkey"]
+                baseVals =
+                  [ tshow . address,
+                    T.pack . keccak256ToHex . blockHash,
+                    tshow . blockTimestamp,
+                    tshow . blockNumber,
+                    T.pack . keccak256ToHex . transactionHash,
+                    tshow . transactionSender,
+                    creator,
+                    root,
+                    contractname,
+                    collectionname,
+                    collectiontype
+                  ]
+                vals = flip map arrays $ \(row, rowList) ->
+                  wrapAndEscape $ map (wrapSingleQuotes . ($ row)) baseVals ++ map snd rowList ++ [T.pack "NULL"]--value_fkey
+                valsForSQL = vals
+                inserts = csv valsForSQL
+             in (: []) $
+                  T.concat
+                    [ "INSERT INTO ",
+                      tableNameToDoubleQuoteText tableName,
+                      " ",
+                      keySt,
+                      "\n  VALUES ",
+                      inserts,
+                      [r|
+  ON CONFLICT DO NOTHING
+    |],
+                      ";"
+                    ]
 insertAbstractTableQuery :: [(E.ProcessedContract, [T.Text], T.Text, TableColumns)] -> Bool -> [Text]
 insertAbstractTableQuery [] _ = error "insertAbstractTableQuery: unhandled empty list"
 insertAbstractTableQuery cs isHistoric =

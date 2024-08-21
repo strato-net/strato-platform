@@ -126,7 +126,7 @@ processedContract ::
 processedContract ABIID {..} state AggregateAction {..} =
   E.ProcessedContract
     { address = actionAccount ^. accountAddress,
-      -- codehash = actionCodeHash,
+      codehash = actionCodeHash,
       creator = actionCreator,
       cc_creator = actionCCCreator,
       root = actionRoot,

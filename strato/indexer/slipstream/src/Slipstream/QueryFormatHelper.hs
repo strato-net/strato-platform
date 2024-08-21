@@ -79,7 +79,7 @@ tableNameToText (EventTableName c a n e) =
         | T.null c = ""
         | T.null a = c <> tableSeparator
         | otherwise = c <> tableSeparator <> a <> tableSeparator
-      contractAndEvent = n <> "." <> e
+      contractAndEvent = n <> "-" <> e
    in prefix <> contractAndEvent
 tableNameToText (AbstractTableName c a n) =
   let prefix
