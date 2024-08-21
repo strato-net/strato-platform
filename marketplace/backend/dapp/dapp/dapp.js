@@ -1075,20 +1075,6 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
     }
     );
 
-    const checkoutEvent = await rest.searchUntil(
-      rawAdmin,
-      { name: "BlockApps-Mercata-PaymentService.Checkout" },
-      (r) => r.length === 1,
-      {
-        ...options,
-        query: {
-          limit: 1,
-          ['checkoutHash']: `eq.${checkoutHash}`,
-        }
-    }
-    );
-
-    
     return orderEvent;
   }
   }
