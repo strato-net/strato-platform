@@ -234,7 +234,7 @@ putIdentity accessToken uuid idProv name mEmail mCo mSub = do
                 -- User has no cert, create cert and wallet.
                 [] -> do
                   -- subscribe if can and should
-                  _ <- case (realmNoficicationServerUrl rd, fromMaybe True mSub) of 
+                  void . async $ case (realmNoficicationServerUrl rd, fromMaybe True mSub) of 
                     (Just url, True) -> runNotificationM url $ subscribeUser accessToken (T.pack name')
                     (_, _) -> return ()
                   createAndRegisterCert name' (T.unpack <$> mEmail) org uuid' realmToken rd k
@@ -255,7 +255,7 @@ putIdentity accessToken uuid idProv name mEmail mCo mSub = do
               -- no vault key, so make key and register cert
               AddressAndKey a k <- postVaultKey accessToken
               -- subscribe if can and should
-              _ <- case (realmNoficicationServerUrl rd, fromMaybe True mSub) of 
+              void . async $ case (realmNoficicationServerUrl rd, fromMaybe True mSub) of 
                 (Just url, True) -> runNotificationM url $ subscribeUser accessToken (T.pack name')
                 (_, _) -> return ()
               createAndRegisterCert name' (T.unpack <$> mEmail) org uuid' realmToken rd k
