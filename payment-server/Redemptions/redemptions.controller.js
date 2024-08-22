@@ -71,9 +71,14 @@ class RedemptionsController {
                 orderByClause = `ORDER BY createdDate ${order}`;
             }
 
-            const query = `SELECT * FROM redemptions WHERE issuerCommonName = $1 AND ($2 = '' OR redemption_id::text = $2) ${orderByClause}`;
-            const values = [req.params.commonName, req.query.redemptionId];
+            const query = `
+                SELECT r.*, a.addressline1, a.addressline2, a.address_id, a.city, a.name, a.zipcode, a.state, a.country
+                FROM redemptions r
+                LEFT JOIN customer_address a ON r.shippingAddressId = a.address_id
+                WHERE r.issuerCommonName = $1 AND ($2 = '' OR r.redemption_id::text = $2) 
+                ${orderByClause}`;
 
+            const values = [req.params.commonName, req.query.redemptionId];
             const result = await client.query(query, values);
 
             // fix casing in columns
@@ -95,9 +100,11 @@ class RedemptionsController {
                     assetName: row["assetname"],
                     shippingAddressId: row["shippingaddressid"],
                     redemptionService: REDEMPTION_CONTRACT_ADDRESS,
-                    createdDate: formattedDate
+                    createdDate: formattedDate,
+                    addressLine1: row["addressline1"],
+                    addressLine2: row["addressline2"]
                 }
-                const { ownercomments, issuercomments, ownercommonname, issuercommonname, assetaddresses, assetname, shippingaddressid, createddate, ...rest } = newRow;
+                const { ownercomments, issuercomments, ownercommonname, issuercommonname, assetaddresses, assetname, shippingaddressid, addressline1, addressline2, createddate, ...rest } = newRow;
                 return rest;
             });
 
