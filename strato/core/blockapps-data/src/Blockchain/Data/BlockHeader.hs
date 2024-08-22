@@ -286,7 +286,7 @@ instance BlockHeaderLike BlockHeader where
   blockHeaderSignatures = getBlockSignatures
   blockHeaderVersion = bh where
     bh BlockHeader {} = 1
-    bh BlockHeaderV2 {} = 1
+    bh BlockHeaderV2 {} = 2
 
   blockHeaderModifyExtra f h = h {extraData = f (extraData h)}
 
