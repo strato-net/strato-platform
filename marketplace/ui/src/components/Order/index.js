@@ -33,6 +33,7 @@ const Order = ({ user }) => {
 
   const currentDate = dayjs().startOf('day').unix(); // todays date
   const startOfMonth = dayjs().startOf('month').unix(); // Starting date of the current month
+  const endOfMonth = dayjs().endOf('month').unix();
   const oneMonthBack = dayjs().subtract(1, 'month').unix(); // Date one month back (same day of the previous month)
 
   const [callExcel, setCallExcel] = useState(false);
@@ -49,13 +50,13 @@ const Order = ({ user }) => {
     navigate(`/order/${key}`)
   };
 
-  const [selectedDate, setSelectedDate] = useState([startOfMonth, currentDate]);
+  const [selectedDate, setSelectedDate] = useState([startOfMonth, endOfMonth]);
 
 
   const onDateChange = (date) => {
-    const startDate = dayjs(date[0]).startOf('day').unix()
-    const endDate = dayjs(date[1]).startOf('day').unix()
-    setSelectedDate([startDate, endDate]);
+    const startOfMonth = dayjs(date).startOf('month').unix();
+    const endOfMonth = dayjs(date).endOf('month').unix();
+    setSelectedDate([startOfMonth, endOfMonth]);
   };
 
   // --------------------- EXPORT TO EXCEL AND CSV START ---------------------

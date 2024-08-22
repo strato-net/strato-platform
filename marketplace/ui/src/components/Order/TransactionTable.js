@@ -305,24 +305,15 @@ const TransactionTable = ({ user, selectedDate, onDateChange, download, isAllOrd
                 // size="small"
                 prefix={<SearchOutlined />}
                 placeholder="Search Transactions #" />
-            
             </Col>
-
             <Col xs={21} md={8} className="mt-2 md:mt-0"> 
               <div className="border border-slate-300 rounded-lg">
-                <RangePicker
-                  onChange={onDateChange}
-                  disabled={false}
-                  value={[dayjs.unix(selectedDate[0]), dayjs.unix(selectedDate[1])]}
-                  disabledDate={(current) => {
-                    const selectedDate = dayjs(current).startOf('day');
-                    return selectedDate.isAfter(currentDate);
-                  }}
-                />
+              <DatePicker onChange={onDateChange} 
+              value={dayjs.unix(selectedDate[0])}
+              picker="month" />
               </div>
               </Col>
               <Col xs={2} offset={1} md={1} className="flex justify-center mt-2 md:mt-0">
-              {/* suffixIcon={<img src={Images.calender} alt="calender" className="w-5 h-5" style={{ maxWidth: "none" }} />} */}
               <Dropdown
                 className="customButton"
                 menu={{ items: DOWNLOAD_OPTIONS, onClick: (e) => download(e.key) }}

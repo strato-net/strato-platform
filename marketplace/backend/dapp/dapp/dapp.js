@@ -346,7 +346,7 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
   }
 
   contract.getOutgoingRedemptionRequests = async function (args, options = optionsNoChainIds) {
-    const { order, search } = args;
+    const { order, search, range } = args;
     const queryParams = new URLSearchParams({
       redemptionId: search,
       order: order
@@ -379,6 +379,14 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
 
       const allRedemptions = await Promise.all(redemptionPromises);
       redemptions = allRedemptions.flat();
+      redemptions = redemptions.filter((item)=>{
+        const dateRange = range[0].split(',')
+        const startRange = dateRange[1];
+        const endRange = dateRange[2];
+        if(item.redemptionDate > startRange && item.redemptionDate < endRange){
+          return item;
+        }
+      })
 
       if (order && order === 'ASC')
         redemptions.sort((a, b) => a.createdDate - b.createdDate);
@@ -395,7 +403,7 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
   };
 
   contract.getIncomingRedemptionRequests = async function (args, options = optionsNoChainIds) {
-    const { order, search } = args;
+    const { order, search, range } = args;
     const queryParams = new URLSearchParams({
       redemptionId: search,
       order: order
@@ -424,6 +432,14 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
 
       const allRedemptions = await Promise.all(redemptionPromises);
       redemptions = allRedemptions.flat();
+      redemptions = redemptions.filter((item)=>{
+        const dateRange = range[0].split(',')
+        const startRange = dateRange[1];
+        const endRange = dateRange[2];
+        if(item.redemptionDate > startRange && item.redemptionDate < endRange){
+          return item;
+        }
+      })
 
       if (order && order === 'ASC')
         redemptions.sort((a, b) => a.createdDate - b.createdDate);
@@ -953,6 +969,9 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
               saleAddresses.push(saleAddress.value);
             }
           });
+        }
+        if(order.saleAddresses?.length){
+          saleAddresses.push(order.saleAddresses[0]);
         }
       });
 
