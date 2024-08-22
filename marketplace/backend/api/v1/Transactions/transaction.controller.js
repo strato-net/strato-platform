@@ -78,7 +78,6 @@ class TransactionController {
             const inventoriesWithImageUrl = inventories?.inventories
             const sortData = data.sort((a, b) => ( b?.transferDate || b?.redemptionDate || b?.createdDate) - ( a?.transferDate || a?.redemptionDate || a?.createdDate));
             const newData = sortData.map((item) => {
-
                 const asset = inventoriesWithImageUrl.find((assetItem)=>{
                     return (assetItem.address === (item?.assetAddress || item?.assetAddresses[0]))
                 });
@@ -105,7 +104,9 @@ class TransactionController {
                 assetDescription:asset?.description || 'null',
                 assetImage:getImage(asset),
                 category:asset?.category || 'null',
-                assetPrice: item?.assetPrice
+                assetPrice: item?.assetPrice,
+                assetAddress: asset?.address,
+                assetContractName: asset?.contract_name
             }});
 
             res.status(200).json({ success: true, message: "Fetched Transactions successfully", data: newData })

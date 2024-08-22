@@ -17,8 +17,6 @@ import TransactionResponsive from "./TransactionResponsive";
 import { actions as transactionAction } from "../../contexts/transaction/actions";
 import { useTransactionDispatch, useTransactionState } from "../../contexts/transaction";
 
-const { RangePicker } = DatePicker;
-
 const limit = '', offset = '';
 
 const TransactionTable = ({ user, selectedDate, onDateChange, download, isAllOrdersLoading }) => {
@@ -309,7 +307,7 @@ const TransactionTable = ({ user, selectedDate, onDateChange, download, isAllOrd
             <Col xs={21} md={8} className="mt-2 md:mt-0"> 
               <div className="border border-slate-300 rounded-lg">
               <DatePicker onChange={onDateChange} 
-              value={dayjs.unix(selectedDate[0])}
+              defaultValue={dayjs.unix(selectedDate[0])}
               picker="month" />
               </div>
               </Col>

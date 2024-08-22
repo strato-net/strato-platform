@@ -21,6 +21,7 @@ import startCase from 'lodash/startCase';
 import { epochToDate } from "../../helpers/utils";
 import { ORDER_STATUS } from "../../helpers/constants";
 import TransactionTable from "./TransactionTable";
+import { useTransactionState } from "../../contexts/transaction";
 const INVERTED_ORDER_STATUS = Object.fromEntries(Object.entries(ORDER_STATUS).map(([key, value]) => [value, key]));
 
 const Order = ({ user }) => {
@@ -30,11 +31,11 @@ const Order = ({ user }) => {
   const { type } = params;
   const dispatch = useOrderDispatch();
   const categoryDispatch = useCategoryDispatch();
+  const { userTransactions } = useTransactionState();
 
-  const currentDate = dayjs().startOf('day').unix(); // todays date
+  // const currentDate = dayjs().startOf('day').unix(); // todays date
   const startOfMonth = dayjs().startOf('month').unix(); // Starting date of the current month
   const endOfMonth = dayjs().endOf('month').unix();
-  const oneMonthBack = dayjs().subtract(1, 'month').unix(); // Date one month back (same day of the previous month)
 
   const [callExcel, setCallExcel] = useState(false);
   const [callCSV, setCallCSV] = useState(false);
@@ -52,11 +53,10 @@ const Order = ({ user }) => {
 
   const [selectedDate, setSelectedDate] = useState([startOfMonth, endOfMonth]);
 
-
   const onDateChange = (date) => {
-    const startOfMonth = dayjs(date).startOf('month').unix();
-    const endOfMonth = dayjs(date).endOf('month').unix();
-    setSelectedDate([startOfMonth, endOfMonth]);
+    const startDate = dayjs(date).startOf('month').unix();
+    const endDate = dayjs(date).endOf('month').unix();
+    setSelectedDate([startDate, endDate]);
   };
 
   // --------------------- EXPORT TO EXCEL AND CSV START ---------------------
@@ -95,40 +95,26 @@ const Order = ({ user }) => {
     try {
       return orders.flatMap(order => {
         // Extract Quantities
-         let orderQuantities;
-         if(order["BlockApps-Mercata-Order-quantities"]?.length){
-          orderQuantities = order["BlockApps-Mercata-Order-quantities"].map(item => item.value)
-         }else if(order.quantities?.length){
-          orderQuantities = order.quantities[0]
-         }
-         else{
-          orderQuantities = [0]
-         }
-  
-        
-        return order.assets.map((asset, index) => {
-          const { category, subCategory } = getCategoryAndSubcategory(asset.contract_name);
-  
+          const { category, subCategory } = getCategoryAndSubcategory(order.assetContractName);
           return formatDataObject({
-            orderNumber: order.orderId,
-            purchaserName: order.purchasersCommonName,
+            orderNumber: order?.reference,
+            purchaserName: order?.purchasersCommonName,
             category,
             subCategory,
-            assetName: asset.name,
-            assetPrice: asset.salePrice,
-            quantity: orderQuantities[index],
-            totalOrderAmount: order.totalPrice,
-            orderDate: order.createdDate,
-            orderFulfillmentDate: order.fulfillmentDate,
+            assetName: order?.assetName,
+            assetPrice: order?.assetPrice,
+            quantity: order?.quantity,
+            totalOrderAmount: order?.totalPrice,
+            orderDate: order?.createdDate,
+            orderFulfillmentDate: order?.fulfillmentDate,
             orderStatus: INVERTED_ORDER_STATUS[order.status] || "Unknown",
-            comments: order.comments,
-            blockchainAddress: order.address
+            comments: order?.comments,
+            blockchainAddress: order?.address
           });
-        });
       });
     } catch (error) {
       // logging the actual error for better debugging
-      console.error("Error during mapping order data:", error);
+      console.error("Error during mapping order data", error);
       throw new Error("Failed to map order data");
     }
   }
@@ -136,7 +122,7 @@ const Order = ({ user }) => {
   function mapTransfersData(transfers) {
     try {
       return transfers.map(order => {
-        const { category, subCategory } = getCategoryAndSubcategory(order.contract_name);
+        const { category, subCategory } = getCategoryAndSubcategory(order.assetContractName);
         return formatDataObject({
           transferNumber: order.id,
           transferDate: order.transferDate,
@@ -156,13 +142,30 @@ const Order = ({ user }) => {
 
 
   useEffect(() => {
-    if (allOrders && callExcel && !isAllOrdersLoading) {
+    let boughtOrders = []
+    let soldOrders = []
+    let transfers = []
+    userTransactions.forEach((item)=>{
+     if(item.type === 'Order'){
+      if(item.sellersCommonName === user?.commonName){
+        soldOrders.push(item)
+      }
+      if(item.purchasersCommonName === user?.commonName){
+        boughtOrders.push(item)
+      }
+     }
+     if(item.type === 'Transfer'){
+        transfers.push(item)
+     }
+    })
+
+    if (userTransactions && callExcel && !isAllOrdersLoading) {
       const wb = XLSX.utils.book_new();
       let sold;
       let bought;
       let transferred;
       try {
-        sold = mapOrderData(allOrders.bodySold)
+        sold = mapOrderData(soldOrders)
       } catch (error) {
         api.error({
           message: 'Data Processing Error',
@@ -173,7 +176,7 @@ const Order = ({ user }) => {
       }
       const wsSold = XLSX.utils.json_to_sheet(sold ? sold : []);
       try {
-        bought = mapOrderData(allOrders.bodyBought)
+        bought = mapOrderData(boughtOrders)
       } catch (error) {
         api.error({
           message: 'Data Processing Error',
@@ -184,7 +187,7 @@ const Order = ({ user }) => {
       }
       const wsBought = XLSX.utils.json_to_sheet(bought ? bought : []);
       try {
-        transferred = mapTransfersData(allOrders.bodyTransfers)
+        transferred = mapTransfersData(transfers)
       } catch (error) {
         api.error({
           message: 'Data Processing Error',
@@ -209,14 +212,14 @@ const Order = ({ user }) => {
       setCallExcel(false);
       setCallCSV(false);
     }
-    if (allOrders && callCSV && !isAllOrdersLoading) {
+    if (userTransactions && callCSV && !isAllOrdersLoading) {
       // Adding an extra column to distinguish data
       const addTypeColumn = (data, type) => data.map(row => ({ ...row, Type: type }));
       let sold;
       let bought;
       let transferred;
       try {
-        sold = mapOrderData(allOrders.bodySold)
+        sold = mapOrderData(soldOrders)
       } catch (error) {
         api.error({
           message: 'Data Processing Error',
@@ -226,7 +229,7 @@ const Order = ({ user }) => {
         return;
       }
       try {
-        bought = mapOrderData(allOrders.bodyBought)
+        bought = mapOrderData(boughtOrders)
       } catch (error) {
         api.error({
           message: 'Data Processing Error',
@@ -236,7 +239,7 @@ const Order = ({ user }) => {
         return;
       }
       try {
-        transferred = mapTransfersData(allOrders.bodyTransfers)
+        transferred = mapTransfersData(transfers)
       } catch (error) {
         api.error({
           message: 'Data Processing Error',
@@ -260,13 +263,13 @@ const Order = ({ user }) => {
       setCallCSV(false);
       setCallExcel(false);
     }
-  }, [allOrders, callExcel, callCSV, isAllOrdersLoading]);
+  }, [ callExcel, callCSV, isAllOrdersLoading]);
 
   const download = async (format) => {
     if (user?.commonName) {
-      await actions.fetchAllOrders(
-        dispatch
-      );
+      // await actions.fetchAllOrders(
+      //   dispatch
+      // );
       if (format === 'xls') {
         setCallExcel(true);
         setCallCSV(false);
