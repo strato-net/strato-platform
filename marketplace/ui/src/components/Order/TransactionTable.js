@@ -296,7 +296,7 @@ const TransactionTable = ({ user, selectedDate, onDateChange, download, isAllOrd
                   )}
                 </Select>
               </Col>
-              <Col xs={24} md={9} className="flex justify-center mt-2 md:mt-0">
+              <Col xs={24} md={8} className="flex justify-center mt-2 md:mt-0">
                 <Input className="text-base w-full md:max-w-[400px] orders_searchbar mx-auto md:p-3 md:mr-3 rounded-full bg-[#F6F6F6]"
                   // key={searchVal}
                   onChange={(e) => { handleChangeSearch(e) }}
@@ -305,12 +305,14 @@ const TransactionTable = ({ user, selectedDate, onDateChange, download, isAllOrd
                   prefix={<SearchOutlined />}
                   placeholder="Search Transactions #" />
               </Col>
-              <Col xs={21} md={6} className="mt-2 md:mt-0 flex justify-center">
+              <Col xs={21} md={7} className="mt-2 md:mt-0 flex justify-center">
                 <div className="border border-slate-300 w-full rounded-lg">
                   <DatePicker onChange={onDateChange}
                   className="w-full"
                     defaultValue={dayjs.unix(selectedDate[0])}
-                    picker="month" />
+                    picker="month" 
+                    format={(value) => dayjs(value).format('MMMM YYYY')} 
+                    />
                 </div>
               </Col>
               <Col xs={2} offset={1} md={1} className="flex justify-center mt-2 md:mt-0">
