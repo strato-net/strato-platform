@@ -1,3 +1,4 @@
+{-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE TemplateHaskell #-}
 
@@ -11,6 +12,7 @@ import Blockchain.Strato.Model.Options (flags_network)
 import Control.Concurrent
 import Control.Lens.Combinators (use)
 import Control.Monad
+import Control.Monad.Catch
 import Control.Monad.IO.Unlift
 import Control.Monad.Trans.Except
 import Control.Monad.Trans.State
@@ -21,11 +23,13 @@ import qualified Data.Map as M
 import qualified Data.Text as T
 import Data.Text.Encoding (decodeUtf8)
 import qualified Data.Text.IO as TIO
-import Network.Kafka (KafkaAddress, KafkaClientError, KafkaState, mkKafkaState, runKafka, stateTopicMetadata, updateMetadata)
+import Network.Kafka (Kafka, KafkaAddress, KafkaClientError, KafkaState, mkKafkaState, runKafka, stateTopicMetadata, updateMetadata)
 import Network.Kafka.Protocol (KafkaError (..), TopicMetadata (..))
 import System.Exit
 import UnliftIO.Directory
-import UnliftIO.IO
+import UnliftIO.IO hiding (withFile)
+
+import Universum.Lifted.File
 
 type GenM = StateT KafkaState (ExceptT KafkaClientError IO)
 
@@ -34,7 +38,7 @@ runGenM kaddr mv = do
   eRes <- runKafka (mkKafkaState "generator" kaddr) mv
   either (die . ("runGenM: " ++) . show) return eRes
 
-initializeTopic :: GenM ()
+initializeTopic :: Kafka m => m ()
 initializeTopic = do
   updateMetadata initTopic
   meta <- use stateTopicMetadata
@@ -46,7 +50,8 @@ initializeTopic = do
 genesisFiles :: [(FilePath, C8.ByteString)]
 genesisFiles = $(embedDir "genesisBlocks")
 
-mkAll :: String -> GenM ()
+mkAll :: (MonadMask m, Kafka m) =>
+         String -> m ()
 mkAll genesisBlockName = do
   initializeTopic
   ethconf <- liftIO genEthConf
@@ -83,7 +88,8 @@ mkAll genesisBlockName = do
 
   addEvent InitComplete
 
-sendGenesisJson :: FilePath -> GenM ()
+sendGenesisJson :: Kafka m =>
+                   FilePath -> m ()
 sendGenesisJson genesisFilename = do
   fsFile <- doesFileExist genesisFilename
   eGenInfo <-
@@ -96,22 +102,21 @@ sendGenesisJson genesisFilename = do
     Left err -> liftIO $ die err
     Right genInfo -> addEvent $ GenesisBlock genInfo
 
-sendAccountInfo :: FilePath -> GenM ()
+sendAccountInfo :: (MonadMask m, Kafka m) =>
+                   FilePath -> m ()
 sendAccountInfo accountInfoFileName = do
   fsFile <- doesFileExist accountInfoFileName
   if fsFile
     then do
-      let sendChunks :: Handle -> GenM ()
+      let sendChunks :: Kafka m => Handle -> m ()
           sendChunks h = do
             chk <- liftIO $ TIO.hGetChunk h
             unless (T.null chk) $ do
               addEvent $ GenesisAccounts chk
               sendChunks h
-      s <- get
-      liftIO . withFile accountInfoFileName ReadMode $ \h -> do
+      withFile accountInfoFileName ReadMode $ \h -> do
         hSetBuffering h (BlockBuffering (Just (1024 * 1024)))
-        mErr <- runKafka s $ sendChunks h
-        either (die . ("sendAccountInfo: " ++) . show) return mErr
+        sendChunks h
     else case lookup accountInfoFileName genesisFiles of
       Nothing -> liftIO $ putStrLn "No account info found, assuming it isn't needed"
       Just bs -> addEvent $ GenesisAccounts $ decodeUtf8 bs
