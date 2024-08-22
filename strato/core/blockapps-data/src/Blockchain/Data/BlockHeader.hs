@@ -244,25 +244,23 @@ instance RLPSerializable BlockHeader where
           mixHash = rlpDecode mh,
           nonce = bytesToWord64 $ B.unpack $ rlpDecode nonce'
         }
-  rlpDecode (RLPArray [v, ph, sr, tr, rr, lb, number', ts, ed, nv, rv, nc, rc, s]) =
-    case rlpDecode v of
-      (2 :: Integer) ->
-        BlockHeaderV2
-        { parentHash = rlpDecode ph,
-          stateRoot = rlpDecode sr,
-          transactionsRoot = rlpDecode tr,
-          receiptsRoot = rlpDecode rr,
-          logsBloom = rlpDecode lb,
-          number = rlpDecode number',
-          timestamp = posixSecondsToUTCTime $ fromInteger $ rlpDecode ts,
-          extraData = rlpDecode ed,
-          newValidators = rlpDecode nv,
-          removedValidators = rlpDecode rv,
-          newCerts = rlpDecode nc,
-          revokedCerts = rlpDecode rc,
-          signatures = rlpDecode s
-        }
-      versionNumber -> error $ "malformed block format: unknown version number: " ++ show versionNumber
+  rlpDecode (RLPArray [v, ph, sr, tr, rr, lb, number', ts, ed, nv, rv, nc, rc, s]) 
+    | rlpDecode v == (2 :: Integer) =
+          BlockHeaderV2
+          { parentHash = rlpDecode ph,
+            stateRoot = rlpDecode sr,
+            transactionsRoot = rlpDecode tr,
+            receiptsRoot = rlpDecode rr,
+            logsBloom = rlpDecode lb,
+            number = rlpDecode number',
+            timestamp = posixSecondsToUTCTime $ fromInteger $ rlpDecode ts,
+            extraData = rlpDecode ed,
+            newValidators = rlpDecode nv,
+            removedValidators = rlpDecode rv,
+            newCerts = rlpDecode nc,
+            revokedCerts = rlpDecode rc,
+            signatures = rlpDecode s
+          }
   rlpDecode x = error $ "can not run rlpDecode on BlockHeader for value " ++ show x
 
 instance BlockHeaderLike BlockHeader where
