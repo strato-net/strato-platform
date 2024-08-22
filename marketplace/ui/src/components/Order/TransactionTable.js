@@ -287,7 +287,7 @@ const TransactionTable = ({ user, selectedDate, onDateChange, download, isAllOrd
           <Col xs={0} md={4}>
             <h2 className="hidden md:block"> My Transactions </h2>
           </Col>
-          <Col xs={24} md={12}>
+          <Col xs={24} md={20} xl={16}>
             <Row className="w-full md:w-auto md:flex md:justify-between items-center mb-5 mt-4">
               <Col xs={24} md={6} className="flex justify-center mt-2 md:mt-0">
                 <Select className="block lg:block w-full md:w-4/5 rounded-md mx-auto" onChange={(val) => { handleFilter(val) }} placeholder="Select Type" defaultValue={type || ''}>
@@ -296,7 +296,7 @@ const TransactionTable = ({ user, selectedDate, onDateChange, download, isAllOrd
                   )}
                 </Select>
               </Col>
-              <Col xs={24} md={8} className="flex justify-center mt-2 md:mt-0">
+              <Col xs={24} md={9} className="flex justify-center mt-2 md:mt-0">
                 <Input className="text-base w-full md:max-w-[400px] orders_searchbar mx-auto md:p-3 md:mr-3 rounded-full bg-[#F6F6F6]"
                   // key={searchVal}
                   onChange={(e) => { handleChangeSearch(e) }}
@@ -305,7 +305,7 @@ const TransactionTable = ({ user, selectedDate, onDateChange, download, isAllOrd
                   prefix={<SearchOutlined />}
                   placeholder="Search Transactions #" />
               </Col>
-              <Col xs={21} md={5} className="mt-2 md:mt-0 ">
+              <Col xs={21} md={6} className="mt-2 md:mt-0 flex justify-center">
                 <div className="border border-slate-300 w-full rounded-lg">
                   <DatePicker onChange={onDateChange}
                   className="w-full"
