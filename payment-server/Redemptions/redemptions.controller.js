@@ -122,7 +122,7 @@ class RedemptionsController {
             const query = `
                 SELECT r.*, a.addressline1, a.addressline2, a.address_id, a.city, a.name, a.zipcode, a.state, a.country
                 FROM redemptions r
-                LEFT JOIN customer_address a ON r.shippingAddressId = a.id
+                LEFT JOIN customer_address a ON r.shippingAddressId = a.address_id
                 WHERE r.redemption_id = $1`;
             const values = [req.params.id];
 
