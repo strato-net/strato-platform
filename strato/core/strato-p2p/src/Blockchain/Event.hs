@@ -204,7 +204,9 @@ handleEvents peer = awaitForever $ \case
         chain <- fmap M.toList . lift . selectMany (Proxy @(Canonical BlockHeader)) $ take count [start' ..]
         yieldR . BlockHeaders . skipEntries skip' $ morphBlockHeader . unCanonical . snd <$> chain
   MsgEvt (BlockHeaders bHeaders) -> do
+    $logInfoS "--------------------- SHOWING bHeaders: " $ T.pack $ show bHeaders
     let headers = morphBlockHeader <$> bHeaders
+    --- put bheaders log right here
     lift stampActionTimestamp
     -- check if blockheaders we recieved have parents.
     let parents = map BlockHeader.parentHash headers

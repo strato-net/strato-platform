@@ -284,12 +284,34 @@ instance BlockHeaderLike BlockHeader where
   blockHeaderNewCerts = getBlockNewCerts
   blockHeaderRevokedCerts = getBlockRevokedCerts
   blockHeaderSignatures = getBlockSignatures
+  blockHeaderVersion = bh where
+    bh BlockHeader {} = 1
+    bh BlockHeaderV2 {} = 1
 
   blockHeaderModifyExtra f h = h {extraData = f (extraData h)}
 
-  morphBlockHeader b =
-    BlockHeaderV2
-      { number = blockHeaderBlockNumber b,
+  morphBlockHeader b = case blockHeaderVersion b of
+    1 -> 
+      BlockHeader { 
+        number = blockHeaderBlockNumber b,
+        parentHash = blockHeaderParentHash b,
+        ommersHash = blockHeaderOmmersHash b,
+        beneficiary = blockHeaderBeneficiary b,
+        stateRoot = MP.StateRoot $ blockHeaderStateRoot b,
+        transactionsRoot = MP.StateRoot $ blockHeaderTransactionsRoot b,
+        receiptsRoot = MP.StateRoot $ blockHeaderReceiptsRoot b,
+        logsBloom = blockHeaderLogsBloom b,
+        gasLimit = blockHeaderGasLimit b,
+        gasUsed = blockHeaderGasUsed b,
+        difficulty = blockHeaderDifficulty b,
+        nonce = blockHeaderNonce b,
+        extraData = blockHeaderExtraData b,
+        timestamp = blockHeaderTimestamp b,
+        mixHash = blockHeaderMixHash b
+      }
+    2 -> 
+      BlockHeaderV2 { 
+        number = blockHeaderBlockNumber b,
         parentHash = blockHeaderParentHash b,
         stateRoot = MP.StateRoot $ blockHeaderStateRoot b,
         transactionsRoot = MP.StateRoot $ blockHeaderTransactionsRoot b,
@@ -303,6 +325,7 @@ instance BlockHeaderLike BlockHeader where
         revokedCerts = blockHeaderRevokedCerts b,
         signatures = blockHeaderSignatures b
       }
+    _ -> error "Unknown block header version"
 
 headerHash :: BlockHeader -> Keccak256
 headerHash = blockHeaderHash

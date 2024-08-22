@@ -66,6 +66,7 @@ class RLPSerializable h => BlockHeaderLike h where
   blockHeaderNewCerts :: h -> [X509Certificate]
   blockHeaderRevokedCerts :: h -> [DummyCertRevocation]
   blockHeaderSignatures :: h -> [Signature]
+  blockHeaderVersion :: h -> Integer
 
   -- This should be Lens' h B.ByteString, except that the RedisHeader cannot
   -- derive it.
@@ -95,7 +96,8 @@ class RLPSerializable h => BlockHeaderLike h where
     blockHeaderNewCerts,
     blockHeaderRevokedCerts,
     blockHeaderSignatures,
-    morphBlockHeader
+    morphBlockHeader,
+    blockHeaderVersion
     #-}
 
   blockHeaderHash :: h -> Keccak256
