@@ -60,21 +60,21 @@ const TransactionTable = ({ user, selectedDate, onDateChange, download, isAllOrd
 
   useEffect(() => {
     let filteredData = userTransactions;
-  
+
     if (type) {
       filteredData = filteredData.filter((item) => item.type === type);
     }
-  
+
     if (search) {
       const searchString = String(search).toLowerCase();
       filteredData = filteredData.filter((item) =>
         String(item.reference).toLowerCase().indexOf(searchString) !== -1
       );
     }
-  
+
     setTransactions(filteredData);
   }, [userTransactions, type, search]);
-  
+
 
 
   useEffect(() => {
@@ -127,9 +127,9 @@ const TransactionTable = ({ user, selectedDate, onDateChange, download, isAllOrd
             <p style={{ color: '#827474' }} className="font-medium cursor-pointer"><Tooltip placement="top" title={data.assetDescription.replace(/<\/?[^>]+(>|$)/g, "")}> {data?.assetDescription.length > 28 ? `${data.assetDescription.replace(/<\/?[^>]+(>|$)/g, "")?.slice(0, 28)}...` : data?.assetDescription.replace(/<\/?[^>]+(>|$)/g, "")} </Tooltip></p>
           </Col>
           <Col span={8} offset={1}>
-           {price
+            {price
               ? <p className="text-right flex justify-end items-center"> <b>$ {price} </b> &nbsp;(<span className="text-[#13188A] font-bold"> {(data?.assetPrice || data?.price) * STRATS_CONVERSION} </span>{StratsIcon}) </p>
-              : <p className="text-right text-[#13188A] font-bold text-sm"> No Price Available  </p>          }
+              : <p className="text-right text-[#13188A] font-bold text-sm"> No Price Available  </p>}
             {/* <p className="text-bold text-right mt-2">Sold Out</p> */}
           </Col>
         </Row>
@@ -284,48 +284,49 @@ const TransactionTable = ({ user, selectedDate, onDateChange, download, isAllOrd
       <Col span={22} className="mx-auto">
         <Row className="flex items-center justify-between">
           <Col xs={0} md={4}>
-          <h2 className="hidden md:block"> My Transactions </h2>
+            <h2 className="hidden md:block"> My Transactions </h2>
           </Col>
-          <Col xs={24} md={16}>
-          <Row className="w-full md:w-auto md:flex md:justify-between items-center mb-5 mt-4">
-            <Col xs={24} md={6} className="flex justify-center mt-2 md:mt-0">
-              <Select className="block lg:block w-full md:w-4/5 rounded-md mx-auto" onChange={(val) => { handleFilter(val) }} placeholder="Select Type" defaultValue={type || ''}>
-                {TRANSACTION_FILTER.map(({ label, value }) =>
-                  <Select.Option value={value}> {label} </Select.Option>
-                )}
-              </Select>
+          <Col xs={24} md={12}>
+            <Row className="w-full md:w-auto md:flex md:justify-between items-center mb-5 mt-4">
+              <Col xs={24} md={6} className="flex justify-center mt-2 md:mt-0">
+                <Select className="block lg:block w-full md:w-4/5 rounded-md mx-auto" onChange={(val) => { handleFilter(val) }} placeholder="Select Type" defaultValue={type || ''}>
+                  {TRANSACTION_FILTER.map(({ label, value }) =>
+                    <Select.Option value={value}> {label} </Select.Option>
+                  )}
+                </Select>
               </Col>
               <Col xs={24} md={8} className="flex justify-center mt-2 md:mt-0">
-              <Input className="text-base w-full md:max-w-[400px] orders_searchbar mx-auto md:p-3 md:mr-3 rounded-full bg-[#F6F6F6]"
-                key={searchVal}
-                onChange={(e) => { handleChangeSearch(e) }}
-                defaultValue={searchVal}
-                // size="small"
-                prefix={<SearchOutlined />}
-                placeholder="Search Transactions #" />
-            </Col>
-            <Col xs={21} md={8} className="mt-2 md:mt-0"> 
-              <div className="border border-slate-300 rounded-lg">
-              <DatePicker onChange={onDateChange} 
-              defaultValue={dayjs.unix(selectedDate[0])}
-              picker="month" />
-              </div>
+                <Input className="text-base w-full md:max-w-[400px] orders_searchbar mx-auto md:p-3 md:mr-3 rounded-full bg-[#F6F6F6]"
+                  key={searchVal}
+                  onChange={(e) => { handleChangeSearch(e) }}
+                  defaultValue={searchVal}
+                  // size="small"
+                  prefix={<SearchOutlined />}
+                  placeholder="Search Transactions #" />
+              </Col>
+              <Col xs={21} md={5} className="mt-2 md:mt-0 ">
+                <div className="border border-slate-300 w-full rounded-lg">
+                  <DatePicker onChange={onDateChange}
+                  className="w-full"
+                    defaultValue={dayjs.unix(selectedDate[0])}
+                    picker="month" />
+                </div>
               </Col>
               <Col xs={2} offset={1} md={1} className="flex justify-center mt-2 md:mt-0">
-              <Dropdown
-                className="customButton"
-                menu={{ items: DOWNLOAD_OPTIONS, onClick: (e) => download(e.key) }}
-                disabled={isAllOrdersLoading}
-                trigger={['click']}
-              >
-                <Button loading={isAllOrdersLoading} className="h-[32px] w-[33px] rounded-md border border-[#6A6A6A] flex justify-center items-center">
-                  <Space>
-                    <DownloadOutlined />
-                  </Space>
-                </Button>
-              </Dropdown>
-            </Col>
-          </Row>
+                <Dropdown
+                  className="customButton"
+                  menu={{ items: DOWNLOAD_OPTIONS, onClick: (e) => download(e.key) }}
+                  disabled={isAllOrdersLoading}
+                  trigger={['click']}
+                >
+                  <Button loading={isAllOrdersLoading} className="h-[32px] w-[33px] rounded-md border border-[#6A6A6A] flex justify-center items-center">
+                    <Space>
+                      <DownloadOutlined />
+                    </Space>
+                  </Button>
+                </Dropdown>
+              </Col>
+            </Row>
           </Col>
         </Row>
         <div className="flex md:hidden order_responsive">
