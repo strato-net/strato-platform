@@ -71,63 +71,8 @@ class RedemptionsController {
                 orderByClause = `ORDER BY createdDate ${order}`;
             }
 
-            const query = `
-                SELECT r.*, a.addressline1, a.addressline2, a.address_id, a.city, a.name, a.zipcode, a.state, a.country
-                FROM redemptions r
-                LEFT JOIN customer_address a ON r.shippingAddressId = a.address_id
-                WHERE r.issuerCommonName = $1 AND ($2 = '' OR r.redemption_id::text = $2) 
-                ${orderByClause}`;
-
+            const query = `SELECT * FROM redemptions WHERE issuerCommonName = $1 AND ($2 = '' OR redemption_id::text = $2) ${orderByClause}`;
             const values = [req.params.commonName, req.query.redemptionId];
-            const result = await client.query(query, values);
-
-            // fix casing in columns
-            const formattedRows = result.rows.map(row => {
-                const date = new Date(row["createddate"]);
-                const formattedDate = date.toLocaleDateString('en-US', {
-                    month: '2-digit',
-                    day: '2-digit',
-                    year: 'numeric'
-                });
-
-                const newRow = {
-                    ...row,
-                    ownerComments: row["ownercomments"],
-                    issuerComments: row["issuercomments"],
-                    ownerCommonName: row["ownercommonname"],
-                    issuerCommonName: row["issuercommonname"],
-                    assetAddresses: row["assetaddresses"],
-                    assetName: row["assetname"],
-                    shippingAddressId: row["shippingaddressid"],
-                    redemptionService: REDEMPTION_CONTRACT_ADDRESS,
-                    createdDate: formattedDate,
-                    addressLine1: row["addressline1"],
-                    addressLine2: row["addressline2"]
-                }
-                const { ownercomments, issuercomments, ownercommonname, issuercommonname, assetaddresses, assetname, shippingaddressid, addressline1, addressline2, createddate, ...rest } = newRow;
-                return rest;
-            });
-
-            res.status(200).json({
-                message: 'success',
-                data: formattedRows || [],
-            });
-
-            return next();
-        } catch (error) {
-            console.error('DB Error:', error.message);
-            next(error);
-        }
-    }
-
-    static async getRedemption(req, res, next) {
-        try {
-            if (!req.params.id) {
-                throw new Error('Missing redemption ID in GET request /:id');
-            }
-
-            const query = 'SELECT * FROM redemptions WHERE redemption_id = $1';
-            const values = [req.params.id];
 
             const result = await client.query(query, values);
 
@@ -153,6 +98,60 @@ class RedemptionsController {
                     createdDate: formattedDate
                 }
                 const { ownercomments, issuercomments, ownercommonname, issuercommonname, assetaddresses, assetname, shippingaddressid, createddate, ...rest } = newRow;
+                return rest;
+            });
+
+            res.status(200).json({
+                message: 'success',
+                data: formattedRows || [],
+            });
+
+            return next();
+        } catch (error) {
+            console.error('DB Error:', error.message);
+            next(error);
+        }
+    }
+
+    static async getRedemption(req, res, next) {
+        try {
+            if (!req.params.id) {
+                throw new Error('Missing redemption ID in GET request /:id');
+            }
+
+            const query = `
+                SELECT r.*, a.addressline1, a.addressline2, a.address_id, a.city, a.name, a.zipcode, a.state, a.country
+                FROM redemptions r
+                LEFT JOIN customer_address a ON r.shippingAddressId = a.id
+                WHERE r.redemption_id = $1`;
+            const values = [req.params.id];
+
+            const result = await client.query(query, values);
+
+            // fix casing in columns
+            const formattedRows = result.rows.map(row => {
+                const date = new Date(row["createddate"]);
+                const formattedDate = date.toLocaleDateString('en-US', {
+                    month: '2-digit',
+                    day: '2-digit',
+                    year: 'numeric'
+                });
+
+                const newRow = {
+                    ...row,
+                    ownerComments: row["ownercomments"],
+                    issuerComments: row["issuercomments"],
+                    ownerCommonName: row["ownercommonname"],
+                    issuerCommonName: row["issuercommonname"],
+                    assetAddresses: row["assetaddresses"],
+                    assetName: row["assetname"],
+                    shippingAddressId: row["shippingaddressid"],
+                    redemptionService: REDEMPTION_CONTRACT_ADDRESS,
+                    addressLine1: row["addressline1"],
+                    addressLine2: row["addressline2"],
+                    createdDate: formattedDate
+                }
+                const { ownercomments, issuercomments, ownercommonname, issuercommonname, assetaddresses, assetname, shippingaddressid, addressline1, addressline2, createddate, ...rest } = newRow;
                 return rest;
             });
 
