@@ -85,13 +85,14 @@ const TransactionTable = ({ user, selectedDate, onDateChange, download, isAllOrd
         } else {
           navigate(`/transaction`)
         }
-      } else {
-        if (type) {
-          navigate(`/transaction?type=${type}&search=${search}`)
-        } else {
-          navigate(`/transaction?search=${search}`)
-        }
-      }
+      } 
+      // else {
+      //   if (type) {
+      //     navigate(`/transaction?type=${type}&search=${search}`)
+      //   } else {
+      //     navigate(`/transaction?search=${search}`)
+      //   }
+      // }
     }, 1000)
     return () => {
       clearTimeout(timeout)
@@ -297,9 +298,9 @@ const TransactionTable = ({ user, selectedDate, onDateChange, download, isAllOrd
               </Col>
               <Col xs={24} md={8} className="flex justify-center mt-2 md:mt-0">
                 <Input className="text-base w-full md:max-w-[400px] orders_searchbar mx-auto md:p-3 md:mr-3 rounded-full bg-[#F6F6F6]"
-                  key={searchVal}
+                  // key={searchVal}
                   onChange={(e) => { handleChangeSearch(e) }}
-                  defaultValue={searchVal}
+                  value={search}
                   // size="small"
                   prefix={<SearchOutlined />}
                   placeholder="Search Transactions #" />
