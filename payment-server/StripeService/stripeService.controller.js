@@ -201,6 +201,7 @@ class StripeServiceController {
           comments: PAYMENT_RECEIVED_MESSAGE,
         } 
         returnStatus = await completeOrder(STRIPE_CONTRACT_ADDRESS, callArgs);
+        res.redirect(`${redirectUrl}?assets=${returnStatus}`);
 
         // Update payment status in DB
         const updateResult = await updateStripePayment(checkoutHash, "PAID");
@@ -237,6 +238,7 @@ class StripeServiceController {
           comments: "",
         } 
         returnStatus = await generateIntermediateOrder(STRIPE_CONTRACT_ADDRESS, callArgs);
+        res.redirect(`${redirectUrl}?assets=${returnStatus}`);
 
         // Update payment status in DB
         const updateResult = await updateStripePayment(checkoutHash, "INITIALIZED");
@@ -261,8 +263,6 @@ class StripeServiceController {
 
       console.log("returnStatus", returnStatus);
 
-      // Redirect back to marketplace
-      res.redirect(`${redirectUrl}?assets=${returnStatus}`);
       return next();
     } catch(e) {
       next(e);
