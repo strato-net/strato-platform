@@ -444,14 +444,19 @@ processTheMessages env conn messages = do
           --get columns for abstract table
           $logInfoLS "abstractColumns" $ T.pack $ "Getting abstract columns from " ++ (show abstracts)
           abstractColumns' <- fmap catMaybes . for (Map.toList abstracts) $ \((_, n'), (cr', ap', cols)) -> do
-            let cregator = fromMaybe cr' (actionCCCreator row)
-                tableName = AbstractTableName cregator ap' n'
-                tableNameText = tableNameToDoubleQuoteText tableName
-            $logDebugLS "actionCCCreator" $ T.pack (show (actionCCCreator row))
-            $logDebugLS "cregator" $ T.pack (show cregator)
-            $logInfoS "Row will be inserted into abstract table: " tableNameText
-            $logInfoS "cols: " $ T.pack (show cols)
-            pure $ (indexContract, fkeysForThisContract, tableNameText, (cr',ap',n'),) . map extractTextInsideQuotes <$> (Just cols)
+              let cregator = fromMaybe cr' (actionCCCreator row)
+                  tableName = AbstractTableName cregator ap' n'
+                  tableNameText = tableNameToDoubleQuoteText tableName
+              $logDebugLS "actionCCCreator" $ T.pack (show (actionCCCreator row))
+              $logDebugLS "cregator" $ T.pack (show cregator)
+              $logInfoS "Row will be inserted into abstract table: " tableNameText
+              $logInfoS "cols: " $ T.pack (show cols)
+              
+              -- let extractedCols = map extractTextInsideQuotes cols
+              let result = (indexContract, fkeysForThisContract, tableNameText, (cr', ap', n'), cols)
+              -- $logInfoS "extractedCols: " $ T.pack (show extractedCols)
+              $logInfoS "result: " $ T.pack (show result)
+              pure (Just result)
           $logDebugLS "Globals: Recorded Map names are: " . T.pack $ show mapNames ++ " contract: " ++ show (E.contractName indexContract)
           $logDebugLS "Globals: Recorded Array names are: " . T.pack $ show arrNames ++ " contract: " ++ show (E.contractName indexContract)
           $logDebugLS "History inserts are: " $ T.pack $ show hs
@@ -500,10 +505,10 @@ processTheMessages env conn messages = do
 
   return events'
 
-extractTextInsideQuotes :: T.Text -> T.Text
-extractTextInsideQuotes input =
-  case T.stripPrefix "\"" input of
-    Just rest ->
-      case T.break (== '"') rest of
-        (extracted, _) -> extracted
-    Nothing -> ""
+-- extractTextInsideQuotes :: T.Text -> T.Text
+-- extractTextInsideQuotes input =
+--   case T.stripPrefix "\"" input of
+--     Just rest ->
+--       case T.break (== '"') rest of
+--         (extracted, _) -> extracted
+--     Nothing -> ""
