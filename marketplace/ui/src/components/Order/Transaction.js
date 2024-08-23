@@ -12,7 +12,7 @@ import { actions as categoryActions } from "../../contexts/category/actions";
 import { useCategoryState, useCategoryDispatch } from "../../contexts/category";
 import startCase from 'lodash/startCase';
 import { epochToDate } from "../../helpers/utils";
-import { ORDER_STATUS } from "../../helpers/constants";
+import { ORDER_STATUS, REDEMPTION_STATUS, TRANSACTION_STATUS } from "../../helpers/constants";
 import TransactionTable from "./TransactionTable";
 import { useTransactionState } from "../../contexts/transaction";
 const INVERTED_ORDER_STATUS = Object.fromEntries(Object.entries(ORDER_STATUS).map(([key, value]) => [value, key]));
@@ -21,10 +21,8 @@ const Transaction = ({ user }) => {
 
   const navigate = useNavigate();
   const params = useParams();
-  const { type } = params;
-  const dispatch = useOrderDispatch();
   const categoryDispatch = useCategoryDispatch();
-  const { userTransactions } = useTransactionState();
+  const { userTransactions, isTransactionLoading } = useTransactionState();
 
   // const currentDate = dayjs().startOf('day').unix(); // todays date
   const startOfMonth = dayjs().startOf('month').unix(); // Starting date of the current month
@@ -32,7 +30,7 @@ const Transaction = ({ user }) => {
 
   const [callExcel, setCallExcel] = useState(false);
   const [callCSV, setCallCSV] = useState(false);
-  const { allOrders, isAllOrdersLoading } = useOrderState();
+  const { isAllOrdersLoading } = useOrderState();
   const { categorys } = useCategoryState();
   const [api, contextHolder] = notification.useNotification();
 
@@ -84,26 +82,29 @@ const Transaction = ({ user }) => {
     return formattedObject;
   }
 
-  function mapOrderData(orders) {
+
+  function mapTransactionData(transactions) {
     try {
-      return orders.flatMap(order => {
+      return transactions.map(transaction => {
         // Extract Quantities
-          const { category, subCategory } = getCategoryAndSubcategory(order.assetContractName);
-          return formatDataObject({
-            orderNumber: order?.reference,
-            purchaserName: order?.purchasersCommonName,
-            category,
-            subCategory,
-            assetName: order?.assetName,
-            assetPrice: order?.assetPrice,
-            quantity: order?.quantity,
-            totalOrderAmount: order?.totalPrice,
-            orderDate: order?.createdDate,
-            orderFulfillmentDate: order?.fulfillmentDate,
-            orderStatus: INVERTED_ORDER_STATUS[order.status] || "Unknown",
-            comments: order?.comments,
-            blockchainAddress: order?.address
-          });
+        const { category, subCategory } = getCategoryAndSubcategory(transaction.assetContractName);
+        return formatDataObject({
+          '#': transaction?.reference,
+          type: transaction?.type,
+          category,
+          subCategory,
+          assetName: transaction?.assetName,
+          Price: transaction?.assetPrice,
+          quantity: transaction?.quantity,
+          // totalOrderAmount: transaction?.totalPrice,
+          from: transaction.from,
+          to: transaction.to,
+          hash: transaction?.redemptionService || transaction?.address,
+          date: transaction?.block_timestamp,
+          Status: transaction?.type === "Transfer" ? 'Closed' : (transaction?.type === "Redemption" 
+                  ? REDEMPTION_STATUS[transaction.status] 
+                  : TRANSACTION_STATUS[transaction.status])
+        });
       });
     } catch (error) {
       // logging the actual error for better debugging
@@ -112,252 +113,95 @@ const Transaction = ({ user }) => {
     }
   }
 
-  function mapTransfersData(transfers) {
-    try {
-      return transfers.map(order => {
-        const { category, subCategory } = getCategoryAndSubcategory(order.assetContractName);
-        return formatDataObject({
-          transferNumber: order.id,
-          transferDate: order.transferDate,
-          category,
-          subCategory,
-          assetName: order.assetName,
-          quantity: order.quantity,
-          sender: order.oldOwnerCommonName,
-          recipient: order.newOwnerCommonName,
-          blockchainAddress: order.address
-        });
-      });
-    } catch (error) {
-      throw new Error("Failed to map transfers data");
-    }
-  }
-
-  function mapRedemptionData(redemption) {
-    try {
-      return redemption.map(order => {
-        const { category, subCategory } = getCategoryAndSubcategory(order.assetContractName);
-        return formatDataObject({
-          redemptionNumber: order.reference,
-          redemptionDate: order.redemptionDate,
-          category,
-          subCategory,
-          assetName: order.assetName,
-          quantity: order.quantity,
-          sender: order.from,
-          recipient: order.to,
-          blockchainAddress: order.redemptionService
-        });
-      });
-    } catch (error) {
-      throw new Error("Failed to map transfers data");
-    }
-  }
-
   useEffect(() => {
-    let boughtOrders = []
-    let soldOrders = []
-    let transfers = []
-    let redemptions = []
-    userTransactions.forEach((item)=>{
-     if(item.type === 'Order'){
-      if(item.sellersCommonName === user?.commonName){
-        soldOrders.push(item)
-      }
-      if(item.purchasersCommonName === user?.commonName){
-        boughtOrders.push(item)
-      }
-     }
-     if(item.type === 'Transfer'){
-        transfers.push(item)
-     }
-     if(item.type === 'Redemption'){
-      redemptions.push(item)
-   }
-    })
+    const mappedData = mapTransactionData(userTransactions)
+    const { Order, Redemption, Transfer } = Object.groupBy(mappedData, ({ Type }) => Type);
+  if (userTransactions && callExcel && !isTransactionLoading) {
+    const wb = XLSX.utils.book_new();
+    const wsOrder = XLSX.utils.json_to_sheet(Order ? Order : []);
+    const wsTransferred = XLSX.utils.json_to_sheet(Transfer ? Transfer : []);
+    const wsRedemption = XLSX.utils.json_to_sheet(Redemption ? Redemption : []);
 
-    if (userTransactions && callExcel && !isAllOrdersLoading) {
-      const wb = XLSX.utils.book_new();
-      let sold;
-      let bought;
-      let transferred;
-      let redemption
-      try {
-        sold = mapOrderData(soldOrders)
-      } catch (error) {
-        api.error({
-          message: 'Data Processing Error',
-          description: 'Failed to process order data. Please contact support.',
-          placement: 'bottom'
-        });
-        return;
-      }
-      const wsSold = XLSX.utils.json_to_sheet(sold ? sold : []);
-      try {
-        bought = mapOrderData(boughtOrders)
-      } catch (error) {
-        api.error({
-          message: 'Data Processing Error',
-          description: 'Failed to process order data. Please contact support.',
-          placement: 'bottom'
-        });
-        return;
-      }
-      const wsBought = XLSX.utils.json_to_sheet(bought ? bought : []);
-      try {
-        transferred = mapTransfersData(transfers)
-      } catch (error) {
-        api.error({
-          message: 'Data Processing Error',
-          description: 'Failed to process order data. Please contact support.',
-          placement: 'bottom'
-        });
-        return;
-      }
-      const wsTransferred = XLSX.utils.json_to_sheet(transferred ? transferred : []);
+    // Append each worksheet to the workbook
+    XLSX.utils.book_append_sheet(wb, wsOrder, 'Orders');
+    XLSX.utils.book_append_sheet(wb, wsTransferred, 'Transfers');
+    XLSX.utils.book_append_sheet(wb, wsRedemption, 'Redemptions');
 
-      try {
-        redemption = mapRedemptionData(redemptions)
-      } catch (error) {
-        api.error({
-          message: 'Data Processing Error',
-          description: 'Failed to process order data. Please contact support.',
-          placement: 'bottom'
-        });
-        return;
-      }
-      const wsRedemption = XLSX.utils.json_to_sheet(redemption ? redemption : []);
+    // Write the workbook to a binary string
+    const wbout = XLSX.write(wb, { bookType: 'xls', type: 'binary' });
 
-      // Append each worksheet to the workbook
-      XLSX.utils.book_append_sheet(wb, wsSold, 'Sold Orders');
-      XLSX.utils.book_append_sheet(wb, wsBought, 'Bought Orders');
-      XLSX.utils.book_append_sheet(wb, wsTransferred, 'Transfers');
-      XLSX.utils.book_append_sheet(wb, wsRedemption, 'Redemptions');
-
-      // Write the workbook to a binary string
-      const wbout = XLSX.write(wb, { bookType: 'xls', type: 'binary' });
-
-      // Convert the binary string to a Blob and save it
-      const blob = new Blob([s2ab(wbout)], { type: 'application/vnd.ms-excel' });
-      saveAs(blob, 'Mercata-Marketplace-Order-History.xls');
-      setCallExcel(false);
-      setCallCSV(false);
-    }
-    if (userTransactions && callCSV && !isAllOrdersLoading) {
-      // Adding an extra column to distinguish data
-      const addTypeColumn = (data, type) => data.map(row => ({ ...row, Type: type }));
-      let sold;
-      let bought;
-      let transferred;
-      let redemption;
-      try {
-        sold = mapOrderData(soldOrders)
-      } catch (error) {
-        api.error({
-          message: 'Data Processing Error',
-          description: 'Failed to process order data. Please contact support.',
-          placement: 'bottom'
-        });
-        return;
-      }
-      try {
-        bought = mapOrderData(boughtOrders)
-      } catch (error) {
-        api.error({
-          message: 'Data Processing Error',
-          description: 'Failed to process order data. Please contact support.',
-          placement: 'bottom'
-        });
-        return;
-      }
-      try {
-        transferred = mapTransfersData(transfers)
-      } catch (error) {
-        api.error({
-          message: 'Data Processing Error',
-          description: 'Failed to process order data. Please contact support.',
-          placement: 'bottom'
-        });
-        return;
-      }
-
-      try {
-        redemption = mapRedemptionData(redemptions)
-      } catch (error) {
-        api.error({
-          message: 'Data Processing Error',
-          description: 'Failed to process order data. Please contact support.',
-          placement: 'bottom'
-        });
-        return;
-      }
-      const soldData = addTypeColumn(sold ? sold : [], 'Sold');
-      const boughtData = addTypeColumn(bought ? bought : [], 'Bought');
-      const transferredData = addTypeColumn(transferred ? transferred : [], 'Transferred');
-      const redemptionData = addTypeColumn(redemption ? redemption : [], 'Redemption');
-
-      const combinedData = [...soldData, ...boughtData, ...transferredData, ...redemptionData];
-      const ws = XLSX.utils.json_to_sheet(combinedData);
-      const wb = XLSX.utils.book_new();
-      XLSX.utils.book_append_sheet(wb, ws, 'Orders');
-
-      const wbout = XLSX.write(wb, { bookType: 'csv', type: 'binary' });
-      const blob = new Blob([s2ab(wbout)], { type: 'text/csv' });
-      saveAs(blob, 'Mercata-Marketplace-Order-History.csv');
-      setCallCSV(false);
-      setCallExcel(false);
-    }
-  }, [ callExcel, callCSV, isAllOrdersLoading]);
-
-  const download = async (format) => {
-    if (user?.commonName) {
-      // await actions.fetchAllOrders(
-      //   dispatch
-      // );
-      if (format === 'xls') {
-        setCallExcel(true);
-        setCallCSV(false);
-      }
-      else if (format === 'csv') {
-        setCallCSV(true);
-        setCallExcel(false);
-      }
-
-    }
-  };
-
-  // Utility function to convert a binary string to an ArrayBuffer
-  function s2ab(s) {
-    const buf = new ArrayBuffer(s.length);
-    const view = new Uint8Array(buf);
-    for (let i = 0; i < s.length; i++) view[i] = s.charCodeAt(i) & 0xFF;
-    return buf;
+    // Convert the binary string to a Blob and save it
+    const blob = new Blob([s2ab(wbout)], { type: 'application/vnd.ms-excel' });
+    saveAs(blob, 'Mercata-Marketplace-Order-History.xls');
+    setCallExcel(false);
+    setCallCSV(false);
   }
+  if (userTransactions && callCSV && !isTransactionLoading) {
+    // Adding an extra column to distinguish data
+    const addTypeColumn = (data, type) => data.map(row => ({ ...row, Type: type }));
 
-  // --------------------- EXPORT TO EXCEL AND CSV END ---------------------
+    const orderData = addTypeColumn(Order ? Order : [], 'Orders');
+    const transferredData = addTypeColumn(Transfer ? Transfer : [], 'Transferred');
+    const redemptionData = addTypeColumn(Redemption ? Redemption : [], 'Redemption');
 
-  return (
-    <div>
-      {contextHolder}
-      <div className="px-4 md:px-20 lg:py-2 lg:mt-3 orders">
-        <Breadcrumb>
-          <Breadcrumb.Item href="" onClick={e => e.preventDefault()}>
-            <ClickableCell href={routes.Marketplace.url}>
-              <p className="text-sm text-[#13188A] font-semibold">
-                Home
-              </p>
-            </ClickableCell>
-          </Breadcrumb.Item>
-          <Breadcrumb.Item href="" onClick={e => e.preventDefault()}>
-            <p className=" text-sm text-[#202020] font-medium">
-              My Transactions
+    const combinedData = [...orderData, ...transferredData, ...redemptionData];
+    const ws = XLSX.utils.json_to_sheet(combinedData);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, 'Orders');
+
+    const wbout = XLSX.write(wb, { bookType: 'csv', type: 'binary' });
+    const blob = new Blob([s2ab(wbout)], { type: 'text/csv' });
+    saveAs(blob, 'Mercata-Marketplace-Order-History.csv');
+    setCallCSV(false);
+    setCallExcel(false);
+  }
+}, [callExcel, callCSV, isTransactionLoading]);
+
+const download = async (format) => {
+  if (user?.commonName) {
+    if (format === 'xls') {
+      setCallExcel(true);
+      setCallCSV(false);
+    }
+    else if (format === 'csv') {
+      setCallCSV(true);
+      setCallExcel(false);
+    }
+  }
+};
+
+// Utility function to convert a binary string to an ArrayBuffer
+function s2ab(s) {
+  const buf = new ArrayBuffer(s.length);
+  const view = new Uint8Array(buf);
+  for (let i = 0; i < s.length; i++) view[i] = s.charCodeAt(i) & 0xFF;
+  return buf;
+}
+
+// --------------------- EXPORT TO EXCEL AND CSV END ---------------------
+
+return (
+  <div>
+    {contextHolder}
+    <div className="px-4 md:px-20 lg:py-2 lg:mt-3 orders">
+      <Breadcrumb>
+        <Breadcrumb.Item href="" onClick={e => e.preventDefault()}>
+          <ClickableCell href={routes.Marketplace.url}>
+            <p className="text-sm text-[#13188A] font-semibold">
+              Home
             </p>
-          </Breadcrumb.Item>
-        </Breadcrumb>
-      </div>
-      <TransactionTable user={user} selectedDate={selectedDate} onDateChange={onDateChange} download={download} isAllOrdersLoading={isAllOrdersLoading} />
+          </ClickableCell>
+        </Breadcrumb.Item>
+        <Breadcrumb.Item href="" onClick={e => e.preventDefault()}>
+          <p className=" text-sm text-[#202020] font-medium">
+            My Transactions
+          </p>
+        </Breadcrumb.Item>
+      </Breadcrumb>
     </div>
-  );
+    <TransactionTable user={user} selectedDate={selectedDate} onDateChange={onDateChange} download={download} isAllOrdersLoading={isTransactionLoading} />
+  </div>
+);
 };
 
 export default Transaction;

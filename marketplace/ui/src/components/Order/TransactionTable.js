@@ -69,7 +69,7 @@ const TransactionTable = ({ user, selectedDate, onDateChange, download, isAllOrd
     if (search) {
       const searchString = String(search).toLowerCase();
       filteredData = filteredData.filter((item) =>
-        String(item.reference).toLowerCase().indexOf(searchString) !== -1
+        String(item.assetName).toLowerCase().indexOf(searchString) !== -1
       );
     }
 
@@ -308,12 +308,10 @@ const TransactionTable = ({ user, selectedDate, onDateChange, download, isAllOrd
                   </Col>
                   <Col xs={24} md={8} className="flex justify-center mt-2 md:mt-0">
                     <Input className="text-base w-full md:max-w-[400px] orders_searchbar mx-auto md:p-3 md:mr-3 rounded-full bg-[#F6F6F6]"
-                      // key={searchVal}
                       onChange={(e) => { handleChangeSearch(e) }}
                       value={search}
-                      // size="small"
                       prefix={<SearchOutlined />}
-                      placeholder="Search Transactions #" />
+                      placeholder="Search Asset" />
                   </Col>
                   <Col xs={21} md={7} className="mt-2 md:mt-0 flex justify-center">
                     <div className="border border-slate-300 w-full rounded-lg">
@@ -330,10 +328,10 @@ const TransactionTable = ({ user, selectedDate, onDateChange, download, isAllOrd
                     <Dropdown
                       className="customButton"
                       menu={{ items: DOWNLOAD_OPTIONS, onClick: (e) => download(e.key) }}
-                      disabled={isAllOrdersLoading}
+                      disabled={isTransactionLoading}
                       trigger={['click']}
                     >
-                      <Button loading={isAllOrdersLoading} className="h-[32px] w-[33px] rounded-md border border-[#6A6A6A] flex justify-center items-center">
+                      <Button className="h-[32px] w-[33px] rounded-md border border-[#6A6A6A] flex justify-center items-center">
                         <Space>
                           <DownloadOutlined />
                         </Space>
