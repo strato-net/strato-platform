@@ -185,6 +185,7 @@ class StripeServiceController {
 
       // Verify payment and perform onchain transfer
       let returnStatus;
+      res.redirect(`${redirectUrl}`);
       if (session.payment_status === 'paid') {
         // Get the payment event from Cirrus
         const checkoutEvent = await getCheckoutEvent(checkoutHash);
@@ -201,7 +202,6 @@ class StripeServiceController {
           comments: PAYMENT_RECEIVED_MESSAGE,
         } 
         returnStatus = await completeOrder(STRIPE_CONTRACT_ADDRESS, callArgs);
-        res.redirect(`${redirectUrl}?assets=${returnStatus}`);
 
         // Update payment status in DB
         const updateResult = await updateStripePayment(checkoutHash, "PAID");
@@ -238,7 +238,6 @@ class StripeServiceController {
           comments: "",
         } 
         returnStatus = await generateIntermediateOrder(STRIPE_CONTRACT_ADDRESS, callArgs);
-        res.redirect(`${redirectUrl}?assets=${returnStatus}`);
 
         // Update payment status in DB
         const updateResult = await updateStripePayment(checkoutHash, "INITIALIZED");
