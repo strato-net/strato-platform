@@ -34,6 +34,9 @@ const actionDescriptors = {
   addShippingAddress: "add_shipping_address",
   addShippingAddressSuccessful: "add_shipping_address_successful",
   addShippingAddressFailed: "add_shipping_address_failed",
+  fetchUserAddress: "fetch_user_address",
+  fetchUserAddressSuccessful: "fetch_user_address_successful",
+  fetchUserAddressFailed: "fetch_user_address_failed",
   fetchUserAddresses: "fetch_user_addresses",
   fetchUserAddressesSuccessful: "fetch_user_addresses_successful",
   fetchUserAddressesFailed: "fetch_user_addresses_failed",
@@ -253,10 +256,10 @@ const actions = {
           type: actionDescriptors.fetchMarketplaceLoggedInFailed,
           error: "Error while fetching marketplace products",
         });
-      } else if(response.status === RestStatus.UNAUTHORIZED) {
-        dispatch({ 
-          type: actionDescriptors.fetchMarketplaceLoggedInFailed, 
-          error: "Unauthorized while fetching marketplace products" 
+      } else if (response.status === RestStatus.UNAUTHORIZED) {
+        dispatch({
+          type: actionDescriptors.fetchMarketplaceLoggedInFailed,
+          error: "Unauthorized while fetching marketplace products"
         });
         window.location.href = body.error.loginUrl;
       }
@@ -325,10 +328,10 @@ const actions = {
           payload: body.data,
         });
         return;
-      } else if(response.status === RestStatus.UNAUTHORIZED) {
-        dispatch({ 
-          type: actionDescriptors.fetchTopSellingProductsLoggedInFailed, 
-          error: "Unauthorized while fetching trending items" 
+      } else if (response.status === RestStatus.UNAUTHORIZED) {
+        dispatch({
+          type: actionDescriptors.fetchTopSellingProductsLoggedInFailed,
+          error: "Unauthorized while fetching trending items"
         });
         window.location.href = body.error.loginUrl;
       }
@@ -396,14 +399,15 @@ const actions = {
     }
   },
 
-  fetchUserAddress: async (dispatch, addressId) => {
+  fetchUserAddress: async (dispatch, redemptionService, shippingAddressId) => {
     dispatch({ type: actionDescriptors.fetchUserAddress });
+    const redemptionArg = redemptionService ? `/${redemptionService}` : '';
 
     try {
       const response = await fetch(
-        `${apiUrl}/order/userAddress/${addressId}`,
+        `${apiUrl}/order/userAddress${redemptionArg}/${shippingAddressId}`,
         {
-          method: HTTP_METHODS.GET,
+          method: HTTP_METHODS.GET
         }
       );
 

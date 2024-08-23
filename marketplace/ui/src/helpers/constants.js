@@ -105,7 +105,8 @@ export const unitOfMeasures = [
 
 export const unitOfSpiritMeasures = [
   { name: "Barrel", value: 1 },
-  { name: "Bottle", value: 2 }
+  { name: "Bottle", value: 2 },
+  { name: "Liter", value: 3 }
 ];
 
 export const CHARGES = {

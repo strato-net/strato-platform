@@ -156,6 +156,7 @@ export const Order = {
   payment: '/payment',
   userAddress: '/userAddress',
   getAllUserAddress: '/userAddresses/user/:redemptionService?',
+  getUserAddress: '/userAddress/:redemptionService/:shippingAddressId',
   cancelSaleOrder: '/sale/cancel',
   checkSaleQuantity: '/saleQuantity',
   executeSale: '/closeSale',
