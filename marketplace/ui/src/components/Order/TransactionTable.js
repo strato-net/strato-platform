@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from "react";
-import { Button, Dropdown, Space, Typography, Input, Row, Col, Popover, Card, Tooltip, Select, DatePicker } from "antd";
-import { DownloadOutlined, SearchOutlined } from "@ant-design/icons";
+import { Button, Dropdown, Space, Typography, Input, Row, Col, Popover, Card, Tooltip, Select, DatePicker, Spin } from "antd";
+import { CheckCircleOutlined, DownloadOutlined, SearchOutlined } from "@ant-design/icons";
 import { useNavigate, useLocation } from "react-router-dom";
 import classNames from "classnames";
 // Components
@@ -16,6 +16,7 @@ import dayjs from "dayjs";
 import TransactionResponsive from "./TransactionResponsive";
 import { actions as transactionAction } from "../../contexts/transaction/actions";
 import { useTransactionDispatch, useTransactionState } from "../../contexts/transaction";
+import { SEO } from "../../helpers/seoConstant";
 
 const limit = '', offset = '';
 
@@ -81,16 +82,16 @@ const TransactionTable = ({ user, selectedDate, onDateChange, download, isAllOrd
     const timeout = setTimeout(() => {
       if (search.length === 0) {
         if (type) {
-          navigate(`/transaction?type=${type}`)
+          navigate(`/transactions?type=${type}`)
         } else {
-          navigate(`/transaction`)
+          navigate(`/transactions`)
         }
-      } 
+      }
       // else {
       //   if (type) {
-      //     navigate(`/transaction?type=${type}&search=${search}`)
+      //     navigate(`/transactions?type=${type}&search=${search}`)
       //   } else {
-      //     navigate(`/transaction?search=${search}`)
+      //     navigate(`/transactions?search=${search}`)
       //   }
       // }
     }, 1000)
@@ -276,62 +277,76 @@ const TransactionTable = ({ user, selectedDate, onDateChange, download, isAllOrd
   }
 
   const handleFilter = (val) => {
-    navigate(val ? `/transaction?type=${val}` : `/transaction`)
+    navigate(val ? `/transactions?type=${val}` : `/transactions`)
   }
+
+  const metaImg = SEO.IMAGE_META;
 
   return (
     <Row>
-      {/* <Col span={4}></Col> */}
-      <Col span={22} className="mx-auto">
-        <Row className="flex items-center justify-between">
-          <Col xs={0} md={4}>
-            <h2 className="hidden md:block"> My Transactions </h2>
+      <Col span={24} className="w-full h-[160px] py-4 px-4 md:h-[96px] bg-[#F6F6F6] flex flex-col md:flex-row md:px-14 justify-between items-center mt-6 lg:mt-8">
+        <Row className="w-full flex justify-between items-center">
+          <Col xs={4} className="flex justify-between w-full">
+            <Button className="!px-1 md:!px-0 flex items-center flex-row-reverse gap-[6px] text-lg md:text-2xl font-semibold !text-[#13188A] "
+              type="link"
+              icon={<img src={Images.ForwardIcon}
+                alt={metaImg}
+                title={metaImg}
+                className="hidden md:block w-6 h-6" />}> My Transactions
+            </Button>
           </Col>
-          <Col xs={24} md={20} xl={16}>
-            <Row className="w-full md:w-auto md:flex md:justify-between items-center mb-5 mt-4">
-              <Col xs={24} md={6} className="flex justify-center mt-2 md:mt-0">
-                <Select className="block lg:block w-full md:w-4/5 rounded-md mx-auto" onChange={(val) => { handleFilter(val) }} placeholder="Select Type" defaultValue={type || ''}>
-                  {TRANSACTION_FILTER.map(({ label, value }) =>
-                    <Select.Option value={value}> {label} </Select.Option>
-                  )}
-                </Select>
-              </Col>
-              <Col xs={24} md={8} className="flex justify-center mt-2 md:mt-0">
-                <Input className="text-base w-full md:max-w-[400px] orders_searchbar mx-auto md:p-3 md:mr-3 rounded-full bg-[#F6F6F6]"
-                  // key={searchVal}
-                  onChange={(e) => { handleChangeSearch(e) }}
-                  value={search}
-                  // size="small"
-                  prefix={<SearchOutlined />}
-                  placeholder="Search Transactions #" />
-              </Col>
-              <Col xs={21} md={7} className="mt-2 md:mt-0 flex justify-center">
-                <div className="border border-slate-300 w-full rounded-lg">
-                  <DatePicker onChange={onDateChange}
-                  className="w-full"
-                    defaultValue={dayjs.unix(selectedDate[0])}
-                    picker="month" 
-                    format={(value) => dayjs(value).format('MMMM YYYY')} 
-                    />
-                </div>
-              </Col>
-              <Col xs={2} offset={1} md={1} className="flex justify-center mt-2 md:mt-0">
-                <Dropdown
-                  className="customButton"
-                  menu={{ items: DOWNLOAD_OPTIONS, onClick: (e) => download(e.key) }}
-                  disabled={isAllOrdersLoading}
-                  trigger={['click']}
-                >
-                  <Button loading={isAllOrdersLoading} className="h-[32px] w-[33px] rounded-md border border-[#6A6A6A] flex justify-center items-center">
-                    <Space>
-                      <DownloadOutlined />
-                    </Space>
-                  </Button>
-                </Dropdown>
+          <Col xs={20} className="flex flex-col md:flex-row gap-3 items-center my-2 md:my-0">
+            <Row className="w-full flex items-center justify-between">
+              <Col xs={24} md={20} xl={24}>
+                <Row className="w-full md:w-auto md:flex md:justify-between items-center mb-5 mt-4">
+                  <Col xs={24} md={6} className="flex justify-center mt-2 md:mt-0">
+                    <Select className="block lg:block w-full md:w-4/5 rounded-md mx-auto" onChange={(val) => { handleFilter(val) }} placeholder="Select Type" defaultValue={type || ''}>
+                      {TRANSACTION_FILTER.map(({ label, value }) =>
+                        <Select.Option value={value}> {label} </Select.Option>
+                      )}
+                    </Select>
+                  </Col>
+                  <Col xs={24} md={8} className="flex justify-center mt-2 md:mt-0">
+                    <Input className="text-base w-full md:max-w-[400px] orders_searchbar mx-auto md:p-3 md:mr-3 rounded-full bg-[#F6F6F6]"
+                      // key={searchVal}
+                      onChange={(e) => { handleChangeSearch(e) }}
+                      value={search}
+                      // size="small"
+                      prefix={<SearchOutlined />}
+                      placeholder="Search Transactions #" />
+                  </Col>
+                  <Col xs={21} md={7} className="mt-2 md:mt-0 flex justify-center">
+                    <div className="border border-slate-300 w-full rounded-lg">
+                      <DatePicker onChange={onDateChange}
+                        className="w-full"
+                        defaultValue={dayjs.unix(selectedDate[0])}
+                        picker="month"
+                        disabledDate={(current) => { return current && current > dayjs().endOf('month') }}
+                        format={(value) => dayjs(value).format('MMMM YYYY')}
+                      />
+                    </div>
+                  </Col>
+                  <Col xs={2} offset={1} md={1} className="flex justify-center mt-2 md:mt-0">
+                    <Dropdown
+                      className="customButton"
+                      menu={{ items: DOWNLOAD_OPTIONS, onClick: (e) => download(e.key) }}
+                      disabled={isAllOrdersLoading}
+                      trigger={['click']}
+                    >
+                      <Button loading={isAllOrdersLoading} className="h-[32px] w-[33px] rounded-md border border-[#6A6A6A] flex justify-center items-center">
+                        <Space>
+                          <DownloadOutlined />
+                        </Space>
+                      </Button>
+                    </Dropdown>
+                  </Col>
+                </Row>
               </Col>
             </Row>
           </Col>
         </Row>
+      </Col>
+      <Col span={22} className="mx-auto mt-5">
         <div className="flex md:hidden order_responsive">
           <TransactionResponsive data={transactions} />
         </div>

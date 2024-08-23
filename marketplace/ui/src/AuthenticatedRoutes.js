@@ -32,6 +32,7 @@ import UserProfile from "./components/UserProfile";
 import Error from "./components/404";
 import FAQ from "./components/FAQ/index";
 import { TransactionsProvider } from "./contexts/transaction";
+import Transaction from "./components/Order/Transaction";
 
 const AuthenticatedRoutes = ({ user, users, isAuthenticated }) => {
   return (
@@ -266,7 +267,7 @@ const AuthenticatedRoutes = ({ user, users, isAuthenticated }) => {
                   <ItemsProvider>
                     <InventoriesProvider>
                       <RedemptionsProvider>
-                        <Order user={user} users={users} />
+                        <Transaction user={user} users={users} />
                       </RedemptionsProvider>
                     </InventoriesProvider>
                   </ItemsProvider>
