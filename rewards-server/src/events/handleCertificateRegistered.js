@@ -24,7 +24,7 @@ async function handleCertificateRegistered(event, token) {
     const queryResponse = await fetch(
       `https://${
         NODE_ENV === "prod" ? prodMarketplaceUrl : testnetMarketplaceUrl
-      }/cirrus/search/Certificate?certificateString=eq.${encodeURIComponent(targetCertificateString)}&select=count`,
+      }/cirrus/search/Certificate?certificateString=eq.${encodeURIComponent(targetCertificateString)}`,
       {
         method: "GET",
         credentials: "same-origin",
@@ -49,11 +49,11 @@ async function handleCertificateRegistered(event, token) {
 
     const queryBody = await queryResponse.json();
     console.log("Certificate query response:", queryBody);
-    if (!queryBody || !queryBody[0].count || queryBody[0].count <= 0) {
+    if (!queryBody || queryBody.length <= 0) {
       console.error("No certificates found in the marketplace.");
       return;
     }
-    if (queryBody[0].count > 1) {
+    if (queryBody.length > 1) {
       console.error("Multiple certificates found in the marketplace.");
       return;
     }
@@ -69,7 +69,7 @@ async function handleCertificateRegistered(event, token) {
     // Create transaction payload
     const response = await createTransactionPayload(
       token,
-      matchedObject.userAddress,
+      queryBody[0].userAddress,
       reward * 100 // Multiply by 100 for STRATS conversion
     );
 
