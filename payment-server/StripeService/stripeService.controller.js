@@ -183,9 +183,12 @@ class StripeServiceController {
       const paymentDetails = await getStripePaymentFromToken(checkoutHash);
       const session = await stripeService.getPaymentSession(paymentDetails.paymentsessionid, paymentDetails.accountid);
 
+      const assets = { 0: "asset" }; // hacky solution to allow for a proper redirect
+      // Redirect back to marketplace
+      res.redirect(`${redirectUrl}?assets=${assets}`);
+
       // Verify payment and perform onchain transfer
       let returnStatus;
-      res.redirect(`${redirectUrl}`);
       if (session.payment_status === 'paid') {
         // Get the payment event from Cirrus
         const checkoutEvent = await getCheckoutEvent(checkoutHash);
