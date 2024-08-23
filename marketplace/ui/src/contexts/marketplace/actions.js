@@ -39,6 +39,9 @@ const actionDescriptors = {
   addShippingAddress: "add_shipping_address",
   addShippingAddressSuccessful: "add_shipping_address_successful",
   addShippingAddressFailed: "add_shipping_address_failed",
+  fetchUserAddress: "fetch_user_address",
+  fetchUserAddressSuccessful: "fetch_user_address_successful",
+  fetchUserAddressFailed: "fetch_user_address_failed",
   fetchUserAddresses: "fetch_user_addresses",
   fetchUserAddressesSuccessful: "fetch_user_addresses_successful",
   fetchUserAddressesFailed: "fetch_user_addresses_failed",
@@ -478,13 +481,17 @@ const actions = {
     }
   },
 
-  fetchUserAddress: async (dispatch, addressId) => {
+  fetchUserAddress: async (dispatch, redemptionService, shippingAddressId) => {
     dispatch({ type: actionDescriptors.fetchUserAddress });
+    const redemptionArg = redemptionService ? `/${redemptionService}` : "";
 
     try {
-      const response = await fetch(`${apiUrl}/order/userAddress/${addressId}`, {
-        method: HTTP_METHODS.GET,
-      });
+      const response = await fetch(
+        `${apiUrl}/order/userAddress${redemptionArg}/${shippingAddressId}`,
+        {
+          method: HTTP_METHODS.GET,
+        }
+      );
 
       const body = await response.json();
 
