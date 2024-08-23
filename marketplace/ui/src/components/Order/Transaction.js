@@ -1,13 +1,12 @@
-import { Tabs, DatePicker, Breadcrumb, Button, Dropdown, Space, notification } from "antd";
+import { Breadcrumb, notification } from "antd";
 import React, { useEffect, useState } from "react";
-import { useNavigate, useParams } from "react-router-dom";
+import { useNavigate } from "react-router-dom";
 import dayjs from "dayjs";
+
 import routes from "../../helpers/routes";
 import ClickableCell from "../ClickableCell";
-// import { Images } from "../../images";
-import { saveAs } from 'file-saver';
 import * as XLSX from 'xlsx';
-import { useOrderDispatch, useOrderState } from "../../contexts/order";
+import { saveAs } from 'file-saver';
 import { actions as categoryActions } from "../../contexts/category/actions";
 import { useCategoryState, useCategoryDispatch } from "../../contexts/category";
 import startCase from 'lodash/startCase';
@@ -15,11 +14,8 @@ import { epochToDate } from "../../helpers/utils";
 import { ORDER_STATUS, REDEMPTION_STATUS, TRANSACTION_STATUS } from "../../helpers/constants";
 import TransactionTable from "./TransactionTable";
 import { useTransactionState } from "../../contexts/transaction";
-const INVERTED_ORDER_STATUS = Object.fromEntries(Object.entries(ORDER_STATUS).map(([key, value]) => [value, key]));
 
 const Transaction = ({ user }) => {
-
-  const navigate = useNavigate();
   const categoryDispatch = useCategoryDispatch();
   const { userTransactions, isTransactionLoading } = useTransactionState();
 
@@ -78,7 +74,6 @@ const Transaction = ({ user }) => {
   function mapTransactionData(transactions) {
     try {
       return transactions.map(transaction => {
-        // Extract Quantities
         const { category, subCategory } = getCategoryAndSubcategory(transaction.assetContractName);
         return formatDataObject({
           reference: transaction?.reference,
@@ -99,7 +94,6 @@ const Transaction = ({ user }) => {
         });
       });
     } catch (error) {
-      // logging the actual error for better debugging
       console.error("Error during mapping order data", error);
       throw new Error("Failed to map order data");
     }

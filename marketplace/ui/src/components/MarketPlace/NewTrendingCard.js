@@ -192,7 +192,6 @@ const NewTrendingCard = ({ topSellingProduct, addItemToCart, parent = "", api, c
                         type='primary'
                         className={`flex-1 h-9 ${isAvailableForSale ? '!bg-[#808080]' : '!bg-[#13188A]'} !text-white ${ownerSameAsUser() ? 'cursor-not-allowed' : 'cursor-pointer'}`}
                         onClick={async () => {
-                            // setCookie('returnUrl', '/checkout', 10); TODO: Uncomment to redirect to checkout on login.
                             const dataLayerEventName = isUserProfile ? 'buy_now_from_user_profile' : 'buy_now_from_top_selling_product';
                             window.LOQ.push(['ready', async LO => {
                                 await LO.$internal.ready('events');

@@ -13,11 +13,4 @@ router.get(
   TransactionController.getAllTransactions
 );
 
-// router.get(
-//   Transaction.get,
-//   authHandler.authorizeRequest(),
-//   loadDapp,
-//   TransactionController.get
-// );
-
 export default router;

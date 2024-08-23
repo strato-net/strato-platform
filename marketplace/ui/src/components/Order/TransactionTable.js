@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react";
-import { Button, Dropdown, Space, Typography, Input, Row, Col, Popover, Card, Tooltip, Select, DatePicker } from "antd";
+import { Button, Dropdown, Space, Typography, Input, Row, Col, Popover, Card, Tooltip, Select, DatePicker, Spin } from "antd";
 import { DownloadOutlined, SearchOutlined } from "@ant-design/icons";
 import { useNavigate, useLocation } from "react-router-dom";
 import classNames from "classnames";
@@ -7,7 +7,6 @@ import dayjs from "dayjs";
 // Components
 import DataTableComponent from "../DataTableComponent";
 import { TRANSACTION_FILTER } from "./constant";
-import useDebounce from "../UseDebounce";
 
 import "./ordersTable.css"
 import routes from "../../helpers/routes";
@@ -32,7 +31,7 @@ const TransactionTable = ({ user, selectedDate, onDateChange, download, isAllOrd
   const transactionDispatch = useTransactionDispatch();
   // States
   const { userTransactions, globalTransaction, isTransactionLoading } = useTransactionState();
-  
+
   const navigate = useNavigate();
   const location = useLocation();
 
@@ -174,7 +173,6 @@ const TransactionTable = ({ user, selectedDate, onDateChange, download, isAllOrd
       key: "quantity",
       align: "right",
       width: '100px',
-      // render : (data, {quantities, BlockApps-Mercata-Order-quantities}) => <span>{quantities[0] || BlockApps-Mercata-Order-quantities.value}</span>
       render: (data, { quantity }) => <span>{quantity ? quantity : '--'}</span>
     },
     {
@@ -316,7 +314,7 @@ const TransactionTable = ({ user, selectedDate, onDateChange, download, isAllOrd
       </Col>
       <Col span={22} className="mx-auto mt-5">
         <div className="flex md:hidden order_responsive">
-          <TransactionResponsive data={transactions} />
+          {isTransactionLoading ? <Spin className="mx-auto" /> : <TransactionResponsive data={transactions} user={user} />}
         </div>
         <div className="hidden md:block">
           <DataTableComponent

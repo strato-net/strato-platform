@@ -4,10 +4,12 @@ import classNames from "classnames";
 import { Images } from "../../images";
 import "./ordersTable.css";
 import { REDEMPTION_STATUS, REDEMPTION_STATUS_CLASSES, TRANSACTION_STATUS, TRANSACTION_STATUS_CLASSES, TRANSACTION_STATUS_COLOR } from "../../helpers/constants";
+import routes from "../../helpers/routes";
+import { useNavigate } from "react-router-dom";
 
-const TransactionResponsive = ({ data }) => {
+const TransactionResponsive = ({ data , user}) => {
   const StratsIcon = <img src={Images.logo} alt="" className="mx-1 w-3 h-3" />;
-
+  const navigate = useNavigate();
   const [expandedRows, setExpandedRows] = useState({});
 
   const handleMore = (index) => {
@@ -55,8 +57,8 @@ const TransactionResponsive = ({ data }) => {
   ];
 
   return (
-    <div className="flex flex-col gap-y-10 w-full ">
-      {data.map(({ address, assetImage, assetName, assetDescription, quantity, from, to, status, reference, type, price, redemptionService, block_timestamp }, index) => {
+    <div className="flex flex-col gap-y-10 w-full">
+      {data.map(({ reference ,address, assetImage,totalAmount, assetName, assetDescription, quantity, from, to, status,transaction_hash, type, price, redemptionService, block_timestamp }, index) => {
         const isExpanded = expandedRows[index];
         const tableData = [{
           key: index,
@@ -66,6 +68,25 @@ const TransactionResponsive = ({ data }) => {
           status,
           type
         }]
+
+        const handleDetailRedirection = () => {
+          let route;
+          if (type === 'Order' && from === user.commonName) {
+            route = `${routes.SoldOrderDetails.url.replace(":id", address ? transaction_hash : address)}`
+          }
+          else if (type === 'Order' && from !== user.commonName) {
+            route = `${routes.BoughtOrderDetails.url.replace(":id", address ? transaction_hash : address)}`
+          }
+          else if (type === 'Transfer') { }
+          else if (type === 'Redemption' && from !== user.commonName) {
+            route = `${routes.RedemptionsIncomingDetails.url.replace(":id", reference)
+              .replace(":redemptionService", redemptionService)}`
+          } else if (type === 'Redemption' && from === user.commonName) {
+            route = `${routes.RedemptionsOutgoingDetails.url.replace(":id", reference)
+              .replace(":redemptionService", redemptionService)}`
+          } else { }
+          route && navigate(route)
+        }
 
         return (
           <Row
@@ -81,11 +102,13 @@ const TransactionResponsive = ({ data }) => {
             </Col>
             <Col span={8} offset={1} className="flex flex-col justify-between">
               <p className="text-base font-bold"> {assetName.length > 10 ? `${assetName.slice(0, 10)}..` : assetName} </p>
-              <p style={{ color: "#13188A" }} className="font-semibold">
+              <p style={{ color: "#13188A" }} className="font-semibold" onClick={() => {
+                handleDetailRedirection()
+              }}>
                 #{reference}
               </p>
               <p style={{ color: "#827474" }} className="font-medium">
-              {assetDescription.length > 25 ? `${assetDescription.replace(/<\/?[^>]+(>|$)/g, "")?.slice(0, 25)}..` : assetDescription.replace(/<\/?[^>]+(>|$)/g, "") }
+                {assetDescription.length > 25 ? `${assetDescription.replace(/<\/?[^>]+(>|$)/g, "")?.slice(0, 25)}..` : assetDescription.replace(/<\/?[^>]+(>|$)/g, "")}
               </p>
               <span
                 style={{ color: "#13188A" }}

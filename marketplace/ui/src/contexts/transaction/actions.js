@@ -35,22 +35,9 @@ const actions = {
     if (commonName) {
       query += `&user=${encodedCommonName}`
     }
-    // if (type) {
-    //   query += `&type=${type}`
-    // }
-    // if (search) {
-    //   const searchValue = isNaN(search) ? search : parseInt(search);
-    //   if (!isNaN(searchValue)) {
-    //     query = search ? query.concat(`&search=${searchValue}`) : query;
-    //   }
-    // }
-  //  console.log(dateRange);
     if(dateRange){
       query += `&startDate=${dateRange[0]}&endDate=${dateRange[1]}`
-      // query += `&range[]=createdDate,${dateRange[0]},${dateRange[1]}`
-      // query = dateRange ? query.concat(`&range[]=createdDate,${dateRange[0]},${dateRange[1]}`) : query;
     }
-
 
     try {
       const response = await fetch(

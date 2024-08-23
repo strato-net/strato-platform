@@ -79,7 +79,6 @@ export const Redemption = {
 export const Transaction = {
   prefix: '/transaction',
   get: '/',
-  // get: '/:id',
 }
 
 export const Item = {
