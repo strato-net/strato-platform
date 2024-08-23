@@ -35,7 +35,6 @@ import qualified Slipstream.Events as SE
 -- import Slipstream.GlobalsColdStorage (fakeHandle)
 import Slipstream.OutputData
 import Slipstream.SolidityValue
-import Slipstream.QueryFormatHelper
 import SolidVM.Model.CodeCollection hiding (contractName, contracts)
 import SolidVM.Model.SolidString
 import qualified SolidVM.Model.Type as SVMType
@@ -83,14 +82,14 @@ createInsertsCollection collections = do
 
 createInsertsAbstract :: OutputM m
               => (SE.ProcessedContract, ContractF())
-              -> [(SE.ProcessedContract, [T.Text], TableName, [T.Text])]
+              -> [(SE.ProcessedContract, [T.Text], T.Text, [T.Text])]
               -> ConduitM () T.Text m ()
 createInsertsAbstract abstract inherited = do
     let contract = snd abstract
         cc = createDummyCodeCollection contract
     _ <- createAbstractTable  (contract) (SE.creator $ fst abstract, SE.application $ fst abstract, SE.contractName $ fst abstract) M.empty cc
     unless (null inherited) $ do 
-      insertAbstractTable inherited
+      insertAbstractTable inherited False
 
 createDummyContract :: [(T.Text, SVMType.Type)] -> ContractF()
 createDummyContract v = 
@@ -857,7 +856,7 @@ spec = do
           SE.contractData = M.fromList
             [ ("addr2", addr 0xdeadbeef)
             ]
-          }, [], (AbstractTableName (T.pack "") (T.pack "") (T.pack "SwissArmy")), [])]
+          }, [], T.pack "SwissArmy", [])]
 
 
      

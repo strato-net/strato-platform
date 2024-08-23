@@ -84,7 +84,7 @@ mergeDiffs lhs rhs = error $ "Invalid diff combination: " ++ show (lhs, rhs)
 
 data BatchedInserts = BatchedInserts
   { indexInsert :: (E.ProcessedContract, [T.Text]),
-    abstractInserts :: [(E.ProcessedContract,[T.Text],TableName, TableColumns)],
+    abstractInserts :: [(E.ProcessedContract,[T.Text],T.Text, TableColumns)],
     historyInserts :: [E.ProcessedContract],
     collectionInserts :: [ProcessedCollectionRow]
   }
@@ -443,15 +443,15 @@ processTheMessages env conn messages = do
               abstracts = actionAbstracts row
           --get columns for abstract table
           $logInfoLS "abstractColumns" $ T.pack $ "Getting abstract columns from " ++ (show abstracts)
-          abstractColumns' <- fmap catMaybes . for (Map.toList abstracts) $ \((_, n'), (cr', ap')) -> do
+          abstractColumns' <- fmap catMaybes . for (Map.toList abstracts) $ \((_, n'), (cr', ap', cols)) -> do
             let cregator = fromMaybe cr' (actionCCCreator row)
                 tableName = AbstractTableName cregator ap' n'
                 tableNameText = tableNameToDoubleQuoteText tableName
             $logDebugLS "actionCCCreator" $ T.pack (show (actionCCCreator row))
             $logDebugLS "cregator" $ T.pack (show cregator)
             $logInfoS "Row will be inserted into abstract table: " tableNameText
-            -- mCols <- getTableColumns  tableName
-            pure $ (indexContract, fkeysForThisContract, tableName, (cr',ap',n'),) . map extractTextInsideQuotes <$> (Just [])
+            $logInfoS "cols: " $ T.pack (show cols)
+            pure $ (indexContract, fkeysForThisContract, tableNameText, (cr',ap',n'),) . map extractTextInsideQuotes <$> (Just cols)
           $logDebugLS "Globals: Recorded Map names are: " . T.pack $ show mapNames ++ " contract: " ++ show (E.contractName indexContract)
           $logDebugLS "Globals: Recorded Array names are: " . T.pack $ show arrNames ++ " contract: " ++ show (E.contractName indexContract)
           $logDebugLS "History inserts are: " $ T.pack $ show hs
@@ -472,7 +472,7 @@ processTheMessages env conn messages = do
   forM_ insertsByCodeHash $ \ins -> do
     outputData conn $ insertIndexTable $ indexInsert ins
     outputData conn $ insertHistoryTable $ historyInserts ins
-    outputData conn $ insertAbstractTable (abstractInserts ins) -- not historic
+    outputData conn $ insertAbstractTable (abstractInserts ins) False-- not historic
     unless ((length (collectionInserts ins) < 1)) $ outputData conn $ insertCollectionTable $ collectionInserts ins
     outputData conn $ insertHistoryAbstractTable (abstractInserts ins) (historyInserts ins)
 
