@@ -15,6 +15,7 @@ import {
   useInventoryDispatch,
   useInventoryState,
 } from "../../contexts/inventory";
+import { actions as marketplaceActions } from "../../contexts/marketplace/actions";
 import { usePaymentServiceDispatch } from "../../contexts/payment";
 import { actions as paymentServiceActions } from "../../contexts/payment/actions";
 import { Images } from "../../images";
@@ -22,10 +23,14 @@ import ClickableCell from "../ClickableCell";
 import routes from "../../helpers/routes";
 import HelmetComponent from "../Helmet/HelmetComponent";
 import { SEO } from "../../helpers/seoConstant";
-import { useMarketplaceState } from "../../contexts/marketplace";
 import { useNavigate } from "react-router-dom";
 import { getStringDate } from "../../helpers/utils";
 import { US_DATE_FORMAT } from "../../helpers/constants";
+import {
+  useMarketplaceDispatch,
+  useMarketplaceState,
+} from "../../contexts/marketplace";
+import { useAuthenticateState } from "../../contexts/authentication";
 
 // Custom hook for media query
 const useMediaQuery = (query) => {
@@ -47,7 +52,7 @@ const useMediaQuery = (query) => {
 const MyWallet = ({ user }) => {
   const [queryValue] = useState("");
   const debouncedSearchTerm = useDebounce(queryValue, 1000);
-  const limit = 10;
+  const limit = 400;
   const [offset] = useState(0);
   const dispatch = useInventoryDispatch();
   // eslint-disable-next-line no-unused-vars
@@ -69,6 +74,13 @@ const MyWallet = ({ user }) => {
   const [priceHistoryMap, setPriceHistoryMap] = useState({});
   const [transfersData, setTransfersData] = useState([]);
   const { itemTransfers } = useInventoryState();
+  const [allMarketplaceItems, setAllMarketplaceItems] = useState([]);
+  const [isMarketplaceLoading, setIsMarketplaceLoading] = useState(true);
+  const marketplaceDispatch = useMarketplaceDispatch();
+  const { hasChecked, isAuthenticated } = useAuthenticateState();
+  const [isPriceLoading, setIsPriceLoading] = useState(true);
+  const [calculatedPrices, setCalculatedPrices] = useState({});
+  const [isDataReady, setIsDataReady] = useState(false);
 
   const categoryDispatch = useCategoryDispatch();
   const { inventories, isInventoriesLoading, priceHistory } =
@@ -94,6 +106,25 @@ const MyWallet = ({ user }) => {
   useEffect(() => {
     categoryActions.fetchCategories(categoryDispatch);
   }, [categoryDispatch]);
+
+  useEffect(() => {
+    const allDataReady =
+      !isInventoriesLoading &&
+      !isMarketplaceLoading &&
+      isPriceHistoryLoaded &&
+      !isPriceLoading &&
+      Object.keys(calculatedPrices).length > 0 &&
+      inventories.length > 0;
+
+    setIsDataReady(allDataReady);
+  }, [
+    isInventoriesLoading,
+    isMarketplaceLoading,
+    isPriceHistoryLoaded,
+    isPriceLoading,
+    calculatedPrices,
+    inventories,
+  ]);
 
   useEffect(() => {
     if (inventories.length > 0) {
@@ -165,11 +196,73 @@ const MyWallet = ({ user }) => {
     }
   }, [itemTransfers]);
 
-  const getUnitPrice = (inventory) => {
-    // Check if the item has an active listing
-    if (inventory.status === "1" && inventory.price) {
-      return parseFloat(inventory.price);
+  const [selectedAvailability, setSelectedAvailability] = useState([
+    "forSale",
+    "soldOut",
+  ]);
+  const availabilityFilter = `&forSale=${selectedAvailability.includes(
+    "forSale"
+  )}&soldOut=${selectedAvailability.includes("soldOut")}`;
+  useEffect(() => {
+    const fetchAllItems = async () => {
+      setIsMarketplaceLoading(true);
+      try {
+        const allItems = await marketplaceActions.fetchAllMarketplaceItems(
+          marketplaceDispatch,
+          "", // categorys
+          "", // subCategorys
+          0, // minPrice
+          Number.MAX_SAFE_INTEGER, // maxPrice
+          "", // search
+          `&forSale=${selectedAvailability.includes(
+            "forSale"
+          )}&soldOut=${selectedAvailability.includes("soldOut")}`
+        );
+        if (allItems && allItems.length > 0) {
+          setAllMarketplaceItems(allItems);
+          console.log("All marketplace items:", allItems);
+        } else {
+          console.log("No items returned from fetchAllMarketplaceItems");
+          setAllMarketplaceItems([]);
+        }
+      } catch (error) {
+        console.error("Error fetching all marketplace items:", error);
+      } finally {
+        setIsMarketplaceLoading(false);
+      }
+    };
+
+    if (hasChecked && isAuthenticated) {
+      fetchAllItems();
     }
+  }, [hasChecked, isAuthenticated, marketplaceDispatch, selectedAvailability]);
+
+  useEffect(() => {
+    console.log("allMarketplaceItems updated:", allMarketplaceItems);
+  }, [allMarketplaceItems]);
+  console.log(allMarketplaceItems);
+
+  const getUnitPrice = (inventory) => {
+    let currentPrice = 0;
+    let highestListedPrice = 0;
+    let priceHistoryPrice = 0;
+
+    // Check if the current item has an active listing
+    if (inventory.status === "1" && inventory.price) {
+      currentPrice = parseFloat(inventory.price);
+    }
+
+    // Check for highest listed price of items with the same root
+    const sameRootItems = allMarketplaceItems.filter(
+      (item) => item.root === inventory.root && item.status === "1"
+    );
+    if (sameRootItems.length > 0) {
+      highestListedPrice = Math.max(
+        ...sameRootItems.map((item) => parseFloat(item.price))
+      );
+    }
+
+    console.log(highestListedPrice);
 
     // Check price history
     const inventoryPriceHistory = Object.values(priceHistoryMap).find(
@@ -182,10 +275,22 @@ const MyWallet = ({ user }) => {
     ) {
       const originRecords = inventoryPriceHistory.data.originRecords;
       const mostRecentPrice = originRecords[originRecords.length - 1].price;
-      return parseFloat(mostRecentPrice);
+      priceHistoryPrice = parseFloat(mostRecentPrice);
     }
 
-    // If no price history, check transfers for price
+    // Return the highest price among current item, other items with same root, and price history
+    const highestOverallPrice = Math.max(
+      currentPrice,
+      highestListedPrice,
+      priceHistoryPrice
+    );
+
+    // If we have a price, return it
+    if (highestOverallPrice > 0) {
+      return highestOverallPrice;
+    }
+
+    // If no price found yet, check transfers for price
     const latestTransfer = transfersData.find((transfer) => {
       return transfer.assetAddress === inventory.originAddress;
     });
@@ -235,10 +340,32 @@ const MyWallet = ({ user }) => {
   const [tableData, setTableData] = useState([]);
 
   useEffect(() => {
-    if (!isInventoriesLoading && inventories.length > 0) {
+    if (
+      !isInventoriesLoading &&
+      inventories.length > 0 &&
+      !isMarketplaceLoading
+    ) {
+      setIsPriceLoading(true);
+      const prices = {};
+      inventories.forEach((inventory) => {
+        const price = getUnitPrice(inventory);
+        prices[inventory.address] = price;
+      });
+      setCalculatedPrices(prices);
+      setIsPriceLoading(false);
+    }
+  }, [
+    isInventoriesLoading,
+    inventories,
+    isMarketplaceLoading,
+    allMarketplaceItems,
+  ]);
+
+  useEffect(() => {
+    if (isDataReady) {
       const inventoryData = inventories.map((inventory, index) => {
         const quantity = Math.round(inventory.quantity) || 1;
-        const price = getUnitPrice(inventory);
+        const price = calculatedPrices[inventory.address] || 0;
         const value = quantity * price;
         return {
           key: `inventory-${index + 2}`,
@@ -253,7 +380,7 @@ const MyWallet = ({ user }) => {
           purchasePrice:
             inventory.data.isMint === "False" ? inventory.price : null,
           creator: inventory.creator,
-          gainLoss: "0%", // This will be calculated in the column render function
+          gainLoss: "0%",
           value: `$${value.toFixed(2)}`,
           status: inventory.status,
           address: inventory.address,
@@ -282,23 +409,61 @@ const MyWallet = ({ user }) => {
         return sum + (isNaN(itemValue) ? 0 : itemValue);
       }, 0);
       setTotalBalance(total.toFixed(2));
-    } else {
-      setTableData([
-        {
-          key: "1",
-          asset: "STRATS",
-          image: Images.logo,
-          quantity: Math.round(stratsBalance),
-          price: "$0.01",
-          gainLoss: "---",
-          value: `$${(stratsBalance * 0.01).toFixed(2)}`,
-          status: null,
-          address: null,
-        },
-      ]);
-      setTotalBalance((stratsBalance * 0.01).toFixed(2));
     }
-  }, [isInventoriesLoading, inventories, stratsBalance, priceHistory]);
+  }, [isDataReady, inventories, calculatedPrices, stratsBalance]);
+
+  const renderPrice = (price, record) => {
+    if (record.key === "1") {
+      return (
+        <div>
+          <div className="text-xs sm:text-sm">{price}</div>
+        </div>
+      );
+    }
+
+    if (isPriceLoading) {
+      return <Spin size="small" />;
+    }
+
+    const priceValue = parseFloat(price.replace("$", ""));
+
+    if (priceValue === 0 || isNaN(priceValue)) {
+      return (
+        <div>
+          <div className="text-xs sm:text-sm">-</div>
+          <div className="flex items-center mt-1">
+            <img
+              src={Images.logo}
+              alt="Small"
+              className="w-3 h-3 sm:w-4 sm:h-4 mr-1 sm:mr-2"
+            />
+            <Text
+              className="text-[10px] sm:text-xs"
+              style={{ color: "#747474" }}
+            >
+              -
+            </Text>
+          </div>
+        </div>
+      );
+    }
+
+    return (
+      <div>
+        <div className="text-xs sm:text-sm">{price}</div>
+        <div className="flex items-center mt-1">
+          <img
+            src={Images.logo}
+            alt="Small"
+            className="w-3 h-3 sm:w-4 sm:h-4 mr-1 sm:mr-2"
+          />
+          <Text className="text-[10px] sm:text-xs" style={{ color: "#747474" }}>
+            {(priceValue / 0.01).toFixed(2)}
+          </Text>
+        </div>
+      </div>
+    );
+  };
 
   const CustomQuestionIcon = () => (
     <svg
@@ -369,57 +534,7 @@ const MyWallet = ({ user }) => {
       title: "Unit Price",
       dataIndex: "price",
       key: "price",
-      render: (price, record) => {
-        if (record.key === "1") {
-          return (
-            <div>
-              <div className="text-xs sm:text-sm">{price}</div>
-            </div>
-          );
-        }
-
-        const priceValue = parseFloat(price.replace("$", ""));
-
-        if (priceValue === 0 || isNaN(priceValue)) {
-          return (
-            <div>
-              <div className="text-xs sm:text-sm">-</div>
-              <div className="flex items-center mt-1">
-                <img
-                  src={Images.logo}
-                  alt="Small"
-                  className="w-3 h-3 sm:w-4 sm:h-4 mr-1 sm:mr-2"
-                />
-                <Text
-                  className="text-[10px] sm:text-xs"
-                  style={{ color: "#747474" }}
-                >
-                  -
-                </Text>
-              </div>
-            </div>
-          );
-        }
-
-        return (
-          <div>
-            <div className="text-xs sm:text-sm">{price}</div>
-            <div className="flex items-center mt-1">
-              <img
-                src={Images.logo}
-                alt="Small"
-                className="w-3 h-3 sm:w-4 sm:h-4 mr-1 sm:mr-2"
-              />
-              <Text
-                className="text-[10px] sm:text-xs"
-                style={{ color: "#747474" }}
-              >
-                {(priceValue / 0.01).toFixed(2)}
-              </Text>
-            </div>
-          </div>
-        );
-      },
+      render: renderPrice,
     },
     {
       title: "Quantity",
@@ -599,14 +714,14 @@ const MyWallet = ({ user }) => {
 
       <div className="p-4">
         <div className="border border-[#D9D9D9] rounded-lg overflow-hidden">
-          {isLoading ? (
-            <div className="flex justify-center items-center h-40">
-              <Spin size="large" />
-            </div>
-          ) : (
+          {isDataReady ? (
             tableData.map((item, index) =>
               renderMobileCard(item, index, tableData.length)
             )
+          ) : (
+            <div className="flex justify-center items-center h-40">
+              <Spin size="large" />
+            </div>
           )}
         </div>
       </div>
@@ -662,13 +777,18 @@ const MyWallet = ({ user }) => {
       </div>
 
       <div className="pt-6 mx-6 md:mx-5 md:px-10 mb-5">
-        <Table
-          columns={columns}
-          dataSource={tableData}
-          pagination={false}
-          className="custom-table"
-          loading={isLoading || isInventoriesLoading}
-        />
+        {isDataReady ? (
+          <Table
+            columns={columns}
+            dataSource={tableData}
+            pagination={false}
+            className="custom-table"
+          />
+        ) : (
+          <div className="flex justify-center items-center h-64">
+            <Spin size="large" />
+          </div>
+        )}
       </div>
     </>
   );

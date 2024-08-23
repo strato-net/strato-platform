@@ -32,6 +32,26 @@ const reducer = (state, action) => {
         error: action.error,
         isMarketplaceLoading: false,
       };
+    case actionDescriptors.fetchAllMarketplaceItems:
+      return {
+        ...state,
+        isMarketplaceLoading: true,
+        error: null,
+      };
+    case actionDescriptors.fetchAllMarketplaceItemsSuccessful:
+      return {
+        ...state,
+        isMarketplaceLoading: false,
+        marketplaceList: action.payload.items,
+        marketplaceListCount: action.payload.totalCount,
+        error: null,
+      };
+    case actionDescriptors.fetchAllMarketplaceItemsFailed:
+      return {
+        ...state,
+        isMarketplaceLoading: false,
+        error: action.error,
+      };
     case actionDescriptors.fetchMarketplaceLoggedIn:
       return {
         ...state,
@@ -250,7 +270,7 @@ const reducer = (state, action) => {
       return {
         ...state,
         isTransferringStrats: false,
-        error: action.error
+        error: action.error,
       };
     default:
       throw new Error(`Unhandled action: '${action.type}'`);

@@ -5,6 +5,9 @@ const actionDescriptors = {
   fetchMarketplace: "fetch_marketplace",
   fetchMarketplaceSuccessful: "fetch_marketplace_successful",
   fetchMarketplaceFailed: "fetch_marketplace_failed",
+  fetchAllMarketplaceItems: "fetch_all_marketplace_items",
+  fetchAllMarketplaceItemsSuccessful: "fetch_all_marketplace_items_successful",
+  fetchAllMarketplaceItemsFailed: "fetch_all_marketplace_items_failed",
   fetchMarketplaceLoggedIn: "fetch_marketplace_logged_in",
   fetchMarketplaceLoggedInSuccessful: "fetch_marketplace_logged_in_successful",
   fetchMarketplaceLoggedInFailed: "fetch_marketplace_logged_in_failed",
@@ -12,8 +15,10 @@ const actionDescriptors = {
   fetchTopSellingProductsSuccessful: "fetch_top_selling_products_successful",
   fetchTopSellingProductsFailed: "fetch_top_selling_products_failed",
   fetchTopSellingProductsLoggedIn: "fetch_top_selling_products_logged_in",
-  fetchTopSellingProductsLoggedInSuccessful: "fetch_top_selling_products_logged_in_successful",
-  fetchTopSellingProductsLoggedInFailed: "fetch_top_selling_products_logged_in_failed",
+  fetchTopSellingProductsLoggedInSuccessful:
+    "fetch_top_selling_products_logged_in_successful",
+  fetchTopSellingProductsLoggedInFailed:
+    "fetch_top_selling_products_logged_in_failed",
   resetMessage: "reset_message",
   setMessage: "set_message",
   addItemToCart: "add_item_to_cart",
@@ -41,11 +46,13 @@ const actionDescriptors = {
   fetchStratsBalanceSuccessful: "fetch_strats_balance_successful",
   fetchStratsBalanceFailed: "fetch_strats_balance_failed",
   fetchStratsTransactionHistory: "fetch_strats_transaction_history",
-  fetchStratsTransactionHistorySuccessful: "fetch_strats_transaction_history_successful",
-  fetchStratsTransactionHistoryFailed: "fetch_strats_transaction_history_failed",
+  fetchStratsTransactionHistorySuccessful:
+    "fetch_strats_transaction_history_successful",
+  fetchStratsTransactionHistoryFailed:
+    "fetch_strats_transaction_history_failed",
   transferStrats: "transfer_strats",
   transferStratsSuccessful: "transfer_strats_successful",
-  transferStratsFailed: "transfer_strats_failed"
+  transferStratsFailed: "transfer_strats_failed",
 };
 
 const actions = {
@@ -105,7 +112,6 @@ const actions = {
     }
   },
 
-
   fetchConfirmOrderItems: (dispatch, cartList) => {
     dispatch({ type: actionDescriptors.fetchConfirmOrderItems });
     try {
@@ -138,7 +144,6 @@ const actions = {
     }
   },
 
-
   fetchMarketplace: async (
     dispatch,
     categorys,
@@ -158,9 +163,7 @@ const actions = {
       ? `&subCategory[]=${subCategorys}`
       : "";
 
-    const searchQuery = search
-      ? `&queryValue=${search}&queryFields=name`
-      : "";
+    const searchQuery = search ? `&queryValue=${search}&queryFields=name` : "";
     const priceQuery = `&range[]=price,${minPrice},${maxPrice}`;
     // const sortLatest = "&order=createdDate.desc"
 
@@ -170,9 +173,9 @@ const actions = {
         {
           method: HTTP_METHODS.GET,
           headers: {
-            'offset': `${offset}`,
-            'limit': `${limit}`
-          }
+            offset: `${offset}`,
+            limit: `${limit}`,
+          },
         }
       );
 
@@ -203,6 +206,88 @@ const actions = {
     }
   },
 
+  fetchAllMarketplaceItems: async (
+    dispatch,
+    categorys,
+    subCategorys,
+    minPrice,
+    maxPrice,
+    search,
+    availabilityQuery
+  ) => {
+    dispatch({ type: actionDescriptors.fetchAllMarketplaceItems });
+
+    let allItems = [];
+    let currentOffset = 0;
+    const itemsPerPage = 100;
+    let totalCount = Infinity;
+
+    const categoryQuery = categorys ? `&category[]=${categorys}` : "";
+    const subCategoryQuery = subCategorys
+      ? `&subCategory[]=${subCategorys}`
+      : "";
+    const priceQuery = `&range[]=price,${minPrice},${maxPrice}`;
+    const searchQuery = search ? `&queryValue=${search}&queryFields=name` : "";
+
+    try {
+      while (allItems.length < totalCount) {
+        const url = `${apiUrl}/marketplace/all?${priceQuery}${categoryQuery}${subCategoryQuery}${searchQuery}${availabilityQuery}`;
+
+        const response = await fetch(url, {
+          method: HTTP_METHODS.GET,
+          headers: {
+            offset: `${currentOffset + 1}`,
+            limit: `${itemsPerPage}`,
+          },
+        });
+
+        if (response.status === RestStatus.OK) {
+          const body = await response.json();
+          const { productsWithImageUrl, inventoryCount } = body.data;
+          allItems = [...allItems, ...productsWithImageUrl];
+          totalCount = inventoryCount;
+
+          if (
+            productsWithImageUrl.length < itemsPerPage ||
+            allItems.length >= totalCount
+          ) {
+            break;
+          }
+
+          currentOffset += itemsPerPage;
+        } else if (response.status === RestStatus.UNAUTHORIZED) {
+          dispatch({
+            type: actionDescriptors.fetchAllMarketplaceItemsFailed,
+            error: "Unauthorized while fetching marketplace products",
+          });
+          return null;
+        } else {
+          const errorBody = await response.json();
+          dispatch({
+            type: actionDescriptors.fetchAllMarketplaceItemsFailed,
+            error:
+              errorBody.error || "Error while fetching marketplace products",
+          });
+          return null;
+        }
+      }
+
+      dispatch({
+        type: actionDescriptors.fetchAllMarketplaceItemsSuccessful,
+        payload: { items: allItems, totalCount },
+      });
+
+      return allItems;
+    } catch (err) {
+      console.error("Error in fetchAllMarketplaceItems:", err);
+      dispatch({
+        type: actionDescriptors.fetchAllMarketplaceItemsFailed,
+        error: "Error while fetching marketplace products",
+      });
+      return null;
+    }
+  },
+
   fetchMarketplaceLoggedIn: async (
     dispatch,
     categorys,
@@ -224,9 +309,7 @@ const actions = {
 
     const priceQuery = `&range[]=price,${minPrice},${maxPrice}`;
     // const sortLatest = "&order=createdDate.desc"
-    const searchQuery = search
-      ? `&queryValue=${search}&queryFields=name`
-      : "";
+    const searchQuery = search ? `&queryValue=${search}&queryFields=name` : "";
 
     try {
       const response = await fetch(
@@ -234,9 +317,9 @@ const actions = {
         {
           method: HTTP_METHODS.GET,
           headers: {
-            'offset': `${offset}`,
-            'limit': `${limit}`
-          }
+            offset: `${offset}`,
+            limit: `${limit}`,
+          },
         }
       );
 
@@ -253,14 +336,13 @@ const actions = {
           type: actionDescriptors.fetchMarketplaceLoggedInFailed,
           error: "Error while fetching marketplace products",
         });
-      } else if(response.status === RestStatus.UNAUTHORIZED) {
-        dispatch({ 
-          type: actionDescriptors.fetchMarketplaceLoggedInFailed, 
-          error: "Unauthorized while fetching marketplace products" 
+      } else if (response.status === RestStatus.UNAUTHORIZED) {
+        dispatch({
+          type: actionDescriptors.fetchMarketplaceLoggedInFailed,
+          error: "Unauthorized while fetching marketplace products",
         });
         window.location.href = body.error.loginUrl;
       }
-
 
       dispatch({
         type: actionDescriptors.fetchMarketplaceLoggedInFailed,
@@ -325,10 +407,10 @@ const actions = {
           payload: body.data,
         });
         return;
-      } else if(response.status === RestStatus.UNAUTHORIZED) {
-        dispatch({ 
-          type: actionDescriptors.fetchTopSellingProductsLoggedInFailed, 
-          error: "Unauthorized while fetching trending items" 
+      } else if (response.status === RestStatus.UNAUTHORIZED) {
+        dispatch({
+          type: actionDescriptors.fetchTopSellingProductsLoggedInFailed,
+          error: "Unauthorized while fetching trending items",
         });
         window.location.href = body.error.loginUrl;
       }
@@ -376,7 +458,7 @@ const actions = {
       } else if (response.status === RestStatus.UNAUTHORIZED) {
         dispatch({
           type: actionDescriptors.addShippingAddressFailed,
-          error: "Unauthorized while adding Shipping address"
+          error: "Unauthorized while adding Shipping address",
         });
         window.location.href = body.error.loginUrl;
       }
@@ -400,12 +482,9 @@ const actions = {
     dispatch({ type: actionDescriptors.fetchUserAddress });
 
     try {
-      const response = await fetch(
-        `${apiUrl}/order/userAddress/${addressId}`,
-        {
-          method: HTTP_METHODS.GET,
-        }
-      );
+      const response = await fetch(`${apiUrl}/order/userAddress/${addressId}`, {
+        method: HTTP_METHODS.GET,
+      });
 
       const body = await response.json();
 
@@ -425,7 +504,7 @@ const actions = {
       } else if (response.status === RestStatus.UNAUTHORIZED) {
         dispatch({
           type: actionDescriptors.fetchUserAddressFailed,
-          error: "Unauthorized while fetching Shipping address"
+          error: "Unauthorized while fetching Shipping address",
         });
         window.location.href = body.error.loginUrl;
       }
@@ -447,7 +526,7 @@ const actions = {
   fetchUserAddresses: async (dispatch, redemptionService) => {
     dispatch({ type: actionDescriptors.fetchUserAddresses });
 
-    const redemptionArg = redemptionService ? `/${redemptionService}` : '';
+    const redemptionArg = redemptionService ? `/${redemptionService}` : "";
     try {
       const response = await fetch(
         `${apiUrl}/order/userAddresses/user${redemptionArg}`,
@@ -474,7 +553,7 @@ const actions = {
       } else if (response.status === RestStatus.UNAUTHORIZED) {
         dispatch({
           type: actionDescriptors.fetchUserAddressesFailed,
-          error: "Unauthorized while fetching Shipping addresses"
+          error: "Unauthorized while fetching Shipping addresses",
         });
         window.location.href = body.error.loginUrl;
       }
@@ -500,7 +579,10 @@ const actions = {
         credentials: "same-origin",
       });
       const body = await response.json();
-      if (response.status === RestStatus.UNAUTHORIZED || response.status === RestStatus.FORBIDDEN) {
+      if (
+        response.status === RestStatus.UNAUTHORIZED ||
+        response.status === RestStatus.FORBIDDEN
+      ) {
         dispatch({
           type: actionDescriptors.fetchStratsBalanceFailed,
           payload: "Error while fetching STRATS",
@@ -510,13 +592,19 @@ const actions = {
       if (response.status === RestStatus.OK) {
         dispatch({
           type: actionDescriptors.fetchStratsBalanceSuccessful,
-          payload: body.data
+          payload: body.data,
         });
         return;
       }
-      dispatch({ type: actionDescriptors.fetchStratsBalanceFailed, payload: "Error while fetching STRATS" });
+      dispatch({
+        type: actionDescriptors.fetchStratsBalanceFailed,
+        payload: "Error while fetching STRATS",
+      });
     } catch (err) {
-      dispatch({ type: actionDescriptors.fetchStratsBalanceFailed, payload: "Error while fetching STRATS" });
+      dispatch({
+        type: actionDescriptors.fetchStratsBalanceFailed,
+        payload: "Error while fetching STRATS",
+      });
     }
   },
   fetchStratsTransactionHistory: async (dispatch) => {
@@ -527,7 +615,10 @@ const actions = {
         credentials: "same-origin",
       });
       const body = await response.json();
-      if (response.status === RestStatus.UNAUTHORIZED || response.status === RestStatus.FORBIDDEN) {
+      if (
+        response.status === RestStatus.UNAUTHORIZED ||
+        response.status === RestStatus.FORBIDDEN
+      ) {
         dispatch({
           type: actionDescriptors.fetchStratsTransactionHistoryFailed,
           payload: "Error while fetching STRATS Transaction History",
@@ -537,13 +628,19 @@ const actions = {
       if (response.status === RestStatus.OK) {
         dispatch({
           type: actionDescriptors.fetchStratsTransactionHistorySuccessful,
-          payload: body.data
+          payload: body.data,
         });
         return;
       }
-      dispatch({ type: actionDescriptors.fetchStratsTransactionHistoryFailed, payload: "Error while fetching STRATS Transaction History" });
+      dispatch({
+        type: actionDescriptors.fetchStratsTransactionHistoryFailed,
+        payload: "Error while fetching STRATS Transaction History",
+      });
     } catch (err) {
-      dispatch({ type: actionDescriptors.fetchStratsTransactionHistoryFailed, payload: "Error while fetching STRATS Transaction History" });
+      dispatch({
+        type: actionDescriptors.fetchStratsTransactionHistoryFailed,
+        payload: "Error while fetching STRATS Transaction History",
+      });
     }
   },
   transferStrats: async (dispatch, payload) => {
@@ -559,7 +656,10 @@ const actions = {
         body: JSON.stringify(payload),
       });
       const body = await response.json();
-      if (response.status === RestStatus.UNAUTHORIZED || response.status === RestStatus.FORBIDDEN) {
+      if (
+        response.status === RestStatus.UNAUTHORIZED ||
+        response.status === RestStatus.FORBIDDEN
+      ) {
         dispatch({
           type: actionDescriptors.transferStratsFailed,
           error: "Error while transferring STRATS",
@@ -570,19 +670,24 @@ const actions = {
       if (response.status === RestStatus.OK) {
         dispatch({
           type: actionDescriptors.transferStratsSuccessful,
-          payload: body.data
+          payload: body.data,
         });
         actions.setMessage(dispatch, "STRATS transferred successfully", true);
         return;
       }
-      dispatch({ type: actionDescriptors.transferStratsFailed, error: "Error while transferring STRATS" });
+      dispatch({
+        type: actionDescriptors.transferStratsFailed,
+        error: "Error while transferring STRATS",
+      });
       actions.setMessage(dispatch, "Error while transferring STRATS");
     } catch (err) {
-      dispatch({ type: actionDescriptors.transferStratsFailed, error: "Error while transferring STRATS" });
+      dispatch({
+        type: actionDescriptors.transferStratsFailed,
+        error: "Error while transferring STRATS",
+      });
       actions.setMessage(dispatch, "Error while transferring STRATS");
     }
   },
-
 };
 
 export { actionDescriptors, actions };
