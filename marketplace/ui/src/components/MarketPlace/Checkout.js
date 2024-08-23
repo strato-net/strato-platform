@@ -78,7 +78,7 @@ const Checkout = () => {
   }, [marketplaceDispatch, cartList]);
 
   useEffect(() => {
-    paymentServiceActions.getPaymentServices(paymentServiceDispatch);
+    paymentServiceActions.getPaymentServices(paymentServiceDispatch, false);
   }, [paymentServiceDispatch]);
 
   useEffect(() => {
@@ -356,13 +356,10 @@ const Checkout = () => {
     },
   ];
 
-  const filterPaymentServices = (es) => {
-    const ps = es.map(p => paymentServices.find(s => s.address === p.value));
-    if (ps.length === 0 || ps[0] === undefined) {
-      return paymentServices.filter((p) => p && p.serviceName === 'Stripe');
-    } else {
-      return ps;
-    }
+  const filterPaymentServices = (e) => {
+    const filteredPaymentServices = e.map(assetPaymentServices => paymentServices.find(paymentService => paymentService.address === assetPaymentServices.value));
+
+    return filteredPaymentServices;
   }
 
   return (

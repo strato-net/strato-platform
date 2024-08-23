@@ -4,52 +4,33 @@ version: '3'
 volumes:
   paymentserverconfig:
     driver: local
-  paymentpgdata:
-    driver: local
 services:
   payment-server:
-    depends_on:
-    - postgres
     environment:
     - SERVER_HOST=${SERVER_HOST}
     - STRIPE_SECRET_KEY=${STRIPE_SECRET_KEY}
-    - POSTGRES_PASSWORD=${postgres_password:-api}
+    - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
     - POSTGRES_SERVER_URL=${POSTGRES_SERVER_URL}
     - POSTGRES_PORT=${POSTGRES_PORT}
     - POSTGRES_USER=${POSTGRES_USER}
     - POSTGRES_DBNAME=${POSTGRES_DBNAME}
     - STRATO_HOST=${STRATO_HOST}
-    - STRIPE_CONTRACT_ADDRESS=${STRIPE_CONTRACT_ADDRESS}
-    - METAMASK_CONTRACT_ADDRESS=${METAMASK_CONTRACT_ADDRESS}
-    - REDEMPTION_CONTRACT_ADDRESS=${REDEMPTION_CONTRACT_ADDRESS}
+    - SENDGRID_API_KEY=${SENDGRID_API_KEY}
     - OAUTH_DISCOVERY_URL=${OAUTH_DISCOVERY_URL}
     - OAUTH_CLIENT_ID=${OAUTH_CLIENT_ID}
     - OAUTH_CLIENT_SECRET=${OAUTH_CLIENT_SECRET}
     - OAUTH_SCOPE=${OAUTH_SCOPE}
     - OAUTH_SERVICE_OAUTH_FLOW=${OAUTH_SERVICE_OAUTH_FLOW}
     - SKIP_CONTRACT_VALIDATION=${SKIP_CONTRACT_VALIDATION}
+    - SKIP_DEPLOYMENT=${SKIP_DEPLOYMENT}
+    - BASE_CODE_COLLECTION=${BASE_CODE_COLLECTION}
+    - UPGRADE_CONTRACTS=${UPGRADE_CONTRACTS}
+    - STRAT_ADDRESS=${STRAT_ADDRESS}
+    - STRAT_FEE_RECIPIENT=${STRAT_FEE_RECIPIENT}
     build: .
     image: ${PAYMENT_SERVER_IMAGE:-<REPO_URL>payment-server:<VERSION>}
     volumes:
        - paymentserverconfig:/config:rw
-    restart: unless-stopped
-    logging:
-      driver: "json-file"
-      options:
-        max-size: "100m"
-        max-file: "3"
-  postgres:
-    environment:
-      - POSTGRES_PASSWORD=${postgres_password:-api}
-    image: postgres:9.6
-    volumes:
-      - paymentpgdata:/var/lib/postgresql/data
-    command:
-      - "postgres"
-      - "-c"
-      - "max_connections=300"
-      - "-c"
-      - "shared_buffers=512MB"
     restart: unless-stopped
     logging:
       driver: "json-file"
@@ -70,7 +51,7 @@ services:
     image: ${PAYMENT_SERVER_NGINX_IMAGE:-<REPO_URL>payment-server-nginx:<VERSION>}
     ports:
     - ${HTTP_PORT:-80}:80 #TAG_REMOVE_WHEN_SSL_CUSTOM_HTTPS_PORT
-    - ${HTTPS_PORT:-44301}:443 #TAG_REMOVE_WHEN_NO_SSL
+    - ${HTTPS_PORT:-443}:443 #TAG_REMOVE_WHEN_NO_SSL
     volumes:
     - ./ssl:/tmp/ssl:ro
     restart: unless-stopped

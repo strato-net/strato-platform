@@ -34,7 +34,8 @@ data ProvidedRealmInfo -- info user provides to support realm
     fallbackNodeUrl :: Maybe String,
     userRegistryAddress :: Maybe Address,
     userRegistryCodeHash :: Maybe Keccak256,
-    userTableName :: Maybe String
+    userTableName :: Maybe String,
+    notificationServerUrl :: Maybe String
   }
   deriving (Show, Generic, FromJSON, ToJSON)
 
@@ -53,6 +54,7 @@ data RealmDetails = RealmDetails
     realmUserRegAddr :: Address,
     realmUserRegCodeHash :: Maybe Keccak256,
     realmUserTableName :: String,
+    realmNoficicationServerUrl :: Maybe String,
     cacheRef :: IORef (LRU String Address), -- commonName -> userAddress
     accessTokenRef :: IORef (Maybe AccessToken, UTCTime)
   }
@@ -88,6 +90,7 @@ getRealmMap realmInfos cacheSize = fromList <$> mapM parseRealmMinInfo realmInfo
               realmUserRegAddr = fromMaybe (Address 0x720) $ userRegistryAddress realmInfo,
               realmUserRegCodeHash = userRegistryCodeHash realmInfo,
               realmUserTableName = fromMaybe "User" $ userTableName realmInfo,
+              realmNoficicationServerUrl = notificationServerUrl realmInfo, 
               cacheRef = cRef,
               accessTokenRef = tRef
             }

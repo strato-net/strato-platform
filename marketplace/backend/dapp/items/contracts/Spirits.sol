@@ -7,7 +7,8 @@ contract UnitOfMeasurement {
 enum UnitOfMeasurement {
     NULL,
     BARREL,
-    BOTTLE  
+    BOTTLE,
+    LITER
 }
 }
 

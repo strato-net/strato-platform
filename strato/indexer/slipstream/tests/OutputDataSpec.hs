@@ -22,7 +22,7 @@ import Data.Time
 import Numeric
 import Test.Hspec
 import Text.RawString.QQ
-import UnliftIO.IORef
+-- import UnliftIO.IORef
 
 import BlockApps.Logging
 import qualified BlockApps.Solidity.Value as V
@@ -31,15 +31,16 @@ import Blockchain.Strato.Model.Address
 import Blockchain.Strato.Model.CodePtr
 import Blockchain.Strato.Model.Keccak256 (hash)
 import qualified Slipstream.Events as SE
-import Slipstream.Globals
-import Slipstream.GlobalsColdStorage (fakeHandle)
+-- import Slipstream.Globals
+-- import Slipstream.GlobalsColdStorage (fakeHandle)
 import Slipstream.OutputData
 import Slipstream.SolidityValue
-
+import Slipstream.QueryFormatHelper
 import SolidVM.Model.CodeCollection hiding (contractName, contracts)
 import SolidVM.Model.SolidString
 import qualified SolidVM.Model.Type as SVMType
 import Blockchain.Data.AddressStateDB
+
 -- import Network.Haskoin.Crypto.BigWord
 -- import Blockchain.Data.ChainInfo
 -- import Blockchain.DB.CodeDB
@@ -62,37 +63,34 @@ instance Selectable Account AddressState (LoggingT IO) where
 
 
 createInserts :: OutputM m
-              => IORef Globals
-              -> (SE.ProcessedContract, ContractF())
+              => (SE.ProcessedContract, ContractF())
               -> ConduitM () T.Text m ()
-createInserts globalsIORef (a,b) = do
+createInserts  (a,b) = do
     let cc = createDummyCodeCollection b 
-    _ <- createIndexTable globalsIORef b cc (SE.creator $ a, SE.application $ a, SE.contractName $ a)
-    createHistoryTable False globalsIORef b cc (SE.creator $ a, SE.application $ a, SE.contractName $ a)
+    _ <- createIndexTable b cc (SE.creator $ a, SE.application $ a, SE.contractName $ a)
+    createHistoryTable False  b cc (SE.creator $ a, SE.application $ a, SE.contractName $ a)
     insertIndexTable $ (a,[])
     insertHistoryTable $ [a]
 
 createInsertsCollection :: OutputM m
-            => IORef Globals
-              -> [ProcessedCollectionRow]
+            => [ProcessedCollectionRow]
               -> ConduitM () T.Text m ()
-createInsertsCollection globalsIORef collections = do
+createInsertsCollection collections = do
   unless (null collections) $ do
     let collection = head collections
-    _ <- createCollectionTable globalsIORef (creator collection, application collection, contractname collection) (collectionname collection)
+    _ <- createMappingTable  (creator collection, application collection, contractname collection) (collectionname collection)
     insertCollectionTable collections
 
 createInsertsAbstract :: OutputM m
-              => IORef Globals
-              -> (SE.ProcessedContract, ContractF())
-              -> [(SE.ProcessedContract, [T.Text], T.Text, TableColumns)]
+              => (SE.ProcessedContract, ContractF())
+              -> [(SE.ProcessedContract, [T.Text], TableName, [T.Text])]
               -> ConduitM () T.Text m ()
-createInsertsAbstract globalsIORef abstract inherited = do
+createInsertsAbstract abstract inherited = do
     let contract = snd abstract
         cc = createDummyCodeCollection contract
-    _ <- createAbstractTable globalsIORef (contract) (SE.creator $ fst abstract, SE.application $ fst abstract, SE.contractName $ fst abstract) M.empty cc
+    _ <- createAbstractTable  (contract) (SE.creator $ fst abstract, SE.application $ fst abstract, SE.contractName $ fst abstract) M.empty cc
     unless (null inherited) $ do 
-      insertAbstractTable inherited False
+      insertAbstractTable inherited
 
 createDummyContract :: [(T.Text, SVMType.Type)] -> ContractF()
 createDummyContract v = 
@@ -136,8 +134,8 @@ createDummyCodeCollection contract = CodeCollection
     _imports = []
   }
 
-fakeCirrusHandle :: CirrusHandle
-fakeCirrusHandle = FakeCirrusHandle
+-- fakeCirrusHandle :: CirrusHandle
+-- fakeCirrusHandle = FakeCirrusHandle
 
 spec :: Spec
 spec = do
@@ -153,6 +151,7 @@ spec = do
                   { SE.address = testAdd,
                     SE.codehash = SolidVMCode "Vehicle" $ hash "<CODEHASH>",
                     SE.creator = "",
+                    SE.cc_creator = Nothing,
                     SE.root = "",
                     SE.application = "",
                     SE.contractName = "Vehicle",
@@ -178,8 +177,8 @@ spec = do
               )
             
 
-      g <- newGlobals fakeHandle fakeCirrusHandle
-      [vehicleCreate, _, _, _, vehicleInsert, _] <- runLoggingT . runConduit $ createInserts g input .| sinkList
+      --  
+      [vehicleCreate, _, _, _, vehicleInsert, _] <- runLoggingT . runConduit $ createInserts  input .| sinkList
       vehicleCreate
         `shouldBe` [r|CREATE TABLE IF NOT EXISTS "Vehicle" (address text,
     block_hash text,
@@ -225,6 +224,7 @@ spec = do
                   { SE.address = testAdd,
                     SE.codehash = cHash,
                     SE.creator = "",
+                    SE.cc_creator = Nothing,
                     SE.root = "",
                     SE.application = "",
                     SE.contractName = "Vehicle2",
@@ -249,10 +249,10 @@ spec = do
                   ]
               )
             
-      g <- newGlobals fakeHandle fakeCirrusHandle
+       
 
       [vehicleCreate, historyCreate, historyIndex, historyAlter, vehicleInsert, historyInsert] <-
-        runLoggingT . runConduit $ createInserts g input .| sinkList
+        runLoggingT . runConduit $ createInserts  input .| sinkList
 
       vehicleCreate
         `shouldBe` [r|CREATE TABLE IF NOT EXISTS "Vehicle2" (address text,
@@ -333,6 +333,7 @@ spec = do
                   { SE.address = testAdd,
                     SE.codehash = SolidVMCode "\"Vehicle''" $ hash "<CODEHASH>",
                     SE.creator = "",
+                    SE.cc_creator = Nothing,
                     SE.root = "",
                     SE.application = "",
                     SE.contractName = "\"Vehicle''",
@@ -358,9 +359,9 @@ spec = do
               )
             
 
-      g <- newGlobals fakeHandle fakeCirrusHandle
+       
       [vehicleCreate, _, _, _, vehicleInsert, _] <-
-        runLoggingT . runConduit $ createInserts g input .| sinkList
+        runLoggingT . runConduit $ createInserts  input .| sinkList
       vehicleCreate
         `shouldBe` [r|CREATE TABLE IF NOT EXISTS "\"Vehicle''''" (address text,
     block_hash text,
@@ -404,6 +405,7 @@ spec = do
                 { SE.address = testAdd,
                   SE.codehash = SolidVMCode "SwissArmy" $ hash "<CODEHASH>",
                   SE.creator = "MyOrg",
+                  SE.cc_creator =Nothing,
                   SE.root = "",
                   SE.application = "MyApp",
                   SE.contractName = "SwissArmy",
@@ -456,9 +458,9 @@ spec = do
             )
           
 
-    g <- newGlobals fakeHandle fakeCirrusHandle
+     
     [swissArmyCreate, _, _, _, swissArmyInsert, _] <-
-      runLoggingT . runConduit $ createInserts g input .| sinkList
+      runLoggingT . runConduit $ createInserts  input .| sinkList
 
     swissArmyCreate
       `shouldBe` [r|CREATE TABLE IF NOT EXISTS "MyOrg-MyApp-SwissArmy" (address text,
@@ -543,10 +545,10 @@ spec = do
             }, createDummyContract [
                        ("array_nums", SVMType.Array (SVMType.Int Nothing Nothing) Nothing)
                        ])]
-      g <- newGlobals M.empty fakeHandle
+       <- newGlobals M.empty fakeHandle
 
       [_, swissArmyCreate, swissArmyInsert] <-
-          runLoggingT . runConduit $ createInserts g [] input .| sinkList
+          runLoggingT . runConduit $ createInserts  [] input .| sinkList
 
       T.unpack swissArmyCreate `shouldContain` "\"array_nums\" jsonb,"
       T.unpack swissArmyInsert `shouldContain` [r|'["0"]')|]
@@ -558,6 +560,7 @@ spec = do
               { SE.address = testAdd,
                 SE.codehash = SolidVMCode "SwissArmy" $ hash "<CODEHASH>",
                 SE.creator = "MyOrg",
+                SE.cc_creator = Nothing,
                 SE.root = "",
                 SE.application = "MyApp",
                 SE.contractName = "SwissArmy",
@@ -603,9 +606,9 @@ spec = do
               ]
           )
         cc =  createDummyCodeCollection (snd input)
-    g <- newGlobals fakeHandle fakeCirrusHandle
+     
 
-    (_, cs1) <- runLoggingT . runConduit $ createExpandIndexTable g (snd input) cc (SE.creator $ fst input, SE.application $ fst input, SE.contractName $ fst input) `fuseBoth` sinkList
+    (_, cs1) <- runLoggingT . runConduit $ createExpandIndexTable  (snd input) cc (SE.creator $ fst input, SE.application $ fst input, SE.contractName $ fst input) `fuseBoth` sinkList
     cs2 <- runLoggingT . runConduit $ insertIndexTable (fst input, []) .| sinkList
     (cs1 ++ cs2) `shouldNotBe` []
 
@@ -616,6 +619,7 @@ spec = do
                 { SE.address = testAdd,
                   SE.codehash = CodeAtAccount (Account (Address 0x1234567890) Nothing) "SwissArmy", -- hash "<CODEHASH>",
                   SE.creator = "",
+                  SE.cc_creator = Nothing,
                   SE.root = "",
                   SE.application = "",
                   SE.contractName = "SwissArmy",
@@ -668,9 +672,9 @@ spec = do
             )
           
 
-    g <- newGlobals fakeHandle fakeCirrusHandle
+     
     [swissArmyCreate, _, _, _, swissArmyInsert, _] <-
-      runLoggingT . runConduit $ createInserts g input .| sinkList
+      runLoggingT . runConduit $ createInserts  input .| sinkList
 
     swissArmyCreate
       `shouldBe` [r|CREATE TABLE IF NOT EXISTS "SwissArmy" (address text,
@@ -742,6 +746,7 @@ spec = do
           address = testAdd,
           codehash = CodeAtAccount (Account (Address 0x1234567890) Nothing) "SwissArmy", -- $ hash "<CODEHASH>",
           creator = "creator",
+          cc_creator = Just "cc_creator",
           root = "groot",
           application = "",
           contractname = "SwissArmy",
@@ -756,9 +761,9 @@ spec = do
           collectionDataValue = V.SimpleValue $ V.ValueString "hi-value"
           }     ]
 
-    g <- newGlobals fakeHandle fakeCirrusHandle
+     
     [swissArmyMappingCreate, swissArmyMappingRowInsert] <-
-        runLoggingT . runConduit $ createInsertsCollection g input .| sinkList
+        runLoggingT . runConduit $ createInsertsCollection  input .| sinkList
 
     swissArmyMappingCreate `shouldBe` [r|CREATE TABLE IF NOT EXISTS "creator-SwissArmy-SwissArmyMapping" (address text,
     block_hash text,
@@ -775,7 +780,7 @@ spec = do
     value text,
   PRIMARY KEY (address, key));|]
 
-    swissArmyMappingRowInsert `shouldBe` [r|INSERT INTO "creator-SwissArmy-SwissArmyMapping" ("address",
+    swissArmyMappingRowInsert `shouldBe` [r|INSERT INTO "cc_creator-SwissArmy-SwissArmyMapping" ("address",
     "block_hash",
     "block_timestamp",
     "block_number",
@@ -819,6 +824,7 @@ spec = do
           SE.address = testAdd,
           SE.codehash = CodeAtAccount (Account (Address 0x1234567890) Nothing) "SwissArmy", -- $ hash "<CODEHASH>",
           SE.creator = "",
+          SE.cc_creator = Nothing,
           SE.root = "",
           SE.application = "",
           SE.contractName = "SwissArmy",
@@ -838,6 +844,7 @@ spec = do
           SE.address = testAdd,
           SE.codehash = CodeAtAccount (Account (Address 0x1234567890) Nothing) "SwissArmyz", -- $ hash "<CODEHASH>",
           SE.creator = "",
+          SE.cc_creator = Nothing,
           SE.root = "",
           SE.application = "",
           SE.contractName = "SwissArmyz",
@@ -850,12 +857,12 @@ spec = do
           SE.contractData = M.fromList
             [ ("addr2", addr 0xdeadbeef)
             ]
-          }, [], T.pack "SwissArmy", [])]
+          }, [], (AbstractTableName (T.pack "") (T.pack "") (T.pack "SwissArmy")), [])]
 
 
-    g <- newGlobals fakeHandle fakeCirrusHandle
+     
     [swissArmyCreateAbstract, swissArmyInsertAbstract] <-
-        runLoggingT . runConduit $ createInsertsAbstract g input inherited .| sinkList
+        runLoggingT . runConduit $ createInsertsAbstract  input inherited .| sinkList
 
     swissArmyCreateAbstract `shouldBe` [r|CREATE TABLE IF NOT EXISTS "SwissArmy" (address text,
     block_hash text,

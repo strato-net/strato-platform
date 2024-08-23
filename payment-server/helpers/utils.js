@@ -5,10 +5,83 @@ import {
   CHECKOUT_EVENT_TABLE,
   SELLER_ONBOARDED_TABLE, 
   TABLE_PREFIX, 
-  STRIPE_CONTRACT_ADDRESS } from "./constants.js";
+  STRIPE_CONTRACT_ADDRESS,
+  SENDGRID_ENV } from "./constants.js";
 import ADMIN from './oauth.js';
 import lodash from 'lodash';
 const { get } = lodash;
+import sgMail from "@sendgrid/mail";
+sgMail.setApiKey(SENDGRID_ENV.API_KEY);
+
+// Fetches Asset Name based on sale address
+const getAssetName = async(saleAddress)=>{
+  //fetch asset address
+  const assetToBeSold= await rest.search(
+                                        ADMIN.getUser()
+                                      , {name : `${TABLE_PREFIX}Sale`}
+                                      , {
+                                        ...DEFAULT_OPTIONS,
+                                        query: {
+                                          limit: 1
+                                        ,  ['address']: `eq.${saleAddress}`
+                                        ,  select:"assetToBeSold"
+                                        }
+                                    });
+  //fetch asset name
+  const tableArgs = { name: `${TABLE_PREFIX}Asset` };
+
+  const searchOptions = {
+    ...DEFAULT_OPTIONS,
+    query: {
+      limit: 1,
+      ['address']: `eq.${assetToBeSold[0].assetToBeSold}`,
+      select:"name"
+    }
+  }
+
+  return await rest.search(ADMIN.getUser(), tableArgs, searchOptions);
+}
+
+// Prepare the orderData array
+const prepareOrderData = (orderDetails, assetData) => {
+  return orderDetails.map((order, index) => {
+    const unitPrice = order.amount / order.quantitiesToBePurchased[0];
+    return {
+      name: assetData[index].name,
+      unitPrice: unitPrice,
+      qty: order.quantitiesToBePurchased[0],
+      tax: 0
+    };
+  });
+};
+
+const sendEmail = async(to, subject, htmlContent) => {
+
+  const msg = {
+    to: to,
+    from: { email: "no_reply@blockapps.net", name: "BlockApps.net" },
+    subject: subject,
+    html: htmlContent,
+    // Remove sales from these emails for testnet testing. This needs to be included for production. 
+    bcc: 'sales@blockapps.net',
+    // attachments: [
+    //   {
+    //     content: pdf.toString("base64"),
+    //     filename: "certificate.pdf",
+    //     type: "application/pdf",
+    //     disposition: "attachment",
+    //   },
+    // ],
+  };
+
+  try {
+    await sgMail.send(msg);
+    console.log("Email sent successfully!");
+  } catch (error) {
+    console.error("Error sending email:", error);
+    throw error;
+  }
+}
 
 const clientErrorHandler = (err, req, res, next) => {
   const statusCode = get(err, 'statusCode');
@@ -146,7 +219,7 @@ const getCheckoutEvent = async (checkoutHash) => {
     }
   };
 
-  return await rest.search(ADMIN.getUser(), tableArgs, searchOptions);
+  return await rest.searchUntil(ADMIN.getUser(), tableArgs, (r) => r.length === 1, searchOptions);
 }
 
 const checkSellerOnboarded = async (commonName) => {
@@ -285,4 +358,7 @@ export {
   generateIntermediateOrder,
   cancelOrder,
   discardCheckoutQuantity,
+  getAssetName,
+  sendEmail,
+  prepareOrderData,
 }
