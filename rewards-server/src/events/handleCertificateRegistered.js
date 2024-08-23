@@ -8,7 +8,6 @@ const { getRewards } = require("../helper/googleSheet.js");
 
 async function handleCertificateRegistered(event, token) {
   try {
-    const { eventTxHash } = event;
     const targetCertificateEntry = event.eventEvent.eventArgs.find(
       (arg) => arg[0] === "certificate"
     );
@@ -25,7 +24,7 @@ async function handleCertificateRegistered(event, token) {
     const queryResponse = await fetch(
       `https://${
         NODE_ENV === "prod" ? prodMarketplaceUrl : testnetMarketplaceUrl
-      }/cirrus/search/Certificate?transaction_hash=eq.${eventTxHash}`,
+      }/cirrus/search/Certificate?certificateString=eq.${encodeURIComponent(targetCertificateString)}&select=count`,
       {
         method: "GET",
         credentials: "same-origin",
@@ -49,13 +48,13 @@ async function handleCertificateRegistered(event, token) {
     }
 
     const queryBody = await queryResponse.json();
-
-    const matchedObject = queryBody.find((obj) =>
-      obj.certificateString.includes(targetCertificateString)
-    );
-
-    if (!matchedObject) {
-      console.log("No match found.");
+    console.log("Certificate query response:", queryBody);
+    if (!queryBody || !queryBody[0].count || queryBody[0].count <= 0) {
+      console.error("No certificates found in the marketplace.");
+      return;
+    }
+    if (queryBody[0].count > 1) {
+      console.error("Multiple certificates found in the marketplace.");
       return;
     }
 
