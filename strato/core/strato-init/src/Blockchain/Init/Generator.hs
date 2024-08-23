@@ -36,7 +36,7 @@ type GenM = StateT KafkaState (ExceptT KafkaClientError IO)
 runGenM :: KafkaAddress -> GenM a -> IO a
 runGenM kaddr mv = do
   eRes <- runKafka (mkKafkaState "generator" kaddr) mv
-  either (die . ("runGenM: " ++) . show) return eRes
+  either (error . ("runGenM: " ++) . show) return eRes
 
 initializeTopic :: Kafka m => m ()
 initializeTopic = do
