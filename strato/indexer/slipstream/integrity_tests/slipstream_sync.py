@@ -135,23 +135,52 @@ if __name__ == "__main__":
 
     #Event tables
     discrepancies_asset_its, count_asset_its_discrepancy = check_table("BlockApps-Mercata-Asset.ItemTransfers")
+    discrepancies_asset_own, count_asset_own_discrepancy = check_table("BlockApps-Mercata-Asset.OwnershipTransfer")
 
     #Colletion tables
     discrepancies_asset_files, count_asset_files_discrepancy = check_table("BlockApps-Mercata-Asset-files")
+    discrepancies_asset_fileNames, count_asset_fileNames_discrepancy = check_table("BlockApps-Mercata-Asset-fileNames")
+    discrepancies_asset_images, count_asset_images_discrepancy = check_table("BlockApps-Mercata-Asset-images")
 
     # Print the results
-    print("\nFinal check summary:")
+    print("\n**Final check summary:**")
     print(f"Asset Discrepancies: {'Yes' if discrepancies_asset else 'No'}")
     print(f"Order Discrepancies: {'Yes' if discrepancies_order else 'No'}")
     print(f"Sale Discrepancies: {'Yes' if discrepancies_sale else 'No'}")
     print(f"Asset.ItemTransfers Discrepancies: {'Yes' if discrepancies_asset_its else 'No'}")
+    print(f"Asset.OwnershipTransfer Discrepancies: {'Yes' if discrepancies_asset_own else 'No'}")
     print(f"Asset-files Discrepancies: {'Yes' if discrepancies_asset_files else 'No'}")
+    print(f"Asset-fileNames Discrepancies: {'Yes' if discrepancies_asset_fileNames else 'No'}")
+    print(f"Asset-images Discrepancies: {'Yes' if discrepancies_asset_images else 'No'}")
+    print()
     print(f"Asset Count Match Discrepancies: {'Yes' if count_asset_discrepancy else 'No'}")
     print(f"Order Count Match Discrepancies: {'Yes' if count_order_discrepancy else 'No'}")
     print(f"Sale Count Match Discrepancies: {'Yes' if  count_sale_discrepancy else 'No'}")
     print(f"Asset.ItemTransfers Count Match Discrepancies: {'Yes' if  count_asset_its_discrepancy else 'No'}")
+    print(f"Asset.OwnershipTransfer Count Match Discrepancies: {'Yes' if  count_asset_own_discrepancy else 'No'}")
     print(f"Asset-files Count Match Discrepancies: {'Yes' if  count_asset_files_discrepancy else 'No'}")
+    print(f"Asset-fileNames Count Match Discrepancies: {'Yes' if  count_asset_fileNames_discrepancy else 'No'}")
+    print(f"Asset-images Count Match Discrepancies: {'Yes' if  count_asset_images_discrepancy else 'No'}")
 
-    # TODO: uncomment
-    # if discrepancies_asset or discrepancies_sale or discrepancies_order or count_asset_discrepancy or count_sale_discrepancy or count_order_discrepancy or discrepancies_asset_its or count_asset_its_discrepancy or discrepancies_asset_files or count_asset_files_discrepancy:
-    #     sys.exit(1)
+    if any(
+        [ 
+          discrepancies_asset,
+          count_asset_discrepancy,
+          discrepancies_sale,
+          count_sale_discrepancy,
+          discrepancies_order,
+          count_order_discrepancy,
+          discrepancies_asset_its,
+          count_asset_its_discrepancy,
+          discrepancies_asset_own,
+          count_asset_own_discrepancy,
+          discrepancies_asset_files,
+          count_asset_files_discrepancy,
+          discrepancies_asset_fileNames,
+          count_asset_fileNames_discrepancy,
+          discrepancies_asset_images,
+          count_asset_images_discrepancy
+        ]
+    ):
+        print("ERROR - one or more discrepancies detected")
+        sys.exit(1)
