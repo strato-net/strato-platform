@@ -25,7 +25,7 @@ module IdentityProvider.Server (identityProviderApp) where
 
 import Bloc.API.Transaction
 import Bloc.API.Users
-import Bloc.Client (postBlocTransactionParallelExternal)
+import Bloc.Client (postBlocTransactionParallelExternal, postBlocTransactionResults)
 import BlockApps.Logging
 import BlockApps.Solidity.ArgValue
 import BlockApps.X509 hiding (isValid)
@@ -480,9 +480,19 @@ registerCert cert token RealmDetails {associatedNodeUrl = nurl, associatedFallba
     Right response ->
       if all txSuccess response
         then $logInfoS "registerCert" $ T.pack $ "Response after registering cert was: " ++ show response
-        else do
-          $logErrorS "registerCert" $ T.pack $ "Failed to register cert for user; response was: " ++ show response
-          throwIO $ IdentityError "Failed to register cert"
+        else do -- got a pending or failure
+          let pending = [hash | BlocTxResult (BlocTransactionResult {blocTransactionStatus = Pending, blocTransactionHash = hash}) <- response]
+          if (not $ null pending) 
+            then do 
+              eresponse2 <- liftIO $ runClientM (postBlocTransactionResults (Just $ "Bearer " <> access_token token) True pending) clientEnv
+              case eresponse2 of 
+                Right response2 | all (\r -> blocTransactionStatus r == Success) response2 -> $logInfoS "registerCert" $ T.pack $ "Response after registering cert was: " ++ show response2
+                err -> do 
+                  $logErrorS "registerCert" $ T.pack $ "Failed to register cert for user; response was: " ++ show err
+                  throwIO $ IdentityError "Failed to register cert"
+            else do -- must've all been failures
+              $logErrorS "registerCert" $ T.pack $ "Failed to register cert for user; response was: " ++ show response
+              throwIO $ IdentityError "Failed to register cert"
     Left clienterr -> do
       $logErrorS "registerCert" $
         T.pack $
@@ -502,8 +512,8 @@ registerCert cert token RealmDetails {associatedNodeUrl = nurl, associatedFallba
           throwIO $ IdentityError "Failed to register cert"
 
 txSuccess :: BlocChainOrTransactionResult -> Bool
-txSuccess (BlocTxResult (BlocTransactionResult{blocTransactionStatus = stat})) | stat /= Failure = True
--- txSuccess (BlocTxResult BlocTransactionResult {blocTransactionStatus = Success}) = True
+-- txSuccess (BlocTxResult (BlocTransactionResult{blocTransactionStatus = stat})) | stat /= Failure = True
+txSuccess (BlocTxResult BlocTransactionResult {blocTransactionStatus = Success}) = True
 txSuccess _ = False
 
 registerUserWalletAsync ::
@@ -562,11 +572,21 @@ registerUserWallet
               . T.pack
               $ "Response after registering user wallet was: " ++ show response
             return True
-          else do
-            $logErrorS "registerUserWallet"
-              . T.pack
-              $ "Failed to register user wallet; response was: " ++ show response
-            return False
+          else do -- got a pending or failure
+            let pending = [hash | BlocTxResult (BlocTransactionResult {blocTransactionStatus = Pending, blocTransactionHash = hash}) <- response]
+            if (not $ null pending) 
+              then do 
+                eresponse2 <- liftIO $ runClientM (postBlocTransactionResults (Just $ "Bearer " <> access_token token) True pending) clientEnv
+                case eresponse2 of
+                  Right response2 | all (\r -> blocTransactionStatus r == Success) response2 -> do
+                    $logInfoS "registerUserWallet" $ T.pack $ "Response after registering user wallet was: " ++ show response2
+                    return True
+                  err -> do 
+                    $logErrorS "registerUserWallet" $ T.pack $ "Failed to register user wallet; response was: " ++ show err
+                    return False
+              else do -- must've all been failures
+                $logErrorS "registerUserWallet" $ T.pack $ "Failed to register user wallet; response was: " ++ show response
+                return False
       Left clienterr -> do
         $logErrorS "registerUserWallet" $
           T.pack $
