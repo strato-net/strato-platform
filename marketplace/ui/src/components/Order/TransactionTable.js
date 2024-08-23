@@ -1,49 +1,45 @@
 import React, { useEffect, useState } from "react";
-import { Button, Dropdown, Space, Typography, Input, Row, Col, Popover, Card, Tooltip, Select, DatePicker, Spin } from "antd";
-import { CheckCircleOutlined, DownloadOutlined, SearchOutlined } from "@ant-design/icons";
+import { Button, Dropdown, Space, Typography, Input, Row, Col, Popover, Card, Tooltip, Select, DatePicker } from "antd";
+import { DownloadOutlined, SearchOutlined } from "@ant-design/icons";
 import { useNavigate, useLocation } from "react-router-dom";
 import classNames from "classnames";
+import dayjs from "dayjs";
 // Components
 import DataTableComponent from "../DataTableComponent";
-import { TRANSACTION_FILTER, getStatus } from "./constant";
+import { TRANSACTION_FILTER } from "./constant";
 import useDebounce from "../UseDebounce";
-import { US_DATE_FORMAT, STRATS_CONVERSION, TRANSACTION_STATUS, TRANSACTION_STATUS_CLASSES, TRANSACTION_SORT, TRANSACTION_STATUS_COLOR, DOWNLOAD_OPTIONS, REDEMPTION_STATUS, REDEMPTION_STATUS_CLASSES } from "../../helpers/constants";
-import { FilterIcon } from "../../images/SVGComponents";
+
 import "./ordersTable.css"
 import routes from "../../helpers/routes";
 import { Images } from "../../images";
-import dayjs from "dayjs";
 import TransactionResponsive from "./TransactionResponsive";
+// Actions
 import { actions as transactionAction } from "../../contexts/transaction/actions";
+// Dispatch & States
 import { useTransactionDispatch, useTransactionState } from "../../contexts/transaction";
+// Utils & Constants
+import {
+  STRATS_CONVERSION, TRANSACTION_STATUS, TRANSACTION_STATUS_CLASSES, TRANSACTION_SORT,
+  TRANSACTION_STATUS_COLOR, DOWNLOAD_OPTIONS, REDEMPTION_STATUS, REDEMPTION_STATUS_CLASSES
+} from "../../helpers/constants";
 import { SEO } from "../../helpers/seoConstant";
 
 const limit = '', offset = '';
 
 const TransactionTable = ({ user, selectedDate, onDateChange, download, isAllOrdersLoading }) => {
   const StratsIcon = <img src={Images.logo} alt="" className="mx-1 w-3 h-3" />
+  // Dispatch
+  const transactionDispatch = useTransactionDispatch();
+  // States
   const { userTransactions, globalTransaction, isTransactionLoading } = useTransactionState();
+  
   const navigate = useNavigate();
   const location = useLocation();
-  const transactionDispatch = useTransactionDispatch();
-
-  const currentDate = dayjs().startOf('day'); // Get the start of today
 
   const searchParams = new URLSearchParams(location.search);
-  const searchVal = searchParams.get('search');
-  const pageVal = searchParams.get('page');
   const type = searchParams.get('type');
-  const pageNo = pageVal ? parseInt(pageVal) : 1;
-  const debouncedSearchTerm = useDebounce("", 1000);
-
-  // const offset = ((pageNo - 1) * limit)
-  const [order, setOrder] = useState("createdDate.desc");
-  const [filter, setFilter] = useState(0)
-  const [selectedValue, setSelectedValue] = useState(null);
-  const [search, setSearch] = useState("")
-  const [dropdownVisible, setDropdownVisible] = useState(false);
-  const [mDropdownVisible, setMDropdownVisible] = useState(false);
   const [transactions, setTransactions] = useState(userTransactions)
+  const [search, setSearch] = useState("")
 
   useEffect(() => {
     if (user?.commonName) {
@@ -65,7 +61,6 @@ const TransactionTable = ({ user, selectedDate, onDateChange, download, isAllOrd
     if (type) {
       filteredData = filteredData.filter((item) => item.type === type);
     }
-
     if (search) {
       const searchString = String(search).toLowerCase();
       filteredData = filteredData.filter((item) =>
@@ -76,8 +71,6 @@ const TransactionTable = ({ user, selectedDate, onDateChange, download, isAllOrd
     setTransactions(filteredData);
   }, [userTransactions, type, search]);
 
-
-
   useEffect(() => {
     const timeout = setTimeout(() => {
       if (search.length === 0) {
@@ -87,34 +80,12 @@ const TransactionTable = ({ user, selectedDate, onDateChange, download, isAllOrd
           navigate(`/transactions`)
         }
       }
-      // else {
-      //   if (type) {
-      //     navigate(`/transactions?type=${type}&search=${search}`)
-      //   } else {
-      //     navigate(`/transactions?search=${search}`)
-      //   }
-      // }
     }, 1000)
     return () => {
       clearTimeout(timeout)
     }
   }, [search])
 
-
-  const handleSort = (data) => {
-    setSelectedValue(data)
-    setFilter(data);
-    setDropdownVisible(false)
-    setMDropdownVisible(false)
-  }
-
-  const Sorting = (classes) => {
-    return (
-      <div className={classes.className}>
-        {TRANSACTION_SORT.map(({ label, value }) => <Typography onClick={() => handleSort(value)}>{label}</Typography>)}
-      </div>
-    )
-  }
 
   const Content = ({ data }) => {
     const price = data?.assetPrice || data?.price
@@ -132,7 +103,6 @@ const TransactionTable = ({ user, selectedDate, onDateChange, download, isAllOrd
             {price
               ? <p className="text-right flex justify-end items-center"> <b>$ {price} </b> &nbsp;(<span className="text-[#13188A] font-bold"> {(data?.assetPrice || data?.price) * STRATS_CONVERSION} </span>{StratsIcon}) </p>
               : <p className="text-right text-[#13188A] font-bold text-sm"> No Price Available  </p>}
-            {/* <p className="text-bold text-right mt-2">Sold Out</p> */}
           </Col>
         </Row>
       </Card>
@@ -156,7 +126,6 @@ const TransactionTable = ({ user, selectedDate, onDateChange, download, isAllOrd
         .replace(":redemptionService", data.redemptionService)}`
     } else { }
     route && navigate(route)
-
   }
 
   const column = [
@@ -284,10 +253,10 @@ const TransactionTable = ({ user, selectedDate, onDateChange, download, isAllOrd
 
   return (
     <Row>
-      <Col span={24} className="w-full h-[160px] py-4 px-4 md:h-[96px] bg-[#F6F6F6] flex flex-col md:flex-row md:px-14 justify-between items-center mt-6 lg:mt-8">
+      <Col span={24} className="w-full min-h-[160px] py-4 px-4 md:min-h-[96px] bg-[#F6F6F6] flex flex-col md:flex-row lg:px-14 justify-between items-center mt-6 lg:mt-8">
         <Row className="w-full flex justify-between items-center">
-          <Col xs={4} className="flex justify-between w-full">
-            <Button className="!px-1 md:!px-0 flex items-center flex-row-reverse gap-[6px] text-lg md:text-2xl font-semibold !text-[#13188A] "
+          <Col xs={24} lg={4} className="flex justify-between w-full">
+            <Button className="!px-1 md:!px-0 md:ml-5 lg:ml-0  flex items-center flex-row-reverse gap-[6px] text-lg md:text-2xl font-semibold !text-[#13188A] "
               type="link"
               icon={<img src={Images.ForwardIcon}
                 alt={metaImg}
@@ -295,11 +264,11 @@ const TransactionTable = ({ user, selectedDate, onDateChange, download, isAllOrd
                 className="hidden md:block w-6 h-6" />}> My Transactions
             </Button>
           </Col>
-          <Col xs={20} className="flex flex-col md:flex-row gap-3 items-center my-2 md:my-0">
+          <Col xs={24} lg={16} xl={12} className="flex flex-col md:flex-row gap-3 items-center my-2 md:my-0">
             <Row className="w-full flex items-center justify-between">
-              <Col xs={24} md={20} xl={24}>
+              <Col xs={24} xl={24}>
                 <Row className="w-full md:w-auto md:flex md:justify-between items-center mb-5 mt-4">
-                  <Col xs={24} md={6} className="flex justify-center mt-2 md:mt-0">
+                  <Col xs={24} md={7} className="flex justify-center mt-2 md:mt-0">
                     <Select className="block lg:block w-full md:w-4/5 rounded-md mx-auto" onChange={(val) => { handleFilter(val) }} placeholder="Select Type" defaultValue={type || ''}>
                       {TRANSACTION_FILTER.map(({ label, value }) =>
                         <Select.Option value={value}> {label} </Select.Option>
@@ -307,13 +276,13 @@ const TransactionTable = ({ user, selectedDate, onDateChange, download, isAllOrd
                     </Select>
                   </Col>
                   <Col xs={24} md={8} className="flex justify-center mt-2 md:mt-0">
-                    <Input className="text-base w-full md:max-w-[400px] orders_searchbar mx-auto md:p-3 md:mr-3 rounded-full bg-[#F6F6F6]"
+                    <Input className="text-base w-full md:max-w-[400px] h-10 orders_searchbar mx-auto md:p-3 md:mr-3 rounded-md bg-[#F6F6F6]"
                       onChange={(e) => { handleChangeSearch(e) }}
                       value={search}
                       prefix={<SearchOutlined />}
                       placeholder="Search Asset" />
                   </Col>
-                  <Col xs={21} md={7} className="mt-2 md:mt-0 flex justify-center">
+                  <Col xs={21} sm={22} md={6} xl={7} className="mt-2 md:mt-0 flex justify-center">
                     <div className="border border-slate-300 w-full rounded-lg">
                       <DatePicker onChange={onDateChange}
                         className="w-full"
@@ -321,10 +290,11 @@ const TransactionTable = ({ user, selectedDate, onDateChange, download, isAllOrd
                         picker="month"
                         disabledDate={(current) => { return current && current > dayjs().endOf('month') }}
                         format={(value) => dayjs(value).format('MMMM YYYY')}
+                        allowClear={false}
                       />
                     </div>
                   </Col>
-                  <Col xs={2} offset={1} md={1} className="flex justify-center mt-2 md:mt-0">
+                  <Col xs={1} md={2} className="ml-4 sm:ml-6 md:ml-0 flex justify-center mt-2 md:mt-0">
                     <Dropdown
                       className="customButton"
                       menu={{ items: DOWNLOAD_OPTIONS, onClick: (e) => download(e.key) }}

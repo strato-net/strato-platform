@@ -97,6 +97,7 @@ class TransactionController {
                 from: item.oldOwnerCommonName || item.sellersCommonName || item.issuerCommonName || item.sellerCommonName,
                 to: item.newOwnerCommonName || item.purchasersCommonName || item.ownerCommonName,
                 price: item.price || item.totalPrice || '',
+                totalAmount: (item.price || item.totalPrice || 0) * getItemQuantity(item),
                 status: item.status || '1',
                 reference: item.transferNumber || item.orderId || item.redemption_id,
                 quantity: getItemQuantity(item),

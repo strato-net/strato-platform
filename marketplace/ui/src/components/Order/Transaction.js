@@ -20,29 +20,21 @@ const INVERTED_ORDER_STATUS = Object.fromEntries(Object.entries(ORDER_STATUS).ma
 const Transaction = ({ user }) => {
 
   const navigate = useNavigate();
-  const params = useParams();
   const categoryDispatch = useCategoryDispatch();
   const { userTransactions, isTransactionLoading } = useTransactionState();
 
-  // const currentDate = dayjs().startOf('day').unix(); // todays date
   const startOfMonth = dayjs().startOf('month').unix(); // Starting date of the current month
   const endOfMonth = dayjs().endOf('month').unix();
 
   const [callExcel, setCallExcel] = useState(false);
   const [callCSV, setCallCSV] = useState(false);
-  const { isAllOrdersLoading } = useOrderState();
   const { categorys } = useCategoryState();
   const [api, contextHolder] = notification.useNotification();
+  const [selectedDate, setSelectedDate] = useState([startOfMonth, endOfMonth]);
 
   useEffect(() => {
     categoryActions.fetchCategories(categoryDispatch);
   }, [categoryDispatch]);
-
-  const onChange = (key) => {
-    navigate(`/order/${key}`)
-  };
-
-  const [selectedDate, setSelectedDate] = useState([startOfMonth, endOfMonth]);
 
   const onDateChange = (date) => {
     const startDate = dayjs(date).startOf('month').unix();
@@ -89,14 +81,14 @@ const Transaction = ({ user }) => {
         // Extract Quantities
         const { category, subCategory } = getCategoryAndSubcategory(transaction.assetContractName);
         return formatDataObject({
-          '#': transaction?.reference,
+          reference: transaction?.reference,
           type: transaction?.type,
           category,
           subCategory,
           assetName: transaction?.assetName,
           Price: transaction?.assetPrice,
+          // amount: transaction?.totalAmount.toFixed(2),
           quantity: transaction?.quantity,
-          // totalOrderAmount: transaction?.totalPrice,
           from: transaction.from,
           to: transaction.to,
           hash: transaction?.redemptionService || transaction?.address,
@@ -183,7 +175,7 @@ function s2ab(s) {
 return (
   <div>
     {contextHolder}
-    <div className="px-4 md:px-20 lg:py-2 lg:mt-3 orders">
+    <div className="px-4 md:px-10 lg:py-2 lg:mt-3 orders">
       <Breadcrumb>
         <Breadcrumb.Item href="" onClick={e => e.preventDefault()}>
           <ClickableCell href={routes.Marketplace.url}>

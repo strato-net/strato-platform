@@ -68,7 +68,7 @@
     .ant-picker-input {
         display: flex !important;
         justify-content: space-between;
-        gap: 80px;
+        gap: 20px;
     }
 
     .ant-picker-input input {
