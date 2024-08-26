@@ -23,13 +23,7 @@ import Network.HTTP.Client
 --This is the received information from the OpenId Connect response
 data VaultToken = VaultToken
   { accessToken :: T.Text,
-    expiresIn :: Integer,
-    refreshExpiresIn :: Integer,
-    refreshToken :: T.Text,
-    tokenType :: T.Text,
-    notBeforePolicy :: Integer,
-    sessionState :: T.Text,
-    scone :: T.Text
+    expiresIn :: Integer
   }
   deriving (Eq, Show)
 
@@ -39,53 +33,16 @@ instance FromJSON VaultToken where
   parseJSON (Object o) = do
     ao <- o .: DAK.fromString "access_token"
     ei <- o .: DAK.fromString "expires_in"
-    rei <- o .: DAK.fromString "refresh_expires_in"
-    rt <- o .: DAK.fromString "refresh_token"
-    tt <- o .: DAK.fromString "token_type"
-    nbp <- o .: DAK.fromString "not-before-policy"
-    ss <- o .: DAK.fromString "session_state"
-    sc <- o .: DAK.fromString "scope"
     --Ensure the correct data types are coming into the system
     access_token <- case ao of
       (String s) -> pure s
-      (Object _) -> error $ "Expected a JSON String under the key \"access_token\", but got something different."
-      _ -> error $ "Expected a JSON String under the key \"access_token\", but got something different."
+      _ -> fail $ "Expected a JSON String under the key \"access_token\", but got something different."
     exprin <- case ei of
       (Number n) -> pure n
-      (Object _) -> error $ "Expected a JSON String under the key \"access_token\", but got something different."
-      _ -> error $ "Expected a JSON Number under the key \"expires_in\", but got something different."
-    refreshexin <- case rei of
-      (Number n) -> pure n
-      (Object _) -> error $ "Expected a JSON String under the key \"access_token\", but got something different."
-      _ -> error $ "Expected a JSON Number under the key \"refresh_expires_in\", but got something different."
-    refresh_token <- case rt of
-      (String s) -> pure s
-      (Object _) -> error $ "Expected a JSON String under the key \"access_token\", but got something different."
-      _ -> error $ "Expected a JSON String under the key \"refresh_token\", but got something different."
-    token_type <- case tt of
-      (String s) -> pure s
-      (Object _) -> error $ "Expected a JSON String under the key \"access_token\", but got something different."
-      _ -> error $ "Expected a JSON String under the key \"token_type\", but got something different."
-    notb4pol <- case nbp of
-      (Number n) -> pure n
-      (Object _) -> error $ "Expected a JSON String under the key \"access_token\", but got something different."
-      _ -> error $ "Expected a JSON Number under the key \"not-before-policy\", but got something different."
-    session_state <- case ss of
-      (String s) -> pure s
-      (Object _) -> error $ "Expected a JSON String under the key \"access_token\", but got something different."
-      _ -> error $ "Expected a JSON String under the key \"session_state\", but got something different."
-    --can't call it scope, so I called it scone, bon appetit
-    sconce <- case sc of
-      (String s) -> pure s
-      (Object _) -> error $ "Expected a JSON String under the key \"access_token\", but got something different."
-      _ -> error $ "Expected a JSON String under the key \"access_token\", but got something different."
-    --Put the scientific numbers into regular ints
-    let not_before_policy = Scientific.coefficient notb4pol
-        refresh_expires_in = Scientific.coefficient refreshexin
-        expires_in = Scientific.coefficient exprin
-    --   parseJSON wat = typeMismatch "Spec" wat
-    return $ VaultToken access_token expires_in refresh_expires_in refresh_token token_type not_before_policy session_state sconce
-  parseJSON wat = typeMismatch "VaultToken " wat
+      _ -> fail $ "Expected a JSON String under the key \"access_token\", but got something different."
+    let expires_in = Scientific.coefficient exprin
+    return $ VaultToken access_token expires_in
+  parseJSON wat = fail $ "FromJSON VaultToken: Expected Object, got " ++ show wat
 
 --TODO: use lenses (not important but would be nice)
 data VaultConnection = VaultConnection
