@@ -287,10 +287,6 @@ const ConfirmOrder = ({ paymentProviders = [], data, columns }) => {
                     <p className="text-base text-[#6A6A6A]">Sub Total:</p>
                     <p className="text-base text-[#202020] md:ml-5 text-right">${subTotal} <span className="ml-1">({(subTotal * 100).toFixed(0)} STRATS)</span></p>
                   </Row>
-                  <Row className="justify-start items-center ">
-                    <p className="text-base text-[#6A6A6A]">Tax:</p>
-                    <p className="text-base text-[#202020] md:ml-16 text-left">${tax}</p>
-                  </Row>
                   <Row className="justify-between items-center">
                     <p className="text-base text-[#6A6A6A]">Total:</p>
                     <p id="totalPrice" className="text-base text-[#202020] md:ml-5 text-right">
