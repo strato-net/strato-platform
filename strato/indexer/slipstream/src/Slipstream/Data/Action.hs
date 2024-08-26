@@ -59,7 +59,8 @@ data AggregateEvent = AggregateEvent
     eventTxHash :: Keccak256,
     eventTxSender :: Account,
     eventAbstracts :: Map (Account, Text) (Text, Text),
-    eventEvent :: Event
+    eventEvent :: Event, 
+    id :: Int
   }
   deriving (Show, Generic, NFData, ToJSON, FromJSON)
 

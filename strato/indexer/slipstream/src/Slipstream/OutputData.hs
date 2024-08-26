@@ -130,6 +130,26 @@ data ProcessedCollectionRow = ProcessedCollectionRow
     collectionDataKey :: V.Value,
     collectionDataValue :: V.Value
   }
+  |
+  ProcessedEventRow
+  { address :: Address,
+    -- codehash :: Maybe CodePtr,
+    creator :: Text,
+    cc_creator :: Maybe Text,
+    root :: Text,
+    application :: Text,
+    contractname :: Text,
+    collectionname :: Text,
+    collectiontype ::Text,
+    blockHash :: Keccak256,
+    blockTimestamp :: UTCTime,
+    blockNumber :: Integer,
+    transactionHash :: Keccak256,
+    transactionSender :: Address,
+    collectionDataKey :: V.Value,
+    collectionDataValue :: V.Value,
+    id :: Int
+  }
   deriving (Show)
 
 crashOnSQLError :: Bool
@@ -253,7 +273,8 @@ baseColumns =
 
 baseEventColumns :: TableColumns
 baseEventColumns =
-  [ "address",
+  [ "id",
+    "address",
     "block_hash",
     "block_timestamp",
     "block_number",
@@ -1493,7 +1514,7 @@ createEventTable globalsIORef (creator, a, n) evName ev cc = do
       cols = getTableColumnAndType isEvent cc [(x, indexedTypeType y) | (x, y) <- fillFirstEmptyEntries $ ev ^. eventLogs]
       arrayNamesAndTypes = [(key, extractLabelOrEntry entry) | (key, IndexedType _ (SVMType.Array entry _)) <- ev ^. eventLogs]
       colsCombined = map (\(x,y)-> x <> " " <> y) cols
-  $logInfoS "hasan-keys" (T.pack $ show arrayNamesAndTypes)
+  $logInfoS "keys" (T.pack $ show arrayNamesAndTypes)
   eventAlreadyCreated <- isTableCreated globalsIORef eventTable
   -- unless eventAlreadyCreated $ do
   --   setTableCreated globalsIORef eventTable $ colsCombined
@@ -1514,7 +1535,7 @@ createEventTableQuery tableName cols =
           tableNameToDoubleQuoteText tableName,
           " (",
           csv $
-            [ "id SERIAL NOT NULL",
+            [ "id INT NOT NULL",
               "address text",
               "block_hash text",
               "block_timestamp text",
@@ -1523,6 +1544,7 @@ createEventTableQuery tableName cols =
               "transaction_sender text"
             ]
               ++ cols,
+              ", PRIMARY KEY (transaction_hash, id)",
           ");"
         ]
 
@@ -1562,7 +1584,7 @@ aggEventToCollectionRows ae =
 
 aggEventToCollectionRow :: AggregateEvent -> Action.Event -> Text -> (Value, Value) -> ProcessedCollectionRow
 aggEventToCollectionRow ae ev arrayName (index, value) =
-  ProcessedCollectionRow
+  ProcessedEventRow
     { address = (_accountAddress . Action.evContractAccount) ev,
       creator = T.pack $ Action.evContractCreator ev,
       application = T.pack $ Action.evContractApplication ev,
@@ -1577,7 +1599,8 @@ aggEventToCollectionRow ae ev arrayName (index, value) =
       collectionDataKey = index,
       collectionDataValue = value,
       root = "",
-      cc_creator = Just ""
+      cc_creator = Just "",
+      id = Slipstream.Data.Action.id ae
     }
 
 removeArrayEvArgs :: Action.Event -> Action.Event
@@ -1667,9 +1690,10 @@ insertEventTableQuery agEv@AggregateEvent {eventEvent = ev} =
           (T.pack $ Action.evContractName ev)
       tableName = EventTableName creator a cname (escapeQuotes $ T.pack $ Action.evName ev)
       filledArgs = map fst . fillFirstEmptyEntries . map (\(aa, bb, _) -> (T.pack aa, bb)) $ Action.evArgs ev
-      keySt = wrapAndEscapeDouble . map escapeQuotes $ ("id" : baseTableColumnsForEvent) ++ filledArgs
+      keySt = wrapAndEscapeDouble . map escapeQuotes $ baseTableColumnsForEvent ++ filledArgs
       baseVals =
-        [ tshow . _accountAddress . Action.evContractAccount . eventEvent,
+        [ tshow . Slipstream.Data.Action.id,
+          tshow . _accountAddress . Action.evContractAccount . eventEvent,
           T.pack . keccak256ToHex . eventBlockHash,
           tshow . eventBlockTimestamp,
           tshow . eventBlockNumber,
@@ -1677,12 +1701,13 @@ insertEventTableQuery agEv@AggregateEvent {eventEvent = ev} =
           tshow . eventTxSender
         ]
       vals = csv $ map (wrapSingleQuotes . escapeQuotes . ($ agEv)) baseVals ++ map (wrapSingleQuotes . escapeSingleQuotes . T.pack . (\(_, x, _) -> x)) (Action.evArgs ev)
+
    in T.concat $
         [ "INSERT INTO ",
           tableNameToDoubleQuoteText tableName,
           " ",
           keySt,
-          "\n  VALUES ( DEFAULT,\n",
+          "\n  VALUES ( \n",
           vals,
           " )\n  ON CONFLICT DO NOTHING;"
         ]

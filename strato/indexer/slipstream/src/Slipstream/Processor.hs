@@ -214,7 +214,7 @@ rowToHistories _ abiId actions cont oldState = do
     newMap <- gets Map.fromList
     return $ processedContract abiId newMap hRow
 
-processedCollectionRow :: Text -> Text -> AggregateAction -> ABIID -> Maybe Text -> Value -> Value -> ProcessedCollectionRow
+processedCollectionRow :: Text -> Text -> AggregateAction -> ABIID -> Maybe Text -> Value -> Value ->  ProcessedCollectionRow
 processedCollectionRow collection ttype AggregateAction {..} ABIID {..} cregator k v =
   ProcessedCollectionRow
     { address = actionAccount ^. accountAddress,
@@ -232,7 +232,7 @@ processedCollectionRow collection ttype AggregateAction {..} ABIID {..} cregator
       transactionHash = actionTxHash,
       transactionSender = actionTxSender ^. accountAddress,
       collectionDataKey = k,
-      collectionDataValue = v
+      collectionDataValue = v 
     }
 
 processArrayFixed :: Text -> AggregateAction -> ABIID -> Maybe Text -> (Int, Value) -> ProcessedCollectionRow
@@ -259,9 +259,9 @@ parseActions events' =
 parseEvents :: [VME.VMEvent] -> [AggregateEvent]
 parseEvents = concatMap parseEvent
   where
-    parseEvent (VME.NewAction a) = mkAggregateEvent a <$> toList (Action._events a)
+    parseEvent (VME.NewAction a) = zipWith (mkAggregateEvent a) [1..] (toList (Action._events a))
     parseEvent _ = []
-    mkAggregateEvent a e =
+    mkAggregateEvent a idx e =
       AggregateEvent
         { eventBlockHash = Action._blockHash a,
           eventBlockTimestamp = Action._blockTimestamp a,
@@ -269,7 +269,8 @@ parseEvents = concatMap parseEvent
           eventTxHash = Action._transactionHash a,
           eventTxSender = Action._transactionSender a,
           eventAbstracts = maybe Map.empty Action._actionDataAbstracts . OMap.lookup (evContractAccount e) $ Action._actionData a,
-          eventEvent = e
+          eventEvent = e, 
+          id = idx
         }
 
 getMappingNamesFromContract :: ContractF () -> [Text]
