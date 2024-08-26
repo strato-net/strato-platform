@@ -148,7 +148,7 @@ data ProcessedCollectionRow = ProcessedCollectionRow
     transactionSender :: Address,
     collectionDataKey :: V.Value,
     collectionDataValue :: V.Value,
-    id :: Int
+    id_event :: Int
   }
   deriving (Show)
 
@@ -1019,9 +1019,16 @@ createArrayTableQuery (creator, a, n, arr) =
           ",\n  PRIMARY KEY (address, key));"
         ]
 
+eventTableName_fkey :: Text -> Text -> Text -> Text
+eventTableName_fkey creator a n = T.intercalate "-" [creator, a, n]
+
+wrapInDoubleQuotes :: Text -> Text
+wrapInDoubleQuotes txt = T.concat ["\"", txt, "\""]
+
 createEventArrayTableQuery :: (Text, Text, Text, Text) -> Text
 createEventArrayTableQuery (creator, a, n, arr) =
   let tableName = collectionTableName creator a n arr
+      evTableName = eventTableName_fkey creator a n
    in T.concat
         [ "CREATE TABLE IF NOT EXISTS ",
           tableNameToDoubleQuoteText tableName,
@@ -1033,8 +1040,11 @@ createEventArrayTableQuery (creator, a, n, arr) =
               "collectiontype text",
               "key text",
               "value text",
-              "value_fkey text);"
-            ]
+              "value_fkey text", 
+              "event_id_fkey INT",
+              T.concat [ "FOREIGN KEY (transaction_hash, event_id_fkey) REFERENCES ", wrapInDoubleQuotes evTableName, " (transaction_hash, id)" ]
+            ],
+          ");"
         ]
 
 
@@ -1258,7 +1268,7 @@ insertEventArrayTableQuery ms =
                     (application x)
                     (contractname x)
                     (collectionname x)
-                keySt = wrapAndEscapeDouble . map escapeQuotes $ baseMappingTableColumns ++ map fst (fillFirstEmptyEntries list) ++ [T.pack "value_fkey"]
+                keySt = wrapAndEscapeDouble . map escapeQuotes $ baseMappingTableColumns ++ map fst (fillFirstEmptyEntries list) ++ [T.pack "value_fkey", T.pack "event_id_fkey"]
                 baseVals =
                   [ tshow . address,
                     T.pack . keccak256ToHex . blockHash,
@@ -1273,7 +1283,7 @@ insertEventArrayTableQuery ms =
                     collectiontype
                   ]
                 vals = flip map arrays $ \(row, rowList) ->
-                  wrapAndEscape $ map (wrapSingleQuotes . ($ row)) baseVals ++ map snd rowList ++ [T.pack "NULL"]--value_fkey
+                  wrapAndEscape $ map (wrapSingleQuotes . ($ row)) baseVals ++ map snd rowList ++ [T.pack "NULL", T.pack (show (id_event row))]--value_fkey
                 valsForSQL = vals
                 inserts = csv valsForSQL
              in (: []) $
@@ -1523,9 +1533,9 @@ createEventTable globalsIORef (creator, a, n) evName ev cc = do
     then return []
     else do
       setTableCreated globalsIORef eventTable $ colsCombined
+      yield $ createEventTableQuery eventTable colsCombined
       eventArrayFkeys <- fmap concat . forM arrayNamesAndTypes $ \anat -> do
         createEventArrayTable globalsIORef (crtr, cname, (escapeQuotes $ labelToText evName)) anat
-      yield $ createEventTableQuery eventTable colsCombined
       return $ eventArrayFkeys
 
 createEventTableQuery :: TableName -> TableColumns -> Text
@@ -1600,7 +1610,7 @@ aggEventToCollectionRow ae ev arrayName (index, value) =
       collectionDataValue = value,
       root = "",
       cc_creator = Just "",
-      id = Slipstream.Data.Action.id ae
+      id_event = Slipstream.Data.Action.id ae
     }
 
 removeArrayEvArgs :: Action.Event -> Action.Event
