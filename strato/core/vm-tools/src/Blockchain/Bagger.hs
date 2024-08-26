@@ -289,15 +289,12 @@ makeNewBlock mineTransactions = do
           return build
         else do
           $logDebugS "Bagger.makeNewBlock" "null $ B.promotedTransactions cache = False"
-          isPBFT <- isBlockstanbul
-          let coinbaseAddr = emptyChainMember
-          let nonce = 0
           let lastSR = B.lastExecutedStateRoot cache
           let lastSHA = B.bestBlockSHA cache
           let lastHead = B.bestBlockHeader cache
           let promoted = take ((fromInteger flags_maxTxsPerBlock) - lastExecLen) $ B.promotedTransactions cache
           let time = B.startTimestamp cache
-          let tempBlockHeader = buildNextBlockHeader lastHead lastSHA [] lastSR [] time isPBFT coinbaseAddr nonce mempty mempty
+          let tempBlockHeader = buildNextBlockHeader lastHead lastSHA lastSR [] time mempty mempty
           let remGas = B.remainingGas cache
           $logDebugS "Bagger.makeNewBlock" . T.pack $ "pre-incremental run :: (" ++ show remGas ++ ", " ++ format lastSR ++ ")"
           withBagger $ do
@@ -562,8 +559,6 @@ buildFromMiningCache = do
   $logInfoS "Bagger.buildFromMiningCache" "pulling from mempool"
   state <- getBaggerState
   isPBFT <- isBlockstanbul
-  let coinbaseAddr = emptyChainMember
-  let nonce = 0
   let cache = B.miningCache state
   let uncles = []
   let parentHash = B.bestBlockSHA cache
@@ -574,7 +569,7 @@ buildFromMiningCache = do
   let parentDiff = getBlockDifficulty parentHeader
   let time = B.startTimestamp cache
   let nextDiff = 1 
-  let nextBlockData = buildNextBlockHeader parentHeader parentHash uncles stateRoot txs time isPBFT coinbaseAddr nonce vDelt cDelt
+  let nextBlockData = buildNextBlockHeader parentHeader parentHash stateRoot txs time vDelt cDelt
   recordMaxBlockNumber "bagger_build" . number $ nextBlockData
   rewardedBlockData <- buildRewardedBlockHeader nextBlockData
   when isPBFT $
@@ -591,24 +586,17 @@ buildFromMiningCache = do
 buildNextBlockHeader ::
   BlockHeader ->
   Keccak256 ->
-  [BlockHeader] ->
   StateRoot ->
   [OutputTx] ->
   UTCTime ->
-  Bool ->
-  ChainMemberParsedSet ->
-  Word64 ->
   ValidatorDelta ->
   CertDelta ->
   BlockHeader
-buildNextBlockHeader parentHeader parentHash _ stateRoot txs time _ _ _ vd cd =
-  let --parentDiff = difficulty parentHeader
-      parentNum = number parentHeader
+buildNextBlockHeader parentHeader parentHash stateRoot txs time vd cd =
+  let parentNum = number parentHeader
       (newV, remV) = fromDelta vd
       (newC, revC) = fromDelta cd
-   in --parentTS   = timestamp parentHeader
-      --nextDiff   = nextDifficulty flags_difficultyBomb flags_testnet parentNum parentDiff parentTS time
-      BlockHeaderV2
+   in BlockHeaderV2
         {
           parentHash = parentHash,
           stateRoot = stateRoot,

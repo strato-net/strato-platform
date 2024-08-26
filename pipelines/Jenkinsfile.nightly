@@ -365,7 +365,6 @@ pipeline {
                 git clone -b develop https://${GITHUB_USERNAME}:${GITHUB_TOKEN}@github.com/blockapps/strato-api-tests.git
                 cd strato-api-tests
                 #git checkout develop # we must not checkout the custom branch for nightly builds - we must test with develop branch of strato-api-tests here as well as in release job.
-                git checkout platform-develop # Replace with custom branch here if made changes to API and strato-api-tests repo code
                 docker build --tag strato-api-tests .
                 docker run \
                   -e OAUTH_DISCOVERY_URL=https://keycloak.blockapps.net/auth/realms/strato-devel/.well-known/openid-configuration \

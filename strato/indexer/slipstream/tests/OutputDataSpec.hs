@@ -216,7 +216,7 @@ spec = do
     transaction_sender = excluded.transaction_sender;|]
 
   describe "Array serialization with history enabled" $ do
-    xit "should create JSON entries" $ do
+    it "should create JSON entries" $ do
       let testAdd = Address $ fst . head . readHex $ "ADDRESS"
           cHash = SolidVMCode "Vehicle2" $ hash "<CODEHASH>"
       let input =
@@ -818,7 +818,7 @@ spec = do
     collectiontype = excluded.collectiontype,
     value = excluded.value;|]
 
-  xit "can create and insert into abstract tables" $ do
+  it "can create and insert into abstract tables" $ do
     let testAdd = Address 0x98eaddede
         input = (SE.ProcessedContract {
           SE.address = testAdd,
