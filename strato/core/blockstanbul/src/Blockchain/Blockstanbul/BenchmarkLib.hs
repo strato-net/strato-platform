@@ -14,7 +14,6 @@ import Blockchain.Data.Json
 import Blockchain.Data.TransactionDef
 import Blockchain.Strato.Model.ChainMember
 import Blockchain.Strato.Model.Code
-import BlockApps.X509.Certificate (rootCert, x509CertToCertInfoState)
 import Data.Aeson
 import Data.Bits
 import qualified Data.ByteString as BS
@@ -50,7 +49,7 @@ benchChainMember :: ChainMemberParsedSet
 benchChainMember = CommonName "BlockApps" "Engineering" "Admin" True
 
 benchContext :: BlockstanbulContext
-benchContext = newContext "" (Checkpoint (View 200 40) [benchValidator]) Nothing True (Just benchChainMember) ([(benchValidator, x509CertToCertInfoState rootCert)])
+benchContext = newContext "" (Checkpoint (View 200 40) [benchValidator]) Nothing True (Just benchChainMember)
     where benchValidator = chainMemberParsedSetToValidator benchChainMember
 
 makeBlock :: Int -> Int -> Block

@@ -14,7 +14,6 @@ module Blockchain.Data.BlockHeader
     extraData2TxsLen,
     mixHashlens,
     extraDataLens,
-    signaturesLens,
     txsLen2ExtraData,
     getBlockBeneficiary,
     getBlockDifficulty,
@@ -25,7 +24,6 @@ module Blockchain.Data.BlockHeader
     getBlockOmmersHash,
     getBlockNewCerts,
     getBlockRevokedCerts,
-    getBlockSignatures,
     getBlockNewValidators,
     getBlockRemovedValidators
   )
@@ -39,7 +37,6 @@ import Blockchain.Strato.Model.Class
 import Blockchain.Strato.Model.ExtendedWord
 import Blockchain.Strato.Model.Keccak256
 import Blockchain.Strato.Model.PositiveInteger
-import Blockchain.Strato.Model.Secp256k1
 import Blockchain.Strato.Model.Validator
 import Control.DeepSeq
 import Control.Lens
@@ -87,8 +84,7 @@ data BlockHeader =
     newValidators :: [Validator],
     removedValidators :: [Validator],
     newCerts :: [X509Certificate],
-    revokedCerts :: [DummyCertRevocation],
-    signatures :: [Signature]
+    revokedCerts :: [DummyCertRevocation]
   }
   deriving (Eq, Show, Generic)
 
@@ -101,8 +97,6 @@ instance Binary BlockHeader
 instance NFData BlockHeader
 
 instance Binary DummyCertRevocation
-
-instance NFData DummyCertRevocation
 
 -- These getters are meant to be used in `instance BlockHeaderLike BlockHeader`
 -- so that the class may handle both V1 and V2
@@ -151,11 +145,7 @@ getBlockRevokedCerts :: BlockHeader -> [DummyCertRevocation]
 getBlockRevokedCerts BlockHeader {} = []
 getBlockRevokedCerts BlockHeaderV2 { revokedCerts } = revokedCerts
 
-getBlockSignatures :: BlockHeader -> [Signature]
-getBlockSignatures BlockHeader {} = []
-getBlockSignatures BlockHeaderV2 { signatures } = signatures
-
-makeLensesFor [("extraData", "extraDataLens"), ("mixHash", "mixHashlens"), ("signatures", "signaturesLens")] ''BlockHeader
+makeLensesFor [("extraData", "extraDataLens"), ("mixHash", "mixHashlens")] ''BlockHeader
 
 instance Format BlockHeader where
   format header@(BlockHeader ph oh b sr tr rr _ d number' gl gu ts ed _ nonce') =
@@ -187,7 +177,6 @@ instance Format BlockHeader where
             ++ "removedValidators: " ++ show removedValidators ++ "\n"
             ++ "newCerts: " ++ show newCerts ++ "\n"
             ++ "revokedCerts: " ++ show revokedCerts ++ "\n"
-            ++ "signatures: " ++ show signatures ++ "\n"
         )
 
 instance RLPSerializable BlockHeader where
@@ -223,8 +212,7 @@ instance RLPSerializable BlockHeader where
         rlpEncode newValidators,
         rlpEncode removedValidators,
         rlpEncode newCerts,
-        rlpEncode revokedCerts,
-        rlpEncode signatures
+        rlpEncode revokedCerts
       ]
   rlpDecode (RLPArray [ph, oh, b, sr, tr, rr, lb, d, number', gl, gu, ts, ed, mh, nonce']) =
         BlockHeader
@@ -244,7 +232,7 @@ instance RLPSerializable BlockHeader where
           mixHash = rlpDecode mh,
           nonce = bytesToWord64 $ B.unpack $ rlpDecode nonce'
         }
-  rlpDecode (RLPArray [v, ph, sr, tr, rr, lb, number', ts, ed, nv, rv, nc, rc, s]) 
+  rlpDecode (RLPArray [v, ph, sr, tr, rr, lb, number', ts, ed, nv, rv, nc, rc])
     | rlpDecode v == (2 :: Integer) =
           BlockHeaderV2
           { parentHash = rlpDecode ph,
@@ -258,8 +246,7 @@ instance RLPSerializable BlockHeader where
             newValidators = rlpDecode nv,
             removedValidators = rlpDecode rv,
             newCerts = rlpDecode nc,
-            revokedCerts = rlpDecode rc,
-            signatures = rlpDecode s
+            revokedCerts = rlpDecode rc
           }
   rlpDecode x = error $ "can not run rlpDecode on BlockHeader for value " ++ show x
 
@@ -283,7 +270,6 @@ instance BlockHeaderLike BlockHeader where
   blockHeaderRemovedValidators = getBlockRemovedValidators
   blockHeaderNewCerts = getBlockNewCerts
   blockHeaderRevokedCerts = getBlockRevokedCerts
-  blockHeaderSignatures = getBlockSignatures
   blockHeaderVersion = bh where
     bh BlockHeader {} = 1
     bh BlockHeaderV2 {} = 2
@@ -322,8 +308,7 @@ instance BlockHeaderLike BlockHeader where
         newValidators = blockHeaderNewValidators b,
         removedValidators = blockHeaderRemovedValidators b,
         newCerts = blockHeaderNewCerts b,
-        revokedCerts = blockHeaderRevokedCerts b,
-        signatures = blockHeaderSignatures b
+        revokedCerts = blockHeaderRevokedCerts b
       }
     _ -> error "Unknown block header version"
 

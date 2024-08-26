@@ -18,6 +18,7 @@
 module Blockchain.BlockChain
   ( addBlock,
     addBlocks,
+    verifyBlock,
     mineTransactions,
     addTransaction,
     addTransactions,
@@ -55,12 +56,12 @@ import qualified Blockchain.Database.MerklePatricia as MP
 import Blockchain.Event
 import Blockchain.Sequencer.Event
 import qualified Blockchain.SolidVM as SolidVM
-import Blockchain.StateRootMismatch
 import Blockchain.Strato.Indexer.Model (IndexEvent (..))
 import Blockchain.Strato.Model.Account
 import Blockchain.Strato.Model.Address
 import Blockchain.Strato.Model.Class
 import Blockchain.Strato.Model.Code
+import Blockchain.Strato.Model.Delta
 import Blockchain.Strato.Model.Event
 import Blockchain.Strato.Model.ExtendedWord
 import Blockchain.Strato.Model.Gas
@@ -163,8 +164,8 @@ addBlocks unfiltered = do
             let !blockNo = number $ obBlockData block
                 !txCount = length $ obReceiptTransactions block
             timeit (printf "Block #%d (%d TXs insertion)" blockNo txCount) timerToUse $ do
-              mSRMismatch <- lift $ addBlock block
-              when (isNothing mSRMismatch) $ do
+              failures <- lift $ addBlock block
+              when (null failures) $ do
                 (didReplaceThisTime, ranPriv, replacedBits@(hsh, num, _)) <- lift . lift $ replaceBestIfBetter block
                 when didReplaceThisTime $ do
                   writeIORef didReplaceBest True
@@ -178,15 +179,15 @@ addBlocks unfiltered = do
                   modifyIORef' ranPrivateTxs $
                     flip M.unionWith ranPriv $
                       \(n1, s1) (n2, s2) -> if n1 > n2 then (n1, s1) else (n2, s2)
-              pure mSRMismatch
-          loop [] = pure Nothing
+              pure failures
+          loop [] = pure []
           loop (b:bs) = go b >>= \case
-            Just srm -> pure $ Just srm
-            Nothing  -> loop bs
-      (mSRMismatch, srLog) <- flip State.runStateT Nothing $ loop filtered
-      case mSRMismatch of
-        Just srMismatch -> yield $ OutStateRootMismatch srMismatch
-        Nothing -> do
+            [] -> loop bs
+            failures -> pure failures
+      (failures, srLog) <- flip State.runStateT Nothing $ loop filtered
+      case failures of
+        (_:_) -> yield $ OutBlockVerificationFailure failures
+        _ -> do
           $logDebugLS "addBlocks/srLog" srLog
           didReplaceBest' <- readIORef didReplaceBest
           ranPrivateTxs' <- readIORef ranPrivateTxs
@@ -207,7 +208,7 @@ setParentStateRoot OutputBlock {..} = do
   liftIO $ setTitle $ "Block #" ++ show (number obBlockData)
   BSDB.getBSum (parentHash obBlockData)
 
-addBlock :: (MonadFail m, Bagger.MonadBagger m, MonadMonitor m) => OutputBlock -> ConduitT a VmOutEvent m (Maybe StateRootMismatch)
+addBlock :: (MonadFail m, Bagger.MonadBagger m, MonadMonitor m) => OutputBlock -> ConduitT a VmOutEvent m [BlockVerificationFailure]
 addBlock b@OutputBlock {obBlockData = bd, obReceiptTransactions = otxs} =
   let obh = outputBlockHash b
    in withCurrentBlockHash obh $ do
@@ -240,18 +241,13 @@ addBlock b@OutputBlock {obBlockData = bd, obReceiptTransactions = otxs} =
         bSum <- setParentStateRoot b
         -- TODO: PLEASE REMOVE THIS FORK WHEN MERCATA-HYDROGEN IS OBSOLETE
         when (computeNetworkID == 7596898649924658542 && number bd == 32624) runTheDAOFork -- Only run this if connected to mercata-hydrogen
-        addBlockTransactions b
+        trrs <- addBlockTransactions b
 
         postRewardSR <- A.lookup (A.Proxy @MP.StateRoot) (Nothing :: Maybe Word256)
 
-        if (Just (stateRoot (obBlockData b)) /= postRewardSR)
-          then do
-            $logInfoS "addBlock/mined" . T.pack $ "newStateRoot: " ++ format postRewardSR
-            pure . Just $ StateRootMismatch (number $ obBlockData b)
-                                            obh
-                                            (stateRoot $ obBlockData b)
-                                            (fromMaybe MP.emptyTriePtr postRewardSR)
-          else do
+        case verifyBlock (obBlockData b) (trrs, postRewardSR) of
+          failures@(_:_) -> pure failures
+          _ -> do
             valid <- checkValidity (blockIsHomestead $ number bd) bSum b
             case valid of
               Nothing -> lift $ P.incCounter vmBlocksValid
@@ -267,30 +263,56 @@ addBlock b@OutputBlock {obBlockData = bd, obReceiptTransactions = otxs} =
             lift $ P.incCounter vmBlocksMined
             lift $ P.incCounter vmBlocksProcessed
             $logInfoS "addBlock" . T.pack $ "Inserted block became #" ++ show (number $ obBlockData b) ++ " (" ++ format obh ++ ")."
-            pure Nothing
+            pure []
 
-addBlockTransactions :: (Bagger.MonadBagger m, MonadMonitor m) => OutputBlock -> ConduitT a VmOutEvent m ()
+-- TODO: If we add more verifications, refactor tuple into a proper data type
+verifyBlock :: BlockHeader -> ([TxRunResult], Maybe MP.StateRoot) -> [BlockVerificationFailure]
+verifyBlock bh (trrs, derivedSR) =
+  let (vDelt, cDelt) = getDeltasFromResults trrs
+      bHash = blockHeaderHash bh
+      bNum = number bh
+      blockSR = Just $ stateRoot bh
+      bVd = toDelta (newValidators bh) (removedValidators bh)
+      bCd = toDelta (newCerts bh) (revokedCerts bh)
+      srCheck =  if derivedSR == blockSR
+        then Nothing
+        else Just . StateRootMismatch $
+               BlockDelta (stateRoot bh)
+                          (fromMaybe MP.emptyTriePtr derivedSR)
+      validatorCheck = if eqDelta bVd vDelt
+        then Nothing
+        else Just . ValidatorMismatch $ BlockDelta (fromDelta bVd) (fromDelta vDelt)
+      certCheck = if eqDelta bCd cDelt
+        then Nothing
+        else Just . CertRegistrationMismatch $ BlockDelta (fromDelta bCd) (fromDelta cDelt)
+   in BlockVerificationFailure bNum bHash <$> case blockHeaderVersion bh of
+        1 -> catMaybes [srCheck]
+        2 -> catMaybes [srCheck, validatorCheck, certCheck]
+        v -> [VersionMismatch $ BlockDelta v 2]
+
+addBlockTransactions :: (Bagger.MonadBagger m, MonadMonitor m) => OutputBlock -> ConduitT a VmOutEvent m [TxRunResult]
 addBlockTransactions OutputBlock {obBlockData = bd, obReceiptTransactions = transactions} = do
   $logDebugS "addBlockTransactions" . T.pack $ "All transactions: " ++ show transactions
   let txs =
         filter (\t -> (txType t /= PrivateHash) || (isJust $ otPrivatePayload t)) $
           transactions
-  -- TODO: Run the checks Bagger does reject invalid transactions for private chains
-  addTransactions bd txs
+  trrs <- addTransactions bd txs
 
   lift $ timeit "flushMemStorageDB" (Just vmBlockInsertionMined) flushMemStorageDB
   lift $ timeit "flushMemAddressStateDB" (Just vmBlockInsertionMined) flushMemAddressStateDB
+  pure trrs
 
 addTransactions ::
   (VMBase m, MonadMonitor m) =>
   BlockHeader ->
   [OutputTx] ->
-  ConduitT a VmOutEvent m ()
+  ConduitT a VmOutEvent m [TxRunResult]
 addTransactions blockData txs =
   timeit ("addTransactions, " ++ show (length txs) ++ " TXs") (Just vmBlockInsertionMined) $ do
     trrs <- lift $ go (getBlockGasLimit blockData) txs DL.empty
     mapM_ (outputTransactionResult blockData blockHeaderHash) trrs
     yield . OutASM $ foldr (flip M.union) M.empty $ map trrAfterMap trrs
+    pure trrs
   where
     go _ [] trrs = return $ DL.toList trrs
     go blockGas (t : rest) trrs = do
@@ -343,7 +365,8 @@ mineTransactions' header remGas ran unran@(tx : txs) = do
               flushMemAddressStateTxToBlockDB
               flushMemStorageTxDBToBlockDB
               mineTransactions' header nextRemGas (ran `DL.snoc` trr) txs
-    Left failure -> return $ Bagger.TxMiningResult (Just failure) (DL.toList ran) unran remGas
+    Left failure -> do
+      return $ Bagger.TxMiningResult (Just failure) (DL.toList ran) unran remGas
 
 blockIsHomestead :: Integer -> Bool
 blockIsHomestead blockNum = blockNum >= fromIntegral gHomesteadFirstBlock

@@ -6,8 +6,8 @@ ifeq ($(ECR_DOCKER_TAG),)
   $(error ECR_DOCKER_TAG is not set)
 endif
 
-all: build
+all: build_docker
 
-build:
+build_docker:
 	docker build --target prod -t $(BASIL_DOCKER_TAG) .
 	docker tag $(BASIL_DOCKER_TAG) $(ECR_DOCKER_TAG)

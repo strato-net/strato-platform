@@ -8,7 +8,6 @@
 
 module Blockchain.Blockstanbul.StateMachine where
 
-import BlockApps.X509
 import BlockApps.Logging
 import Blockchain.Blockstanbul.Messages
 import Blockchain.Data.Block
@@ -23,7 +22,6 @@ import Control.Lens hiding (view)
 import Control.Monad
 import Control.Monad.State.Class
 import qualified Data.Map.Strict as M
-import Data.List (find)
 import Data.Maybe
 import qualified Data.Set as S
 import qualified Data.Text as T
@@ -53,7 +51,7 @@ data BlockstanbulContext = BlockstanbulContext
     -- The designated participant to suggest a block for this round
     _proposer :: Validator,
     -- The total group of participants
-    _validators :: S.Set (Validator, X509CertInfoState),
+    _validators :: S.Set Validator,
     -- Validators who have sent us a prepare for this round
     _prepared :: M.Map Validator Keccak256,
     -- Validators who have sent us a commitment seal for this round
@@ -100,15 +98,16 @@ debugShowCtx = do
   debugLog "showctx/hasPrepared" hasPrepared show
   debugLog "showctx/roundChanged" roundChanged show
 
-newContext :: String -> Checkpoint -> Maybe Address -> Bool -> Maybe ChainMemberParsedSet -> [(Validator, X509CertInfoState)] -> BlockstanbulContext
-newContext network' (Checkpoint v _) addr valB chainm valSet = do
-  let (prop, _) = fromMaybe (error "you need at least one validator in the network") . S.lookupMin $ S.fromList valSet
+newContext :: String -> Checkpoint -> Maybe Address -> Bool -> Maybe ChainMemberParsedSet -> BlockstanbulContext
+newContext network' (Checkpoint v as) addr valB chainm =
+  let valSet = S.fromList as
+      prop = fromMaybe (error "you need at least one validator in the network") $ S.lookupMin valSet
    in BlockstanbulContext
         { _view = v,
           _productionAuth = True,
           _proposal = Nothing,
           _proposer = prop,
-          _validators = S.fromList valSet,
+          _validators = valSet,
           _prepared = M.empty,
           _committed = M.empty,
           _hasPreprepared = False,
@@ -132,12 +131,6 @@ generateNonceMap = M.fromList . flip zip (repeat 0)
 poolSize :: (StateMachineM m) => m Int
 poolSize = uses validators S.size
 
-contextValidatorsContain :: (StateMachineM m) => Maybe Validator -> m Bool 
-contextValidatorsContain Nothing = return False
-contextValidatorsContain (Just val) = do
-    vs <- use validators 
-    return $ val `elem` (map fst $ S.toList vs)
-
 clearLock :: (StateMachineM m) => m ()
 clearLock = do
   blockLock .= Nothing
@@ -147,15 +140,3 @@ setLock :: StateMachineM m => m ()
 setLock = do
   (blockLock .=) =<< use proposal
   (lockSender .=) =<< uses proposer Just
-
-coupleValidatorWithX509s :: [Validator] -> [X509CertInfoState] -> [(Validator, X509CertInfoState)]
-coupleValidatorWithX509s vs x509s = 
-    -- We should filter validators out of the context that don't have an associated certificate
-    excludeMissingCerts $ map getValidatorCert vs
-    where
-        getValidatorCert :: Validator -> (Validator, Maybe X509CertInfoState)
-        getValidatorCert v@(Validator cn) = (v, find (match cn) x509s) 
-        excludeMissingCerts :: [(Validator, Maybe X509CertInfoState)] -> [(Validator, X509CertInfoState)]
-        excludeMissingCerts = map (\(a, b) -> (a, fromJust b)) . dropWhile (isNothing . snd) 
-        match cn cert = T.unpack cn == BlockApps.X509.commonName cert
-

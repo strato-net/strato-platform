@@ -416,8 +416,7 @@ instance ToJSON BlockData' where
         "newValidators" .= newValidators,
         "removedValidators" .= removedValidators,
         "newCerts" .= newCerts,
-        "revokedCerts" .= revokedCerts,
-        "signatures" .= signatures
+        "revokedCerts" .= revokedCerts
       ]
 
 instance FromJSON BlockData' where

@@ -10,7 +10,6 @@
 
 module Blockchain.Blockstanbul.Messages where
 
-import BlockApps.X509
 import BlockApps.Logging
 import Blockchain.Data.ArbitraryInstances ()
 import Blockchain.Data.Block
@@ -155,27 +154,23 @@ roundchangeCode = 3
 data InEvent
   = IMsg {iAuth :: MsgAuth, iMessage :: TrustedMessage}
   | Timeout RoundNumber
-  | -- TODO(tim): CommitResult should have the digest
-    CommitResult (Either Text Keccak256)
   | UnannouncedBlock Block
   | PreviousBlock Block
   | PreprepareResponse PreprepareDecision
   | ForcedConfigChange ForcedConfigChange
   | ValidatorBehaviorChange ForcedValidatorChange
-  | ValidatorChange Validator (Maybe X509CertInfoState) Bool 
+  | ValidatorChange Validator Bool 
   deriving (Eq, Show)
 
 instance Format InEvent where
   format (IMsg (MsgAuth s _) msg) = "IMsg " ++ format msg ++ " " ++ format s
   format (Timeout rn) = "Timeout " ++ format rn
-  format (CommitResult (Left text)) = unpack $ "CommitResult Error: " <> text
-  format (CommitResult (Right sha)) = "CommitResult Success: " ++ format sha
   format (UnannouncedBlock blk) = "UnannouncedBlock " ++ format (blockHash blk)
   format (PreprepareResponse rspns) = "Preprepare Response " ++ format rspns
   format (PreviousBlock blk) = "PreviousBlock " ++ format (blockHash blk)
   format (ForcedConfigChange cc) = "ForcedConfigChange " ++ format cc
   format (ValidatorBehaviorChange theBool) = "ValidatorBehaviorChange " ++ format theBool
-  format (ValidatorChange val _ theBool) = "ValidatorChange " ++ format val ++ if theBool then " added" else " removed"
+  format (ValidatorChange val theBool) = "ValidatorChange " ++ format val ++ if theBool then " added" else " removed"
 
 data OutEvent
   = OMsg {oAuth :: MsgAuth, oMessage :: TrustedMessage}
@@ -221,14 +216,12 @@ inShortLog loc iev = $logInfoS loc . pack $
   case iev of
     IMsg a m -> shortFormat $ WireMessage a m
     Timeout rn -> CL.blue "TIMEOUT " ++ show rn
-    CommitResult (Left err) -> CL.red "COMMIT_RESULT " ++ show err
-    CommitResult (Right hsh) -> CL.blue "COMMIT_RESULT " ++ format hsh
     UnannouncedBlock blk -> CL.blue "UNANNOUNCED_BLOCK " ++ blkNum blk
     PreprepareResponse rspns -> CL.blue "PRE_PREPARE_RESPONSE " ++ format rspns
     PreviousBlock blk -> CL.blue "PREVIOUS_BLOCK " ++ blkNum blk
     ForcedConfigChange cc -> CL.blue "FORCED_CONFIG_CHANGE " ++ format cc
     ValidatorBehaviorChange vc -> CL.blue "VALIDATOR_BEHAVIOR_CHANGE " ++ show vc
-    ValidatorChange val _ dir -> CL.blue "VALIDATOR_CHANGE " ++ format val ++ if dir then " ADDED" else " REMOVED"
+    ValidatorChange val dir -> CL.blue "VALIDATOR_CHANGE " ++ format val ++ if dir then " ADDED" else " REMOVED"
 
 outShortLog :: MonadLogger m => Text -> EOutEvent -> m ()
 outShortLog loc eoev = do

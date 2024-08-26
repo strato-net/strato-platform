@@ -79,10 +79,16 @@ addProposerSeal sig =
       . cookRawExtra
 
 addCommitmentSeals :: [Signature] -> Block -> Block
-addCommitmentSeals sigs b = 
-    let header' = blockBlockData b
-        header = header' { signatures = sigs }
-    in b { blockBlockData = header }
+addCommitmentSeals sigs =
+  over extraLens $
+    uncookRawExtra
+      . over
+        istanbul
+        ( \i ->
+            fmap (set commitment sigs) i
+              <|> error "must set validators before commitment seals"
+        )
+      . cookRawExtra
 
 scrubAllSeals :: RawExtraData -> RawExtraData
 scrubAllSeals =
@@ -100,7 +106,6 @@ proposalMessage =
     . hash
     . rlpSerialize
     . rlpEncode
-    . over signaturesLens scrubSignaturesFromBlock
     . over extraDataLens scrubAllSeals
     . blockBlockData
 
@@ -140,7 +145,6 @@ finalHash =
   hash
     . rlpSerialize
     . rlpEncode
-    . over signaturesLens scrubSignaturesFromBlock
     . over extraDataLens scrubCommitmentSeals
     . blockBlockData
 
@@ -184,15 +188,14 @@ getX509FromAddress' address = do
     Just v -> return v
 
 replayHistoricBlock :: (MonadError String m, A.Selectable Address X509CertInfoState m) =>
-                       Set (Validator, X509CertInfoState) -> Word256 -> Block -> m (Word256, Validator)
-replayHistoricBlock validatorSet seqNo blk = do
+                       Set Validator -> Word256 -> Block -> m (Word256, Validator)
+replayHistoricBlock realValidators seqNo blk = do
   let ExtraData {..} = cookRawExtra . L.view extraLens $ blk
   IstanbulExtra {..} <- liftEither $ maybeToEither "no istanbul metadata" _istanbul
   let mProp = verifyProposerSeal blk =<< _proposedSig
       blockNo = fromIntegral . number . blockBlockData $ blk
-      realValidators = S.fromList . map fst . S.toList $ validatorSet 
 
-  signers <- sequence $ map (verifyCommitmentSeal (blockHash blk)) $ signatures $ blockBlockData blk
+  signers <- sequence $ map (verifyCommitmentSeal (blockHash blk)) _commitment
       
   noAddress <- sequence $ map getX509FromAddress signers
   

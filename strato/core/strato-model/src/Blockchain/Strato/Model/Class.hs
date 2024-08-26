@@ -11,8 +11,8 @@ import Blockchain.Strato.Model.ChainMember
 import Blockchain.Strato.Model.Code
 import Blockchain.Strato.Model.ExtendedWord
 import Blockchain.Strato.Model.Keccak256
-import Blockchain.Strato.Model.Secp256k1 (Signature)
 import Blockchain.Strato.Model.Validator (Validator)
+import Control.DeepSeq
 import Data.Aeson
 import qualified Data.ByteString as B
 import Data.Data
@@ -43,7 +43,7 @@ class (RLPSerializable b, BlockHeaderLike h, TransactionLike t) => BlockLike h t
   morphBlock :: (BlockLike h2 t2 b2) => b2 -> b
   morphBlock b2 = buildBlock' (blockHeader b2) (blockTransactions b2) (blockUncleHeaders b2)
 
-newtype DummyCertRevocation = DummyCertRevocation String deriving (Show, Read, Eq, Generic, Data, ToJSON, RLPSerializable)
+newtype DummyCertRevocation = DummyCertRevocation Address deriving (Show, Read, Eq, NFData, Generic, Data, ToJSON, RLPSerializable)
 
 class RLPSerializable h => BlockHeaderLike h where
   blockHeaderBlockNumber :: h -> Integer
@@ -65,8 +65,7 @@ class RLPSerializable h => BlockHeaderLike h where
   blockHeaderRemovedValidators :: h -> [Validator]
   blockHeaderNewCerts :: h -> [X509Certificate]
   blockHeaderRevokedCerts :: h -> [DummyCertRevocation]
-  blockHeaderSignatures :: h -> [Signature]
-  blockHeaderVersion :: h -> Integer
+  blockHeaderVersion :: h -> Int
 
   -- This should be Lens' h B.ByteString, except that the RedisHeader cannot
   -- derive it.
@@ -95,7 +94,7 @@ class RLPSerializable h => BlockHeaderLike h where
     blockHeaderRemovedValidators,
     blockHeaderNewCerts,
     blockHeaderRevokedCerts,
-    blockHeaderSignatures,
+    blockHeaderModifyExtra,
     morphBlockHeader,
     blockHeaderVersion
     #-}

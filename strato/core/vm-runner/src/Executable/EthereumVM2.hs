@@ -138,13 +138,12 @@ handleVmEvents = awaitForever $ \InBatch {..} -> do
               bHeader'
               otxs 
             case res of 
-              Right (sr, _, _) -> do 
-                let  desiredSR = stateRoot bHeader
+              Right (sr, trrs, _) -> do 
                 $logDebugS "handleVmEvents/preprepareBlock" . T.pack $ "Stateroot we got: " <> format sr
-                $logDebugS "handleVmEvents/preprepareBlock" . T.pack $ "Stateroot in block: " <> format desiredSR
-                if sr == desiredSR 
-                  then pure . Just $ AcceptPreprepare bHash
-                  else pure $ Just RejectPreprepare
+                $logDebugS "handleVmEvents/preprepareBlock" . T.pack $ "Stateroot in block: " <> format (stateRoot bHeader)
+                case verifyBlock bHeader (trrs, Just sr) of
+                  [] -> pure . Just $ AcceptPreprepare bHash
+                  _  -> pure $ Just RejectPreprepare
               _ -> pure $ Just RejectPreprepare
   $logDebugS "handleVmEvents/mPreDec" . T.pack $ format mPreDec
   traverse_ (yield . OutPreprepareResponse) mPreDec
@@ -190,16 +189,7 @@ handleVmEvents = awaitForever $ \InBatch {..} -> do
         pure $ Just newBlock 
       else pure Nothing
     
-  case mNewBlock of 
-    Just b -> do 
-        ValidatorDelta !newv !removedv <- lift getContextValidators
-        CertsDelta !newc !revokedc <- lift getContextCerts
-        let bh = obBlockData b 
-            bh' = bh { newValidators = S.toList newv, removedValidators = S.toList removedv , newCerts = S.toList newc , revokedCerts = revokedc }
-        yield . OutBlock $ b { obBlockData = bh' }
-        flushContextValidators
-        flushContextCerts
-    Nothing -> pure ()
+  for_ mNewBlock $ yield . OutBlock 
 
 groupEithers :: [Either a b] -> [Either [a] [b]]
 groupEithers = foldr f []

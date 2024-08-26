@@ -19,7 +19,6 @@ module Blockchain.Sequencer where
 import BlockApps.Logging
 import BlockApps.X509.Certificate
 import Blockchain.Blockstanbul 
---import Blockchain.Blockstanbul.StateMachine (coupleValidatorWithX509s)
 import qualified Blockchain.Data.Block as BDB
 import Blockchain.Data.BlockHeader
 import Blockchain.Data.ChainInfo (chainInfo, creationBlock, parentChains)
@@ -135,7 +134,7 @@ type MonadSequencer m =
     HasVault m
   )
 
-sequencer :: [(Validator, X509CertInfoState)] -> SequencerM ()
+sequencer :: [Validator] -> SequencerM ()
 sequencer validators = do
   let logF = logFF "sequencer"
   hasPBFT <- isJust <$> getBlockstanbulContext
@@ -146,7 +145,7 @@ sequencer validators = do
       Just cert -> do
         let chainm = getChainMemberFromX509 cert
         logF $ "Node identity verified: " ++ show chainm
-        case chainMemberParsedSetToValidator chainm `elem` (map fst validators) of
+        case chainMemberParsedSetToValidator chainm `elem` validators of
           True -> do
             putBlockstanbulContext $ ctx { _selfCert = Just chainm, _isValidator = True }
             logF "You are a validator in this network!"
@@ -278,21 +277,13 @@ blockstanbulSend' ::
   InEvent ->
   ConduitT a SeqEvent m ()
 blockstanbulSend' msg = do
-  resp' <- sendAllMessages [msg]
-  let blocks = [b | ToCommit b <- resp']
-  resp <-
-    (resp' ++)
-      <$> case blocks of
-        [] -> return []
-        -- TODO(tim): Block insertion can potentially fail, so there
-        -- should be feedback here
-        [b] -> sendAllMessages $ [CommitResult . Right . blockHash $ b]
-        bs -> error $ "can send at most 1 block at a time: " ++ show bs
+  resp <- sendAllMessages [msg]
+  let blocks = [b | ToCommit b <- resp]
   for_ resp $ \case
     ResetTimer rn -> createNewTimer rn
     FailedHistoric blk -> A.delete (Proxy @DependentBlockEntry) (blockHash blk) -- First time using `delete`
     _ -> pure ()
-  $logDebugS "seq/pbft/send" . T.pack $ "Pre-rewrite: " ++ format (map blockHash blocks)
+  $logDebugS "seq/pbft/send" . T.pack $ "Pre-rewrite: " ++ format (blockHash <$> blocks)
 
   let getSequencedBlock =
         ingestBlockToSequencedBlock
@@ -682,13 +673,13 @@ splitEvents es = forM_ (splitWith iEventType es) $ \(eventType, events) ->
         IETValidatorAdded -> do
           record "inevent_type_validator_added" "ValidatorChange"
           let bs = map (\(IEValidatorAdded bHash vc) -> (bHash, vc)) events
-          blockstanbulSend $ map (\(_, vc) -> ValidatorChange vc Nothing True) bs
+          blockstanbulSend $ map (\(_, vc) -> ValidatorChange vc True) bs
           retries <- lift $ map (PreviousBlock . outputBlockToBlock) . join <$> traverse retryFailedChildren (fst <$> bs)
           blockstanbulSend retries
         IETValidatorRemoved -> do
           record "inevent_type_validator_removed" "ValidatorChange"
           let bs = map (\(IEValidatorRemoved bHash vc) -> (bHash, vc)) events
-          blockstanbulSend $ map (\(_, vc) -> ValidatorChange vc Nothing False) bs
+          blockstanbulSend $ map (\(_, vc) -> ValidatorChange vc False) bs
           retries <- lift $ map (PreviousBlock . outputBlockToBlock) . join <$> traverse retryFailedChildren (fst <$> bs)
           blockstanbulSend retries
         IETBlockstanbul -> do

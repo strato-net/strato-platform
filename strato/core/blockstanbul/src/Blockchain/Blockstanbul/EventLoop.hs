@@ -4,9 +4,11 @@
 {-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE TypeApplications #-}
+{-# LANGUAGE TypeOperators #-}
 {-# OPTIONS_GHC -fno-warn-orphans #-}
 
 module Blockchain.Blockstanbul.EventLoop where
@@ -22,11 +24,12 @@ import Blockchain.Data.Block
 import Blockchain.Data.BlockHeader
 import Blockchain.Strato.Model.Address
 import Blockchain.Strato.Model.ChainMember
-import Blockchain.Strato.Model.Class (blockHash)
+import Blockchain.Strato.Model.Class (blockHash, DummyCertRevocation(..))
 import Blockchain.Strato.Model.ExtendedWord
 import Blockchain.Strato.Model.Keccak256
 import Blockchain.Strato.Model.Secp256k1
 import Conduit
+import Control.Arrow ((&&&))
 import Control.Lens hiding (view)
 import Control.Monad hiding (sequence)
 import qualified Control.Monad.Change.Alter as A
@@ -57,17 +60,17 @@ yieldManyR = yieldMany . map Right
 authorize :: (StateMachineM m) => InEvent -> ExceptT String m ()
 authorize = \case
   IMsg (MsgAuth cm _) _ -> do
-    ret <- lift $ contextValidatorsContain (Just $ chainMemberParsedSetToValidator cm)
+    ret <- uses validators $ S.member (chainMemberParsedSetToValidator cm)
     unless ret $ do
       let reason = "Rejecting message; sender not a validator: " ++ show cm
       $logWarnS "blockstanbul/auth" . T.pack $ reason
       throwE reason
   _ -> return ()
 
-isAuthorized :: (StateMachineM m, A.Selectable Address X509CertInfoState m) => InEvent -> m AuthResult
+isAuthorized :: (StateMachineM m, (Address `A.Alters` X509CertInfoState) m) => InEvent -> m AuthResult
 isAuthorized iev = fmap (either AuthFailure (const AuthSuccess)) . runExceptT $ do
   doAuthn <- use productionAuth
-  authenticated <- lift $ authenticate iev --InEvent (benf is a (ChainMemberParsedSet, Bool,Int))
+  authenticated <- authenticate iev --InEvent (benf is a (ChainMemberParsedSet, Bool,Int))
   let raiseInProd reason = when doAuthn $ do
         $logWarnS "blockstanbul/auth" . T.pack $ reason
         throwE reason --debug statement?
@@ -78,12 +81,13 @@ isAuthorized iev = fmap (either AuthFailure (const AuthSuccess)) . runExceptT $ 
   -- TODO(tim): RoundChange a Preprepare correctly signed by the proposer,
   -- but with incorrect extraData.
     IMsg _ (Preprepare _ pp) -> do
+      valSet <- use validators -- this is _validators from bloctanbul context?
       let mSignatory = verifyProposerSeal pp =<< getProposerSeal pp -- same convention getProposerSeal :: Block -> Maybe Signature
       case mSignatory of
         Nothing -> raiseInProd "Rejecting Preprepare; proposer seal could not be verified"
         Just signatory -> do
-          mChainMember <- lift $ fmap (chainMemberParsedSetToValidator . getChainMemberFromX509) <$> getX509FromAddress signatory
-          signerExists <- lift $ contextValidatorsContain mChainMember
+          mChainMember <- fmap (chainMemberParsedSetToValidator . getChainMemberFromX509) <$> getX509FromAddress signatory
+          let signerExists = maybe False (`S.member` valSet) mChainMember
           unless signerExists $
             raiseInProd $
               "Rejecting Preprepare; signer " ++ formatAddressWithoutColor signatory
@@ -152,7 +156,7 @@ nextRound nt = do
   thisR <- use $ view . round
   when (S.null vals) . liftIO $
     die "All participants voted out, consensus is stuck."
-  let (leader, _) = (fromIntegral thisR `mod` S.size vals) `S.elemAt` vals
+  let leader = (fromIntegral thisR `mod` S.size vals) `S.elemAt` vals
   proposer .= leader
   proposal .= Nothing
   self <- use selfCert
@@ -176,19 +180,59 @@ nextRound nt = do
   hasPrepared .= False
   pendingRound .= Nothing
 
-  when (isJust self) $ isValidator .= (chainMemberParsedSetToValidator (fromJust self) `elem` (map fst . S.toList $ vals))
+  when (isJust self) $ isValidator .= (chainMemberParsedSetToValidator (fromJust self) `elem` vals)
 
   yieldR . NewCheckpoint
     =<< liftA2
       Checkpoint
       (use view)
-      (uses validators (map fst . S.toList))
+      (uses validators S.toList)
 
-instance A.Selectable Address X509CertInfoState m => A.Selectable Address X509CertInfoState (StateT BlockstanbulContext m) where
-  select p = lift . A.select p
+applyValidatorAndCertChanges ::
+  ( (Address `A.Alters` X509CertInfoState) m
+  , MonadState BlockstanbulContext m
+  ) =>
+  BlockHeader ->
+  m ()
+applyValidatorAndCertChanges BlockHeader{} = pure ()
+applyValidatorAndCertChanges BlockHeaderV2{..} = do
+  A.insertMany (A.Proxy @X509CertInfoState) . M.fromList $
+    (userAddress &&& id) . x509CertToCertInfoState <$> newCerts
+  A.deleteMany (A.Proxy @X509CertInfoState) $
+    (\(DummyCertRevocation a) -> a) <$> revokedCerts
+  validators %= (S.union $ S.fromList newValidators)
+  validators %= (flip S.difference $ S.fromList removedValidators)
 
-instance A.Selectable Address X509CertInfoState m => A.Selectable Address X509CertInfoState (ExceptT String  m) where
-  select p = lift . A.select p
+commitBlock ::
+  ( (Address `A.Alters` X509CertInfoState) m
+  , StateMachineM m
+  ) =>
+  Block ->
+  ConduitM InEvent EOutEvent m ()
+commitBlock blk = do
+  lift . applyValidatorAndCertChanges $ blockBlockData blk
+  yieldR $ ToCommit blk
+  let hsh = blockHash blk
+  $logInfoS "blockstanbul" . T.pack $ "Successful block commit of " ++ format hsh
+  lastParent .= Just hsh
+  clearLock
+  whenM (use hasPreprepared) $
+    recordProposal
+  s <- use $ view . sequence
+  nextRound . Sequence $ s + 1
+
+instance (Address `A.Alters` X509CertInfoState) m => (Address `A.Alters` X509CertInfoState) (StateT BlockstanbulContext m) where
+  lookup p   = lift . A.lookup p
+  insert p k = lift . A.insert p k
+  delete p   = lift . A.delete p
+
+instance (Address `A.Alters` X509CertInfoState) m => (Address `A.Alters` X509CertInfoState) (ExceptT String m) where
+  lookup p = lift . A.lookup p
+  insert p k = lift . A.insert p k
+  delete p   = lift . A.delete p
+
+instance (Address `A.Alters` X509CertInfoState) m => (A.Selectable Address X509CertInfoState) (ExceptT e m) where
+  select p = lift . A.lookup p
 
 
 
@@ -196,7 +240,7 @@ eventLoop ::
   ( MonadIO m,
     MonadLogger m,
     HasVault m,
-    A.Selectable Address X509CertInfoState m
+    (Address `A.Alters` X509CertInfoState) m
   ) =>
   BlockstanbulContext ->
   ConduitM InEvent EOutEvent m BlockstanbulContext
@@ -214,17 +258,10 @@ eventLoop ctx = execStateC ctx $
             ForcedValidator fv -> modify' $ validatorBehavior .~ fv
           valB <- use validatorBehavior
           $logInfoLS "blockstanbul/ValidatorBehaviorChange" valB
-        ValidatorChange val cert dir -> do
+        ValidatorChange val dir -> do
           modify' $
             validators
-              %~ ( \cm ->
-                     let cm' = (if dir then S.insert else S.delete) (val, getCert) cm 
-                         getCert = 
-                            case cert of
-                                Just c -> c
-                                Nothing -> snd $ fromMaybe (error "how is this a validator with no certificate?") $ find (\(v', _) -> v' == val) $ S.toList cm
-                     in cm'
-                 )
+              %~ (if dir then S.insert else S.delete) val
           vals' <- use validators
           $logInfoLS "blockstanbul/ValidatorChange" . T.pack $
             concat
@@ -265,9 +302,11 @@ eventLoop ctx = execStateC ctx $
                 $ err
               yieldR $ FailedHistoric blk
             Right _ -> do
+              network' <- use network
+              lift . validatorTimingHack network' $ number (blockBlockData blk)
               acceptHistoric
               $logInfoS "blockstanbul" . T.pack . printf "Accepting historical block #%d" $ blockNo
-              yieldR . ToCommit $ blk
+              commitBlock blk
         UnannouncedBlock blk' -> do
           -- this is for sending out a new block,
           -- may be a good candidtate for sending newCerts
@@ -275,10 +314,9 @@ eventLoop ctx = execStateC ctx $
           ppl <- use proposal
           leader <- use proposer
           self <- use selfCert
-          -- TODO(max, matt): Do look up of all Certificates and filter out for commonName, add to newCerts
           when (isNothing ppl && Just leader == fmap chainMemberParsedSetToValidator self) $ do
             vs <- use validators
-            let blockWithVs = addValidators (ChainMembers $ S.map (validatorToChainMemberParsedSet . fst) vs) blk
+            let blockWithVs = addValidators (ChainMembers $ S.map validatorToChainMemberParsedSet vs) blk
             pseal <- proposerSeal blockWithVs
             let sealedBlk = addProposerSeal pseal blockWithVs
             mLocked <- use blockLock
@@ -384,7 +422,7 @@ eventLoop ctx = execStateC ctx $
                 let seals = map snd . M.elems $ cs
                 let blockNo = number . blockBlockData $ blk
                 recordMaxBlockNumber "pbft_commit" blockNo
-                yieldR . ToCommit . addCommitmentSeals seals $ blk
+                commitBlock $ addCommitmentSeals seals blk
         IMsg auth (RoundChange vn _) -> when (_round v < _round vn) $ do
           let rn = _round vn
           mSigners <- use $ roundChanged . at rn
@@ -421,19 +459,6 @@ eventLoop ctx = execStateC ctx $
               $logInfoS "blockstanbul/roundchange" "timeout"
               roundChange
             GT -> error $ printf "We're in a time loop: %v was received at now=%v" r' (_round v)
-        CommitResult (Left err) -> do
-          $logWarnS "blockstanbul" err
-          $logInfoS "blockstanbul/roundchange" "commit failure (how...)"
-          clearLock
-          roundChange
-        CommitResult (Right hsh) -> do
-          $logInfoS "blockstanbul" . T.pack $ "Successful block commit of " ++ format hsh
-          lastParent .= Just hsh
-          clearLock
-          whenM (use hasPreprepared) $
-            recordProposal
-          s <- use $ view . sequence
-          nextRound . Sequence $ s + 1
 
 loopback :: EOutEvent -> Maybe InEvent
 loopback (Right (OMsg a m)) = Just $ IMsg a m
@@ -444,7 +469,7 @@ sendMessages' ::
     MonadLogger m,
     HasBlockstanbulContext m,
     HasVault m,
-    A.Selectable Address X509CertInfoState m
+    (Address `A.Alters` X509CertInfoState) m
   ) =>
   [InEvent] ->
   m [EOutEvent]
@@ -474,10 +499,10 @@ sendMessages' wms = do
 
       return evs
 
-sendMessages :: (MonadIO m, MonadLogger m, HasBlockstanbulContext m, HasVault m, A.Selectable Address X509CertInfoState m) => [InEvent] -> m [OutEvent]
+sendMessages :: (MonadIO m, MonadLogger m, HasBlockstanbulContext m, HasVault m, (Address `A.Alters` X509CertInfoState) m) => [InEvent] -> m [OutEvent]
 sendMessages = fmap (map fromE) . sendMessages'
 
-sendAllMessages :: (MonadIO m, MonadLogger m, HasBlockstanbulContext m, HasVault m, A.Selectable Address X509CertInfoState m) => [InEvent] -> m [OutEvent]
+sendAllMessages :: (MonadIO m, MonadLogger m, HasBlockstanbulContext m, HasVault m, (Address `A.Alters` X509CertInfoState) m) => [InEvent] -> m [OutEvent]
 sendAllMessages wms = do
   eout <- sendMessages' wms
   let out = fromE <$> eout
@@ -501,7 +526,6 @@ recordInEvent ev =
         IMsg _ Commit {} -> inc "commit_message"
         IMsg _ RoundChange {} -> inc "roundchange_message"
         Timeout {} -> inc "timeout"
-        CommitResult {} -> inc "commit_result"
         UnannouncedBlock {} -> inc "unannounced_block"
         PreviousBlock {} -> inc "previous_block"
         PreprepareResponse {} -> inc "preprepare_response"

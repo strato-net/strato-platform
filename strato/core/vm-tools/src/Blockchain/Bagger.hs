@@ -33,6 +33,7 @@ import Blockchain.Strato.Model.Account
 import Blockchain.Strato.Model.Address
 import Blockchain.Strato.Model.ChainMember
 import Blockchain.Strato.Model.Class
+import Blockchain.Strato.Model.Delta
 import Blockchain.Strato.Model.ExtendedWord
 import Blockchain.Strato.Model.Keccak256
 import Blockchain.Timing
@@ -296,7 +297,7 @@ makeNewBlock mineTransactions = do
           let lastHead = B.bestBlockHeader cache
           let promoted = take ((fromInteger flags_maxTxsPerBlock) - lastExecLen) $ B.promotedTransactions cache
           let time = B.startTimestamp cache
-          let tempBlockHeader = buildNextBlockHeader lastHead lastSHA [] lastSR [] time isPBFT coinbaseAddr nonce
+          let tempBlockHeader = buildNextBlockHeader lastHead lastSHA [] lastSR [] time isPBFT coinbaseAddr nonce mempty mempty
           let remGas = B.remainingGas cache
           $logDebugS "Bagger.makeNewBlock" . T.pack $ "pre-incremental run :: (" ++ show remGas ++ ", " ++ format lastSR ++ ")"
           withBagger $ do
@@ -568,11 +569,12 @@ buildFromMiningCache = do
   let parentHash = B.bestBlockSHA cache
   let parentHeader = B.bestBlockHeader cache
   let stateRoot = B.lastExecutedStateRoot cache
+  let (vDelt, cDelt) = getDeltasFromResults $ B.lastExecutedTxs cache
   let txs = (trrTransaction <$> B.lastExecutedTxs cache) ++ (DL.toList $ B.privateHashes cache)
   let parentDiff = getBlockDifficulty parentHeader
   let time = B.startTimestamp cache
   let nextDiff = 1 
-  let nextBlockData = buildNextBlockHeader parentHeader parentHash uncles stateRoot txs time isPBFT coinbaseAddr nonce
+  let nextBlockData = buildNextBlockHeader parentHeader parentHash uncles stateRoot txs time isPBFT coinbaseAddr nonce vDelt cDelt
   recordMaxBlockNumber "bagger_build" . number $ nextBlockData
   rewardedBlockData <- buildRewardedBlockHeader nextBlockData
   when isPBFT $
@@ -596,10 +598,14 @@ buildNextBlockHeader ::
   Bool ->
   ChainMemberParsedSet ->
   Word64 ->
+  ValidatorDelta ->
+  CertDelta ->
   BlockHeader
-buildNextBlockHeader parentHeader parentHash _ stateRoot txs time _ _ _ =
+buildNextBlockHeader parentHeader parentHash _ stateRoot txs time _ _ _ vd cd =
   let --parentDiff = difficulty parentHeader
       parentNum = number parentHeader
+      (newV, remV) = fromDelta vd
+      (newC, revC) = fromDelta cd
    in --parentTS   = timestamp parentHeader
       --nextDiff   = nextDifficulty flags_difficultyBomb flags_testnet parentNum parentDiff parentTS time
       BlockHeaderV2
@@ -612,11 +618,10 @@ buildNextBlockHeader parentHeader parentHash _ stateRoot txs time _ _ _ =
           number = parentNum + 1,
           timestamp = time,
           extraData = txsLen2ExtraData (length txs),
-          newValidators = [],
-          removedValidators = [],
-          newCerts = [],
-          revokedCerts = [],
-          signatures = []
+          newValidators = newV,
+          removedValidators = remV,
+          newCerts = newC,
+          revokedCerts = revC
         }
 
 buildRewardedBlockHeader :: MonadBagger m => BlockHeader -> m BlockHeader
