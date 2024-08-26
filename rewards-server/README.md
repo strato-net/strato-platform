@@ -1,8 +1,8 @@
 # Rewards Server
 
-## Conection info
+## Connection info
 - No ports exposed
-- Connects to marketplace node of testnet2 or prod, based on the `NODE` var value (in .env): `prod` for prod, anything else (e.g. `testnet`) for testnet2 
+- Connects to marketplace node of testnet2 or prod, based on the `NODE_ENV` var value (in .env): `prod` for prod, anything else (e.g. `testnet`) for testnet2 
 
 ## Deploy dockerized
 
