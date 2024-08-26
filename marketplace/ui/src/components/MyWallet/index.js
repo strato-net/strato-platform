@@ -364,7 +364,7 @@ const MyWallet = ({ user }) => {
   useEffect(() => {
     if (isDataReady) {
       const inventoryData = inventories.map((inventory, index) => {
-        const quantity = Math.round(inventory.quantity) || 1;
+        const quantity = Math.round(inventory.quantity) || 0;
         const price = calculatedPrices[inventory.address] || 0;
         const value = quantity * price;
         return {
