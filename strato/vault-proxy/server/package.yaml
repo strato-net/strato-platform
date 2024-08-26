@@ -52,6 +52,7 @@ executables:
       - http-conduit
       - http-reverse-proxy
       - http-types
+      - process-monitor
       - regex-compat
       - servant-client
       - servant-client-core

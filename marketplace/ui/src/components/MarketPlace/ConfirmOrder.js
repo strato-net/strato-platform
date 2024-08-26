@@ -39,7 +39,7 @@ const ConfirmOrder = ({ paymentProviders = [], data, columns }) => {
   const [cartData, setCartData] = useState(data);
   const [selectedProvider, setSelectedProvider] = useState('');
 
-  const activePaymentProviders = (paymentProviders[0] !== undefined) ? paymentProviders.filter(paymentProvider => paymentProvider.isActive) : [];
+  const activePaymentProviders = (paymentProviders[0] !== undefined) ? paymentProviders.filter(paymentProvider => paymentProvider?.isActive) : [];
 
   useEffect(() => {
     setCartData(data);
@@ -116,13 +116,13 @@ const ConfirmOrder = ({ paymentProviders = [], data, columns }) => {
   
       concatenatedOrderString += `${itemName}:\n`; 
       concatenatedOrderString += `$${itemTotal} (${itemTotal*100} STRATS)<br>`; 
-      concatenatedOrderString += `Qty: ${itemQty} &nbsp; $${itemPrice} each (${itemPrice*100} STRATS each)<br><br>`; 
+      concatenatedOrderString += `Qty: ${itemQty} &nbsp; $${itemPrice} each (${(itemPrice*100).toFixed(0)} STRATS each)<br><br>`; 
       orderTotal += parseFloat(itemTotal); 
       if (i === cartData.length - 1) {
         concatenatedOrderString += `<hr style="border-top: 1px dotted #0A1B71; min-width: 80%; max-width: 80%; margin-left: 15px;">`;
-        concatenatedOrderString += `Sales Tax: $${parseFloat(tax).toFixed(2)} (${parseFloat(tax).toFixed(2) * 100} STRATS)<br>`;
+        concatenatedOrderString += `Sales Tax: $${parseFloat(tax).toFixed(2)} (${(parseFloat(tax) * 100).toFixed(0)} STRATS)<br>`;
         concatenatedOrderString += `Shipping Fee: <i><strong>Free</strong></i><br><br>`;
-        concatenatedOrderString += `Order Total: $${orderTotal.toFixed(2)} (${orderTotal.toFixed(2)*100} STRATS)<br>`;
+        concatenatedOrderString += `Order Total: $${orderTotal.toFixed(2)} (${(orderTotal * 100).toFixed(0)} STRATS)<br>`;
       }
     }
     

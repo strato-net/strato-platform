@@ -50,6 +50,7 @@ packages:
 - libs/composable-monads/redis-monad
 - libs/composable-monads/sql-monad
 - libs/composable-monads/identity-monad
+- libs/composable-monads/notification-monad
 - libs/composable-monads/vault-monad
 - libs/ethereum-rlp
 - libs/format
@@ -72,6 +73,7 @@ packages:
 
 - tools/blockapps-tools
 - tools/debugger-tools
+- tools/process-monitor
 - tools/x509-tools
 
 - vault/api
