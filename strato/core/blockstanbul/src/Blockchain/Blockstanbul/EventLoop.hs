@@ -569,6 +569,16 @@ validatorTimingHackMercata = \case
 
 validatorTimingHackMercataHydrogen :: (MonadState BlockstanbulContext m)  =>
                                Integer -> m ()
-validatorTimingHackMercataHydrogen _ = do
-  return ()
+validatorTimingHackMercataHydrogen = \case
+  32424 -> modify' $ validators %~ S.insert "service-account-io-stratomercata-wongway"
+  32444 -> modify' $ validators %~ S.insert "service-account-io-stratomercata-kierensnode"
+  32644 -> modify' $ validators %~ S.insert "dustin-node"
+  32705 -> modify' $ validators %~ S.delete "dustin-node"
+  32706 -> modify' $ validators %~ S.delete "service-account-io-stratomercata-kierensnode"
+  32707 -> modify' $ validators %~ S.delete "service-account-io-stratomercata-wongway"
+  33128 -> modify' $ validators %~ S.insert "Multinode302"
+  33179 -> modify' $ validators %~ S.delete "Multinode302"
+  37598 -> modify' $ validators %~ S.insert "dmoney-testnet2"
+  43711 -> modify' $ validators %~ S.delete "dmoney-testnet2"
+  _ -> return ()
 
