@@ -31,7 +31,6 @@ import Blockchain.Database.MerklePatricia (StateRoot (..))
 import Blockchain.Sequencer.Event (OutputBlock (..), OutputTx (..))
 import Blockchain.Strato.Model.Account
 import Blockchain.Strato.Model.Address
-import Blockchain.Strato.Model.ChainMember
 import Blockchain.Strato.Model.Class
 import Blockchain.Strato.Model.Delta
 import Blockchain.Strato.Model.ExtendedWord
