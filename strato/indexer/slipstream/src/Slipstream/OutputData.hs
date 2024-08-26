@@ -1128,15 +1128,16 @@ insertAbstractTableQuery cs isHistoric =
                     E.creator,
                     E.root
                   ]
-                vals = flip map contracts $ \((row, contractColumns), _) ->
-                  let baseRowVals = map (wrapSingleQuotes . ($ row)) baseVals
+                (vals, jsonPaths, jsonValues) = unzip3 $ flip map contracts $ \((row, contractColumns), _) ->
+                  let baseRowVals = map (wrapSingleQuotes . ($ row)) baseVals 
                       contractNameVal = [wrapSingleQuotes $ escapeQuotes (tableNameToText contractTableName)] 
-                      dataVals = [wrapSingleQuotes . decodeUtf8 . BL.toStrict $ Aeson.encode $ MapWrapper $ aesonHelper $ Map.filterWithKey (\k _ -> k `notElem` abColumns) contractColumns] 
-                      contractValEntries = Map.toList contractColumns
-                      regularVals = [(snd kv) | kv@(k, _) <- contractValEntries, k `elem` keysForSQL]
-                      fkeyVals = ["NULL" | k <- fkeyColumns, k `elem` keysForSQL]  -- This avoids circular dependancies as the inserts occur first and set fkeys=null
-                      valsForSQL = baseRowVals ++ contractNameVal ++ dataVals ++ regularVals ++ fkeyVals
-                  in wrapAndEscape valsForSQL
+                      dataVals = Map.filterWithKey (\k _ -> k `notElem` abColumns) contractColumns 
+                      jsonPathz = T.concat ["'{", csv (map (\(k, _) -> T.concat ["\"", escapeQuotes k, "\""]) (Map.toList dataVals)), "}'"]
+                      jsonValuez = csv (map (wrapSingleQuotes . wrapDoubleQuotes . removeSingleQuotes . removeSingleQuotes) $ Map.elems dataVals)
+                      regularVals = [(snd kv) | kv@(k, _) <- Map.toList contractColumns, k `elem` keysForSQL]
+                      fkeyVals = ["NULL" | k <- fkeyColumns, k `elem` keysForSQL]  -- This avoids circular dependencies as the inserts occur first and set fkeys=null
+                      valsForSQL = baseRowVals ++ contractNameVal ++ [wrapSingleQuotes (decodeUtf8 . BL.toStrict $ Aeson.encode $ MapWrapper $ aesonHelper dataVals) <> "::jsonb"] ++ regularVals ++ fkeyVals
+                  in (wrapAndEscape valsForSQL, jsonPathz, jsonValuez)
                 inserts = csv vals
             in (: []) $
                   T.concat $
@@ -1149,21 +1150,29 @@ insertAbstractTableQuery cs isHistoric =
                     ] ++
                     if isHistoric
                       then
-                        [[r| ON CONFLICT DO NOTHING;|]]
+                        [T.pack " ON CONFLICT DO NOTHING;"]
                       else
-                          [[r|
-                          ON CONFLICT (address) DO UPDATE SET
-                            block_hash = excluded.block_hash,
-                            block_timestamp = excluded.block_timestamp,
-                            block_number = excluded.block_number,
-                            transaction_hash = excluded.transaction_hash,
-                            transaction_sender = excluded.transaction_sender,
-                            contract_name = excluded.contract_name,
-                            data = excluded.data
-                          |],
-                          if null keysForSQL then "" else ",\n    ",
-                          tableUpsert $ keysForSQL,
-                          ";"]
+                        [T.concat
+                          [ " ON CONFLICT (address) DO UPDATE SET\n",
+                            "    block_hash = excluded.block_hash,\n",
+                            "    block_timestamp = excluded.block_timestamp,\n",
+                            "    block_number = excluded.block_number,\n",
+                            "    transaction_hash = excluded.transaction_hash,\n",
+                            "    transaction_sender = excluded.transaction_sender,\n",
+                            "    contract_name = excluded.contract_name,\n",
+                            "    data = jsonb_set(",
+                            abTableName,
+                            ".data, ",
+                            head jsonPaths,
+                            ", ",
+                            if head jsonValues == ""
+                              then "excluded.data::jsonb" 
+                              else "(" <> head jsonValues <> ")::jsonb",
+                            ")",
+                            if null keysForSQL then "" else ",\n    ",
+                            tableUpsert keysForSQL,
+                            ";"
+                          ]]
 
 -- Result: UPDATE table SET (fkey1,fkey2, ...)=(val1,val2, ...) where (fkey1_fkey,fkey2_fkey, ...)=(val1,val2, ...);
 updateFkeysQueryAbstract :: [(E.ProcessedContract, [T.Text], T.Text, TableColumns)] -> [Text]
