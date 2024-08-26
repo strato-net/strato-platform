@@ -12,7 +12,7 @@ import {
   Spin,
   Tabs,
 } from "antd";
-import { useLocation, useMatch } from "react-router-dom";
+import { Link, useLocation, useMatch } from "react-router-dom";
 import { actions } from "../../contexts/order/actions";
 import { useOrderDispatch, useOrderState } from "../../contexts/order";
 import routes from "../../helpers/routes";
@@ -309,6 +309,24 @@ const BoughtOrderDetails = ({ user, users }) => {
       align: "center",
       render: (text) => <p id="detail-amount" >{text}</p>,
     },
+    {
+      title: "Invoice",
+      dataIndex: "invoice",
+      key: "invoice",
+      render: (text) => (
+        <button>
+          <Link
+            to={`${routes.Invoice.url.replace(":id", routeMatch?.params?.id)}`}
+            target="_blank"
+          >
+            <div className="flex items-center cursor-pointer hover:text-primary">
+              <EyeOutlined className="mr-2" />
+              <p>View</p>
+            </div>
+          </Link>
+        </button>
+      ),
+    },
   ];
 
   if (data[0] && !data[0].serialNumber.containsSerialNumber) {
@@ -408,6 +426,20 @@ const BoughtOrderDetails = ({ user, users }) => {
                 </Col>
               </Row>
               <Row className="my-2 md:hidden flex-col gap-[6px] justify-between p-4 pb-0 rounded">
+              <Col span={24}>
+                  <div className="flex justify-between"> <span>Invoice</span>
+                    <button>
+                      <Link
+                        to={`${routes.Invoice.url.replace(":id", routeMatch?.params?.id)}`}
+                        target="_blank"
+                      >
+                        <div className="flex items-center cursor-pointer hover:text-primary">
+                          <EyeOutlined className="mr-2" />
+                          <p>View</p>
+                        </div>
+                      </Link>
+                    </button> </div>
+                </Col>
                 <div className="flex gap-4">
                   <NewOrderData className="w-2/4" title="Order Number" value={'#' + `${details.order.orderId}`.substring(0, 6)} />
                   <NewOrderData className="w-2/4" title="Buyer" value={details.order.purchasersCommonName} />

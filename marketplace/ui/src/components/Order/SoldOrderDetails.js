@@ -14,7 +14,7 @@ import {
   notification,
   Tabs,
 } from "antd";
-import { useLocation, useMatch } from "react-router-dom";
+import { Link, useLocation, useMatch } from "react-router-dom";
 import { actions } from "../../contexts/order/actions";
 import { useOrderDispatch, useOrderState } from "../../contexts/order";
 import routes from "../../helpers/routes";
@@ -33,6 +33,7 @@ import RedemptionsOutgoingTable from "./RedemptionsOutgoingTable";
 import RedemptionsIncomingTable from "./RedemptionsIncomingTable";
 import { ResponsiveOrderDetailCard } from "./ResponsiveOrderDetailCard";
 import { LeftArrow } from "../../images/SVGComponents";
+import { EyeOutlined } from "@ant-design/icons";
 
 const SoldOrderDetails = ({ user, users }) => {
   const [Id, setId] = useState(undefined);
@@ -82,6 +83,7 @@ const SoldOrderDetails = ({ user, users }) => {
       let items = [];
       const orderQuantities = orderDetails.order.quantities ? orderDetails.order.quantities : orderDetails.order["BlockApps-Mercata-Order-quantities"].map(item => item.value);
       orderDetails.assets.forEach((prod, index) => {
+        console.log();
         items.push({
           address: prod.address,
           chainId: prod.chainId,
@@ -276,6 +278,24 @@ const SoldOrderDetails = ({ user, users }) => {
       align: "center",
       render: (text) => <p>{text}</p>,
     },
+    {
+      title: "Invoice",
+      dataIndex: "invoice",
+      key: "invoice",
+      render: (text) => (
+        <button>
+          <Link
+            to={`${routes.Invoice.url.replace(":id", routeMatch?.params?.id)}`}
+            target="_blank"
+          >
+            <div className="flex items-center cursor-pointer hover:text-primary">
+              <EyeOutlined className="mr-2" />
+              <p>View</p>
+            </div>
+          </Link>
+        </button>
+      ),
+    },
   ];
 
   const openToastOrder = (placement) => {
@@ -307,7 +327,7 @@ const SoldOrderDetails = ({ user, users }) => {
             </ClickableCell>
           </Breadcrumb.Item>
           <Breadcrumb.Item href="" onClick={e => e.preventDefault()}>
-            <div onClick={() => { navigate(routes.Transactions.url)}}>
+            <div onClick={() => { navigate(routes.Transactions.url) }}>
               <p className="text-sm text-primary font-semibold">Orders (sold)</p>
             </div>
           </Breadcrumb.Item>
@@ -436,6 +456,20 @@ const SoldOrderDetails = ({ user, users }) => {
                 </div>
               </Row>
               <Row className="my-2 md:hidden flex-col gap-[6px] justify-between p-4 rounded">
+              <Col span={24}>
+                  <div className="flex justify-between"> <span>Invoice</span>
+                    <button>
+                      <Link
+                        to={`${routes.Invoice.url.replace(":id", routeMatch?.params?.id)}`}
+                        target="_blank"
+                      >
+                        <div className="flex items-center cursor-pointer hover:text-primary">
+                          <EyeOutlined className="mr-2" />
+                          <p>View</p>
+                        </div>
+                      </Link>
+                    </button> </div>
+                </Col>
                 <div className="flex gap-4">
                   <NewOrderData className="w-2/4" title="Order Number" value={'#' + `${details.order.orderId}`.substring(0, 6)} />
                   <NewOrderData className="w-2/4" title="Buyer" value={details.order.purchasersCommonName} />

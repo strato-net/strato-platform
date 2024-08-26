@@ -885,7 +885,6 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
           assetPrice: sale?.price,
           saleQuantity: sale.quantity,
           saleAddress: sale.address,
-          amount: sale.quantity * price,
         });
       }
 

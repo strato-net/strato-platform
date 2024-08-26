@@ -4,6 +4,7 @@ import { DownloadOutlined, SearchOutlined } from "@ant-design/icons";
 import { useNavigate, useLocation } from "react-router-dom";
 import classNames from "classnames";
 import dayjs from "dayjs";
+import moment from "moment";
 // Components
 import DataTableComponent from "../DataTableComponent";
 import { TRANSACTION_FILTER } from "./constant";
@@ -100,7 +101,7 @@ const TransactionTable = ({ user, selectedDate, onDateChange, download, isAllOrd
           </Col>
           <Col span={8} offset={1}>
             {price
-              ? <p className="text-right flex justify-end items-center"> <b>$ {price} </b> &nbsp;(<span className="text-[#13188A] font-bold"> {(data?.assetPrice || data?.price) * STRATS_CONVERSION} </span>{StratsIcon}) </p>
+              ? <p className="text-right flex justify-end items-center"> <b>$ {price} </b> &nbsp;(<span className="text-[#13188A] font-bold"> {(price) * STRATS_CONVERSION} </span>{StratsIcon}) </p>
               : <p className="text-right text-[#13188A] font-bold text-sm"> No Price Available  </p>}
           </Col>
         </Row>
@@ -211,7 +212,7 @@ const TransactionTable = ({ user, selectedDate, onDateChange, download, isAllOrd
       dataIndex: "date",
       key: "date",
       width: '150px',
-      render: (text, { block_timestamp }) => <p>{block_timestamp}</p>,
+      render: (text,{block_timestamp}) => <p>{moment(block_timestamp).format('L')}</p>,
       title: (
         <div style={{ display: "flex" }}>
           <div className="mt-1.5">{"Date"}</div>

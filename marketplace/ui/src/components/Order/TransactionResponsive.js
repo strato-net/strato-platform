@@ -6,6 +6,7 @@ import "./ordersTable.css";
 import { REDEMPTION_STATUS, REDEMPTION_STATUS_CLASSES, TRANSACTION_STATUS, TRANSACTION_STATUS_CLASSES, TRANSACTION_STATUS_COLOR } from "../../helpers/constants";
 import routes from "../../helpers/routes";
 import { useNavigate } from "react-router-dom";
+import moment from "moment";
 
 const TransactionResponsive = ({ data , user}) => {
   const StratsIcon = <img src={Images.logo} alt="" className="mx-1 w-3 h-3" />;
@@ -131,7 +132,7 @@ const TransactionResponsive = ({ data , user}) => {
               </p>
                 : <p className="text-right text-[#13188A] font-bold text-sm"> No Price Available  </p>}
               <p className="text-right">Qty: {quantity}</p>
-              <p className="text-right">{block_timestamp}</p>
+              <p className="text-right">{moment(block_timestamp).format('L')}</p>
             </Col>
             {isExpanded && <Col span={24}>
               <Table className="mt-6" columns={columns} dataSource={tableData} pagination={false} />
