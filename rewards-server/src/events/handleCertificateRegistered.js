@@ -58,6 +58,32 @@ async function handleCertificateRegistered(event, token) {
       return;
     }
 
+    // Fetch certificates based on transaction hash
+    const userQueryResponse = await fetch(
+      `https://${
+        NODE_ENV === "prod" ? prodMarketplaceUrl : testnetMarketplaceUrl
+      }/cirrus/search/Certificate?userAddress=eq.${encodeURIComponent(queryBody[0].userAddress)}`,
+      {
+        method: "GET",
+        credentials: "same-origin",
+        headers: {
+          Accept: "application/json",
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+      }
+    );
+    const userQueryBody = await userQueryResponse.json();
+    console.log("User certificate query response:", userQueryBody);
+    if (!userQueryBody || userQueryBody.length <= 0) {
+      console.error("No certificates found in the marketplace. User address:", queryBody[0].userAddress);
+      return;
+    }
+    if (userQueryBody.length > 1) {
+      console.error("Multiple certificates found in the marketplace. User address:", queryBody[0].userAddress);
+      return;
+    }
+
     const getReward = await getRewards(["handleCertificateRegistered"]);
     const reward = getReward["handleCertificateRegistered"];
     
