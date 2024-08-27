@@ -36,7 +36,8 @@ module Control.Monad.Composable.Kafka (
   conduitSource,
   conduitSourceUsingEnv,
   createKafkaEnv,
-  assertTopicCreation
+  assertTopicCreation,
+  createTopic
   ) where
 
 import BlockApps.Logging
@@ -58,7 +59,8 @@ import Data.IORef
 import Data.List
 import Data.Text (Text)
 import qualified Data.Text as T
-import Network.Kafka
+import Network.Kafka hiding (createTopic)
+import qualified Network.Kafka as Milena
 import Network.Kafka.Consumer
 import Network.Kafka.Producer
 import Network.Kafka.Protocol
@@ -227,6 +229,15 @@ conduitSourceUsingEnv name env topicName = do
       $logInfoS name . T.pack $ "Fetched " ++ show (length items) ++ " events starting from " ++ show offset
       forM_ items yield
       return $ offset + fromIntegral (length items)
+
+createTopic :: Kafka m =>
+               TopicName -> m ()
+createTopic name = do
+  TopicsResp result <- Milena.createTopic $ createTopicsRequest name 1 1 [] []
+  let errors = filter ((/= NoError) . snd) result
+  case errors of
+    [] -> return ()
+    _ -> error $ "Error creating kafka topic " ++ show name ++ ": " ++ show errors
 
 assertTopicCreation :: HasKafka m => TopicName -> m ()
 assertTopicCreation theTopic = execKafka $ updateMetadata theTopic

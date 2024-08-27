@@ -9,22 +9,19 @@ import Blockchain.Init.Options
 import Blockchain.Init.Protocol
 import qualified Blockchain.Network as Net
 import Blockchain.Strato.Model.Options (flags_network)
-import Control.Concurrent
-import Control.Lens.Combinators (use)
 import Control.Monad
 import Control.Monad.Catch
+import Control.Monad.Composable.Kafka
 import Control.Monad.IO.Unlift
 import Control.Monad.Trans.Except
 import Control.Monad.Trans.State
 import qualified Data.Aeson as Ae
 import qualified Data.ByteString.Char8 as C8
 import Data.FileEmbed
-import qualified Data.Map as M
 import qualified Data.Text as T
 import Data.Text.Encoding (decodeUtf8)
 import qualified Data.Text.IO as TIO
-import Network.Kafka (Kafka, KafkaAddress, KafkaClientError, KafkaState, mkKafkaState, runKafka, stateTopicMetadata, updateMetadata)
-import Network.Kafka.Protocol (KafkaError (..), TopicMetadata (..))
+import Network.Kafka (Kafka, KafkaClientError, KafkaState, mkKafkaState, runKafka)
 import System.Exit
 import UnliftIO.Directory
 import UnliftIO.IO hiding (withFile)
@@ -39,13 +36,7 @@ runGenM kaddr mv = do
   either (error . ("runGenM: " ++) . show) return eRes
 
 initializeTopic :: Kafka m => m ()
-initializeTopic = do
-  updateMetadata initTopic
-  meta <- use stateTopicMetadata
-  -- Wait until the broker believes in the metadata
-  case M.lookup initTopic meta of
-    Just (TopicMetadata (NoError, _, _)) -> return ()
-    _ -> liftIO (threadDelay 100000) >> initializeTopic
+initializeTopic = createTopic initTopic
 
 genesisFiles :: [(FilePath, C8.ByteString)]
 genesisFiles = $(embedDir "genesisBlocks")
