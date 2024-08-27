@@ -26,7 +26,7 @@ module Slipstream.OutputData (
   insertArrayTableQuery,
   insertAbstractTable,
   insertAbstractTableQuery,
-  insertHistoryAbstractTable,
+  -- insertHistoryAbstractTable,
   createIndexTable,
   createMappingTable,
   createArrayTable,
@@ -56,7 +56,7 @@ import           Conduit
 import           Control.Lens ((^.))
 import           Control.Monad
 import qualified Data.Aeson                      as Aeson
-import           Data.Bool                       (bool)
+-- import           Data.Bool                       (bool)
 import qualified Data.Set as Set
 import qualified Data.ByteString.Base16         as Base16
 import qualified Data.ByteString.Char8           as BC
@@ -84,7 +84,6 @@ import           Database.PostgreSQL.Typed.Protocol
 import           Database.PostgreSQL.Typed.Query
 import           Slipstream.Data.Action
 import qualified Slipstream.Events               as E
-import           Slipstream.Metrics
 import           Slipstream.Options
 import           Slipstream.QueryFormatHelper
 import           Slipstream.SolidityValue
@@ -552,26 +551,27 @@ createHistoryTable' ::
   ContractF () ->
   CodeCollectionF () ->
   (Text, Text, Text) ->
-  ConduitM () (Text, Maybe ( TableName, TableColumns)) m ()
-createHistoryTable' isAbstract  contract cc (creator, a, n) = do
-  incNumHistoryTables
+  ConduitM () (Text, Maybe (TableName, TableColumns)) m ()
+createHistoryTable' isAbstract contract cc (creator, a, n) = do
   let isEvent = False
       list = getTableColumnAndType isEvent cc $ map (\(x, y) -> (labelToText x, y ^. varType)) $ Map.toList $ contract ^. storageDefs
-      listCombined = map (\(x,y)-> x <> " " <> y) list
-  yield $ ((createHistoryTableQuery isAbstract (creator, a, n) listCombined), Nothing)
-  yieldMany $ map (\x -> (x, Nothing)) (addHistoryUnique (creator, a, n))
+      listCombined = map (\(x, y) -> x <> " " <> y) list
+      createTableQuery = if isAbstract
+                         then createAbstractHistoryTableQuery (creator, a, n) listCombined
+                         else createHistoryTableQuery (creator, a, n) listCombined
+  yield $ (createTableQuery, Nothing)
+  -- when (not isAbstract) $ yieldMany $ addHistoryUnique (creator, a, n)
 
 createHistoryTable ::
   OutputM m =>
-  Bool ->
   ContractF () ->
   CodeCollectionF () ->
   (Text, Text, Text) ->
   ConduitM () Text m ()
-createHistoryTable isAbstract  contract cc (creator, a, n) = do
+createHistoryTable contract cc (creator, a, n) = do
   let list = getTableColumnAndType False cc $ map (\(x, y) -> (labelToText x, y ^. varType)) $ Map.toList $ contract ^. storageDefs
       listCombined = map (\(x,y)-> x <> " " <> y) list
-  yield $ (createHistoryTableQuery isAbstract (creator, a, n) listCombined)
+  yield $ (createHistoryTableQuery (creator, a, n) listCombined)
   yieldMany $ addHistoryUnique (creator, a, n)
 
 -- Runs ALTER TABLE <name> [ADD COLUMN <column>] for any new fields added to a contract definition
@@ -784,26 +784,25 @@ insertHistoryTable contracts@(E.ProcessedContract {creator = crtr, application =
   $logDebugLS "insertHistoryTable" $ T.pack $ "Inserting row in history table for: " ++ show tableName
   yieldMany $ insertHistoryTableQuery contracts
 
-insertHistoryAbstractTable :: 
-  OutputM m => 
-  [(E.ProcessedContract, [T.Text], T.Text, TableColumns)] ->
-  [E.ProcessedContract] ->
-  ConduitM () Text m ()
-insertHistoryAbstractTable [] _ = pure ()
-insertHistoryAbstractTable abstracts hists = do 
-  let historyAbstracts = [(history, fkeys, tableName, tableCols) | history <- hists, (_, fkeys, tableName, tableCols) <- abstracts]
-  yieldMany $ insertAbstractTableQuery historyAbstracts True
+-- insertHistoryAbstractTable :: 
+--   OutputM m => 
+--   [(E.ProcessedContract, [T.Text], T.Text, TableColumns)] ->
+--   [E.ProcessedContract] ->
+--   ConduitM () Text m ()
+-- insertHistoryAbstractTable [] _ = pure ()
+-- insertHistoryAbstractTable abstracts hists = do 
+--   let historyAbstracts = [(history, fkeys, tableName, tableCols) | history <- hists, (_, fkeys, tableName, tableCols) <- abstracts]
+--   yieldMany $ insertHistoryAbstractTableQuery historyAbstracts
 
 insertAbstractTable ::
   OutputM m =>
   [(E.ProcessedContract, [T.Text], T.Text, TableColumns)] ->
-  Bool ->
   ConduitM () Text m ()
-insertAbstractTable [] _ = pure ()
-insertAbstractTable cs@((_, _,abTableName, _) : _) isHistoric = do
+insertAbstractTable [] = pure ()
+insertAbstractTable cs@((_, _,abTableName, _) : _) = do
   $logInfoS "insertAbstractTable" $ T.pack $ "Inserting row in abstract table for: " ++ show abTableName
   multilineLog "insertAbstractTable/processedContract" $ show cs
-  yieldMany $ insertAbstractTableQuery cs isHistoric
+  yieldMany $ insertAbstractTableQuery cs
   
 updateForeignKeysFromNULLAbstract ::
   OutputM m =>
@@ -909,17 +908,62 @@ createAbstractTableQuery (creator, a, n) list =
           ",\n  PRIMARY KEY (address));"
         ]
 
-createHistoryTableQuery :: Bool -> (Text, Text, Text) ->  TableColumns -> Text
-createHistoryTableQuery isAbstract (creator, a, n) cols =
+createHistoryTableQuery :: (Text, Text, Text) ->  TableColumns -> Text
+createHistoryTableQuery (creator, a, n) cols =
   let tableName = historyTableName creator a n
    in T.concat
         [ "CREATE TABLE IF NOT EXISTS ",
           tableNameToDoubleQuoteText tableName,
           " (",
           csv $
-            (bool baseColumnsQuery abstractBaseColumnsQuery isAbstract)
+            baseColumnsQuery
               ++ cols,
           ");"
+        ]
+
+createAbstractHistoryTableQuery :: (Text, Text, Text) -> TableColumns -> Text
+createAbstractHistoryTableQuery (creator, a, n) cols =
+  let historyTableName' = historyTableName creator a n
+      normalTableName = abstractTableName creator a n
+      triggerFunctionName = "\"" <> "insert_or_update_" <> tableNameToText normalTableName <> "_history_table" <> "\""
+   in T.concat
+        [ "CREATE TABLE IF NOT EXISTS ",
+          tableNameToDoubleQuoteText historyTableName',
+          " (",
+          csv $
+            abstractBaseColumnsQuery
+              ++ cols,
+          ");\n\n",
+          -- Create or replace the function for handling insert and update triggers
+          "CREATE OR REPLACE FUNCTION ", triggerFunctionName, "() RETURNS TRIGGER AS $$\n",
+          "BEGIN\n",
+          "    RAISE NOTICE 'Trigger fired for % on table ", tableNameToText normalTableName, ": %', TG_OP, NEW.address;\n",
+          "    IF TG_OP = 'INSERT' THEN\n",
+          "        RAISE NOTICE 'Inserting into history table ", tableNameToText historyTableName', " for address: %', NEW.address;\n",
+          "        INSERT INTO ",
+          tableNameToDoubleQuoteText historyTableName',
+          " VALUES (NEW.*);\n",
+          "    ELSIF TG_OP = 'UPDATE' THEN\n",
+          "        RAISE NOTICE 'Updating history table ", tableNameToText historyTableName', " for address: %', NEW.address;\n",
+          "        INSERT INTO ",
+          tableNameToDoubleQuoteText historyTableName',
+          " VALUES (NEW.*);\n",
+          "    END IF;\n",
+          "    RETURN NEW;\n",
+          "END;\n",
+          "$$ LANGUAGE plpgsql;\n\n",
+          -- Create trigger for insert operations
+          "CREATE TRIGGER \"after_insert_on_",
+          tableNameToText normalTableName, "\"",
+          "\nAFTER INSERT ON ",
+          tableNameToDoubleQuoteText normalTableName,
+          "\nFOR EACH ROW EXECUTE PROCEDURE ", triggerFunctionName, "();\n\n",
+          -- Create trigger for update operations
+          "CREATE TRIGGER \"after_update_on_",
+          tableNameToText normalTableName, "\"",
+          "\nAFTER UPDATE ON ",
+          tableNameToDoubleQuoteText normalTableName,
+          "\nFOR EACH ROW EXECUTE PROCEDURE ", triggerFunctionName, "();"
         ]
 
 addHistoryUnique :: (Text, Text, Text) -> [Text]
@@ -1103,9 +1147,9 @@ insertArrayTableQuery ms =
                       ";"
                     ]
 
-insertAbstractTableQuery :: [(E.ProcessedContract, [T.Text], T.Text, TableColumns)] -> Bool -> [Text]
-insertAbstractTableQuery [] _ = error "insertAbstractTableQuery: unhandled empty list"
-insertAbstractTableQuery cs isHistoric =
+insertAbstractTableQuery :: [(E.ProcessedContract, [T.Text], T.Text, TableColumns)] -> [Text]
+insertAbstractTableQuery [] = error "insertAbstractTableQuery: unhandled empty list"
+insertAbstractTableQuery cs =
   concat $
     let cs' = (\(c@E.ProcessedContract {contractData = contractData}, fkeys, ab, abColumns) -> 
                 ((c, Map.mapMaybe valueToSQLTextFilterContract $ contractData), (ab, abColumns, fkeys))) <$> cs
@@ -1142,37 +1186,124 @@ insertAbstractTableQuery cs isHistoric =
             in (: []) $
                   T.concat $
                     [ "INSERT INTO ",
-                      (bool abTableName (wrapDoubleQuotes $ "history@" <> unwrapDoubleQuotes abTableName) isHistoric),
+                      abTableName,
                       " ",
                       keySt,
                       "\n  VALUES ",
-                      inserts
-                    ] ++
-                    if isHistoric
-                      then
-                        [T.pack " ON CONFLICT DO NOTHING;"]
-                      else
-                        [T.concat
-                          [ " ON CONFLICT (address) DO UPDATE SET\n",
-                            "    block_hash = excluded.block_hash,\n",
-                            "    block_timestamp = excluded.block_timestamp,\n",
-                            "    block_number = excluded.block_number,\n",
-                            "    transaction_hash = excluded.transaction_hash,\n",
-                            "    transaction_sender = excluded.transaction_sender,\n",
-                            "    contract_name = excluded.contract_name,\n",
-                            "    data = jsonb_set(",
-                            abTableName,
-                            ".data, ",
-                            head jsonPaths,
-                            ", ",
-                            if head jsonValues == ""
-                              then "excluded.data::jsonb" 
-                              else "(" <> head jsonValues <> ")::jsonb",
-                            ")",
-                            if null keysForSQL then "" else ",\n    ",
-                            tableUpsert keysForSQL,
-                            ";"
-                          ]]
+                      inserts,
+                      " ON CONFLICT (address) DO UPDATE SET\n",
+                      "    block_hash = excluded.block_hash,\n",
+                      "    block_timestamp = excluded.block_timestamp,\n",
+                      "    block_number = excluded.block_number,\n",
+                      "    transaction_hash = excluded.transaction_hash,\n",
+                      "    transaction_sender = excluded.transaction_sender,\n",
+                      "    contract_name = excluded.contract_name,\n",
+                      "    data = jsonb_set(",
+                      abTableName,
+                      ".data, ",
+                      head jsonPaths,
+                      ", ",
+                      if head jsonValues == ""
+                        then "excluded.data::jsonb" 
+                        else "(" <> head jsonValues <> ")::jsonb",
+                      ")",
+                      if null keysForSQL then "" else ",\n    ",
+                      tableUpsert keysForSQL,
+                      ";"
+                          ]
+
+-- insertHistoryAbstractTableQuery :: [(E.ProcessedContract, [T.Text], T.Text, TableColumns)] -> [Text]
+-- insertHistoryAbstractTableQuery [] = error "insertAbstractTableQuery: unhandled empty list"
+-- insertHistoryAbstractTableQuery cs =
+--   concat $
+--     let cs' = (\(c@E.ProcessedContract {contractData = contractData}, fkeys, ab, abColumns) -> 
+--                 ((c, Map.mapMaybe valueToSQLTextFilterContract $ contractData), (ab, abColumns, fkeys))) <$> cs
+--      in flip map (map snd $ partitionWith ((\(ab, _, _) -> ab) . snd) cs') $ \case
+--           [] -> []
+--           contracts@(((x, list), (abTableName, abColumns, fkeys)) : _) ->
+--             let contractTableName =
+--                   abstractTableName (E.creator x) (E.application x) (E.contractName x)
+--                 list' = Map.toList $ Map.filterWithKey (\k _ -> k `elem` abColumns) list 
+--                 fkeyColumns = [T.pack ((T.unpack k) ++ "_fkey") | k <- fkeys, k `elem` abColumns]
+--                 keysForSQL = map fst list' ++ fkeyColumns
+--                 keySt = wrapAndEscapeDouble . map escapeQuotes $ ["id"] ++ baseAbstractColumns ++ keysForSQL
+--                 address = (tshow . E.address) x
+--                 baseVals =
+--                   [ tshow . E.address,
+--                     T.pack . keccak256ToHex . E.blockHash,
+--                     tshow . E.blockTimestamp,
+--                     tshow . E.blockNumber,
+--                     T.pack . keccak256ToHex . E.transactionHash,
+--                     tshow . E.transactionSender,
+--                     E.creator,
+--                     E.root
+--                   ]
+--                 (vals, jsonPaths, jsonValues) = unzip3 $ flip map contracts $ \((row, contractColumns), _) ->
+--                   let baseRowVals = map (wrapSingleQuotes . ($ row)) baseVals 
+--                       contractNameVal = [wrapSingleQuotes $ escapeQuotes (tableNameToText contractTableName)] 
+--                       dataVals = Map.filterWithKey (\k _ -> k `notElem` abColumns) contractColumns 
+--                       jsonPathz = T.concat ["'{", csv (map (\(k, _) -> T.concat ["\"", escapeQuotes k, "\""]) (Map.toList dataVals)), "}'"]
+--                       jsonValuez = csv (map (wrapSingleQuotes . wrapDoubleQuotes . removeSingleQuotes . removeSingleQuotes) $ Map.elems dataVals)
+--                       regularVals = [(snd kv) | kv@(k, _) <- Map.toList contractColumns, k `elem` keysForSQL]
+--                       fkeyVals = ["NULL" | k <- fkeyColumns, k `elem` keysForSQL]  -- This avoids circular dependencies as the inserts occur first and set fkeys=null
+--                       valsForSQL = [T.pack "id_value"] ++ baseRowVals ++ contractNameVal ++ [wrapSingleQuotes (decodeUtf8 . BL.toStrict $ Aeson.encode $ MapWrapper $ aesonHelper dataVals) <> "::jsonb"] ++ regularVals ++ fkeyVals
+--                   in (wrapAndEscape valsForSQL, jsonPathz, jsonValuez)
+--                 inserts = csv vals
+--             in (: []) $
+--                   T.concat $
+--                     [ "DO $$\n",
+--                         "DECLARE\n",
+--                         "    column_list TEXT;\n",
+--                         "    id_value INTEGER;\n",
+--                         "BEGIN\n",
+--                           "SELECT string_agg(column_name, ', ')\n",
+--                           "INTO column_list\n",
+--                           "FROM information_schema.columns\n",
+--                           "WHERE table_name = ", (wrapSingleQuotes $ "history@" <> unwrapDoubleQuotes abTableName),
+--                           "\nAND column_name != 'id';\n",
+--                           -- Get the current id value + 1
+--                           "SELECT id + 1\n",
+--                           "INTO id_value\n",
+--                           "\nFROM ", (wrapDoubleQuotes $ "history@" <> unwrapDoubleQuotes abTableName),
+--                           "\nWHERE address = ", (wrapSingleQuotes address),
+--                           "\nLIMIT 1;\n",
+
+--                           -- Execute the insert statement dynamically
+--                           "\nEXECUTE format(",
+--                               "'INSERT INTO ", (wrapDoubleQuotes $ "history@" <> unwrapDoubleQuotes abTableName), "(id, %s)\n",
+--                               "SELECT %L, %s FROM ", (wrapDoubleQuotes $ "history@" <> unwrapDoubleQuotes abTableName),
+--                               "\nWHERE address = %L",
+--                               "\nLIMIT 1',",
+--                               "\ncolumn_list, id_value, column_list, ",(wrapSingleQuotes address),
+--                           ");\n",
+
+--                           "\nINSERT INTO ",
+--                           (wrapDoubleQuotes $ "history@" <> unwrapDoubleQuotes abTableName),
+--                           " ",
+--                           keySt,
+--                           "\n  VALUES ",
+--                           inserts,
+--                           " ON CONFLICT (address, block_hash, transaction_hash) DO UPDATE SET\n",
+--                           "    block_hash = excluded.block_hash,\n",
+--                           "    block_timestamp = excluded.block_timestamp,\n",
+--                           "    block_number = excluded.block_number,\n",
+--                           "    transaction_hash = excluded.transaction_hash,\n",
+--                           "    transaction_sender = excluded.transaction_sender,\n",
+--                           "    contract_name = excluded.contract_name,\n",
+--                           "    data = jsonb_set(",
+--                           (wrapDoubleQuotes $ "history@" <> unwrapDoubleQuotes abTableName),
+--                           ".data, ",
+--                           head jsonPaths,
+--                           ", ",
+--                           if head jsonValues == ""
+--                             then "excluded.data::jsonb" 
+--                             else head jsonValues <> "::jsonb",
+--                           ")",
+--                           if null keysForSQL then "" else ",\n    ",
+--                           tableUpsert keysForSQL,
+--                           ";\n",
+--                       "END $$;"
+--                       ]
 
 -- Result: UPDATE table SET (fkey1,fkey2, ...)=(val1,val2, ...) where (fkey1_fkey,fkey2_fkey, ...)=(val1,val2, ...);
 updateFkeysQueryAbstract :: [(E.ProcessedContract, [T.Text], T.Text, TableColumns)] -> [Text]

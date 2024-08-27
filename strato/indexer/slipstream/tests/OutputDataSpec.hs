@@ -67,7 +67,7 @@ createInserts :: OutputM m
 createInserts  (a,b) = do
     let cc = createDummyCodeCollection b 
     _ <- createIndexTable b cc (SE.creator $ a, SE.application $ a, SE.contractName $ a)
-    createHistoryTable False  b cc (SE.creator $ a, SE.application $ a, SE.contractName $ a)
+    createHistoryTable  b cc (SE.creator $ a, SE.application $ a, SE.contractName $ a)
     insertIndexTable $ (a,[])
     insertHistoryTable $ [a]
 
@@ -89,7 +89,7 @@ createInsertsAbstract abstract inherited = do
         cc = createDummyCodeCollection contract
     _ <- createAbstractTable  (contract) (SE.creator $ fst abstract, SE.application $ fst abstract, SE.contractName $ fst abstract) M.empty cc
     unless (null inherited) $ do 
-      insertAbstractTable inherited False
+      insertAbstractTable inherited
 
 createDummyContract :: [(T.Text, SVMType.Type)] -> ContractF()
 createDummyContract v = 

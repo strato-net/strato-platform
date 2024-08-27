@@ -477,9 +477,9 @@ processTheMessages env conn messages = do
   forM_ insertsByCodeHash $ \ins -> do
     outputData conn $ insertIndexTable $ indexInsert ins
     outputData conn $ insertHistoryTable $ historyInserts ins
-    outputData conn $ insertAbstractTable (abstractInserts ins) False-- not historic
+    outputData conn $ insertAbstractTable (abstractInserts ins)-- not historic
     unless ((length (collectionInserts ins) < 1)) $ outputData conn $ insertCollectionTable $ collectionInserts ins
-    outputData conn $ insertHistoryAbstractTable (abstractInserts ins) (historyInserts ins)
+    -- outputData conn $ insertHistoryAbstractTable (abstractInserts ins) (historyInserts ins)
 
 --updating the foreign keys from null
   outputDataDedup conn . forM_ insertsByCodeHash $ \ins -> do
