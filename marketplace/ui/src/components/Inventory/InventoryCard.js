@@ -154,10 +154,7 @@ const InventoryCard = ({ inventory, category, debouncedSearchTerm, id, allSubcat
       return false; // or handle the undefined case as needed
     }
     const address = inventory.originAddress;
-    return (
-      address.toLowerCase() === "72599614549ffe3a0f7e86caf2c25d29590f3b7c" ||
-      address.toLowerCase() === "dbf23119bb52a7419c66c7b5055dd3f31545dc14"
-    );
+    return address.toLowerCase() === "dbf23119bb52a7419c66c7b5055dd3f31545dc14";
   }
 
   return (
