@@ -21,7 +21,7 @@ import Data.FileEmbed
 import qualified Data.Text as T
 import Data.Text.Encoding (decodeUtf8)
 import qualified Data.Text.IO as TIO
-import Network.Kafka (Kafka, KafkaClientError, KafkaState, mkKafkaState, runKafka)
+import Network.Kafka (Kafka, KafkaClientError, KafkaState)
 import System.Exit
 import UnliftIO.Directory
 import UnliftIO.IO hiding (withFile)
@@ -30,10 +30,10 @@ import Universum.Lifted.File
 
 type GenM = StateT KafkaState (ExceptT KafkaClientError IO)
 
-runGenM :: KafkaAddress -> GenM a -> IO a
+runGenM :: MonadIO m =>
+           KafkaAddress -> KafkaM m a -> m a
 runGenM kaddr mv = do
-  eRes <- runKafka (mkKafkaState "generator" kaddr) mv
-  either (error . ("runGenM: " ++) . show) return eRes
+  runKafkaM "generator" kaddr mv
 
 initializeTopic :: Kafka m => m ()
 initializeTopic = createTopic initTopic
@@ -41,14 +41,14 @@ initializeTopic = createTopic initTopic
 genesisFiles :: [(FilePath, C8.ByteString)]
 genesisFiles = $(embedDir "genesisBlocks")
 
-mkAll :: (MonadMask m, Kafka m) =>
+mkAll :: HasKafka m =>
          String -> m ()
 mkAll genesisBlockName = do
-  initializeTopic
+  execKafka initializeTopic
   ethconf <- liftIO genEthConf
-  addEvent $ EthConf ethconf
+  execKafka $ addEvent $ EthConf ethconf
 
-  addEvent $
+  execKafka $ addEvent $
     TopicList
       [ (t, t)
         | t <-
@@ -69,15 +69,15 @@ mkAll genesisBlockName = do
     (True, []) -> liftIO $ fmap (fmap $ map Net.webAddress) $ Net.getParams flags_network
     (True, _) -> return $ Just flags_stratoBootnode
 
-  addEvent $ PeerList bootnodes
+  execKafka $ addEvent $ PeerList bootnodes
 
   let genesisFileName = genesisBlockName ++ "Genesis.json"
       accountInfoFileName = genesisBlockName ++ "AccountInfo"
 
-  sendGenesisJson genesisFileName
-  sendAccountInfo accountInfoFileName
+  execKafka $ sendGenesisJson genesisFileName
+  execKafka $ sendAccountInfo accountInfoFileName
 
-  addEvent InitComplete
+  execKafka $ addEvent InitComplete
 
 sendGenesisJson :: Kafka m =>
                    FilePath -> m ()
