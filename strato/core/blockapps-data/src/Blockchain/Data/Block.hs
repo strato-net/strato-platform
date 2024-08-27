@@ -20,6 +20,7 @@ import Blockchain.Data.BlockHeader (BlockHeader)
 import qualified Blockchain.Data.BlockHeader as BlockHeader
 import Blockchain.Data.RLP
 import Blockchain.Data.Transaction
+import Blockchain.Blockstanbul.Model.Authentication
 import Blockchain.Strato.Model.Class
 import Blockchain.Strato.Model.Keccak256
 import Control.DeepSeq
@@ -71,6 +72,10 @@ instance RLPSerializable Block where
 
   rlpEncode Block {blockBlockData = bd, blockReceiptTransactions = receipts, blockBlockUncles = uncles} =
     RLPArray [rlpEncode bd, RLPArray (rlpEncode <$> receipts), RLPArray $ rlpEncode <$> uncles]
+
+instance HasIstanbulExtra Block where
+  getIstanbulExtra     = getIstanbulExtra . blockBlockData
+  putIstanbulExtra i b = b{blockBlockData = putIstanbulExtra i $ blockBlockData b}
 
 instance BlockLike BlockHeader Transaction Block where
   blockHeader = blockBlockData

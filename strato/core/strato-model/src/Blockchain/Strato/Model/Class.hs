@@ -4,13 +4,14 @@
 module Blockchain.Strato.Model.Class where
 
 import BlockApps.X509.Certificate
-import Blockchain.Blockstanbul.Model.Authentication (scrubCommitmentSeals, scrubConsensus)
+import Blockchain.Blockstanbul.Model.Authentication
 import Blockchain.Data.RLP
 import Blockchain.Strato.Model.Address
 import Blockchain.Strato.Model.ChainMember
 import Blockchain.Strato.Model.Code
 import Blockchain.Strato.Model.ExtendedWord
 import Blockchain.Strato.Model.Keccak256
+import Blockchain.Strato.Model.Secp256k1
 import Blockchain.Strato.Model.Validator (Validator)
 import Control.DeepSeq
 import Data.Aeson
@@ -45,7 +46,7 @@ class (RLPSerializable b, BlockHeaderLike h, TransactionLike t) => BlockLike h t
 
 newtype DummyCertRevocation = DummyCertRevocation Address deriving (Show, Read, Eq, NFData, Generic, Data, ToJSON, RLPSerializable)
 
-class RLPSerializable h => BlockHeaderLike h where
+class (RLPSerializable h, HasIstanbulExtra h) => BlockHeaderLike h where
   blockHeaderBlockNumber :: h -> Integer
   blockHeaderParentHash :: h -> Keccak256
   blockHeaderOmmersHash :: h -> Keccak256
@@ -61,15 +62,14 @@ class RLPSerializable h => BlockHeaderLike h where
   blockHeaderExtraData :: h -> B.ByteString -- todo: extradata newtype
   blockHeaderTimestamp :: h -> UTCTime
   blockHeaderMixHash :: h -> Keccak256
+  blockHeaderValidators :: h -> [Validator]
   blockHeaderNewValidators :: h -> [Validator]
   blockHeaderRemovedValidators :: h -> [Validator]
   blockHeaderNewCerts :: h -> [X509Certificate]
   blockHeaderRevokedCerts :: h -> [DummyCertRevocation]
+  blockHeaderProposal :: h -> Maybe Signature
+  blockHeaderSignatures :: h -> [Signature]
   blockHeaderVersion :: h -> Int
-
-  -- This should be Lens' h B.ByteString, except that the RedisHeader cannot
-  -- derive it.
-  blockHeaderModifyExtra :: (B.ByteString -> B.ByteString) -> h -> h
 
   morphBlockHeader :: (BlockHeaderLike h2) => h2 -> h
   {-# MINIMAL
@@ -89,12 +89,13 @@ class RLPSerializable h => BlockHeaderLike h where
     blockHeaderExtraData,
     blockHeaderTimestamp,
     blockHeaderMixHash,
-    blockHeaderModifyExtra,
+    blockHeaderValidators,
     blockHeaderNewValidators,
     blockHeaderRemovedValidators,
     blockHeaderNewCerts,
     blockHeaderRevokedCerts,
-    blockHeaderModifyExtra,
+    blockHeaderProposal,
+    blockHeaderSignatures,
     morphBlockHeader,
     blockHeaderVersion
     #-}
@@ -104,11 +105,12 @@ class RLPSerializable h => BlockHeaderLike h where
     hash
       . rlpSerialize
       . rlpEncode
-      . blockHeaderModifyExtra scrubCommitmentSeals
+      . scrubCommitmentSeals
 
   -- This is a PBFT style partial hash. PoW style partial hash should remove the nonce instead.
   blockHeaderPartialHash :: h -> Keccak256
-  blockHeaderPartialHash = blockHeaderHash . blockHeaderModifyExtra scrubConsensus
+  blockHeaderPartialHash = blockHeaderHash
+                         . scrubConsensus
 
   blockHeaderOrdering :: h -> Integer
   blockHeaderOrdering = blockHeaderBlockNumber

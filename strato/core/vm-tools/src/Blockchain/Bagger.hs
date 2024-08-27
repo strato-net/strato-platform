@@ -595,6 +595,11 @@ buildNextBlockHeader parentHeader parentHash stateRoot txs time vd cd =
   let parentNum = number parentHeader
       (newV, remV) = fromDelta vd
       (newC, revC) = fromDelta cd
+      curValidators = S.toList $ S.difference
+                                   (S.union
+                                     (S.fromList (currentValidators parentHeader))
+                                     (S.fromList (newValidators parentHeader)))
+                                   (S.fromList (removedValidators parentHeader))
    in BlockHeaderV2
         {
           parentHash = parentHash,
@@ -605,10 +610,13 @@ buildNextBlockHeader parentHeader parentHash stateRoot txs time vd cd =
           number = parentNum + 1,
           timestamp = time,
           extraData = txsLen2ExtraData (length txs),
+          currentValidators = curValidators,
           newValidators = newV,
           removedValidators = remV,
           newCerts = newC,
-          revokedCerts = revC
+          revokedCerts = revC,
+          proposalSignature = Nothing,
+          signatures = []
         }
 
 buildRewardedBlockHeader :: MonadBagger m => BlockHeader -> m BlockHeader

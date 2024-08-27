@@ -50,71 +50,40 @@ instance Arbitrary IstanbulExtra where
 instance Arbitrary ExtraData where
   arbitrary = liftM2 ExtraData arbitrary arbitrary
 
-truncateExtra :: Block -> Block
-truncateExtra = over extraLens scrubConsensus
+addValidators :: HasIstanbulExtra h => [Validator] -> h -> h
+addValidators vs = execIstanbulExtra (const . Just $ IstanbulExtra vs Nothing [])
 
-addValidators :: ChainMembers -> Block -> Block
-addValidators vs =
-  over extraLens $
-    uncookRawExtra
-      . set istanbul (Just (IstanbulExtra vs Nothing []))
-      . cookRawExtra
+getProposerSeal :: HasIstanbulExtra h => h -> Maybe Signature
+getProposerSeal = evalIstanbulExtra (_proposedSig =<<)
 
-getProposerSeal :: Block -> Maybe Signature
-getProposerSeal x = do
-  ist <- L.view istanbul . cookRawExtra . L.view extraLens $ x
-  sig <- L.view proposedSig ist
-  return sig
+addProposerSeal :: HasIstanbulExtra h => Signature -> h -> h
+addProposerSeal sig = execIstanbulExtra addSeal
+  where addSeal i = fmap (set proposedSig (Just sig)) i
+                <|> error "must set validators before proposer seal"
 
-addProposerSeal :: Signature -> Block -> Block
-addProposerSeal sig =
-  over extraLens $
-    uncookRawExtra
-      . over
-        istanbul
-        ( \i ->
-            fmap (set proposedSig (Just sig)) i
-              <|> error "must set validators before proposer seal"
-        )
-      . cookRawExtra
+addCommitmentSeals :: HasIstanbulExtra h => [Signature] -> h -> h
+addCommitmentSeals sigs = execIstanbulExtra addSeals
+  where addSeals i = fmap (set commitment sigs) i
+                 <|> error "must set validators before commitment seals"
 
-addCommitmentSeals :: [Signature] -> Block -> Block
-addCommitmentSeals sigs =
-  over extraLens $
-    uncookRawExtra
-      . over
-        istanbul
-        ( \i ->
-            fmap (set commitment sigs) i
-              <|> error "must set validators before commitment seals"
-        )
-      . cookRawExtra
+scrubAllSeals :: Maybe IstanbulExtra -> Maybe IstanbulExtra
+scrubAllSeals = set (_Just . proposedSig) Nothing
+              . set (_Just . commitment) []
 
-scrubAllSeals :: RawExtraData -> RawExtraData
-scrubAllSeals =
-  uncookRawExtra
-    . set (istanbul . _Just . proposedSig) Nothing
-    . set (istanbul . _Just . commitment) []
-    . cookRawExtra
-
-scrubSignaturesFromBlock :: [Signature] -> [Signature]
-scrubSignaturesFromBlock _ = []
-
-proposalMessage :: Block -> B.ByteString
+proposalMessage :: (RLPSerializable h, HasIstanbulExtra h) => h -> B.ByteString
 proposalMessage =
   keccak256ToByteString
     . hash
     . rlpSerialize
     . rlpEncode
-    . over extraDataLens scrubAllSeals
-    . blockBlockData
+    . execIstanbulExtra scrubAllSeals
 
-proposerSeal :: (HasVault m) => Block -> m (Signature)
+proposerSeal :: (RLPSerializable h, HasIstanbulExtra h, HasVault m) => h -> m (Signature)
 proposerSeal blk =
   let mesg = proposalMessage blk
    in sign mesg
 
-verifyProposerSeal :: Block -> Signature -> Maybe Address
+verifyProposerSeal :: (RLPSerializable h, HasIstanbulExtra h) => h -> Signature -> Maybe Address
 verifyProposerSeal blk sig =
   let mesg = proposalMessage blk
    in fromPublicKey <$> recoverPub sig mesg
@@ -140,13 +109,12 @@ recoverPub' sig v =
     Nothing -> throwError "can't recover public key"
     Just val -> return val
 
-finalHash :: Block -> Keccak256
+finalHash :: (RLPSerializable h, HasIstanbulExtra h) => h -> Keccak256
 finalHash =
   hash
     . rlpSerialize
     . rlpEncode
-    . over extraDataLens scrubCommitmentSeals
-    . blockBlockData
+    . scrubCommitmentSeals
 
 signBenfInfo :: (HasVault m) => (Validator, Bool, Int) -> m (Signature)
 signBenfInfo bnf =
@@ -190,8 +158,7 @@ getX509FromAddress' address = do
 replayHistoricBlock :: (MonadError String m, A.Selectable Address X509CertInfoState m) =>
                        Set Validator -> Word256 -> Block -> m (Word256, Validator)
 replayHistoricBlock realValidators seqNo blk = do
-  let ExtraData {..} = cookRawExtra . L.view extraLens $ blk
-  IstanbulExtra {..} <- liftEither $ maybeToEither "no istanbul metadata" _istanbul
+  IstanbulExtra {..} <- liftEither $ maybeToEither "no istanbul metadata" $ evalIstanbulExtra id blk
   let mProp = verifyProposerSeal blk =<< _proposedSig
       blockNo = fromIntegral . number . blockBlockData $ blk
 
@@ -216,7 +183,7 @@ replayHistoricBlock realValidators seqNo blk = do
       "proposer " ++ formatAddressWithoutColor prop ++ " (" ++ format propChainMember ++ ")  not a validator"
       ++ "\nreal validator list: " ++ show (map format $ S.toList realValidators)
 
-  let expectedValidatorList = S.map chainMemberParsedSetToValidator $ unChainMembers _validatorList
+  let expectedValidatorList = S.fromList _validatorList
 --  let expectedValidatorList = [c | CommonName _ _ c _ <- S.toList (unChainMembers _validatorList)]
 
   unless (expectedValidatorList == realValidators) $

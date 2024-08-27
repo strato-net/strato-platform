@@ -15,6 +15,7 @@ import Blockchain.Data.Enode
 import Blockchain.Data.RLP
 import qualified Blockchain.Data.Transaction as TXD
 import Blockchain.Data.TransactionDef (formatChainId)
+import Blockchain.Blockstanbul.Model.Authentication
 import Blockchain.Strato.Model.Account
 import Blockchain.Strato.Model.Address
 import Blockchain.Strato.Model.ChainMember
@@ -193,7 +194,7 @@ instance (RLPSerializable a, RLPSerializable b) => RedisDBValuable (a, b) where
           [a, b] -> (rlpDecode a, rlpDecode b)
           _ -> error "fromValue: not a pair"
 
-newtype RedisHeader = RedisHeader BHD.BlockHeader deriving newtype (Eq, Show, RLPSerializable, BlockHeaderLike)
+newtype RedisHeader = RedisHeader BHD.BlockHeader deriving newtype (Eq, Show, RLPSerializable, HasIstanbulExtra, BlockHeaderLike)
 
 newtype RedisTx = RedisTx TXD.Transaction deriving newtype (Eq, Read, Show, RLPSerializable, TransactionLike)
 

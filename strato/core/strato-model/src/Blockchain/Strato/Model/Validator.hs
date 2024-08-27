@@ -24,7 +24,11 @@ import Test.QuickCheck.Arbitrary
 import Test.QuickCheck.Instances.Text ()
 import Text.Format
 
-newtype Validator = Validator Text deriving (Generic, Eq, Data, Show, Ord, Read, IsString, RLPSerializable)
+newtype Validator = Validator Text deriving (Generic, Eq, Data, Show, Ord, Read, IsString)
+
+instance RLPSerializable Validator where
+  rlpEncode (Validator v) = rlpEncode v
+  rlpDecode v = Validator $ rlpDecode v
 
 instance NFData Validator where
   rnf (Validator c) = c `seq` ()

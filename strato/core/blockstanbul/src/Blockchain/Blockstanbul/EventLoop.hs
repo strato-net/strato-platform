@@ -310,13 +310,13 @@ eventLoop ctx = execStateC ctx $
         UnannouncedBlock blk' -> do
           -- this is for sending out a new block,
           -- may be a good candidtate for sending newCerts
-          let blk = truncateExtra blk'
+          let blk = scrubConsensus blk'
           ppl <- use proposal
           leader <- use proposer
           self <- use selfCert
           when (isNothing ppl && Just leader == fmap chainMemberParsedSetToValidator self) $ do
             vs <- use validators
-            let blockWithVs = addValidators (ChainMembers $ S.map validatorToChainMemberParsedSet vs) blk
+            let blockWithVs = addValidators (S.toList vs) blk
             pseal <- proposerSeal blockWithVs
             let sealedBlk = addProposerSeal pseal blockWithVs
             mLocked <- use blockLock
