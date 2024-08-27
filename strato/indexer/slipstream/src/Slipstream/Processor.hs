@@ -420,8 +420,6 @@ processTheMessages env conn messages = do
   inserts <- enterBloc2 env $ do
     forM changes $ \(acct, actions) -> do
       let row = combineActions actions
-      mapM_ recordAction actions
-      recordCombinedAction row
       $logDebugS "processTheMessages" $ "Combined Action = " <> formatAction row
       $logDebugS "processTheMessages" $ T.pack $ "the diff is " ++ format (actionStorage row)
 
@@ -503,6 +501,11 @@ processTheMessages env conn messages = do
   forM_ transactionResults $ putTransactionResult
 
   flushPendingWrites g
+
+  -- record prometheus metrics
+  forM_ changes $ \(_, actions) -> do 
+    mapM_ recordAction actions
+    recordCombinedAction $ combineActions actions
 
   return events'
 
