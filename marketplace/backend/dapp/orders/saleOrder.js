@@ -281,7 +281,7 @@ async function getAll(admin, args = {}, options) {
   if (saleOrders) {
     for (let i = 0; i < saleOrders.length; i++) {
       const order = saleOrders[i];
-      if (order.status === '2') {
+      if (parseInt(order.status) === 2) {
         if (paymentProvidersToOrderHashes[order.address]) {
           paymentProvidersToOrderHashes[order.address].push(order.orderHash);
         }
