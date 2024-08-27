@@ -1,0 +1,850 @@
+import React, { useState, useEffect, useRef } from "react";
+import {
+  Breadcrumb,
+  notification,
+  Typography,
+  Table,
+  Tooltip,
+  Spin,
+} from "antd";
+import { actions as categoryActions } from "../../contexts/category/actions";
+import { useCategoryDispatch } from "../../contexts/category";
+import useDebounce from "../UseDebounce";
+import { actions } from "../../contexts/inventory/actions";
+import {
+  useInventoryDispatch,
+  useInventoryState,
+} from "../../contexts/inventory";
+import { actions as marketplaceActions } from "../../contexts/marketplace/actions";
+import { usePaymentServiceDispatch } from "../../contexts/payment";
+import { actions as paymentServiceActions } from "../../contexts/payment/actions";
+import { Images } from "../../images";
+import ClickableCell from "../ClickableCell";
+import routes from "../../helpers/routes";
+import HelmetComponent from "../Helmet/HelmetComponent";
+import { SEO } from "../../helpers/seoConstant";
+import { useNavigate } from "react-router-dom";
+import { getStringDate } from "../../helpers/utils";
+import { US_DATE_FORMAT } from "../../helpers/constants";
+import {
+  useMarketplaceDispatch,
+  useMarketplaceState,
+} from "../../contexts/marketplace";
+import { useAuthenticateState } from "../../contexts/authentication";
+
+// Custom hook for media query
+const useMediaQuery = (query) => {
+  const [matches, setMatches] = useState(false);
+
+  useEffect(() => {
+    const media = window.matchMedia(query);
+    if (media.matches !== matches) {
+      setMatches(media.matches);
+    }
+    const listener = () => setMatches(media.matches);
+    media.addListener(listener);
+    return () => media.removeListener(listener);
+  }, [matches, query]);
+
+  return matches;
+};
+
+const MyWallet = ({ user }) => {
+  const [queryValue] = useState("");
+  const debouncedSearchTerm = useDebounce(queryValue, 1000);
+  const limit = 400;
+  const [offset] = useState(0);
+  const dispatch = useInventoryDispatch();
+  // eslint-disable-next-line no-unused-vars
+  const [api, contextHolder] = notification.useNotification();
+  const [isSearch] = useState(false);
+  const [category] = useState(undefined);
+  const linkUrl = window.location.href;
+  const { Title, Text } = Typography;
+  const navigate = useNavigate();
+  const isMobile = useMediaQuery("(max-width: 767px)");
+  const [isLoading, setIsLoading] = useState(true);
+  const [isPriceHistoryLoaded, setIsPriceHistoryLoaded] = useState(false);
+  const priceHistoryLoadedCount = useRef(0);
+  const naviroute = routes.MyWalletDetail.url;
+
+  const { strats } = useMarketplaceState();
+  const stratsBalance = Object.keys(strats).length > 0 ? strats : 0;
+  const [totalBalance, setTotalBalance] = useState(0);
+  const [priceHistoryMap, setPriceHistoryMap] = useState({});
+  const [transfersData, setTransfersData] = useState([]);
+  const { itemTransfers } = useInventoryState();
+  const [allMarketplaceItems, setAllMarketplaceItems] = useState([]);
+  const [isMarketplaceLoading, setIsMarketplaceLoading] = useState(true);
+  const marketplaceDispatch = useMarketplaceDispatch();
+  const { hasChecked, isAuthenticated } = useAuthenticateState();
+  const [isPriceLoading, setIsPriceLoading] = useState(true);
+  const [calculatedPrices, setCalculatedPrices] = useState({});
+  const [isDataReady, setIsDataReady] = useState(false);
+  const [highestPrices, setHighestPrices] = useState({});
+  const [priceHistories, setPriceHistories] = useState({});
+  const [isPriceHistoryLoading, setIsPriceHistoryLoading] = useState(true);
+  const { priceHistories: storedPriceHistories } = useMarketplaceState();
+
+  const categoryDispatch = useCategoryDispatch();
+  const { inventories, isInventoriesLoading, priceHistory } =
+    useInventoryState();
+
+  const paymentServiceDispatch = usePaymentServiceDispatch();
+
+  useEffect(() => {
+    if (user?.commonName) {
+      setIsLoading(true);
+      Promise.all([
+        paymentServiceActions.getPaymentServices(paymentServiceDispatch, true),
+        paymentServiceActions.getNotOnboarded(
+          paymentServiceDispatch,
+          user.commonName,
+          10,
+          0
+        ),
+      ]).finally(() => setIsLoading(false));
+    }
+  }, [paymentServiceDispatch, user]);
+
+  useEffect(() => {
+    categoryActions.fetchCategories(categoryDispatch);
+  }, [categoryDispatch]);
+
+  useEffect(() => {
+    const allDataReady =
+      !isInventoriesLoading &&
+      !isMarketplaceLoading &&
+      isPriceHistoryLoaded &&
+      !isPriceLoading &&
+      Object.keys(calculatedPrices).length > 0 &&
+      inventories.length > 0;
+
+    setIsDataReady(allDataReady);
+  }, [
+    isInventoriesLoading,
+    isMarketplaceLoading,
+    isPriceHistoryLoaded,
+    isPriceLoading,
+    calculatedPrices,
+    inventories,
+  ]);
+
+  useEffect(() => {
+    if (inventories.length > 0) {
+      setIsPriceHistoryLoading(true);
+      const fetchPriceHistories = async () => {
+        const fetchPromises = inventories.map((inventory) =>
+          marketplaceActions.fetchPriceHistory(
+            marketplaceDispatch,
+            inventory.address,
+            "1"
+          )
+        );
+        await Promise.all(fetchPromises);
+        setIsPriceHistoryLoading(false);
+        setIsPriceHistoryLoaded(true);
+      };
+      fetchPriceHistories();
+    }
+  }, [inventories, marketplaceDispatch]);
+
+  useEffect(() => {
+    setPriceHistories(storedPriceHistories);
+  }, [storedPriceHistories]);
+
+  useEffect(() => {
+    if (priceHistory && priceHistory.data) {
+      const timestamp = priceHistory.data.originRecords[0]?.block_timestamp;
+
+      if (timestamp) {
+        setPriceHistoryMap((prevMap) => {
+          const updatedMap = { ...prevMap };
+          updatedMap[timestamp] = priceHistory;
+          return updatedMap;
+        });
+      }
+
+      priceHistoryLoadedCount.current += 1;
+      if (priceHistoryLoadedCount.current === inventories.length) {
+        setIsPriceHistoryLoaded(true);
+      }
+    }
+  }, [priceHistory, inventories.length]);
+
+  console.log(priceHistory);
+
+  useEffect(() => {
+    setIsLoading(isInventoriesLoading || !isPriceHistoryLoaded);
+  }, [isInventoriesLoading, isPriceHistoryLoaded]);
+
+  useEffect(() => {
+    if (user?.commonName) {
+      actions.fetchItemTransfers(
+        dispatch,
+        limit,
+        offset,
+        user.commonName,
+        "desc"
+      );
+    }
+  }, [dispatch, user, limit, offset]);
+
+  useEffect(() => {
+    if (itemTransfers) {
+      const formattedTransfers = itemTransfers.map((transfer) => ({
+        address: transfer.address,
+        assetAddress: transfer.assetAddress,
+        assetName: decodeURIComponent(transfer.assetName),
+        newOwner: transfer.newOwner,
+        newOwnerCommonName: transfer.newOwnerCommonName,
+        oldOwner: transfer.oldOwner,
+        oldOwnerCommonName: transfer.oldOwnerCommonName,
+        quantity: transfer.quantity,
+        transferDate: getStringDate(transfer.transferDate, US_DATE_FORMAT),
+        transferNumber: transfer.transferNumber,
+        price: transfer?.price,
+      }));
+      setTransfersData(formattedTransfers);
+    }
+  }, [itemTransfers]);
+
+  useEffect(() => {
+    const fetchHighestPrices = async () => {
+      if (inventories.length > 0) {
+        setIsMarketplaceLoading(true);
+        try {
+          const uniqueRoots = [
+            ...new Set(inventories.map((item) => item.root)),
+          ];
+          const highestPricesMap = {};
+          for (const root of uniqueRoots) {
+            const highestPrice =
+              await marketplaceActions.fetchHighestListedPrice(
+                marketplaceDispatch,
+                root
+              );
+            highestPricesMap[root] = highestPrice;
+          }
+          setHighestPrices(highestPricesMap);
+        } catch (error) {
+          console.error("Error fetching highest prices:", error);
+        } finally {
+          setIsMarketplaceLoading(false);
+        }
+      }
+    };
+
+    fetchHighestPrices();
+  }, [inventories, marketplaceDispatch]);
+
+  const getUnitPrice = (inventory) => {
+    console.log("getUnitPrice called with inventory:", inventory);
+    console.log("Current priceHistories state:", priceHistories);
+
+    let currentPrice = 0;
+    let highestListedPrice = highestPrices[inventory.root] || 0;
+    let priceHistoryPrice = 0;
+
+    // Check if the current item has an active listing
+    if (inventory.status === "1" && inventory.price) {
+      currentPrice = parseFloat(inventory.price);
+    }
+
+    // Check price history
+    const inventoryPriceHistory = priceHistories[inventory.address];
+    console.log(
+      "inventoryPriceHistory for address",
+      inventory.address,
+      ":",
+      inventoryPriceHistory
+    );
+
+    if (inventoryPriceHistory && inventoryPriceHistory.length > 0) {
+      priceHistoryPrice = parseFloat(inventoryPriceHistory[0].price);
+    }
+
+    // Return the highest price among current item, highest listed price, and price history
+    const highestOverallPrice = Math.max(
+      currentPrice,
+      highestListedPrice,
+      priceHistoryPrice
+    );
+
+    // If we have a price, return it
+    if (highestOverallPrice > 0) {
+      return highestOverallPrice;
+    }
+
+    // If no price found yet, check transfers for price
+    const latestTransfer = transfersData.find(
+      (transfer) => transfer.assetAddress === inventory.originAddress
+    );
+
+    if (latestTransfer && latestTransfer.price) {
+      return parseFloat(latestTransfer.price);
+    }
+
+    // If no price history or transfer price available, return 0
+    return 0;
+  };
+
+  const calculateGainLoss = (currentPrice, purchasePrice) => {
+    if (!purchasePrice) return null;
+    const percentageChange =
+      ((currentPrice - purchasePrice) / purchasePrice) * 100;
+    return Math.round(percentageChange * 100) / 100;
+  };
+
+  const renderGainLoss = (percentage) => {
+    if (percentage === null)
+      return <span className="text-xs sm:text-sm">-</span>;
+    if (percentage === 0) return <span className="text-xs sm:text-sm">0%</span>;
+
+    const isPositive = percentage > 0;
+    const color = isPositive ? "#00A455" : "#C00000";
+    const sign = isPositive ? "+" : "-";
+
+    return (
+      <span className="text-xs sm:text-sm" style={{ color: color }}>
+        {`${sign}${Math.abs(percentage).toFixed(2)}%`}
+      </span>
+    );
+  };
+
+  useEffect(() => {
+    if (isSearch) {
+      actions.fetchInventorySearch(
+        dispatch,
+        limit,
+        offset,
+        debouncedSearchTerm
+      );
+    } else actions.fetchInventory(dispatch, limit, offset, "", category);
+  }, [dispatch, limit, offset, debouncedSearchTerm, category, isSearch]);
+
+  const [tableData, setTableData] = useState([]);
+
+  useEffect(() => {
+    if (
+      !isInventoriesLoading &&
+      inventories.length > 0 &&
+      !isMarketplaceLoading
+    ) {
+      setIsPriceLoading(true);
+      const prices = {};
+      inventories.forEach((inventory) => {
+        const price = getUnitPrice(inventory);
+        prices[inventory.address] = price;
+      });
+      setCalculatedPrices(prices);
+      setIsPriceLoading(false);
+    }
+  }, [
+    isInventoriesLoading,
+    inventories,
+    isMarketplaceLoading,
+    allMarketplaceItems,
+  ]);
+
+  useEffect(() => {
+    if (isDataReady) {
+      const inventoryData = inventories.map((inventory, index) => {
+        const quantity = Math.round(inventory.quantity) || 0;
+        const price = calculatedPrices[inventory.address] || 0;
+        const value = quantity * price;
+        return {
+          key: `inventory-${index + 2}`,
+          asset: inventory.name,
+          image:
+            inventory["BlockApps-Mercata-Asset-images"] &&
+            inventory["BlockApps-Mercata-Asset-images"].length > 0
+              ? inventory["BlockApps-Mercata-Asset-images"][0].value
+              : Images.image_placeholder,
+          quantity: quantity,
+          price: `$${price.toFixed(2)}`,
+          purchasePrice:
+            inventory.data.isMint === "False" ? inventory.price : null,
+          creator: inventory.creator,
+          gainLoss: "0%",
+          value: `$${value.toFixed(2)}`,
+          status: inventory.status,
+          address: inventory.address,
+        };
+      });
+
+      const newTableData = [
+        {
+          key: "1",
+          asset: "STRATS",
+          image: Images.logo,
+          quantity: stratsBalance,
+          price: "$0.01",
+          gainLoss: "---",
+          value: `$${(stratsBalance * 0.01).toFixed(2)}`,
+          status: null,
+          address: null,
+        },
+        ...inventoryData,
+      ];
+
+      setTableData(newTableData);
+
+      const total = newTableData.reduce((sum, item) => {
+        const itemValue = parseFloat(item.value.replace("$", ""));
+        return sum + (isNaN(itemValue) ? 0 : itemValue);
+      }, 0);
+      setTotalBalance(total.toFixed(2));
+    }
+  }, [isDataReady, inventories, calculatedPrices, stratsBalance]);
+
+  const renderPrice = (price, record) => {
+    if (record.key === "1") {
+      return (
+        <div>
+          <div className="text-xs sm:text-sm">{price}</div>
+        </div>
+      );
+    }
+
+    if (isPriceLoading) {
+      return <Spin size="small" />;
+    }
+
+    const priceValue = parseFloat(price.replace("$", ""));
+
+    if (priceValue === 0 || isNaN(priceValue)) {
+      return (
+        <div>
+          <div className="text-xs sm:text-sm">-</div>
+          <div className="flex items-center mt-1">
+            <img
+              src={Images.logo}
+              alt="Small"
+              className="w-3 h-3 sm:w-4 sm:h-4 mr-1 sm:mr-2"
+            />
+            <Text
+              className="text-[10px] sm:text-xs"
+              style={{ color: "#747474" }}
+            >
+              -
+            </Text>
+          </div>
+        </div>
+      );
+    }
+
+    return (
+      <div>
+        <div className="text-xs sm:text-sm">{price}</div>
+        <div className="flex items-center mt-1">
+          <img
+            src={Images.logo}
+            alt="Small"
+            className="w-3 h-3 sm:w-4 sm:h-4 mr-1 sm:mr-2"
+          />
+          <Text className="text-[10px] sm:text-xs" style={{ color: "#747474" }}>
+            {(priceValue / 0.01).toFixed(2)}
+          </Text>
+        </div>
+      </div>
+    );
+  };
+
+  const CustomQuestionIcon = () => (
+    <svg
+      width="16"
+      height="16"
+      viewBox="0 0 16 16"
+      fill="none"
+      xmlns="http://www.w3.org/2000/svg"
+    >
+      <circle cx="8" cy="8" r="8" fill="#373B9C" />
+      <text
+        x="8"
+        y="12"
+        textAnchor="middle"
+        fill="white"
+        fontSize="12"
+        fontFamily="Arial, sans-serif"
+      >
+        ?
+      </text>
+    </svg>
+  );
+
+  const columns = [
+    {
+      title: "Asset",
+      dataIndex: "asset",
+      key: "asset",
+      render: (text, record) => {
+        const callDetailPage = () => {
+          if (record.key !== "1" && record.address) {
+            navigate(
+              `${naviroute
+                .replace(":id", record.address)
+                .replace(":name", encodeURIComponent(record.asset))}`,
+              {
+                state: { isCalledFromWallet: true },
+              }
+            );
+          }
+        };
+
+        return (
+          <div className="flex items-center">
+            <div className="mr-2 w-[74px] h-[52px] flex items-center justify-center">
+              <img
+                src={record.image}
+                alt={text}
+                title={text}
+                className="rounded-md w-full h-full object-contain"
+              />
+            </div>
+            {record.key !== "1" ? (
+              <span
+                className="text-xs sm:text-sm text-[#13188A] hover:underline cursor-pointer"
+                onClick={callDetailPage}
+              >
+                {text}
+              </span>
+            ) : (
+              <span className="text-xs sm:text-sm">{text}</span>
+            )}
+          </div>
+        );
+      },
+    },
+    {
+      title: "Unit Price",
+      dataIndex: "price",
+      key: "price",
+      render: renderPrice,
+    },
+    {
+      title: "Quantity",
+      dataIndex: "quantity",
+      key: "quantity",
+      render: (quantity) => (quantity === 0 ? "-" : quantity),
+    },
+    {
+      title: (
+        <span className="flex items-center">
+          Gain/Loss %{" "}
+          <Tooltip title="Calculated as the percentage change between the current marketplace price and the original acquisition price of the asset.">
+            <span className="ml-1 cursor-pointer inline-flex items-center">
+              <CustomQuestionIcon />
+            </span>
+          </Tooltip>
+        </span>
+      ),
+      dataIndex: "gainLoss",
+      key: "gainLoss",
+      render: (text, record) => {
+        if (record.key === "1")
+          return <span className="text-xs sm:text-sm">---</span>;
+
+        const currentPrice = parseFloat(record.price.replace("$", ""));
+        const inventoryPriceHistory = priceHistories[record.address];
+
+        if (!inventoryPriceHistory || inventoryPriceHistory.length === 0) {
+          return renderGainLoss(null);
+        }
+
+        const purchasePrice = parseFloat(
+          inventoryPriceHistory[inventoryPriceHistory.length - 1].price
+        );
+
+        if (user?.commonName && record.creator === user.commonName) {
+          return renderGainLoss(null);
+        }
+
+        const percentage = calculateGainLoss(currentPrice, purchasePrice);
+        return renderGainLoss(percentage);
+      },
+    },
+    {
+      title: "Value",
+      dataIndex: "value",
+      key: "value",
+      render: (value, record) => {
+        if (record.key === "1") {
+          // For the first row (STRATS), keep the original value
+          return (
+            <div>
+              <div className="text-xs sm:text-sm">{value}</div>
+            </div>
+          );
+        } else {
+          // For all other rows, calculate Value as Quantity * Price
+          const quantity = parseFloat(record.quantity);
+          const price = parseFloat(record.price.replace("$", ""));
+          const calculatedValue = (quantity * price).toFixed(2);
+
+          return (
+            <div>
+              <div className="text-xs sm:text-sm">${calculatedValue}</div>
+              <div className="flex items-center mt-1">
+                <img
+                  src={Images.logo}
+                  alt="Small"
+                  className="w-3 h-3 sm:w-4 sm:h-4 mr-1 sm:mr-2"
+                />
+                <Text
+                  className="text-[10px] sm:text-xs"
+                  style={{ color: "#747474" }}
+                >
+                  {(parseFloat(calculatedValue) / 0.01).toFixed(2)}
+                </Text>
+              </div>
+            </div>
+          );
+        }
+      },
+    },
+  ];
+
+  const renderMobileCard = (item, index, totalItems) => (
+    <div key={item.key}>
+      <div className="bg-white p-4">
+        <div className="grid grid-cols-2 gap-4">
+          <div className="col-span-1 flex items-center">
+            <img
+              src={item.image}
+              alt={item.asset}
+              className="w-12 h-12 object-contain mr-2"
+            />
+            {item.key !== "1" && item.address ? (
+              <p
+                className="text-sm font-semibold text-[#13188A] hover:underline cursor-pointer"
+                onClick={() =>
+                  navigate(
+                    `${routes.MyWalletDetail.url
+                      .replace(":id", item.address)
+                      .replace(":name", encodeURIComponent(item.asset))}`,
+                    {
+                      state: { isCalledFromWallet: true },
+                    }
+                  )
+                }
+              >
+                {item.asset}
+              </p>
+            ) : (
+              <p className="text-sm font-semibold">{item.asset}</p>
+            )}
+          </div>
+          <div className="col-span-1 text-right">
+            <p className="text-sm font-bold">{item.value}</p>
+            <p className="text-xs text-gray-500">
+              {item.key !== "1"
+                ? renderGainLoss(
+                    calculateGainLoss(
+                      parseFloat(item.price.replace("$", "")),
+                      Object.values(priceHistoryMap).find(
+                        (h) => h.address === item.address
+                      )?.data.originRecords[0]?.price
+                    )
+                  )
+                : (parseFloat(item.value.replace("$", "")) / 0.01).toFixed(2) +
+                  " STRATS"}
+            </p>
+          </div>
+          <div className="col-span-1">
+            <p className="text-xs">
+              <span style={{ color: "#373B9C", fontWeight: "bold" }}>
+                Unit Price:
+              </span>{" "}
+              <span style={{ color: "#3F4149" }}>{item.price}</span>
+            </p>
+          </div>
+          <div className="col-span-1 text-right">
+            <p className="text-xs">
+              <span style={{ color: "#373B9C", fontWeight: "bold" }}>
+                Quantity:
+              </span>{" "}
+              <span style={{ color: "#3F4149" }}>
+                {item.quantity === 0 ? "-" : item.quantity}
+              </span>
+            </p>
+          </div>
+        </div>
+      </div>
+      {index !== totalItems - 1 && (
+        <div className="mx-4">
+          <div className="border-b border-[#D9D9D9]"></div>
+        </div>
+      )}
+    </div>
+  );
+
+  const renderMobileView = () => (
+    <div className="bg-gray-100 min-h-screen">
+      <div className="p-4">
+        <div className="rounded-lg overflow-hidden wallet-gradient p-4 flex justify-between items-center">
+          <div>
+            <Text className="text-white text-sm font-semibold">
+              Total Balance:
+            </Text>
+            <Text className="text-white text-xl font-bold block mt-1">
+              ${totalBalance}
+            </Text>
+          </div>
+          <div className="flex items-center">
+            <img src={Images.logo} alt="STRATS" className="w-4 h-4 mr-2" />
+            <Text className="text-white text-lg font-semibold">
+              {stratsBalance}
+            </Text>
+          </div>
+        </div>
+      </div>
+
+      <div className="p-4">
+        <div className="border border-[#D9D9D9] rounded-lg overflow-hidden">
+          {isDataReady ? (
+            tableData.map((item, index) =>
+              renderMobileCard(item, index, tableData.length)
+            )
+          ) : (
+            <div className="flex justify-center items-center h-40">
+              <Spin size="large" />
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+
+  const renderDesktopView = () => (
+    <>
+      <div
+        className="w-full h-[150px] py-4 bg-[#ADA0E2] bg-opacity-20 flex flex-col justify-between mt-0 lg:-mt-8"
+        style={{ borderColor: "#13188A" }}
+      >
+        <div className="mx-5 md:mx-14">
+          <Breadcrumb className="mt-2 lg:mt-4">
+            <Breadcrumb.Item href="" onClick={(e) => e.preventDefault()}>
+              <ClickableCell href={routes.Marketplace.url}>
+                <p className="text-sm text-[#13188A] font-semibold">Home</p>
+              </ClickableCell>
+            </Breadcrumb.Item>
+            <Breadcrumb.Item>
+              <p className="text-sm text-[#202020] font-medium">My Wallet</p>
+            </Breadcrumb.Item>
+          </Breadcrumb>
+
+          <div className="mt-4">
+            <Title style={{ color: "#373B9C", marginBottom: "0" }} level={5}>
+              Balance:
+            </Title>
+            <div className="flex items-center">
+              <Text
+                style={{
+                  fontSize: "24px",
+                  color: "#373B9C",
+                  fontWeight: "bold",
+                  marginRight: "10px",
+                }}
+              >
+                ${totalBalance}
+              </Text>
+              <div className="flex items-center">
+                <img
+                  src={Images.logo}
+                  alt="STRATS"
+                  style={{ width: "12px", height: "12px", marginRight: "5px" }}
+                />
+                <Text style={{ fontSize: "14px", color: "#747474" }}>
+                  {Number(stratsBalance).toFixed(2)}
+                </Text>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div className="pt-6 mx-6 md:mx-5 md:px-10 mb-5">
+        {isDataReady ? (
+          <Table
+            columns={columns}
+            dataSource={tableData}
+            pagination={false}
+            className="custom-table"
+          />
+        ) : (
+          <div className="flex justify-center items-center h-64">
+            <Spin size="large" />
+          </div>
+        )}
+      </div>
+    </>
+  );
+
+  return (
+    <>
+      <HelmetComponent
+        title={`${category ? `${category} |` : ""} ${SEO.TITLE_META} `}
+        description={SEO.DESCRIPTION_META}
+        link={linkUrl}
+      />
+      {contextHolder}
+      {isLoading ? (
+        <div className="flex justify-center items-center h-screen">
+          <Spin size="large" />
+        </div>
+      ) : isMobile ? (
+        renderMobileView()
+      ) : (
+        renderDesktopView()
+      )}
+      <style jsx>{`
+        .custom-table .ant-table-thead > tr > th {
+          background-color: white !important;
+          color: #373b9c;
+          font-weight: bold;
+          border: none !important;
+        }
+        .wallet-gradient {
+          background: linear-gradient(
+            135deg,
+            rgba(55, 59, 156, 1) 30%,
+            rgba(58, 71, 164, 0.94) 44%,
+            rgba(90, 189, 245, 0.3) 100%
+          );
+        }
+        .custom-table .ant-table-tbody > tr > td {
+          color: #3f4149;
+          border: none !important;
+        }
+        .custom-table .ant-table {
+          border: none !important;
+        }
+        .custom-table .ant-table-container {
+          border: none !important;
+        }
+        .custom-table .ant-table-tbody > tr:not(:last-child) > td {
+          border-bottom: 1px solid #f0f0f0 !important;
+        }
+        .custom-table
+          .ant-table-container
+          table
+          > thead
+          > tr:first-child
+          th:first-child {
+          border-top-left-radius: 0;
+        }
+        .custom-table
+          .ant-table-container
+          table
+          > thead
+          > tr:first-child
+          th:last-child {
+          border-top-right-radius: 0;
+        }
+      `}</style>
+    </>
+  );
+};
+
+export default MyWallet;

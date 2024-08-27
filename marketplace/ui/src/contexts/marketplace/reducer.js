@@ -255,7 +255,7 @@ const reducer = (state, action) => {
       return {
         ...state,
         isTransferringStrats: false,
-        error: action.error
+        error: action.error,
       };
     default:
       throw new Error(`Unhandled action: '${action.type}'`);

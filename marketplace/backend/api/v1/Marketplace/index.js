@@ -55,4 +55,18 @@ router.get(
   MarketplaceController.getStratsTransactionHistory
 );
 
+router.get(
+  Marketplace.getHighestListedPrice,
+  authHandler.authorizeRequest(),
+  loadDapp,
+  MarketplaceController.getHighestListedPrice
+);
+
+router.get(
+  Marketplace.getPriceHistory,
+  authHandler.authorizeRequest(),
+  loadDapp,
+  MarketplaceController.getPriceHistory
+);
+
 export default router;
