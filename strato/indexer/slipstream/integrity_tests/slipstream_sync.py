@@ -12,18 +12,18 @@ def wait_for_slipstream_to_sync(node1_url, node2_url, headers1, headers2, attemp
     while True:
         attempt += 1
         try:
-            response1 = requests.get(node1_url + "/cirrus/search/BlockApps-Mercata-Asset", headers=headers1, params={'order':'block_timestamp.desc', 'limit':1})
-            response2 = requests.get(node2_url + "/cirrus/search/BlockApps-Mercata-Asset", headers=headers2, params={'order':'block_timestamp.desc', 'limit':1})
+            response1 = requests.get(node1_url + '/prometheus/api/v1/query?query=max_block_number_seen{job="slipstream"}', headers=headers1)
+            response2 = requests.get(node2_url + '/prometheus/api/v1/query?query=max_block_number_seen{job="slipstream"}', headers=headers2)
             if response1.ok and response2.ok and response1:
                 response1_json = response1.json()
                 response2_json = response2.json()
                 if len(response1_json) < 1:
-                    print(f"Cirrus response from Node1 is empty: `{response1_json}` (attempt #{attempt} of {attempts})")
+                    print(f"Prometheus response from Node1 is empty: `{response1_json}` (attempt #{attempt} of {attempts})")
                 elif len(response2_json) < 1:
-                    print(f"Cirrus response from Node2 is empty: `{response2_json}` (attempt #{attempt} of {attempts})")
+                    print(f"Prometheus response from Node2 is empty: `{response2_json}` (attempt #{attempt} of {attempts})")
                 else:
-                    block_number1 = response1.json()[0]["block_number"]
-                    block_number2 = response2.json()[0]["block_number"]
+                    block_number1 = response1.json()['data']['result'][0]['value'][1]
+                    block_number2 = response2.json()['data']['result'][0]['value'][1]
                     if block_number1 == block_number2:
                         print(f"Nodes are in sync with block number: {block_number1}")
                         break
