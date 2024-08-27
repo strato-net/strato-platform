@@ -96,7 +96,7 @@ const TransactionTable = ({ user, selectedDate, onDateChange, download, isAllOrd
             <img src={data?.assetImage} alt={data?.assetName} className="border w-88 h-88 border-indigo-600 rounded-md" />
           </Col>
           <Col span={8} offset={1}>
-            <p className="text-base font-bold">{data?.assetName.length > 28 ? `${data?.assetName.slice(0, 28)}..` : data?.assetName}</p>
+            <p className="text-base font-bold text-truncate">{data?.assetName}</p>
             <p style={{ color: '#827474' }} className="font-medium cursor-pointer"><Tooltip placement="top" title={data.assetDescription.replace(/<\/?[^>]+(>|$)/g, "")}> {data?.assetDescription.length > 28 ? `${data.assetDescription.replace(/<\/?[^>]+(>|$)/g, "")?.slice(0, 28)}...` : data?.assetDescription.replace(/<\/?[^>]+(>|$)/g, "")} </Tooltip></p>
           </Col>
           <Col span={8} offset={1}>
@@ -159,15 +159,17 @@ const TransactionTable = ({ user, selectedDate, onDateChange, download, isAllOrd
       key: "Item",
       align: "left",
       width: '150px',
-      render: (asset, data) => <>
-        <Popover className="flex " content={<Content data={data} />} trigger="hover">
+      render: (asset, data) => (
+        <Popover className="flex" content={<Content data={data} />} trigger="hover">
           <div className="flex items-center cursor-default">
-            <img src={data?.assetImage} alt={data?.assetName} width={24} height={30} className="border w-6 h-8 border-indigo-600 rounded-md object-contain" />
-            <span className="ml-1"> {data?.assetName.length > 15 ? `${data?.assetName.slice(0, 15)}..` : data?.assetName} </span>
+            <img src={data?.assetImage} alt={data?.assetName} width={24} height={30} 
+              className="border w-6 h-8 border-indigo-600 rounded-md object-contain" 
+            />
+            <span className="ml-1 text-truncate">{data?.assetName}</span>
           </div>
         </Popover>
-      </>
-    },
+      )
+    },    
     {
       title: "Quantity",
       dataIndex: "quantity",
@@ -205,7 +207,7 @@ const TransactionTable = ({ user, selectedDate, onDateChange, download, isAllOrd
       align: "left",
       width: '150px',
       render: (data, { redemptionService, address }) => <Tooltip placement="top" title={address}>
-        <p className="text-[#13188A] hover:text-primaryHover cursor-pointer " >{`# ${(redemptionService || address)?.slice(0, 10)}..`}</p>
+        <p className="text-[#13188A] hover:text-primaryHover cursor-pointer text-truncate" >{`# ${(redemptionService || address)}`}</p>
       </Tooltip>
     },
     {

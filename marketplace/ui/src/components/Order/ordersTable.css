@@ -100,6 +100,14 @@
     height: 32px;
 }
 
+.text-truncate {
+    display: inline-block;
+    width: 100%;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
 @media (min-width : 770px) {
     :where(.css-dev-only-do-not-override-9ntgx0).ant-picker {
         height: 36px;

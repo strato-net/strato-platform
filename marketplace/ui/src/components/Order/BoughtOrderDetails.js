@@ -426,8 +426,8 @@ const BoughtOrderDetails = ({ user, users }) => {
                 </Col>
               </Row>
               <Row className="my-2 md:hidden flex-col gap-[6px] justify-between p-4 pb-0 rounded">
-              <Col span={24}>
-                  <div className="flex justify-between"> <span>Invoice</span>
+              <Col span={24} className="bg-[#E9E9E9]">
+                  <div className="flex justify-between items-center px-2 h-12 rounded-xl"> <span>Invoice</span>
                     <button>
                       <Link
                         to={`${routes.Invoice.url.replace(":id", routeMatch?.params?.id)}`}
