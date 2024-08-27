@@ -33,6 +33,7 @@ so that they could be properly moved to their respective version's subsection.
 - Fixed truncate logic to actually use truncate rather than round
 
 ### Removed
+ - Removed Globals
 
 
 ## [11.3.1] - 7/10/2024 
