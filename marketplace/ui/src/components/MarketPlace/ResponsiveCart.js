@@ -80,7 +80,6 @@ const ResponsiveCart = ({
       orderTotal += parseFloat(itemTotal); 
       if (i === cartData.length - 1) {
         concatenatedOrderString += `<hr style="border-top: 1px dotted #0A1B71; min-width: 80%; max-width: 80%; margin-left: 15px;">`;
-        concatenatedOrderString += `Sales Tax: $${parseFloat(tax).toFixed(2)} <br>`;
         concatenatedOrderString += `Shipping Fee: <i><strong>Free</strong></i><br><br>`;
         concatenatedOrderString += `Order Total: $${orderTotal.toFixed(2)} <br>`;
       }
@@ -285,10 +284,6 @@ const ResponsiveCart = ({
                       <Typography className="text-sm text-[#202020] font-medium">Unit Price($):</Typography>
                       <Typography className="text-sm text-[#202020] font-semibold">{`$${(element?.unitPrice).toFixed(2)}`}</Typography>
                     </div>
-                    <div className="flex justify-between">
-                      <Typography className="text-sm text-[#202020] font-medium">Tax($):</Typography>
-                      <Typography className="text-sm text-[#202020] font-semibold">{'$' + (element?.tax).toFixed(2)}</Typography>
-                    </div>
                   </div>
                 </div>
               )}
@@ -311,10 +306,6 @@ const ResponsiveCart = ({
           <div className="flex justify-between">
             <p className="text-sm font-medium">Sub Total:</p>
             <p className="text-sm text-right font-semibold">${subTotal} <span className="ml-1">({(subTotal * 100).toFixed(0)} STRATS)</span></p>
-          </div>
-          <div className="flex justify-between">
-            <p className="text-sm font-medium">Tax:</p>
-            <p className="text-sm font-semibold text-right">${tax}</p>
           </div>
           <div className="w-full h-[1px] bg-[#E9E9E9]"></div>
           <div className="flex justify-between">
