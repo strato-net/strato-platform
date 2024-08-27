@@ -19,6 +19,12 @@ const actionDescriptors = {
     "fetch_top_selling_products_logged_in_successful",
   fetchTopSellingProductsLoggedInFailed:
     "fetch_top_selling_products_logged_in_failed",
+  fetchHighestListedPrice: "fetch_highest_listed_price",
+  fetchHighestListedPriceSuccessful: "fetch_highest_listed_price_successful",
+  fetchHighestListedPriceFailed: "fetch_highest_listed_price_failed",
+  fetchPriceHistory: "fetch_price_history",
+  fetchPriceHistorySuccessful: "fetch_price_history_successful",
+  fetchPriceHistoryFailed: "fetch_price_history_failed",
   resetMessage: "reset_message",
   setMessage: "set_message",
   addItemToCart: "add_item_to_cart",
@@ -247,7 +253,19 @@ const actions = {
         if (response.status === RestStatus.OK) {
           const body = await response.json();
           const { productsWithImageUrl, inventoryCount } = body.data;
-          allItems = [...allItems, ...productsWithImageUrl];
+
+          // Fetch highest price for each item
+          const itemsWithHighestPrice = await Promise.all(
+            productsWithImageUrl.map(async (item) => {
+              const highestPrice = await actions.fetchHighestListedPrice(
+                dispatch,
+                item.root
+              );
+              return { ...item, highestListedPrice: highestPrice };
+            })
+          );
+
+          allItems = [...allItems, ...itemsWithHighestPrice];
           totalCount = inventoryCount;
 
           if (
@@ -288,6 +306,73 @@ const actions = {
         error: "Error while fetching marketplace products",
       });
       return null;
+    }
+  },
+
+  fetchHighestListedPrice: async (dispatch, root) => {
+    dispatch({ type: actionDescriptors.fetchHighestListedPrice });
+    try {
+      const response = await fetch(
+        `${apiUrl}/marketplace/highestPrice?root=${root}`,
+        {
+          method: HTTP_METHODS.GET,
+          credentials: "same-origin",
+        }
+      );
+      const body = await response.json();
+
+      if (response.status === RestStatus.OK) {
+        dispatch({
+          type: actionDescriptors.fetchHighestListedPriceSuccessful,
+          payload: body.data.highestPrice,
+        });
+        return body.data.highestPrice;
+      } else if (response.status === RestStatus.UNAUTHORIZED) {
+        dispatch({
+          type: actionDescriptors.fetchHighestListedPriceFailed,
+          error: "Unauthorized while fetching highest listed price",
+        });
+        window.location.href = body.error.loginUrl;
+      } else {
+        dispatch({
+          type: actionDescriptors.fetchHighestListedPriceFailed,
+          error: body.error || "Error while fetching highest listed price",
+        });
+      }
+    } catch (err) {
+      console.error("Error in fetchHighestListedPrice:", err);
+      dispatch({
+        type: actionDescriptors.fetchHighestListedPriceFailed,
+        error: "Error while fetching highest listed price",
+      });
+    }
+    return null;
+  },
+
+  fetchPriceHistory: async (dispatch, address, timeFilter = "all") => {
+    dispatch({ type: actionDescriptors.fetchPriceHistory });
+    try {
+      const response = await fetch(
+        `${apiUrl}/marketplace/priceHistory?address=${address}&timeFilter=${timeFilter}`
+      );
+      const data = await response.json();
+      if (response.ok) {
+        dispatch({
+          type: actionDescriptors.fetchPriceHistorySuccessful,
+          payload: {
+            address,
+            priceHistory: data.priceHistory,
+            stats: data.stats,
+          },
+        });
+      } else {
+        throw new Error(data.error || "Failed to fetch price history");
+      }
+    } catch (error) {
+      dispatch({
+        type: actionDescriptors.fetchPriceHistoryFailed,
+        error: error.message,
+      });
     }
   },
 

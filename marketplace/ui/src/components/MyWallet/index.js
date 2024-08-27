@@ -81,6 +81,10 @@ const MyWallet = ({ user }) => {
   const [isPriceLoading, setIsPriceLoading] = useState(true);
   const [calculatedPrices, setCalculatedPrices] = useState({});
   const [isDataReady, setIsDataReady] = useState(false);
+  const [highestPrices, setHighestPrices] = useState({});
+  const [priceHistories, setPriceHistories] = useState({});
+  const [isPriceHistoryLoading, setIsPriceHistoryLoading] = useState(true);
+  const { priceHistories: storedPriceHistories } = useMarketplaceState();
 
   const categoryDispatch = useCategoryDispatch();
   const { inventories, isInventoriesLoading, priceHistory } =
@@ -128,38 +132,47 @@ const MyWallet = ({ user }) => {
 
   useEffect(() => {
     if (inventories.length > 0) {
-      priceHistoryLoadedCount.current = 0;
-      setIsPriceHistoryLoaded(false);
-      inventories.forEach((inventory) => {
-        if (inventory.address) {
-          actions.fetchPriceHistoryWithAddress(
-            dispatch,
+      setIsPriceHistoryLoading(true);
+      const fetchPriceHistories = async () => {
+        const fetchPromises = inventories.map((inventory) =>
+          marketplaceActions.fetchPriceHistory(
+            marketplaceDispatch,
             inventory.address,
-            10,
-            0,
-            1
-          );
-        }
-      });
+            "1"
+          )
+        );
+        await Promise.all(fetchPromises);
+        setIsPriceHistoryLoading(false);
+        setIsPriceHistoryLoaded(true);
+      };
+      fetchPriceHistories();
     }
-  }, [inventories, dispatch]);
+  }, [inventories, marketplaceDispatch]);
+
+  useEffect(() => {
+    setPriceHistories(storedPriceHistories);
+  }, [storedPriceHistories]);
 
   useEffect(() => {
     if (priceHistory && priceHistory.data) {
-      setPriceHistoryMap((prevMap) => {
-        const updatedMap = { ...prevMap };
-        const key =
-          priceHistory.data.originRecords[0]?.block_timestamp ||
-          Date.now().toString();
-        updatedMap[key] = priceHistory;
-        return updatedMap;
-      });
+      const timestamp = priceHistory.data.originRecords[0]?.block_timestamp;
+
+      if (timestamp) {
+        setPriceHistoryMap((prevMap) => {
+          const updatedMap = { ...prevMap };
+          updatedMap[timestamp] = priceHistory;
+          return updatedMap;
+        });
+      }
+
       priceHistoryLoadedCount.current += 1;
       if (priceHistoryLoadedCount.current === inventories.length) {
         setIsPriceHistoryLoaded(true);
       }
     }
   }, [priceHistory, inventories.length]);
+
+  console.log(priceHistory);
 
   useEffect(() => {
     setIsLoading(isInventoriesLoading || !isPriceHistoryLoaded);
@@ -196,55 +209,41 @@ const MyWallet = ({ user }) => {
     }
   }, [itemTransfers]);
 
-  const [selectedAvailability, setSelectedAvailability] = useState([
-    "forSale",
-    "soldOut",
-  ]);
-  const availabilityFilter = `&forSale=${selectedAvailability.includes(
-    "forSale"
-  )}&soldOut=${selectedAvailability.includes("soldOut")}`;
   useEffect(() => {
-    const fetchAllItems = async () => {
-      setIsMarketplaceLoading(true);
-      try {
-        const allItems = await marketplaceActions.fetchAllMarketplaceItems(
-          marketplaceDispatch,
-          "", // categorys
-          "", // subCategorys
-          0, // minPrice
-          Number.MAX_SAFE_INTEGER, // maxPrice
-          "", // search
-          `&forSale=${selectedAvailability.includes(
-            "forSale"
-          )}&soldOut=${selectedAvailability.includes("soldOut")}`
-        );
-        if (allItems && allItems.length > 0) {
-          setAllMarketplaceItems(allItems);
-          console.log("All marketplace items:", allItems);
-        } else {
-          console.log("No items returned from fetchAllMarketplaceItems");
-          setAllMarketplaceItems([]);
+    const fetchHighestPrices = async () => {
+      if (inventories.length > 0) {
+        setIsMarketplaceLoading(true);
+        try {
+          const uniqueRoots = [
+            ...new Set(inventories.map((item) => item.root)),
+          ];
+          const highestPricesMap = {};
+          for (const root of uniqueRoots) {
+            const highestPrice =
+              await marketplaceActions.fetchHighestListedPrice(
+                marketplaceDispatch,
+                root
+              );
+            highestPricesMap[root] = highestPrice;
+          }
+          setHighestPrices(highestPricesMap);
+        } catch (error) {
+          console.error("Error fetching highest prices:", error);
+        } finally {
+          setIsMarketplaceLoading(false);
         }
-      } catch (error) {
-        console.error("Error fetching all marketplace items:", error);
-      } finally {
-        setIsMarketplaceLoading(false);
       }
     };
 
-    if (hasChecked && isAuthenticated) {
-      fetchAllItems();
-    }
-  }, [hasChecked, isAuthenticated, marketplaceDispatch, selectedAvailability]);
-
-  useEffect(() => {
-    console.log("allMarketplaceItems updated:", allMarketplaceItems);
-  }, [allMarketplaceItems]);
-  console.log(allMarketplaceItems);
+    fetchHighestPrices();
+  }, [inventories, marketplaceDispatch]);
 
   const getUnitPrice = (inventory) => {
+    console.log("getUnitPrice called with inventory:", inventory);
+    console.log("Current priceHistories state:", priceHistories);
+
     let currentPrice = 0;
-    let highestListedPrice = 0;
+    let highestListedPrice = highestPrices[inventory.root] || 0;
     let priceHistoryPrice = 0;
 
     // Check if the current item has an active listing
@@ -252,33 +251,20 @@ const MyWallet = ({ user }) => {
       currentPrice = parseFloat(inventory.price);
     }
 
-    // Check for highest listed price of items with the same root
-    const sameRootItems = allMarketplaceItems.filter(
-      (item) => item.root === inventory.root && item.status === "1"
-    );
-    if (sameRootItems.length > 0) {
-      highestListedPrice = Math.max(
-        ...sameRootItems.map((item) => parseFloat(item.price))
-      );
-    }
-
-    console.log(highestListedPrice);
-
     // Check price history
-    const inventoryPriceHistory = Object.values(priceHistoryMap).find(
-      (history) => history.address === inventory.address
+    const inventoryPriceHistory = priceHistories[inventory.address];
+    console.log(
+      "inventoryPriceHistory for address",
+      inventory.address,
+      ":",
+      inventoryPriceHistory
     );
 
-    if (
-      inventoryPriceHistory &&
-      inventoryPriceHistory.data.originRecords.length > 0
-    ) {
-      const originRecords = inventoryPriceHistory.data.originRecords;
-      const mostRecentPrice = originRecords[originRecords.length - 1].price;
-      priceHistoryPrice = parseFloat(mostRecentPrice);
+    if (inventoryPriceHistory && inventoryPriceHistory.length > 0) {
+      priceHistoryPrice = parseFloat(inventoryPriceHistory[0].price);
     }
 
-    // Return the highest price among current item, other items with same root, and price history
+    // Return the highest price among current item, highest listed price, and price history
     const highestOverallPrice = Math.max(
       currentPrice,
       highestListedPrice,
@@ -291,9 +277,9 @@ const MyWallet = ({ user }) => {
     }
 
     // If no price found yet, check transfers for price
-    const latestTransfer = transfersData.find((transfer) => {
-      return transfer.assetAddress === inventory.originAddress;
-    });
+    const latestTransfer = transfersData.find(
+      (transfer) => transfer.assetAddress === inventory.originAddress
+    );
 
     if (latestTransfer && latestTransfer.price) {
       return parseFloat(latestTransfer.price);
@@ -392,7 +378,7 @@ const MyWallet = ({ user }) => {
           key: "1",
           asset: "STRATS",
           image: Images.logo,
-          quantity: Math.round(stratsBalance),
+          quantity: stratsBalance,
           price: "$0.01",
           gainLoss: "---",
           value: `$${(stratsBalance * 0.01).toFixed(2)}`,
@@ -540,6 +526,7 @@ const MyWallet = ({ user }) => {
       title: "Quantity",
       dataIndex: "quantity",
       key: "quantity",
+      render: (quantity) => (quantity === 0 ? "-" : quantity),
     },
     {
       title: (
@@ -559,16 +546,15 @@ const MyWallet = ({ user }) => {
           return <span className="text-xs sm:text-sm">---</span>;
 
         const currentPrice = parseFloat(record.price.replace("$", ""));
+        const inventoryPriceHistory = priceHistories[record.address];
 
-        const itemPriceHistory = Object.values(priceHistoryMap).find(
-          (history) => history.address === record.address
-        );
-
-        if (!itemPriceHistory || !itemPriceHistory.data.originRecords.length) {
+        if (!inventoryPriceHistory || inventoryPriceHistory.length === 0) {
           return renderGainLoss(null);
         }
 
-        const purchasePrice = itemPriceHistory.data.originRecords[0].price;
+        const purchasePrice = parseFloat(
+          inventoryPriceHistory[inventoryPriceHistory.length - 1].price
+        );
 
         if (user?.commonName && record.creator === user.commonName) {
           return renderGainLoss(null);
@@ -678,7 +664,9 @@ const MyWallet = ({ user }) => {
               <span style={{ color: "#373B9C", fontWeight: "bold" }}>
                 Quantity:
               </span>{" "}
-              <span style={{ color: "#3F4149" }}>{item.quantity}</span>
+              <span style={{ color: "#3F4149" }}>
+                {item.quantity === 0 ? "-" : item.quantity}
+              </span>
             </p>
           </div>
         </div>

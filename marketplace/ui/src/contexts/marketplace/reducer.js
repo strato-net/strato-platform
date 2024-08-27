@@ -52,6 +52,49 @@ const reducer = (state, action) => {
         isMarketplaceLoading: false,
         error: action.error,
       };
+    case actionDescriptors.fetchHighestListedPrice:
+      return {
+        ...state,
+        isFetchingHighestPrice: true,
+      };
+    case actionDescriptors.fetchHighestListedPriceSuccessful:
+      return {
+        ...state,
+        isFetchingHighestPrice: false,
+        highestPrices: {
+          ...state.highestPrices,
+          [action.payload.root]: action.payload.highestPrice,
+        },
+      };
+    case actionDescriptors.fetchHighestListedPriceFailed:
+      return {
+        ...state,
+        isFetchingHighestPrice: false,
+        error: action.error,
+      };
+    case actionDescriptors.fetchPriceHistory:
+      return {
+        ...state,
+        isFetchingPriceHistory: true,
+      };
+    case actionDescriptors.fetchPriceHistorySuccessful:
+      return {
+        ...state,
+        priceHistories: {
+          ...state.priceHistories,
+          [action.payload.address]: action.payload.priceHistory,
+        },
+        priceHistoryStats: {
+          ...state.priceHistoryStats,
+          [action.payload.address]: action.payload.stats,
+        },
+      };
+    case actionDescriptors.fetchPriceHistoryFailed:
+      return {
+        ...state,
+        isFetchingPriceHistory: false,
+        error: action.error,
+      };
     case actionDescriptors.fetchMarketplaceLoggedIn:
       return {
         ...state,
