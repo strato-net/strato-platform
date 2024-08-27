@@ -69,7 +69,7 @@ createInserts  (a,b) = do
     _ <- createIndexTable b cc (SE.creator $ a, SE.application $ a, SE.contractName $ a)
     createHistoryTable  b cc (SE.creator $ a, SE.application $ a, SE.contractName $ a)
     insertIndexTable $ (a,[])
-    insertHistoryTable $ [a]
+    -- insertHistoryTable $ [a]
 
 createInsertsCollection :: OutputM m
             => [ProcessedCollectionRow]

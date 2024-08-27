@@ -31,7 +31,7 @@ module Slipstream.OutputData (
   createMappingTable,
   createArrayTable,
   createAbstractTable,
-  insertHistoryTable,
+  -- insertHistoryTable,
   createExpandEventTables,
   createExpandIndexTable,
   createForeignIndexesForJoins,
@@ -289,8 +289,8 @@ baseAbstractColumns =
     "data"
   ]
 
-baseTableColumns :: TableColumns
-baseTableColumns = baseColumns
+-- baseTableColumns :: TableColumns
+-- baseTableColumns = baseColumns
 
 baseTableColumnsForEvent :: TableColumns
 baseTableColumnsForEvent = baseEventColumns
@@ -774,15 +774,15 @@ insertForeignKeys conn contract = do
             <> "=null WHERE address="
             <> wrapSingleQuotes (makeAccount (E.chain c) (E.address c))
 
-insertHistoryTable ::
-  OutputM m =>
-  [E.ProcessedContract] ->
-  ConduitM () Text m ()
-insertHistoryTable [] = return () --no data, do nothing
-insertHistoryTable contracts@(E.ProcessedContract {creator = crtr, application = app, contractName = cName} : _) = do
-  let tableName = historyTableName crtr app cName
-  $logDebugLS "insertHistoryTable" $ T.pack $ "Inserting row in history table for: " ++ show tableName
-  yieldMany $ insertHistoryTableQuery contracts
+-- insertHistoryTable ::
+--   OutputM m =>
+--   [E.ProcessedContract] ->
+--   ConduitM () Text m ()
+-- insertHistoryTable [] = return () --no data, do nothing
+-- insertHistoryTable contracts@(E.ProcessedContract {creator = crtr, application = app, contractName = cName} : _) = do
+--   let tableName = historyTableName crtr app cName
+--   $logDebugLS "insertHistoryTable" $ T.pack $ "Inserting row in history table for: " ++ show tableName
+--   yieldMany $ insertHistoryTableQuery contracts
 
 -- insertHistoryAbstractTable :: 
 --   OutputM m => 
@@ -908,17 +908,49 @@ createAbstractTableQuery (creator, a, n) list =
           ",\n  PRIMARY KEY (address));"
         ]
 
-createHistoryTableQuery :: (Text, Text, Text) ->  TableColumns -> Text
+createHistoryTableQuery :: (Text, Text, Text) -> TableColumns -> Text
 createHistoryTableQuery (creator, a, n) cols =
-  let tableName = historyTableName creator a n
+  let historyTableName' = historyTableName creator a n
+      normalTableName = indexTableName creator a n
+      triggerFunctionName = "\"" <> "insert_or_update_" <> tableNameToText normalTableName <> "_history_table" <> "\""
    in T.concat
         [ "CREATE TABLE IF NOT EXISTS ",
-          tableNameToDoubleQuoteText tableName,
+          tableNameToDoubleQuoteText historyTableName',
           " (",
           csv $
             baseColumnsQuery
               ++ cols,
-          ");"
+          ");\n\n",
+          -- Create or replace the function for handling insert and update triggers
+          "CREATE OR REPLACE FUNCTION ", triggerFunctionName, "() RETURNS TRIGGER AS $$\n",
+          "BEGIN\n",
+          "    RAISE NOTICE 'Trigger fired for % on table ", tableNameToText normalTableName, ": %', TG_OP, NEW.address;\n",
+          "    IF TG_OP = 'INSERT' THEN\n",
+          "        RAISE NOTICE 'Inserting into history table ", tableNameToText historyTableName', " for address: %', NEW.address;\n",
+          "        INSERT INTO ",
+          tableNameToDoubleQuoteText historyTableName',
+          " VALUES (NEW.*);\n",
+          "    ELSIF TG_OP = 'UPDATE' THEN\n",
+          "        RAISE NOTICE 'Updating history table ", tableNameToText historyTableName', " for address: %', NEW.address;\n",
+          "        INSERT INTO ",
+          tableNameToDoubleQuoteText historyTableName',
+          " VALUES (NEW.*);\n",
+          "    END IF;\n",
+          "    RETURN NEW;\n",
+          "END;\n",
+          "$$ LANGUAGE plpgsql;\n\n",
+          -- Create trigger for insert operations
+          "CREATE TRIGGER \"after_insert_on_",
+          tableNameToText normalTableName, "\"",
+          "\nAFTER INSERT ON ",
+          tableNameToDoubleQuoteText normalTableName,
+          "\nFOR EACH ROW EXECUTE PROCEDURE ", triggerFunctionName, "();\n\n",
+          -- Create trigger for update operations
+          "CREATE TRIGGER \"after_update_on_",
+          tableNameToText normalTableName, "\"",
+          "\nAFTER UPDATE ON ",
+          tableNameToDoubleQuoteText normalTableName,
+          "\nFOR EACH ROW EXECUTE PROCEDURE ", triggerFunctionName, "();"
         ]
 
 createAbstractHistoryTableQuery :: (Text, Text, Text) -> TableColumns -> Text
@@ -1172,17 +1204,18 @@ insertAbstractTableQuery cs =
                     E.creator,
                     E.root
                   ]
-                (vals, jsonPaths, jsonValues) = unzip3 $ flip map contracts $ \((row, contractColumns), _) ->
+                (vals, dataVals') = unzip $ flip map contracts $ \((row, contractColumns), _) ->
                   let baseRowVals = map (wrapSingleQuotes . ($ row)) baseVals 
                       contractNameVal = [wrapSingleQuotes $ escapeQuotes (tableNameToText contractTableName)] 
-                      dataVals = Map.filterWithKey (\k _ -> k `notElem` abColumns) contractColumns 
-                      jsonPathz = T.concat ["'{", csv (map (\(k, _) -> T.concat ["\"", escapeQuotes k, "\""]) (Map.toList dataVals)), "}'"]
-                      jsonValuez = csv (map (wrapSingleQuotes . wrapDoubleQuotes . removeSingleQuotes . removeSingleQuotes) $ Map.elems dataVals)
+                      dataVals = [wrapSingleQuotes (decodeUtf8 . BL.toStrict $ Aeson.encode $ MapWrapper $ aesonHelper (Map.filterWithKey (\k _ -> k `notElem` abColumns) contractColumns )) <> "::jsonb"]
+                      -- jsonPathz = T.concat ["'{", csv (map (\(k, _) -> T.concat ["\"", escapeQuotes k, "\""]) (Map.toList dataVals)), "}'"]
+                      -- jsonValuez = csv (map (wrapSingleQuotes . wrapDoubleQuotes . removeSingleQuotes . removeSingleQuotes) $ Map.elems dataVals)
                       regularVals = [(snd kv) | kv@(k, _) <- Map.toList contractColumns, k `elem` keysForSQL]
                       fkeyVals = ["NULL" | k <- fkeyColumns, k `elem` keysForSQL]  -- This avoids circular dependencies as the inserts occur first and set fkeys=null
-                      valsForSQL = baseRowVals ++ contractNameVal ++ [wrapSingleQuotes (decodeUtf8 . BL.toStrict $ Aeson.encode $ MapWrapper $ aesonHelper dataVals) <> "::jsonb"] ++ regularVals ++ fkeyVals
-                  in (wrapAndEscape valsForSQL, jsonPathz, jsonValuez)
+                      valsForSQL = baseRowVals ++ contractNameVal ++ dataVals ++ regularVals ++ fkeyVals
+                  in (wrapAndEscape valsForSQL, wrapAndEscape dataVals)
                 inserts = csv vals
+                dataVals'' = csv dataVals'
             in (: []) $
                   T.concat $
                     [ "INSERT INTO ",
@@ -1198,15 +1231,12 @@ insertAbstractTableQuery cs =
                       "    transaction_hash = excluded.transaction_hash,\n",
                       "    transaction_sender = excluded.transaction_sender,\n",
                       "    contract_name = excluded.contract_name,\n",
-                      "    data = jsonb_set(",
+                      "    data = ",
                       abTableName,
-                      ".data, ",
-                      head jsonPaths,
-                      ", ",
-                      if head jsonValues == ""
+                      ".data || ",
+                      if dataVals'' == "{}"
                         then "excluded.data::jsonb" 
-                        else "(" <> head jsonValues <> ")::jsonb",
-                      ")",
+                        else dataVals'',
                       if null keysForSQL then "" else ",\n    ",
                       tableUpsert keysForSQL,
                       ";"
@@ -1393,63 +1423,63 @@ updateFkeysQueryArray rows = concatMap createUpdateQuery rows
         , ";"
         ]]
 
-insertHistoryTableQuery :: [E.ProcessedContract] -> [Text]
-insertHistoryTableQuery [] = error "insertHistoryTableQuery: unhandled empty list"
-insertHistoryTableQuery cs =
-  concat $
-    let cs' = (\c -> (c, Map.toList $ Map.mapMaybe valueToSQLText $ E.contractData c)) <$> cs
-     in flip map (map snd $ partitionWith (length . snd) cs') $ \case
-          [] -> []
-          contracts@((x, list) : _) ->
-            let tableName =
-                  historyTableName
-                    (case (E.cc_creator x) of 
-                      Just cc_creator' -> cc_creator'
-                      Nothing -> (E.creator x))
-                    (E.application x)
-                    (E.contractName x)
-                keySt = wrapAndEscapeDouble . map escapeQuotes $ baseTableColumns ++ map fst (fillFirstEmptyEntries list)
-                baseVals =
-                  [ tshow . E.address,
-                    T.pack . keccak256ToHex . E.blockHash,
-                    tshow . E.blockTimestamp,
-                    tshow . E.blockNumber,
-                    T.pack . keccak256ToHex . E.transactionHash,
-                    tshow . E.transactionSender,
-                    E.creator,
-                    E.root
-                  ]
-                address = (tshow . E.address) x
-                vals = flip map contracts $ \(row, rowList) ->
-                  wrapAndEscape $ map (wrapSingleQuotes . wrapSingleQuotes . ($ row)) baseVals ++ map snd rowList
-                inserts = csv vals
-             in (: []) . T.concat $
-                  ["DO $$\nDECLARE\n"
-                       , "    col_name RECORD;\n"
-                       , "    column_list TEXT := ' ';\n"
-                       , "    select_list TEXT := ' ';\n"
-                       , "BEGIN\n"
-                       , "    FOR col_name IN\n"
-                       , "        SELECT column_name\n"
-                       , "        FROM information_schema.columns\n"
-                       , "        WHERE table_name = ", tableNameToDoubleQuoteText tableName, "\n"
-                       , "        AND column_name NOT IN (", keySt,", 'address')\n"
-                       , "    LOOP\n"
-                       , "        column_list := column_list || col_name.column_name || ', ';\n"
-                       , "        select_list := select_list || col_name.column_name || ', ';\n"
-                       , "    END LOOP;\n"
-                       , "    column_list := rtrim(column_list, ', ');\n"
-                       , "    select_list := rtrim(select_list, ', ');\n"
-                       , "    EXECUTE 'WITH selected_row AS (\n"
-                       , "                SELECT ' || select_list || '\n"
-                       , "                FROM ", tableNameToDoubleQuoteText tableName, "\n"
-                       , "                WHERE address = ''", wrapSingleQuotes address, "''\n"
-                       , "                LIMIT 1\n"
-                       , "             )\n"
-                       , "             INSERT INTO ", tableNameToDoubleQuoteText tableName, " (", keySt, ", ' || column_list || ')\n"
-                       , "             SELECT ", inserts, ", ' || select_list || '\n"
-                       , "             FROM selected_row;';\n"
-                       , "END $$;"]
+-- insertHistoryTableQuery :: [E.ProcessedContract] -> [Text]
+-- insertHistoryTableQuery [] = error "insertHistoryTableQuery: unhandled empty list"
+-- insertHistoryTableQuery cs =
+--   concat $
+--     let cs' = (\c -> (c, Map.toList $ Map.mapMaybe valueToSQLText $ E.contractData c)) <$> cs
+--      in flip map (map snd $ partitionWith (length . snd) cs') $ \case
+--           [] -> []
+--           contracts@((x, list) : _) ->
+--             let tableName =
+--                   historyTableName
+--                     (case (E.cc_creator x) of 
+--                       Just cc_creator' -> cc_creator'
+--                       Nothing -> (E.creator x))
+--                     (E.application x)
+--                     (E.contractName x)
+--                 keySt = wrapAndEscapeDouble . map escapeQuotes $ baseTableColumns ++ map fst (fillFirstEmptyEntries list)
+--                 baseVals =
+--                   [ tshow . E.address,
+--                     T.pack . keccak256ToHex . E.blockHash,
+--                     tshow . E.blockTimestamp,
+--                     tshow . E.blockNumber,
+--                     T.pack . keccak256ToHex . E.transactionHash,
+--                     tshow . E.transactionSender,
+--                     E.creator,
+--                     E.root
+--                   ]
+--                 address = (tshow . E.address) x
+--                 vals = flip map contracts $ \(row, rowList) ->
+--                   wrapAndEscape $ map (wrapSingleQuotes . wrapSingleQuotes . ($ row)) baseVals ++ map snd rowList
+--                 inserts = csv vals
+--              in (: []) . T.concat $
+--                   ["DO $$\nDECLARE\n"
+--                        , "    col_name RECORD;\n"
+--                        , "    column_list TEXT := ' ';\n"
+--                        , "    select_list TEXT := ' ';\n"
+--                        , "BEGIN\n"
+--                        , "    FOR col_name IN\n"
+--                        , "        SELECT column_name\n"
+--                        , "        FROM information_schema.columns\n"
+--                        , "        WHERE table_name = ", tableNameToDoubleQuoteText tableName, "\n"
+--                        , "        AND column_name NOT IN (", keySt,", 'address')\n"
+--                        , "    LOOP\n"
+--                        , "        column_list := column_list || col_name.column_name || ', ';\n"
+--                        , "        select_list := select_list || col_name.column_name || ', ';\n"
+--                        , "    END LOOP;\n"
+--                        , "    column_list := rtrim(column_list, ', ');\n"
+--                        , "    select_list := rtrim(select_list, ', ');\n"
+--                        , "    EXECUTE 'WITH selected_row AS (\n"
+--                        , "                SELECT ' || select_list || '\n"
+--                        , "                FROM ", tableNameToDoubleQuoteText tableName, "\n"
+--                        , "                WHERE address = ''", wrapSingleQuotes address, "''\n"
+--                        , "                LIMIT 1\n"
+--                        , "             )\n"
+--                        , "             INSERT INTO ", tableNameToDoubleQuoteText tableName, " (", keySt, ", ' || column_list || ')\n"
+--                        , "             SELECT ", inserts, ", ' || select_list || '\n"
+--                        , "             FROM selected_row;';\n"
+--                        , "END $$;"]
 
 -- Creates tables for all event declarations, stores table name in
 -- globals{createdEvents}

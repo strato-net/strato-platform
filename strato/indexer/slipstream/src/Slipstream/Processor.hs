@@ -476,7 +476,7 @@ processTheMessages env conn messages = do
   
   forM_ insertsByCodeHash $ \ins -> do
     outputData conn $ insertIndexTable $ indexInsert ins
-    outputData conn $ insertHistoryTable $ historyInserts ins
+    -- outputData conn $ insertHistoryTable $ historyInserts ins
     outputData conn $ insertAbstractTable (abstractInserts ins)-- not historic
     unless ((length (collectionInserts ins) < 1)) $ outputData conn $ insertCollectionTable $ collectionInserts ins
     -- outputData conn $ insertHistoryAbstractTable (abstractInserts ins) (historyInserts ins)
