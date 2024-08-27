@@ -114,7 +114,7 @@ function marshalOut(_args) {
   const { unitsPerDollar, amount, totalPrice, createdDate, block_timestamp, status } = _args;
   const args = {
     ..._args,
-    totalPrice: totalPrice || (unitsPerDollar ? Math.round((amount * 100) / unitsPerDollar) / 100 : amount),
+    totalPrice: totalPrice ? totalPrice : amount,
     createdDate: createdDate || (new Date(block_timestamp)).getTime() / 1000,
     status: status || 3,
   };
