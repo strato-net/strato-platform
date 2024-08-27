@@ -172,6 +172,13 @@ export const Marketplace = {
   getPriceHistory: "/priceHistory",
 };
 
+export const Wallet = {
+  prefix: "/wallet",
+  getWalletSummary: "/summary",
+  getWalletAssets: "/assets",
+  getStratsBalance: "/strats",
+};
+
 export const PaymentService = {
   prefix: "/payment",
   getAll: "/",
