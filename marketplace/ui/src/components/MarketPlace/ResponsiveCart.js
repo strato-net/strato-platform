@@ -134,7 +134,7 @@ const ResponsiveCart = ({
         const url = `${serviceURL}${checkoutRoute}?email=${encodeURIComponent(user.email)}&checkoutHash=${checkoutHash}&redirectUrl=${window.location.protocol}//${window.location.host}/order/status`;
         window.location.replace(url);
       } else {
-        window.location.replace(`/order/status?assets=${assets}`);
+        window.location.replace(`/order/status?assets=${assets}&orderHash=${checkoutHash}`);
       }
     }
   };
