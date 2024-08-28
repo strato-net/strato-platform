@@ -15,6 +15,7 @@ import BlockApps.Crossmon
 import BlockApps.Logging
 import qualified Blockchain.Bagger.BaggerState as B
 import Blockchain.Bagger.Transactions
+import Blockchain.Blockstanbul.Authentication
 --import           Blockchain.Data.Block
 
 import Blockchain.DB.ChainDB
@@ -595,11 +596,13 @@ buildNextBlockHeader parentHeader parentHash stateRoot txs time vd cd =
   let parentNum = number parentHeader
       (newV, remV) = fromDelta vd
       (newC, revC) = fromDelta cd
-      curValidators = S.toList $ S.difference
-                                   (S.union
-                                     (S.fromList (currentValidators parentHeader))
-                                     (S.fromList (newValidators parentHeader)))
-                                   (S.fromList (removedValidators parentHeader))
+      curValidators = case parentHeader of
+        BlockHeaderV2{} -> S.toList $ S.difference
+                                       (S.union
+                                         (getValidatorSet parentHeader)
+                                         (S.fromList $ newValidators parentHeader))
+                                       (S.fromList $ removedValidators parentHeader)
+        BlockHeader{} -> S.toList $ getValidatorSet parentHeader
    in BlockHeaderV2
         {
           parentHash = parentHash,

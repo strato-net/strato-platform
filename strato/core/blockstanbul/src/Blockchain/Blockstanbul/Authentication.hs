@@ -50,6 +50,9 @@ instance Arbitrary IstanbulExtra where
 instance Arbitrary ExtraData where
   arbitrary = liftM2 ExtraData arbitrary arbitrary
 
+getValidatorSet :: HasIstanbulExtra h => h -> Set Validator
+getValidatorSet =  evalIstanbulExtra (maybe S.empty $ S.map chainMemberParsedSetToValidator . unChainMembers . _validatorList)
+
 addValidators :: HasIstanbulExtra h => ChainMembers -> h -> h
 addValidators vs = execIstanbulExtra (const . Just $ IstanbulExtra vs Nothing [])
 
