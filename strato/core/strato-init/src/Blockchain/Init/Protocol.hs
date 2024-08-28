@@ -13,12 +13,11 @@ where
 
 import Blockchain.Data.GenesisInfo
 import Blockchain.EthConf.Model
-import Blockchain.Strato.StateDiff.Kafka (filterResponse)
 import Blockchain.Stream.Raw
+import Control.Monad.Composable.Kafka
 import Control.Monad.IO.Class
 import qualified Data.Aeson as Ae
 import qualified Data.ByteString.Char8 as C8
-import qualified Data.ByteString.Lazy as BL
 import qualified Data.Text as T
 import GHC.Generics
 import qualified Network.Kafka as K
@@ -44,12 +43,10 @@ data EventInit
 initTopic :: K.TopicName
 initTopic = "strato-init-events"
 
-addEvent :: K.Kafka k => EventInit -> k ()
+addEvent :: HasKafka k => EventInit -> k ()
 addEvent ev = do
-  rsp <- produceBytes initTopic [BL.toStrict . Ae.encode $ ev]
-  case filterResponse rsp of
-    [] -> return ()
-    errs -> liftIO . die $ show errs
+  _ <- produceItemsAsJSON initTopic [ev]
+  return ()
 
 receiveEvent :: K.Kafka k => K.Offset -> k EventInit
 receiveEvent off = do

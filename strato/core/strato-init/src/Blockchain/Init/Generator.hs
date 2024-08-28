@@ -41,14 +41,14 @@ initializeTopic = createTopic initTopic
 genesisFiles :: [(FilePath, C8.ByteString)]
 genesisFiles = $(embedDir "genesisBlocks")
 
-mkAll :: HasKafka m =>
+mkAll :: (MonadMask m, HasKafka m) =>
          String -> m ()
 mkAll genesisBlockName = do
   execKafka initializeTopic
   ethconf <- liftIO genEthConf
-  execKafka $ addEvent $ EthConf ethconf
+  addEvent $ EthConf ethconf
 
-  execKafka $ addEvent $
+  addEvent $
     TopicList
       [ (t, t)
         | t <-
@@ -69,17 +69,17 @@ mkAll genesisBlockName = do
     (True, []) -> liftIO $ fmap (fmap $ map Net.webAddress) $ Net.getParams flags_network
     (True, _) -> return $ Just flags_stratoBootnode
 
-  execKafka $ addEvent $ PeerList bootnodes
+  addEvent $ PeerList bootnodes
 
   let genesisFileName = genesisBlockName ++ "Genesis.json"
       accountInfoFileName = genesisBlockName ++ "AccountInfo"
 
-  execKafka $ sendGenesisJson genesisFileName
-  execKafka $ sendAccountInfo accountInfoFileName
+  sendGenesisJson genesisFileName
+  sendAccountInfo accountInfoFileName
 
-  execKafka $ addEvent InitComplete
+  addEvent InitComplete
 
-sendGenesisJson :: Kafka m =>
+sendGenesisJson :: HasKafka m =>
                    FilePath -> m ()
 sendGenesisJson genesisFilename = do
   fsFile <- doesFileExist genesisFilename
@@ -93,13 +93,13 @@ sendGenesisJson genesisFilename = do
     Left err -> liftIO $ die err
     Right genInfo -> addEvent $ GenesisBlock genInfo
 
-sendAccountInfo :: (MonadMask m, Kafka m) =>
+sendAccountInfo :: (MonadMask m, HasKafka m) =>
                    FilePath -> m ()
 sendAccountInfo accountInfoFileName = do
   fsFile <- doesFileExist accountInfoFileName
   if fsFile
     then do
-      let sendChunks :: Kafka m => Handle -> m ()
+      let sendChunks :: HasKafka m => Handle -> m ()
           sendChunks h = do
             chk <- liftIO $ TIO.hGetChunk h
             unless (T.null chk) $ do
