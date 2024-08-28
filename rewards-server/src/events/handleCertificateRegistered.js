@@ -24,7 +24,7 @@ async function handleCertificateRegistered(event, token) {
     const queryResponse = await fetch(
       `https://${
         NODE_ENV === "prod" ? prodMarketplaceUrl : testnetMarketplaceUrl
-      }/cirrus/search/Certificate?certificateString=eq.${encodeURIComponent(targetCertificateString)}`,
+      }/cirrus/search/Certificate?certificateString=eq.${encodeURIComponent(targetCertificateString)}&select=userAddress`,
       {
         method: "GET",
         credentials: "same-origin",
@@ -53,16 +53,12 @@ async function handleCertificateRegistered(event, token) {
       console.error("No certificates found in the marketplace.");
       return;
     }
-    if (queryBody.length > 1) {
-      console.error("Multiple certificates found in the marketplace.");
-      return;
-    }
 
     // Fetch certificates based on transaction hash
     const userQueryResponse = await fetch(
       `https://${
         NODE_ENV === "prod" ? prodMarketplaceUrl : testnetMarketplaceUrl
-      }/cirrus/search/Certificate?userAddress=eq.${encodeURIComponent(queryBody[0].userAddress)}`,
+      }/cirrus/search/Certificate?userAddress=eq.${encodeURIComponent(queryBody[0].userAddress)}&select=count`,
       {
         method: "GET",
         credentials: "same-origin",
@@ -79,7 +75,7 @@ async function handleCertificateRegistered(event, token) {
       console.error("No certificates found in the marketplace. User address:", queryBody[0].userAddress);
       return;
     }
-    if (userQueryBody.length > 1) {
+    if (userQueryBody[0].count > 1) {
       console.error("Multiple certificates found in the marketplace. User address:", queryBody[0].userAddress);
       return;
     }
