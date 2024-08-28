@@ -1033,9 +1033,15 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
           throw new rest.RestError(RestStatus.BAD_REQUEST, "Cannot buy products from multiple sellers in the same Order/Checkout",);
         }
       }
+
+      // Get User's STRATS Asset Address
+      const stratsOriginAddress = await strats.getStratsAddress();
+      const stratsAssetAddresses = await inventoryJs.getAll(rawAdmin, { ownerCommonName: userCert.commonName, originAddress: stratsOriginAddress, queryOptions: { select: "address" }}, options);
+
       const createdDate = Math.floor(Date.now() / 1000);
       const paymentParameters = {
         address: paymentProvider.address,
+        stratsAssetAddresses,
         checkoutId: util.uid(),
         saleAddresses,
         quantities,
