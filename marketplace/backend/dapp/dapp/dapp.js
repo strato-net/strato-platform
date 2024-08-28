@@ -1143,7 +1143,7 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
     }
   };
 
-  contract.getStratsBalance = async function ( options = defaultOptions ) {
+  contract.getStratsBalance = async function ( args, options = defaultOptions ) {
     const stratsOriginAddress = await strats.getStratsAddress();
     const balance = await inventoryJs.getAll(rawAdmin, { ownerCommonName: userCert.commonName, originAddress: stratsOriginAddress, queryOptions: { select: "quantity.sum()" }}, options);
 
@@ -1158,9 +1158,91 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
   }
 
   contract.transferStrats = async function (args, options = defaultOptions) {
-    const res = await strats.transferStrats(rawAdmin, args, options)
-    return res;
-  }
+    try {
+      const { value: initialQuantity, to: newOwner } = args;
+  
+      // Get strats origin address
+      const stratsOriginAddress = await strats.getStratsAddress();
+      if (!stratsOriginAddress) {
+        throw new rest.RestError(RestStatus.BAD_REQUEST, "Strats origin address not found.");
+      }
+  
+      // Get all eligible strats for balance check and transfer
+      const strats = await inventoryJs.getAll(
+        rawAdmin,
+        {
+          ownerCommonName: userCert.commonName,
+          originAddress: stratsOriginAddress,
+          queryOptions: { select: "address,quantity" },
+          notEqualsField: 'quantity',
+          notEqualsValue: '0'
+        },
+        options
+      );
+  
+      if (!strats || strats.length === 0) {
+        throw new rest.RestError(RestStatus.BAD_REQUEST, "No eligible strats available for transfer.");
+      }
+  
+      let totalAvailableQuantity = 0;
+  
+      // Check if the balance is sufficient
+      for (const strat of strats) {
+        totalAvailableQuantity += strat.quantity;
+        if (totalAvailableQuantity >= initialQuantity) {
+          break;
+        }
+      }
+  
+      if (totalAvailableQuantity < initialQuantity) {
+        throw new rest.RestError(RestStatus.BAD_REQUEST, `Insufficient balance: Required ${initialQuantity}, but only ${totalAvailableQuantity} is available.`);
+      }
+  
+      let remainingQuantity = initialQuantity;
+  
+      // Second loop: Perform the transfer
+      for (const strat of strats) {
+        if (remainingQuantity <= 0) {
+          break;
+        }
+  
+        const transferQuantity = Math.min(strat.quantity, remainingQuantity);
+        const transferNumber = parseInt(util.uid());
+        const transfer = {
+          transferNumber,
+          newOwner,
+          quantity: transferQuantity,
+          price: 0,
+        };
+  
+        try {
+          await inventoryJs.transferItem(
+            rawAdmin,
+            { address: strat.address },
+            transfer,
+            options
+          );
+          remainingQuantity -= transferQuantity;
+        } catch (innerError) {
+          console.error(`Transfer failed for strat with address ${strat.address}:`, innerError);
+          throw new rest.RestError(RestStatus.INTERNAL_SERVER_ERROR, `Failed to transfer strat at address ${strat.address}.`);
+        }
+      }
+  
+      return {
+        status: RestStatus.OK,
+        message: 'Transfer completed successfully.',
+        remainingQuantity: 0
+      };
+  
+    } catch (error) {
+      console.error('TransferStrats operation failed:', error);
+      return {
+        status: error.status || RestStatus.ERROR,
+        message: error.message || 'An unknown error occurred during transfer.'
+      };
+    }
+  };  
 
   return contract;
 };
