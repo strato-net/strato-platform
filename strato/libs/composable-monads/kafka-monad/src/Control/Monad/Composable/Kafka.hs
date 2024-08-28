@@ -20,6 +20,7 @@ module Control.Monad.Composable.Kafka (
   commitSingleOffset,
   fetchSingleOffset,
   produceItems,
+  produceItemsAsJSON,
   consume,
   runConsume,
   fetchItems,
@@ -50,6 +51,7 @@ import Control.Monad.Loops
 import Control.Monad.Reader
 import Control.Monad.Trans.Except
 import Control.Monad.Trans.State
+import qualified Data.Aeson as JSON
 import Data.Binary
 import qualified Data.ByteString as B
 import qualified Data.ByteString.Base16 as B16
@@ -167,7 +169,13 @@ produceItems topicName events = do
   liftIO $ mapM_ parseKafkaResponse results
   return results
 
-
+produceItemsAsJSON :: (JSON.ToJSON a, HasKafka m) => TopicName -> [a] -> m [ProduceResponse]
+produceItemsAsJSON topicName events = do
+  results <-
+    execKafka $ produceMessagesAsSingletonSets $
+      (TopicAndMessage topicName . makeMessage . BL.toStrict . JSON.encode) <$> events
+  liftIO $ mapM_ parseKafkaResponse results
+  return results
 
 ----------------------
 --Consuming/Fetching--
