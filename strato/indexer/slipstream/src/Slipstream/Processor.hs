@@ -51,7 +51,7 @@ import Data.Function
 -- import Data.IORef
 import qualified Data.IntMap as I
 import qualified Data.Map.Ordered as OMap
-import Data.List (foldl', sortOn)
+import Data.List (sortOn)
 import qualified Data.Map as Map
 import Data.Maybe
 import Data.Ord (Down (..))
@@ -75,11 +75,6 @@ diffNull :: Action.DataDiff -> Bool
 diffNull (Action.EVMDiff m) = Map.null m
 diffNull (Action.SolidVMDiff m) = Map.null m
 
-mergeDiffs :: Action.DataDiff -> Action.DataDiff -> Action.DataDiff
-mergeDiffs (Action.EVMDiff lhs) (Action.EVMDiff rhs) = Action.EVMDiff $ lhs <> rhs
-mergeDiffs (Action.SolidVMDiff lhs) (Action.SolidVMDiff rhs) = Action.SolidVMDiff $ lhs <> rhs
-mergeDiffs lhs rhs = error $ "Invalid diff combination: " ++ show (lhs, rhs)
-
 data BatchedInserts = BatchedInserts
   { indexInsert :: (E.ProcessedContract, [T.Text]),
     abstractInserts :: [(E.ProcessedContract,[T.Text],T.Text, TableColumns)],
@@ -96,16 +91,6 @@ matters AggregateAction {..} =
   (actionType == Action.Create || (not $ diffNull actionStorage))
     && (resolvedCodePtrToSHA actionCodeHash /= emptyHash)
 
--- assumes all Actions in the list are for the same Account
-combineActions :: [AggregateAction] -> AggregateAction
-combineActions [] = error "cannot combine 0 actions"
-combineActions (x : xs) = foldl' merge x xs
-  where
-    merge a b =
-      b
-        { actionStorage = (mergeDiffs `on` actionStorage) b a,
-          actionMetadata = (Map.union `on` actionMetadata) b a
-        }
 
 splitActions :: [AggregateAction] -> [(Account, [AggregateAction])]
 splitActions = partitionWith actionAccount
@@ -159,19 +144,6 @@ rowToInsert abiid row cont =
   -- setContractState gref (actionAccount row) newState
   in return $ processedContract abiid (Map.fromList $ newState) row
 
-rowToHistories ::
-  (MonadIO m) =>
-  ABIID ->
-  [AggregateAction] ->
-  OLD.Contract ->
-  m [E.ProcessedContract]
-rowToHistories abiId actions cont = do
-  forM actions $ \hRow -> do
-    let updatedMap = case actionStorage hRow of
-          Action.EVMDiff mp     -> SVR.decodeCacheValues cont (flip Map.lookup mp) []
-          Action.SolidVMDiff mp -> SolidVM.decodeCacheValues mp
-    let newMap = Map.fromList updatedMap
-    return $ processedContract abiId newMap hRow
 
 rowToCollections :: MonadIO m => AggregateAction -> m (Map.Map Text Value)
 rowToCollections row = do
@@ -410,57 +382,57 @@ processTheMessages env conn messages = do
   let fkeys = rights $ fkeys' -- ++ dfkeys'
       concatFkeys = concat fkeys
 
-  inserts <- enterBloc2 env $ do
+  inserts <- fmap concat $ enterBloc2 env $ do
     forM changes $ \(_, actions) -> do
-      let row = combineActions actions
-      $logDebugS "processTheMessages" $ "Combined Action = " <> formatAction row
-      $logDebugS "processTheMessages" $ T.pack $ "the diff is " ++ format (actionStorage row)
-
-      case actionStorage row of
-        Action.EVMDiff {} -> pure $ Left "EVM code indexing ignored"
-        Action.SolidVMDiff {} -> do
-          let cid = maybe "" (T.pack . chainIdString . ChainId) $ (actionAccount row ^. accountChainId)
-              name = case actionCodeHash row of
-                SolidVMCode name' _ -> name'
-                _ -> error "internal error: contract should be SolidVM for SolidVM"
-              abiid =
-                ABIID
-                  { aiName = T.pack name,
-                    aiChain = cid
-                  }
-              cont = error "internal error: contract should be unused for SolidVM"
-          $logInfoLS "Contract name is: " $ T.pack $ show name
-          indexContract <- rowToInsert abiid row cont
-          let fkeysForThisContract = getContractsFromPC indexContract
-          hs <- rowToHistories abiid actions cont
-          let mapNames = actionMappings row --recorded mappings
-              arrNames = actionArrays row --all
-              collectionNames = mapNames ++ arrNames
-              abstracts = actionAbstracts row
-          --get columns for abstract table
-          $logInfoLS "abstractColumns" $ T.pack $ "Getting abstract columns from " ++ (show abstracts)
-          abstractColumns' <- fmap catMaybes . for (Map.toList abstracts) $ \((_, n'), (cr', ap', cols)) -> do
-              let cregator = fromMaybe cr' (actionCCCreator row)
-                  tableName = AbstractTableName cregator ap' n'
-                  tableNameText = tableNameToDoubleQuoteText tableName
-              $logDebugLS "actionCCCreator" $ T.pack (show (actionCCCreator row))
-              $logDebugLS "cregator" $ T.pack (show cregator)
-              $logInfoS "Row will be inserted into abstract table: " tableNameText
-              $logInfoS "cols: " $ T.pack (show cols)
-              
-              let result = (indexContract, fkeysForThisContract, tableNameText, (cr', ap', n'), cols)
-              -- $logInfoS "extractedCols: " $ T.pack (show extractedCols)
-              $logInfoS "result: " $ T.pack (show result)
-              pure (Just result)
-          $logDebugLS "Globals: Recorded Map names are: " . T.pack $ show mapNames ++ " contract: " ++ show (E.contractName indexContract)
-          $logDebugLS "Globals: Recorded Array names are: " . T.pack $ show arrNames ++ " contract: " ++ show (E.contractName indexContract)
-          $logDebugLS "History inserts are: " $ T.pack $ show hs
-          stateDiff <- rowToCollections row
-          parents' <- pure $ map (\(_,_,_,p ,_)-> p) abstractColumns'
-          abstractColumns <- pure $ map (\(a,b,c,_,e) -> (a,b,c,e)) abstractColumns'
-          pCollections <- processedContractToProcessedCollectionRows stateDiff (collectionNames) row abiid (actionCCCreator row) --get all collection rows to insert
-          pCollectionsWithAbstracts <- pure $ duplicateForParentsAndIncludeOriginal pCollections parents'
-          pure . Right $ BatchedInserts (indexContract, fkeysForThisContract) abstractColumns hs pCollectionsWithAbstracts
+      -- let row = combineActions actions
+      -- $logDebugS "processTheMessages" $ "Combined Action = " <> formatAction row
+      -- $logDebugS "processTheMessages" $ T.pack $ "the diff is " ++ format (actionStorage row)
+      forM actions $ \(row) -> do
+        case actionStorage row of
+          Action.EVMDiff {} -> pure $ Left "EVM code indexing ignored"
+          Action.SolidVMDiff {} -> do
+            let cid = maybe "" (T.pack . chainIdString . ChainId) $ (actionAccount row ^. accountChainId)
+                name = case actionCodeHash row of
+                  SolidVMCode name' _ -> name'
+                  _ -> error "internal error: contract should be SolidVM for SolidVM"
+                abiid =
+                  ABIID
+                    { aiName = T.pack name,
+                      aiChain = cid
+                    }
+                cont = error "internal error: contract should be unused for SolidVM"
+            $logInfoLS "Contract name is: " $ T.pack $ show name
+            indexContract <- rowToInsert abiid row cont
+            let fkeysForThisContract = getContractsFromPC indexContract
+            -- hs <- rowToHistories abiid actions cont
+            let mapNames = actionMappings row --recorded mappings
+                arrNames = actionArrays row --all
+                collectionNames = mapNames ++ arrNames
+                abstracts = actionAbstracts row
+            --get columns for abstract table
+            $logInfoLS "abstractColumns" $ T.pack $ "Getting abstract columns from " ++ (show abstracts)
+            abstractColumns' <- fmap catMaybes . for (Map.toList abstracts) $ \((_, n'), (cr', ap', cols)) -> do
+                let cregator = fromMaybe cr' (actionCCCreator row)
+                    tableName = AbstractTableName cregator ap' n'
+                    tableNameText = tableNameToDoubleQuoteText tableName
+                $logDebugLS "actionCCCreator" $ T.pack (show (actionCCCreator row))
+                $logDebugLS "cregator" $ T.pack (show cregator)
+                $logInfoS "Row will be inserted into abstract table: " tableNameText
+                $logInfoS "cols: " $ T.pack (show cols)
+                
+                let result = (indexContract, fkeysForThisContract, tableNameText, (cr', ap', n'), cols)
+                -- $logInfoS "extractedCols: " $ T.pack (show extractedCols)
+                $logInfoS "result: " $ T.pack (show result)
+                pure (Just result)
+            $logDebugLS "Globals: Recorded Map names are: " . T.pack $ show mapNames ++ " contract: " ++ show (E.contractName indexContract)
+            $logDebugLS "Globals: Recorded Array names are: " . T.pack $ show arrNames ++ " contract: " ++ show (E.contractName indexContract)
+            $logDebugLS "History inserts are: " $ T.pack $ show indexContract
+            stateDiff <- rowToCollections row
+            parents' <- pure $ map (\(_,_,_,p ,_)-> p) abstractColumns'
+            abstractColumns <- pure $ map (\(a,b,c,_,e) -> (a,b,c,e)) abstractColumns'
+            pCollections <- processedContractToProcessedCollectionRows stateDiff (collectionNames) row abiid (actionCCCreator row) --get all collection rows to insert
+            pCollectionsWithAbstracts <- pure $ duplicateForParentsAndIncludeOriginal pCollections parents'
+            pure . Right $ BatchedInserts (indexContract, fkeysForThisContract) abstractColumns [indexContract] pCollectionsWithAbstracts
 
   forM_ (lefts inserts) $ $logErrorS "processTheMessages"
 
@@ -471,10 +443,8 @@ processTheMessages env conn messages = do
   
   forM_ insertsByCodeHash $ \ins -> do
     outputData conn $ insertIndexTable $ indexInsert ins
-    -- outputData conn $ insertHistoryTable $ historyInserts ins
-    -- outputData conn $ insertAbstractTable (abstractInserts ins)-- not historic
+    outputData conn $ insertAbstractTable (abstractInserts ins)-- not historic
     unless ((length (collectionInserts ins) < 1)) $ outputData conn $ insertCollectionTable $ collectionInserts ins
-    outputData conn $ insertHistoryAbstractTable (abstractInserts ins) (historyInserts ins)
 
 --updating the foreign keys from null
   outputDataDedup conn . forM_ insertsByCodeHash $ \ins -> do

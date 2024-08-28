@@ -26,7 +26,6 @@ module Slipstream.OutputData (
   insertArrayTableQuery,
   insertAbstractTable,
   insertAbstractTableQuery,
-  insertHistoryAbstractTable,
   createIndexTable,
   createMappingTable,
   createArrayTable,
@@ -768,26 +767,6 @@ insertForeignKeys conn contract = do
             <> wrapDoubleQuotes theName
             <> "=null WHERE address="
             <> wrapSingleQuotes (makeAccount (E.chain c) (E.address c))
-
--- insertHistoryTable ::
---   OutputM m =>
---   [E.ProcessedContract] ->
---   ConduitM () Text m ()
--- insertHistoryTable [] = return () --no data, do nothing
--- insertHistoryTable contracts@(E.ProcessedContract {creator = crtr, application = app, contractName = cName} : _) = do
---   let tableName = historyTableName crtr app cName
---   $logDebugLS "insertHistoryTable" $ T.pack $ "Inserting row in history table for: " ++ show tableName
---   yieldMany $ insertHistoryTableQuery contracts
-
-insertHistoryAbstractTable :: 
-  OutputM m => 
-  [(E.ProcessedContract, [T.Text], T.Text, TableColumns)] ->
-  [E.ProcessedContract] ->
-  ConduitM () Text m ()
-insertHistoryAbstractTable [] _ = pure ()
-insertHistoryAbstractTable abstracts hists = do 
-  let historyAbstracts = [(history, fkeys, tableName, tableCols) | history <- hists, (_, fkeys, tableName, tableCols) <- abstracts]
-  yieldMany $ insertAbstractTableQuery historyAbstracts
 
 insertAbstractTable ::
   OutputM m =>
