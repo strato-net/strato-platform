@@ -17,6 +17,11 @@ pipeline {
             currentBuild.result = 'FAILURE'
             sh "exit 1"
           }
+          if(env.RELEASE_TYPE != 'master' && env.RELEASE_TYPE != 'marketplace-master') {
+            echo "Unexpected RELEASE_TYPE: ${env.RELEASE_TYPE}, expected 'master' or 'marketplace-master'. Exit 1."
+            currentBuild.result = 'FAILURE'
+            sh "exit 1"
+          }
           lib = load("${env.WORKSPACE}/pipelines/Jenkinsfile.library")
         }
         sh '''#!/bin/bash -le
