@@ -110,8 +110,8 @@ const TransactionResponsive = ({ data , user}) => {
               />
             </Col>
             <Col span={8} offset={1} className="flex flex-col justify-between">
-              <p className="text-base font-bold text-truncate-single-line" onClick={()=>{handleAssetRedirection()}}> {assetName} </p>
-              <p style={{ color: "#13188A" }} className="font-semibold" onClick={() => {
+              <p className="text-base font-bold text-truncate-single-line cursor-pointer" onClick={()=>{handleAssetRedirection()}}> {assetName} </p>
+              <p style={{ color: "#13188A" }} className={`font-semibold ${type === 'Transfer' ? 'cursor-default' : 'cursor-pointer' }`} onClick={() => {
                 handleDetailRedirection()
               }}>
                 #{reference}

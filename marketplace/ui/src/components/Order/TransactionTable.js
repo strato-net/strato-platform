@@ -89,7 +89,6 @@ const TransactionTable = ({ user, selectedDate, onDateChange, download, isAllOrd
     }
   }, [search])
 
-
   const Content = ({ data }) => {
     const price = data?.assetPrice || data?.price
     return <div className="min-h-44 h-full" style={{ width: '460px' }}>
@@ -148,7 +147,7 @@ const TransactionTable = ({ user, selectedDate, onDateChange, download, isAllOrd
           onClick={() => {
             handleDetailRedirection(data)
           }}
-          className="text-[#13188A] hover:text-primaryHover cursor-pointer"
+          className={`text-[#13188A] hover:text-primaryHover ${data.type === 'Transfer' ? 'cursor-default' : 'cursor-pointer' }`}
         >
           {`#${`${reference}`.substring(0, 6)}`}
         </p>
