@@ -26,12 +26,11 @@ module Slipstream.OutputData (
   insertArrayTableQuery,
   insertAbstractTable,
   insertAbstractTableQuery,
-  -- insertHistoryAbstractTable,
+  insertHistoryAbstractTable,
   createIndexTable,
   createMappingTable,
   createArrayTable,
   createAbstractTable,
-  -- insertHistoryTable,
   createExpandEventTables,
   createExpandIndexTable,
   createForeignIndexesForJoins,
@@ -780,15 +779,15 @@ insertForeignKeys conn contract = do
 --   $logDebugLS "insertHistoryTable" $ T.pack $ "Inserting row in history table for: " ++ show tableName
 --   yieldMany $ insertHistoryTableQuery contracts
 
--- insertHistoryAbstractTable :: 
---   OutputM m => 
---   [(E.ProcessedContract, [T.Text], T.Text, TableColumns)] ->
---   [E.ProcessedContract] ->
---   ConduitM () Text m ()
--- insertHistoryAbstractTable [] _ = pure ()
--- insertHistoryAbstractTable abstracts hists = do 
---   let historyAbstracts = [(history, fkeys, tableName, tableCols) | history <- hists, (_, fkeys, tableName, tableCols) <- abstracts]
---   yieldMany $ insertHistoryAbstractTableQuery historyAbstracts
+insertHistoryAbstractTable :: 
+  OutputM m => 
+  [(E.ProcessedContract, [T.Text], T.Text, TableColumns)] ->
+  [E.ProcessedContract] ->
+  ConduitM () Text m ()
+insertHistoryAbstractTable [] _ = pure ()
+insertHistoryAbstractTable abstracts hists = do 
+  let historyAbstracts = [(history, fkeys, tableName, tableCols) | history <- hists, (_, fkeys, tableName, tableCols) <- abstracts]
+  yieldMany $ insertAbstractTableQuery historyAbstracts
 
 insertAbstractTable ::
   OutputM m =>

@@ -63,8 +63,6 @@ import Database.PostgreSQL.Typed (PGConnection)
 import SelectAccessible ()
 import Slipstream.Data.Action
 import qualified Slipstream.Events as E
--- import Slipstream.Globals
-import Slipstream.Metrics
 import Slipstream.OutputData
 import Slipstream.QueryFormatHelper
 import SolidVM.Model.CodeCollection hiding (contractName)
@@ -169,10 +167,11 @@ rowToHistories ::
   m [E.ProcessedContract]
 rowToHistories abiId actions cont = do
   forM actions $ \hRow -> do
-    let newMap = case actionStorage hRow of
-          Action.EVMDiff mp -> SVR.decodeCacheValues cont (flip Map.lookup mp) []
+    let updatedMap = case actionStorage hRow of
+          Action.EVMDiff mp     -> SVR.decodeCacheValues cont (flip Map.lookup mp) []
           Action.SolidVMDiff mp -> SolidVM.decodeCacheValues mp
-    return $ processedContract abiId (Map.fromList newMap) hRow
+    let newMap = Map.fromList updatedMap
+    return $ processedContract abiId newMap hRow
 
 rowToCollections :: MonadIO m => AggregateAction -> m (Map.Map Text Value)
 rowToCollections row = do
@@ -357,12 +356,12 @@ processTheMessages env conn messages = do
             
             deferredForeignKeys <- case (_contractType c) of
               AbstractType -> do
-                abstractfkeys <- outputData conn $ createExpandAbstractTable c nameParts abstracts' cc
+                abstractfkeys <- outputDataDedup conn $ createExpandAbstractTable c nameParts abstracts' cc
                 outputData' conn $ createExpandHistoryTable True c cc nameParts
                 $logInfoS "processTheMessages/deferredForeignKeys/abstractfkeys" $ T.pack $ show abstractfkeys
                 return abstractfkeys
               _ -> do
-                indexfkeys <- outputData conn $ createExpandIndexTable c cc nameParts
+                indexfkeys <- outputDataDedup conn $ createExpandIndexTable c cc nameParts
                 $logInfoS "processTheMessages/deferredForeignKeys/indexfkeys" $ T.pack $ show indexfkeys
                 outputData' conn $ createExpandHistoryTable False c cc nameParts
                 return indexfkeys
@@ -414,8 +413,6 @@ processTheMessages env conn messages = do
   inserts <- enterBloc2 env $ do
     forM changes $ \(_, actions) -> do
       let row = combineActions actions
-      mapM_ recordAction actions
-      recordCombinedAction row
       $logDebugS "processTheMessages" $ "Combined Action = " <> formatAction row
       $logDebugS "processTheMessages" $ T.pack $ "the diff is " ++ format (actionStorage row)
 
@@ -433,7 +430,6 @@ processTheMessages env conn messages = do
                   }
               cont = error "internal error: contract should be unused for SolidVM"
           $logInfoLS "Contract name is: " $ T.pack $ show name
-          -- oldState <- readPreviousSolidVMState  acct
           indexContract <- rowToInsert abiid row cont
           let fkeysForThisContract = getContractsFromPC indexContract
           hs <- rowToHistories abiid actions cont
@@ -452,7 +448,6 @@ processTheMessages env conn messages = do
               $logInfoS "Row will be inserted into abstract table: " tableNameText
               $logInfoS "cols: " $ T.pack (show cols)
               
-              -- let extractedCols = map extractTextInsideQuotes cols
               let result = (indexContract, fkeysForThisContract, tableNameText, (cr', ap', n'), cols)
               -- $logInfoS "extractedCols: " $ T.pack (show extractedCols)
               $logInfoS "result: " $ T.pack (show result)
@@ -477,9 +472,9 @@ processTheMessages env conn messages = do
   forM_ insertsByCodeHash $ \ins -> do
     outputData conn $ insertIndexTable $ indexInsert ins
     -- outputData conn $ insertHistoryTable $ historyInserts ins
-    outputData conn $ insertAbstractTable (abstractInserts ins)-- not historic
+    -- outputData conn $ insertAbstractTable (abstractInserts ins)-- not historic
     unless ((length (collectionInserts ins) < 1)) $ outputData conn $ insertCollectionTable $ collectionInserts ins
-    -- outputData conn $ insertHistoryAbstractTable (abstractInserts ins) (historyInserts ins)
+    outputData conn $ insertHistoryAbstractTable (abstractInserts ins) (historyInserts ins)
 
 --updating the foreign keys from null
   outputDataDedup conn . forM_ insertsByCodeHash $ \ins -> do

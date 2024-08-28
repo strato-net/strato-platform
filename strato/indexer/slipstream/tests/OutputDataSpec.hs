@@ -895,13 +895,11 @@ spec = do
     '',
     '',
     'SwissArmyz',
-    '{"addr2":"00000000000000000000000000000000deadbeef"}')
-                          ON CONFLICT (address) DO UPDATE SET
-                            block_hash = excluded.block_hash,
-                            block_timestamp = excluded.block_timestamp,
-                            block_number = excluded.block_number,
-                            transaction_hash = excluded.transaction_hash,
-                            transaction_sender = excluded.transaction_sender,
-                            contract_name = excluded.contract_name,
-                            data = excluded.data
-                          ;|]
+    '{"addr2":"00000000000000000000000000000000deadbeef"}'::jsonb) ON CONFLICT (address) DO UPDATE SET
+    block_hash = excluded.block_hash,
+    block_timestamp = excluded.block_timestamp,
+    block_number = excluded.block_number,
+    transaction_hash = excluded.transaction_hash,
+    transaction_sender = excluded.transaction_sender,
+    contract_name = excluded.contract_name,
+    data = SwissArmy.data || ('{"addr2":"00000000000000000000000000000000deadbeef"}'::jsonb);|]
