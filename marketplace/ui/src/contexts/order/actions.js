@@ -530,6 +530,11 @@ const actions = {
           error: "Unauthorized while fetching users" 
         });
         window.location.href = body.error.loginUrl;
+      } else if(response.status === RestStatus.GATEWAY_TIMEOUT) {
+        dispatch({ 
+          type: actionDescriptors.waitForOrderEventFailed, 
+          error: "There was a problem processing your order, reach out to sales@blockapps.net for next steps." 
+        });
       }
 
       dispatch({
