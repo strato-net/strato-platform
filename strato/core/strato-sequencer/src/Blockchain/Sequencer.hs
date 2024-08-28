@@ -18,7 +18,7 @@ module Blockchain.Sequencer where
 
 import BlockApps.Logging
 import BlockApps.X509.Certificate
-import Blockchain.Blockstanbul
+import Blockchain.Blockstanbul 
 import qualified Blockchain.Data.Block as BDB
 import Blockchain.Data.BlockHeader
 import Blockchain.Data.ChainInfo (chainInfo, creationBlock, parentChains)
@@ -57,11 +57,13 @@ import Data.Maybe
 import Data.Proxy
 import qualified Data.Set as S
 import qualified Data.Text as T
+--import Data.Tuple.Extra ((&&&))
 import Data.Time.Clock
 import Prometheus as P
 import qualified Text.Colors as CL
 import Text.Format
 import Text.Printf
+--import Blockchain.Data.Block (Block(blockBlockData))
 
 instance MonadMonitor m => MonadMonitor (ConduitT i o m) where
   doIO = lift . doIO
@@ -275,21 +277,13 @@ blockstanbulSend' ::
   InEvent ->
   ConduitT a SeqEvent m ()
 blockstanbulSend' msg = do
-  resp' <- sendAllMessages [msg]
-  let blocks = [b | ToCommit b <- resp']
-  resp <-
-    (resp' ++)
-      <$> case blocks of
-        [] -> return []
-        -- TODO(tim): Block insertion can potentially fail, so there
-        -- should be feedback here
-        [b] -> sendAllMessages [CommitResult . Right . blockHash $ b]
-        bs -> error $ "can send at most 1 block at a time: " ++ show bs
+  resp <- sendAllMessages [msg]
+  let blocks = [b | ToCommit b <- resp]
   for_ resp $ \case
     ResetTimer rn -> createNewTimer rn
     FailedHistoric blk -> A.delete (Proxy @DependentBlockEntry) (blockHash blk) -- First time using `delete`
     _ -> pure ()
-  $logDebugS "seq/pbft/send" . T.pack $ "Pre-rewrite: " ++ format (map blockHash blocks)
+  $logDebugS "seq/pbft/send" . T.pack $ "Pre-rewrite: " ++ format (blockHash <$> blocks)
 
   let getSequencedBlock =
         ingestBlockToSequencedBlock

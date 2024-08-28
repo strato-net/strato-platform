@@ -1047,7 +1047,11 @@ runVMM isRunningTests' isHomestead preExistingSuicideList cDepth env availableGa
               -- , erNewX509Certs       = M.empty
               erPragmas = [],
               erCreator = "",
-              erAppName = ""
+              erAppName = "",
+              erNewValidators = [],
+              erRemovedValidators = [],
+              erNewCerts = [],
+              erRevokedCerts = []
             }
       Right _ -> do
         vmState'@VMState {..} <- readIORef vmStateRef
@@ -1483,7 +1487,11 @@ vmStateToExecResults vmState = do
         -- , erNewX509Certs       = M.empty
         erPragmas = [],
         erCreator = "",
-        erAppName = ""
+        erAppName = "",
+        erNewValidators = [],
+        erRemovedValidators = [],
+        erNewCerts = [],
+        erRevokedCerts = []
       }
 
 getExternallyOwned' :: HasCodeDB m => CodePtr -> m BC.ByteString

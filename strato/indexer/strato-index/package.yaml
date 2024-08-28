@@ -31,7 +31,6 @@ library:
   - strato-model
   - strato-redis-blockdb
   - text
-  - x509-certs
 
 executables:
   strato-api-indexer:
@@ -112,7 +111,6 @@ tests:
     - bytestring
     - hspec
     - strato-index
-    - x509-certs
     - strato-model
     - text
 

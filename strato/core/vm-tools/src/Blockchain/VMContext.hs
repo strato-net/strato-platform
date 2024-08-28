@@ -212,7 +212,7 @@ instance NFData RBDB.RedisConnection where
   rnf (RBDB.RedisConnection c) = c `seq` ()
 
 data ContextBestBlockInfo = Unspecified | ContextBestBlockInfo !Keccak256 !BlockHeader !Integer !Int !Int
-  deriving (Eq, Read, Show, Generic, NFData)
+  deriving (Eq, Show, Generic, NFData)
 
 instance Binary ContextBestBlockInfo
 
@@ -582,4 +582,3 @@ putContextBestBlockInfo new = Mod.modifyStatefully_ Mod.Proxy $ assign bestBlock
 
 checkIfRunningTests :: (Functor m, Mod.Accessible ContextState m) => m Bool
 checkIfRunningTests = _runningTests <$> Mod.access Mod.Proxy
-
