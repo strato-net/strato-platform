@@ -238,10 +238,10 @@ conduitSourceUsingEnv name env topicName = do
       forM_ items yield
       return $ offset + fromIntegral (length items)
 
-createTopic :: Kafka m =>
+createTopic :: HasKafka m =>
                TopicName -> m ()
 createTopic name = do
-  TopicsResp result <- Milena.createTopic $ createTopicsRequest name 1 1 [] []
+  TopicsResp result <- execKafka $ Milena.createTopic $ createTopicsRequest name 1 1 [] []
   let errors = filter ((/= NoError) . snd) result
   case errors of
     [] -> return ()

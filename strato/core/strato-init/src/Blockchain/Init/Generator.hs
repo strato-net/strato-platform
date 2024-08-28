@@ -13,29 +13,24 @@ import Control.Monad
 import Control.Monad.Catch
 import Control.Monad.Composable.Kafka
 import Control.Monad.IO.Unlift
-import Control.Monad.Trans.Except
-import Control.Monad.Trans.State
 import qualified Data.Aeson as Ae
 import qualified Data.ByteString.Char8 as C8
 import Data.FileEmbed
 import qualified Data.Text as T
 import Data.Text.Encoding (decodeUtf8)
 import qualified Data.Text.IO as TIO
-import Network.Kafka (Kafka, KafkaClientError, KafkaState)
 import System.Exit
 import UnliftIO.Directory
 import UnliftIO.IO hiding (withFile)
 
 import Universum.Lifted.File
 
-type GenM = StateT KafkaState (ExceptT KafkaClientError IO)
-
 runGenM :: MonadIO m =>
            KafkaAddress -> KafkaM m a -> m a
 runGenM kaddr mv = do
   runKafkaM "generator" kaddr mv
 
-initializeTopic :: Kafka m => m ()
+initializeTopic :: HasKafka m => m ()
 initializeTopic = createTopic initTopic
 
 genesisFiles :: [(FilePath, C8.ByteString)]
@@ -44,7 +39,7 @@ genesisFiles = $(embedDir "genesisBlocks")
 mkAll :: (MonadMask m, HasKafka m) =>
          String -> m ()
 mkAll genesisBlockName = do
-  execKafka initializeTopic
+  initializeTopic
   ethconf <- liftIO genEthConf
   addEvent $ EthConf ethconf
 
