@@ -109,9 +109,9 @@ const Transaction = ({ user }) => {
     const wsRedemption = XLSX.utils.json_to_sheet(Redemption ? Redemption : []);
 
     // Append each worksheet to the workbook
-    XLSX.utils.book_append_sheet(wb, wsOrder, 'Orders');
-    XLSX.utils.book_append_sheet(wb, wsTransferred, 'Transfers');
-    XLSX.utils.book_append_sheet(wb, wsRedemption, 'Redemptions');
+    XLSX.utils.book_append_sheet(wb, wsOrder, 'Order');
+    XLSX.utils.book_append_sheet(wb, wsTransferred, 'Transfer');
+    XLSX.utils.book_append_sheet(wb, wsRedemption, 'Redemption');
 
     // Write the workbook to a binary string
     const wbout = XLSX.write(wb, { bookType: 'xls', type: 'binary' });
@@ -126,8 +126,8 @@ const Transaction = ({ user }) => {
     // Adding an extra column to distinguish data
     const addTypeColumn = (data, type) => data.map(row => ({ ...row, Type: type }));
 
-    const orderData = addTypeColumn(Order ? Order : [], 'Orders');
-    const transferredData = addTypeColumn(Transfer ? Transfer : [], 'Transferred');
+    const orderData = addTypeColumn(Order ? Order : [], 'Order');
+    const transferredData = addTypeColumn(Transfer ? Transfer : [], 'Transfer');
     const redemptionData = addTypeColumn(Redemption ? Redemption : [], 'Redemption');
 
     const combinedData = [...orderData, ...transferredData, ...redemptionData];

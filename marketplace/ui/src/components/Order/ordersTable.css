@@ -100,13 +100,46 @@
     height: 32px;
 }
 
-.text-truncate {
+.text-truncate-single-line {
     display: inline-block;
     width: 100%;
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
+    word-break: break-all; /* Breaks long words */
+    overflow-wrap: break-word
   }
+
+  .text-truncate {
+    display: -webkit-box;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 2;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    line-height: 1.5em;
+    max-height: 3em;
+}
+
+.text-truncate > span {
+    display: -webkit-box;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 2;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    line-height: 1.5em;
+    max-height: 3em;
+    word-break: break-all;
+    overflow-wrap: break-word;
+}
+
+  /* .text-truncate > span{
+    display: inline-block;
+    width: 100%;
+    height: 50px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }   */
 
 @media (min-width : 770px) {
     :where(.css-dev-only-do-not-override-9ntgx0).ant-picker {

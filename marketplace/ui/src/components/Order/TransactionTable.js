@@ -41,6 +41,9 @@ const TransactionTable = ({ user, selectedDate, onDateChange, download, isAllOrd
   const [transactions, setTransactions] = useState(userTransactions)
   const [search, setSearch] = useState("")
 
+  const formatter = new Intl.NumberFormat('en-IN');
+  const formattedNum = (num) => formatter.format(num);
+
   useEffect(() => {
     if (user?.commonName) {
       transactionAction.fetchUserTransaction(
@@ -96,8 +99,8 @@ const TransactionTable = ({ user, selectedDate, onDateChange, download, isAllOrd
             <img src={data?.assetImage} alt={data?.assetName} className="border w-88 h-88 border-indigo-600 rounded-md" />
           </Col>
           <Col span={8} offset={1}>
-            <p className="text-base font-bold text-truncate">{data?.assetName}</p>
-            <p style={{ color: '#827474' }} className="font-medium cursor-pointer"><Tooltip placement="top" title={data.assetDescription.replace(/<\/?[^>]+(>|$)/g, "")}> {data?.assetDescription.length > 28 ? `${data.assetDescription.replace(/<\/?[^>]+(>|$)/g, "")?.slice(0, 28)}...` : data?.assetDescription.replace(/<\/?[^>]+(>|$)/g, "")} </Tooltip></p>
+            <p className="text-base font-bold text-truncate cursor-pointer" onClick={()=>{handleAssetRedirection(data)}}>{data?.assetName}</p>
+            <p style={{ color: '#827474' }} className="font-medium mt-2 min-h-20 cursor-default text-truncate"><Tooltip placement="top" title={data.assetDescription.replace(/<\/?[^>]+(>|$)/g, "")}> {data?.assetDescription.replace(/<\/?[^>]+(>|$)/g, "")} </Tooltip></p>
           </Col>
           <Col span={8} offset={1}>
             {price
@@ -126,6 +129,11 @@ const TransactionTable = ({ user, selectedDate, onDateChange, download, isAllOrd
         .replace(":redemptionService", data.redemptionService)}`
     } else { }
     route && navigate(route)
+  }
+
+  const handleAssetRedirection = (data) => {
+    const url = routes.MarketplaceProductDetail.url.replace(':address',data.assetAddress).replace(':name', data.assetName)
+    navigate(url)
   }
 
   const column = [
@@ -176,7 +184,7 @@ const TransactionTable = ({ user, selectedDate, onDateChange, download, isAllOrd
       key: "quantity",
       align: "right",
       width: '100px',
-      render: (data, { quantity }) => <span>{quantity ? quantity : '--'}</span>
+      render: (data, { quantity }) => <span>{quantity ? formattedNum(quantity) : '--'}</span>
     },
     {
       title: "Price ($)",
@@ -184,7 +192,7 @@ const TransactionTable = ({ user, selectedDate, onDateChange, download, isAllOrd
       key: "price",
       align: "right",
       width: '100px',
-      render: (data, { price }) => <p>{price ? price : '--'}</p>
+      render: (data, { price }) => <p>{price ? formattedNum(price) : '--'}</p>
     },
     {
       title: "From",
@@ -206,9 +214,10 @@ const TransactionTable = ({ user, selectedDate, onDateChange, download, isAllOrd
       key: "hash",
       align: "left",
       width: '150px',
-      render: (data, { redemptionService, address }) => <Tooltip placement="top" title={address}>
-        <p className="text-[#13188A] hover:text-primaryHover cursor-pointer text-truncate" >{`# ${(redemptionService || address)}`}</p>
-      </Tooltip>
+      render: (data, { transaction_hash }) =>{
+        return <Tooltip placement="top" title={transaction_hash || ''}>
+        <p className="text-[#13188A] hover:text-primaryHover cursor-pointer text-truncate-single-line" >{transaction_hash ? `# ${transaction_hash}` : '--'}</p>
+      </Tooltip>}
     },
     {
       dataIndex: "date",
@@ -277,7 +286,7 @@ const TransactionTable = ({ user, selectedDate, onDateChange, download, isAllOrd
                     </Select>
                   </Col>
                   <Col xs={24} md={8} className="flex justify-center mt-2 md:mt-0">
-                    <Input className="text-base w-full md:max-w-[400px] h-10 orders_searchbar mx-auto md:p-3 md:mr-3 rounded-md bg-[#F6F6F6]"
+                    <Input className="text-base w-full md:max-w-[400px] h-10 orders_searchbar mx-auto md:mr-3 rounded-md bg-[#F6F6F6]"
                       onChange={(e) => { handleChangeSearch(e) }}
                       value={search}
                       prefix={<SearchOutlined />}

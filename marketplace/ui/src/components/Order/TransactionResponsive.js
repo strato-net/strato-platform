@@ -13,6 +13,9 @@ const TransactionResponsive = ({ data , user}) => {
   const navigate = useNavigate();
   const [expandedRows, setExpandedRows] = useState({});
 
+  const formatter = new Intl.NumberFormat('en-IN');
+  const formattedNum = (num) => formatter.format(num);
+
   const handleMore = (index) => {
     setExpandedRows((prevExpandedRows) => ({
       ...prevExpandedRows,
@@ -47,7 +50,7 @@ const TransactionResponsive = ({ data , user}) => {
       title: 'Hash',
       dataIndex: 'hash',
       key: 'hash',
-      render: (text) => <p className="text-[#13188A]">{`${text.slice(0, 15)}..`}</p>
+      render: (text) => <p className="text-[#13188A]">{text ? `${text.slice(0, 15)}..`:'--'}</p>
     },
     {
       title: 'Status',
@@ -59,13 +62,13 @@ const TransactionResponsive = ({ data , user}) => {
 
   return (
     <div className="flex flex-col gap-y-10 w-full">
-      {data.map(({ reference ,address, assetImage,totalAmount, assetName, assetDescription, quantity, from, to, status,transaction_hash, type, price, redemptionService, block_timestamp }, index) => {
+      {data.map(({ reference ,address, assetImage,totalAmount, assetName,assetAddress, assetDescription, quantity, from, to, status,transaction_hash, type, price, redemptionService, block_timestamp }, index) => {
         const isExpanded = expandedRows[index];
         const tableData = [{
           key: index,
           from,
           to,
-          hash: address || redemptionService || '--',
+          hash: transaction_hash,
           status,
           type
         }]
@@ -89,9 +92,14 @@ const TransactionResponsive = ({ data , user}) => {
           route && navigate(route)
         }
 
+        const handleAssetRedirection = () => {
+          const url = routes.MarketplaceProductDetail.url.replace(':address',assetAddress).replace(':name', assetName)
+          navigate(url)
+        }
+
         return (
           <Row
-            key={index} // Use assetName as unique key
+            key={index}
             className={`bg-red-300 w-full ${isExpanded ? '' : 'h-36'} rounded-xl px-2 py-2 shadow-2xl border-2 `}
           >
             <Col span={6} className="flex justify-center bg-grey-400">
@@ -102,14 +110,14 @@ const TransactionResponsive = ({ data , user}) => {
               />
             </Col>
             <Col span={8} offset={1} className="flex flex-col justify-between">
-              <p className="text-base font-bold"> {assetName.length > 10 ? `${assetName.slice(0, 10)}..` : assetName} </p>
+              <p className="text-base font-bold text-truncate-single-line" onClick={()=>{handleAssetRedirection()}}> {assetName} </p>
               <p style={{ color: "#13188A" }} className="font-semibold" onClick={() => {
                 handleDetailRedirection()
               }}>
                 #{reference}
               </p>
-              <p style={{ color: "#827474" }} className="font-medium">
-                {assetDescription.length > 25 ? `${assetDescription.replace(/<\/?[^>]+(>|$)/g, "")?.slice(0, 25)}..` : assetDescription.replace(/<\/?[^>]+(>|$)/g, "")}
+              <p style={{ color: "#827474" }} className="font-medium text-truncate">
+                {assetDescription.replace(/<\/?[^>]+(>|$)/g, "")}
               </p>
               <span
                 style={{ color: "#13188A" }}
@@ -128,10 +136,10 @@ const TransactionResponsive = ({ data , user}) => {
                 {type}
               </Button>
               {price ? <p className={`text-right flex justify-end items-center`}>
-                $ {price} ({price * 100} {StratsIcon})
+                $ {formattedNum(price)} ({formattedNum(price * 100)} {StratsIcon})
               </p>
                 : <p className="text-right text-[#13188A] font-bold text-sm"> No Price Available  </p>}
-              <p className="text-right">Qty: {quantity}</p>
+              <p className="text-right">Qty: {formattedNum(quantity)}</p>
               <p className="text-right">{moment(block_timestamp).format('L')}</p>
             </Col>
             {isExpanded && <Col span={24}>
