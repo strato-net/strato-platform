@@ -1153,7 +1153,11 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
   contract.getStratsTransactionHistory = async function (args, options = defaultOptions) {
     const getOptions = { ...options, app: contractName, };
     const { userAddress } = args;
-    return inventoryJs.getAllItemTransferEvents(rawAdmin, `or=(oldOwner.eq.${userAddress},newOwner.eq.${userAddress})`, getOptions);
+    const stratsOriginAddress = await strats.getStratsAddress();
+      if (!stratsOriginAddress) {
+        throw new rest.RestError(RestStatus.BAD_REQUEST, "Strats origin address not found.");
+      }
+    return inventoryJs.getAllItemTransferEvents(rawAdmin, `originAddress=eq.${stratsOriginAddress}&or=(oldOwner.eq.${userAddress},newOwner.eq.${userAddress})`, getOptions);
   }
 
   contract.transferStrats = async function (args, options = defaultOptions) {
