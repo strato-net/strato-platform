@@ -155,6 +155,7 @@ export const Order = {
   cancelSaleOrder: '/sale/cancel',
   checkSaleQuantity: '/saleQuantity',
   executeSale: '/closeSale',
+  waitForOrderEvent: '/wait/event',
   updateOrderComment: '/updateComment',
   export: '/exportOrders'
 }
