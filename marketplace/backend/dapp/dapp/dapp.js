@@ -1143,17 +1143,10 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
     }
   };
 
-  contract.getStratsBalance = async function (args, options = defaultOptions) {
-    const { userAddress } = args;
-    const getOptions = { ...options, org: "TestCompany", app: '' };
-    const address = strats.getStratsAddress();
+  contract.getStratsBalance = async function ( options = defaultOptions ) {
+    const stratsOriginAddress = await strats.getStratsAddress();
+    const balance = await inventoryJs.getAll(rawAdmin, { ownerCommonName: userCert.commonName, originAddress: stratsOriginAddress, queryOptions: { select: "quantity.sum()" }}, options);
 
-    const newArgs = {
-      address: address,
-      key: userAddress
-    }
-
-    const balance = await strats.getStratsBalance(rawAdmin, newArgs, getOptions);
     return balance;
   }
 
