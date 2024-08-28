@@ -21,7 +21,7 @@ stateDiffTopicName :: KP.TopicName
 stateDiffTopicName = lookupTopic "statediff"
 
 assertStateDiffTopicCreation :: HasKafka k => k ()
-assertStateDiffTopicCreation = assertTopicCreation stateDiffTopicName
+assertStateDiffTopicCreation = createTopic stateDiffTopicName
 
 {-
 mkTopicAndMessage :: (ToJSON a) => a -> K.TopicAndMessage

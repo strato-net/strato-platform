@@ -8,6 +8,8 @@
 {-# LANGUAGE TupleSections #-}
 {-# LANGUAGE TypeSynonymInstances #-}
 
+{-# OPTIONS -fno-warn-unused-top-binds #-}
+
 module Control.Monad.Composable.Kafka (
   KafkaM,
   HasKafka,
@@ -37,7 +39,6 @@ module Control.Monad.Composable.Kafka (
   conduitSource,
   conduitSourceUsingEnv,
   createKafkaEnv,
-  assertTopicCreation,
   createTopic
   ) where
 
@@ -245,8 +246,5 @@ createTopic name = do
   let errors = filter ((/= NoError) . snd) result
   case errors of
     [] -> return ()
+    [(_, TopicAlreadyExists)] -> return () -- No problem, it was already there
     _ -> error $ "Error creating kafka topic " ++ show name ++ ": " ++ show errors
-
-assertTopicCreation :: HasKafka m => TopicName -> m ()
-assertTopicCreation theTopic = execKafka $ updateMetadata theTopic
-
