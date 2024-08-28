@@ -4,13 +4,11 @@ pragma strict;
 import <BASE_CODE_COLLECTION>;
 
 contract StratPaymentService is PaymentService {
-    address public stratAddress;
     decimal public stratsPerDollar;
 
     address public feeRecipient;
 
     constructor (
-        address _stratAddress,
         decimal _stratsPerDollar,
         string _imageURL,
         decimal _primarySaleFeePercentage,
@@ -23,12 +21,12 @@ contract StratPaymentService is PaymentService {
         _primarySaleFeePercentage,
         _secondarySaleFeePercentage
     ) public {
-        stratAddress = _stratAddress;
         stratsPerDollar = _stratsPerDollar;
         feeRecipient = _feeRecipient;
     }
 
     function _checkoutInitialized (
+        address[] _stratsAssetAddresses,
         string _checkoutHash,
         string _checkoutId,
         address _purchaser,
@@ -98,11 +96,35 @@ contract StratPaymentService is PaymentService {
             uint stratAmountNet = uint(net * stratsPerDollar * 100);
             uint stratFee = uint(fee * stratsPerDollar * 100);
 
-            // Transfer strats
-            bool success = stratAddress.call("transfer", sellerAddress, stratAmountNet);
-            require(success, err);
-            success = stratAddress.call("transfer", feeRecipient, stratFee);
-            require(success, feeErr);
+            // Transfer STRATS
+            uint remainingStratsToTransfer = stratAmountNet;
+            uint remainingFeeToTransfer = stratFee;
+            uint stratQuantity = 0;
+            uint transferAmount = 0;
+            uint transferFee = 0;
+
+            for (uint j = 0; j < _stratsAssetAddresses.length; j++) {
+                Asset stratAsset = Asset(_stratsAssetAddresses[j]);
+                stratQuantity = stratAsset.quantity();
+
+                if (remainingStratsToTransfer > 0) {
+                    transferAmount = stratQuantity >= remainingStratsToTransfer ? remainingStratsToTransfer : stratQuantity;
+                    stratAsset.transferOwnership(sellerAddress, transferAmount, false, 0, 0);
+                    remainingStratsToTransfer -= transferAmount;
+                }
+                stratQuantity = stratQuantity - transferAmount;
+                if (remainingFeeToTransfer > 0 && stratQuantity > 0) {
+                    
+                    transferFee = stratQuantity >= remainingFeeToTransfer ? remainingFeeToTransfer : stratQuantity;
+                    stratAsset.transferOwnership(feeRecipient, transferFee, false, 0, 0);
+                    remainingFeeToTransfer -= transferFee;
+                }
+
+                if (remainingStratsToTransfer == 0 && remainingFeeToTransfer == 0) {
+                    break;
+                }
+            }
+            require(remainingStratsToTransfer == 0 && remainingFeeToTransfer == 0, "Failed to fulfill STRATS payment");
 
             // Transfer assets
             try {
