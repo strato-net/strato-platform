@@ -50,7 +50,7 @@ instance Arbitrary IstanbulExtra where
 instance Arbitrary ExtraData where
   arbitrary = liftM2 ExtraData arbitrary arbitrary
 
-addValidators :: HasIstanbulExtra h => [Validator] -> h -> h
+addValidators :: HasIstanbulExtra h => ChainMembers -> h -> h
 addValidators vs = execIstanbulExtra (const . Just $ IstanbulExtra vs Nothing [])
 
 getProposerSeal :: HasIstanbulExtra h => h -> Maybe Signature
@@ -70,20 +70,24 @@ scrubAllSeals :: Maybe IstanbulExtra -> Maybe IstanbulExtra
 scrubAllSeals = set (_Just . proposedSig) Nothing
               . set (_Just . commitment) []
 
-proposalMessage :: (RLPSerializable h, HasIstanbulExtra h) => h -> B.ByteString
+scrubSignaturesFromBlock :: [Signature] -> [Signature]
+scrubSignaturesFromBlock _ = []
+
+proposalMessage :: Block -> B.ByteString
 proposalMessage =
   keccak256ToByteString
     . hash
     . rlpSerialize
     . rlpEncode
     . execIstanbulExtra scrubAllSeals
+    . blockBlockData
 
-proposerSeal :: (RLPSerializable h, HasIstanbulExtra h, HasVault m) => h -> m (Signature)
+proposerSeal :: HasVault m => Block -> m (Signature)
 proposerSeal blk =
   let mesg = proposalMessage blk
    in sign mesg
 
-verifyProposerSeal :: (RLPSerializable h, HasIstanbulExtra h) => h -> Signature -> Maybe Address
+verifyProposerSeal :: Block -> Signature -> Maybe Address
 verifyProposerSeal blk sig =
   let mesg = proposalMessage blk
    in fromPublicKey <$> recoverPub sig mesg
@@ -108,13 +112,6 @@ recoverPub' sig v =
   case recoverPub sig v of
     Nothing -> throwError "can't recover public key"
     Just val -> return val
-
-finalHash :: (RLPSerializable h, HasIstanbulExtra h) => h -> Keccak256
-finalHash =
-  hash
-    . rlpSerialize
-    . rlpEncode
-    . scrubCommitmentSeals
 
 signBenfInfo :: (HasVault m) => (Validator, Bool, Int) -> m (Signature)
 signBenfInfo bnf =
@@ -183,7 +180,7 @@ replayHistoricBlock realValidators seqNo blk = do
       "proposer " ++ formatAddressWithoutColor prop ++ " (" ++ format propChainMember ++ ")  not a validator"
       ++ "\nreal validator list: " ++ show (map format $ S.toList realValidators)
 
-  let expectedValidatorList = S.fromList _validatorList
+  let expectedValidatorList = S.map chainMemberParsedSetToValidator $ unChainMembers _validatorList
 --  let expectedValidatorList = [c | CommonName _ _ c _ <- S.toList (unChainMembers _validatorList)]
 
   unless (expectedValidatorList == realValidators) $
