@@ -283,8 +283,6 @@ processTheMessages ::
   [VME.VMEvent] ->
   m [AggregateEvent]
 processTheMessages env conn messages = do
-  --  <- Mod.access (Mod.Proxy @(IORef Globals))
-
   case length messages of
     0 -> return ()
     1 -> $logInfoS "processTheMessages" "1 message has arrived"
@@ -346,9 +344,6 @@ processTheMessages env conn messages = do
             outputData conn $ createExpandEventTables c cc nameParts
 
             return $ deferredForeignKeys ++ deferredForeignKeysForMappings ++ deferredForeignKeysForArrays
-
-        -- forM_ deferredForeignKeys $ \deferredForeignKey -> do
-        --   outputData conn $ createForeignIndexesForJoins deferredForeignKey
         pure $ Right deferredForeignKeys
   -- TODO: Add delegatecall indexing back in
   -- dfkeys' <- forM delegates $ \d@(Action.Delegatecall s c' o a) -> do
@@ -384,9 +379,6 @@ processTheMessages env conn messages = do
 
   inserts <- fmap concat $ enterBloc2 env $ do
     forM changes $ \(_, actions) -> do
-      -- let row = combineActions actions
-      -- $logDebugS "processTheMessages" $ "Combined Action = " <> formatAction row
-      -- $logDebugS "processTheMessages" $ T.pack $ "the diff is " ++ format (actionStorage row)
       forM actions $ \(row) -> do
         case actionStorage row of
           Action.EVMDiff {} -> pure $ Left "EVM code indexing ignored"
@@ -404,7 +396,6 @@ processTheMessages env conn messages = do
             $logInfoLS "Contract name is: " $ T.pack $ show name
             indexContract <- rowToInsert abiid row cont
             let fkeysForThisContract = getContractsFromPC indexContract
-            -- hs <- rowToHistories abiid actions cont
             let mapNames = actionMappings row --recorded mappings
                 arrNames = actionArrays row --all
                 collectionNames = mapNames ++ arrNames
@@ -421,7 +412,6 @@ processTheMessages env conn messages = do
                 $logInfoS "cols: " $ T.pack (show cols)
                 
                 let result = (indexContract, fkeysForThisContract, tableNameText, (cr', ap', n'), cols)
-                -- $logInfoS "extractedCols: " $ T.pack (show extractedCols)
                 $logInfoS "result: " $ T.pack (show result)
                 pure (Just result)
             $logDebugLS "Globals: Recorded Map names are: " . T.pack $ show mapNames ++ " contract: " ++ show (E.contractName indexContract)
@@ -466,14 +456,4 @@ processTheMessages env conn messages = do
 
   forM_ transactionResults $ putTransactionResult
 
-  -- flushPendingWrites 
-
   return events'
-
--- extractTextInsideQuotes :: T.Text -> T.Text
--- extractTextInsideQuotes input =
---   case T.stripPrefix "\"" input of
---     Just rest ->
---       case T.break (== '"') rest of
---         (extracted, _) -> extracted
---     Nothing -> ""
