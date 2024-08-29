@@ -28,7 +28,7 @@ import { useCategoryDispatch, useCategoryState } from "../../contexts/category";
 import { SEO } from "../../helpers/seoConstant";
 import LoginModal from "../MarketPlace/LoginModal"
 import { setCookie } from "../../helpers/cookie";
-import TransferStratsModal from "../MarketPlace/TransferStratsModal";
+import TransferModal from "../Inventory/TransferModal";
 import StratsTransactionHistoryModal from "../MarketPlace/StratsTransactionHistoryModal";
 
 import { navItems } from "../../helpers/constants";
@@ -498,10 +498,10 @@ const HeaderComponent = ({ user, loginUrl, showMenu, handleSubMenu, handleMenuTa
         onLogin={handleLogin}
       />
       {isTransferStratsModalVisible &&
-        <TransferStratsModal
-          visible={isTransferStratsModalVisible}
-          onCancel={handleCloseTransferStratsModal}
-          balance={stratsBalance}
+        <TransferModal
+          open={isTransferStratsModalVisible}
+          handleCancel={handleCloseTransferStratsModal}
+          inventory={{name: 'STRATS', quantity: stratsBalance}}
         />}
       {isStratsTransactionHistoryModalVisible &&
         <StratsTransactionHistoryModal

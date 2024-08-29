@@ -1,19 +1,22 @@
 import { Button, Select, InputNumber, Modal, Table } from "antd";
 import { useEffect, useRef,useState } from "react";
 import { actions } from "../../contexts/inventory/actions";
+import { actions as marketplaceActions } from "../../contexts/marketplace/actions";
 import { actions as userActions } from "../../contexts/users/actions";
 import { useInventoryDispatch, useInventoryState } from "../../contexts/inventory";
+import { useMarketplaceDispatch, useMarketplaceState } from "../../contexts/marketplace";
 import { useUsersDispatch, useUsersState } from "../../contexts/users";
 import { useAuthenticateState } from "../../contexts/authentication";
 import { SearchOutlined } from '@ant-design/icons';
 import { handlePriceInput, handleQuantityInput } from "../../helpers/utils";
 
-const TransferModal = ({ open, handleCancel, inventory, categoryName, limit, offset }) => {
+const TransferModal = ({ open, handleCancel, inventory, categoryName = "", limit=0, offset=0 }) => {
     const [data, setData] = useState([inventory]);
     const [quantity, setQuantity] = useState(1);
     const [price, setPrice] = useState(0);
     const [userAddress, setUserAddress] = useState("");
     const inventoryDispatch = useInventoryDispatch();
+    const marketplaceDispatch = useMarketplaceDispatch();
     const userDispatch = useUsersDispatch();
     const [canTransfer, setCanTransfer] = useState(true);
     const {
@@ -25,6 +28,9 @@ const TransferModal = ({ open, handleCancel, inventory, categoryName, limit, off
     const {
         isTransferring
     } = useInventoryState();
+    const { 
+        isTransferringStrats
+    } = useMarketplaceState();
     const inputPriceDesktopRef = useRef(null);
     const inputPriceMobileRef = useRef(null);
     const inputQuantityDesktopRef = useRef(null);
@@ -169,22 +175,38 @@ const TransferModal = ({ open, handleCancel, inventory, categoryName, limit, off
 
 
     const handleSubmit = async () => {
-        const body = {
-            assetAddress: inventory.address,
-            newOwner: userAddress,
-            quantity,
-            price
-        };
-
         if (quantity > 0 && quantity <= inventory.quantity && userAddress) {
-            let isDone = await actions.transferInventory(inventoryDispatch, body);
+            let isDone = false;
+    
+            if (inventory.name === "STRATS") {
+                const payload = {
+                    to: userAddress,
+                    value: quantity,
+                    price,
+                };
+                isDone = await marketplaceActions.transferStrats(marketplaceDispatch, payload);
+                if (isDone) {
+                    await marketplaceActions.fetchStratsBalance(marketplaceDispatch);
+                }
+            } else {
+                const body = {
+                    assetAddress: inventory.address,
+                    newOwner: userAddress,
+                    quantity,
+                    price,
+                };
+                isDone = await actions.transferInventory(inventoryDispatch, body);
+                if (isDone) {
+                    await actions.fetchInventory(inventoryDispatch, limit, offset, "", categoryName);
+                    await actions.fetchInventoryForUser(inventoryDispatch, user.commonName);
+                }
+            }
+    
             if (isDone) {
-                await actions.fetchInventory(inventoryDispatch, limit, offset, "", categoryName);
-                await actions.fetchInventoryForUser(inventoryDispatch, user.commonName);
                 handleCancel();
             }
         }
-    }
+    };    
 
     return (
         <Modal
@@ -194,7 +216,7 @@ const TransferModal = ({ open, handleCancel, inventory, categoryName, limit, off
             width={1000}
             footer={[
                 <div className="flex justify-center md:block">
-                    <Button type="primary" className="w-32 h-9" onClick={handleSubmit} disabled={!canTransfer} loading={isTransferring}>
+                    <Button type="primary" className="w-32 h-9" onClick={handleSubmit} disabled={!canTransfer} loading={isTransferring || isTransferringStrats}>
                         Transfer
                     </Button>
                 </div>
