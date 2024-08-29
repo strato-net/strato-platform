@@ -249,7 +249,6 @@ const reducer = (state, action) => {
       return {
         ...state,
         isTransferringStrats: false,
-        strats: action.payload,
       };
     case actionDescriptors.transferStratsFailed:
       return {
