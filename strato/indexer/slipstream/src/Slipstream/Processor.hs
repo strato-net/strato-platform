@@ -426,7 +426,7 @@ processTheMessages env conn messages = do
             pure . Right $ BatchedInserts (indexContract, fkeysForThisContract) abstractColumns [indexContract] pCollectionsWithAbstracts
       
       -- record prometheus metrics
-      mapM_ recordAction actions
+      -- mapM_ recordAction actions
       pure results
 
   forM_ (lefts inserts) $ $logErrorS "processTheMessages"
