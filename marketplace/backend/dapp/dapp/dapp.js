@@ -1193,7 +1193,9 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
       timestamp: transfer.transferDate,
       _to: transfer.newOwner,
       _from: transfer.oldOwner,
-      _value: transfer.quantity
+      _value: transfer.quantity,
+      _price: transfer.price,
+      _assetName: transfer.assetName,
     }));
   }
 
