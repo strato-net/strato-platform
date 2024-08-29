@@ -144,7 +144,9 @@ handleVmEvents = awaitForever $ \InBatch {..} -> do
                 blockFailures <- verifyBlock block (trrs, Just sr) summ
                 case blockFailures of 
                   [] -> pure . Just $ AcceptPreprepare bHash
-                  _  -> pure $ Just RejectPreprepare
+                  _  -> do
+                    $logDebugS "handleVmEvents/preprepareBlock" . T.pack $ show blockFailures
+                    pure $ Just RejectPreprepare
               _ -> pure $ Just RejectPreprepare
   $logDebugS "handleVmEvents/mPreDec" . T.pack $ format mPreDec
   traverse_ (yield . OutPreprepareResponse) mPreDec

@@ -45,7 +45,7 @@ verifyOmmersRoot :: HasStateDB m => Block -> m (Maybe BlockVerificationFailureDe
 verifyOmmersRoot Block {blockBlockData = bd, blockBlockUncles = bu} = 
   let inBlockOmmersHash = getBlockOmmersHash bd
       derivedOmmersHash = hash (rlpSerialize $ RLPArray $ map rlpEncode $ bu)
-  in if inBlockOmmersHash == derivedOmmersHash 
+  in if inBlockOmmersHash /= derivedOmmersHash 
         then return $ Just $ UnclesMismatch (BlockDelta inBlockOmmersHash derivedOmmersHash)
         else return Nothing
 
