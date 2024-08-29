@@ -85,7 +85,7 @@ const Transaction = ({ user }) => {
           quantity: transaction?.quantity,
           from: transaction.from,
           to: transaction.to,
-          hash: transaction?.redemptionService || transaction?.address,
+          hash: transaction.transaction_hash,
           date: transaction?.block_timestamp,
           Status: transaction?.type === "Transfer" ? 'Closed' : (transaction?.type === "Redemption" 
                   ? REDEMPTION_STATUS[transaction.status] 
