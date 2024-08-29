@@ -1035,13 +1035,43 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
       }
 
       // Get User's STRATS Asset Address
-      const stratsOriginAddress = await strats.getStratsAddress();
-      const stratsAssetAddresses = await inventoryJs.getAll(rawAdmin, { ownerCommonName: userCert.commonName, originAddress: stratsOriginAddress, queryOptions: { select: "address" }}, options);
+      const stratsOriginAddress = "72599614549ffe3a0f7e86caf2c25d29590f3b7c";//await strats.getStratsAddress();
+
+      // Retrieve all sales data
+      const salesData = await saleJs.getAll(rawAdmin, { saleAddresses }, options);
+
+      // Calculate the total order amount
+      const orderTotal = salesData.reduce((acc, sale, index) => acc + (sale.price * quantities[index]), 0);
+
+      // Retrieve the user's active STRATS asset addresses with non-zero quantities
+      const userStratsAssets = await inventoryJs.getAll(
+        rawAdmin,
+        {
+          ownerCommonName: userCert.commonName,
+          originAddress: stratsOriginAddress,
+          status: ASSET_STATUS.ACTIVE,
+          queryOptions: { select: "address, quantity" },
+          notEqualsField: "quantity",
+          notEqualsValue: "0",
+        },
+        options
+      );
+
+      // Accumulate STRATS asset addresses to cover the order total
+      let accumulatedTotal = 0;
+      const stratsAssetAddressesToUse = userStratsAssets.reduce((addresses, asset) => {
+        if (accumulatedTotal >= orderTotal) return addresses;
+        
+        addresses.push(asset.address);
+        accumulatedTotal += asset.quantity / 100;
+
+        return addresses;
+      }, []);
 
       const createdDate = Math.floor(Date.now() / 1000);
       const paymentParameters = {
         address: paymentProvider.address,
-        stratsAssetAddresses,
+        stratsAssetAddresses: stratsAssetAddressesToUse,
         checkoutId: util.uid(),
         saleAddresses,
         quantities,
