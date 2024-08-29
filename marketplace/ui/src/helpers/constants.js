@@ -280,6 +280,21 @@ const bannerConfig = [
 
 export const BANNER = [
   {
+    label: "Liquid Gold",
+    link: '/c/Collectibles?sc=Collectibles',
+    text: <div className="liquid_gold_banner_text banner-text ">
+      <h1> Liquid Gold </h1>
+    </div>,
+    // desktopText: "Explore More",
+    // mobileText: "Explore",
+    alt: metaImg,
+    title: metaImg,
+    desktopImg: Images.LiquidGoldX2222,
+    laptopImg: Images.LiquidGoldX2222,
+    tabletImg: Images.LiquidGoldX2222,
+    mobileImg: Images.LiquidGoldX2222,
+  },
+  {
     label: "Collectibles",
     link: '/c/Collectibles?sc=Collectibles',
     text: <div className="collectible_banner_text banner-text ">
