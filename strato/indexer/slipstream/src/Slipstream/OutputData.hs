@@ -1443,13 +1443,8 @@ createEventTable  (creator, a, n) evName ev cc = do
       isEvent = True
       cols = getTableColumnAndType isEvent cc [(x, indexedTypeType y) | (x, y) <- fillFirstEmptyEntries $ ev ^. eventLogs]
       colsCombined = map (\(x,y)-> x <> " " <> y) cols
-  --eventAlreadyCreated <- isTableCreated  eventTable
-  --if eventAlreadyCreated
-    -- then return []
-    -- else do
-      --setTableCreated  eventTable $ colsCombined
-    yield $ createEventTableQuery eventTable colsCombined
-    return $ getDeferredForeignKeysForEvents eventTable creator a
+  yield $ createEventTableQuery eventTable colsCombined
+  return $ getDeferredForeignKeysForEvents eventTable creator a
 
 createEventTableQuery :: TableName -> TableColumns -> Text
 createEventTableQuery tableName cols =
