@@ -88,6 +88,13 @@ export const Images = {
   'HowX1440': require("./resources/Banner/HowX1440.png"),
   'HowX1600': require("./resources/Banner/HowX1600.png"),
 
+  // 'LiquidGoldX394': require("./resources/Banner/LiquidGoldX394.png"),
+  // 'LiquidGoldX768': require("./resources/Banner/LiquidGoldX768.png"),
+  // 'LiquidGoldX1440': require("./resources/Banner/LiquidGoldX1440.png"),
+  // 'LiquidGoldX1600': require("./resources/Banner/LiquidGoldX1600.png"),
+
+  'LiquidGoldX2222': require("./resources/Banner/LiquidGoldX2222.png"),
+
 
   'Icon_1': require("./resources/Banner/banner_icon_1.png"),
   'Icon_2': require("./resources/Banner/banner_icon_2.png"),
