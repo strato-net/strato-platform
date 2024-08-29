@@ -116,17 +116,17 @@ contract EventTest {
     let magic = 97;
     let res = await rest.call(user, {contract, method: "emitTest", args: {magic}}, vmOptions);
     await sleep(2000);
-    res = await rest.search(user, {...contract, name: toTableName("EventTest.SlipstreamTest")}, {...vmOptions, query: {magic: "eq.97"}});
+    res = await rest.search(user, {...contract, name: toTableName("EventTest-SlipstreamTest")}, {...vmOptions, query: {magic: "eq.97"}});
     assert.equal(res[0].magic, magic);
     magic = 98;
     res = await rest.call(user, {contract, method: "emitTest", args: {magic}}, vmOptions);
     await sleep(2000);
-    res = await rest.search(user, {...contract, name: toTableName("EventTest.SlipstreamTest")}, {...vmOptions, query: {magic: "eq.98"}});
+    res = await rest.search(user, {...contract, name: toTableName("EventTest-SlipstreamTest")}, {...vmOptions, query: {magic: "eq.98"}});
     assert.equal(res[0].magic, magic)
     magic = 99;
     res = await rest.call(user, {contract, method: "emitTest", args: {magic}}, vmOptions);
     await sleep(2000);
-    res = await rest.search(user, {...contract, name: toTableName("EventTest.SlipstreamTest")}, {...vmOptions, query: {magic: "eq.99"}});
+    res = await rest.search(user, {...contract, name: toTableName("EventTest-SlipstreamTest")}, {...vmOptions, query: {magic: "eq.99"}});
    
     assert.equal(res[0].magic, magic)
     
