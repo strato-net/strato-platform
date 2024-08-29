@@ -16,8 +16,10 @@ import {
 import { useMatch } from "react-router-dom";
 import { actions } from "../../contexts/redemption/actions";
 import { actions as inventoryActions } from "../../contexts/inventory/actions";
+import { actions as marketplaceActions } from "../../contexts/marketplace/actions";
 import { useRedemptionDispatch, useRedemptionState } from "../../contexts/redemption";
 import { useInventoryDispatch, useInventoryState } from "../../contexts/inventory";
+import { useMarketplaceDispatch, useMarketplaceState } from "../../contexts/marketplace";
 import routes from "../../helpers/routes";
 import { REDEMPTION_STATUS } from "../../helpers/constants";
 import classNames from "classnames";
@@ -29,14 +31,14 @@ import BoughtOrdersTable from "./BoughtOrdersTable";
 import SoldOrdersTable from "./SoldOrdersTable";
 import TransfersTable from "./TransfersTable";
 import RedemptionsOutgoingTable from "./RedemptionsOutgoingTable";
-import { ResponsiveOrderDetailCard } from "./ResponsiveOrderDetailCard";
+import AddressComponent from "../MarketPlace/AddressComponent";
 
 const RedemptionsIncomingDetails = ({ user }) => {
     const [id, setId] = useState(undefined);
     const [redemptionService, setRedemptionService] = useState(undefined);
-    const [data, setdata] = useState([]);
     const dispatch = useRedemptionDispatch();
     const inventoryDispatch = useInventoryDispatch();
+    const marketplaceDispatch = useMarketplaceDispatch();
     const { Text } = Typography;
     const [selectedDate, setSelectedDate] = useState("");
     const navigate = useNavigate();
@@ -45,6 +47,7 @@ const RedemptionsIncomingDetails = ({ user }) => {
     const [api, contextHolder] = notification.useNotification();
     const { redemption, isFetchingRedemptionDetails, isClosingRedemption, message, success, } = useRedemptionState();
     let { inventoryDetails, isInventoryDetailsLoading } = useInventoryState();
+    const { userAddress } = useMarketplaceState();
 
     const routeMatch = useMatch({
         path: routes.RedemptionsIncomingDetails.url,
@@ -67,12 +70,13 @@ const RedemptionsIncomingDetails = ({ user }) => {
 
     useEffect(() => {
         if (redemption) {
-            const fetchAsset = async () => {
-                await inventoryActions.fetchInventoryDetail(inventoryDispatch, redemption.assetAddresses[0])
+            const fetchAssetAndUserAddress = async () => {
+                await inventoryActions.fetchInventoryDetail(inventoryDispatch, redemption.assetAddresses[0]);
+                await marketplaceActions.fetchUserAddress(marketplaceDispatch, redemptionService, redemption.shippingAddressId);
             };
-            fetchAsset();
+            fetchAssetAndUserAddress();
         }
-    }, [redemption, inventoryDispatch])
+    }, [redemption, inventoryDispatch]);
 
     const OrderData = ({ title, value }) => {
         return (
@@ -122,7 +126,7 @@ const RedemptionsIncomingDetails = ({ user }) => {
     };
 
 
-    inventoryDetails={...inventoryDetails, images: inventoryDetails && Array.isArray(inventoryDetails["BlockApps-Mercata-Asset-images"]) ? inventoryDetails["BlockApps-Mercata-Asset-images"][0].value: []}
+    inventoryDetails = { ...inventoryDetails, images: inventoryDetails && Array.isArray(inventoryDetails["BlockApps-Mercata-Asset-images"]) ? inventoryDetails["BlockApps-Mercata-Asset-images"][0].value : [] }
     let column = [
         {
             title: "",
@@ -347,11 +351,11 @@ const RedemptionsIncomingDetails = ({ user }) => {
                                                     isLoading={isInventoryDetailsLoading}
                                                 />
                                             </div>
+                                            <h1 className="text-md mb-2 ml-2"> Requestor's Address </h1>
+                                            <div className={`w-[307px] h-[200px] overflow-x-auto hide-Scroll py-3 px-[14px] rounded-[4px] border border-[#0000002E]`}>
+                                                {userAddress && <AddressComponent userAddress={userAddress} />}
+                                            </div>
                                         </Card>
-                                        {data?.length > 0 && data?.map((item) => {
-                                            return (
-                                                <ResponsiveOrderDetailCard data={item} />)
-                                        })}
                                     </div>
                             },
                         ]}

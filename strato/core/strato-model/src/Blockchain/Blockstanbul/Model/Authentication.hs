@@ -1,4 +1,5 @@
 {-# LANGUAGE TemplateHaskell #-}
+{-# LANGUAGE TupleSections #-}
 
 module Blockchain.Blockstanbul.Model.Authentication where
 
@@ -7,6 +8,7 @@ import Blockchain.Data.RLP
 
 import Blockchain.Strato.Model.ChainMember
 import Blockchain.Strato.Model.Secp256k1
+import Control.Arrow ((&&&))
 import Control.Lens
 import qualified Data.ByteString as B
 
@@ -60,11 +62,22 @@ cookRawExtra bs =
           then Nothing
           else Just . rlpDecode . rlpDeserialize $ rest
 
-scrubCommitmentSeals :: RawExtraData -> RawExtraData
-scrubCommitmentSeals =
-  uncookRawExtra
-    . set (istanbul . _Just . commitment) []
-    . cookRawExtra
+class Show h => HasIstanbulExtra h where
+  getIstanbulExtra :: h -> Maybe IstanbulExtra
+  putIstanbulExtra :: Maybe IstanbulExtra -> h -> h
 
-scrubConsensus :: RawExtraData -> RawExtraData
-scrubConsensus = B.take 32
+runIstanbulExtra :: HasIstanbulExtra h => (Maybe IstanbulExtra -> (a, Maybe IstanbulExtra)) -> h -> (a, h)
+runIstanbulExtra f h = let (a, mIst) = f $ getIstanbulExtra h
+                         in (a, putIstanbulExtra mIst h)
+
+evalIstanbulExtra :: HasIstanbulExtra h => (Maybe IstanbulExtra -> a) -> h -> a
+evalIstanbulExtra f = fst . runIstanbulExtra (f &&& id)
+
+execIstanbulExtra :: HasIstanbulExtra h => (Maybe IstanbulExtra -> Maybe IstanbulExtra) -> h -> h
+execIstanbulExtra f = snd . runIstanbulExtra (((),) . f)
+
+scrubConsensus :: HasIstanbulExtra h => h -> h
+scrubConsensus = execIstanbulExtra (const Nothing)
+
+scrubCommitmentSeals :: HasIstanbulExtra h => h -> h
+scrubCommitmentSeals = execIstanbulExtra (set (_Just . commitment) [])

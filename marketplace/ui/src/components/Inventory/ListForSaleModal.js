@@ -33,7 +33,7 @@ const ListForSaleModal = ({ open, handleCancel, inventory, categoryName, limit, 
     const inputQuantityMobileRef = useRef(null);
 
     useEffect(() => {
-        paymentServiceActions.getPaymentServices(paymentServiceDispatch);
+        paymentServiceActions.getPaymentServices(paymentServiceDispatch, true);
         paymentServiceActions.getNotOnboarded(paymentServiceDispatch, user?.commonName, 10, 0);
     }, [paymentServiceDispatch, user]);
 

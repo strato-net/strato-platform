@@ -20,13 +20,13 @@ import Blockchain.Data.BlockHeader (BlockHeader)
 import qualified Blockchain.Data.BlockHeader as BlockHeader
 import Blockchain.Data.RLP
 import Blockchain.Data.Transaction
+import Blockchain.Blockstanbul.Model.Authentication
 import Blockchain.Strato.Model.Class
 import Blockchain.Strato.Model.Keccak256
 import Control.DeepSeq
 import Control.Lens
 import Data.Binary
 import qualified Data.ByteString as BS
-import Data.Data
 import Data.List
 import GHC.Generics
 import qualified Text.Colors as CL
@@ -38,7 +38,7 @@ data Block = Block
     blockReceiptTransactions :: [Transaction],
     blockBlockUncles :: [BlockHeader]
   }
-  deriving (Eq, Read, Show, Generic, Binary, NFData, Data)
+  deriving (Eq, Show, Generic, Binary, NFData)
 
 makeLensesFor [("blockBlockData", "blockHeaderLens")] ''Block
 
@@ -72,6 +72,10 @@ instance RLPSerializable Block where
 
   rlpEncode Block {blockBlockData = bd, blockReceiptTransactions = receipts, blockBlockUncles = uncles} =
     RLPArray [rlpEncode bd, RLPArray (rlpEncode <$> receipts), RLPArray $ rlpEncode <$> uncles]
+
+instance HasIstanbulExtra Block where
+  getIstanbulExtra     = getIstanbulExtra . blockBlockData
+  putIstanbulExtra i b = b{blockBlockData = putIstanbulExtra i $ blockBlockData b}
 
 instance BlockLike BlockHeader Transaction Block where
   blockHeader = blockBlockData

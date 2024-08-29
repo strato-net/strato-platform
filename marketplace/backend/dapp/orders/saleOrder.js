@@ -200,6 +200,8 @@ async function get(user, args, options) {
   return marshalOut(order['0'] ? { ...order['0'] } : { ...order });
 }
 
+
+
 async function getAll(admin, args = {}, options) {
   let saleOrders;
   const { offset, limit, order } = args;
@@ -339,7 +341,7 @@ async function getAll(admin, args = {}, options) {
   else
     saleOrders.sort((a, b) => b.createdDate - a.createdDate);
 
-  saleOrders = saleOrders.slice(offset, offset + limit)
+  saleOrders = saleOrders.slice(offset, parseInt(offset) + parseInt(limit))
 
   return saleOrders ? { orders: saleOrders.map((order) => marshalOut(order)), total: totalCount } : undefined;
 }

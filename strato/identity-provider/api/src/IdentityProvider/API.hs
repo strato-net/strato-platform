@@ -24,11 +24,13 @@ type PutIdentity =
     :> Header' '[Required, Strict] "X-USER-COMMON-NAME" Text
     :> Header' '[Optional, Strict] "X-USER-EMAIL" Text
     :> QueryParam "company" Text
+    :> QueryParam "subscribe" Bool
     :> Put '[JSON] Address --should return user address
 
 type PutIdentityExternal =
   "identity" -- only to be used for external api client bindings
     :> Header' '[Required, Strict] "Authorization" Text
+    :> QueryParam "subscribe" Bool
     :> Put '[JSON] Address
 
 type IdentityProviderAPI = GetPingIdentity :<|> PutIdentity :<|> PutIdentityExternal

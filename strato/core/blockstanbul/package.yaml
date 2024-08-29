@@ -31,7 +31,6 @@ library:
   - text
   - transformers
   - monad-alter
-  - x509-certs
 
 tests:
   blockstanbul-test:

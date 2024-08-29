@@ -40,8 +40,7 @@ stack test $5\
       strato-model \
       strato-redis-blockdb \
       strato-sequencer \
-      vm-runner \
-      x509-certs
+      vm-runner
 
 #      strato-lite \
 

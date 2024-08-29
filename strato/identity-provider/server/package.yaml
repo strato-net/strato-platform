@@ -30,6 +30,7 @@ library:
   - bloc2api
   - bloc2client
   - blockapps-identity-provider-api
+  - blockapps-identity-provider-client
   - blockapps-vault-wrapper-client
   - blockapps-vault-wrapper-api
   - bytestring
@@ -42,6 +43,7 @@ library:
   - lrucache
   - monad-alter
   - mtl
+  - notification-monad
   - servant-client
   - servant-server
   - solid-vm-model
@@ -53,7 +55,6 @@ library:
   - unliftio
   - utf8-string
   - vault-monad
-  - x509-certs
 
 executables:
   identity-provider-server:
@@ -68,8 +69,8 @@ executables:
     - common-log
     - containers
     - hflags
+    - strato-model
     - warp
-    - x509-certs
     - yaml
 
 tests:
