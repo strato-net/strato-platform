@@ -64,7 +64,7 @@ import SelectAccessible ()
 import Slipstream.Data.Action
 import qualified Slipstream.Events as E
 import Slipstream.OutputData
-import Slipstream.Metrics
+-- import Slipstream.Metrics
 import Slipstream.QueryFormatHelper
 import SolidVM.Model.CodeCollection hiding (contractName)
 import qualified SolidVM.Model.Type as SVMType
