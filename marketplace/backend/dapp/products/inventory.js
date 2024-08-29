@@ -443,6 +443,7 @@ async function getAll(admin, args = {}, defaultOptions) {
             inventories = await searchAllWithQueryArgs(contractName,
                 {
                     ...restArgs,
+                    status,
                     ownerCommonName: ownerCommonName,
                     queryOptions: queryOptions ? queryOptions : { select: constants.attachSalesAndImagesAndFiles }
                 }, options, admin);

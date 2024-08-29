@@ -1183,6 +1183,7 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
         {
           ownerCommonName: userCert.commonName,
           originAddress: stratsOriginAddress,
+          status: ASSET_STATUS.ACTIVE,
           queryOptions: { select: "address,quantity" },
           notEqualsField: 'quantity',
           notEqualsValue: '0'
