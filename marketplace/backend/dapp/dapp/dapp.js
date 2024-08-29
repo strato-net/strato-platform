@@ -1035,7 +1035,7 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
       }
 
       // Get User's STRATS Asset Address
-      const stratsOriginAddress = await strats.getStratsAddress();
+      const stratsOriginAddress = "72599614549ffe3a0f7e86caf2c25d29590f3b7c";;
       const stratsAssetAddresses = await inventoryJs.getAll(rawAdmin, { ownerCommonName: userCert.commonName, originAddress: stratsOriginAddress, queryOptions: { select: "address" }}, options);
 
       const createdDate = Math.floor(Date.now() / 1000);
@@ -1146,7 +1146,7 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
   contract.getStratsBalance = async function ( args, options = defaultOptions ) {
     const stratsOriginAddress = await strats.getStratsAddress();
     const balance = await inventoryJs.getAll(rawAdmin, { ownerCommonName: userCert.commonName, originAddress: stratsOriginAddress, queryOptions: { select: "quantity.sum()" }}, options);
-    return balance[0].sum;
+    return balance[0].sum ? balance[0].sum : 0;
   }
 
   contract.getStratsTransactionHistory = async function (args, options = defaultOptions) {
@@ -1156,7 +1156,15 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
     if (!stratsOriginAddress) {
       throw new rest.RestError(RestStatus.BAD_REQUEST, "Strats origin address not found.");
     }
-    return inventoryJs.getAllItemTransferEvents(rawAdmin, {or: `(oldOwner.eq.${userAddress},newOwner.eq.${userAddress})`}, getOptions);
+    let res = await inventoryJs.getAllItemTransferEvents(rawAdmin, {or: `(oldOwner.eq.${userAddress},newOwner.eq.${userAddress})`, assetName: "Sad Dog Kennel Club ($SADDOGS)"}, getOptions);
+
+    return res.transfers.map(transfer => ({
+      id: transfer.transferNumber,
+      timestamp: transfer.transferDate,
+      _to: transfer.newOwner,
+      _from: transfer.oldOwner,
+      _value: transfer.quantity
+    }));
   }
 
   contract.transferStrats = async function (args, options = defaultOptions) {
