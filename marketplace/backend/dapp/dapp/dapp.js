@@ -1199,7 +1199,7 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
 
   contract.transferStrats = async function (args, options = defaultOptions) {
     try {
-      const { value: initialQuantity, to: newOwner } = args;
+      const { value: initialQuantity, to: newOwner, price } = args;
   
       // Get strats origin address
       const stratsOriginAddress = await strats.getStratsAddress();
@@ -1253,7 +1253,7 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
           transferNumber,
           newOwner,
           quantity: transferQuantity,
-          price: 0,
+          price,
         };
   
         try {

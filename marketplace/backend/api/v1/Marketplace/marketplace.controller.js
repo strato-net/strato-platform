@@ -107,9 +107,9 @@ class MarketplaceController {
   static async transferStrats(req, res, next) {
     try {
       const { dapp, body } = req
-      const { to, value } = body
+      const { to, value, price } = body
 
-      await dapp.transferStrats({ to, value });
+      await dapp.transferStrats({ to, value, price });
 
       return rest.response.status200(res)
     } catch (e) {
