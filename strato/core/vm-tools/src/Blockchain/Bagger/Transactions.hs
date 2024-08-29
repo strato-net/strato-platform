@@ -1,4 +1,5 @@
 {-# LANGUAGE DeriveGeneric #-}
+{-# LANGUAGE RecordWildCards #-}
 
 module Blockchain.Bagger.Transactions where
 
@@ -11,6 +12,7 @@ import Blockchain.Database.MerklePatricia (StateRoot (..))
 import Blockchain.Sequencer.Event (OutputTx (..))
 import Blockchain.Strato.Model.Account
 import Blockchain.Strato.Model.Class
+import Blockchain.Strato.Model.Delta
 import Blockchain.Strato.Model.ExtendedWord
 import Blockchain.Strato.Model.Keccak256 hiding (hash)
 import qualified Blockchain.Stream.Action as Action
@@ -238,3 +240,12 @@ instance Format TransactionFailureCause where
   format (TFNonceLimitExceeded limit actual _) = "Nonce limit exceeded: limit of " ++ show limit ++ ", actual " ++ show actual
   format (TFTXSizeLimitExceeded limit actual _) = "TX size limit exceeded: limit of " ++ show limit ++ ", actual " ++ show actual
   format (TFKnownFailedTX t) = "Known failed tx: " ++ show (otHash t)
+
+getDeltasFromResults :: [TxRunResult] -> (ValidatorDelta, CertDelta)
+getDeltasFromResults = foldr go (mempty,mempty)
+  where go trr (v,c) = case trrResult trr of
+          Left _ -> (v,c)
+          Right ExecResults{..} ->
+            let vd' = toDelta erNewValidators erRemovedValidators
+                cd' = toDelta erNewCerts      erRevokedCerts
+             in (vd' <> v, cd' <> c)

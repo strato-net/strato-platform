@@ -66,7 +66,6 @@ packages:
 - libs/prometheus/cross-monitoring
 - libs/secp256k1-haskell
 - libs/type-lits
-- libs/x509-certs
 
 #removing for now, too hard to keep this up to date when making large changes elsewhere
 #- simulator/strato-lite

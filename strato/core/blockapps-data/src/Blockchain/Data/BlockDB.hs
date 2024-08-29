@@ -37,27 +37,27 @@ blk2BlkDataRef b hash' difficulty' makeHashOne =
   BlockDataRef pH uH cO cU cC sR tR rR lB d n gL gU t eD nc mH hash'' True True difficulty' --- Horrible! Apparently I need to learn the Lens library, yesterday
   where
     hash'' = if makeHashOne then unsafeCreateKeccak256FromWord256 1 else hash'
-    bd = blockBlockData b
-    pH = parentHash bd
-    uH = ommersHash bd
-    cB = beneficiary bd
     (cO, cU, cC) = case cB of
       Org o True -> (o, "", "")
       OrgUnit o u True -> (o, u, "")
       CommonName o u c True -> (o, u, c)
       _ -> ("", "", "")
+    bd = blockBlockData b
+    pH = parentHash bd
     sR = stateRoot bd
     tR = transactionsRoot bd
     rR = receiptsRoot bd
     lB = logsBloom bd
     n = number bd
-    d = difficulty bd
-    gL = gasLimit bd
-    gU = gasUsed bd
     t = timestamp bd
     eD = extraData bd
-    nc = nonce bd
-    mH = mixHash bd
+    nc = getBlockNonce bd
+    d = getBlockDifficulty bd
+    gL = getBlockGasLimit bd
+    gU = getBlockGasUsed bd
+    uH = getBlockOmmersHash bd
+    cB = getBlockBeneficiary bd
+    mH = getBlockMixHash bd
 
 getBlock ::
   HasSQLDB m =>

@@ -9,6 +9,7 @@ module Blockchain.Strato.Model.Validator
   )
 where
 
+import Blockchain.Data.RLP
 import Control.DeepSeq
 import Data.Aeson hiding (Array, String)
 import Data.Binary
@@ -24,6 +25,10 @@ import Test.QuickCheck.Instances.Text ()
 import Text.Format
 
 newtype Validator = Validator Text deriving (Generic, Eq, Data, Show, Ord, Read, IsString)
+
+instance RLPSerializable Validator where
+  rlpEncode (Validator v) = rlpEncode v
+  rlpDecode v = Validator $ rlpDecode v
 
 instance NFData Validator where
   rnf (Validator c) = c `seq` ()

@@ -51,6 +51,7 @@ main = do
   runInstrumentation "strato-sequencer"
   s <- $initHFlags "Block/Txn sequencer for the Haskell EVM"
   validators <- readValidatorsFromGenesisInfo <$> getGenesisInfoFromFile flags_genesisBlockName
+
   exportFlagsAsMetrics
   putStrLn $ "strato-sequencer ignoring unknown flags: " ++ show s
   putStrLn $ "strato-sequencer network: " ++ show flags_network
