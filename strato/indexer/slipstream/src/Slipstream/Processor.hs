@@ -423,6 +423,9 @@ processTheMessages env conn messages = do
             pCollections <- processedContractToProcessedCollectionRows stateDiff (collectionNames) row abiid (actionCCCreator row) --get all collection rows to insert
             pCollectionsWithAbstracts <- pure $ duplicateForParentsAndIncludeOriginal pCollections parents'
             pure . Right $ BatchedInserts (indexContract, fkeysForThisContract) abstractColumns [indexContract] pCollectionsWithAbstracts
+      
+      -- record prometheus metrics
+      mapM_ recordAction actions
 
   forM_ (lefts inserts) $ $logErrorS "processTheMessages"
 
