@@ -1625,8 +1625,11 @@ expandEventTable  (creator, a, n) evName ev cc = do
 -- Function to convert AggregateEvent to ProcessedCollectionRow
 aggEventToCollectionRows :: AggregateEvent -> [ProcessedCollectionRow]
 aggEventToCollectionRows ae =
-  let (arrayName, arrayElements) = getArraysFromEvents $ Action.evArgs ev
-  in map (aggEventToCollectionRow ae ev (T.pack arrayName)) arrayElements
+  case Action.evArgs ev of
+    [] -> []
+    args -> 
+      let (arrayName, arrayElements) = getArraysFromEvents args
+      in map (aggEventToCollectionRow ae ev (T.pack arrayName)) arrayElements
   where
     ev = eventEvent ae
 
