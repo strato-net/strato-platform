@@ -574,10 +574,9 @@ const actions = {
       if (response.status === RestStatus.OK) {
         dispatch({
           type: actionDescriptors.transferStratsSuccessful,
-          payload: body.data
         });
         actions.setMessage(dispatch, "STRATS transferred successfully", true);
-        return;
+        return true;
       }
       dispatch({ type: actionDescriptors.transferStratsFailed, error: "Error while transferring STRATS" });
       actions.setMessage(dispatch, "Error while transferring STRATS");
