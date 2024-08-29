@@ -1035,7 +1035,7 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
       }
 
       // Get User's STRATS Asset Address
-      const stratsOriginAddress = "72599614549ffe3a0f7e86caf2c25d29590f3b7c";//await strats.getStratsAddress();
+      const stratsOriginAddress = await strats.getStratsAddress();
 
       // Retrieve all sales data
       const salesData = await saleJs.getAll(rawAdmin, { saleAddresses }, options);
