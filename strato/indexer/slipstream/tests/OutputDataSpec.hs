@@ -177,7 +177,7 @@ spec = do
             
 
       --  
-      [vehicleCreate, _, _, _, vehicleInsert, _] <- runLoggingT . runConduit $ createInserts  input .| sinkList
+      [vehicleCreate, _, _, _, vehicleInsert] <- runLoggingT . runConduit $ createInserts  input .| sinkList
       vehicleCreate
         `shouldBe` [r|CREATE TABLE IF NOT EXISTS "Vehicle" (address text,
     block_hash text,
@@ -250,7 +250,7 @@ spec = do
             
        
 
-      [vehicleCreate, historyCreate, historyIndex, historyAlter, vehicleInsert, historyInsert] <-
+      [vehicleCreate, historyCreate, historyIndex, historyAlter, vehicleInsert] <-
         runLoggingT . runConduit $ createInserts  input .| sinkList
 
       vehicleCreate
@@ -272,7 +272,29 @@ spec = do
     transaction_hash text,
     transaction_sender text,
     creator text,
-    root text);|]
+    root text);
+
+CREATE OR REPLACE FUNCTION "insert_or_update_Vehicle2_history_table"() RETURNS TRIGGER AS $$
+BEGIN
+    RAISE NOTICE 'Trigger fired for % on table Vehicle2: %', TG_OP, NEW.address;
+    IF TG_OP = 'INSERT' THEN
+        RAISE NOTICE 'Inserting into history table history@Vehicle2 for address: %', NEW.address;
+        INSERT INTO "history@Vehicle2" VALUES (NEW.*);
+    ELSIF TG_OP = 'UPDATE' THEN
+        RAISE NOTICE 'Updating history table history@Vehicle2 for address: %', NEW.address;
+        INSERT INTO "history@Vehicle2" VALUES (NEW.*);
+    END IF;
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+CREATE TRIGGER "after_insert_on_Vehicle2"
+AFTER INSERT ON "Vehicle2"
+FOR EACH ROW EXECUTE PROCEDURE "insert_or_update_Vehicle2_history_table"();
+
+CREATE TRIGGER "after_update_on_Vehicle2"
+AFTER UPDATE ON "Vehicle2"
+FOR EACH ROW EXECUTE PROCEDURE "insert_or_update_Vehicle2_history_table"();|]
 
       historyIndex
         `shouldBe` [r|CREATE UNIQUE INDEX IF NOT EXISTS "index_history@Vehicle2"
@@ -304,25 +326,6 @@ spec = do
     block_number = excluded.block_number,
     transaction_hash = excluded.transaction_hash,
     transaction_sender = excluded.transaction_sender;|]
-
-      historyInsert
-        `shouldBe` [r|INSERT INTO "history@Vehicle2" ("address",
-    "block_hash",
-    "block_timestamp",
-    "block_number",
-    "transaction_hash",
-    "transaction_sender",
-    "creator",
-    "root")
-  VALUES ('0000000000000000000000000000000000000add',
-    '2b47410f675ac98038c44d14a87eac6855e0bfcbb0473649c22e147a789a9f08',
-    '2018-09-16 18:28:52.607875 UTC',
-    '123',
-    '242d201a68fa4440fcb3c77610785eb207b5a8b9f88208a3525efe6a7677ed59',
-    '0000000000000000000000000000000000000add',
-    '',
-    '')
-  ON CONFLICT DO NOTHING;|]
 
   describe "String escaping" $ do
     it "should create JSON entries with quotes escaped" $ do
@@ -359,7 +362,7 @@ spec = do
             
 
        
-      [vehicleCreate, _, _, _, vehicleInsert, _] <-
+      [vehicleCreate, _, _, _, vehicleInsert] <-
         runLoggingT . runConduit $ createInserts  input .| sinkList
       vehicleCreate
         `shouldBe` [r|CREATE TABLE IF NOT EXISTS "\"Vehicle''''" (address text,
@@ -458,7 +461,7 @@ spec = do
           
 
      
-    [swissArmyCreate, _, _, _, swissArmyInsert, _] <-
+    [swissArmyCreate, _, _, _, swissArmyInsert] <-
       runLoggingT . runConduit $ createInserts  input .| sinkList
 
     swissArmyCreate
@@ -672,7 +675,7 @@ spec = do
           
 
      
-    [swissArmyCreate, _, _, _, swissArmyInsert, _] <-
+    [swissArmyCreate, _, _, _, swissArmyInsert] <-
       runLoggingT . runConduit $ createInserts  input .| sinkList
 
     swissArmyCreate
