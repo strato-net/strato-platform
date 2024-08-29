@@ -13,7 +13,7 @@ const TransactionResponsive = ({ data , user}) => {
   const navigate = useNavigate();
   const [expandedRows, setExpandedRows] = useState({});
 
-  const formatter = new Intl.NumberFormat('en-IN');
+  const formatter = new Intl.NumberFormat('en-US');
   const formattedNum = (num) => formatter.format(num);
 
   const handleMore = (index) => {

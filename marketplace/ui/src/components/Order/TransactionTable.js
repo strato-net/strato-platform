@@ -41,7 +41,7 @@ const TransactionTable = ({ user, selectedDate, onDateChange, download, isAllOrd
   const [transactions, setTransactions] = useState(userTransactions)
   const [search, setSearch] = useState("")
 
-  const formatter = new Intl.NumberFormat('en-IN');
+  const formatter = new Intl.NumberFormat('en-US');
   const formattedNum = (num) => formatter.format(num);
 
   useEffect(() => {
