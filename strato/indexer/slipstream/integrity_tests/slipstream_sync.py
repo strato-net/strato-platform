@@ -5,25 +5,25 @@ import base64
 import time
 import sys
 
-def wait_for_slipstream_to_sync(node1_url, node2_url, headers1, headers2, attempts, sleep_time):
+def wait_for_slipstream_to_sync(node1_url, node2_url, headers1, headers2, attempts, sleep_time, table_name):
     attempts = int(attempts)
     sleep_time = int(sleep_time)
     attempt = 0
     while True:
         attempt += 1
         try:
-            response1 = requests.get(node1_url + '/prometheus/api/v1/query?query=max_block_number_seen{job="slipstream"}', headers=headers1)
-            response2 = requests.get(node2_url + '/prometheus/api/v1/query?query=max_block_number_seen{job="slipstream"}', headers=headers2)
+            response1 = requests.get(node1_url + "/cirrus/search/{table_name}", headers=headers1, params={'order':'block_timestamp.desc', 'limit':1})
+            response2 = requests.get(node2_url + "/cirrus/search/{table_name}", headers=headers2, params={'order':'block_timestamp.desc', 'limit':1})
             if response1.ok and response2.ok and response1:
                 response1_json = response1.json()
                 response2_json = response2.json()
                 if len(response1_json) < 1:
-                    print(f"Prometheus response from Node1 is empty: `{response1_json}` (attempt #{attempt} of {attempts})")
+                    print(f"Cirrus response from Node1 is empty: `{response1_json}` (attempt #{attempt} of {attempts})")
                 elif len(response2_json) < 1:
-                    print(f"Prometheus response from Node2 is empty: `{response2_json}` (attempt #{attempt} of {attempts})")
+                    print(f"Cirrus response from Node2 is empty: `{response2_json}` (attempt #{attempt} of {attempts})")
                 else:
-                    block_number1 = response1.json()['data']['result'][0]['value'][1]
-                    block_number2 = response2.json()['data']['result'][0]['value'][1]
+                    block_number1 = response1.json()[0]["block_number"]
+                    block_number2 = response2.json()[0]["block_number"]
                     if block_number1 == block_number2:
                         print(f"Nodes are in sync with block number: {block_number1}")
                         break
@@ -127,7 +127,13 @@ if __name__ == "__main__":
     headers2 = {'Authorization': f'Bearer {token2}'}
 
     # Wait until both nodes have the same latest block indexed in Slipstream
-    wait_for_slipstream_to_sync(node1_url, node2_url, headers1, headers2, attempts, sleep_time)
+    wait_for_slipstream_to_sync(node1_url, node2_url, headers1, headers2, attempts, sleep_time, "BlockApps-Mercata-Asset")
+    wait_for_slipstream_to_sync(node1_url, node2_url, headers1, headers2, attempts, sleep_time, "BlockApps-Mercata-Order")
+    wait_for_slipstream_to_sync(node1_url, node2_url, headers1, headers2, attempts, sleep_time, "BlockApps-Mercata-Sale")
+    wait_for_slipstream_to_sync(node1_url, node2_url, headers1, headers2, attempts, sleep_time, "BlockApps-Mercata-Asset.ItemTransfers")
+    wait_for_slipstream_to_sync(node1_url, node2_url, headers1, headers2, attempts, sleep_time, "BlockApps-Mercata-Asset-files")
+    wait_for_slipstream_to_sync(node1_url, node2_url, headers1, headers2, attempts, sleep_time, "BlockApps-Mercata-Asset-images")
+    wait_for_slipstream_to_sync(node1_url, node2_url, headers1, headers2, attempts, sleep_time, "BlockApps-Mercata-Asset-fileNames")
 
     discrepancies_asset, count_asset_discrepancy = check_table("BlockApps-Mercata-Asset")
     discrepancies_sale, count_sale_discrepancy = check_table("BlockApps-Mercata-Order")

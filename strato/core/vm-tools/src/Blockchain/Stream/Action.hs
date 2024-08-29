@@ -230,7 +230,7 @@ data ActionData = ActionData
     _actionDataApplication :: Text,
     _actionDataCodeKind :: CodeKind,
     _actionDataStorageDiffs :: DataDiff,
-    _actionDataAbstracts :: Map (Account, Text) (Text, Text), -- (import address, contract name) -> (cn, app)
+    _actionDataAbstracts :: Map (Account, Text) (Text, Text, [Text]), -- (import address, contract name) -> (cn, app)
     _actionDataMappings :: [Text],
     _actionDataArrays :: [Text],
     _actionDataCallTypes :: [CallType]
