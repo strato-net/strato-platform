@@ -2,7 +2,7 @@ import { rest, util, importer } from "blockapps-rest";
 const { createContract } = rest;
 import constants, {
   calculatePriceFluctuation,
-  calculateAveragePrice,
+  calculateAverageSalePrice,
   calculateVolumeTraded,
   getOneYearAgoTime,
   getSixMonthsAgoTime,
@@ -626,7 +626,7 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
       const records = {
         originFluctuation: calculatePriceFluctuation(Object.values(twelveMonthHistoryRecords)),
         originVolume: calculateVolumeTraded(Object.values(twelveMonthHistoryRecords)),
-        originAveragePrice: calculateAveragePrice(Object.values(twelveMonthHistoryRecords))
+        originAveragePrice: calculateAverageSalePrice(Object.values(twelveMonthHistoryRecords))
       };
 
       return { records, originRecords };
