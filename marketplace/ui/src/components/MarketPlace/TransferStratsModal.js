@@ -53,7 +53,7 @@ const TransferStratsModal = ({ visible, onCancel }) => {
   }, []);
 
   useEffect(() => {
-    if (amount > strats || strats <= 0 || amount <= 0 || !strats || !receiverAddress) {
+    if (amount > strats || strats <= 0 || amount <= 0 || !strats || Object.keys(strats).length === 0 || !receiverAddress) {
       setCanTransfer(false);
     }
     else {
@@ -78,7 +78,7 @@ const TransferStratsModal = ({ visible, onCancel }) => {
   const handleSubmit = async (e) => {
     const payload = {
       to: receiverAddress,
-      value: amount !== undefined ? ((amount * 100).toFixed(0) / 100) : 0
+      value: amount !== undefined ? (amount * 100).toFixed(0) : 0
     };
 
     if (amount > 0 && amount <= strats && receiverAddress) {

@@ -1176,7 +1176,7 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
   contract.getStratsBalance = async function ( args, options = defaultOptions ) {
     const stratsOriginAddress = await strats.getStratsAddress();
     const balance = await inventoryJs.getAll(rawAdmin, { ownerCommonName: userCert.commonName, originAddress: stratsOriginAddress, queryOptions: { select: "quantity.sum()" }}, options);
-    return balance[0].sum ? balance[0].sum : 0;
+    return balance[0].sum ? `${balance[0].sum}` : 0;
   }
 
   contract.getStratsTransactionHistory = async function (args, options = defaultOptions) {
