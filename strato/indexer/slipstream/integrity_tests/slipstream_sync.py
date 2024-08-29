@@ -6,6 +6,7 @@ import time
 import sys
 
 def wait_for_slipstream_to_sync(node1_url, node2_url, headers1, headers2, attempts, sleep_time, table_name):
+    print(f"Trying for: " {table_name})
     attempts = int(attempts)
     sleep_time = int(sleep_time)
     attempt = 0
@@ -107,7 +108,7 @@ if __name__ == "__main__":
         sys.exit(1)
 
     DEFAULT_ATTEMPTS = 0  # 0 for infinite
-    DEFAULT_SLEEP_TIME = 30
+    DEFAULT_SLEEP_TIME = 60
 
     client_id1 = sys.argv[1]
     client_id2 = sys.argv[2]
