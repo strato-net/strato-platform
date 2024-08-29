@@ -40,7 +40,7 @@ const StratsTransactionHistoryModal = ({ visible, onCancel }) => {
         return {
             key: r.id,
             ...r,
-            value: (parseInt(r._value) / 100).toLocaleString(),
+            value: parseInt(r._value).toLocaleString(),
             to: displayName(r._to),
             from: displayName(r._from),
             timestamp: moment.unix(r.timestamp).format('MM-DD-YYYY hh:mm a')
