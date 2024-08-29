@@ -1658,10 +1658,14 @@ removeArrayEvArgs :: Action.Event -> Action.Event
 removeArrayEvArgs ev = ev { Action.evArgs = filter (\(_, _, c) -> c /= "Array") (Action.evArgs ev) }
 
 getArraysFromEvents :: [(String, String, String)] -> (String, [(Value, Value)])
-getArraysFromEvents evArgs =
-  let (arrayName, arrayStr) = head [(a, b) | (a, b, c) <- evArgs, c == "Array"]
-      elements = fromMaybe [] (Aeson.decode (BL.fromStrict $ TE.encodeUtf8 $ T.pack arrayStr) :: Maybe [String])
-  in (arrayName, zip (map (SimpleValue . ValueString . T.pack . show) [0 :: Int ..]) (map (SimpleValue . ValueString . T.pack) elements))
+getArraysFromEvents evArgs = do 
+  let li = [(a, b) | (a, b, c) <- evArgs, c == "Array"]
+  case li of 
+    [] -> ("", [])
+    (arrayName, arrayStr):_ -> 
+         let elements = fromMaybe [] (Aeson.decode (BL.fromStrict $ TE.encodeUtf8 $ T.pack arrayStr) :: Maybe [String])
+         in (arrayName, zip (map (SimpleValue . ValueString . T.pack . show) [0 :: Int ..]) 
+                            (map (SimpleValue . ValueString . T.pack) elements))
 
 insertEventTables :: 
   OutputM m =>
