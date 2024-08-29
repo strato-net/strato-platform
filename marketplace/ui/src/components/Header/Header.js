@@ -89,7 +89,7 @@ const HeaderComponent = ({ user, loginUrl, showMenu, handleSubMenu, handleMenuTa
   const [isTransferStratsModalVisible, setIsTransferStratsModalVisible] = useState(false);
   const [isStratsTransactionHistoryModalVisible, setIsStratsTransactionHistoryModalVisible] = useState(false);
 
-  const stratsBalance = strats ? strats : 0
+  const stratsBalance = (Object.keys(strats).length > 0) ? strats : 0
 
   useEffect(() => {
     setSelectedCategory(categoryQueryValue)
