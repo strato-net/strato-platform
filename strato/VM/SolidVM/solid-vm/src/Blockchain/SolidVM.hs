@@ -51,6 +51,7 @@ import Blockchain.Strato.Model.Account
 import Blockchain.Strato.Model.Address
 import Blockchain.Strato.Model.Class
 import Blockchain.Strato.Model.Code
+import Blockchain.Strato.Model.Delta
 import Blockchain.Strato.Model.Event
 import Blockchain.Strato.Model.ExtendedWord
 import Blockchain.Strato.Model.Gas
@@ -63,6 +64,7 @@ import qualified Blockchain.Stream.VMEvent as VME
 import Blockchain.VMContext
 import Blockchain.VMOptions
 import Control.Applicative
+import Control.Arrow ((***))
 import Control.DeepSeq (force)
 import Control.Exception (throw)
 import Control.Lens hiding (Context, assign, from, to)
@@ -368,6 +370,7 @@ create' creator maybeCodePtr originAddress issuerAcct issuerName newAccount ch c
   solidVMBreakpoint emptySourceAnnotation -- just to force a resume at the end of the transaction
   finalEvs <- Mod.get (Mod.Proxy @(Q.Seq Event))
   finalAct <- Mod.get (Mod.Proxy @Action)
+  let ((newV, remV), (newC, revC)) = (fromDelta *** fromDelta) . getDeltasFromEvents $ toList finalEvs
   return
     ExecResults
       { erRemainingTxGas = 0, --Just use up all the allocated gas for now....
@@ -383,11 +386,15 @@ create' creator maybeCodePtr originAddress issuerAcct issuerName newAccount ch c
         erKind = SolidVM,
         erPragmas = CC._pragmas cc,
         erCreator = issuerName,
-        erAppName = parentName'
+        erAppName = parentName',
+        erNewValidators = newV,
+        erRemovedValidators = remV,
+        erNewCerts = newC,
+        erRevokedCerts = revC
       }
 
 call ::
-  (SolidVMBase m) =>
+  SolidVMBase m =>
   Bool ->
   Bool ->
   Bool ->
@@ -449,6 +456,7 @@ call _ _ _ isRCC _ blockData _ _ codeAddress sender' _ _ _ availableGas origin' 
     solidVMBreakpoint emptySourceAnnotation -- just to force a resume at the end of the transaction
     finalAct <- Mod.get (Mod.Proxy @Action)
     finalEvs <- Mod.get (Mod.Proxy @(Q.Seq Event))
+    let ((newV, remV), (newC, revC)) = (fromDelta *** fromDelta) . getDeltasFromEvents $ toList finalEvs
 
     return $
       ExecResults
@@ -465,7 +473,11 @@ call _ _ _ isRCC _ blockData _ _ codeAddress sender' _ _ _ availableGas origin' 
           erKind = SolidVM,
           erPragmas = [],
           erCreator = creator,
-          erAppName = appName
+          erAppName = appName,
+          erNewValidators = newV,
+          erRemovedValidators = remV,
+          erNewCerts = newC,
+          erRevokedCerts = revC
         }
 
 call' ::

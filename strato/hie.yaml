@@ -522,12 +522,6 @@ cradle:
     - path: "libs/type-lits/src"
       component: "type-lits:lib"
 
-    - path: "libs/x509-certs/src"
-      component: "x509-certs:lib"
-
-    - path: "libs/x509-certs/test/"
-      component: "x509-certs:test:x509-test"
-
     - path: "tools/blockapps-tools/src/"
       component: "blockapps-tools:lib"
 

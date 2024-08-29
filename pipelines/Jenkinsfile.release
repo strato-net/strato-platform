@@ -6,6 +6,7 @@ pipeline {
   parameters {
     string(name: 'GIT_TAG', defaultValue: 'tags/10.0-rc0', description: 'The strato-platform git tag to build as a release candidate. Use `tags/<tag_name>` format. NOTE: Other Refspec types are not supported.')
     string(name: 'RELEASE_VERSION', defaultValue: '10.0', description: 'The version tag for the future release')
+    string(name: 'RELEASE_TYPE', defaultValue: 'master', description: 'The type of release to perform. Use \'master\' for validator releases and \'marketplace-master\' for marketplace releases')
   }
   stages {
     stage('Prepare') {
@@ -13,6 +14,11 @@ pipeline {
         script {
           if (!env.GIT_TAG.contains("tags/")) {
             echo "Unexpected GIT_TAG format: ${env.GIT_TAG}, expected to include 'tags/'. Exit 1."
+            currentBuild.result = 'FAILURE'
+            sh "exit 1"
+          }
+          if(env.RELEASE_TYPE != 'master' && env.RELEASE_TYPE != 'marketplace-master') {
+            echo "Unexpected RELEASE_TYPE: ${env.RELEASE_TYPE}, expected 'master' or 'marketplace-master'. Exit 1."
             currentBuild.result = 'FAILURE'
             sh "exit 1"
           }
@@ -235,7 +241,7 @@ pipeline {
               RELEASE_VERSION=$(<VERSION)
               STRATOGS_RELEASE_DETAILS_STABLE="--user blockapps --repo strato-getting-started --tag ${RELEASE_VERSION}"
               github-release delete $STRATOGS_RELEASE_DETAILS_STABLE || true
-              github-release release $STRATOGS_RELEASE_DETAILS_STABLE --name "${RELEASE_VERSION}"
+              github-release release $STRATOGS_RELEASE_DETAILS_STABLE --name "${RELEASE_VERSION}-marketplace"
               sleep 5
               github-release upload $STRATOGS_RELEASE_DETAILS_STABLE --name "docker-compose.yml" --file ./docker-compose.yml
               github-release upload $STRATOGS_RELEASE_DETAILS_STABLE --name "docker-compose.vault.yml" --file ./docker-compose.vault.yml
@@ -251,16 +257,16 @@ pipeline {
               github-release upload $STRATOGS_RELEASE_DETAILS_STABLE --name "docker-compose.notification.ecr.yml" --file ./docker-compose.notification.ecr.yml
             '''
 
-            // Merge release code to master
+            // Merge release code to ${env.RELEASE_TYPE}
             sh 'git checkout VERSION'
-            // Make sure no master branch exists with random/old code, we want code from origin/master
-            sh 'git branch -D master || true'
-            sh 'git checkout master'
+            // Make sure no ${env.RELEASE_TYPE} branch exists with random/old code, we want code from origin/${env.RELEASE_TYPE}
+            sh "git branch -D ${env.RELEASE_TYPE} || true"
+            sh "git checkout ${env.RELEASE_TYPE}"
             sh "git merge ${env.GIT_TAG}"
             sh "echo ${env.RELEASE_VERSION} > VERSION"
             sh 'git add VERSION'
             sh "git -c user.name=${GITHUB_USERNAME} -c user.email=\'cd@blockapps\' commit VERSION -m 'Update latest release version to ${env.RELEASE_VERSION}' --allow-empty"
-            sh 'git push https://$GITHUB_USERNAME:$GITHUB_TOKEN@github.com/blockapps/strato-platform master'
+            sh "git push https://$GITHUB_USERNAME:$GITHUB_TOKEN@github.com/blockapps/strato-platform ${env.RELEASE_TYPE}"
             sh "git tag ${env.RELEASE_VERSION}"
             sh 'git push https://$GITHUB_USERNAME:$GITHUB_TOKEN@github.com/blockapps/strato-platform --tags'
 
@@ -270,12 +276,13 @@ pipeline {
             // Merge VERSION change back to develop
             sh 'git checkout develop'
             sh 'git pull https://$GITHUB_USERNAME:$GITHUB_TOKEN@github.com/blockapps/strato-platform develop'
-            sh 'git merge master'
-            
-            // The following step requires `cd-blockapps` user to be able to push directly to develop bypassing the required Status Check to pass ("continuous-integration/jenkins/pr-merge")
-            // This can't be bypassed based on the GitHub branch settings as it is done for pull requests. So we are manually temporary disabling that check ("Require status checks to pass before merging") for develop branch on Github to execute it.
-            // any ideas how to avoid that?
-            sh 'git push https://$GITHUB_USERNAME:$GITHUB_TOKEN@github.com/blockapps/strato-platform develop'
+            sh "git merge ${env.RELEASE_TYPE}"
+          
+          
+          // The following step requires `cd-blockapps` user to be able to push directly to develop bypassing the required Status Check to pass ("continuous-integration/jenkins/pr-merge")
+          // This can't be bypassed based on the GitHub branch settings as it is done for pull requests. So we are manually temporary disabling that check ("Require status checks to pass before merging") for develop branch on Github to execute it.
+          // any ideas how to avoid that?
+          sh 'git push https://$GITHUB_USERNAME:$GITHUB_TOKEN@github.com/blockapps/strato-platform develop'
           }
         }
       }
