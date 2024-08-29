@@ -380,7 +380,7 @@ processTheMessages env conn messages = do
 
   inserts <- fmap concat $ enterBloc2 env $ do
     forM changes $ \(_, actions) -> do
-      forM actions $ \(row) -> do
+      results <- forM actions $ \(row) -> do
         case actionStorage row of
           Action.EVMDiff {} -> pure $ Left "EVM code indexing ignored"
           Action.SolidVMDiff {} -> do
@@ -427,6 +427,7 @@ processTheMessages env conn messages = do
       
       -- record prometheus metrics
       mapM_ recordAction actions
+      pure results
 
   forM_ (lefts inserts) $ $logErrorS "processTheMessages"
 
