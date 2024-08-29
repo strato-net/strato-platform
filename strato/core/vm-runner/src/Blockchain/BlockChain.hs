@@ -245,10 +245,10 @@ addBlock b@OutputBlock {obBlockData = bd, obReceiptTransactions = otxs} =
 
         postRewardSR <- A.lookup (A.Proxy @MP.StateRoot) (Nothing :: Maybe Word256)
 
-        case verifyBlock (obBlockData b) (trrs, postRewardSR) of
+        case verifyBlock b (trrs, postRewardSR) bSum of
           failures@(_:_) -> pure failures
           _ -> do
-            valid <- checkValidity (blockIsHomestead $ number bd) bSum b
+            valid <- checkValidity bSum b
             case valid of
               Nothing -> lift $ P.incCounter vmBlocksValid
               Just _ -> lift $ P.incCounter vmBlocksInvalid -- error err -- todo: i dont think we ACTUALLY need to error here
@@ -266,8 +266,14 @@ addBlock b@OutputBlock {obBlockData = bd, obReceiptTransactions = otxs} =
             pure []
 
 -- TODO: If we add more verifications, refactor tuple into a proper data type
-verifyBlock :: BlockHeader -> ([TxRunResult], Maybe MP.StateRoot) -> [BlockVerificationFailure]
-verifyBlock bh (trrs, derivedSR) =
+verifyBlock :: (HasStateDB m) =>
+  OutputBlock -> 
+  ([TxRunResult], Maybe MP.StateRoot) -> 
+  BlockSummary ->
+  [BlockVerificationFailure]
+verifyBlock b@OutputBlock{obBlockData = bh} (trrs, derivedSR) parentBSum =
+  validity <- checkValidity parentBSum b
+  -- do something w/ validity
   let (vDelt, cDelt) = getDeltasFromResults trrs
       bHash = blockHeaderHash bh
       bNum = number bh

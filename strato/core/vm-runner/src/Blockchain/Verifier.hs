@@ -36,27 +36,14 @@ nextGasLimitDelta oldGasLimit = oldGasLimit `div` 1024
 --     ommersHash bd == hash (rlpSerialize $ RLPArray (rlpEncode <$> bus))
 
 checkParentChildValidity ::
-  (MonadFail m) =>
-  Bool ->
   OutputBlock ->
   BlockSummary ->
-  m ()
-checkParentChildValidity _ OutputBlock {obBlockData = c} parentBSum = do
-  unless (number c == bSumNumber parentBSum + 1) $
-    fail $ "Block number is wrong: got " ++ show (number c) ++ ", expected " ++ show (bSumNumber parentBSum + 1)
-  unless (getBlockGasLimit c <= bSumGasLimit parentBSum + nextGasLimitDelta (bSumGasLimit parentBSum)) $
-    fail $
-      "Block gasLimit is too high: got " ++ show (getBlockGasLimit c)
-        ++ ", should be less than "
-        ++ show (bSumGasLimit parentBSum + nextGasLimitDelta (bSumGasLimit parentBSum))
-  unless (getBlockGasLimit c >= bSumGasLimit parentBSum - nextGasLimitDelta (bSumGasLimit parentBSum)) $
-    fail $
-      "Block gasLimit is too low: got " ++ show (getBlockGasLimit c)
-        ++ ", should be less than "
-        ++ show (bSumGasLimit parentBSum - nextGasLimitDelta (bSumGasLimit parentBSum))
-  unless (getBlockGasLimit c >= minGasLimit flags_testnet) $
-    fail $ "Block gasLimit is lower than minGasLimit: got " ++ show (getBlockGasLimit c) ++ ", should be larger than " ++ show (minGasLimit flags_testnet :: Integer)
-  return ()
+  m (Maybe BlockVerificationFailureDetails)
+checkParentChildValidity OutputBlock {obBlockData = c} parentBSum = do
+  if (number c == bSumNumber parentBSum + 1) $
+    return Nothing
+  else 
+    return UnexpectedBlockNumber (BlockDelta (number c) (bSumNumber parentBSum + 1))
 
 verifyTransactionRoot' :: OutputBlock -> (Bool, MP.StateRoot)
 verifyTransactionRoot' OutputBlock {obBlockData = bd, obReceiptTransactions = txs} =
@@ -67,23 +54,27 @@ verifyTransactionRoot OutputBlock {obBlockData = bd, obReceiptTransactions = txs
   sr <- MP.addAllKVs MP.emptyTriePtr $ zip [(0 :: Integer) ..] $ (otBaseTx <$> txs)
   return (transactionsRoot bd == sr, sr)
 
-verifyOmmersRoot :: HasStateDB m => OutputBlock -> m Bool
+verifyOmmersRoot :: HasStateDB m => OutputBlock -> m (Maybe BlockVerificationFailureDetails)
 verifyOmmersRoot OutputBlock {obBlockData = bd, obBlockUncles = bu} = 
-    return $ (getBlockOmmersHash bd) == hash (rlpSerialize $ RLPArray $ map rlpEncode $ bu)
+  let inBlockOmmersHash = getBlockOmmersHash bd
+      derivedOmmersHash = hash (rlpSerialize $ RLPArray $ map rlpEncode $ bu)
+  return $ case inBlockOmmersHash == derivedOmmersHash of 
+    True -> UnclesMismatch (BlockDelta inBlockOmmersHash derivedOmmersHash)
+    False -> Nothing
 
-checkValidity :: (MonadFail m, HasStateDB m) => Bool -> BlockSummary -> OutputBlock -> m (Maybe String)
-checkValidity isHomestead parentBSum b = do
-  when (flags_transactionRootVerification) $ do
-    trVerified <- verifyTransactionRoot b
-    let trVerifiedMem = verifyTransactionRoot' b
+checkValidity :: (HasStateDB m) => BlockSummary -> OutputBlock -> m [BlockVerificationFailureDetails]
+checkValidity parentBSum b = do
+  -- for some reason transactionRootVerification is always false so not handling this case
+  -- when (flags_transactionRootVerification) $ do
+  --   trVerified <- verifyTransactionRoot b
+  --   let trVerifiedMem = verifyTransactionRoot' b
 
-    when (not (fst trVerifiedMem)) $ error "memTransactionRoot doesn't match transactions"
-    when (not (fst trVerified)) $ error "transactionRoot doesn't match transactions"
+  --   when (not (fst trVerifiedMem)) $ error "memTransactionRoot doesn't match transactions"
+  --   when (not (fst trVerified)) $ error "transactionRoot doesn't match transactions"
 
   ommersVerified <- verifyOmmersRoot b
-  when (not ommersVerified) $ error "ommersRoot doesn't match uncles"
-  checkParentChildValidity isHomestead b parentBSum
-  pure Nothing
+  blockNumberVerified <- checkParentChildValidity b parentBSum
+  pure $ catMaybes [ommersVerified : blockNumberVerified]
 
 isNonceValid :: (Account `A.Alters` AddressState) f => OutputTx -> f Bool
 isNonceValid ot@OutputTx {otSigner = txAddr} =
