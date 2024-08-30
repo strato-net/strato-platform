@@ -281,7 +281,10 @@ class InventoryController {
     const listItemSchema = Joi.object({
       assetToBeSold: Joi.string().required(),
       paymentProviders: Joi.array().min(1).items(
-        Joi.string().min(0).required(),
+        Joi.object({
+            creator: Joi.string().required(),
+            serviceName: Joi.string().required(),
+        })
       ).required(),
       price: Joi.number().greater(0).precision(2).required(),
       quantity: Joi.number().integer().greater(0).optional(),
