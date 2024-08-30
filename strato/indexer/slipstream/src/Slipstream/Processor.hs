@@ -248,18 +248,14 @@ getMappingNamesFromContract c =
       listOfCollections = listOfMappingsWithRecords
    in T.pack . fst <$> listOfCollections
 
-getArrayNamesFromContract :: ContractF () -> Map.Map T.Text T.Text
+getArrayNamesFromContract :: ContractF () -> Map.Map T.Text SVMType.Type
 getArrayNamesFromContract c =
   let storageDefs' = c ^. storageDefs
       storageDefsList = Map.toList storageDefs'
       listOfArraysWithTypename = map (\(name, vd) -> case (_varType vd) of
-                                                       SVMType.Array entry _ -> Just (T.pack name, extractLabelOrEntry entry)
+                                                       SVMType.Array entry _ -> Just (T.pack name, entry)
                                                        _ -> Nothing) storageDefsList
    in Map.fromList $ catMaybes listOfArraysWithTypename
-
-extractLabelOrEntry :: SVMType.Type -> T.Text
-extractLabelOrEntry (SVMType.UnknownLabel solidString _) = T.pack solidString
-extractLabelOrEntry entry = T.pack (show entry)
 
 getContractsFromPC :: E.ProcessedContract -> [Text]
 getContractsFromPC pc = Map.keys $ Map.filter isValueContract (E.contractData pc)
@@ -323,7 +319,7 @@ processTheMessages env conn messages = do
             --Create array tables
             deferredForeignKeysForArrays <- fmap concat $
               forM arrayNamesAndTypes $ \anat -> do
-                outputData conn $ createArrayTable  nameParts anat
+                outputData conn $ createArrayTable nameParts anat c cc
             
             deferredForeignKeys <- case (_contractType c) of
               AbstractType -> do
