@@ -534,13 +534,15 @@ createMappingTable (creator, a, n) m = do
 createArrayTable ::
   OutputM m =>
   (Text, Text, Text) ->
-  (Text, Text) ->
+  (Text, Maybe Text) ->
   ConduitM () Text m [ForeignKeyInfo]
-createArrayTable  (creator, a, n) (arr, arrType) = do
+createArrayTable (creator, a, n) (arr, arrType) = do
   let tableName = collectionTableName creator a n arr
   yield $ (createArrayTableQuery (creator, a, n, arr))
   let fkeys1 = getDeferredForeignKeysForCollection tableName creator a
-      fkeys2 = getDeferredForeignKeysForArrayType tableName creator a arrType
+      fkeys2 = case arrType of
+                Just x ->  getDeferredForeignKeysForArrayType tableName creator a x
+                Nothing -> []
   return $ fkeys1 ++ fkeys2
 
 createHistoryTable' ::

@@ -232,7 +232,7 @@ data ActionData = ActionData
     _actionDataStorageDiffs :: DataDiff,
     _actionDataAbstracts :: Map (Account, Text) (Text, Text, [Text]), -- (import address, contract name) -> (cn, app)
     _actionDataMappings :: [Text],
-    _actionDataArrays :: [Text],
+    _actionDataArrays :: [(Text, Bool)], --(array,isContract)
     _actionDataCallTypes :: [CallType]
   }
   deriving (Eq, Show, Generic, NFData)
