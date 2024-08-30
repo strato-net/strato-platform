@@ -248,12 +248,10 @@ addBlock b@OutputBlock {obBlockData = bd, obReceiptTransactions = otxs} =
         postRewardSR <- A.lookup (A.Proxy @MP.StateRoot) (Nothing :: Maybe Word256)
         verifyBlockResult <- verifyBlock (outputBlockToBlock b) (trrs, postRewardSR) bSum
         case verifyBlockResult of 
-          failures@(_:_) -> pure $ map (\r -> BlockVerificationFailure (bSumNumber bSum) (bSumParentHash bSum) r) failures
+          failures@(_:_) -> do
+            lift $ P.incCounter vmBlocksInvalid
+            pure $ map (\r -> BlockVerificationFailure (bSumNumber bSum) (bSumParentHash bSum) r) failures
           _ -> do
-            valid <- checkValidity bSum (outputBlockToBlock b)
-            case valid of
-              [] -> lift $ P.incCounter vmBlocksValid
-              _ -> lift $ P.incCounter vmBlocksInvalid -- error err -- todo: i dont think we ACTUALLY need to error here
             when flags_debug $ do
               bhr'' <- Mod.get (Proxy @BlockHashRoot)
               $logDebugS "addBlock" $ T.pack $ "New blockhash root after running block: " ++ format bhr''
@@ -262,6 +260,7 @@ addBlock b@OutputBlock {obBlockData = bd, obReceiptTransactions = otxs} =
                 Nothing -> $logDebugS "addBlock" $ T.pack $ "Could not locate new chain root after running block. Using emptyTriePtr"
                 Just cr -> $logDebugS "addBlock" $ T.pack $ "New chain root after running block: " ++ format cr
 
+            lift $ P.incCounter vmBlocksValid
             lift $ P.incCounter vmBlocksMined
             lift $ P.incCounter vmBlocksProcessed
             $logInfoS "addBlock" . T.pack $ "Inserted block became #" ++ show (number $ obBlockData b) ++ " (" ++ format obh ++ ")."
