@@ -205,8 +205,15 @@ const ListForSaleModal = ({ open, handleCancel, inventory, categoryName, limit, 
 
     const handleSubmit = async () => {
         let body = {
-            paymentProviders: paymentTypes.filter((p) => availablePaymentProviders[p]).map((p) => availablePaymentProviders[p].address),
-            price: pricePerUnit,
+          paymentProviders: paymentTypes
+            .filter((p) => availablePaymentProviders[p])
+            .map((p) => {
+              return {
+                creator: availablePaymentProviders[p].creator,
+                serviceName: availablePaymentProviders[p].serviceName,
+              };
+            }),
+          price: pricePerUnit,
         };
         if (inventory.saleAddress) {
             body = { ...body, saleAddress: inventory.saleAddress }

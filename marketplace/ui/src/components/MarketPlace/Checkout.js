@@ -357,7 +357,7 @@ const Checkout = () => {
   ];
 
   const filterPaymentServices = (e) => {
-    const filteredPaymentServices = e.map(assetPaymentServices => paymentServices.find(paymentService => paymentService.address === assetPaymentServices.value));
+    const filteredPaymentServices = e.map(assetPaymentServices => paymentServices.find(paymentService => paymentService.creator === assetPaymentServices.creator && paymentService.serviceName === assetPaymentServices.serviceName));
 
     return filteredPaymentServices;
   }
