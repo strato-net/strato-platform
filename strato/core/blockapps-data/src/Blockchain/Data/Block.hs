@@ -10,7 +10,6 @@ module Blockchain.Data.Block
     WorldBestBlock (..),
     Canonical (..),
     Private (..),
-    extraLens,
     setBlockNo,
     createBlockFromHeaderAndBody,
   )
@@ -41,9 +40,6 @@ data Block = Block
   deriving (Eq, Show, Generic, Binary, NFData)
 
 makeLensesFor [("blockBlockData", "blockHeaderLens")] ''Block
-
-extraLens :: Lens' Block BS.ByteString
-extraLens = blockHeaderLens . BlockHeader.extraDataLens
 
 setBlockNo :: Integer -> Block -> Block
 setBlockNo n blk = blk {blockBlockData = (blockBlockData blk) {BlockHeader.number = n}}
