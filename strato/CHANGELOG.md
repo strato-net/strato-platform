@@ -34,6 +34,7 @@ so that they could be properly moved to their respective version's subsection.
 - Fixed bagger's more lucrative tx decision logic
 
 ### Removed
+ - Removed Globals
 
 
 ## [11.3.1] - 7/10/2024 

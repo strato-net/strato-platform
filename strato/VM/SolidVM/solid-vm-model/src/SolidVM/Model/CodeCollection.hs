@@ -23,6 +23,7 @@ module SolidVM.Model.CodeCollection (
   usesStrictModifiers,
   getContractsBySolidString,
   resolvePragmaFeature,
+  structDef,
   module SolidVM.Model.CodeCollection.Contract,
   --module SolidVM.Model.CodeCollection.Def,
   module SolidVM.Model.CodeCollection.Function,
@@ -36,6 +37,7 @@ module SolidVM.Model.CodeCollection (
   ) where
 
 import Blockchain.SolidVM.Exception
+import Control.Applicative ((<|>))
 import Control.DeepSeq
 import Control.Lens
 import Data.Aeson as A
@@ -176,3 +178,6 @@ resolvePragmaFeature pragmaList feature =
           "strictDecimals" -> True
           _ -> False
       (_) -> isJust $ find ((== feature) . fst) pragmaList
+
+structDef :: ContractF a -> CodeCollectionF a -> SolidString -> Maybe [(SolidString, FieldType, a)]
+structDef c cc n = (c ^. structs . at n) <|> (cc ^. flStructs . at n)
