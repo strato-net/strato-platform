@@ -68,7 +68,7 @@ import Slipstream.OutputData
 import Slipstream.QueryFormatHelper
 import SolidVM.Model.CodeCollection hiding (contractName)
 import qualified SolidVM.Model.Type as SVMType
--- import Text.Format
+import Text.Format
 import Text.Tools (boringBox, multilineLog)
 import Prelude hiding (lookup)
 
@@ -248,18 +248,13 @@ getMappingNamesFromContract c =
       listOfCollections = listOfMappingsWithRecords
    in T.pack . fst <$> listOfCollections
 
-getArrayNamesFromContract :: ContractF () -> CodeCollectionF () -> Map.Map T.Text (Maybe T.Text)
-getArrayNamesFromContract c CodeCollection { _contracts = ccs } =
+getArrayNamesFromContract :: ContractF () -> Map.Map T.Text T.Text
+getArrayNamesFromContract c =
   let storageDefs' = c ^. storageDefs
       storageDefsList = Map.toList storageDefs'
-      listOfArraysWithTypename = map (\(name, vd) -> 
-                                        case (_varType vd) of
-                                          SVMType.Array entry _ -> 
-                                            let labelOrEntry = extractLabelOrEntry entry
-                                            in if Map.member (T.unpack labelOrEntry) ccs 
-                                               then Just (T.pack name, Just labelOrEntry)
-                                               else Just (T.pack name, Nothing)
-                                          _ -> Nothing) storageDefsList
+      listOfArraysWithTypename = map (\(name, vd) -> case (_varType vd) of
+                                                       SVMType.Array entry _ -> Just (T.pack name, extractLabelOrEntry entry)
+                                                       _ -> Nothing) storageDefsList
    in Map.fromList $ catMaybes listOfArraysWithTypename
 
 extractLabelOrEntry :: SVMType.Type -> T.Text
@@ -301,8 +296,8 @@ processTheMessages env conn messages = do
       -- delegates = [d | DelegatecallMade d <- messages]
       transactionResults = [tr | VME.NewTransactionResult tr <- messages]
 
-  fkeys' <- forM creates $ \(cc, _, cr, ap, hl, abstracts', _) -> do
-        $logInfoS "processTheMessages" $ "CodeCollection Added: " <> T.pack (show cc) 
+  fkeys' <- forM creates $ \(cc, cp, cr, ap, hl, abstracts', _) -> do
+        $logInfoS "processTheMessages" $ "CodeCollection Added: " <> T.pack (format cp) 
         multilineLog "processTheMessages/contracts" $ boringBox $ map show (Map.keys $ cc ^. contracts)
 
         deferredForeignKeys <- fmap concat $
@@ -311,7 +306,7 @@ processTheMessages env conn messages = do
             -- We will then create a table for each of these collections and add a foreign key to the main table
 
             let mappingNames = getMappingNamesFromContract c  
-                arrayNamesAndTypes = Map.toList $ getArrayNamesFromContract c cc
+                arrayNamesAndTypes = Map.toList $ getArrayNamesFromContract c
             let historyTableNames = map (historyTableName cr ap) hl
             $logInfoS "processTheMessages/arrayNamesAndTypes" $ T.pack $ show arrayNamesAndTypes
             $logDebugS "processTheMessages/historyTableNames" $ T.pack $ show historyTableNames
@@ -328,7 +323,7 @@ processTheMessages env conn messages = do
             --Create array tables
             deferredForeignKeysForArrays <- fmap concat $
               forM arrayNamesAndTypes $ \anat -> do
-                outputData conn $ createArrayTable nameParts anat
+                outputData conn $ createArrayTable  nameParts anat
             
             deferredForeignKeys <- case (_contractType c) of
               AbstractType -> do
