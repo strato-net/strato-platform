@@ -36,53 +36,36 @@ const StratsTransactionHistoryModal = ({ visible, onCancel }) => {
                 else { return addr }
             }
         }
-        
+
         return {
             key: r.id,
             ...r,
-            value: parseInt(r._value).toLocaleString(),
+            value: (parseInt(r._value) / 100).toLocaleString(),
             to: displayName(r._to),
             from: displayName(r._from),
-            timestamp: moment.unix(r.timestamp).format('MM-DD-YYYY hh:mm a'),
-            assetName: r._assetName ? r._assetName : 'N/A',
-            price: r._price ? r._price : 'N/A'
+            timestamp: moment.unix(r.timestamp).format('MM-DD-YYYY hh:mm a')
         }
     }).reverse()
 
     const columns = [
-        {
-            title: 'Transfer Number',
-            dataIndex: 'id',
-            align: 'center'
-        },
-        {
-            title: 'From',
-            dataIndex: 'from',
-            align: 'center'
-        },
-        {
-            title: 'To',
-            dataIndex: 'to',
-            align: 'center'
-        },
         {
             title: 'Date',
             dataIndex: 'timestamp',
             align: 'center'
         },
         {
-            title: 'Asset Name',
-            dataIndex: 'assetName',
+            title: 'Sender',
+            dataIndex: 'from',
+            align: 'center'
+        },
+        {
+            title: 'Recipient',
+            dataIndex: 'to',
             align: 'center'
         },
         {
             title: 'Value',
             dataIndex: 'value',
-            align: 'center'
-        },
-        {
-            title: 'Price',
-            dataIndex: 'price',
             align: 'center'
         },
     ]
@@ -94,7 +77,7 @@ const StratsTransactionHistoryModal = ({ visible, onCancel }) => {
             centered
             onCancel={onCancel}
             footer={false}
-            width={1200}
+            width={900}
         >
             <Spin
                 spinning={isFetchingStratsTransactionHistory}
