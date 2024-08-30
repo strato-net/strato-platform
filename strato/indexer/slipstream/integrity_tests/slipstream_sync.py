@@ -108,7 +108,7 @@ if __name__ == "__main__":
         sys.exit(1)
 
     DEFAULT_ATTEMPTS = 0  # 0 for infinite
-    DEFAULT_SLEEP_TIME = 60
+    DEFAULT_SLEEP_TIME = 300
 
     client_id1 = sys.argv[1]
     client_id2 = sys.argv[2]
