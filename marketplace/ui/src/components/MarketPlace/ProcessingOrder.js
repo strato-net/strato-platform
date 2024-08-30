@@ -83,8 +83,8 @@ const ProcessingOrder = ({ user }) => {
         });
         actions.addItemToCart(marketplaceDispatch, updatedCart);
   
-        // Navigate to bought once the cart is updated
-        navigate(routes.Orders.url.replace(':type', 'bought'));
+        // Navigate to transaction once the cart is updated
+        navigate(routes.Transactions.url);
       } else {
         setTimeout(() => {
           navigate(routes.Checkout.url);
