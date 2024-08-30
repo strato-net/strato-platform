@@ -81,7 +81,7 @@ abstract contract Sale is Utils {
     function addPaymentProviders(PaymentProvider[] _paymentProviders) public requireSeller("add payment providers") {
         for (uint i = 0; i < _paymentProviders.length; i++) {
             PaymentProvider p = _paymentProviders[i];
-            _paymentProviders.push(p);
+            paymentProviders.push(p);
             paymentProvidersMap[p.serviceName][p.creator] = paymentProviders.length;
         }
     }
