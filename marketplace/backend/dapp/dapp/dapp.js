@@ -1149,6 +1149,23 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
     }
   }
 
+
+  contract.waitForOrderEvent = async function (args, options = defaultOptions) {
+      const orderEvent = await rest.searchUntil(
+        rawAdmin,
+        { name: "BlockApps-Mercata-PaymentService.Order" },
+        (r) => r.length === 1,
+        {
+          ...options,
+          query: {
+            limit: 1,
+            orderHash: `eq.${args.orderHash}`,
+          }
+        }
+      );
+      return orderEvent;
+  }
+
   contract.createUserAddress = async function (args, options = defaultOptions) {
     const { redemptionService, ...restArgs } = args;
     try {
