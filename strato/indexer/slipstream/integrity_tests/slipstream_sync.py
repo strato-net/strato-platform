@@ -6,7 +6,7 @@ import time
 import sys
 
 def wait_for_slipstream_to_sync(node1_url, node2_url, headers1, headers2, attempts, sleep_time, table_name):
-    print(f"Trying for: " {table_name})
+    print(f"Trying for: {table_name}")
     attempts = int(attempts)
     sleep_time = int(sleep_time)
     attempt = 0
