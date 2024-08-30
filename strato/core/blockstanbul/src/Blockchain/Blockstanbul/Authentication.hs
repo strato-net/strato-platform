@@ -37,7 +37,7 @@ import qualified Data.ByteString as B
 import qualified Data.ByteString.Lazy as BL
 import Data.Either.Extra
 import Data.List
-import Data.Maybe (catMaybes, fromJust)
+import Data.Maybe (catMaybes, fromJust, isNothing)
 import Data.Set (Set)
 import qualified Data.Set as S
 import Test.QuickCheck
@@ -212,7 +212,7 @@ replayHistoricBlock realValidators seqNo blk = do
   return (fromIntegral $ seqNo + 1, propChainMember)
 
 isHistoricBlock :: Block -> Bool
-isHistoricBlock = (> 32) . B.length . L.view extraLens
+isHistoricBlock = isNothing . evalIstanbulExtra id
 
 --Required hack to ignore known bugs in the production chain for now.  This should be removed once we restart the chain, or purge the bad blocks from the network
 futureValidatorsHack :: Set Validator
