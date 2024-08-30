@@ -10,7 +10,6 @@ module Blockchain.Data.Block
     WorldBestBlock (..),
     Canonical (..),
     Private (..),
-    extraLens,
     setBlockNo,
     createBlockFromHeaderAndBody,
   )
@@ -24,9 +23,7 @@ import Blockchain.Blockstanbul.Model.Authentication
 import Blockchain.Strato.Model.Class
 import Blockchain.Strato.Model.Keccak256
 import Control.DeepSeq
-import Control.Lens
 import Data.Binary
-import qualified Data.ByteString as BS
 import Data.List
 import GHC.Generics
 import qualified Text.Colors as CL
@@ -39,11 +36,6 @@ data Block = Block
     blockBlockUncles :: [BlockHeader]
   }
   deriving (Eq, Show, Generic, Binary, NFData)
-
-makeLensesFor [("blockBlockData", "blockHeaderLens")] ''Block
-
-extraLens :: Lens' Block BS.ByteString
-extraLens = blockHeaderLens . BlockHeader.extraDataLens
 
 setBlockNo :: Integer -> Block -> Block
 setBlockNo n blk = blk {blockBlockData = (blockBlockData blk) {BlockHeader.number = n}}

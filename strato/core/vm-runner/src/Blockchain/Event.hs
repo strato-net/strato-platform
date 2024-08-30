@@ -86,6 +86,8 @@ data BlockVerificationFailureDetails
   | ValidatorMismatch        (BlockDelta ([Validator],[Validator]))
   | CertRegistrationMismatch (BlockDelta ([X509Certificate],[DummyCertRevocation]))
   | VersionMismatch          (BlockDelta Int)
+  | UnclesMismatch           (BlockDelta Keccak256)
+  | UnexpectedBlockNumber    (BlockDelta Integer)
   deriving (Eq, Show)
 
 data BlockVerificationFailure = BlockVerificationFailure

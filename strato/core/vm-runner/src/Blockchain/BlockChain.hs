@@ -44,6 +44,7 @@ import Blockchain.DB.ModifyStateDB
 import Blockchain.DB.RawStorageDB
 import Blockchain.DB.StorageDB
 import Blockchain.Data.AddressStateDB
+import Blockchain.Data.Block
 import Blockchain.Data.BlockHeader
 import Blockchain.Data.BlockSummary
 import Blockchain.Data.DataDefs
@@ -53,6 +54,7 @@ import Blockchain.Data.Transaction
 import Blockchain.Data.TransactionDef (formatChainId)
 import Blockchain.Data.TransactionResultStatus
 import qualified Blockchain.Database.MerklePatricia as MP
+import Blockchain.DB.StateDB
 import Blockchain.Event
 import Blockchain.Sequencer.Event
 import qualified Blockchain.SolidVM as SolidVM
@@ -244,14 +246,12 @@ addBlock b@OutputBlock {obBlockData = bd, obReceiptTransactions = otxs} =
         trrs <- addBlockTransactions b
 
         postRewardSR <- A.lookup (A.Proxy @MP.StateRoot) (Nothing :: Maybe Word256)
-
-        case verifyBlock (obBlockData b) (trrs, postRewardSR) of
-          failures@(_:_) -> pure failures
+        verifyBlockResult <- verifyBlock (outputBlockToBlock b) (trrs, postRewardSR) bSum
+        case verifyBlockResult of 
+          failures@(_:_) -> do
+            lift $ P.incCounter vmBlocksInvalid
+            pure $ map (\r -> BlockVerificationFailure (bSumNumber bSum) (bSumParentHash bSum) r) failures
           _ -> do
-            valid <- checkValidity (blockIsHomestead $ number bd) bSum b
-            case valid of
-              Nothing -> lift $ P.incCounter vmBlocksValid
-              Just _ -> lift $ P.incCounter vmBlocksInvalid -- error err -- todo: i dont think we ACTUALLY need to error here
             when flags_debug $ do
               bhr'' <- Mod.get (Proxy @BlockHashRoot)
               $logDebugS "addBlock" $ T.pack $ "New blockhash root after running block: " ++ format bhr''
@@ -260,17 +260,22 @@ addBlock b@OutputBlock {obBlockData = bd, obReceiptTransactions = otxs} =
                 Nothing -> $logDebugS "addBlock" $ T.pack $ "Could not locate new chain root after running block. Using emptyTriePtr"
                 Just cr -> $logDebugS "addBlock" $ T.pack $ "New chain root after running block: " ++ format cr
 
+            lift $ P.incCounter vmBlocksValid
             lift $ P.incCounter vmBlocksMined
             lift $ P.incCounter vmBlocksProcessed
             $logInfoS "addBlock" . T.pack $ "Inserted block became #" ++ show (number $ obBlockData b) ++ " (" ++ format obh ++ ")."
             pure []
 
 -- TODO: If we add more verifications, refactor tuple into a proper data type
-verifyBlock :: BlockHeader -> ([TxRunResult], Maybe MP.StateRoot) -> [BlockVerificationFailure]
-verifyBlock bh (trrs, derivedSR) =
+verifyBlock :: 
+  HasStateDB m =>
+  Block -> 
+  ([TxRunResult], Maybe MP.StateRoot) -> 
+  BlockSummary ->
+  m [BlockVerificationFailureDetails]
+verifyBlock b@Block{blockBlockData = bh} (trrs, derivedSR) parentBSum = do
+  validity <- checkValidity parentBSum b
   let (vDelt, cDelt) = getDeltasFromResults trrs
-      bHash = blockHeaderHash bh
-      bNum = number bh
       blockSR = Just $ stateRoot bh
       bVd = toDelta (newValidators bh) (removedValidators bh)
       bCd = toDelta (newCerts bh) (revokedCerts bh)
@@ -285,7 +290,7 @@ verifyBlock bh (trrs, derivedSR) =
       certCheck = if eqDelta bCd cDelt
         then Nothing
         else Just . CertRegistrationMismatch $ BlockDelta (fromDelta bCd) (fromDelta cDelt)
-   in BlockVerificationFailure bNum bHash <$> case blockHeaderVersion bh of
+   in return $ validity ++ case blockHeaderVersion bh of
         1 -> catMaybes [srCheck]
         2 -> catMaybes [srCheck, validatorCheck, certCheck]
         v -> [VersionMismatch $ BlockDelta v 2]

@@ -141,9 +141,12 @@ handleVmEvents = awaitForever $ \InBatch {..} -> do
               Right (sr, trrs, _) -> do 
                 $logDebugS "handleVmEvents/preprepareBlock" . T.pack $ "Stateroot we got: " <> format sr
                 $logDebugS "handleVmEvents/preprepareBlock" . T.pack $ "Stateroot in block: " <> format (stateRoot bHeader)
-                case verifyBlock bHeader (trrs, Just sr) of
+                blockFailures <- verifyBlock block (trrs, Just sr) summ
+                case blockFailures of 
                   [] -> pure . Just $ AcceptPreprepare bHash
-                  _  -> pure $ Just RejectPreprepare
+                  _  -> do
+                    $logDebugS "handleVmEvents/preprepareBlock" . T.pack $ show blockFailures
+                    pure $ Just RejectPreprepare
               _ -> pure $ Just RejectPreprepare
   $logDebugS "handleVmEvents/mPreDec" . T.pack $ format mPreDec
   traverse_ (yield . OutPreprepareResponse) mPreDec
