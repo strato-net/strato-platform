@@ -64,6 +64,8 @@ decodeCacheValuesForCollections hxs = either (error . (++ ": " ++ show hxs) . pr
   let parseM = bimapM (hexStorageToPath . HexStorage) (hexStorageToBasic . HexStorage)
       isBasic (StoragePath [Field _, MapIndex _]) = True
       isBasic (StoragePath [Field _, ArrayIndex _]) = True
+      isBasic (StoragePath [Field _, MapIndex _, Field fieldBS]) = C8.unpack fieldBS /= "length"
+      isBasic (StoragePath [Field _, ArrayIndex _, Field fieldBS]) = C8.unpack fieldBS /= "length"
       isBasic _ = False
   pathValues <- mapM parseM $ M.toList hxs
   let pathValues' = filter (isBasic . fst) pathValues

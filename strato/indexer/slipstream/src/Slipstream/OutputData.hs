@@ -133,11 +133,11 @@ fillFirstEmptyEntries :: [(Text, a)] -> [(Text, a)]
 fillFirstEmptyEntries = map unFirst . fillEmptyEntries . map First
 
 getTableColumnAndType :: Bool -> CodeCollectionF () -> [(Text, SVMType.Type)] -> [(T.Text, T.Text)]
-getTableColumnAndType isEvent (CodeCollection ccs _ _ _ _ _ _ _) = concatMap go . fillFirstEmptyEntries
+getTableColumnAndType isEvent cc@(CodeCollection ccs _ _ _ _ _ _ _) = concatMap go . fillFirstEmptyEntries
   where
     go :: (Text, SVMType.Type) -> [(T.Text, T.Text)]
     go (x, y) = 
-      case solidityTypeToSQLType isEvent y of
+      case solidityTypeToSQLType isEvent Nothing cc y of
         Nothing -> []
         Just v -> 
           let defaultColumn = (columnName x, v)
@@ -534,13 +534,16 @@ createMappingTable (creator, a, n) m = do
 createArrayTable ::
   OutputM m =>
   (Text, Text, Text) ->
-  (Text, Text) ->
+  (Text, SVMType.Type) ->
+  ContractF () ->
+  CodeCollectionF () ->
   ConduitM () Text m [ForeignKeyInfo]
-createArrayTable  (creator, a, n) (arr, arrType) = do
+createArrayTable (creator, a, n) (arr, arrType) c cc = do
   let tableName = collectionTableName creator a n arr
-  yield $ (createArrayTableQuery (creator, a, n, arr))
+      arrSqlType = fromMaybe "text" $ solidityTypeToSQLType False (Just c) cc arrType
+  yield $ (createArrayTableQuery (creator, a, n, arr, arrSqlType))
   let fkeys1 = getDeferredForeignKeysForCollection tableName creator a
-      fkeys2 = getDeferredForeignKeysForArrayType tableName creator a arrType
+      fkeys2 = getDeferredForeignKeysForArrayType tableName creator a arrSqlType
   return $ fkeys1 ++ fkeys2
 
 createHistoryTable' ::
@@ -852,8 +855,8 @@ createMappingTableQuery (creator, a, n, m) =
           ",\n  PRIMARY KEY (address, key));"
         ]
 
-createArrayTableQuery :: (Text, Text, Text, Text) -> Text
-createArrayTableQuery (creator, a, n, arr) =
+createArrayTableQuery :: (Text, Text, Text, Text, Text) -> Text
+createArrayTableQuery (creator, a, n, arr, arrType) =
   let tableName = collectionTableName creator a n arr
    in T.concat
         [ "CREATE TABLE IF NOT EXISTS ",
@@ -864,7 +867,7 @@ createArrayTableQuery (creator, a, n, arr) =
               "collectionname text",
               "collectiontype text",
               "key text",
-              "value text",
+              "value " <> arrType,
               "value_fkey text"
             ],
           ",\n  PRIMARY KEY (address, key));"
@@ -1405,24 +1408,24 @@ insertEventTableQuery agEv@AggregateEvent {eventEvent = ev} =
 ------------------
 
 --This is a temporary function that converts solidity types to a sample value...  I am just using this now to convert table creation from the old way (value based when values come through) to the new way (direct from the types when a CC is registered)
-solidityTypeToSQLType :: Bool -> SVMType.Type -> Maybe Text
-solidityTypeToSQLType _ SVMType.Bool = Just "bool"
-solidityTypeToSQLType _ (SVMType.Int _ _) = Just "decimal"
-solidityTypeToSQLType _ (SVMType.String _) = Just "text"
-solidityTypeToSQLType _ (SVMType.Bytes _ _) = Just "text"
-solidityTypeToSQLType _ (SVMType.UserDefined _ _) = Just "text"
-solidityTypeToSQLType _ SVMType.Decimal = Just "decimal"
-solidityTypeToSQLType _ (SVMType.Address _) = Just "text"
-solidityTypeToSQLType _ (SVMType.Account _) = Just "text"
-solidityTypeToSQLType isEvent (SVMType.Array _ _) = if isEvent then Just "jsonb" else Nothing
-solidityTypeToSQLType _ (SVMType.Mapping _ _ _) = Nothing -- Just "jsonb"
-solidityTypeToSQLType _ (SVMType.UnknownLabel _ _) = Just "text"
+solidityTypeToSQLType :: Bool -> Maybe (ContractF ()) -> CodeCollectionF () -> SVMType.Type -> Maybe Text
+solidityTypeToSQLType _ _ _ SVMType.Bool = Just "bool"
+solidityTypeToSQLType _ _ _ (SVMType.Int _ _) = Just "decimal"
+solidityTypeToSQLType _ _ _ (SVMType.String _) = Just "text"
+solidityTypeToSQLType _ _ _ (SVMType.Bytes _ _) = Just "text"
+solidityTypeToSQLType _ _ _ (SVMType.UserDefined _ _) = Just "text"
+solidityTypeToSQLType _ _ _ SVMType.Decimal = Just "decimal"
+solidityTypeToSQLType _ _ _ (SVMType.Address _) = Just "text"
+solidityTypeToSQLType _ _ _ (SVMType.Account _) = Just "text"
+solidityTypeToSQLType isEvent _ _ (SVMType.Array _ _) = if isEvent then Just "jsonb" else Nothing
+solidityTypeToSQLType _ _ _ (SVMType.Mapping _ _ _) = Nothing -- Just "jsonb"
+solidityTypeToSQLType _ mc cc (SVMType.UnknownLabel l _) = Just . maybe "text" (const "jsonb") $ (\c -> structDef c cc l) =<< mc
 --solidityTypeToSQLType _ (SVMType.UnknownLabel x) = Just $ "text references " <> T.pack x <> "(id)"
-solidityTypeToSQLType _ (SVMType.Struct _ _) = Just "jsonb"
-solidityTypeToSQLType _ (SVMType.Enum _ _ _) = Just "text"
-solidityTypeToSQLType _ (SVMType.Contract _) = Just "text"
-solidityTypeToSQLType _ (SVMType.Error _ _) = Just "text"
-solidityTypeToSQLType _ SVMType.Variadic = Nothing
+solidityTypeToSQLType _ _ _ (SVMType.Struct _ _) = Just "jsonb"
+solidityTypeToSQLType _ _ _ (SVMType.Enum _ _ _) = Just "text"
+solidityTypeToSQLType _ _ _ (SVMType.Contract _) = Just "text"
+solidityTypeToSQLType _ _ _ (SVMType.Error _ _) = Just "text"
+solidityTypeToSQLType _ _ _ SVMType.Variadic = Nothing
 
 --solidityTypeToSQLType x = error $ "undefined type in solidityTypeToSQLType: " ++ show (varType x)
 
