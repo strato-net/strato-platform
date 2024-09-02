@@ -284,6 +284,7 @@ export const BANNER = [
     link: '/c/Spirits?sc=Spirits',
     text: <div className="liquid_gold_text_box banner-text">
       <h1> Liquid Gold </h1>
+      <h1> Whiskey Casks </h1>
     </div>,
     desktopText: "Explore More",
     mobileText: "Explore",
