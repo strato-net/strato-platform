@@ -163,6 +163,7 @@ abstract contract PaymentService is Utils {
     }
 
     function checkoutInitialized (
+        address[] _stratsAssetAddresses,
         string _checkoutId,
         address[] _saleAddresses,
         uint[] _quantities,
@@ -173,6 +174,7 @@ abstract contract PaymentService is Utils {
         string _purchasersCommonName = getCommonName(msg.sender);
         string checkoutHash = getOrderHash(_checkoutId, _purchasersCommonName, _saleAddresses, _quantities);
         return _checkoutInitialized(
+            _stratsAssetAddresses,
             checkoutHash,
             _checkoutId,
             msg.sender,
@@ -185,6 +187,7 @@ abstract contract PaymentService is Utils {
     }
 
     function _checkoutInitialized (
+        address[] _stratsAssetAddresses,
         string _checkoutHash,
         string _checkoutId,
         address _purchaser,
