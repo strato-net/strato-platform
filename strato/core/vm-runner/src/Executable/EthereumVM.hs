@@ -221,7 +221,7 @@ sendOutEvent (OutAction act) = do
                 cc = foldr (\ad b -> Action._actionDataCodeCollection ad <> b) mempty $ snd <$> actionDatas
                 abstracts' = foldr (\ad b -> Action._actionDataAbstracts ad <> b) mempty $ snd <$> actionDatas
                 contracts' = (cc ^. contracts) <&> ( (functions .~ M.empty)
-                                                   . (constructor .~ Nothing)
+                                                  --  . (constructor .~ Nothing)
                                                    . (modifiers .~ M.empty)
                                                    )
                 cc' = emptyCodeCollection & contracts .~ contracts'
