@@ -58,7 +58,6 @@ library:
     - resourcet
     - stm-chans
     - unliftio
-    - x509-certs
 
 executables:
   strato-sequencer:
@@ -76,6 +75,7 @@ executables:
       - hflags
       - http-client
       - milena
+      - process-monitor
       - prometheus-client
       - safe
       - seqevents

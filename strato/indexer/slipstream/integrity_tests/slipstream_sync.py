@@ -5,15 +5,16 @@ import base64
 import time
 import sys
 
-def wait_for_slipstream_to_sync(node1_url, node2_url, headers1, headers2, attempts, sleep_time):
+def wait_for_slipstream_to_sync(node1_url, node2_url, headers1, headers2, attempts, sleep_time, table_name):
+    print(f"Trying for: {table_name}")
     attempts = int(attempts)
     sleep_time = int(sleep_time)
     attempt = 0
     while True:
         attempt += 1
         try:
-            response1 = requests.get(node1_url + "/cirrus/search/BlockApps-Mercata-Asset", headers=headers1, params={'order':'block_timestamp.desc', 'limit':1})
-            response2 = requests.get(node2_url + "/cirrus/search/BlockApps-Mercata-Asset", headers=headers2, params={'order':'block_timestamp.desc', 'limit':1})
+            response1 = requests.get(node1_url + "/cirrus/search/{table_name}", headers=headers1, params={'order':'block_timestamp.desc', 'limit':1})
+            response2 = requests.get(node2_url + "/cirrus/search/{table_name}", headers=headers2, params={'order':'block_timestamp.desc', 'limit':1})
             if response1.ok and response2.ok and response1:
                 response1_json = response1.json()
                 response2_json = response2.json()
@@ -107,7 +108,7 @@ if __name__ == "__main__":
         sys.exit(1)
 
     DEFAULT_ATTEMPTS = 0  # 0 for infinite
-    DEFAULT_SLEEP_TIME = 30
+    DEFAULT_SLEEP_TIME = 300
 
     client_id1 = sys.argv[1]
     client_id2 = sys.argv[2]
@@ -127,7 +128,13 @@ if __name__ == "__main__":
     headers2 = {'Authorization': f'Bearer {token2}'}
 
     # Wait until both nodes have the same latest block indexed in Slipstream
-    wait_for_slipstream_to_sync(node1_url, node2_url, headers1, headers2, attempts, sleep_time)
+    wait_for_slipstream_to_sync(node1_url, node2_url, headers1, headers2, attempts, sleep_time, "BlockApps-Mercata-Asset")
+    wait_for_slipstream_to_sync(node1_url, node2_url, headers1, headers2, attempts, sleep_time, "BlockApps-Mercata-Order")
+    wait_for_slipstream_to_sync(node1_url, node2_url, headers1, headers2, attempts, sleep_time, "BlockApps-Mercata-Sale")
+    wait_for_slipstream_to_sync(node1_url, node2_url, headers1, headers2, attempts, sleep_time, "BlockApps-Mercata-Asset.ItemTransfers")
+    wait_for_slipstream_to_sync(node1_url, node2_url, headers1, headers2, attempts, sleep_time, "BlockApps-Mercata-Asset-files")
+    wait_for_slipstream_to_sync(node1_url, node2_url, headers1, headers2, attempts, sleep_time, "BlockApps-Mercata-Asset-images")
+    wait_for_slipstream_to_sync(node1_url, node2_url, headers1, headers2, attempts, sleep_time, "BlockApps-Mercata-Asset-fileNames")
 
     discrepancies_asset, count_asset_discrepancy = check_table("BlockApps-Mercata-Asset")
     discrepancies_sale, count_sale_discrepancy = check_table("BlockApps-Mercata-Order")

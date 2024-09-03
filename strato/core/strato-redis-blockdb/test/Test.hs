@@ -24,7 +24,6 @@ import Data.Maybe
 import Data.Ord
 import Data.Tree
 import Database.Redis hiding (sortBy)
-import Lens.Family2 hiding (set)
 import qualified Test.HUnit as HUnit
 import Test.Hspec
 import Test.QuickCheck
@@ -87,7 +86,7 @@ specTest = around (withConn 1) $ do
       p <- generate arbitrary
       let pHash = blockHeaderHash p
       c <- generate arbitrary
-      let c' = over _parentHash (const $ blockHeaderHash p) c
+      let c' = c{parentHash=blockHeaderHash p}
       let cHash = blockHeaderParentHash c'
       p' <- runRedis conn $ do
         void $ RDB.putHeader p

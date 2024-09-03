@@ -7,13 +7,49 @@ import qualified Data.Aeson as Aeson
 import qualified Data.Aeson.Key as AesonKey
 import qualified Data.Map as Map
 import qualified Data.Text as T
-import Slipstream.Data.Globals (TableName (..))
+--import Slipstream.Data.Globals (TableName (..))
+
+
+data TableName
+  = IndexTableName
+      { itCreator :: T.Text,
+        itApplication :: T.Text,
+        itContractName :: T.Text
+      }
+  | HistoryTableName -- technically the same as index, but logically different
+      { htCreator :: T.Text,
+        htApplication :: T.Text,
+        htContractName :: T.Text
+      }
+  | EventTableName
+      { etCreator :: T.Text,
+        etApplication :: T.Text,
+        etContractName :: T.Text,
+        etEventName :: T.Text
+      }
+  | CollectionTableName
+      { mtCreator :: T.Text,
+        mtApplication :: T.Text,
+        mtContractName :: T.Text,
+        mtCollectionName :: T.Text
+      }
+  | AbstractTableName
+      { atCreator :: T.Text,
+        atApplication :: T.Text,
+        atContractName :: T.Text
+      }
+  deriving (Show, Eq, Ord)
+
+type TableColumns = [T.Text]
 
 tshow :: Show a => a -> T.Text
 tshow = T.pack . show
 
 csv :: [T.Text] -> T.Text
 csv = T.intercalate ",\n    "
+
+csv' :: [T.Text] -> T.Text
+csv' = T.intercalate "dream,\n    "
 
 wrap :: T.Text -> T.Text -> T.Text -> T.Text
 wrap b e x = T.concat [b, x, e]
@@ -32,6 +68,9 @@ wrapParens = wrap "(" ")"
 
 wrapAndEscape :: [T.Text] -> T.Text
 wrapAndEscape = wrapParens . csv
+
+wrapAndEscapeSingle :: [T.Text] -> T.Text
+wrapAndEscapeSingle = wrapParens . csv . map wrapSingleQuotes
 
 wrapAndEscapeDouble :: [T.Text] -> T.Text
 wrapAndEscapeDouble = wrapParens . csv . map wrapDoubleQuotes
@@ -79,7 +118,7 @@ tableNameToText (EventTableName c a n e) =
         | T.null c = ""
         | T.null a = c <> tableSeparator
         | otherwise = c <> tableSeparator <> a <> tableSeparator
-      contractAndEvent = n <> "." <> e
+      contractAndEvent = n <> "-" <> e
    in prefix <> contractAndEvent
 tableNameToText (AbstractTableName c a n) =
   let prefix

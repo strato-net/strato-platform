@@ -138,8 +138,12 @@ function newnode {
   then p2pMinLogLevel=LevelDebug
   fi
 
+  if [ -n "${INSTRUMENTATION}" ]; then
+      iFlag="+RTS -T -RTS"
+  fi
+
   echo "Starting ethereum-discover"
-  runBackgroundProcess ethereum-discover  &>> logs/ethereum-discover
+  runBackgroundProcess ethereum-discover "${iFlag}" &>> logs/ethereum-discover
 
   echo "Starting strato-p2p"
   runBackgroundProcess strato-p2p \
@@ -152,7 +156,7 @@ function newnode {
      --sqlPeers=true \
      --txGossipFanout=${txGossipFanount:-3} \
      --minLogLevel=$p2pMinLogLevel \
-     ${networkFlag} &>> logs/strato-p2p
+     ${networkFlag} "${iFlag}" &>> logs/strato-p2p
 
   echo "Starting strato-sequencer"
   runBackgroundProcess strato-sequencer \
@@ -164,17 +168,17 @@ function newnode {
     --seq_max_events_per_iter=${seqMaxEventsPerIter:-500} \
     --seq_max_us_per_iter=${seqMaxUsPerIter:-50000} \
     --validatorBehavior=${validatorBehavior:-true} \
-    "${networkFlag}" \
+    "${networkFlag}" "${iFlag}" \
     +RTS "${seqRTSOPTs:-}" -N1 &>> logs/strato-sequencer
 
   echo "Starting strato-api-indexer"
-  runBackgroundProcess strato-api-indexer +RTS -N1 >> logs/strato-api-indexer 2>&1
+  runBackgroundProcess strato-api-indexer "${iFlag}" +RTS -N1 >> logs/strato-api-indexer 2>&1
 
   echo "Starting strato-p2p-indexer"
-  runBackgroundProcess strato-p2p-indexer +RTS -N1 >> logs/strato-p2p-indexer 2>&1
+  runBackgroundProcess strato-p2p-indexer "${iFlag}" +RTS -N1 >> logs/strato-p2p-indexer 2>&1
 
   echo "Starting strato-txr-indexer"
-  runBackgroundProcess strato-txr-indexer +RTS -N1 >> logs/strato-txr-indexer 2>&1
+  runBackgroundProcess strato-txr-indexer "${iFlag}" +RTS -N1 >> logs/strato-txr-indexer 2>&1
 
   if [ -n "${svmDev}" ]; then
     svdFlag="--svmDev=${svmDev}"
@@ -233,6 +237,7 @@ function newnode {
     "${txsFlag}" \
     "${gasFlag}" \
     "${creatorFlag}" \
+    "${iFlag}" \
     +RTS "${vmRunnerRTSOPTs:-}" -I2 -N1 &>> logs/vm-runner
 
   # Leave the +RTS -N1, it is important
@@ -251,7 +256,7 @@ function newnode {
     "${ucFlag}" \
     "${ubFlag}" \
     "${udFlag}" \
-    "${fsFlag}" +RTS -N1 >> logs/strato-api 2>&1
+    "${fsFlag}" "${iFlag}" +RTS -N1 >> logs/strato-api 2>&1
 
   SLIPSTREAM_CMD="slipstream \
   --database=${postgres_slipstream_db} \
@@ -262,7 +267,8 @@ function newnode {
   --pgport=${postgres_port} \
   --pguser=${postgres_user} \
   --password=${postgres_password} \
-  --stratourl=http://localhost:3000/eth/v1.2"
+  --stratourl=http://localhost:3000/eth/v1.2 \
+  ${iFlag}"
 
   echo "Starting slipstream"
   if [ "${SLIPSTREAM_OPTIONAL}" = true ]; then
@@ -270,6 +276,9 @@ function newnode {
   else
       runBackgroundProcess $SLIPSTREAM_CMD &>> logs/slipstream
   fi
+
+  echo "Starting process monitoring..."
+  runBackgroundProcess process-monitor-exe "${iFlag}" &>> logs/process-monitoring
 
   echo "Configuring log rotation..."
   runBackgroundProcess logRotation

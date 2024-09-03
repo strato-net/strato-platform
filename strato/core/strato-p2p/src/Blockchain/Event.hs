@@ -205,6 +205,7 @@ handleEvents peer = awaitForever $ \case
         yieldR . BlockHeaders . skipEntries skip' $ morphBlockHeader . unCanonical . snd <$> chain
   MsgEvt (BlockHeaders bHeaders) -> do
     let headers = morphBlockHeader <$> bHeaders
+    --- put bheaders log right here
     lift stampActionTimestamp
     -- check if blockheaders we recieved have parents.
     let parents = map BlockHeader.parentHash headers
