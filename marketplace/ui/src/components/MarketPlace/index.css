@@ -54,6 +54,13 @@ img.ant-image-preview-img {
     width: 10% !important;
   }
 }
+
+.liquid_gold_text_box{
+  font-family: "Bricolage Grotesque", sans-serif !important;
+  font-weight: 900;
+  position: relative;
+}
+
 :where(.css-dev-only-do-not-override-9ntgx0).ant-checkbox-wrapper:not(
     .ant-checkbox-wrapper-disabled
   ):hover
@@ -142,6 +149,12 @@ img.ant-image-preview-img {
 
 .metal_banner_text {
   font-weight: 900;
+}
+
+.liquid_gold_text_box{
+  top: 30%;
+  font-size: 30px;
+  margin-left: 4%;
 }
 
 .token_banner_text_box {
@@ -374,6 +387,12 @@ img.ant-image-preview-img {
     line-height: 52px;
   }
 
+  .liquid_gold_text_box{
+    top: 30%;
+    font-size: 42px;
+    margin-left: 7%;
+  }
+
   .token_banner_text_box {
     top: 5%;
     left: 7%;
@@ -456,6 +475,12 @@ img.ant-image-preview-img {
     font-size: 48px;
     margin-top: 20px;
     line-height: 52px;
+  }
+
+  .liquid_gold_text_box{
+    top: 28%;
+    font-size: 42px;
+    margin-left: 7%;
   }
 
   .how_banner_text_box {
@@ -541,6 +566,12 @@ img.ant-image-preview-img {
     left: 7%;
     top: 15%;
     line-height: 42px;
+  }
+
+  .liquid_gold_text_box{
+    top: 30%;
+    font-size: 42px;
+    margin-left: 7%;
   }
 
   .token_banner_text_box {
@@ -641,6 +672,12 @@ img.ant-image-preview-img {
     left: 7%;
     top: 10%;
     line-height: 44px;
+  }
+
+  .liquid_gold_text_box{
+    top: 33%;
+    font-size: 44px;
+    margin-left: 7%;
   }
 
   .token_banner_text_box {
@@ -747,6 +784,12 @@ img.ant-image-preview-img {
     width: 120px;
   }
 
+  .liquid_gold_text_box {
+    top: 35%;
+    font-size: 42px;
+    margin-left: 7%;
+  }
+
   .token_banner_text_box {
     top: 5%;
     left: 8%;
@@ -850,6 +893,12 @@ img.ant-image-preview-img {
 
   .metal_banner_text > h1:first-child {
     width: 120px;
+  }
+
+  .liquid_gold_text_box{
+    top: 25%;
+    font-size: 30px;
+    margin-left: 4%;
   }
 
   .token_banner_text_box {
@@ -981,6 +1030,12 @@ img.ant-image-preview-img {
     top: -10%;
     line-height: 20px;
     margin-top: 5px;
+  }
+
+  .liquid_gold_text_box {
+    top: 30%;
+    font-size: 28px;
+    margin-left: 14px;
   }
 
   .how_banner_text_box {
