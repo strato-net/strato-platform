@@ -45,7 +45,13 @@ module Slipstream.OutputData (
   updateForeignKeysFromNULLArray,
   cirrusInfo,
   historyTableName,
-  getTableColumnAndType
+  getTableColumnAndType,
+  aggEventToCollectionRow,
+  aggEventToCollectionRows,
+  removeArrayEvArgs,
+  getArraysFromEvents,
+  getAllEvents,
+  processParents
   ) where
 
 
@@ -69,11 +75,12 @@ import           Bloc.Server.Utils               (partitionWith)
 import           BlockApps.Logging
 import           Blockchain.Strato.Model.Account
 import           Blockchain.Strato.Model.Address
-import           Blockchain.Strato.Model.CodePtr
+-- import           Blockchain.Strato.Model.CodePtr
 import qualified Blockchain.Strato.Model.Event   as Action
 import           Blockchain.Strato.Model.Keccak256
-import           Data.Bifunctor                  (first)
-import           Data.List                       (groupBy, nubBy, sortBy)
+-- import           Data.Bifunctor                  (first)
+-- import           Data.Function                   (on)
+import           Data.List                       ( groupBy, nubBy, sortBy)
 import           Data.Ord (comparing)
 import           Data.Text.Encoding              (decodeUtf8, decodeUtf8', encodeUtf8)
 import           Data.Time
@@ -92,6 +99,8 @@ import           Text.Printf
 import           Text.RawString.QQ
 import           Text.Tools
 import           UnliftIO.Exception              (SomeException, catch, handle)
+import qualified Data.Text.Encoding as TE
+
 
 newtype First b a = First {unFirst :: (a, b)}
 
@@ -101,7 +110,7 @@ instance Functor (First b) where
 
 data ProcessedCollectionRow = ProcessedCollectionRow
   { address :: Address,
-    codehash :: CodePtr,
+    -- codehash :: Maybe CodePtr,
     creator :: Text,
     cc_creator :: Maybe Text,
     root :: Text,
@@ -116,6 +125,26 @@ data ProcessedCollectionRow = ProcessedCollectionRow
     transactionSender :: Address,
     collectionDataKey :: V.Value,
     collectionDataValue :: V.Value
+  }
+  |
+  ProcessedEventRow
+  { address :: Address,
+    -- codehash :: Maybe CodePtr,
+    creator :: Text,
+    cc_creator :: Maybe Text,
+    root :: Text,
+    application :: Text,
+    contractname :: Text,
+    collectionname :: Text,
+    collectiontype ::Text,
+    blockHash :: Keccak256,
+    blockTimestamp :: UTCTime,
+    blockNumber :: Integer,
+    transactionHash :: Keccak256,
+    transactionSender :: Address,
+    collectionDataKey :: V.Value,
+    collectionDataValue :: V.Value,
+    id_event :: Int
   }
   deriving (Show)
 
@@ -250,7 +279,8 @@ baseColumns =
 
 baseEventColumns :: TableColumns
 baseEventColumns =
-  [ "address",
+  [ "id",
+    "address",
     "block_hash",
     "block_timestamp",
     "block_number",
@@ -546,6 +576,28 @@ createArrayTable (creator, a, n) (arr, arrType) c cc = do
       fkeys2 = getDeferredForeignKeysForArrayType tableName creator a arrSqlType
   return $ fkeys1 ++ fkeys2
 
+createEventArrayTable ::
+  OutputM m =>
+  (Text, Text, Text) ->
+  (Text, Text) ->
+  ConduitM () Text m [ForeignKeyInfo]
+createEventArrayTable (creator, a, n) (arr, arrType) = do
+  let tableName = collectionTableName creator a n arr
+  -- tableExists <- isTableCreated tableName
+  $logInfoS "createEventArrayTable/tableExists"  $ T.pack ( "Table Name: " ++ show tableName ++ ", table exists: ")
+  $logInfoS "createEventArrayTable/(creator, a, n) " (T.pack $ show (creator, a, n))
+  $logInfoS "createEventArrayTable/(arr, arrType) " (T.pack $ show (arr, arrType))
+  -- if tableExists
+  --   then return []
+  --   else do
+  --     incNumArrayTables
+  yield $ (createEventArrayTableQuery (creator, a, n, arr))
+  -- let list = ["key", "value"]
+  -- setTableCreated tableName list
+  let fkeys1 = getDeferredForeignKeysForCollection tableName creator a
+      fkeys2 = getDeferredForeignKeysForArrayType tableName creator a arrType
+  return $ fkeys1 ++ fkeys2
+
 createHistoryTable' ::
   OutputM m =>
   Bool ->
@@ -732,6 +784,7 @@ processGroupedData :: [ProcessedCollectionRow] -> [Text]
 processGroupedData rows@(row:_) =
   case collectiontype row of
     "Array" -> insertArrayTableQuery rows
+    "Event Array" -> insertEventArrayTableQuery rows
     _ -> insertMappingTableQuery rows
 processGroupedData [] = []
 
@@ -872,6 +925,35 @@ createArrayTableQuery (creator, a, n, arr, arrType) =
             ],
           ",\n  PRIMARY KEY (address, key));"
         ]
+
+eventTableName_fkey :: Text -> Text -> Text -> Text
+eventTableName_fkey creator a n = T.intercalate "-" [creator, a, n]
+
+wrapInDoubleQuotes :: Text -> Text
+wrapInDoubleQuotes txt = T.concat ["\"", txt, "\""]
+
+createEventArrayTableQuery :: (Text, Text, Text, Text) -> Text
+createEventArrayTableQuery (creator, a, n, arr) =
+  let tableName = collectionTableName creator a n arr
+      evTableName = eventTableName_fkey creator a n
+   in T.concat
+        [ "CREATE TABLE IF NOT EXISTS ",
+          tableNameToDoubleQuoteText tableName,
+          " (",
+          csv $ baseColumnsQuery ++
+            [ "id serial primary key",
+              "contract_name text",
+              "collectionname text",
+              "collectiontype text",
+              "key text",
+              "value text",
+              "value_fkey text", 
+              "event_id_fkey INT",
+              T.concat [ "FOREIGN KEY (transaction_hash, event_id_fkey) REFERENCES ", wrapInDoubleQuotes evTableName, " (transaction_hash, id)" ]
+            ],
+          ");"
+        ]
+
 
 createAbstractTableQuery :: (Text, Text, Text) -> TableColumns -> Text
 createAbstractTableQuery (creator, a, n) list =
@@ -1111,6 +1193,51 @@ insertArrayTableQuery ms =
                       ";"
                     ]
 
+insertEventArrayTableQuery :: [ProcessedCollectionRow] -> [Text]
+insertEventArrayTableQuery [] = []
+insertEventArrayTableQuery ms =
+  concat $
+    let ms' = (\m -> (m, Map.toList $ Map.mapMaybe valueToSQLText $ Map.fromList [("key", collectionDataKey m), ("value", collectionDataValue m)])) <$> ms
+     in flip map (map snd $ partitionWith (length . snd) ms') $ \case
+          [] -> []
+          arrays@((x, list) : _) ->
+            let tableName =
+                  collectionTableName
+                    (creator x)
+                    (application x)
+                    (contractname x)
+                    (collectionname x)
+                keySt = wrapAndEscapeDouble . map escapeQuotes $ baseMappingTableColumns ++ map fst (fillFirstEmptyEntries list) ++ [T.pack "value_fkey", T.pack "event_id_fkey"]
+                baseVals =
+                  [ tshow . address,
+                    T.pack . keccak256ToHex . blockHash,
+                    tshow . blockTimestamp,
+                    tshow . blockNumber,
+                    T.pack . keccak256ToHex . transactionHash,
+                    tshow . transactionSender,
+                    creator,
+                    root,
+                    contractname,
+                    collectionname,
+                    collectiontype
+                  ]
+                vals = flip map arrays $ \(row, rowList) ->
+                  wrapAndEscape $ map (wrapSingleQuotes . ($ row)) baseVals ++ map snd rowList ++ [T.pack "NULL", T.pack (show (id_event row))]--value_fkey
+                valsForSQL = vals
+                inserts = csv valsForSQL
+             in (: []) $
+                  T.concat
+                    [ "INSERT INTO ",
+                      tableNameToDoubleQuoteText tableName,
+                      " ",
+                      keySt,
+                      "\n  VALUES ",
+                      inserts,
+                      [r|
+  ON CONFLICT DO NOTHING
+    |],
+                      ";"
+                    ]
 insertAbstractTableQuery :: [(E.ProcessedContract, [T.Text], T.Text, TableColumns)] -> [Text]
 insertAbstractTableQuery [] = error "insertAbstractTableQuery: unhandled empty list"
 insertAbstractTableQuery cs =
@@ -1269,12 +1396,17 @@ createExpandEventTables ::
   ContractF () ->
   CodeCollectionF () ->
   (Text, Text, Text) ->
-  ConduitM () Text m ()
-createExpandEventTables c cc nameParts = mapM_ go . Map.toList $ c ^. events
+  ConduitM () Text m [ForeignKeyInfo]
+createExpandEventTables c cc nameParts = fmap concat . mapM go . Map.toList $ c ^. events
   where
     go (evName, ev) = do
-      createEventTable nameParts evName ev cc
+      fkInfo <- createEventTable nameParts evName ev cc
       expandEventTable nameParts evName ev cc
+      return fkInfo
+
+extractLabelOrEntry :: SVMType.Type -> T.Text
+extractLabelOrEntry (SVMType.UnknownLabel solidString _) = T.pack solidString
+extractLabelOrEntry entry = T.pack (show entry)
 
 createEventTable ::
   OutputM m =>
@@ -1282,14 +1414,30 @@ createEventTable ::
   SolidString ->
   EventF () ->
   CodeCollectionF () ->
-  ConduitM () Text m ()
+
+  ConduitM () Text m [ForeignKeyInfo]
 createEventTable (creator, a, n) evName ev cc = do
+  $logInfoS "createEventTable" . T.pack $ show ev
   let (crtr, app, cname) = constructTableNameParameters creator a n
       eventTable = EventTableName crtr app cname (escapeQuotes $ labelToText evName)
       isEvent = True
       cols = getTableColumnAndType isEvent cc [(x, indexedTypeType y) | (x, y) <- fillFirstEmptyEntries $ ev ^. eventLogs]
+      arrayNamesAndTypes = [(key, extractLabelOrEntry entry) | (key, IndexedType _ (SVMType.Array entry _)) <- ev ^. eventLogs]
       colsCombined = map (\(x,y)-> x <> " " <> y) cols
+  $logInfoS "keys" (T.pack $ show arrayNamesAndTypes)
+  -- eventAlreadyCreated <- isTableCreated eventTable
+  -- unless eventAlreadyCreated $ do
+  --   setTableCreated globalsIORef eventTable $ colsCombined
+  --   yield $ createEventTableQuery eventTable colsCombined
+  -- if eventAlreadyCreated
+  --   then return []
+  --   else do
+    -- setTableCreated eventTable $ colsCombined
   yield $ createEventTableQuery eventTable colsCombined
+  eventArrayFkeys <- fmap concat . forM arrayNamesAndTypes $ \anat -> do
+    createEventArrayTable (crtr, cname, (escapeQuotes $ labelToText evName)) anat
+  return $ eventArrayFkeys
+
 
 createEventTableQuery :: TableName -> TableColumns -> Text
 createEventTableQuery tableName cols =
@@ -1298,7 +1446,7 @@ createEventTableQuery tableName cols =
           tableNameToDoubleQuoteText tableName,
           " (",
           csv $
-            [ "id SERIAL NOT NULL",
+            [ "id INT NOT NULL",
               "address text",
               "block_hash text",
               "block_timestamp text",
@@ -1307,6 +1455,7 @@ createEventTableQuery tableName cols =
               "transaction_sender text"
             ]
               ++ cols,
+              ", PRIMARY KEY (transaction_hash, id)",
           ");"
         ]
 
@@ -1334,38 +1483,97 @@ expandEventTable  (creator, a, n) evName ev cc = do
         ]
     yield $ expandTableQuery tableName allTableColsCombined
 
+-- Function to convert AggregateEvent to ProcessedCollectionRow
+aggEventToCollectionRows :: AggregateEvent -> [ProcessedCollectionRow]
+aggEventToCollectionRows ae =
+  case Action.evArgs ev of
+    [] -> []
+    args -> 
+      let (arrayName, arrayElements) = getArraysFromEvents args
+      in map (aggEventToCollectionRow ae ev (T.pack arrayName)) arrayElements
+  where
+    ev = eventEvent ae
+
+aggEventToCollectionRow :: AggregateEvent -> Action.Event -> Text -> (Value, Value) -> ProcessedCollectionRow
+aggEventToCollectionRow ae ev arrayName (index, value) =
+  ProcessedEventRow
+    { address = (_accountAddress . Action.evContractAccount) ev,
+      creator = T.pack $ Action.evContractCreator ev,
+      application = T.pack $ Action.evContractApplication ev,
+      contractname = (T.pack $ Action.evContractName ev) <> "-" <> (T.pack $ Action.evName ev),
+      collectionname = arrayName,
+      collectiontype = "Event Array",
+      blockHash = eventBlockHash ae,
+      blockTimestamp = eventBlockTimestamp ae,
+      blockNumber = eventBlockNumber ae,
+      transactionHash = eventTxHash ae,
+      transactionSender = _accountAddress $ eventTxSender ae,
+      collectionDataKey = index,
+      collectionDataValue = value,
+      root = "",
+      cc_creator = Just "",
+      id_event = Slipstream.Data.Action.id ae
+    }
+
+removeArrayEvArgs :: Action.Event -> Action.Event
+removeArrayEvArgs ev = ev { Action.evArgs = filter (\(_, _, c) -> c /= "Array") (Action.evArgs ev) }
+
+getArraysFromEvents :: [(String, String, String)] -> (String, [(Value, Value)])
+getArraysFromEvents evArgs = do 
+  let li = [(a, b) | (a, b, c) <- evArgs, c == "Array"]
+  case li of 
+    [] -> ("", [])
+    (arrayName, arrayStr):_ -> 
+         let elements = fromMaybe [] (Aeson.decode (BL.fromStrict $ TE.encodeUtf8 $ T.pack arrayStr) :: Maybe [String])
+         in (arrayName, zip (map (SimpleValue . ValueString . T.pack . show) [0 :: Int ..]) 
+                            (map (SimpleValue . ValueString . T.pack) elements))
+
 insertEventTables :: 
   OutputM m =>
+  [ProcessedCollectionRow] ->
   [AggregateEvent] ->
   ConduitM () Text m ()
-insertEventTables evs = do
-  let processedEvents = concatMap getAllEvents evs
-  $logInfoS "insertEventTables/processedEvents" . T.pack $ show processedEvents
-  yieldMany =<< lift (mapM (insertEventTable) processedEvents)
-  where
-    getAllEvents :: 
-      AggregateEvent -> 
-      [AggregateEvent]
-    getAllEvents aggEvent = do
-      let newEvents = processParents aggEvent
-       in aggEvent : newEvents
+insertEventTables processedEventArrays processedEventsWithoutArrays = do
+  $logInfoS "insertEventTables/processedEventArrays" . T.pack $ show processedEventArrays
+  $logInfoS "insertEventTables/processedEventsWithoutArrays" . T.pack $ show processedEventsWithoutArrays
+  yieldMany =<< lift (mapM (insertEventTable) processedEventsWithoutArrays)
+      
+  -- yieldMany . catMaybes =<< lift (mapM (insertEventTable) processedEventsWithoutArrays)
+  when (not (null processedEventArrays)) $ insertCollectionTable processedEventArrays
 
-    processParents :: 
-      AggregateEvent -> [AggregateEvent]
-    processParents ae = createNewEvent <$> Map.toList (eventAbstracts ae)
-      where
-        createNewEvent :: 
-          ((Account, Text), (Text, Text, [Text])) -> AggregateEvent
-        createNewEvent ((_, n'), (c, a, _)) =
-          ae { eventEvent = (eventEvent ae) {
-            Action.evContractCreator = 
-              if (Action.evContractApplication (eventEvent ae)) == "" 
-              then T.unpack c
-              else Action.evContractCreator (eventEvent ae),
-            Action.evContractApplication = T.unpack a,
-            Action.evContractName = T.unpack n'
-              }
+getAllEvents :: 
+  AggregateEvent -> 
+  [AggregateEvent]
+getAllEvents aggEvent = do
+  let newEvents = processParents aggEvent
+    in aggEvent : newEvents
+
+processParents :: 
+  AggregateEvent -> [AggregateEvent]
+processParents ae = createNewEvent <$> Map.toList (eventAbstracts ae)
+  where
+    createNewEvent :: 
+      ((Account, Text), (Text, Text, [Text])) -> AggregateEvent
+    createNewEvent ((_, n'), (c, a, _)) =
+      ae { eventEvent = (eventEvent ae) {
+        Action.evContractCreator = 
+          if (Action.evContractApplication (eventEvent ae)) == "" 
+          then T.unpack c
+          else Action.evContractCreator (eventEvent ae),
+        Action.evContractApplication = T.unpack a,
+        Action.evContractName = T.unpack n'
           }
+      }
+
+-- insertEventTable ::
+--   OutputM m =>
+--   AggregateEvent ->
+--   m (Text)
+-- insertEventTable agEv = do
+--   let q = insertEventTableQuery agEv
+--   multilineDebugLog "insertEventTable/SQL" $ T.unpack q
+--   return q
+
 
 insertEventTable ::
   OutputM m =>
@@ -1384,23 +1592,25 @@ insertEventTableQuery agEv@AggregateEvent {eventEvent = ev} =
           (T.pack $ Action.evContractApplication ev)
           (T.pack $ Action.evContractName ev)
       tableName = EventTableName creator a cname (escapeQuotes $ T.pack $ Action.evName ev)
-      filledArgs = map fst . fillFirstEmptyEntries . map (first T.pack) $ Action.evArgs ev
-      keySt = wrapAndEscapeDouble . map escapeQuotes $ ("id" : baseTableColumnsForEvent) ++ filledArgs
+      filledArgs = map fst . fillFirstEmptyEntries . map (\(aa, bb, _) -> (T.pack aa, bb)) $ Action.evArgs ev
+      keySt = wrapAndEscapeDouble . map escapeQuotes $ baseTableColumnsForEvent ++ filledArgs
       baseVals =
-        [ tshow . _accountAddress . Action.evContractAccount . eventEvent,
+        [ tshow . Slipstream.Data.Action.id,
+          tshow . _accountAddress . Action.evContractAccount . eventEvent,
           T.pack . keccak256ToHex . eventBlockHash,
           tshow . eventBlockTimestamp,
           tshow . eventBlockNumber,
           T.pack . keccak256ToHex . eventTxHash,
           tshow . eventTxSender
         ]
-      vals = csv $ map (wrapSingleQuotes . escapeQuotes . ($ agEv)) baseVals ++ map (wrapSingleQuotes . escapeSingleQuotes . T.pack . snd) (Action.evArgs ev)
+      vals = csv $ map (wrapSingleQuotes . escapeQuotes . ($ agEv)) baseVals ++ map (wrapSingleQuotes . escapeSingleQuotes . T.pack . (\(_, x, _) -> x)) (Action.evArgs ev)
+
    in T.concat $
         [ "INSERT INTO ",
           tableNameToDoubleQuoteText tableName,
           " ",
           keySt,
-          "\n  VALUES ( DEFAULT,\n",
+          "\n  VALUES ( \n",
           vals,
           " )\n  ON CONFLICT DO NOTHING;"
         ]

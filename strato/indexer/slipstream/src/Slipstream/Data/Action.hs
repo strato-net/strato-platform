@@ -58,6 +58,7 @@ data AggregateEvent = AggregateEvent
     eventBlockNumber :: Integer,
     eventTxHash :: Keccak256,
     eventTxSender :: Account,
+    id :: Int,
     eventAbstracts :: Map (Account, Text) (Text, Text, [Text]),
     eventEvent :: Event
   }

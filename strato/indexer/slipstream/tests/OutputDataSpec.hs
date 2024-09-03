@@ -746,7 +746,7 @@ FOR EACH ROW EXECUTE PROCEDURE "insert_or_update_Vehicle2_history_table"();|]
     let testAdd = Address 0x98eaddede
         input = [ProcessedCollectionRow {
           address = testAdd,
-          codehash = CodeAtAccount (Account (Address 0x1234567890) Nothing) "SwissArmy", -- $ hash "<CODEHASH>",
+          -- codehash = CodeAtAccount (Account (Address 0x1234567890) Nothing) "SwissArmy", -- $ hash "<CODEHASH>",
           creator = "creator",
           cc_creator = Just "cc_creator",
           root = "groot",

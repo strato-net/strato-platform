@@ -181,11 +181,12 @@ processedContractToProcessedCollectionRows state mapAndArrayNames row abiid creg
                 map (processArrayDynamic mName row abiid cregator) (I.toList intMapValues)
       return result
 
-processedCollectionRow :: Text -> Text -> AggregateAction -> ABIID -> Maybe Text -> Value -> Value -> ProcessedCollectionRow
+
+processedCollectionRow :: Text -> Text -> AggregateAction -> ABIID -> Maybe Text -> Value -> Value ->  ProcessedCollectionRow
 processedCollectionRow collection ttype AggregateAction {..} ABIID {..} cregator k v =
   ProcessedCollectionRow
     { address = actionAccount ^. accountAddress,
-      codehash = actionCodeHash,
+      -- codehash = actionCodeHash,
       creator = actionCreator,
       cc_creator = cregator,
       root = actionRoot,
@@ -199,7 +200,7 @@ processedCollectionRow collection ttype AggregateAction {..} ABIID {..} cregator
       transactionHash = actionTxHash,
       transactionSender = actionTxSender ^. accountAddress,
       collectionDataKey = k,
-      collectionDataValue = v
+      collectionDataValue = v 
     }
 
 processArrayFixed :: Text -> AggregateAction -> ABIID -> Maybe Text -> (Int, Value) -> ProcessedCollectionRow
@@ -226,9 +227,9 @@ parseActions events' =
 parseEvents :: [VME.VMEvent] -> [AggregateEvent]
 parseEvents = concatMap parseEvent
   where
-    parseEvent (VME.NewAction a) = mkAggregateEvent a <$> toList (Action._events a)
+    parseEvent (VME.NewAction a) = zipWith (mkAggregateEvent a) [1..] (toList (Action._events a))
     parseEvent _ = []
-    mkAggregateEvent a e =
+    mkAggregateEvent a idx e =
       AggregateEvent
         { eventBlockHash = Action._blockHash a,
           eventBlockTimestamp = Action._blockTimestamp a,
@@ -236,7 +237,8 @@ parseEvents = concatMap parseEvent
           eventTxHash = Action._transactionHash a,
           eventTxSender = Action._transactionSender a,
           eventAbstracts = maybe Map.empty Action._actionDataAbstracts . OMap.lookup (evContractAccount e) $ Action._actionData a,
-          eventEvent = e
+          eventEvent = e, 
+          id = idx
         }
 
 getMappingNamesFromContract :: ContractF () -> [Text]
@@ -338,9 +340,14 @@ processTheMessages env conn messages = do
             $logInfoS "processTheMessages/deferredForeignKeysForArrays" $ T.pack $ show deferredForeignKeysForArrays
 
 
-            outputData conn $ createExpandEventTables c cc nameParts
+            -- outputData conn $ createExpandEventTables g c cc nameParts
+            deferredForeignKeysForEvents <- outputData conn $ createExpandEventTables c cc nameParts
 
-            return $ deferredForeignKeys ++ deferredForeignKeysForMappings ++ deferredForeignKeysForArrays
+
+            return $ deferredForeignKeys ++ deferredForeignKeysForMappings ++ deferredForeignKeysForArrays ++ deferredForeignKeysForEvents
+
+        -- forM_ deferredForeignKeys $ \deferredForeignKey -> do
+        --   outputData conn $ createForeignIndexesForJoins deferredForeignKey
         pure $ Right deferredForeignKeys
   -- TODO: Add delegatecall indexing back in
   -- dfkeys' <- forM delegates $ \d@(Action.Delegatecall s c' o a) -> do
@@ -448,8 +455,18 @@ processTheMessages env conn messages = do
     $logDebugLS "processTheMessages" $ T.pack $ "Updating PostgREST schema cache for " ++ show (sum $ map length fkeys) ++ " foreign key relationships"
     notifyPostgREST conn
 
-  when (length events' > 0) $
-    outputData conn $ insertEventTables events'
+  when (not (null events')) $ do
+    --Getting event entries that go into the parent abstract tables and event array inserts
+    let processedEvents = concatMap getAllEvents events'
+        processedEventArrays = concatMap aggEventToCollectionRows processedEvents
+        processedEventsWithoutArrays = map (\ae -> ae { eventEvent = removeArrayEvArgs (eventEvent ae) }) processedEvents
+        
+    -- Insert the events into the event tables
+    outputData conn $ insertEventTables processedEventArrays processedEventsWithoutArrays
+    
+    -- If there are processed event arrays, update the foreign keys
+    unless (null processedEventArrays) $
+      outputData conn $ updateForeignKeysFromNULLArray processedEventArrays
 
   $logInfoS "processTheMessages" . T.pack $ "Inserting " ++ show (length transactionResults) ++ " transaction results"
 

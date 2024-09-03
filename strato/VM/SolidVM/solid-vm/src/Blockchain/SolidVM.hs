@@ -1354,7 +1354,15 @@ runStatement st@(CC.EmitStatement eventName exptups pos) = do
                           _ -> pure ""
                   )
           -- pair up field names with values one-by-one (no type checking tho, lol)
-          let pairs = zip (map (T.unpack . fst) $ CC._eventLogs ev) expStrs
+          -- let pairs = zip (map (T.unpack . fst) $ CC._eventLogs ev) expStrs
+
+          let evArgs = zipWith (\(name, CC.IndexedType _ idxType) value -> 
+                        (T.unpack name, value, if isTypeArray idxType then "Array" else "Other")) 
+                     (CC._eventLogs ev) expStrs
+                where
+                  isTypeArray :: SVMType.Type -> Bool
+                  isTypeArray (SVMType.Array _ _) = True
+                  isTypeArray _ = False
 
           multilineLog "event/emit/versioning" $
             boringBox
@@ -1366,7 +1374,7 @@ runStatement st@(CC.EmitStatement eventName exptups pos) = do
               ]
 
           bHash <- blockHeaderHash . Env.blockHeader <$> getEnv
-          addEvent $ Event bHash ctrName parentName (labelToString $ CC._contractName curCnct) account eventName pairs
+          addEvent $ Event bHash ctrName parentName (labelToString $ CC._contractName curCnct) account eventName evArgs
           return Nothing
 runStatement (CC.UncheckedStatement code pos) = do
   solidVMBreakpoint pos
