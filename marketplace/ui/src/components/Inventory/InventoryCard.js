@@ -165,6 +165,14 @@ const InventoryCard = ({ inventory, category, debouncedSearchTerm, id, allSubcat
     return () => window.removeEventListener('resize', checkOverflow);
   }, []);
 
+  function disableSADDOGS(inventory) {
+    if (!inventory || !inventory.originAddress) {
+      return false; // or handle the undefined case as needed
+    }
+    const address = inventory.originAddress;
+    return address.toLowerCase() === "dbf23119bb52a7419c66c7b5055dd3f31545dc14";
+  }
+
   return (
     <div id={`asset-${inventory?.name}`} className="p-3 md:p-[18px] border border-[#BABABA] md:border-[#E9E9E9] rounded-lg sm:w-[343px] md:w-full  ">
       <div className="bg-[#F2F2F9] rounded-md px-[14px] flex flex-col justify-between items-center pb-[13px] pt-2 w-full">
@@ -195,19 +203,19 @@ const InventoryCard = ({ inventory, category, debouncedSearchTerm, id, allSubcat
           <div className="mt-3">
             {((itemData.isMint === "True" && inventory.quantity === 0) || inventory.quantity > 0) &&
               <div className="grid grid-cols-3 gap-1 w-full">
-                <Button id="sell-listing-btn" type="link" className="text-[#13188A] text-left px-0 font-semibold text-sm h-6" onClick={showListModal} disabled={isEditSellDisabled() || !isActive()}>
+                <Button id="sell-listing-btn" type="link" className="text-[#13188A] text-left px-0 font-semibold text-sm h-6" onClick={showListModal} disabled={isEditSellDisabled() || !isActive() || disableSADDOGS(inventory)}>
                   {inventory.price ? <><EditOutlined /> Edit</> : <><DollarOutlined /> Sell</>}
                 </Button>
                 <Button id="asset-card-unlist-btn" type="link" className="text-[#13188A] text-left px-0 font-semibold text-sm h-6" onClick={showUnlistModal} disabled={!inventory.price || !isActive()}>
                   <><StopOutlined /> Unlist</>
                 </Button>
-                <Button type="link" className="text-[#13188A] text-left px-0 font-semibold text-sm h-6" onClick={showResellModal} disabled={!(itemData.isMint && itemData.isMint == "True") || !isActive()}>
+                <Button type="link" className="text-[#13188A] text-left px-0 font-semibold text-sm h-6" onClick={showResellModal} disabled={!(itemData.isMint && itemData.isMint == "True" && disableSADDOGS(inventory)) || !isActive()}>
                   <><PieChartOutlined /> Mint</>
                 </Button>
-                <Button type="link" className="text-[#13188A] text-left px-0 font-semibold text-sm h-6" onClick={showTransferModal} disabled={isTransferDisabled() || !isActive()}>
+                <Button type="link" className="text-[#13188A] text-left px-0 font-semibold text-sm h-6" onClick={showTransferModal} disabled={isTransferDisabled() || !isActive() || disableSADDOGS(inventory)}>
                   <><SwapOutlined /> Transfer</>
                 </Button>
-                <Button type="link" className="text-[#13188A] text-left px-0 font-semibold text-sm h-6" onClick={showRedeemModal} disabled={inventory.price || inventory.address === inventory.originAddress || !isActive()}>
+                <Button type="link" className="text-[#13188A] text-left px-0 font-semibold text-sm h-6" onClick={showRedeemModal} disabled={inventory.price || inventory.address === inventory.originAddress || !isActive() || disableSADDOGS(inventory)}>
                   <><SendOutlined /> Redeem</>
                 </Button>
                 <Button type="link" className={`text-[#13188A] text-left px-0 font-semibold text-sm h-6 ${!isTokenSupported(inventory.root) ? 'hidden' : ''}`} onClick={showBridgeModal}>
