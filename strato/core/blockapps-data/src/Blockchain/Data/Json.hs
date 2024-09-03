@@ -348,12 +348,7 @@ blockDataRefToBlock bdr txs =
         BlockHeader
           { parentHash = blockDataRefParentHash bdr,
             ommersHash = blockDataRefUnclesHash bdr,
-            beneficiary =
-              CommonName
-                (blockDataRefCoinbaseOrg bdr)
-                (blockDataRefCoinbaseOrgUnit bdr)
-                (blockDataRefCoinbaseCommonName bdr)
-                True,
+            beneficiary = CommonName "" "" (blockDataRefCoinbase bdr) True,
             stateRoot = blockDataRefStateRoot bdr,
             transactionsRoot = blockDataRefTransactionsRoot bdr,
             receiptsRoot = blockDataRefReceiptsRoot bdr,
@@ -457,13 +452,11 @@ bdPrimeToBd (BlockData' bd) = bd
 data BlockDataRef' = BlockDataRef' BlockDataRef deriving (Eq, Show)
 
 instance ToJSON BlockDataRef' where
-  toJSON (BlockDataRef' (BlockDataRef ph uh co cu cc sr tr rr _ d num gl gu ts ed non mh h pow isConf td)) =
+  toJSON (BlockDataRef' (BlockDataRef ph uh cc sr tr rr _ d num gl gu ts ed non mh h pow isConf td v)) =
     object
       [ "parentHash" .= ph,
         "unclesHash" .= uh,
-        "coinbaseOrg" .= co,
-        "coinbaseOrgUnit" .= cu,
-        "coinbaseCommonName" .= cc,
+        "coinbase" .= cc,
         "stateRoot" .= sr,
         "transactionsRoot" .= tr,
         "receiptsRoot" .= rr,
@@ -478,7 +471,8 @@ instance ToJSON BlockDataRef' where
         "hash" .= h,
         "powVerified" .= pow,
         "isConfirmed" .= isConf,
-        "totalDifficulty" .= td
+        "totalDifficulty" .= td,
+        "version" .= v
       ]
 
 bdrToBdrPrime :: BlockDataRef -> BlockDataRef'
