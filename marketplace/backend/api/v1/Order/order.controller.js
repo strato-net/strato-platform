@@ -111,6 +111,20 @@ class OrderController {
     }
   }
 
+  static async getUserAddress(req, res, next) {
+    try {
+      const { dapp, query } = req
+      const { redemptionService, shippingAddressId } = req.params;
+
+      const orders = await dapp.getUserAddress({ ...query, redemptionService, shippingAddressId})
+      rest.response.status200(res, orders)
+
+      return next()
+    } catch (e) {
+      return next(e)
+    }
+  }
+
   static async getAllUserAddress(req, res, next) {
     try {
       const { dapp, query } = req
