@@ -40,7 +40,7 @@ import inventoryJs from "/dapp/products/inventory";
 import marketplaceJs from "/dapp/marketplace/marketplace.js";
 import paymentProviderJs from "/dapp/payments/paymentProvider";
 import redemptionServiceJs from "/dapp/redemptions/redemptionService";
-import walletJs from "/dapp/wallet/wallet";
+import walletJs from "/dapp/wallet/wallet.js";
 
 import strats from "../strats/strats";
 
@@ -986,24 +986,27 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
     } catch (error) {
       console.error("Error fetching price history:", error);
     }
+  };
 
-    contract.getWalletSummary = async function (
-      args,
-      options = defaultOptions
-    ) {
-      return walletJs.getWalletSummary(rawAdmin, args, options);
-    };
+  contract.getWalletSummary = async function (args, options = defaultOptions) {
+    return walletJs.getWalletSummary(rawAdmin, args, options);
+  };
 
-    contract.getWalletAssets = async function (
-      args,
-      options = optionsNoChainIds
-    ) {
-      return walletJs.getWalletAssets(
-        rawAdmin,
-        { ...args, userCommonName: userCert.commonName },
-        options
-      );
+  contract.getWalletAssets = async function (
+    args,
+    options = optionsNoChainIds
+  ) {
+    const getOptions = { ...options, app: contractName };
+    const { ownerCommonName, address, ...restArgs } = args;
+    const newArgs = {
+      ...restArgs,
+      ownerCommonName,
+      address,
+      // notEqualsField: "sale",
+      // notEqualsValue: constants.zeroAddress,
+      userProfile: true,
     };
+    return walletJs.getWalletAssets(rawAdmin, newArgs, getOptions);
   };
 
   // ------------------------------ ART STARTS ------------------------------
