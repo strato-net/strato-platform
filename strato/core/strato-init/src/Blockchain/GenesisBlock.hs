@@ -45,7 +45,6 @@ import Blockchain.Sequencer.Bootstrap (bootstrapSequencer)
 import Blockchain.Sequencer.Event (OutputBlock)
 import Blockchain.SolidVM.CodeCollectionDB
 import qualified Blockchain.Strato.Indexer.ApiIndexer as ApiIndexer
-import qualified Blockchain.Strato.Indexer.IContext as IContext
 import qualified Blockchain.Strato.Indexer.Kafka as IdxKafka
 import qualified Blockchain.Strato.Indexer.Model as IdxModel
 import qualified Blockchain.Strato.Model.Account as Ac
@@ -65,7 +64,6 @@ import qualified Blockchain.Stream.Action as A
 import Blockchain.Stream.VMEvent
 import Control.Monad
 import Control.Monad.Change.Alter (Alters, Selectable)
-import Control.Monad.Composable.Kafka
 import Control.Monad.Composable.Redis
 import Control.Monad.IO.Class
 import qualified Data.ByteString.Base16 as B16
@@ -306,32 +304,12 @@ populateStorageDBs getMetadata genesisBlock genesisChainId = do
     return ()
 
 bootstrapIndexer :: OutputBlock -> IO ()
-bootstrapIndexer obGB =
+bootstrapIndexer obGB = do
   let clientId = fst ApiIndexer.kafkaClientIds
-      consumer = snd ApiIndexer.kafkaClientIds
-      topic = IContext.targetTopicName
-      mkMeta = Metadata . KString $ C8.empty
-      commit = do
-        putStrLn $ "Bootstrapping indexer"
-        runKafkaConfigured clientId $
-          commitSingleOffset consumer topic 0 0 mkMeta
-      runner =
-        commit >>= \case
-          Right (Right _) -> do
-            putStrLn "bootstrapIndex API checkpoint successful!"
+  putStrLn "About to bootstrap index events"
+  res <-
+    runKafkaMConfigured clientId $
+    IdxKafka.produceIndexEvents [IdxModel.RanBlock obGB]
 
-            putStrLn "About to bootstrap index events"
-
-            res <-
-              runKafkaMConfigured clientId $
-                IdxKafka.produceIndexEvents [IdxModel.RanBlock obGB]
-
-            print res
-            putStrLn "bootstrapIndex genesis seed successful!"
-          Right (Left l) -> do
-            putStrLn $ "will retry bootstrapIndex as I got a broker error: " ++ show (l :: KafkaError)
-            runner
-          (Left l) -> do
-            putStrLn $ "will retry bootstrapIndexer as I got a client error: " ++ show l
-            runner
-   in runner
+  print res
+  putStrLn "bootstrapIndex genesis seed successful!"
