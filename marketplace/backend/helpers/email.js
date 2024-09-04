@@ -12,7 +12,7 @@ async function sendEmail(to, subject, htmlContent) {
     subject: subject,
     html: htmlContent,
     // Remove sales from these emails for testnet testing. This needs to be included for production. 
-    // bcc: 'sales@blockapps.net',
+    bcc: 'sales@blockapps.net',
     // attachments: [
     //   {
     //     content: pdf.toString("base64"),
