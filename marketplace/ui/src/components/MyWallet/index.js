@@ -45,11 +45,10 @@ const MyWallet = ({ user }) => {
   const stratsBalance = Object.keys(strats).length > 0 ? strats : 0;
 
   useEffect(() => {
-    actions.fetchWalletData(
-      dispatch,
-      "b839d5b5c4ddb49b2010075dd0211e79285dfbb0"
-    );
-  }, [dispatch]);
+    if (user && user.userAddress) {
+      actions.fetchWalletData(dispatch, user.userAddress);
+    }
+  }, [dispatch, user]);
 
   useEffect(() => {
     if (walletData) {
