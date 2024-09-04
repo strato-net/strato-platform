@@ -39,8 +39,6 @@ const ConfirmOrder = ({ paymentProviders = [], data, columns }) => {
   const [cartData, setCartData] = useState(data);
   const [selectedProvider, setSelectedProvider] = useState('');
 
-  const activePaymentProviders = (paymentProviders[0] !== undefined) ? paymentProviders.filter(paymentProvider => paymentProvider?.isActive) : [];
-
   useEffect(() => {
     setCartData(data);
   }, [data]);
@@ -209,7 +207,7 @@ const ConfirmOrder = ({ paymentProviders = [], data, columns }) => {
   };
 
   const handleChange = async (value) => {
-    const provider = activePaymentProviders.find(provider => provider?.serviceName === value);
+    const provider = paymentProviders.find(provider => provider?.serviceName === value);
     setSelectedProvider(provider);
 
     if (hasChecked && !isAuthenticated && loginUrl !== undefined) {
@@ -306,9 +304,9 @@ const ConfirmOrder = ({ paymentProviders = [], data, columns }) => {
                     className="w-[250px] text-center selected-payment-option items-select"
                     onChange={handleChange}
                     placeholder="Select Payment Option"
-                    disabled={activePaymentProviders.length === 0}
+                    disabled={paymentProviders.length === 0}
                   >
-                    {activePaymentProviders && activePaymentProviders.map(provider => (
+                    {paymentProviders && paymentProviders.map(provider => (
                       provider && <Option className='payment-dropdown' key={provider?.serviceName} value={provider?.serviceName}>
                         <Row className="w-full">
                         <Col span={22} className="text-left">Checkout with {provider?.serviceName}</Col>

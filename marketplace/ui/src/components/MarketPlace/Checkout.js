@@ -78,7 +78,7 @@ const Checkout = () => {
   }, [marketplaceDispatch, cartList]);
 
   useEffect(() => {
-    paymentServiceActions.getPaymentServices(paymentServiceDispatch, false);
+    paymentServiceActions.getPaymentServices(paymentServiceDispatch, true);
   }, [paymentServiceDispatch]);
 
   useEffect(() => {
@@ -357,7 +357,7 @@ const Checkout = () => {
   ];
 
   const filterPaymentServices = (e) => {
-    const filteredPaymentServices = e.map(assetPaymentServices => paymentServices.find(paymentService => paymentService.creator === assetPaymentServices.creator && paymentService.serviceName === assetPaymentServices.serviceName));
+    const filteredPaymentServices = e.map(assetPaymentServices => paymentServices.find(paymentService => paymentService.creator === JSON.parse(assetPaymentServices.value).creator && paymentService.serviceName === JSON.parse(assetPaymentServices.value).serviceName));
 
     return filteredPaymentServices;
   }
