@@ -55,6 +55,9 @@ const actionDescriptors = {
   fetchPriceHistoryWithAddress: "fetch_price_history_with_address",
   fetchPriceHistorySuccessful: "fetch_price_history_successful",
   fetchPriceHistoryFailed: "fetch_price_history_failed",
+  fetchWalletData: "fetch_wallet_data",
+  fetchWalletDataSuccessful: "fetch_wallet_data_successful",
+  fetchWalletDataFailed: "fetch_wallet_data_failed",
 };
 
 const actions = {
@@ -978,6 +981,28 @@ const actions = {
       dispatch({
         type: actionDescriptors.fetchPriceHistoryFailed,
         payload: "Error while fetching price history",
+      });
+    }
+  },
+  fetchWalletData: async (dispatch, owner) => {
+    dispatch({ type: actionDescriptors.fetchWalletData });
+
+    try {
+      const response = await fetch(`${apiUrl}/wallet/assets?owner=${owner}`);
+      const result = await response.json();
+
+      if (result.success) {
+        dispatch({
+          type: actionDescriptors.fetchWalletDataSuccessful,
+          payload: result.data,
+        });
+      } else {
+        throw new Error("Failed to fetch wallet data");
+      }
+    } catch (err) {
+      dispatch({
+        type: actionDescriptors.fetchWalletDataFailed,
+        error: err.message,
       });
     }
   },

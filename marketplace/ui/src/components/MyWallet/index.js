@@ -7,6 +7,11 @@ import HelmetComponent from "../Helmet/HelmetComponent";
 import { SEO } from "../../helpers/seoConstant";
 import { useNavigate } from "react-router-dom";
 import { useMarketplaceState } from "../../contexts/marketplace";
+import {
+  useInventoryDispatch,
+  useInventoryState,
+} from "../../contexts/inventory";
+import { actions } from "../../contexts/inventory/actions";
 
 const useMediaQuery = (query) => {
   const [matches, setMatches] = useState(false);
@@ -33,66 +38,60 @@ const MyWallet = ({ user }) => {
   const linkUrl = window.location.href;
   const [totalBalance, setTotalBalance] = useState(0);
   const [tableData, setTableData] = useState([]);
+  const dispatch = useInventoryDispatch();
+  const { walletData, isWalletDataLoading, error } = useInventoryState();
 
   const { strats } = useMarketplaceState();
   const stratsBalance = Object.keys(strats).length > 0 ? strats : 0;
 
   useEffect(() => {
-    const fetchData = async () => {
-      setIsLoading(true);
-      try {
-        const response = await fetch(
-          `http://localhost/api/v1/wallet/assets?owner=b839d5b5c4ddb49b2010075dd0211e79285dfbb0`
-        );
-        const result = await response.json();
-        if (result.success) {
-          const assets = result.data.inventoriesWithImageUrl;
-          const processedData = assets.map((asset, index) => ({
-            key: index,
-            asset: asset.name,
-            image:
-              asset["BlockApps-Mercata-Asset-images"][0]?.value ||
-              Images.image_placeholder,
-            quantity: asset.quantity,
-            price: asset.price ? `$${asset.price}` : "-",
-            value: asset.price
-              ? `$${(asset.quantity * asset.price).toFixed(2)}`
-              : "-",
-            gainLoss: asset.gainLossPercentage
-              ? `${asset.gainLossPercentage}%`
-              : "-",
-            address: asset.address,
-          }));
+    actions.fetchWalletData(
+      dispatch,
+      "b839d5b5c4ddb49b2010075dd0211e79285dfbb0"
+    );
+  }, [dispatch]);
 
-          processedData.unshift({
-            key: "strats",
-            asset: "STRATS",
-            image: Images.logo,
-            quantity: stratsBalance,
-            price: "$0.01",
-            value: `$${(stratsBalance * 0.01).toFixed(2)}`,
-            gainLoss: "-",
-            address: null,
-          });
+  useEffect(() => {
+    if (walletData) {
+      const assets = walletData.inventoriesWithImageUrl;
+      const processedData = assets.map((asset, index) => ({
+        key: index,
+        asset: asset.name,
+        image:
+          asset["BlockApps-Mercata-Asset-images"][0]?.value ||
+          Images.image_placeholder,
+        quantity: asset.quantity,
+        price: asset.price ? `$${asset.price}` : "-",
+        value: asset.price
+          ? `$${(asset.quantity * asset.price).toFixed(2)}`
+          : "-",
+        gainLoss: asset.gainLossPercentage
+          ? `${asset.gainLossPercentage}%`
+          : "-",
+        address: asset.address,
+      }));
 
-          setTableData(processedData);
+      processedData.unshift({
+        key: "strats",
+        asset: "STRATS",
+        image: Images.logo,
+        quantity: stratsBalance,
+        price: "$0.01",
+        value: `$${(stratsBalance * 0.01).toFixed(2)}`,
+        gainLoss: "-",
+        address: null,
+      });
 
-          // Calculate total balance
-          const total = processedData.reduce((sum, item) => {
-            const itemValue = parseFloat(item.value.replace("$", ""));
-            return sum + (isNaN(itemValue) ? 0 : itemValue);
-          }, 0);
-          setTotalBalance(total.toFixed(2));
-        }
-      } catch (error) {
-        console.error("Error fetching wallet data:", error);
-      } finally {
-        setIsLoading(false);
-      }
-    };
+      setTableData(processedData);
 
-    fetchData();
-  }, [stratsBalance]);
+      const total = processedData.reduce((sum, item) => {
+        const itemValue = parseFloat(item.value.replace("$", ""));
+        return sum + (isNaN(itemValue) ? 0 : itemValue);
+      }, 0);
+      setTotalBalance(total.toFixed(2));
+      setIsLoading(false);
+    }
+  }, [walletData, stratsBalance]);
 
   const CustomQuestionIcon = () => (
     <svg
