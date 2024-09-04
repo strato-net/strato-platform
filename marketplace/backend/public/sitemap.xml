@@ -7,133 +7,133 @@
      
      <url>
        <loc>http://localhost/</loc>
-       <lastmod>2024-08-27T22:00:00.722Z</lastmod>
+       <lastmod>2024-09-04T02:47:32.304Z</lastmod>
        <changefreq>daily</changefreq>
        <priority>0.5</priority>
      </url>
 
      <url>
        <loc>http://localhost/c/All</loc>
-       <lastmod>2024-08-27T22:00:00.722Z</lastmod>
+       <lastmod>2024-09-04T02:47:32.304Z</lastmod>
        <changefreq>daily</changefreq>
        <priority>0.5</priority>
      </url>
 
      <url>
        <loc>http://localhost/c/Carbon?sc=CarbonOffset%2CCarbonDAO</loc>
-       <lastmod>2024-08-27T22:00:00.722Z</lastmod>
+       <lastmod>2024-09-04T02:47:32.304Z</lastmod>
        <changefreq>daily</changefreq>
        <priority>0.5</priority>
      </url>
 
      <url>
        <loc>http://localhost/c/Metals?sc=Metals</loc>
-       <lastmod>2024-08-27T22:00:00.722Z</lastmod>
+       <lastmod>2024-09-04T02:47:32.304Z</lastmod>
        <changefreq>daily</changefreq>
        <priority>0.5</priority>
      </url>
 
      <url>
        <loc>http://localhost/c/Clothing?sc=Clothing</loc>
-       <lastmod>2024-08-27T22:00:00.722Z</lastmod>
+       <lastmod>2024-09-04T02:47:32.304Z</lastmod>
        <changefreq>daily</changefreq>
        <priority>0.5</priority>
      </url>
 
      <url>
        <loc>http://localhost/c/Collectibles?sc=Collectibles</loc>
-       <lastmod>2024-08-27T22:00:00.722Z</lastmod>
+       <lastmod>2024-09-04T02:47:32.304Z</lastmod>
        <changefreq>daily</changefreq>
        <priority>0.5</priority>
      </url>
 
      <url>
        <loc>http://localhost/c/Art?sc=Art</loc>
-       <lastmod>2024-08-27T22:00:00.722Z</lastmod>
+       <lastmod>2024-09-04T02:47:32.304Z</lastmod>
        <changefreq>daily</changefreq>
        <priority>0.5</priority>
      </url>
 
      <url>
        <loc>http://localhost/c/Membership?sc=Membership</loc>
-       <lastmod>2024-08-27T22:00:00.722Z</lastmod>
+       <lastmod>2024-09-04T02:47:32.304Z</lastmod>
        <changefreq>daily</changefreq>
        <priority>0.5</priority>
      </url>
 
      <url>
        <loc>http://localhost/checkout</loc>
-       <lastmod>2024-08-27T22:00:00.722Z</lastmod>
+       <lastmod>2024-09-04T02:47:32.304Z</lastmod>
+       <changefreq>daily</changefreq>
+       <priority>0.5</priority>
+     </url>
+
+     <url>
+       <loc>http://localhost/dp/2f211a4ce699936e6d382b169d7ae4b68876b23a/liter%20test</loc>
+       <lastmod>2024-09-04T02:47:34.012Z</lastmod>
+       <changefreq>daily</changefreq>
+       <priority>0.5</priority>
+     </url>
+
+     <url>
+       <loc>http://localhost/dp/d0a5916ebcbb1ce4918d4034d74fb8c4be497719/Liter%20Test</loc>
+       <lastmod>2024-09-04T02:47:34.012Z</lastmod>
+       <changefreq>daily</changefreq>
+       <priority>0.5</priority>
+     </url>
+
+     <url>
+       <loc>http://localhost/dp/05b8fe59c4f1166e7f575436857db529a50e3977/HD5</loc>
+       <lastmod>2024-09-04T02:47:34.012Z</lastmod>
+       <changefreq>daily</changefreq>
+       <priority>0.5</priority>
+     </url>
+
+     <url>
+       <loc>http://localhost/dp/c8ead1bd5d26457cf63dc01b8640dc5ab266ce87/liter%20test%202</loc>
+       <lastmod>2024-09-04T02:47:34.012Z</lastmod>
        <changefreq>daily</changefreq>
        <priority>0.5</priority>
      </url>
 
      <url>
        <loc>http://localhost/dp/33b8abed7bbf9b0bd4dbc8709b1b16bad6bf68ec/Happy%20Dog%20Charlie</loc>
-       <lastmod>2024-08-27T22:00:02.227Z</lastmod>
+       <lastmod>2024-09-04T02:47:34.012Z</lastmod>
        <changefreq>daily</changefreq>
        <priority>0.5</priority>
      </url>
 
      <url>
-       <loc>http://localhost/dp/0d2ecd5c90b7c1c0b91245153b4c559a446cac22/Liter%20Test</loc>
-       <lastmod>2024-08-27T22:00:02.228Z</lastmod>
+       <loc>http://localhost/dp/a954822f39e0d0b4f16d0aca3d0f9ceb51f19bd6/Test</loc>
+       <lastmod>2024-09-04T02:47:34.012Z</lastmod>
        <changefreq>daily</changefreq>
        <priority>0.5</priority>
      </url>
 
      <url>
-       <loc>http://localhost/dp/30b915082a6962502b2cf9526412469f26eb1d56/Payment%20Server%20Deployment</loc>
-       <lastmod>2024-08-27T22:00:02.228Z</lastmod>
-       <changefreq>daily</changefreq>
-       <priority>0.5</priority>
-     </url>
-
-     <url>
-       <loc>http://localhost/dp/e6db6d90187a9254ae7efc878d243a89e4c81171/Liter%20Test</loc>
-       <lastmod>2024-08-27T22:00:02.228Z</lastmod>
-       <changefreq>daily</changefreq>
-       <priority>0.5</priority>
-     </url>
-
-     <url>
-       <loc>http://localhost/dp/2b9d0126b8f30405fe3ec7281043be6ee5419e4f/Barrel%20Test</loc>
-       <lastmod>2024-08-27T22:00:02.228Z</lastmod>
-       <changefreq>daily</changefreq>
-       <priority>0.5</priority>
-     </url>
-
-     <url>
-       <loc>http://localhost/dp/75dbc1d49d6a43af1296c8b75f018e8ec73a02b2/HD6</loc>
-       <lastmod>2024-08-27T22:00:02.228Z</lastmod>
+       <loc>http://localhost/dp/e626220ba80d5ca7afcc5c31ce853173689987c9/Test</loc>
+       <lastmod>2024-09-04T02:47:34.012Z</lastmod>
        <changefreq>daily</changefreq>
        <priority>0.5</priority>
      </url>
 
      <url>
        <loc>http://localhost/dp/e4823dedeb2c7868f243059856354bbf32c76ec5/Test</loc>
-       <lastmod>2024-08-27T22:00:02.228Z</lastmod>
+       <lastmod>2024-09-04T02:47:34.012Z</lastmod>
        <changefreq>daily</changefreq>
        <priority>0.5</priority>
      </url>
 
      <url>
-       <loc>http://localhost/dp/82adac4835ae85e7093affc11a5e0a76b3670608/Lego%20Cat%20Prod%20Replicate</loc>
-       <lastmod>2024-08-27T22:00:02.228Z</lastmod>
+       <loc>http://localhost/dp/75dbc1d49d6a43af1296c8b75f018e8ec73a02b2/HD6</loc>
+       <lastmod>2024-09-04T02:47:34.012Z</lastmod>
        <changefreq>daily</changefreq>
        <priority>0.5</priority>
      </url>
 
      <url>
-       <loc>http://localhost/dp/be71f75d2b1207323fff30b180774cc4fb68bf8b/Liter%20Test</loc>
-       <lastmod>2024-08-27T22:00:02.228Z</lastmod>
-       <changefreq>daily</changefreq>
-       <priority>0.5</priority>
-     </url>
-
-     <url>
-       <loc>http://localhost/dp/b0690bec710e54aaa00b5bb3d28d98b2defb211c/Piece%20of%20Moon</loc>
-       <lastmod>2024-08-27T22:00:02.228Z</lastmod>
+       <loc>http://localhost/dp/30b915082a6962502b2cf9526412469f26eb1d56/Payment%20Server%20Deployment</loc>
+       <lastmod>2024-09-04T02:47:34.012Z</lastmod>
        <changefreq>daily</changefreq>
        <priority>0.5</priority>
      </url>
