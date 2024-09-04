@@ -174,6 +174,14 @@ const InventoryCard = ({
     return () => window.removeEventListener("resize", checkOverflow);
   }, []);
 
+  function disableSADDOGS(inventory) {
+    if (!inventory || !inventory.originAddress) {
+      return false; // or handle the undefined case as needed
+    }
+    const address = inventory.originAddress;
+    return address.toLowerCase() === "dbf23119bb52a7419c66c7b5055dd3f31545dc14";
+  }
+
   return (
     <div
       id={`asset-${inventory?.name}`}
@@ -224,7 +232,11 @@ const InventoryCard = ({
                   type="link"
                   className="text-[#13188A] text-left px-0 font-semibold text-sm h-6"
                   onClick={showListModal}
-                  disabled={isEditSellDisabled() || !isActive()}
+                  disabled={
+                    isEditSellDisabled() ||
+                    !isActive() ||
+                    disableSADDOGS(inventory)
+                  }
                 >
                   {inventory.price ? (
                     <>
@@ -252,8 +264,11 @@ const InventoryCard = ({
                   className="text-[#13188A] text-left px-0 font-semibold text-sm h-6"
                   onClick={showResellModal}
                   disabled={
-                    !(itemData.isMint && itemData.isMint == "True") ||
-                    !isActive()
+                    !(
+                      itemData.isMint &&
+                      itemData.isMint == "True" &&
+                      disableSADDOGS(inventory)
+                    ) || !isActive()
                   }
                 >
                   <>
@@ -264,7 +279,11 @@ const InventoryCard = ({
                   type="link"
                   className="text-[#13188A] text-left px-0 font-semibold text-sm h-6"
                   onClick={showTransferModal}
-                  disabled={isTransferDisabled() || !isActive()}
+                  disabled={
+                    isTransferDisabled() ||
+                    !isActive() ||
+                    disableSADDOGS(inventory)
+                  }
                 >
                   <>
                     <SwapOutlined /> Transfer
@@ -277,7 +296,8 @@ const InventoryCard = ({
                   disabled={
                     inventory.price ||
                     inventory.address === inventory.originAddress ||
-                    !isActive()
+                    !isActive() ||
+                    disableSADDOGS(inventory)
                   }
                 >
                   <>
