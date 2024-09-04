@@ -120,7 +120,7 @@ const TransactionTable = ({ user, selectedDate, onDateChange, download, isAllOrd
       route = `${routes.BoughtOrderDetails.url.replace(":id", data.address ? data.transaction_hash : data.address)}`
     }
     else if (data.type === 'Transfer') { }
-    else if (data.type === 'Redemption' && data.from !== user.commonName) {
+    else if (data.type === 'Redemption' && data.to === user.commonName) {
       route = `${routes.RedemptionsIncomingDetails.url.replace(":id", data.redemption_id)
         .replace(":redemptionService", data.redemptionService)}`
     } else if (data.type === 'Redemption' && data.from === user.commonName) {

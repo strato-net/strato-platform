@@ -82,7 +82,7 @@ const TransactionResponsive = ({ data , user}) => {
             route = `${routes.BoughtOrderDetails.url.replace(":id", address ? transaction_hash : address)}`
           }
           else if (type === 'Transfer') { }
-          else if (type === 'Redemption' && from !== user.commonName) {
+          else if (type === 'Redemption' && to === user.commonName) {
             route = `${routes.RedemptionsIncomingDetails.url.replace(":id", reference)
               .replace(":redemptionService", redemptionService)}`
           } else if (type === 'Redemption' && from === user.commonName) {
