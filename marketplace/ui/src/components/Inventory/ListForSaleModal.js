@@ -205,7 +205,7 @@ const ListForSaleModal = ({ open, handleCancel, inventory, categoryName, limit, 
 
     const handleSubmit = async () => {
         let body = {
-          paymentProviders: paymentTypes
+            paymentServices: paymentTypes
             .filter((p) => availablePaymentProviders[p])
             .map((p) => {
               return {

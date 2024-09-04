@@ -16,7 +16,7 @@ abstract contract Sale is Utils {
     Asset public assetToBeSold;
     decimal public price;
     uint public quantity;
-    PaymentProvider[] public paymentProviders;
+    PaymentProvider[] public paymentServices;
     mapping (string => mapping (string => uint)) paymentProvidersMap;
     mapping (string => uint) lockedQuantity;
     uint totalLockedQuantity;
@@ -81,8 +81,8 @@ abstract contract Sale is Utils {
     function addPaymentProviders(PaymentProvider[] _paymentProviders) public requireSeller("add payment providers") {
         for (uint i = 0; i < _paymentProviders.length; i++) {
             PaymentProvider p = _paymentProviders[i];
-            paymentProviders.push(p);
-            paymentProvidersMap[p.serviceName][p.creator] = paymentProviders.length;
+            paymentServices.push(p);
+            paymentProvidersMap[p.serviceName][p.creator] = paymentServices.length;
         }
     }
 
@@ -92,19 +92,19 @@ abstract contract Sale is Utils {
             uint x = paymentProvidersMap[p.serviceName][p.creator];
             if (x > 0) {
                 // TODO not sure if delete keyword works for structs?
-                delete paymentProviders[x-1]; 
+                delete paymentServices[x-1]; 
                 delete paymentProvidersMap[p.serviceName][p.creator];
             }
         }
     }
 
     function clearPaymentProviders() public requireSeller("clear payment providers") {
-        for (uint i = 0; i < paymentProviders.length; i++) {
-            PaymentProvider p = paymentProviders[i];
+        for (uint i = 0; i < paymentServices.length; i++) {
+            PaymentProvider p = paymentServices[i];
             delete paymentProvidersMap[p.serviceName][p.creator];
-            delete paymentProviders[i];
+            delete paymentServices[i];
         }
-        paymentProviders = [];
+        paymentServices = [];
     }
 
     function isPaymentProvider(PaymentProvider _paymentProvider) public returns (bool) {
