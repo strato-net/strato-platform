@@ -37,12 +37,31 @@ async function getWalletSummary(admin, args = {}, options) {
   return { stratsBalance };
 }
 
-function calculateGainLossPercentage(currentPrice, lastSoldPrice) {
-  if (lastSoldPrice === null || lastSoldPrice === 0) {
-    return null; // Avoid division by zero or invalid calculation
+function calculateGainLossPercentage(
+  currentPrice,
+  originalPrice,
+  highestMarketplacePrice,
+  lastSoldPrice
+) {
+  let basePrice;
+  if (originalPrice !== null && originalPrice !== 0) {
+    basePrice = originalPrice;
+  } else if (lastSoldPrice !== null && lastSoldPrice !== 0) {
+    basePrice = lastSoldPrice;
+  } else if (
+    highestMarketplacePrice !== null &&
+    highestMarketplacePrice !== 0
+  ) {
+    basePrice = highestMarketplacePrice;
+  } else {
+    return null; // Avoid invalid calculation
   }
-  const percentageChange =
-    ((currentPrice - lastSoldPrice) / lastSoldPrice) * 100;
+
+  if (basePrice === 0) {
+    return null; // Avoid division by zero
+  }
+
+  const percentageChange = ((currentPrice - basePrice) / basePrice) * 100;
   return percentageChange.toFixed(2); // Return percentage with 2 decimal places
 }
 
@@ -104,7 +123,7 @@ async function getWalletAssets(admin, args = {}, options) {
 
   const inventoryResults = await inventoryJs.getAll(
     admin,
-    { ...queryArgs, isMarketplaceSearch: true, isTrendingSearch: false },
+    { ...queryArgs },
     options
   );
   const inventoryCount = await inventoryJs.inventoryCount(
@@ -135,7 +154,7 @@ async function getWalletAssets(admin, args = {}, options) {
         // Get the last sold price for this specific asset
         const lastSoldPrice = await getLastSoldPrice(
           admin,
-          inventory.address,
+          originAddress,
           options
         );
 
@@ -149,6 +168,8 @@ async function getWalletAssets(admin, args = {}, options) {
         // Calculate gain/loss percentage
         const gainLossPercentage = calculateGainLossPercentage(
           finalPrice,
+          inventory.price,
+          highestMarketplacePrice,
           lastSoldPrice
         );
 

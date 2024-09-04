@@ -1,7 +1,8 @@
 pragma es6;
 pragma strict;
 
-import <c338f43418d1d79cae95f23f5b62202eae3317d4>;
+import <BASE_CODE_COLLECTION>;
+
 
 contract ExternalRedemptionService is RedemptionService {
 
