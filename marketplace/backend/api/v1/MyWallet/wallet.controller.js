@@ -22,16 +22,10 @@ class WalletController {
         address,
         ...restQuery,
       });
-      const sortedInventories = inventories?.inventoryResults.sort((a, b) => {
-        if (a.saleDate && b.saleDate) {
-          return b.saleDate.localeCompare(a.saleDate);
-        }
-        return a.saleDate ? -1 : 1;
-      });
 
       rest.response.status200(res, {
-        inventoriesWithImageUrl: sortedInventories,
-        count: sortedInventories.length,
+        inventoriesWithImageUrl: inventories?.inventoryResults,
+        count: inventories?.inventoryResults.length,
       });
 
       return next();
