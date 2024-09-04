@@ -57,7 +57,13 @@ class TransactionController {
             if (type === 'Redemption' || !type) {
                 outgoingRedemptions = await dapp.getOutgoingRedemptionRequests(redemptionQuery)
                 incomingRedemptions = await dapp.getIncomingRedemptionRequests(redemptionQuery)
-                data = [...data, ...outgoingRedemptions, ...incomingRedemptions]
+                let redemptions = [...outgoingRedemptions, ...incomingRedemptions];
+                redemptions = redemptions.filter((value, index, self) =>
+                    index === self.findIndex((t) => (
+                        t.redemption_id === value.redemption_id
+                    ))
+                );
+                data = [...data, ...redemptions]
             }
             let assetAddress = data.filter((item)=>{
                 if(item.assetAddress){

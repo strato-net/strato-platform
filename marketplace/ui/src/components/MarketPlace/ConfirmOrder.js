@@ -310,7 +310,7 @@ const ConfirmOrder = ({ paymentProviders = [], data, columns }) => {
                   >
                     {activePaymentProviders && activePaymentProviders.map(provider => (
                       provider && <Option className='payment-dropdown' key={provider?.serviceName} value={provider?.serviceName}>
-                        <Row className="w-full">
+                        <Row className="w-full items-center">
                         <Col span={22} className="text-left">Checkout with {provider?.serviceName}</Col>
                         <Col span={2} className="flex justify-end"><img src={provider?.imageURL} alt={provider?.serviceName} style={{ width: 20, height: 20, marginRight: 2 }} /> </Col>
                         </Row>
