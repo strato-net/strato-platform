@@ -1,4 +1,4 @@
-export const sendEmail = async (baseUrl, type, userName, token) =>{
+const sendEmail = async (baseUrl, type, userName, token) =>{
   try {
     const purchaseRewardMailRes = await axios.post(`http://localhost/api/v1/notification/${type}`,
       { user: userName },
@@ -14,7 +14,7 @@ export const sendEmail = async (baseUrl, type, userName, token) =>{
   }
 }
 
-export const getUserName = async (baseUrl, address, token) => {
+const getUserName = async (baseUrl, address, token) => {
   try {
     const res = await axios.get(
       `https://${baseUrl}/cirrus/search/Certificate?userAddress=eq.${address}`,
@@ -33,3 +33,7 @@ export const getUserName = async (baseUrl, address, token) => {
   }
 
 }
+
+module.exports = {
+  sendEmail, getUserName
+};
