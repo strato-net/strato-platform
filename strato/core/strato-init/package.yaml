@@ -40,8 +40,6 @@ library:
   - kafka-monad
   - leveldb-haskell
   - merkle-patricia-db
-  - milena
-  - milena-tools
   - monad-alter
   - nibblestring
   - persistent-postgresql

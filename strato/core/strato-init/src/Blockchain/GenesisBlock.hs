@@ -79,8 +79,6 @@ import Data.Maybe
 import qualified Data.Sequence as S
 import Data.Text (Text)
 import qualified Data.Text as T
-import qualified Network.Kafka as K
-import qualified Network.Kafka.Protocol as KP
 import SolidVM.Model.CodeCollection (emptyCodeCollection)
 import System.Directory
 import Text.Format
@@ -312,7 +310,7 @@ bootstrapIndexer obGB =
   let clientId = fst ApiIndexer.kafkaClientIds
       consumer = snd ApiIndexer.kafkaClientIds
       topic = IContext.targetTopicName
-      mkMeta = KP.Metadata . KP.KString $ C8.empty
+      mkMeta = Metadata . KString $ C8.empty
       commit = do
         putStrLn $ "Bootstrapping indexer"
         runKafkaConfigured clientId $
@@ -331,9 +329,9 @@ bootstrapIndexer obGB =
             print res
             putStrLn "bootstrapIndex genesis seed successful!"
           Right (Left l) -> do
-            putStrLn $ "will retry bootstrapIndex as I got a broker error: " ++ show (l :: KP.KafkaError)
+            putStrLn $ "will retry bootstrapIndex as I got a broker error: " ++ show (l :: KafkaError)
             runner
           (Left l) -> do
-            putStrLn $ "will retry bootstrapIndexer as I got a client error: " ++ show (l :: K.KafkaClientError)
+            putStrLn $ "will retry bootstrapIndexer as I got a client error: " ++ show l
             runner
    in runner
