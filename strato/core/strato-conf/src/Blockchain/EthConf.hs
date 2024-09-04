@@ -2,8 +2,14 @@
 {-# LANGUAGE OverloadedStrings #-}
 
 module Blockchain.EthConf
-  ( module Blockchain.EthConf.Model,
-    module Blockchain.EthConf,
+  (
+    ethConf,
+    connStr,
+    runKafkaConfigured,
+    lookupRedisBlockDBConfig,
+    cirrusConnStr,
+    runKafkaMConfigured,
+    module Blockchain.EthConf.Model,
   )
 where
 
@@ -17,7 +23,6 @@ import Data.String
 import Data.Yaml
 import qualified Database.Redis as Redis
 import Network.Kafka
-import qualified Network.Kafka.Protocol as KP
 import System.IO.Unsafe
 
 {- CONFIG: first change, make this local -}
@@ -53,10 +58,6 @@ mkConfiguredKafkaState cid = (mkKafkaState cid (kh, kp)) {_stateRequiredAcks = -
     k = kafkaConfig ethConf
     kh = fromString $ kafkaHost k
     kp = fromIntegral $ kafkaPort k
-
-lookupConsumerGroup :: KafkaClientId -> KP.ConsumerGroup
-lookupConsumerGroup "slipstream" = KP.ConsumerGroup "slipstream"
-lookupConsumerGroup kcid = KP.ConsumerGroup . KP.KString $ KP._kString kcid
 
 lookupRedisBlockDBConfig :: Redis.ConnectInfo
 lookupRedisBlockDBConfig = redisConnection $ redisBlockDBConfig ethConf

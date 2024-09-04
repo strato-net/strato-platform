@@ -9,7 +9,6 @@ import BlockApps.Init
 import BlockApps.Logging
 import Blockchain.Blockstanbul
 import Blockchain.Data.GenesisInfo
-import qualified Blockchain.EthConf as EC
 import Blockchain.Generation
 import Blockchain.Sequencer
 import Blockchain.Sequencer.CablePackage
@@ -21,8 +20,6 @@ import Control.Concurrent.Async as Async
 import Control.Concurrent.STM
 import Control.Concurrent.STM.TMChan
 import Control.Monad
-import Control.Monad.Composable.Kafka
-import qualified Data.ByteString.Char8 as C8
 import Data.String
 import Flags
 import HFlags
@@ -58,7 +55,7 @@ main = do
   putStrLn $ "strato-sequencer validatorBehavior: " ++ show flags_validatorBehavior
 
   pkg <- atomically newCablePackage
-  let kafkaClientId' = KString $ C8.pack flags_kafkaclientid
+  let kafkaClientId' = flags_kafkaclientid
       mKafkaAddress = case span (/= ':') flags_kafkaaddress of
         (_, "") -> Nothing
         (khost, kport) ->
@@ -66,8 +63,8 @@ main = do
       gregorCfg =
         GregorConfig
           { kafkaAddress = mKafkaAddress,
-            kafkaClientId = kafkaClientId',
-            kafkaConsumerGroup = EC.lookupConsumerGroup kafkaClientId',
+            kafkaClientId = fromString kafkaClientId',
+            kafkaConsumerGroup = fromString kafkaClientId',
             cablePackage = pkg
           }
 
@@ -113,7 +110,7 @@ main = do
             maxEventsPerIter = flags_seq_max_events_per_iter,
             maxUsPerIter = flags_seq_max_us_per_iter,
             vaultClient = Just clientEnv,
-            kafkaClientId = kafkaClientId'
+            kafkaClientId = fromString kafkaClientId'
           }
   race_ (runTheGregor gregorCfg)
     . race_ (runLoggingT (runSequencerM seqCfg mCtx (sequencer validators)))

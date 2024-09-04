@@ -236,7 +236,7 @@ sendOutEvent (OutMPNodesResponse o nds) = void $ writeUnseqEvents [IEMPNodesResp
 sendOutEvent (OutPreprepareResponse dec) = void $ writeUnseqEvents [IEPreprepareResponse dec]
 
 consumerGroup :: KP.ConsumerGroup
-consumerGroup = lookupConsumerGroup "ethereum-vm"
+consumerGroup = "ethereum-vm"
 
 getFirstBlockFromSequencer :: (MonadLogger m, MonadFail m, HasKafka m) => m OutputBlock
 getFirstBlockFromSequencer = do

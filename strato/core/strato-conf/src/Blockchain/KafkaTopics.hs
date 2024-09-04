@@ -3,12 +3,12 @@
 
 module Blockchain.KafkaTopics where
 
+import Control.Monad.Composable.Kafka
 import qualified Data.ByteString as B
-import qualified Data.ByteString.Char8 as C
 import qualified Data.Map as Map
 import Data.Maybe
+import Data.String
 import Data.Yaml
-import Network.Kafka.Protocol
 import System.IO.Unsafe
 
 type TopicLabel = String
@@ -22,4 +22,4 @@ kafkaTopics = unsafePerformIO $ do
   return $ (either (error . show) id . decodeEither') contents
 
 lookupTopic :: TopicLabel -> TopicName
-lookupTopic label = fromMaybe (TName . KString . C.pack $ label) (TName . KString . C.pack <$> Map.lookup label kafkaTopics)
+lookupTopic label = fromMaybe (fromString label) (fromString <$> Map.lookup label kafkaTopics)

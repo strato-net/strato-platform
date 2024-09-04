@@ -18,7 +18,6 @@ import Blockchain.Data.DataDefs (EventDB (..), LogDB (..), TransactionResult (..
 import qualified Blockchain.Data.LogDB as LogDB
 import Blockchain.Data.TransactionDef (formatChainId)
 import Blockchain.Data.ValidatorRef
-import Blockchain.EthConf (lookupConsumerGroup)
 import Blockchain.Sequencer.Event
 import Blockchain.Sequencer.Kafka
 import Blockchain.Strato.Indexer.IContext
@@ -122,7 +121,7 @@ doValidatorRemoved bHash cm = do
 txrIndexerMainLoop :: (MonadLogger m, HasKafka m, HasRedis m, HasSQL m) =>
                       m ()
 txrIndexerMainLoop = forever $ do
-  consume "txrIndexer" (lookupConsumerGroup "strato-txr-indexer") targetTopicName $ \() idxEvents -> do
+  consume "txrIndexer" "strato-txr-indexer" targetTopicName $ \() idxEvents -> do
     runConduit $ yieldMany idxEvents .| process .| output
     return ()
   where
