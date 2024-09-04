@@ -180,3 +180,8 @@ export const UserActivity = {
   prefix: '/userActivity',
   getAll: '/',
 }
+
+export const Notification = {
+  prefix: '/notification',
+  getAll: '/',
+}

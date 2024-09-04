@@ -5,8 +5,12 @@ const {
   testnetMarketplaceUrl,
 } = require("../config");
 const { getRewards } = require("../helper/googleSheet.js");
+const axios = require("axios");
+const { sendEmail } = require("../helper/utils.js");
 
 async function handleCertificateRegistered(event, token) {
+  const baseUrl = NODE_ENV === "prod" ? prodMarketplaceUrl : testnetMarketplaceUrl
+
   try {
     const targetCertificateEntry = event.eventEvent.eventArgs.find(
       (arg) => arg[0] === "certificate"
@@ -21,18 +25,14 @@ async function handleCertificateRegistered(event, token) {
     }
 
     // Fetch certificates based on transaction hash
-    const queryResponse = await fetch(
-      `https://${
-        NODE_ENV === "prod" ? prodMarketplaceUrl : testnetMarketplaceUrl
-      }/cirrus/search/Certificate?certificateString=eq.${encodeURIComponent(targetCertificateString)}`,
+    const queryResponse = await axios.get(
+      `https://${baseUrl}/cirrus/search/Certificate?certificateString=eq.${encodeURIComponent(targetCertificateString)}`,
       {
-        method: "GET",
-        credentials: "same-origin",
         headers: {
           Accept: "application/json",
           "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
-        },
+          Authorization: `Bearer ${token}`
+        }
       }
     );
 
@@ -83,6 +83,9 @@ async function handleCertificateRegistered(event, token) {
     }
 
     const body = await response.json();
+    const purchaserName = await getUserName(baseUrl, queryBody[0].userAddress, token)
+    sendEmail(baseUrl, 'new-registration', purchaserName, token );
+    
     console.log("New registration reward successful:", body);
   } catch (error) {
     console.error("Error handling CertificateRegistered event:", error);

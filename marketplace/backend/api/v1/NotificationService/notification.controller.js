@@ -1,12 +1,42 @@
 import { rest } from "blockapps-rest";
 import config from "../../../load.config";
 import sendEmail from "../../../helpers/email";
+const axios = require("axios");
 
+const sendMail = async (email, subject, contents, authorizationHeader) => {
+
+  if (!authorizationHeader || !authorizationHeader.startsWith('Bearer')) {
+    console.log("Unauthorized: Missing or invalid token");
+  }
+
+  const token = authorizationHeader.split(' ')[1];
+
+  const reqBody = {
+    usernames: [email],
+    message: {
+      subject,
+      htmlContent: contents
+    }
+  };
+
+  const mailRes = await axios.post(
+    `${process.env.NOTIFICATION_SERVER_URL}/notify`,
+    reqBody, {
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${token}`
+    }
+  });
+  console.log("mailRes", mailRes);
+  return mailRes;
+
+}
 class NotificationController {
+
   static async sendNewRegistrationEmail(req, res, next) {
     try {
-      const { body } = req;
-      const { email, name } = body;
+      const { body: { user } } = req;
+      const authorizationHeader = req.headers.authorization;
 
       const subject = "Jackpot! You've Just Scored 100 STRATS on Mercata!";
       const contents = `
@@ -22,7 +52,7 @@ class NotificationController {
         <p>Best,<br>The Mercata Marketplace Team</p>
       `;
 
-      await sendEmail(email, subject, contents);
+      await sendMail(user, subject, contents, authorizationHeader)
       rest.response.status200(res);
       return next();
     } catch (e) {
@@ -32,8 +62,8 @@ class NotificationController {
 
   static async sendFirstPurchaseEmail(req, res, next) {
     try {
-      const { body } = req;
-      const { email, name, purchaseAmount } = body;
+      const { body: { user } } = req;
+      const authorizationHeader = req.headers.authorization;
 
       const subject = "Big Win! You've Earned 4% Back in STRATS!";
       const contents = `
@@ -50,7 +80,7 @@ class NotificationController {
         <p>Best Regards,<br>The Mercata Team</p>
       `;
 
-      await sendEmail(email, subject, contents);
+      await sendMail(user, subject, contents, authorizationHeader)
       rest.response.status200(res);
       return next();
     } catch (e) {
@@ -60,8 +90,8 @@ class NotificationController {
 
   static async sendAdditionalPurchaseEmail(req, res, next) {
     try {
-      const { body } = req;
-      const { email, name, purchaseAmount } = body;
+      const { body: { user } } = req;
+      const authorizationHeader = req.headers.authorization;
 
       const subject = "Your Purchase Earned You More STRATS – Keep Winning!";
       const contents = `
@@ -74,7 +104,7 @@ class NotificationController {
         <p>Wishing you luck,<br>The Mercata Team</p>
       `;
 
-      await sendEmail(email, subject, contents);
+      await sendMail(user, subject, contents, authorizationHeader)
       rest.response.status200(res);
       return next();
     } catch (e) {
@@ -84,8 +114,8 @@ class NotificationController {
 
   static async sendSellerRewardEmail(req, res, next) {
     try {
-      const { body } = req;
-      const { email, name, saleAmount } = body;
+      const { body: { user } } = req;
+      const authorizationHeader = req.headers.authorization;
 
       const subject = "🎉 You've Earned 1% Back in STRATS for Your Sale!";
       const contents = `
@@ -103,7 +133,7 @@ class NotificationController {
         <p>Best regards,<br>The Mercata Team</p>
       `;
 
-      await sendEmail(email, subject, contents);
+      await sendMail(user, subject, contents, authorizationHeader)
       rest.response.status200(res);
       return next();
     } catch (e) {
