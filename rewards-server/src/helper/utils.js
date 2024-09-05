@@ -77,14 +77,19 @@ const sendEmail = async (baseUrl, type, userName, token) => {
       }
     };
 
-    await axios.post(`https://${baseUrl}/notify`, reqBody, {
+    const response = await axios.post(`https://${baseUrl}/notify`, reqBody, {
       headers: {
         'Content-Type': 'application/json',
         Authorization: `Bearer ${token}`,
       },
     });
 
+    if (response.status === 200 || response.status === 201) {
+      console.log("Email sent successfully to ", userName);
+    }
+
   } catch (error) {
+    console.log("Failed to send email to ", userName);
     console.log("error", error);
   }
 };
