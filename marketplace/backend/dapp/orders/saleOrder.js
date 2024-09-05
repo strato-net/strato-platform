@@ -184,7 +184,7 @@ async function get(user, args, options) {
 
     // Legacy orders need to join array tables. 
     let legacyArgs = {
-      address: address,
+      transaction_hash: address,
       limit: 1,
       queryOptions: {
         select: constants.attach_saleAddresses_Quantities_completedSales_onOrder
