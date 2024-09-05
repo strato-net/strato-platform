@@ -21,9 +21,6 @@ class OrderController {
       }
 
       const order = await dapp.getOrder(args, chainOptions);
-      if (order.order.totalPrice === undefined || order.order.totalPrice === 0) {
-          order.order.totalPrice = order.order.amount;
-      }
       
       const assetsWithImageUrl = order.assets
       const result = { ...order, assets: assetsWithImageUrl }
@@ -38,21 +35,9 @@ class OrderController {
   static async getAll(req, res, next) {
     try {
       const { dapp, query } = req
-
       const {orders, total} = await dapp.getSaleOrders({ ...query });
-      if (Array.isArray(orders)) {
-        orders.forEach(order => {
-          if (order.totalPrice === undefined || order.totalPrice === 0) {
-            order.totalPrice = order.amount;
-          }
-        });
-      } else {
-        console.error('Expected orders to be an array, but got:', orders);
-      }
-      
       
       rest.response.status200(res, {orders, total})
-
       return next()
     } catch (e) {
       return next(e)
@@ -104,6 +89,20 @@ class OrderController {
 
       const result = await dapp.createUserAddress(body)
       rest.response.status200(res, result)
+
+      return next()
+    } catch (e) {
+      return next(e)
+    }
+  }
+
+  static async getUserAddress(req, res, next) {
+    try {
+      const { dapp, query } = req
+      const { redemptionService, shippingAddressId } = req.params;
+
+      const orders = await dapp.getUserAddress({ ...query, redemptionService, shippingAddressId})
+      rest.response.status200(res, orders)
 
       return next()
     } catch (e) {

@@ -105,7 +105,8 @@ export const unitOfMeasures = [
 
 export const unitOfSpiritMeasures = [
   { name: "Barrel", value: 1 },
-  { name: "Bottle", value: 2 }
+  { name: "Bottle", value: 2 },
+  { name: "Liter", value: 3 }
 ];
 
 export const CHARGES = {
@@ -278,6 +279,22 @@ const bannerConfig = [
 ];
 
 export const BANNER = [
+  {
+    label: "Liquid Gold",
+    link: '/c/Spirits?sc=Spirits',
+    text: <div className="liquid_gold_text_box banner-text">
+      <h1> Liquid Gold </h1>
+      <h1> Whiskey Casks </h1>
+    </div>,
+    desktopText: "Explore More",
+    mobileText: "Explore",
+    alt: metaImg,
+    title: metaImg,
+    desktopImg: Images.LiquidGoldX1600,
+    laptopImg: Images.LiquidGoldX1440,
+    tabletImg: Images.LiquidGoldX768,
+    mobileImg: Images.LiquidGoldX394,
+  },
   {
     label: "Collectibles",
     link: '/c/Collectibles?sc=Collectibles',
