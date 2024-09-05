@@ -84,7 +84,7 @@ async function handleCertificateRegistered(event, token) {
 
     const body = await response.json();
     const purchaserName = await getUserName(baseUrl, queryBody[0].userAddress, token)
-    sendEmail(baseUrl, 'new-registration', purchaserName, token );
+    sendEmail(baseUrl, 'newRegistration', purchaserName, token );
     
     console.log("New registration reward successful:", body);
   } catch (error) {

@@ -63,7 +63,7 @@ async function handleOrderRewards(event, token) {
   if (queryBody[0].count === 1) {
     console.log("User's first order");
     const purchaserName = await getUserName(baseUrl, purchaser, token)
-    sendEmail(baseUrl, 'first-purchase', purchaserName, token);
+    sendEmail(baseUrl, 'firstPurchase', purchaserName, token);
 
     eventKey = "FirstOrder";
   }
@@ -164,10 +164,10 @@ async function handleOrderReward(
       const sellerName = await getUserName(baseUrl, seller, token);
 
       // To Purchaser
-      sendEmail(baseUrl, 'additional-purchase', purchaserName, token);
+      sendEmail(baseUrl, 'additionalPurchase', purchaserName, token);
 
       // To Seller
-      sendEmail(baseUrl, 'seller-reward', sellerName, token);
+      sendEmail(baseUrl, 'sellerReward', sellerName, token);
 
     } else {
       console.log("Some reward transactions were not successful:", response);
