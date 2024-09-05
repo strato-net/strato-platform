@@ -945,7 +945,7 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
       address,
       // notEqualsField: "category",
       // notEqualsValue: null,
-      userProfile: false,
+      userProfile: true,
     };
     return walletJs.getWalletAssets(rawAdmin, newArgs, getOptions);
   };
