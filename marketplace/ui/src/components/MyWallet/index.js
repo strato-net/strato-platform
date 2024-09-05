@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { Breadcrumb, Typography, Table, Tooltip, Spin } from "antd";
+import { Breadcrumb, Typography, Table, Tooltip, Spin, Tag } from "antd";
 import { Images } from "../../images";
 import ClickableCell from "../ClickableCell";
 import routes from "../../helpers/routes";
@@ -68,6 +68,8 @@ const MyWallet = ({ user }) => {
           ? `${asset.gainLossPercentage}%`
           : "-",
         address: asset.address,
+        creator: asset.creator, // Add this line to include the creator
+        isIssuer: asset.creator === user.commonName,
       }));
 
       processedData.unshift({
@@ -143,16 +145,23 @@ const MyWallet = ({ user }) => {
                 className="rounded-md w-full h-full object-contain"
               />
             </div>
-            {record.key !== "strats" ? (
-              <span
-                className="text-xs sm:text-sm text-[#13188A] hover:underline cursor-pointer"
-                onClick={callDetailPage}
-              >
-                {text}
-              </span>
-            ) : (
-              <span className="text-xs sm:text-sm">{text}</span>
-            )}
+            <div>
+              {record.key !== "strats" ? (
+                <span
+                  className="text-xs sm:text-sm text-[#13188A] hover:underline cursor-pointer"
+                  onClick={callDetailPage}
+                >
+                  {text}
+                </span>
+              ) : (
+                <span className="text-xs sm:text-sm">{text}</span>
+              )}
+              {record.isIssuer && (
+                <Tag color="blue" className="ml-2">
+                  Issuer
+                </Tag>
+              )}
+            </div>
           </div>
         );
       },
@@ -224,6 +233,11 @@ const MyWallet = ({ user }) => {
               </p>
             ) : (
               <p className="text-sm font-semibold">{item.asset}</p>
+            )}
+            {item.isIssuer && (
+              <Tag color="blue" className="mt-1">
+                Issuer
+              </Tag>
             )}
           </div>
           <div className="col-span-1 text-right">
