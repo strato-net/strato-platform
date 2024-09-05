@@ -230,7 +230,7 @@ putIdentity accessToken uuid idProv name mEmail mCo mSub = do
           getVaultKey accessToken >>= \case
             Just (AddressAndKey a k) -> do
               -- has vault key, confirm also has cert
-              certInCirrus accessToken rd a >>= \case
+              certInCirrus accessToken rd a name' >>= \case
                 -- User has no cert, create cert and wallet.
                 [] -> do
                   createAndRegisterCert name' (T.unpack <$> mEmail) org uuid' realmToken rd k
@@ -326,8 +326,9 @@ certInCirrus ::
   Text ->
   RealmDetails ->
   Address ->
+  String ->
   m [CertificateInCirrus]
-certInCirrus token RealmDetails {associatedNodeUrl = nurl1, associatedFallback = nurl2} a = do
+certInCirrus token RealmDetails {associatedNodeUrl = nurl1, associatedFallback = nurl2} a name = do
   response1 <- callCirrus nurl1
   mCerts :: Maybe [CertificateInCirrus] <-
     if statusCode (responseStatus response1) == 200
@@ -341,13 +342,13 @@ certInCirrus token RealmDetails {associatedNodeUrl = nurl1, associatedFallback =
       $logErrorS "certInCirrus" "Unexpected response from cirrus query. This should never happen"
       throwIO $ IdentityError "Unable to decode cirrus query for user's cert. Something went very wrong"
   where
-    cirrusSearchPath :: Address -> String
-    cirrusSearchPath address =
-      "/cirrus/search/Certificate?userAddress=eq." <> show address <> "&order=block_timestamp.desc&limit=1"
+    cirrusSearchPath :: Address -> String -> String
+    cirrusSearchPath address commonName =
+      "/cirrus/search/Certificate?or=(userAddress.eq." <> show address <> ",commonName.eq." <> commonName <> ")&order=block_timestamp.desc&limit=1"
 
     callCirrus :: MonadIO m => BaseUrl -> m (HTTP.Response BL.ByteString)
     callCirrus nurl = do
-      let cirrusEndpoint = cirrusSearchPath a
+      let cirrusEndpoint = cirrusSearchPath a name
           url = showBaseUrl nurl {baseUrlPath = baseUrlPath nurl <> cirrusEndpoint}
       mgr <- liftIO $ case baseUrlScheme nurl of
         Http -> newManager defaultManagerSettings
