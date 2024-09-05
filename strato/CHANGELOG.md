@@ -16,6 +16,21 @@ so that they could be properly moved to their respective version's subsection.
 
 ## [Unreleased] 
 ### Added
+- Introduced BlockHeaderV2 constructor to BlockHeader type
+- Added support for BlockHeaderV2 fields to eth db and strato-api
+- Added BlockHeaderV2 fields to BlockView component in SMD
+
+### Changed
+
+### Fixed
+- Fixed bagger's more lucrative tx decision logic
+
+### Removed
+ - Removed Globals from Slipstream
+
+
+## [11.4.0] - 8/15/2024
+### Added
 - CodePtr transactions can be made
 - RawTransaction now stores CodePtr information
 - Added `pragma safeExternalCalls` for contracts that want to enforce extra type safety on external calls from other contracts
@@ -31,11 +46,8 @@ so that they could be properly moved to their respective version's subsection.
 - patched rare race condition where node updates sync status to true before running the last few blocks left in the sync
 - patched p2p bug where occassionally, threads erroring out would cause all the threads in p2p to die
 - Fixed truncate logic to actually use truncate rather than round
-- Fixed bagger's more lucrative tx decision logic
 
 ### Removed
- - Removed Globals
-
 
 ## [11.3.1] - 7/10/2024 
 ### Added
