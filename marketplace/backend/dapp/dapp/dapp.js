@@ -997,14 +997,10 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
     options = optionsNoChainIds
   ) {
     const getOptions = { ...options, app: contractName };
-    const { ownerCommonName, address, ...restArgs } = args;
     const newArgs = {
-      ...restArgs,
-      ownerCommonName,
-      address,
-      // notEqualsField: "category",
-      // notEqualsValue: null,
-      userProfile: true,
+      ...args,
+      ownerCommonName: userCert.commonName,
+      sort: "-createdDate"
     };
     return walletJs.getWalletAssets(rawAdmin, newArgs, getOptions);
   };

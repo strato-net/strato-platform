@@ -73,6 +73,7 @@ async function getHighestMarketplacePrice(admin, originAddress, options) {
         originAddress: originAddress,
         isMarketplaceSearch: true,
         isTrendingSearch: false,
+        limit: 15
       },
       options
     );
@@ -117,13 +118,9 @@ async function getLastSoldPrice(admin, assetAddress, options) {
 }
 
 async function getWalletAssets(admin, args = {}, options) {
-  const { address, ...otherArgs } = args;
-
-  const queryArgs = address ? { ...otherArgs, owner: address } : otherArgs;
-
   const inventoryResults = await inventoryJs.getAll(
     admin,
-    { ...queryArgs },
+    { ...args },
     options
   );
   const inventoryCount = await inventoryJs.inventoryCount(
@@ -137,12 +134,7 @@ async function getWalletAssets(admin, args = {}, options) {
       console.log(`Processing inventory item: ${inventory.address}`);
 
       try {
-        const assetWithoutQuantity = await inventoryJs.get(
-          admin,
-          { address: inventory.address },
-          options
-        );
-        const originAddress = assetWithoutQuantity.originAddress;
+        const originAddress = inventory.originAddress;
 
         // Get the highest marketplace price for items with the same origin address
         const highestMarketplacePrice = await getHighestMarketplacePrice(

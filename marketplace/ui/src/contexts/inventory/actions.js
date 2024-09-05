@@ -983,11 +983,11 @@ const actions = {
       });
     }
   },
-  fetchWalletData: async (dispatch, owner) => {
+  fetchWalletData: async (dispatch) => {
     dispatch({ type: actionDescriptors.fetchWalletData });
 
     try {
-      const response = await fetch(`${apiUrl}/wallet/assets?owner=${owner}`);
+      const response = await fetch(`${apiUrl}/wallet/assets`);
       const result = await response.json();
 
       if (result.success) {
