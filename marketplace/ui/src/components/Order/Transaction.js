@@ -1,6 +1,6 @@
 import { Breadcrumb, notification } from "antd";
 import React, { useEffect, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useLocation, useNavigate } from "react-router-dom";
 import dayjs from "dayjs";
 
 import routes from "../../helpers/routes";
@@ -17,26 +17,16 @@ import { useTransactionState } from "../../contexts/transaction";
 
 const Transaction = ({ user }) => {
   const categoryDispatch = useCategoryDispatch();
+
   const { userTransactions, isTransactionLoading } = useTransactionState();
-
-  const startOfMonth = dayjs().startOf('month').unix(); // Starting date of the current month
-  const endOfMonth = dayjs().endOf('month').unix();
-
   const [callExcel, setCallExcel] = useState(false);
   const [callCSV, setCallCSV] = useState(false);
   const { categorys } = useCategoryState();
   const [api, contextHolder] = notification.useNotification();
-  const [selectedDate, setSelectedDate] = useState([startOfMonth, endOfMonth]);
 
   useEffect(() => {
     categoryActions.fetchCategories(categoryDispatch);
   }, [categoryDispatch]);
-
-  const onDateChange = (date) => {
-    const startDate = dayjs(date).startOf('month').unix();
-    const endDate = dayjs(date).endOf('month').unix();
-    setSelectedDate([startDate, endDate]);
-  };
 
   // --------------------- EXPORT TO EXCEL AND CSV START ---------------------
   function getCategoryAndSubcategory(contractName) {
@@ -87,9 +77,9 @@ const Transaction = ({ user }) => {
           to: transaction.to,
           hash: transaction.transaction_hash,
           date: transaction?.block_timestamp,
-          Status: transaction?.type === "Transfer" ? 'Closed' : (transaction?.type === "Redemption" 
-                  ? REDEMPTION_STATUS[transaction.status] 
-                  : TRANSACTION_STATUS[transaction.status])
+          Status: transaction?.type === "Transfer" ? 'Closed' : (transaction?.type === "Redemption"
+            ? REDEMPTION_STATUS[transaction.status]
+            : TRANSACTION_STATUS[transaction.status])
         });
       });
     } catch (error) {
@@ -101,92 +91,92 @@ const Transaction = ({ user }) => {
   useEffect(() => {
     const mappedData = mapTransactionData(userTransactions)
     const { Order, Redemption, Transfer } = Object.groupBy(mappedData, ({ Type }) => Type);
-  if (userTransactions && callExcel && !isTransactionLoading) {
-    const wb = XLSX.utils.book_new();
-    const wsOrder = XLSX.utils.json_to_sheet(Order ? Order : []);
-    const wsTransferred = XLSX.utils.json_to_sheet(Transfer ? Transfer : []);
-    const wsRedemption = XLSX.utils.json_to_sheet(Redemption ? Redemption : []);
+    if (userTransactions && callExcel && !isTransactionLoading) {
+      const wb = XLSX.utils.book_new();
+      const wsOrder = XLSX.utils.json_to_sheet(Order ? Order : []);
+      const wsTransferred = XLSX.utils.json_to_sheet(Transfer ? Transfer : []);
+      const wsRedemption = XLSX.utils.json_to_sheet(Redemption ? Redemption : []);
 
-    // Append each worksheet to the workbook
-    XLSX.utils.book_append_sheet(wb, wsOrder, 'Order');
-    XLSX.utils.book_append_sheet(wb, wsTransferred, 'Transfer');
-    XLSX.utils.book_append_sheet(wb, wsRedemption, 'Redemption');
+      // Append each worksheet to the workbook
+      XLSX.utils.book_append_sheet(wb, wsOrder, 'Order');
+      XLSX.utils.book_append_sheet(wb, wsTransferred, 'Transfer');
+      XLSX.utils.book_append_sheet(wb, wsRedemption, 'Redemption');
 
-    // Write the workbook to a binary string
-    const wbout = XLSX.write(wb, { bookType: 'xls', type: 'binary' });
+      // Write the workbook to a binary string
+      const wbout = XLSX.write(wb, { bookType: 'xls', type: 'binary' });
 
-    // Convert the binary string to a Blob and save it
-    const blob = new Blob([s2ab(wbout)], { type: 'application/vnd.ms-excel' });
-    saveAs(blob, 'Mercata-Marketplace-Order-History.xls');
-    setCallExcel(false);
-    setCallCSV(false);
-  }
-  if (userTransactions && callCSV && !isTransactionLoading) {
-    // Adding an extra column to distinguish data
-    const addTypeColumn = (data, type) => data.map(row => ({ ...row, Type: type }));
-
-    const orderData = addTypeColumn(Order ? Order : [], 'Order');
-    const transferredData = addTypeColumn(Transfer ? Transfer : [], 'Transfer');
-    const redemptionData = addTypeColumn(Redemption ? Redemption : [], 'Redemption');
-
-    const combinedData = [...orderData, ...transferredData, ...redemptionData];
-    const ws = XLSX.utils.json_to_sheet(combinedData);
-    const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, 'Orders');
-
-    const wbout = XLSX.write(wb, { bookType: 'csv', type: 'binary' });
-    const blob = new Blob([s2ab(wbout)], { type: 'text/csv' });
-    saveAs(blob, 'Mercata-Marketplace-Order-History.csv');
-    setCallCSV(false);
-    setCallExcel(false);
-  }
-}, [callExcel, callCSV, isTransactionLoading]);
-
-const download = async (format) => {
-  if (user?.commonName) {
-    if (format === 'xls') {
-      setCallExcel(true);
+      // Convert the binary string to a Blob and save it
+      const blob = new Blob([s2ab(wbout)], { type: 'application/vnd.ms-excel' });
+      saveAs(blob, 'Mercata-Marketplace-Order-History.xls');
+      setCallExcel(false);
       setCallCSV(false);
     }
-    else if (format === 'csv') {
-      setCallCSV(true);
+    if (userTransactions && callCSV && !isTransactionLoading) {
+      // Adding an extra column to distinguish data
+      const addTypeColumn = (data, type) => data.map(row => ({ ...row, Type: type }));
+
+      const orderData = addTypeColumn(Order ? Order : [], 'Order');
+      const transferredData = addTypeColumn(Transfer ? Transfer : [], 'Transfer');
+      const redemptionData = addTypeColumn(Redemption ? Redemption : [], 'Redemption');
+
+      const combinedData = [...orderData, ...transferredData, ...redemptionData];
+      const ws = XLSX.utils.json_to_sheet(combinedData);
+      const wb = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(wb, ws, 'Orders');
+
+      const wbout = XLSX.write(wb, { bookType: 'csv', type: 'binary' });
+      const blob = new Blob([s2ab(wbout)], { type: 'text/csv' });
+      saveAs(blob, 'Mercata-Marketplace-Order-History.csv');
+      setCallCSV(false);
       setCallExcel(false);
     }
+  }, [callExcel, callCSV, isTransactionLoading]);
+
+  const download = async (format) => {
+    if (user?.commonName) {
+      if (format === 'xls') {
+        setCallExcel(true);
+        setCallCSV(false);
+      }
+      else if (format === 'csv') {
+        setCallCSV(true);
+        setCallExcel(false);
+      }
+    }
+  };
+
+  // Utility function to convert a binary string to an ArrayBuffer
+  function s2ab(s) {
+    const buf = new ArrayBuffer(s.length);
+    const view = new Uint8Array(buf);
+    for (let i = 0; i < s.length; i++) view[i] = s.charCodeAt(i) & 0xFF;
+    return buf;
   }
-};
 
-// Utility function to convert a binary string to an ArrayBuffer
-function s2ab(s) {
-  const buf = new ArrayBuffer(s.length);
-  const view = new Uint8Array(buf);
-  for (let i = 0; i < s.length; i++) view[i] = s.charCodeAt(i) & 0xFF;
-  return buf;
-}
+  // --------------------- EXPORT TO EXCEL AND CSV END ---------------------
 
-// --------------------- EXPORT TO EXCEL AND CSV END ---------------------
-
-return (
-  <div>
-    {contextHolder}
-    <div className="px-4 md:px-10 lg:py-2 lg:mt-3 orders">
-      <Breadcrumb>
-        <Breadcrumb.Item href="" onClick={e => e.preventDefault()}>
-          <ClickableCell href={routes.Marketplace.url}>
-            <p className="text-sm text-[#13188A] font-semibold">
-              Home
+  return (
+    <div>
+      {contextHolder}
+      <div className="px-4 md:px-10 lg:py-2 lg:mt-3 orders">
+        <Breadcrumb>
+          <Breadcrumb.Item href="" onClick={e => e.preventDefault()}>
+            <ClickableCell href={routes.Marketplace.url}>
+              <p className="text-sm text-[#13188A] font-semibold">
+                Home
+              </p>
+            </ClickableCell>
+          </Breadcrumb.Item>
+          <Breadcrumb.Item href="" onClick={e => e.preventDefault()}>
+            <p className=" text-sm text-[#202020] font-medium">
+              My Transactions
             </p>
-          </ClickableCell>
-        </Breadcrumb.Item>
-        <Breadcrumb.Item href="" onClick={e => e.preventDefault()}>
-          <p className=" text-sm text-[#202020] font-medium">
-            My Transactions
-          </p>
-        </Breadcrumb.Item>
-      </Breadcrumb>
+          </Breadcrumb.Item>
+        </Breadcrumb>
+      </div>
+      <TransactionTable user={user} download={download} isAllOrdersLoading={isTransactionLoading} />
     </div>
-    <TransactionTable user={user} selectedDate={selectedDate} onDateChange={onDateChange} download={download} isAllOrdersLoading={isTransactionLoading} />
-  </div>
-);
+  );
 };
 
 export default Transaction;

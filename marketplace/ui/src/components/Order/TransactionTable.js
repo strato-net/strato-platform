@@ -26,7 +26,7 @@ import { SEO } from "../../helpers/seoConstant";
 
 const limit = '', offset = '';
 
-const TransactionTable = ({ user, selectedDate, onDateChange, download, isAllOrdersLoading }) => {
+const TransactionTable = ({ user, download, isAllOrdersLoading }) => {
   const StratsIcon = <img src={Images.logo} alt="" className="mx-1 w-3 h-3" />
   // Dispatch
   const transactionDispatch = useTransactionDispatch();
@@ -36,27 +36,41 @@ const TransactionTable = ({ user, selectedDate, onDateChange, download, isAllOrd
   const navigate = useNavigate();
   const location = useLocation();
 
+  const currentMonth = dayjs().startOf('month').unix();
+
   const searchParams = new URLSearchParams(location.search);
   const type = searchParams.get('type');
+  const dateQuery = searchParams.get('date');
   const [transactions, setTransactions] = useState(userTransactions)
   const [search, setSearch] = useState("")
 
   const formatter = new Intl.NumberFormat('en-US');
   const formattedNum = (num) => formatter.format(num);
+  const defaultDate =  dateQuery ? dayjs.unix(dayjs(dateQuery).startOf('month').unix()) : dayjs.unix(currentMonth);
 
   useEffect(() => {
-    if (user?.commonName) {
+    if (user?.commonName && dateQuery) {
       transactionAction.fetchUserTransaction(
         transactionDispatch,
         limit,
         offset,
         user?.commonName,
-        selectedDate
-        // type,
-        // searchVal
+        dateReturn(dateQuery)
       );
     }
-  }, [user, selectedDate])
+    if (user?.commonName && !dateQuery) {
+      const startOfMonth = dayjs().startOf('month').unix();
+      const endOfMonth = dayjs().endOf('month').unix();
+      const dateArr = [startOfMonth, endOfMonth]
+      transactionAction.fetchUserTransaction(
+        transactionDispatch,
+        limit,
+        offset,
+        user?.commonName,
+        dateArr
+      );
+    }
+  }, [user, dateQuery])
 
   useEffect(() => {
     let filteredData = userTransactions;
@@ -74,20 +88,18 @@ const TransactionTable = ({ user, selectedDate, onDateChange, download, isAllOrd
     setTransactions(filteredData);
   }, [userTransactions, type, search]);
 
-  useEffect(() => {
-    const timeout = setTimeout(() => {
-      if (search.length === 0) {
-        if (type) {
-          navigate(`/transactions?type=${type}`)
-        } else {
-          navigate(`/transactions`)
-        }
-      }
-    }, 1000)
-    return () => {
-      clearTimeout(timeout)
-    }
-  }, [search])
+
+  const onDateChange = (date) => {
+    const unixTimestamp = dayjs(date).unix();
+    const formattedDate = dayjs.unix(unixTimestamp).format('MMMM YYYY');
+    navigate(`/transactions?date=${formattedDate}`);
+  };
+
+  const dateReturn = (date) => {
+    const startDate = dayjs(date).startOf('month').unix();
+    const endDate = dayjs(date).endOf('month').unix();
+    return [startDate, endDate]
+  }
 
   const Content = ({ data }) => {
     const price = data?.assetPrice || data?.price
@@ -295,7 +307,7 @@ const TransactionTable = ({ user, selectedDate, onDateChange, download, isAllOrd
                     <div className="border border-slate-300 w-full rounded-lg">
                       <DatePicker onChange={onDateChange}
                         className="w-full"
-                        defaultValue={dayjs.unix(selectedDate[0])}
+                        defaultValue={defaultDate}
                         picker="month"
                         disabledDate={(current) => { return current && current > dayjs().endOf('month') }}
                         format={(value) => dayjs(value).format('MMMM YYYY')}
@@ -325,7 +337,8 @@ const TransactionTable = ({ user, selectedDate, onDateChange, download, isAllOrd
       </Col>
       <Col span={22} className="mx-auto mt-5">
         <div className="flex md:hidden order_responsive">
-          {isTransactionLoading ? <Spin className="mx-auto" /> : <TransactionResponsive data={transactions} user={user} />}
+          {isTransactionLoading ? <Spin className="mx-auto" /> 
+          : <TransactionResponsive data={transactions} user={user} />}
         </div>
         <div className="hidden md:block">
           <DataTableComponent
