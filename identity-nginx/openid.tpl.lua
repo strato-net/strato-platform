@@ -171,9 +171,7 @@ if unique_name ~= '' then
   ngx.req.set_header("X-USER-UNIQUE-NAME", unique_name)
 end
 
-if ngx.req.get_headers()["CUSTOM-COMMON-NAME"] then
-  ngx.req.set_header("X-USER-COMMON-NAME", ngx.req.get_headers()["CUSTOM-COMMON-NAME"])
-elseif common_name ~= '' then
+if common_name ~= '' then
   ngx.req.set_header("X-USER-COMMON-NAME", common_name)
 end
 

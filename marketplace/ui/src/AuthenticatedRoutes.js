@@ -32,8 +32,6 @@ import LoginRedirect from "./components/LoginRedirect";
 import UserProfile from "./components/UserProfile";
 import Error from "./components/404";
 import FAQ from "./components/FAQ/index";
-import { TransactionsProvider } from "./contexts/transaction";
-import Transaction from "./components/Order/Transaction";
 
 const AuthenticatedRoutes = ({ user, users, isAuthenticated }) => {
   return (
@@ -304,22 +302,19 @@ const AuthenticatedRoutes = ({ user, users, isAuthenticated }) => {
       />
       <Route
         exact
-        path={routes.Transactions.url}
-        // path={routes.Orders.url}
+        path={routes.Orders.url}
         element={
           <UsersProvider>
             <CategorysProvider>
-              <TransactionsProvider>
-                <OrdersProvider>
-                  <ItemsProvider>
-                    <InventoriesProvider>
-                      <RedemptionsProvider>
-                        <Transaction user={user} users={users} />
-                      </RedemptionsProvider>
-                    </InventoriesProvider>
-                  </ItemsProvider>
-                </OrdersProvider>
-              </TransactionsProvider>
+              <OrdersProvider>
+                <ItemsProvider>
+                  <InventoriesProvider>
+                    <RedemptionsProvider>
+                      <Order user={user} users={users} />
+                    </RedemptionsProvider>
+                  </InventoriesProvider>
+                </ItemsProvider>
+              </OrdersProvider>
             </CategorysProvider>
           </UsersProvider>
         }

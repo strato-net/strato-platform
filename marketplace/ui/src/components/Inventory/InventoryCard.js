@@ -16,11 +16,7 @@ import ResellModal from "./ResellModal";
 import TransferModal from "./TransferModal";
 import RedeemModal from "./RedeemModal";
 import routes from "../../helpers/routes";
-import {
-  ASSET_STATUS,
-  STRATS_CONVERSION,
-  OLD_SADDOG_ORIGIN_ADDRESS,
-} from "../../helpers/constants";
+import { ASSET_STATUS, STRATS_CONVERSION } from "../../helpers/constants";
 import image_placeholder from "../../images/resources/image_placeholder.png";
 import "react-responsive-carousel/lib/styles/carousel.min.css";
 import { SEO } from "../../helpers/seoConstant";
@@ -183,7 +179,7 @@ const InventoryCard = ({
       return false; // or handle the undefined case as needed
     }
     const address = inventory.originAddress;
-    return address.toLowerCase() === OLD_SADDOG_ORIGIN_ADDRESS;
+    return address.toLowerCase() === "dbf23119bb52a7419c66c7b5055dd3f31545dc14";
   }
 
   return (
@@ -283,7 +279,11 @@ const InventoryCard = ({
                   type="link"
                   className="text-[#13188A] text-left px-0 font-semibold text-sm h-6"
                   onClick={showTransferModal}
-                  disabled={isTransferDisabled() || !isActive()}
+                  disabled={
+                    isTransferDisabled() ||
+                    !isActive() ||
+                    disableSADDOGS(inventory)
+                  }
                 >
                   <>
                     <SwapOutlined /> Transfer
