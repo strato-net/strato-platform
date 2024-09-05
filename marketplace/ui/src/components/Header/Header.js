@@ -112,7 +112,7 @@ const HeaderComponent = ({
   }, [categoryQueryValue]);
 
   const navUrls = [
-    routes.Orders.url.replace(":type", "sold"),
+    routes.Transactions.url,
     routes.MyItems.url,
     routes.MyWallet.url,
   ];
@@ -273,20 +273,34 @@ const HeaderComponent = ({
             </div>
           ),
         }
-      : null,
-    user
-      ? {
-          value: "logout",
-          path: "/logout",
-          label: (
-            <div>
-              <p className="text-gray">{user?.commonName}</p>
-              <p className="text-xs text-gray">{user?.preferred_username}</p>
-              <p className="!mb-0">Logout</p>
-            </div>
-          ),
-        }
-      : null,
+      ],
+    }
+  ]
+
+  useEffect(() => {
+    if (user) setRoleIndex(0)
+    else setRoleIndex(1)
+  }, [user])
+
+  const subMenuItems = [
+    { value: "transactions", path: routes.Transactions.url, label: "Transactions" },
+    { value: "myitems", path: "/myitems", label: "My Items" },
+    user ? {
+      value: "my-profile",
+      path: routes.MarketplaceUserProfile.url.replace(':commonName', user.commonName),
+      label: (<div> <p className="!mb-0"> My Profile </p> </div>)
+    } : null,
+    user ? {
+      value: "logout",
+      path: "/logout",
+      label: (
+        <div>
+          <p className="text-gray">{user?.commonName}</p>
+          <p className="text-xs text-gray">{user?.preferred_username}</p>
+          <p className="!mb-0">Logout</p>
+        </div>
+      )
+    } : null,
   ].filter(Boolean);
 
   const handleIntMenuTab = (data) => {

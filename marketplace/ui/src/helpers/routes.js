@@ -28,6 +28,7 @@ export default {
   MyWalletDetail: { label: "MyWallet Detail", url: "/mywallet/:id/:name" },
   Items: { label: "Item", url: "/items" },
   Orders: { label: "Order", url: "/order/:type" },
+  Transactions: { label: "Transactions", url: "/transactions" },
   RedemptionsOutgoingDetails: {
     label: "Redemption Outgoing Detail",
     url: "/redemptions-outgoing/:redemptionService/:id",

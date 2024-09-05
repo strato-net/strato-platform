@@ -973,49 +973,47 @@ const ProductDetails = ({ user, users }) => {
                               );
                               window.location.href = loginUrl;
                             }}
-                          >
-                            login
-                          </span>
-                          to view ownership history.
-                        </p>
-                      </div>
-                    ),
-                  },
-                  {
-                    label: (
-                      <span className="text-sm md:text-base">
-                        Additional Information
-                      </span>
-                    ),
-                    key: "3",
-                    children: (
-                      <div>
-                        <List
-                          size="small"
-                          boardered
-                          dataSource={fileValues?.length > 0 ? fileValues : []}
-                          renderItem={(item) => (
-                            <List.Item>
-                              <a
-                                href={item.url}
-                                rel="noreferrer"
-                                target="_blank"
-                                className="hover:underline break-all text-[#1e40af]"
-                              >
-                                <Button
-                                  className="!text-blue border-blue"
-                                  icon={<FilePdfOutlined />}
-                                >
-                                  {item.name}
-                                </Button>
-                              </a>
-                            </List.Item>
-                          )}
-                        />
-                      </div>
-                    ),
-                  },
-                ]}
+                          />
+                        </div>
+                      ) : (
+                        <div className="text-center p-4">
+                          <p>
+                            Please{" "}
+                            <span
+                              className="text-blue hover:text-blue cursor-pointer hover:underline"
+                              onClick={() => {
+                                setCookie("returnUrl", window.location.pathname, 10);
+                                window.location.href = loginUrl;
+                              }}
+                            >
+                              login
+                            </span>{" "}
+                            to view ownership history.
+                          </p>
+                        </div>
+
+                      ),
+                    },
+                    {
+                      label: <span className="text-sm md:text-base">Additional Information</span>,
+                      key: "3",
+                      children: (
+                        <div>
+                          <List
+                            size="small"
+                            boardered
+                            dataSource={fileValues?.length > 0 ? fileValues : []}
+                            renderItem={(item) =>
+                              <List.Item>
+                                <a href={item.url} rel="noreferrer" target="_blank" className="hover:underline break-all text-[#1e40af]">
+                                  <Button className="!text-blue border-blue" icon={<FilePdfOutlined />} >{item.name}</Button>
+                                </a>
+                              </List.Item>}
+                          />
+                        </div>
+                      )
+                    },
+                  ]}
               />
             </div>
             {isFetchingPriceHistory ? (
