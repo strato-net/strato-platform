@@ -53,6 +53,7 @@ CertificateRevokedRef
 
 ProposalSignatureRef
     blockDataRefId BlockDataRefId
+    signer Address
     r Word256
     s Word256
     v Word8
@@ -60,6 +61,7 @@ ProposalSignatureRef
 
 CommitmentSignatureRef
     blockDataRefId BlockDataRefId
+    signer Address
     r Word256
     s Word256
     v Word8

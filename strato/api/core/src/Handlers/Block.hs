@@ -191,23 +191,36 @@ instance HasSQL m => Selectable BlocksFilterParams [Block] m where
 
             E.distinctOnOrderBy [sortToOrderBy qbSortby $ bdRef E.^. BlockDataRefNumber] (return bdRef)
 
-      let blockIds = map fst blks
+      let blockIds = fst <$> blks
+          buildList' f g = Map.fromListWith (flip (++)) . map (f &&& g)
+          buildList  f   = buildList' f (:[]) . map E.entityVal
+          get' = Map.findWithDefault []
+      vs <- fmap (buildList blockValidatorRefBlockDataRefId) . sqlQuery $ E.select $ E.from $ \v -> do
+        E.where_ $ v E.^. BlockValidatorRefBlockDataRefId `E.in_` E.valList blockIds
+        pure v
+      vd <- fmap (buildList validatorDeltaRefBlockDataRefId) . sqlQuery $ E.select $ E.from $ \v -> do
+        E.where_ $ v E.^. ValidatorDeltaRefBlockDataRefId `E.in_` E.valList blockIds
+        pure v
+      ca <- fmap (buildList certificateAddedRefBlockDataRefId) . sqlQuery $ E.select $ E.from $ \v -> do
+        E.where_ $ v E.^. CertificateAddedRefBlockDataRefId `E.in_` E.valList blockIds
+        pure v
+      cr <- fmap (buildList certificateRevokedRefBlockDataRefId) . sqlQuery $ E.select $ E.from $ \v -> do
+        E.where_ $ v E.^. CertificateRevokedRefBlockDataRefId `E.in_` E.valList blockIds
+        pure v
+      ps <- fmap (buildList proposalSignatureRefBlockDataRefId) . sqlQuery $ E.select $ E.from $ \v -> do
+        E.where_ $ v E.^. ProposalSignatureRefBlockDataRefId `E.in_` E.valList blockIds
+        pure v
+      ss <- fmap (buildList commitmentSignatureRefBlockDataRefId) . sqlQuery $ E.select $ E.from $ \v -> do
+        E.where_ $ v E.^. CommitmentSignatureRefBlockDataRefId `E.in_` E.valList blockIds
+        pure v
+      txs <- fmap (buildList' (blockTransactionBlockDataRefId . fst) ((: []) . rawTX2TX . snd) . map (E.entityVal *** E.entityVal)) . sqlQuery $
+        E.select $ E.from $ \(btx `E.InnerJoin` rawTX) -> do
+          E.on (rawTX E.^. RawTransactionId E.==. btx E.^. BlockTransactionTransaction)
+          E.where_ $ btx E.^. BlockTransactionBlockDataRefId `E.in_` E.valList blockIds
+          E.orderBy [E.asc (btx E.^. BlockTransactionId)]
+          return (btx, rawTX)
 
-      txs <- fmap (map (E.entityVal *** E.entityVal)) . sqlQuery $
-        E.select $
-          E.from $ \(btx `E.InnerJoin` rawTX) -> do
-            E.on (rawTX E.^. RawTransactionId E.==. btx E.^. BlockTransactionTransaction)
-            E.where_ $ btx E.^. BlockTransactionBlockDataRefId `E.in_` E.valList blockIds
-            E.orderBy [E.asc (btx E.^. BlockTransactionId)]
-            return (btx, rawTX)
-
-      let getTXLists =
-            flip (Map.findWithDefault []) $
-              Map.fromListWith (flip (++)) $ map (blockTransactionBlockDataRefId *** ((: []) . rawTX2TX)) txs
-
-      let modBlocks = map (\(k, v) -> (v, getTXLists k)) blks
-
-      return . Just $ map (uncurry blockDataRefToBlock) modBlocks
+      return . Just $ map (\(k,v) -> blockDataRefToBlock v (get' k vs) (get' k  vd) (get' k  ca) (get' k  cr) (get' k  ps) (get' k  ss) (get' k txs)) blks
 
 getBlockInfo ::
   Selectable BlocksFilterParams [Block] m =>

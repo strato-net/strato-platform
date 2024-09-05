@@ -65,6 +65,9 @@ instance RLPSerializable Block where
   rlpEncode Block {blockBlockData = bd, blockReceiptTransactions = receipts, blockBlockUncles = uncles} =
     RLPArray [rlpEncode bd, RLPArray (rlpEncode <$> receipts), RLPArray $ rlpEncode <$> uncles]
 
+instance {-# OVERLAPPING #-} RLPHashable Block where
+  rlpHash = rlpHash . blockBlockData
+
 instance HasIstanbulExtra Block where
   getIstanbulExtra     = getIstanbulExtra . blockBlockData
   putIstanbulExtra i b = b{blockBlockData = putIstanbulExtra i $ blockBlockData b}

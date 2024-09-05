@@ -18,7 +18,6 @@ import Blockchain.Blockstanbul.StateMachine
 import Blockchain.Data.ArbitraryInstances ()
 import Blockchain.Data.Block
 import Blockchain.Data.BlockHeader
-import Blockchain.Data.RLP
 import Blockchain.Strato.Model.Address
 import Blockchain.Strato.Model.ChainMember
 import Blockchain.Strato.Model.Class (blockHash)
@@ -26,105 +25,34 @@ import Blockchain.Strato.Model.ExtendedWord
 import Blockchain.Strato.Model.Keccak256
 import Blockchain.Strato.Model.Secp256k1
 import Blockchain.Strato.Model.Validator
-import Control.Applicative ((<|>))
 import Control.Lens as L
-import Control.Monad (liftM2, liftM3, unless)
+import Control.Monad (unless)
 import qualified Control.Monad.Change.Alter as A
 import Control.Monad.Except
 import Data.Binary
-import Data.ByteString (ByteString)
-import qualified Data.ByteString as B
 import qualified Data.ByteString.Lazy as BL
 import Data.Either.Extra
 import Data.List
 import Data.Maybe (catMaybes, fromJust, fromMaybe)
 import Data.Set (Set)
 import qualified Data.Set as S
-import Test.QuickCheck
 import Text.Printf
 import Text.Format
-
-instance Arbitrary IstanbulExtra where
-  arbitrary = liftM3 IstanbulExtra arbitrary arbitrary arbitrary
-
-instance Arbitrary ExtraData where
-  arbitrary = liftM2 ExtraData arbitrary arbitrary
-
-getValidatorSet :: HasIstanbulExtra h => h -> Set Validator
-getValidatorSet =  evalIstanbulExtra (maybe S.empty $ S.map chainMemberParsedSetToValidator . unChainMembers . _validatorList)
-
-addValidators :: HasIstanbulExtra h => ChainMembers -> h -> h
-addValidators vs = execIstanbulExtra (const . Just $ IstanbulExtra vs Nothing [])
-
-getProposerSeal :: HasIstanbulExtra h => h -> Maybe Signature
-getProposerSeal = evalIstanbulExtra (_proposedSig =<<)
-
-addProposerSeal :: HasIstanbulExtra h => Signature -> h -> h
-addProposerSeal sig = execIstanbulExtra addSeal
-  where addSeal i = fmap (set proposedSig (Just sig)) i
-                <|> error "must set validators before proposer seal"
-
-addCommitmentSeals :: HasIstanbulExtra h => [Signature] -> h -> h
-addCommitmentSeals sigs = execIstanbulExtra addSeals
-  where addSeals i = fmap (set commitment sigs) i
-                 <|> error "must set validators before commitment seals"
-
-scrubAllSeals :: Maybe IstanbulExtra -> Maybe IstanbulExtra
-scrubAllSeals = set (_Just . proposedSig) Nothing
-              . set (_Just . commitment) []
-
-scrubSignaturesFromBlock :: [Signature] -> [Signature]
-scrubSignaturesFromBlock _ = []
-
-proposalMessage :: Block -> B.ByteString
-proposalMessage =
-  keccak256ToByteString
-    . hash
-    . rlpSerialize
-    . rlpEncode
-    . execIstanbulExtra scrubAllSeals
-    . blockBlockData
 
 proposerSeal :: HasVault m => Block -> m (Signature)
 proposerSeal blk =
   let mesg = proposalMessage blk
    in sign mesg
 
-verifyProposerSeal :: Block -> Signature -> Maybe Address
-verifyProposerSeal blk sig =
-  let mesg = proposalMessage blk
-   in fromPublicKey <$> recoverPub sig mesg
-
-commitmentMessage :: Keccak256 -> B.ByteString
-commitmentMessage dig = keccak256ToByteString . hash . (<> B.singleton 2) . keccak256ToByteString $ dig
-
 commitmentSeal :: (HasVault m) => Keccak256 -> m (Signature)
 commitmentSeal sha =
   let mesg = commitmentMessage sha
    in sign mesg
 
-verifyCommitmentSeal :: MonadError String m =>
-                        Keccak256 -> Signature -> m Address
-verifyCommitmentSeal sha sig =
-  let mesg = commitmentMessage sha
-   in fromPublicKey <$> recoverPub' sig mesg
-
-recoverPub' :: MonadError String m =>
-               Signature -> ByteString -> m PublicKey
-recoverPub' sig v =
-  case recoverPub sig v of
-    Nothing -> throwError "can't recover public key"
-    Just val -> return val
-
 signBenfInfo :: (HasVault m) => (Validator, Bool, Int) -> m (Signature)
 signBenfInfo bnf =
   let mesg = keccak256ToByteString $ hash $ BL.toStrict $ encode bnf
    in sign mesg
-
-verifyBenfInfo :: (Validator, Bool, Int) -> Signature -> Maybe Address
-verifyBenfInfo bnf sig =
-  let mesg = keccak256ToByteString $ hash $ BL.toStrict $ encode (bnf)
-   in fromPublicKey <$> recoverPub sig mesg
 
 signMessage :: (StateMachineM m) => TrustedMessage -> m (OutEvent)
 signMessage tm = do

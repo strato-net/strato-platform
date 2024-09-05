@@ -13,12 +13,14 @@ module Blockchain.Data.BlockDB
 where
 
 import BlockApps.X509
+import Blockchain.Blockstanbul.Model.Authentication
 import Blockchain.DB.SQLDB
 import Blockchain.Data.Block
 import Blockchain.Data.BlockHeader
 import Blockchain.Data.DataDefs
 import Blockchain.Data.TXOrigin
 import Blockchain.Data.Transaction
+import Blockchain.Strato.Model.Address
 import Blockchain.Strato.Model.ChainMember hiding (commonName)
 import Blockchain.Strato.Model.Class
 import Blockchain.Strato.Model.ExtendedWord
@@ -122,12 +124,14 @@ putBlocks blocksAndDifficulties makeHashOne = do
             let r = bytesToWord256 . BSS.fromShort $ getCompactRecSigR sig
                 s = bytesToWord256 . BSS.fromShort $ getCompactRecSigS sig
                 v = getCompactRecSigV sig
-            SQL.insert $ ProposalSignatureRef blkDataRefId r s v
+                signer' = fromMaybe (Address 0) $ verifyProposerSeal b (Signature sig)
+            SQL.insert $ ProposalSignatureRef blkDataRefId signer' r s v
           forM_ sigs $ \(Signature sig) -> do
             let r = bytesToWord256 . BSS.fromShort $ getCompactRecSigR sig
                 s = bytesToWord256 . BSS.fromShort $ getCompactRecSigS sig
                 v = getCompactRecSigV sig
-            SQL.insert $ CommitmentSignatureRef blkDataRefId r s v
+                signer' = either (const $ Address 0) id $ verifyCommitmentSeal hash' (Signature sig)
+            SQL.insert $ CommitmentSignatureRef blkDataRefId signer' r s v
 
           return blkDataRefId
         [bd] -> return $ SQL.entityKey bd
