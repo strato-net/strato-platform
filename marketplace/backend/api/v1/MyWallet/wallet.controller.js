@@ -13,15 +13,9 @@ class WalletController {
 
   static async getWalletAssets(req, res, next) {
     try {
-      const { dapp, query } = req;
-      const { gtField, gtValue, address, ...restQuery } = query;
+      const { dapp } = req;
 
-      const inventories = await dapp.getWalletAssets({
-        userProfileGtField: gtField,
-        userProfileGtValue: gtValue,
-        address,
-        ...restQuery,
-      });
+      const inventories = await dapp.getWalletAssets();
 
       rest.response.status200(res, {
         inventoriesWithImageUrl: inventories?.inventoryResults,
