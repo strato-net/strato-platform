@@ -2,7 +2,9 @@
 {-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE OverloadedStrings #-}
 
-module BlockApps.Tools.Checkpoints
+--removing this, as it doesn't apply to RabbitMQ, which will be added soon.  I'm keeping the code here for now, as we might need something similar soon
+module BlockApps.Tools.Checkpoints where
+{-
   ( doCheckpointPut,
     doCheckpointGet,
     doCheckpointUsage,
@@ -163,3 +165,4 @@ checkpointUsage =
 
 doCheckpointUsage :: IO ()
 doCheckpointUsage = forM_ checkpointUsage putStrLn
+-}
