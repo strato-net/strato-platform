@@ -28,7 +28,6 @@ const sendMail = async (email, subject, contents, authorizationHeader) => {
         'Authorization': `Bearer ${token}`
       }
     });
-    console.log("mailRes", mailRes);
     return mailRes;
   } catch (error) {
     console.log("error", error);
