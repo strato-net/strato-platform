@@ -54,15 +54,15 @@ function calculateGainLossPercentage(
   ) {
     basePrice = highestMarketplacePrice;
   } else {
-    return null; // Avoid invalid calculation
+    return 0; // Return 0 instead of null when no valid base price is found
   }
 
-  if (basePrice === 0) {
-    return null; // Avoid division by zero
+  if (basePrice === 0 || currentPrice === null || currentPrice === 0) {
+    return 0; // Return 0 for edge cases to avoid NaN
   }
 
   const percentageChange = ((currentPrice - basePrice) / basePrice) * 100;
-  return percentageChange.toFixed(2); // Return percentage with 2 decimal places
+  return isNaN(percentageChange) ? 0 : parseFloat(percentageChange.toFixed(2)); // Ensure we return a number, not a string
 }
 
 async function getHighestMarketplacePrice(admin, originAddress, options) {
@@ -73,7 +73,7 @@ async function getHighestMarketplacePrice(admin, originAddress, options) {
         originAddress: originAddress,
         isMarketplaceSearch: true,
         isTrendingSearch: false,
-        limit: 15
+        limit: 15,
       },
       options
     );
@@ -131,8 +131,6 @@ async function getWalletAssets(admin, args = {}, options) {
 
   const processedResults = await Promise.all(
     inventoryResults.map(async (inventory) => {
-      console.log(`Processing inventory item: ${inventory.address}`);
-
       try {
         const originAddress = inventory.originAddress;
 
@@ -160,19 +158,10 @@ async function getWalletAssets(admin, args = {}, options) {
         // Calculate gain/loss percentage
         const gainLossPercentage = calculateGainLossPercentage(
           finalPrice,
-          inventory.price,
-          highestMarketplacePrice,
-          lastSoldPrice
+          inventory.price || 0,
+          highestMarketplacePrice || 0,
+          lastSoldPrice || 0
         );
-
-        console.log(`
-          For inventory ${inventory.address}:
-          Original price: ${inventory.price}
-          Highest marketplace price: ${highestMarketplacePrice}
-          Last sold price: ${lastSoldPrice}
-          Final price: ${finalPrice}
-          Gain/Loss percentage: ${gainLossPercentage}
-        `);
 
         return {
           ...inventory,
@@ -198,16 +187,6 @@ async function getWalletAssets(admin, args = {}, options) {
     ),
     inventoryCount: inventoryCount,
   };
-
-  // Print the first item of the results
-  console.log("Wallet Assets:");
-  console.log("Inventory Count:", result.inventoryCount);
-  if (result.inventoryResults.length > 0) {
-    console.log("First Inventory Item:");
-    console.log(JSON.stringify(result.inventoryResults[0], null, 2));
-  } else {
-    console.log("No inventory items found.");
-  }
 
   return result;
 }
