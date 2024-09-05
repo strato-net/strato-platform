@@ -179,8 +179,14 @@ async function get(user, args, defaultOptions) {
 }
 
 async function getAll(admin, args = {}, baseOptions) {
+    const { onlyActive, ...restArgs } = args;
     const options = { ...baseOptions, org: 'BlockApps', app: 'Mercata' };
-    const searchArgs = setSearchQueryOptions(args, [{ key: 'isActive', value: 'true' }])
+    let searchArgs;
+    if (onlyActive) {
+      searchArgs = setSearchQueryOptions(restArgs, [{ key: 'isActive', value: 'true' }]) 
+    } else {
+      searchArgs = setSearchQueryOptions(restArgs, {})
+    }
     const paymentProviders = await searchAllWithQueryArgs(contractName, searchArgs, options, admin);
     return paymentProviders.map((paymentProvider) => marshalOut(paymentProvider));
 }
@@ -190,15 +196,18 @@ async function getNotOnboarded(admin, args = {}, baseOptions) {
     const eventContract = { name: `${tablePrefix}${onboardedEventName}` }
     const onboardedQuery = {
       sellersCommonName: `eq.${sellersCommonName}`,
+      select: `ownerCommonName,serviceName`,
+      ownerCommonName: `neq.null`,
+      serviceName: `neq.null`,
     }
     const onboardedOptions = { ...baseOptions, query: onboardedQuery };
     const onboardedEventsRes = await rest.search(admin, eventContract, onboardedOptions);
-    const onboardedAddresses = onboardedEventsRes.map((oe) => oe.address);
+    const onboardedServices = onboardedEventsRes.map((oe) => `or(ownerCommonName.neq."${oe.ownerCommonName}",serviceName.neq."${oe.serviceName}")`);
     const contract = { name: `${tablePrefix}${contractName}` }
     const notOnboardedQuery = {
       isActive: 'eq.true',
       contract_name: `like.*${externalContractName}`,
-      address: `not.in.(${onboardedAddresses.join(',')})`
+      and: onboardedServices.length > 0 ? `(${onboardedServices.join(',')})` : undefined,
     }
     const notOnboardedOptions = { ...baseOptions, query: notOnboardedQuery }
     const paymentServices = await rest.search(admin, contract, notOnboardedOptions);
@@ -219,7 +228,7 @@ async function createPayment(user, args, options) {
     const contract = { name: contractName, address }
     const callArgs = {
       contract,
-      method: "createOrder",
+      method: "checkoutInitialized",
       args: util.usc({ ...restArgs }),
     };
     const token = await rest.call(user, callArgs, options);

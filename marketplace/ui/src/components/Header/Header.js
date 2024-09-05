@@ -66,9 +66,9 @@ const HeaderComponent = ({ user, loginUrl, showMenu, handleSubMenu, handleMenuTa
   const { categorys } = useCategoryState();
   let { isAuthenticated } = useAuthenticateState();
 
-  const storedData = useMemo(() => {
-    return window.localStorage.getItem("cartList") == null ? [] : JSON.parse(window.localStorage.getItem("cartList"));
-  }, []);
+  // const storedData = useMemo(() => {
+  //   return window.localStorage.getItem("cartList") == null ? [] : JSON.parse(window.localStorage.getItem("cartList"));
+  // }, []);
 
   useEffect(() => {
     if (user) {
@@ -77,8 +77,8 @@ const HeaderComponent = ({ user, loginUrl, showMenu, handleSubMenu, handleMenuTa
   }, [user]);
 
   useEffect(() => {
-    marketplaceActions.fetchCartItems(marketplaceDispatch, storedData);
-  }, [marketplaceDispatch, storedData]);
+    marketplaceActions.fetchCartItems(marketplaceDispatch, cartList);
+  }, [marketplaceDispatch, cartList]);
 
   const [selectedTab, setSelectedTab] = useState("0");
   const [roleIndex, setRoleIndex] = useState();
@@ -96,7 +96,7 @@ const HeaderComponent = ({ user, loginUrl, showMenu, handleSubMenu, handleMenuTa
   }, [categoryQueryValue])
 
   const navUrls = [
-    routes.Orders.url.replace(':type', 'sold'),
+    routes.Transactions.url,
     routes.MyItems.url,
     routes.Products.url,
   ];
@@ -233,7 +233,7 @@ const HeaderComponent = ({ user, loginUrl, showMenu, handleSubMenu, handleMenuTa
   }, [user])
 
   const subMenuItems = [
-    { value: "orders", path: routes.Orders.url.replace(':type', 'sold'), label: "Orders" },
+    { value: "transactions", path: routes.Transactions.url, label: "Transactions" },
     { value: "myitems", path: "/myitems", label: "My Items" },
     user ? {
       value: "my-profile",
@@ -338,13 +338,13 @@ const HeaderComponent = ({ user, loginUrl, showMenu, handleSubMenu, handleMenuTa
       <Header className={`fixed z-[100] !bg-[#ffffff] !pl-2 w-full !pr-4 md:px-12 flex md:!mb-10 ${showMenu ? '' : 'shadow-header'} items-center justify-between md:justify-start`}>
         <Row className="relative flex-grow-0 md:flex-1 ml-2 md:ml-5">
           <Col xs={20} md={10} lg={4}
-            className="mt-4 mr-5 md:mt-0 cursor-pointer flex-grow-0 w-max md:w-[170px] h-[44px] logo"
+            className="mt-2 mr-5 md:mt-0 cursor-pointer flex-grow-0 w-max md:w-[170px] h-[44px] logo"
             onClick={() => {
               navigate(routes.Marketplace.url)
               window.scrollTo(0, 0);
             }}
           >
-            <img src={Images.newLogo} alt={IMG_META} title={IMG_META} className="h-[31px] w-[120px] md:w-[120px] lg:w-[150px] md:h-[44px] logo-image" preview={false} />
+            <img src={Images.marketplaceLogo} alt={IMG_META} title={IMG_META} className="h-[40px] w-[150px] md:w-[170px] md:h-[44px] object-contain logo-image" preview={false} />
           </Col>
           <Col xs={showSearch ? 24 : 4} md={12} lg={18} className={`lg:ml-4 mf:ml-20 md:ml-1 bg-[#F6F6F6] shadow-md flex-1 header-search ${showSearch ? ' fixed top-[13px] left-0 flex w-[100vw] z-50 mb-2' : 'hidden md:flex '}`}>
             <Select
@@ -415,7 +415,9 @@ const HeaderComponent = ({ user, loginUrl, showMenu, handleSubMenu, handleMenuTa
           {<div className="flex md:hidden mx-2" onClick={() => handleSearchShow(true)}>
             <img src={Images.Responsive_search} alt={IMG_META} title={IMG_META} className="w-6 h-6" />
           </div>}
-          <Badge
+          
+          {/* TODO: uncomment the code to show the cart */}
+          {/* <Badge
             className="cursor-pointer mr-3 md:mr-1"
             count={cartList.length}
             onClick={() => {
@@ -438,7 +440,7 @@ const HeaderComponent = ({ user, loginUrl, showMenu, handleSubMenu, handleMenuTa
                 icon={<img src={Images.Header_cart} alt={IMG_META} title={IMG_META} className="w-6 h-6" />}
               />
             </div>
-          </Badge>
+          </Badge> */}
 
           {(roleIndex !== undefined && roleIndex !== 1)
             && <Dropdown menu={{ items: stratsItem }} placement="bottomRight" trigger={["click"]} className="xs:mt-5 md:mt-0" overlayStyle={{ position: 'fixed' }}>

@@ -12,18 +12,18 @@ def wait_for_slipstream_to_sync(node1_url, node2_url, headers1, headers2, attemp
     while True:
         attempt += 1
         try:
-            response1 = requests.get(node1_url + "/cirrus/search/BlockApps-Mercata-Asset", headers=headers1, params={'order':'block_timestamp.desc', 'limit':1})
-            response2 = requests.get(node2_url + "/cirrus/search/BlockApps-Mercata-Asset", headers=headers2, params={'order':'block_timestamp.desc', 'limit':1})
+            response1 = requests.get(node1_url + '/prometheus/api/v1/query?query=max_block_number_seen{job="slipstream"}', headers=headers1)
+            response2 = requests.get(node2_url + '/prometheus/api/v1/query?query=max_block_number_seen{job="slipstream"}', headers=headers2)
             if response1.ok and response2.ok and response1:
                 response1_json = response1.json()
                 response2_json = response2.json()
                 if len(response1_json) < 1:
-                    print(f"Cirrus response from Node1 is empty: `{response1_json}` (attempt #{attempt} of {attempts})")
+                    print(f"Prometheus response from Node1 is empty: `{response1_json}` (attempt #{attempt} of {attempts})")
                 elif len(response2_json) < 1:
-                    print(f"Cirrus response from Node2 is empty: `{response2_json}` (attempt #{attempt} of {attempts})")
+                    print(f"Prometheus response from Node2 is empty: `{response2_json}` (attempt #{attempt} of {attempts})")
                 else:
-                    block_number1 = response1.json()[0]["block_number"]
-                    block_number2 = response2.json()[0]["block_number"]
+                    block_number1 = response1.json()['data']['result'][0]['value'][1]
+                    block_number2 = response2.json()['data']['result'][0]['value'][1]
                     if block_number1 == block_number2:
                         print(f"Nodes are in sync with block number: {block_number1}")
                         break
@@ -133,14 +133,54 @@ if __name__ == "__main__":
     discrepancies_sale, count_sale_discrepancy = check_table("BlockApps-Mercata-Order")
     discrepancies_order, count_order_discrepancy = check_table("BlockApps-Mercata-Sale")
 
+    #Event tables
+    discrepancies_asset_its, count_asset_its_discrepancy = check_table("BlockApps-Mercata-Asset.ItemTransfers")
+    discrepancies_asset_own, count_asset_own_discrepancy = check_table("BlockApps-Mercata-Asset.OwnershipTransfer")
+
+    #Colletion tables
+    discrepancies_asset_files, count_asset_files_discrepancy = check_table("BlockApps-Mercata-Asset-files")
+    discrepancies_asset_fileNames, count_asset_fileNames_discrepancy = check_table("BlockApps-Mercata-Asset-fileNames")
+    discrepancies_asset_images, count_asset_images_discrepancy = check_table("BlockApps-Mercata-Asset-images")
+
     # Print the results
-    print("\nFinal check summary:")
+    print("\n**Final check summary:**")
     print(f"Asset Discrepancies: {'Yes' if discrepancies_asset else 'No'}")
     print(f"Order Discrepancies: {'Yes' if discrepancies_order else 'No'}")
     print(f"Sale Discrepancies: {'Yes' if discrepancies_sale else 'No'}")
+    print(f"Asset.ItemTransfers Discrepancies: {'Yes' if discrepancies_asset_its else 'No'}")
+    print(f"Asset.OwnershipTransfer Discrepancies: {'Yes' if discrepancies_asset_own else 'No'}")
+    print(f"Asset-files Discrepancies: {'Yes' if discrepancies_asset_files else 'No'}")
+    print(f"Asset-fileNames Discrepancies: {'Yes' if discrepancies_asset_fileNames else 'No'}")
+    print(f"Asset-images Discrepancies: {'Yes' if discrepancies_asset_images else 'No'}")
+    print()
     print(f"Asset Count Match Discrepancies: {'Yes' if count_asset_discrepancy else 'No'}")
     print(f"Order Count Match Discrepancies: {'Yes' if count_order_discrepancy else 'No'}")
     print(f"Sale Count Match Discrepancies: {'Yes' if  count_sale_discrepancy else 'No'}")
+    print(f"Asset.ItemTransfers Count Match Discrepancies: {'Yes' if  count_asset_its_discrepancy else 'No'}")
+    print(f"Asset.OwnershipTransfer Count Match Discrepancies: {'Yes' if  count_asset_own_discrepancy else 'No'}")
+    print(f"Asset-files Count Match Discrepancies: {'Yes' if  count_asset_files_discrepancy else 'No'}")
+    print(f"Asset-fileNames Count Match Discrepancies: {'Yes' if  count_asset_fileNames_discrepancy else 'No'}")
+    print(f"Asset-images Count Match Discrepancies: {'Yes' if  count_asset_images_discrepancy else 'No'}")
 
-    if discrepancies_asset or discrepancies_sale or discrepancies_order or count_asset_discrepancy or count_sale_discrepancy or count_order_discrepancy:
+    if any(
+        [ 
+          discrepancies_asset,
+          count_asset_discrepancy,
+          discrepancies_sale,
+          count_sale_discrepancy,
+          discrepancies_order,
+          count_order_discrepancy,
+          discrepancies_asset_its,
+          count_asset_its_discrepancy,
+          discrepancies_asset_own,
+          count_asset_own_discrepancy,
+          discrepancies_asset_files,
+          count_asset_files_discrepancy,
+          discrepancies_asset_fileNames,
+          count_asset_fileNames_discrepancy,
+          discrepancies_asset_images,
+          count_asset_images_discrepancy
+        ]
+    ):
+        print("ERROR - one or more discrepancies detected")
         sys.exit(1)

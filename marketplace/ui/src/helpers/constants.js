@@ -56,6 +56,8 @@ export const INVENTORY_STATUS = {
   "2": "Unpublished",
 };
 
+export const OLD_SADDOG_ORIGIN_ADDRESS = "dbf23119bb52a7419c66c7b5055dd3f31545dc14";
+
 export const getUnitNameByIndex = (index) => {
   const unit = unitOfMeasures.find((measure) => measure.value === parseInt(index));
 
@@ -105,7 +107,8 @@ export const unitOfMeasures = [
 
 export const unitOfSpiritMeasures = [
   { name: "Barrel", value: 1 },
-  { name: "Bottle", value: 2 }
+  { name: "Bottle", value: 2 },
+  { name: "Liter", value: 3 }
 ];
 
 export const CHARGES = {
@@ -248,7 +251,7 @@ export const PAYMENT_LIST = ['card', 'us_bank_account']
 export const STRATS_CONVERSION = 100;
 
 export const navItems = [
-  { label: <div id="Orders">Orders</div>, key: '0' },
+  { label: <div id="Transactions">My Transactions</div>, key: '0' },
   { label: <div id="Inventory">My Items</div>, key: '1' }
 ];
 
@@ -278,6 +281,22 @@ const bannerConfig = [
 ];
 
 export const BANNER = [
+  {
+    label: "Liquid Gold",
+    link: '/c/Spirits?sc=Spirits',
+    text: <div className="liquid_gold_text_box banner-text">
+      <h1> Liquid Gold </h1>
+      <h1> Whiskey Casks </h1>
+    </div>,
+    desktopText: "Explore More",
+    mobileText: "Explore",
+    alt: metaImg,
+    title: metaImg,
+    desktopImg: Images.LiquidGoldX1600,
+    laptopImg: Images.LiquidGoldX1440,
+    tabletImg: Images.LiquidGoldX768,
+    mobileImg: Images.LiquidGoldX394,
+  },
   {
     label: "Collectibles",
     link: '/c/Collectibles?sc=Collectibles',
@@ -346,7 +365,7 @@ export const BANNER = [
     label: "How",
     link: "/c/All",
     text: <>
-      <Row>
+      <Row style={{width:'90%', margin:'auto'}}>
         <Col xs={24} md={24} lg={8} >
           <h1 className="how_banner_text_box banner-text"> How It Works </h1>
         </Col>
@@ -358,11 +377,11 @@ export const BANNER = [
             <img
               src={item.icon}
               // style={{ width: '42px', height: '48px' }}
-              className="flex ml-auto banner-icons"
+              className="flex banner-icons"
               alt={`icon-${index + 1}`}
             />
-            <p className="banner-step">{item.step}</p>
-            <p className="banner-step-description">{item.description}</p>
+            <p className="banner-step">Step {index+1}</p>
+            <p className={`banner-step-description ${index===2 && `rwa-class`}`}>{item.description}</p>
           </div>
           {index < bannerConfig.length - 1 && (
             <img
@@ -386,4 +405,78 @@ export const BANNER = [
     tabletImg: Images.HowX768,
     mobileImg: Images.HowX394,
   }
+];
+
+
+export const TRANSACTION_STATUS = {
+  1: 'Awaiting Fulfillment',
+  2: 'Payment Pending',
+  3: 'Closed',
+  4: 'Cancelled',
+  5: 'Discarded'
+}
+
+export const TRANSACTION_STATUS_COLOR = {
+  Order: "#2A53FF",
+  Transfer: "#FF0000",
+  Redemption: "#001C76",
+};
+
+export const TRANSACTION_STATUS_CLASSES = {
+  1: {
+    textClass: "bg-[#FF8C0033]",
+    bgClass: "bg-[#FF8C00]"
+  },
+  2: {
+    textClass: "bg-[#FF8C0033]",
+    bgClass: "bg-[#FF8C00]"
+  },
+  3: {
+    textClass: "bg-[#119B2D33]",
+    bgClass: "bg-[#119B2D]"
+  },
+  4: {
+    textClass: "bg-[#FFF0F0]",
+    bgClass: "bg-[#FF0000]"
+  },
+  5: {
+    textClass: "bg-[#FFF0F0]",
+    bgClass: "bg-[#FF0000]"
+  },
+}
+  
+
+export const REDEMPTION_STATUS_CLASSES = {
+  1: {
+    textClass: "bg-[#FF8C0033]",
+    bgClass: "bg-[#FF8C00]"
+  },
+  2: {
+    textClass: "bg-[#119B2D33]",
+    bgClass: "bg-[#119B2D]"
+  },
+  3: {
+    textClass: "bg-[#FFF0F0]",
+    bgClass: "bg-[#FF0000]"
+  },
+}
+
+export const TRANSACTION_SORT = [
+  {label:'All', value:'0'},
+  {label:'Awaiting Fulfillment', value:'1'},
+  {label:'Awaiting Shipment', value:'2'},
+  {label:'Closed', value:'3'},
+  {label:'Cancelled', value:'4'},
+  {label:'Payment Pending', value:'5'},
+]
+
+export const DOWNLOAD_OPTIONS = [
+  {
+    key: 'xls',
+    label: 'Excel',
+  },
+  {
+    key: 'csv',
+    label: 'CSV',
+  },
 ];

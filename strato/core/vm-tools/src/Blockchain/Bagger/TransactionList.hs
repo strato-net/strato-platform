@@ -38,7 +38,7 @@ insertTransaction t tl =
    in case oldTx of
         Nothing -> (Nothing, t, M.insert nonce' t tl)
         Just existing ->
-          if gasPrice existing > gasPrice t
+          if gasPrice existing <= gasPrice t
             then (oldTx, t, M.insert nonce' t tl)
             else (Just t, existing, tl)
 

@@ -1,14 +1,28 @@
 import dotenv from 'dotenv';
-import fs from 'fs';
 import pg from 'pg';
+import fs from 'fs';
+import path from 'path';
 const { Client } = pg;
 dotenv.config();
+
+import { fileURLToPath } from 'url';
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+
+
 
 const host = process.env.POSTGRES_SERVER_URL || 'postgres';
 const port = process.env.POSTGRES_PORT || '5432';
 const user = process.env.POSTGRES_USER || 'postgres';
 const password = process.env.POSTGRES_PASSWORD;
 const database = process.env.POSTGRES_DBNAME || 'postgres';
+const ssl = (process.env.POSTGRES_SERVER_URL !== 'postgres') ?
+    {
+        require: true,
+        rejectUnauthorized: true,
+        ca: fs.readFileSync(path.join(__dirname,'../dbCert/us-east-1-bundle.cer')).toString()
+    } 
+    : false
 
 let client;
 
@@ -18,7 +32,8 @@ const connectToDB = async () => {
         port,
         user,
         password,
-        database
+        database,
+        ssl
     });
     await client.connect()
         .then(() => {
@@ -80,18 +95,19 @@ const connectToDB = async () => {
         })
         .catch(async (error) => {
             console.error('Error creating table:', error);
-            client.end();
             if (error.code === 'ECONNREFUSED') {
                 console.log('Attempting to reconnect to DB after 3 seconds...');
-                const sleep = ms => new Promise(resolve => setTimeout(resolve, ms))
-                await sleep(3000);
-                connectToDB();
+                await new Promise(resolve => setTimeout(resolve, 3000));
+                await connectToDB();
+            } else {
+                client.end();
+                process.exit(1);
             }
         })
 } 
 
 if (host && password) {
-    connectToDB();
+    await connectToDB();
 } else {
     console.error('CRITICAL ERROR: Missing Postgres URL and/or password');
     process.exit(1)

@@ -12,14 +12,14 @@ const actionDescriptors = {
 
 const actions = {
 
-  getPaymentServices: async (dispatch, limit, offset, queryValue) => {
-    const query = queryValue ? `&serviceName=${queryValue}` : ``;
+  getPaymentServices: async (dispatch, queryValue) => {
+    const query = queryValue ? `&onlyActive=${queryValue}` : ``;
 
     dispatch({ type: actionDescriptors.getPaymentServices });
 
     try {
       const response = await fetch(
-        `${apiUrl}/payment?limit=${limit}&offset=${offset}${query}`,
+        `${apiUrl}/payment?${query}`,
         {
           method: HTTP_METHODS.GET,
         }

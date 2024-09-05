@@ -8,6 +8,7 @@ import {
   Select,
   Tabs
 } from "antd";
+import { CheckCircleOutlined } from '@ant-design/icons';
 import InventoryCard from "./InventoryCard";
 import CreateInventoryModal from "./CreateInventoryModal";
 import { actions as categoryActions } from "../../contexts/category/actions";
@@ -46,7 +47,6 @@ const Inventory = ({ user }) => {
   const limit = 10;
   const [offset, setOffset] = useState(0);
   const [page, setPage] = useState(1);
-  const [selectedService, setSelectedService] = useState(null);
   const dispatch = useInventoryDispatch();
   const [api, contextHolder] = notification.useNotification();
   const [isSearch, setIsSearch] = useState(false);
@@ -59,29 +59,37 @@ const Inventory = ({ user }) => {
   const { inventories, isInventoriesLoading, message, success, inventoriesTotal } =
     useInventoryState();
   const {
-      paymentServices,
-      arePaymentServicesLoading,
-      notOnboarded,
-      areNotOnboardedLoading
+    paymentServices,
+    arePaymentServicesLoading,
+    notOnboarded,
+    areNotOnboardedLoading
   } = usePaymentServiceState();
   const paymentServiceDispatch = usePaymentServiceDispatch();
+  const [sortedPaymentServices, setSortedPaymentServices] = useState([]);
+
+  const isNotOnboarded = (service) => notOnboarded.some(n => n.serviceName === service.serviceName);
+
+  useEffect(() => {
+    // Create a set of not onboarded service names for quick lookup
+    const notOnboardedNames = new Set(notOnboarded.map(n => n.serviceName));
+
+    // Sort paymentServices array so that not onboarded services come first
+    const sortedServices = [...paymentServices].sort((a, b) => {
+      return isNotOnboarded(a) - isNotOnboarded(b);
+    }).map(service => ({
+      ...service,
+      isNotOnboarded: notOnboardedNames.has(service.serviceName),
+    }));
+
+    setSortedPaymentServices(sortedServices);
+  }, [paymentServices, notOnboarded]);
 
   useEffect(() => {
     if (user && user.commonName) {
-      paymentServiceActions.getPaymentServices(paymentServiceDispatch);
+      paymentServiceActions.getPaymentServices(paymentServiceDispatch, true);
       paymentServiceActions.getNotOnboarded(paymentServiceDispatch, user.commonName, 10, 0);
     }
   }, [paymentServiceDispatch, user]);
-
-  useEffect(() => {
-    const stripeServiec = notOnboarded.some(service => service.serviceName === 'Stripe');
-    if (stripeServiec) {
-      setSelectedService(notOnboarded.find(service => service.serviceName === 'Stripe'));
-    } else {
-      setSelectedService(notOnboarded[0]);
-    }
-  }, [paymentServices, notOnboarded]);
-
 
   const itemDispatch = useItemDispatch();
   const { message: itemMsg, success: itemSuccess } = useItemState();
@@ -129,7 +137,7 @@ const Inventory = ({ user }) => {
 
   const handleChange = value => {
     const service = notOnboarded.find(service => service.serviceName === value);
-    setSelectedService(service);
+    handleOnboard(service);
   };
 
   const showReqModModal = () => {
@@ -229,9 +237,9 @@ const Inventory = ({ user }) => {
   const getAllSubcategories = (categories) => {
     let subcategories = [];
     categories.forEach(category => {
-        if (category.subCategories && category.subCategories.length > 0) {
-            subcategories = subcategories.concat(category.subCategories);
-        }
+      if (category.subCategories && category.subCategories.length > 0) {
+        subcategories = subcategories.concat(category.subCategories);
+      }
     });
     return subcategories;
   }
@@ -249,16 +257,16 @@ const Inventory = ({ user }) => {
 
   const renderImg = (service) => {
     return service.imageURL && service.imageURL !== ''
-        ? <img src={service.imageURL} alt={service.serviceName} height="16px" width="16px"/>
-        : ''
+      ? <img src={service.imageURL} alt={service.serviceName} height="16px" width="16px" />
+      : ''
   };
 
   return (
     <>
-      <HelmetComponent 
-        title={`${category ? `${category} |` :''} ${SEO.TITLE_META} `}
-        description={SEO.DESCRIPTION_META} 
-        link={linkUrl} 
+      <HelmetComponent
+        title={`${category ? `${category} |` : ''} ${SEO.TITLE_META} `}
+        description={SEO.DESCRIPTION_META}
+        link={linkUrl}
       />
       {contextHolder}
       <>
@@ -278,66 +286,60 @@ const Inventory = ({ user }) => {
         </Breadcrumb>
         <div className="w-full h-[160px] py-4 px-4 md:h-[96px] bg-[#F6F6F6] flex flex-col md:flex-row md:px-14 justify-between items-center mt-6 lg:mt-8">
           <div className="flex justify-between w-full">
-            <Button className="!px-1 md:!px-0 flex items-center flex-row-reverse gap-[6px] text-lg md:text-2xl font-semibold !text-[#13188A] " 
-              type="link" 
-              icon={<img src={Images.ForwardIcon} 
-              alt={metaImg} 
-              title={metaImg}
-              className="hidden md:block w-6 h-6" />}> My Items
+            <Button className="!px-1 md:!px-0 flex items-center flex-row-reverse gap-[6px] text-lg md:text-2xl font-semibold !text-[#13188A] "
+              type="link"
+              icon={<img src={Images.ForwardIcon}
+                alt={metaImg}
+                title={metaImg}
+                className="hidden md:block w-6 h-6" />}> My Items
             </Button>
           </div>
           <div className="flex flex-col md:flex-row gap-3 items-center my-2 md:my-0">
             <div className="flex gap-3 items-center">
               {!areNotOnboardedLoading ? (
                 <Select
-                  style={{ width: 200, height: 40 }}
+                  className="items-select"
+                  style={{ width: 250, height: 40 }}
                   onChange={handleChange}
-                  defaultValue={notOnboarded[0]?.serviceName}
-                  value={selectedService?.serviceName}
-                  disabled={notOnboarded.length === 0}
+                  value={'Connect to Payment Provider'}
                 >
-                  {paymentServices.map(service => (
-                    <Option 
-                      key={service.serviceName} 
+                  {sortedPaymentServices.map(service => (
+                    <Option
+                      key={service.serviceName}
                       value={service.serviceName}
-                      disabled={!notOnboarded.some(n => n.serviceName === service.serviceName)}
+                      disabled={!service.isNotOnboarded}
                     >
-                      {service.onboardingText || service.data.onboardingText}
+                      {service.serviceName}
+                      {!service.isNotOnboarded && <CheckCircleOutlined style={{ color: '#28a745', position: 'absolute', right: '10px' }} />}
                     </Option>
                   ))}
                 </Select>
               ) : (
                 <Spin size="large" />
               )}
-              <Button
-                type="primary"
-                style={{ height: 40 }}
-                disabled={!selectedService}
-                onClick={() => handleOnboard(selectedService)}
-              >
-                {selectedService ? `Connect to ${selectedService.serviceName}` : "Select a service"}
-              </Button>
             </div>
             <div className="flex gap-3 items-center">
               <Button
                 type="primary"
                 id="createItem"
-                className="w-40 flex items-center justify-center gap-[6px]"
+                className="w-[250px] sm:w-40 flex items-center justify-center gap-[6px]"
                 style={{ height: 40 }}
-                disabled={notOnboarded.length === paymentServices.length - 2} // Subtract two to account for STRATS and Sad Dogs
                 onClick={() => {
                   if (hasChecked && !isAuthenticated && loginUrl !== undefined) {
                     window.location.href = loginUrl;
-                  } else {
+                  } else if (issuerStatus != ISSUER_STATUS.AUTHORIZED) {
+                    showReqModModal()
+                  }
+                  else {
                     showModal();
                   }
                 }}
               >
                 <div className="flex items-center justify-center gap-[6px]">
-                  <img src={Images.CreateInventory} 
+                  <img src={Images.CreateInventory}
                     alt={metaImg}
                     title={metaImg}
-                    className="w-[18px] h-[18px]" 
+                    className="w-[18px] h-[18px]"
                   />
                   Create Item
                 </div>
@@ -385,11 +387,14 @@ const Inventory = ({ user }) => {
                       inventories.map((inventory, index) => (
                         <InventoryCard
                           id={index}
+                          limit={limit}
+                          offset={offset}
                           inventory={inventory}
                           category={category}
                           key={index}
                           debouncedSearchTerm={debouncedSearchTerm}
                           allSubcategories={allSubcategories}
+                          user={user}
                         />
                       ))
                     ) : (

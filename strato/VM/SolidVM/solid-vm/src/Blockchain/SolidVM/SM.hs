@@ -82,6 +82,7 @@ import Blockchain.SolidVM.GasInfo
 import Blockchain.Strato.Model.Account
 import Blockchain.Strato.Model.Address
 import Blockchain.Strato.Model.Class
+import Blockchain.Strato.Model.Code
 import Blockchain.Strato.Model.Event
 import Blockchain.Strato.Model.ExtendedWord
 import Blockchain.Strato.Model.Keccak256
@@ -99,7 +100,6 @@ import qualified Control.Monad.Change.Modify as Mod
 import Control.Monad.Trans.Class
 import Control.Monad.Trans.Reader
 import Data.Bifunctor (first)
-import Data.ByteString (ByteString)
 import qualified Data.ByteString as B
 import qualified Data.ByteString.Char8 as BC
 import qualified Data.ByteString.UTF8 as UTF8
@@ -355,7 +355,7 @@ runSM ::
     Mod.Modifiable ContextState m,
     Mod.Modifiable GasCap m
   ) =>
-  (Maybe ByteString) ->
+  (Maybe Code) ->
   Env.Environment ->
   GasInfo ->
   Maybe Word256 ->
@@ -403,7 +403,7 @@ pushSender newSender mv = do
   Mod.put (Mod.Proxy @Env.Sender) oldSender
   return $ ret
 
-startingAction :: Maybe ByteString -> Env.Environment -> Maybe Word256 -> Action
+startingAction :: Maybe Code -> Env.Environment -> Maybe Word256 -> Action
 startingAction maybeCode env' chainId' =
   Action.Action
     { _blockHash = blockHeaderHash $ Env.blockHeader env',
@@ -415,8 +415,9 @@ startingAction maybeCode env' chainId' =
       _actionData = OMap.empty,
       _metadata =
         case maybeCode of
-          Just theCode ->
+          Just (Code theCode) ->
             Just $ M.insert "src" (T.pack $ UTF8.toString theCode) $ fromMaybe M.empty $ Env.metadata env'
+          Just (PtrToCode _) -> Env.metadata env'
           Nothing -> Env.metadata env',
       _events = Q.empty,
       _delegatecalls = Q.empty
@@ -792,7 +793,7 @@ getCurrentCodeCollection = do
   cs <- Mod.get (Mod.Proxy @[CallInfo])
   case cs of
     (currentCallInfo : _) -> return (collectionHash currentCallInfo, codeCollection currentCallInfo)
-    _ -> internalError "getCurrentContract called with an empty stack" ()
+    _ -> internalError "getCurrentCodeCollection called with an empty stack" ()
 
 hintFromType :: MonadSM m => SVMType.Type -> m BasicType
 hintFromType = \case
@@ -887,6 +888,7 @@ initializeAction :: MonadSM m
                  => Account
                  -> String
                  -> String
+                 -> Maybe String
                  -> String
                  -> String
                  -> Keccak256
@@ -895,8 +897,8 @@ initializeAction :: MonadSM m
                  -> [T.Text]
                  -> [T.Text]
                  -> m ()
-initializeAction acct name crtr root appName hsh cc ab maps arrs = do
-  let newData = Action.ActionData (SolidVMCode name hsh) cc (T.pack crtr) (T.pack root) (T.pack appName) SolidVM (Action.SolidVMDiff M.empty) ab maps arrs []
+initializeAction acct name crtr cc_crtr root appName hsh cc ab maps arrs = do
+  let newData = Action.ActionData (SolidVMCode name hsh) cc (T.pack crtr) (fmap T.pack cc_crtr) (T.pack root) (T.pack appName) SolidVM (Action.SolidVMDiff M.empty) ab maps arrs []
   Mod.modifyStatefully_ (Mod.Proxy @Action) $
     Action.actionData %= Action.omapInsertWith Action.mergeActionData acct newData
 

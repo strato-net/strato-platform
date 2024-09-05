@@ -48,7 +48,6 @@ import Blockchain.Data.AddressStateDB
 import Blockchain.Data.DataDefs
 import Blockchain.Strato.Model.Account
 import Blockchain.Strato.Model.ChainId
-import Blockchain.Strato.Model.Code
 import Blockchain.Strato.Model.Keccak256
 import Control.Arrow
 import Control.Concurrent
@@ -141,7 +140,7 @@ getBlocTransactionResult ::
   Keccak256 ->
   Bool ->
   m BlocTransactionResult
-getBlocTransactionResult txHash resolve = fmap head $ postBlocTransactionResults resolve [txHash]
+getBlocTransactionResult txHash resolve = fmap head $ postBlocTransactionResults Nothing resolve [txHash]
 
 getBatchBlocTransactionResult' ::
   ( (Keccak256 `A.Selectable` SourceMap) m,
@@ -155,7 +154,7 @@ getBatchBlocTransactionResult' ::
   m [BlocTransactionResult]
 getBatchBlocTransactionResult' hashes resolve =
   if resolve
-    then postBlocTransactionResults True hashes
+    then postBlocTransactionResults Nothing True hashes
     else return $ map (\h -> BlocTransactionResult Pending h Nothing Nothing) hashes
 
 postBlocTransactionResults ::
@@ -165,10 +164,11 @@ postBlocTransactionResults ::
     MonadLogger m,
     HasSQL m
   ) =>
+  Maybe Text ->
   Bool ->
   [Keccak256] ->
   m [BlocTransactionResult]
-postBlocTransactionResults resolve hashes = recurseTRDs resolve hashes >>= evalAndReturn
+postBlocTransactionResults _ resolve hashes = recurseTRDs resolve hashes >>= evalAndReturn
 
 recurseTRDs ::
   (MonadLogger m, HasSQL m) =>
@@ -252,7 +252,7 @@ evalAndReturn list = forStateT emptyBatchState list $
       Nothing -> return $ BlocTransactionResult Pending txHash Nothing Nothing
       Just (r@RawTransaction {..}, txr) -> case (rawTransactionToAddress, rawTransactionCodeOrData) of
         (Nothing, _) -> contractResult i txHash txr (Map.fromList <$> rawTransactionMetadata)
-        (_, Code "") -> return $ BlocTransactionResult Success txHash (Just txr) (Just . Send $ rawTx2PostTx r)
+        (_, Just bs) | bs == ByteString.empty -> return $ BlocTransactionResult Success txHash (Just txr) (Just . Send $ rawTx2PostTx r)
         (Just addr, _) -> functionResult i txHash txr (Map.fromList <$> rawTransactionMetadata) (Account addr $ toMaybe 0 rawTransactionChainId)
 
 nth :: Integer -> Text

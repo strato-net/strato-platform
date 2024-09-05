@@ -16,11 +16,34 @@ so that they could be properly moved to their respective version's subsection.
 
 ## [Unreleased] 
 ### Added
+- CodePtr transactions can be made
+- RawTransaction now stores CodePtr information
+- Added `pragma safeExternalCalls` for contracts that want to enforce extra type safety on external calls from other contracts
+- Added `pragma solidvm 11.4` that includes all existing pragmas and their features
+- Added decimal precision strictness to `pragma solidvm 11.4`
+- Added `truncate(uint)` built-in method for decimal numbers to `pragma solidvm 11.4`
+- Added typechecking to emit statements
+- Added typechecking to modifier definitions
+
+### Changed
+
+### Fixed
+- patched rare race condition where node updates sync status to true before running the last few blocks left in the sync
+- patched p2p bug where occassionally, threads erroring out would cause all the threads in p2p to die
+- Fixed truncate logic to actually use truncate rather than round
+- Fixed bagger's more lucrative tx decision logic
+
+### Removed
+
+
+## [11.3.1] - 7/10/2024 
+### Added
 
 ### Changed
 - In Slipstream, index arrays in event tables within the event table, otherwise index them in a separate array table.
 
 ### Fixed
+- try-catch exception handler in solidVM will throw excpetion in all cases instead of potentially `error`ing so node does not crash
 
 ### Removed
 - Removed strato-api paymentServerUrl flag
@@ -30,6 +53,7 @@ so that they could be properly moved to their respective version's subsection.
 - <address>.nonce accessor in SolidVM
 - Upgraded PostgREST to version 12.0
 - Support for `decimal` numbers type
+- Arrays in events are stored as is i.e without tables
 
 ### Changed
 - Allow public keys to be passed to x509-generator in PEM format

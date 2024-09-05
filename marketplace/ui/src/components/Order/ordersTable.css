@@ -61,14 +61,14 @@
     }
 
     .ant-picker {
-        padding: 8px 10px;
+        padding: 4px 10px;
         border: none;
     }
 
     .ant-picker-input {
         display: flex !important;
         justify-content: space-between;
-        gap: 80px;
+        gap: 20px;
     }
 
     .ant-picker-input input {
@@ -98,6 +98,38 @@
 
 :where(.css-dev-only-do-not-override-9ntgx0).ant-picker {
     height: 32px;
+}
+
+.text-truncate-single-line {
+    display: inline-block;
+    width: 100%;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    word-break: break-all; /* Breaks long words */
+    overflow-wrap: break-word
+  }
+
+  .text-truncate {
+    display: -webkit-box;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 2;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    line-height: 1.5em;
+    max-height: 3em;
+}
+
+.text-truncate > span {
+    display: -webkit-box;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 2;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    line-height: 1.5em;
+    max-height: 3em;
+    word-break: break-all;
+    overflow-wrap: break-word;
 }
 
 @media (min-width : 770px) {

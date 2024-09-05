@@ -1,4 +1,5 @@
 import config from '../load.config.js';
+import deployment from '../load.deploy.js';
 
 const OPTIONS = { config };
 
@@ -11,11 +12,14 @@ const STRIPE_ENV = {
   }
 }
 
+const SENDGRID_ENV = { API_KEY: process.env.SENDGRID_API_KEY }
+
 const DEFAULT_OPTIONS = { ...OPTIONS, chainIds: [], cacheNonce: true };
 
-const STRIPE_CONTRACT_ADDRESS = process.env.STRIPE_CONTRACT_ADDRESS;
-const METAMASK_CONTRACT_ADDRESS = process.env.METAMASK_CONTRACT_ADDRESS;
-const REDEMPTION_CONTRACT_ADDRESS = process.env.REDEMPTION_CONTRACT_ADDRESS;
+const STRIPE_CONTRACT_ADDRESS = deployment.contracts.stripe.address;
+// TODO: Disabled for initial payment server release
+// const METAMASK_CONTRACT_ADDRESS = deployment.contracts.metamask.address;
+const REDEMPTION_CONTRACT_ADDRESS = deployment.contracts.redemption.address;
 
 const SERVER_URL = `${config.serverHost}`;
 const TABLE_PREFIX = `${process.env.TABLE_PREFIX ? process.env.TABLE_PREFIX : 'BlockApps-Mercata-'}`;
@@ -24,7 +28,7 @@ const SERVER_CONFIRM_URL = `${SERVER_URL}/stripe/checkout/confirm`;
 
 const SERVER_CANCEL_URL = `${SERVER_URL}/stripe/checkout/cancel`;
 
-const ORDER_EVENT_TABLE = `${TABLE_PREFIX}PaymentService.Order`;
+const CHECKOUT_EVENT_TABLE = `${TABLE_PREFIX}PaymentService.Checkout`;
 
 const SELLER_ONBOARDED_TABLE = `${TABLE_PREFIX}PaymentService.SellerOnboarded`;
 
@@ -42,13 +46,14 @@ export {
   SERVER_CONFIRM_URL,
   SERVER_CANCEL_URL,
   STRIPE_CONTRACT_ADDRESS,
-  METAMASK_CONTRACT_ADDRESS,
+  // METAMASK_CONTRACT_ADDRESS, // TODO: Disabled for initial payment server release
   REDEMPTION_CONTRACT_ADDRESS,
   SERVER_URL,
   DEFAULT_OPTIONS,
-  ORDER_EVENT_TABLE,
+  CHECKOUT_EVENT_TABLE,
   SELLER_ONBOARDED_TABLE,
   PAYMENT_STATUS,
   TABLE_PREFIX,
   PAYMENT_RECEIVED_MESSAGE,
+  SENDGRID_ENV,
 }

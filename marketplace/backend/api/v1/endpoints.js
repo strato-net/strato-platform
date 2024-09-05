@@ -76,6 +76,11 @@ export const Redemption = {
   close: '/close'
 }
 
+export const Transaction = {
+  prefix: '/transaction',
+  get: '/',
+}
+
 export const Item = {
   prefix: '/item',
   ownershipHistory: '/ownership/:address',
@@ -151,9 +156,11 @@ export const Order = {
   payment: '/payment',
   userAddress: '/userAddress',
   getAllUserAddress: '/userAddresses/user/:redemptionService?',
+  getUserAddress: '/userAddress/:redemptionService/:shippingAddressId',
   cancelSaleOrder: '/sale/cancel',
   checkSaleQuantity: '/saleQuantity',
   executeSale: '/closeSale',
+  waitForOrderEvent: '/wait/event',
   updateOrderComment: '/updateComment',
   export: '/exportOrders'
 }

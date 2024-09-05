@@ -1,6 +1,7 @@
 import { util, rest, importer } from "/blockapps-rest-plus";
 import config from "/load.config";
 import RestStatus from "http-status-codes";
+import saleJs from "../../dapp/orders/sale";
 import {
   setSearchQueryOptions,
   searchOne,
@@ -111,10 +112,10 @@ async function getHistory(user, chainId, address, options) {
  * @param _args - Contract state
  */
 function marshalOut(_args) {
-  const { unitsPerDollar, amount, totalPrice, createdDate, block_timestamp, status } = _args;
+  const { amount, totalPrice, createdDate, block_timestamp, status } = _args;
   const args = {
     ..._args,
-    totalPrice: totalPrice || (unitsPerDollar ? Math.round((amount * 100) / unitsPerDollar) / 100 : amount),
+    totalPrice: totalPrice || amount,
     createdDate: createdDate || (new Date(block_timestamp)).getTime() / 1000,
     status: status || 3,
   };
@@ -173,18 +174,17 @@ async function get(user, args, options) {
   let searchArgs = {
     limit: 1,
     queryOptions: {
+      order: 'status.desc',
       transaction_hash: `eq.${address}`,
-      status: 'not.in.(1,5)',
-      select: 'id:id.max(),*',
     }
   }
   order = await searchAllWithQueryArgs(paymentTableName, searchArgs, newOptions, user);
 
-  if (!order) {
+  if (order.length === 0) {
 
     // Legacy orders need to join array tables. 
     let legacyArgs = {
-      address: address,
+      transaction_hash: address,
       limit: 1,
       queryOptions: {
         select: constants.attach_saleAddresses_Quantities_completedSales_onOrder
@@ -201,13 +201,15 @@ async function get(user, args, options) {
   return marshalOut(order['0'] ? { ...order['0'] } : { ...order });
 }
 
+
+
 async function getAll(admin, args = {}, options) {
   let saleOrders;
   const { offset, limit, order } = args;
   const newOptions = { ...options, org: 'BlockApps', app: 'Mercata' }
+
   const newCountArgs = {
     ...args,
-    status: '1',
     limit: undefined,
     offset: 0,
     order: undefined,
@@ -236,20 +238,41 @@ async function getAll(admin, args = {}, options) {
   let totalCount = newCount[0] ? newCount[0].count : 0;
 
   // Get the latest payment event for each sale token
-  if (totalCount !== 0 && !(offset && (totalCount < offset))) {
+  if (totalCount !== 0) {
     const uniqueOrderArgs = {
       ...args,
+      limit: undefined,
+      offset: 0,
       queryOptions: {
-        status: 'not.in.(1,5)',
         select: 'id:id.max(),orderHash,createdDate',
       }
     };
-    const uniqueOrders = await searchAllWithQueryArgs(paymentTableName, uniqueOrderArgs, newOptions, admin);
+
+    let uniqueOrders = await searchAllWithQueryArgs(paymentTableName, uniqueOrderArgs, newOptions, admin);
+
+    uniqueOrders = uniqueOrders.reduce((acc, order) => {
+      // Find if the orderHash already exists in the accumulator
+      const existingOrderIndex = acc.findIndex(existingOrder => existingOrder.orderHash === order.orderHash);
+
+      if (existingOrderIndex === -1) {
+        // If the orderHash does not exist, add the order to the accumulator
+        acc.push(order);
+      } else {
+        // If the orderHash exists, compare createdDate and keep the latest one
+        if (new Date(order.createdDate) > new Date(acc[existingOrderIndex].createdDate)) {
+          acc[existingOrderIndex] = order;
+        }
+      }
+
+      return acc;
+    }, []);
+
     const idArgs = {
       id: uniqueOrders.map((uo) => uo.id),
       order: order,
-    }
+    };
     saleOrders = await searchAllWithQueryArgs(paymentTableName, idArgs, newOptions, admin);
+    saleOrders = saleOrders.map((item)=>({...item, type: 'Order'}))
   }
 
   // ACH status updates
@@ -260,7 +283,7 @@ async function getAll(admin, args = {}, options) {
   if (saleOrders) {
     for (let i = 0; i < saleOrders.length; i++) {
       const order = saleOrders[i];
-      if (order.status === '2') {
+      if (parseInt(order.status) === 2) {
         if (paymentProvidersToOrderHashes[order.address]) {
           paymentProvidersToOrderHashes[order.address].push(order.orderHash);
         }
@@ -292,38 +315,37 @@ async function getAll(admin, args = {}, options) {
         saleOrders[index] = {
           ...saleOrders[index],
           status: paymentServiceRes[key],
+          type: 'Order'
         }
       });
   }
 
   let oldCount = 0;
   try {
-    if (!saleOrders || !limit || saleOrders.length < limit) {
-      let oldLimit = saleOrders && limit ? limit - saleOrders.length : limit;
-      let oldOffset = 0;
-      if (offset)
-        oldOffset = offset - (saleOrders ? saleOrders.length : 0);
-      // Legacy orders need to join array tables.
-      let oldArgs = { ...args, limit: oldLimit, offset: oldOffset, queryOptions: { select: constants.attach_saleAddresses_Quantities_completedSales_onOrder }};
-      const oldSaleOrders = await searchAllWithQueryArgs(constants.orderTableName, oldArgs, newOptions, admin);
-      saleOrders = saleOrders ? [...saleOrders, ...oldSaleOrders] : [...oldSaleOrders];
-    }
+    // Legacy orders need to join array tables.
+    let oldArgs = { ...args, limit: undefined, offset: 0, queryOptions: { select: constants.attach_saleAddresses_Quantities_completedSales_onOrder } };
+    let oldSaleOrders = await searchAllWithQueryArgs(constants.orderTableName, oldArgs, newOptions, admin);
+    oldSaleOrders = oldSaleOrders.map((item) => ({ ...item, type: 'Order' }));
+    saleOrders = saleOrders ? [...saleOrders, ...oldSaleOrders] : [...oldSaleOrders];
+
     oldCount = await searchAllWithQueryArgs(
       constants.orderTableName,
       countArgs,
       newOptions,
       admin
     );
-  } catch(err) {
+  } catch (err) {
     console.log("Legacy order table does not exist.", err, JSON.stringify(err));
   }
 
   totalCount += oldCount[0] ? oldCount[0].count : 0;
 
   if (order && order === 'createdDate.asc')
-    saleOrders.sort((a, b) => a.createdDate - b.createdDate);
+    saleOrders.sort((a, b) => a?.createdDate - b?.createdDate);
   else
-    saleOrders.sort((a, b) => b.createdDate - a.createdDate);
+    saleOrders.sort((a, b) => b?.createdDate - a?.createdDate);
+
+  saleOrders = saleOrders.slice(offset, parseInt(offset) + parseInt(limit))
 
   return saleOrders ? { orders: saleOrders.map((order) => marshalOut(order)), total: totalCount } : undefined;
 }

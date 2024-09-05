@@ -42,10 +42,24 @@ router.post(
 )
 
 router.get(
+  Order.getUserAddress,
+  authHandler.authorizeRequest(),
+  loadDapp,
+  OrderController.getUserAddress
+)
+
+router.get(
   Order.getAllUserAddress,
   authHandler.authorizeRequest(),
   loadDapp,
   OrderController.getAllUserAddress
+)
+
+router.get(
+  Order.waitForOrderEvent,
+  authHandler.authorizeRequest(),
+  loadDapp,
+  OrderController.waitForOrderEvent
 )
 
 router.post(
