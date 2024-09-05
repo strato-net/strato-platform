@@ -55,6 +55,13 @@ router.get(
   OrderController.getAllUserAddress
 )
 
+router.get(
+  Order.waitForOrderEvent,
+  authHandler.authorizeRequest(),
+  loadDapp,
+  OrderController.waitForOrderEvent
+)
+
 router.post(
   Order.cancelSaleOrder,
   authHandler.authorizeRequest(),
