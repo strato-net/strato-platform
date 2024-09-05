@@ -19,16 +19,21 @@ const sendMail = async (email, subject, contents, authorizationHeader) => {
     }
   };
 
-  const mailRes = await axios.post(
-    `${process.env.NOTIFICATION_SERVER_URL}/notify`,
-    reqBody, {
-    headers: {
-      'Content-Type': 'application/json',
-      'Authorization': `Bearer ${token}`
-    }
-  });
-  console.log("mailRes", mailRes);
-  return mailRes;
+  try {
+    const mailRes = await axios.post(
+      `${process.env.NOTIFICATION_SERVER_URL}/notify`,
+      reqBody, {
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token}`
+      }
+    });
+    console.log("mailRes", mailRes);
+    return mailRes;
+  } catch (error) {
+    console.log("error", error);
+  }
+  
 
 }
 class NotificationController {

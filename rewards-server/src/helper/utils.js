@@ -1,6 +1,8 @@
+const axios = require("axios");
+
 const sendEmail = async (baseUrl, type, userName, token) =>{
   try {
-    const purchaseRewardMailRes = await axios.post(`http://localhost/api/v1/notification/${type}`,
+    const purchaseRewardMailRes = await axios.post(`https://${baseUrl}/notification/${type}`,
       { user: userName },
       {
         headers: {
