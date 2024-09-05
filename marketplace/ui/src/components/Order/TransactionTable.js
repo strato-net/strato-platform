@@ -267,7 +267,11 @@ const TransactionTable = ({ user, download, isAllOrdersLoading }) => {
   }
 
   const handleFilter = (val) => {
-    navigate(val ? `/transactions?type=${val}` : `/transactions`)
+    if(dateQuery){
+      navigate(val ? `/transactions?type=${val}&date=${dateQuery}` : `/transactions?date=${dateQuery}`)
+    }else{
+      navigate(val ? `/transactions?type=${val}` : `/transactions`)
+    }
   }
 
   const metaImg = SEO.IMAGE_META;
