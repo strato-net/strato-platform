@@ -246,6 +246,13 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
     return { inventories: inventories, inventoryCount: inventoryCount }
   };
 
+  contract.getAllInventories = async function (args, options = optionsNoChainIds) {
+    const getOptions = { ...options, app: contractName };
+    const inventories = await inventoryJs.getAll(rawAdmin, { ...args, sort: '-createdDate' }, getOptions);
+    const inventoryCount = await inventoryJs.inventoryCount(rawAdmin, { ...args, sort: '-createdDate' }, getOptions);
+    return { inventories: inventories, inventoryCount: inventoryCount }
+  };
+
   contract.getInventoriesForUser = async function (args, options = optionsNoChainIds) {
     const getOptions = { ...options, app: contractName };
     const { ownerCommonName, ...restArgs } = args;
@@ -339,7 +346,7 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
   }
 
   contract.getOutgoingRedemptionRequests = async function (args, options = optionsNoChainIds) {
-    const { order, search } = args;
+    const { order, search, range } = args;
     const queryParams = new URLSearchParams({
       redemptionId: search,
       order: order
@@ -359,15 +366,27 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
       const redemptionPromises = redemptionServices.map(async (rs) => {
         const serviceUrl = rs.serviceURL || rs.data.serviceURL;
         const getOutgoingRedemptionRoute = rs.outgoingRedemptionsRoute || rs.data.outgoingRedemptionsRoute;
-        const res = await axios.get(new URL(`${serviceUrl}${getOutgoingRedemptionRoute}/${userCert.commonName}?${queryParams}`).href);
+        let res = await axios.get(new URL(`${serviceUrl}${getOutgoingRedemptionRoute}/${userCert.commonName}?${queryParams}`).href);
         if (res.status === 200)
-          return res.data.data;
+          return res.data.data.map((item) => {
+            const date = new Date(item.createdDate);
+            const unixTimestamp = Math.floor(date.getTime() / 1000);
+            return { ...item, redemptionDate: unixTimestamp, type:'Redemption', block_timestamp: new Date(item.createdDate) }
+          })
         else
           return [];
       });
 
       const allRedemptions = await Promise.all(redemptionPromises);
       redemptions = allRedemptions.flat();
+      redemptions = redemptions.filter((item)=>{
+        const dateRange = range[0].split(',')
+        const startRange = dateRange[1];
+        const endRange = dateRange[2];
+        if(item.redemptionDate > startRange && item.redemptionDate < endRange){
+          return item;
+        }
+      })
 
       if (order && order === 'ASC')
         redemptions.sort((a, b) => a.createdDate - b.createdDate);
@@ -384,7 +403,7 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
   };
 
   contract.getIncomingRedemptionRequests = async function (args, options = optionsNoChainIds) {
-    const { order, search } = args;
+    const { order, search, range } = args;
     const queryParams = new URLSearchParams({
       redemptionId: search,
       order: order
@@ -401,7 +420,11 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
         const getIncomingRedemptionRoute = rs.incomingRedemptionsRoute || rs.data.incomingRedemptionsRoute;
         const res = await axios.get(new URL(`${serviceUrl}${getIncomingRedemptionRoute}/${userCert.commonName}?${queryParams}`).href);
         if (res.status === 200) {
-          return res.data.data;
+          return res.data.data.map((item) => {
+            const date = new Date(item.createdDate);
+            const unixTimestamp = Math.floor(date.getTime() / 1000);
+            return { ...item, redemptionDate: unixTimestamp, type: 'Redemption', block_timestamp: new Date(item.createdDate) }
+          })
         } else {
           return [];
         }
@@ -409,6 +432,14 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
 
       const allRedemptions = await Promise.all(redemptionPromises);
       redemptions = allRedemptions.flat();
+      redemptions = redemptions.filter((item)=>{
+        const dateRange = range[0].split(',')
+        const startRange = dateRange[1];
+        const endRange = dateRange[2];
+        if(item.redemptionDate > startRange && item.redemptionDate < endRange){
+          return item;
+        }
+      })
 
       if (order && order === 'ASC')
         redemptions.sort((a, b) => a.createdDate - b.createdDate);
@@ -823,7 +854,46 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
 
   contract.getSaleOrders = async function (args, options = defaultOptions) {
     const getOptions = { ...options, app: contractName, };
-    return saleOrderJs.getAll(rawAdmin, args, getOptions);
+
+
+   let data = await saleOrderJs.getAll(rawAdmin, args, getOptions);
+   let saleAddressArr = [];
+   data = data.orders.map((item)=> {
+    if(item?.saleAddresses?.length){
+      saleAddressArr.push(item?.saleAddresses[0])
+     return {...item,saleAddress:item?.saleAddresses[0]}
+    }else if(item["BlockApps-Mercata-Order-saleAddresses"]){
+      const address = item["BlockApps-Mercata-Order-saleAddresses"][0]?.value
+      saleAddressArr.push(address)
+     return {...item, saleAddress:address  }
+    }else{
+      saleAddressArr.push(item?.saleAddresses)
+      return {...item,saleAddress:item?.saleAddresses}
+    }
+  })
+
+  const sales = await saleJs.getAll(rawAdmin, { saleAddresses: saleAddressArr }, options);
+
+  let assets = [];
+      for (const sale of sales) {
+        const history = await saleJs.getSaleHistory(rawAdmin, { contract: sale.contract_name, transaction_hash: sale.transaction_hash, assetToBeSold: sale.assetToBeSold }, options);
+        const price = history['0'] ? history['0'].price : null;
+
+        assets.push({
+          assetAddress: sale.assetToBeSold,
+          price: price,
+          assetPrice: sale?.price,
+          saleQuantity: sale.quantity,
+          saleAddress: sale.address,
+        });
+      }
+
+      data = data.map((item)=>{
+        const saleData = assets.find((asset)=> asset.saleAddress === item.saleAddress) 
+        return {...item, ...saleData }
+      })
+
+  return data;
   }
 
   contract.checkSaleQuantity = async function (args, options = defaultOptions) {
@@ -894,6 +964,9 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
               saleAddresses.push(saleAddress.value);
             }
           });
+        }
+        if(order.saleAddresses?.length){
+          saleAddresses.push(order.saleAddresses[0]);
         }
       });
 
@@ -1074,6 +1147,23 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
       );
       return orderEvent;
     }
+  }
+
+
+  contract.waitForOrderEvent = async function (args, options = defaultOptions) {
+      const orderEvent = await rest.searchUntil(
+        rawAdmin,
+        { name: "BlockApps-Mercata-PaymentService.Order" },
+        (r) => r.length === 1,
+        {
+          ...options,
+          query: {
+            limit: 1,
+            orderHash: `eq.${args.orderHash}`,
+          }
+        }
+      );
+      return orderEvent;
   }
 
   contract.createUserAddress = async function (args, options = defaultOptions) {

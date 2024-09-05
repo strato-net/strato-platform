@@ -328,7 +328,6 @@ const BoughtOrdersTable = ({ user, selectedDate, onDateChange, download, isAllOr
             disabledDate={(current) => {
               const currentDate = dayjs().startOf('day'); // Get the start of today
               const selectedDate = dayjs(current).startOf('day');
-
               return selectedDate.isAfter(currentDate);
             }}
             onChange={onDateChange}
