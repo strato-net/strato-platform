@@ -235,7 +235,7 @@ sendOutEvent (OutGetMPNodes mpNodes) = void $ writeUnseqEvents [IEGetMPNodes mpN
 sendOutEvent (OutMPNodesResponse o nds) = void $ writeUnseqEvents [IEMPNodesResponse o nds]
 sendOutEvent (OutPreprepareResponse dec) = void $ writeUnseqEvents [IEPreprepareResponse dec]
 
-consumerGroup :: KP.ConsumerGroup
+consumerGroup :: ConsumerGroup
 consumerGroup = "ethereum-vm"
 
 getFirstBlockFromSequencer :: (MonadLogger m, MonadFail m, HasKafka m) => m OutputBlock
@@ -252,7 +252,7 @@ initializeCheckpointAndBlockSummaryKafka = do
   checkpoint <- initializeCheckpointAndBlockSummary block
   setCheckpoint 1 checkpoint
 
-getCheckpoint :: (MonadLogger m, MonadFail m, HasKafka m, HasContext m, (MP.StateRoot `A.Alters` MP.NodeData) m) => m (KP.Offset, EVMCheckpoint)
+getCheckpoint :: (MonadLogger m, MonadFail m, HasKafka m, HasContext m, (MP.StateRoot `A.Alters` MP.NodeData) m) => m (Offset, EVMCheckpoint)
 getCheckpoint = do
   let topic = seqVmEventsTopicName
       cg = consumerGroup
@@ -265,14 +265,14 @@ getCheckpoint = do
       $logInfoS "getCheckpoint" . T.pack $ show ofs ++ " / " ++ format evmCheckpoint
       return (ofs, evmCheckpoint)
 
-setCheckpoint :: (MonadLogger m, HasKafka m) => KP.Offset -> EVMCheckpoint -> m ()
+setCheckpoint :: (MonadLogger m, HasKafka m) => Offset -> EVMCheckpoint -> m ()
 setCheckpoint ofs checkpoint = do
   $logInfoS "setCheckpoint" . T.pack $ "Setting checkpoint to " ++ show ofs ++ " / " ++ format checkpoint
   let kMetadata = packMetadata checkpoint
   ret <- execKafka $ K.commitSingleOffset consumerGroup seqVmEventsTopicName 0 ofs kMetadata
   either (error . show) return ret
 
-getUnprocessedKafkaEvents :: (MonadLogger m, HasKafka m) => KP.Offset -> m [VmEvent]
+getUnprocessedKafkaEvents :: (MonadLogger m, HasKafka m) => Offset -> m [VmEvent]
 getUnprocessedKafkaEvents offset = do
   $logInfoS "getUnprocessedKafkaEvents" . T.pack $ "Fetching sequenced blockchain events with offset " ++ show offset
   ret <- readSeqVmEvents offset
