@@ -120,7 +120,6 @@ const ConfirmOrder = ({ paymentProviders = [], data, columns }) => {
       orderTotal += parseFloat(itemTotal); 
       if (i === cartData.length - 1) {
         concatenatedOrderString += `<hr style="border-top: 1px dotted #0A1B71; min-width: 80%; max-width: 80%; margin-left: 15px;">`;
-        concatenatedOrderString += `Sales Tax: $${parseFloat(tax).toFixed(2)} (${(parseFloat(tax) * 100).toFixed(0)} STRATS)<br>`;
         concatenatedOrderString += `Shipping Fee: <i><strong>Free</strong></i><br><br>`;
         concatenatedOrderString += `Order Total: $${orderTotal.toFixed(2)} (${(orderTotal * 100).toFixed(0)} STRATS)<br>`;
       }
@@ -286,10 +285,6 @@ const ConfirmOrder = ({ paymentProviders = [], data, columns }) => {
                   <Row className="justify-between items-center ">
                     <p className="text-base text-[#6A6A6A]">Sub Total:</p>
                     <p className="text-base text-[#202020] md:ml-5 text-right">${subTotal} <span className="ml-1">({(subTotal * 100).toFixed(0)} STRATS)</span></p>
-                  </Row>
-                  <Row className="justify-start items-center ">
-                    <p className="text-base text-[#6A6A6A]">Tax:</p>
-                    <p className="text-base text-[#202020] md:ml-16 text-left">${tax}</p>
                   </Row>
                   <Row className="justify-between items-center">
                     <p className="text-base text-[#6A6A6A]">Total:</p>
