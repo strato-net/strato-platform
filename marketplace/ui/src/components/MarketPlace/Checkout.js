@@ -292,8 +292,7 @@ const Checkout = () => {
               -
             </div>
             <InputNumber
-              style={{ background: "transparent" }}
-              className="w-[43px] border-none text-[#202020]  font-semibold text-sm text-center flex flex-col justify-center"
+              className="w-[100px] bg-[transparent] border-none text-[#202020]  font-semibold text-sm text-center flex flex-col justify-center"
               min={1}
               value={qty}
               defaultValue={qty}
