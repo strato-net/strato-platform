@@ -86,7 +86,6 @@ mkAll genesisBlockName = do
         "unseqevents",
         "jsonrpcresponse",
         "indexevents",
-        "block",
         "vmevents",
         "solidvmevents"
         ]
