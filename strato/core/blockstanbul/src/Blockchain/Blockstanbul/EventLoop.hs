@@ -554,6 +554,7 @@ validatorTimingHack :: (MonadState BlockstanbulContext m)  =>
                        String -> Integer -> m ()
 validatorTimingHack "mercata" blockNumber = validatorTimingHackMercata blockNumber
 validatorTimingHack "mercata-hydrogen" blockNumber = validatorTimingHackMercataHydrogen blockNumber
+validatorTimingHack "mercata-uranium" blockNumber = validatorTimingHackMercataUranium blockNumber
 validatorTimingHack _ _ = do
   return ()
 
@@ -610,4 +611,22 @@ validatorTimingHackMercataHydrogen = \case
   33179 -> modify' $ validators %~ S.delete "Multinode302"
   37598 -> modify' $ validators %~ S.insert "dmoney-testnet2"
   43711 -> modify' $ validators %~ S.delete "dmoney-testnet2"
+  _ -> return ()
+
+validatorTimingHackMercataUranium :: (MonadState BlockstanbulContext m)  => Integer -> m ()
+validatorTimingHackMercataUranium = \case
+  43 -> modify' $ validators %~ S.insert "service-account-mercata-devnet-node5"
+  44 -> modify' $ validators %~ S.delete "service-account-mercata-devnet-node5"
+  48 -> modify' $ validators %~ S.insert "mercata-devnet-node5"
+  49 -> modify' $ validators %~ S.delete "mercata-devnet-node5"
+  53 -> modify' $ validators %~ S.insert "service-account-mercata-devnet-node5"
+  101 -> modify' $ validators %~ S.insert "service-account-mercata-devnet-node6"
+  102 -> modify' $ validators %~ S.insert "service-account-mercata-devnet-node10"
+  104 -> modify' $ validators %~ S.insert "service-account-mercata-devnet-node13"
+  105 -> modify' $ validators %~ S.insert "service-account-mercata-devnet-node15"
+  107 -> modify' $ validators %~ S.delete "service-account-mercata-devnet-node5"
+  108 -> modify' $ validators %~ S.delete "service-account-mercata-devnet-node6"
+  109 -> modify' $ validators %~ S.delete "service-account-mercata-devnet-node10"
+  110 -> modify' $ validators %~ S.delete "service-account-mercata-devnet-node13"
+  111 -> modify' $ validators %~ S.delete "service-account-mercata-devnet-node15"
   _ -> return ()
