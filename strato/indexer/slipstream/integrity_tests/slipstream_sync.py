@@ -149,6 +149,9 @@ if __name__ == "__main__":
     discrepancies_asset_fileNames, count_asset_fileNames_discrepancy = check_table("BlockApps-Mercata-Asset-fileNames")
     discrepancies_asset_images, count_asset_images_discrepancy = check_table("BlockApps-Mercata-Asset-images")
 
+    #Joins
+    discrepancies_join, count_join_discrepancy = check_table("BlockApps-Mercata-Asset?&select=*,BlockApps-Mercata-Asset-files(*),BlockApps-Mercata-Asset-images(*),BlockApps-Mercata-Asset-fileNames(*),BlockApps-Mercata-Sale!BlockApps-Mercata-Sale_BlockApps-Mercata-Asset_fk(*,BlockApps-Mercata-Sale-paymentProviders(*))")
+
     # Print the results
     print("\n**Final check summary:**")
     print(f"Asset Discrepancies: {'Yes' if discrepancies_asset else 'No'}")
@@ -159,6 +162,7 @@ if __name__ == "__main__":
     print(f"Asset-files Discrepancies: {'Yes' if discrepancies_asset_files else 'No'}")
     print(f"Asset-fileNames Discrepancies: {'Yes' if discrepancies_asset_fileNames else 'No'}")
     print(f"Asset-images Discrepancies: {'Yes' if discrepancies_asset_images else 'No'}")
+    print(f"The Join Discrepancies: {'Yes' if discrepancies_join else 'No'}")
     print()
     print(f"Asset Count Match Discrepancies: {'Yes' if count_asset_discrepancy else 'No'}")
     print(f"Order Count Match Discrepancies: {'Yes' if count_order_discrepancy else 'No'}")
@@ -168,6 +172,7 @@ if __name__ == "__main__":
     print(f"Asset-files Count Match Discrepancies: {'Yes' if  count_asset_files_discrepancy else 'No'}")
     print(f"Asset-fileNames Count Match Discrepancies: {'Yes' if  count_asset_fileNames_discrepancy else 'No'}")
     print(f"Asset-images Count Match Discrepancies: {'Yes' if  count_asset_images_discrepancy else 'No'}")
+    print(f"The Join Count Discrepancies: {'Yes' if count_join_discrepancy else 'No'}")
 
     if any(
         [ 
@@ -186,7 +191,9 @@ if __name__ == "__main__":
           discrepancies_asset_fileNames,
           count_asset_fileNames_discrepancy,
           discrepancies_asset_images,
-          count_asset_images_discrepancy
+          count_asset_images_discrepancy,
+          discrepancies_join,
+          count_join_discrepancy
         ]
     ):
         print("ERROR - one or more discrepancies detected")
