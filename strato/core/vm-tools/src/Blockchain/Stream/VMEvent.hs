@@ -22,6 +22,7 @@ import Data.Binary
 import Data.Map.Strict (Map)
 import Data.Text (Text)
 import GHC.Generics
+import Network.Kafka.Protocol hiding (Key)
 import SolidVM.Model.CodeCollection
 import Text.Format
 import Text.Tools

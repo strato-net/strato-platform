@@ -38,7 +38,7 @@ import BlockApps.Logging
 import Blockchain.Data.ChainInfo
 import Blockchain.Data.ChainInfoDB
 import Blockchain.Data.TXOrigin
-import Blockchain.EthConf (runKafkaMConfigured)
+import Blockchain.EthConf (runKafkaConfigured)
 import Blockchain.Sequencer.Event (IngestEvent (IEGenesis), IngestGenesis (..))
 import Blockchain.Sequencer.Kafka (writeUnseqEvents)
 import Blockchain.Strato.Model.ChainId
@@ -158,7 +158,10 @@ emitKafkaTransactions = loop id
     loop front = await >>= maybe (emit $ front []) (\x -> loop $ front . (x :))
     emit gs = do
       $logDebugS "writeUnseqEventsBegin" . T.pack $ "Writing " ++ show (length gs) ++ " genesis info to unseqevents"
-      void $ liftIO $ runKafkaMConfigured "strato-api" $ writeUnseqEvents gs
+      rets <- liftIO $ runKafkaConfigured "strato-api" $ writeUnseqEvents gs
+      case rets of
+        Left e -> $logError $ T.pack $ "Could not write txs to Kafka: " ++ show e
+        Right resps -> $logDebug $ T.pack $ "writeUnseqEventsEnd Kafka commit: " ++ show resps
 
 processChainInfos :: [ChainInfo] -> Either (Int, String) [ChainId]
 processChainInfos chainInfos = forM (zip [0 ..] chainInfos) $ -- TODO(dustin): Use post-incrementing state
@@ -168,4 +171,3 @@ processChainInfos chainInfos = forM (zip [0 ..] chainInfos) $ -- TODO(dustin): U
     when ((S.size $ unChainMembers mb) == 0) $ Left (i, "member list is empty")
     let cid = rlpHash gen
     return . ChainId $ keccak256ToWord256 cid
-

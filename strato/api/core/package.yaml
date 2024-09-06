@@ -30,7 +30,6 @@ library:
   - format
   - hflags
   - http-types
-  - kafka-monad
   - labeled-error
   - lens
   - monad-alter

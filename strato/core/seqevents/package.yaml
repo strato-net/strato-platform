@@ -14,11 +14,11 @@ library:
     - aeson
     - blockstanbul
     - bytestring
+    - conduit
     - deepseq
     - ethereum-rlp
     - format
     - generic-arbitrary
-    - kafka-monad
     - lens
     - merkle-patricia-db
     - milena

@@ -1,108 +1,79 @@
-{-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE OverloadedStrings #-}
-{-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TemplateHaskell #-}
 
-module Blockchain.Init.Generator (
-  mkAll
-  ) where
+module Blockchain.Init.Generator where
 
-import BlockApps.Logging
-import qualified Blockchain.Data.DataDefs as DataDefs
-import qualified Blockchain.EthConf as UEC
-import qualified Blockchain.EthConf.Model as EC
-import Blockchain.Data.GenesisInfo
-import Blockchain.DB.CodeDB
-import Blockchain.GenesisBlock
 import Blockchain.Init.EthConf
-import Blockchain.Init.Monad
 import Blockchain.Init.Options
+import Blockchain.Init.Protocol
 import qualified Blockchain.Network as Net
 import Blockchain.Strato.Model.Options (flags_network)
-import Conduit
+import Control.Concurrent
+import Control.Lens.Combinators (use)
 import Control.Monad
-import Control.Monad.Catch
-import Control.Monad.Composable.Kafka
-import Control.Monad.Composable.Redis
-import Control.Monad.Composable.SQL
-import Control.Monad.Trans.Reader
+import Control.Monad.IO.Unlift
+import Control.Monad.Trans.Except
+import Control.Monad.Trans.State
 import qualified Data.Aeson as Ae
 import qualified Data.ByteString.Char8 as C8
 import Data.FileEmbed
-import Data.String
-import qualified Data.Text as T
-import qualified Text.Colors as CL
 import qualified Data.Map as M
+import qualified Data.Text as T
 import Data.Text.Encoding (decodeUtf8)
 import qualified Data.Text.IO as TIO
-import qualified Data.Yaml as YAML
-import Database.Persist.Postgresql
-import qualified Executable.EthDiscoverySetup as EthDiscovery
-import SelectAccessible ()
+import Network.Kafka (KafkaAddress, KafkaClientError, KafkaState, mkKafkaState, runKafka, stateTopicMetadata, updateMetadata)
+import Network.Kafka.Protocol (KafkaError (..), TopicMetadata (..))
 import System.Exit
-import System.FilePath ((</>))
-import Turtle (chmod, roo)
 import UnliftIO.Directory
-import UnliftIO.IO hiding (withFile)
+import UnliftIO.IO
 
-import Universum.Lifted.File
+type GenM = StateT KafkaState (ExceptT KafkaClientError IO)
+
+runGenM :: KafkaAddress -> GenM a -> IO a
+runGenM kaddr mv = do
+  eRes <- runKafka (mkKafkaState "generator" kaddr) mv
+  either (die . ("runGenM: " ++) . show) return eRes
+
+initializeTopic :: GenM ()
+initializeTopic = do
+  updateMetadata initTopic
+  meta <- use stateTopicMetadata
+  -- Wait until the broker believes in the metadata
+  case M.lookup initTopic meta of
+    Just (TopicMetadata (NoError, _, _)) -> return ()
+    _ -> liftIO (threadDelay 100000) >> initializeTopic
 
 genesisFiles :: [(FilePath, C8.ByteString)]
 genesisFiles = $(embedDir "genesisBlocks")
 
-mkAll :: (MonadLoggerIO m, MonadUnliftIO m, MonadFail m, MonadMask m, HasKafka m) =>
-         String -> m ()
+mkAll :: String -> GenM ()
 mkAll genesisBlockName = do
+  initializeTopic
   ethconf <- liftIO genEthConf
+  addEvent $ EthConf ethconf
 
-  let dir = ".ethereumH"
-  liftIO $ createDirectoryIfMissing True dir
-  liftIO $ YAML.encodeFile (dir </> "ethconf.yaml") ethconf
-  liftIO $ makeReadOnly $ dir </> "ethconf.yaml"
-
-  let pgconf = EC.sqlConfig ethconf
-      rawConn = EC.postgreSQLConnectionString pgconf {EC.database = ""}
-      localConn = EC.postgreSQLConnectionString pgconf
-      db = EC.database pgconf
-  $logInfoS "ethconf/Create Database" . T.pack $ CL.yellow db
-  $logInfoLS "ethconf/Create Database" rawConn
-  let query = T.pack $ "CREATE DATABASE " ++ show db ++ ";"
-
-  withPostgresqlConn rawConn (runReaderT (rawExecute query []))
-
-  withPostgresqlConn localConn $
-    runReaderT $ do
-      $logInfoS "ethconf/migrate" . T.pack $ CL.yellow ">>>> Migrating eth"
-      $logInfoLS "ethconf/migrateconn" localConn
-      runMigration DataDefs.migrateAll
-      $logInfoS "ethconf/migrate" . T.pack $ CL.yellow ">>>> Indexing eth"
-      runMigration DataDefs.indexAll
-
-  let topics :: [String] =
-        [
-        "statediff",
-        "seq_vm_events",
-        "seq_p2p_events",
-        "unseqevents",
-        "jsonrpcresponse",
-        "indexevents",
-        "vmevents",
-        "solidvmevents"
-        ]
-
-  forM_ topics $ createTopic . fromString
-
-  let uniqueTopicMap = M.fromList $ map (\x -> (x, x)) topics
-  liftIO $ YAML.encodeFile (".ethereumH" </> "topics.yaml") uniqueTopicMap
+  addEvent $
+    TopicList
+      [ (t, t)
+        | t <-
+            [ "statediff",
+              "seq_vm_events",
+              "seq_p2p_events",
+              "unseqevents",
+              "jsonrpcresponse",
+              "indexevents",
+              "block",
+              "vmevents",
+              "solidvmevents"
+            ]
+      ]
 
   bootnodes <- case (flags_addBootnodes, flags_stratoBootnode) of
     (False, _) -> return Nothing
     (True, []) -> liftIO $ fmap (fmap $ map Net.webAddress) $ Net.getParams flags_network
     (True, _) -> return $ Just flags_stratoBootnode
 
-  $logInfoS "ethconf/bootnodes" . T.pack $ CL.yellow ">>>> Inserting bootnodes"
-  $logInfoLS "ethconf/bootnodes" bootnodes
-  EthDiscovery.setup bootnodes
+  addEvent $ PeerList bootnodes
 
   let genesisFileName = genesisBlockName ++ "Genesis.json"
       accountInfoFileName = genesisBlockName ++ "AccountInfo"
@@ -110,15 +81,9 @@ mkAll genesisBlockName = do
   sendGenesisJson genesisFileName
   sendAccountInfo accountInfoFileName
 
-  runResourceT . runSetupDBM . runRedisM UEC.lookupRedisBlockDBConfig . runSQLM $ do
-    $logInfoS "runWorker" "Adding empty code"
-    void $ addCode EVM mempty -- blank code is the default for Accounts, but gets added nowhere else.
-    $logInfoS "runWorker" "Processing genesis block"
-    initializeGenesisBlock genesisBlockName
-    $logInfoS "runWorker" "done. here I am once again"
+  addEvent InitComplete
 
-sendGenesisJson :: HasKafka m =>
-                   FilePath -> m ()
+sendGenesisJson :: FilePath -> GenM ()
 sendGenesisJson genesisFilename = do
   fsFile <- doesFileExist genesisFilename
   eGenInfo <-
@@ -127,36 +92,26 @@ sendGenesisJson genesisFilename = do
       else return $ do
         contents <- maybe (Left "file not found") Right $ lookup genesisFilename genesisFiles
         Ae.eitherDecodeStrict' contents
-  case (eGenInfo :: Either String GenesisInfo) of
+  case eGenInfo of
     Left err -> liftIO $ die err
-    Right genInfo -> do
-      let blockFile = "Genesis.json"
-      liftIO $ Ae.encodeFile blockFile genInfo
-      liftIO $ makeReadOnly blockFile
+    Right genInfo -> addEvent $ GenesisBlock genInfo
 
-sendAccountInfo :: (MonadMask m, HasKafka m) =>
-                   FilePath -> m ()
+sendAccountInfo :: FilePath -> GenM ()
 sendAccountInfo accountInfoFileName = do
   fsFile <- doesFileExist accountInfoFileName
   if fsFile
     then do
-      let sendChunks :: HasKafka m => Handle -> m ()
+      let sendChunks :: Handle -> GenM ()
           sendChunks h = do
-            acs <- liftIO $ TIO.hGetChunk h
-            unless (T.null acs) $ do
-
-              let accountFile = "AccountInfo"
-              liftIO $ TIO.appendFile accountFile acs
-
+            chk <- liftIO $ TIO.hGetChunk h
+            unless (T.null chk) $ do
+              addEvent $ GenesisAccounts chk
               sendChunks h
-      withFile accountInfoFileName ReadMode $ \h -> do
+      s <- get
+      liftIO . withFile accountInfoFileName ReadMode $ \h -> do
         hSetBuffering h (BlockBuffering (Just (1024 * 1024)))
-        sendChunks h
+        mErr <- runKafka s $ sendChunks h
+        either (die . ("sendAccountInfo: " ++) . show) return mErr
     else case lookup accountInfoFileName genesisFiles of
       Nothing -> liftIO $ putStrLn "No account info found, assuming it isn't needed"
-      Just acs -> do
-          let accountFile = "AccountInfo"
-          liftIO $ TIO.appendFile accountFile $ decodeUtf8 acs
-
-makeReadOnly :: FilePath -> IO ()
-makeReadOnly = void . chmod roo
+      Just bs -> addEvent $ GenesisAccounts $ decodeUtf8 bs

@@ -229,14 +229,14 @@ sendOutEvent (OutASM asm) =
           | (theAccount, Mem.ASModification asMod) <- M.toList asm
         ]
 sendOutEvent (OutJSONRPC s b) = liftIO $ produceResponse s b
-sendOutEvent (OutBlock o) = void $ writeUnseqEvents [IEBlock $ blockToIngestBlock TO.Quarry $ outputBlockToBlock o]
+sendOutEvent (OutBlock o) = void . execKafka $ writeUnseqEvents [IEBlock $ blockToIngestBlock TO.Quarry $ outputBlockToBlock o]
 sendOutEvent (OutStateRootMismatch _) = pure ()
-sendOutEvent (OutGetMPNodes mpNodes) = void $ writeUnseqEvents [IEGetMPNodes mpNodes]
-sendOutEvent (OutMPNodesResponse o nds) = void $ writeUnseqEvents [IEMPNodesResponse o nds]
-sendOutEvent (OutPreprepareResponse dec) = void $ writeUnseqEvents [IEPreprepareResponse dec]
+sendOutEvent (OutGetMPNodes mpNodes) = void . execKafka $ writeUnseqEvents [IEGetMPNodes mpNodes]
+sendOutEvent (OutMPNodesResponse o nds) = void . execKafka $ writeUnseqEvents [IEMPNodesResponse o nds]
+sendOutEvent (OutPreprepareResponse dec) = void . execKafka $ writeUnseqEvents [IEPreprepareResponse dec]
 
-consumerGroup :: ConsumerGroup
-consumerGroup = "ethereum-vm"
+consumerGroup :: KP.ConsumerGroup
+consumerGroup = lookupConsumerGroup "ethereum-vm"
 
 getFirstBlockFromSequencer :: (MonadLogger m, MonadFail m, HasKafka m) => m OutputBlock
 getFirstBlockFromSequencer = do
@@ -252,7 +252,7 @@ initializeCheckpointAndBlockSummaryKafka = do
   checkpoint <- initializeCheckpointAndBlockSummary block
   setCheckpoint 1 checkpoint
 
-getCheckpoint :: (MonadLogger m, MonadFail m, HasKafka m, HasContext m, (MP.StateRoot `A.Alters` MP.NodeData) m) => m (Offset, EVMCheckpoint)
+getCheckpoint :: (MonadLogger m, MonadFail m, HasKafka m, HasContext m, (MP.StateRoot `A.Alters` MP.NodeData) m) => m (KP.Offset, EVMCheckpoint)
 getCheckpoint = do
   let topic = seqVmEventsTopicName
       cg = consumerGroup
@@ -265,17 +265,17 @@ getCheckpoint = do
       $logInfoS "getCheckpoint" . T.pack $ show ofs ++ " / " ++ format evmCheckpoint
       return (ofs, evmCheckpoint)
 
-setCheckpoint :: (MonadLogger m, HasKafka m) => Offset -> EVMCheckpoint -> m ()
+setCheckpoint :: (MonadLogger m, HasKafka m) => KP.Offset -> EVMCheckpoint -> m ()
 setCheckpoint ofs checkpoint = do
   $logInfoS "setCheckpoint" . T.pack $ "Setting checkpoint to " ++ show ofs ++ " / " ++ format checkpoint
   let kMetadata = packMetadata checkpoint
   ret <- execKafka $ K.commitSingleOffset consumerGroup seqVmEventsTopicName 0 ofs kMetadata
   either (error . show) return ret
 
-getUnprocessedKafkaEvents :: (MonadLogger m, HasKafka m) => Offset -> m [VmEvent]
+getUnprocessedKafkaEvents :: (MonadLogger m, HasKafka m) => KP.Offset -> m [VmEvent]
 getUnprocessedKafkaEvents offset = do
   $logInfoS "getUnprocessedKafkaEvents" . T.pack $ "Fetching sequenced blockchain events with offset " ++ show offset
-  ret <- readSeqVmEvents offset
+  ret <- execKafka (readSeqVmEvents offset)
   let countLimit =
         if flags_seqEventsBatchSize > 0
           then take flags_seqEventsBatchSize

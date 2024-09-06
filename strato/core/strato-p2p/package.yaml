@@ -7,6 +7,7 @@ synopsis: a microservice that handles peer to peer connections for strato
 dependencies:
   - base
   - common-log
+  - vm-tools
 
 ghc-options: -Wall -threaded
 
@@ -22,7 +23,6 @@ executables:
       - lifted-async
       - strato-model
       - strato-p2p
-      - vm-tools
       - wai-middleware-prometheus
       - warp
       
@@ -57,11 +57,12 @@ library:
     - hflags
     - http-client
     - iproute
-    - kafka-monad
     - lens
     - lifted-async
     - lifted-base
     - merkle-patricia-db
+    - milena
+    - milena-tools
     - monad-alter
     - mtl
     - network
@@ -81,6 +82,7 @@ library:
     - text
     - these
     - time
+    - transformers
     - unliftio-core
     - unliftio 
     - warp

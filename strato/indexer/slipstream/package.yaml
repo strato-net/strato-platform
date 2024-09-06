@@ -38,6 +38,7 @@ library:
     - lens
     - lrucache
     - kafka-monad
+    - milena
     - monad-alter
     - persistent
     - postgresql-typed
@@ -45,7 +46,6 @@ library:
     - solid-vm-model
     - scientific
     - sql-monad
-    - strato-conf
     - strato-model
     - text
     - time

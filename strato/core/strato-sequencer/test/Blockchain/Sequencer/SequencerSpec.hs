@@ -143,7 +143,6 @@ withTemporaryDepBlockDB pbft genesisBlock m = do
                                , maxUsPerIter = 200
                                , maxEventsPerIter = 10
                                , vaultClient = Nothing
-                               , kafkaClientId = "dummyClientId"
                                }
         myAddr = fromPrivateKey myPriv
         myCM = CommonName "BlockApps" "Engineering" "Admin" True

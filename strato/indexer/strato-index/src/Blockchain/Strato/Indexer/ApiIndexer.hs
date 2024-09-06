@@ -15,6 +15,7 @@ where
 
 import BlockApps.Logging
 import Blockchain.Data.ChainInfo
+import Blockchain.EthConf (lookupConsumerGroup)
 import Blockchain.Sequencer.Event
 import Blockchain.Strato.Indexer.IContext
 import Blockchain.Strato.Indexer.Kafka
@@ -71,7 +72,7 @@ indexAPI idxEvents = do
     filterHelper [] a = a
 
 kafkaClientIds :: (KafkaClientId, ConsumerGroup)
-kafkaClientIds = ("strato-api-indexer", "strato-api-indexer")
+kafkaClientIds = ("strato-api-indexer", lookupConsumerGroup "strato-api-indexer")
 
 {-
 indexerMetadata :: Metadata

@@ -2,9 +2,7 @@
 {-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE OverloadedStrings #-}
 
---removing this, as it doesn't apply to RabbitMQ, which will be added soon.  I'm keeping the code here for now, as we might need something similar soon
-module BlockApps.Tools.Checkpoints where
-{-
+module BlockApps.Tools.Checkpoints
   ( doCheckpointPut,
     doCheckpointGet,
     doCheckpointUsage,
@@ -24,7 +22,6 @@ import Control.Monad (forM_, unless, void)
 import qualified Data.ByteString.Char8 as S8
 import Data.Data
 import Data.Maybe
-import Data.String
 import GHC.Read
 import qualified Network.Kafka as K
 import qualified Network.Kafka.Protocol as KP
@@ -78,11 +75,20 @@ kafkaBitsForService :: CheckpointService -> KafkaBits
 kafkaBitsForService = \case
   NullService -> error "kafkaBitsForService NullService called"
   Sequencer ->
-    (fromString SeqConst.defaultKafkaClientId', fromString SeqConst.defaultKafkaClientId', SeqKafka.unseqEventsTopicName)
-  EVM -> ("ethereum-vm", "ethereum-vm", SeqKafka.seqVmEventsTopicName)
-  ApiIndexer -> ("strato-api-indexer", "strato-api-indexer", IdxKafka.indexEventsTopicName)
-  P2PIndexer -> ("strato-p2p-indexer", "strato-p2p-indexer", IdxKafka.indexEventsTopicName)
-  Slipstream -> ("slipstream", "slipstream", DiffKafka.stateDiffTopicName)
+    let clientId = KP.KString (S8.pack SeqConst.defaultKafkaClientId')
+     in (clientId, lookupConsumerGroup clientId, SeqKafka.unseqEventsTopicName)
+  EVM ->
+    let clientId = "ethereum-vm"
+     in (clientId, lookupConsumerGroup clientId, SeqKafka.seqVmEventsTopicName)
+  ApiIndexer ->
+    let clientId = "strato-api-indexer"
+     in (clientId, lookupConsumerGroup clientId, IdxKafka.indexEventsTopicName)
+  P2PIndexer ->
+    let clientId = "strato-p2p-indexer"
+     in (clientId, lookupConsumerGroup clientId, IdxKafka.indexEventsTopicName)
+  Slipstream ->
+    let clientId = "slipstream"
+     in (clientId, lookupConsumerGroup clientId, DiffKafka.stateDiffTopicName)
 
 lookupByBits :: KafkaBits -> IO CPTuple
 lookupByBits bits@(clientId, consumerId, topicName) =
@@ -165,4 +171,3 @@ checkpointUsage =
 
 doCheckpointUsage :: IO ()
 doCheckpointUsage = forM_ checkpointUsage putStrLn
--}

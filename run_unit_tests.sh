@@ -16,6 +16,7 @@ stack test $5\
       blockapps-data \
       blockapps-init \
       blockapps-mpdbs \
+      blockapps-tools \
       blockapps-vault-proxy-server \
       bloc2api \
       common-log \

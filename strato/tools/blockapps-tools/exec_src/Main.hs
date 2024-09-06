@@ -3,8 +3,10 @@
 {-# LANGUAGE RecordWildCards #-}
 {-# OPTIONS_GHC -Wall #-}
 
---import BlockApps.Tools.Checkpoints
+import BlockApps.Tools.Checkpoints
 import BlockApps.Tools.Code as Code
+import BlockApps.Tools.DumpKafkaBlocks
+import BlockApps.Tools.DumpKafkaRaw
 import BlockApps.Tools.DumpKafkaSequencer
 import BlockApps.Tools.DumpKafkaStateDiff
 import BlockApps.Tools.DumpKafkaUnSequencer
@@ -14,6 +16,7 @@ import BlockApps.Tools.FRawMP as FRawMP
 import BlockApps.Tools.Hash as Hash
 import BlockApps.Tools.InsertP2P
 import BlockApps.Tools.InsertSeq
+import BlockApps.Tools.Kafka
 import BlockApps.Tools.Psql
 import BlockApps.Tools.RLP as RLP
 import BlockApps.Tools.Raw as Raw
@@ -27,6 +30,7 @@ import Blockchain.Strato.Model.ChainMember
 import Blockchain.Strato.Model.Keccak256 hiding (hash)
 import qualified Data.ByteString as B
 import qualified Data.ByteString.Char8 as BC
+import Data.Int
 import qualified Data.Text as T
 import qualified LabeledError
 import System.Console.CmdArgs
@@ -40,15 +44,16 @@ data Options
   | AskForBlocks {startBlock :: Integer, endBlock :: Integer, qOrg :: String, qOrgUnit :: String, qCommonName :: String}
   | AskForTxs
   | ChainHash
---  | Checkpoints {service :: CheckpointService, operation :: CheckpointOperation, offset :: Maybe Int64, cp :: Maybe String}
+  | Checkpoints {service :: CheckpointService, operation :: CheckpointOperation, offset :: Maybe Int64, cp :: Maybe String}
   | Code {hash :: String}
   | DeleteDepBlock {valK :: String}
+  | DumpKafkaBlocks {startingBlock :: Int}
   | DumpKafkaVMEvents {startingBlock :: Int}
   | DumpKafkaSequencer {startingBlock :: Int}
   | DumpKafkaSequencerVM {startingBlock :: Int}
   | DumpKafkaSequencerP2P {startingBlock :: Int}
   | DumpKafkaUnSequencer {startingBlock :: Int}
---  | DumpKafkaRaw {streamName :: String, startingBlock :: Int}
+  | DumpKafkaRaw {streamName :: String, startingBlock :: Int}
   | DumpKafkaStateDiff {startingBlock :: Int}
   | DumpRedis {databaseNumber :: Integer}
   | FRawMP {stateRoot :: String, filename :: String}
@@ -66,6 +71,9 @@ data Options
   | ValidatorBehavior {valB :: Bool}
   | GetPrivacy {registry :: String, key :: String}
   | PutPrivacy {registry :: String, key :: String, value :: String}
+  | SaveKafka {topic :: String, filename :: String}
+  | LoadKafka {topic :: String, filename :: String}
+  | VerifyKafkaFile {filename :: String}
   deriving (Show, Data, Typeable)
 
 stateOptions :: Annotate Ann
@@ -153,13 +161,20 @@ dumpKafkaUnSequencerOptions =
     [ startingBlock := 0 += typ "INT"
     ]
 
+dumpKafkaBlocksOptions :: Annotate Ann
+dumpKafkaBlocksOptions =
+  record
+    DumpKafkaBlocks {startingBlock = undefined}
+    [ startingBlock := 0 += typ "INT"
+    ]
+
 dumpKafkaVMEventsOptions :: Annotate Ann
 dumpKafkaVMEventsOptions =
   record
     DumpKafkaVMEvents {startingBlock = undefined}
     [ startingBlock := 0 += typ "INT"
     ]
-{-
+
 dumpKafkaRawOptions :: Annotate Ann
 dumpKafkaRawOptions =
   record
@@ -167,7 +182,7 @@ dumpKafkaRawOptions =
     [ startingBlock := 0 += typ "INT" += argPos 1,
       streamName := def += typ "DBSTRING" += argPos 0
     ]
--}
+
 dumpKafkaStateDiffOptions :: Annotate Ann
 dumpKafkaStateDiffOptions =
   record
@@ -178,7 +193,7 @@ dumpKafkaStateDiffOptions =
 insertTXOptions :: Annotate Ann
 insertTXOptions =
   record InsertTX {} []
-{-
+
 checkpointOptions :: Annotate Ann
 checkpointOptions =
   record
@@ -190,7 +205,7 @@ checkpointOptions =
     ]
   where
     nil = undefined
--}
+
 askOptions :: Annotate Ann
 askOptions =
   record
@@ -279,6 +294,29 @@ deleteDepBlockOptions =
     [ valK := error "valK" += typ "STRING" += argPos 0
     ]
 
+saveKafkaOptions :: Annotate Ann
+saveKafkaOptions =
+  record
+    SaveKafka {filename = error "unused filename", topic = error "unused topic"}
+    [ filename := error "savekafka --filename=<file> --topic=<topic>" += typ "PATH" += explicit += name "filename",
+      topic := error "savekafka --filename=<file> --topic=<topic>" += typ "TOPIC" += explicit += name "topic"
+    ]
+
+loadKafkaOptions :: Annotate Ann
+loadKafkaOptions =
+  record
+    LoadKafka {filename = error "unused filename", topic = error "unused topic"}
+    [ filename := error "loadkafka --filename=<file> --topic=<topic>" += typ "PATH" += explicit += name "filename",
+      topic := error "loadkafka --filename=<file> --topic=<topic>" += typ "TOPIC" += explicit += name "topic"
+    ]
+
+verifyKafkaFileOptions :: Annotate Ann
+verifyKafkaFileOptions =
+  record
+    VerifyKafkaFile {filename = error "unused filename"}
+    [ filename := error "verifykafkafile --filename=<file>" += typ "PATH" += explicit += name "filename"
+    ]
+
 setParticipationModeOptions :: Annotate Ann
 setParticipationModeOptions =
   record
@@ -320,10 +358,11 @@ options =
       askOptions,
       askForTxOptions,
       chainHashOptions,
---      checkpointOptions,
+      checkpointOptions,
       codeOptions,
+      dumpKafkaBlocksOptions,
       dumpKafkaVMEventsOptions,
---      dumpKafkaRawOptions,
+      dumpKafkaRawOptions,
       dumpKafkaSequencerOptions,
       dumpKafkaSequencerVmOptions,
       dumpKafkaSequencerP2pOptions,
@@ -343,6 +382,9 @@ options =
       stateOptions,
       validatorBehaviorOptions,
       deleteDepBlockOptions,
+      saveKafkaOptions,
+      loadKafkaOptions,
+      verifyKafkaFileOptions,
       setParticipationModeOptions,
       getPrivacyOptions,
       putPrivacyOptions
@@ -375,18 +417,19 @@ run AskForTxs =
     . BC.split '\n'
     =<< B.getContents
 run ChainHash = error "strato-barometer: the chainhash tool has been deprecated."
---run Checkpoints {..} = case operation of
---  Get -> doCheckpointGet service
---  Put -> doCheckpointPut service (fromIntegral <$> offset) cp
---  NullOperation -> doCheckpointUsage
+run Checkpoints {..} = case operation of
+  Get -> doCheckpointGet service
+  Put -> doCheckpointPut service (fromIntegral <$> offset) cp
+  NullOperation -> doCheckpointUsage
 run Code {..} = Code.doit hash
 run DeleteDepBlock {..} = deleteDepBlock valK
 run DumpKafkaSequencer {..} = dumpKafkaSequencer (fromIntegral startingBlock)
 run DumpKafkaSequencerVM {..} = dumpKafkaSequencerVM (fromIntegral startingBlock)
 run DumpKafkaSequencerP2P {..} = dumpKafkaSequencerP2P (fromIntegral startingBlock)
 run DumpKafkaUnSequencer {..} = dumpKafkaUnSequencer (fromIntegral startingBlock)
+run DumpKafkaBlocks {..} = dumpKafkaBlocks (fromIntegral startingBlock)
 run DumpKafkaVMEvents {..} = dumpKafkaVMEvents (fromIntegral startingBlock)
---run DumpKafkaRaw {..} = dumpKafkaRaw streamName (fromIntegral startingBlock)
+run DumpKafkaRaw {..} = dumpKafkaRaw streamName (fromIntegral startingBlock)
 run DumpKafkaStateDiff {..} = dumpKafkaStateDiff $ fromIntegral startingBlock
 run DumpRedis {..} = dumpRedis databaseNumber
 run InsertTX {} = error "strato-barometer: the insertTx tool has been deprecated."
@@ -404,5 +447,8 @@ run SetParticipationMode {..} = remoteSetParticipationMode mode
 run State {..} = let sr = MP.StateRoot $ LabeledError.b16Decode "strato-barometer/state" $ BC.pack root in State.doit sr
 run ValidatorBehavior {..} = validatorBehavior valB
 run Migrate {..} = migrate tables
+run SaveKafka {..} = saveKafka topic filename
+run LoadKafka {..} = loadKafka topic filename
+run VerifyKafkaFile {..} = verifyKafkaFile filename
 run GetPrivacy {} = error "strato-barometer: the getPrivacy tool has been deprecated."
 run PutPrivacy {} = error "strato-barometer: the putPrivacy tool has been deprecated."

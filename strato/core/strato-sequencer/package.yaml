@@ -75,7 +75,7 @@ executables:
       - common-log
       - hflags
       - http-client
-      - kafka-monad
+      - milena
       - prometheus-client
       - safe
       - seqevents
@@ -98,7 +98,7 @@ executables:
     dependencies:
       - blockstanbul
       - hflags
-      - kafka-monad
+      - milena
       - seqevents
       - strato-conf
 

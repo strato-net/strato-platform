@@ -15,7 +15,6 @@ import Blockchain.Sequencer.Event
 import Blockchain.Sequencer.Kafka
 import Blockchain.Strato.Model.Keccak256 (hash, keccak256ToByteString)
 import Blockchain.Stream.Raw
-import Control.Monad.Composable.Kafka
 import Control.Monad.IO.Class
 import Control.Monad.Except
 import qualified Data.Aeson as JSON
@@ -30,6 +29,7 @@ import qualified Data.Text as T
 import qualified Data.Vector as V
 import Network.JsonRpc.Server
 import Network.Kafka
+import Network.Kafka.Protocol
 import System.Random
 import Prelude hiding (id)
 
@@ -232,8 +232,13 @@ eth_blockNumber = toMethod "eth_blockNumber" f ()
 
 emitKafkaJsonRlpCommand :: JsonRpcCommand -> IO ()
 emitKafkaJsonRlpCommand c = do
-  _ <- runKafkaMConfigured "strato-api" $ writeSeqVmEvents [VmJsonRpcCommand c]
-  return ()
+  rets <-
+    liftIO $
+      runKafkaConfigured "strato-api" $
+        writeSeqVmEvents [VmJsonRpcCommand c]
+  case rets of
+    Left e -> error $ "Could not write txs to Kafka: " ++ show e
+    Right _ -> return ()
 
 waitForResponse :: String -> Offset -> IO B.ByteString
 waitForResponse id offset = do

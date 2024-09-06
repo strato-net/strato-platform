@@ -34,7 +34,6 @@ import Blockchain.Sequencer.DB.GetTransactionsDB
 import Blockchain.Sequencer.DB.SeenTransactionDB
 import Blockchain.Sequencer.DB.Witnessable
 import Blockchain.Sequencer.Event
-import Blockchain.Sequencer.Kafka
 import Blockchain.Sequencer.Metrics
 import Blockchain.Sequencer.Monad
 import Blockchain.Strato.Model.ChainMember
@@ -176,10 +175,10 @@ oneSequencerIter src = timeAction seqLoopTiming $ do
   prunePrivacyDBs
 
   unless (null _toVm) $ do
-    _ <- writeSeqVmEvents _toVm
+    writeSeqVmEvents _toVm
     $logDebugS "sequencer" . T.pack $ "Wrote " ++ format _toVm ++ " SeqEvents to VM"
   unless (null toP2p') $ do
-    _ <- writeSeqP2pEvents toP2p'
+    writeSeqP2pEvents toP2p'
     $logDebugS "sequencer" . T.pack $ "Wrote " ++ format toP2p' ++ " SeqEvents to P2P"
   unless (null _toUnseq) $ writeUnseqCheckpoints _toUnseq
   flush
@@ -248,7 +247,7 @@ checkForUnseq inEvents = do
 
 bootstrapBlockstanbul :: SequencerM ()
 bootstrapBlockstanbul = do
-  _ <- writeSeqVmEvents [VmCreateBlockCommand]
+  writeSeqVmEvents [VmCreateBlockCommand]
   createFirstTimer
 
 blockstanbulSend ::
@@ -758,6 +757,16 @@ prettyOTx OutputTx {otOrigin = o, otBaseTx = t} = prefix t ++ " via " ++ shortOr
 writeUnseqCheckpoints :: [Checkpoint] -> SequencerM ()
 writeUnseqCheckpoints events = do
   ch <- asks (unseqCheckpoints . cablePackage)
+  atomically . mapM_ (writeTQueue ch) $ events
+
+writeSeqVmEvents :: [VmEvent] -> SequencerM ()
+writeSeqVmEvents events = do
+  ch <- asks (seqVMEvents . cablePackage)
+  atomically . mapM_ (writeTQueue ch) $ events
+
+writeSeqP2pEvents :: [P2pEvent] -> SequencerM ()
+writeSeqP2pEvents events = do
+  ch <- asks (seqP2PEvents . cablePackage)
   atomically . mapM_ (writeTQueue ch) $ events
 
 splitWith :: Eq k => (a -> k) -> [a] -> [(k, [a])]

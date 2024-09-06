@@ -69,7 +69,6 @@ import BlockApps.X509.Certificate
 import Blockchain.Blockstanbul
 import Blockchain.Constants
 import Blockchain.Data.ChainInfo
-import Blockchain.EthConf
 import Blockchain.Privacy
 import Blockchain.Sequencer.CablePackage
 import Blockchain.Sequencer.DB.DependentBlockDB
@@ -91,7 +90,6 @@ import Control.Lens
 import Control.Monad (join, unless, void)
 import qualified Control.Monad.Change.Alter as A
 import qualified Control.Monad.Change.Modify as Mod
-import Control.Monad.Composable.Kafka
 import Control.Monad.Reader
 import Control.Monad.State
 import Data.Binary
@@ -168,11 +166,10 @@ data SequencerConfig = SequencerConfig
     cablePackage :: CablePackage,
     maxEventsPerIter :: Int,
     maxUsPerIter :: Int,
-    vaultClient :: Maybe ClientEnv, -- Nothing in tests
-    kafkaClientId :: KafkaClientId
+    vaultClient :: Maybe ClientEnv -- Nothing in tests
   }
 
-type SequencerM = StateT SequencerContext (ReaderT SequencerConfig (KafkaM (ResourceT (LoggingT IO))))
+type SequencerM = StateT SequencerContext (ReaderT SequencerConfig (ResourceT (LoggingT IO)))
 
 instance HasDependentBlockDB SequencerM where
   getDependentBlockDB = use dependentBlockDB
@@ -478,7 +475,7 @@ prunePrivacyDBs = do
 runSequencerM :: SequencerConfig -> Maybe BlockstanbulContext -> SequencerM a -> (LoggingT IO) a
 runSequencerM c mbc m = do
   liftIO $ createDirectoryIfMissing False $ dbDir "h"
-  a <- runResourceT . runKafkaMConfigured (kafkaClientId c) . flip runReaderT c $ do
+  a <- runResourceT . flip runReaderT c $ do
     dbCS <- asks depBlockDBCacheSize
     dbPath <- asks depBlockDBPath
     stxSize <- asks seenTransactionDBSize
@@ -505,7 +502,6 @@ runSequencerM c mbc m = do
           _loopTimeout = loopCh,
           _latestRoundNumber = latestRound
         }
-
   return $ fst a
 
 pairToVmTx :: (Timestamp, OutputTx) -> VmEvent
