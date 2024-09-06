@@ -129,7 +129,7 @@ if __name__ == "__main__":
 
     # Wait until both nodes have the same latest block indexed in Slipstream
     wait_for_slipstream_to_sync(node1_url, node2_url, headers1, headers2, attempts, sleep_time, "BlockApps-Mercata-Asset")
-    wait_for_slipstream_to_sync(node1_url, node2_url, headers1, headers2, attempts, sleep_time, "BlockApps-Mercata-Order")
+    wait_for_slipstream_to_sync(node1_url, node2_url, headers1, headers2, attempts, sleep_time, "BlockApps-Mercata-PaymentService.Order")
     wait_for_slipstream_to_sync(node1_url, node2_url, headers1, headers2, attempts, sleep_time, "BlockApps-Mercata-Sale")
     wait_for_slipstream_to_sync(node1_url, node2_url, headers1, headers2, attempts, sleep_time, "BlockApps-Mercata-Asset.ItemTransfers")
     wait_for_slipstream_to_sync(node1_url, node2_url, headers1, headers2, attempts, sleep_time, "BlockApps-Mercata-Asset-files")
@@ -137,7 +137,7 @@ if __name__ == "__main__":
     wait_for_slipstream_to_sync(node1_url, node2_url, headers1, headers2, attempts, sleep_time, "BlockApps-Mercata-Asset-fileNames")
 
     discrepancies_asset, count_asset_discrepancy = check_table("BlockApps-Mercata-Asset")
-    discrepancies_sale, count_sale_discrepancy = check_table("BlockApps-Mercata-Order")
+    discrepancies_sale, count_sale_discrepancy = check_table("BlockApps-Mercata-PaymentService.Order")
     discrepancies_order, count_order_discrepancy = check_table("BlockApps-Mercata-Sale")
 
     #Event tables
