@@ -106,8 +106,7 @@ replayHistoricBlock realValidators seqNo blk = do
   let propChainMember = chainMemberParsedSetToValidator $ getChainMemberFromX509 propCert
 
   unless (propChainMember `elem` realValidators) $
-    throwError $
---    error $
+    error $
       "proposer " ++ formatAddressWithoutColor prop ++ " (" ++ format propChainMember ++ ")  not a validator"
       ++ "\nreal validator list: " ++ show (map format $ S.toList realValidators)
 
@@ -115,7 +114,7 @@ replayHistoricBlock realValidators seqNo blk = do
 --  let expectedValidatorList = [c | CommonName _ _ c _ <- S.toList (unChainMembers _validatorList)]
 
   unless (expectedValidatorList == realValidators) $
-    throwError $
+    error $
       "real validator list doesn't match expected validator list for block #" ++ show (number . blockBlockData $ blk)
       ++ "\nreal validator list: " ++ show (map format $ S.toList realValidators)
       ++ "\nblock validator list: " ++ show (map format $ S.toList expectedValidatorList)
@@ -123,16 +122,15 @@ replayHistoricBlock realValidators seqNo blk = do
   unless (signerRes `S.isSubsetOf` realValidators) $ do
         let unexplained = intercalate "," . map format . S.toList $ signerRes S.\\ realValidators
         if (signerRes S.\\ realValidators) `S.isSubsetOf` futureValidatorsHack
-          then throwError $ "future validators " ++ show unexplained ++ " jumped the gun, signed block #" ++ show blockNo ++ " before they were authorized to do so.  I'll throw the block away and wait for another validator to send me the properly signed block"
-          else throwError $
+          then error $ "future validators " ++ show unexplained ++ " jumped the gun, signed block #" ++ show blockNo ++ " before they were authorized to do so.  I'll throw the block away and wait for another validator to send me the properly signed block"
+          else error $
                "unknown signers in block #" ++ show blockNo ++ ": " ++ unexplained
                ++ "\nsignerRes: " ++ show (map format $ S.toList signerRes)
                ++ "\nreal validator list: " ++ show (map format $ S.toList realValidators)
                ++ "\nblock validator list: " ++ show (map format $ S.toList expectedValidatorList)
 
   unless (3 * S.size signerRes > 2 * S.size realValidators) $
-    throwError $
---        error $ --will make this stricter once the full soln is in
+    error $
       printf "not enough commit seals (have %d out of %d)" (S.size signerRes) (S.size realValidators)
       ++ ": signerRes = " ++ show signerRes
       ++ ", realValidators = " ++ show realValidators
