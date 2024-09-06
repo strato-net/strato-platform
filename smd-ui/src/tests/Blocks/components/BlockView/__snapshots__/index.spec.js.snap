@@ -212,15 +212,15 @@ exports[`BlockView: index render component with no recipient transactions 1`] = 
       </table>
     </div>
   </div>
-  <div className="row">
-    <div className="col-sm-12">
-      <div className="h3">
+  <div className=\\"row\\">
+    <div className=\\"col-sm-12\\">
+      <div className=\\"h3\\">
         Validators 
       </div>
-      <table className="pt-table pt-interactive pt-condensed pt-striped" style={{...}}>
+      <table className=\\"pt-table pt-interactive pt-condensed pt-striped\\" style={{...}}>
         <thead>
           <tr>
-            <th width="60%">
+            <th width=\\"60%\\">
               <h5>
                 Username
               </h5>
@@ -231,15 +231,15 @@ exports[`BlockView: index render component with no recipient transactions 1`] = 
       </table>
     </div>
   </div>
-  <div className="row">
-    <div className="col-sm-12">
-      <div className="h3">
+  <div className=\\"row\\">
+    <div className=\\"col-sm-12\\">
+      <div className=\\"h3\\">
         New Validators 
       </div>
-      <table className="pt-table pt-interactive pt-condensed pt-striped" style={{...}}>
+      <table className=\\"pt-table pt-interactive pt-condensed pt-striped\\" style={{...}}>
         <thead>
           <tr>
-            <th width="60%">
+            <th width=\\"60%\\">
               <h5>
                 Username
               </h5>
@@ -250,15 +250,15 @@ exports[`BlockView: index render component with no recipient transactions 1`] = 
       </table>
     </div>
   </div>
-  <div className="row">
-    <div className="col-sm-12">
-      <div className="h3">
+  <div className=\\"row\\">
+    <div className=\\"col-sm-12\\">
+      <div className=\\"h3\\">
         Removed Validators 
       </div>
-      <table className="pt-table pt-interactive pt-condensed pt-striped" style={{...}}>
+      <table className=\\"pt-table pt-interactive pt-condensed pt-striped\\" style={{...}}>
         <thead>
           <tr>
-            <th width="60%">
+            <th width=\\"60%\\">
               <h5>
                 Username
               </h5>
@@ -269,15 +269,15 @@ exports[`BlockView: index render component with no recipient transactions 1`] = 
       </table>
     </div>
   </div>
-  <div className="row">
-    <div className="col-sm-12">
-      <div className="h3">
+  <div className=\\"row\\">
+    <div className=\\"col-sm-12\\">
+      <div className=\\"h3\\">
         New Certificates 
       </div>
-      <table className="pt-table pt-interactive pt-condensed pt-striped" style={{...}}>
+      <table className=\\"pt-table pt-interactive pt-condensed pt-striped\\" style={{...}}>
         <thead>
           <tr>
-            <th width="60%">
+            <th width=\\"60%\\">
               <h5>
                 Certificate Data
               </h5>
@@ -288,15 +288,15 @@ exports[`BlockView: index render component with no recipient transactions 1`] = 
       </table>
     </div>
   </div>
-  <div className="row">
-    <div className="col-sm-12">
-      <div className="h3">
+  <div className=\\"row\\">
+    <div className=\\"col-sm-12\\">
+      <div className=\\"h3\\">
         Revoked Certificates 
       </div>
-      <table className="pt-table pt-interactive pt-condensed pt-striped" style={{...}}>
+      <table className=\\"pt-table pt-interactive pt-condensed pt-striped\\" style={{...}}>
         <thead>
           <tr>
-            <th width="60%">
+            <th width=\\"60%\\">
               <h5>
                 Address
               </h5>
@@ -307,25 +307,25 @@ exports[`BlockView: index render component with no recipient transactions 1`] = 
       </table>
     </div>
   </div>
-  <div className="row">
-    <div className="col-sm-12">
-      <div className="h3">
+  <div className=\\"row\\">
+    <div className=\\"col-sm-12\\">
+      <div className=\\"h3\\">
         Proposal Signature 
       </div>
-      <table className="pt-table pt-interactive pt-condensed pt-striped" style={{...}}>
+      <table className=\\"pt-table pt-interactive pt-condensed pt-striped\\" style={{...}}>
         <thead>
           <tr>
-            <th width="40%">
+            <th width=\\"40%\\">
               <h5>
                 R
               </h5>
             </th>
-            <th width="40%">
+            <th width=\\"40%\\">
               <h5>
                 S
               </h5>
             </th>
-            <th width="20%">
+            <th width=\\"20%\\">
               <h5>
                 V
               </h5>
@@ -336,25 +336,25 @@ exports[`BlockView: index render component with no recipient transactions 1`] = 
       </table>
     </div>
   </div>
-  <div className="row">
-    <div className="col-sm-12">
-      <div className="h3">
+  <div className=\\"row\\">
+    <div className=\\"col-sm-12\\">
+      <div className=\\"h3\\">
         Commitment Signatures 
       </div>
-      <table className="pt-table pt-interactive pt-condensed pt-striped" style={{...}}>
+      <table className=\\"pt-table pt-interactive pt-condensed pt-striped\\" style={{...}}>
         <thead>
           <tr>
-            <th width="40%">
+            <th width=\\"40%\\">
               <h5>
                 R
               </h5>
             </th>
-            <th width="40%">
+            <th width=\\"40%\\">
               <h5>
                 S
               </h5>
             </th>
-            <th width="20%">
+            <th width=\\"20%\\">
               <h5>
                 V
               </h5>
@@ -511,15 +511,15 @@ exports[`BlockView: index render component with values 1`] = `
       </table>
     </div>
   </div>
-  <div className="row">
-    <div className="col-sm-12">
-      <div className="h3">
+  <div className=\\"row\\">
+    <div className=\\"col-sm-12\\">
+      <div className=\\"h3\\">
         Validators 
       </div>
-      <table className="pt-table pt-interactive pt-condensed pt-striped" style={{...}}>
+      <table className=\\"pt-table pt-interactive pt-condensed pt-striped\\" style={{...}}>
         <thead>
           <tr>
-            <th width="60%">
+            <th width=\\"60%\\">
               <h5>
                 Username
               </h5>
@@ -530,15 +530,15 @@ exports[`BlockView: index render component with values 1`] = `
       </table>
     </div>
   </div>
-  <div className="row">
-    <div className="col-sm-12">
-      <div className="h3">
+  <div className=\\"row\\">
+    <div className=\\"col-sm-12\\">
+      <div className=\\"h3\\">
         New Validators 
       </div>
-      <table className="pt-table pt-interactive pt-condensed pt-striped" style={{...}}>
+      <table className=\\"pt-table pt-interactive pt-condensed pt-striped\\" style={{...}}>
         <thead>
           <tr>
-            <th width="60%">
+            <th width=\\"60%\\">
               <h5>
                 Username
               </h5>
@@ -549,15 +549,15 @@ exports[`BlockView: index render component with values 1`] = `
       </table>
     </div>
   </div>
-  <div className="row">
-    <div className="col-sm-12">
-      <div className="h3">
+  <div className=\\"row\\">
+    <div className=\\"col-sm-12\\">
+      <div className=\\"h3\\">
         Removed Validators 
       </div>
-      <table className="pt-table pt-interactive pt-condensed pt-striped" style={{...}}>
+      <table className=\\"pt-table pt-interactive pt-condensed pt-striped\\" style={{...}}>
         <thead>
           <tr>
-            <th width="60%">
+            <th width=\\"60%\\">
               <h5>
                 Username
               </h5>
@@ -568,15 +568,15 @@ exports[`BlockView: index render component with values 1`] = `
       </table>
     </div>
   </div>
-  <div className="row">
-    <div className="col-sm-12">
-      <div className="h3">
+  <div className=\\"row\\">
+    <div className=\\"col-sm-12\\">
+      <div className=\\"h3\\">
         New Certificates 
       </div>
-      <table className="pt-table pt-interactive pt-condensed pt-striped" style={{...}}>
+      <table className=\\"pt-table pt-interactive pt-condensed pt-striped\\" style={{...}}>
         <thead>
           <tr>
-            <th width="60%">
+            <th width=\\"60%\\">
               <h5>
                 Certificate Data
               </h5>
@@ -587,15 +587,15 @@ exports[`BlockView: index render component with values 1`] = `
       </table>
     </div>
   </div>
-  <div className="row">
-    <div className="col-sm-12">
-      <div className="h3">
+  <div className=\\"row\\">
+    <div className=\\"col-sm-12\\">
+      <div className=\\"h3\\">
         Revoked Certificates 
       </div>
-      <table className="pt-table pt-interactive pt-condensed pt-striped" style={{...}}>
+      <table className=\\"pt-table pt-interactive pt-condensed pt-striped\\" style={{...}}>
         <thead>
           <tr>
-            <th width="60%">
+            <th width=\\"60%\\">
               <h5>
                 Address
               </h5>
@@ -606,25 +606,25 @@ exports[`BlockView: index render component with values 1`] = `
       </table>
     </div>
   </div>
-  <div className="row">
-    <div className="col-sm-12">
-      <div className="h3">
+  <div className=\\"row\\">
+    <div className=\\"col-sm-12\\">
+      <div className=\\"h3\\">
         Proposal Signature 
       </div>
-      <table className="pt-table pt-interactive pt-condensed pt-striped" style={{...}}>
+      <table className=\\"pt-table pt-interactive pt-condensed pt-striped\\" style={{...}}>
         <thead>
           <tr>
-            <th width="40%">
+            <th width=\\"40%\\">
               <h5>
                 R
               </h5>
             </th>
-            <th width="40%">
+            <th width=\\"40%\\">
               <h5>
                 S
               </h5>
             </th>
-            <th width="20%">
+            <th width=\\"20%\\">
               <h5>
                 V
               </h5>
@@ -635,25 +635,25 @@ exports[`BlockView: index render component with values 1`] = `
       </table>
     </div>
   </div>
-  <div className="row">
-    <div className="col-sm-12">
-      <div className="h3">
+  <div className=\\"row\\">
+    <div className=\\"col-sm-12\\">
+      <div className=\\"h3\\">
         Commitment Signatures 
       </div>
-      <table className="pt-table pt-interactive pt-condensed pt-striped" style={{...}}>
+      <table className=\\"pt-table pt-interactive pt-condensed pt-striped\\" style={{...}}>
         <thead>
           <tr>
-            <th width="40%">
+            <th width=\\"40%\\">
               <h5>
                 R
               </h5>
             </th>
-            <th width="40%">
+            <th width=\\"40%\\">
               <h5>
                 S
               </h5>
             </th>
-            <th width="20%">
+            <th width=\\"20%\\">
               <h5>
                 V
               </h5>
@@ -721,15 +721,15 @@ exports[`BlockView: index render component without values 1`] = `
       </table>
     </div>
   </div>
-  <div className="row">
-    <div className="col-sm-12">
-      <div className="h3">
+  <div className=\\"row\\">
+    <div className=\\"col-sm-12\\">
+      <div className=\\"h3\\">
         Validators 
       </div>
-      <table className="pt-table pt-interactive pt-condensed pt-striped" style={{...}}>
+      <table className=\\"pt-table pt-interactive pt-condensed pt-striped\\" style={{...}}>
         <thead>
           <tr>
-            <th width="60%">
+            <th width=\\"60%\\">
               <h5>
                 Username
               </h5>
@@ -740,15 +740,15 @@ exports[`BlockView: index render component without values 1`] = `
       </table>
     </div>
   </div>
-  <div className="row">
-    <div className="col-sm-12">
-      <div className="h3">
+  <div className=\\"row\\">
+    <div className=\\"col-sm-12\\">
+      <div className=\\"h3\\">
         New Validators 
       </div>
-      <table className="pt-table pt-interactive pt-condensed pt-striped" style={{...}}>
+      <table className=\\"pt-table pt-interactive pt-condensed pt-striped\\" style={{...}}>
         <thead>
           <tr>
-            <th width="60%">
+            <th width=\\"60%\\">
               <h5>
                 Username
               </h5>
@@ -759,15 +759,15 @@ exports[`BlockView: index render component without values 1`] = `
       </table>
     </div>
   </div>
-  <div className="row">
-    <div className="col-sm-12">
-      <div className="h3">
+  <div className=\\"row\\">
+    <div className=\\"col-sm-12\\">
+      <div className=\\"h3\\">
         Removed Validators 
       </div>
-      <table className="pt-table pt-interactive pt-condensed pt-striped" style={{...}}>
+      <table className=\\"pt-table pt-interactive pt-condensed pt-striped\\" style={{...}}>
         <thead>
           <tr>
-            <th width="60%">
+            <th width=\\"60%\\">
               <h5>
                 Username
               </h5>
@@ -778,15 +778,15 @@ exports[`BlockView: index render component without values 1`] = `
       </table>
     </div>
   </div>
-  <div className="row">
-    <div className="col-sm-12">
-      <div className="h3">
+  <div className=\\"row\\">
+    <div className=\\"col-sm-12\\">
+      <div className=\\"h3\\">
         New Certificates 
       </div>
-      <table className="pt-table pt-interactive pt-condensed pt-striped" style={{...}}>
+      <table className=\\"pt-table pt-interactive pt-condensed pt-striped\\" style={{...}}>
         <thead>
           <tr>
-            <th width="60%">
+            <th width=\\"60%\\">
               <h5>
                 Certificate Data
               </h5>
@@ -797,15 +797,15 @@ exports[`BlockView: index render component without values 1`] = `
       </table>
     </div>
   </div>
-  <div className="row">
-    <div className="col-sm-12">
-      <div className="h3">
+  <div className=\\"row\\">
+    <div className=\\"col-sm-12\\">
+      <div className=\\"h3\\">
         Revoked Certificates 
       </div>
-      <table className="pt-table pt-interactive pt-condensed pt-striped" style={{...}}>
+      <table className=\\"pt-table pt-interactive pt-condensed pt-striped\\" style={{...}}>
         <thead>
           <tr>
-            <th width="60%">
+            <th width=\\"60%\\">
               <h5>
                 Address
               </h5>
@@ -816,25 +816,25 @@ exports[`BlockView: index render component without values 1`] = `
       </table>
     </div>
   </div>
-  <div className="row">
-    <div className="col-sm-12">
-      <div className="h3">
+  <div className=\\"row\\">
+    <div className=\\"col-sm-12\\">
+      <div className=\\"h3\\">
         Proposal Signature 
       </div>
-      <table className="pt-table pt-interactive pt-condensed pt-striped" style={{...}}>
+      <table className=\\"pt-table pt-interactive pt-condensed pt-striped\\" style={{...}}>
         <thead>
           <tr>
-            <th width="40%">
+            <th width=\\"40%\\">
               <h5>
                 R
               </h5>
             </th>
-            <th width="40%">
+            <th width=\\"40%\\">
               <h5>
                 S
               </h5>
             </th>
-            <th width="20%">
+            <th width=\\"20%\\">
               <h5>
                 V
               </h5>
@@ -845,25 +845,25 @@ exports[`BlockView: index render component without values 1`] = `
       </table>
     </div>
   </div>
-  <div className="row">
-    <div className="col-sm-12">
-      <div className="h3">
+  <div className=\\"row\\">
+    <div className=\\"col-sm-12\\">
+      <div className=\\"h3\\">
         Commitment Signatures 
       </div>
-      <table className="pt-table pt-interactive pt-condensed pt-striped" style={{...}}>
+      <table className=\\"pt-table pt-interactive pt-condensed pt-striped\\" style={{...}}>
         <thead>
           <tr>
-            <th width="40%">
+            <th width=\\"40%\\">
               <h5>
                 R
               </h5>
             </th>
-            <th width="40%">
+            <th width=\\"40%\\">
               <h5>
                 S
               </h5>
             </th>
-            <th width="20%">
+            <th width=\\"20%\\">
               <h5>
                 V
               </h5>
