@@ -38,9 +38,11 @@ initP2P = labelTheThread "initP2P" $ do
   _ <- liftIO $ $initHFlags "Strato P2P"
   setParticipationMode flags_participationMode
   cfg <- initConfig flags_maxReturnedHeaders
-  let sSource  = seqEventNotificationSource $ contextKafkaState initContext
+  c <- initContext
+  let sSource  = seqEventNotificationSource $ contextKafkaState c
       runner f = do
-        ctx <- liftIO $ newIORef initContext
+        c' <- initContext
+        ctx <- liftIO $ newIORef c'
         let cfg' = cfg { configContext = ctx }
         runContextM cfg' $ f sSource
   liftIO $

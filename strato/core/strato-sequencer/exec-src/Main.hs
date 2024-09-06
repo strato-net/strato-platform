@@ -9,7 +9,6 @@ import BlockApps.Init
 import BlockApps.Logging
 import Blockchain.Blockstanbul
 import Blockchain.Data.GenesisInfo
-import qualified Blockchain.EthConf as EC
 import Blockchain.Generation
 import Blockchain.Sequencer
 import Blockchain.Sequencer.CablePackage
@@ -21,12 +20,11 @@ import Control.Concurrent.Async as Async
 import Control.Concurrent.STM
 import Control.Concurrent.STM.TMChan
 import Control.Monad
-import qualified Data.ByteString.Char8 as C8
+import Data.String
 import Flags
 import HFlags
 import Instrumentation
 import Network.HTTP.Client (defaultManagerSettings, newManager)
-import qualified Network.Kafka.Protocol as KP
 import Network.Wai.Handler.Warp
 import Network.Wai.Middleware.Prometheus
 import Safe
@@ -60,19 +58,16 @@ main = do
   putStrLn $ "strato-sequencer validatorBehavior: " ++ show flags_validatorBehavior
 
   pkg <- atomically newCablePackage
-  let kafkaClientId' = KP.KString $ C8.pack flags_kafkaclientid
+  let kafkaClientId' = flags_kafkaclientid
       mKafkaAddress = case span (/= ':') flags_kafkaaddress of
         (_, "") -> Nothing
         (khost, kport) ->
-          Just
-            ( KP.Host (KP.KString (C8.pack khost)),
-              KP.Port (readDef 9092 (drop 1 kport))
-            )
+          Just (fromString khost, fromInteger $ readDef 9092 $ drop 1 kport)
       gregorCfg =
         GregorConfig
           { kafkaAddress = mKafkaAddress,
-            kafkaClientId = kafkaClientId',
-            kafkaConsumerGroup = EC.lookupConsumerGroup kafkaClientId',
+            kafkaClientId = fromString kafkaClientId',
+            kafkaConsumerGroup = fromString kafkaClientId',
             cablePackage = pkg
           }
 
@@ -117,7 +112,8 @@ main = do
             cablePackage = pkg,
             maxEventsPerIter = flags_seq_max_events_per_iter,
             maxUsPerIter = flags_seq_max_us_per_iter,
-            vaultClient = Just clientEnv
+            vaultClient = Just clientEnv,
+            kafkaClientId = fromString kafkaClientId'
           }
   race_ (runTheGregor gregorCfg)
     . race_ (runLoggingT (runSequencerM seqCfg mCtx (sequencer validators)))
