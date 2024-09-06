@@ -12,7 +12,7 @@ import { generateHtmlContent } from "../../helpers/emailTemplate";
 const { Option } = Select;
 
 const ResponsiveCart = ({
-  paymentProviders,
+  paymentServices,
   data,
   confirm,
   AddQty,
@@ -90,7 +90,7 @@ const ResponsiveCart = ({
      htmlContents.push(generateHtmlContent(customerFirstName, concatenatedOrderString));
   };
 
-  const handlePaymentConfirm = async (paymentProvider) => {
+  const handlePaymentConfirm = async (paymentService) => {
     actions.addItemToConfirmOrder(marketplaceDispatch, cartData);
     let orderList = [];
     cartData.forEach((item) => {
@@ -105,7 +105,7 @@ const ResponsiveCart = ({
     generate_HTML_Content(user.commonName)
 
     let body = {
-      paymentProvider: { address: paymentProvider.address },
+      paymentService: { address: paymentService.address },
       buyerOrganization: userOrganization,
       orderList,
       orderTotal: total,
@@ -128,8 +128,8 @@ const ResponsiveCart = ({
     let checkoutHashAndAssets = await orderActions.createPayment(orderDispatch, body);
     if (checkoutHashAndAssets && checkoutHashAndAssets !== false) {
       const [checkoutHash, assets] = checkoutHashAndAssets;
-      let serviceURL = paymentProvider.serviceURL || paymentProvider.data.serviceURL;
-      let checkoutRoute = paymentProvider.checkoutRoute || paymentProvider.data.checkoutRoute;
+      let serviceURL = paymentService.serviceURL || paymentService.data.serviceURL;
+      let checkoutRoute = paymentService.checkoutRoute || paymentService.data.checkoutRoute;
       if (serviceURL && serviceURL !== '' && checkoutRoute && checkoutRoute !== '') {
         const url = `${serviceURL}${checkoutRoute}?email=${encodeURIComponent(user.email)}&checkoutHash=${checkoutHash}&redirectUrl=${window.location.protocol}//${window.location.host}/order/status`;
         window.location.replace(url);
@@ -140,7 +140,7 @@ const ResponsiveCart = ({
   };
 
   const handleChange = async (value) => {
-    const provider = paymentProviders.find(provider => provider?.serviceName === value);
+    const provider = paymentServices.find(provider => provider?.serviceName === value);
     setSelectedProvider(provider);
 
     if (hasChecked && !isAuthenticated && loginUrl !== undefined) {
@@ -338,7 +338,7 @@ const ResponsiveCart = ({
                 onChange={handleChange}
                 placeholder="Select Payment Option"
               >
-                {paymentProviders && paymentProviders.map(provider => (
+                {paymentServices && paymentServices.map(provider => (
                   provider && <Option className='payment-dropdown' key={provider?.serviceName} value={provider?.serviceName}>
                     <Row className="w-full">
                         <Col span={22} className="text-left">Checkout with {provider?.serviceName}</Col>

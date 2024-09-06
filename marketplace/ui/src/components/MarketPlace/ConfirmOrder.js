@@ -24,7 +24,7 @@ import { generateHtmlContent } from "../../helpers/emailTemplate";
 
 const { Option } = Select;
 
-const ConfirmOrder = ({ paymentProviders = [], data, columns }) => {
+const ConfirmOrder = ({ paymentServices = [], data, columns }) => {
   const marketplaceDispatch = useMarketplaceDispatch();
   const orderDispatch = useOrderDispatch();
   const [api, contextHolder] = notification.useNotification();
@@ -148,7 +148,7 @@ const ConfirmOrder = ({ paymentProviders = [], data, columns }) => {
 
 
 
-  const handlePaymentConfirm = async (paymentProvider) => {
+  const handlePaymentConfirm = async (paymentService) => {
     actions.addItemToConfirmOrder(marketplaceDispatch, cartData);
     let orderList = [];
     cartData.forEach((item) => {
@@ -163,7 +163,7 @@ const ConfirmOrder = ({ paymentProviders = [], data, columns }) => {
     generate_HTML_Content(user.commonName)
 
     let body = {
-      paymentProvider: { address: paymentProvider.address },
+      paymentService: { address: paymentService.address },
       buyerOrganization: userOrganization,
       orderList,
       orderTotal: total,
@@ -191,8 +191,8 @@ const ConfirmOrder = ({ paymentProviders = [], data, columns }) => {
     }
     if (checkoutHashAndAssets && checkoutHashAndAssets !== false) {
       const [checkoutHash, assets] = checkoutHashAndAssets;
-      let serviceURL = paymentProvider.serviceURL || paymentProvider.data.serviceURL;
-      let checkoutRoute = paymentProvider.checkoutRoute || paymentProvider.data.checkoutRoute;
+      let serviceURL = paymentService.serviceURL || paymentService.data.serviceURL;
+      let checkoutRoute = paymentService.checkoutRoute || paymentService.data.checkoutRoute;
       if (serviceURL
             && serviceURL !== ''
             && checkoutRoute
@@ -207,7 +207,7 @@ const ConfirmOrder = ({ paymentProviders = [], data, columns }) => {
   };
 
   const handleChange = async (value) => {
-    const provider = paymentProviders.find(provider => provider?.serviceName === value);
+    const provider = paymentServices.find(provider => provider?.serviceName === value);
     setSelectedProvider(provider);
 
     if (hasChecked && !isAuthenticated && loginUrl !== undefined) {
@@ -304,9 +304,9 @@ const ConfirmOrder = ({ paymentProviders = [], data, columns }) => {
                     className="w-[250px] text-center selected-payment-option items-select"
                     onChange={handleChange}
                     placeholder="Select Payment Option"
-                    disabled={paymentProviders.length === 0}
+                    disabled={paymentServices.length === 0}
                   >
-                    {paymentProviders && paymentProviders.map(provider => (
+                    {paymentServices && paymentServices.map(provider => (
                       provider && <Option className='payment-dropdown' key={provider?.serviceName} value={provider?.serviceName}>
                         <Row className="w-full">
                         <Col span={22} className="text-left">Checkout with {provider?.serviceName}</Col>

@@ -85,18 +85,18 @@ const Checkout = () => {
     const map = new Map();
     for (const obj of cartList) {
       const org = obj.product.ownerCommonName;
-      const newPPs = new Set(obj.product.paymentProviders)
+      const newPPs = new Set(obj.product.paymentServices)
       if (!map.has(org)) {
-        map.set(org, { paymentProviders: newPPs, items: [] });
+        map.set(org, { paymentServices: newPPs, items: [] });
       }
-      const oldPPs = map.get(org).paymentProviders;
+      const oldPPs = map.get(org).paymentServices;
       map.get(org).items.push(obj);
-      map.get(org).paymentProviders = new Set([...oldPPs].filter(x => newPPs.has(x)))
+      map.get(org).paymentServices = new Set([...oldPPs].filter(x => newPPs.has(x)))
     }
     const mapDataArray = Array.from(map, (entry, index) => {
       // Modify the values and keys as needed
       const [key, value] = entry;
-      const { paymentProviders, items } = value;
+      const { paymentServices, items } = value;
       let modifiedValue = [];
       items.forEach((item) => {
         const parts = item.product.contract_name.split("-");
@@ -126,7 +126,7 @@ const Checkout = () => {
       });
 
       // Return the new object
-      return { key: key, value: { paymentProviders: [...paymentProviders], items: modifiedValue } };
+      return { key: key, value: { paymentServices: [...paymentServices], items: modifiedValue } };
     });
     setmapData(mapDataArray);
   }, [marketplaceDispatch, cartList]);
@@ -357,7 +357,6 @@ const Checkout = () => {
   ];
 
   const filterPaymentServices = (e) => {
-    console.log(e);
     const filteredPaymentServices = e.map(assetPaymentServices => paymentServices.find(paymentService => paymentService.creator === assetPaymentServices.value.creator && paymentService.serviceName === assetPaymentServices.value.serviceName));
 
     return filteredPaymentServices;
@@ -402,14 +401,14 @@ const Checkout = () => {
                 <React.Fragment key={e.key}>
                   <div className={`hidden lg:block`}>
                     <ConfirmOrder
-                      paymentProviders={filterPaymentServices(e.value.paymentProviders)}
+                      paymentServices={filterPaymentServices(e.value.paymentServices)}
                       data={e.value.items}
                       columns={columns}
                     />
                   </div>
                   <div className="lg:hidden">
                     <ResponsiveCart
-                      paymentProviders={filterPaymentServices(e.value.paymentProviders)}
+                      paymentServices={filterPaymentServices(e.value.paymentServices)}
                       data={e.value.items}
                       AddQty={AddQty}
                       MinusQty={MinusQty}

@@ -38,7 +38,7 @@ import saleOrderJs from "/dapp/orders/saleOrder";
 
 import inventoryJs from "/dapp/products/inventory";
 import marketplaceJs from "/dapp/marketplace/marketplace.js";
-import paymentProviderJs from '/dapp/payments/paymentProvider';
+import paymentServiceJs from '/dapp/payments/paymentService';
 import redemptionServiceJs from '/dapp/redemptions/redemptionService';
 
 import strats from "../strats/strats";
@@ -816,8 +816,8 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
   // ------------------------------ SALE TEST STARTS ------------------------------
 
   contract.cancelSaleOrder = async function (args, options = defaultOptions) {
-    const { paymentProvider, ...restArgs } = args;
-    const contract = { name: saleOrderJs.paymentServiceContractName, address: paymentProvider.address }
+    const { paymentService, ...restArgs } = args;
+    const contract = { name: saleOrderJs.paymentServiceContractName, address: paymentService.address }
     return saleOrderJs.cancelOrder(rawAdmin, contract, restArgs, options);
   }
 
@@ -996,19 +996,19 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
   // //-----------------------------PAYMENT starts here -------------------------------
 
   contract.getPaymentServices = async function (args, options = defaultOptions) {
-    const paymentServices = await paymentProviderJs.getAll(rawAdmin, args, options);
+    const paymentServices = await paymentServiceJs.getAll(rawAdmin, args, options);
     return paymentServices;
   }
 
   contract.getNotOnboardedPaymentServices = async function (args, options = defaultOptions) {
-    const paymentServices = await paymentProviderJs.getNotOnboarded(rawAdmin, args, options);
+    const paymentServices = await paymentServiceJs.getNotOnboarded(rawAdmin, args, options);
     return paymentServices;
   }
 
   contract.paymentCheckout = async function (originUrl, args, options = defaultOptions) {
     try {
 
-      const { paymentProvider, orderList, orderTotal: recievedOrderTotal } = args;
+      const { paymentService, orderList, orderTotal: recievedOrderTotal } = args;
 
       const assetAddresses = orderList.map(o => o.assetAddress);
       const quantities = orderList.map(o => o.quantity);
@@ -1035,14 +1035,14 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
       }
       const createdDate = Math.floor(Date.now() / 1000);
       const paymentParameters = {
-        address: paymentProvider.address,
+        address: paymentService.address,
         checkoutId: util.uid(),
         saleAddresses,
         quantities,
         createdDate,
         comments: DEFAULT_COMMENT,
       }
-      const checkoutHashAndAssets = await paymentProviderJs.createPayment(rawAdmin, paymentParameters, options);
+      const checkoutHashAndAssets = await paymentServiceJs.createPayment(rawAdmin, paymentParameters, options);
 
       return checkoutHashAndAssets;
 
@@ -1057,8 +1057,8 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
 
   contract.getStratsOrderEvent = async function (args, options = defaultOptions) {
 
-    const currentPaymentProvider = await paymentProviderJs.getAll(rawAdmin, { address: args.paymentProvider }, options);
-    if (currentPaymentProvider[0].contract_name.includes('StratPaymentService')) {
+    const currentPaymentService = await paymentServiceJs.getAll(rawAdmin, { address: args.paymentService }, options);
+    if (currentPaymentService[0].contract_name.includes('StratPaymentService')) {
       const orderEvent = await rest.searchUntil(
         rawAdmin,
         { name: "BlockApps-Mercata-PaymentService.Order" },
