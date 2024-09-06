@@ -73,13 +73,18 @@ authenticate (IMsg (MsgAuth cm sig) tm) = do
   return (mAddress == cmAddress)
 authenticate _ = return True
 
+getValidatorFromAddress :: (MonadError String m, A.Selectable Address X509CertInfoState m) =>
+                           Address -> m (Maybe Validator)
+getValidatorFromAddress addr = case addr of
+  Address 0x8c945210bbedf90a0c54d0e68357398586c865c3 -> pure . Just $ Validator "dustin-node" -- testnet2 hack
+  _ -> fmap (chainMemberParsedSetToValidator . getChainMemberFromX509) <$> getX509FromAddress addr
 
-getX509FromAddress' :: (MonadError String m, A.Selectable Address X509CertInfoState m) =>
-                       Address -> m X509CertInfoState
-getX509FromAddress' address = do
-  maybeCert <- getX509FromAddress address
+getValidatorFromAddress' :: (MonadError String m, A.Selectable Address X509CertInfoState m) =>
+                       Address -> m Validator
+getValidatorFromAddress' address = do
+  maybeValidator <- getValidatorFromAddress address
 
-  case maybeCert of
+  case maybeValidator of
     Nothing -> throwError $ "Missing address in X509 certificate database: " ++ formatAddressWithoutColor address
     Just v -> return v
 
@@ -92,22 +97,18 @@ replayHistoricBlock realValidators seqNo blk = do
 
   signers <- sequence $ map (verifyCommitmentSeal (blockHash blk)) _commitment
       
-  noAddress <- sequence $ map getX509FromAddress signers
-  
-  let signerRes = S.fromList $ ((chainMemberParsedSetToValidator . getChainMemberFromX509) <$> (catMaybes noAddress))
+  signerRes <- S.fromList . catMaybes <$> traverse getValidatorFromAddress signers
   
   unless (seqNo + 1 == blockNo) $
     throwError $ printf "unexpected block number: have %d, wanted %d" blockNo (seqNo + 1)
 
   prop <- liftEither $ maybeToEither "invalid proposer seal" mProp
 
-  propCert <- getX509FromAddress' prop
+  propValidator <- getValidatorFromAddress' prop
 
-  let propChainMember = chainMemberParsedSetToValidator $ getChainMemberFromX509 propCert
-
-  unless (propChainMember `elem` realValidators) $
+  unless (propValidator `elem` realValidators) $
     error $
-      "proposer " ++ formatAddressWithoutColor prop ++ " (" ++ format propChainMember ++ ")  not a validator"
+      "proposer " ++ formatAddressWithoutColor prop ++ " (" ++ format propValidator ++ ")  not a validator"
       ++ "\nreal validator list: " ++ show (map format $ S.toList realValidators)
 
   let expectedValidatorList = S.map chainMemberParsedSetToValidator $ unChainMembers _validatorList
@@ -135,7 +136,7 @@ replayHistoricBlock realValidators seqNo blk = do
       ++ ": signerRes = " ++ show signerRes
       ++ ", realValidators = " ++ show realValidators
         
-  return (fromIntegral $ seqNo + 1, propChainMember)
+  return (fromIntegral $ seqNo + 1, propValidator)
 
 isHistoricBlock :: Block -> Bool
 isHistoricBlock = fromMaybe False . evalIstanbulExtra (fmap $ not . null . _commitment) -- check if signatures list from IstanbulExtra is empty
