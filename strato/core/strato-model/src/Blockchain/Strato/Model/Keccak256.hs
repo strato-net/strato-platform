@@ -6,15 +6,16 @@
 {-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE OverloadedLists #-}
 {-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE UndecidableInstances #-}
 {-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE TypeApplications #-}
 
 module Blockchain.Strato.Model.Keccak256
   ( Keccak256,
+    RLPHashable(..),
     blockstanbulMixHash,
     formatKeccak256WithoutColor,
     hash,
-    rlpHash,
     emptyHash,
     zeroHash,
     keccak256FromHex,
@@ -148,8 +149,11 @@ formatKeccak256WithoutColor s
   | s == hash "" = "<blank>"
   | otherwise = keccak256ToHex s
 
-rlpHash :: RLPSerializable a => a -> Keccak256
-rlpHash = hash . rlpSerialize . rlpEncode
+class RLPHashable a where
+  rlpHash :: a -> Keccak256
+
+instance RLPSerializable a => RLPHashable a where
+  rlpHash = hash . rlpSerialize . rlpEncode
 
 hash :: BC.ByteString -> Keccak256
 hash = Keccak256 . fastKeccak256
