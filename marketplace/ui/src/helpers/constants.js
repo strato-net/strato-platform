@@ -56,6 +56,8 @@ export const INVENTORY_STATUS = {
   "2": "Unpublished",
 };
 
+export const OLD_SADDOG_ORIGIN_ADDRESS = "dbf23119bb52a7419c66c7b5055dd3f31545dc14";
+
 export const getUnitNameByIndex = (index) => {
   const unit = unitOfMeasures.find((measure) => measure.value === parseInt(index));
 
@@ -284,6 +286,7 @@ export const BANNER = [
     link: '/c/Spirits?sc=Spirits',
     text: <div className="liquid_gold_text_box banner-text">
       <h1> Liquid Gold </h1>
+      <h1> Whiskey Casks </h1>
     </div>,
     desktopText: "Explore More",
     mobileText: "Explore",

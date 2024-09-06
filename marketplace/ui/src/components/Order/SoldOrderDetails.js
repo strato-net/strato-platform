@@ -265,13 +265,6 @@ const SoldOrderDetails = ({ user, users }) => {
       render: (text) => <p>{text}</p>,
     },
     {
-      title: <Text className="text-primaryC text-[13px]">Tax</Text>,
-      dataIndex: "tax",
-      key: "tax",
-      align: "center",
-      render: (text) => <p>{text}</p>,
-    },
-    {
       title: <Text className="text-primaryC text-[13px]">Amount</Text>,
       dataIndex: "amount",
       key: "amount",

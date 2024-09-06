@@ -38,9 +38,8 @@ const TransactionTable = ({ user, download, isAllOrdersLoading }) => {
 
   const currentMonth = dayjs().startOf('month').unix();
 
-  const searchParams = new URLSearchParams(location.search);
-  const type = searchParams.get('type');
-  const dateQuery = searchParams.get('date');
+  const [type, setType] = useState("");
+  const [dateQuery, setDateQuery] = useState("");
   const [transactions, setTransactions] = useState(userTransactions)
   const [search, setSearch] = useState("")
 
@@ -77,27 +76,59 @@ const TransactionTable = ({ user, download, isAllOrdersLoading }) => {
   },[dateQuery, type])
 
   useEffect(() => {
-    let filteredData = userTransactions;
+    const searchParams = new URLSearchParams(location.search);
+    const urlType = searchParams.get("type");
+    const urlDate = searchParams.get("date");
+  
+    // Update state based on URL params, but skip empty values
+    setType(urlType && urlType !== "all" ? urlType : "");
+    setDateQuery(urlDate || "");
+  }, [location.search]);
+  
 
+  useEffect(() => {
+    let filteredData = userTransactions;
+  
+    // Type filter
     if (type) {
       filteredData = filteredData.filter((item) => item.type === type);
     }
+  
+    // Search filter
     if (search) {
       const searchString = String(search).toLowerCase();
       filteredData = filteredData.filter((item) =>
-        String(item.assetName).toLowerCase().indexOf(searchString) !== -1
+        String(item.assetName).toLowerCase().includes(searchString)
       );
     }
-
+  
+    // Apply the date filter (month and year comparison)
+    if (dateQuery) {
+      // Format `dateQuery` (e.g., "August 2024") into a dayjs object
+      const selectedMonthYear = dayjs(dateQuery, "MMMM YYYY");
+  
+      filteredData = filteredData.filter((item) => {
+        const itemDate = dayjs(item.block_timestamp); // Convert block timestamp to dayjs object
+  
+        // Compare both month and year
+        return itemDate.isSame(selectedMonthYear, 'month') && itemDate.isSame(selectedMonthYear, 'year');
+      });
+    }
+  
     setTransactions(filteredData);
-  }, [userTransactions, type, search]);
+  }, [userTransactions, type, search, dateQuery]);
+  
 
 
+  // Handle the date change event. Update the URL and state
   const onDateChange = (date) => {
     const unixTimestamp = dayjs(date).unix();
     const formattedDate = dayjs.unix(unixTimestamp).format('MMMM YYYY');
-    navigate(`/transactions?date=${formattedDate}`);
+    const currentType = type || ""; // Use the current type value or empty if not set
+    navigate(`/transactions?type=${currentType}&date=${formattedDate}`);
+    setDateQuery(formattedDate); // Update the date state
   };
+  
 
   const dateReturn = (date) => {
     const startDate = dayjs(date).startOf('month').unix();
@@ -270,6 +301,7 @@ const TransactionTable = ({ user, download, isAllOrdersLoading }) => {
     setSearch(value)
   }
 
+  // Handle the Type change event. Update the URL and state
   const handleFilter = (val) => {
     if(dateQuery){
       navigate(val ? `/transactions?type=${val}&date=${dateQuery}` : `/transactions?date=${dateQuery}`)
