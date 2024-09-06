@@ -72,6 +72,10 @@ const TransactionTable = ({ user, download, isAllOrdersLoading }) => {
     }
   }, [user, dateQuery])
 
+  useEffect(()=>{
+    setSearch('')
+  },[dateQuery, type])
+
   useEffect(() => {
     let filteredData = userTransactions;
 
@@ -294,7 +298,7 @@ const TransactionTable = ({ user, download, isAllOrdersLoading }) => {
               <Col xs={24} xl={24}>
                 <Row className="w-full md:w-auto md:flex md:justify-between items-center mb-5 mt-4">
                   <Col xs={24} md={7} className="flex justify-center mt-2 md:mt-0">
-                    <Select className="block lg:block w-full md:w-4/5 rounded-md mx-auto" onChange={(val) => { handleFilter(val) }} placeholder="Select Type" defaultValue={type || ''}>
+                    <Select className="block lg:block w-full md:w-4/5 rounded-md mx-auto" key={type} onChange={(val) => { handleFilter(val) }} placeholder="Select Type" defaultValue={type || ''}>
                       {TRANSACTION_FILTER.map(({ label, value }) =>
                         <Select.Option value={value}> {label} </Select.Option>
                       )}
