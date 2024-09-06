@@ -33,7 +33,7 @@ const MyWallet = ({ user }) => {
   const [isLoading, setIsLoading] = useState(true);
   const isMobile = useMediaQuery("(max-width: 767px)");
   const navigate = useNavigate();
-  const naviroute = routes.MyWalletDetail.url;
+  const naviroute = routes.MyWallet.url;
   const { Title, Text } = Typography;
   const linkUrl = window.location.href;
   const [totalBalance, setTotalBalance] = useState(0);

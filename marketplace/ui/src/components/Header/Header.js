@@ -115,6 +115,7 @@ const HeaderComponent = ({
     routes.Transactions.url,
     routes.MyItems.url,
     routes.Products.url,
+    routes.MyWallet.url,
   ];
 
   const logout = () => {
@@ -146,7 +147,7 @@ const HeaderComponent = ({
       setSelectedTab("1");
     } else if (pathName.includes("/myitems")) {
       setSelectedTab("2");
-    } else if (pathName.includes("/products")) {
+    } else if (pathName.includes("/mywallet")) {
       setSelectedTab("3");
     } else {
       setSelectedTab("0");
@@ -258,6 +259,7 @@ const HeaderComponent = ({
       label: "Transactions",
     },
     { value: "myitems", path: "/myitems", label: "My Items" },
+    { value: "mywallet", path: "/mywallet", label: "My Wallet" },
     user
       ? {
           value: "my-profile",

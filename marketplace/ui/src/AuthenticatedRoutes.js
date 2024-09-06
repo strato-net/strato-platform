@@ -10,6 +10,7 @@ import Inventory from "./components/Inventory";
 import { InventoriesProvider } from "./contexts/inventory";
 import { PaymentServicesProvider } from "./contexts/payment";
 import Item from "./components/Item";
+import MyWallet from "./components/MyWallet";
 import { ItemsProvider } from "./contexts/item";
 import Order from "./components/Order";
 import SoldOrderDetails from "./components/Order/SoldOrderDetails";
@@ -134,17 +135,19 @@ const AuthenticatedRoutes = ({ user, users, isAuthenticated }) => {
           </UsersProvider>
         }
       />
-      {user?.isAdmin && (<Route
-        exact
-        path={routes.Admin.url}
-        element={
-          <UsersProvider>
-            <IssuerStatusProvider>
-              <AuthorizeIssuer />
-            </IssuerStatusProvider>
-          </UsersProvider>
-        }
-      />)}
+      {user?.isAdmin && (
+        <Route
+          exact
+          path={routes.Admin.url}
+          element={
+            <UsersProvider>
+              <IssuerStatusProvider>
+                <AuthorizeIssuer />
+              </IssuerStatusProvider>
+            </UsersProvider>
+          }
+        />
+      )}
       <Route
         exact
         path={routes.MarketplaceProductDetail.url}
@@ -331,6 +334,31 @@ const AuthenticatedRoutes = ({ user, users, isAuthenticated }) => {
       />
       <Route exact path={routes.FAQ.url} element={<FAQ />} />
       <Route path="*" element={<Error />} />
+      <Route
+        exact
+        path={routes.MyWallet.url}
+        element={
+          <UsersProvider>
+            <CategorysProvider>
+              <SubCategorysProvider>
+                <ItemsProvider>
+                  <ProductsProvider>
+                    <InventoriesProvider>
+                      <RedemptionsProvider>
+                        <PaymentServicesProvider>
+                          <IssuerStatusProvider>
+                            <MyWallet user={user} users={users} />
+                          </IssuerStatusProvider>
+                        </PaymentServicesProvider>
+                      </RedemptionsProvider>
+                    </InventoriesProvider>
+                  </ProductsProvider>
+                </ItemsProvider>
+              </SubCategorysProvider>
+            </CategorysProvider>
+          </UsersProvider>
+        }
+      />
     </Routes>
   );
 };
