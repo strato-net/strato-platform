@@ -13,7 +13,6 @@ module Blockchain.Strato.Indexer.P2PIndexer (
 import BlockApps.Logging
 import Blockchain.Data.Block (BestBlock (..), Private (..))
 import Blockchain.Data.ChainInfo
-import Blockchain.EthConf (lookupConsumerGroup)
 import Blockchain.Sequencer.Event
 import Blockchain.Strato.Indexer.IContext
 import Blockchain.Strato.Indexer.Kafka
@@ -43,7 +42,7 @@ p2pIndexerMainLoop ::
   ) =>
   m ()
 p2pIndexerMainLoop = forever $ do
-  consume "p2pIndexer" (lookupConsumerGroup "strato-p2p-indexer") targetTopicName $ \() idxEvents -> do
+  consume "p2pIndexer" "strato-p2p-indexer" targetTopicName $ \() idxEvents -> do
     indexP2P idxEvents
     return ()
 

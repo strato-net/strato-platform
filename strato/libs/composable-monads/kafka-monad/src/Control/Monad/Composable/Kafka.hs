@@ -14,12 +14,15 @@ module Control.Monad.Composable.Kafka (
   KafkaM,
   HasKafka,
   KafkaEnv(..),
+  TopicName,
+  kafkaStateToKafkaEnv,
   runKafkaM,
   runKafkaMUsingEnv,
   execKafka,
   commitSingleOffset,
   fetchSingleOffset,
   produceItems,
+  produceItemsAsJSON,
   consume,
   runConsume,
   fetchItems,
@@ -30,19 +33,26 @@ module Control.Monad.Composable.Kafka (
   Metadata(..),
   ConsumerGroup,
   KafkaError(..),
+  ProduceResponse,
   packMetadata,
-  unpackMetadata
+  unpackMetadata,
+  conduitSource,
+  conduitSourceUsingEnv,
+  createKafkaEnv,
+  createTopic
   ) where
 
 import BlockApps.Logging
 import Blockchain.MilenaTools
+import Conduit
 import Control.Lens
-import Control.Monad (void)
+import Control.Monad (forM_, void)
 import Control.Monad.Composable.Base
-import Control.Monad.IO.Unlift
+import Control.Monad.Loops
 import Control.Monad.Reader
 import Control.Monad.Trans.Except
 import Control.Monad.Trans.State
+import qualified Data.Aeson as JSON
 import Data.Binary
 import qualified Data.ByteString as B
 import qualified Data.ByteString.Base16 as B16
@@ -52,8 +62,8 @@ import Data.IORef
 import Data.List
 import Data.Text (Text)
 import qualified Data.Text as T
-import Data.Void (Void)
-import Network.Kafka
+import Network.Kafka hiding (createTopic)
+import qualified Network.Kafka as Milena
 import Network.Kafka.Consumer
 import Network.Kafka.Producer
 import Network.Kafka.Protocol
@@ -70,7 +80,7 @@ data KafkaEnv = KafkaEnv
 
 createKafkaEnv ::
   MonadIO m =>
-  KafkaString ->
+  KafkaClientId ->
   KafkaAddress ->
   m KafkaEnv
 createKafkaEnv x y = do
@@ -81,6 +91,11 @@ createKafkaEnv x y = do
             _stateWaitTime = 100000 -- 100s
           }
 
+  kafkaStateToKafkaEnv kafkaState
+
+kafkaStateToKafkaEnv :: MonadIO m =>
+                        KafkaState -> m KafkaEnv
+kafkaStateToKafkaEnv kafkaState = do
   ksIORef <- liftIO $ newIORef kafkaState
   return $ KafkaEnv ksIORef
 
@@ -155,7 +170,13 @@ produceItems topicName events = do
   liftIO $ mapM_ parseKafkaResponse results
   return results
 
-
+produceItemsAsJSON :: (JSON.ToJSON a, HasKafka m) => TopicName -> [a] -> m [ProduceResponse]
+produceItemsAsJSON topicName events = do
+  results <-
+    execKafka $ produceMessagesAsSingletonSets $
+      (TopicAndMessage topicName . makeMessage . BL.toStrict . JSON.encode) <$> events
+  liftIO $ mapM_ parseKafkaResponse results
+  return results
 
 ----------------------
 --Consuming/Fetching--
@@ -199,3 +220,31 @@ fetchBytes topic offset = do
 
   return $ fetchResponseToPayload [offset] fetched
 
+conduitSource :: (MonadLogger m, MonadIO m, Binary a) =>
+                 LogSource -> KafkaClientId -> KafkaAddress -> TopicName -> ConduitT i a m b
+conduitSource name clientId kafkaAddress topicName = do
+  env <- createKafkaEnv clientId kafkaAddress
+
+  conduitSourceUsingEnv name env topicName
+
+conduitSourceUsingEnv :: (MonadLogger m, MonadIO m, Binary a) =>
+                         LogSource -> KafkaEnv -> TopicName -> ConduitT i a m b
+conduitSourceUsingEnv name env topicName = do
+  startingOffset <- runKafkaMUsingEnv env $ execKafka $ getLastOffset LatestTime 0 topicName
+
+  flip iterateM_ startingOffset $ \offset -> do
+      $logInfoS name "About to fetch blocks"
+      items <- runKafkaMUsingEnv env $ fetchItems topicName offset
+      $logInfoS name . T.pack $ "Fetched " ++ show (length items) ++ " events starting from " ++ show offset
+      forM_ items yield
+      return $ offset + fromIntegral (length items)
+
+createTopic :: HasKafka m =>
+               TopicName -> m ()
+createTopic name = do
+  TopicsResp result <- execKafka $ Milena.createTopic $ createTopicsRequest name 1 1 [] []
+  let errors = filter ((/= NoError) . snd) result
+  case errors of
+    [] -> return ()
+    [(_, TopicAlreadyExists)] -> return () -- No problem, it was already there
+    _ -> error $ "Error creating kafka topic " ++ show name ++ ": " ++ show errors
