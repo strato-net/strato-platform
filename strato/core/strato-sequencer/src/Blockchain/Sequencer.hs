@@ -302,13 +302,18 @@ blockstanbulSend' msg = do
         (P2pBlock <$> committedBlocks)
           ++ p2ps
 
-  unless (null blocks) $ do
-    let tLast = blockHeaderTimestamp . BDB.blockBlockData . head $ blocks
-    dt <- unBlockPeriod <$> Mod.access (Mod.Proxy @BlockPeriod)
-    let tNext = addUTCTime dt tLast
-    now <- liftIO getCurrentTime
-    when (now < tNext) $
-      liftIO . threadDelay . round $ 1e6 * diffUTCTime tNext now
+  case committedBlocks of
+    [] -> pure ()
+    (b:_) -> do
+      let bh = BDB.blockHeader b
+          tLast = blockHeaderTimestamp bh
+      dt <- unBlockPeriod <$> Mod.access (Mod.Proxy @BlockPeriod)
+      let tNext = addUTCTime dt tLast
+      now <- liftIO getCurrentTime
+      when (now < tNext) $
+        liftIO . threadDelay . round $ 1e6 * diffUTCTime tNext now
+      Mod.put (Mod.Proxy @BDB.BestSequencedBlock) . BDB.BestSequencedBlock $
+        BDB.BestBlock (BDB.blockHeaderHash bh) (BDB.blockHeaderBlockNumber bh) (obTotalDifficulty b)
 
   $logDebugS "seq/pbft/send_checkpoints" . T.pack $ show ckpts
   yieldMany $ ToUnseq <$> ckpts

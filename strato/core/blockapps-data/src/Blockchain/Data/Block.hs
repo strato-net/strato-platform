@@ -7,6 +7,7 @@
 module Blockchain.Data.Block
   ( Block (..),
     BestBlock (..),
+    BestSequencedBlock (..),
     WorldBestBlock (..),
     Canonical (..),
     Private (..),
@@ -85,6 +86,8 @@ data BestBlock = BestBlock
     bestBlockTotalDifficulty :: Integer
   }
   deriving (Eq, Show)
+
+newtype BestSequencedBlock = BestSequencedBlock {unBestSequencedBlock :: BestBlock} deriving (Eq, Show)
 
 newtype WorldBestBlock = WorldBestBlock {unWorldBestBlock :: BestBlock} deriving (Eq, Show)
 

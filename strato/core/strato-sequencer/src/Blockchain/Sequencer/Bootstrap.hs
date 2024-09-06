@@ -88,7 +88,8 @@ bootstrapSequencer
                   maxEventsPerIter = 65,
                   maxUsPerIter = 20000,
                   vaultClient = Just clientEnv,
-                  kafkaClientId = KString $ C8.pack defaultKafkaClientId'
+                  kafkaClientId = KString $ C8.pack defaultKafkaClientId',
+                  redisConn = error "initLevelDB: redisConn"
                 }
         runLoggingT . runSequencerM dummySequencerCfg Nothing $ do
           bootstrapGenesisBlock hash difficulty'

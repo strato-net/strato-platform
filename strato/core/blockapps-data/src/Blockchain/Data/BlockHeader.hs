@@ -114,7 +114,7 @@ instance Binary DummyCertRevocation
 
 getBlockDifficulty :: BlockHeader -> Integer
 getBlockDifficulty BlockHeader { difficulty } = difficulty
-getBlockDifficulty BlockHeaderV2 {} = 8193
+getBlockDifficulty BlockHeaderV2 {} = 1
 
 getBlockGasLimit :: BlockHeader -> Integer
 getBlockGasLimit BlockHeader { gasLimit } = gasLimit
