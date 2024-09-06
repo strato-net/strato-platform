@@ -280,7 +280,7 @@ class InventoryController {
   static validateListItemArgs(args) {
     const listItemSchema = Joi.object({
       assetToBeSold: Joi.string().required(),
-      paymentProviders: Joi.array().min(1).items(
+      paymentServices: Joi.array().min(1).items(
         Joi.object({
             creator: Joi.string().required(),
             serviceName: Joi.string().required(),
@@ -372,7 +372,7 @@ class InventoryController {
   static validateUpdateSaleArgs(args) {
     const updateSaleItemSchema = Joi.object({
       saleAddress: Joi.string().required(),
-      paymentProviders: Joi.array().min(1).items(
+      paymentServices: Joi.array().min(1).items(
         Joi.string().min(0).required(),
       ).optional(),
       price: Joi.number().greater(0).precision(2).optional(),

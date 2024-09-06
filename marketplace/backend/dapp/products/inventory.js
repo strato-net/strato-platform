@@ -328,7 +328,7 @@ async function updateSale(admin, contract, _args, options) {
                 return agg | (base << 0)
             case 'price':
                 return agg | (base << 1)
-            case 'paymentProviders':
+            case 'paymentServices':
                 return agg | (base << 2)
             default:
                 return agg
@@ -385,7 +385,7 @@ async function get(user, args, options) {
             price: sale.price,
             saleAddress: sale.address,
             saleQuantity: sale.quantity,
-            paymentProviders: sale ? (sale['BlockApps-Mercata-Sale-paymentProviders'] ? sale['BlockApps-Mercata-Sale-paymentProviders'] : null) : null
+            paymentProviders: sale ? (sale['BlockApps-Mercata-Sale-paymentServices'] ? sale['BlockApps-Mercata-Sale-paymentServices'] : null) : null
         }
     }
 
@@ -431,7 +431,7 @@ async function getAll(admin, args = {}, defaultOptions) {
                         saleAddress: itemSale?.address,
                         saleQuantity: itemSale?.quantity,
                         saleDate: itemSale?.block_timestamp,
-                        paymentProviders: itemSale ? (itemSale['BlockApps-Mercata-Sale-paymentProviders'] ? itemSale['BlockApps-Mercata-Sale-paymentProviders'] : null) : null,
+                        paymentProviders: itemSale ? (itemSale['BlockApps-Mercata-Sale-paymentServices'] ? itemSale['BlockApps-Mercata-Sale-paymentServices'] : null) : null,
                         totalLockedQuantity: itemSale?.totalLockedQuantity
                     });
                 }
@@ -492,7 +492,7 @@ async function getAll(admin, args = {}, defaultOptions) {
                                 saleQuantity: sales[0]?.quantity,
                                 saleDate: sales[0]?.block_timestamp,
                                 totalLockedQuantity: sales[0]?.totalLockedQuantity,
-                                paymentProviders: sales[0] ? (sales[0]['BlockApps-Mercata-Sale-paymentProviders'] ? sales[0]['BlockApps-Mercata-Sale-paymentProviders'] : null) : null,
+                                paymentProviders: sales[0] ? (sales[0]['BlockApps-Mercata-Sale-paymentServices'] ? sales[0]['BlockApps-Mercata-Sale-paymentServices'] : null) : null,
                                 'BlockApps-Mercata-Sale': undefined  // Removing the nested sale data to avoid redundancy
                             });
                         }
@@ -504,7 +504,7 @@ async function getAll(admin, args = {}, defaultOptions) {
                             saleQuantity: sales[0]?.quantity,
                             saleDate: sales[0]?.block_timestamp,
                             totalLockedQuantity: sales[0]?.totalLockedQuantity,
-                            paymentProviders: sales[0] ? (sales[0]['BlockApps-Mercata-Sale-paymentProviders'] ? sales[0]['BlockApps-Mercata-Sale-paymentProviders'] : null) : null,
+                            paymentProviders: sales[0] ? (sales[0]['BlockApps-Mercata-Sale-paymentServices'] ? sales[0]['BlockApps-Mercata-Sale-paymentServices'] : null) : null,
                             'BlockApps-Mercata-Sale': undefined  // Removing the nested sale data to avoid redundancy
                         });
                     }
