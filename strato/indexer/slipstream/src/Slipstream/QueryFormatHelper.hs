@@ -127,6 +127,41 @@ tableNameToText (AbstractTableName c a n) =
         | otherwise = c <> tableSeparator <> a <> tableSeparator
    in prefix <> n
 
+-- TODO: delete once marketplace uses new separator format everywhere
+oldTableNameToText :: TableName -> T.Text
+oldTableNameToText (IndexTableName c a n) =
+  let prefix
+        | T.null c = ""
+        | T.null a = c <> tableSeparator
+        | otherwise = c <> tableSeparator <> a <> tableSeparator
+   in prefix <> n
+oldTableNameToText (CollectionTableName c a n m) =
+  let prefix
+        | T.null c = ""
+        | T.null a = c <> tableSeparator
+        | otherwise = c <> tableSeparator <> a <> tableSeparator
+      contractAndCollection = n <> "-" <> m
+   in prefix <> contractAndCollection
+oldTableNameToText (HistoryTableName c a n) =
+  let prefix
+        | T.null c = ""
+        | T.null a = c <> tableSeparator
+        | otherwise = c <> tableSeparator <> a <> tableSeparator
+   in "history@" <> prefix <> n
+oldTableNameToText (EventTableName c a n e) =
+  let prefix
+        | T.null c = ""
+        | T.null a = c <> tableSeparator
+        | otherwise = c <> tableSeparator <> a <> tableSeparator
+      contractAndEvent = n <> "." <> e
+   in prefix <> contractAndEvent
+oldTableNameToText (AbstractTableName c a n) =
+  let prefix
+        | T.null c = ""
+        | T.null a = c <> tableSeparator
+        | otherwise = c <> tableSeparator <> a <> tableSeparator
+   in prefix <> n
+
 tableNameToTextPostgres :: TableName -> T.Text
 tableNameToTextPostgres = T.take 63 . tableNameToText -- max table name len in psql is 63 char
 
@@ -135,6 +170,10 @@ tableNameToSingleQuoteText = wrapSingleQuotes . escapeQuotes . tableNameToTextPo
 
 tableNameToDoubleQuoteText :: TableName -> T.Text
 tableNameToDoubleQuoteText = wrapDoubleQuotes . escapeQuotes . tableNameToText
+
+-- TODO: delete once marketplace uses new separator format everywhere
+oldTableNameToDoubleQuoteText :: TableName -> T.Text
+oldTableNameToDoubleQuoteText = wrapDoubleQuotes . escapeQuotes . oldTableNameToText
 
 textToDoubleQuoteText :: T.Text -> T.Text
 textToDoubleQuoteText =  wrapDoubleQuotes . escapeQuotes

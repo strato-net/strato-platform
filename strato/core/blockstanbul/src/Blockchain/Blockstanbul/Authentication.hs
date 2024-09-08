@@ -11,6 +11,7 @@ module Blockchain.Blockstanbul.Authentication
   )
 where
 
+import BlockApps.Logging
 import BlockApps.X509.Certificate
 import Blockchain.Blockstanbul.Messages hiding (sequence)
 import Blockchain.Blockstanbul.Model.Authentication
@@ -35,6 +36,7 @@ import Data.Either.Extra
 import Data.List
 import Data.Maybe (catMaybes, fromJust, fromMaybe)
 import Data.Set (Set)
+import qualified Data.Text as T
 import qualified Data.Set as S
 import Text.Printf
 import Text.Format
@@ -88,7 +90,7 @@ getValidatorFromAddress' address = do
     Nothing -> throwError $ "Missing address in X509 certificate database: " ++ formatAddressWithoutColor address
     Just v -> return v
 
-replayHistoricBlock :: (MonadError String m, A.Selectable Address X509CertInfoState m) =>
+replayHistoricBlock :: (MonadLogger m, MonadError String m, A.Selectable Address X509CertInfoState m) =>
                        Set Validator -> Word256 -> Block -> m (Word256, Validator)
 replayHistoricBlock realValidators seqNo blk = do
   IstanbulExtra {..} <- liftEither $ maybeToEither "no istanbul metadata" $ evalIstanbulExtra id blk
@@ -123,7 +125,7 @@ replayHistoricBlock realValidators seqNo blk = do
   unless (signerRes `S.isSubsetOf` realValidators) $ do
         let unexplained = intercalate "," . map format . S.toList $ signerRes S.\\ realValidators
         if (signerRes S.\\ realValidators) `S.isSubsetOf` futureValidatorsHack
-          then error $ "future validators " ++ show unexplained ++ " jumped the gun, signed block #" ++ show blockNo ++ " before they were authorized to do so.  I'll throw the block away and wait for another validator to send me the properly signed block"
+          then $logErrorS "replayHistoricBlock" . T.pack $ "future validators " ++ show unexplained ++ " jumped the gun, signed block #" ++ show blockNo ++ " before they were authorized to do so.  I'll throw the block away and wait for another validator to send me the properly signed block"
           else error $
                "unknown signers in block #" ++ show blockNo ++ ": " ++ unexplained
                ++ "\nsignerRes: " ++ show (map format $ S.toList signerRes)

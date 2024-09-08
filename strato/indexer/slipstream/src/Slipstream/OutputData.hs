@@ -744,6 +744,17 @@ expandTableQuery tableName cols =
       ";"
     ]
 
+-- TODO: Remove once marketplace uses new naming convention ('-')
+oldExpandTableQuery :: TableName -> TableColumns -> Text
+oldExpandTableQuery tableName cols =
+  T.concat
+    [ "ALTER TABLE ",
+      oldTableNameToDoubleQuoteText tableName,
+      " ADD COLUMN IF NOT EXISTS",
+      T.intercalate ", ADD COLUMN IF NOT EXISTS" cols,
+      ";"
+    ]
+
 expandAbstractTableQuery :: TableName -> TableColumns -> Text
 expandAbstractTableQuery tableName cols =
   T.concat
@@ -1433,17 +1444,17 @@ createEventTable (creator, a, n) evName ev cc = do
   --   then return []
   --   else do
     -- setTableCreated eventTable $ colsCombined
-  yield $ createEventTableQuery eventTable colsCombined
+  yieldMany $ createEventTableQuery eventTable colsCombined
   eventArrayFkeys <- fmap concat . forM arrayNamesAndTypes $ \anat -> do
     createEventArrayTable (crtr, cname, (escapeQuotes $ labelToText evName)) anat
   return $ eventArrayFkeys
 
 
-createEventTableQuery :: TableName -> TableColumns -> Text
+createEventTableQuery :: TableName -> TableColumns -> [Text]
 createEventTableQuery tableName cols =
-     T.concat
+  (\n -> T.concat
         [ "CREATE TABLE IF NOT EXISTS ",
-          tableNameToDoubleQuoteText tableName,
+          n,
           " (",
           csv $
             [ "id INT NOT NULL",
@@ -1458,6 +1469,7 @@ createEventTableQuery tableName cols =
               ", PRIMARY KEY (transaction_hash, id)",
           ");"
         ]
+  ) <$> [tableNameToDoubleQuoteText tableName, oldTableNameToDoubleQuoteText tableName]
 
 expandEventTable ::
   OutputM m =>
@@ -1482,6 +1494,7 @@ expandEventTable  (creator, a, n) evName ev cc = do
           T.intercalate ", " allTableColsCombined
         ]
     yield $ expandTableQuery tableName allTableColsCombined
+    yield $ oldExpandTableQuery tableName allTableColsCombined
 
 -- Function to convert AggregateEvent to ProcessedCollectionRow
 aggEventToCollectionRows :: AggregateEvent -> [ProcessedCollectionRow]
@@ -1536,7 +1549,7 @@ insertEventTables ::
 insertEventTables processedEventArrays processedEventsWithoutArrays = do
   $logInfoS "insertEventTables/processedEventArrays" . T.pack $ show processedEventArrays
   $logInfoS "insertEventTables/processedEventsWithoutArrays" . T.pack $ show processedEventsWithoutArrays
-  yieldMany =<< lift (mapM (insertEventTable) processedEventsWithoutArrays)
+  yieldMany . concat =<< lift (mapM (insertEventTable) processedEventsWithoutArrays)
       
   -- yieldMany . catMaybes =<< lift (mapM (insertEventTable) processedEventsWithoutArrays)
   when (not (null processedEventArrays)) $ insertCollectionTable processedEventArrays
@@ -1578,13 +1591,13 @@ processParents ae = createNewEvent <$> Map.toList (eventAbstracts ae)
 insertEventTable ::
   OutputM m =>
   AggregateEvent ->
-  m (Text)
+  m [Text]
 insertEventTable agEv = do
   let q = insertEventTableQuery agEv
-  multilineDebugLog "insertEventTable/SQL" $ T.unpack q
+  multilineDebugLog "insertEventTable/SQL" $ T.unpack $ T.intercalate "\n" q
   return q
 
-insertEventTableQuery :: AggregateEvent -> Text
+insertEventTableQuery :: AggregateEvent -> [Text]
 insertEventTableQuery agEv@AggregateEvent {eventEvent = ev} =
   let (creator, a, cname) =
         constructTableNameParameters
@@ -1605,15 +1618,16 @@ insertEventTableQuery agEv@AggregateEvent {eventEvent = ev} =
         ]
       vals = csv $ map (wrapSingleQuotes . escapeQuotes . ($ agEv)) baseVals ++ map (wrapSingleQuotes . escapeSingleQuotes . T.pack . (\(_, x, _) -> x)) (Action.evArgs ev)
 
-   in T.concat $
+   in (\n -> T.concat $
         [ "INSERT INTO ",
-          tableNameToDoubleQuoteText tableName,
+          n,
           " ",
           keySt,
           "\n  VALUES ( \n",
           vals,
           " )\n  ON CONFLICT DO NOTHING;"
         ]
+      ) <$> [tableNameToDoubleQuoteText tableName,  oldTableNameToDoubleQuoteText tableName]
 
 ------------------
 
