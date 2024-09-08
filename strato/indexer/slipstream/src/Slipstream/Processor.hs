@@ -64,7 +64,7 @@ import SelectAccessible ()
 import Slipstream.Data.Action
 import qualified Slipstream.Events as E
 import Slipstream.OutputData
--- import Slipstream.Metrics
+import Slipstream.Metrics (recordAction)
 import Slipstream.QueryFormatHelper
 import SolidVM.Model.CodeCollection hiding (contractName)
 import qualified SolidVM.Model.Type as SVMType
@@ -426,10 +426,9 @@ processTheMessages env conn messages = do
             abstractColumns <- pure $ map (\(a,b,c,_,e) -> (a,b,c,e)) abstractColumns'
             pCollections <- processedContractToProcessedCollectionRows stateDiff (collectionNames) row abiid (actionCCCreator row) --get all collection rows to insert
             pCollectionsWithAbstracts <- pure $ duplicateForParentsAndIncludeOriginal pCollections parents'
+            recordAction row
             pure . Right $ BatchedInserts (indexContract, fkeysForThisContract) abstractColumns [indexContract] pCollectionsWithAbstracts
       
-      -- record prometheus metrics
-      -- mapM_ recordAction actions
       pure results
 
   forM_ (lefts inserts) $ $logErrorS "processTheMessages"
@@ -459,7 +458,8 @@ processTheMessages env conn messages = do
     --Getting event entries that go into the parent abstract tables and event array inserts
     let processedEvents = concatMap getAllEvents events'
         processedEventArrays = concatMap aggEventToCollectionRows processedEvents
-        processedEventsWithoutArrays = map (\ae -> ae { eventEvent = removeArrayEvArgs (eventEvent ae) }) processedEvents
+         -- TODO: Remove arrays once marketplace switches over to using event array tables
+        processedEventsWithoutArrays = processedEvents -- map (\ae -> ae { eventEvent = removeArrayEvArgs (eventEvent ae) }) processedEvents
         
     -- Insert the events into the event tables
     outputData conn $ insertEventTables processedEventArrays processedEventsWithoutArrays
