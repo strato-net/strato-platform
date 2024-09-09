@@ -23,9 +23,9 @@ contract StratPaymentService is PaymentService {
         _primarySaleFeePercentage,
         _secondarySaleFeePercentage
     ) public {
+        stratAddress = _stratAddress;
         stratsPerDollar = _stratsPerDollar;
         feeRecipient = _feeRecipient;
-        stratAddress = _stratAddress;
     }
 
     function _checkoutInitialized (
