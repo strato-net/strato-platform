@@ -314,18 +314,6 @@ const Checkout = () => {
       },
     },
     {
-      title: (
-        <Text className="text-[#202020] text-base font-semibold">
-          Amount($)
-        </Text>
-      ),
-      dataIndex: "amount",
-      align: "center",
-      render: (text) => (
-        <p className="text-sm font-semibold text-[#202020]">{"$" + text.toFixed(2)}</p>
-      ),
-    },
-    {
       title: <Text className="text-[#202020] text-base font-semibold "></Text>,
       dataIndex: "action",
       align: "",
