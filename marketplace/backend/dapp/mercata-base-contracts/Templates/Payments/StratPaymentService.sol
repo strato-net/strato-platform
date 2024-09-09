@@ -2,6 +2,7 @@ pragma es6;
 pragma strict;
 
 import <BASE_CODE_COLLECTION>;
+import "../../../items/contracts/Tokens.sol";
 
 contract StratPaymentService is PaymentService {
     address public stratAddress;
@@ -108,7 +109,7 @@ contract StratPaymentService is PaymentService {
 
             for (uint j = 0; j < _stratsAssetAddresses.length; j++) {
                 Tokens stratAsset = Tokens(_stratsAssetAddresses[j]);
-                require(stratAsset.originAddress() == assetOriginAddress, "Asset is not a STRATS asset");
+                require(stratAsset.originAddress() == stratAddress, "Asset is not a STRATS asset");
                 stratQuantity = stratAsset.quantity();
 
                 if (remainingStratsToTransfer > 0) {
