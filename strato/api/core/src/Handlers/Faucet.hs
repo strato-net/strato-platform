@@ -26,7 +26,7 @@ import Blockchain.DB.SQLDB
 import Blockchain.Data.DataDefs
 import Blockchain.Data.TXOrigin
 import Blockchain.Data.Transaction
-import Blockchain.EthConf (runKafkaConfigured)
+import Blockchain.EthConf (runKafkaMConfigured)
 import Blockchain.Sequencer.Event (IngestEvent (IETx), IngestTx (..))
 import Blockchain.Sequencer.Kafka (writeUnseqEvents)
 import Blockchain.Strato.Model.Address
@@ -190,10 +190,7 @@ emitKafkaTransactions = loop id
     loop front = await >>= maybe (emit $ front []) (\x -> loop $ front . (x :))
     emit txs = do
       $logDebugS "writeUnseqEventsBegin" . T.pack $ "Writing " ++ show (length txs) ++ " faucet tx(s) to unseqevents"
-      rets <- liftIO $ runKafkaConfigured "strato-api" $ writeUnseqEvents txs
-      case rets of
-        Left e -> $logError $ T.pack $ "Could not write txs to Kafka: " ++ show e
-        Right resps -> $logDebug $ T.pack $ "writeUnseqEventsEnd Kafka commit: " ++ show resps
+      void $ liftIO $ runKafkaMConfigured "strato-api" $ writeUnseqEvents txs
 
 makeSendTX :: MonadIO m => Integer -> PrivateKey -> Address -> Integer -> m Transaction
 makeSendTX maxN k a n = do

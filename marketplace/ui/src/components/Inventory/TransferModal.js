@@ -9,12 +9,12 @@ import { useUsersDispatch, useUsersState } from "../../contexts/users";
 import { useAuthenticateState } from "../../contexts/authentication";
 import { SearchOutlined } from '@ant-design/icons';
 import { handlePriceInput, handleQuantityInput } from "../../helpers/utils";
+import { OLD_SADDOG_ORIGIN_ADDRESS } from "../../helpers/constants";
 
 const TransferModal = ({ open, handleCancel, inventory, categoryName = "", limit=0, offset=0 }) => {
     const [data, setData] = useState([inventory]);
     const [quantity, setQuantity] = useState(1);
     const [price, setPrice] = useState(0);
-    const [userAddress, setUserAddress] = useState("");
     const inventoryDispatch = useInventoryDispatch();
     const marketplaceDispatch = useMarketplaceDispatch();
     const userDispatch = useUsersDispatch();
@@ -48,9 +48,27 @@ const TransferModal = ({ open, handleCancel, inventory, categoryName = "", limit
         setDropdownOpen(!!value);
     };
 
-    const usersList = users.map((record) => (user.commonName !== record.commonName ? { label: `${record.commonName} - ${record.organization}`, value: record.userAddress } : {}));
-    const filteredUsersList = filterDuplicateUserAddresses(usersList);
+    const originAddress = inventory.originAddress.toLowerCase();
+    const isBurner = originAddress === OLD_SADDOG_ORIGIN_ADDRESS;
 
+    const usersList = users
+      .filter((record) =>
+        isBurner
+          ? record.commonName.toLowerCase() === "burner"
+          : user.commonName !== record.commonName
+      )
+      .map((record) => ({
+        label: isBurner
+          ? `burner - ${record.organization}`
+          : `${record.commonName} - ${record.organization}`,
+        value: record.userAddress,
+      }));
+
+    const filteredUsersList = filterDuplicateUserAddresses(usersList);
+    const [userAddress, setUserAddress] = useState(
+      isBurner && filteredUsersList.length > 0 ? filteredUsersList[0].value : ""
+    );
+    
     const handleSelect = (userAddress) => {
         setUserAddress(userAddress);
 
@@ -168,6 +186,7 @@ const TransferModal = ({ open, handleCancel, inventory, categoryName = "", limit
                     onFocus={() => setDropdownOpen(!!searchInput)} // Open dropdown on focus if there is any input
                     onBlur={() => setDropdownOpen(false)} // Close dropdown on blur
                     popupClassName="custom-select-dropdown" // Add this line
+                    defaultValue={isBurner ? filteredUsersList[0] : null}
                 />
             )
         }
@@ -288,6 +307,7 @@ const TransferModal = ({ open, handleCancel, inventory, categoryName = "", limit
                         onFocus={() => setDropdownOpen(!!searchInput)} // Open dropdown on focus if there is any input
                         onBlur={() => setDropdownOpen(false)} // Close dropdown on blur
                         popupClassName="custom-select-dropdown"
+                        defaultValue={isBurner ? filteredUsersList[0] : null}
                     />
                 </div>
 

@@ -20,6 +20,9 @@ import Blockchain.Stream.Action (Action)
 import qualified Blockchain.Stream.Action as Action (Action (..), ActionData (..), CallType (..), DataDiff (..))
 import Control.DeepSeq
 import Data.Aeson
+import qualified Data.Aeson as JSON
+import Data.Binary
+import Data.Binary.Get
 import Data.Map.Strict (Map)
 import qualified Data.Map.Strict as M
 import qualified Data.Map.Ordered as OMap
@@ -62,6 +65,17 @@ data AggregateEvent = AggregateEvent
     eventEvent :: Event
   }
   deriving (Show, Generic, NFData, ToJSON, FromJSON)
+
+-- Binary encoding is set to JSON for now, since kafka monad lib encodes binary, and marketplace needs this as JSON
+-- We probably should just offer a way to enocde json in kafka lib, but this will do for now
+instance Binary AggregateEvent where
+  put v = do
+    put $ JSON.encode v
+  get = do
+    bytes <- getRemainingLazyByteString
+    case JSON.decode bytes of
+      Just val -> return val
+      Nothing -> error "error decoding AggregateEvent"
 
 flatten :: Action -> [AggregateAction]
 flatten Action.Action {..} = flip map (OMap.assocs _actionData) $
