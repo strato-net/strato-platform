@@ -4,13 +4,13 @@ pragma strict;
 import <BASE_CODE_COLLECTION>;
 
 contract StratPaymentService is PaymentService {
-    address public stratAddress;
+    address public assetOriginAddress;
     decimal public stratsPerDollar;
 
     address public feeRecipient;
 
     constructor (
-        address _stratAddress,
+        address _assetOriginAddress,
         decimal _stratsPerDollar,
         string _imageURL,
         decimal _primarySaleFeePercentage,
@@ -23,7 +23,7 @@ contract StratPaymentService is PaymentService {
         _primarySaleFeePercentage,
         _secondarySaleFeePercentage
     ) public {
-        stratAddress = _stratAddress;
+        assetOriginAddress = _assetOriginAddress;
         stratsPerDollar = _stratsPerDollar;
         feeRecipient = _feeRecipient;
     }
@@ -108,19 +108,19 @@ contract StratPaymentService is PaymentService {
 
             for (uint j = 0; j < _stratsAssetAddresses.length; j++) {
                 Asset stratAsset = Asset(_stratsAssetAddresses[j]);
-                require(stratAsset.originAddress() == stratAddress, "Asset is not a STRATS asset");
+                require(stratAsset.originAddress() == assetOriginAddress, "Asset is not a STRATS asset");
                 stratQuantity = stratAsset.quantity();
 
                 if (remainingStratsToTransfer > 0) {
                     transferAmount = stratQuantity >= remainingStratsToTransfer ? remainingStratsToTransfer : stratQuantity;
-                    stratAsset.transferOwnership(sellerAddress, transferAmount, false, 0, 0);
+                    stratAsset.purchaseTransfer(sellerAddress, transferAmount);
                     remainingStratsToTransfer -= transferAmount;
                 }
                 stratQuantity = stratQuantity - transferAmount;
                 if (remainingFeeToTransfer > 0 && stratQuantity > 0) {
                     
                     transferFee = stratQuantity >= remainingFeeToTransfer ? remainingFeeToTransfer : stratQuantity;
-                    stratAsset.transferOwnership(feeRecipient, transferFee, false, 0, 0);
+                    stratAsset.purchaseTransfer(feeRecipient, transferFee);
                     remainingFeeToTransfer -= transferFee;
                 }
 

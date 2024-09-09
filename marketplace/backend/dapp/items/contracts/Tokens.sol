@@ -22,4 +22,20 @@ contract Tokens is Mintable {
         Tokens newToken = new Tokens(name, description, images, files, fileNames, createdDate, _quantity, status, address(redemptionService));
         return UTXO(address(newToken)); 
     }
+
+    modifier fromPaymentService(string action) {
+        ps = PaymentService(msg.sender);
+        string err = "Only the current corresponding Payment Service contract can "
+                       + action
+                       + ".";
+        require(ps.assetOriginAddress == originAddress && ps.ownerCommonName == "BlockApps", err);
+        _;
+    }
+    
+    function purchaseTransfer(address _newOwner, uint _quantity) public fromPaymentService("make a purchase") {
+        require(_quantity <= quantity, "Cannot transfer more than available quantity.");
+        // regular transfer - isUserTransfer: false, transferNumber: 0
+        // transfer feature - isUserTransfer: true, transferNumber: >0
+        _transfer(_newOwner, _quantity, false, 0, 0);
+    }
 }
