@@ -8,6 +8,7 @@ module Main where
 import BlockApps.Init
 import BlockApps.Logging
 import Blockchain.Blockstanbul
+import Blockchain.Blockstanbul.Options ()
 import Blockchain.Data.GenesisInfo
 import Blockchain.EthConf
 import Blockchain.Generation
