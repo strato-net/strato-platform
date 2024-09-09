@@ -188,7 +188,7 @@ const ResponsiveCart = ({
   const totalAmount = selectedProvider?.serviceName === 'STRATS' ? 
              `${(subTotal * 100).toFixed(0)} STRATS` :  
              selectedProvider?.serviceName === 'Stripe' ? `${subTotal} USD` : 
-             `${subTotal} ${selectedProvider?.serviceName}`
+             `${subTotal} ${selectedProvider?.serviceName || 'USD'}`
 
   return (
     <div className=" rounded-md mt-3 flex flex-col gap-[18px] sm:w-[400px] md:w-[450px] items-center">
@@ -310,7 +310,7 @@ const ResponsiveCart = ({
           <div className="rounded-lg shadow-md w-full">
             <Radio.Group
               onChange={(e) => { handleChange(e.target.value) }}
-              value={selectedProvider.serviceName}
+              value={selectedProvider?.serviceName}
               className="w-full">
               <div className="flex flex-col space-y-4">
                 {paymentProviders && paymentProviders.map(provider => (
@@ -333,7 +333,7 @@ const ResponsiveCart = ({
           </div>
           <Button
             type="primary"
-            // disabled={!paymentProviders || paymentProviders?.length===0}
+            disabled={!paymentProviders || paymentProviders?.length===0}
             className="w-full mt-3 mb-6 bg-blue-800 text-white h-10 text-lg"
             onClick={()=>{handlePlaceOrder(selectedProvider)}}
           >

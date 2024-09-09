@@ -228,7 +228,7 @@ const handlePlaceOrder = async () => {
     });
     const checkQuantity = await orderActions.fetchSaleQuantity(orderDispatch, saleAddresses, quantities);
     if (checkQuantity === true) {
-      if (selectedProvider.serviceName === "Stripe" && total < 0.50) {
+      if (selectedProvider?.serviceName === "Stripe" && total < 0.50) {
         openToastOrder("bottom", "The minimum order amount is $0.50. Please increase the item quantity to account for this.");
         setSelectedProvider('');
       } else {
@@ -263,7 +263,7 @@ const handlePlaceOrder = async () => {
 const totalAmount = selectedProvider?.serviceName === 'STRATS' ? 
       `${(subTotal * 100).toFixed(0)} STRATS` :  
       selectedProvider?.serviceName === 'Stripe' ? `${subTotal} USD` : 
-      `${subTotal} ${selectedProvider?.serviceName}`
+      `${subTotal} ${selectedProvider?.serviceName || 'USD'}`
 
   return (
     <>
@@ -297,7 +297,7 @@ const totalAmount = selectedProvider?.serviceName === 'STRATS' ?
                 <div className="p-6 rounded-lg shadow-md w-full">
                   <Radio.Group
                     onChange={(e) => { handleChange(e.target.value) }}
-                    value={selectedProvider.serviceName}
+                    value={selectedProvider?.serviceName}
                     className="w-full">
                     <div className="flex flex-col space-y-4">
                       {activePaymentProviders && activePaymentProviders.map(provider => (
@@ -325,7 +325,7 @@ const totalAmount = selectedProvider?.serviceName === 'STRATS' ?
                   </div>
                   <Button
                     type="primary"
-                    // disabled={!paymentProviders || paymentProviders?.length===0}
+                    disabled={!activePaymentProviders || activePaymentProviders?.length===0}
                     className="w-full bg-blue-800 text-white h-10 text-lg"
                     onClick={handlePlaceOrder}
                   >
