@@ -16,7 +16,7 @@ const SENDGRID_ENV = { API_KEY: process.env.SENDGRID_API_KEY }
 
 const DEFAULT_OPTIONS = { ...OPTIONS, chainIds: [], cacheNonce: true };
 
-const STRIPE_CONTRACT_ADDRESS = deployment.contracts.stripe.address;
+const STRIPE_CONTRACT_ADDRESS = process.env.STRIPE_CONTRACT_ADDRESS;
 // TODO: Disabled for initial payment server release
 // const METAMASK_CONTRACT_ADDRESS = deployment.contracts.metamask.address;
 const REDEMPTION_CONTRACT_ADDRESS = deployment.contracts.redemption.address;
@@ -33,10 +33,9 @@ const CHECKOUT_EVENT_TABLE = `${TABLE_PREFIX}PaymentService.Checkout`;
 const SELLER_ONBOARDED_TABLE = `${TABLE_PREFIX}PaymentService.SellerOnboarded`;
 
 const PAYMENT_STATUS = {
-  'INITIALIZED': '2',
+  'PAYMENT_PENDING': '5',
   'PAID': '3',
   'CANCELED': '4',
-  'DISCARDED': '5',
 }
 
 const PAYMENT_RECEIVED_MESSAGE = "Thank you for your payment.";

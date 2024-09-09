@@ -242,7 +242,7 @@ class StripeServiceController {
         returnStatus = await generateIntermediateOrder(STRIPE_CONTRACT_ADDRESS, callArgs);
 
         // Update payment status in DB
-        const updateResult = await updateStripePayment(checkoutHash, "INITIALIZED");
+        const updateResult = await updateStripePayment(checkoutHash, "PAYMENT_PENDING");
         
         // EMAIL CONFIRMATION
         // Prepare HTML content and sendEmail
@@ -288,11 +288,11 @@ class StripeServiceController {
         quantities: checkoutEvent[0].quantitiesToBePurchased,
       } 
 
-      const cancelOrderStatus = await discardCheckoutQuantity(STRIPE_CONTRACT_ADDRESS, callArgs);
-      console.log("cancelOrderStatus", cancelOrderStatus);
+      const discardCheckoutQuantityStatus = await discardCheckoutQuantity(STRIPE_CONTRACT_ADDRESS, callArgs);
+      console.log("discardCheckoutQuantityStatus", discardCheckoutQuantityStatus);
 
       // Update payment status in DB
-      const updateResult = await updateStripePayment(checkoutHash, "DISCARDED");
+      const updateResult = await updateStripePayment(checkoutHash, "UNLOCK_CHECKOUT_QUANTITY");
 
       // Redirect back to marketplace
       res.redirect(`${redirectUrl}`);
@@ -310,8 +310,8 @@ class StripeServiceController {
       // Get all statuses from tokens and recheck status from Stripe if ACH initialized
       let statuses = {};
       const paymentDetails = await getStripePaymentsFromTokens(JSON.parse(orderHashes));
-      paymentDetails.map(async (p) => {
-        if (p.status === 'INITIALIZED') {
+      paymentDetails?.map(async (p) => {
+        if (p.status === 'PAYMENT_PENDING') {
           const session = await stripeService.getPaymentSession(p.paymentsessionid, p.accountid);
           if (session.payment_status === 'paid') {
             // Get the payment event from Cirrus

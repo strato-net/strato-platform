@@ -26,7 +26,7 @@ abstract contract PaymentService is Utils {
         string serviceName
     );
 
-    enum PaymentStatus { NULL, AWAITING_FULFILLMENT, PAYMENT_PENDING, CLOSED, CANCELED }
+    enum PaymentStatus { NULL, AWAITING_FULFILLMENT, AWAITING_SHIPMENT, CLOSED, CANCELED, PAYMENT_PENDING, PAID, MAX }
 
     event Checkout (
         string checkoutHash,                /* Unique hash of the order details for payment server lookup to
