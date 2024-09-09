@@ -501,7 +501,7 @@ postBlocTransaction ::
   Bool ->
   PostBlocTransactionRequest ->
   m [BlocChainOrTransactionResult]
-postBlocTransaction = postBlocTransaction' (Don't CacheNonce)
+postBlocTransaction = postBlocTransaction' (Do CacheNonce)
 
 postBlocTransactionParallelExternal ::
   ( MonadLogger m,
