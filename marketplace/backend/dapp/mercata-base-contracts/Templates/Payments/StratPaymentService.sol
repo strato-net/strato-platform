@@ -4,7 +4,6 @@ pragma strict;
 import <BASE_CODE_COLLECTION>;
 
 contract StratPaymentService is PaymentService {
-    address public assetOriginAddress;
     decimal public stratsPerDollar;
 
     address public feeRecipient;
@@ -21,9 +20,9 @@ contract StratPaymentService is PaymentService {
         _imageURL,
         "Checkout with STRATS",
         _primarySaleFeePercentage,
-        _secondarySaleFeePercentage
+        _secondarySaleFeePercentage,
+        _assetOriginAddress
     ) public {
-        assetOriginAddress = _assetOriginAddress;
         stratsPerDollar = _stratsPerDollar;
         feeRecipient = _feeRecipient;
     }

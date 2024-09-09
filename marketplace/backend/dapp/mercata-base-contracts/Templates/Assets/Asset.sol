@@ -125,6 +125,14 @@ abstract contract Asset is Utils {
         }
         _;
     }
+    modifier fromPaymentService(string action) {
+        PaymentService ps = PaymentService(msg.sender);
+        string err = "Only the current corresponding Payment Service contract can "
+                       + action
+                       + ".";
+        require(ps.assetOriginAddress == originAddress && ps.ownerCommonName == "BlockApps", err);
+        _;
+    }
 
     // Updated function to add a sale to the whitelist
     function attachSale() public requireOwnerOrigin("attach sale") {
@@ -198,6 +206,13 @@ abstract contract Asset is Utils {
             // transfer feature - isUserTransfer: true, transferNumber: >0
             return Sale(sale).automaticTransfer(_newOwner, _price, _quantity, _transferNumber);
         }
+    }
+    
+    function purchaseTransfer(address _newOwner, uint _quantity) public fromPaymentService("make a purchase") {
+        require(_quantity <= quantity, "Cannot transfer more than available quantity.");
+        // regular transfer - isUserTransfer: false, transferNumber: 0
+        // transfer feature - isUserTransfer: true, transferNumber: >0
+        _transfer(_newOwner, _quantity, false, 0, 0);
     }
 
     function updateAsset(
