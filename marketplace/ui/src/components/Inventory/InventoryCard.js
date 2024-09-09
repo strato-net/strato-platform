@@ -193,7 +193,7 @@ const InventoryCard = ({ inventory, category, debouncedSearchTerm, id, allSubcat
                 <Button id="asset-card-unlist-btn" type="link" className="text-[#13188A] text-left px-0 font-semibold text-sm h-6" onClick={showUnlistModal} disabled={!inventory.price || !isActive()}>
                   <><StopOutlined /> Unlist</>
                 </Button>
-                <Button type="link" className="text-[#13188A] text-left px-0 font-semibold text-sm h-6" onClick={showResellModal} disabled={!(itemData.isMint && itemData.isMint == "True" && disableSADDOGS(inventory)) || !isActive()}>
+                <Button type="link" className="text-[#13188A] text-left px-0 font-semibold text-sm h-6" onClick={showResellModal} disabled={!(itemData.isMint && itemData.isMint == "True" && !disableSADDOGS(inventory)) || !isActive()}>
                   <><PieChartOutlined /> Mint</>
                 </Button>
                 <Button type="link" className="text-[#13188A] text-left px-0 font-semibold text-sm h-6" onClick={showTransferModal} disabled={isTransferDisabled() || !isActive() }>

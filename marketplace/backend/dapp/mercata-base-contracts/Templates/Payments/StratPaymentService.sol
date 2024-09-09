@@ -4,12 +4,13 @@ pragma strict;
 import <BASE_CODE_COLLECTION>;
 
 contract StratPaymentService is PaymentService {
+    address public stratAddress;
     decimal public stratsPerDollar;
 
     address public feeRecipient;
 
     constructor (
-        address _assetOriginAddress,
+        address _stratAddress,
         decimal _stratsPerDollar,
         string _imageURL,
         decimal _primarySaleFeePercentage,
@@ -20,11 +21,11 @@ contract StratPaymentService is PaymentService {
         _imageURL,
         "Checkout with STRATS",
         _primarySaleFeePercentage,
-        _secondarySaleFeePercentage,
-        _assetOriginAddress
+        _secondarySaleFeePercentage
     ) public {
         stratsPerDollar = _stratsPerDollar;
         feeRecipient = _feeRecipient;
+        stratAddress = _stratAddress;
     }
 
     function _checkoutInitialized (
@@ -106,7 +107,7 @@ contract StratPaymentService is PaymentService {
             uint transferFee = 0;
 
             for (uint j = 0; j < _stratsAssetAddresses.length; j++) {
-                Asset stratAsset = Asset(_stratsAssetAddresses[j]);
+                Tokens stratAsset = Tokens(_stratsAssetAddresses[j]);
                 require(stratAsset.originAddress() == assetOriginAddress, "Asset is not a STRATS asset");
                 stratQuantity = stratAsset.quantity();
 
