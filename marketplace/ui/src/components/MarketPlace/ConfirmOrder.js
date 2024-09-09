@@ -260,7 +260,10 @@ const handlePlaceOrder = async () => {
   }
 }
 
-const totalAmount = selectedProvider.serviceName === 'Stripe' ? `${subTotal} USD` : `${(subTotal * 100).toFixed(0)} STRATS`
+const totalAmount = selectedProvider?.serviceName === 'STRATS' ? 
+      `${(subTotal * 100).toFixed(0)} STRATS` :  
+      selectedProvider?.serviceName === 'Stripe' ? `${subTotal} USD` : 
+      `${subTotal} ${selectedProvider?.serviceName}`
 
   return (
     <>
@@ -302,7 +305,11 @@ const totalAmount = selectedProvider.serviceName === 'Stripe' ? `${subTotal} USD
                         <Radio value={provider?.serviceName} className="w-full">
                           <p className="flex text-base font-normal items-center"> 
                           {/* <img src={provider?.imageURL} alt={provider?.serviceName} style={{ width: 20, height: 20 }} />  */}
-                          <span className="ml-2"> {PAYMENT_LABEL[provider?.serviceName]} </span></p>
+                          <span className="ml-2"> 
+                          {PAYMENT_LABEL[provider?.serviceName] 
+                          ? PAYMENT_LABEL[provider?.serviceName] 
+                          : `Pay with ${provider?.serviceName}`} 
+                          </span></p>
                         </Radio>
                       ))}
                     </div>
@@ -318,6 +325,7 @@ const totalAmount = selectedProvider.serviceName === 'Stripe' ? `${subTotal} USD
                   </div>
                   <Button
                     type="primary"
+                    // disabled={!paymentProviders || paymentProviders?.length===0}
                     className="w-full bg-blue-800 text-white h-10 text-lg"
                     onClick={handlePlaceOrder}
                   >

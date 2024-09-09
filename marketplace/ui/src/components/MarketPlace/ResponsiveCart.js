@@ -185,7 +185,10 @@ const ResponsiveCart = ({
     }
   }
 
-  const totalAmount = selectedProvider.serviceName === 'Stripe' ? `${subTotal} USD` : `${(subTotal * 100).toFixed(0)} STRATS`
+  const totalAmount = selectedProvider?.serviceName === 'STRATS' ? 
+             `${(subTotal * 100).toFixed(0)} STRATS` :  
+             selectedProvider?.serviceName === 'Stripe' ? `${subTotal} USD` : 
+             `${subTotal} ${selectedProvider?.serviceName}`
 
   return (
     <div className=" rounded-md mt-3 flex flex-col gap-[18px] sm:w-[400px] md:w-[450px] items-center">
@@ -315,7 +318,10 @@ const ResponsiveCart = ({
                   <Radio value={provider?.serviceName} className="w-full">
                     <p className="flex text-base font-normal items-center"> 
                     {/* <img src={provider?.imageURL} alt={provider?.serviceName} style={{ width: 20, height: 20 }} />  */}
-                    <span className="ml-2 text-sm font-normal"> {PAYMENT_LABEL[provider?.serviceName]} </span></p>
+                    <span className="ml-2 text-sm font-normal"> 
+                    {PAYMENT_LABEL[provider?.serviceName] 
+                    ? PAYMENT_LABEL[provider?.serviceName] 
+                    : `Pay with ${provider?.serviceName}`} </span></p>
                   </Radio>
                 ))}
               </div>
@@ -327,6 +333,7 @@ const ResponsiveCart = ({
           </div>
           <Button
             type="primary"
+            // disabled={!paymentProviders || paymentProviders?.length===0}
             className="w-full mt-3 mb-6 bg-blue-800 text-white h-10 text-lg"
             onClick={()=>{handlePlaceOrder(selectedProvider)}}
           >
