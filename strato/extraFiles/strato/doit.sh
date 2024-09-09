@@ -158,6 +158,10 @@ function newnode {
      --minLogLevel=$p2pMinLogLevel \
      ${networkFlag} "${iFlag}" &>> logs/strato-p2p
 
+  if [ -n "${strictBlockstanbul}" ]; then
+      sBFlag="--strictBlockstanbul=${strictBlockstanbul}"
+  fi
+
   echo "Starting strato-sequencer"
   runBackgroundProcess strato-sequencer \
     --blockstanbul=true \
@@ -168,7 +172,7 @@ function newnode {
     --seq_max_events_per_iter=${seqMaxEventsPerIter:-500} \
     --seq_max_us_per_iter=${seqMaxUsPerIter:-50000} \
     --validatorBehavior=${validatorBehavior:-true} \
-    "${networkFlag}" "${iFlag}" \
+    "${networkFlag}" "${iFlag}" "${sBFlag}" \
     +RTS "${seqRTSOPTs:-}" -N1 &>> logs/strato-sequencer
 
   echo "Starting strato-api-indexer"
