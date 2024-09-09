@@ -20,14 +20,17 @@ so that they could be properly moved to their respective version's subsection.
 - Added support for BlockHeaderV2 fields to eth db and strato-api
 - Added BlockHeaderV2 fields to BlockView component in SMD
 - Added event array tables to Cirrus
+- Added Kafka composable monad
 
 ### Changed
+- General cleanup of Kafka-related code
 
 ### Fixed
 - Fixed bagger's more lucrative tx decision logic
 
 ### Removed
- - Removed Globals from Slipstream
+- Removed Globals from Slipstream
+- Removed block Kafka topic
 
 
 ## [11.4.0] - 8/15/2024
