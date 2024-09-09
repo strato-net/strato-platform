@@ -11,6 +11,7 @@ module Blockchain.Blockstanbul.Authentication
   )
 where
 
+import BlockApps.Logging
 import BlockApps.X509.Certificate
 import Blockchain.Blockstanbul.Messages hiding (sequence)
 import Blockchain.Blockstanbul.Model.Authentication
@@ -35,6 +36,7 @@ import Data.Either.Extra
 import Data.List
 import Data.Maybe (catMaybes, fromJust, fromMaybe)
 import Data.Set (Set)
+import qualified Data.Text as T
 import qualified Data.Set as S
 import Text.Printf
 import Text.Format
@@ -73,17 +75,22 @@ authenticate (IMsg (MsgAuth cm sig) tm) = do
   return (mAddress == cmAddress)
 authenticate _ = return True
 
+getValidatorFromAddress :: (MonadError String m, A.Selectable Address X509CertInfoState m) =>
+                           Address -> m (Maybe Validator)
+getValidatorFromAddress addr = case addr of
+  Address 0x8c945210bbedf90a0c54d0e68357398586c865c3 -> pure . Just $ Validator "dustin-node" -- testnet2 hack
+  _ -> fmap (chainMemberParsedSetToValidator . getChainMemberFromX509) <$> getX509FromAddress addr
 
-getX509FromAddress' :: (MonadError String m, A.Selectable Address X509CertInfoState m) =>
-                       Address -> m X509CertInfoState
-getX509FromAddress' address = do
-  maybeCert <- getX509FromAddress address
+getValidatorFromAddress' :: (MonadError String m, A.Selectable Address X509CertInfoState m) =>
+                       Address -> m Validator
+getValidatorFromAddress' address = do
+  maybeValidator <- getValidatorFromAddress address
 
-  case maybeCert of
+  case maybeValidator of
     Nothing -> throwError $ "Missing address in X509 certificate database: " ++ formatAddressWithoutColor address
     Just v -> return v
 
-replayHistoricBlock :: (MonadError String m, A.Selectable Address X509CertInfoState m) =>
+replayHistoricBlock :: (MonadLogger m, MonadError String m, A.Selectable Address X509CertInfoState m) =>
                        Set Validator -> Word256 -> Block -> m (Word256, Validator)
 replayHistoricBlock realValidators seqNo blk = do
   IstanbulExtra {..} <- liftEither $ maybeToEither "no istanbul metadata" $ evalIstanbulExtra id blk
@@ -92,30 +99,25 @@ replayHistoricBlock realValidators seqNo blk = do
 
   signers <- sequence $ map (verifyCommitmentSeal (blockHash blk)) _commitment
       
-  noAddress <- sequence $ map getX509FromAddress signers
-  
-  let signerRes = S.fromList $ ((chainMemberParsedSetToValidator . getChainMemberFromX509) <$> (catMaybes noAddress))
+  signerRes <- S.fromList . catMaybes <$> traverse getValidatorFromAddress signers
   
   unless (seqNo + 1 == blockNo) $
     throwError $ printf "unexpected block number: have %d, wanted %d" blockNo (seqNo + 1)
 
   prop <- liftEither $ maybeToEither "invalid proposer seal" mProp
 
-  propCert <- getX509FromAddress' prop
+  propValidator <- getValidatorFromAddress' prop
 
-  let propChainMember = chainMemberParsedSetToValidator $ getChainMemberFromX509 propCert
-
-  unless (propChainMember `elem` realValidators) $
-    throwError $
---    error $
-      "proposer " ++ formatAddressWithoutColor prop ++ " (" ++ format propChainMember ++ ")  not a validator"
+  unless (propValidator `elem` realValidators) $
+    error $
+      "proposer " ++ formatAddressWithoutColor prop ++ " (" ++ format propValidator ++ ")  not a validator"
       ++ "\nreal validator list: " ++ show (map format $ S.toList realValidators)
 
   let expectedValidatorList = S.map chainMemberParsedSetToValidator $ unChainMembers _validatorList
 --  let expectedValidatorList = [c | CommonName _ _ c _ <- S.toList (unChainMembers _validatorList)]
 
   unless (expectedValidatorList == realValidators) $
-    throwError $
+    error $
       "real validator list doesn't match expected validator list for block #" ++ show (number . blockBlockData $ blk)
       ++ "\nreal validator list: " ++ show (map format $ S.toList realValidators)
       ++ "\nblock validator list: " ++ show (map format $ S.toList expectedValidatorList)
@@ -123,21 +125,20 @@ replayHistoricBlock realValidators seqNo blk = do
   unless (signerRes `S.isSubsetOf` realValidators) $ do
         let unexplained = intercalate "," . map format . S.toList $ signerRes S.\\ realValidators
         if (signerRes S.\\ realValidators) `S.isSubsetOf` futureValidatorsHack
-          then throwError $ "future validators " ++ show unexplained ++ " jumped the gun, signed block #" ++ show blockNo ++ " before they were authorized to do so.  I'll throw the block away and wait for another validator to send me the properly signed block"
-          else throwError $
+          then $logErrorS "replayHistoricBlock" . T.pack $ "future validators " ++ show unexplained ++ " jumped the gun, signed block #" ++ show blockNo ++ " before they were authorized to do so.  I'll throw the block away and wait for another validator to send me the properly signed block"
+          else error $
                "unknown signers in block #" ++ show blockNo ++ ": " ++ unexplained
                ++ "\nsignerRes: " ++ show (map format $ S.toList signerRes)
                ++ "\nreal validator list: " ++ show (map format $ S.toList realValidators)
                ++ "\nblock validator list: " ++ show (map format $ S.toList expectedValidatorList)
 
   unless (3 * S.size signerRes > 2 * S.size realValidators) $
-    throwError $
---        error $ --will make this stricter once the full soln is in
+    error $
       printf "not enough commit seals (have %d out of %d)" (S.size signerRes) (S.size realValidators)
       ++ ": signerRes = " ++ show signerRes
       ++ ", realValidators = " ++ show realValidators
         
-  return (fromIntegral $ seqNo + 1, propChainMember)
+  return (fromIntegral $ seqNo + 1, propValidator)
 
 isHistoricBlock :: Block -> Bool
 isHistoricBlock = fromMaybe False . evalIstanbulExtra (fmap $ not . null . _commitment) -- check if signatures list from IstanbulExtra is empty

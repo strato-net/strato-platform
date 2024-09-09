@@ -9,18 +9,21 @@ import BlockApps.Init
 import BlockApps.Logging
 import Blockchain.Blockstanbul
 import Blockchain.Data.GenesisInfo
+import Blockchain.EthConf
 import Blockchain.Generation
 import Blockchain.Sequencer
 import Blockchain.Sequencer.CablePackage
 import Blockchain.Sequencer.Gregor
 import Blockchain.Sequencer.Monad
 import Blockchain.Strato.Model.Options (flags_network)
+import qualified Blockchain.Strato.RedisBlockDB as RBDB
 import Control.Concurrent (threadDelay)
 import Control.Concurrent.Async as Async
 import Control.Concurrent.STM
 import Control.Concurrent.STM.TMChan
 import Control.Monad
 import Data.String
+import qualified Database.Redis as Redis
 import Flags
 import HFlags
 import Instrumentation
@@ -100,6 +103,8 @@ main = do
 
   cht <- atomically newTMChan
 
+  redisBDBPool <- Redis.checkedConnect lookupRedisBlockDBConfig
+
   let seqCfg =
         SequencerConfig
           { depBlockDBCacheSize = flags_depblockcachesize,
@@ -113,7 +118,8 @@ main = do
             maxEventsPerIter = flags_seq_max_events_per_iter,
             maxUsPerIter = flags_seq_max_us_per_iter,
             vaultClient = Just clientEnv,
-            kafkaClientId = fromString kafkaClientId'
+            kafkaClientId = fromString kafkaClientId',
+            redisConn = RBDB.RedisConnection redisBDBPool
           }
   race_ (runTheGregor gregorCfg)
     . race_ (runLoggingT (runSequencerM seqCfg mCtx (sequencer validators)))

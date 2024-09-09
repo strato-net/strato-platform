@@ -302,13 +302,18 @@ blockstanbulSend' msg = do
         (P2pBlock <$> committedBlocks)
           ++ p2ps
 
-  unless (null blocks) $ do
-    let tLast = blockHeaderTimestamp . BDB.blockBlockData . head $ blocks
-    dt <- unBlockPeriod <$> Mod.access (Mod.Proxy @BlockPeriod)
-    let tNext = addUTCTime dt tLast
-    now <- liftIO getCurrentTime
-    when (now < tNext) $
-      liftIO . threadDelay . round $ 1e6 * diffUTCTime tNext now
+  case committedBlocks of
+    [] -> pure ()
+    (b:_) -> do
+      let bh = BDB.blockHeader b
+          tLast = blockHeaderTimestamp bh
+      dt <- unBlockPeriod <$> Mod.access (Mod.Proxy @BlockPeriod)
+      let tNext = addUTCTime dt tLast
+      now <- liftIO getCurrentTime
+      when (now < tNext) $
+        liftIO . threadDelay . round $ 1e6 * diffUTCTime tNext now
+      Mod.put (Mod.Proxy @BDB.BestSequencedBlock) . BDB.BestSequencedBlock $
+        BDB.BestBlock (BDB.blockHeaderHash bh) (BDB.blockHeaderBlockNumber bh) (obTotalDifficulty b)
 
   $logDebugS "seq/pbft/send_checkpoints" . T.pack $ show ckpts
   yieldMany $ ToUnseq <$> ckpts
@@ -651,38 +656,9 @@ splitEvents es = forM_ (splitWith iEventType es) $ \(eventType, events) ->
         IETGenesis -> do
           record "inevent_type_genesis" "IngestGenesises"
           transformGenesis $ map (\(IEGenesis og) -> og) events
-        IETNewCertRegistered -> do
-          record "inevent_type_new_cert_registered" "IngestNewCertRegistered"
-          hasPBFT <- isJust <$> getBlockstanbulContext
-          case hasPBFT of
-            True -> do
-              ctx <- fromJust <$> getBlockstanbulContext
-              traverse_ (\(IENewCertRegistered a e) -> do
-                  when ((_selfAddr ctx) == Just a) $ do
-                    let chainm = getChainMemberFromX509 e
-                    putBlockstanbulContext $ ctx { _selfCert = Just chainm }
-                    $logInfoS "sequencer" . T.pack $ "Node identity verified: " ++ show chainm
-                  A.insert (A.Proxy @X509CertInfoState) a e
-                ) events --this is where we submit to ldb
-            False -> traverse_ (\(IENewCertRegistered a e) -> A.insert (A.Proxy @X509CertInfoState) a e) events
-        IETCertRevoked -> do
-          record "inevent_type_cert_revoked" "IngestCertRevoked"
-          traverse_ (\(IECertRevoked a) -> A.delete (A.Proxy @X509CertInfoState) a) events
         IETNewChainOrgName -> do
           record "inevent_type_new_org_name" "IngestNewChainOrgName"
           yieldMany $ map (\(IENewChainOrgName c cm) -> ToP2p $ P2pNewOrgName c cm) events
-        IETValidatorAdded -> do
-          record "inevent_type_validator_added" "ValidatorChange"
-          let bs = map (\(IEValidatorAdded bHash vc) -> (bHash, vc)) events
-          blockstanbulSend $ map (\(_, vc) -> ValidatorChange vc True) bs
-          retries <- lift $ map (PreviousBlock . outputBlockToBlock) . join <$> traverse retryFailedChildren (fst <$> bs)
-          blockstanbulSend retries
-        IETValidatorRemoved -> do
-          record "inevent_type_validator_removed" "ValidatorChange"
-          let bs = map (\(IEValidatorRemoved bHash vc) -> (bHash, vc)) events
-          blockstanbulSend $ map (\(_, vc) -> ValidatorChange vc False) bs
-          retries <- lift $ map (PreviousBlock . outputBlockToBlock) . join <$> traverse retryFailedChildren (fst <$> bs)
-          blockstanbulSend retries
         IETBlockstanbul -> do
           record "inevent_type_blockstanbul" "IngestBlockstanbuls"
           blockstanbulSend $ map (\(IEBlockstanbul (WireMessage a m)) -> IMsg a m) events

@@ -554,6 +554,7 @@ validatorTimingHack :: (MonadState BlockstanbulContext m)  =>
                        String -> Integer -> m ()
 validatorTimingHack "mercata" blockNumber = validatorTimingHackMercata blockNumber
 validatorTimingHack "mercata-hydrogen" blockNumber = validatorTimingHackMercataHydrogen blockNumber
+validatorTimingHack "mercata-uranium" blockNumber = validatorTimingHackMercataUranium blockNumber
 validatorTimingHack _ _ = do
   return ()
 
@@ -594,6 +595,10 @@ validatorTimingHackMercata = \case
   8743 -> modify' $ validators %~ S.insert "jamrose.stratomercata.io"
   8914 -> modify' $ validators %~ S.insert "service-account-io-stratomercata-dttr1"
   8921 -> modify' $ validators %~ S.insert "service-account-io-stratomercata-dttr2"
+  11265 -> modify' $ validators %~ S.delete "service-account-Io-stratomercata-hasanthevalidator"
+  11266 -> modify' $ validators %~ S.delete "service-account-Io-stratomercata-numbatwopencil"
+  11271 -> modify' $ validators %~ S.delete "service-account-io-stratomercata-jacoguzo"
+  11275 -> modify' $ validators %~ S.delete "service-account-io-stratomercata-dgs"
   _ -> return ()
   
 
@@ -610,4 +615,22 @@ validatorTimingHackMercataHydrogen = \case
   33179 -> modify' $ validators %~ S.delete "Multinode302"
   37598 -> modify' $ validators %~ S.insert "dmoney-testnet2"
   43711 -> modify' $ validators %~ S.delete "dmoney-testnet2"
+  _ -> return ()
+
+validatorTimingHackMercataUranium :: (MonadState BlockstanbulContext m)  => Integer -> m ()
+validatorTimingHackMercataUranium = \case
+  43 -> modify' $ validators %~ S.insert "service-account-mercata-devnet-node5"
+  44 -> modify' $ validators %~ S.delete "service-account-mercata-devnet-node5"
+  48 -> modify' $ validators %~ S.insert "mercata-devnet-node5"
+  49 -> modify' $ validators %~ S.delete "mercata-devnet-node5"
+  53 -> modify' $ validators %~ S.insert "service-account-mercata-devnet-node5"
+  101 -> modify' $ validators %~ S.insert "service-account-mercata-devnet-node6"
+  102 -> modify' $ validators %~ S.insert "service-account-mercata-devnet-node10"
+  104 -> modify' $ validators %~ S.insert "service-account-mercata-devnet-node13"
+  105 -> modify' $ validators %~ S.insert "service-account-mercata-devnet-node15"
+  107 -> modify' $ validators %~ S.delete "service-account-mercata-devnet-node5"
+  108 -> modify' $ validators %~ S.delete "service-account-mercata-devnet-node6"
+  109 -> modify' $ validators %~ S.delete "service-account-mercata-devnet-node10"
+  110 -> modify' $ validators %~ S.delete "service-account-mercata-devnet-node13"
+  111 -> modify' $ validators %~ S.delete "service-account-mercata-devnet-node15"
   _ -> return ()

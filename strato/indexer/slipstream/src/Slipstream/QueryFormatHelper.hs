@@ -9,7 +9,7 @@ import qualified Data.Map as Map
 import qualified Data.Text as T
 --import Slipstream.Data.Globals (TableName (..))
 
-
+-- TODO: Refactor this type before someone external sees it
 data TableName
   = IndexTableName
       { itCreator :: T.Text,
@@ -32,6 +32,13 @@ data TableName
         mtApplication :: T.Text,
         mtContractName :: T.Text,
         mtCollectionName :: T.Text
+      }
+  | EventCollectionTableName
+      { ectCreator :: T.Text,
+        ectApplication :: T.Text,
+        ectContractName :: T.Text,
+        ectEventName :: T.Text,
+        ectCollectionName :: T.Text
       }
   | AbstractTableName
       { atCreator :: T.Text,
@@ -118,14 +125,32 @@ tableNameToText (EventTableName c a n e) =
         | T.null c = ""
         | T.null a = c <> tableSeparator
         | otherwise = c <> tableSeparator <> a <> tableSeparator
-      contractAndEvent = n <> "-" <> e
+      contractAndEvent = n <> tableSeparator <> e
    in prefix <> contractAndEvent
+tableNameToText (EventCollectionTableName c a n e m) =
+  let prefix
+        | T.null c = ""
+        | T.null a = c <> tableSeparator
+        | otherwise = c <> tableSeparator <> a <> tableSeparator
+      contractEventAndCollection = n <> tableSeparator <> e <> tableSeparator <> m
+   in prefix <> contractEventAndCollection
 tableNameToText (AbstractTableName c a n) =
   let prefix
         | T.null c = ""
         | T.null a = c <> tableSeparator
         | otherwise = c <> tableSeparator <> a <> tableSeparator
    in prefix <> n
+
+-- TODO: delete once marketplace uses new separator format everywhere
+oldTableNameToText :: TableName -> T.Text
+oldTableNameToText (EventTableName c a n e) =
+  let prefix
+        | T.null c = ""
+        | T.null a = c <> tableSeparator
+        | otherwise = c <> tableSeparator <> a <> tableSeparator
+      contractAndEvent = n <> "." <> e
+   in prefix <> contractAndEvent
+oldTableNameToText t = tableNameToText t
 
 tableNameToTextPostgres :: TableName -> T.Text
 tableNameToTextPostgres = T.take 63 . tableNameToText -- max table name len in psql is 63 char
@@ -135,6 +160,10 @@ tableNameToSingleQuoteText = wrapSingleQuotes . escapeQuotes . tableNameToTextPo
 
 tableNameToDoubleQuoteText :: TableName -> T.Text
 tableNameToDoubleQuoteText = wrapDoubleQuotes . escapeQuotes . tableNameToText
+
+-- TODO: delete once marketplace uses new separator format everywhere
+oldTableNameToDoubleQuoteText :: TableName -> T.Text
+oldTableNameToDoubleQuoteText = wrapDoubleQuotes . escapeQuotes . oldTableNameToText
 
 textToDoubleQuoteText :: T.Text -> T.Text
 textToDoubleQuoteText =  wrapDoubleQuotes . escapeQuotes

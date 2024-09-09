@@ -144,6 +144,7 @@ withTemporaryDepBlockDB pbft genesisBlock m = do
                                , maxEventsPerIter = 10
                                , vaultClient = Nothing
                                , kafkaClientId = "dummyClientId"
+                               , redisConn = error "withTemporaryDepBlockDB: redisConn"
                                }
         myAddr = fromPrivateKey myPriv
         myCM = CommonName "BlockApps" "Engineering" "Admin" True

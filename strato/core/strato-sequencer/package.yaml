@@ -47,6 +47,7 @@ library:
     - stm-conduit
     - strato-conf
     - strato-model
+    - strato-redis-blockdb
     - servant-client
     - text
     - time
@@ -72,6 +73,7 @@ executables:
       - blockstanbul
       - bytestring
       - common-log
+      - hedis
       - hflags
       - http-client
       - kafka-monad
@@ -85,6 +87,7 @@ executables:
       - strato-conf
       - strato-genesis
       - strato-model
+      - strato-redis-blockdb
       - strato-sequencer
       - text
       - wai-middleware-prometheus

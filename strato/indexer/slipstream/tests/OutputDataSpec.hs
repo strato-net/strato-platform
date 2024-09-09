@@ -752,6 +752,7 @@ FOR EACH ROW EXECUTE PROCEDURE "insert_or_update_Vehicle2_history_table"();|]
           root = "groot",
           application = "",
           contractname = "SwissArmy",
+          eventInfo = Nothing,
           collectionname = "SwissArmyMapping",
           collectiontype = "Mapping",
           blockHash = hash "<BLOCKHASH>",
