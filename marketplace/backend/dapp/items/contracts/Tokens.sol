@@ -2,6 +2,7 @@ pragma es6;
 pragma strict;
 
 import <BASE_CODE_COLLECTION>;
+import "../../mercata-base-contracts/Templates/Payments/StratPaymentService.sol";
 
 /// @title A representation of Token assets
 contract Tokens is Mintable {
@@ -24,11 +25,11 @@ contract Tokens is Mintable {
     }
 
     modifier fromPaymentService(string action) {
-        ps = PaymentService(msg.sender);
+        StratPaymentService ps = StratPaymentService(msg.sender);
         string err = "Only the current corresponding Payment Service contract can "
                        + action
                        + ".";
-        require(ps.assetOriginAddress == originAddress && ps.ownerCommonName == "BlockApps", err);
+        require(ps.stratAddress() == originAddress && ps.ownerCommonName() == "BlockApps", err);
         _;
     }
     
