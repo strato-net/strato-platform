@@ -116,6 +116,7 @@ data ProcessedCollectionRow = ProcessedCollectionRow
     root :: Text,
     application :: Text,
     contractname :: Text,
+    eventInfo :: Maybe (Text, Int),
     collectionname :: Text,
     collectiontype ::Text,
     blockHash :: Keccak256,
@@ -125,26 +126,6 @@ data ProcessedCollectionRow = ProcessedCollectionRow
     transactionSender :: Address,
     collectionDataKey :: V.Value,
     collectionDataValue :: V.Value
-  }
-  |
-  ProcessedEventRow
-  { address :: Address,
-    -- codehash :: Maybe CodePtr,
-    creator :: Text,
-    cc_creator :: Maybe Text,
-    root :: Text,
-    application :: Text,
-    contractname :: Text,
-    collectionname :: Text,
-    collectiontype ::Text,
-    blockHash :: Keccak256,
-    blockTimestamp :: UTCTime,
-    blockNumber :: Integer,
-    transactionHash :: Keccak256,
-    transactionSender :: Address,
-    collectionDataKey :: V.Value,
-    collectionDataValue :: V.Value,
-    id_event :: Int
   }
   deriving (Show)
 
@@ -279,13 +260,22 @@ baseColumns =
 
 baseEventColumns :: TableColumns
 baseEventColumns =
-  [ "id",
-    "address",
+  [ "address",
     "block_hash",
     "block_timestamp",
     "block_number",
     "transaction_hash",
-    "transaction_sender"
+    "transaction_sender",
+    "event_index"
+  ]
+
+baseEventCollectionColumns :: TableColumns
+baseEventCollectionColumns =
+  baseEventColumns ++
+  [
+    "contract_name",
+    "collectionname",
+    "collectiontype"
   ]
 
 baseMappingColumns :: TableColumns
@@ -350,6 +340,16 @@ collectionTableName creator a n m =
   let (c', a', n') = constructTableNameParameters creator a n
    in CollectionTableName c' a' n' m
 
+eventTableName :: Text -> Text -> Text -> Text -> TableName
+eventTableName creator a n e =
+  let (c', a', n') = constructTableNameParameters creator a n
+   in EventTableName c' a' n' e
+
+eventCollectionTableName :: Text -> Text -> Text -> Text -> Text -> TableName
+eventCollectionTableName creator a n e m =
+  let (c', a', n') = constructTableNameParameters creator a n
+   in EventCollectionTableName c' a' n' e m
+
 uncurry3 :: (a -> b -> c -> d) -> (a, b, c) -> d
 uncurry3 f (x, y, z) = f x y z
 
@@ -394,21 +394,23 @@ createExpandAbstractTable c nameParts abstracts cc = do
 
 data ForeignKeyInfo = ForeignKeyInfo
   { tableName :: TableName,
-    columnName :: Text,
-    foreignTableName :: TableName
+    columnNames :: [Text],
+    foreignTableName :: TableName,
+    foreignColumnNames :: [Text]
   }
   deriving (Show)
 
 instance Eq ForeignKeyInfo where
     x == y =
         tableName x == tableName y &&
-        columnName x == columnName y &&
-        foreignTableName x == foreignTableName y
+        columnNames x == columnNames y &&
+        foreignTableName x == foreignTableName y &&
+        foreignColumnNames x == foreignColumnNames y
 
 instance Ord ForeignKeyInfo where
     compare x y =
-        compare (tableName x, columnName x, foreignTableName x)
-                (tableName y, columnName y, foreignTableName y)
+        compare (tableName x, columnNames x, foreignTableName x, foreignColumnNames x)
+                (tableName y, columnNames y, foreignTableName y, foreignColumnNames y)
 
 createForeignIndexesForJoins ::
   OutputM m =>
@@ -416,8 +418,9 @@ createForeignIndexesForJoins ::
   ConduitM () Text m ()
 createForeignIndexesForJoins foreignKey = do
   let srcTable = textToDoubleQuoteText $ tableNameToTextPostgres (tableName foreignKey)
-      srcColumn = wrapDoubleQuotes (columnName foreignKey)
+      srcColumns = csv $ wrapDoubleQuotes <$> columnNames foreignKey
       targetTable = textToDoubleQuoteText $ tableNameToTextPostgres (foreignTableName foreignKey)
+      targetColumns = csv $ wrapDoubleQuotes <$> foreignColumnNames foreignKey
       fkNameSrcToTarget = textToDoubleQuoteText $ tableNameToTextPostgres (tableName foreignKey) <> "_" <> tableNameToTextPostgres (foreignTableName foreignKey) <> "_fk"
       -- fkNameTargetToSrc = textToDoubleQuoteText $ tableNameToTextPostgres (foreignTableName foreignKey) <> "_" <> tableNameToTextPostgres (tableName foreignKey) <> "_fk"
       logMessage = 
@@ -427,7 +430,7 @@ createForeignIndexesForJoins foreignKey = do
   -- Add new foreign key
   yield $ "ALTER TABLE " <> srcTable 
           <> " ADD CONSTRAINT " <> fkNameSrcToTarget <> " FOREIGN KEY (" 
-          <> srcColumn <> ") REFERENCES " <> targetTable <> " (address);"
+          <> srcColumns <> ") REFERENCES " <> targetTable <> " (" <> targetColumns <> ");"
 
 notifyPostgREST ::
   OutputM m =>
@@ -459,8 +462,9 @@ getDeferredForeignKeys tableName c (CodeCollection ccs _ _ _ _ _ _ _) creator a 
             Just _ -> do
               pure $ Just $ ForeignKeyInfo
                   { tableName = tableName,
-                    columnName = labelToText $ theName++"_fkey",
-                    foreignTableName = indexTableName creator a $ labelToText x
+                    columnNames = [labelToText $ theName++"_fkey"],
+                    foreignTableName = indexTableName creator a $ labelToText x,
+                    foreignColumnNames = [labelToText "address"]
                   }
         Nothing -> return Nothing
   return result
@@ -486,8 +490,9 @@ getDeferredForeignKeysAbstract tableName c creator a abstracts' cc@(CodeCollecti
                                               Just (creator'', a'', _) -> (creator'', a'', _contractName c')
                   pure $ Just $ ForeignKeyInfo
                     { tableName = tableName,
-                      columnName = labelToText $ theName++"_fkey",
-                      foreignTableName = abstractTableName creator' a' $ T.pack n'
+                      columnNames = [labelToText $ theName++"_fkey"],
+                      foreignTableName = abstractTableName creator' a' $ T.pack n',
+                      foreignColumnNames = [labelToText "address"]
                       }
                 Nothing -> return Nothing
         Nothing -> return Nothing
@@ -497,14 +502,31 @@ getDeferredForeignKeysForCollection :: TableName -> Text -> Text -> [ForeignKeyI
 getDeferredForeignKeysForCollection tableName creator a =
   [ ForeignKeyInfo
       { tableName = tableName,
-        columnName = T.pack "address",
+        columnNames = [T.pack "address"],
         foreignTableName =
           indexTableName creator a $
             ( \case
                 CollectionTableName _ _ n' _ -> n'
                 _ -> ""
             )
-              tableName
+              tableName,
+        foreignColumnNames = [T.pack "address"]
+      }
+  ]
+
+getDeferredForeignKeysForEventCollection :: TableName -> Text -> Text -> [ForeignKeyInfo]
+getDeferredForeignKeysForEventCollection tableName creator a =
+  [ ForeignKeyInfo
+      { tableName = tableName,
+        columnNames = [T.pack "transaction_hash", T.pack "event_index"],
+        foreignTableName =
+          uncurry (eventTableName creator a) $
+            ( \case
+                EventCollectionTableName _ _ n' e' _ -> (n', e')
+                _ -> ("", "")
+            )
+              tableName,
+        foreignColumnNames = [T.pack "transaction_hash", T.pack "event_index"]
       }
   ]
 
@@ -512,8 +534,9 @@ getDeferredForeignKeysForArrayType :: TableName -> Text -> Text -> Text -> [Fore
 getDeferredForeignKeysForArrayType tableName creator a arrType =
   [ ForeignKeyInfo
       { tableName = tableName,
-        columnName = T.pack "value_fkey",
-        foreignTableName = indexTableName creator a arrType
+        columnNames = [T.pack "value_fkey"],
+        foreignTableName = indexTableName creator a arrType,
+        foreignColumnNames = [T.pack "address"]
       }
   ]
 
@@ -578,23 +601,17 @@ createArrayTable (creator, a, n) (arr, arrType) c cc = do
 
 createEventArrayTable ::
   OutputM m =>
-  (Text, Text, Text) ->
+  (Text, Text, Text, Text) ->
   (Text, Text) ->
   ConduitM () Text m [ForeignKeyInfo]
-createEventArrayTable (creator, a, n) (arr, arrType) = do
-  let tableName = collectionTableName creator a n arr
-  -- tableExists <- isTableCreated tableName
+createEventArrayTable (creator, a, n, e) (arr, arrType) = do
+  let tableName = eventCollectionTableName creator a n e arr
   $logInfoS "createEventArrayTable/tableExists"  $ T.pack ( "Table Name: " ++ show tableName ++ ", table exists: ")
-  $logInfoS "createEventArrayTable/(creator, a, n) " (T.pack $ show (creator, a, n))
+  $logInfoS "createEventArrayTable/(creator, a, n, e) " (T.pack $ show (creator, a, n, e))
   $logInfoS "createEventArrayTable/(arr, arrType) " (T.pack $ show (arr, arrType))
-  -- if tableExists
-  --   then return []
-  --   else do
-  --     incNumArrayTables
-  yield $ (createEventArrayTableQuery (creator, a, n, arr))
+  yield $ (createEventArrayTableQuery (creator, a, n, e, arr))
   -- let list = ["key", "value"]
-  -- setTableCreated tableName list
-  let fkeys1 = getDeferredForeignKeysForCollection tableName creator a
+  let fkeys1 = getDeferredForeignKeysForEventCollection tableName creator a
       fkeys2 = getDeferredForeignKeysForArrayType tableName creator a arrType
   return $ fkeys1 ++ fkeys2
 
@@ -891,6 +908,18 @@ abstractBaseColumnsQuery =
     "data jsonb"
   ]
 
+eventBaseColumnsQuery :: [Text]
+eventBaseColumnsQuery =
+  [
+    "address text",
+    "block_hash text",
+    "block_timestamp text",
+    "block_number text",
+    "transaction_hash text",
+    "transaction_sender text",
+    "event_index int"
+  ]
+
 createIndexTableQuery ::(Text, Text, Text) -> TableColumns-> Text
 createIndexTableQuery (creator, a, n) cols =
   let tableName = indexTableName creator a n
@@ -937,30 +966,22 @@ createArrayTableQuery (creator, a, n, arr, arrType) =
           ",\n  PRIMARY KEY (address, key));"
         ]
 
-eventTableName_fkey :: Text -> Text -> Text -> Text
-eventTableName_fkey creator a n = T.intercalate "-" [creator, a, n]
-
-wrapInDoubleQuotes :: Text -> Text
-wrapInDoubleQuotes txt = T.concat ["\"", txt, "\""]
-
-createEventArrayTableQuery :: (Text, Text, Text, Text) -> Text
-createEventArrayTableQuery (creator, a, n, arr) =
-  let tableName = collectionTableName creator a n arr
-      evTableName = eventTableName_fkey creator a n
+createEventArrayTableQuery :: (Text, Text, Text, Text, Text) -> Text
+createEventArrayTableQuery (creator, a, n, e, arr) =
+  let tableName = eventCollectionTableName creator a n e arr
+      evTableName = tableNameToDoubleQuoteText $ eventTableName creator a n e
    in T.concat
         [ "CREATE TABLE IF NOT EXISTS ",
           tableNameToDoubleQuoteText tableName,
           " (",
-          csv $ baseColumnsQuery ++
-            [ "id serial primary key",
-              "contract_name text",
+          csv $ eventBaseColumnsQuery ++
+            [ "contract_name text",
               "collectionname text",
               "collectiontype text",
               "key text",
               "value text",
               "value_fkey text", 
-              "event_id_fkey INT",
-              T.concat [ "FOREIGN KEY (transaction_hash, event_id_fkey) REFERENCES ", wrapInDoubleQuotes evTableName, " (transaction_hash, id)" ]
+              T.concat [ "FOREIGN KEY (transaction_hash, event_index) REFERENCES ", evTableName, " (transaction_hash, event_index)" ]
             ],
           ");"
         ]
@@ -1208,17 +1229,18 @@ insertEventArrayTableQuery :: [ProcessedCollectionRow] -> [Text]
 insertEventArrayTableQuery [] = []
 insertEventArrayTableQuery ms =
   concat $
-    let ms' = (\m -> (m, Map.toList $ Map.mapMaybe valueToSQLText $ Map.fromList [("key", collectionDataKey m), ("value", collectionDataValue m)])) <$> ms
-     in flip map (map snd $ partitionWith (length . snd) ms') $ \case
-          [] -> []
-          arrays@((x, list) : _) ->
-            let tableName =
-                  collectionTableName
+    let ms' = (\m -> (m, valueToSQLText $ collectionDataKey m, valueToSQLText $ collectionDataValue m)) <$> ms
+     in flip map ms' $ \case
+          (x,mk,mv) ->
+            let tNull = T.pack "NULL"
+                tableName =
+                  eventCollectionTableName
                     (creator x)
                     (application x)
                     (contractname x)
+                    (maybe "" fst $ eventInfo x)
                     (collectionname x)
-                keySt = wrapAndEscapeDouble . map escapeQuotes $ baseMappingTableColumns ++ map fst (fillFirstEmptyEntries list) ++ [T.pack "value_fkey", T.pack "event_id_fkey"]
+                keySt = wrapAndEscapeDouble . map escapeQuotes $ baseEventCollectionColumns ++ (T.pack <$> ["key", "value", "value_fkey"])
                 baseVals =
                   [ tshow . address,
                     T.pack . keccak256ToHex . blockHash,
@@ -1226,16 +1248,12 @@ insertEventArrayTableQuery ms =
                     tshow . blockNumber,
                     T.pack . keccak256ToHex . transactionHash,
                     tshow . transactionSender,
-                    creator,
-                    root,
+                    tshow . maybe 0 snd . eventInfo,
                     contractname,
                     collectionname,
                     collectiontype
                   ]
-                vals = flip map arrays $ \(row, rowList) ->
-                  wrapAndEscape $ map (wrapSingleQuotes . ($ row)) baseVals ++ map snd rowList ++ [T.pack "NULL", T.pack (show (id_event row))]--value_fkey
-                valsForSQL = vals
-                inserts = csv valsForSQL
+                vals = wrapAndEscape $ map (wrapSingleQuotes . ($ x)) baseVals ++ [fromMaybe tNull mk, fromMaybe tNull mv, T.pack "NULL"]
              in (: []) $
                   T.concat
                     [ "INSERT INTO ",
@@ -1243,10 +1261,7 @@ insertEventArrayTableQuery ms =
                       " ",
                       keySt,
                       "\n  VALUES ",
-                      inserts,
-                      [r|
-  ON CONFLICT DO NOTHING
-    |],
+                      vals,
                       ";"
                     ]
 insertAbstractTableQuery :: [(E.ProcessedContract, [T.Text], T.Text, TableColumns)] -> [Text]
@@ -1446,7 +1461,7 @@ createEventTable (creator, a, n) evName ev cc = do
     -- setTableCreated eventTable $ colsCombined
   yieldMany $ createEventTableQuery eventTable colsCombined
   eventArrayFkeys <- fmap concat . forM arrayNamesAndTypes $ \anat -> do
-    createEventArrayTable (crtr, cname, (escapeQuotes $ labelToText evName)) anat
+    createEventArrayTable (crtr, app, cname, (escapeQuotes $ labelToText evName)) anat
   return $ eventArrayFkeys
 
 
@@ -1456,17 +1471,8 @@ createEventTableQuery tableName cols =
         [ "CREATE TABLE IF NOT EXISTS ",
           n,
           " (",
-          csv $
-            [ "id INT NOT NULL",
-              "address text",
-              "block_hash text",
-              "block_timestamp text",
-              "block_number text",
-              "transaction_hash text",
-              "transaction_sender text"
-            ]
-              ++ cols,
-              ", PRIMARY KEY (transaction_hash, id)",
+          csv $ ("id SERIAL NOT NULL" : eventBaseColumnsQuery) ++ cols,
+          ", PRIMARY KEY (transaction_hash, event_index)",
           ");"
         ]
   ) <$> [tableNameToDoubleQuoteText tableName, oldTableNameToDoubleQuoteText tableName]
@@ -1509,11 +1515,12 @@ aggEventToCollectionRows ae =
 
 aggEventToCollectionRow :: AggregateEvent -> Action.Event -> Text -> (Value, Value) -> ProcessedCollectionRow
 aggEventToCollectionRow ae ev arrayName (index, value) =
-  ProcessedEventRow
+  ProcessedCollectionRow
     { address = (_accountAddress . Action.evContractAccount) ev,
       creator = T.pack $ Action.evContractCreator ev,
       application = T.pack $ Action.evContractApplication ev,
-      contractname = (T.pack $ Action.evContractName ev) <> "-" <> (T.pack $ Action.evName ev),
+      contractname = T.pack $ Action.evContractName ev,
+      eventInfo = Just (T.pack $ Action.evName ev, eventIndex ae),
       collectionname = arrayName,
       collectiontype = "Event Array",
       blockHash = eventBlockHash ae,
@@ -1524,8 +1531,7 @@ aggEventToCollectionRow ae ev arrayName (index, value) =
       collectionDataKey = index,
       collectionDataValue = value,
       root = "",
-      cc_creator = Just "",
-      id_event = Slipstream.Data.Action.id ae
+      cc_creator = Just ""
     }
 
 removeArrayEvArgs :: Action.Event -> Action.Event
@@ -1608,13 +1614,13 @@ insertEventTableQuery agEv@AggregateEvent {eventEvent = ev} =
       filledArgs = map fst . fillFirstEmptyEntries . map (\(aa, bb, _) -> (T.pack aa, bb)) $ Action.evArgs ev
       keySt = wrapAndEscapeDouble . map escapeQuotes $ baseTableColumnsForEvent ++ filledArgs
       baseVals =
-        [ tshow . Slipstream.Data.Action.id,
-          tshow . _accountAddress . Action.evContractAccount . eventEvent,
+        [ tshow . _accountAddress . Action.evContractAccount . eventEvent,
           T.pack . keccak256ToHex . eventBlockHash,
           tshow . eventBlockTimestamp,
           tshow . eventBlockNumber,
           T.pack . keccak256ToHex . eventTxHash,
-          tshow . eventTxSender
+          tshow . eventTxSender,
+          tshow . eventIndex
         ]
       vals = csv $ map (wrapSingleQuotes . escapeQuotes . ($ agEv)) baseVals ++ map (wrapSingleQuotes . escapeSingleQuotes . T.pack . (\(_, x, _) -> x)) (Action.evArgs ev)
 

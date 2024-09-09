@@ -192,6 +192,7 @@ processedCollectionRow collection ttype AggregateAction {..} ABIID {..} cregator
       root = actionRoot,
       application = actionApplication,
       contractname = aiName,
+      eventInfo = Nothing,
       collectionname = collection,
       collectiontype = ttype,
       blockHash = actionBlockHash,
@@ -238,7 +239,7 @@ parseEvents = concatMap parseEvent
           eventTxSender = Action._transactionSender a,
           eventAbstracts = maybe Map.empty Action._actionDataAbstracts . OMap.lookup (evContractAccount e) $ Action._actionData a,
           eventEvent = e, 
-          id = idx
+          eventIndex = idx
         }
 
 getMappingNamesFromContract :: ContractF () -> [Text]
