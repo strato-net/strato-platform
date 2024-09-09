@@ -19,8 +19,6 @@ abstract contract PaymentService is Utils {
     decimal public primarySaleFeePercentage;
     decimal public secondarySaleFeePercentage;
 
-    address public assetOriginAddress;
-
     event SellerOnboarded (
         string sellersCommonName,
         bool isActive,
@@ -69,8 +67,7 @@ abstract contract PaymentService is Utils {
         string _imageURL,
         string _checkoutText,
         decimal _primarySaleFeePercentage,
-        decimal _secondarySaleFeePercentage,
-        address _assetOriginAddress
+        decimal _secondarySaleFeePercentage
     ) public {
         owner = msg.sender;
         ownerCommonName = getCommonName(msg.sender);
@@ -87,7 +84,6 @@ abstract contract PaymentService is Utils {
 
         primarySaleFeePercentage = _primarySaleFeePercentage;
         secondarySaleFeePercentage = _secondarySaleFeePercentage;
-        assetOriginAddress = _assetOriginAddress;
     }
 
     modifier requireOwner(string action) {
