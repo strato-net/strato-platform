@@ -27,8 +27,8 @@ import Text.Printf
 insertSeq :: IngestEvent -> IO ()
 insertSeq iev = do
   printf "Inserting %s into unseqevents...\n" $ show iev
-  resps <- runKafkaConfigured "queryStrato" $ do
-    assertTopicCreation
+  resps <- runKafkaMConfigured "queryStrato" $ do
+    assertSequencerTopicsCreation
     writeUnseqEvents [iev]
   mapM_ print resps
 
@@ -37,7 +37,7 @@ validatorBehavior valB = do
   printf "Validator behavior = %s \n" $ show valB
   let msg = IEValidatorBehavior . ForcedValidator $ valB
   print msg
-  resp <- runKafkaConfigured (KP.KString "validator-bevaiour-flag") $ do
+  resp <- runKafkaMConfigured (KP.KString "validator-bevaiour-flag") $ do
     writeUnseqEvents [msg]
   print resp
 
@@ -46,7 +46,7 @@ deleteDepBlock k = do
   printf "deleteDepBlock = %s \n" $ k
   let msg = IEDeleteDepBlock $ keccak256FromHex k
   print msg
-  resp <- runKafkaConfigured (KP.KString "delete-dep-block") $ do
+  resp <- runKafkaMConfigured (KP.KString "delete-dep-block") $ do
     writeUnseqEvents [msg]
   print resp
 
@@ -67,8 +67,8 @@ addBlocksFromFile fileName = do
     Right b -> do
       let bs = map bPrimeToB b
       printf "Inserting %d blocks into unseq_events...\n" (length bs)
-      resps <- runKafkaConfigured "queryStrato" $ do
-        assertTopicCreation
+      resps <- runKafkaMConfigured "queryStrato" $ do
+        assertSequencerTopicsCreation
         writeUnseqEvents $
           map
             ( \(Block bd txs us) ->
@@ -84,8 +84,8 @@ addGenesisFromFile fileName = do
     Left err -> die $ printf "Malformed ChainInfo file: %s" err
     Right bs -> do
       printf "Inserting %d chain infos into unseq_events...\n" (length bs)
-      resps <- runKafkaConfigured "queryStrato" $ do
-        assertTopicCreation
+      resps <- runKafkaMConfigured "queryStrato" $ do
+        assertSequencerTopicsCreation
         writeUnseqEvents $
           map ((IEGenesis . IngestGenesis (TXO.PeerString "")) . unNamedTuple @"id" @"info") bs
       mapM_ print resps
@@ -99,8 +99,8 @@ addTxsFromFile fileName = do
       let bs = map (\(Transaction' t) -> t) b
       printf "Inserting %d transactions into unseq_events...\n" (length bs)
       t <- getCurrentMicrotime
-      resps <- runKafkaConfigured "queryStrato" $ do
-        assertTopicCreation
+      resps <- runKafkaMConfigured "queryStrato" $ do
+        assertSequencerTopicsCreation
         writeUnseqEvents $
           map (IETx t . IngestTx (TXO.PeerString "")) bs
       mapM_ print resps

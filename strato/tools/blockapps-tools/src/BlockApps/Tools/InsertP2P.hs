@@ -10,7 +10,7 @@ import Text.Printf
 insertP2P :: P2pEvent -> IO ()
 insertP2P oev = do
   printf "Inserting %s into seq_p2p_events...\n" $ show oev
-  resps <- runKafkaConfigured "queryStrato" $ do
-    assertTopicCreation
+  resps <- runKafkaMConfigured "queryStrato" $ do
+    assertSequencerTopicsCreation
     writeSeqP2pEvents [oev]
   mapM_ print resps

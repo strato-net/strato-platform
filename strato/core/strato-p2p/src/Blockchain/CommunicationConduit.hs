@@ -115,9 +115,7 @@ handleMsgClientConduit myId peer = do
       when (networkID' /= computeNetworkID) $ throwIO $ NetworkIDMismatch
       -- we set to 0 cause we dont necessarily know the number yet
       lift . Mod.put (Mod.Proxy @WorldBestBlock) . WorldBestBlock $ BestBlock peerBestHash 0 peerTD
-      (BestBlockNumber num) <- lift $ Mod.access (Mod.Proxy @BestBlockNumber)
-      (BestBlock _ num' _ ) <- lift $ Mod.get (Mod.Proxy @BestBlock)
-      let lastBlockNumber = max num num' -- BestBlockNumber not guaranteed to be > BestBlock (nor vice versa)
+      (BestBlock _ lastBlockNumber _ ) <- lift $ Mod.get (Mod.Proxy @BestBlock)
       mrh <- lift $ unMaxReturnedHeaders <$> Mod.access (Mod.Proxy @MaxReturnedHeaders)
       yield . Right $ GetBlockHeaders (BlockNumber (max (lastBlockNumber - flags_syncBacktrackNumber) 0)) mrh 0 Forward
       yield . Right $ GetChainDetails []
@@ -172,9 +170,7 @@ handleMsgServerConduit myPubkey peer = do
                       genesisHash = genHash
                     }
           )
-      (BestBlockNumber num) <- lift $ Mod.access (Mod.Proxy @BestBlockNumber)
-      (BestBlock _ num' _ ) <- lift $ Mod.get (Mod.Proxy @BestBlock)
-      let lastBlockNumber = max num num' -- BestBlockNumber not guaranteed to be > BestBlock (nor vice versa)
+      (BestBlock _ lastBlockNumber _ ) <- lift $ Mod.get (Mod.Proxy @BestBlock)
       mrh <- lift $ unMaxReturnedHeaders <$> Mod.access (Mod.Proxy @MaxReturnedHeaders)
       yield . Right $ GetBlockHeaders (BlockNumber (max (lastBlockNumber - flags_syncBacktrackNumber) 0)) mrh 0 Forward
       yield . Right $ GetChainDetails []

@@ -4,13 +4,9 @@
 module Blockchain.Stream.Raw
   ( produceBytes,
     fetchBytes,
-    fetchBytesIO,
-    fetchBytesOneIO,
-    setDefaultKafkaState,
   )
 where
 
-import Blockchain.EthConf
 import Control.Lens
 import qualified Data.ByteString as B
 import qualified Data.ByteString.Char8 as BC
@@ -40,30 +36,3 @@ fetchBytes' topic offset = do
 
   return $ zip [offset ..] $ fetchResponseToPayload [offset] fetched
 
-fetchBytesIO :: TopicName -> Offset -> IO (Maybe [B.ByteString])
-fetchBytesIO topic offset = do
-  ret <-
-    runKafkaConfigured "blockapps-data" $ do
-      lastOffset <- getLastOffset LatestTime 0 topic
-
-      if offset > lastOffset
-        then return Nothing
-        else setDefaultKafkaState >> Just <$> fetchBytes topic offset
-
-  case ret of
-    Left e -> error $ show e
-    Right v -> return v
-
-fetchBytesOneIO :: TopicName -> Offset -> IO (Maybe B.ByteString)
-fetchBytesOneIO topic offset = do
-  res <- fetchBytesIO topic offset
-  case res of
-    Nothing -> return Nothing
-    Just (x : _) -> return $ Just x
-    Just [] -> error "something impossible happened in fetchBytesOneIO"
-
-setDefaultKafkaState :: Kafka k => k ()
-setDefaultKafkaState = do
-  stateRequiredAcks .= -1
-  stateWaitSize .= 1
-  stateWaitTime .= 100000
