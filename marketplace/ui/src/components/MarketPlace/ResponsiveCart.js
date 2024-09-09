@@ -189,12 +189,14 @@ const ResponsiveCart = ({
 
   return (
     <div className=" rounded-md mt-3 flex flex-col gap-[18px] sm:w-[400px] md:w-[450px] items-center">
+      
       {cartData.map((element, index) => {
         let qty = element.qty;
         let product = element;
         return (
           <div className=" w-full" key={index}>
-            <div className="p-3 border border-[#E9E9E9] rounded-md w-full">
+            <div className="w-full bg-[#d8cbcb] h-[1px]"></div>
+            <div className="p-3 rounded-md w-full">
               <div className="flex justify-between">
                 <div className="flex gap-x-3">
                   <img
@@ -297,7 +299,7 @@ const ResponsiveCart = ({
           </div>
         );
       })}
-
+     <div className="w-full bg-[#d8cbcb] h-[1px]"></div>
       <div className="w-full px-2">
         <div className="checkout-card">
           <h3 className="text-lg p-2 font-semibold mb-4 h-12 bg-[#EEEFFA]">Payment Method</h3>
