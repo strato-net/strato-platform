@@ -299,9 +299,10 @@ const ResponsiveCart = ({
       })}
 
       <div className="w-full px-2">
-        <div className="mobile-checkout-card">
-          <h3 className="text-lg font-semibold mb-4 h-12 p-2 bg-[#EEEFFA]">Payment Method</h3>
-          <div className="p-2 rounded-lg shadow-md w-full">
+        <div className="checkout-card">
+          <h3 className="text-lg p-2 font-semibold mb-4 h-12 bg-[#EEEFFA]">Payment Method</h3>
+          <div className="p-2">
+          <div className="rounded-lg shadow-md w-full">
             <Radio.Group
               onChange={(e) => { handleChange(e.target.value) }}
               value={selectedProvider.serviceName}
@@ -318,17 +319,18 @@ const ResponsiveCart = ({
               </div>
             </Radio.Group>
           </div>
-          <div className="flex justify-between items-center my-6 p-2">
+          <div className="flex justify-between items-center mt-10 mb-3 p-2">
             <span className="text-base font-normal">Order Total :</span>
             <span className="text-base font-normal">{totalAmount} </span>
           </div>
           <Button
             type="primary"
-            className="w-full bg-blue-800 text-white h-10 text-lg"
+            className="w-full mt-3 mb-6 bg-blue-800 text-white h-10 text-lg"
             onClick={()=>{handlePlaceOrder(selectedProvider)}}
           >
             Place Order
           </Button>
+        </div>
         </div>
       </div>
     </div>
