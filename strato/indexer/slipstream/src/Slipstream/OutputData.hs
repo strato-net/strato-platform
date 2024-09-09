@@ -514,6 +514,22 @@ getDeferredForeignKeysForCollection tableName creator a =
       }
   ]
 
+getDeferredForeignKeysForEvent :: TableName -> Text -> Text -> [ForeignKeyInfo]
+getDeferredForeignKeysForEvent tableName creator a =
+  [ ForeignKeyInfo
+      { tableName = tableName,
+        columnNames = [T.pack "address"],
+        foreignTableName =
+          indexTableName creator a $
+            ( \case
+                EventTableName _ _ n' _ -> n'
+                _ -> ""
+            )
+              tableName,
+        foreignColumnNames = [T.pack "address"]
+      }
+  ]
+
 getDeferredForeignKeysForEventCollection :: TableName -> Text -> Text -> [ForeignKeyInfo]
 getDeferredForeignKeysForEventCollection tableName creator a =
   [ ForeignKeyInfo
@@ -969,7 +985,6 @@ createArrayTableQuery (creator, a, n, arr, arrType) =
 createEventArrayTableQuery :: (Text, Text, Text, Text, Text) -> Text
 createEventArrayTableQuery (creator, a, n, e, arr) =
   let tableName = eventCollectionTableName creator a n e arr
-      evTableName = tableNameToDoubleQuoteText $ eventTableName creator a n e
    in T.concat
         [ "CREATE TABLE IF NOT EXISTS ",
           tableNameToDoubleQuoteText tableName,
@@ -980,8 +995,7 @@ createEventArrayTableQuery (creator, a, n, e, arr) =
               "collectiontype text",
               "key text",
               "value text",
-              "value_fkey text", 
-              T.concat [ "FOREIGN KEY (transaction_hash, event_index) REFERENCES ", evTableName, " (transaction_hash, event_index)" ]
+              "value_fkey text"
             ],
           ");"
         ]
@@ -1450,6 +1464,7 @@ createEventTable (creator, a, n) evName ev cc = do
       cols = getTableColumnAndType isEvent cc [(x, indexedTypeType y) | (x, y) <- fillFirstEmptyEntries $ ev ^. eventLogs]
       arrayNamesAndTypes = [(key, extractLabelOrEntry entry) | (key, IndexedType _ (SVMType.Array entry _)) <- ev ^. eventLogs]
       colsCombined = map (\(x,y)-> x <> " " <> y) cols
+      eventFkeys = getDeferredForeignKeysForEvent eventTable crtr app
   $logInfoS "keys" (T.pack $ show arrayNamesAndTypes)
   -- eventAlreadyCreated <- isTableCreated eventTable
   -- unless eventAlreadyCreated $ do
@@ -1462,7 +1477,7 @@ createEventTable (creator, a, n) evName ev cc = do
   yieldMany $ createEventTableQuery eventTable colsCombined
   eventArrayFkeys <- fmap concat . forM arrayNamesAndTypes $ \anat -> do
     createEventArrayTable (crtr, app, cname, (escapeQuotes $ labelToText evName)) anat
-  return $ eventArrayFkeys
+  return $ eventFkeys ++ eventArrayFkeys
 
 
 createEventTableQuery :: TableName -> TableColumns -> [Text]
@@ -1558,7 +1573,8 @@ insertEventTables processedEventArrays processedEventsWithoutArrays = do
   yieldMany . concat =<< lift (mapM (insertEventTable) processedEventsWithoutArrays)
       
   -- yieldMany . catMaybes =<< lift (mapM (insertEventTable) processedEventsWithoutArrays)
-  when (not (null processedEventArrays)) $ insertCollectionTable processedEventArrays
+  when (not (null processedEventArrays)) $
+    yieldMany $ insertEventArrayTableQuery processedEventArrays
 
 getAllEvents :: 
   AggregateEvent -> 
