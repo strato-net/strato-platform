@@ -38,13 +38,12 @@ initP2P = labelTheThread "initP2P" $ do
   _ <- liftIO $ $initHFlags "Strato P2P"
   setParticipationMode flags_participationMode
   cfg <- initConfig flags_maxReturnedHeaders
-  c <- initContext
-  let sSource  = seqEventNotificationSource $ contextKafkaState c
+  let sSource = seqEventNotificationSource . contextKafkaState
       runner f = do
         c' <- initContext
         ctx <- liftIO $ newIORef c'
         let cfg' = cfg { configContext = ctx }
-        runContextM cfg' $ f sSource
+        runContextM cfg' . f $ sSource c'
   liftIO $
     race_
       (run 10248 $ prometheus def p2pApp)
