@@ -91,6 +91,7 @@ import Control.Monad.Trans.Except
 import qualified Control.Monad.Trans.State.Strict as State
 import Data.Bifunctor (bimap)
 import qualified Data.Binary as Bin
+import Data.Bool (bool)
 import qualified Data.ByteString as B
 import qualified Data.ByteString.Lazy as BL
 import qualified Data.DList as DL
@@ -431,7 +432,10 @@ addTransaction chainId isRunningTests' b remainingBlockGas t@OutputTx {otSigner 
   when flags_debug $ $logDebugS "addTx" "running code"
   let txTypeCounter = if isContractCreationTX bt then vmTxsCreation else vmTxsCall
   lift $ P.incCounter txTypeCounter
-  execResults <- runCodeForTransaction isRunningTests' isHomestead b (fromInteger (transactionGasLimit bt) - intrinsicGas') tAcct t
+  let adjustedTxGasLimit = bool (transactionGasLimit bt) (flags_strictGasLimit) flags_strictGas
+  when flags_strictGas $ $logInfoS "addTx" . T.pack $ "Strict Gas Mode is on. Adjusted transaction gas limit is " ++ show adjustedTxGasLimit 
+
+  execResults <- runCodeForTransaction isRunningTests' isHomestead b (fromInteger (adjustedTxGasLimit) - intrinsicGas') tAcct t
   lift $ P.incCounter vmTxsProcessed
 
   case erException execResults of

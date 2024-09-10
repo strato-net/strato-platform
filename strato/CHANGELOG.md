@@ -21,6 +21,7 @@ so that they could be properly moved to their respective version's subsection.
 - Added BlockHeaderV2 fields to BlockView component in SMD
 - Added event array tables to Cirrus
 - Added Kafka composable monad
+- Added strict gas mode for the Bagger
 
 ### Changed
 - General cleanup of Kafka-related code
