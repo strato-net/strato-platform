@@ -72,6 +72,7 @@ import Blockchain.Strato.Model.Options (computeNetworkID)
 import qualified Blockchain.Strato.StateDiff as SD
 import Blockchain.TheDAOFork
 import Blockchain.Timing
+import Blockchain.VM.SolidException (SolidException( TooMuchGas ))
 import Blockchain.VM.VMException
 import Blockchain.VMConstants
 import Blockchain.VMContext
@@ -365,11 +366,17 @@ mineTransactions' header remGas ran unran@(tx : txs) = do
               putAddressStateTxDBMap M.empty
               putMemRawStorageTxMap M.empty
               return $ Bagger.TxMiningResult (Just $ TFInvalidPragma invalidPragmasUsed tx) (DL.toList ran) unran remGas -- use invalidPragmasUsed here
-            else do
-              let nextRemGas = remGas - (transactionGasLimit bt - calculateReturned bt execResult)
-              flushMemAddressStateTxToBlockDB
-              flushMemStorageTxDBToBlockDB
-              mineTransactions' header nextRemGas (ran `DL.snoc` trr) txs
+            else do 
+              case erException execResult of
+                Just (Left (TooMuchGas limit actual)) -> do
+                  putAddressStateTxDBMap M.empty
+                  putMemRawStorageTxMap M.empty
+                  return $ Bagger.TxMiningResult (Just $ TFTransactionGasExceeded limit actual tx) (DL.toList ran) unran remGas
+                _ -> do
+                  let nextRemGas = remGas - (transactionGasLimit bt - calculateReturned bt execResult)
+                  flushMemAddressStateTxToBlockDB
+                  flushMemStorageTxDBToBlockDB
+                  mineTransactions' header nextRemGas (ran `DL.snoc` trr) txs
     Left failure -> do
       return $ Bagger.TxMiningResult (Just failure) (DL.toList ran) unran remGas
 

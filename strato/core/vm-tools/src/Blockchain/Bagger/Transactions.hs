@@ -54,6 +54,7 @@ data TransactionFailureCause
   | TFNonceLimitExceeded Integer Integer OutputTx -- accountNonceLimit, actualNonce
   | TFTXSizeLimitExceeded Integer Integer OutputTx -- txSizeLimit, actualSize
   | TFKnownFailedTX OutputTx
+  | TFTransactionGasExceeded Integer Integer OutputTx
   deriving (Eq, Read, Show, Generic)
 
 instance NFData TransactionFailureCause
@@ -229,6 +230,7 @@ tfToBaggerTxRejection (TFInvalidPragma erPragmas' tx) = InvalidPragma Validation
 tfToBaggerTxRejection (TFNonceLimitExceeded limit actual tx) = NonceLimitExceeded Execution Queued actual limit tx
 tfToBaggerTxRejection (TFTXSizeLimitExceeded limit actual tx) = TXSizeLimitExceeded Execution Queued actual limit tx
 tfToBaggerTxRejection (TFKnownFailedTX tx) = KnownFailedTX Execution Queued tx
+tfToBaggerTxRejection (TFTransactionGasExceeded limit actual tx) = GasLimitExceeded Execution Queued actual limit tx
 
 instance Format TransactionFailureCause where
   format (TFIntrinsicGasExceedsTxLimit intG txGL _) = "Intrinsic gas exceeds TX gas limit: intrinsic gas " ++ show intG ++ " > tx gas limit " ++ show txGL
@@ -240,6 +242,7 @@ instance Format TransactionFailureCause where
   format (TFNonceLimitExceeded limit actual _) = "Nonce limit exceeded: limit of " ++ show limit ++ ", actual " ++ show actual
   format (TFTXSizeLimitExceeded limit actual _) = "TX size limit exceeded: limit of " ++ show limit ++ ", actual " ++ show actual
   format (TFKnownFailedTX t) = "Known failed tx: " ++ show (otHash t)
+  format (TFTransactionGasExceeded limit actual _) = "Transaction gas limit exceeded: limit of " ++ show limit ++ ", actual " ++ show actual
 
 getDeltasFromResults :: [TxRunResult] -> (ValidatorDelta, CertDelta)
 getDeltasFromResults = foldr go (mempty,mempty)
