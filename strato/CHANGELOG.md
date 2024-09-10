@@ -22,6 +22,7 @@ so that they could be properly moved to their respective version's subsection.
 - Added event array tables to Cirrus
 
 ### Changed
+- Bagger will now drop transactions that ran out of gas
 
 ### Fixed
 - Fixed bagger's more lucrative tx decision logic
