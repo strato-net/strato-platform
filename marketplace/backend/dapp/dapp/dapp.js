@@ -1296,7 +1296,7 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
     if (!stratsOriginAddress) {
       throw new rest.RestError(RestStatus.BAD_REQUEST, "Strats origin address not found.");
     }
-    let res = await inventoryJs.getAllItemTransferEvents(rawAdmin, {or: `(oldOwner.eq.${userAddress},newOwner.eq.${userAddress})`, assetName: "Sad Dog Kennel Club ($SADDOGS)"}, getOptions);
+    let res = await inventoryJs.getAllItemTransferEvents(rawAdmin, {or: `(oldOwner.eq.${userAddress},newOwner.eq.${userAddress})`, assetName: "strats1"}, getOptions);
 
     return res.transfers.map(transfer => ({
       id: transfer.transferNumber,
@@ -1328,7 +1328,8 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
           status: ASSET_STATUS.ACTIVE,
           queryOptions: { select: "address,quantity" },
           notEqualsField: 'quantity',
-          notEqualsValue: '0'
+          notEqualsValue: '0',
+          order: "block_timestamp.desc",
         },
         options
       );

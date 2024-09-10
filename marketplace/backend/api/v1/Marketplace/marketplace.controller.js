@@ -1,5 +1,7 @@
 import { rest } from 'blockapps-rest'
 import constants from '../../../helpers/constants'
+import Joi from '@hapi/joi'
+import RestStatus from 'http-status-codes'
 
 
 class MarketplaceController {
@@ -108,10 +110,13 @@ class MarketplaceController {
     try {
       const { dapp, body } = req
       const { to, value, price } = body
-
-      await dapp.transferStrats({ to, value, price });
-
-      return rest.response.status200(res)
+      
+      MarketplaceController.validateSTRATSTransferItemArgs({ to, value, price })
+      
+      const result = await dapp.transferStrats({ to, value, price });
+      rest.response.status200(res, result)
+      
+      return next()
     } catch (e) {
       return next(e)
     }
@@ -152,6 +157,23 @@ class MarketplaceController {
       finalInventory = []
     }
     return finalInventory
+  }
+  
+  static validateSTRATSTransferItemArgs(args) {
+    const transferItemSchema = Joi.object({
+      to: Joi.string().required(),
+      value: Joi.number().integer().greater(0).required(),
+      price: Joi.number().greater(0).precision(2).required(),
+    });
+
+    const validation = transferItemSchema.validate(args);
+
+    if (validation.error) {
+      console.log('validation error: ', validation.error)
+      throw new rest.RestError(RestStatus.BAD_REQUEST, validation.error.message, {
+        message: `Missing args or bad format: ${validation.error.message}`,
+      })
+    }
   }
 
 }

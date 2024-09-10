@@ -48,7 +48,7 @@ const TransferModal = ({ open, handleCancel, inventory, categoryName = "", limit
         setDropdownOpen(!!value);
     };
 
-    const originAddress = inventory.originAddress.toLowerCase();
+    const originAddress = inventory.originAddress?.toLowerCase();
     const isBurner = originAddress === OLD_SADDOG_ORIGIN_ADDRESS;
 
     const usersList = users
