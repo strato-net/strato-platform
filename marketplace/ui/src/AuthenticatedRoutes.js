@@ -228,6 +228,25 @@ const AuthenticatedRoutes = ({ user, users, isAuthenticated }) => {
       />
       <Route
         exact
+        path={routes.MyWalletDetail.url}
+        element={
+          <UsersProvider>
+            <CategorysProvider>
+              <SubCategorysProvider>
+                <InventoriesProvider>
+                  <ItemsProvider>
+                    <OrdersProvider>
+                      <ProductDetails user={user} users={users} />
+                    </OrdersProvider>
+                  </ItemsProvider>
+                </InventoriesProvider>
+              </SubCategorysProvider>
+            </CategorysProvider>
+          </UsersProvider>
+        }
+      />
+      <Route
+        exact
         path={routes.MarketplaceUserProfile.url}
         element={
           <UsersProvider>
