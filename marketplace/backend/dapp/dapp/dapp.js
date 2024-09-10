@@ -1000,6 +1000,7 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
     const newArgs = {
       ...args,
       ownerCommonName: userCert.commonName,
+      isMint: true,
       sort: "-createdDate"
     };
     return walletJs.getWalletAssets(rawAdmin, newArgs, getOptions);
