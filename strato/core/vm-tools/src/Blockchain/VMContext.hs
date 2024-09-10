@@ -63,6 +63,7 @@ module Blockchain.VMContext
     checkIfRunningTests,
     lookupX509AddrFromCBHash,
     knownFailedTxs,
+    knownExpensiveTxs,
   )
 where
 
@@ -197,6 +198,14 @@ knownFailedTxs =
       keccak256FromHex "19f5c3f02eece1e5ac12fa83d6666d3ec4b73afbbc1dbba410b4debc5ebf77a0",
       keccak256FromHex "0e8c8612865ce10a7e5f07f4003e0dba081ae1260c1d99bce82ac9d88a29b483",
       keccak256FromHex "866ce8e521aee5a30284702dc38c4e8c160f40c9a17e52f4ba806dd22f0afed7"
+    ]
+
+{-# NOINLINE knownExpensiveTxs #-}
+knownExpensiveTxs :: S.Set Keccak256
+knownExpensiveTxs =
+  S.fromList
+    [
+      keccak256FromHex "4f9e09efa40b1ddc9b9bbfb056161f87714f15bcb0d7fd7db3158528ed766065"
     ]
 
 newtype CurrentBlockHash = CurrentBlockHash {unCurrentBlockHash :: Keccak256}
