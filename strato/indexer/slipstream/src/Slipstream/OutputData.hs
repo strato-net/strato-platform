@@ -1591,10 +1591,7 @@ processParents ae = createNewEvent <$> Map.toList (eventAbstracts ae)
       ((Account, Text), (Text, Text, [Text])) -> AggregateEvent
     createNewEvent ((_, n'), (c, a, _)) =
       ae { eventEvent = (eventEvent ae) {
-        Action.evContractCreator = 
-          if (Action.evContractApplication (eventEvent ae)) == "" 
-          then T.unpack c
-          else Action.evContractCreator (eventEvent ae),
+        Action.evContractCreator = T.unpack c,
         Action.evContractApplication = T.unpack a,
         Action.evContractName = T.unpack n'
           }
