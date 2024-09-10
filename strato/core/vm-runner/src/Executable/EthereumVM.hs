@@ -83,7 +83,7 @@ ethereumVM d = runResourceT $ do
   ctx <- initContext d
   void . runSQLM . runKafkaMConfigured "ethereum-vm" $ execContextM' ctx $ do
     Bagger.setCalculateIntrinsicGas $ \i otx -> toInteger (calculateIntrinsicGas' i otx)
-    (_, EVMCheckpoint _ cpHead cpBBI cpSR) <- getCheckpoint
+    (_, EVMCheckpoint cpHead cpBBI cpSR) <- getCheckpoint
     $logInfoLS "ethereumVM/getCheckpoint" (blockHeaderHash cpHead, cpBBI, cpSR)
 
     putContextBestBlockInfo cpBBI
@@ -104,8 +104,11 @@ ethereumVM d = runResourceT $ do
 
         loopTimeit "compactContextM" $ compactContextM
 
-        bestHeader <- Bagger.getCheckpointableState
-        baggerData <- EVMCheckpoint (blockHeaderHash bestHeader) bestHeader <$> getContextBestBlockInfo <*> (unBlockHashRoot <$> Mod.get Proxy)
+        baggerData <- EVMCheckpoint <$>
+                      Bagger.getCheckpointableState <*>
+                      getContextBestBlockInfo <*>
+                      (unBlockHashRoot <$> Mod.get Proxy)
+
         return (mSRMismatch, baggerData)
     
     let err = "stateRoot mismatch!!  New stateRoot doesn't match block stateRoot: " ++ format _srmBlockSR 
@@ -124,7 +127,7 @@ initializeCheckpointAndBlockSummary ::
   OutputBlock ->
   m EVMCheckpoint
 initializeCheckpointAndBlockSummary block = do
-  let evmc@(EVMCheckpoint _ header _ sr) = outputBlockToEvmCheckpoint block
+  let evmc@(EVMCheckpoint header _ sr) = outputBlockToEvmCheckpoint block
   writeBlockSummary block
   (BlockHashRoot bhr) <- bootstrapChainDB (blockHeaderHash header) [(Nothing, sr)]
   return
@@ -134,15 +137,14 @@ initializeCheckpointAndBlockSummary block = do
 
 outputBlockToEvmCheckpoint :: OutputBlock -> EVMCheckpoint
 outputBlockToEvmCheckpoint block =
-  let sha = outputBlockHash block
-      header = obBlockData block
+  let header = obBlockData block
       txs = obReceiptTransactions block
       td = obTotalDifficulty block
       txL = length txs
       uncL = length (obBlockUncles block)
-      cbbi = ContextBestBlockInfo sha header td txL uncL
+      cbbi = ContextBestBlockInfo (blockHeaderHash header) header td txL uncL
       sr = stateRoot header
-   in EVMCheckpoint (blockHeaderHash header) header cbbi sr
+   in EVMCheckpoint header cbbi sr
 
 logEventSummaries :: MonadLogger m => [VmEvent] -> m ()
 logEventSummaries events = do
