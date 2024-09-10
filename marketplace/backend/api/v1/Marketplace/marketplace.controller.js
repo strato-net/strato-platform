@@ -207,20 +207,11 @@ class MarketplaceController {
   }
 
   static async getPriceHistory(req, res, next) {
-    console.log("Entering getPriceHistory method");
     try {
       const { dapp, query } = req;
       const { address, limit, offset, timeFilter } = query;
 
-      console.log("Request parameters:", {
-        address,
-        limit,
-        offset,
-        timeFilter,
-      });
-
       if (!address) {
-        console.log("Address parameter is missing");
         return rest.response.status400(res, "Address parameter is required");
       }
 
@@ -231,7 +222,6 @@ class MarketplaceController {
         timeFilter: timeFilter,
       });
 
-      console.log("Price history data retrieved successfully");
       return rest.response.status200(res, priceHistoryData);
     } catch (e) {
       console.error("Error in getPriceHistory:", e);
