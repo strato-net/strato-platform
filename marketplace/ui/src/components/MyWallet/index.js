@@ -44,6 +44,10 @@ const MyWallet = ({ user }) => {
   const { strats } = useMarketplaceState();
   const stratsBalance = Object.keys(strats).length > 0 ? strats : 0;
 
+  const formatNumber = (num) => {
+    return num.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ",");
+  };
+
   useEffect(() => {
     if (user) {
       actions.fetchWalletData(dispatch);
@@ -59,11 +63,11 @@ const MyWallet = ({ user }) => {
         image:
           asset["BlockApps-Mercata-Asset-images"][0]?.value ||
           Images.image_placeholder,
-        quantity: asset.quantity,
-        price: asset.price ? `$${asset.price}` : "-",
-        value: asset.price
-          ? `$${(asset.quantity * asset.price).toFixed(2)}`
-          : "-",
+          quantity: formatNumber(asset.quantity),
+          price: asset.price ? `$${formatNumber(parseFloat(asset.price).toFixed(2))}` : "-",
+          value: asset.price
+            ? `$${formatNumber((asset.quantity * asset.price).toFixed(2))}`
+            : "-",
         gainLoss: asset.gainLossPercentage
           ? `${asset.gainLossPercentage}%`
           : "-",
@@ -284,7 +288,7 @@ const MyWallet = ({ user }) => {
           <div className="flex items-center">
             <img src={Images.logo} alt="STRATS" className="w-4 h-4 mr-2" />
             <Text className="text-white text-lg font-semibold">
-              {stratsBalance}
+            {formatNumber(stratsBalance)}
             </Text>
           </div>
         </div>
@@ -338,7 +342,7 @@ const MyWallet = ({ user }) => {
                   style={{ width: "12px", height: "12px", marginRight: "5px" }}
                 />
                 <Text style={{ fontSize: "14px", color: "#747474" }}>
-                  {Number(stratsBalance).toFixed(2)}
+                {formatNumber(Number(stratsBalance).toFixed(2))}
                 </Text>
               </div>
             </div>
