@@ -217,7 +217,7 @@ getCheckpointableState :: MonadBagger m => m (Keccak256, BlockHeader)
 getCheckpointableState = do
   state <- getBaggerState
   let miningCache = B.miningCache state
-      bestSHA = B.bestBlockSHA miningCache
+      bestSHA = blockHeaderHash bestHeader
       bestHeader = B.bestBlockHeader miningCache
   return (bestSHA, bestHeader)
 

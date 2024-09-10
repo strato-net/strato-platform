@@ -39,6 +39,7 @@ import Blockchain.Sequencer.Kafka
 import Blockchain.StateRootMismatch
 import Blockchain.Strato.Indexer.Kafka (produceIndexEvents)
 import Blockchain.Strato.Indexer.Model (IndexEvent (..))
+import Blockchain.Strato.Model.Class
 import qualified Blockchain.Strato.Model.Keccak256 as Keccak256
 import Blockchain.Strato.StateDiff          (stateDiff')
 import Blockchain.Strato.StateDiff.Database (commitSqlDiffs)
@@ -82,13 +83,13 @@ ethereumVM d = runResourceT $ do
   ctx <- initContext d
   void . runSQLM . runKafkaMConfigured "ethereum-vm" $ execContextM' ctx $ do
     Bagger.setCalculateIntrinsicGas $ \i otx -> toInteger (calculateIntrinsicGas' i otx)
-    (_, EVMCheckpoint cpHash cpHead cpBBI cpSR) <- getCheckpoint
-    $logInfoLS "ethereumVM/getCheckpoint" (cpHash, cpBBI, cpSR)
+    (_, EVMCheckpoint _ cpHead cpBBI cpSR) <- getCheckpoint
+    $logInfoLS "ethereumVM/getCheckpoint" (blockHeaderHash cpHead, cpBBI, cpSR)
 
     putContextBestBlockInfo cpBBI
     Mod.put Proxy $ BlockHashRoot cpSR
 
-    Bagger.processNewBestBlock cpHash cpHead [] -- bootstrap Bagger with genesis block
+    Bagger.processNewBestBlock (blockHeaderHash cpHead) cpHead [] -- bootstrap Bagger with genesis block
 
     StateRootMismatch{..} <- runConsume "evm/loop" consumerGroup seqVmEventsTopicName $ \_ seqEvents -> do
         recordBaggerMetrics =<< contextGets _baggerState
@@ -124,9 +125,9 @@ initializeCheckpointAndBlockSummary ::
   OutputBlock ->
   m EVMCheckpoint
 initializeCheckpointAndBlockSummary block = do
-  let evmc@(EVMCheckpoint sha _ _ sr) = outputBlockToEvmCheckpoint block
+  let evmc@(EVMCheckpoint _ header _ sr) = outputBlockToEvmCheckpoint block
   writeBlockSummary block
-  (BlockHashRoot bhr) <- bootstrapChainDB sha [(Nothing, sr)]
+  (BlockHashRoot bhr) <- bootstrapChainDB (blockHeaderHash header) [(Nothing, sr)]
   return
     evmc
       { ctxChainDBStateRoot = bhr
@@ -142,7 +143,7 @@ outputBlockToEvmCheckpoint block =
       uncL = length (obBlockUncles block)
       cbbi = ContextBestBlockInfo sha header td txL uncL
       sr = stateRoot header
-   in EVMCheckpoint sha header cbbi sr
+   in EVMCheckpoint (blockHeaderHash header) header cbbi sr
 
 logEventSummaries :: MonadLogger m => [VmEvent] -> m ()
 logEventSummaries events = do
