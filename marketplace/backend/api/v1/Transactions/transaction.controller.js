@@ -97,6 +97,7 @@ class TransactionController {
 
                 return {
                 ...item,
+                createdDate: item.transferDate || item.redemptionDate || item.createdDate,
                 from: item.oldOwnerCommonName || item.sellersCommonName || item.issuerCommonName || item.sellerCommonName,
                 to: item.newOwnerCommonName || item.purchasersCommonName || item.ownerCommonName,
                 price: item.price || '',

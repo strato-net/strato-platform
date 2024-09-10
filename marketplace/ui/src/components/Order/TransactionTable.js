@@ -1,10 +1,9 @@
 import React, { useEffect, useState } from "react";
-import { Button, Dropdown, Space, Typography, Input, Row, Col, Popover, Card, Tooltip, Select, DatePicker, Spin } from "antd";
+import { Button, Dropdown, Space, Input, Row, Col, Popover, Card, Tooltip, Select, DatePicker, Spin } from "antd";
 import { DownloadOutlined, SearchOutlined } from "@ant-design/icons";
 import { useNavigate, useLocation } from "react-router-dom";
 import classNames from "classnames";
 import dayjs from "dayjs";
-import moment from "moment";
 // Components
 import DataTableComponent from "../DataTableComponent";
 import { TRANSACTION_FILTER } from "./constant";
@@ -19,10 +18,11 @@ import { actions as transactionAction } from "../../contexts/transaction/actions
 import { useTransactionDispatch, useTransactionState } from "../../contexts/transaction";
 // Utils & Constants
 import {
-  STRATS_CONVERSION, TRANSACTION_STATUS, TRANSACTION_STATUS_CLASSES, TRANSACTION_SORT,
-  TRANSACTION_STATUS_COLOR, DOWNLOAD_OPTIONS, REDEMPTION_STATUS, REDEMPTION_STATUS_CLASSES
+  STRATS_CONVERSION, TRANSACTION_STATUS, TRANSACTION_STATUS_CLASSES, TRANSACTION_STATUS_COLOR, 
+  DOWNLOAD_OPTIONS, REDEMPTION_STATUS, REDEMPTION_STATUS_CLASSES, US_DATE_FORMAT
 } from "../../helpers/constants";
 import { SEO } from "../../helpers/seoConstant";
+import { getStringDate } from "../../helpers/utils";
 
 const limit = '', offset = '';
 
@@ -265,7 +265,7 @@ const TransactionTable = ({ user, download, isAllOrdersLoading }) => {
       dataIndex: "date",
       key: "date",
       width: '150px',
-      render: (text,{block_timestamp}) => <p>{moment(block_timestamp).format('L')}</p>,
+      render: (text,{createdDate}) => <p>{getStringDate(createdDate, US_DATE_FORMAT)}</p>,
       title: (
         <div style={{ display: "flex" }}>
           <div className="mt-1.5">{"Date"}</div>
