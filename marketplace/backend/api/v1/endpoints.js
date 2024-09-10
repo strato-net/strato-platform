@@ -106,6 +106,12 @@ export const Tokens = {
   create: '/'
 }
 
+export const STRATS = {
+  prefix: '/STRATS',
+  getAll: '/',
+  create: '/'
+}
+
 export const CarbonOffset = {
   prefix: '/carbonOffset',
   getAll: '/',

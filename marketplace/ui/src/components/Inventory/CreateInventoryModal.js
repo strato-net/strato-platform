@@ -208,7 +208,7 @@ const CreateInventoryModal = ({
   const handleCategory = (value) => {
     form.setFieldValue("category", value);
     setCategoryValue(value);
-    if (value === 'Carbon') {
+    if (value === 'Carbon' || value === 'Tokens') {
       form.setFieldValue("subCategory", null);
       setSubCategoryValue(null);
     } else {

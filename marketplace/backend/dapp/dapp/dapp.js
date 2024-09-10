@@ -25,6 +25,7 @@ import certificateJs from "/dapp/certificates/certificate";
 
 import artJs from "/dapp/items/art";
 import tokensJs from "/dapp/items/tokens";
+import STRATSJs from "/dapp/items/STRATS";
 import carbonOffsetJs from "/dapp/items/carbonOffset";
 import metalsJs from "/dapp/items/metals";
 import spiritsJs from "/dapp/items/spirits";
@@ -705,6 +706,25 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
   };
 
   // ------------------------------ TOKENS ENDS --------------------------------
+  
+  // ------------------------------ STRATS STARTS ------------------------------
+
+  contract.createSTRATS = async function (args, options = defaultOptions) {
+    const createdDate = Math.floor(Date.now() / 1000);
+    const newArgs = {
+      ...args.itemArgs,
+      createdDate,
+      status: ASSET_STATUS.ACTIVE
+    };
+    return STRATSJs.uploadContract(rawAdmin, newArgs, options);
+  };
+
+  contract.getSTRATS = async function (args = {}, options = optionsNoChainIds) {
+    const getOptions = { ...options, app: contractName, };
+    return STRATSJs.getAll(rawAdmin, args, getOptions);
+  };
+
+  // ------------------------------ STRATS ENDS --------------------------------
 
   // ------------------------------ CARBONOFFSET STARTS------------------------------
 
