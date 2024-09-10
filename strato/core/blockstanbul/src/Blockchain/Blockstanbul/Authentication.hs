@@ -15,6 +15,7 @@ import BlockApps.Logging
 import BlockApps.X509.Certificate
 import Blockchain.Blockstanbul.Messages hiding (sequence)
 import Blockchain.Blockstanbul.Model.Authentication
+import Blockchain.Blockstanbul.Options (flags_strictBlockstanbul)
 import Blockchain.Blockstanbul.StateMachine
 import Blockchain.Data.ArbitraryInstances ()
 import Blockchain.Data.Block
@@ -63,6 +64,9 @@ signMessage tm = do
   sig <- sign mesg
   return $ OMsg (MsgAuth (fromJust addr) sig) $ tm
 
+blockstanbulError :: (MonadError String m) => String -> m a
+blockstanbulError = if flags_strictBlockstanbul then error else throwError
+
 authenticate :: (A.Selectable Address X509CertInfoState m) => InEvent -> m Bool
 authenticate (IMsg (MsgAuth cm sig) tm) = do
   let msgHash = getHash tm
@@ -109,7 +113,7 @@ replayHistoricBlock realValidators seqNo blk = do
   propValidator <- getValidatorFromAddress' prop
 
   unless (propValidator `elem` realValidators) $
-    error $
+    blockstanbulError $
       "proposer " ++ formatAddressWithoutColor prop ++ " (" ++ format propValidator ++ ")  not a validator"
       ++ "\nreal validator list: " ++ show (map format $ S.toList realValidators)
 
@@ -117,7 +121,7 @@ replayHistoricBlock realValidators seqNo blk = do
 --  let expectedValidatorList = [c | CommonName _ _ c _ <- S.toList (unChainMembers _validatorList)]
 
   unless (expectedValidatorList == realValidators) $
-    error $
+    blockstanbulError $
       "real validator list doesn't match expected validator list for block #" ++ show (number . blockBlockData $ blk)
       ++ "\nreal validator list: " ++ show (map format $ S.toList realValidators)
       ++ "\nblock validator list: " ++ show (map format $ S.toList expectedValidatorList)
@@ -126,14 +130,14 @@ replayHistoricBlock realValidators seqNo blk = do
         let unexplained = intercalate "," . map format . S.toList $ signerRes S.\\ realValidators
         if (signerRes S.\\ realValidators) `S.isSubsetOf` futureValidatorsHack
           then $logErrorS "replayHistoricBlock" . T.pack $ "future validators " ++ show unexplained ++ " jumped the gun, signed block #" ++ show blockNo ++ " before they were authorized to do so.  I'll throw the block away and wait for another validator to send me the properly signed block"
-          else error $
+          else blockstanbulError $
                "unknown signers in block #" ++ show blockNo ++ ": " ++ unexplained
                ++ "\nsignerRes: " ++ show (map format $ S.toList signerRes)
                ++ "\nreal validator list: " ++ show (map format $ S.toList realValidators)
                ++ "\nblock validator list: " ++ show (map format $ S.toList expectedValidatorList)
 
   unless (3 * S.size signerRes > 2 * S.size realValidators) $
-    error $
+    blockstanbulError $
       printf "not enough commit seals (have %d out of %d)" (S.size signerRes) (S.size realValidators)
       ++ ": signerRes = " ++ show signerRes
       ++ ", realValidators = " ++ show realValidators
