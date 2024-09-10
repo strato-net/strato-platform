@@ -19,8 +19,6 @@ import {
   useInventoryDispatch,
   useInventoryState,
 } from "../../contexts/inventory";
-import { actions as marketplaceActions } from "../../contexts/marketplace/actions";
-import { useMarketplaceDispatch, useMarketplaceState } from "../../contexts/marketplace";
 import { usePaymentServiceDispatch, usePaymentServiceState } from "../../contexts/payment";
 import { actions as paymentServiceActions } from "../../contexts/payment/actions";
 import { Images } from "../../images";
@@ -50,7 +48,6 @@ const Inventory = ({ user }) => {
   const [offset, setOffset] = useState(0);
   const [page, setPage] = useState(1);
   const dispatch = useInventoryDispatch();
-  const marketplaceDispatch = useMarketplaceDispatch();
   const [api, contextHolder] = notification.useNotification();
   const [isSearch, setIsSearch] = useState(false);
   const [category, setCategory] = useState(undefined);
@@ -61,7 +58,6 @@ const Inventory = ({ user }) => {
   const { categorys } = useCategoryState();
   const { inventories, isInventoriesLoading, message, success, inventoriesTotal } =
     useInventoryState();
-  const { message: marketplaceMsg, success: marketplaceSuccess } = useMarketplaceState();
   const {
     paymentServices,
     arePaymentServicesLoading,
@@ -164,24 +160,6 @@ const Inventory = ({ user }) => {
       api.error({
         message: message,
         onClose: actions.resetMessage(dispatch),
-        placement,
-        key: 2,
-      });
-    }
-  };
-  
-  const marketplaceToast = (placement) => {
-    if (marketplaceSuccess) {
-      api.success({
-        message: marketplaceMsg,
-        onClose: marketplaceActions.resetMessage(marketplaceDispatch),
-        placement,
-        key: 1,
-      });
-    } else {
-      api.error({
-        message: marketplaceMsg,
-        onClose: marketplaceActions.resetMessage(marketplaceDispatch),
         placement,
         key: 2,
       });
@@ -463,7 +441,6 @@ const Inventory = ({ user }) => {
       {itemMsg && itemToast("bottom")}
       {redemptionMsg && redemptionToast("bottom")}
       {issuerStatusMsg && issuerStatusToast("bottom")}
-      {marketplaceMsg && marketplaceToast("bottom")}
     </>
   );
 };

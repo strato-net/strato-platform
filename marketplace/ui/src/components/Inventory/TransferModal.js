@@ -1,4 +1,4 @@
-import { Button, Select, InputNumber, Modal, Table } from "antd";
+import { Button, Select, InputNumber, Modal, Table, notification } from "antd";
 import { useEffect, useRef,useState } from "react";
 import { actions } from "../../contexts/inventory/actions";
 import { actions as marketplaceActions } from "../../contexts/marketplace/actions";
@@ -18,6 +18,7 @@ const TransferModal = ({ open, handleCancel, inventory, categoryName = "", limit
     const inventoryDispatch = useInventoryDispatch();
     const marketplaceDispatch = useMarketplaceDispatch();
     const userDispatch = useUsersDispatch();
+    const [api, contextHolder] = notification.useNotification();
     const [canTransfer, setCanTransfer] = useState(true);
     const {
         user
@@ -29,7 +30,7 @@ const TransferModal = ({ open, handleCancel, inventory, categoryName = "", limit
         isTransferring
     } = useInventoryState();
     const { 
-        isTransferringStrats
+        isTransferringStrats, message: marketplaceMsg, success: marketplaceSuccess
     } = useMarketplaceState();
     const inputPriceDesktopRef = useRef(null);
     const inputPriceMobileRef = useRef(null);
@@ -68,6 +69,24 @@ const TransferModal = ({ open, handleCancel, inventory, categoryName = "", limit
     const [userAddress, setUserAddress] = useState(
       isBurner && filteredUsersList.length > 0 ? filteredUsersList[0].value : ""
     );
+    
+    const marketplaceToast = (placement) => {
+        if (marketplaceSuccess) {
+            api.success({
+            message: marketplaceMsg,
+            onClose: marketplaceActions.resetMessage(marketplaceDispatch),
+            placement,
+            key: 1,
+            });
+        } else {
+            api.error({
+            message: marketplaceMsg,
+            onClose: marketplaceActions.resetMessage(marketplaceDispatch),
+            placement,
+            key: 2,
+            });
+        }
+    };
     
     const handleSelect = (userAddress) => {
         setUserAddress(userAddress);
@@ -312,6 +331,8 @@ const TransferModal = ({ open, handleCancel, inventory, categoryName = "", limit
                 </div>
 
             </div>
+            {contextHolder}
+            {marketplaceMsg && marketplaceToast("bottom")}
         </Modal>
     )
 }
