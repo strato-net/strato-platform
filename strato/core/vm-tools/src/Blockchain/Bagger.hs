@@ -213,13 +213,12 @@ baggerRejectionToTransactionResultBits rejection = case rejection of
     p stage queue = "Rejected from mempool at " ++ show stage ++ "/" ++ show queue ++ " due to "
     p' s q = p s q ++ "low "
 
-getCheckpointableState :: MonadBagger m => m (Keccak256, BlockHeader)
+getCheckpointableState :: MonadBagger m => m BlockHeader
 getCheckpointableState = do
   state <- getBaggerState
   let miningCache = B.miningCache state
-      bestSHA = blockHeaderHash bestHeader
       bestHeader = B.bestBlockHeader miningCache
-  return (bestSHA, bestHeader)
+  return bestHeader
 
 updateBaggerState :: MonadBagger m => (B.BaggerState -> B.BaggerState) -> m ()
 updateBaggerState f = putBaggerState =<< (f <$> getBaggerState)

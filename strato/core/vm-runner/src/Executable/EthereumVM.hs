@@ -104,10 +104,9 @@ ethereumVM d = runResourceT $ do
 
         loopTimeit "compactContextM" $ compactContextM
 
-        baggerData <- uncurry EVMCheckpoint <$> Bagger.getCheckpointableState
-        checkpointData <- baggerData <$> getContextBestBlockInfo
-        withChainroot <- checkpointData . unBlockHashRoot <$> Mod.get Proxy
-        return (mSRMismatch, withChainroot)
+        bestHeader <- Bagger.getCheckpointableState
+        baggerData <- EVMCheckpoint (blockHeaderHash bestHeader) bestHeader <$> getContextBestBlockInfo <*> (unBlockHashRoot <$> Mod.get Proxy)
+        return (mSRMismatch, baggerData)
     
     let err = "stateRoot mismatch!!  New stateRoot doesn't match block stateRoot: " ++ format _srmBlockSR 
     runStateRootMismatchM $ do
