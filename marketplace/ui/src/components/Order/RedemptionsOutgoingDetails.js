@@ -162,7 +162,7 @@ const RedemptionsOutgoingDetails = ({ user }) => {
                         </Breadcrumb.Item>
                         <Breadcrumb.Item href="" onClick={e => e.preventDefault()}>
                             <div onClick={() => { navigate(routes.Transactions.url) }}>
-                                <p className="text-sm text-primary font-semibold">Redemptions (outgoing)</p>
+                                <p className="text-sm text-primary font-semibold">My Transactions</p>
                             </div>
                         </Breadcrumb.Item>
                         <Breadcrumb.Item className="text-sm text-[#202020] font-medium">
