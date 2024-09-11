@@ -167,9 +167,9 @@ getContractsBySolidString solidStr codeCollection = M.lookup solidStr (_contract
 
 resolvePragmaFeature :: [(String, String)] -> String -> Bool
 resolvePragmaFeature pragmaList feature = 
-  let solidVMVersion = maybe "" snd $ find ((== "solidvm") . fst) pragmaList
+  let solidVMVersion = find (== ("solidvm", "11.4")) pragmaList
   in case (solidVMVersion) of
-      ("11.4") -> 
+      Just _ -> 
         case feature of
           "es6" -> True
           "strict" -> True
@@ -177,7 +177,7 @@ resolvePragmaFeature pragmaList feature =
           "safeExternalCalls" -> True
           "strictDecimals" -> True
           _ -> False
-      (_) -> isJust $ find ((== feature) . fst) pragmaList
+      _ -> isJust $ find ((== feature) . fst) pragmaList
 
 structDef :: ContractF a -> CodeCollectionF a -> SolidString -> Maybe [(SolidString, FieldType, a)]
 structDef c cc n = (c ^. structs . at n) <|> (cc ^. flStructs . at n)
