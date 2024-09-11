@@ -205,7 +205,7 @@ knownExpensiveTxs :: S.Set Keccak256
 knownExpensiveTxs =
   S.fromList
     [
-      keccak256FromHex "4f9e09efa40b1ddc9b9bbfb056161f87714f15bcb0d7fd7db3158528ed766065"
+      keccak256FromHex "4f9e09efa40b1ddc9b9bbfb056161f87714f15bcb0d7fd7db3158528ed766065" -- testnet2 tx requiring ~1,000,000 gas
     ]
 
 newtype CurrentBlockHash = CurrentBlockHash {unCurrentBlockHash :: Keccak256}
