@@ -9,6 +9,8 @@ contract STRATS is Tokens {
     string public paymentServiceCreator;
     string public paymentServiceName;
 
+    bool public quantityIsDecimal = true;
+
     constructor(
         string _name,
         string _description,

@@ -42,8 +42,6 @@ import marketplaceJs from "/dapp/marketplace/marketplace.js";
 import paymentProviderJs from '/dapp/payments/paymentProvider';
 import redemptionServiceJs from '/dapp/redemptions/redemptionService';
 
-import strats from "../strats/strats";
-
 const allAssetNames = [];
 dayjs.extend(utc);
 const contractName = "Mercata";
@@ -1128,7 +1126,7 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
       }
 
       // Get User's STRATS Asset Address
-      const stratsOriginAddress = await strats.getStratsAddress();
+      const stratsOriginAddress = await STRATSJs.getStratsAddress();
 
       // Retrieve all sales data
       const salesData = await saleJs.getAll(rawAdmin, { saleAddresses }, options);
@@ -1284,7 +1282,7 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
   };
 
   contract.getStratsBalance = async function ( args, options = defaultOptions ) {
-    const stratsOriginAddress = await strats.getStratsAddress();
+    const stratsOriginAddress = await STRATSJs.getStratsAddress();
     const balance = await inventoryJs.getAll(rawAdmin, { ownerCommonName: userCert.commonName, originAddress: stratsOriginAddress, queryOptions: { select: "quantity.sum()" }}, options);
     return balance[0].sum ? `${balance[0].sum}` : 0;
   }
@@ -1292,7 +1290,7 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
   contract.getStratsTransactionHistory = async function (args, options = defaultOptions) {
     const getOptions = { ...options, app: contractName, };
     const { userAddress } = args;
-    const stratsOriginAddress = await strats.getStratsAddress();
+    const stratsOriginAddress = await STRATSJs.getStratsAddress();
     if (!stratsOriginAddress) {
       throw new rest.RestError(RestStatus.BAD_REQUEST, "Strats origin address not found.");
     }
@@ -1314,7 +1312,7 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
       const { value: initialQuantity, to: newOwner, price } = args;
   
       // Get strats origin address
-      const stratsOriginAddress = await strats.getStratsAddress();
+      const stratsOriginAddress = await STRATSJs.getStratsAddress();
       if (!stratsOriginAddress) {
         throw new rest.RestError(RestStatus.BAD_REQUEST, "Strats origin address not found.");
       }

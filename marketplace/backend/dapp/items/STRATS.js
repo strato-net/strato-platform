@@ -18,11 +18,11 @@ const contractEvents = { OWNERSHIP_UPDATE: "OwnershipUpdate" }
  * */
 async function uploadContract(user, _constructorArgs, options) {
     const constructorArgs = marshalIn(_constructorArgs);
-
+    const { quantity, ...restArgs } = constructorArgs;
     const contractArgs = {
         name: contractName,
         source: await importer.combine(contractFilename),
-        args: util.usc(constructorArgs),
+        args: util.usc({quantity: quantity * 100, ...restArgs}),
     };
 
     let error = [];
@@ -212,6 +212,16 @@ async function getAllOwnershipEvents(admin, args = {}, options) {
     return itemOwnershipEvents.map((item) => marshalOut(item))
 }
 
+function getStratsAddress() {
+    if (process.env.networkID === constants.prodNetworkId) {
+        return constants.prodStratsAddress
+    } else if (process.env.networkID === constants.testnetNetworkId) {
+        return constants.testnetStratsAddress
+    } else {
+        return constants.prodStratsAddress
+    }
+}
+
 export default {
     uploadContract,
     contractName,
@@ -223,5 +233,6 @@ export default {
     transferOwnership,
     marshalIn,
     marshalOut,
-    getHistory
+    getHistory,
+    getStratsAddress
 }
