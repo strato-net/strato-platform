@@ -14,6 +14,7 @@ import { epochToDate } from "../../helpers/utils";
 import { ORDER_STATUS, REDEMPTION_STATUS, TRANSACTION_STATUS } from "../../helpers/constants";
 import TransactionTable from "./TransactionTable";
 import { useTransactionState } from "../../contexts/transaction";
+import moment from "moment";
 
 const Transaction = ({ user }) => {
   const categoryDispatch = useCategoryDispatch();
@@ -76,7 +77,7 @@ const Transaction = ({ user }) => {
           from: transaction.from,
           to: transaction.to,
           hash: transaction.transaction_hash,
-          date: transaction?.block_timestamp,
+          date: moment(transaction?.block_timestamp).format('L'),
           Status: transaction?.type === "Transfer" ? 'Closed' : (transaction?.type === "Redemption"
             ? REDEMPTION_STATUS[transaction.status]
             : TRANSACTION_STATUS[transaction.status])
