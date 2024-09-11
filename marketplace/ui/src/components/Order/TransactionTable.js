@@ -237,14 +237,14 @@ const TransactionTable = ({ user, download, isAllOrdersLoading }) => {
       render: (data, { price }) => <p>{price ? formattedNum(price) : '--'}</p>
     },
     {
-      title: "From",
+      title: "Buyer/Sender",
       dataIndex: "from",
       key: "from",
       align: "center",
       width: '150px',
     },
     {
-      title: "To",
+      title: "Seller/Recipient",
       dataIndex: "to",
       key: "to",
       align: "center",
