@@ -38,7 +38,7 @@ type SourceCode = String
 data ParserState = ParserState
   { contractName :: ContractName,
     pragmaVersion :: PragmaVersion,
-    pragmas :: M.Map String String,
+    pragmas :: [(String, String)],
     userDefinedTypes :: (M.Map String String),
     contractSrcLength :: Int
   }
@@ -48,10 +48,10 @@ data ParserState = ParserState
 type SolidityParser = Parsec SourceCode ParserState
 
 initialParserState :: ParserState
-initialParserState = ParserState "" "" M.empty M.empty 0
+initialParserState = ParserState "" "" [] M.empty 0
 
 initialParserStateWithLength :: Int -> ParserState
-initialParserStateWithLength srcLength = ParserState "" "" M.empty M.empty srcLength
+initialParserStateWithLength srcLength = ParserState "" "" [] M.empty srcLength
 
 --given inputs set the parser state
 setParserState :: ParserState -> SolidityParser ()
@@ -78,16 +78,17 @@ addPragma k v = do
   ParserState {..} <- getState
   case k of
     "solidvm" ->
-      let versionPragmaMap = resolveSolidVMVersion v
-          newPragmas = M.union versionPragmaMap pragmas
+      let pragmaList = resolveSolidVMVersion v
+          newPragmas = pragmaList ++ pragmas
       in putState $ ParserState contractName pragmaVersion newPragmas userDefinedTypes contractSrcLength
-    _ -> putState $ ParserState contractName pragmaVersion (M.insert k v pragmas) userDefinedTypes contractSrcLength
+    _ -> putState $ ParserState contractName pragmaVersion ((k,v):pragmas) userDefinedTypes contractSrcLength
   where
-    resolveSolidVMVersion :: String -> M.Map String String
+    resolveSolidVMVersion :: String -> [(String, String)]
     resolveSolidVMVersion version =
       case version of
-        "11.4" -> M.fromList $ [("es6", ""), ("strict", ""), ("builtinCreates", ""), ("safeExternalCalls", "")]
-        _ -> M.empty
+        "11.5" -> ("solidvm", "11.5") : resolveSolidVMVersion "11.4"
+        "11.4" -> [("solidvm", "11.4"), ("es6", ""), ("strict", ""), ("builtinCreates", ""), ("safeExternalCalls", "")]
+        ver -> [("solidvm", ver)]
 
 addUserDefinedType :: String -> String -> SolidityParser ()
 addUserDefinedType k v =
