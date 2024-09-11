@@ -217,6 +217,12 @@ function newnode {
   if [ -n "${FILE_SERVER_URL}" ]; then
       fsFlag="--fileServerUrl=${FILE_SERVER_URL}"
   fi
+  if [ -n "${strictGas}" ]; then
+      sgFlag="--strictGas=${strictGas}"
+  fi
+  if [ -n "${strictGasLimit}" ]; then
+      sglFlag="--strictGasLimit=${strictGasLimit}"
+  fi
 
   echo "Starting vm-runner"
   runBackgroundProcess vm-runner \
@@ -242,6 +248,8 @@ function newnode {
     "${gasFlag}" \
     "${creatorFlag}" \
     "${iFlag}" \
+    "${sgFlag}" \
+    "${sglFlag}" \
     +RTS "${vmRunnerRTSOPTs:-}" -I2 -N1 &>> logs/vm-runner
 
   # Leave the +RTS -N1, it is important
