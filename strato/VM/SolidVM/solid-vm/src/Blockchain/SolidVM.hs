@@ -1515,7 +1515,7 @@ decrementGas !gas = do
     then do
       let msg = "out of gas: " ++ show gasLeft' ++ " < " ++ show gas
       liftIO $ putStrLn $ C.red $ msg
-      tooMuchGas (show (_gasInitialAllotment gasInfo')) gasInfo'
+      tooMuchGas (getGasValue $ _gasInitialAllotment gasInfo') (getGasValue gasUsed')
     else do
       return ()
 expToVar' :: MonadSM m => CC.Expression -> Maybe SVMType.Type -> m Variable

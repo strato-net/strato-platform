@@ -113,6 +113,7 @@ runFromStateRoot mineTransactions remainingGas theBlockHeader txs = do
     Just f@TFNonceLimitExceeded {} -> recoverable f
     Just f@TFTXSizeLimitExceeded {} -> recoverable f
     Just f@TFKnownFailedTX {} -> recoverable f
+    Just f@TFTransactionGasExceeded {} -> recoverable f
 
 -- rewardCoinbases :: MonadBagger m => ChainMemberParsedSet -> [BlockHeader] -> Integer -> m StateRoot -- miner coinbase -> known uncles -> this block number -> stateRoot
 -- rewardCoinbases us uncles ourNumber = do

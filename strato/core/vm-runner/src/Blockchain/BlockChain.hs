@@ -72,6 +72,7 @@ import Blockchain.Strato.Model.Options (computeNetworkID)
 import qualified Blockchain.Strato.StateDiff as SD
 import Blockchain.TheDAOFork
 import Blockchain.Timing
+import Blockchain.VM.SolidException (SolidException( TooMuchGas ))
 import Blockchain.VM.VMException
 import Blockchain.VMConstants
 import Blockchain.VMContext
@@ -90,6 +91,7 @@ import Control.Monad.Trans.Except
 import qualified Control.Monad.Trans.State.Strict as State
 import Data.Bifunctor (bimap)
 import qualified Data.Binary as Bin
+import Data.Bool (bool)
 import qualified Data.ByteString as B
 import qualified Data.ByteString.Lazy as BL
 import qualified Data.DList as DL
@@ -365,11 +367,17 @@ mineTransactions' header remGas ran unran@(tx : txs) = do
               putAddressStateTxDBMap M.empty
               putMemRawStorageTxMap M.empty
               return $ Bagger.TxMiningResult (Just $ TFInvalidPragma invalidPragmasUsed tx) (DL.toList ran) unran remGas -- use invalidPragmasUsed here
-            else do
-              let nextRemGas = remGas - (transactionGasLimit bt - calculateReturned bt execResult)
-              flushMemAddressStateTxToBlockDB
-              flushMemStorageTxDBToBlockDB
-              mineTransactions' header nextRemGas (ran `DL.snoc` trr) txs
+            else do 
+              case erException execResult of
+                Just (Left (TooMuchGas limit actual)) -> do
+                  putAddressStateTxDBMap M.empty
+                  putMemRawStorageTxMap M.empty
+                  return $ Bagger.TxMiningResult (Just $ TFTransactionGasExceeded limit actual tx) (DL.toList ran) unran remGas
+                _ -> do
+                  let nextRemGas = remGas - (transactionGasLimit bt - calculateReturned bt execResult)
+                  flushMemAddressStateTxToBlockDB
+                  flushMemStorageTxDBToBlockDB
+                  mineTransactions' header nextRemGas (ran `DL.snoc` trr) txs
     Left failure -> do
       return $ Bagger.TxMiningResult (Just failure) (DL.toList ran) unran remGas
 
@@ -424,7 +432,11 @@ addTransaction chainId isRunningTests' b remainingBlockGas t@OutputTx {otSigner 
   when flags_debug $ $logDebugS "addTx" "running code"
   let txTypeCounter = if isContractCreationTX bt then vmTxsCreation else vmTxsCall
   lift $ P.incCounter txTypeCounter
-  execResults <- runCodeForTransaction isRunningTests' isHomestead b (fromInteger (transactionGasLimit bt) - intrinsicGas') tAcct t
+  let isKnownToBeSlow = otHash t `S.member` knownExpensiveTxs
+      adjustedTxGasLimit = bool (transactionGasLimit bt) (flags_strictGasLimit) (flags_strictGas && not isKnownToBeSlow)
+  when flags_strictGas $ $logInfoS "addTx" . T.pack $ "Strict Gas Mode is on. Adjusted transaction gas limit is " ++ show adjustedTxGasLimit
+
+  execResults <- runCodeForTransaction isRunningTests' isHomestead b (fromInteger (adjustedTxGasLimit) - intrinsicGas') tAcct t
   lift $ P.incCounter vmTxsProcessed
 
   case erException execResults of

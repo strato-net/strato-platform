@@ -190,6 +190,8 @@ services:
     - SLIPSTREAM_DEBUG_LOG=${SLIPSTREAM_DEBUG_LOG:-false}
     - SLIPSTREAM_OPTIONAL=${SLIPSTREAM_OPTIONAL}
     - strictBlockstanbul=${strictBlockstanbul}
+    - strictGas=${strictGas}
+    - strictGasLimit=${strictGasLimit}
     - STRIPE_PAYMENT_SERVER_URL=${STRIPE_PAYMENT_SERVER_URL}
     - svmTrace=${svmTrace}
     - sqlDiff=${sqlDiff}
