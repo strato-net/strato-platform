@@ -1356,8 +1356,8 @@ runStatement st@(CC.EmitStatement eventName exptups pos) = do
           -- pair up field names with values one-by-one (no type checking tho, lol)
           -- let pairs = zip (map (T.unpack . fst) $ CC._eventLogs ev) expStrs
 
-          let evArgs = zipWith (\(EventLog name _ (CC.IndexedType _ idxType)) value -> 
-                        (T.unpack name, isIndexed, value, if isTypeArray idxType then "Array" else "Other")) 
+          let evArgs = zipWith (\(CC.EventLog name _ (CC.IndexedType _ idxType)) value -> 
+                        (T.unpack name, value, if isTypeArray idxType then "Array" else "Other")) 
                      (CC._eventLogs ev) expStrs
                 where
                   isTypeArray :: SVMType.Type -> Bool

@@ -405,10 +405,10 @@ functionDeclaration free = do
 functionXabi :: Bool -> SolidityParser SolidVM.Func
 functionXabi free = do
   start <- getSourcePosition
-  functionArgs <- tupleDeclaration
+  functionArgs <- map (fmap snd) <$> tupleDeclaration
 
   let lastParamIsVariadic = maybe False ((==) SVMType.Variadic . fst) (Data.List.uncons . reverse . map snd $ functionArgs)
-      containsOnly1 = length (filter (SVMType.Variadic ==) (map (snd . snd) functionArgs)) == 1
+      containsOnly1 = length (filter (SVMType.Variadic ==) (map snd functionArgs)) == 1
   case (lastParamIsVariadic, containsOnly1) of
     (True, False) -> unexpected "only one variadic parameter is allowed"
     (False, True) -> unexpected "variadic parameter must be the last parameter"
@@ -461,7 +461,7 @@ eventDeclaration = do
       EventDeclaration
         SolidVM.Event
           { SolidVM._eventAnonymous = anon,
-            SolidVM._eventLogs = zipWith (\i (n,(x,t)) -> EventLog n x (SolidVM.IndexedType i t)) [0 ..] logs,
+            SolidVM._eventLogs = zipWith (\i (n,(x,t)) -> SolidVM.EventLog n x (SolidVM.IndexedType i t)) [0 ..] logs,
             SolidVM._eventContext = ctx
             --         objName = name,
             --         objValueType = NoValue,
@@ -506,7 +506,7 @@ tupleDeclaration :: SolidityParser [(Text, (Bool, SVMType.Type))]
 tupleDeclaration = parens $
   commaSep $ do
     partType <- simpleTypeExpression
-    indexed <- fmap (fromMaybe False) . optional $
+    indexed <- option False $
             (True <$ reserved "indexed")
         <|> (False <$ reserved "storage")
         <|> (False <$ reserved "memory")

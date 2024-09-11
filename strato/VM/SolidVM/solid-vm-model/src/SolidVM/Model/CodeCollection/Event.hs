@@ -5,14 +5,7 @@
 {-# LANGUAGE DeriveTraversable #-}
 {-# LANGUAGE TemplateHaskell #-}
 
-module SolidVM.Model.CodeCollection.Event
-  ( EventF (..),
-    Event,
-    eventAnonymous,
-    eventLogs,
-    eventContext,
-  )
-where
+module SolidVM.Model.CodeCollection.Event where
 
 import Control.DeepSeq
 import Control.Lens hiding ((.=))
@@ -53,7 +46,7 @@ instance FromJSON EventLog where
       <*> (o .: "type")
   parseJSON o = typeMismatch "SolidVM.EventLog: Expected Object" o
 
-instance Arbitrary a => Arbitrary (EventF a) where
+instance Arbitrary EventLog where
   arbitrary = GR.genericArbitrary GR.uniform
 
 --Changes to this structure should make a change to the unparser :)
