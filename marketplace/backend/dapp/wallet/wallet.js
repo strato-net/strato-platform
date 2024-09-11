@@ -8,6 +8,9 @@ import saleJs from "/dapp/orders/sale";
 import saleOrderJs from "/dapp/orders/saleOrder";
 import constants from "/helpers/constants";
 import strats from "/dapp/strats/strats";
+import { searchAllWithQueryArgs } from '/helpers/utils';
+
+const contractName = constants.assetTableName;
 
 function marshalOut(_args) {
   const args = {
@@ -117,6 +120,22 @@ async function getLastSoldPrice(admin, assetAddress, options) {
   }
 }
 
+async function getOwnershipHistory(user, args, options) {
+  const { originAddress, minItemNumber, maxItemNumber } = args;
+  const newOptions = { ...options, org: 'BlockApps', app: 'Mercata' }
+  const searchArgs = {
+      originAddress,
+      gteField: 'maxItemNumber',
+      gteValue: minItemNumber,
+      lteField: 'minItemNumber',
+      lteValue: maxItemNumber,
+      sort: '+block_timestamp'
+  };
+
+  const history = await searchAllWithQueryArgs(`${contractName}.OwnershipTransfer`, searchArgs, newOptions, user);
+  return history;
+}
+
 async function getWalletAssets(admin, args = {}, options) {
   const inventoryResults = await inventoryJs.getAll(
     admin,
@@ -134,6 +153,10 @@ async function getWalletAssets(admin, args = {}, options) {
       try {
         const originAddress = inventory.originAddress;
 
+        // Get ownership history and log it
+        const ownershipHistory = await getOwnershipHistory(admin, { originAddress, minItemNumber: 1, maxItemNumber: 10 }, options);
+        const isRelevantToAdmin = ownershipHistory.some(entry => entry.purchaserCommonName === admin.username);
+
         // Get the highest marketplace price for items with the same origin address
         const highestMarketplacePrice = await getHighestMarketplacePrice(
           admin,
@@ -142,12 +165,15 @@ async function getWalletAssets(admin, args = {}, options) {
         );
 
         // Get the last sold price for this specific asset
-        const lastSoldPrice = await getLastSoldPrice(
-          admin,
-          originAddress,
-          options
-        );
-
+        let lastSoldPrice = 0;
+        if (!isRelevantToAdmin) {
+          lastSoldPrice = await getLastSoldPrice(
+            admin,
+            originAddress,
+            options
+          );
+        }
+        
         // Determine the final price (highest of inventory price, marketplace price, and last sold price)
         const finalPrice = Math.max(
           inventory.price || 0,
