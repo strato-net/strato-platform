@@ -116,7 +116,6 @@ export default function Example() {
                       <p className="text-base leading-7 text-gray-600">
                         {faq.answer}
                       </p>
-                      {/* {faq.answer} */}
                     </Disclosure.Panel>
                   </>
                 )}
