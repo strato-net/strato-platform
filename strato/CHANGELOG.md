@@ -21,6 +21,7 @@ so that they could be properly moved to their respective version's subsection.
 - Added BlockHeaderV2 fields to BlockView component in SMD
 - Added event array tables to Cirrus
 - Added Kafka composable monad
+- Added pragma solidvm 11.5
 
 ### Changed
 - General cleanup of Kafka-related code
