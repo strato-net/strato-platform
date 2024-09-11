@@ -1774,7 +1774,7 @@ statementHelper (EmitStatement eventName vals x) = do
                                     _          -> error "Internal Error: Type is not static"
                            ) vals'
               -- valsStaticDebug = trace ("Static types: " ++ show vals'') vals''
-          let expectedTypes = [indexedTypeType it | (_, it) <- _eventLogs event]
+          let expectedTypes = _eventLogType <$> _eventLogs event
               -- expectedTypesDebug = trace ("Expected types: " ++ show expectedTypes) expectedTypes
           if length expectedTypes /= length vals''
             then pure . bottom $ "Wrong number of arguments provided" <$ x

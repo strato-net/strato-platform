@@ -408,7 +408,7 @@ functionXabi free = do
   functionArgs <- tupleDeclaration
 
   let lastParamIsVariadic = maybe False ((==) SVMType.Variadic . fst) (Data.List.uncons . reverse . map snd $ functionArgs)
-      containsOnly1 = length (filter (SVMType.Variadic ==) (map snd functionArgs)) == 1
+      containsOnly1 = length (filter (SVMType.Variadic ==) (map (snd . snd) functionArgs)) == 1
   case (lastParamIsVariadic, containsOnly1) of
     (True, False) -> unexpected "only one variadic parameter is allowed"
     (False, True) -> unexpected "variadic parameter must be the last parameter"
@@ -461,7 +461,7 @@ eventDeclaration = do
       EventDeclaration
         SolidVM.Event
           { SolidVM._eventAnonymous = anon,
-            SolidVM._eventLogs = zipWith (\i -> fmap (SolidVM.IndexedType i)) [0 ..] logs,
+            SolidVM._eventLogs = zipWith (\i (n,(x,t)) -> EventLog n x (SolidVM.IndexedType i t)) [0 ..] logs,
             SolidVM._eventContext = ctx
             --         objName = name,
             --         objValueType = NoValue,
@@ -479,7 +479,7 @@ modifierDeclaration = do
   start <- getSourcePosition
   reserved "modifier"
   name <- identifier
-  args <- option [] tupleDeclaration
+  args <- map (fmap snd) <$> option [] tupleDeclaration
   contents <- Just <$> statements <|> (reservedOp ";" >> return Nothing)
   end <- getSourcePosition
   let ctx = SourceAnnotation start end ()
@@ -502,17 +502,17 @@ modifierDeclaration = do
 
 -- | Parses a '(x, y, z)'-style tuple, such as appears in function
 -- arguments and return values.
-tupleDeclaration :: SolidityParser [(Text, SVMType.Type)]
+tupleDeclaration :: SolidityParser [(Text, (Bool, SVMType.Type))]
 tupleDeclaration = parens $
   commaSep $ do
     partType <- simpleTypeExpression
-    optional $
-      reserved "indexed"
-        <|> reserved "storage"
-        <|> reserved "memory"
-        <|> reserved "calldata"
+    indexed <- fmap (fromMaybe False) . optional $
+            (True <$ reserved "indexed")
+        <|> (False <$ reserved "storage")
+        <|> (False <$ reserved "memory")
+        <|> (False <$ reserved "calldata")
     partName <- option "" identifier
-    return (Text.pack partName, partType)
+    return (Text.pack partName, (indexed, partType))
 
 --  ObjDef{
 --    objName = partName,
@@ -549,7 +549,7 @@ functionModifiers ::
 functionModifiers = do
   vals <-
     many $
-      (ReturnsMod <$> returnModifier)
+      (ReturnsMod . map (fmap snd) <$> returnModifier)
         <|> (VisibilityMod <$> visibilityModifier)
         <|> (MutabilityMod <$> mutabilityModifier)
         <|> (VirtualMod <$ reserved "virtual")
