@@ -25,6 +25,7 @@ const NewTrendingCard = ({ topSellingProduct, addItemToCart, parent = "", api, c
 
     const [isModalVisible, setIsModalVisible] = useState(false);
     const [isWishlisted, setIsWishlisted] = useState(false);
+    const saleQuantity = topSellingProduct.quantityIsDecimal === true ? (topSellingProduct.saleQuantity / 100) : topSellingProduct.saleQuantity;
     const [quantity, setQuantity] = useState(1);
 
     const ownerSameAsUser = () => {
@@ -35,7 +36,7 @@ const NewTrendingCard = ({ topSellingProduct, addItemToCart, parent = "", api, c
     }
 
     const naviroute = routes.MarketplaceProductDetail.url;
-    const isAvailableForSale = (!topSellingProduct.price || topSellingProduct.saleQuantity === 0)
+    const isAvailableForSale = (!topSellingProduct.price || saleQuantity === 0)
 
     const queryParams = new URLSearchParams(location.search);
     const categoryQueryValue = queryParams.get('category');
@@ -161,12 +162,12 @@ const NewTrendingCard = ({ topSellingProduct, addItemToCart, parent = "", api, c
                             size="small"
                             bordered={false}
                             value={quantity}
-                            max={topSellingProduct.saleQuantity}
+                            max={saleQuantity}
                             min={1}
                             onChange={setQuantity}
                             onPressEnter={(e) => {
                                 const newValue = parseInt(e.target.value, 10);
-                                if (newValue <= topSellingProduct.saleQuantity) {
+                                if (newValue <= saleQuantity) {
                                     setQuantity(newValue);
                                 } else {
                                     api.error({
@@ -176,8 +177,8 @@ const NewTrendingCard = ({ topSellingProduct, addItemToCart, parent = "", api, c
                                 }
                             }}
                             controls={false} />
-                        <Typography className={`px-2 bg-[#EEEFFA] rounded-sm ${quantity >= Math.min(topSellingProduct.saleQuantity, topSellingProduct.quantity) ? 'cursor-not-allowed opacity-50' : 'cursor-pointer'}`} onClick={() => {
-                            if ((quantity + 1 <= topSellingProduct.saleQuantity) && (quantity + 1 <= topSellingProduct.quantity)) {
+                        <Typography className={`px-2 bg-[#EEEFFA] rounded-sm ${quantity >= Math.min(saleQuantity, topSellingProduct.quantity) ? 'cursor-not-allowed opacity-50' : 'cursor-pointer'}`} onClick={() => {
+                            if ((quantity + 1 <= saleQuantity) && (quantity + 1 <= topSellingProduct.quantity)) {
                                 setQuantity(quantity + 1)
                             }
                         }}>

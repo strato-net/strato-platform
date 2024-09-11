@@ -177,7 +177,8 @@ const ProductDetails = ({ user, users }) => {
       const detailsData = details.data;
       setItemData(detailsData);
       if (details.saleQuantity) {
-        setAvailableQuantity(details.saleQuantity || 1);
+        let saleQuantity = details.quantityIsDecimal === true ? (details.saleQuantity / 100) : details.saleQuantity
+        setAvailableQuantity(saleQuantity || 1);
       }
     }
   }, [categorys, details]);
@@ -308,7 +309,7 @@ const ProductDetails = ({ user, users }) => {
   // };
 
   const addItemToCart = async () =>{
-    const items = [{ product: details, qty }];
+    const items = [{ product: details, qty: details.quantityIsDecimal === true ? qty * 100 : qty }];
     marketPlaceActions.addItemToCart(marketplaceDispatch, items);
     navigate('/checkout');
     window.scrollTo(0, 0);
