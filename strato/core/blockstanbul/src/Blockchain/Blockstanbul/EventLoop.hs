@@ -599,6 +599,11 @@ validatorTimingHackMercata = \case
   11266 -> modify' $ validators %~ S.delete "service-account-Io-stratomercata-numbatwopencil"
   11271 -> modify' $ validators %~ S.delete "service-account-io-stratomercata-jacoguzo"
   11275 -> modify' $ validators %~ S.delete "service-account-io-stratomercata-dgs"
+  11714 -> modify' $ validators %~ S.insert "illerchiller.com"
+  11800 -> modify' $ validators %~ S.insert "greenrubric.openwealthfi.com"
+  11801 -> modify' $ validators %~ S.insert "events34.openwealthfi.com"
+  11804 -> modify' $ validators %~ S.insert "coach.instanodes.io"
+  11805 -> modify' $ validators %~ S.insert "joyz.openwealthfi.com"
   _ -> return ()
   
 
