@@ -359,7 +359,7 @@ mineTransactions' header remGas ran unran@(tx : txs) = do
   trr <- setNewAddresses $ TxRunResult tx result time' beforeMap afterMap []
   case result of
     Right execResult ->
-      let supportedPragmas = [("es6", ""), ("strict", ""), ("builtinCreates", ""), ("safeExternalCalls", ""), ("solidvm", "11.4")]
+      let supportedPragmas = [("es6", ""), ("strict", ""), ("builtinCreates", ""), ("safeExternalCalls", ""), ("solidvm", "11.4"), ("solidvm", "11.5")]
           findInvalidPragmas pragma = if fst pragma == "solidity" || pragma `elem` supportedPragmas then id else (pragma :) -- include solidity pragma for backwards compatibility
           invalidPragmasUsed = foldr findInvalidPragmas [] (erPragmas execResult)
        in if not $ null invalidPragmasUsed

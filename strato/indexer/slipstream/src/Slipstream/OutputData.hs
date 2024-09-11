@@ -1461,8 +1461,13 @@ createEventTable (creator, a, n) evName ev cc = do
   let (crtr, app, cname) = constructTableNameParameters creator a n
       eventTable = EventTableName crtr app cname (escapeQuotes $ labelToText evName)
       isEvent = True
-      cols = getTableColumnAndType isEvent cc [(x, indexedTypeType y) | (x, y) <- fillFirstEmptyEntries $ ev ^. eventLogs]
-      arrayNamesAndTypes = [(key, extractLabelOrEntry entry) | (key, IndexedType _ (SVMType.Array entry _)) <- ev ^. eventLogs]
+      evLogToPair (EventLog n' _ t') = (n', t')
+      cols = getTableColumnAndType isEvent cc [(x, indexedTypeType y) | (x, y) <- fillFirstEmptyEntries . map evLogToPair $ ev ^. eventLogs]
+      arrayNamesAndTypes = [(key, extractLabelOrEntry entry) | (key, IndexedType _ (SVMType.Array entry _)) <- map evLogToPair $ ev ^. eventLogs]
+      indexedFields = map fst . filter snd . fillFirstEmptyEntries $ [(key, indexed) | (EventLog key indexed _) <- ev ^. eventLogs]
+      primaryKey = case indexedFields of
+        [] -> "(transaction_hash, event_index)"
+        _ -> wrapParens . csv $ "address" : indexedFields
       colsCombined = map (\(x,y)-> x <> " " <> y) cols
       eventFkeys = getDeferredForeignKeysForEvent eventTable crtr app
   $logInfoS "keys" (T.pack $ show arrayNamesAndTypes)
@@ -1474,20 +1479,21 @@ createEventTable (creator, a, n) evName ev cc = do
   --   then return []
   --   else do
     -- setTableCreated eventTable $ colsCombined
-  yieldMany $ createEventTableQuery eventTable colsCombined
+  yieldMany $ createEventTableQuery eventTable colsCombined primaryKey
   eventArrayFkeys <- fmap concat . forM arrayNamesAndTypes $ \anat -> do
     createEventArrayTable (crtr, app, cname, (escapeQuotes $ labelToText evName)) anat
   return $ eventFkeys ++ eventArrayFkeys
 
 
-createEventTableQuery :: TableName -> TableColumns -> [Text]
-createEventTableQuery tableName cols =
+createEventTableQuery :: TableName -> TableColumns -> Text -> [Text]
+createEventTableQuery tableName cols primaryKey =
   (\n -> T.concat
         [ "CREATE TABLE IF NOT EXISTS ",
           n,
           " (",
           csv $ ("id SERIAL NOT NULL" : eventBaseColumnsQuery) ++ cols,
-          ", PRIMARY KEY (transaction_hash, event_index)",
+          ", PRIMARY KEY ",
+          primaryKey,
           ");"
         ]
   ) <$> [tableNameToDoubleQuoteText tableName, oldTableNameToDoubleQuoteText tableName]
@@ -1503,7 +1509,8 @@ expandEventTable  (creator, a, n) evName ev cc = do
   let (crtr, app, cname) = constructTableNameParameters creator a n
       tableName = EventTableName crtr app cname (escapeQuotes $ labelToText evName)
       isEvent = True
-      (allTableCols :: [(T.Text, T.Text)]) = getTableColumnAndType isEvent cc [(x, indexedTypeType y) | (x, y) <- fillFirstEmptyEntries $ ev ^. eventLogs]
+      evLogToPair (EventLog n' _ t') = (n', t')
+      (allTableCols :: [(T.Text, T.Text)]) = getTableColumnAndType isEvent cc [(x, indexedTypeType y) | (x, y) <- fillFirstEmptyEntries . map evLogToPair $ ev ^. eventLogs]
       allTableColsCombined = map (\(x,y)-> x <> " " <> y) allTableCols
   unless (null allTableCols) $ do
     $logInfoS "expandEventTable" . T.pack $ "We just got new fields for a contract that already has a table!"
@@ -1591,10 +1598,7 @@ processParents ae = createNewEvent <$> Map.toList (eventAbstracts ae)
       ((Account, Text), (Text, Text, [Text])) -> AggregateEvent
     createNewEvent ((_, n'), (c, a, _)) =
       ae { eventEvent = (eventEvent ae) {
-        Action.evContractCreator = 
-          if (Action.evContractApplication (eventEvent ae)) == "" 
-          then T.unpack c
-          else Action.evContractCreator (eventEvent ae),
+        Action.evContractCreator = T.unpack c,
         Action.evContractApplication = T.unpack a,
         Action.evContractName = T.unpack n'
           }
@@ -1642,14 +1646,26 @@ insertEventTableQuery agEv@AggregateEvent {eventEvent = ev} =
 
    in (\n -> T.concat $
         [ "INSERT INTO ",
-          n,
+          wrapDoubleQuotes $ escapeQuotes n,
           " ",
           keySt,
           "\n  VALUES ( \n",
           vals,
-          " )\n  ON CONFLICT DO NOTHING;"
+          " )\n  ON CONFLICT ON CONSTRAINT ",
+          wrapDoubleQuotes . escapeQuotes $ n <> "_pkey",
+          " DO UPDATE SET",
+          [r|
+    address = excluded.address,
+    block_hash = excluded.block_hash,
+    block_timestamp = excluded.block_timestamp,
+    block_number = excluded.block_number,
+    transaction_hash = excluded.transaction_hash,
+    transaction_sender = excluded.transaction_sender|],
+          if null filledArgs then "" else ",\n    ",
+          tableUpsert filledArgs,
+          ";"
         ]
-      ) <$> [tableNameToDoubleQuoteText tableName,  oldTableNameToDoubleQuoteText tableName]
+      ) <$> [tableNameToText tableName,  oldTableNameToText tableName]
 
 ------------------
 

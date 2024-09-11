@@ -89,7 +89,7 @@ const AddAddressModal = ({open , close, redemptionService}) => {
         addressLine1: encodeURIComponent(values.addressLine1),
         addressLine2: encodeURIComponent(values.addressLine2),
         country: encodeURIComponent(values.country),
-        redemptionService: encodeURIComponent(redemptionService),
+        redemptionService: redemptionService ? encodeURIComponent(redemptionService): redemptionService,
         // billing address
       };
     
