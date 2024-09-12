@@ -116,12 +116,13 @@ const Checkout = () => {
           sellersCommonName: item.product.ownerCommonName,
           unitOfMeasure: item.product.unitOfMeasurement,
           unitPrice: item.product.price,
-          quantity: item.product.saleQuantity,
+          quantity: item.product.data.quantityIsDecimal && item.product.data.quantityIsDecimal === "True" ? (item.product.saleQuantity / 100) : item.product.saleQuantity,
           saleAddress: item.product.saleAddress,
           tax: calculateTax(item),
           amount: amount,
           action: item.product.address,
           qty: item.qty,
+          quantityIsDecimal: item.product.data.quantityIsDecimal,
         });
       });
 
@@ -132,7 +133,7 @@ const Checkout = () => {
   }, [marketplaceDispatch, cartList]);
 
   const MinusQty = (qty, product) => {
-    if (qty === 1) {
+    if (qty <= 1) {
       return;
     }
 

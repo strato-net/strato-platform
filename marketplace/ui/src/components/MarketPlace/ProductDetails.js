@@ -177,7 +177,7 @@ const ProductDetails = ({ user, users }) => {
       const detailsData = details.data;
       setItemData(detailsData);
       if (details.saleQuantity) {
-        let saleQuantity = details.quantityIsDecimal === true ? (details.saleQuantity / 100) : details.saleQuantity
+        let saleQuantity = details.data.quantityIsDecimal && details.data.quantityIsDecimal === "True" ? (details.saleQuantity / 100) : details.saleQuantity
         setAvailableQuantity(saleQuantity || 1);
       }
     }
@@ -222,14 +222,12 @@ const ProductDetails = ({ user, users }) => {
   };
 
   const subtract = () => {
-    if (qty !== 1) {
-      let value = qty - 1;
-      setQty(value);
-    }
+    const value = Math.max(qty - 1, 1);
+    setQty(value);
   };
 
   const add = () => {
-    if (qty < availableQuantity) {
+    if (qty + 1 <= availableQuantity) {
       let value = qty + 1;
       setQty(value);
     } else {
