@@ -22,7 +22,7 @@ so that they could be properly moved to their respective version's subsection.
 - Added event array tables to Cirrus
 - Added Kafka composable monad
 - Added strict gas mode for the Bagger
-- Added capability to use `indexed` keyword in event declarations to index fields as primary keys
+- Added capability to use `indexed` keyword in event declarations to index fields as primary keys, and indexed@ event tables
 - Added pragma solidvm 11.5
 
 ### Changed
