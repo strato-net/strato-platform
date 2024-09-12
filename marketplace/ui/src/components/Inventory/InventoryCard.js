@@ -33,15 +33,19 @@ const InventoryCard = ({ inventory, category, debouncedSearchTerm, id, allSubcat
   const navigate = useNavigate();
   const naviroute = routes.InventoryDetail.url;
   const imgMeta = category ? category : SEO.TITLE_META
-  const isStrats =  inventory.quantityIsDecimal === true
+  const itemData = inventory.data;
+  const isStrats = itemData.quantityIsDecimal && itemData.quantityIsDecimal === "True"
   const quantity = isStrats ? parseFloat((inventory.quantity / 100).toFixed(2)) : inventory.quantity
-  const saleQuantity = isStrats ? (inventory.saleQuantity / 100).toFixed(2) : inventory.saleQuantity
+  const saleQuantity = isStrats
+    ? inventory.saleQuantity !== undefined
+      ? parseFloat((inventory.saleQuantity / 100).toFixed(2))
+      : undefined
+    : inventory.saleQuantity;
   const totalLockedQuantity = inventory.totalLockedQuantity
     ? isStrats
       ? (inventory.totalLockedQuantity / 100).toFixed(2)
       : inventory.totalLockedQuantity
     : 0;
-  const itemData = inventory.data;
 
   const handleCancel = () => {
     setOpen(false);
