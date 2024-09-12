@@ -329,7 +329,7 @@ runTestWithTimeout timeout f = do
       writeBlockSummary outputBlock
       let genHash = rlpHash $ (blockCreated)
       bhr <- bootstrapChainDB genHash [(Nothing, (stateRoot $ blockBlockData $ blockCreated))]
-      putContextBestBlockInfo $ ContextBestBlockInfo genHash (blockBlockData $ blockCreated) 0 0 0
+      putContextBestBlockInfo $ ContextBestBlockInfo genHash (blockBlockData $ blockCreated) 0 0
       Mod.put (Mod.Proxy @BlockHashRoot) $ bhr
       processNewBestBlock genHash (blockBlockData $ blockCreated) [] -- bootstrap Bagger with genesis block
       withCurrentBlockHash genHash $ do

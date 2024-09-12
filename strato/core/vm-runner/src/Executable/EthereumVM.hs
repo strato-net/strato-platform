@@ -136,8 +136,7 @@ outputBlockToEvmCheckpoint block =
       txs = obReceiptTransactions block
       td = obTotalDifficulty block
       txL = length txs
-      uncL = length (obBlockUncles block)
-      cbbi = ContextBestBlockInfo (blockHeaderHash header) header td txL uncL
+      cbbi = ContextBestBlockInfo (blockHeaderHash header) header td txL
    in EVMCheckpoint header cbbi
 
 logEventSummaries :: MonadLogger m => [VmEvent] -> m ()

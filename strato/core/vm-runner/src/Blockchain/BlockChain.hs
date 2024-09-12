@@ -150,7 +150,7 @@ addBlocks unfiltered = do
   case (filtered, bbi) of
     ([], _) -> return ()
     (_, Unspecified) -> return ()
-    (firstBlock : _, ContextBestBlockInfo _ oldHeader _ _ _) -> do
+    (firstBlock : _, ContextBestBlockInfo _ oldHeader _ _) -> do
       $logInfoS "addBlocks" $
         T.pack
           ( "Inserting " ++ show (length filtered) ++ " blocks(s) starting with "
@@ -663,17 +663,16 @@ indexMaybe (_ : rest) i = indexMaybe rest (i - 1)
 ----------------
 
 replaceBestIfBetter :: (Bagger.MonadBagger m) => OutputBlock -> m (Bool, M.Map Word256 (Integer, Keccak256), (Keccak256, Integer, Integer))
-replaceBestIfBetter b@OutputBlock {obBlockData = bd, obTotalDifficulty = td, obReceiptTransactions = txs, obBlockUncles = uncles} = do
+replaceBestIfBetter b@OutputBlock {obBlockData = bd, obTotalDifficulty = td, obReceiptTransactions = txs} = do
   let txPayloads = (\t -> fromMaybe (otBaseTx t) (otPrivatePayload t)) <$> txs
   bbi <- getContextBestBlockInfo
 
   case bbi of
     Unspecified -> error $ "Trying to replace an Unspecified Best Block"
-    ContextBestBlockInfo oldBestSha oldBestBlock oldBestDifficulty oldTxCount _ -> do
+    ContextBestBlockInfo oldBestSha oldBestBlock oldBestDifficulty oldTxCount -> do
       let !newNumber = number bd
           !newStateRoot = stateRoot bd
           !newTxCount = fromIntegral $ length txs
-          !newUncleCount = fromIntegral $ length uncles
           !oldNumber = number oldBestBlock
           !oldStateRoot = stateRoot oldBestBlock
           !bH = outputBlockHash b
@@ -690,20 +689,18 @@ replaceBestIfBetter b@OutputBlock {obBlockData = bd, obTotalDifficulty = td, obR
 
       when shouldReplace $ do
         Bagger.processNewBestBlock bH bd bTHs
-        putContextBestBlockInfo $! ContextBestBlockInfo bH bd td newTxCount newUncleCount
+        putContextBestBlockInfo $! ContextBestBlockInfo bH bd td newTxCount
         cbbi <- getContextBestBlockInfo
         case cbbi of
           Unspecified -> $logInfoS "replaceBestIfBetter" "ContextBestBlockInfo is Unspecified"
-          ContextBestBlockInfo h _ d t u ->
+          ContextBestBlockInfo h _ d t ->
             $logInfoS "ContextBestBlockInfo" . T.pack $
               concat
                 [ format h,
                   " ",
                   show d,
                   " ",
-                  show t,
-                  " ",
-                  show u
+                  show t
                 ]
 
       -- we're replaying SeqEvents, and need to notify the mempool
