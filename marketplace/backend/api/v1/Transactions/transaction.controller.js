@@ -111,7 +111,8 @@ class TransactionController {
                 category:asset?.category || 'null',
                 assetPrice: item?.assetPrice,
                 assetAddress: asset?.address,
-                assetContractName: asset?.contract_name
+                assetContractName: asset?.contract_name,
+                quantityIsDecimal: asset?.data.quantityIsDecimal
             }});
 
             res.status(200).json({ success: true, message: "Fetched Transactions successfully", data: newData })

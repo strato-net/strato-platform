@@ -134,6 +134,7 @@ const TransactionTable = ({ user, download, isAllOrdersLoading }) => {
 
   const Content = ({ data }) => {
     const price = data?.assetPrice || data?.price
+    const quantityIsDecimal = data?.quantityIsDecimal
     return <div className="min-h-44 h-full" style={{ width: '460px' }}>
       <Card>
         <Row>
@@ -146,7 +147,7 @@ const TransactionTable = ({ user, download, isAllOrdersLoading }) => {
           </Col>
           <Col span={8} offset={1}>
             {price
-              ? <p className="text-right flex justify-end items-center"> <b>$ {price} </b> &nbsp;(<span className="text-[#13188A] font-bold"> {(price) * STRATS_CONVERSION} </span>{StratsIcon}) </p>
+              ? <p className="text-right flex justify-end items-center"> <b>$ {quantityIsDecimal === "True" ? (price * 100) : price} </b> &nbsp;(<span className="text-[#13188A] font-bold"> {(quantityIsDecimal === "True" ? (price * 100) : price) * STRATS_CONVERSION} </span>{StratsIcon}) </p>
               : <p className="text-right text-[#13188A] font-bold text-sm"> No Price Available  </p>}
           </Col>
         </Row>
@@ -226,7 +227,7 @@ const TransactionTable = ({ user, download, isAllOrdersLoading }) => {
       key: "quantity",
       align: "right",
       width: '100px',
-      render: (data, { quantity }) => <span>{quantity ? formattedNum(quantity) : '--'}</span>
+      render: (data, { quantity, quantityIsDecimal }) => <span>{quantity ? formattedNum(quantityIsDecimal && quantityIsDecimal === "True" ? (quantity / 100) : quantity) : '--'}</span>
     },
     {
       title: "Price ($)",
@@ -234,7 +235,7 @@ const TransactionTable = ({ user, download, isAllOrdersLoading }) => {
       key: "price",
       align: "right",
       width: '100px',
-      render: (data, { price }) => <p>{price ? formattedNum(price) : '--'}</p>
+      render: (data, { price, quantityIsDecimal }) => <p>{price ? formattedNum(quantityIsDecimal && quantityIsDecimal === "True" ? (price * 100) : price) : '--'}</p>
     },
     {
       title: "From",
