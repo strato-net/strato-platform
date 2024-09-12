@@ -36,13 +36,13 @@ const TransactionResponsive = ({ data , user}) => {
 
   const columns = [
     {
-      title: 'From',
+      title: 'Buyer/Sender',
       dataIndex: 'from',
       key: 'from',
       render: (text) => <p>{text}</p>,
     },
     {
-      title: 'To',
+      title: 'Seller/Recipient',
       dataIndex: 'to',
       key: 'to',
     },

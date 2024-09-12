@@ -98,8 +98,8 @@ class TransactionController {
                 return {
                 ...item,
                 createdDate: item.transferDate || item.redemptionDate || item.createdDate,
-                from: item.oldOwnerCommonName || item.sellersCommonName || item.issuerCommonName || item.sellerCommonName,
-                to: item.newOwnerCommonName || item.purchasersCommonName || item.ownerCommonName,
+                from: item.oldOwnerCommonName || item.purchasersCommonName || item.ownerCommonName,
+                to: item.newOwnerCommonName || item.sellersCommonName || item.issuerCommonName || item.sellerCommonName,
                 price: item.price || '',
                 totalAmount:  item.totalPrice || (item.price ? item.price * getItemQuantity(item) : ''),
                 status: item.status || '1',
