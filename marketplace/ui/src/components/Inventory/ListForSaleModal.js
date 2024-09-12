@@ -24,7 +24,14 @@ const ListForSaleModal = ({ open, handleCancel, inventory, categoryName, limit, 
     });
     const [paymentTypes, setPaymentTypes] = useState([]);
     const [availablePaymentProviders, setAvailablePaymentProviders] = useState([]);
-    const [pricePerUnit, setpricePerUnit] = useState(inventory.price ? inventory.price : inventory.pricePerUnit);
+    const [pricePerUnit, setpricePerUnit] = useState(() => {
+        const selectedPrice = inventory.price ? inventory.price : inventory.pricePerUnit;
+      
+        return selectedPrice !== undefined && inventory.data.quantityIsDecimal === "True"
+          ? selectedPrice * 100
+          : selectedPrice;
+      });
+      
     const inventoryDispatch = useInventoryDispatch();
     const [canList, setCanList] = useState(true);
     const {
@@ -217,7 +224,7 @@ const ListForSaleModal = ({ open, handleCancel, inventory, categoryName, limit, 
     const handleSubmit = async () => {
         let body = {
             paymentProviders: paymentTypes.filter((p) => availablePaymentProviders[p]).map((p) => availablePaymentProviders[p].address),
-            price: pricePerUnit,
+            price: inventory.data.quantityIsDecimal && inventory.data.quantityIsDecimal === "True" ? pricePerUnit / 100 : pricePerUnit,
         };
         if (inventory.saleAddress) {
             body = { ...body, saleAddress: inventory.saleAddress }

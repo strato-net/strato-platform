@@ -515,13 +515,24 @@ const ProductDetails = ({ user, users }) => {
                 <div className=" pt-4 lg:pt-[22px]">
 
                   <Paragraph level={4} id="price" className=" text-[#13188A] text-xl font-bold lg:text-2xl lg:font-semibold">
-                    {details?.price ? (
-                      <>
-                        ${details?.price} <span className="font-normal text-xs mr-2 text-primary"><b>({(details?.price * STRATS_CONVERSION).toFixed(0)} STRATS)</b></span>
-                      </>
-                    ) : (
-                      "No Price Available"
-                    )}
+                  {details?.price ? (
+                    (() => {
+                      const adjustedPrice = details.data.quantityIsDecimal && details.data.quantityIsDecimal === "True" 
+                        ? details.price * 100 
+                        : details.price;
+
+                      return (
+                        <>
+                          ${adjustedPrice} 
+                          <span className="font-normal text-xs mr-2 text-primary">
+                            <b> ({(adjustedPrice * STRATS_CONVERSION).toFixed(0)} STRATS)</b>
+                          </span>
+                        </>
+                      );
+                    })()
+                  ) : (
+                    "No Price Available"
+                  )}
                   </Paragraph>
                   {isAvailableForSale && <Text type="danger" strong> Sold Out </Text>}
                 </div>

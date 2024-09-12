@@ -94,10 +94,10 @@ const ResponsiveCart = ({
     let orderList = [];
     cartData.forEach((item) => {
       orderList.push({
-        quantity: item.qty,
+        quantity: item.quantityIsDecimal && item.quantityIsDecimal === "True" ? item.qty * 100 : item.qty,
         assetAddress: item.key,
         firstSale: item.firstSale,
-        unitPrice: item.unitPrice
+        unitPrice: item.quantityIsDecimal && item.quantityIsDecimal === "True" ? item.unitPrice / 100 : item.unitPrice
       });
     });
   

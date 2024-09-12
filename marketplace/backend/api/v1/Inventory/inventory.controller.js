@@ -283,7 +283,7 @@ class InventoryController {
       paymentProviders: Joi.array().min(1).items(
         Joi.string().min(0).required(),
       ).required(),
-      price: Joi.number().greater(0).precision(2).required(),
+      price: Joi.number().greater(0).precision(4).required(),
       quantity: Joi.number().integer().greater(0).optional(),
     });
 
@@ -372,7 +372,7 @@ class InventoryController {
       paymentProviders: Joi.array().min(1).items(
         Joi.string().min(0).required(),
       ).optional(),
-      price: Joi.number().greater(0).precision(2).optional(),
+      price: Joi.number().greater(0).precision(4).optional(),
       quantity: Joi.number().integer().greater(0).optional(),
     });
 
