@@ -1464,10 +1464,13 @@ createEventTable (creator, a, n) evName ev cc = do
       evLogToPair (EventLog n' _ t') = (n', t')
       cols = getTableColumnAndType isEvent cc [(x, indexedTypeType y) | (x, y) <- fillFirstEmptyEntries . map evLogToPair $ ev ^. eventLogs]
       arrayNamesAndTypes = [(key, extractLabelOrEntry entry) | (key, IndexedType _ (SVMType.Array entry _)) <- map evLogToPair $ ev ^. eventLogs]
-      indexedFields = map fst . filter snd . fillFirstEmptyEntries $ [(key, indexed) | (EventLog key indexed _) <- ev ^. eventLogs]
-      primaryKey = case indexedFields of
-        [] -> "(transaction_hash, event_index)"
-        _ -> wrapParens . csv $ "address" : indexedFields
+      indexedFields = map (wrapDoubleQuotes . escapeQuotes . fst)
+                    . filter snd
+                    . fillFirstEmptyEntries
+                    $ [(key, indexed) | (EventLog key indexed _) <- ev ^. eventLogs]
+      uniqueConstraint = case indexedFields of
+        [] -> Nothing
+        _ -> Just . wrapParens . csv $ "address" : indexedFields
       colsCombined = map (\(x,y)-> x <> " " <> y) cols
       eventFkeys = getDeferredForeignKeysForEvent eventTable crtr app
   $logInfoS "keys" (T.pack $ show arrayNamesAndTypes)
@@ -1479,24 +1482,32 @@ createEventTable (creator, a, n) evName ev cc = do
   --   then return []
   --   else do
     -- setTableCreated eventTable $ colsCombined
-  yieldMany $ createEventTableQuery eventTable colsCombined primaryKey
+  yieldMany $ createEventTableQuery eventTable colsCombined uniqueConstraint
   eventArrayFkeys <- fmap concat . forM arrayNamesAndTypes $ \anat -> do
     createEventArrayTable (crtr, app, cname, (escapeQuotes $ labelToText evName)) anat
   return $ eventFkeys ++ eventArrayFkeys
 
 
-createEventTableQuery :: TableName -> TableColumns -> Text -> [Text]
-createEventTableQuery tableName cols primaryKey =
-  (\n -> T.concat
+createEventTableQuery :: TableName -> TableColumns -> Maybe Text -> [Text]
+createEventTableQuery tableName cols uniqueConstraint =
+  (\(i,n) -> T.concat
         [ "CREATE TABLE IF NOT EXISTS ",
-          n,
+          wrapDoubleQuotes . escapeQuotes $ (if i then "indexed@" else "") <> n,
           " (",
           csv $ ("id SERIAL NOT NULL" : eventBaseColumnsQuery) ++ cols,
-          ", PRIMARY KEY ",
-          primaryKey,
+          ", PRIMARY KEY (transaction_hash, event_index)",
+          case (i, uniqueConstraint) of
+            (True, Just uc) -> T.concat
+              [
+                ", CONSTRAINT ",
+                wrapDoubleQuotes . escapeQuotes $ n <> "_indexed",
+                " UNIQUE ",
+                uc
+              ]
+            _ -> "",
           ");"
         ]
-  ) <$> [tableNameToDoubleQuoteText tableName, oldTableNameToDoubleQuoteText tableName]
+  ) <$> [(False, tableNameToText tableName), (False, oldTableNameToText tableName), (True, tableNameToText tableName)]
 
 expandEventTable ::
   OutputM m =>
@@ -1508,6 +1519,7 @@ expandEventTable ::
 expandEventTable  (creator, a, n) evName ev cc = do
   let (crtr, app, cname) = constructTableNameParameters creator a n
       tableName = EventTableName crtr app cname (escapeQuotes $ labelToText evName)
+      indexedTableName = EventTableName ("indexed@" <> crtr) app cname (escapeQuotes $ labelToText evName)
       isEvent = True
       evLogToPair (EventLog n' _ t') = (n', t')
       (allTableCols :: [(T.Text, T.Text)]) = getTableColumnAndType isEvent cc [(x, indexedTypeType y) | (x, y) <- fillFirstEmptyEntries . map evLogToPair $ ev ^. eventLogs]
@@ -1523,6 +1535,7 @@ expandEventTable  (creator, a, n) evName ev cc = do
         ]
     yield $ expandTableQuery tableName allTableColsCombined
     yield $ oldExpandTableQuery tableName allTableColsCombined
+    yield $ expandTableQuery indexedTableName allTableColsCombined
 
 -- Function to convert AggregateEvent to ProcessedCollectionRow
 aggEventToCollectionRows :: AggregateEvent -> [ProcessedCollectionRow]
@@ -1644,28 +1657,33 @@ insertEventTableQuery agEv@AggregateEvent {eventEvent = ev} =
         ]
       vals = csv $ map (wrapSingleQuotes . escapeQuotes . ($ agEv)) baseVals ++ map (wrapSingleQuotes . escapeSingleQuotes . T.pack . (\(_, x, _) -> x)) (Action.evArgs ev)
 
-   in (\n -> T.concat $
+   in (\(i,n) -> T.concat $
         [ "INSERT INTO ",
-          wrapDoubleQuotes $ escapeQuotes n,
+          wrapDoubleQuotes . escapeQuotes $ (if i then "indexed@" else "") <> n,
           " ",
           keySt,
           "\n  VALUES ( \n",
           vals,
-          " )\n  ON CONFLICT ON CONSTRAINT ",
-          wrapDoubleQuotes . escapeQuotes $ n <> "_pkey",
-          " DO UPDATE SET",
-          [r|
+          " )\n  ON CONFLICT ",
+          if i
+            then T.concat
+              [ "ON CONSTRAINT ",
+                wrapDoubleQuotes . escapeQuotes $ n <> "_indexed",
+                " DO UPDATE SET",
+                [r|
     address = excluded.address,
     block_hash = excluded.block_hash,
     block_timestamp = excluded.block_timestamp,
     block_number = excluded.block_number,
     transaction_hash = excluded.transaction_hash,
     transaction_sender = excluded.transaction_sender|],
-          if null filledArgs then "" else ",\n    ",
-          tableUpsert filledArgs,
-          ";"
+                if null filledArgs then "" else ",\n    ",
+                tableUpsert filledArgs,
+                ";"
+              ]
+            else "DO NOTHING;"
         ]
-      ) <$> [tableNameToText tableName,  oldTableNameToText tableName]
+      ) <$> [(False, tableNameToText tableName), (False, oldTableNameToText tableName), (True, tableNameToText tableName)]
 
 ------------------
 
