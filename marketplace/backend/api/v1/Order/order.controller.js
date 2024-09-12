@@ -68,6 +68,21 @@ class OrderController {
       return next(e)
     }
   }
+
+  static async waitForOrderEvent(req, res, next) {
+    try {
+      const { dapp, query } = req
+      const { orderHash } = query;
+      const orderEvent = await dapp.waitForOrderEvent({orderHash: orderHash}, options)
+       if(orderEvent && orderEvent.length === 1)
+      {
+        rest.response.status200(res, orderEvent)
+      }
+      return next()
+    } catch (e) {
+      return next(e)
+    }
+  }
   
   static async export(req, res, next) {
     try {
@@ -221,7 +236,7 @@ class OrderController {
       addressLine1: Joi.string().required(),
       addressLine2: Joi.string().allow(""),
       country: Joi.string().required(),
-      redemptionService: Joi.string().required(),
+      redemptionService: Joi.string().optional(),
     }).required();
 
     const validation = createUserAddressSchema.validate(args);
