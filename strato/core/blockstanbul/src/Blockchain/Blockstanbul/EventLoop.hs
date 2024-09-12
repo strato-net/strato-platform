@@ -198,7 +198,7 @@ applyValidatorAndCertChanges BlockHeader{} = pure ()
 applyValidatorAndCertChanges BlockHeaderV2{..} = do
   myAddr <- use selfAddr
   let mMyNewCert = find (\c -> Just (userAddress (x509CertToCertInfoState c)) == myAddr) newCerts
-  selfCert %= (case mMyNewCert of Nothing -> id; Just cert -> return $ Just $ getChainMemberFromX509 $ x509CertToCertInfoState cert)
+  when (isJust mMyNewCert) $ selfCert .= ((getChainMemberFromX509 . x509CertToCertInfoState) <$> mMyNewCert)
   A.insertMany (A.Proxy @X509CertInfoState) . M.fromList $
     (userAddress &&& id) . x509CertToCertInfoState <$> newCerts
   A.deleteMany (A.Proxy @X509CertInfoState) $
