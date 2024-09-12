@@ -27,6 +27,11 @@ contract STRATS is Tokens {
         paymentServiceCreator = _paymentServiceCreator;
         paymentServiceName = _paymentServiceName;
     }
+    
+    function mint(uint _quantity) internal override returns (UTXO) {
+        STRATS newSTRATS = new STRATS(name, description, images, files, fileNames, createdDate, _quantity, status, address(redemptionService), paymentServiceCreator, paymentServiceName);
+        return UTXO(address(newSTRATS)); 
+    }
 
     modifier fromPaymentService(string action) {
         StratPaymentService ps = StratPaymentService(msg.sender);
