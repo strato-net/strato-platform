@@ -164,10 +164,10 @@ const TransactionTable = ({ user, download, isAllOrdersLoading }) => {
     }
     else if (data.type === 'Transfer') { }
     else if (data.type === 'Redemption' && data.to === user.commonName) {
-      route = `${routes.RedemptionsOutgoingDetails.url.replace(":id", data.redemption_id)
+      route = `${routes.RedemptionsIncomingDetails.url.replace(":id", data.redemption_id)
         .replace(":redemptionService", data.redemptionService)}`
     } else if (data.type === 'Redemption' && data.from === user.commonName) {
-      route = `${routes.RedemptionsIncomingDetails.url.replace(":id", data.redemption_id)
+      route = `${routes.RedemptionsOutgoingDetails.url.replace(":id", data.redemption_id)
         .replace(":redemptionService", data.redemptionService)}`
     } else { }
     route && navigate(route)
