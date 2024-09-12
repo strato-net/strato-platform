@@ -65,7 +65,6 @@ import Data.List
 import qualified Data.Map as M
 import qualified Data.Map.Ordered as OMap
 import Data.Maybe
-import Data.Proxy
 import qualified Data.Text as T
 import qualified Data.Text.Encoding as UTF8
 import Debugger
@@ -83,11 +82,11 @@ ethereumVM d = runResourceT $ do
   ctx <- initContext d
   void . runSQLM . runKafkaMConfigured "ethereum-vm" $ execContextM' ctx $ do
     Bagger.setCalculateIntrinsicGas $ \i otx -> toInteger (calculateIntrinsicGas' i otx)
-    (_, EVMCheckpoint cpHead cpBBI cpSR) <- getCheckpoint
-    $logInfoLS "ethereumVM/getCheckpoint" (blockHeaderHash cpHead, cpBBI, cpSR)
+    (_, EVMCheckpoint cpHead cpBBI) <- getCheckpoint
+    $logInfoLS "ethereumVM/getCheckpoint" (blockHeaderHash cpHead, cpBBI)
 
     putContextBestBlockInfo cpBBI
-    Mod.put Proxy $ BlockHashRoot cpSR
+    -- Mod.put Proxy $ BlockHashRoot cpSR
 
     Bagger.processNewBestBlock (blockHeaderHash cpHead) cpHead [] -- bootstrap Bagger with genesis block
 
@@ -106,8 +105,7 @@ ethereumVM d = runResourceT $ do
 
         baggerData <- EVMCheckpoint <$>
                       Bagger.getCheckpointableState <*>
-                      getContextBestBlockInfo <*>
-                      (unBlockHashRoot <$> Mod.get Proxy)
+                      getContextBestBlockInfo
 
         return (mSRMismatch, baggerData)
     
@@ -127,13 +125,10 @@ initializeCheckpointAndBlockSummary ::
   OutputBlock ->
   m EVMCheckpoint
 initializeCheckpointAndBlockSummary block = do
-  let evmc@(EVMCheckpoint header _ sr) = outputBlockToEvmCheckpoint block
+  let evmc@(EVMCheckpoint header _) = outputBlockToEvmCheckpoint block
   writeBlockSummary block
-  (BlockHashRoot bhr) <- bootstrapChainDB (blockHeaderHash header) [(Nothing, sr)]
-  return
-    evmc
-      { ctxChainDBStateRoot = bhr
-      }
+  _ <- bootstrapChainDB (blockHeaderHash header) [(Nothing, stateRoot $ obBlockData block)]
+  return evmc
 
 outputBlockToEvmCheckpoint :: OutputBlock -> EVMCheckpoint
 outputBlockToEvmCheckpoint block =
@@ -143,8 +138,7 @@ outputBlockToEvmCheckpoint block =
       txL = length txs
       uncL = length (obBlockUncles block)
       cbbi = ContextBestBlockInfo (blockHeaderHash header) header td txL uncL
-      sr = stateRoot header
-   in EVMCheckpoint header cbbi sr
+   in EVMCheckpoint header cbbi
 
 logEventSummaries :: MonadLogger m => [VmEvent] -> m ()
 logEventSummaries events = do
