@@ -197,21 +197,21 @@ const HeaderComponent = ({ user, loginUrl, showMenu, handleSubMenu, handleMenuTa
         </div>
       ),
       children: [
+        // {
+        //   key: '2',
+        //   onClick: () => setIsTransferStratsModalVisible(true),
+        //   label: (
+        //     <div>
+        //       {user &&
+        //         <p className="text-xs mt-1">
+        //           Transfer
+        //         </p>
+        //       }
+        //     </div>
+        //   ),
+        // },
         {
           key: '2',
-          onClick: () => setIsTransferStratsModalVisible(true),
-          label: (
-            <div>
-              {user &&
-                <p className="text-xs mt-1">
-                  Transfer
-                </p>
-              }
-            </div>
-          ),
-        },
-        {
-          key: '3',
           onClick: () => setIsStratsTransactionHistoryModalVisible(true),
           label: (
             <div>

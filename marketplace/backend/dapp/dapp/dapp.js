@@ -1284,7 +1284,7 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
   contract.getStratsBalance = async function ( args, options = defaultOptions ) {
     const stratsOriginAddress = await STRATSJs.getStratsAddress();
     const balance = await inventoryJs.getAll(rawAdmin, { ownerCommonName: userCert.commonName, originAddress: stratsOriginAddress, queryOptions: { select: "quantity.sum()" }}, options);
-    return balance[0].sum ? `${balance[0].sum}` : 0;
+    return balance[0].sum ? `${balance[0].sum/100}` : 0;
   }
 
   contract.getStratsTransactionHistory = async function (args, options = defaultOptions) {
@@ -1294,15 +1294,15 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
     if (!stratsOriginAddress) {
       throw new rest.RestError(RestStatus.BAD_REQUEST, "Strats origin address not found.");
     }
-    let res = await inventoryJs.getAllItemTransferEvents(rawAdmin, {or: `(oldOwner.eq.${userAddress},newOwner.eq.${userAddress})`, assetName: "strats1"}, getOptions);
+    let res = await inventoryJs.getAllItemTransferEvents(rawAdmin, {or: `(oldOwner.eq.${userAddress},newOwner.eq.${userAddress})`}, getOptions);
 
     return res.transfers.map(transfer => ({
       id: transfer.transferNumber,
       timestamp: transfer.transferDate,
       _to: transfer.newOwner,
       _from: transfer.oldOwner,
-      _value: transfer.quantity,
-      _price: transfer.price,
+      _value: transfer.quantity / 100,
+      _price: transfer.price * 100,
       _assetName: transfer.assetName,
     }));
   }
