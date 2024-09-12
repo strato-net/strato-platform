@@ -329,7 +329,7 @@ const BoughtOrderDetails = ({ user, users }) => {
 
   const handleCancelOrder = async () => {
     const body = {
-      paymentProvider: {
+      paymentService: {
         address: details.order.address,
       },
       orderHash: details.order.orderHash,

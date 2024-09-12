@@ -23,7 +23,7 @@ const ListForSaleModal = ({ open, handleCancel, inventory, categoryName, limit, 
         : undefined;
     });
     const [paymentTypes, setPaymentTypes] = useState([]);
-    const [availablePaymentProviders, setAvailablePaymentProviders] = useState([]);
+    const [availablePaymentServices, setAvailablePaymentServices] = useState([]);
     const [pricePerUnit, setpricePerUnit] = useState(() => {
         const selectedPrice = inventory.price ? inventory.price : inventory.pricePerUnit;
       
@@ -71,18 +71,18 @@ const ListForSaleModal = ({ open, handleCancel, inventory, categoryName, limit, 
         const diff = paymentServices.filter(ps =>
             !notOnboarded.some(x => x.address === ps.address)
         );
-        setAvailablePaymentProviders(diff);
+        setAvailablePaymentServices(diff);
 
 
-        const inventoryPaymentProviders = inventory.paymentProviders
-            ? inventory.paymentProviders.filter(provider => provider.value).map(provider => provider.value)
+        const inventoryPaymentServices = inventory.paymentServices
+            ? inventory.paymentServices.filter(provider => provider.value).map(provider => provider.value)
             : [];
-        const selectedPaymentServiceIndices = inventoryPaymentProviders.map(address =>
+        const selectedPaymentServiceIndices = inventoryPaymentServices.map(address =>
             diff.findIndex(ps => ps.address === address)
         );
         setPaymentTypes(selectedPaymentServiceIndices);
 
-    }, [paymentServices, notOnboarded, inventory.paymentProviders]);
+    }, [paymentServices, notOnboarded, inventory.paymentServices]);
 
     useEffect(() => {
         const priceInputElements = [inputPriceDesktopRef.current, inputPriceMobileRef.current];
@@ -123,7 +123,7 @@ const ListForSaleModal = ({ open, handleCancel, inventory, categoryName, limit, 
 
     const tagRender = (props) => {
         const { value, closable, onClose } = props;
-        const service = availablePaymentProviders[value];
+        const service = availablePaymentServices[value];
         const onPreventMouseDown = (event) => {
             event.preventDefault();
             event.stopPropagation();
@@ -165,7 +165,7 @@ const ListForSaleModal = ({ open, handleCancel, inventory, categoryName, limit, 
                         className="w-64"
                     >
                         {!arePaymentServicesLoading ? (
-                            availablePaymentProviders.map((e, index) => (
+                            availablePaymentServices.map((e, index) => (
                                 <Option value={index}>
                                     <div className="flex items-center mr-1">
                                         {e.serviceName}&nbsp;
@@ -223,8 +223,15 @@ const ListForSaleModal = ({ open, handleCancel, inventory, categoryName, limit, 
 
     const handleSubmit = async () => {
         let body = {
-            paymentProviders: paymentTypes.filter((p) => availablePaymentProviders[p]).map((p) => availablePaymentProviders[p].address),
-            price: inventory.data.quantityIsDecimal && inventory.data.quantityIsDecimal === "True" ? pricePerUnit / 100 : pricePerUnit,
+            paymentServices: paymentTypes
+            .filter((p) => availablePaymentServices[p])
+            .map((p) => {
+              return {
+                creator: availablePaymentServices[p].creator,
+                serviceName: availablePaymentServices[p].serviceName,
+              };
+            }),
+          price: inventory.data.quantityIsDecimal && inventory.data.quantityIsDecimal === "True" ? pricePerUnit / 100 : pricePerUnit,
         };
         if (inventory.saleAddress) {
             body = { ...body, saleAddress: inventory.saleAddress }
@@ -284,7 +291,7 @@ const ListForSaleModal = ({ open, handleCancel, inventory, categoryName, limit, 
                         showSearch={false}
                         className="w-full"
                     >
-                        {availablePaymentProviders.map((e, index) => (
+                        {availablePaymentServices.map((e, index) => (
                             <Option value={index}>
                                 <div className="flex items-center mr-1">
                                     {e.serviceName}&nbsp;
