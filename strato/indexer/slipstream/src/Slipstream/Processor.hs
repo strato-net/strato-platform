@@ -295,7 +295,7 @@ processTheMessages env conn messages = do
       -- delegates = [d | DelegatecallMade d <- messages]
       transactionResults = [tr | VME.NewTransactionResult tr <- messages]
 
-  fkeys' <- forM creates $ \(cc, cp, cr, ap, hl, abstracts', _) -> do
+  fkeys' <- outputDataDedup conn . forM creates $ \(cc, cp, cr, ap, hl, abstracts', _) -> do
         $logInfoS "processTheMessages" $ "CodeCollection Added: " <> T.pack (format cp) 
         multilineLog "processTheMessages/contracts" $ boringBox $ map show (Map.keys $ cc ^. contracts)
 
@@ -317,23 +317,23 @@ processTheMessages env conn messages = do
             --Create mapping tables
             deferredForeignKeysForMappings <- fmap concat $
               forM mappingNames $ \m -> do
-                outputData conn $ createMappingTable  nameParts m
+                createMappingTable  nameParts m
 
             --Create array tables
             deferredForeignKeysForArrays <- fmap concat $
               forM arrayNamesAndTypes $ \anat -> do
-                outputData conn $ createArrayTable nameParts anat c cc
+                createArrayTable nameParts anat c cc
             
             deferredForeignKeys <- case (_contractType c) of
               AbstractType -> do
-                abstractfkeys <- outputDataDedup conn $ createExpandAbstractTable c nameParts abstracts' cc
-                outputData' conn $ createExpandHistoryTable True c cc nameParts
+                abstractfkeys <- createExpandAbstractTable c nameParts abstracts' cc
+                createExpandHistoryTable True c cc nameParts
                 $logInfoS "processTheMessages/deferredForeignKeys/abstractfkeys" $ T.pack $ show abstractfkeys
                 return abstractfkeys
               _ -> do
-                indexfkeys <- outputDataDedup conn $ createExpandIndexTable c cc nameParts
+                indexfkeys <- createExpandIndexTable c cc nameParts
                 $logInfoS "processTheMessages/deferredForeignKeys/indexfkeys" $ T.pack $ show indexfkeys
-                outputData' conn $ createExpandHistoryTable False c cc nameParts
+                createExpandHistoryTable False c cc nameParts
                 return indexfkeys
 
             $logInfoS "processTheMessages/deferredForeignKeys" $ T.pack $ show deferredForeignKeys
@@ -342,7 +342,7 @@ processTheMessages env conn messages = do
 
 
             -- outputData conn $ createExpandEventTables g c cc nameParts
-            deferredForeignKeysForEvents <- outputData conn $ createExpandEventTables c cc nameParts
+            deferredForeignKeysForEvents <- createExpandEventTables c cc nameParts
 
 
             return $ deferredForeignKeys ++ deferredForeignKeysForMappings ++ deferredForeignKeysForArrays ++ deferredForeignKeysForEvents
@@ -439,17 +439,18 @@ processTheMessages env conn messages = do
 
   forM_ (rights inserts) $ $logDebugLS "processTheMessages/toInsert"
   
-  forM_ insertsByCodeHash $ \ins -> do
-    outputData conn $ insertIndexTable $ indexInsert ins
-    outputData conn $ insertAbstractTable (abstractInserts ins)-- not historic
-    unless ((length (collectionInserts ins) < 1)) $ outputData conn $ insertCollectionTable $ collectionInserts ins
---updating the foreign keys from null
-    outputDataDedup conn $ updateForeignKeysFromNULLAbstract (abstractInserts ins) -- not historic
-    outputDataDedup conn $ updateForeignKeysFromNULLIndex (indexInsert ins)
-    unless ((length (collectionInserts ins) < 1)) $ outputDataDedup conn $ updateForeignKeysFromNULLArray (collectionInserts ins)
+  outputDataDedup conn $ do
+    forM_ insertsByCodeHash $ \ins -> do
+      insertIndexTable $ indexInsert ins
+      insertAbstractTable (abstractInserts ins)-- not historic
+      unless ((length (collectionInserts ins) < 1)) $ insertCollectionTable $ collectionInserts ins
+      --updating the foreign keys from null
+      updateForeignKeysFromNULLAbstract (abstractInserts ins) -- not historic
+      updateForeignKeysFromNULLIndex (indexInsert ins)
+      unless ((length (collectionInserts ins) < 1)) $ updateForeignKeysFromNULLArray (collectionInserts ins)
 
-  forM_ concatFkeys $ \deferredForeignKey -> do
-    outputData conn $ createForeignIndexesForJoins deferredForeignKey
+    forM_ concatFkeys $ \deferredForeignKey -> do
+      createForeignIndexesForJoins deferredForeignKey
 
   when ((length creates > 0) && any (\k -> length k > 0) fkeys) $ do
     $logDebugLS "processTheMessages" $ T.pack $ "Updating PostgREST schema cache for " ++ show (sum $ map length fkeys) ++ " foreign key relationships"
