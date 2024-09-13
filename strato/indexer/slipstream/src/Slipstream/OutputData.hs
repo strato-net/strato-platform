@@ -446,7 +446,7 @@ createExpandHistoryTable ::
   ContractF () ->
   CodeCollectionF () ->
   (Text, Text, Text) ->
-  ConduitM () (Text, Maybe ( TableName, TableColumns)) m ()
+  ConduitM () Text m ()
 createExpandHistoryTable isAbstract c cc nameParts = do
   createHistoryTable' isAbstract c cc nameParts
   expandHistoryTable isAbstract c cc nameParts
@@ -637,12 +637,12 @@ createHistoryTable' ::
   ContractF () ->
   CodeCollectionF () ->
   (Text, Text, Text) ->
-  ConduitM () (Text, Maybe (TableName, TableColumns)) m ()
+  ConduitM () Text m ()
 createHistoryTable' isAbstract contract cc (creator, a, n) = do
   let isEvent = False
       list = getTableColumnAndType isEvent cc $ map (\(x, y) -> (labelToText x, y ^. varType)) $ Map.toList $ contract ^. storageDefs
       listCombined = map (\(x, y) -> x <> " " <> y) list
-  yield $ (createHistoryTableQuery isAbstract (creator, a, n) listCombined, Nothing)
+  yield $ createHistoryTableQuery isAbstract (creator, a, n) listCombined
 
 createHistoryTable ::
   OutputM m =>
@@ -685,20 +685,20 @@ expandHistoryTable ::
   ContractF () ->
   CodeCollectionF () ->
   (Text, Text, Text) ->
-  ConduitM () (Text, Maybe ( TableName, TableColumns)) m ()
+  ConduitM () Text m ()
 expandHistoryTable isAbstract  contract cc (creator, a, n) = do
   let tableName = historyTableName creator a n
   void $ 
     if isAbstract
-      then mapOutput (\o -> (o, Nothing)) $ expandAbstractContractTable  contract tableName Map.empty cc --abstracts' needs to be passed in for fkeys
-      else expandContractTable'  contract cc tableName
+      then expandAbstractContractTable contract tableName Map.empty cc --abstracts' needs to be passed in for fkeys
+      else expandContractTable' contract cc tableName
 
 expandContractTable' ::
   OutputM m =>
   ContractF () ->
   CodeCollectionF () ->
   TableName ->
-  ConduitM () (Text, Maybe ( TableName, TableColumns)) m [ForeignKeyInfo]
+  ConduitM () Text m [ForeignKeyInfo]
 expandContractTable'  contract cc tableName = do
   let list = fillFirstEmptyEntries . map (fmap _varType) . Map.toList $ Map.mapKeys labelToText $ contract ^. storageDefs
       isEvent = False
@@ -713,7 +713,7 @@ expandContractTable'  contract cc tableName = do
           " for the following fields: ",
           T.intercalate ", " colsCombined
         ]
-    yield $ ((expandTableQuery tableName colsCombined), Just (tableName, colsCombined))
+    yield $ expandTableQuery tableName colsCombined
   return $ []
 
 expandContractTable ::

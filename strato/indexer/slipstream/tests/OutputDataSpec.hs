@@ -67,7 +67,7 @@ createInserts :: OutputM m
 createInserts  (a,b) = do
     let cc = createDummyCodeCollection b 
     _ <- createIndexTable b cc (SE.creator $ a, SE.application $ a, SE.contractName $ a)
-    createHistoryTable  b cc (SE.creator $ a, SE.application $ a, SE.contractName $ a)
+    createHistoryTable b cc (SE.creator $ a, SE.application $ a, SE.contractName $ a)
     insertIndexTable $ (a,[])
     -- insertHistoryTable $ [a]
 
