@@ -1154,7 +1154,7 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
         if (accumulatedTotal >= orderTotal) return addresses;
         
         addresses.push(asset.address);
-        accumulatedTotal += asset.quantity / 100;
+        accumulatedTotal += asset.quantity / 10000;
 
         return addresses;
       }, []);
