@@ -2,6 +2,8 @@ import { rest } from 'blockapps-rest'
 import Joi from '@hapi/joi'
 import RestStatus from 'http-status-codes'
 import config from '../../../load.config'
+import { TransferRecipient, TransferSender } from '../../../helpers/emailTemplates'
+import sendEmail from '../../../helpers/email'
 
 const options = { config, cacheNonce: true }
 
@@ -143,13 +145,19 @@ class InventoryController {
 
   static async transfer(req, res, next) {
     try {
-      const { dapp, body } = req
+      const { dapp, body } = req;
+      const { mailData, ...restData } = body;
 
-      InventoryController.validateTransferItemArgs(body)
+      InventoryController.validateTransferItemArgs(restData)
 
-      const result = await dapp.transferItem(body)
+      const result = await dapp.transferItem(restData)
+      
+      const TransferSenderTemplate =  TransferSender(mailData);
+      const TransferRecipientTemplate =  TransferRecipient(mailData);
+      const mail1 = await sendEmail(mailData.senderCommonName, 'Your Item Transfer Confirmation', TransferSenderTemplate)
+      // const mail2 = await sendEmail(mailData.recipientCommonName, 'You’ve Received an Item Transfer!', TransferRecipientTemplate)
+      // console.log("mail1-response", mail1);
       rest.response.status200(res, result)
-
       return next()
     } catch (e) {
       return next(e)

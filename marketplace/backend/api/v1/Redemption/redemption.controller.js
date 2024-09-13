@@ -1,6 +1,7 @@
 import { rest } from 'blockapps-rest'
 import Joi from '@hapi/joi'
 import RestStatus from 'http-status-codes'
+import { RedemptionApprovalToIssuer, RedemptionApprovalToRedeemer, RedemptionRejectionToIssuer, RedemptionRejectionToRedeemer, RedemptionRequestToIssuer, RedemptionRequestToRedeemer } from '../../../helpers/emailTemplates'
 
 class RedemptionController {
 
@@ -35,13 +36,18 @@ class RedemptionController {
 
     static async requestRedemption(req, res, next) {
         try {
-            const { dapp, body } = req
+            const { dapp, body } = req;
+            const { issuerCommonName, ownerCommonName, assetName, quantity, ownerComments } = body;
+            const { userAddress, ...rest } = body;
+            RedemptionController.validateRequestRedemptionArgs(rest)
 
-            RedemptionController.validateRequestRedemptionArgs(body)
-
-            const result = await dapp.requestRedemption(body)
+            const result = await dapp.requestRedemption(rest)
             rest.response.status200(res, result)
 
+            const RedemptionRequestToIssuerTemplate = RedemptionRequestToIssuer(issuerCommonName, ownerCommonName, userAddress, assetName, quantity, ownerComments);
+            const RedemptionRequestToRedeemerTemplate = RedemptionRequestToRedeemer(ownerCommonName, ownerCommonName, userAddress, assetName, quantity, ownerComments);
+            await sendEmail(issuerCommonName, 'Redemption Request Submitted for Review', RedemptionRequestToIssuerTemplate)
+            await sendEmail(ownerCommonName, 'Redemption Request Confirmation', RedemptionRequestToRedeemerTemplate)
             return next()
         } catch (e) {
             return next(e)
@@ -77,11 +83,26 @@ class RedemptionController {
     static async closeRedemption(req, res, next) {
         try {
             const { dapp, body } = req
+            const { redeemerCommonName, issuerCommonName, assetName, quantity, ...rest  } = body;
 
             RedemptionController.validateCloseRedemptionArgs(body)
 
             const result = await dapp.closeRedemption(body)
             rest.response.status200(res, result)
+
+            if (body.status === 2) {
+                const RedemptionApprovalToIssuerTemplate = RedemptionApprovalToIssuer(issuerCommonName, redeemerCommonName, 'redeemerAddress', assetName, quantity, body.issuerComments);
+                const RedemptionApprovalToRedeemerTemplate = RedemptionApprovalToRedeemer(redeemerCommonName, redeemerCommonName, 'redeemerAddress', assetName, quantity, body.issuerComments);
+                await sendEmail(issuerCommonName, 'Redemption Request Approved', RedemptionApprovalToIssuerTemplate);
+                await sendEmail(ownerCommonName, 'Redemption Request Approved', RedemptionApprovalToRedeemerTemplate);
+            }
+            if (body.status === 3) {
+                const RedemptionRejectionToIssuerTemplate = RedemptionRejectionToIssuer(issuerCommonName, redeemerCommonName, 'redeemerAddress', assetName, quantity, body.issuerComments);
+                const RedemptionRejectionToRedeemerTemplate = RedemptionRejectionToRedeemer(redeemerCommonName, redeemerCommonName, 'redeemerAddress', assetName, quantity, body.issuerComments);
+                await sendEmail(issuerCommonName, 'Redemption Request Rejected', RedemptionRejectionToIssuerTemplate);
+                await sendEmail(ownerCommonName, 'Redemption Request Rejected', RedemptionRejectionToRedeemerTemplate);
+            }
+
 
             return next()
         } catch (e) {
