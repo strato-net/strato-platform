@@ -24,10 +24,16 @@ so that they could be properly moved to their respective version's subsection.
 - Added strict gas mode for the Bagger
 - Added capability to use `indexed` keyword in event declarations to index fields as primary keys, and indexed@ event tables
 - Added pragma solidvm 11.5
+- Added foreign keys in cirrus between event tables and contract tables
+- Added `<best_sequenced_block>` to reduce the redundant block requests in p2p
+- Added strict mode to sequencer that will cause crash on block authentication
+- Added `INSTRUMENTATION` flag to see finer-grained memory usage in processes
 
 ### Changed
 - General cleanup of Kafka-related code
 - Bagger will now drop transactions that ran out of gas
+- Reduced data sent from vm to slipstream
+- Reduced redundant queries written to postgres
 
 ### Fixed
 - Fixed bagger's more lucrative tx decision logic
@@ -35,6 +41,7 @@ so that they could be properly moved to their respective version's subsection.
 ### Removed
 - Removed Globals from Slipstream
 - Removed block Kafka topic
+- txr-indexer no longer indexes events relating to chains, certificates (registered or revoked), or validators (added or removed)
 
 
 ## [11.4.0] - 8/15/2024
