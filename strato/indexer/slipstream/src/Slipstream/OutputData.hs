@@ -1411,7 +1411,9 @@ updateFkeysQueryArray rows = concatMap createUpdateQuery rows
     createUpdateQuery :: ProcessedCollectionRow -> [Text]
     createUpdateQuery c =
       let
-        tableName = collectionTableName (creator c) (application c) (contractname c) (collectionname c)
+        tableName = case eventInfo c of
+              Just x  -> eventCollectionTableName (creator c) (application c) (contractname c) (fst x) (collectionname c)
+              Nothing -> collectionTableName (creator c) (application c) (contractname c) (collectionname c)
         value_fkey = wrapAndEscapeDouble . map escapeQuotes $ [T.pack "value_fkey"]
         value = wrapAndEscapeDouble . map escapeQuotes $ [T.pack "value"]
         value' = wrapAndEscape [fromMaybe T.empty (valueToSQLText $ collectionDataValue c)]
