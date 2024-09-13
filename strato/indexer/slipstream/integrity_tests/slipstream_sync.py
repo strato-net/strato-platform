@@ -5,7 +5,7 @@ import base64
 import time
 import sys
 
-def wait_for_slipstream_to_sync(node1_url, node2_url, headers1, headers2, attempts, sleep_time, table_name):
+def wait_for_slipstream_to_sync(node1_url, node2_url, token_info1, token_info2, attempts, sleep_time, table_name):
     print(f"Trying for: {table_name}")
     attempts = int(attempts)
     sleep_time = int(sleep_time)
@@ -13,6 +13,10 @@ def wait_for_slipstream_to_sync(node1_url, node2_url, headers1, headers2, attemp
     while True:
         attempt += 1
         try:
+            token1 = get_auth_token(*token_info1)
+            token2 = get_auth_token(*token_info2)
+            headers1 = {'Authorization': f'Bearer {token1}'}
+            headers2 = {'Authorization': f'Bearer {token2}'}
             response1 = requests.get(node1_url + f"/cirrus/search/{table_name}", headers=headers1, params={'order':'block_timestamp.desc', 'limit':1})
             response2 = requests.get(node2_url + f"/cirrus/search/{table_name}", headers=headers2, params={'order':'block_timestamp.desc', 'limit':1})
             if response1.ok and response2.ok and response1:
@@ -57,7 +61,7 @@ def get_auth_token(client_id, client_secret, realm_name):
     resp = requests.request("POST", url, headers=headers, data=payload)
     return resp.json()['access_token']
 
-def check_table(table):
+def check_table(table, headers1, headers2):
     discrepancies, count = False, False
     print("Checking table ", table)
     endpoint = "/cirrus/search/" + table
@@ -124,35 +128,40 @@ if __name__ == "__main__":
     node1_url = "http://localhost"
     node2_url = "https://node1.mercata-testnet2.blockapps.net"
 
-    token1 = get_auth_token(client_id1, client_secret1, realm_1)
-    token2 = get_auth_token(client_id2, client_secret2, realm_2)
+    token_info1 = (client_id1, client_secret1, realm_1)
+    token_info2 = (client_id2, client_secret2, realm_2)
+
+    # Wait until both nodes have the same latest block indexed in Slipstream
+    wait_for_slipstream_to_sync(node1_url, node2_url, token_info1, token_info2, attempts, sleep_time, "BlockApps-Mercata-Asset")
+    wait_for_slipstream_to_sync(node1_url, node2_url, token_info1, token_info2, attempts, sleep_time, "BlockApps-Mercata-PaymentService.Order")
+    wait_for_slipstream_to_sync(node1_url, node2_url, token_info1, token_info2, attempts, sleep_time, "BlockApps-Mercata-Sale")
+    wait_for_slipstream_to_sync(node1_url, node2_url, token_info1, token_info2, attempts, sleep_time, "BlockApps-Mercata-Asset.ItemTransfers")
+    wait_for_slipstream_to_sync(node1_url, node2_url, token_info1, token_info2, attempts, sleep_time, "BlockApps-Mercata-Asset-files")
+    wait_for_slipstream_to_sync(node1_url, node2_url, token_info1, token_info2, attempts, sleep_time, "BlockApps-Mercata-Asset-images")
+    wait_for_slipstream_to_sync(node1_url, node2_url, token_info1, token_info2, attempts, sleep_time, "BlockApps-Mercata-Asset-fileNames")
+
+    token1 = get_auth_token(*token_info1)
+    token2 = get_auth_token(*token_info2)
     headers1 = {'Authorization': f'Bearer {token1}'}
     headers2 = {'Authorization': f'Bearer {token2}'}
 
-    # Wait until both nodes have the same latest block indexed in Slipstream
-    wait_for_slipstream_to_sync(node1_url, node2_url, headers1, headers2, attempts, sleep_time, "BlockApps-Mercata-Asset")
-    wait_for_slipstream_to_sync(node1_url, node2_url, headers1, headers2, attempts, sleep_time, "BlockApps-Mercata-PaymentService.Order")
-    wait_for_slipstream_to_sync(node1_url, node2_url, headers1, headers2, attempts, sleep_time, "BlockApps-Mercata-Sale")
-    wait_for_slipstream_to_sync(node1_url, node2_url, headers1, headers2, attempts, sleep_time, "BlockApps-Mercata-Asset.ItemTransfers")
-    wait_for_slipstream_to_sync(node1_url, node2_url, headers1, headers2, attempts, sleep_time, "BlockApps-Mercata-Asset-files")
-    wait_for_slipstream_to_sync(node1_url, node2_url, headers1, headers2, attempts, sleep_time, "BlockApps-Mercata-Asset-images")
-    wait_for_slipstream_to_sync(node1_url, node2_url, headers1, headers2, attempts, sleep_time, "BlockApps-Mercata-Asset-fileNames")
-
-    discrepancies_asset, count_asset_discrepancy = check_table("BlockApps-Mercata-Asset")
-    discrepancies_sale, count_sale_discrepancy = check_table("BlockApps-Mercata-PaymentService.Order")
-    discrepancies_order, count_order_discrepancy = check_table("BlockApps-Mercata-Sale")
+    discrepancies_asset, count_asset_discrepancy = check_table("BlockApps-Mercata-Asset", headers1, headers2)
+    discrepancies_sale, count_sale_discrepancy = check_table("BlockApps-Mercata-PaymentService.Order", headers1, headers2)
+    discrepancies_order, count_order_discrepancy = check_table("BlockApps-Mercata-Sale", headers1, headers2)
 
     #Event tables
-    discrepancies_asset_its, count_asset_its_discrepancy = check_table("BlockApps-Mercata-Asset.ItemTransfers")
-    discrepancies_asset_own, count_asset_own_discrepancy = check_table("BlockApps-Mercata-Asset.OwnershipTransfer")
+    discrepancies_asset_its, count_asset_its_discrepancy = check_table("BlockApps-Mercata-Asset.ItemTransfers", headers1, headers2)
+    discrepancies_asset_own, count_asset_own_discrepancy = check_table("BlockApps-Mercata-Asset.OwnershipTransfer", headers1, headers2)
 
     #Colletion tables
-    discrepancies_asset_files, count_asset_files_discrepancy = check_table("BlockApps-Mercata-Asset-files")
-    discrepancies_asset_fileNames, count_asset_fileNames_discrepancy = check_table("BlockApps-Mercata-Asset-fileNames")
-    discrepancies_asset_images, count_asset_images_discrepancy = check_table("BlockApps-Mercata-Asset-images")
+    discrepancies_asset_files, count_asset_files_discrepancy = check_table("BlockApps-Mercata-Asset-files", headers1, headers2)
+    discrepancies_asset_fileNames, count_asset_fileNames_discrepancy = check_table("BlockApps-Mercata-Asset-fileNames", headers1, headers2)
+    discrepancies_asset_images, count_asset_images_discrepancy = check_table("BlockApps-Mercata-Asset-images", headers1, headers2)
 
     #Joins
-    discrepancies_join, count_join_discrepancy = check_table("BlockApps-Mercata-Asset?&select=*,BlockApps-Mercata-Asset-files(*),BlockApps-Mercata-Asset-images(*),BlockApps-Mercata-Asset-fileNames(*),BlockApps-Mercata-Sale!BlockApps-Mercata-Sale_BlockApps-Mercata-Asset_fk(*,BlockApps-Mercata-Sale-paymentProviders(*))")
+    discrepancies_join, count_join_discrepancy = check_table("BlockApps-Mercata-Asset?&select=*,BlockApps-Mercata-Asset-files(*),BlockApps-Mercata-Asset-images(*),BlockApps-Mercata-Asset-fileNames(*),BlockApps-Mercata-Sale!BlockApps-Mercata-Sale_BlockApps-Mercata-Asset_fk(*,BlockApps-Mercata-Sale-paymentProviders(*))"
+                                                             , headers1
+                                                             , headers2)
 
     # Print the results
     print("\n**Final check summary:**")
