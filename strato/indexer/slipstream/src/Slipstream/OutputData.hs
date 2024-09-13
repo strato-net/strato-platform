@@ -34,6 +34,7 @@ module Slipstream.OutputData (
   createExpandIndexTable,
   createForeignIndexesForJoins,
   createExpandAbstractTable,
+  createHistoryTable',
   createHistoryTable,
   expandAbstractTable,
   expandAbstractContractTable,
@@ -447,7 +448,7 @@ createExpandHistoryTable ::
   (Text, Text, Text) ->
   ConduitM () Text m ()
 createExpandHistoryTable isAbstract c cc nameParts = do
-  createHistoryTable isAbstract c cc nameParts
+  createHistoryTable' isAbstract c cc nameParts
   expandHistoryTable isAbstract c cc nameParts
 
 getDeferredForeignKeys :: (MonadLogger m) => TableName -> ContractF () -> CodeCollectionF () -> Text -> Text -> m [ForeignKeyInfo] --circular dependancy only fixed for abstract tables
@@ -630,18 +631,30 @@ createEventArrayTable (creator, a, n, e) (arr, arrType) = do
       fkeys2 = getDeferredForeignKeysForArrayType tableName creator a arrType
   return $ fkeys1 ++ fkeys2
 
-createHistoryTable ::
+createHistoryTable' ::
   OutputM m =>
   Bool ->
   ContractF () ->
   CodeCollectionF () ->
   (Text, Text, Text) ->
   ConduitM () Text m ()
-createHistoryTable isAbstract contract cc (creator, a, n) = do
+createHistoryTable' isAbstract contract cc (creator, a, n) = do
   let isEvent = False
       list = getTableColumnAndType isEvent cc $ map (\(x, y) -> (labelToText x, y ^. varType)) $ Map.toList $ contract ^. storageDefs
       listCombined = map (\(x, y) -> x <> " " <> y) list
   yield $ createHistoryTableQuery isAbstract (creator, a, n) listCombined
+
+createHistoryTable ::
+  OutputM m =>
+  ContractF () ->
+  CodeCollectionF () ->
+  (Text, Text, Text) ->
+  ConduitM () Text m ()
+createHistoryTable contract cc (creator, a, n) = do
+  let list = getTableColumnAndType False cc $ map (\(x, y) -> (labelToText x, y ^. varType)) $ Map.toList $ contract ^. storageDefs
+      listCombined = map (\(x,y)-> x <> " " <> y) list
+  yield $ (createHistoryTableQuery False (creator, a, n) listCombined)
+  yieldMany $ addHistoryUnique (creator, a, n)
 
 -- Runs ALTER TABLE <name> [ADD COLUMN <column>] for any new fields added to a contract definition
 expandIndexTable ::
@@ -1044,6 +1057,24 @@ createHistoryTableQuery isAbstract (creator, a, n) cols =
           tableNameToDoubleQuoteText normalTableName,
           "\nFOR EACH ROW EXECUTE PROCEDURE ", triggerFunctionName, "();"
         ]
+
+addHistoryUnique :: (Text, Text, Text) -> [Text]
+addHistoryUnique (creator, a, n) =
+  let (crtr, app, cname) = constructTableNameParameters creator a n
+      historyName' = HistoryTableName crtr app cname
+      historyName = tableNameToDoubleQuoteText historyName'
+      indexName = "index_" <> (escapeQuotes $ tableNameToText historyName')
+   in [ "CREATE UNIQUE INDEX IF NOT EXISTS "
+          <> wrapDoubleQuotes indexName
+          <> "\n  ON "
+          <> historyName
+          <> " (address, block_hash, transaction_hash);",
+        "ALTER TABLE "
+          <> historyName
+          <> " ADD PRIMARY KEY USING INDEX "
+          <> wrapDoubleQuotes indexName
+          <> ";"
+      ]
 
 insertIndexTableQuery :: (E.ProcessedContract, [T.Text]) -> Text -- does not accomodate extra _fkey 
 insertIndexTableQuery cs = 
