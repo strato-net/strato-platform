@@ -32,6 +32,8 @@ def wait_for_slipstream_to_sync(node1_url, node2_url, headers1, headers2, attemp
                         print(f"Slipstream of node1 is at block {block_number1}, but Node2 is at block {block_number2} (attempt #{attempt} of {attempts})")
             else:
                 print(f"Failed to fetch data for one of the nodes (attempt #{attempt} of {attempts})")
+                print("Node 1 response: ", response1, response1.text)
+                print("Node 2 response: ", response2, response2.text)
         except Exception as e:
             print(f"Slipstream sync test exception occurred: {e}")
             sys.exit(1)
