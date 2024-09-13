@@ -36,7 +36,7 @@ const InventoryCard = ({ inventory, category, debouncedSearchTerm, id, allSubcat
   const itemData = inventory.data;
   const isStrats = itemData.quantityIsDecimal && itemData.quantityIsDecimal === "True"
   const quantity = isStrats ? parseFloat((inventory.quantity / 100).toFixed(2)) : inventory.quantity
-  const price = inventory?.price ? parseFloat(inventory?.price * 100).toFixed(2) : undefined;
+  const price = inventory?.price ? (isStrats ? parseFloat(inventory?.price * 100).toFixed(2) : inventory?.price) : undefined ;
   const saleQuantity = isStrats
     ? inventory.saleQuantity !== undefined
       ? parseFloat((inventory.saleQuantity / 100).toFixed(2))
