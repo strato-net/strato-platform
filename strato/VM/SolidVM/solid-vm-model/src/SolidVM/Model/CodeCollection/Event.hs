@@ -5,14 +5,7 @@
 {-# LANGUAGE DeriveTraversable #-}
 {-# LANGUAGE TemplateHaskell #-}
 
-module SolidVM.Model.CodeCollection.Event
-  ( EventF (..),
-    Event,
-    eventAnonymous,
-    eventLogs,
-    eventContext,
-  )
-where
+module SolidVM.Model.CodeCollection.Event where
 
 import Control.DeepSeq
 import Control.Lens hiding ((.=))
@@ -27,10 +20,39 @@ import qualified SolidVM.Model.CodeCollection.VarDef as SolidVM
 import Test.QuickCheck
 import Test.QuickCheck.Instances ()
 
+data EventLog = EventLog
+  { _eventLogName    :: Text
+  , _eventLogIndexed :: Bool
+  , _eventLogType    :: SolidVM.IndexedType
+  } deriving (Eq, Show, Generic, NFData)
+
+makeLenses ''EventLog
+
+instance Binary EventLog
+
+instance ToJSON EventLog where
+  toJSON e =
+    object
+      [ "name" .= _eventLogName e,
+        "indexed" .= _eventLogIndexed e,
+        "type" .= _eventLogType e
+      ]
+
+instance FromJSON EventLog where
+  parseJSON (Object o) =
+    EventLog
+      <$> (o .: "name")
+      <*> (o .: "indexed")
+      <*> (o .: "type")
+  parseJSON o = typeMismatch "SolidVM.EventLog: Expected Object" o
+
+instance Arbitrary EventLog where
+  arbitrary = GR.genericArbitrary GR.uniform
+
 --Changes to this structure should make a change to the unparser :)
 data EventF a = Event
   { _eventAnonymous :: Bool,
-    _eventLogs :: [(Text, SolidVM.IndexedType)],
+    _eventLogs :: [EventLog],
     _eventContext :: a
   }
   deriving (Eq, Show, Generic, NFData, Functor, Foldable, Traversable)

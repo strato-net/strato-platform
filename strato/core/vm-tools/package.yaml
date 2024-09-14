@@ -41,6 +41,7 @@ library:
     - blockapps-datadefs
     - blockapps-init
     - blockapps-mpdbs
+    - blockstanbul
     - bytestring
     - common-log
     - composable-monads-base
@@ -83,7 +84,6 @@ library:
     - time
     - transformers
     - unliftio
-    - x509-certs
 
 
 

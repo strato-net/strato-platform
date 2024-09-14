@@ -66,6 +66,8 @@ executables:
       - hflags
       - kafka-monad
       - persistent-postgresql
+      - process-monitor
+      - prometheus-client
       - postgresql-typed
       - slipstream
       - sql-monad

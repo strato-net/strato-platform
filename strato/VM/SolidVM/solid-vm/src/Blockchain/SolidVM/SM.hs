@@ -893,7 +893,7 @@ initializeAction :: MonadSM m
                  -> String
                  -> Keccak256
                  -> CC.CodeCollection
-                 -> Map (Account, T.Text) (T.Text, T.Text)
+                 -> Map (Account, T.Text) (T.Text, T.Text, [T.Text])
                  -> [T.Text]
                  -> [T.Text]
                  -> m ()
@@ -1000,25 +1000,25 @@ resolveNameParts ::
   T.Text ->
   T.Text ->
   CC.Contract ->
-  m ((Account, T.Text), (T.Text, T.Text))
+  m ((Account, T.Text), (T.Text, T.Text, [T.Text]))
 resolveNameParts to' crtr app c = do
   let tName = T.pack . CC._contractName
   case c ^. CC.importedFrom of
-    Nothing -> pure ((to', tName c), (crtr, app))
+    Nothing -> pure ((to', tName c), (crtr, app, (map T.pack (M.keys $ CC._storageDefs c))))
     Just acct ->
       A.select (A.Proxy @AddressState) acct >>= \case
         Nothing -> do
           $logWarnS "processTheMessages/resolveNameParts" . T.pack $
             "Could not find address state for account " ++ show acct
-          pure ((acct, tName c), (crtr, app))
+          pure ((acct, tName c), (crtr, app, (map T.pack (M.keys $ CC._storageDefs c))))
         Just s ->
           resolveCodePtr (acct ^. accountChainId) (addressStateCodeHash s) >>= \case
             Just (SolidVMCode appName _) -> do
               appCreator <- getSolidStorageKeyVal' acct $ MS.StoragePath [MS.Field ":creator"]
               case appCreator of
-                MS.BString cn' -> pure ((acct, tName c), (T.pack $ BC.unpack cn', T.pack appName))
-                _ -> pure ((acct, tName c), (crtr, T.pack appName))
+                MS.BString cn' -> pure ((acct, tName c), (T.pack $ BC.unpack cn', T.pack appName, (map T.pack (M.keys $ CC._storageDefs c))))
+                _ -> pure ((acct, tName c), (crtr, T.pack appName, (map T.pack (M.keys $ CC._storageDefs c))))
             _ -> do
               $logWarnS "resolveNameParts" . T.pack $
                 "Could not resolve code for account " ++ show acct
-              pure ((acct, tName c), (crtr, app))
+              pure ((acct, tName c), (crtr, app, (map T.pack (M.keys $ CC._storageDefs c))))

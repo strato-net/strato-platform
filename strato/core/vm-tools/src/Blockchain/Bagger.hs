@@ -15,6 +15,7 @@ import BlockApps.Crossmon
 import BlockApps.Logging
 import qualified Blockchain.Bagger.BaggerState as B
 import Blockchain.Bagger.Transactions
+import Blockchain.Blockstanbul.Authentication
 --import           Blockchain.Data.Block
 
 import Blockchain.DB.ChainDB
@@ -31,8 +32,8 @@ import Blockchain.Database.MerklePatricia (StateRoot (..))
 import Blockchain.Sequencer.Event (OutputBlock (..), OutputTx (..))
 import Blockchain.Strato.Model.Account
 import Blockchain.Strato.Model.Address
-import Blockchain.Strato.Model.ChainMember
 import Blockchain.Strato.Model.Class
+import Blockchain.Strato.Model.Delta
 import Blockchain.Strato.Model.ExtendedWord
 import Blockchain.Strato.Model.Keccak256
 import Blockchain.Timing
@@ -112,6 +113,7 @@ runFromStateRoot mineTransactions remainingGas theBlockHeader txs = do
     Just f@TFNonceLimitExceeded {} -> recoverable f
     Just f@TFTXSizeLimitExceeded {} -> recoverable f
     Just f@TFKnownFailedTX {} -> recoverable f
+    Just f@TFTransactionGasExceeded {} -> recoverable f
 
 -- rewardCoinbases :: MonadBagger m => ChainMemberParsedSet -> [BlockHeader] -> Integer -> m StateRoot -- miner coinbase -> known uncles -> this block number -> stateRoot
 -- rewardCoinbases us uncles ourNumber = do
@@ -249,13 +251,14 @@ processNewBestBlock bh bd txShas = do
       f = not . (`S.member` shaSet) . txHash . otBaseTx
       hashMap = DL.fromList . filter f $ DL.toList pHashes
       thisStateRoot = stateRoot bd
+
       newMiningCache =
         B.MiningCache
           { B.bestBlockSHA = bh,
             B.bestBlockHeader = bd,
             B.bestBlockTxHashes = txShas,
             B.lastExecutedStateRoot = thisStateRoot,
-            B.remainingGas = nextGasLimit $ gasLimit bd,
+            B.remainingGas = nextGasLimit . getBlockGasLimit $ bd,
             B.lastExecutedTxs = [],
             B.promotedTransactions = [],
             B.privateHashes = hashMap,
@@ -287,15 +290,12 @@ makeNewBlock mineTransactions = do
           return build
         else do
           $logDebugS "Bagger.makeNewBlock" "null $ B.promotedTransactions cache = False"
-          isPBFT <- isBlockstanbul
-          let coinbaseAddr = emptyChainMember
-          let nonce = 0
           let lastSR = B.lastExecutedStateRoot cache
           let lastSHA = B.bestBlockSHA cache
           let lastHead = B.bestBlockHeader cache
           let promoted = take ((fromInteger flags_maxTxsPerBlock) - lastExecLen) $ B.promotedTransactions cache
           let time = B.startTimestamp cache
-          let tempBlockHeader = buildNextBlockHeader lastHead lastSHA [] lastSR [] time isPBFT coinbaseAddr nonce
+          let tempBlockHeader = buildNextBlockHeader lastHead lastSHA lastSR [] time mempty mempty
           let remGas = B.remainingGas cache
           $logDebugS "Bagger.makeNewBlock" . T.pack $ "pre-incremental run :: (" ++ show remGas ++ ", " ++ format lastSR ++ ")"
           withBagger $ do
@@ -560,20 +560,17 @@ buildFromMiningCache = do
   $logInfoS "Bagger.buildFromMiningCache" "pulling from mempool"
   state <- getBaggerState
   isPBFT <- isBlockstanbul
-  let coinbaseAddr = emptyChainMember
-  let nonce = 0
   let cache = B.miningCache state
   let uncles = []
   let parentHash = B.bestBlockSHA cache
   let parentHeader = B.bestBlockHeader cache
   let stateRoot = B.lastExecutedStateRoot cache
+  let (vDelt, cDelt) = getDeltasFromResults $ B.lastExecutedTxs cache
   let txs = (trrTransaction <$> B.lastExecutedTxs cache) ++ (DL.toList $ B.privateHashes cache)
-  --let parentNum    = number parentHeader
-  let parentDiff = difficulty parentHeader
-  -- let parentTS     = timestamp parentHeader
+  let parentDiff = getBlockDifficulty parentHeader
   let time = B.startTimestamp cache
-  let nextDiff = 1 --nextDifficulty flags_difficultyBomb flags_testnet parentNum parentDiff parentTS time
-  let nextBlockData = buildNextBlockHeader parentHeader parentHash uncles stateRoot txs time isPBFT coinbaseAddr nonce
+  let nextDiff = 1 
+  let nextBlockData = buildNextBlockHeader parentHeader parentHash stateRoot txs time vDelt cDelt
   recordMaxBlockNumber "bagger_build" . number $ nextBlockData
   rewardedBlockData <- buildRewardedBlockHeader nextBlockData
   when isPBFT $
@@ -590,35 +587,40 @@ buildFromMiningCache = do
 buildNextBlockHeader ::
   BlockHeader ->
   Keccak256 ->
-  [BlockHeader] ->
   StateRoot ->
   [OutputTx] ->
   UTCTime ->
-  Bool ->
-  ChainMemberParsedSet ->
-  Word64 ->
+  ValidatorDelta ->
+  CertDelta ->
   BlockHeader
-buildNextBlockHeader parentHeader parentHash uncles stateRoot txs time isPBFT coinbaseAddr nonce =
-  let --parentDiff = difficulty parentHeader
-      parentNum = number parentHeader
-   in --parentTS   = timestamp parentHeader
-      --nextDiff   = nextDifficulty flags_difficultyBomb flags_testnet parentNum parentDiff parentTS time
-      BlockHeader
-        { parentHash = parentHash,
-          ommersHash = V.ommersVerificationValue uncles,
-          beneficiary = coinbaseAddr, -- TODO?: Removed case for PoW because it relied on ethConf, but should really come from Vault now
+buildNextBlockHeader parentHeader parentHash stateRoot txs time vd cd =
+  let parentNum = number parentHeader
+      (newV, remV) = fromDelta vd
+      (newC, revC) = fromDelta cd
+      curValidators = case parentHeader of
+        BlockHeaderV2{} -> S.toList $ S.difference
+                                       (S.union
+                                         (getValidatorSet parentHeader)
+                                         (S.fromList $ newValidators parentHeader))
+                                       (S.fromList $ removedValidators parentHeader)
+        BlockHeader{} -> S.toList $ getValidatorSet parentHeader
+   in BlockHeaderV2
+        {
+          parentHash = parentHash,
           stateRoot = stateRoot,
           transactionsRoot = V.transactionsVerificationValue (otBaseTx <$> txs),
           receiptsRoot = V.receiptsVerificationValue (),
           logsBloom = "0000000000000000000000000000000000000000000000000000000000000000",
-          difficulty = 1, --nextDiff
           number = parentNum + 1,
-          gasLimit = nextGasLimit $ gasLimit parentHeader,
-          gasUsed = 0,
           timestamp = time,
           extraData = txsLen2ExtraData (length txs),
-          mixHash = if isPBFT then blockstanbulMixHash else unsafeCreateKeccak256FromWord256 0x0,
-          nonce = nonce
+          currentValidators = curValidators,
+          newValidators = newV,
+          removedValidators = remV,
+          newCerts = newC,
+          revokedCerts = revC,
+          proposalSignature = Nothing,
+          signatures = []
         }
 
 buildRewardedBlockHeader :: MonadBagger m => BlockHeader -> m BlockHeader
