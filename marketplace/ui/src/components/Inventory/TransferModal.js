@@ -68,7 +68,7 @@ const TransferModal = ({ open, handleCancel, inventory, categoryName, limit, off
     const handleSelect = (userAddress) => {
         setUserAddress(userAddress);
         const user = filteredOptions.find(item=>item.value === userAddress);
-        const recipientCommonName = user.label.split('-')[0].trim() //user.label:- 'tanujsoni53 - BlockApps'
+        const recipientCommonName = user.label.split('-')[0].trim()
         setSelectedRecipient(recipientCommonName)
         setDropdownOpen(false);
     }
