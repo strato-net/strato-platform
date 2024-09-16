@@ -1253,6 +1253,91 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
     return res;
   }
 
+  // -----------------------------PAYMENT ends here -------------------------------
+
+  // -----------------------------OFFERS starts here -------------------------------
+  // export const Offers = {
+  //   prefix: '/offers',
+  //   get: '/:address',
+  //   getAll: '/',
+  //   create: '/',
+  //   update: '/update',
+  //   accept: '/accept',
+  //   reject: '/reject',
+  //   cancel: '/cancel',
+  //   getIncomingOffers: '/incoming',
+  //   getOutgoingOffers: '/outgoing',
+  //   getAcceptedOffers: '/accepted',
+  //   getRejectedOffers: '/rejected',
+  //   getCancelledOffers: '/cancelled'
+  // }
+
+  contract.getOffers = async function (args, options = defaultOptions) {
+    const getOptions = { ...options, app: contractName }
+    return offerJs.getAll(rawAdmin, args, getOptions);
+  }
+
+  contract.createOffer = async function (args, options = defaultOptions) {
+    const createdDate = Math.floor(Date.now() / 1000);
+    const newArgs = {
+      ...args.itemArgs,
+      createdDate,
+      status: OFFER_STATUS.PENDING
+    };
+    return offerJs.uploadContract(rawAdmin, newArgs, options);
+  }
+
+  contract.updateOffer = async function (args, options = defaultOptions) {
+    const { offerAddress, ...restArgs } = args;
+    const contract = { name: offerJs.contractName, address: offerAddress }
+    return offerJs.updateOffer(rawAdmin, contract, restArgs, options);
+  }
+
+  contract.acceptOffer = async function (args, options = defaultOptions) {
+    const { offerAddress, ...restArgs } = args;
+    const contract = { name: offerJs.contractName, address: offerAddress }
+    return offerJs.acceptOffer(rawAdmin, contract, restArgs, options);
+  }
+
+  contract.rejectOffer = async function (args, options = defaultOptions) {
+    const { offerAddress, ...restArgs } = args;
+    const contract = { name: offerJs.contractName, address: offerAddress }
+    return offerJs.rejectOffer(rawAdmin, contract, restArgs, options);
+  }
+
+  contract.cancelOffer = async function (args, options = defaultOptions) {
+    const { offerAddress, ...restArgs } = args;
+    const contract = { name: offerJs.contractName, address: offerAddress }
+    return offerJs.cancelOffer(rawAdmin, contract, restArgs, options);
+  }
+
+  contract.getIncomingOffers = async function (args, options = defaultOptions) {
+    const getOptions = { ...options, app: contractName }
+    return offerJs.getIncomingOffers(rawAdmin, args, getOptions);
+  }
+
+  contract.getOutgoingOffers = async function (args, options = defaultOptions) {
+    const getOptions = { ...options, app: contractName }
+    return offerJs.getOutgoingOffers(rawAdmin, args, getOptions);
+  }
+
+  contract.getAcceptedOffers = async function (args, options = defaultOptions) {
+    const getOptions = { ...options, app: contractName }
+    return offerJs.getAcceptedOffers(rawAdmin, args, getOptions);
+  }
+
+  contract.getRejectedOffers = async function (args, options = defaultOptions) {
+    const getOptions = { ...options, app: contractName }
+    return offerJs.getRejectedOffers(rawAdmin, args, getOptions);
+  }
+
+  contract.getCancelledOffers = async function (args, options = defaultOptions) {
+    const getOptions = { ...options, app: contractName }
+    return offerJs.getCancelledOffers(rawAdmin, args, getOptions);
+  }
+
+  // -----------------------------OFFERS ends here -------------------------------
+
   return contract;
 };
 

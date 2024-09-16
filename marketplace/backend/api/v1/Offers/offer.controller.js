@@ -2,7 +2,6 @@ import { rest } from 'blockapps-rest'
 import Joi from '@hapi/joi'
 import RestStatus from 'http-status-codes'
 import config from '../../../load.config'
-import sendEmail from '../../../helpers/email'
 import constants from '../../../helpers/constants'
 const options = { config, cacheNonce: true }
 
