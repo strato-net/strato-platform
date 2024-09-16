@@ -68,6 +68,7 @@ import qualified Handlers.Storage as Storage
 import qualified Handlers.Transaction as Transaction
 import qualified Handlers.TransactionResult as TransactionResult
 import qualified Handlers.TxLast as TxLast
+import Instrumentation
 import Network.HTTP.Types.Status
 import Network.Wai
 import Network.Wai.Handler.Warp
@@ -277,6 +278,7 @@ main = do
 
   -- print theDoc
   blockappsInit "core-api"
+  runInstrumentation "strato-api"
 
   let stateFetchLimit' = 100
       nonceCounterTimeout = 10

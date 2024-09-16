@@ -33,7 +33,7 @@ data DependentBlockEntry
       { emittedTotalDifficulty :: Integer,
         blocks :: [SequencedBlock]
       }
-  deriving (Eq, Read, Show, GHCG.Generic)
+  deriving (Eq, Show, GHCG.Generic)
 
 instance Binary DependentBlockEntry
 

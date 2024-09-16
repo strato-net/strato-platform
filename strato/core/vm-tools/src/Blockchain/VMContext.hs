@@ -63,6 +63,7 @@ module Blockchain.VMContext
     checkIfRunningTests,
     lookupX509AddrFromCBHash,
     knownFailedTxs,
+    knownExpensiveTxs,
   )
 where
 
@@ -199,6 +200,14 @@ knownFailedTxs =
       keccak256FromHex "866ce8e521aee5a30284702dc38c4e8c160f40c9a17e52f4ba806dd22f0afed7"
     ]
 
+{-# NOINLINE knownExpensiveTxs #-}
+knownExpensiveTxs :: S.Set Keccak256
+knownExpensiveTxs =
+  S.fromList
+    [
+      keccak256FromHex "4f9e09efa40b1ddc9b9bbfb056161f87714f15bcb0d7fd7db3158528ed766065" -- testnet2 tx requiring ~1,000,000 gas
+    ]
+
 newtype CurrentBlockHash = CurrentBlockHash {unCurrentBlockHash :: Keccak256}
   deriving (Generic, NFData, Show)
 
@@ -212,7 +221,7 @@ instance NFData RBDB.RedisConnection where
   rnf (RBDB.RedisConnection c) = c `seq` ()
 
 data ContextBestBlockInfo = Unspecified | ContextBestBlockInfo !Keccak256 !BlockHeader !Integer !Int !Int
-  deriving (Eq, Read, Show, Generic, NFData)
+  deriving (Eq, Show, Generic, NFData)
 
 instance Binary ContextBestBlockInfo
 
@@ -582,4 +591,3 @@ putContextBestBlockInfo new = Mod.modifyStatefully_ Mod.Proxy $ assign bestBlock
 
 checkIfRunningTests :: (Functor m, Mod.Accessible ContextState m) => m Bool
 checkIfRunningTests = _runningTests <$> Mod.access Mod.Proxy
-

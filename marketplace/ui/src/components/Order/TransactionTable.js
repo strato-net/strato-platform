@@ -165,10 +165,10 @@ const TransactionTable = ({ user, download, isAllOrdersLoading }) => {
     }
     else if (data.type === 'Transfer') { }
     else if (data.type === 'Redemption' && data.to === user.commonName) {
-      route = `${routes.RedemptionsOutgoingDetails.url.replace(":id", data.redemption_id)
+      route = `${routes.RedemptionsIncomingDetails.url.replace(":id", data.redemption_id)
         .replace(":redemptionService", data.redemptionService)}`
     } else if (data.type === 'Redemption' && data.from === user.commonName) {
-      route = `${routes.RedemptionsIncomingDetails.url.replace(":id", data.redemption_id)
+      route = `${routes.RedemptionsOutgoingDetails.url.replace(":id", data.redemption_id)
         .replace(":redemptionService", data.redemptionService)}`
     } else { }
     route && navigate(route)
@@ -238,14 +238,14 @@ const TransactionTable = ({ user, download, isAllOrdersLoading }) => {
       render: (data, { price, quantityIsDecimal }) => <p>{price ? formattedNum(quantityIsDecimal && quantityIsDecimal === "True" ? (price * 100) : price) : '--'}</p>
     },
     {
-      title: "From",
+      title: "Buyer/Sender",
       dataIndex: "from",
       key: "from",
       align: "center",
       width: '150px',
     },
     {
-      title: "To",
+      title: "Seller/Recipient",
       dataIndex: "to",
       key: "to",
       align: "center",
