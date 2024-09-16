@@ -334,9 +334,9 @@ apply' funcArgTypes funcValTypes overloads args argNames funcArgNames functionAr
               newOrder =
                 map
                   ( \case
-                      Nothing -> error "Argument name does not exist"
+                      Nothing -> bottom $ "Argument name does not exist" <$ emptyAnnotation
                       Just x -> case M.lookup x zipped of
-                        Nothing -> error "Argument name does not exist" x
+                        Nothing -> bottom $ "Argument name does not exist" <$ emptyAnnotation
                         Just y -> y
                   )
                   funcArgNames
@@ -366,7 +366,7 @@ apply' funcArgTypes funcValTypes overloads args argNames funcArgNames functionAr
         then t
         else loop (count - 1) t
     loop 0 b = b
-    loop _ _ = error "trying to access an index outside of range"
+    loop count _ = internalError "trying to access an index outside of range" count
 
 apply :: Type' -> Type' -> Maybe [SolidString] -> SSS Type'
 apply (Bottom es) (Bottom ess) _ = pure $ Bottom (es <> ess)
@@ -1309,7 +1309,7 @@ statementsHelper' x stmts = do
   modify $ NE.cons (Nothing, M.empty)
   anns <- reduceType' x <$> traverse statementHelper stmts
   modify $ \case
-    _ :| [] -> error "statementsHelper': Stack underflow"
+    _ :| [] -> internalError "statementsHelper': Stack underflow" x
     (r, _) :| ((s, l) : rest) -> case (r, s) of
       (Nothing, Nothing) -> (Just (Sum (Product [] x :| [])), l) :| rest
       (Nothing, Just (Sum ss)) -> (Just (Sum (NE.cons (Product [] x) ss)), l) :| rest
@@ -1557,7 +1557,7 @@ getVarTypeByName' :: SolidString -> SourceAnnotation Text -> SSS Type'
 getVarTypeByName' name ctx = do
   mVar <- foldr (lookupVar . snd) Nothing <$> get
   case mVar of
-    Just BlankEntry -> error "getVarTypeByName' BlankEntry: I don't think this can happen"
+    Just BlankEntry -> pure . bottom $ "getVarTypeByName' BlankEntry: I don't think this can happen" <$ ctx
     Just VarDefEntry {..} -> case vardefType of
       Just t -> pure $ Static t ctx
       Nothing -> pure $ Top (S.singleton name) ctx
@@ -1675,7 +1675,7 @@ statementHelper (TryCatchStatement tryStatmenets catchMap x) = do
           $ M.keys catchMap
       zipped =
         zipWith
-          (curry (\case (y, Just z) -> zip y z; _ -> error "errorParams and catchMap don't match"))
+          (curry (\case (y, Just z) -> zip y z; _ -> internalError "errorParams and catchMap don't match" x))
           errorParams
           (map (fst . snd) (M.toList catchMap))
 
@@ -1771,7 +1771,7 @@ statementHelper (EmitStatement eventName vals x) = do
               -- valsDebug = trace ("Evaluated types: " ++ show vals') vals'
           let vals'' = map (\y -> case y of
                                     Static s _ -> s
-                                    _          -> error "Internal Error: Type is not static"
+                                    _          -> internalError "Type is not static" x
                            ) vals'
               -- valsStaticDebug = trace ("Static types: " ++ show vals'') vals''
           let expectedTypes = indexedTypeType . _eventLogType <$> _eventLogs event
@@ -1810,7 +1810,7 @@ statementHelper (RevertStatement errorName (NamedArgs vals) x) = do
                                                  let valB' = runReader (evalStateT (tcExpr valB) ((Nothing, M.empty) :| [])) (R cc c Nothing Nothing Nothing [])
                                                  let valB'' = case valB' of
                                                                 Static s _ -> s
-                                                                _          -> error "Internal Error: Type is not static"
+                                                                _          -> internalError "Type is not static" x
                                                  let expectedType = indexedTypeType errC
                                                  case isSameType expectedType valB'' of
                                                    False -> False
@@ -1837,7 +1837,7 @@ statementHelper (RevertStatement errorName (OrderedArgs vals) x) = do
                     -- valsDebug = trace ("Evaluated types: " ++ show vals') vals'
                 let vals'' = map (\y -> case y of
                                           Static s _ -> s
-                                          _          -> error "Internal Error: Type is not static"
+                                          _          -> internalError "Type is not static" x
                                  ) vals'
                     -- valsStaticDebug = trace ("Static types: " ++ show vals'') vals''
                 let expectedTypes = [indexedTypeType it | (_, it, _) <- err]
