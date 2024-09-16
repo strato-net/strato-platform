@@ -186,3 +186,19 @@ export const UserActivity = {
   prefix: '/userActivity',
   getAll: '/',
 }
+
+export const Offers = {
+  prefix: '/offers',
+  get: '/:address',
+  getAll: '/',
+  create: '/',
+  update: '/update',
+  accept: '/accept',
+  reject: '/reject',
+  cancel: '/cancel',
+  getIncomingOffers: '/incoming',
+  getOutgoingOffers: '/outgoing',
+  getAcceptedOffers: '/accepted',
+  getRejectedOffers: '/rejected',
+  getCancelledOffers: '/cancelled'
+}

@@ -50,7 +50,8 @@ import {
   PaymentService,
   UserActivity,
   Redemption,
-  Transaction
+  Transaction,
+  Offers,
 } from './endpoints'
 
 
@@ -79,6 +80,7 @@ router.use(PaymentService.prefix, paymentService)
 router.use(UserActivity.prefix, userActivity)
 router.use(Redemption.prefix, redemption)
 router.use(Transaction.prefix, transaction)
+router.use(Offers.prefix, Offers)
 
 
 router.get(`/health`, (req, res) => {
