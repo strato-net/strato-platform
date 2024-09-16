@@ -196,20 +196,9 @@ const TransferModal = ({ open, handleCancel, inventory, categoryName, limit, off
             newOwner: userAddress,
             quantity,
             price,
-            mailData: {
-                //  TransferSender
-                senderCommonName:user.commonName,
-                recipientFirstName:'firstName',
-                recipientLastName:'lastName',
-                //   TransferRecipient
-                recipientCommonName:selectedRecipient,
-                senderFirstName:'firstName',
-                senderLastName:'lastName',
-                // Common values
-                itemName,
-                itemQuantity:quantity,
-                itemValue:price,
-            }
+            senderCommonName:user.commonName,
+            recipientCommonName:selectedRecipient,
+            itemName,
         };
 
         if (quantity > 0 && quantity <= inventory.quantity && userAddress) {

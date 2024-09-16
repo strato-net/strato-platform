@@ -2,6 +2,7 @@ import { rest } from 'blockapps-rest'
 import Joi from '@hapi/joi'
 import RestStatus from 'http-status-codes'
 import { RedemptionApprovalToIssuer, RedemptionApprovalToRedeemer, RedemptionRejectionToIssuer, RedemptionRejectionToRedeemer, RedemptionRequestToIssuer, RedemptionRequestToRedeemer } from '../../../helpers/emailTemplates'
+import sendEmail from '../../../helpers/email'
 
 class RedemptionController {
 
@@ -38,10 +39,10 @@ class RedemptionController {
         try {
             const { dapp, body } = req;
             const { issuerCommonName, ownerCommonName, assetName, quantity, ownerComments } = body;
-            const { userAddress, ...rest } = body;
-            RedemptionController.validateRequestRedemptionArgs(rest)
+            const { userAddress, ...restData } = body;
+            RedemptionController.validateRequestRedemptionArgs(restData)
 
-            const result = await dapp.requestRedemption(rest)
+            const result = await dapp.requestRedemption(restData)
             rest.response.status200(res, result)
 
             const RedemptionRequestToIssuerTemplate = RedemptionRequestToIssuer(issuerCommonName, ownerCommonName, userAddress, assetName, quantity, ownerComments);
@@ -83,24 +84,24 @@ class RedemptionController {
     static async closeRedemption(req, res, next) {
         try {
             const { dapp, body } = req
-            const { redeemerCommonName, issuerCommonName, assetName, quantity, ...rest  } = body;
+            const { redeemerCommonName, issuerCommonName,redeemerAddress, assetName, quantity, ...restData  } = body;
 
-            RedemptionController.validateCloseRedemptionArgs(body)
+            RedemptionController.validateCloseRedemptionArgs(restData)
 
-            const result = await dapp.closeRedemption(body)
+            const result = await dapp.closeRedemption(restData)
             rest.response.status200(res, result)
 
             if (body.status === 2) {
-                const RedemptionApprovalToIssuerTemplate = RedemptionApprovalToIssuer(issuerCommonName, redeemerCommonName, 'redeemerAddress', assetName, quantity, body.issuerComments);
-                const RedemptionApprovalToRedeemerTemplate = RedemptionApprovalToRedeemer(redeemerCommonName, redeemerCommonName, 'redeemerAddress', assetName, quantity, body.issuerComments);
+                const RedemptionApprovalToIssuerTemplate = RedemptionApprovalToIssuer(issuerCommonName, redeemerCommonName, redeemerAddress, assetName, quantity, body.issuerComments);
+                const RedemptionApprovalToRedeemerTemplate = RedemptionApprovalToRedeemer(redeemerCommonName, redeemerAddress, assetName, quantity, body.issuerComments);
                 await sendEmail(issuerCommonName, 'Redemption Request Approved', RedemptionApprovalToIssuerTemplate);
-                await sendEmail(ownerCommonName, 'Redemption Request Approved', RedemptionApprovalToRedeemerTemplate);
+                await sendEmail(redeemerCommonName, 'Redemption Request Approved', RedemptionApprovalToRedeemerTemplate);
             }
             if (body.status === 3) {
-                const RedemptionRejectionToIssuerTemplate = RedemptionRejectionToIssuer(issuerCommonName, redeemerCommonName, 'redeemerAddress', assetName, quantity, body.issuerComments);
-                const RedemptionRejectionToRedeemerTemplate = RedemptionRejectionToRedeemer(redeemerCommonName, redeemerCommonName, 'redeemerAddress', assetName, quantity, body.issuerComments);
+                const RedemptionRejectionToIssuerTemplate = RedemptionRejectionToIssuer(issuerCommonName, redeemerCommonName, redeemerAddress, assetName, quantity, body.issuerComments);
+                const RedemptionRejectionToRedeemerTemplate = RedemptionRejectionToRedeemer(redeemerCommonName, redeemerAddress, assetName, quantity, body.issuerComments);
                 await sendEmail(issuerCommonName, 'Redemption Request Rejected', RedemptionRejectionToIssuerTemplate);
-                await sendEmail(ownerCommonName, 'Redemption Request Rejected', RedemptionRejectionToRedeemerTemplate);
+                await sendEmail(redeemerCommonName, 'Redemption Request Rejected', RedemptionRejectionToRedeemerTemplate);
             }
 
 

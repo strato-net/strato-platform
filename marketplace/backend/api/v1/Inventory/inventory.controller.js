@@ -146,17 +146,16 @@ class InventoryController {
   static async transfer(req, res, next) {
     try {
       const { dapp, body } = req;
-      const { mailData, ...restData } = body;
+      const { senderCommonName, recipientCommonName,
+         itemName, quantity, price, ...restData } = body;
+      const payload = { quantity, price, ...restData }
+      InventoryController.validateTransferItemArgs(payload)
+      const result = await dapp.transferItem(payload)
 
-      InventoryController.validateTransferItemArgs(restData)
-
-      const result = await dapp.transferItem(restData)
-      
-      const TransferSenderTemplate =  TransferSender(mailData);
-      const TransferRecipientTemplate =  TransferRecipient(mailData);
-      const mail1 = await sendEmail(mailData.senderCommonName, 'Your Item Transfer Confirmation', TransferSenderTemplate)
-      // const mail2 = await sendEmail(mailData.recipientCommonName, 'You’ve Received an Item Transfer!', TransferRecipientTemplate)
-      // console.log("mail1-response", mail1);
+      const TransferSenderTemplate = TransferSender(senderCommonName, itemName, quantity, price, recipientCommonName);
+      const TransferRecipientTemplate = TransferRecipient(recipientCommonName, itemName, quantity, price, senderCommonName);
+      await sendEmail(senderCommonName, 'Your Item Transfer Confirmation', TransferSenderTemplate)
+      await sendEmail(recipientCommonName, 'You’ve Received an Item Transfer!', TransferRecipientTemplate)
       rest.response.status200(res, result)
       return next()
     } catch (e) {

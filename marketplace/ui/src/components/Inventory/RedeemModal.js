@@ -115,7 +115,7 @@ const RedeemModal = ({ open, handleCancel, inventory, categoryName, limit, offse
             ownerCommonName: user.commonName,
             issuerCommonName: inventory.creator,
             ownerComments: comments,
-            userAddress: user.address
+            userAddress: user.userAddress
         };
 
         if (quantity > 0 && quantity <= inventory.quantity) {
