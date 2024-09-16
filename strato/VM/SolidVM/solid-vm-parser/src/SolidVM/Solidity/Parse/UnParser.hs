@@ -383,7 +383,7 @@ unparseEvent (name, Event {..}) =
     "event "
       <> labelToText name
       <> "(\n    "
-      <> Text.intercalate ",\n    " (List.map unparseArgs _eventLogs)
+      <> Text.intercalate ",\n    " (List.map (\(EventLog n _ i) -> unparseArgs (n,i)) _eventLogs)
       <> ")"
       <> (if _eventAnonymous then "anonymous" else "")
       <> ";"

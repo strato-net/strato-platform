@@ -26,7 +26,7 @@ async function handleCertificateRegistered(event, token) {
 
     // Fetch certificates based on transaction hash
     const queryResponse = await axios.get(
-      `https://${baseUrl}/cirrus/search/Certificate?certificateString=eq.${encodeURIComponent(targetCertificateString)}`,
+      `https://${baseUrl}/cirrus/search/Certificate?certificateString=eq.${encodeURIComponent(targetCertificateString)}&select=userAddress`,
       {
         headers: {
           Accept: "application/json",
@@ -53,8 +53,28 @@ async function handleCertificateRegistered(event, token) {
       console.error("No certificates found in the marketplace.");
       return;
     }
-    if (queryBody.length > 1) {
-      console.error("Multiple certificates found in the marketplace.");
+
+    // Fetch certificates based on transaction hash
+    const userQueryResponse = await fetch(
+      `https://${baseUrl}/cirrus/search/Certificate?userAddress=eq.${encodeURIComponent(queryBody[0].userAddress)}&select=count`,
+      {
+        method: "GET",
+        credentials: "same-origin",
+        headers: {
+          Accept: "application/json",
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+      }
+    );
+    const userQueryBody = await userQueryResponse.json();
+    console.log("User certificate query response:", userQueryBody);
+    if (!userQueryBody || userQueryBody.length <= 0) {
+      console.error("No certificates found in the marketplace. User address:", queryBody[0].userAddress);
+      return;
+    }
+    if (userQueryBody[0].count > 1) {
+      console.error("Multiple certificates found in the marketplace. User address:", queryBody[0].userAddress);
       return;
     }
 

@@ -15,16 +15,13 @@
 {-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE TypeOperators #-}
 
-{-# OPTIONS_GHC -fno-warn-unused-top-binds #-}
-
 module Blockchain.Sequencer.Gregor
   ( GregorConfig (..),
     runTheGregor,
     runGregorM,
-    assertTopicCreation,
+    assertSequencerTopicsCreation,
     initializeCheckpoint,
-    writeSeqP2pEvents,
-    writeSeqVmEvents,
+    updateMetadata_locked
   )
 where
 
@@ -68,12 +65,8 @@ data GregorConfig = GregorConfig
 data GregorContext = GregorContext
   { _gregorConsumerGroup :: Kafka.ConsumerGroup,
     _gregorUnseq :: TBQueue IngestEvent,
-    _gregorUnseqCheckpoints :: TQueue Checkpoint,
-    _gregorSeqP2P :: TQueue P2pEvent,
-    _gregorSeqVM :: TQueue VmEvent
+    _gregorUnseqCheckpoints :: TQueue Checkpoint
   }
-
-makeLenses ''GregorContext
 
 type GregorM = ReaderT GregorContext
 
@@ -84,9 +77,7 @@ convert GregorConfig {..} =
     GregorContext
         { _gregorConsumerGroup = kafkaConsumerGroup,
           _gregorUnseq = unseqEvents cablePackage,
-          _gregorUnseqCheckpoints = unseqCheckpoints cablePackage,
-          _gregorSeqP2P = seqP2PEvents cablePackage,
-          _gregorSeqVM = seqVMEvents cablePackage
+          _gregorUnseqCheckpoints = unseqCheckpoints cablePackage
         }
 
 runGregorM :: MonadUnliftIO m =>
@@ -111,23 +102,13 @@ readUnseqEvents' :: (MonadLogger m, P.MonadMonitor m, HasKafka m, HasGregorConte
 readUnseqEvents' = do
   offset <- getNextIngestedOffset
   $logInfoS "readUnseqEvents'" . T.pack $ "Fetching unseqevents from " ++ show offset
-  ret <- execKafka $ SK.readUnseqEvents offset
+  ret <- SK.readUnseqEvents offset
   let count = length ret
   P.unsafeAddCounter gregorUnseqRead $ fromIntegral count
   return (offset + fromIntegral count, ret)
 
-writeSeqVmEvents :: (HasKafka m, P.MonadMonitor m) => [VmEvent] -> m ()
-writeSeqVmEvents events = do
-  void $ execKafka (SK.writeSeqVmEvents events)
-  P.unsafeAddCounter gregorVMWrite (fromIntegral (length events))
-
-writeSeqP2pEvents :: (HasKafka m, P.MonadMonitor m) => [P2pEvent] -> m ()
-writeSeqP2pEvents events = do
-  void $ execKafka (SK.writeSeqP2pEvents events)
-  P.unsafeAddCounter gregorP2PWrite (fromIntegral (length events))
-
-assertTopicCreation :: HasKafka m => m ()
-assertTopicCreation = void $ execKafka SK.assertTopicCreation
+assertSequencerTopicsCreation :: HasKafka m => m ()
+assertSequencerTopicsCreation = void $ SK.assertSequencerTopicsCreation
 
 getNextIngestedOffset :: (MonadLogger m, HasKafka m, HasGregorContext m) =>
                          m Kafka.Offset
@@ -184,7 +165,7 @@ initializeCheckpoint vals = do
     (_, Right kafkaCkpt) ->
       if null (checkpointValidators kafkaCkpt)
         then do
-          $logInfoS "initializeCheckpoin" "No validators in checkpoint -- setting by flags"
+          $logInfoS "initializeCheckpoint" "No validators in checkpoint -- setting by flags"
           return $ overrideVals kafkaCkpt
         else return kafkaCkpt
 
@@ -207,31 +188,17 @@ unseqReader = forever . timeAction gregorUnseqTiming $ do
   -- with the events that `seqWriters` processes.
   updateOffset_locked nextOff
 
-data ImOnlyUsedInSeqWriters a b c = VM a | P2P b | KafkaCheckpoint c
+data ImOnlyUsedInSeqWriters a b c = KafkaCheckpoint c
   deriving (Foldable)
 
 seqWriters :: (MonadLogger m, P.MonadMonitor m, HasKafka m, HasGregorContext m) =>
               m ()
 seqWriters = forever . timeAction gregorSeqTiming $ do
-  vmq <- fmap _gregorSeqVM accessEnv
-  p2pq <- fmap _gregorSeqP2P accessEnv
   ckptq <- fmap _gregorUnseqCheckpoints accessEnv
   events <-
-    atomically $
-      fmap VM (blockFlushTQueue vmq)
-        `orElse` ( fmap P2P (blockFlushTQueue p2pq)
-                     `orElse` fmap KafkaCheckpoint (blockFlushTQueue ckptq)
-                 )
+    atomically $ fmap KafkaCheckpoint (blockFlushTQueue ckptq)
   $logDebugS "gregor/seqWriter" . T.pack . show $ length events
   case events of
-    VM vmevs -> do
-      P.withLabel gregorLoop "seq_vm_events" P.incCounter
-      P.unsafeAddCounter gregorVMRead (fromIntegral $ length vmevs)
-      writeSeqVmEvents vmevs
-    P2P p2pevs -> do
-      P.withLabel gregorLoop "seq_p2p_events" P.incCounter
-      P.unsafeAddCounter gregorP2PRead (fromIntegral $ length p2pevs)
-      writeSeqP2pEvents p2pevs
     KafkaCheckpoint ckpts -> do
       let safeLast [] = Nothing
           safeLast xs = Just $ last xs

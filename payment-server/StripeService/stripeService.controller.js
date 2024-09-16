@@ -183,6 +183,9 @@ class StripeServiceController {
       const paymentDetails = await getStripePaymentFromToken(checkoutHash);
       const session = await stripeService.getPaymentSession(paymentDetails.paymentsessionid, paymentDetails.accountid);
 
+      // Redirect back to marketplace
+      res.redirect(`${redirectUrl}?assets=[]&orderHash=${checkoutHash}`);
+
       // Verify payment and perform onchain transfer
       let returnStatus;
       if (session.payment_status === 'paid') {
@@ -261,8 +264,6 @@ class StripeServiceController {
 
       console.log("returnStatus", returnStatus);
 
-      // Redirect back to marketplace
-      res.redirect(`${redirectUrl}?assets=${returnStatus}`);
       return next();
     } catch(e) {
       next(e);

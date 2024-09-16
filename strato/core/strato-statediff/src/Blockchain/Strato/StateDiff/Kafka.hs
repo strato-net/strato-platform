@@ -1,6 +1,6 @@
 module Blockchain.Strato.StateDiff.Kafka
   ( stateDiffTopicName,
-    assertTopicCreation,
+    assertStateDiffTopicCreation,
     --    , writeActionJSONToKafka
     filterResponse,
   )
@@ -14,14 +14,14 @@ where
 --import           Blockchain.Strato.Model.Action    (Action)
 import Blockchain.KafkaTopics (lookupTopic)
 import Control.Lens.Getter (view)
-import qualified Network.Kafka as K
+import Control.Monad.Composable.Kafka
 import qualified Network.Kafka.Protocol as KP
 
 stateDiffTopicName :: KP.TopicName
 stateDiffTopicName = lookupTopic "statediff"
 
-assertTopicCreation :: K.Kafka k => k ()
-assertTopicCreation = K.updateMetadata stateDiffTopicName
+assertStateDiffTopicCreation :: HasKafka k => k ()
+assertStateDiffTopicCreation = createTopic stateDiffTopicName
 
 {-
 mkTopicAndMessage :: (ToJSON a) => a -> K.TopicAndMessage

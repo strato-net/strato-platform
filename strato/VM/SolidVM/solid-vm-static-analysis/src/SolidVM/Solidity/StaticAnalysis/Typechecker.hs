@@ -946,9 +946,8 @@ contractHelper ::
   Annotated CodeCollectionF ->
   Annotated ContractF ->
   Type'
-contractHelper cc c = do
-  let solidVMVersion = maybe "" snd $ find ((== "solidvm") . fst) $ _pragmas cc
-  if solidVMVersion == "11.4" 
+contractHelper cc c =
+  if isSVMVersion "11.4" cc
     then
       let constr = maybe M.empty (M.singleton "constructor") $ _constructor c
           funcsAndConstr = constr <> _functions c 
@@ -1655,6 +1654,9 @@ pushLocalVariable v@VarDefEntry {..} = modify $ \case
 pushLocalVariables :: [Annotated VarDefEntryF] -> SSS ()
 pushLocalVariables = traverse_ pushLocalVariable
 
+isSVMVersion :: String -> CodeCollectionF a -> Bool
+isSVMVersion ver cc = isJust . find (== ("solidvm", ver)) $ _pragmas cc
+
 statementHelper :: Annotated StatementF -> SSS Type'
 statementHelper (IfStatement cond thens mElse x) = do
   cs <- tcExpr cond
@@ -1722,8 +1724,7 @@ statementHelper (Break x) = pure $ topType' x
 statementHelper (Return mExpr x) = do
   cc <- asks codeCollection
   mf <- asks function
-  let solidVMVersion = maybe "" snd $ find ((== "solidvm") . fst) $ _pragmas cc
-  if solidVMVersion == "11.4"
+  if isSVMVersion "11.4" cc
     then do 
       fm <- asks modifier
       case (fm,mf) of
@@ -1758,9 +1759,8 @@ statementHelper (Throw e x) = do
 statementHelper (ModifierExecutor x) = pure $ topType' x
 statementHelper (EmitStatement eventName vals x) = do
   cc <- asks codeCollection
-  let solidVMVersion = maybe "" snd $ find ((== "solidvm") . fst) $ _pragmas cc
-  case solidVMVersion of
-    "11.4" -> do
+  if isSVMVersion "11.4" cc
+    then do
       c  <- asks contract
       case M.lookup eventName (_events c) of 
         Just event -> do
@@ -1774,7 +1774,7 @@ statementHelper (EmitStatement eventName vals x) = do
                                     _          -> error "Internal Error: Type is not static"
                            ) vals'
               -- valsStaticDebug = trace ("Static types: " ++ show vals'') vals''
-          let expectedTypes = [indexedTypeType it | (_, it) <- _eventLogs event]
+          let expectedTypes = indexedTypeType . _eventLogType <$> _eventLogs event
               -- expectedTypesDebug = trace ("Expected types: " ++ show expectedTypes) expectedTypes
           if length expectedTypes /= length vals''
             then pure . bottom $ "Wrong number of arguments provided" <$ x
@@ -1782,13 +1782,12 @@ statementHelper (EmitStatement eventName vals x) = do
               then pure . bottom $ "Type mismatch in event arguments" <$ x
               else reduceType' x <$> traverse (tcExpr . snd) vals 
         Nothing -> pure . bottom $ "Event does not exist" <$ x
-    _    ->
+    else
       reduceType' x <$> traverse (tcExpr . snd) vals
 statementHelper (RevertStatement errorName (NamedArgs vals) x) = do
   cc <- asks codeCollection
-  let solidVMVersion = maybe "" snd $ find ((== "solidvm") . fst) $ _pragmas cc
-  case solidVMVersion of
-    "11.4" ->
+  if isSVMVersion "11.4" cc
+    then
       case errorName of
         Nothing -> pure . bottom $ "Cannot have arguments without custom error" <$ x
         Just erName -> do
@@ -1820,13 +1819,12 @@ statementHelper (RevertStatement errorName (NamedArgs vals) x) = do
                           case all (==True) matched' of 
                             False -> pure . bottom $ "Type mismatch in error arguments" <$ x
                             True  -> reduceType' x <$> traverse (tcExpr . snd) vals 
-    _    ->
+    else
         reduceType' x <$> traverse (tcExpr . snd) vals
 statementHelper (RevertStatement errorName (OrderedArgs vals) x) = do
     cc <- asks codeCollection
-    let solidVMVersion = maybe "" snd $ find ((== "solidvm") . fst) $ _pragmas cc
-    case solidVMVersion of
-      "11.4" -> do
+    if isSVMVersion "11.4" cc
+      then
         case errorName of 
           Just erName -> do
             c  <- asks contract
@@ -1851,7 +1849,7 @@ statementHelper (RevertStatement errorName (OrderedArgs vals) x) = do
                     else reduceType' x <$> traverse tcExpr vals
               Nothing -> pure . bottom $ "Error does not exist" <$ x
           Nothing -> reduceType' x <$> traverse tcExpr vals
-      _    ->
+      else
         reduceType' x <$> traverse tcExpr vals
 statementHelper (UncheckedStatement body x) =
   statementsHelper' x body

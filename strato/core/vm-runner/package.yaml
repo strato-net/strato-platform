@@ -8,8 +8,6 @@ category:      Data Structures
 
 dependencies:
   - base
-  - blockstanbul # This dependency doesn't appear to be used at all, except for one symbol that doesn't exist.
-                 # To avoid breaking builds, please leave this here: https://blockapps.atlassian.net/browse/OPS-65
 
 library:
   source-dirs: src/
@@ -24,6 +22,7 @@ library:
   - blockapps-data
   - blockapps-datadefs
   - blockapps-mpdbs
+  - blockstanbul
   - bytestring
   - common-log
   - composable-monads-base
@@ -45,6 +44,7 @@ library:
   - prometheus-client
   - seqevents
   - solid-vm
+  - solid-vm-model
   - sql-monad
   - strato-conf
   - strato-genesis
@@ -68,6 +68,7 @@ executables:
       - common-log
       - debugger
       - hflags
+      - process-monitor
       - solid-vm-fuzzer
       - strato-model
       - vm-runner

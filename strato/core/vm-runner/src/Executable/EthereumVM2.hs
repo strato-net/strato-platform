@@ -105,6 +105,7 @@ handleVmEvents = awaitForever $ \InBatch {..} -> do
   yieldMany $ outputPrivateTransactions privateTxs
   processBlocksAndNewChains blocksAndNewChains
 
+
   mPreDec <- lift $ do
     case preprepareBlock of
       Nothing -> pure Nothing
@@ -118,24 +119,34 @@ handleVmEvents = awaitForever $ \InBatch {..} -> do
         case mSumm of 
           Nothing -> pure Nothing
           Just summ -> do
+            let bHeader' = case bHeader of
+                            -- imitate parent block as closely as possible (most important is the stateroot)
+                            BlockHeader {} -> bHeader { 
+                              parentHash = bSumParentHash summ,
+                              stateRoot = bSumStateRoot summ,
+                              number = bSumNumber summ,
+                              gasLimit = bSumGasLimit summ
+                            }
+                            BlockHeaderV2 {} -> bHeader { 
+                              parentHash = bSumParentHash summ,
+                              stateRoot = bSumStateRoot summ,
+                              number = bSumNumber summ
+                            }
             res <- Bagger.runFromStateRoot 
               mineTransactions 
               (bSumGasLimit summ) 
-              bHeader { -- immitate parent block as closely as possible (most important is the stateroot)
-                parentHash = bSumParentHash summ,
-                stateRoot = bSumStateRoot summ,
-                number = bSumNumber summ,
-                gasLimit = bSumGasLimit summ
-              } 
+              bHeader'
               otxs 
             case res of 
-              Right (sr, _, _) -> do 
-                let  desiredSR = stateRoot bHeader
+              Right (sr, trrs, _) -> do 
                 $logDebugS "handleVmEvents/preprepareBlock" . T.pack $ "Stateroot we got: " <> format sr
-                $logDebugS "handleVmEvents/preprepareBlock" . T.pack $ "Stateroot in block: " <> format desiredSR
-                if sr == desiredSR 
-                  then pure . Just $ AcceptPreprepare bHash
-                  else pure $ Just RejectPreprepare
+                $logDebugS "handleVmEvents/preprepareBlock" . T.pack $ "Stateroot in block: " <> format (stateRoot bHeader)
+                blockFailures <- verifyBlock block (trrs, Just sr) summ
+                case blockFailures of 
+                  [] -> pure . Just $ AcceptPreprepare bHash
+                  _  -> do
+                    $logDebugS "handleVmEvents/preprepareBlock" . T.pack $ show blockFailures
+                    pure $ Just RejectPreprepare
               _ -> pure $ Just RejectPreprepare
   $logDebugS "handleVmEvents/mPreDec" . T.pack $ format mPreDec
   traverse_ (yield . OutPreprepareResponse) mPreDec
@@ -178,9 +189,10 @@ handleVmEvents = awaitForever $ \InBatch {..} -> do
       then do
         $logInfoS "evm/loop/newBlock" "calling Bagger.makeNewBlock"
         newBlock <- Bagger.makeNewBlock mineTransactions
-        pure $ Just newBlock
+        pure $ Just newBlock 
       else pure Nothing
-  traverse_ (yield . OutBlock) mNewBlock
+    
+  for_ mNewBlock $ yield . OutBlock 
 
 groupEithers :: [Either a b] -> [Either [a] [b]]
 groupEithers = foldr f []

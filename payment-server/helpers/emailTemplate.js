@@ -175,7 +175,6 @@ function generateHtmlContent(customerFirstName, concatenatedOrderString) {
       orderTotal += parseFloat(itemTotal); 
       if (i === orderData.length - 1) {
         concatenatedOrderString += `<hr style="border-top: 1px dotted #0A1B71; min-width: 80%; max-width: 80%; margin-left: 15px;">`;
-        concatenatedOrderString += `Sales Tax: $${parseFloat(orderItem.tax).toFixed(2)} <br>`;
         concatenatedOrderString += `Shipping Fee: <i><strong>Free</strong></i><br><br>`;
         concatenatedOrderString += `Order Total: $${orderTotal.toFixed(2)} <br>`;
       }

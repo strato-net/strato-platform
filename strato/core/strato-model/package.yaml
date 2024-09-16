@@ -28,6 +28,7 @@ library:
     - QuickCheck
     - aeson
     - aeson-casing
+    - asn1-encoding
     - asn1-types
     - base16-bytestring
     - binary
@@ -35,7 +36,9 @@ library:
     - conduit
     - containers
     - cpu
-    - cryptonite
+    - crypton
+    - crypton-x509
+    - crypton-x509-validation
     - data-default
     - deepseq
     - ethereum-rlp
@@ -46,15 +49,19 @@ library:
     - generic-deriving
     - hashable
     - hflags
+    - hourglass
     - http-api-data
     - integer-gmp
     - labeled-error
     - lens
     - memory
+    - monad-alter
+    - mtl
     - nibblestring
     - quickcheck-instances
     - path-pieces
     - persistent
+    - pem
     - primitive
     - raw-strings-qq
     - secp256k1-haskell

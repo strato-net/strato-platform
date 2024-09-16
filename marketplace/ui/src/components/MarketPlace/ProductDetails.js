@@ -749,7 +749,8 @@ const ProductDetails = ({ user, users }) => {
                         </div>
                       ) : (
                         <div className="text-center p-4">
-                          <p>Please
+                          <p>
+                            Please{" "}
                             <span
                               className="text-blue hover:text-blue cursor-pointer hover:underline"
                               onClick={() => {
@@ -758,10 +759,11 @@ const ProductDetails = ({ user, users }) => {
                               }}
                             >
                               login
-                            </span>
+                            </span>{" "}
                             to view ownership history.
                           </p>
                         </div>
+
                       ),
                     },
                     {
