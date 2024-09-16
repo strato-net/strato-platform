@@ -3,12 +3,13 @@ const {
   NODE_ENV,
   prodMarketplaceUrl,
   testnetMarketplaceUrl,
+  notificationUrl
 } = require("../config");
 const { getRewards } = require("../helper/googleSheet.js");
 const axios = require("axios");
 const { sendEmail, getUserName } = require("../helper/utils.js");
 
-const baseUrl = NODE_ENV === "prod" ? prodMarketplaceUrl : testnetMarketplaceUrl
+const baseUrl = NODE_ENV === "prod" ? prodMarketplaceUrl : testnetMarketplaceUrl;
 
 async function handleOrderRewards(event, token) {
   const purchaser = event.eventEvent.eventArgs.find(
@@ -63,8 +64,7 @@ async function handleOrderRewards(event, token) {
   if (queryBody[0].count === 1) {
     console.log("User's first order");
     const purchaserName = await getUserName(baseUrl, purchaser, token)
-    sendEmail(baseUrl, 'firstPurchase', purchaserName, token);
-
+    sendEmail(baseUrl, notificationUrl, 'firstPurchase', purchaserName, token);
     eventKey = "FirstOrder";
   }
 
@@ -164,10 +164,10 @@ async function handleOrderReward(
       const sellerName = await getUserName(baseUrl, seller, token);
 
       // To Purchaser
-      sendEmail(baseUrl, 'additionalPurchase', purchaserName, token);
+      sendEmail(baseUrl, notificationUrl, 'additionalPurchase', purchaserName, token);
 
       // To Seller
-      sendEmail(baseUrl, 'sellerReward', sellerName, token);
+      sendEmail(baseUrl, notificationUrl, 'sellerReward', sellerName, token);
 
     } else {
       console.log("Some reward transactions were not successful:", response);

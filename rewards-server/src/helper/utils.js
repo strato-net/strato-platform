@@ -1,6 +1,6 @@
 const axios = require("axios");
 
-const sendEmail = async (baseUrl, type, userName, token) => {
+const sendEmail = async (baseUrl, notificationUrl, type, userName, token) => {
 
   const emailTemplates = {
     firstPurchase: {
@@ -77,7 +77,7 @@ const sendEmail = async (baseUrl, type, userName, token) => {
       }
     };
 
-    const response = await axios.post(`https://${baseUrl}/notify`, reqBody, {
+    const response = await axios.post(`${notificationUrl}/notify`, reqBody, {
       headers: {
         'Content-Type': 'application/json',
         Authorization: `Bearer ${token}`,
