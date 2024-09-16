@@ -2,6 +2,7 @@ import { rest } from 'blockapps-rest'
 import constants from '../../../helpers/constants'
 import Joi from '@hapi/joi'
 import RestStatus from 'http-status-codes'
+import STRATSJs from '../../../dapp/items/STRATS'
 
 
 class MarketplaceController {
@@ -89,6 +90,17 @@ class MarketplaceController {
       stratsBalance = await dapp.getStratsBalance({ userAddress: userAddress });
 
       return rest.response.status200(res, stratsBalance)
+    } catch (e) {
+      return next(e)
+    }
+  }
+  
+  static async getStratsAddress(req, res, next) {
+    try {
+      
+      const address = await STRATSJs.getStratsAddress();
+
+      return rest.response.status200(res, address)
     } catch (e) {
       return next(e)
     }

@@ -49,6 +49,13 @@ router.get(
 );
 
 router.get(
+  Marketplace.getStratsAddress,
+  authHandler.authorizeRequest(),
+  loadDapp,
+  MarketplaceController.getStratsAddress
+);
+
+router.get(
   Marketplace.getStratsTransactionHistory,
   authHandler.authorizeRequest(),
   loadDapp,

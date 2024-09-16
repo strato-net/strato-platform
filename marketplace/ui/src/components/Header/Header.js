@@ -212,7 +212,10 @@ const HeaderComponent = ({ user, loginUrl, showMenu, handleSubMenu, handleMenuTa
         // },
         {
           key: '2',
-          onClick: () => setIsStratsTransactionHistoryModalVisible(true),
+          onClick: async () => {
+            const stratAddress = await marketplaceActions.fetchStratsAddress(marketplaceDispatch)
+            navigate(`${routes.Transactions.url}?address=${stratAddress}`)
+          },
           label: (
             <div>
               {user &&

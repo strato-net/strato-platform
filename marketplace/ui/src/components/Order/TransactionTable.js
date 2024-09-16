@@ -41,6 +41,7 @@ const TransactionTable = ({ user, download, isAllOrdersLoading }) => {
   const [type, setType] = useState("");
   const [dateQuery, setDateQuery] = useState("");
   const [transactions, setTransactions] = useState(userTransactions)
+  const [originAddress, setOriginAddress] = useState("");
   const [search, setSearch] = useState("")
 
   const formatter = new Intl.NumberFormat('en-US');
@@ -79,6 +80,7 @@ const TransactionTable = ({ user, download, isAllOrdersLoading }) => {
     // Update state based on URL params, but skip empty values
     setType(urlType && urlType !== "all" ? urlType : "");
     setDateQuery(urlDate || "");
+    setOriginAddress(searchParams.get("address") || "");
   }, [location.search]);
   
 
@@ -88,6 +90,12 @@ const TransactionTable = ({ user, download, isAllOrdersLoading }) => {
     // Type filter
     if (type) {
       filteredData = filteredData.filter((item) => item.type === type);
+    }
+    
+    if (originAddress) {
+      filteredData = filteredData.filter((item) => item.assetAddress === originAddress);
+      setSearch(filteredData[0].assetName)
+      setOriginAddress("")
     }
   
     // Search filter

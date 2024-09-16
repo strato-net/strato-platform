@@ -111,6 +111,7 @@ class TransactionController {
                 category:asset?.category || 'null',
                 assetPrice: item?.assetPrice,
                 assetAddress: asset?.address,
+                assetOriginAddress: asset?.originAddress,
                 assetContractName: asset?.contract_name,
                 quantityIsDecimal: asset?.data.quantityIsDecimal
             }});
