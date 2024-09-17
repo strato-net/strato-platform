@@ -13,11 +13,10 @@ where
 import Blockchain.KafkaTopics (lookupTopic)
 import Control.Monad.Composable.Kafka
 import Data.Binary
-import qualified Network.Kafka.Protocol as KP
 
-indexEventsTopicName :: KP.TopicName
+indexEventsTopicName :: TopicName
 indexEventsTopicName = lookupTopic "indexevents"
 
 produceIndexEvents :: (Binary a, HasKafka m) =>
-                      [a] -> m [KP.ProduceResponse]
+                      [a] -> m [ProduceResponse]
 produceIndexEvents = produceItems indexEventsTopicName

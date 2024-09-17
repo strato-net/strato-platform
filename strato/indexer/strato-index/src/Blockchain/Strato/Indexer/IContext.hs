@@ -10,7 +10,7 @@ where
 
 import Blockchain.Strato.Indexer.Kafka
 import Control.Exception
-import Network.Kafka.Protocol
+import Control.Monad.Composable.Kafka
 
 newtype API a = API { unAPI :: a }
 
