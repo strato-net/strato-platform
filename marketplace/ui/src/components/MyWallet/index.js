@@ -80,9 +80,9 @@ const MyWallet = ({ user }) => {
         key: "strats",
         asset: "STRATS",
         image: Images.logo,
-        quantity: stratsBalance,
+        quantity: formatNumber(stratsBalance),
         price: "$0.01",
-        value: `$${(stratsBalance * 0.01).toFixed(2)}`,
+        value: `$${formatNumber((stratsBalance * 0.01).toFixed(2))}`,
         gainLoss: "-",
         address: null,
       });
