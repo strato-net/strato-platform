@@ -25,6 +25,7 @@ import           Executable.StratoP2P
 import           BlockApps.Init
 import           BlockApps.Logging as BL
 import           Data.IORef
+import           Instrumentation
 
 main :: IO ()
 main = runLoggingT initP2P
@@ -32,17 +33,17 @@ main = runLoggingT initP2P
 initP2P :: LoggingT IO ()
 initP2P = labelTheThread "initP2P" $ do
   liftIO $ blockappsInit "strato_p2p"
+  liftIO $ runInstrumentation "strato-p2p"
   liftIO $ resetPeers
   _ <- liftIO $ $initHFlags "Strato P2P"
   setParticipationMode flags_participationMode
   cfg <- initConfig flags_maxReturnedHeaders
-  c <- initContext
-  let sSource  = seqEventNotificationSource $ contextKafkaState c
+  let sSource = seqEventNotificationSource . contextKafkaState
       runner f = do
         c' <- initContext
         ctx <- liftIO $ newIORef c'
         let cfg' = cfg { configContext = ctx }
-        runContextM cfg' $ f sSource
+        runContextM cfg' . f $ sSource c'
   liftIO $
     race_
       (run 10248 $ prometheus def p2pApp)

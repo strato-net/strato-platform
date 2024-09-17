@@ -20,6 +20,9 @@ newtype Gas = Gas Integer
   deriving anyclass (NFData)
   deriving (Show, Read, Enum, Eq, Ord, Generic)
 
+getGasValue :: Gas -> Integer
+getGasValue (Gas n) = n
+
 instance Arbitrary Gas where arbitrary = Gas <$> arbitrary
 
 instance ToJSON Gas where

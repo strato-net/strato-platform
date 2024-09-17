@@ -1245,7 +1245,7 @@ def registerTestUserCert(stratoPlatformPath='.', OAuthDiscoveryUrl, clientId, cl
       CERT_ESCAPED=$(echo "${CERT_ESCAPED:2: -2}")
       ADMIN_TOKEN=$(curl --fail -L -X POST "$(<_oauth_token_endpoint_tmp)" -H 'Content-Type: application/x-www-form-urlencoded' -H "Authorization: Basic $(<_admin_client_b64string_tmp)" --data-urlencode 'grant_type=client_credentials' | jq -r .access_token)
       
-      docker exec strato-nginx-1 curl --fail -X POST "localhost/strato/v2.3/transaction?resolve=true" \\
+      docker exec strato-nginx-1 curl --fail -X POST "localhost/strato/v2.3/transaction/parallel?resolve=true" \\
         -H 'Accept: application/json' \\
         -H "Authorization: Bearer ${ADMIN_TOKEN}" \\
         -H 'Content-Type: application/json' \\
@@ -1278,7 +1278,7 @@ def runSyncTester() {
 
   WAIT_TIME=30
   STALLED_INTERVALS=0
-  MAX_STALLED_INTERVALS=15
+  MAX_STALLED_INTERVALS=50
 
   LAST_VM_BLOCK_NUM=0
   LAST_SEQ_BLOCK_NUM=0

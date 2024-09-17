@@ -51,6 +51,7 @@ import Blockchain.Strato.Model.Account
 import Blockchain.Strato.Model.Address
 import Blockchain.Strato.Model.Class
 import Blockchain.Strato.Model.Code
+import Blockchain.Strato.Model.Delta
 import Blockchain.Strato.Model.Event
 import Blockchain.Strato.Model.ExtendedWord
 import Blockchain.Strato.Model.Gas
@@ -63,6 +64,7 @@ import qualified Blockchain.Stream.VMEvent as VME
 import Blockchain.VMContext
 import Blockchain.VMOptions
 import Control.Applicative
+import Control.Arrow ((***))
 import Control.DeepSeq (force)
 import Control.Exception (throw)
 import Control.Lens hiding (Context, assign, from, to)
@@ -368,6 +370,7 @@ create' creator maybeCodePtr originAddress issuerAcct issuerName newAccount ch c
   solidVMBreakpoint emptySourceAnnotation -- just to force a resume at the end of the transaction
   finalEvs <- Mod.get (Mod.Proxy @(Q.Seq Event))
   finalAct <- Mod.get (Mod.Proxy @Action)
+  let ((newV, remV), (newC, revC)) = (fromDelta *** fromDelta) . getDeltasFromEvents $ toList finalEvs
   return
     ExecResults
       { erRemainingTxGas = 0, --Just use up all the allocated gas for now....
@@ -383,11 +386,15 @@ create' creator maybeCodePtr originAddress issuerAcct issuerName newAccount ch c
         erKind = SolidVM,
         erPragmas = CC._pragmas cc,
         erCreator = issuerName,
-        erAppName = parentName'
+        erAppName = parentName',
+        erNewValidators = newV,
+        erRemovedValidators = remV,
+        erNewCerts = newC,
+        erRevokedCerts = revC
       }
 
 call ::
-  (SolidVMBase m) =>
+  SolidVMBase m =>
   Bool ->
   Bool ->
   Bool ->
@@ -449,6 +456,7 @@ call _ _ _ isRCC _ blockData _ _ codeAddress sender' _ _ _ availableGas origin' 
     solidVMBreakpoint emptySourceAnnotation -- just to force a resume at the end of the transaction
     finalAct <- Mod.get (Mod.Proxy @Action)
     finalEvs <- Mod.get (Mod.Proxy @(Q.Seq Event))
+    let ((newV, remV), (newC, revC)) = (fromDelta *** fromDelta) . getDeltasFromEvents $ toList finalEvs
 
     return $
       ExecResults
@@ -465,7 +473,11 @@ call _ _ _ isRCC _ blockData _ _ codeAddress sender' _ _ _ availableGas origin' 
           erKind = SolidVM,
           erPragmas = [],
           erCreator = creator,
-          erAppName = appName
+          erAppName = appName,
+          erNewValidators = newV,
+          erRemovedValidators = remV,
+          erNewCerts = newC,
+          erRevokedCerts = revC
         }
 
 call' ::
@@ -1342,7 +1354,15 @@ runStatement st@(CC.EmitStatement eventName exptups pos) = do
                           _ -> pure ""
                   )
           -- pair up field names with values one-by-one (no type checking tho, lol)
-          let pairs = zip (map (T.unpack . fst) $ CC._eventLogs ev) expStrs
+          -- let pairs = zip (map (T.unpack . fst) $ CC._eventLogs ev) expStrs
+
+          let evArgs = zipWith (\(CC.EventLog name _ (CC.IndexedType _ idxType)) value -> 
+                        (T.unpack name, value, if isTypeArray idxType then "Array" else "Other")) 
+                     (CC._eventLogs ev) expStrs
+                where
+                  isTypeArray :: SVMType.Type -> Bool
+                  isTypeArray (SVMType.Array _ _) = True
+                  isTypeArray _ = False
 
           multilineLog "event/emit/versioning" $
             boringBox
@@ -1354,7 +1374,7 @@ runStatement st@(CC.EmitStatement eventName exptups pos) = do
               ]
 
           bHash <- blockHeaderHash . Env.blockHeader <$> getEnv
-          addEvent $ Event bHash ctrName parentName (labelToString $ CC._contractName curCnct) account eventName pairs
+          addEvent $ Event bHash ctrName parentName (labelToString $ CC._contractName curCnct) account eventName evArgs
           return Nothing
 runStatement (CC.UncheckedStatement code pos) = do
   solidVMBreakpoint pos
@@ -1495,7 +1515,7 @@ decrementGas !gas = do
     then do
       let msg = "out of gas: " ++ show gasLeft' ++ " < " ++ show gas
       liftIO $ putStrLn $ C.red $ msg
-      tooMuchGas (show (_gasInitialAllotment gasInfo')) gasInfo'
+      tooMuchGas (getGasValue $ _gasInitialAllotment gasInfo') (getGasValue gasUsed')
     else do
       return ()
 expToVar' :: MonadSM m => CC.Expression -> Maybe SVMType.Type -> m Variable

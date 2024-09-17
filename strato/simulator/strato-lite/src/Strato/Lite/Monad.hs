@@ -1470,33 +1470,6 @@ createPeer privKey selfId initialValidators' extraCerts inet name ipAsText@(IPAs
                               Just (FalseOrgNameChains s) -> M.insert cm (FalseOrgNameChains $ Set.insert chainId s) m
                           )
                      atomically . writeTQueue unseqSource . (: []) . UnseqEvent $ IENewChainOrgName chainId cm
-                   ValidatorAdded bHash cm -> do
-                     p2pValidators %= Set.insert cm
-                     atomically . writeTQueue unseqSource . (: []) . UnseqEvent $ IEValidatorAdded bHash cm
-                   ValidatorRemoved bHash cm -> do
-                     p2pValidators %= Set.delete cm
-                     atomically . writeTQueue unseqSource . (: []) . UnseqEvent $ IEValidatorRemoved bHash cm
-                   RegisterCertificate addr certState@(X509CertInfoState _ _ _ _ o u c) -> do
-                     let setOrg = Org (T.pack o) True
-                         setOrgUnit = OrgUnit (T.pack o) (T.pack $ fromMaybe "Nothing" u) True
-                         setCommonName = CommonName (T.pack o) (T.pack $ fromMaybe "Nothing" u) (T.pack c) True
-                     parsedSetMap
-                       %= ( \m -> case ((M.lookup setOrg m), (M.lookup setOrgUnit m)) of
-                              (Just _, Just mems) -> case setCommonName `elem` mems of
-                                True -> m
-                                False -> M.insert setOrgUnit (mems ++ [setCommonName]) m
-                              (Just units, Nothing) -> do
-                                let stageOne = M.insert setOrg (units ++ [setOrgUnit]) m
-                                M.insert setOrgUnit [setCommonName] stageOne
-                              (Nothing, Just _) -> m
-                              (Nothing, Nothing) -> do
-                                let stageOne = M.insert setOrg [setOrgUnit] m
-                                M.insert setOrgUnit [setCommonName] stageOne
-                          )
-                     x509certMap %= M.insert addr certState
-                     let theParsedSet = CommonName ((T.pack . X509.orgName) certState) (T.pack $ fromMaybe "Nothing" $ X509.orgUnit certState) ((T.pack . X509.commonName) certState) True
-                     parsedSetToX509Map %= M.insert theParsedSet certState
-                   CertificateRevoked _ -> pure () --(Right addr) -> pure ()
                    TerminateChain _ -> pure ()
                    PutLogDB _ -> pure ()
                    PutEventDB _ -> pure ()

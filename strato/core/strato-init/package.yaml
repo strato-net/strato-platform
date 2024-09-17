@@ -63,11 +63,9 @@ library:
   - text
   - transformers
   - turtle
-  - universum
   - unliftio
   - unliftio-core
   - vm-tools
-  - x509-certs
   - yaml
   - ordered-containers
 
@@ -94,7 +92,6 @@ executables:
       - strato-genesis
       - strato-init
       - strato-model
-      - x509-certs
     other-modules: []
 
 tests:
