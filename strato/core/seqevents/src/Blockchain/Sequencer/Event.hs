@@ -8,7 +8,6 @@
 
 module Blockchain.Sequencer.Event where
 
-import BlockApps.X509.Certificate
 import qualified Blockchain.Blockstanbul as PBFT
 import qualified Blockchain.Data.Block as BDB
 import Blockchain.Data.BlockHeader
@@ -27,7 +26,6 @@ import Blockchain.Strato.Model.ExtendedWord (Word256)
 import Blockchain.Strato.Model.Keccak256 (Keccak256)
 import Blockchain.Strato.Model.MicroTime
 import Blockchain.Strato.Model.StateRoot
-import Blockchain.Strato.Model.Validator
 import Control.DeepSeq
 import Control.Lens
 import Data.Aeson hiding (encode)
@@ -62,11 +60,7 @@ data IngestEvent
   = IETx Timestamp IngestTx
   | IEBlock IngestBlock
   | IEGenesis IngestGenesis
-  | IENewCertRegistered A.Address X509CertInfoState
-  | IECertRevoked A.Address
   | IENewChainOrgName Word256 ChainMemberParsedSet
-  | IEValidatorAdded Keccak256 Validator
-  | IEValidatorRemoved Keccak256 Validator
   | IEBlockstanbul PBFT.WireMessage
   | IEForcedConfigChange PBFT.ForcedConfigChange
   | IEValidatorBehavior PBFT.ForcedValidatorChange
@@ -83,11 +77,7 @@ data IngestEventType
   | IETBlock
   | IETPreprepareResponse
   | IETGenesis
-  | IETNewCertRegistered
-  | IETCertRevoked
   | IETNewChainOrgName
-  | IETValidatorAdded
-  | IETValidatorRemoved
   | IETBlockstanbul
   | IETForcedConfigChange
   | IETValidatorBehavior
@@ -103,11 +93,7 @@ iEventType = \case
   IETx {} -> IETTransaction
   IEBlock {} -> IETBlock
   IEGenesis {} -> IETGenesis
-  IENewCertRegistered {} -> IETNewCertRegistered
-  IECertRevoked {} -> IETCertRevoked
   IENewChainOrgName {} -> IETNewChainOrgName
-  IEValidatorAdded {} -> IETValidatorAdded
-  IEValidatorRemoved {} -> IETValidatorRemoved
   IEBlockstanbul {} -> IETBlockstanbul
   IEForcedConfigChange {} -> IETForcedConfigChange
   IEValidatorBehavior {} -> IETValidatorBehavior
@@ -122,11 +108,7 @@ instance Format IngestEvent where
   format (IETx ts o) = show ts ++ " " ++ format o
   format (IEBlock o) = format o
   format (IEGenesis o) = show o
-  format (IENewCertRegistered a e) = intercalate ", " [CL.yellow $ format a, show e]
-  format (IECertRevoked a) = CL.yellow $ format a
   format (IENewChainOrgName c cm) = intercalate ", " [CL.yellow $ format c, format cm]
-  format (IEValidatorAdded b a) = intercalate ", " [CL.yellow $ format b, CL.yellow $ format a]
-  format (IEValidatorRemoved b a) = intercalate ", " [CL.yellow $ format b, CL.yellow $ format a]
   format (IEBlockstanbul o) = format o
   format (IEForcedConfigChange o) = format o
   format (IEValidatorBehavior o) = show o
@@ -141,11 +123,7 @@ instance ShowConstructor IngestEvent where
   showConstructor IETx{} = "IETx"
   showConstructor IEBlock{} = "IEBlock"
   showConstructor IEGenesis{} = "IEGenesis"
-  showConstructor IENewCertRegistered{} =  "IENewCertRegistered"
-  showConstructor IECertRevoked{} =  "IECertRevoked"
   showConstructor IENewChainOrgName{} = "IENewChainOrgName"
-  showConstructor IEValidatorAdded{} = "IEValidatorAdded"
-  showConstructor IEValidatorRemoved{} = "IEValidatorRemoved"
   showConstructor IEBlockstanbul{} = "IEBlockstanbul"
   showConstructor IEForcedConfigChange{} = "IEForcedConfigChange"
   showConstructor IEValidatorBehavior{} = "IEValidatorBehavior"
@@ -170,7 +148,7 @@ data IngestBlock = IngestBlock
     ibReceiptTransactions :: [TX.Transaction],
     ibBlockUncles :: [BlockHeader]
   }
-  deriving (Eq, Read, Show, GHCG.Generic)
+  deriving (Eq, Show, GHCG.Generic)
 
 data IngestGenesis = IngestGenesis
   { igOrigin :: TO.TXOrigin,
@@ -185,7 +163,7 @@ data SequencedBlock = SequencedBlock
     sbReceiptTransactions :: [OutputTx],
     sbBlockUncles :: [BlockHeader]
   }
-  deriving (Read, Show, GHCG.Generic)
+  deriving (Show, GHCG.Generic)
 
 data JsonRpcCommand
   = JRCGetBalance {jrcAddress :: A.Address, jrcId :: String, jrcBlockString :: String}
@@ -299,7 +277,7 @@ data OutputBlock = OutputBlock
     obReceiptTransactions :: [OutputTx],
     obBlockUncles :: [BlockHeader]
   }
-  deriving (Eq, Read, Show, GHCG.Generic, Data)
+  deriving (Eq, Show, GHCG.Generic)
 
 data OutputBlock' = OutputBlock'
   { ob'Origin :: TO.TXOrigin,
@@ -449,7 +427,7 @@ blockHashBS :: SequencedBlock -> BS.ByteString
 blockHashBS = B.toStrict . encode . sbHash
 
 sequencedBlockDifficulty :: SequencedBlock -> Integer
-sequencedBlockDifficulty = difficulty . sbBlockData
+sequencedBlockDifficulty = getBlockDifficulty . sbBlockData
 
 outputBlockHash :: OutputBlock -> Keccak256
 outputBlockHash = blockHeaderHash . obBlockData

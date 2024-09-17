@@ -6,6 +6,7 @@
 {-# LANGUAGE MonoLocalBinds #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE RecordWildCards #-}
+{-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE TupleSections #-}
 {-# LANGUAGE TypeApplications #-}
@@ -68,6 +69,7 @@ import qualified Data.Text as T
 import qualified Data.Text.Encoding as UTF8
 import Debugger
 import Executable.EthereumVM2
+import SolidVM.Model.CodeCollection
 import Text.Format (format)
 
 -- newtype CertRoot = CertRoot { unCertRoot :: MP.StateRoot }
@@ -81,12 +83,12 @@ ethereumVM d = runResourceT $ do
 
     initializeBestBlock
 
-    StateRootMismatch{..} <- runConsume "evm/loop" consumerGroup seqVmEventsTopicName $ \_ seqEvents -> do
+    failures <- runConsume "evm/loop" consumerGroup seqVmEventsTopicName $ \_ seqEvents -> do
         recordBaggerMetrics =<< contextGets _baggerState
         logEventSummaries seqEvents
 
         let !vmInEventBatch = foldr insertInBatch newInBatch seqEvents
-        mSRMismatch <- fmap listToMaybe . runConduit $
+        failures <- fmap concat . runConduit $
           yield vmInEventBatch
             .| handleVmEvents
             .| mapMaybeM routeOutEvent
@@ -94,14 +96,39 @@ ethereumVM d = runResourceT $ do
 
         loopTimeit "compactContextM" $ compactContextM
 
-        return (mSRMismatch, ())
-    
-    let err = "stateRoot mismatch!!  New stateRoot doesn't match block stateRoot: " ++ format _srmBlockSR 
-    runStateRootMismatchM $ do
-      sd <- runConduit $ stateDiff' Nothing _srmBlockNumber _srmBlockHash _srmBlockSR _srmNewSR
-         .| headDefC (error $ err ++ "\nError encountered while analyzing stateRoot mismatch")
-      $logErrorS "ethereumVM/StateRootMismatch" . T.pack $ formatStateRootMismatch sd
-    error err
+        return (if null failures then Nothing else Just failures, ())
+
+    for_ failures $ \(BlockVerificationFailure bNum bHash bDetails) -> case bDetails of
+      StateRootMismatch BlockDelta{..} -> do
+        let err = "stateRoot mismatch!!  New stateRoot doesn't match block stateRoot: " ++ format _inBlock 
+        runStateRootMismatchM $ do
+          sd <- runConduit $ stateDiff' Nothing bNum bHash _inBlock _derived
+             .| headDefC (error $ err ++ "\nError encountered while analyzing stateRoot mismatch")
+          $logErrorS "ethereumVM/StateRootMismatch" . T.pack $ formatStateRootMismatch sd
+      ValidatorMismatch BlockDelta{..} -> do
+        $logErrorS "ethereumVM/ValidatorMismatch" . T.pack $ "There was a validator mismatch in block #" ++ show bNum ++ ", hash " ++ format bHash 
+        $logErrorS "ethereumVM/ValidatorMismatch" . T.pack $ "New validators found in block header:        " ++ show (fst _inBlock) 
+        $logErrorS "ethereumVM/ValidatorMismatch" . T.pack $ "New validators found from running block:     " ++ show (fst _derived) 
+        $logErrorS "ethereumVM/ValidatorMismatch" . T.pack $ "Removed validators found in block header:    " ++ show (snd _inBlock) 
+        $logErrorS "ethereumVM/ValidatorMismatch" . T.pack $ "Removed validators found from running block: " ++ show (snd _derived) 
+      CertRegistrationMismatch BlockDelta{..} -> do
+        $logErrorS "ethereumVM/CertRegistrationMismatch" . T.pack $ "There was a cert mismatch in block #" ++ show bNum ++ ", hash " ++ format bHash 
+        $logErrorS "ethereumVM/CertRegistrationMismatch" . T.pack $ "New certs found in block header:        " ++ show (fst _inBlock) 
+        $logErrorS "ethereumVM/CertRegistrationMismatch" . T.pack $ "New certs found from running block:     " ++ show (fst _derived) 
+        $logErrorS "ethereumVM/CertRegistrationMismatch" . T.pack $ "Removed certs found in block header:    " ++ show (snd _inBlock) 
+        $logErrorS "ethereumVM/CertRegistrationMismatch" . T.pack $ "Removed certs found from running block: " ++ show (snd _derived) 
+      VersionMismatch BlockDelta{..} -> do
+        $logErrorS "ethereumVM/InvalidVersion" . T.pack $ "There was a block header version mismatch in block #" ++ show bNum ++ ", hash " ++ format bHash 
+        $logErrorS "ethereumVM/InvalidVersion" . T.pack $ "Block header version found in block header:      " ++ show _inBlock
+        $logErrorS "ethereumVM/InvalidVersion" . T.pack $ "Latest supported block header version by system: " ++ show _derived
+      UnclesMismatch BlockDelta{..} -> do
+        $logErrorS "ethereumVM/UnclesMismatch" . T.pack $ "There was a mismatch between uncles in block #" ++ show bNum 
+        $logErrorS "ethereumVM/UnclesMismatch" . T.pack $ "Received uncle hashes: " ++ format _inBlock 
+        $logErrorS "ethereumVM/UnclesMismatch" . T.pack $ "But expected: " ++ format _derived
+      UnexpectedBlockNumber BlockDelta{..} -> do
+        $logErrorS "ethereumVM/UnexpectedBlockNumber" . T.pack $ "Expected block number: " ++ show _derived 
+        $logErrorS "ethereumVM/UnexpectedBlockNumber" . T.pack $ "But actually received: " ++ show _inBlock
+    error "STRATO vm-runner encountered errors while verifying a block in the chain. Please review the logs above for more information."
 
 initializeBestBlock :: (HasContext m, Bagger.MonadBagger m) => m ()
 initializeBestBlock = do
@@ -130,8 +157,8 @@ outputBlockToContextBestBlockInfo block =
   in ContextBestBlockInfo (blockHeaderHash header) header td txL
 
 logEventSummaries :: MonadLogger m => [VmEvent] -> m ()
-logEventSummaries events = do
-  let names = map getNames events
+logEventSummaries evs = do
+  let names = map getNames evs
       numberedNames = map (\x -> numberIt (length x) (head x)) $ group $ sort names
 
   $logInfoS "logEventSummaries" . T.pack $
@@ -154,8 +181,8 @@ logEventSummaries events = do
 
 -- KAFKA
 
-routeOutEvent :: (MonadLogger m, HasKafka m, HasSQL m, HasContext m, (MP.StateRoot `A.Alters` MP.NodeData) m) => VmOutEvent -> m (Maybe StateRootMismatch)
-routeOutEvent (OutStateRootMismatch srm) = pure $ Just srm
+routeOutEvent :: (MonadLogger m, HasKafka m, HasSQL m, HasContext m, (MP.StateRoot `A.Alters` MP.NodeData) m) => VmOutEvent -> m (Maybe [BlockVerificationFailure])
+routeOutEvent (OutBlockVerificationFailure bvf) = pure $ Just bvf
 routeOutEvent oev = Nothing <$ sendOutEvent oev
 
 sendOutEvent :: (MonadLogger m, HasKafka m, HasSQL m, HasContext m, (MP.StateRoot `A.Alters` MP.NodeData) m) => VmOutEvent -> m ()
@@ -178,9 +205,14 @@ sendOutEvent (OutAction act) = do
                     else Nothing
                 cc = foldr (\ad b -> Action._actionDataCodeCollection ad <> b) mempty $ snd <$> actionDatas
                 abstracts' = foldr (\ad b -> Action._actionDataAbstracts ad <> b) mempty $ snd <$> actionDatas
+                contracts' = (cc ^. contracts) <&> ( (functions .~ M.empty)
+                                                  --  . (constructor .~ Nothing)
+                                                   . (modifiers .~ M.empty)
+                                                   )
+                cc' = emptyCodeCollection & contracts .~ contracts'
              in Just $
                   CodeCollectionAdded
-                    { codeCollection = const () <$> cc,
+                    { codeCollection = const () <$> cc',
                       codePtr = cp,
                       creator = cn,
                       application = n,
@@ -215,7 +247,7 @@ sendOutEvent (OutASM asm) =
         ]
 sendOutEvent (OutJSONRPC s b) = liftIO $ produceResponse s b
 sendOutEvent (OutBlock o) = void $ writeUnseqEvents [IEBlock $ blockToIngestBlock TO.Quarry $ outputBlockToBlock o]
-sendOutEvent (OutStateRootMismatch _) = pure ()
+sendOutEvent (OutBlockVerificationFailure _) = pure ()
 sendOutEvent (OutGetMPNodes mpNodes) = void $ writeUnseqEvents [IEGetMPNodes mpNodes]
 sendOutEvent (OutMPNodesResponse o nds) = void $ writeUnseqEvents [IEMPNodesResponse o nds]
 sendOutEvent (OutPreprepareResponse dec) = void $ writeUnseqEvents [IEPreprepareResponse dec]

@@ -8,9 +8,7 @@ ValidatorRef
 BlockDataRef
     parentHash Keccak256
     unclesHash Keccak256
-    coinbaseOrg Text
-    coinbaseOrgUnit Text
-    coinbaseCommonName Text
+    coinbase Text
     stateRoot StateRoot
     transactionsRoot StateRoot
     receiptsRoot StateRoot
@@ -27,6 +25,46 @@ BlockDataRef
     powVerified Bool
     isConfirmed Bool
     totalDifficulty Integer sqltype=numeric(1000,0)
+    version Int
+    deriving Eq Read Show
+
+BlockValidatorRef
+    blockDataRefId BlockDataRefId
+    commonName Text
+    deriving Eq Read Show
+
+ValidatorDeltaRef
+    blockDataRefId BlockDataRefId
+    commonName Text
+    direction Bool
+    deriving Eq Read Show
+
+CertificateAddedRef
+    blockDataRefId BlockDataRefId
+    commonName Text
+    userAddress Address
+    certString Text
+    deriving Eq Read Show
+
+CertificateRevokedRef
+    blockDataRefId BlockDataRefId
+    userAddress Address
+    deriving Eq Read Show
+
+ProposalSignatureRef
+    blockDataRefId BlockDataRefId
+    signer Address
+    r Word256
+    s Word256
+    v Word8
+    deriving Eq Read Show
+
+CommitmentSignatureRef
+    blockDataRefId BlockDataRefId
+    signer Address
+    r Word256
+    s Word256
+    v Word8
     deriving Eq Read Show
 
 BlockTransaction

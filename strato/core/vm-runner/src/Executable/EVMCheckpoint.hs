@@ -18,7 +18,7 @@ data EVMCheckpoint = EVMCheckpoint
   { checkpointHead :: BlockHeader,
     ctxBestBlockInfo :: ContextBestBlockInfo
   }
-  deriving (Read, Show, Generic)
+  deriving (Show, Generic)
 
 instance Format EVMCheckpoint where -- todo add format instance for ContextBestBlockInfo and show it here as well.
   format (EVMCheckpoint header _) =

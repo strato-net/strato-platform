@@ -47,7 +47,7 @@ data AggregateAction = AggregateAction
     actionCodeHash :: CodePtr,
     actionCodeCollection :: CodeCollection,
     actionStorage :: Action.DataDiff,
-    actionAbstracts :: Map (Account, Text) (Text, Text),
+    actionAbstracts :: Map (Account, Text) (Text, Text, [Text]),
     actionMappings :: [Text],
     actionArrays :: [Text],
     actionType :: Action.CallType,
@@ -61,7 +61,8 @@ data AggregateEvent = AggregateEvent
     eventBlockNumber :: Integer,
     eventTxHash :: Keccak256,
     eventTxSender :: Account,
-    eventAbstracts :: Map (Account, Text) (Text, Text),
+    eventIndex :: Int,
+    eventAbstracts :: Map (Account, Text) (Text, Text, [Text]),
     eventEvent :: Event
   }
   deriving (Show, Generic, NFData, ToJSON, FromJSON)
