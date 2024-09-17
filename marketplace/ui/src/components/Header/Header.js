@@ -214,7 +214,8 @@ const HeaderComponent = ({ user, loginUrl, showMenu, handleSubMenu, handleMenuTa
           key: '2',
           onClick: async () => {
             const stratAddress = await marketplaceActions.fetchStratsAddress(marketplaceDispatch)
-            navigate(`${routes.Transactions.url}?address=${stratAddress}`)
+            const randomRefresh = Math.floor(Math.random() * 1000000);
+            navigate(`${routes.Transactions.url}?address=${stratAddress}&refresh=${randomRefresh}`)
           },
           label: (
             <div>

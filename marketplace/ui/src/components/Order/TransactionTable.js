@@ -76,11 +76,13 @@ const TransactionTable = ({ user, download, isAllOrdersLoading }) => {
     const searchParams = new URLSearchParams(location.search);
     const urlType = searchParams.get("type");
     const urlDate = searchParams.get("date");
-  
+    const urlRefresh = searchParams.get("refresh");
+    const urlAddress = searchParams.get("address");
     // Update state based on URL params, but skip empty values
     setType(urlType && urlType !== "all" ? urlType : "");
     setDateQuery(urlDate || "");
-    setOriginAddress(searchParams.get("address") || "");
+    setOriginAddress(urlAddress || "");
+    urlRefresh && setSearch(" ")
   }, [location.search]);
   
 
@@ -96,6 +98,7 @@ const TransactionTable = ({ user, download, isAllOrdersLoading }) => {
       filteredData = filteredData.filter((item) => item.assetAddress === originAddress);
       setSearch(filteredData[0].assetName)
       setOriginAddress("")
+      return;
     }
   
     // Search filter
