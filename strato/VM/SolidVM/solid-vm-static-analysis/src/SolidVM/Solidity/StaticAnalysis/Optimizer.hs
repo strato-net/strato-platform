@@ -14,8 +14,9 @@ import Control.Monad.Reader
 import Control.Monad.Trans.State
 import Data.Decimal
 import Data.Functor.Compose
+import Data.List (find)
 import Data.Map as M
-import Data.Maybe (fromMaybe)
+import Data.Maybe (fromMaybe, isJust)
 import SolidVM.Model.CodeCollection
 import SolidVM.Model.SolidString (SolidString)
 import qualified SolidVM.Model.Type as SVMType
@@ -269,7 +270,12 @@ optimizeExpression (FunctionCall x1 (MemberAccess x2 (Variable x3 nam) "unwrap")
       OrderedArgs [x] | M.member nam (_userDefined c) -> optimizeExpression x Nothing
       _ -> pure $ FunctionCall x1 (MemberAccess x2 (Variable x3 nam) "unwrap") args
     Nothing -> pure $ FunctionCall x1 (MemberAccess x2 (Variable x3 nam) "unwrap") args
-
+optimizeExpression n@(NumberLiteral x val _) (Just (SVMType.Decimal)) = do
+  cc <- asks codeCollection
+  let pragmaCheck = find (== ("solidvm", "11.5")) $ _pragmas cc
+  if (isJust pragmaCheck)
+    then pure $ DecimalLiteral x $ WrappedDecimal $ Decimal 0 val
+    else pure n
 --This needs further research before letting loose on the code base
 --This function as of now is neutured
 optimizeExpression (Variable x name) _ = do

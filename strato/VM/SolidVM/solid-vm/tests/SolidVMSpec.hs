@@ -13,6 +13,7 @@
 {-# LANGUAGE UndecidableInstances #-}
 
 {-# OPTIONS_GHC -fno-warn-orphans #-}
+{-# OPTIONS_GHC -fno-warn-unused-imports #-}
 
 module SolidVMSpec where
 
@@ -80,7 +81,7 @@ import qualified LabeledError
 import qualified Numeric (readHex, showHex)
 import SolidVM.Model.SolidString
 import SolidVM.Model.Storable as MS
-import Test.Hspec (Selector, Spec, anyException, it, pendingWith, shouldThrow, xdescribe, xit)
+import Test.Hspec (Selector, Spec, anyException, it, pendingWith, shouldThrow, xdescribe, xit, fit)
 import Test.Hspec.Expectations.Lifted
 import Text.Printf
 import Text.RawString.QQ
@@ -9147,3 +9148,13 @@ contract qq {
 |]
     getFields ["x"]
       `shouldReturn` [BInteger 5])
+
+  it "can now assign number literals as decimals rather than integer" . runTest $ do
+    runBS [r| 
+pragma solidvm 11.5;
+contract qq {
+    decimal a = 3;
+  }
+|]
+    getFields ["a"]
+      `shouldReturn` [BDecimal "3"]
