@@ -9,7 +9,11 @@ class IssuerStatusController {
       const {dapp, body} = req;
       const {emailAddr, commonName} = body;
       try {
-        const contents = 'The user <b>'+commonName+'</b> is requesting to be an authorized issuer on Strato Mercata. You may get in contact with them by reaching out at '+emailAddr+'. You may grant or deny issuer authorization at the admin dashboad: '+config.serverHost+'/admin.';
+        const contents = `
+        <p>The user <b>${commonName}</b> is requesting to be an authorized issuer on Strato Mercata.</p> 
+        <p>You may get in contact with them by reaching out at ${emailAddr}.</p>
+        <p>You may grant or deny issuer authorization at the admin dashboard: ${config.serverHost}/admin.</p>
+      `;
         await sendEmail('sales@blockapps.net', commonName + ' Requesting Issuer Status', contents);
       } catch {
         throw new rest.RestError(RestStatus.BAD_GATEWAY,
