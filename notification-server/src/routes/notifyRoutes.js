@@ -33,7 +33,7 @@ router.post("/notify", async (req, res) => {
         emails.push(username);
       } else {
         // If the username is not a valid email, fetch the corresponding email using getEmailsByUsernames
-        const fetchedEmails = await getEmailsByUsernames(username);
+        const fetchedEmails = await getEmailsByUsernames([username]);
         emails = emails.concat(fetchedEmails);
       }
     }
