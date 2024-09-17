@@ -136,6 +136,35 @@ async function getOwnershipHistory(user, args, options) {
   return history;
 }
 
+async function getAllItemTransferEvents(admin, newOwner, assetName, options) {
+  try {
+    const contractName = "Mercata";
+    const defaultOptions = {
+      ...options,
+      chainIds: [],
+      cacheNonce: true,
+    };
+
+    const contract = {
+      getAllItemTransferEvents: function (args, options = defaultOptions) {
+        const getOptions = { ...options, app: contractName };
+        return inventoryJs.getAllItemTransferEvents(admin, args, getOptions);
+      }
+    };
+
+    const transferEventsArgs = {
+      newOwner: newOwner,
+      assetName: assetName,
+    };
+
+    const transferEvents = await contract.getAllItemTransferEvents(transferEventsArgs, defaultOptions);
+    return transferEvents;
+  } catch (error) {
+    console.error("Error fetching item transfer events:", error);
+    return null;
+  }
+}
+
 async function getWalletAssets(admin, args = {}, options) {
   const inventoryResults = await inventoryJs.getAll(
     admin,
@@ -173,9 +202,26 @@ async function getWalletAssets(admin, args = {}, options) {
             options
           );
         }
+
+        // Check if all prices are 0 or null
+        let transferPrice = 0;
+        if (
+          (!inventory.price || inventory.price === 0) &&
+          (!highestMarketplacePrice || highestMarketplacePrice === 0) &&
+          (!lastSoldPrice || lastSoldPrice === 0)
+        ) {
+          // Get item transfer events
+          const transferEvents = await getAllItemTransferEvents(admin, admin.address, inventory.name, options);
+
+          // Use the price from transfer events if available
+          if (transferEvents && transferEvents.transfers && transferEvents.transfers.length > 0) {
+            transferPrice = transferEvents.transfers[0].price || 0;
+          }
+        }
         
         // Determine the final price (highest of inventory price, marketplace price, and last sold price)
         const finalPrice = Math.max(
+          transferPrice || 0,
           inventory.price || 0,
           highestMarketplacePrice || 0,
           lastSoldPrice || 0
@@ -195,6 +241,7 @@ async function getWalletAssets(admin, args = {}, options) {
           originalPrice: inventory.price, // Keep the original price for reference
           lastSoldPrice,
           highestMarketplacePrice,
+          transferPrice,
           gainLossPercentage,
         };
       } catch (error) {
