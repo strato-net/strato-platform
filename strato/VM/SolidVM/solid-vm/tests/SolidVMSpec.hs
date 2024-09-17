@@ -9153,8 +9153,20 @@ contract qq {
     runBS [r| 
 pragma solidvm 11.5;
 contract qq {
-    decimal a = 3;
+  decimal a = 3;
+}
+|]
+    getFields ["a"]
+      `shouldReturn` [BDecimal "3"]
+
+  it "can test stuff" . runTest $ do
+    runBS [r| 
+pragma solidvm 11.5;
+contract qq {
+  decimal a = 3;
+  constructor() {
   }
+}
 |]
     getFields ["a"]
       `shouldReturn` [BDecimal "3"]

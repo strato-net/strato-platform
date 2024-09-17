@@ -2171,3 +2171,45 @@ contract qq {
   }
   |]
       length anns `shouldBe` 0
+
+    it "cannot assign an int variable to a decimal on the contract level" $ do
+      anns <-
+        liftIO $
+          runTypechecker
+            [r|
+  contract qq {
+    uint a = 5;
+    decimal b = a;
+    constructor(){
+    }
+  }
+  |]
+      length anns `shouldBe` 1
+
+    it "cannot assign an int variable to a decimal within a function" $ do
+      anns <-
+        liftIO $
+          runTypechecker
+            [r|
+  contract qq {
+    decimal b;
+    constructor(uint _b){
+      b = _b;
+    }
+  }
+  |]
+      length anns `shouldBe` 1
+
+    it "cannot assign an int variable to a decimal within a function part 2" $ do
+      anns <-
+        liftIO $
+          runTypechecker
+            [r|
+  contract qq {
+    constructor(){
+      uint b = 5;
+      decimal c = b;
+    }
+  }
+  |]
+      length anns `shouldBe` 1
