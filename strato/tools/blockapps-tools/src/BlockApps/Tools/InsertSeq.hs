@@ -20,7 +20,7 @@ import Blockchain.TypeLits
 import Data.Aeson
 import qualified Data.ByteString.Char8 as C8
 import qualified Data.ByteString.Lazy.Char8 as BLC
-import Network.Kafka.Protocol as KP
+--import Network.Kafka.Protocol as KP
 import System.Exit
 import Text.Printf
 
@@ -37,7 +37,7 @@ validatorBehavior valB = do
   printf "Validator behavior = %s \n" $ show valB
   let msg = IEValidatorBehavior . ForcedValidator $ valB
   print msg
-  resp <- runKafkaMConfigured (KP.KString "validator-bevaiour-flag") $ do
+  resp <- runKafkaMConfigured "validator-bevaiour-flag" $ do
     writeUnseqEvents [msg]
   print resp
 
@@ -46,7 +46,7 @@ deleteDepBlock k = do
   printf "deleteDepBlock = %s \n" $ k
   let msg = IEDeleteDepBlock $ keccak256FromHex k
   print msg
-  resp <- runKafkaMConfigured (KP.KString "delete-dep-block") $ do
+  resp <- runKafkaMConfigured "delete-dep-block" $ do
     writeUnseqEvents [msg]
   print resp
 

@@ -39,8 +39,6 @@ library:
     - leveldb-haskell
     - memory
     - merkle-patricia-db
-    - milena
-    - milena-tools
     - monad-alter
     - monad-logger
     - monad-loops
