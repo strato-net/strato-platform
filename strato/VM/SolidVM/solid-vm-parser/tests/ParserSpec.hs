@@ -9,6 +9,7 @@ import Data.Source.Annotation as SA
 import Data.Source.Position as SP
 import SolidVM.Model.CodeCollection.Statement
 import SolidVM.Model.Type
+import SolidVM.Solidity.Parse.Declarations
 import SolidVM.Solidity.Parse.Lexer
 import SolidVM.Solidity.Parse.ParserTypes
 import SolidVM.Solidity.Parse.Statement
@@ -129,18 +130,18 @@ spec = do
   --               ]
   --   forM_ cases $ \(input, want) -> do
   --     it ("can parse " ++ input) $ parseDecl input `shouldBe` Right ((show want), want)
-  {-}
 
+  {-
   --"contract qq {\n  uint x = 3;\n  modifier myModifier(uint _x) {\n      require(_x == 3 , string.concat('x is not 3 : ', string(_x)));\n    x = 4;    _;\n    require(x == 5 , 'x is not 5');\n  }\n\n  constructor() public myModifier(3) {\n    x = 5;\n    return;\n  }\n}\n"
     describe "Contract Parsing" $ do
-      let parseContract = runParser solidityContract "" ""
-          cases = [ ( "contract qq {\n  uint constant c = 2022;\n  constructor() public\n {\n    c = 666;\n  }\n}", DummySourceUnit)
+      let parseContract = runParser solidityContract initialParserState ""
+          ccases = [ ( "contract qq {\n  decimal b = 2;\n  constructor()\n {}\n}", DummySourceUnit)
                   --, ("contract qq {\n  uint x;\n  modifier myModifier() {\n      require(false, 'bigTest');\n  }\n  function a() public myModifier() returns (bool) {\n    x = 5;\n    return true;\n  }\n}" , DummySourceUnit)
                   ]
-      forM_ cases $ \(input, want) -> do
+      forM_ ccases $ \(input, want) -> do
         it ("can parse " ++ input) $ parseContract input `shouldBe` Right want
-
   -}
+
 
   describe "Statement parsing" $ do
     let parseStatement = fmap (fmap (const ())) . runParser statement initialParserState ""
