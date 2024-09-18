@@ -12,7 +12,6 @@ module Blockchain.Sequencer.Kafka
     writeUnseqEvents,
     writeSeqVmEvents,
     writeSeqP2pEvents,
-    writeUnseqEventsWithLimits,
     emitBlockstanbulMsg,
   )
 where
@@ -24,7 +23,6 @@ import Blockchain.Sequencer.Kafka.Metrics
 import Control.Monad.Change.Modify (Outputs (..))
 import Control.Monad.Composable.Kafka
 import Data.Binary (Binary, encode)
-import qualified Data.ByteString as B
 import qualified Data.ByteString.Lazy as BL
 import qualified Network.Kafka as K
 import qualified Network.Kafka.Producer as KW
@@ -68,11 +66,6 @@ writeSeqP2pEvents events = do
   recordEvents seqP2PWrites events
   execKafka $ KW.produceMessagesAsSingletonSets $
     (K.TopicAndMessage seqP2pEventsTopicName . KW.makeMessage . BL.toStrict . encode) <$> events
-
-writeUnseqEventsWithLimits :: K.Kafka k => [B.ByteString] -> k [ProduceResponse]
-writeUnseqEventsWithLimits events = do
-  KW.produceMessagesAsSingletonSets $
-    (K.TopicAndMessage unseqEventsTopicName . KW.makeMessage) <$> events
 
 readFromTopic' :: (Binary b, HasKafka k) => TopicName -> Offset -> k [b]
 readFromTopic' = fetchItems
