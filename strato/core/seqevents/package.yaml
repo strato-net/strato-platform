@@ -21,7 +21,6 @@ library:
     - kafka-monad
     - lens
     - merkle-patricia-db
-    - milena
     - monad-alter
     - prometheus-client
     - strato-conf

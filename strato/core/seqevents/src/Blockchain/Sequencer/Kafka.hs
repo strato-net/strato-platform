@@ -1,8 +1,6 @@
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE TypeOperators #-}
 
--- {-# OPTIONS -fno-warn-unused-top-binds #-}
-
 module Blockchain.Sequencer.Kafka
   ( assertSequencerTopicsCreation,
     unseqEventsTopicName,
@@ -22,10 +20,7 @@ import Blockchain.Sequencer.Event
 import Blockchain.Sequencer.Kafka.Metrics
 import Control.Monad.Change.Modify (Outputs (..))
 import Control.Monad.Composable.Kafka
-import Data.Binary (Binary, encode)
-import qualified Data.ByteString.Lazy as BL
-import qualified Network.Kafka as K
-import qualified Network.Kafka.Producer as KW
+import Data.Binary (Binary)
 
 unseqEventsTopicName :: TopicName
 unseqEventsTopicName = lookupTopic "unseqevents"
@@ -58,14 +53,12 @@ writeUnseqEvents events = do
 writeSeqVmEvents :: HasKafka k => [VmEvent] -> k [ProduceResponse]
 writeSeqVmEvents events = do
   recordEvents seqVMWrites events
-  execKafka $ KW.produceMessagesAsSingletonSets $
-    (K.TopicAndMessage seqVmEventsTopicName . KW.makeMessage . BL.toStrict . encode) <$> events
+  produceItems seqVmEventsTopicName events
 
 writeSeqP2pEvents :: HasKafka k => [P2pEvent] -> k [ProduceResponse]
 writeSeqP2pEvents events = do
   recordEvents seqP2PWrites events
-  execKafka $ KW.produceMessagesAsSingletonSets $
-    (K.TopicAndMessage seqP2pEventsTopicName . KW.makeMessage . BL.toStrict . encode) <$> events
+  produceItems seqP2pEventsTopicName events
 
 readFromTopic' :: (Binary b, HasKafka k) => TopicName -> Offset -> k [b]
 readFromTopic' = fetchItems
