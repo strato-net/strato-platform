@@ -108,7 +108,7 @@ contract StratPaymentService is PaymentService {
             uint transferFee = 0;
 
             for (uint j = 0; j < _stratsAssetAddresses.length; j++) {
-                STRATS stratAsset = STRATS(_stratsAssetAddresses[j]);
+                STRATSTokens stratAsset = STRATSTokens(_stratsAssetAddresses[j]);
                 require(stratAsset.root == stratAddress, "Asset is not a STRATS asset");
                 stratQuantity = stratAsset.quantity();
 

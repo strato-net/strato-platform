@@ -103,7 +103,8 @@ const CategoryProductList = ({ user }) => {
     // Initially, all subcategories are stored as selected, which occurs when a new category is chosen. 
     // In this context, if both "CarbonDAO" and "CarbonOffset" 
     // are found within unSelectedSubCat, the "Carbon" category is also deselected.
-    if (unSelectedSubCat.includes("CarbonDAO") && unSelectedSubCat.includes("CarbonOffset")) {
+    if ((categoryParam === 'Carbon' && unSelectedSubCat.includes("CarbonDAO") && unSelectedSubCat.includes("CarbonOffset")) ||
+        (categoryParam === 'Tokens' && unSelectedSubCat.length === subCategories.length)) {
       let baseUrl = new URL(`/c/All`, window.location.origin);
 
       const url = baseUrl.pathname + baseUrl.search;
@@ -452,7 +453,7 @@ const AvailabilityFilter = () =>
     {ClearFilterComponent()}
     <div className="bg-white border border-solid border-[#E9E9E9] my-6 mb-24">
 
-      {subCategories?.length !== 0 && category === 'Carbon' && (
+      {subCategories?.length !== 0 && (category === 'Carbon' || category === 'Tokens') && (
         <>
           {DesktopCollapseComponent(
             SubCategoryFilterComponent()
@@ -480,7 +481,7 @@ const AvailabilityFilter = () =>
         </div>
         <Divider className="m-0 mt-3" />
         <>
-          {subCategories?.length > 1 && category === 'Carbon' && MobileCollapseComponent(
+          {subCategories?.length > 1 && (category === 'Carbon' || category === 'Tokens') && MobileCollapseComponent(
             SubCategoryFilterComponent()
           )}
           <Divider className="m-0" />

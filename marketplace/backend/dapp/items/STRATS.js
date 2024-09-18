@@ -5,7 +5,7 @@ import { setSearchQueryOptions, searchOne, searchAll, searchAllWithQueryArgs, wa
 import dayjs from 'dayjs';
 import constants from '../../helpers/constants';
 
-const contractName = "STRATS";
+const contractName = "STRATSTokens";
 const contractFilename = `${util.cwd}/dapp/items/contracts/STRATS.sol`;
 const contractEvents = { OWNERSHIP_UPDATE: "OwnershipUpdate" }
 

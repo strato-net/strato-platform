@@ -5,7 +5,7 @@ import "./Tokens.sol";
 import "../../mercata-base-contracts/Templates/Payments/StratPaymentService.sol";
 
 /// @title A representation of STRATS assets
-contract STRATS is Tokens {
+contract STRATSTokens is Tokens {
     string public paymentServiceCreator;
     string public paymentServiceName;
 
@@ -29,7 +29,7 @@ contract STRATS is Tokens {
     }
     
     function mint(uint _quantity) internal override returns (UTXO) {
-        STRATS newSTRATS = new STRATS(name, description, images, files, fileNames, createdDate, _quantity, status, address(redemptionService), paymentServiceCreator, paymentServiceName);
+        STRATSTokens newSTRATS = new STRATSTokens(name, description, images, files, fileNames, createdDate, _quantity, status, address(redemptionService), paymentServiceCreator, paymentServiceName);
         return UTXO(address(newSTRATS)); 
     }
 
