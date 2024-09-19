@@ -7,13 +7,6 @@ import loadDapp from "../../middleware/loadDappHandler";
 const router = express.Router();
 
 router.get(
-    Offer.export,
-    authHandler.authorizeRequest(),
-    loadDapp,
-    OfferController.export
-)
-
-router.get(
     Offer.get,
     authHandler.authorizeRequest(),
     loadDapp,

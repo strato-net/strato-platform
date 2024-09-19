@@ -187,8 +187,8 @@ export const UserActivity = {
   getAll: '/',
 }
 
-export const Offers = {
-  prefix: '/offers',
+export const Offer = {
+  prefix: '/offer',
   get: '/:address',
   getAll: '/',
   create: '/',
