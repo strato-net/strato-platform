@@ -1160,6 +1160,10 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
         return addresses;
       }, []);
 
+      // if the total order amount is greater than the total STRATS balance, throw an error
+      if (accumulatedTotal < orderTotal) {
+        throw new rest.RestError(RestStatus.BAD_REQUEST, "Insufficient STRATS balance");
+      }
       const createdDate = Math.floor(Date.now() / 1000);
       const paymentParameters = {
         address: paymentService.address,
@@ -1177,7 +1181,7 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
     } catch (error) {
       console.log(error);
       if (error.response) {
-        throw new rest.RestError(error.response.status, error.response.data);
+        throw new rest.RestError(error.response.status, error.response.statusText);
       }
       throw new rest.RestError(RestStatus.BAD_REQUEST, "Error while updating the order");
     }

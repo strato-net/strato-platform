@@ -1,3 +1,4 @@
+const { parse } = require("dotenv");
 const {
   contractName,
   NODE_ENV,
@@ -7,6 +8,13 @@ const {
   testnetMarketplaceUrl,
 } = require("../config");
 
+function uid(prefix = '', digits = 6) {
+  if (digits < 1) digits = 1;
+  if (digits > 16) digits = 16;
+  const random = Math.floor(Math.random() * (10 ** digits));
+  return prefix ? `${prefix}_${random}` : `${random}`;
+}
+
 async function createTransactionPayload(token, toAddress, value) {
   const payload = {
     txs: [
@@ -15,10 +23,12 @@ async function createTransactionPayload(token, toAddress, value) {
           contractName,
           contractAddress:
             NODE_ENV === "prod" ? prodStratsAddress : testnetStratsAddress,
-          method: "transfer",
+          method: "automaticTransfer",
           args: {
-            _to: toAddress,
-            _value: value,
+            _newOwner: toAddress,
+            _price: 0.0001,
+            _quantity: value,
+            _transferNumber: parseInt(uid()),
           },
         },
         type: "FUNCTION",
@@ -58,10 +68,12 @@ async function createTwoTransactionPayload(token, toAddress1, toAddress2, value1
           contractName,
           contractAddress:
             NODE_ENV === "prod" ? prodStratsAddress : testnetStratsAddress,
-          method: "transfer",
+          method: "automaticTransfer",
           args: {
-            _to: toAddress1,
-            _value: value1,
+            _newOwner: toAddress1,
+            _price: 0.0001,
+            _quantity: value1,
+            _transferNumber: parseInt(uid()),
           },
         },
         type: "FUNCTION",
@@ -71,10 +83,12 @@ async function createTwoTransactionPayload(token, toAddress1, toAddress2, value1
           contractName,
           contractAddress:
             NODE_ENV === "prod" ? prodStratsAddress : testnetStratsAddress,
-          method: "transfer",
+          method: "automaticTransfer",
           args: {
-            _to: toAddress2,
-            _value: value2,
+            _newOwner: toAddress2,
+            _price: 0.001,
+            _quantity: value2,
+            _transferNumber: parseInt(uid()),
           },
         },
         type: "FUNCTION",

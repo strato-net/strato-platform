@@ -129,7 +129,8 @@ contract StratPaymentService is PaymentService {
                     break;
                 }
             }
-            require(remainingStratsToTransfer == 0 && remainingFeeToTransfer == 0, "Failed to fulfill STRATS payment");
+            require(remainingStratsToTransfer == 0, err);
+            require(remainingFeeToTransfer == 0, feeErr);
 
             // Transfer assets
             try {

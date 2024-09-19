@@ -61,13 +61,11 @@ def main():
     balances = transform_response_to_tuple_list(response.json())
 
     # print([generate_tx(a, b) for (a, b) in balances])
-    print(headers)
-    res = requests.post(
+    requests.post(
             mercata_node + '/strato/v2.3/transaction?resolve=true',
             headers=headers,
             json={ 'txs': [generate_tx(a, b) for (a, b) in balances] }
         )
-    print(res.content)
 
 if __name__ == "__main__":
     main()
