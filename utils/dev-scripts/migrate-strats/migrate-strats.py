@@ -17,7 +17,7 @@ def transform_response_to_tuple_list(response_data):
 def generate_tx(address, balance):
     return {
         "payload": {
-            "contractName": "STRATS",
+            "contractName": "STRATSToken",
             "contractAddress": strat_address,
             "method": "automaticTransfer",
             "args": {
@@ -26,9 +26,9 @@ def generate_tx(address, balance):
                 "_quantity": balance,
                 "_transferNumber": 0 # TODO same goes for this
 
-            },
-            "type": "FUNCTION"
-        }
+            }
+        },
+        "type": "FUNCTION"
     }
 
 def main():
@@ -51,8 +51,8 @@ def main():
     access_token = response.json()["access_token"]
 
     headers = {
-        'X-USER-UNIQUE-NAME': mercata_username,
-        'Authorization': 'Bearer ' + access_token
+        'Authorization': 'Bearer ' + access_token,
+        'Content-Type': 'application/json'
     }
 
     # Get the balances and create a list of tuples that contains (address, balance)
@@ -60,12 +60,14 @@ def main():
     response = requests.get(balances_endpoint, headers=headers)
     balances = transform_response_to_tuple_list(response.json())
 
-    # [print(generate_tx(a, b, root)) for (a, b) in balances]
-    requests.post(
-            mercata_node + '/bloc/v2.2/transaction?resolve',
-            headers,
-            { 'txs': [generate_tx(a, b) for (a, b) in balances] }
+    # print([generate_tx(a, b) for (a, b) in balances])
+    print(headers)
+    res = requests.post(
+            mercata_node + '/strato/v2.3/transaction?resolve=true',
+            headers=headers,
+            json={ 'txs': [generate_tx(a, b) for (a, b) in balances] }
         )
+    print(res.content)
 
 if __name__ == "__main__":
     main()
