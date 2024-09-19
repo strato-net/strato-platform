@@ -101,6 +101,7 @@ constructor (
         decimal totalAmountGross = 0.0;
         decimal totalAmountNet = 0.0;
         decimal totalFee = 0.0;
+        address seller;
         string sellerCommonName;
         address sellerAddress;
         string err = "Your " + serviceName + " balance is not high enough to cover the purchase.";
@@ -112,6 +113,7 @@ constructor (
             Sale s = Sale(_saleAddresses[i]);
             Asset a = s.assetToBeSold();
             assets.push(address(a));
+            seller = a.owner();
             sellerCommonName = getCommonName(a.owner());
             sellerAddress = a.owner();
             uint quantity = _quantities[i];
@@ -146,7 +148,6 @@ constructor (
                 _checkoutId,
                 _purchaser,
                 _purchasersCommonName,
-                sellerCommonName,
                 _saleAddresses,
                 _quantities,
                 totalAmountGross
@@ -164,7 +165,7 @@ constructor (
 
             // Transfer assets
             try {
-                s.completeSale(_orderHash, _purchaser);
+                uint x = s.completeSale(_checkoutHash, _purchaser);
             } catch {
                 try {
                     address(s).call("completeSale", _purchaser);
@@ -248,4 +249,21 @@ constructor (
       tokensPerDollar = _tokensPerDollar;
       return RestStatus.OK;
     }
+
+    function openOffer(
+        address _assetToBeSold,
+        decimal _price,
+        uint _quantity
+        address _sale,
+    ) public returns (address) {    
+        decimal totalPrice = _price * decimal(_quantity);
+        decimal amountToTransfer = 1.0 + totalPrice * tokensPerDollar * (10 ** decimals);
+        decimal decimalBalance = decimal(balance());
+        string err = "You don't have enough balance to cover the bid";
+        require(decimalBalance >= amountToTransfer, err);
+        TokenOffer offer = new TokenOffer(_assetToBeSold, _price, _quantity, msg.sender);
+        require(transfer(getCommonName(address(offer)), uint(amountToTransfer)), err);
+        return address(bid);
+    }
+
 }
