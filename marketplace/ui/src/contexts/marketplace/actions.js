@@ -535,7 +535,6 @@ const actions = {
       });
       
       const body = await response.json();
-      console.log("response", body); 
       if (response.status === RestStatus.UNAUTHORIZED || response.status === RestStatus.FORBIDDEN) {
         dispatch({
           type: actionDescriptors.fetchStratsAddressFailed,
