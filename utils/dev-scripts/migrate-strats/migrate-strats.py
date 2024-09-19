@@ -8,22 +8,23 @@ mercata_username  = os.getenv("MINTER_USERNAME")
 mercata_password  = os.getenv("MINTER_PASSWORD")
 mercata_node      = os.getenv("NODE_ENDPOINT") 
 keycloak_endpoint = os.getenv("KEYCLOAK_ENDPOINT")
+strat_address     = os.getenv("STRAT_ASSET_ADDRESS")
 cirrus_endpoint   = "/cirrus/search/"
 
 def transform_response_to_tuple_list(response_data):
     return [(item['key'], item['value']) for item in response_data]
 
-def generate_tx(address, balance, root):
+def generate_tx(address, balance):
     return {
         "payload": {
-            "contractName": "ERC20Dapp",
-            "contractAddress": root,
+            "contractName": "STRATS",
+            "contractAddress": strat_address,
             "method": "automaticTransfer",
             "args": {
                 "_newOwner": address,
                 "_price": 0, # TODO what should this value truly be?
                 "_quantity": balance,
-                "_transferNumber": 0
+                "_transferNumber": 0 # TODO same goes for this
 
             },
             "type": "FUNCTION"
@@ -31,7 +32,7 @@ def generate_tx(address, balance, root):
     }
 
 def main():
-    if None in (mercata_username, mercata_password, mercata_node, keycloak_endpoint):
+    if None in (mercata_username, mercata_password, mercata_node, keycloak_endpoint, strat_address):
         raise ValueError("One or more required environment variables are not set.")
 
     headers = {
@@ -58,13 +59,12 @@ def main():
     balances_endpoint = mercata_node + cirrus_endpoint + "TestCompany-ERC20Dapp-balances"
     response = requests.get(balances_endpoint, headers=headers)
     balances = transform_response_to_tuple_list(response.json())
-    root = response.json()[0]["root"]
 
     # [print(generate_tx(a, b, root)) for (a, b) in balances]
     requests.post(
             mercata_node + '/bloc/v2.2/transaction?resolve',
             headers,
-            { 'txs': [generate_tx(a, b, root) for (a, b) in balances] }
+            { 'txs': [generate_tx(a, b) for (a, b) in balances] }
         )
 
 if __name__ == "__main__":
