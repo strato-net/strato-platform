@@ -15,6 +15,7 @@ import qualified Data.Text as T
 import Executable.EthereumDiscovery
 import Executable.Options
 import HFlags
+import Instrumentation
 import qualified Network.Socket as S
 import qualified Text.Colors as CL
 import UnliftIO
@@ -22,6 +23,7 @@ import UnliftIO
 main :: IO ()
 main = do
   blockappsInit "ethereum-discovery"
+  runInstrumentation "ethereum-discovery"
   _ <- $initHFlags "ethereum-discover"
 
   let runner f = do

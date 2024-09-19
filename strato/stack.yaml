@@ -66,13 +66,13 @@ packages:
 - libs/prometheus/cross-monitoring
 - libs/secp256k1-haskell
 - libs/type-lits
-- libs/x509-certs
 
 #removing for now, too hard to keep this up to date when making large changes elsewhere
 #- simulator/strato-lite
 
 - tools/blockapps-tools
 - tools/debugger-tools
+- tools/process-monitor
 - tools/x509-tools
 
 - vault/api

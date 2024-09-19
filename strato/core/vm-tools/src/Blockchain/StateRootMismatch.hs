@@ -16,17 +16,11 @@
 {-# OPTIONS -fno-warn-orphans      #-}
 
 module Blockchain.StateRootMismatch
-  ( StateRootMismatch(..),
-    srmBlockNumber,
-    srmBlockHash,
-    srmBlockSR,
-    srmNewSR,
-    StateRootMismatchM(..),
+  ( StateRootMismatchM(..),
     formatStateRootMismatch
   )
 where
 
-import BlockApps.Init ()
 import BlockApps.Logging
 import Blockchain.Data.RLP
 import qualified Blockchain.Database.MerklePatricia as MP
@@ -36,7 +30,6 @@ import Blockchain.Strato.Model.CodePtr ()
 import Blockchain.Strato.Model.Keccak256
 import Blockchain.Strato.StateDiff
 import Control.Applicative ((<|>))
-import Control.Lens hiding (Context (..))
 import Control.Monad (void)
 import qualified Control.Monad.Change.Alter as A
 import Control.Monad.Composable.Kafka
@@ -53,15 +46,6 @@ import SolidVM.Model.Storable
 import Text.Format
 import Text.Tools
 import UnliftIO
-
-data StateRootMismatch = StateRootMismatch
-  { _srmBlockNumber :: Integer
-  , _srmBlockHash   :: Keccak256
-  , _srmBlockSR     :: MP.StateRoot
-  , _srmNewSR       :: MP.StateRoot
-  } deriving (Eq, Show)
-
-makeLenses ''StateRootMismatch
 
 newtype StateRootMismatchM m a = StateRootMismatchM { runStateRootMismatchM :: m a }
 

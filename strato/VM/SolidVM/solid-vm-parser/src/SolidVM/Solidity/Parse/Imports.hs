@@ -7,7 +7,7 @@
 -- Maintainer: Dustin Norwood <dustin@blockapps.net>
 module SolidVM.Solidity.Parse.Imports (solidityImport) where
 
-import qualified Data.Map.Strict as M
+import Data.List (find)
 import Data.Maybe (isJust)
 import Data.Source
 import qualified Data.Text as T
@@ -20,7 +20,7 @@ import Text.Parsec
 
 solidityImport :: SolidityParser SourceUnit
 solidityImport = do
-  es6 <- isJust . M.lookup "es6" . pragmas <$> getState
+  es6 <- isJust . find ((== "es6") . fst) . pragmas <$> getState
   ~(a, imp) <- withPosition $ do
     reserved "import"
     fileImport es6
