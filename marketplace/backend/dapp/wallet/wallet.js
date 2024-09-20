@@ -62,8 +62,6 @@ async function getHighestMarketplacePrice(admin, originAddress, options) {
       options
     );
 
-    console.log("marketplace", marketplaceListings);
-
     if (marketplaceListings.length === 0) {
       return null;
     }
@@ -165,9 +163,9 @@ async function getWalletAssets(admin, args = {}, options) {
       try {
         const originAddress = inventory.originAddress;
 
-        // Get ownership history and log it
-        const ownershipHistory = await getOwnershipHistory(admin, { originAddress, minItemNumber: 1, maxItemNumber: 10 }, options);
-        const isRelevantToAdmin = ownershipHistory.some(entry => entry.purchaserCommonName === admin.username);
+        // Get ownership history
+        // const ownershipHistory = await getOwnershipHistory(admin, { originAddress, minItemNumber: 1, maxItemNumber: 10 }, options);
+        // const isRelevantToAdmin = ownershipHistory.some(entry => entry.purchaserCommonName === admin.username);
 
         // Get the highest marketplace price for items with the same origin address
         const highestMarketplacePrice = await getHighestMarketplacePrice(
@@ -178,30 +176,29 @@ async function getWalletAssets(admin, args = {}, options) {
 
         // Get the last sold price for this specific asset
         let lastSoldPrice = 0;
-        if (!isRelevantToAdmin) {
           lastSoldPrice = await getLastSoldPrice(
             admin,
             originAddress,
             options
           );
-        }
 
-        // Always get item transfer events
-        const transferEvents = await getAllItemTransferEvents(admin, admin.address, inventory.name, options);
-        const transferPrice = transferEvents && transferEvents.transfers && transferEvents.transfers.length > 0
-          ? transferEvents.transfers[0].price || 0
-          : 0;
+         // Get item transfer events
+         const transferEvents = await getAllItemTransferEvents(admin, admin.address, inventory.name, options);
+         const matchingTransfer = transferEvents && transferEvents.transfers 
+           ? transferEvents.transfers.find(transfer => transfer.block_hash === inventory.block_hash)
+           : null;
+         const transferPrice = matchingTransfer ? matchingTransfer.price || 0 : 0;
         
         
         // Determine the final price based on the new logic
         let finalPrice;
-        if (highestMarketplacePrice !== null && highestMarketplacePrice !== 0) {
+        if (highestMarketplacePrice !== undefined && highestMarketplacePrice !== null && highestMarketplacePrice !== 0) {
           finalPrice = highestMarketplacePrice;
-        } else if (inventory.price !== null && inventory.price !== 0) {
+        } else if (inventory.price !== undefined && inventory.price !== null && inventory.price !== 0) {
           finalPrice = inventory.price;
-        } else if (lastSoldPrice !== 0 && lastSoldPrice !== null) {
+        } else if (lastSoldPrice !== undefined && lastSoldPrice !== null && lastSoldPrice !== 0) {
           finalPrice = lastSoldPrice;
-        } else if (transferPrice !== null && transferPrice !== 0) {
+        } else if (transferPrice !== undefined && transferPrice !== null && transferPrice !== 0) {
           finalPrice = transferPrice;
         } else {
           finalPrice = 0;
