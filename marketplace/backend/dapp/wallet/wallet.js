@@ -40,12 +40,19 @@ async function getWalletSummary(admin, args = {}, options) {
   return { stratsBalance };
 }
 
-function calculateGainLossPercentage(currentPrice, lastSoldPrice) {
-  if (lastSoldPrice === null || lastSoldPrice === 0 || currentPrice === null || currentPrice === 0) {
+function calculateGainLossPercentage(currentPrice, lastSoldPrice, transferPrice) {
+  let basePrice = lastSoldPrice;
+  
+  // If lastSoldPrice is not available, use transferPrice
+  if (lastSoldPrice === null || lastSoldPrice === 0) {
+    basePrice = transferPrice;
+  }
+
+  if (basePrice === null || basePrice === 0 || currentPrice === null || currentPrice === 0) {
     return 0; // Return 0 if either price is invalid
   }
 
-  const percentageChange = ((currentPrice - lastSoldPrice) / lastSoldPrice) * 100;
+  const percentageChange = ((currentPrice - basePrice) / basePrice) * 100;
   return isNaN(percentageChange) ? 0 : parseFloat(percentageChange.toFixed(2)); // Ensure we return a number, not a string
 }
 
@@ -86,7 +93,7 @@ async function getLastSoldPrice(admin, assetAddress, options) {
       {
         assetToBeSold: [assetAddress],
         order: "block_timestamp.desc",
-        limit: 1,
+        limit: 5,
       },
       options
     );
@@ -163,9 +170,9 @@ async function getWalletAssets(admin, args = {}, options) {
       try {
         const originAddress = inventory.originAddress;
 
-        // Get ownership history
-        // const ownershipHistory = await getOwnershipHistory(admin, { originAddress, minItemNumber: 1, maxItemNumber: 10 }, options);
-        // const isRelevantToAdmin = ownershipHistory.some(entry => entry.purchaserCommonName === admin.username);
+        // Get ownership history and log it
+        const ownershipHistory = await getOwnershipHistory(admin, { originAddress, minItemNumber: 1, maxItemNumber: 10 }, options);
+        const isRelevantToAdmin = ownershipHistory.some(entry => entry.purchaserCommonName === admin.username);
 
         // Get the highest marketplace price for items with the same origin address
         const highestMarketplacePrice = await getHighestMarketplacePrice(
@@ -176,11 +183,13 @@ async function getWalletAssets(admin, args = {}, options) {
 
         // Get the last sold price for this specific asset
         let lastSoldPrice = 0;
+        if (!isRelevantToAdmin) {
           lastSoldPrice = await getLastSoldPrice(
             admin,
             originAddress,
             options
           );
+        }
 
          // Get item transfer events
          const transferEvents = await getAllItemTransferEvents(admin, admin.address, inventory.name, options);
@@ -192,20 +201,20 @@ async function getWalletAssets(admin, args = {}, options) {
         
         // Determine the final price based on the new logic
         let finalPrice;
-        if (highestMarketplacePrice !== undefined && highestMarketplacePrice !== null && highestMarketplacePrice !== 0) {
+        if (highestMarketplacePrice !== null && highestMarketplacePrice !== undefined && highestMarketplacePrice !== 0) {
           finalPrice = highestMarketplacePrice;
-        } else if (inventory.price !== undefined && inventory.price !== null && inventory.price !== 0) {
+        } else if (inventory.price !== null && inventory.price !== undefined && inventory.price !== 0) {
           finalPrice = inventory.price;
-        } else if (lastSoldPrice !== undefined && lastSoldPrice !== null && lastSoldPrice !== 0) {
+        } else if (lastSoldPrice !== 0 && lastSoldPrice !== undefined && lastSoldPrice !== null) {
           finalPrice = lastSoldPrice;
-        } else if (transferPrice !== undefined && transferPrice !== null && transferPrice !== 0) {
+        } else if (transferPrice !== null && transferPrice !== undefined && transferPrice !== 0) {
           finalPrice = transferPrice;
         } else {
           finalPrice = 0;
         }
 
         // Calculate gain/loss percentage using the simplified logic
-        const gainLossPercentage = calculateGainLossPercentage(finalPrice, lastSoldPrice);
+        const gainLossPercentage = calculateGainLossPercentage(finalPrice, lastSoldPrice, transferPrice);
 
         return {
           ...inventory,
