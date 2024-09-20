@@ -40,31 +40,12 @@ async function getWalletSummary(admin, args = {}, options) {
   return { stratsBalance };
 }
 
-function calculateGainLossPercentage(
-  currentPrice,
-  originalPrice,
-  highestMarketplacePrice,
-  lastSoldPrice
-) {
-  let basePrice;
-  if (originalPrice !== null && originalPrice !== 0) {
-    basePrice = originalPrice;
-  } else if (lastSoldPrice !== null && lastSoldPrice !== 0) {
-    basePrice = lastSoldPrice;
-  } else if (
-    highestMarketplacePrice !== null &&
-    highestMarketplacePrice !== 0
-  ) {
-    basePrice = highestMarketplacePrice;
-  } else {
-    return 0; // Return 0 instead of null when no valid base price is found
+function calculateGainLossPercentage(currentPrice, lastSoldPrice) {
+  if (lastSoldPrice === null || lastSoldPrice === 0 || currentPrice === null || currentPrice === 0) {
+    return 0; // Return 0 if either price is invalid
   }
 
-  if (basePrice === 0 || currentPrice === null || currentPrice === 0) {
-    return 0; // Return 0 for edge cases to avoid NaN
-  }
-
-  const percentageChange = ((currentPrice - basePrice) / basePrice) * 100;
+  const percentageChange = ((currentPrice - lastSoldPrice) / lastSoldPrice) * 100;
   return isNaN(percentageChange) ? 0 : parseFloat(percentageChange.toFixed(2)); // Ensure we return a number, not a string
 }
 
@@ -80,6 +61,8 @@ async function getHighestMarketplacePrice(admin, originAddress, options) {
       },
       options
     );
+
+    console.log("marketplace", marketplaceListings);
 
     if (marketplaceListings.length === 0) {
       return null;
@@ -203,37 +186,29 @@ async function getWalletAssets(admin, args = {}, options) {
           );
         }
 
-        // Check if all prices are 0 or null
-        let transferPrice = 0;
-        if (
-          (!inventory.price || inventory.price === 0) &&
-          (!highestMarketplacePrice || highestMarketplacePrice === 0) &&
-          (!lastSoldPrice || lastSoldPrice === 0)
-        ) {
-          // Get item transfer events
-          const transferEvents = await getAllItemTransferEvents(admin, admin.address, inventory.name, options);
-
-          // Use the price from transfer events if available
-          if (transferEvents && transferEvents.transfers && transferEvents.transfers.length > 0) {
-            transferPrice = transferEvents.transfers[0].price || 0;
-          }
-        }
+        // Always get item transfer events
+        const transferEvents = await getAllItemTransferEvents(admin, admin.address, inventory.name, options);
+        const transferPrice = transferEvents && transferEvents.transfers && transferEvents.transfers.length > 0
+          ? transferEvents.transfers[0].price || 0
+          : 0;
         
-        // Determine the final price (highest of inventory price, marketplace price, and last sold price)
-        const finalPrice = Math.max(
-          transferPrice || 0,
-          inventory.price || 0,
-          highestMarketplacePrice || 0,
-          lastSoldPrice || 0
-        );
+        
+        // Determine the final price based on the new logic
+        let finalPrice;
+        if (highestMarketplacePrice !== null && highestMarketplacePrice !== 0) {
+          finalPrice = highestMarketplacePrice;
+        } else if (inventory.price !== null && inventory.price !== 0) {
+          finalPrice = inventory.price;
+        } else if (lastSoldPrice !== 0 && lastSoldPrice !== null) {
+          finalPrice = lastSoldPrice;
+        } else if (transferPrice !== null && transferPrice !== 0) {
+          finalPrice = transferPrice;
+        } else {
+          finalPrice = 0;
+        }
 
-        // Calculate gain/loss percentage
-        const gainLossPercentage = calculateGainLossPercentage(
-          finalPrice,
-          inventory.price || 0,
-          highestMarketplacePrice || 0,
-          lastSoldPrice || 0
-        );
+        // Calculate gain/loss percentage using the simplified logic
+        const gainLossPercentage = calculateGainLossPercentage(finalPrice, lastSoldPrice);
 
         return {
           ...inventory,
