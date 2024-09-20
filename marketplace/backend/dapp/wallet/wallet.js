@@ -44,7 +44,7 @@ function calculateGainLossPercentage(currentPrice, lastSoldPrice, transferPrice)
   let basePrice = lastSoldPrice;
   
   // If lastSoldPrice is not available, use transferPrice
-  if (lastSoldPrice === null || lastSoldPrice === 0) {
+  if (lastSoldPrice === null || lastSoldPrice === 0 || lastSoldPrice === currentPrice) {
     basePrice = transferPrice;
   }
 
@@ -171,8 +171,8 @@ async function getWalletAssets(admin, args = {}, options) {
         const originAddress = inventory.originAddress;
 
         // Get ownership history and log it
-        const ownershipHistory = await getOwnershipHistory(admin, { originAddress, minItemNumber: 1, maxItemNumber: 10 }, options);
-        const isRelevantToAdmin = ownershipHistory.some(entry => entry.purchaserCommonName === admin.username);
+        // const ownershipHistory = await getOwnershipHistory(admin, { originAddress, minItemNumber: 1, maxItemNumber: 10 }, options);
+        // const isRelevantToAdmin = ownershipHistory.some(entry => entry.purchaserCommonName === admin.username);
 
         // Get the highest marketplace price for items with the same origin address
         const highestMarketplacePrice = await getHighestMarketplacePrice(
@@ -183,17 +183,14 @@ async function getWalletAssets(admin, args = {}, options) {
 
         // Get the last sold price for this specific asset
         let lastSoldPrice = 0;
-        if (!isRelevantToAdmin) {
           lastSoldPrice = await getLastSoldPrice(
             admin,
             originAddress,
             options
           );
-        }
 
          // Get item transfer events
          const transferEvents = await getAllItemTransferEvents(admin, admin.address, inventory.name, options);
-         console.log("trsf",transferEvents);
          const matchingTransfer = transferEvents && transferEvents.transfers 
            ? transferEvents.transfers.find(transfer => transfer.block_hash === inventory.block_hash)
            : null;
