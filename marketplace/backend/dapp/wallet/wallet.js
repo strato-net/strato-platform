@@ -93,7 +93,7 @@ async function getLastSoldPrice(admin, assetAddress, options) {
       {
         assetToBeSold: [assetAddress],
         order: "block_timestamp.desc",
-        limit: 5,
+        limit: 15,
       },
       options
     );
@@ -193,6 +193,7 @@ async function getWalletAssets(admin, args = {}, options) {
 
          // Get item transfer events
          const transferEvents = await getAllItemTransferEvents(admin, admin.address, inventory.name, options);
+         console.log("trsf",transferEvents);
          const matchingTransfer = transferEvents && transferEvents.transfers 
            ? transferEvents.transfers.find(transfer => transfer.block_hash === inventory.block_hash)
            : null;
