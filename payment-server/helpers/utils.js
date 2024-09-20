@@ -277,7 +277,7 @@ const validateAndGetOrderDetails = async (quantities, saleAddresses) => {
   if (openSaleCheck && sameOwnerCheck) {
     let orderDetails = [];
     for (let i = 0; i < quantities.length; i++) {
-      const isDecimal = assetContracts[i].data.quantityIsDecimal && (assetContracts[i].data.quantityIsDecimal === 'true' || assetContracts[i].data.quantityIsDecimal === true);
+      const isDecimal = assetContracts[i].data.quantityIsDecimal && (assetContracts[i].data.quantityIsDecimal === 'True' || assetContracts[i].data.quantityIsDecimal === true);
       orderDetails.push({ 
         productName: assetContracts[i].name, 
         unitPrice: isDecimal ? saleContracts[i].price * 100 : saleContracts[i].price, 
