@@ -25,6 +25,7 @@ import ClickableCell from "../ClickableCell";
 import TimeRangeTabs from "./TimeRangeTabs";
 import Statistics from "./Statistics";
 import LoginModal from './LoginModal';
+import OfferModal from "../Offers/OfferModal";
 // other
 import { setCookie } from "../../helpers/cookie";
 import routes from "../../helpers/routes";
@@ -399,6 +400,13 @@ const ProductDetails = ({ user, users }) => {
   const contractName = getCategoryName(decodeURIComponent(details?.contract_name))
   const linkUrl = window.location.href;
 
+  // Offers Modal and Functions
+  const [isOfferModalOpen, setIsOfferModalOpen] = useState(false);
+
+  function openOfferModal() {
+    setIsOfferModalOpen(true);
+  }
+
 
 
   return (
@@ -594,6 +602,20 @@ const ProductDetails = ({ user, users }) => {
                     >
                       Buy Now
                     </Button>
+                    <Button
+                      type="primary"
+                      className="w-[100%] h-9 !bg-[#DDDCFE] !hover:bg-[#FFB84D] !text-[#121888]"
+                      onClick={() => { openOfferModal(); }}
+                      disabled={ownerSameAsUser()}
+                      id="makeOffer"
+                    >
+                      Make an Offer
+                    </Button>
+                    <OfferModal
+                      isOpen={isOfferModalOpen}            
+                      onClose={() => setIsOfferModalOpen(false)}  
+                      // product={product}               
+                    />
                   {/* TODO:- Remove Comment to show the Add-to-Cart Button */}
                   {/* {ownerSameAsUser() ?
                       <Button
