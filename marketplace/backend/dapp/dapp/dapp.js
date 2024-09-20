@@ -486,6 +486,10 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
       assetStatus = ASSET_STATUS.ACTIVE;
     }
 
+    if (args.issuerCommonName !== userCert.commonName) {
+      throw new rest.RestError(RestStatus.UNAUTHORIZED, 'Only the issuer can close a redemption request');
+    }
+
     const contract = { address: assetAddresses[0] };
     const [updateStatus] = await inventoryJs.updateAssetStatus(rawAdmin, contract, { status: assetStatus }, options);
 
