@@ -1,7 +1,9 @@
-import { useEffect, useState } from "react";
+import { useEffect } from "react";
 import { InputNumber, Button as AntButton } from "antd";
 import { ReactComponent as WalletIcon } from "../../images/offerImages/wallet-icon.svg";
 import { ReactComponent as StratIcon } from "../../images/offerImages/strats-icon.svg";
+import { useFormik } from "formik";
+import * as Yup from "yup";
 
 const MakeOfferModal = ({
   isOpen,
@@ -10,27 +12,43 @@ const MakeOfferModal = ({
     title: "Lorem ipsum dolor sit amet ",
     owner: "andrew",
     price: "$30",
-    strats: 3000,
+    quantity: 25,
+    strats: 3000, // Assuming this is the maximum allowed price in STRATS
     saleAddress: "0x1234abcd5678efgh",
     productId: "prod_123456",
     category: "Electronics",
     imageUrl: "https://via.placeholder.com/100", // Example image placeholder URL
   },
 }) => {
-  const [quantity, setQuantity] = useState(1);
-  const [price, setPrice] = useState(0);
+  const formik = useFormik({
+    initialValues: {
+      quantity: 1,
+      price: 0,
+    },
+    validationSchema: Yup.object({
+      quantity: Yup.number()
+        .min(1, "*Quantity must be at least 1")
+        .max(product.quantity, `*Quantity must be less than ${product.quantity}`)
+        .nullable()
+        .transform((value) => (isNaN(value) ? 1 : value))
+        .required("*Quantity is required"),
+      price: Yup.number()
+        .min(1, "*Price must be greater than 0")
+        .nullable()
+        .transform((value) => (isNaN(value) ? 1 : value))
+        .max(product.strats, `*Price must be less than ${product.strats} STRATS`)
+        .required("*Price is required"),
+    }),
+    onSubmit: (values) => {
+      const totalCost = values.quantity * values.price;
+      alert(`Offer made for ${totalCost} STRATS`);
+    },
+  });
 
   const calculateTotalCost = () => {
-    return quantity * price;
+    return formik.values.quantity * formik.values.price;
   };
-  
-  const handlePriceChange = (value) => {
-    if (value === "") {
-      return;
-    } else {
-      setPrice(value);
-    }
-  }
+
   useEffect(() => {
     if (isOpen) {
       document.body.style.overflow = "hidden";
@@ -47,7 +65,7 @@ const MakeOfferModal = ({
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-30 flex justify-center items-center z-50">
-      <div className="bg-white w-[400px] lg:w-[550px] lg:h-[430px] px-8 py-4 rounded-lg shadow-lg">
+      <div className="bg-white w-[400px] lg:w-[550px] px-8 py-4 rounded-lg shadow-lg">
         <div className="flex justify-between items-center mb-6">
           <h2 className="text-xl font-semibold">Make an Offer</h2>
           <button
@@ -76,50 +94,63 @@ const MakeOfferModal = ({
           </div>
         </div>
 
-        {/* Cost Section */}
-        <div className="bg-[#EEEEF8] p-3 mb-8 flex items-center">
-          <WalletIcon className="" />
-          <p className="text-xs text-[#7E7878] px-2">
-            Total Cost: {calculateTotalCost()} STRATS
-          </p>
-          <StratIcon />
-        </div>
+        <form onSubmit={formik.handleSubmit}>
+          {/* Cost Section */}
+          <div className="bg-[#EEEEF8] p-3 mb-8 flex items-center">
+            <WalletIcon className="" />
+            <p className="text-xs text-[#7E7878] px-2">
+              Total Cost: {calculateTotalCost()} STRATS
+            </p>
+            <StratIcon />
+          </div>
 
-        {/* Input Section */}
-        <div className="flex gap-4 mb-5">
-          <InputNumber
-            min={1}
-            value={quantity}
-            placeholder="Enter Quantity"
-            onChange={(value) => setQuantity(value)}
-            className="w-full"
-          />
-          <InputNumber
-            min={0}
-            value={price}
-            placeholder="Enter Price (STRATS)"
-            onChange={(value) => handlePriceChange(value)}
-            className="w-full"
-          />
-        </div>
+          {/* Input Section */}
+          <div className="flex gap-4 mb-5 content-end">
+            <div className="w-full flex flex-col">
+              <InputNumber
+                min={1}
+                max={product.quantity}
+                value={formik.values.quantity}
+                onChange={(value) => formik.setFieldValue("quantity", value)}
+                placeholder="Enter Quantity"
+                className="w-full"
+                status={formik.errors.quantity ? "error" : ""}
+              />
+              {formik.touched.quantity && formik.errors.quantity ? (
+                <p className="text-error text-xs">
+                  {formik.errors.quantity}
+                </p>
+              ) : null}
+            </div>
+            <div className="w-full flex flex-col">
+              <InputNumber
+                min={0}
+                max={product.strats}
+                value={formik.values.price}
+                onChange={(value) => formik.setFieldValue("price", value)}
+                placeholder="Enter Price (STRATS)"
+                className="w-full"
+                status={formik.errors.price ? "error" : ""}
+              />
+              {formik.touched.price && formik.errors.price ? (
+                <p className="text-error text-xs">
+                  {formik.errors.price}
+                </p>
+              ) : null}
+            </div>
+          </div>
 
-        {/* Buttons Section */}
-        <div className="">
-          <AntButton
-            type="primary"
-            className="w-[100%]  h-9 !bg-[#13188A] !hover:bg-primaryHover !text-white"
-            onClick={() => alert("Offer made!")}
-          >
-            Make Offer
-          </AntButton>
-          {/* <AntButton
-            type="primary"
-            className="w-[100%] h-9 !bg-[#DDDCFE] !hover:bg-[#FFB84D] !text-[#121888]"
-            onClick={() => alert("Redirect to buy STRATS")}
-          >
-            Buy STRATS
-          </AntButton> */}
-        </div>
+          {/* Buttons Section */}
+          <div>
+            <AntButton
+              type="primary"
+              htmlType="submit"
+              className="w-[100%] h-9 !bg-[#13188A] !hover:bg-primaryHover !text-white"
+            >
+              Make Offer
+            </AntButton>
+          </div>
+        </form>
       </div>
     </div>
   );
