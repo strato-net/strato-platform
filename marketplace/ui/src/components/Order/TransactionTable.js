@@ -95,7 +95,7 @@ const TransactionTable = ({ user, download, isAllOrdersLoading }) => {
     }
     
     if (originAddress && filteredData.length > 0) {
-      filteredData = filteredData.filter((item) => item.assetAddress === originAddress);
+      filteredData = filteredData.filter((item) => item.assetOriginAddress === originAddress);
       if (filteredData.length === 0) {
         return;
       }
