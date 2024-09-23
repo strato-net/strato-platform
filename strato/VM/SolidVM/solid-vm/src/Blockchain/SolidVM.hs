@@ -33,10 +33,11 @@ import Blockchain.DB.ModifyStateDB (pay)
 import Blockchain.DB.SolidStorageDB
 import Blockchain.Data.AddressStateDB
 import Blockchain.Data.BlockHeader (BlockHeader)
+import Blockchain.Blockstanbul.Model.Authentication
 import qualified Blockchain.Data.BlockHeader as BlockHeader
 import Blockchain.Data.ChainInfo
 import Blockchain.Data.ExecResults
-import Blockchain.Data.Transaction (whoSignedThisTransactionEcrecover)
+import Blockchain.Data.Transaction (whoSignedThisTransactionEcrecover, whoReallySignedThisTransactionEcrecover, getSigVals)
 import qualified Blockchain.Database.MerklePatricia as MP
 import qualified Blockchain.SolidVM.Builtins as Builtins
 import Blockchain.SolidVM.CodeCollectionDB
@@ -1679,6 +1680,19 @@ expToVar' x@(CC.MemberAccess _ expr name) _ = do
             Just (CC.ConstantDecl _ _ constExp _) -> expToVar constExp Nothing
             Nothing -> unknownConstant "constant member access" (contractName', constName)
           Just (CC.ConstantDecl _ _ constExp _) -> expToVar constExp Nothing
+    (SBuiltinVariable "block", "proposer") -> do
+      env' <- getEnv
+      let bh = Env.blockHeader env'
+          pHash = proposalHash bh
+          mSig = BlockHeader.proposalSignature bh  -- Signature is Maybe type
+      case mSig of
+          Just sig -> do
+              let (r, s, v) = getSigVals sig
+                  proposerAddress = whoReallySignedThisTransactionEcrecover pHash r s (v - 0x1b)
+              case proposerAddress of
+                Just addr ->  return $ Constant (flip SAccount False (unspecifiedChain addr))
+                Nothing -> return $ Constant SNULL
+          Nothing -> return $ Constant SNULL
     (SBuiltinVariable "block", "timestamp") -> do
       env' <- getEnv
       return $ Constant $ SInteger $ round $ utcTimeToPOSIXSeconds $ BlockHeader.timestamp $ Env.blockHeader env'
