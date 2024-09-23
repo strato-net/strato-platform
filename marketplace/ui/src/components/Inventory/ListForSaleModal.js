@@ -10,7 +10,18 @@ const { Option } = Select;
 
 const ListForSaleModal = ({ open, handleCancel, inventory, categoryName, limit, offset, user }) => {
     const [data, setData] = useState([inventory]);
-    const [quantity, setQuantity] = useState(inventory.saleAddress ? inventory.saleQuantity : inventory.quantity);
+    const [quantity, setQuantity] = useState(() => {
+      const selectedQuantity = inventory.saleAddress
+        ? inventory.saleQuantity
+        : inventory.quantity;
+
+      return selectedQuantity !== undefined
+        ? inventory.data.quantityIsDecimal &&
+          inventory.data.quantityIsDecimal === "True"
+          ? Math.floor(selectedQuantity / 100)
+          : selectedQuantity
+        : undefined;
+    });
     const [paymentTypes, setPaymentTypes] = useState([]);
     const [availablePaymentProviders, setAvailablePaymentProviders] = useState([]);
     const [pricePerUnit, setpricePerUnit] = useState(inventory.price ? inventory.price : inventory.pricePerUnit);
@@ -215,7 +226,7 @@ const ListForSaleModal = ({ open, handleCancel, inventory, categoryName, limit, 
         }
         body = {
             ...body,
-            quantity,
+            quantity: inventory.data.quantityIsDecimal && inventory.data.quantityIsDecimal === "True" ? quantity * 100 : quantity,
         }
         let isDone
 

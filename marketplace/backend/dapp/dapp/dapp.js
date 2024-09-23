@@ -25,6 +25,7 @@ import certificateJs from "/dapp/certificates/certificate";
 
 import artJs from "/dapp/items/art";
 import tokensJs from "/dapp/items/tokens";
+import STRATSJs from "/dapp/items/STRATS";
 import carbonOffsetJs from "/dapp/items/carbonOffset";
 import metalsJs from "/dapp/items/metals";
 import spiritsJs from "/dapp/items/spirits";
@@ -40,8 +41,6 @@ import inventoryJs from "/dapp/products/inventory";
 import marketplaceJs from "/dapp/marketplace/marketplace.js";
 import paymentProviderJs from '/dapp/payments/paymentProvider';
 import redemptionServiceJs from '/dapp/redemptions/redemptionService';
-
-import strats from "../strats/strats";
 
 const allAssetNames = [];
 dayjs.extend(utc);
@@ -705,6 +704,25 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
   };
 
   // ------------------------------ TOKENS ENDS --------------------------------
+  
+  // ------------------------------ STRATS STARTS ------------------------------
+
+  contract.createSTRATS = async function (args, options = defaultOptions) {
+    const createdDate = Math.floor(Date.now() / 1000);
+    const newArgs = {
+      ...args.itemArgs,
+      createdDate,
+      status: ASSET_STATUS.ACTIVE
+    };
+    return STRATSJs.uploadContract(rawAdmin, newArgs, options);
+  };
+
+  contract.getSTRATS = async function (args = {}, options = optionsNoChainIds) {
+    const getOptions = { ...options, app: contractName, };
+    return STRATSJs.getAll(rawAdmin, args, getOptions);
+  };
+
+  // ------------------------------ STRATS ENDS --------------------------------
 
   // ------------------------------ CARBONOFFSET STARTS------------------------------
 
@@ -1106,9 +1124,45 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
           throw new rest.RestError(RestStatus.BAD_REQUEST, "Cannot buy products from multiple sellers in the same Order/Checkout",);
         }
       }
+
+      // Get User's STRATS Asset Address
+      const stratsOriginAddress = await STRATSJs.getStratsAddress();
+
+      // Retrieve all sales data
+      const salesData = await saleJs.getAll(rawAdmin, { saleAddresses }, options);
+
+      // Calculate the total order amount
+      const orderTotal = salesData.reduce((acc, sale, index) => acc + (sale.price * quantities[index]), 0);
+
+      // Retrieve the user's active STRATS asset addresses with non-zero quantities
+      const userStratsAssets = await inventoryJs.getAll(
+        rawAdmin,
+        {
+          ownerCommonName: userCert.commonName,
+          originAddress: stratsOriginAddress,
+          status: ASSET_STATUS.ACTIVE,
+          queryOptions: { select: "address, quantity" },
+          notEqualsField: "quantity",
+          notEqualsValue: "0",
+        },
+        options
+      );
+
+      // Accumulate STRATS asset addresses to cover the order total
+      let accumulatedTotal = 0;
+      const stratsAssetAddressesToUse = userStratsAssets.reduce((addresses, asset) => {
+        if (accumulatedTotal >= orderTotal) return addresses;
+        
+        addresses.push(asset.address);
+        accumulatedTotal += asset.quantity / 100;
+
+        return addresses;
+      }, []);
+
       const createdDate = Math.floor(Date.now() / 1000);
       const paymentParameters = {
         address: paymentProvider.address,
+        stratsAssetAddresses: stratsAssetAddressesToUse,
         checkoutId: util.uid(),
         saleAddresses,
         quantities,
@@ -1227,31 +1281,120 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
     }
   };
 
-  contract.getStratsBalance = async function (args, options = defaultOptions) {
-    const { userAddress } = args;
-    const getOptions = { ...options, org: "TestCompany", app: '' };
-    const address = strats.getStratsAddress();
-
-    const newArgs = {
-      address: address,
-      key: userAddress
-    }
-
-    const balance = await strats.getStratsBalance(rawAdmin, newArgs, getOptions);
-    return balance;
+  contract.getStratsBalance = async function ( args, options = defaultOptions ) {
+    const stratsOriginAddress = await STRATSJs.getStratsAddress();
+    const balance = await inventoryJs.getAll(rawAdmin, { ownerCommonName: userCert.commonName, originAddress: stratsOriginAddress, queryOptions: { select: "quantity.sum()" }}, options);
+    return balance[0].sum ? `${balance[0].sum}` : 0;
   }
 
   contract.getStratsTransactionHistory = async function (args, options = defaultOptions) {
-    const getOptions = { ...options, org: "TestCompany", app: '' };
-    const transactionHistory = await strats.getStratsTransactionHistory(rawAdmin, args, getOptions);
+    const getOptions = { ...options, app: contractName, };
+    const { userAddress } = args;
+    const stratsOriginAddress = await STRATSJs.getStratsAddress();
+    if (!stratsOriginAddress) {
+      throw new rest.RestError(RestStatus.BAD_REQUEST, "Strats origin address not found.");
+    }
+    let res = await inventoryJs.getAllItemTransferEvents(rawAdmin, {or: `(oldOwner.eq.${userAddress},newOwner.eq.${userAddress})`, assetName: "strats1"}, getOptions);
 
-    return transactionHistory;
+    return res.transfers.map(transfer => ({
+      id: transfer.transferNumber,
+      timestamp: transfer.transferDate,
+      _to: transfer.newOwner,
+      _from: transfer.oldOwner,
+      _value: transfer.quantity,
+      _price: transfer.price,
+      _assetName: transfer.assetName,
+    }));
   }
 
   contract.transferStrats = async function (args, options = defaultOptions) {
-    const res = await strats.transferStrats(rawAdmin, args, options)
-    return res;
-  }
+    try {
+      const { value: initialQuantity, to: newOwner, price } = args;
+  
+      // Get strats origin address
+      const stratsOriginAddress = await STRATSJs.getStratsAddress();
+      if (!stratsOriginAddress) {
+        throw new rest.RestError(RestStatus.BAD_REQUEST, "Strats origin address not found.");
+      }
+  
+      // Get all eligible strats for balance check and transfer
+      const strats = await inventoryJs.getAll(
+        rawAdmin,
+        {
+          ownerCommonName: userCert.commonName,
+          originAddress: stratsOriginAddress,
+          status: ASSET_STATUS.ACTIVE,
+          queryOptions: { select: "address,quantity" },
+          notEqualsField: 'quantity',
+          notEqualsValue: '0',
+          order: "block_timestamp.desc",
+        },
+        options
+      );
+  
+      if (!strats || strats.length === 0) {
+        throw new rest.RestError(RestStatus.BAD_REQUEST, "No eligible strats available for transfer.");
+      }
+  
+      let totalAvailableQuantity = 0;
+  
+      // Check if the balance is sufficient
+      for (const strat of strats) {
+        totalAvailableQuantity += strat.quantity;
+        if (totalAvailableQuantity >= initialQuantity) {
+          break;
+        }
+      }
+  
+      if (totalAvailableQuantity < initialQuantity) {
+        throw new rest.RestError(RestStatus.BAD_REQUEST, `Insufficient balance: Required ${initialQuantity}, but only ${totalAvailableQuantity} is available.`);
+      }
+  
+      let remainingQuantity = initialQuantity;
+  
+      // Second loop: Perform the transfer
+      for (const strat of strats) {
+        if (remainingQuantity <= 0) {
+          break;
+        }
+  
+        const transferQuantity = Math.min(strat.quantity, remainingQuantity);
+        const transferNumber = parseInt(util.uid());
+        const transfer = {
+          transferNumber,
+          newOwner,
+          quantity: transferQuantity,
+          price,
+        };
+  
+        try {
+          await inventoryJs.transferItem(
+            rawAdmin,
+            { address: strat.address },
+            transfer,
+            options
+          );
+          remainingQuantity -= transferQuantity;
+        } catch (innerError) {
+          console.error(`Transfer failed for strat with address ${strat.address}:`, innerError);
+          throw new rest.RestError(RestStatus.INTERNAL_SERVER_ERROR, `Failed to transfer strat at address ${strat.address}.`);
+        }
+      }
+  
+      return {
+        status: RestStatus.OK,
+        message: 'Transfer completed successfully.',
+        remainingQuantity: 0
+      };
+  
+    } catch (error) {
+      console.error('TransferStrats operation failed:', error);
+      return {
+        status: error.status || RestStatus.ERROR,
+        message: error.message || 'An unknown error occurred during transfer.'
+      };
+    }
+  };  
 
   return contract;
 };

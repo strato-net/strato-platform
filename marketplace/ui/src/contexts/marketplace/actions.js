@@ -563,24 +563,31 @@ const actions = {
         body: JSON.stringify(payload),
       });
       const body = await response.json();
-      if (response.status === RestStatus.UNAUTHORIZED || response.status === RestStatus.FORBIDDEN) {
-        dispatch({
-          type: actionDescriptors.transferStratsFailed,
-          error: "Error while transferring STRATS",
-        });
-        actions.setMessage(dispatch, "Error while transferring STRATS");
-        window.location.href = body.error.loginUrl;
-      }
+
       if (response.status === RestStatus.OK) {
         dispatch({
           type: actionDescriptors.transferStratsSuccessful,
-          payload: body.data
         });
         actions.setMessage(dispatch, "STRATS transferred successfully", true);
-        return;
+        return true;
+      } else if (response.status === RestStatus.CONFLICT) {
+        dispatch({ type: actionDescriptors.transferStratsFailed, error: body.error.message });
+        actions.setMessage(dispatch, body.error.message)
+        return false;
+      } else if (response.status === RestStatus.INTERNAL_SERVER_ERROR) {
+        dispatch({ type: actionDescriptors.transferStratsFailed, error: "Error while transferring Item" });
+        actions.setMessage(dispatch, "Error while transferring Item")
+        return false;
+      } else if (response.status === RestStatus.UNAUTHORIZED) {
+        dispatch({
+          type: actionDescriptors.transferStratsFailed,
+          error: "Unauthorized while transferring STRATS"
+        });
+        window.location.href = body.error.loginUrl;
       }
-      dispatch({ type: actionDescriptors.transferStratsFailed, error: "Error while transferring STRATS" });
-      actions.setMessage(dispatch, "Error while transferring STRATS");
+      dispatch({ type: actionDescriptors.transferStratsFailed, error: body.error});
+      actions.setMessage(dispatch, body.error);
+      return false
     } catch (err) {
       dispatch({ type: actionDescriptors.transferStratsFailed, error: "Error while transferring STRATS" });
       actions.setMessage(dispatch, "Error while transferring STRATS");

@@ -1,0 +1,57 @@
+paths:
+  /STRATS/:
+    get:
+      security:
+        - bearerAuth: []
+      tags:
+        - STRATS
+      summary: Retrieve STRATS
+      produces:
+        - application/json
+      responses:
+        200:
+          description: Array of STRATS
+    post:
+      security:
+        - bearerAuth: []
+      tags:
+        - STRATS
+      summary: Create a STRATS
+      produces:
+        - application/json
+      requestBody:
+        description: It enables user to create STRATS
+        required: true
+        content:
+          'application/json':
+            schema:
+              $ref: '#/definitions/createSTRATS'
+      responses:
+        200:
+          description: Object of create STRATS
+
+definitions:
+  createSTRATS:
+    type: object
+    properties:
+      machineArgs:
+        type: object
+        properties:
+          serialNumber:
+            type: string
+          name:
+            type: string
+          description:
+            type: string
+          quantity:
+            type: number
+          images:
+            type: array
+            items:
+              type: string
+          price:
+            type: number
+          paymentTypes:
+            type: array
+            items:
+              type: number

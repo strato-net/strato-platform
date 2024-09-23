@@ -402,7 +402,7 @@ async function get(user, args, options) {
 }
 
 async function getAll(admin, args = {}, defaultOptions) {
-    const { range, ownerCommonName, assetAddresses, status, isMarketplaceSearch, isTrendingSearch, userProfile, userProfileGtField, userProfileGtValue, ...restArgs } = args;
+    const { range, ownerCommonName, assetAddresses, status, isMarketplaceSearch, isTrendingSearch, userProfile, userProfileGtField, userProfileGtValue, queryOptions, ...restArgs } = args;
     let isNullPriceRange = false; //TODO: find a better way to identify/handle this
     if (range !== undefined) {
         isNullPriceRange = range ? range[0].split(",")[1] == 0 : true;
@@ -450,8 +450,9 @@ async function getAll(admin, args = {}, defaultOptions) {
             inventories = await searchAllWithQueryArgs(contractName,
                 {
                     ...restArgs,
+                    status,
                     ownerCommonName: ownerCommonName,
-                    queryOptions: { select: constants.attachSalesAndImagesAndFiles }
+                    queryOptions: queryOptions ? queryOptions : { select: constants.attachSalesAndImagesAndFiles }
                 }, options, admin);
         } else if (assetAddresses) {
             inventories = await searchAllWithQueryArgs(contractName,

@@ -1,20 +1,24 @@
-import { Button, Select, InputNumber, Modal, Table } from "antd";
+import { Button, Select, InputNumber, Modal, Table, notification } from "antd";
 import { useEffect, useRef,useState } from "react";
 import { actions } from "../../contexts/inventory/actions";
+import { actions as marketplaceActions } from "../../contexts/marketplace/actions";
 import { actions as userActions } from "../../contexts/users/actions";
 import { useInventoryDispatch, useInventoryState } from "../../contexts/inventory";
+import { useMarketplaceDispatch, useMarketplaceState } from "../../contexts/marketplace";
 import { useUsersDispatch, useUsersState } from "../../contexts/users";
 import { useAuthenticateState } from "../../contexts/authentication";
 import { SearchOutlined } from '@ant-design/icons';
 import { handlePriceInput, handleQuantityInput } from "../../helpers/utils";
 import { OLD_SADDOG_ORIGIN_ADDRESS } from "../../helpers/constants";
 
-const TransferModal = ({ open, handleCancel, inventory, categoryName, limit, offset }) => {
+const TransferModal = ({ open, handleCancel, inventory, categoryName = "", limit=0, offset=0 }) => {
     const [data, setData] = useState([inventory]);
     const [quantity, setQuantity] = useState(1);
     const [price, setPrice] = useState(0);
     const inventoryDispatch = useInventoryDispatch();
+    const marketplaceDispatch = useMarketplaceDispatch();
     const userDispatch = useUsersDispatch();
+    const [api, contextHolder] = notification.useNotification();
     const [canTransfer, setCanTransfer] = useState(true);
     const {
         user
@@ -25,6 +29,9 @@ const TransferModal = ({ open, handleCancel, inventory, categoryName, limit, off
     const {
         isTransferring
     } = useInventoryState();
+    const { 
+        isTransferringStrats, message: marketplaceMsg, success: marketplaceSuccess
+    } = useMarketplaceState();
     const inputPriceDesktopRef = useRef(null);
     const inputPriceMobileRef = useRef(null);
     const inputQuantityDesktopRef = useRef(null);
@@ -42,7 +49,7 @@ const TransferModal = ({ open, handleCancel, inventory, categoryName, limit, off
         setDropdownOpen(!!value);
     };
 
-    const originAddress = inventory.originAddress.toLowerCase();
+    const originAddress = inventory.originAddress?.toLowerCase();
     const isBurner = originAddress === OLD_SADDOG_ORIGIN_ADDRESS;
 
     const usersList = users
@@ -62,6 +69,24 @@ const TransferModal = ({ open, handleCancel, inventory, categoryName, limit, off
     const [userAddress, setUserAddress] = useState(
       isBurner && filteredUsersList.length > 0 ? filteredUsersList[0].value : ""
     );
+    
+    const marketplaceToast = (placement) => {
+        if (marketplaceSuccess) {
+            api.success({
+            message: marketplaceMsg,
+            onClose: marketplaceActions.resetMessage(marketplaceDispatch),
+            placement,
+            key: 1,
+            });
+        } else {
+            api.error({
+            message: marketplaceMsg,
+            onClose: marketplaceActions.resetMessage(marketplaceDispatch),
+            placement,
+            key: 2,
+            });
+        }
+    };
     
     const handleSelect = (userAddress) => {
         setUserAddress(userAddress);
@@ -188,22 +213,38 @@ const TransferModal = ({ open, handleCancel, inventory, categoryName, limit, off
 
 
     const handleSubmit = async () => {
-        const body = {
-            assetAddress: inventory.address,
-            newOwner: userAddress,
-            quantity,
-            price
-        };
-
         if (quantity > 0 && quantity <= inventory.quantity && userAddress) {
-            let isDone = await actions.transferInventory(inventoryDispatch, body);
+            let isDone = false;
+    
+            if (inventory.name === "STRATS") {
+                const payload = {
+                    to: userAddress,
+                    value: quantity,
+                    price,
+                };
+                isDone = await marketplaceActions.transferStrats(marketplaceDispatch, payload);
+                if (isDone) {
+                    await marketplaceActions.fetchStratsBalance(marketplaceDispatch);
+                }
+            } else {
+                const body = {
+                    assetAddress: inventory.address,
+                    newOwner: userAddress,
+                    quantity,
+                    price,
+                };
+                isDone = await actions.transferInventory(inventoryDispatch, body);
+                if (isDone) {
+                    await actions.fetchInventory(inventoryDispatch, limit, offset, "", categoryName);
+                    await actions.fetchInventoryForUser(inventoryDispatch, user.commonName);
+                }
+            }
+    
             if (isDone) {
-                await actions.fetchInventory(inventoryDispatch, limit, offset, "", categoryName);
-                await actions.fetchInventoryForUser(inventoryDispatch, user.commonName);
                 handleCancel();
             }
         }
-    }
+    };    
 
     return (
         <Modal
@@ -213,7 +254,7 @@ const TransferModal = ({ open, handleCancel, inventory, categoryName, limit, off
             width={1000}
             footer={[
                 <div className="flex justify-center md:block">
-                    <Button type="primary" className="w-32 h-9" onClick={handleSubmit} disabled={!canTransfer} loading={isTransferring}>
+                    <Button type="primary" className="w-32 h-9" onClick={handleSubmit} disabled={!canTransfer} loading={isTransferring || isTransferringStrats}>
                         Transfer
                     </Button>
                 </div>
@@ -290,6 +331,8 @@ const TransferModal = ({ open, handleCancel, inventory, categoryName, limit, off
                 </div>
 
             </div>
+            {contextHolder}
+            {marketplaceMsg && marketplaceToast("bottom")}
         </Modal>
     )
 }
