@@ -86,7 +86,7 @@ async function createTwoTransactionPayload(token, toAddress1, toAddress2, value1
           method: "automaticTransfer",
           args: {
             _newOwner: toAddress2,
-            _price: 0.001,
+            _price: 0.0001,
             _quantity: value2,
             _transferNumber: parseInt(uid()),
           },

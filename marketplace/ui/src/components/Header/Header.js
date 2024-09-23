@@ -28,7 +28,7 @@ import { useCategoryDispatch, useCategoryState } from "../../contexts/category";
 import { SEO } from "../../helpers/seoConstant";
 import LoginModal from "../MarketPlace/LoginModal"
 import { setCookie } from "../../helpers/cookie";
-import TransferModal from "../Inventory/TransferModal";
+import TransferStratsModal from "../MarketPlace/TransferStratsModal";
 import StratsTransactionHistoryModal from "../MarketPlace/StratsTransactionHistoryModal";
 
 import { navItems } from "../../helpers/constants";
@@ -213,9 +213,7 @@ const HeaderComponent = ({ user, loginUrl, showMenu, handleSubMenu, handleMenuTa
         {
           key: '2',
           onClick: async () => {
-            const stratAddress = await marketplaceActions.fetchStratsAddress(marketplaceDispatch)
-            const randomRefresh = Math.floor(Math.random() * 1000000);
-            navigate(`${routes.Transactions.url}?address=${stratAddress}&refresh=${randomRefresh}`)
+            navigate(`${routes.Transactions.url}?type=STRATS`)
           },
           label: (
             <div>
@@ -502,10 +500,10 @@ const HeaderComponent = ({ user, loginUrl, showMenu, handleSubMenu, handleMenuTa
         onLogin={handleLogin}
       />
       {isTransferStratsModalVisible &&
-        <TransferModal
-          open={isTransferStratsModalVisible}
-          handleCancel={handleCloseTransferStratsModal}
-          inventory={{name: 'STRATS', quantity: stratsBalance}}
+        <TransferStratsModal
+          visible={isTransferStratsModalVisible}
+          onCancel={handleCloseTransferStratsModal}
+          balance={stratsBalance}
         />}
       {isStratsTransactionHistoryModalVisible &&
         <StratsTransactionHistoryModal

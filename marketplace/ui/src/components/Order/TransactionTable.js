@@ -14,8 +14,10 @@ import { Images } from "../../images";
 import TransactionResponsive from "./TransactionResponsive";
 // Actions
 import { actions as transactionAction } from "../../contexts/transaction/actions";
+import { actions as marketplaceActions } from "../../contexts/marketplace/actions";
 // Dispatch & States
 import { useTransactionDispatch, useTransactionState } from "../../contexts/transaction";
+import { useMarketplaceDispatch, } from "../../contexts/marketplace";
 // Utils & Constants
 import {
   STRATS_CONVERSION, TRANSACTION_STATUS, TRANSACTION_STATUS_CLASSES, TRANSACTION_STATUS_COLOR, 
@@ -30,6 +32,7 @@ const TransactionTable = ({ user, download, isAllOrdersLoading }) => {
   const StratsIcon = <img src={Images.logo} alt="" className="mx-1 w-3 h-3" />
   // Dispatch
   const transactionDispatch = useTransactionDispatch();
+  const marketplaceDispatch = useMarketplaceDispatch();
   // States
   const { userTransactions, globalTransaction, isTransactionLoading } = useTransactionState();
 
@@ -48,6 +51,14 @@ const TransactionTable = ({ user, download, isAllOrdersLoading }) => {
   const formattedNum = (num) => formatter.format(num);
   const defaultDate =  dateQuery ? dayjs.unix(dayjs(dateQuery).startOf('month').unix()) : dayjs.unix(currentMonth);
 
+  useEffect(() => {
+    async function fetchStratsAddress() {
+      const stratsAddress = await marketplaceActions.fetchStratsAddress(marketplaceDispatch);
+      setOriginAddress(stratsAddress);
+    }
+    fetchStratsAddress();
+  }, [marketplaceDispatch]);
+  
   useEffect(() => {
     if (user?.commonName && dateQuery) {
       transactionAction.fetchUserTransaction(
@@ -76,13 +87,9 @@ const TransactionTable = ({ user, download, isAllOrdersLoading }) => {
     const searchParams = new URLSearchParams(location.search);
     const urlType = searchParams.get("type");
     const urlDate = searchParams.get("date");
-    const urlRefresh = searchParams.get("refresh");
-    const urlAddress = searchParams.get("address");
     // Update state based on URL params, but skip empty values
     setType(urlType && urlType !== "all" ? urlType : "");
     setDateQuery(urlDate || "");
-    setOriginAddress(urlAddress || "");
-    urlRefresh && setSearch(" ")
   }, [location.search]);
   
 
@@ -91,17 +98,11 @@ const TransactionTable = ({ user, download, isAllOrdersLoading }) => {
   
     // Type filter
     if (type) {
-      filteredData = filteredData.filter((item) => item.type === type);
-    }
-    
-    if (originAddress && filteredData.length > 0) {
-      filteredData = filteredData.filter((item) => item.assetOriginAddress === originAddress);
-      if (filteredData.length === 0) {
-        return;
+      if (type === "STRATS") {
+        filteredData = filteredData.filter((item) => item.currency === "STRATS" || item.assetOriginAddress === originAddress);
+      } else {
+        filteredData = filteredData.filter((item) => item.type === type);
       }
-      setSearch(filteredData[0].assetName)
-      setOriginAddress("")
-      return;
     }
   
     // Search filter
