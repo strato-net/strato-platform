@@ -39,7 +39,7 @@ import Blockchain.Data.DataDefs
 import Blockchain.Data.Json
 import Blockchain.Data.TXOrigin
 import Blockchain.Data.Transaction
-import Blockchain.EthConf (runKafkaConfigured)
+import Blockchain.EthConf (runKafkaMConfigured)
 import Blockchain.Sequencer.Event (IngestEvent (IETx), IngestTx (..), Timestamp)
 import Blockchain.Sequencer.Kafka (writeUnseqEventsWithLimits)
 import Blockchain.Strato.Model.Address
@@ -50,6 +50,7 @@ import Control.DeepSeq
 import qualified Control.Exception as E
 import Control.Monad (when)
 import Control.Monad.Change.Alter
+import Control.Monad.Composable.Kafka
 import Control.Monad.Composable.SQL
 import Control.Monad.IO.Class
 import Data.Aeson
@@ -372,7 +373,5 @@ emitKafkaTransactions = loop id
     loop front = await >>= maybe (emit $ front []) (\x -> loop $ front . (x :))
     emit txs = do
       $logDebugS "writeUnseqEventsBegin" . T.pack $ "Writing " ++ show (length txs) ++ " faucet tx(s) to unseqevents"
-      rets <- liftIO $ runKafkaConfigured "strato-api" $ writeUnseqEventsWithLimits txs
-      case rets of
-        Left e -> $logError $ T.pack $ "Could not write txs to Kafka: " ++ show e
-        Right resps -> $logDebug $ T.pack $ "writeUnseqEventsEnd Kafka commit: " ++ show resps
+      resps <- liftIO $ runKafkaMConfigured "strato-api" $ execKafka $ writeUnseqEventsWithLimits txs
+      $logDebug $ T.pack $ "writeUnseqEventsEnd Kafka commit: " ++ show resps

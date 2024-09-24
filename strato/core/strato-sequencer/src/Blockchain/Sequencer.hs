@@ -18,7 +18,7 @@ module Blockchain.Sequencer where
 
 import BlockApps.Logging
 import BlockApps.X509.Certificate
-import Blockchain.Blockstanbul
+import Blockchain.Blockstanbul 
 import qualified Blockchain.Data.Block as BDB
 import Blockchain.Data.BlockHeader
 import Blockchain.Data.ChainInfo (chainInfo, creationBlock, parentChains)
@@ -34,6 +34,7 @@ import Blockchain.Sequencer.DB.GetTransactionsDB
 import Blockchain.Sequencer.DB.SeenTransactionDB
 import Blockchain.Sequencer.DB.Witnessable
 import Blockchain.Sequencer.Event
+import Blockchain.Sequencer.Kafka
 import Blockchain.Sequencer.Metrics
 import Blockchain.Sequencer.Monad
 import Blockchain.Strato.Model.ChainMember
@@ -57,11 +58,13 @@ import Data.Maybe
 import Data.Proxy
 import qualified Data.Set as S
 import qualified Data.Text as T
+--import Data.Tuple.Extra ((&&&))
 import Data.Time.Clock
 import Prometheus as P
 import qualified Text.Colors as CL
 import Text.Format
 import Text.Printf
+--import Blockchain.Data.Block (Block(blockBlockData))
 
 instance MonadMonitor m => MonadMonitor (ConduitT i o m) where
   doIO = lift . doIO
@@ -175,10 +178,10 @@ oneSequencerIter src = timeAction seqLoopTiming $ do
   prunePrivacyDBs
 
   unless (null _toVm) $ do
-    writeSeqVmEvents _toVm
+    _ <- writeSeqVmEvents _toVm
     $logDebugS "sequencer" . T.pack $ "Wrote " ++ format _toVm ++ " SeqEvents to VM"
   unless (null toP2p') $ do
-    writeSeqP2pEvents toP2p'
+    _ <- writeSeqP2pEvents toP2p'
     $logDebugS "sequencer" . T.pack $ "Wrote " ++ format toP2p' ++ " SeqEvents to P2P"
   unless (null _toUnseq) $ writeUnseqCheckpoints _toUnseq
   flush
@@ -247,7 +250,7 @@ checkForUnseq inEvents = do
 
 bootstrapBlockstanbul :: SequencerM ()
 bootstrapBlockstanbul = do
-  writeSeqVmEvents [VmCreateBlockCommand]
+  _ <- writeSeqVmEvents [VmCreateBlockCommand]
   createFirstTimer
 
 blockstanbulSend ::
@@ -275,21 +278,13 @@ blockstanbulSend' ::
   InEvent ->
   ConduitT a SeqEvent m ()
 blockstanbulSend' msg = do
-  resp' <- sendAllMessages [msg]
-  let blocks = [b | ToCommit b <- resp']
-  resp <-
-    (resp' ++)
-      <$> case blocks of
-        [] -> return []
-        -- TODO(tim): Block insertion can potentially fail, so there
-        -- should be feedback here
-        [b] -> sendAllMessages [CommitResult . Right . blockHash $ b]
-        bs -> error $ "can send at most 1 block at a time: " ++ show bs
+  resp <- sendAllMessages [msg]
+  let blocks = [b | ToCommit b <- resp]
   for_ resp $ \case
     ResetTimer rn -> createNewTimer rn
     FailedHistoric blk -> A.delete (Proxy @DependentBlockEntry) (blockHash blk) -- First time using `delete`
     _ -> pure ()
-  $logDebugS "seq/pbft/send" . T.pack $ "Pre-rewrite: " ++ format (map blockHash blocks)
+  $logDebugS "seq/pbft/send" . T.pack $ "Pre-rewrite: " ++ format (blockHash <$> blocks)
 
   let getSequencedBlock =
         ingestBlockToSequencedBlock
@@ -307,13 +302,18 @@ blockstanbulSend' msg = do
         (P2pBlock <$> committedBlocks)
           ++ p2ps
 
-  unless (null blocks) $ do
-    let tLast = blockHeaderTimestamp . BDB.blockBlockData . head $ blocks
-    dt <- unBlockPeriod <$> Mod.access (Mod.Proxy @BlockPeriod)
-    let tNext = addUTCTime dt tLast
-    now <- liftIO getCurrentTime
-    when (now < tNext) $
-      liftIO . threadDelay . round $ 1e6 * diffUTCTime tNext now
+  case committedBlocks of
+    [] -> pure ()
+    (b:_) -> do
+      let bh = BDB.blockHeader b
+          tLast = blockHeaderTimestamp bh
+      dt <- unBlockPeriod <$> Mod.access (Mod.Proxy @BlockPeriod)
+      let tNext = addUTCTime dt tLast
+      now <- liftIO getCurrentTime
+      when (now < tNext) $
+        liftIO . threadDelay . round $ 1e6 * diffUTCTime tNext now
+      Mod.put (Mod.Proxy @BDB.BestSequencedBlock) . BDB.BestSequencedBlock $
+        BDB.BestBlock (BDB.blockHeaderHash bh) (BDB.blockHeaderBlockNumber bh) (obTotalDifficulty b)
 
   $logDebugS "seq/pbft/send_checkpoints" . T.pack $ show ckpts
   yieldMany $ ToUnseq <$> ckpts
@@ -656,38 +656,9 @@ splitEvents es = forM_ (splitWith iEventType es) $ \(eventType, events) ->
         IETGenesis -> do
           record "inevent_type_genesis" "IngestGenesises"
           transformGenesis $ map (\(IEGenesis og) -> og) events
-        IETNewCertRegistered -> do
-          record "inevent_type_new_cert_registered" "IngestNewCertRegistered"
-          hasPBFT <- isJust <$> getBlockstanbulContext
-          case hasPBFT of
-            True -> do
-              ctx <- fromJust <$> getBlockstanbulContext
-              traverse_ (\(IENewCertRegistered a e) -> do
-                  when ((_selfAddr ctx) == Just a) $ do
-                    let chainm = getChainMemberFromX509 e
-                    putBlockstanbulContext $ ctx { _selfCert = Just chainm }
-                    $logInfoS "sequencer" . T.pack $ "Node identity verified: " ++ show chainm
-                  A.insert (A.Proxy @X509CertInfoState) a e
-                ) events --this is where we submit to ldb
-            False -> traverse_ (\(IENewCertRegistered a e) -> A.insert (A.Proxy @X509CertInfoState) a e) events
-        IETCertRevoked -> do
-          record "inevent_type_cert_revoked" "IngestCertRevoked"
-          traverse_ (\(IECertRevoked a) -> A.delete (A.Proxy @X509CertInfoState) a) events
         IETNewChainOrgName -> do
           record "inevent_type_new_org_name" "IngestNewChainOrgName"
           yieldMany $ map (\(IENewChainOrgName c cm) -> ToP2p $ P2pNewOrgName c cm) events
-        IETValidatorAdded -> do
-          record "inevent_type_validator_added" "ValidatorChange"
-          let bs = map (\(IEValidatorAdded bHash vc) -> (bHash, vc)) events
-          blockstanbulSend $ map (\(_, vc) -> ValidatorChange vc True) bs
-          retries <- lift $ map (PreviousBlock . outputBlockToBlock) . join <$> traverse retryFailedChildren (fst <$> bs)
-          blockstanbulSend retries
-        IETValidatorRemoved -> do
-          record "inevent_type_validator_removed" "ValidatorChange"
-          let bs = map (\(IEValidatorRemoved bHash vc) -> (bHash, vc)) events
-          blockstanbulSend $ map (\(_, vc) -> ValidatorChange vc False) bs
-          retries <- lift $ map (PreviousBlock . outputBlockToBlock) . join <$> traverse retryFailedChildren (fst <$> bs)
-          blockstanbulSend retries
         IETBlockstanbul -> do
           record "inevent_type_blockstanbul" "IngestBlockstanbuls"
           blockstanbulSend $ map (\(IEBlockstanbul (WireMessage a m)) -> IMsg a m) events
@@ -757,16 +728,6 @@ prettyOTx OutputTx {otOrigin = o, otBaseTx = t} = prefix t ++ " via " ++ shortOr
 writeUnseqCheckpoints :: [Checkpoint] -> SequencerM ()
 writeUnseqCheckpoints events = do
   ch <- asks (unseqCheckpoints . cablePackage)
-  atomically . mapM_ (writeTQueue ch) $ events
-
-writeSeqVmEvents :: [VmEvent] -> SequencerM ()
-writeSeqVmEvents events = do
-  ch <- asks (seqVMEvents . cablePackage)
-  atomically . mapM_ (writeTQueue ch) $ events
-
-writeSeqP2pEvents :: [P2pEvent] -> SequencerM ()
-writeSeqP2pEvents events = do
-  ch <- asks (seqP2PEvents . cablePackage)
   atomically . mapM_ (writeTQueue ch) $ events
 
 splitWith :: Eq k => (a -> k) -> [a] -> [(k, [a])]

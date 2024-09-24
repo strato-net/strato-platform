@@ -20,10 +20,11 @@ const ProcessingOrder = ({ user }) => {
   const orderDispatch = useOrderDispatch();
   const marketplaceDispatch = useMarketplaceDispatch();
   const [error, setError] = useState(null)
-  const { message, success } = useOrderState();
+  const { message, success, isOrderEventLoading } = useOrderState();
   const [api, contextHolder] = notification.useNotification();
   const [called, setCalled] = useState(false);
   const { cartList } = useMarketplaceState();
+  const [orderHash, setOrderHash] = useState("");
 
   // const storedData = useMemo(() => {
   //   return JSON.parse(window.localStorage.getItem("cartList") ?? []);
@@ -42,25 +43,38 @@ const ProcessingOrder = ({ user }) => {
 
   useEffect(() => {
     setAssetAddresses(query.get("assets"));
+    setOrderHash(query.get("orderHash"));
   }, [routeMatch, query]);
-
+  
+  useEffect(() => {
+    if (orderHash) {
+      orderActions.waitForOrderEvent(orderDispatch, orderHash);
+    }
+  }, [orderHash]);
+  
   useEffect(() => {
     if (assetAddresses !== undefined && user !== undefined && !called) {
       setCalled(true);
-      getCartData();
     }
-  }, [assetAddresses, user]);
-
+  }, [assetAddresses, user, called]);
+  
   useEffect(() => {
     const errorMsg = query.get("error");
     if (errorMsg) {
       setError(new Error(errorMsg));
     }
   }, [query]);
-
+  
+  useEffect(() => {
+    // Trigger getCartData when isOrderEventLoading changes to false
+    if (!isOrderEventLoading && called) {
+      getCartData();
+    }
+  }, [isOrderEventLoading, called]);
+  
   const getCartData = async () => {
     try {
-      if (assetAddresses) {
+      if (orderHash) {
         let updatedCart = [];
         storedConfirmList.forEach(cart => {
           if (!assetAddresses.includes(cart.action)) {
@@ -68,9 +82,9 @@ const ProcessingOrder = ({ user }) => {
           }
         });
         actions.addItemToCart(marketplaceDispatch, updatedCart);
-        setTimeout(() => {
-          navigate(routes.Orders.url.replace(':type', 'bought'));
-        }, 500);
+  
+        // Navigate to transaction once the cart is updated
+        navigate(routes.Transactions.url);
       } else {
         setTimeout(() => {
           navigate(routes.Checkout.url);
@@ -79,8 +93,8 @@ const ProcessingOrder = ({ user }) => {
     } catch (err) {
       setError(err);
     }
-  }
-
+  };
+  
   const openToastMarketplace = (placement) => {
     if (error != null) {
       api.error({

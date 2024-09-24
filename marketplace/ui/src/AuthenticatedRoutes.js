@@ -31,6 +31,8 @@ import LoginRedirect from "./components/LoginRedirect";
 import UserProfile from "./components/UserProfile";
 import Error from "./components/404";
 import FAQ from "./components/FAQ/index";
+import { TransactionsProvider } from "./contexts/transaction";
+import Transaction from "./components/Order/Transaction";
 
 const AuthenticatedRoutes = ({ user, users, isAuthenticated }) => {
   return (
@@ -83,7 +85,7 @@ const AuthenticatedRoutes = ({ user, users, isAuthenticated }) => {
               <OrdersProvider>
                 <InventoriesProvider>
                   <PaymentServicesProvider>
-                  <ConfirmOrder user={user} users={users} />
+                    <ConfirmOrder user={user} users={users} />
                   </PaymentServicesProvider>
                 </InventoriesProvider>
               </OrdersProvider>
@@ -138,7 +140,7 @@ const AuthenticatedRoutes = ({ user, users, isAuthenticated }) => {
         element={
           <UsersProvider>
             <IssuerStatusProvider>
-              <AuthorizeIssuer/>
+              <AuthorizeIssuer />
             </IssuerStatusProvider>
           </UsersProvider>
         }
@@ -231,9 +233,15 @@ const AuthenticatedRoutes = ({ user, users, isAuthenticated }) => {
                 <InventoriesProvider>
                   <ItemsProvider>
                     <OrdersProvider>
-                      <UserActivityProvider>
-                        <UserProfile user={user} users={users} />
-                      </UserActivityProvider>
+                      <PaymentServicesProvider>
+                        <RedemptionsProvider>
+                          <IssuerStatusProvider>
+                            <UserActivityProvider>
+                              <UserProfile user={user} users={users} />
+                            </UserActivityProvider>
+                          </IssuerStatusProvider>
+                        </RedemptionsProvider>
+                      </PaymentServicesProvider>
                     </OrdersProvider>
                   </ItemsProvider>
                 </InventoriesProvider>
@@ -255,19 +263,22 @@ const AuthenticatedRoutes = ({ user, users, isAuthenticated }) => {
       />
       <Route
         exact
-        path={routes.Orders.url}
+        path={routes.Transactions.url}
+        // path={routes.Orders.url}
         element={
           <UsersProvider>
             <CategorysProvider>
-              <OrdersProvider>
-                <ItemsProvider>
-                  <InventoriesProvider>
-                    <RedemptionsProvider>
-                      <Order user={user} users={users} />
-                    </RedemptionsProvider>
-                  </InventoriesProvider>
-                </ItemsProvider>
-              </OrdersProvider>
+              <TransactionsProvider>
+                <OrdersProvider>
+                  <ItemsProvider>
+                    <InventoriesProvider>
+                      <RedemptionsProvider>
+                        <Transaction user={user} users={users} />
+                      </RedemptionsProvider>
+                    </InventoriesProvider>
+                  </ItemsProvider>
+                </OrdersProvider>
+              </TransactionsProvider>
             </CategorysProvider>
           </UsersProvider>
         }

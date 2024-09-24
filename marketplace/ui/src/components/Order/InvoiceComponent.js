@@ -121,7 +121,6 @@ const InvoiceComponent = ({ invoice }) => {
             <Text style={[styles.label, styles.tableHeaderColumn]}>Currency</Text>
             <Text style={[styles.label, styles.tableHeaderColumn]}>Unit Price</Text>
             <Text style={[styles.label, styles.tableHeaderColumn]}>Quantity</Text>
-            <Text style={[styles.label, styles.tableHeaderColumn]}>Tax</Text>
             <Text style={[styles.label, styles.tableHeaderColumn]}>Amount</Text>
           </View>
           {invoice.assets.map((asset, index) => (
@@ -130,7 +129,6 @@ const InvoiceComponent = ({ invoice }) => {
               <Text style={[styles.value, styles.tableRowColumn]}>{invoice.order.currency ? invoice.order.currency : "USD"}</Text>
               <Text style={[styles.value, styles.tableRowColumn]}>{invoice.order.currency === "STRATS" ? (asset.price * STRATS_CONVERSION).toFixed(0) : asset.price.toFixed(2)}</Text>
               <Text style={[styles.value, styles.tableRowColumn]}>{orderQuantities[index]}</Text>
-              <Text style={[styles.value, styles.tableRowColumn]}>{asset.tax ? asset.tax : 0}</Text>
               <Text style={[styles.value, styles.tableRowColumn]}>{invoice.order.currency === "STRATS" ? (asset.price * STRATS_CONVERSION).toFixed(0) * orderQuantities[index] : (asset.price * orderQuantities[index]).toFixed(2)}</Text>
             </View>
           ))}
@@ -140,10 +138,6 @@ const InvoiceComponent = ({ invoice }) => {
             <View style={styles.textSection}>
               <Text style={styles.bottomLabel}>Subtotal</Text>
               <Text style={styles.bottomLabel}>{subtotal}</Text>
-            </View>
-            <View style={styles.textSection}>
-              <Text style={styles.bottomLabel}>Tax</Text>
-              <Text style={styles.bottomLabel}>{totalTax}</Text>
             </View>
             <View style={styles.textSection}>
               <Text style={styles.bottomLabel}>Total</Text>

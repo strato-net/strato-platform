@@ -1,6 +1,6 @@
 const { createTransactionPayload } = require("../helper/transferSTRATS");
 const {
-  NODE,
+  NODE_ENV,
   prodMarketplaceUrl,
   testnetMarketplaceUrl,
 } = require("../config");
@@ -8,7 +8,6 @@ const { getRewards } = require("../helper/googleSheet.js");
 
 async function handleCertificateRegistered(event, token) {
   try {
-    const { eventTxHash } = event;
     const targetCertificateEntry = event.eventEvent.eventArgs.find(
       (arg) => arg[0] === "certificate"
     );
@@ -24,8 +23,8 @@ async function handleCertificateRegistered(event, token) {
     // Fetch certificates based on transaction hash
     const queryResponse = await fetch(
       `https://${
-        NODE === "prod" ? prodMarketplaceUrl : testnetMarketplaceUrl
-      }/cirrus/search/Certificate?transaction_hash=eq.${eventTxHash}`,
+        NODE_ENV === "prod" ? prodMarketplaceUrl : testnetMarketplaceUrl
+      }/cirrus/search/Certificate?certificateString=eq.${encodeURIComponent(targetCertificateString)}&select=userAddress`,
       {
         method: "GET",
         credentials: "same-origin",
@@ -49,13 +48,35 @@ async function handleCertificateRegistered(event, token) {
     }
 
     const queryBody = await queryResponse.json();
+    console.log("Certificate query response:", queryBody);
+    if (!queryBody || queryBody.length <= 0) {
+      console.error("No certificates found in the marketplace.");
+      return;
+    }
 
-    const matchedObject = queryBody.find((obj) =>
-      obj.certificateString.includes(targetCertificateString)
+    // Fetch certificates based on transaction hash
+    const userQueryResponse = await fetch(
+      `https://${
+        NODE_ENV === "prod" ? prodMarketplaceUrl : testnetMarketplaceUrl
+      }/cirrus/search/Certificate?userAddress=eq.${encodeURIComponent(queryBody[0].userAddress)}&select=count`,
+      {
+        method: "GET",
+        credentials: "same-origin",
+        headers: {
+          Accept: "application/json",
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+      }
     );
-
-    if (!matchedObject) {
-      console.log("No match found.");
+    const userQueryBody = await userQueryResponse.json();
+    console.log("User certificate query response:", userQueryBody);
+    if (!userQueryBody || userQueryBody.length <= 0) {
+      console.error("No certificates found in the marketplace. User address:", queryBody[0].userAddress);
+      return;
+    }
+    if (userQueryBody[0].count > 1) {
+      console.error("Multiple certificates found in the marketplace. User address:", queryBody[0].userAddress);
       return;
     }
 
@@ -70,7 +91,7 @@ async function handleCertificateRegistered(event, token) {
     // Create transaction payload
     const response = await createTransactionPayload(
       token,
-      matchedObject.userAddress,
+      queryBody[0].userAddress,
       reward * 100 // Multiply by 100 for STRATS conversion
     );
 

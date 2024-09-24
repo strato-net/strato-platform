@@ -23,7 +23,6 @@ library:
     - Blockchain.StateRootMismatch
     - Blockchain.Stream.Action
     - Blockchain.Stream.VMEvent
-    - Blockchain.Stream.VMOutput
     - Blockchain.Timing
     - Blockchain.TxRunResultCache
     - Blockchain.MemVMContext
@@ -42,6 +41,7 @@ library:
     - blockapps-datadefs
     - blockapps-init
     - blockapps-mpdbs
+    - blockstanbul
     - bytestring
     - common-log
     - composable-monads-base
@@ -64,8 +64,6 @@ library:
     - leveldb-haskell
     - lrucache
     - merkle-patricia-db
-    - milena
-    - milena-tools
     - monad-alter
     - mtl
     - nibblestring
@@ -86,7 +84,6 @@ library:
     - time
     - transformers
     - unliftio
-    - x509-certs
 
 
 

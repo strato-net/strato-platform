@@ -1,6 +1,7 @@
 import { util, rest, importer } from "/blockapps-rest-plus";
 import config from "/load.config";
 import RestStatus from "http-status-codes";
+import saleJs from "../../dapp/orders/sale";
 import {
   setSearchQueryOptions,
   searchOne,
@@ -111,10 +112,10 @@ async function getHistory(user, chainId, address, options) {
  * @param _args - Contract state
  */
 function marshalOut(_args) {
-  const { unitsPerDollar, amount, totalPrice, createdDate, block_timestamp, status } = _args;
+  const { amount, totalPrice, createdDate, block_timestamp, status } = _args;
   const args = {
     ..._args,
-    totalPrice: totalPrice || (unitsPerDollar ? Math.round((amount * 100) / unitsPerDollar) / 100 : amount),
+    totalPrice: totalPrice || amount,
     createdDate: createdDate || (new Date(block_timestamp)).getTime() / 1000,
     status: status || 3,
   };
@@ -183,7 +184,7 @@ async function get(user, args, options) {
 
     // Legacy orders need to join array tables. 
     let legacyArgs = {
-      address: address,
+      transaction_hash: address,
       limit: 1,
       queryOptions: {
         select: constants.attach_saleAddresses_Quantities_completedSales_onOrder
@@ -271,6 +272,7 @@ async function getAll(admin, args = {}, options) {
       order: order,
     };
     saleOrders = await searchAllWithQueryArgs(paymentTableName, idArgs, newOptions, admin);
+    saleOrders = saleOrders.map((item)=>({...item, type: 'Order'}))
   }
 
   // ACH status updates
@@ -281,7 +283,7 @@ async function getAll(admin, args = {}, options) {
   if (saleOrders) {
     for (let i = 0; i < saleOrders.length; i++) {
       const order = saleOrders[i];
-      if (order.status === '2') {
+      if (parseInt(order.status) === 2) {
         if (paymentProvidersToOrderHashes[order.address]) {
           paymentProvidersToOrderHashes[order.address].push(order.orderHash);
         }
@@ -313,6 +315,7 @@ async function getAll(admin, args = {}, options) {
         saleOrders[index] = {
           ...saleOrders[index],
           status: paymentServiceRes[key],
+          type: 'Order'
         }
       });
   }
@@ -321,7 +324,8 @@ async function getAll(admin, args = {}, options) {
   try {
     // Legacy orders need to join array tables.
     let oldArgs = { ...args, limit: undefined, offset: 0, queryOptions: { select: constants.attach_saleAddresses_Quantities_completedSales_onOrder } };
-    const oldSaleOrders = await searchAllWithQueryArgs(constants.orderTableName, oldArgs, newOptions, admin);
+    let oldSaleOrders = await searchAllWithQueryArgs(constants.orderTableName, oldArgs, newOptions, admin);
+    oldSaleOrders = oldSaleOrders.map((item) => ({ ...item, type: 'Order' }));
     saleOrders = saleOrders ? [...saleOrders, ...oldSaleOrders] : [...oldSaleOrders];
 
     oldCount = await searchAllWithQueryArgs(
@@ -337,9 +341,9 @@ async function getAll(admin, args = {}, options) {
   totalCount += oldCount[0] ? oldCount[0].count : 0;
 
   if (order && order === 'createdDate.asc')
-    saleOrders.sort((a, b) => a.createdDate - b.createdDate);
+    saleOrders.sort((a, b) => a?.createdDate - b?.createdDate);
   else
-    saleOrders.sort((a, b) => b.createdDate - a.createdDate);
+    saleOrders.sort((a, b) => b?.createdDate - a?.createdDate);
 
   saleOrders = saleOrders.slice(offset, parseInt(offset) + parseInt(limit))
 

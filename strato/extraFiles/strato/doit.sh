@@ -160,7 +160,7 @@ function newnode {
     fi
 
     echo "Starting ethereum-discover"
-    runBackgroundProcess ethereum-discover  &>> logs/ethereum-discover
+    runBackgroundProcess ethereum-discover "${iFlag}" &>> logs/ethereum-discover
 
     echo "Starting strato-p2p"
     runBackgroundProcess strato-p2p \
@@ -173,7 +173,11 @@ function newnode {
        --sqlPeers=true \
        --txGossipFanout=${txGossipFanount:-3} \
        --minLogLevel=$p2pMinLogLevel \
-       ${networkFlag} ${iFlag} &>> logs/strato-p2p
+       ${networkFlag} "${iFlag}" &>> logs/strato-p2p
+
+    if [ -n "${strictBlockstanbul}" ]; then
+        sBFlag="--strictBlockstanbul=${strictBlockstanbul}"
+    fi
 
     echo "Starting strato-sequencer"
     runBackgroundProcess strato-sequencer \
@@ -185,17 +189,17 @@ function newnode {
       --seq_max_events_per_iter=${seqMaxEventsPerIter:-500} \
       --seq_max_us_per_iter=${seqMaxUsPerIter:-50000} \
       --validatorBehavior=${validatorBehavior:-true} \
-      "${networkFlag}" "${iFlag}" \
+      "${networkFlag}" "${iFlag}" "${sBFlag}" \
       +RTS "${seqRTSOPTs:-}" -N1 &>> logs/strato-sequencer
 
     echo "Starting strato-api-indexer"
-    runBackgroundProcess strato-api-indexer +RTS -N1 >> logs/strato-api-indexer 2>&1
+    runBackgroundProcess strato-api-indexer "${iFlag}" +RTS -N1 >> logs/strato-api-indexer 2>&1
 
     echo "Starting strato-p2p-indexer"
-    runBackgroundProcess strato-p2p-indexer +RTS -N1 >> logs/strato-p2p-indexer 2>&1
+    runBackgroundProcess strato-p2p-indexer "${iFlag}" +RTS -N1 >> logs/strato-p2p-indexer 2>&1
 
     echo "Starting strato-txr-indexer"
-    runBackgroundProcess strato-txr-indexer +RTS -N1 >> logs/strato-txr-indexer 2>&1
+    runBackgroundProcess strato-txr-indexer "${iFlag}" +RTS -N1 >> logs/strato-txr-indexer 2>&1
   fi
 
   if [ -n "${svmDev}" ]; then
@@ -231,6 +235,12 @@ function newnode {
   if [ -n "${FILE_SERVER_URL}" ]; then
       fsFlag="--fileServerUrl=${FILE_SERVER_URL}"
   fi
+  if [ -n "${strictGas}" ]; then
+      sgFlag="--strictGas=${strictGas}"
+  fi
+  if [ -n "${strictGasLimit}" ]; then
+      sglFlag="--strictGasLimit=${strictGasLimit}"
+  fi
 
   if [ "${STRATO_MODE}" != "CLIENT" ]; then
       echo "Starting vm-runner"
@@ -257,6 +267,8 @@ function newnode {
         "${gasFlag}" \
         "${creatorFlag}" \
         "${iFlag}" \
+        "${sgFlag}" \
+        "${sglFlag}" \
         +RTS "${vmRunnerRTSOPTs:-}" -I2 -N1 &>> logs/vm-runner
   fi
 
@@ -282,7 +294,7 @@ function newnode {
     "${ubFlag}" \
     "${udFlag}" \
     "${fsFlag}" \
-    "${apiFlag}" +RTS -N1 >> logs/strato-api 2>&1
+    "${apiFlag}" "${iFlag}" +RTS -N1 >> logs/strato-api 2>&1
 
   if [ "${STRATO_MODE}" != "CLIENT" ]; then
       SLIPSTREAM_CMD="slipstream \
@@ -306,7 +318,7 @@ function newnode {
   fi
 
   echo "Starting process monitoring..."
-  runBackgroundProcess process-monitor-exe &>> logs/process-monitoring
+  runBackgroundProcess process-monitor-exe "${iFlag}" &>> logs/process-monitoring
 
   echo "Configuring log rotation..."
   runBackgroundProcess logRotation
@@ -395,11 +407,6 @@ function doInit {
   echo "init event source: $cmd"
   # logging to stdout and log file:
   $cmd 2>&1 | tee logs/strato-setup
-  if [ ${PIPESTATUS[0]} -ne 0 ]; then
-    echo "STRATO SETUP FAILED: see /var/lib/strato/logs/strato-setup for details"
-    tail -f /dev/null
-  fi
-  init-worker --kafkahost=$kafkaHost 2>&1 | tee --append logs/strato-setup
   if [ ${PIPESTATUS[0]} -ne 0 ]; then
     echo "STRATO SETUP FAILED: see /var/lib/strato/logs/strato-setup for details"
     tail -f /dev/null

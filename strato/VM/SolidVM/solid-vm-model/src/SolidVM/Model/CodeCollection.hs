@@ -23,6 +23,7 @@ module SolidVM.Model.CodeCollection (
   usesStrictModifiers,
   getContractsBySolidString,
   resolvePragmaFeature,
+  structDef,
   module SolidVM.Model.CodeCollection.Contract,
   --module SolidVM.Model.CodeCollection.Def,
   module SolidVM.Model.CodeCollection.Function,
@@ -36,6 +37,7 @@ module SolidVM.Model.CodeCollection (
   ) where
 
 import Blockchain.SolidVM.Exception
+import Control.Applicative ((<|>))
 import Control.DeepSeq
 import Control.Lens
 import Data.Aeson as A
@@ -165,9 +167,9 @@ getContractsBySolidString solidStr codeCollection = M.lookup solidStr (_contract
 
 resolvePragmaFeature :: [(String, String)] -> String -> Bool
 resolvePragmaFeature pragmaList feature = 
-  let solidVMVersion = maybe "" snd $ find ((== "solidvm") . fst) pragmaList
+  let solidVMVersion = find (== ("solidvm", "11.4")) pragmaList
   in case (solidVMVersion) of
-      ("11.4") -> 
+      Just _ -> 
         case feature of
           "es6" -> True
           "strict" -> True
@@ -175,4 +177,7 @@ resolvePragmaFeature pragmaList feature =
           "safeExternalCalls" -> True
           "strictDecimals" -> True
           _ -> False
-      (_) -> isJust $ find ((== feature) . fst) pragmaList
+      _ -> isJust $ find ((== feature) . fst) pragmaList
+
+structDef :: ContractF a -> CodeCollectionF a -> SolidString -> Maybe [(SolidString, FieldType, a)]
+structDef c cc n = (c ^. structs . at n) <|> (cc ^. flStructs . at n)

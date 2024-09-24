@@ -47,6 +47,7 @@ library:
     - stm-conduit
     - strato-conf
     - strato-model
+    - strato-redis-blockdb
     - servant-client
     - text
     - time
@@ -58,7 +59,6 @@ library:
     - resourcet
     - stm-chans
     - unliftio
-    - x509-certs
 
 executables:
   strato-sequencer:
@@ -73,9 +73,10 @@ executables:
       - blockstanbul
       - bytestring
       - common-log
+      - hedis
       - hflags
       - http-client
-      - milena
+      - kafka-monad
       - process-monitor
       - prometheus-client
       - safe
@@ -86,6 +87,7 @@ executables:
       - strato-conf
       - strato-genesis
       - strato-model
+      - strato-redis-blockdb
       - strato-sequencer
       - text
       - wai-middleware-prometheus
@@ -99,7 +101,7 @@ executables:
     dependencies:
       - blockstanbul
       - hflags
-      - milena
+      - kafka-monad
       - seqevents
       - strato-conf
 

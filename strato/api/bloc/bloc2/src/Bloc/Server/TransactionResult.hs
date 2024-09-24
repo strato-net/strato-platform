@@ -139,7 +139,7 @@ getBlocTransactionResult ::
   Keccak256 ->
   Bool ->
   m BlocTransactionResult
-getBlocTransactionResult txHash resolve = fmap head $ postBlocTransactionResults resolve [txHash]
+getBlocTransactionResult txHash resolve = fmap head $ postBlocTransactionResults Nothing resolve [txHash]
 
 getBatchBlocTransactionResult' ::
   ( (Keccak256 `A.Selectable` SourceMap) m,
@@ -152,7 +152,7 @@ getBatchBlocTransactionResult' ::
   m [BlocTransactionResult]
 getBatchBlocTransactionResult' hashes resolve =
   if resolve
-    then postBlocTransactionResults True hashes
+    then postBlocTransactionResults Nothing True hashes
     else return $ map (\h -> BlocTransactionResult Pending h Nothing Nothing) hashes
 
 postBlocTransactionResults ::
@@ -162,10 +162,11 @@ postBlocTransactionResults ::
     MonadLogger m,
     MonadIO m, HasStrato m, HasCallStack
   ) =>
+  Maybe Text ->
   Bool ->
   [Keccak256] ->
   m [BlocTransactionResult]
-postBlocTransactionResults resolve hashes = recurseTRDs resolve hashes >>= evalAndReturn
+postBlocTransactionResults _ resolve hashes = recurseTRDs resolve hashes >>= evalAndReturn
 
 recurseTRDs ::
   (MonadIO m, MonadLogger m, HasStrato m, HasCallStack) =>

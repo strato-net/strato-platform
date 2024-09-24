@@ -82,7 +82,7 @@ data SolidException
   | InvalidWrite String String
   | InvalidCertificate String String
   | MalformedData String String
-  | TooMuchGas String String
+  | TooMuchGas Integer Integer
   | PaymentError String String
   | ReservedWordError String String
   | ImmutableError String String
@@ -127,7 +127,7 @@ showSolidException (InaccessibleChain a b) = printf "inaccessible chain: %s: %s"
 showSolidException (InvalidWrite a b) = printf "invalid write: %s: %s" a b
 showSolidException (InvalidCertificate a b) = printf "invalid certificate: %s: %s" a b
 showSolidException (MalformedData a b) = printf "Malformed data: %s: %s" a b
-showSolidException (TooMuchGas a b) = printf "You've run out of gas, the original alotment was %s, but the current gasInfo was: %s" a b
+showSolidException (TooMuchGas a b) = printf "You've run out of gas, the original alotment was %d, but the current gasInfo was: %d" a b
 showSolidException (PaymentError a b) = printf "There was an error sending %s wei to the following address: %s" a b
 showSolidException (ReservedWordError a b) = printf "%s is a reserved word in version %s and up." b a
 showSolidException (ImmutableError a b) = printf "%s is an immutable variable in line '%s'" a b
@@ -226,8 +226,8 @@ invalidCertificate = toThrower InvalidCertificate
 malformedData :: (Show v) => String -> v -> a
 malformedData = toThrower MalformedData
 
-tooMuchGas :: (Show v) => String -> v -> a
-tooMuchGas = toThrower TooMuchGas
+tooMuchGas :: Integer -> Integer -> a
+tooMuchGas limit actual = throw $ TooMuchGas limit actual
 
 paymentError :: (Show v) => String -> v -> a
 paymentError = toThrower PaymentError

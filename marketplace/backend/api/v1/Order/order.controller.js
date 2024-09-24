@@ -21,9 +21,6 @@ class OrderController {
       }
 
       const order = await dapp.getOrder(args, chainOptions);
-      if (order.order.totalPrice === undefined || order.order.totalPrice === 0) {
-          order.order.totalPrice = order.order.amount;
-      }
       
       const assetsWithImageUrl = order.assets
       const result = { ...order, assets: assetsWithImageUrl }
@@ -38,21 +35,9 @@ class OrderController {
   static async getAll(req, res, next) {
     try {
       const { dapp, query } = req
-
       const {orders, total} = await dapp.getSaleOrders({ ...query });
-      if (Array.isArray(orders)) {
-        orders.forEach(order => {
-          if (order.totalPrice === undefined || order.totalPrice === 0) {
-            order.totalPrice = order.amount;
-          }
-        });
-      } else {
-        console.error('Expected orders to be an array, but got:', orders);
-      }
-      
       
       rest.response.status200(res, {orders, total})
-
       return next()
     } catch (e) {
       return next(e)
@@ -72,13 +57,28 @@ class OrderController {
       // check orderEvent.status is 3 and sendEmail
       // Only send email if order is created successfully(STRATS Orders)
       const orderEvent = await dapp.getStratsOrderEvent({orderHash: checkoutHash, paymentProvider: restArgs.paymentProvider.address}, options)
-       if(orderEvent.length === 1 && orderEvent[0].status === "3" &&  orderEvent[0].currency === "STRATS")
+       if(orderEvent && orderEvent.length === 1 && orderEvent[0].status === "3" &&  orderEvent[0].currency === "STRATS")
       {
             await sendEmail(body.email, "Your Order Confirmation", htmlContents[0]);
             console.log("*Buyer placed order*",orderEvent);
       }
       return next()
 
+    } catch (e) {
+      return next(e)
+    }
+  }
+
+  static async waitForOrderEvent(req, res, next) {
+    try {
+      const { dapp, query } = req
+      const { orderHash } = query;
+      const orderEvent = await dapp.waitForOrderEvent({orderHash: orderHash}, options)
+       if(orderEvent && orderEvent.length === 1)
+      {
+        rest.response.status200(res, orderEvent)
+      }
+      return next()
     } catch (e) {
       return next(e)
     }
@@ -104,6 +104,20 @@ class OrderController {
 
       const result = await dapp.createUserAddress(body)
       rest.response.status200(res, result)
+
+      return next()
+    } catch (e) {
+      return next(e)
+    }
+  }
+
+  static async getUserAddress(req, res, next) {
+    try {
+      const { dapp, query } = req
+      const { redemptionService, shippingAddressId } = req.params;
+
+      const orders = await dapp.getUserAddress({ ...query, redemptionService, shippingAddressId})
+      rest.response.status200(res, orders)
 
       return next()
     } catch (e) {
@@ -222,7 +236,7 @@ class OrderController {
       addressLine1: Joi.string().required(),
       addressLine2: Joi.string().allow(""),
       country: Joi.string().required(),
-      redemptionService: Joi.string().required(),
+      redemptionService: Joi.string().optional(),
     }).required();
 
     const validation = createUserAddressSchema.validate(args);

@@ -33,6 +33,7 @@ executables:
     - lens
     - monad-alter
     - parametric-apis
+    - process-monitor
     - regex-compat
     - servant-client
     - servant-client-core

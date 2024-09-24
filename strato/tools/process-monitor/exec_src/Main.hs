@@ -12,6 +12,7 @@ import Control.Monad (forever)
 import Data.Foldable (traverse_)
 import Data.Metrics
 import Data.ProcessInfo
+import Instrumentation
 import Network.Wai.Middleware.Prometheus
 import Network.Wai.Handler.Warp
 import Prometheus
@@ -30,6 +31,7 @@ runProcessMonitoring = forever $ do
 
 main :: IO ()
 main = do
+  runInstrumentation "process-monitor"
   race_ runProcessMonitoring
     . run 10778
     $ metricsApp
