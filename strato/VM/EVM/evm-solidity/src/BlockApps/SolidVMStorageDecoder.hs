@@ -154,7 +154,6 @@ applyDelta' (Field n : sp) bv (ValueStruct ss) = do
   case M.lookup n' ss of
     Just v -> ValueStruct . (\x -> M.insert n' x ss) <$> applyDelta' sp bv v
     Nothing -> Right . ValueStruct $ M.insert n' (constructFromNothing' sp bv) ss
-applyDelta' [Field _] bv _ = Right $ fromBasic bv -- Handle struct value assignment case
 applyDelta' (MapIndex n : sp) bv (ValueMapping ms) =
   let n' = fromIndex n
    in case M.lookup n' ms of
@@ -170,6 +169,7 @@ applyDelta' [Field "length"] (BInteger n) (ValueArrayDynamic vs) =
   let n' = fromIntegral n
    in Right . ValueArrayDynamic $ I.insert n' (ValueArraySentinel n') vs
 applyDelta' [Field "length"] (BInteger n) (ValueArraySentinel {}) = Right . ValueArraySentinel $ fromIntegral n
+applyDelta' [Field _] bv _ = Right $ fromBasic bv -- Handle struct value assignment case
 applyDelta' sp bv (ValueArraySentinel {}) = Right $ constructFromNothing' sp bv
 applyDelta' sp b s = Left $ TypeMismatch (StoragePath sp) b s
 
