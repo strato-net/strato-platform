@@ -102,7 +102,6 @@ abstract contract Sale is Utils {
         for (uint i = 0; i < paymentServices.length; i++) {
             PaymentService p = paymentServices[i];
             delete paymentServicesMap[p.serviceName][p.creator];
-            delete paymentServices[i];
         }
         paymentServices = [];
     }
