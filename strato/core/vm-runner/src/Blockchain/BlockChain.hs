@@ -303,7 +303,7 @@ addBlockTransactions OutputBlock {obBlockData = bd, obReceiptTransactions = tran
   let txs =
         filter (\t -> (txType t /= PrivateHash) || (isJust $ otPrivatePayload t)) $
           transactions
-  trrs <- addTransactions bd txs
+  trrs <- addTransactions bd txs proposer
 
   lift $ timeit "flushMemStorageDB" (Just vmBlockInsertionMined) flushMemStorageDB
   lift $ timeit "flushMemAddressStateDB" (Just vmBlockInsertionMined) flushMemAddressStateDB
@@ -313,8 +313,9 @@ addTransactions ::
   (VMBase m, MonadMonitor m) =>
   BlockHeader ->
   [OutputTx] ->
+  Account ->
   ConduitT a VmOutEvent m [TxRunResult]
-addTransactions blockData txs =
+addTransactions blockData txs proposer =
   timeit ("addTransactions, " ++ show (length txs) ++ " TXs") (Just vmBlockInsertionMined) $ do
     trrs <- lift $ go (getBlockGasLimit blockData) txs DL.empty
     mapM_ (outputTransactionResult blockData blockHeaderHash) trrs
@@ -328,7 +329,7 @@ addTransactions blockData txs =
       flushMemStorageTxDBToBlockDB
       beforeMap <- getAddressStateTxDBMap
       let chainId = txChainId =<< otPrivatePayload t
-      (!deltaT, !result) <- timeIt $ runExceptT $ addTransaction chainId False blockData blockGas t
+      (!deltaT, !result) <- timeIt $ runExceptT $ addTransaction chainId False blockData blockGas t proposer
 
       afterMap <- getAddressStateTxDBMap
 
@@ -345,14 +346,15 @@ addTransactions blockData txs =
       go remainingBlockGas rest (trrs `DL.snoc` trr)
 
 mineTransactions :: (VMBase m, MonadMonitor m) => Bagger.MineTransactions m
-mineTransactions bd remGas otxs = mineTransactions' bd remGas DL.empty otxs
+mineTransactions bd remGas otxs mSelfAddress = mineTransactions' bd remGas DL.empty otxs mSelfAddress
 
-mineTransactions' :: (VMBase m, MonadMonitor m) => BlockHeader -> Integer -> DL.DList TxRunResult -> [OutputTx] -> m Bagger.TxMiningResult
-mineTransactions' _ remGas ran [] = return $ Bagger.TxMiningResult Nothing (DL.toList ran) [] remGas
-mineTransactions' header remGas ran unran@(tx : txs) = do
+mineTransactions' :: (VMBase m, MonadMonitor m) => BlockHeader -> Integer -> DL.DList TxRunResult -> [OutputTx] -> Address-> m Bagger.TxMiningResult
+mineTransactions' _ remGas ran [] _ = return $ Bagger.TxMiningResult Nothing (DL.toList ran) [] remGas
+mineTransactions' header remGas ran unran@(tx : txs) mSelfAddress = do
+
   let bt = fromMaybe (otBaseTx tx) (otPrivatePayload tx)
   beforeMap <- getAddressStateTxDBMap
-  (!time', !result) <- timeIt . runExceptT $ addTransaction Nothing False header remGas tx
+  (!time', !result) <- timeIt . runExceptT $ addTransaction Nothing False header remGas tx mSelfAddress
   afterMap <- getAddressStateTxDBMap
   P.setGauge vmTxMining (realToFrac time')
   printTransactionMessage tx result time' (txChainId bt)
@@ -391,8 +393,9 @@ addTransaction ::
   BlockHeader ->
   Integer ->
   OutputTx ->
+  Account -> 
   ExceptT TransactionFailureCause m ExecResults
-addTransaction chainId isRunningTests' b remainingBlockGas t@OutputTx {otSigner = tAddr} = do
+addTransaction chainId isRunningTests' b remainingBlockGas t@OutputTx {otSigner = tAddr} proposer = do
   nonceValid <- lift $ isNonceValid t
 
   let isHomestead = blockIsHomestead $ number b
@@ -454,7 +457,7 @@ addTransaction chainId isRunningTests' b remainingBlockGas t@OutputTx {otSigner 
 runCodeForTransaction ::
   (VMBase m) =>
   Bool ->
-  Bool ->
+  Bool -> -- add address here
   BlockHeader ->
   Gas ->
   Account ->

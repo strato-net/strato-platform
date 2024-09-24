@@ -226,6 +226,7 @@ create ::
   Int ->
   Account ->
   Account ->
+  Account ->
   Integer ->
   Integer ->
   Gas ->
@@ -237,12 +238,13 @@ create ::
   m ExecResults
 --create isRunningTests' isHomestead preExistingSuicideList b callDepth sender origin
 --       value gasPrice availableGas newAddress initCode txHash chainId metadata =
-create _ _ _ blockData _ sender' origin' _ _ availableGas newAddress code txHash' chainId' metadata = do
+create _ _ _ blockData _ sender' origin' proposer' _ _ availableGas newAddress code txHash' chainId' metadata = do
   isRunningTests <- checkIfRunningTests
   let env' =
         Env.Environment
           { Env.blockHeader = blockData,
             Env.sender = sender',
+            Env.proposer = proposer',
             Env.origin = origin',
             Env.txHash = txHash',
             Env.metadata = metadata,
@@ -406,6 +408,7 @@ call ::
   Account ->
   Account ->
   Account ->
+  Account ->
   Word256 ->
   Word256 ->
   B.ByteString ->
@@ -417,7 +420,7 @@ call ::
   m ExecResults
 --  call isRunningTests' isHomestead noValueTransfer preExistingSuicideList b callDepth receiveAddress
 --       (Address codeAddress) sender value gasPrice theData availableGas origin txHash chainId metadata =
-call _ _ _ isRCC _ blockData _ _ codeAddress sender' _ _ _ availableGas origin' txHash' chainId' metadata = do
+call _ _ _ isRCC _ blockData _ _ codeAddress sender' proposer' _ _ _ availableGas origin' txHash' chainId' metadata = do
   recordCall
 
   isRunningTests <- checkIfRunningTests
@@ -426,6 +429,7 @@ call _ _ _ isRCC _ blockData _ _ codeAddress sender' _ _ _ availableGas origin' 
           { Env.blockHeader = blockData,
             Env.sender = sender',
             Env.origin = origin',
+            Env.proposer = proposer',
             Env.txHash = txHash',
             Env.metadata = metadata,
             Env.runningTests = isRunningTests
@@ -1682,17 +1686,22 @@ expToVar' x@(CC.MemberAccess _ expr name) _ = do
           Just (CC.ConstantDecl _ _ constExp _) -> expToVar constExp Nothing
     (SBuiltinVariable "block", "proposer") -> do
       env' <- getEnv
-      let bh = Env.blockHeader env'
-          pHash = proposalHash bh
-          mSig = BlockHeader.proposalSignature bh  -- Signature is Maybe type
-      case mSig of
-          Just sig -> do
-              let (r, s, v) = getSigVals sig
-                  proposerAddress = whoReallySignedThisTransactionEcrecover pHash r s (v - 0x1b)
-              case proposerAddress of
-                Just addr ->  return $ Constant (flip SAccount False (unspecifiedChain addr))
-                Nothing -> return $ Constant SNULL
-          Nothing -> return $ Constant SNULL
+      let proposer = Env.proposer env'
+      case proposer of
+        Just addr ->  return $ Constant (flip SAccount False (unspecifiedChain addr))
+        Nothing -> return $ Constant SNULL
+
+      -- let bh = Env.blockHeader env'
+      --     pHash = proposalHash bh
+      --     mSig = BlockHeader.proposalSignature bh  -- Signature is Maybe type
+      -- case mSig of
+      --     Just sig -> do
+      --         let (r, s, v) = getSigVals sig
+      --             proposerAddress = whoReallySignedThisTransactionEcrecover pHash r s (v - 0x1b)
+      --         case proposerAddress of
+      --           Just addr ->  return $ Constant (flip SAccount False (unspecifiedChain addr))
+      --           Nothing -> return $ Constant SNULL
+      --     Nothing -> return $ Constant SNULL
     (SBuiltinVariable "block", "timestamp") -> do
       env' <- getEnv
       return $ Constant $ SInteger $ round $ utcTimeToPOSIXSeconds $ BlockHeader.timestamp $ Env.blockHeader env'

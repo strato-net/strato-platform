@@ -39,6 +39,7 @@ module Blockchain.VMContext
     bestBlockInfo,
     vmGasCap,
     hasBlockstanbul,
+    selfAddress,
     blockRequested,
     runningTests,
     txRunResultsCache,
@@ -269,7 +270,8 @@ data ContextState = ContextState
     _blockRequested :: !Bool,
     _runningTests :: !Bool,
     _txRunResultsCache :: TRC.Cache,
-    _debugSettings :: !(Maybe DebugSettings)
+    _debugSettings :: !(Maybe DebugSettings),
+    _selfAddress :: Maybe Address
   }
   deriving (Generic, NFData)
 
@@ -286,7 +288,8 @@ instance Default ContextState where
         _blockRequested = False,
         _runningTests = False,
         _txRunResultsCache = error "Default ContextState: accessing uninitialized txRunResultsCache",
-        _debugSettings = Nothing
+        _debugSettings = Nothing,
+        _selfAddress = Nothing
       }
 
 data QueueEvent
@@ -441,7 +444,8 @@ runTestContextM f = withSystemTempDirectory "test_evm_context" $ \tmpdir ->
               _blockRequested = False,
               _runningTests = True,
               _txRunResultsCache = cache,
-              _debugSettings = Nothing
+              _debugSettings = Nothing,
+              _selfAddress = Nothing
             }
       que <- newTQueueIO
       let ctx =

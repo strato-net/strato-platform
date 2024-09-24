@@ -208,6 +208,9 @@ failedAssertion _ = False
 sender :: Account
 sender = Account 0xdeadbeef Nothing
 
+proposer :: Account
+proposer = Account 0xdeadbeef2 Nothing
+
 privateChainAcc :: Account
 privateChainAcc = Account 0xdeadbeef (Just 0x776622233444)
 
@@ -419,6 +422,7 @@ runArgsWithSenderBeef acc args bs = do
       blockData
       callDepth
       sender
+      proposer
       origin
       value
       gasPrice
@@ -475,6 +479,7 @@ runArgsWithSender acc args bs = do
       blockData
       callDepth
       sender
+      proposer
       origin
       value
       gasPrice
@@ -528,6 +533,7 @@ runArgsWithOrigin orig acc args bs = do
       blockData
       callDepth
       sender
+      proposer
       orig
       value
       gasPrice
@@ -652,6 +658,7 @@ runCall funcName callArgs bs = do
       blockData
       callDepth
       sender
+      proposer
       origin
       value
       gasPrice
@@ -676,6 +683,7 @@ runCall funcName callArgs bs = do
       receiveAddress
       newAddress
       sender
+      proposer
       value
       gasPrice
       theData
@@ -736,6 +744,7 @@ runCall' funcName callArgs bs = do
       blockData
       callDepth
       sender
+      proposer
       origin
       value
       gasPrice
@@ -760,6 +769,7 @@ runCall' funcName callArgs bs = do
       receiveAddress
       newAddress
       sender
+      proposer
       value
       gasPrice
       theData
@@ -823,6 +833,7 @@ call2 funcName callArgs contractAddress = do
       receiveAddress
       contractAddress
       sender
+      proposer
       value
       gasPrice
       theData
