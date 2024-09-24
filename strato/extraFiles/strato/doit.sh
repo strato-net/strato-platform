@@ -81,7 +81,7 @@ function newnode {
   echo 'Waiting for vault-proxy to rise and shine at http://localhost:8013...'
   started=$(date +%s)
   timeout=30
-  while ! curl --silent --output /dev/null --fail --max-time 0.2 --location http://localhost:8013; do
+  while ! curl --silent --output /dev/null --fail --max-time 0.5 --location http://localhost:8013; do
     if [[ $(date +%s) -ge ${started}+${timeout} ]]; then
       echo -e "\n tail -n40 logs/vault-proxy"
       tail -n40 logs/vault-proxy
