@@ -64,6 +64,7 @@ const MakeOfferModal = ({
     return values.quantity * values.price;
   };
 
+  // This is to prevent scrolling when the modal is open. It will disable the body scroll.
   useEffect(() => {
     if (isOpen) {
       document.body.style.overflow = "hidden";
