@@ -32,6 +32,7 @@ import clothingJs from "/dapp/items/clothing";
 import membershipJs from "/dapp/items/membership";
 import carbonDAOJs from "/dapp/items/carbonDAO";
 import collectibleJs from "dapp/items/collectibles";
+import offerJs from "/dapp/offers/offer";
 
 import saleJs from "/dapp/orders/sale";
 import saleOrderJs from "/dapp/orders/saleOrder";
@@ -1256,25 +1257,16 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
   // -----------------------------PAYMENT ends here -------------------------------
 
   // -----------------------------OFFERS starts here -------------------------------
-  // export const Offers = {
-  //   prefix: '/offers',
-  //   get: '/:address',
-  //   getAll: '/',
-  //   create: '/',
-  //   update: '/update',
-  //   accept: '/accept',
-  //   reject: '/reject',
-  //   cancel: '/cancel',
-  //   getIncomingOffers: '/incoming',
-  //   getOutgoingOffers: '/outgoing',
-  //   getAcceptedOffers: '/accepted',
-  //   getRejectedOffers: '/rejected',
-  //   getCancelledOffers: '/cancelled'
-  // }
 
-  contract.getOffers = async function (args, options = defaultOptions) {
+  contract.getOffer = async function (args, options = defaultOptions) {
     const getOptions = { ...options, app: contractName }
-    return offerJs.getAll(rawAdmin, args, getOptions);
+    return offerJs.get(rawAdmin, args, getOptions);
+  }
+
+  contract.getAllOffers = async function (args, options = defaultOptions) {
+    console.log("offerArgs===>", args);
+    const offers = await offerJs.getAll(rawAdmin, args, options);
+    return offers;
   }
 
   contract.createOffer = async function (args, options = defaultOptions) {

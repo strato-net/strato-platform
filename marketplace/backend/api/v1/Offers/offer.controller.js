@@ -18,7 +18,7 @@ class OfferController {
                 args = { address }
             }
 
-            const order = await dapp.getOrder(args, chainOptions);
+            const order = await dapp.getOffer(args, chainOptions);
 
             const assetsWithImageUrl = order.assets
             const result = { ...order, assets: assetsWithImageUrl }
@@ -33,9 +33,8 @@ class OfferController {
     static async getAll(req, res, next) {
         try {
             const { dapp, query } = req
-            const { orders, total } = await dapp.getSaleOrders({ ...query });
-
-            rest.response.status200(res, { orders, total })
+            const offers = await dapp.getAllOffers({ ...query });
+            rest.response.status200(res, offers)
             return next()
         } catch (e) {
             return next(e)
@@ -45,8 +44,7 @@ class OfferController {
     static async create(req, res, next) {
         try {
             const { dapp, body } = req
-            const { order } = body
-            const result = await dapp.createOrder({ order }, options)
+            const result = await dapp.createOffer(body, options)
             rest.response.status200(res, result)
             return next()
         } catch (e) {
@@ -57,8 +55,7 @@ class OfferController {
     static async update(req, res, next) {
         try {
             const { dapp, body } = req
-            const { order } = body
-            const result = await dapp.updateOrder({ order }, options)
+            const result = await dapp.updateOffer(body, options)
             rest.response.status200(res, result)
             return next()
         } catch (e) {
@@ -69,8 +66,7 @@ class OfferController {
     static async accept(req, res, next) {
         try {
             const { dapp, body } = req
-            const { order } = body
-            const result = await dapp.acceptOrder({ order }, options)
+            const result = await dapp.acceptOrder(body, options)
             rest.response.status200(res, result)
             return next()
         } catch (e) {
@@ -81,8 +77,7 @@ class OfferController {
     static async reject(req, res, next) {
         try {
             const { dapp, body } = req
-            const { order } = body
-            const result = await dapp.rejectOrder({ order }, options)
+            const result = await dapp.rejectOffer(body, options)
             rest.response.status200(res, result)
             return next()
         } catch (e) {
@@ -93,8 +88,7 @@ class OfferController {
     static async cancel(req, res, next) {
         try {
             const { dapp, body } = req
-            const { order } = body
-            const result = await dapp.cancelOrder({ order }, options)
+            const result = await dapp.cancelOffer(body, options)
             rest.response.status200(res, result)
             return next()
         } catch (e) {

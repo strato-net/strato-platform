@@ -10,11 +10,13 @@ import { useInventoryDispatch, useInventoryState, } from "../../contexts/invento
 import { actions as categoryActions } from "../../contexts/category/actions";
 import { actions as marketPlaceActions } from "../../contexts/marketplace/actions";
 import { actions as orderActions } from "../../contexts/order/actions"
+import { actions as offerActions } from "../../contexts/offer/actions"
 // dispatch & state
 import { useMarketplaceDispatch, useMarketplaceState, } from "../../contexts/marketplace";
 import { useOrderDispatch } from "../../contexts/order";
 import { useCategoryDispatch, useCategoryState } from "../../contexts/category";
 import { useAuthenticateState } from "../../contexts/authentication";
+import { useOfferDispatch, useOfferState } from "../../contexts/offer";
 // components
 import HelmetComponent from "../Helmet/HelmetComponent";
 import DataTableComponent from "../DataTableComponent";
@@ -65,12 +67,15 @@ const ProductDetails = ({ user, users }) => {
   const categoryDispatch = useCategoryDispatch();
   const orderDispatch = useOrderDispatch();
   const marketplaceDispatch = useMarketplaceDispatch();
+  const offerDispatch = useOfferDispatch();
+
   // state
   const { categorys, iscategorysLoading } = useCategoryState();
   const { inventoryDetails, isInventoryDetailsLoading, isInventoryOwnershipHistoryLoading,
     inventoryOwnershipHistory, priceHistory, isFetchingPriceHistory
   } = useInventoryState();
   const { cartList } = useMarketplaceState();
+  const { offer, isCreateOfferSubmitting, offers, isOffersLoading, error, success, message } = useOfferState();
 
 
   const [isModalVisible, setIsModalVisible] = useState(false);
@@ -116,6 +121,12 @@ const ProductDetails = ({ user, users }) => {
   useEffect(() => {
     categoryActions.fetchCategories(categoryDispatch);
   }, [categoryDispatch]);
+
+  // Fetch Offers made for the product: Offers where product.address = Offer.assetToBeSold
+  // fetchOffers(offerDispatch, productAddress = null, userAddress = null)
+  useEffect(() => {
+    offerActions.fetchOffers(offerDispatch, "15d337829e236cf6939e9324237d020ae1ecd8c8");
+  }, [user, offerDispatch]);
 
   useEffect(() => {
     if (Id !== undefined) {

@@ -8,6 +8,7 @@ import {
   searchAllWithQueryArgs,
   setSearchQueryOptionsPrime,
 } from "/helpers/utils";
+
 import dayjs from "dayjs";
 import constants from "../../helpers/constants";
 
@@ -128,18 +129,22 @@ function bind(user, _contract, options) {
   return contract;
 }
 
-async function get(user, args, options) {
+async function get(user, args, defaultOptions) {
+  const options = { ...defaultOptions, org: 'BlockApps', app: 'Mercata' }
+
   const contractArgs = {
     name: contractName,
     address: args.address,
   };
 
-  const offer = await rest.searchOne(user, contractArgs, options);
+  const offer = await searchOne(user, contractArgs, options);
   return offer;
 }
 
-async function getAll(user, args = {}, options) {
-  const offers = await rest.searchAllWithQueryArgs(
+async function getAll(user, args = {}, defaultOptions) {
+  const options = { ...defaultOptions, org: 'BlockApps', app: 'Mercata' }
+
+  const offers = await searchAllWithQueryArgs(
     contractName,
     args,
     options,

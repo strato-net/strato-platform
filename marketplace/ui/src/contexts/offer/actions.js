@@ -70,28 +70,51 @@ const actions = {
     }
   },
 
-  fetchOffers: async (dispatch) => {
+  fetchOffers: async (dispatch, productAddress = null, userAddress = null) => {
     dispatch({ type: actionDescriptors.fetchOffers });
 
     try {
-      const response = await fetch(`${apiUrl}/offer`, {
-        method: HTTP_METHODS.GET,
-      });
-
-      const body = await response.json();
-
-      if (response.status === RestStatus.OK) {
-        dispatch({
-          type: actionDescriptors.fetchOffersSuccessful,
-          payload: body.data,
+      // Fetch offers for specific product (For product details page)
+      if (productAddress) {
+        const response = await fetch(`${apiUrl}/offer?assetToBeSold=${productAddress}`, {
+          method: HTTP_METHODS.GET,
         });
-        return;
-      }
 
-      dispatch({
-        type: actionDescriptors.fetchOffersFailed,
-        error: body.error || "Error while fetching offers",
-      });
+        const body = await response.json();
+
+        if (response.status === RestStatus.OK) {
+          dispatch({
+            type: actionDescriptors.fetchOffersSuccessful,
+            payload: body.data,
+          });
+          return;
+        }
+
+        dispatch({
+          type: actionDescriptors.fetchOffersFailed,
+          error: body.error || "Error while fetching offers",
+        });
+      } else if (userAddress) {
+        // Fetch Offers for User
+        const response = await fetch(`${apiUrl}/offer?seller=${userAddress}`, {
+          method: HTTP_METHODS.GET,
+        });
+
+        const body = await response.json();
+
+        if (response.status === RestStatus.OK) {
+          dispatch({
+            type: actionDescriptors.fetchOffersSuccessful,
+            payload: body.data,
+          });
+          return;
+        }
+
+        dispatch({
+          type: actionDescriptors.fetchOffersFailed,
+          error: body.error || "Error while fetching offers",
+        });
+      } 
     } catch (err) {
       dispatch({
         type: actionDescriptors.fetchOffersFailed,
