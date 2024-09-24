@@ -37,6 +37,9 @@ const actionDescriptors = {
   executeSale: "execute_sale",
   executeSaleSuccessful: "execute_sale_successful",
   executeSaleFailed: "execute_sale_failed",
+  waitForOrderEvent: "wait_for_order_event",
+  waitForOrderEventSuccessful: "wait_for_order_event_successful",
+  waitForOrderEventFailed: "wait_for_order_event_failed",
   updateOrderComment: "update_order_comment",
   updateOrderCommentSuccessful: "update_order_comment_successful",
   updateOrderCommentFailed: "update_order_comment_failed",
@@ -500,6 +503,52 @@ const actions = {
         error: "Error while fulfilling order",
       });
       actions.setMessage(dispatch, "Error while fulfilling order");
+    }
+  },
+
+
+  waitForOrderEvent: async (dispatch, orderHash) => {
+    dispatch({ type: actionDescriptors.waitForOrderEvent });
+
+    try {
+      const response = await fetch(`${apiUrl}/order/wait/event?orderHash=${orderHash}`, {
+        method: HTTP_METHODS.GET
+      });
+
+      const body = await response.json();
+
+      if (response.status === RestStatus.OK) {
+        dispatch({
+          type: actionDescriptors.waitForOrderEventSuccessful,
+          payload: body.data,
+        });
+        actions.setMessage(dispatch, "Order retrieved successfully", true);
+        return body.data;
+      } else if(response.status === RestStatus.UNAUTHORIZED) {
+        dispatch({ 
+          type: actionDescriptors.waitForOrderEventFailed, 
+          error: "Unauthorized while fetching users" 
+        });
+        window.location.href = body.error.loginUrl;
+      } else if(response.status === RestStatus.GATEWAY_TIMEOUT) {
+        dispatch({ 
+          type: actionDescriptors.waitForOrderEventFailed, 
+          error: "There was a problem processing your order, reach out to sales@blockapps.net for next steps." 
+        });
+      }
+
+      dispatch({
+        type: actionDescriptors.waitForOrderEventFailed,
+        error: "Error while fulfilling order",
+      });
+      actions.setMessage(dispatch, "Error while retrieving order");
+      return false;
+    } catch (err) {
+      dispatch({
+        type: actionDescriptors.waitForOrderEventFailed,
+        error: "Error while fulfilling order",
+      });
+      actions.setMessage(dispatch, "Error while retrieving order");
     }
   },
 

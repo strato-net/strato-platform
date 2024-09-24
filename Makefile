@@ -34,11 +34,11 @@ all: build_all docker-compose eks
 
 all_develop: build_develop docker-compose eks
 
-build_all: strato apex highway highway-nginx strato-nginx postgrest prometheus smd marketplace-backend marketplace-ui vault-wrapper vault-nginx identity-provider identity-service identity-nginx payment-server payment-server-nginx subject-signing-tool
+build_all: strato apex highway highway-nginx strato-nginx postgrest prometheus smd marketplace-backend marketplace-ui vault-wrapper vault-nginx identity-provider identity-service identity-nginx payment-server payment-server-nginx subject-signing-tool notification-server notification-server-nginx
 
-build_develop: develop apex highway highway-nginx strato-nginx postgrest prometheus smd marketplace-backend marketplace-ui vault-wrapper vault-nginx identity-provider identity-service identity-nginx payment-server payment-server-nginx subject-signing-tool
+build_develop: develop apex highway highway-nginx strato-nginx postgrest prometheus smd marketplace-backend marketplace-ui vault-wrapper vault-nginx identity-provider identity-service identity-nginx payment-server payment-server-nginx subject-signing-tool notification-server notification-server-nginx
 
-.PHONY: strato apex highway highway-nginx ory strato-nginx postgrest prometheus smd marketplace-backend marketplace-ui vault-wrapper vault-nginx identity-provider identity-service identity-nginx payment-server payment-server-nginx subject-signing-tool build_buildbase build_common build_common_profiled eks
+.PHONY: strato apex highway highway-nginx ory strato-nginx postgrest prometheus smd marketplace-backend marketplace-ui vault-wrapper vault-nginx identity-provider identity-service identity-nginx payment-server payment-server-nginx subject-signing-tool notification-server notification-server-nginx build_buildbase build_common build_common_profiled eks
 
 apex:
 	@echo Now building apex...
@@ -76,6 +76,14 @@ payment-server-nginx:
 	@echo Now building payment-server-nginx...
 	BASIL_DOCKER_TAG=${REPO_URL}payment-server-nginx:${VERSION} ECR_DOCKER_TAG=${REPO_AWS_ECR_URL}payment-server-nginx:${VERSION} make --directory=payment-server-nginx/
 
+notification-server:
+	@echo Now building notification server...
+	BASIL_DOCKER_TAG=${REPO_URL}notification-server:${VERSION} ECR_DOCKER_TAG=${REPO_AWS_ECR_URL}notification-server:${VERSION} make --directory=notification-server/
+
+notification-server-nginx:
+	@echo Now building notification-server-nginx...
+	BASIL_DOCKER_TAG=${REPO_URL}notification-server-nginx:${VERSION} ECR_DOCKER_TAG=${REPO_AWS_ECR_URL}notification-server-nginx:${VERSION} make --directory=notification-server-nginx/
+
 eks:
 	@echo Now generating eks manifest files
 	cd devops/eks/strato && sed -e 's|<REPO_URL>|'"${REPO_AWS_ECR_URL}"'|g' -e 's|<VERSION>|'"${VERSION}"'|g' strato-platform-manifest.tpl.yaml > strato-platform-manifest.yaml
@@ -83,7 +91,8 @@ eks:
 	#TODO: create eks manifest for identity server
 	#cd devops/eks/identity && sed -e 's|<REPO_URL>|'"${REPO_AWS_ECR_URL}"'|g' -e 's|<VERSION>|'"${VERSION}"'|g' eks-identity-deployment.tpl.yaml > eks-identity-deployment.yaml
 	#TODO: create eks manifest for highway server
-	#TODO: create eks manifest for payment-server server
+	#TODO: create eks manifest for payment server
+	#TODO: create eks manifest for notification server
 
 build_buildbase:
 	@echo building buildbase...
@@ -230,6 +239,8 @@ docker-compose:
 	sed -e 's|<REPO_URL>|'"${REPO_AWS_ECR_URL}"'|g' -e 's|<VERSION>|'"${VERSION}"'|g' docker-compose.highway.tpl.yml > docker-compose.highway.push.ecr.yml
 	sed -e 's|<REPO_URL>|'"${REPO_URL}"'|g' -e 's|<VERSION>|'"${VERSION}"'|g' docker-compose.payment.tpl.yml > docker-compose.payment.push.yml
 	sed -e 's|<REPO_URL>|'"${REPO_AWS_ECR_URL}"'|g' -e 's|<VERSION>|'"${VERSION}"'|g' docker-compose.payment.tpl.yml > docker-compose.payment.push.ecr.yml
+	sed -e 's|<REPO_URL>|'"${REPO_URL}"'|g' -e 's|<VERSION>|'"${VERSION}"'|g' docker-compose.notification.tpl.yml > docker-compose.notification.push.yml
+	sed -e 's|<REPO_URL>|'"${REPO_AWS_ECR_URL}"'|g' -e 's|<VERSION>|'"${VERSION}"'|g' docker-compose.notification.tpl.yml > docker-compose.notification.push.ecr.yml
 
 	@echo Creating the final docker-compose.yml...
 	awk '/build: ./{getline} 1' docker-compose.push.yml > docker-compose.yml
@@ -250,6 +261,8 @@ docker-compose:
 	awk '/build: ./{getline} 1' docker-compose.highway.push.ecr.yml > docker-compose.highway.ecr.yml
 	awk '/build: ./{getline} 1' docker-compose.payment.push.yml > docker-compose.payment.yml
 	awk '/build: ./{getline} 1' docker-compose.payment.push.ecr.yml > docker-compose.payment.ecr.yml
+	awk '/build: ./{getline} 1' docker-compose.notification.push.yml > docker-compose.notification.yml
+	awk '/build: ./{getline} 1' docker-compose.notification.push.ecr.yml > docker-compose.notification.ecr.yml
 
 docker-build:
 	cp -fr strato/extraFiles/* ${STRATODIR}

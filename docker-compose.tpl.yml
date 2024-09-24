@@ -165,6 +165,7 @@ services:
     - minBlockDifficulty=${minBlockDifficulty}
     - network=${network}
     - networkID=${networkID}
+    - NOTIFICATION_SERVER_URL=${NOTIFICATION_SERVER_URL}
     - numMinPeers=${numMinPeers}
     - OAUTH_DISCOVERY_URL=${OAUTH_DISCOVERY_URL}
     - OAUTH_CLIENT_ID=${OAUTH_CLIENT_ID}
@@ -345,9 +346,10 @@ services:
       KAFKA_DELETE_TOPIC_ENABLE: "true"
       KAFKA_LOG_CLEANER_ENABLE: "true"
       KAFKA_LOG_DIRS: '/kafka/kafka-logs'
-      KAFKA_LOG_RETENTION_HOURS: 2147483647
+      KAFKA_LOG_RETENTION_HOURS: 168  # Set to 7 days
+      KAFKA_LOG_RETENTION_MAX_BYTES: 5368709119
       KAFKA_OFFSET_METADATA_MAX_BYTES: 1048576
-      KAFKA_OFFSETS_RETENTION_MINUTES: 2147483647
+      KAFKA_OFFSETS_RETENTION_MINUTES: 2147483647 # Leaving as infinite for now
       KAFKA_MAX_REQUEST_SIZE: ${KAFKA_MAX_REQUEST_SIZE:-100663296}
       KAFKA_MESSAGE_MAX_BYTES: ${KAFKA_MESSAGE_MAX_BYTES:-100663296}
     image: registry-aws.blockapps.net:5000/blockapps-repo/kafka:2.12-2.0.1

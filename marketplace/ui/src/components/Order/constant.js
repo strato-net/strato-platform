@@ -24,3 +24,16 @@ export const getStatus = (num) => {
 export const getStatusByValue = (value) => {
   return Object.keys(status).find((key) => status[key] === value);
 };
+
+export const TYPE_COLOR = {
+  Order: "#2A53FF",
+  Transfer: "#FF0000",
+  Redemption: "#001C76"
+}
+
+export const TRANSACTION_FILTER = [
+  { value: "", label: "All" },
+  { value: "Order", label: "Order" },
+  { value: "Transfer", label: "Transfer" },
+  { value: "Redemption", label: "Redemption" }]
+

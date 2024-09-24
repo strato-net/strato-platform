@@ -421,6 +421,7 @@ main = do
   let urlMap = fromList
         [ ("vault", flags_vaultUrl),
           ("oauthDiscovery", flags_oauthDiscoveryUrl),
+          ("notificationServer", flags_notificationServerUrl),
           ( "fileServer",
             case (flags_fileServerUrl, computeNetworkID) of
               ("", 7596898649924658542) -> "https://fileserver.mercata-testnet2.blockapps.net/highway"

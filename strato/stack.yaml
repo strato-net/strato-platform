@@ -55,6 +55,7 @@ packages:
 - libs/composable-monads/sql-monad
 - libs/composable-monads/strato-monad
 - libs/composable-monads/identity-monad
+- libs/composable-monads/notification-monad
 - libs/composable-monads/vault-monad
 - libs/ethereum-rlp
 - libs/format
