@@ -17,6 +17,7 @@ newtype Sender = Sender {unSender :: Account}
 data Environment = Environment
   { sender :: Account,
     origin :: Account,
+    proposer :: Account,
     blockHeader :: BlockHeader,
     txHash :: Keccak256,
     metadata :: Maybe (M.Map T.Text T.Text),

@@ -133,6 +133,7 @@ handleVmEvents = awaitForever $ \InBatch {..} -> do
                               number = bSumNumber summ
                             }
             res <- Bagger.runFromStateRoot 
+              --account
               mineTransactions 
               (bSumGasLimit summ) 
               bHeader'
@@ -155,6 +156,7 @@ handleVmEvents = awaitForever $ \InBatch {..} -> do
     Mod.modify_ (Mod.Proxy @ContextState) $ pure . (blockRequested ||~ createBlock)
     -- todo: perhaps we shouldnt even add TXs to the mempool, it might make for a VERY large checkpoint
     -- todo: which may fail
+    mSelfAddress <- _selfAddr <$> Mod.get (Mod.Proxy @ContextState)
     bState <- Bagger.getBaggerState
     pbft <- _hasBlockstanbul <$> Mod.get (Mod.Proxy @ContextState)
     reqd <- _blockRequested <$> Mod.get (Mod.Proxy @ContextState)
@@ -164,7 +166,7 @@ handleVmEvents = awaitForever $ \InBatch {..} -> do
         hasTxs = (numPoolable > 0) || not (M.null pending) || not (null priv)
         shouldOutputBlocks =
           if pbft
-            then reqd && hasTxs
+            then reqd && hasTxs && isJust mSelfAddress
             else not makeLazyBlocks || hasTxs
     $logInfoS "evm/loop/newBlock" . T.pack $
       printf
@@ -188,7 +190,7 @@ handleVmEvents = awaitForever $ \InBatch {..} -> do
     if shouldOutputBlocks
       then do
         $logInfoS "evm/loop/newBlock" "calling Bagger.makeNewBlock"
-        newBlock <- Bagger.makeNewBlock mineTransactions
+        newBlock <- Bagger.makeNewBlock mineTransactions mSelfAddress
         pure $ Just newBlock 
       else pure Nothing
     

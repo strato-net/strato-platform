@@ -93,6 +93,10 @@ ethereumVM d = runResourceT $ do
     Bagger.processNewBestBlock cpHash cpHead [] -- bootstrap Bagger with genesis block
 
     failures <- runConsume "evm/loop" consumerGroup seqVmEventsTopicName $ \_ seqEvents -> do
+
+        let maybeSelfAddress = listToMaybe [ addr | VmSelfAddress addr <- toList seqEvents ]
+        modify' $ \cs@(ContextState) -> cs{_selfAddress = addr}
+
         recordBaggerMetrics =<< contextGets _baggerState
         logEventSummaries seqEvents
 

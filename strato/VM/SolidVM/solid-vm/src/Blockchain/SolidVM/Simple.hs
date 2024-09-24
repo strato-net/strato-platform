@@ -80,6 +80,7 @@ data SolidVMTxArgs = SolidVMTxArgs
   { _argsBlockData :: BlockHeader,
     _argsSender :: Account,
     _argsOrigin :: Account,
+    _argsProposer :: Account,
     _argsTxHash :: Keccak256,
     _argsChainId :: Maybe Word256,
     _argsMetadata :: Maybe (M.Map T.Text T.Text)
@@ -92,6 +93,7 @@ instance Default SolidVMTxArgs where
   def =
     SolidVMTxArgs
       defaultBlockData
+      (Account 0 Nothing)
       (Account 0 Nothing)
       (Account 0 Nothing)
       emptyHash
@@ -164,6 +166,7 @@ create s =
     (createErr "callDepth")
     (s ^. createArgs . argsSender)
     (s ^. createArgs . argsOrigin)
+    (s ^. createArgs . argsProposer)
     (createErr "value")
     (createErr "gasPrice")
     (Gas 100000000)
@@ -189,6 +192,7 @@ call s =
     (callErr "receiveAddress")
     (s ^. callCodeAddress)
     (s ^. callArgs . argsSender)
+    (s ^. callArgs . argsProposer)
     (callErr "value")
     (callErr "gasPrice")
     (callErr "theData")

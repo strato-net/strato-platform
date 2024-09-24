@@ -16,6 +16,8 @@ import Blockchain.Sequencer
 import Blockchain.Sequencer.CablePackage
 import Blockchain.Sequencer.Gregor
 import Blockchain.Sequencer.Monad
+import Blockchain.Sequencer.Event
+import Blockchain.Sequencer.Kafka
 import Blockchain.Strato.Model.Options (flags_network)
 import qualified Blockchain.Strato.RedisBlockDB as RBDB
 import Control.Concurrent (threadDelay)
@@ -80,24 +82,26 @@ main = do
   vaultWrapperUrl <- parseBaseUrl flags_vaultWrapperUrl
   let clientEnv = mkClientEnv mgr vaultWrapperUrl
 
-  selfAddress <- do
+  selfAddress <- do --send to vm with kafka
     addrAndKey <- waitOnVault $ runClientM (VC.getKey Nothing Nothing) clientEnv
     return $ VC.unAddress addrAndKey
-
+  
   putStrLn $ "strato-sequencer nodeAddress: " ++ show selfAddress
-
+  
   mCtx <-
     if not flags_blockstanbul
       then return Nothing
       else do
         unless (flags_blockstanbul_block_period_ms >= 0) . ioError . userError $
           "--blockstanbul_block_period_ms must be nonnegative"
-        unless (flags_blockstanbul_round_period_s > 0) . ioError . userError $
+        unless (flags_blockstanbul_round_period_s > 0) . ioErr  or . userError $
           "--blockstanbul_round_period_s must be positive"
 
         putStrLn $ "ACTUAL validators list: " ++ show validators
 
-        ckpt <- runGregorM gregorCfg $ initializeCheckpoint validators
+        ckpt <- runGregorM gregorCfg $ do
+          initializeCheckpoint validators
+          writeSeqVmEvents ([VmSelfAddress selfAddress])
         putStrLn $ "Checkpoint: " ++ show ckpt
 
         return $ Just $ newContext flags_network ckpt (Just selfAddress) flags_validatorBehavior Nothing
