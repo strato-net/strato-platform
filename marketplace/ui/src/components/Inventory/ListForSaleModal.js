@@ -77,8 +77,8 @@ const ListForSaleModal = ({ open, handleCancel, inventory, categoryName, limit, 
         const inventoryPaymentServices = inventory.paymentServices
             ? inventory.paymentServices.filter(provider => provider.value).map(provider => provider.value)
             : [];
-        const selectedPaymentServiceIndices = inventoryPaymentServices.map(address =>
-            diff.findIndex(ps => ps.address === address)
+        const selectedPaymentServiceIndices = inventoryPaymentServices.map(inventoryPS =>
+            diff.findIndex(ps => ps.creator === inventoryPS.creator && ps.serviceName === inventoryPS.serviceName)
         );
         setPaymentTypes(selectedPaymentServiceIndices);
 
