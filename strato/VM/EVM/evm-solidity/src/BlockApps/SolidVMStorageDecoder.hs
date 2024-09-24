@@ -149,6 +149,7 @@ applyDelta' :: [StoragePathPiece] -> BasicValue -> V.Value -> Either ReplayFailu
 applyDelta' [] bv (SimpleValue {}) = Right $ fromBasic bv
 applyDelta' [] bv (ValueEnum {}) = Right $ fromBasic bv
 applyDelta' [] bv (ValueContract {}) = Right $ fromBasic bv
+applyDelta' [Field _] bv (SimpleValue (ValueAddress 0x0)) = Right $ fromBasic bv -- Handle struct value assignment case
 applyDelta' (Field n : sp) bv (ValueStruct ss) = do
   n' <- first (UnicodeError n) $ decodeUtf8' n
   case M.lookup n' ss of
