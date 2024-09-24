@@ -12,6 +12,7 @@ import { PaymentServicesProvider } from "./contexts/payment";
 import Item from "./components/Item";
 import { ItemsProvider } from "./contexts/item";
 import Order from "./components/Order";
+import { OffersProvider } from "./contexts/offer";
 import SoldOrderDetails from "./components/Order/SoldOrderDetails";
 import BoughtOrderDetails from "./components/Order/BoughtOrderDetails";
 import RedemptionsOutgoingDetails from "./components/Order/RedemptionsOutgoingDetails";
@@ -155,7 +156,9 @@ const AuthenticatedRoutes = ({ user, users, isAuthenticated }) => {
                 <InventoriesProvider>
                   <ItemsProvider>
                     <OrdersProvider>
-                      <ProductDetails user={user} users={users} />
+                      <OffersProvider>
+                        <ProductDetails user={user} users={users} />
+                      </OffersProvider>
                     </OrdersProvider>
                   </ItemsProvider>
                 </InventoriesProvider>
@@ -214,7 +217,9 @@ const AuthenticatedRoutes = ({ user, users, isAuthenticated }) => {
                 <InventoriesProvider>
                   <ItemsProvider>
                     <OrdersProvider>
-                      <ProductDetails user={user} users={users} />
+                      <OffersProvider>
+                        <ProductDetails user={user} users={users} />
+                      </OffersProvider>
                     </OrdersProvider>
                   </ItemsProvider>
                 </InventoriesProvider>
@@ -273,7 +278,9 @@ const AuthenticatedRoutes = ({ user, users, isAuthenticated }) => {
                   <ItemsProvider>
                     <InventoriesProvider>
                       <RedemptionsProvider>
-                        <Transaction user={user} users={users} />
+                        <OffersProvider>
+                          <Transaction user={user} users={users} />
+                        </OffersProvider>
                       </RedemptionsProvider>
                     </InventoriesProvider>
                   </ItemsProvider>
