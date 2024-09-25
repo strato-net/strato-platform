@@ -34,19 +34,19 @@ all: build_all docker-compose eks
 
 all_develop: build_develop docker-compose eks
 
-build_all: strato apex highway highway-nginx strato-nginx postgrest prometheus smd marketplace-backend marketplace-ui vault-wrapper vault-nginx identity-provider identity-service identity-nginx payment-server payment-server-nginx subject-signing-tool notification-server notification-server-nginx
+build_all: strato apex highway highway-nginx nginx postgrest prometheus smd marketplace-backend marketplace-ui vault-wrapper vault-nginx identity-provider identity-service identity-nginx payment-server payment-server-nginx subject-signing-tool notification-server notification-server-nginx
 
-build_develop: develop apex highway highway-nginx strato-nginx postgrest prometheus smd marketplace-backend marketplace-ui vault-wrapper vault-nginx identity-provider identity-service identity-nginx payment-server payment-server-nginx subject-signing-tool notification-server notification-server-nginx
+build_develop: develop apex highway highway-nginx nginx postgrest prometheus smd marketplace-backend marketplace-ui vault-wrapper vault-nginx identity-provider identity-service identity-nginx payment-server payment-server-nginx subject-signing-tool notification-server notification-server-nginx
 
-.PHONY: strato apex highway highway-nginx ory strato-nginx postgrest prometheus smd marketplace-backend marketplace-ui vault-wrapper vault-nginx identity-provider identity-service identity-nginx payment-server payment-server-nginx subject-signing-tool notification-server notification-server-nginx build_buildbase build_common build_common_profiled eks
+.PHONY: strato apex highway highway-nginx ory nginx postgrest prometheus smd marketplace-backend marketplace-ui vault-wrapper vault-nginx identity-provider identity-service identity-nginx payment-server payment-server-nginx subject-signing-tool notification-server notification-server-nginx build_buildbase build_common build_common_profiled eks
 
 apex:
 	@echo Now building apex...
 	BASIL_DOCKER_TAG=${REPO_URL}apex:${VERSION} ECR_DOCKER_TAG=${REPO_AWS_ECR_URL}apex:${VERSION} STRATO_VERSION=${VERSION} make --directory=apex/
 
-strato-nginx:
+nginx:
 	@echo Now building nginx...
-	BASIL_DOCKER_TAG=${REPO_URL}strato-nginx:${VERSION} ECR_DOCKER_TAG=${REPO_AWS_ECR_URL}strato-nginx:${VERSION} make --directory=nginx-packager/
+	BASIL_DOCKER_TAG=${REPO_URL}nginx:${VERSION} ECR_DOCKER_TAG=${REPO_AWS_ECR_URL}nginx:${VERSION} make --directory=nginx-packager/
 
 postgrest:
 	@echo Now building postgrest...
