@@ -91,17 +91,16 @@ abstract contract Sale is Utils {
             PaymentService p = _paymentServices[i];
             uint x = paymentServicesMap[p.serviceName][p.creator];
             if (x > 0) {
-                // TODO not sure if delete keyword works for structs?
-                delete paymentServices[x-1]; 
-                delete paymentServicesMap[p.serviceName][p.creator];
+                paymentServices[x-1] = PaymentService("", "");
+                paymentServicesMap[p.serviceName][p.creator] = 0;
             }
         }
     }
 
-    function clearPaymentServices() public requireSeller("clear payment services") {
-        for (uint i = 0; i < paymentServices.length; i++) {
-            PaymentService p = paymentServices[i];
-            delete paymentServicesMap[p.serviceName][p.creator];
+    function clearPaymentServices() {
+        for(uint i = 0; i < paymentServices.length; i++) {
+            paymentServices[i].creator = "";
+            paymentServices[i].serviceName = "";
         }
         paymentServices = [];
     }
