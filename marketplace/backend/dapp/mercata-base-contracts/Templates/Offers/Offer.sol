@@ -10,30 +10,38 @@ abstract contract Offer is Utils {
     Asset public assetToBePurchased;
     Asset public assetToBeSold;
     address public sale;
-    decimal public price;
+    decimal public pricePerItem;
+    decimal public totalPrice;
     uint public quantity;
     address public purchaser;
     string public purchaserCommonName;
+    address public seller;
     PaymentService public paymentService;
-    bool isOpen;
+    string public imageUrl;
+    offerStatus public status;
+
+    enum OfferStatus { PENDING, ACCEPTED, REJECTED, CANCELLED }
 
     constructor(
         address _assetToBePurchased,
         address _sale,
-        decimal _price,
+        decimal _pricePerItem,
         uint _quantity,
-        address _purchaser
+        address _purchaser,
+        string _imageUrl
     ) {    
         assetToBePurchased = Asset(_assetToBePurchased);
         sale = _sale;
         // require(_assetToBePurchased == assetToBePurchased.root, "Can only open Offers on root assets");
         assetToBeSold = assetToBePurchased;
-        price = _price;
+        priceperItem = _pricePerItem;
         quantity = _quantity;
+        totalPrice = pricePerItem * decimal(quantity);
         purchaser = _purchaser;
         purchaserCommonName = getCommonName(purchaser);
         paymentService = PaymentService(msg.sender);
-        isOpen = true;
+        imageUrl = _imageUrl;
+        status = OfferStatus.PENDING;
     }
 
     modifier requirePurchaser(string action) {
@@ -46,7 +54,12 @@ abstract contract Offer is Utils {
         require(commonName == purchaserCommonName, err);
     }
 
-    function fillOffer(uint _quantity, address[] _assets) public returns (uint, uint) {
+    modifier requireOwner() {
+        string err = "Only the owner of the asset can perform this action.";
+        require(msg.sender == seller, err);
+    }
+
+    function acceptOffer(uint _quantity, address[] _assets) requireOwner() public returns (uint, uint) {
         uint quantityToFill;
         uint quantityToReturn;
         if (_quantity <= quantity) {
@@ -74,10 +87,10 @@ abstract contract Offer is Utils {
                 [address(this)],
                 [quantityForAsset],
                 block.timestamp,
-                "Bid of quantity " + string(quantityForAsset) + "filled for asset " + string(address(a)) + " for $" + string(uint(price))
+                "Offer of quantity " + string(quantityForAsset) + "filled for asset " + string(address(a)) + " for $" + string(uint(totalPrice))
             );
             try {
-                a.transferOwnership(purchaser, quantityForAsset, false, 0, price);
+                a.transferOwnership(purchaser, quantityForAsset, false, 0, totalPrice);
             } catch { // Backwards compatibility for old assets
                 address(a).call("transferOwnership", purchaser, quantityForAsset, false, 0);
             }
@@ -133,7 +146,7 @@ abstract contract Offer is Utils {
 
     function update(
         uint _quantity,
-        decimal _price,
+        decimal _pricePerItem,
         uint _scheme
     ) public requirePurchaser("update the Offer") returns (uint) {
 
@@ -145,29 +158,24 @@ abstract contract Offer is Utils {
         quantity = _quantity;
       }
       if ((_scheme & (1 << 1)) == (1 << 1)) {
-        price = _price;
+        pricePerItem = _pricePerItem;
       }
       return RestStatus.OK;
     }
 
-    function acceptOffer() public requireOwner returns (uint) {
-        require(isOpen == true, "Cannot accept a non-pending offer.");
-        transferAssetToPurchaser();
-        isOpen = false;
-        return RestStatus.OK;
-    }
-
-    function rejectOffer() public requireOwner returns (uint) {
+    function rejectOffer() public requireOwner() returns (uint) {
         require(isOpen == true, "Cannot accept a non-pending offer.");
         closeOffer();
         isOpen = false;
+        status = OfferStatus.REJECTED;
         return RestStatus.OK;
     }
 
-    function cancelOffer() public requirePurchaser returns (uint) {
+    function cancelOffer() public requirePurchaser("cancel the Offer") returns (uint) {
         require(isOpen == true, "Cannot accept a non-pending offer.");
         closeOffer();
         isOpen = false;
+        status = OfferStatus.CANCELLED;
         return RestStatus.OK;
     }
 }

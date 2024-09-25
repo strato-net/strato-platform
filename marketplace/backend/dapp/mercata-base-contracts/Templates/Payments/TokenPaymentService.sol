@@ -253,8 +253,12 @@ constructor (
     function openOffer(
         address _assetToBeSold,
         decimal _price,
-        uint _quantity
+        uint _quantity,
+        decimal _totalPrice,
         address _sale,
+        address _seller,
+        string _imageUrl,
+
     ) public returns (address) {    
         decimal totalPrice = _price * decimal(_quantity);
         decimal amountToTransfer = 1.0 + totalPrice * tokensPerDollar * (10 ** decimals);
