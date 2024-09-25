@@ -97,7 +97,7 @@ abstract contract Sale is Utils {
         }
     }
 
-    function clearPaymentServices() {
+    function clearPaymentServices() public requireSeller("clear payment services") {
         for(uint i = 0; i < paymentServices.length; i++) {
             paymentServices[i].creator = "";
             paymentServices[i].serviceName = "";
