@@ -53,6 +53,7 @@ import 'swiper/css/autoplay';
 
 // import required modules
 import { EffectFade, Navigation, Pagination, Autoplay } from 'swiper/modules';
+import dayjs from "dayjs";
 
 
 const ProductDetails = ({ user, users }) => {
@@ -818,6 +819,72 @@ const ProductDetails = ({ user, users }) => {
                         </div>
                       )
                     },
+                    {
+                      label: <span className="text-sm md:text-base">Offers</span>,
+                      key: "4",
+                      children: (
+                        <div>
+                          <DataTableComponent
+                            columns={[
+                              {
+                                title: "Offerer",
+                                dataIndex: "purchaserCommonName",
+                                key: "purchaserCommonName",
+                                align: "center",
+                                render: (text) => (
+                                  <p>{text}</p>
+                                ),
+                              },
+                              {
+                                title: "Quantity", 
+                                dataIndex: "quantity",
+                                key: "quantity",
+                                align: "center",
+                                render: (text) => (
+                                  <p>{text}</p>
+                                ),
+                              },
+                              {
+                                title: "Price",
+                                dataIndex: "price",
+                                key: "price",
+                                align: "center",
+                                render: (text) => (
+                                  <p>${text}</p>
+                                ),
+                              },
+                              {
+                                title: "Date",
+                                dataIndex: "block_timestamp",
+                                key: "block_timestamp",
+                                align: "center",
+                                render: (text) => (
+                                  // Use day.js to format the date
+                                  <p>{dayjs(text).format("MM-DD-YYYY")}</p>
+                                ),
+                              },
+                              {
+                                title: "Status",
+                                dataIndex: "status",
+                                key: "status",
+                                align: "center",
+                                render: (text) => (
+                                  <p>{text}</p>
+                                ),
+                              }
+                            ]}
+                            scrollX="100%"
+                            data={offers}
+                            isLoading={isOffersLoading}
+                            pagination={{
+                              defaultPageSize: 10,
+                              position: ["bottomCenter"],
+                              showSizeChanger: false,
+                            }}
+                          />
+                        </div>
+                      )
+                    }
                   ]}
               />
             </div>
