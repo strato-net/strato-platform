@@ -88,17 +88,23 @@ async function getHighestMarketplacePrice(admin, originAddress, options) {
 
 async function getLastSoldPrice(admin, assetAddress, options) {
   try {
-    const lastSale = await saleJs.getAll(
+    const saleHistory = await saleJs.getAll(
       admin,
       {
-        assetToBeSold: [assetAddress],
+        assetToBeSold: assetAddress,
         order: "block_timestamp.desc",
-        limit: 15,
+        limit: 6,
       },
       options
     );
 
-    return lastSale.length > 0 ? lastSale[0].price : null;
+    console.log("Sale history:", saleHistory);
+
+    if (saleHistory && saleHistory.length > 0) {
+      return saleHistory[0].price;
+    } else {
+      return null;
+    }
   } catch (error) {
     console.error(
       `Error fetching last sold price for asset ${assetAddress}:`,
@@ -172,7 +178,8 @@ async function getWalletAssets(admin, args = {}, options) {
 
         // Get ownership history and log it
         // const ownershipHistory = await getOwnershipHistory(admin, { originAddress, minItemNumber: 1, maxItemNumber: 10 }, options);
-        // const isRelevantToAdmin = ownershipHistory.some(entry => entry.purchaserCommonName === admin.username);
+        // console.log("ownr",ownershipHistory);
+        // const isRelevantToAdmin = ownershipHistory.every(entry => entry.purchaserCommonName === admin.username);
 
         // Get the highest marketplace price for items with the same origin address
         const highestMarketplacePrice = await getHighestMarketplacePrice(
@@ -192,7 +199,7 @@ async function getWalletAssets(admin, args = {}, options) {
          // Get item transfer events
          const transferEvents = await getAllItemTransferEvents(admin, admin.address, inventory.name, options);
          const matchingTransfer = transferEvents && transferEvents.transfers 
-           ? transferEvents.transfers.find(transfer => transfer.block_hash === inventory.block_hash)
+           ? transferEvents.transfers.find(transfer => transfer.block_hash === inventory["BlockApps-Mercata-Asset-images"][0].block_hash)
            : null;
          const transferPrice = matchingTransfer ? matchingTransfer.price || 0 : 0;
         
