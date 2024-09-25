@@ -25,7 +25,7 @@ module IdentityProvider.Server (identityProviderApp) where
 
 import Bloc.API.Transaction
 import Bloc.API.Users
-import Bloc.Client (postBlocTransactionParallelExternal, postBlocTransactionResults)
+import Bloc.Client (postBlocTransactionParallel, postBlocTransactionResults)
 import BlockApps.Logging
 import BlockApps.Solidity.ArgValue
 import BlockApps.X509 hiding (isValid)
