@@ -91,7 +91,8 @@ abstract contract Sale is Utils {
             PaymentService p = _paymentServices[i];
             uint x = paymentServicesMap[p.serviceName][p.creator];
             if (x > 0) {
-                paymentServices[x-1] = PaymentService("", "");
+                paymentServices[x-1].creator = "";
+                paymentServices[x-1].serviceName = "";
                 paymentServicesMap[p.serviceName][p.creator] = 0;
             }
         }
