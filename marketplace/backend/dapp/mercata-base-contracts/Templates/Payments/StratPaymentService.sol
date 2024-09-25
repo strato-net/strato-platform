@@ -124,7 +124,7 @@ contract StratPaymentService is PaymentService {
                     stratAsset.purchaseTransfer(feeRecipient, transferFee);
                     remainingFeeToTransfer -= transferFee;
                 }
-
+                transferAmount = 0;
                 if (remainingStratsToTransfer == 0 && remainingFeeToTransfer == 0) {
                     break;
                 }
