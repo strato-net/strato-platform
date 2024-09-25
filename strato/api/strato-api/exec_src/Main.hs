@@ -230,7 +230,7 @@ coreProxyServer =
     :<|> (\a -> blocStrato $ client (Proxy @Account.GetX509) a)
     :<|> (\a -> blocStrato $ client (Proxy @BatchTransactionResult.API) a)
     :<|> (\a -> blocStrato $ client (Proxy @BlkLast.API) a)
-    :<|> (\a b c d e f g h i j k l m n o p q r s t u v -> blocStrato $ client (Proxy @Block.API) a b c d e f g h i j k l m n o p q r s t u v)
+    :<|> (\a b c d e f g h i j k l m n o p q r s t -> blocStrato $ client (Proxy @Block.API) a b c d e f g h i j k l m n o p q r s t)
     :<|> ((\a b c d -> blocStrato $ Chain.getChainClient a b c d)
       :<|> (\a -> blocStrato $ Chain.postChainClient a)
       :<|> (\a -> blocStrato $ Chain.postChainsClient a))

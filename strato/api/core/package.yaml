@@ -60,4 +60,3 @@ library:
   - identity-monad
   - strato-redis-blockdb
   - evm-solidity
-  - x509-certs

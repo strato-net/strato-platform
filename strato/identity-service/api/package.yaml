@@ -23,6 +23,5 @@ library:
   - servant
   - strato-model
   - text
-  - x509-certs
 
 
