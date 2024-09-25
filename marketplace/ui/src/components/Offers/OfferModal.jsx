@@ -9,21 +9,16 @@ import * as Yup from "yup";
 const MakeOfferModal = ({
   isOpen,
   onClose,
-  product = {
-    title: "Lorem ipsum dolor sit amet ",
-    owner: "andrew",
-    price: "$30",
-    strats: 3000,
-    quantity: 10,
-    saleAddress: "0x1234abcd5678efgh",
-    productId: "prod_123456",
-    category: "Electronics",
-    imageUrl: "https://via.placeholder.com/100", // Example image placeholder URL
-  },
+  actions,
+  dispatch,
+  product,
+  user
 }) => {
   const [isConfirming, setIsConfirming] = useState(false); // For confirmation modal
   const [isLoading, setIsLoading] = useState(false); // For loading state
   const [isConfirmed, setIsConfirmed] = useState(false); // For final confirmation screen
+
+  const { name, owner, price, quantity, saleAddress, address } = product;
 
   const formik = useFormik({
     initialValues: {
@@ -53,10 +48,29 @@ const MakeOfferModal = ({
     onSubmit: (values) => {
       // Form is only submitted when user clicks "Approve"
       setIsLoading(true); // Show loading screen
-      setTimeout(() => {
-        setIsLoading(false); // After loading, show final confirmation screen
-        setIsConfirmed(true);
-      }, 2000); // Simulate loading delay
+      // Call Create Offer to submit the offer
+      const body = {
+        assetAddress: product.address,
+        saleAddress: product.saleAddress,
+        purchaser: user.address,        
+        quantity: values.quantity,
+        price: values.price * values.quantity,
+        imageUrl: product["BlockApps-Mercata-Asset-images"][0].value,
+      };
+
+      const request = actions.createOffer(dispatch, body);
+      request
+        .then((response) => {
+          setIsLoading(false); // Hide loading screen
+          setIsConfirmed(true); // Show confirmation screen
+        })
+        .catch((error) => {
+          setIsLoading(false); // Hide loading screen
+          console.log("Error submitting offer: ", error);
+          // reset form values and return to initial state
+          formik.resetForm();
+          setIsConfirming(false);
+        }, [actions, body]);
     },
   });
 
@@ -160,12 +174,12 @@ const MakeOfferModal = ({
             <div className="w-full bg-gray-200 col-span-2 py-2 flex items-center rounded-lg overflow-hidden">
               <img
                 src={product.imageUrl}
-                alt={product.title}
+                alt={product.name}
                 className="object-cover w-[110px] h-[110px] rounded-lg"
               />
             </div>
             <div className="flex flex-col col-span-4 lg:col-span-5 py-2 h-full justify-evenly">
-              <h3 className="font-bold text-lg lg:text-xl">{product.title}</h3>
+              <h3 className="font-bold text-lg lg:text-xl">{product.name}</h3>
               <p className="text-xs text-gray-500">Owned By: {product.owner}</p>
               <p className="text-lg lg:text-xl font-semibold text-[#13188A]">
                 {product.price} ({product.strats} STRATS)
@@ -237,12 +251,12 @@ const MakeOfferModal = ({
           <div className="w-full bg-gray-200 col-span-2 py-2 flex items-center rounded-lg overflow-hidden">
             <img
               src={product.imageUrl}
-              alt={product.title}
+              alt={product.name}
               className="object-cover w-[110px] h-[110px] rounded-lg"
             />
           </div>
           <div className="flex flex-col col-span-4 lg:col-span-5 py-2 h-full justify-evenly">
-            <h3 className="font-bold text-lg lg:text-xl">{product.title}</h3>
+            <h3 className="font-bold text-lg lg:text-xl">{product.name}</h3>
             <p className="text-xs text-gray-500">Owned By: {product.owner}</p>
             <p className="text-lg lg:text-xl font-semibold text-[#13188A]">
               {product.price} ({product.strats} STRATS)

@@ -10,12 +10,10 @@ abstract contract Offer is Utils {
     Asset public assetToBePurchased;
     Asset public assetToBeSold;
     address public sale;
-    decimal public pricePerItem;
-    decimal public totalPrice;
+    decimal public price; // Total offer price
     uint public quantity;
     address public purchaser;
     string public purchaserCommonName;
-    address public seller;
     PaymentService public paymentService;
     string public imageUrl;
     offerStatus public status;
@@ -25,7 +23,7 @@ abstract contract Offer is Utils {
     constructor(
         address _assetToBePurchased,
         address _sale,
-        decimal _pricePerItem,
+        decimal _price,
         uint _quantity,
         address _purchaser,
         string _imageUrl
@@ -34,9 +32,8 @@ abstract contract Offer is Utils {
         sale = _sale;
         // require(_assetToBePurchased == assetToBePurchased.root, "Can only open Offers on root assets");
         assetToBeSold = assetToBePurchased;
-        priceperItem = _pricePerItem;
+        priceperItem = _price;
         quantity = _quantity;
-        totalPrice = pricePerItem * decimal(quantity);
         purchaser = _purchaser;
         purchaserCommonName = getCommonName(purchaser);
         paymentService = PaymentService(msg.sender);
@@ -56,6 +53,8 @@ abstract contract Offer is Utils {
 
     modifier requireOwner() {
         string err = "Only the owner of the asset can perform this action.";
+        Asset a = Asset(assetToBePurchased);
+        address seller = a.owner();
         require(msg.sender == seller, err);
     }
 
@@ -87,10 +86,10 @@ abstract contract Offer is Utils {
                 [address(this)],
                 [quantityForAsset],
                 block.timestamp,
-                "Offer of quantity " + string(quantityForAsset) + "filled for asset " + string(address(a)) + " for $" + string(uint(totalPrice))
+                "Offer of quantity " + string(quantityForAsset) + "filled for asset " + string(address(a)) + " for $" + string(uint(price))
             );
             try {
-                a.transferOwnership(purchaser, quantityForAsset, false, 0, totalPrice);
+                a.transferOwnership(purchaser, quantityForAsset, false, 0, price);
             } catch { // Backwards compatibility for old assets
                 address(a).call("transferOwnership", purchaser, quantityForAsset, false, 0);
             }
@@ -146,7 +145,7 @@ abstract contract Offer is Utils {
 
     function update(
         uint _quantity,
-        decimal _pricePerItem,
+        decimal _price,
         uint _scheme
     ) public requirePurchaser("update the Offer") returns (uint) {
 
@@ -158,7 +157,7 @@ abstract contract Offer is Utils {
         quantity = _quantity;
       }
       if ((_scheme & (1 << 1)) == (1 << 1)) {
-        pricePerItem = _pricePerItem;
+        price = _price;
       }
       return RestStatus.OK;
     }
