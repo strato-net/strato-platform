@@ -306,8 +306,8 @@ function newnode {
       --pgport=${postgres_port} \
       --pguser=${postgres_user} \
       --password=${postgres_password} \
-      --stratourl=http://localhost:3000/eth/v1.2" \
-      "${iFlag}"
+      --stratourl=http://localhost:3000/eth/v1.2 \
+      ${iFlag}"
 
       echo "Starting slipstream"
       if [ "${SLIPSTREAM_OPTIONAL}" = true ]; then
