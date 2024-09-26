@@ -29,7 +29,7 @@ import qualified Data.HashMap.Strict as HM
 import qualified Data.IntMap as I
 import qualified Data.Map as M
 import qualified Data.Text as T
-import Data.Text.Encoding (decodeUtf8, decodeUtf8', encodeUtf8)
+import Data.Text.Encoding (decodeUtf8, decodeUtf8')
 import Data.Text.Encoding.Error (UnicodeException)
 import GHC.Generics
 import SolidVM.Model.SolidString
@@ -48,17 +48,15 @@ bimapValue f (name', value') = do
   mValue <- valueToSolidityValue value'
   return $ fmap (name,) mValue
 
-decodeCacheValues :: M.Map B.ByteString B.ByteString -> [(T.Text, Value)] -> [(T.Text, Value)]
-decodeCacheValues hxs prevState = either (error . (++ ": " ++ show hxs) . printf "SVM.decodeCacheValues: %s" . show) id $ do
+decodeCacheValues :: M.Map B.ByteString B.ByteString -> [(T.Text, Value)]
+decodeCacheValues hxs = either (error . (++ ": " ++ show hxs) . printf "SVM.decodeCacheValues: %s" . show) id $ do
   let parseM = bimapM (hexStorageToPath . HexStorage) (hexStorageToBasic . HexStorage)
       isBasic (StoragePath ([Field _])) = True
       isBasic (StoragePath [Field _, Field fieldBS]) = C8.unpack fieldBS /= "length"
       isBasic _ = False
   pathValues <- mapM parseM $ M.toList hxs
   let pathValues' = filter (isBasic . fst) pathValues
-  finalState <- bimap show HM.toList $ case prevState of
-    [] -> synthesize pathValues'
-    tvs -> replayDeltas pathValues' . HM.fromList . map (first encodeUtf8) $ tvs
+  finalState <- bimap show HM.toList $ synthesize pathValues'
   mapM (bimapM bsToText return) finalState
 
 decodeCacheValuesForCollections :: M.Map B.ByteString B.ByteString -> [(T.Text, Value)]
@@ -66,6 +64,8 @@ decodeCacheValuesForCollections hxs = either (error . (++ ": " ++ show hxs) . pr
   let parseM = bimapM (hexStorageToPath . HexStorage) (hexStorageToBasic . HexStorage)
       isBasic (StoragePath [Field _, MapIndex _]) = True
       isBasic (StoragePath [Field _, ArrayIndex _]) = True
+      isBasic (StoragePath [Field _, MapIndex _, Field fieldBS]) = C8.unpack fieldBS /= "length"
+      isBasic (StoragePath [Field _, ArrayIndex _, Field fieldBS]) = C8.unpack fieldBS /= "length"
       isBasic _ = False
   pathValues <- mapM parseM $ M.toList hxs
   let pathValues' = filter (isBasic . fst) pathValues
@@ -169,6 +169,7 @@ applyDelta' [Field "length"] (BInteger n) (ValueArrayDynamic vs) =
   let n' = fromIntegral n
    in Right . ValueArrayDynamic $ I.insert n' (ValueArraySentinel n') vs
 applyDelta' [Field "length"] (BInteger n) (ValueArraySentinel {}) = Right . ValueArraySentinel $ fromIntegral n
+applyDelta' [Field _] bv _ = Right $ fromBasic bv -- Handle struct value assignment case
 applyDelta' sp bv (ValueArraySentinel {}) = Right $ constructFromNothing' sp bv
 applyDelta' sp b s = Left $ TypeMismatch (StoragePath sp) b s
 

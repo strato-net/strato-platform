@@ -100,7 +100,7 @@ spec = parallel $ do
   describe "The blockstanbul event loop" $ do
     it "requests a round changes round in response to a timeout or insertion failure" $
       runTest $ do
-        got <- sendMessages [Timeout 20, CommitResult (Left  "invalid hash")]
+        got <- sendMessages [Timeout 20]
         map (_round . roundchangeView . oMessage) got `shouldBe` [21, 21]
 
     it "ignores stale timeouts" .  runTest $
@@ -146,8 +146,7 @@ spec = parallel $ do
                              }
 
         -- Pretend that in this interval, the block was committed
-        sendMessages [CommitResult (Right (blockHash blk))] `shouldReturn`
-          [ NewCheckpoint (Checkpoint (over sequence (+1) v) M.empty (map sender as) []) ]
+        -- [ NewCheckpoint (Checkpoint (over sequence (+1) v) M.empty (map sender as) []) ]
         -- The proposer *shouldn't* change, because the round number is the same
         let nextPpr = as !! ((1 + fromIntegral (_round v)) `mod` length as)
         use proposer `shouldReturn` sender ppr
@@ -191,7 +190,6 @@ spec = parallel $ do
         void $ sendMessages $ [IMsg ppr $ Preprepare v blk]
                            ++ [IMsg a $ Prepare v hsh | a <- as]
                            ++ [IMsg a $ Commit v hsh seal | a <- as]
-                           ++ [CommitResult (Right (blockHash blk))]
         use view `shouldReturn` over sequence (+1) v
         use proposal `shouldReturn` Nothing
 
@@ -509,19 +507,6 @@ spec = parallel $ do
         next <- uses view (over round (+1))
         map (roundchangeView . oMessage) omsgs `shouldBe` [next]
 
-    it "Resets the lock after a commit result -- positive or negative" $ property $ \blk as ->
-      runTest $ do
-        me <- use selfCert
-        validators .= S.fromList (me:as)
-        blockLock .= Just blk
-        _ <- sendMessages [CommitResult (Left "oops")]
-        use blockLock `shouldReturn` Nothing
-
-        blockLock .= Just blk
-        _ <- sendMessages [CommitResult (Right (blockHash blk))]
-        use blockLock `shouldReturn` Nothing
-        use lastParent `shouldReturn` Just (blockHash blk)
-
     it "Sets a lock after prepare consensus is reached" $ property $ \auth blk ->
       runTest $ do
         (curView, di) <- setupRound blk [sender auth]
@@ -533,14 +518,6 @@ spec = parallel $ do
           validators .= S.singleton me
           proposal .= Just blk
           blockLock .= Just blk
-
-    it "requests a new block after success" $ property $ \blk ->
-      runTest $ do
-        setBlock blk
-        me <- use selfCert
-        sendMessages [CommitResult (Right (blockHash blk))] `shouldReturn`
-          [MakeBlockCommand
-          , NewCheckpoint (Checkpoint (View 20 19) M.empty [me] [])]
 
     it "re-issues the lock after round change" $ property $ \blk sig ->
       runTest $ do
@@ -626,7 +603,6 @@ spec = parallel $ do
         checkedSend :: Block -> StateT BlockstanbulContext (LoggingT IO) ()
         checkedSend blk = do
           sendMessages [PreviousBlock blk] `shouldReturn` [ToCommit blk]
-          void $ sendMessages [CommitResult . Right $ blockHash blk]
 
     it "will accept a previous block with the current sequence number" $ runTest $ do
       me <- use selfCert

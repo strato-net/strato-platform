@@ -20,7 +20,7 @@ data EVMCheckpoint = EVMCheckpoint
     ctxBestBlockInfo :: ContextBestBlockInfo,
     ctxChainDBStateRoot :: MP.StateRoot
   }
-  deriving (Read, Show, Generic)
+  deriving (Show, Generic)
 
 instance Format EVMCheckpoint where -- todo add format instance for ContextBestBlockInfo and show it here as well.
   format (EVMCheckpoint sha _ _ _) =

@@ -31,7 +31,6 @@ library:
   - strato-model
   - strato-redis-blockdb
   - text
-  - x509-certs
 
 executables:
   strato-api-indexer:
@@ -46,6 +45,7 @@ executables:
       - evm-solidity
       - hflags
       - monad-alter
+      - process-monitor
       - redis-monad
       - seqevents
       - sql-monad
@@ -68,6 +68,7 @@ executables:
       - evm-solidity
       - hflags
       - monad-alter
+      - process-monitor
       - redis-monad
       - seqevents
       - strato-conf
@@ -89,6 +90,7 @@ executables:
       - evm-solidity
       - hflags
       - monad-alter
+      - process-monitor
       - redis-monad
       - seqevents
       - sql-monad
@@ -109,7 +111,6 @@ tests:
     - bytestring
     - hspec
     - strato-index
-    - x509-certs
     - strato-model
     - text
 
