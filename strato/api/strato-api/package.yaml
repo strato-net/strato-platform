@@ -33,6 +33,7 @@ executables:
     - lens
     - monad-alter
     - parametric-apis
+    - process-monitor
     - regex-compat
     - servant-client
     - servant-client-core
@@ -55,7 +56,6 @@ executables:
     - wai-extra
     - wai-middleware-prometheus
     - warp
-    - x509-certs
     # Don't touch this next setting, leave -threaded, otherwise it WILL NOT WORK
     # https://blockappsdev.slack.com/archives/G5E7K3ETX/p1645104924934129
     ghc-options: -threaded

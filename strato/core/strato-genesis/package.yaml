@@ -42,7 +42,6 @@ library:
       - solid-vm-compiler
       - solid-vm-model
       - ethereum-rlp
-      - x509-certs
       - lens
       - ordered-containers
 

@@ -47,9 +47,7 @@ import UnliftIO
 
 type API =
   "block" :> QueryParam "txaddress" Address
-    :> QueryParam "coinbaseOrg" Text
-    :> QueryParam "coinbaseOrgUnit" Text
-    :> QueryParam "coinbaseCommonName" Text
+    :> QueryParam "coinbase" Text
     :> QueryParam "address" Address
     :> QueryParam "blockid" Text
     :> QueryParam "hash" Keccak256
@@ -72,9 +70,7 @@ type API =
 
 data BlocksFilterParams = BlocksFilterParams
   { qbTxAddress :: Maybe Address,
-    qbCoinbaseOrg :: Maybe Text,
-    qbCoinbaseOrgUnit :: Maybe Text,
-    qbCoinbaseCommonName :: Maybe Text,
+    qbCoinbase :: Maybe Text,
     qbAddress :: Maybe Address,
     qbBlockId :: Maybe Text,
     qbHash :: Maybe Keccak256,
@@ -119,8 +115,6 @@ blocksFilterParams =
     Nothing
     Nothing
     Nothing
-    Nothing
-    Nothing
 
 getBlocksFilter :: BlocksFilterParams -> ClientM [Block']
 getBlocksFilter = uncurryBlocksFilterParams getBlocksFilter'
@@ -129,9 +123,7 @@ getBlocksFilter = uncurryBlocksFilterParams getBlocksFilter'
     uncurryBlocksFilterParams f BlocksFilterParams {..} =
       f
         qbTxAddress
-        qbCoinbaseOrg
-        qbCoinbaseOrgUnit
-        qbCoinbaseCommonName
+        qbCoinbase
         qbAddress
         qbBlockId
         qbHash
@@ -182,9 +174,7 @@ instance HasSQL m => Selectable BlocksFilterParams [Block] m where
                       fmap (\v -> bdRef E.^. BlockDataRefDifficulty E.==. E.val v) (fromIntegral <$> qbDiff),
                       fmap (\v -> bdRef E.^. BlockDataRefDifficulty E.>=. E.val v) (fromIntegral <$> qbMinDiff),
                       fmap (\v -> bdRef E.^. BlockDataRefDifficulty E.<=. E.val v) (fromIntegral <$> qbMaxDiff),
-                      fmap (\v -> bdRef E.^. BlockDataRefCoinbaseOrg E.==. E.val v) qbCoinbaseOrg,
-                      fmap (\v -> bdRef E.^. BlockDataRefCoinbaseOrgUnit E.==. E.val v) qbCoinbaseOrgUnit,
-                      fmap (\v -> bdRef E.^. BlockDataRefCoinbaseCommonName E.==. E.val v) qbCoinbaseCommonName,
+                      fmap (\v -> bdRef E.^. BlockDataRefCoinbase E.==. E.val v) qbCoinbase,
                       fmap (\v -> accStateRef E.^. AddressStateRefAddress E.==. E.val v) qbAddress,
                       --                  fmap (\v -> bdRef E.^. BlockDataRefNumber E.==. E.val v) ntx,
                       fmap
@@ -203,29 +193,40 @@ instance HasSQL m => Selectable BlocksFilterParams [Block] m where
 
             E.distinctOnOrderBy [sortToOrderBy qbSortby $ bdRef E.^. BlockDataRefNumber] (return bdRef)
 
-      let blockIds = map fst blks
+      let blockIds = fst <$> blks
+          buildList' f g = Map.fromListWith (flip (++)) . map (f &&& g)
+          buildList  f   = buildList' f (:[]) . map E.entityVal
+          get' = Map.findWithDefault []
+      vs <- fmap (buildList blockValidatorRefBlockDataRefId) . sqlQuery $ E.select $ E.from $ \v -> do
+        E.where_ $ v E.^. BlockValidatorRefBlockDataRefId `E.in_` E.valList blockIds
+        pure v
+      vd <- fmap (buildList validatorDeltaRefBlockDataRefId) . sqlQuery $ E.select $ E.from $ \v -> do
+        E.where_ $ v E.^. ValidatorDeltaRefBlockDataRefId `E.in_` E.valList blockIds
+        pure v
+      ca <- fmap (buildList certificateAddedRefBlockDataRefId) . sqlQuery $ E.select $ E.from $ \v -> do
+        E.where_ $ v E.^. CertificateAddedRefBlockDataRefId `E.in_` E.valList blockIds
+        pure v
+      cr <- fmap (buildList certificateRevokedRefBlockDataRefId) . sqlQuery $ E.select $ E.from $ \v -> do
+        E.where_ $ v E.^. CertificateRevokedRefBlockDataRefId `E.in_` E.valList blockIds
+        pure v
+      ps <- fmap (buildList proposalSignatureRefBlockDataRefId) . sqlQuery $ E.select $ E.from $ \v -> do
+        E.where_ $ v E.^. ProposalSignatureRefBlockDataRefId `E.in_` E.valList blockIds
+        pure v
+      ss <- fmap (buildList commitmentSignatureRefBlockDataRefId) . sqlQuery $ E.select $ E.from $ \v -> do
+        E.where_ $ v E.^. CommitmentSignatureRefBlockDataRefId `E.in_` E.valList blockIds
+        pure v
+      txs <- fmap (buildList' (blockTransactionBlockDataRefId . fst) ((: []) . rawTX2TX . snd) . map (E.entityVal *** E.entityVal)) . sqlQuery $
+        E.select $ E.from $ \(btx `E.InnerJoin` rawTX) -> do
+          E.on (rawTX E.^. RawTransactionId E.==. btx E.^. BlockTransactionTransaction)
+          E.where_ $ btx E.^. BlockTransactionBlockDataRefId `E.in_` E.valList blockIds
+          E.orderBy [E.asc (btx E.^. BlockTransactionId)]
+          return (btx, rawTX)
 
-      txs <- fmap (map (E.entityVal *** E.entityVal)) . sqlQuery $
-        E.select $
-          E.from $ \(btx `E.InnerJoin` rawTX) -> do
-            E.on (rawTX E.^. RawTransactionId E.==. btx E.^. BlockTransactionTransaction)
-            E.where_ $ btx E.^. BlockTransactionBlockDataRefId `E.in_` E.valList blockIds
-            E.orderBy [E.asc (btx E.^. BlockTransactionId)]
-            return (btx, rawTX)
-
-      let getTXLists =
-            flip (Map.findWithDefault []) $
-              Map.fromListWith (flip (++)) $ map (blockTransactionBlockDataRefId *** ((: []) . rawTX2TX)) txs
-
-      let modBlocks = map (\(k, v) -> (v, getTXLists k)) blks
-
-      return . Just $ map (uncurry blockDataRefToBlock) modBlocks
+      return . Just $ map (\(k,v) -> blockDataRefToBlock v (get' k vs) (get' k  vd) (get' k  ca) (get' k  cr) (get' k  ps) (get' k  ss) (get' k txs)) blks
 
 getBlockInfo ::
   Selectable BlocksFilterParams [Block] m =>
   Maybe Address ->
-  Maybe Text ->
-  Maybe Text ->
   Maybe Text ->
   Maybe Address ->
   Maybe Text ->
@@ -246,16 +247,14 @@ getBlockInfo ::
   Maybe ChainId ->
   Maybe Sortby ->
   m [Block']
-getBlockInfo a b c d e f g h i j k l m n o p q r s t u v =
-  getBlockInfo' (BlocksFilterParams a b c d e f g h i j k l m n o p q r s t u v)
+getBlockInfo a b c d e f g h i j k l m n o p q r s t =
+  getBlockInfo' (BlocksFilterParams a b c d e f g h i j k l m n o p q r s t)
 
 getBlockInfo' :: Selectable BlocksFilterParams [Block] m => BlocksFilterParams -> m [Block']
 getBlockInfo' b = map (flip Block' "") . fromMaybe [] <$> select (Proxy @[Block]) b
 
 getBlockInfoClient ::
   Maybe Address ->
-  Maybe Text ->
-  Maybe Text ->
   Maybe Text ->
   Maybe Address ->
   Maybe Text ->
@@ -279,15 +278,13 @@ getBlockInfoClient ::
 getBlockInfoClient = client (Proxy @API)
 
 getBlockInfoClient' :: BlocksFilterParams -> ClientM [Block']
-getBlockInfoClient' (BlocksFilterParams a b c d e f g h i j k l m n o p q r s t u v) =
-  getBlockInfoClient a b c d e f g h i j k l m n o p q r s t u v
+getBlockInfoClient' (BlocksFilterParams a b c d e f g h i j k l m n o p q r s t) =
+  getBlockInfoClient a b c d e f g h i j k l m n o p q r s t
 
 blockQueryParams :: [Text]
 blockQueryParams =
   [ "txaddress",
-    "coinbaseOrg",
-    "coinbaseOrgUnit",
-    "coinbaseOrgCommonName",
+    "coinbase",
     "address",
     "blockid",
     "hash",

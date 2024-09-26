@@ -7,9 +7,7 @@ import Numeric.Natural
 
 data CablePackage = CablePackage
   { unseqEvents :: TBQueue IngestEvent,
-    unseqCheckpoints :: TQueue Checkpoint,
-    seqP2PEvents :: TQueue P2pEvent,
-    seqVMEvents :: TQueue VmEvent
+    unseqCheckpoints :: TQueue Checkpoint
   }
 
 queueDepth :: Natural
@@ -19,6 +17,4 @@ newCablePackage :: STM CablePackage
 newCablePackage = do
   a <- newTBQueue queueDepth
   b <- newTQueue
-  c <- newTQueue
-  d <- newTQueue
-  return $ CablePackage a b c d
+  return $ CablePackage a b

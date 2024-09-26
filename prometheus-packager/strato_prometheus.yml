@@ -62,6 +62,14 @@ scrape_configs:
       - target_label: instance
         replacement: '__NODE_HOST_MARKER__'
 
+  - job_name: 'strato-process-monitor'
+    metrics_path: '/metrics'
+    static_configs:
+      - targets: ['strato:10778']
+    metric_relabel_configs:
+      - target_label: instance
+        replacement: '__NODE_HOST_MARKER__'
+
 # TODO: move to Vault's prometheus when implemented
 #   - job_name: 'vault-wrapper'
 #     metrics_path: '/strato/v2.3/metrics'

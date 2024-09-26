@@ -1,0 +1,29 @@
+name: process-monitor
+version: 0.0.1
+build-type: Simple
+author: Dustin
+maintainer:    dustin@blockapps.net
+synopsis:      A per-process resource monitor for STRATO services
+category:      Monitoring?
+description:   A per-process resource monitor for STRATO services
+
+dependencies:
+  - async
+  - base
+  - containers
+  - process
+  - prometheus-client
+  - text
+  - wai-middleware-prometheus
+  - warp
+
+library:
+  source-dirs: src/
+
+executables:
+  process-monitor-exe:
+    source-dirs: exec_src/
+    main: Main.hs
+    other-modules: []
+    dependencies:
+      - process-monitor

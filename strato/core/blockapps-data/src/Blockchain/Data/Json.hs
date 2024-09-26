@@ -1,12 +1,15 @@
 {-# LANGUAGE DataKinds #-}
 {-# LANGUAGE DeriveGeneric #-}
+{-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 --TODO : Take this next line out
 {-# OPTIONS_GHC -fno-warn-orphans #-}
 
 module Blockchain.Data.Json where
 
+import BlockApps.X509
 import Blockchain.Data.Block
 import Blockchain.Data.BlockHeader
 import Blockchain.Data.DataDefs
@@ -15,16 +18,20 @@ import Blockchain.Data.Transaction
 import Blockchain.Strato.Model.Address
 import Blockchain.Strato.Model.ChainId
 import Blockchain.Strato.Model.ChainMember
-import Blockchain.Strato.Model.Class (blockHeaderHash)
+import Blockchain.Strato.Model.Class (blockHeaderHash, DummyCertRevocation(..))
 import Blockchain.Strato.Model.Code
-import Blockchain.Strato.Model.ExtendedWord (Word256)
+import Blockchain.Strato.Model.ExtendedWord (Word256, word256ToBytes)
 import Blockchain.Strato.Model.Keccak256
+import Blockchain.Strato.Model.Secp256k1
+import Blockchain.Strato.Model.Validator
+import Control.Monad (join)
 import Data.Aeson
 import Data.Aeson.Types (Parser)
 import qualified Data.ByteString as B
 import qualified Data.Map.Strict as M
 import Data.Maybe
 import Data.Swagger hiding (format)
+import Data.Text.Encoding (encodeUtf8)
 import Data.Time.Calendar
 import Data.Time.Clock
 import Data.Word
@@ -340,42 +347,62 @@ instance ToJSON Block' where
         "blockHash" .= blockHeaderHash bd
       ]
 
-blockDataRefToBlock :: BlockDataRef -> [Transaction] -> Block
-blockDataRefToBlock bdr txs =
-  Block
-    { blockBlockData =
-        BlockHeader
-          { parentHash = blockDataRefParentHash bdr,
-            ommersHash = blockDataRefUnclesHash bdr,
-            beneficiary =
-              CommonName
-                (blockDataRefCoinbaseOrg bdr)
-                (blockDataRefCoinbaseOrgUnit bdr)
-                (blockDataRefCoinbaseCommonName bdr)
-                True,
-            stateRoot = blockDataRefStateRoot bdr,
-            transactionsRoot = blockDataRefTransactionsRoot bdr,
-            receiptsRoot = blockDataRefReceiptsRoot bdr,
-            logsBloom = blockDataRefLogBloom bdr,
-            difficulty = blockDataRefDifficulty bdr,
-            number = blockDataRefNumber bdr,
-            gasLimit = blockDataRefGasLimit bdr,
-            gasUsed = blockDataRefGasUsed bdr,
-            timestamp = blockDataRefTimestamp bdr,
-            extraData = blockDataRefExtraData bdr,
-            nonce = blockDataRefNonce bdr,
-            mixHash = blockDataRefMixHash bdr
-          },
-      blockReceiptTransactions = txs,
-      blockBlockUncles = []
-    }
-
-bToBPrime :: String -> BlockDataRef -> [Transaction] -> Block'
-bToBPrime s x txs = Block' (blockDataRefToBlock x txs) s
-
-bToBPrime' :: BlockDataRef -> [Transaction] -> Block'
-bToBPrime' x txs = Block' (blockDataRefToBlock x txs) ""
-
+blockDataRefToBlock :: BlockDataRef ->
+                       [BlockValidatorRef] ->
+                       [ValidatorDeltaRef] ->
+                       [CertificateAddedRef] ->
+                       [CertificateRevokedRef] ->
+                       [ProposalSignatureRef] ->
+                       [CommitmentSignatureRef] ->
+                       [Transaction] ->
+                       Block
+blockDataRefToBlock bdr vs vd ca cr ps sigs txs = case vs of
+  [] -> -- this is a v1 block
+    Block
+      { blockBlockData =
+          BlockHeader
+            { parentHash = blockDataRefParentHash bdr,
+              ommersHash = blockDataRefUnclesHash bdr,
+              beneficiary = CommonName "" "" (blockDataRefCoinbase bdr) True,
+              stateRoot = blockDataRefStateRoot bdr,
+              transactionsRoot = blockDataRefTransactionsRoot bdr,
+              receiptsRoot = blockDataRefReceiptsRoot bdr,
+              logsBloom = blockDataRefLogBloom bdr,
+              difficulty = blockDataRefDifficulty bdr,
+              number = blockDataRefNumber bdr,
+              gasLimit = blockDataRefGasLimit bdr,
+              gasUsed = blockDataRefGasUsed bdr,
+              timestamp = blockDataRefTimestamp bdr,
+              extraData = blockDataRefExtraData bdr,
+              nonce = blockDataRefNonce bdr,
+              mixHash = blockDataRefMixHash bdr
+            },
+        blockReceiptTransactions = txs,
+        blockBlockUncles = []
+      }
+  _ ->
+    Block
+      { blockBlockData =
+          BlockHeaderV2
+            { parentHash = blockDataRefParentHash bdr,
+              stateRoot = blockDataRefStateRoot bdr,
+              transactionsRoot = blockDataRefTransactionsRoot bdr,
+              receiptsRoot = blockDataRefReceiptsRoot bdr,
+              logsBloom = blockDataRefLogBloom bdr,
+              number = blockDataRefNumber bdr,
+              timestamp = blockDataRefTimestamp bdr,
+              extraData = blockDataRefExtraData bdr,
+              currentValidators = bvr2v <$> vs,
+              newValidators = catMaybes $ vdr2v True <$> vd,
+              removedValidators = catMaybes $ vdr2v False <$> vd,
+              newCerts = catMaybes $ car2x509 <$> ca,
+              revokedCerts = crr2dcr <$> cr,
+              proposalSignature = join . listToMaybe $ psr2s <$> ps,
+              signatures = catMaybes $ csr2s <$> sigs
+            },
+        blockReceiptTransactions = txs,
+        blockBlockUncles = []
+      }
 
 bPrimeToB :: Block' -> Block
 bPrimeToB (Block' x _) = x
@@ -402,13 +429,32 @@ instance ToJSON BlockData' where
         "mixHash" .= mh
       ]
 
+  toJSON (BlockData' (BlockHeaderV2{..})) = 
+    object
+      [ "kind" .= ("BlockData" :: String),
+        "parentHash" .= parentHash,
+        "stateRoot" .= stateRoot,
+        "transactionsRoot" .= transactionsRoot,
+        "receiptsRoot" .= receiptsRoot,
+        "number" .= number,
+        "timestamp" .= timestamp,
+        "extraData" .= extraData,
+        "currentValidators" .= currentValidators,
+        "newValidators" .= newValidators,
+        "removedValidators" .= removedValidators,
+        "newCerts" .= newCerts,
+        "revokedCerts" .= revokedCerts,
+        "proposalSignature" .= proposalSignature,
+        "signatures" .= signatures
+      ]
+
 instance FromJSON BlockData' where
-  parseJSON = withObject "BlockData'" $ \v ->
-    BlockData'
+  parseJSON = withObject "BlockData'" $ \v -> v .:? "coinbase" >>= \case
+    Just cb -> BlockData'
       <$> ( BlockHeader
               <$> v .: "parentHash"
               <*> v .: "unclesHash"
-              <*> v .: "coinbase"
+              <*> (pure cb)
               <*> v .: "stateRoot"
               <*> v .: "transactionsRoot"
               <*> v .: "receiptsRoot"
@@ -421,6 +467,24 @@ instance FromJSON BlockData' where
               <*> v .: "extraData"
               <*> v .: "mixHash"
               <*> v .: "nonce"
+          )
+    Nothing -> BlockData'
+      <$> ( BlockHeaderV2
+              <$> v .: "parentHash"
+              <*> v .: "stateRoot"
+              <*> v .: "transactionsRoot"
+              <*> v .: "receiptsRoot"
+              <*> v .:? "logBloom" .!= (B.replicate 64 0x30) -- this is what log blooms currently get set to
+              <*> v .: "number"
+              <*> v .: "timestamp"
+              <*> v .: "extraData"
+              <*> v .: "currentValidators"
+              <*> v .: "newValidators"
+              <*> v .: "removedValidators"
+              <*> v .: "newCerts"
+              <*> v .: "revokedCerts"
+              <*> v .: "proposalSignature"
+              <*> v .: "signatures"
           )
 
 instance FromJSON Block' where
@@ -440,12 +504,10 @@ bdPrimeToBd (BlockData' bd) = bd
 data BlockDataRef' = BlockDataRef' BlockDataRef deriving (Eq, Show)
 
 instance ToJSON BlockDataRef' where
-  toJSON (BlockDataRef' (BlockDataRef ph uh co cu cc sr tr rr _ d num gl gu ts ed non mh h pow isConf td)) =
+  toJSON (BlockDataRef' (BlockDataRef ph uh cc sr tr rr _ d num gl gu ts ed non mh h pow isConf td v)) =
     object
       [ "parentHash" .= ph,
         "unclesHash" .= uh,
-        "coinbaseOrg" .= co,
-        "coinbaseOrgUnit" .= cu,
         "coinbaseCommonName" .= cc,
         "stateRoot" .= sr,
         "transactionsRoot" .= tr,
@@ -461,11 +523,36 @@ instance ToJSON BlockDataRef' where
         "hash" .= h,
         "powVerified" .= pow,
         "isConfirmed" .= isConf,
-        "totalDifficulty" .= td
+        "totalDifficulty" .= td,
+        "version" .= v
       ]
 
 bdrToBdrPrime :: BlockDataRef -> BlockDataRef'
 bdrToBdrPrime = BlockDataRef'
+
+bvr2v :: BlockValidatorRef -> Validator
+bvr2v (BlockValidatorRef _ cn) = Validator cn
+
+vdr2v :: Bool -> ValidatorDeltaRef -> Maybe Validator
+vdr2v d' (ValidatorDeltaRef _ cn d) | d' == d = Just $ Validator cn
+vdr2v _ _ = Nothing
+
+car2x509 :: CertificateAddedRef -> Maybe X509Certificate
+car2x509 (CertificateAddedRef _ _ _ cs) =
+  either (const Nothing) Just . bsToCert $ encodeUtf8 cs
+
+crr2dcr :: CertificateRevokedRef -> DummyCertRevocation
+crr2dcr (CertificateRevokedRef _ ua) = DummyCertRevocation ua
+
+psr2s :: ProposalSignatureRef -> Maybe Signature
+psr2s (ProposalSignatureRef _ _ r s v) =
+  either (const Nothing) Just . importSignature $
+    word256ToBytes r <> word256ToBytes s <> B.singleton v
+
+csr2s :: CommitmentSignatureRef -> Maybe Signature
+csr2s (CommitmentSignatureRef _ _ r s v) =
+  either (const Nothing) Just . importSignature $
+    word256ToBytes r <> word256ToBytes s <> B.singleton v
 
 data AddressStateRef' = AddressStateRef' AddressStateRef String deriving (Eq, Show)
 

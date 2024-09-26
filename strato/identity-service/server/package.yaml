@@ -53,7 +53,6 @@ library:
   - unliftio
   - utf8-string
   - vault-monad
-  - x509-certs
 
 executables:
   identity-service-server:
@@ -72,7 +71,6 @@ executables:
     - strato-model
     - warp
     - wai-cors
-    - x509-certs
     - yaml
 
 tests:

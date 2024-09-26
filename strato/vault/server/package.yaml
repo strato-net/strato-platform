@@ -92,7 +92,6 @@ executables:
       - wai-extra
       - wai-middleware-prometheus
       - warp
-      - x509-certs
     ghc-options: -threaded
 
   migrate-keys:

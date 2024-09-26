@@ -61,12 +61,10 @@ data SetupDBs = SetupDBs
     localAddressStateBlock :: IORef (M.Map Account AddressStateModification)
   }
 
-type SetupDBM = ReaderT SetupDBs (ResourceT (LoggingT IO))
-
 type HasDBs m = Mod.Accessible SetupDBs m
 
-
-runSetupDBM :: SetupDBM a -> ResourceT (LoggingT IO) a
+runSetupDBM :: (MonadResource m, MonadFail m) =>
+               ReaderT SetupDBs m b -> m b
 runSetupDBM mv = do
   let open path = DB.open (".ethereumH" ++ path) DB.defaultOptions {DB.createIfMissing = True, DB.cacheSize = 1024}
   sdb <- open stateDBPath

@@ -24,11 +24,11 @@ where
 import BlockApps.Crossmon
 import qualified Blockchain.Stream.Action as Action
 import Control.Monad
+import Control.Monad.Composable.Kafka
 import Control.Monad.IO.Class
 import qualified Data.Cache.LRU as LRU
 import qualified Data.Map.Strict as M
 import qualified Data.Text as T
-import Network.Kafka.Protocol (Offset)
 import Prometheus
 import Slipstream.Data.Action
 import Slipstream.Data.Globals

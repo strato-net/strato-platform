@@ -31,6 +31,7 @@ library:
   - format
   - hflags
   - http-types
+  - kafka-monad
   - labeled-error
   - lens
   - monad-alter
@@ -59,4 +60,3 @@ library:
   - identity-monad
   - strato-redis-blockdb
   - evm-solidity
-  - x509-certs

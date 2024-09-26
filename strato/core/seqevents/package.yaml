@@ -14,11 +14,11 @@ library:
     - aeson
     - blockstanbul
     - bytestring
-    - conduit
     - deepseq
     - ethereum-rlp
     - format
     - generic-arbitrary
+    - kafka-monad
     - lens
     - merkle-patricia-db
     - milena
@@ -27,7 +27,6 @@ library:
     - strato-conf
     - strato-model
     - text
-    - x509-certs
 
 tests:
   seqevents-spec:

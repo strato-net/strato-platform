@@ -83,21 +83,6 @@ import Text.Tools
 import UnliftIO.Exception
 import Prelude hiding (lookup)
 
-setTitleAndProduceBlocks ::
-  ( MonadLogger m,
-    MonadIO m,
-    Stacks Block m
-  ) =>
-  [Block] ->
-  m Int
-setTitleAndProduceBlocks blocks = do
-  lastBlockHashes <- map blockHash <$> takeStack (Proxy @Block) 200
-  let newBlocks = filter (not . (`elem` lastBlockHashes) . blockHash) blocks
-  unless (null newBlocks) $ do
-    liftIO . setTitle $ "Block #" ++ show (maximum $ map (BlockHeader.number . blockBlockData) newBlocks)
-    pushStack newBlocks
-  return $ length newBlocks
-
 -- drop every n-th element from the list
 -- e.g. skipEntries 0 [1..20] => [1..20]
 --      skipEntries 1 [1..20] => [13,5,7,9,11,13,15,17,19]
@@ -148,19 +133,18 @@ handleEvents peer = awaitForever $ \case
     parentHeader <- lift $ lookup (Proxy @BlockHeader) parentHash'
     case parentHeader of
       Nothing -> do
-        bestBlock <- lift $ Mod.get (Proxy @BestBlock)
+        BestSequencedBlock bestBlock <- lift $ Mod.get (Proxy @BestSequencedBlock)
         let bestBlockNum = numberFromBestBlock bestBlock
             fetchNumber = if bestBlockNum < 2 then 1 else bestBlockNum - 1
         $logInfoS "handleEvents/NewBlock" $ T.pack $ "newBlock :: fetchNumber is " ++ show fetchNumber
         $logInfoS "handleEvents/NewBlock" $ T.pack $ "#### New block is missing its parent, I am resyncing"
         syncFetch Forward fetchNumber
       Just _ -> do
-        lift . void $ setTitleAndProduceBlocks [block']
         let ingestBlock = IEBlock $ blockToIngestBlock (Origin.PeerString $ peerString peer) block'
         yieldL $ ToUnseq [ingestBlock]
   MsgEvt (NewBlockHashes _) -> do
     lift stampActionTimestamp
-    bestBlock <- lift $ Mod.get (Proxy @BestBlock)
+    BestSequencedBlock bestBlock <- lift $ Mod.get (Proxy @BestSequencedBlock)
     let bestBlockNum = numberFromBestBlock bestBlock
     let fetchNumber = if bestBlockNum < 2 then 1 else bestBlockNum - 1
     $logInfoS "handleEvents/NewBlockHashes" $ T.pack $ "newBlockHashes :: fetchNumber is " ++ show fetchNumber
@@ -205,13 +189,14 @@ handleEvents peer = awaitForever $ \case
         yieldR . BlockHeaders . skipEntries skip' $ morphBlockHeader . unCanonical . snd <$> chain
   MsgEvt (BlockHeaders bHeaders) -> do
     let headers = morphBlockHeader <$> bHeaders
+    --- put bheaders log right here
     lift stampActionTimestamp
     -- check if blockheaders we recieved have parents.
     let parents = map BlockHeader.parentHash headers
     existingParents <- lift $ lookupMany (Proxy @BlockHeader) parents
     let missingParents = S.fromList parents S.\\ (M.keysSet existingParents `S.union` S.fromList (blockHeaderHash <$> bHeaders))
     unless (S.null missingParents) $ do
-      bestBlock <- lift $ Mod.get (Proxy @BestBlock)
+      BestSequencedBlock bestBlock <- lift $ Mod.get (Proxy @BestSequencedBlock)
       let fetchNumber = numberFromBestBlock bestBlock + 1
       $logInfoS "handleEvents/BlockHeaders" $ T.pack $ "blockHeaders :: fetchNumber is " ++ show fetchNumber
       $logInfoS "handleEvents/BlockHeaders" $ T.pack $ "missing blocks: " ++ (unlines $ format <$> S.toList missingParents)
@@ -319,14 +304,13 @@ handleEvents peer = awaitForever $ \case
     $logInfoS "handleEvents/BlockBodies" $ T.pack $ "len headers is " ++ show (length headers) ++ ", len bodies is " ++ show (length bodies)
     unless (null headers) $ recordMaxBlockNumber "p2p_block_bodies" . maximum $ map BlockHeader.number headers
     let blocks' = zipWith createBlockFromHeaderAndBody (morphBlockHeader <$> headers) bodies
-    newCount <- lift $ setTitleAndProduceBlocks blocks'
     yieldL . ToUnseq $ IEBlock . blockToIngestBlock (Origin.PeerString $ peerString peer) <$> blocks'
     rHeaders <- lift getRemainingBHeaders
     let (neededHeaders, remainingHeaders) = splitNeededHeaders rHeaders
     lift $ putBlockHeaders neededHeaders
     lift $ putRemainingBHeaders remainingHeaders
     if null neededHeaders
-      then when (newCount > 0) $ do
+      then do
         mrh <- lift $ unMaxReturnedHeaders <$> access (Proxy @MaxReturnedHeaders)
         let sortedHeaders = sortOn blockHeaderBlockNumber headers
         yieldR $ GetBlockHeaders (BlockHash $ blockHeaderHash $ last sortedHeaders) mrh 0 Forward

@@ -55,7 +55,6 @@ library:
   - unliftio
   - utf8-string
   - vault-monad
-  - x509-certs
 
 executables:
   identity-provider-server:
@@ -70,8 +69,8 @@ executables:
     - common-log
     - containers
     - hflags
+    - strato-model
     - warp
-    - x509-certs
     - yaml
 
 tests:

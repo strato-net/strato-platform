@@ -11,7 +11,7 @@ description:
 dependencies:
   - base >= 4 && < 5
   - bytestring
-  - x509-certs
+  - strato-model
 
 
 ghc-options: -Wall -Werror

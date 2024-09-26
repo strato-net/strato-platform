@@ -22,7 +22,6 @@ import Data.Binary
 import Data.Map.Strict (Map)
 import Data.Text (Text)
 import GHC.Generics
-import Network.Kafka.Protocol hiding (Key)
 import SolidVM.Model.CodeCollection
 import Text.Format
 import Text.Tools
@@ -35,7 +34,7 @@ data VMEvent
         creator :: Text,
         application :: Text,
         historyList :: [Text],
-        abstracts :: Map (Account, Text) (Text, Text),
+        abstracts :: Map (Account, Text) (Text, Text, [Text]),
         recordMappings :: [Text]
       }
   | DelegatecallMade Delegatecall

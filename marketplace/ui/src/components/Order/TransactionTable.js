@@ -1,10 +1,9 @@
 import React, { useEffect, useState } from "react";
-import { Button, Dropdown, Space, Typography, Input, Row, Col, Popover, Card, Tooltip, Select, DatePicker, Spin } from "antd";
+import { Button, Dropdown, Space, Input, Row, Col, Popover, Card, Tooltip, Select, DatePicker, Spin } from "antd";
 import { DownloadOutlined, SearchOutlined } from "@ant-design/icons";
 import { useNavigate, useLocation } from "react-router-dom";
 import classNames from "classnames";
 import dayjs from "dayjs";
-import moment from "moment";
 // Components
 import DataTableComponent from "../DataTableComponent";
 import { TRANSACTION_FILTER } from "./constant";
@@ -19,10 +18,11 @@ import { actions as transactionAction } from "../../contexts/transaction/actions
 import { useTransactionDispatch, useTransactionState } from "../../contexts/transaction";
 // Utils & Constants
 import {
-  STRATS_CONVERSION, TRANSACTION_STATUS, TRANSACTION_STATUS_CLASSES, TRANSACTION_SORT,
-  TRANSACTION_STATUS_COLOR, DOWNLOAD_OPTIONS, REDEMPTION_STATUS, REDEMPTION_STATUS_CLASSES
+  STRATS_CONVERSION, TRANSACTION_STATUS, TRANSACTION_STATUS_CLASSES, TRANSACTION_STATUS_COLOR, 
+  DOWNLOAD_OPTIONS, REDEMPTION_STATUS, REDEMPTION_STATUS_CLASSES, US_DATE_FORMAT
 } from "../../helpers/constants";
 import { SEO } from "../../helpers/seoConstant";
+import { getStringDate } from "../../helpers/utils";
 
 const limit = '', offset = '';
 
@@ -38,9 +38,8 @@ const TransactionTable = ({ user, download, isAllOrdersLoading }) => {
 
   const currentMonth = dayjs().startOf('month').unix();
 
-  const searchParams = new URLSearchParams(location.search);
-  const type = searchParams.get('type');
-  const dateQuery = searchParams.get('date');
+  const [type, setType] = useState("");
+  const [dateQuery, setDateQuery] = useState("");
   const [transactions, setTransactions] = useState(userTransactions)
   const [search, setSearch] = useState("")
 
@@ -73,27 +72,59 @@ const TransactionTable = ({ user, download, isAllOrdersLoading }) => {
   }, [user, dateQuery])
 
   useEffect(() => {
-    let filteredData = userTransactions;
+    const searchParams = new URLSearchParams(location.search);
+    const urlType = searchParams.get("type");
+    const urlDate = searchParams.get("date");
+  
+    // Update state based on URL params, but skip empty values
+    setType(urlType && urlType !== "all" ? urlType : "");
+    setDateQuery(urlDate || "");
+  }, [location.search]);
+  
 
+  useEffect(() => {
+    let filteredData = userTransactions;
+  
+    // Type filter
     if (type) {
       filteredData = filteredData.filter((item) => item.type === type);
     }
+  
+    // Search filter
     if (search) {
       const searchString = String(search).toLowerCase();
       filteredData = filteredData.filter((item) =>
-        String(item.assetName).toLowerCase().indexOf(searchString) !== -1
+        String(item.assetName).toLowerCase().includes(searchString)
       );
     }
-
+  
+    // Apply the date filter (month and year comparison)
+    if (dateQuery) {
+      // Format `dateQuery` (e.g., "August 2024") into a dayjs object
+      const selectedMonthYear = dayjs(dateQuery, "MMMM YYYY");
+  
+      filteredData = filteredData.filter((item) => {
+        const itemDate = dayjs(item.block_timestamp); // Convert block timestamp to dayjs object
+  
+        // Compare both month and year
+        return itemDate.isSame(selectedMonthYear, 'month') && itemDate.isSame(selectedMonthYear, 'year');
+      });
+    }
+  
     setTransactions(filteredData);
-  }, [userTransactions, type, search]);
+  }, [userTransactions, type, search, dateQuery]);
+  
 
 
+  // Handle the date change event. Update the URL and state
   const onDateChange = (date) => {
     const unixTimestamp = dayjs(date).unix();
     const formattedDate = dayjs.unix(unixTimestamp).format('MMMM YYYY');
-    navigate(`/transactions?date=${formattedDate}`);
+    const currentType = type || ""; // Use the current type value or empty if not set
+    navigate(`/transactions?type=${currentType}&date=${formattedDate}`);
+    setDateQuery(formattedDate); // Update the date state
   };
+  
 
   const dateReturn = (date) => {
     const startDate = dayjs(date).startOf('month').unix();
@@ -206,14 +237,14 @@ const TransactionTable = ({ user, download, isAllOrdersLoading }) => {
       render: (data, { price }) => <p>{price ? formattedNum(price) : '--'}</p>
     },
     {
-      title: "From",
+      title: "Buyer/Sender",
       dataIndex: "from",
       key: "from",
       align: "center",
       width: '150px',
     },
     {
-      title: "To",
+      title: "Seller/Recipient",
       dataIndex: "to",
       key: "to",
       align: "center",
@@ -234,7 +265,7 @@ const TransactionTable = ({ user, download, isAllOrdersLoading }) => {
       dataIndex: "date",
       key: "date",
       width: '150px',
-      render: (text,{block_timestamp}) => <p>{moment(block_timestamp).format('L')}</p>,
+      render: (text,{createdDate}) => <p>{getStringDate(createdDate, US_DATE_FORMAT)}</p>,
       title: (
         <div style={{ display: "flex" }}>
           <div className="mt-1.5">{"Date"}</div>
@@ -266,9 +297,24 @@ const TransactionTable = ({ user, download, isAllOrdersLoading }) => {
     setSearch(value)
   }
 
+  // Handle the Type change event. Update the URL and state
   const handleFilter = (val) => {
-    navigate(val ? `/transactions?type=${val}` : `/transactions`)
-  }
+    const currentDateQuery = dateQuery || ""; // Use the current date or empty string if not set
+  
+    // If "All" is selected, remove `type` from query params
+    const queryParams = new URLSearchParams();
+    if (val && val !== "all") {
+      queryParams.set("type", val);
+    }
+    if (currentDateQuery) {
+      queryParams.set("date", currentDateQuery);
+    }
+  
+    navigate(`/transactions?${queryParams.toString()}`);
+    setType(val === "all" ? "" : val); // Set empty type for "All"
+  };
+  
+  
 
   const metaImg = SEO.IMAGE_META;
 
@@ -290,7 +336,7 @@ const TransactionTable = ({ user, download, isAllOrdersLoading }) => {
               <Col xs={24} xl={24}>
                 <Row className="w-full md:w-auto md:flex md:justify-between items-center mb-5 mt-4">
                   <Col xs={24} md={7} className="flex justify-center mt-2 md:mt-0">
-                    <Select className="block lg:block w-full md:w-4/5 rounded-md mx-auto" onChange={(val) => { handleFilter(val) }} placeholder="Select Type" defaultValue={type || ''}>
+                    <Select className="block lg:block w-full md:w-4/5 rounded-md mx-auto" onChange={(val) => { handleFilter(val) }} placeholder="Select Type" value={type} defaultValue={type || ''}>
                       {TRANSACTION_FILTER.map(({ label, value }) =>
                         <Select.Option value={value}> {label} </Select.Option>
                       )}
@@ -308,6 +354,7 @@ const TransactionTable = ({ user, download, isAllOrdersLoading }) => {
                       <DatePicker onChange={onDateChange}
                         className="w-full"
                         defaultValue={defaultDate}
+                        value={defaultDate}
                         picker="month"
                         disabledDate={(current) => { return current && current > dayjs().endOf('month') }}
                         format={(value) => dayjs(value).format('MMMM YYYY')}

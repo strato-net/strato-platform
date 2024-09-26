@@ -7,17 +7,19 @@ dependencies:
 library:
   source-dirs: src
   dependencies:
+  - aeson
   - base16-bytestring
   - binary
   - bytestring
   - common-log
   - composable-monads-base
+  - conduit
   - lens
   - milena
   - milena-tools
+  - monad-loops
   - mtl
   - text
   - transformers
-  - unliftio-core
   
   

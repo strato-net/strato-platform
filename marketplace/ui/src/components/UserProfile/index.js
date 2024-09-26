@@ -427,6 +427,7 @@ const UserProfile = ({user}) => {
                             key={index}
                             // debouncedSearchTerm={debouncedSearchTerm}
                             allSubcategories={allSubcategories}
+                            user={user}
                           />
                         );
                       })
@@ -453,6 +454,7 @@ const UserProfile = ({user}) => {
                             key={index}
                             // debouncedSearchTerm={debouncedSearchTerm}
                             allSubcategories={allSubcategories}
+                            user={user}
                           />
                         );
                       })
@@ -479,6 +481,7 @@ const UserProfile = ({user}) => {
                             key={index}
                             // debouncedSearchTerm={debouncedSearchTerm}
                             allSubcategories={allSubcategories}
+                            user={user}
                           />
                         );
                       })
