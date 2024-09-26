@@ -13,7 +13,7 @@ import dayjs from "dayjs";
 import constants from "../../helpers/constants";
 
 const contractName = "Offer";
-const contractFilename = `${util.cwd}/dapp/offers/contracts/Offer.sol`;
+const paymentServiceContractName = "TokenPaymentService";
 
 /**
  * Upload a new Offer
@@ -23,30 +23,22 @@ const contractFilename = `${util.cwd}/dapp/offers/contracts/Offer.sol`;
  * @returns Contract object
  * */
 
-async function uploadContract(user, _constructorArgs, options) {
+async function createOffer(user, _constructorArgs, options) {
   const constructorArgs = marshalIn(_constructorArgs);
-
+  console.log("Checking createOffer1111 ===> ", user, constructorArgs, options);
+  const contract = { name: paymentServiceContractName, address: options.contractAddress };
   const contractArgs = {
-    name: contractName,
-    source: await importer.combine(contractFilename),
+    contract,
     args: util.usc(constructorArgs),
   };
-
-  let error = [];
-
-  if (error.length) {
-    throw new Error(error.join("\n"));
-  }
 
   const copyOfOptions = {
     ...options,
     history: contractName,
   };
-
-  const contract = await rest.createContract(user, contractArgs, copyOfOptions);
-  contract.src = "removed";
-
-  return bind(user, contract, copyOfOptions);
+  console.log("Checking createOffer2222 ===> ", user, contractArgs, copyOfOptions);
+  const createOffer = await rest.call(user, contractArgs, copyOfOptions);
+  return createOffer;
 }
 
 async function getHistory(user, chainId, address, options) {
@@ -255,7 +247,7 @@ async function getCancelledOffers(user, args, options) {
 }
 
 export default {
-  uploadContract,
+  createOffer,
   get,
   getAll,
   updateOffer,

@@ -319,7 +319,6 @@ const ProductDetails = ({ user, users }) => {
   //     });
   //   }
   // };
-
   const addItemToCart = async () =>{
     const items = [{ product: details, qty }];
     marketPlaceActions.addItemToCart(marketplaceDispatch, items);
@@ -626,7 +625,10 @@ const ProductDetails = ({ user, users }) => {
                     <OfferModal
                       isOpen={isOfferModalOpen}            
                       onClose={() => setIsOfferModalOpen(false)}  
-                      // product={product}               
+                      actions={offerActions}
+                      dispatch={offerDispatch}
+                      product={details}
+                      error={error}
                     />
                   {/* TODO:- Remove Comment to show the Add-to-Cart Button */}
                   {/* {ownerSameAsUser() ?

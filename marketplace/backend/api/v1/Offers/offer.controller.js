@@ -44,6 +44,9 @@ class OfferController {
     static async create(req, res, next) {
         try {
             const { dapp, body } = req
+            console.log("Checking Controller ===> ", body);
+            OfferController.validateCreateOfferArgs(body)
+
             const result = await dapp.createOffer(body, options)
             rest.response.status200(res, result)
             return next()
@@ -153,6 +156,24 @@ class OfferController {
             return next()
         } catch (e) {
             return next(e)
+        }
+    }
+
+    static validateCreateOfferArgs(args) {
+        const createOfferSchema = Joi.object({
+            assetAddress: Joi.string().required(),
+            saleAddress: Joi.string().required(),
+            quantity: Joi.number().min(1).required(),
+            price: Joi.number().min(1).required(),
+            imageUrl: Joi.string().required(),
+        }).required()
+
+        const validation = createOfferSchema.validate(args)
+
+        if (validation.error) {
+            throw new rest.RestError(RestStatus.BAD_REQUEST, 'Create Offer Argument Validation Error', {
+                message: `Missing args or bad format: ${validation.error.message}`,
+            })
         }
     }
 }

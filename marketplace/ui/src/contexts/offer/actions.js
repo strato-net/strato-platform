@@ -32,20 +32,23 @@ const actions = {
 
   createOffer: async (dispatch, payload) => {
     dispatch({ type: actionDescriptors.createOffer });
-
+  
+    console.log("Getting to actions ===> ", dispatch, payload);
+  
     try {
       const response = await fetch(`${apiUrl}/offer`, {
         method: HTTP_METHODS.POST,
         credentials: "same-origin",
         headers: {
-          "Accept": "application/json",
+          Accept: "application/json",
           "Content-Type": "application/json",
         },
         body: JSON.stringify(payload),
       });
-
+  
       const body = await response.json();
-
+  
+      // Handle successful response
       if (response.status === RestStatus.OK) {
         dispatch({
           type: actionDescriptors.createOfferSuccessful,
@@ -54,21 +57,30 @@ const actions = {
         actions.setMessage(dispatch, "Offer created successfully", true);
         return true;
       }
-
+  
+      const errorMessage = body?.error || "Error while creating offer";
       dispatch({
         type: actionDescriptors.createOfferFailed,
-        error: "Error while creating offer",
+        error: errorMessage,
       });
-      actions.setMessage(dispatch, "Error while creating offer");
-      return false;
+      actions.setMessage(dispatch, errorMessage);
+      
+      throw new Error(errorMessage);
     } catch (err) {
+      // Log and handle the error
+      console.error("Error while creating offer:", err);
+  
       dispatch({
         type: actionDescriptors.createOfferFailed,
-        error: "Error while creating offer",
+        error: err.message || "Error while creating offer",
       });
-      actions.setMessage(dispatch, "Error while creating offer");
+      actions.setMessage(dispatch, err.message || "Error while creating offer");
+  
+      // Re-throw the error so it can be caught in the calling code
+      throw err;
     }
   },
+  
 
   fetchOffers: async (dispatch, productAddress = null, userAddress = null) => {
     dispatch({ type: actionDescriptors.fetchOffers });

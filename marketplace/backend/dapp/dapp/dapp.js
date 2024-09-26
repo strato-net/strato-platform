@@ -1264,19 +1264,14 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
   }
 
   contract.getAllOffers = async function (args, options = defaultOptions) {
-    console.log("offerArgs===>", args);
     const offers = await offerJs.getAll(rawAdmin, args, options);
     return offers;
   }
 
   contract.createOffer = async function (args, options = defaultOptions) {
-    const createdDate = Math.floor(Date.now() / 1000);
-    const newArgs = {
-      ...args.itemArgs,
-      createdDate,
-      status: OFFER_STATUS.PENDING
-    };
-    return offerJs.uploadContract(rawAdmin, newArgs, options);
+    console.log("createOffer args", args, options);
+    const offer = await offerJs.createOffer(rawAdmin, args, options);
+    return offer;
   }
 
   contract.updateOffer = async function (args, options = defaultOptions) {

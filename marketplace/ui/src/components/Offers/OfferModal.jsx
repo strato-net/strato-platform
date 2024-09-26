@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Button as AntButton, InputNumber, Spin } from "antd"; // Spin for loading
+import { Button as AntButton, InputNumber, Spin, Alert } from "antd"; // Alert for error message
 import { ReactComponent as WalletIcon } from "../../images/offer-images/wallet-icon.svg";
 import { ReactComponent as StratIcon } from "../../images/offer-images/strats-icon.svg";
 import { ReactComponent as SuccessIcon } from "../../images/offer-images/offer-success.svg";
@@ -12,13 +12,13 @@ const MakeOfferModal = ({
   actions,
   dispatch,
   product,
-  user
 }) => {
   const [isConfirming, setIsConfirming] = useState(false); // For confirmation modal
   const [isLoading, setIsLoading] = useState(false); // For loading state
   const [isConfirmed, setIsConfirmed] = useState(false); // For final confirmation screen
+  const [errorMessage, setErrorMessage] = useState(null); // To track error message
 
-  const { name, owner, price, quantity, saleAddress, address } = product;
+  const imageUrl = product["BlockApps-Mercata-Asset-images"][0].value;
 
   const formik = useFormik({
     initialValues: {
@@ -40,37 +40,34 @@ const MakeOfferModal = ({
         .nullable()
         .transform((value) => (isNaN(value) ? 1 : value))
         .max(
-          product.strats,
-          `*Price must be less than ${product.strats} STRATS`
+          product.price * 100,
+          `*Price must be less than ${product.price * 100} STRATS`
         )
         .required("*Price is required"),
     }),
-    onSubmit: (values) => {
-      // Form is only submitted when user clicks "Approve"
+    onSubmit: async (values) => {
       setIsLoading(true); // Show loading screen
-      // Call Create Offer to submit the offer
+      setErrorMessage(null); // Reset any existing error messages
+
       const body = {
         assetAddress: product.address,
         saleAddress: product.saleAddress,
-        purchaser: user.address,        
         quantity: values.quantity,
-        price: values.price * values.quantity,
-        imageUrl: product["BlockApps-Mercata-Asset-images"][0].value,
+        price: calculateTotalCost(values),
+        imageUrl: imageUrl,
       };
 
-      const request = actions.createOffer(dispatch, body);
-      request
-        .then((response) => {
-          setIsLoading(false); // Hide loading screen
-          setIsConfirmed(true); // Show confirmation screen
-        })
-        .catch((error) => {
-          setIsLoading(false); // Hide loading screen
-          console.log("Error submitting offer: ", error);
-          // reset form values and return to initial state
-          formik.resetForm();
-          setIsConfirming(false);
-        }, [actions, body]);
+      try {
+        await actions.createOffer(dispatch, body);
+        setIsLoading(false); // Hide loading screen
+        setIsConfirmed(true); // Show confirmation screen
+      } catch (error) {
+        setIsLoading(false); // Hide loading screen
+        setErrorMessage("There was an issue creating the offer. Please try again."); // Show error message
+        console.log("Error submitting offer: ", error);
+        formik.resetForm(); // Reset form values
+        setIsConfirming(false);
+      }
     },
   });
 
@@ -78,7 +75,6 @@ const MakeOfferModal = ({
     return values.quantity * values.price;
   };
 
-  // This is to prevent scrolling when the modal is open. It will disable the body scroll.
   useEffect(() => {
     if (isOpen) {
       document.body.style.overflow = "hidden";
@@ -102,7 +98,6 @@ const MakeOfferModal = ({
             <h2 className="text-xl font-semibold">Make an Offer</h2>
           </div>
           <p className="text-lg ">Please wait while we submit your offer.</p>
-          {/* Loading Spinner */}
           <div className="flex justify-center items-center h-80">
             <Spin className="w-max h-max" tip="Loading..." size="large" />
           </div>
@@ -129,15 +124,12 @@ const MakeOfferModal = ({
           <div className="flex justify-center items-center my-14">
             <SuccessIcon className="h-40" />
           </div>
-
-          {/* Offer Status*/}
           <div className="text-center flex flex-col justify-end h-max">
             <p className=" text-[#7E7878] leading-loose">
               You can check your offer status at any time
             </p>
             <AntButton
               type="primary"
-              className=""
               onClick={() => {
                 setIsConfirming(false); // Reset state
                 setIsConfirmed(false);
@@ -173,16 +165,16 @@ const MakeOfferModal = ({
           <div className="grid grid-cols-6 lg:grid-cols-7 gap-4 lg:gap-0 mb-8">
             <div className="w-full bg-gray-200 col-span-2 py-2 flex items-center rounded-lg overflow-hidden">
               <img
-                src={product.imageUrl}
+                src={imageUrl}
                 alt={product.name}
                 className="object-cover w-[110px] h-[110px] rounded-lg"
               />
             </div>
             <div className="flex flex-col col-span-4 lg:col-span-5 py-2 h-full justify-evenly">
               <h3 className="font-bold text-lg lg:text-xl">{product.name}</h3>
-              <p className="text-xs text-gray-500">Owned By: {product.owner}</p>
+              <p className="text-xs text-gray-500">Owned By: {product.ownerCommonName}</p>
               <p className="text-lg lg:text-xl font-semibold text-[#13188A]">
-                {product.price} ({product.strats} STRATS)
+                {formik.values.price} STRATS
               </p>
             </div>
           </div>
@@ -209,7 +201,6 @@ const MakeOfferModal = ({
 
           {/* Buttons Section */}
           <div className="flex justify-between">
-            {/* Submitting the form when user clicks approve.  */}
             <AntButton
               type="primary"
               className="w-[48%] h-9 !bg-[#13188A] !hover:bg-primaryHover !text-white"
@@ -246,26 +237,37 @@ const MakeOfferModal = ({
           </button>
         </div>
 
+        {/* Display Error Message */}
+        {errorMessage && (
+          <Alert
+            message={errorMessage}
+            type="error"
+            showIcon
+            closable
+            onClose={() => setErrorMessage(null)} // Reset error message on close
+            className="mb-4"
+          />
+        )}
+
         {/* Product Info */}
         <div className="grid grid-cols-6 lg:grid-cols-7 gap-4 lg:gap-0 mb-8">
           <div className="w-full bg-gray-200 col-span-2 py-2 flex items-center rounded-lg overflow-hidden">
             <img
-              src={product.imageUrl}
+              src={imageUrl}
               alt={product.name}
               className="object-cover w-[110px] h-[110px] rounded-lg"
             />
           </div>
           <div className="flex flex-col col-span-4 lg:col-span-5 py-2 h-full justify-evenly">
             <h3 className="font-bold text-lg lg:text-xl">{product.name}</h3>
-            <p className="text-xs text-gray-500">Owned By: {product.owner}</p>
+            <p className="text-xs text-gray-500">Owned By: {product.ownerCommonName}</p>
             <p className="text-lg lg:text-xl font-semibold text-[#13188A]">
-              {product.price} ({product.strats} STRATS)
+              {product.price * 100} STRATS
             </p>
           </div>
         </div>
 
         <form>
-          {/* Cost Section */}
           <div className="bg-[#EEEEF8] p-3 mb-8 flex items-center">
             <WalletIcon className="" />
             <p className="text-xs text-[#7E7878] px-2">
@@ -274,39 +276,37 @@ const MakeOfferModal = ({
             <StratIcon />
           </div>
 
-          {/* Input Section */}
           <div className="flex gap-4 mb-5 content-end">
             <div className="w-full flex flex-col">
               <InputNumber
                 min={1}
-                max={product.quantity}
+                max={product.saleQuantity}
                 value={formik.values.quantity}
                 onChange={(value) => formik.setFieldValue("quantity", value)}
                 placeholder="Enter Quantity"
                 className="w-full"
                 status={formik.errors.quantity ? "error" : ""}
               />
-              {formik.touched.quantity && formik.errors.quantity ? (
+              {formik.errors.quantity ? (
                 <p className="text-error text-xs">{formik.errors.quantity}</p>
               ) : null}
             </div>
             <div className="w-full flex flex-col">
               <InputNumber
                 min={0}
-                max={product.strats}
+                max={product.price * 100 - 1}
                 value={formik.values.price}
                 onChange={(value) => formik.setFieldValue("price", value)}
                 placeholder="Enter Price (STRATS)"
                 className="w-full"
                 status={formik.errors.price ? "error" : ""}
               />
-              {formik.touched.price && formik.errors.price ? (
+              {formik.errors.price ? (
                 <p className="text-error text-xs">{formik.errors.price}</p>
               ) : null}
             </div>
           </div>
 
-          {/* Buttons Section */}
           <div>
             <AntButton
               type="primary"
