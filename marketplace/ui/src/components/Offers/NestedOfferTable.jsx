@@ -11,10 +11,12 @@ const productData = [
     totalQuantity: 3000,
     price: "3300 STRATS",
     totalOffers: 6,
-    imageUrl: "https://fileserver.mercata-testnet2.blockapps.net/highway/b878c7de956e27099c1c5f16aa49e725cee03f5e1a9ab2a6ad496af1f0a407ff.png", // Product image
+    imageUrl:
+      "https://fileserver.mercata-testnet2.blockapps.net/highway/b878c7de956e27099c1c5f16aa49e725cee03f5e1a9ab2a6ad496af1f0a407ff.png", // Product image
     offers: [
       {
         offerer: "Evelyn",
+        date: "2021-09-01",
         quantity: 16,
         price: 200,
         totalPrice: 2800,
@@ -23,6 +25,7 @@ const productData = [
       },
       {
         offerer: "Jaime",
+        date: "2021-09-02",
         quantity: 6,
         price: 200,
         totalPrice: 1200,
@@ -31,11 +34,21 @@ const productData = [
       },
       {
         offerer: "Andrew",
+        date: "2021-09-03",
         quantity: 6,
         price: 200,
         totalPrice: 1200,
         key: "3",
         status: "declined",
+      },
+      {
+        offerer: "Andrew",
+        date: "2021-09-03",
+        quantity: 7,
+        price: 210,
+        totalPrice: 1600,
+        key: "4",
+        status: "canceled",
       },
     ],
   },
@@ -45,10 +58,12 @@ const productData = [
     totalQuantity: 300,
     price: "1300 STRATS",
     totalOffers: 2,
-    imageUrl: "https://fileserver.mercata-testnet2.blockapps.net/highway/b878c7de956e27099c1c5f16aa49e725cee03f5e1a9ab2a6ad496af1f0a407ff.png",
+    imageUrl:
+      "https://fileserver.mercata-testnet2.blockapps.net/highway/b878c7de956e27099c1c5f16aa49e725cee03f5e1a9ab2a6ad496af1f0a407ff.png",
     offers: [
       {
         offerer: "Username",
+        date: "2021-09-01",
         quantity: 6,
         price: 200,
         totalPrice: 1200,
@@ -93,7 +108,11 @@ const offerColumns = (handleAction, tableType) => {
         render: (offerer) => (
           <div style={{ display: "flex", alignItems: "center" }}>
             <Avatar
-              style={{ backgroundColor: getAvatarColor(offerer), marginRight: 8, borderRadius: 4 }} // Square avatar
+              style={{
+                backgroundColor: getAvatarColor(offerer),
+                marginRight: 8,
+                borderRadius: 4,
+              }} // Square avatar
             >
               {offerer.charAt(0).toUpperCase()}
             </Avatar>
@@ -126,14 +145,21 @@ const offerColumns = (handleAction, tableType) => {
         key: "status",
         render: (record) => (
           <Badge
-            status={
-              record.status === "accepted"
-                ? "success"
-                : record.status === "declined"
-                ? "error"
-                : "default"
+            status={(() => {
+              switch (record.status) {
+                case "accepted":
+                  return "success";
+                case "declined":
+                  return "error";
+                case "canceled":
+                  return "warning";
+                default:
+                  return "default";
+              }
+            })()}
+            text={
+              record.status.charAt(0).toUpperCase() + record.status.slice(1)
             }
-            text={record.status.charAt(0).toUpperCase() + record.status.slice(1)}
           />
         ),
       },
@@ -208,7 +234,9 @@ const offerColumns = (handleAction, tableType) => {
                 ? "error"
                 : "default"
             }
-            text={record.status.charAt(0).toUpperCase() + record.status.slice(1)}
+            text={
+              record.status.charAt(0).toUpperCase() + record.status.slice(1)
+            }
           />
         ),
       },

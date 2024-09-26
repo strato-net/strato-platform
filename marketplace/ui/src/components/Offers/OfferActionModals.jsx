@@ -97,7 +97,7 @@ const ConfirmationModal = ({ isOpen, onClose, onConfirm, product, actionType, is
                             className="w-full h-9 !bg-[#13188A] !hover:bg-primaryHover !text-white"
                             onClick={onConfirm}
                         >
-                            Approve
+                            Accept Offer
                         </Button>
                     )}
                     {actionType === "decline" && (
