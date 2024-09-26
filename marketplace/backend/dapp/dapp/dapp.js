@@ -1155,6 +1155,10 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
         return addresses;
       }, []);
 
+      if (accumulatedTotal < orderTotal) {
+        throw new rest.RestError(RestStatus.BAD_REQUEST, "Insufficient STRATS balance");
+      }
+      
       const createdDate = Math.floor(Date.now() / 1000);
       const paymentParameters = {
         address: paymentService.address,
