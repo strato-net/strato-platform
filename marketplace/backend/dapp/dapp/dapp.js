@@ -60,7 +60,6 @@ let userCert = null;
 // }
 
 function deploy(contract, args, options) {
-  console.log(options);
   // author the deployment
   const { deployFilePath } = args;
 
@@ -131,9 +130,8 @@ async function uploadContract(token, options) {
 
 async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
   const contract = _contract;
-  console.debug(contract);
-  let userOrganization;
-  let userCommonName;
+  let userOrganization
+  let userCommonName
 
   if (!serviceUser) {
     let userCertificate = await pollingHelper(certificateJs.getCertificateMe, [
@@ -332,11 +330,7 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
     return marketplaceJs.getAll(rawAdmin, newArgs, getOptions);
   };
 
-  contract.getOwnershipHistory = async function (
-    args,
-    options = optionsNoChainIds
-  ) {
-    console.log("#### GET OWNERSHIP HISTORY ARGS", JSON.stringify(args));
+  contract.getOwnershipHistory = async function (args, options = optionsNoChainIds) {
     return await inventoryJs.getOwnershipHistory(rawAdmin, args, options);
   };
 
@@ -1145,7 +1139,6 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
       owner: rawAdmin.address,
       status: ASSET_STATUS.ACTIVE,
     };
-    console.log("newArgs", newArgs);
     return membershipJs.uploadContract(rawAdmin, newArgs, options);
   };
 
@@ -1168,7 +1161,6 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
       createdDate,
       status: ASSET_STATUS.ACTIVE,
     };
-    console.log("newArgs", newArgs);
     return carbonDAOJs.uploadContract(rawAdmin, newArgs, options);
   };
 
