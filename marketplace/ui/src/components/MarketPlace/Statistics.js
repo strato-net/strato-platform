@@ -3,9 +3,9 @@ import './Statistics.css';
 const Statistics = ({ priceHistory }) => {
 
 // Origin Asset Statistics
-const originFluctuation = priceHistory.records.originFluctuation;
-const originVolume = priceHistory.records.originVolume;
-const originAveragePrice = priceHistory.records.originAveragePrice.toFixed(2);
+const originFluctuation = priceHistory?.records?.originFluctuation;
+const originVolume = priceHistory?.records?.originVolume;
+const originAveragePrice = priceHistory?.records?.originAveragePrice.toFixed(2);
 
 return (
   <div className="container">
@@ -13,7 +13,7 @@ return (
     {/* Tile for Price Range */}
     <div className="tileWrapper p-2 flex-auto md:max-w-[calc(33.333%-1.5rem)] w-full">
       <div className="tile bg-gray-200 p-4 rounded-lg shadow-md text-center">
-        <p className="title text-2xl font-semibold">${originFluctuation.min} - ${originFluctuation.max}</p>
+        <p className="title text-2xl font-semibold">${originFluctuation?.min} - ${originFluctuation?.max}</p>
         <p className="subtitle text-gray-600">12-Month Price Range</p>
       </div>
     </div>

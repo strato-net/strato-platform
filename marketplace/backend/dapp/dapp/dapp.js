@@ -13,6 +13,7 @@ import constants, {
   ASSET_STATUS,
   REDEMPTION_STATUS,
   DEFAULT_COMMENT,
+  fetchSalesInBatches
 } from "/helpers/constants";
 import { yamlWrite, yamlSafeDumpSync, getYamlFile } from "/helpers/config";
 import { pollingHelper } from "/helpers/utils";
@@ -572,7 +573,7 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
       const assetsAddressArr = assetsOfOriginAsset.map(item => item.address);
       // Aggregate sales for all associated assets
 
-      const allAssetSales = await saleJs.getAll(rawAdmin, {
+      const allAssetSales = await saleJs.fetchSalesInBatches(rawAdmin, {
         assetToBeSold: assetsAddressArr,
         order: "block_timestamp.asc",
         gtField: "block_timestamp",
@@ -600,7 +601,7 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
         return;
       }
 
-      const timeRangeSales = await saleJs.getAll(rawAdmin, {
+      const timeRangeSales = await saleJs.fetchSalesInBatches(rawAdmin, {
         assetToBeSold: assetsAddressArr,
         ...salesFilter
       }, options);
@@ -616,11 +617,11 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
           //Fetch saleHistory
           if (filter.order) {
             //If timeFilter is applied, also add those filters
-            return saleJs.getAllSaleHistory(rawAdmin, { ...filter, assetToBeSold: sale.assetToBeSold }, options);
+            return saleJs.getAllSaleHistory(rawAdmin, { ...filter, assetToBeSold: sale.assetToBeSold, queryOptions: {'select' : 'address,block_timestamp,price,assetToBeSold,quantity,totalLockedQuantity'} }, options);
           } else {
             //If historical data is fetched, apply 12 month timeFilter
 
-            return saleJs.getAllSaleHistory(rawAdmin, { assetToBeSold: sale.assetToBeSold, order: "block_timestamp.asc", gtField: "block_timestamp", gtValue: getOneYearAgoTime() }, options);
+            return saleJs.getAllSaleHistory(rawAdmin, { assetToBeSold: sale.assetToBeSold, order: "block_timestamp.asc", gtField: "block_timestamp", gtValue: getOneYearAgoTime(), queryOptions: {'select' : 'address,block_timestamp,price,assetToBeSold,quantity,totalLockedQuantity'} }, options);
           }
         });
         const histories = await Promise.all(historyPromises);

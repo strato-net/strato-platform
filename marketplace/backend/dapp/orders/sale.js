@@ -2,6 +2,7 @@ import { util, rest } from '/blockapps-rest-plus';
 import RestStatus from 'http-status-codes';
 import { setSearchQueryOptions, searchOne, searchAllWithQueryArgs } from '/helpers/utils';
 import constants from '../../helpers/constants';
+const pLimit = require('p-limit'); // Concurrency control library
 
 const contractName = constants.saleTableName;
 const saleAllTableContract = constants.saleAllTableName;
@@ -206,6 +207,75 @@ async function getAll(admin, args = {}, defaultOptions) {
 }
 
 
+async function fetchSalesInBatches(rawAdmin, args = {}, options = defaultOptions) {
+  
+  const chunkSize = 15;  // chunk size for batching
+  const maxConcurrency = 15;  // Max number of concurrent requests
+  const { assetToBeSold, gtField, gtValue, order, salesFilter } = args;
+  
+  const batches = [];
+  for (let i = 0; i < assetToBeSold.length; i += chunkSize) {
+    batches.push(assetToBeSold.slice(i, i + chunkSize));
+  }
+
+  console.log(`Total number of batches:`, batches.length);
+
+  // Concurrency limit setup
+  const limit = pLimit(maxConcurrency);
+
+  // Function to fetch sales for each batch
+  const fetchChunkSales = async (chunk) => {
+    try {
+      console.log(`Fetching sales for chunk with ${chunk.length} assets`);
+
+      let chunkSales;
+      if (gtField && gtValue) {
+        // Fetch sales data for the current chunk
+        chunkSales = await getAll(rawAdmin, {
+          assetToBeSold: chunk,
+          gtField: gtField || salesFilter.gtField,
+          gtValue: gtValue || salesFilter.gtValue,
+          order: order || salesFilter.order,
+          queryOptions: {'select': "block_timestamp,assetToBeSold,price"},
+          ...salesFilter
+        }, options);
+      } else {
+        // Fetch sales data without gtField and gtValue
+        chunkSales = await getAll(rawAdmin, {
+          assetToBeSold: chunk,
+          order: order || salesFilter.order,
+          queryOptions: {'select': "block_timestamp,assetToBeSold,price"},
+
+
+        }, options);
+      }
+
+      console.log(`Fetched ${chunkSales.length} sales for chunk`);
+      return chunkSales || [];
+
+    } catch (error) {
+      console.error(`Error fetching sales for chunk ${chunk.join(', ')}`, error);
+      // Return an empty array in case of an error
+      return [];
+    }
+  };
+
+  // Limit to control the concurrency of fetchChunkSales
+  const allSalesChunks = await Promise.all(
+    batches.map(chunk => limit(() => fetchChunkSales(chunk)))
+  );
+
+  // Flatten the array of results into a single array of sales
+  const allSales = allSalesChunks.flat();
+
+  console.log(`Completed fetching sales. Total sales:`, allSales.length);
+  return allSales;  // Return the aggregated sales
+}
+
+  
+  
+  
+
 /**
  * Get contract state in bloc.
  * @deprecated Use {@link get `get`} instead.
@@ -224,5 +294,6 @@ export default {
     marshalOut,
     getHistory,
     getSaleHistory,
-    getAllSaleHistory
+    getAllSaleHistory,
+    fetchSalesInBatches,
 }
