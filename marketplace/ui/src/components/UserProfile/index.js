@@ -22,6 +22,7 @@ import {
   useMarketplaceState,
 } from "../../contexts/marketplace";
 import NewTrendingCard from "../MarketPlace/NewTrendingCard";
+import NestedTableComponent from "../Offers/NestedOfferTable";
 import { useCategoryDispatch, useCategoryState } from "../../contexts/category";
 import { actions as categoryActions } from "../../contexts/category/actions";
 import InventoryCard from "../Inventory/InventoryCard";
@@ -616,6 +617,9 @@ const UserProfile = ({user}) => {
               )}
         </TabPane>
       )}
+        <TabPane tab="Offers Received" key="offers">
+          <NestedTableComponent />
+        </TabPane>
       </Tabs>
 
       {/* TABS End */}

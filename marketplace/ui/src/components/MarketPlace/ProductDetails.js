@@ -27,7 +27,7 @@ import ClickableCell from "../ClickableCell";
 import TimeRangeTabs from "./TimeRangeTabs";
 import Statistics from "./Statistics";
 import LoginModal from './LoginModal';
-import OfferModal from "../Offers/OfferModal";
+import OfferModal from "../Offers/CreateOfferModal";
 // other
 import { setCookie } from "../../helpers/cookie";
 import routes from "../../helpers/routes";

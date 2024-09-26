@@ -1,0 +1,25 @@
+/* Remove background color for product rows header */
+.product-rows .ant-table-thead>tr>th {
+    background: none !important;
+    color: #181EAC !important;
+    /* Blue header text for product rows */
+}
+
+.ant-table-thead>tr>.ant-table-row-expand-icon-cell {
+    background: none !important;
+    /* Remove background color for expand icon */
+}
+
+/* Style the offer row headers */
+.offer-rows .ant-table-thead>tr>th {
+    background: #F7F7F7 !important;
+    /* Light background for offer row headers */
+    color: #5C5C5C !important;
+    /* Gray text for offer row headers */
+}
+
+/* Optional padding or height increase for rows */
+.ant-table-row {
+    height: auto;
+    /* Ensure the row height adjusts automatically */
+}
