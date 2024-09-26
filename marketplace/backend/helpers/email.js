@@ -1,28 +1,35 @@
-import sgMail from "@sendgrid/mail";
+import axios from "axios";
 import dotenv from "dotenv";
+import config from "../load.config";
+import { util } from "../blockapps-rest-plus";
 
 dotenv.config({ path: "../../../.env" });
-sgMail.setApiKey(process.env.SENDGRID_API_KEY);
 
 async function sendEmail(to, subject, htmlContent) {
-
-  const msg = {
-    to: to,
-    from: { email: "no_reply@blockapps.net", name: "BlockApps.net" },
-    subject: subject,
-    html: htmlContent,
+  const url = process.env.NOTIFICATION_SERVER_URL
+  const { token } = await util.getApplicationCredentials({ config });
+  const reqBody = {
+    usernames: [to],
+    message: {
+      subject: subject,
+      htmlContent: htmlContent
+    }
   };
-  
-  if (to !== "sales@blockapps.net") {
-    msg.bcc = "sales@blockapps.net";
-  }
-
   try {
-    await sgMail.send(msg);
-    console.log("Email sent successfully!");
+
+    const response = await axios.post(`${url}/notify`, reqBody, {
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${token}`,
+      },
+    });
+
+    if (response.status === 200 || response.status === 201) {
+      console.log("Email sent successfully");
+    }
+
   } catch (error) {
     console.error("Error sending email:", error);
-    throw error;
   }
 }
 

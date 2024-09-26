@@ -36,6 +36,7 @@ const TransferModal = ({ open, handleCancel, inventory, categoryName, limit, off
 
     const [searchInput, setSearchInput] = useState('');
     const [dropdownOpen, setDropdownOpen] = useState(false);
+    const [selectedRecipient, setSelectedRecipient] = useState('');
 
     const handleSearchChange = (value) => {
         setSearchInput(value);
@@ -44,6 +45,7 @@ const TransferModal = ({ open, handleCancel, inventory, categoryName, limit, off
 
     const originAddress = inventory.originAddress.toLowerCase();
     const isBurner = originAddress === OLD_SADDOG_ORIGIN_ADDRESS;
+    const itemName = decodeURIComponent(inventory.name)
 
     const usersList = users
       .filter((record) =>
@@ -65,7 +67,9 @@ const TransferModal = ({ open, handleCancel, inventory, categoryName, limit, off
     
     const handleSelect = (userAddress) => {
         setUserAddress(userAddress);
-
+        const user = filteredOptions.find(item=>item.value === userAddress);
+        const recipientCommonName = user.label.split('-')[0].trim()
+        setSelectedRecipient(recipientCommonName)
         setDropdownOpen(false);
     }
 
@@ -118,7 +122,6 @@ const TransferModal = ({ open, handleCancel, inventory, categoryName, limit, off
             option.label && option.label.toLowerCase().includes(searchInput.toLowerCase())
         )
         : [];
-
 
     const columns = [
         {
@@ -192,7 +195,10 @@ const TransferModal = ({ open, handleCancel, inventory, categoryName, limit, off
             assetAddress: inventory.address,
             newOwner: userAddress,
             quantity,
-            price
+            price,
+            senderCommonName:user.commonName,
+            recipientCommonName:selectedRecipient,
+            itemName,
         };
 
         if (quantity > 0 && quantity <= inventory.quantity && userAddress) {
@@ -209,7 +215,7 @@ const TransferModal = ({ open, handleCancel, inventory, categoryName, limit, off
         <Modal
             open={open}
             onCancel={handleCancel}
-            title={`Transfer - ${decodeURIComponent(inventory.name)}`}
+            title={`Transfer - ${itemName}`}
             width={1000}
             footer={[
                 <div className="flex justify-center md:block">
