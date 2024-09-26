@@ -57,7 +57,7 @@ async function createTransactionPayload(token, transactions) {
 
     const stratsAssetAddressesToUse = [];
 
-    let remainingValue = transaction.value * 100;
+    let remainingValue = transaction.value;
 
     for (const asset of STRATSContracts) {
       if (remainingValue <= 0) break;
