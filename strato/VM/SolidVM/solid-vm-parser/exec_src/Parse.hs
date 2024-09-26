@@ -6,5 +6,5 @@ import Text.Parsec
 main :: IO ()
 main = do
   contents <- getContents
-  let maybeFile = runParser solidityFile (ParserState "qq" "" M.empty M.empty 0) "qq" contents
+  let maybeFile = runParser solidityFile (ParserState "qq" "" [] M.empty 0) "qq" contents
   putStrLn $ show maybeFile

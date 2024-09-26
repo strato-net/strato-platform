@@ -82,7 +82,6 @@ library:
   - unliftio
   - vm-runner
   - vm-tools
-  - x509-certs
 
 tests:
   simulator-spec:
@@ -118,4 +117,3 @@ tests:
       - text
       - unliftio
       - vm-tools
-      - x509-certs

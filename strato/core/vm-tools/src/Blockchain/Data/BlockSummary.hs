@@ -35,10 +35,10 @@ blockHeaderToBSum :: BlockHeader -> Difficulty -> Integer -> BlockSummary
 blockHeaderToBSum b totalDiff txCount =
   BlockSummary
     { bSumParentHash = parentHash b,
-      bSumDifficulty = difficulty b,
+      bSumDifficulty = getBlockDifficulty b,
       bSumTotalDifficulty = totalDiff,
       bSumStateRoot = stateRoot b,
-      bSumGasLimit = gasLimit b,
+      bSumGasLimit = getBlockGasLimit b,
       bSumTimestamp = timestamp b,
       bSumNumber = number b,
       bSumTxCount = txCount

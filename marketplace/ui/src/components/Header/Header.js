@@ -233,7 +233,7 @@ const HeaderComponent = ({ user, loginUrl, showMenu, handleSubMenu, handleMenuTa
   }, [user])
 
   const subMenuItems = [
-    { value: "transactions", path: routes.Transactions.url, label: "Transactions" },
+    { value: "transactions", path: routes.Transactions.url, label: "My Transactions" },
     { value: "myitems", path: "/myitems", label: "My Items" },
     user ? {
       value: "my-profile",

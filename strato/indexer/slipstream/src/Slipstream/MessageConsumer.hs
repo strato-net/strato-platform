@@ -54,4 +54,4 @@ solidVmEventsTopicName = fromString "solidvmevents"
 
 produceSolidVmEvents :: MonadIO m =>
                         [AggregateEvent] -> m [ProduceResponse]
-produceSolidVmEvents = runKafkaMConfigured "slipstream" . produceItems solidVmEventsTopicName
+produceSolidVmEvents = runKafkaMConfigured "slipstream" . produceItemsAsJSON solidVmEventsTopicName

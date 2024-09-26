@@ -72,7 +72,7 @@ data TrustedMessage
   | Prepare View Keccak256
   | Commit View Keccak256 Signature
   | RoundChange {roundchangeView :: View, roundchangeNonce :: Word256}
-  deriving (Eq, Show, Generic, Binary, NFData, Data)
+  deriving (Eq, Show, Generic, Binary, NFData)
 
 instance Format TrustedMessage where
   format (Preprepare v theBlock) = CL.blue "PRE_PREPARE " ++ format v ++ " " ++ format (blockHash theBlock)
@@ -93,7 +93,7 @@ data WireMessage = WireMessage
   { _msgAuth :: MsgAuth,
     _message :: TrustedMessage
   }
-  deriving (Eq, Show, Generic, Binary, NFData, Data)
+  deriving (Eq, Show, Generic, Binary, NFData)
 
 makeLenses ''WireMessage
 
@@ -154,21 +154,17 @@ roundchangeCode = 3
 data InEvent
   = IMsg {iAuth :: MsgAuth, iMessage :: TrustedMessage}
   | Timeout RoundNumber
-  | -- TODO(tim): CommitResult should have the digest
-    CommitResult (Either Text Keccak256)
   | UnannouncedBlock Block
   | PreviousBlock Block
   | PreprepareResponse PreprepareDecision
   | ForcedConfigChange ForcedConfigChange
   | ValidatorBehaviorChange ForcedValidatorChange
-  | ValidatorChange Validator Bool
+  | ValidatorChange Validator Bool 
   deriving (Eq, Show)
 
 instance Format InEvent where
   format (IMsg (MsgAuth s _) msg) = "IMsg " ++ format msg ++ " " ++ format s
   format (Timeout rn) = "Timeout " ++ format rn
-  format (CommitResult (Left text)) = unpack $ "CommitResult Error: " <> text
-  format (CommitResult (Right sha)) = "CommitResult Success: " ++ format sha
   format (UnannouncedBlock blk) = "UnannouncedBlock " ++ format (blockHash blk)
   format (PreprepareResponse rspns) = "Preprepare Response " ++ format rspns
   format (PreviousBlock blk) = "PreviousBlock " ++ format (blockHash blk)
@@ -220,8 +216,6 @@ inShortLog loc iev = $logInfoS loc . pack $
   case iev of
     IMsg a m -> shortFormat $ WireMessage a m
     Timeout rn -> CL.blue "TIMEOUT " ++ show rn
-    CommitResult (Left err) -> CL.red "COMMIT_RESULT " ++ show err
-    CommitResult (Right hsh) -> CL.blue "COMMIT_RESULT " ++ format hsh
     UnannouncedBlock blk -> CL.blue "UNANNOUNCED_BLOCK " ++ blkNum blk
     PreprepareResponse rspns -> CL.blue "PRE_PREPARE_RESPONSE " ++ format rspns
     PreviousBlock blk -> CL.blue "PREVIOUS_BLOCK " ++ blkNum blk

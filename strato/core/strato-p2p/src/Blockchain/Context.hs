@@ -252,6 +252,16 @@ instance (MonadIO m, MonadLogger m) => Mod.Modifiable BestBlock (ReaderT Config 
       Left _ -> $logInfoS "ContextM.put BestBlock" $ T.pack "Failed to update BestBlock"
       Right _ -> return ()
 
+instance (MonadIO m, MonadLogger m) => Mod.Modifiable BestSequencedBlock (ReaderT Config m) where
+  get _ =
+    RBDB.withRedisBlockDB RBDB.getBestSequencedBlockInfo >>= \case
+      Nothing -> BestSequencedBlock <$> Mod.get (Mod.Proxy @BestBlock)
+      Just (RedisBestBlock s n d) -> pure . BestSequencedBlock $ BestBlock s n d
+  put _ (BestSequencedBlock (BestBlock s n d)) =
+    RBDB.withRedisBlockDB (RBDB.putBestSequencedBlockInfo s n d) >>= \case
+      Left _ -> $logInfoS "ContextM.put BestSequencedBlock" $ T.pack "Failed to update BestSequencedBlock"
+      Right _ -> return ()
+
 instance MonadIO m => A.Selectable Integer (Canonical BlockHeader) (ReaderT Config m) where
   select _ i = fmap (fmap Canonical) . RBDB.withRedisBlockDB $ RBDB.getCanonicalHeader i
 
@@ -481,6 +491,7 @@ type MonadP2P m =
     All
       '[Mod.Modifiable]
       '[ BestBlock,
+         BestSequencedBlock,
          WorldBestBlock
        ]
       m,

@@ -45,8 +45,6 @@ import Turtle (chmod, roo)
 import UnliftIO.Directory
 import UnliftIO.IO hiding (withFile)
 
-import Universum.Lifted.File
-
 genesisFiles :: [(FilePath, C8.ByteString)]
 genesisFiles = $(embedDir "genesisBlocks")
 
@@ -149,7 +147,7 @@ sendAccountInfo accountInfoFileName = do
               liftIO $ TIO.appendFile accountFile acs
 
               sendChunks h
-      withFile accountInfoFileName ReadMode $ \h -> do
+      bracket (openFile accountInfoFileName ReadMode) hClose $ \h -> do
         hSetBuffering h (BlockBuffering (Just (1024 * 1024)))
         sendChunks h
     else case lookup accountInfoFileName genesisFiles of

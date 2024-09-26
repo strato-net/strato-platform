@@ -68,6 +68,7 @@ import BlockApps.Logging
 import BlockApps.X509.Certificate
 import Blockchain.Blockstanbul
 import Blockchain.Constants
+import Blockchain.Data.Block
 import Blockchain.Data.ChainInfo
 import Blockchain.EthConf
 import Blockchain.Privacy
@@ -82,6 +83,8 @@ import Blockchain.Strato.Model.Address
 import Blockchain.Strato.Model.ExtendedWord (Word256)
 import Blockchain.Strato.Model.Keccak256
 import Blockchain.Strato.Model.Secp256k1
+import qualified Blockchain.Strato.RedisBlockDB as RBDB
+import qualified Blockchain.Strato.RedisBlockDB.Models as RBDB
 import ClassyPrelude (STM, atomically)
 import Conduit
 import Control.Concurrent (forkIO, threadDelay)
@@ -148,6 +151,7 @@ type MonadBlockstanbul m =
     Mod.Accessible (TMChan RoundNumber) m,
     Mod.Accessible BlockPeriod m,
     Mod.Accessible RoundPeriod m,
+    Mod.Modifiable BestSequencedBlock m,
     (Address `A.Alters` X509CertInfoState) m,
     (Address `A.Selectable` X509CertInfoState) m,
     HasVault m
@@ -169,7 +173,8 @@ data SequencerConfig = SequencerConfig
     maxEventsPerIter :: Int,
     maxUsPerIter :: Int,
     vaultClient :: Maybe ClientEnv, -- Nothing in tests
-    kafkaClientId :: KafkaClientId
+    kafkaClientId :: KafkaClientId,
+    redisConn :: RBDB.RedisConnection
   }
 
 type SequencerM = StateT SequencerContext (ReaderT SequencerConfig (KafkaM (ResourceT (LoggingT IO))))
@@ -423,6 +428,9 @@ instance Mod.Accessible RoundPeriod SequencerM where
 instance Mod.Accessible View SequencerM where
   access _ = currentView
 
+instance Mod.Accessible RBDB.RedisConnection SequencerM where
+  access _ = asks redisConn
+
 instance (Keccak256 `A.Alters` ()) SequencerM where
   lookup _ = genericLookupSeenTransactionDB
   insert _ = genericInsertSeenTransactionDB
@@ -431,6 +439,16 @@ instance (Keccak256 `A.Alters` ()) SequencerM where
 instance HasBlockstanbulContext SequencerM where
   getBlockstanbulContext = use blockstanbulContext
   putBlockstanbulContext = modify' . (.~) (blockstanbulContext . _Just)
+
+instance Mod.Modifiable BestSequencedBlock SequencerM where
+  get _ =
+    RBDB.withRedisBlockDB RBDB.getBestSequencedBlockInfo <&> \case
+      Nothing -> BestSequencedBlock $ BestBlock (unsafeCreateKeccak256FromWord256 0) (-1) 0
+      Just (RBDB.RedisBestBlock s n d) -> BestSequencedBlock $ BestBlock s n d
+  put _ (BestSequencedBlock (BestBlock s n d)) =
+    RBDB.withRedisBlockDB (RBDB.putBestSequencedBlockInfo s n d) >>= \case
+      Left _ -> $logInfoS "ContextM.put BestSequencedBlock" $ T.pack "Failed to update BestSequencedBlock"
+      Right _ -> return ()
 
 -- If there is no vault client (i.e. in hspec tests), the HasVault instance will use this key,
 -- I know, it's ugly...the SequencerSpec test uses SequencerM itself, so this was a lot

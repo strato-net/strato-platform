@@ -123,7 +123,7 @@ getGenesisBlockAndPopulateInitialMPs ::
   m ([(Ad.Address, X509CertInfoState)], [Validator], ([(AccountInfo, CodeInfo)], Block))
 getGenesisBlockAndPopulateInitialMPs genesisBlockName = do
   genesisInfo <- getGenesisInfoFromFile genesisBlockName
-  let certs = readCertsFromGenesisInfo genesisInfo
+  let certs' = readCertsFromGenesisInfo genesisInfo
       validators = readValidatorsFromGenesisInfo genesisInfo
   extraAccounts <- liftIO . readSupplementaryAccounts $ genesisBlockName
 
@@ -142,7 +142,7 @@ getGenesisBlockAndPopulateInitialMPs genesisBlockName = do
             Left e -> $logInfoS "Redis/certInsertion" $ T.pack $ "Certificate insertion failed: " ++ show e
           pure (ua', c')
       )
-      certs
+      certs'
 
   insertValidators <- execRedis $ RBDB.addValidators validators
   case insertValidators of

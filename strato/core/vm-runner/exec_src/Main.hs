@@ -19,6 +19,7 @@ import Debugger.Options ()
 import Executable.EVMFlags ()
 import Executable.EthereumVM
 import HFlags
+import Instrumentation
 import Network.Wai.Handler.Warp
 import Network.Wai.Middleware.Prometheus
 -- HFlags
@@ -27,6 +28,7 @@ import SolidVM.Solidity.SourceTools
 main :: IO ()
 main = do
   blockappsInit "vm_main"
+  runInstrumentation "vm-runner"
   void $ $initHFlags "Ethereum VM"
   mDebugger <- initializeSolidVMDebuggerSimple
   let metricsRunner = run 8009 metricsApp

@@ -37,7 +37,7 @@ const ResponsiveAddAddress = ({ close, redemptionService }) => {
       country: encodeURIComponent(values.country),
       addressLine1: encodeURIComponent(values.addressLine1),
       addressLine2: encodeURIComponent(values.addressLine2),
-      redemptionService: encodeURIComponent(redemptionService),
+      redemptionService: redemptionService ? encodeURIComponent(redemptionService): redemptionService,
     };
 
     window.LOQ.push([

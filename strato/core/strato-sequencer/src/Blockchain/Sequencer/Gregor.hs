@@ -165,7 +165,7 @@ initializeCheckpoint vals = do
     (_, Right kafkaCkpt) ->
       if null (checkpointValidators kafkaCkpt)
         then do
-          $logInfoS "initializeCheckpoin" "No validators in checkpoint -- setting by flags"
+          $logInfoS "initializeCheckpoint" "No validators in checkpoint -- setting by flags"
           return $ overrideVals kafkaCkpt
         else return kafkaCkpt
 

@@ -84,6 +84,8 @@ module Blockchain.Strato.RedisBlockDB
     deleteBlocks,
     getBestBlockInfo,
     putBestBlockInfo,
+    getBestSequencedBlockInfo,
+    putBestSequencedBlockInfo,
     forceBestBlockInfo,
     withRedisBlockDB,
     commonAncestorHelper,
@@ -624,6 +626,10 @@ bestBlockInfoKey :: S8.ByteString
 bestBlockInfoKey = S8.pack "<best>"
 {-# INLINE bestBlockInfoKey #-}
 
+bestSequencedBlockInfoKey :: S8.ByteString
+bestSequencedBlockInfoKey = S8.pack "<best_sequenced>"
+{-# INLINE bestSequencedBlockInfoKey #-}
+
 getGenesisHash :: Redis (Maybe Keccak256)
 getGenesisHash = getCanonical 0
 
@@ -1092,6 +1098,13 @@ forceBestBlockInfo' key = set key . toValue
 
 getBestBlockInfo :: Redis (Maybe RedisBestBlock)
 getBestBlockInfo = getBestBlockInfo' bestBlockInfoKey
+
+getBestSequencedBlockInfo :: Redis (Maybe RedisBestBlock)
+getBestSequencedBlockInfo = getBestBlockInfo' bestSequencedBlockInfoKey
+
+putBestSequencedBlockInfo :: RedisCtx m f => Keccak256 -> Integer -> Integer -> m (f Status)
+putBestSequencedBlockInfo sha i j =
+  forceBestBlockInfo' bestSequencedBlockInfoKey (RedisBestBlock sha i j)
 
 getBestBlockInfo' :: S8.ByteString -> Redis (Maybe RedisBestBlock)
 getBestBlockInfo' key =

@@ -233,9 +233,15 @@ const AuthenticatedRoutes = ({ user, users, isAuthenticated }) => {
                 <InventoriesProvider>
                   <ItemsProvider>
                     <OrdersProvider>
-                      <UserActivityProvider>
-                        <UserProfile user={user} users={users} />
-                      </UserActivityProvider>
+                      <PaymentServicesProvider>
+                        <RedemptionsProvider>
+                          <IssuerStatusProvider>
+                            <UserActivityProvider>
+                              <UserProfile user={user} users={users} />
+                            </UserActivityProvider>
+                          </IssuerStatusProvider>
+                        </RedemptionsProvider>
+                      </PaymentServicesProvider>
                     </OrdersProvider>
                   </ItemsProvider>
                 </InventoriesProvider>

@@ -1,8 +1,5 @@
 import { Breadcrumb, notification } from "antd";
 import React, { useEffect, useState } from "react";
-import { useLocation, useNavigate } from "react-router-dom";
-import dayjs from "dayjs";
-
 import routes from "../../helpers/routes";
 import ClickableCell from "../ClickableCell";
 import * as XLSX from 'xlsx';
@@ -10,8 +7,8 @@ import { saveAs } from 'file-saver';
 import { actions as categoryActions } from "../../contexts/category/actions";
 import { useCategoryState, useCategoryDispatch } from "../../contexts/category";
 import startCase from 'lodash/startCase';
-import { epochToDate } from "../../helpers/utils";
-import { ORDER_STATUS, REDEMPTION_STATUS, TRANSACTION_STATUS } from "../../helpers/constants";
+import { epochToDate, getStringDate } from "../../helpers/utils";
+import { REDEMPTION_STATUS, TRANSACTION_STATUS, US_DATE_FORMAT } from "../../helpers/constants";
 import TransactionTable from "./TransactionTable";
 import { useTransactionState } from "../../contexts/transaction";
 
@@ -76,7 +73,7 @@ const Transaction = ({ user }) => {
           from: transaction.from,
           to: transaction.to,
           hash: transaction.transaction_hash,
-          date: transaction?.block_timestamp,
+          date: getStringDate(transaction?.createdDate, US_DATE_FORMAT),
           Status: transaction?.type === "Transfer" ? 'Closed' : (transaction?.type === "Redemption"
             ? REDEMPTION_STATUS[transaction.status]
             : TRANSACTION_STATUS[transaction.status])

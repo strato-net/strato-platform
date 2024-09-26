@@ -360,7 +360,7 @@ const BoughtOrderDetails = ({ user, users }) => {
           <Breadcrumb.Item href="" onClick={e => e.preventDefault()}>
             <div onClick={() => { navigate(routes.Transactions.url) }}>
               <p className="text-sm text-[#13188A] font-semibold">
-                Orders (bought)
+                My Transactions
               </p>
             </div>
           </Breadcrumb.Item>
