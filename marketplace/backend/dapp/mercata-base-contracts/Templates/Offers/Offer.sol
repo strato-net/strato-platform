@@ -16,7 +16,7 @@ abstract contract Offer is Utils {
     string public purchaserCommonName;
     PaymentService public paymentService;
     string public imageUrl;
-    offerStatus public status;
+    OfferStatus public status;
 
     enum OfferStatus { PENDING, ACCEPTED, REJECTED, CANCELLED }
 
@@ -30,9 +30,8 @@ abstract contract Offer is Utils {
     ) {    
         assetToBePurchased = Asset(_assetToBePurchased);
         sale = _sale;
-        // require(_assetToBePurchased == assetToBePurchased.root, "Can only open Offers on root assets");
         assetToBeSold = assetToBePurchased;
-        priceperItem = _price;
+        price = _price;
         quantity = _quantity;
         purchaser = _purchaser;
         purchaserCommonName = getCommonName(purchaser);
@@ -58,7 +57,8 @@ abstract contract Offer is Utils {
         require(msg.sender == seller, err);
     }
 
-    function acceptOffer(uint _quantity, address[] _assets) requireOwner() public returns (uint, uint) {
+    function accept(uint _quantity, address[] _assets) requireOwner() public returns (uint, uint) {
+        require(status == OfferStatus.PENDING, "Cannot accept a non-pending offer.");
         uint quantityToFill;
         uint quantityToReturn;
         if (_quantity <= quantity) {
@@ -125,7 +125,6 @@ abstract contract Offer is Utils {
     function close() internal {
         _close();
         quantity = 0;
-        isOpen = false;
     }
 
     function _close() internal virtual {
@@ -162,18 +161,16 @@ abstract contract Offer is Utils {
       return RestStatus.OK;
     }
 
-    function rejectOffer() public requireOwner() returns (uint) {
-        require(isOpen == true, "Cannot accept a non-pending offer.");
+    function reject() public requireOwner() returns (uint) {
+        require(status == OfferStatus.PENDING, "Cannot accept a non-pending offer.");
         closeOffer();
-        isOpen = false;
         status = OfferStatus.REJECTED;
         return RestStatus.OK;
     }
 
-    function cancelOffer() public requirePurchaser("cancel the Offer") returns (uint) {
-        require(isOpen == true, "Cannot accept a non-pending offer.");
+    function cancel() public requirePurchaser("cancel the Offer") returns (uint) {
+        require(status == OfferStatus.PENDING, "Cannot accept a non-pending offer.");
         closeOffer();
-        isOpen = false;
         status = OfferStatus.CANCELLED;
         return RestStatus.OK;
     }

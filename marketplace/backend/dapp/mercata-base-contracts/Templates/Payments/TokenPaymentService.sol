@@ -1,8 +1,6 @@
 pragma es6;
 pragma strict;
 
-import <BASE_CODE_COLLECTION>;
-
 contract TokenPaymentService is PaymentService {   
     // TODO: receipts for minting/removing?
     enum ReceiptType { TRANSFER, PURCHASE, MINT }
@@ -158,7 +156,7 @@ constructor (
             uint tokenFee = uint(fee * tokensPerDollar * (10 ** decimals));
 
             // Transfer tokens
-            bool success = transfer(seller, tokenAmountNet);
+            bool success = transfer(sellerCommonName, tokenAmountNet);
             require(success, err);
             success = transfer(feeRecipient, tokenFee);
             require(success, feeErr);
@@ -252,22 +250,19 @@ constructor (
 
     function openOffer(
         address _assetToBeSold,
+        address _sale,
         decimal _price,
         uint _quantity,
-        decimal _totalPrice,
-        address _sale,
-        address _seller,
-        string _imageUrl,
-
+        string _imageUrl
     ) public returns (address) {    
-        decimal totalPrice = _price * decimal(_quantity);
+        decimal totalPrice = _price;
         decimal amountToTransfer = 1.0 + totalPrice * tokensPerDollar * (10 ** decimals);
         decimal decimalBalance = decimal(balance());
         string err = "You don't have enough balance to cover the bid";
         require(decimalBalance >= amountToTransfer, err);
-        TokenOffer offer = new TokenOffer(_assetToBeSold, _price, _quantity, msg.sender);
+        TokenOffer offer = new TokenOffer(_assetToBeSold, _sale, _price, _quantity, msg.sender, _imageUrl);
         require(transfer(getCommonName(address(offer)), uint(amountToTransfer)), err);
-        return address(bid);
+        return address(offer);
     }
 
 }

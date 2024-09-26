@@ -1,6 +1,9 @@
 pragma es6;
 pragma strict;
 
+import "../Payments/TokenPaymentService.sol";
+
+
 
 /// @title A representation of asset sale contract
 contract TokenOffer is Offer, Utils {
@@ -29,8 +32,8 @@ contract TokenOffer is Offer, Utils {
         decimal _price
     ) returns (uint) {
         TokenPaymentService tps = TokenPaymentService(paymentService);
-        decimal currentBalance = decimal(tps.balance());
-        decimal totalDollarPrice = _price
+        decimal currentBalance = decimal(tps.balanceOf(purchaserCommonName));
+        decimal totalDollarPrice = _price;
         decimal totalTokenPrice = totalDollarPrice * tps.tokensPerDollar() * (10 ** tps.decimals());
         string err = "Bid does not hold enough token balance to update";
         require(currentBalance >= totalTokenPrice, err);
@@ -45,14 +48,14 @@ contract TokenOffer is Offer, Utils {
     // Accept the offer
     function acceptOffer(address offerAddress) external returns (uint) {
         Offer offer = Offer(offerAddress);
-        offer.acceptOffer();
+        offer.accept(offer.quantity(), [address(offer.assetToBePurchased())]);
         return RestStatus.OK;
     }
 
     // Cancel the offer
     function cancelOffer(address offerAddress) external returns (uint) {
         Offer offer = Offer(offerAddress);
-        offer.cancelOffer();
+        offer.cancel();
         _close();
         return RestStatus.OK;
     }
@@ -60,8 +63,8 @@ contract TokenOffer is Offer, Utils {
     // Reject the offer
     function rejectOffer(address offerAddress) external returns (uint) {
         Offer offer = Offer(offerAddress);
-        offer.rejectOffer();
+        offer.reject();
         _close();
-        return RestStatus.REJECTED;
+        return RestStatus.OK;
     }
 }
