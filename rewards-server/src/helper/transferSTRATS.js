@@ -6,6 +6,9 @@ const {
   prodMarketplaceUrl,
   testnetMarketplaceUrl,
 } = require("../config");
+const axios = require("axios");
+
+const baseUrl = NODE_ENV === "prod" ? prodMarketplaceUrl : testnetMarketplaceUrl
 
 async function createTransactionPayload(token, toAddress, value) {
   const payload = {
@@ -31,21 +34,18 @@ async function createTransactionPayload(token, toAddress, value) {
   };
 
   // This needs to use the parallel endpoint to resolve transactions that might go at the same time (i.e buyer and seller rewards)
-  const response = await fetch(
-    `https://${
-      NODE_ENV === "prod" ? prodMarketplaceUrl : testnetMarketplaceUrl
-    }/strato/v2.3/transaction/parallel?resolve=true`,
+  const response = await axios.post(
+    `https://${baseUrl}/strato/v2.3/transaction/parallel?resolve=true`,
+    payload,
     {
-      method: "POST",
-      credentials: "same-origin",
       headers: {
         Accept: "application/json",
         "Content-Type": "application/json",
-        Authorization: `Bearer ${token}`,
-      },
-      body: JSON.stringify(payload),
+        Authorization: `Bearer ${token}`
+      }
     }
   );
+  
 
   return response;
 }
@@ -87,21 +87,17 @@ async function createTwoTransactionPayload(token, toAddress1, toAddress2, value1
   };
 
   // This needs to use the parallel endpoint to resolve transactions that might go at the same time (i.e buyer and seller rewards)
-  const response = await fetch(
-    `https://${
-      NODE_ENV === "prod" ? prodMarketplaceUrl : testnetMarketplaceUrl
-    }/strato/v2.3/transaction/parallel?resolve=true`,
+  const response = await axios.post(
+    `https://${baseUrl}/strato/v2.3/transaction/parallel?resolve=true`,
+    payload,
     {
-      method: "POST",
-      credentials: "same-origin",
       headers: {
         Accept: "application/json",
         "Content-Type": "application/json",
-        Authorization: `Bearer ${token}`,
-      },
-      body: JSON.stringify(payload),
+        Authorization: `Bearer ${token}`
+      }
     }
-  );
+  );  
 
   return response;
 }
