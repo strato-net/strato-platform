@@ -29,8 +29,8 @@ import Data.Proxy()
 import HFlags
 import Servant.Client
 import SignSubjectOptions
-import Strato.Strato23.API.Types (MsgHash(..))
-import Strato.Strato23.Client (postSignature)
+import Strato.Strato23.API.Types
+import Strato.Strato23.Client (postSignature, getKey)
 import System.IO
   ( BufferMode (..),
     hSetBuffering,
@@ -47,20 +47,25 @@ main :: IO ()
 main = do
   forM_ [stdout, stderr] $ flip hSetBuffering LineBuffering
   _ <- $initHFlags "Subject signing tool"
-  pkBS <- B.readFile flags_key
+  -- pkBS <- B.readFile flags_key
   emSslCert <- if flags_ssl_cert_file == ""
     then pure $ Right Nothing
     else fmap Just . bsToCert <$> B.readFile flags_ssl_cert_file
-  let ePK = bsToPriv pkBS
-  case (,) <$> ePK <*> emSslCert of
-    Left err -> error $ "Could not decode private key: " ++ err
-    Right (pk, mSslCert) -> do
-      let pub = case flags_public_key of
-            "" -> derivePublicKey pk -- signing own subject info
-            mp  -> case importPublicKey $ C8.pack mp of
-              Nothing -> error $ "Could not decode public key from " ++ mp
-              Just p -> p -- signing somebody else's subject info
-          ou = if flags_organizationUnit == "" then Nothing else Just flags_organizationUnit
+  -- let ePK = bsToPriv pkBS
+  -- case (,) <$> ePK <*> emSslCert of
+  case emSslCert of
+    Left err -> error $ "Could not decode ssl cert: " ++ err
+    Right mSslCert -> do
+      pub <- case flags_public_key of
+        "" -> do -- signing own subject info
+          mPubKey <- runVaultM "http://strato:8013/strato/v2.3" $ getVaultKey
+          case mPubKey of 
+            Just pk -> return pk
+            Nothing -> error "could not get pub key from vault-proxy"
+        mp  -> case importPublicKey $ C8.pack mp of
+          Nothing -> error $ "Could not decode public key from " ++ mp
+          Just p -> return p -- signing somebody else's subject info
+      let ou = if flags_organizationUnit == "" then Nothing else Just flags_organizationUnit
           c = if flags_country == "" then Nothing else Just flags_country
           mSslSub = unsafeGetCertSubjectUndefinedPubKey =<< mSslCert
           sub = Subject
@@ -109,3 +114,9 @@ getVaultSig h = do
   VaultData url mgr <- access Proxy
   res <- liftIO $ runClientM (postSignature Nothing (MsgHash h)) (mkClientEnv mgr url)
   return $ eitherToMaybe res
+
+getVaultKey :: (MonadIO m, HasVault m) => m (Maybe PublicKey)
+getVaultKey = do
+  VaultData url mgr <- access Proxy
+  res <- liftIO $ runClientM (getKey Nothing Nothing) (mkClientEnv mgr url)
+  return $ unPubKey <$> eitherToMaybe res
