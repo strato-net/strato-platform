@@ -68,9 +68,13 @@ const ListForSaleModal = ({ open, handleCancel, inventory, categoryName, limit, 
     }, [quantity, pricePerUnit, paymentTypes])
 
     useEffect(() => {
-        const diff = paymentServices.filter(ps =>
-            !notOnboarded.some(x => x.address === ps.address)
-        );
+        const excludeStrats = inventory.contract_name && inventory.contract_name.toLowerCase().includes('strats');
+        
+        const diff = paymentServices.filter(ps => {
+            const isNotOnboarded = !notOnboarded.some(x => x.address === ps.address);
+            const isStratsService = excludeStrats && ps.serviceName.toLowerCase().includes('strats');
+            return isNotOnboarded && !isStratsService;
+        });
         setAvailablePaymentServices(diff);
 
 
