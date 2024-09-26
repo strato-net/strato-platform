@@ -88,7 +88,7 @@ async function getHighestMarketplacePrice(admin, originAddress, options) {
 
 async function getLastSoldPrice(admin, assetAddress, options) {
   try {
-    const saleHistory = await saleJs.getAll(
+    const saleHistory = await saleJs.getAllSaleHistory(
       admin,
       {
         assetToBeSold: assetAddress,
@@ -97,8 +97,6 @@ async function getLastSoldPrice(admin, assetAddress, options) {
       },
       options
     );
-
-    console.log("Sale history:", saleHistory);
 
     if (saleHistory && saleHistory.length > 0) {
       return saleHistory[0].price;
@@ -178,7 +176,6 @@ async function getWalletAssets(admin, args = {}, options) {
 
         // Get ownership history and log it
         // const ownershipHistory = await getOwnershipHistory(admin, { originAddress, minItemNumber: 1, maxItemNumber: 10 }, options);
-        // console.log("ownr",ownershipHistory);
         // const isRelevantToAdmin = ownershipHistory.every(entry => entry.purchaserCommonName === admin.username);
 
         // Get the highest marketplace price for items with the same origin address
