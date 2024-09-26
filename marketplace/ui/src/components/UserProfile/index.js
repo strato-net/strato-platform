@@ -617,8 +617,11 @@ const UserProfile = ({user}) => {
               )}
         </TabPane>
       )}
-        <TabPane tab="Offers Received" key="offers">
-          <NestedTableComponent />
+        <TabPane tab="Offers Received" key="offers-received">
+          <NestedTableComponent tableType="received"/>
+        </TabPane>
+        <TabPane tab="Offers Made" key="offers-made">
+          <NestedTableComponent tableType="made"/>
         </TabPane>
       </Tabs>
 

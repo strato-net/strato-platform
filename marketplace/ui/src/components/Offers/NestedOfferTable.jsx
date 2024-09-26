@@ -1,7 +1,7 @@
 import React, { useState } from "react";
 import { Table, Button, Badge, Avatar } from "antd";
-import ConfirmationModal from "./OfferActionModals"; 
-import "./NestedOfferTable.css"; 
+import ConfirmationModal from "./OfferActionModals";
+import "./NestedOfferTable.css";
 
 // Updated product data with image URLs
 const productData = [
@@ -82,104 +82,175 @@ const sortOffers = (offers) => {
   });
 };
 
-const offerColumns = (handleAction) => [
-  {
-    title: "Offerer",
-    dataIndex: "offerer",
-    key: "offerer",
-    render: (offerer) => (
-      <div style={{ display: "flex", alignItems: "center" }}>
-        <Avatar
-          style={{ backgroundColor: getAvatarColor(offerer), marginRight: 8, borderRadius: 4 }} // Square avatar
-        >
-          {offerer.charAt(0).toUpperCase()}
-        </Avatar>
-        {offerer}
-      </div>
-    ),
-  },
-  {
-    title: "Quantity",
-    dataIndex: "quantity",
-    key: "quantity",
-    align: "center", // Center alignment
-  },
-  {
-    title: "Price (Qty)",
-    dataIndex: "price",
-    key: "price",
-    align: "center", // Center alignment
-    render: (price) => `${price} STRATS`,
-  },
-  {
-    title: "Total Price",
-    dataIndex: "totalPrice",
-    key: "totalPrice",
-    align: "center", // Center alignment
-    render: (totalPrice) => `${totalPrice} STRATS`,
-  },
-  {
-    title: "Status",
-    key: "status",
-    render: (record) => (
-      <Badge
-        status={
-          record.status === "accepted"
-            ? "success"
-            : record.status === "declined"
-            ? "error"
-            : "default"
-        }
-        text={record.status.charAt(0).toUpperCase() + record.status.slice(1)}
-      />
-    ),
-  },
-  {
-    title: "Action",
-    key: "action",
-    align: "center", // Center alignment
-    render: (text, record) => (
-      <>
-        {record.status === "pending" && (
+// Offer columns will adjust depending on whether the table is "received" or "made"
+const offerColumns = (handleAction, tableType) => {
+  if (tableType === "received") {
+    return [
+      {
+        title: "Offerer",
+        dataIndex: "offerer",
+        key: "offerer",
+        render: (offerer) => (
+          <div style={{ display: "flex", alignItems: "center" }}>
+            <Avatar
+              style={{ backgroundColor: getAvatarColor(offerer), marginRight: 8, borderRadius: 4 }} // Square avatar
+            >
+              {offerer.charAt(0).toUpperCase()}
+            </Avatar>
+            {offerer}
+          </div>
+        ),
+      },
+      {
+        title: "Quantity",
+        dataIndex: "quantity",
+        key: "quantity",
+        align: "center", // Center alignment
+      },
+      {
+        title: "Price (Qty)",
+        dataIndex: "price",
+        key: "price",
+        align: "center", // Center alignment
+        render: (price) => `${price} STRATS`,
+      },
+      {
+        title: "Total Price",
+        dataIndex: "totalPrice",
+        key: "totalPrice",
+        align: "center", // Center alignment
+        render: (totalPrice) => `${totalPrice} STRATS`,
+      },
+      {
+        title: "Status",
+        key: "status",
+        render: (record) => (
+          <Badge
+            status={
+              record.status === "accepted"
+                ? "success"
+                : record.status === "declined"
+                ? "error"
+                : "default"
+            }
+            text={record.status.charAt(0).toUpperCase() + record.status.slice(1)}
+          />
+        ),
+      },
+      {
+        title: "Action",
+        key: "action",
+        align: "center",
+        render: (text, record) => (
           <>
-            <Button
-              type="primary"
-              size="small"
-              className="mr-3 !bg-[#EEF3FE] !text-[#1F34B5] hover:!bg-[#D6E1FF] hover:!text-[#0F2299]"
-              onClick={() => handleAction('accept', record)}
-            >
-              Accept
-            </Button>
-            <Button
-              type="primary"
-              size="small"
-              className="!bg-[#FEF0E6] !text-[#B63B38] hover:!bg-[#FFD2C5] hover:!text-[#962626]"
-              onClick={() => handleAction('decline', record)}
-            >
-              Decline
-            </Button>
+            {record.status === "pending" && (
+              <>
+                <Button
+                  type="primary"
+                  size="small"
+                  className="mr-3 !bg-[#EEF3FE] !text-[#1F34B5] hover:!bg-[#D6E1FF] hover:!text-[#0F2299]"
+                  onClick={() => handleAction("accept", record)}
+                >
+                  Accept
+                </Button>
+                <Button
+                  type="primary"
+                  size="small"
+                  className="!bg-[#FEF0E6] !text-[#B63B38] hover:!bg-[#FFD2C5] hover:!text-[#962626]"
+                  onClick={() => handleAction("decline", record)}
+                >
+                  Decline
+                </Button>
+              </>
+            )}
           </>
-        )}
-      </>
-    ),
-  },
-];
+        ),
+      },
+    ];
+  } else {
+    // For "offers made", we show the date instead of the offerer, and only a "Cancel" button
+    return [
+      {
+        title: "Date",
+        dataIndex: "date",
+        key: "date",
+        align: "center", // Center alignment
+      },
+      {
+        title: "Quantity",
+        dataIndex: "quantity",
+        key: "quantity",
+        align: "center",
+      },
+      {
+        title: "Price (Qty)",
+        dataIndex: "price",
+        key: "price",
+        align: "center", // Center alignment
+        render: (price) => `${price} STRATS`,
+      },
+      {
+        title: "Total Price",
+        dataIndex: "totalPrice",
+        key: "totalPrice",
+        align: "center", // Center alignment
+        render: (totalPrice) => `${totalPrice} STRATS`,
+      },
+      {
+        title: "Status",
+        key: "status",
+        render: (record) => (
+          <Badge
+            status={
+              record.status === "accepted"
+                ? "success"
+                : record.status === "declined"
+                ? "error"
+                : "default"
+            }
+            text={record.status.charAt(0).toUpperCase() + record.status.slice(1)}
+          />
+        ),
+      },
+      {
+        title: "Action",
+        key: "action",
+        align: "center",
+        render: (text, record) => (
+          <>
+            {record.status === "pending" && (
+              <Button
+                type="primary"
+                size="small"
+                className="!bg-[#FEF0E6] !text-[#B63B38] hover:!bg-[#FFD2C5] hover:!text-[#962626]"
+                onClick={() => handleAction("cancel", record)}
+              >
+                Cancel Offer
+              </Button>
+            )}
+          </>
+        ),
+      },
+    ];
+  }
+};
 
+// Main columns for product data
 const columns = [
   {
     title: "Product",
     dataIndex: "productName",
     key: "productName",
     render: (text, record) => (
-      <div style={{ display: 'flex', alignItems: 'center' }}>
+      <div style={{ display: "flex", alignItems: "center" }}>
         <img
           src={record.imageUrl}
           alt={text}
           style={{
-            width: '80px',
-            height: '80px',
-            objectFit: 'cover', // Maintains aspect ratio
-            marginRight: '10px',
+            width: "80px",
+            height: "80px",
+            objectFit: "cover", // Maintains aspect ratio
+            marginRight: "10px",
           }}
         />
         {text}
@@ -206,41 +277,47 @@ const columns = [
   },
 ];
 
-const NestedTableComponent = () => {
+const NestedTableComponent = ({ tableType }) => {
+  const [isConfirming, setIsConfirming] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
+  const [isConfirmed, setIsConfirmed] = useState(false);
+  const [selectedOffer, setSelectedOffer] = useState(null); // Now we're selecting the offer, not the whole product
+  const [actionType, setActionType] = useState(""); // 'accept', 'decline', or 'cancel'
 
-    const [isConfirming, setIsConfirming] = useState(false);
-    const [isLoading, setIsLoading] = useState(false);
-    const [isConfirmed, setIsConfirmed] = useState(false);
-    const [selectedOffer, setSelectedOffer] = useState(null);  // Now we're selecting the offer, not the whole product
-    const [actionType, setActionType] = useState(""); // 'accept' or 'decline'
-  
-    const handleAction = (action, offer) => {
-        console.log("offer",)
-      setSelectedOffer(offer);  // Set the selected offer
-      setActionType(action);
-      setIsConfirming(true);
-    };
-  
-    const onConfirm = () => {
-      setIsConfirming(false);
-      setIsLoading(true);
-      
-      // Simulate an API call
-      setTimeout(() => {
-        setIsLoading(false);
-        setIsConfirmed(true);
-      }, 2000);
-    };
-  
-    const onClose = () => {
-      setIsConfirming(false);
+  const handleAction = (action, offer) => {
+    setSelectedOffer(offer); // Set the selected offer
+    setActionType(action);
+    setIsConfirming(true);
+  };
+
+  const onConfirm = () => {
+    setIsConfirming(false);
+    setIsLoading(true);
+
+    // Simulate an API call
+    setTimeout(() => {
       setIsLoading(false);
-      setIsConfirmed(false);
-    };
+      setIsConfirmed(true);
+    }, 2000);
+  };
+
+  const onClose = () => {
+    setIsConfirming(false);
+    setIsLoading(false);
+    setIsConfirmed(false);
+  };
 
   const expandedRowRender = (record) => {
     const sortedOffers = sortOffers(record.offers);
-    return <Table columns={offerColumns(handleAction)} dataSource={sortedOffers} pagination={false} rowKey="key" className="offer-rows" />;
+    return (
+      <Table
+        columns={offerColumns(handleAction, tableType)}
+        dataSource={sortedOffers}
+        pagination={false}
+        rowKey="key"
+        className="offer-rows"
+      />
+    );
   };
 
   return (
@@ -260,7 +337,7 @@ const NestedTableComponent = () => {
         isOpen={isConfirming || isLoading || isConfirmed}
         onClose={onClose}
         onConfirm={onConfirm}
-        product={selectedOffer} 
+        product={selectedOffer}
         actionType={actionType}
         isLoading={isLoading}
         isConfirmed={isConfirmed}
