@@ -1,28 +1,47 @@
 {-# LANGUAGE DataKinds #-}
+{-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE FlexibleInstances #-}
+{-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE NoMonomorphismRestriction #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE TypeApplications #-}
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE TypeOperators #-}
+{-# LANGUAGE TypeSynonymInstances #-}
+
+{-# OPTIONS -fno-warn-orphans #-}
 
 import BlockApps.X509.Certificate -- (Subject(..))
 import BlockApps.X509.Keys (bsToPriv)
 import Blockchain.Strato.Model.Keccak256
-import Blockchain.Strato.Model.Secp256k1
+import Blockchain.Strato.Model.Secp256k1 hiding (HasVault)
 import Control.Monad
+import Control.Monad.Change.Modify
+import Control.Monad.Composable.Vault
+import Control.Monad.IO.Class (liftIO, MonadIO)
+import Control.Monad.Trans.Reader
 import Data.Aeson (encode)
 import qualified Data.ByteString as B
 import qualified Data.ByteString.Lazy as BL
 import qualified Data.ByteString.Char8 as C8
+import Data.Proxy()
 import HFlags
+import Servant.Client
 import SignSubjectOptions
+import Strato.Strato23.API.Types (MsgHash(..))
+import Strato.Strato23.Client (postSignature)
 import System.IO
   ( BufferMode (..),
     hSetBuffering,
     stderr,
     stdout,
   )
+
+ -- call POST /signature to vault proxy 
+ -- need url to vault-proxy
+instance Monad m => Accessible VaultData (VaultM m) where
+  access _ = ask
 
 main :: IO ()
 main = do
@@ -51,21 +70,42 @@ main = do
                   (maybe c subCountry mSslSub)
                   pub
           sac = SubjectAndCert sub mSslCert
-          sign' p = signMsg p . keccak256ToByteString . rlpHash
+          vaultSig h = runVaultM "http://strato:8013/strato/v2.3" $ getVaultSig h
+          sign' a = vaultSig . keccak256ToByteString $ rlpHash a
+          -- sign' p = signMsg p . keccak256ToByteString . rlpHash
           printS = putStrLn . C8.unpack . BL.toStrict . encode
       case flags_verification_key of
         "" -> do -- new identity
-          let sig = sign' pk sac
-              signed = Signed sac sig
-          printS signed
+          mSig <- sign' sac
+          case mSig of
+            Just sig -> do 
+              let signed = Signed sac sig
+              printS signed
+            Nothing -> error "Could not call POST /signature endpoint on vault-proxy"
         filename -> do -- existing identity
           pkBS' <- B.readFile filename
           let ePK' = bsToPriv pkBS'
           case ePK' of
             Left err -> error $ "Could not decode verification private key: " ++ err
-            Right pk' -> do
-              let sig' = sign' pk' sac
-                  signedSub = Signed sac sig'
-                  sig = sign' pk signedSub
-                  signed = Signed signedSub sig
-              printS signed
+            Right _ -> do
+              mSig' <- sign' sac
+              case mSig' of 
+                Just sig' -> do
+                  let signedSub = Signed sac sig'
+                  mSig <- sign' signedSub
+                  case mSig of 
+                    Just sig -> do 
+                      let signed = Signed signedSub sig
+                      printS signed
+                    Nothing -> error "waaaaaa"
+                Nothing -> error "helpful error messages r dum"
+
+eitherToMaybe :: Either a b -> Maybe b
+eitherToMaybe (Left _) = Nothing
+eitherToMaybe (Right x) = Just x
+
+getVaultSig :: (MonadIO m, HasVault m) => C8.ByteString -> m (Maybe Signature)
+getVaultSig h = do
+  VaultData url mgr <- access Proxy
+  res <- liftIO $ runClientM (postSignature Nothing (MsgHash h)) (mkClientEnv mgr url)
+  return $ eitherToMaybe res
