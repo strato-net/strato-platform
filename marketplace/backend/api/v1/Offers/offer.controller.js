@@ -101,8 +101,9 @@ class OfferController {
 
     static async getIncomingOffers(req, res, next) {
         try {
-            const { dapp, query } = req
-            const result = await dapp.getIncomingOffers({ ...query });
+            const { dapp, params } = req
+
+            const result = await dapp.getIncomingOffers({ ...params });
 
             rest.response.status200(res, result)
             return next()
@@ -113,8 +114,9 @@ class OfferController {
 
     static async getOutgoingOffers(req, res, next) {
         try {
-            const { dapp, query } = req
-            const result = await dapp.getOutgoingOffers({ ...query });
+            const { dapp, params } = req
+
+            const result = await dapp.getOutgoingOffers({ ...params });
 
             rest.response.status200(res, result)
             return next()

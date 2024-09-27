@@ -182,7 +182,7 @@ const actions = {
     dispatch({ type: actionDescriptors.fetchIncomingOffers });
 
     try {
-      const response = await fetch(`${apiUrl}/offer/incomimg/${user}`, {
+      const response = await fetch(`${apiUrl}/offer/incoming/${user}`, {
         method: HTTP_METHODS.GET,
       });
 
