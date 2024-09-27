@@ -180,7 +180,7 @@ const actions = {
   // Offers Received by User
   fetchIncomingOffers: async (dispatch, user) => {
     dispatch({ type: actionDescriptors.fetchIncomingOffers });
-    console.log("Getting to fetchIncomingOffers ===> ", user);
+
     try {
       const response = await fetch(`${apiUrl}/offer/incomimg/${user}`, {
         method: HTTP_METHODS.GET,
@@ -212,7 +212,7 @@ const actions = {
   // Offers Made by User
   fetchOutgoingOffers: async (dispatch, user) => {
     dispatch({ type: actionDescriptors.fetchOutgoingOffers });
-    console.log("Getting to fetchOutgoingOffers ===> ", user);
+
     try {
       const response = await fetch(`${apiUrl}/offer/outgoing/${user}`, {
         method: HTTP_METHODS.GET,
