@@ -41,7 +41,7 @@ module Bloc.API.Users
 where
 
 import qualified Bloc.API.DeprecatedPostTransaction as Deprecated
-import Bloc.API.SwaggerSchema
+import Bloc.API.SwaggerSchema hiding (Header)
 import Bloc.API.TypeWrappers
 import Bloc.API.Utils
 import BlockApps.Solidity.ArgValue
@@ -322,6 +322,7 @@ type GetBlocTransactionResult =
 type PostBlocTransactionResults =
   "transactions"
     :> "results"
+    :> Header "Authorization" Text
     :> QueryFlag "resolve"
     :> ReqBody '[JSON] [Keccak256]
     :> Post '[JSON] [BlocTransactionResult]

@@ -4,9 +4,12 @@
 module BlockApps.Tools.DumpKafkaSequencer where
 
 import Blockchain.EthConf
+import Blockchain.Sequencer.Event
 import Blockchain.Sequencer.Kafka
+import Control.Monad.Composable.Kafka
 import Control.Monad.IO.Class
-import Network.Kafka.Protocol
+import Control.Monad.Logger
+import Text.Format
 
 dumpKafkaSequencer :: Offset -> IO ()
 dumpKafkaSequencer ofs = do
@@ -20,26 +23,18 @@ dumpKafkaSequencer ofs = do
     ]
   dumpKafkaSequencerVM ofs
 
+--ignoring startingBlock for now, might fix this later, but it won't apply to RabbitMQ
 dumpKafkaSequencerVM :: Offset -> IO ()
-dumpKafkaSequencerVM startingBlock = do
-  ret <- runKafkaConfigured "queryStrato" $ doConsume' startingBlock
-  case ret of
-    Left e -> error $ show e
-    Right _ -> return ()
-  where
-    doConsume' offset = do
-      seqEvents <- readSeqVmEvents offset
-      liftIO . putStrLn . unlines $ show <$> seqEvents
-      doConsume' (offset + fromIntegral (length seqEvents))
+dumpKafkaSequencerVM startingBlock | startingBlock /= 0 = error "startingBlock currently can only equal 0"
+dumpKafkaSequencerVM _ = runStderrLoggingT $ runKafkaMConfigured "queryStrato" $
+  consume "queryStrato" "queryStrato" seqVmEventsTopicName $ \() seqEvents -> do
+    liftIO . putStrLn . unlines $ format <$> (seqEvents :: [VmEvent])
+    return ()
 
+--ignoring startingBlock for now, might fix this later, but it won't apply to RabbitMQ
 dumpKafkaSequencerP2P :: Offset -> IO ()
-dumpKafkaSequencerP2P startingBlock = do
-  ret <- runKafkaConfigured "queryStrato" $ doConsume' startingBlock
-  case ret of
-    Left e -> error $ show e
-    Right _ -> return ()
-  where
-    doConsume' offset = do
-      seqEvents <- readSeqP2pEvents offset
-      liftIO . putStrLn . unlines $ show <$> seqEvents
-      doConsume' (offset + fromIntegral (length seqEvents))
+dumpKafkaSequencerP2P startingBlock | startingBlock /= 0 = error "startingBlock currently can only equal 0"
+dumpKafkaSequencerP2P _ = runStderrLoggingT $ runKafkaMConfigured "queryStrato" $
+  consume "queryStrato" "queryStrato" seqP2pEventsTopicName $ \() seqEvents -> do
+    liftIO . putStrLn . unlines $ format <$> (seqEvents :: [P2pEvent])
+    return ()

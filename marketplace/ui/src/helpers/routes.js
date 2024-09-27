@@ -26,6 +26,7 @@ export default {
   InventoryDetail: { label: "Inventory Detail", url: "/inventories/:id/:name" },
   Items: { label: "Item", url: "/items" },
   Orders: { label: "Order", url: "/order/:type" },
+  Transactions: { label: "Transactions", url: "/transactions" },
   RedemptionsOutgoingDetails: { label: "Redemption Outgoing Detail", url: "/redemptions-outgoing/:redemptionService/:id" },
   RedemptionsIncomingDetails: { label: "Redemption Incoming Detail", url: "/redemptions-incoming/:redemptionService/:id" },
   SoldOrderDetails: { label: "Sold Order Detail", url: "/sold-orders/:id" },

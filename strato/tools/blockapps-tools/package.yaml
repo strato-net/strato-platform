@@ -42,6 +42,7 @@ library:
     - milena
     - milena-tools
     - monad-alter
+    - monad-logger
     - monad-loops
     - nibblestring
     - persistent-postgresql
@@ -94,17 +95,3 @@ executables:
       - hflags
       - time
     other-modules: []
-
-
-tests:
-  blockapps-tools-test:
-    source-dirs: test/
-    main: KafkaSpec.hs
-    ghc-options: -dynamic
-    dependencies:
-      - QuickCheck
-      - blockapps-tools
-      - bytestring
-      - bytestring-arbitrary
-      - hspec
-      - temporary

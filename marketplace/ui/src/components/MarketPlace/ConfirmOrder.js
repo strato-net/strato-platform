@@ -120,7 +120,6 @@ const ConfirmOrder = ({ paymentProviders = [], data, columns }) => {
       orderTotal += parseFloat(itemTotal); 
       if (i === cartData.length - 1) {
         concatenatedOrderString += `<hr style="border-top: 1px dotted #0A1B71; min-width: 80%; max-width: 80%; margin-left: 15px;">`;
-        concatenatedOrderString += `Sales Tax: $${parseFloat(tax).toFixed(2)} (${(parseFloat(tax) * 100).toFixed(0)} STRATS)<br>`;
         concatenatedOrderString += `Shipping Fee: <i><strong>Free</strong></i><br><br>`;
         concatenatedOrderString += `Order Total: $${orderTotal.toFixed(2)} (${(orderTotal * 100).toFixed(0)} STRATS)<br>`;
       }
@@ -203,7 +202,7 @@ const ConfirmOrder = ({ paymentProviders = [], data, columns }) => {
         const url = `${serviceURL}${checkoutRoute}?email=${encodeURIComponent(user.email)}&checkoutHash=${checkoutHash}&redirectUrl=${window.location.protocol}//${window.location.host}/order/status`;
         window.location.replace(url);
       } else {
-        window.location.replace(`/order/status?assets=${assets}`);
+        window.location.replace(`/order/status?assets=${assets}&orderHash=${checkoutHash}`);
       }
     }
   };
@@ -287,10 +286,6 @@ const ConfirmOrder = ({ paymentProviders = [], data, columns }) => {
                     <p className="text-base text-[#6A6A6A]">Sub Total:</p>
                     <p className="text-base text-[#202020] md:ml-5 text-right">${subTotal} <span className="ml-1">({(subTotal * 100).toFixed(0)} STRATS)</span></p>
                   </Row>
-                  <Row className="justify-start items-center ">
-                    <p className="text-base text-[#6A6A6A]">Tax:</p>
-                    <p className="text-base text-[#202020] md:ml-16 text-left">${tax}</p>
-                  </Row>
                   <Row className="justify-between items-center">
                     <p className="text-base text-[#6A6A6A]">Total:</p>
                     <p id="totalPrice" className="text-base text-[#202020] md:ml-5 text-right">
@@ -310,7 +305,7 @@ const ConfirmOrder = ({ paymentProviders = [], data, columns }) => {
                   >
                     {activePaymentProviders && activePaymentProviders.map(provider => (
                       provider && <Option className='payment-dropdown' key={provider?.serviceName} value={provider?.serviceName}>
-                        <Row className="w-full">
+                        <Row className="w-full items-center">
                         <Col span={22} className="text-left">Checkout with {provider?.serviceName}</Col>
                         <Col span={2} className="flex justify-end"><img src={provider?.imageURL} alt={provider?.serviceName} style={{ width: 20, height: 20, marginRight: 2 }} /> </Col>
                         </Row>

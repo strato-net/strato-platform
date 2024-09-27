@@ -18,7 +18,7 @@ import TransferModal from "./TransferModal";
 import RedeemModal from "./RedeemModal";
 import BridgeModal from "./BridgeModal";
 import routes from "../../helpers/routes";
-import { ASSET_STATUS, STRATS_CONVERSION } from "../../helpers/constants";
+import { ASSET_STATUS, STRATS_CONVERSION, OLD_SADDOG_ORIGIN_ADDRESS } from "../../helpers/constants";
 import image_placeholder from "../../images/resources/image_placeholder.png";
 import "react-responsive-carousel/lib/styles/carousel.min.css";
 import { SEO } from "../../helpers/seoConstant";
@@ -170,7 +170,7 @@ const InventoryCard = ({ inventory, category, debouncedSearchTerm, id, allSubcat
       return false; // or handle the undefined case as needed
     }
     const address = inventory.originAddress;
-    return address.toLowerCase() === "dbf23119bb52a7419c66c7b5055dd3f31545dc14";
+    return address.toLowerCase() === OLD_SADDOG_ORIGIN_ADDRESS;
   }
 
   return (
@@ -209,10 +209,10 @@ const InventoryCard = ({ inventory, category, debouncedSearchTerm, id, allSubcat
                 <Button id="asset-card-unlist-btn" type="link" className="text-[#13188A] text-left px-0 font-semibold text-sm h-6" onClick={showUnlistModal} disabled={!inventory.price || !isActive()}>
                   <><StopOutlined /> Unlist</>
                 </Button>
-                <Button type="link" className="text-[#13188A] text-left px-0 font-semibold text-sm h-6" onClick={showResellModal} disabled={!(itemData.isMint && itemData.isMint == "True" && disableSADDOGS(inventory)) || !isActive()}>
+                <Button type="link" className="text-[#13188A] text-left px-0 font-semibold text-sm h-6" onClick={showResellModal} disabled={!(itemData.isMint && itemData.isMint == "True" && !disableSADDOGS(inventory)) || !isActive()}>
                   <><PieChartOutlined /> Mint</>
                 </Button>
-                <Button type="link" className="text-[#13188A] text-left px-0 font-semibold text-sm h-6" onClick={showTransferModal} disabled={isTransferDisabled() || !isActive() || disableSADDOGS(inventory)}>
+                <Button type="link" className="text-[#13188A] text-left px-0 font-semibold text-sm h-6" onClick={showTransferModal} disabled={isTransferDisabled() || !isActive() }>
                   <><SwapOutlined /> Transfer</>
                 </Button>
                 <Button type="link" className="text-[#13188A] text-left px-0 font-semibold text-sm h-6" onClick={showRedeemModal} disabled={inventory.price || inventory.address === inventory.originAddress || !isActive() || disableSADDOGS(inventory)}>

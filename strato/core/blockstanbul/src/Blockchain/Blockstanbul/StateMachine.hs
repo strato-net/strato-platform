@@ -23,7 +23,6 @@ import Control.Monad
 import Control.Monad.State.Class
 import qualified Data.Map.Strict as M
 import Data.Maybe
-import Data.Set (Set)
 import qualified Data.Set as S
 import qualified Data.Text as T
 import Text.Format
@@ -52,7 +51,7 @@ data BlockstanbulContext = BlockstanbulContext
     -- The designated participant to suggest a block for this round
     _proposer :: Validator,
     -- The total group of participants
-    _validators :: Set Validator,
+    _validators :: S.Set Validator,
     -- Validators who have sent us a prepare for this round
     _prepared :: M.Map Validator Keccak256,
     -- Validators who have sent us a commitment seal for this round
@@ -102,7 +101,7 @@ debugShowCtx = do
 newContext :: String -> Checkpoint -> Maybe Address -> Bool -> Maybe ChainMemberParsedSet -> BlockstanbulContext
 newContext network' (Checkpoint v as) addr valB chainm =
   let valSet = S.fromList as
-      prop = fromMaybe (error "you need at least one validator in the network") . S.lookupMin $ valSet
+      prop = fromMaybe (error "you need at least one validator in the network") $ S.lookupMin valSet
    in BlockstanbulContext
         { _view = v,
           _productionAuth = True,

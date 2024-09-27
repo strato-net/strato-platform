@@ -16,28 +16,20 @@
 {-# OPTIONS -fno-warn-orphans      #-}
 
 module Blockchain.StateRootMismatch
-  ( StateRootMismatch(..),
-    srmBlockNumber,
-    srmBlockHash,
-    srmBlockSR,
-    srmNewSR,
-    StateRootMismatchM(..),
+  ( StateRootMismatchM(..),
     formatStateRootMismatch
   )
 where
 
-import BlockApps.Init ()
 import BlockApps.Logging
 import Blockchain.Data.RLP
 import qualified Blockchain.Database.MerklePatricia as MP
-import Blockchain.EthConf
 import Blockchain.Sequencer.Event
 import Blockchain.Sequencer.Kafka
 import Blockchain.Strato.Model.CodePtr ()
 import Blockchain.Strato.Model.Keccak256
 import Blockchain.Strato.StateDiff
 import Control.Applicative ((<|>))
-import Control.Lens hiding (Context (..))
 import Control.Monad (void)
 import qualified Control.Monad.Change.Alter as A
 import Control.Monad.Composable.Kafka
@@ -54,15 +46,6 @@ import SolidVM.Model.Storable
 import Text.Format
 import Text.Tools
 import UnliftIO
-
-data StateRootMismatch = StateRootMismatch
-  { _srmBlockNumber :: Integer
-  , _srmBlockHash   :: Keccak256
-  , _srmBlockSR     :: MP.StateRoot
-  , _srmNewSR       :: MP.StateRoot
-  } deriving (Eq, Show)
-
-makeLenses ''StateRootMismatch
 
 newtype StateRootMismatchM m a = StateRootMismatchM { runStateRootMismatchM :: m a }
 
@@ -97,9 +80,9 @@ instance ( MonadUnliftIO m
   lookup _ k = lift (A.lookup (A.Proxy @MP.NodeData) k) >>= \case
     Just nd -> pure $ Just nd
     Nothing -> do
-      StateRootMismatchM . void . execKafka $ writeUnseqEvents [IEGetMPNodes [k]]
+      StateRootMismatchM . void $ writeUnseqEvents [IEGetMPNodes [k]]
       fmap (Just . fromMaybe MP.EmptyNodeData) . timeout 10000000 $
-        runConsume "StateRootMismatchM/lookup" (lookupConsumerGroup "ethereum-vm") seqVmEventsTopicName $ \_ evs -> do
+        runConsume "StateRootMismatchM/lookup" "ethereum-vm" seqVmEventsTopicName $ \_ evs -> do
           let findND (VmMPNodesReceived [nd]) | k == MP.sha2StateRoot (rlpHash nd) = Just nd
               findND _ = Nothing
               mND = foldr (<|>) Nothing (findND <$> evs)

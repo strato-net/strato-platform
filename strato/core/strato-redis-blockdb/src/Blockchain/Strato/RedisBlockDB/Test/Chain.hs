@@ -8,7 +8,6 @@ module Blockchain.Strato.RedisBlockDB.Test.Chain where
 -- import qualified Text.PrettyPrint.ANSI.Leijen as L
 
 import Blockchain.Data.ArbitraryInstances ()
-import Blockchain.Data.Block
 import Blockchain.Data.BlockHeader
 import Blockchain.Strato.Model.Class
 import Blockchain.Strato.Model.Keccak256
@@ -16,29 +15,22 @@ import Control.Monad
 import Data.Foldable
 import Data.Maybe
 import Data.Tree
-import Lens.Family2
-import Lens.Family2.TH
 import Test.QuickCheck
 
 ------------------------------------------------------------------------------
--- Lenses
---
-$(makeLensesBy (\n -> Just ("_" ++ n)) ''BlockHeader)
-$(makeLensesBy (\n -> Just ("_" ++ n)) ''Block)
 
 makeGenesisBlock :: IO BlockHeader
 makeGenesisBlock = do
-  startBlock <-
-    ( (over _parentHash (const . unsafeCreateKeccak256FromWord256 $ 0))
-        --                   . (over _ommersHash (const (ommersVerificationValue [])))
-        . (over _number (const 0))
-        . (over _gasUsed (const 0))
-        . (over _nonce (const 42)) -- this is ethereum spec!
-        --                   . (over _receiptTransactions (const []))
-        --                   . (over _blockDataUncles              (const []))
-      )
-      <$> generate arbitrary
-  return $ startBlock
+  arbitraryBlock <- generate arbitrary
+  return $ arbitraryBlock {
+    parentHash=unsafeCreateKeccak256FromWord256 0,
+    --                   ommersHash=ommersVerificationValue [],
+    number=0,
+    gasUsed=0,
+    nonce=42 -- this is ethereum spec!
+    --                 receiptTransactions=[],
+    --                 blockDataUncles=[]
+    }
 
 buildChain :: BlockHeader -> Int -> Int -> IO [BlockHeader]
 buildChain seed depth maxSiblings = do
@@ -51,12 +43,11 @@ makeNextBlock block = do
       nextNumber = (number block) + 1
   diff <- return 1 --((blockDataDifficulty block) +) <$> (generate $ choose (1,1000))
   child <- generate arbitrary :: IO BlockHeader
-  return $
-    ( (over _parentHash (const parent))
-        . (over _difficulty (const diff))
-        . (over _number (const nextNumber))
-    )
-      child
+  return child{
+    parentHash=parent,
+    difficulty=diff,
+    number=nextNumber
+    }
 
 makeNextBlockIncorrectly :: BlockHeader -> IO BlockHeader
 makeNextBlockIncorrectly block = do
@@ -64,12 +55,11 @@ makeNextBlockIncorrectly block = do
       nextNumber = (number block) + 2
   diff <- ((difficulty block) +) <$> (generate $ choose (1, 1000))
   child <- generate arbitrary :: IO BlockHeader
-  return $
-    ( (over _parentHash (const parent))
-        . (over _difficulty (const diff))
-        . (over _number (const nextNumber))
-    )
-      child
+  return $ child {
+    parentHash=parent,
+    difficulty=diff,
+    number=nextNumber
+    }
 
 extendChain :: Int -> [BlockHeader] -> IO [BlockHeader]
 extendChain n blocks | n <= 0 = return blocks
@@ -113,12 +103,13 @@ buildY seed depth maxSiblings = do
   nextNumber <- return $ (number seed) + 1
   siblings <- generate $ vectorOf spread arbitrary :: IO [BlockHeader]
   withUpdates <-
-    return $
-      ( (over _parentHash (const . blockHeaderHash $ seed))
-          . (over _difficulty (const nextDifficulty'))
-          . (over _number (const nextNumber))
-      )
-        <$> siblings
+    return $ fmap 
+      (\sibling -> sibling{
+          parentHash=blockHeaderHash seed,
+          difficulty=nextDifficulty',
+          number=nextNumber
+          }
+      ) siblings
   expanded <- forM withUpdates $ \sibling -> do
     grandchildren <- buildY sibling (depth - 1) maxSiblings
     return $ grandchildren
@@ -133,12 +124,13 @@ buildTree seed depth maxSiblings = do
   nextNumber <- return $ (number seed) + 1
   siblings <- generate $ vectorOf siblingCount arbitrary :: IO [BlockHeader]
   withUpdates <-
-    return $
-      ( (over _parentHash (const . blockHeaderHash $ seed))
-          . (over _difficulty (const nextDifficulty'))
-          . (over _number (const nextNumber))
-      )
-        <$> siblings
+    return $ fmap (\sibling ->
+      sibling{
+        parentHash=blockHeaderHash seed,
+        difficulty=nextDifficulty',
+        number=nextNumber
+        }) siblings
+
   expanded <- forM (zip withUpdates ([1 ..] :: [Int])) $ \(sibling, i) -> do
     deathRate <- case i == 1 of
       True -> pure 1 :: IO Int

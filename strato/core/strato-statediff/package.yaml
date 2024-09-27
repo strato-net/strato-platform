@@ -17,6 +17,7 @@ library:
     - containers
     - ethereum-rlp
     - format
+    - kafka-monad
     - lens
     - merkle-patricia-db
     - milena

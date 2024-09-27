@@ -15,6 +15,7 @@
 module Slipstream.OutputData (
   outputData,
   outputData',
+  outputDataDedup,
   OutputM,
   ProcessedCollectionRow(..),
   insertEventTables,
@@ -25,12 +26,10 @@ module Slipstream.OutputData (
   insertArrayTableQuery,
   insertAbstractTable,
   insertAbstractTableQuery,
-  insertHistoryAbstractTable,
   createIndexTable,
   createMappingTable,
   createArrayTable,
   createAbstractTable,
-  insertHistoryTable,
   createExpandEventTables,
   createExpandIndexTable,
   createForeignIndexesForJoins,
@@ -46,13 +45,18 @@ module Slipstream.OutputData (
   updateForeignKeysFromNULLArray,
   cirrusInfo,
   historyTableName,
-  getTableColumnAndType
+  getTableColumnAndType,
+  aggEventToCollectionRow,
+  aggEventToCollectionRows,
+  removeArrayEvArgs,
+  getArraysFromEvents,
+  getAllEvents,
+  processParents
   ) where
 
 
 import           BlockApps.Solidity.Value as V
 import           Conduit
--- import           Control.Arrow                   ((***))
 import           Control.Lens ((^.))
 import           Control.Monad
 import qualified Data.Aeson                      as Aeson
@@ -71,12 +75,12 @@ import           Bloc.Server.Utils               (partitionWith)
 import           BlockApps.Logging
 import           Blockchain.Strato.Model.Account
 import           Blockchain.Strato.Model.Address
-import           Blockchain.Strato.Model.CodePtr
+-- import           Blockchain.Strato.Model.CodePtr
 import qualified Blockchain.Strato.Model.Event   as Action
 import           Blockchain.Strato.Model.Keccak256
-import           Data.Bifunctor                  (first)
+-- import           Data.Bifunctor                  (first)
 -- import           Data.Function                   (on)
-import           Data.List                       (groupBy, nubBy, sortBy)
+import           Data.List                       ( groupBy, nubBy, sortBy)
 import           Data.Ord (comparing)
 import           Data.Text.Encoding              (decodeUtf8, decodeUtf8', encodeUtf8)
 import           Data.Time
@@ -85,8 +89,6 @@ import           Database.PostgreSQL.Typed.Protocol
 import           Database.PostgreSQL.Typed.Query
 import           Slipstream.Data.Action
 import qualified Slipstream.Events               as E
-import           Slipstream.Globals
-import           Slipstream.Metrics
 import           Slipstream.Options
 import           Slipstream.QueryFormatHelper
 import           Slipstream.SolidityValue
@@ -95,9 +97,10 @@ import           SolidVM.Model.SolidString
 import qualified SolidVM.Model.Type              as SVMType
 import           Text.Printf
 import           Text.RawString.QQ
-import           Text.Tools                      
+import           Text.Tools
 import           UnliftIO.Exception              (SomeException, catch, handle)
-import           UnliftIO.IORef
+import qualified Data.Text.Encoding as TE
+
 
 newtype First b a = First {unFirst :: (a, b)}
 
@@ -107,12 +110,13 @@ instance Functor (First b) where
 
 data ProcessedCollectionRow = ProcessedCollectionRow
   { address :: Address,
-    codehash :: CodePtr,
+    -- codehash :: Maybe CodePtr,
     creator :: Text,
     cc_creator :: Maybe Text,
     root :: Text,
     application :: Text,
     contractname :: Text,
+    eventInfo :: Maybe (Text, Int),
     collectionname :: Text,
     collectiontype ::Text,
     blockHash :: Keccak256,
@@ -139,11 +143,11 @@ fillFirstEmptyEntries :: [(Text, a)] -> [(Text, a)]
 fillFirstEmptyEntries = map unFirst . fillEmptyEntries . map First
 
 getTableColumnAndType :: Bool -> CodeCollectionF () -> [(Text, SVMType.Type)] -> [(T.Text, T.Text)]
-getTableColumnAndType isEvent (CodeCollection ccs _ _ _ _ _ _ _) = concatMap go . fillFirstEmptyEntries
+getTableColumnAndType isEvent cc@(CodeCollection ccs _ _ _ _ _ _ _) = concatMap go . fillFirstEmptyEntries
   where
     go :: (Text, SVMType.Type) -> [(T.Text, T.Text)]
     go (x, y) = 
-      case solidityTypeToSQLType isEvent y of
+      case solidityTypeToSQLType isEvent Nothing cc y of
         Nothing -> []
         Just v -> 
           let defaultColumn = (columnName x, v)
@@ -191,7 +195,7 @@ cirrusInfo =
       pgDBParams = [("Timezone", "UTC")]
     }
 
-dbQueryCatchError' :: (MonadLogger m, MonadUnliftIO m) => PGConnection -> (Text, Maybe (IORef Globals, TableName, TableColumns)) -> m ()
+dbQueryCatchError' :: (MonadLogger m, MonadUnliftIO m) => PGConnection -> (Text, Maybe (TableName, TableColumns)) -> m ()
 dbQueryCatchError' conn (insrt, b) = handle (handlePostgresError' b) $ dbQuery conn insrt
 
 dbQueryCatchError :: (MonadLogger m, MonadUnliftIO m) => PGConnection -> Text -> m ()
@@ -202,15 +206,11 @@ dbQuery conn insrt = do
   $logDebugS "outputData" insrt
   liftIO . void . pgQuery conn . rawPGSimpleQuery $! encodeUtf8 insrt
 
-handlePostgresError' :: (MonadLogger m, MonadIO m) => Maybe (IORef Globals, TableName, TableColumns) -> SomeException -> m ()
+handlePostgresError' :: (MonadLogger m) => Maybe (TableName, TableColumns) -> SomeException -> m ()
 handlePostgresError' myStuff e =
   case myStuff of
     Nothing -> handlePostgresError e
-    Just (x, y, z) -> do
-      setTableCreated x y z
-      handlePostgresError e
-
---setTableCreated globalsIORef tableName $ cols
+    Just (_, _) -> handlePostgresError e
 
 handlePostgresError :: MonadLogger m => SomeException -> m ()
 handlePostgresError e =
@@ -221,7 +221,7 @@ handlePostgresError e =
 outputData' ::
   OutputM m =>
   PGConnection ->
-  ConduitM () (Text, Maybe (IORef Globals, TableName, TableColumns)) m a ->
+  ConduitM () (Text, Maybe ( TableName, TableColumns)) m a ->
   m a
 outputData' conn c = runConduit $ c `fuseUpstream` mapM_C (dbQueryCatchError' conn)
 
@@ -231,6 +231,20 @@ outputData ::
   ConduitM () Text m a ->
   m a
 outputData conn c = runConduit $ c `fuseUpstream` mapM_C (dbQueryCatchError conn)
+
+dedupC :: (Monad m, Ord a) => ConduitM a a m ()
+dedupC = go Set.empty
+  where go seen = await >>= \case
+          Just a | not (a `Set.member` seen) -> yield a >> go (Set.insert a seen)
+          Just _ -> go seen
+          Nothing -> pure ()
+
+outputDataDedup ::
+  OutputM m =>
+  PGConnection ->
+  ConduitM () Text m a ->
+  m a
+outputDataDedup conn c = runConduit $ c `fuseUpstream` (dedupC .| mapM_C (dbQueryCatchError conn))
 
 baseColumns :: TableColumns
 baseColumns =
@@ -251,7 +265,17 @@ baseEventColumns =
     "block_timestamp",
     "block_number",
     "transaction_hash",
-    "transaction_sender"
+    "transaction_sender",
+    "event_index"
+  ]
+
+baseEventCollectionColumns :: TableColumns
+baseEventCollectionColumns =
+  baseEventColumns ++
+  [
+    "contract_name",
+    "collectionname",
+    "collectiontype"
   ]
 
 baseMappingColumns :: TableColumns
@@ -283,8 +307,8 @@ baseAbstractColumns =
     "data"
   ]
 
-baseTableColumns :: TableColumns
-baseTableColumns = baseColumns
+-- baseTableColumns :: TableColumns
+-- baseTableColumns = baseColumns
 
 baseTableColumnsForEvent :: TableColumns
 baseTableColumnsForEvent = baseEventColumns
@@ -316,6 +340,16 @@ collectionTableName creator a n m =
   let (c', a', n') = constructTableNameParameters creator a n
    in CollectionTableName c' a' n' m
 
+eventTableName :: Text -> Text -> Text -> Text -> TableName
+eventTableName creator a n e =
+  let (c', a', n') = constructTableNameParameters creator a n
+   in EventTableName c' a' n' e
+
+eventCollectionTableName :: Text -> Text -> Text -> Text -> Text -> TableName
+eventCollectionTableName creator a n e m =
+  let (c', a', n') = constructTableNameParameters creator a n
+   in EventCollectionTableName c' a' n' e m
+
 uncurry3 :: (a -> b -> c -> d) -> (a, b, c) -> d
 uncurry3 f (x, y, z) = f x y z
 
@@ -335,66 +369,48 @@ compareCollectionRows' x y =
 
 createExpandIndexTable ::
   OutputM m =>
-  IORef Globals ->
+  --
   ContractF () ->
   CodeCollectionF () ->
   (Text, Text, Text) ->
   ConduitM () Text m [ForeignKeyInfo]
-createExpandIndexTable g c cc nameParts = do
-  creationForeignKeys <- createIndexTable g c cc nameParts
-  expansionForeignKeys <- expandIndexTable g c cc nameParts
+createExpandIndexTable c cc nameParts = do
+  creationForeignKeys <- createIndexTable c cc nameParts
+  expansionForeignKeys <- expandIndexTable c cc nameParts
   return $ creationForeignKeys ++ expansionForeignKeys
 
 createExpandAbstractTable ::
   OutputM m =>
-  IORef Globals ->
   ContractF () ->
   (Text, Text, Text) ->
-  Map.Map (Account, Text) (Text, Text) ->
+  Map.Map (Account, Text) (Text, Text, [Text]) ->
   CodeCollectionF () ->
   ConduitM () Text m [ForeignKeyInfo]
-createExpandAbstractTable g c nameParts abstracts cc = do
-  creationForeignKeys <- createAbstractTable g c nameParts abstracts cc
-  expansionForeignKeys <- expandAbstractTable g c nameParts abstracts cc
+createExpandAbstractTable c nameParts abstracts cc = do
+  creationForeignKeys <- createAbstractTable c nameParts abstracts cc
+  expansionForeignKeys <- expandAbstractTable c nameParts abstracts cc
   return $ creationForeignKeys ++ expansionForeignKeys
+
 
 data ForeignKeyInfo = ForeignKeyInfo
   { tableName :: TableName,
-    columnName :: Text,
-    foreignTableName :: TableName
+    columnNames :: [Text],
+    foreignTableName :: TableName,
+    foreignColumnNames :: [Text]
   }
   deriving (Show)
 
 instance Eq ForeignKeyInfo where
     x == y =
         tableName x == tableName y &&
-        columnName x == columnName y &&
-        foreignTableName x == foreignTableName y
+        columnNames x == columnNames y &&
+        foreignTableName x == foreignTableName y &&
+        foreignColumnNames x == foreignColumnNames y
 
 instance Ord ForeignKeyInfo where
     compare x y =
-        compare (tableName x, columnName x, foreignTableName x)
-                (tableName y, columnName y, foreignTableName y)
-
--- dropFkeysBetween :: OutputM m =>
---   ForeignKeyInfo ->
---   ConduitM () Text m ()
--- dropFkeysBetween foreignKey = do
---   let srcTable = textToDoubleQuoteText $ tableNameToTextPostgres (tableName foreignKey)
---       -- srcColumn = wrapDoubleQuotes (columnName foreignKey)
---       targetTable = textToDoubleQuoteText $ tableNameToTextPostgres (foreignTableName foreignKey)
---       fkNameSrcToTarget = textToDoubleQuoteText $ tableNameToTextPostgres (tableName foreignKey) <> "_" <> tableNameToTextPostgres (foreignTableName foreignKey) <> "_fk"
---       fkNameTargetToSrc = textToDoubleQuoteText $ tableNameToTextPostgres (foreignTableName foreignKey) <> "_" <> tableNameToTextPostgres (tableName foreignKey) <> "_fk"
---       logMessage = 
---         "srcTable: " <> (T.pack $ show $ tableName foreignKey) <>
---         ", targetTable: " <> (T.pack $ show $ foreignTableName foreignKey) 
---   $logInfoS "dropFkeysBetween" logMessage
-
---   -- Drop existing foreign keys so theres no cyclical or old dependancy
---   yield $ "ALTER TABLE " <> srcTable 
---           <> " DROP CONSTRAINT IF EXISTS " <> fkNameSrcToTarget <> ";"
---   yield $ "ALTER TABLE " <> targetTable 
---           <> " DROP CONSTRAINT IF EXISTS " <> fkNameTargetToSrc <> ";"
+        compare (tableName x, columnNames x, foreignTableName x, foreignColumnNames x)
+                (tableName y, columnNames y, foreignTableName y, foreignColumnNames y)
 
 createForeignIndexesForJoins ::
   OutputM m =>
@@ -402,8 +418,9 @@ createForeignIndexesForJoins ::
   ConduitM () Text m ()
 createForeignIndexesForJoins foreignKey = do
   let srcTable = textToDoubleQuoteText $ tableNameToTextPostgres (tableName foreignKey)
-      srcColumn = wrapDoubleQuotes (columnName foreignKey)
+      srcColumns = csv $ wrapDoubleQuotes <$> columnNames foreignKey
       targetTable = textToDoubleQuoteText $ tableNameToTextPostgres (foreignTableName foreignKey)
+      targetColumns = csv $ wrapDoubleQuotes <$> foreignColumnNames foreignKey
       fkNameSrcToTarget = textToDoubleQuoteText $ tableNameToTextPostgres (tableName foreignKey) <> "_" <> tableNameToTextPostgres (foreignTableName foreignKey) <> "_fk"
       -- fkNameTargetToSrc = textToDoubleQuoteText $ tableNameToTextPostgres (foreignTableName foreignKey) <> "_" <> tableNameToTextPostgres (tableName foreignKey) <> "_fk"
       logMessage = 
@@ -413,7 +430,7 @@ createForeignIndexesForJoins foreignKey = do
   -- Add new foreign key
   yield $ "ALTER TABLE " <> srcTable 
           <> " ADD CONSTRAINT " <> fkNameSrcToTarget <> " FOREIGN KEY (" 
-          <> srcColumn <> ") REFERENCES " <> targetTable <> " (address);"
+          <> srcColumns <> ") REFERENCES " <> targetTable <> " (" <> targetColumns <> ");"
 
 notifyPostgREST ::
   OutputM m =>
@@ -425,14 +442,14 @@ notifyPostgREST conn = do
 createExpandHistoryTable ::
   OutputM m =>
   Bool ->
-  IORef Globals ->
+  
   ContractF () ->
   CodeCollectionF () ->
   (Text, Text, Text) ->
-  ConduitM () (Text, Maybe (IORef Globals, TableName, TableColumns)) m ()
-createExpandHistoryTable isAbstract g c cc nameParts = do
-  createHistoryTable' isAbstract g c cc nameParts
-  expandHistoryTable isAbstract g c cc nameParts
+  ConduitM () Text m ()
+createExpandHistoryTable isAbstract c cc nameParts = do
+  createHistoryTable' isAbstract c cc nameParts
+  expandHistoryTable isAbstract c cc nameParts
 
 getDeferredForeignKeys :: (MonadLogger m) => TableName -> ContractF () -> CodeCollectionF () -> Text -> Text -> m [ForeignKeyInfo] --circular dependancy only fixed for abstract tables
 getDeferredForeignKeys tableName c (CodeCollection ccs _ _ _ _ _ _ _) creator a = do
@@ -445,15 +462,16 @@ getDeferredForeignKeys tableName c (CodeCollection ccs _ _ _ _ _ _ _) creator a 
             Just _ -> do
               pure $ Just $ ForeignKeyInfo
                   { tableName = tableName,
-                    columnName = labelToText $ theName++"_fkey",
-                    foreignTableName = indexTableName creator a $ labelToText x
+                    columnNames = [labelToText $ theName++"_fkey"],
+                    foreignTableName = indexTableName creator a $ labelToText x,
+                    foreignColumnNames = [labelToText "address"]
                   }
         Nothing -> return Nothing
   return result
 
 getDeferredForeignKeysAbstract ::
   (MonadLogger m) =>
-  TableName -> ContractF () -> Text -> Text -> Map.Map (Account, Text) (Text, Text) -> CodeCollectionF () -> m [ForeignKeyInfo]
+  TableName -> ContractF () -> Text -> Text -> Map.Map (Account, Text) (Text, Text, [Text]) -> CodeCollectionF () -> m [ForeignKeyInfo]
 getDeferredForeignKeysAbstract tableName c creator a abstracts' cc@(CodeCollection ccs _ _ _ _ _ _ _) = do
   result <- fmap catMaybes . for [(theName, x) | (theName, VariableDecl {_varType = SVMType.UnknownLabel x _}) <- Map.toList (c ^. storageDefs)] $ \(theName, x) -> do
       let contractF = Map.lookup x ccs
@@ -469,11 +487,12 @@ getDeferredForeignKeysAbstract tableName c creator a abstracts' cc@(CodeCollecti
                                             Nothing -> (creator, a, _contractName c')
                                             Just acct -> case Map.lookup (acct, T.pack $ _contractName c') abstracts' of
                                               Nothing -> (creator, a, _contractName c')
-                                              Just (creator'', a'') -> (creator'', a'', _contractName c')
+                                              Just (creator'', a'', _) -> (creator'', a'', _contractName c')
                   pure $ Just $ ForeignKeyInfo
                     { tableName = tableName,
-                      columnName = labelToText $ theName++"_fkey",
-                      foreignTableName = abstractTableName creator' a' $ T.pack n'
+                      columnNames = [labelToText $ theName++"_fkey"],
+                      foreignTableName = abstractTableName creator' a' $ T.pack n',
+                      foreignColumnNames = [labelToText "address"]
                       }
                 Nothing -> return Nothing
         Nothing -> return Nothing
@@ -483,14 +502,47 @@ getDeferredForeignKeysForCollection :: TableName -> Text -> Text -> [ForeignKeyI
 getDeferredForeignKeysForCollection tableName creator a =
   [ ForeignKeyInfo
       { tableName = tableName,
-        columnName = T.pack "address",
+        columnNames = [T.pack "address"],
         foreignTableName =
           indexTableName creator a $
             ( \case
                 CollectionTableName _ _ n' _ -> n'
                 _ -> ""
             )
-              tableName
+              tableName,
+        foreignColumnNames = [T.pack "address"]
+      }
+  ]
+
+getDeferredForeignKeysForEvent :: TableName -> Text -> Text -> [ForeignKeyInfo]
+getDeferredForeignKeysForEvent tableName creator a =
+  [ ForeignKeyInfo
+      { tableName = tableName,
+        columnNames = [T.pack "address"],
+        foreignTableName =
+          indexTableName creator a $
+            ( \case
+                EventTableName _ _ n' _ -> n'
+                _ -> ""
+            )
+              tableName,
+        foreignColumnNames = [T.pack "address"]
+      }
+  ]
+
+getDeferredForeignKeysForEventCollection :: TableName -> Text -> Text -> [ForeignKeyInfo]
+getDeferredForeignKeysForEventCollection tableName creator a =
+  [ ForeignKeyInfo
+      { tableName = tableName,
+        columnNames = [T.pack "transaction_hash", T.pack "event_index"],
+        foreignTableName =
+          uncurry (eventTableName creator a) $
+            ( \case
+                EventCollectionTableName _ _ n' e' _ -> (n', e')
+                _ -> ("", "")
+            )
+              tableName,
+        foreignColumnNames = [T.pack "transaction_hash", T.pack "event_index"]
       }
   ]
 
@@ -498,191 +550,156 @@ getDeferredForeignKeysForArrayType :: TableName -> Text -> Text -> Text -> [Fore
 getDeferredForeignKeysForArrayType tableName creator a arrType =
   [ ForeignKeyInfo
       { tableName = tableName,
-        columnName = T.pack "value_fkey",
-        foreignTableName = indexTableName creator a arrType
+        columnNames = [T.pack "value_fkey"],
+        foreignTableName = indexTableName creator a arrType,
+        foreignColumnNames = [T.pack "address"]
       }
   ]
 
 createIndexTable ::
   OutputM m=>
-  IORef Globals ->
+  --
   ContractF () ->
   CodeCollectionF () ->
   (Text, Text, Text) ->
   ConduitM () Text m [ForeignKeyInfo]
-createIndexTable globalsIORef contract cc (creator, a, n) = do
+createIndexTable contract cc (creator, a, n) = do
   let tableName = indexTableName creator a n
-  tableExists <- isTableCreated globalsIORef tableName
 
-  --When contract hasn't been written to "contract" table and indexing table doesn't exist
-  $logDebugLS "createIndexTable/tableExists" ("Table Name: " ++ show tableName ++ ", contract already created: " ++ show tableExists)
-  if tableExists 
-    then return []
-    else do
-      incNumTables
-      let isEvent = False
-          list = getTableColumnAndType isEvent cc $ map (\(x, y) -> (labelToText x, y ^. varType)) $ Map.toList $ contract ^. storageDefs
-          listCombined = map (\(x,y)-> x <> " " <> y) list
-      yield $ createIndexTableQuery (creator, a, n) listCombined
-      setTableCreated globalsIORef tableName listCombined
-      getDeferredForeignKeys tableName contract cc creator a
+  let isEvent = False
+      list = getTableColumnAndType isEvent cc $ map (\(x, y) -> (labelToText x, y ^. varType)) $ Map.toList $ contract ^. storageDefs
+      listCombined = map (\(x,y)-> x <> " " <> y) list
+  yield $ createIndexTableQuery (creator, a, n) listCombined
+  getDeferredForeignKeys tableName contract cc creator a
 
 createAbstractTable ::
   OutputM m =>
-  IORef Globals ->
   ContractF () ->
   (Text, Text, Text) ->
-  Map.Map (Account, Text) (Text, Text) ->
+  Map.Map (Account, Text) (Text, Text, [Text]) ->
   CodeCollectionF () ->
   ConduitM () Text m [ForeignKeyInfo]
-createAbstractTable globalsIORef contract (creator, a, n) abstracts' cc = do
+createAbstractTable contract (creator, a, n) abstracts' cc = do
   let tableName = abstractTableName creator a n
-  tableExists <- isTableCreated globalsIORef tableName
-  if tableExists
-    then return []
-    else do
-      let storageDefs' =  Map.toList $ contract ^. storageDefs
-          isEvent = False
-          list = getTableColumnAndType isEvent cc $ map (\(x, y) -> (labelToText x, y ^. varType)) $ storageDefs'
-          listCombined = map (\(x,y)-> x <> " " <> y) list
-      yield $ createAbstractTableQuery (creator, a, n) listCombined
-      setTableCreated globalsIORef tableName (listCombined ++ ["\"data\" jsonb"])
-      getDeferredForeignKeysAbstract tableName contract creator a abstracts' cc
+  let storageDefs' =  Map.toList $ contract ^. storageDefs
+      isEvent = False
+      list = getTableColumnAndType isEvent cc $ map (\(x, y) -> (labelToText x, y ^. varType)) $ storageDefs'
+      listCombined = map (\(x,y)-> x <> " " <> y) list
+  yield $ createAbstractTableQuery (creator, a, n) listCombined
+  getDeferredForeignKeysAbstract tableName contract creator a abstracts' cc
 
 -- if flag from solidvm that it is a record, vmevent
 createMappingTable ::
   OutputM m =>
-  IORef Globals ->
+  --
   (Text, Text, Text) ->
   Text ->
   ConduitM () Text m [ForeignKeyInfo]
-createMappingTable globalsIORef (creator, a, n) m = do
+createMappingTable (creator, a, n) m = do
   let tableName = collectionTableName creator a n m
-  tableExists <- isTableCreated globalsIORef tableName
-
-  $logDebugLS "createMappingTable/tableExists" ("Table Name: " ++ show tableName ++ ", table exists: " ++ formatBool tableExists)
-  if tableExists
-    then return []
-    else do
-      incNumMappingTables
-      yield $ (createMappingTableQuery (creator, a, n, m))
-      let list = ["key", "value"]
-      setTableCreated globalsIORef tableName list
-      return $ getDeferredForeignKeysForCollection tableName creator a
+  yield $ (createMappingTableQuery (creator, a, n, m))
+  return $ getDeferredForeignKeysForCollection tableName creator a
 
 createArrayTable ::
   OutputM m =>
-  IORef Globals ->
   (Text, Text, Text) ->
+  (Text, SVMType.Type) ->
+  ContractF () ->
+  CodeCollectionF () ->
+  ConduitM () Text m [ForeignKeyInfo]
+createArrayTable (creator, a, n) (arr, arrType) c cc = do
+  let tableName = collectionTableName creator a n arr
+      arrSqlType = fromMaybe "text" $ solidityTypeToSQLType False (Just c) cc arrType
+  yield $ (createArrayTableQuery (creator, a, n, arr, arrSqlType))
+  let fkeys1 = getDeferredForeignKeysForCollection tableName creator a
+      fkeys2 = getDeferredForeignKeysForArrayType tableName creator a arrSqlType
+  return $ fkeys1 ++ fkeys2
+
+createEventArrayTable ::
+  OutputM m =>
+  (Text, Text, Text, Text) ->
   (Text, Text) ->
   ConduitM () Text m [ForeignKeyInfo]
-createArrayTable globalsIORef (creator, a, n) (arr, arrType) = do
-  let tableName = collectionTableName creator a n arr
-  tableExists <- isTableCreated globalsIORef tableName
-  $logDebugLS "createArrayTable/tableExists" ("Table Name: " ++ show tableName ++ ", table exists: " ++ formatBool tableExists)
-  if tableExists
-    then return []
-    else do
-      incNumArrayTables
-      yield $ (createArrayTableQuery (creator, a, n, arr))
-      let list = ["key", "value"]
-      setTableCreated globalsIORef tableName list
-      let fkeys1 = getDeferredForeignKeysForCollection tableName creator a
-          fkeys2 = getDeferredForeignKeysForArrayType tableName creator a arrType
-      return $ fkeys1 ++ fkeys2
+createEventArrayTable (creator, a, n, e) (arr, arrType) = do
+  let tableName = eventCollectionTableName creator a n e arr
+  $logInfoS "createEventArrayTable/tableExists"  $ T.pack ( "Table Name: " ++ show tableName ++ ", table exists: ")
+  $logInfoS "createEventArrayTable/(creator, a, n, e) " (T.pack $ show (creator, a, n, e))
+  $logInfoS "createEventArrayTable/(arr, arrType) " (T.pack $ show (arr, arrType))
+  yield $ (createEventArrayTableQuery (creator, a, n, e, arr))
+  -- let list = ["key", "value"]
+  let fkeys1 = getDeferredForeignKeysForEventCollection tableName creator a
+      fkeys2 = getDeferredForeignKeysForArrayType tableName creator a arrType
+  return $ fkeys1 ++ fkeys2
 
 createHistoryTable' ::
   OutputM m =>
   Bool ->
-  IORef Globals ->
-  ContractF () ->
-  CodeCollectionF () ->
-  (Text, Text, Text) ->
-  ConduitM () (Text, Maybe (IORef Globals, TableName, TableColumns)) m ()
-createHistoryTable' isAbstract globalsIORef contract cc (creator, a, n) = do
-  let tableName = historyTableName creator a n
-  tableExists <- isTableCreated globalsIORef tableName
-
-  $logDebugLS "createHistoryTable'/tableExists" ("Table Name: " ++ show tableName ++ ", table exists: " ++ formatBool tableExists)
-
-  when (not tableExists) $ do
-    incNumHistoryTables
-    let isEvent = False
-        list = getTableColumnAndType isEvent cc $ map (\(x, y) -> (labelToText x, y ^. varType)) $ Map.toList $ contract ^. storageDefs
-        listCombined = map (\(x,y)-> x <> " " <> y) list
-    yield $ ((createHistoryTableQuery isAbstract (creator, a, n) listCombined), Nothing)
-    yieldMany $ map (\x -> (x, Nothing)) (addHistoryUnique (creator, a, n))
-    setTableCreated globalsIORef tableName listCombined
-
-createHistoryTable ::
-  OutputM m =>
-  Bool ->
-  IORef Globals ->
   ContractF () ->
   CodeCollectionF () ->
   (Text, Text, Text) ->
   ConduitM () Text m ()
-createHistoryTable isAbstract globalsIORef contract cc (creator, a, n) = do
-  let tableName = historyTableName creator a n
-  tableExists <- isTableCreated globalsIORef tableName
+createHistoryTable' isAbstract contract cc (creator, a, n) = do
+  let isEvent = False
+      list = getTableColumnAndType isEvent cc $ map (\(x, y) -> (labelToText x, y ^. varType)) $ Map.toList $ contract ^. storageDefs
+      listCombined = map (\(x, y) -> x <> " " <> y) list
+  yield $ createHistoryTableQuery isAbstract (creator, a, n) listCombined
 
-  $logDebugLS "createHistoryTable/tableExists" ("Table Name: " ++ show tableName ++ ", table exists: " ++ formatBool tableExists)
-
-  when (not tableExists) $ do
-    incNumHistoryTables
-    let list = getTableColumnAndType False cc $ map (\(x, y) -> (labelToText x, y ^. varType)) $ Map.toList $ contract ^. storageDefs
-        listCombined = map (\(x,y)-> x <> " " <> y) list
-    yield $ (createHistoryTableQuery isAbstract (creator, a, n) listCombined)
-    yieldMany $ addHistoryUnique (creator, a, n)
-    setTableCreated globalsIORef tableName listCombined
+createHistoryTable ::
+  OutputM m =>
+  ContractF () ->
+  CodeCollectionF () ->
+  (Text, Text, Text) ->
+  ConduitM () Text m ()
+createHistoryTable contract cc (creator, a, n) = do
+  let list = getTableColumnAndType False cc $ map (\(x, y) -> (labelToText x, y ^. varType)) $ Map.toList $ contract ^. storageDefs
+      listCombined = map (\(x,y)-> x <> " " <> y) list
+  yield $ (createHistoryTableQuery False (creator, a, n) listCombined)
+  yieldMany $ addHistoryUnique (creator, a, n)
 
 -- Runs ALTER TABLE <name> [ADD COLUMN <column>] for any new fields added to a contract definition
 expandIndexTable ::
   OutputM m =>
-  IORef Globals ->
+  --
   ContractF () ->
   CodeCollectionF () ->
   (Text, Text, Text) ->
   ConduitM () Text m [ForeignKeyInfo]
-expandIndexTable globalsIORef contract cc (creator, a, n) = do
+expandIndexTable contract cc (creator, a, n) = do
   let tableName = indexTableName creator a n
-  expandContractTable globalsIORef contract cc tableName
+  expandContractTable contract cc tableName
 
 expandAbstractTable ::
   OutputM m =>
-  IORef Globals ->
   ContractF () ->
   (Text, Text, Text) ->
-  Map.Map (Account, Text) (Text, Text) ->
+  Map.Map (Account, Text) (Text, Text, [Text]) ->
   CodeCollectionF () ->
   ConduitM () Text m [ForeignKeyInfo]
-expandAbstractTable globalsIORef contract (creator, a, n) abstracts' cc = do
+expandAbstractTable  contract (creator, a, n) abstracts' cc = do
   let tableName = abstractTableName creator a n
-  expandAbstractContractTable globalsIORef contract tableName abstracts' cc
+  expandAbstractContractTable  contract tableName abstracts' cc
 
 expandHistoryTable ::
   OutputM m =>
   Bool ->
-  IORef Globals ->
   ContractF () ->
   CodeCollectionF () ->
   (Text, Text, Text) ->
-  ConduitM () (Text, Maybe (IORef Globals, TableName, TableColumns)) m ()
-expandHistoryTable isAbstract globalsIORef contract cc (creator, a, n) = do
+  ConduitM () Text m ()
+expandHistoryTable isAbstract  contract cc (creator, a, n) = do
   let tableName = historyTableName creator a n
   void $ 
     if isAbstract
-      then mapOutput (\o -> (o, Nothing)) $ expandAbstractContractTable globalsIORef contract tableName Map.empty cc --abstracts' needs to be passed in for fkeys
-      else expandContractTable' globalsIORef contract cc tableName
+      then expandAbstractContractTable contract tableName Map.empty cc --abstracts' needs to be passed in for fkeys
+      else expandContractTable' contract cc tableName
 
 expandContractTable' ::
   OutputM m =>
-  IORef Globals ->
   ContractF () ->
   CodeCollectionF () ->
   TableName ->
-  ConduitM () (Text, Maybe (IORef Globals, TableName, TableColumns)) m [ForeignKeyInfo]
-expandContractTable' globalsIORef contract cc tableName = do
+  ConduitM () Text m [ForeignKeyInfo]
+expandContractTable'  contract cc tableName = do
   let list = fillFirstEmptyEntries . map (fmap _varType) . Map.toList $ Map.mapKeys labelToText $ contract ^. storageDefs
       isEvent = False
       cols = getTableColumnAndType isEvent cc list
@@ -696,18 +713,16 @@ expandContractTable' globalsIORef contract cc tableName = do
           " for the following fields: ",
           T.intercalate ", " colsCombined
         ]
-    setTableCreated globalsIORef tableName $ colsCombined
-    yield $ ((expandTableQuery tableName colsCombined), Just (globalsIORef, tableName, colsCombined))
+    yield $ expandTableQuery tableName colsCombined
   return $ []
 
 expandContractTable ::
   OutputM m =>
-  IORef Globals ->
   ContractF () ->
   CodeCollectionF () ->
   TableName ->
   ConduitM () Text m [ForeignKeyInfo]
-expandContractTable globalsIORef contract cc tableName = do
+expandContractTable  contract cc tableName = do
     let list = fillFirstEmptyEntries . map (fmap _varType) . Map.toList $ Map.mapKeys labelToText $ contract ^. storageDefs
         isEvent = False
         cols = getTableColumnAndType isEvent cc list
@@ -721,7 +736,6 @@ expandContractTable globalsIORef contract cc tableName = do
             " for the following fields: ",
             T.intercalate ", " colsCombined
           ]
-      setTableCreated globalsIORef tableName $ colsCombined
       yield $ expandTableQuery tableName colsCombined
     case tableName of
       IndexTableName creator a _ -> getDeferredForeignKeys tableName contract cc creator a
@@ -729,13 +743,12 @@ expandContractTable globalsIORef contract cc tableName = do
 
 expandAbstractContractTable ::
   OutputM m =>
-  IORef Globals ->
   ContractF () ->
   TableName ->
-  Map.Map (Account, Text) (Text, Text) ->
+  Map.Map (Account, Text) (Text, Text, [Text]) ->
   CodeCollectionF () ->
   ConduitM () Text m [ForeignKeyInfo]
-expandAbstractContractTable globalsIORef contract tableName abstracts' cc = do
+expandAbstractContractTable  contract tableName abstracts' cc = do
   let list = fillFirstEmptyEntries . map (fmap _varType) . Map.toList $ Map.mapKeys labelToText $ contract ^. storageDefs
       isEvent = False
       cols = getTableColumnAndType isEvent cc list
@@ -749,7 +762,6 @@ expandAbstractContractTable globalsIORef contract tableName abstracts' cc = do
           " for the following new fields: ",
           T.intercalate ", " colsCombined
         ]
-    setTableCreated globalsIORef tableName $ colsCombined
     yield $ expandAbstractTableQuery tableName colsCombined
   case tableName of
     AbstractTableName creator a _ -> getDeferredForeignKeysAbstract tableName contract creator a abstracts' cc 
@@ -760,6 +772,17 @@ expandTableQuery tableName cols =
   T.concat
     [ "ALTER TABLE ",
       tableNameToDoubleQuoteText tableName,
+      " ADD COLUMN IF NOT EXISTS",
+      T.intercalate ", ADD COLUMN IF NOT EXISTS" cols,
+      ";"
+    ]
+
+-- TODO: Remove once marketplace uses new naming convention ('-')
+oldExpandTableQuery :: TableName -> TableColumns -> Text
+oldExpandTableQuery tableName cols =
+  T.concat
+    [ "ALTER TABLE ",
+      oldTableNameToDoubleQuoteText tableName,
       " ADD COLUMN IF NOT EXISTS",
       T.intercalate ", ADD COLUMN IF NOT EXISTS" cols,
       ";"
@@ -805,6 +828,7 @@ processGroupedData :: [ProcessedCollectionRow] -> [Text]
 processGroupedData rows@(row:_) =
   case collectiontype row of
     "Array" -> insertArrayTableQuery rows
+    "Event Array" -> insertEventArrayTableQuery rows
     _ -> insertMappingTableQuery rows
 processGroupedData [] = []
 
@@ -844,36 +868,15 @@ insertForeignKeys conn contract = do
             <> "=null WHERE address="
             <> wrapSingleQuotes (makeAccount (E.chain c) (E.address c))
 
-insertHistoryTable ::
-  OutputM m =>
-  [E.ProcessedContract] ->
-  ConduitM () Text m ()
-insertHistoryTable [] = return () --no data, do nothing
-insertHistoryTable contracts@(E.ProcessedContract {creator = crtr, application = app, contractName = cName} : _) = do
-  let tableName = historyTableName crtr app cName
-  $logDebugLS "insertHistoryTable" $ T.pack $ "Inserting row in history table for: " ++ show tableName
-  yieldMany $ insertHistoryTableQuery contracts
-
-insertHistoryAbstractTable :: 
-  OutputM m => 
-  [(E.ProcessedContract, [T.Text], T.Text, TableColumns)] ->
-  [E.ProcessedContract] ->
-  ConduitM () Text m ()
-insertHistoryAbstractTable [] _ = pure ()
-insertHistoryAbstractTable abstracts hists = do 
-  let historyAbstracts = [(history, fkeys, tableName, tableCols) | history <- hists, (_, fkeys, tableName, tableCols) <- abstracts]
-  yieldMany $ insertAbstractTableQuery historyAbstracts True
-
 insertAbstractTable ::
   OutputM m =>
   [(E.ProcessedContract, [T.Text], T.Text, TableColumns)] ->
-  Bool ->
   ConduitM () Text m ()
-insertAbstractTable [] _ = pure ()
-insertAbstractTable cs@((_, _,abTableName, _) : _) isHistoric = do
+insertAbstractTable [] = pure ()
+insertAbstractTable cs@((_, _,abTableName, _) : _) = do
   $logInfoS "insertAbstractTable" $ T.pack $ "Inserting row in abstract table for: " ++ show abTableName
   multilineLog "insertAbstractTable/processedContract" $ show cs
-  yieldMany $ insertAbstractTableQuery cs isHistoric
+  yieldMany $ insertAbstractTableQuery cs
   
 updateForeignKeysFromNULLAbstract ::
   OutputM m =>
@@ -921,6 +924,18 @@ abstractBaseColumnsQuery =
     "data jsonb"
   ]
 
+eventBaseColumnsQuery :: [Text]
+eventBaseColumnsQuery =
+  [
+    "address text",
+    "block_hash text",
+    "block_timestamp text",
+    "block_number text",
+    "transaction_hash text",
+    "transaction_sender text",
+    "event_index int"
+  ]
+
 createIndexTableQuery ::(Text, Text, Text) -> TableColumns-> Text
 createIndexTableQuery (creator, a, n) cols =
   let tableName = indexTableName creator a n
@@ -949,8 +964,8 @@ createMappingTableQuery (creator, a, n, m) =
           ",\n  PRIMARY KEY (address, key));"
         ]
 
-createArrayTableQuery :: (Text, Text, Text, Text) -> Text
-createArrayTableQuery (creator, a, n, arr) =
+createArrayTableQuery :: (Text, Text, Text, Text, Text) -> Text
+createArrayTableQuery (creator, a, n, arr, arrType) =
   let tableName = collectionTableName creator a n arr
    in T.concat
         [ "CREATE TABLE IF NOT EXISTS ",
@@ -961,11 +976,30 @@ createArrayTableQuery (creator, a, n, arr) =
               "collectionname text",
               "collectiontype text",
               "key text",
-              "value text",
+              "value " <> arrType,
               "value_fkey text"
             ],
           ",\n  PRIMARY KEY (address, key));"
         ]
+
+createEventArrayTableQuery :: (Text, Text, Text, Text, Text) -> Text
+createEventArrayTableQuery (creator, a, n, e, arr) =
+  let tableName = eventCollectionTableName creator a n e arr
+   in T.concat
+        [ "CREATE TABLE IF NOT EXISTS ",
+          tableNameToDoubleQuoteText tableName,
+          " (",
+          csv $ eventBaseColumnsQuery ++
+            [ "contract_name text",
+              "collectionname text",
+              "collectiontype text",
+              "key text",
+              "value text",
+              "value_fkey text"
+            ],
+          ");"
+        ]
+
 
 createAbstractTableQuery :: (Text, Text, Text) -> TableColumns -> Text
 createAbstractTableQuery (creator, a, n) list =
@@ -981,15 +1015,47 @@ createAbstractTableQuery (creator, a, n) list =
 
 createHistoryTableQuery :: Bool -> (Text, Text, Text) ->  TableColumns -> Text
 createHistoryTableQuery isAbstract (creator, a, n) cols =
-  let tableName = historyTableName creator a n
+  let historyTableName' = historyTableName creator a n
+      normalTableName = bool (indexTableName creator a n) (abstractTableName creator a n) isAbstract
+      triggerFunctionName = "\"" <> "insert_or_update_" <> tableNameToText normalTableName <> "_history_table" <> "\""
    in T.concat
         [ "CREATE TABLE IF NOT EXISTS ",
-          tableNameToDoubleQuoteText tableName,
+          tableNameToDoubleQuoteText historyTableName',
           " (",
           csv $
             (bool baseColumnsQuery abstractBaseColumnsQuery isAbstract)
               ++ cols,
-          ");"
+          ");\n\n",
+          -- Create or replace the function for handling insert and update triggers
+          "CREATE OR REPLACE FUNCTION ", triggerFunctionName, "() RETURNS TRIGGER AS $$\n",
+          "BEGIN\n",
+          "    RAISE NOTICE 'Trigger fired for % on table ", tableNameToText normalTableName, ": %', TG_OP, NEW.address;\n",
+          "    IF TG_OP = 'INSERT' THEN\n",
+          "        RAISE NOTICE 'Inserting into history table ", tableNameToText historyTableName', " for address: %', NEW.address;\n",
+          "        INSERT INTO ",
+          tableNameToDoubleQuoteText historyTableName',
+          " VALUES (NEW.*);\n",
+          "    ELSIF TG_OP = 'UPDATE' THEN\n",
+          "        RAISE NOTICE 'Updating history table ", tableNameToText historyTableName', " for address: %', NEW.address;\n",
+          "        INSERT INTO ",
+          tableNameToDoubleQuoteText historyTableName',
+          " VALUES (NEW.*);\n",
+          "    END IF;\n",
+          "    RETURN NEW;\n",
+          "END;\n",
+          "$$ LANGUAGE plpgsql;\n\n",
+          -- Create trigger for insert operations
+          "CREATE TRIGGER \"after_insert_on_",
+          tableNameToText normalTableName, "\"",
+          "\nAFTER INSERT ON ",
+          tableNameToDoubleQuoteText normalTableName,
+          "\nFOR EACH ROW EXECUTE PROCEDURE ", triggerFunctionName, "();\n\n",
+          -- Create trigger for update operations
+          "CREATE TRIGGER \"after_update_on_",
+          tableNameToText normalTableName, "\"",
+          "\nAFTER UPDATE ON ",
+          tableNameToDoubleQuoteText normalTableName,
+          "\nFOR EACH ROW EXECUTE PROCEDURE ", triggerFunctionName, "();"
         ]
 
 addHistoryUnique :: (Text, Text, Text) -> [Text]
@@ -1173,9 +1239,48 @@ insertArrayTableQuery ms =
                       ";"
                     ]
 
-insertAbstractTableQuery :: [(E.ProcessedContract, [T.Text], T.Text, TableColumns)] -> Bool -> [Text]
-insertAbstractTableQuery [] _ = error "insertAbstractTableQuery: unhandled empty list"
-insertAbstractTableQuery cs isHistoric =
+insertEventArrayTableQuery :: [ProcessedCollectionRow] -> [Text]
+insertEventArrayTableQuery [] = []
+insertEventArrayTableQuery ms =
+  concat $
+    let ms' = (\m -> (m, valueToSQLText $ collectionDataKey m, valueToSQLText $ collectionDataValue m)) <$> ms
+     in flip map ms' $ \case
+          (x,mk,mv) ->
+            let tNull = T.pack "NULL"
+                tableName =
+                  eventCollectionTableName
+                    (creator x)
+                    (application x)
+                    (contractname x)
+                    (maybe "" fst $ eventInfo x)
+                    (collectionname x)
+                keySt = wrapAndEscapeDouble . map escapeQuotes $ baseEventCollectionColumns ++ (T.pack <$> ["key", "value", "value_fkey"])
+                baseVals =
+                  [ tshow . address,
+                    T.pack . keccak256ToHex . blockHash,
+                    tshow . blockTimestamp,
+                    tshow . blockNumber,
+                    T.pack . keccak256ToHex . transactionHash,
+                    tshow . transactionSender,
+                    tshow . maybe 0 snd . eventInfo,
+                    contractname,
+                    collectionname,
+                    collectiontype
+                  ]
+                vals = wrapAndEscape $ map (wrapSingleQuotes . ($ x)) baseVals ++ [fromMaybe tNull mk, fromMaybe tNull mv, T.pack "NULL"]
+             in (: []) $
+                  T.concat
+                    [ "INSERT INTO ",
+                      tableNameToDoubleQuoteText tableName,
+                      " ",
+                      keySt,
+                      "\n  VALUES ",
+                      vals,
+                      ";"
+                    ]
+insertAbstractTableQuery :: [(E.ProcessedContract, [T.Text], T.Text, TableColumns)] -> [Text]
+insertAbstractTableQuery [] = error "insertAbstractTableQuery: unhandled empty list"
+insertAbstractTableQuery cs =
   concat $
     let cs' = (\(c@E.ProcessedContract {contractData = contractData}, fkeys, ab, abColumns) -> 
                 ((c, Map.mapMaybe valueToSQLTextFilterContract $ contractData), (ab, abColumns, fkeys))) <$> cs
@@ -1198,42 +1303,43 @@ insertAbstractTableQuery cs isHistoric =
                     E.creator,
                     E.root
                   ]
-                vals = flip map contracts $ \((row, contractColumns), _) ->
-                  let baseRowVals = map (wrapSingleQuotes . ($ row)) baseVals
+                (vals, dataVals') = unzip $ flip map contracts $ \((row, contractColumns), _) ->
+                  let baseRowVals = map (wrapSingleQuotes . ($ row)) baseVals 
                       contractNameVal = [wrapSingleQuotes $ escapeQuotes (tableNameToText contractTableName)] 
-                      dataVals = [wrapSingleQuotes . decodeUtf8 . BL.toStrict $ Aeson.encode $ MapWrapper $ aesonHelper $ Map.filterWithKey (\k _ -> k `notElem` abColumns) contractColumns] 
-                      contractValEntries = Map.toList contractColumns
-                      regularVals = [(snd kv) | kv@(k, _) <- contractValEntries, k `elem` keysForSQL]
-                      fkeyVals = ["NULL" | k <- fkeyColumns, k `elem` keysForSQL]  -- This avoids circular dependancies as the inserts occur first and set fkeys=null
+                      dataVals = [wrapSingleQuotes (decodeUtf8 . BL.toStrict $ Aeson.encode $ MapWrapper $ aesonHelper (Map.filterWithKey (\k _ -> k `notElem` abColumns) contractColumns )) <> "::jsonb"]
+                      -- jsonPathz = T.concat ["'{", csv (map (\(k, _) -> T.concat ["\"", escapeQuotes k, "\""]) (Map.toList dataVals)), "}'"]
+                      -- jsonValuez = csv (map (wrapSingleQuotes . wrapDoubleQuotes . removeSingleQuotes . removeSingleQuotes) $ Map.elems dataVals)
+                      regularVals = [(snd kv) | kv@(k, _) <- Map.toList contractColumns, k `elem` keysForSQL]
+                      fkeyVals = ["NULL" | k <- fkeyColumns, k `elem` keysForSQL]  -- This avoids circular dependencies as the inserts occur first and set fkeys=null
                       valsForSQL = baseRowVals ++ contractNameVal ++ dataVals ++ regularVals ++ fkeyVals
-                  in wrapAndEscape valsForSQL
+                  in (wrapAndEscape valsForSQL, wrapAndEscape dataVals)
                 inserts = csv vals
+                dataVals'' = csv dataVals'
             in (: []) $
                   T.concat $
                     [ "INSERT INTO ",
-                      (bool abTableName (wrapDoubleQuotes $ "history@" <> unwrapDoubleQuotes abTableName) isHistoric),
+                      abTableName,
                       " ",
                       keySt,
                       "\n  VALUES ",
-                      inserts
-                    ] ++
-                    if isHistoric
-                      then
-                        [[r| ON CONFLICT DO NOTHING;|]]
-                      else
-                          [[r|
-                          ON CONFLICT (address) DO UPDATE SET
-                            block_hash = excluded.block_hash,
-                            block_timestamp = excluded.block_timestamp,
-                            block_number = excluded.block_number,
-                            transaction_hash = excluded.transaction_hash,
-                            transaction_sender = excluded.transaction_sender,
-                            contract_name = excluded.contract_name,
-                            data = excluded.data
-                          |],
-                          if null keysForSQL then "" else ",\n    ",
-                          tableUpsert $ keysForSQL,
-                          ";"]
+                      inserts,
+                      " ON CONFLICT (address) DO UPDATE SET\n",
+                      "    block_hash = excluded.block_hash,\n",
+                      "    block_timestamp = excluded.block_timestamp,\n",
+                      "    block_number = excluded.block_number,\n",
+                      "    transaction_hash = excluded.transaction_hash,\n",
+                      "    transaction_sender = excluded.transaction_sender,\n",
+                      "    contract_name = excluded.contract_name,\n",
+                      "    data = ",
+                      abTableName,
+                      ".data || ",
+                      if dataVals'' == "{}"
+                        then "excluded.data::jsonb" 
+                        else dataVals'',
+                      if null keysForSQL then "" else ",\n    ",
+                      tableUpsert keysForSQL,
+                      ";"
+                          ]
 
 -- Result: UPDATE table SET (fkey1,fkey2, ...)=(val1,val2, ...) where (fkey1_fkey,fkey2_fkey, ...)=(val1,val2, ...);
 updateFkeysQueryAbstract :: [(E.ProcessedContract, [T.Text], T.Text, TableColumns)] -> [Text]
@@ -1305,7 +1411,9 @@ updateFkeysQueryArray rows = concatMap createUpdateQuery rows
     createUpdateQuery :: ProcessedCollectionRow -> [Text]
     createUpdateQuery c =
       let
-        tableName = collectionTableName (creator c) (application c) (contractname c) (collectionname c)
+        tableName = case eventInfo c of
+              Just x  -> eventCollectionTableName (creator c) (application c) (contractname c) (fst x) (collectionname c)
+              Nothing -> collectionTableName (creator c) (application c) (contractname c) (collectionname c)
         value_fkey = wrapAndEscapeDouble . map escapeQuotes $ [T.pack "value_fkey"]
         value = wrapAndEscapeDouble . map escapeQuotes $ [T.pack "value"]
         value' = wrapAndEscape [fromMaybe T.empty (valueToSQLText $ collectionDataValue c)]
@@ -1323,115 +1431,103 @@ updateFkeysQueryArray rows = concatMap createUpdateQuery rows
         , ";"
         ]]
 
-insertHistoryTableQuery :: [E.ProcessedContract] -> [Text]
-insertHistoryTableQuery [] = error "insertHistoryTableQuery: unhandled empty list"
-insertHistoryTableQuery cs =
-  concat $
-    let cs' = (\c -> (c, Map.toList $ Map.mapMaybe valueToSQLText $ E.contractData c)) <$> cs
-     in flip map (map snd $ partitionWith (length . snd) cs') $ \case
-          [] -> []
-          contracts@((x, list) : _) ->
-            let tableName =
-                  historyTableName
-                    (case (E.cc_creator x) of 
-                      Just cc_creator' -> cc_creator'
-                      Nothing -> (E.creator x))
-                    (E.application x)
-                    (E.contractName x)
-                keySt = wrapAndEscapeDouble . map escapeQuotes $ baseTableColumns ++ map fst (fillFirstEmptyEntries list)
-                baseVals =
-                  [ tshow . E.address,
-                    T.pack . keccak256ToHex . E.blockHash,
-                    tshow . E.blockTimestamp,
-                    tshow . E.blockNumber,
-                    T.pack . keccak256ToHex . E.transactionHash,
-                    tshow . E.transactionSender,
-                    E.creator,
-                    E.root
-                  ]
-                vals = flip map contracts $ \(row, rowList) ->
-                  wrapAndEscape $ map (wrapSingleQuotes . ($ row)) baseVals ++ map snd rowList
-                inserts = csv vals
-             in (: []) . T.concat $
-                  [ "INSERT INTO ",
-                    tableNameToDoubleQuoteText tableName,
-                    " ",
-                    keySt,
-                    "\n  VALUES ",
-                    inserts,
-                    "\n  ON CONFLICT DO NOTHING;"
-                  ]
-
 -- Creates tables for all event declarations, stores table name in
 -- globals{createdEvents}
 createExpandEventTables ::
   OutputM m =>
-  IORef Globals ->
   ContractF () ->
   CodeCollectionF () ->
   (Text, Text, Text) ->
-  ConduitM () Text m ()
-createExpandEventTables globalsIORef c cc nameParts = mapM_ go . Map.toList $ c ^. events
+  ConduitM () Text m [ForeignKeyInfo]
+createExpandEventTables c cc nameParts = fmap concat . mapM go . Map.toList $ c ^. events
   where
     go (evName, ev) = do
-      createEventTable globalsIORef nameParts evName ev cc
-      expandEventTable globalsIORef nameParts evName ev cc
+      fkInfo <- createEventTable nameParts evName ev cc
+      expandEventTable nameParts evName ev cc
+      return fkInfo
+
+extractLabelOrEntry :: SVMType.Type -> T.Text
+extractLabelOrEntry (SVMType.UnknownLabel solidString _) = T.pack solidString
+extractLabelOrEntry entry = T.pack (show entry)
 
 createEventTable ::
   OutputM m =>
-  IORef Globals ->
   (Text, Text, Text) ->
   SolidString ->
   EventF () ->
   CodeCollectionF () ->
-  ConduitM () Text m ()
-createEventTable globalsIORef (creator, a, n) evName ev cc = do
+
+  ConduitM () Text m [ForeignKeyInfo]
+createEventTable (creator, a, n) evName ev cc = do
+  $logInfoS "createEventTable" . T.pack $ show ev
   let (crtr, app, cname) = constructTableNameParameters creator a n
       eventTable = EventTableName crtr app cname (escapeQuotes $ labelToText evName)
       isEvent = True
-      cols = getTableColumnAndType isEvent cc [(x, indexedTypeType y) | (x, y) <- fillFirstEmptyEntries $ ev ^. eventLogs]
+      evLogToPair (EventLog n' _ t') = (n', t')
+      cols = getTableColumnAndType isEvent cc [(x, indexedTypeType y) | (x, y) <- fillFirstEmptyEntries . map evLogToPair $ ev ^. eventLogs]
+      arrayNamesAndTypes = [(key, extractLabelOrEntry entry) | (key, IndexedType _ (SVMType.Array entry _)) <- map evLogToPair $ ev ^. eventLogs]
+      indexedFields = map (wrapDoubleQuotes . escapeQuotes . fst)
+                    . filter snd
+                    . fillFirstEmptyEntries
+                    $ [(key, indexed) | (EventLog key indexed _) <- ev ^. eventLogs]
+      uniqueConstraint = case indexedFields of
+        [] -> Nothing
+        _ -> Just . wrapParens . csv $ "address" : indexedFields
       colsCombined = map (\(x,y)-> x <> " " <> y) cols
-  eventAlreadyCreated <- isTableCreated globalsIORef eventTable
-  unless eventAlreadyCreated $ do
-    setTableCreated globalsIORef eventTable $ colsCombined
-    yield $ createEventTableQuery eventTable colsCombined
+      eventFkeys = getDeferredForeignKeysForEvent eventTable crtr app
+  $logInfoS "keys" (T.pack $ show arrayNamesAndTypes)
+  -- eventAlreadyCreated <- isTableCreated eventTable
+  -- unless eventAlreadyCreated $ do
+  --   setTableCreated globalsIORef eventTable $ colsCombined
+  --   yield $ createEventTableQuery eventTable colsCombined
+  -- if eventAlreadyCreated
+  --   then return []
+  --   else do
+    -- setTableCreated eventTable $ colsCombined
+  yieldMany $ createEventTableQuery eventTable colsCombined uniqueConstraint
+  eventArrayFkeys <- fmap concat . forM arrayNamesAndTypes $ \anat -> do
+    createEventArrayTable (crtr, app, cname, (escapeQuotes $ labelToText evName)) anat
+  return $ eventFkeys ++ eventArrayFkeys
 
-createEventTableQuery :: TableName -> TableColumns -> Text
-createEventTableQuery tableName cols =
-     T.concat
+
+createEventTableQuery :: TableName -> TableColumns -> Maybe Text -> [Text]
+createEventTableQuery tableName cols uniqueConstraint =
+  (\(i,n) -> T.concat
         [ "CREATE TABLE IF NOT EXISTS ",
-          tableNameToDoubleQuoteText tableName,
+          wrapDoubleQuotes . escapeQuotes $ (if i then "indexed@" else "") <> n,
           " (",
-          csv $
-            [ "id SERIAL NOT NULL",
-              "address text",
-              "block_hash text",
-              "block_timestamp text",
-              "block_number text",
-              "transaction_hash text",
-              "transaction_sender text"
-            ]
-              ++ cols,
+          csv $ ("id SERIAL NOT NULL" : eventBaseColumnsQuery) ++ cols,
+          ", PRIMARY KEY (transaction_hash, event_index)",
+          case (i, uniqueConstraint) of
+            (True, Just uc) -> T.concat
+              [
+                ", CONSTRAINT ",
+                wrapDoubleQuotes . escapeQuotes $ n <> "_indexed",
+                " UNIQUE ",
+                uc
+              ]
+            _ -> "",
           ");"
         ]
+  ) <$> [(False, tableNameToText tableName), (False, oldTableNameToText tableName), (True, tableNameToText tableName)]
 
 expandEventTable ::
   OutputM m =>
-  IORef Globals ->
   (Text, Text, Text) ->
   SolidString ->
   EventF () ->
   CodeCollectionF() ->
   ConduitM () Text m ()
-expandEventTable globalsIORef (creator, a, n) evName ev cc = do
+expandEventTable  (creator, a, n) evName ev cc = do
   let (crtr, app, cname) = constructTableNameParameters creator a n
       tableName = EventTableName crtr app cname (escapeQuotes $ labelToText evName)
+      indexedTableName = EventTableName ("indexed@" <> crtr) app cname (escapeQuotes $ labelToText evName)
       isEvent = True
-      (allTableCols :: [(T.Text, T.Text)]) = getTableColumnAndType isEvent cc [(x, indexedTypeType y) | (x, y) <- fillFirstEmptyEntries $ ev ^. eventLogs]
+      evLogToPair (EventLog n' _ t') = (n', t')
+      (allTableCols :: [(T.Text, T.Text)]) = getTableColumnAndType isEvent cc [(x, indexedTypeType y) | (x, y) <- fillFirstEmptyEntries . map evLogToPair $ ev ^. eventLogs]
       allTableColsCombined = map (\(x,y)-> x <> " " <> y) allTableCols
   unless (null allTableCols) $ do
     $logInfoS "expandEventTable" . T.pack $ "We just got new fields for a contract that already has a table!"
-    setTableCreated globalsIORef tableName allTableColsCombined
     $logInfoS "expandEventTable" $
       T.concat
         [ "Adding columns to ",
@@ -1440,47 +1536,109 @@ expandEventTable globalsIORef (creator, a, n) evName ev cc = do
           T.intercalate ", " allTableColsCombined
         ]
     yield $ expandTableQuery tableName allTableColsCombined
+    yield $ oldExpandTableQuery tableName allTableColsCombined
+    yield $ expandTableQuery indexedTableName allTableColsCombined
+
+-- Function to convert AggregateEvent to ProcessedCollectionRow
+aggEventToCollectionRows :: AggregateEvent -> [ProcessedCollectionRow]
+aggEventToCollectionRows ae =
+  case Action.evArgs ev of
+    [] -> []
+    args -> 
+      let (arrayName, arrayElements) = getArraysFromEvents args
+      in map (aggEventToCollectionRow ae ev (T.pack arrayName)) arrayElements
+  where
+    ev = eventEvent ae
+
+aggEventToCollectionRow :: AggregateEvent -> Action.Event -> Text -> (Value, Value) -> ProcessedCollectionRow
+aggEventToCollectionRow ae ev arrayName (index, value) =
+  ProcessedCollectionRow
+    { address = (_accountAddress . Action.evContractAccount) ev,
+      creator = T.pack $ Action.evContractCreator ev,
+      application = T.pack $ Action.evContractApplication ev,
+      contractname = T.pack $ Action.evContractName ev,
+      eventInfo = Just (T.pack $ Action.evName ev, eventIndex ae),
+      collectionname = arrayName,
+      collectiontype = "Event Array",
+      blockHash = eventBlockHash ae,
+      blockTimestamp = eventBlockTimestamp ae,
+      blockNumber = eventBlockNumber ae,
+      transactionHash = eventTxHash ae,
+      transactionSender = _accountAddress $ eventTxSender ae,
+      collectionDataKey = index,
+      collectionDataValue = value,
+      root = "",
+      cc_creator = Just ""
+    }
+
+removeArrayEvArgs :: Action.Event -> Action.Event
+removeArrayEvArgs ev = ev { Action.evArgs = filter (\(_, _, c) -> c /= "Array") (Action.evArgs ev) }
+
+getArraysFromEvents :: [(String, String, String)] -> (String, [(Value, Value)])
+getArraysFromEvents evArgs = do 
+  let li = [(a, b) | (a, b, c) <- evArgs, c == "Array"]
+  case li of 
+    [] -> ("", [])
+    (arrayName, arrayStr):_ -> 
+         let elements = fromMaybe [] (Aeson.decode (BL.fromStrict $ TE.encodeUtf8 $ T.pack arrayStr) :: Maybe [String])
+         in (arrayName, zip (map (SimpleValue . ValueString . T.pack . show) [0 :: Int ..]) 
+                            (map (SimpleValue . ValueString . T.pack) elements))
 
 insertEventTables :: 
   OutputM m =>
+  [ProcessedCollectionRow] ->
   [AggregateEvent] ->
   ConduitM () Text m ()
-insertEventTables evs = do
-  let processedEvents = concatMap getAllEvents evs
-  $logInfoS "insertEventTables/processedEvents" . T.pack $ show processedEvents
-  yieldMany =<< lift (mapM (insertEventTable) processedEvents)
-  where
-    getAllEvents :: 
-      AggregateEvent -> 
-      [AggregateEvent]
-    getAllEvents aggEvent = do
-      let newEvents = processParents aggEvent
-       in aggEvent : newEvents
+insertEventTables processedEventArrays processedEventsWithoutArrays = do
+  $logInfoS "insertEventTables/processedEventArrays" . T.pack $ show processedEventArrays
+  $logInfoS "insertEventTables/processedEventsWithoutArrays" . T.pack $ show processedEventsWithoutArrays
+  yieldMany . concat =<< lift (mapM (insertEventTable) processedEventsWithoutArrays)
+      
+  -- yieldMany . catMaybes =<< lift (mapM (insertEventTable) processedEventsWithoutArrays)
+  when (not (null processedEventArrays)) $
+    yieldMany $ insertEventArrayTableQuery processedEventArrays
 
-    processParents :: 
-      AggregateEvent -> [AggregateEvent]
-    processParents ae = createNewEvent <$> Map.toList (eventAbstracts ae)
-      where
-        createNewEvent :: 
-          ((Account, Text), (Text, Text)) -> AggregateEvent
-        createNewEvent ((_, n'), (c, a)) =
-          ae { eventEvent = (eventEvent ae) {
-            Action.evContractCreator = T.unpack c,
-            Action.evContractApplication = T.unpack a,
-            Action.evContractName = T.unpack n'
-              }
+getAllEvents :: 
+  AggregateEvent -> 
+  [AggregateEvent]
+getAllEvents aggEvent = do
+  let newEvents = processParents aggEvent
+    in aggEvent : newEvents
+
+processParents :: 
+  AggregateEvent -> [AggregateEvent]
+processParents ae = createNewEvent <$> Map.toList (eventAbstracts ae)
+  where
+    createNewEvent :: 
+      ((Account, Text), (Text, Text, [Text])) -> AggregateEvent
+    createNewEvent ((_, n'), (c, a, _)) =
+      ae { eventEvent = (eventEvent ae) {
+        Action.evContractCreator = T.unpack c,
+        Action.evContractApplication = T.unpack a,
+        Action.evContractName = T.unpack n'
           }
+      }
+
+-- insertEventTable ::
+--   OutputM m =>
+--   AggregateEvent ->
+--   m (Text)
+-- insertEventTable agEv = do
+--   let q = insertEventTableQuery agEv
+--   multilineDebugLog "insertEventTable/SQL" $ T.unpack q
+--   return q
+
 
 insertEventTable ::
   OutputM m =>
   AggregateEvent ->
-  m (Text)
+  m [Text]
 insertEventTable agEv = do
   let q = insertEventTableQuery agEv
-  multilineDebugLog "insertEventTable/SQL" $ T.unpack q
+  multilineDebugLog "insertEventTable/SQL" $ T.unpack $ T.intercalate "\n" q
   return q
 
-insertEventTableQuery :: AggregateEvent -> Text
+insertEventTableQuery :: AggregateEvent -> [Text]
 insertEventTableQuery agEv@AggregateEvent {eventEvent = ev} =
   let (creator, a, cname) =
         constructTableNameParameters
@@ -1488,48 +1646,68 @@ insertEventTableQuery agEv@AggregateEvent {eventEvent = ev} =
           (T.pack $ Action.evContractApplication ev)
           (T.pack $ Action.evContractName ev)
       tableName = EventTableName creator a cname (escapeQuotes $ T.pack $ Action.evName ev)
-      filledArgs = map fst . fillFirstEmptyEntries . map (first T.pack) $ Action.evArgs ev
-      keySt = wrapAndEscapeDouble . map escapeQuotes $ ("id" : baseTableColumnsForEvent) ++ filledArgs
+      filledArgs = map fst . fillFirstEmptyEntries . map (\(aa, bb, _) -> (T.pack aa, bb)) $ Action.evArgs ev
+      keySt = wrapAndEscapeDouble . map escapeQuotes $ baseTableColumnsForEvent ++ filledArgs
       baseVals =
         [ tshow . _accountAddress . Action.evContractAccount . eventEvent,
           T.pack . keccak256ToHex . eventBlockHash,
           tshow . eventBlockTimestamp,
           tshow . eventBlockNumber,
           T.pack . keccak256ToHex . eventTxHash,
-          tshow . eventTxSender
+          tshow . eventTxSender,
+          tshow . eventIndex
         ]
-      vals = csv $ map (wrapSingleQuotes . escapeQuotes . ($ agEv)) baseVals ++ map (wrapSingleQuotes . escapeSingleQuotes . T.pack . snd) (Action.evArgs ev)
-   in T.concat $
+      vals = csv $ map (wrapSingleQuotes . escapeQuotes . ($ agEv)) baseVals ++ map (wrapSingleQuotes . escapeSingleQuotes . T.pack . (\(_, x, _) -> x)) (Action.evArgs ev)
+
+   in (\(i,n) -> T.concat $
         [ "INSERT INTO ",
-          tableNameToDoubleQuoteText tableName,
+          wrapDoubleQuotes . escapeQuotes $ (if i then "indexed@" else "") <> n,
           " ",
           keySt,
-          "\n  VALUES ( DEFAULT,\n",
+          "\n  VALUES ( \n",
           vals,
-          " )\n  ON CONFLICT DO NOTHING;"
+          " )\n  ON CONFLICT ",
+          if i
+            then T.concat
+              [ "ON CONSTRAINT ",
+                wrapDoubleQuotes . escapeQuotes $ n <> "_indexed",
+                " DO UPDATE SET",
+                [r|
+    address = excluded.address,
+    block_hash = excluded.block_hash,
+    block_timestamp = excluded.block_timestamp,
+    block_number = excluded.block_number,
+    transaction_hash = excluded.transaction_hash,
+    transaction_sender = excluded.transaction_sender|],
+                if null filledArgs then "" else ",\n    ",
+                tableUpsert filledArgs,
+                ";"
+              ]
+            else "DO NOTHING;"
         ]
+      ) <$> [(False, tableNameToText tableName), (False, oldTableNameToText tableName), (True, tableNameToText tableName)]
 
 ------------------
 
 --This is a temporary function that converts solidity types to a sample value...  I am just using this now to convert table creation from the old way (value based when values come through) to the new way (direct from the types when a CC is registered)
-solidityTypeToSQLType :: Bool -> SVMType.Type -> Maybe Text
-solidityTypeToSQLType _ SVMType.Bool = Just "bool"
-solidityTypeToSQLType _ (SVMType.Int _ _) = Just "decimal"
-solidityTypeToSQLType _ (SVMType.String _) = Just "text"
-solidityTypeToSQLType _ (SVMType.Bytes _ _) = Just "text"
-solidityTypeToSQLType _ (SVMType.UserDefined _ _) = Just "text"
-solidityTypeToSQLType _ SVMType.Decimal = Just "decimal"
-solidityTypeToSQLType _ (SVMType.Address _) = Just "text"
-solidityTypeToSQLType _ (SVMType.Account _) = Just "text"
-solidityTypeToSQLType isEvent (SVMType.Array _ _) = if isEvent then Just "jsonb" else Nothing
-solidityTypeToSQLType _ (SVMType.Mapping _ _ _) = Nothing -- Just "jsonb"
-solidityTypeToSQLType _ (SVMType.UnknownLabel _ _) = Just "text"
+solidityTypeToSQLType :: Bool -> Maybe (ContractF ()) -> CodeCollectionF () -> SVMType.Type -> Maybe Text
+solidityTypeToSQLType _ _ _ SVMType.Bool = Just "bool"
+solidityTypeToSQLType _ _ _ (SVMType.Int _ _) = Just "decimal"
+solidityTypeToSQLType _ _ _ (SVMType.String _) = Just "text"
+solidityTypeToSQLType _ _ _ (SVMType.Bytes _ _) = Just "text"
+solidityTypeToSQLType _ _ _ (SVMType.UserDefined _ _) = Just "text"
+solidityTypeToSQLType _ _ _ SVMType.Decimal = Just "decimal"
+solidityTypeToSQLType _ _ _ (SVMType.Address _) = Just "text"
+solidityTypeToSQLType _ _ _ (SVMType.Account _) = Just "text"
+solidityTypeToSQLType isEvent _ _ (SVMType.Array _ _) = if isEvent then Just "jsonb" else Nothing
+solidityTypeToSQLType _ _ _ (SVMType.Mapping _ _ _) = Nothing -- Just "jsonb"
+solidityTypeToSQLType _ mc cc (SVMType.UnknownLabel l _) = Just . maybe "text" (const "jsonb") $ (\c -> structDef c cc l) =<< mc
 --solidityTypeToSQLType _ (SVMType.UnknownLabel x) = Just $ "text references " <> T.pack x <> "(id)"
-solidityTypeToSQLType _ (SVMType.Struct _ _) = Just "jsonb"
-solidityTypeToSQLType _ (SVMType.Enum _ _ _) = Just "text"
-solidityTypeToSQLType _ (SVMType.Contract _) = Just "text"
-solidityTypeToSQLType _ (SVMType.Error _ _) = Just "text"
-solidityTypeToSQLType _ SVMType.Variadic = Nothing
+solidityTypeToSQLType _ _ _ (SVMType.Struct _ _) = Just "jsonb"
+solidityTypeToSQLType _ _ _ (SVMType.Enum _ _ _) = Just "text"
+solidityTypeToSQLType _ _ _ (SVMType.Contract _) = Just "text"
+solidityTypeToSQLType _ _ _ (SVMType.Error _ _) = Just "text"
+solidityTypeToSQLType _ _ _ SVMType.Variadic = Nothing
 
 --solidityTypeToSQLType x = error $ "undefined type in solidityTypeToSQLType: " ++ show (varType x)
 

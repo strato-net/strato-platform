@@ -25,6 +25,7 @@ import marketplace from './Marketplace'
 import paymentService from './PaymentService'
 import userActivity from './UserActivity'
 import redemption from './Redemption'
+import transaction from "./Transactions"
 
 import {
   Authentication,
@@ -48,7 +49,8 @@ import {
   Marketplace,
   PaymentService,
   UserActivity,
-  Redemption
+  Redemption,
+  Transaction
 } from './endpoints'
 
 
@@ -76,6 +78,7 @@ router.use(Marketplace.prefix, marketplace)
 router.use(PaymentService.prefix, paymentService)
 router.use(UserActivity.prefix, userActivity)
 router.use(Redemption.prefix, redemption)
+router.use(Transaction.prefix, transaction)
 
 
 router.get(`/health`, (req, res) => {

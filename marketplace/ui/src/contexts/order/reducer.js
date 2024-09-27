@@ -201,6 +201,22 @@ const reducer = (state, action) => {
         error: action.error,
         isCreateOrderSubmitting: false,
       }
+      case actionDescriptors.waitForOrderEvent:
+        return {
+          ...state,
+          isOrderEventLoading: true,
+        }
+      case actionDescriptors.waitForOrderEventSuccessful:
+        return {
+          ...state,
+          isOrderEventLoading: false,
+        }
+      case actionDescriptors.waitForOrderEventFailed:
+        return {
+          ...state,
+          error: action.error,
+          isOrderEventLoading: false,
+        }      
     case actionDescriptors.updateOrderComment:
       return {
         ...state,

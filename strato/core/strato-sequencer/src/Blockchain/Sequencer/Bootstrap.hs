@@ -18,6 +18,7 @@ import Blockchain.Sequencer.DB.DependentBlockDB
 import Blockchain.Sequencer.Event
 import Blockchain.Sequencer.ExtraCertsHack
 import Blockchain.Sequencer.Gregor
+import Blockchain.Sequencer.Kafka (writeSeqVmEvents, writeSeqP2pEvents)
 import Blockchain.Sequencer.Monad
 import Blockchain.Strato.Model.Address
 import Blockchain.Strato.Model.Class
@@ -54,7 +55,7 @@ bootstrapSequencer
             obReceiptTransactions = map kludge txs
           }
       hash = blockHeaderHash bd
-      difficulty' = difficulty bd
+      difficulty' = getBlockDifficulty bd
       kludge t = fromMaybe fallback (wrapIngestBlockTransactionUnanchored hash t)
         where
           fallback =
@@ -86,7 +87,9 @@ bootstrapSequencer
                   cablePackage = pkg,
                   maxEventsPerIter = 65,
                   maxUsPerIter = 20000,
-                  vaultClient = Just clientEnv
+                  vaultClient = Just clientEnv,
+                  kafkaClientId = KString $ C8.pack defaultKafkaClientId',
+                  redisConn = error "initLevelDB: redisConn"
                 }
         runLoggingT . runSequencerM dummySequencerCfg Nothing $ do
           bootstrapGenesisBlock hash difficulty'
@@ -94,16 +97,9 @@ bootstrapSequencer
           for_ (extraCerts ++ extraCertsHack) . uncurry $ A.insert (A.Proxy @X509CertInfoState)
           flushLdbBatchOps
       initKafka :: CablePackage -> IO ()
-      initKafka pkg = do
-        let clientId = KString $ C8.pack defaultKafkaClientId'
-            dummyGregorCfg =
-              GregorConfig
-                { kafkaAddress = Nothing,
-                  kafkaClientId = clientId,
-                  kafkaConsumerGroup = EC.lookupConsumerGroup clientId,
-                  cablePackage = pkg
-                }
-        runGregorM dummyGregorCfg $ do
-          assertTopicCreation
-          writeSeqVmEvents [VmBlock shortCircuit] -- todo handle the error :)
-          writeSeqP2pEvents [P2pBlock shortCircuit] -- todo handle the error :)
+      initKafka _ = do
+        runKafkaMConfigured (KString $ C8.pack defaultKafkaClientId') $ do
+          assertSequencerTopicsCreation
+          _ <- writeSeqVmEvents [VmBlock shortCircuit] -- todo handle the error :)
+          _ <- writeSeqP2pEvents [P2pBlock shortCircuit] -- todo handle the error :)
+          return ()

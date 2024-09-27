@@ -80,4 +80,4 @@ subscribeUser auth user = do
   eResp <- liftIO $ runClientM (putSubscribe ("Bearer " <> auth) (Username user)) (mkClientEnv mgr url)
   case eResp of 
     Right _ -> $logInfoS "subscribeUser" $ "Successfully subscribed user " <> user
-    Left err -> $logErrorS "subscribeUser" . T.pack $ "Error while trying to subscribe: " <> show err
+    Left err -> $logErrorS "subscribeUser" $ "Error while trying to subscribe" <> user <> ": " <> (T.pack $ show err)

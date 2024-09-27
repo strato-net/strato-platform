@@ -429,6 +429,7 @@ const UserProfile = ({user}) => {
                             // debouncedSearchTerm={debouncedSearchTerm}
                             allSubcategories={allSubcategories}
                             supportedTokens={supportedTokens}
+                            user={user}
                           />
                         );
                       })
@@ -456,6 +457,7 @@ const UserProfile = ({user}) => {
                             // debouncedSearchTerm={debouncedSearchTerm}
                             allSubcategories={allSubcategories}
                             supportedTokens={supportedTokens}
+                            user={user}
                           />
                         );
                       })
@@ -483,6 +485,7 @@ const UserProfile = ({user}) => {
                             // debouncedSearchTerm={debouncedSearchTerm}
                             allSubcategories={allSubcategories}
                             supportedTokens={supportedTokens}
+                            user={user}
                           />
                         );
                       })

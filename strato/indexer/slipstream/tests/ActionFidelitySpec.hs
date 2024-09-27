@@ -126,7 +126,7 @@ spec = describe "Action conversions" $ do
              "eventContractName" : "Vehicle",
              "eventContractAccount" : "2e385b6a3aea46d4172df98617b5385c13b7100d",
              "eventName" : "Vehicle Event",
-             "eventArgs" : [["field", "value"], ["anotherField", "anotherValue"]]
+             "eventArgs" : [["field", "value", "String"], ["anotherField", "anotherValue","String"]]
            }
          ]
        }|]
@@ -165,7 +165,7 @@ spec = describe "Action conversions" $ do
                       Action._actionDataCallTypes = [Action.Create]
                     }),
               Action._metadata = Just . M.fromList $ [("name", "Vehicle"), ("src", "contract Vehicle {}")],
-              Action._events = S.singleton $ Event zeroHash "BlockApps2" "LogisticsEngine2" "Vehicle" (Account 0x2e385b6a3aea46d4172df98617b5385c13b7100d Nothing) "Vehicle Event" [("field", "value"), ("anotherField", "anotherValue")],
+              Action._events = S.singleton $ Event zeroHash "BlockApps2" "LogisticsEngine2" "Vehicle" (Account 0x2e385b6a3aea46d4172df98617b5385c13b7100d Nothing) "Vehicle Event" [("field", "value", "String"), ("anotherField", "anotherValue", "String")],
               Action._delegatecalls = S.empty
             }
         )

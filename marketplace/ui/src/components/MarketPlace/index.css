@@ -61,6 +61,15 @@ img.ant-image-preview-img {
   position: relative;
 }
 
+.liquid_gold_text_box > h1:first-child {
+  text-shadow: 0px 0px 10px #F29100;
+}
+
+.liquid_gold_text_box > h1:last-child {
+  text-shadow: 0px 0px 4px #F29100;
+  line-height: 36px;
+}
+
 :where(.css-dev-only-do-not-override-9ntgx0).ant-checkbox-wrapper:not(
     .ant-checkbox-wrapper-disabled
   ):hover
@@ -152,8 +161,7 @@ img.ant-image-preview-img {
 }
 
 .liquid_gold_text_box{
-  top: 30%;
-  font-size: 30px;
+  top: 20%;
   margin-left: 4%;
 }
 
@@ -388,9 +396,16 @@ img.ant-image-preview-img {
   }
 
   .liquid_gold_text_box{
-    top: 30%;
-    font-size: 42px;
+    top: 11%;
     margin-left: 7%;
+  }
+
+  .liquid_gold_text_box > h1:first-child {
+    font-size: 48px;
+  }
+  
+  .liquid_gold_text_box > h1:last-child {
+    font-size: 30px;
   }
 
   .token_banner_text_box {
@@ -478,9 +493,16 @@ img.ant-image-preview-img {
   }
 
   .liquid_gold_text_box{
-    top: 28%;
-    font-size: 42px;
+    top: 3%;
     margin-left: 7%;
+  }
+
+  .liquid_gold_text_box > h1:first-child {
+    font-size: 48px;
+  }
+  
+  .liquid_gold_text_box > h1:last-child {
+    font-size: 30px;
   }
 
   .how_banner_text_box {
@@ -569,9 +591,16 @@ img.ant-image-preview-img {
   }
 
   .liquid_gold_text_box{
-    top: 30%;
-    font-size: 42px;
+    top: 8%;
     margin-left: 7%;
+  }
+
+  .liquid_gold_text_box > h1:first-child {
+    font-size: 48px;
+  }
+  
+  .liquid_gold_text_box > h1:last-child {
+    font-size: 30px;
   }
 
   .token_banner_text_box {
@@ -675,9 +704,16 @@ img.ant-image-preview-img {
   }
 
   .liquid_gold_text_box{
-    top: 33%;
-    font-size: 44px;
+    top: 7%;
     margin-left: 7%;
+  }
+
+  .liquid_gold_text_box > h1:first-child {
+    font-size: 48px;
+  }
+  
+  .liquid_gold_text_box > h1:last-child {
+    font-size: 30px;
   }
 
   .token_banner_text_box {
@@ -785,9 +821,17 @@ img.ant-image-preview-img {
   }
 
   .liquid_gold_text_box {
-    top: 35%;
+    top: 18%;
     font-size: 42px;
     margin-left: 7%;
+  }
+
+  .liquid_gold_text_box > h1:first-child {
+    font-size: 40px;
+  }
+  
+  .liquid_gold_text_box > h1:last-child {
+    font-size: 30px;
   }
 
   .token_banner_text_box {
@@ -896,9 +940,16 @@ img.ant-image-preview-img {
   }
 
   .liquid_gold_text_box{
-    top: 25%;
-    font-size: 30px;
+    top: 3%;
     margin-left: 4%;
+  }
+
+  .liquid_gold_text_box > h1:first-child {
+    font-size: 30px;
+  }
+  
+  .liquid_gold_text_box > h1:last-child {
+    font-size: 20px;
   }
 
   .token_banner_text_box {
@@ -1033,9 +1084,17 @@ img.ant-image-preview-img {
   }
 
   .liquid_gold_text_box {
-    top: 30%;
+    top: 5%;
     font-size: 28px;
     margin-left: 14px;
+  }
+
+  .liquid_gold_text_box > h1:first-child {
+    font-size: 30px;
+  }
+  
+  .liquid_gold_text_box > h1:last-child {
+    font-size: 20px;
   }
 
   .how_banner_text_box {

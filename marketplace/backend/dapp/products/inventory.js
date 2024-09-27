@@ -389,6 +389,13 @@ async function get(user, args, options) {
         }
     }
 
+    // Sort the images and files by their order
+    if (inventory['BlockApps-Mercata-Asset-images']) {
+        inventory['BlockApps-Mercata-Asset-images'].sort((a, b) => {
+            return parseInt(a.key) - parseInt(b.key);
+        });
+    }
+
     return marshalOut({
         ...inventory,
     });
@@ -524,7 +531,17 @@ async function getAll(admin, args = {}, defaultOptions) {
             });
         } 
     }
-    return finalInventory ? finalInventory.map((inventory) => marshalOut(inventory)) : undefined;
+    // Sort the images and files by their order
+    return finalInventory
+      ? finalInventory.map((inventory) => {
+          if (inventory["BlockApps-Mercata-Asset-images"]) {
+            inventory["BlockApps-Mercata-Asset-images"].sort(
+              (a, b) => parseInt(a.key) - parseInt(b.key)
+            );
+          }
+          return marshalOut(inventory);
+        })
+      : undefined;
 }
 
 
@@ -532,7 +549,7 @@ async function getAll(admin, args = {}, defaultOptions) {
 async function getAllItemTransferEvents(admin, args = {}, defaultOptions) {
     const options = { ...defaultOptions, org: 'BlockApps', app: 'Mercata' }
     let itemTransferEvents = await searchAllWithQueryArgs(`${contractName}.${contractEvents.ITEM_TRANSFER}`, args, options, admin);
-
+    itemTransferEvents = itemTransferEvents.map((item)=>({...item, type: 'Transfer'}))
 
     const total = await searchAllWithQueryArgs(`${contractName}.${contractEvents.ITEM_TRANSFER}`,
         { ...args, limit: undefined, offset: 0, order: undefined, queryOptions: { select: "count" } }, options, admin);

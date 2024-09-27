@@ -27,10 +27,10 @@ library:
   - conduit
   - containers
   - directory
-  - either
   - ethereum-discovery
   - ethereum-rlp
   - evm-solidity
+  - exceptions
   - file-embed
   - filepath
   - format
@@ -38,11 +38,8 @@ library:
   - http-client
   - http-types
   - kafka-monad
-  - lens
   - leveldb-haskell
   - merkle-patricia-db
-  - milena
-  - milena-tools
   - monad-alter
   - nibblestring
   - persistent-postgresql
@@ -69,7 +66,6 @@ library:
   - unliftio
   - unliftio-core
   - vm-tools
-  - x509-certs
   - yaml
   - ordered-containers
 
@@ -79,19 +75,12 @@ executables:
     source-dirs: exec_src/
     main: Main.hs
     dependencies:
+      - common-log
       - hflags
+      - kafka-monad
       - strato-init
       - strato-model
 
-    other-modules: []
-
-  init-worker:
-    source-dirs: exec_src/
-    main: InitWorker.hs
-    dependencies:
-      - common-log
-      - hflags
-      - strato-init
     other-modules: []
 
   genesis-builder:
@@ -103,7 +92,6 @@ executables:
       - strato-genesis
       - strato-init
       - strato-model
-      - x509-certs
     other-modules: []
 
 tests:

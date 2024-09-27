@@ -96,7 +96,7 @@ const HeaderComponent = ({ user, loginUrl, showMenu, handleSubMenu, handleMenuTa
   }, [categoryQueryValue])
 
   const navUrls = [
-    routes.Orders.url.replace(':type', 'sold'),
+    routes.Transactions.url,
     routes.MyItems.url,
     routes.Products.url,
   ];
@@ -233,7 +233,7 @@ const HeaderComponent = ({ user, loginUrl, showMenu, handleSubMenu, handleMenuTa
   }, [user])
 
   const subMenuItems = [
-    { value: "orders", path: routes.Orders.url.replace(':type', 'sold'), label: "Orders" },
+    { value: "transactions", path: routes.Transactions.url, label: "My Transactions" },
     { value: "myitems", path: "/myitems", label: "My Items" },
     user ? {
       value: "my-profile",

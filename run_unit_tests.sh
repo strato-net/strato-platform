@@ -16,7 +16,6 @@ stack test $5\
       blockapps-data \
       blockapps-init \
       blockapps-mpdbs \
-      blockapps-tools \
       blockapps-vault-proxy-server \
       bloc2api \
       common-log \
@@ -40,8 +39,7 @@ stack test $5\
       strato-model \
       strato-redis-blockdb \
       strato-sequencer \
-      vm-runner \
-      x509-certs
+      vm-runner
 
 #      strato-lite \
 

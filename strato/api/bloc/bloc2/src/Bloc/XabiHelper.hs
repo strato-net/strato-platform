@@ -127,7 +127,7 @@ tFormEv :: SolidEv.Event -> EVMXabi.Event
 tFormEv SolidEv.Event {..} =
   EVMXabi.Event
     { eventAnonymous = _eventAnonymous,
-      eventLogs = [(a, tFormIndexedType b) | (a, b) <- _eventLogs]
+      eventLogs = [(a, tFormIndexedType b) | SolidEv.EventLog a _ b <- _eventLogs]
     }
 
 tFormUs :: [SVMXabi.Using] -> EVMXabi.Using

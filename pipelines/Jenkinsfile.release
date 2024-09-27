@@ -239,9 +239,13 @@ pipeline {
             sh '''#!/bin/bash -le
               set -x
               RELEASE_VERSION=$(<VERSION)
+              RELEASE_SUFFIX=""
+              if [ "${env.RELEASE_TYPE}" == "marketplace-master" ]; then
+                RELEASE_SUFFIX="-marketplace"
+              fi
               STRATOGS_RELEASE_DETAILS_STABLE="--user blockapps --repo strato-getting-started --tag ${RELEASE_VERSION}"
               github-release delete $STRATOGS_RELEASE_DETAILS_STABLE || true
-              github-release release $STRATOGS_RELEASE_DETAILS_STABLE --name "${RELEASE_VERSION}-marketplace"
+              github-release release $STRATOGS_RELEASE_DETAILS_STABLE --name "${RELEASE_VERSION}${RELEASE_SUFFIX}"
               sleep 5
               github-release upload $STRATOGS_RELEASE_DETAILS_STABLE --name "docker-compose.yml" --file ./docker-compose.yml
               github-release upload $STRATOGS_RELEASE_DETAILS_STABLE --name "docker-compose.vault.yml" --file ./docker-compose.vault.yml

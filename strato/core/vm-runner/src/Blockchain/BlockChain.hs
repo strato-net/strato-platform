@@ -18,6 +18,7 @@
 module Blockchain.BlockChain
   ( addBlock,
     addBlocks,
+    verifyBlock,
     mineTransactions,
     addTransaction,
     addTransactions,
@@ -43,6 +44,7 @@ import Blockchain.DB.ModifyStateDB
 import Blockchain.DB.RawStorageDB
 import Blockchain.DB.StorageDB
 import Blockchain.Data.AddressStateDB
+import Blockchain.Data.Block
 import Blockchain.Data.BlockHeader
 import Blockchain.Data.BlockSummary
 import Blockchain.Data.DataDefs
@@ -52,15 +54,16 @@ import Blockchain.Data.Transaction
 import Blockchain.Data.TransactionDef (formatChainId)
 import Blockchain.Data.TransactionResultStatus
 import qualified Blockchain.Database.MerklePatricia as MP
+import Blockchain.DB.StateDB
 import Blockchain.Event
 import Blockchain.Sequencer.Event
 import qualified Blockchain.SolidVM as SolidVM
-import Blockchain.StateRootMismatch
 import Blockchain.Strato.Indexer.Model (IndexEvent (..))
 import Blockchain.Strato.Model.Account
 import Blockchain.Strato.Model.Address
 import Blockchain.Strato.Model.Class
 import Blockchain.Strato.Model.Code
+import Blockchain.Strato.Model.Delta
 import Blockchain.Strato.Model.Event
 import Blockchain.Strato.Model.ExtendedWord
 import Blockchain.Strato.Model.Gas
@@ -69,6 +72,7 @@ import Blockchain.Strato.Model.Options (computeNetworkID)
 import qualified Blockchain.Strato.StateDiff as SD
 import Blockchain.TheDAOFork
 import Blockchain.Timing
+import Blockchain.VM.SolidException (SolidException( TooMuchGas ))
 import Blockchain.VM.VMException
 import Blockchain.VMConstants
 import Blockchain.VMContext
@@ -87,6 +91,7 @@ import Control.Monad.Trans.Except
 import qualified Control.Monad.Trans.State.Strict as State
 import Data.Bifunctor (bimap)
 import qualified Data.Binary as Bin
+import Data.Bool (bool)
 import qualified Data.ByteString as B
 import qualified Data.ByteString.Lazy as BL
 import qualified Data.DList as DL
@@ -163,8 +168,8 @@ addBlocks unfiltered = do
             let !blockNo = number $ obBlockData block
                 !txCount = length $ obReceiptTransactions block
             timeit (printf "Block #%d (%d TXs insertion)" blockNo txCount) timerToUse $ do
-              mSRMismatch <- lift $ addBlock block
-              when (isNothing mSRMismatch) $ do
+              failures <- lift $ addBlock block
+              when (null failures) $ do
                 (didReplaceThisTime, ranPriv, replacedBits@(hsh, num, _)) <- lift . lift $ replaceBestIfBetter block
                 when didReplaceThisTime $ do
                   writeIORef didReplaceBest True
@@ -178,15 +183,15 @@ addBlocks unfiltered = do
                   modifyIORef' ranPrivateTxs $
                     flip M.unionWith ranPriv $
                       \(n1, s1) (n2, s2) -> if n1 > n2 then (n1, s1) else (n2, s2)
-              pure mSRMismatch
-          loop [] = pure Nothing
+              pure failures
+          loop [] = pure []
           loop (b:bs) = go b >>= \case
-            Just srm -> pure $ Just srm
-            Nothing  -> loop bs
-      (mSRMismatch, srLog) <- flip State.runStateT Nothing $ loop filtered
-      case mSRMismatch of
-        Just srMismatch -> yield $ OutStateRootMismatch srMismatch
-        Nothing -> do
+            [] -> loop bs
+            failures -> pure failures
+      (failures, srLog) <- flip State.runStateT Nothing $ loop filtered
+      case failures of
+        (_:_) -> yield $ OutBlockVerificationFailure failures
+        _ -> do
           $logDebugLS "addBlocks/srLog" srLog
           didReplaceBest' <- readIORef didReplaceBest
           ranPrivateTxs' <- readIORef ranPrivateTxs
@@ -207,7 +212,7 @@ setParentStateRoot OutputBlock {..} = do
   liftIO $ setTitle $ "Block #" ++ show (number obBlockData)
   BSDB.getBSum (parentHash obBlockData)
 
-addBlock :: (MonadFail m, Bagger.MonadBagger m, MonadMonitor m) => OutputBlock -> ConduitT a VmOutEvent m (Maybe StateRootMismatch)
+addBlock :: (MonadFail m, Bagger.MonadBagger m, MonadMonitor m) => OutputBlock -> ConduitT a VmOutEvent m [BlockVerificationFailure]
 addBlock b@OutputBlock {obBlockData = bd, obReceiptTransactions = otxs} =
   let obh = outputBlockHash b
    in withCurrentBlockHash obh $ do
@@ -240,22 +245,15 @@ addBlock b@OutputBlock {obBlockData = bd, obReceiptTransactions = otxs} =
         bSum <- setParentStateRoot b
         -- TODO: PLEASE REMOVE THIS FORK WHEN MERCATA-HYDROGEN IS OBSOLETE
         when (computeNetworkID == 7596898649924658542 && number bd == 32624) runTheDAOFork -- Only run this if connected to mercata-hydrogen
-        addBlockTransactions b
+        trrs <- addBlockTransactions b
 
         postRewardSR <- A.lookup (A.Proxy @MP.StateRoot) (Nothing :: Maybe Word256)
-
-        if (Just (stateRoot (obBlockData b)) /= postRewardSR)
-          then do
-            $logInfoS "addBlock/mined" . T.pack $ "newStateRoot: " ++ format postRewardSR
-            pure . Just $ StateRootMismatch (number $ obBlockData b)
-                                            obh
-                                            (stateRoot $ obBlockData b)
-                                            (fromMaybe MP.emptyTriePtr postRewardSR)
-          else do
-            valid <- checkValidity (blockIsHomestead $ number bd) bSum b
-            case valid of
-              Nothing -> lift $ P.incCounter vmBlocksValid
-              Just _ -> lift $ P.incCounter vmBlocksInvalid -- error err -- todo: i dont think we ACTUALLY need to error here
+        verifyBlockResult <- verifyBlock (outputBlockToBlock b) (trrs, postRewardSR) bSum
+        case verifyBlockResult of 
+          failures@(_:_) -> do
+            lift $ P.incCounter vmBlocksInvalid
+            pure $ map (\r -> BlockVerificationFailure (bSumNumber bSum) (bSumParentHash bSum) r) failures
+          _ -> do
             when flags_debug $ do
               bhr'' <- Mod.get (Proxy @BlockHashRoot)
               $logDebugS "addBlock" $ T.pack $ "New blockhash root after running block: " ++ format bhr''
@@ -264,33 +262,64 @@ addBlock b@OutputBlock {obBlockData = bd, obReceiptTransactions = otxs} =
                 Nothing -> $logDebugS "addBlock" $ T.pack $ "Could not locate new chain root after running block. Using emptyTriePtr"
                 Just cr -> $logDebugS "addBlock" $ T.pack $ "New chain root after running block: " ++ format cr
 
+            lift $ P.incCounter vmBlocksValid
             lift $ P.incCounter vmBlocksMined
             lift $ P.incCounter vmBlocksProcessed
             $logInfoS "addBlock" . T.pack $ "Inserted block became #" ++ show (number $ obBlockData b) ++ " (" ++ format obh ++ ")."
-            pure Nothing
+            pure []
 
-addBlockTransactions :: (Bagger.MonadBagger m, MonadMonitor m) => OutputBlock -> ConduitT a VmOutEvent m ()
+-- TODO: If we add more verifications, refactor tuple into a proper data type
+verifyBlock :: 
+  HasStateDB m =>
+  Block -> 
+  ([TxRunResult], Maybe MP.StateRoot) -> 
+  BlockSummary ->
+  m [BlockVerificationFailureDetails]
+verifyBlock b@Block{blockBlockData = bh} (trrs, derivedSR) parentBSum = do
+  validity <- checkValidity parentBSum b
+  let (vDelt, cDelt) = getDeltasFromResults trrs
+      blockSR = Just $ stateRoot bh
+      bVd = toDelta (newValidators bh) (removedValidators bh)
+      bCd = toDelta (newCerts bh) (revokedCerts bh)
+      srCheck =  if derivedSR == blockSR
+        then Nothing
+        else Just . StateRootMismatch $
+               BlockDelta (stateRoot bh)
+                          (fromMaybe MP.emptyTriePtr derivedSR)
+      validatorCheck = if eqDelta bVd vDelt
+        then Nothing
+        else Just . ValidatorMismatch $ BlockDelta (fromDelta bVd) (fromDelta vDelt)
+      certCheck = if eqDelta bCd cDelt
+        then Nothing
+        else Just . CertRegistrationMismatch $ BlockDelta (fromDelta bCd) (fromDelta cDelt)
+   in return $ validity ++ case blockHeaderVersion bh of
+        1 -> catMaybes [srCheck]
+        2 -> catMaybes [srCheck, validatorCheck, certCheck]
+        v -> [VersionMismatch $ BlockDelta v 2]
+
+addBlockTransactions :: (Bagger.MonadBagger m, MonadMonitor m) => OutputBlock -> ConduitT a VmOutEvent m [TxRunResult]
 addBlockTransactions OutputBlock {obBlockData = bd, obReceiptTransactions = transactions} = do
   $logDebugS "addBlockTransactions" . T.pack $ "All transactions: " ++ show transactions
   let txs =
         filter (\t -> (txType t /= PrivateHash) || (isJust $ otPrivatePayload t)) $
           transactions
-  -- TODO: Run the checks Bagger does reject invalid transactions for private chains
-  addTransactions bd txs
+  trrs <- addTransactions bd txs
 
   lift $ timeit "flushMemStorageDB" (Just vmBlockInsertionMined) flushMemStorageDB
   lift $ timeit "flushMemAddressStateDB" (Just vmBlockInsertionMined) flushMemAddressStateDB
+  pure trrs
 
 addTransactions ::
   (VMBase m, MonadMonitor m) =>
   BlockHeader ->
   [OutputTx] ->
-  ConduitT a VmOutEvent m ()
+  ConduitT a VmOutEvent m [TxRunResult]
 addTransactions blockData txs =
   timeit ("addTransactions, " ++ show (length txs) ++ " TXs") (Just vmBlockInsertionMined) $ do
-    trrs <- lift $ go (gasLimit blockData) txs DL.empty
+    trrs <- lift $ go (getBlockGasLimit blockData) txs DL.empty
     mapM_ (outputTransactionResult blockData blockHeaderHash) trrs
     yield . OutASM $ foldr (flip M.union) M.empty $ map trrAfterMap trrs
+    pure trrs
   where
     go _ [] trrs = return $ DL.toList trrs
     go blockGas (t : rest) trrs = do
@@ -330,7 +359,7 @@ mineTransactions' header remGas ran unran@(tx : txs) = do
   trr <- setNewAddresses $ TxRunResult tx result time' beforeMap afterMap []
   case result of
     Right execResult ->
-      let supportedPragmas = [("es6", ""), ("strict", ""), ("builtinCreates", ""), ("safeExternalCalls", ""), ("solidvm", "11.4")]
+      let supportedPragmas = [("es6", ""), ("strict", ""), ("builtinCreates", ""), ("safeExternalCalls", ""), ("solidvm", "11.4"), ("solidvm", "11.5")]
           findInvalidPragmas pragma = if fst pragma == "solidity" || pragma `elem` supportedPragmas then id else (pragma :) -- include solidity pragma for backwards compatibility
           invalidPragmasUsed = foldr findInvalidPragmas [] (erPragmas execResult)
        in if not $ null invalidPragmasUsed
@@ -338,12 +367,19 @@ mineTransactions' header remGas ran unran@(tx : txs) = do
               putAddressStateTxDBMap M.empty
               putMemRawStorageTxMap M.empty
               return $ Bagger.TxMiningResult (Just $ TFInvalidPragma invalidPragmasUsed tx) (DL.toList ran) unran remGas -- use invalidPragmasUsed here
-            else do
-              let nextRemGas = remGas - (transactionGasLimit bt - calculateReturned bt execResult)
-              flushMemAddressStateTxToBlockDB
-              flushMemStorageTxDBToBlockDB
-              mineTransactions' header nextRemGas (ran `DL.snoc` trr) txs
-    Left failure -> return $ Bagger.TxMiningResult (Just failure) (DL.toList ran) unran remGas
+            else do 
+              case erException execResult of
+                Just (Left (TooMuchGas limit actual)) -> do
+                  putAddressStateTxDBMap M.empty
+                  putMemRawStorageTxMap M.empty
+                  return $ Bagger.TxMiningResult (Just $ TFTransactionGasExceeded limit actual tx) (DL.toList ran) unran remGas
+                _ -> do
+                  let nextRemGas = remGas - (transactionGasLimit bt - calculateReturned bt execResult)
+                  flushMemAddressStateTxToBlockDB
+                  flushMemStorageTxDBToBlockDB
+                  mineTransactions' header nextRemGas (ran `DL.snoc` trr) txs
+    Left failure -> do
+      return $ Bagger.TxMiningResult (Just failure) (DL.toList ran) unran remGas
 
 blockIsHomestead :: Integer -> Bool
 blockIsHomestead blockNum = blockNum >= fromIntegral gHomesteadFirstBlock
@@ -396,7 +432,11 @@ addTransaction chainId isRunningTests' b remainingBlockGas t@OutputTx {otSigner 
   when flags_debug $ $logDebugS "addTx" "running code"
   let txTypeCounter = if isContractCreationTX bt then vmTxsCreation else vmTxsCall
   lift $ P.incCounter txTypeCounter
-  execResults <- runCodeForTransaction isRunningTests' isHomestead b (fromInteger (transactionGasLimit bt) - intrinsicGas') tAcct t
+  let isKnownToBeSlow = otHash t `S.member` knownExpensiveTxs
+      adjustedTxGasLimit = bool (transactionGasLimit bt) (flags_strictGasLimit) (flags_strictGas && not isKnownToBeSlow)
+  when flags_strictGas $ $logInfoS "addTx" . T.pack $ "Strict Gas Mode is on. Adjusted transaction gas limit is " ++ show adjustedTxGasLimit
+
+  execResults <- runCodeForTransaction isRunningTests' isHomestead b (fromInteger (adjustedTxGasLimit) - intrinsicGas') tAcct t
   lift $ P.incCounter vmTxsProcessed
 
   case erException execResults of
@@ -558,7 +598,7 @@ mkLogEntry :: Keccak256 -> Keccak256 -> Maybe Word256 -> Log -> LogDB
 mkLogEntry bHash tHash chainId Log {..} = LogDB bHash tHash chainId (account ^. accountAddress) (topics `indexMaybe` 0) (topics `indexMaybe` 1) (topics `indexMaybe` 2) (topics `indexMaybe` 3) logData bloom
 
 mkEventEntry :: Maybe Word256 -> Event -> EventDB
-mkEventEntry chainId Event {..} = EventDB evBlockHash evContractAccount chainId evName $ map snd evArgs -- drop the field names, only slipstream needs them
+mkEventEntry chainId Event {..} = EventDB evBlockHash evContractAccount chainId evName $ map (\(_,x,_) -> x) evArgs -- drop the field names, only slipstream needs them
 
 outputTransactionResult ::
   VMBase m =>

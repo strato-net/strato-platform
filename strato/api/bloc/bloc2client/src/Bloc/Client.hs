@@ -123,7 +123,7 @@ postContractsXabi = client (Proxy @PostContractsXabi)
 getBlocTransactionResult :: Keccak256 -> Bool -> ClientM BlocTransactionResult
 getBlocTransactionResult = client (Proxy @GetBlocTransactionResult)
 
-postBlocTransactionResults :: Bool -> [Keccak256] -> ClientM [BlocTransactionResult]
+postBlocTransactionResults :: Maybe Text -> Bool -> [Keccak256] -> ClientM [BlocTransactionResult]
 postBlocTransactionResults = client (Proxy @PostBlocTransactionResults)
 
 ------------- /chain(s) endpoints -------------

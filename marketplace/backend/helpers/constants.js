@@ -114,10 +114,43 @@ SERVICE_PROVIDERS[SERVICE_PROVIDERS['STRIPE'] = 1] = 'STRIPE';
 SERVICE_PROVIDERS[SERVICE_PROVIDERS['PAYPAL'] = 2] = 'PAYPAL';
 Object.freeze(SERVICE_PROVIDERS)
 
-// Helpers to calculate average price, range, units sold for Pirce History Stats
-export const calculateAveragePrice = (records) => {
-  return records.reduce((sum, record) => sum + record.price, 0) / records.length;
-}
+export const calculateAverageSalePrice = (records) => {
+
+  // Track the last seen effective quantity (quantity + totalLockedQuantity)
+  const lastSeenEffectiveQuantities = {};
+
+  // Filter records where the effective purchase quantity decreases
+  const filteredRecords = records.filter(record => {
+    const key = `${record.address}-${record.assetToBeSold}`;
+    const currentEffectiveQuantity = record.quantity + record.totalLockedQuantity;
+    
+    if (!(key in lastSeenEffectiveQuantities)) {
+      // Update dictionary
+      lastSeenEffectiveQuantities[key] = currentEffectiveQuantity;
+      return false; // No previous record to compare
+    }
+    
+    // Check if the effective quantity has decreased
+    const hasDecreased = currentEffectiveQuantity < lastSeenEffectiveQuantities[key];
+    
+    // Update the last seen effective quantity
+    lastSeenEffectiveQuantities[key] = currentEffectiveQuantity;
+
+    return hasDecreased;
+  });
+
+  // Calculate the average sale price for the filtered records
+  if (filteredRecords.length === 0) {
+    return 0; // If there are no records with decreased effective quantity, return 0
+  }
+
+  const totalPrice = filteredRecords.reduce((sum, record) => sum + record.price, 0);
+  const averagePrice = totalPrice / filteredRecords.length;
+
+  return averagePrice;
+};
+
+
 
 export const calculatePriceFluctuation = (records) => {
   const prices = records.map(record => record.price);

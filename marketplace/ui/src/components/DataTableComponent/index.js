@@ -24,41 +24,41 @@ const DataTableComponent = ({
 
   return (
     <Spin spinning={isLoading} delay={500} size="large">
-      <Table
-        columns={columns}
-        dataSource={data}
-        className="custom-table "
-        sticky={true}
-        pagination={
-          pagination ?? {
-            defaultPageSize: 10,
-            showSizeChanger: false,
-            position: ["bottomCenter"],
-          }
+       <Table
+      columns={columns}
+      dataSource={data}
+      className="custom-table"
+      sticky={true}
+      pagination={
+        pagination ?? {
+          defaultPageSize: 10,
+          showSizeChanger: false,
+          position: ["bottomCenter"],
         }
-        scroll={{
-          x: scrollX ? scrollX : 1050,
-          
-        }}
-        size="middle"
-        rowClassName={"bg-white"}
-        rowKey={rowKey}
-        rowSelection={rowSelection}
-        onChange={onChange}
-        onRow={(record) => {
-          return {
-            onClick: (e) => {
-              try {
-                navigate(
-                  `${naviroute.replace(":id", record.address)}?chainId=${
-                    record.chainId
-                  }`
-                );
-              } catch (e) {}
-            },
-          };
-        }}
-      />
+      }
+      scroll={{
+        x: scrollX ? scrollX : 1050,
+      }}
+      // scrollX={true}
+      size="middle"
+      rowClassName={"bg-white"}
+      rowKey={rowKey}
+      rowSelection={rowSelection}
+      onChange={onChange}
+      onRow={(record) => {
+        return {
+          onClick: () => {
+            try {
+              navigate(
+                `${naviroute.replace(":id", record.address)}?chainId=${
+                  record.chainId
+                }`
+              );
+            } catch (e) {}
+          },
+        };
+      }}
+    />
     </Spin>
   );
 };
