@@ -115,7 +115,7 @@ async function getAdminStratsContractAddress(token) {
     originAddress: `eq.${originAddress}`,
     status: 'eq.1',
     select: 'address,quantity',
-    order: 'createdDate.desc',
+    order: 'block_timestamp.desc',
     quantity: 'neq.0'
   });
 
