@@ -1,7 +1,7 @@
 import { util, rest } from '/blockapps-rest-plus';
 import RestStatus from 'http-status-codes';
 import { setSearchQueryOptions, searchOne, searchAllWithQueryArgs } from '/helpers/utils';
-import constants from '../../helpers/constants';
+import constants, { getOneYearAgoTime } from '../../helpers/constants';
 const pLimit = require('p-limit'); // Concurrency control library
 
 const contractName = constants.saleTableName;
@@ -207,6 +207,61 @@ async function getAll(admin, args = {}, defaultOptions) {
 }
 
 
+
+// Function to fetch sale histories in batches
+async function fetchSaleHistoriesInBatches(rawAdmin, args = {}, options = defaultOptions) {
+    const { assetToBeSold, filter = {}, maxConcurrency = 10 } = args;
+    const chunkSize = 15; // chunk size for sale histories
+    const limit = pLimit(maxConcurrency);  // Concurrency control
+  
+    // Split asset addresses into batches of chunkSize
+    const batches = [];
+    for (let i = 0; i < assetToBeSold.length; i += chunkSize) {
+      batches.push(assetToBeSold.slice(i, i + chunkSize));
+    }
+  
+    // Fetch history for each chunk of assets
+    const fetchHistoryChunk = async (chunk) => {
+      const historyPromises = chunk.map(address => {
+        if(filter.order)
+        {
+        // Fetch sale history based on the filters provided
+        return getAllSaleHistory(rawAdmin, {
+            ...filter,
+            assetToBeSold: address,
+            queryOptions: {
+                'select': 'address,block_timestamp,price,assetToBeSold,quantity,totalLockedQuantity'
+            }
+        }, options);
+        }
+        else{
+        // 12-Month Historical Data
+        return getAllSaleHistory(rawAdmin, {
+            assetToBeSold: address,
+            order: "block_timestamp.asc", 
+            gtField: "block_timestamp", 
+            gtValue: getOneYearAgoTime(),
+            queryOptions: {
+                'select': 'address,block_timestamp,price,assetToBeSold,quantity,totalLockedQuantity'
+            }
+        }, options);
+    }
+      });
+  
+      // Run history fetch requests in parallel for the current chunk
+      return await Promise.all(historyPromises);
+    };
+  
+    // Fetch all history chunks in parallel with concurrency control
+    const allHistoryChunks = await Promise.all(
+      batches.map(batch => limit(() => fetchHistoryChunk(batch)))
+    );
+  
+    // Flatten the array of results into a single array of histories
+    return allHistoryChunks.flat();
+  };
+  
+
 async function fetchSalesInBatches(rawAdmin, args = {}, options = defaultOptions) {
     
     const chunkSize = 30;  // Chunk size
@@ -287,4 +342,5 @@ export default {
     getSaleHistory,
     getAllSaleHistory,
     fetchSalesInBatches,
+    fetchSaleHistoriesInBatches,
 }

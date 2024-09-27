@@ -13,7 +13,6 @@ import constants, {
   ASSET_STATUS,
   REDEMPTION_STATUS,
   DEFAULT_COMMENT,
-  fetchSalesInBatches
 } from "/helpers/constants";
 import { yamlWrite, yamlSafeDumpSync, getYamlFile } from "/helpers/config";
 import { pollingHelper } from "/helpers/utils";
@@ -610,24 +609,16 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
 
       // Process records such that for a given date the most recent sale price is fetched
       // This method processes sales passed, drills down into history table for each sale
-      // This needs to be done as a 2 step process, i.e. a single query to fetch sale & saleHistory can't be done because the contract name is dependent on the sale
-      const processSalesHistory = async (sales, filter = {}, shouldAggregate = true) => {
-        //Fetch histories for each sale
-        const historyPromises = sales.map(sale => {
-          //Fetch saleHistory
-          if (filter.order) {
-            //If timeFilter is applied, also add those filters
-            return saleJs.getAllSaleHistory(rawAdmin, { ...filter, assetToBeSold: sale.assetToBeSold, queryOptions: {'select' : 'address,block_timestamp,price,assetToBeSold,quantity,totalLockedQuantity'} }, options);
-          } else {
-            //If historical data is fetched, apply 12 month timeFilter
-
-            return saleJs.getAllSaleHistory(rawAdmin, { assetToBeSold: sale.assetToBeSold, order: "block_timestamp.asc", gtField: "block_timestamp", gtValue: getOneYearAgoTime(), queryOptions: {'select' : 'address,block_timestamp,price,assetToBeSold,quantity,totalLockedQuantity'} }, options);
-          }
-        });
-        const histories = await Promise.all(historyPromises);
-
+      const processSalesHistory = async (sales, filter = {}, shouldAggregate = true, options = defaultOptions) => {
+        // Fetch sale histories in batches using the new fetchSaleHistoriesInBatches function
+        const histories = await saleJs.fetchSaleHistoriesInBatches(rawAdmin, {
+          assetToBeSold: sales.map(sale => sale.assetToBeSold),  // Pass assetToBeSold from sales
+          filter,  // Apply filter
+          maxConcurrency: 10  // Number of concurrent requests
+        }, options);
+      
         if (shouldAggregate) {
-          // Flatten records, process them using accumulator hash map such that for a given date we fetch latest timestamp's sale record from history table
+          // Flatten records and aggregate by date, keeping the latest sale record for each date
           return histories.flat().reduce((acc, recordContainer) => {
             Object.values(recordContainer).forEach(record => {
               const date = getDate(record);
@@ -639,7 +630,7 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
             return acc;
           }, {});
         } else {
-          //send the history data without processing
+          // Return history data without processing
           return histories.flat().map(recordContainer => Object.values(recordContainer)).flat();
         }
       };
