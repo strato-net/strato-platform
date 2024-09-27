@@ -182,10 +182,10 @@ const actions = {
     dispatch({ type: actionDescriptors.fetchIncomingOffers });
     console.log("Getting to fetchIncomingOffers ===> ", user);
     try {
-      const response = await fetch(`${apiUrl}/offer/incoming/${user}`, {
+      const response = await fetch(`${apiUrl}/offer/incomimg/${user}`, {
         method: HTTP_METHODS.GET,
       });
-      console.log("Getting to fetchIncomingOffers ===> ", response);
+
       const body = await response.json();
 
       if (response.status === RestStatus.OK) {
@@ -217,7 +217,7 @@ const actions = {
       const response = await fetch(`${apiUrl}/offer/outgoing/${user}`, {
         method: HTTP_METHODS.GET,
       });
-      console.log("Getting to fetchOutgoingOffers ===> ", response);
+
       const body = await response.json();
 
       if (response.status === RestStatus.OK) {
