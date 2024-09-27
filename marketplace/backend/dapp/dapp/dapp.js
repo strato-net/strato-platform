@@ -42,6 +42,8 @@ import marketplaceJs from "/dapp/marketplace/marketplace.js";
 import paymentServiceJs from '/dapp/payments/paymentService';
 import redemptionServiceJs from '/dapp/redemptions/redemptionService';
 
+import strats from "../strats/strats";
+
 const allAssetNames = [];
 dayjs.extend(utc);
 const contractName = "Mercata";
@@ -357,7 +359,12 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
           redemptionServiceAddresses.push(r.address);
         }
       });
-      const redemptionServices = await redemptionServiceJs.getAll(rawAdmin, { address: redemptionServiceAddresses }, options);
+      let redemptionServices = await redemptionServiceJs.getAll(rawAdmin, { address: redemptionServiceAddresses }, options);
+
+      // handle backwards compatibility case
+      if (Object.keys(redemptionServices).length === 0) {
+        redemptionServices = await redemptionServiceJs.getAll(rawAdmin, { isActive: true, ownerCommonName: "Server" }, options);
+      }
 
       const redemptionPromises = redemptionServices.map(async (rs) => {
         const serviceUrl = rs.serviceURL || rs.data.serviceURL;
@@ -409,7 +416,12 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
       let redemptions = [];
       const redemptionEvents = await redemptionServiceJs.getRedemptions(rawAdmin, { issuer: userCert.commonName }, options);
       const redemptionServiceAddresses = redemptionEvents.map(r => r.address);
-      const redemptionServices = await redemptionServiceJs.getAll(rawAdmin, { address: redemptionServiceAddresses }, options);
+      let redemptionServices = await redemptionServiceJs.getAll(rawAdmin, { address: redemptionServiceAddresses }, options);
+
+      // handle backwards compatibility case
+      if (Object.keys(redemptionServices).length === 0) {
+        redemptionServices = await redemptionServiceJs.getAll(rawAdmin, { isActive: true, ownerCommonName: "Server" }, options);
+      }
 
       const redemptionPromises = redemptionServices.map(async (rs) => {
         const serviceUrl = rs.serviceURL || rs.data.serviceURL;
@@ -1291,113 +1303,16 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
   }
 
   contract.getStratsTransactionHistory = async function (args, options = defaultOptions) {
-    const getOptions = { ...options, app: contractName, };
-    const { userAddress } = args;
-    const stratsOriginAddress = await STRATSJs.getStratsAddress();
-    if (!stratsOriginAddress) {
-      throw new rest.RestError(RestStatus.BAD_REQUEST, "Strats origin address not found.");
-    }
-    let res = await inventoryJs.getAllItemTransferEvents(rawAdmin, {or: `(oldOwner.eq.${userAddress},newOwner.eq.${userAddress})`}, getOptions);
+    const getOptions = { ...options, org: "TestCompany", app: '' };
+    const transactionHistory = await strats.getStratsTransactionHistory(rawAdmin, args, getOptions);
 
-    return res.transfers.map(transfer => ({
-      id: transfer.transferNumber,
-      timestamp: transfer.transferDate,
-      _to: transfer.newOwner,
-      _from: transfer.oldOwner,
-      _value: transfer.quantity / 100,
-      _price: transfer.price * 100,
-      _assetName: transfer.assetName,
-    }));
+    return transactionHistory;
   }
 
   contract.transferStrats = async function (args, options = defaultOptions) {
-    try {
-      const { value: initialQuantity, to: newOwner, price } = args;
-  
-      // Get strats origin address
-      const stratsOriginAddress = await STRATSJs.getStratsAddress();
-      if (!stratsOriginAddress) {
-        throw new rest.RestError(RestStatus.BAD_REQUEST, "Strats origin address not found.");
-      }
-  
-      // Get all eligible strats for balance check and transfer
-      const strats = await inventoryJs.getAll(
-        rawAdmin,
-        {
-          ownerCommonName: userCert.commonName,
-          originAddress: stratsOriginAddress,
-          status: ASSET_STATUS.ACTIVE,
-          queryOptions: { select: "address,quantity" },
-          notEqualsField: 'quantity',
-          notEqualsValue: '0',
-          order: "block_timestamp.desc",
-        },
-        options
-      );
-  
-      if (!strats || strats.length === 0) {
-        throw new rest.RestError(RestStatus.BAD_REQUEST, "No eligible strats available for transfer.");
-      }
-  
-      let totalAvailableQuantity = 0;
-  
-      // Check if the balance is sufficient
-      for (const strat of strats) {
-        totalAvailableQuantity += strat.quantity;
-        if (totalAvailableQuantity >= initialQuantity) {
-          break;
-        }
-      }
-  
-      if (totalAvailableQuantity < initialQuantity) {
-        throw new rest.RestError(RestStatus.BAD_REQUEST, `Insufficient balance: Required ${initialQuantity}, but only ${totalAvailableQuantity} is available.`);
-      }
-  
-      let remainingQuantity = initialQuantity;
-  
-      // Second loop: Perform the transfer
-      for (const strat of strats) {
-        if (remainingQuantity <= 0) {
-          break;
-        }
-  
-        const transferQuantity = Math.min(strat.quantity, remainingQuantity);
-        const transferNumber = parseInt(util.uid());
-        const transfer = {
-          transferNumber,
-          newOwner,
-          quantity: transferQuantity,
-          price,
-        };
-  
-        try {
-          await inventoryJs.transferItem(
-            rawAdmin,
-            { address: strat.address },
-            transfer,
-            options
-          );
-          remainingQuantity -= transferQuantity;
-        } catch (innerError) {
-          console.error(`Transfer failed for strat with address ${strat.address}:`, innerError);
-          throw new rest.RestError(RestStatus.INTERNAL_SERVER_ERROR, `Failed to transfer strat at address ${strat.address}.`);
-        }
-      }
-  
-      return {
-        status: RestStatus.OK,
-        message: 'Transfer completed successfully.',
-        remainingQuantity: 0
-      };
-  
-    } catch (error) {
-      console.error('TransferStrats operation failed:', error);
-      return {
-        status: error.status || RestStatus.ERROR,
-        message: error.message || 'An unknown error occurred during transfer.'
-      };
-    }
-  };  
+    const res = await strats.transferStrats(rawAdmin, args, options)
+    return res;
+  }
 
   return contract;
 };
