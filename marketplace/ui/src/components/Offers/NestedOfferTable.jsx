@@ -3,76 +3,76 @@ import { Table, Button, Badge, Avatar } from "antd";
 import ConfirmationModal from "./OfferActionModals";
 import "./NestedOfferTable.css";
 
-// Updated product data with image URLs
-const productData = [
-  {
-    key: "1",
-    productName: "Vintage Sterling Brown Crystal Ring",
-    totalQuantity: 3000,
-    price: "3300 STRATS",
-    totalOffers: 6,
-    imageUrl:
-      "https://fileserver.mercata-testnet2.blockapps.net/highway/b878c7de956e27099c1c5f16aa49e725cee03f5e1a9ab2a6ad496af1f0a407ff.png", // Product image
-    offers: [
-      {
-        offerer: "Evelyn",
-        date: "2021-09-01",
-        quantity: 16,
-        price: 200,
-        totalPrice: 2800,
-        key: "1",
-        status: "pending",
-      },
-      {
-        offerer: "Jaime",
-        date: "2021-09-02",
-        quantity: 6,
-        price: 200,
-        totalPrice: 1200,
-        key: "2",
-        status: "accepted",
-      },
-      {
-        offerer: "Andrew",
-        date: "2021-09-03",
-        quantity: 6,
-        price: 200,
-        totalPrice: 1200,
-        key: "3",
-        status: "declined",
-      },
-      {
-        offerer: "Andrew",
-        date: "2021-09-03",
-        quantity: 7,
-        price: 210,
-        totalPrice: 1600,
-        key: "4",
-        status: "canceled",
-      },
-    ],
-  },
-  {
-    key: "2",
-    productName: "Air Jordan 1 Low SE",
-    totalQuantity: 300,
-    price: "1300 STRATS",
-    totalOffers: 2,
-    imageUrl:
-      "https://fileserver.mercata-testnet2.blockapps.net/highway/b878c7de956e27099c1c5f16aa49e725cee03f5e1a9ab2a6ad496af1f0a407ff.png",
-    offers: [
-      {
-        offerer: "Username",
-        date: "2021-09-01",
-        quantity: 6,
-        price: 200,
-        totalPrice: 1200,
-        key: "1",
-        status: "pending",
-      },
-    ],
-  },
-];
+
+// const productData = [
+//   {
+//     key: "1",
+//     productName: "Vintage Sterling Brown Crystal Ring",
+//     totalQuantity: 3000,
+//     price: "3300 STRATS",
+//     totalOffers: 6,
+//     imageUrl:
+//       "https://fileserver.mercata-testnet2.blockapps.net/highway/b878c7de956e27099c1c5f16aa49e725cee03f5e1a9ab2a6ad496af1f0a407ff.png", // Product image
+//     offers: [
+//       {
+//         offerer: "Evelyn",
+//         date: "2021-09-01",
+//         quantity: 16,
+//         price: 200,
+//         totalPrice: 2800,
+//         key: "1",
+//         status: "pending",
+//       },
+//       {
+//         offerer: "Jaime",
+//         date: "2021-09-02",
+//         quantity: 6,
+//         price: 200,
+//         totalPrice: 1200,
+//         key: "2",
+//         status: "accepted",
+//       },
+//       {
+//         offerer: "Andrew",
+//         date: "2021-09-03",
+//         quantity: 6,
+//         price: 200,
+//         totalPrice: 1200,
+//         key: "3",
+//         status: "declined",
+//       },
+//       {
+//         offerer: "Andrew",
+//         date: "2021-09-03",
+//         quantity: 7,
+//         price: 210,
+//         totalPrice: 1600,
+//         key: "4",
+//         status: "canceled",
+//       },
+//     ],
+//   },
+//   {
+//     key: "2",
+//     productName: "Air Jordan 1 Low SE",
+//     totalQuantity: 300,
+//     price: "1300 STRATS",
+//     totalOffers: 2,
+//     imageUrl:
+//       "https://fileserver.mercata-testnet2.blockapps.net/highway/b878c7de956e27099c1c5f16aa49e725cee03f5e1a9ab2a6ad496af1f0a407ff.png",
+//     offers: [
+//       {
+//         offerer: "Username",
+//         date: "2021-09-01",
+//         quantity: 6,
+//         price: 200,
+//         totalPrice: 1200,
+//         key: "1",
+//         status: "pending",
+//       },
+//     ],
+//   },
+// ];
 
 // Function to assign color based on the first letter of the offerer's name
 const getAvatarColor = (name) => {
@@ -124,20 +124,20 @@ const offerColumns = (handleAction, tableType) => {
         title: "Quantity",
         dataIndex: "quantity",
         key: "quantity",
-        align: "center", // Center alignment
+        align: "center",
       },
       {
         title: "Price (Qty)",
         dataIndex: "price",
         key: "price",
-        align: "center", // Center alignment
+        align: "center",
         render: (price) => `${price} STRATS`,
       },
       {
         title: "Total Price",
         dataIndex: "totalPrice",
         key: "totalPrice",
-        align: "center", // Center alignment
+        align: "center",
         render: (totalPrice) => `${totalPrice} STRATS`,
       },
       {
@@ -200,7 +200,7 @@ const offerColumns = (handleAction, tableType) => {
         title: "Date",
         dataIndex: "date",
         key: "date",
-        align: "center", // Center alignment
+        align: "center",
       },
       {
         title: "Quantity",
@@ -212,14 +212,14 @@ const offerColumns = (handleAction, tableType) => {
         title: "Price (Qty)",
         dataIndex: "price",
         key: "price",
-        align: "center", // Center alignment
+        align: "center",
         render: (price) => `${price} STRATS`,
       },
       {
         title: "Total Price",
         dataIndex: "totalPrice",
         key: "totalPrice",
-        align: "center", // Center alignment
+        align: "center",
         render: (totalPrice) => `${totalPrice} STRATS`,
       },
       {
@@ -289,23 +289,23 @@ const columns = [
     title: "Total Quantity",
     dataIndex: "totalQuantity",
     key: "totalQuantity",
-    align: "center", // Center alignment
+    align: "center",
   },
   {
     title: "Price",
     dataIndex: "price",
     key: "price",
-    align: "center", // Center alignment
+    align: "center",
   },
   {
     title: "Total Offers",
     dataIndex: "totalOffers",
     key: "totalOffers",
-    align: "center", // Center alignment
+    align: "center",
   },
 ];
 
-const NestedTableComponent = ({ tableType }) => {
+const NestedTableComponent = ({ tableType, offersData }) => {
   const [isConfirming, setIsConfirming] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [isConfirmed, setIsConfirmed] = useState(false);
@@ -356,7 +356,7 @@ const NestedTableComponent = ({ tableType }) => {
           expandedRowRender,
           rowExpandable: (record) => record.offers.length > 0,
         }}
-        dataSource={productData}
+        dataSource={offersData}
         rowKey="key"
         pagination={false}
         className="product-rows"
