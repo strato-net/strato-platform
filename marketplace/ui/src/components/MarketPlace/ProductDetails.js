@@ -307,7 +307,7 @@ const ProductDetails = ({ user, users }) => {
   // };
 
   const addItemToCart = async () =>{
-    const items = [{ product: details, qty: details.quantityIsDecimal === true ? qty * 100 : qty }];
+    const items = [{ product: details, qty }];
     marketPlaceActions.addItemToCart(marketplaceDispatch, items);
     navigate('/checkout');
     window.scrollTo(0, 0);
@@ -809,14 +809,14 @@ const ProductDetails = ({ user, users }) => {
                     <div className="w-full h-full">
                       <h2 className='w-full text-center font-bold text-2xl'>Price History</h2>
                       <TimeRangeTabs onChange={handleTimeFilterChange} activeKey={timeFilter} />
-                      <PriceChartAndStats priceHistory={priceHistory} />
+                      <PriceChartAndStats priceHistory={priceHistory} isDecimal={details?.data?.quantityIsDecimal === "True"}/>
                     </div>
                   )}
                   <div>
                     {(priceHistory?.originRecords?.length !== 0) && (
                       <>
                         <h2 className='w-full text-center font-bold text-2xl'>12-Month Historical Data</h2>
-                        <Statistics priceHistory={priceHistory} />
+                        <Statistics priceHistory={priceHistory} isDecimal={details?.data?.quantityIsDecimal === "True"}/>
                       </>
                     )}
                   </div>

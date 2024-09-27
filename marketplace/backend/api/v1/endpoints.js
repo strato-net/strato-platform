@@ -107,7 +107,7 @@ export const Tokens = {
 }
 
 export const STRATS = {
-  prefix: '/STRATS',
+  prefix: '/STRATSTokens',
   getAll: '/',
   create: '/'
 }
