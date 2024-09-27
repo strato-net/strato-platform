@@ -11,6 +11,12 @@ const actionDescriptors = {
   fetchOffer: "fetch_offer",
   fetchOfferSuccessful: "fetch_offer_successful",
   fetchOfferFailed: "fetch_offer_failed",
+  fetchIncomingOffers: "fetch_incoming_offers",
+  fetchIncomingOffersSuccessful: "fetch_incoming_offers_successful",
+  fetchIncomingOffersFailed: "fetch_incoming_offers_failed",
+  fetchOutgoingOffers: "fetch_outgoing_offers",
+  fetchOutgoingOffersSuccessful: "fetch_outgoing_offers_successful",
+  fetchOutgoingOffersFailed: "fetch_outgoing_offers_failed",
   updateOffer: "update_offer",
   updateOfferSuccessful: "update_offer_successful",
   updateOfferFailed: "update_offer_failed",
@@ -167,6 +173,70 @@ const actions = {
       dispatch({
         type: actionDescriptors.fetchOfferFailed,
         error: "Error while fetching offer",
+      });
+    }
+  },
+
+  // Offers Received by User
+  fetchIncomingOffers: async (dispatch, user) => {
+    dispatch({ type: actionDescriptors.fetchIncomingOffers });
+    console.log("Getting to fetchIncomingOffers ===> ", user);
+    try {
+      const response = await fetch(`${apiUrl}/offer/incoming/${user}`, {
+        method: HTTP_METHODS.GET,
+      });
+      console.log("Getting to fetchIncomingOffers ===> ", response);
+      const body = await response.json();
+
+      if (response.status === RestStatus.OK) {
+        dispatch({
+          type: actionDescriptors.fetchIncomingOffersSuccessful,
+          payload: body.data,
+        });
+        return;
+      }
+
+      dispatch({
+        type: actionDescriptors.fetchIncomingOffersFailed,
+        error: body.error || "Error while fetching incoming offers",
+      });
+      throw new Error(body.error || "Error while fetching incoming offers");
+    } catch (err) {
+      dispatch({
+        type: actionDescriptors.fetchIncomingOffersFailed,
+        error: "Error while fetching incoming offers",
+      });
+    }
+  },
+
+  // Offers Made by User
+  fetchOutgoingOffers: async (dispatch, user) => {
+    dispatch({ type: actionDescriptors.fetchOutgoingOffers });
+    console.log("Getting to fetchOutgoingOffers ===> ", user);
+    try {
+      const response = await fetch(`${apiUrl}/offer/outgoing/${user}`, {
+        method: HTTP_METHODS.GET,
+      });
+      console.log("Getting to fetchOutgoingOffers ===> ", response);
+      const body = await response.json();
+
+      if (response.status === RestStatus.OK) {
+        dispatch({
+          type: actionDescriptors.fetchOutgoingOffersSuccessful,
+          payload: body.data,
+        });
+        return;
+      }
+
+      dispatch({
+        type: actionDescriptors.fetchOutgoingOffersFailed,
+        error: body.error || "Error while fetching outgoing offers",
+      });
+      throw new Error(body.error || "Error while fetching outgoing offers");
+    } catch (err) {
+      dispatch({
+        type: actionDescriptors.fetchOutgoingOffersFailed,
+        error: "Error while fetching outgoing offers",
       });
     }
   },

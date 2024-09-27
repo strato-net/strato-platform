@@ -116,6 +116,46 @@ const reducer = (state, action) => {
         success: true,
         message: "Offer canceled successfully",
       };
+
+    case actionDescriptors.fetchIncomingOffers:
+      return {
+        ...state,
+        isIncomingOffersLoading: true,
+      };
+
+    case actionDescriptors.fetchIncomingOffersSuccessful:
+      return {
+        ...state,
+        incomingOffers: action.payload,
+        isIncomingOffersLoading: false,
+      };
+
+    case actionDescriptors.fetchIncomingOffersFailed:
+      return {
+        ...state,
+        error: action.error,
+        isIncomingOffersLoading: false,
+      };
+
+    case actionDescriptors.fetchOutgoingOffers:
+      return {
+        ...state,
+        isOutgoingOffersLoading: true,
+      };
+
+    case actionDescriptors.fetchOutgoingOffersSuccessful:
+      return {
+        ...state,
+        outgoingOffers: action.payload,
+        isOutgoingOffersLoading: false,
+      };
+
+    case actionDescriptors.fetchOutgoingOffersFailed:
+      return {
+        ...state,
+        error: action.error,
+        isOutgoingOffersLoading: false,
+      };
       
     default:
       throw new Error(`Unhandled action: '${action.type}'`);

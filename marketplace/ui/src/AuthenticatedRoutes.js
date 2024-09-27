@@ -242,7 +242,9 @@ const AuthenticatedRoutes = ({ user, users, isAuthenticated }) => {
                         <RedemptionsProvider>
                           <IssuerStatusProvider>
                             <UserActivityProvider>
-                              <UserProfile user={user} users={users} />
+                              <OffersProvider>
+                                <UserProfile user={user} users={users} />
+                              </OffersProvider>
                             </UserActivityProvider>
                           </IssuerStatusProvider>
                         </RedemptionsProvider>

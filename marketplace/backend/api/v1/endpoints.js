@@ -196,9 +196,6 @@ export const Offer = {
   accept: '/accept',
   reject: '/reject',
   cancel: '/cancel',
-  getIncomingOffers: '/incoming',
-  getOutgoingOffers: '/outgoing',
-  getAcceptedOffers: '/accepted',
-  getRejectedOffers: '/rejected',
-  getCancelledOffers: '/cancelled'
+  getIncomingOffers: '/incoming/:user',
+  getOutgoingOffers: '/outgoing/:user',
 }

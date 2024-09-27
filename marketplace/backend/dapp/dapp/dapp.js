@@ -1300,12 +1300,18 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
 
   contract.getIncomingOffers = async function (args, options = defaultOptions) {
     const getOptions = { ...options, app: contractName }
-    return offerJs.getIncomingOffers(rawAdmin, args, getOptions);
+    const user = args.userCommonName
+    const newArgs = { ...args, sellerCommonName: user}
+    const incomingOffers = await offerJs.getAll(rawAdmin, newArgs, getOptions);
+    return incomingOffers;
   }
 
   contract.getOutgoingOffers = async function (args, options = defaultOptions) {
     const getOptions = { ...options, app: contractName }
-    return offerJs.getOutgoingOffers(rawAdmin, args, getOptions);
+    const user = args.userCommonName
+    const newArgs = { ...args, purchaserCommonName: user}
+    const outgoingOffers = await offerJs.getAll(rawAdmin, newArgs, getOptions);
+    return outgoingOffers;
   }
 
   contract.getAcceptedOffers = async function (args, options = defaultOptions) {

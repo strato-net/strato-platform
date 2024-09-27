@@ -69,25 +69,5 @@ router.get(
     OfferController.getOutgoingOffers
 )
 
-router.get(
-    Offer.getAcceptedOffers,
-    authHandler.authorizeRequest(),
-    loadDapp,
-    OfferController.getAcceptedOffers
-)
-
-router.get(
-    Offer.getRejectedOffers,
-    authHandler.authorizeRequest(),
-    loadDapp,
-    OfferController.getRejectedOffers
-)
-
-router.get(
-    Offer.getCancelledOffers,
-    authHandler.authorizeRequest(),
-    loadDapp,
-    OfferController.getCancelledOffers
-)
 
 export default router;

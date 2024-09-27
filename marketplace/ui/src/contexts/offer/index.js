@@ -13,6 +13,10 @@ const OffersProvider = ({ children }) => {
     error: undefined,
     success: false,
     message: null,
+    incomingOffers: [],
+    isIncomingOffersLoading: false,
+    outgoingOffers: [],
+    isOutgoingOffersLoading: false,
   };
 
   const [state, dispatch] = useReducer(reducer, initialState);

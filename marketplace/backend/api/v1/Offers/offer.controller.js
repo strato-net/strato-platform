@@ -102,9 +102,9 @@ class OfferController {
     static async getIncomingOffers(req, res, next) {
         try {
             const { dapp, query } = req
-            const { orders, total } = await dapp.getIncomingOffers({ ...query });
+            const result = await dapp.getIncomingOffers({ ...query });
 
-            rest.response.status200(res, { orders, total })
+            rest.response.status200(res, result)
             return next()
         } catch (e) {
             return next(e)
@@ -114,45 +114,9 @@ class OfferController {
     static async getOutgoingOffers(req, res, next) {
         try {
             const { dapp, query } = req
-            const { orders, total } = await dapp.getOutgoingOffers({ ...query });
+            const result = await dapp.getOutgoingOffers({ ...query });
 
-            rest.response.status200(res, { orders, total })
-            return next()
-        } catch (e) {
-            return next(e)
-        }
-    }
-
-    static async getAcceptedOffers(req, res, next) {
-        try {
-            const { dapp, query } = req
-            const { orders, total } = await dapp.getAcceptedOffers({ ...query });
-
-            rest.response.status200(res, { orders, total })
-            return next()
-        } catch (e) {
-            return next(e)
-        }
-    }
-
-    static async getRejectedOffers(req, res, next) {
-        try {
-            const { dapp, query } = req
-            const { orders, total } = await dapp.getRejectedOffers({ ...query });
-
-            rest.response.status200(res, { orders, total })
-            return next()
-        } catch (e) {
-            return next(e)
-        }
-    }
-
-    static async getCancelledOffers(req, res, next) {
-        try {
-            const { dapp, query } = req
-            const { orders, total } = await dapp.getCancelledOffers({ ...query });
-
-            rest.response.status200(res, { orders, total })
+            rest.response.status200(res, result)
             return next()
         } catch (e) {
             return next(e)
