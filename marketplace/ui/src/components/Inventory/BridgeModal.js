@@ -5,7 +5,7 @@ import { useInventoryDispatch, useInventoryState } from "../../contexts/inventor
 import { useAuthenticateState } from "../../contexts/authentication";
 import { handleQuantityInput, handleWalletAddressInput } from "../../helpers/utils";
 
-const TransferModal = ({ open, handleCancel, inventory, categoryName, limit, offset }) => {
+const BridgeModal = ({ open, handleCancel, inventory, categoryName, limit, offset }) => {
     const [data, setData] = useState([inventory]);
     const [quantity, setQuantity] = useState(1);
     const [userAddress, setUserAddress] = useState("");
@@ -177,4 +177,4 @@ const TransferModal = ({ open, handleCancel, inventory, categoryName, limit, off
 }
 
 
-export default TransferModal;
+export default BridgeModal;

@@ -6,7 +6,6 @@ import config from '../../../load.config'
 import constants from "/helpers/constants";
 
 function getTokenServerUrl() {
-  console.log("process.env.networkID", process.env.networkID);
   if (process.env.networkID === constants.prodNetworkId) {
     return constants.prodTokenServerUrl
   } else if (process.env.networkID === constants.testnetNetworkId) {
@@ -85,8 +84,6 @@ class InventoryController {
 
       const result = await dapp.createInventory(body)
       rest.response.status200(res, result)
-
-      console.log("*Seller listed item*");
 
       return next()
     } catch (e) {
@@ -221,7 +218,6 @@ class InventoryController {
           mercataAddress: body.mercataAddress,
       };
       const url = await getTokenServerUrl();
-      console.log("url", url);
       const response = await axios.post(`${url}/api/bridgeMercata`, payload, {
         headers: {
           Accept: "application/json",
