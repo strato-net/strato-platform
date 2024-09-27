@@ -1120,43 +1120,46 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
         }
       }
 
-      // Get User's STRATS Asset Address
-      const stratsOriginAddress = await STRATSJs.getStratsAddress();
+      let stratsAssetAddressesToUse = [];
+      if (paymentService.serviceName.toLowerCase().includes("strats")) {
+        // Get User's STRATS Asset Address
+        const stratsOriginAddress = await STRATSJs.getStratsAddress();
 
-      // Retrieve all sales data
-      const salesData = await saleJs.getAll(rawAdmin, { saleAddresses }, options);
+        // Retrieve all sales data
+        const salesData = await saleJs.getAll(rawAdmin, { saleAddresses }, options);
 
-      // Calculate the total order amount
-      const orderTotal = salesData.reduce((acc, sale, index) => acc + (sale.price * quantities[index]), 0);
+        // Calculate the total order amount
+        const orderTotal = salesData.reduce((acc, sale, index) => acc + (sale.price * quantities[index]), 0);
 
-      // Retrieve the user's active STRATS asset addresses with non-zero quantities
-      const userStratsAssets = await inventoryJs.getAll(
-        rawAdmin,
-        {
-          ownerCommonName: userCert.commonName,
-          originAddress: stratsOriginAddress,
-          status: ASSET_STATUS.ACTIVE,
-          queryOptions: { select: "address, quantity" },
-          notEqualsField: "quantity",
-          notEqualsValue: "0",
-          order: 'block_timestamp.desc'
-        },
-        options
-      );
+        // Retrieve the user's active STRATS asset addresses with non-zero quantities
+        const userStratsAssets = await inventoryJs.getAll(
+          rawAdmin,
+          {
+            ownerCommonName: userCert.commonName,
+            originAddress: stratsOriginAddress,
+            status: ASSET_STATUS.ACTIVE,
+            queryOptions: { select: "address, quantity" },
+            notEqualsField: "quantity",
+            notEqualsValue: "0",
+            order: 'block_timestamp.desc'
+          },
+          options
+        );
 
-      // Accumulate STRATS asset addresses to cover the order total
-      let accumulatedTotal = 0;
-      const stratsAssetAddressesToUse = userStratsAssets.reduce((addresses, asset) => {
-        if (accumulatedTotal >= orderTotal) return addresses;
-        
-        addresses.push(asset.address);
-        accumulatedTotal += asset.quantity / 10000;
+        // Accumulate STRATS asset addresses to cover the order total
+        let accumulatedTotal = 0;
+        stratsAssetAddressesToUse = userStratsAssets.reduce((addresses, asset) => {
+          if (accumulatedTotal >= orderTotal) return addresses;
+          
+          addresses.push(asset.address);
+          accumulatedTotal += asset.quantity / 10000;
 
-        return addresses;
-      }, []);
+          return addresses;
+        }, []);
 
-      if (accumulatedTotal < orderTotal) {
-        throw new rest.RestError(RestStatus.BAD_REQUEST, "Insufficient STRATS balance");
+        if (accumulatedTotal < orderTotal) {
+          throw new rest.RestError(RestStatus.BAD_REQUEST, "Not enough STRATS balance");
+        }
       }
       
       const createdDate = Math.floor(Date.now() / 1000);
