@@ -6,7 +6,8 @@ import {
   SendOutlined,
   PieChartOutlined,
   StopOutlined,
-  SwapOutlined
+  SwapOutlined,
+  RetweetOutlined
 } from "@ant-design/icons";
 import PreviewInventoryModal from "./PreviewInventoryModal";
 import { useNavigate } from "react-router-dom";
@@ -15,13 +16,14 @@ import UnlistModal from "./UnlistModal";
 import ResellModal from "./ResellModal";
 import TransferModal from "./TransferModal";
 import RedeemModal from "./RedeemModal";
+import BridgeModal from "./BridgeModal";
 import routes from "../../helpers/routes";
 import { ASSET_STATUS, STRATS_CONVERSION, OLD_SADDOG_ORIGIN_ADDRESS } from "../../helpers/constants";
 import image_placeholder from "../../images/resources/image_placeholder.png";
 import "react-responsive-carousel/lib/styles/carousel.min.css";
 import { SEO } from "../../helpers/seoConstant";
 
-const InventoryCard = ({ inventory, category, debouncedSearchTerm, id, allSubcategories, limit, offset, user }) => {
+const InventoryCard = ({ inventory, category, debouncedSearchTerm, id, allSubcategories, limit, offset, user, supportedTokens }) => {
   const textRef = useRef(null);
   const [isOverflowing, setIsOverflowing] = useState(false);
   const [open, setOpen] = useState(false);
@@ -30,6 +32,7 @@ const InventoryCard = ({ inventory, category, debouncedSearchTerm, id, allSubcat
   const [resellModalOpen, setResellModalOpen] = useState(false);
   const [transferModalOpen, setTransferModalOpen] = useState(false);
   const [redeemModalOpen, setRedeemModalOpen] = useState(false);
+  const [bridgeModalOpen, setBridgeModalOpen] = useState(false);
   const navigate = useNavigate();
   const naviroute = routes.InventoryDetail.url;
   const imgMeta = category ? category : SEO.TITLE_META
@@ -78,6 +81,14 @@ const InventoryCard = ({ inventory, category, debouncedSearchTerm, id, allSubcat
 
   const handleRedeemModalClose = () => {
     setRedeemModalOpen(false);
+  };
+  
+  const showBridgeModal = () => {
+    setBridgeModalOpen(true);
+  };
+
+  const handleBridgeModalClose = () => {
+    setBridgeModalOpen(false);
   };
 
   const callDetailPage = () => {
@@ -129,6 +140,11 @@ const InventoryCard = ({ inventory, category, debouncedSearchTerm, id, allSubcat
       return true;
     }
   }
+
+  // Function to check if the inventory.root is within the supportedTokens array
+  const isTokenSupported = (inventoryRoot) => {
+    return Array.isArray(supportedTokens) && supportedTokens.some(token => token.mercata_root_address === inventoryRoot);
+  };  
 
   /**
    * Determines if the Tooltip of the asset name should be displayed.
@@ -201,6 +217,9 @@ const InventoryCard = ({ inventory, category, debouncedSearchTerm, id, allSubcat
                 </Button>
                 <Button type="link" className="text-[#13188A] text-left px-0 font-semibold text-sm h-6" onClick={showRedeemModal} disabled={inventory.price || inventory.address === inventory.originAddress || !isActive() || disableSADDOGS(inventory)}>
                   <><SendOutlined /> Redeem</>
+                </Button>
+                <Button type="link" className={`text-[#13188A] text-left px-0 font-semibold text-sm h-6 ${!isTokenSupported(inventory.root) ? 'hidden' : ''}`} onClick={showBridgeModal}>
+                  <><RetweetOutlined /> Bridge</>
                 </Button>
               </div>
             }
@@ -339,6 +358,16 @@ const InventoryCard = ({ inventory, category, debouncedSearchTerm, id, allSubcat
         <RedeemModal
           open={redeemModalOpen}
           handleCancel={handleRedeemModalClose}
+          limit={limit}
+          offset={offset}
+          inventory={inventory}
+          categoryName={category}
+        />
+      )}
+      {bridgeModalOpen && (
+        <BridgeModal
+          open={bridgeModalOpen}
+          handleCancel={handleBridgeModalClose}
           limit={limit}
           offset={offset}
           inventory={inventory}
