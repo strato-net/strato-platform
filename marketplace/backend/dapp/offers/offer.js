@@ -160,7 +160,6 @@ async function acceptOffer(user, args, options) {
   const callArgs = {
     name: contractName,
     address: args.address,
-    args: marshalIn(args),
   };
 
   const acceptedOffer = await rest.call(user, callArgs, options);
@@ -171,7 +170,6 @@ async function rejectOffer(user, args, options) {
   const callArgs = {
     name: contractName,
     address: args.address,
-    args: marshalIn(args),
   };
 
   const rejectedOffer = await rest.call(user, callArgs, options);
@@ -182,7 +180,6 @@ async function cancelOffer(user, args, options) {
   const callArgs = {
     name: contractName,
     address: args.address,
-    args: marshalIn(args),
   };
 
   const canceledOffer = await rest.call(user, callArgs, options);
