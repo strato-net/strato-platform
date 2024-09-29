@@ -1275,27 +1275,23 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
   }
 
   contract.updateOffer = async function (args, options = defaultOptions) {
-    const { offerAddress, ...restArgs } = args;
-    const contract = { name: offerJs.contractName, address: offerAddress }
-    return offerJs.updateOffer(rawAdmin, contract, restArgs, options);
+    const offers = await offerJs.rejectOffer(rawAdmin, args, options);
+    return offers;
   }
 
   contract.acceptOffer = async function (args, options = defaultOptions) {
-    const { offerAddress, ...restArgs } = args;
-    const contract = { name: offerJs.contractName, address: offerAddress }
-    return offerJs.acceptOffer(rawAdmin, contract, restArgs, options);
+    const offers = await offerJs.rejectOffer(rawAdmin, args, options);
+    return offers;
   }
 
   contract.rejectOffer = async function (args, options = defaultOptions) {
-    const { offerAddress, ...restArgs } = args;
-    const contract = { name: offerJs.contractName, address: offerAddress }
-    return offerJs.rejectOffer(rawAdmin, contract, restArgs, options);
+    const offers = await offerJs.rejectOffer(rawAdmin, args, options);
+    return offers;
   }
 
   contract.cancelOffer = async function (args, options = defaultOptions) {
-    const { offerAddress, ...restArgs } = args;
-    const contract = { name: offerJs.contractName, address: offerAddress }
-    return offerJs.cancelOffer(rawAdmin, contract, restArgs, options);
+    const offers = await offerJs.rejectOffer(rawAdmin, args, options);
+    return offers;
   }
 
   contract.getIncomingOffers = async function (args, options = defaultOptions) {
@@ -1304,6 +1300,7 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
     const user = args.user
     const newArgs = { sellerCommonName: user }
     const incomingOffers = await offerJs.getAll(rawAdmin, newArgs, getOptions);
+    // TODO: Organize the offers. Group them by the asset they are offering to buy
     return incomingOffers;
   }
 
@@ -1313,6 +1310,7 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
     const user = args.user
     const newArgs = { purchaserCommonName: user }
     const outgoingOffers = await offerJs.getAll(rawAdmin, newArgs, getOptions);
+    // TODO: Organize the offers. Group them by the asset they are offering to buy
     return outgoingOffers;
   }
 

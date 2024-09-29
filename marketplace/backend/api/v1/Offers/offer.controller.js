@@ -44,7 +44,6 @@ class OfferController {
     static async create(req, res, next) {
         try {
             const { dapp, body } = req
-            console.log("Checking Controller ===> ", body);
             OfferController.validateCreateOfferArgs(body)
 
             const result = await dapp.createOffer(body, options)
@@ -69,7 +68,7 @@ class OfferController {
     static async accept(req, res, next) {
         try {
             const { dapp, body } = req
-            const result = await dapp.acceptOrder(body, options)
+            const result = await dapp.acceptOffer(body, options)
             rest.response.status200(res, result)
             return next()
         } catch (e) {
@@ -138,6 +137,20 @@ class OfferController {
 
         if (validation.error) {
             throw new rest.RestError(RestStatus.BAD_REQUEST, 'Create Offer Argument Validation Error', {
+                message: `Missing args or bad format: ${validation.error.message}`,
+            })
+        }
+    }
+
+    static validateOfferActionArgs(args) {
+        const offerActionSchema = Joi.object({
+            address: Joi.string().required(),
+        }).required()
+
+        const validation = offerActionSchema.validate(args)
+
+        if (validation.error) {
+            throw new rest.RestError(RestStatus.BAD_REQUEST, 'Offer Action Argument Validation Error', {
                 message: `Missing args or bad format: ${validation.error.message}`,
             })
         }
