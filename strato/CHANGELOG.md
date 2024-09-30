@@ -28,6 +28,7 @@ so that they could be properly moved to their respective version's subsection.
 - Added `<best_sequenced_block>` to reduce the redundant block requests in p2p
 - Added strict mode to sequencer that will cause crash on block authentication
 - Added `INSTRUMENTATION` flag to see finer-grained memory usage in processes
+- Added block.proposer to SolidVM
 
 ### Changed
 - General cleanup of Kafka-related code

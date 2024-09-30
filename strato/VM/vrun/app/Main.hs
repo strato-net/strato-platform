@@ -17,6 +17,7 @@ import Blockchain.Data.Transaction
 import qualified Blockchain.Database.MerklePatricia as MP
 import Blockchain.Sequencer.Event
 import Blockchain.Strato.Model.Account
+import Blockchain.Strato.Model.Address
 import Blockchain.Strato.Model.ChainMember
 import Blockchain.Strato.Model.Code
 import Blockchain.Strato.Model.Keccak256
@@ -131,7 +132,7 @@ main = do
             addressStateChainId = Nothing
           }
 
-      runExceptT $ addTransaction Nothing True blockData 10000000000000000000000000000 signedTransaction
+      runExceptT $ addTransaction Nothing True blockData 10000000000000000000000000000 signedTransaction (Address 0)
 
   case result of
     Left e -> putStrLn $ show e
