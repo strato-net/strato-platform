@@ -280,10 +280,13 @@ class InventoryController {
   static validateListItemArgs(args) {
     const listItemSchema = Joi.object({
       assetToBeSold: Joi.string().required(),
-      paymentProviders: Joi.array().min(1).items(
-        Joi.string().min(0).required(),
+      paymentServices: Joi.array().min(1).items(
+        Joi.object({
+            creator: Joi.string().required(),
+            serviceName: Joi.string().required(),
+        })
       ).required(),
-      price: Joi.number().greater(0).precision(2).required(),
+      price: Joi.number().greater(0).precision(4).required(),
       quantity: Joi.number().integer().greater(0).optional(),
     });
 
@@ -353,7 +356,7 @@ class InventoryController {
       assetAddress: Joi.string().required(),
       newOwner: Joi.string().required(),
       quantity: Joi.number().integer().greater(0).required(),
-      price: Joi.number().greater(0).precision(2).required(),
+      price: Joi.number().greater(0).precision(4).required(),
     });
 
     const validation = transferItemSchema.validate(args);
@@ -369,10 +372,13 @@ class InventoryController {
   static validateUpdateSaleArgs(args) {
     const updateSaleItemSchema = Joi.object({
       saleAddress: Joi.string().required(),
-      paymentProviders: Joi.array().min(1).items(
-        Joi.string().min(0).required(),
-      ).optional(),
-      price: Joi.number().greater(0).precision(2).optional(),
+      paymentServices: Joi.array().min(1).items(
+        Joi.object({
+            creator: Joi.string().required(),
+            serviceName: Joi.string().required(),
+        })
+      ).required(),
+      price: Joi.number().greater(0).precision(4).optional(),
       quantity: Joi.number().integer().greater(0).optional(),
     });
 
