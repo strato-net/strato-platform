@@ -271,7 +271,7 @@ data ContextState = ContextState
     _runningTests :: !Bool,
     _txRunResultsCache :: TRC.Cache,
     _debugSettings :: !(Maybe DebugSettings),
-    _selfAddress :: Maybe Address
+    _selfAddress :: !Address
   }
   deriving (Generic, NFData)
 
@@ -289,7 +289,7 @@ instance Default ContextState where
         _runningTests = False,
         _txRunResultsCache = error "Default ContextState: accessing uninitialized txRunResultsCache",
         _debugSettings = Nothing,
-        _selfAddress = Nothing
+        _selfAddress = Address 0
       }
 
 data QueueEvent
@@ -445,7 +445,7 @@ runTestContextM f = withSystemTempDirectory "test_evm_context" $ \tmpdir ->
               _runningTests = True,
               _txRunResultsCache = cache,
               _debugSettings = Nothing,
-              _selfAddress = Nothing
+              _selfAddress = Address 0
             }
       que <- newTQueueIO
       let ctx =

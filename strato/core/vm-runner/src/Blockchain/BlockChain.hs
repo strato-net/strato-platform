@@ -39,6 +39,7 @@ import qualified Blockchain.DB.BlockSummaryDB as BSDB
 import Blockchain.DB.ChainDB
 import Blockchain.DB.CodeDB
 import Blockchain.DB.HashDB
+-- import qualified Blockchain.SolidVM.Environment as Env
 import Blockchain.DB.MemAddressStateDB
 import Blockchain.DB.ModifyStateDB
 import Blockchain.DB.RawStorageDB
@@ -51,6 +52,7 @@ import Blockchain.Data.DataDefs
 import Blockchain.Data.ExecResults
 import Blockchain.Data.Log
 import Blockchain.Data.Transaction
+-- import SolidVM.Model.Value
 import Blockchain.Data.TransactionDef (formatChainId)
 import Blockchain.Data.TransactionResultStatus
 import qualified Blockchain.Database.MerklePatricia as MP
@@ -58,6 +60,7 @@ import Blockchain.DB.StateDB
 import Blockchain.Event
 import Blockchain.Sequencer.Event
 import qualified Blockchain.SolidVM as SolidVM
+-- import Blockchain.SolidVM.SM
 import Blockchain.Strato.Indexer.Model (IndexEvent (..))
 import Blockchain.Strato.Model.Account
 import Blockchain.Strato.Model.Address
@@ -79,6 +82,7 @@ import Blockchain.VMContext
 import Blockchain.VMMetrics
 import qualified Blockchain.EVM as EVM
 -- import qualified Blockchain.EVM.Code as EVC
+import Blockchain.Blockstanbul.Model.Authentication
 import Blockchain.VMOptions
 import Blockchain.Verifier
 import Conduit
@@ -245,7 +249,19 @@ addBlock b@OutputBlock {obBlockData = bd, obReceiptTransactions = otxs} =
         bSum <- setParentStateRoot b
         -- TODO: PLEASE REMOVE THIS FORK WHEN MERCATA-HYDROGEN IS OBSOLETE
         when (computeNetworkID == 7596898649924658542 && number bd == 32624) runTheDAOFork -- Only run this if connected to mercata-hydrogen
-        trrs <- addBlockTransactions b
+
+        let pHash = proposalHash bd
+            mSig = getProposerSeal bd  -- Signature is Maybe type
+        proposer <- case mSig of
+                        Just sig -> do
+                            let (r, s, v) = getSigVals sig
+                                proposerAddress = whoReallySignedThisTransactionEcrecover pHash r s (v - 0x1b)
+                            case proposerAddress of
+                              Just addr ->  return addr
+                              Nothing -> error "no proposer"
+                        Nothing -> error "no proposer"
+
+        trrs <- addBlockTransactions b proposer
 
         postRewardSR <- A.lookup (A.Proxy @MP.StateRoot) (Nothing :: Maybe Word256)
         verifyBlockResult <- verifyBlock (outputBlockToBlock b) (trrs, postRewardSR) bSum
@@ -297,8 +313,8 @@ verifyBlock b@Block{blockBlockData = bh} (trrs, derivedSR) parentBSum = do
         2 -> catMaybes [srCheck, validatorCheck, certCheck]
         v -> [VersionMismatch $ BlockDelta v 2]
 
-addBlockTransactions :: (Bagger.MonadBagger m, MonadMonitor m) => OutputBlock -> ConduitT a VmOutEvent m [TxRunResult]
-addBlockTransactions OutputBlock {obBlockData = bd, obReceiptTransactions = transactions} = do
+addBlockTransactions :: (Bagger.MonadBagger m, MonadMonitor m) => OutputBlock -> Address -> ConduitT a VmOutEvent m [TxRunResult]
+addBlockTransactions OutputBlock {obBlockData = bd, obReceiptTransactions = transactions} proposer = do
   $logDebugS "addBlockTransactions" . T.pack $ "All transactions: " ++ show transactions
   let txs =
         filter (\t -> (txType t /= PrivateHash) || (isJust $ otPrivatePayload t)) $
@@ -313,7 +329,7 @@ addTransactions ::
   (VMBase m, MonadMonitor m) =>
   BlockHeader ->
   [OutputTx] ->
-  Account ->
+  Address ->
   ConduitT a VmOutEvent m [TxRunResult]
 addTransactions blockData txs proposer =
   timeit ("addTransactions, " ++ show (length txs) ++ " TXs") (Just vmBlockInsertionMined) $ do
@@ -379,7 +395,7 @@ mineTransactions' header remGas ran unran@(tx : txs) mSelfAddress = do
                   let nextRemGas = remGas - (transactionGasLimit bt - calculateReturned bt execResult)
                   flushMemAddressStateTxToBlockDB
                   flushMemStorageTxDBToBlockDB
-                  mineTransactions' header nextRemGas (ran `DL.snoc` trr) txs
+                  mineTransactions' header nextRemGas (ran `DL.snoc` trr) txs mSelfAddress
     Left failure -> do
       return $ Bagger.TxMiningResult (Just failure) (DL.toList ran) unran remGas
 
@@ -393,7 +409,7 @@ addTransaction ::
   BlockHeader ->
   Integer ->
   OutputTx ->
-  Account -> 
+  Address -> 
   ExceptT TransactionFailureCause m ExecResults
 addTransaction chainId isRunningTests' b remainingBlockGas t@OutputTx {otSigner = tAddr} proposer = do
   nonceValid <- lift $ isNonceValid t
@@ -439,7 +455,7 @@ addTransaction chainId isRunningTests' b remainingBlockGas t@OutputTx {otSigner 
       adjustedTxGasLimit = bool (transactionGasLimit bt) (flags_strictGasLimit) (flags_strictGas && not isKnownToBeSlow)
   when flags_strictGas $ $logInfoS "addTx" . T.pack $ "Strict Gas Mode is on. Adjusted transaction gas limit is " ++ show adjustedTxGasLimit
 
-  execResults <- runCodeForTransaction isRunningTests' isHomestead b (fromInteger (adjustedTxGasLimit) - intrinsicGas') tAcct t
+  execResults <- runCodeForTransaction isRunningTests' isHomestead b (fromInteger (adjustedTxGasLimit) - intrinsicGas') tAcct t proposer
   lift $ P.incCounter vmTxsProcessed
 
   case erException execResults of
@@ -462,8 +478,9 @@ runCodeForTransaction ::
   Gas ->
   Account ->
   OutputTx ->
+  Address ->
   ExceptT TransactionFailureCause m ExecResults
-runCodeForTransaction isRunningTests' isHomestead b availableGas tAcct t =
+runCodeForTransaction isRunningTests' isHomestead b availableGas tAcct t proposer =
   let ut = fromMaybe (otBaseTx t) (otPrivatePayload t)
    in if isContractCreationTX ut
         then do
@@ -471,12 +488,12 @@ runCodeForTransaction isRunningTests' isHomestead b availableGas tAcct t =
 
           let create =
                 case join $ fmap (M.lookup "VM") $ transactionMetadata ut of
-                  Just "EVM" -> EVM.create
+                  Just "EVM" -> (\a bro c d e f g _ i j k l m n o p -> EVM.create a bro c d e f g i j k l m n o p)
                   Just "SolidVM" -> SolidVM.create
-                  Nothing -> EVM.create
+                  Nothing -> (\a bro c d e f g _ i j k l m n o p -> EVM.create a bro c d e f g i j k l m n o p)
                   Just vmName ->
                     -- Return a dummy VM that just complains that the requested VM doesn't exist
-                    \_ _ _ _ _ _ _ _ _ ag _ _ _ _ _ ->
+                    \_ _ _ _ _ _ _ _ _ _ ag _ _ _ _ _ ->
                       return $ evmErrorResults (toInteger ag) (UnsupportedVM vmName)
 
           --TODO- The new address state should be created in the VM itself....  Currently the EVM doesn't do this (and could be cleaned up by doing so), SolidVM does do this.  I will calculate this value here, but then ignore the value in SolidVM (and recalculate it there).  Eventually this should be moved into the EVM also
@@ -493,6 +510,7 @@ runCodeForTransaction isRunningTests' isHomestead b availableGas tAcct t =
               0
               tAcct
               tAcct
+              proposer
               (transactionValue ut)
               (fromInteger $ transactionGasPrice ut)
               availableGas
@@ -511,14 +529,14 @@ runCodeForTransaction isRunningTests' isHomestead b availableGas tAcct t =
 
           let eCall =
                 case codeHash of
-                  ExternallyOwned _ -> Right EVM.call
+                  ExternallyOwned _ -> Right (\a bro c d e f g h i j _ l m n o p q r -> EVM.call a bro c d e f g h i j l m n o p q r)
                   SolidVMCode _ _ -> Right SolidVM.call
                   CodeAtAccount acct name -> case resolvedCodeHash of
-                    Just (ExternallyOwned _) -> Right EVM.call
+                    Just (ExternallyOwned _) -> Right (\a bro c d e f g h i j _ l m n o p q r -> EVM.call a bro c d e f g h i j l m n o p q r)
                     Just (SolidVMCode _ _) -> Right SolidVM.call
                     Just (CodeAtAccount acct' name') -> Left (acct', name')
                     Nothing -> Left (acct, name)
-
+          
           case eCall of
             Left (acct, name) -> throwE $ TFCodeCollectionNotFound acct name t
             Right call ->
@@ -534,6 +552,7 @@ runCodeForTransaction isRunningTests' isHomestead b availableGas tAcct t =
                   owner
                   owner
                   tAcct
+                  proposer
                   (fromInteger $ transactionValue ut)
                   (fromInteger $ transactionGasPrice ut)
                   (transactionData ut)
