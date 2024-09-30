@@ -15,6 +15,7 @@
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE StandaloneDeriving #-}
 {-# LANGUAGE TemplateHaskell #-}
+{-# LANGUAGE TupleSections #-}
 {-# LANGUAGE TypeApplications #-}
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE TypeOperators #-}
@@ -40,18 +41,19 @@ import Control.Monad.Trans.Except
 import Data.Aeson hiding (Success)
 import qualified Data.ByteString.Lazy as BL
 import qualified Data.Map as M
-import Data.Maybe (catMaybes, fromMaybe)
+import Data.Maybe (catMaybes, fromMaybe, maybeToList)
 import qualified Data.Text as T
 import Data.Text.Encoding (decodeUtf8, encodeUtf8)
 import Data.Time (getCurrentTime)
 import GHC.Generics
+import IdentityProvider.OAuth (getAccessToken, AccessToken(..))
 import IdentityService.API
 import IdentityService.API.Types
 import IdentityService.Server.Types
 import Network.HTTP.Client hiding (Proxy)
 import qualified Network.HTTP.Client as HTTP (Response)
 import Network.HTTP.Client.TLS
-import Network.HTTP.Types.Header (hContentType)
+import Network.HTTP.Types.Header (hContentType, hAuthorization)
 import Network.HTTP.Types.Status
 import Servant
 import Servant.Client hiding (manager, responseBody)
@@ -68,6 +70,13 @@ instance Monad m => HasVault (ReaderT IdentityServerData m) where
     pk <- asks issuerPrivKey
     pure $ derivePublicKey pk
   getShared _ = error "The Identity Server should not need to create a shared key"
+
+-- instance (MonadIO m, Accessible IdentityServerData m) => Accessible (Maybe AccessToken) (ReaderT IdentityServerData m) where
+--   access _ = do
+--     te <- asks tokenEndpoint
+--     ci <- asks clientId
+--     cs <- asks clientSecret
+--     getAccessToken ci cs te
 
 getPingIdentity :: (MonadIO m) => m Int
 getPingIdentity = return 1
@@ -197,8 +206,9 @@ certInCirrus ::
   BinaryOp String Address ->
   m [X509Certificate]
 certInCirrus op = do
-  nurl1 <- nodeUrl <$> access (Proxy @IdentityServerData)
-  response1 <- callCirrus nurl1
+  IdentityServerData{nodeUrl = nurl1, tokenEndpoint = te, clientId = ci, clientSecret = cs} <- access (Proxy @IdentityServerData)
+  mToken <- getAccessToken ci cs te
+  response1 <- callCirrus nurl1 mToken
   mCerts :: Either String [CertificateInCirrus] <-
     if statusCode (responseStatus response1) == 200
       then return . eitherDecode $ responseBody response1
@@ -237,8 +247,8 @@ certInCirrus op = do
       , restOfQuery
       ]
 
-    callCirrus :: (MonadIO m, MonadLogger m) => BaseUrl -> m (HTTP.Response BL.ByteString)
-    callCirrus nurl = do
+    callCirrus :: (MonadIO m, MonadLogger m) => BaseUrl -> Maybe AccessToken -> m (HTTP.Response BL.ByteString)
+    callCirrus nurl mToken = do
       let cirrusEndpoint = cirrusSearchPath op
           url = showBaseUrl nurl {baseUrlPath = baseUrlPath nurl <> cirrusEndpoint}
       $logErrorS "callCirrus" . T.pack $ cirrusEndpoint
@@ -247,7 +257,7 @@ certInCirrus op = do
         Http -> newManager defaultManagerSettings
         Https -> newManager tlsManagerSettings
       request <- liftIO $ parseRequest url
-      let rHead = [(hContentType, "application/json")]
+      let rHead = [(hContentType, "application/json")] ++ maybeToList ( ((hAuthorization, ) .  encodeUtf8 . T.append "Bearer " . access_token) <$> mToken )
       liftIO $ httpLbs request {requestHeaders = rHead} mgr
 
 createAndRegisterCert ::
@@ -284,10 +294,11 @@ registerCert ::
   X509Certificate ->
   m ()
 registerCert cert = do
-  IdentityServerData{nodeUrl = nurl} <- access (Proxy @IdentityServerData)
+  IdentityServerData{nodeUrl = nurl, tokenEndpoint = te, clientId = ci, clientSecret = cs} <- access (Proxy @IdentityServerData)
   mgr <- liftIO $ case baseUrlScheme nurl of
     Http -> newManager defaultManagerSettings
     Https -> newManager tlsManagerSettings
+  mToken <- getAccessToken ci cs te
   let clientEnv = mkClientEnv mgr nurl {baseUrlPath = baseUrlPath nurl <> blocEndpoint}
       txPayload =
         BlocFunction
@@ -301,7 +312,7 @@ registerCert cert = do
               functionpayloadMetadata = Nothing
             }
       txRequest = PostBlocTransactionRequest Nothing [txPayload] Nothing Nothing
-      postBlocTx = runClientM (postBlocTransactionParallel Nothing Nothing Nothing True False txRequest)
+      postBlocTx = runClientM (postBlocTransactionParallel (access_token <$> mToken) Nothing Nothing True False txRequest)
   eresponse <- liftIO $ postBlocTx clientEnv
   case eresponse of
     Right response ->

@@ -3,7 +3,9 @@
 set -ex
 
 echo 'export PS1="⛓ \w> "' >> /root/.bashrc
-
+CLIENT_ID=${CLIENT_ID}
+CLIENT_SECRET=${CLIENT_SECRET}
+OAUTH_DISCOVERY_URL=${OAUTH_DISCOVERY_URL}
 PROCESS_MONITORING=${PROCESS_MONITORING:-true}
 identityServicePort=${identityServicePort:-8014}
 NODE_URL=${NODE_URL:-http://localhost:8080}
@@ -43,6 +45,7 @@ function runIdentityServer {
     --nodeUrl=${NODE_URL} \
     --userRegistryAddress=${USER_REGISTRY_ADDRESS} \
     --userRegistryCodeHash=${USER_REGISTRY_CODEHASH} \
+    --CLIENT_ID=${CLIENT_ID} --CLIENT_SECRET=${CLIENT_SECRET} --OAUTH_DISCOVERY_URL=${OAUTH_DISCOVERY_URL} \
     --userContractName=${USER_CONTRACT_NAME} &>> logs/identity-service-server
   
   echo "Configuring log rotation..."

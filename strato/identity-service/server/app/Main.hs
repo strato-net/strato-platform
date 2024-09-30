@@ -14,6 +14,7 @@ import Blockchain.Strato.Model.Keccak256
 import qualified Data.ByteString as B
 import Data.Maybe (fromMaybe)
 import HFlags
+import qualified IdentityProvider.OAuth as OAuth (getEndpointsFromDiscovery, OAuthEndpoints(..))
 import IdentityService.Server
 import Network.Wai.Handler.Warp (run)
 import Network.Wai.Middleware.Cors
@@ -41,6 +42,7 @@ main = do
     Left err -> error $ "Error parsing issuer private key: " <> err
     Right privk -> return privk
   nurl <- parseBaseUrl flags_nodeUrl
+  te <- OAuth.token_endpoint <$> OAuth.getEndpointsFromDiscovery flags_OAUTH_DISCOVERY_URL
 
   putStrLn "Initializing identity server..."
   let p = flags_port
@@ -51,7 +53,10 @@ main = do
                    nodeUrl = nurl,
                    userRegAddr = fromMaybe (Address 0x720) . stringAddress $ flags_userRegistryAddress,
                    userRegCodeHash = stringKeccak256 $ flags_userRegistryCodeHash,
-                   userTableName = flags_userContractName
+                   userTableName = flags_userContractName,
+                   clientId = flags_CLIENT_ID,
+                   clientSecret = flags_CLIENT_SECRET,
+                   tokenEndpoint = te
                  }
   run p
     $ cors (const $ Just simpleCorsResourcePolicy {corsRequestHeaders = ["Content-Type"]})
