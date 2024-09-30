@@ -189,6 +189,7 @@ const ConfirmOrder = ({ paymentServices = [], data, columns }) => {
       setSelectedProvider('')
     }
     if (checkoutHashAndAssets && checkoutHashAndAssets !== false) {
+      await actions.fetchStratsBalance(marketplaceDispatch);
       const [checkoutHash, assets] = checkoutHashAndAssets;
       let serviceURL = paymentService.serviceURL || paymentService.data.serviceURL;
       let checkoutRoute = paymentService.checkoutRoute || paymentService.data.checkoutRoute;
