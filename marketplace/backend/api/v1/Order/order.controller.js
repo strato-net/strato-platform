@@ -203,6 +203,7 @@ class OrderController {
     const paymentSchema = Joi.object({
       paymentService: Joi.object({
         address: Joi.string().required(),
+        serviceName: Joi.string().required(),
       }).required(),
       buyerOrganization: Joi.string().required(),
       orderList: Joi.array().min(1).items(Joi.object({

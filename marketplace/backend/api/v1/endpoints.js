@@ -62,6 +62,8 @@ export const Inventory = {
   unlist: '/unlist',
   resell: '/resell',
   transfer: '/transfer',
+  supportedTokens: '/supportedTokens',
+  bridge: '/bridge',
   updateSale: '/updateSale',
   getPriceHistory: '/price/history',
 }
@@ -107,7 +109,7 @@ export const Tokens = {
 }
 
 export const STRATS = {
-  prefix: '/STRATS',
+  prefix: '/STRATSTokens',
   getAll: '/',
   create: '/'
 }

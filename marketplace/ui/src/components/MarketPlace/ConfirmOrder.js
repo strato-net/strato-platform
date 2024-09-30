@@ -162,7 +162,7 @@ const ConfirmOrder = ({ paymentServices = [], data, columns }) => {
     generate_HTML_Content(user.commonName)
 
     let body = {
-      paymentService: { address: paymentService.address },
+      paymentService: { address: paymentService.address, serviceName: paymentService.serviceName },
       buyerOrganization: userOrganization,
       orderList,
       orderTotal: total,

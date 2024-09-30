@@ -57,7 +57,7 @@ async function createTransactionPayload(token, transactions) {
 
     const stratsAssetAddressesToUse = [];
 
-    let remainingValue = transaction.value * 100;
+    let remainingValue = transaction.value;
 
     for (const asset of STRATSContracts) {
       if (remainingValue <= 0) break;
@@ -115,7 +115,7 @@ async function getAdminStratsContractAddress(token) {
     originAddress: `eq.${originAddress}`,
     status: 'eq.1',
     select: 'address,quantity',
-    order: 'createdDate.desc',
+    order: 'block_timestamp.desc',
     quantity: 'neq.0'
   });
 

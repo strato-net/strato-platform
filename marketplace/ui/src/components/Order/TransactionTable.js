@@ -54,6 +54,7 @@ const TransactionTable = ({ user, download, isAllOrdersLoading }) => {
   useEffect(() => {
     async function fetchStratsAddress() {
       const stratsAddress = await marketplaceActions.fetchStratsAddress(marketplaceDispatch);
+      await marketplaceActions.fetchStratsBalance(marketplaceDispatch);
       setOriginAddress(stratsAddress);
     }
     fetchStratsAddress();
@@ -99,7 +100,7 @@ const TransactionTable = ({ user, download, isAllOrdersLoading }) => {
     // Type filter
     if (type) {
       if (type === "STRATS") {
-        filteredData = filteredData.filter((item) => item.currency === "STRATS" || item.assetOriginAddress === originAddress);
+        filteredData = filteredData.filter((item) => item.assetOriginAddress === originAddress);
       } else {
         filteredData = filteredData.filter((item) => item.type === type);
       }

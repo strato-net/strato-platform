@@ -77,6 +77,11 @@ const HeaderComponent = ({ user, loginUrl, showMenu, handleSubMenu, handleMenuTa
   }, [user]);
 
   useEffect(() => {
+    async function fetchStratsAddress() {
+      const stratsAddress = await marketplaceActions.fetchStratsAddress(marketplaceDispatch);
+      setOriginAddress(stratsAddress);
+    }
+    fetchStratsAddress();
     marketplaceActions.fetchCartItems(marketplaceDispatch, cartList);
   }, [marketplaceDispatch, cartList]);
 
@@ -88,7 +93,7 @@ const HeaderComponent = ({ user, loginUrl, showMenu, handleSubMenu, handleMenuTa
   const [isModalVisible, setIsModalVisible] = useState(false);
   const [isTransferStratsModalVisible, setIsTransferStratsModalVisible] = useState(false);
   const [isStratsTransactionHistoryModalVisible, setIsStratsTransactionHistoryModalVisible] = useState(false);
-
+  const [originAddress, setOriginAddress] = useState();
   const stratsBalance = (Object.keys(strats).length > 0) ? strats : 0
 
   useEffect(() => {
@@ -197,21 +202,23 @@ const HeaderComponent = ({ user, loginUrl, showMenu, handleSubMenu, handleMenuTa
         </div>
       ),
       children: [
-        // {
-        //   key: '2',
-        //   onClick: () => setIsTransferStratsModalVisible(true),
-        //   label: (
-        //     <div>
-        //       {user &&
-        //         <p className="text-xs mt-1">
-        //           Transfer
-        //         </p>
-        //       }
-        //     </div>
-        //   ),
-        // },
         {
           key: '2',
+          onClick: async () => {
+            navigate(`${routes.MarketplaceProductDetail.url.replace(':address', originAddress).replace(':name', "STRATS")}`)
+          },
+          label: (
+            <div>
+              {user && originAddress &&
+                <p className="text-xs mt-1">
+                  Buy STRATS
+                </p>
+              }
+            </div>
+          ),
+        },
+        {
+          key: '3',
           onClick: async () => {
             navigate(`${routes.Transactions.url}?type=STRATS`)
           },

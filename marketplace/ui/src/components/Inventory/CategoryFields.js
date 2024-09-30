@@ -61,7 +61,7 @@ export const categoricalProperties = (form, handleClothingTypeChange, clothingTy
                     </Form.Item>
                 </div>
             );
-        case "STRATS":
+        case "STRATSTokens":
             return (
                 <div className="flex justify-between gap-3 flex-wrap md:flex-nowrap mt-4">
                     <Form.Item
