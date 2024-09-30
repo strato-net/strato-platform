@@ -54,6 +54,7 @@ const TransactionTable = ({ user, download, isAllOrdersLoading }) => {
   useEffect(() => {
     async function fetchStratsAddress() {
       const stratsAddress = await marketplaceActions.fetchStratsAddress(marketplaceDispatch);
+      await marketplaceActions.fetchStratsBalance(marketplaceDispatch);
       setOriginAddress(stratsAddress);
     }
     fetchStratsAddress();
