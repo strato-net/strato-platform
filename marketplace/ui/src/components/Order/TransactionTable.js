@@ -99,7 +99,7 @@ const TransactionTable = ({ user, download, isAllOrdersLoading }) => {
     // Type filter
     if (type) {
       if (type === "STRATS") {
-        filteredData = filteredData.filter((item) => item.currency === "STRATS" || item.assetOriginAddress === originAddress);
+        filteredData = filteredData.filter((item) => item.assetOriginAddress === originAddress);
       } else {
         filteredData = filteredData.filter((item) => item.type === type);
       }

@@ -42,10 +42,10 @@ contract STRATSTokens is Tokens {
         _;
     }
     
-    function purchaseTransfer(address _newOwner, uint _quantity) public fromPaymentService("make a purchase") {
+    function purchaseTransfer(address _newOwner, uint _quantity, uint _transferNumber, decimal _price) public fromPaymentService("make a purchase") {
         require(_quantity <= quantity, "Cannot transfer more than available quantity.");
         // regular transfer - isUserTransfer: false, transferNumber: 0
         // transfer feature - isUserTransfer: true, transferNumber: >0
-        _transfer(_newOwner, _quantity, false, 0, 0);
+        _transfer(_newOwner, _quantity, true, _transferNumber, _price);
     }
 }
