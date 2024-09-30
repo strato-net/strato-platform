@@ -1,5 +1,5 @@
 const factory = {
-    getPaymentProviderArgs: (uid) => {
+    getPaymentServiceArgs: (uid) => {
         const args = {
             name: 1,
             accountId: `accountId_${uid}`,

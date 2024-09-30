@@ -25,7 +25,7 @@ const NewTrendingCard = ({ topSellingProduct, addItemToCart, parent = "", api, c
 
     const [isModalVisible, setIsModalVisible] = useState(false);
     const [isWishlisted, setIsWishlisted] = useState(false);
-    const saleQuantity = topSellingProduct.quantityIsDecimal === true ? (topSellingProduct.saleQuantity / 100) : topSellingProduct.saleQuantity;
+    const saleQuantity = topSellingProduct.data.quantityIsDecimal && topSellingProduct.data.quantityIsDecimal === "True" ? (topSellingProduct.saleQuantity / 100) : topSellingProduct.saleQuantity;
     const [quantity, setQuantity] = useState(1);
 
     const ownerSameAsUser = () => {
@@ -132,12 +132,21 @@ const NewTrendingCard = ({ topSellingProduct, addItemToCart, parent = "", api, c
                     </div>
                 </a>
                 <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                    {topSellingProduct?.price &&
-                        <Typography className="font-semibold">
-                        {`$${topSellingProduct?.price} `} <span className="font-normal text-xs mr-2 text-primary"><b> {`(${(topSellingProduct?.price * STRATS_CONVERSION).toFixed(0)} STRATS)`} </b></span>
-                    </Typography>
-                    
-                    }
+                    {topSellingProduct?.price ? (
+                        (() => {
+                        const adjustedPrice = topSellingProduct.data.quantityIsDecimal && topSellingProduct.data.quantityIsDecimal === "True" 
+                            ? topSellingProduct.price * 100 
+                            : topSellingProduct.price;
+
+                        return (
+                            <Typography className="font-semibold">
+                                {`$${adjustedPrice} `} <span className="font-normal text-xs mr-2 text-primary"><b> {`(${(adjustedPrice * STRATS_CONVERSION).toFixed(0)} STRATS)`} </b></span>
+                            </Typography>
+                        );
+                        })()
+                    ) : (
+                        "No Price Available"
+                    )}
                     {isAvailableForSale && <Text type="danger" strong> Sold Out </Text>}
                     {topSellingProduct?.contract_name.toLowerCase().includes("clothing") && (
                         <Typography className='font-normal text-black'>Size: {topSellingProduct?.data?.size ? topSellingProduct?.data?.size : "N/A"}</Typography>
@@ -153,7 +162,7 @@ const NewTrendingCard = ({ topSellingProduct, addItemToCart, parent = "", api, c
                     <Typography>Quantity:</Typography>
                     <div className='flex gap-3 p-1 bg-white'>
                         <Typography className={`px-2 bg-[#EEEFFA] rounded-sm ${quantity === 1 ? 'cursor-not-allowed opacity-50' : 'cursor-pointer'}`} onClick={() => {
-                            setQuantity(quantity === 1 ? quantity : quantity - 1)
+                            setQuantity(Math.max(quantity - 1, 1));
                         }}>
                             -
                         </Typography>

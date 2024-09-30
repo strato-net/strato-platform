@@ -12,7 +12,7 @@ import { handlePriceInput, handleQuantityInput } from "../../helpers/utils";
 import { OLD_SADDOG_ORIGIN_ADDRESS } from "../../helpers/constants";
 
 const TransferModal = ({ open, handleCancel, inventory, categoryName = "", limit=0, offset=0 }) => {
-    const [data, setData] = useState([inventory]);
+    const [data, setData] = useState(inventory);
     const [quantity, setQuantity] = useState(1);
     const [price, setPrice] = useState(0);
     const inventoryDispatch = useInventoryDispatch();
@@ -20,6 +20,7 @@ const TransferModal = ({ open, handleCancel, inventory, categoryName = "", limit
     const userDispatch = useUsersDispatch();
     const [api, contextHolder] = notification.useNotification();
     const [canTransfer, setCanTransfer] = useState(true);
+    const quantityIsDecimal = data.data.quantityIsDecimal && data.data.quantityIsDecimal === "True";
     const {
         user
     } = useAuthenticateState();
@@ -99,7 +100,7 @@ const TransferModal = ({ open, handleCancel, inventory, categoryName = "", limit
     }, []);
 
     useEffect(() => {
-        if (quantity > inventory.quantity || quantity <= 0 || !userAddress) {
+        if (quantity > (quantityIsDecimal ? inventory.quantity / 100 : inventory.quantity) || quantity <= 0 || !userAddress) {
             setCanTransfer(false);
         }
         else {
@@ -149,7 +150,8 @@ const TransferModal = ({ open, handleCancel, inventory, categoryName = "", limit
         {
             title: "Quantity Available",
             dataIndex: "quantity",
-            align: "center"
+            align: "center",
+            render: (text, record) => quantityIsDecimal ? record.quantity / 100 : record.quantity,
         },
         {
             title: "Set Quantity",
@@ -213,31 +215,20 @@ const TransferModal = ({ open, handleCancel, inventory, categoryName = "", limit
 
 
     const handleSubmit = async () => {
-        if (quantity > 0 && quantity <= inventory.quantity && userAddress) {
+        if (quantity > 0 && quantity <= (quantityIsDecimal ? inventory.quantity / 100 : inventory.quantity) && userAddress) {
             let isDone = false;
     
-            if (inventory.name === "STRATS") {
-                const payload = {
-                    to: userAddress,
-                    value: quantity,
-                    price,
-                };
-                isDone = await marketplaceActions.transferStrats(marketplaceDispatch, payload);
-                if (isDone) {
-                    await marketplaceActions.fetchStratsBalance(marketplaceDispatch);
-                }
-            } else {
-                const body = {
-                    assetAddress: inventory.address,
-                    newOwner: userAddress,
-                    quantity,
-                    price,
-                };
-                isDone = await actions.transferInventory(inventoryDispatch, body);
-                if (isDone) {
-                    await actions.fetchInventory(inventoryDispatch, limit, offset, "", categoryName);
-                    await actions.fetchInventoryForUser(inventoryDispatch, user.commonName);
-                }
+            const body = {
+                assetAddress: inventory.address,
+                newOwner: userAddress,
+                quantity: quantityIsDecimal ? quantity * 100 : quantity,
+                price: quantityIsDecimal ? price / 100 : price,
+            };
+            isDone = await actions.transferInventory(inventoryDispatch, body);
+            if (isDone) {
+                await actions.fetchInventory(inventoryDispatch, limit, offset, "", categoryName);
+                await actions.fetchInventoryForUser(inventoryDispatch, user.commonName);
+                await marketplaceActions.fetchStratsBalance(marketplaceDispatch);
             }
     
             if (isDone) {
@@ -264,7 +255,7 @@ const TransferModal = ({ open, handleCancel, inventory, categoryName = "", limit
 
                 <Table
                     columns={columns}
-                    dataSource={data}
+                    dataSource={[data]}
                     pagination={false}
                 />
             </div>

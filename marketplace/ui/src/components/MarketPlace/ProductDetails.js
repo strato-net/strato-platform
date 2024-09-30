@@ -177,7 +177,7 @@ const ProductDetails = ({ user, users }) => {
       const detailsData = details.data;
       setItemData(detailsData);
       if (details.saleQuantity) {
-        let saleQuantity = details.quantityIsDecimal === true ? (details.saleQuantity / 100) : details.saleQuantity
+        let saleQuantity = details.data.quantityIsDecimal && details.data.quantityIsDecimal === "True" ? (details.saleQuantity / 100) : details.saleQuantity
         setAvailableQuantity(saleQuantity || 1);
       }
     }
@@ -222,14 +222,12 @@ const ProductDetails = ({ user, users }) => {
   };
 
   const subtract = () => {
-    if (qty !== 1) {
-      let value = qty - 1;
-      setQty(value);
-    }
+    const value = Math.max(qty - 1, 1);
+    setQty(value);
   };
 
   const add = () => {
-    if (qty < availableQuantity) {
+    if (qty + 1 <= availableQuantity) {
       let value = qty + 1;
       setQty(value);
     } else {
@@ -309,7 +307,7 @@ const ProductDetails = ({ user, users }) => {
   // };
 
   const addItemToCart = async () =>{
-    const items = [{ product: details, qty: details.quantityIsDecimal === true ? qty * 100 : qty }];
+    const items = [{ product: details, qty }];
     marketPlaceActions.addItemToCart(marketplaceDispatch, items);
     navigate('/checkout');
     window.scrollTo(0, 0);
@@ -517,13 +515,24 @@ const ProductDetails = ({ user, users }) => {
                 <div className=" pt-4 lg:pt-[22px]">
 
                   <Paragraph level={4} id="price" className=" text-[#13188A] text-xl font-bold lg:text-2xl lg:font-semibold">
-                    {details?.price ? (
-                      <>
-                        ${details?.price} <span className="font-normal text-xs mr-2 text-primary"><b>({(details?.price * STRATS_CONVERSION).toFixed(0)} STRATS)</b></span>
-                      </>
-                    ) : (
-                      "No Price Available"
-                    )}
+                  {details?.price ? (
+                    (() => {
+                      const adjustedPrice = details.data.quantityIsDecimal && details.data.quantityIsDecimal === "True" 
+                        ? details.price * 100 
+                        : details.price;
+
+                      return (
+                        <>
+                          ${adjustedPrice} 
+                          <span className="font-normal text-xs mr-2 text-primary">
+                            <b> ({(adjustedPrice * STRATS_CONVERSION).toFixed(0)} STRATS)</b>
+                          </span>
+                        </>
+                      );
+                    })()
+                  ) : (
+                    "No Price Available"
+                  )}
                   </Paragraph>
                   {isAvailableForSale && <Text type="danger" strong> Sold Out </Text>}
                 </div>
@@ -800,14 +809,14 @@ const ProductDetails = ({ user, users }) => {
                     <div className="w-full h-full">
                       <h2 className='w-full text-center font-bold text-2xl'>Price History</h2>
                       <TimeRangeTabs onChange={handleTimeFilterChange} activeKey={timeFilter} />
-                      <PriceChartAndStats priceHistory={priceHistory} />
+                      <PriceChartAndStats priceHistory={priceHistory} isDecimal={details?.data?.quantityIsDecimal === "True"}/>
                     </div>
                   )}
                   <div>
                     {(priceHistory?.originRecords?.length !== 0) && (
                       <>
                         <h2 className='w-full text-center font-bold text-2xl'>12-Month Historical Data</h2>
-                        <Statistics priceHistory={priceHistory} />
+                        <Statistics priceHistory={priceHistory} isDecimal={details?.data?.quantityIsDecimal === "True"}/>
                       </>
                     )}
                   </div>

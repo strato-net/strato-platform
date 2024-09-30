@@ -107,7 +107,7 @@ export const Tokens = {
 }
 
 export const STRATS = {
-  prefix: '/STRATS',
+  prefix: '/STRATSTokens',
   getAll: '/',
   create: '/'
 }
@@ -179,6 +179,7 @@ export const Marketplace = {
   getTopSellingProductsLoggedIn: '/user/topselling',
   transferStrats: '/strats/transfer',
   getStratsBalance: '/strats',
+  getStratsAddress: '/strats/address',
   getStratsTransactionHistory: '/strats/history'
 }
 

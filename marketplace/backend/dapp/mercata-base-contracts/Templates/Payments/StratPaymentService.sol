@@ -108,15 +108,15 @@ contract StratPaymentService is PaymentService {
             uint stratQuantity = 0;
             uint transferAmount = 0;
             uint transferFee = 0;
-
+            uint transferNumber = 0;
             for (uint j = 0; j < _stratsAssetAddresses.length; j++) {
-                STRATS stratAsset = STRATS(_stratsAssetAddresses[j]);
-                require(stratAsset.originAddress() == stratAddress, "Asset is not a STRATS asset");
+                STRATSTokens stratAsset = STRATSTokens(_stratsAssetAddresses[j]);
+                require(stratAsset.root == stratAddress, "Asset is not a STRATS asset");
                 stratQuantity = stratAsset.quantity();
-
+                transferNumber = (uint(_checkoutHash, 16) + j) % 1000000;
                 if (remainingStratsToTransfer > 0) {
                     transferAmount = stratQuantity >= remainingStratsToTransfer ? remainingStratsToTransfer : stratQuantity;
-                    stratAsset.purchaseTransfer(sellerAddress, transferAmount);
+                    stratAsset.purchaseTransfer(sellerAddress, transferAmount, transferNumber, 0.0001);
                     remainingStratsToTransfer -= transferAmount;
                     stratQuantity -= transferAmount;
                 }
@@ -141,6 +141,20 @@ contract StratPaymentService is PaymentService {
                 }
             }
             require(remainingStratsToTransfer == 0 && remainingFeeToTransferToFeeReceipient == 0 && remainingFeeToTransferToProposer == 0, "Failed to fulfill STRATS payment");
+                stratQuantity = stratQuantity - transferAmount;
+                if (remainingFeeToTransfer > 0 && stratQuantity > 0) {
+                    transferNumber = (uint(_checkoutHash, 16) + j + block.timestamp) % 1000000;
+                    transferFee = stratQuantity >= remainingFeeToTransfer ? remainingFeeToTransfer : stratQuantity;
+                    stratAsset.purchaseTransfer(feeRecipient, transferFee, transferNumber, 0.0001);
+                    remainingFeeToTransfer -= transferFee;
+                }
+                transferAmount = 0;
+                if (remainingStratsToTransfer == 0 && remainingFeeToTransfer == 0) {
+                    break;
+                }
+            }
+            require(remainingStratsToTransfer == 0, err);
+            require(remainingFeeToTransfer == 0, feeErr);
 
             // Transfer assets
             try {

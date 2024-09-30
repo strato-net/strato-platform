@@ -14,8 +14,10 @@ import { Images } from "../../images";
 import TransactionResponsive from "./TransactionResponsive";
 // Actions
 import { actions as transactionAction } from "../../contexts/transaction/actions";
+import { actions as marketplaceActions } from "../../contexts/marketplace/actions";
 // Dispatch & States
 import { useTransactionDispatch, useTransactionState } from "../../contexts/transaction";
+import { useMarketplaceDispatch, } from "../../contexts/marketplace";
 // Utils & Constants
 import {
   STRATS_CONVERSION, TRANSACTION_STATUS, TRANSACTION_STATUS_CLASSES, TRANSACTION_STATUS_COLOR, 
@@ -30,6 +32,7 @@ const TransactionTable = ({ user, download, isAllOrdersLoading }) => {
   const StratsIcon = <img src={Images.logo} alt="" className="mx-1 w-3 h-3" />
   // Dispatch
   const transactionDispatch = useTransactionDispatch();
+  const marketplaceDispatch = useMarketplaceDispatch();
   // States
   const { userTransactions, globalTransaction, isTransactionLoading } = useTransactionState();
 
@@ -41,12 +44,21 @@ const TransactionTable = ({ user, download, isAllOrdersLoading }) => {
   const [type, setType] = useState("");
   const [dateQuery, setDateQuery] = useState("");
   const [transactions, setTransactions] = useState(userTransactions)
+  const [originAddress, setOriginAddress] = useState("");
   const [search, setSearch] = useState("")
 
   const formatter = new Intl.NumberFormat('en-US');
   const formattedNum = (num) => formatter.format(num);
   const defaultDate =  dateQuery ? dayjs.unix(dayjs(dateQuery).startOf('month').unix()) : dayjs.unix(currentMonth);
 
+  useEffect(() => {
+    async function fetchStratsAddress() {
+      const stratsAddress = await marketplaceActions.fetchStratsAddress(marketplaceDispatch);
+      setOriginAddress(stratsAddress);
+    }
+    fetchStratsAddress();
+  }, [marketplaceDispatch]);
+  
   useEffect(() => {
     if (user?.commonName && dateQuery) {
       transactionAction.fetchUserTransaction(
@@ -75,7 +87,6 @@ const TransactionTable = ({ user, download, isAllOrdersLoading }) => {
     const searchParams = new URLSearchParams(location.search);
     const urlType = searchParams.get("type");
     const urlDate = searchParams.get("date");
-  
     // Update state based on URL params, but skip empty values
     setType(urlType && urlType !== "all" ? urlType : "");
     setDateQuery(urlDate || "");
@@ -87,7 +98,11 @@ const TransactionTable = ({ user, download, isAllOrdersLoading }) => {
   
     // Type filter
     if (type) {
-      filteredData = filteredData.filter((item) => item.type === type);
+      if (type === "STRATS") {
+        filteredData = filteredData.filter((item) => item.assetOriginAddress === originAddress);
+      } else {
+        filteredData = filteredData.filter((item) => item.type === type);
+      }
     }
   
     // Search filter
@@ -134,6 +149,7 @@ const TransactionTable = ({ user, download, isAllOrdersLoading }) => {
 
   const Content = ({ data }) => {
     const price = data?.assetPrice || data?.price
+    const quantityIsDecimal = data?.quantityIsDecimal
     return <div className="min-h-44 h-full" style={{ width: '460px' }}>
       <Card>
         <Row>
@@ -146,7 +162,7 @@ const TransactionTable = ({ user, download, isAllOrdersLoading }) => {
           </Col>
           <Col span={8} offset={1}>
             {price
-              ? <p className="text-right flex justify-end items-center"> <b>$ {price} </b> &nbsp;(<span className="text-[#13188A] font-bold"> {(price) * STRATS_CONVERSION} </span>{StratsIcon}) </p>
+              ? <p className="text-right flex justify-end items-center"> <b>$ {quantityIsDecimal === "True" ? (price * 100) : price} </b> &nbsp;(<span className="text-[#13188A] font-bold"> {(quantityIsDecimal === "True" ? (price * 100) : price) * STRATS_CONVERSION} </span>{StratsIcon}) </p>
               : <p className="text-right text-[#13188A] font-bold text-sm"> No Price Available  </p>}
           </Col>
         </Row>
@@ -226,7 +242,7 @@ const TransactionTable = ({ user, download, isAllOrdersLoading }) => {
       key: "quantity",
       align: "right",
       width: '100px',
-      render: (data, { quantity }) => <span>{quantity ? formattedNum(quantity) : '--'}</span>
+      render: (data, { quantity, quantityIsDecimal }) => <span>{quantity ? formattedNum(quantityIsDecimal && quantityIsDecimal === "True" ? (quantity / 100) : quantity) : '--'}</span>
     },
     {
       title: "Price ($)",
@@ -234,7 +250,7 @@ const TransactionTable = ({ user, download, isAllOrdersLoading }) => {
       key: "price",
       align: "right",
       width: '100px',
-      render: (data, { price }) => <p>{price ? formattedNum(price) : '--'}</p>
+      render: (data, { price, quantityIsDecimal }) => <p>{price ? formattedNum(quantityIsDecimal && quantityIsDecimal === "True" ? (price * 100) : price) : '--'}</p>
     },
     {
       title: "Buyer/Sender",

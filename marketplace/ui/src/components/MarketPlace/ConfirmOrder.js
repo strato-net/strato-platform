@@ -24,7 +24,7 @@ import { generateHtmlContent } from "../../helpers/emailTemplate";
 
 const { Option } = Select;
 
-const ConfirmOrder = ({ paymentProviders = [], data, columns }) => {
+const ConfirmOrder = ({ paymentServices = [], data, columns }) => {
   const marketplaceDispatch = useMarketplaceDispatch();
   const orderDispatch = useOrderDispatch();
   const [api, contextHolder] = notification.useNotification();
@@ -38,8 +38,6 @@ const ConfirmOrder = ({ paymentProviders = [], data, columns }) => {
   const [modal, contextHolderForModal] = Modal.useModal();
   const [cartData, setCartData] = useState(data);
   const [selectedProvider, setSelectedProvider] = useState('');
-
-  const activePaymentProviders = (paymentProviders[0] !== undefined) ? paymentProviders.filter(paymentProvider => paymentProvider?.isActive) : [];
 
   useEffect(() => {
     setCartData(data);
@@ -149,22 +147,22 @@ const ConfirmOrder = ({ paymentProviders = [], data, columns }) => {
 
 
 
-  const handlePaymentConfirm = async (paymentProvider) => {
+  const handlePaymentConfirm = async (paymentService) => {
     actions.addItemToConfirmOrder(marketplaceDispatch, cartData);
     let orderList = [];
     cartData.forEach((item) => {
       orderList.push({
-        quantity: item.qty,
+        quantity: item.quantityIsDecimal && item.quantityIsDecimal === "True" ? item.qty * 100 : item.qty,
         assetAddress: item.key,
         firstSale: item.firstSale,
-        unitPrice: item.unitPrice
+        unitPrice: item.quantityIsDecimal && item.quantityIsDecimal === "True" ? item.unitPrice / 100 : item.unitPrice
       });
     });
 
     generate_HTML_Content(user.commonName)
 
     let body = {
-      paymentProvider: { address: paymentProvider.address },
+      paymentService: { address: paymentService.address, serviceName: paymentService.serviceName },
       buyerOrganization: userOrganization,
       orderList,
       orderTotal: total,
@@ -192,8 +190,8 @@ const ConfirmOrder = ({ paymentProviders = [], data, columns }) => {
     }
     if (checkoutHashAndAssets && checkoutHashAndAssets !== false) {
       const [checkoutHash, assets] = checkoutHashAndAssets;
-      let serviceURL = paymentProvider.serviceURL || paymentProvider.data.serviceURL;
-      let checkoutRoute = paymentProvider.checkoutRoute || paymentProvider.data.checkoutRoute;
+      let serviceURL = paymentService.serviceURL || paymentService.data.serviceURL;
+      let checkoutRoute = paymentService.checkoutRoute || paymentService.data.checkoutRoute;
       if (serviceURL
             && serviceURL !== ''
             && checkoutRoute
@@ -208,7 +206,7 @@ const ConfirmOrder = ({ paymentProviders = [], data, columns }) => {
   };
 
   const handleChange = async (value) => {
-    const provider = activePaymentProviders.find(provider => provider?.serviceName === value);
+    const provider = paymentServices.find(provider => provider?.serviceName === value);
     setSelectedProvider(provider);
 
     if (hasChecked && !isAuthenticated && loginUrl !== undefined) {
@@ -301,9 +299,9 @@ const ConfirmOrder = ({ paymentProviders = [], data, columns }) => {
                     className="w-[250px] text-center selected-payment-option items-select"
                     onChange={handleChange}
                     placeholder="Select Payment Option"
-                    disabled={activePaymentProviders.length === 0}
+                    disabled={paymentServices.length === 0}
                   >
-                    {activePaymentProviders && activePaymentProviders.map(provider => (
+                    {paymentServices && paymentServices.map(provider => (
                       provider && <Option className='payment-dropdown' key={provider?.serviceName} value={provider?.serviceName}>
                         <Row className="w-full items-center">
                         <Col span={22} className="text-left">Checkout with {provider?.serviceName}</Col>

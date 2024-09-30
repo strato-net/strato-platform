@@ -54,7 +54,7 @@
                 },
                 {
                     "name": "STRATS",
-                    "contract": "STRATS"
+                    "contract": "STRATSTokens"
                 }
             ]
         },

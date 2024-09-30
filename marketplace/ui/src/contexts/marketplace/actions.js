@@ -43,6 +43,9 @@ const actionDescriptors = {
   fetchStratsBalance: "fetch_strats_balance",
   fetchStratsBalanceSuccessful: "fetch_strats_balance_successful",
   fetchStratsBalanceFailed: "fetch_strats_balance_failed",
+  fetchStratsAddress: "fetch_strats_address",
+  fetchStratsAddressSuccessful: "fetch_strats_address_successful",
+  fetchStratsAddressFailed: "fetch_strats_address_failed",
   fetchStratsTransactionHistory: "fetch_strats_transaction_history",
   fetchStratsTransactionHistorySuccessful: "fetch_strats_transaction_history_successful",
   fetchStratsTransactionHistoryFailed: "fetch_strats_transaction_history_failed",
@@ -523,6 +526,38 @@ const actions = {
       dispatch({ type: actionDescriptors.fetchStratsBalanceFailed, payload: "Error while fetching STRATS" });
     }
   },
+  fetchStratsAddress: async (dispatch) => {
+    dispatch({ type: actionDescriptors.fetchStratsAddress });
+    try {
+      let response = await fetch(`${apiUrl}/marketplace/strats/address`, {
+        method: HTTP_METHODS.GET,
+        credentials: "same-origin",
+      });
+      
+      const body = await response.json();
+      if (response.status === RestStatus.UNAUTHORIZED || response.status === RestStatus.FORBIDDEN) {
+        dispatch({
+          type: actionDescriptors.fetchStratsAddressFailed,
+          payload: "Error while fetching STRATS address",
+        });
+        window.location.href = body.error.loginUrl;
+        return null;
+      }
+  
+      if (response.status === RestStatus.OK) {
+        dispatch({
+          type: actionDescriptors.fetchStratsAddressSuccessful
+        });
+        return body.data;
+      }
+      
+      dispatch({ type: actionDescriptors.fetchStratsAddressFailed, payload: "Error while fetching STRATS address" });
+      return null;
+    } catch (err) {
+      dispatch({ type: actionDescriptors.fetchStratsAddressFailed, payload: "Error while fetching STRATS address" });
+      return null;
+    }
+  },  
   fetchStratsTransactionHistory: async (dispatch) => {
     dispatch({ type: actionDescriptors.fetchStratsTransactionHistory });
     try {

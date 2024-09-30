@@ -36,6 +36,7 @@ const InventoryCard = ({ inventory, category, debouncedSearchTerm, id, allSubcat
   const itemData = inventory.data;
   const isStrats = itemData.quantityIsDecimal && itemData.quantityIsDecimal === "True"
   const quantity = isStrats ? parseFloat((inventory.quantity / 100).toFixed(2)) : inventory.quantity
+  const price = inventory?.price ? (isStrats ? parseFloat(inventory?.price * 100).toFixed(2) : inventory?.price) : undefined ;
   const saleQuantity = isStrats
     ? inventory.saleQuantity !== undefined
       ? parseFloat((inventory.saleQuantity / 100).toFixed(2))
@@ -282,9 +283,9 @@ const InventoryCard = ({ inventory, category, debouncedSearchTerm, id, allSubcat
           <div className="flex justify-between  ">
             <p className="text-[#6A6A6A]">Price</p>
             <p className="text-[#202020] font-semibold">
-              {inventory?.price ? (
+              {price ? (
                 <>
-                  ${inventory?.price} <span className="text-xs">({(inventory?.price * STRATS_CONVERSION).toFixed(0)} STRATS)</span>
+                  ${price} <span className="text-xs">({(price * STRATS_CONVERSION).toFixed(0)} STRATS)</span>
                 </>
               ) : (
                 "N/A"
