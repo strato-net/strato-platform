@@ -1162,7 +1162,7 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
         }, []);
 
         if (accumulatedTotal < orderTotal) {
-          throw new rest.RestError(RestStatus.BAD_REQUEST, "Not enough STRATS balance");
+          throw new rest.RestError(RestStatus.BAD_REQUEST, "You don't have enough STRATS balance to make this purchase");
         }
       }
       
