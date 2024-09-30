@@ -40,7 +40,10 @@ export default {
   attachSalesAndImagesAndFiles: "*,BlockApps-Mercata-Asset-files(*),BlockApps-Mercata-Asset-images(*),BlockApps-Mercata-Asset-fileNames(*),BlockApps-Mercata-Sale!BlockApps-Mercata-Sale_BlockApps-Mercata-Asset_fk(*,BlockApps-Mercata-Sale-paymentServices(*))",
   attach_saleAddresses_Quantities_completedSales_onOrder: "*,BlockApps-Mercata-Order-saleAddresses(*),BlockApps-Mercata-Order-quantities(*),BlockApps-Mercata-Order-completedSales(*)",
   baUserNames: ['blockapps_carbon', 'blockapps_metals', 'blockapps_clothing', 'blockapps_collectibles', 'blockapps_memberships', 'blockapps_art', 'blockapps_spirits'],
-  localHost: 'http://localhost'
+  localHost: 'http://localhost',
+  burnAddress: '6ec8bbe4a5b87be18d443408df43a45e5972fa1b',
+  testTokenServerUrl: 'https://campaigns-test.blockapps.net',
+  prodTokenServerUrl: 'https://campaigns.blockapps.net',
 };
 
 export const unitOfMeasurement = {}
