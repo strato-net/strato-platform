@@ -5,7 +5,7 @@ const Statistics = ({ priceHistory, isDecimal }) => {
 // Origin Asset Statistics
 const originFluctuation = priceHistory.records.originFluctuation;
 const originVolume = isDecimal ? priceHistory.records.originVolume / 100 : priceHistory.records.originVolume;
-const originAveragePrice = isDecimal ? (priceHistory.records.originAveragePrice * 100).toFixed(2) : priceHistory.records.originAveragePrice;
+const originAveragePrice = isDecimal ? (priceHistory.records.originAveragePrice * 100).toFixed(2) : (priceHistory.records.originAveragePrice).toFixed(2);
 
 return (
   <div className="container">
