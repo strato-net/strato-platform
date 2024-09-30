@@ -94,14 +94,15 @@ main = do
       else do
         unless (flags_blockstanbul_block_period_ms >= 0) . ioError . userError $
           "--blockstanbul_block_period_ms must be nonnegative"
-        unless (flags_blockstanbul_round_period_s > 0) . ioErr  or . userError $
+        unless (flags_blockstanbul_round_period_s > 0) . ioError . userError $
           "--blockstanbul_round_period_s must be positive"
 
         putStrLn $ "ACTUAL validators list: " ++ show validators
-
+      
         ckpt <- runGregorM gregorCfg $ do
+          _ <- writeSeqVmEvents ([VmSelfAddress selfAddress])
           initializeCheckpoint validators
-          writeSeqVmEvents ([VmSelfAddress selfAddress])
+          
         putStrLn $ "Checkpoint: " ++ show ckpt
 
         return $ Just $ newContext flags_network ckpt (Just selfAddress) flags_validatorBehavior Nothing
