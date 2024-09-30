@@ -1,6 +1,7 @@
 {-# LANGUAGE DataKinds #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE FlexibleInstances #-}
+{-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE NoMonomorphismRestriction #-}
 {-# LANGUAGE OverloadedStrings #-}
@@ -12,6 +13,7 @@
 
 {-# OPTIONS -fno-warn-orphans #-}
 
+import Blockchain.Data.RLP (RLPSerializable)
 import BlockApps.X509.Certificate -- (Subject(..))
 import BlockApps.X509.Keys (bsToPriv)
 import Blockchain.Strato.Model.Keccak256
@@ -47,21 +49,17 @@ main :: IO ()
 main = do
   forM_ [stdout, stderr] $ flip hSetBuffering LineBuffering
   _ <- $initHFlags "Subject signing tool"
-  -- pkBS <- B.readFile flags_key
   emSslCert <- if flags_ssl_cert_file == ""
     then pure $ Right Nothing
     else fmap Just . bsToCert <$> B.readFile flags_ssl_cert_file
-  -- let ePK = bsToPriv pkBS
-  -- case (,) <$> ePK <*> emSslCert of
   case emSslCert of
     Left err -> error $ "Could not decode ssl cert: " ++ err
     Right mSslCert -> do
       pub <- case flags_public_key of
         "" -> do -- signing own subject info
-          mPubKey <- runVaultM "http://strato:8013/strato/v2.3" $ getVaultKey
-          case mPubKey of 
+          runVaultM flags_vault_proxy $ getVaultKey >>= \case
             Just pk -> return pk
-            Nothing -> error "could not get pub key from vault-proxy"
+            Nothing -> error "could not GET /key from vault-proxy"
         mp  -> case importPublicKey $ C8.pack mp of
           Nothing -> error $ "Could not decode public key from " ++ mp
           Just p -> return p -- signing somebody else's subject info
@@ -75,13 +73,10 @@ main = do
                   (maybe c subCountry mSslSub)
                   pub
           sac = SubjectAndCert sub mSslCert
-          vaultSig h = runVaultM "http://strato:8013/strato/v2.3" $ getVaultSig h
-          sign' a = vaultSig . keccak256ToByteString $ rlpHash a
-          -- sign' p = signMsg p . keccak256ToByteString . rlpHash
           printS = putStrLn . C8.unpack . BL.toStrict . encode
       case flags_verification_key of
         "" -> do -- new identity
-          mSig <- sign' sac
+          mSig <- signWithVault sac
           case mSig of
             Just sig -> do 
               let signed = Signed sac sig
@@ -92,25 +87,27 @@ main = do
           let ePK' = bsToPriv pkBS'
           case ePK' of
             Left err -> error $ "Could not decode verification private key: " ++ err
-            Right _ -> do
-              mSig' <- sign' sac
-              case mSig' of 
-                Just sig' -> do
-                  let signedSub = Signed sac sig'
-                  mSig <- sign' signedSub
-                  case mSig of 
-                    Just sig -> do 
-                      let signed = Signed signedSub sig
-                      printS signed
-                    Nothing -> error "waaaaaa"
-                Nothing -> error "helpful error messages r dum"
+            Right pk -> do
+              let sig' = signWithRawKey pk sac
+              let signedSub = Signed sac sig'
+              signWithVault signedSub >>= \case
+                Just sig -> do 
+                  let signed = Signed signedSub sig
+                  printS signed
+                Nothing -> error "Could not call POST /signature endpoint on vault-proxy"
 
 eitherToMaybe :: Either a b -> Maybe b
 eitherToMaybe (Left _) = Nothing
 eitherToMaybe (Right x) = Just x
 
-getVaultSig :: (MonadIO m, HasVault m) => C8.ByteString -> m (Maybe Signature)
-getVaultSig h = do
+signWithRawKey :: (RLPSerializable r) => PrivateKey -> r -> Signature
+signWithRawKey p = signMsg p . keccak256ToByteString . rlpHash
+
+signWithVault :: (MonadIO m, RLPSerializable r) => r -> m (Maybe Signature)
+signWithVault = runVaultM flags_vault_proxy . postVaultSig . keccak256ToByteString . rlpHash
+
+postVaultSig :: (MonadIO m, HasVault m) => C8.ByteString -> m (Maybe Signature)
+postVaultSig h = do
   VaultData url mgr <- access Proxy
   res <- liftIO $ runClientM (postSignature Nothing (MsgHash h)) (mkClientEnv mgr url)
   return $ eitherToMaybe res
