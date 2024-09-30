@@ -1,3 +1,4 @@
+import random
 import requests as requests
 import os
 from dotenv import load_dotenv
@@ -11,6 +12,17 @@ keycloak_endpoint = os.getenv("KEYCLOAK_ENDPOINT")
 strat_address     = os.getenv("STRAT_ASSET_ADDRESS")
 cirrus_endpoint   = "/cirrus/search/"
 
+
+# Emulates blockapps-rest util function 'uid()'
+def uid(prefix=None, digits=6):
+    digits = max(1, min(16, digits))
+    random_number = random.randint(0, 10**digits - 1)
+
+    if prefix is None:
+        return f"{random_number:0{digits}d}"
+    else:
+        return f"{prefix}_{random_number:0{digits}d}"
+
 def transform_response_to_tuple_list(response_data):
     return [(item['key'], item['value']) for item in response_data]
 
@@ -22,10 +34,9 @@ def generate_tx(address, balance):
             "method": "automaticTransfer",
             "args": {
                 "_newOwner": address,
-                "_price": 0, # TODO what should this value truly be?
+                "_price": 0.0001,
                 "_quantity": balance,
-                "_transferNumber": 0 # TODO same goes for this
-
+                "_transferNumber": int(uid())
             }
         },
         "type": "FUNCTION"
