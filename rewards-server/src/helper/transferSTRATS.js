@@ -53,53 +53,83 @@ async function createTransactionPayload(token, transactions) {
   const results = [];
 
   for (const transaction of transactions) {
-    const STRATSContracts = await getAdminStratsContractAddress(token);
+    try {
+      // Wrap API calls in try-catch blocks to handle potential failures
+      let STRATSContracts;
+      try {
+        STRATSContracts = await getAdminStratsContractAddress(token);
+      } catch (error) {
+        console.error("Error fetching STRATS contracts:", error);
+        throw new Error("Failed to fetch STRATS contracts");
+      }
 
-    const stratsAssetAddressesToUse = [];
+      const stratsAssetAddressesToUse = [];
 
-    let remainingValue = transaction.value;
+      let remainingValue = transaction.value;
 
-    for (const asset of STRATSContracts) {
-      if (remainingValue <= 0) break;
+      for (const asset of STRATSContracts) {
+        if (remainingValue <= 0) break;
 
-      const quantityToUse = Math.min(asset.quantity, remainingValue);
-      stratsAssetAddressesToUse.push({
-        address: asset.address,
-        quantity: quantityToUse
-      });
-      
-      remainingValue -= quantityToUse;
+        const quantityToUse = Math.min(asset.quantity, remainingValue);
+        stratsAssetAddressesToUse.push({
+          address: asset.address,
+          quantity: quantityToUse,
+        });
+
+        remainingValue -= quantityToUse;
+      }
+
+      if (remainingValue > 0) {
+        throw new Error("Not enough STRATS to cover the transaction");
+      }
+
+      const payload = {
+        txs: stratsAssetAddressesToUse.map((strats) =>
+          createTransactionObject(strats.address, transaction.toAddress, strats.quantity)
+        ),
+        txParams: {
+          gasLimit: 32100000000,
+          gasPrice: 1,
+        },
+      };
+
+      let response;
+      try {
+        response = await fetchParallelTransaction(token, payload);
+      } catch (error) {
+        console.error("Error executing fetchParallelTransaction:", error);
+        throw new Error("Failed to execute transaction");
+      }
+
+      results.push(response);
+    } catch (error) {
+      console.error(`Error processing transaction to ${transaction.toAddress}:`, error);
+
+      // Create a failed response object to include in the results
+      const failedResponse = {
+        ok: false,
+        status: 500,
+        statusText: "Internal Server Error",
+        json: async () => ({ error: error.message }),
+        text: async () => error.message,
+      };
+      results.push(failedResponse);
     }
-
-    if (remainingValue > 0) {
-      throw new Error("Not enough STRATS to cover the transaction");
-    }
-
-    const payload = {
-      txs: stratsAssetAddressesToUse.map(strats => createTransactionObject(strats.address, transaction.toAddress, strats.quantity)),
-      txParams: {
-        gasLimit: 32100000000,
-        gasPrice: 1,
-      },
-    };
-  
-    const response = await fetchParallelTransaction(token, payload);
-    results.push(response);
   }
 
   // Combine all responses into a single response object
   const combinedResponse = {
-    ok: results.every(r => r.ok),
-    status: results.every(r => r.ok) ? 200 : 400,
-    statusText: results.every(r => r.ok) ? "OK" : "Bad Request",
+    ok: results.every((r) => r.ok),
+    status: results.every((r) => r.ok) ? 200 : 400,
+    statusText: results.every((r) => r.ok) ? "OK" : "Bad Request",
     json: async () => {
-      const jsonResults = await Promise.all(results.map(r => r.json()));
+      const jsonResults = await Promise.all(results.map((r) => r.json()));
       return jsonResults.flat();
     },
     text: async () => {
-      const textResults = await Promise.all(results.map(r => r.text()));
-      return textResults.join('\n');
-    }
+      const textResults = await Promise.all(results.map((r) => r.text()));
+      return textResults.join("\n");
+    },
   };
 
   return combinedResponse;
