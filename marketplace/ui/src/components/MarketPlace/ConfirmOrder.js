@@ -117,7 +117,7 @@ const ConfirmOrder = ({ paymentProviders = [], data, columns }) => {
       let itemName = decodeURIComponent(orderItem.item.name);
       let itemPrice = parseFloat(orderItem.unitPrice).toFixed(2);
       let itemQty = orderItem.qty;
-      let itemTotal = (itemPrice * itemQty).toFixed(2);
+      let itemTotal = (itemPrice * itemQty).toFixed(0);
 
       concatenatedOrderString += `${itemName}:\n`;
       concatenatedOrderString += `$${itemTotal} (${itemTotal * 100} STRATS)<br>`;
@@ -304,7 +304,6 @@ const totalAmount = selectedProvider?.serviceName === 'STRATS' ?
                         provider &&
                         <Radio value={provider?.serviceName} className="w-full">
                           <p className="flex text-base font-normal items-center"> 
-                          {/* <img src={provider?.imageURL} alt={provider?.serviceName} style={{ width: 20, height: 20 }} />  */}
                           <span className="ml-2"> 
                           {PAYMENT_LABEL[provider?.serviceName] 
                           ? PAYMENT_LABEL[provider?.serviceName] 

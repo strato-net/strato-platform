@@ -317,7 +317,6 @@ const ResponsiveCart = ({
                   provider &&
                   <Radio value={provider?.serviceName} className="w-full">
                     <p className="flex text-base font-normal items-center"> 
-                    {/* <img src={provider?.imageURL} alt={provider?.serviceName} style={{ width: 20, height: 20 }} />  */}
                     <span className="ml-2 text-sm font-normal"> 
                     {PAYMENT_LABEL[provider?.serviceName] 
                     ? PAYMENT_LABEL[provider?.serviceName] 
