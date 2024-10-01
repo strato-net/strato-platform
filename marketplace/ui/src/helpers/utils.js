@@ -80,3 +80,10 @@ export const handleQuantityInput = (setQuantity) => (event) => {
       setQuantity(0);
   }
 };
+
+export const handleWalletAddressInput = (setUserAddress) => (event) => {
+  let value = event.target.value;
+  value = value.replace(/[^a-zA-Z0-9]/g, ''); // remove any characters that are not alphanumeric
+  event.target.value = value;
+  setUserAddress(value);
+};

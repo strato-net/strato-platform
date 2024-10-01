@@ -56,7 +56,7 @@ const Inventory = ({ user }) => {
 
   const categoryDispatch = useCategoryDispatch();
   const { categorys } = useCategoryState();
-  const { inventories, isInventoriesLoading, message, success, inventoriesTotal } =
+  const { inventories, isInventoriesLoading, message, success, inventoriesTotal, supportedTokens, isFetchingTokens } =
     useInventoryState();
   const {
     paymentServices,
@@ -112,6 +112,7 @@ const Inventory = ({ user }) => {
     if (isSearch) {
       actions.fetchInventorySearch(dispatch, limit, offset, debouncedSearchTerm);
     } else actions.fetchInventory(dispatch, limit, offset, "", category);
+    actions.fetchSupportedTokens(dispatch);
   }, [dispatch, limit, offset, debouncedSearchTerm, category]);
 
   const showModal = () => {
@@ -358,7 +359,7 @@ const Inventory = ({ user }) => {
                 key: undefined,
                 children: (
                   <div className="my-4 grid grid-cols-1 md:grid-cols-2 gap-6 lg:grid-cols-3 3xl:grid-cols-4 5xl:grid-cols-5 sm:place-items-center md:place-items-start inventoryCard max-w-full">
-                    {!isInventoriesLoading ? (
+                    {!isInventoriesLoading && !isFetchingTokens ? (
                       inventories.map((inventory, index) => (
                         <InventoryCard
                           id={index}
@@ -370,6 +371,7 @@ const Inventory = ({ user }) => {
                           debouncedSearchTerm={debouncedSearchTerm}
                           allSubcategories={allSubcategories}
                           user={user}
+                          supportedTokens={supportedTokens}
                         />
                       ))
                     ) : (
@@ -383,7 +385,7 @@ const Inventory = ({ user }) => {
                 key: categoryObject.name,
                 children: (
                   <div className="my-4 grid grid-cols-1 md:grid-cols-2 gap-6 lg:grid-cols-3 3xl:grid-cols-4 5xl:grid-cols-5 inventoryCard max-w-full">
-                    {!isInventoriesLoading ? (
+                    {!isInventoriesLoading && !isFetchingTokens ? (
                       inventories.map((inventory, index) => (
                         <InventoryCard
                           id={index}
@@ -394,6 +396,7 @@ const Inventory = ({ user }) => {
                           key={index}
                           debouncedSearchTerm={debouncedSearchTerm}
                           allSubcategories={allSubcategories}
+                          supportedTokens={supportedTokens}
                           user={user}
                         />
                       ))
