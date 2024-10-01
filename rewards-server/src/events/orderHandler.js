@@ -152,9 +152,9 @@ async function handleOrderReward(
     const response = await transactionResponse.json();
     const allSuccessful = response.every((tx) => tx.status === "Success");
     if (allSuccessful) {
-      console.log("All reward transactions were successful:", response.map(tx => ({ status: tx.status, hash: tx.hash })));
+      console.log("All reward transactions were successful:", response);
     } else {
-      console.log("Some reward transactions were not successful:", response.map(tx => ({ status: tx.status, hash: tx.hash })));
+      console.log("Some reward transactions were not successful:", response);
     }
     return response;
   } catch (error) {
