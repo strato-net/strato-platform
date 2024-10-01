@@ -189,6 +189,7 @@ const Checkout = () => {
   };
 
   const ValueQty = (product, e) => {
+    e = parseInt(e || 0);
     let items = [...cartList];
     cartList.forEach((element, index) => {
       if (element.product.address === product.key) {
