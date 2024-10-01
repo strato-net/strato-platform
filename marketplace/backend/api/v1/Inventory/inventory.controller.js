@@ -1,7 +1,19 @@
 import { rest } from 'blockapps-rest'
+import axios from 'axios';
 import Joi from '@hapi/joi'
 import RestStatus from 'http-status-codes'
 import config from '../../../load.config'
+import constants from "/helpers/constants";
+
+function getTokenServerUrl() {
+  if (process.env.networkID === constants.prodNetworkId) {
+    return constants.prodTokenServerUrl
+  } else if (process.env.networkID === constants.testnetNetworkId) {
+    return constants.testTokenServerUrl
+  } else {
+    return constants.prodTokenServerUrl
+  }
+}
 
 const options = { config, cacheNonce: true }
 
@@ -72,8 +84,6 @@ class InventoryController {
 
       const result = await dapp.createInventory(body)
       rest.response.status200(res, result)
-
-      console.log("*Seller listed item*");
 
       return next()
     } catch (e) {
@@ -148,11 +158,78 @@ class InventoryController {
       InventoryController.validateTransferItemArgs(body)
 
       const result = await dapp.transferItem(body)
-      rest.response.status200(res, result)
+      rest.response.status200(res, result.transferStatus)
 
       return next()
     } catch (e) {
       return next(e)
+    }
+  }
+  
+  static async getSupportedTokens(req, res, next) {
+    try {
+      const url = await getTokenServerUrl();
+
+      // Making a GET request to the supported tokens endpoint
+      const response = await axios.get(`${url}/api/tokens/supportedTokens`, {
+        headers: {
+          Accept: "application/json",
+          "Content-Type": "application/json",
+        },
+      });
+
+      // Checking if the response is successful
+      if (response.status !== 200) {
+        throw new Error(`Failed to fetch supported tokens: ${response.status}`);
+      }
+
+      // Returning the supported tokens data
+      res.status(200).json(response.data);
+
+      return next();
+    } catch (e) {
+      return next(e);
+    }
+  }
+  
+  static async bridge(req, res, next) {
+    try {
+      const { dapp, body } = req;
+
+      InventoryController.validateBridgeItemArgs(body);
+      const transferPayload = {
+          assetAddress: body.assetAddress,
+          newOwner: constants.burnAddress,
+          quantity: body.quantity,
+          price: body.price,
+      };
+
+      const result = await dapp.transferItem(transferPayload);
+
+      if (result.transferStatus[0] !== '200') {
+          throw new Error(`Transfer failed with status: ${result.transferStatus[0]}`);
+      }
+
+      const payload = {
+          tokenSymbol: body.rootAddress,
+          quantity: body.quantity,
+          baseAddress: body.baseAddress,
+          transferNumber: result.transferNumber.toString(),
+          mercataAddress: body.mercataAddress,
+      };
+      const url = await getTokenServerUrl();
+      const response = await axios.post(`${url}/api/bridgeMercata`, payload, {
+        headers: {
+          Accept: "application/json",
+          "Content-Type": "application/json",
+        },
+      });
+
+      rest.response.status200(res, response.data);
+
+      return next();
+    } catch (e) {
+      return next(e);
     }
   }
 
@@ -357,6 +434,26 @@ class InventoryController {
     });
 
     const validation = transferItemSchema.validate(args);
+
+    if (validation.error) {
+      console.log('validation error: ', validation.error)
+      throw new rest.RestError(RestStatus.BAD_REQUEST, validation.error.message, {
+        message: `Missing args or bad format: ${validation.error.message}`,
+      })
+    }
+  }
+  
+  static validateBridgeItemArgs(args) {
+    const bridgeItemSchema = Joi.object({
+      rootAddress: Joi.string().required(),
+      assetAddress: Joi.string().required(),
+      quantity: Joi.number().integer().greater(0).required(),
+      price: Joi.number().integer().min(0).required(),
+      baseAddress: Joi.string().required(),
+      mercataAddress: Joi.string().required(),
+    });
+
+    const validation = bridgeItemSchema.validate(args);
 
     if (validation.error) {
       console.log('validation error: ', validation.error)

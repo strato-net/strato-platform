@@ -59,7 +59,6 @@ let userCert = null;
 // }
 
 function deploy(contract, args, options) {
-  console.log(options)
   // author the deployment
   const { deployFilePath } = args;
 
@@ -130,7 +129,6 @@ async function uploadContract(token, options) {
 
 async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
   const contract = _contract;
-  console.debug(contract)
   let userOrganization
   let userCommonName
 
@@ -261,7 +259,6 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
   };
 
   contract.getOwnershipHistory = async function (args, options = optionsNoChainIds) {
-    console.log('#### GET OWNERSHIP HISTORY ARGS', JSON.stringify(args))
     return await inventoryJs.getOwnershipHistory(rawAdmin, args, options);
   };
 
@@ -361,7 +358,12 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
           redemptionServiceAddresses.push(r.address);
         }
       });
-      const redemptionServices = await redemptionServiceJs.getAll(rawAdmin, { address: redemptionServiceAddresses }, options);
+      let redemptionServices = await redemptionServiceJs.getAll(rawAdmin, { address: redemptionServiceAddresses }, options);
+
+      // handle backwards compatibility case
+      if (Object.keys(redemptionServices).length === 0) {
+        redemptionServices = await redemptionServiceJs.getAll(rawAdmin, { isActive: true, ownerCommonName: "Server" }, options);
+      }
 
       const redemptionPromises = redemptionServices.map(async (rs) => {
         const serviceUrl = rs.serviceURL || rs.data.serviceURL;
@@ -413,7 +415,12 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
       let redemptions = [];
       const redemptionEvents = await redemptionServiceJs.getRedemptions(rawAdmin, { issuer: userCert.commonName }, options);
       const redemptionServiceAddresses = redemptionEvents.map(r => r.address);
-      const redemptionServices = await redemptionServiceJs.getAll(rawAdmin, { address: redemptionServiceAddresses }, options);
+      let redemptionServices = await redemptionServiceJs.getAll(rawAdmin, { address: redemptionServiceAddresses }, options);
+
+      // handle backwards compatibility case
+      if (Object.keys(redemptionServices).length === 0) {
+        redemptionServices = await redemptionServiceJs.getAll(rawAdmin, { isActive: true, ownerCommonName: "Server" }, options);
+      }
 
       const redemptionPromises = redemptionServices.map(async (rs) => {
         const serviceUrl = rs.serviceURL || rs.data.serviceURL;
@@ -798,7 +805,6 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
       owner: rawAdmin.address,
       status: ASSET_STATUS.ACTIVE
     };
-    console.log("newArgs", newArgs);
     return membershipJs.uploadContract(rawAdmin, newArgs, options);
   };
 
@@ -818,7 +824,6 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
       createdDate,
       status: ASSET_STATUS.ACTIVE
     };
-    console.log("newArgs", newArgs);
     return carbonDAOJs.uploadContract(rawAdmin, newArgs, options);
   };
 
