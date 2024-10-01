@@ -117,10 +117,10 @@ const ConfirmOrder = ({ paymentProviders = [], data, columns }) => {
       let itemName = decodeURIComponent(orderItem.item.name);
       let itemPrice = parseFloat(orderItem.unitPrice).toFixed(2);
       let itemQty = orderItem.qty;
-      let itemTotal = (itemPrice * itemQty).toFixed(0);
+      let itemTotal = (itemPrice * itemQty).toFixed(2);
 
       concatenatedOrderString += `${itemName}:\n`;
-      concatenatedOrderString += `$${itemTotal} (${itemTotal * 100} STRATS)<br>`;
+      concatenatedOrderString += `$${itemTotal} (${(itemTotal * 100).toFixed(0)} STRATS)<br>`;
       concatenatedOrderString += `Qty: ${itemQty} &nbsp; $${itemPrice} each (${(itemPrice * 100).toFixed(0)} STRATS each)<br><br>`;
       orderTotal += parseFloat(itemTotal);
       if (i === cartData.length - 1) {
