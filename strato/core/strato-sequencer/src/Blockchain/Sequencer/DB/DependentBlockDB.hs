@@ -6,7 +6,23 @@
 {-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE TypeOperators #-}
 
-module Blockchain.Sequencer.DB.DependentBlockDB where
+module Blockchain.Sequencer.DB.DependentBlockDB (
+  DependentBlockDB,
+  DependentBlockEntry,
+  HasDependentBlockDB,
+  EmissionReadiness(..),
+  bootstrapGenesisBlock,
+  getDependentBlockDB,
+  getWriteOptions,
+  getReadOptions,
+  genericLookupDependentBlockDB,
+  genericBatchInsertDependentBlockDB,
+  genericBatchDeleteDependentBlockDB,
+  applyLDBBatchWrites,
+  insertEmitted,
+  enqueueIfParentNotEmitted,
+  buildEmissionChain
+  ) where
 
 import BlockApps.Logging
 import Blockchain.Data.BlockHeader
@@ -28,7 +44,7 @@ type DependentBlockDB = LDB.DB
 -- totalDifficulty always includes the difficulty of the block currently being operated on
 data DependentBlockEntry
   = DependentBlocks {blocks :: [SequencedBlock]}
-  | Emitted {emittedTotalDifficulty :: Integer}
+  | Emitted {emittedTotalDifficulty :: Integer} -- , qq :: Keccak256}
   | ChildFailedConsensus
       { emittedTotalDifficulty :: Integer,
         blocks :: [SequencedBlock]
@@ -56,20 +72,8 @@ genericLookupDependentBlockDB k = do
   readOptions <- getReadOptions
   fmap (decode . B.fromStrict) <$> LDB.get db readOptions (B.toStrict $ encode k)
 
-genericInsertDependentBlockDB :: (HasDependentBlockDB m, Binary k, Binary a) => k -> a -> m ()
-genericInsertDependentBlockDB k a = do
-  db <- getDependentBlockDB
-  writeOptions <- getWriteOptions
-  LDB.put db writeOptions (B.toStrict $ encode k) (B.toStrict $ encode a)
-
 genericBatchInsertDependentBlockDB :: (Binary k, Binary a) => k -> a -> LDB.BatchOp
 genericBatchInsertDependentBlockDB k a = LDB.Put (B.toStrict $ encode k) (B.toStrict $ encode a)
-
-genericDeleteDependentBlockDB :: (HasDependentBlockDB m, Binary k) => k -> m ()
-genericDeleteDependentBlockDB k = do
-  db <- getDependentBlockDB
-  writeOptions <- getWriteOptions
-  LDB.delete db writeOptions (B.toStrict $ encode k)
 
 genericBatchDeleteDependentBlockDB :: Binary k => k -> LDB.BatchOp
 genericBatchDeleteDependentBlockDB k = LDB.Del (B.toStrict $ encode k)
@@ -77,25 +81,8 @@ genericBatchDeleteDependentBlockDB k = LDB.Del (B.toStrict $ encode k)
 bootstrapGenesisBlock :: (Keccak256 `Alters` DependentBlockEntry) m => Keccak256 -> Integer -> m ()
 bootstrapGenesisBlock hash' = insert Proxy hash' . Emitted
 
-appendChildFailure :: (Keccak256 `Alters` DependentBlockEntry) m => SequencedBlock -> m ()
-appendChildFailure b =
-  --do
-  let parentHash' = parentHash $ sbBlockData b
-   in repsert_ Proxy parentHash' $ \case
-        Just (Emitted t) -> pure $ ChildFailedConsensus t [b]
-        Just (ChildFailedConsensus t bs) -> pure $ ChildFailedConsensus t (b : bs)
-        _ -> error "appendChildFailure: Parent hasn't been emitted yet. This should never happen"
-
 existingParent :: (Keccak256 `Alters` DependentBlockEntry) m => SequencedBlock -> m (Maybe DependentBlockEntry)
 existingParent = lookup Proxy . parentHash . sbBlockData
-
-readyToEmit :: (Keccak256 `Alters` DependentBlockEntry) m => SequencedBlock -> m Bool
-readyToEmit b = do
-  ep <- existingParent b
-  case ep of
-    Just (Emitted _) -> return True
-    Just (ChildFailedConsensus _ existingDeps) | not (b `elem` existingDeps) -> return True
-    _ -> return False
 
 enqueueIfParentNotEmitted :: (Keccak256 `Alters` DependentBlockEntry) m => SequencedBlock -> m EmissionReadiness
 enqueueIfParentNotEmitted b =
@@ -172,17 +159,3 @@ buildEmissionChain' retryFailed b lastTotalDifficulty =
   where
     totalDifficulty' = lastTotalDifficulty + sequencedBlockDifficulty b
     theBlock t' = sequencedBlockToOutputBlock b t'
-
-retryFailedChildren ::
-  ( (Keccak256 `Alters` DependentBlockEntry) m,
-    MonadLogger m
-  ) =>
-  Keccak256 ->
-  m [OutputBlock]
-retryFailedChildren h =
-  lookup Proxy h >>= \case
-    Just (ChildFailedConsensus t blocks') -> do
-      $logInfoS "retryFailedChildren" . T.pack $ "Block " <> format h <> " has " <> show (length blocks') <> " failed children."
-      insert Proxy h $ Emitted t
-      fmap join . sequence $ flip (buildEmissionChain' True) t <$> blocks'
-    _ -> return []
