@@ -62,14 +62,15 @@ const Transaction = ({ user }) => {
     try {
       return transactions.map(transaction => {
         const { category, subCategory } = getCategoryAndSubcategory(transaction.assetContractName);
+        let quantityIsDecimal = transaction.quantityIsDecimal && transaction.quantityIsDecimal === "True";
         return formatDataObject({
           reference: transaction?.reference,
           type: transaction?.type,
           category,
           subCategory,
           assetName: transaction?.assetName,
-          Price: transaction?.price,
-          quantity: transaction?.quantity,
+          Price: quantityIsDecimal ? Number((transaction?.price * 100).toFixed(2)) : transaction?.price,
+          quantity: quantityIsDecimal ? Number((transaction?.quantity / 100).toFixed(2)) : transaction?.quantity,
           from: transaction.from,
           to: transaction.to,
           hash: transaction.transaction_hash,

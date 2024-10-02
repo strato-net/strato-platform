@@ -5,7 +5,7 @@ import "./Tokens.sol";
 import "../../mercata-base-contracts/Templates/Payments/StratPaymentService.sol";
 
 /// @title A representation of STRATS assets
-contract STRATS is Tokens {
+contract STRATSTokens is Tokens {
     string public paymentServiceCreator;
     string public paymentServiceName;
 
@@ -27,6 +27,11 @@ contract STRATS is Tokens {
         paymentServiceCreator = _paymentServiceCreator;
         paymentServiceName = _paymentServiceName;
     }
+    
+    function mint(uint _quantity) internal override returns (UTXO) {
+        STRATSTokens newSTRATS = new STRATSTokens(name, description, images, files, fileNames, createdDate, _quantity, status, address(redemptionService), paymentServiceCreator, paymentServiceName);
+        return UTXO(address(newSTRATS)); 
+    }
 
     modifier fromPaymentService(string action) {
         StratPaymentService ps = StratPaymentService(msg.sender);
@@ -37,10 +42,10 @@ contract STRATS is Tokens {
         _;
     }
     
-    function purchaseTransfer(address _newOwner, uint _quantity) public fromPaymentService("make a purchase") {
+    function purchaseTransfer(address _newOwner, uint _quantity, uint _transferNumber, decimal _price) public fromPaymentService("make a purchase") {
         require(_quantity <= quantity, "Cannot transfer more than available quantity.");
         // regular transfer - isUserTransfer: false, transferNumber: 0
         // transfer feature - isUserTransfer: true, transferNumber: >0
-        _transfer(_newOwner, _quantity, false, 0, 0);
+        _transfer(_newOwner, _quantity, true, _transferNumber, _price);
     }
 }

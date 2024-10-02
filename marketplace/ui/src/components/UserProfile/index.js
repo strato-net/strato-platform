@@ -43,7 +43,7 @@ const UserProfile = ({user}) => {
   const { cartList } = useMarketplaceState();
   const [api, contextHolder] = notification.useNotification();
   const marketplaceDispatch = useMarketplaceDispatch();
-  const { userInventories, isUserInventoriesLoading, inventories, isInventoriesLoading, message, success, inventoriesTotal } = useInventoryState();
+  const { userInventories, isUserInventoriesLoading, inventories, isInventoriesLoading, message, success, inventoriesTotal, supportedTokens, isFetchingTokens } = useInventoryState();
   let { hasChecked, isAuthenticated, loginUrl } = useAuthenticateState();
   const { TabPane } = Tabs;
   const orderDispatch = useOrderDispatch();
@@ -124,6 +124,7 @@ const UserProfile = ({user}) => {
       if(isOwner) 
         {
           inventoryActions.fetchInventory(dispatch, limit, offset, "",category);
+          inventoryActions.fetchSupportedTokens(dispatch);
         }
       }, [dispatch, limit, offset, category, isOwner]);
 
@@ -417,7 +418,7 @@ const UserProfile = ({user}) => {
                 key: undefined,
                 children: (
                   <div className="my-4 grid grid-cols-1 md:grid-cols-2 gap-6 lg:grid-cols-2 xl:grid-cols-3 3xl:grid-cols-4 5xl:grid-cols-5 sm:place-items-center md:place-items-start  inventoryCard max-w-full">
-                    {!isInventoriesLoading ? (
+                    {!isInventoriesLoading && !isFetchingTokens ? (
                       inventories.map((inventory, index) => {
                         return (
                           <InventoryCard
@@ -427,6 +428,7 @@ const UserProfile = ({user}) => {
                             key={index}
                             // debouncedSearchTerm={debouncedSearchTerm}
                             allSubcategories={allSubcategories}
+                            supportedTokens={supportedTokens}
                             user={user}
                           />
                         );
@@ -444,7 +446,7 @@ const UserProfile = ({user}) => {
                 key: 'For Sale',
                 children: (
                   <div className="my-4 grid grid-cols-1 md:grid-cols-2 gap-6 lg:grid-cols-3 3xl:grid-cols-4 5xl:grid-cols-5 sm:place-items-center md:place-items-start  inventoryCard max-w-full">
-                    {!isUserInventoriesLoading ? (
+                    {!isUserInventoriesLoading && !isFetchingTokens ? (
                       userInventories.map((inventory, index) => {
                         return (
                           <InventoryCard
@@ -454,6 +456,7 @@ const UserProfile = ({user}) => {
                             key={index}
                             // debouncedSearchTerm={debouncedSearchTerm}
                             allSubcategories={allSubcategories}
+                            supportedTokens={supportedTokens}
                             user={user}
                           />
                         );
@@ -471,7 +474,7 @@ const UserProfile = ({user}) => {
                 key: categoryObject.name,
                 children: (
                   <div className="my-4 grid grid-cols-1 md:grid-cols-2 gap-6 lg:grid-cols-3 3xl:grid-cols-4 5xl:grid-cols-5 inventoryCard max-w-full">
-                    {!isInventoriesLoading ? (
+                    {!isInventoriesLoading && !isFetchingTokens ? (
                       inventories.map((inventory, index) => {
                         return (
                           <InventoryCard
@@ -481,6 +484,7 @@ const UserProfile = ({user}) => {
                             key={index}
                             // debouncedSearchTerm={debouncedSearchTerm}
                             allSubcategories={allSubcategories}
+                            supportedTokens={supportedTokens}
                             user={user}
                           />
                         );

@@ -10,7 +10,6 @@ import FooterComponent from "./components/Footer/FooterComponent";
 import TagManager from "react-gtm-module";
 import { UsersProvider } from "./contexts/users";
 import { useMarketplaceState } from "./contexts/marketplace";
-import { InventoriesProvider } from "./contexts/inventory";
 import { getCookie, delete_cookie } from "./helpers/cookie";
 import InternalError from "./components/500";
 import { CategorysProvider } from "./contexts/category";
@@ -75,17 +74,15 @@ const App = () => {
       <Layout className="overflow-auto">
         <UsersProvider>
           <CategorysProvider>
-            <InventoriesProvider>
-              <HeaderComponent
-                isOauth={isAuthenticated}
-                user={user}
-                users={users}
-                loginUrl={loginUrl}
-                showMenu={showMenu}
-                handleSubMenu={handleSubMenu}
-                handleMenuTab={handleMenuTab}
-              />
-            </InventoriesProvider>
+            <HeaderComponent
+              isOauth={isAuthenticated}
+              user={user}
+              users={users}
+              loginUrl={loginUrl}
+              showMenu={showMenu}
+              handleSubMenu={handleSubMenu}
+              handleMenuTab={handleMenuTab}
+            />
           </CategorysProvider>
         </UsersProvider>
         {error === "Internal Server Error 101"
