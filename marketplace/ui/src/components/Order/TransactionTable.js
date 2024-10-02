@@ -230,7 +230,7 @@ const TransactionTable = ({ user, download, isAllOrdersLoading }) => {
         <Popover className="flex" content={<Content data={data} />} trigger="hover">
           <div className="flex items-center cursor-default">
             <img src={data?.assetImage} alt={data?.assetName} width={24} height={30} 
-              className="border w-6 h-8 border-indigo-600 rounded-md object-contain" 
+              className="border w-9 h-9 border-indigo-600 rounded-md object-contain" 
             />
             <span className="ml-1 text-truncate">{data?.assetName}</span>
           </div>

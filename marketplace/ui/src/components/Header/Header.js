@@ -255,7 +255,7 @@ const HeaderComponent = ({ user, loginUrl, showMenu, handleSubMenu, handleMenuTa
       label: (
         <div>
           <p className="text-gray">{user?.commonName}</p>
-          <p className="text-xs text-gray">{user?.preferred_username}</p>
+          <p className="text-xs text-gray">{user?.email}</p>
           <p className="!mb-0">Logout</p>
         </div>
       )
