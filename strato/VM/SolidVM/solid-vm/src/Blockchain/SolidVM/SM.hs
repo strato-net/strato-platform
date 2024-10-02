@@ -968,15 +968,16 @@ getContractsForParents parents' cc =
   let getContractForParent parent = M.lookup parent cc
    in mapMaybe getContractForParent parents'
 
+-- Only get top-level abstract contracts (e.g. Asset, Sale), to reduce Cirrus table bloat
 getAbstractParentsFromContract :: CC.Contract -> CC.CodeCollection -> [CC.Contract]
-getAbstractParentsFromContract c cc =
-  -- recursively obtain parent + grandparent contracts
-  -- ex. B is A, C is B, then C should also be A
-  let go [] = []
-      go xs = xs ++ (go $ getContractsForParents (concatMap (CC._parents) xs) ccc)
-      ccc = CC._contracts cc
-      parents' = CC._parents c
-   in filter ((== CC.AbstractType) . CC._contractType) (go $ getContractsForParents parents' ccc)
+getAbstractParentsFromContract c' cc = go c'
+  where
+    go c = case CC._contractType c of
+      CC.AbstractType -> case doParents c of
+        [] -> [c] 
+        cs -> cs
+      _ -> doParents c
+    doParents = concatMap (maybe [] go . flip M.lookup (CC._contracts cc)) . CC._parents
 
 getMapNamesFromContract :: CC.Contract -> [T.Text]
 getMapNamesFromContract c =
