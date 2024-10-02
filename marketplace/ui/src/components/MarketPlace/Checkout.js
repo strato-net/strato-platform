@@ -189,6 +189,7 @@ const Checkout = () => {
   };
 
   const ValueQty = (product, e) => {
+    e = parseInt(e || 0);
     let items = [...cartList];
     cartList.forEach((element, index) => {
       if (element.product.address === product.key) {
@@ -312,18 +313,6 @@ const Checkout = () => {
           </div>
         );
       },
-    },
-    {
-      title: (
-        <Text className="text-[#202020] text-base font-semibold">
-          Amount($)
-        </Text>
-      ),
-      dataIndex: "amount",
-      align: "center",
-      render: (text) => (
-        <p className="text-sm font-semibold text-[#202020]">{"$" + text.toFixed(2)}</p>
-      ),
     },
     {
       title: <Text className="text-[#202020] text-base font-semibold "></Text>,

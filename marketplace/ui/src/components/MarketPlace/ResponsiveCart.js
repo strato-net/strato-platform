@@ -1,4 +1,4 @@
-import { Button, Row, Typography, InputNumber, Select, Spin, Col } from "antd";
+import { Button, Row, Typography, InputNumber, Select, Spin, Col, Radio } from "antd";
 import { useState, useEffect } from "react";
 import { Images } from "../../images";
 import { useMarketplaceDispatch } from "../../contexts/marketplace";
@@ -8,6 +8,7 @@ import { actions } from "../../contexts/marketplace/actions";
 import { actions as orderActions } from "../../contexts/order/actions";
 import { useOrderDispatch, useOrderState } from "../../contexts/order";
 import { generateHtmlContent } from "../../helpers/emailTemplate";
+import { PAYMENT_LABEL } from "../../helpers/constants";
 
 const { Option } = Select;
 
@@ -21,7 +22,8 @@ const ResponsiveCart = ({
   removeCartList,
   openToastOrder
 }) => {
-  const [selectedProvider, setSelectedProvider] = useState("");
+  const initialPaymentState = paymentProviders?.length !==0 ? paymentProviders[0] : '' 
+  const [selectedProvider, setSelectedProvider] = useState(initialPaymentState);
   const marketplaceDispatch = useMarketplaceDispatch();
   const [tax, setTax] = useState(0);
   const [subTotal, setSubTotal] = useState(0);
@@ -61,32 +63,32 @@ const ResponsiveCart = ({
   let htmlContents = [];
   const generate_HTML_Content = async (username) => {
     htmlContents = [];
-    
+
     let customerFirstName = username;
-    
+
     // Construct Email with order details
     let concatenatedOrderString = "";
-    let orderTotal = 0; 
+    let orderTotal = 0;
     for (let i = 0; i < cartData.length; i++) {
       let orderItem = cartData[i];
       let itemName = decodeURIComponent(orderItem.item.name);
-      let itemPrice = parseFloat(orderItem.unitPrice).toFixed(2); 
+      let itemPrice = parseFloat(orderItem.unitPrice).toFixed(2);
       let itemQty = orderItem.qty;
-      let itemTotal = (itemPrice * itemQty).toFixed(2); 
-  
-      concatenatedOrderString += `${itemName}:\n`; 
-      concatenatedOrderString += `$${itemTotal} <br>`; 
-      concatenatedOrderString += `Qty: ${itemQty} &nbsp; $${itemPrice} each (${(itemPrice*100).toFixed(0)} STRATS)<br><br>`; 
-      orderTotal += parseFloat(itemTotal); 
+      let itemTotal = (itemPrice * itemQty).toFixed(2);
+
+      concatenatedOrderString += `${itemName}:\n`;
+      concatenatedOrderString += `$${itemTotal} <br>`;
+      concatenatedOrderString += `Qty: ${itemQty} &nbsp; $${itemPrice} each (${(itemPrice * 100).toFixed(0)} STRATS)<br><br>`;
+      orderTotal += parseFloat(itemTotal);
       if (i === cartData.length - 1) {
         concatenatedOrderString += `<hr style="border-top: 1px dotted #0A1B71; min-width: 80%; max-width: 80%; margin-left: 15px;">`;
         concatenatedOrderString += `Shipping Fee: <i><strong>Free</strong></i><br><br>`;
         concatenatedOrderString += `Order Total: $${orderTotal.toFixed(2)} <br>`;
       }
     }
-    
 
-     htmlContents.push(generateHtmlContent(customerFirstName, concatenatedOrderString));
+
+    htmlContents.push(generateHtmlContent(customerFirstName, concatenatedOrderString));
   };
 
   const handlePaymentConfirm = async (paymentProvider) => {
@@ -100,7 +102,7 @@ const ResponsiveCart = ({
         unitPrice: item.unitPrice
       });
     });
-  
+
     generate_HTML_Content(user.commonName)
 
     let body = {
@@ -141,7 +143,9 @@ const ResponsiveCart = ({
   const handleChange = async (value) => {
     const provider = paymentProviders.find(provider => provider?.serviceName === value);
     setSelectedProvider(provider);
+  };
 
+  const handlePlaceOrder = async (provider) => {
     if (hasChecked && !isAuthenticated && loginUrl !== undefined) {
       window.location.href = loginUrl;
     } else {
@@ -179,16 +183,23 @@ const ResponsiveCart = ({
         setSelectedProvider("");
       }
     }
-  };
+  }
+
+  const totalAmount = selectedProvider?.serviceName === 'STRATS' ? 
+             `${(subTotal * 100).toFixed(0)} STRATS` :  
+             selectedProvider?.serviceName === 'Stripe' ? `${subTotal} USD` : 
+             `${subTotal} ${selectedProvider?.serviceName || 'USD'}`
 
   return (
-    <div className="border border-[#E9E9E9] rounded-md mt-3 flex flex-col gap-[18px] sm:w-[400px] md:w-[450px] items-center">
+    <div className=" rounded-md mt-3 flex flex-col gap-[18px] sm:w-[400px] md:w-[450px] items-center">
+      
       {cartData.map((element, index) => {
         let qty = element.qty;
         let product = element;
         return (
-          <div className="p-3 w-full" key={index}>
-            <div className="p-3 border border-[#E9E9E9] rounded-md w-full">
+          <div className=" w-full" key={index}>
+            <div className="w-full bg-[#d8cbcb] h-[1px]"></div>
+            <div className="p-3 rounded-md w-full">
               <div className="flex justify-between">
                 <div className="flex gap-x-3">
                   <img
@@ -287,60 +298,48 @@ const ResponsiveCart = ({
                   </div>
                 </div>
               )}
-
-              <div className="pt-[18px] flex justify-between">
-                <Typography className="text-sm font-semibold text-[#202020]">
-                  Amount($):
-                </Typography>
-                <Typography className="text-sm font-semibold text-[#202020]">
-                  {'$' + (element?.amount).toFixed(2)}
-                </Typography>
-              </div>
             </div>
           </div>
         );
       })}
-
-      <div className="flex flex-col w-full bg-[#F6F6F6] px-[10px] py-3">
-        <div className="flex flex-col gap-3">
-          <div className="flex justify-between">
-            <p className="text-sm font-medium">Sub Total:</p>
-            <p className="text-sm text-right font-semibold">${subTotal} <span className="ml-1">({(subTotal * 100).toFixed(0)} STRATS)</span></p>
-          </div>
-          <div className="w-full h-[1px] bg-[#E9E9E9]"></div>
-          <div className="flex justify-between">
-            <p className="text-sm font-medium">Total:</p>
-            <p className="text-sm font-semibold text-right">
-              ${total} <span className="ml-1">({(total * 100).toFixed(0)} STRATS)</span>
-            </p>
-          </div>
-        </div>
-
-        {!confirm && (
-          isCreateOrderSubmitting || isCreatePaymentSubmitting ? (
-            <div className="flex justify-center items-center">
-              <Spin spinning={isCreateOrderSubmitting || isCreatePaymentSubmitting} size="large"/>
-            </div>
-          ) : (
-            <Row className="flex justify-center mt-4">
-              <Select
-                value={selectedProvider?.serviceName}
-                className="w-[250px] text-center selected-payment-option items-select"
-                onChange={handleChange}
-                placeholder="Select Payment Option"
-              >
+     <div className="w-full bg-[#d8cbcb] h-[1px]"></div>
+      <div className="w-full px-2">
+        <div className="checkout-card">
+          <h3 className="text-lg p-2 font-semibold mb-4 h-12 bg-[#EEEFFA]">Payment Method</h3>
+          <div className="p-2">
+          <div className="rounded-lg shadow-md w-full">
+            <Radio.Group
+              onChange={(e) => { handleChange(e.target.value) }}
+              value={selectedProvider?.serviceName}
+              className="w-full">
+              <div className="flex flex-col space-y-4">
                 {paymentProviders && paymentProviders.map(provider => (
-                  provider && <Option className='payment-dropdown' key={provider?.serviceName} value={provider?.serviceName}>
-                    <Row className="w-full">
-                        <Col span={22} className="text-left">Checkout with {provider?.serviceName}</Col>
-                        <Col span={2} className="flex justify-end"><img src={provider?.imageURL} alt={provider?.serviceName} style={{ width: 20, height: 20, marginRight: 2 }} /> </Col>
-                    </Row>
-                  </Option>
+                  provider &&
+                  <Radio value={provider?.serviceName} className="w-full">
+                    <p className="flex text-base font-normal items-center"> 
+                    <span className="ml-2 text-sm font-normal"> 
+                    {PAYMENT_LABEL[provider?.serviceName] 
+                    ? PAYMENT_LABEL[provider?.serviceName] 
+                    : `Pay with ${provider?.serviceName}`} </span></p>
+                  </Radio>
                 ))}
-              </Select>
-            </Row>
-          )
-        )}
+              </div>
+            </Radio.Group>
+          </div>
+          <div className="flex justify-between items-center mt-10 mb-3 p-2">
+            <span className="text-base font-normal">Order Total :</span>
+            <span className="text-base font-normal">{totalAmount} </span>
+          </div>
+          <Button
+            type="primary"
+            disabled={!paymentProviders || paymentProviders?.length===0}
+            className="w-full mt-3 mb-6 bg-blue-800 text-white h-10 text-lg"
+            onClick={()=>{handlePlaceOrder(selectedProvider)}}
+          >
+            Place Order
+          </Button>
+        </div>
+        </div>
       </div>
     </div>
   );

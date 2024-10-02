@@ -163,7 +163,7 @@ const NewTrendingCard = ({ topSellingProduct, addItemToCart, parent = "", api, c
                             value={quantity}
                             max={topSellingProduct.saleQuantity}
                             min={1}
-                            onChange={setQuantity}
+                            onChange={(e)=>{setQuantity(parseInt(e || 0))}}
                             onPressEnter={(e) => {
                                 const newValue = parseInt(e.target.value, 10);
                                 if (newValue <= topSellingProduct.saleQuantity) {

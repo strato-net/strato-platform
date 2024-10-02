@@ -534,14 +534,21 @@ const ProductDetails = ({ user, users }) => {
                       className={`h-9 w-11 md:h-10 md:w-12 lg:h-[46px] lg:w-[52px] rounded-lg flex justify-center items-center border border-[#00000029] text-center cursor-pointer ${qty > 1 ? '' : 'cursor-not-allowed opacity-50'}`}>
                       <p className=" text-2xl md:text-3xl lg:text-4xl font-semibold lg:text-[#202020] text-[#989898]">-</p>
                     </div>
-                    <InputNumber className="w-full md:w-[280px] h-9 md:h-10 lg:h-[46px] border text-[#6A6A6A] border-[#00000029] text-center flex flex-col justify-center font-semibold !rounded-lg" min={1} max={availableQuantity} value={`${qty}`} defaultValue={`${qty}`} controls={false}
+                    <InputNumber 
+                      className="w-full md:w-[280px] h-9 md:h-10 lg:h-[46px] border text-[#6A6A6A] border-[#00000029] text-center flex flex-col justify-center font-semibold !rounded-lg" 
+                      min={1} 
+                      max={availableQuantity} 
+                      value={`${qty}`} 
+                      defaultValue={`${qty}`} 
+                      controls={false}
                       onChange={e => {
-                        if (e < availableQuantity) {
-                          setQty(e)
-                        } else {
-                          setQty(availableQuantity)
-                        }
-                      }} />
+                          if (e < availableQuantity) {
+                            setQty(parseInt(e || 0))
+                          } else {
+                            setQty(availableQuantity)
+                          }
+                        }} 
+                    />
                     <div
                       onClick={add}
                       className={`h-9 w-11 md:h-10 md:w-12 lg:h-[46px] lg:w-[52px] rounded-lg flex justify-center items-center border border-[#00000029] text-center cursor-pointer ${qty < availableQuantity ? '' : 'cursor-not-allowed opacity-50'}`}>
