@@ -5,7 +5,7 @@ import utc from 'dayjs/plugin/utc';
 
 dayjs.extend(utc);
 
-const PriceChartAndStats = ({ isFetchingPriceHistory, priceHistory }) => {
+const PriceChartAndStats = ({ isFetchingPriceHistory, priceHistory, isDecimal }) => {
   if (isFetchingPriceHistory || !priceHistory || !priceHistory.originRecords || priceHistory.originRecords.length === 0) {
     return <div className="h-full bg-gray-200 animate-pulse"></div>;
   }
@@ -18,7 +18,7 @@ const PriceChartAndStats = ({ isFetchingPriceHistory, priceHistory }) => {
       const currentRecord = records[i];
       const isoDate = currentRecord.block_timestamp.replace(' UTC', 'Z');
       const date = dayjs(isoDate).utc();
-      const price = currentRecord.price;
+      const price = isDecimal ? currentRecord.price * 100 : currentRecord.price;
    
       // Set the last known price if it's null (first iteration) or update it to the current record's price
       if (lastKnownPrice === null || price !== lastKnownPrice) {
@@ -129,7 +129,7 @@ const PriceChartAndStats = ({ isFetchingPriceHistory, priceHistory }) => {
     yaxis: {
       labels: {
         formatter: function(value) {
-          return `$${value}`
+          return `$${value.toFixed(2)}`;
         }
       }
     },

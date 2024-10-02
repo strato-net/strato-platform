@@ -1,21 +1,26 @@
-import { Button, Select, InputNumber, Modal, Table } from "antd";
+import { Button, Select, InputNumber, Modal, Table, notification } from "antd";
 import { useEffect, useRef,useState } from "react";
 import { actions } from "../../contexts/inventory/actions";
+import { actions as marketplaceActions } from "../../contexts/marketplace/actions";
 import { actions as userActions } from "../../contexts/users/actions";
 import { useInventoryDispatch, useInventoryState } from "../../contexts/inventory";
+import { useMarketplaceDispatch, useMarketplaceState } from "../../contexts/marketplace";
 import { useUsersDispatch, useUsersState } from "../../contexts/users";
 import { useAuthenticateState } from "../../contexts/authentication";
 import { SearchOutlined } from '@ant-design/icons';
 import { handlePriceInput, handleQuantityInput } from "../../helpers/utils";
 import { OLD_SADDOG_ORIGIN_ADDRESS } from "../../helpers/constants";
 
-const TransferModal = ({ open, handleCancel, inventory, categoryName, limit, offset }) => {
-    const [data, setData] = useState([inventory]);
+const TransferModal = ({ open, handleCancel, inventory, categoryName = "", limit=0, offset=0 }) => {
+    const [data, setData] = useState(inventory);
     const [quantity, setQuantity] = useState(1);
     const [price, setPrice] = useState(0);
     const inventoryDispatch = useInventoryDispatch();
+    const marketplaceDispatch = useMarketplaceDispatch();
     const userDispatch = useUsersDispatch();
+    const [api, contextHolder] = notification.useNotification();
     const [canTransfer, setCanTransfer] = useState(true);
+    const quantityIsDecimal = data.data.quantityIsDecimal && data.data.quantityIsDecimal === "True";
     const {
         user
     } = useAuthenticateState();
@@ -25,6 +30,9 @@ const TransferModal = ({ open, handleCancel, inventory, categoryName, limit, off
     const {
         isTransferring
     } = useInventoryState();
+    const { 
+        isTransferringStrats, message: marketplaceMsg, success: marketplaceSuccess
+    } = useMarketplaceState();
     const inputPriceDesktopRef = useRef(null);
     const inputPriceMobileRef = useRef(null);
     const inputQuantityDesktopRef = useRef(null);
@@ -42,7 +50,7 @@ const TransferModal = ({ open, handleCancel, inventory, categoryName, limit, off
         setDropdownOpen(!!value);
     };
 
-    const originAddress = inventory.originAddress.toLowerCase();
+    const originAddress = inventory.originAddress?.toLowerCase();
     const isBurner = originAddress === OLD_SADDOG_ORIGIN_ADDRESS;
 
     const usersList = users
@@ -63,6 +71,24 @@ const TransferModal = ({ open, handleCancel, inventory, categoryName, limit, off
       isBurner && filteredUsersList.length > 0 ? filteredUsersList[0].value : ""
     );
     
+    const marketplaceToast = (placement) => {
+        if (marketplaceSuccess) {
+            api.success({
+            message: marketplaceMsg,
+            onClose: marketplaceActions.resetMessage(marketplaceDispatch),
+            placement,
+            key: 1,
+            });
+        } else {
+            api.error({
+            message: marketplaceMsg,
+            onClose: marketplaceActions.resetMessage(marketplaceDispatch),
+            placement,
+            key: 2,
+            });
+        }
+    };
+    
     const handleSelect = (userAddress) => {
         setUserAddress(userAddress);
 
@@ -74,7 +100,7 @@ const TransferModal = ({ open, handleCancel, inventory, categoryName, limit, off
     }, []);
 
     useEffect(() => {
-        if (quantity > inventory.quantity || quantity <= 0 || !userAddress) {
+        if (quantity > (quantityIsDecimal ? inventory.quantity / 100 : inventory.quantity) || quantity <= 0 || !userAddress) {
             setCanTransfer(false);
         }
         else {
@@ -124,7 +150,8 @@ const TransferModal = ({ open, handleCancel, inventory, categoryName, limit, off
         {
             title: "Quantity Available",
             dataIndex: "quantity",
-            align: "center"
+            align: "center",
+            render: (text, record) => quantityIsDecimal ? record.quantity / 100 : record.quantity,
         },
         {
             title: "Set Quantity",
@@ -188,22 +215,27 @@ const TransferModal = ({ open, handleCancel, inventory, categoryName, limit, off
 
 
     const handleSubmit = async () => {
-        const body = {
-            assetAddress: inventory.address,
-            newOwner: userAddress,
-            quantity,
-            price
-        };
-
-        if (quantity > 0 && quantity <= inventory.quantity && userAddress) {
-            let isDone = await actions.transferInventory(inventoryDispatch, body);
+        if (quantity > 0 && quantity <= (quantityIsDecimal ? inventory.quantity / 100 : inventory.quantity) && userAddress) {
+            let isDone = false;
+    
+            const body = {
+                assetAddress: inventory.address,
+                newOwner: userAddress,
+                quantity: quantityIsDecimal ? quantity * 100 : quantity,
+                price: quantityIsDecimal ? price / 100 : price,
+            };
+            isDone = await actions.transferInventory(inventoryDispatch, body);
             if (isDone) {
                 await actions.fetchInventory(inventoryDispatch, limit, offset, "", categoryName);
                 await actions.fetchInventoryForUser(inventoryDispatch, user.commonName);
+                await marketplaceActions.fetchStratsBalance(marketplaceDispatch);
+            }
+    
+            if (isDone) {
                 handleCancel();
             }
         }
-    }
+    };    
 
     return (
         <Modal
@@ -213,7 +245,7 @@ const TransferModal = ({ open, handleCancel, inventory, categoryName, limit, off
             width={1000}
             footer={[
                 <div className="flex justify-center md:block">
-                    <Button type="primary" className="w-32 h-9" onClick={handleSubmit} disabled={!canTransfer} loading={isTransferring}>
+                    <Button type="primary" className="w-32 h-9" onClick={handleSubmit} disabled={!canTransfer} loading={isTransferring || isTransferringStrats}>
                         Transfer
                     </Button>
                 </div>
@@ -223,7 +255,7 @@ const TransferModal = ({ open, handleCancel, inventory, categoryName, limit, off
 
                 <Table
                     columns={columns}
-                    dataSource={data}
+                    dataSource={[data]}
                     pagination={false}
                 />
             </div>
@@ -290,6 +322,8 @@ const TransferModal = ({ open, handleCancel, inventory, categoryName, limit, off
                 </div>
 
             </div>
+            {contextHolder}
+            {marketplaceMsg && marketplaceToast("bottom")}
         </Modal>
     )
 }

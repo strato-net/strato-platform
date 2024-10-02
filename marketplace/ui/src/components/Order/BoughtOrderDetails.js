@@ -110,6 +110,7 @@ const BoughtOrderDetails = ({ user, users }) => {
       const orderQuantities = orderDetails.order.quantities ? orderDetails.order.quantities : orderDetails.order["BlockApps-Mercata-Order-quantities"].map(item => item.value);
       let items = [];
       orderDetails.assets.forEach((prod, index) => {
+        const quantityIsDecimal = prod.data.quantityIsDecimal && prod.data.quantityIsDecimal === "True";
         items.push({
           address: prod.address,
           chainId: prod.chainId,
@@ -117,8 +118,8 @@ const BoughtOrderDetails = ({ user, users }) => {
           productImage: prod["BlockApps-Mercata-Asset-images"].length > 0 ? prod["BlockApps-Mercata-Asset-images"][0].value : image_placeholder,
           productName: prod,
           name: prod.name,
-          unitPrice: orderDetails.order.currency === "STRATS" ? (prod.price * STRATS_CONVERSION).toFixed(0) : prod.price.toFixed(2),
-          quantity: parseInt(orderQuantities[index]),
+          unitPrice: orderDetails.order.currency === "STRATS" ? (prod.price * (quantityIsDecimal ? 100 : 1) * STRATS_CONVERSION).toFixed(0) : (prod.price * (quantityIsDecimal ? 100 : 1)).toFixed(2),
+          quantity: quantityIsDecimal ? orderQuantities[index] / 100 : parseInt(orderQuantities[index]),
           amount: (orderDetails.order.currency === "STRATS" ? (prod.price * STRATS_CONVERSION * parseInt(orderQuantities[index])).toFixed(0) : (prod.price * parseInt(orderQuantities[index])).toFixed(2)),
           serialNumber: prod,
           tax: prod.tax ? prod.tax : 0,
@@ -328,7 +329,7 @@ const BoughtOrderDetails = ({ user, users }) => {
 
   const handleCancelOrder = async () => {
     const body = {
-      paymentProvider: {
+      paymentService: {
         address: details.order.address,
       },
       orderHash: details.order.orderHash,
