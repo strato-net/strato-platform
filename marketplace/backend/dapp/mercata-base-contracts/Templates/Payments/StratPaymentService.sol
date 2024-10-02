@@ -102,7 +102,8 @@ contract StratPaymentService is PaymentService {
 
             // Transfer STRATS
             uint remainingStratsToTransfer = stratAmountNet;
-            uint remainingFeeToTransfer = stratFee;
+            uint remainingFeeToTransferToFeeReceipient = uint(stratFee / 2);
+            uint remainingFeeToTransferToProposer = stratFee - remainingFeeToTransferToFeeReceipient;
             uint stratQuantity = 0;
             uint transferAmount = 0;
             uint transferFee = 0;
@@ -118,11 +119,18 @@ contract StratPaymentService is PaymentService {
                     remainingStratsToTransfer -= transferAmount;
                 }
                 stratQuantity = stratQuantity - transferAmount;
-                if (remainingFeeToTransfer > 0 && stratQuantity > 0) {
+                if (remainingFeeToTransferToFeeReceipient > 0 && stratQuantity > 0)
                     transferNumber = (uint(_checkoutHash, 16) + j + block.timestamp) % 1000000;
                     transferFee = stratQuantity >= remainingFeeToTransfer ? remainingFeeToTransfer : stratQuantity;
                     stratAsset.purchaseTransfer(feeRecipient, transferFee, transferNumber, 0.0001);
-                    remainingFeeToTransfer -= transferFee;
+                    remainingFeeToTransferToFeeReceipient -= transferFee;
+                }
+
+                if (remainingFeeToTransferToProposer > 0 && stratQuantity > 0) {
+                    transferNumber = (uint(_checkoutHash, 16) + j + 1 + block.timestamp) % 1000000;
+                    transferFee = stratQuantity >= remainingFeeToTransferToProposer ? remainingFeeToTransferToProposer : stratQuantity;
+                    stratAsset.purchaseTransfer(block.proposer, transferFee); //sends 50% of fee to block proposer
+                    remainingFeeToTransferToProposer -= transferFee;
                 }
                 transferAmount = 0;
                 if (remainingStratsToTransfer == 0 && remainingFeeToTransfer == 0) {
