@@ -2,7 +2,7 @@ const factory = {
     getPaymentArgs: (uid) => {
         const args = {
             paymentSessionId: `paymentSessionId_${uid}`,
-            paymentProvider: `paymentProvider_${uid}`,
+            paymentService: `paymentService_${uid}`,
             paymentStatus: `paymentStatus_${uid}`,
             sessionStatus: `sessionStatus_${uid}`,
             amount: `${uid}`,

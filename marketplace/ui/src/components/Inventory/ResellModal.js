@@ -37,7 +37,7 @@ const ResellModal = ({ open, handleCancel, inventory, categoryName, limit, offse
     const handleSubmit = async () => {
         let body = {
             assetAddress: inventory.address,
-            quantity
+            quantity: inventory.data.quantityIsDecimal && inventory.data.quantityIsDecimal === "True" ? quantity * 100 : quantity,
         };
         let isDone = await actions.resellInventory(inventoryDispatch, body);
         if (isDone) {

@@ -77,6 +77,11 @@ const HeaderComponent = ({ user, loginUrl, showMenu, handleSubMenu, handleMenuTa
   }, [user]);
 
   useEffect(() => {
+    async function fetchStratsAddress() {
+      const stratsAddress = await marketplaceActions.fetchStratsAddress(marketplaceDispatch);
+      setOriginAddress(stratsAddress);
+    }
+    fetchStratsAddress();
     marketplaceActions.fetchCartItems(marketplaceDispatch, cartList);
   }, [marketplaceDispatch, cartList]);
 
@@ -88,7 +93,7 @@ const HeaderComponent = ({ user, loginUrl, showMenu, handleSubMenu, handleMenuTa
   const [isModalVisible, setIsModalVisible] = useState(false);
   const [isTransferStratsModalVisible, setIsTransferStratsModalVisible] = useState(false);
   const [isStratsTransactionHistoryModalVisible, setIsStratsTransactionHistoryModalVisible] = useState(false);
-
+  const [originAddress, setOriginAddress] = useState();
   const stratsBalance = (Object.keys(strats).length > 0) ? strats : 0
 
   useEffect(() => {
@@ -199,12 +204,14 @@ const HeaderComponent = ({ user, loginUrl, showMenu, handleSubMenu, handleMenuTa
       children: [
         {
           key: '2',
-          onClick: () => setIsTransferStratsModalVisible(true),
+          onClick: async () => {
+            navigate(`${routes.MarketplaceProductDetail.url.replace(':address', originAddress).replace(':name', "STRATS")}`)
+          },
           label: (
             <div>
-              {user &&
+              {user && originAddress &&
                 <p className="text-xs mt-1">
-                  Transfer
+                  Buy STRATS
                 </p>
               }
             </div>
@@ -212,7 +219,9 @@ const HeaderComponent = ({ user, loginUrl, showMenu, handleSubMenu, handleMenuTa
         },
         {
           key: '3',
-          onClick: () => setIsStratsTransactionHistoryModalVisible(true),
+          onClick: async () => {
+            navigate(`${routes.Transactions.url}?type=STRATS`)
+          },
           label: (
             <div>
               {user &&
