@@ -16,6 +16,16 @@ so that they could be properly moved to their respective version's subsection.
 
 ## [Unreleased] 
 ### Added
+
+### Changed
+- Only genesis block contracts and top-level abstract contracts are now indexed by Slipstream
+
+### Fixed
+
+### Removed
+
+## [12.0]
+### Added
 - Introduced BlockHeaderV2 constructor to BlockHeader type
 - Added support for BlockHeaderV2 fields to eth db and strato-api
 - Added BlockHeaderV2 fields to BlockView component in SMD
