@@ -970,14 +970,7 @@ getContractsForParents parents' cc =
 
 -- Only get top-level abstract contracts (e.g. Asset, Sale), to reduce Cirrus table bloat
 getAbstractParentsFromContract :: CC.Contract -> CC.CodeCollection -> [CC.Contract]
-getAbstractParentsFromContract c' cc = go c'
-  where
-    go c = case CC._contractType c of
-      CC.AbstractType -> case doParents c of
-        [] -> [c] 
-        cs -> cs
-      _ -> doParents c
-    doParents = concatMap (maybe [] go . flip M.lookup (CC._contracts cc)) . CC._parents
+getAbstractParentsFromContract c cc = M.elems $ CC.getTopLevelAbstractsForContract cc c
 
 getMapNamesFromContract :: CC.Contract -> [T.Text]
 getMapNamesFromContract c =

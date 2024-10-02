@@ -226,10 +226,10 @@ sendOutEvent (OutAction act) = do
                                                    . (modifiers .~ M.empty)
                                                    )
                 -- If there are no abstract contracts, emit normal contracts. Else, only emit abstract contracts
-                abstractNames = S.fromList $ snd <$> M.keys abstracts'
-                contracts'' = if S.null abstractNames
+                abstractNames = S.fromList . M.keys $ getTopLevelAbstracts cc
+                contracts'' = if cn == ""
                                 then M.filter (isNothing . _importedFrom) contracts'
-                                else M.filterWithKey (\k v -> (isNothing $ _importedFrom v) && (T.pack k `S.member` abstractNames)) contracts'
+                                else M.filterWithKey (\k v -> (isNothing $ _importedFrom v) && (k `S.member` abstractNames)) contracts'
                 cc' = emptyCodeCollection & contracts .~ contracts''
              in Just $
                   CodeCollectionAdded
