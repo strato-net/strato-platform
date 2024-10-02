@@ -133,7 +133,7 @@ contract StratPaymentService is PaymentService {
                     remainingFeeToTransferToProposer -= transferFee;
                 }
                 transferAmount = 0;
-                if (remainingStratsToTransfer == 0 && remainingFeeToTransfer == 0) {
+                if (remainingStratsToTransfer == 0 && remainingFeeToTransferToFeeReceipient == 0 && remainingFeeToTransferToProposer == 0) {
                     break;
                 }
             }
