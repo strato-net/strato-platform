@@ -213,6 +213,18 @@ const ConfirmOrder = ({ paymentServices = [], data, columns }) => {
   const handleChange = async (value) => {
     const provider = paymentServices.find(provider => provider?.serviceName === value);
     setSelectedProvider(provider);
+    window.LOQ.push(['ready', async LO => {
+      await LO.$internal.ready('events')
+      LO.events.track('Payment Selection',{
+        paymentType: provider?.serviceName
+      })
+    }])
+    TagManager.dataLayer({
+      dataLayer: {
+        event: 'payment_selection',
+        paymentType: provider?.serviceName
+      },
+    });
   };
 
 const handlePlaceOrder = async () => {
@@ -259,7 +271,7 @@ const handlePlaceOrder = async () => {
   }
 }
 
-const totalAmount = selectedProvider?.serviceName === 'STRATS' || selectedProvider?.serviceName.includes('STRATS') ? 
+const totalAmount = selectedProvider?.serviceName === 'STRATS' || selectedProvider?.serviceName?.includes('STRATS') ? 
       `${(subTotal * 100).toFixed(0)} STRATS` :  
       selectedProvider?.serviceName === 'Stripe' ? `${subTotal} USD` : 
       `${subTotal} ${selectedProvider?.serviceName || 'USD'}`
