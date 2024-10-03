@@ -227,7 +227,7 @@ sendOutEvent (OutAction act) = do
                                                    )
                 -- If there are no abstract contracts, emit normal contracts. Else, only emit abstract contracts
                 abstractNames = S.fromList . M.keys $ getTopLevelAbstracts cc
-                contracts'' = if cn == ""
+                contracts'' = if S.null abstractNames
                                 then M.filter (isNothing . _importedFrom) contracts'
                                 else M.filterWithKey (\k v -> (isNothing $ _importedFrom v) && (k `S.member` abstractNames)) contracts'
                 cc' = emptyCodeCollection & contracts .~ contracts''
