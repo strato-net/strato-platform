@@ -128,7 +128,7 @@ abstract contract OfferTest is Utils {
         // Transfer STRATS back to the purchaser
         for (uint i = 0; i < stratAssetAddresses.length; i++) {
             address stratAsset = stratAssetAddresses[i];
-            STRATSToken token = STRATSToken(stratAsset);
+            STRATSTokens token = STRATSTokens(stratAsset);
             uint transferNumber = ((keccak256(string (address(this)), string(address(a)), string(block.timestamp)) + i + block.timestamp) % 1000000);
             token._transfer(purchaser, quantity, true, transferNumber, offerPrice);
         }
@@ -143,7 +143,7 @@ abstract contract OfferTest is Utils {
         // Transfer STRATS back to the purchaser
         for (uint i = 0; i < stratAssetAddresses.length; i++) {
             address stratAsset = stratAssetAddresses[i];
-            STRATSToken token = STRATSToken(stratAsset);
+            STRATSTokens token = STRATSTokens(stratAsset);
             uint transferNumber = ((keccak256(string (address(this)), string(address(a)), string(block.timestamp)) + i + block.timestamp) % 1000000);
             token._transfer(purchaser, quantity, true, transferNumber, offerPrice);
         }
