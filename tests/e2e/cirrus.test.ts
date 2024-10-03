@@ -12,14 +12,21 @@ let config:Config = fsUtil.getYaml("config.yaml");
 
 const options = { config };
 const contractName = 'CirrusAccessTest';
+const abstractContractName = `A${contractName}`
 const commonName = "Test"
-const tableName = `${commonName}-${contractName}`
+const tableName = `${commonName}-${abstractContractName}`
 const contractSrc = `
-contract ${contractName} {
+pragma solidvm 11.4;
+
+abstract contract ${abstractContractName} {
   int x;
   constructor(int _x) {
     x = _x;
   }
+}
+
+contract ${contractName} is ${abstractContractName} {
+  constructor(int _x) ${abstractContractName}(_x) { }
 }`;
 
 describe('postgREST allowed methods', function () {

@@ -29,7 +29,8 @@ config.apiDebug=true;
 const SIZE=10
 const transactions = Array.from(Array(SIZE).keys()).map(i => {
   const name = `ScatterUpload_${i}`
-  return { nonce: i, name: name, src: `contract ${name} \{\}` }
+  const aname = `A${name}`
+  return { nonce: i, name: name, aname: aname, src: `abstract contract ${aname} \{\} contract ${name} is ${aname} \{\}` }
 })
 
 async function sleep(timeout) {
@@ -60,7 +61,7 @@ describe("Concurrent uploads", function() {
     console.log(allResults);
     const query = rest.searchUntil
     const qromises = transactions.map(tx =>
-      query(user, {name: `Test-${tx.name}`}, results => results.length > 0, options));
+      query(user, {name: `Test-${tx.aname}`}, results => results.length > 0, options));
     let allQueries = await Promise.all(qromises);
     console.log(allQueries);
   });

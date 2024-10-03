@@ -20,7 +20,9 @@ let options:Options = {config};
 let user:BlockChainUser;
 
 const counter = `
-contract Counter {
+pragma solidvm 11.4;
+
+abstract contract ACounter {
     uint count;
 
     function incr() public {
@@ -30,10 +32,14 @@ contract Counter {
         return count;
     }
 }
+
+contract Counter is ACounter { }
 `;
 
 const partialModify = `
-contract PartialModify {
+pragma solidvm 11.4;
+
+abstract contract APartialModify {
   uint x = 83;
   uint y = 72;
 
@@ -41,12 +47,14 @@ contract PartialModify {
     y *= 2;
   }
 }
+
+contract PartialModify is APartialModify { }
 `;
 
 const deployAndModify = `
 ${partialModify}
 
-contract Deployer {
+abstract contract ADeployer {
   PartialModify pm;
 
   constructor() public {
@@ -54,15 +62,27 @@ contract Deployer {
     pm.doubleY();
   }
 }
-`;
 
-const enumContract = `contract EnumContract {
-  enum E {A, B, C, D}
-  E e = E.C;
+contract Deployer is ADeployer {
+  constructor() ADeployer() { }
 }
 `;
 
-const stringsContract = `contract StringReturns {
+const enumContract = `
+pragma solidvm 11.4;
+
+abstract contract AEnumContract {
+  enum E {A, B, C, D}
+  E e = E.C;
+}
+
+contract EnumContract is AEnumContract { }
+`;
+
+const stringsContract = `
+pragma solidvm 11.4;
+
+abstract contract AStringReturns {
 
   function single() returns (string) {
     return "how are you?";
@@ -76,6 +96,8 @@ const stringsContract = `contract StringReturns {
     return (42, "the meaning of life", msg.sender, "STRATO");
   }
 }
+
+contract StringReturns is AStringReturns { }
 `;
 
 async function upload(vm, name, source):Promise<Contract> {
@@ -104,7 +126,7 @@ async function index(contract:Contract) {
 }
 
 function toTableName(contractName){
-  return `Test-${contractName}`; // prepend with Test cuz all users' commonName are Test
+  return `Test-A${contractName}`; // prepend with Test cuz all users' commonName are Test
 }
 
 describe('Solid VM: Contract uploads', function() {
