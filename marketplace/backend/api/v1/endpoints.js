@@ -62,6 +62,8 @@ export const Inventory = {
   unlist: '/unlist',
   resell: '/resell',
   transfer: '/transfer',
+  supportedTokens: '/supportedTokens',
+  bridge: '/bridge',
   updateSale: '/updateSale',
   getPriceHistory: '/price/history',
 }
@@ -102,6 +104,12 @@ export const Art = {
 
 export const Tokens = {
   prefix: '/tokens',
+  getAll: '/',
+  create: '/'
+}
+
+export const STRATS = {
+  prefix: '/STRATSTokens',
   getAll: '/',
   create: '/'
 }
@@ -173,6 +181,7 @@ export const Marketplace = {
   getTopSellingProductsLoggedIn: '/user/topselling',
   transferStrats: '/strats/transfer',
   getStratsBalance: '/strats',
+  getStratsAddress: '/strats/address',
   getStratsTransactionHistory: '/strats/history'
 }
 

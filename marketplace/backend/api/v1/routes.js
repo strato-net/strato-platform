@@ -10,6 +10,7 @@ import inventory from './Inventory'
 import item from './Item'
 import art from './Art'
 import tokens from './Tokens'
+import strats from './STRATS'
 import carbonOffset from './CarbonOffset'
 import metals from './Metals'
 import spirits from './Spirits'
@@ -39,6 +40,7 @@ import {
   Item,
   Art,
   Tokens,
+  STRATS,
   CarbonOffset,
   Metals,
   Spirits,
@@ -68,6 +70,7 @@ router.use(Inventory.prefix, inventory)
 router.use(Item.prefix, item)
 router.use(Art.prefix, art)
 router.use(Tokens.prefix, tokens)
+router.use(STRATS.prefix, strats)
 router.use(CarbonOffset.prefix, carbonOffset)
 router.use(Clothing.prefix, clothing)
 router.use(Membership.prefix, membership)

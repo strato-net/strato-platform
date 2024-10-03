@@ -63,15 +63,7 @@ const UserProfile = ({ user }) => {
   const { cartList } = useMarketplaceState();
   const [api, contextHolder] = notification.useNotification();
   const marketplaceDispatch = useMarketplaceDispatch();
-  const {
-    userInventories,
-    isUserInventoriesLoading,
-    inventories,
-    isInventoriesLoading,
-    message,
-    success,
-    inventoriesTotal,
-  } = useInventoryState();
+  const { userInventories, isUserInventoriesLoading, inventories, isInventoriesLoading, message, success, inventoriesTotal, supportedTokens, isFetchingTokens } = useInventoryState();
   let { hasChecked, isAuthenticated, loginUrl } = useAuthenticateState();
   const { TabPane } = Tabs;
   const orderDispatch = useOrderDispatch();
@@ -213,12 +205,14 @@ const UserProfile = ({ user }) => {
 
   const allSubcategories = getAllSubcategories(categorys);
 
-  //Fetch inventories for owner previewing their own profile
-  useEffect(() => {
-    if (isOwner) {
-      inventoryActions.fetchInventory(dispatch, limit, offset, "", category);
-    }
-  }, [dispatch, limit, offset, category, isOwner]);
+    //Fetch inventories for owner previewing their own profile
+    useEffect(() => {
+      if(isOwner) 
+        {
+          inventoryActions.fetchInventory(dispatch, limit, offset, "",category);
+          inventoryActions.fetchSupportedTokens(dispatch);
+        }
+      }, [dispatch, limit, offset, category, isOwner]);
 
   // Fetch Categories
   useEffect(() => {
@@ -519,94 +513,97 @@ const UserProfile = ({ user }) => {
           <TabPane tab="My Items" key="0">
             {/* MyItems Assets of the Owner Profile */}
 
-            <Tabs
-              defaultActiveKey={category ? category : "All"}
-              className="items"
-              onChange={(key) => handleTabSelectForOwner(key)}
-              items={[
-                {
-                  label: "All",
-                  key: undefined,
-                  children: (
-                    <div className="my-4 grid grid-cols-1 md:grid-cols-2 gap-6 lg:grid-cols-2 xl:grid-cols-3 3xl:grid-cols-4 5xl:grid-cols-5 sm:place-items-center md:place-items-start  inventoryCard max-w-full">
-                      {!isInventoriesLoading ? (
-                        inventories.map((inventory, index) => {
-                          return (
-                            <InventoryCard
-                              id={index}
-                              inventory={inventory}
-                              category={category}
-                              key={index}
-                              // debouncedSearchTerm={debouncedSearchTerm}
-                              allSubcategories={allSubcategories}
-                              user={user}
-                            />
-                          );
-                        })
-                      ) : (
-                        <div className="absolute left-[50%] md:top-4">
-                          <Spin size="large" />
-                        </div>
-                      )}
-                    </div>
-                  ),
-                },
-                {
-                  label: "For Sale",
-                  key: "For Sale",
-                  children: (
-                    <div className="my-4 grid grid-cols-1 md:grid-cols-2 gap-6 lg:grid-cols-3 3xl:grid-cols-4 5xl:grid-cols-5 sm:place-items-center md:place-items-start  inventoryCard max-w-full">
-                      {!isUserInventoriesLoading ? (
-                        userInventories.map((inventory, index) => {
-                          return (
-                            <InventoryCard
-                              id={index}
-                              inventory={inventory}
-                              category={category}
-                              key={index}
-                              // debouncedSearchTerm={debouncedSearchTerm}
-                              allSubcategories={allSubcategories}
-                              user={user}
-                            />
-                          );
-                        })
-                      ) : (
-                        <div className="absolute left-[50%] md:top-4">
-                          <Spin size="large" />
-                        </div>
-                      )}
-                    </div>
-                  ),
-                },
-                ...categorys.map((categoryObject, index) => ({
-                  label: categoryObject.name,
-                  key: categoryObject.name,
-                  children: (
-                    <div className="my-4 grid grid-cols-1 md:grid-cols-2 gap-6 lg:grid-cols-3 3xl:grid-cols-4 5xl:grid-cols-5 inventoryCard max-w-full">
-                      {!isInventoriesLoading ? (
-                        inventories.map((inventory, index) => {
-                          return (
-                            <InventoryCard
-                              id={index}
-                              inventory={inventory}
-                              category={category}
-                              key={index}
-                              // debouncedSearchTerm={debouncedSearchTerm}
-                              allSubcategories={allSubcategories}
-                              user={user}
-                            />
-                          );
-                        })
-                      ) : (
-                        <div className="absolute left-[50%] md:top-4">
-                          <Spin size="large" />
-                        </div>
-                      )}
-                    </div>
-                  ),
-                })),
-              ]}
-            />
+          <Tabs
+            defaultActiveKey={category ? category : "All"}
+            className="items"
+            onChange={(key) => handleTabSelectForOwner(key)}
+            items={[
+              {
+                label: "All",
+                key: undefined,
+                children: (
+                  <div className="my-4 grid grid-cols-1 md:grid-cols-2 gap-6 lg:grid-cols-2 xl:grid-cols-3 3xl:grid-cols-4 5xl:grid-cols-5 sm:place-items-center md:place-items-start  inventoryCard max-w-full">
+                    {!isInventoriesLoading && !isFetchingTokens ? (
+                      inventories.map((inventory, index) => {
+                        return (
+                          <InventoryCard
+                            id={index}
+                            inventory={inventory}
+                            category={category}
+                            key={index}
+                            // debouncedSearchTerm={debouncedSearchTerm}
+                            allSubcategories={allSubcategories}
+                            supportedTokens={supportedTokens}
+                            user={user}
+                          />
+                        );
+                      })
+                    ) : (
+                      <div className="absolute left-[50%] md:top-4">
+                        <Spin size="large" />
+                      </div>
+                    )}
+                  </div>
+                ),
+              },
+              {
+                label: "For Sale",
+                key: 'For Sale',
+                children: (
+                  <div className="my-4 grid grid-cols-1 md:grid-cols-2 gap-6 lg:grid-cols-3 3xl:grid-cols-4 5xl:grid-cols-5 sm:place-items-center md:place-items-start  inventoryCard max-w-full">
+                    {!isUserInventoriesLoading && !isFetchingTokens ? (
+                      userInventories.map((inventory, index) => {
+                        return (
+                          <InventoryCard
+                            id={index}
+                            inventory={inventory}
+                            category={category}
+                            key={index}
+                            // debouncedSearchTerm={debouncedSearchTerm}
+                            allSubcategories={allSubcategories}
+                            supportedTokens={supportedTokens}
+                            user={user}
+                          />
+                        );
+                      })
+                    ) : (
+                      <div className="absolute left-[50%] md:top-4">
+                        <Spin size="large" />
+                      </div>
+                    )}
+                  </div>
+                ),
+              },
+              ...categorys.map((categoryObject, index) => ({
+                label: categoryObject.name,
+                key: categoryObject.name,
+                children: (
+                  <div className="my-4 grid grid-cols-1 md:grid-cols-2 gap-6 lg:grid-cols-3 3xl:grid-cols-4 5xl:grid-cols-5 inventoryCard max-w-full">
+                    {!isInventoriesLoading && !isFetchingTokens ? (
+                      inventories.map((inventory, index) => {
+                        return (
+                          <InventoryCard
+                            id={index}
+                            inventory={inventory}
+                            category={category}
+                            key={index}
+                            // debouncedSearchTerm={debouncedSearchTerm}
+                            allSubcategories={allSubcategories}
+                            supportedTokens={supportedTokens}
+                            user={user}
+                          />
+                        );
+                      })
+                    ) : (
+                      <div className="absolute left-[50%] md:top-4">
+                        <Spin size="large" />
+                      </div>
+                    )}
+                  </div>
+                ),
+              })),
+            ]}
+          />
 
             <div className="flex justify-center pt-6">
               <Pagination

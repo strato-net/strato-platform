@@ -43,7 +43,7 @@ async function uploadContract(user, _constructorArgs, options) {
  * Augment contract arguments before they are used to post a contract.
  * Its counterpart is {@link marshalOut `marshalOut`}.
  * 
- * As our arguments come into the paymentProvider contract they first pass through `marshalIn` and 
+ * As our arguments come into the paymentService contract they first pass through `marshalIn` and 
  * when we retrieve contract state they pass through {@link marshalOut `marshalOut`}.
  * 
  * (A mathematical analogy: `marshalIn` and {@link marshalOut `marshalOut`} form something like a 
@@ -61,7 +61,7 @@ function marshalIn(_args) {
  * Augment returned contract state before it is returned.
  * Its counterpart is {@link marshalIn `marshalIn`}.
  * 
- * As our arguments come into the paymentProvider contract they first pass through {@link marshalIn `marshalIn`} 
+ * As our arguments come into the paymentService contract they first pass through {@link marshalIn `marshalIn`} 
  * and when we retrieve contract state they pass through `marshalOut`.
  * 
  * (A mathematical analogy: {@link marshalIn `marshalIn`} and `marshalOut` form something like a 
