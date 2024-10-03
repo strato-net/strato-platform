@@ -5,8 +5,8 @@ import oauthHelper from '/helpers/oauthHelper';
 import dotenv from 'dotenv';
 import dappJs from '/dapp/dapp/dapp'
 import RestStatus from 'http-status-codes';
-import paymentProviderJs from '../paymentProvider';
-import factory from '../factory/paymentProvider.factory';
+import paymentServiceJs from '../paymentService';
+import factory from '../factory/paymentService.factory';
 import { args } from 'commander';
 
 const options = { config };
@@ -25,7 +25,7 @@ describe('Payment', function() {
     let dapp;
     let newOptions;
 
-    const factoryArgs = (user) => ({ ...(factory.getPaymentProviderArgs(util.uid()))});
+    const factoryArgs = (user) => ({ ...(factory.getPaymentServiceArgs(util.uid()))});
 
     before(async () => {
         assert.isDefined(
@@ -78,9 +78,9 @@ describe('Payment', function() {
     });
 
  
-    it('should upload PaymentProvider smart contract', async () => {
+    it('should upload PaymentService smart contract', async () => {
     const args=factoryArgs(globalAdmin)
-    contract=await paymentProviderJs.uploadContract(globalAdmin,args,newOptions);
+    contract=await paymentServiceJs.uploadContract(globalAdmin,args,newOptions);
     const state=await contract.get({address:contract.address})
 
 
