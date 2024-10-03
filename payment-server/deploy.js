@@ -6,7 +6,7 @@ import oauthHelper from "./helpers/oauthHelper.js";
 import { yamlWrite, yamlSafeDumpSync } from "./helpers/config.js";
 import { replaceInFiles } from './helpers/replaceInFiles.js';
 
-const contractDir = config.contractDirPath || '/usr/src/payment-server/contracts/Templates';
+const contractDir = config.contractDirPath || '/usr/src/payment-server/dapp/mercata-base-contracts/Templates';
 
 async function uploadContract(token, location, type, args) {
   const contractName = `${location}${type}Service`;
