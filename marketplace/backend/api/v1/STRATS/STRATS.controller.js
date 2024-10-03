@@ -5,13 +5,13 @@ import config from '../../../load.config'
 
 const options = { config, cacheNonce: true }
 
-class MembershipController {
+class STRATSController {
   static async getAll(req, res, next) {
     try {
       const { dapp, query } = req
 
-      const memberships = await dapp.getMemberships({ ...query })
-      rest.response.status200(res, memberships)
+      const STRATS = await dapp.getSTRATS({ ...query })
+      rest.response.status200(res, STRATS)
 
       return next()
     } catch (e) {
@@ -23,9 +23,9 @@ class MembershipController {
     try {
       const { dapp, body } = req
 
-      MembershipController.validateCreateMembershipArgs(body)
+      STRATSController.validateCreateSTRATSArgs(body)
 
-      const result = await dapp.createMembership(body)
+      const result = await dapp.createSTRATS(body)
       rest.response.status200(res, result)
 
       return next()
@@ -34,32 +34,32 @@ class MembershipController {
     }
   }
 
-  // ----------------------- ARG VALIDATION ------------------------
+  // ----------------------- ARG VALIDATION ------------------------  
 
-  static validateCreateMembershipArgs(args) {
-    const createMembershipSchema = Joi.object({
+  static validateCreateSTRATSArgs(args) {
+    const createSTRATSSchema = Joi.object({
       itemArgs: Joi.object({
-        serialNumber: Joi.string().allow("").optional(),
         name: Joi.string().required(),
         description: Joi.string().required(),
-        expirationPeriodInMonths: Joi.number().integer().min(1).required(),
         quantity: Joi.number().integer().min(1).required(),
-        images: Joi.array().items(Joi.string().allow(null)).required(),
-        files: Joi.array().items(Joi.string().allow(null)).required(),
-        fileNames: Joi.array().items(Joi.string().allow(null)).required(),
+        images: Joi.array().items(Joi.string()).required(),
+        files: Joi.array().items(Joi.string()).required(),
+        fileNames: Joi.array().items(Joi.string()).required(),
         redemptionService: Joi.string().required(),
+        paymentServiceCreator: Joi.string().required(),
+        paymentServiceName: Joi.string().required(),
       }).required()
     });
 
-    const validation = createMembershipSchema.validate(args);
+    const validation = createSTRATSSchema.validate(args);
 
     if (validation.error) {
       console.log(validation.error.message);
-      throw new rest.RestError(RestStatus.BAD_REQUEST, 'Create Membership Argument Validation Error', {
+      throw new rest.RestError(RestStatus.BAD_REQUEST, 'Create STRATS Argument Validation Error', {
         message: `Missing args or bad format: ${validation.error.message}`,
       })
     }
   }
 }
 
-export default MembershipController;
+export default STRATSController;

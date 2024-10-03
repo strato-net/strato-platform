@@ -1,4 +1,4 @@
-const { createTwoTransactionPayload } = require("../helper/transferSTRATS");
+const { createTransactionPayload } = require("../helper/transferSTRATS");
 const {
   NODE_ENV,
   prodMarketplaceUrl,
@@ -136,12 +136,14 @@ async function handleOrderReward(
       `Sending sale reward to , ${seller}, ${sellerReward / 100}STRATS`
     );
 
-    const transactionResponse = await createTwoTransactionPayload(
+    const transactions = [
+      {toAddress: seller, value: sellerReward },
+      {toAddress: purchaser, value: buyerReward }
+    ];
+
+    const transactionResponse = await createTransactionPayload(
       token,
-      purchaser,
-      seller,
-      buyerReward,
-      sellerReward
+      transactions
     );
 
     if (transactionResponse.status !== 200) {

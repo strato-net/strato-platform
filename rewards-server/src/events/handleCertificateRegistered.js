@@ -87,10 +87,12 @@ async function handleCertificateRegistered(event, token) {
     }
 
     // Create transaction payload
+    const transactions = [
+      {toAddress: queryBody[0].userAddress, value: reward * 100}
+    ];
     const response = await createTransactionPayload(
       token,
-      queryBody[0].userAddress,
-      reward * 100 // Multiply by 100 for STRATS conversion
+      transactions
     );
 
     if (!response.ok) {
