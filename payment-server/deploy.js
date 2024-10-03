@@ -7,6 +7,7 @@ import { yamlWrite, yamlSafeDumpSync } from "./helpers/config.js";
 import { replaceInFiles } from './helpers/replaceInFiles.js';
 
 const contractDir = config.contractDirPath || '/usr/src/payment-server/dapp/mercata-base-contracts/Templates';
+const assetsDir = config.assetsDirPath || '/usr/src/payment-server/dapp/items/contracts';
 
 async function uploadContract(token, location, type, args) {
   const contractName = `${location}${type}Service`;
@@ -75,6 +76,7 @@ describe("Payment Server - deploy contracts", function () {
     }
     try {
       replaceInFiles(contractDir, 'BASE_CODE_COLLECTION', process.env.BASE_CODE_COLLECTION);
+      replaceInFiles(assetsDir, 'BASE_CODE_COLLECTION', process.env.BASE_CODE_COLLECTION);
     } catch (e) {
       console.error("ERROR: unable to insert BASE_CODE_COLLECTION address to contract files", e)
     }
@@ -83,6 +85,7 @@ describe("Payment Server - deploy contracts", function () {
   after(async () => {
     try {
       replaceInFiles(contractDir, process.env.BASE_CODE_COLLECTION, 'BASE_CODE_COLLECTION');
+      replaceInFiles(assetsDir, process.env.BASE_CODE_COLLECTION, 'BASE_CODE_COLLECTION');
     } catch (e) {
       console.error("ERROR: unable to remove BASE_CODE_COLLECTION address from contract files", e)
     }
