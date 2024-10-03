@@ -13,8 +13,6 @@ import "Templates/Redemptions/RedemptionService.sol";
 import "Templates/Sales/Sale.sol";
 import "Templates/Utils/Utils.sol";
 import "Templates/Offers/Offer.sol";
-import "Templates/Offers/TokenOffer.sol";
-import "Templates/Payments/TokenPaymentService.sol";
 
 // Uncomment to test whether all non-base contracts typecheck
 // import "All.sol";

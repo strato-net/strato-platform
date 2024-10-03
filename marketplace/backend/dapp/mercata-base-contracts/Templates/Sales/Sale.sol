@@ -49,7 +49,7 @@ abstract contract Sale is Utils {
         require(commonName == sellersCommonName, err);
     }
 
-    modifier requirePaymentProvider(string action) {
+    modifier requirePaymentService(string action) {
         require(isPaymentProvider(msg.sender.root), "Only whitelisted payment providers can perform " + action + ".");
         _;
     }

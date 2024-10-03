@@ -224,4 +224,37 @@ contract StratPaymentService is PaymentService {
       stratsPerDollar = _stratsPerDollar;
       return RestStatus.OK;
     }
+
+    function openOffer (
+        address _assetToBeSold,
+        address[] _stratAssetAddresses,
+        address _sale,
+        decimal _price,
+        uint _quantity
+    ) public returns (uint, address) {    
+        decimal totalPrice = _price;
+        decimal amountToTransfer = 1.0 + totalPrice * tokensPerDollar * (10 ** decimals);
+        string err = "Your STRATS balance is not high enough to make an Offer.";
+        OfferTest offer = new OfferTest(_assetToBeSold, _sale, _price, _quantity, msg.sender);
+
+        // Transfer STRATS to Offer Contract
+        string remainingStratsToTransfer = amountToTransfer;
+        string[] transferedStrats;
+        for (uint i = 0; i < _stratAssetAddresses.length; i++) {
+            STRATSTokens stratAsset = STRATSTokens(_stratAssetAddresses[i]);
+            require(stratAsset.root == stratAddress, "Asset is not a STRATS asset");
+            string stratQuantity = stratAsset.quantity();
+            string transferAmount = stratQuantity >= remainingStratsToTransfer ? remainingStratsToTransfer : stratQuantity;
+            uint transferNumber = ((keccak256(string (address(this)), string(address(stratAsset)),string(block.timestamp)) + i + block.timestamp) % 1000000);
+            stratAsset._transfer(address(offer), transferAmount, true, transferNumber, 0.0001);
+            remainingStratsToTransfer -= transferAmount;
+            transferedStrats.push(address(stratAsset));
+            if (remainingStratsToTransfer == 0) {
+                break;
+            }
+        }
+        offer.stratAssetAddresses = transferedStrats;
+        require(remainingStratsToTransfer == 0, err);
+        return (RestStatus.OK, address(offer));
+    }
 }

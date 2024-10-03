@@ -1,22 +1,24 @@
 pragma es6;
 pragma strict;
 
-import <509>;
-import "../Assets/Asset.sol";
-import "../Enums/RestStatus.sol";
-import "../Sales/Sale.sol";
+import <BASE_CODE_COLLECTION>;
+import "../../../items/contracts/STRATS.sol";
 
-abstract contract Offer is Utils { 
+abstract contract OfferTest is Utils { 
     Asset public assetToBePurchased;
-    Asset public assetToBeSold;
     address public sale;
-    decimal public price; // Total offer price
+    string[] public stratAssetAddresses;
+    decimal public offerPrice; // Offer Price per item.
+    decimal public totalOfferPrice; // Total amount of the offer.
     uint public quantity;
     address public purchaser;
     string public purchaserCommonName;
     PaymentService public paymentService;
     string public imageUrl;
+    string public assetName;
     OfferStatus public status;
+    string public createdDate;
+    string public updatedDate;
 
     enum OfferStatus { PENDING, ACCEPTED, REJECTED, CANCELLED }
 
@@ -25,19 +27,21 @@ abstract contract Offer is Utils {
         address _sale,
         decimal _price,
         uint _quantity,
-        address _purchaser,
-        string _imageUrl
+        address _purchaser
     ) {    
         assetToBePurchased = Asset(_assetToBePurchased);
         sale = _sale;
-        assetToBeSold = assetToBePurchased;
-        price = _price;
+        offerPrice = _price;
+        totalOfferPrice = _price * _quantity;
         quantity = _quantity;
         purchaser = _purchaser;
         purchaserCommonName = getCommonName(purchaser);
         paymentService = PaymentService(msg.sender);
-        imageUrl = _imageUrl;
+        imageUrl = assetToBePurchased.images()[0];
+        assetName = assetToBePurchased.name();
         status = OfferStatus.PENDING;
+        createdDate = string(block.timestamp);
+        updatedDate = string(0);
     }
 
     modifier requirePurchaser(string action) {
@@ -57,53 +61,30 @@ abstract contract Offer is Utils {
         require(msg.sender == seller, err);
     }
 
-    function accept(uint _quantity, address[] _assets) requireOwner() public returns (uint, uint) {
+    function accept(address _asset) requireOwner() public returns (uint) {
         require(status == OfferStatus.PENDING, "Cannot accept a non-pending offer.");
-        uint quantityToFill;
-        uint quantityToReturn;
-        if (_quantity <= quantity) {
-            quantityToFill = _quantity;
-        } else {
-            quantityToFill = quantity;
-            quantityToReturn = _quantity - quantity;
-        }
-        uint quantityRemaining = quantityToFill;
-        for (uint i = 0; i < _assets.length; i++) {
-            Asset a = Asset(_assets[i]);
-            require(Asset(a.root) == assetToBeSold, "Cannot fill bid with different types of assets.");
-            uint q = a.quantity();
-            uint quantityForAsset;
-            if (q <= quantityRemaining) {
-                quantityForAsset = q;
-            } else {
-                quantityForAsset = quantityRemaining;
-            }
-            quantityRemaining -= quantityForAsset;
-            // a.attachSale();
-            assetToBeSold = a;
-            paymentService.checkoutInitialized(
-                keccak256(string(address(this)) + string(address(a)) + string(block.timestamp)),
-                [address(this)],
-                [quantityForAsset],
-                block.timestamp,
-                "Offer of quantity " + string(quantityForAsset) + "filled for asset " + string(address(a)) + " for $" + string(uint(price))
-            );
-            try {
-                a.transferOwnership(purchaser, quantityForAsset, false, 0, price);
-            } catch { // Backwards compatibility for old assets
-                address(a).call("transferOwnership", purchaser, quantityForAsset, false, 0);
-            }
-            if (quantityRemaining == 0) {
-                break;
-            }
-        }
-        assetToBeSold = assetToBePurchased;
-        uint quantityFilled = quantityToFill - quantityRemaining;
-        quantity -= quantityFilled;
-        closeSaleIfEmpty();
-        return (quantityFilled, quantityToReturn + quantityRemaining);
-    }
+        Sale s = Sale(sale);
+        uint quantityToFill = s.quantity();
 
+        require(quantityToFill >= quantity, "Not enough quantity to fill the offer.");
+
+        paymentService.checkoutInitialized(
+            stratAssetAddresses,
+            keccak256(string(this), string(_asset) + string(block.timestamp) + "checkoutHash"),
+            keccak256(string(this), string(_asset) + string(block.timestamp) + "checkoutId"),
+            purchaser,
+            purchaserCommonName,
+            [address(this)],
+            [quantity],
+            block.timestamp,
+            "Offer accepted for asset " + string(_asset) + " of quantity " + string(quantity) + " for $" + string(uint(totalOfferPrice))
+        );
+
+        status = OfferStatus.ACCEPTED;
+        updatedDate = string(block.timestamp);
+
+        return (RestStatus.OK);
+    }
 
     function completeSale(
         string _orderHash,
@@ -111,23 +92,8 @@ abstract contract Offer is Utils {
     ) public returns (uint) {
         Sale s = Sale(sale);
         s.completeSale(_orderHash, _purchaser);
-        closeSaleIfEmpty();
         return RestStatus.OK;
 
-    }
-
-    function closeSaleIfEmpty() internal {
-        if (quantity == 0) {
-            close();
-        }
-    }
-
-    function close() internal {
-        _close();
-        quantity = 0;
-    }
-
-    function _close() internal virtual {
     }
 
     function lockQuantity(
@@ -135,43 +101,52 @@ abstract contract Offer is Utils {
         string _orderHash,
         address _purchaser
     ) public {
+        Sale s = Sale(sale);
+        s.lockQuantity(_quantityToLock, _orderHash, _purchaser);
+    }
+    // Needed for old assets
+    function lockQuantity(
+        uint _quantityToLock,
+        address _purchaser
+    ) public {
+        Sale s = Sale(sale);
+        s.lockQuantity(_quantityToLock, _purchaser);
+    }
+    // Needed for old assets
+    function lockQuantity(
+        uint _quantityToLock
+    ) public {
+        Sale s = Sale(sale);
+        s.lockQuantity(_quantityToLock);
     }
 
-    function closeOffer() public requirePurchaser("close Offer") returns (uint) {
-        close();
-        return RestStatus.OK;
-    }
-
-    function update(
-        uint _quantity,
-        decimal _price,
-        uint _scheme
-    ) public requirePurchaser("update the Offer") returns (uint) {
-
-      if (_scheme == 0) {
-        return RestStatus.OK;
-      }
-
-      if ((_scheme & (1 << 0)) == (1 << 0)) {
-        quantity = _quantity;
-      }
-      if ((_scheme & (1 << 1)) == (1 << 1)) {
-        price = _price;
-      }
-      return RestStatus.OK;
-    }
-
+    // Update offer status and transfer strats back to the purchaser
     function reject() public requireOwner() returns (uint) {
-        require(status == OfferStatus.PENDING, "Cannot accept a non-pending offer.");
-        closeOffer();
+        require(status == OfferStatus.PENDING, "Cannot reject a non-pending offer.");
         status = OfferStatus.REJECTED;
+
+        // Transfer STRATS back to the purchaser
+        for (uint i = 0; i < stratAssetAddresses.length; i++) {
+            address stratAsset = stratAssetAddresses[i];
+            STRATSToken token = STRATSToken(stratAsset);
+            uint transferNumber = ((keccak256(string (address(this)), string(address(a)), string(block.timestamp)) + i + block.timestamp) % 1000000);
+            token._transfer(purchaser, quantity, true, transferNumber, offerPrice);
+        }
         return RestStatus.OK;
     }
 
+    // Update offer status and transfer strats back to the purchaser
     function cancel() public requirePurchaser("cancel the Offer") returns (uint) {
-        require(status == OfferStatus.PENDING, "Cannot accept a non-pending offer.");
-        closeOffer();
+        require(status == OfferStatus.PENDING, "Cannot cancel a non-pending offer.");
         status = OfferStatus.CANCELLED;
+
+        // Transfer STRATS back to the purchaser
+        for (uint i = 0; i < stratAssetAddresses.length; i++) {
+            address stratAsset = stratAssetAddresses[i];
+            STRATSToken token = STRATSToken(stratAsset);
+            uint transferNumber = ((keccak256(string (address(this)), string(address(a)), string(block.timestamp)) + i + block.timestamp) % 1000000);
+            token._transfer(purchaser, quantity, true, transferNumber, offerPrice);
+        }
         return RestStatus.OK;
     }
 }

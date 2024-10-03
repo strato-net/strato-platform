@@ -13,7 +13,7 @@ import dayjs from "dayjs";
 import constants from "../../helpers/constants";
 
 const contractName = "Offer";
-const paymentServiceContractName = "TokenPaymentService";
+const paymentServiceContractName = "StratPaymentService";
 
 /**
  * Upload a new Offer
