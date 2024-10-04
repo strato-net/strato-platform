@@ -265,7 +265,7 @@ const TransactionTable = ({ user, download, isAllOrdersLoading }) => {
       dataIndex: "to",
       key: "to",
       align: "center",
-      width: '150px',
+      width: '160px',
     },
     {
       title: "Hash",
