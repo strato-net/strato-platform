@@ -59,8 +59,6 @@ class ShowConstructor a where
 data IngestEvent
   = IETx Timestamp IngestTx
   | IEBlock IngestBlock
-  | IEGenesis IngestGenesis
-  | IENewChainOrgName Word256 ChainMemberParsedSet
   | IEBlockstanbul PBFT.WireMessage
   | IEForcedConfigChange PBFT.ForcedConfigChange
   | IEValidatorBehavior PBFT.ForcedValidatorChange
@@ -76,8 +74,6 @@ data IngestEventType
   = IETTransaction
   | IETBlock
   | IETPreprepareResponse
-  | IETGenesis
-  | IETNewChainOrgName
   | IETBlockstanbul
   | IETForcedConfigChange
   | IETValidatorBehavior
@@ -92,8 +88,6 @@ iEventType :: IngestEvent -> IngestEventType
 iEventType = \case
   IETx {} -> IETTransaction
   IEBlock {} -> IETBlock
-  IEGenesis {} -> IETGenesis
-  IENewChainOrgName {} -> IETNewChainOrgName
   IEBlockstanbul {} -> IETBlockstanbul
   IEForcedConfigChange {} -> IETForcedConfigChange
   IEValidatorBehavior {} -> IETValidatorBehavior
@@ -107,8 +101,6 @@ iEventType = \case
 instance Format IngestEvent where
   format (IETx ts o) = show ts ++ " " ++ format o
   format (IEBlock o) = format o
-  format (IEGenesis o) = show o
-  format (IENewChainOrgName c cm) = intercalate ", " [CL.yellow $ format c, format cm]
   format (IEBlockstanbul o) = format o
   format (IEForcedConfigChange o) = format o
   format (IEValidatorBehavior o) = show o
@@ -122,8 +114,6 @@ instance Format IngestEvent where
 instance ShowConstructor IngestEvent where
   showConstructor IETx{} = "IETx"
   showConstructor IEBlock{} = "IEBlock"
-  showConstructor IEGenesis{} = "IEGenesis"
-  showConstructor IENewChainOrgName{} = "IENewChainOrgName"
   showConstructor IEBlockstanbul{} = "IEBlockstanbul"
   showConstructor IEForcedConfigChange{} = "IEForcedConfigChange"
   showConstructor IEValidatorBehavior{} = "IEValidatorBehavior"

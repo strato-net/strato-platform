@@ -12,7 +12,6 @@
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE TypeOperators #-}
 {-# OPTIONS_GHC -fno-warn-orphans #-}
-{-# OPTIONS_GHC -fno-warn-unused-top-binds #-}
 
 module Blockchain.Sequencer.Monad
   ( MonadBlockstanbul,
@@ -33,7 +32,6 @@ module Blockchain.Sequencer.Monad
     genericLookupSequencer,
     genericInsertSequencer,
     genericDeleteSequencer,
-    prunePrivacyDBs,
     runSequencerM,
     pairToVmTx,
     clearLdbBatchOps,
@@ -49,13 +47,7 @@ module Blockchain.Sequencer.Monad
     dependentBlockDB,
     seenTransactionDB,
     dbeRegistry,
-    blockHashRegistry,
-    emittedBlockRegistry,
-    txHashRegistry,
-    chainHashRegistry,
-    chainIdRegistry,
     x509certInfoState,
-    getChainsDB,
     getTransactionsDB,
     ldbBatchOps,
     blockstanbulContext,
@@ -69,18 +61,14 @@ import BlockApps.X509.Certificate
 import Blockchain.Blockstanbul
 import Blockchain.Constants
 import Blockchain.Data.Block
-import Blockchain.Data.ChainInfo
 import Blockchain.EthConf
-import Blockchain.Privacy
 import Blockchain.Sequencer.CablePackage
 import Blockchain.Sequencer.DB.DependentBlockDB
-import Blockchain.Sequencer.DB.GetChainsDB
 import Blockchain.Sequencer.DB.GetTransactionsDB
 import Blockchain.Sequencer.DB.SeenTransactionDB
 import Blockchain.Sequencer.Event
 import Blockchain.Sequencer.Metrics
 import Blockchain.Strato.Model.Address
-import Blockchain.Strato.Model.ExtendedWord (Word256)
 import Blockchain.Strato.Model.Keccak256
 import Blockchain.Strato.Model.Secp256k1
 import qualified Blockchain.Strato.RedisBlockDB as RBDB
@@ -127,14 +115,7 @@ data SequencerContext = SequencerContext
   { _dependentBlockDB :: DependentBlockDB,
     _seenTransactionDB :: !SeenTransactionDB,
     _dbeRegistry :: !(Map Keccak256 DependentBlockEntry),
-    _blockHashRegistry :: !(Map Keccak256 (Modification OutputBlock)),
-    _emittedBlockRegistry :: !(Map Keccak256 (Modification EmittedBlock)),
-    _txHashRegistry :: !(Map Keccak256 (Modification OutputTx)),
-    _chainHashRegistry :: !(Map Keccak256 (Modification ChainHashEntry)),
-    _chainIdRegistry :: !(Map Word256 (Modification ChainIdEntry)),
-    _chainInfoRegistry :: !(Map Word256 (Modification ChainInfo)),
     _x509certInfoState :: !(Map Address (Modification X509CertInfoState)), --map to pubkey
-    _getChainsDB :: !GetChainsDB,
     _getTransactionsDB :: !GetTransactionsDB,
     _ldbBatchOps :: !(Q.Seq LDB.BatchOp),
     _blockstanbulContext :: Maybe BlockstanbulContext,
@@ -184,17 +165,9 @@ instance HasDependentBlockDB SequencerM where
   getWriteOptions = LDB.WriteOptions . syncWrites <$> ask
   getReadOptions = return LDB.defaultReadOptions
 
-instance Mod.Modifiable GetChainsDB SequencerM where
-  get _ = use getChainsDB
-  put _ g = modify' $ getChainsDB .~ g
-
 instance Mod.Modifiable GetTransactionsDB SequencerM where
   get _ = use getTransactionsDB
   put _ g = modify' $ getTransactionsDB .~ g
-
-instance HasPrivateHashDB SequencerM where
-  requestChain = insertGetChainsDB
-  requestTransaction = insertGetTransactionsDB
 
 instance Mod.Accessible LDB.DB SequencerM where
   access _ = use dependentBlockDB
@@ -219,26 +192,6 @@ fromNamespace p bs =
   if isInNamespace p bs
     then Just . decode $ BL.drop (BL.length (namespace p)) bs
     else Nothing
-
-instance HasNamespace OutputBlock where
-  type NSKey OutputBlock = Keccak256
-  namespace _ = "bh:"
-
-instance HasNamespace EmittedBlock where
-  type NSKey EmittedBlock = Keccak256
-  namespace _ = "eb:"
-
-instance HasNamespace OutputTx where
-  type NSKey OutputTx = Keccak256
-  namespace _ = "th:"
-
-instance HasNamespace ChainHashEntry where
-  type NSKey ChainHashEntry = Keccak256
-  namespace _ = "ch:"
-
-instance HasNamespace ChainIdEntry where
-  type NSKey ChainIdEntry = Word256
-  namespace _ = "ci:"
 
 instance HasNamespace X509CertInfoState where
   type NSKey X509CertInfoState = Address
@@ -320,61 +273,6 @@ genericDeleteSequencer registry p k = do
   modify' $ registry . at k ?~ Deletion
   addLdbBatchOps . (: []) $ batchDeleteInLDB p k
 
-instance (Keccak256 `A.Alters` OutputBlock) SequencerM where
-  lookup = genericLookupSequencer blockHashRegistry
-  insert p k v = do
-    genericInsertSequencer blockHashRegistry p k v
-    sz <- M.size <$> use blockHashRegistry
-    liftIO $ withLabel blockHashRegistrySize "block_hash_registry" (flip setGauge (fromIntegral sz))
-  delete p k = do
-    genericDeleteSequencer blockHashRegistry p k
-    sz <- M.size <$> use blockHashRegistry
-    liftIO $ withLabel blockHashRegistrySize "block_hash_registry" (flip setGauge (fromIntegral sz))
-
-instance (Keccak256 `A.Alters` EmittedBlock) SequencerM where
-  lookup = genericLookupSequencer emittedBlockRegistry
-  insert p k v = do
-    genericInsertSequencer emittedBlockRegistry p k v
-    sz <- M.size <$> use emittedBlockRegistry
-    liftIO $ withLabel emittedBlockRegistrySize "emitted_block_registry" (flip setGauge (fromIntegral sz))
-  delete p k = do
-    genericDeleteSequencer emittedBlockRegistry p k
-    sz <- M.size <$> use emittedBlockRegistry
-    liftIO $ withLabel emittedBlockRegistrySize "emitted_block_registry" (flip setGauge (fromIntegral sz))
-
-instance (Keccak256 `A.Alters` OutputTx) SequencerM where
-  lookup = genericLookupSequencer txHashRegistry
-  insert p k v = do
-    genericInsertSequencer txHashRegistry p k v
-    sz <- M.size <$> use txHashRegistry
-    liftIO $ withLabel txHashRegistrySize "tx_hash_registry" (flip setGauge (fromIntegral sz))
-  delete p k = do
-    genericDeleteSequencer txHashRegistry p k
-    sz <- M.size <$> use txHashRegistry
-    liftIO $ withLabel txHashRegistrySize "tx_hash_registry" (flip setGauge (fromIntegral sz))
-
-instance (Keccak256 `A.Alters` ChainHashEntry) SequencerM where
-  lookup = genericLookupSequencer chainHashRegistry
-  insert p k v = do
-    genericInsertSequencer chainHashRegistry p k v
-    sz <- M.size <$> use chainHashRegistry
-    liftIO $ withLabel chainHashRegistrySize "chain_hash_registry" (flip setGauge (fromIntegral sz))
-  delete p k = do
-    genericDeleteSequencer chainHashRegistry p k
-    sz <- M.size <$> use chainHashRegistry
-    liftIO $ withLabel chainHashRegistrySize "chain_hash_registry" (flip setGauge (fromIntegral sz))
-
-instance (Word256 `A.Alters` ChainIdEntry) SequencerM where
-  lookup = genericLookupSequencer chainIdRegistry
-  insert p k v = do
-    genericInsertSequencer chainIdRegistry p k v
-    sz <- M.size <$> use chainIdRegistry
-    liftIO $ withLabel chainIdRegistrySize "chain_id_registry" (flip setGauge (fromIntegral sz))
-  delete p k = do
-    genericDeleteSequencer chainIdRegistry p k
-    sz <- M.size <$> use chainIdRegistry
-    liftIO $ withLabel chainIdRegistrySize "chain_id_registry" (flip setGauge (fromIntegral sz))
-
 instance (Address `A.Alters` X509CertInfoState) SequencerM where
   lookup = genericLookupSequencer x509certInfoState
   insert p k v = do
@@ -401,9 +299,6 @@ instance (Keccak256 `A.Alters` DependentBlockEntry) SequencerM where
   delete _ k = do
     modify' $ dbeRegistry . at k .~ Nothing
     addLdbBatchOps . (: []) $ genericBatchDeleteDependentBlockDB k
-
-instance A.Selectable Word256 ParentChainIds SequencerM where
-  select _ cId = join . fmap (fmap (ParentChainIds . parentChains . chainInfo) . _chainIdInfo) <$> A.lookup (A.Proxy @ChainIdEntry) cId
 
 instance Mod.Modifiable SeenTransactionDB SequencerM where
   get _ = use seenTransactionDB
@@ -479,20 +374,6 @@ waitOnVault action = do
       $logInfoS "HasVault" "Got a signature from vault"
       return val
 
-initialEmittedBlockCache :: Map Keccak256 (Modification EmittedBlock)
-initialEmittedBlockCache = M.singleton zeroHash $ Modification alreadyEmittedBlock
-
-prunePrivacyDBs :: SequencerM ()
-prunePrivacyDBs = do
-  prune blockHashRegistry
-  prune txHashRegistry
-  prune chainHashRegistry
-  prune chainIdRegistry
-  setTo initialEmittedBlockCache emittedBlockRegistry
-  where
-    prune = setTo M.empty
-    setTo s r = modify' $ r .~ s
-
 runSequencerM :: SequencerConfig -> Maybe BlockstanbulContext -> SequencerM a -> (LoggingT IO) a
 runSequencerM c mbc m = do
   liftIO $ createDirectoryIfMissing False $ dbDir "h"
@@ -509,14 +390,7 @@ runSequencerM c mbc m = do
         { _dependentBlockDB = depBlock,
           _seenTransactionDB = mkSeenTxDB stxSize,
           _dbeRegistry = M.empty,
-          _blockHashRegistry = M.empty,
-          _emittedBlockRegistry = initialEmittedBlockCache,
-          _txHashRegistry = M.empty,
-          _chainHashRegistry = M.empty,
-          _chainIdRegistry = M.empty,
-          _chainInfoRegistry = M.empty,
           _x509certInfoState = M.empty,
-          _getChainsDB = emptyGetChainsDB,
           _getTransactionsDB = emptyGetTransactionsDB,
           _ldbBatchOps = Q.empty,
           _blockstanbulContext = mbc,

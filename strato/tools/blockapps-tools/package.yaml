@@ -21,7 +21,6 @@ library:
     - blockapps-data
     - blockapps-datadefs
     - blockapps-mpdbs
-    - blockapps-privacy
     - blockstanbul
     - bytestring
     - common-log

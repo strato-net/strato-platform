@@ -328,8 +328,7 @@ handleEvents peer = awaitForever $ \case
 
   -- private chains
   MsgEvt (GetChainDetails cids') -> handleGetChainDetails peer $ S.fromList cids'
-  MsgEvt (ChainDetails chpairs) -> do
-    yieldL . ToUnseq $ IEGenesis . IngestGenesis (Origin.PeerString $ peerString peer) <$> chpairs
+  MsgEvt (ChainDetails _) -> return ()
 
   -- TODO: Optimize/do security checking (a peer can spam you with random hashes and keep you busy forever)
   MsgEvt (GetTransactions trHashes) -> do

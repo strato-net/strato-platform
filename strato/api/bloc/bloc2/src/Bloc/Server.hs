@@ -10,7 +10,6 @@ module Bloc.Server where
 
 import Bloc.API
 import Bloc.Monad
-import Bloc.Server.Chain
 import Bloc.Server.Contracts
 import Bloc.Server.Transaction
 import Bloc.Server.TransactionResult
@@ -61,10 +60,6 @@ bloc =
     :<|> postContractsXabi
     :<|> getBlocTransactionResult
     :<|> postBlocTransactionResults
-    :<|> postChainInfo
-    :<|> getSingleChainInfo
-    :<|> postChainInfos
-    :<|> getChainInfo
     :<|> postBlocTransactionParallel
     :<|> postBlocTransactionBody
     :<|> postBlocTransactionUnsigned
