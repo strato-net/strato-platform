@@ -107,8 +107,9 @@ abstract contract Sale is Utils {
         paymentServices = [];
     }
 
-    function isPaymentService(PaymentService _paymentService) public returns (bool) {
-        return paymentServicesMap[_paymentService.serviceName][_paymentService.creator] != 0;
+    function isPaymentService(address _paymentService) public returns (bool) {
+        string _serviceName = _paymentService.call("serviceName");
+        return paymentServicesMap[_serviceName][_paymentService.creator] != 0;
     }
 
     function completeSale(
