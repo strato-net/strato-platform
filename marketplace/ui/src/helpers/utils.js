@@ -17,6 +17,21 @@ export function arrayToStr(arr) {
 
   return valueString;
 }
+
+export function groupBy(array, keyAccessor) {
+  return array.reduce((accumulator, element) => {
+    const key = keyAccessor(element);
+
+    if (!accumulator[key]) {
+      accumulator[key] = [];
+    }
+
+    accumulator[key].push(element);
+
+    return accumulator;
+  }, {});
+}
+
 export function arrayToCsv(data) {
   return data
     .map((row) =>

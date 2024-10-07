@@ -38,7 +38,7 @@ contract STRATSTokens is Tokens {
         string err = "Only the current corresponding Payment Service contract can "
                        + action
                        + ".";
-        require(ps.stratAddress() == originAddress && ps.ownerCommonName() == paymentServiceCreator && ps.serviceName() == paymentServiceName && ps.isActive(), err);
+        require(ps.stratAddress() == this.root && ps.creator == paymentServiceCreator && ps.serviceName() == paymentServiceName && ps.isActive(), err);
         _;
     }
     
