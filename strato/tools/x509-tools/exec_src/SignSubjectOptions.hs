@@ -5,8 +5,8 @@ module SignSubjectOptions where
 
 import HFlags
 
-defineFlag "k:key" ("priv.pem" :: String) "The PEM file which holds the private key to sign the subject info"
-defineFlag "v:verification_key" ("" :: String) "The PEM file which holds the already-registered private key used for identity verification"
+defineFlag "v:vault_proxy" ("http://strato:8013/strato/v2.3" :: String) "The url to vault proxy (default assumes being run within strato docker network)"
+defineFlag "r:verification_key" ("" :: String) "The PEM file which holds the already-registered private key used for identity verification"
 defineFlag "o:organization" ("" :: String) "The desired subject's organization (optional)"
 defineFlag "u:organizationUnit" ("" :: String) "The desired subject's organization unit (optional)"
 defineFlag "n:commonName" ("" :: String) "The desired subject's common name"

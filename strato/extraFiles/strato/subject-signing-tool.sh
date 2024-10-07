@@ -10,9 +10,9 @@ if [ -f ssl.pem ]; then
     sslFlag="-s /ssl.pem"
 fi
 if [ "${backup}" = "" ]; then
-    x509-sign-subject -k /priv.pem -n "${MERCATA_USERNAME}" $sslFlag > subject.json
+    x509-sign-subject -n "${MERCATA_USERNAME}" $sslFlag > subject.json
 else
-    x509-sign-subject -k /priv.pem -v /backup_priv.pem -n "${MERCATA_USERNAME}" $sslFlag > subject.json
+    x509-sign-subject -r /backup_priv.pem -n "${MERCATA_USERNAME}" $sslFlag > subject.json
 fi
 
 cat subject.json

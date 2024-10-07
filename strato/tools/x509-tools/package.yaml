@@ -41,9 +41,16 @@ executables:
     other-modules: [SignSubjectOptions]
     dependencies:
       - aeson
+      - blockapps-vault-wrapper-api
+      - blockapps-vault-wrapper-client
       - bytestring
+      - ethereum-rlp
       - hflags
+      - monad-alter
       - strato-model
+      - servant-client
+      - transformers
+      - vault-monad
     
   x509-info:
     source-dirs: exec_src/
