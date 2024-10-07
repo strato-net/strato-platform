@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from "react";
 import { Button, Dropdown, Space, Input, Row, Col, Popover, Card, Tooltip, Select, DatePicker, Spin, Typography } from "antd";
-import { DownloadOutlined, SearchOutlined } from "@ant-design/icons";
+import { CloseOutlined, DownloadOutlined, FilterOutlined, SearchOutlined } from "@ant-design/icons";
 import { useNavigate, useLocation } from "react-router-dom";
 import classNames from "classnames";
 import dayjs from "dayjs";
@@ -52,6 +52,7 @@ const GlobalTransaction = ({ user, download, isAllOrdersLoading }) => {
   // const [selectedCategory, setSelectedCategory] = useState([]);
   // const selectedFilters = [...selectedCategory, ...type];
   const [selectedFilters, setSelectedFilters] = useState([]);
+  const [isFilterActive, setIsFilterActive] = useState(false)
   // const [selectedType, setSelectedType] = useState([]);
   // console.log("selectedFilters", type, selectedCategory)
   const formatter = new Intl.NumberFormat('en-US');
@@ -68,16 +69,16 @@ const GlobalTransaction = ({ user, download, isAllOrdersLoading }) => {
   }, [marketplaceDispatch]);
 
   useEffect(() => {
-      const startOfMonth = dayjs().startOf('month').unix();
-      const endOfMonth = dayjs().endOf('month').unix();
-      const dateArr = [startOfMonth, endOfMonth]
-      transactionAction.fetchGlobalTransaction(
-        transactionDispatch,
-        limit,
-        offset,
-        user?.commonName,
-        dateArr
-      );
+    const startOfMonth = dayjs().startOf('month').unix();
+    const endOfMonth = dayjs().endOf('month').unix();
+    const dateArr = [startOfMonth, endOfMonth]
+    transactionAction.fetchGlobalTransaction(
+      transactionDispatch,
+      limit,
+      offset,
+      user?.commonName,
+      dateArr
+    );
   }, [user, dateQuery])
 
   useEffect(() => {
@@ -135,7 +136,7 @@ const GlobalTransaction = ({ user, download, isAllOrdersLoading }) => {
       dataIndex: "type",
       key: "type",
       width: "150px",
-      render: (text) => (<p 
+      render: (text) => (<p
         // style={{ background: TRANSACTION_STATUS_COLOR[text] }} 
         // bg-${TRANSACTION_STATUS_COLOR[text]} 
         className={`
@@ -174,9 +175,9 @@ const GlobalTransaction = ({ user, download, isAllOrdersLoading }) => {
       width: '100px',
       render: (data, { price, quantityIsDecimal }) =>
         <>
-         <p>{price ? formattedNum(quantityIsDecimal && quantityIsDecimal === "True" ? (price * 100) : price) : '--'}</p>
-         <p>{price ? (formattedNum(quantityIsDecimal && quantityIsDecimal === "True" ? (price * 100) : price)*100).toFixed(0) : '--'}</p>
-         </>
+          <p>{price ? formattedNum(quantityIsDecimal && quantityIsDecimal === "True" ? (price * 100) : price) : '--'}</p>
+          <p>{price ? (formattedNum(quantityIsDecimal && quantityIsDecimal === "True" ? (price * 100) : price) * 100).toFixed(0) : '--'}</p>
+        </>
     },
     {
       title: "Buyer/Sender",
@@ -219,9 +220,35 @@ const GlobalTransaction = ({ user, download, isAllOrdersLoading }) => {
     });
   };
 
-  const bgColor = (item) =>{
+  const bgColor = (item) => {
     return selectedFilters.includes(item) ? 'bg-[#8388D2]' : 'bg-[#F6F6F6]';
-   }
+  }
+
+  const handleFilterActive = () => {
+    setIsFilterActive((prev) => !prev)
+  }
+
+  const FilterComponent = () =>{
+    return  <Card>
+    <Title level={5} className="mt-2">
+      Categories
+    </Title>
+    <div className="flex flex-wrap">
+      {categorys?.map(({ name }) => {
+        return <span onClick={() => { handleFilter(name) }} className={`border-lg p-2 m-2 rounded-lg ${bgColor(name)} cursor-pointer`} key={name}> {name} </span>
+      })}
+    </div>
+    <br />
+    <Title level={5} className="mt-2">
+      Transaction Types
+    </Title>
+    <div className="flex flex-wrap">
+      {TRANSACTION_FILTER?.map(({ label }) => {
+        return <span onClick={() => { handleFilter(label) }} className={`border-lg p-2 m-2 rounded-lg ${bgColor(label)} cursor-pointer`} key={label}> {label} </span>
+      })}
+    </div>
+  </Card>
+  }
 
   return (
     <Row>
@@ -241,7 +268,27 @@ const GlobalTransaction = ({ user, download, isAllOrdersLoading }) => {
       <Col span={22} className="mx-auto mt-5">
         <div className="flex md:hidden order_responsive">
           {isTransactionLoading ? <Spin className="mx-auto" />
-            : <GlobalTransactionResponsive data={transactions} user={user} />}
+            :
+            <Row>
+              <Col>
+                {selectedFilters?.length !== 0 && <> <div className="h-20 w-full p-2"> {selectedFilters?.map((item) =>
+                  <span onClick={() => { handleFilter(item) }} className="p-2 m-2 rounded-lg bg-[#F6F6F6] cursor-pointer" key={item}> {item} </span>)}
+                  <span onClick={() => { setSelectedFilters([]) }} className="p-2 m-2 rounded-lg bg-[#8388D2] cursor-pointer" > Clear All </span>
+                </div> </>}
+              </Col>
+              <Col span={24}>
+                <div className="flex justify-between items-center">
+                  <Title level={3} className="mt-2">
+                    Filter
+                  </Title>
+                  <Button type="primary" shape="round" onClick={handleFilterActive} icon={isFilterActive ? <CloseOutlined /> : <FilterOutlined />} size={'large'} />
+                </div>
+               {isFilterActive && 
+               <FilterComponent/>}
+              </Col>
+              <GlobalTransactionResponsive data={transactions} user={user} />
+            </Row>
+          }
         </div>
         <div className="hidden md:block">
           <Row>
@@ -249,31 +296,13 @@ const GlobalTransaction = ({ user, download, isAllOrdersLoading }) => {
               <Title level={3} className="mt-2">
                 Filter
               </Title>
-              <Card>
-                <Title level={5} className="mt-2">
-                  Categories
-                </Title>
-                <div className="flex flex-wrap">
-                  {categorys?.map(({ name }) => {
-                    return <span onClick={() => { handleFilter(name) }} className={`border-lg p-2 m-2 rounded-lg ${bgColor(name)} cursor-pointer`} key={name}> {name} </span>
-                  })}
-                </div>
-                <br />
-                <Title level={5} className="mt-2">
-                  Transaction Types
-                </Title>
-                <div className="flex flex-wrap">
-                  {TRANSACTION_FILTER?.map(({ label }) => {
-                    return <span onClick={() => { handleFilter(label) }} className={`border-lg p-2 m-2 rounded-lg ${bgColor(label)} cursor-pointer`} key={label}> {label} </span>
-                  })}
-                </div>
-              </Card>
+             <FilterComponent/>
             </Col>
             <Col span={18} offset={1}>
-             {selectedFilters?.length!==0 &&<> <div className="h-20 w-full p-2"> {selectedFilters?.map((item) => 
-             <span onClick={() => { handleFilter(item) }} className="p-2 m-2 rounded-lg bg-[#F6F6F6] cursor-pointer" key={item}> {item} </span> )} 
-             <span onClick={()=>{setSelectedFilters([])}} className="p-2 m-2 rounded-lg bg-[#8388D2] cursor-pointer" > Clear All </span>
-             </div> </>}
+              {selectedFilters?.length !== 0 && <> <div className="h-20 w-full p-2"> {selectedFilters?.map((item) =>
+                <span onClick={() => { handleFilter(item) }} className="p-2 m-2 rounded-lg bg-[#F6F6F6] cursor-pointer" key={item}> {item} </span>)}
+                <span onClick={() => { setSelectedFilters([]) }} className="p-2 m-2 rounded-lg bg-[#8388D2] cursor-pointer" > Clear All </span>
+              </div> </>}
               <DataTableComponent
                 columns={column}
                 data={transactions}

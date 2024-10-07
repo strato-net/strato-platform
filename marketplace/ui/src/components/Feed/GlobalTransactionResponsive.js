@@ -50,6 +50,7 @@ const GlobalTransactionResponsive = ({ data , user}) => {
 
   return (
     <div className="flex flex-col gap-y-10 w-full">
+      
       {data.map(({ reference ,address, assetImage,totalAmount, assetName,assetAddress, assetDescription, quantity, from, to, status,transaction_hash, type, price, redemptionService, block_timestamp }, index) => {
         block_timestamp = type === "Redemption" ? moment(block_timestamp).utc().format('YYYY-MM-DD HH:mm:ss [UTC]') : block_timestamp;
         const isExpanded = expandedRows[index];
