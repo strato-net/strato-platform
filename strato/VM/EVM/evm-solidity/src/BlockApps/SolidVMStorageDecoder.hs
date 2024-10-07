@@ -169,6 +169,7 @@ applyDelta' [Field "length"] (BInteger n) (ValueArrayDynamic vs) =
   let n' = fromIntegral n
    in Right . ValueArrayDynamic $ I.insert n' (ValueArraySentinel n') vs
 applyDelta' [Field "length"] (BInteger n) (ValueArraySentinel {}) = Right . ValueArraySentinel $ fromIntegral n
+applyDelta' [Field _] bv _ = Right $ fromBasic bv -- Handle struct value assignment case
 applyDelta' sp bv (ValueArraySentinel {}) = Right $ constructFromNothing' sp bv
 applyDelta' sp b s = Left $ TypeMismatch (StoragePath sp) b s
 

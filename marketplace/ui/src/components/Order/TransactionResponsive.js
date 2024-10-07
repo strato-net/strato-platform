@@ -63,6 +63,7 @@ const TransactionResponsive = ({ data , user}) => {
   return (
     <div className="flex flex-col gap-y-10 w-full">
       {data.map(({ reference ,address, assetImage,totalAmount, assetName,assetAddress, assetDescription, quantity, from, to, status,transaction_hash, type, price, redemptionService, block_timestamp }, index) => {
+        block_timestamp = type === "Redemption" ? moment(block_timestamp).utc().format('YYYY-MM-DD HH:mm:ss [UTC]') : block_timestamp;
         const isExpanded = expandedRows[index];
         const tableData = [{
           key: index,
@@ -138,9 +139,9 @@ const TransactionResponsive = ({ data , user}) => {
               {price ? <p className={`text-right flex justify-end items-center`}>
                 $ {formattedNum(price)} ({formattedNum(price * 100)} {StratsIcon})
               </p>
-                : <p className="text-right text-[#13188A] font-bold text-sm"> No Price Available  </p>}
+                : <p className="text-right text-[#13188A] font-bold text-sm">No Price Available</p>}
               <p className="text-right">Qty: {formattedNum(quantity)}</p>
-              <p className="text-right">{moment(block_timestamp).format('L')}</p>
+              <p className="text-right">{moment(block_timestamp.replace(/-/g, "/")).format('L')}</p>
             </Col>
             {isExpanded && <Col span={24}>
               <Table className="mt-6" columns={columns} dataSource={tableData} pagination={false} />

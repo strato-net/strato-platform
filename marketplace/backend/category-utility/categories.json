@@ -51,6 +51,10 @@
                 {
                     "name": "Tokens",
                     "contract": "Tokens"
+                },
+                {
+                    "name": "STRATS",
+                    "contract": "STRATSTokens"
                 }
             ]
         },

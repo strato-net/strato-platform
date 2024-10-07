@@ -2,6 +2,7 @@ pragma es6;
 pragma strict;
 
 import <BASE_CODE_COLLECTION>;
+import "../../../items/contracts/STRATS.sol";
 
 contract StratPaymentService is PaymentService {
     address public stratAddress;
@@ -29,6 +30,7 @@ contract StratPaymentService is PaymentService {
     }
 
     function _checkoutInitialized (
+        address[] _stratsAssetAddresses,
         string _checkoutHash,
         string _checkoutId,
         address _purchaser,
@@ -98,11 +100,37 @@ contract StratPaymentService is PaymentService {
             uint stratAmountNet = uint(net * stratsPerDollar * 100);
             uint stratFee = uint(fee * stratsPerDollar * 100);
 
-            // Transfer strats
-            bool success = stratAddress.call("transfer", sellerAddress, stratAmountNet);
-            require(success, err);
-            success = stratAddress.call("transfer", feeRecipient, stratFee);
-            require(success, feeErr);
+            // Transfer STRATS
+            uint remainingStratsToTransfer = stratAmountNet;
+            uint remainingFeeToTransfer = stratFee;
+            uint stratQuantity = 0;
+            uint transferAmount = 0;
+            uint transferFee = 0;
+            uint transferNumber = 0;
+            for (uint j = 0; j < _stratsAssetAddresses.length; j++) {
+                STRATSTokens stratAsset = STRATSTokens(_stratsAssetAddresses[j]);
+                require(stratAsset.root == stratAddress, "Asset is not a STRATS asset");
+                stratQuantity = stratAsset.quantity();
+                transferNumber = (uint(_checkoutHash, 16) + j) % 1000000;
+                if (remainingStratsToTransfer > 0) {
+                    transferAmount = stratQuantity >= remainingStratsToTransfer ? remainingStratsToTransfer : stratQuantity;
+                    stratAsset.purchaseTransfer(sellerAddress, transferAmount, transferNumber, 0.0001);
+                    remainingStratsToTransfer -= transferAmount;
+                }
+                stratQuantity = stratQuantity - transferAmount;
+                if (remainingFeeToTransfer > 0 && stratQuantity > 0) {
+                    transferNumber = (uint(_checkoutHash, 16) + j + block.timestamp) % 1000000;
+                    transferFee = stratQuantity >= remainingFeeToTransfer ? remainingFeeToTransfer : stratQuantity;
+                    stratAsset.purchaseTransfer(feeRecipient, transferFee, transferNumber, 0.0001);
+                    remainingFeeToTransfer -= transferFee;
+                }
+                transferAmount = 0;
+                if (remainingStratsToTransfer == 0 && remainingFeeToTransfer == 0) {
+                    break;
+                }
+            }
+            require(remainingStratsToTransfer == 0, err);
+            require(remainingFeeToTransfer == 0, feeErr);
 
             // Transfer assets
             try {

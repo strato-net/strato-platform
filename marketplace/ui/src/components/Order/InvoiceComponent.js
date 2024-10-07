@@ -123,15 +123,28 @@ const InvoiceComponent = ({ invoice }) => {
             <Text style={[styles.label, styles.tableHeaderColumn]}>Quantity</Text>
             <Text style={[styles.label, styles.tableHeaderColumn]}>Amount</Text>
           </View>
-          {invoice.assets.map((asset, index) => (
-            <View style={styles.tableRow} key={asset.address}>
-              <Text style={[styles.value, styles.tableRowColumn]}>{decodeURIComponent(asset.name)}</Text>
-              <Text style={[styles.value, styles.tableRowColumn]}>{invoice.order.currency ? invoice.order.currency : "USD"}</Text>
-              <Text style={[styles.value, styles.tableRowColumn]}>{invoice.order.currency === "STRATS" ? (asset.price * STRATS_CONVERSION).toFixed(0) : asset.price.toFixed(2)}</Text>
-              <Text style={[styles.value, styles.tableRowColumn]}>{orderQuantities[index]}</Text>
-              <Text style={[styles.value, styles.tableRowColumn]}>{invoice.order.currency === "STRATS" ? (asset.price * STRATS_CONVERSION).toFixed(0) * orderQuantities[index] : (asset.price * orderQuantities[index]).toFixed(2)}</Text>
-            </View>
-          ))}
+          {invoice.assets.map((asset, index) => {
+            const adjustedPrice = asset.data.quantityIsDecimal && asset.data.quantityIsDecimal === "True"
+              ? asset.price * 100
+              : asset.price;
+          
+            const quantity = asset.data.quantityIsDecimal && asset.data.quantityIsDecimal === "True"
+              ? orderQuantities[index] / 100
+              : orderQuantities[index];
+          
+            const totalPrice = invoice.order.currency === "STRATS"
+              ? (asset.price * STRATS_CONVERSION * orderQuantities[index]).toFixed(0)
+              : (asset.price * orderQuantities[index]).toFixed(2);
+            return (
+              <View style={styles.tableRow} key={asset.address}>
+                <Text style={[styles.value, styles.tableRowColumn]}>{decodeURIComponent(asset.name)}</Text>
+                <Text style={[styles.value, styles.tableRowColumn]}>{invoice.order.currency ? invoice.order.currency : "USD"}</Text>
+                <Text style={[styles.value, styles.tableRowColumn]}>{invoice.order.currency === "STRATS" ? (adjustedPrice * STRATS_CONVERSION).toFixed(0) : adjustedPrice.toFixed(2)}</Text>
+                <Text style={[styles.value, styles.tableRowColumn]}>{quantity}</Text>
+                <Text style={[styles.value, styles.tableRowColumn]}>{totalPrice}</Text>
+              </View>
+            )
+          })}
         </View>
         <View style={styles.totalSection}>
           <View style={styles.bottomSection}>

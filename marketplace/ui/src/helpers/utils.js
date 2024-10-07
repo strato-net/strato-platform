@@ -17,6 +17,21 @@ export function arrayToStr(arr) {
 
   return valueString;
 }
+
+export function groupBy(array, keyAccessor) {
+  return array.reduce((accumulator, element) => {
+    const key = keyAccessor(element);
+
+    if (!accumulator[key]) {
+      accumulator[key] = [];
+    }
+
+    accumulator[key].push(element);
+
+    return accumulator;
+  }, {});
+}
+
 export function arrayToCsv(data) {
   return data
     .map((row) =>
@@ -79,4 +94,11 @@ export const handleQuantityInput = (setQuantity) => (event) => {
   } else {
       setQuantity(0);
   }
+};
+
+export const handleWalletAddressInput = (setUserAddress) => (event) => {
+  let value = event.target.value;
+  value = value.replace(/[^a-zA-Z0-9]/g, ''); // remove any characters that are not alphanumeric
+  event.target.value = value;
+  setUserAddress(value);
 };
