@@ -56,7 +56,8 @@ abstract contract PaymentService is Utils {
         string currency,              // The type of currency used for the purchase
         PaymentStatus status,         // Status of the payment
         uint createdDate,              // Date at the time of fresh order creation
-        string comments               // Comments for the order
+        string comments,               // Comments for the order
+        address blockProposer
     );
 
     address public purchasersAddress;   // ONLY USED FOR BACKWARDS COMPATIBILITY WITH SALE. DELETE ONCE ALL SALES USE NEW LOGIC!!!
@@ -196,7 +197,7 @@ abstract contract PaymentService is Utils {
         uint[] _quantities,
         uint _createdDate,
         string _comments
-    ) internal virtual returns (string, address[]) {
+    ) internal virtual returns (string, address[]) {//set block.proposer here
         address[] assets;
         decimal totalAmount = 0;
         string seller;
@@ -226,6 +227,7 @@ abstract contract PaymentService is Utils {
             _quantities,
             totalAmount
         );
+     
         return (_checkoutHash, assets);
     }
 
@@ -295,7 +297,8 @@ abstract contract PaymentService is Utils {
             _currency,
             PaymentStatus.PAYMENT_PENDING,
             _createdDate,
-            ""
+            "",
+            block.proposer
         );
         return assets;
     }
@@ -382,7 +385,8 @@ abstract contract PaymentService is Utils {
             _currency,
             PaymentStatus.CLOSED,
             _createdDate,
-            _comments
+            _comments,
+            block.proposer
         );
         return assets;
     }
@@ -510,7 +514,8 @@ abstract contract PaymentService is Utils {
             _currency,
             PaymentStatus.CANCELED,
             _createdDate,
-            _comments
+            _comments,
+            block.proposer
         );
     }
 
