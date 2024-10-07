@@ -33,6 +33,7 @@ import Error from "./components/404";
 import FAQ from "./components/FAQ/index";
 import { TransactionsProvider } from "./contexts/transaction";
 import Transaction from "./components/Order/Transaction";
+import Feed from "./components/Feed/Feed";
 
 const AuthenticatedRoutes = ({ user, users, isAuthenticated }) => {
   return (
@@ -274,6 +275,28 @@ const AuthenticatedRoutes = ({ user, users, isAuthenticated }) => {
                     <InventoriesProvider>
                       <RedemptionsProvider>
                         <Transaction user={user} users={users} />
+                      </RedemptionsProvider>
+                    </InventoriesProvider>
+                  </ItemsProvider>
+                </OrdersProvider>
+              </TransactionsProvider>
+            </CategorysProvider>
+          </UsersProvider>
+        }
+      />
+       <Route
+        exact
+        path={routes.Feeds.url}
+        // path={routes.Orders.url}
+        element={
+          <UsersProvider>
+            <CategorysProvider>
+              <TransactionsProvider>
+                <OrdersProvider>
+                  <ItemsProvider>
+                    <InventoriesProvider>
+                      <RedemptionsProvider>
+                        <Feed user={user} users={users} />
                       </RedemptionsProvider>
                     </InventoriesProvider>
                   </ItemsProvider>
