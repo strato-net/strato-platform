@@ -512,7 +512,6 @@ const actions = {
           type: actionDescriptors.fetchStratsBalanceFailed,
           payload: "Error while fetching STRATS",
         });
-        window.location.href = body.error.loginUrl;
       }
       if (response.status === RestStatus.OK) {
         dispatch({
@@ -540,7 +539,6 @@ const actions = {
           type: actionDescriptors.fetchStratsAddressFailed,
           payload: "Error while fetching STRATS address",
         });
-        window.location.href = body.error.loginUrl;
         return null;
       }
   
