@@ -24,8 +24,8 @@ import {
 import { SEO } from "../../helpers/seoConstant";
 import { getStringDate } from "../../helpers/utils";
 import { TRANSACTION_FILTER } from "../Order/constant";
-import TransactionResponsive from "../Order/TransactionResponsive";
 import { useCategoryState } from "../../contexts/category";
+import GlobalTransactionResponsive from "./GlobalTransactionResponsive";
 
 const limit = '', offset = '';
 const { Title } = Typography;
@@ -36,7 +36,7 @@ const GlobalTransaction = ({ user, download, isAllOrdersLoading }) => {
   const transactionDispatch = useTransactionDispatch();
   const marketplaceDispatch = useMarketplaceDispatch();
   // States
-  const { userTransactions, globalTransaction, isTransactionLoading } = useTransactionState();
+  const { userTransactions, globalTransactions, isTransactionLoading } = useTransactionState();
   const { categorys } = useCategoryState();
 
   const navigate = useNavigate();
@@ -46,7 +46,7 @@ const GlobalTransaction = ({ user, download, isAllOrdersLoading }) => {
 
   const [type, setType] = useState("");
   const [dateQuery, setDateQuery] = useState("");
-  const [transactions, setTransactions] = useState(userTransactions)
+  const [transactions, setTransactions] = useState(globalTransactions)
   const [originAddress, setOriginAddress] = useState("");
   // const [search, setSearch] = useState("");
   // const [selectedCategory, setSelectedCategory] = useState([]);
@@ -68,31 +68,20 @@ const GlobalTransaction = ({ user, download, isAllOrdersLoading }) => {
   }, [marketplaceDispatch]);
 
   useEffect(() => {
-    if (user?.commonName && dateQuery) {
-      transactionAction.fetchUserTransaction(
-        transactionDispatch,
-        limit,
-        offset,
-        user?.commonName,
-        dateReturn(dateQuery)
-      );
-    }
-    if (user?.commonName && !dateQuery) {
       const startOfMonth = dayjs().startOf('month').unix();
       const endOfMonth = dayjs().endOf('month').unix();
       const dateArr = [startOfMonth, endOfMonth]
-      transactionAction.fetchUserTransaction(
+      transactionAction.fetchGlobalTransaction(
         transactionDispatch,
         limit,
         offset,
         user?.commonName,
         dateArr
       );
-    }
   }, [user, dateQuery])
 
   useEffect(() => {
-    let filteredData = userTransactions;
+    let filteredData = globalTransactions;
 
     // Type filter
     if (type) {
@@ -104,7 +93,7 @@ const GlobalTransaction = ({ user, download, isAllOrdersLoading }) => {
     }
 
     setTransactions(filteredData);
-  }, [userTransactions, type]);
+  }, [globalTransactions, type]);
 
   const dateReturn = (date) => {
     const startDate = dayjs(date).startOf('month').unix();
@@ -230,9 +219,13 @@ const GlobalTransaction = ({ user, download, isAllOrdersLoading }) => {
     });
   };
 
+  const bgColor = (item) =>{
+    return selectedFilters.includes(item) ? 'bg-[#8388D2]' : 'bg-[#F6F6F6]';
+   }
+
   return (
     <Row>
-      <Col span={24} className="w-full min-h-[160px] py-4 px-4 md:min-h-[96px] bg-[#F6F6F6] flex flex-col md:flex-row lg:px-14 justify-between items-center mt-6 lg:mt-8">
+      <Col span={24} className="w-full xs:max-h-[60px] py-4 px-4 md:min-h-[96px] bg-[#F6F6F6] flex flex-col md:flex-row lg:px-14 justify-between items-center mt-6 lg:mt-8">
         <Row className="w-full flex justify-between items-center">
           <Col xs={24} lg={4} className="flex justify-between w-full">
             <Button className="!px-1 md:!px-0 md:ml-5 lg:ml-0  flex items-center flex-row-reverse gap-[6px] text-lg md:text-2xl font-semibold !text-[#13188A] "
@@ -248,7 +241,7 @@ const GlobalTransaction = ({ user, download, isAllOrdersLoading }) => {
       <Col span={22} className="mx-auto mt-5">
         <div className="flex md:hidden order_responsive">
           {isTransactionLoading ? <Spin className="mx-auto" />
-            : <TransactionResponsive data={transactions} user={user} />}
+            : <GlobalTransactionResponsive data={transactions} user={user} />}
         </div>
         <div className="hidden md:block">
           <Row>
@@ -262,7 +255,7 @@ const GlobalTransaction = ({ user, download, isAllOrdersLoading }) => {
                 </Title>
                 <div className="flex flex-wrap">
                   {categorys?.map(({ name }) => {
-                    return <span onClick={() => { handleFilter(name) }} className={`border-lg p-2 m-2 rounded-lg bg-[#F6F6F6] cursor-pointer`} key={name}> {name} </span>
+                    return <span onClick={() => { handleFilter(name) }} className={`border-lg p-2 m-2 rounded-lg ${bgColor(name)} cursor-pointer`} key={name}> {name} </span>
                   })}
                 </div>
                 <br />
@@ -271,7 +264,7 @@ const GlobalTransaction = ({ user, download, isAllOrdersLoading }) => {
                 </Title>
                 <div className="flex flex-wrap">
                   {TRANSACTION_FILTER?.map(({ label }) => {
-                    return <span onClick={() => { handleFilter(label) }} className="border-lg p-2 m-2 rounded-lg bg-[#F6F6F6] cursor-pointer" key={label}> {label} </span>
+                    return <span onClick={() => { handleFilter(label) }} className={`border-lg p-2 m-2 rounded-lg ${bgColor(label)} cursor-pointer`} key={label}> {label} </span>
                   })}
                 </div>
               </Card>

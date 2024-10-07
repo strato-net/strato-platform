@@ -41,7 +41,7 @@ const actions = {
 
     try {
       const response = await fetch(
-        `${apiUrl}/transaction?${query}`,
+        `${apiUrl}/transaction/user?${query}`,
         {
           method: HTTP_METHODS.GET,
         }
@@ -65,6 +65,53 @@ const actions = {
       dispatch({ type: actionDescriptors.fetchUserTransactionFailed, error: body.error });
     } catch (err) {
       dispatch({ type: actionDescriptors.fetchUserTransactionFailed, error: undefined });
+    }
+  },
+
+  fetchGlobalTransaction: async (dispatch, limit, offset, commonName, dateRange) => {
+    dispatch({ type: actionDescriptors.fetchGlobalTransaction });
+
+    const encodedCommonName = encodeURIComponent(commonName);
+    let query = "";
+    if (limit) {
+      query += `limit=${limit}`
+    }
+    if (offset) {
+      query += `&offset=${offset}`
+    }
+    if (commonName) {
+      query += `&user=${encodedCommonName}`
+    }
+    if(dateRange){
+      query += `&startDate=${dateRange[0]}&endDate=${dateRange[1]}`
+    }
+
+    try {
+      const response = await fetch(
+        `${apiUrl}/transaction/global?${query}`,
+        {
+          method: HTTP_METHODS.GET,
+        }
+      );
+
+      const body = await response.json();
+
+      if (response.status === RestStatus.OK) {
+        dispatch({
+          type: actionDescriptors.fetchGlobalTransactionSuccessful,
+          payload: body.data,
+        });
+        return;
+      } else if (response.status === RestStatus.UNAUTHORIZED) {
+        dispatch({
+          type: actionDescriptors.fetchGlobalTransactionFailed,
+          error: "Unauthorized while fetching UserTransaction"
+        });
+        window.location.href = body.error.loginUrl;
+      }
+      dispatch({ type: actionDescriptors.fetchGlobalTransactionFailed, error: body.error });
+    } catch (err) {
+      dispatch({ type: actionDescriptors.fetchGlobalTransactionFailed, error: undefined });
     }
   },
 

@@ -34,7 +34,7 @@ const TransactionTable = ({ user, download, isAllOrdersLoading }) => {
   const transactionDispatch = useTransactionDispatch();
   const marketplaceDispatch = useMarketplaceDispatch();
   // States
-  const { userTransactions, globalTransaction, isTransactionLoading } = useTransactionState();
+  const { userTransactions, isTransactionLoading } = useTransactionState();
 
   const navigate = useNavigate();
   const location = useLocation();
