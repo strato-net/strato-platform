@@ -192,11 +192,15 @@ stratoP2PClient runner = runner $ \_ -> labelTheThread "strato P2P Client main l
   where
     handleRunPeerResult :: MonadP2P m => PPeer -> Either SomeException () -> m ()
     handleRunPeerResult thePeer = \case
-      Left e | Just (ErrorCall x) <- fromException e -> error x
       Left e -> do
         $logInfoS "stratoP2PClient/handleRunPeerResult" $ T.pack $ "Connection ended: " ++ show (e :: SomeException)
         recordException thePeer e
         case e of
+          e' | Just (ErrorCall x) <- fromException e' -> do 
+            disableException thePeer x Nothing False 
+            error x
+          e' | Just (HandshakeException _) <- fromException e' -> do 
+            disableException thePeer "HandshakeException" Nothing False 
           e' | Just WrongGenesisBlock <- fromException e' -> do
             disableException thePeer "WrongGenesisBlock" Nothing True
             case pPeerPubkey thePeer of 
