@@ -50,7 +50,7 @@ abstract contract Sale is Utils {
     }
 
     modifier requirePaymentService(string action) {
-        require(isPaymentProvider(msg.sender.root), "Only whitelisted payment providers can perform " + action + ".");
+        require(isPaymentService(msg.sender), "Only whitelisted payment services can perform " + action + ".");
         _;
     }
 
