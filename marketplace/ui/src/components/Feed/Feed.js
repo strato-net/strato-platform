@@ -58,101 +58,6 @@ const Feed = ({ user }) => {
   }
 
 
-  function mapTransactionData(transactions) {
-    try {
-      return transactions.map(transaction => {
-        const { category, subCategory } = getCategoryAndSubcategory(transaction.assetContractName);
-        let quantityIsDecimal = transaction.quantityIsDecimal && transaction.quantityIsDecimal === "True";
-        return formatDataObject({
-          reference: transaction?.reference,
-          type: transaction?.type,
-          category,
-          subCategory,
-          assetName: transaction?.assetName,
-          Price: quantityIsDecimal ? Number((transaction?.price * 100).toFixed(2)) : transaction?.price,
-          quantity: quantityIsDecimal ? Number((transaction?.quantity / 100).toFixed(2)) : transaction?.quantity,
-          from: transaction.from,
-          to: transaction.to,
-          hash: transaction.transaction_hash,
-          date: getStringDate(transaction?.createdDate, US_DATE_FORMAT),
-          Status: transaction?.type === "Transfer" ? 'Closed' : (transaction?.type === "Redemption"
-            ? REDEMPTION_STATUS[transaction.status]
-            : TRANSACTION_STATUS[transaction.status])
-        });
-      });
-    } catch (error) {
-      console.error("Error during mapping order data", error);
-      throw new Error("Failed to map order data");
-    }
-  }
-
-  useEffect(() => {
-    const mappedData = mapTransactionData(userTransactions)
-    const { Order, Redemption, Transfer } = groupBy(mappedData, ({ Type }) => Type);
-    if (userTransactions && callExcel && !isTransactionLoading) {
-      const wb = XLSX.utils.book_new();
-      const wsOrder = XLSX.utils.json_to_sheet(Order ? Order : []);
-      const wsTransferred = XLSX.utils.json_to_sheet(Transfer ? Transfer : []);
-      const wsRedemption = XLSX.utils.json_to_sheet(Redemption ? Redemption : []);
-
-      // Append each worksheet to the workbook
-      XLSX.utils.book_append_sheet(wb, wsOrder, 'Order');
-      XLSX.utils.book_append_sheet(wb, wsTransferred, 'Transfer');
-      XLSX.utils.book_append_sheet(wb, wsRedemption, 'Redemption');
-
-      // Write the workbook to a binary string
-      const wbout = XLSX.write(wb, { bookType: 'xls', type: 'binary' });
-
-      // Convert the binary string to a Blob and save it
-      const blob = new Blob([s2ab(wbout)], { type: 'application/vnd.ms-excel' });
-      saveAs(blob, 'Mercata-Marketplace-Order-History.xls');
-      setCallExcel(false);
-      setCallCSV(false);
-    }
-    if (userTransactions && callCSV && !isTransactionLoading) {
-      // Adding an extra column to distinguish data
-      const addTypeColumn = (data, type) => data.map(row => ({ ...row, Type: type }));
-
-      const orderData = addTypeColumn(Order ? Order : [], 'Order');
-      const transferredData = addTypeColumn(Transfer ? Transfer : [], 'Transfer');
-      const redemptionData = addTypeColumn(Redemption ? Redemption : [], 'Redemption');
-
-      const combinedData = [...orderData, ...transferredData, ...redemptionData];
-      const ws = XLSX.utils.json_to_sheet(combinedData);
-      const wb = XLSX.utils.book_new();
-      XLSX.utils.book_append_sheet(wb, ws, 'Orders');
-
-      const wbout = XLSX.write(wb, { bookType: 'csv', type: 'binary' });
-      const blob = new Blob([s2ab(wbout)], { type: 'text/csv' });
-      saveAs(blob, 'Mercata-Marketplace-Order-History.csv');
-      setCallCSV(false);
-      setCallExcel(false);
-    }
-  }, [callExcel, callCSV, isTransactionLoading]);
-
-  const download = async (format) => {
-    if (user?.commonName) {
-      if (format === 'xls') {
-        setCallExcel(true);
-        setCallCSV(false);
-      }
-      else if (format === 'csv') {
-        setCallCSV(true);
-        setCallExcel(false);
-      }
-    }
-  };
-
-  // Utility function to convert a binary string to an ArrayBuffer
-  function s2ab(s) {
-    const buf = new ArrayBuffer(s.length);
-    const view = new Uint8Array(buf);
-    for (let i = 0; i < s.length; i++) view[i] = s.charCodeAt(i) & 0xFF;
-    return buf;
-  }
-
-  // --------------------- EXPORT TO EXCEL AND CSV END ---------------------
-
   return (
     <div>
       {contextHolder}
@@ -172,7 +77,7 @@ const Feed = ({ user }) => {
           </Breadcrumb.Item>
         </Breadcrumb>
       </div>
-      <GlobalTransaction user={user} download={download} isAllOrdersLoading={isTransactionLoading} />
+      <GlobalTransaction user={user} isAllOrdersLoading={isTransactionLoading} />
     </div>
   );
 };

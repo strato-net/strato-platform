@@ -23,16 +23,6 @@ const GlobalTransactionResponsive = ({ data , user}) => {
     }));
   };
 
-  const statusComponent = (status, data) => {
-    status = data.type === "Transfer" ? 3 : status
-    const { textClass, bgClass } = data.type === "Redemption" ? REDEMPTION_STATUS_CLASSES[status] : TRANSACTION_STATUS_CLASSES[status] || { textClass: "bg-[#FFF6EC]", bgClass: "bg-[#119B2D]" };
-    return (
-      <div className={classNames(textClass, "w-max text-center py-1 rounded-xl flex justify-start items-center gap-1 p-3")}>
-        <div className={classNames(bgClass, "h-3 w-3 rounded-sm")}></div>
-        <p>{data.type === 'Redemption' ? REDEMPTION_STATUS[status] : TRANSACTION_STATUS[status]}</p>
-      </div>
-    );
-  };
 
   const columns = [
     {

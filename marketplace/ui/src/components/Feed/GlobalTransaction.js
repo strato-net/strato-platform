@@ -30,13 +30,13 @@ import GlobalTransactionResponsive from "./GlobalTransactionResponsive";
 const limit = '', offset = '';
 const { Title } = Typography;
 
-const GlobalTransaction = ({ user, download, isAllOrdersLoading }) => {
-  const StratsIcon = <img src={Images.logo} alt="" className="mx-1 w-3 h-3" />
+const GlobalTransaction = ({ user }) => {
+  const StratsIcon = <img src={Images.logo} alt="STRATS" className="mx-1 w-3 h-3" />
   // Dispatch
   const transactionDispatch = useTransactionDispatch();
   const marketplaceDispatch = useMarketplaceDispatch();
   // States
-  const { userTransactions, globalTransactions, isTransactionLoading } = useTransactionState();
+  const { globalTransactions, isTransactionLoading } = useTransactionState();
   const { categorys } = useCategoryState();
 
   const navigate = useNavigate();
@@ -48,16 +48,10 @@ const GlobalTransaction = ({ user, download, isAllOrdersLoading }) => {
   const [dateQuery, setDateQuery] = useState("");
   const [transactions, setTransactions] = useState(globalTransactions)
   const [originAddress, setOriginAddress] = useState("");
-  // const [search, setSearch] = useState("");
-  // const [selectedCategory, setSelectedCategory] = useState([]);
-  // const selectedFilters = [...selectedCategory, ...type];
   const [selectedFilters, setSelectedFilters] = useState([]);
   const [isFilterActive, setIsFilterActive] = useState(false)
-  // const [selectedType, setSelectedType] = useState([]);
-  // console.log("selectedFilters", type, selectedCategory)
   const formatter = new Intl.NumberFormat('en-US');
   const formattedNum = (num) => formatter.format(num);
-  // const defaultDate = dateQuery ? dayjs.unix(dayjs(dateQuery).startOf('month').unix()) : dayjs.unix(currentMonth);
 
   useEffect(() => {
     async function fetchStratsAddress() {
@@ -95,12 +89,6 @@ const GlobalTransaction = ({ user, download, isAllOrdersLoading }) => {
 
     setTransactions(filteredData);
   }, [globalTransactions, type]);
-
-  const dateReturn = (date) => {
-    const startDate = dayjs(date).startOf('month').unix();
-    const endDate = dayjs(date).endOf('month').unix();
-    return [startDate, endDate]
-  }
 
   const Content = ({ data }) => {
     const price = data?.assetPrice || data?.price
@@ -168,15 +156,15 @@ const GlobalTransaction = ({ user, download, isAllOrdersLoading }) => {
       render: (data, { quantity, quantityIsDecimal }) => <span>{quantity ? formattedNum(quantityIsDecimal && quantityIsDecimal === "True" ? (quantity / 100) : quantity) : '--'}</span>
     },
     {
-      title: "Price ($)",
+      title: "Price",
       dataIndex: "price",
       key: "price",
       align: "right",
       width: '100px',
       render: (data, { price, quantityIsDecimal }) =>
         <>
-          <p>{price ? formattedNum(quantityIsDecimal && quantityIsDecimal === "True" ? (price * 100) : price) : '--'}</p>
-          <p>{price ? (formattedNum(quantityIsDecimal && quantityIsDecimal === "True" ? (price * 100) : price) * 100).toFixed(0) : '--'}</p>
+          <p className="text-base flex justify-end items-center">{price ? (formattedNum(quantityIsDecimal && quantityIsDecimal === "True" ? (price * 100) : price) * 100).toFixed(0) : '--'} <span>{StratsIcon}</span></p>
+          <p className="text-xs">{price ? `${formattedNum(quantityIsDecimal && quantityIsDecimal === "True" ? (price * 100) : price)} $` : '--'}</p>
         </>
     },
     {
@@ -200,7 +188,7 @@ const GlobalTransaction = ({ user, download, isAllOrdersLoading }) => {
       render: (text, { createdDate }) => <p>{getStringDate(createdDate, US_DATE_FORMAT)}</p>,
       title: (
         <div style={{ display: "flex" }}>
-          <div className="mt-1.5">{"Date"}</div>
+          <div>{"Date"}</div>
         </div>
       ),
     },
@@ -230,7 +218,7 @@ const GlobalTransaction = ({ user, download, isAllOrdersLoading }) => {
 
   const FilterComponent = () =>{
     return  <Card>
-    <Title level={5} className="mt-2">
+    {/* <Title level={5} className="mt-2">
       Categories
     </Title>
     <div className="flex flex-wrap">
@@ -238,7 +226,7 @@ const GlobalTransaction = ({ user, download, isAllOrdersLoading }) => {
         return <span onClick={() => { handleFilter(name) }} className={`border-lg p-2 m-2 rounded-lg ${bgColor(name)} cursor-pointer`} key={name}> {name} </span>
       })}
     </div>
-    <br />
+    <br /> */}
     <Title level={5} className="mt-2">
       Transaction Types
     </Title>
