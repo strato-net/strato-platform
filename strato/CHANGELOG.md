@@ -17,6 +17,8 @@ so that they could be properly moved to their respective version's subsection.
 ## [Unreleased] 
 ### Added
 - Added block.proposer to SolidVM
+- Reintroduced wire cache to strato-p2p to reduce redundant blockstanbul messages sent to the sequencer
+
 ### Changed
 
 ### Fixed
