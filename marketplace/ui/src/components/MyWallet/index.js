@@ -38,11 +38,10 @@ const MyWallet = ({ user }) => {
   const linkUrl = window.location.href;
   const [totalBalance, setTotalBalance] = useState(0);
   const [tableData, setTableData] = useState([]);
+  const [stratsBalance, setStratsBalance] = useState(0);
   const dispatch = useInventoryDispatch();
   const { walletData, isWalletDataLoading, error } = useInventoryState();
 
-  const { strats } = useMarketplaceState();
-  const stratsBalance = Object.keys(strats).length > 0 ? strats : 0;
 
   const formatNumber = (num) => {
     return num.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ",");
@@ -57,46 +56,51 @@ const MyWallet = ({ user }) => {
   useEffect(() => {
     if (walletData) {
       const assets = walletData.inventoriesWithImageUrl;
-      const processedData = assets.map((asset, index) => ({
-        key: index,
-        asset: asset.name,
-        image:
-          asset["BlockApps-Mercata-Asset-images"][0]?.value ||
-          Images.image_placeholder,
+      let stratsAsset = assets.find(asset => asset.name === "STRATS");
+      let stratsQuantity = stratsAsset ? stratsAsset.quantity : 0;
+      setStratsBalance(stratsQuantity);
+
+      const processedData = assets
+        .filter(asset => asset.name !== "STRATS") // Filter out STRATS from regular assets
+        .map((asset, index) => ({
+          key: index + 1, // Start from 1 to reserve 0 for STRATS
+          asset: asset.name,
+          image: asset["BlockApps-Mercata-Asset-images"][0]?.value || Images.image_placeholder,
           quantity: formatNumber(asset.quantity),
           price: asset.price ? `$${formatNumber(parseFloat(asset.price).toFixed(2))}` : "-",
           value: asset.price
             ? `$${formatNumber((asset.quantity * asset.price).toFixed(2))}`
             : "-",
-        gainLoss: asset.gainLossPercentage
-          ? `${asset.gainLossPercentage}%`
-          : "-",
-        address: asset.address,
-        creator: asset.creator, // Add this line to include the creator
-        isIssuer: asset.creator === user.commonName,
-      }));
+          gainLoss: asset.gainLossPercentage
+            ? `${asset.gainLossPercentage}%`
+            : "-",
+          address: asset.address,
+          creator: asset.creator,
+          isIssuer: asset.creator === user.commonName,
+        }));
 
-      processedData.unshift({
-        key: "strats",
+      // Add STRATS at the top of the list
+      const stratsEntry = {
+        key: 0,
         asset: "STRATS",
-        image: Images.logo,
-        quantity: formatNumber(stratsBalance),
+        image: Images.logo, // Assuming this is the correct path to the STRATS logo
+        quantity: formatNumber(stratsQuantity),
         price: "$0.01",
-        value: `$${formatNumber((stratsBalance * 0.01).toFixed(2))}`,
+        value: `$${formatNumber((stratsQuantity * 0.01).toFixed(2))}`,
         gainLoss: "-",
-        address: null,
-      });
+        address: stratsAsset ? stratsAsset.address : null,
+      };
 
-      setTableData(processedData);
+      setTableData([stratsEntry, ...processedData]);
 
-      const total = processedData.reduce((sum, item) => {
-        const itemValue = parseFloat(item.value.replace("$", ""));
+      const total = [stratsEntry, ...processedData].reduce((sum, item) => {
+        const itemValue = parseFloat(item.value.replace("$", "").replace(",", ""));
         return sum + (isNaN(itemValue) ? 0 : itemValue);
       }, 0);
       setTotalBalance(total.toFixed(2));
       setIsLoading(false);
     }
-  }, [walletData, stratsBalance]);
+  }, [walletData]);
 
   const CustomQuestionIcon = () => (
     <svg
