@@ -36,7 +36,7 @@ async function handleCertificateRegistered(event, token) {
       }
     );
 
-    if (!queryResponse.ok) {
+    if (queryResponse!==200) {
       const errorText = await queryResponse.text();
       console.error(
         `Error: ${queryResponse.status} ${queryResponse.statusText}`
@@ -47,7 +47,7 @@ async function handleCertificateRegistered(event, token) {
       );
     }
 
-    const queryBody = await queryResponse.json();
+    const queryBody = await queryResponse.data;
     console.log("Certificate query response:", queryBody);
     if (!queryBody || queryBody.length <= 0) {
       console.error("No certificates found in the marketplace.");
@@ -55,19 +55,21 @@ async function handleCertificateRegistered(event, token) {
     }
 
     // Fetch certificates based on transaction hash
-    const userQueryResponse = await fetch(
-      `https://${baseUrl}/cirrus/search/Certificate?userAddress=eq.${encodeURIComponent(queryBody[0].userAddress)}&select=count`,
+    const userQueryResponse = await axios.get(
+      `https://${baseUrl}/cirrus/search/Certificate`, 
       {
-        method: "GET",
-        credentials: "same-origin",
+        params: {
+          userAddress: `eq.${encodeURIComponent(queryBody[0].userAddress)}`,
+          select: 'count',
+        },
         headers: {
           Accept: "application/json",
           "Content-Type": "application/json",
           Authorization: `Bearer ${token}`,
-        },
+        }
       }
     );
-    const userQueryBody = await userQueryResponse.json();
+    const userQueryBody = await userQueryResponse.data;
     console.log("User certificate query response:", userQueryBody);
     if (!userQueryBody || userQueryBody.length <= 0) {
       console.error("No certificates found in the marketplace. User address:", queryBody[0].userAddress);
@@ -95,7 +97,7 @@ async function handleCertificateRegistered(event, token) {
       transactions
     );
 
-    if (!response.ok) {
+    if (response.status!==200) {
       const errorText = await response.text();
       console.error(`Error: ${response.status} ${response.statusText}`);
       console.error(`Response body: ${errorText}`);
@@ -104,7 +106,7 @@ async function handleCertificateRegistered(event, token) {
       );
     }
 
-    const body = await response.json();
+    const body = await response.data;
     const purchaserName = await getUserName(baseUrl, queryBody[0].userAddress, token)
     sendEmail(baseUrl, 'newRegistration', purchaserName, token );
     
