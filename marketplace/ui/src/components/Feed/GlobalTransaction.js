@@ -81,11 +81,11 @@ const GlobalTransaction = ({ user }) => {
     let filteredData = globalTransactions;
 
     // Type filter
-    if (type) {
-      if (type === "STRATS") {
+    if (selectedFilters?.length!==0) {
+      if (selectedFilters.includes("STRATS")) {
         filteredData = filteredData.filter((item) => item.assetOriginAddress === originAddress);
       } else {
-        filteredData = filteredData.filter((item) => item.type === type);
+        filteredData = filteredData.filter((item) => selectedFilters.includes(item.type));
       }
     }
 
@@ -220,20 +220,11 @@ const GlobalTransaction = ({ user }) => {
 
   const FilterComponent = () =>{
     return  <Card>
-    {/* <Title level={5} className="mt-2">
-      Categories
-    </Title>
-    <div className="flex flex-wrap">
-      {categorys?.map(({ name }) => {
-        return <span onClick={() => { handleFilter(name) }} className={`border-lg p-2 m-2 rounded-lg ${bgColor(name)} cursor-pointer`} key={name}> {name} </span>
-      })}
-    </div>
-    <br /> */}
     <Title level={5} className="mt-2">
       Transaction Types
     </Title>
     <div className="flex flex-wrap">
-      {TRANSACTION_FILTER?.map(({ label }) => {
+      {TRANSACTION_FILTER.slice(1, TRANSACTION_FILTER.length)?.map(({ label }) => {
         return <span onClick={() => { handleFilter(label) }} className={`border-lg p-2 m-2 rounded-lg ${bgColor(label)} cursor-pointer`} key={label}> {label} </span>
       })}
     </div>

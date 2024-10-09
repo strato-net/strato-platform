@@ -41,7 +41,7 @@ const GlobalTransactionResponsive = ({ data , user}) => {
   return (
     <div className="flex flex-col gap-y-10 w-full">
       
-      {data.map(({ reference ,address, assetImage,totalAmount, assetName,assetAddress, assetDescription, quantity, from, to, status,transaction_hash, type, price, redemptionService, block_timestamp }, index) => {
+      {data?.map(({ reference ,address, assetImage,totalAmount, assetName,assetAddress, assetDescription, quantity, from, to, status,transaction_hash, type, price, redemptionService, block_timestamp }, index) => {
         block_timestamp = type === "Redemption" ? moment(block_timestamp).utc().format('YYYY-MM-DD HH:mm:ss [UTC]') : block_timestamp;
         const isExpanded = expandedRows[index];
         const tableData = [{
@@ -79,7 +79,7 @@ const GlobalTransactionResponsive = ({ data , user}) => {
 
         return (
           <Row
-            key={index}
+            key={reference}
             className={`bg-red-300 w-full ${isExpanded ? '' : 'h-36'} rounded-xl px-2 py-2 shadow-2xl border-2 `}
           >
             <Col span={6} className="flex justify-center bg-grey-400">
