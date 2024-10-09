@@ -35,6 +35,7 @@ import BlockApps.Solidity.ArgValue
 import BlockApps.X509 hiding (isValid)
 import Blockchain.Strato.Model.Address
 import Blockchain.Strato.Model.Secp256k1
+import Control.Monad.Catch (MonadThrow)
 import Control.Monad.Change.Modify
 import Control.Monad.Reader
 import Control.Monad.Trans.Except
@@ -46,6 +47,7 @@ import qualified Data.Text as T
 import Data.Text.Encoding (decodeUtf8, encodeUtf8)
 import Data.Time (getCurrentTime)
 import GHC.Generics
+import Handlers.Metadata (getMetaDataClient, MetadataResponse(..))
 import IdentityProvider.OAuth (getAccessToken, AccessToken(..))
 import IdentityService.API
 import IdentityService.API.Types
@@ -84,6 +86,7 @@ getPingIdentity = return 1
 postIdentity ::
   ( MonadUnliftIO m,
     MonadLogger m,
+    MonadThrow m,
     HasVault m,
     Accessible IdentityServerData m
   ) =>
@@ -119,8 +122,10 @@ postIdentity (PostIdentityRequest eMsg) = do
       Just a | a == fromPublicKey (subPub sub) -> certInCirrus (Sum (subCommonName sub) a) >>= \case
         -- User has no cert, create cert
         [] -> do
-          cert <- createAndRegisterCert sub
-          pure cert
+          domainValid <- checkDomain (subCommonName sub) (subPub sub)
+          if domainValid 
+            then createAndRegisterCert sub
+            else throwIO $ ExistingIdentity "Public key at metadata endpoint not match one used to sign request"
         (cert:_) -> do
           let sub' = getCertSubject cert
               err =
@@ -178,6 +183,26 @@ postIdentity (PostIdentityRequest eMsg) = do
         $logErrorS "postIdentity" err
         throwIO $ IdentityError err
   pure $ PostIdentityResponse cert
+
+checkDomain ::
+  ( MonadIO m
+  , MonadLogger m
+  , MonadThrow m
+  ) => 
+  String -> 
+  PublicKey -> 
+  m Bool
+checkDomain domain pk = do 
+  mgr <- liftIO $ newManager tlsManagerSettings -- MUST BE TLS
+  url <- parseBaseUrl $ "https://" <> domain -- MUST BE TLS
+  let clientEnv = mkClientEnv mgr url
+  eresponse <- liftIO $ runClientM getMetaDataClient clientEnv
+  case eresponse of
+    Right MetadataResponse{nodePubKey = pk'} -> return $ pk == pk'
+    Left clienterr -> do
+      $logErrorS "checkDomain" $
+        T.pack $ "Error while attempting to call metadata data endpoint of domain " <> domain <> ": " <> show clienterr
+      throwIO $ IdentityError "Failed to reach metadata endpoint"
 
 blocEndpoint :: String
 blocEndpoint = "/bloc/v2.2"
@@ -337,6 +362,7 @@ txSuccess _ = False
 server ::
   ( MonadUnliftIO m,
     MonadLogger m,
+    MonadThrow m,
     HasVault m,
     Accessible IdentityServerData m
   ) =>
