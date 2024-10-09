@@ -50,21 +50,23 @@ export const Product = {
 };
 
 export const Inventory = {
-  prefix: "/inventory",
-  transferredItems: "/transfers/items/",
-  getOwnershipHistory: "/ownership/history",
-  get: "/:address",
-  getAll: "/",
-  getAllUserInventories: "/user/inventories/",
-  create: "/",
-  update: "/update",
-  list: "/list",
-  unlist: "/unlist",
-  resell: "/resell",
-  transfer: "/transfer",
-  updateSale: "/updateSale",
-  getPriceHistory: "/price/history",
-};
+  prefix: '/inventory',
+  transferredItems: '/transfers/items/',
+  getOwnershipHistory: '/ownership/history',
+  get: '/:address',
+  getAll: '/',
+  getAllUserInventories: '/user/inventories/',
+  create: '/',
+  update: '/update',
+  list: '/list',
+  unlist: '/unlist',
+  resell: '/resell',
+  transfer: '/transfer',
+  supportedTokens: '/supportedTokens',
+  bridge: '/bridge',
+  updateSale: '/updateSale',
+  getPriceHistory: '/price/history',
+}
 
 export const Redemption = {
   prefix: "/redemption",
@@ -105,6 +107,12 @@ export const Tokens = {
   getAll: "/",
   create: "/",
 };
+
+export const STRATS = {
+  prefix: '/STRATSTokens',
+  getAll: '/',
+  create: '/'
+}
 
 export const CarbonOffset = {
   prefix: "/carbonOffset",
@@ -173,6 +181,7 @@ export const Marketplace = {
   getTopSellingProductsLoggedIn: "/user/topselling",
   transferStrats: "/strats/transfer",
   getStratsBalance: "/strats",
+  getStratsAddress: '/strats/address',
   getStratsTransactionHistory: "/strats/history",
   getHighestListedPrice: "/highestPrice",
   getPriceHistory: "/priceHistory",

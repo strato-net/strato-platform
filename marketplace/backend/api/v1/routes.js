@@ -39,6 +39,7 @@ import {
   Item,
   Art,
   Tokens,
+  STRATS,
   CarbonOffset,
   Metals,
   Spirits,

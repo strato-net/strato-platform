@@ -45,6 +45,9 @@ const actionDescriptors = {
   fetchStratsBalance: "fetch_strats_balance",
   fetchStratsBalanceSuccessful: "fetch_strats_balance_successful",
   fetchStratsBalanceFailed: "fetch_strats_balance_failed",
+  fetchStratsAddress: "fetch_strats_address",
+  fetchStratsAddressSuccessful: "fetch_strats_address_successful",
+  fetchStratsAddressFailed: "fetch_strats_address_failed",
   fetchStratsTransactionHistory: "fetch_strats_transaction_history",
   fetchStratsTransactionHistorySuccessful:
     "fetch_strats_transaction_history_successful",
@@ -509,7 +512,6 @@ const actions = {
           type: actionDescriptors.fetchStratsBalanceFailed,
           payload: "Error while fetching STRATS",
         });
-        window.location.href = body.error.loginUrl;
       }
       if (response.status === RestStatus.OK) {
         dispatch({
@@ -529,6 +531,37 @@ const actions = {
       });
     }
   },
+  fetchStratsAddress: async (dispatch) => {
+    dispatch({ type: actionDescriptors.fetchStratsAddress });
+    try {
+      let response = await fetch(`${apiUrl}/marketplace/strats/address`, {
+        method: HTTP_METHODS.GET,
+        credentials: "same-origin",
+      });
+      
+      const body = await response.json();
+      if (response.status === RestStatus.UNAUTHORIZED || response.status === RestStatus.FORBIDDEN) {
+        dispatch({
+          type: actionDescriptors.fetchStratsAddressFailed,
+          payload: "Error while fetching STRATS address",
+        });
+        return null;
+      }
+  
+      if (response.status === RestStatus.OK) {
+        dispatch({
+          type: actionDescriptors.fetchStratsAddressSuccessful
+        });
+        return body.data;
+      }
+      
+      dispatch({ type: actionDescriptors.fetchStratsAddressFailed, payload: "Error while fetching STRATS address" });
+      return null;
+    } catch (err) {
+      dispatch({ type: actionDescriptors.fetchStratsAddressFailed, payload: "Error while fetching STRATS address" });
+      return null;
+    }
+  },  
   fetchStratsTransactionHistory: async (dispatch) => {
     dispatch({ type: actionDescriptors.fetchStratsTransactionHistory });
     try {
@@ -578,30 +611,31 @@ const actions = {
         body: JSON.stringify(payload),
       });
       const body = await response.json();
-      if (
-        response.status === RestStatus.UNAUTHORIZED ||
-        response.status === RestStatus.FORBIDDEN
-      ) {
-        dispatch({
-          type: actionDescriptors.transferStratsFailed,
-          error: "Error while transferring STRATS",
-        });
-        actions.setMessage(dispatch, "Error while transferring STRATS");
-        window.location.href = body.error.loginUrl;
-      }
+
       if (response.status === RestStatus.OK) {
         dispatch({
           type: actionDescriptors.transferStratsSuccessful,
-          payload: body.data,
         });
         actions.setMessage(dispatch, "STRATS transferred successfully", true);
-        return;
+        return true;
+      } else if (response.status === RestStatus.CONFLICT) {
+        dispatch({ type: actionDescriptors.transferStratsFailed, error: body.error.message });
+        actions.setMessage(dispatch, body.error.message)
+        return false;
+      } else if (response.status === RestStatus.INTERNAL_SERVER_ERROR) {
+        dispatch({ type: actionDescriptors.transferStratsFailed, error: "Error while transferring Item" });
+        actions.setMessage(dispatch, "Error while transferring Item")
+        return false;
+      } else if (response.status === RestStatus.UNAUTHORIZED) {
+        dispatch({
+          type: actionDescriptors.transferStratsFailed,
+          error: "Unauthorized while transferring STRATS"
+        });
+        window.location.href = body.error.loginUrl;
       }
-      dispatch({
-        type: actionDescriptors.transferStratsFailed,
-        error: "Error while transferring STRATS",
-      });
-      actions.setMessage(dispatch, "Error while transferring STRATS");
+      dispatch({ type: actionDescriptors.transferStratsFailed, error: body.error});
+      actions.setMessage(dispatch, body.error);
+      return false
     } catch (err) {
       dispatch({
         type: actionDescriptors.transferStratsFailed,

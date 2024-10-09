@@ -89,6 +89,11 @@ const HeaderComponent = ({
   }, [user]);
 
   useEffect(() => {
+    async function fetchStratsAddress() {
+      const stratsAddress = await marketplaceActions.fetchStratsAddress(marketplaceDispatch);
+      setOriginAddress(stratsAddress);
+    }
+    fetchStratsAddress();
     marketplaceActions.fetchCartItems(marketplaceDispatch, cartList);
   }, [marketplaceDispatch, cartList]);
 
@@ -98,14 +103,10 @@ const HeaderComponent = ({
   const [categories, setCategories] = useState([]);
   const [selectedCategory, setSelectedCategory] = useState(categoryQueryValue);
   const [isModalVisible, setIsModalVisible] = useState(false);
-  const [isTransferStratsModalVisible, setIsTransferStratsModalVisible] =
-    useState(false);
-  const [
-    isStratsTransactionHistoryModalVisible,
-    setIsStratsTransactionHistoryModalVisible,
-  ] = useState(false);
-
-  const stratsBalance = Object.keys(strats).length > 0 ? strats : 0;
+  const [isTransferStratsModalVisible, setIsTransferStratsModalVisible] = useState(false);
+  const [isStratsTransactionHistoryModalVisible, setIsStratsTransactionHistoryModalVisible] = useState(false);
+  const [originAddress, setOriginAddress] = useState();
+  const stratsBalance = (Object.keys(strats).length > 0) ? strats : 0
 
   useEffect(() => {
     setSelectedCategory(categoryQueryValue);
@@ -169,83 +170,96 @@ const HeaderComponent = ({
     setCategories(categories);
   }, [categorys]);
 
-  const items = user
-    ? [
-        {
-          key: "3",
-          label: (
-            <div>
-              <p>My Profile</p>
-            </div>
-          ),
-          onClick: () =>
-            navigate(
-              `${routes.MarketplaceUserProfile.url.replace(
-                ":commonName",
-                user.commonName
-              )}`
-            ),
-        },
-        {
-          key: "2",
-          label: (
-            <div>
-              <p>{user == null ? "" : user.commonName}</p>
-              <p className="text-xs">{user == null ? "" : user.email}</p>
-            </div>
-          ),
-        },
-        {
-          key: "1",
-          label: (
-            <div
-              type="text"
-              id="logout"
-              className="w-full text-secondryB text-sm !hover:bg-success flex gap-2 items-center"
-            >
-              <div className="-rotate-90">
-                <LogoutOutlined />
-              </div>
-              Logout
-            </div>
-          ),
-          onClick: () => logout(),
-        },
-      ]
+  const items = user ? [
+    {
+      key: "3",
+      label: (
+        <div>
+          <p>My Profile</p>
+        </div>
+      ),
+      onClick: () => navigate(`${routes.MarketplaceUserProfile.url.replace(":commonName", user.commonName)}`)
+    },
+    {
+      key: "2",
+      label: (
+        <div>
+          <p>{user == null ? "" : user.commonName}</p>
+          <p className="text-xs">{user == null ? "" : user.email}</p>
+        </div>
+      ),
+    },
+    {
+      key: "1",
+      label: (
+        <div
+          type="text"
+          id="logout"
+          className="w-full text-secondryB text-sm !hover:bg-success flex gap-2 items-center"
+        >
+          <div className="-rotate-90">
+            <LogoutOutlined />
+          </div>
+          Logout
+        </div>
+      ),
+      onClick: () => logout(),
+    },
+  ]
     : [
-        {
-          key: "2",
-          label: <a href={loginUrl}> Login </a>,
-        },
-      ];
+      {
+        key: "2",
+        label: <a href={loginUrl}> Login </a>,
+      },
+    ];
 
   const stratsItem = [
     {
-      key: "1",
-      type: "group",
+      key: '1',
+      type: 'group',
       label: (
         <div>
-          {user && <p className="text-xs mt-1">STRATS: {stratsBalance}</p>}
+          {user &&
+            <p className="text-xs mt-1">
+              STRATS: {stratsBalance}
+            </p>
+          }
         </div>
       ),
       children: [
         {
-          key: "2",
-          onClick: () => setIsTransferStratsModalVisible(true),
-          label: <div>{user && <p className="text-xs mt-1">Transfer</p>}</div>,
-        },
-        {
-          key: "3",
-          onClick: () => setIsStratsTransactionHistoryModalVisible(true),
+          key: '2',
+          onClick: async () => {
+            navigate(`${routes.MarketplaceProductDetail.url.replace(':address', originAddress).replace(':name', "STRATS")}`)
+          },
           label: (
             <div>
-              {user && <p className="text-xs mt-1">Transaction History</p>}
+              {user && originAddress &&
+                <p className="text-xs mt-1">
+                  Buy STRATS
+                </p>
+              }
             </div>
           ),
         },
+        {
+          key: '3',
+          onClick: async () => {
+            navigate(`${routes.Transactions.url}?type=STRATS`)
+          },
+          label: (
+            <div>
+              {user &&
+                <p className="text-xs mt-1">
+                  Transaction History
+                </p>
+              }
+            </div>
+          ),
+        }
       ],
-    },
-  ];
+    }
+  ]
 
   useEffect(() => {
     if (user) setRoleIndex(0);
@@ -253,40 +267,36 @@ const HeaderComponent = ({
   }, [user]);
 
   const subMenuItems = [
-    {
-      value: "transactions",
-      path: routes.Transactions.url,
-      label: "Transactions",
-    },
+    { value: "transactions", path: routes.Transactions.url, label: "Transactions" },
     { value: "myitems", path: "/myitems", label: "My Items" },
     { value: "mywallet", path: "/mywallet", label: "My Wallet" },
     user
       ? {
-          value: "my-profile",
-          path: routes.MarketplaceUserProfile.url.replace(
-            ":commonName",
-            user.commonName
-          ),
-          label: (
-            <div>
-              {" "}
-              <p className="!mb-0"> My Profile </p>{" "}
-            </div>
-          ),
-        }
+        value: "my-profile",
+        path: routes.MarketplaceUserProfile.url.replace(
+          ":commonName",
+          user.commonName
+        ),
+        label: (
+          <div>
+            {" "}
+            <p className="!mb-0"> My Profile </p>{" "}
+          </div>
+        ),
+      }
       : null,
     user
       ? {
-          value: "logout",
-          path: "/logout",
-          label: (
-            <div>
-              <p className="text-gray">{user?.commonName}</p>
-              <p className="text-xs text-gray">{user?.preferred_username}</p>
-              <p className="!mb-0">Logout</p>
-            </div>
-          ),
-        }
+        value: "logout",
+        path: "/logout",
+        label: (
+          <div>
+            <p className="text-gray">{user?.commonName}</p>
+            <p className="text-xs text-gray">{user?.preferred_username}</p>
+            <p className="!mb-0">Logout</p>
+          </div>
+        ),
+      }
       : null,
   ].filter(Boolean);
 
@@ -299,10 +309,10 @@ const HeaderComponent = ({
       data.value === "logout"
         ? logout()
         : data.value === "orders"
-        ? navigate(routes.Orders.url.replace(":type", "sold"), {
+          ? navigate(routes.Orders.url.replace(":type", "sold"), {
             state: { defaultKey: "Sold" },
           })
-        : navigate(data.path);
+          : navigate(data.path);
       handleMenuTab(data);
     }
   };
@@ -379,9 +389,8 @@ const HeaderComponent = ({
   return (
     <>
       <Header
-        className={`fixed z-[100] !bg-[#ffffff] !pl-2 w-full !pr-4 md:px-12 flex md:!mb-10 ${
-          showMenu ? "" : "shadow-header"
-        } items-center justify-between md:justify-start`}
+        className={`fixed z-[100] !bg-[#ffffff] !pl-2 w-full !pr-4 md:px-12 flex md:!mb-10 ${showMenu ? "" : "shadow-header"
+          } items-center justify-between md:justify-start`}
       >
         <Row className="relative flex-grow-0 md:flex-1 ml-2 md:ml-5">
           <Col
@@ -406,11 +415,10 @@ const HeaderComponent = ({
             xs={showSearch ? 24 : 4}
             md={12}
             lg={18}
-            className={`lg:ml-4 mf:ml-20 md:ml-1 bg-[#F6F6F6] shadow-md flex-1 header-search ${
-              showSearch
-                ? " fixed top-[13px] left-0 flex w-[100vw] z-50 mb-2"
-                : "hidden md:flex "
-            }`}
+            className={`lg:ml-4 mf:ml-20 md:ml-1 bg-[#F6F6F6] shadow-md flex-1 header-search ${showSearch
+              ? " fixed top-[13px] left-0 flex w-[100vw] z-50 mb-2"
+              : "hidden md:flex "
+              }`}
           >
             <Select
               defaultValue="All"
@@ -630,9 +638,8 @@ const HeaderComponent = ({
             {subMenuItems.map((item) => (
               <Typography
                 onClick={() => handleIntMenuTab(item)}
-                className={`text-base py-3 px-4 cursor-pointer ${
-                  item ? "" : "hidden"
-                }`}
+                className={`text-base py-3 px-4 cursor-pointer ${item ? "" : "hidden"
+                  }`}
               >
                 {item?.label}
               </Typography>

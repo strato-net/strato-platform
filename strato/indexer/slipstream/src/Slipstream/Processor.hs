@@ -444,7 +444,9 @@ processTheMessages env conn messages = do
       insertIndexTable $ indexInsert ins
       insertAbstractTable (abstractInserts ins)-- not historic
       unless ((length (collectionInserts ins) < 1)) $ insertCollectionTable $ collectionInserts ins
+
       --updating the foreign keys from null
+    forM_ insertsByCodeHash $ \ins -> do
       updateForeignKeysFromNULLAbstract (abstractInserts ins) -- not historic
       updateForeignKeysFromNULLIndex (indexInsert ins)
       unless ((length (collectionInserts ins) < 1)) $ updateForeignKeysFromNULLArray (collectionInserts ins)

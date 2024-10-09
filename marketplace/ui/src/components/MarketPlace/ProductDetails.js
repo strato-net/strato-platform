@@ -225,7 +225,8 @@ const ProductDetails = ({ user, users }) => {
       const detailsData = details.data;
       setItemData(detailsData);
       if (details.saleQuantity) {
-        setAvailableQuantity(details.saleQuantity || 1);
+        let saleQuantity = details.data.quantityIsDecimal && details.data.quantityIsDecimal === "True" ? (details.saleQuantity / 100) : details.saleQuantity
+        setAvailableQuantity(saleQuantity || 1);
       }
     }
   }, [categorys, details]);
@@ -273,14 +274,12 @@ const ProductDetails = ({ user, users }) => {
   };
 
   const subtract = () => {
-    if (qty !== 1) {
-      let value = qty - 1;
-      setQty(value);
-    }
+    const value = Math.max(qty - 1, 1);
+    setQty(value);
   };
 
   const add = () => {
-    if (qty < availableQuantity) {
+    if (qty + 1 <= availableQuantity) {
       let value = qty + 1;
       setQty(value);
     } else {
@@ -654,24 +653,26 @@ const ProductDetails = ({ user, users }) => {
                   </div>
                 </div>
                 <div className=" pt-4 lg:pt-[22px]">
-                  <Paragraph
-                    level={4}
-                    id="price"
-                    className=" text-[#13188A] text-xl font-bold lg:text-2xl lg:font-semibold"
-                  >
-                    {details?.price ? (
-                      <>
-                        ${details?.price}{" "}
-                        <span className="font-normal text-xs mr-2 text-primary">
-                          <b>
-                            ({(details?.price * STRATS_CONVERSION).toFixed(0)}{" "}
-                            STRATS)
-                          </b>
-                        </span>
-                      </>
-                    ) : (
-                      "No Price Available"
-                    )}
+
+                  <Paragraph level={4} id="price" className=" text-[#13188A] text-xl font-bold lg:text-2xl lg:font-semibold">
+                  {details?.price ? (
+                    (() => {
+                      const adjustedPrice = details.data.quantityIsDecimal && details.data.quantityIsDecimal === "True" 
+                        ? details.price * 100 
+                        : details.price;
+
+                      return (
+                        <>
+                          ${adjustedPrice} 
+                          <span className="font-normal text-xs mr-2 text-primary">
+                            <b> ({(adjustedPrice * STRATS_CONVERSION).toFixed(0)} STRATS)</b>
+                          </span>
+                        </>
+                      );
+                    })()
+                  ) : (
+                    "No Price Available"
+                  )}
                   </Paragraph>
                   {isAvailableForSale && (
                     <Text type="danger" strong>
@@ -696,20 +697,20 @@ const ProductDetails = ({ user, users }) => {
                         -
                       </p>
                     </div>
-                    <InputNumber
-                      className="w-full md:w-[280px] h-9 md:h-10 lg:h-[46px] border text-[#6A6A6A] border-[#00000029] text-center flex flex-col justify-center font-semibold !rounded-lg"
-                      min={1}
-                      max={availableQuantity}
-                      value={`${qty}`}
-                      defaultValue={`${qty}`}
+                    <InputNumber 
+                      className="w-full md:w-[280px] h-9 md:h-10 lg:h-[46px] border text-[#6A6A6A] border-[#00000029] text-center flex flex-col justify-center font-semibold !rounded-lg" 
+                      min={1} 
+                      max={availableQuantity} 
+                      value={`${qty}`} 
+                      defaultValue={`${qty}`} 
                       controls={false}
-                      onChange={(e) => {
-                        if (e < availableQuantity) {
-                          setQty(e);
-                        } else {
-                          setQty(availableQuantity);
-                        }
-                      }}
+                      onChange={e => {
+                          if (e < availableQuantity) {
+                            setQty(parseInt(e || 0))
+                          } else {
+                            setQty(availableQuantity)
+                          }
+                        }} 
                     />
                     <div
                       onClick={add}
@@ -1027,28 +1028,22 @@ const ProductDetails = ({ user, users }) => {
                 {priceHistory?.originRecords?.length !== 0 &&
                   priceHistory?.records && (
                     <div className="w-full h-full">
-                      <h2 className="w-full text-center font-bold text-2xl">
-                        Price History
-                      </h2>
-                      <TimeRangeTabs
-                        onChange={handleTimeFilterChange}
-                        activeKey={timeFilter}
-                      />
-                      <PriceChartAndStats priceHistory={priceHistory} />
+                      <h2 className='w-full text-center font-bold text-2xl'>Price History</h2>
+                      <TimeRangeTabs onChange={handleTimeFilterChange} activeKey={timeFilter} />
+                      <PriceChartAndStats priceHistory={priceHistory} isDecimal={details?.data?.quantityIsDecimal === "True"}/>
                     </div>
                   )}
-                <div>
-                  {priceHistory?.originRecords?.length !== 0 && (
-                    <>
-                      <h2 className="w-full text-center font-bold text-2xl">
-                        12-Month Historical Data
-                      </h2>
-                      <Statistics priceHistory={priceHistory} />
-                    </>
-                  )}
-                </div>
-              </>
-            )}
+                  <div>
+                    {(priceHistory?.originRecords?.length !== 0) && (
+                      <>
+                        <h2 className='w-full text-center font-bold text-2xl'>12-Month Historical Data</h2>
+                        <Statistics priceHistory={priceHistory} isDecimal={details?.data?.quantityIsDecimal === "True"}/>
+                      </>
+                    )}
+                  </div>
+                </>
+              )
+            }
           </div>
         </div>
       )}

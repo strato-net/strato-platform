@@ -224,6 +224,18 @@ const reducer = (state, action) => {
         ...state,
         isFetchingStrats: false,
       };
+    case actionDescriptors.fetchStratsAddress:
+      return {
+        ...state
+      };
+    case actionDescriptors.fetchStratsAddressSuccessful:
+      return {
+        ...state
+      };
+    case actionDescriptors.fetchStratsAddressFailed:
+      return {
+        ...state
+      };
     case actionDescriptors.fetchStratsTransactionHistory:
       return {
         ...state,
@@ -249,7 +261,6 @@ const reducer = (state, action) => {
       return {
         ...state,
         isTransferringStrats: false,
-        strats: action.payload,
       };
     case actionDescriptors.transferStratsFailed:
       return {

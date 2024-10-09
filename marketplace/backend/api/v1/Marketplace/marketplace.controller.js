@@ -1,5 +1,7 @@
-import { rest } from "blockapps-rest";
-import constants from "../../../helpers/constants";
+import { rest } from 'blockapps-rest'
+import constants from '../../../helpers/constants'
+import STRATSJs from '../../../dapp/items/STRATS'
+
 
 class MarketplaceController {
   static async getAll(req, res, next) {
@@ -101,6 +103,17 @@ class MarketplaceController {
       return rest.response.status200(res, stratsBalance);
     } catch (e) {
       return next(e);
+    }
+  }
+  
+  static async getStratsAddress(req, res, next) {
+    try {
+      
+      const address = await STRATSJs.getStratsAddress();
+
+      return rest.response.status200(res, address)
+    } catch (e) {
+      return next(e)
     }
   }
 
