@@ -337,7 +337,7 @@ registerCert cert = do
               functionpayloadMetadata = Nothing
             }
       txRequest = PostBlocTransactionRequest Nothing [txPayload] Nothing Nothing
-      postBlocTx = runClientM (postBlocTransactionParallel (access_token <$> mToken) Nothing Nothing True False txRequest)
+      postBlocTx = runClientM (postBlocTransactionParallel ((T.append "Bearer " . access_token) <$> mToken) Nothing Nothing True False txRequest)
   eresponse <- liftIO $ postBlocTx clientEnv
   case eresponse of
     Right response ->
