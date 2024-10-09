@@ -185,7 +185,7 @@ const ResponsiveCart = ({
     }
   }
 
-  const totalAmount = selectedProvider?.serviceName === 'STRATS' || selectedProvider?.serviceName.includes('STRATS') ? 
+  const totalAmount = selectedProvider?.serviceName === 'STRATS' || selectedProvider?.serviceName?.includes('STRATS') ? 
              `${(subTotal * 100).toFixed(0)} STRATS` :  
              selectedProvider?.serviceName === 'Stripe' ? `${subTotal} USD` : 
              `${subTotal} ${selectedProvider?.serviceName || 'USD'}`
