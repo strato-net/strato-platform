@@ -131,7 +131,6 @@ class TransactionController {
                 limit: limit,
                 offset: offset,
                 order: 'createdDate.desc',
-                // or: `(sellersCommonName.eq.${user},purchasersCommonName.eq.${user})`,
                 id: search,
             }
 
@@ -145,7 +144,6 @@ class TransactionController {
             const TransferQuery = {
                 limit: limit,
                 offset: offset,
-                // or: `(oldOwnerCommonName.eq.${user},newOwnerCommonName.eq.${user})`,
                 order: 'transferDate.desc',
                 id: search
             }
@@ -155,7 +153,7 @@ class TransactionController {
                 TransferQuery['range'] = [`transferDate,${startDate},${endDate}`]
             }
 
-            let orderData, itemTransfers, outgoingRedemptions, incomingRedemptions
+            let orderData, itemTransfers, redemptions
             let data = []
             if (type === 'Order' || !type) {
                 orderData = await dapp.getSaleOrders({ ...transactionQuery });
@@ -166,9 +164,7 @@ class TransactionController {
                 data = [...data, ...itemTransfers.transfers]
             }
         if (type === 'Redemption' || !type) {
-                outgoingRedemptions = await dapp.getOutgoingRedemptionRequests(redemptionQuery)
-                incomingRedemptions = await dapp.getIncomingRedemptionRequests(redemptionQuery)
-                let redemptions = [...outgoingRedemptions, ...incomingRedemptions];
+                redemptions = await dapp.getAllRedemptionRequests(redemptionQuery)
                 redemptions = redemptions.filter((value, index, self) =>
                     index === self.findIndex((t) => (
                         t.redemption_id === value.redemption_id
@@ -176,6 +172,7 @@ class TransactionController {
                 );
                 data = [...data, ...redemptions]
             }
+            
             let assetAddress = data.filter((item)=>{
                 if(item.assetAddress){
                     return item.assetAddress

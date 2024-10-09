@@ -27,10 +27,10 @@ import { TRANSACTION_FILTER } from "../Order/constant";
 import { useCategoryState } from "../../contexts/category";
 import GlobalTransactionResponsive from "./GlobalTransactionResponsive";
 
-const limit = '', offset = '';
 const { Title } = Typography;
 
 const GlobalTransaction = ({ user }) => {
+  const limit = '20', offset = '';
   const StratsIcon = <img src={Images.logo} alt="STRATS" className="mx-1 w-3 h-3" />
   // Dispatch
   const transactionDispatch = useTransactionDispatch();
@@ -65,7 +65,8 @@ const GlobalTransaction = ({ user }) => {
   useEffect(() => {
     const startOfMonth = dayjs().startOf('month').unix();
     const endOfMonth = dayjs().endOf('month').unix();
-    const dateArr = [startOfMonth, endOfMonth]
+    const dateArr = [startOfMonth, endOfMonth];
+
     transactionAction.fetchGlobalTransaction(
       transactionDispatch,
       limit,
@@ -73,6 +74,7 @@ const GlobalTransaction = ({ user }) => {
       user?.commonName,
       dateArr
     );
+
   }, [user, dateQuery])
 
   useEffect(() => {
