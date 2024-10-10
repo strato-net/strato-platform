@@ -90,7 +90,7 @@ const GlobalTransaction = ({ user }) => {
     }
 
     setTransactions(filteredData);
-  }, [globalTransactions, type]);
+  }, [globalTransactions, selectedFilters]);
 
   const Content = ({ data }) => {
     const price = data?.assetPrice || data?.price
@@ -155,7 +155,7 @@ const GlobalTransaction = ({ user }) => {
       key: "quantity",
       align: "right",
       width: '100px',
-      render: (data, { quantity, quantityIsDecimal }) => <span>{quantity ? formattedNum(quantityIsDecimal && quantityIsDecimal === "True" ? (quantity / 100) : quantity) : '--'}</span>
+      render: (data, { quantity, quantityIsDecimal }) => <span>{quantity ? parseInt(quantity) : '--'}</span>
     },
     {
       title: "Price",
@@ -224,12 +224,18 @@ const GlobalTransaction = ({ user }) => {
       Transaction Types
     </Title>
     <div className="flex flex-wrap">
-      {TRANSACTION_FILTER.slice(1, TRANSACTION_FILTER.length)?.map(({ label }) => {
+      {TRANSACTION_FILTER.slice(1, 4)?.map(({ label }) => {
         return <span onClick={() => { handleFilter(label) }} className={`border-lg p-2 m-2 rounded-lg ${bgColor(label)} cursor-pointer`} key={label}> {label} </span>
       })}
     </div>
   </Card>
   }
+
+  const SelectedFilter = () =>  {
+    return selectedFilters?.length !== 0 && <div className="h-20 w-full p-2"> {selectedFilters?.map((item) =>
+    <span onClick={() => { handleFilter(item) }} className="p-2 m-2 rounded-lg bg-[#F6F6F6] cursor-pointer" key={item}> {item} <span className="font-semibold"><CloseOutlined/></span> </span>)}
+    <span onClick={() => { setSelectedFilters([]) }} className="p-2 m-2 rounded-lg bg-[#8388D2] cursor-pointer text-white" > Clear All </span>
+  </div>}
 
   return (
     <Row>
@@ -247,18 +253,15 @@ const GlobalTransaction = ({ user }) => {
         </Row>
       </Col>
       <Col span={22} className="mx-auto mt-5">
-        <div className="flex md:hidden order_responsive">
+        <div className="w-full flex md:hidden order_responsive">
           {isTransactionLoading ? <Spin className="mx-auto" />
             :
-            <Row>
+            <Row className="w-full">
               <Col>
-                {selectedFilters?.length !== 0 && <> <div className="h-20 w-full p-2"> {selectedFilters?.map((item) =>
-                  <span onClick={() => { handleFilter(item) }} className="p-2 m-2 rounded-lg bg-[#F6F6F6] cursor-pointer" key={item}> {item} </span>)}
-                  <span onClick={() => { setSelectedFilters([]) }} className="p-2 m-2 rounded-lg bg-[#8388D2] cursor-pointer" > Clear All </span>
-                </div> </>}
+                <SelectedFilter/>
               </Col>
               <Col span={24}>
-                <div className="flex justify-between items-center">
+                <div className="w-full flex justify-between items-center">
                   <Title level={3} className="mt-2">
                     Filter
                   </Title>
@@ -280,10 +283,7 @@ const GlobalTransaction = ({ user }) => {
              <FilterComponent/>
             </Col>
             <Col span={18} offset={1}>
-              {selectedFilters?.length !== 0 && <> <div className="h-20 w-full p-2"> {selectedFilters?.map((item) =>
-                <span onClick={() => { handleFilter(item) }} className="p-2 m-2 rounded-lg bg-[#F6F6F6] cursor-pointer" key={item}> {item} </span>)}
-                <span onClick={() => { setSelectedFilters([]) }} className="p-2 m-2 rounded-lg bg-[#8388D2] cursor-pointer" > Clear All </span>
-              </div> </>}
+              <SelectedFilter/>
               <DataTableComponent
                 columns={column}
                 data={transactions}
