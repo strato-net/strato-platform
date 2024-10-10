@@ -126,7 +126,7 @@ class TransactionController {
     static async getGlobalTransactions(req, res, next) {
         try {
             const { dapp, params, query } = req
-            const { limit = '20', offset = '0', order, search = '', type, user, startDate, endDate } = query;
+            const { limit, offset = '0', order, search = '', type, user, startDate, endDate } = query;
             let transactionQuery = {
                 limit: limit,
                 offset: offset,
