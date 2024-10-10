@@ -103,7 +103,7 @@ const HeaderComponent = ({ user, loginUrl, showMenu, handleSubMenu, handleMenuTa
   const navUrls = [
     routes.Transactions.url,
     routes.MyItems.url,
-    routes.Products.url,
+    routes.Feeds.url,
   ];
 
   const logout = () => {
@@ -127,7 +127,7 @@ const HeaderComponent = ({ user, loginUrl, showMenu, handleSubMenu, handleMenuTa
       setSelectedTab("1");
     } else if (pathName.includes("/myitems")) {
       setSelectedTab("2");
-    } else if (pathName.includes("/products")) {
+    } else if (pathName.includes("/feed")) {
       setSelectedTab("3");
     } else {
       setSelectedTab("0");
@@ -244,6 +244,7 @@ const HeaderComponent = ({ user, loginUrl, showMenu, handleSubMenu, handleMenuTa
   const subMenuItems = [
     { value: "transactions", path: routes.Transactions.url, label: "My Transactions" },
     { value: "myitems", path: "/myitems", label: "My Items" },
+    { value: "feed", path: "/feed", label: "Feeds" },
     user ? {
       value: "my-profile",
       path: routes.MarketplaceUserProfile.url.replace(':commonName', user.commonName),
@@ -411,7 +412,7 @@ const HeaderComponent = ({ user, loginUrl, showMenu, handleSubMenu, handleMenuTa
               if (item.key === "2") {
                 TagManager.dataLayer({
                   dataLayer: {
-                    event: 'view_products_page',
+                    event: 'view_feed_page',
                   },
                 });
               }

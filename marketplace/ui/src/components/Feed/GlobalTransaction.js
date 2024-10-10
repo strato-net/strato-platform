@@ -234,7 +234,7 @@ const GlobalTransaction = ({ user }) => {
   const SelectedFilter = () =>  {
     return selectedFilters?.length !== 0 && <div className="h-20 w-full p-2"> {selectedFilters?.map((item) =>
     <span onClick={() => { handleFilter(item) }} className="p-2 m-2 rounded-lg bg-[#F6F6F6] cursor-pointer" key={item}> {item} <span className="font-semibold"><CloseOutlined/></span> </span>)}
-    <span onClick={() => { setSelectedFilters([]) }} className="p-2 m-2 rounded-lg bg-[#8388D2] cursor-pointer text-white" > Clear All </span>
+    <span onClick={() => { setSelectedFilters([]) }} className="p-2 m-2 rounded-lg bg-[#13188A] cursor-pointer text-white" > Clear All </span>
   </div>}
 
   return (
