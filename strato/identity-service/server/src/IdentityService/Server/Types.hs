@@ -26,7 +26,10 @@ data IdentityServerData = IdentityServerData
     nodeUrl :: BaseUrl,
     userRegAddr :: Address,
     userRegCodeHash :: Maybe Keccak256,
-    userTableName :: String
+    userTableName :: String,
+    tokenEndpoint :: String,
+    clientId :: String,
+    clientSecret :: String
   }
 
 instance Monad m => Accessible IdentityServerData (ReaderT IdentityServerData m) where

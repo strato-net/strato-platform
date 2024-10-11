@@ -20,6 +20,7 @@ description:         Please see the README on GitHub at <https://github.com/gith
 
 dependencies:
 - base
+- blockapps-identity-provider-server
 
 
 library:
@@ -35,7 +36,9 @@ library:
   - bytestring
   - common-log
   - containers
+  - core-api2
   - evm-solidity
+  - exceptions
   - format
   - http-client
   - http-client-tls

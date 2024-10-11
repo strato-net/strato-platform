@@ -15,6 +15,7 @@
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE StandaloneDeriving #-}
 {-# LANGUAGE TemplateHaskell #-}
+{-# LANGUAGE TupleSections #-}
 {-# LANGUAGE TypeApplications #-}
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE TypeOperators #-}
@@ -34,24 +35,27 @@ import BlockApps.Solidity.ArgValue
 import BlockApps.X509 hiding (isValid)
 import Blockchain.Strato.Model.Address
 import Blockchain.Strato.Model.Secp256k1
+import Control.Monad.Catch (MonadThrow)
 import Control.Monad.Change.Modify
 import Control.Monad.Reader
 import Control.Monad.Trans.Except
 import Data.Aeson hiding (Success)
 import qualified Data.ByteString.Lazy as BL
 import qualified Data.Map as M
-import Data.Maybe (catMaybes, fromMaybe)
+import Data.Maybe (catMaybes, fromMaybe, maybeToList)
 import qualified Data.Text as T
 import Data.Text.Encoding (decodeUtf8, encodeUtf8)
 import Data.Time (getCurrentTime)
 import GHC.Generics
+import Handlers.Metadata (getMetaDataClient, MetadataResponse(..))
+import IdentityProvider.OAuth (getAccessToken, AccessToken(..))
 import IdentityService.API
 import IdentityService.API.Types
 import IdentityService.Server.Types
 import Network.HTTP.Client hiding (Proxy)
 import qualified Network.HTTP.Client as HTTP (Response)
 import Network.HTTP.Client.TLS
-import Network.HTTP.Types.Header (hContentType)
+import Network.HTTP.Types.Header (hContentType, hAuthorization)
 import Network.HTTP.Types.Status
 import Servant
 import Servant.Client hiding (manager, responseBody)
@@ -69,12 +73,20 @@ instance Monad m => HasVault (ReaderT IdentityServerData m) where
     pure $ derivePublicKey pk
   getShared _ = error "The Identity Server should not need to create a shared key"
 
+-- instance (MonadIO m, Accessible IdentityServerData m) => Accessible (Maybe AccessToken) (ReaderT IdentityServerData m) where
+--   access _ = do
+--     te <- asks tokenEndpoint
+--     ci <- asks clientId
+--     cs <- asks clientSecret
+--     getAccessToken ci cs te
+
 getPingIdentity :: (MonadIO m) => m Int
 getPingIdentity = return 1
 
 postIdentity ::
   ( MonadUnliftIO m,
     MonadLogger m,
+    MonadThrow m,
     HasVault m,
     Accessible IdentityServerData m
   ) =>
@@ -110,8 +122,10 @@ postIdentity (PostIdentityRequest eMsg) = do
       Just a | a == fromPublicKey (subPub sub) -> certInCirrus (Sum (subCommonName sub) a) >>= \case
         -- User has no cert, create cert
         [] -> do
-          cert <- createAndRegisterCert sub
-          pure cert
+          domainValid <- checkDomain (subCommonName sub) (subPub sub)
+          if domainValid 
+            then createAndRegisterCert sub
+            else throwIO $ IdentityError "Public key at metadata endpoint not match one used to sign request"
         (cert:_) -> do
           let sub' = getCertSubject cert
               err =
@@ -136,30 +150,37 @@ postIdentity (PostIdentityRequest eMsg) = do
         let err = "Signer does not match public key in Subject"
         $logErrorS "postIdentity" err
         throwIO $ IdentityError err
-    Right s'@(Signed s@(Signed _ _) _) -> case (,) <$> (recoverAddress s) <*> (recoverAddress s') of -- existing identity
-      Just (existingA, newA) | newA == fromPublicKey (subPub sub) -> certInCirrus (Second newA) >>= \case
-        [] -> certInCirrus (Product (subCommonName sub) existingA) >>= \case
-          (c:_) -> do
-            let existingCN = (subCommonName <$> getCertSubject c)
-                newCN = subCommonName sub
-            if existingCN == Just newCN
-              then createAndRegisterCert sub
-              else do
-                let err = "Common names do not match between "
-                       <> (T.pack $ fromMaybe "" existingCN)
-                       <> " in the existing cert, and "
-                       <> (T.pack newCN)
-                       <> " in the subject info"
-                $logErrorS "postIdentity" err
-                throwIO $ ExistingIdentity err
+    Right s'@(Signed s@(Signed _ _) _) -> case (,) <$> (recoverSigned s) <*> (recoverSigned s') of -- existing identity
+      Just (existingPK, newPK) | newPK == subPub sub -> do 
+        let existingA = fromPublicKey existingPK
+            newA = fromPublicKey newPK
+        certInCirrus (Second newA) >>= \case
+          [] -> certInCirrus (Product (subCommonName sub) existingA) >>= \case
+            (c:_) -> do
+              let existingCN = (subCommonName <$> getCertSubject c)
+                  newCN = subCommonName sub
+              if existingCN == Just newCN
+                then do
+                  domainValid <- checkDomain newCN existingPK
+                  if domainValid
+                    then createAndRegisterCert sub
+                    else throwIO $ IdentityError "Public key at metadata endpoint not match one used to sign request"
+                else do
+                  let err = "Common names do not match between "
+                        <> (T.pack $ fromMaybe "" existingCN)
+                        <> " in the existing cert, and "
+                        <> (T.pack newCN)
+                        <> " in the subject info"
+                  $logErrorS "postIdentity" err
+                  throwIO $ ExistingIdentity err
+            _ -> do
+              let err = "There is no existing cert for address " <> T.pack (format existingA)
+              $logErrorS "postIdentity" err
+              throwIO $ IdentityError err
           _ -> do
-            let err = "There is no existing cert for address " <> T.pack (format existingA)
+            let err = "A cert already exists for address " <> T.pack (format newA)
             $logErrorS "postIdentity" err
-            throwIO $ IdentityError err
-        _ -> do
-          let err = "A cert already exists for address " <> T.pack (format newA)
-          $logErrorS "postIdentity" err
-          throwIO $ ExistingIdentity err
+            throwIO $ ExistingIdentity err
       Nothing -> do
         let err = "Could not recover address from signature"
         $logErrorS "postIdentity" err
@@ -169,6 +190,26 @@ postIdentity (PostIdentityRequest eMsg) = do
         $logErrorS "postIdentity" err
         throwIO $ IdentityError err
   pure $ PostIdentityResponse cert
+
+checkDomain ::
+  ( MonadIO m
+  , MonadLogger m
+  , MonadThrow m
+  ) => 
+  String -> 
+  PublicKey -> 
+  m Bool
+checkDomain domain pk = do 
+  mgr <- liftIO $ newManager tlsManagerSettings -- MUST BE TLS
+  url <- parseBaseUrl $ "https://" <> domain -- MUST BE TLS
+  let clientEnv = mkClientEnv mgr url
+  eresponse <- liftIO $ runClientM getMetaDataClient clientEnv
+  case eresponse of
+    Right MetadataResponse{nodePubKey = pk'} -> return $ pk == pk'
+    Left clienterr -> do
+      $logErrorS "checkDomain" $
+        T.pack $ "Error while attempting to call metadata data endpoint of domain " <> domain <> ": " <> show clienterr
+      throwIO $ IdentityError "Failed to reach metadata endpoint"
 
 blocEndpoint :: String
 blocEndpoint = "/bloc/v2.2"
@@ -197,8 +238,9 @@ certInCirrus ::
   BinaryOp String Address ->
   m [X509Certificate]
 certInCirrus op = do
-  nurl1 <- nodeUrl <$> access (Proxy @IdentityServerData)
-  response1 <- callCirrus nurl1
+  IdentityServerData{nodeUrl = nurl1, tokenEndpoint = te, clientId = ci, clientSecret = cs} <- access (Proxy @IdentityServerData)
+  mToken <- getAccessToken ci cs te
+  response1 <- callCirrus nurl1 mToken
   mCerts :: Either String [CertificateInCirrus] <-
     if statusCode (responseStatus response1) == 200
       then return . eitherDecode $ responseBody response1
@@ -237,8 +279,8 @@ certInCirrus op = do
       , restOfQuery
       ]
 
-    callCirrus :: (MonadIO m, MonadLogger m) => BaseUrl -> m (HTTP.Response BL.ByteString)
-    callCirrus nurl = do
+    callCirrus :: (MonadIO m, MonadLogger m) => BaseUrl -> Maybe AccessToken -> m (HTTP.Response BL.ByteString)
+    callCirrus nurl mToken = do
       let cirrusEndpoint = cirrusSearchPath op
           url = showBaseUrl nurl {baseUrlPath = baseUrlPath nurl <> cirrusEndpoint}
       $logErrorS "callCirrus" . T.pack $ cirrusEndpoint
@@ -247,7 +289,7 @@ certInCirrus op = do
         Http -> newManager defaultManagerSettings
         Https -> newManager tlsManagerSettings
       request <- liftIO $ parseRequest url
-      let rHead = [(hContentType, "application/json")]
+      let rHead = [(hContentType, "application/json")] ++ maybeToList ( ((hAuthorization, ) .  encodeUtf8 . T.append "Bearer " . access_token) <$> mToken )
       liftIO $ httpLbs request {requestHeaders = rHead} mgr
 
 createAndRegisterCert ::
@@ -284,10 +326,11 @@ registerCert ::
   X509Certificate ->
   m ()
 registerCert cert = do
-  IdentityServerData{nodeUrl = nurl} <- access (Proxy @IdentityServerData)
+  IdentityServerData{nodeUrl = nurl, tokenEndpoint = te, clientId = ci, clientSecret = cs} <- access (Proxy @IdentityServerData)
   mgr <- liftIO $ case baseUrlScheme nurl of
     Http -> newManager defaultManagerSettings
     Https -> newManager tlsManagerSettings
+  mToken <- getAccessToken ci cs te
   let clientEnv = mkClientEnv mgr nurl {baseUrlPath = baseUrlPath nurl <> blocEndpoint}
       txPayload =
         BlocFunction
@@ -301,7 +344,7 @@ registerCert cert = do
               functionpayloadMetadata = Nothing
             }
       txRequest = PostBlocTransactionRequest Nothing [txPayload] Nothing Nothing
-      postBlocTx = runClientM (postBlocTransactionParallel Nothing Nothing Nothing True False txRequest)
+      postBlocTx = runClientM (postBlocTransactionParallel ((T.append "Bearer " . access_token) <$> mToken) Nothing Nothing True False txRequest)
   eresponse <- liftIO $ postBlocTx clientEnv
   case eresponse of
     Right response ->
@@ -326,6 +369,7 @@ txSuccess _ = False
 server ::
   ( MonadUnliftIO m,
     MonadLogger m,
+    MonadThrow m,
     HasVault m,
     Accessible IdentityServerData m
   ) =>
