@@ -125,7 +125,7 @@ postIdentity (PostIdentityRequest eMsg) = do
           domainValid <- checkDomain (subCommonName sub) (subPub sub)
           if domainValid 
             then createAndRegisterCert sub
-            else throwIO $ ExistingIdentity "Public key at metadata endpoint not match one used to sign request"
+            else throwIO $ IdentityError "Public key at metadata endpoint not match one used to sign request"
         (cert:_) -> do
           let sub' = getCertSubject cert
               err =
@@ -150,30 +150,37 @@ postIdentity (PostIdentityRequest eMsg) = do
         let err = "Signer does not match public key in Subject"
         $logErrorS "postIdentity" err
         throwIO $ IdentityError err
-    Right s'@(Signed s@(Signed _ _) _) -> case (,) <$> (recoverAddress s) <*> (recoverAddress s') of -- existing identity
-      Just (existingA, newA) | newA == fromPublicKey (subPub sub) -> certInCirrus (Second newA) >>= \case
-        [] -> certInCirrus (Product (subCommonName sub) existingA) >>= \case
-          (c:_) -> do
-            let existingCN = (subCommonName <$> getCertSubject c)
-                newCN = subCommonName sub
-            if existingCN == Just newCN
-              then createAndRegisterCert sub
-              else do
-                let err = "Common names do not match between "
-                       <> (T.pack $ fromMaybe "" existingCN)
-                       <> " in the existing cert, and "
-                       <> (T.pack newCN)
-                       <> " in the subject info"
-                $logErrorS "postIdentity" err
-                throwIO $ ExistingIdentity err
+    Right s'@(Signed s@(Signed _ _) _) -> case (,) <$> (recoverSigned s) <*> (recoverSigned s') of -- existing identity
+      Just (existingPK, newPK) | newPK == subPub sub -> do 
+        let existingA = fromPublicKey existingPK
+            newA = fromPublicKey newPK
+        certInCirrus (Second newA) >>= \case
+          [] -> certInCirrus (Product (subCommonName sub) existingA) >>= \case
+            (c:_) -> do
+              let existingCN = (subCommonName <$> getCertSubject c)
+                  newCN = subCommonName sub
+              if existingCN == Just newCN
+                then do
+                  domainValid <- checkDomain newCN existingPK
+                  if domainValid
+                    then createAndRegisterCert sub
+                    else throwIO $ IdentityError "Public key at metadata endpoint not match one used to sign request"
+                else do
+                  let err = "Common names do not match between "
+                        <> (T.pack $ fromMaybe "" existingCN)
+                        <> " in the existing cert, and "
+                        <> (T.pack newCN)
+                        <> " in the subject info"
+                  $logErrorS "postIdentity" err
+                  throwIO $ ExistingIdentity err
+            _ -> do
+              let err = "There is no existing cert for address " <> T.pack (format existingA)
+              $logErrorS "postIdentity" err
+              throwIO $ IdentityError err
           _ -> do
-            let err = "There is no existing cert for address " <> T.pack (format existingA)
+            let err = "A cert already exists for address " <> T.pack (format newA)
             $logErrorS "postIdentity" err
-            throwIO $ IdentityError err
-        _ -> do
-          let err = "A cert already exists for address " <> T.pack (format newA)
-          $logErrorS "postIdentity" err
-          throwIO $ ExistingIdentity err
+            throwIO $ ExistingIdentity err
       Nothing -> do
         let err = "Could not recover address from signature"
         $logErrorS "postIdentity" err
