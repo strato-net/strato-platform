@@ -15,44 +15,20 @@
 
 module Blockchain.Sequencer.Monad
   ( MonadBlockstanbul,
-    Modification (..),
     SequencerContext (..),
     SequencerConfig (..),
     SequencerM,
-    HasNamespace (..),
     BlockPeriod (..),
     RoundPeriod (..),
-    isInNamespace,
-    fromNamespace,
-    lookupInLDB,
-    insertInLDB,
-    batchInsertInLDB,
-    deleteInLDB,
-    batchDeleteInLDB,
-    genericLookupSequencer,
-    genericInsertSequencer,
-    genericDeleteSequencer,
     runSequencerM,
     pairToVmTx,
     clearLdbBatchOps,
     flushLdbBatchOps,
-    addLdbBatchOps,
     clearDBERegistry,
     createFirstTimer,
     createNewTimer,
-    drainTMChan,
-    drainTimeouts,
     fuseChannels,
-    createWaitTimer,
-    dependentBlockDB,
-    seenTransactionDB,
-    dbeRegistry,
-    x509certInfoState,
-    getTransactionsDB,
-    ldbBatchOps,
-    blockstanbulContext,
     loopTimeout,
-    latestRoundNumber,
   )
 where
 
@@ -67,19 +43,20 @@ import Blockchain.Sequencer.DB.DependentBlockDB
 import Blockchain.Sequencer.DB.GetTransactionsDB
 import Blockchain.Sequencer.DB.SeenTransactionDB
 import Blockchain.Sequencer.Event
+import Blockchain.Sequencer.Kafka
 import Blockchain.Sequencer.Metrics
 import Blockchain.Strato.Model.Address
 import Blockchain.Strato.Model.Keccak256
 import Blockchain.Strato.Model.Secp256k1
 import qualified Blockchain.Strato.RedisBlockDB as RBDB
 import qualified Blockchain.Strato.RedisBlockDB.Models as RBDB
-import ClassyPrelude (STM, atomically)
+import ClassyPrelude (atomically)
 import Conduit
-import Control.Concurrent (forkIO, threadDelay)
+import Control.Concurrent (threadDelay)
 import Control.Concurrent.AlarmClock
 import Control.Concurrent.STM.TMChan
 import Control.Lens
-import Control.Monad (join, unless, void)
+import Control.Monad (unless)
 import qualified Control.Monad.Change.Alter as A
 import qualified Control.Monad.Change.Modify as Mod
 import Control.Monad.Composable.Kafka
@@ -90,13 +67,13 @@ import qualified Data.ByteString as B
 import qualified Data.ByteString.Char8 as C8
 import qualified Data.ByteString.Lazy as BL
 import Data.Conduit.TMChan
-import Data.Conduit.TQueue
 import Data.Foldable (foldl', toList)
 import Data.IORef
 import Data.Map (Map)
 import qualified Data.Map as M
 import Data.Maybe
 import qualified Data.Sequence as Q
+import Data.String
 import qualified Data.Text as T
 import Data.Time.Clock
 import qualified Database.LevelDB as LDB
@@ -180,19 +157,6 @@ class HasNamespace a where
   default namespaced :: Binary (NSKey a) => Mod.Proxy a -> NSKey a -> B.ByteString
   namespaced p = BL.toStrict . BL.append (namespace p) . encode
 
-isInNamespace :: HasNamespace a => Mod.Proxy a -> BL.ByteString -> Bool
-isInNamespace = BL.isPrefixOf . namespace
-
-fromNamespace ::
-  (HasNamespace a, Binary (NSKey a)) =>
-  Mod.Proxy a ->
-  BL.ByteString ->
-  Maybe (NSKey a)
-fromNamespace p bs =
-  if isInNamespace p bs
-    then Just . decode $ BL.drop (BL.length (namespace p)) bs
-    else Nothing
-
 instance HasNamespace X509CertInfoState where
   type NSKey X509CertInfoState = Address
   namespace _ = "cis:" -- make a namespace instance for new mapping
@@ -206,27 +170,8 @@ lookupInLDB p k =
   Mod.access Mod.Proxy >>= \db ->
     fmap (decode . BL.fromStrict) <$> LDB.get db LDB.defaultReadOptions (namespaced p k)
 
-insertInLDB ::
-  (Binary a, HasNamespace a, MonadIO m, Mod.Accessible LDB.DB m) =>
-  Mod.Proxy a ->
-  NSKey a ->
-  a ->
-  m ()
-insertInLDB p k v =
-  Mod.access Mod.Proxy >>= \db ->
-    LDB.put db LDB.defaultWriteOptions (namespaced p k) (BL.toStrict $ encode v)
-
 batchInsertInLDB :: (Binary a, HasNamespace a) => Mod.Proxy a -> NSKey a -> a -> LDB.BatchOp
 batchInsertInLDB p k v = LDB.Put (namespaced p k) (BL.toStrict $ encode v)
-
-deleteInLDB ::
-  (HasNamespace a, MonadIO m, Mod.Accessible LDB.DB m) =>
-  Mod.Proxy a ->
-  NSKey a ->
-  m ()
-deleteInLDB p k =
-  Mod.access Mod.Proxy >>= \db ->
-    LDB.delete db LDB.defaultWriteOptions (namespaced p k)
 
 batchDeleteInLDB ::
   HasNamespace a =>
@@ -403,7 +348,7 @@ runSequencerM c mbc m = do
 pairToVmTx :: (Timestamp, OutputTx) -> VmEvent
 pairToVmTx = uncurry VmTx
 
-clearDBERegistry :: SequencerM ()
+clearDBERegistry :: MonadState SequencerContext m => m ()
 clearDBERegistry = modify' $ dbeRegistry .~ M.empty
 
 createFirstTimer ::
@@ -438,20 +383,10 @@ createNewTimer rn = do
   next <- addUTCTime dt <$> liftIO getCurrentTime
   liftIO $ setAlarm alarm next
 
-drainTMChan :: TMChan a -> STM [a]
-drainTMChan ch = do
-  mx <- join <$> tryReadTMChan ch
-  case mx of
-    Nothing -> return []
-    Just x -> (x :) <$> drainTMChan ch
-
-drainTimeouts :: SequencerM [RoundNumber]
-drainTimeouts = join $ asks (atomically . drainTMChan . blockstanbulTimeouts)
-
 clearLdbBatchOps :: Mod.Modifiable (Q.Seq LDB.BatchOp) m => m ()
 clearLdbBatchOps = Mod.put (Mod.Proxy @(Q.Seq LDB.BatchOp)) Q.empty
 
-flushLdbBatchOps :: SequencerM ()
+flushLdbBatchOps :: (MonadMonitor m, HasDependentBlockDB m, Mod.Modifiable (Q.Seq LDB.BatchOp) m, MonadState SequencerContext m) => m ()
 flushLdbBatchOps = do
   pendingLDBWrites <- use ldbBatchOps
   applyLDBBatchWrites $ toList pendingLDBWrites
@@ -466,22 +401,15 @@ addLdbBatchOps ops = Mod.modify_ (Mod.Proxy @(Q.Seq LDB.BatchOp)) $ \existingOps
 
 fuseChannels :: SequencerM (ConduitM () SeqLoopEvent SequencerM ())
 fuseChannels = do
-  unseq <- asks $ unseqEvents . cablePackage
+  --unseq <- asks $ unseqEvents . cablePackage
   timers <- asks blockstanbulTimeouts
-  loop <- use loopTimeout
+  let k = kafkaConfig ethConf
+      kafkaAddress = (fromString $ kafkaHost k, fromIntegral $ kafkaPort k)
+
   let debugLog = (.| iterMC ($logDebugS "fuseChannels" . T.pack . format))
   (debugLog . transPipe lift)
     <$> mergeSources
-      [ sourceTBQueue unseq .| mapC UnseqEvent,
-        sourceTMChan timers .| mapC TimerFire,
-        sourceTMChan loop .| mapC (const WaitTerminated)
+      [ conduitBatchSource "conduitSource" "sequencer" kafkaAddress unseqEventsTopicName .| mapC UnseqEvents,
+        sourceTMChan timers .| mapC TimerFire
       ]
       4096 -- 🙏
-
-createWaitTimer :: Int -> SequencerM ()
-createWaitTimer dt = do
-  lch <- use loopTimeout
-  $logDebugS "createWaitTimer" . T.pack . show $ dt
-  void . liftIO . forkIO $ do
-    threadDelay dt
-    atomically (writeTMChan lch ())

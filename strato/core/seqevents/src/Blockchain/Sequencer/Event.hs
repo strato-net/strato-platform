@@ -44,14 +44,12 @@ import Text.Tools
 
 data SeqLoopEvent
   = TimerFire PBFT.RoundNumber
-  | UnseqEvent IngestEvent
-  | WaitTerminated
+  | UnseqEvents [IngestEvent]
   deriving (Eq, Show, GHCG.Generic)
 
 instance Format SeqLoopEvent where
   format (TimerFire rn) = "TimerFire " ++ format rn
-  format (UnseqEvent ev) = "UnseqEvent " ++ format ev
-  format WaitTerminated = "WaitTerminated"
+  format (UnseqEvents ev) = "UnseqEvents " ++ format ev
 
 class ShowConstructor a where
   showConstructor :: a -> String
@@ -641,7 +639,7 @@ instance Arbitrary JsonRpcCommand where
 -- has to go down here because of Lens TH shenanigans
 data BatchSeqLoopEvent = BatchSeqLoopEvent
   { _timerFires :: [PBFT.RoundNumber],
-    _ingestEvents :: [IngestEvent]
+    _ingestEvents :: [[IngestEvent]]
   }
 
 makeLenses ''BatchSeqLoopEvent
@@ -654,5 +652,4 @@ batchSeqLoopEvents = foldr f emptyBatchSeqLoopEvent
   where
     f s b = case s of
       TimerFire r -> (timerFires %~ (r :)) b
-      UnseqEvent r -> (ingestEvents %~ (r :)) b
-      WaitTerminated -> b
+      UnseqEvents r -> (ingestEvents %~ (r :)) b

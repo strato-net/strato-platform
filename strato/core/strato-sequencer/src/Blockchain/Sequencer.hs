@@ -42,18 +42,21 @@ import Blockchain.Strato.Model.Validator
 import ClassyPrelude (atomically)
 import Conduit
 import Control.Concurrent hiding (yield)
-import Control.Concurrent.STM.TBQueue
 import Control.Concurrent.STM.TQueue
 import Control.Lens
-import Control.Monad (forM, unless, when)
+import Control.Monad (forever, forM, unless, when)
 import qualified Control.Monad.Change.Alter as A
 import qualified Control.Monad.Change.Modify as Mod
+import Control.Monad.Composable.Kafka
+import Control.Monad.State.Class
 import Control.Monad.Reader
 import Data.Foldable
 import Data.Maybe
 import Data.Proxy
+import Data.Sequence (Seq)
 import qualified Data.Text as T
 import Data.Time.Clock
+import Database.LevelDB.Types
 import Prometheus as P
 import Text.Format
 import Text.Printf
@@ -141,24 +144,36 @@ sequencer validators = do
             putBlockstanbulContext $ ctx { _selfCert = Just chainm }
       Nothing -> logF "Awaiting node identity verification..."
   logF "Sequencer startup"
-  source <- sealConduitT <$> fuseChannels
+  source <- fuseChannels
   bootstrapBlockstanbul
   logF "Sequencer initialized"
   flush
-  go source
-  where
-    go :: SealedConduitT () SeqLoopEvent SequencerM () -> SequencerM ()
-    go src = oneSequencerIter src >>= go
+  runConduit $ source .| oneSequencerIter
 
-oneSequencerIter :: SealedConduitT () SeqLoopEvent SequencerM () -> SequencerM (SealedConduitT () SeqLoopEvent SequencerM ())
-oneSequencerIter src = timeAction seqLoopTiming $ do
-  (src', events) <- readEventsInBufferedWindow src
-  BatchSeqEvent {..} <- runSequencerBatch events
+oneSequencerIter :: (
+                     MonadFail m,
+                     MonadReader SequencerConfig m,
+                     HasKafka m,
+                     HasDependentBlockDB m,
+                     Mod.Modifiable GetTransactionsDB m,
+                     MonadSequencer m,
+                     Mod.Modifiable (Seq BatchOp) m,
+                     MonadState SequencerContext m
+                    ) =>
+                    ConduitT SeqLoopEvent Void m ()
+oneSequencerIter = forever $ timeAction seqLoopTiming $ do
+  logFF "sequencer/events" "Reading from fused channels..."
+  maybeEvent <- await
+  let event = fromMaybe (error "input stream to sequencer closed, this shouldn't happen") maybeEvent
+
+  $logDebugS "sequencer/events" . T.pack $ format event
+
+  BatchSeqEvent {..} <- runSequencerBatch [event]
   txHashes <- unGetTransactionsDB <$> Mod.get (Mod.Proxy @GetTransactionsDB)
   let txHashesList = toList txHashes
       getTxs = if null txHashesList then [] else [P2pGetTx txHashesList]
       toP2p' = getTxs ++ _toP2p
-  flushLdbBatchOps
+  lift flushLdbBatchOps
 
   unless (null _toVm) $ do
     _ <- writeSeqVmEvents _toVm
@@ -168,37 +183,12 @@ oneSequencerIter src = timeAction seqLoopTiming $ do
     $logDebugS "sequencer" . T.pack $ "Wrote " ++ format toP2p' ++ " SeqEvents to P2P"
   unless (null _toUnseq) $ writeUnseqCheckpoints _toUnseq
   flush
-  return src'
 
-flush :: SequencerM ()
+flush :: (Mod.Modifiable GetTransactionsDB m, MonadState SequencerContext m) =>
+         m ()
 flush =
   clearDBERegistry
     >> clearGetTransactionsDB
-
-readEventsInBufferedWindow :: SealedConduitT () SeqLoopEvent SequencerM () -> SequencerM (SealedConduitT () SeqLoopEvent SequencerM (), [SeqLoopEvent])
-readEventsInBufferedWindow src = do
-  let logF = logFF "sequencer/events"
-  logF "Reading from fused channels..."
-  dt <- asks maxUsPerIter
-  uch <- asks $ unseqEvents . cablePackage
-  top <- atomically . tryPeekTBQueue $ uch
-  $logDebugS "sequencer/events" . T.pack $ "top event is: " ++ show top
-  -- There may be WaitTerminateds left over from the last iteration
-  -- This will block indefinitely if there are no real messages to process,
-  -- so `src` must be the only source of input to this thread.
-  (src', ()) <- src $$++ dropWhileC (== WaitTerminated)
-  -- Only append the WaitTerminateds once we are certain that we will not drop them
-  -- again
-  createWaitTimer dt
-  maxEvents <- asks maxEventsPerIter
-  -- Takes up to maxEvents for a single buffer, waiting only as long as maxUsPerIter
-  (src'', events) <-
-    src' $$++ takeWhileC (/= WaitTerminated)
-      .| takeC maxEvents
-      .| sinkList
-  $logDebugS "sequencer/events" . T.pack $ format events
-  logF . printf "read %d events from fused channels" $ length events
-  return (src'', events)
 
 runSequencerBatch ::
   MonadSequencer m =>
@@ -207,7 +197,7 @@ runSequencerBatch ::
 runSequencerBatch events = runBatch $ do
   let BatchSeqLoopEvent {..} = batchSeqLoopEvents events
   checkForTimeouts _timerFires
-  checkForUnseq _ingestEvents
+  forM_ _ingestEvents checkForUnseq
 
 checkForTimeouts ::
   ( MonadLogger m,
@@ -501,7 +491,8 @@ prettyTx IngestTx {itOrigin = o, itTransaction = t} = prefix t ++ " via " ++ sho
     shortOrigin (TO.PeerString peer) = "Peer " ++ take 8 peer
     shortOrigin x = format x
 
-writeUnseqCheckpoints :: [Checkpoint] -> SequencerM ()
+writeUnseqCheckpoints :: (MonadIO m, MonadReader SequencerConfig m) =>
+                         [Checkpoint] -> m ()
 writeUnseqCheckpoints events = do
   ch <- asks (unseqCheckpoints . cablePackage)
   atomically . mapM_ (writeTQueue ch) $ events
