@@ -106,7 +106,7 @@ const GlobalTransaction = ({ user }) => {
             <p style={{ color: '#827474' }} className="font-medium mt-2 min-h-20 cursor-default text-truncate"><Tooltip placement="top" title={data.assetDescription.replace(/<\/?[^>]+(>|$)/g, "")}> {data?.assetDescription.replace(/<\/?[^>]+(>|$)/g, "")} </Tooltip></p>
           </Col>
           <Col span={8} offset={1}>
-            {price
+            {(price || price!=='--')
               ? <p className="text-right flex justify-end items-center"> <b>$ {quantityIsDecimal === "True" ? (price * 100) : price} </b> &nbsp;(<span className="text-[#13188A] font-bold"> {(quantityIsDecimal === "True" ? (price * 100) : price) * STRATS_CONVERSION} </span>{StratsIcon}) </p>
               : <p className="text-right text-[#13188A] font-bold text-sm"> No Price Available  </p>}
           </Col>
@@ -247,7 +247,7 @@ const GlobalTransaction = ({ user }) => {
               icon={<img src={Images.ForwardIcon}
                 alt={metaImg}
                 title={metaImg}
-                className="hidden md:block w-6 h-6" />}> Feeds
+                className="hidden md:block w-6 h-6" />}> Global Transactions
             </Button>
           </Col>
         </Row>

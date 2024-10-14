@@ -27,7 +27,7 @@ export default {
   Items: { label: "Item", url: "/items" },
   Orders: { label: "Order", url: "/order/:type" },
   Transactions: { label: "Transactions", url: "/transactions" },
-  Feeds: { label: "Feed", url: "/feed" },
+  GlobalTransactions: { label: "Global Transactions", url: "/globalTransactions" },
   RedemptionsOutgoingDetails: { label: "Redemption Outgoing Detail", url: "/redemptions-outgoing/:redemptionService/:id" },
   RedemptionsIncomingDetails: { label: "Redemption Incoming Detail", url: "/redemptions-incoming/:redemptionService/:id" },
   SoldOrderDetails: { label: "Sold Order Detail", url: "/sold-orders/:id" },

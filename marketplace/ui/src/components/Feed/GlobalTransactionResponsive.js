@@ -116,7 +116,7 @@ const GlobalTransactionResponsive = ({ data , user}) => {
                 {type}
               </Button>
               {price ? <p className={`text-right flex justify-end items-center`}>
-                $ {formattedNum(price)} ({formattedNum(price * 100)} {StratsIcon})
+                $ {price} ({formattedNum(price * 100)} {StratsIcon})
               </p>
                 : <p className="text-right text-[#13188A] font-bold text-sm">No Price Available</p>}
               <p className="text-right">Qty: {formattedNum(quantity)}</p>

@@ -934,7 +934,7 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
 
    let data = await saleOrderJs.getAll(rawAdmin, args, getOptions);
    let saleAddressArr = [];
-   data = data.orders.map((item)=> {
+   data = data?.orders?.map((item)=> {
     if(item?.saleAddresses?.length){
       saleAddressArr.push(item?.saleAddresses[0])
      return {...item,saleAddress:item?.saleAddresses[0]}

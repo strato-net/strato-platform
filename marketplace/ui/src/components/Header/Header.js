@@ -148,13 +148,22 @@ const HeaderComponent = ({ user, loginUrl, showMenu, handleSubMenu, handleMenuTa
 
   const items = user ? [
     {
-      key: '3',
+      key: '4',
       label: (
         <div>
           <p>My Profile</p>
         </div>
       ),
       onClick: () => navigate(`${routes.MarketplaceUserProfile.url.replace(":commonName", user.commonName)}`)
+    },
+    {
+      key: '3',
+      label: (
+        <div>
+          <p>Global Transactions</p>
+        </div>
+      ),
+      onClick: () => navigate(routes.GlobalTransactions.url)
     },
     {
       key: '2',
@@ -249,6 +258,7 @@ const HeaderComponent = ({ user, loginUrl, showMenu, handleSubMenu, handleMenuTa
       path: routes.MarketplaceUserProfile.url.replace(':commonName', user.commonName),
       label: (<div> <p className="!mb-0"> My Profile </p> </div>)
     } : null,
+    { value: "GlobalTransactions", path: "/globalTransactions", label: "Global Transactions" },
     user ? {
       value: "logout",
       path: "/logout",
