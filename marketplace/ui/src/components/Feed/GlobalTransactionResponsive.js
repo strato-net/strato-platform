@@ -120,7 +120,7 @@ const GlobalTransactionResponsive = ({ data , user}) => {
               </p>
                 : <p className="text-right text-[#13188A] font-bold text-sm">No Price Available</p>}
               <p className="text-right">Qty: {formattedNum(quantity)}</p>
-              <p className="text-right">{moment(block_timestamp.replace(/-/g, "/")).format('L')}</p>
+              <p className="text-right">{moment(block_timestamp.replace(/-/g, "/")).fromNow()}</p>
             </Col>
             {isExpanded && <Col span={24}>
               <Table className="mt-6" columns={columns} dataSource={tableData} pagination={false} />

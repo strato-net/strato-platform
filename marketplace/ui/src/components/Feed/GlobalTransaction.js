@@ -22,7 +22,7 @@ import {
   DOWNLOAD_OPTIONS, REDEMPTION_STATUS, REDEMPTION_STATUS_CLASSES, US_DATE_FORMAT
 } from "../../helpers/constants";
 import { SEO } from "../../helpers/seoConstant";
-import { getStringDate } from "../../helpers/utils";
+import { getAgoTime, getStringDate } from "../../helpers/utils";
 import { TRANSACTION_FILTER } from "../Order/constant";
 import { useCategoryState } from "../../contexts/category";
 import GlobalTransactionResponsive from "./GlobalTransactionResponsive";
@@ -187,7 +187,7 @@ const GlobalTransaction = ({ user }) => {
       dataIndex: "date",
       key: "date",
       width: '150px',
-      render: (text, { createdDate }) => <p>{getStringDate(createdDate, US_DATE_FORMAT)}</p>,
+      render: (text, { createdDate }) => <p>{getAgoTime(createdDate, US_DATE_FORMAT)}</p>,
       title: (
         <div style={{ display: "flex" }}>
           <div>{"Date"}</div>
