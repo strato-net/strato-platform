@@ -52,7 +52,7 @@ function generateHtmlContent(customerFirstName, concatenatedOrderString) {
         <div class="container">
             <h2>Hello <strong>${customerFirstName},</strong></h2>
             
-            <p>Thank you for shopping with us. Your recent order on the BlockApps Mercata Marketplace has been successfully processed. Below are the details of your purchase:</p>
+            <p>Thank you for shopping with us. Your recent order on the David Nallapu Mercata Marketplace has been successfully processed. Below are the details of your purchase:</p>
             
             <ul>
                 ${concatenatedOrderString}
@@ -63,7 +63,7 @@ function generateHtmlContent(customerFirstName, concatenatedOrderString) {
             <div class="signature">
             <img class="logo" src="https://blockapps.net/wp-content/uploads/2022/08/blockapps-avatar.jpg" alt="Logo" />
 
-                <h3 class="logo-text">BlockApps Mercata Marketplace <a href="https://blockapps.net/products/strato-mercata/" rel="noopener noreferrer"><em>powered by STRATO Mercata™</em><a></h3>
+                <h3 class="logo-text">David Nallapu Mercata Marketplace <a href="https://blockapps.net/products/strato-mercata/" rel="noopener noreferrer"><em>powered by STRATO Mercata™</em><a></h3>
             </div>
             <p class="footer">This email was sent from a notification-only address and cannot accept incoming email. Please do not reply to this message.</p>
         </div>
@@ -126,7 +126,7 @@ function generateHtmlContent(customerFirstName, concatenatedOrderString) {
         <div class="container">
             <h2>Hello <strong>${customerFirstName},</strong></h2>
             
-            <p>Your recent order on the BlockApps Mercata Marketplace has been canceled due to a payment failure:</p><br><br>
+            <p>Your recent order on the David Nallapu Mercata Marketplace has been canceled due to a payment failure:</p><br><br>
             
             <ul>
                 <p><b>
@@ -146,7 +146,7 @@ function generateHtmlContent(customerFirstName, concatenatedOrderString) {
             <div class="signature">
             <img class="logo" src="https://blockapps.net/wp-content/uploads/2022/08/blockapps-avatar.jpg" alt="Logo" />
 
-                <h3 class="logo-text">BlockApps Mercata Marketplace <a href="https://blockapps.net/products/strato-mercata/" rel="noopener noreferrer"><em>powered by STRATO Mercata™</em><a></h3>
+                <h3 class="logo-text">David Nallapu Mercata Marketplace <a href="https://blockapps.net/products/strato-mercata/" rel="noopener noreferrer"><em>powered by STRATO Mercata™</em><a></h3>
             </div>
             <p class="footer">This email was sent from a notification-only address and cannot accept incoming email. Please do not reply to this message.</p>
         </div>

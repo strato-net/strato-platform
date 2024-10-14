@@ -29,7 +29,7 @@ class SearchResults extends Component {
     }.bind(this));
 
     const appsList = [{
-      appName: "BlockApps Bucks",
+      appName: "David Nallapu Bucks",
       urlToApp: 'https://blockappsbucks.mercata-testnet.blockapps.net/ ',
       description: 'STRATO Mercata is home to a wide range of applications to help you complete your business faster, easier, and more securely. Transact with trusted partners for all of your business needs with real, fiat currency - no speculation and no gimmicks. Start using STRATO Mercata with one of the apps below.',
       icon: "fa fa-window-restore"

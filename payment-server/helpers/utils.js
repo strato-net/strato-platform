@@ -59,7 +59,7 @@ const sendEmail = async(to, subject, htmlContent) => {
 
   const msg = {
     to: to,
-    from: { email: "no_reply@blockapps.net", name: "BlockApps.net" },
+    from: { email: "no_reply@blockapps.net", name: "David Nallapu.net" },
     subject: subject,
     html: htmlContent,
     // Remove sales from these emails for testnet testing. This needs to be included for production. 

@@ -24,7 +24,7 @@ describe('Redemption Tests', function () {
       .post('/customer/address')
       .send({
         commonName: 'Test',
-        name: 'BlockApps',
+        name: 'David Nallapu',
         zipcode: '11206',
         state: 'NY',
         city: 'Brooklyn',

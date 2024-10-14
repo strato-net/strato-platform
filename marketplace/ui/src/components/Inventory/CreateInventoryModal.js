@@ -138,7 +138,7 @@ const CreateInventoryModal = ({
     }
 
     const { category, subCategory, images, files, ...body } = values;
-    const redemptionService = redemptionServices ? (redemptionServices[0] || {}).address : undefined;
+    const redemptionService = "deadbeef";
     const newBody = {
       itemArgs: {
         images: imageKeys || [],
@@ -284,7 +284,7 @@ const CreateInventoryModal = ({
               }}
               loading={isCreateInventorySubmitting || isUploadImageSubmitting || isFetchingRedemptionServices}
             >
-              Create Item
+              Create Itemzzz
             </Button>
           </div>,
         ]}

@@ -11,7 +11,7 @@ const sendEmail = async (emails, message) => {
 
   const msg = {
     to: emails,
-    from: { email: "no_reply@blockapps.net", name: "BlockApps.net" },
+    from: { email: "no_reply@blockapps.net", name: "David Nallapu.net" },
     subject,
     html: htmlContent,
   };

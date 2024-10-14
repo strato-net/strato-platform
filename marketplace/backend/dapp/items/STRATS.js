@@ -213,13 +213,7 @@ async function getAllOwnershipEvents(admin, args = {}, options) {
 }
 
 function getStratsAddress() {
-    if (process.env.networkID === constants.prodNetworkId) {
-        return constants.prodStratsAddress
-    } else if (process.env.networkID === constants.testnetNetworkId) {
         return constants.testnetStratsAddress
-    } else {
-        return constants.prodStratsAddress
-    }
 }
 
 export default {

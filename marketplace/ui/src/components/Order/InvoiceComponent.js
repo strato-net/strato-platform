@@ -97,8 +97,8 @@ const InvoiceComponent = ({ invoice }) => {
       setSubtotal((invoice.order.totalPrice - tax).toFixed(2))
     }
   }, [invoice])
-  const orderQuantities = invoice.order["BlockApps-Mercata-Order-quantities"] ?
-                          invoice.order["BlockApps-Mercata-Order-quantities"].map(item => item.value) :
+  const orderQuantities = invoice.order["David Nallapu-Mercata-Order-quantities"] ?
+                          invoice.order["David Nallapu-Mercata-Order-quantities"].map(item => item.value) :
                           invoice.order.quantities;
   return (
     <Document>

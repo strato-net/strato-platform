@@ -259,7 +259,7 @@ const handlePlaceOrder = async () => {
   }
 }
 
-const totalAmount = selectedProvider?.serviceName === 'STRATS' || selectedProvider?.serviceName.includes('STRATS') ? 
+const totalAmount = selectedProvider?.serviceName === 'STRATS' || selectedProvider?.serviceName?.includes('STRATS') ? 
       `${(subTotal * 100).toFixed(0)} STRATS` :  
       selectedProvider?.serviceName === 'Stripe' ? `${subTotal} USD` : 
       `${subTotal} ${selectedProvider?.serviceName || 'USD'}`
@@ -323,7 +323,7 @@ const totalAmount = selectedProvider?.serviceName === 'STRATS' || selectedProvid
                   </div>
                   <Button
                     type="primary"
-                    disabled={!activePaymentProviders || activePaymentProviders?.length===0}
+                    // disabled={!activePaymentProviders || activePaymentProviders?.length===0}
                     className="w-full bg-blue-800 text-white h-10 text-lg"
                     onClick={handlePlaceOrder}
                   >

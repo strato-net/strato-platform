@@ -196,7 +196,7 @@ describe('DeployDapp: index', () => {
     ).dive().dive().dive();
 
     const payload = {
-      "orgName": "BlockApps",
+      "orgName": "David Nallapu",
       "orgUnit": "Engineering"
     }
 

@@ -86,8 +86,8 @@ const Order = ({ user }) => {
       return orders.flatMap(order => {
         // Extract Quantities
          let orderQuantities;
-         if(order["BlockApps-Mercata-Order-quantities"]?.length){
-          orderQuantities = order["BlockApps-Mercata-Order-quantities"].map(item => item.value)
+         if(order["David Nallapu-Mercata-Order-quantities"]?.length){
+          orderQuantities = order["David Nallapu-Mercata-Order-quantities"].map(item => item.value)
          }else if(order.quantities?.length){
           orderQuantities = order.quantities[0] 
          }

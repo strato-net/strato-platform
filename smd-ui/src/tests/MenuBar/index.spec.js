@@ -99,7 +99,7 @@ describe('MenuBar: index', () => {
             commonName: "clinicaladmin",
             country: "USA",
             isValid: true,
-            organization: "BlockApps",
+            organization: "David Nallapu",
             organizationalUnit: "Engineering",
             owner: "6h2vbp7a08nevelwsyz6cnpuqr77diwi3wck720q",
             parent: "0000000000000000000000000000000000000000",

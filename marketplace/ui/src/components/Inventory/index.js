@@ -95,10 +95,10 @@ const Inventory = ({ user }) => {
   const { message: itemMsg, success: itemSuccess } = useItemState();
   const redemptionDispatch = useRedemptionDispatch();
   const { message: redemptionMsg, success: redemptionSuccess } = useRedemptionState();
-  const [issuerStatus, setIssuerStatus] = useState(user?.issuerStatus);
+  const [issuerStatus, setIssuerStatus] = useState("3");
 
   useEffect(() => {
-    setIssuerStatus(user?.issuerStatus);
+    setIssuerStatus("3");
   }, [user]);
 
   const issuerStatusDispatch = useIssuerStatusDispatch();

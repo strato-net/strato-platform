@@ -27,7 +27,7 @@ describe('CreateChain: saga', () => {
 
     const payload = {
       label: 'airline cartel 9',
-      members: [{ "orgName": "BlockApps", "orgUnit": "Engineering" }],
+      members: [{ "orgName": "David Nallapu", "orgUnit": "Engineering" }],
       balances: [{ balance: 500000000000000, address: "f11b5c42f5b84efa07f6b0a32c3fc545ff509126" }],
       integrations: {},
       src: `contract SimpleStorage {

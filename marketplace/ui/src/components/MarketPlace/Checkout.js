@@ -106,8 +106,8 @@ const Checkout = () => {
           key: item.product.address,
           item: {
             name: item.product.name,
-            image: (item.product["BlockApps-Mercata-Asset-images"] && item.product["BlockApps-Mercata-Asset-images"].length > 0)
-              ? item.product["BlockApps-Mercata-Asset-images"][0].value
+            image: (item.product["David Nallapu-Mercata-Asset-images"] && item.product["David Nallapu-Mercata-Asset-images"].length > 0)
+              ? item.product["David Nallapu-Mercata-Asset-images"][0].value
               : image_placeholder,
             status: "Active",
           },

@@ -65,7 +65,7 @@ describe('CreateChain: index', () => {
 
       // on address radio selection
       wrapper.find('Field').first().simulate('click');
-      wrapper.find('Field').at(1).simulate('change', { target: { value: 'BlockApps' } });
+      wrapper.find('Field').at(1).simulate('change', { target: { value: 'David Nallapu' } });
       wrapper.find('Field').at(2).simulate('change', { target: { value: 'Engineering' } });
       wrapper.find('Field').at(3).simulate('change', { target: { value: 'James Hormuzdiar' } });
       wrapper.find('Field').at(4).simulate('change', { target: { value: true } });
@@ -73,7 +73,7 @@ describe('CreateChain: index', () => {
 
       // on user radio selection
       wrapper.find('Field').at(1).simulate('click');
-      wrapper.find('Field').at(1).simulate('change', { target: { value: 'BlockApps' } });
+      wrapper.find('Field').at(1).simulate('change', { target: { value: 'David Nallapu' } });
       wrapper.find('Field').at(2).simulate('change', { target: { value: 'Engineering' } });
       wrapper.find('Field').at(3).simulate('change', { target: { value: 'James Hormuzdiar' } });
       wrapper.find('Field').at(4).simulate('change', { target: { value: false } });
@@ -160,7 +160,7 @@ describe('CreateChain: index', () => {
         ).dive().dive().dive();
 
         expect(wrapper.state()).toMatchSnapshot();
-        wrapper.find('Field').at(1).simulate('change', { target: { value: 'BlockApps' } });
+        wrapper.find('Field').at(1).simulate('change', { target: { value: 'David Nallapu' } });
         wrapper.find('Field').at(2).simulate('change', { target: { value: 'Engineering' } });
         wrapper.find('Field').at(3).simulate('change', { target: { value: 'James Hormuzdiar' } });
         expect(wrapper.state()).toMatchSnapshot();

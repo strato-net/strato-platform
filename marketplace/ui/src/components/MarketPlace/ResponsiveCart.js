@@ -185,7 +185,7 @@ const ResponsiveCart = ({
     }
   }
 
-  const totalAmount = selectedProvider?.serviceName === 'STRATS' || selectedProvider?.serviceName.includes('STRATS') ? 
+  const totalAmount = selectedProvider?.serviceName === 'STRATS' || selectedProvider?.serviceName?.includes('STRATS') ? 
              `${(subTotal * 100).toFixed(0)} STRATS` :  
              selectedProvider?.serviceName === 'Stripe' ? `${subTotal} USD` : 
              `${subTotal} ${selectedProvider?.serviceName || 'USD'}`
@@ -332,7 +332,7 @@ const ResponsiveCart = ({
           </div>
           <Button
             type="primary"
-            disabled={!paymentServices || paymentServices?.length===0}
+            // disabled={!paymentServices || paymentServices?.length===0}
             className="w-full mt-3 mb-6 bg-blue-800 text-white h-10 text-lg"
             onClick={()=>{handlePlaceOrder(selectedProvider)}}
           >

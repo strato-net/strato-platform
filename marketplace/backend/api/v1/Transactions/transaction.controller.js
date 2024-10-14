@@ -4,8 +4,8 @@ const getItemQuantity = (item) => {
         return item.quantity;
     } else if (item.quantities?.length) {
         return item.quantities[0]
-    } else if (item['BlockApps-Mercata-Order-quantities']?.length) {
-        return item['BlockApps-Mercata-Order-quantities'][0]?.value
+    } else if (item['David Nallapu-Mercata-Order-quantities']?.length) {
+        return item['David Nallapu-Mercata-Order-quantities'][0]?.value
     } else {
         return ''
     }
@@ -86,8 +86,8 @@ class TransactionController {
                 });
 
                 const getImage=(assetItem)=> {
-                    if(assetItem && assetItem["BlockApps-Mercata-Asset-images"]?.length ){
-                        return assetItem["BlockApps-Mercata-Asset-images"][0].value;
+                    if(assetItem && assetItem["David Nallapu-Mercata-Asset-images"]?.length ){
+                        return assetItem["David Nallapu-Mercata-Asset-images"][0].value;
                     }else if (item.image){
                         return item.image;
                     }else{
