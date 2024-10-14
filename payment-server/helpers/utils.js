@@ -12,6 +12,7 @@ import lodash from 'lodash';
 const { get } = lodash;
 import sgMail from "@sendgrid/mail";
 import oauthHelper from './oauthHelper.js';
+import axios from 'axios';
 sgMail.setApiKey(SENDGRID_ENV.API_KEY);
 
 // Fetches Asset Name based on sale address
@@ -59,7 +60,7 @@ const prepareOrderData = (orderDetails, assetData) => {
 const sendEmail = async(to, subject, htmlContent) => {
 
   const url = process.env.NOTIFICATION_SERVER_URL
-  token = await oauthHelper.getServiceToken()
+  const {token } = await oauthHelper.getServiceToken()
   const reqBody = {
     usernames: [to],
     message: {
