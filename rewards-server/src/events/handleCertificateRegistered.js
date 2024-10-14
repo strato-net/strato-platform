@@ -3,10 +3,11 @@ const {
   NODE_ENV,
   prodMarketplaceUrl,
   testnetMarketplaceUrl,
+  notificationUrl
 } = require("../config");
 const { getRewards } = require("../helper/googleSheet.js");
 const axios = require("axios");
-const { sendEmail } = require("../helper/utils.js");
+const { sendEmail, getUserName } = require("../helper/utils.js");
 
 async function handleCertificateRegistered(event, token) {
   const baseUrl = NODE_ENV === "prod" ? prodMarketplaceUrl : testnetMarketplaceUrl
@@ -36,7 +37,7 @@ async function handleCertificateRegistered(event, token) {
       }
     );
 
-    if (queryResponse!==200) {
+    if (queryResponse.status !==200) {
       const errorText = await queryResponse.text();
       console.error(
         `Error: ${queryResponse.status} ${queryResponse.statusText}`
@@ -108,7 +109,7 @@ async function handleCertificateRegistered(event, token) {
 
     const body = await response.data;
     const purchaserName = await getUserName(baseUrl, queryBody[0].userAddress, token)
-    sendEmail(baseUrl, 'newRegistration', purchaserName, token );
+    sendEmail(baseUrl, notificationUrl, 'newRegistration', purchaserName, token );
     
     console.log("New registration reward successful:", body);
   } catch (error) {
