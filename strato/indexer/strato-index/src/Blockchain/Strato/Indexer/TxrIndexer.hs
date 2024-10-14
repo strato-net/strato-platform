@@ -18,8 +18,6 @@ import Blockchain.Data.DataDefs (EventDB (..), LogDB (..), TransactionResult (..
 import qualified Blockchain.Data.LogDB as LogDB
 import Blockchain.Data.TransactionDef (formatChainId)
 import Blockchain.Data.ValidatorRef
-import Blockchain.Sequencer.Event
-import Blockchain.Sequencer.Kafka
 import Blockchain.Strato.Indexer.IContext
 import Blockchain.Strato.Indexer.Kafka
 import Blockchain.Strato.Indexer.Model
@@ -56,7 +54,6 @@ doAddOrgName chainId cm = do
     ]
   addMember chainId cm
   void . execRedis $ RBDB.addChainMember chainId cm
-  void $ writeUnseqEvents [IENewChainOrgName chainId cm]
 
 doRemoveOrgName :: (MonadLogger m, HasRedis m, HasSQL m) =>
                    Word256 -> ChainMemberParsedSet -> m ()
@@ -80,7 +77,6 @@ doRegisterCertificate userAddress x509CertInfoState = do
       format x509CertInfoState
     ]
   void . execRedis $ RBDB.registerCertificate userAddress x509CertInfoState
-  void $ writeUnseqEvents [IENewCertRegistered userAddress x509CertInfoState]
 
 doRevokeCertificate :: (MonadLogger m, HasKafka m, HasRedis m) =>
                        Address -> m ()
@@ -90,7 +86,6 @@ doRevokeCertificate userAddress = do
       format userAddress
     ]
   void . execRedis $ RBDB.revokeCertificate userAddress
-  void $ writeUnseqEvents [IECertRevoked userAddress]
 
 doValidatorAdded :: (MonadLogger m, HasKafka m, HasRedis m, HasSQL m) =>
                     Keccak256 -> Validator -> m ()
@@ -103,7 +98,6 @@ doValidatorAdded bHash cm = do
     ]
   addRemoveValidator ([], [cm])
   void . execRedis $ RBDB.addValidators [cm]
-  void $ writeUnseqEvents [IEValidatorAdded bHash cm]
 
 doValidatorRemoved :: (MonadLogger m, HasKafka m, HasRedis m, HasSQL m) =>
                       Keccak256 -> Validator -> m ()
@@ -116,7 +110,6 @@ doValidatorRemoved bHash cm = do
     ]
   addRemoveValidator ([cm], [])
   void . execRedis $ RBDB.removeValidators [cm]
-  void $ writeUnseqEvents [IEValidatorRemoved bHash cm]
 
 txrIndexerMainLoop :: (MonadLogger m, HasKafka m, HasRedis m, HasSQL m) =>
                       m ()

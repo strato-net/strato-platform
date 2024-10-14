@@ -1,8 +1,5 @@
 import { Breadcrumb, notification } from "antd";
 import React, { useEffect, useState } from "react";
-import { useLocation, useNavigate } from "react-router-dom";
-import dayjs from "dayjs";
-
 import routes from "../../helpers/routes";
 import ClickableCell from "../ClickableCell";
 import * as XLSX from 'xlsx';
@@ -10,8 +7,8 @@ import { saveAs } from 'file-saver';
 import { actions as categoryActions } from "../../contexts/category/actions";
 import { useCategoryState, useCategoryDispatch } from "../../contexts/category";
 import startCase from 'lodash/startCase';
-import { epochToDate } from "../../helpers/utils";
-import { ORDER_STATUS, REDEMPTION_STATUS, TRANSACTION_STATUS } from "../../helpers/constants";
+import { epochToDate, getStringDate, groupBy } from "../../helpers/utils";
+import { REDEMPTION_STATUS, TRANSACTION_STATUS, US_DATE_FORMAT } from "../../helpers/constants";
 import TransactionTable from "./TransactionTable";
 import { useTransactionState } from "../../contexts/transaction";
 
@@ -65,18 +62,19 @@ const Transaction = ({ user }) => {
     try {
       return transactions.map(transaction => {
         const { category, subCategory } = getCategoryAndSubcategory(transaction.assetContractName);
+        let quantityIsDecimal = transaction.quantityIsDecimal && transaction.quantityIsDecimal === "True";
         return formatDataObject({
           reference: transaction?.reference,
           type: transaction?.type,
           category,
           subCategory,
           assetName: transaction?.assetName,
-          Price: transaction?.price,
-          quantity: transaction?.quantity,
+          Price: quantityIsDecimal ? Number((transaction?.price * 100).toFixed(2)) : transaction?.price,
+          quantity: quantityIsDecimal ? Number((transaction?.quantity / 100).toFixed(2)) : transaction?.quantity,
           from: transaction.from,
           to: transaction.to,
           hash: transaction.transaction_hash,
-          date: transaction?.block_timestamp,
+          date: getStringDate(transaction?.createdDate, US_DATE_FORMAT),
           Status: transaction?.type === "Transfer" ? 'Closed' : (transaction?.type === "Redemption"
             ? REDEMPTION_STATUS[transaction.status]
             : TRANSACTION_STATUS[transaction.status])
@@ -90,7 +88,7 @@ const Transaction = ({ user }) => {
 
   useEffect(() => {
     const mappedData = mapTransactionData(userTransactions)
-    const { Order, Redemption, Transfer } = Object.groupBy(mappedData, ({ Type }) => Type);
+    const { Order, Redemption, Transfer } = groupBy(mappedData, ({ Type }) => Type);
     if (userTransactions && callExcel && !isTransactionLoading) {
       const wb = XLSX.utils.book_new();
       const wsOrder = XLSX.utils.json_to_sheet(Order ? Order : []);

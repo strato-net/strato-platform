@@ -1,10 +1,9 @@
 import React, { useEffect, useState } from "react";
-import { Button, Dropdown, Space, Typography, Input, Row, Col, Popover, Card, Tooltip, Select, DatePicker, Spin } from "antd";
+import { Button, Dropdown, Space, Input, Row, Col, Popover, Card, Tooltip, Select, DatePicker, Spin } from "antd";
 import { DownloadOutlined, SearchOutlined } from "@ant-design/icons";
 import { useNavigate, useLocation } from "react-router-dom";
 import classNames from "classnames";
 import dayjs from "dayjs";
-import moment from "moment";
 // Components
 import DataTableComponent from "../DataTableComponent";
 import { TRANSACTION_FILTER } from "./constant";
@@ -15,14 +14,17 @@ import { Images } from "../../images";
 import TransactionResponsive from "./TransactionResponsive";
 // Actions
 import { actions as transactionAction } from "../../contexts/transaction/actions";
+import { actions as marketplaceActions } from "../../contexts/marketplace/actions";
 // Dispatch & States
 import { useTransactionDispatch, useTransactionState } from "../../contexts/transaction";
+import { useMarketplaceDispatch, } from "../../contexts/marketplace";
 // Utils & Constants
 import {
-  STRATS_CONVERSION, TRANSACTION_STATUS, TRANSACTION_STATUS_CLASSES, TRANSACTION_SORT,
-  TRANSACTION_STATUS_COLOR, DOWNLOAD_OPTIONS, REDEMPTION_STATUS, REDEMPTION_STATUS_CLASSES
+  STRATS_CONVERSION, TRANSACTION_STATUS, TRANSACTION_STATUS_CLASSES, TRANSACTION_STATUS_COLOR, 
+  DOWNLOAD_OPTIONS, REDEMPTION_STATUS, REDEMPTION_STATUS_CLASSES, US_DATE_FORMAT
 } from "../../helpers/constants";
 import { SEO } from "../../helpers/seoConstant";
+import { getStringDate } from "../../helpers/utils";
 
 const limit = '', offset = '';
 
@@ -30,6 +32,7 @@ const TransactionTable = ({ user, download, isAllOrdersLoading }) => {
   const StratsIcon = <img src={Images.logo} alt="" className="mx-1 w-3 h-3" />
   // Dispatch
   const transactionDispatch = useTransactionDispatch();
+  const marketplaceDispatch = useMarketplaceDispatch();
   // States
   const { userTransactions, globalTransaction, isTransactionLoading } = useTransactionState();
 
@@ -41,12 +44,22 @@ const TransactionTable = ({ user, download, isAllOrdersLoading }) => {
   const [type, setType] = useState("");
   const [dateQuery, setDateQuery] = useState("");
   const [transactions, setTransactions] = useState(userTransactions)
+  const [originAddress, setOriginAddress] = useState("");
   const [search, setSearch] = useState("")
 
   const formatter = new Intl.NumberFormat('en-US');
   const formattedNum = (num) => formatter.format(num);
   const defaultDate =  dateQuery ? dayjs.unix(dayjs(dateQuery).startOf('month').unix()) : dayjs.unix(currentMonth);
 
+  useEffect(() => {
+    async function fetchStratsAddress() {
+      const stratsAddress = await marketplaceActions.fetchStratsAddress(marketplaceDispatch);
+      await marketplaceActions.fetchStratsBalance(marketplaceDispatch);
+      setOriginAddress(stratsAddress);
+    }
+    fetchStratsAddress();
+  }, [marketplaceDispatch]);
+  
   useEffect(() => {
     if (user?.commonName && dateQuery) {
       transactionAction.fetchUserTransaction(
@@ -75,7 +88,6 @@ const TransactionTable = ({ user, download, isAllOrdersLoading }) => {
     const searchParams = new URLSearchParams(location.search);
     const urlType = searchParams.get("type");
     const urlDate = searchParams.get("date");
-  
     // Update state based on URL params, but skip empty values
     setType(urlType && urlType !== "all" ? urlType : "");
     setDateQuery(urlDate || "");
@@ -87,7 +99,11 @@ const TransactionTable = ({ user, download, isAllOrdersLoading }) => {
   
     // Type filter
     if (type) {
-      filteredData = filteredData.filter((item) => item.type === type);
+      if (type === "STRATS") {
+        filteredData = filteredData.filter((item) => item.assetOriginAddress === originAddress);
+      } else {
+        filteredData = filteredData.filter((item) => item.type === type);
+      }
     }
   
     // Search filter
@@ -134,6 +150,7 @@ const TransactionTable = ({ user, download, isAllOrdersLoading }) => {
 
   const Content = ({ data }) => {
     const price = data?.assetPrice || data?.price
+    const quantityIsDecimal = data?.quantityIsDecimal
     return <div className="min-h-44 h-full" style={{ width: '460px' }}>
       <Card>
         <Row>
@@ -146,7 +163,7 @@ const TransactionTable = ({ user, download, isAllOrdersLoading }) => {
           </Col>
           <Col span={8} offset={1}>
             {price
-              ? <p className="text-right flex justify-end items-center"> <b>$ {price} </b> &nbsp;(<span className="text-[#13188A] font-bold"> {(price) * STRATS_CONVERSION} </span>{StratsIcon}) </p>
+              ? <p className="text-right flex justify-end items-center"> <b>$ {quantityIsDecimal === "True" ? (price * 100) : price} </b> &nbsp;(<span className="text-[#13188A] font-bold"> {(quantityIsDecimal === "True" ? (price * 100) : price) * STRATS_CONVERSION} </span>{StratsIcon}) </p>
               : <p className="text-right text-[#13188A] font-bold text-sm"> No Price Available  </p>}
           </Col>
         </Row>
@@ -213,7 +230,7 @@ const TransactionTable = ({ user, download, isAllOrdersLoading }) => {
         <Popover className="flex" content={<Content data={data} />} trigger="hover">
           <div className="flex items-center cursor-default">
             <img src={data?.assetImage} alt={data?.assetName} width={24} height={30} 
-              className="border w-6 h-8 border-indigo-600 rounded-md object-contain" 
+              className="border w-9 h-9 border-indigo-600 rounded-md object-contain" 
             />
             <span className="ml-1 text-truncate">{data?.assetName}</span>
           </div>
@@ -226,7 +243,7 @@ const TransactionTable = ({ user, download, isAllOrdersLoading }) => {
       key: "quantity",
       align: "right",
       width: '100px',
-      render: (data, { quantity }) => <span>{quantity ? formattedNum(quantity) : '--'}</span>
+      render: (data, { quantity, quantityIsDecimal }) => <span>{quantity ? formattedNum(quantityIsDecimal && quantityIsDecimal === "True" ? (quantity / 100) : quantity) : '--'}</span>
     },
     {
       title: "Price ($)",
@@ -234,21 +251,21 @@ const TransactionTable = ({ user, download, isAllOrdersLoading }) => {
       key: "price",
       align: "right",
       width: '100px',
-      render: (data, { price }) => <p>{price ? formattedNum(price) : '--'}</p>
+      render: (data, { price, quantityIsDecimal }) => <p>{price ? formattedNum(quantityIsDecimal && quantityIsDecimal === "True" ? (price * 100) : price) : '--'}</p>
     },
     {
-      title: "From",
+      title: "Buyer/Sender",
       dataIndex: "from",
       key: "from",
       align: "center",
       width: '150px',
     },
     {
-      title: "To",
+      title: "Seller/Recipient",
       dataIndex: "to",
       key: "to",
       align: "center",
-      width: '150px',
+      width: '160px',
     },
     {
       title: "Hash",
@@ -265,7 +282,7 @@ const TransactionTable = ({ user, download, isAllOrdersLoading }) => {
       dataIndex: "date",
       key: "date",
       width: '150px',
-      render: (text,{block_timestamp}) => <p>{moment(block_timestamp).format('L')}</p>,
+      render: (text,{createdDate}) => <p>{getStringDate(createdDate, US_DATE_FORMAT)}</p>,
       title: (
         <div style={{ display: "flex" }}>
           <div className="mt-1.5">{"Date"}</div>
@@ -336,7 +353,7 @@ const TransactionTable = ({ user, download, isAllOrdersLoading }) => {
               <Col xs={24} xl={24}>
                 <Row className="w-full md:w-auto md:flex md:justify-between items-center mb-5 mt-4">
                   <Col xs={24} md={7} className="flex justify-center mt-2 md:mt-0">
-                    <Select className="block lg:block w-full md:w-4/5 rounded-md mx-auto" onChange={(val) => { handleFilter(val) }} placeholder="Select Type" defaultValue={type || ''}>
+                    <Select className="block lg:block w-full md:w-4/5 rounded-md mx-auto" onChange={(val) => { handleFilter(val) }} placeholder="Select Type" value={type} defaultValue={type || ''}>
                       {TRANSACTION_FILTER.map(({ label, value }) =>
                         <Select.Option value={value}> {label} </Select.Option>
                       )}
@@ -354,6 +371,7 @@ const TransactionTable = ({ user, download, isAllOrdersLoading }) => {
                       <DatePicker onChange={onDateChange}
                         className="w-full"
                         defaultValue={defaultDate}
+                        value={defaultDate}
                         picker="month"
                         disabledDate={(current) => { return current && current > dayjs().endOf('month') }}
                         format={(value) => dayjs(value).format('MMMM YYYY')}

@@ -34,7 +34,7 @@ data VMEvent
         creator :: Text,
         application :: Text,
         historyList :: [Text],
-        abstracts :: Map (Account, Text) (Text, Text),
+        abstracts :: Map (Account, Text) (Text, Text, [Text]),
         recordMappings :: [Text]
       }
   | DelegatecallMade Delegatecall

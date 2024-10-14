@@ -35,12 +35,15 @@ export default {
   prodNetworkId: "6909499098523985262",
   testnetNetworkId: "7596898649924658542",
   prodStratsAddress: "b220195543f652f735b7847c4af399d0323e1ff6",
-  testnetStratsAddress: "488cd3909d94606051e0684cf6caa5763fb78613",
+  testnetStratsAddress: "5375b8b1c691201acf16a72612d82ed438951a04",
   attachImagesAndFiles: "*,BlockApps-Mercata-Asset-files(*),BlockApps-Mercata-Asset-images(*),BlockApps-Mercata-Asset-fileNames(*)",
-  attachSalesAndImagesAndFiles: "*,BlockApps-Mercata-Asset-files(*),BlockApps-Mercata-Asset-images(*),BlockApps-Mercata-Asset-fileNames(*),BlockApps-Mercata-Sale!BlockApps-Mercata-Sale_BlockApps-Mercata-Asset_fk(*,BlockApps-Mercata-Sale-paymentProviders(*))",
+  attachSalesAndImagesAndFiles: "*,BlockApps-Mercata-Asset-files(*),BlockApps-Mercata-Asset-images(*),BlockApps-Mercata-Asset-fileNames(*),BlockApps-Mercata-Sale!BlockApps-Mercata-Sale_BlockApps-Mercata-Asset_fk(*,BlockApps-Mercata-Sale-paymentServices(*))",
   attach_saleAddresses_Quantities_completedSales_onOrder: "*,BlockApps-Mercata-Order-saleAddresses(*),BlockApps-Mercata-Order-quantities(*),BlockApps-Mercata-Order-completedSales(*)",
   baUserNames: ['blockapps_carbon', 'blockapps_metals', 'blockapps_clothing', 'blockapps_collectibles', 'blockapps_memberships', 'blockapps_art', 'blockapps_spirits'],
-  localHost: 'http://localhost'
+  localHost: 'http://localhost',
+  burnAddress: '6ec8bbe4a5b87be18d443408df43a45e5972fa1b',
+  testTokenServerUrl: 'https://campaigns-test.blockapps.net',
+  prodTokenServerUrl: 'https://campaigns.blockapps.net',
 };
 
 export const unitOfMeasurement = {}

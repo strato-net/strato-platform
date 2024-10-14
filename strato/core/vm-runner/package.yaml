@@ -44,6 +44,7 @@ library:
   - prometheus-client
   - seqevents
   - solid-vm
+  - solid-vm-model
   - sql-monad
   - strato-conf
   - strato-genesis
@@ -67,6 +68,7 @@ executables:
       - common-log
       - debugger
       - hflags
+      - process-monitor
       - solid-vm-fuzzer
       - strato-model
       - vm-runner

@@ -56,7 +56,7 @@ class OrderController {
       rest.response.status200(res, result)
       // check orderEvent.status is 3 and sendEmail
       // Only send email if order is created successfully(STRATS Orders)
-      const orderEvent = await dapp.getStratsOrderEvent({orderHash: checkoutHash, paymentProvider: restArgs.paymentProvider.address}, options)
+      const orderEvent = await dapp.getStratsOrderEvent({orderHash: checkoutHash, paymentService: restArgs.paymentService.address}, options)
        if(orderEvent && orderEvent.length === 1 && orderEvent[0].status === "3" &&  orderEvent[0].currency === "STRATS")
       {
             await sendEmail(body.email, "Your Order Confirmation", htmlContents[0]);
@@ -201,8 +201,9 @@ class OrderController {
 
   static validatePaymentArgs(args) {
     const paymentSchema = Joi.object({
-      paymentProvider: Joi.object({
+      paymentService: Joi.object({
         address: Joi.string().required(),
+        serviceName: Joi.string().required(),
       }).required(),
       buyerOrganization: Joi.string().required(),
       orderList: Joi.array().min(1).items(Joi.object({
@@ -236,7 +237,7 @@ class OrderController {
       addressLine1: Joi.string().required(),
       addressLine2: Joi.string().allow(""),
       country: Joi.string().required(),
-      redemptionService: Joi.string().required(),
+      redemptionService: Joi.string().optional(),
     }).required();
 
     const validation = createUserAddressSchema.validate(args);

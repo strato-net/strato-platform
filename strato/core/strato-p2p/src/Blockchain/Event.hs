@@ -133,7 +133,7 @@ handleEvents peer = awaitForever $ \case
     parentHeader <- lift $ lookup (Proxy @BlockHeader) parentHash'
     case parentHeader of
       Nothing -> do
-        bestBlock <- lift $ Mod.get (Proxy @BestBlock)
+        BestSequencedBlock bestBlock <- lift $ Mod.get (Proxy @BestSequencedBlock)
         let bestBlockNum = numberFromBestBlock bestBlock
             fetchNumber = if bestBlockNum < 2 then 1 else bestBlockNum - 1
         $logInfoS "handleEvents/NewBlock" $ T.pack $ "newBlock :: fetchNumber is " ++ show fetchNumber
@@ -144,7 +144,7 @@ handleEvents peer = awaitForever $ \case
         yieldL $ ToUnseq [ingestBlock]
   MsgEvt (NewBlockHashes _) -> do
     lift stampActionTimestamp
-    bestBlock <- lift $ Mod.get (Proxy @BestBlock)
+    BestSequencedBlock bestBlock <- lift $ Mod.get (Proxy @BestSequencedBlock)
     let bestBlockNum = numberFromBestBlock bestBlock
     let fetchNumber = if bestBlockNum < 2 then 1 else bestBlockNum - 1
     $logInfoS "handleEvents/NewBlockHashes" $ T.pack $ "newBlockHashes :: fetchNumber is " ++ show fetchNumber
@@ -189,13 +189,14 @@ handleEvents peer = awaitForever $ \case
         yieldR . BlockHeaders . skipEntries skip' $ morphBlockHeader . unCanonical . snd <$> chain
   MsgEvt (BlockHeaders bHeaders) -> do
     let headers = morphBlockHeader <$> bHeaders
+    --- put bheaders log right here
     lift stampActionTimestamp
     -- check if blockheaders we recieved have parents.
     let parents = map BlockHeader.parentHash headers
     existingParents <- lift $ lookupMany (Proxy @BlockHeader) parents
     let missingParents = S.fromList parents S.\\ (M.keysSet existingParents `S.union` S.fromList (blockHeaderHash <$> bHeaders))
     unless (S.null missingParents) $ do
-      bestBlock <- lift $ Mod.get (Proxy @BestBlock)
+      BestSequencedBlock bestBlock <- lift $ Mod.get (Proxy @BestSequencedBlock)
       let fetchNumber = numberFromBestBlock bestBlock + 1
       $logInfoS "handleEvents/BlockHeaders" $ T.pack $ "blockHeaders :: fetchNumber is " ++ show fetchNumber
       $logInfoS "handleEvents/BlockHeaders" $ T.pack $ "missing blocks: " ++ (unlines $ format <$> S.toList missingParents)

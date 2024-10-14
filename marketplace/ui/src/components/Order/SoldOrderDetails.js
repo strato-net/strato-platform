@@ -83,7 +83,7 @@ const SoldOrderDetails = ({ user, users }) => {
       let items = [];
       const orderQuantities = orderDetails.order.quantities ? orderDetails.order.quantities : orderDetails.order["BlockApps-Mercata-Order-quantities"].map(item => item.value);
       orderDetails.assets.forEach((prod, index) => {
-        console.log();
+        const quantityIsDecimal = prod.data.quantityIsDecimal && prod.data.quantityIsDecimal === "True";
         items.push({
           address: prod.address,
           chainId: prod.chainId,
@@ -91,8 +91,8 @@ const SoldOrderDetails = ({ user, users }) => {
           productImage: prod["BlockApps-Mercata-Asset-images"].length > 0 ? prod["BlockApps-Mercata-Asset-images"][0].value : image_placeholder,
           productName: prod,
           name: prod.name,
-          unitPrice: orderDetails.order.currency === "STRATS" ? (prod.price * STRATS_CONVERSION).toFixed(0) : prod.price.toFixed(2),
-          quantity: parseInt(orderQuantities[index]),
+          unitPrice: orderDetails.order.currency === "STRATS" ? (prod.price * (quantityIsDecimal ? 100 : 1) * STRATS_CONVERSION).toFixed(0) : (prod.price * (quantityIsDecimal ? 100 : 1)).toFixed(2),
+          quantity: quantityIsDecimal ? orderQuantities[index] / 100 : parseInt(orderQuantities[index]),
           amount: (orderDetails.order.currency === "STRATS" ? (prod.price * STRATS_CONVERSION * parseInt(orderQuantities[index])).toFixed(0) : (prod.price * parseInt(orderQuantities[index])).toFixed(2)),
           serialNumber: prod,
           tax: prod.tax ? prod.tax : 0,
@@ -321,7 +321,7 @@ const SoldOrderDetails = ({ user, users }) => {
           </Breadcrumb.Item>
           <Breadcrumb.Item href="" onClick={e => e.preventDefault()}>
             <div onClick={() => { navigate(routes.Transactions.url) }}>
-              <p className="text-sm text-primary font-semibold">Orders (sold)</p>
+              <p className="text-sm text-primary font-semibold">My Transactions</p>
             </div>
           </Breadcrumb.Item>
           <Breadcrumb.Item className="text-sm text-[#202020] font-medium">

@@ -29,7 +29,7 @@ data Event = Event
     evContractName :: String,
     evContractAccount :: Account,
     evName :: String,
-    evArgs :: [(String, String)] -- TODO: probably should use Solidity values here?
+    evArgs :: [(String, String, String)] -- TODO: probably should use Solidity values here?
   }
   deriving (Eq, Read, Show, Generic)
 

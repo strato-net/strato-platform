@@ -6,7 +6,8 @@ import {
   SendOutlined,
   PieChartOutlined,
   StopOutlined,
-  SwapOutlined
+  SwapOutlined,
+  RetweetOutlined
 } from "@ant-design/icons";
 import PreviewInventoryModal from "./PreviewInventoryModal";
 import { useNavigate } from "react-router-dom";
@@ -15,13 +16,14 @@ import UnlistModal from "./UnlistModal";
 import ResellModal from "./ResellModal";
 import TransferModal from "./TransferModal";
 import RedeemModal from "./RedeemModal";
+import BridgeModal from "./BridgeModal";
 import routes from "../../helpers/routes";
 import { ASSET_STATUS, STRATS_CONVERSION, OLD_SADDOG_ORIGIN_ADDRESS } from "../../helpers/constants";
 import image_placeholder from "../../images/resources/image_placeholder.png";
 import "react-responsive-carousel/lib/styles/carousel.min.css";
 import { SEO } from "../../helpers/seoConstant";
 
-const InventoryCard = ({ inventory, category, debouncedSearchTerm, id, allSubcategories, limit, offset, user }) => {
+const InventoryCard = ({ inventory, category, debouncedSearchTerm, id, allSubcategories, limit, offset, user, supportedTokens }) => {
   const textRef = useRef(null);
   const [isOverflowing, setIsOverflowing] = useState(false);
   const [open, setOpen] = useState(false);
@@ -30,11 +32,24 @@ const InventoryCard = ({ inventory, category, debouncedSearchTerm, id, allSubcat
   const [resellModalOpen, setResellModalOpen] = useState(false);
   const [transferModalOpen, setTransferModalOpen] = useState(false);
   const [redeemModalOpen, setRedeemModalOpen] = useState(false);
+  const [bridgeModalOpen, setBridgeModalOpen] = useState(false);
   const navigate = useNavigate();
   const naviroute = routes.InventoryDetail.url;
   const imgMeta = category ? category : SEO.TITLE_META
-
   const itemData = inventory.data;
+  const isStrats = itemData.quantityIsDecimal && itemData.quantityIsDecimal === "True"
+  const quantity = isStrats ? parseFloat((inventory.quantity / 100).toFixed(2)) : inventory.quantity
+  const price = inventory?.price ? (isStrats ? parseFloat(inventory?.price * 100).toFixed(2) : inventory?.price) : undefined ;
+  const saleQuantity = isStrats
+    ? inventory.saleQuantity !== undefined
+      ? parseFloat((inventory.saleQuantity / 100).toFixed(2))
+      : undefined
+    : inventory.saleQuantity;
+  const totalLockedQuantity = inventory.totalLockedQuantity
+    ? isStrats
+      ? (inventory.totalLockedQuantity / 100).toFixed(2)
+      : inventory.totalLockedQuantity
+    : 0;
 
   const handleCancel = () => {
     setOpen(false);
@@ -79,6 +94,14 @@ const InventoryCard = ({ inventory, category, debouncedSearchTerm, id, allSubcat
   const handleRedeemModalClose = () => {
     setRedeemModalOpen(false);
   };
+  
+  const showBridgeModal = () => {
+    setBridgeModalOpen(true);
+  };
+
+  const handleBridgeModalClose = () => {
+    setBridgeModalOpen(false);
+  };
 
   const callDetailPage = () => {
     navigate(`${naviroute.replace(":id", inventory.address).replace(":name", encodeURIComponent(inventory.name))}`, {
@@ -112,14 +135,14 @@ const InventoryCard = ({ inventory, category, debouncedSearchTerm, id, allSubcat
    * Determines if the Transfer button should be disabled.
    * 
    * The button is disabled if any of the following conditions are true:
-   * - inventory.quantity is not set or is zero, meaning there is nothing to transfer.
-   * - inventory.saleAddress is set but inventory.saleQuantity is not greater than zero, indicating
+   * - quantity is not set or is zero, meaning there is nothing to transfer.
+   * - inventory.saleAddress is set but saleQuantity is not greater than zero, indicating
    *   there are no available items left to transfer that are not already committed to a sale.
    * 
    * @returns {boolean} True if the button should be disabled, false otherwise.
    */
   function isTransferDisabled() {
-    return !(inventory.quantity && parseInt(inventory.quantity) > 0 && (!inventory.saleAddress || (inventory.saleAddress && parseInt(inventory.saleQuantity) > 0)));
+    return !(quantity && quantity > 0 && (!inventory.saleAddress || (inventory.saleAddress && saleQuantity > 0)));
   }
 
   function isActive() {
@@ -129,6 +152,11 @@ const InventoryCard = ({ inventory, category, debouncedSearchTerm, id, allSubcat
       return true;
     }
   }
+
+  // Function to check if the inventory.root is within the supportedTokens array
+  const isTokenSupported = (inventoryRoot) => {
+    return Array.isArray(supportedTokens) && supportedTokens.some(token => token.mercata_root_address === inventoryRoot);
+  };  
 
   /**
    * Determines if the Tooltip of the asset name should be displayed.
@@ -185,7 +213,7 @@ const InventoryCard = ({ inventory, category, debouncedSearchTerm, id, allSubcat
             </div>
           </div>
           <div className="mt-3">
-            {((itemData.isMint === "True" && inventory.quantity === 0) || inventory.quantity > 0) &&
+            {((itemData.isMint === "True" && quantity === 0) || quantity > 0) &&
               <div className="grid grid-cols-3 gap-1 w-full">
                 <Button id="sell-listing-btn" type="link" className="text-[#13188A] text-left px-0 font-semibold text-sm h-6" onClick={showListModal} disabled={isEditSellDisabled() || !isActive() || disableSADDOGS(inventory)}>
                   {inventory.price ? <><EditOutlined /> Edit</> : <><DollarOutlined /> Sell</>}
@@ -193,7 +221,7 @@ const InventoryCard = ({ inventory, category, debouncedSearchTerm, id, allSubcat
                 <Button id="asset-card-unlist-btn" type="link" className="text-[#13188A] text-left px-0 font-semibold text-sm h-6" onClick={showUnlistModal} disabled={!inventory.price || !isActive()}>
                   <><StopOutlined /> Unlist</>
                 </Button>
-                <Button type="link" className="text-[#13188A] text-left px-0 font-semibold text-sm h-6" onClick={showResellModal} disabled={!(itemData.isMint && itemData.isMint == "True" && disableSADDOGS(inventory)) || !isActive()}>
+                <Button type="link" className="text-[#13188A] text-left px-0 font-semibold text-sm h-6" onClick={showResellModal} disabled={!(itemData.isMint && itemData.isMint == "True" && !disableSADDOGS(inventory)) || !isActive()}>
                   <><PieChartOutlined /> Mint</>
                 </Button>
                 <Button type="link" className="text-[#13188A] text-left px-0 font-semibold text-sm h-6" onClick={showTransferModal} disabled={isTransferDisabled() || !isActive() }>
@@ -201,6 +229,9 @@ const InventoryCard = ({ inventory, category, debouncedSearchTerm, id, allSubcat
                 </Button>
                 <Button type="link" className="text-[#13188A] text-left px-0 font-semibold text-sm h-6" onClick={showRedeemModal} disabled={inventory.price || inventory.address === inventory.originAddress || !isActive() || disableSADDOGS(inventory)}>
                   <><SendOutlined /> Redeem</>
+                </Button>
+                <Button type="link" className={`text-[#13188A] text-left px-0 font-semibold text-sm h-6 ${!isTokenSupported(inventory.root) ? 'hidden' : ''}`} onClick={showBridgeModal}>
+                  <><RetweetOutlined /> Bridge</>
                 </Button>
               </div>
             }
@@ -242,7 +273,7 @@ const InventoryCard = ({ inventory, category, debouncedSearchTerm, id, allSubcat
                     <p className="text-[#4D4D4D] text-[13px]">Retired</p>
                   </div>
                   :
-                  (inventory.data.isMint && inventory.data.isMint === "False" && inventory.quantity === 0) || (!inventory.data.isMint && inventory.quantity === 0) ?
+                  (inventory.data.isMint && inventory.data.isMint === "False" && quantity === 0) || (!inventory.data.isMint && quantity === 0) ?
                     <div className="flex items-center justify-center gap-2 bg-[#FFA50029] p-[6px] rounded-md">
                       <div className="w-[7px] h-[7px] rounded-full bg-[#FFA500]"></div>
                       <p className="text-[#4D4D4D] text-[13px]">Sold Out</p>
@@ -260,20 +291,20 @@ const InventoryCard = ({ inventory, category, debouncedSearchTerm, id, allSubcat
         <div className="flex flex-col justify-between gap-4 px-[18px] py-4 border border-[#E9E9E9] rounded-md w-full ">
           <div className="flex justify-between  ">
             <p className="text-[#6A6A6A]">Quantity Owned</p>
-            <p className="text-[#202020] font-semibold">{inventory.quantity || "N/A"}</p>
+            <p className="text-[#202020] font-semibold">{ quantity || "N/A"}</p>
           </div> <div className="flex justify-between  ">
             <p className="text-[#6A6A6A]">Quantity Available for Sale </p>
-            <p className="text-[#202020] font-semibold">{(inventory.quantity - (inventory.totalLockedQuantity ? inventory.totalLockedQuantity : 0)) || "N/A"}</p>
+            <p className="text-[#202020] font-semibold">{(quantity - totalLockedQuantity) || "N/A"}</p>
           </div> <div className="flex justify-between  ">
             <p className="text-[#6A6A6A]">Quantity Listed for Sale</p>
-            <p className="text-[#202020] font-semibold">{inventory.saleQuantity || "N/A"}</p>
+            <p className="text-[#202020] font-semibold">{saleQuantity || "N/A"}</p>
           </div>
           <div className="flex justify-between  ">
             <p className="text-[#6A6A6A]">Price</p>
             <p className="text-[#202020] font-semibold">
-              {inventory?.price ? (
+              {price ? (
                 <>
-                  ${inventory?.price} <span className="text-xs">({(inventory?.price * STRATS_CONVERSION).toFixed(0)} STRATS)</span>
+                  ${price} <span className="text-xs">({(price * STRATS_CONVERSION).toFixed(0)} STRATS)</span>
                 </>
               ) : (
                 "N/A"
@@ -339,6 +370,16 @@ const InventoryCard = ({ inventory, category, debouncedSearchTerm, id, allSubcat
         <RedeemModal
           open={redeemModalOpen}
           handleCancel={handleRedeemModalClose}
+          limit={limit}
+          offset={offset}
+          inventory={inventory}
+          categoryName={category}
+        />
+      )}
+      {bridgeModalOpen && (
+        <BridgeModal
+          open={bridgeModalOpen}
+          handleCancel={handleBridgeModalClose}
           limit={limit}
           offset={offset}
           inventory={inventory}

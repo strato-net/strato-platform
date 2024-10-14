@@ -27,7 +27,6 @@ library:
     - strato-conf
     - strato-model
     - text
-    - x509-certs
 
 tests:
   seqevents-spec:

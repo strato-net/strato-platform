@@ -31,6 +31,7 @@ executables:
     - insert-ordered-containers
     - lens
     - monad-alter
+    - process-monitor
     - regex-compat
     - servant-client-core
     - servant-multipart

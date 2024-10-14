@@ -97,8 +97,9 @@ class TransactionController {
 
                 return {
                 ...item,
-                from: item.oldOwnerCommonName || item.sellersCommonName || item.issuerCommonName || item.sellerCommonName,
-                to: item.newOwnerCommonName || item.purchasersCommonName || item.ownerCommonName,
+                createdDate: item.transferDate || item.redemptionDate || item.createdDate,
+                from: item.oldOwnerCommonName || item.purchasersCommonName || item.ownerCommonName,
+                to: item.newOwnerCommonName || item.sellersCommonName || item.issuerCommonName || item.sellerCommonName,
                 price: item.price || '',
                 totalAmount:  item.totalPrice || (item.price ? item.price * getItemQuantity(item) : ''),
                 status: item.status || '1',
@@ -110,7 +111,9 @@ class TransactionController {
                 category:asset?.category || 'null',
                 assetPrice: item?.assetPrice,
                 assetAddress: asset?.address,
-                assetContractName: asset?.contract_name
+                assetOriginAddress: asset?.originAddress,
+                assetContractName: asset?.contract_name,
+                quantityIsDecimal: asset?.data.quantityIsDecimal
             }});
 
             res.status(200).json({ success: true, message: "Fetched Transactions successfully", data: newData })

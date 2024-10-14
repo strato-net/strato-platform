@@ -96,7 +96,7 @@ handleMsgClientConduit myId peer = do
     Just Hello {} ->
       yield
         =<< lift
-          ( Mod.get (Mod.Proxy @BestBlock) >>= \(BestBlock bHash _ tdiff) -> do
+          ( Mod.get (Mod.Proxy @BestSequencedBlock) >>= \(BestSequencedBlock (BestBlock bHash _ tdiff)) -> do
               (GenesisBlockHash genHash) <- Mod.access (Mod.Proxy @GenesisBlockHash)
               let s = Status
                       { protocolVersion = fromIntegral ethVersion,
@@ -115,7 +115,7 @@ handleMsgClientConduit myId peer = do
       when (networkID' /= computeNetworkID) $ throwIO $ NetworkIDMismatch
       -- we set to 0 cause we dont necessarily know the number yet
       lift . Mod.put (Mod.Proxy @WorldBestBlock) . WorldBestBlock $ BestBlock peerBestHash 0 peerTD
-      (BestBlock _ lastBlockNumber _ ) <- lift $ Mod.get (Mod.Proxy @BestBlock)
+      BestSequencedBlock (BestBlock _ lastBlockNumber _ ) <- lift $ Mod.get (Mod.Proxy @BestSequencedBlock)
       mrh <- lift $ unMaxReturnedHeaders <$> Mod.access (Mod.Proxy @MaxReturnedHeaders)
       yield . Right $ GetBlockHeaders (BlockNumber (max (lastBlockNumber - flags_syncBacktrackNumber) 0)) mrh 0 Forward
       yield . Right $ GetChainDetails []
@@ -156,7 +156,7 @@ handleMsgServerConduit myPubkey peer = do
       $logInfoS "serverHandshake/Status{}" "received status"
       yield
         =<< lift
-          ( Mod.get (Mod.Proxy @BestBlock) >>= \(BestBlock bHash _ tdiff) -> do
+          ( Mod.get (Mod.Proxy @BestSequencedBlock) >>= \(BestSequencedBlock (BestBlock bHash _ tdiff)) -> do
               (GenesisBlockHash genHash) <- Mod.access (Mod.Proxy @GenesisBlockHash)
               -- we set to 0 cause we dont necessarily know the number yet
               when (networkID' == computeNetworkID && genHash == peerGH) $ Mod.put (Mod.Proxy @WorldBestBlock) . WorldBestBlock $ BestBlock peerBestHash 0 peerTD
@@ -170,7 +170,7 @@ handleMsgServerConduit myPubkey peer = do
                       genesisHash = genHash
                     }
           )
-      (BestBlock _ lastBlockNumber _ ) <- lift $ Mod.get (Mod.Proxy @BestBlock)
+      BestSequencedBlock (BestBlock _ lastBlockNumber _ ) <- lift $ Mod.get (Mod.Proxy @BestSequencedBlock)
       mrh <- lift $ unMaxReturnedHeaders <$> Mod.access (Mod.Proxy @MaxReturnedHeaders)
       yield . Right $ GetBlockHeaders (BlockNumber (max (lastBlockNumber - flags_syncBacktrackNumber) 0)) mrh 0 Forward
       yield . Right $ GetChainDetails []
