@@ -28,7 +28,6 @@ async function filterMessages(msg) {
 
     // If the block number is less than or equal to the last seen block number, ignore it
     if (currentBlockNumber < latestBlockNumber) {
-      console.log("Ignoring old event with block number:", currentBlockNumber);
       return false;
     }
 
@@ -40,7 +39,6 @@ async function filterMessages(msg) {
 
     // Check if the event name is one of the allowed events
     if (!eventName || !allowedEvents.includes(eventName)) {
-      console.log("Event not allowed or missing event name:", eventName);
       return false;
     }
     console.log("Received event:", eventName);
