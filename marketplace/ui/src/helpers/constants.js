@@ -45,6 +45,7 @@ export const UNIT_OF_MEASUREMENTS = {
 };
 
 export const US_DATE_FORMAT = "MM/DD/YYYY";
+export const DATE_TIME_FORMAT = "MMM D, YYYY h:mm A";
 
 export const MAX_QUANTITY = 1000000;
 export const MAX_PRICE = 100000000;

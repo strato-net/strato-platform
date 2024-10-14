@@ -19,7 +19,8 @@ import { useMarketplaceDispatch, } from "../../contexts/marketplace";
 // Utils & Constants
 import {
   STRATS_CONVERSION, TRANSACTION_STATUS, TRANSACTION_STATUS_CLASSES, TRANSACTION_STATUS_COLOR,
-  DOWNLOAD_OPTIONS, REDEMPTION_STATUS, REDEMPTION_STATUS_CLASSES, US_DATE_FORMAT
+  DOWNLOAD_OPTIONS, REDEMPTION_STATUS, REDEMPTION_STATUS_CLASSES, US_DATE_FORMAT,
+  DATE_TIME_FORMAT
 } from "../../helpers/constants";
 import { SEO } from "../../helpers/seoConstant";
 import { getAgoTime, getStringDate } from "../../helpers/utils";
@@ -187,7 +188,7 @@ const GlobalTransaction = ({ user }) => {
       dataIndex: "date",
       key: "date",
       width: '150px',
-      render: (text, { createdDate }) => <p>{getAgoTime(createdDate, US_DATE_FORMAT)}</p>,
+      render: (text, { createdDate }) => <p>{getStringDate(createdDate, DATE_TIME_FORMAT)}</p>,
       title: (
         <div style={{ display: "flex" }}>
           <div>{"Date"}</div>
