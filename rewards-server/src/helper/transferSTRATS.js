@@ -64,7 +64,7 @@ async function createTransactionPayload(token, transactions) {
     }
 
     // Create a copy of STRATSContracts to track remaining quantities
-    const remainingAssets = STRATSContracts.map((asset) => ({
+    const remainingAssets = STRATSContracts?.map((asset) => ({
       address: asset.address,
       quantity: asset.quantity,
     }));
@@ -98,7 +98,7 @@ async function createTransactionPayload(token, transactions) {
       }
 
       // Create transaction objects and add them to the txs array
-      const txObjects = stratsAssetAddressesToUse.map((strats) =>
+      const txObjects = stratsAssetAddressesToUse?.map((strats) =>
         createTransactionObject(
           strats.address,
           transaction.toAddress,
@@ -160,21 +160,19 @@ async function getAdminStratsContractAddress(token) {
   const fullUrl = `${url}?${queryParams}`;
 
   try {
-    const response = await fetch(fullUrl, {
-      method: "GET",
-      credentials: "same-origin",
+    const response = await axios.get(fullUrl, {
       headers: {
         Accept: "application/json",
         "Content-Type": "application/json",
         Authorization: `Bearer ${token}`,
-      },
+      }
     });
 
-    if (!response.ok) {
+    if (response.status !== 200) {
       throw new Error(`HTTP error! status: ${response.status}`);
     }
 
-    const body = await response.json();
+    const body = await response.data;
     return body;
   } catch (error) {
     console.error("Error fetching admin STRATS contract addresses:", error);
