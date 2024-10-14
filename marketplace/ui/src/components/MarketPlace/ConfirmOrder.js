@@ -197,9 +197,7 @@ const ConfirmOrder = ({ paymentServices = [], data, columns }) => {
       },
     });
     let checkoutHashAndAssets = await orderActions.createPayment(orderDispatch, body);
-    if (!checkoutHashAndAssets) {
-      setSelectedProvider('')
-    }
+
     if (checkoutHashAndAssets && checkoutHashAndAssets !== false) {
       const [checkoutHash, assets] = checkoutHashAndAssets;
       let serviceURL = paymentService.serviceURL || paymentService.data.serviceURL;
@@ -236,7 +234,6 @@ const handlePlaceOrder = async () => {
     if (checkQuantity === true) {
       if (selectedProvider?.serviceName === "Stripe" && total < 0.50) {
         openToastOrder("bottom", "The minimum order amount is $0.50. Please increase the item quantity to account for this.");
-        setSelectedProvider('');
       } else {
         await handlePaymentConfirm(selectedProvider);
       }
@@ -261,7 +258,6 @@ const handlePlaceOrder = async () => {
         errorMessage += `The following item(s) are temporarily out of stock and should be removed:\n${outOfStockMessage}`;
       }
       openToastOrder("bottom", errorMessage);
-      setSelectedProvider('')
     }
   }
 }
