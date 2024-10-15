@@ -460,7 +460,7 @@ const HeaderComponent = ({ user, loginUrl, showMenu, handleSubMenu, handleMenuTa
                   count={stratsBalance}
                   overflowCount={9999999}
                 >
-                  <img src={Images.logo} alt={IMG_META} title={IMG_META} className="w-[30px] h-[30px] " />
+                  <img src={Images.strats} alt={IMG_META} title={IMG_META} className="w-[35px] h-[35px] " />
                 </Badge>
               </a>
             </Dropdown>

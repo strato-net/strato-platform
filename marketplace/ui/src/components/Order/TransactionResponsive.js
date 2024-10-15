@@ -9,7 +9,7 @@ import { useNavigate } from "react-router-dom";
 import moment from "moment";
 
 const TransactionResponsive = ({ data , user}) => {
-  const StratsIcon = <img src={Images.logo} alt="" className="mx-1 w-3 h-3" />;
+  const StratsIcon = <img src={Images.strats} alt="" className="w-5 h-5" />;
   const navigate = useNavigate();
   const [expandedRows, setExpandedRows] = useState({});
 
