@@ -852,7 +852,6 @@ postUsersContractSolidVM' ::
   Text ->
   m BlocTransactionResult
 postUsersContractSolidVM' cacheNonce ContractParameters {..} jwtToken = do
-  params <- getAccountTxParams cacheNonce fromAddr chainId txParams
   --We might be able to get rid of the metadata for SolidVM, but that will require a change in the API, and needs to be discussed
   $logInfoLS "postUsersContractSolidVM'/args" args
   (_, Contract {..}) <-
@@ -865,6 +864,8 @@ postUsersContractSolidVM' cacheNonce ContractParameters {..} jwtToken = do
   (_, argsAsSource) <- constructArgValuesAndSource args xabiArgs
 
   let metadata' = Just $ fromMaybe Map.empty metadata `Map.union` Map.fromList [("name", Text.pack _contractName), ("args", argsAsSource)]
+  
+  params <- getAccountTxParams cacheNonce fromAddr chainId txParams
   
   tx <-
     signAndPrepare jwtToken fromAddr metadata' $
@@ -1040,8 +1041,6 @@ postUsersContractMethod' ::
   Text ->
   m BlocTransactionResult
 postUsersContractMethod' cacheNonce FunctionParameters {..} jwtToken = do
-  params <- getAccountTxParams cacheNonce fromAddr chainId txParams
-
   let err =
         CouldNotFind $
           Text.concat
@@ -1064,6 +1063,8 @@ postUsersContractMethod' cacheNonce FunctionParameters {..} jwtToken = do
         Map.insert "funcName" funcName $
           Map.insert "args" argsAsSource $
             fromMaybe Map.empty metadata
+  
+  params <- getAccountTxParams cacheNonce fromAddr chainId txParams
 
   tx <-
     signAndPrepare jwtToken fromAddr (Just metadataWithCallInfo) $
