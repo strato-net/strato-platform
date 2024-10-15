@@ -851,7 +851,7 @@ argsToValsModifiers ctract md args =
       OrderedVals <$> zipWithM eval32 orderedTypes xs
     CC.NamedArgs xs ->
       NamedVals . M.toList <$> do
-        let strTypes = M.mapKeys (T.unpack) $ CC._modifierArgs md
+        let strTypes = M.fromList $ (\(n,a) -> (T.unpack n, a)) <$> CC._modifierArgs md
         M.mergeA
           (M.mapMissing $ curry $ invalidArguments "missing argument")
           (M.mapMissing $ curry $ invalidArguments "extra argument")
@@ -863,7 +863,7 @@ argsToValsModifiers ctract md args =
     orderedTypes =
       map CC.indexedTypeType
         . map snd
-        $ M.toList $ CC._modifierArgs md
+        $ CC._modifierArgs md
 
     eval32 :: MonadSM m => SVMType.Type -> CC.Expression -> m Value
     eval32 t x = do
@@ -3226,10 +3226,10 @@ runTheCall address' contract' funcName hsh cc theFunction argVals ro ff = do
       margVals <- argsToValsModifiers contract' modi margList
       case margVals of
         OrderedVals vs -> do
-          let argMeta = map (\(n, CC.IndexedType _ t) -> (n, t)) $ M.toList $ CC._modifierArgs modi
+          let argMeta = map (\(n, CC.IndexedType _ t) -> (n, t)) $ CC._modifierArgs modi
           return (zipWith (\(n, t) v -> (n, (t, v))) argMeta vs)
         NamedVals ns -> do
-          let strTypes = M.fromList $ map (\(theName, y) -> (theName, y)) $ M.toList $ CC._modifierArgs modi
+          let strTypes = M.fromList $ CC._modifierArgs modi
               typeAndVal =
                 M.merge
                   (M.mapMissing (curry $ invalidArguments "missing argument"))
