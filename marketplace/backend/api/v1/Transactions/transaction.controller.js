@@ -153,17 +153,20 @@ class TransactionController {
                 TransferQuery['range'] = [`transferDate,${startDate},${endDate}`]
             }
 
-            let orderData, itemTransfers, redemptions
+            let orderlist, itemTransfers, redemptions,count=0;
             let data = []
-            if (type === 'Order' || !type) {
-                orderData = await dapp.getSaleOrders({ ...transactionQuery });
-                data = [...data, ...orderData]
+            if (type?.includes('Order') || !type) {
+               const {orderData, total} = await dapp.getSaleOrders({ ...transactionQuery });
+               count = count + total;
+               orderlist = orderData;
+                data = [...data, ...orderlist]
             }
-            if (type === 'Transfer' || !type) {
-                itemTransfers = await dapp.getAllItemTransferEvents(TransferQuery);
-                data = [...data, ...itemTransfers.transfers]
+            if (type?.includes('Transfer') || !type) {
+                const {transfers, total} = await dapp.getAllItemTransferEvents(TransferQuery);
+                count = count + total;
+                data = [...data, ...transfers]
             }
-        if (type === 'Redemption' || !type) {
+            if (type?.includes('Redemption') || !type) {
                 redemptions = await dapp.getAllRedemptionRequests(redemptionQuery)
                 redemptions = redemptions.filter((value, index, self) =>
                     index === self.findIndex((t) => (
@@ -224,7 +227,7 @@ class TransactionController {
                 quantityIsDecimal: asset?.data.quantityIsDecimal
             }});
 
-            res.status(200).json({ success: true, message: "Fetched Transactions successfully", data: newData })
+            res.status(200).json({ success: true, message: "Fetched Transactions successfully", data: newData, count })
             return next()
         } catch (e) {
             return next(e)

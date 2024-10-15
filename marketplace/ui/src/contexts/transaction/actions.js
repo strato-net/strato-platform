@@ -68,7 +68,7 @@ const actions = {
     }
   },
 
-  fetchGlobalTransaction: async (dispatch, limit, offset, commonName, dateRange) => {
+  fetchGlobalTransaction: async (dispatch, limit, offset, commonName, dateRange, type) => {
     dispatch({ type: actionDescriptors.fetchGlobalTransaction });
 
     const encodedCommonName = encodeURIComponent(commonName);
@@ -85,6 +85,9 @@ const actions = {
     if(dateRange){
       query += `&startDate=${dateRange[0]}&endDate=${dateRange[1]}`
     }
+    if(type?.length){
+      query += `&type=${type}`
+    }
 
     try {
       const response = await fetch(
@@ -99,7 +102,7 @@ const actions = {
       if (response.status === RestStatus.OK) {
         dispatch({
           type: actionDescriptors.fetchGlobalTransactionSuccessful,
-          payload: body.data,
+          payload: body,
         });
         return;
       } else if (response.status === RestStatus.UNAUTHORIZED) {

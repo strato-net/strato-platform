@@ -6,7 +6,7 @@ import classNames from "classnames";
 import dayjs from "dayjs";
 // Components
 import DataTableComponent from "../DataTableComponent";
-
+import InfiniteScroll from 'react-infinite-scroll-component';
 import "./../Order/ordersTable.css";
 import routes from "../../helpers/routes";
 import { Images } from "../../images";
@@ -31,21 +31,22 @@ import GlobalTransactionResponsive from "./GlobalTransactionResponsive";
 const { Title } = Typography;
 
 const GlobalTransaction = ({ user }) => {
-  const limit = '20', offset = '';
   const StratsIcon = <img src={Images.logo} alt="STRATS" className="mx-1 w-3 h-3" />
   // Dispatch
   const transactionDispatch = useTransactionDispatch();
   const marketplaceDispatch = useMarketplaceDispatch();
   // States
-  const { globalTransactions, isTransactionLoading } = useTransactionState();
+  const { globalTransactions, isTransactionLoading, count } = useTransactionState();
   const { categorys } = useCategoryState();
 
   const navigate = useNavigate();
   // const location = useLocation();
 
   // const currentMonth = dayjs().startOf('month').unix();
-
+  const [limit, setLimit] = useState(15);
+  const [offset, setOffset] = useState(0);
   const [type, setType] = useState("");
+  const [list, setList] = useState([]);
   const [dateQuery, setDateQuery] = useState("");
   const [transactions, setTransactions] = useState(globalTransactions)
   const [originAddress, setOriginAddress] = useState("");
@@ -73,16 +74,18 @@ const GlobalTransaction = ({ user }) => {
       limit,
       offset,
       user?.commonName,
-      dateArr
+      dateArr,
+      selectedFilters
     );
 
-  }, [user, dateQuery])
+  }, [user, dateQuery, limit, offset, selectedFilters])
+  
 
   useEffect(() => {
     let filteredData = globalTransactions;
 
     // Type filter
-    if (selectedFilters?.length!==0) {
+    if (selectedFilters?.length !== 0) {
       if (selectedFilters.includes("STRATS")) {
         filteredData = filteredData.filter((item) => item.assetOriginAddress === originAddress);
       } else {
@@ -128,10 +131,10 @@ const GlobalTransaction = ({ user }) => {
       key: "type",
       width: "150px",
       render: (text) => (<p
-        // style={{ background: TRANSACTION_STATUS_COLOR[text] }} 
-        // bg-${TRANSACTION_STATUS_COLOR[text]} 
+        style={{ background: TRANSACTION_STATUS_COLOR[text] }} 
         className={`
-        min-w-[80px] text-center cursor-default px-2 py-2 rounded-lg text-black`}>{text}</p>),
+        bg-${TRANSACTION_STATUS_COLOR[text]} 
+        min-w-[80px] text-center cursor-default px-2 py-2 rounded-lg text-white`}>{text}</p>),
     },
     {
       title: "Asset",
@@ -219,24 +222,29 @@ const GlobalTransaction = ({ user }) => {
     setIsFilterActive((prev) => !prev)
   }
 
-  const FilterComponent = () =>{
-    return  <Card>
-    <Title level={5} className="mt-2">
-      Transaction Types
-    </Title>
-    <div className="flex flex-wrap">
-      {TRANSACTION_FILTER.slice(1, 4)?.map(({ label }) => {
-        return <span onClick={() => { handleFilter(label) }} className={`border-lg p-2 m-2 rounded-lg ${bgColor(label)} cursor-pointer`} key={label}> {label} </span>
-      })}
-    </div>
-  </Card>
+  const FilterComponent = () => {
+    return <Card>
+      <Title level={5} className="mt-2">
+        Transaction Types
+      </Title>
+      <div className="flex flex-wrap">
+        {TRANSACTION_FILTER.slice(1, 4)?.map(({ label }) => {
+          return <span onClick={() => { handleFilter(label) }} className={`border-lg p-2 m-2 rounded-lg ${bgColor(label)} cursor-pointer`} key={label}> {label} </span>
+        })}
+      </div>
+    </Card>
   }
 
-  const SelectedFilter = () =>  {
+  const SelectedFilter = () => {
     return selectedFilters?.length !== 0 && <div className="h-20 w-full p-2"> {selectedFilters?.map((item) =>
-    <span onClick={() => { handleFilter(item) }} className="p-2 m-2 rounded-lg bg-[#F6F6F6] cursor-pointer" key={item}> {item} <span className="font-semibold"><CloseOutlined/></span> </span>)}
-    <span onClick={() => { setSelectedFilters([]) }} className="p-2 m-2 rounded-lg bg-[#13188A] cursor-pointer text-white" > Clear All </span>
-  </div>}
+      <span onClick={() => { handleFilter(item) }} className="p-2 m-2 rounded-lg bg-[#F6F6F6] cursor-pointer" key={item}> {item} <span className="font-semibold"><CloseOutlined /></span> </span>)}
+      <span onClick={() => { setSelectedFilters([]) }} className="p-2 m-2 rounded-lg bg-[#13188A] cursor-pointer text-white" > Clear All </span>
+    </div>
+  }
+
+  const fetchData = () => {
+    setOffset((prev)=> prev + 15)
+  }
 
   return (
     <Row>
@@ -253,13 +261,13 @@ const GlobalTransaction = ({ user }) => {
           </Col>
         </Row>
       </Col>
-      <Col span={22} className="mx-auto mt-5">
+      <Col span={22} className="mx-auto mt-5 ">
         <div className="w-full flex md:hidden order_responsive">
           {isTransactionLoading ? <Spin className="mx-auto" />
             :
             <Row className="w-full">
               <Col>
-                <SelectedFilter/>
+                <SelectedFilter />
               </Col>
               <Col span={24}>
                 <div className="w-full flex justify-between items-center">
@@ -268,8 +276,8 @@ const GlobalTransaction = ({ user }) => {
                   </Title>
                   <Button type="primary" shape="round" onClick={handleFilterActive} icon={isFilterActive ? <CloseOutlined /> : <FilterOutlined />} size={'large'} />
                 </div>
-               {isFilterActive && 
-               <FilterComponent/>}
+                {isFilterActive &&
+                  <FilterComponent />}
               </Col>
               <GlobalTransactionResponsive data={transactions} user={user} />
             </Row>
@@ -281,17 +289,39 @@ const GlobalTransaction = ({ user }) => {
               <Title level={3} className="mt-2">
                 Filter
               </Title>
-             <FilterComponent/>
+              <FilterComponent />
             </Col>
             <Col span={18} offset={1}>
-              <SelectedFilter/>
-              <DataTableComponent
-                columns={column}
-                data={transactions}
-                isLoading={isTransactionLoading}
-                pagination={false}
-                scrollX="100%"
-              />
+              <SelectedFilter />
+              <div
+                id="scrollableDiv"
+                style={{
+                  height: 700,
+                  overflow: 'auto',
+                  display: 'flex',
+                  flexDirection: 'column-reverse',
+                }}
+              >
+                <InfiniteScroll
+                  dataLength={count}
+                  next={fetchData}
+                  hasMore={true}
+                  loader={isTransactionLoading && <h3 className="text-center">Loading...</h3>}
+                  endMessage={
+                    <p style={{ textAlign: 'center' }}>
+                      <b>Yay! You have seen it all</b>
+                    </p>
+                  }
+                >
+                  <DataTableComponent
+                    columns={column}
+                    data={transactions}
+                    isLoading={isTransactionLoading}
+                    pagination={false}
+                    scrollX="100%"
+                  />
+                </InfiniteScroll>
+              </div>
             </Col>
           </Row>
         </div>

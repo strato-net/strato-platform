@@ -465,11 +465,12 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
   };
 
   contract.getAllRedemptionRequests = async function (args, options = optionsNoChainIds) {
-    const { order, search, range, limit } = args;
+    const { order, search, range, limit, offset } = args;
     const queryParams = new URLSearchParams({
       redemptionId: search,
       order: order,
-      limit
+      limit,
+      offset
     }).toString();
 
     try {
@@ -932,9 +933,10 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
     const getOptions = { ...options, app: contractName, };
 
 
-   let data = await saleOrderJs.getAll(rawAdmin, args, getOptions);
+   let {orders, total} = await saleOrderJs.getAll(rawAdmin, args, getOptions);
+   let data;
    let saleAddressArr = [];
-   data = data?.orders?.map((item)=> {
+   data = orders?.map((item)=> {
     if(item?.saleAddresses?.length){
       saleAddressArr.push(item?.saleAddresses[0])
      return {...item,saleAddress:item?.saleAddresses[0]}
@@ -969,7 +971,7 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
         return {...item, ...saleData }
       })
 
-  return data;
+  return { orderData:data, total };
   }
 
   contract.checkSaleQuantity = async function (args, options = defaultOptions) {

@@ -39,7 +39,8 @@ const reducer = (state, action) => {
     case actionDescriptors.fetchGlobalTransactionSuccessful:
         return {
           ...state,
-          globalTransactions: action.payload,
+          globalTransactions: action.payload?.data,
+          count: action.payload?.count,
           isTransactionLoading: false,
         };
     case actionDescriptors.fetchGlobalTransactionFailed:
