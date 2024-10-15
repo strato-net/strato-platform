@@ -117,14 +117,16 @@ class RedemptionsController {
         try {
 
             let orderByClause = '';
-            const order = req.query.order;
+            const {order, limit, offset } = req.query;
 
             if (order === 'ASC' || order === 'DESC') {
-                orderByClause = `ORDER BY createdDate ${order}`;
+                orderByClause = `ORDER BY createdDate ${order} LIMIT ${limit} OFFSET ${offset}`;
             }
 
             const query = `SELECT * FROM redemptions ${orderByClause}`;
+            const countQuery = `SELECT COUNT(*) AS total_count FROM redemptions`
             const result = await client.query(query);
+            const count = await client.query(countQuery);
 
             // fix casing in columns
             const formattedRows = result.rows.map(row => {
@@ -154,6 +156,7 @@ class RedemptionsController {
             res.status(200).json({
                 message: 'success',
                 data: formattedRows || [],
+                count: count.rows[0].total_count
             });
 
             return next();
