@@ -73,26 +73,16 @@ const GlobalTransaction = ({ user }) => {
       transactionDispatch,
       limit,
       offset,
-      user?.commonName,
       dateArr,
       selectedFilters
-    );
+    )
 
-  }, [user, dateQuery, limit, offset, selectedFilters])
+  }, [dateQuery, limit, offset, selectedFilters])
   
 
   useEffect(() => {
     let filteredData = globalTransactions;
-
-    // Type filter
-    if (selectedFilters?.length !== 0) {
-      if (selectedFilters.includes("STRATS")) {
-        filteredData = filteredData.filter((item) => item.assetOriginAddress === originAddress);
-      } else {
-        filteredData = filteredData.filter((item) => selectedFilters.includes(item.type));
-      }
-    }
-
+    setList((prev)=>[...prev, ...globalTransactions])
     setTransactions(filteredData);
   }, [globalTransactions, selectedFilters]);
 
@@ -299,7 +289,6 @@ const GlobalTransaction = ({ user }) => {
                   height: 700,
                   overflow: 'auto',
                   display: 'flex',
-                  flexDirection: 'column-reverse',
                 }}
               >
                 <InfiniteScroll
@@ -315,7 +304,7 @@ const GlobalTransaction = ({ user }) => {
                 >
                   <DataTableComponent
                     columns={column}
-                    data={transactions}
+                    data={list}
                     isLoading={isTransactionLoading}
                     pagination={false}
                     scrollX="100%"

@@ -68,19 +68,15 @@ const actions = {
     }
   },
 
-  fetchGlobalTransaction: async (dispatch, limit, offset, commonName, dateRange, type) => {
+  fetchGlobalTransaction: async (dispatch, limit, offset, dateRange, type) => {
     dispatch({ type: actionDescriptors.fetchGlobalTransaction });
 
-    const encodedCommonName = encodeURIComponent(commonName);
     let query = "";
     if (limit) {
       query += `limit=${limit}`
     }
     if (offset) {
       query += `&offset=${offset}`
-    }
-    if (commonName) {
-      query += `&user=${encodedCommonName}`
     }
     if(dateRange){
       query += `&startDate=${dateRange[0]}&endDate=${dateRange[1]}`

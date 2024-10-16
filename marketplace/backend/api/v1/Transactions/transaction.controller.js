@@ -44,10 +44,10 @@ class TransactionController {
                 TransferQuery['range'] = [`transferDate,${startDate},${endDate}`]
             }
 
-            let orderData, itemTransfers, outgoingRedemptions, incomingRedemptions
+            let itemTransfers, outgoingRedemptions, incomingRedemptions
             let data = []
             if (type === 'Order' || !type) {
-                orderData = await dapp.getSaleOrders({ ...transactionQuery });
+                const {orderData, total} = await dapp.getSaleOrders({ ...transactionQuery });
                 data = [...data, ...orderData]
             }
             if (type === 'Transfer' || !type) {
