@@ -34,7 +34,7 @@ class StripeServiceController {
 
       const userAccount = await getStripeAccountForUser(username);
       
-      if (!userAccount || userAccount === "null") {
+      if (!userAccount) {
         // Generate a new Stripe Account Id
         let userStripeAccount = await stripeService.generateStripeAccountId();
 
