@@ -33,8 +33,8 @@ class StripeServiceController {
       const { username, redirectUrl } = req.query;
 
       const userAccount = await getStripeAccountForUser(username);
-      
-      if (!userAccount) {
+
+      if (!userAccount || userAccount === "null") {
         // Generate a new Stripe Account Id
         let userStripeAccount = await stripeService.generateStripeAccountId();
 
@@ -69,7 +69,7 @@ class StripeServiceController {
 
       const hasSellerOnboarded = await checkSellerOnboarded(username);
 
-      if (!hasSellerOnboarded || hasSellerOnboarded.length === 0) {
+      if (!hasSellerOnboarded || hasSellerOnboarded.length === 0 || hasSellerOnboarded[0].isActive === false) {
         const userDetails = await stripeService.getStripeConnectAccountDetail(userAccount);
 
         if (userDetails.charges_enabled && userDetails.details_submitted && userDetails.payouts_enabled) {
