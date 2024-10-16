@@ -138,12 +138,13 @@ const getStripePaymentsFromTokens = async (orderHashes) => {
 
 const insertStripeAccount = async (commonName, accountId) => {
   const insertQuery = `
-    INSERT INTO stripe_accounts (
-      commonName,
-      accountId
-    ) VALUES (
-      $1, $2
-    )`;
+    INSERT INTO stripe_accounts (commonName, accountId)
+    VALUES ($1, $2)
+    ON CONFLICT (commonName) 
+    DO UPDATE 
+    SET accountId = EXCLUDED.accountId
+    WHERE stripe_accounts.accountId IS NULL;
+  `;
   const insertValues = [ commonName, accountId ];
   const insertResult = await client.query(insertQuery, insertValues);
   return insertResult;
