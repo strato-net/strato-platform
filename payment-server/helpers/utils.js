@@ -238,7 +238,7 @@ const checkSellerOnboarded = async (commonName) => {
       ['order']: `id.desc`
     }
   }
-  console.log("searchOptions: ", searchOptions)
+
   return await rest.search(ADMIN.getUser(), tableArgs, searchOptions);
 }
 
