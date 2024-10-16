@@ -143,8 +143,7 @@ const insertStripeAccount = async (commonName, accountId) => {
     VALUES ($1, $2)
     ON CONFLICT (commonName) 
     DO UPDATE 
-    SET accountId = EXCLUDED.accountId
-    WHERE stripe_accounts.accountId IS NULL;
+    SET accountId = EXCLUDED.accountId;
   `;
   const insertValues = [ commonName, accountId ];
   const insertResult = await client.query(insertQuery, insertValues);

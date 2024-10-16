@@ -33,7 +33,7 @@ class StripeServiceController {
       const { username, redirectUrl } = req.query;
 
       const userAccount = await getStripeAccountForUser(username);
-
+      
       if (!userAccount || userAccount === "null") {
         // Generate a new Stripe Account Id
         let userStripeAccount = await stripeService.generateStripeAccountId();
