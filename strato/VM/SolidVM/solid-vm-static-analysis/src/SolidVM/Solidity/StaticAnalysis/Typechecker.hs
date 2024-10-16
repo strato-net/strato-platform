@@ -27,7 +27,6 @@ import Data.Source
 import Data.String (IsString, fromString)
 import Data.Text (Text)
 import qualified Data.Text as T
-import Data.Traversable (for)
 import SolidVM.Model.CodeCollection hiding (modifierContext)
 import qualified SolidVM.Model.CodeCollection.Contract as Con
 import SolidVM.Model.SolidString
@@ -711,7 +710,6 @@ typecheckMember (Static (SVMType.UnknownLabel "block" Nothing) x) "number" = pur
 typecheckMember (Static (SVMType.UnknownLabel "block" Nothing) x) "coinbase" = pure $ Static (SVMType.Account True) x
 typecheckMember (Static (SVMType.UnknownLabel "block" Nothing) x) "difficulty" = pure $ Static (SVMType.Int Nothing Nothing) x
 typecheckMember (Static (SVMType.UnknownLabel "block" Nothing) x) "gaslimit" = pure $ Static (SVMType.Int Nothing Nothing) x
-typecheckMember (Static (SVMType.UnknownLabel "block" Nothing) x) "proposer" = pure $ Static (SVMType.Account False) x
 typecheckMember (Static (SVMType.UnknownLabel "type" Nothing) x) "name" = pure $ (Static (SVMType.String Nothing) x)
 typecheckMember (Static (SVMType.UnknownLabel "type" Nothing) x) "creationCode" = pure $ (Static (SVMType.String Nothing) x)
 typecheckMember (Static (SVMType.UnknownLabel "type" Nothing) x) "runtimeCode" = pure $ (Static (SVMType.String Nothing) x)
@@ -1051,7 +1049,7 @@ modifierHelper cc c m@SolidVM.Model.CodeCollection.Modifier {..} =
 functionHelper ::
   Annotated CodeCollectionF ->
   Annotated ContractF ->
-  String ->
+  SolidString ->
   Annotated FuncF ->
   Type'
 functionHelper cc c funcName f@Func {..} =
@@ -1175,7 +1173,7 @@ functionHelper cc c funcName f@Func {..} =
                     ret <- statementsHelper argVals stmts
                     pure $ reduceType' _funcContext [ret, mods]
                   where checkModifier modName modArgs = do
-                          e <- getModifierByNameRecursively modName _funcContext
+                          e <- getModifierByNameRecursively funcName modName _funcContext
                           a <- productType' _funcContext <$> traverse tcExpr modArgs
                           apply e a Nothing
 
@@ -1191,9 +1189,7 @@ statementsHelperM args ss = do
       modifierError "you cannot return a value as part of a modifier" (x)
     Just m -> do
       let x = _modifierContext m
-      ~(ts', s) <- flip runStateT ((Nothing, args) :| []) $ do
-        stmts' <- traverse statementHelper ss
-        pure stmts'
+      ~(ts', s) <- flip runStateT ((Nothing, args) :| []) $ traverse statementHelper ss
       let ret = case fst $ NE.head s of
             Nothing -> Product [] x
             Just (Sum rs) ->
@@ -1227,14 +1223,7 @@ statementsHelper args ss = do
       pure . bottom $ "Cannot use keyword 'return' outside of a function" <$ x
     Just f -> do
       let x = _funcContext f
-      ~(ts', s) <- flip runStateT ((Nothing, args) :| []) $ do
-        cCalls <- for (M.assocs $ _funcConstructorCalls f) $ \(cName, exprs) -> do
-          let constructorArgs = getConstructorType' x cName
-              givenArgs = flip Product x <$> traverse tcExpr exprs
-              givenFunc = (\t -> Function t (Static (SVMType.Contract cName) x) x [] [] False) <$> givenArgs
-          constructorArgs <~> givenFunc
-        stmts' <- traverse statementHelper ss
-        pure $ concat [stmts', cCalls]
+      ~(ts', s) <- flip runStateT ((Nothing, args) :| []) $ traverse statementHelper ss
       let ret = case fst $ NE.head s of
             Nothing -> Product [] x
             Just (Sum rs) ->
@@ -1499,14 +1488,22 @@ getFunctionByNameRecursively name ctx = go False
         Nothing -> pure . bottom $ "Could not find parent contract " <> T.pack parentName <$ ctx
         Just c' -> local (\r -> r {contract = c'}) $ go True
 
-getModifierByNameRecursively :: SolidString -> SourceAnnotation Text -> SSS Type'
-getModifierByNameRecursively name ctx = go
+getModifierByNameRecursively :: SolidString -> SolidString -> SourceAnnotation Text -> SSS Type'
+getModifierByNameRecursively funcName name ctx = go
   where
     go = do
       c <- asks contract
       case M.lookup name $ c ^. modifiers of
         Just theMod -> pure $ modifierType ctx theMod
-        Nothing -> pickType' ctx <$> traverse recurse (c ^. parents)
+        Nothing -> do
+          cc <- asks codeCollection
+          case M.lookup name $ cc ^. contracts of
+            Just c' -> if funcName /= "constructor"
+              then pure . bottom $ "Parent constructors can only be invoked from the contract's constructor" <$ ctx
+              else case c' ^. constructor of
+                Just f -> pure $ functionType cc ctx name f
+                Nothing -> pure . bottom $ "Parent contract " <> T.pack name <> " does not expose a constructor" <$ ctx
+            Nothing -> pickType' ctx <$> traverse recurse (c ^. parents)
     recurse parentName = do
       cc <- asks codeCollection
       case M.lookup parentName $ cc ^. contracts of
