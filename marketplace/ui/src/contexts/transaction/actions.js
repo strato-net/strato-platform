@@ -52,7 +52,7 @@ const actions = {
       if (response.status === RestStatus.OK) {
         dispatch({
           type: actionDescriptors.fetchUserTransactionSuccessful,
-          payload: body.data,
+          payload: body,
         });
         return;
       } else if (response.status === RestStatus.UNAUTHORIZED) {

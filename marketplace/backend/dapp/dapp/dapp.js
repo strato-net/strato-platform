@@ -873,9 +873,10 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
     const getOptions = { ...options, app: contractName, };
 
 
-   let data = await saleOrderJs.getAll(rawAdmin, args, getOptions);
+    let {orders, total} = await saleOrderJs.getAll(rawAdmin, args, getOptions);
+    let data;
    let saleAddressArr = [];
-   data = data.orders.map((item)=> {
+   data = orders.map((item)=> {
     if(item?.saleAddresses?.length){
       saleAddressArr.push(item?.saleAddresses[0])
      return {...item,saleAddress:item?.saleAddresses[0]}
@@ -910,7 +911,7 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
         return {...item, ...saleData }
       })
 
-  return data;
+  return { orderData:data, total };;
   }
 
   contract.checkSaleQuantity = async function (args, options = defaultOptions) {

@@ -44,20 +44,24 @@ class TransactionController {
                 TransferQuery['range'] = [`transferDate,${startDate},${endDate}`]
             }
 
-            let orderData, itemTransfers, outgoingRedemptions, incomingRedemptions
+            let outgoingRedemptions, incomingRedemptions, count = 0;
             let data = []
             if (type === 'Order' || !type) {
-                orderData = await dapp.getSaleOrders({ ...transactionQuery });
+                const {orderData, total} = await dapp.getSaleOrders({ ...transactionQuery });
                 data = [...data, ...orderData]
+                count = count + total;
             }
             if (type === 'Transfer' || !type) {
-                itemTransfers = await dapp.getAllItemTransferEvents(TransferQuery);
-                data = [...data, ...itemTransfers.transfers]
+                const {transfers, total} = await dapp.getAllItemTransferEvents(TransferQuery);
+                data = [...data, ...transfers]
+                count = count + total;
             }
             if (type === 'Redemption' || !type) {
                 outgoingRedemptions = await dapp.getOutgoingRedemptionRequests(redemptionQuery)
                 incomingRedemptions = await dapp.getIncomingRedemptionRequests(redemptionQuery)
-                let redemptions = [...outgoingRedemptions, ...incomingRedemptions];
+                let redemptions = [...outgoingRedemptions?.data, ...incomingRedemptions?.data];
+                const total = outgoingRedemptions?.count + incomingRedemptions?.count;
+                count = count + total;
                 redemptions = redemptions.filter((value, index, self) =>
                     index === self.findIndex((t) => (
                         t.redemption_id === value.redemption_id
@@ -116,7 +120,7 @@ class TransactionController {
                 quantityIsDecimal: asset?.data.quantityIsDecimal
             }});
 
-            res.status(200).json({ success: true, message: "Fetched Transactions successfully", data: newData })
+            res.status(200).json({ success: true, message: "Fetched Transactions successfully", data: newData, count:count })
             return next()
         } catch (e) {
             return next(e)

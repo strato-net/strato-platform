@@ -17,9 +17,12 @@ class RedemptionsController {
             }
 
             const query = `SELECT * FROM redemptions WHERE ownerCommonName = $1 AND ($2 = '' OR redemption_id::text = $2) ${orderByClause}`;
+            const countQuery = `SELECT COUNT(*) AS total_count FROM redemptions WHERE ownerCommonName = $1 AND ($2 = '' OR redemption_id::text = $2) ${orderByClause}`
+
             const values = [req.params.commonName, req.query.redemptionId];
 
             const result = await client.query(query, values);
+            const count = await client.query(countQuery);
 
             // fix casing in columns
             const formattedRows = result.rows.map(row => {
@@ -49,6 +52,7 @@ class RedemptionsController {
             res.status(200).json({
                 message: 'success',
                 data: formattedRows || [],
+                count: count.rows[0].total_count
             });
 
             return next();
@@ -72,9 +76,11 @@ class RedemptionsController {
             }
 
             const query = `SELECT * FROM redemptions WHERE issuerCommonName = $1 AND ($2 = '' OR redemption_id::text = $2) ${orderByClause}`;
+            const countQuery = `SELECT COUNT(*) AS total_count FROM redemptions WHERE issuerCommonName = $1 AND ($2 = '' OR redemption_id::text = $2) ${orderByClause}`
             const values = [req.params.commonName, req.query.redemptionId];
 
             const result = await client.query(query, values);
+            const count = await client.query(countQuery);
 
             // fix casing in columns
             const formattedRows = result.rows.map(row => {
@@ -104,6 +110,7 @@ class RedemptionsController {
             res.status(200).json({
                 message: 'success',
                 data: formattedRows || [],
+                count: count.rows[0].total_count
             });
 
             return next();
