@@ -45,6 +45,7 @@ const getAssetName = async(saleAddress)=>{
 // Prepare the orderData array
 const prepareOrderData = (orderDetails, assetData) => {
   return orderDetails.map((order, index) => {
+    console.log("order: ", order)
     const unitPrice = order.amount / order.quantitiesToBePurchased[0];
     return {
       name: assetData[index].name,
