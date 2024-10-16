@@ -24,9 +24,8 @@ export const HTTP_METHODS = {
 };
 
 export const homeUrl = new URL("/", window.location.origin).toString();
-export const soldOrdersBaseUrl = new URL("/order/sold", window.location.origin).toString();
-export const boughtOrdersBaseUrl = new URL("/order/bought", window.location.origin).toString();
-export const transfersBaseUrl = new URL("/order/transfers", window.location.origin).toString();
+export const ordersBaseUrl = new URL("/transactions?type=Order", window.location.origin).toString();
+export const transfersBaseUrl = new URL("/transactions?type=Transfer", window.location.origin).toString();
 export const soldOrderDetailssBaseUrl = new URL("/sold-orders", window.location.origin).toString();
 export const boughtOrderDetailssBaseUrl = new URL("/bought-orders", window.location.origin).toString();
 
