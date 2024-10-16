@@ -15,7 +15,7 @@ import           Strato.Strato23.Crypto
 import           Strato.Strato23.Database.Queries      (getUserKeyQuery')
 import           UnliftIO
 
-postSignature :: Text -> Text -> MsgHash -> VaultM Signature
+postSignature :: ServerEmbed VaultHeaders (MsgHash -> VaultM Signature)
 postSignature userName oauthProvider (MsgHash msgBS) = do
   cache <- asks keyStoreCache
   cachedPk <- liftIO $ Cache.lookup cache (append userName oauthProvider)

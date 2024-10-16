@@ -15,7 +15,7 @@ import Strato.Strato23.Crypto
 import Strato.Strato23.Database.Queries
 import Strato.Strato23.Monad
 
-getKey :: Text -> Text -> Maybe Text -> VaultM AddressAndKey
+getKey :: ServerEmbed VaultHeaders (Maybe Text -> VaultM AddressAndKey)
 getKey headerUserName headerOauthProvider queryParamUserName = withSecretKey $ \key -> do
   let userName = fromMaybe headerUserName queryParamUserName
   (_ :: ByteString, nonce, encKey, _ :: Address) <-
@@ -26,7 +26,7 @@ getKey headerUserName headerOauthProvider queryParamUserName = withSecretKey $ \
     Nothing -> vaultWrapperError IncorrectPasswordError
     Just pKey -> return $ AddressAndKey (fromPrivateKey pKey) (derivePublicKey pKey)
 
-getKeys :: Text -> Text -> Maybe Text -> VaultM [AddressAndKey]
+getKeys :: ServerEmbed VaultHeaders (Maybe Text -> VaultM [AddressAndKey])
 getKeys _ _ queryParamUserName = withSecretKey $ \key -> do
   let userName = fromJust queryParamUserName
   ls :: [(ByteString, SecretBox.Nonce, ByteString, Address)] <- toUserError ("User " <> userName <> " doesn't exist") . vaultQueryMany $ getUserKeyQuery userName
@@ -36,7 +36,7 @@ getKeys _ _ queryParamUserName = withSecretKey $ \key -> do
             Just pKey -> return $ AddressAndKey (fromPrivateKey pKey) (derivePublicKey pKey) 
   sequence $ map (\(_, noncee, encKeyy, _ ) ->  decryptHelper noncee encKeyy) ls
   
-postKey :: Text -> Text -> VaultM AddressAndKey
+postKey :: ServerEmbed VaultHeaders (VaultM AddressAndKey)
 postKey userName oauthProvider = withSecretKey $ \key -> do
   keyStore@KeyStore{..} <- newKeyStore key
   created <- vaultModify $ postUserKeyQuery' userName oauthProvider keyStore
@@ -46,7 +46,7 @@ postKey userName oauthProvider = withSecretKey $ \key -> do
       Nothing -> vaultWrapperError IncorrectPasswordError
       Just pKey -> return $ AddressAndKey (fromPrivateKey pKey) (derivePublicKey pKey)
 
-getSharedKey :: Text -> Text -> PublicKey -> VaultM SharedKey
+getSharedKey :: ServerEmbed VaultHeaders (PublicKey -> VaultM SharedKey)
 getSharedKey userName oauthProvider otherPub = withSecretKey $ \key -> do
   (_ :: ByteString, nonce, encKey, (_ :: Address)) <- 
                           toUserError ("User " <> userName <> " " <> oauthProvider<> " doesn't exist")

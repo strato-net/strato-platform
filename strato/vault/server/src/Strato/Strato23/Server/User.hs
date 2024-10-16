@@ -7,13 +7,12 @@ module Strato.Strato23.Server.User
 
 import BlockApps.Logging
 import Data.Int
-import Data.Text (Text)
 
 import Strato.Strato23.API
 import Strato.Strato23.Database.Queries
 import Strato.Strato23.Monad
 
-getUsers :: Text -> Text -> Maybe Address -> Maybe Int -> Maybe Int -> VaultM [User]
+getUsers :: ServerEmbed VaultHeaders (Maybe Address -> Maybe Int -> Maybe Int -> VaultM [User])
 getUsers headerUsername oauth mAddr mLimit mOffset = do
   $logDebugLS "getUsers" (headerUsername, oauth, mAddr, mOffset, mLimit)
   exists <- (> 0) <$> (vaultQuery1 (countUsers' headerUsername oauth) :: VaultM Int64)
