@@ -22,7 +22,14 @@ const ResponsiveCart = ({
   removeCartList,
   openToastOrder
 }) => {
-  const initialPaymentState = paymentServices?.length !==0 ? paymentServices[0] : '' 
+  // temporary fix to put STRATs as top payment option, will be updated in next release
+  const activePaymentProviders = (paymentServices[0] !== undefined) ? paymentServices.filter(paymentProvider => paymentProvider?.isActive) : [];
+  const stratsIndex = activePaymentProviders.findIndex(service => service.serviceName.toLowerCase().includes('strats'));
+  if (stratsIndex > 0) {
+    const [stratsObject] = activePaymentProviders.splice(stratsIndex, 1);
+    activePaymentProviders.unshift(stratsObject);
+  }
+  const initialPaymentState = activePaymentProviders?.length !==0 ? activePaymentProviders[0] : '' 
   const [selectedProvider, setSelectedProvider] = useState(initialPaymentState);
   const marketplaceDispatch = useMarketplaceDispatch();
   const [tax, setTax] = useState(0);
@@ -315,7 +322,7 @@ const ResponsiveCart = ({
               value={selectedProvider?.serviceName}
               className="w-full">
               <div className="flex flex-col space-y-4">
-                {paymentServices && paymentServices.map(provider => (
+                {activePaymentProviders && activePaymentProviders.map(provider => (
                   provider &&
                   <Radio value={provider?.serviceName} className="w-full">
                     <p className="flex text-base font-normal items-center"> 
@@ -334,7 +341,7 @@ const ResponsiveCart = ({
           </div>
           <Button
             type="primary"
-            disabled={!paymentServices || paymentServices?.length===0}
+            disabled={!activePaymentProviders || activePaymentProviders?.length===0}
             className="w-full mt-3 mb-6 bg-blue-800 text-white h-10 text-lg"
             onClick={()=>{handlePlaceOrder(selectedProvider)}}
           >
