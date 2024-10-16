@@ -235,6 +235,7 @@ const checkSellerOnboarded = async (commonName) => {
       limit: 1,
       ['sellersCommonName']: `eq.${commonName}`,
       ['address']: `eq.${STRIPE_CONTRACT_ADDRESS}`,
+      ['order']: `id.desc`
     }
   }
   console.log("searchOptions: ", searchOptions)
