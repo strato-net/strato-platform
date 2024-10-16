@@ -1502,7 +1502,7 @@ getModifierByNameRecursively funcName name ctx = go
               then pure . bottom $ "Parent constructors can only be invoked from the contract's constructor" <$ ctx
               else case c' ^. constructor of
                 Just f -> pure $ functionType cc ctx name f
-                Nothing -> pure . bottom $ "Parent contract " <> T.pack name <> " does not expose a constructor" <$ ctx
+                Nothing -> pure $ Function (Product [] ctx) (Product [] ctx) ctx [] [] False
             Nothing -> pickType' ctx <$> traverse recurse (c ^. parents)
     recurse parentName = do
       cc <- asks codeCollection
