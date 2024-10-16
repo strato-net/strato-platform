@@ -37,7 +37,7 @@ class StripeServiceController {
       if (!userAccount || userAccount === "null") {
         // Generate a new Stripe Account Id
         let userStripeAccount = await stripeService.generateStripeAccountId();
-        console.log("userStripeAccount: ", userStripeAccount)
+
         // Insert new Stripe Account Id for user in DB
         const insertResult = await insertStripeAccount(username, userStripeAccount.id);
         console.log("insertResult: ", insertResult)
@@ -68,7 +68,7 @@ class StripeServiceController {
       }
 
       const hasSellerOnboarded = await checkSellerOnboarded(username);
-
+      console.log("hasSellerOnboarded: ", hasSellerOnboarded)
       if (!hasSellerOnboarded || hasSellerOnboarded.length === 0) {
         const userDetails = await stripeService.getStripeConnectAccountDetail(userAccount);
 

@@ -236,7 +236,7 @@ const checkSellerOnboarded = async (commonName) => {
       ['address']: `eq.${STRIPE_CONTRACT_ADDRESS}`,
     }
   }
-
+  console.log("searchOptions: ", searchOptions)
   return await rest.search(ADMIN.getUser(), tableArgs, searchOptions);
 }
 
