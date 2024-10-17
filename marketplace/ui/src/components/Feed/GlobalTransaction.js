@@ -84,7 +84,7 @@ const GlobalTransaction = ({ user }) => {
     let filteredData = globalTransactions;
     setList((prev)=>[...prev, ...globalTransactions])
     setTransactions(filteredData);
-  }, [globalTransactions, selectedFilters]);
+  }, [globalTransactions]);
 
   const Content = ({ data }) => {
     const price = data?.assetPrice || data?.price
@@ -193,6 +193,8 @@ const GlobalTransaction = ({ user }) => {
   const metaImg = SEO.IMAGE_META;
 
   const handleFilter = (value) => {
+    setList([]);
+    setOffset(0);
     setSelectedFilters((prev) => {
       if (prev.includes(value)) {
         const arr = prev.filter((item) => item !== value)
@@ -225,10 +227,16 @@ const GlobalTransaction = ({ user }) => {
     </Card>
   }
 
+ const handleClearFilter = () =>{
+    setSelectedFilters([]);
+    setOffset(0);
+    setList([]);
+ }
+
   const SelectedFilter = () => {
     return selectedFilters?.length !== 0 && <div className="h-20 w-full p-2"> {selectedFilters?.map((item) =>
       <span onClick={() => { handleFilter(item) }} className="p-2 m-2 rounded-lg bg-[#F6F6F6] cursor-pointer" key={item}> {item} <span className="font-semibold"><CloseOutlined /></span> </span>)}
-      <span onClick={() => { setSelectedFilters([]) }} className="p-2 m-2 rounded-lg bg-[#13188A] cursor-pointer text-white" > Clear All </span>
+      <span onClick={handleClearFilter} className="p-2 m-2 rounded-lg bg-[#13188A] cursor-pointer text-white" > Clear All </span>
     </div>
   }
 
@@ -285,16 +293,12 @@ const GlobalTransaction = ({ user }) => {
               <SelectedFilter />
               <div
                 id="scrollableDiv"
-                style={{
-                  height: 700,
-                  overflow: 'auto',
-                  display: 'flex',
-                }}
               >
                 <InfiniteScroll
-                  dataLength={count}
+                  dataLength={list.length}
                   next={fetchData}
                   hasMore={true}
+                  // scrollThreshold={0.8}
                   loader={isTransactionLoading && <h3 className="text-center">Loading...</h3>}
                   endMessage={
                     <p style={{ textAlign: 'center' }}>
