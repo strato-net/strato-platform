@@ -29,7 +29,7 @@ import { getStringDate } from "../../helpers/utils";
 const limit = '', offset = '';
 
 const TransactionTable = ({ user, download, isAllOrdersLoading }) => {
-  const StratsIcon = <img src={Images.logo} alt="" className="mx-1 w-3 h-3" />
+  const StratsIcon = <img src={Images.strats} alt="" className=" w-5 h-5" />
   // Dispatch
   const transactionDispatch = useTransactionDispatch();
   const marketplaceDispatch = useMarketplaceDispatch();
