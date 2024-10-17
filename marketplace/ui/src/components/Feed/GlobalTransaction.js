@@ -261,8 +261,6 @@ const GlobalTransaction = ({ user }) => {
       </Col>
       <Col span={22} className="mx-auto mt-5 ">
         <div className="w-full flex md:hidden order_responsive">
-          {isTransactionLoading ? <Spin className="mx-auto" />
-            :
             <Row className="w-full">
               <Col>
                 <SelectedFilter />
@@ -277,9 +275,8 @@ const GlobalTransaction = ({ user }) => {
                 {isFilterActive &&
                   <FilterComponent />}
               </Col>
-              <GlobalTransactionResponsive data={transactions} user={user} />
+              <GlobalTransactionResponsive data={list} user={user} isTransactionLoading={isTransactionLoading}  />
             </Row>
-          }
         </div>
         <div className="hidden md:block">
           <Row>
