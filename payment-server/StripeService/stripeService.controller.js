@@ -212,9 +212,7 @@ class StripeServiceController {
         // Prepare HTML content and sendEmail
         try {
           const assetData = await getAsset(checkoutEvent[0].saleAddresses[0]);
-          console.log("assetData at controller: ", assetData)
           const orderString = prepareOrderData(checkoutEvent, assetData);
-          console.log("orderString at controller: ", orderString)
           const htmlContents = buildConcatenatedOrderString(checkoutEvent[0].purchasersCommonName, orderString, assetData);
       
           await sendEmail(email, "Your Order Confirmation", htmlContents);

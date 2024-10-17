@@ -282,7 +282,7 @@ const validateAndGetOrderDetails = async (quantities, saleAddresses) => {
         productName: assetContracts[i].name, 
         unitPrice: isDecimal ? saleContracts[i].price * 100 : saleContracts[i].price, 
         quantity: isDecimal ? quantities[i] / 100 : quantities[i],
-        firstSale: assetContracts[i].address === assetContracts[i].originAddress ? true : false
+        firstSale: assetContracts[i].address === assetContracts[i].originAddress ? true : false 
       });
     }
     return { sellerCommonName, orderDetails };
