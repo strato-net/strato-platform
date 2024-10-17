@@ -15,7 +15,7 @@ import {
   generateIntermediateOrder,
   cancelOrder,
   discardCheckoutQuantity,
-  getAssetName,
+  getAsset,
   prepareOrderData,
   sendEmail,
 } from '../helpers/utils.js';
@@ -211,9 +211,11 @@ class StripeServiceController {
         // EMAIL CONFIRMATION
         // Prepare HTML content and sendEmail
         try {
-          const assetName = await getAssetName(checkoutEvent[0].saleAddresses[0]);
-          const orderString = prepareOrderData(checkoutEvent, assetName);
-          const htmlContents = buildConcatenatedOrderString(checkoutEvent[0].purchasersCommonName, orderString);
+          const assetData = await getAsset(checkoutEvent[0].saleAddresses[0]);
+          console.log("assetData at controller: ", assetData)
+          const orderString = prepareOrderData(checkoutEvent, assetData);
+          console.log("orderString at controller: ", orderString)
+          const htmlContents = buildConcatenatedOrderString(checkoutEvent[0].purchasersCommonName, orderString, assetData);
       
           await sendEmail(email, "Your Order Confirmation", htmlContents);
           console.log("*Buyer placed order*");
@@ -247,9 +249,9 @@ class StripeServiceController {
         // EMAIL CONFIRMATION
         // Prepare HTML content and sendEmail
         try {
-          const assetName = await getAssetName(checkoutEvent[0].saleAddresses[0]);
-          const orderString = prepareOrderData(checkoutEvent, assetName);
-          const htmlContents = buildConcatenatedOrderString(checkoutEvent[0].purchasersCommonName, orderString);
+          const assetData = await getAsset(checkoutEvent[0].saleAddresses[0]);
+          const orderString = prepareOrderData(checkoutEvent, assetData);
+          const htmlContents = buildConcatenatedOrderString(checkoutEvent[0].purchasersCommonName, orderString, assetData);
       
           await sendEmail(email, "Your Order Confirmation", htmlContents);
           console.log("*Buyer placed order*");

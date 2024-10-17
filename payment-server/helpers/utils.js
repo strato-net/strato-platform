@@ -14,7 +14,7 @@ import sgMail from "@sendgrid/mail";
 sgMail.setApiKey(SENDGRID_ENV.API_KEY);
 
 // Fetches Asset Name based on sale address
-const getAssetName = async(saleAddress)=>{
+const getAsset = async(saleAddress)=>{
   //fetch asset address
   const assetToBeSold= await rest.search(
                                         ADMIN.getUser()
@@ -35,7 +35,7 @@ const getAssetName = async(saleAddress)=>{
     query: {
       limit: 1,
       ['address']: `eq.${assetToBeSold[0].assetToBeSold}`,
-      select:"name"
+      select:"name,quantityIsDecimal"
     }
   }
 
@@ -282,7 +282,8 @@ const validateAndGetOrderDetails = async (quantities, saleAddresses) => {
         productName: assetContracts[i].name, 
         unitPrice: isDecimal ? saleContracts[i].price * 100 : saleContracts[i].price, 
         quantity: isDecimal ? quantities[i] / 100 : quantities[i],
-        firstSale: assetContracts[i].address === assetContracts[i].originAddress ? true : false 
+        firstSale: assetContracts[i].address === assetContracts[i].originAddress ? true : false,
+        isDecimal
       });
     }
     return { sellerCommonName, orderDetails };
@@ -359,7 +360,7 @@ export {
   generateIntermediateOrder,
   cancelOrder,
   discardCheckoutQuantity,
-  getAssetName,
+  getAsset,
   sendEmail,
   prepareOrderData,
 }
