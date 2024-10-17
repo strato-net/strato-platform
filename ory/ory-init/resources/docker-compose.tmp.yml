@@ -1,9 +1,10 @@
-
+version: "3.9"
 services:
   hydra:
     image: oryd/hydra:v2.2.0
     command: serve -c /etc/config/hydra/hydra.yml all --dev
     volumes:
+      # TODO: limit what files are mapped in every service
       - type: bind
         source: .
         target: /etc/config/hydra
@@ -19,6 +20,7 @@ services:
       - DSN=postgres://hydra:secret@postgresd:5432/hydra?sslmode=disable&max_conns=20&max_idle_conns=4
     command: migrate -c /etc/config/hydra/hydra.yml sql -e --yes
     volumes:
+      # TODO: limit what files are mapped in every service
       - type: bind
         source: .
         target: /etc/config/hydra
@@ -26,7 +28,7 @@ services:
   postgresd:
     image: postgres:11.8
     ports:
-      - "5432:5432"
+      - "5432:5432" # TODO: REMOVE!
     environment:
       - POSTGRES_USER=hydra
       - POSTGRES_PASSWORD=secret
@@ -41,9 +43,7 @@ services:
     - sslCertFileType=${sslCertFileType}
     image: nginx
     ports:
-    - "4444:4444"
-    - "4433:4433"
-    - "4455:4455"
+    - "443:443"
     volumes:
     - ${sslDir}:/etc/ssl:ro
     - ./nginx.conf:/etc/nginx/nginx.conf:ro
@@ -56,6 +56,7 @@ services:
   kratos-selfservice-ui-node:
     image: oryd/kratos-selfservice-ui-node:v1.1.0
     environment:
+      - BASE_PATH=/ui
       - PORT=4455
       - HYDRA_ADMIN_URL=http://hydra:4445
       - KRATOS_PUBLIC_URL=http://kratos:4433
@@ -70,6 +71,7 @@ services:
     environment:
       - DSN=postgres://kratos:secret@kpostgresd:5432/kratos?sslmode=disable&max_conns=20&max_idle_conns=4
     volumes:
+      # TODO: limit what files are mapped in every service
       -
         type: bind
         source: .
