@@ -164,7 +164,7 @@ function generateHtmlContent(customerFirstName, concatenatedOrderString) {
     let orderTotal = 0; 
     for (let i = 0; i < orderData.length; i++) {
       let orderItem = orderData[i];
-      let isDecimal = assetData[index].quantityIsDecimal && assetData[index].quantityIsDecimal === 'True';
+      let isDecimal = assetData[index].data.quantityIsDecimal && assetData[index].data.quantityIsDecimal === 'True';
       let itemName = decodeURIComponent(orderItem.name);
       let itemPrice = parseFloat(orderItem.unitPrice * (isDecimal ? 100 : 1)).toFixed(2);
       let itemQty = orderItem.qty / (isDecimal ? 100 : 1);

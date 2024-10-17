@@ -35,7 +35,7 @@ const getAsset = async(saleAddress)=>{
     query: {
       limit: 1,
       ['address']: `eq.${assetToBeSold[0].assetToBeSold}`,
-      select:"name,quantityIsDecimal"
+      select:"name,data"
     }
   }
 
@@ -282,8 +282,7 @@ const validateAndGetOrderDetails = async (quantities, saleAddresses) => {
         productName: assetContracts[i].name, 
         unitPrice: isDecimal ? saleContracts[i].price * 100 : saleContracts[i].price, 
         quantity: isDecimal ? quantities[i] / 100 : quantities[i],
-        firstSale: assetContracts[i].address === assetContracts[i].originAddress ? true : false,
-        isDecimal
+        firstSale: assetContracts[i].address === assetContracts[i].originAddress ? true : false
       });
     }
     return { sellerCommonName, orderDetails };
