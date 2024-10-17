@@ -295,8 +295,7 @@ const GlobalTransaction = ({ user }) => {
                   dataLength={list.length}
                   next={fetchData}
                   hasMore={true}
-                  // scrollThreshold={0.8}
-                  loader={isTransactionLoading && <h3 className="text-center">Loading...</h3>}
+                  loader={isTransactionLoading && <h3 className="text-center"><Spin/></h3>}
                   endMessage={
                     <p style={{ textAlign: 'center' }}>
                       <b>Yay! You have seen it all</b>
@@ -306,7 +305,7 @@ const GlobalTransaction = ({ user }) => {
                   <DataTableComponent
                     columns={column}
                     data={list}
-                    isLoading={isTransactionLoading}
+                    isLoading={false}
                     pagination={false}
                     scrollX="100%"
                   />
