@@ -48,10 +48,7 @@ describe('Payment Server - Offboard Stripe Seller', function () {
 
     try {
       // Verify database connection
-      await assert.isFulfilled(
-        verifyDatabaseConnection(),
-        'Database connection could not be verified.'
-      );
+      await verifyDatabaseConnection();
       console.log('Database connection verified successfully.');
 
       const stripeContract = deployment.contracts?.stripe;
