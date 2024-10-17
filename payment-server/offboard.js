@@ -3,6 +3,7 @@ import { rest } from 'blockapps-rest';
 import config from './load.config.js';
 import deployment from './load.deploy.js';
 import oauthHelper from './helpers/oauthHelper.js';
+import { verifyDatabaseConnection, removeStripeAccount } from './helpers/utils.js';
 
 // Function to offboard a seller using the 'offboardSeller' method on the Stripe contract
 async function offboardSeller(token, contract, sellerCommonName) {
@@ -42,16 +43,34 @@ describe('Payment Server - Offboard Stripe Seller', function () {
 
   // Offboard seller from the Stripe payment service
   it('Offboard Seller from Stripe ExternalPaymentService', async () => {
-    const sellerCommonName = process.env.SELLER_NAME;
+    const sellerCommonName = process.env.SELLER_NAME ?? 
+      assert.fail('Seller common name must be provided as a command-line argument.');
 
-    if (!sellerCommonName) {
-      throw new Error('Seller common name must be provided as a command-line argument.');
-    }
+    try {
+      // Verify database connection
+      await assert.isFulfilled(
+        verifyDatabaseConnection(),
+        'Database connection could not be verified.'
+      );
+      console.log('Database connection verified successfully.');
 
-    if (deployment.contracts.stripe) {
-      await offboardSeller(token, deployment.contracts.stripe, sellerCommonName);
-    } else {
-      console.warn('Stripe contract not deployed.');
+      const stripeContract = deployment.contracts?.stripe;
+      if (!stripeContract) {
+        console.warn('Stripe contract not deployed. Skipping offboarding.');
+        return;
+      }
+
+      // Offboard the seller
+      await offboardSeller(token, stripeContract, sellerCommonName);
+      console.log(`Successfully offboarded seller: ${sellerCommonName}`);
+
+      // Remove the seller's account from the database
+      const removeResult = await removeStripeAccount(sellerCommonName);
+      console.log(`Removed Stripe account for seller: ${sellerCommonName}`, removeResult);
+
+    } catch (error) {
+      console.error(`ERROR: Failed to offboard seller: ${sellerCommonName}`, error);
+      throw new Error(`Offboarding process failed for seller: ${sellerCommonName}`);
     }
   });
 });

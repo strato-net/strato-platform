@@ -149,6 +149,16 @@ const insertStripeAccount = async (commonName, accountId) => {
   return insertResult;
 }
 
+const removeStripeAccount = async (commonName) => {
+  const deleteQuery = `
+    DELETE FROM stripe_accounts
+    WHERE commonName = $1
+    `;
+  const deleteValues = [commonName];
+  const deleteResult = await client.query(deleteQuery, deleteValues);
+  return deleteResult;
+}
+
 const insertStripePayment = async (orderHash, sessionId, sellerCommonName) => {
   const insertQuery = `
     INSERT INTO stripe_payments (
@@ -349,6 +359,7 @@ export {
   getStripePaymentsFromTokens,
   insertStripeAccount,
   insertStripePayment,
+  removeStripeAccount,
   updateStripePayment,
   validatePaymentServiceContract,
   validateRedemptionServiceContract,
