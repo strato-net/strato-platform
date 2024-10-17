@@ -158,7 +158,7 @@ function generateHtmlContent(customerFirstName, concatenatedOrderString) {
   // Generating Email Confirmation HTML
   const buildConcatenatedOrderString =  (username, orderData, assetData, isCanceled = false) => {
     let customerFirstName = username;
-    console.log("assetData")
+
     // Construct Email with order details
     let concatenatedOrderString = '';
     let orderTotal = 0; 
