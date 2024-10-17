@@ -41,7 +41,7 @@ services:
     environment:
     - ssl=true
     - sslCertFileType=${sslCertFileType}
-    image: nginx
+    image: nginx:1.27-alpine
     ports:
     - "443:443"
     volumes:
