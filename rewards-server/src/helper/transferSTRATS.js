@@ -8,6 +8,9 @@ const {
   testnetMarketplaceUrl,
   baUsername
 } = require("../config");
+const axios = require("axios");
+
+const baseUrl = NODE_ENV === "prod" ? prodMarketplaceUrl : testnetMarketplaceUrl
 
 function uid(prefix = '', digits = 6) {
   if (digits < 1) digits = 1;
@@ -17,17 +20,17 @@ function uid(prefix = '', digits = 6) {
 }
 
 async function fetchParallelTransaction(token, payload) {
-  const url = `https://${NODE_ENV === "prod" ? prodMarketplaceUrl : testnetMarketplaceUrl}/strato/v2.3/transaction/parallel?resolve=true`;
-  const response = await fetch(url, {
-    method: "POST",
-    credentials: "same-origin",
-    headers: {
-      Accept: "application/json",
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${token}`,
-    },
-    body: JSON.stringify(payload),
-  });
+  const response = await axios.post(
+    `https://${baseUrl}/strato/v2.3/transaction/parallel?resolve=true`,
+    payload,
+    {
+      headers: {
+        Accept: "application/json",
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${token}`
+      }
+    }
+  );
 
   return response;
 }
