@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react";
-import { Button, Dropdown, Space, Input, Row, Col, Popover, Card, Tooltip, Select, DatePicker, Spin } from "antd";
+import { Button, Dropdown, Space, Input, Row, Col, Popover, Card, Tooltip, Select, DatePicker, Spin, Table, Pagination } from "antd";
 import { DownloadOutlined, SearchOutlined } from "@ant-design/icons";
 import { useNavigate, useLocation } from "react-router-dom";
 import classNames from "classnames";
@@ -20,13 +20,11 @@ import { useTransactionDispatch, useTransactionState } from "../../contexts/tran
 import { useMarketplaceDispatch, } from "../../contexts/marketplace";
 // Utils & Constants
 import {
-  STRATS_CONVERSION, TRANSACTION_STATUS, TRANSACTION_STATUS_CLASSES, TRANSACTION_STATUS_COLOR, 
+  STRATS_CONVERSION, TRANSACTION_STATUS, TRANSACTION_STATUS_CLASSES, TRANSACTION_STATUS_COLOR,
   DOWNLOAD_OPTIONS, REDEMPTION_STATUS, REDEMPTION_STATUS_CLASSES, US_DATE_FORMAT
 } from "../../helpers/constants";
 import { SEO } from "../../helpers/seoConstant";
 import { getStringDate } from "../../helpers/utils";
-
-const limit = '', offset = '';
 
 const TransactionTable = ({ user, download, isAllOrdersLoading }) => {
   const StratsIcon = <img src={Images.strats} alt="" className=" w-5 h-5" />
@@ -34,13 +32,16 @@ const TransactionTable = ({ user, download, isAllOrdersLoading }) => {
   const transactionDispatch = useTransactionDispatch();
   const marketplaceDispatch = useMarketplaceDispatch();
   // States
-  const { userTransactions, isTransactionLoading } = useTransactionState();
+  const { userTransactions, globalTransaction, count, isTransactionLoading } = useTransactionState();
 
   const navigate = useNavigate();
   const location = useLocation();
 
+  const pageSize = 20;
   const currentMonth = dayjs().startOf('month').unix();
-
+  const [limit, setLimit] = useState(5);
+  const [offset, setOffset] = useState(0);
+  const [currentPage, setCurrentPage] = useState(1);
   const [type, setType] = useState("");
   const [dateQuery, setDateQuery] = useState("");
   const [transactions, setTransactions] = useState(userTransactions)
@@ -49,7 +50,7 @@ const TransactionTable = ({ user, download, isAllOrdersLoading }) => {
 
   const formatter = new Intl.NumberFormat('en-US');
   const formattedNum = (num) => formatter.format(num);
-  const defaultDate =  dateQuery ? dayjs.unix(dayjs(dateQuery).startOf('month').unix()) : dayjs.unix(currentMonth);
+  const defaultDate = dateQuery ? dayjs.unix(dayjs(dateQuery).startOf('month').unix()) : dayjs.unix(currentMonth);
 
   useEffect(() => {
     async function fetchStratsAddress() {
@@ -59,7 +60,7 @@ const TransactionTable = ({ user, download, isAllOrdersLoading }) => {
     }
     fetchStratsAddress();
   }, [marketplaceDispatch]);
-  
+
   useEffect(() => {
     if (user?.commonName && dateQuery) {
       transactionAction.fetchUserTransaction(
@@ -82,7 +83,7 @@ const TransactionTable = ({ user, download, isAllOrdersLoading }) => {
         dateArr
       );
     }
-  }, [user, dateQuery])
+  }, [user, dateQuery, offset])
 
   useEffect(() => {
     const searchParams = new URLSearchParams(location.search);
@@ -92,11 +93,9 @@ const TransactionTable = ({ user, download, isAllOrdersLoading }) => {
     setType(urlType && urlType !== "all" ? urlType : "");
     setDateQuery(urlDate || "");
   }, [location.search]);
-  
 
   useEffect(() => {
     let filteredData = userTransactions;
-  
     // Type filter
     if (type) {
       if (type === "STRATS") {
@@ -105,7 +104,7 @@ const TransactionTable = ({ user, download, isAllOrdersLoading }) => {
         filteredData = filteredData.filter((item) => item.type === type);
       }
     }
-  
+
     // Search filter
     if (search) {
       const searchString = String(search).toLowerCase();
@@ -113,23 +112,22 @@ const TransactionTable = ({ user, download, isAllOrdersLoading }) => {
         String(item.assetName).toLowerCase().includes(searchString)
       );
     }
-  
+
     // Apply the date filter (month and year comparison)
     if (dateQuery) {
       // Format `dateQuery` (e.g., "August 2024") into a dayjs object
       const selectedMonthYear = dayjs(dateQuery, "MMMM YYYY");
-  
+
       filteredData = filteredData.filter((item) => {
         const itemDate = dayjs(item.block_timestamp); // Convert block timestamp to dayjs object
-  
+
         // Compare both month and year
         return itemDate.isSame(selectedMonthYear, 'month') && itemDate.isSame(selectedMonthYear, 'year');
       });
     }
-  
+
     setTransactions(filteredData);
   }, [userTransactions, type, search, dateQuery]);
-  
 
 
   // Handle the date change event. Update the URL and state
@@ -140,7 +138,6 @@ const TransactionTable = ({ user, download, isAllOrdersLoading }) => {
     navigate(`/transactions?type=${currentType}&date=${formattedDate}`);
     setDateQuery(formattedDate); // Update the date state
   };
-  
 
   const dateReturn = (date) => {
     const startDate = dayjs(date).startOf('month').unix();
@@ -158,7 +155,7 @@ const TransactionTable = ({ user, download, isAllOrdersLoading }) => {
             <img src={data?.assetImage} alt={data?.assetName} className="border w-88 h-88 border-indigo-600 rounded-md" />
           </Col>
           <Col span={8} offset={1}>
-            <p className="text-base font-bold text-truncate cursor-pointer" onClick={()=>{handleAssetRedirection(data)}}>{data?.assetName}</p>
+            <p className="text-base font-bold text-truncate cursor-pointer" onClick={() => { handleAssetRedirection(data) }}>{data?.assetName}</p>
             <p style={{ color: '#827474' }} className="font-medium mt-2 min-h-20 cursor-default text-truncate"><Tooltip placement="top" title={data.assetDescription.replace(/<\/?[^>]+(>|$)/g, "")}> {data?.assetDescription.replace(/<\/?[^>]+(>|$)/g, "")} </Tooltip></p>
           </Col>
           <Col span={8} offset={1}>
@@ -191,7 +188,7 @@ const TransactionTable = ({ user, download, isAllOrdersLoading }) => {
   }
 
   const handleAssetRedirection = (data) => {
-    const url = routes.MarketplaceProductDetail.url.replace(':address',data.assetAddress).replace(':name', data.assetName)
+    const url = routes.MarketplaceProductDetail.url.replace(':address', data.assetAddress).replace(':name', data.assetName)
     navigate(url)
   }
 
@@ -207,7 +204,7 @@ const TransactionTable = ({ user, download, isAllOrdersLoading }) => {
           onClick={() => {
             handleDetailRedirection(data)
           }}
-          className={`text-[#13188A] hover:text-primaryHover ${data.type === 'Transfer' ? 'cursor-default' : 'cursor-pointer' }`}
+          className={`text-[#13188A] hover:text-primaryHover ${data.type === 'Transfer' ? 'cursor-default' : 'cursor-pointer'}`}
         >
           {`#${`${reference}`.substring(0, 6)}`}
         </p>
@@ -229,14 +226,14 @@ const TransactionTable = ({ user, download, isAllOrdersLoading }) => {
       render: (asset, data) => (
         <Popover className="flex" content={<Content data={data} />} trigger="hover">
           <div className="flex items-center cursor-default">
-            <img src={data?.assetImage} alt={data?.assetName} width={24} height={30} 
-              className="border w-9 h-9 border-indigo-600 rounded-md object-contain" 
+            <img src={data?.assetImage} alt={data?.assetName} width={24} height={30}
+              className="border w-9 h-9 border-indigo-600 rounded-md object-contain"
             />
             <span className="ml-1 text-truncate">{data?.assetName}</span>
           </div>
         </Popover>
       )
-    },    
+    },
     {
       title: "Quantity",
       dataIndex: "quantity",
@@ -273,16 +270,17 @@ const TransactionTable = ({ user, download, isAllOrdersLoading }) => {
       key: "hash",
       align: "left",
       width: '150px',
-      render: (data, { transaction_hash }) =>{
+      render: (data, { transaction_hash }) => {
         return <Tooltip placement="top" title={transaction_hash || ''}>
-        <p className="text-[#13188A] hover:text-primaryHover cursor-pointer text-truncate-single-line" >{transaction_hash ? `# ${transaction_hash}` : '--'}</p>
-      </Tooltip>}
+          <p className="text-[#13188A] hover:text-primaryHover cursor-pointer text-truncate-single-line" >{transaction_hash ? `# ${transaction_hash}` : '--'}</p>
+        </Tooltip>
+      }
     },
     {
       dataIndex: "date",
       key: "date",
       width: '150px',
-      render: (text,{createdDate}) => <p>{getStringDate(createdDate, US_DATE_FORMAT)}</p>,
+      render: (text, { createdDate }) => <p>{getStringDate(createdDate, US_DATE_FORMAT)}</p>,
       title: (
         <div style={{ display: "flex" }}>
           <div className="mt-1.5">{"Date"}</div>
@@ -297,6 +295,12 @@ const TransactionTable = ({ user, download, isAllOrdersLoading }) => {
       render: (text, data) => statusComponent(text, data),
     },
   ];
+
+  const handlePagination = (current) =>{
+    setCurrentPage(current)
+    const offsetVal = (current-1) * 5
+    setOffset(offsetVal)
+  }
 
   const statusComponent = (status, data) => {
     status = data.type === "Transfer" ? 3 : status
@@ -317,7 +321,7 @@ const TransactionTable = ({ user, download, isAllOrdersLoading }) => {
   // Handle the Type change event. Update the URL and state
   const handleFilter = (val) => {
     const currentDateQuery = dateQuery || ""; // Use the current date or empty string if not set
-  
+
     // If "All" is selected, remove `type` from query params
     const queryParams = new URLSearchParams();
     if (val && val !== "all") {
@@ -326,12 +330,10 @@ const TransactionTable = ({ user, download, isAllOrdersLoading }) => {
     if (currentDateQuery) {
       queryParams.set("date", currentDateQuery);
     }
-  
+
     navigate(`/transactions?${queryParams.toString()}`);
     setType(val === "all" ? "" : val); // Set empty type for "All"
   };
-  
-  
 
   const metaImg = SEO.IMAGE_META;
 
@@ -401,18 +403,35 @@ const TransactionTable = ({ user, download, isAllOrdersLoading }) => {
       </Col>
       <Col span={22} className="mx-auto mt-5">
         <div className="flex md:hidden order_responsive">
-          {isTransactionLoading ? <Spin className="mx-auto" /> 
-          : <TransactionResponsive data={transactions} user={user} />}
+          {isTransactionLoading ? <Spin className="mx-auto" />
+            : <TransactionResponsive data={transactions} user={user} />}
         </div>
         <div className="hidden md:block">
-          <DataTableComponent
-            columns={column}
-            data={transactions}
-            isLoading={isTransactionLoading}
-            pagination={false}
-            scrollX="100%"
-          />
+          <Spin spinning={isTransactionLoading} delay={500} size="large">
+            <Table
+              columns={column}
+              dataSource={transactions}
+              className="custom-table"
+              sticky={true}
+              pagination={false}
+              scroll={{
+                x: '100%',
+              }}
+              size="middle"
+              rowClassName={"bg-white"}
+            />
+          </Spin>
         </div>
+        <div className="flex justify-center pt-6">
+            <Pagination
+              current={currentPage}
+              defaultPageSize={pageSize}
+              onChange={(e)=>{handlePagination(e)}}
+              total={count}
+              showSizeChanger={false}
+              className="flex justify-center my-5"
+            />
+          </div>
       </Col>
     </Row>
   );
