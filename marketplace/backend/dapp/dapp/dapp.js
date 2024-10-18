@@ -545,13 +545,17 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
   };
 
   contract.closeRedemption = async function (args, options = optionsNoChainIds) {
-    const { id, assetAddresses, redemptionService, status, ...restArgs } = args;
+    const { id, assetAddresses, redemptionService, status, issuerCommonName, ...restArgs } = args;
 
     let assetStatus;
     if (status === REDEMPTION_STATUS.FULFILLED) {
       assetStatus = ASSET_STATUS.RETIRED;
     } else if (status === REDEMPTION_STATUS.REJECTED) {
       assetStatus = ASSET_STATUS.ACTIVE;
+    }
+
+    if (issuerCommonName !== userCert.commonName) {
+      throw new rest.RestError(RestStatus.UNAUTHORIZED, 'Only the issuer can close a redemption request');
     }
 
     const contract = { address: assetAddresses[0] };
