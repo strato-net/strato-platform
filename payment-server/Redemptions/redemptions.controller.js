@@ -10,14 +10,14 @@ class RedemptionsController {
             }
 
             let orderByClause = '';
-            const order = req.query.order;
+            const {order, limit, offset } = req.query;
 
             if (order === 'ASC' || order === 'DESC') {
-                orderByClause = `ORDER BY createdDate ${order}`;
+                orderByClause = `ORDER BY createdDate ${order} LIMIT ${limit} OFFSET ${offset}`;
             }
 
             const query = `SELECT * FROM redemptions WHERE ownerCommonName = $1 AND ($2 = '' OR redemption_id::text = $2) ${orderByClause}`;
-            const countQuery = `SELECT COUNT(*) AS total_count FROM redemptions WHERE ownerCommonName = $1 AND ($2 = '' OR redemption_id::text = $2) ${orderByClause}`
+            const countQuery = `SELECT COUNT(*) AS total_count FROM redemptions WHERE ownerCommonName = $1 AND ($2 = '' OR redemption_id::text = $2)`
 
             const values = [req.params.commonName, req.query.redemptionId];
 
@@ -69,14 +69,14 @@ class RedemptionsController {
             }
 
             let orderByClause = '';
-            const order = req.query.order;
+            const {order, limit, offset } = req.query;
 
             if (order === 'ASC' || order === 'DESC') {
-                orderByClause = `ORDER BY createdDate ${order}`;
+                orderByClause = `ORDER BY createdDate ${order} LIMIT ${limit} OFFSET ${offset}`;
             }
 
             const query = `SELECT * FROM redemptions WHERE issuerCommonName = $1 AND ($2 = '' OR redemption_id::text = $2) ${orderByClause}`;
-            const countQuery = `SELECT COUNT(*) AS total_count FROM redemptions WHERE issuerCommonName = $1 AND ($2 = '' OR redemption_id::text = $2) ${orderByClause}`
+            const countQuery = `SELECT COUNT(*) AS total_count FROM redemptions WHERE issuerCommonName = $1 AND ($2 = '' OR redemption_id::text = $2)`
             const values = [req.params.commonName, req.query.redemptionId];
 
             const result = await client.query(query, values);
