@@ -14,7 +14,7 @@ serve:
 selfservice:
   default_browser_return_url: https://${domainName}:8443/ui/
   allowed_return_urls:
-    - https://${domainName}/ui/
+    - https://${domainName}:8443/ui/
 
   methods:
     password:
