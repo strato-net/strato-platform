@@ -60,7 +60,7 @@ class TransactionController {
                 outgoingRedemptions = await dapp.getOutgoingRedemptionRequests(redemptionQuery)
                 incomingRedemptions = await dapp.getIncomingRedemptionRequests(redemptionQuery)
                 let redemptions = [...outgoingRedemptions?.data, ...incomingRedemptions?.data];
-                const total = outgoingRedemptions?.count + incomingRedemptions?.count;
+                const total = Number(outgoingRedemptions?.count) + Number(incomingRedemptions?.count);
                 count = count + total;
                 redemptions = redemptions.filter((value, index, self) =>
                     index === self.findIndex((t) => (
