@@ -13,7 +13,7 @@ import { PAYMENT_LABEL } from "../../helpers/constants";
 const { Option } = Select;
 
 const ResponsiveCart = ({
-  paymentProviders,
+  paymentServices,
   data,
   confirm,
   AddQty,
@@ -22,7 +22,7 @@ const ResponsiveCart = ({
   removeCartList,
   openToastOrder
 }) => {
-  const initialPaymentState = paymentProviders?.length !==0 ? paymentProviders[0] : '' 
+  const initialPaymentState = paymentServices?.length !==0 ? paymentServices[0] : '' 
   const [selectedProvider, setSelectedProvider] = useState(initialPaymentState);
   const marketplaceDispatch = useMarketplaceDispatch();
   const [tax, setTax] = useState(0);
@@ -91,22 +91,22 @@ const ResponsiveCart = ({
     htmlContents.push(generateHtmlContent(customerFirstName, concatenatedOrderString));
   };
 
-  const handlePaymentConfirm = async (paymentProvider) => {
+  const handlePaymentConfirm = async (paymentService) => {
     actions.addItemToConfirmOrder(marketplaceDispatch, cartData);
     let orderList = [];
     cartData.forEach((item) => {
       orderList.push({
-        quantity: item.qty,
+        quantity: item.quantityIsDecimal && item.quantityIsDecimal === "True" ? item.qty * 100 : item.qty,
         assetAddress: item.key,
         firstSale: item.firstSale,
-        unitPrice: item.unitPrice
+        unitPrice: item.quantityIsDecimal && item.quantityIsDecimal === "True" ? item.unitPrice / 100 : item.unitPrice
       });
     });
 
     generate_HTML_Content(user.commonName)
 
     let body = {
-      paymentProvider: { address: paymentProvider.address },
+      paymentService: { address: paymentService.address, serviceName: paymentService.serviceName },
       buyerOrganization: userOrganization,
       orderList,
       orderTotal: total,
@@ -129,8 +129,8 @@ const ResponsiveCart = ({
     let checkoutHashAndAssets = await orderActions.createPayment(orderDispatch, body);
     if (checkoutHashAndAssets && checkoutHashAndAssets !== false) {
       const [checkoutHash, assets] = checkoutHashAndAssets;
-      let serviceURL = paymentProvider.serviceURL || paymentProvider.data.serviceURL;
-      let checkoutRoute = paymentProvider.checkoutRoute || paymentProvider.data.checkoutRoute;
+      let serviceURL = paymentService.serviceURL || paymentService.data.serviceURL;
+      let checkoutRoute = paymentService.checkoutRoute || paymentService.data.checkoutRoute;
       if (serviceURL && serviceURL !== '' && checkoutRoute && checkoutRoute !== '') {
         const url = `${serviceURL}${checkoutRoute}?email=${encodeURIComponent(user.email)}&checkoutHash=${checkoutHash}&redirectUrl=${window.location.protocol}//${window.location.host}/order/status`;
         window.location.replace(url);
@@ -141,7 +141,7 @@ const ResponsiveCart = ({
   };
 
   const handleChange = async (value) => {
-    const provider = paymentProviders.find(provider => provider?.serviceName === value);
+    const provider = paymentServices.find(provider => provider?.serviceName === value);
     setSelectedProvider(provider);
   };
 
@@ -185,7 +185,7 @@ const ResponsiveCart = ({
     }
   }
 
-  const totalAmount = selectedProvider?.serviceName === 'STRATS' ? 
+  const totalAmount = selectedProvider?.serviceName === 'STRATS' || selectedProvider?.serviceName?.includes('STRATS') ? 
              `${(subTotal * 100).toFixed(0)} STRATS` :  
              selectedProvider?.serviceName === 'Stripe' ? `${subTotal} USD` : 
              `${subTotal} ${selectedProvider?.serviceName || 'USD'}`
@@ -313,7 +313,7 @@ const ResponsiveCart = ({
               value={selectedProvider?.serviceName}
               className="w-full">
               <div className="flex flex-col space-y-4">
-                {paymentProviders && paymentProviders.map(provider => (
+                {paymentServices && paymentServices.map(provider => (
                   provider &&
                   <Radio value={provider?.serviceName} className="w-full">
                     <p className="flex text-base font-normal items-center"> 
@@ -332,7 +332,7 @@ const ResponsiveCart = ({
           </div>
           <Button
             type="primary"
-            disabled={!paymentProviders || paymentProviders?.length===0}
+            disabled={!paymentServices || paymentServices?.length===0}
             className="w-full mt-3 mb-6 bg-blue-800 text-white h-10 text-lg"
             onClick={()=>{handlePlaceOrder(selectedProvider)}}
           >

@@ -108,6 +108,12 @@ export const Tokens = {
   create: '/'
 }
 
+export const STRATS = {
+  prefix: '/STRATSTokens',
+  getAll: '/',
+  create: '/'
+}
+
 export const CarbonOffset = {
   prefix: '/carbonOffset',
   getAll: '/',
@@ -175,6 +181,7 @@ export const Marketplace = {
   getTopSellingProductsLoggedIn: '/user/topselling',
   transferStrats: '/strats/transfer',
   getStratsBalance: '/strats',
+  getStratsAddress: '/strats/address',
   getStratsTransactionHistory: '/strats/history'
 }
 

@@ -28,7 +28,7 @@ import { PAYMENT_LABEL } from "../../helpers/constants";
 
 const { Option } = Select;
 
-const ConfirmOrder = ({ paymentProviders = [], data, columns }) => {
+const ConfirmOrder = ({ paymentServices = [], data, columns }) => {
   const marketplaceDispatch = useMarketplaceDispatch();
   const orderDispatch = useOrderDispatch();
   const [api, contextHolder] = notification.useNotification();
@@ -41,8 +41,7 @@ const ConfirmOrder = ({ paymentProviders = [], data, columns }) => {
   const { success: marketplaceSuccess, message: marketplaceMessage } = useMarketplaceState();
   const [modal, contextHolderForModal] = Modal.useModal();
   const [cartData, setCartData] = useState(data);
-  
-  const activePaymentProviders = (paymentProviders[0] !== undefined) ? paymentProviders.filter(paymentProvider => paymentProvider?.isActive) : [];
+  const activePaymentProviders = (paymentServices[0] !== undefined) ? paymentServices.filter(paymentProvider => paymentProvider?.isActive) : [];
   const initialPaymentState = activePaymentProviders?.length !==0 ? activePaymentProviders[0] : '' 
   const [selectedProvider, setSelectedProvider] = useState(initialPaymentState);
 
@@ -153,22 +152,22 @@ const ConfirmOrder = ({ paymentProviders = [], data, columns }) => {
   };
 
 
-  const handlePaymentConfirm = async (paymentProvider) => {
+  const handlePaymentConfirm = async (paymentService) => {
     actions.addItemToConfirmOrder(marketplaceDispatch, cartData);
     let orderList = [];
     cartData.forEach((item) => {
       orderList.push({
-        quantity: item.qty,
+        quantity: item.quantityIsDecimal && item.quantityIsDecimal === "True" ? item.qty * 100 : item.qty,
         assetAddress: item.key,
         firstSale: item.firstSale,
-        unitPrice: item.unitPrice
+        unitPrice: item.quantityIsDecimal && item.quantityIsDecimal === "True" ? item.unitPrice / 100 : item.unitPrice
       });
     });
 
     generate_HTML_Content(user.commonName)
 
     let body = {
-      paymentProvider: { address: paymentProvider.address },
+      paymentService: { address: paymentService.address, serviceName: paymentService.serviceName },
       buyerOrganization: userOrganization,
       orderList,
       orderTotal: total,
@@ -196,8 +195,8 @@ const ConfirmOrder = ({ paymentProviders = [], data, columns }) => {
     }
     if (checkoutHashAndAssets && checkoutHashAndAssets !== false) {
       const [checkoutHash, assets] = checkoutHashAndAssets;
-      let serviceURL = paymentProvider.serviceURL || paymentProvider.data.serviceURL;
-      let checkoutRoute = paymentProvider.checkoutRoute || paymentProvider.data.checkoutRoute;
+      let serviceURL = paymentService.serviceURL || paymentService.data.serviceURL;
+      let checkoutRoute = paymentService.checkoutRoute || paymentService.data.checkoutRoute;
       if (serviceURL
         && serviceURL !== ''
         && checkoutRoute
@@ -212,7 +211,7 @@ const ConfirmOrder = ({ paymentProviders = [], data, columns }) => {
   };
 
   const handleChange = async (value) => {
-    const provider = activePaymentProviders.find(provider => provider?.serviceName === value);
+    const provider = paymentServices.find(provider => provider?.serviceName === value);
     setSelectedProvider(provider);
   };
 
@@ -260,7 +259,7 @@ const handlePlaceOrder = async () => {
   }
 }
 
-const totalAmount = selectedProvider?.serviceName === 'STRATS' ? 
+const totalAmount = selectedProvider?.serviceName === 'STRATS' || selectedProvider?.serviceName?.includes('STRATS') ? 
       `${(subTotal * 100).toFixed(0)} STRATS` :  
       selectedProvider?.serviceName === 'Stripe' ? `${subTotal} USD` : 
       `${subTotal} ${selectedProvider?.serviceName || 'USD'}`

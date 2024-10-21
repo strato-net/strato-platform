@@ -25,6 +25,7 @@ import           Executable.StratoP2P
 import           BlockApps.Init
 import           BlockApps.Logging as BL
 import           Data.IORef
+import           Data.Set.Ordered (empty)
 import           Instrumentation
 
 main :: IO ()
@@ -37,7 +38,8 @@ initP2P = labelTheThread "initP2P" $ do
   liftIO $ resetPeers
   _ <- liftIO $ $initHFlags "Strato P2P"
   setParticipationMode flags_participationMode
-  cfg <- initConfig flags_maxReturnedHeaders
+  wireMessagesRef <- liftIO $ newIORef empty
+  cfg <- initConfig wireMessagesRef flags_maxReturnedHeaders
   let sSource = seqEventNotificationSource . contextKafkaState
       runner f = do
         c' <- initContext
