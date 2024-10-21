@@ -4,10 +4,10 @@ serve:
 
 urls:
   self:
-    issuer: https://${domainName}
-  consent: https://${domainName}/ui/consent
-  login: https://${domainName}/ui/login
-  logout: https://${domainName}/ui/logout
+    issuer: https://${domainName}:8443
+  consent: https://${domainName}:8443/ui/consent
+  login: https://${domainName}:8443/ui/login
+  logout: https://${domainName}:8443/ui/logout
 
 secrets:
   system:

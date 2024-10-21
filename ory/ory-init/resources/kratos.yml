@@ -5,14 +5,14 @@ dsn: memory
 
 serve:
   public:
-    base_url: https://${domainName}
+    base_url: https://${domainName}:8443
     cors:
       enabled: true
   admin:
     base_url: http://kratos:4434
 
 selfservice:
-  default_browser_return_url: https://${domainName}/ui/
+  default_browser_return_url: https://${domainName}:8443/ui/
   allowed_return_urls:
     - https://${domainName}/ui/
 
@@ -26,18 +26,18 @@ selfservice:
 
   flows:
     error:
-      ui_url: https://${domainName}/ui/error
+      ui_url: https://${domainName}:8443/ui/error
 
     settings:
-      ui_url: https://${domainName}/ui/settings
+      ui_url: https://${domainName}:8443/ui/settings
       privileged_session_max_age: 15m
       required_aal: highest_available
 
     login:
-      ui_url: https://${domainName}/ui/login
+      ui_url: https://${domainName}:8443/ui/login
 
     registration:
-      ui_url: https://${domainName}/ui/registration
+      ui_url: https://${domainName}:8443/ui/registration
 
 identity:
   schemas:
