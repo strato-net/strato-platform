@@ -7,7 +7,7 @@ import { saveAs } from 'file-saver';
 import { actions as categoryActions } from "../../contexts/category/actions";
 import { useCategoryState, useCategoryDispatch } from "../../contexts/category";
 import startCase from 'lodash/startCase';
-import { epochToDate, getStringDate } from "../../helpers/utils";
+import { epochToDate, getStringDate, groupBy } from "../../helpers/utils";
 import { REDEMPTION_STATUS, TRANSACTION_STATUS, US_DATE_FORMAT } from "../../helpers/constants";
 import TransactionTable from "./TransactionTable";
 import { useTransactionState } from "../../contexts/transaction";
@@ -88,7 +88,7 @@ const Transaction = ({ user }) => {
 
   useEffect(() => {
     const mappedData = mapTransactionData(userTransactions)
-    const { Order, Redemption, Transfer } = Object.groupBy(mappedData, ({ Type }) => Type);
+    const { Order, Redemption, Transfer } = groupBy(mappedData, ({ Type }) => Type);
     if (userTransactions && callExcel && !isTransactionLoading) {
       const wb = XLSX.utils.book_new();
       const wsOrder = XLSX.utils.json_to_sheet(Order ? Order : []);

@@ -16,7 +16,7 @@ import axios from 'axios';
 sgMail.setApiKey(SENDGRID_ENV.API_KEY);
 
 // Fetches Asset Name based on sale address
-const getAssetName = async(saleAddress)=>{
+const getAsset = async(saleAddress)=>{
   //fetch asset address
   const assetToBeSold= await rest.search(
                                         ADMIN.getUser()
@@ -37,7 +37,7 @@ const getAssetName = async(saleAddress)=>{
     query: {
       limit: 1,
       ['address']: `eq.${assetToBeSold[0].assetToBeSold}`,
-      select:"name"
+      select:"name,data"
     }
   }
 
@@ -235,6 +235,7 @@ const checkSellerOnboarded = async (commonName) => {
       limit: 1,
       ['sellersCommonName']: `eq.${commonName}`,
       ['address']: `eq.${STRIPE_CONTRACT_ADDRESS}`,
+      ['order']: `id.desc`
     }
   }
 
@@ -361,7 +362,7 @@ export {
   generateIntermediateOrder,
   cancelOrder,
   discardCheckoutQuantity,
-  getAssetName,
+  getAsset,
   sendEmail,
   prepareOrderData,
 }
