@@ -193,16 +193,38 @@ async function getAll(admin, args = {}, baseOptions) {
 
 async function getNotOnboarded(admin, args = {}, baseOptions) {
     const { sellersCommonName, ...restArgs } = args;
+
+    // Step 1: Fetch onboarded events
     const eventContract = { name: `${tablePrefix}${onboardedEventName}` }
     const onboardedQuery = {
       sellersCommonName: `eq.${sellersCommonName}`,
-      select: `ownerCommonName,serviceName`,
+      select: `ownerCommonName,serviceName,isActive,block_timestamp`,
       ownerCommonName: `neq.null`,
       serviceName: `neq.null`,
     }
     const onboardedOptions = { ...baseOptions, query: onboardedQuery };
     const onboardedEventsRes = await rest.search(admin, eventContract, onboardedOptions);
-    const onboardedServices = onboardedEventsRes.map((oe) => `or(ownerCommonName.neq."${oe.ownerCommonName}",serviceName.neq."${oe.serviceName}")`);
+
+    // Step 2: Get latest unique active entries
+    const latestActiveEntries = Array.from(
+      onboardedEventsRes.reduce((map, entry) => {
+        const key = `${entry.serviceName}-${entry.ownerCommonName}`;
+        const entryTimestamp = new Date(entry.block_timestamp);
+
+        if (
+          !map.has(key) ||
+          entryTimestamp > new Date(map.get(key).block_timestamp)
+        ) {
+          map.set(key, entry);
+        }
+        return map;
+      }, new Map())
+    )
+      .map(([, value]) => value) // Extract the values from the Map
+      .filter((entry) => entry.isActive); // Keep only active entries
+
+    // Step 3: Build exclusion query using onboarded services
+    const onboardedServices = latestActiveEntries.map((oe) => `or(ownerCommonName.neq."${oe.ownerCommonName}",serviceName.neq."${oe.serviceName}")`);
     const contract = { name: `${tablePrefix}${contractName}` }
     const notOnboardedQuery = {
       isActive: 'eq.true',

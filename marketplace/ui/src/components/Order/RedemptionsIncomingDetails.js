@@ -65,14 +65,18 @@ const RedemptionsIncomingDetails = ({ user }) => {
     }, [id, dispatch]);
 
     useEffect(() => {
-        if (redemption) {
+        if (redemption && user) {
+            if (redemption.issuerCommonName !== user.commonName) {
+                navigate(routes.Marketplace.url);
+                return;
+            }
             const fetchAssetAndUserAddress = async () => {
                 await inventoryActions.fetchInventoryDetail(inventoryDispatch, redemption.assetAddresses[0]);
                 await marketplaceActions.fetchUserAddress(marketplaceDispatch, redemptionService, redemption.shippingAddressId);
             };
             fetchAssetAndUserAddress();
         }
-    }, [redemption, inventoryDispatch]);
+    }, [redemption, inventoryDispatch, user]);
 
     const OrderData = ({ title, value }) => {
         return (
@@ -116,11 +120,6 @@ const RedemptionsIncomingDetails = ({ user }) => {
             </div>
         );
     };
-
-    const onChange = (key) => {
-        navigate(routes.Transactions.url)
-    };
-
 
     inventoryDetails = { ...inventoryDetails, images: inventoryDetails && Array.isArray(inventoryDetails["BlockApps-Mercata-Asset-images"]) ? inventoryDetails["BlockApps-Mercata-Asset-images"][0].value : [] }
     let column = [
@@ -176,7 +175,8 @@ const RedemptionsIncomingDetails = ({ user }) => {
             issuerComments: comments,
             id: redemption.redemption_id,
             assetAddresses: redemption.assetAddresses,
-            redemptionService
+            redemptionService,
+            issuerCommonName: redemption.issuerCommonName
         }
 
         const isDone = await actions.closeRedemption(dispatch, body);

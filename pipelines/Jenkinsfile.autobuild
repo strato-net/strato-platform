@@ -282,6 +282,7 @@ pipeline {
                 allOf {
                   branch "PR-*"
                   environment(name: "CHANGE_TARGET", value: "develop")
+                  changeset "strato/**"
                 }
               }
               agent { label "testsync" }
