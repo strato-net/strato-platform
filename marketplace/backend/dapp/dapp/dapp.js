@@ -475,6 +475,7 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
 
     try {
       let redemptions = [];
+      let count = 0;
       const redemptionEvents = await redemptionServiceJs.getRedemptions(rawAdmin,{ limit }, options);
       const redemptionServiceAddresses = redemptionEvents.map(r => r.address);
       let redemptionServices = await redemptionServiceJs.getAll(rawAdmin, { address: redemptionServiceAddresses }, options);
@@ -488,6 +489,7 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
         const serviceUrl = rs.serviceURL || rs.data.serviceURL;
         const res = await axios.get(`${serviceUrl}/redemption/all?${queryParams}`);
         if (res.status === 200) {
+          count = res.data.count; 
           return res.data.data.map((item) => {
             const date = new Date(item.createdDate);
             const unixTimestamp = Math.floor(date.getTime() / 1000);
@@ -515,7 +517,7 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
         redemptions.sort((a, b) => b.createdDate - a.createdDate);
 
 
-      return redemptions;
+      return {data:redemptions, count};
     } catch (error) {
       if (error.response) {
         throw new rest.RestError(error.response.status, error.response.statusText);

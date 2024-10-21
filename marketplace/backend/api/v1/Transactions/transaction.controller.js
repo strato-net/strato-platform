@@ -168,7 +168,8 @@ class TransactionController {
             }
             if (type?.includes('Redemption') || !type) {
                 redemptions = await dapp.getAllRedemptionRequests(redemptionQuery)
-                redemptions = redemptions.filter((value, index, self) =>
+                count = count + Number(redemptions.count);
+                redemptions = redemptions?.data.filter((value, index, self) =>
                     index === self.findIndex((t) => (
                         t.redemption_id === value.redemption_id
                     ))
