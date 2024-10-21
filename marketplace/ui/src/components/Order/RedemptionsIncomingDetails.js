@@ -30,6 +30,7 @@ import ClickableCell from "../ClickableCell";
 import AddressComponent from "../MarketPlace/AddressComponent";
 
 const RedemptionsIncomingDetails = ({ user }) => {
+    
     const [id, setId] = useState(undefined);
     const [redemptionService, setRedemptionService] = useState(undefined);
     const dispatch = useRedemptionDispatch();
@@ -44,7 +45,6 @@ const RedemptionsIncomingDetails = ({ user }) => {
     const { redemption, isFetchingRedemptionDetails, isClosingRedemption, message, success, } = useRedemptionState();
     let { inventoryDetails, isInventoryDetailsLoading } = useInventoryState();
     const { userAddress } = useMarketplaceState();
-
     const routeMatch = useMatch({
         path: routes.RedemptionsIncomingDetails.url,
         strict: true,
@@ -176,6 +176,11 @@ const RedemptionsIncomingDetails = ({ user }) => {
             id: redemption.redemption_id,
             assetAddresses: redemption.assetAddresses,
             redemptionService,
+            redeemerCommonName: redemption.ownerCommonName,
+            redeemerAddress: inventoryDetails.owner,
+            issuerCommonName: user?.commonName,
+            assetName: inventoryDetails.name,
+            quantity: inventoryDetails.quantity,
             issuerCommonName: redemption.issuerCommonName
         }
 

@@ -11,6 +11,8 @@ import ADMIN from './oauth.js';
 import lodash from 'lodash';
 const { get } = lodash;
 import sgMail from "@sendgrid/mail";
+import oauthHelper from './oauthHelper.js';
+import axios from 'axios';
 sgMail.setApiKey(SENDGRID_ENV.API_KEY);
 
 // Fetches Asset Name based on sale address
@@ -57,29 +59,29 @@ const prepareOrderData = (orderDetails, assetData) => {
 
 const sendEmail = async(to, subject, htmlContent) => {
 
-  const msg = {
-    to: to,
-    from: { email: "no_reply@blockapps.net", name: "BlockApps.net" },
-    subject: subject,
-    html: htmlContent,
-    // Remove sales from these emails for testnet testing. This needs to be included for production. 
-    bcc: 'sales@blockapps.net',
-    // attachments: [
-    //   {
-    //     content: pdf.toString("base64"),
-    //     filename: "certificate.pdf",
-    //     type: "application/pdf",
-    //     disposition: "attachment",
-    //   },
-    // ],
+  const url = process.env.NOTIFICATION_SERVER_URL
+  const {token } = await oauthHelper.getServiceToken()
+  const reqBody = {
+    usernames: [to],
+    message: {
+      subject: subject,
+      htmlContent: htmlContent
+    }
   };
-
   try {
-    await sgMail.send(msg);
-    console.log("Email sent successfully!");
+    const response = await axios.post(`${url}/notify`, reqBody, {
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${token}`,
+      },
+    });
+
+    if (response.status === 200 || response.status === 201) {
+      console.log("Email sent successfully");
+    }
+
   } catch (error) {
     console.error("Error sending email:", error);
-    throw error;
   }
 }
 
