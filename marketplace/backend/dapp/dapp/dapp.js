@@ -371,7 +371,7 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
       const redemptionPromises = redemptionServices.map(async (rs) => {
         const serviceUrl = rs.serviceURL || rs.data.serviceURL;
         const getOutgoingRedemptionRoute = rs.outgoingRedemptionsRoute || rs.data.outgoingRedemptionsRoute;
-        let res = await axios.get(new URL(`${process.env.PAYMENT_SERVER_URL}${getOutgoingRedemptionRoute}/${userCert.commonName}?${queryParams}`).href);
+        let res = await axios.get(new URL(`${serviceUrl}${getOutgoingRedemptionRoute}/${userCert.commonName}?${queryParams}`).href);
         if (res.status === 200)
           return res.data.data.map((item) => {
             const date = new Date(item.createdDate);
@@ -430,7 +430,7 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
       const redemptionPromises = redemptionServices.map(async (rs) => {
         const serviceUrl = rs.serviceURL || rs.data.serviceURL;
         const getIncomingRedemptionRoute = rs.incomingRedemptionsRoute || rs.data.incomingRedemptionsRoute;
-        const res = await axios.get(new URL(`${process.env.PAYMENT_SERVER_URL}${getIncomingRedemptionRoute}/${userCert.commonName}?${queryParams}`).href);
+        const res = await axios.get(new URL(`${serviceUrl}${getIncomingRedemptionRoute}/${userCert.commonName}?${queryParams}`).href);
         if (res.status === 200) {
           return res.data.data.map((item) => {
             const date = new Date(item.createdDate);
