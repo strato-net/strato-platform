@@ -143,6 +143,7 @@ class RedemptionController {
             status: Joi.number().integer().min(2).max(3).required(),
             issuerComments: Joi.string().allow(""),
             redemptionService: Joi.string(),
+            issuerCommonName: Joi.string().required()
         });
 
         const validation = requestRedemptionSchema.validate(args);
