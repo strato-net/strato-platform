@@ -18,7 +18,7 @@ const sendEmail = async (emails, message) => {
 
   // Remove sales from these emails for testnet testing. This needs to be included for production.
   if (env === "production") {
-    if (emails.length === 1 && emails[0] === 'sales@blockapps.net') {
+    if (emails.includes("sales@blockapps.net")) {
       // No BCC needed
     }
     else { msg.bcc = "sales@blockapps.net"; }
