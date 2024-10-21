@@ -344,10 +344,12 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
   }
 
   contract.getOutgoingRedemptionRequests = async function (args, options = optionsNoChainIds) {
-    const { order, search, range } = args;
+    const { order, search, range , limit, offset } = args;
     const queryParams = new URLSearchParams({
       redemptionId: search,
-      order: order
+      order: order,
+      limit,
+      offset
     }).toString();
 
     try {
@@ -406,10 +408,12 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
   };
 
   contract.getIncomingRedemptionRequests = async function (args, options = optionsNoChainIds) {
-    const { order, search, range } = args;
+    const { order, search, range, limit, offset } = args;
     const queryParams = new URLSearchParams({
       redemptionId: search,
-      order: order
+      order: order,
+      limit,
+      offset
     }).toString();
 
     try {
