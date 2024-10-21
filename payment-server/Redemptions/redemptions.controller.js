@@ -22,7 +22,7 @@ class RedemptionsController {
             const values = [req.params.commonName, req.query.redemptionId];
 
             const result = await client.query(query, values);
-            const count = await client.query(countQuery);
+            const count = await client.query(countQuery, values);
 
             // fix casing in columns
             const formattedRows = result.rows.map(row => {
@@ -80,7 +80,7 @@ class RedemptionsController {
             const values = [req.params.commonName, req.query.redemptionId];
 
             const result = await client.query(query, values);
-            const count = await client.query(countQuery);
+            const count = await client.query(countQuery, values);
 
             // fix casing in columns
             const formattedRows = result.rows.map(row => {
