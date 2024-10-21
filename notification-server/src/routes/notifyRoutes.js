@@ -22,6 +22,10 @@ router.post("/notify", async (req, res) => {
       return res.status(400).send("Bad Request: Missing usernames or message");
     }
 
+    // Get emails from db using usernames
+    const emails = await getEmailsByUsernames(usernames);
+    // const numbers = await getNumbersByUsernames(usernames);
+
     if (!emails.length) {
       return res
       .status(404)
