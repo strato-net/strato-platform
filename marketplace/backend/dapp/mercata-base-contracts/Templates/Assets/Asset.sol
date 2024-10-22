@@ -1,9 +1,9 @@
-pragma es6;
-pragma strict;
+pragma "solidvm12.0";
 
 import <509>;
 import "../Enums/RestStatus.sol";
 import "../Utils/Utils.sol";
+import "../Governance/Fee.sol";
 
 abstract contract Asset is Utils {
     enum AssetStatus {
@@ -15,8 +15,9 @@ abstract contract Asset is Utils {
     }
 
     uint public assetMagicNumber = 0x4173736574; // 'Asset'
-    address public owner;
-    string public ownerCommonName;
+    address private owner;
+    string private ownerCommonName;
+    address public feeAddress = ""; //Need to se this before releasing
     address public originAddress; // For NFTS, this will always be address(this), but this should be the mint address for UTXOs
     string public name;
     string public description;
@@ -29,6 +30,7 @@ abstract contract Asset is Utils {
     AssetStatus public status;
 
     address public sale;
+    decimal public proposerFee == 0.0;
 
     event OwnershipTransfer(
         address originAddress,
@@ -127,9 +129,10 @@ abstract contract Asset is Utils {
     }
 
     // Updated function to add a sale to the whitelist
-    function attachSale() public requireOwnerOrigin("attach sale") {
+    function attachSale() public virtual requireOwnerOrigin("attach sale") {
         require(sale == address(0), "Sale is already assigned for this asset");
         sale = msg.sender;
+        proposerFee = 0.05 * Fee(feeAddress).getProposerFee();
     }
 
     // Updated function to remove a sale from the whitelist
@@ -144,7 +147,11 @@ abstract contract Asset is Utils {
     function _transfer(address _newOwner, uint _quantity, bool _isUserTransfer, uint _transferNumber, decimal _price) internal virtual {
         require(status != AssetStatus.PENDING_REDEMPTION, "Asset is not in ACTIVE state.");
         require(status != AssetStatus.RETIRED, "Asset is not in ACTIVE state.");
+        require(proposerFee==0.0, "Asset fees for transfer not paid");
         string newOwnerCommonName = getCommonName(_newOwner);
+
+        owner = _newOwner;
+        ownerCommonName = newOwnerCommonName;
 
         if(_isUserTransfer && _transferNumber>0){
 
@@ -174,8 +181,7 @@ abstract contract Asset is Utils {
             itemNumber,
             itemNumber + _quantity - 1
         );
-        owner = _newOwner;
-        ownerCommonName = newOwnerCommonName;
+
         close();
     }
     
@@ -198,6 +204,12 @@ abstract contract Asset is Utils {
             // transfer feature - isUserTransfer: true, transferNumber: >0
             return Sale(sale).automaticTransfer(_newOwner, _price, _quantity, _transferNumber);
         }
+    }
+
+    function payFeesToProposer(address stratAsset, uint transferFee, uint transferNumber) external {
+        require(proposerFee>=0, "Fees is zero");
+        stratAsset.purchaseTransfer(block.proposer, transferFee, transferNumber, 0.0001);
+        proposerFee -= transferFee;
     }
 
     function updateAsset(
