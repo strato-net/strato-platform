@@ -1,5 +1,4 @@
-pragma es6;
-pragma strict;
+pragma "solidvm12.0";
 
 import <BASE_CODE_COLLECTION>;
 import "../../../items/contracts/STRATS.sol";
@@ -102,7 +101,8 @@ contract StratPaymentService is PaymentService {
 
             // Transfer STRATS
             uint remainingStratsToTransfer = stratAmountNet;
-            uint remainingFeeToTransfer = stratFee;
+            uint remainingFeeToTransferToBA = stratFee/2;
+            uint remainingFeeToTransferToProposer = stratFee - remainingFeeToTransferToBA;
             uint stratQuantity = 0;
             uint transferAmount = 0;
             uint transferFee = 0;
@@ -118,19 +118,27 @@ contract StratPaymentService is PaymentService {
                     remainingStratsToTransfer -= transferAmount;
                 }
                 stratQuantity = stratQuantity - transferAmount;
-                if (remainingFeeToTransfer > 0 && stratQuantity > 0) {
+                if (remainingFeeToTransferToBA > 0 && stratQuantity > 0) {
                     transferNumber = (uint(_checkoutHash, 16) + j + block.timestamp) % 1000000;
-                    transferFee = stratQuantity >= remainingFeeToTransfer ? remainingFeeToTransfer : stratQuantity;
+                    transferFee = stratQuantity >= remainingFeeToTransferToBA ? remainingFeeToTransferToBA : stratQuantity;
                     stratAsset.purchaseTransfer(feeRecipient, transferFee, transferNumber, 0.0001);
-                    remainingFeeToTransfer -= transferFee;
+                    remainingFeeToTransferToBA -= transferFee;
+                }
+                if (remainingFeeToTransferToProposer > 0 && stratQuantity > 0) {
+                    transferNumber = (uint(_checkoutHash, 16) + j + block.timestamp) % 1000000;
+                    transferFee = stratQuantity >= remainingFeeToTransferToProposer ? remainingFeeToTransferToProposer : stratQuantity;
+                    s.assetToBeSold().payFeesToProposer(STRATSTokens stratAsset, );
+                    remainingFeeToTransferToProposer -= transferFee;
                 }
                 transferAmount = 0;
-                if (remainingStratsToTransfer == 0 && remainingFeeToTransfer == 0) {
+
+                if (remainingStratsToTransfer == 0 && remainingFeeToTransferToBA == 0 && remainingFeeToTransferToProposer ==0) {
                     break;
                 }
             }
             require(remainingStratsToTransfer == 0, err);
-            require(remainingFeeToTransfer == 0, feeErr);
+            require(remainingFeeToTransferToBA == 0, feeErr);
+            require(remainingFeeToTransferToProposer == 0, feeErr);
 
             // Transfer assets
             try {
