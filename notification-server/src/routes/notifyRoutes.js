@@ -23,20 +23,7 @@ router.post("/notify", async (req, res) => {
     }
 
     // Get emails from db using usernames
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    let emails = [];
-    
-    // Iterate over each username
-    for (const username of usernames) {
-      if (emailRegex.test(username)) {
-        // If the username is a valid email, add it directly to the emails array
-        emails.push(username);
-      } else {
-        // If the username is not a valid email, fetch the corresponding email using getEmailsByUsernames
-        const fetchedEmails = await getEmailsByUsernames([username]);
-        emails = emails.concat(fetchedEmails);
-      }
-    }
+    const emails = await getEmailsByUsernames(usernames);
     // const numbers = await getNumbersByUsernames(usernames);
 
     if (!emails.length) {

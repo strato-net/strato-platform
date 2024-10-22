@@ -176,13 +176,11 @@ const RedemptionsIncomingDetails = ({ user }) => {
             id: redemption.redemption_id,
             assetAddresses: redemption.assetAddresses,
             redemptionService,
-
-            redeemerCommonName:redemption.ownerCommonName,
-            redeemerAddress:inventoryDetails.owner,
-            issuerCommonName: redemption.issuerCommonName,
-
-            assetName:inventoryDetails.name,
+            redeemerCommonName: redemption.ownerCommonName,
+            redeemerAddress: inventoryDetails.owner,
+            assetName: inventoryDetails.name,
             quantity: inventoryDetails.quantity,
+            issuerCommonName: redemption.issuerCommonName
         }
 
         const isDone = await actions.closeRedemption(dispatch, body);
