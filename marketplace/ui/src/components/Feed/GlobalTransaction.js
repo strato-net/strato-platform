@@ -65,7 +65,7 @@ const GlobalTransaction = ({ user }) => {
   }, [marketplaceDispatch]);
 
   useEffect(() => {
-    const startOfMonth = dayjs().startOf('month').unix();
+    const startOfMonth = dayjs().subtract(2, 'month').startOf('month').unix();
     const endOfMonth = dayjs().endOf('month').unix();
     const dateArr = [startOfMonth, endOfMonth];
 
