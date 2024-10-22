@@ -1,5 +1,4 @@
-pragma es6;
-pragma strict;
+pragma "solidvm12.0";
 
 import "./Tokens.sol";
 import "../../mercata-base-contracts/Templates/Payments/StratPaymentService.sol";
@@ -38,8 +37,13 @@ contract STRATSTokens is Tokens {
         string err = "Only the current corresponding Payment Service contract can "
                        + action
                        + ".";
-        require(ps.stratAddress() == originAddress && ps.ownerCommonName() == paymentServiceCreator && ps.serviceName() == paymentServiceName && ps.isActive(), err);
+        require(ps.stratAddress() == this.root && ps.creator == paymentServiceCreator && ps.serviceName() == paymentServiceName && ps.isActive(), err);
         _;
+    }
+
+    //Prevents proposer fee being set so no infinite loop
+    function attachSale() public override{
+        require(False, "Can't Attach Sale to Strats Asset");
     }
     
     function purchaseTransfer(address _newOwner, uint _quantity, uint _transferNumber, decimal _price) public fromPaymentService("make a purchase") {

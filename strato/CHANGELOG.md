@@ -16,6 +16,20 @@ so that they could be properly moved to their respective version's subsection.
 
 ## [Unreleased] 
 ### Added
+- Added block.proposer to SolidVM
+- Reintroduced wire cache to strato-p2p to reduce redundant blockstanbul messages sent to the sequencer
+
+### Changed
+
+### Fixed
+- Bugfix in slipstream to support decoding structs
+- Foreign keys in cirrus properly updated
+- Bugfix in p2p to prevent peers from continuously attempting to connect to offline peers
+
+### Removed
+
+## [12.0.0] - 9/23/2024
+### Added
 - Introduced BlockHeaderV2 constructor to BlockHeader type
 - Added support for BlockHeaderV2 fields to eth db and strato-api
 - Added BlockHeaderV2 fields to BlockView component in SMD
@@ -28,7 +42,6 @@ so that they could be properly moved to their respective version's subsection.
 - Added `<best_sequenced_block>` to reduce the redundant block requests in p2p
 - Added strict mode to sequencer that will cause crash on block authentication
 - Added `INSTRUMENTATION` flag to see finer-grained memory usage in processes
-- Added block.proposer to SolidVM
 
 ### Changed
 - General cleanup of Kafka-related code

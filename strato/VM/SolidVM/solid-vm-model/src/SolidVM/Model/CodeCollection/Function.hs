@@ -191,7 +191,7 @@ instance FromJSON a => FromJSON (FuncF a)
 type Func = Positioned FuncF
 
 data ModifierF a = Modifier
-  { _modifierArgs     :: Map Text SolidVM.IndexedType,
+  { _modifierArgs     :: [(Text, SolidVM.IndexedType)],
     _modifierSelector :: Text,
     _modifierContents :: Maybe [StatementF a],
     _modifierContext  :: a

@@ -86,6 +86,7 @@ addPragma k v = do
     resolveSolidVMVersion :: String -> [(String, String)]
     resolveSolidVMVersion version =
       case version of
+        "12.0" -> ("privateSV","") : resolveSolidVMVersion "11.5"
         "11.5" -> ("solidvm", "11.5") : resolveSolidVMVersion "11.4"
         "11.4" -> [("solidvm", "11.4"), ("es6", ""), ("strict", ""), ("builtinCreates", ""), ("safeExternalCalls", "")]
         ver -> [("solidvm", ver)]

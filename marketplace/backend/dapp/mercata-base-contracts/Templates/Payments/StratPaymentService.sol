@@ -1,5 +1,4 @@
-pragma es6;
-pragma strict;
+pragma "solidvm12.0";
 
 import <BASE_CODE_COLLECTION>;
 import "../../../items/contracts/STRATS.sol";
@@ -102,8 +101,13 @@ contract StratPaymentService is PaymentService {
 
             // Transfer STRATS
             uint remainingStratsToTransfer = stratAmountNet;
+<<<<<<< HEAD
             uint remainingFeeToTransferToFeeReceipient = uint(stratFee / 2);
             uint remainingFeeToTransferToProposer = stratFee - remainingFeeToTransferToFeeReceipient;
+=======
+            uint remainingFeeToTransferToBA = stratFee/2;
+            uint remainingFeeToTransferToProposer = stratFee - remainingFeeToTransferToBA;
+>>>>>>> platform-develop
             uint stratQuantity = 0;
             uint transferAmount = 0;
             uint transferFee = 0;
@@ -119,11 +123,25 @@ contract StratPaymentService is PaymentService {
                     remainingStratsToTransfer -= transferAmount;
                 }
                 stratQuantity = stratQuantity - transferAmount;
+<<<<<<< HEAD
                 if (remainingFeeToTransferToFeeReceipient > 0 && stratQuantity > 0){
                     transferNumber = (uint(_checkoutHash, 16) + j + block.timestamp) % 1000000;
                     transferFee = stratQuantity >= remainingFeeToTransferToFeeReceipient ? remainingFeeToTransferToFeeReceipient : stratQuantity;
                     stratAsset.purchaseTransfer(feeRecipient, transferFee, transferNumber, 0.0001);
                     remainingFeeToTransferToFeeReceipient -= transferFee;
+=======
+                if (remainingFeeToTransferToBA > 0 && stratQuantity > 0) {
+                    transferNumber = (uint(_checkoutHash, 16) + j + block.timestamp) % 1000000;
+                    transferFee = stratQuantity >= remainingFeeToTransferToBA ? remainingFeeToTransferToBA : stratQuantity;
+                    stratAsset.purchaseTransfer(feeRecipient, transferFee, transferNumber, 0.0001);
+                    remainingFeeToTransferToBA -= transferFee;
+                }
+                if (remainingFeeToTransferToProposer > 0 && stratQuantity > 0) {
+                    transferNumber = (uint(_checkoutHash, 16) + j + block.timestamp) % 1000000;
+                    transferFee = stratQuantity >= remainingFeeToTransferToProposer ? remainingFeeToTransferToProposer : stratQuantity;
+                    s.assetToBeSold().payFeesToProposer(STRATSTokens stratAsset, );
+                    remainingFeeToTransferToProposer -= transferFee;
+>>>>>>> platform-develop
                 }
 
                 if (remainingFeeToTransferToProposer > 0 && stratQuantity > 0) {
@@ -134,12 +152,21 @@ contract StratPaymentService is PaymentService {
                 }
 
                 transferAmount = 0;
+<<<<<<< HEAD
                 if (remainingStratsToTransfer == 0 && remainingFeeToTransferToFeeReceipient == 0 && remainingFeeToTransferToProposer == 0) {
+=======
+
+                if (remainingStratsToTransfer == 0 && remainingFeeToTransferToBA == 0 && remainingFeeToTransferToProposer ==0) {
+>>>>>>> platform-develop
                     break;
                 }
             }
             require(remainingStratsToTransfer == 0, err);
+<<<<<<< HEAD
             require(remainingFeeToTransferToFeeReceipient == 0, feeErr);
+=======
+            require(remainingFeeToTransferToBA == 0, feeErr);
+>>>>>>> platform-develop
             require(remainingFeeToTransferToProposer == 0, feeErr);
 
             // Transfer assets
