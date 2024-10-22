@@ -68,7 +68,8 @@ const TransactionTable = ({ user, download, isAllOrdersLoading }) => {
         limit,
         offset,
         user?.commonName,
-        dateReturn(dateQuery)
+        dateReturn(dateQuery),
+        type
       );
     }
     if (user?.commonName && !dateQuery) {
@@ -80,10 +81,11 @@ const TransactionTable = ({ user, download, isAllOrdersLoading }) => {
         limit,
         offset,
         user?.commonName,
-        dateArr
+        dateArr,
+        type
       );
     }
-  }, [user, dateQuery, offset])
+  }, [user, dateQuery, offset, type])
 
   useEffect(() => {
     const searchParams = new URLSearchParams(location.search);
@@ -97,13 +99,13 @@ const TransactionTable = ({ user, download, isAllOrdersLoading }) => {
   useEffect(() => {
     let filteredData = userTransactions;
     // Type filter
-    if (type) {
-      if (type === "STRATS") {
-        filteredData = filteredData.filter((item) => item.assetOriginAddress === originAddress);
-      } else {
-        filteredData = filteredData.filter((item) => item.type === type);
-      }
-    }
+    // if (type) {
+    //   if (type === "STRATS") {
+    //     filteredData = filteredData.filter((item) => item.assetOriginAddress === originAddress);
+    //   } else {
+    //     filteredData = filteredData.filter((item) => item.type === type);
+    //   }
+    // }
 
     // Search filter
     if (search) {

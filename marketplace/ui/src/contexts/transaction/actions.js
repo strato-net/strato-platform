@@ -21,7 +21,7 @@ const actions = {
     dispatch({ type: actionDescriptors.setMessage, message, success });
   },
 
-  fetchUserTransaction: async (dispatch, limit, offset, commonName, dateRange) => {
+  fetchUserTransaction: async (dispatch, limit, offset, commonName, dateRange, type) => {
     dispatch({ type: actionDescriptors.fetchUserTransaction });
 
     const encodedCommonName = encodeURIComponent(commonName);
@@ -37,6 +37,9 @@ const actions = {
     }
     if(dateRange){
       query += `&startDate=${dateRange[0]}&endDate=${dateRange[1]}`
+    }
+    if (type) {
+      query += `&type=${type}`
     }
 
     try {
