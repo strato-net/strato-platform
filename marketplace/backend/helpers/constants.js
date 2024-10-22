@@ -34,7 +34,7 @@ export default {
   blockAppsOrg: "BlockApps",
   prodNetworkId: "6909499098523985262",
   testnetNetworkId: "7596898649924658542",
-  prodStratsAddress: "b220195543f652f735b7847c4af399d0323e1ff6",
+  prodStratsAddress: "d2810818e0401e85693f83107ed2b96faeed329c",
   testnetStratsAddress: "5375b8b1c691201acf16a72612d82ed438951a04",
   attachImagesAndFiles: "*,BlockApps-Mercata-Asset-files(*),BlockApps-Mercata-Asset-images(*),BlockApps-Mercata-Asset-fileNames(*)",
   attachSalesAndImagesAndFiles: "*,BlockApps-Mercata-Asset-files(*),BlockApps-Mercata-Asset-images(*),BlockApps-Mercata-Asset-fileNames(*),BlockApps-Mercata-Sale!BlockApps-Mercata-Sale_BlockApps-Mercata-Asset_fk(*,BlockApps-Mercata-Sale-paymentServices(*))",

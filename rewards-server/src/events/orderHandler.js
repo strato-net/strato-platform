@@ -3,8 +3,13 @@ const {
   NODE_ENV,
   prodMarketplaceUrl,
   testnetMarketplaceUrl,
+  notificationUrl
 } = require("../config");
 const { getRewards } = require("../helper/googleSheet.js");
+const axios = require("axios");
+const { sendEmail, getUserName } = require("../helper/utils.js");
+
+const baseUrl = NODE_ENV === "prod" ? prodMarketplaceUrl : testnetMarketplaceUrl;
 
 async function handleOrderRewards(event, token) {
   const purchaser = event.eventEvent.eventArgs.find(
@@ -36,27 +41,30 @@ async function handleOrderRewards(event, token) {
   );
 
   // Check if the purchaser has made a first order before
-  const checkFirstPurchase = await fetch(
-    `https://${
-      NODE_ENV === "prod" ? prodMarketplaceUrl : testnetMarketplaceUrl
-    }/cirrus/search/BlockApps-Mercata-PaymentService.Order?purchaser=eq.${purchaser}&status=eq.3&select=count`,
+  const checkFirstPurchase = await axios.get(
+    `https://${baseUrl}/cirrus/search/BlockApps-Mercata-PaymentService.Order`,
     {
-      method: "GET",
-      credentials: "same-origin",
-      headers: {
-        Accept: "application/json",
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${token}`,
+      params: {
+        purchaser: `eq.${purchaser}`,
+        status: 'eq.3',
+        select: 'count'
       },
+      headers: {
+        Accept: 'application/json',
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${token}`
+      }
     }
   );
 
-  const queryBody = await checkFirstPurchase.json();
+  const queryBody = checkFirstPurchase.data;
 
   let eventKey = "RegularOrder";
 
   if (queryBody[0].count === 1) {
     console.log("User's first order");
+    const purchaserName = await getUserName(baseUrl, purchaser, token)
+    sendEmail(baseUrl, notificationUrl, 'firstPurchase', purchaserName, token);
     eventKey = "FirstOrder";
   }
 
@@ -138,7 +146,7 @@ async function handleOrderReward(
       transactions
     );
 
-    if (!transactionResponse.ok) {
+    if (transactionResponse.status !== 200) {
       const errorText = await transactionResponse.text();
       console.error(
         `Error: ${transactionResponse.status} ${transactionResponse.statusText}`
@@ -149,10 +157,20 @@ async function handleOrderReward(
       );
     }
 
-    const response = await transactionResponse.json();
+    const response = await transactionResponse.data;
     const allSuccessful = response.every((tx) => tx.status === "Success");
     if (allSuccessful) {
       console.log("All reward transactions were successful:", response);
+
+      const purchaserName = await getUserName(baseUrl, purchaser, token);
+      const sellerName = await getUserName(baseUrl, seller, token);
+
+      // To Purchaser
+      sendEmail(baseUrl, notificationUrl, 'additionalPurchase', purchaserName, token);
+
+      // To Seller
+      sendEmail(baseUrl, notificationUrl, 'sellerReward', sellerName, token);
+
     } else {
       console.log("Some reward transactions were not successful:", response);
     }
