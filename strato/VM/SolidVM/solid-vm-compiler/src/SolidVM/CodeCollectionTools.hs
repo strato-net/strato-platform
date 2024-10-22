@@ -93,7 +93,7 @@ applyInheritanceFunctions cc = do
 
 addInheritedObjects :: CodeCollection -> Contract -> SolidEither Contract
 addInheritedObjects cc c = do
-  sd <- toUnionMaker _storageDefs cc c
+  sd <- toUnionMaker' _storageDefs (bool id (M.filter _varIsPublic) (usesPrivateSVModifiers cc) . _storageDefs) cc c
   ud <- toUnionMaker _userDefined cc c
   en <- toUnionMaker _enums cc c
   st <- toUnionMaker _structs cc c

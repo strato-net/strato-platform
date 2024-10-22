@@ -21,6 +21,7 @@ module SolidVM.Model.CodeCollection (
   pragmas,  
   imports,
   usesStrictModifiers,
+  usesPrivateSVModifiers,
   getContractsBySolidString,
   resolvePragmaFeature,
   resolvePragmaFeature',
@@ -161,6 +162,9 @@ instance Arbitrary CodeCollection where
 usesStrictModifiers :: CodeCollectionF a -> Bool
 usesStrictModifiers = flip resolvePragmaFeature "strict" . _pragmas
 
+usesPrivateSVModifiers :: CodeCollectionF a -> Bool
+usesPrivateSVModifiers = flip resolvePragmaFeature "privateSV" . _pragmas
+
 -- Function to get all ContractF values matching a SolidString
 getContractsBySolidString :: SolidString -> CodeCollectionF a -> Maybe (ContractF a)
 getContractsBySolidString solidStr codeCollection = M.lookup solidStr (_contracts codeCollection)
@@ -183,7 +187,8 @@ resolvePragmaFeature' pragmaList feature version =
             ("solidvm", "11.4")
           ]),
           (("solidvm", "12.0"), S.fromList [
-            ("solidvm", "11.5")
+            ("solidvm", "11.5"),
+            ("privateSV", "")
           ])
         ]
       extendedPragmaSet = foldr (\(e,es) a -> if e `S.member` a then a <> es else a) pragmaSet extensions
