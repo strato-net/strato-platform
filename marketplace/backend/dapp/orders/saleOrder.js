@@ -325,7 +325,7 @@ async function getAll(admin, args = {}, options) {
     // Legacy orders need to join array tables.
     let oldArgs = { ...args, limit: undefined, offset: 0, queryOptions: { select: constants.attach_saleAddresses_Quantities_completedSales_onOrder } };
     let oldSaleOrders = await searchAllWithQueryArgs(constants.orderTableName, oldArgs, newOptions, admin);
-    oldSaleOrders = oldSaleOrders.map((item) => ({ ...item, type: 'Order' }));
+    oldSaleOrders = oldSaleOrders.map((item) => ({ ...item, type: 'Order', status: item.status === "5" ? "2" : item.status }));
     saleOrders = saleOrders ? [...saleOrders, ...oldSaleOrders] : [...oldSaleOrders];
 
     oldCount = await searchAllWithQueryArgs(
