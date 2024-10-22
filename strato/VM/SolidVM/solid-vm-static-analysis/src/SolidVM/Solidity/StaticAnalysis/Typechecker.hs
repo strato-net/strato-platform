@@ -327,8 +327,10 @@ apply (Bottom es) (Bottom ess) _ = pure $ Bottom (es <> ess)
 apply (Bottom es) _ _ = pure $ Bottom es
 apply _ (Bottom ess) _ = pure $ Bottom ess
 apply (Function funcArgTypes funcValTypes _ overloads funcArgNames functionArrayGetter) args argNames = apply' funcArgTypes funcValTypes overloads args argNames funcArgNames functionArrayGetter
+apply (Top ts x) _ _ = pure $ Top ts x
 apply (Sum types@(t :| _)) args argList =
   let isFunction (Function _ _ _ _ _ _) = True
+      isFunction (Top _ _) = True
       isFunction _ = False
    in pickType' (context' t) <$> traverse (\x -> apply x args argList) (filter isFunction $ NE.toList types)
 apply x _ _ = pure . bottom $ "trying to apply function to a non-function type" <$ context' x
@@ -1173,9 +1175,12 @@ functionHelper cc c funcName f@Func {..} =
                     ret <- statementsHelper argVals stmts
                     pure $ reduceType' _funcContext [ret, mods]
                   where checkModifier modName modArgs = do
-                          e <- getModifierByNameRecursively funcName modName _funcContext
-                          a <- productType' _funcContext <$> traverse tcExpr modArgs
-                          apply e a Nothing
+                          if isSVMVersion "11.4" cc
+                            then do
+                              e <- getModifierByNameRecursively funcName modName _funcContext
+                              a <- productType' _funcContext <$> traverse tcExpr modArgs
+                              apply e a Nothing
+                            else pure $ topType' _funcContext
 
 statementsHelperM ::
   (M.Map SolidString (Annotated VarDefEntryF)) ->
@@ -1502,7 +1507,7 @@ getModifierByNameRecursively funcName name ctx = go
               then pure . bottom $ "Parent constructors can only be invoked from the contract's constructor" <$ ctx
               else case c' ^. constructor of
                 Just f -> pure $ functionType cc ctx name f
-                Nothing -> pure . bottom $ "Parent contract " <> T.pack name <> " does not expose a constructor" <$ ctx
+                Nothing -> pure $ Function (Product [] ctx) (Product [] ctx) ctx [] [] False
             Nothing -> pickType' ctx <$> traverse recurse (c ^. parents)
     recurse parentName = do
       cc <- asks codeCollection
