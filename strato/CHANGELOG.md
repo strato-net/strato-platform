@@ -20,6 +20,7 @@ so that they could be properly moved to their respective version's subsection.
 - Reintroduced wire cache to strato-p2p to reduce redundant blockstanbul messages sent to the sequencer
 
 ### Changed
+- Only genesis block contracts and top-level abstract contracts are now indexed by Slipstream
 
 ### Fixed
 - Bugfix in slipstream to support decoding structs
