@@ -137,6 +137,12 @@ The server **requires** the following environmental variables to run in non-dock
 If running non-dockerized, use `npm run start` or `npm run dev`.  
 If running dockerized, provide a `docker-compose.payment-server.yml` file and use `docker-compose -f docker-compose.payment-server.yml up -d --remove-orphans`.
 
+## Script
+To offboard a seller, run the following command:
+```
+SELLER_NAME="sellerCommonName" yarn offboard
+```
+
 ## Testing
 
 The payment server uses `jest` as its testing framework. In order to run the tests, the following environment variables should be available:

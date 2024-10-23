@@ -35,5 +35,6 @@ export const TRANSACTION_FILTER = [
   { value: "", label: "All" },
   { value: "Order", label: "Order" },
   { value: "Transfer", label: "Transfer" },
-  { value: "Redemption", label: "Redemption" }]
+  { value: "Redemption", label: "Redemption" },
+  { value: "STRATS", label: "STRATS" },];
 

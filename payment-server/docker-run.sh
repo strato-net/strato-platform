@@ -148,7 +148,7 @@ sed -i 's*<redemptions_service_url_value>*'"${SERVER_HOST}"'*g' /tmp/tmp.config.
 mv /tmp/tmp.config.yaml ./config/generated.config.yaml
 cp ./config/generated.config.yaml ${CONFIG_DIR_PATH}/config.yaml
 
-ls contracts
+ls dapp
 
 if [ -f "${CONFIG_DIR_PATH}/deploy.yaml" ]; then
   echo 'deploy.yaml already exists.'

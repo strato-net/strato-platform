@@ -10,7 +10,7 @@ import {
 } from "/helpers/utils";
 import constants from "../../helpers/constants";
 import axios from "axios";
-import paymentProvider from "../payments/paymentProvider";
+import paymentService from "../payments/paymentService";
 
 const contractName = "SimpleOrder";
 const contractFilename = `${util.cwd}/dapp/mercata-base-contracts/Templates/Orders/SimpleOrder.sol`;
@@ -205,7 +205,7 @@ async function get(user, args, options) {
 
 async function getAll(admin, args = {}, options) {
   let saleOrders;
-  const { offset, limit, order } = args;
+  const { offset = 0, limit = 2000, order } = args;
   const newOptions = { ...options, org: 'BlockApps', app: 'Mercata' }
 
   const newCountArgs = {
@@ -277,30 +277,30 @@ async function getAll(admin, args = {}, options) {
 
   // ACH status updates
   let orderHashesToIndicies = {};
-  let paymentProvidersToOrderHashes = {};
+  let paymentServicesToOrderHashes = {};
   let paymentServiceRes = {};
 
   if (saleOrders) {
     for (let i = 0; i < saleOrders.length; i++) {
       const order = saleOrders[i];
       if (parseInt(order.status) === 2) {
-        if (paymentProvidersToOrderHashes[order.address]) {
-          paymentProvidersToOrderHashes[order.address].push(order.orderHash);
+        if (paymentServicesToOrderHashes[order.address]) {
+          paymentServicesToOrderHashes[order.address].push(order.orderHash);
         }
         else {
-          paymentProvidersToOrderHashes[order.address] = [order.orderHash];
+          paymentServicesToOrderHashes[order.address] = [order.orderHash];
         }
         orderHashesToIndicies[order.orderHash] = i;
       }
     }
   }
-  if (Object.keys(paymentProvidersToOrderHashes).length > 0) {
-    const paymentProviderAddresses = Object.keys(paymentProvidersToOrderHashes);
-    const paymentProviders = await paymentProvider.getAll(admin, { address: paymentProviderAddresses }, options);
-    paymentProviders.map(async (ppro) => {
+  if (Object.keys(paymentServicesToOrderHashes).length > 0) {
+    const paymentServiceAddresses = Object.keys(paymentServicesToOrderHashes);
+    const paymentServices = await paymentService.getAll(admin, { address: paymentServiceAddresses }, options);
+    paymentServices.map(async (ppro) => {
       const serviceUrl = ppro.serviceURL || ppro.data.serviceURL;
       const statusRoute = ppro.orderStatusRoute || ppro.data.orderStatusRoute;
-      const tokens = encodeURIComponent(JSON.stringify(paymentProvidersToOrderHashes[ppro.address]));
+      const tokens = encodeURIComponent(JSON.stringify(paymentServicesToOrderHashes[ppro.address]));
       const statusRes = await axios.get(new URL(`${serviceUrl}${statusRoute}?orderHashes=${tokens}`).href).then(function (res) {
         if (res.status === 200) {
           paymentServiceRes = { ...paymentServiceRes, ...res.data }

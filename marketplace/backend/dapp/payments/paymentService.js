@@ -12,9 +12,9 @@ const onboardedEventName = 'PaymentService.SellerOnboarded';
 const contractFilename = `${util.cwd}/dapp/mercata-base-contracts/Templates/Payments/ExternalPaymentService.sol`;
 
 /** 
- * Upload a new PaymentProvider 
+ * Upload a new PaymentService 
  * @param user User token (typically an admin)
- * @param _constructorArgs Arguments of PaymentProvider's constructor
+ * @param _constructorArgs Arguments of PaymentService's constructor
  * @param options  deployment options (found in _/config/*.config.yaml_ via _load.config.js_) 
  * @returns Contract object
  * */
@@ -48,7 +48,7 @@ async function uploadContract(user, _constructorArgs, options) {
  * Augment contract arguments before they are used to post a contract.
  * Its counterpart is {@link marshalOut `marshalOut`}.
  * 
- * As our arguments come into the paymentProvider contract they first pass through `marshalIn` and 
+ * As our arguments come into the paymentService contract they first pass through `marshalIn` and 
  * when we retrieve contract state they pass through {@link marshalOut `marshalOut`}.
  * 
  * (A mathematical analogy: `marshalIn` and {@link marshalOut `marshalOut`} form something like a 
@@ -92,7 +92,7 @@ async function getHistory(user, chainId, address, options) {
  * Augment returned contract state before it is returned.
  * Its counterpart is {@link marshalIn `marshalIn`}.
  * 
- * As our arguments come into the paymentProvider contract they first pass through {@link marshalIn `marshalIn`} 
+ * As our arguments come into the paymentService contract they first pass through {@link marshalIn `marshalIn`} 
  * and when we retrieve contract state they pass through `marshalOut`.
  * 
  * (A mathematical analogy: {@link marshalIn `marshalIn`} and `marshalOut` form something like a 
@@ -107,10 +107,10 @@ function marshalOut(_args) {
 }
 
 /**
- * Bind functions relevant for paymentProvider to the _contract object. 
+ * Bind functions relevant for paymentService to the _contract object. 
  * @param user User token
  * @param _contract Contract object from `rest.createContract()` etc.
- * @param options PaymentProvider deployment options (found in _/config/*.config.yaml_ via _load.config.js_)
+ * @param options PaymentService deployment options (found in _/config/*.config.yaml_ via _load.config.js_)
  */
 
 
@@ -127,14 +127,14 @@ function bind(user, _contract, options) {
 }
 
 /** 
- * Bind an existing PaymentProvider contract to a new user token. Useful for having multiple users test
+ * Bind an existing PaymentService contract to a new user token. Useful for having multiple users test
  * the same contract.
- * @example <caption>Create an admin and user bound to the same new paymentProvider contract.</caption>
+ * @example <caption>Create an admin and user bound to the same new paymentService contract.</caption>
  * const adminBoundContract = uploadContract(adminToken, args, options);
  * const userBoundContract = bindAddress(userToken, adminBoundContract.address, options);
  * @param user User token
- * @param address Address of the PaymentProvider contract
- * @param options PaymentProvider deployment options (found in _/config/*.config.yaml_ via _load.config.js_)
+ * @param address Address of the PaymentService contract
+ * @param options PaymentService deployment options (found in _/config/*.config.yaml_ via _load.config.js_)
  */
 function bindAddress(user, address, options) {
     const contract = {
@@ -146,7 +146,7 @@ function bindAddress(user, address, options) {
 
 /**
  * Get contract state via cirrus. A proper chainId is typically already provided in options.
- * @param args Lookup with an address or uniquePaymentProviderID.
+ * @param args Lookup with an address or uniquePaymentServiceID.
  * @returns Contract state in cirrus
  */
 
@@ -155,27 +155,27 @@ function bindAddress(user, address, options) {
 async function get(user, args, defaultOptions) {
     const { ownerCommonName, name, address, accountId, accountDeauthorized, transaction_sender, ...restArgs } = args;
     const options = { ...defaultOptions, org: 'BlockApps', app: 'Mercata' }
-    let paymentProvider;
+    let paymentService;
 
     if (address) {
         const searchArgs = setSearchQueryOptions(restArgs, [{ key: 'address', value: address }, {key: 'order', value: 'chargesEnabled.desc,block_timestamp.desc'}]);
-        paymentProvider = await search(contractName, searchArgs, options, user);
+        paymentService = await search(contractName, searchArgs, options, user);
     } else if (ownerCommonName) {
         let searchValues = [{ key: 'ownerCommonName', value: ownerCommonName }, { key: 'name', value: name }, {key: 'order', value: 'chargesEnabled.desc,block_timestamp.desc'}];
         if (accountDeauthorized != undefined) {
             searchValues.push({ key: 'accountDeauthorized', value: accountDeauthorized })
         }
         const searchArgs = setSearchQueryOptions(restArgs, searchValues);
-        paymentProvider = await search(contractName, searchArgs, options, user);
+        paymentService = await search(contractName, searchArgs, options, user);
     } else if (transaction_sender) {
         const searchArgs = setSearchQueryOptions(restArgs, [{ key: 'transaction_sender', value: transaction_sender }, { key: 'name', value: name }, {key: 'order', value: 'chargesEnabled.desc,block_timestamp.desc'}]);
-        paymentProvider = await search(contractName, searchArgs, options, user);
+        paymentService = await search(contractName, searchArgs, options, user);
     }
-    if (!paymentProvider) {
+    if (!paymentService) {
         return [];
     }
 
-    return paymentProvider.map((p) => marshalOut({ ...p, }));
+    return paymentService.map((p) => marshalOut({ ...p, }));
 }
 
 async function getAll(admin, args = {}, baseOptions) {
@@ -187,22 +187,44 @@ async function getAll(admin, args = {}, baseOptions) {
     } else {
       searchArgs = setSearchQueryOptions(restArgs, {})
     }
-    const paymentProviders = await searchAllWithQueryArgs(contractName, searchArgs, options, admin);
-    return paymentProviders.map((paymentProvider) => marshalOut(paymentProvider));
+    const paymentServices = await searchAllWithQueryArgs(contractName, searchArgs, options, admin);
+    return paymentServices.map((paymentService) => marshalOut(paymentService));
 }
 
 async function getNotOnboarded(admin, args = {}, baseOptions) {
     const { sellersCommonName, ...restArgs } = args;
+
+    // Step 1: Fetch onboarded events
     const eventContract = { name: `${tablePrefix}${onboardedEventName}` }
     const onboardedQuery = {
       sellersCommonName: `eq.${sellersCommonName}`,
-      select: `ownerCommonName,serviceName`,
+      select: `ownerCommonName,serviceName,isActive,block_timestamp`,
       ownerCommonName: `neq.null`,
       serviceName: `neq.null`,
     }
     const onboardedOptions = { ...baseOptions, query: onboardedQuery };
     const onboardedEventsRes = await rest.search(admin, eventContract, onboardedOptions);
-    const onboardedServices = onboardedEventsRes.map((oe) => `or(ownerCommonName.neq."${oe.ownerCommonName}",serviceName.neq."${oe.serviceName}")`);
+
+    // Step 2: Get latest unique active entries
+    const latestActiveEntries = Array.from(
+      onboardedEventsRes.reduce((map, entry) => {
+        const key = `${entry.serviceName}-${entry.ownerCommonName}`;
+        const entryTimestamp = new Date(entry.block_timestamp);
+
+        if (
+          !map.has(key) ||
+          entryTimestamp > new Date(map.get(key).block_timestamp)
+        ) {
+          map.set(key, entry);
+        }
+        return map;
+      }, new Map())
+    )
+      .map(([, value]) => value) // Extract the values from the Map
+      .filter((entry) => entry.isActive); // Keep only active entries
+
+    // Step 3: Build exclusion query using onboarded services
+    const onboardedServices = latestActiveEntries.map((oe) => `or(ownerCommonName.neq."${oe.ownerCommonName}",serviceName.neq."${oe.serviceName}")`);
     const contract = { name: `${tablePrefix}${contractName}` }
     const notOnboardedQuery = {
       isActive: 'eq.true',
@@ -257,7 +279,7 @@ async function finalizePayment(user, args, options) {
     return finalizeStatus;
 }
 
-async function updatePaymentProvider(admin, contract, _args, baseOptions) {
+async function updatePaymentService(admin, contract, _args, baseOptions) {
     const args = { ..._args }
   
     const scheme = Object.keys(_args).reduce((agg, key) => {
@@ -292,7 +314,7 @@ async function updatePaymentProvider(admin, contract, _args, baseOptions) {
       history: [contractName],
     };
   
-    const [restStatus, paymentProviderAddress] = await rest.call(
+    const [restStatus, paymentServiceAddress] = await rest.call(
       admin,
       callArgs,
       options
@@ -301,7 +323,7 @@ async function updatePaymentProvider(admin, contract, _args, baseOptions) {
     if (parseInt(restStatus, 10) !== RestStatus.OK)
       throw new rest.RestError(restStatus, 0, { callArgs });
   
-    return [restStatus, paymentProviderAddress];
+    return [restStatus, paymentServiceAddress];
   }
 
 export default {
@@ -317,5 +339,5 @@ export default {
     getHistory,
     createPayment,
     finalizePayment,
-    updatePaymentProvider,
+    updatePaymentService,
 }

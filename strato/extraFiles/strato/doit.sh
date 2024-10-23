@@ -81,7 +81,7 @@ function newnode {
   echo 'Waiting for vault-proxy to rise and shine at http://localhost:8013...'
   started=$(date +%s)
   timeout=30
-  while ! curl --silent --output /dev/null --fail --max-time 0.2 --location http://localhost:8013; do
+  while ! curl --silent --output /dev/null --fail --max-time 0.5 --location http://localhost:8013; do
     if [[ $(date +%s) -ge ${started}+${timeout} ]]; then
       echo -e "\n tail -n40 logs/vault-proxy"
       tail -n40 logs/vault-proxy
@@ -217,6 +217,9 @@ function newnode {
   if [ -n "${FILE_SERVER_URL}" ]; then
       fsFlag="--fileServerUrl=${FILE_SERVER_URL}"
   fi
+  if [ -n "${NOTIFICATION_SERVER_URL}" ]; then
+      nsFlag="--notificationServerUrl=${NOTIFICATION_SERVER_URL}"
+  fi
   if [ -n "${strictGas}" ]; then
       sgFlag="--strictGas=${strictGas}"
   fi
@@ -268,7 +271,9 @@ function newnode {
     "${ucFlag}" \
     "${ubFlag}" \
     "${udFlag}" \
-    "${fsFlag}" "${iFlag}" +RTS -N1 >> logs/strato-api 2>&1
+    "${fsFlag}" \
+    "${nsFlag}" \
+    "${iFlag}" +RTS -N1 >> logs/strato-api 2>&1
 
   SLIPSTREAM_CMD="slipstream \
   --database=${postgres_slipstream_db} \
