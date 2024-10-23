@@ -54,7 +54,7 @@ const TransactionTable = ({ user, download, isAllOrdersLoading }) => {
 
   const formatter = new Intl.NumberFormat('en-US');
   const formattedNum = (num) => formatter.format(num);
-  const defaultDate =  dateQuery ? dayjs.unix(dayjs(dateQuery, 'MMMM YYYY').startOf('month').unix()) : dayjs.unix(currentMonth);
+  const defaultDate =  dateQuery ? dayjs.unix(dayjs(dateQuery, 'MMMM YYYY').startOf('month').unix()) : '';
 
   useEffect(() => {
     async function fetchStratsAddress() {
