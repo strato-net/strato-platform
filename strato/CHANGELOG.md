@@ -21,6 +21,7 @@ so that they could be properly moved to their respective version's subsection.
 
 ### Changed
 - Only genesis block contracts and top-level abstract contracts are now indexed by Slipstream
+- Set default nonce limit to 4000
 
 ### Fixed
 - Bugfix in slipstream to support decoding structs
