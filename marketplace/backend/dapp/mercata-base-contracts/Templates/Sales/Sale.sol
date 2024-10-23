@@ -28,9 +28,10 @@ abstract contract Sale is Utils {
         uint _quantity,
         PaymentService[] _paymentServices
     ) {    
+        require(_quantity > 0, "Quantity must be greater than 0");
+        require(assetToBeSold.quantity() >= _quantity, "Cannot sell more units than what are owned.");
         assetToBeSold = Asset(_assetToBeSold);
         price = _price;
-        require(assetToBeSold.quantity() >= _quantity, "Cannot sell more units than what are owned.");
         quantity = _quantity;
         totalLockedQuantity = 0;
         isOpen = true;
