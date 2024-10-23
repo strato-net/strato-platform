@@ -1,14 +1,13 @@
-pragma "solidvm12.0";
+pragma solidvm12.0;
 
 import <509>;
 
-contract MercataProposerFee {
+contract MercataProposerFee is MercataGovernance {
 
+    address mercataGovernance = "";
     uint private proposerFee;
-    mapping (string => mapping (string => mapping (string => uint))) proposerFeeVoteMap;
-    mapping (string => mapping (string => mapping (string => MercataValidatorVote[]))) proposerFeeVotes;
-    mapping (string => mapping (string => mapping (string => uint))) proposerFeeVoteCountMap;
-    
+    mapping (string => mapping (string => mapping (string => bool))) public hasVoted;  // Track if a validator has already voted
+    uint public totalVotes;
     uint public proposerFeeFinalizationThreshold;
     address public owner;
 
@@ -16,53 +15,80 @@ contract MercataProposerFee {
 
     constructor(uint _initialFee, uint _threshold) {
         proposerFee = _initialFee;
-        owner = address("0x509");
+        owner = MercataGovernance(mercataGovernance).owner();
         proposerFeeFinalizationThreshold = _threshold;
+        initializeHasVoted();  // Initialize hasVoted for all current validators
     }
 
-    function getProposerFee() public view returns (uint) {
-        return proposerFee;
+    // Initializes the `hasVoted` mapping for all current validators
+    function initializeHasVoted() internal {
+        // Loop through the validatorMap in MercataGovernance and set hasVoted to false for each
+        // You will need to implement a way to loop over the validatorMap keys if not already available
+        for (uint i = 0; i < validatorCount; i++) {
+            (string memory org, string memory unit, string memory name) = getValidatorDetails(i);  // Example function, implement as needed
+            if (validatorMap[org][unit][name].isActive()) {
+                hasVoted[org][unit][name] = false;
+            }
+        }
     }
 
-    function voteToSetProposerFee(uint _newFee) public {
-        Certificate c = CertificateRegistry(address(0x509)).getUserCert(tx.origin);
-        require(address(c) != address(0), "Voting to set proposer fee requires having a valid X.509 certificate");
-        require(c.isValid(), "Voting to set proposer fee requires having a valid X.509 certificate");
-        string memory originOrg = c.organization();
-        string memory originUnit = c.organizationalUnit();
-        string memory originName = c.commonName();
+    // Updates the validator list whenever a vote is called to ensure new validators are accounted for
+    function updateValidators() internal {
+        // Add any new validators who may not have been in the original hasVoted map
+        for (uint i = 0; i < validatorCount; i++) {
+            (string memory org, string memory unit, string memory name) = getValidatorDetails(i);  // Example function
+            if (validatorMap[org][unit][name].isActive() && hasVoted[org][unit][name] == false) {
+                hasVoted[org][unit][name] = false;
+            }
+        }
 
-        MercataValidator v = MercataGovernance(address(0x509)).validatorMap(originOrg, originUnit, originName);
-        require(address(v) != address(0), "Only validators can vote for proposer fee");
+        // Handle removing any inactive validators from the hasVoted map
+        for (uint i = 0; i < validatorCount; i++) {
+            (string memory org, string memory unit, string memory name) = getValidatorDetails(i);  // Example function
+            if (!validatorMap[org][unit][name].isActive()) {
+                hasVoted[org][unit][name] = false;  // Invalidate their voting status
+            }
+        }
+    }
+
+    function voteToSetProposerFee(string memory _org, string memory _orgUnit, string memory _commonName, uint _newFee) public {
+        // Refresh validator list before voting
+        updateValidators();
+
+        // Ensure only active validators can vote
+        MercataValidator v = validatorMap[_org][_orgUnit][_commonName];
+        require(address(v) != address(0), "Only registered validators can vote for proposer fee");
         require(v.isActive(), "Only active validators can vote for proposer fee");
 
-        // Check if the validator already voted
-        uint voteIndex = proposerFeeVoteMap[originOrg][originUnit][originName];
-        require(voteIndex == 0, "Validator has already voted");
+        // Check if the validator has already voted
+        require(!hasVoted[_org][_orgUnit][_commonName], "Validator has already voted");
 
-        // Create a new vote
-        MercataValidatorVote newVote = new MercataValidatorVote(originOrg, originUnit, originName, "", "", "", true);
-        uint voteCount = proposerFeeVoteCountMap[originOrg][originUnit][originName] + 1;
-        proposerFeeVoteCountMap[originOrg][originUnit][originName] = voteCount;
-        proposerFeeVotes[originOrg][originUnit][originName].push(newVote);
-        proposerFeeVoteMap[originOrg][originUnit][originName] = proposerFeeVotes[originOrg][originUnit][originName].length;
+        // Mark the validator as having voted
+        hasVoted[_org][_orgUnit][_commonName] = true;
 
-        // If enough votes, finalize the new proposer fee
-        uint newVoteCount = proposerFeeVoteCountMap[originOrg][originUnit][originName];
-        if (newVoteCount >= proposerFeeFinalizationThreshold) {
+        // Increment the total number of votes
+        totalVotes++;
+
+        // Check if the vote count has reached the finalization threshold
+        if (totalVotes >= proposerFeeFinalizationThreshold) {
             finalizeProposerFee(_newFee);
         }
     }
 
     function finalizeProposerFee(uint _newFee) internal {
         proposerFee = _newFee;
-
-        // Reset votes
-        for (uint i = 0; i < proposerFeeVoteCountMap.length; i++) {
-            proposerFeeVotes; // Clear all votes
-        }
-        proposerFeeVoteCountMap = 0;
-
+        resetVotes();  // Reset voting state for the next round
         emit ProposerFeeUpdated(_newFee);
+    }
+
+    function resetVotes() internal {
+        // Reset all votes by marking hasVoted as false for all active validators
+        for (uint i = 0; i < validatorCount; i++) {
+            (string memory org, string memory unit, string memory name) = getValidatorDetails(i);  // Example function
+            if (validatorMap[org][unit][name].isActive()) {
+                hasVoted[org][unit][name] = false;
+            }
+        }
+        totalVotes = 0;
     }
 }

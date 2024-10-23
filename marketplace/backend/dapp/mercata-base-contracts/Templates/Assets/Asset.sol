@@ -1,4 +1,4 @@
-pragma "solidvm12.0";
+pragma solidvm12.0;
 
 import <509>;
 import "../Enums/RestStatus.sol";
@@ -30,7 +30,7 @@ abstract contract Asset is Utils {
     AssetStatus public status;
 
     address public sale;
-    decimal public proposerFee == 0.0;
+    decimal public proposerFee = 0.0;
 
     event OwnershipTransfer(
         address originAddress,
@@ -206,6 +206,7 @@ abstract contract Asset is Utils {
         }
     }
 
+    //Can be called for stripe and ach
     function payFeesToProposer(address stratAsset, uint transferFee, uint transferNumber) external {
         require(proposerFee>=0, "Fees is zero");
         stratAsset.purchaseTransfer(block.proposer, transferFee, transferNumber, 0.0001);
