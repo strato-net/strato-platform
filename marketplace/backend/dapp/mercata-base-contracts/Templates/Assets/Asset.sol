@@ -189,6 +189,7 @@ abstract contract Asset is Utils {
     function automaticTransfer(address _newOwner, decimal _price, uint _quantity, uint _transferNumber) public requireOwner("automatic transfer") returns (uint) {
         require(status != AssetStatus.PENDING_REDEMPTION, "Asset is not in ACTIVE state.");
         require(status != AssetStatus.RETIRED, "Asset is not in ACTIVE state.");
+        require(_quantity > 0, "Quantity must be greater than 0");
         require(_quantity <= quantity, "Cannot transfer more than available quantity.");
         if (sale == address(0)) {
             // transfer feature - isUserTransfer: true, transferNumber: >0
