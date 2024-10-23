@@ -42,7 +42,6 @@ const ConfirmOrder = ({ paymentServices = [], data, columns }) => {
   const [modal, contextHolderForModal] = Modal.useModal();
   const [cartData, setCartData] = useState(data);
   
-  // temporary fix to put STRATs as top payment option, will be updated in next release
   const activePaymentProviders = (paymentServices[0] !== undefined) ? paymentServices.filter(paymentProvider => paymentProvider?.isActive) : [];
   const stratsIndex = activePaymentProviders.findIndex(service => service.serviceName.toLowerCase().includes('strats'));
   if (stratsIndex > 0) {

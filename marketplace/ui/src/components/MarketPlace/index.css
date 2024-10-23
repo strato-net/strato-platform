@@ -1201,3 +1201,15 @@ img.ant-image-preview-img {
 .ant-table-pagination{
   justify-content: center !important;
 }
+
+.custom-select-no-tick .ant-select-item-option-selected .ant-select-item-option-state {
+  display: none !important;
+}
+
+
+.custom-check-icon {
+  color: #28a745;
+  font-size: 18px;
+  position: absolute;
+  right: 7px;
+}

@@ -54,7 +54,7 @@ const TransactionTable = ({ user, download, isAllOrdersLoading }) => {
 
   const formatter = new Intl.NumberFormat('en-US');
   const formattedNum = (num) => formatter.format(num);
-  const defaultDate = dateQuery ? dayjs.unix(dayjs(dateQuery).startOf('month').unix()) : dayjs.unix(currentMonth);
+  const defaultDate =  dateQuery ? dayjs.unix(dayjs(dateQuery, 'MMMM YYYY').startOf('month').unix()) : dayjs.unix(currentMonth);
 
   useEffect(() => {
     async function fetchStratsAddress() {
@@ -116,8 +116,12 @@ const TransactionTable = ({ user, download, isAllOrdersLoading }) => {
       const selectedMonthYear = dayjs(dateQuery, "MMMM YYYY");
 
       filteredData = filteredData.filter((item) => {
-        const itemDate = dayjs(item.block_timestamp); // Convert block timestamp to dayjs object
-
+        let blockTimestamp = item.block_timestamp;
+        if (blockTimestamp.includes('UTC')) {
+          blockTimestamp = blockTimestamp.replace(' UTC', 'Z'); 
+        }
+        const itemDate = dayjs(blockTimestamp);
+        
         // Compare both month and year
         return itemDate.isSame(selectedMonthYear, 'month') && itemDate.isSame(selectedMonthYear, 'year');
       });
@@ -137,10 +141,12 @@ const TransactionTable = ({ user, download, isAllOrdersLoading }) => {
   };
 
   const dateReturn = (date) => {
-    const startDate = dayjs(date).startOf('month').unix();
-    const endDate = dayjs(date).endOf('month').unix();
-    return [startDate, endDate]
+    const parsedDate = dayjs(date, 'MMMM YYYY').startOf('month');
+    const startDate = parsedDate.unix();
+    const endDate = parsedDate.endOf('month').unix();
+    return [startDate, endDate];
   }
+  
 
   const Content = ({ data }) => {
     const price = data?.assetPrice || data?.price

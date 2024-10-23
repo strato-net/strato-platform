@@ -417,7 +417,7 @@ export const TRANSACTION_STATUS = {
   1: 'Awaiting Fulfillment',
   2: 'Payment Pending',
   3: 'Closed',
-  4: 'Cancelled',
+  4: 'Canceled',
   5: 'Discarded'
 }
 
@@ -471,7 +471,7 @@ export const TRANSACTION_SORT = [
   {label:'Awaiting Fulfillment', value:'1'},
   {label:'Awaiting Shipment', value:'2'},
   {label:'Closed', value:'3'},
-  {label:'Cancelled', value:'4'},
+  {label:'Canceled', value:'4'},
   {label:'Payment Pending', value:'5'},
 ]
 
