@@ -399,9 +399,9 @@ addLdbBatchOps :: Mod.Modifiable (Q.Seq LDB.BatchOp) m => [LDB.BatchOp] -> m ()
 addLdbBatchOps ops = Mod.modify_ (Mod.Proxy @(Q.Seq LDB.BatchOp)) $ \existingOps ->
   pure $ foldl' (Q.|>) existingOps ops
 
-fuseChannels :: SequencerM (ConduitM () SeqLoopEvent SequencerM ())
+fuseChannels :: (MonadIO m, MonadReader SequencerConfig m) =>
+                m (ConduitM () SeqLoopEvent SequencerM ())
 fuseChannels = do
-  --unseq <- asks $ unseqEvents . cablePackage
   timers <- asks blockstanbulTimeouts
   let k = kafkaConfig ethConf
       kafkaAddress = (fromString $ kafkaHost k, fromIntegral $ kafkaPort k)

@@ -118,44 +118,24 @@ buildEmissionChain ::
   ( (Keccak256 `Alters` DependentBlockEntry) m,
     MonadLogger m
   ) =>
-  SequencedBlock ->
-  Integer ->
-  m [OutputBlock]
-buildEmissionChain = buildEmissionChain' False
-
-buildEmissionChain' ::
-  ( (Keccak256 `Alters` DependentBlockEntry) m,
-    MonadLogger m
-  ) =>
-  Bool ->
-  SequencedBlock ->
-  Integer ->
-  m [OutputBlock]
-buildEmissionChain' retryFailed b lastTotalDifficulty =
+  SequencedBlock -> Integer -> m [OutputBlock]
+buildEmissionChain b lastTotalDifficulty =
   lookup Proxy (sbHash b) >>= \case
     Nothing -> do
-      $logDebugS "buildEmissionChain'" . T.pack $ "Got Nothing for " <> format (sbHash b)
+      $logDebugS "buildEmissionChain" . T.pack $ "Got Nothing for " <> format (sbHash b)
       insert Proxy (sbHash b) $ Emitted totalDifficulty'
       return [theBlock totalDifficulty']
     Just (Emitted _) -> do
-      $logDebugS "buildEmissionChain'" . T.pack $ "Got Emitted for " <> format (sbHash b)
-      if retryFailed
-        then return [theBlock totalDifficulty']
-        else return []
+      $logDebugS "buildEmissionChain" . T.pack $ "Got Emitted for " <> format (sbHash b)
+      return []
     Just (DependentBlocks blocks') -> do
-      $logDebugS "buildEmissionChain'" . T.pack $ "Got DependentBlocks for " <> format (sbHash b)
+      $logDebugS "buildEmissionChain" . T.pack $ "Got DependentBlocks for " <> format (sbHash b)
       insert Proxy (sbHash b) $ Emitted totalDifficulty'
-      subChains <- sequence $ flip (buildEmissionChain' retryFailed) totalDifficulty' <$> blocks'
+      subChains <- sequence $ flip buildEmissionChain totalDifficulty' <$> blocks'
       return $ theBlock totalDifficulty' : join subChains
-    Just (ChildFailedConsensus t blocks') -> do
-      $logDebugS "buildEmissionChain'" . T.pack $ "Got ChildFailedConsensus for " <> format (sbHash b)
-      $logDebugS "buildEmissionChain'" . T.pack $ "retryFailed is " <> show retryFailed
-      if retryFailed
-        then do
-          insert Proxy (sbHash b) $ Emitted t
-          subChains <- sequence $ flip (buildEmissionChain' retryFailed) t <$> blocks'
-          return $ theBlock t : join subChains
-        else return []
+    Just (ChildFailedConsensus _ _) -> do
+      $logDebugS "buildEmissionChain" . T.pack $ "Got ChildFailedConsensus for " <> format (sbHash b)
+      return []
   where
     totalDifficulty' = lastTotalDifficulty + sequencedBlockDifficulty b
     theBlock t' = sequencedBlockToOutputBlock b t'
