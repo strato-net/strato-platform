@@ -497,7 +497,7 @@ postBlocTransaction ::
   Bool ->
   PostBlocTransactionRequest ->
   m [BlocChainOrTransactionResult]
-postBlocTransaction = postBlocTransaction' (Do CacheNonce)
+postBlocTransaction = postBlocTransaction' (Don't CacheNonce)
 
 postBlocTransaction' ::
   ( MonadLogger m,
@@ -931,7 +931,7 @@ postUsersUploadListSolidVM' cacheNonce ContractListParameters {..} jwtToken = do
             cid
       return (name, tx)
   let txs = map snd namesTxs
-  hashes <- traverse (blocStrato . postTransactionClient) txs
+  hashes <- blocStrato $  postTransactionListClient txs
   getBatchBlocTransactionResult' hashes resolve
 
 postUsersSendList' ::
@@ -964,7 +964,7 @@ postUsersSendList' cacheNonce TransferListParameters {..} jwtToken = do
           signAndPrepare jwtToken fromAddr md header
       )
       txsWithParams
-  hashes <- traverse (blocStrato . postTransactionClient) txs''
+  hashes <- blocStrato $ postTransactionListClient txs''
   getBatchBlocTransactionResult' hashes resolve
 
 postUsersContractMethodList' ::
@@ -1022,7 +1022,7 @@ postUsersContractMethodList' cacheNonce FunctionListParameters {..} jwtToken = d
           return (tx, methodcallMethodName)
       let finalTxs = fst <$> txsFuncNames
       mapM_ ($logDebugLS "postUsersContractMethodList'/txs") finalTxs
-      hashes <- traverse (blocStrato . postTransactionClient) finalTxs
+      hashes <- blocStrato $ postTransactionListClient finalTxs
       mapM_ ($logInfoLS "postUsersContractMethodList'/hashes") hashes
       getBatchBlocTransactionResult' hashes resolve
 

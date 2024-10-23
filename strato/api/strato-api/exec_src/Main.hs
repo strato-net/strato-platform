@@ -250,7 +250,8 @@ coreProxyServer =
     :<|> (\a b c d e f g h i j k -> blocStrato $ client (Proxy @Storage.API) a b c d e f g h i j k)
     :<|> (blocStrato $ client (Proxy @SyncStatus.API))
     :<|> ((\a b c d e f g h i j k l m n o p q -> blocStrato $ client (Proxy @Transaction.GetTransaction) a b c d e f g h i j k l m n o p q)
-      :<|> (\a -> blocStrato $ client (Proxy @Transaction.PostTransaction) a))
+      :<|> (\a -> blocStrato $ client (Proxy @Transaction.PostTransaction) a)
+      :<|> (\a -> blocStrato $ client (Proxy @Transaction.PostTransactionList) a))
     :<|> (\a -> blocStrato $ client (Proxy @TransactionResult.API) a)
     :<|> (\a b -> blocStrato $ client (Proxy @TxLast.API) a b)
 
