@@ -113,7 +113,9 @@ const InventoryCard = ({ inventory, category, debouncedSearchTerm, id, allSubcat
     const parts = inventory.contract_name.split('-');
     const contractName = parts[parts.length - 1];
 
-    return allSubcategories?.find(c => c.contract === contractName)?.name
+    let category = allSubcategories?.find(c => c.contract === contractName)?.name;
+    category = category === 'STRATS' ? 'STRAT' : category; 
+    return category
   };
 
   /**
