@@ -1198,4 +1198,6 @@ img.ant-image-preview-img {
   margin-top: 140px;
 }
 
-
+.ant-table-pagination{
+  justify-content: center !important;
+}

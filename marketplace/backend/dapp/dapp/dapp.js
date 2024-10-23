@@ -344,7 +344,7 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
   }
 
   contract.getOutgoingRedemptionRequests = async function (args, options = optionsNoChainIds) {
-    const { order, search, range , limit, offset } = args;
+    const { order, search, range, limit, offset } = args;
     const queryParams = new URLSearchParams({
       redemptionId: search,
       order: order,
@@ -386,21 +386,23 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
 
       const allRedemptions = await Promise.all(redemptionPromises);
       redemptions = allRedemptions.flat();
-      redemptions = redemptions.filter((item)=>{
-        const dateRange = range[0].split(',')
-        const startRange = dateRange[1];
-        const endRange = dateRange[2];
-        if(item.redemptionDate > startRange && item.redemptionDate < endRange){
-          return item;
-        }
-      })
+      if (range?.length) {
+        redemptions = redemptions.filter((item) => {
+          const dateRange = range[0].split(',')
+          const startRange = dateRange[1];
+          const endRange = dateRange[2];
+          if (item.redemptionDate > startRange && item.redemptionDate < endRange) {
+            return item;
+          }
+        })
+      }
 
       if (order && order === 'ASC')
         redemptions.sort((a, b) => a.createdDate - b.createdDate);
       else
         redemptions.sort((a, b) => b.createdDate - a.createdDate);
 
-      return {data:redemptions, count};
+      return { data: redemptions, count };
     } catch (error) {
       if (error.response) {
         throw new rest.RestError(error.response.status, error.response.statusText);
@@ -448,14 +450,16 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
 
       const allRedemptions = await Promise.all(redemptionPromises);
       redemptions = allRedemptions.flat();
-      redemptions = redemptions.filter((item)=>{
-        const dateRange = range[0].split(',')
-        const startRange = dateRange[1];
-        const endRange = dateRange[2];
-        if(item.redemptionDate > startRange && item.redemptionDate < endRange){
-          return item;
-        }
-      })
+      if (range?.length) {
+        redemptions = redemptions.filter((item) => {
+          const dateRange = range[0].split(',')
+          const startRange = dateRange[1];
+          const endRange = dateRange[2];
+          if (item.redemptionDate > startRange && item.redemptionDate < endRange) {
+            return item;
+          }
+        })
+      }
 
       if (order && order === 'ASC')
         redemptions.sort((a, b) => a.createdDate - b.createdDate);
@@ -463,7 +467,7 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
         redemptions.sort((a, b) => b.createdDate - a.createdDate);
 
 
-      return {data:redemptions, count};
+      return { data: redemptions, count };
     } catch (error) {
       if (error.response) {
         throw new rest.RestError(error.response.status, error.response.statusText);
@@ -881,43 +885,43 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
     const getOptions = { ...options, app: contractName, };
 
 
-    let {orders, total} = await saleOrderJs.getAll(rawAdmin, args, getOptions);
+    let { orders, total } = await saleOrderJs.getAll(rawAdmin, args, getOptions);
     let data;
    let saleAddressArr = [];
    data = orders.map((item)=> {
     if(item?.saleAddresses?.length){
       saleAddressArr.push(item?.saleAddresses[0])
-     return {...item,saleAddress:item?.saleAddresses[0]}
-    }else if(item["BlockApps-Mercata-Order-saleAddresses"]){
+     return {...item,saleAddress:item?.saleAddresses[0] }
+    }else if(item["BlockApps-Mercata-Order-saleAddresses"]) {
       const address = item["BlockApps-Mercata-Order-saleAddresses"][0]?.value
       saleAddressArr.push(address)
-     return {...item, saleAddress:address  }
+     return {...item, saleAddress:address }
     }else{
       saleAddressArr.push(item?.saleAddresses)
-      return {...item,saleAddress:item?.saleAddresses}
+      return {...item,saleAddress:item?.saleAddresses }
     }
   })
 
   const sales = await saleJs.getAll(rawAdmin, { saleAddresses: saleAddressArr }, options);
 
   let assets = [];
-      for (const sale of sales) {
-        const history = await saleJs.getSaleHistory(rawAdmin, { contract: sale.contract_name, transaction_hash: sale.transaction_hash, assetToBeSold: sale.assetToBeSold }, options);
-        const price = history['0'] ? history['0'].price : null;
+    for (const sale of sales) {
+      const history = await saleJs.getSaleHistory(rawAdmin, { contract: sale.contract_name, transaction_hash: sale.transaction_hash, assetToBeSold: sale.assetToBeSold }, options);
+      const price = history['0'] ? history['0'].price : null;
 
-        assets.push({
-          assetAddress: sale.assetToBeSold,
-          price: price,
-          assetPrice: sale?.price,
-          saleQuantity: sale.quantity,
-          saleAddress: sale.address,
-        });
-      }
+      assets.push({
+        assetAddress: sale.assetToBeSold,
+        price: price,
+        assetPrice: sale?.price,
+        saleQuantity: sale.quantity,
+        saleAddress: sale.address,
+      });
+    }
 
-      data = data.map((item)=>{
-        const saleData = assets.find((asset)=> asset.saleAddress === item.saleAddress) 
-        return {...item, ...saleData }
-      })
+    data = data.map((item)=>{
+      const saleData = assets.find((asset)=> asset.saleAddress === item.saleAddress)
+      return {...item, ...saleData }
+    })
 
   return { orderData:data, total };;
   }
@@ -1297,9 +1301,9 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
     }
   };
 
-  contract.getStratsBalance = async function ( args, options = defaultOptions ) {
+  contract.getStratsBalance = async function (args, options = defaultOptions) {
     const stratsOriginAddress = await STRATSJs.getStratsAddress();
-    const balance = await inventoryJs.getAll(rawAdmin, { ownerCommonName: userCert.commonName, originAddress: stratsOriginAddress, queryOptions: { select: "quantity.sum()" }}, options);
+    const balance = await inventoryJs.getAll(rawAdmin, { ownerCommonName: userCert.commonName, originAddress: stratsOriginAddress, queryOptions: { select: "quantity.sum()" } }, options);
     return balance[0].sum ? `${balance[0].sum/100}` : 0;
   }
 
