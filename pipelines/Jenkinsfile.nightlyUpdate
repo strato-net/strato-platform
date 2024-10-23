@@ -41,6 +41,43 @@ pipeline {
         sh 'sudo docker image prune'
       }
     }
+
+    stage('Update Testnet2 Payment Server') {
+      agent { label "mercata-testnet2-payment" }
+      steps {
+        copyArtifacts filter: 'docker-compose.payment.yml', fingerprintArtifacts: true, projectName: 'STRATO_develop_nightly_build', selector: lastSuccessful()
+        
+        
+        dir ('/datadrive/testnet2/strato-getting-started') {
+          sh 'mv docker-compose.payment.yml docker-compose.payment.$(date \'+%Y%m%d\').yml || true'
+        }
+        sh 'mv docker-compose.payment.yml /datadrive/testnet2/strato-getting-started'
+        
+        dir ('/datadrive/testnet2/strato-getting-started') {
+          sh 'sudo ./payment-server --pull'
+          sh 'sudo ./run-ps.sh'
+        }
+        sh 'sudo docker image prune'
+      }
+    }
+
+    stage('Update Testnet2 Rewards Server') {
+      agent { label "mercata-testnet2-rewards" }
+      steps {
+        withCredentials([usernamePassword(credentialsId: 'blockapps-cd-github', passwordVariable: 'GITHUB_TOKEN', usernameVariable: 'GITHUB_USERNAME')]) {
+            dir ('/home/ec2-user/strato-platform/rewards-server') {
+                sh """
+                set -xe
+                git checkout develop
+                git pull https://${GITHUB_USERNAME}:${GITHUB_TOKEN}@github.com/blockapps/strato-platform.git
+                sudo docker compose up --build -d
+              """
+              }
+            }
+          }
+        sh 'sudo docker image prune'
+      }
+    }
   }
   post {
     success {
