@@ -37,9 +37,13 @@ const TransactionTable = ({ user, download, isAllOrdersLoading }) => {
   const navigate = useNavigate();
   const location = useLocation();
 
-  const pageSize = 20;
+  const searchParams = new URLSearchParams(location.search);
+  const urlType = searchParams.get("type");
+  const urlDate = searchParams.get("date");
+
   const currentMonth = dayjs().startOf('month').unix();
-  const [limit, setLimit] = useState(5);
+  const limit = urlDate ? '' : 5;
+  const pageSize = 10;
   const [offset, setOffset] = useState(0);
   const [currentPage, setCurrentPage] = useState(1);
   const [type, setType] = useState("");
@@ -69,28 +73,19 @@ const TransactionTable = ({ user, download, isAllOrdersLoading }) => {
         offset,
         user?.commonName,
         dateReturn(dateQuery),
-        type
       );
     }
     if (user?.commonName && !dateQuery) {
-      const startOfMonth = dayjs().startOf('month').unix();
-      const endOfMonth = dayjs().endOf('month').unix();
-      const dateArr = [startOfMonth, endOfMonth]
       transactionAction.fetchUserTransaction(
         transactionDispatch,
         limit,
         offset,
         user?.commonName,
-        dateArr,
-        type
       );
     }
-  }, [user, dateQuery, offset, type])
+  }, [user, dateQuery, offset])
 
   useEffect(() => {
-    const searchParams = new URLSearchParams(location.search);
-    const urlType = searchParams.get("type");
-    const urlDate = searchParams.get("date");
     // Update state based on URL params, but skip empty values
     setType(urlType && urlType !== "all" ? urlType : "");
     setDateQuery(urlDate || "");
@@ -99,13 +94,13 @@ const TransactionTable = ({ user, download, isAllOrdersLoading }) => {
   useEffect(() => {
     let filteredData = userTransactions;
     // Type filter
-    // if (type) {
-    //   if (type === "STRATS") {
-    //     filteredData = filteredData.filter((item) => item.assetOriginAddress === originAddress);
-    //   } else {
-    //     filteredData = filteredData.filter((item) => item.type === type);
-    //   }
-    // }
+    if (type) {
+      if (type === "STRATS") {
+        filteredData = filteredData.filter((item) => item.assetOriginAddress === originAddress);
+      } else {
+        filteredData = filteredData.filter((item) => item.type === type);
+      }
+    }
 
     // Search filter
     if (search) {
@@ -127,7 +122,7 @@ const TransactionTable = ({ user, download, isAllOrdersLoading }) => {
         return itemDate.isSame(selectedMonthYear, 'month') && itemDate.isSame(selectedMonthYear, 'year');
       });
     }
-
+    setCurrentPage(1)
     setTransactions(filteredData);
   }, [userTransactions, type, search, dateQuery]);
 
@@ -298,11 +293,6 @@ const TransactionTable = ({ user, download, isAllOrdersLoading }) => {
     },
   ];
 
-  const handlePagination = (current) =>{
-    setCurrentPage(current)
-    const offsetVal = (current-1) * 5
-    setOffset(offsetVal)
-  }
 
   const statusComponent = (status, data) => {
     status = data.type === "Transfer" ? 3 : status
@@ -338,6 +328,14 @@ const TransactionTable = ({ user, download, isAllOrdersLoading }) => {
   };
 
   const metaImg = SEO.IMAGE_META;
+
+  const handlePageChange
+    = (page) => {
+      setCurrentPage(page);
+    };
+
+  const paginatedTransactions = transactions.slice((currentPage - 1) * pageSize, currentPage * pageSize);
+
 
   return (
     <Row>
@@ -406,34 +404,28 @@ const TransactionTable = ({ user, download, isAllOrdersLoading }) => {
       <Col span={22} className="mx-auto mt-5">
         <div className="flex md:hidden order_responsive">
           {isTransactionLoading ? <Spin className="mx-auto" />
-            : <TransactionResponsive data={transactions} user={user} />}
+            : <div className="flex flex-col mx-auto">
+              <TransactionResponsive data={paginatedTransactions} user={user} />
+              {urlDate && <Pagination
+                className="mx-auto mt-5"
+                total={transactions.length}
+                current={currentPage}
+                pageSize={pageSize}
+                onChange={handlePageChange}
+              />}
+            </div>}
         </div>
-        <div className="hidden md:block">
+        <div className="hidden md:block mx:auto">
           <Spin spinning={isTransactionLoading} delay={500} size="large">
-            <Table
+            <DataTableComponent
               columns={column}
-              dataSource={transactions}
-              className="custom-table"
-              sticky={true}
-              pagination={false}
-              scroll={{
-                x: '100%',
-              }}
-              size="middle"
-              rowClassName={"bg-white"}
+              data={transactions}
+              isLoading={isTransactionLoading}
+              pagination={urlDate ? true : false}
+              scrollX="100%"
             />
           </Spin>
         </div>
-        <div className="flex justify-center pt-6">
-            <Pagination
-              current={currentPage}
-              defaultPageSize={pageSize}
-              onChange={(e)=>{handlePagination(e)}}
-              total={count}
-              showSizeChanger={false}
-              className="flex justify-center my-5"
-            />
-          </div>
       </Col>
     </Row>
   );

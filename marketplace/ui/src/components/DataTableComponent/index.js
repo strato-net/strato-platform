@@ -30,7 +30,7 @@ const DataTableComponent = ({
       className="custom-table"
       sticky={true}
       pagination={
-        pagination ?? {
+        pagination && {
           defaultPageSize: 10,
           showSizeChanger: false,
           position: ["bottomCenter"],
