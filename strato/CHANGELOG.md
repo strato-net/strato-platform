@@ -16,6 +16,21 @@ so that they could be properly moved to their respective version's subsection.
 
 ## [Unreleased] 
 ### Added
+- Added block.proposer to SolidVM
+- Reintroduced wire cache to strato-p2p to reduce redundant blockstanbul messages sent to the sequencer
+
+### Changed
+- Only genesis block contracts and top-level abstract contracts are now indexed by Slipstream
+
+### Fixed
+- Bugfix in slipstream to support decoding structs
+- Foreign keys in cirrus properly updated
+- Bugfix in p2p to prevent peers from continuously attempting to connect to offline peers
+
+### Removed
+
+## [12.0.0] - 9/23/2024
+### Added
 - Introduced BlockHeaderV2 constructor to BlockHeader type
 - Added support for BlockHeaderV2 fields to eth db and strato-api
 - Added BlockHeaderV2 fields to BlockView component in SMD

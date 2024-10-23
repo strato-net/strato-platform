@@ -23,7 +23,7 @@ where
 import BlockApps.Crossmon (recordMaxBlockNumber)
 import BlockApps.Logging
 import BlockApps.X509.Certificate as XC
-import Blockchain.Blockstanbul (blockstanbulSender)
+import Blockchain.Blockstanbul (blockstanbulSender, WireMessage)
 import Blockchain.Context
 import Blockchain.Data.Block
 import Blockchain.Data.BlockHeader (BlockHeader)
@@ -324,7 +324,26 @@ handleEvents peer = awaitForever $ \case
       setPeerAddrIfUnset $ blockstanbulSender wm
       peerAddr <- unPeerAddress <$> access (Proxy @PeerAddress)
       $logInfoS "handleEvents/Blockstanbul" . T.pack $ "blockstanbulPeerAddr: " ++ show peerAddr
-    yieldL $ ToUnseq [IEBlockstanbul wm]
+    let msgHash = rlpHash wm
+    lift $ insert (Proxy @(Proxy (Outbound WireMessage))) (pPeerIp peer, msgHash) Proxy
+    msgExists <- lift $ exists (Proxy @(Proxy (Inbound WireMessage))) msgHash
+    if msgExists
+      then
+        $logInfoS "handleEvents/Blockstanbul" . T.pack $
+          concat
+            [ "Already seen inbound wire message ",
+              format msgHash,
+              ". Not forwarding to Sequencer."
+            ]
+      else do
+        $logInfoS "handleEvents/Blockstanbul" . T.pack $
+          concat
+            [ "First time seeing inbound wire message ",
+              format msgHash,
+              ". Forwarding to Sequencer."
+            ]
+        lift $ insert (Proxy @(Proxy (Inbound WireMessage))) msgHash Proxy
+        yieldL $ ToUnseq [IEBlockstanbul wm]
 
   -- private chains
   MsgEvt (GetChainDetails cids') -> handleGetChainDetails peer $ S.fromList cids'
@@ -433,7 +452,29 @@ handleEvents peer = awaitForever $ \case
             True -> do
               let outbound = Blockstanbul msg
               $logDebugS "handleEvents/P2pBlockstanbul" . T.pack $ "Outgoing mesage: " ++ show outbound
-              yieldR outbound
+              let !msgHash = rlpHash msg
+              lift $ insert (Proxy @(Proxy (Inbound WireMessage))) msgHash Proxy
+              msgExists <- lift $ exists (Proxy @(Proxy (Outbound WireMessage))) (pPeerIp peer, msgHash)
+              if msgExists
+                then
+                  $logInfoS "handleEvents/P2pBlockstanbul" $
+                    T.concat
+                      [ "Already seen outbound wire message ",
+                        T.pack (format msgHash),
+                        ". Not forwarding to peer ",
+                        pPeerIp peer
+                      ]
+                else do
+                  $logInfoS "handleEvents/P2pBlockstanbul" $
+                    T.concat
+                      [ "First time seeing outbound wire message ",
+                        T.pack (format msgHash),
+                        ". Forwarding to peer ",
+                        pPeerIp peer
+                      ]
+                  let !ip = pPeerIp peer
+                  lift $ insert (Proxy @(Proxy (Outbound WireMessage))) (ip, msgHash) Proxy
+                  yieldR outbound
     P2pAskForBlocks start _ _ -> do
       $logDebugS "handleEvents/P2pAskForBlocks" . T.pack $ "syncFetch: " ++ show start
       syncFetch Forward start

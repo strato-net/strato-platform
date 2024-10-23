@@ -61,6 +61,65 @@ export const categoricalProperties = (form, handleClothingTypeChange, clothingTy
                     </Form.Item>
                 </div>
             );
+        case "STRATSTokens":
+            return (
+                <div className="flex justify-between gap-3 flex-wrap md:flex-nowrap mt-4">
+                    <Form.Item
+                        label="Payment Service Name"
+                        name="paymentServiceName"
+                        className="w-full md:w-[200px] "
+                        rules={[
+                            {
+                                required: true,
+                                message: 'Please enter a payment service name',
+                            },
+                        ]}
+                    >
+                        <Input placeholder="Payment service name" />
+                    </Form.Item>
+                    <Form.Item
+                        label="Payment Service Creator"
+                        name="paymentServiceCreator"
+                        className=" w-full sm:w-[200px] md:w-30"
+                        rules={[
+                            {
+                                required: true,
+                                message: 'Please enter the payment service creator',
+                            },
+                        ]}
+                    >
+                        <Input placeholder="Payment service creator" />
+                    </Form.Item>
+                    <Form.Item
+                        label="Quantity"
+                        name="quantity"
+                        className="w-full sm:w-[200px] md:w-30"
+                        rules={[
+                            {
+                                required: true,
+                                message: 'Please enter a quantity',
+                            },
+                            {
+                                type: 'number',
+                                min: 1,
+                                message: 'Quantity must be greater than or equal to 1',
+                            },
+                            {
+                                validator: (_, value) =>
+                                value && Number.isInteger(value)
+                                    ? Promise.resolve()
+                                    : Promise.reject(new Error('Quantity must be an integer')),
+                            },
+                        ]}
+                    >
+                        <InputNumber 
+                            style={{ width: '100%', height: '42px', display: 'flex', alignItems: 'center' }}  
+                            min={1} 
+                            placeholder="Enter Quantity" 
+                        />
+                    </Form.Item>
+                </div>
+            );
         case "CarbonOffset":
             return (
                 <div className="flex justify-between mt-4 ">
@@ -353,15 +412,30 @@ export const categoricalProperties = (form, handleClothingTypeChange, clothingTy
                     <Form.Item
                         label="Least Sellable Unit(s)"
                         name="leastSellableUnits"
-                        className=" w-full sm:w-[200px] md:w-30"
+                        className="w-full sm:w-[200px] md:w-30"
                         rules={[
                             {
                                 required: true,
                                 message: 'Please enter the least sellable unit',
                             },
+                            {
+                                type: 'number',
+                                min: 1,
+                                message: 'Least sellable unit must be greater than or equal to 1',
+                            },
+                            {
+                                validator: (_, value) =>
+                                  value && Number.isInteger(value)
+                                    ? Promise.resolve()
+                                    : Promise.reject(new Error('Least sellable unit must be an integer')),
+                            },
                         ]}
                     >
-                        <Input placeholder="Enter Least Sellable Units" />
+                        <InputNumber 
+                            style={{ width: '100%', height: '42px', display: 'flex', alignItems: 'center' }}  
+                            min={1} 
+                            placeholder="Enter Least Sellable Units" 
+                        />
                     </Form.Item>
                     <Form.Item
                         label="Quantity"
@@ -405,9 +479,24 @@ export const categoricalProperties = (form, handleClothingTypeChange, clothingTy
                                 required: true,
                                 message: 'Please enter an expiration period',
                             },
+                            {
+                                type: 'number',
+                                min: 1,
+                                message: 'Expiration period must be greater than or equal to 1',
+                            },
+                            {
+                                validator: (_, value) =>
+                                  value && Number.isInteger(value)
+                                    ? Promise.resolve()
+                                    : Promise.reject(new Error('Expiration period must be an integer')),
+                            },
                         ]}
                     >
-                        <Input placeholder="Enter Expiration (in months)" />
+                        <InputNumber 
+                            style={{ width: '100%', height: '42px', display: 'flex', alignItems: 'center' }}  
+                            min={1} 
+                            placeholder="Enter Expiration" 
+                        />
                     </Form.Item>
                     <Form.Item
                         label="Quantity"

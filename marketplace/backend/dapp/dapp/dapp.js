@@ -25,6 +25,7 @@ import certificateJs from "/dapp/certificates/certificate";
 
 import artJs from "/dapp/items/art";
 import tokensJs from "/dapp/items/tokens";
+import STRATSJs from "/dapp/items/STRATS";
 import carbonOffsetJs from "/dapp/items/carbonOffset";
 import metalsJs from "/dapp/items/metals";
 import spiritsJs from "/dapp/items/spirits";
@@ -38,7 +39,7 @@ import saleOrderJs from "/dapp/orders/saleOrder";
 
 import inventoryJs from "/dapp/products/inventory";
 import marketplaceJs from "/dapp/marketplace/marketplace.js";
-import paymentProviderJs from '/dapp/payments/paymentProvider';
+import paymentServiceJs from '/dapp/payments/paymentService';
 import redemptionServiceJs from '/dapp/redemptions/redemptionService';
 
 import strats from "../strats/strats";
@@ -358,7 +359,12 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
           redemptionServiceAddresses.push(r.address);
         }
       });
-      const redemptionServices = await redemptionServiceJs.getAll(rawAdmin, { address: redemptionServiceAddresses }, options);
+      let redemptionServices = await redemptionServiceJs.getAll(rawAdmin, { address: redemptionServiceAddresses }, options);
+
+      // handle backwards compatibility case
+      if (Object.keys(redemptionServices).length === 0) {
+        redemptionServices = await redemptionServiceJs.getAll(rawAdmin, { isActive: true, ownerCommonName: "Server" }, options);
+      }
 
       const redemptionPromises = redemptionServices.map(async (rs) => {
         const serviceUrl = rs.serviceURL || rs.data.serviceURL;
@@ -410,7 +416,12 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
       let redemptions = [];
       const redemptionEvents = await redemptionServiceJs.getRedemptions(rawAdmin, { issuer: userCert.commonName }, options);
       const redemptionServiceAddresses = redemptionEvents.map(r => r.address);
-      const redemptionServices = await redemptionServiceJs.getAll(rawAdmin, { address: redemptionServiceAddresses }, options);
+      let redemptionServices = await redemptionServiceJs.getAll(rawAdmin, { address: redemptionServiceAddresses }, options);
+
+      // handle backwards compatibility case
+      if (Object.keys(redemptionServices).length === 0) {
+        redemptionServices = await redemptionServiceJs.getAll(rawAdmin, { isActive: true, ownerCommonName: "Server" }, options);
+      }
 
       const redemptionPromises = redemptionServices.map(async (rs) => {
         const serviceUrl = rs.serviceURL || rs.data.serviceURL;
@@ -474,13 +485,17 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
   };
 
   contract.closeRedemption = async function (args, options = optionsNoChainIds) {
-    const { id, assetAddresses, redemptionService, status, ...restArgs } = args;
+    const { id, assetAddresses, redemptionService, status, issuerCommonName, ...restArgs } = args;
 
     let assetStatus;
     if (status === REDEMPTION_STATUS.FULFILLED) {
       assetStatus = ASSET_STATUS.RETIRED;
     } else if (status === REDEMPTION_STATUS.REJECTED) {
       assetStatus = ASSET_STATUS.ACTIVE;
+    }
+
+    if (issuerCommonName !== userCert.commonName) {
+      throw new rest.RestError(RestStatus.UNAUTHORIZED, 'Only the issuer can close a redemption request');
     }
 
     const contract = { address: assetAddresses[0] };
@@ -562,7 +577,7 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
       const assetsAddressArr = assetsOfOriginAsset.map(item => item.address);
       // Aggregate sales for all associated assets
 
-      const allAssetSales = await saleJs.getAll(rawAdmin, {
+      const allAssetSales = await saleJs.fetchSalesInBatches(rawAdmin, {
         assetToBeSold: assetsAddressArr,
         order: "block_timestamp.asc",
         gtField: "block_timestamp",
@@ -590,7 +605,7 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
         return;
       }
 
-      const timeRangeSales = await saleJs.getAll(rawAdmin, {
+      const timeRangeSales = await saleJs.fetchSalesInBatches(rawAdmin, {
         assetToBeSold: assetsAddressArr,
         ...salesFilter
       }, options);
@@ -599,24 +614,16 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
 
       // Process records such that for a given date the most recent sale price is fetched
       // This method processes sales passed, drills down into history table for each sale
-      // This needs to be done as a 2 step process, i.e. a single query to fetch sale & saleHistory can't be done because the contract name is dependent on the sale
-      const processSalesHistory = async (sales, filter = {}, shouldAggregate = true) => {
-        //Fetch histories for each sale
-        const historyPromises = sales.map(sale => {
-          //Fetch saleHistory
-          if (filter.order) {
-            //If timeFilter is applied, also add those filters
-            return saleJs.getAllSaleHistory(rawAdmin, { ...filter, assetToBeSold: sale.assetToBeSold }, options);
-          } else {
-            //If historical data is fetched, apply 12 month timeFilter
-
-            return saleJs.getAllSaleHistory(rawAdmin, { assetToBeSold: sale.assetToBeSold, order: "block_timestamp.asc", gtField: "block_timestamp", gtValue: getOneYearAgoTime() }, options);
-          }
-        });
-        const histories = await Promise.all(historyPromises);
-
+      const processSalesHistory = async (sales, filter = {}, shouldAggregate = true, options = defaultOptions) => {
+        // Fetch sale histories in batches using the new fetchSaleHistoriesInBatches function
+        const histories = await saleJs.fetchSaleHistoriesInBatches(rawAdmin, {
+          assetToBeSold: sales.map(sale => sale.assetToBeSold),  // Pass assetToBeSold from sales
+          filter,  // Apply filter
+          maxConcurrency: 10  // Number of concurrent requests
+        }, options);
+      
         if (shouldAggregate) {
-          // Flatten records, process them using accumulator hash map such that for a given date we fetch latest timestamp's sale record from history table
+          // Flatten records and aggregate by date, keeping the latest sale record for each date
           return histories.flat().reduce((acc, recordContainer) => {
             Object.values(recordContainer).forEach(record => {
               const date = getDate(record);
@@ -628,7 +635,7 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
             return acc;
           }, {});
         } else {
-          //send the history data without processing
+          // Return history data without processing
           return histories.flat().map(recordContainer => Object.values(recordContainer)).flat();
         }
       };
@@ -702,6 +709,25 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
   };
 
   // ------------------------------ TOKENS ENDS --------------------------------
+  
+  // ------------------------------ STRATS STARTS ------------------------------
+
+  contract.createSTRATS = async function (args, options = defaultOptions) {
+    const createdDate = Math.floor(Date.now() / 1000);
+    const newArgs = {
+      ...args.itemArgs,
+      createdDate,
+      status: ASSET_STATUS.ACTIVE
+    };
+    return STRATSJs.uploadContract(rawAdmin, newArgs, options);
+  };
+
+  contract.getSTRATS = async function (args = {}, options = optionsNoChainIds) {
+    const getOptions = { ...options, app: contractName, };
+    return STRATSJs.getAll(rawAdmin, args, getOptions);
+  };
+
+  // ------------------------------ STRATS ENDS --------------------------------
 
   // ------------------------------ CARBONOFFSET STARTS------------------------------
 
@@ -842,8 +868,8 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
   // ------------------------------ SALE TEST STARTS ------------------------------
 
   contract.cancelSaleOrder = async function (args, options = defaultOptions) {
-    const { paymentProvider, ...restArgs } = args;
-    const contract = { name: saleOrderJs.paymentServiceContractName, address: paymentProvider.address }
+    const { paymentService, ...restArgs } = args;
+    const contract = { name: saleOrderJs.paymentServiceContractName, address: paymentService.address }
     return saleOrderJs.cancelOrder(rawAdmin, contract, restArgs, options);
   }
 
@@ -1064,19 +1090,19 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
   // //-----------------------------PAYMENT starts here -------------------------------
 
   contract.getPaymentServices = async function (args, options = defaultOptions) {
-    const paymentServices = await paymentProviderJs.getAll(rawAdmin, args, options);
+    const paymentServices = await paymentServiceJs.getAll(rawAdmin, args, options);
     return paymentServices;
   }
 
   contract.getNotOnboardedPaymentServices = async function (args, options = defaultOptions) {
-    const paymentServices = await paymentProviderJs.getNotOnboarded(rawAdmin, args, options);
+    const paymentServices = await paymentServiceJs.getNotOnboarded(rawAdmin, args, options);
     return paymentServices;
   }
 
   contract.paymentCheckout = async function (originUrl, args, options = defaultOptions) {
     try {
 
-      const { paymentProvider, orderList, orderTotal: recievedOrderTotal } = args;
+      const { paymentService, orderList, orderTotal: recievedOrderTotal } = args;
 
       const assetAddresses = orderList.map(o => o.assetAddress);
       const quantities = orderList.map(o => o.quantity);
@@ -1101,23 +1127,67 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
           throw new rest.RestError(RestStatus.BAD_REQUEST, "Cannot buy products from multiple sellers in the same Order/Checkout",);
         }
       }
+
+      let stratsAssetAddressesToUse = [];
+      if (paymentService.serviceName.toLowerCase().includes("strats")) {
+        // Get User's STRATS Asset Address
+        const stratsOriginAddress = await STRATSJs.getStratsAddress();
+
+        // Retrieve all sales data
+        const salesData = await saleJs.getAll(rawAdmin, { saleAddresses }, options);
+
+        // Calculate the total order amount
+        const orderTotal = salesData.reduce((acc, sale, index) => acc + (sale.price * quantities[index]), 0);
+
+        // Retrieve the user's active STRATS asset addresses with non-zero quantities
+        const userStratsAssets = await inventoryJs.getAll(
+          rawAdmin,
+          {
+            ownerCommonName: userCert.commonName,
+            originAddress: stratsOriginAddress,
+            status: ASSET_STATUS.ACTIVE,
+            queryOptions: { select: "address, quantity" },
+            notEqualsField: "quantity",
+            notEqualsValue: "0",
+            order: 'block_timestamp.desc'
+          },
+          options
+        );
+
+        // Accumulate STRATS asset addresses to cover the order total
+        let accumulatedTotal = 0;
+        stratsAssetAddressesToUse = userStratsAssets.reduce((addresses, asset) => {
+          if (accumulatedTotal >= orderTotal) return addresses;
+          
+          addresses.push(asset.address);
+          accumulatedTotal += asset.quantity / 10000;
+
+          return addresses;
+        }, []);
+
+        if (accumulatedTotal < orderTotal) {
+          throw new rest.RestError(RestStatus.BAD_REQUEST, "You don't have enough STRATS balance to make this purchase");
+        }
+      }
+      
       const createdDate = Math.floor(Date.now() / 1000);
       const paymentParameters = {
-        address: paymentProvider.address,
+        address: paymentService.address,
+        stratsAssetAddresses: stratsAssetAddressesToUse,
         checkoutId: util.uid(),
         saleAddresses,
         quantities,
         createdDate,
         comments: DEFAULT_COMMENT,
       }
-      const checkoutHashAndAssets = await paymentProviderJs.createPayment(rawAdmin, paymentParameters, options);
+      const checkoutHashAndAssets = await paymentServiceJs.createPayment(rawAdmin, paymentParameters, options);
 
       return checkoutHashAndAssets;
 
     } catch (error) {
       console.log(error);
       if (error.response) {
-        throw new rest.RestError(error.response.status, error.response.data);
+        throw new rest.RestError(error.response.status, error.response.statusText);
       }
       throw new rest.RestError(RestStatus.BAD_REQUEST, "Error while updating the order");
     }
@@ -1125,8 +1195,8 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
 
   contract.getStratsOrderEvent = async function (args, options = defaultOptions) {
 
-    const currentPaymentProvider = await paymentProviderJs.getAll(rawAdmin, { address: args.paymentProvider }, options);
-    if (currentPaymentProvider[0].contract_name.includes('StratPaymentService')) {
+    const currentPaymentService = await paymentServiceJs.getAll(rawAdmin, { address: args.paymentService }, options);
+    if (currentPaymentService[0].contract_name.includes('StratPaymentService')) {
       const orderEvent = await rest.searchUntil(
         rawAdmin,
         { name: "BlockApps-Mercata-PaymentService.Order" },
@@ -1222,18 +1292,10 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
     }
   };
 
-  contract.getStratsBalance = async function (args, options = defaultOptions) {
-    const { userAddress } = args;
-    const getOptions = { ...options, org: "TestCompany", app: '' };
-    const address = strats.getStratsAddress();
-
-    const newArgs = {
-      address: address,
-      key: userAddress
-    }
-
-    const balance = await strats.getStratsBalance(rawAdmin, newArgs, getOptions);
-    return balance;
+  contract.getStratsBalance = async function ( args, options = defaultOptions ) {
+    const stratsOriginAddress = await STRATSJs.getStratsAddress();
+    const balance = await inventoryJs.getAll(rawAdmin, { ownerCommonName: userCert.commonName, originAddress: stratsOriginAddress, queryOptions: { select: "quantity.sum()" }}, options);
+    return balance[0].sum ? `${balance[0].sum/100}` : 0;
   }
 
   contract.getStratsTransactionHistory = async function (args, options = defaultOptions) {

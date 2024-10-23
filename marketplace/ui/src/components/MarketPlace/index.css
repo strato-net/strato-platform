@@ -235,6 +235,15 @@ img.ant-image-preview-img {
   font-weight: 600;
 }
 
+.checkout-card{
+  box-shadow: 0px 4px 4px 0px #00000040;
+  border-radius: 5px;
+}
+
+.mobile-checkout-card{
+  box-shadow: 0px 4px 4px 0px #00000040;
+}
+
 @media (min-width: 1600px) {
   .banner-block-container {
     margin-top: 30px;
@@ -1190,3 +1199,14 @@ img.ant-image-preview-img {
 }
 
 
+.custom-select-no-tick .ant-select-item-option-selected .ant-select-item-option-state {
+  display: none !important;
+}
+
+
+.custom-check-icon {
+  color: #28a745;
+  font-size: 18px;
+  position: absolute;
+  right: 7px;
+}

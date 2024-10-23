@@ -444,7 +444,9 @@ processTheMessages env conn messages = do
       insertIndexTable $ indexInsert ins
       insertAbstractTable (abstractInserts ins)-- not historic
       unless ((length (collectionInserts ins) < 1)) $ insertCollectionTable $ collectionInserts ins
+
       --updating the foreign keys from null
+    forM_ insertsByCodeHash $ \ins -> do
       updateForeignKeysFromNULLAbstract (abstractInserts ins) -- not historic
       updateForeignKeysFromNULLIndex (indexInsert ins)
       unless ((length (collectionInserts ins) < 1)) $ updateForeignKeysFromNULLArray (collectionInserts ins)
@@ -452,7 +454,7 @@ processTheMessages env conn messages = do
     forM_ concatFkeys $ \deferredForeignKey -> do
       createForeignIndexesForJoins deferredForeignKey
 
-  when ((length creates > 0) && any (\k -> length k > 0) fkeys) $ do
+  when (any (not . null) fkeys) $ do
     $logDebugLS "processTheMessages" $ T.pack $ "Updating PostgREST schema cache for " ++ show (sum $ map length fkeys) ++ " foreign key relationships"
     notifyPostgREST conn
 

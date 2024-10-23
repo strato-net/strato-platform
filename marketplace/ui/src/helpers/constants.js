@@ -24,9 +24,8 @@ export const HTTP_METHODS = {
 };
 
 export const homeUrl = new URL("/", window.location.origin).toString();
-export const soldOrdersBaseUrl = new URL("/order/sold", window.location.origin).toString();
-export const boughtOrdersBaseUrl = new URL("/order/bought", window.location.origin).toString();
-export const transfersBaseUrl = new URL("/order/transfers", window.location.origin).toString();
+export const ordersBaseUrl = new URL("/transactions?type=Order", window.location.origin).toString();
+export const transfersBaseUrl = new URL("/transactions?type=Transfer", window.location.origin).toString();
 export const soldOrderDetailssBaseUrl = new URL("/sold-orders", window.location.origin).toString();
 export const boughtOrderDetailssBaseUrl = new URL("/bought-orders", window.location.origin).toString();
 
@@ -186,6 +185,11 @@ export const PAYMENT_TYPE = [
     ]
   }
 ]
+
+export const PAYMENT_LABEL = {
+  'Stripe': 'Pay with Credit Card / ACH',
+  'STRATS': 'Pay with STRATS (Express Checkout)'
+}
 
 export const SIZES = {
   shoes: ["3.5", "4", "4.5", "5", "5.5", "6", "6.5", "7", "7.5", "8", "8.5", "9", "9.5", "10", "10.5", "11", "11.5", "12", "12.5", "13", "13.5", "14", "14.5", "15", "16", "17", "18"],
@@ -412,7 +416,7 @@ export const TRANSACTION_STATUS = {
   1: 'Awaiting Fulfillment',
   2: 'Payment Pending',
   3: 'Closed',
-  4: 'Cancelled',
+  4: 'Canceled',
   5: 'Discarded'
 }
 
@@ -466,7 +470,7 @@ export const TRANSACTION_SORT = [
   {label:'Awaiting Fulfillment', value:'1'},
   {label:'Awaiting Shipment', value:'2'},
   {label:'Closed', value:'3'},
-  {label:'Cancelled', value:'4'},
+  {label:'Canceled', value:'4'},
   {label:'Payment Pending', value:'5'},
 ]
 
