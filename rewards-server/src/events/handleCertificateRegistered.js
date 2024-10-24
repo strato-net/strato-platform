@@ -27,7 +27,7 @@ async function handleCertificateRegistered(event, token) {
 
     // Fetch certificates based on transaction hash
     const queryResponse = await axios.get(
-      `https://${baseUrl}/cirrus/search/Certificate?certificateString=eq.${encodeURIComponent(targetCertificateString)}&select=userAddress`,
+      `https://${baseUrl}/cirrus/search/Certificate?certificateString=eq.${encodeURIComponent(targetCertificateString)}&select=userAddress,commonName`,
       {
         headers: {
           Accept: "application/json",
@@ -108,7 +108,7 @@ async function handleCertificateRegistered(event, token) {
     }
 
     const body = await response.data;
-    const purchaserName = await getUserName(baseUrl, queryBody[0].userAddress, token)
+    const purchaserName = await getUserName(baseUrl, queryBody[0].commonName, token)
     sendEmail(baseUrl, notificationUrl, 'newRegistration', purchaserName, token );
     
     console.log("New registration reward successful:", body);

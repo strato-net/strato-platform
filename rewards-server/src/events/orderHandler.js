@@ -13,11 +13,11 @@ const baseUrl = NODE_ENV === "prod" ? prodMarketplaceUrl : testnetMarketplaceUrl
 
 async function handleOrderRewards(event, token) {
   const purchaser = event.eventEvent.eventArgs.find(
-    (arg) => arg[0] === "purchaser"
+    (arg) => arg[0] === "purchasersCommonName"
   )?.[1];
 
   const seller = event.eventEvent.eventArgs.find(
-    (arg) => arg[0] === "sellerAddress"
+    (arg) => arg[0] === "sellersCommonName"
   )?.[1];
 
   const status = event.eventEvent.eventArgs.find(

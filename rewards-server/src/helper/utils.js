@@ -95,10 +95,10 @@ const sendEmail = async (baseUrl, notificationUrl, type, userName, token) => {
 };
 
 
-const getUserName = async (baseUrl, address, token) => {
+const getUserName = async (baseUrl, commonName, token) => {
   try {
     const res = await axios.get(
-      `https://${baseUrl}/cirrus/search/Certificate?userAddress=eq.${address}`,
+      `https://${baseUrl}/cirrus/search/Certificate?commonName=eq.${commonName}`,
       {
         headers: {
           Accept: "application/json",
