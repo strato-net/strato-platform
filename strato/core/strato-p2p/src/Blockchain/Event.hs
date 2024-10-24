@@ -391,7 +391,7 @@ handleEvents peer = awaitForever $ \case
           mems <- lift $ selectWithDefault (Proxy @ChainMemberRSet) cId
           return $ checkPeerIsMember myX509 peerX509 mems
 
-      whenM (shouldSendGossip peer $ otOrigin tx) $ do
+      whenM (shouldSend peer $ otOrigin tx) $ do
         if not match
           then
             $logInfoS "handleEvents/P2pTx" $
@@ -593,18 +593,6 @@ shouldSend peer txo = case txo of
     -- probably means it was converted, see if this is a problem
     trace "NewTx of type Morphism came in. Should this even happen?" True
   Origin.Blockstanbul -> True
-
-shouldSendGossip :: MonadIO m => PPeer -> Origin.TXOrigin -> m Bool
-shouldSendGossip peer txo =
-  recordGossipFinal
-    . (shouldSend peer txo &&)
-    . (flags_txGossipFanout == -1 ||)
-    =<< case txo of
-      Origin.PeerString {} -> do
-        rangeEnd <- getNumPeersMem
-        rng <- liftIO $ randomRIO (1, rangeEnd)
-        recordGossipRNG $! rangeEnd <= flags_txGossipFanout || rng <= flags_txGossipFanout
-      _ -> return True
 
 checkPeerIsMember :: Maybe X509CertInfoState -> Maybe X509CertInfoState -> ChainMemberRSet -> Bool
 checkPeerIsMember myCert pcert mems = case pcert of
