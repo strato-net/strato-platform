@@ -217,6 +217,9 @@ function newnode {
   if [ -n "${FILE_SERVER_URL}" ]; then
       fsFlag="--fileServerUrl=${FILE_SERVER_URL}"
   fi
+  if [ -n "${NOTIFICATION_SERVER_URL}" ]; then
+      nsFlag="--notificationServerUrl=${NOTIFICATION_SERVER_URL}"
+  fi
   if [ -n "${strictGas}" ]; then
       sgFlag="--strictGas=${strictGas}"
   fi
@@ -268,7 +271,9 @@ function newnode {
     "${ucFlag}" \
     "${ubFlag}" \
     "${udFlag}" \
-    "${fsFlag}" "${iFlag}" +RTS -N1 >> logs/strato-api 2>&1
+    "${fsFlag}" \
+    "${nsFlag}" \
+    "${iFlag}" +RTS -N1 >> logs/strato-api 2>&1
 
   SLIPSTREAM_CMD="slipstream \
   --database=${postgres_slipstream_db} \

@@ -114,7 +114,8 @@ const RedeemModal = ({ open, handleCancel, inventory, categoryName, limit, offse
             shippingAddressId: userAddresses[selectedAddress].address_id,
             ownerCommonName: user.commonName,
             issuerCommonName: inventory.creator,
-            ownerComments: comments
+            ownerComments: comments,
+            userAddress: user.userAddress
         };
 
         if (quantity > 0 && quantity <= inventory.quantity) {
@@ -172,7 +173,7 @@ const RedeemModal = ({ open, handleCancel, inventory, categoryName, limit, offse
                         <Spin spinning={isLoadingUserAddresses} size="large" />
                     </div>
                     :
-                    userAddresses.length !== 0 ?
+                    (userAddresses && userAddresses.length !== 0) ?
                         <div className="grid grid-rows-2 sm:grid-rows-1 grid-flow-col gap-4 lg:flex  lg:flex-wrap overflow-x-auto lg:overflow-y-auto hide-Scroll lg:gap-x-6 lg:gap-y-[20px] pt-4 h-[50%] lg:h-[44vh]">
                             {
                                 userAddresses.map((add, index) =>

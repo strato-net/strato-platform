@@ -38,8 +38,8 @@ cd backend
 GLOBAL_ADMIN_NAME=<globalAdminUsername>
 GLOBAL_ADMIN_PASSWORD=<globalAdminPassword>
 
-SENDGRID_API_KEY=<sendgridApiKey>
 NOTIFICATION_SERVER_URL=<notificationServerUrl>
+networkID=<networkID>
 
 ### VARS USED IN BACKEND TESTS ONLY: ###
 #  accounts for testing user roles:
@@ -63,7 +63,7 @@ yarn install
 
 4. Deploy Dapp contracts to blockchain:
 ```
-yarn deploy
+yarn deploy:develop
 ```
 
 Start the backend webserver:
@@ -86,7 +86,7 @@ This should open a browser window and display a basic React webpage.
 *NOTE: Please make sure that you run `nginx-docker` with proper HOST_IP (see nginx part above).*
 
 #### Stopping the App
-Once you are node with Martketplace development, also stop the Nginx-docker container:
+Once you are done with Marketplace development, also stop the Nginx-docker container:
 
 To stop the app, hit `CTRL+C` on the server and UI windows. To stop the nginx server, run
 ```

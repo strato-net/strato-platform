@@ -1,5 +1,5 @@
 import { Button, Select, InputNumber, Modal, Table, notification } from "antd";
-import { useEffect, useRef,useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { actions } from "../../contexts/inventory/actions";
 import { actions as marketplaceActions } from "../../contexts/marketplace/actions";
 import { actions as userActions } from "../../contexts/users/actions";
@@ -11,7 +11,7 @@ import { SearchOutlined } from '@ant-design/icons';
 import { handlePriceInput, handleQuantityInput } from "../../helpers/utils";
 import { OLD_SADDOG_ORIGIN_ADDRESS } from "../../helpers/constants";
 
-const TransferModal = ({ open, handleCancel, inventory, categoryName = "", limit=0, offset=0 }) => {
+const TransferModal = ({ open, handleCancel, inventory, categoryName = "", limit = 0, offset = 0 }) => {
     const [data, setData] = useState(inventory);
     const [quantity, setQuantity] = useState(1);
     const [price, setPrice] = useState(0);
@@ -30,8 +30,8 @@ const TransferModal = ({ open, handleCancel, inventory, categoryName = "", limit
     const {
         isTransferring
     } = useInventoryState();
-    const { 
-        isTransferringStrats, message: marketplaceMsg, success: marketplaceSuccess
+    const {
+        message: marketplaceMsg, success: marketplaceSuccess
     } = useMarketplaceState();
     const inputPriceDesktopRef = useRef(null);
     const inputPriceMobileRef = useRef(null);
@@ -44,6 +44,7 @@ const TransferModal = ({ open, handleCancel, inventory, categoryName = "", limit
 
     const [searchInput, setSearchInput] = useState('');
     const [dropdownOpen, setDropdownOpen] = useState(false);
+    const [selectedRecipient, setSelectedRecipient] = useState('');
 
     const handleSearchChange = (value) => {
         setSearchInput(value);
@@ -52,46 +53,49 @@ const TransferModal = ({ open, handleCancel, inventory, categoryName = "", limit
 
     const originAddress = inventory.originAddress?.toLowerCase();
     const isBurner = originAddress === OLD_SADDOG_ORIGIN_ADDRESS;
+    const itemName = decodeURIComponent(inventory.name)
 
     const usersList = users
-      .filter((record) =>
-        isBurner
-          ? record.commonName.toLowerCase() === "burner"
-          : user.commonName !== record.commonName
-      )
-      .map((record) => ({
-        label: isBurner
-          ? `burner - ${record.organization}`
-          : `${record.commonName} - ${record.organization}`,
-        value: record.userAddress,
-      }));
+        .filter((record) =>
+            isBurner
+                ? record.commonName.toLowerCase() === "burner"
+                : user.commonName !== record.commonName
+        )
+        .map((record) => ({
+            label: isBurner
+                ? `burner - ${record.organization}`
+                : `${record.commonName} - ${record.organization}`,
+            value: record.userAddress,
+        }));
 
     const filteredUsersList = filterDuplicateUserAddresses(usersList);
     const [userAddress, setUserAddress] = useState(
-      isBurner && filteredUsersList.length > 0 ? filteredUsersList[0].value : ""
+        isBurner && filteredUsersList.length > 0 ? filteredUsersList[0].value : ""
     );
-    
+
     const marketplaceToast = (placement) => {
         if (marketplaceSuccess) {
             api.success({
-            message: marketplaceMsg,
-            onClose: marketplaceActions.resetMessage(marketplaceDispatch),
-            placement,
-            key: 1,
+                message: marketplaceMsg,
+                onClose: marketplaceActions.resetMessage(marketplaceDispatch),
+                placement,
+                key: 1,
             });
         } else {
             api.error({
-            message: marketplaceMsg,
-            onClose: marketplaceActions.resetMessage(marketplaceDispatch),
-            placement,
-            key: 2,
+                message: marketplaceMsg,
+                onClose: marketplaceActions.resetMessage(marketplaceDispatch),
+                placement,
+                key: 2,
             });
         }
     };
-    
+
     const handleSelect = (userAddress) => {
         setUserAddress(userAddress);
-
+        const user = filteredOptions.find(item => item.value === userAddress);
+        const recipientCommonName = user.label.split('-')[0].trim()
+        setSelectedRecipient(recipientCommonName)
         setDropdownOpen(false);
     }
 
@@ -111,7 +115,7 @@ const TransferModal = ({ open, handleCancel, inventory, categoryName = "", limit
     useEffect(() => {
         const priceInputElements = [inputPriceDesktopRef.current, inputPriceMobileRef.current];
         const quantityInputElements = [inputQuantityDesktopRef.current, inputQuantityMobileRef.current];
-        
+
         priceInputElements.forEach(inputElement => {
             if (inputElement) {
                 inputElement.addEventListener('input', handlePriceInput(setPrice));
@@ -144,7 +148,6 @@ const TransferModal = ({ open, handleCancel, inventory, categoryName = "", limit
             option.label && option.label.toLowerCase().includes(searchInput.toLowerCase())
         )
         : [];
-
 
     const columns = [
         {
@@ -217,12 +220,15 @@ const TransferModal = ({ open, handleCancel, inventory, categoryName = "", limit
     const handleSubmit = async () => {
         if (quantity > 0 && quantity <= (quantityIsDecimal ? inventory.quantity / 100 : inventory.quantity) && userAddress) {
             let isDone = false;
-    
+
             const body = {
                 assetAddress: inventory.address,
                 newOwner: userAddress,
                 quantity: quantityIsDecimal ? quantity * 100 : quantity,
                 price: quantityIsDecimal ? price / 100 : price,
+                senderCommonName:user.commonName,
+                recipientCommonName:selectedRecipient,
+                itemName,
             };
             isDone = await actions.transferInventory(inventoryDispatch, body);
             if (isDone) {
@@ -230,22 +236,22 @@ const TransferModal = ({ open, handleCancel, inventory, categoryName = "", limit
                 await actions.fetchInventoryForUser(inventoryDispatch, user.commonName);
                 await marketplaceActions.fetchStratsBalance(marketplaceDispatch);
             }
-    
+
             if (isDone) {
                 handleCancel();
             }
         }
-    };    
+    };
 
     return (
         <Modal
             open={open}
             onCancel={handleCancel}
-            title={`Transfer - ${decodeURIComponent(inventory.name)}`}
+            title={`Transfer - ${itemName}`}
             width={1000}
             footer={[
                 <div className="flex justify-center md:block">
-                    <Button type="primary" className="w-32 h-9" onClick={handleSubmit} disabled={!canTransfer} loading={isTransferring || isTransferringStrats}>
+                    <Button type="primary" className="w-32 h-9" onClick={handleSubmit} disabled={!canTransfer} loading={isTransferring}>
                         Transfer
                     </Button>
                 </div>
