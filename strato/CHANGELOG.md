@@ -18,16 +18,21 @@ so that they could be properly moved to their respective version's subsection.
 ### Added
 - Added block.proposer to SolidVM
 - Reintroduced wire cache to strato-p2p to reduce redundant blockstanbul messages sent to the sequencer
+- Added pragma solidvm 12.0 and cascading pragma set inclusion logic
 
 ### Changed
+- Reduced Cirrus table indexing to top-level abstract contracts, or concrete contracts when there are no abstracts in the CC
 - Only genesis block contracts and top-level abstract contracts are now indexed by Slipstream
+- Set default nonce limit to 4000
 
 ### Fixed
 - Bugfix in slipstream to support decoding structs
 - Foreign keys in cirrus properly updated
 - Bugfix in p2p to prevent peers from continuously attempting to connect to offline peers
+- Fixed solidvm 11.4 logic in the typechecker, including removing instances of error
 
 ### Removed
+- Removed gossip fanout in p2p so now we broadcast transactions to all peers instead of attempting probabilistically
 
 ## [12.0.0] - 9/23/2024
 ### Added
