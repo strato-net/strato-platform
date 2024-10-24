@@ -297,7 +297,7 @@ function newnode {
     "${ubFlag}" \
     "${udFlag}" \
     "${fsFlag}" \
-    "${apiFlag}"
+    "${apiFlag}" \
     "${nsFlag}" \
     "${iFlag}" +RTS -N1 >> logs/strato-api 2>&1
 
