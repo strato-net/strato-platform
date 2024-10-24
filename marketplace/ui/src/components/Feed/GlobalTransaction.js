@@ -50,7 +50,7 @@ const GlobalTransaction = ({ user }) => {
   const [dateQuery, setDateQuery] = useState("");
   const [transactions, setTransactions] = useState(globalTransactions)
   const [originAddress, setOriginAddress] = useState("");
-  const [selectedFilters, setSelectedFilters] = useState([]);
+  const [selectedFilters, setSelectedFilters] = useState(['Order', 'Transfer', 'Redemption']);
   const [isFilterActive, setIsFilterActive] = useState(false)
   const formatter = new Intl.NumberFormat('en-US');
   const formattedNum = (num) => formatter.format(num);

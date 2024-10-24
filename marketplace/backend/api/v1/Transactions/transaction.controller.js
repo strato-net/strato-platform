@@ -155,18 +155,18 @@ class TransactionController {
 
             let orderlist, itemTransfers, redemptions,count=0;
             let data = []
-            if (type?.includes('Order') || !type) {
+            if (type?.includes('Order')) {
                const {orderData, total} = await dapp.getSaleOrders({ ...transactionQuery });
                count = count + total;
                orderlist = orderData;
                 data = [...data, ...orderlist]
             }
-            if (type?.includes('Transfer') || !type) {
+            if (type?.includes('Transfer')) {
                 const {transfers, total} = await dapp.getAllItemTransferEvents(TransferQuery);
                 count = count + total;
                 data = [...data, ...transfers]
             }
-            if (type?.includes('Redemption') || !type) {
+            if (type?.includes('Redemption')) {
                 redemptions = await dapp.getAllRedemptionRequests(redemptionQuery)
                 count = count + Number(redemptions.count);
                 redemptions = redemptions?.data.filter((value, index, self) =>
