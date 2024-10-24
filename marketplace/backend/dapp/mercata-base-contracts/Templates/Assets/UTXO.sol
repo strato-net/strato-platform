@@ -25,6 +25,7 @@ abstract contract UTXO is Asset {
     }
 
     function mint(uint _quantity) internal virtual returns (UTXO) {
+        require(_quantity > 0, "Quantity must be greater than 0");
         return new UTXO(name, description, images, files, fileNames, createdDate, _quantity, status);
     }
 
@@ -76,6 +77,7 @@ abstract contract UTXO is Asset {
     }
 
     function _callMint(address _newOwner, uint _quantity) internal virtual{
+        require(_quantity > 0, "Quantity must be greater than 0");
         UTXO newAsset = mint(_quantity);
         Asset(newAsset).transferOwnership(_newOwner, _quantity, false, 0, 0);
     }

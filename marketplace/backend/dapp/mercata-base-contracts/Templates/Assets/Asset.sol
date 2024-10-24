@@ -145,6 +145,7 @@ abstract contract Asset is Utils {
     function _transfer(address _newOwner, uint _quantity, bool _isUserTransfer, uint _transferNumber, decimal _price) internal virtual {
         require(status != AssetStatus.PENDING_REDEMPTION, "Asset is not in ACTIVE state.");
         require(status != AssetStatus.RETIRED, "Asset is not in ACTIVE state.");
+        require(_quantity > 0, "Quantity must be greater than 0");
         string newOwnerCommonName = getCommonName(_newOwner);
 
         if(_isUserTransfer && _transferNumber>0){
