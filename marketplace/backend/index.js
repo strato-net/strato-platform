@@ -18,6 +18,7 @@ import websocket from "./websocket";
 import axios from "axios";
 import { cronSyncCall } from "./helpers/cronSyncCall";
 import cronFunc from "./cron";
+import jwtDecode from 'jwt-decode'
 const isLocalHost = config.serverHost === constants.localHost;
 
 let server
@@ -51,11 +52,23 @@ let server
       meta: false,
       expressFormat: true,
       dynamicMeta: (req, res) => {
+        let username;
+        if (req.headers['x-user-access-token']) {
+          const token = jwtDecode(req.headers['x-user-access-token']);
+          if (token.preferred_username) {
+            username = token.preferred_username;
+          } else if (token.email) {
+            username = email;
+          } else {
+            username = "";
+          }
+        }
         return {
           userAgent: req.headers['user-agent'],
           ip: req.headers['cf-connecting-ip'] || req.headers['cf-connecting-ipv6'],
           forwardedFor: req.headers['x-forwarded-for'],
           referrer: req.headers['referer'] || req.headers['referrer'],
+          username: username
         };
       }
     })
