@@ -52,11 +52,18 @@ let server
       meta: false,
       expressFormat: true,
       dynamicMeta: (req, res) => {
-        const token = jwtDecode(req.headers['x-user-access-token']);
+        let token;
+        try {
+          token = jwtDecode(req.headers['x-user-access-token']);
+        } catch (err) {
+          token = null;
+          console.error("Failed to decode token:", err);
+        }
+
         return {
           userAgent: req.headers['user-agent'],
-          ip: req.headers['cf-connecting-ip'] || req.headers['cf-connecting-ipv6'],
-          forwardedFor: req.headers['x-forwarded-for'],
+          cf_ip: req.headers['cf-connecting-ip'] || req.headers['cf-connecting-ipv6'],
+          xForwardedFor: req.headers['x-forwarded-for'],
           referrer: req.headers['referer'] || req.headers['referrer'],
           user: token?.preferred_username ? token.preferred_username : (token?.email ? token.email : "")
         };
