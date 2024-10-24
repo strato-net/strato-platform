@@ -38,7 +38,6 @@ import Blockchain.Data.TransactionDef (formatChainId)
 import Blockchain.Data.Wire
 import Blockchain.EventException
 import Blockchain.EventModel
-import Blockchain.Metrics
 import Blockchain.Options
 import Blockchain.Sequencer.Event
 import Blockchain.Strato.Discovery.Data.Peer
@@ -74,7 +73,6 @@ import qualified Data.Text as T
 import Data.These
 import Data.Time.Clock
 import Debug.Trace (trace)
-import System.Random
 import qualified Text.Colors as CL
 import Text.Format
 import Text.Printf
