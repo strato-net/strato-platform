@@ -42,14 +42,22 @@ let server
   app.use(helmet());
   app.use(cors());
   app.use(bodyParser.json());
-  app.use(cookieParser())
+  app.use(cookieParser());
   
   // Setup logging
   app.use(
     expressWinston.logger({
       transports: [new winston.transports.Console()],
-      meta: true,
-      expressFormat: true
+      meta: false,
+      expressFormat: true,
+      dynamicMeta: (req, res) => {
+        return {
+          userAgent: req.headers['user-agent'],
+          ip: req.headers['cf-connecting-ip'] || req.headers['cf-connecting-ipv6'],
+          forwardedFor: req.headers['x-forwarded-for'],
+          referrer: req.headers['referer'] || req.headers['referrer'],
+        };
+      }
     })
   );
   
