@@ -74,7 +74,6 @@ import qualified Data.Text as T
 import Data.These
 import Data.Time.Clock
 import Debug.Trace (trace)
-import GHC.Utils.Monad
 import System.Random
 import qualified Text.Colors as CL
 import Text.Format
@@ -391,7 +390,7 @@ handleEvents peer = awaitForever $ \case
           mems <- lift $ selectWithDefault (Proxy @ChainMemberRSet) cId
           return $ checkPeerIsMember myX509 peerX509 mems
 
-      whenM (shouldSend peer $ otOrigin tx) $ do
+      when (shouldSend peer $ otOrigin tx) $ do
         if not match
           then
             $logInfoS "handleEvents/P2pTx" $
