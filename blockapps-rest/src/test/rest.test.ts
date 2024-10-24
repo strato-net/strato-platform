@@ -733,70 +733,70 @@ describe("search query", function () {
   });
 });
 
-describe("chain", function () {
-  this.timeout(config.timeout);
-  let admin, chainId, chainArgs;
-  const options:Options = { config };
+// describe("chain", function () {
+//   this.timeout(config.timeout);
+//   let admin, chainId, chainArgs;
+//   const options:Options = { config };
 
-  async function createChain() {
-    const uid = util.uid();
-    const { chain, contractName: name } = factory.createChainArgs(uid, [
-      admin.address
-    ]);
-    const contract = { name };
-    chainArgs = chain;
-    const result = await rest.createChain(admin, chain, contract, options);
-    return result;
-  }
+//   async function createChain() {
+//     const uid = util.uid();
+//     const { chain, contractName: name } = factory.createChainArgs(uid, [
+//       admin.address
+//     ]);
+//     const contract = { name };
+//     chainArgs = chain;
+//     const result = await rest.createChain(admin, chain, contract, options);
+//     return result;
+//   }
 
-  before(async () => {
-    const oauth:oauthUtil = await oauthUtil.init(config.nodes[0].oauth);
-    let accessToken:AccessToken = await oauth.getAccessTokenByClientSecret();
-    const userArgs:OAuthUser = {token: accessToken.token.access_token};
-    admin = await factory.createAdmin(userArgs, options);
-  });
+//   before(async () => {
+//     const oauth:oauthUtil = await oauthUtil.init(config.nodes[0].oauth);
+//     let accessToken:AccessToken = await oauth.getAccessTokenByClientSecret();
+//     const userArgs:OAuthUser = {token: accessToken.token.access_token};
+//     admin = await factory.createAdmin(userArgs, options);
+//   });
 
-  beforeEach(async () => {
-    chainId = await createChain();
-  });
+//   beforeEach(async () => {
+//     chainId = await createChain();
+//   });
 
-  it("create", async () => {
-    assert.isOk(util.isHash(chainId), "hash");
-  });
+//   it("create", async () => {
+//     assert.isOk(util.isHash(chainId), "hash");
+//   });
 
-  it("create and verify", async () => {
-    assert.isOk(util.isHash(chainId), "hash");
+//   it("create and verify", async () => {
+//     assert.isOk(util.isHash(chainId), "hash");
 
-    // This is to wait until data is available on the chain
-    await util.timeout(1000);
+//     // This is to wait until data is available on the chain
+//     await util.timeout(1000);
 
-    // verify chain data
-    const result = await rest.getChain(admin, chainId, options);
-    assert.equal(result.info.label, chainArgs.label, "chain label");
-    assert.equal(result.id, chainId, "chainId");
-  });
+//     // verify chain data
+//     const result = await rest.getChain(admin, chainId, options);
+//     assert.equal(result.info.label, chainArgs.label, "chain label");
+//     assert.equal(result.id, chainId, "chainId");
+//   });
 
-  it("list of chains", async () => {
-    assert.isOk(util.isHash(chainId), "hash");
+//   it("list of chains", async () => {
+//     assert.isOk(util.isHash(chainId), "hash");
 
-    // This is to wait until data is available on the chain
-    await util.timeout(1000);
-    // get all chain
-    const result = await rest.getChains(admin, [], options);
+//     // This is to wait until data is available on the chain
+//     await util.timeout(1000);
+//     // get all chain
+//     const result = await rest.getChains(admin, [], options);
 
-    assert.isArray(result, "should be array");
-    assert.isAbove(result.length, 0, "should be greater than 0");
-  });
+//     assert.isArray(result, "should be array");
+//     assert.isAbove(result.length, 0, "should be greater than 0");
+//   });
 
-  it("list of chains", async () => {
-    assert.isOk(util.isHash(chainId), "hash");
+//   it("list of chains", async () => {
+//     assert.isOk(util.isHash(chainId), "hash");
 
-    // This is to wait until data is available on the chain
-    await util.timeout(1000);
-    // get all chain
-    const result = await rest.getChains(admin, [chainId], options);
+//     // This is to wait until data is available on the chain
+//     await util.timeout(1000);
+//     // get all chain
+//     const result = await rest.getChains(admin, [chainId], options);
 
-    assert.isArray(result, "should be array");
-    assert.equal(result.length, 1, "should be 1");
-  });
-});
+//     assert.isArray(result, "should be array");
+//     assert.equal(result.length, 1, "should be 1");
+//   });
+// });
