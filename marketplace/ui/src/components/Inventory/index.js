@@ -79,8 +79,9 @@ const Inventory = ({ user }) => {
     }).map(service => ({
       ...service,
       isNotOnboarded: notOnboardedNames.has(service.serviceName),
+      serviceName: service?.serviceName === 'STRATS' ? 'STRATs' : service?.serviceName
     }));
-
+    console.log("test", sortedServices);
     setSortedPaymentServices(sortedServices);
   }, [paymentServices, notOnboarded]);
 
