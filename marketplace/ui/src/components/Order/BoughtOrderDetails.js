@@ -388,7 +388,6 @@ const BoughtOrderDetails = ({ user, users }) => {
                     <Text className="hidden md:flex mt-2">{statusComponentForPayment(paid)}</Text>
                   </div>
                 </div>
-
               </div>
               <Row className="hidden md:flex my-6 justify-between bg-[#F6F6F6] p-4 pb-2 rounded">
                 <OrderData title="Order Number" value={`#${`${details.order.orderId}`.substring(0, 6)}`} />
@@ -403,7 +402,7 @@ const BoughtOrderDetails = ({ user, users }) => {
                   value={details.order.sellersCommonName}
                 />
                 <Divider type="vertical" className="h-14 bg-secondryD" />
-                <OrderData title="Currency" value={details.order.currency ? details.order.currency : "USD"} />
+                <OrderData title="Currency" value={details.order.currency === 'STRATS' ? 'STRAT' : details.order.currency ? details.order.currency : "USD"} />
                 <Divider type="vertical" className="h-14 bg-secondryD" />
                 <OrderData title="Total" value={details.order.currency === "STRATS" ? (details.order.totalPrice * STRATS_CONVERSION).toFixed(0) : details.order.totalPrice} />
                 <Divider type="vertical" className="h-14 bg-secondryD" />
