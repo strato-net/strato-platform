@@ -91,13 +91,6 @@ recordMessage' msgVect msg = do
         MPNodes _ -> "mp_nodes"
   liftIO $ withLabel msgVect label incCounter
 
-gossipDecisions :: Vector Text Counter
-gossipDecisions =
-  unsafeRegister
-    . vector "decision"
-    . counter
-    $ Info "p2p_gossip_decisions" "Count of approves and rejects for gossip"
-
 {-# NOINLINE canaryCount #-}
 canaryCount :: Gauge
 canaryCount =
