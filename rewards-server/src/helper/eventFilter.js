@@ -1,4 +1,18 @@
-let latestBlockNumber = 0; // Variable to track the largest block number
+const fs = require('fs');
+const path = require('path');
+
+const filePath = path.join(__dirname, '..', 'config', 'latestBlock.json');
+
+let latestBlockNumber;
+try {
+  const block = JSON.parse(fs.readFileSync(filePath, 'utf-8'))?.latestBlockNumber;
+
+  latestBlockNumber = (block === null || isNaN(block)) ? 0 : block
+  console.log("Loaded block number:", latestBlockNumber);
+} catch (error) {
+  console.error("Error reading or parsing latestBlock.json:", error);
+  latestBlockNumber = 0;
+}
 
 async function filterMessages(msg) {
   try {
@@ -32,7 +46,7 @@ async function filterMessages(msg) {
     }
 
     // Update the latest block number
-    latestBlockNumber = currentBlockNumber;
+    fs.writeFileSync(filePath, JSON.stringify({ latestBlockNumber: currentBlockNumber }), 'utf-8');
 
     // List of allowed event names
     const allowedEvents = ["CertificateRegistered", "Order"];
