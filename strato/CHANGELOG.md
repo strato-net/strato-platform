@@ -32,6 +32,7 @@ so that they could be properly moved to their respective version's subsection.
 - Fixed solidvm 11.4 logic in the typechecker, including removing instances of error
 
 ### Removed
+- Removed gossip fanout in p2p so now we broadcast transactions to all peers instead of attempting probabilistically
 
 ## [12.0.0] - 9/23/2024
 ### Added
