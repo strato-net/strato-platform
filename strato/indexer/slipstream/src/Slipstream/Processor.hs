@@ -454,7 +454,7 @@ processTheMessages env conn messages = do
     forM_ concatFkeys $ \deferredForeignKey -> do
       createForeignIndexesForJoins deferredForeignKey
 
-  when ((length creates > 0) && any (\k -> length k > 0) fkeys) $ do
+  when (any (not . null) fkeys) $ do
     $logDebugLS "processTheMessages" $ T.pack $ "Updating PostgREST schema cache for " ++ show (sum $ map length fkeys) ++ " foreign key relationships"
     notifyPostgREST conn
 
