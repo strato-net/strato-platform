@@ -280,11 +280,13 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
   }
 
   contract.transferItem = async function (args, options = defaultOptions) {
-    const { assetAddress, ...restArgs } = args;
-    const transferNumber = parseInt(util.uid())
-    const finalArgs = { transferNumber: transferNumber, ...restArgs };
-    const contract = { address: assetAddress };
-    return inventoryJs.transferItem(rawAdmin, contract, finalArgs, options);
+    const finalArgs = args.map(arg => {
+      const { assetAddress, ...restArgs } = arg;
+      const transferNumber = parseInt(util.uid())
+      const contract = { address: assetAddress };
+      return { contract: contract, transferNumber: transferNumber, ...restArgs };
+    });
+    return inventoryJs.transferItem(rawAdmin, finalArgs, options);
   }
 
   contract.getAllItemTransferEvents = function (args, options = defaultOptions) {

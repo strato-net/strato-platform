@@ -654,10 +654,7 @@ const actions = {
       const body = await response.json();
 
       if (response.status === RestStatus.OK) {
-        dispatch({
-          type: actionDescriptors.transferInventorySuccessful,
-          payload: body.data,
-        });
+        dispatch({ type: actionDescriptors.transferInventorySuccessful });
         actions.setMessage(dispatch, "Item has been transferred", true);
         return true;
       } else if (response.status === RestStatus.CONFLICT) {

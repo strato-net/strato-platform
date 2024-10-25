@@ -156,17 +156,20 @@ class InventoryController {
   static async transfer(req, res, next) {
     try {
       const { dapp, body } = req;
-      const { senderCommonName, recipientCommonName,
-         itemName, quantity, price, ...restData } = body;
-      const payload = { quantity, price, ...restData }
-      InventoryController.validateTransferItemArgs(payload)
-      const result = await dapp.transferItem(payload)
+      InventoryController.validateTransferItemArgs(body)
 
-      const TransferSenderTemplate = TransferSender(senderCommonName, itemName, quantity, price, recipientCommonName);
-      const TransferRecipientTemplate = TransferRecipient(recipientCommonName, itemName, quantity, price, senderCommonName);
-      await sendEmail(senderCommonName, 'Your Item Transfer Confirmation', TransferSenderTemplate)
-      await sendEmail(recipientCommonName, 'You’ve Received an Item Transfer!', TransferRecipientTemplate)
-      rest.response.status200(res, result.transferStatus)
+      const transfers = body.map(({ assetAddress, newOwner, quantity, price }) => ({ assetAddress, newOwner, quantity, price }));
+      await dapp.transferItem(transfers)
+
+      // TODO: Send emails once to seller. But recipients should get their individual emails.
+      body.map(async ({ senderCommonName, recipientCommonName, itemName, quantity, price }) => {
+        const TransferSenderTemplate = TransferSender(senderCommonName, itemName, quantity, price, recipientCommonName);
+        const TransferRecipientTemplate = TransferRecipient(recipientCommonName, itemName, quantity, price, senderCommonName);
+        await sendEmail(senderCommonName, 'Your Item Transfer Confirmation', TransferSenderTemplate);
+        await sendEmail(recipientCommonName, 'You’ve Received an Item Transfer!', TransferRecipientTemplate);
+      });
+
+      rest.response.status200(res)
       return next()
     } catch (e) {
       return next(e)
@@ -211,17 +214,13 @@ class InventoryController {
           price: body.price,
       };
 
-      const result = await dapp.transferItem(transferPayload);
-
-      if (result.transferStatus[0] !== '200') {
-          throw new Error(`Transfer failed with status: ${result.transferStatus[0]}`);
-      }
+      const result = await dapp.transferItem([transferPayload]);
 
       const payload = {
           tokenSymbol: body.rootAddress,
           quantity: body.quantity,
           baseAddress: body.baseAddress,
-          transferNumber: result.transferNumber.toString(),
+          transferNumber: result[0].toString(),
           mercataAddress: body.mercataAddress,
       };
       const url = await getTokenServerUrl();
@@ -436,12 +435,15 @@ class InventoryController {
   }
 
   static validateTransferItemArgs(args) {
-    const transferItemSchema = Joi.object({
+    const transferItemSchema = Joi.array().min(1).items(Joi.object({
       assetAddress: Joi.string().required(),
       newOwner: Joi.string().required(),
       quantity: Joi.number().integer().greater(0).required(),
       price: Joi.number().greater(0).precision(4).required(),
-    });
+      senderCommonName: Joi.string().required(),
+      recipientCommonName: Joi.string().required(),
+      itemName: Joi.string().required()
+    }));
 
     const validation = transferItemSchema.validate(args);
 
