@@ -392,7 +392,7 @@ body{
   height: 42px !important;
 }
 
-.ant-select-selector{
+.inventory_modal .ant-select-selector{
   height: 42px !important; 
   align-items: center;
 }
