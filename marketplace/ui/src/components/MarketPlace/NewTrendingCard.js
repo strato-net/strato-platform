@@ -140,7 +140,7 @@ const NewTrendingCard = ({ topSellingProduct, addItemToCart, parent = "", api, c
 
                         return (
                             <Typography className="font-semibold">
-                                {`$${adjustedPrice} `} <span className="font-normal text-xs mr-2 text-primary"><b> {`(${(adjustedPrice * STRATS_CONVERSION).toFixed(0)} STRATs)`} </b></span>
+                                {`$${adjustedPrice} `} <span className="font-normal text-xs mr-2 text-primary"><b>{`(${(adjustedPrice * STRATS_CONVERSION).toFixed(0)} ${(adjustedPrice * STRATS_CONVERSION).toFixed(0) == 1 ? 'STRAT' : 'STRATs'})`}</b></span>
                             </Typography>
                         );
                         })()
