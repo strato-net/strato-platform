@@ -302,10 +302,12 @@ lengthenPeerDisableBy ::
   NominalDiffTime ->
   PPeer ->
   m (Either SomeException ())
-lengthenPeerDisableBy secs peer' = try $ do
+lengthenPeerDisableBy secs peer = try $ do
   currentTime <- liftIO getCurrentTime
-  let disable = SetPeerDisableTime (TcpEnableTime $ 5 `addUTCTime` currentTime) 5 (secs `addUTCTime` currentTime)
-  A.replace (A.Proxy @PeerDisable) peer' disable
+  let disable = if (currentTime < pPeerDisableExpiration peer)
+                then ExtendPeerDisableTime (TcpEnableTime $ fromIntegral (pPeerNextDisableWindowSeconds peer) `addUTCTime` currentTime) 2
+                else SetPeerDisableTime (TcpEnableTime $ 5 `addUTCTime` currentTime) 5 (secs `addUTCTime` currentTime)
+  A.replace (A.Proxy @PeerDisable) peer disable
 
 -- A variation of 'lengthenPeerDisable' but for UDP instead, currently used for ethereum-discovery.
 lengthenPeerDisable' ::
