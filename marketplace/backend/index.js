@@ -57,12 +57,12 @@ let server
           token = jwtDecode(req.headers['x-user-access-token']);
         } catch (err) {
           token = null;
-          console.error("Failed to decode token:", err);
+          console.warn("Failed to decode token:", err);
         }
 
         return {
           userAgent: req.headers['user-agent'],
-          cf_ip: req.headers['cf-connecting-ip'] || req.headers['cf-connecting-ipv6'],
+          cfIp: req.headers['cf-connecting-ip'] || req.headers['cf-connecting-ipv6'],
           xForwardedFor: req.headers['x-forwarded-for'],
           referrer: req.headers['referer'] || req.headers['referrer'],
           user: token?.preferred_username ? token.preferred_username : (token?.email ? token.email : "")
