@@ -1,18 +1,23 @@
-export const TransferSender = (senderCommonName, itemName, itemQuantity, itemValue, recipientCommonName) => {
+export const TransferSender = (senderCommonName, items) => {
+  const itemsList = items.map(({ itemName, quantity, price, recipientCommonName }) => `
+    <li>
+      <strong>Item:</strong> ${itemName}<br>
+      <strong>Quantity:</strong> ${quantity}<br>
+      <strong>Total Value:</strong> ${price}<br>
+      <strong>Recipient:</strong> ${recipientCommonName}
+    </li>
+  `).join('');
 
   const htmlContent = `
-  <p>Hello ${senderCommonName},</p>
-  <p>We wanted to let you know that your recent item transfer has been successfully processed. Below are the details of your transfer:</p>
-  <ul>
-      <li><strong>Item:</strong> ${itemName}</li>
-      <li><strong>Quantity:</strong> ${itemQuantity}</li>
-      <li><strong>Total Value:</strong> ${itemValue}</li>
-      <li><strong>Recipient:</strong> ${recipientCommonName}</li>
-  </ul>
-  <p>If you have any questions or need assistance with your transfer, please contact our customer support team at <a href="mailto:sales@blockapps.net">sales@blockapps.net</a>.</p>
-  <p>BlockApps Mercata Marketplace</p>
-  <small>powered by STRATO Mercata™</small>
-`;
+    <p>Hello ${senderCommonName},</p>
+    <p>We wanted to let you know that your recent item transfers have been successfully processed. Below are the details of your transfers:</p>
+    <ul>
+      ${itemsList}
+    </ul>
+    <p>If you have any questions or need assistance with your transfer, please contact our customer support team at <a href="mailto:sales@blockapps.net">sales@blockapps.net</a>.</p>
+    <p>BlockApps Mercata Marketplace</p>
+    <small>powered by STRATO Mercata™</small>
+  `;
 
   return htmlContent;
 }

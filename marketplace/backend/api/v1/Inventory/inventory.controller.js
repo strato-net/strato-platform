@@ -161,13 +161,15 @@ class InventoryController {
       const transfers = body.map(({ assetAddress, newOwner, quantity, price }) => ({ assetAddress, newOwner, quantity, price }));
       await dapp.transferItem(transfers)
 
-      // TODO: Send emails once to seller. But recipients should get their individual emails.
-      body.map(async ({ senderCommonName, recipientCommonName, itemName, quantity, price }) => {
-        const TransferSenderTemplate = TransferSender(senderCommonName, itemName, quantity, price, recipientCommonName);
-        const TransferRecipientTemplate = TransferRecipient(recipientCommonName, itemName, quantity, price, senderCommonName);
-        await sendEmail(senderCommonName, 'Your Item Transfer Confirmation', TransferSenderTemplate);
-        await sendEmail(recipientCommonName, 'You’ve Received an Item Transfer!', TransferRecipientTemplate);
-      });
+      // Send email to sender once
+      const senderCommonName = body[0].senderCommonName;
+      const itemsSummary = body.map(({ itemName, quantity, price, recipientCommonName }) => ({ itemName, quantity, price, recipientCommonName }));
+      await sendEmail(senderCommonName, 'Your Item Transfer Confirmation', TransferSender(senderCommonName, itemsSummary));
+  
+      // Send individual emails to each recipient
+      await Promise.all(body.map(({ recipientCommonName, itemName, quantity, price, senderCommonName }) => 
+        sendEmail(recipientCommonName, 'You’ve Received an Item Transfer!', TransferRecipient(recipientCommonName, itemName, quantity, price, senderCommonName))
+      ));
 
       rest.response.status200(res)
       return next()
