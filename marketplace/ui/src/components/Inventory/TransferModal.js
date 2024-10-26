@@ -267,7 +267,7 @@ const TransferModal = ({
       align: "center",
       render: (record, _, index) => (
         <Select
-          className="w-[390px]"
+          className="transfer_modal w-[390px]"
           showSearch
           onSelect={(value) => handleRecipientSelect(record.id, value)}
           onSearch={(value) => handleSearchChange(record.id, value)}
@@ -278,7 +278,7 @@ const TransferModal = ({
           }
           open={record.openDropdown}
           suffixIcon={<SearchOutlined />}
-          onFocus={() => handleDropdownOpenChange(record.id, true)}
+          onFocus={() => handleDropdownOpenChange(record.id, false)}
           onBlur={() => handleDropdownOpenChange(record.id, false)}
           popupClassName="custom-select-dropdown"
           defaultValue={isBurner ? filteredUsersList[0] : null}

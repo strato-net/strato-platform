@@ -392,8 +392,13 @@ body{
   height: 42px !important;
 }
 
-.inventory_modal .ant-select-selector{
+.ant-select-selector{
   height: 42px !important; 
+  align-items: center;
+}
+
+.transfer_modal .ant-select-selector{
+  height: auto !important;
   align-items: center;
 }
 
