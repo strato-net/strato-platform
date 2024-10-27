@@ -154,7 +154,6 @@ function newnode {
      --maxReturnedHeaders=${maxReturnedHeaders:-500} \
      --networkID=${networkID:--1} \
      --sqlPeers=true \
-     --txGossipFanout=${txGossipFanount:-3} \
      --minLogLevel=$p2pMinLogLevel \
      ${networkFlag} "${iFlag}" &>> logs/strato-p2p
 

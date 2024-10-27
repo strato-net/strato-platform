@@ -932,7 +932,7 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
       let assets = [];
 
       for (const sale of sales) {
-        const history = await saleJs.getSaleHistory(rawAdmin, { contract: sale.contract_name, transaction_hash: order.transaction_hash, assetToBeSold: sale.assetToBeSold }, options);
+        const history = await saleJs.getSaleHistory(rawAdmin, { transaction_hash: order.transaction_hash, assetToBeSold: sale.assetToBeSold }, options);
         const price = history['0'] ? history['0'].price : null;
 
         const assetAddress = sale.assetToBeSold;

@@ -23,7 +23,7 @@ where
 import BlockApps.Crossmon (recordMaxBlockNumber)
 import BlockApps.Logging
 import BlockApps.X509.Certificate as XC
-import Blockchain.Blockstanbul (blockstanbulSender)
+import Blockchain.Blockstanbul (blockstanbulSender, WireMessage)
 import Blockchain.Context
 import Blockchain.Data.Block
 import Blockchain.Data.BlockHeader (BlockHeader)
@@ -38,7 +38,6 @@ import Blockchain.Data.TransactionDef (formatChainId)
 import Blockchain.Data.Wire
 import Blockchain.EventException
 import Blockchain.EventModel
-import Blockchain.Metrics
 import Blockchain.Options
 import Blockchain.Sequencer.Event
 import Blockchain.Strato.Discovery.Data.Peer
@@ -74,8 +73,6 @@ import qualified Data.Text as T
 import Data.These
 import Data.Time.Clock
 import Debug.Trace (trace)
-import GHC.Utils.Monad
-import System.Random
 import qualified Text.Colors as CL
 import Text.Format
 import Text.Printf
@@ -324,7 +321,26 @@ handleEvents peer = awaitForever $ \case
       setPeerAddrIfUnset $ blockstanbulSender wm
       peerAddr <- unPeerAddress <$> access (Proxy @PeerAddress)
       $logInfoS "handleEvents/Blockstanbul" . T.pack $ "blockstanbulPeerAddr: " ++ show peerAddr
-    yieldL $ ToUnseq [IEBlockstanbul wm]
+    let msgHash = rlpHash wm
+    lift $ insert (Proxy @(Proxy (Outbound WireMessage))) (pPeerIp peer, msgHash) Proxy
+    msgExists <- lift $ exists (Proxy @(Proxy (Inbound WireMessage))) msgHash
+    if msgExists
+      then
+        $logInfoS "handleEvents/Blockstanbul" . T.pack $
+          concat
+            [ "Already seen inbound wire message ",
+              format msgHash,
+              ". Not forwarding to Sequencer."
+            ]
+      else do
+        $logInfoS "handleEvents/Blockstanbul" . T.pack $
+          concat
+            [ "First time seeing inbound wire message ",
+              format msgHash,
+              ". Forwarding to Sequencer."
+            ]
+        lift $ insert (Proxy @(Proxy (Inbound WireMessage))) msgHash Proxy
+        yieldL $ ToUnseq [IEBlockstanbul wm]
 
   -- private chains
   MsgEvt (GetChainDetails cids') -> handleGetChainDetails peer $ S.fromList cids'
@@ -371,7 +387,7 @@ handleEvents peer = awaitForever $ \case
           mems <- lift $ selectWithDefault (Proxy @ChainMemberRSet) cId
           return $ checkPeerIsMember myX509 peerX509 mems
 
-      whenM (shouldSendGossip peer $ otOrigin tx) $ do
+      when (shouldSend peer $ otOrigin tx) $ do
         if not match
           then
             $logInfoS "handleEvents/P2pTx" $
@@ -432,7 +448,29 @@ handleEvents peer = awaitForever $ \case
             True -> do
               let outbound = Blockstanbul msg
               $logDebugS "handleEvents/P2pBlockstanbul" . T.pack $ "Outgoing mesage: " ++ show outbound
-              yieldR outbound
+              let !msgHash = rlpHash msg
+              lift $ insert (Proxy @(Proxy (Inbound WireMessage))) msgHash Proxy
+              msgExists <- lift $ exists (Proxy @(Proxy (Outbound WireMessage))) (pPeerIp peer, msgHash)
+              if msgExists
+                then
+                  $logInfoS "handleEvents/P2pBlockstanbul" $
+                    T.concat
+                      [ "Already seen outbound wire message ",
+                        T.pack (format msgHash),
+                        ". Not forwarding to peer ",
+                        pPeerIp peer
+                      ]
+                else do
+                  $logInfoS "handleEvents/P2pBlockstanbul" $
+                    T.concat
+                      [ "First time seeing outbound wire message ",
+                        T.pack (format msgHash),
+                        ". Forwarding to peer ",
+                        pPeerIp peer
+                      ]
+                  let !ip = pPeerIp peer
+                  lift $ insert (Proxy @(Proxy (Outbound WireMessage))) (ip, msgHash) Proxy
+                  yieldR outbound
     P2pAskForBlocks start _ _ -> do
       $logDebugS "handleEvents/P2pAskForBlocks" . T.pack $ "syncFetch: " ++ show start
       syncFetch Forward start
@@ -551,18 +589,6 @@ shouldSend peer txo = case txo of
     -- probably means it was converted, see if this is a problem
     trace "NewTx of type Morphism came in. Should this even happen?" True
   Origin.Blockstanbul -> True
-
-shouldSendGossip :: MonadIO m => PPeer -> Origin.TXOrigin -> m Bool
-shouldSendGossip peer txo =
-  recordGossipFinal
-    . (shouldSend peer txo &&)
-    . (flags_txGossipFanout == -1 ||)
-    =<< case txo of
-      Origin.PeerString {} -> do
-        rangeEnd <- getNumPeersMem
-        rng <- liftIO $ randomRIO (1, rangeEnd)
-        recordGossipRNG $! rangeEnd <= flags_txGossipFanout || rng <= flags_txGossipFanout
-      _ -> return True
 
 checkPeerIsMember :: Maybe X509CertInfoState -> Maybe X509CertInfoState -> ChainMemberRSet -> Bool
 checkPeerIsMember myCert pcert mems = case pcert of

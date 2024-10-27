@@ -26,6 +26,7 @@ import Blockchain.Strato.Model.ExtendedWord (Word256)
 import Blockchain.Strato.Model.Keccak256 (Keccak256)
 import Blockchain.Strato.Model.MicroTime
 import Blockchain.Strato.Model.StateRoot
+import Blockchain.Strato.Model.Address
 import Control.DeepSeq
 import Control.Lens
 import Data.Aeson hiding (encode)
@@ -211,6 +212,7 @@ data VmEvent
   | VmGetMPNodesRequest TO.TXOrigin [StateRoot]
   | VmMPNodesReceived [NodeData]
   | VmRunPreprepare BDB.Block
+  | VmSelfAddress Address
   deriving (Eq, Show, GHCG.Generic)
 
 instance Format VmEvent where
@@ -231,6 +233,7 @@ instance ShowConstructor VmEvent where
   showConstructor VmGetMPNodesRequest{} = "VmGetMPNodesRequest"
   showConstructor VmMPNodesReceived{} = "VmMPNodesReceived"
   showConstructor VmRunPreprepare{} = "VmRunPreprepare"
+  showConstructor VmSelfAddress{} = "VmSelfAddress"
 
 data OutputTx = OutputTx
   { otOrigin :: TO.TXOrigin,
