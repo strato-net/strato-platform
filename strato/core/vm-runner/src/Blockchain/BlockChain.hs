@@ -155,7 +155,7 @@ addBlocks unfiltered = do
   case (filtered, bbi) of
     ([], _) -> return ()
     (_, Unspecified) -> return ()
-    (firstBlock : _, ContextBestBlockInfo _ oldHeader _ _) -> do
+    (firstBlock : _, ContextBestBlockInfo _ oldHeader _) -> do
       $logInfoS "addBlocks" $
         T.pack
           ( "Inserting " ++ show (length filtered) ++ " blocks(s) starting with "
@@ -170,7 +170,7 @@ addBlocks unfiltered = do
             timeit (printf "Block #%d (%d TXs insertion)" blockNo txCount) timerToUse $ do
               failures <- lift $ addBlock block
               when (null failures) $ do
-                (didReplaceThisTime, ranPriv, replacedBits@(hsh, num, _)) <- lift . lift $ replaceBestIfBetter block
+                (didReplaceThisTime, ranPriv, replacedBits@(hsh, num)) <- lift . lift $ replaceBestIfBetter block
                 when didReplaceThisTime $ do
                   writeIORef didReplaceBest True
                   writeIORef replacedBest replacedBits
@@ -702,14 +702,14 @@ indexMaybe (_ : rest) i = indexMaybe rest (i - 1)
 
 ----------------
 
-replaceBestIfBetter :: (Bagger.MonadBagger m) => OutputBlock -> m (Bool, M.Map Word256 (Integer, Keccak256), (Keccak256, Integer, Integer))
-replaceBestIfBetter b@OutputBlock {obBlockData = bd, obTotalDifficulty = td, obReceiptTransactions = txs} = do
+replaceBestIfBetter :: (Bagger.MonadBagger m) => OutputBlock -> m (Bool, M.Map Word256 (Integer, Keccak256), (Keccak256, Integer))
+replaceBestIfBetter b@OutputBlock {obBlockData = bd, obReceiptTransactions = txs} = do
   let txPayloads = (\t -> fromMaybe (otBaseTx t) (otPrivatePayload t)) <$> txs
   bbi <- getContextBestBlockInfo
 
   case bbi of
     Unspecified -> error $ "Trying to replace an Unspecified Best Block"
-    ContextBestBlockInfo oldBestSha oldBestBlock oldBestDifficulty oldTxCount -> do
+    ContextBestBlockInfo oldBestSha oldBestBlock oldTxCount -> do
       let !newNumber = number bd
           !newStateRoot = stateRoot bd
           !newTxCount = fromIntegral $ length txs
@@ -721,24 +721,21 @@ replaceBestIfBetter b@OutputBlock {obBlockData = bd, obTotalDifficulty = td, obR
       let shouldReplace =
             newNumber == 0
               || (newNumber > oldNumber)
-              || ((newNumber == oldNumber) && (td > oldBestDifficulty))
-              || ((newNumber == oldNumber) && (td == oldBestDifficulty) && (newTxCount > oldTxCount))
+              || ((newNumber == oldNumber) && (newTxCount > oldTxCount))
           ranPriv = M.fromSet (const (newNumber, bH)) . S.fromList . catMaybes $ map txChainId txPayloads
 
       $logInfoS "replaceBestIfBetter" . T.pack $ "shouldReplace = " ++ show shouldReplace ++ ", newNumber = " ++ show newNumber ++ ", oldBestNumber = " ++ show (number oldBestBlock)
 
       when shouldReplace $ do
         Bagger.processNewBestBlock bH bd bTHs
-        putContextBestBlockInfo $! ContextBestBlockInfo bH bd td newTxCount
+        putContextBestBlockInfo $! ContextBestBlockInfo bH bd newTxCount
         cbbi <- getContextBestBlockInfo
         case cbbi of
           Unspecified -> $logInfoS "replaceBestIfBetter" "ContextBestBlockInfo is Unspecified"
-          ContextBestBlockInfo h _ d t ->
+          ContextBestBlockInfo h _ t ->
             $logInfoS "ContextBestBlockInfo" . T.pack $
               concat
                 [ format h,
-                  " ",
-                  show d,
                   " ",
                   show t
                 ]
@@ -747,10 +744,9 @@ replaceBestIfBetter b@OutputBlock {obBlockData = bd, obTotalDifficulty = td, obR
       when (not shouldReplace && (newNumber == oldNumber) && (oldStateRoot == newStateRoot)) $
         Bagger.processNewBestBlock bH bd bTHs
 
-      let bbi' = (bestSha, bestNum, bestTdiff)
+      let bbi' = (bestSha, bestNum)
           bestSha = if shouldReplace then bH else oldBestSha
           bestNum = if shouldReplace then newNumber else oldNumber
-          bestTdiff = if shouldReplace then td else oldBestDifficulty
 
       return (shouldReplace, ranPriv, bbi')
 

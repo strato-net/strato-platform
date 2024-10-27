@@ -488,7 +488,7 @@ bdPrimeToBd (BlockData' bd) = bd
 data BlockDataRef' = BlockDataRef' BlockDataRef deriving (Eq, Show)
 
 instance ToJSON BlockDataRef' where
-  toJSON (BlockDataRef' (BlockDataRef ph uh cc sr tr rr _ d num gl gu ts ed non mh h pow isConf td v)) =
+  toJSON (BlockDataRef' (BlockDataRef ph uh cc sr tr rr _ d num gl gu ts ed non mh h pow isConf v)) =
     object
       [ "parentHash" .= ph,
         "unclesHash" .= uh,
@@ -507,7 +507,6 @@ instance ToJSON BlockDataRef' where
         "hash" .= h,
         "powVerified" .= pow,
         "isConfirmed" .= isConf,
-        "totalDifficulty" .= td,
         "version" .= v
       ]
 

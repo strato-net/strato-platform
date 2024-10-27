@@ -173,7 +173,7 @@ initializeGenesisBlock genesisBlockName = do
   obGB <- liftIO $ bootstrapSequencer extraCertInfoStates genesisBlock
   putGenesisHash $ blockHash genesisBlock
   $logInfoS "initgen" "Initial merkle patricia tries successfully created"
-  void $ putBlocks [(genesisBlock, difficulty (blockBlockData genesisBlock))] False
+  void $ putBlocks [genesisBlock] False
   $logInfoS "initgen" "Genesis Block put"
   $logInfoS "initgen" "State diff has been generated"
 
@@ -185,12 +185,10 @@ initializeGenesisBlock genesisBlockName = do
     RBDB.forceBestBlockInfo
       (blockHash genesisBlock)
       (number . blockBlockData $ genesisBlock)
-      (difficulty . blockBlockData $ genesisBlock)
 
   void . execRedis $
     RBDB.putBlock OutputBlock
     { obOrigin = Origin.Direct,
-      obTotalDifficulty = 0,
       obBlockData = blockBlockData genesisBlock,
       obReceiptTransactions = [],
       obBlockUncles = []

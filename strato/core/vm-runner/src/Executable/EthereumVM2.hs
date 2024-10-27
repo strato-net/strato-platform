@@ -476,7 +476,6 @@ writeBlockSummary :: HasBlockSummaryDB m => OutputBlock -> m ()
 writeBlockSummary block =
   let sha = outputBlockHash block
       header = obBlockData block
-      td = obTotalDifficulty block
       txCnt = fromIntegral $ length (obReceiptTransactions block)
-   in putBSum sha (blockHeaderToBSum header td txCnt)
+   in putBSum sha (blockHeaderToBSum header txCnt)
 

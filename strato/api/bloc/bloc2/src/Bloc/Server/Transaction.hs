@@ -1457,9 +1457,9 @@ checkIsSynced = do
   status <- runStratoRedisIO getSyncStatus
   nodeBestBlock <- runStratoRedisIO getBestBlockInfo
   worldBestBlock <- runStratoRedisIO getWorldBestBlockInfo
-  let nodeTotalDiff = bestBlockTotalDifficulty <$> nodeBestBlock
-      worldTotalDiff = bestBlockTotalDifficulty <$> worldBestBlock
+  let nodeNumber = bestBlockNumber <$> nodeBestBlock
+      worldNumber = bestBlockNumber <$> worldBestBlock
 
-  case (status, worldTotalDiff, nodeTotalDiff) of
+  case (status, worldNumber, nodeNumber) of
     (Just False, Just wtd, Just ntd) -> throwIO $ NotYetSynced ntd wtd
     _ -> pure ()

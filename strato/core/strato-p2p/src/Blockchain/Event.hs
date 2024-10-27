@@ -121,15 +121,15 @@ handleEvents peer = awaitForever $ \case
     ts <- liftIO getCurrentMicrotime
     let ingestTxs = IETx ts . IngestTx txo <$> txs
     yieldL $ ToUnseq ingestTxs
-  MsgEvt (NewBlock block' tdiff) -> do
+  MsgEvt (NewBlock block' _) -> do
     lift stampActionTimestamp
-    $logInfoS "handleEvents/NewBlock" $ T.pack $ "newBlock with tdiff " ++ show tdiff
+    $logInfoS "handleEvents/NewBlock" $ T.pack $ "newBlock"
     let sha = blockHash block'
     let header = blockHeader block'
     let num = blockHeaderBlockNumber header
     let parentHash' = blockHeaderParentHash header
     lift . Mod.put (Proxy @WorldBestBlock) . WorldBestBlock $
-      BestBlock sha num tdiff
+      BestBlock sha num
     parentHeader <- lift $ lookup (Proxy @BlockHeader) parentHash'
     case parentHeader of
       Nothing -> do
@@ -356,11 +356,11 @@ handleEvents peer = awaitForever $ \case
   NewSeqEvent oe -> case oe of
     P2pBlock b -> do
       when (shouldSend peer $ obOrigin b) $ do
-        WorldBestBlock (BestBlock _ _ worldTDiff) <- lift $ Mod.get (Proxy @WorldBestBlock)
-        $logInfoS "handleEvents/P2pBlock" . T.pack $ "World TDiff: " ++ show worldTDiff
-        when (obTotalDifficulty b >= worldTDiff) $ do
+        WorldBestBlock (BestBlock _ worldNumber) <- lift $ Mod.get (Proxy @WorldBestBlock)
+        $logInfoS "handleEvents/P2pBlock" . T.pack $ "World Number: " ++ show worldNumber
+        when (BlockHeader.number (obBlockData b) >= worldNumber) $ do
           $logInfoS "handleEvents/P2pBlock" . T.pack $ "yielding new block: " ++ show (BlockHeader.number . blockBlockData . outputBlockToBlock $ b)
-          yieldR $ NewBlock (outputBlockToBlock b) (obTotalDifficulty b)
+          yieldR $ NewBlock (outputBlockToBlock b) 0
     P2pTx tx -> do
       let mCid = txChainId tx
       match <- case mCid of
@@ -520,7 +520,7 @@ handleGetChainDetails peer cids' = do
           ++ (intercalate "\n" $ formatChainId . Just . fst <$> cInfos')
 
 numberFromBestBlock :: BestBlock -> Integer
-numberFromBestBlock (BestBlock _ n _) = n
+numberFromBestBlock (BestBlock _ n) = n
 
 syncFetch ::
   ( MonadIO m,

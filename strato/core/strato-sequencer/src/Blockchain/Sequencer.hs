@@ -245,7 +245,7 @@ blockstanbulSend' msg = do
       when (now < tNext) $
         liftIO . threadDelay . round $ 1e6 * diffUTCTime tNext now
       Mod.put (Mod.Proxy @BDB.BestSequencedBlock) . BDB.BestSequencedBlock $
-        BDB.BestBlock (BDB.blockHeaderHash bh) (BDB.blockHeaderBlockNumber bh) (obTotalDifficulty b)
+        BDB.BestBlock (BDB.blockHeaderHash bh) (BDB.blockHeaderBlockNumber bh)
 
   $logDebugS "seq/pbft/send_checkpoints" . T.pack $ show ckpts
   writeUnseqCheckpoints ckpts
@@ -312,9 +312,9 @@ expandBlock sb = do
       $logWarnS "expandBlock" . T.pack $ prettyBlock sb ++ " is not yet ready to emit."
       P.incCounter seqBlocksEnqueued
       return []
-    (ReadyToEmit totalPastDifficulty) -> do
+    ReadyToEmit -> do
       -- TODO: buildEmissionChain needs to do all of this so that we don't emit blocks missing transactions prematurely
-      dryChain <- buildEmissionChain sb totalPastDifficulty
+      dryChain <- buildEmissionChain sb
       if dryChain /= []
         then do
           $logInfoS "expandBlock" . T.pack $ prettyBlock sb ++ " is ready to emit! Emitting it and chain of dependents."

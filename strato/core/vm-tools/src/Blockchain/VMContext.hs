@@ -220,7 +220,7 @@ newtype GasCap = GasCap {unVmGasCap :: Gas}
 instance NFData RBDB.RedisConnection where
   rnf (RBDB.RedisConnection c) = c `seq` ()
 
-data ContextBestBlockInfo = Unspecified | ContextBestBlockInfo !Keccak256 !BlockHeader !Integer !Int
+data ContextBestBlockInfo = Unspecified | ContextBestBlockInfo !Keccak256 !BlockHeader !Int
   deriving (Eq, Show, Generic, NFData)
 
 instance Binary ContextBestBlockInfo

@@ -260,7 +260,6 @@ otxPrimeToOtx (OutputTx' o h s b mp) = OutputTx o h s (unTransaction' b) (unTran
 
 data OutputBlock = OutputBlock
   { obOrigin :: TO.TXOrigin,
-    obTotalDifficulty :: Integer,
     obBlockData :: BlockHeader,
     obReceiptTransactions :: [OutputTx],
     obBlockUncles :: [BlockHeader]
@@ -269,7 +268,6 @@ data OutputBlock = OutputBlock
 
 data OutputBlock' = OutputBlock'
   { ob'Origin :: TO.TXOrigin,
-    ob'TotalDifficulty :: Integer,
     ob'BlockData :: BlockData',
     ob'ReceiptTransactions :: [OutputTx'],
     ob'BlockUncles :: [BlockData']
@@ -277,19 +275,17 @@ data OutputBlock' = OutputBlock'
   deriving (Eq, Show, GHCG.Generic)
 
 obToObPrime :: OutputBlock -> OutputBlock'
-obToObPrime (OutputBlock o td bd rt bu) =
+obToObPrime (OutputBlock o bd rt bu) =
   OutputBlock'
     o
-    td
     (BlockData' bd)
     (otxToOtxPrime <$> rt)
     (BlockData' <$> bu)
 
 obPrimeToOb :: OutputBlock' -> OutputBlock
-obPrimeToOb (OutputBlock' o td (BlockData' bd) rt bu) =
+obPrimeToOb (OutputBlock' o (BlockData' bd) rt bu) =
   OutputBlock
     o
-    td
     bd
     (otxPrimeToOtx <$> rt)
     ((\(BlockData' b) -> b) <$> bu)
@@ -323,11 +319,10 @@ ingestBlockToSequencedBlock ib = do
         sbBlockUncles = ibBlockUncles ib
       }
 
-sequencedBlockToOutputBlock :: SequencedBlock -> Integer -> OutputBlock
-sequencedBlockToOutputBlock sb totalDifficulty =
+sequencedBlockToOutputBlock :: SequencedBlock -> OutputBlock
+sequencedBlockToOutputBlock sb =
   OutputBlock
     { obOrigin = sbOrigin sb,
-      obTotalDifficulty = totalDifficulty,
       obBlockData = sbBlockData sb,
       obReceiptTransactions = sbReceiptTransactions sb,
       obBlockUncles = sbBlockUncles sb
@@ -436,8 +431,7 @@ quarryBlockToOutputBlock BDB.Block {BDB.blockBlockData = bd, BDB.blockReceiptTra
       { obOrigin = TO.Quarry,
         obBlockData = bd,
         obBlockUncles = us,
-        obReceiptTransactions = rtxs,
-        obTotalDifficulty = 0
+        obReceiptTransactions = rtxs
       }
   where
     wrapQuarryReceipt t = do
@@ -513,12 +507,11 @@ instance Format OutputBlock where
   format
     b@OutputBlock
       { obOrigin = origin,
-        obTotalDifficulty = totDiff,
         obBlockData = bd,
         obReceiptTransactions = receipts,
         obBlockUncles = uncles
       } =
-      CL.blue ("OutputBlock #" ++ show (number bd) ++ "; total diff " ++ show totDiff) ++ " (via " ++ format origin ++ ") "
+      CL.blue ("OutputBlock #" ++ show (number bd) ++ ";") ++ " (via " ++ format origin ++ ") "
         ++ tab'
           ( format (outputBlockHash b) ++ "\n"
               ++ format bd
@@ -592,7 +585,7 @@ instance BlockLike BlockHeader OutputTx OutputBlock where
   blockUncleHeaders = obBlockUncles
 
   blockOrdering = number . obBlockData
-  buildBlock = OutputBlock TO.Morphism 0
+  buildBlock = OutputBlock TO.Morphism
 
 instance Arbitrary IngestEvent where
   arbitrary = genericArbitrary

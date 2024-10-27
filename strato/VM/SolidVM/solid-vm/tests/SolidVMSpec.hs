@@ -291,7 +291,6 @@ generateGBlock gi = do
         },
       OutputBlock
         { obOrigin = TXO.Direct,
-          obTotalDifficulty = 0,
           obBlockData = bData,
           obReceiptTransactions = [],
           obBlockUncles = []
@@ -302,9 +301,8 @@ writeBlockSummary :: HasBlockSummaryDB m => OutputBlock -> m ()
 writeBlockSummary block =
   let sha = outputBlockHash block
       header = obBlockData block
-      td = obTotalDifficulty block
       txCnt = fromIntegral $ length (obReceiptTransactions block)
-   in putBSum sha (blockHeaderToBSum header td txCnt)
+   in putBSum sha (blockHeaderToBSum header txCnt)
 
 instance {-# OVERLAPPING #-} Monad m => AccessibleEnv SQLDB (ReaderT Context m) where
   accessEnv = fmap (view $ dbs . sqldb) accessEnv
@@ -329,7 +327,7 @@ runTestWithTimeout timeout f = do
       writeBlockSummary outputBlock
       let genHash = rlpHash $ (blockCreated)
       bhr <- bootstrapChainDB genHash [(Nothing, (stateRoot $ blockBlockData $ blockCreated))]
-      putContextBestBlockInfo $ ContextBestBlockInfo genHash (blockBlockData $ blockCreated) 0 0
+      putContextBestBlockInfo $ ContextBestBlockInfo genHash (blockBlockData $ blockCreated) 0
       Mod.put (Mod.Proxy @BlockHashRoot) $ bhr
       processNewBestBlock genHash (blockBlockData $ blockCreated) [] -- bootstrap Bagger with genesis block
       withCurrentBlockHash genHash $ do
@@ -464,7 +462,7 @@ runArgsWithSender acc args bs = do
       chainId = Nothing
       metadata = Just $ M.fromList [("name", "qq"), ("args", args)]
   
-  insert (Proxy @BlockSummary) (unsafeCreateKeccak256FromWord256 0x0) (blockHeaderToBSum blockData 900 1)
+  insert (Proxy @BlockSummary) (unsafeCreateKeccak256FromWord256 0x0) (blockHeaderToBSum blockData 1)
 
   newAddress <- getNewAddress acc
   er <-

@@ -566,9 +566,7 @@ buildFromMiningCache = do
   let stateRoot = B.lastExecutedStateRoot cache
   let (vDelt, cDelt) = getDeltasFromResults $ B.lastExecutedTxs cache
   let txs = (trrTransaction <$> B.lastExecutedTxs cache) ++ (DL.toList $ B.privateHashes cache)
-  let parentDiff = getBlockDifficulty parentHeader
   let time = B.startTimestamp cache
-  let nextDiff = 1 
   let nextBlockData = buildNextBlockHeader parentHeader parentHash stateRoot txs time vDelt cDelt
   recordMaxBlockNumber "bagger_build" . number $ nextBlockData
   rewardedBlockData <- buildRewardedBlockHeader nextBlockData
@@ -577,7 +575,6 @@ buildFromMiningCache = do
   return
     OutputBlock
       { obOrigin = TO.Quarry,
-        obTotalDifficulty = parentDiff + nextDiff,
         obBlockUncles = uncles,
         obReceiptTransactions = txs,
         obBlockData = rewardedBlockData

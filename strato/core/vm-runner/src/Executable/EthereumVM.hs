@@ -152,9 +152,8 @@ outputBlockToContextBestBlockInfo :: OutputBlock -> ContextBestBlockInfo
 outputBlockToContextBestBlockInfo block =
   let header = obBlockData block
       txs = obReceiptTransactions block
-      td = obTotalDifficulty block
       txL = length txs
-  in ContextBestBlockInfo (blockHeaderHash header) header td txL
+  in ContextBestBlockInfo (blockHeaderHash header) header txL
 
 logEventSummaries :: MonadLogger m => [VmEvent] -> m ()
 logEventSummaries evs = do
