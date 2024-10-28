@@ -172,7 +172,7 @@ const ListForSaleModal = ({ open, handleCancel, inventory, categoryName, limit, 
                             availablePaymentServices.map((e, index) => (
                                 <Option value={index}>
                                     <div className="flex items-center mr-1">
-                                        {e.serviceName}&nbsp;
+                                        {e.serviceName === 'STRATS' ? 'STRAT' : e.serviceName}&nbsp;
                                         {renderImg(e)}
                                     </div>
                                 </Option>
@@ -298,7 +298,7 @@ const ListForSaleModal = ({ open, handleCancel, inventory, categoryName, limit, 
                         {availablePaymentServices.map((e, index) => (
                             <Option value={index}>
                                 <div className="flex items-center mr-1">
-                                    {e.serviceName}&nbsp;
+                                    {e.serviceName === 'STRATS' ? 'STRAT' : e.serviceName}&nbsp;
                                     {renderImg(e)}
                                 </div>
                             </Option>
