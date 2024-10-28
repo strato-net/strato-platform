@@ -215,7 +215,7 @@ const HeaderComponent = ({ user, loginUrl, showMenu, handleSubMenu, handleMenuTa
             <div>
               {user && originAddress &&
                 <p className="text-xs mt-1">
-                  Buy STRATs
+                  Buy STRAT
                 </p>
               }
             </div>

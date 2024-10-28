@@ -247,7 +247,7 @@ const ListForSaleModal = ({ open, handleCancel, inventory, categoryName, limit, 
                                 >
                                     <div className="flex items-center justify-between">
                                         <div className="flex items-center">
-                                            {e.serviceName}&nbsp;
+                                            {e.serviceName === 'STRATS' ? 'STRAT' : e.serviceName}&nbsp;
                                             {renderImg(e)}
                                         </div>
                                         {paymentTypes.includes(index) && (
@@ -350,10 +350,9 @@ const ListForSaleModal = ({ open, handleCancel, inventory, categoryName, limit, 
                         >
                             <div className="flex items-center justify-between">
                                 <div className="flex items-center">
-                                    {e.serviceName}&nbsp;
+                                    {e.serviceName === 'STRATS' ? 'STRAT' : e.serviceName}&nbsp;
                                     {renderImg(e)}
                                 </div>
-                                
                                 {paymentTypes.includes(index) && (
                                     <CheckCircleOutlined className="custom-check-icon" />
                                 )}
