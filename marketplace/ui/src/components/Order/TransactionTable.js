@@ -43,7 +43,7 @@ const TransactionTable = ({ user, download, isAllOrdersLoading }) => {
 
   const currentMonth = dayjs().startOf('month').unix();
   const limit = urlDate ? '' : 5;
-  const pageSize = 10;
+  const pageSize =  urlDate ? 10 : 20;
   const [offset, setOffset] = useState(0);
   const [currentPage, setCurrentPage] = useState(1);
   const [type, setType] = useState("");
