@@ -31,7 +31,7 @@ const TransferModal = ({ open, handleCancel, inventory, categoryName = "", limit
         isTransferring
     } = useInventoryState();
     const {
-        isTransferringStrats, message: marketplaceMsg, success: marketplaceSuccess
+        message: marketplaceMsg, success: marketplaceSuccess
     } = useMarketplaceState();
     const inputPriceDesktopRef = useRef(null);
     const inputPriceMobileRef = useRef(null);
@@ -251,7 +251,7 @@ const TransferModal = ({ open, handleCancel, inventory, categoryName = "", limit
             width={1000}
             footer={[
                 <div className="flex justify-center md:block">
-                    <Button type="primary" className="w-32 h-9" onClick={handleSubmit} disabled={!canTransfer} loading={isTransferring || isTransferringStrats}>
+                    <Button type="primary" className="w-32 h-9" onClick={handleSubmit} disabled={!canTransfer} loading={isTransferring}>
                         Transfer
                     </Button>
                 </div>

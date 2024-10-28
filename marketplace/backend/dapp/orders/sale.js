@@ -153,9 +153,8 @@ async function get(user, args, options) {
 async function getSaleHistory(user, args, options) {
     const { contract, ...restArgs } = args;
 
-    const newOptions = { ...options, org: undefined, app: undefined }
-    let historySale = await searchAllWithQueryArgs(`history@${contract}`, restArgs, newOptions, user);
-
+    const newOptions = { ...options, org: "history@BlockApps", app: "Mercata" }
+    let historySale = await searchAllWithQueryArgs(`${contractName}`, restArgs, newOptions, user);
 
     if (!historySale) {
         return undefined;

@@ -38,7 +38,6 @@ cd backend
 GLOBAL_ADMIN_NAME=<globalAdminUsername>
 GLOBAL_ADMIN_PASSWORD=<globalAdminPassword>
 
-SENDGRID_API_KEY=<sendgridApiKey>
 NOTIFICATION_SERVER_URL=<notificationServerUrl>
 networkID=<networkID>
 

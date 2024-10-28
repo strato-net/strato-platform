@@ -14,6 +14,8 @@ module SolidVM.Model.CodeCollection (
   flFuncs,
   contracts,
   getParents,
+  getTopLevelAbstracts,
+  getTopLevelAbstractsForContract,
   flConstants,
   flStructs,
   flEnums,
@@ -23,6 +25,7 @@ module SolidVM.Model.CodeCollection (
   usesStrictModifiers,
   getContractsBySolidString,
   resolvePragmaFeature,
+  resolvePragmaFeature',
   structDef,
   module SolidVM.Model.CodeCollection.Contract,
   --module SolidVM.Model.CodeCollection.Def,
@@ -43,10 +46,9 @@ import Control.Lens
 import Data.Aeson as A
 import Data.Binary
 import Data.Default
-import Data.List (find)
 import Data.Map (Map)
 import qualified Data.Map as M
-import Data.Maybe (isJust)
+import qualified Data.Set as S
 import Data.Source
 import Data.Traversable (for)
 import GHC.Generics
@@ -141,6 +143,19 @@ getParents cc c =
         p' <- toErr (c ^. contractContext) p . M.lookup p $ cc ^. contracts
         (p' :) <$> getParents cc p'
 
+getTopLevelAbstracts :: CodeCollection -> Map SolidString Contract
+getTopLevelAbstracts cc = M.unions . map (getTopLevelAbstractsForContract cc) . M.elems $ _contracts cc
+
+getTopLevelAbstractsForContract :: CodeCollection -> Contract -> Map SolidString Contract
+getTopLevelAbstractsForContract cc = go
+  where
+    go c =
+      let m = doParents c
+       in if _contractType c == AbstractType && M.null m
+            then M.singleton (_contractName c) c
+            else m
+    doParents = M.unions . map (maybe M.empty go . flip M.lookup (_contracts cc)) . _parents
+
 instance Arbitrary CodeCollection where
   arbitrary = do
     contr <- arbitrary
@@ -166,18 +181,28 @@ getContractsBySolidString :: SolidString -> CodeCollectionF a -> Maybe (Contract
 getContractsBySolidString solidStr codeCollection = M.lookup solidStr (_contracts codeCollection)
 
 resolvePragmaFeature :: [(String, String)] -> String -> Bool
-resolvePragmaFeature pragmaList feature = 
-  let solidVMVersion = find (== ("solidvm", "11.4")) pragmaList
-  in case (solidVMVersion) of
-      Just _ -> 
-        case feature of
-          "es6" -> True
-          "strict" -> True
-          "builtinCreates" -> True
-          "safeExternalCalls" -> True
-          "strictDecimals" -> True
-          _ -> False
-      _ -> isJust $ find ((== feature) . fst) pragmaList
+resolvePragmaFeature pragmaList feature = resolvePragmaFeature' pragmaList feature ""
+
+resolvePragmaFeature' :: [(String, String)] -> String -> String -> Bool
+resolvePragmaFeature' pragmaList feature version =
+  let pragmaSet = S.fromList pragmaList
+      extensions = [
+          (("solidvm", "11.4"), S.fromList [
+            ("es6", ""),
+            ("strict", ""),
+            ("builtinCreates", ""),
+            ("safeExternalCalls", ""),
+            ("strictDecimals", "")
+           ]),
+          (("solidvm", "11.5"), S.fromList [
+            ("solidvm", "11.4")
+          ]),
+          (("solidvm", "12.0"), S.fromList [
+            ("solidvm", "11.5")
+          ])
+        ]
+      extendedPragmaSet = foldr (\(e,es) a -> if e `S.member` a then a <> es else a) pragmaSet extensions
+   in (feature, version) `S.member` extendedPragmaSet
 
 structDef :: ContractF a -> CodeCollectionF a -> SolidString -> Maybe [(SolidString, FieldType, a)]
 structDef c cc n = (c ^. structs . at n) <|> (cc ^. flStructs . at n)

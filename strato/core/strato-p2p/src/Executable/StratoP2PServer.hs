@@ -17,7 +17,7 @@ where
 
 import BlockApps.Logging
 import Blockchain.CommunicationConduit
-import Blockchain.Context
+import Blockchain.Context hiding (Inbound, Outbound)
 import Blockchain.Data.PubKey (secPubKeyToPoint)
 import Blockchain.Display (displayMessage, MsgDirection(..))
 import Blockchain.EthEncryptionException
