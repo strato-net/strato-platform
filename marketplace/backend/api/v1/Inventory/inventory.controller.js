@@ -3,6 +3,8 @@ import axios from 'axios';
 import Joi from '@hapi/joi'
 import RestStatus from 'http-status-codes'
 import config from '../../../load.config'
+import { TransferRecipient, TransferSender } from '../../../helpers/emailTemplates'
+import sendEmail from '../../../helpers/email'
 import constants from "/helpers/constants";
 
 function getTokenServerUrl() {
@@ -153,13 +155,18 @@ class InventoryController {
 
   static async transfer(req, res, next) {
     try {
-      const { dapp, body } = req
+      const { dapp, body } = req;
+      const { senderCommonName, recipientCommonName,
+         itemName, quantity, price, ...restData } = body;
+      const payload = { quantity, price, ...restData }
+      InventoryController.validateTransferItemArgs(payload)
+      const result = await dapp.transferItem(payload)
 
-      InventoryController.validateTransferItemArgs(body)
-
-      const result = await dapp.transferItem(body)
+      const TransferSenderTemplate = TransferSender(senderCommonName, itemName, quantity, price, recipientCommonName);
+      const TransferRecipientTemplate = TransferRecipient(recipientCommonName, itemName, quantity, price, senderCommonName);
+      await sendEmail(senderCommonName, 'Your Item Transfer Confirmation', TransferSenderTemplate)
+      await sendEmail(recipientCommonName, 'You’ve Received an Item Transfer!', TransferRecipientTemplate)
       rest.response.status200(res, result.transferStatus)
-
       return next()
     } catch (e) {
       return next(e)

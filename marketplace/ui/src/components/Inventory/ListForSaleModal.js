@@ -5,6 +5,7 @@ import { useInventoryDispatch, useInventoryState } from "../../contexts/inventor
 import { usePaymentServiceDispatch, usePaymentServiceState } from "../../contexts/payment";
 import { actions as paymentServiceActions } from "../../contexts/payment/actions";
 import { handlePriceInput, handleQuantityInput } from "../../helpers/utils";
+import { CheckCircleOutlined } from '@ant-design/icons';
 
 const { Option } = Select;
 
@@ -67,26 +68,6 @@ const ListForSaleModal = ({ open, handleCancel, inventory, categoryName, limit, 
         };
     }, [quantity, pricePerUnit, paymentTypes])
 
-    useEffect(() => {
-        const excludeStrats = inventory.contract_name && inventory.contract_name.toLowerCase().includes('strats');
-        
-        const diff = paymentServices.filter(ps => {
-            const isNotOnboarded = !notOnboarded.some(x => x.address === ps.address);
-            const isStratsService = excludeStrats && ps.serviceName.toLowerCase().includes('strats');
-            return isNotOnboarded && !isStratsService;
-        });
-        setAvailablePaymentServices(diff);
-
-
-        const inventoryPaymentServices = inventory.paymentServices
-            ? inventory.paymentServices.filter(provider => provider.value).map(provider => provider.value)
-            : [];
-        const selectedPaymentServiceIndices = inventoryPaymentServices.map(inventoryPS =>
-            diff.findIndex(ps => ps.creator === inventoryPS.creator && ps.serviceName === inventoryPS.serviceName)
-        );
-        setPaymentTypes(selectedPaymentServiceIndices);
-
-    }, [paymentServices, notOnboarded, inventory.paymentServices]);
 
     useEffect(() => {
         const priceInputElements = [inputPriceDesktopRef.current, inputPriceMobileRef.current];
@@ -125,29 +106,117 @@ const ListForSaleModal = ({ open, handleCancel, inventory, categoryName, limit, 
             : ''
     }
 
+    const handleSelect = (values) => {
+        const stratsIndex = availablePaymentServices.findIndex(service => service.serviceName.toLowerCase().includes('strats'));
+
+        // Ensure 'strats' service is always selected
+        if (stratsIndex !== -1 && !values.includes(stratsIndex)) {
+            values = [stratsIndex, ...values];
+        }
+        setPaymentTypes(values);
+    };
+
+   
+    useEffect(() => {
+        const excludeStrats = inventory.contract_name && inventory.contract_name.toLowerCase().includes('strats');
+
+        const diff = paymentServices.filter(ps => {
+            const isNotOnboarded = !notOnboarded.some(x => x.address === ps.address);
+            const isStratsService = excludeStrats && ps.serviceName.toLowerCase().includes('strats');
+            return isNotOnboarded && !isStratsService;
+        });
+
+        setAvailablePaymentServices(diff);
+
+        const inventoryPaymentServices = inventory.paymentServices
+            ? inventory.paymentServices.filter(provider => provider.value).map(provider => provider.value)
+            : [];
+
+        const selectedPaymentServiceIndices = inventoryPaymentServices.map(inventoryPS =>
+            diff.findIndex(ps => ps.creator === inventoryPS.creator && ps.serviceName === inventoryPS.serviceName)
+        );
+
+        const stratsIndex = diff.findIndex(ps => ps.serviceName.toLowerCase().includes('strats'));
+
+        // Auto-select 'strats' if it exists
+        if (stratsIndex !== -1 && !selectedPaymentServiceIndices.includes(stratsIndex)) {
+            selectedPaymentServiceIndices.push(stratsIndex);
+        }
+
+        setPaymentTypes(selectedPaymentServiceIndices);
+
+    }, [paymentServices, notOnboarded, inventory.paymentServices]);
+
+    
     const tagRender = (props) => {
         const { value, closable, onClose } = props;
         const service = availablePaymentServices[value];
+        const isStratsService = service?.serviceName.toLowerCase().includes('strats');
         const onPreventMouseDown = (event) => {
             event.preventDefault();
             event.stopPropagation();
         };
-        return <> {service ? (
+
+        return service ? (
             <Tag
                 onMouseDown={onPreventMouseDown}
-                closable={closable}
+                closable={!isStratsService && closable} // prevent closing if it's 'strats'
                 onClose={onClose}
                 className="flex items-center mr-1"
             >
                 {service.serviceName}&nbsp;
                 {renderImg(service)}
             </Tag>
-        ) : ''}
-        </>;
+        ) : '';
     };
 
-    const handleSelect = (values) => {
-        setPaymentTypes(values);
+    
+    const handleSubmit = async () => {
+        const stratsService = availablePaymentServices.find(service => service.serviceName.toLowerCase().includes('strats'));
+
+        let body = {
+            paymentServices: paymentTypes
+                .filter((p) => availablePaymentServices[p])
+                .map((p) => {
+                    return {
+                        creator: availablePaymentServices[p].creator,
+                        serviceName: availablePaymentServices[p].serviceName,
+                    };
+                }),
+            price: inventory.data.quantityIsDecimal && inventory.data.quantityIsDecimal === "True" ? pricePerUnit / 100 : pricePerUnit,
+        };
+
+        // Ensure 'strats' is included in the submission
+        if (stratsService && !body.paymentServices.some(service => service.serviceName.toLowerCase().includes('strats'))) {
+            body.paymentServices.push({
+                creator: stratsService.creator,
+                serviceName: stratsService.serviceName
+            });
+        }
+
+        if (inventory.saleAddress) {
+            body = { ...body, saleAddress: inventory.saleAddress }
+        } else {
+            body = { ...body, assetToBeSold: inventory.address }
+        }
+
+        body = {
+            ...body,
+            quantity: inventory.data.quantityIsDecimal && inventory.data.quantityIsDecimal === "True" ? quantity * 100 : quantity,
+        }
+
+        let isDone;
+
+        if (inventory.saleAddress) {
+            isDone = await actions.updateSale(inventoryDispatch, body);
+        } else {
+            isDone = await actions.listInventory(inventoryDispatch, body);
+        }
+
+        if (isDone) {
+            await actions.fetchInventory(inventoryDispatch, limit, offset, "", categoryName);
+            handleCancel();
+        }
     };
 
     const columns = () => {
@@ -155,7 +224,7 @@ const ListForSaleModal = ({ open, handleCancel, inventory, categoryName, limit, 
             {
                 title: "Payment Type (s)",
                 align: "center",
-                render: () => (
+                render: () => (                    
                     <Select
                         id="paymentTypes"
                         mode="multiple"
@@ -167,13 +236,24 @@ const ListForSaleModal = ({ open, handleCancel, inventory, categoryName, limit, 
                         onChange={handleSelect}
                         showSearch={false}
                         className="w-64"
+                        popupClassName="custom-select-no-tick"
                     >
                         {!arePaymentServicesLoading ? (
                             availablePaymentServices.map((e, index) => (
-                                <Option value={index}>
-                                    <div className="flex items-center mr-1">
-                                        {e.serviceName}&nbsp;
-                                        {renderImg(e)}
+                                <Option 
+                                    key={index}
+                                    value={index} 
+                                    disabled={e.serviceName.toLowerCase().includes('strats')}
+                                >
+                                    <div className="flex items-center justify-between">
+                                        <div className="flex items-center">
+                                            {e.serviceName}&nbsp;
+                                            {renderImg(e)}
+                                        </div>
+                                        {paymentTypes.includes(index) && (
+                                            <CheckCircleOutlined className="custom-check-icon" />
+
+                                        )}
                                     </div>
                                 </Option>
                             ))
@@ -225,40 +305,6 @@ const ListForSaleModal = ({ open, handleCancel, inventory, categoryName, limit, 
         return finalColumns;
     };
 
-    const handleSubmit = async () => {
-        let body = {
-            paymentServices: paymentTypes
-            .filter((p) => availablePaymentServices[p])
-            .map((p) => {
-              return {
-                creator: availablePaymentServices[p].creator,
-                serviceName: availablePaymentServices[p].serviceName,
-              };
-            }),
-          price: inventory.data.quantityIsDecimal && inventory.data.quantityIsDecimal === "True" ? pricePerUnit / 100 : pricePerUnit,
-        };
-        if (inventory.saleAddress) {
-            body = { ...body, saleAddress: inventory.saleAddress }
-        } else {
-            body = { ...body, assetToBeSold: inventory.address }
-        }
-        body = {
-            ...body,
-            quantity: inventory.data.quantityIsDecimal && inventory.data.quantityIsDecimal === "True" ? quantity * 100 : quantity,
-        }
-        let isDone
-
-        if (inventory.saleAddress) {
-            isDone = await actions.updateSale(inventoryDispatch, body);
-        } else {
-            isDone = await actions.listInventory(inventoryDispatch, body);
-        }
-        if (isDone) {
-            await actions.fetchInventory(inventoryDispatch, limit, offset, "", categoryName);
-            handleCancel();
-        }
-    }
-
     return (
         <Modal
             open={open}
@@ -294,14 +340,25 @@ const ListForSaleModal = ({ open, handleCancel, inventory, categoryName, limit, 
                         onChange={handleSelect}
                         showSearch={false}
                         className="w-full"
+                        popupClassName="custom-select-no-tick"
                     >
                         {availablePaymentServices.map((e, index) => (
-                            <Option value={index}>
-                                <div className="flex items-center mr-1">
+                        <Option 
+                            key={index}
+                            value={index} 
+                            disabled={e.serviceName.toLowerCase().includes('strats')}
+                        >
+                            <div className="flex items-center justify-between">
+                                <div className="flex items-center">
                                     {e.serviceName}&nbsp;
                                     {renderImg(e)}
                                 </div>
-                            </Option>
+                                
+                                {paymentTypes.includes(index) && (
+                                    <CheckCircleOutlined className="custom-check-icon" />
+                                )}
+                            </div>
+                        </Option>
                         ))}
                     </Select>
                 </div>

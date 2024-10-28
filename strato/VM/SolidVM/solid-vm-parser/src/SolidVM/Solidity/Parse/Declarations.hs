@@ -489,9 +489,7 @@ modifierDeclaration = do
       ModifierDeclaration
         Xabi.Modifier
           { Xabi._modifierArgs -- undefined args -- :: Map Text SolidVM.IndexedType
-            =
-              Map.fromList $
-                zipWith (\x i -> fmap (SolidVM.IndexedType i) (nameUnnamed x i)) args [0 ..],
+            = zipWith (\x i -> fmap (SolidVM.IndexedType i) (nameUnnamed x i)) args [0 ..],
             Xabi._modifierSelector = Text.pack name, -- ? -- undefined -- :: Text
             Xabi._modifierContents = contents, -- :: Maybe [Statement]
             Xabi._modifierContext = ctx

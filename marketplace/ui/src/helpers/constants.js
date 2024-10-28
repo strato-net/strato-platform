@@ -24,9 +24,8 @@ export const HTTP_METHODS = {
 };
 
 export const homeUrl = new URL("/", window.location.origin).toString();
-export const soldOrdersBaseUrl = new URL("/order/sold", window.location.origin).toString();
-export const boughtOrdersBaseUrl = new URL("/order/bought", window.location.origin).toString();
-export const transfersBaseUrl = new URL("/order/transfers", window.location.origin).toString();
+export const ordersBaseUrl = new URL("/transactions?type=Order", window.location.origin).toString();
+export const transfersBaseUrl = new URL("/transactions?type=Transfer", window.location.origin).toString();
 export const soldOrderDetailssBaseUrl = new URL("/sold-orders", window.location.origin).toString();
 export const boughtOrderDetailssBaseUrl = new URL("/bought-orders", window.location.origin).toString();
 
@@ -256,8 +255,8 @@ export const PAYMENT_LIST = ['card', 'us_bank_account']
 export const STRATS_CONVERSION = 100;
 
 export const navItems = [
-  { label: <div id="Transactions">My Transactions</div>, key: '0' },
-  { label: <div id="Inventory">My Items</div>, key: '1' }
+  { label: <div id="Transactions">My Transactions</div>, key: '1' },
+  { label: <div id="Inventory">My Items</div>, key: '2' }
 ];
 
 const metaImg = SEO.IMAGE_META
@@ -417,7 +416,7 @@ export const TRANSACTION_STATUS = {
   1: 'Awaiting Fulfillment',
   2: 'Payment Pending',
   3: 'Closed',
-  4: 'Cancelled',
+  4: 'Canceled',
   5: 'Discarded'
 }
 
@@ -471,7 +470,7 @@ export const TRANSACTION_SORT = [
   {label:'Awaiting Fulfillment', value:'1'},
   {label:'Awaiting Shipment', value:'2'},
   {label:'Closed', value:'3'},
-  {label:'Cancelled', value:'4'},
+  {label:'Canceled', value:'4'},
   {label:'Payment Pending', value:'5'},
 ]
 

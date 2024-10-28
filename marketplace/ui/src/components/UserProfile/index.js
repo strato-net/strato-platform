@@ -28,7 +28,7 @@ import InventoryCard from "../Inventory/InventoryCard";
 import { useItemDispatch, useItemState } from "../../contexts/item";
 import { actions as itemActions } from "../../contexts/item/actions";
 import ClickableCell from "../ClickableCell";
-import { homeUrl, soldOrderDetailssBaseUrl, soldOrdersBaseUrl, boughtOrderDetailssBaseUrl, boughtOrdersBaseUrl, transfersBaseUrl } from "../../helpers/constants";
+import { homeUrl, soldOrderDetailssBaseUrl, boughtOrderDetailssBaseUrl, ordersBaseUrl, transfersBaseUrl } from "../../helpers/constants";
 
 
 
@@ -58,10 +58,6 @@ const UserProfile = ({user}) => {
   const { userActivity } = useUserActivityState();
   const [wishlistData, setWishlistData] = useState([]);
   const routeMatch = useMatch({ path: routes.MarketplaceUserProfile.url, strict: true });
-
-  const soldOrdersBaseUrl = new URL("/order/sold", window.location.origin).toString();
-  const boughtOrdersBaseUrl = new URL("/order/bought", window.location.origin).toString();
-  const transfersBaseUrl = new URL("/order/transfers", window.location.origin).toString();
   const [breadcrumbs, setBreadcrumbs] = useState([{ text: 'Home', path: homeUrl }]);
   
   const params = useParams();
@@ -192,11 +188,9 @@ const UserProfile = ({user}) => {
           const productDetailsPath = new URL(`/dp/${productID}/${productName}`, window.location.origin).toString();
           initialBreadcrumbs.push({ text: 'Product Details', path: productDetailsPath });
         }
-      } else if (referrer.includes('/order/bought')) {
-        initialBreadcrumbs.push({ text: 'Orders (Bought)', path: boughtOrdersBaseUrl });
-      } else if (referrer.includes('/order/sold')) {
-        initialBreadcrumbs.push({ text: 'Orders (Sold)', path: soldOrdersBaseUrl });
-      } else if (referrer.includes('/order/transfers')) {
+      } else if (referrer.includes(ordersBaseUrl)) {
+        initialBreadcrumbs.push({ text: 'Orders', path: ordersBaseUrl });
+      } else if (referrer.includes(transfersBaseUrl)) {
         initialBreadcrumbs.push({ text: 'Transfers', path: transfersBaseUrl });
       }
       
@@ -586,11 +580,11 @@ const UserProfile = ({user}) => {
                   switch (activity.type) {
                     case "sold":
                       description = `You have received a new order ${activity.orderId} from ${activity.purchasersCommonName}.`;
-                      href = `${soldOrderDetailssBaseUrl}/${activity.address}`;
+                      href = `${soldOrderDetailssBaseUrl}/${activity.transaction_hash}`;
                       break;
                     case "bought":
                       description = `Your order ${activity.orderId} was fulfilled by ${activity.sellersCommonName}.`;
-                      href = `${boughtOrderDetailssBaseUrl}/${activity.address}`;
+                      href = `${boughtOrderDetailssBaseUrl}/${activity.transaction_hash}`;
                       break;
                     case "transfer":
                       description = `You have received one or more items as a free transfer from ${activity.oldOwnerCommonName}.`;
