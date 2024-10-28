@@ -418,18 +418,27 @@ const TransactionTable = ({ user, download, isAllOrdersLoading }) => {
                 current={currentPage}
                 pageSize={pageSize}
                 onChange={handlePageChange}
+                showSizeChanger={false}
               />}
             </div>}
         </div>
-        <div className="hidden md:block mx:auto">
+        <div className="hidden flex flex-col md:block mx:auto">
           <Spin spinning={isTransactionLoading} delay={500} size="large">
             <DataTableComponent
               columns={column}
-              data={transactions}
+              data={paginatedTransactions}
               isLoading={isTransactionLoading}
-              pagination={urlDate ? true : false}
+              pagination={false}
               scrollX="100%"
             />
+            <div className="flex justify-between">{urlDate && <Pagination
+                className="mx-auto w-88 mt-5"
+                total={transactions.length}
+                current={currentPage}
+                pageSize={pageSize}
+                onChange={handlePageChange}
+                showSizeChanger={false}
+              />}</div>
           </Spin>
         </div>
       </Col>
