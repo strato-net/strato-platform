@@ -585,8 +585,6 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
       }, options);
 
       // Fetch sales (12 months) for stats
-      console.log("Fetched origin yearly sales:", allAssetSales.length, "sales");
-
       let salesFilter = { order: "block_timestamp.asc" };
 
       // Sales Filter modification based on timeFilter
@@ -1002,7 +1000,7 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
           const sale = sales.find(sale => sale.address === saleAddress);
           if (!sale) return undefined;
 
-          const history = await saleJs.getAllSaleHistory(rawAdmin, {
+          const history = await saleJs.getSaleHistory(rawAdmin, {
             transaction_hash: order.transaction_hash,
             assetToBeSold: sale.assetToBeSold
           }, options);
