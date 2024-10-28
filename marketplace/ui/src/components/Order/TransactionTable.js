@@ -28,8 +28,8 @@ import { getStringDate } from "../../helpers/utils";
 
 const limit = '', offset = '';
 
-const TransactionTable = ({ user, download, isAllOrdersLoading }) => {
-  const StratsIcon = <img src={Images.strats} alt="" className=" w-5 h-5" />
+const TransactionTable = ({ user, download }) => {
+  const StratsIcon = <img src={Images.logo} alt="" className="mx-1 w-3 h-3" />
   // Dispatch
   const transactionDispatch = useTransactionDispatch();
   const marketplaceDispatch = useMarketplaceDispatch();
@@ -49,7 +49,7 @@ const TransactionTable = ({ user, download, isAllOrdersLoading }) => {
 
   const formatter = new Intl.NumberFormat('en-US');
   const formattedNum = (num) => formatter.format(num);
-  const defaultDate =  dateQuery ? dayjs.unix(dayjs(dateQuery).startOf('month').unix()) : dayjs.unix(currentMonth);
+  const defaultDate =  dateQuery ? dayjs.unix(dayjs(dateQuery, 'MMMM YYYY').startOf('month').unix()) : dayjs.unix(currentMonth);
 
   useEffect(() => {
     async function fetchStratsAddress() {
@@ -120,18 +120,20 @@ const TransactionTable = ({ user, download, isAllOrdersLoading }) => {
       const selectedMonthYear = dayjs(dateQuery, "MMMM YYYY");
   
       filteredData = filteredData.filter((item) => {
-        const itemDate = dayjs(item.block_timestamp); // Convert block timestamp to dayjs object
-  
+        let blockTimestamp = item.block_timestamp;
+        if (blockTimestamp.includes('UTC')) {
+          blockTimestamp = blockTimestamp.replace(' UTC', 'Z'); 
+        }
+        const itemDate = dayjs(blockTimestamp);
+        
         // Compare both month and year
         return itemDate.isSame(selectedMonthYear, 'month') && itemDate.isSame(selectedMonthYear, 'year');
       });
     }
-  
+
     setTransactions(filteredData);
   }, [userTransactions, type, search, dateQuery]);
   
-
-
   // Handle the date change event. Update the URL and state
   const onDateChange = (date) => {
     const unixTimestamp = dayjs(date).unix();
@@ -140,13 +142,14 @@ const TransactionTable = ({ user, download, isAllOrdersLoading }) => {
     navigate(`/transactions?type=${currentType}&date=${formattedDate}`);
     setDateQuery(formattedDate); // Update the date state
   };
-  
 
   const dateReturn = (date) => {
-    const startDate = dayjs(date).startOf('month').unix();
-    const endDate = dayjs(date).endOf('month').unix();
-    return [startDate, endDate]
+    const parsedDate = dayjs(date, 'MMMM YYYY').startOf('month');
+    const startDate = parsedDate.unix();
+    const endDate = parsedDate.endOf('month').unix();
+    return [startDate, endDate];
   }
+  
 
   const Content = ({ data }) => {
     const price = data?.assetPrice || data?.price
@@ -337,7 +340,7 @@ const TransactionTable = ({ user, download, isAllOrdersLoading }) => {
 
   return (
     <Row>
-      <Col span={24} className="w-full min-h-[160px] py-4 px-4 md:min-h-[96px] bg-[#F6F6F6] flex flex-col md:flex-row lg:px-14 justify-between items-center mt-6 lg:mt-8">
+      <Col span={24} className="w-full min-h-[160px] py-4 px-4 md:min-h-[96px] bg-[#F6F6F6] flex flex-col md:flex-row lg:px-14 justify-between items-center mt-6 lg:mt-8 sticky top-14 z-10 shadow-header">
         <Row className="w-full flex justify-between items-center">
           <Col xs={24} lg={4} className="flex justify-between w-full">
             <Button className="!px-1 md:!px-0 md:ml-5 lg:ml-0  flex items-center flex-row-reverse gap-[6px] text-lg md:text-2xl font-semibold !text-[#13188A] "

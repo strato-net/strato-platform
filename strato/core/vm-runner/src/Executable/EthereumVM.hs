@@ -66,6 +66,7 @@ import qualified Data.Map as M
 import qualified Data.Map.Ordered as OMap
 import Data.Maybe
 import Data.Proxy
+import qualified Data.Set as S
 import qualified Data.Text as T
 import qualified Data.Text.Encoding as UTF8
 import Debugger
@@ -93,6 +94,12 @@ ethereumVM d = runResourceT $ do
     Bagger.processNewBestBlock cpHash cpHead [] -- bootstrap Bagger with genesis block
 
     failures <- runConsume "evm/loop" consumerGroup seqVmEventsTopicName $ \_ seqEvents -> do
+
+        let maybeSelfAddress = listToMaybe [ addr | VmSelfAddress addr <- toList seqEvents ]
+        $logInfoLS "ethereumVM/maybeSelfAddress" (show maybeSelfAddress)
+        case maybeSelfAddress of
+          Just x -> contextModify' $ \cs@(ContextState{}) -> cs{_selfAddress = x}
+          Nothing -> pure ()
         recordBaggerMetrics =<< contextGets _baggerState
         logEventSummaries seqEvents
 
@@ -189,6 +196,7 @@ logEventSummaries evs = do
     getNames (VmGetMPNodesRequest _ _) = "GetMPNodesRequest"
     getNames (VmMPNodesReceived _) = "MPNodesReceived"
     getNames (VmRunPreprepare _) = "VmRunPreprepare"
+    getNames (VmSelfAddress _) = "VmSelfAddress"
 
     numberIt :: Int -> String -> String
     numberIt 1 x = "1 " ++ x
@@ -224,7 +232,12 @@ sendOutEvent (OutAction act) = do
                                                   --  . (constructor .~ Nothing)
                                                    . (modifiers .~ M.empty)
                                                    )
-                cc' = emptyCodeCollection & contracts .~ contracts'
+                -- If there are no abstract contracts, emit normal contracts. Else, only emit abstract contracts
+                abstractNames = S.fromList . M.keys $ getTopLevelAbstracts cc
+                contracts'' = if S.null abstractNames
+                                then M.filter (isNothing . _importedFrom) contracts'
+                                else M.filterWithKey (\k v -> (isNothing $ _importedFrom v) && (k `S.member` abstractNames)) contracts'
+                cc' = emptyCodeCollection & contracts .~ contracts''
              in Just $
                   CodeCollectionAdded
                     { codeCollection = const () <$> cc',

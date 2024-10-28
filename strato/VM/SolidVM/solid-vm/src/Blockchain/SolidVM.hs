@@ -33,6 +33,7 @@ import Blockchain.DB.ModifyStateDB (pay)
 import Blockchain.DB.SolidStorageDB
 import Blockchain.Data.AddressStateDB
 import Blockchain.Data.BlockHeader (BlockHeader)
+-- import Blockchain.Blockstanbul.Model.Authentication
 import qualified Blockchain.Data.BlockHeader as BlockHeader
 import Blockchain.Data.ChainInfo
 import Blockchain.Data.ExecResults
@@ -225,6 +226,7 @@ create ::
   Int ->
   Account ->
   Account ->
+  Address ->
   Integer ->
   Integer ->
   Gas ->
@@ -236,12 +238,13 @@ create ::
   m ExecResults
 --create isRunningTests' isHomestead preExistingSuicideList b callDepth sender origin
 --       value gasPrice availableGas newAddress initCode txHash chainId metadata =
-create _ _ _ blockData _ sender' origin' _ _ availableGas newAddress code txHash' chainId' metadata = do
+create _ _ _ blockData _ sender' origin' proposer' _ _ availableGas newAddress code txHash' chainId' metadata = do
   isRunningTests <- checkIfRunningTests
   let env' =
         Env.Environment
           { Env.blockHeader = blockData,
             Env.sender = sender',
+            Env.proposer = proposer',
             Env.origin = origin',
             Env.txHash = txHash',
             Env.metadata = metadata,
@@ -405,6 +408,7 @@ call ::
   Account ->
   Account ->
   Account ->
+  Address ->
   Word256 ->
   Word256 ->
   B.ByteString ->
@@ -416,7 +420,7 @@ call ::
   m ExecResults
 --  call isRunningTests' isHomestead noValueTransfer preExistingSuicideList b callDepth receiveAddress
 --       (Address codeAddress) sender value gasPrice theData availableGas origin txHash chainId metadata =
-call _ _ _ isRCC _ blockData _ _ codeAddress sender' _ _ _ availableGas origin' txHash' chainId' metadata = do
+call _ _ _ isRCC _ blockData _ _ codeAddress sender' proposer' _ _ _ availableGas origin' txHash' chainId' metadata = do
   recordCall
 
   isRunningTests <- checkIfRunningTests
@@ -425,6 +429,7 @@ call _ _ _ isRCC _ blockData _ _ codeAddress sender' _ _ _ availableGas origin' 
           { Env.blockHeader = blockData,
             Env.sender = sender',
             Env.origin = origin',
+            Env.proposer = proposer',
             Env.txHash = txHash',
             Env.metadata = metadata,
             Env.runningTests = isRunningTests
@@ -846,7 +851,7 @@ argsToValsModifiers ctract md args =
       OrderedVals <$> zipWithM eval32 orderedTypes xs
     CC.NamedArgs xs ->
       NamedVals . M.toList <$> do
-        let strTypes = M.mapKeys (T.unpack) $ CC._modifierArgs md
+        let strTypes = M.fromList $ (\(n,a) -> (T.unpack n, a)) <$> CC._modifierArgs md
         M.mergeA
           (M.mapMissing $ curry $ invalidArguments "missing argument")
           (M.mapMissing $ curry $ invalidArguments "extra argument")
@@ -858,7 +863,7 @@ argsToValsModifiers ctract md args =
     orderedTypes =
       map CC.indexedTypeType
         . map snd
-        $ M.toList $ CC._modifierArgs md
+        $ CC._modifierArgs md
 
     eval32 :: MonadSM m => SVMType.Type -> CC.Expression -> m Value
     eval32 t x = do
@@ -1679,6 +1684,10 @@ expToVar' x@(CC.MemberAccess _ expr name) _ = do
             Just (CC.ConstantDecl _ _ constExp _) -> expToVar constExp Nothing
             Nothing -> unknownConstant "constant member access" (contractName', constName)
           Just (CC.ConstantDecl _ _ constExp _) -> expToVar constExp Nothing
+    (SBuiltinVariable "block", "proposer") -> do
+      env' <- getEnv
+      let acc = Env.proposer env'
+      return $ Constant (flip SAccount False (unspecifiedChain acc))
     (SBuiltinVariable "block", "timestamp") -> do
       env' <- getEnv
       return $ Constant $ SInteger $ round $ utcTimeToPOSIXSeconds $ BlockHeader.timestamp $ Env.blockHeader env'
@@ -3217,10 +3226,10 @@ runTheCall address' contract' funcName hsh cc theFunction argVals ro ff = do
       margVals <- argsToValsModifiers contract' modi margList
       case margVals of
         OrderedVals vs -> do
-          let argMeta = map (\(n, CC.IndexedType _ t) -> (n, t)) $ M.toList $ CC._modifierArgs modi
+          let argMeta = map (\(n, CC.IndexedType _ t) -> (n, t)) $ CC._modifierArgs modi
           return (zipWith (\(n, t) v -> (n, (t, v))) argMeta vs)
         NamedVals ns -> do
-          let strTypes = M.fromList $ map (\(theName, y) -> (theName, y)) $ M.toList $ CC._modifierArgs modi
+          let strTypes = M.fromList $ CC._modifierArgs modi
               typeAndVal =
                 M.merge
                   (M.mapMissing (curry $ invalidArguments "missing argument"))
