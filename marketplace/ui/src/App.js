@@ -20,7 +20,8 @@ const App = () => {
   const [showMenu, setShowMenu] = useState(false)
   const { isMarketplaceLoading } = useMarketplaceState();
   const tagManagerArgs = {
-    gtmId: "GTM-NHBZ2BX",
+    // gtmId: "GTM-NHBZ2BX",
+    gtmId: "GTM-WHLJ47D2",
   };
 
   TagManager.initialize(tagManagerArgs);
