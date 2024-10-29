@@ -77,6 +77,24 @@ pipeline {
           }
         sh 'sudo docker image prune'
       }
+
+      stage('Update Testnet2 Notification Server') {
+      agent { label "mercata-testnet2-notification" }
+      steps {
+        copyArtifacts filter: 'docker-compose.notification.yml', fingerprintArtifacts: true, projectName: 'STRATO_develop_nightly_build', selector: lastSuccessful()
+        
+        
+        dir ('/home/ec2-user/strato-getting-started') {
+          sh 'mv docker-compose.notification.yml docker-compose.notification.$(date \'+%Y%m%d\').yml || true'
+        }
+        sh 'mv docker-compose.notification.yml /home/ec2-user/strato-getting-started'
+        
+        dir ('/home/ec2-user/strato-getting-started') {
+          sh 'sudo ./notification-server --pull'
+          sh 'sudo ./run-notification-server.sh'
+        }
+        sh 'sudo docker image prune'
+      }
     }
   }
   post {
