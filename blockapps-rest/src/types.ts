@@ -15,7 +15,6 @@ interface Options {
   stateQuery?: any,
   query?: any,
   logger?:Console,
-  chainIds?:any,
   history?:any,
   doNotResolve?:boolean
 }
@@ -45,19 +44,6 @@ interface Balance {
   balance: number,
 }
 
-interface Chain {
-  label:string,
-  src?:string,
-  args:any,
-  members:Member[],
-  balances:Balance[],
-  contractName?:string,
-  codePtr?: {
-    name: string,
-    account: string
-  }
-}
-
 interface BlockChainUser {
   token:string,
   address:string
@@ -71,7 +57,6 @@ interface ContractDefinition {
   source:string,
   name:string,
   args:any,
-  chainid?:any,
   txParams?:any
 }
 
@@ -80,14 +65,12 @@ interface Contract {
   address?: string,
   src?:string,
   bin?:any,
-  codeHash?:any,
-  chainId?:any
+  codeHash?:any
 }
 
 interface SendTx {
   toAddress:string,
-  value:number,
-  chainId?:string
+  value:number
 }
 
 interface TransactionResultHash {
@@ -99,7 +82,6 @@ interface CallArgs {
   method: string,
   args: any,
   value?:BigNumber,
-  chainid?:any,
   txParams?:any
 }
 
@@ -114,6 +96,5 @@ export {
   CallArgs,
   Member,
   Balance,
-  Chain,
   SendTx
 };
