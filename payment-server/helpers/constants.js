@@ -1,5 +1,5 @@
-import config from '../load.config.js';
-import deployment from '../load.deploy.js';
+import config from "../load.config.js";
+import deployment from "../load.deploy.js";
 
 const OPTIONS = { config };
 
@@ -8,11 +8,9 @@ const STRIPE_ENV = {
     STRIPE_SECRET_KEY: process.env.STRIPE_SECRET_KEY,
   },
   ACCOUNT_ONBOARDING: {
-    TYPE: 'accountOnboarding',
-  }
-}
-
-const SENDGRID_ENV = { API_KEY: process.env.SENDGRID_API_KEY }
+    TYPE: "accountOnboarding",
+  },
+};
 
 const DEFAULT_OPTIONS = { ...OPTIONS, chainIds: [], cacheNonce: true };
 
@@ -22,7 +20,9 @@ const STRIPE_CONTRACT_ADDRESS = deployment.contracts.stripe.address;
 const REDEMPTION_CONTRACT_ADDRESS = deployment.contracts.redemption.address;
 
 const SERVER_URL = `${config.serverHost}`;
-const TABLE_PREFIX = `${process.env.TABLE_PREFIX ? process.env.TABLE_PREFIX : 'BlockApps-Mercata-'}`;
+const TABLE_PREFIX = `${
+  process.env.TABLE_PREFIX ? process.env.TABLE_PREFIX : "BlockApps-Mercata-"
+}`;
 
 const SERVER_CONFIRM_URL = `${SERVER_URL}/stripe/checkout/confirm`;
 
@@ -33,15 +33,15 @@ const CHECKOUT_EVENT_TABLE = `${TABLE_PREFIX}PaymentService.Checkout`;
 const SELLER_ONBOARDED_TABLE = `${TABLE_PREFIX}PaymentService.SellerOnboarded`;
 
 const PAYMENT_STATUS = {
-  'INITIALIZED': '2',
-  'PAID': '3',
-  'CANCELED': '4',
-  'DISCARDED': '5',
-}
+  INITIALIZED: "2",
+  PAID: "3",
+  CANCELED: "4",
+  DISCARDED: "5",
+};
 
 const PAYMENT_RECEIVED_MESSAGE = "Thank you for your payment.";
 
-export { 
+export {
   STRIPE_ENV,
   SERVER_CONFIRM_URL,
   SERVER_CANCEL_URL,
@@ -55,5 +55,4 @@ export {
   PAYMENT_STATUS,
   TABLE_PREFIX,
   PAYMENT_RECEIVED_MESSAGE,
-  SENDGRID_ENV,
-}
+};

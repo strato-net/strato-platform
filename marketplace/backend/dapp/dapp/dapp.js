@@ -659,8 +659,6 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
       }, options);
 
       // Fetch sales (12 months) for stats
-      console.log("Fetched origin yearly sales:", allAssetSales.length, "sales");
-
       let salesFilter = { order: "block_timestamp.asc" };
 
       // Sales Filter modification based on timeFilter
@@ -971,9 +969,9 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
   const sales = await saleJs.getAll(rawAdmin, { saleAddresses: saleAddressArr }, options);
 
   let assets = [];
-    for (const sale of sales) {
-      const history = await saleJs.getSaleHistory(rawAdmin, { contract: sale.contract_name, transaction_hash: sale.transaction_hash, assetToBeSold: sale.assetToBeSold }, options);
-      const price = history['0'] ? history['0'].price : null;
+      for (const sale of sales) {
+        const history = await saleJs.getSaleHistory(rawAdmin, { transaction_hash: sale.transaction_hash, assetToBeSold: sale.assetToBeSold }, options);
+        const price = history['0'] ? history['0'].price : null;
 
       assets.push({
         assetAddress: sale.assetToBeSold,
@@ -1007,7 +1005,7 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
       let assets = [];
 
       for (const sale of sales) {
-        const history = await saleJs.getSaleHistory(rawAdmin, { contract: sale.contract_name, transaction_hash: order.transaction_hash, assetToBeSold: sale.assetToBeSold }, options);
+        const history = await saleJs.getSaleHistory(rawAdmin, { transaction_hash: order.transaction_hash, assetToBeSold: sale.assetToBeSold }, options);
         const price = history['0'] ? history['0'].price : null;
 
         const assetAddress = sale.assetToBeSold;
@@ -1077,7 +1075,7 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
           const sale = sales.find(sale => sale.address === saleAddress);
           if (!sale) return undefined;
 
-          const history = await saleJs.getAllSaleHistory(rawAdmin, {
+          const history = await saleJs.getSaleHistory(rawAdmin, {
             transaction_hash: order.transaction_hash,
             assetToBeSold: sale.assetToBeSold
           }, options);
