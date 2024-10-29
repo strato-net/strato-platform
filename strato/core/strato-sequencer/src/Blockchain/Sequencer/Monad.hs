@@ -40,7 +40,6 @@ import Blockchain.Data.Block
 import Blockchain.EthConf
 import Blockchain.Sequencer.CablePackage
 import Blockchain.Sequencer.DB.DependentBlockDB
-import Blockchain.Sequencer.DB.GetTransactionsDB
 import Blockchain.Sequencer.DB.SeenTransactionDB
 import Blockchain.Sequencer.Event
 import Blockchain.Sequencer.Kafka
@@ -93,7 +92,6 @@ data SequencerContext = SequencerContext
     _seenTransactionDB :: !SeenTransactionDB,
     _dbeRegistry :: !(Map Keccak256 DependentBlockEntry),
     _x509certInfoState :: !(Map Address (Modification X509CertInfoState)), --map to pubkey
-    _getTransactionsDB :: !GetTransactionsDB,
     _ldbBatchOps :: !(Q.Seq LDB.BatchOp),
     _blockstanbulContext :: Maybe BlockstanbulContext,
     _loopTimeout :: TMChan (),
@@ -141,10 +139,6 @@ instance HasDependentBlockDB SequencerM where
   getDependentBlockDB = use dependentBlockDB
   getWriteOptions = LDB.WriteOptions . syncWrites <$> ask
   getReadOptions = return LDB.defaultReadOptions
-
-instance Mod.Modifiable GetTransactionsDB SequencerM where
-  get _ = use getTransactionsDB
-  put _ g = modify' $ getTransactionsDB .~ g
 
 instance Mod.Accessible LDB.DB SequencerM where
   access _ = use dependentBlockDB
@@ -336,7 +330,6 @@ runSequencerM c mbc m = do
           _seenTransactionDB = mkSeenTxDB stxSize,
           _dbeRegistry = M.empty,
           _x509certInfoState = M.empty,
-          _getTransactionsDB = emptyGetTransactionsDB,
           _ldbBatchOps = Q.empty,
           _blockstanbulContext = mbc,
           _loopTimeout = loopCh,

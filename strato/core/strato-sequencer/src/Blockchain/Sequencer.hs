@@ -27,7 +27,6 @@ import qualified Blockchain.Data.TXOrigin as TO
 import qualified Blockchain.Data.TransactionDef as TD
 import Blockchain.Sequencer.CablePackage
 import Blockchain.Sequencer.DB.DependentBlockDB
-import Blockchain.Sequencer.DB.GetTransactionsDB
 import Blockchain.Sequencer.DB.SeenTransactionDB
 import Blockchain.Sequencer.DB.Witnessable
 import Blockchain.Sequencer.Event
@@ -42,7 +41,7 @@ import ClassyPrelude (atomically)
 import Conduit
 import Control.Concurrent hiding (yield)
 import Control.Concurrent.STM.TQueue
-import Control.Monad (forever, forM, unless, when)
+import Control.Monad (forever, forM, when)
 import qualified Control.Monad.Change.Alter as A
 import qualified Control.Monad.Change.Modify as Mod
 import Control.Monad.Composable.Kafka
@@ -125,7 +124,6 @@ oneSequencerIter :: (
                      MonadReader SequencerConfig m,
                      HasKafka m,
                      HasDependentBlockDB m,
-                     Mod.Modifiable GetTransactionsDB m,
                      MonadSequencer m,
                      Mod.Modifiable (Seq BatchOp) m,
                      MonadState SequencerContext m
@@ -139,22 +137,14 @@ oneSequencerIter = forever $ timeAction seqLoopTiming $ do
   $logDebugS "sequencer/events" . T.pack $ format event
 
   runSequencerBatch [event]
-  txHashes <- unGetTransactionsDB <$> Mod.get (Mod.Proxy @GetTransactionsDB)
-  let txHashesList = toList txHashes
-      getTxs = if null txHashesList then [] else [P2pGetTx txHashesList]
 
   lift flushLdbBatchOps
 
-  unless (null getTxs) $ do
-    _ <- writeSeqP2pEvents getTxs
-    return ()
   flush
 
-flush :: (Mod.Modifiable GetTransactionsDB m, MonadState SequencerContext m) =>
+flush :: MonadState SequencerContext m =>
          m ()
-flush =
-  clearDBERegistry
-    >> clearGetTransactionsDB
+flush = clearDBERegistry
 
 runSequencerBatch ::
   (MonadSequencer m, MonadReader SequencerConfig m, HasKafka m) =>
