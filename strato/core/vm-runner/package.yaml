@@ -38,8 +38,6 @@ library:
   - lens
   - kafka-monad
   - merkle-patricia-db
-  - milena
-  - milena-tools
   - monad-alter
   - prometheus-client
   - seqevents
@@ -50,6 +48,7 @@ library:
   - strato-genesis
   - strato-index
   - strato-model
+  - strato-redis-blockdb
   - strato-statediff
   - text
   - time

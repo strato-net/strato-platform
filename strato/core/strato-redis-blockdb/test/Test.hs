@@ -175,11 +175,11 @@ specTest = around (withConn 1) $ do
           bbh = blockHeaderHash bb
           bbn = number bb
       r <- runRedis conn $ do
-        void $ RDB.forceBestBlockInfo bbh bbn 9999
+        void $ RDB.forceBestBlockInfo bbh bbn
         RDB.getBestBlockInfo :: Redis (Maybe RedisBestBlock)
       HUnit.assertEqual
         "Couldn't get back best block"
-        (Just (RedisBestBlock bbh bbn 9999))
+        (Just (RedisBestBlock bbh bbn))
         r
 
   describe "ReplaceBestBlock" $ do
@@ -194,7 +194,7 @@ specTest = around (withConn 1) $ do
         -- liftIO . putStrLn . showTree $ pb <$> tree
 
         r <- runRedis conn $ do
-          void $ RDB.forceBestBlockInfo (blockHeaderHash g) (number g) 0
+          void $ RDB.forceBestBlockInfo (blockHeaderHash g) (number g)
           forM_ allblocks RDB.putHeader
           forM chains $ \chain -> do
             workChain' RDB.putBestBlockInfo $ (reverse $ chain)
@@ -217,7 +217,7 @@ specTest = around (withConn 1) $ do
         -- liftIO . putStrLn . showTree $ pb <$> tree
 
         r <- runRedis conn $ do
-          void $ RDB.forceBestBlockInfo (blockHeaderHash g) (number g) 0
+          void $ RDB.forceBestBlockInfo (blockHeaderHash g) (number g)
           forM_ allblocks RDB.putHeader
           forM chains $ \chain -> do
             workChain' RDB.putBestBlockInfo $ (reverse $ chain)
@@ -240,7 +240,7 @@ specTest = around (withConn 1) $ do
       -- liftIO . putStrLn $ showTree $ pb <$> tree
       r <- runRedis conn $ do
         forM_ allblocks RDB.putHeader
-        void $ RDB.forceBestBlockInfo (blockHeaderHash g) (number g) 0
+        void $ RDB.forceBestBlockInfo (blockHeaderHash g) (number g)
         workChain RDB.putBestBlockInfo $ head chains -- insert shortest best chain
         workChain RDB.putBestBlockInfo $ last chains -- insert longest best chain
         let maxN = fromIntegral . number . head . last $ chains
@@ -262,7 +262,7 @@ specTest = around (withConn 1) $ do
         -- liftIO . putStrLn . showTree $ pb <$> tree
 
         r <- runRedis conn $ do
-          void $ RDB.forceBestBlockInfo (blockHeaderHash g) (number g) 0
+          void $ RDB.forceBestBlockInfo (blockHeaderHash g) (number g)
           forM_ allblocks RDB.putHeader
           forM chains $ \chain -> do
             workChain' RDB.putBestBlockInfo $ (reverse $ chain)
@@ -303,7 +303,7 @@ specTest = around (withConn 1) $ do
       newChain <- extendChain 7 chain
       newCanon <- runRedis conn $ do
         forM_ oldChain RDB.putHeader
-        void $ RDB.forceBestBlockInfo (blockHeaderHash g) (number g) 0
+        void $ RDB.forceBestBlockInfo (blockHeaderHash g) (number g)
         workChain RDB.putBestBlockInfo oldChain
         forM_ newChain RDB.putHeader
         workChain RDB.putBestBlockInfo newChain
@@ -321,7 +321,7 @@ specTest = around (withConn 1) $ do
       g <- makeGenesisBlock
       chain <- extendChain 10 [g]
       canon <- runRedis conn $ do
-        void $ RDB.forceBestBlockInfo (blockHeaderHash g) (number g) 0
+        void $ RDB.forceBestBlockInfo (blockHeaderHash g) (number g)
         forM_ chain $ RDB.putBlock . (\b -> morphBlock $ Block b [] [])
         _ <- putBestBlockInfo (last chain)
         let maxN = (+ 1) . fromIntegral . number . last $ chain
@@ -401,7 +401,7 @@ specTest = around (withConn 1) $ do
       oldChain <- extendChain 2 chain
       void . runRedis conn $ do
         forM_ oldChain RDB.putHeader
-        void $ RDB.forceBestBlockInfo (blockHeaderHash g) (number g) 0
+        void $ RDB.forceBestBlockInfo (blockHeaderHash g) (number g)
         forM oldChain putBestBlockInfo
       newChain <- extendChain 2 chain
       newCanon <- runRedis conn $ do
@@ -419,8 +419,7 @@ putBestBlockInfo :: BlockHeader -> Redis (Either Reply Status)
 putBestBlockInfo b =
   let sha = blockHeaderHash b
       num = number b
-      dif = difficulty b
-   in RDB.putBestBlockInfo sha num dif
+   in RDB.putBestBlockInfo sha num
 
 prettyBlock :: Monad m => BlockHeader -> m (Integer, String, String)
 prettyBlock b = return (number b, showHash . parentHash $ b, showHash . blockHeaderHash $ b)
@@ -435,7 +434,7 @@ callCommonAncestor old new =
 
 insertAndUpdateChain :: BlockHeader -> [BlockHeader] -> [BlockHeader] -> Redis [(Keccak256, BlockHeader)]
 insertAndUpdateChain g oldChain newChain = do
-  void $ RDB.forceBestBlockInfo (blockHeaderHash g) (number g) 0
+  void $ RDB.forceBestBlockInfo (blockHeaderHash g) (number g)
   forM_ oldChain $ RDB.putBlock . (\b -> morphBlock $ Block b [] [])
   forM_ newChain $ RDB.putBlock . (\b -> morphBlock $ Block b [] [])
   forM_ oldChain $ \b -> set (RDB.inNamespace Canonical $ number b) (toValue $ blockHeaderHash b)
@@ -447,18 +446,16 @@ insertAndUpdateChain g oldChain newChain = do
   let maxN = (+ 1) . fromIntegral . number . last $ newChain
   RDB.getCanonicalHeaderChain 0 maxN :: Redis [(Keccak256, BlockHeader)]
 
-workChain :: (Keccak256 -> Integer -> Integer -> Redis (Either Reply Status)) -> [BlockHeader] -> Redis ()
-workChain g chain = forM_ zC f
+workChain :: (Keccak256 -> Integer -> Redis (Either Reply Status)) -> [BlockHeader] -> Redis ()
+workChain g chain = forM_ (reverse chain) f
   where
-    f (b, i) = g (blockHeaderHash b) (number b) i
-    zC = zip (reverse chain) [1 ..]
+    f b = g (blockHeaderHash b) (number b)
 
-workChain' :: (Keccak256 -> Integer -> Integer -> Redis (Either Reply Status)) -> [BlockHeader] -> Redis ()
-workChain' g = foldM_ f 0
+workChain' :: (Keccak256 -> Integer -> Redis (Either Reply Status)) -> [BlockHeader] -> Redis ()
+workChain' g = flip forM_ f
   where
-    f d b = do
-      void $ g (blockHeaderHash b) (number b) d
-      pure $ d + (difficulty b)
+    f b = do
+      void $ g (blockHeaderHash b) (number b)
 
 pb :: BlockHeader -> (Integer, Integer, String, String)
 pb x =

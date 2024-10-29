@@ -996,14 +996,13 @@ deleteBlocks = mapM deleteBlock
 putBestBlockInfo ::
   Keccak256 ->
   Integer ->
-  Integer ->
   Redis (Either Reply Status)
-putBestBlockInfo newSha newNumber newTDiff = do
+putBestBlockInfo newSha newNumber = do
   --liftIO . putStrLn . ("New args" ++) $ show (keccak256ToHex newSha, newNumber, newTDiff)
   oldBBI' <- getBestBlockInfo
   case oldBBI' of
     Nothing -> return (Left $ SingleLine "Got no block from getBetstBlockInfo")
-    Just (RedisBestBlock oldSha oldNumber _) -> do
+    Just (RedisBestBlock oldSha oldNumber) -> do
       --liftIO . putStrLn . ("Old args" ++) $ show (keccak256ToHex oldSha, oldNumber, oldTDiff)
       helper' <- commonAncestorHelper oldNumber newNumber oldSha newSha
       case helper' of
@@ -1014,7 +1013,7 @@ putBestBlockInfo newSha newNumber newTDiff = do
           res <- multiExec $ do
             forM_ updates $ \(sha, num) -> set (inNamespace Canonical $ num) (toValue sha)
             unless (null deletions) . void . del $ inNamespace Canonical . toKey <$> deletions
-            forceBestBlockInfo newSha newNumber newTDiff
+            forceBestBlockInfo newSha newNumber
           checkAndUpdateSyncStatus
           case res of
             TxSuccess _ -> return $ Right Ok
@@ -1089,9 +1088,9 @@ commonAncestorHelper oldNum newNum oldSha' newSha' = helper [oldSha'] [newSha'] 
 --validateChain (x:xs) = (validateLink x $ head xs) && (validateChain xs)
 
 -- | Used to seed the first bestBlock, e.g. genesis block in strato-setup
-forceBestBlockInfo :: RedisCtx m f => Keccak256 -> Integer -> Integer -> m (f Status)
-forceBestBlockInfo sha i j =
-  forceBestBlockInfo' bestBlockInfoKey (RedisBestBlock sha i j) --`totalRecall` (,,)
+forceBestBlockInfo :: RedisCtx m f => Keccak256 -> Integer -> m (f Status)
+forceBestBlockInfo sha i =
+  forceBestBlockInfo' bestBlockInfoKey (RedisBestBlock sha i) --`totalRecall` (,,)
 
 forceBestBlockInfo' :: RedisCtx m f => S8.ByteString -> RedisBestBlock -> m (f Status)
 forceBestBlockInfo' key = set key . toValue
@@ -1102,9 +1101,9 @@ getBestBlockInfo = getBestBlockInfo' bestBlockInfoKey
 getBestSequencedBlockInfo :: Redis (Maybe RedisBestBlock)
 getBestSequencedBlockInfo = getBestBlockInfo' bestSequencedBlockInfoKey
 
-putBestSequencedBlockInfo :: RedisCtx m f => Keccak256 -> Integer -> Integer -> m (f Status)
-putBestSequencedBlockInfo sha i j =
-  forceBestBlockInfo' bestSequencedBlockInfoKey (RedisBestBlock sha i j)
+putBestSequencedBlockInfo :: RedisCtx m f => Keccak256 -> Integer -> m (f Status)
+putBestSequencedBlockInfo sha i =
+  forceBestBlockInfo' bestSequencedBlockInfoKey (RedisBestBlock sha i)
 
 getBestBlockInfo' :: S8.ByteString -> Redis (Maybe RedisBestBlock)
 getBestBlockInfo' key =
@@ -1114,9 +1113,9 @@ getBestBlockInfo' key =
       return Nothing
     Right r -> case r of
       Nothing -> return Nothing -- return . Left $ SingleLine "No BestBlock data set in RedisBlockDB"
-      Just bs -> return . Just $ RedisBestBlock sha num tdiff
+      Just bs -> return . Just $ RedisBestBlock sha num
         where
-          RedisBestBlock sha num tdiff = fromValue bs
+          RedisBestBlock sha num = fromValue bs
 
 releaseRedlockScript :: S8.ByteString
 releaseRedlockScript =
@@ -1189,8 +1188,8 @@ putVmGasCap g =
       Left _ -> return Nothing
       Right _ -> return . Just $ g
 
-updateWorldBestBlockInfo :: Keccak256 -> Integer -> Integer -> Redis (Either Reply Bool)
-updateWorldBestBlockInfo sha num tdiff = withRetryCount 0
+updateWorldBestBlockInfo :: Keccak256 -> Integer -> Redis (Either Reply Bool)
+updateWorldBestBlockInfo sha num = withRetryCount 0
   where
     withRetryCount :: Int -> Redis (Either Reply Bool)
     withRetryCount theRetryCount = do
@@ -1207,16 +1206,16 @@ updateWorldBestBlockInfo sha num tdiff = withRetryCount 0
           case maybeExistingWBBI of
             Nothing -> do
               liftLog $ $logWarnS "updateWorldBestBlockInfo" "No WorldBestBlock in Redis, will force"
-              void $ forceBestBlockInfo' worldBestBlockKey (RedisBestBlock sha num tdiff)
+              void $ forceBestBlockInfo' worldBestBlockKey (RedisBestBlock sha num)
               checkAndUpdateSyncStatus
               releaseAndFinalize lockID True
-            Just (RedisBestBlock _ _ oldTDiff) -> do
-              liftLog $ $logDebugS "updateWorldBestBlockInfo" $ T.pack ("oldTDiff = " ++ show oldTDiff ++ "; newTDiff = " ++ show tdiff)
-              let willUpdate = oldTDiff <= tdiff
+            Just (RedisBestBlock _ oldNumber) -> do
+              liftLog $ $logDebugS "updateWorldBestBlockInfo" $ T.pack ("oldNumber = " ++ show oldNumber ++ "; newNumber = " ++ show num)
+              let willUpdate = oldNumber <= num
               if willUpdate
                 then do
                   liftLog $ $logDebugS "updateWorldBestBlockInfo" . T.pack $ "Updating best block: " ++ show num
-                  void $ forceBestBlockInfo' worldBestBlockKey (RedisBestBlock sha num tdiff)
+                  void $ forceBestBlockInfo' worldBestBlockKey (RedisBestBlock sha num)
                   checkAndUpdateSyncStatus
                 else liftLog $ $logDebugS "updateWorldBestBlockInfo" "Not updating"
               releaseAndFinalize lockID willUpdate
@@ -1235,10 +1234,10 @@ checkAndUpdateSyncStatus = do
   status <- getSyncStatus
   nodeBestBlock <- getBestBlockInfo
   worldBestBlock <- getWorldBestBlockInfo
-  let nodeTotalDiff = bestBlockTotalDifficulty <$> nodeBestBlock
-      worldTotalDiff = bestBlockTotalDifficulty <$> worldBestBlock
+  let nodeNumber = bestBlockNumber <$> nodeBestBlock
+      worldNumber = bestBlockNumber <$> worldBestBlock
 
-  case (status, nodeTotalDiff, worldTotalDiff) of
+  case (status, nodeNumber, worldNumber) of
     (Just False, Just ntd, Just wtd) -> when (ntd >= wtd) (void $ putSyncStatus True)
     (Nothing, Just ntd, Just wtd) -> void $ putSyncStatus (ntd >= wtd)
     (Nothing, Nothing, Just _) -> void $ putSyncStatus False
@@ -1252,10 +1251,10 @@ getSyncStatusNow = do
     else do
       nodeBestBlock <- getBestBlockInfo
       worldBestBlock <- getWorldBestBlockInfo
-      let nodeTotalDiff = bestBlockTotalDifficulty <$> nodeBestBlock
-          worldTotalDiff = bestBlockTotalDifficulty <$> worldBestBlock
+      let nodeNumber = bestBlockNumber <$> nodeBestBlock
+          worldNumber = bestBlockNumber <$> worldBestBlock
       pure $
-        Just $ case (status, nodeTotalDiff, worldTotalDiff) of
+        Just $ case (status, nodeNumber, worldNumber) of
           (Just False, Just ntd, Just wtd) -> ntd >= wtd
           (Nothing, Just ntd, Just wtd) -> ntd >= wtd
           (Nothing, Nothing, Just _) -> False

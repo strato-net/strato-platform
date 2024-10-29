@@ -40,7 +40,6 @@ library:
   - labeled-error
   - lens
   - merkle-patricia-db
-  - milena
   - monad-alter
   - monad-logger
   - network
