@@ -79,8 +79,6 @@ indexAll = do
   exec "CREATE INDEX CONCURRENTLY ON block_data_ref (parent_hash);"
   exec "CREATE INDEX CONCURRENTLY ON block_data_ref (coinbase);"
 
-  exec "CREATE INDEX CONCURRENTLY ON block_data_ref (total_difficulty);"
-
   exec "CREATE INDEX CONCURRENTLY ON address_state_ref (address);"
 
   exec "CREATE INDEX CONCURRENTLY ON raw_transaction (from_address);"

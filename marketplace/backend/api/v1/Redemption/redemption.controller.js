@@ -84,11 +84,11 @@ class RedemptionController {
     static async closeRedemption(req, res, next) {
         try {
             const { dapp, body } = req
-            const { redeemerCommonName, issuerCommonName,redeemerAddress, assetName, quantity, ...restData  } = body;
+            const { redeemerCommonName, issuerCommonName, redeemerAddress, assetName, quantity, ...restData } = body;
 
-            RedemptionController.validateCloseRedemptionArgs(restData)
+            RedemptionController.validateCloseRedemptionArgs({ issuerCommonName, ...restData })
 
-            const result = await dapp.closeRedemption(restData)
+            const result = await dapp.closeRedemption({ issuerCommonName, ...restData })
             rest.response.status200(res, result)
 
             if (body.status === 2) {

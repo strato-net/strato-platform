@@ -15,7 +15,6 @@ packages:
 - core/fastMP
 - core/merkle-patricia-db
 - core/miner-ethash
-- core/privacy
 - core/seqevents
 - core/strato-conf
 - core/strato-genesis

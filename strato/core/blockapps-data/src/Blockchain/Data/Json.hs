@@ -24,6 +24,7 @@ import Blockchain.Strato.Model.ExtendedWord (Word256, word256ToBytes)
 import Blockchain.Strato.Model.Keccak256
 import Blockchain.Strato.Model.Secp256k1
 import Blockchain.Strato.Model.Validator
+import Control.DeepSeq
 import Control.Monad (join)
 import Data.Aeson
 import Data.Aeson.Types (Parser)
@@ -47,6 +48,8 @@ data RawTransaction' = RawTransaction' RawTransaction String deriving (Eq, Show,
 data UnsignedRawTransaction' = UnsignedRawTransaction' RawTransaction deriving (Eq, Show, Generic)
 
 {- note we keep the file MiscJSON around for the instances we don't want to export - ByteString, Point -}
+
+instance NFData RawTransaction'
 
 instance ToSchema RawTransaction' where
   declareNamedSchema _ =
@@ -504,7 +507,7 @@ bdPrimeToBd (BlockData' bd) = bd
 data BlockDataRef' = BlockDataRef' BlockDataRef deriving (Eq, Show)
 
 instance ToJSON BlockDataRef' where
-  toJSON (BlockDataRef' (BlockDataRef ph uh cc sr tr rr _ d num gl gu ts ed non mh h pow isConf td v)) =
+  toJSON (BlockDataRef' (BlockDataRef ph uh cc sr tr rr _ d num gl gu ts ed non mh h pow isConf v)) =
     object
       [ "parentHash" .= ph,
         "unclesHash" .= uh,
@@ -523,7 +526,6 @@ instance ToJSON BlockDataRef' where
         "hash" .= h,
         "powVerified" .= pow,
         "isConfirmed" .= isConf,
-        "totalDifficulty" .= td,
         "version" .= v
       ]
 

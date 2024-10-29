@@ -16,11 +16,10 @@ import Blockchain.Sequencer.Event
 import Blockchain.Sequencer.Kafka
 import Blockchain.Strato.Model.Keccak256
 import Blockchain.Strato.Model.MicroTime (getCurrentMicrotime)
-import Blockchain.TypeLits
 import Data.Aeson
 import qualified Data.ByteString.Char8 as C8
 import qualified Data.ByteString.Lazy.Char8 as BLC
-import Network.Kafka.Protocol as KP
+--import Network.Kafka.Protocol as KP
 import System.Exit
 import Text.Printf
 
@@ -37,7 +36,7 @@ validatorBehavior valB = do
   printf "Validator behavior = %s \n" $ show valB
   let msg = IEValidatorBehavior . ForcedValidator $ valB
   print msg
-  resp <- runKafkaMConfigured (KP.KString "validator-bevaiour-flag") $ do
+  resp <- runKafkaMConfigured "validator-bevaiour-flag" $ do
     writeUnseqEvents [msg]
   print resp
 
@@ -46,7 +45,7 @@ deleteDepBlock k = do
   printf "deleteDepBlock = %s \n" $ k
   let msg = IEDeleteDepBlock $ keccak256FromHex k
   print msg
-  resp <- runKafkaMConfigured (KP.KString "delete-dep-block") $ do
+  resp <- runKafkaMConfigured "delete-dep-block" $ do
     writeUnseqEvents [msg]
   print resp
 
@@ -75,19 +74,6 @@ addBlocksFromFile fileName = do
                 IEBlock (IngestBlock (TXO.PeerString "") bd txs us)
             )
             bs
-      mapM_ print resps
-
-addGenesisFromFile :: FilePath -> IO ()
-addGenesisFromFile fileName = do
-  file <- BLC.readFile fileName
-  case eitherDecode file of
-    Left err -> die $ printf "Malformed ChainInfo file: %s" err
-    Right bs -> do
-      printf "Inserting %d chain infos into unseq_events...\n" (length bs)
-      resps <- runKafkaMConfigured "queryStrato" $ do
-        assertSequencerTopicsCreation
-        writeUnseqEvents $
-          map ((IEGenesis . IngestGenesis (TXO.PeerString "")) . unNamedTuple @"id" @"info") bs
       mapM_ print resps
 
 addTxsFromFile :: FilePath -> IO ()

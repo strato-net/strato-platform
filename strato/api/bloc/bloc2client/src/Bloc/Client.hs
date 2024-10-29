@@ -19,10 +19,6 @@ module Bloc.Client
     getBlocTransactionResult,
     postBlocTransactionResults,
     postBlocTransaction,
-    postChainInfo,
-    getSingleChainInfo,
-    postChainInfos,
-    getChainInfo,
     postBlocTransactionParallel,
     postBlocTransactionBody,
     postBlocTransactionUnsigned,
@@ -126,24 +122,6 @@ getBlocTransactionResult = client (Proxy @GetBlocTransactionResult)
 
 postBlocTransactionResults :: Maybe Text -> Bool -> [Keccak256] -> ClientM [BlocTransactionResult]
 postBlocTransactionResults = client (Proxy @PostBlocTransactionResults)
-
-------------- /chain(s) endpoints -------------
-postChainInfo :: ClientEmbed ExternalHeaders (ChainInput -> ClientM ChainId)
-postChainInfo = client (Proxy @(PostChainInfo '[Optional, Strict] ExternalHeaders))
-
-getSingleChainInfo :: ChainId -> ClientM ChainIdChainOutput
-getSingleChainInfo = client (Proxy @GetSingleChainInfo)
-
-postChainInfos :: ClientEmbed ExternalHeaders ([ChainInput] -> ClientM [ChainId])
-postChainInfos = client (Proxy @(PostChainInfos '[Optional, Strict] ExternalHeaders))
-
-getChainInfo ::
-  [ChainId] ->
-  Maybe Text ->
-  Maybe Integer ->
-  Maybe Integer ->
-  ClientM [ChainIdChainOutput]
-getChainInfo = client (Proxy @GetChainInfo)
 
 ------------- /transaction endpoints -------------
 postBlocTransactionParallel ::
