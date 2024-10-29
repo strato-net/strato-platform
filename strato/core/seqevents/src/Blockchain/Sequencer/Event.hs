@@ -20,8 +20,6 @@ module Blockchain.Sequencer.Event (
   Timestamp,
   OutputGenesis(..),
   SeqLoopEvent(..),
-  BatchSeqLoopEvent(..),
-  IngestEventType(..),
   JsonRpcCommand(..),
   outputBlockToBlockRetainPayloads,
   outputBlockToBlock,
@@ -31,10 +29,8 @@ module Blockchain.Sequencer.Event (
   blockToIngestBlock,
   ingestBlockToSequencedBlock,
   sequencedBlockToBlock,
-  iEventType,
   wrapTransaction,
   wrapTransactionUnanchored,
-  batchSeqLoopEvents,
   outputBlockHash
   ) where
 
@@ -58,7 +54,6 @@ import Blockchain.Strato.Model.MicroTime
 import Blockchain.Strato.Model.StateRoot
 import Blockchain.Strato.Model.Address
 import Control.DeepSeq
-import Control.Lens
 import Data.Aeson hiding (encode)
 import Data.Binary
 import qualified Data.ByteString as BS
@@ -97,34 +92,6 @@ data IngestEvent
   | IEMPNodesReceived [NodeData]
   | IEPreprepareResponse PBFT.PreprepareDecision
   deriving (Eq, Show, GHCG.Generic)
-
-data IngestEventType
-  = IETTransaction
-  | IETBlock
-  | IETPreprepareResponse
-  | IETBlockstanbul
-  | IETForcedConfigChange
-  | IETValidatorBehavior
-  | IETDeleteDepBlock
-  | IETGetMPNodes
-  | IETGetMPNodesRequest
-  | IETMPNodesResponse
-  | IETMPNodesReceived
-  deriving (Eq, Ord, Show)
-
-iEventType :: IngestEvent -> IngestEventType
-iEventType = \case
-  IETx {} -> IETTransaction
-  IEBlock {} -> IETBlock
-  IEBlockstanbul {} -> IETBlockstanbul
-  IEForcedConfigChange {} -> IETForcedConfigChange
-  IEValidatorBehavior {} -> IETValidatorBehavior
-  IEDeleteDepBlock {} -> IETDeleteDepBlock
-  IEGetMPNodes {} -> IETGetMPNodes
-  IEGetMPNodesRequest {} -> IETGetMPNodesRequest
-  IEMPNodesResponse {} -> IETMPNodesResponse
-  IEMPNodesReceived {} -> IETMPNodesReceived
-  IEPreprepareResponse {} -> IETPreprepareResponse
 
 instance Format IngestEvent where
   format (IETx ts o) = show ts ++ " " ++ format o
@@ -590,21 +557,3 @@ instance FromJSON OutputTx'
 -- just end me fam
 instance Arbitrary JsonRpcCommand where
   arbitrary = JRCGetBalance <$> arbitrary <*> arbitrary <*> arbitrary
-
--- has to go down here because of Lens TH shenanigans
-data BatchSeqLoopEvent = BatchSeqLoopEvent
-  { _timerFires :: [PBFT.RoundNumber],
-    _ingestEvents :: [[IngestEvent]]
-  }
-
-makeLenses ''BatchSeqLoopEvent
-
-emptyBatchSeqLoopEvent :: BatchSeqLoopEvent
-emptyBatchSeqLoopEvent = BatchSeqLoopEvent [] []
-
-batchSeqLoopEvents :: [SeqLoopEvent] -> BatchSeqLoopEvent
-batchSeqLoopEvents = foldr f emptyBatchSeqLoopEvent
-  where
-    f s b = case s of
-      TimerFire r -> (timerFires %~ (r :)) b
-      UnseqEvents r -> (ingestEvents %~ (r :)) b

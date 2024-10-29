@@ -11,7 +11,6 @@
 {-# LANGUAGE TupleSections #-}
 {-# LANGUAGE TypeApplications #-}
 {-# LANGUAGE TypeOperators #-}
-{-# OPTIONS_GHC -fno-warn-incomplete-uni-patterns #-}
 {-# OPTIONS_GHC -fno-warn-orphans #-}
 
 module Blockchain.Sequencer (
@@ -117,62 +116,103 @@ sequencer validators = do
   bootstrapBlockstanbul
   logF "Sequencer initialized"
   flush
-  runConduit $ source .| oneSequencerIter
+  runConduit $ source .| eventHandler
 
-oneSequencerIter :: (
-                     MonadFail m,
-                     MonadReader SequencerConfig m,
-                     HasKafka m,
-                     HasDependentBlockDB m,
-                     MonadSequencer m,
-                     Mod.Modifiable (Seq BatchOp) m,
-                     MonadState SequencerContext m
-                    ) =>
-                    ConduitT SeqLoopEvent Void m ()
-oneSequencerIter = forever $ timeAction seqLoopTiming $ do
+eventHandler :: (
+  MonadFail m,
+  MonadReader SequencerConfig m,
+  HasKafka m,
+  HasDependentBlockDB m,
+  MonadSequencer m,
+  Mod.Modifiable (Seq BatchOp) m,
+  MonadState SequencerContext m
+  ) =>
+  ConduitT SeqLoopEvent Void m ()
+eventHandler = forever $ timeAction seqLoopTiming $ do
   logFF "sequencer/events" "Reading from fused channels..."
   maybeEvent <- await
   let event = fromMaybe (error "input stream to sequencer closed, this shouldn't happen") maybeEvent
 
   $logDebugS "sequencer/events" . T.pack $ format event
 
-  runSequencerBatch [event]
+  case event of
+    TimerFire roundNumber -> do
+      withLabel seqLoopEvents "timeout" (flip unsafeAddCounter 1)
+      blockstanbulSend [Timeout roundNumber]
+    UnseqEvents unseqEvents -> do
+      withLabel seqLoopEvents "unseq" (flip unsafeAddCounter . fromIntegral . length $ unseqEvents)
+      timeAction seqSplitEventsTiming $ unseqEventHandler unseqEvents
 
   lift flushLdbBatchOps
 
   flush
 
-flush :: MonadState SequencerContext m =>
-         m ()
-flush = clearDBERegistry
-
-runSequencerBatch ::
-  (MonadSequencer m, MonadReader SequencerConfig m, HasKafka m) =>
-  [SeqLoopEvent] -> m ()
-runSequencerBatch events = do
-  let BatchSeqLoopEvent {..} = batchSeqLoopEvents events
-  checkForTimeouts _timerFires
-  forM_ _ingestEvents checkForUnseq
-
-checkForTimeouts ::
+unseqEventHandler ::
   ( MonadLogger m,
     MonadMonitor m,
     MonadBlockstanbul m,
     (Keccak256 `A.Alters` DependentBlockEntry) m,
+    (Keccak256 `A.Alters` ()) m,
     MonadReader SequencerConfig m,
     HasKafka m
   ) =>
-  [RoundNumber] -> m ()
-checkForTimeouts rns = do
-  withLabel seqLoopEvents "timeout" (flip unsafeAddCounter . fromIntegral . length $ rns)
-  blockstanbulSend . map Timeout $ rns
-
-checkForUnseq ::
-  (MonadSequencer m, MonadReader SequencerConfig m, HasKafka m) =>
   [IngestEvent] -> m ()
-checkForUnseq inEvents = do
-  withLabel seqLoopEvents "unseq" (flip unsafeAddCounter . fromIntegral . length $ inEvents)
-  timeAction seqSplitEventsTiming $ splitEvents inEvents
+unseqEventHandler events = do
+  let num = length events
+      record :: (MonadIO m, MonadLogger m) => T.Text -> T.Text -> m ()
+      record t k = do
+        liftIO $ withLabel eventsplitMetrics t (flip unsafeAddCounter . fromIntegral $ num)
+        $logInfoS "splitEvents" . T.pack $ printf "Running %d %s" num k
+        
+  let blocks = [b | IEBlock b <- events]
+
+  when (not $ null blocks) $ record "inevent_type_block" "IngestBlocks"
+  transformBlocks blocks
+
+  let transactions = [(ts, tx) | IETx ts tx <- events]
+
+  when (not $ null transactions) $ record "inevent_type_transaction" "IngestTransactions"
+  transformFullTransactions transactions
+
+  forM_ events $ \event ->
+    case event of
+        (IETx _ _) -> return () --Already handled above
+        (IEBlock _) -> return () --Already handled above
+        (IEBlockstanbul (WireMessage a m))-> do
+          record "inevent_type_blockstanbul" "IngestBlockstanbuls"
+          blockstanbulSend [IMsg a m]
+        (IEForcedConfigChange cc) -> do
+          record "inevent_type_forced_config_change" "ForcedConfigChanges"
+          blockstanbulSend [ForcedConfigChange cc]
+        (IEValidatorBehavior vc) -> do
+          record "inevent_type_validator_behavior" "ValidatorBehaviorChange"
+          blockstanbulSend [ValidatorBehaviorChange vc]
+        (IEDeleteDepBlock k) -> do
+          record "inevent_type_delete_dep_block" "DeleteDepBlock"
+          A.delete (A.Proxy @DependentBlockEntry) k
+        (IEGetMPNodes srs) -> do
+          record "inevent_type_get_mp_nodes" "GetMPNodes"
+          _ <- writeSeqP2pEvents [P2pGetMPNodes srs]
+          return ()
+        (IEGetMPNodesRequest o srs) -> do
+          record "inevent_type_get_mp_nodes_request" "GetMPNodesRequest"
+          _ <- writeSeqVmEvents [VmGetMPNodesRequest o srs]
+          return ()
+        (IEMPNodesResponse o nds)-> do
+          record "inevent_type_mp_nodes_response" "MPNodesResponse"
+          _ <- writeSeqP2pEvents [P2pMPNodesResponse o nds]
+          return ()
+        (IEMPNodesReceived nds) -> do
+          record "inevent_type_mp_nodes_received" "MPNodesReceived"
+          _ <- writeSeqVmEvents [VmMPNodesReceived nds]
+          return ()
+        (IEPreprepareResponse decis) -> do
+          record "inevent_type_preprepare_response" "PreprepareResponse"
+          blockstanbulSend [PreprepareResponse decis]
+
+flush :: MonadState SequencerContext m =>
+         m ()
+flush = clearDBERegistry
 
 bootstrapBlockstanbul :: (MonadBlockstanbul m, Mod.Accessible View m, HasKafka m) =>
                          m ()
@@ -363,61 +403,6 @@ transformBlocks ibs = do
       Just sb -> do
         runConsensus sb
 
-splitEvents ::
-  ( MonadLogger m,
-    MonadMonitor m,
-    MonadBlockstanbul m,
-    (Keccak256 `A.Alters` DependentBlockEntry) m,
-    (Keccak256 `A.Alters` ()) m,
-    MonadReader SequencerConfig m,
-    HasKafka m
-  ) =>
-  [IngestEvent] -> m ()
-splitEvents es = forM_ (splitWith iEventType es) $ \(eventType, events) ->
-  let num = length events
-      record :: (MonadIO m, MonadLogger m) => T.Text -> T.Text -> m ()
-      record t k = do
-        liftIO $ withLabel eventsplitMetrics t (flip unsafeAddCounter . fromIntegral $ num)
-        $logInfoS "splitEvents" . T.pack $ printf "Running %d %s" num k
-   in case eventType of
-        IETTransaction -> do
-          record "inevent_type_transaction" "IngestTransactions"
-          transformFullTransactions $ map (\(IETx ts tx) -> (ts, tx)) events
-        IETBlock -> do
-          record "inevent_type_block" "IngestBlocks"
-          transformBlocks $ map (\(IEBlock ob) -> ob) events
-        IETBlockstanbul -> do
-          record "inevent_type_blockstanbul" "IngestBlockstanbuls"
-          blockstanbulSend $ map (\(IEBlockstanbul (WireMessage a m)) -> IMsg a m) events
-        IETForcedConfigChange -> do
-          record "inevent_type_forced_config_change" "ForcedConfigChanges"
-          blockstanbulSend $ map (\(IEForcedConfigChange cc) -> ForcedConfigChange cc) events
-        IETValidatorBehavior -> do
-          record "inevent_type_validator_behavior" "ValidatorBehaviorChange"
-          blockstanbulSend $ map (\(IEValidatorBehavior vc) -> ValidatorBehaviorChange vc) events
-        IETDeleteDepBlock -> do
-          record "inevent_type_delete_dep_block" "DeleteDepBlock"
-          traverse_ (\(IEDeleteDepBlock k) -> A.delete (A.Proxy @DependentBlockEntry) k) events
-        IETGetMPNodes -> do
-          record "inevent_type_get_mp_nodes" "GetMPNodes"
-          _ <- writeSeqP2pEvents $ map (\(IEGetMPNodes srs) -> P2pGetMPNodes srs) events
-          return ()
-        IETGetMPNodesRequest -> do
-          record "inevent_type_get_mp_nodes_request" "GetMPNodesRequest"
-          _ <- writeSeqVmEvents $ map (\(IEGetMPNodesRequest o srs) -> VmGetMPNodesRequest o srs) events
-          return ()
-        IETMPNodesResponse -> do
-          record "inevent_type_mp_nodes_response" "MPNodesResponse"
-          _ <- writeSeqP2pEvents $ map (\(IEMPNodesResponse o nds) -> P2pMPNodesResponse o nds) events
-          return ()
-        IETMPNodesReceived -> do
-          record "inevent_type_mp_nodes_received" "MPNodesReceived"
-          _ <- writeSeqVmEvents $ map (\(IEMPNodesReceived nds) -> VmMPNodesReceived nds) events
-          return ()
-        IETPreprepareResponse -> do
-          record "inevent_type_preprepare_response" "PreprepareResponse"
-          blockstanbulSend $ map (\(IEPreprepareResponse decis) -> PreprepareResponse decis) events
-
 prettyIBlock :: IngestBlock -> String
 prettyIBlock IngestBlock {ibOrigin = o, ibBlockData = bd, ibReceiptTransactions = txs} = "Block #" ++ blockNonce ++ "/" ++ bHash ++ " (via " ++ format o ++ ", " ++ show (length txs) ++ " txs)"
   where
@@ -445,13 +430,3 @@ writeUnseqCheckpoints :: (MonadIO m, MonadReader SequencerConfig m) =>
 writeUnseqCheckpoints events = do
   ch <- asks (unseqCheckpoints . cablePackage)
   atomically . mapM_ (writeTQueue ch) $ events
-
-splitWith :: Eq k => (a -> k) -> [a] -> [(k, [a])]
-splitWith f = foldr agg []
-  where
-    agg a [] = [(f a, [a])]
-    agg a kas@((k, as) : kas') =
-      let fa = f a
-       in if fa == k
-            then (k, a : as) : kas'
-            else (fa, [a]) : kas
