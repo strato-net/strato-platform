@@ -6,7 +6,37 @@
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE TemplateHaskell #-}
 
-module Blockchain.Sequencer.Event where
+module Blockchain.Sequencer.Event (
+  ShowConstructor,
+  showConstructor,
+  IngestEvent(..),
+  VmEvent(..),
+  P2pEvent(..),
+  IngestTx(..),
+  OutputTx(..),
+  IngestBlock(..),
+  OutputBlock(..),
+  SequencedBlock(..),
+  Timestamp,
+  OutputGenesis(..),
+  SeqLoopEvent(..),
+  BatchSeqLoopEvent(..),
+  IngestEventType(..),
+  JsonRpcCommand(..),
+  outputBlockToBlockRetainPayloads,
+  outputBlockToBlock,
+  sequencedBlockToOutputBlock,
+  wrapIngestBlockTransaction,
+  wrapIngestBlockTransactionUnanchored,
+  blockToIngestBlock,
+  ingestBlockToSequencedBlock,
+  sequencedBlockToBlock,
+  iEventType,
+  wrapTransaction,
+  wrapTransactionUnanchored,
+  batchSeqLoopEvents,
+  outputBlockHash
+  ) where
 
 import qualified Blockchain.Blockstanbul as PBFT
 import qualified Blockchain.Data.Block as BDB
@@ -32,7 +62,6 @@ import Control.Lens
 import Data.Aeson hiding (encode)
 import Data.Binary
 import qualified Data.ByteString as BS
-import qualified Data.ByteString.Lazy as B
 import Data.Data
 import Data.List (intercalate)
 import Data.Maybe (fromJust, fromMaybe)
@@ -253,14 +282,6 @@ data OutputTx' = OutputTx'
   }
   deriving (Eq, Show, GHCG.Generic)
 
-otxToOtxPrime :: OutputTx -> OutputTx'
-otxToOtxPrime (OutputTx o h s b p) = (OutputTx' o h s (Transaction' b) (Transaction' <$> p))
-
-otxPrimeToOtx :: OutputTx' -> OutputTx
-otxPrimeToOtx (OutputTx' o h s b mp) = OutputTx o h s (unTransaction' b) (unTransaction' <$> mp)
-  where
-    unTransaction' (Transaction' t) = t
-
 data OutputBlock = OutputBlock
   { obOrigin :: TO.TXOrigin,
     obBlockData :: BlockHeader,
@@ -277,37 +298,15 @@ data OutputBlock' = OutputBlock'
   }
   deriving (Eq, Show, GHCG.Generic)
 
-obToObPrime :: OutputBlock -> OutputBlock'
-obToObPrime (OutputBlock o bd rt bu) =
-  OutputBlock'
-    o
-    (BlockData' bd)
-    (otxToOtxPrime <$> rt)
-    (BlockData' <$> bu)
-
-obPrimeToOb :: OutputBlock' -> OutputBlock
-obPrimeToOb (OutputBlock' o (BlockData' bd) rt bu) =
-  OutputBlock
-    o
-    bd
-    (otxPrimeToOtx <$> rt)
-    ((\(BlockData' b) -> b) <$> bu)
-
 data OutputGenesis = OutputGenesis
   { ogOrigin :: TO.TXOrigin,
     ogGenesisInfo :: (Word256, ChainInfo)
   }
   deriving (Eq, Show, GHCG.Generic, Data)
 
-ingestGenesisToOutputGenesis :: IngestGenesis -> OutputGenesis
-ingestGenesisToOutputGenesis (IngestGenesis o g) = OutputGenesis o g
-
 blockToIngestBlock :: TO.TXOrigin -> BDB.Block -> IngestBlock
 blockToIngestBlock origin BDB.Block {BDB.blockBlockData = bd, BDB.blockReceiptTransactions = txs, BDB.blockBlockUncles = us} =
   IngestBlock {ibOrigin = origin, ibBlockData = bd, ibReceiptTransactions = txs, ibBlockUncles = us}
-
-ingestBlockToBlock :: IngestBlock -> BDB.Block
-ingestBlockToBlock IngestBlock {ibBlockData = bd, ibReceiptTransactions = txs, ibBlockUncles = us} = BDB.Block bd txs us
 
 ingestBlockToSequencedBlock :: IngestBlock -> Maybe SequencedBlock
 ingestBlockToSequencedBlock ib = do
@@ -333,10 +332,6 @@ sequencedBlockToOutputBlock sb =
 
 sequencedBlockToBlock :: SequencedBlock -> BDB.Block
 sequencedBlockToBlock sb = BDB.Block (sbBlockData sb) (map otBaseTx $ sbReceiptTransactions sb) (sbBlockUncles sb)
-
-sequencedBlockShortName :: SequencedBlock -> String
-sequencedBlockShortName SequencedBlock {sbBlockData = d, sbHash = theHash} =
-  "Block #" ++ CL.yellow (show . number $ d) ++ "/" ++ CL.blue (format theHash)
 
 wrapTransaction :: Monad m => IngestTx -> m (Maybe OutputTx)
 wrapTransaction tx@IngestTx {} = do
@@ -397,23 +392,8 @@ wrapIngestBlockTransactionUnanchored hash tx =
             otPrivatePayload = Nothing
           }
 
-parentHashBS :: SequencedBlock -> BS.ByteString
-parentHashBS = B.toStrict . encode . parentHash . sbBlockData
-
 ingestBlockHash :: IngestBlock -> Keccak256
 ingestBlockHash = blockHeaderHash . ibBlockData
-
-ingestBlockHashBS :: IngestBlock -> BS.ByteString
-ingestBlockHashBS = B.toStrict . encode . ingestBlockHash
-
-ingestBlockDifficulty :: IngestBlock -> Integer
-ingestBlockDifficulty = difficulty . ibBlockData
-
-blockHashBS :: SequencedBlock -> BS.ByteString
-blockHashBS = B.toStrict . encode . sbHash
-
-sequencedBlockDifficulty :: SequencedBlock -> Integer
-sequencedBlockDifficulty = getBlockDifficulty . sbBlockData
 
 outputBlockHash :: OutputBlock -> Keccak256
 outputBlockHash = blockHeaderHash . obBlockData
@@ -425,27 +405,6 @@ outputBlockToBlockRetainPayloads :: OutputBlock -> BDB.Block
 outputBlockToBlockRetainPayloads OutputBlock {obBlockData = bd, obReceiptTransactions = txs, obBlockUncles = us} =
   let payload t = fromMaybe (otBaseTx t) (otPrivatePayload t)
    in BDB.Block bd (payload <$> txs) us
-
-quarryBlockToOutputBlock :: Monad m => BDB.Block -> m OutputBlock
-quarryBlockToOutputBlock BDB.Block {BDB.blockBlockData = bd, BDB.blockReceiptTransactions = txs, BDB.blockBlockUncles = us} = do
-  rtxs <- mapM wrapQuarryReceipt txs
-  return
-    OutputBlock
-      { obOrigin = TO.Quarry,
-        obBlockData = bd,
-        obBlockUncles = us,
-        obReceiptTransactions = rtxs
-      }
-  where
-    wrapQuarryReceipt t = do
-      return
-        OutputTx
-          { otOrigin = TO.Quarry,
-            otBaseTx = t,
-            otSigner = fromJust . TX.whoSignedThisTransaction $ t,
-            otHash = TX.transactionHash t,
-            otPrivatePayload = Nothing
-          }
 
 instance Witnessable IngestTx where
   witnessableHash = TX.partialTransactionHash . itTransaction
