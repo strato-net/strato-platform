@@ -22,6 +22,7 @@
     "googleapis": "^140.0.1",
     "helmet": "^7.1.0",
     "jwt-decode": "^4.0.0",
+    "path": "^0.12.7",
     "pg": "^8.12.0",
     "react-use-websocket": "^4.8.1",
     "ws": "^8.18.0"
