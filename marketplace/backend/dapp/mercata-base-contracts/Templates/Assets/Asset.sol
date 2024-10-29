@@ -144,7 +144,7 @@ abstract contract Asset is Utils {
         sale = address(0);
     }
 
-    function changeOwner(address _newOwner){
+    function changeOwner(address _newOwner) internal {
         require(proposerFee==0.0, "Asset fees for transfer not paid");
         owner = _newOwner;
         string newOwnerCommonName = getCommonName(_newOwner);
