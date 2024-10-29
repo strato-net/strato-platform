@@ -13,7 +13,7 @@ import {
 } from "../../contexts/marketplace";
 import { useUsersDispatch, useUsersState } from "../../contexts/users";
 import { useAuthenticateState } from "../../contexts/authentication";
-import { SearchOutlined } from "@ant-design/icons";
+import { SearchOutlined, DeleteOutlined } from "@ant-design/icons";
 import { OLD_SADDOG_ORIGIN_ADDRESS } from "../../helpers/constants";
 
 const TransferModal = ({
@@ -69,15 +69,33 @@ const TransferModal = ({
         openDropdown: false,
       },
     ]);
+    setTimeout(() => {
+      const scrollRow = document.querySelector('.scroll-row');
+      if (scrollRow) {
+        scrollRow.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      }
+    }, 0);
   };
 
-  const handleRemoveTransfer = () => {
-    if (transfers.length > 1) {
-      const remainingTransfers = transfers.slice(0, -1);
-      setTransfers(remainingTransfers);
-    }
+  const handleRemoveTransfer = (id) => {
+    setTransfers((prevTransfers) => {
+      const updatedTransfers = prevTransfers.filter(
+        (transfer) => transfer.id !== id
+      );
+      return updatedTransfers.map((transfer, index) => ({
+        ...transfer,
+        id: index + 1,
+      }));
+    });
+    setTimeout(() => {
+      const scrollRow = document.querySelector('.scroll-row');
+      if (scrollRow) {
+        scrollRow.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      }
+    }, 0);
   };
 
+  // User list filtering
   const filterDuplicateUserAddresses = (arr) => {
     return [...new Map(arr.map((u) => [u.value, u])).values()];
   };
@@ -101,6 +119,7 @@ const TransferModal = ({
 
   const filteredUsersList = filterDuplicateUserAddresses(usersList);
 
+  // Notification for marketplace
   const marketplaceToast = (placement) => {
     if (marketplaceSuccess) {
       api.success({
@@ -138,7 +157,7 @@ const TransferModal = ({
 
     setCanTransfer(isValidTransfer && totalQuantity <= availableQuantity);
     setCanAddRow(
-      transfers.length < 5 &&
+      transfers.length < 10 &&
         totalQuantity < availableQuantity &&
         isValidTransfer
     );
@@ -213,6 +232,7 @@ const TransferModal = ({
       title: "Quantity Available",
       dataIndex: "quantity",
       align: "center",
+      width: 150,
       render: (_, record, index) => {
         // Calculate the quantity available for each row
         const availableQuantity = quantityIsDecimal
@@ -269,6 +289,7 @@ const TransferModal = ({
         <Select
           className="transfer_modal w-[390px]"
           showSearch
+          value={record.recipient}
           onSelect={(value) => handleRecipientSelect(record.id, value)}
           onSearch={(value) => handleSearchChange(record.id, value)}
           options={filteredUsersList}
@@ -283,6 +304,16 @@ const TransferModal = ({
           popupClassName="custom-select-dropdown"
           defaultValue={isBurner ? filteredUsersList[0] : null}
           disabled={index !== transfers.length - 1}
+        />
+      ),
+    },
+    {
+      render: (record) => (
+        <Button
+          type="link"
+          onClick={() => handleRemoveTransfer(record.id)}
+          disabled={!canRemoveRow}
+          icon={<DeleteOutlined />}
         />
       ),
     },
@@ -330,18 +361,10 @@ const TransferModal = ({
             <Button
               type="dashed"
               className="w-32 h-9"
-              onClick={handleRemoveTransfer}
-              disabled={!canRemoveRow}
-            >
-              Remove Row
-            </Button>
-            <Button
-              type="dashed"
-              className="w-32 h-9"
               onClick={handleAddTransfer}
               disabled={!canAddRow}
             >
-              Add Row
+              Add
             </Button>
           </div>
           <div className="md:w-auto w-full flex md:justify-end justify-center mt-2 md:mt-0">
@@ -360,7 +383,18 @@ const TransferModal = ({
     >
       {/* Desktop View */}
       <div className="head hidden md:block">
-        <Table columns={columns} dataSource={transfers} pagination={false} />
+        <Table
+          rowClassName={(record, index) =>
+            index === transfers.length - 1 ? 'scroll-row' : ''
+          }
+          columns={columns}
+          dataSource={transfers}
+          pagination={false}
+          scroll={{
+            x: 'max-content',
+            y: 300,
+          }}
+        />
       </div>
 
       {/* Mobile View */}
