@@ -158,20 +158,19 @@ unseqEventHandler ::
   ) =>
   [IngestEvent] -> m ()
 unseqEventHandler events = do
-  let num = length events
-      record :: (MonadIO m, MonadLogger m) => T.Text -> T.Text -> m ()
-      record t k = do
+  let record :: (MonadIO m, MonadLogger m) => T.Text -> T.Text -> Int -> m ()
+      record t k num = do
         liftIO $ withLabel eventsplitMetrics t (flip unsafeAddCounter . fromIntegral $ num)
         $logInfoS "splitEvents" . T.pack $ printf "Running %d %s" num k
         
   let blocks = [b | IEBlock b <- events]
 
-  when (not $ null blocks) $ record "inevent_type_block" "IngestBlocks"
+  when (not $ null blocks) $ record "inevent_type_block" "IngestBlocks" (length blocks)
   transformBlocks blocks
 
   let transactions = [(ts, tx) | IETx ts tx <- events]
 
-  when (not $ null transactions) $ record "inevent_type_transaction" "IngestTransactions"
+  when (not $ null transactions) $ record "inevent_type_transaction" "IngestTransactions" (length transactions)
   transformFullTransactions transactions
 
   forM_ events $ \event ->
@@ -179,35 +178,35 @@ unseqEventHandler events = do
         (IETx _ _) -> return () --Already handled above
         (IEBlock _) -> return () --Already handled above
         (IEBlockstanbul (WireMessage a m))-> do
-          record "inevent_type_blockstanbul" "IngestBlockstanbuls"
+          record "inevent_type_blockstanbul" "IngestBlockstanbuls" 1
           blockstanbulSend [IMsg a m]
         (IEForcedConfigChange cc) -> do
-          record "inevent_type_forced_config_change" "ForcedConfigChanges"
+          record "inevent_type_forced_config_change" "ForcedConfigChanges" 1
           blockstanbulSend [ForcedConfigChange cc]
         (IEValidatorBehavior vc) -> do
-          record "inevent_type_validator_behavior" "ValidatorBehaviorChange"
+          record "inevent_type_validator_behavior" "ValidatorBehaviorChange" 1
           blockstanbulSend [ValidatorBehaviorChange vc]
         (IEDeleteDepBlock k) -> do
-          record "inevent_type_delete_dep_block" "DeleteDepBlock"
+          record "inevent_type_delete_dep_block" "DeleteDepBlock" 1
           A.delete (A.Proxy @DependentBlockEntry) k
         (IEGetMPNodes srs) -> do
-          record "inevent_type_get_mp_nodes" "GetMPNodes"
+          record "inevent_type_get_mp_nodes" "GetMPNodes" 1
           _ <- writeSeqP2pEvents [P2pGetMPNodes srs]
           return ()
         (IEGetMPNodesRequest o srs) -> do
-          record "inevent_type_get_mp_nodes_request" "GetMPNodesRequest"
+          record "inevent_type_get_mp_nodes_request" "GetMPNodesRequest" 1
           _ <- writeSeqVmEvents [VmGetMPNodesRequest o srs]
           return ()
         (IEMPNodesResponse o nds)-> do
-          record "inevent_type_mp_nodes_response" "MPNodesResponse"
+          record "inevent_type_mp_nodes_response" "MPNodesResponse" 1
           _ <- writeSeqP2pEvents [P2pMPNodesResponse o nds]
           return ()
         (IEMPNodesReceived nds) -> do
-          record "inevent_type_mp_nodes_received" "MPNodesReceived"
+          record "inevent_type_mp_nodes_received" "MPNodesReceived" 1
           _ <- writeSeqVmEvents [VmMPNodesReceived nds]
           return ()
         (IEPreprepareResponse decis) -> do
-          record "inevent_type_preprepare_response" "PreprepareResponse"
+          record "inevent_type_preprepare_response" "PreprepareResponse" 1
           blockstanbulSend [PreprepareResponse decis]
 
 flush :: MonadState SequencerContext m =>
