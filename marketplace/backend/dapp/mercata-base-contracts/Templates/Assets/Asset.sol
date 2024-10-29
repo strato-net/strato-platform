@@ -144,14 +144,18 @@ abstract contract Asset is Utils {
         sale = address(0);
     }
 
+    function changeOwner(address _newOwner){
+        require(proposerFee==0.0, "Asset fees for transfer not paid");
+        owner = _newOwner;
+        string newOwnerCommonName = getCommonName(_newOwner);
+        ownerCommonName = newOwnerCommonName;
+    }
+
     function _transfer(address _newOwner, uint _quantity, bool _isUserTransfer, uint _transferNumber, decimal _price) internal virtual {
         require(status != AssetStatus.PENDING_REDEMPTION, "Asset is not in ACTIVE state.");
         require(status != AssetStatus.RETIRED, "Asset is not in ACTIVE state.");
-        require(proposerFee==0.0, "Asset fees for transfer not paid");
-        string newOwnerCommonName = getCommonName(_newOwner);
 
-        owner = _newOwner;
-        ownerCommonName = newOwnerCommonName;
+        changeOwner(_newOwner);
 
         if(_isUserTransfer && _transferNumber>0){
 
