@@ -24,6 +24,10 @@ module SolidVM.Model.CodeCollection (
   imports,
   usesStrictModifiers,
   getContractsBySolidString,
+  supportedPragmas,
+  findInvalidPragmas,
+  invalidPragmasUsedBy,
+  invalidPragmasUsed,
   resolvePragmaFeature,
   resolvePragmaFeature',
   structDef,
@@ -179,6 +183,33 @@ usesStrictModifiers = flip resolvePragmaFeature "strict" . _pragmas
 -- Function to get all ContractF values matching a SolidString
 getContractsBySolidString :: SolidString -> CodeCollectionF a -> Maybe (ContractF a)
 getContractsBySolidString solidStr codeCollection = M.lookup solidStr (_contracts codeCollection)
+
+supportedPragmas :: [(String, String)]
+supportedPragmas =
+  [ ("es6", "")
+  , ("strict", "")
+  , ("builtinCreates", "")
+  , ("safeExternalCalls", "")
+  , ("strictDecimals", "")
+  , ("solidvm", "11.4")
+  , ("solidvm", "11.5")
+  , ("solidvm", "12.0")
+  ]
+
+isValidPragma :: (String, String) -> Bool
+isValidPragma pragma = fst pragma == "solidity" || pragma `elem` supportedPragmas
+
+findInvalidPragmas :: (a -> (String, String)) -> a -> [a] -> [a]
+findInvalidPragmas f pragma =
+  if isValidPragma $ f pragma
+    then id
+    else (pragma :) -- include solidity pragma for backwards compatibility
+
+invalidPragmasUsedBy :: (a -> (String, String)) -> [a] -> [a]
+invalidPragmasUsedBy f = foldr (findInvalidPragmas f) []
+
+invalidPragmasUsed :: [(String, String)] -> [(String, String)]
+invalidPragmasUsed = invalidPragmasUsedBy id
 
 resolvePragmaFeature :: [(String, String)] -> String -> Bool
 resolvePragmaFeature pragmaList feature = resolvePragmaFeature' pragmaList feature ""
