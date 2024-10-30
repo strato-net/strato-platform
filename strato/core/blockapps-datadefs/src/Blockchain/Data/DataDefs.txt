@@ -24,7 +24,6 @@ BlockDataRef
     hash Keccak256
     powVerified Bool
     isConfirmed Bool
-    totalDifficulty Integer sqltype=numeric(1000,0)
     version Int
     deriving Eq Read Show
 

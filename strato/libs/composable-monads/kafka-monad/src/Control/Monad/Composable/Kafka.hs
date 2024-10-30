@@ -38,6 +38,8 @@ module Control.Monad.Composable.Kafka (
   unpackMetadata,
   conduitSource,
   conduitSourceUsingEnv,
+  conduitBatchSource,
+  conduitBatchSourceUsingEnv,
   createKafkaEnv,
   createTopic
   ) where
@@ -237,6 +239,25 @@ conduitSourceUsingEnv name env topicName = do
       items <- runKafkaMUsingEnv env $ fetchItems topicName offset
       $logInfoS name . T.pack $ "Fetched " ++ show (length items) ++ " events starting from " ++ show offset
       forM_ items yield
+      return $ offset + fromIntegral (length items)
+
+conduitBatchSource :: (MonadLogger m, MonadIO m, Binary a) =>
+                      LogSource -> KafkaClientId -> KafkaAddress -> TopicName -> ConduitT i [a] m b
+conduitBatchSource name clientId kafkaAddress topicName = do
+  env <- createKafkaEnv clientId kafkaAddress
+
+  conduitBatchSourceUsingEnv name env topicName
+
+conduitBatchSourceUsingEnv :: (MonadLogger m, MonadIO m, Binary a) =>
+                              LogSource -> KafkaEnv -> TopicName -> ConduitT i [a] m b
+conduitBatchSourceUsingEnv name env topicName = do
+  startingOffset <- runKafkaMUsingEnv env $ execKafka $ getLastOffset LatestTime 0 topicName
+
+  flip iterateM_ startingOffset $ \offset -> do
+      $logInfoS name "About to fetch blocks"
+      items <- runKafkaMUsingEnv env $ fetchItems topicName offset
+      $logInfoS name . T.pack $ "Fetched " ++ show (length items) ++ " events starting from " ++ show offset
+      yield items
       return $ offset + fromIntegral (length items)
 
 createTopic :: HasKafka m =>

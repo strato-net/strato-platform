@@ -7,11 +7,9 @@ import BlockApps.Logging
 import BlockApps.X509.Certificate
 import Blockchain.Constants
 import Blockchain.Data.Block
-import Blockchain.Data.BlockHeader
 import qualified Blockchain.Data.TXOrigin as TO
 import qualified Blockchain.Data.Transaction as TX
 import Blockchain.EthConf as EC
-import Blockchain.Privacy.Monad
 import Blockchain.Sequencer.CablePackage
 import Blockchain.Sequencer.Constants
 import Blockchain.Sequencer.DB.DependentBlockDB
@@ -51,11 +49,9 @@ bootstrapSequencer
           { obOrigin = TO.Direct,
             obBlockData = bd,
             obBlockUncles = us,
-            obTotalDifficulty = difficulty',
             obReceiptTransactions = map kludge txs
           }
       hash = blockHeaderHash bd
-      difficulty' = getBlockDifficulty bd
       kludge t = fromMaybe fallback (wrapIngestBlockTransactionUnanchored hash t)
         where
           fallback =
@@ -92,8 +88,7 @@ bootstrapSequencer
                   redisConn = error "initLevelDB: redisConn"
                 }
         runLoggingT . runSequencerM dummySequencerCfg Nothing $ do
-          bootstrapGenesisBlock hash difficulty'
-          A.insert (A.Proxy @EmittedBlock) hash alreadyEmittedBlock
+          bootstrapGenesisBlock hash
           for_ (extraCerts ++ extraCertsHack) . uncurry $ A.insert (A.Proxy @X509CertInfoState)
           flushLdbBatchOps
       initKafka :: CablePackage -> IO ()

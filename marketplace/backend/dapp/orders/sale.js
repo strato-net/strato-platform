@@ -5,7 +5,6 @@ import constants, { getOneYearAgoTime } from '../../helpers/constants';
 const pLimit = require('p-limit'); // Concurrency control library
 
 const contractName = constants.saleTableName;
-const saleAllTableContract = constants.saleAllTableName;
 
 /**
  * Augment contract arguments before they are used to post a contract.
@@ -151,25 +150,9 @@ async function get(user, args, options) {
 }
 
 async function getSaleHistory(user, args, options) {
-    const { contract, ...restArgs } = args;
 
-    const newOptions = { ...options, org: undefined, app: undefined }
-    let historySale = await searchAllWithQueryArgs(`history@${contract}`, restArgs, newOptions, user);
-
-
-    if (!historySale) {
-        return undefined;
-    }
-
-    return marshalOut({
-        ...historySale,
-    });
-}
-
-async function getAllSaleHistory(user, args, options) {
-
-    const newOptions = { ...options, org: undefined, app: undefined }
-    let historySale = await searchAllWithQueryArgs(`history@${saleAllTableContract}`, args, newOptions, user);
+    const newOptions = { ...options, org: "history@BlockApps", app: "Mercata" }
+    let historySale = await searchAllWithQueryArgs(contractName, args, newOptions, user);
 
     if (!historySale) {
         return undefined;
@@ -226,7 +209,7 @@ async function fetchSaleHistoriesInBatches(rawAdmin, args = {}, options = defaul
         if(filter.order)
         {
         // Fetch sale history based on the filters provided
-        return getAllSaleHistory(rawAdmin, {
+        return getSaleHistory(rawAdmin, {
             ...filter,
             assetToBeSold: address,
             queryOptions: {
@@ -236,7 +219,7 @@ async function fetchSaleHistoriesInBatches(rawAdmin, args = {}, options = defaul
         }
         else{
         // 12-Month Historical Data
-        return getAllSaleHistory(rawAdmin, {
+        return getSaleHistory(rawAdmin, {
             assetToBeSold: address,
             order: "block_timestamp.asc", 
             gtField: "block_timestamp", 
@@ -340,7 +323,6 @@ export default {
     marshalOut,
     getHistory,
     getSaleHistory,
-    getAllSaleHistory,
     fetchSalesInBatches,
     fetchSaleHistoriesInBatches,
 }

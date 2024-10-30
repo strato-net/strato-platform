@@ -14,7 +14,7 @@ import Data.Binary
 
 data IndexEvent
   = RanBlock OutputBlock
-  | NewBestBlock (Keccak256, Integer, Integer)
+  | NewBestBlock (Keccak256, Integer)
   | LogDBEntry LogDB
   | TxResult TransactionResult
   | UpdateTxResult (Keccak256, Keccak256, Keccak256, Bool) -- Deprecated

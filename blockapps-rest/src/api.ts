@@ -29,7 +29,6 @@ function getCreateArgs(contract:ContractDefinition, options:Options) {
     src: contract.source,
     contract: contract.name,
     args: contract.args,
-    chainid: contract.chainid,
     txParams: contract.txParams,
     metadata: constructMetadata(options, contract.name)
   };
@@ -124,19 +123,18 @@ async function getBalance(user:OAuthUser, bcuser:BlockChainUser | null, options:
   return new BigNumber(accounts[0].balance);
 }
 
-async function getContracts(user:OAuthUser, chainId, options:Options) {
+async function getContracts(user:OAuthUser, options:Options) {
   const url = getNodeUrl(options);
   const endpoint = constructEndpoint(Endpoint.CONTRACTS, {
     ...options,
-    chainIds: [chainId]
   });
   return get(url, endpoint, setAuthHeaders(user, options));
 }
 
-async function getContractsContract(user:OAuthUser, name, address, chainId, options:Options) {
+async function getContractsContract(user:OAuthUser, name, address, options:Options) {
   const url = getNodeUrl(options);
   const urlParams = { name, address };
-  const xabiOptions = { ...options, chainIds: [chainId] };
+  const xabiOptions = { ...options };
   const endpoint = constructEndpoint(Endpoint.CONTRACTS_CONTRACT, xabiOptions, urlParams);
   return get(url, endpoint, setAuthHeaders(user, options));
 }
@@ -162,12 +160,11 @@ async function getState(user:OAuthUser, contract, options:Options) {
 
 
 function getCallArgs(callMethodArgs:CallArgs, options:Options) {
-  const { contract, method, args, value, chainid, txParams } = callMethodArgs;
+  const { contract, method, args, value, txParams } = callMethodArgs;
   const valueFixed = value instanceof BigNumber ? value.toFixed(0) : value;
   const payload = {
     contractName: contract.name,
     contractAddress: contract.address,
-    chainid,
     value: valueFixed,
     method,
     args,
@@ -278,28 +275,6 @@ async function searchWithContentRange(user:OAuthUser, contract, options:Options)
   const [start, end] = range.split("-").map(s => parseInt(s, 10));
   const contentRange = { start, end, count };
   return { data, contentRange };
-}
-
-// TODO: check options.params and options.headers in axoos wrapper.
-async function getChains(chainIds, options:Options) {
-  const url = getNodeUrl(options);
-  const endpoint = constructEndpoint(Endpoint.CHAIN, {
-    config: options.config,
-    chainIds
-  });
-  return get(url, endpoint, options);
-}
-
-async function createChain(body, options:Options) {
-  const url = getNodeUrl(options);
-  const endpoint = constructEndpoint(Endpoint.CHAIN, options);
-  return await post(url, endpoint, body, options);
-}
-
-async function createChains(body, options:Options) {
-  const url = getNodeUrl(options);
-  const endpoint = constructEndpoint(Endpoint.CHAINS, options);
-  return await post(url, endpoint, body, options);
 }
 
 async function pingOauth(user:OAuthUser, options:Options) {
@@ -460,9 +435,6 @@ export default {
   createKey,
   search,
   searchWithContentRange,
-  getChains,
-  createChain,
-  createChains,
   pingOauth,
   debugStatus,
   debugPause,
