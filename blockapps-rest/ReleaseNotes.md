@@ -1,5 +1,8 @@
 ## RELEASE NOTES
 
+### Version 8.5.0
+- removed all /chain endpoints and references to chainId
+
 ### Version 8.4.0
 - remove following obsolete endpoints and references to them: `/users/user/:address/fill` and `/version`
 
