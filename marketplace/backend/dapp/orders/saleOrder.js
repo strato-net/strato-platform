@@ -205,7 +205,7 @@ async function get(user, args, options) {
 
 async function getAll(admin, args = {}, options) {
   let saleOrders;
-  const { offset = 0, limit = 2000, order } = args;
+  const { offset, limit, order } = args;
   const newOptions = { ...options, org: 'BlockApps', app: 'Mercata' }
 
   const newCountArgs = {

@@ -20,7 +20,7 @@ class TransactionController {
                 limit: limit,
                 offset: offset,
                 order: 'createdDate.desc',
-                or: `(sellersCommonName.eq.${user},purchasersCommonName.eq.${user})`,
+                // or: `(sellersCommonName.eq.${user},purchasersCommonName.eq.${user})`,
                 id: search,
             }
 
@@ -34,7 +34,7 @@ class TransactionController {
             const TransferQuery = {
                 limit: limit,
                 offset: offset,
-                or: `(oldOwnerCommonName.eq.${user},newOwnerCommonName.eq.${user})`,
+                // or: `(oldOwnerCommonName.eq.${user},newOwnerCommonName.eq.${user})`,
                 order: 'transferDate.desc',
                 id: search
             }
@@ -44,20 +44,24 @@ class TransactionController {
                 TransferQuery['range'] = [`transferDate,${startDate},${endDate}`]
             }
 
-            let orderData, itemTransfers, outgoingRedemptions, incomingRedemptions
+            let orderData, itemTransfers, outgoingRedemptions, incomingRedemptions, count=0;
             let data = []
             if (type === 'Order' || !type) {
                 orderData = await dapp.getSaleOrders({ ...transactionQuery });
-                data = [...data, ...orderData]
+                count = count + orderData.count;
+                data = [...data, ...orderData.data]
             }
             if (type === 'Transfer' || !type) {
                 itemTransfers = await dapp.getAllItemTransferEvents(TransferQuery);
+                count = count + itemTransfers.total;
                 data = [...data, ...itemTransfers.transfers]
             }
             if (type === 'Redemption' || !type) {
-                outgoingRedemptions = await dapp.getOutgoingRedemptionRequests(redemptionQuery)
-                incomingRedemptions = await dapp.getIncomingRedemptionRequests(redemptionQuery)
-                let redemptions = [...outgoingRedemptions, ...incomingRedemptions];
+                // outgoingRedemptions = await dapp.getOutgoingRedemptionRequests(redemptionQuery)
+                // incomingRedemptions = await dapp.getIncomingRedemptionRequests(redemptionQuery)
+                const allRedemptions = await dapp.getAllRedemptionRequests(redemptionQuery)
+                count = count + Number(allRedemptions.count);
+                let redemptions = [...allRedemptions.data];
                 redemptions = redemptions.filter((value, index, self) =>
                     index === self.findIndex((t) => (
                         t.redemption_id === value.redemption_id
@@ -76,10 +80,12 @@ class TransactionController {
             assetAddress = assetAddress.map((item)=>item.assetAddress || item.assetAddresses[0])
             assetAddress = [...new Set(assetAddress)]
 
-            const queryData = {address: assetAddress, limit:2000, offset:0 }
-            const inventories = await dapp.getAllInventories({ ...queryData })
-            const inventoriesWithImageUrl = inventories?.inventories
-            const sortData = data.sort((a, b) => ( b?.transferDate || b?.redemptionDate || b?.createdDate) - ( a?.transferDate || a?.redemptionDate || a?.createdDate));
+            const queryData = {address: assetAddress, creator: process.env.SELLER, limit:2000, offset:0 }
+            const { inventories } = await dapp.getAllInventories({ ...queryData })
+            const assetsAddressArr = inventories.map(item=>item.address); 
+            const inventoriesWithImageUrl = inventories;
+            let sortData = data.sort((a, b) => ( b?.transferDate || b?.redemptionDate || b?.createdDate) - ( a?.transferDate || a?.redemptionDate || a?.createdDate));
+            sortData = sortData.filter(item=>assetsAddressArr.includes(item?.assetAddress || item?.assetAddresses[0]))  
             const newData = sortData.map((item) => {
                 const asset = inventoriesWithImageUrl.find((assetItem)=>{
                     return (assetItem.address === (item?.assetAddress || item?.assetAddresses[0]))

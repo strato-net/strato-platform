@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react";
-import { Button, Dropdown, Space, Input, Row, Col, Popover, Card, Tooltip, Select, DatePicker, Spin } from "antd";
+import { Button, Dropdown, Space, Input, Row, Col, Popover, Card, Tooltip, Select, DatePicker, Spin, Table, Pagination } from "antd";
 import { DownloadOutlined, SearchOutlined } from "@ant-design/icons";
 import { useNavigate, useLocation } from "react-router-dom";
 import classNames from "classnames";
@@ -20,13 +20,11 @@ import { useTransactionDispatch, useTransactionState } from "../../contexts/tran
 import { useMarketplaceDispatch, } from "../../contexts/marketplace";
 // Utils & Constants
 import {
-  STRATS_CONVERSION, TRANSACTION_STATUS, TRANSACTION_STATUS_CLASSES, TRANSACTION_STATUS_COLOR, 
+  STRATS_CONVERSION, TRANSACTION_STATUS, TRANSACTION_STATUS_CLASSES, TRANSACTION_STATUS_COLOR,
   DOWNLOAD_OPTIONS, REDEMPTION_STATUS, REDEMPTION_STATUS_CLASSES, US_DATE_FORMAT
 } from "../../helpers/constants";
 import { SEO } from "../../helpers/seoConstant";
 import { getStringDate } from "../../helpers/utils";
-
-const limit = '', offset = '';
 
 const TransactionTable = ({ user, download }) => {
   const StratsIcon = <img src={Images.logo} alt="" className="mx-1 w-3 h-3" />
@@ -34,13 +32,21 @@ const TransactionTable = ({ user, download }) => {
   const transactionDispatch = useTransactionDispatch();
   const marketplaceDispatch = useMarketplaceDispatch();
   // States
-  const { userTransactions, globalTransaction, isTransactionLoading } = useTransactionState();
+  const { userTransactions, globalTransaction, count, isTransactionLoading } = useTransactionState();
 
   const navigate = useNavigate();
   const location = useLocation();
 
-  const currentMonth = dayjs().startOf('month').unix();
+  const searchParams = new URLSearchParams(location.search);
+  const urlType = searchParams.get("type");
+  const urlDate = searchParams.get("date");
 
+  const currentMonth = dayjs().startOf('month').unix();
+  // const limit = urlDate ? '' : 50;
+  const limit = '100';
+  const pageSize =  urlDate ? 10 : 20;
+  const [offset, setOffset] = useState(0);
+  const [currentPage, setCurrentPage] = useState(1);
   const [type, setType] = useState("");
   const [dateQuery, setDateQuery] = useState("");
   const [transactions, setTransactions] = useState(userTransactions)
@@ -49,7 +55,7 @@ const TransactionTable = ({ user, download }) => {
 
   const formatter = new Intl.NumberFormat('en-US');
   const formattedNum = (num) => formatter.format(num);
-  const defaultDate =  dateQuery ? dayjs.unix(dayjs(dateQuery, 'MMMM YYYY').startOf('month').unix()) : dayjs.unix(currentMonth);
+  const defaultDate =  dateQuery ? dayjs.unix(dayjs(dateQuery, 'MMMM YYYY').startOf('month').unix()) : '';
 
   useEffect(() => {
     async function fetchStratsAddress() {
@@ -67,13 +73,13 @@ const TransactionTable = ({ user, download }) => {
         limit,
         offset,
         user?.commonName,
-        dateReturn(dateQuery)
+        dateReturn(dateQuery),
       );
     }
     if (user?.commonName && !dateQuery) {
-      const startOfMonth = dayjs().startOf('month').unix();
+      const startOfMonth = dayjs().subtract(2, 'month').startOf('month').unix();
       const endOfMonth = dayjs().endOf('month').unix();
-      const dateArr = [startOfMonth, endOfMonth]
+      const dateArr = [startOfMonth, endOfMonth];
       transactionAction.fetchUserTransaction(
         transactionDispatch,
         limit,
@@ -82,21 +88,16 @@ const TransactionTable = ({ user, download }) => {
         dateArr
       );
     }
-  }, [user, dateQuery])
+  }, [user, dateQuery, offset])
 
   useEffect(() => {
-    const searchParams = new URLSearchParams(location.search);
-    const urlType = searchParams.get("type");
-    const urlDate = searchParams.get("date");
     // Update state based on URL params, but skip empty values
     setType(urlType && urlType !== "all" ? urlType : "");
     setDateQuery(urlDate || "");
   }, [location.search]);
-  
 
   useEffect(() => {
     let filteredData = userTransactions;
-  
     // Type filter
     if (type) {
       if (type === "STRATS") {
@@ -130,7 +131,7 @@ const TransactionTable = ({ user, download }) => {
         return itemDate.isSame(selectedMonthYear, 'month') && itemDate.isSame(selectedMonthYear, 'year');
       });
     }
-
+    setCurrentPage(1)
     setTransactions(filteredData);
   }, [userTransactions, type, search, dateQuery]);
   
@@ -338,6 +339,14 @@ const TransactionTable = ({ user, download }) => {
 
   const metaImg = SEO.IMAGE_META;
 
+  const handlePageChange
+    = (page) => {
+      setCurrentPage(page);
+    };
+
+  const paginatedTransactions = transactions.slice((currentPage - 1) * pageSize, currentPage * pageSize);
+
+
   return (
     <Row>
       <Col span={24} className="w-full min-h-[160px] py-4 px-4 md:min-h-[96px] bg-[#F6F6F6] flex flex-col md:flex-row lg:px-14 justify-between items-center mt-6 lg:mt-8 sticky top-14 z-10 shadow-header">
@@ -405,16 +414,36 @@ const TransactionTable = ({ user, download }) => {
       <Col span={22} className="mx-auto mt-5">
         <div className="flex md:hidden order_responsive">
           {isTransactionLoading ? <Spin className="mx-auto" /> 
-          : <TransactionResponsive data={transactions} user={user} />}
+            : <div className="flex flex-col mx-auto">
+              <TransactionResponsive data={paginatedTransactions} user={user} />
+              {urlDate && <Pagination
+                className="mx-auto mt-5"
+                total={transactions.length}
+                current={currentPage}
+                pageSize={pageSize}
+                onChange={handlePageChange}
+                showSizeChanger={false}
+              />}
+            </div>}
         </div>
-        <div className="hidden md:block">
+        <div className="hidden flex flex-col md:block mx:auto">
+          <Spin spinning={isTransactionLoading} delay={500} size="large">
           <DataTableComponent
             columns={column}
-            data={transactions}
+            data={paginatedTransactions}
             isLoading={isTransactionLoading}
             pagination={false}
             scrollX="100%"
           />
+            <div className="flex justify-between">{urlDate && <Pagination
+                className="mx-auto w-88 mt-5"
+                total={transactions.length}
+                current={currentPage}
+                pageSize={pageSize}
+                onChange={handlePageChange}
+                showSizeChanger={false}
+              />}</div>
+          </Spin>
         </div>
       </Col>
     </Row>
