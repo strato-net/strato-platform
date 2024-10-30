@@ -3,7 +3,7 @@ import util from "../util/util";
 import fsUtil from "../util/fsUtil";
 import assert from "../util/assert";
 import BigNumber from "bignumber.js";
-import { Chain, Options, SendTx } from "../types"
+import { Options, SendTx } from "../types"
 
 import * as ip from "ip";
 
@@ -124,27 +124,6 @@ function createCallListArgs(contract, method, args, value, count = 2) {
   return callArgsList;
 }
 
-const createChainArgs = (uid, members) => {
-  const contractName = `TestContract_${uid}`;
-  const memberList = members.map(address => {
-    return { orgName: 'BlockApps', access: true };
-  });
-  const balanceList = members.map(address => {
-    return { address: address, balance };
-  });
-
-  const chain:Chain = {
-    label: `airline-${uid}`,
-    src: `contract ${contractName} { constructor(){} }`,
-    args: {},
-    members: memberList,
-    balances: balanceList,
-    contractName
-  };
-
-  return { chain, contractName };
-};
-
 export default {
   createAdmin,
   createContractArgs,
@@ -156,7 +135,6 @@ export default {
   createSendTxArgsArr,
   createCallArgs,
   createCallListArgs,
-  createChainArgs,
   createCompileContractsArgs,
   getTestConfig,
   getTestFixtures
