@@ -108,10 +108,10 @@ function bindAddress(user, address, options) {
 
 async function get(user, args, options) {
     const { address, assetToBeSold, state, ...restArgs } = args;
-    const newOptions = { ...options, org: 'David Nallapu', app: 'Mercata' }
+    const newOptions = { ...options, org: 'david nallapu', app: 'Mercata' }
     let sale;
     let searchArgs;
-    const newArgs = { ...restArgs, queryOptions: { 'select': '*,David Nallapu-Mercata-Sale-paymentServices(*)' } }
+    const newArgs = { ...restArgs, queryOptions: { 'select': '*,david nallapu-Mercata-Sale-paymentServices(*)' } }
 
     if (assetToBeSold) {
         searchArgs = setSearchQueryOptions(newArgs,
@@ -182,7 +182,7 @@ async function getAllSaleHistory(user, args, options) {
 
 async function getAll(admin, args = {}, defaultOptions) {
     const { saleAddresses, assetAddresses, isOpen, range, saleGtField, saleGtValue, ...restArgs } = args;
-    const options = { ...defaultOptions, org: 'David Nallapu', app: 'Mercata' }
+    const options = { ...defaultOptions, org: 'david nallapu', app: 'Mercata' }
     let sales;
     if (assetAddresses) {
         sales = await searchAllWithQueryArgs(contractName, {
@@ -191,14 +191,14 @@ async function getAll(admin, args = {}, defaultOptions) {
             gtValue: saleGtValue,
             isOpen: isOpen,
             range: range,
-            queryOptions: { 'select': '*,David Nallapu-Mercata-Sale-paymentServices(*)' }
+            queryOptions: { 'select': '*,david nallapu-Mercata-Sale-paymentServices(*)' }
         }, options, admin);
     }
     else {
         sales = await searchAllWithQueryArgs(contractName, {
             address: saleAddresses,
             isOpen: isOpen,
-            queryOptions: { 'select': '*,David Nallapu-Mercata-Sale-paymentServices(*)' },
+            queryOptions: { 'select': '*,david nallapu-Mercata-Sale-paymentServices(*)' },
             ...restArgs,
         }, options, admin);
     }

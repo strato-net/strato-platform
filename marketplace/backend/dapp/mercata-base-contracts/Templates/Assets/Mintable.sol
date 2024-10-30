@@ -59,8 +59,8 @@ abstract contract Mintable is Redeemable {
             originAddress,
             address(0),
             "",
-            owner,
-            ownerCommonName,
+            getCurrentOwner(),
+            getCurrentOwnerCommonName(),
             itemNumber + quantity,
             itemNumber + quantity + _quantity - 1
         );

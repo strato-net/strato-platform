@@ -168,7 +168,7 @@ function bindAddress(user, address, options) {
 
 async function get(user, args, options) {
   const { address, ...restArgs } = args;
-  const newOptions = { ...options, org: 'David Nallapu', app: 'Mercata' }
+  const newOptions = { ...options, org: 'david nallapu', app: 'Mercata' }
   let order;
 
   let searchArgs = {
@@ -206,7 +206,7 @@ async function get(user, args, options) {
 async function getAll(admin, args = {}, options) {
   let saleOrders;
   const { offset = 0, limit = 2000, order } = args;
-  const newOptions = { ...options, org: 'David Nallapu', app: 'Mercata' }
+  const newOptions = { ...options, org: 'david nallapu', app: 'Mercata' }
 
   const newCountArgs = {
     ...args,

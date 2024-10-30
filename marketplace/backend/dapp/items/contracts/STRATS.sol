@@ -1,5 +1,3 @@
-pragma "solidvm12.0";
-
 import "./Tokens.sol";
 import "../../mercata-base-contracts/Templates/Payments/StratPaymentService.sol";
 

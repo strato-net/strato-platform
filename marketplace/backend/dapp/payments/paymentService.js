@@ -5,7 +5,7 @@ import { setSearchQueryOptions, search, searchOne, searchAll, searchAllWithQuery
 // import dayjs from 'dayjs';
 
 
-const tablePrefix = 'David Nallapu-Mercata-';
+const tablePrefix = 'david nallapu-Mercata-';
 const contractName = 'PaymentService';
 const externalContractName = 'ExternalPaymentService';
 const onboardedEventName = 'PaymentService.SellerOnboarded';
@@ -154,7 +154,7 @@ function bindAddress(user, address, options) {
 
 async function get(user, args, defaultOptions) {
     const { ownerCommonName, name, address, accountId, accountDeauthorized, transaction_sender, ...restArgs } = args;
-    const options = { ...defaultOptions, org: 'David Nallapu', app: 'Mercata' }
+    const options = { ...defaultOptions, org: 'david nallapu', app: 'Mercata' }
     let paymentService;
 
     if (address) {
@@ -180,7 +180,7 @@ async function get(user, args, defaultOptions) {
 
 async function getAll(admin, args = {}, baseOptions) {
     const { onlyActive, ...restArgs } = args;
-    const options = { ...baseOptions, org: 'David Nallapu', app: 'Mercata' };
+    const options = { ...baseOptions, org: 'david nallapu', app: 'Mercata' };
     let searchArgs;
     if (onlyActive) {
       searchArgs = setSearchQueryOptions(restArgs, [{ key: 'isActive', value: 'true' }]) 

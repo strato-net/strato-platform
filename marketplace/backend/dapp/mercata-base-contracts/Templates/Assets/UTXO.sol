@@ -36,17 +36,16 @@ abstract contract UTXO is Asset {
         // Create a new UTXO with a portion of the units
         try {
             // This is a hack to prevent the splitted UTXO from infinitely creating new UTXOs
-            assert(UTXO(owner).utxoMagicNumber() == utxoMagicNumber);
-            owner = _newOwner;
-            ownerCommonName = getCommonName(_newOwner);
+            assert(UTXO(getCurrentOwner()).utxoMagicNumber() == utxoMagicNumber);
+            changeOwner(_newOwner);
         } catch {
             
             if(_isUserTransfer && _transferNumber>0){
             // Emit ItemTransfers Event
                 emit ItemTransfers(
                     originAddress,
-                    owner,
-                    ownerCommonName,
+                    getCurrentOwner(),
+                    getCurrentOwnerCommonName(),
                     _newOwner,
                     getCommonName(_newOwner),
                     name,
@@ -61,8 +60,8 @@ abstract contract UTXO is Asset {
 
             emit OwnershipTransfer(
                 originAddress,
-                owner,
-                ownerCommonName,
+                getCurrentOwner(),
+                getCurrentOwnerCommonName(),
                 _newOwner,
                 getCommonName(_newOwner),
                 itemNumber,

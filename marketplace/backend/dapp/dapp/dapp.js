@@ -883,8 +883,8 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
     if(item?.saleAddresses?.length){
       saleAddressArr.push(item?.saleAddresses[0])
      return {...item,saleAddress:item?.saleAddresses[0]}
-    }else if(item["David Nallapu-Mercata-Order-saleAddresses"]){
-      const address = item["David Nallapu-Mercata-Order-saleAddresses"][0]?.value
+    }else if(item["david nallapu-Mercata-Order-saleAddresses"]){
+      const address = item["david nallapu-Mercata-Order-saleAddresses"][0]?.value
       saleAddressArr.push(address)
      return {...item, saleAddress:address  }
     }else{
@@ -927,7 +927,7 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
       const order = await saleOrderJs.get(rawAdmin, args, options);
 
       // Extracting the sale addresses
-      const saleAddresses = order.saleAddresses ? order.saleAddresses : order["David Nallapu-Mercata-Order-saleAddresses"].map(item => item.value);
+      const saleAddresses = order.saleAddresses ? order.saleAddresses : order["david nallapu-Mercata-Order-saleAddresses"].map(item => item.value);
       const sales = await saleJs.getAll(rawAdmin, { saleAddresses: saleAddresses }, options);
       let assets = [];
 
@@ -979,8 +979,8 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
       let saleAddresses = [];
 
       orders.orders.forEach(order => {
-        if (order['David Nallapu-Mercata-Order-saleAddresses'] && Array.isArray(order['David Nallapu-Mercata-Order-saleAddresses'])) {
-          order['David Nallapu-Mercata-Order-saleAddresses'].forEach(saleAddress => {
+        if (order['david nallapu-Mercata-Order-saleAddresses'] && Array.isArray(order['david nallapu-Mercata-Order-saleAddresses'])) {
+          order['david nallapu-Mercata-Order-saleAddresses'].forEach(saleAddress => {
             if (saleAddress.value) {
               saleAddresses.push(saleAddress.value);
             }
@@ -1199,7 +1199,7 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
     if (currentPaymentService[0].contract_name.includes('StratPaymentService')) {
       const orderEvent = await rest.searchUntil(
         rawAdmin,
-        { name: "David Nallapu-Mercata-PaymentService.Order" },
+        { name: "david nallapu-Mercata-PaymentService.Order" },
         (r) => r.length === 1,
         {
           ...options,
@@ -1218,7 +1218,7 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
   contract.waitForOrderEvent = async function (args, options = defaultOptions) {
       const orderEvent = await rest.searchUntil(
         rawAdmin,
-        { name: "David Nallapu-Mercata-PaymentService.Order" },
+        { name: "david nallapu-Mercata-PaymentService.Order" },
         (r) => r.length === 1,
         {
           ...options,

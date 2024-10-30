@@ -1,7 +1,7 @@
 pragma es6;
 pragma strict;
 
-import <BASE_CODE_COLLECTION>;
+
 
 contract TokenPaymentService is PaymentService {   
     // TODO: receipts for minting/removing?
@@ -112,8 +112,8 @@ constructor (
             Sale s = Sale(_saleAddresses[i]);
             Asset a = s.assetToBeSold();
             assets.push(address(a));
-            sellerCommonName = getCommonName(a.owner());
-            sellerAddress = a.owner();
+            sellerCommonName = getCommonName(a.getCurrentOwner());
+            sellerAddress = a.getCurrentOwner();
             uint quantity = _quantities[i];
 
             // Lock assets

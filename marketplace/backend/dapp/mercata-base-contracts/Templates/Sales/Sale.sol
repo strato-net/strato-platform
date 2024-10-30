@@ -39,7 +39,7 @@ abstract contract Sale is Utils {
     }
 
     modifier requireSeller(string action) {
-        string sellersCommonName = assetToBeSold.ownerCommonName();
+        string sellersCommonName = assetToBeSold.getCurrentOwnerCommonName();
         string err = "Only "
                    + sellersCommonName
                    + " can perform "
@@ -55,7 +55,7 @@ abstract contract Sale is Utils {
     }
 
     modifier requireSellerOrPaymentService(string action) {
-        string sellersCommonName = assetToBeSold.ownerCommonName();
+        string sellersCommonName = assetToBeSold.getCurrentOwnerCommonName();
         string commonName = getCommonName(msg.sender);
         bool isAuthorized = commonName == sellersCommonName
                          || isPaymentService(msg.sender);

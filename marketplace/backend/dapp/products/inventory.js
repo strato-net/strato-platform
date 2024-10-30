@@ -361,7 +361,7 @@ async function updateSale(admin, contract, _args, options) {
 
 async function get(user, args, options) {
     const { address, ...restArgs } = args;
-    const newOptions = { ...options, org: 'David Nallapu', app: 'Mercata' }
+    const newOptions = { ...options, org: 'david nallapu', app: 'Mercata' }
     let inventory;
 
     const searchArgs = setSearchQueryOptions(restArgs, [
@@ -385,13 +385,13 @@ async function get(user, args, options) {
             price: sale.price,
             saleAddress: sale.address,
             saleQuantity: sale.quantity,
-            paymentServices: sale ? (sale['David Nallapu-Mercata-Sale-paymentServices'] ? sale['David Nallapu-Mercata-Sale-paymentServices'] : null) : null
+            paymentServices: sale ? (sale['david nallapu-Mercata-Sale-paymentServices'] ? sale['david nallapu-Mercata-Sale-paymentServices'] : null) : null
         }
     }
 
     // Sort the images and files by their order
-    if (inventory['David Nallapu-Mercata-Asset-images']) {
-        inventory['David Nallapu-Mercata-Asset-images'].sort((a, b) => {
+    if (inventory['david nallapu-Mercata-Asset-images']) {
+        inventory['david nallapu-Mercata-Asset-images'].sort((a, b) => {
             return parseInt(a.key) - parseInt(b.key);
         });
     }
@@ -410,7 +410,7 @@ async function getAll(admin, args = {}, defaultOptions) {
     let inventories;
     let sales;
     let finalInventory = [];
-    const options = { ...defaultOptions, org: 'David Nallapu', app: 'Mercata' };
+    const options = { ...defaultOptions, org: 'david nallapu', app: 'Mercata' };
 
     if (isTrendingSearch) {
         // Fetch the sales first
@@ -438,7 +438,7 @@ async function getAll(admin, args = {}, defaultOptions) {
                         saleAddress: itemSale?.address,
                         saleQuantity: itemSale?.quantity,
                         saleDate: itemSale?.block_timestamp,
-                        paymentServices: itemSale ? (itemSale['David Nallapu-Mercata-Sale-paymentServices'] ? itemSale['David Nallapu-Mercata-Sale-paymentServices'] : null) : null,
+                        paymentServices: itemSale ? (itemSale['david nallapu-Mercata-Sale-paymentServices'] ? itemSale['david nallapu-Mercata-Sale-paymentServices'] : null) : null,
                         totalLockedQuantity: itemSale?.totalLockedQuantity
                     });
                 }
@@ -473,8 +473,8 @@ async function getAll(admin, args = {}, defaultOptions) {
         // Sales only has price and quantity fields to filter, so better to join sales on asset table (asset has multiple filters for each route). 
         if (inventories) {
             inventories.forEach(inventory => {
-                if (inventory['David Nallapu-Mercata-Sale'] && inventory['David Nallapu-Mercata-Sale'].length > 0) {
-                    let sales = inventory['David Nallapu-Mercata-Sale']
+                if (inventory['david nallapu-Mercata-Sale'] && inventory['david nallapu-Mercata-Sale'].length > 0) {
+                    let sales = inventory['david nallapu-Mercata-Sale']
                         .filter(sale => sale.isOpen === true);
 
                     // Filter by quantity if userProfile is present
@@ -500,8 +500,8 @@ async function getAll(admin, args = {}, defaultOptions) {
                                 saleQuantity: sales[0]?.quantity,
                                 saleDate: sales[0]?.block_timestamp,
                                 totalLockedQuantity: sales[0]?.totalLockedQuantity,
-                                paymentServices: sales[0] ? (sales[0]['David Nallapu-Mercata-Sale-paymentServices'] ? sales[0]['David Nallapu-Mercata-Sale-paymentServices'] : null) : null,
-                                'David Nallapu-Mercata-Sale': undefined  // Removing the nested sale data to avoid redundancy
+                                paymentServices: sales[0] ? (sales[0]['david nallapu-Mercata-Sale-paymentServices'] ? sales[0]['david nallapu-Mercata-Sale-paymentServices'] : null) : null,
+                                'david nallapu-Mercata-Sale': undefined  // Removing the nested sale data to avoid redundancy
                             });
                         }
                     } else { // Just combine the data if userProfile is not present
@@ -512,8 +512,8 @@ async function getAll(admin, args = {}, defaultOptions) {
                             saleQuantity: sales[0]?.quantity,
                             saleDate: sales[0]?.block_timestamp,
                             totalLockedQuantity: sales[0]?.totalLockedQuantity,
-                            paymentServices: sales[0] ? (sales[0]['David Nallapu-Mercata-Sale-paymentServices'] ? sales[0]['David Nallapu-Mercata-Sale-paymentServices'] : null) : null,
-                            'David Nallapu-Mercata-Sale': undefined  // Removing the nested sale data to avoid redundancy
+                            paymentServices: sales[0] ? (sales[0]['david nallapu-Mercata-Sale-paymentServices'] ? sales[0]['david nallapu-Mercata-Sale-paymentServices'] : null) : null,
+                            'david nallapu-Mercata-Sale': undefined  // Removing the nested sale data to avoid redundancy
                         });
                     }
                 } else if (isMarketplaceSearch && isNullPriceRange) {
@@ -535,8 +535,8 @@ async function getAll(admin, args = {}, defaultOptions) {
     // Sort the images and files by their order
     return finalInventory
       ? finalInventory.map((inventory) => {
-          if (inventory["David Nallapu-Mercata-Asset-images"]) {
-            inventory["David Nallapu-Mercata-Asset-images"].sort(
+          if (inventory["david nallapu-Mercata-Asset-images"]) {
+            inventory["david nallapu-Mercata-Asset-images"].sort(
               (a, b) => parseInt(a.key) - parseInt(b.key)
             );
           }
@@ -548,7 +548,7 @@ async function getAll(admin, args = {}, defaultOptions) {
 
 
 async function getAllItemTransferEvents(admin, args = {}, defaultOptions) {
-    const options = { ...defaultOptions, org: 'David Nallapu', app: 'Mercata' }
+    const options = { ...defaultOptions, org: 'david nallapu', app: 'Mercata' }
     let itemTransferEvents = await searchAllWithQueryArgs(`${contractName}.${contractEvents.ITEM_TRANSFER}`, args, options, admin);
     itemTransferEvents = itemTransferEvents.map((item)=>({...item, type: 'Transfer'}))
 
@@ -560,7 +560,7 @@ async function getAllItemTransferEvents(admin, args = {}, defaultOptions) {
 
 async function getOwnershipHistory(user, args, options) {
     const { originAddress, minItemNumber, maxItemNumber } = args;
-    const newOptions = { ...options, org: 'David Nallapu', app: 'Mercata' }
+    const newOptions = { ...options, org: 'david nallapu', app: 'Mercata' }
     const searchArgs = {
         originAddress,
         gteField: 'maxItemNumber',
@@ -575,7 +575,7 @@ async function getOwnershipHistory(user, args, options) {
 }
 
 async function inventoryCount(admin, args = {}, defaultOptions) {
-    const options = { ...defaultOptions, org: 'David Nallapu', app: 'Mercata' }
+    const options = { ...defaultOptions, org: 'david nallapu', app: 'Mercata' }
     const { range, userProfile, userProfileGtField, userProfileGtValue, ...newArgs } = args;
     const queryArgs = setSearchQueryOptionsPrime({
         ...newArgs,
@@ -601,7 +601,7 @@ async function inventoryCount(admin, args = {}, defaultOptions) {
 
 async function checkSaleQuantity(admin, args, defaultOptions) {
     const { saleAddresses, orderQuantity } = args; // Assuming orderQuantity here is used differently now
-    const options = { ...defaultOptions, org: 'David Nallapu', app: 'Mercata' };
+    const options = { ...defaultOptions, org: 'david nallapu', app: 'Mercata' };
 
     // Fetch sales and assets data
     const sales = await saleJs.getAll(admin, { address: saleAddresses }, options);

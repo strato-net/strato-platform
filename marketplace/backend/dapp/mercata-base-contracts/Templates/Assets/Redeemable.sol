@@ -59,7 +59,7 @@ abstract contract Redeemable is UTXO {
 
         UTXO newAsset = mint(_quantity);
         quantity -= _quantity;
-        uint restStatus = Redeemable(newAsset).issueRedemptionRequest(_redemptionId, owner);
+        uint restStatus = Redeemable(newAsset).issueRedemptionRequest(_redemptionId, getCurrentOwner());
 
         return (restStatus, address(newAsset));
     }

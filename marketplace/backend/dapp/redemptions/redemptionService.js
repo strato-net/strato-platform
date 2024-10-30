@@ -77,7 +77,7 @@ function marshalOut(_args) {
 
 async function get(user, args, defaultOptions) {
     const { address, ...restArgs } = args;
-    const options = { ...defaultOptions, org: 'David Nallapu', app: 'Mercata' }
+    const options = { ...defaultOptions, org: 'david nallapu', app: 'Mercata' }
     let redemptionService;
     let searchArgs;
 
@@ -93,14 +93,14 @@ async function get(user, args, defaultOptions) {
 }
 
 async function getAll(admin, args = {}, baseOptions) {
-    const options = { ...baseOptions, org: 'David Nallapu', app: 'Mercata' };
+    const options = { ...baseOptions, org: 'david nallapu', app: 'Mercata' };
     const searchArgs = setSearchQueryOptions(args, [{ key: 'isActive', value: 'true' }])
     const redemptionServices = await searchAllWithQueryArgs(contractName, searchArgs, options, admin);
     return redemptionServices.map((redemptionService) => marshalOut(redemptionService));
 }
 
 async function getRedemptions(admin, args = {}, baseOptions) {
-    const options = { ...baseOptions, org: 'David Nallapu', app: 'Mercata' };
+    const options = { ...baseOptions, org: 'david nallapu', app: 'Mercata' };
     const redemptions = await searchAllWithQueryArgs(eventName, args, options, admin);
     return redemptions;
 }

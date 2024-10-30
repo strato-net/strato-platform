@@ -1,7 +1,3 @@
-pragma solidvm12.0;
-
-import <BASE_CODE_COLLECTION>;
-import "../../../items/contracts/STRATS.sol";
 
 contract StratPaymentService is PaymentService {
     address public stratAddress;
@@ -54,7 +50,7 @@ contract StratPaymentService is PaymentService {
             Sale s = Sale(_saleAddresses[i]);
             Asset a = s.assetToBeSold();
             assets.push(address(a));
-            sellerAddress = a.owner();
+            sellerAddress = a.getCurrentOwner();
             sellerCommonName = getCommonName(sellerAddress);
             uint quantity = _quantities[i];
 
@@ -101,9 +97,8 @@ contract StratPaymentService is PaymentService {
 
             // Transfer STRATS
             uint remainingStratsToTransfer = stratAmountNet;
-            uint remainingFeeToTransferToFeeReceipient = uint(stratFee / 2);
-            uint remainingFeeToTransferToProposer = stratFee - remainingFeeToTransferToFeeReceipient;
-
+            uint remainingFeeToTransferToBA = stratFee/2;
+            uint remainingFeeToTransferToProposer = stratFee - remainingFeeToTransferToBA;
             uint stratQuantity = 0;
             uint transferAmount = 0;
             uint transferFee = 0;
@@ -111,69 +106,34 @@ contract StratPaymentService is PaymentService {
             for (uint j = 0; j < _stratsAssetAddresses.length; j++) {
                 STRATSTokens stratAsset = STRATSTokens(_stratsAssetAddresses[j]);
                 require(stratAsset.root == stratAddress, "Asset is not a STRATS asset");
-                require(stratAsset.ownerCommonName() == getCommonName(msg.sender), "Purchaser doesn't own STRATS");
                 stratQuantity = stratAsset.quantity();
                 transferNumber = (uint(_checkoutHash, 16) + j) % 1000000;
                 if (remainingStratsToTransfer > 0) {
                     transferAmount = stratQuantity >= remainingStratsToTransfer ? remainingStratsToTransfer : stratQuantity;
                     stratAsset.purchaseTransfer(sellerAddress, transferAmount, transferNumber, 0.0001);
                     remainingStratsToTransfer -= transferAmount;
-                    stratQuantity -= transferAmount;
                 }
-
-                if (remainingFeeToTransferToFeeReceipient > 0 && stratQuantity > 0) {
-                    
-                    transferFee = stratQuantity >= remainingFeeToTransferToFeeReceipient ? remainingFeeToTransferToFeeReceipient : stratQuantity;
-                    stratAsset.purchaseTransfer(feeRecipient, transferFee);
-                    remainingFeeToTransferToFeeReceipient -= transferFee;
-                    stratQuantity -= transferFee
-                }
-
-                if (remainingFeeToTransferToProposer > 0 && stratQuantity > 0) {
-                    
-                    transferFee = stratQuantity >= remainingFeeToTransferToProposer ? remainingFeeToTransferToProposer : stratQuantity;
-                    stratAsset.purchaseTransfer(block.proposer, transferFee); //sends 50% of fee to block proposer
-                    remainingFeeToTransferToProposer -= transferFee;
-                }
-
-                if (remainingStratsToTransfer == 0 && remainingFeeToTransferToFeeReceipient == 0 && remainingFeeToTransferToProposer == 0) {
-                    break;
-                }
-            }
-            require(remainingStratsToTransfer == 0 && remainingFeeToTransferToFeeReceipient == 0 && remainingFeeToTransferToProposer == 0, "Failed to fulfill STRATS payment");
                 stratQuantity = stratQuantity - transferAmount;
                 if (remainingFeeToTransferToBA > 0 && stratQuantity > 0) {
-                if (remainingFeeToTransferToFeeReceipient > 0 && stratQuantity > 0){
                     transferNumber = (uint(_checkoutHash, 16) + j + block.timestamp) % 1000000;
                     transferFee = stratQuantity >= remainingFeeToTransferToBA ? remainingFeeToTransferToBA : stratQuantity;
-                    transferFee = stratQuantity >= remainingFeeToTransferToFeeReceipient ? remainingFeeToTransferToFeeReceipient : stratQuantity;
                     stratAsset.purchaseTransfer(feeRecipient, transferFee, transferNumber, 0.0001);
                     remainingFeeToTransferToBA -= transferFee;
                 }
                 if (remainingFeeToTransferToProposer > 0 && stratQuantity > 0) {
                     transferNumber = (uint(_checkoutHash, 16) + j + block.timestamp) % 1000000;
                     transferFee = stratQuantity >= remainingFeeToTransferToProposer ? remainingFeeToTransferToProposer : stratQuantity;
-                    s.assetToBeSold().payFeesToProposer(STRATSTokens stratAsset, );
-                    remainingFeeToTransferToProposer -= transferFee;
-                    remainingFeeToTransferToFeeReceipient -= transferFee;
-                }
-
-                if (remainingFeeToTransferToProposer > 0 && stratQuantity > 0) {
-                    transferNumber = (uint(_checkoutHash, 16) + j + _stratsAssetAddresses.length + block.timestamp) % 1000000;
-                    transferFee = stratQuantity >= remainingFeeToTransferToProposer ? remainingFeeToTransferToProposer : stratQuantity;
-                    stratAsset.purchaseTransfer(block.proposer, transferFee, transferNumber, 0.0001); //sends 50% of fee to block proposer
+                    s.assetToBeSold().payFeesToProposer(stratAsset, transferFee, transferNumber);
                     remainingFeeToTransferToProposer -= transferFee;
                 }
-
                 transferAmount = 0;
 
-                if (remainingStratsToTransfer == 0 && remainingFeeToTransferToFeeReceipient == 0 && remainingFeeToTransferToProposerToBA == 0 && remainingFeeToTransferToProposer ==0) {
+                if (remainingStratsToTransfer == 0 && remainingFeeToTransferToBA == 0 && remainingFeeToTransferToProposer ==0) {
                     break;
                 }
             }
             require(remainingStratsToTransfer == 0, err);
-            require(remainingFeeToTransferToFeeReceipient == 0, feeErr);
-            require(remainingFeeToTransferToProposerToBA == 0, feeErr);
+            require(remainingFeeToTransferToBA == 0, feeErr);
             require(remainingFeeToTransferToProposer == 0, feeErr);
 
             // Transfer assets
@@ -186,7 +146,7 @@ contract StratPaymentService is PaymentService {
                     address(s).call("completeSale");
                 }
             }
-        
+        }
         emit Order(
             _checkoutHash,
             _checkoutId,
@@ -203,12 +163,13 @@ contract StratPaymentService is PaymentService {
             "STRATS",
             PaymentStatus.CLOSED,
             _createdDate,
-            _comments
+            _comments,
+            block.proposer
         );
         purchasersAddress = address(0); // Support for legacy sales
         purchasersCommonName = "";
         return (_checkoutHash, assets);
-    }}
+    }
 
     function updateFeeRecipient(
         address _feeRecipient
