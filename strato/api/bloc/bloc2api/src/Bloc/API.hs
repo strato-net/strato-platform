@@ -11,14 +11,12 @@ module Bloc.API
     module Bloc.API.Git,
     module Bloc.API.Users,
     module Bloc.API.Contracts,
-    module Bloc.API.Chain,
     module Bloc.API.Transaction,
     module Bloc.API.Utils,
   )
 where
 
 import API.Parametric
-import Bloc.API.Chain
 import Bloc.API.Contracts
 import Bloc.API.Git
 import Bloc.API.Transaction
@@ -48,12 +46,6 @@ type BlocAPI r hs =
     -- /search endpoints
     :<|> GetBlocTransactionResult
     :<|> PostBlocTransactionResults
-    -- /chain endpoints
-    :<|> PostChainInfo r hs
-    :<|> GetSingleChainInfo
-    -- /chains endpoints
-    :<|> PostChainInfos r hs
-    :<|> GetChainInfo
     -- /transaction endpoints
     :<|> PostBlocTransactionParallel r hs
     :<|> PostBlocTransactionBody r hs

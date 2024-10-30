@@ -58,6 +58,6 @@ server = do
   status <- runStratoRedisIO getSyncStatus
   nodeBestBlock <- runStratoRedisIO getBestBlockInfo
   worldBestBlock <- runStratoRedisIO getWorldBestBlockInfo
-  let nodeTotalDiff = bestBlockTotalDifficulty <$> nodeBestBlock
-      worldTotalDiff = bestBlockTotalDifficulty <$> worldBestBlock
-  pure $ SyncStatus status worldTotalDiff nodeTotalDiff
+  let nodeNumber = bestBlockNumber <$> nodeBestBlock
+      worldNumber = bestBlockNumber <$> worldBestBlock
+  pure $ SyncStatus status worldNumber nodeNumber

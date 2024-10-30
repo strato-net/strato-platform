@@ -11,13 +11,10 @@
 
 module Handlers.Stats
   ( API,
-    TotalTxAPI,
-    TotalDifficultyAPI,
     server,
   )
 where
 
-import Blockchain.DB.DetailsDB
 import Blockchain.DB.SQLDB
 import Blockchain.Data.DataDefs
 import Control.Monad.Change.Modify
@@ -26,20 +23,6 @@ import Data.Aeson
 import Data.Swagger
 import qualified Database.Esqueleto.Legacy as E
 import Servant
-
-newtype TotalDifficulty = TotalDifficulty Integer
-
-instance ToJSON TotalDifficulty where
-  toJSON (TotalDifficulty td) = object ["difficulty" .= td]
-
-instance FromJSON TotalDifficulty where
-  parseJSON (Object o) = TotalDifficulty <$> o .: "difficulty"
-  parseJSON e = fail $ "FromJSON TotalDifficulty: Expected object, got " ++ show e
-
-instance ToSchema TotalDifficulty where
-  declareNamedSchema _ =
-    return $
-      NamedSchema (Just "TotalDifficulty") mempty
 
 newtype TransactionCount = TransactionCount Integer
 
@@ -55,17 +38,13 @@ instance ToSchema TransactionCount where
     return $
       NamedSchema (Just "TransactionCount") mempty
 
-type API = TotalTxAPI :<|> TotalDifficultyAPI
-type TotalTxAPI = "stats" :> "totaltx" :> Get '[JSON] TransactionCount
-type TotalDifficultyAPI = "stats" :> "difficulty" :> Get '[JSON] TotalDifficulty
+type API =
+  "stats" :> "totaltx" :> Get '[JSON] TransactionCount
 
 server :: HasSQL m => ServerT API m
-server = getStatTx :<|> getStatDiff
+server = getStatTx
 
 ---------------------
-
-instance HasSQL m => Accessible TotalDifficulty m where
-  access _ = TotalDifficulty . blockDataRefTotalDifficulty <$> getBestBlock
 
 instance HasSQL m => Accessible TransactionCount m where
   access _ = do
@@ -74,9 +53,6 @@ instance HasSQL m => Accessible TransactionCount m where
     where
       myval ((E.Value v) : _) = v
       myval _ = 0
-
-getStatDiff :: Accessible TotalDifficulty m => m TotalDifficulty
-getStatDiff = access (Proxy @TotalDifficulty)
 
 getStatTx :: Accessible TransactionCount m => m TransactionCount
 getStatTx = access (Proxy @TransactionCount)

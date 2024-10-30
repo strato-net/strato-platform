@@ -62,7 +62,6 @@ import qualified Handlers.AccountInfo as Account
 import qualified Handlers.BatchTransactionResult as BatchTransactionResult
 import qualified Handlers.BlkLast as BlkLast
 import qualified Handlers.Block as Block
-import qualified Handlers.Chain as Chain
 import qualified Handlers.Faucet as Faucet
 import qualified Handlers.IdentityServerCallback as Identity
 import qualified Handlers.Metadata as Metadata
@@ -164,7 +163,6 @@ type CoreAPI =
            :<|> BatchTransactionResult.API
            :<|> BlkLast.API
            :<|> Block.API
-           :<|> Chain.API
            :<|> Faucet.API
            :<|> Identity.API
            :<|> Metadata.API
@@ -200,7 +198,6 @@ coreServer =
     :<|> BatchTransactionResult.server
     :<|> BlkLast.server
     :<|> Block.server
-    :<|> Chain.server
     :<|> Faucet.server
     :<|> Identity.server
     :<|> Metadata.server
@@ -231,9 +228,6 @@ coreProxyServer =
     :<|> (\a -> blocStrato $ client (Proxy @BatchTransactionResult.API) a)
     :<|> (\a -> blocStrato $ client (Proxy @BlkLast.API) a)
     :<|> (\a b c d e f g h i j k l m n o p q r s t -> blocStrato $ client (Proxy @Block.API) a b c d e f g h i j k l m n o p q r s t)
-    :<|> ((\a b c d -> blocStrato $ Chain.getChainClient a b c d)
-      :<|> (\a -> blocStrato $ Chain.postChainClient a)
-      :<|> (\a -> blocStrato $ Chain.postChainsClient a))
     :<|> ((\a -> blocStrato $ client (Proxy @Faucet.PostFaucet) a)
       :<|> (error "PostFaucetMultipart") -- (\_ -> blocStrato $ client (Proxy @Faucet.PostFaucetMultipart)) -- TODO
       :<|> (\a b -> blocStrato $ client (Proxy @Faucet.PostDataFaucet) a b))
@@ -245,8 +239,7 @@ coreProxyServer =
          )
     :<|> (blocStrato $ client (Proxy @Peers.API))
     :<|> (blocStrato $ client (Proxy @QueuedTransactions.API))
-    :<|> ((blocStrato $ client (Proxy @Stats.TotalTxAPI))
-      :<|> (blocStrato $ client (Proxy @Stats.TotalDifficultyAPI)))
+    :<|> (blocStrato $ client (Proxy @Stats.API))
     :<|> (\a b c d e f g h i j k -> blocStrato $ client (Proxy @Storage.API) a b c d e f g h i j k)
     :<|> (blocStrato $ client (Proxy @SyncStatus.API))
     :<|> ((\a b c d e f g h i j k l m n o p q -> blocStrato $ client (Proxy @Transaction.GetTransaction) a b c d e f g h i j k l m n o p q)

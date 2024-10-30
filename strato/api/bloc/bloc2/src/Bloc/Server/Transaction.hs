@@ -23,14 +23,12 @@ module Bloc.Server.Transaction
 where
 
 import API.Parametric
-import Bloc.API.Chain
 import Bloc.API.Transaction
 import Bloc.API.TypeWrappers
 import Bloc.API.Users
 import Bloc.API.Utils
 import Bloc.Database.Queries (getContractDetailsForContract)
 import Bloc.Monad
-import Bloc.Server.Chain
 import Bloc.Server.Contracts (getSourceMapFromAddress)
 import Bloc.Server.TransactionResult hiding (constructArgValuesAndSource)
 import Bloc.Server.Utils
@@ -278,7 +276,6 @@ postBlocTransactionBody headers cid (PostBlocTransactionRequest mAddr txList txP
               (Code $ sel <> argsBin)
               _methodcallChainid
           return $ BlocTransactionBodyResult (hash' tx) (Just tx)
-    GENESIS -> throwIO . UserError . Text.pack $ "ERROR! Only TRANSFER, CONTRACT, and FUNCTION calls are allowed."
   where
     hash' = transactionHash . rawTX2TX . rtPrimeToRt
     fromTransfer = \case
@@ -426,7 +423,6 @@ postBlocTransactionUnsigned headers cid (PostBlocTransactionRequest mAddr txList
               (Wei (fromIntegral $ unStrung methodcallValue))
               (Code $ sel <> argsBin)
               _methodcallChainid
-    GENESIS -> throwIO . UserError . Text.pack $ "ERROR! Only TRANSFER, CONTRACT, and FUNCTION calls are allowed."
   where fromTransfer = \case
           BlocTransfer t -> return t
           _ -> throwIO $ UserError "Could not decode transfer arguments from body"
@@ -751,19 +747,6 @@ postBlocTransaction' cacheNonce headers chainId mUseWallet resolve (PostBlocTran
                     resolve
         let bflp' = bool bflp bflpWallet useWallet
         fmap BlocTxResult <$> postUsersContractMethodList' cacheNonce bflp' jwtToken
-    GENESIS -> case txs of
-      [] -> return []
-      xs -> do
-        chainInputs <- traverse fromGenesis xs
-        let chainInputSrc :: ChainInput -> Maybe SourceMap
-            chainInputSrc p =
-              if chaininputSrc p == mempty
-                then Nothing
-                else Just $ chaininputSrc p
-            chainInputSrcMap :: ChainInput -> Maybe SourceMap
-            chainInputSrcMap p = join $ liftA2 Map.lookup (chaininputContract p) msrcs
-            hydrate p = p {chaininputSrc = fromMaybe mempty $ chainInputSrc p <|> chainInputSrcMap p}
-        fmap (fmap BlocChainResult) . postChainInfos headers $ hydrate <$> chainInputs
   where
     fromTransfer = \case
       BlocTransfer t -> return t
@@ -773,9 +756,6 @@ postBlocTransaction' cacheNonce headers chainId mUseWallet resolve (PostBlocTran
       _ -> throwIO $ UserError "Could not decode contract arguments from body"
     fromFunction = \case
       BlocFunction f -> return f
-      _ -> throwIO $ UserError "Could not decode function arguments from body"
-    fromGenesis = \case
-      BlocGenesis f -> return f
       _ -> throwIO $ UserError "Could not decode function arguments from body"
 
 callSignature ::

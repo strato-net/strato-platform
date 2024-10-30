@@ -12,7 +12,6 @@ module Bloc.Server where
 import API.Parametric
 import Bloc.API
 import Bloc.Monad
-import Bloc.Server.Chain
 import Bloc.Server.Contracts
 import Bloc.Server.Transaction
 import Bloc.Server.TransactionResult
@@ -22,7 +21,7 @@ import Blockchain.Data.CirrusDefs
 import Blockchain.Strato.Model.Account
 import Blockchain.Strato.Model.Address
 import Blockchain.Strato.Model.Keccak256
-import Control.Lens (makeLenses, over, (&), (.~), (?~))
+import Control.Lens (makeLenses, over)
 import Control.Monad.Change.Alter
 import Control.Monad.Composable.Strato
 import Control.Monad.Composable.Vault
@@ -32,7 +31,6 @@ import Data.Source.Map
 import Data.Swagger
 import GHC.Stack
 import Servant
-import Servant.Swagger
 import SolidVM.Model.CodeCollection.Contract
 import UnliftIO
 
@@ -67,10 +65,6 @@ blocOauth p =
     :<|> postContractsXabi
     :<|> getBlocTransactionResult
     :<|> postBlocTransactionResults
-    :<|> embedServer p postChainInfo
-    :<|> getSingleChainInfo
-    :<|> embedServer p postChainInfos
-    :<|> getChainInfo
     :<|> embedServer p postBlocTransactionParallel
     :<|> embedServer p postBlocTransactionBody
     :<|> embedServer p postBlocTransactionUnsigned
@@ -107,22 +101,10 @@ blocSimple p =
     :<|> postContractsXabi
     :<|> getBlocTransactionResult
     :<|> postBlocTransactionResults
-    :<|> embedServer p postChainInfo
-    :<|> getSingleChainInfo
-    :<|> embedServer p postChainInfos
-    :<|> getChainInfo
     :<|> embedServer p postBlocTransactionParallel
     :<|> embedServer p postBlocTransactionBody
     :<|> embedServer p postBlocTransactionUnsigned
     :<|> embedServer p postBlocTransaction
-
-blocSwagger :: Swagger
-blocSwagger =
-  toSwagger (Proxy @(BlocAPI '[Required, Strict] InternalHeaders))
-    & info . title .~ "Bloc API"
-    & info . version .~ "2.2"
-    & info . description ?~ "This is the V2.2 API for the BlocH"
-    & basePath ?~ "/bloc/v2.2"
 
 type BlocDocsAPI = "swagger.json" :> Get '[JSON] Swagger
 
