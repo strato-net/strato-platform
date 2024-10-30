@@ -25,7 +25,6 @@ module SolidVM.Model.CodeCollection (
   usesStrictModifiers,
   getContractsBySolidString,
   Pragma,
-  latestSolidVMPragma,
   supportedPragmaMap,
   supportedPragmas,
   resolvePragmaFeature,
@@ -192,10 +191,7 @@ getContractsBySolidString solidStr codeCollection = M.lookup solidStr (_contract
 
 type Pragma = (String, String)
 
-latestSolidVMPragma :: Pragma
-latestSolidVMPragma = ("solidvm", "12.0")
-
-supportedPragmaMap :: Map Pragma (Set Pragma)
+supportedPragmaMap :: Map Pragma (S.Set Pragma)
 supportedPragmaMap = M.fromList
   [ (("solidvm", "11.4"), S.fromList [
       ("es6", ""),
@@ -213,7 +209,7 @@ supportedPragmaMap = M.fromList
   ]
 
 supportedPragmas :: [Pragma]
-supportedPragmas = S.toList $ resolveAllPragmas [latestSolidVMPragma]
+supportedPragmas = S.toList . resolveAllPragmas $ M.keys supportedPragmaMap
 
 resolvePragmaFeature :: [Pragma] -> String -> Bool
 resolvePragmaFeature pragmaList feature = resolvePragmaFeature' pragmaList feature ""
@@ -224,11 +220,11 @@ resolvePragmaFeature' pragmaList feature version = (feature, version) `S.member`
 resolveSolidVMVersion :: String -> [Pragma]
 resolveSolidVMVersion version = S.toList $ resolveAllPragmas [("solidvm", version)]
 
-resolveAllPragmas :: [Pragma] -> Set Pragma
-resolveAllPragmas ps = S.fromList $ go <$> ps
-  go p = case M.lookup p pragmaDependencies of
-    Nothing -> [p]
-    Just deps -> p : concatMap go deps
+resolveAllPragmas :: [Pragma] -> S.Set Pragma
+resolveAllPragmas ps = S.fromList $ concatMap go ps
+  where go p = case M.lookup p supportedPragmaMap of
+                 Nothing -> [p]
+                 Just deps -> p : concatMap go deps
 
 isValidPragma :: Pragma -> Bool
 isValidPragma pragma = fst pragma == "solidity" || pragma `elem` supportedPragmas
