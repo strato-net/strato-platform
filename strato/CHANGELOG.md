@@ -16,11 +16,12 @@ so that they could be properly moved to their respective version's subsection.
 
 ## [Unrealeased]
 ### Added
-- partial support for ipv6
+- Partial support for ipv6
 
 ### Changed
 
 ### Fixed
+- Ethereum-discovery now looks at udp_enable_time instead of enable_time for bonded/available peers 
 
 ### Removed
 
