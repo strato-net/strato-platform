@@ -215,13 +215,12 @@ baggerRejectionToTransactionResultBits rejection = case rejection of
     p stage queue = "Rejected from mempool at " ++ show stage ++ "/" ++ show queue ++ " due to "
     p' s q = p s q ++ "low "
 
-getCheckpointableState :: MonadBagger m => m (Keccak256, BlockHeader)
+getCheckpointableState :: MonadBagger m => m BlockHeader
 getCheckpointableState = do
   state <- getBaggerState
   let miningCache = B.miningCache state
-      bestSHA = B.bestBlockSHA miningCache
       bestHeader = B.bestBlockHeader miningCache
-  return (bestSHA, bestHeader)
+  return bestHeader
 
 updateBaggerState :: MonadBagger m => (B.BaggerState -> B.BaggerState) -> m ()
 updateBaggerState f = putBaggerState =<< (f <$> getBaggerState)
@@ -567,9 +566,7 @@ buildFromMiningCache = do
   let stateRoot = B.lastExecutedStateRoot cache
   let (vDelt, cDelt) = getDeltasFromResults $ B.lastExecutedTxs cache
   let txs = (trrTransaction <$> B.lastExecutedTxs cache) ++ (DL.toList $ B.privateHashes cache)
-  let parentDiff = getBlockDifficulty parentHeader
   let time = B.startTimestamp cache
-  let nextDiff = 1 
   let nextBlockData = buildNextBlockHeader parentHeader parentHash stateRoot txs time vDelt cDelt
   recordMaxBlockNumber "bagger_build" . number $ nextBlockData
   rewardedBlockData <- buildRewardedBlockHeader nextBlockData
@@ -578,7 +575,6 @@ buildFromMiningCache = do
   return
     OutputBlock
       { obOrigin = TO.Quarry,
-        obTotalDifficulty = parentDiff + nextDiff,
         obBlockUncles = uncles,
         obReceiptTransactions = txs,
         obBlockData = rewardedBlockData

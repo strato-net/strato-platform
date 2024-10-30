@@ -7,7 +7,6 @@
 
 module Bloc.Server.Utils
   ( toMaybe,
-    maybeChainBatchResult,
     getBatchBlocTxStatus,
     partitionWith,
     indexedPartitionWith,
@@ -28,7 +27,6 @@ import Bloc.API.Utils
 import Blockchain.DB.SQLDB (sqlQuery)
 import Blockchain.Data.DataDefs
 import Blockchain.Data.Json (rtPrimeToRt)
-import Blockchain.Strato.Model.ChainId
 import Blockchain.Strato.Model.ExtendedWord
 import Blockchain.Strato.Model.Keccak256
 import Control.Concurrent (threadDelay)
@@ -45,7 +43,6 @@ import Data.Traversable (for)
 import Data.Word
 import qualified Database.Esqueleto.Legacy as E
 import Handlers.BatchTransactionResult
-import Handlers.Chain
 import Handlers.Transaction
 import qualified LabeledError
 import qualified MaybeNamed
@@ -68,20 +65,6 @@ maybeTxBatchResult hashes = do
     maybeHeads :: M.Map Keccak256 [TransactionResult] -> (Keccak256, [RawTransaction]) -> Maybe (RawTransaction, TransactionResult)
     maybeHeads btxr (h, rtxs) = case (rtxs, M.lookup h btxr) of
       ((rtx : _), Just (txr : _)) -> Just (rtx, txr)
-      _ -> Nothing
-
-maybeChainBatchResult ::
-  HasSQL m =>
-  [ChainId] ->
-  m [Maybe (TransactionResult, Maybe ChainInfo)]
-maybeChainBatchResult chainIds = do
-  cIdsAndInfos <- M.fromList . map unNamedTuple <$> getChain chainIds Nothing Nothing Nothing
-  mtxrs <- postBatchTransactionResult $ unsafeCreateKeccak256FromWord256 . unChainId <$> chainIds
-  pure $ maybeHeads mtxrs cIdsAndInfos <$> chainIds
-  where
-    maybeHeads :: M.Map Keccak256 [TransactionResult] -> M.Map ChainId ChainInfo -> ChainId -> Maybe (TransactionResult, Maybe ChainInfo)
-    maybeHeads btxr cInfos cId = case M.lookup (unsafeCreateKeccak256FromWord256 $ unChainId cId) btxr of
-      Just (txr : _) -> Just (txr, M.lookup cId cInfos)
       _ -> Nothing
 
 getBatchBlocTxStatus ::
