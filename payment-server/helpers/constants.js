@@ -22,7 +22,7 @@ const STRIPE_CONTRACT_ADDRESS = deployment.contracts.stripe.address;
 const REDEMPTION_CONTRACT_ADDRESS = deployment.contracts.redemption.address;
 
 const SERVER_URL = `${config.serverHost}`;
-const TABLE_PREFIX = `${process.env.TABLE_PREFIX ? process.env.TABLE_PREFIX : 'David Nallapu-Mercata-'}`;
+const TABLE_PREFIX = `${process.env.TABLE_PREFIX ? process.env.TABLE_PREFIX : 'david nallapu-Mercata-'}`;
 
 const SERVER_CONFIRM_URL = `${SERVER_URL}/stripe/checkout/confirm`;
 

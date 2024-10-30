@@ -246,8 +246,8 @@ const InventoryCard = ({ inventory, category, debouncedSearchTerm, id, allSubcat
               alt={imgMeta}
               title={imgMeta}
               src={
-                inventory["David Nallapu-Mercata-Asset-images"] && inventory["David Nallapu-Mercata-Asset-images"].length > 0
-                  ? inventory["David Nallapu-Mercata-Asset-images"][0].value
+                inventory["david nallapu-Mercata-Asset-images"] && inventory["david nallapu-Mercata-Asset-images"].length > 0
+                  ? inventory["david nallapu-Mercata-Asset-images"][0].value
                   : image_placeholder}
 
             />

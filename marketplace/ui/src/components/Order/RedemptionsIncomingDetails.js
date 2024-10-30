@@ -126,7 +126,7 @@ const RedemptionsIncomingDetails = ({ user }) => {
     };
 
 
-    inventoryDetails = { ...inventoryDetails, images: inventoryDetails && Array.isArray(inventoryDetails["David Nallapu-Mercata-Asset-images"]) ? inventoryDetails["David Nallapu-Mercata-Asset-images"][0].value : [] }
+    inventoryDetails = { ...inventoryDetails, images: inventoryDetails && Array.isArray(inventoryDetails["david nallapu-Mercata-Asset-images"]) ? inventoryDetails["david nallapu-Mercata-Asset-images"][0].value : [] }
     let column = [
         {
             title: "",

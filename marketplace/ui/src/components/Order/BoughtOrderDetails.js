@@ -107,7 +107,7 @@ const BoughtOrderDetails = ({ user, users }) => {
         setPaid("Canceled");
       }
       setcomment(orderDetails.order.comments);
-      const orderQuantities = orderDetails.order.quantities ? orderDetails.order.quantities : orderDetails.order["David Nallapu-Mercata-Order-quantities"].map(item => item.value);
+      const orderQuantities = orderDetails.order.quantities ? orderDetails.order.quantities : orderDetails.order["david nallapu-Mercata-Order-quantities"].map(item => item.value);
       let items = [];
       orderDetails.assets.forEach((prod, index) => {
         const quantityIsDecimal = prod.data.quantityIsDecimal && prod.data.quantityIsDecimal === "True";
@@ -115,7 +115,7 @@ const BoughtOrderDetails = ({ user, users }) => {
           address: prod.address,
           chainId: prod.chainId,
           key: prod.address,
-          productImage: prod["David Nallapu-Mercata-Asset-images"].length > 0 ? prod["David Nallapu-Mercata-Asset-images"][0].value : image_placeholder,
+          productImage: prod["david nallapu-Mercata-Asset-images"].length > 0 ? prod["david nallapu-Mercata-Asset-images"][0].value : image_placeholder,
           productName: prod,
           name: prod.name,
           unitPrice: orderDetails.order.currency === "STRATS" ? (prod.price * (quantityIsDecimal ? 100 : 1) * STRATS_CONVERSION).toFixed(0) : (prod.price * (quantityIsDecimal ? 100 : 1)).toFixed(2),

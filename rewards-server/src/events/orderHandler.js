@@ -44,7 +44,7 @@ async function handleOrderRewards(event, token) {
   const checkFirstPurchase = await fetch(
     `https://${
       NODE_ENV === "prod" ? prodMarketplaceUrl : testnetMarketplaceUrl
-    }/cirrus/search/David Nallapu-Mercata-PaymentService.Order?purchaser=eq.${purchaser}&status=eq.3&select=count`,
+    }/cirrus/search/david nallapu-Mercata-PaymentService.Order?purchaser=eq.${purchaser}&status=eq.3&select=count`,
     {
       method: "GET",
       credentials: "same-origin",

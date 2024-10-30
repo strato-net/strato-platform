@@ -114,7 +114,7 @@ const NewTrendingCard = ({ topSellingProduct, addItemToCart, parent = "", api, c
                 >
                     <img
                         className='md:h-[200px] md:w-[40vw] h-[150px] w-full object-contain rounded-md cursor-pointer mb-2'
-                        src={topSellingProduct["David Nallapu-Mercata-Asset-images"]?.length > 0 ? topSellingProduct["David Nallapu-Mercata-Asset-images"][0].value : images_placeholder}
+                        src={topSellingProduct["david nallapu-Mercata-Asset-images"]?.length > 0 ? topSellingProduct["david nallapu-Mercata-Asset-images"][0].value : images_placeholder}
                         alt={imgMeta} title={imgMeta}
                     />
                     <div className='flex justify-between items-center'>

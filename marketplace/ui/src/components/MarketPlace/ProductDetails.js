@@ -157,12 +157,12 @@ const ProductDetails = ({ user, users }) => {
   let fileValues = [];
   let fileNames = [];
   
-  if (details && Array.isArray(details['David Nallapu-Mercata-Asset-fileNames'])) {
-    fileNames = details['David Nallapu-Mercata-Asset-fileNames'];
+  if (details && Array.isArray(details['david nallapu-Mercata-Asset-fileNames'])) {
+    fileNames = details['david nallapu-Mercata-Asset-fileNames'];
   }
   
-  if (details && Array.isArray(details['David Nallapu-Mercata-Asset-files'])) {
-    fileValues = details['David Nallapu-Mercata-Asset-files'].map((file, index) => {
+  if (details && Array.isArray(details['david nallapu-Mercata-Asset-files'])) {
+    fileValues = details['david nallapu-Mercata-Asset-files'].map((file, index) => {
       let name = fileNames[index]?.value ? fileNames[index]?.value : `Information-${index+1}.pdf`;
       name = name.replace(/ /g, "-");
       return { url: file.value, name };
@@ -448,7 +448,7 @@ const ProductDetails = ({ user, users }) => {
           </Row>
           <div className="flex w-full flex-col lg:leading-12 px-4 sm:px-8 md:px-0  items-center lg:items-start  md:w-[750px] lg:w-[835px] xl:w-[858px]  md:mx-auto ">
             <div className="flex md:justify-center gap-[15px] lg:gap-6 flex-col lg:flex-row   ">
-              { details["David Nallapu-Mercata-Asset-images"].length > 0 
+              { details["david nallapu-Mercata-Asset-images"].length > 0 
               ?  <Swiper
                 spaceBetween={30}
                 effect={'fade'}
@@ -460,7 +460,7 @@ const ProductDetails = ({ user, users }) => {
                 modules={[Autoplay, EffectFade, Navigation, Pagination]}
                 className="product-detail-swiper"
               >    
-                {details["David Nallapu-Mercata-Asset-images"].length > 0 && details["David Nallapu-Mercata-Asset-images"].map((element, index) => {
+                {details["david nallapu-Mercata-Asset-images"].length > 0 && details["david nallapu-Mercata-Asset-images"].map((element, index) => {
                   return (<SwiperSlide><div key={index} className="mx-auto sm:w-[343px ] h-[212px] lg:h-[348px]  md:h-[250px] lg:w-[417px] w-full rounded-md ">
                     <img width={"100%"}
                       alt={`${assetName} | Image ${index}`}

@@ -110,7 +110,7 @@ const navigation = {
     },
     {
       name: "YouTube",
-      href: "https://www.youtube.com/@David Nallapu",
+      href: "https://www.youtube.com/@david nallapu",
       icon: (props) => (
         <svg fill="currentColor" viewBox="0 0 24 24" {...props}>
           <path
@@ -253,7 +253,7 @@ export default function FooterComponent() {
         </div>
         <div className="mt-16 border-t border-white/10 pt-8 sm:mt-20 lg:mt-24">
           <p className="text-xs leading-5 text-white">
-            &copy; 2024 David Nallapu, Inc. All rights reserved.
+            &copy; 2024 david nallapu, Inc. All rights reserved.
           </p>
         </div>
       </div>

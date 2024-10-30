@@ -146,7 +146,7 @@ async function createTransactionPayload(token, transactions) {
 async function getAdminStratsContractAddress(token) {
   const domain = NODE_ENV === "prod" ? prodMarketplaceUrl : testnetMarketplaceUrl;
   const originAddress = testnetStratsAddress;
-  const url = `https://${domain}/cirrus/search/David Nallapu-Mercata-Asset`;
+  const url = `https://${domain}/cirrus/search/david nallapu-Mercata-Asset`;
 
   const queryParams = new URLSearchParams({
     ownerCommonName: `eq.${baUsername}`,

@@ -21,7 +21,7 @@ describe('Customer Address Database Tests', function () {
       .post('/customer/address')
       .send({
         commonName: 'Test',
-        name: 'David Nallapu',
+        name: 'david nallapu',
         zipcode: '11206',
         state: 'NY',
         city: 'Brooklyn',
@@ -38,7 +38,7 @@ describe('Customer Address Database Tests', function () {
     const res = await request(app)
       .post('/customer/address')
       .send({
-        name: 'David Nallapu',
+        name: 'david nallapu',
         zipcode: '11206',
         state: 'NY',
         city: 'Brooklyn'

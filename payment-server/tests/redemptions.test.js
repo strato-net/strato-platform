@@ -24,7 +24,7 @@ describe('Redemption Tests', function () {
       .post('/customer/address')
       .send({
         commonName: 'Test',
-        name: 'David Nallapu',
+        name: 'david nallapu',
         zipcode: '11206',
         state: 'NY',
         city: 'Brooklyn',
