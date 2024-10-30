@@ -4,6 +4,7 @@
 
 module Blockchain.Strato.Discovery.UDPSpec where
 
+import Blockchain.Data.RLP
 import Blockchain.Strato.Discovery.UDP
 import Data.Bits
 import Network.Socket (tupleToHostAddress, tupleToHostAddress6)
@@ -32,3 +33,8 @@ spec = do
 
     it "converts hostnames" $ do
       stringToIAddr "hotdogs.com" `shouldBe` HostName "hotdogs.com"
+  
+  describe "IAddr RLP Serialization" $ do
+    it "parses ipv6 addresses" $ do
+      let addr = rlpDecode . rlpEncode $ stringToIAddr "2001:0db8:85a3:0000:0000:8a2e:0370:7334"
+      addr `shouldBe` (IPV6Addr (536939960, 2242052096, 35374, 57701172))
