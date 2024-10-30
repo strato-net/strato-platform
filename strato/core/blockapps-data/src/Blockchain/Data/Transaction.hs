@@ -27,6 +27,7 @@ module Blockchain.Data.Transaction
     transactionHash,
     partialTransactionHash,
     whoSignedThisTransactionEcrecover,
+    whoReallySignedThisTransactionEcrecover,
     getSigVals,
     codePtrChainId,
     codePtrAddress,
@@ -321,6 +322,13 @@ whoSignedThisTransactionEcrecover hsh r s v = fromPublicKey <$> EC.recoverPub si
   where
     intToBSS = BSS.toShort . word256ToBytes . fromInteger
     sig = EC.Signature (SEC.CompactRecSig (intToBSS $ r) (intToBSS $ s) (((fromInteger v) :: Word8) - 0x1b))
+    mesg = keccak256ToByteString $ hsh
+
+whoReallySignedThisTransactionEcrecover :: Keccak256 -> Word256 -> Word256 -> Word8 -> Maybe Address
+whoReallySignedThisTransactionEcrecover hsh r s v = fromPublicKey <$> EC.recoverPub sig mesg
+  where
+    word256ToBSS = BSS.toShort . word256ToBytes
+    sig = EC.Signature (SEC.CompactRecSig (word256ToBSS $ r) (word256ToBSS $ s) v)
     mesg = keccak256ToByteString $ hsh
 
 {-

@@ -38,6 +38,7 @@ import Blockchain.Strato.Model.ExtendedWord
 import Blockchain.Strato.Model.Keccak256
 import Blockchain.Strato.Model.StateRoot
 import Blockchain.Strato.Model.Validator
+import Blockchain.Strato.Model.Address
 import Blockchain.Strato.StateDiff
 import Blockchain.Stream.Action (Action)
 import qualified Data.ByteString as B
@@ -57,11 +58,12 @@ data VmInEventBatch = InBatch
     privateTxs :: [OutputTx],
     mpNodesReqs :: [(TXOrigin, [StateRoot])],
     mpNodesResps :: [[NodeData]],
-    preprepareBlock :: Maybe Block
+    preprepareBlock :: Maybe Block,
+    selfAddress :: Maybe Address
   }
 
 newInBatch :: VmInEventBatch
-newInBatch = InBatch [] [] 0 [] 0 False [] [] [] Nothing
+newInBatch = InBatch [] [] 0 [] 0 False [] [] [] Nothing Nothing
 
 insertInBatch :: VmInEvent -> VmInEventBatch -> VmInEventBatch
 insertInBatch e b = case e of
@@ -74,7 +76,8 @@ insertInBatch e b = case e of
   VmGetMPNodesRequest o srs -> b {mpNodesReqs = (o, srs) : mpNodesReqs b}
   VmMPNodesReceived nds -> b {mpNodesResps = nds : mpNodesResps b}
   VmRunPreprepare b' -> b {preprepareBlock = Just b'}
-
+  VmSelfAddress sa -> b {selfAddress = Just sa}
+  
 data BlockDelta a = BlockDelta 
   { _inBlock :: a
   , _derived :: a

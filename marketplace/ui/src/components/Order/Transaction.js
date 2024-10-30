@@ -172,7 +172,7 @@ const Transaction = ({ user }) => {
           </Breadcrumb.Item>
         </Breadcrumb>
       </div>
-      <TransactionTable user={user} download={download} isAllOrdersLoading={isTransactionLoading} />
+      <TransactionTable user={user} download={download} />
     </div>
   );
 };
