@@ -24,12 +24,18 @@ module SolidVM.Model.CodeCollection (
   imports,
   usesStrictModifiers,
   getContractsBySolidString,
+  Pragma,
+  latestSolidVMPragma,
+  supportedPragmaMap,
   supportedPragmas,
+  resolvePragmaFeature,
+  resolvePragmaFeature',
+  resolveSolidVMVersion,
+  resolveAllPragmas,
+  isValidPragma,
   findInvalidPragmas,
   invalidPragmasUsedBy,
   invalidPragmasUsed,
-  resolvePragmaFeature,
-  resolvePragmaFeature',
   structDef,
   module SolidVM.Model.CodeCollection.Contract,
   --module SolidVM.Model.CodeCollection.Def,
@@ -184,56 +190,60 @@ usesStrictModifiers = flip resolvePragmaFeature "strict" . _pragmas
 getContractsBySolidString :: SolidString -> CodeCollectionF a -> Maybe (ContractF a)
 getContractsBySolidString solidStr codeCollection = M.lookup solidStr (_contracts codeCollection)
 
-supportedPragmas :: [(String, String)]
-supportedPragmas =
-  [ ("es6", "")
-  , ("strict", "")
-  , ("builtinCreates", "")
-  , ("safeExternalCalls", "")
-  , ("strictDecimals", "")
-  , ("solidvm", "11.4")
-  , ("solidvm", "11.5")
-  , ("solidvm", "12.0")
+type Pragma = (String, String)
+
+latestSolidVMPragma :: Pragma
+latestSolidVMPragma = ("solidvm", "12.0")
+
+supportedPragmaMap :: Map Pragma (Set Pragma)
+supportedPragmaMap = M.fromList
+  [ (("solidvm", "11.4"), S.fromList [
+      ("es6", ""),
+      ("strict", ""),
+      ("builtinCreates", ""),
+      ("safeExternalCalls", ""),
+      ("strictDecimals", "")
+     ])
+  , (("solidvm", "11.5"), S.fromList [
+      ("solidvm", "11.4")
+    ])
+  , (("solidvm", "12.0"), S.fromList [
+      ("solidvm", "11.5")
+    ])
   ]
 
-isValidPragma :: (String, String) -> Bool
+supportedPragmas :: [Pragma]
+supportedPragmas = S.toList $ resolveAllPragmas [latestSolidVMPragma]
+
+resolvePragmaFeature :: [Pragma] -> String -> Bool
+resolvePragmaFeature pragmaList feature = resolvePragmaFeature' pragmaList feature ""
+
+resolvePragmaFeature' :: [Pragma] -> String -> String -> Bool
+resolvePragmaFeature' pragmaList feature version = (feature, version) `S.member` resolveAllPragmas pragmaList
+
+resolveSolidVMVersion :: String -> [Pragma]
+resolveSolidVMVersion version = S.toList $ resolveAllPragmas [("solidvm", version)]
+
+resolveAllPragmas :: [Pragma] -> Set Pragma
+resolveAllPragmas ps = S.fromList $ go <$> ps
+  go p = case M.lookup p pragmaDependencies of
+    Nothing -> [p]
+    Just deps -> p : concatMap go deps
+
+isValidPragma :: Pragma -> Bool
 isValidPragma pragma = fst pragma == "solidity" || pragma `elem` supportedPragmas
 
-findInvalidPragmas :: (a -> (String, String)) -> a -> [a] -> [a]
+findInvalidPragmas :: (a -> Pragma) -> a -> [a] -> [a]
 findInvalidPragmas f pragma =
   if isValidPragma $ f pragma
     then id
     else (pragma :) -- include solidity pragma for backwards compatibility
 
-invalidPragmasUsedBy :: (a -> (String, String)) -> [a] -> [a]
+invalidPragmasUsedBy :: (a -> Pragma) -> [a] -> [a]
 invalidPragmasUsedBy f = foldr (findInvalidPragmas f) []
 
-invalidPragmasUsed :: [(String, String)] -> [(String, String)]
+invalidPragmasUsed :: [Pragma] -> [Pragma]
 invalidPragmasUsed = invalidPragmasUsedBy id
-
-resolvePragmaFeature :: [(String, String)] -> String -> Bool
-resolvePragmaFeature pragmaList feature = resolvePragmaFeature' pragmaList feature ""
-
-resolvePragmaFeature' :: [(String, String)] -> String -> String -> Bool
-resolvePragmaFeature' pragmaList feature version =
-  let pragmaSet = S.fromList pragmaList
-      extensions = [
-          (("solidvm", "11.4"), S.fromList [
-            ("es6", ""),
-            ("strict", ""),
-            ("builtinCreates", ""),
-            ("safeExternalCalls", ""),
-            ("strictDecimals", "")
-           ]),
-          (("solidvm", "11.5"), S.fromList [
-            ("solidvm", "11.4")
-          ]),
-          (("solidvm", "12.0"), S.fromList [
-            ("solidvm", "11.5")
-          ])
-        ]
-      extendedPragmaSet = foldr (\(e,es) a -> if e `S.member` a then a <> es else a) pragmaSet extensions
-   in (feature, version) `S.member` extendedPragmaSet
 
 structDef :: ContractF a -> CodeCollectionF a -> SolidString -> Maybe [(SolidString, FieldType, a)]
 structDef c cc n = (c ^. structs . at n) <|> (cc ^. flStructs . at n)
