@@ -13,7 +13,6 @@
 
 module Bloc.API.Transaction where
 
-import Bloc.API.Chain
 import Bloc.API.SwaggerSchema
 import Bloc.API.TypeWrappers
 import Bloc.API.Users
@@ -50,7 +49,7 @@ import Test.QuickCheck hiding (Success)
 ---- Routes and Types
 --------------------------------------------------------------------------------
 
-data BlocTransactionType = TRANSFER | CONTRACT | FUNCTION | GENESIS
+data BlocTransactionType = TRANSFER | CONTRACT | FUNCTION
   deriving (Eq, Ord, Show, Generic)
 
 instance ToJSON BlocTransactionType
@@ -61,7 +60,6 @@ transactionType :: BlocTransactionPayload -> BlocTransactionType
 transactionType (BlocTransfer _) = TRANSFER
 transactionType (BlocContract _) = CONTRACT
 transactionType (BlocFunction _) = FUNCTION
-transactionType (BlocGenesis _) = GENESIS
 
 instance ToParam (QueryFlag "queue") where
   toParam _ =
@@ -243,7 +241,6 @@ data BlocTransactionPayload
   = BlocTransfer TransferPayload
   | BlocContract ContractPayload
   | BlocFunction FunctionPayload
-  | BlocGenesis ChainInput
   deriving (Eq, Show, Generic)
 
 instance Arbitrary BlocTransactionPayload where
@@ -253,7 +250,6 @@ instance ToJSON BlocTransactionPayload where
   toJSON (BlocTransfer t) = object ["type" .= TRANSFER, "payload" .= t]
   toJSON (BlocContract c) = object ["type" .= CONTRACT, "payload" .= c]
   toJSON (BlocFunction f) = object ["type" .= FUNCTION, "payload" .= f]
-  toJSON (BlocGenesis g) = object ["type" .= GENESIS, "payload" .= g]
 
 instance FromJSON BlocTransactionPayload where
   parseJSON (Object o) = do
@@ -262,7 +258,6 @@ instance FromJSON BlocTransactionPayload where
       TRANSFER -> BlocTransfer <$> (o .: "payload")
       CONTRACT -> BlocContract <$> (o .: "payload")
       FUNCTION -> BlocFunction <$> (o .: "payload")
-      GENESIS -> BlocGenesis <$> (o .: "payload")
   parseJSON o = fail $ "fromJSON BlocTransactionPayload: Expected Object, but got " ++ show o
 
 data ContractPayload = ContractPayload

@@ -45,7 +45,7 @@ getAndProcessMessages env conn = do
     cache <- access (Proxy @(IORef Globals))
     forceGlobalEval cache
     emittedEvents <- processTheMessages env conn messages
-    _ <- execKafka $ produceSolidVmEvents emittedEvents
+    _ <- produceSolidVmEvents emittedEvents
     return ()
 
 ------ solidvmevents indexer code here ------

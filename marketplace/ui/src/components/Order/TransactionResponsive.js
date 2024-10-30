@@ -62,7 +62,7 @@ const TransactionResponsive = ({ data , user}) => {
 
   return (
     <div className="flex flex-col gap-y-10 w-full">
-      {data.map(({ reference ,address, assetImage,totalAmount, assetName,assetAddress, assetDescription, quantity, from, to, status,transaction_hash, type, price, redemptionService, block_timestamp }, index) => {
+      {data.map(({ reference ,address, assetImage, assetName, assetAddress, assetDescription, quantity, from, to, status,transaction_hash, type, price, redemptionService, block_timestamp, quantityIsDecimal }, index) => {
         block_timestamp = type === "Redemption" ? moment(block_timestamp).utc().format('YYYY-MM-DD HH:mm:ss [UTC]') : block_timestamp;
         const isExpanded = expandedRows[index];
         const tableData = [{
@@ -73,6 +73,10 @@ const TransactionResponsive = ({ data , user}) => {
           status,
           type
         }]
+        if (quantityIsDecimal && quantityIsDecimal === "True") {
+          quantity /= 100;
+          price *= 100;
+        }
 
         const handleDetailRedirection = () => {
           let route;

@@ -394,7 +394,7 @@ pipeline {
                 set -x
                 # Re-cloning the repo might be redundant but we'll follow same approach as other tests. And the docker rebuild should be quick with docker layer caches.
                 rm -rf strato-api-tests
-                git clone -b develop https://${GITHUB_USERNAME}:${GITHUB_TOKEN}@github.com/blockapps/strato-api-tests.git
+                git clone -b bunny https://${GITHUB_USERNAME}:${GITHUB_TOKEN}@github.com/blockapps/strato-api-tests.git
                 cd strato-api-tests
                 # git checkout feature-branch # Replace with custom branch here if made changes to API and strato-api-tests repo code
                 docker build --tag strato-api-tests .

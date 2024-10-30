@@ -21,7 +21,6 @@ library:
     - blockapps-data
     - blockapps-datadefs
     - blockapps-mpdbs
-    - blockapps-privacy
     - blockstanbul
     - bytestring
     - common-log
@@ -39,8 +38,6 @@ library:
     - leveldb-haskell
     - memory
     - merkle-patricia-db
-    - milena
-    - milena-tools
     - monad-alter
     - monad-logger
     - monad-loops
