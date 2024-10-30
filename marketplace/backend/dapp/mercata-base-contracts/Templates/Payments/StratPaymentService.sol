@@ -111,6 +111,7 @@ contract StratPaymentService is PaymentService {
             for (uint j = 0; j < _stratsAssetAddresses.length; j++) {
                 STRATSTokens stratAsset = STRATSTokens(_stratsAssetAddresses[j]);
                 require(stratAsset.root == stratAddress, "Asset is not a STRATS asset");
+                require(stratAsset.ownerCommonName() == getCommonName(msg.sender), "Purchaser doesn't own STRATS");
                 stratQuantity = stratAsset.quantity();
                 transferNumber = (uint(_checkoutHash, 16) + j) % 1000000;
                 if (remainingStratsToTransfer > 0) {

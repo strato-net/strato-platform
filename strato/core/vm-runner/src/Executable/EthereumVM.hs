@@ -66,6 +66,7 @@ import qualified Data.Map as M
 import qualified Data.Map.Ordered as OMap
 import Data.Maybe
 import Data.Proxy
+import qualified Data.Set as S
 import qualified Data.Text as T
 import qualified Data.Text.Encoding as UTF8
 import Debugger
@@ -231,7 +232,12 @@ sendOutEvent (OutAction act) = do
                                                   --  . (constructor .~ Nothing)
                                                    . (modifiers .~ M.empty)
                                                    )
-                cc' = emptyCodeCollection & contracts .~ contracts'
+                -- If there are no abstract contracts, emit normal contracts. Else, only emit abstract contracts
+                abstractNames = S.fromList . M.keys $ getTopLevelAbstracts cc
+                contracts'' = if S.null abstractNames
+                                then M.filter (isNothing . _importedFrom) contracts'
+                                else M.filterWithKey (\k v -> (isNothing $ _importedFrom v) && (k `S.member` abstractNames)) contracts'
+                cc' = emptyCodeCollection & contracts .~ contracts''
              in Just $
                   CodeCollectionAdded
                     { codeCollection = const () <$> cc',

@@ -156,7 +156,7 @@ function generateHtmlContent(customerFirstName, concatenatedOrderString) {
   }
 
   // Generating Email Confirmation HTML
-  const buildConcatenatedOrderString =  (username, orderData, isCanceled = false) => {
+  const buildConcatenatedOrderString =  (username, orderData, assetData, isCanceled = false) => {
     let customerFirstName = username;
     
     // Construct Email with order details
@@ -164,9 +164,10 @@ function generateHtmlContent(customerFirstName, concatenatedOrderString) {
     let orderTotal = 0; 
     for (let i = 0; i < orderData.length; i++) {
       let orderItem = orderData[i];
+      let isDecimal = assetData[i].data.quantityIsDecimal && assetData[i].data.quantityIsDecimal === 'True';
       let itemName = decodeURIComponent(orderItem.name);
-      let itemPrice = parseFloat(orderItem.unitPrice).toFixed(2); 
-      let itemQty = orderItem.qty;
+      let itemPrice = parseFloat(orderItem.unitPrice * (isDecimal ? 100 : 1)).toFixed(2);
+      let itemQty = orderItem.qty / (isDecimal ? 100 : 1);
       let itemTotal = (itemPrice * itemQty).toFixed(2); 
   
       concatenatedOrderString += `${itemName}:\n`; 

@@ -22,7 +22,14 @@ const ResponsiveCart = ({
   removeCartList,
   openToastOrder
 }) => {
-  const initialPaymentState = paymentServices?.length !==0 ? paymentServices[0] : '' 
+  // temporary fix to put STRATs as top payment option, will be updated in next release
+  const activePaymentProviders = (paymentServices[0] !== undefined) ? paymentServices.filter(paymentProvider => paymentProvider?.isActive) : [];
+  const stratsIndex = activePaymentProviders.findIndex(service => service.serviceName.toLowerCase().includes('strats'));
+  if (stratsIndex > 0) {
+    const [stratsObject] = activePaymentProviders.splice(stratsIndex, 1);
+    activePaymentProviders.unshift(stratsObject);
+  }
+  const initialPaymentState = activePaymentProviders?.length !==0 ? activePaymentProviders[0] : '' 
   const [selectedProvider, setSelectedProvider] = useState(initialPaymentState);
   const marketplaceDispatch = useMarketplaceDispatch();
   const [tax, setTax] = useState(0);
@@ -157,8 +164,11 @@ const ResponsiveCart = ({
       });
       const checkQuantity = await orderActions.fetchSaleQuantity(orderDispatch, saleAddresses, quantities);
       if (checkQuantity === true) {
-        await handlePaymentConfirm(provider);
-        setSelectedProvider("");
+        if (selectedProvider?.serviceName === "Stripe" && total < 0.50) {
+          openToastOrder("bottom", "The minimum order amount is $0.50. Please increase the item quantity to account for this.");
+        } else {
+          await handlePaymentConfirm(provider);
+        }
       } else {
         let insufficientQuantityMessage = "";
         let outOfStockMessage = "";
@@ -180,7 +190,6 @@ const ResponsiveCart = ({
           errorMessage += `The following item(s) are temporarily out of stock and should be removed:\n${outOfStockMessage}`;
         }
         openToastOrder("bottom", errorMessage);
-        setSelectedProvider("");
       }
     }
   }
@@ -313,7 +322,7 @@ const ResponsiveCart = ({
               value={selectedProvider?.serviceName}
               className="w-full">
               <div className="flex flex-col space-y-4">
-                {paymentServices && paymentServices.map(provider => (
+                {activePaymentProviders && activePaymentProviders.map(provider => (
                   provider &&
                   <Radio value={provider?.serviceName} className="w-full">
                     <p className="flex text-base font-normal items-center"> 

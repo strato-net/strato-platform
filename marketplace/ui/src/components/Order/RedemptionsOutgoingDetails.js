@@ -33,6 +33,7 @@ const RedemptionsOutgoingDetails = ({ user }) => {
     const { redemption, isFetchingRedemptionDetails } = useRedemptionState();
     const inventoryDispatch = useInventoryDispatch();
     let { inventoryDetails, isInventoryDetailsLoading } = useInventoryState();
+    const navigate = useNavigate();
 
     const routeMatch = useMatch({
         path: routes.RedemptionsOutgoingDetails.url,
@@ -54,13 +55,17 @@ const RedemptionsOutgoingDetails = ({ user }) => {
     }, [id, redemptionService, dispatch]);
 
     useEffect(() => {
-        if (redemption) {
+        if (redemption && user) {
+            if (redemption.ownerCommonName !== user.commonName) {
+                navigate(routes.Marketplace.url);
+                return;
+            }
             const fetchAsset = async () => {
                 await inventoryActions.fetchInventoryDetail(inventoryDispatch, redemption.assetAddresses[0])
             };
             fetchAsset();
         }
-    }, [redemption])
+    }, [redemption, inventoryDispatch, user])
 
     const OrderData = ({ title, value }) => {
         return (

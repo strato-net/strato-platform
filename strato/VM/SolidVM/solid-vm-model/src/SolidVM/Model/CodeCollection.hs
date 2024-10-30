@@ -14,6 +14,8 @@ module SolidVM.Model.CodeCollection (
   flFuncs,
   contracts,
   getParents,
+  getTopLevelAbstracts,
+  getTopLevelAbstractsForContract,
   flConstants,
   flStructs,
   flEnums,
@@ -141,6 +143,19 @@ getParents cc c =
    in fmap concat . for (c ^. parents) $ \p -> do
         p' <- toErr (c ^. contractContext) p . M.lookup p $ cc ^. contracts
         (p' :) <$> getParents cc p'
+
+getTopLevelAbstracts :: CodeCollection -> Map SolidString Contract
+getTopLevelAbstracts cc = M.unions . map (getTopLevelAbstractsForContract cc) . M.elems $ _contracts cc
+
+getTopLevelAbstractsForContract :: CodeCollection -> Contract -> Map SolidString Contract
+getTopLevelAbstractsForContract cc = go
+  where
+    go c =
+      let m = doParents c
+       in if _contractType c == AbstractType && M.null m
+            then M.singleton (_contractName c) c
+            else m
+    doParents = M.unions . map (maybe M.empty go . flip M.lookup (_contracts cc)) . _parents
 
 instance Arbitrary CodeCollection where
   arbitrary = do

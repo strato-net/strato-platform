@@ -1,8 +1,9 @@
-import sgMail from "@sendgrid/mail";
+import axios from "axios";
 import dotenv from "dotenv";
+import config from "../load.config";
+import { util } from "../blockapps-rest-plus";
 
 dotenv.config({ path: "../../../.env" });
-sgMail.setApiKey(process.env.SENDGRID_API_KEY);
 
 async function sendEmail(to, subject, htmlContent) {
 
@@ -22,7 +23,6 @@ async function sendEmail(to, subject, htmlContent) {
     console.log("Email sent successfully!");
   } catch (error) {
     console.error("Error sending email:", error);
-    throw error;
   }
 }
 
