@@ -63,7 +63,7 @@ class InventoryController {
   static async getAllUserInventories(req, res, next) {
     try {
       const { dapp, query } = req
-      const { gtField, gtValue, limit, offset, ...restQuery } = query;
+      const { gtField, gtValue, ...restQuery } = query;
 
       const inventories = await dapp.getInventoriesForUser({ userProfileGtField: gtField, userProfileGtValue: gtValue, ...restQuery });
       const sortedInventories = inventories?.inventoryResults.sort((a, b) => {
@@ -72,8 +72,6 @@ class InventoryController {
         }
         return a.saleDate ? -1 : 1; // Move items without saleDate to the end
       });
-
-      // const paginatedInventories = sortedInventories.slice(offset, parseInt(offset) + parseInt(limit));
 
       rest.response.status200(res, { inventoriesWithImageUrl: sortedInventories, count: sortedInventories.length })
 

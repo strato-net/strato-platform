@@ -542,7 +542,7 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
   contract.getMarketplaceInventories = async function (args = {}, options = optionsNoChainIds) {
     const getOptions = { ...options, app: contractName };
 
-    const newArgs = { ...args, notEqualsField: ['sale'], notEqualsValue: [constants.zeroAddress], ownerCommonName: process.env.SELLER }
+    const newArgs = { ...args, notEqualsField: ['sale'], notEqualsValue: [constants.zeroAddress], creator: process.env.SELLER }
     const all = await marketplaceJs.getAll(rawAdmin, newArgs, getOptions);
 
     return { inventoryResults: all.inventoryResults, inventoryCount: all.inventoryCount };
@@ -551,14 +551,14 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
   contract.getMarketplaceInventoriesLoggedIn = async function (args = {}, options = optionsNoChainIds) {
     const getOptions = { ...options, app: contractName };
 
-    const newArgs = { ...args, ownerCommonName: process.env.SELLER, notEqualsField: ['sale'], notEqualsValue: [constants.zeroAddress] }
+    const newArgs = { ...args, creator: process.env.SELLER, notEqualsField: ['sale'], notEqualsValue: [constants.zeroAddress] }
     const all = await marketplaceJs.getAll(rawAdmin, newArgs, getOptions);
     return { inventoryResults: all.inventoryResults, inventoryCount: all.inventoryCount };
   };
 
   contract.getTopSellingProducts = async function (args = {}, options = optionsNoChainIds) {
     const getOptions = { ...options, app: contractName }
-    const newArgs = { ...args, notEqualsField: 'sale', notEqualsValue: constants.zeroAddress, ownerCommonName: process.env.SELLER }
+    const newArgs = { ...args, notEqualsField: 'sale', notEqualsValue: constants.zeroAddress, creator: process.env.SELLER }
     return marketplaceJs.getTopSellingProducts(rawAdmin, newArgs, getOptions)
   }
 
@@ -567,7 +567,7 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
     const newArgs = {
       ...args, notEqualsField: ['sale'],
       notEqualsValue: [constants.zeroAddress],
-      ownerCommonName: process.env.SELLER
+      creator: process.env.SELLER
     }
     return marketplaceJs.getTopSellingProducts(rawAdmin, newArgs, getOptions)
   }
