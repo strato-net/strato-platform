@@ -1,7 +1,7 @@
 # APEX (an SMD backend server)
 
 ## Prepare to run server/tests locally (development mode):
-0. Use the same NodeJS version as in Dockerfile (e.g. `nvm install 8 && nvm use 8`). As of Dec 2021, using the newer node version (like 14) with current Apex code makes all DB queries stall (and no migrations run on first start).
+0. Use the same NodeJS version as in Dockerfile (e.g. `nvm install 21.7.1 && nvm use 21`).
 1. Run strato-getting-started single node locally with ports proxied (by changing docker-compose.yml):
     1. postgres (15433:5432)
     2. prometheus (9090:9090)
