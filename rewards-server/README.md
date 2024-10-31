@@ -7,7 +7,14 @@
 ## Deploy dockerized
 
 1. Create `.env` and `secrets.json` in the rewards-server folder.
-2. Build and start the server:
+2. Create `latestBlock.json` in the rewards-server/config folder.
+   ```
+   {
+    "latestBlockNumber" : 0
+    }   
+   ```
+   This file will be updated with the latest block it has seen - this prevents duplicate rewards from being sent out.
+3. Build and start the server:
     ```
     docker compose up -d --build
     ```

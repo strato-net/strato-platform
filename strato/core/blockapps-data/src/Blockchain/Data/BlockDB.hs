@@ -40,11 +40,10 @@ import Crypto.Secp256k1.Internal
 blk2BlkDataRef ::
   Block ->
   Keccak256 ->
-  Integer ->
   Bool ->
   (BlockDataRef, [Validator], [Validator], [Validator], [X509Certificate], [DummyCertRevocation], Maybe Signature, [Signature])
-blk2BlkDataRef b hash' difficulty' makeHashOne =
-  let bdr = BlockDataRef pH uH cC sR tR rR lB d n gL gU t eD nc mH hash'' True True difficulty' v --- Horrible! Apparently I need to learn the Lens library, yesterday
+blk2BlkDataRef b hash' makeHashOne =
+  let bdr = BlockDataRef pH uH cC sR tR rR lB d n gL gU t eD nc mH hash'' True True v --- Horrible! Apparently I need to learn the Lens library, yesterday
    in (bdr, vs, va, vr, ca, cr, ps, sigs)
   where
     hash'' = if makeHashOne then unsafeCreateKeccak256FromWord256 1 else hash'
@@ -94,20 +93,20 @@ getBlock h = do
 
 putBlocks ::
   HasSQLDB m =>
-  [(Block, Integer)] ->
+  [Block] ->
   Bool ->
   m [Key BlockDataRef]
-putBlocks blocksAndDifficulties makeHashOne = do
-  let blocksHashesAndDifficulties = (\(b, d) -> (b, blockHash b, d)) <$> blocksAndDifficulties
+putBlocks blockList makeHashOne = do
+  let blocksWithHashes = (\b -> (b, blockHash b)) <$> blockList
   sqlQuery $
-    forM blocksHashesAndDifficulties $ \(b, hash', diff) -> do
+    forM blocksWithHashes $ \(b, hash') -> do
       insertTXIfNew' (BlockHash $ blockHash b) (Just $ number $ blockBlockData b) (blockReceiptTransactions b)
 
       existingBlockData <- SQL.selectList [BlockDataRefHash SQL.==. blockHash b] []
 
       case existingBlockData of
         [] -> do
-          let (toInsert, vs, va, vr, ca, cr, ps, sigs) = blk2BlkDataRef b hash' diff makeHashOne
+          let (toInsert, vs, va, vr, ca, cr, ps, sigs) = blk2BlkDataRef b hash' makeHashOne
           blkDataRefId <- SQL.insert toInsert
           forM_ (blockReceiptTransactions b) $ \tx -> do
             txID <- updateBlockNumber b (transactionHash tx) (txChainId tx)
