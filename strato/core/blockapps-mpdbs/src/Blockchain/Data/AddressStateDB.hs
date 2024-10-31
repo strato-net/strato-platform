@@ -94,7 +94,7 @@ instance MonadUnliftIO m => MonadUnliftIO (MainChainT m) where
 instance MonadLogger m => MonadLogger  (MainChainT m)
 
 blankAddressState :: AddressState
-blankAddressState = AddressState {addressStateNonce = 0, addressStateBalance = 0, addressStateContractRoot = MP.emptyTriePtr, addressStateCodeHash = EVMCode $ hash "", addressStateChainId = Nothing}
+blankAddressState = AddressState {addressStateNonce = 0, addressStateBalance = 0, addressStateContractRoot = MP.emptyTriePtr, addressStateCodeHash = ExternallyOwned $ hash "", addressStateChainId = Nothing}
 
 instance Default AddressState where
   def = blankAddressState
@@ -164,7 +164,7 @@ resolveCodePtr' visited chainId (CodeAtAccount acct name) = do
       if isAccessibleChain && (Set.notMember addressStateCodeHash visited)
         then
           resolveCodePtr' (Set.insert addressStateCodeHash visited) codeAccountChainId addressStateCodeHash >>= \case
-            Just e@(EVMCode _) -> pure $ Just e
+            Just e@(ExternallyOwned _) -> pure $ Just e
             Just (SolidVMCode _ d) -> pure . Just $ SolidVMCode name d
             _ -> pure Nothing
         else pure Nothing
@@ -187,7 +187,7 @@ unsafeResolveCodePtr (CodeAtAccount acct name) =
     Nothing -> pure Nothing
     Just AddressState {..} ->
       unsafeResolveCodePtr addressStateCodeHash >>= \case
-        Just e@(EVMCode _) -> pure $ Just e
+        Just e@(ExternallyOwned _) -> pure $ Just e
         Just (SolidVMCode _ d) -> pure . Just $ SolidVMCode name d
         _ -> pure Nothing
 unsafeResolveCodePtr codePtr = pure $ Just codePtr
@@ -212,7 +212,7 @@ unsafeResolveCodePtrParent (CodeAtAccount acct _) =
     Nothing -> pure Nothing
     Just AddressState {..} ->
       unsafeResolveCodePtrParent addressStateCodeHash >>= \case
-        Just e@(EVMCode _) -> pure $ Just e
+        Just e@(ExternallyOwned _) -> pure $ Just e
         Just (SolidVMCode name' d) -> pure . Just $ SolidVMCode name' d
         _ -> pure Nothing
 unsafeResolveCodePtrParent codePtr = pure $ Just codePtr
@@ -226,12 +226,12 @@ codePtrToSHA ::
   m (Maybe Keccak256)
 codePtrToSHA chainId =
   resolveCodePtr chainId >=> \case
-    Just (EVMCode hsh) -> pure $ Just hsh
+    Just (ExternallyOwned hsh) -> pure $ Just hsh
     Just (SolidVMCode _ hsh) -> pure $ Just hsh
     _ -> pure Nothing -- CodeAtAccount cannot happen here
 
 resolvedCodePtrToSHA :: CodePtr -> Keccak256
-resolvedCodePtrToSHA (EVMCode hsh) = hsh
+resolvedCodePtrToSHA (ExternallyOwned hsh) = hsh
 resolvedCodePtrToSHA (SolidVMCode _ hsh) = hsh
 resolvedCodePtrToSHA _ = emptyHash
 
@@ -245,13 +245,13 @@ codePtrToCodeKind ::
 codePtrToCodeKind chainId =
   resolveCodePtr chainId >=> \case
     Just (SolidVMCode _ _) -> pure SolidVM
-    _ -> pure EVM -- TODO: should this return (Maybe CodeKind)?
+    _ -> pure SolidVM -- TODO: should this return (Maybe CodeKind)?
 
 unsafeCodePtrToCodeKind :: Selectable Account AddressState m => CodePtr -> m CodeKind
 unsafeCodePtrToCodeKind =
   unsafeResolveCodePtr >=> \case
     Just (SolidVMCode _ _) -> pure SolidVM
-    _ -> pure EVM -- TODO: should this return (Maybe CodeKind)?
+    _ -> pure SolidVM -- TODO: should this return (Maybe CodeKind)?
 
 getAppAccount ::
   ( Selectable Word256 ParentChainIds m,

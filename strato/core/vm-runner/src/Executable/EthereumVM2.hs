@@ -22,20 +22,25 @@ import BlockApps.Logging
 import qualified Blockchain.Bagger as Bagger
 import qualified Blockchain.Bagger.BaggerState as B
 import Blockchain.BlockChain
+import Blockchain.Blockstanbul.Model.Authentication
+import Blockchain.Blockstanbul (PreprepareDecision(..))
 import Blockchain.DB.BlockSummaryDB
 import Blockchain.DB.ChainDB
 import Blockchain.DB.CodeDB (CodeKind (..), getCode)
 import qualified Blockchain.DB.MemAddressStateDB as Mem
 import Blockchain.DB.StorageDB
 import Blockchain.Data.AddressStateDB
+import Blockchain.Data.Block
+import Blockchain.Data.BlockHeader
 import Blockchain.Data.BlockSummary
 import Blockchain.Data.ChainInfo
-import Blockchain.Data.DataDefs (BlockData (..), TransactionResult (..), blockDataNumber)
+import Blockchain.Data.DataDefs (TransactionResult (..))
 import Blockchain.Data.ExecResults
 import Blockchain.Data.GenesisBlock
 import Blockchain.Data.TransactionResultStatus
+import Blockchain.Data.Transaction
 import qualified Blockchain.Database.MerklePatricia as MP
-import Blockchain.Event
+import Blockchain.Event hiding (selfAddress)
 import Blockchain.JsonRpcCommand
 import Blockchain.Sequencer.Event
 import qualified Blockchain.SolidVM as SolidVM
@@ -86,6 +91,11 @@ handleVmEvents ::
   (MonadFail m, Bagger.MonadBagger m, MonadMonitor m) =>
   ConduitT VmInEventBatch VmOutEvent m ()
 handleVmEvents = awaitForever $ \InBatch {..} -> do
+  mpResps <- lift $ for mpNodesReqs $ \(o, srs) -> do
+    nds <- catMaybes <$> traverse (A.lookup (A.Proxy @MP.NodeData)) srs
+    pure $! OutMPNodesResponse o nds
+  yieldMany $! mpResps
+
   rpcResps <- lift $ do
     bbHash <- maybe Keccak256.zeroHash fst <$> getChainBestBlock Nothing
     resps <- withCurrentBlockHash bbHash $ traverse runJsonRpcCommand' rpcCommands
@@ -97,6 +107,65 @@ handleVmEvents = awaitForever $ \InBatch {..} -> do
   yieldMany $ outputPrivateTransactions privateTxs
   processBlocksAndNewChains blocksAndNewChains
 
+
+  mPreDec <- lift $ do
+    case preprepareBlock of
+      Nothing -> pure Nothing
+      Just block -> do
+        let bHeader = blockBlockData block
+            bHash = blockHeaderHash bHeader
+            -- bro if there are any maybes in this list thaz BAD
+            -- private txs don't affect stateroot we compute
+            otxs = catMaybes $ wrapIngestBlockTransaction  bHash <$> [t | t <- blockReceiptTransactions block, txType t /= PrivateHash]
+        mSumm <- A.lookup (A.Proxy @BlockSummary) (parentHash bHeader)
+        case mSumm of 
+          Nothing -> pure Nothing
+          Just summ -> do
+            let bHeader' = case bHeader of
+                            -- imitate parent block as closely as possible (most important is the stateroot)
+                            BlockHeader {} -> bHeader { 
+                              parentHash = bSumParentHash summ,
+                              stateRoot = bSumStateRoot summ,
+                              number = bSumNumber summ,
+                              gasLimit = bSumGasLimit summ
+                            }
+                            BlockHeaderV2 {} -> bHeader { 
+                              parentHash = bSumParentHash summ,
+                              stateRoot = bSumStateRoot summ,
+                              number = bSumNumber summ
+                            }
+            let pHash = proposalHash bHeader
+                mSig = getProposerSeal bHeader  -- Signature is Maybe type
+            proposer <- case mSig of
+                            Just sig -> do
+                                let (r, s, v) = getSigVals sig
+                                    proposerAddress = whoReallySignedThisTransactionEcrecover pHash r s (v - 0x1b)
+                                case proposerAddress of
+                                  Just addr ->  return addr
+                                  Nothing -> error "no proposer"
+                            Nothing -> error "no proposer"
+            res <- Bagger.runFromStateRoot 
+              --account
+              mineTransactions 
+              (bSumGasLimit summ) 
+              bHeader'
+              otxs 
+              proposer
+            case res of 
+              Right (sr, trrs, _) -> do 
+                $logDebugS "handleVmEvents/preprepareBlock" . T.pack $ "Stateroot we got: " <> format sr
+                $logDebugS "handleVmEvents/preprepareBlock" . T.pack $ "Stateroot in block: " <> format (stateRoot bHeader)
+                blockFailures <- verifyBlock block (trrs, Just sr) summ
+                case blockFailures of 
+                  [] -> pure . Just $ AcceptPreprepare bHash
+                  _  -> do
+                    $logDebugS "handleVmEvents/preprepareBlock" . T.pack $ show blockFailures
+                    pure $ Just RejectPreprepare
+              _ -> pure $ Just RejectPreprepare
+  $logDebugS "handleVmEvents/mPreDec" . T.pack $ format mPreDec
+  traverse_ (yield . OutPreprepareResponse) mPreDec
+
+  mSelfAddress <- _selfAddress <$> Mod.get (Mod.Proxy @ContextState)
   mNewBlock <- lift $ do
     Mod.modify_ (Mod.Proxy @ContextState) $ pure . (blockRequested ||~ createBlock)
     -- todo: perhaps we shouldnt even add TXs to the mempool, it might make for a VERY large checkpoint
@@ -134,10 +203,11 @@ handleVmEvents = awaitForever $ \InBatch {..} -> do
     if shouldOutputBlocks
       then do
         $logInfoS "evm/loop/newBlock" "calling Bagger.makeNewBlock"
-        newBlock <- Bagger.makeNewBlock mineTransactions
-        pure $ Just newBlock
+        newBlock <- Bagger.makeNewBlock mineTransactions mSelfAddress
+        pure $ Just newBlock 
       else pure Nothing
-  traverse_ (yield . OutBlock) mNewBlock
+    
+  for_ mNewBlock $ yield . OutBlock 
 
 groupEithers :: [Either a b] -> [Either [a] [b]]
 groupEithers = foldr f []
@@ -197,9 +267,9 @@ insertNewChains ogs = fmap catMaybes . forM ogs $ \OutputGenesis {..} -> do
           [] -> do
             yieldMany . concat $! map (OutLog . mkLogEntry bHash tHash (Just cId)) . erLogs <$> mExecResults
             yield . OutEvent . concat $! map (mkEventEntry (Just cId)) . erEvents <$> mExecResults
-            let (orgName, appName) = case mExecResults of
+            let (creator, appName) = case mExecResults of
                   [] -> ("", "")
-                  x : _ -> (erOrgName x, erAppName x)
+                  x : _ -> (erCreator x, erAppName x)
             yield . OutTXR $
               TransactionResult
                 { transactionResultBlockHash = cBlock,
@@ -220,7 +290,7 @@ insertNewChains ogs = fmap catMaybes . forM ogs $ \OutputGenesis {..} -> do
                   transactionResultStatus = Just Success,
                   transactionResultChainId = Just cId,
                   transactionResultKind = Just kind,
-                  transactionResultOrgName = orgName,
+                  transactionResultCreator = creator,
                   transactionResultAppName = appName
                 }
             Just (cId, cInfo, bHash, mExecResults) <$ putChainGenesisInfo (Just cId) cBlock sr pChains
@@ -246,7 +316,7 @@ insertNewChains ogs = fmap catMaybes . forM ogs $ \OutputGenesis {..} -> do
                   transactionResultStatus = Just $ Failure "Execution" Nothing (ExecutionFailure fmt) Nothing Nothing (Just fmt),
                   transactionResultChainId = Just cId,
                   transactionResultKind = Just kind,
-                  transactionResultOrgName = "",
+                  transactionResultCreator = "",
                   transactionResultAppName = ""
                 }
             return Nothing
@@ -254,17 +324,17 @@ insertNewChains ogs = fmap catMaybes . forM ogs $ \OutputGenesis {..} -> do
 outputNewChains :: VMBase m => [(Word256, ChainInfo, Keccak256, [ExecResults])] -> ConduitT a VmOutEvent m ()
 outputNewChains = traverse_ $ \(cId, cInfo, bHash, execr) -> do
   yield . OutIndexEvent $! NewChainInfo cId cInfo
-  let org = fromMaybe "" $ do
+  let crtr = fromMaybe "" $ do
         e <- listToMaybe execr
         a <- erAction e
         d <- listToMaybe . OMap.assocs $ a ^. Action.actionData
-        pure $ d ^. _2 . Action.actionDataOrganization
+        pure $ d ^. _2 . Action.actionDataCreator
       app = fromMaybe "" $ do
         e <- listToMaybe execr
         a <- erAction e
         d <- listToMaybe . OMap.assocs $ a ^. Action.actionData
         pure $ d ^. _2 . Action.actionDataApplication
-  yield $ OutToStateDiff cId cInfo bHash org app
+  yield $ OutToStateDiff cId cInfo bHash crtr app
   for_ (catMaybes $ erAction <$> execr) $ yield . OutAction
   yield . OutEvent $ flip map (concatMap erEvents execr) $ mkEventEntry (Just cId)
 
@@ -285,13 +355,13 @@ processBlockSummaries ::
   [OutputBlock] ->
   m ()
 processBlockSummaries = mapM_ $ \b -> do
-  let number = blockDataNumber $ obBlockData b
+  let number' = number $ obBlockData b
       txCount = length $ obReceiptTransactions b
-  recordMaxBlockNumber "vm_seqevents" number
+  recordMaxBlockNumber "vm_seqevents" number'
   $logDebugS "evm/processBlockSummaries" . T.pack $
     concat
       [ "Received block number ",
-        show number,
+        show number',
         " with ",
         show txCount,
         " transactions from seqEvents"
@@ -349,7 +419,7 @@ runChainConstructors cId cInfo = do
           hsh <- MaybeT $
             pure $ case cp of
               SolidVMCode _ h -> Just h
-              EVMCode h -> Just h
+              ExternallyOwned h -> Just h
               CodeAtAccount _ _ -> Nothing
           (MaybeT $ pure $ M.lookup hsh codeHashMap)
             <|> MaybeT (fmap (T.pack . BC.unpack . snd) <$> getCode hsh)
@@ -371,7 +441,7 @@ runChainConstructors cId cInfo = do
           False --noValueTransfer
           True -- isRunChainConstructors
           S.empty --pre-existing suicide list
-          ( BlockData
+          ( BlockHeader
               (Keccak256.unsafeCreateKeccak256FromWord256 0)
               (Keccak256.unsafeCreateKeccak256FromWord256 0)
               emptyChainMember
@@ -385,13 +455,14 @@ runChainConstructors cId cInfo = do
               0
               (bSumTimestamp curBlockSummary)
               ""
-              0
               (Keccak256.unsafeCreateKeccak256FromWord256 0)
+              0
           )
           0 --callDepth
           (Account 0 $ Just cId) --receiveAddress
           (Account addr $ Just cId) --codeAddress
           sender
+          (Address 0)
           0 --value
           1 --gasPrice
           ""
@@ -421,7 +492,6 @@ writeBlockSummary :: HasBlockSummaryDB m => OutputBlock -> m ()
 writeBlockSummary block =
   let sha = outputBlockHash block
       header = obBlockData block
-      td = obTotalDifficulty block
       txCnt = fromIntegral $ length (obReceiptTransactions block)
-   in putBSum sha (blockHeaderToBSum header td txCnt)
+   in putBSum sha (blockHeaderToBSum header txCnt)
 

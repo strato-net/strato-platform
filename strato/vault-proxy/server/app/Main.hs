@@ -20,6 +20,7 @@ import Data.Text.Encoding as TE
 import Debug.Trace
 import GHC.Conc
 import HFlags
+import Instrumentation
 import qualified Network.HTTP.Client as HCLI
 import Network.HTTP.Conduit as HCON hiding (Request)
 import Network.HTTP.ReverseProxy
@@ -44,6 +45,7 @@ import Text.Regex
 main :: IO ()
 main = do
   blockappsInit "blockapps-vault-proxy-server"
+  runInstrumentation "blockapps-vault-proxy-server"
   --Print the startup logo
   forM_ [stdout, stderr] $ flip hSetBuffering LineBuffering
   putStrLn . unlines $

@@ -26,6 +26,7 @@ module SolidVM.Model.CodeCollection.Statement
     ArgList,
     NumberUnit (..),
     numLitGen,
+    WrappedDecimal (..),
   )
 where
 
@@ -35,13 +36,14 @@ import Blockchain.Strato.Model.Account
 import Control.DeepSeq
 import Data.Aeson
 import Data.Binary
+import Data.Decimal
 import qualified Data.Map.Strict as Map
 import Data.Source
 import qualified Data.Text as T
 import GHC.Generics
 import qualified Generic.Random as GR
 import SolidVM.Model.SolidString
-import SolidVM.Model.Type
+import SolidVM.Model.Type hiding (Decimal)
 import Test.QuickCheck
 import Test.QuickCheck.Instances ()
 
@@ -171,6 +173,7 @@ data ExpressionF a
   | Ternary a (ExpressionF a) (ExpressionF a) (ExpressionF a)
   | BoolLiteral a Bool
   | NumberLiteral a Integer (Maybe NumberUnit)
+  | DecimalLiteral a WrappedDecimal
   | StringLiteral a String
   | AccountLiteral a NamedAccount
   | TupleExpression a [Maybe (ExpressionF a)]
@@ -192,6 +195,7 @@ extractExpression (Binary a _ _ _) = a
 extractExpression (Ternary a _ _ _) = a
 extractExpression (BoolLiteral a _) = a
 extractExpression (NumberLiteral a _ _) = a
+extractExpression (DecimalLiteral a _) = a
 extractExpression (StringLiteral a _) = a
 extractExpression (AccountLiteral a _) = a
 extractExpression (TupleExpression a _) = a
@@ -264,3 +268,28 @@ instance Arbitrary a => Arbitrary (SimpleStatementF a) where
 
 instance Arbitrary a => Arbitrary (VarDefEntryF a) where
   arbitrary = GR.genericArbitrary GR.uniform
+
+newtype WrappedDecimal = WrappedDecimal { unwrapDecimal :: DecimalRaw Integer }
+    deriving (Show, Eq, Ord, Generic, NFData)
+
+instance Binary WrappedDecimal where
+    put (WrappedDecimal (Decimal places mantissa)) = do
+        put places
+        put mantissa
+    
+    get = do
+        places <- get
+        mantissa <- get
+        return $ WrappedDecimal (Decimal places mantissa)
+
+instance FromJSON WrappedDecimal where
+    parseJSON = withObject "WrappedDecimal" $ \v -> do
+        places <- v .: "decimalPlaces"
+        mantissa <- v .: "decimalMantissa"
+        return $ WrappedDecimal (Decimal places mantissa)
+
+instance ToJSON WrappedDecimal where
+    toJSON (WrappedDecimal (Decimal places mantissa)) = object
+        [ "decimalPlaces" .= places
+        , "decimalMantissa" .= mantissa
+        ]

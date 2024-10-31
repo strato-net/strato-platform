@@ -21,8 +21,10 @@ import Blockchain.Data.ChainInfo
 import Blockchain.Data.PubKey ()
 import Blockchain.Data.RLP
 import Blockchain.Data.Transaction
+import Blockchain.Database.MerklePatricia.NodeData (NodeData)
 import Blockchain.Strato.Model.ExtendedWord
 import Blockchain.Strato.Model.Keccak256
+import Blockchain.Strato.Model.StateRoot
 import Crypto.Types.PubKey.ECC
 import qualified Data.ByteString as B
 import Data.List
@@ -172,7 +174,7 @@ data Message
     Status
       { protocolVersion :: Int,
         networkID :: Integer,
-        totalDifficulty :: Integer,
+        highestBlockNum :: Integer,
         latestHash :: Keccak256,
         genesisHash :: Keccak256
       }
@@ -188,6 +190,8 @@ data Message
     GetChainDetails [Word256]
   | ChainDetails [(Word256, ChainInfo)]
   | GetTransactions [Keccak256]
+  | GetMPNodes [StateRoot]
+  | MPNodes [NodeData]
   deriving (Eq, Show)
 
 instance Format Message where
@@ -212,22 +216,22 @@ instance Format Message where
   format Ping = CL.blue "Ping"
   format Pong = CL.blue "Pong"
   --ethereum wire protocol
-  format Status {protocolVersion = ver, networkID = nID, totalDifficulty = d, latestHash = lh, genesisHash = gh} =
+  format Status {..} =
     CL.blue "Status"
       ++ "    protocolVersion: "
-      ++ show ver
+      ++ show protocolVersion
       ++ "\n"
       ++ "    networkID: "
-      ++ show nID
+      ++ show networkID
       ++ "\n"
       ++ "    totalDifficulty: "
-      ++ show d
+      ++ show highestBlockNum
       ++ "\n"
       ++ "    latestHash: "
-      ++ format lh
+      ++ format latestHash
       ++ "\n"
       ++ "    genesisHash: "
-      ++ format gh
+      ++ format genesisHash
   format (NewBlockHashes items) = CL.blue "NewBlockHashes" ++ tab ("\n" ++ intercalate "\n    " ((\(hash', number') -> "(" ++ format hash' ++ ", " ++ show number' ++ ")") <$> items))
   format (Transactions transactions) =
     CL.blue "Transactions:\n    " ++ tab' (intercalate "\n    " (format <$> transactions))
@@ -265,6 +269,10 @@ instance Format Message where
           ++ formatPairs xs
   format (GetTransactions txHashes) =
     CL.blue "GetTransactions\n" ++ "requested transaction hashes: " ++ (intercalate "\n" (show <$> txHashes))
+  format (GetMPNodes mpNodes) =
+    CL.blue "GetMPNodes\n" ++ "requested MP nodes: " ++ (intercalate "\n" (format <$> mpNodes))
+  format (MPNodes mpNodes) =
+    CL.blue "MPNodes\n" ++ "received MP nodes: " ++ (intercalate "\n" (format <$> mpNodes))
 
 --format x = error $ "missing value in format for Wire Message: " ++ show x
 
@@ -278,11 +286,11 @@ obj2WireMessage 0x2 (RLPArray []) = Ping
 obj2WireMessage 0x2 (RLPArray [RLPArray []]) = Ping
 obj2WireMessage 0x3 (RLPArray []) = Pong
 -- TODO remove distinction between new status messages and old ones once entire protocol is complete
-obj2WireMessage 0x10 (RLPArray [ver, nID, d, lh, gh]) =
+obj2WireMessage 0x10 (RLPArray [ver, nID, hbn, lh, gh]) =
   Status
     { protocolVersion = fromInteger $ rlpDecode ver,
       networkID = fromInteger $ rlpDecode nID,
-      totalDifficulty = rlpDecode d,
+      highestBlockNum = rlpDecode hbn,
       latestHash = rlpDecode lh,
       genesisHash = rlpDecode gh
     }
@@ -311,6 +319,10 @@ obj2WireMessage 0x1d (RLPArray chDetPairs) =
   ChainDetails $ rlpDecode <$> chDetPairs
 obj2WireMessage 0x1e (RLPArray trHashes) =
   GetTransactions $ rlpDecode <$> trHashes
+obj2WireMessage 0x1f (RLPArray (RLPScalar 0 : mpNodes)) =
+  GetMPNodes $ rlpDecode <$> mpNodes
+obj2WireMessage 0x1f (RLPArray (RLPScalar 1 : mpNodes)) =
+  MPNodes $ rlpDecode <$> mpNodes
 obj2WireMessage x y = error ("Missing case in obj2WireMessage: " ++ show x ++ ", " ++ format y)
 
 -- Convert Message into RLPObject and corresponding message code
@@ -371,5 +383,9 @@ wireMessage2Obj (ChainDetails chpairs) =
   (0x1d, RLPArray $ rlpEncode <$> chpairs)
 wireMessage2Obj (GetTransactions trhashes) =
   (0x1e, RLPArray $ rlpEncode <$> trhashes)
+wireMessage2Obj (GetMPNodes mpNodes) =
+  (0x1f, RLPArray . (RLPScalar 0 :) $ rlpEncode <$> mpNodes)
+wireMessage2Obj (MPNodes mpNodes) =
+  (0x1f, RLPArray . (RLPScalar 1 :) $ rlpEncode <$> mpNodes)
 
 --wireMessage2Obj x = error $ "Missing case in wireMessage2Obj: " ++ show x

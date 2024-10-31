@@ -13,9 +13,6 @@ import {
   fetchBalanceFailure,
   fetchCurrentAccountDetailSuccess,
   fetchCurrentAccountDetailFailure,
-  faucetSuccess,
-  faucetRequest,
-  faucetFailure,
   fetchOauthAccountsFailure,
   fetchOauthAccountsSuccess
 } from '../../components/Accounts/accounts.actions';
@@ -218,63 +215,6 @@ describe('Accounts: reducer', () => {
         currentAccountDetail: { balance: "3000000000000000000000" },
         filter: '',
         error: null
-      };
-      expect(reducer(initialState, action)).toMatchSnapshot();
-    });
-
-  });
-
-  describe('faucet', () => {
-
-    // FAUCET_REQUEST
-    test('request', () => {
-      let data = {
-        name: 'tanuj',
-        address: '76a3192ce9aa0531fe7e0e3489a469018c0bff03',
-        flag: 'faucet'
-      };
-      const action = faucetRequest(data.address, data.name, data.flag);
-      const initialState = {
-        accounts: reducerAccounts,
-        currentAccountDetail: null,
-        filter: '',
-        error: null,
-        faucet: {
-          status: false,
-          accountAddress: null
-        }
-      };
-      expect(reducer(initialState, action)).toMatchSnapshot();
-    });
-
-    // FAUCET_SUCCESS
-    test('success', () => {
-      const action = faucetSuccess();
-      const initialState = {
-        accounts: reducerAccounts,
-        currentAccountDetail: null,
-        filter: '',
-        error: null,
-        faucet: {
-          status: false,
-          accountAddress: null
-        }
-      };
-      expect(reducer(initialState, action)).toMatchSnapshot();
-    });
-
-    // FAUCET_FAILURE
-    test('failure', () => {
-      const action = faucetFailure(error);
-      const initialState = {
-        accounts: reducerAccounts,
-        currentAccountDetail: { balance: "3000000000000000000000" },
-        filter: '',
-        error: null,
-        faucet: {
-          status: false,
-          accountAddress: null
-        }
       };
       expect(reducer(initialState, action)).toMatchSnapshot();
     });

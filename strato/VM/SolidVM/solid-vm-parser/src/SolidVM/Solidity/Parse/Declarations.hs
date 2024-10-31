@@ -405,7 +405,7 @@ functionDeclaration free = do
 functionXabi :: Bool -> SolidityParser SolidVM.Func
 functionXabi free = do
   start <- getSourcePosition
-  functionArgs <- tupleDeclaration
+  functionArgs <- map (fmap snd) <$> tupleDeclaration
 
   let lastParamIsVariadic = maybe False ((==) SVMType.Variadic . fst) (Data.List.uncons . reverse . map snd $ functionArgs)
       containsOnly1 = length (filter (SVMType.Variadic ==) (map snd functionArgs)) == 1
@@ -461,7 +461,7 @@ eventDeclaration = do
       EventDeclaration
         SolidVM.Event
           { SolidVM._eventAnonymous = anon,
-            SolidVM._eventLogs = zipWith (\i -> fmap (SolidVM.IndexedType i)) [0 ..] logs,
+            SolidVM._eventLogs = zipWith (\i (n,(x,t)) -> SolidVM.EventLog n x (SolidVM.IndexedType i t)) [0 ..] logs,
             SolidVM._eventContext = ctx
             --         objName = name,
             --         objValueType = NoValue,
@@ -479,7 +479,7 @@ modifierDeclaration = do
   start <- getSourcePosition
   reserved "modifier"
   name <- identifier
-  args <- option [] tupleDeclaration
+  args <- map (fmap snd) <$> option [] tupleDeclaration
   contents <- Just <$> statements <|> (reservedOp ";" >> return Nothing)
   end <- getSourcePosition
   let ctx = SourceAnnotation start end ()
@@ -489,9 +489,7 @@ modifierDeclaration = do
       ModifierDeclaration
         Xabi.Modifier
           { Xabi._modifierArgs -- undefined args -- :: Map Text SolidVM.IndexedType
-            =
-              Map.fromList $
-                zipWith (\x i -> fmap (SolidVM.IndexedType i) (nameUnnamed x i)) args [0 ..],
+            = zipWith (\x i -> fmap (SolidVM.IndexedType i) (nameUnnamed x i)) args [0 ..],
             Xabi._modifierSelector = Text.pack name, -- ? -- undefined -- :: Text
             Xabi._modifierContents = contents, -- :: Maybe [Statement]
             Xabi._modifierContext = ctx
@@ -502,17 +500,17 @@ modifierDeclaration = do
 
 -- | Parses a '(x, y, z)'-style tuple, such as appears in function
 -- arguments and return values.
-tupleDeclaration :: SolidityParser [(Text, SVMType.Type)]
+tupleDeclaration :: SolidityParser [(Text, (Bool, SVMType.Type))]
 tupleDeclaration = parens $
   commaSep $ do
     partType <- simpleTypeExpression
-    optional $
-      reserved "indexed"
-        <|> reserved "storage"
-        <|> reserved "memory"
-        <|> reserved "calldata"
+    indexed <- option False $
+            (True <$ reserved "indexed")
+        <|> (False <$ reserved "storage")
+        <|> (False <$ reserved "memory")
+        <|> (False <$ reserved "calldata")
     partName <- option "" identifier
-    return (Text.pack partName, partType)
+    return (Text.pack partName, (indexed, partType))
 
 --  ObjDef{
 --    objName = partName,
@@ -549,7 +547,7 @@ functionModifiers ::
 functionModifiers = do
   vals <-
     many $
-      (ReturnsMod <$> returnModifier)
+      (ReturnsMod . map (fmap snd) <$> returnModifier)
         <|> (VisibilityMod <$> visibilityModifier)
         <|> (MutabilityMod <$> mutabilityModifier)
         <|> (VirtualMod <$ reserved "virtual")

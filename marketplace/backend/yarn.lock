@@ -1339,10 +1339,10 @@ binary-extensions@^2.0.0:
   resolved "https://registry.yarnpkg.com/binary-extensions/-/binary-extensions-2.2.0.tgz#75f502eeaf9ffde42fc98829645be4ea76bd9e2d"
   integrity sha512-jDctJ/IVQbZoJykoeHbhXpOlNBqGNcwXJKJog42E5HDPUwQTSdjCHdihjj0DlnheQ7blbT6dHOafNAiS8ooQKA==
 
-blockapps-rest@8.3.1:
-  version "8.3.1"
-  resolved "https://registry.yarnpkg.com/blockapps-rest/-/blockapps-rest-8.3.1.tgz#11565e95fa20abe9dc4d0117048ec72f4c98a4b3"
-  integrity sha512-G4o7VWcW5JwTeBH/R6vxaO17LEEzaIQXwRSH2AcfC0IOZ8BJhVA9+PSD/ilg4gYSCGRpVQBZdpPmSnjC6Qx3fA==
+blockapps-rest@8.4.0:
+  version "8.4.0"
+  resolved "https://registry.yarnpkg.com/blockapps-rest/-/blockapps-rest-8.4.0.tgz#46c559c59c65dab8914c9f783088abcdeb67e477"
+  integrity sha512-DXNDOJLcOy4ERTNHO7ivFludhjJvDCtO4nbzj8CJAx8wpUia+J0A7yAah9ZXONEVx+pD5Rx6lTyuiTUNJ6wXug==
   dependencies:
     "@babel/polyfill" "^7.8.3"
     "@solidity-parser/parser" "^0.14.1"
@@ -3286,19 +3286,19 @@ open@^6.0.0:
   dependencies:
     is-wsl "^1.1.0"
 
+p-limit@3, p-limit@^3.0.2:
+  version "3.1.0"
+  resolved "https://registry.yarnpkg.com/p-limit/-/p-limit-3.1.0.tgz#e1daccbe78d0d1388ca18c64fea38e3e57e3706b"
+  integrity sha512-TYOanM3wGwNGsZN2cVTYPArw454xnXj5qmWF1bEoAc4+cU/ol7GVh7odevjp1FNHduHc3KZMcFduxU5Xc6uJRQ==
+  dependencies:
+    yocto-queue "^0.1.0"
+
 p-limit@^2.0.0:
   version "2.3.0"
   resolved "https://registry.yarnpkg.com/p-limit/-/p-limit-2.3.0.tgz#3dd33c647a214fdfffd835933eb086da0dc21db1"
   integrity sha512-//88mFWSJx8lxCzwdAABTJL2MyWB12+eIY7MDL2SqLmAkeKU9qxRvWuSyTjm3FUmpBEMuFfckAIqEaVGUDxb6w==
   dependencies:
     p-try "^2.0.0"
-
-p-limit@^3.0.2:
-  version "3.1.0"
-  resolved "https://registry.yarnpkg.com/p-limit/-/p-limit-3.1.0.tgz#e1daccbe78d0d1388ca18c64fea38e3e57e3706b"
-  integrity sha512-TYOanM3wGwNGsZN2cVTYPArw454xnXj5qmWF1bEoAc4+cU/ol7GVh7odevjp1FNHduHc3KZMcFduxU5Xc6uJRQ==
-  dependencies:
-    yocto-queue "^0.1.0"
 
 p-locate@^3.0.0:
   version "3.0.0"

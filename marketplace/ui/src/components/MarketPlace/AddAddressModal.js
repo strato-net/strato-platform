@@ -13,7 +13,7 @@ import {
 
 
 
-const AddAddressModal = ({open , close }) => {
+const AddAddressModal = ({open , close, redemptionService}) => {
     const [showAddress, setshowAddress] = useState(false);
     const marketplaceDispatch = useMarketplaceDispatch();
     const ShippingDetailsSchema = () => {
@@ -89,6 +89,7 @@ const AddAddressModal = ({open , close }) => {
         addressLine1: encodeURIComponent(values.addressLine1),
         addressLine2: encodeURIComponent(values.addressLine2),
         country: encodeURIComponent(values.country),
+        redemptionService: redemptionService ? encodeURIComponent(redemptionService): redemptionService,
         // billing address
       };
     
@@ -104,7 +105,7 @@ const AddAddressModal = ({open , close }) => {
       });
       let res = await actions.addShippingAddress(marketplaceDispatch, body);
       if (res != null) {
-        await actions.fetchUserAddresses(marketplaceDispatch);
+        await actions.fetchUserAddresses(marketplaceDispatch, redemptionService);
       }
     };
     const { TextArea } = Input;
@@ -143,7 +144,6 @@ const AddAddressModal = ({open , close }) => {
     title={
       <div className="flex justify-between border-b border-[#BABABA]">
         <Typography className="text-xl text-[#202020] font-semibold">Add New Address</Typography>
-
       </div>
     }
     footer={
@@ -287,7 +287,7 @@ const AddAddressModal = ({open , close }) => {
         </div>
       </div>
       <div className="flex justify-center pt-6" id="add-address-button">
-        <div className="cursor-pointer justify-center flex items-center w-40 h-9  border border-primary rounded bg-primary hover:bg-primaryHover text-white"
+        <div id="add-Address-Btn" className="cursor-pointer justify-center flex items-center w-40 h-9 border border-primary rounded bg-primary hover:bg-primaryHover text-white"
           onClick={formik.handleSubmit}>
           Add Address
         </div>

@@ -1,0 +1,63 @@
+#payment-server-version:<VERSION>
+#strato-getting-started-min-version:4.5.0
+version: '3'
+volumes:
+  paymentserverconfig:
+    driver: local
+services:
+  payment-server:
+    environment:
+    - SERVER_HOST=${SERVER_HOST}
+    - STRIPE_SECRET_KEY=${STRIPE_SECRET_KEY}
+    - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
+    - POSTGRES_SERVER_URL=${POSTGRES_SERVER_URL}
+    - POSTGRES_PORT=${POSTGRES_PORT}
+    - POSTGRES_USER=${POSTGRES_USER}
+    - POSTGRES_DBNAME=${POSTGRES_DBNAME}
+    - STRATO_HOST=${STRATO_HOST}
+    - SENDGRID_API_KEY=${SENDGRID_API_KEY}
+    - OAUTH_DISCOVERY_URL=${OAUTH_DISCOVERY_URL}
+    - OAUTH_CLIENT_ID=${OAUTH_CLIENT_ID}
+    - OAUTH_CLIENT_SECRET=${OAUTH_CLIENT_SECRET}
+    - OAUTH_SCOPE=${OAUTH_SCOPE}
+    - OAUTH_SERVICE_OAUTH_FLOW=${OAUTH_SERVICE_OAUTH_FLOW}
+    - SKIP_CONTRACT_VALIDATION=${SKIP_CONTRACT_VALIDATION}
+    - SKIP_DEPLOYMENT=${SKIP_DEPLOYMENT}
+    - BASE_CODE_COLLECTION=${BASE_CODE_COLLECTION}
+    - UPGRADE_CONTRACTS=${UPGRADE_CONTRACTS}
+    - NOTIFICATION_SERVER_URL=${NOTIFICATION_SERVER_URL}
+    - STRAT_ADDRESS=${STRAT_ADDRESS}
+    - STRAT_FEE_RECIPIENT=${STRAT_FEE_RECIPIENT}
+    build: .
+    image: ${PAYMENT_SERVER_IMAGE:-<REPO_URL>payment-server:<VERSION>}
+    volumes:
+       - paymentserverconfig:/config:rw
+    restart: unless-stopped
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "100m"
+        max-file: "3"
+  nginx:
+    depends_on:
+    - payment-server
+    environment:
+    - OAUTH_CLIENT_ID=${OAUTH_CLIENT_ID}
+    - OAUTH_CLIENT_SECRET=${OAUTH_CLIENT_SECRET}
+    - OAUTH_DISCOVERY_URL=${OAUTH_DISCOVERY_URL}
+    - OAUTH_SCOPE=${OAUTH_SCOPE}
+    - ssl=${ssl}
+    - sslCertFileType=${sslCertFileType}
+    build: .
+    image: ${PAYMENT_SERVER_NGINX_IMAGE:-<REPO_URL>payment-server-nginx:<VERSION>}
+    ports:
+    - ${HTTP_PORT:-80}:80 #TAG_REMOVE_WHEN_SSL_CUSTOM_HTTPS_PORT
+    - ${HTTPS_PORT:-443}:443 #TAG_REMOVE_WHEN_NO_SSL
+    volumes:
+    - ./ssl:/tmp/ssl:ro
+    restart: unless-stopped
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "100m"
+        max-file: "3"

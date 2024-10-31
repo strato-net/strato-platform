@@ -22,28 +22,21 @@ import Blockchain.Strato.Model.Account
 import Blockchain.Strato.Model.ExtendedWord
 import Control.Monad ((<=<))
 import qualified Control.Monad.Change.Alter as A
+import Control.Monad.Composable.Kafka
 import Control.Monad.IO.Class
-import Data.Binary
 import qualified Data.ByteString as B
 import qualified Data.ByteString.Char8 as BC
-import qualified Data.ByteString.Lazy as BL
 import qualified Data.Text as T
-import Network.Kafka
-import Network.Kafka.Producer
 import Prelude hiding (id)
 
 -- TODO: Add private chain functionality to JSON RPC commands
 
 produceResponse :: String -> B.ByteString -> IO ()
 produceResponse id theData = do
-  ret <-
-    liftIO $
-      runKafkaConfigured "ethereum-vm" $
-        produceMessages $
-          [TopicAndMessage (lookupTopic "jsonrpcresponse") . makeMessage . BL.toStrict $ encode (id, theData)]
-  case ret of
-    Left e -> error $ "Could not write txs to Kafka: " ++ show e
-    Right _ -> return ()
+  _ <- runKafkaMConfigured "ethereum-vm" $
+       produceItems (lookupTopic "jsonrpcresponse") [(id, theData)]
+
+  return ()
 
 runJsonRpcCommand ::
   ( MonadIO m,
@@ -78,9 +71,9 @@ runJsonRpcCommand' c@JRCGetCode {jrcAddress = address, jrcId = id} = do
   codeHash <-
     addressStateCodeHash
       <$> A.lookupWithDefault (A.Proxy @AddressState) (Account address Nothing)
-  code <- getEVMCode $
+  code <- getExternallyOwned $
     case codeHash of
-      EVMCode ch -> ch
+      ExternallyOwned ch -> ch
       _ -> error "runJsonRpcCommand currently only supported for the EVM"
   return (id, code)
 runJsonRpcCommand' c@JRCGetTransactionCount {jrcAddress = address, jrcId = id} = do

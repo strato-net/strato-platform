@@ -23,13 +23,14 @@ import Blockchain.DB.StateDB
 import Blockchain.DB.StorageDB
 import Blockchain.Data.AddressStateDB
 import Blockchain.Data.Block
+import Blockchain.Data.BlockHeader
 import Blockchain.Data.BlockDB
 import Blockchain.Data.ChainInfo
-import Blockchain.Data.DataDefs
 import Blockchain.Data.Extra
 import Blockchain.Data.GenesisBlock
 import Blockchain.Data.GenesisInfo
 import Blockchain.Data.RLP
+import qualified Blockchain.Data.TXOrigin as Origin
 import Blockchain.Data.ValidatorRef
 import qualified Blockchain.Database.MerklePatricia as MP
 import qualified Blockchain.Database.MerklePatricia.ForEach as MP
@@ -42,10 +43,9 @@ import Blockchain.Generation
     readValidatorsFromGenesisInfo,
   )
 import Blockchain.Sequencer.Bootstrap (bootstrapSequencer)
-import Blockchain.Sequencer.Event (OutputBlock)
+import Blockchain.Sequencer.Event (OutputBlock(..))
 import Blockchain.SolidVM.CodeCollectionDB
 import qualified Blockchain.Strato.Indexer.ApiIndexer as ApiIndexer
-import qualified Blockchain.Strato.Indexer.IContext as IContext
 import qualified Blockchain.Strato.Indexer.Kafka as IdxKafka
 import qualified Blockchain.Strato.Indexer.Model as IdxModel
 import qualified Blockchain.Strato.Model.Account as Ac
@@ -55,17 +55,16 @@ import Blockchain.Strato.Model.Class
 import Blockchain.Strato.Model.ExtendedWord
 import Blockchain.Strato.Model.Keccak256
 import Blockchain.Strato.Model.Util
+import Blockchain.Strato.Model.Validator
 import qualified Blockchain.Strato.RedisBlockDB as RBDB
 import Blockchain.Strato.StateDiff hiding (StateDiff (blockHash, chainId, stateRoot))
 import qualified Blockchain.Strato.StateDiff as StateDiff (StateDiff (blockHash, chainId, stateRoot))
 import Blockchain.Strato.StateDiff.Database
-import Blockchain.Strato.StateDiff.Kafka (assertTopicCreation)
+import Blockchain.Strato.StateDiff.Kafka (assertStateDiffTopicCreation)
 import qualified Blockchain.Stream.Action as A
 import Blockchain.Stream.VMEvent
-import Blockchain.Stream.VMOutput
 import Control.Monad
 import Control.Monad.Change.Alter (Alters, Selectable)
-import Control.Monad.Composable.Kafka
 import Control.Monad.Composable.Redis
 import Control.Monad.IO.Class
 import qualified Data.ByteString.Base16 as B16
@@ -79,8 +78,6 @@ import Data.Maybe
 import qualified Data.Sequence as S
 import Data.Text (Text)
 import qualified Data.Text as T
-import qualified Network.Kafka as K
-import qualified Network.Kafka.Protocol as KP
 import SolidVM.Model.CodeCollection (emptyCodeCollection)
 import System.Directory
 import Text.Format
@@ -98,7 +95,7 @@ readSupplementaryAccounts genesisBlockName = do
             [] -> []
             "s" : _ -> []
             ["a", a, b] -> [NonContract (Ad.Address (parseHex a)) (read b)]
-            ["a", a, b, c] -> [ContractNoStorage (Ad.Address (parseHex a)) (read b) (EVMCode $ unsafeCreateKeccak256FromWord256 (parseHex c))]
+            ["a", a, b, c] -> [ContractNoStorage (Ad.Address (parseHex a)) (read b) (ExternallyOwned $ unsafeCreateKeccak256FromWord256 (parseHex c))]
             _ -> error $ "invalid AccountInfo line: " ++ line
       return . concatMap parseAccounts . lines $ accountInfoString
 
@@ -124,10 +121,10 @@ getGenesisBlockAndPopulateInitialMPs ::
     HasRedis m
   ) =>
   String ->
-  m ([(Ad.Address, X509CertInfoState)], [ChainMemberParsedSet], ([(AccountInfo, CodeInfo)], Block))
+  m ([(Ad.Address, X509CertInfoState)], [Validator], ([(AccountInfo, CodeInfo)], Block))
 getGenesisBlockAndPopulateInitialMPs genesisBlockName = do
   genesisInfo <- getGenesisInfoFromFile genesisBlockName
-  let certs = readCertsFromGenesisInfo genesisInfo
+  let certs' = readCertsFromGenesisInfo genesisInfo
       validators = readValidatorsFromGenesisInfo genesisInfo
   extraAccounts <- liftIO . readSupplementaryAccounts $ genesisBlockName
 
@@ -146,7 +143,7 @@ getGenesisBlockAndPopulateInitialMPs genesisBlockName = do
             Left e -> $logInfoS "Redis/certInsertion" $ T.pack $ "Certificate insertion failed: " ++ show e
           pure (ua', c')
       )
-      certs
+      certs'
 
   insertValidators <- execRedis $ RBDB.addValidators validators
   case insertValidators of
@@ -173,11 +170,10 @@ initializeGenesisBlock ::
 initializeGenesisBlock genesisBlockName = do
   $logInfoS "initgen" "Begin of initgen"
   (extraCertInfoStates, validators, (srcInfo, genesisBlock)) <- getGenesisBlockAndPopulateInitialMPs genesisBlockName
-  _ <- produceVMOutputs [ChainBlock genesisBlock]
   obGB <- liftIO $ bootstrapSequencer extraCertInfoStates genesisBlock
   putGenesisHash $ blockHash genesisBlock
   $logInfoS "initgen" "Initial merkle patricia tries successfully created"
-  void $ putBlocks [(genesisBlock, blockDataDifficulty (blockBlockData genesisBlock))] False
+  void $ putBlocks [genesisBlock] False
   $logInfoS "initgen" "Genesis Block put"
   $logInfoS "initgen" "State diff has been generated"
 
@@ -185,11 +181,19 @@ initializeGenesisBlock genesisBlockName = do
 
   let genesisChainId = Nothing -- TODO: It's possible that we would call this function for private chain creation
   $logInfoS "initgen" "Beginning to write to redis"
-  void . execRedis $
+  void . execRedis $ do
     RBDB.forceBestBlockInfo
       (blockHash genesisBlock)
-      (blockDataNumber . blockBlockData $ genesisBlock)
-      (blockDataDifficulty . blockBlockData $ genesisBlock)
+      (number . blockBlockData $ genesisBlock)
+
+  void . execRedis $
+    RBDB.putBlock OutputBlock
+    { obOrigin = Origin.Direct,
+      obBlockData = blockBlockData genesisBlock,
+      obReceiptTransactions = [],
+      obBlockUncles = []
+    }
+
   $logInfoS "initgen" "best block info inserted"
   liftIO $ bootstrapIndexer obGB
   $logInfoS "initgen" "indexer has been bootstrapped"
@@ -221,12 +225,8 @@ populateStorageDBs ::
   m ()
 populateStorageDBs getMetadata genesisBlock genesisChainId = do
   sr <- getStateRoot genesisChainId
-  res <- liftIO . runKafkaConfigured "strato-init" $ do
-    assertTopicCreation
-
-  case res of
-    Right () -> return ()
-    Left err -> error . show $ err
+  liftIO . runKafkaMConfigured "strato-init" $ do
+    assertStateDiffTopicCreation
 
   MP.forEach sr $ \keyHash value -> do
     address <- fmap (fromMaybe (error $ "missing key value in hash table: " ++ C8.unpack (B16.encode $ nibbleString2ByteString keyHash))) $ getAddressFromHash keyHash
@@ -258,9 +258,11 @@ populateStorageDBs getMetadata genesisBlock genesisChainId = do
                     (codeHash d)
                     emptyCodeCollection
                     ""
+                    Nothing
+                    ""
                     ""
                     ( case codeHash d of
-                        EVMCode _ -> EVM
+                        ExternallyOwned _ -> EVM
                         SolidVMCode _ _ -> SolidVM
                         CodeAtAccount _ _ -> error "CodeAtAccount not supported in genesis block"
                     )
@@ -273,7 +275,7 @@ populateStorageDBs getMetadata genesisBlock genesisChainId = do
               A._metadata =
                 getMetadata
                   ( case codeHash d of
-                      EVMCode ch' -> ch'
+                      ExternallyOwned ch' -> ch'
                       SolidVMCode _ ch' -> ch'
                       CodeAtAccount _ _ -> error "TODO: Encountered CodeAtAccount in genesis block"
                   ),
@@ -311,32 +313,12 @@ populateStorageDBs getMetadata genesisBlock genesisChainId = do
     return ()
 
 bootstrapIndexer :: OutputBlock -> IO ()
-bootstrapIndexer obGB =
+bootstrapIndexer obGB = do
   let clientId = fst ApiIndexer.kafkaClientIds
-      consumer = snd ApiIndexer.kafkaClientIds
-      topic = IContext.targetTopicName
-      mkMeta = KP.Metadata . KP.KString $ C8.empty
-      commit = do
-        putStrLn $ "Bootstrapping indexer"
-        runKafkaConfigured clientId $
-          commitSingleOffset consumer topic 0 0 mkMeta
-      runner =
-        commit >>= \case
-          Right (Right _) -> do
-            putStrLn "bootstrapIndex API checkpoint successful!"
+  putStrLn "About to bootstrap index events"
+  res <-
+    runKafkaMConfigured clientId $
+    IdxKafka.produceIndexEvents [IdxModel.RanBlock obGB]
 
-            putStrLn "About to bootstrap index events"
-
-            res <-
-              runKafkaMConfigured clientId $
-                IdxKafka.produceIndexEvents [IdxModel.RanBlock obGB]
-
-            print res
-            putStrLn "bootstrapIndex genesis seed successful!"
-          Right (Left l) -> do
-            putStrLn $ "will retry bootstrapIndex as I got a broker error: " ++ show (l :: KP.KafkaError)
-            runner
-          (Left l) -> do
-            putStrLn $ "will retry bootstrapIndexer as I got a client error: " ++ show (l :: K.KafkaClientError)
-            runner
-   in runner
+  print res
+  putStrLn "bootstrapIndex genesis seed successful!"

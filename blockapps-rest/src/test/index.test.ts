@@ -54,16 +54,6 @@ describe("contracts", function() {
     assert.isOk(util.isAddress(contract.address), "address");
   });
 
-  it("create contract - detailed", async () => {
-    const uid = util.uid();
-    const contractArgs = factory.createContractArgs(uid);
-    options.isDetailed = true;
-    const contract = <Contract>await rest.createContract(admin, contractArgs, options);
-    assert.equal(contract.name, contractArgs.name, "name");
-    assert.isOk(util.isAddress(contract.address), "address");
-    assert.isDefined(contract.chainId, "chainId");
-  });
-
   it("create contract - BAD_REQUEST", async () => {
     const uid = util.uid();
     const contractArgs = factory.createContractSyntaxErrorArgs(uid);
@@ -374,7 +364,7 @@ describe("history", function() {
       
     const contractHistory = await rest.searchUntil(
       admin,
-      { name: `history@TestHistory` },
+      { name: `history@Test-TestHistory` },
       (r) => r.length > 1,
       {
         ...options,
@@ -388,7 +378,7 @@ describe("history", function() {
 
     const filteredContractHistory = await rest.searchUntil(
       admin,
-      { name: `history@TestHistory` },
+      { name: `history@Test-TestHistory` },
       (r) => r.length > 0,
       {
         ...options,

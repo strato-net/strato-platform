@@ -115,7 +115,7 @@ tFormFieldType (CCVarfDef.FieldType x typ) = XabiType.FieldType x (tFormTypeToTy
 tFormModifer :: SolidF.Modifier -> EVMXabi.Modifier
 tFormModifer SolidF.Modifier {..} =
   EVMXabi.Modifier
-    { modifierArgs = M.map tFormIndexedType _modifierArgs,
+    { modifierArgs = M.fromList $ fmap tFormIndexedType <$> _modifierArgs,
       modifierSelector = _modifierSelector,
       modifierVals = M.empty, -- :: Map Text Xabi.IndexedType __TODO!!!!
       modifierContents = case _modifierContents of
@@ -127,7 +127,7 @@ tFormEv :: SolidEv.Event -> EVMXabi.Event
 tFormEv SolidEv.Event {..} =
   EVMXabi.Event
     { eventAnonymous = _eventAnonymous,
-      eventLogs = [(a, tFormIndexedType b) | (a, b) <- _eventLogs]
+      eventLogs = [(a, tFormIndexedType b) | SolidEv.EventLog a _ b <- _eventLogs]
     }
 
 tFormUs :: [SVMXabi.Using] -> EVMXabi.Using
@@ -152,6 +152,6 @@ tFormTypeToType = \case
   (SolidType.Bool) -> (XabiType.Bool)
   (SolidType.Address _) -> (XabiType.Address)
   (SolidType.Account _) -> (XabiType.Account)
-  (SolidType.Fixed _ _) -> (XabiType.Bool) --Questionable at best
+  SolidType.Decimal -> XabiType.Decimal
   (SolidType.Error _ ss) -> (XabiType.UnknownLabel ss) --Questionable at best
   SolidType.Variadic -> XabiType.Variadic

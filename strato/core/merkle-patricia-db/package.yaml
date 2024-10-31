@@ -31,6 +31,7 @@ library:
   - deepseq
   - format
   - mtl
+  - QuickCheck
   - Ranged-sets
 
 

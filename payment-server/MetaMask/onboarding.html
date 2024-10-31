@@ -1,0 +1,24 @@
+<!doctype html>
+<html lang="en-CA">
+    <head>
+        <title>MetaMask Seller Onboarding</title>
+        <meta charset="UTF-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <link rel="stylesheet" href="../onboarding.css">
+    </head>
+    <h1>Select supported token options</h1><br>
+    <body>
+        <!-- <img src="../metamask.svg" style="width:500px;height:500px;"/> -->
+        <form id="tokenSelection">
+            <label>
+                <input type="checkbox" name="option" value="ETH"> ETH
+            </label><br>
+            <label>
+                <input type="checkbox" name="option" value="USDC"> USDC
+            </label><br>
+            <button id="connect" type="submit">Connect to MetaMask</button>
+        </form>
+        <script src="../metamask-onboarding.bundle.js"></script>
+        <script src="../onboarding.js"></script>
+    </body>
+</html>

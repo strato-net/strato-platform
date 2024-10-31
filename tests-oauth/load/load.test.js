@@ -5,7 +5,6 @@ import fs from 'fs';
 import moment from 'moment';
 
 import config from '../loadConfig';
-import '../loadEnv';
 import utils from './utils';
 
 
@@ -14,7 +13,6 @@ const { createUser, createContractList } = rest;
 describe(`Strato Load Test - ${process.env.CONFIG_FILE}`, function beanstalkLoadTest() {
   this.timeout(config.timeout);
 
-  const userArgs = { token: process.env.USER_TOKEN };
   const options = { config };
 
   let txs = []; let txResults = []; let initialNonce = 0;
@@ -22,6 +20,14 @@ describe(`Strato Load Test - ${process.env.CONFIG_FILE}`, function beanstalkLoad
   let user = null;
 
   before(async () => {
+    console.log('Obtaining User Token');
+    
+    const USERNAME = 'user1'
+    const PASSWORD = '1234'
+    
+    const userToken = await utils.getUserToken(USERNAME, PASSWORD)
+    const userArgs = { token: userToken };
+    
     console.log('Creating User');
     user = await createUser(userArgs, options);
     console.log(`

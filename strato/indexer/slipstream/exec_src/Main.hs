@@ -24,6 +24,7 @@ import Data.String
 import Database.Persist.Postgresql
 import Database.PostgreSQL.Typed
 import HFlags
+import Instrumentation
 import Network.Wai.Handler.Warp
 import Network.Wai.Middleware.Prometheus
 -- import Slipstream.Processor
@@ -70,6 +71,7 @@ main :: IO ()
 main = do
   _ <- $initHFlags "Setup Slipstream Variables"
   blockappsInit "slipstream_main"
+  runInstrumentation "slipstream"
 
   runLoggingT
     . runResourceT

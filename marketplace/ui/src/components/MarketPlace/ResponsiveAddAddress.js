@@ -6,7 +6,7 @@ import * as yup from "yup";
 import { actions } from "../../contexts/marketplace/actions";
 import { useMarketplaceDispatch } from "../../contexts/marketplace";
 
-const ResponsiveAddAddress = ({ back }) => {
+const ResponsiveAddAddress = ({ close, redemptionService }) => {
   const [showAddress, setshowAddress] = useState(false);
   const marketplaceDispatch = useMarketplaceDispatch();
   const ShippingDetailsSchema = () => {
@@ -37,6 +37,7 @@ const ResponsiveAddAddress = ({ back }) => {
       country: encodeURIComponent(values.country),
       addressLine1: encodeURIComponent(values.addressLine1),
       addressLine2: encodeURIComponent(values.addressLine2),
+      redemptionService: redemptionService ? encodeURIComponent(redemptionService): redemptionService,
     };
 
     window.LOQ.push([
@@ -55,10 +56,9 @@ const ResponsiveAddAddress = ({ back }) => {
     console.log(body, "body")
     let res = await actions.addShippingAddress(marketplaceDispatch, body);
     if (res != null) {
-      await actions.fetchUserAddresses(marketplaceDispatch);
+      await actions.fetchUserAddresses(marketplaceDispatch, redemptionService);
     }
   };
-  const { TextArea } = Input;
   const formik = useFormik({
     initialValues: {
       sameAddress: true,
@@ -71,14 +71,16 @@ const ResponsiveAddAddress = ({ back }) => {
       country: "",
     },
     validationSchema: ShippingDetailsSchema,
-    onSubmit: function (values) {
+    onSubmit: function (values, { resetForm }) {
       handleFormSubmit(values);
-      back();
+      resetForm();
+      close();
     },
   });
   return (
     <Form layout="horizontal" className="">
-      <div className="pt-2 pb-5 px-4 h-[70vh] overflow-y-auto">
+      <div className="pt-2 px-4 overflow-y-auto">
+        <p className="text-base md:text-xl lg:text-2xl text-[#202020] font-semibold mb-6">Add New Address</p>
         <div className="flex flex-col gap-[18px]">
           <Form.Item name="name" className="">
             <p className="text-left text-[#202020]  text-sm font-medium">Name</p>
@@ -192,7 +194,7 @@ const ResponsiveAddAddress = ({ back }) => {
             )}
           </Form.Item>
           <Form.Item label="" name="country" className="">
-            <p className="text-[#202020]  text-sm font-medium text-left">
+            <p className="text-[#202020] text-sm font-medium text-left">
               Country
             </p>
             <Input
@@ -213,21 +215,12 @@ const ResponsiveAddAddress = ({ back }) => {
         </div>
       </div>
 
-      <div className="absolute bottom-0 px-[14px] w-full py-[14px] shadow-Footer  !z-50">
-        <div className="flex w-full justify-between items-center gap-4">
-          <Button
-            type="default"
-            className="h-[42px] pt-1  w-[163px]"
-            onClick={back}
-          >
-            Cancel
-          </Button>
-          <div
-            className="cursor-pointer justify-center flex items-center w-40 h-[42px] pt-1   border border-primary rounded bg-primary hover:bg-primaryHover text-white"
-            onClick={formik.handleSubmit}
-          >
-            Add address
-          </div>
+      <div className="flex justify-center px-[14px] py-[14px] mt-2 mb-6 !z-50">
+        <div
+          className="cursor-pointer justify-center flex items-center w-40 h-[42px] pt-1 border border-primary rounded bg-primary hover:bg-primaryHover text-white"
+          onClick={formik.handleSubmit}
+        >
+          Add address
         </div>
       </div>
     </Form>

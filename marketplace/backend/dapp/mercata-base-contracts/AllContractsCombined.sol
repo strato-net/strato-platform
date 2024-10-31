@@ -1,8 +1,6 @@
 pragma es6;
 pragma strict;
 
-import <509>;
-
 contract Mercata{}
 
 abstract contract Asset is Utils {
@@ -14,6 +12,7 @@ abstract contract Asset is Utils {
     string public description;
     string[] public images;
     string[] public files;
+    string[] public fileNames;
     uint public createdDate;
     uint public quantity;
     uint public itemNumber;
@@ -49,6 +48,7 @@ abstract contract Asset is Utils {
         string _description,
         string[] _images,
         string[] _files,
+        string[] _fileNames,
         uint _createdDate,
         uint _quantity
     ) {
@@ -59,6 +59,7 @@ abstract contract Asset is Utils {
         description = _description;
         images = _images;
         files = _files;
+        fileNames = _fileNames;
         createdDate = _createdDate;
         quantity = _quantity;
         try {
@@ -183,9 +184,11 @@ abstract contract Asset is Utils {
     function updateAsset(
         string[] _images,
         string[] _files
+        string[] _fileNames
     ) public requireOwner("update asset") returns (uint) {
         images = _images;
         files = _files;
+        fileNames = _fileNames;
         return RestStatus.OK;
     }
 }
@@ -198,6 +201,7 @@ abstract contract UTXO is Asset {
         string _description,
         string[] _images,
         string[] _files,
+        string[] _fileNames,
         uint _createdDate,
         uint _quantity
     ) Asset(
@@ -205,13 +209,14 @@ abstract contract UTXO is Asset {
         _description,
         _images,
         _files,
+        _fileNames,
         _createdDate,
         _quantity
     ) {
     }
 
     function mint(uint _quantity) internal virtual returns (UTXO) {
-        return new UTXO(name, description, images, files, createdDate, _quantity);
+        return new UTXO(name, description, images, files, fileNames, createdDate, _quantity);
     }
 
     // Quantity is already checked by transferOwnership function
@@ -275,6 +280,7 @@ abstract contract SemiFungible is Mintable {
         string _description,
         string[] _images,
         string[] _files,
+        string[] _fileNames,
         uint _createdDate,
         uint _quantity
     ) Mintable (
@@ -282,6 +288,7 @@ abstract contract SemiFungible is Mintable {
         _description,
         _images,
         _files,
+        _fileNames,
         _createdDate,
         _quantity
     ) {
@@ -292,6 +299,7 @@ abstract contract SemiFungible is Mintable {
                               description, 
                               images, 
                               files, 
+                              fileNames,
                               createdDate, 
                               splitQuantity);
         return UTXO(address(sf)); // Typechecker won't let me cast directly to UTXO
@@ -322,6 +330,7 @@ abstract contract Mintable is UTXO {
         string _description,
         string[] _images,
         string[] _files,
+        string[] _fileNames,
         uint _createdDate,
         uint _quantity
     ) UTXO(
@@ -329,6 +338,7 @@ abstract contract Mintable is UTXO {
         _description,
         _images,
         _files,
+        _fileNames,
         _createdDate,
         _quantity
     ) {
@@ -346,7 +356,7 @@ abstract contract Mintable is UTXO {
     }
 
     function mint(uint _quantity) internal virtual override returns (UTXO) {
-        Mintable m = new Mintable(name, description, images, files, createdDate, _quantity);
+        Mintable m = new Mintable(name, description, images, files, fileNames, createdDate, _quantity);
         return UTXO(m);
     }
 
@@ -793,12 +803,8 @@ abstract contract Sale is Utils {
 
 contract Utils { 
     function getCommonName(address addr) internal returns (string) {
-        CertificateRegistry r = CertificateRegistry(account(0x509, "main"));
-        Certificate c = CertificateRegistry(account(address(r), "main")).getUserCert(addr);
-        string commonName = "";
-        try {
-            commonName = c.commonName();
-        } catch {
+        string commonName = getUserCert(addr)["commonName"];
+        if (commonName == ""){
             commonName = "Contract " + string(addr);
         }
         return commonName;

@@ -15,16 +15,11 @@
 {-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE TypeOperators #-}
 
-{-# OPTIONS_GHC -fno-warn-unused-top-binds #-}
-
 module Blockchain.Sequencer.Gregor
   ( GregorConfig (..),
-    runTheGregor,
     runGregorM,
-    assertTopicCreation,
+    assertSequencerTopicsCreation,
     initializeCheckpoint,
-    writeSeqP2pEvents,
-    writeSeqVmEvents,
   )
 where
 
@@ -34,28 +29,17 @@ import qualified Blockchain.EthConf as EC
 import Blockchain.Sequencer.CablePackage
 import Blockchain.Sequencer.Event
 import qualified Blockchain.Sequencer.Kafka as SK
-import Blockchain.Sequencer.Metrics
-import Blockchain.Strato.Model.ChainMember
-import Control.Concurrent.Async.Lifted (race_)
-import Control.Concurrent.Extra (Lock, newLock, withLock)
-import Control.Concurrent.STM (flushTQueue)
+import Blockchain.Strato.Model.Validator
 import Control.Lens hiding (op)
 import Control.Monad
 import Control.Monad.Composable.Base
-import Control.Monad.Composable.Kafka (KafkaM, HasKafka, KafkaEnv(..), runKafkaM, runKafkaMUsingEnv, KafkaClientId, KafkaAddress, execKafka)
+import Control.Monad.Composable.Kafka (KafkaM, HasKafka, runKafkaM, KafkaClientId, KafkaAddress, execKafka)
 import qualified Control.Monad.Composable.Kafka as Kafka
-import Control.Monad.IO.Class
 import Control.Monad.Trans.Reader
 import Control.Monad.Trans.Resource
 import Data.Default
-import Data.Foldable (for_)
-import Data.List.Extra (chunksOf)
 import Data.Maybe
 import Data.String
-import qualified Data.Text as T
-import qualified Prometheus as P
-import System.IO.Unsafe
-import Text.Format
 import UnliftIO.STM
 
 data GregorConfig = GregorConfig
@@ -68,12 +52,8 @@ data GregorConfig = GregorConfig
 data GregorContext = GregorContext
   { _gregorConsumerGroup :: Kafka.ConsumerGroup,
     _gregorUnseq :: TBQueue IngestEvent,
-    _gregorUnseqCheckpoints :: TQueue Checkpoint,
-    _gregorSeqP2P :: TQueue P2pEvent,
-    _gregorSeqVM :: TQueue VmEvent
+    _gregorUnseqCheckpoints :: TQueue Checkpoint
   }
-
-makeLenses ''GregorContext
 
 type GregorM = ReaderT GregorContext
 
@@ -84,9 +64,7 @@ convert GregorConfig {..} =
     GregorContext
         { _gregorConsumerGroup = kafkaConsumerGroup,
           _gregorUnseq = unseqEvents cablePackage,
-          _gregorUnseqCheckpoints = unseqCheckpoints cablePackage,
-          _gregorSeqP2P = seqP2PEvents cablePackage,
-          _gregorSeqVM = seqVMEvents cablePackage
+          _gregorUnseqCheckpoints = unseqCheckpoints cablePackage
         }
 
 runGregorM :: MonadUnliftIO m =>
@@ -106,34 +84,8 @@ getKafkaConsumerGroup :: (Functor m, HasGregorContext m) =>
                          m Kafka.ConsumerGroup
 getKafkaConsumerGroup = fmap _gregorConsumerGroup accessEnv
 
-readUnseqEvents' :: (MonadLogger m, P.MonadMonitor m, HasKafka m, HasGregorContext m) =>
-                    m (Kafka.Offset, [IngestEvent])
-readUnseqEvents' = do
-  offset <- getNextIngestedOffset
-  $logInfoS "readUnseqEvents'" . T.pack $ "Fetching unseqevents from " ++ show offset
-  ret <- execKafka $ SK.readUnseqEvents offset
-  let count = length ret
-  P.unsafeAddCounter gregorUnseqRead $ fromIntegral count
-  return (offset + fromIntegral count, ret)
-
-writeSeqVmEvents :: (HasKafka m, P.MonadMonitor m) => [VmEvent] -> m ()
-writeSeqVmEvents events = do
-  void $ execKafka (SK.writeSeqVmEvents events)
-  P.unsafeAddCounter gregorVMWrite (fromIntegral (length events))
-
-writeSeqP2pEvents :: (HasKafka m, P.MonadMonitor m) => [P2pEvent] -> m ()
-writeSeqP2pEvents events = do
-  void $ execKafka (SK.writeSeqP2pEvents events)
-  P.unsafeAddCounter gregorP2PWrite (fromIntegral (length events))
-
-assertTopicCreation :: HasKafka m => m ()
-assertTopicCreation = void $ execKafka SK.assertTopicCreation
-
-getNextIngestedOffset :: (MonadLogger m, HasKafka m, HasGregorContext m) =>
-                         m Kafka.Offset
-getNextIngestedOffset = do
-  group <- getKafkaConsumerGroup
-  fst <$> getNextOffsetAndMetadata group
+assertSequencerTopicsCreation :: HasKafka m => m ()
+assertSequencerTopicsCreation = void $ SK.assertSequencerTopicsCreation
 
 encodeMeta :: Checkpoint -> Kafka.Metadata
 encodeMeta = Kafka.Metadata . Kafka.KString . encodeCheckpoint
@@ -161,16 +113,11 @@ setNextOffsetAndMetadata group newOffset newMeta = do
       error $ "Unexpected response when setting the offset to " ++ show newOffset ++ ": " ++ show err
     Right () -> return ()
 
-runTheGregor :: GregorConfig -> IO ()
-runTheGregor cfg =
-  race_
-    (runGregorM cfg unseqReader)
-    (runGregorM cfg seqWriters)
 
 -- When a checkpoint already exists, the arguments are ignored. They might
 -- be stale if the validator pool has expanded.
 initializeCheckpoint :: (MonadLogger m, HasKafka m, HasGregorContext m) =>
-                        [ChainMemberParsedSet] -> m Checkpoint
+                        [Validator] -> m Checkpoint
 initializeCheckpoint vals = do
   group <- getKafkaConsumerGroup
   meta <- snd <$> getNextOffsetAndMetadata group
@@ -184,96 +131,11 @@ initializeCheckpoint vals = do
     (_, Right kafkaCkpt) ->
       if null (checkpointValidators kafkaCkpt)
         then do
-          $logInfoS "initializeCheckpoin" "No validators in checkpoint -- setting by flags"
+          $logInfoS "initializeCheckpoint" "No validators in checkpoint -- setting by flags"
           return $ overrideVals kafkaCkpt
         else return kafkaCkpt
 
-unseqReader :: (MonadLogger m, HasKafka m, P.MonadMonitor m, HasGregorContext m) =>
-               m ()
-unseqReader = forever . timeAction gregorUnseqTiming $ do
-  (nextOff, inEvents) <- readUnseqEvents'
-  P.withLabel gregorLoop "unseq_events" P.incCounter
-  $logInfoS "gregor" . T.pack $ "Fetched " ++ show (length inEvents) ++ " unseq events"
-  ch <- fmap _gregorUnseq accessEnv
-  forM_ (chunksOf (fromIntegral queueDepth `div` 4) inEvents) $ \chnk -> do
-    atomically . forM_ chnk $ writeTBQueue ch
-    P.unsafeAddCounter gregorUnseqWrite (fromIntegral (length chnk))
-  hd <- atomically $ tryPeekTBQueue ch
-  $logDebugS "gregor/unseqchHead" $ maybe "empty" (T.pack . format) hd
-  -- TODO: This should only really be set by the writer, i.e. once
-  -- the results are committed to seq_.*_events. The reader should use
-  -- an internal offset to detirmine the read start. However, with
-  -- asynchronous readers and writers its difficult to correlate offsets
-  -- with the events that `seqWriters` processes.
-  updateOffset_locked nextOff
 
-data ImOnlyUsedInSeqWriters a b c = VM a | P2P b | KafkaCheckpoint c
+data ImOnlyUsedInSeqWriters a b c = KafkaCheckpoint c
   deriving (Foldable)
-
-seqWriters :: (MonadLogger m, P.MonadMonitor m, HasKafka m, HasGregorContext m) =>
-              m ()
-seqWriters = forever . timeAction gregorSeqTiming $ do
-  vmq <- fmap _gregorSeqVM accessEnv
-  p2pq <- fmap _gregorSeqP2P accessEnv
-  ckptq <- fmap _gregorUnseqCheckpoints accessEnv
-  events <-
-    atomically $
-      fmap VM (blockFlushTQueue vmq)
-        `orElse` ( fmap P2P (blockFlushTQueue p2pq)
-                     `orElse` fmap KafkaCheckpoint (blockFlushTQueue ckptq)
-                 )
-  $logDebugS "gregor/seqWriter" . T.pack . show $ length events
-  case events of
-    VM vmevs -> do
-      P.withLabel gregorLoop "seq_vm_events" P.incCounter
-      P.unsafeAddCounter gregorVMRead (fromIntegral $ length vmevs)
-      writeSeqVmEvents vmevs
-    P2P p2pevs -> do
-      P.withLabel gregorLoop "seq_p2p_events" P.incCounter
-      P.unsafeAddCounter gregorP2PRead (fromIntegral $ length p2pevs)
-      writeSeqP2pEvents p2pevs
-    KafkaCheckpoint ckpts -> do
-      let safeLast [] = Nothing
-          safeLast xs = Just $ last xs
-      for_ (safeLast ckpts) $ \ckpt -> do
-        $logDebugLS "gregor/seqWriter/checkpoint" ckpt
-        P.incCounter gregorCheckpointsSent
-        updateMetadata_locked $ encodeMeta ckpt
-
--- Will only read if at least one element is in the queue.
-blockFlushTQueue :: TQueue a -> STM [a]
-blockFlushTQueue ch = do
-  first <- readTQueue ch
-  rest <- flushTQueue ch
-  return $ first : rest
-
-{-# NOINLINE unseqEventsLock #-}
-unseqEventsLock :: Lock
-unseqEventsLock = unsafePerformIO newLock
-
-updateOffset_locked :: (MonadLogger m, HasKafka m, HasGregorContext m) =>
-                       Kafka.Offset -> m ()
-updateOffset_locked off = do
-  ctx <- accessEnv
-
-  group <- getKafkaConsumerGroup
-
-  $logInfoS "setNextIngestedOffset" . T.pack $ "Setting checkpoint to " ++ show off
-
-  liftIO $ withLock unseqEventsLock . runKafkaMUsingEnv (KafkaEnv ctx) $ do
-    (_, meta) <- getNextOffsetAndMetadata group
-    setNextOffsetAndMetadata group off meta
-
-updateMetadata_locked :: (MonadLogger m, HasKafka m, HasGregorContext m) =>
-                         Kafka.Metadata -> m ()
-updateMetadata_locked meta = do
-  ctx <- accessEnv
-
-  group <- getKafkaConsumerGroup
-
-  liftIO $ withLock unseqEventsLock . runKafkaMUsingEnv (KafkaEnv ctx) $ do
-    (off, _) <- getNextOffsetAndMetadata group
-    setNextOffsetAndMetadata group off meta
-
-
 

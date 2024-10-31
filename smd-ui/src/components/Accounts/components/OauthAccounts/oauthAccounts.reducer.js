@@ -3,9 +3,6 @@ import {
   FETCH_OAUTH_ACCOUNT_DETAIL_FAILURE,
   RESET_OAUTH_USER_ACCOUNT,
   FETCH_OAUTH_ACCOUNT_DETAIL_REQUEST,
-  OAUTH_FAUCET_REQUEST,
-  OAUTH_FAUCET_SUCCESS,
-  OAUTH_FAUCET_FAILURE,
   OAUTH_ACCOUNTS_FILTER
 } from './oauthAccounts.actions';
 
@@ -14,10 +11,6 @@ const initialState = {
   name: null,
   error: null,
   filter: '',
-  faucet: {
-    status: false,
-    accountAddress: null
-  },
 };
 
 const reducer = function (state = initialState, action) {
@@ -46,30 +39,6 @@ const reducer = function (state = initialState, action) {
         error: null,
         name: null
       };
-    case OAUTH_FAUCET_REQUEST:
-      return {
-        ...state,
-        faucet: {
-          status: true,
-          accountAddress: action.address
-        }
-      }
-    case OAUTH_FAUCET_SUCCESS:
-      return {
-        ...state,
-        faucet: {
-          status: false,
-          accountAddress: null
-        }
-      }
-    case OAUTH_FAUCET_FAILURE:
-      return {
-        ...state,
-        faucet: {
-          status: false,
-          accountAddress: null
-        }
-      }
     case OAUTH_ACCOUNTS_FILTER:
       return {
         ...state,

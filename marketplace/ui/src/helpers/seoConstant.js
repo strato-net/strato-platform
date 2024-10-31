@@ -6,7 +6,7 @@ export const SEO = {
   IMAGE_META: `STRATO Mercata Marketplace Banner`,
   SEO_ROUTES:[
     "/",
-    "/c/all",
+    "/c/All",
     "/c/Carbon?sc=CarbonOffset%2CCarbonDAO",
     "/c/Metals?sc=Metals",
     "/c/Clothing?sc=Clothing",

@@ -1,7 +1,0 @@
-module BlockApps.Tools.Block where
-
-import BlockApps.Tools.DumpLevelDB
-import Text.Format
-
-doit :: String -> String -> IO ()
-doit dbtype h = showKeyVal format dbtype "blockchain" (if h == "-" then Nothing else Just h)

@@ -18,7 +18,6 @@ module Bloc.API.Users
     BlocTransactionUnsignedResult (..),
     BlocTransactionResult (..),
     BlocTransactionStatus (..),
-    PostUsersFill,
     GetBlocTransactionResult,
     PostBlocTransactionResults,
     TransferParameters (..),
@@ -42,7 +41,7 @@ module Bloc.API.Users
 where
 
 import qualified Bloc.API.DeprecatedPostTransaction as Deprecated
-import Bloc.API.SwaggerSchema
+import Bloc.API.SwaggerSchema hiding (Header)
 import Bloc.API.TypeWrappers
 import Bloc.API.Utils
 import BlockApps.Solidity.ArgValue
@@ -56,6 +55,7 @@ import Blockchain.Strato.Model.Gas
 import Blockchain.Strato.Model.Keccak256
 import Blockchain.Strato.Model.Nonce
 import Blockchain.Strato.Model.Wei
+import Blockchain.Strato.Model.Code (Code)
 import Control.Lens (mapped)
 import Control.Lens.Operators hiding ((.=))
 import Control.Lens.TH
@@ -322,6 +322,7 @@ type GetBlocTransactionResult =
 type PostBlocTransactionResults =
   "transactions"
     :> "results"
+    :> Header "Authorization" Text
     :> QueryFlag "resolve"
     :> ReqBody '[JSON] [Keccak256]
     :> Post '[JSON] [BlocTransactionResult]
@@ -335,14 +336,6 @@ instance ToParam (QueryParam "use_wallet" Bool) where
     DocQueryParam "use_wallet" [] "flag for overriding default user wallet behavior" Normal
 
 --------------------------------------------------------------------------------
-
-type PostUsersFill =
-  "users"
-    :> Capture "user" JwtToken
-    :> Capture "address" Address
-    :> "fill"
-    :> QueryFlag "resolve"
-    :> Post '[JSON] BlocTransactionResult
 
 data TransferParameters = TransferParameters
   { fromAddress :: Address,
@@ -365,7 +358,8 @@ data ContractParameters = ContractParameters
     txParams :: Maybe TxParams,
     metadata :: Maybe (Map Text Text),
     chainId :: Maybe ChainId,
-    resolve :: Bool
+    resolve :: Bool,
+    ptr2Code :: Maybe Code
   }
 
 --------------------------------------------------------------------------------
@@ -376,7 +370,8 @@ data UploadListContract = UploadListContract
     _uploadlistcontractTxParams :: Maybe TxParams,
     uploadlistcontractValue :: Maybe (Strung Natural),
     _uploadlistcontractChainid :: Maybe ChainId,
-    uploadlistcontractMetadata :: Maybe (Map Text Text)
+    uploadlistcontractMetadata :: Maybe (Map Text Text),
+    uploadlistcontractPtr2Code :: Maybe Code
   }
   deriving (Eq, Show, Generic)
 
@@ -393,7 +388,8 @@ instance ToJSON UploadListContract where
         "txParams" .= _uploadlistcontractTxParams,
         "value" .= uploadlistcontractValue,
         "chainid" .= _uploadlistcontractChainid,
-        "metadata" .= uploadlistcontractMetadata
+        "metadata" .= uploadlistcontractMetadata,
+        "ptr2code" .= uploadlistcontractPtr2Code
       ]
 
 instance FromJSON UploadListContract where
@@ -406,6 +402,7 @@ instance FromJSON UploadListContract where
       <*> (o .:? "value")
       <*> (o .:? "chainid")
       <*> (o .:? "metadata")
+      <*> (o .:? "ptr2Code")
   parseJSON o = fail $ "parseJSON UploadListContract: Expected Object, got " ++ show o
 
 instance ToSchema UploadListContract where
@@ -423,7 +420,8 @@ instance ToSchema UploadListContract where
             _uploadlistcontractTxParams = Just $ TxParams (Just $ Gas 123) (Just $ Wei 345) Nothing,
             uploadlistcontractValue = Nothing,
             _uploadlistcontractChainid = Nothing,
-            uploadlistcontractMetadata = Nothing
+            uploadlistcontractMetadata = Nothing,
+            uploadlistcontractPtr2Code = Nothing
           }
 
 data ContractListParameters = ContractListParameters

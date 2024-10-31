@@ -2,7 +2,6 @@
 
 module Bloc.Client
   ( getGitInfo,
-    postUsersFill,
     getContracts,
     postContractsBatchSeries,
     getContractsData,
@@ -20,12 +19,7 @@ module Bloc.Client
     postBlocTransactionResults,
     postBlocTransaction,
     postBlocTransactionParallelExternal,
-    postChainInfo,
-    getSingleChainInfo,
-    postChainInfos,
-    getChainInfo,
     postBlocTransactionParallel,
-    postBlocTransactionRaw,
     postBlocTransactionBody,
     postBlocTransactionUnsigned,
   )
@@ -42,10 +36,6 @@ import SolidVM.Model.CodeCollection.Contract
 
 getGitInfo :: ClientM GitInfo
 getGitInfo = client (Proxy @GetGitInfo)
-
-------------- /users endpoints -------------
-postUsersFill :: JwtToken -> Address -> Bool -> ClientM BlocTransactionResult
-postUsersFill = client (Proxy @PostUsersFill)
 
 ------------- /contracts endpoints -------------
 getContracts ::
@@ -129,26 +119,8 @@ postContractsXabi = client (Proxy @PostContractsXabi)
 getBlocTransactionResult :: Keccak256 -> Bool -> ClientM BlocTransactionResult
 getBlocTransactionResult = client (Proxy @GetBlocTransactionResult)
 
-postBlocTransactionResults :: Bool -> [Keccak256] -> ClientM [BlocTransactionResult]
+postBlocTransactionResults :: Maybe Text -> Bool -> [Keccak256] -> ClientM [BlocTransactionResult]
 postBlocTransactionResults = client (Proxy @PostBlocTransactionResults)
-
-------------- /chain(s) endpoints -------------
-postChainInfo :: Maybe Text -> ChainInput -> ClientM ChainId
-postChainInfo = client (Proxy @PostChainInfo)
-
-getSingleChainInfo :: ChainId -> ClientM ChainIdChainOutput
-getSingleChainInfo = client (Proxy @GetSingleChainInfo)
-
-postChainInfos :: Maybe Text -> [ChainInput] -> ClientM [ChainId]
-postChainInfos = client (Proxy @PostChainInfos)
-
-getChainInfo ::
-  [ChainId] ->
-  Maybe Text ->
-  Maybe Integer ->
-  Maybe Integer ->
-  ClientM [ChainIdChainOutput]
-getChainInfo = client (Proxy @GetChainInfo)
 
 ------------- /transaction endpoints -------------
 postBlocTransactionParallel ::
@@ -170,15 +142,6 @@ postBlocTransactionParallelExternal ::
   PostBlocTransactionRequest ->
   ClientM [BlocChainOrTransactionResult]
 postBlocTransactionParallelExternal = client (Proxy @PostBlocTransactionParallelExternal)
-
-postBlocTransactionRaw ::
-  Maybe Text ->
-  Maybe ChainId ->
-  Bool ->
-  Bool ->
-  PostBlocTransactionRawRequest ->
-  ClientM BlocChainOrTransactionResult
-postBlocTransactionRaw = client (Proxy @PostBlocTransactionRaw)
 
 postBlocTransactionBody ::
   Maybe Text ->

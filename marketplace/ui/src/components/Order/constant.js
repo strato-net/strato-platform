@@ -1,17 +1,16 @@
 export const status = {
   1: "Awaiting Fulfillment",
-  2: "Awaiting Shipment",
+  2: "Payment Pending",
   3: "Closed",
   4: "Canceled",
-  5: "Payment Pending"
+  5: "Discarded"
 };
 
 export const statusByName = {
   "Awaiting Fulfillment": "Awaiting Fulfillment",
-  "Awaiting Shipment": "Awaiting Shipment",
+  "Payment Pending": "Payment Pending",
   "Closed": "Closed",
   "Canceled": "Canceled",
-  "Payment Pending": "Payment Pending"
 };
 
 export const getStatusByName = (name) => {
@@ -25,3 +24,17 @@ export const getStatus = (num) => {
 export const getStatusByValue = (value) => {
   return Object.keys(status).find((key) => status[key] === value);
 };
+
+export const TYPE_COLOR = {
+  Order: "#2A53FF",
+  Transfer: "#FF0000",
+  Redemption: "#001C76"
+}
+
+export const TRANSACTION_FILTER = [
+  { value: "", label: "All" },
+  { value: "Order", label: "Order" },
+  { value: "Transfer", label: "Transfer" },
+  { value: "Redemption", label: "Redemption" },
+  { value: "STRATS", label: "STRATS" },];
+

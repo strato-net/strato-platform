@@ -1,5 +1,5 @@
 import { Space, Typography } from "antd";
-import { getUnitNameByIndex } from "../../helpers/constants";
+import { getUnitNameByIndex, getSpiritUnitNameByIndex } from "../../helpers/constants";
 
 const ProductItemDetails = ({ categoryName, itemData }) => {
     const { Text } = Typography;
@@ -74,6 +74,18 @@ const ProductItemDetails = ({ categoryName, itemData }) => {
                     <Space className="flex justify-between">
                         <DescTitle text="Expiration (in months)" />
                         <Text className="text-[13px] text-[#202020] font-medium">{itemData?.expirationPeriodInMonths}</Text>
+                    </Space>
+                </Space>)
+        case "Spirits":
+            return (
+                <Space direction="vertical" className="py-[15px] px-[14px] w-full sm:w-[388px] md:w-[417px] border border-[#E9E9E9] rounded-md">
+                    <Space className="flex justify-between">
+                        <DescTitle text="Type" />
+                        <Text className="text-[13px] text-[#202020] font-medium">{itemData?.spiritType}</Text>
+                    </Space>
+                    <Space className="flex justify-between">
+                        <DescTitle text="Unit of Measurement" />
+                        <Text className="text-[13px] text-[#202020] font-medium">{getSpiritUnitNameByIndex(itemData?.unitOfMeasurement)}</Text>
                     </Space>
                 </Space>)
         default:

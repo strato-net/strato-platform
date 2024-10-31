@@ -7,7 +7,7 @@
 module BlockApps.SolidVMStorageDecoder
   ( decodeSolidVMValues,
     decodeCacheValues,
-    decodeCacheValuesForMapping,
+    decodeCacheValuesForCollections,
     replayDeltas, -- Testing only
     ReplayFailure (..),
     synthesize, -- Testing only
@@ -29,7 +29,7 @@ import qualified Data.HashMap.Strict as HM
 import qualified Data.IntMap as I
 import qualified Data.Map as M
 import qualified Data.Text as T
-import Data.Text.Encoding (decodeUtf8, decodeUtf8', encodeUtf8)
+import Data.Text.Encoding (decodeUtf8, decodeUtf8')
 import Data.Text.Encoding.Error (UnicodeException)
 import GHC.Generics
 import SolidVM.Model.SolidString
@@ -48,23 +48,24 @@ bimapValue f (name', value') = do
   mValue <- valueToSolidityValue value'
   return $ fmap (name,) mValue
 
-decodeCacheValues :: M.Map B.ByteString B.ByteString -> [(T.Text, Value)] -> [(T.Text, Value)]
-decodeCacheValues hxs prevState = either (error . (++ ": " ++ show hxs) . printf "SVM.decodeCacheValues: %s" . show) id $ do
+decodeCacheValues :: M.Map B.ByteString B.ByteString -> [(T.Text, Value)]
+decodeCacheValues hxs = either (error . (++ ": " ++ show hxs) . printf "SVM.decodeCacheValues: %s" . show) id $ do
   let parseM = bimapM (hexStorageToPath . HexStorage) (hexStorageToBasic . HexStorage)
-      isBasic (StoragePath (Field _ : _)) = True
+      isBasic (StoragePath ([Field _])) = True
+      isBasic (StoragePath [Field _, Field fieldBS]) = C8.unpack fieldBS /= "length"
       isBasic _ = False
   pathValues <- mapM parseM $ M.toList hxs
   let pathValues' = filter (isBasic . fst) pathValues
-  finalState <- bimap show HM.toList $ case prevState of
-    [] -> synthesize pathValues'
-    tvs -> replayDeltas pathValues' . HM.fromList . map (first encodeUtf8) $ tvs
-
+  finalState <- bimap show HM.toList $ synthesize pathValues'
   mapM (bimapM bsToText return) finalState
 
-decodeCacheValuesForMapping :: M.Map B.ByteString B.ByteString -> [(T.Text, Value)]
-decodeCacheValuesForMapping hxs = either (error . (++ ": " ++ show hxs) . printf "SVM.decodeCacheValuesForMapping: %s" . show) id $ do
+decodeCacheValuesForCollections :: M.Map B.ByteString B.ByteString -> [(T.Text, Value)]
+decodeCacheValuesForCollections hxs = either (error . (++ ": " ++ show hxs) . printf "SVM.decodeCacheValuesForCollections: %s" . show) id $ do
   let parseM = bimapM (hexStorageToPath . HexStorage) (hexStorageToBasic . HexStorage)
       isBasic (StoragePath [Field _, MapIndex _]) = True
+      isBasic (StoragePath [Field _, ArrayIndex _]) = True
+      isBasic (StoragePath [Field _, MapIndex _, Field fieldBS]) = C8.unpack fieldBS /= "length"
+      isBasic (StoragePath [Field _, ArrayIndex _, Field fieldBS]) = C8.unpack fieldBS /= "length"
       isBasic _ = False
   pathValues <- mapM parseM $ M.toList hxs
   let pathValues' = filter (isBasic . fst) pathValues
@@ -84,6 +85,7 @@ valueToSolidityValue = \case
     ValueBytes _ b -> Just . SolidityValueAsString <$> (first show . decodeUtf8') b
     ValueBool b -> Right . Just $ SolidityBool b
     ValueInt _ _ n -> fromShowable n
+    ValueDecimal n -> Right . Just $ SolidityValueAsString $ decodeUtf8 n
     ValueAddress a -> fromShowable a
     ValueAccount a -> fromShowable a
     ValueString s -> fromText s
@@ -106,6 +108,7 @@ valueToSolidityValue = \case
     tshowIdx :: SimpleValue -> Either String T.Text
     tshowIdx = \case
       ValueInt _ _ n -> Right . T.pack . show $ n
+      ValueDecimal n -> Right . T.pack . show $ n
       ValueAddress a -> Right . T.pack . show $ a
       ValueAccount a -> Right . T.pack . show $ a
       ValueString t -> Right t
@@ -166,6 +169,7 @@ applyDelta' [Field "length"] (BInteger n) (ValueArrayDynamic vs) =
   let n' = fromIntegral n
    in Right . ValueArrayDynamic $ I.insert n' (ValueArraySentinel n') vs
 applyDelta' [Field "length"] (BInteger n) (ValueArraySentinel {}) = Right . ValueArraySentinel $ fromIntegral n
+applyDelta' [Field _] bv _ = Right $ fromBasic bv -- Handle struct value assignment case
 applyDelta' sp bv (ValueArraySentinel {}) = Right $ constructFromNothing' sp bv
 applyDelta' sp b s = Left $ TypeMismatch (StoragePath sp) b s
 
@@ -210,6 +214,7 @@ fromBasic = \case
   BBool b -> SimpleValue $ ValueBool b
   BInteger n -> SimpleValue $! valueInt n
   BString bs -> SimpleValue $! valueBytes bs
+  BDecimal v -> SimpleValue $! ValueDecimal v
   BAccount a -> SimpleValue $! ValueAccount a
   BContract _ c -> ValueContract c
   BEnumVal tipe name num -> ValueEnum (labelToText tipe) (labelToText name) (fromIntegral num)

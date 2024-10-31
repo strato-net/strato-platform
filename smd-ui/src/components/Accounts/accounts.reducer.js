@@ -12,9 +12,6 @@ import {
   BALANCE_FAILURE,
   FETCH_CURRENT_ACCOUNT_DETAIL_SUCCESS,
   FETCH_CURRENT_ACCOUNT_DETAIL_FAILURE,
-  FAUCET_REQUEST,
-  FAUCET_SUCCESS,
-  FAUCET_FAILURE,
   FETCH_OAUTH_ACCOUNTS_SUCCESS,
   FETCH_OAUTH_ACCOUNTS_FAILURE
 } from './accounts.actions';
@@ -24,10 +21,6 @@ const initialState = {
   currentAccountDetail: null,
   filter: '',
   error: null,
-  faucet: {
-    status: false,
-    accountAddress: null
-  },
   oauthAccounts: []
 };
 
@@ -160,30 +153,6 @@ const reducer = function (state = initialState, action) {
         ...state,
         currentAccountDetail: null,
         error: action.error
-      }
-    case FAUCET_REQUEST:
-      return {
-        ...state,
-        faucet: {
-          status: true,
-          accountAddress: action.address
-        }
-      }
-    case FAUCET_SUCCESS:
-      return {
-        ...state,
-        faucet: {
-          status: false,
-          accountAddress: null
-        }
-      }
-    case FAUCET_FAILURE:
-      return {
-        ...state,
-        faucet: {
-          status: false,
-          accountAddress: null
-        }
       }
     case FETCH_OAUTH_ACCOUNTS_SUCCESS:
       return {

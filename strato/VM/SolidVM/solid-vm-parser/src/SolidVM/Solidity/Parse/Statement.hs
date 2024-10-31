@@ -4,6 +4,7 @@ module SolidVM.Solidity.Parse.Statement where
 
 import Blockchain.Strato.Model.Account
 import Control.Monad
+import Data.Decimal
 import Data.Foldable (asum, foldl')
 import Data.Functor.Identity
 import qualified Data.Map.Strict as Map
@@ -382,12 +383,23 @@ primaryExpression = do
     <|> (uncurry Variable . fmap stringToLabel <$> res "tx")
     <|> (uncurry Variable . fmap stringToLabel <$> res "uint")
     <|> (uncurry Variable . fmap stringToLabel <$> res "int")
+    <|> (uncurry Variable . fmap stringToLabel <$> res "decimal")
     <|> (uncurry Variable . fmap stringToLabel <$> res "byte")
     <|> (uncurry Variable . fmap stringToLabel <$> res "bytes")
     <|> (uncurry Variable . fmap stringToLabel <$> res "string")
     <|> (uncurry BoolLiteral <$> res' "false" False)
     <|> (uncurry BoolLiteral <$> res' "true" True)
     <|> (uncurry NewExpression <$> withPosition (reserved "new" >> simpleTypeExpression))
+    <|> ( try $ do
+            ~(a, decimalNum) <- withPosition $ do
+              num <- lexeme $ integer
+              period <- string "."
+              fraction <- many1 digit
+              skipMany space
+              let decimalNum = read (show num ++ period ++ fraction) :: Decimal
+              pure (decimalNum)
+            pure $ DecimalLiteral a $ WrappedDecimal decimalNum
+          )
     <|> (uncurry Variable <$> withPosition (stringToLabel <$> identifier))
     <|> ( do
             ~(a, (val, nu)) <- withPosition $ do
@@ -482,7 +494,17 @@ accountLiteral = do
 literal :: SolidityParser Expression
 literal =
   asum
-    [ do
+    [ ( try $ do
+            ~(a, decimalNum) <- withPosition $ do
+              num <- lexeme $ integer
+              period <- string "."
+              fraction <- many1 digit
+              skipMany space
+              let decimalNum = read (show num ++ period ++ fraction) :: Decimal
+              pure (decimalNum)
+            pure $ DecimalLiteral a $ WrappedDecimal decimalNum
+      ),
+      do
         ~(a, (n, u)) <- withPosition $ (,) <$> integer <*> optionMaybe numberUnit
         pure $ NumberLiteral a n u,
       uncurry StringLiteral <$> withPosition stringLiteral,

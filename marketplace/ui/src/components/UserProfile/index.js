@@ -28,7 +28,7 @@ import InventoryCard from "../Inventory/InventoryCard";
 import { useItemDispatch, useItemState } from "../../contexts/item";
 import { actions as itemActions } from "../../contexts/item/actions";
 import ClickableCell from "../ClickableCell";
-import { homeUrl, soldOrderDetailssBaseUrl, soldOrdersBaseUrl, boughtOrderDetailssBaseUrl, boughtOrdersBaseUrl, transfersBaseUrl } from "../../helpers/constants";
+import { homeUrl, soldOrderDetailssBaseUrl, boughtOrderDetailssBaseUrl, ordersBaseUrl, transfersBaseUrl } from "../../helpers/constants";
 
 
 
@@ -43,7 +43,7 @@ const UserProfile = ({user}) => {
   const { cartList } = useMarketplaceState();
   const [api, contextHolder] = notification.useNotification();
   const marketplaceDispatch = useMarketplaceDispatch();
-  const { userInventories, isUserInventoriesLoading, inventories, isInventoriesLoading, message, success, isLoadingStripeStatus, stripeStatus, inventoriesTotal } = useInventoryState();
+  const { userInventories, isUserInventoriesLoading, inventories, isInventoriesLoading, message, success, inventoriesTotal, supportedTokens, isFetchingTokens } = useInventoryState();
   let { hasChecked, isAuthenticated, loginUrl } = useAuthenticateState();
   const { TabPane } = Tabs;
   const orderDispatch = useOrderDispatch();
@@ -58,10 +58,6 @@ const UserProfile = ({user}) => {
   const { userActivity } = useUserActivityState();
   const [wishlistData, setWishlistData] = useState([]);
   const routeMatch = useMatch({ path: routes.MarketplaceUserProfile.url, strict: true });
-
-  const soldOrdersBaseUrl = new URL("/order/sold", window.location.origin).toString();
-  const boughtOrdersBaseUrl = new URL("/order/bought", window.location.origin).toString();
-  const transfersBaseUrl = new URL("/order/transfers", window.location.origin).toString();
   const [breadcrumbs, setBreadcrumbs] = useState([{ text: 'Home', path: homeUrl }]);
   
   const params = useParams();
@@ -124,16 +120,10 @@ const UserProfile = ({user}) => {
       if(isOwner) 
         {
           inventoryActions.fetchInventory(dispatch, limit, offset, "",category);
+          inventoryActions.fetchSupportedTokens(dispatch);
         }
       }, [dispatch, limit, offset, category, isOwner]);
 
-    // Seller Stripe Status fetch to preview options of listing
-    useEffect(() => {
-      if(isAuthenticated && hasChecked)
-        {
-          inventoryActions.sellerStripeStatus(dispatch, commonName);
-        }
-    }, [dispatch, category, user, commonName]);
 
     // Fetch Categories
     useEffect(() => {
@@ -198,11 +188,9 @@ const UserProfile = ({user}) => {
           const productDetailsPath = new URL(`/dp/${productID}/${productName}`, window.location.origin).toString();
           initialBreadcrumbs.push({ text: 'Product Details', path: productDetailsPath });
         }
-      } else if (referrer.includes('/order/bought')) {
-        initialBreadcrumbs.push({ text: 'Orders (Bought)', path: boughtOrdersBaseUrl });
-      } else if (referrer.includes('/order/sold')) {
-        initialBreadcrumbs.push({ text: 'Orders (Sold)', path: soldOrdersBaseUrl });
-      } else if (referrer.includes('/order/transfers')) {
+      } else if (referrer.includes(ordersBaseUrl)) {
+        initialBreadcrumbs.push({ text: 'Orders', path: ordersBaseUrl });
+      } else if (referrer.includes(transfersBaseUrl)) {
         initialBreadcrumbs.push({ text: 'Transfers', path: transfersBaseUrl });
       }
       
@@ -232,7 +220,7 @@ const UserProfile = ({user}) => {
     };
 
     //helper
-    const openToast = (placement) => {
+    const openToast = (placement,success,message) => {
       if (success) {
         api.success({
           message: message,
@@ -251,47 +239,61 @@ const UserProfile = ({user}) => {
     };
 
     //helper
+    // const addItemToCart = async (product, quantity) => {
+    //   if (product.ownerCommonName === user?.commonName) {
+    //     openToast("bottom", false, "Cannot buy your own item");
+    //     return false;
+    //   }
+
+    //   // Search for the product in the cart
+    //   let foundIndex = cartList.findIndex((item) => item.product.address === product.address);
+    //   let items = [...cartList]; 
+
+    //   if (foundIndex === -1) {
+    //     // Product not found, check quantity before adding
+    //     const checkQuantity = await orderActions.fetchSaleQuantity(orderDispatch, [product.saleAddress], [quantity]);
+    //     if (checkQuantity === true) {
+    //       // Quantity check passed, add new item to the cart
+    //       // Adding single object to keep single product in cart
+    //       items = [{ product, qty: quantity }];
+    //       marketplaceActions.addItemToCart(marketplaceDispatch, items);
+    //       openToast("bottom", true, "Item added to cart");
+    //       return true;
+    //     } else {
+    //       // Not enough quantity, inform the user
+    //       openToast("bottom", false, `Currently available quantity for ${product.name}: ${checkQuantity[0].availableQuantity}. Try lowering the quantity to continue.`);
+    //       setTimeout(() => {
+    //         navigate('/checkout')
+    //       }, 2000);
+    //       return false;
+    //     }
+    //   } else {
+    //     // Product found, prepare to update quantity after check
+    //     const potentialNewQty = items[foundIndex].qty + quantity;
+    //     const checkQuantity = await orderActions.fetchSaleQuantity(orderDispatch, [product.saleAddress], [potentialNewQty]);
+    //     if (checkQuantity === true) {
+    //       // Quantity check passed, update item quantity in the cart
+    //       items[foundIndex].qty = potentialNewQty;
+    //       marketplaceActions.addItemToCart(marketplaceDispatch, items);
+    //       openToast("bottom", true, "Item updated in cart");
+    //       return true;
+    //     } else {
+    //       // Not enough quantity, inform the user
+    //       openToast("bottom", false, `Currently available quantity for ${product.name}: ${checkQuantity[0].availableQuantity}. Try lowering the quantity to continue.`);
+    //       setTimeout(() => {
+    //         navigate('/checkout')
+    //       }, 2000);
+    //       return false;
+    //     }
+    //   }
+    // };
+
     const addItemToCart = async (product, quantity) => {
-      if (product.ownerCommonName === user?.commonName) {
-        openToast("bottom", true, "Cannot buy your own item");
-        return false;
-      }
-
-      // Search for the product in the cart
-      let foundIndex = cartList.findIndex((item) => item.product.address === product.address);
-      let items = [...cartList]; 
-
-      if (foundIndex === -1) {
-        // Product not found, check quantity before adding
-        const checkQuantity = await orderActions.fetchSaleQuantity(orderDispatch, [product.saleAddress], [quantity]);
-        if (checkQuantity === true) {
-          // Quantity check passed, add new item to the cart
-          items.push({ product, qty: quantity });
+          const items = [{ product, qty: quantity }];
           marketplaceActions.addItemToCart(marketplaceDispatch, items);
-          openToast("bottom", false, "Item added to cart");
-          return true;
-        } else {
-          // Not enough quantity, inform the user
-          openToast("bottom", true, `Currently available quantity for ${product.name}: ${checkQuantity[0].availableQuantity}. Try lowering the quantity to continue.`);
-          return false;
-        }
-      } else {
-        // Product found, prepare to update quantity after check
-        const potentialNewQty = items[foundIndex].qty + quantity;
-        const checkQuantity = await orderActions.fetchSaleQuantity(orderDispatch, [product.saleAddress], [potentialNewQty]);
-        if (checkQuantity === true) {
-          // Quantity check passed, update item quantity in the cart
-          items[foundIndex].qty = potentialNewQty;
-          marketplaceActions.addItemToCart(marketplaceDispatch, items);
-          openToast("bottom", false, "Item updated in cart");
-          return true;
-        } else {
-          // Not enough quantity, inform the user
-          openToast("bottom", true, `Currently available quantity for ${product.name}: ${checkQuantity[0].availableQuantity}. Try lowering the quantity to continue.`);
-          return false;
-        }
-      }
-    };
+          navigate('/checkout');
+          window.scrollTo(0, 0);
+    }
 
 /**************************************************************************************************************************************************************************************
                                                    RENDER UI
@@ -299,9 +301,10 @@ const UserProfile = ({user}) => {
 
   return (
     
-    <div className="container mx-auto p-6">
+    <div className="container mx-auto">
+      {contextHolder}
         {/* Bread Crumb Navigation */}
-      <div className="px-0 md:px-5 lg:py-1 lg:mt-3 orders">
+      <div className="px-6 md:px-5 lg:py-1 lg:mt-3 orders">
         <Breadcrumb>
           {breadcrumbs.map((breadcrumb, index) => {
             const isLast = index === breadcrumbs.length - 1;
@@ -328,7 +331,7 @@ const UserProfile = ({user}) => {
 
       
       {/* User Cover */}
-      <div className="relative mb-6">
+      <div className="relative mb-6 px-6">
         <img 
           className="w-full h-36 sm:h-52 md:h-60 lg:h-68 object-cover rounded-lg" 
           src={Images.blockapps_cover} 
@@ -388,7 +391,7 @@ const UserProfile = ({user}) => {
      <Tabs
         defaultActiveKey={activeTab}
         onChange={handleTabSelect}
-        className="p-3 ml-6 mr-6 mb-6"
+        className="p-3 mx-1 lg:mx-6 mb-6"
       >
 
 
@@ -408,8 +411,8 @@ const UserProfile = ({user}) => {
                 label: "All",
                 key: undefined,
                 children: (
-                  <div className="my-4 grid grid-cols-1 md:grid-cols-2 gap-6 lg:grid-cols-3 3xl:grid-cols-4 5xl:grid-cols-5 sm:place-items-center md:place-items-start  inventoryCard max-w-full">
-                    {!isInventoriesLoading ? (
+                  <div className="my-4 grid grid-cols-1 md:grid-cols-2 gap-6 lg:grid-cols-2 xl:grid-cols-3 3xl:grid-cols-4 5xl:grid-cols-5 sm:place-items-center md:place-items-start  inventoryCard max-w-full">
+                    {!isInventoriesLoading && !isFetchingTokens ? (
                       inventories.map((inventory, index) => {
                         return (
                           <InventoryCard
@@ -418,10 +421,9 @@ const UserProfile = ({user}) => {
                             category={category}
                             key={index}
                             // debouncedSearchTerm={debouncedSearchTerm}
-                            paymentProviderAddress={
-                              stripeStatus ? stripeStatus.paymentProviderAddress : undefined
-                            }
                             allSubcategories={allSubcategories}
+                            supportedTokens={supportedTokens}
+                            user={user}
                           />
                         );
                       })
@@ -438,7 +440,7 @@ const UserProfile = ({user}) => {
                 key: 'For Sale',
                 children: (
                   <div className="my-4 grid grid-cols-1 md:grid-cols-2 gap-6 lg:grid-cols-3 3xl:grid-cols-4 5xl:grid-cols-5 sm:place-items-center md:place-items-start  inventoryCard max-w-full">
-                    {!isUserInventoriesLoading ? (
+                    {!isUserInventoriesLoading && !isFetchingTokens ? (
                       userInventories.map((inventory, index) => {
                         return (
                           <InventoryCard
@@ -447,10 +449,9 @@ const UserProfile = ({user}) => {
                             category={category}
                             key={index}
                             // debouncedSearchTerm={debouncedSearchTerm}
-                            paymentProviderAddress={
-                              stripeStatus ? stripeStatus.paymentProviderAddress : undefined
-                            }
                             allSubcategories={allSubcategories}
+                            supportedTokens={supportedTokens}
+                            user={user}
                           />
                         );
                       })
@@ -467,7 +468,7 @@ const UserProfile = ({user}) => {
                 key: categoryObject.name,
                 children: (
                   <div className="my-4 grid grid-cols-1 md:grid-cols-2 gap-6 lg:grid-cols-3 3xl:grid-cols-4 5xl:grid-cols-5 inventoryCard max-w-full">
-                    {!isInventoriesLoading ? (
+                    {!isInventoriesLoading && !isFetchingTokens ? (
                       inventories.map((inventory, index) => {
                         return (
                           <InventoryCard
@@ -476,10 +477,9 @@ const UserProfile = ({user}) => {
                             category={category}
                             key={index}
                             // debouncedSearchTerm={debouncedSearchTerm}
-                            paymentProviderAddress={
-                              stripeStatus ? stripeStatus.paymentProviderAddress : undefined
-                            }
                             allSubcategories={allSubcategories}
+                            supportedTokens={supportedTokens}
+                            user={user}
                           />
                         );
                       })
@@ -580,11 +580,11 @@ const UserProfile = ({user}) => {
                   switch (activity.type) {
                     case "sold":
                       description = `You have received a new order ${activity.orderId} from ${activity.purchasersCommonName}.`;
-                      href = `${soldOrderDetailssBaseUrl}/${activity.address}`;
+                      href = `${soldOrderDetailssBaseUrl}/${activity.transaction_hash}`;
                       break;
                     case "bought":
                       description = `Your order ${activity.orderId} was fulfilled by ${activity.sellersCommonName}.`;
-                      href = `${boughtOrderDetailssBaseUrl}/${activity.address}`;
+                      href = `${boughtOrderDetailssBaseUrl}/${activity.transaction_hash}`;
                       break;
                     case "transfer":
                       description = `You have received one or more items as a free transfer from ${activity.oldOwnerCommonName}.`;
@@ -617,7 +617,7 @@ const UserProfile = ({user}) => {
       </Tabs>
 
       {/* TABS End */}
-      {message && openToast("bottom")}
+      {message && openToast("bottom", success, message)}
       {itemMsg && itemToast("bottom")}
     </div>
   );

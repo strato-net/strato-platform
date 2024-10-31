@@ -14,9 +14,13 @@ module Blockchain.VMOptions
     flags_accountNonceLimit,
     flags_txSizeLimit,
     flags_gasLimit,
+    flags_creatorForkBlockNumber,
+    flags_strictGas,
+    flags_strictGasLimit,
   )
 where
 
+import Blockchain.Strato.Model.Options
 import HFlags
 
 defineFlag "debug" False "turn debug info on or off"
@@ -37,6 +41,6 @@ defineFlag "startingBlock" (-1 :: Integer) "block in kafka to start running the 
 defineFlag "svmDev" (False :: Bool) "Whether to crash on SolidVM exceptions"
 defineFlag "svmTrace" (True :: Bool) "Whether to have verbose logging in SolidVM"
 defineFlag "requireCerts" (True :: Bool) "Flag to enable the requirement of a cert to send transactions"
-defineFlag "txSizeLimit" (150000 :: Integer) "The maximum length of a valid RLP encoded transaction bytestring"
-defineFlag "accountNonceLimit" (1000 :: Integer) "The maximum number of transactions a single account can make"
-defineFlag "gasLimit" (1000000 :: Integer) "The maximum amount of gas a transaction can use"
+defineFlag "creatorForkBlockNumber" (-1 :: Integer) "The block number at which to use commonName for the creator value instead of organization"
+defineFlag "strictGas" (True :: Bool) "Whether to restrict transactions to approximately 2 second gas timeout"
+defineFlag "strictGasLimit" (400000 :: Integer) "The maximum amount of gas that can be used for a transaction in strict mode"

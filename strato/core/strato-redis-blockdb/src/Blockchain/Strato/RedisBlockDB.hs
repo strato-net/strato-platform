@@ -84,6 +84,8 @@ module Blockchain.Strato.RedisBlockDB
     deleteBlocks,
     getBestBlockInfo,
     putBestBlockInfo,
+    getBestSequencedBlockInfo,
+    putBestSequencedBlockInfo,
     forceBestBlockInfo,
     withRedisBlockDB,
     commonAncestorHelper,
@@ -102,8 +104,8 @@ where
 
 import BlockApps.Logging
 import BlockApps.X509.Certificate
+import Blockchain.Data.BlockHeader
 import Blockchain.Data.ChainInfo
-import Blockchain.Data.DataDefs
 import Blockchain.EthConf (lookupRedisBlockDBConfig)
 import Blockchain.Partitioner (partitionWith)
 import Blockchain.Sequencer.Event
@@ -114,6 +116,7 @@ import Blockchain.Strato.Model.ExtendedWord (Word256)
 import Blockchain.Strato.Model.Gas
 import Blockchain.Strato.Model.Keccak256
 import Blockchain.Strato.RedisBlockDB.Models as Models
+import Blockchain.Strato.Model.Validator (Validator(..))
 import Control.Arrow (second, (&&&), (***))
 import Control.Concurrent (threadDelay)
 import Control.Monad
@@ -230,10 +233,11 @@ putChainInfo cId cInfo = do
 isValidator ::
   CM.ChainMemberParsedSet ->
   Redis Bool
-isValidator val =
-  sismember (namespaceToKeyPrefix Validators) (toValue val) >>= \case
+isValidator (CM.CommonName _ _ v _) =
+  sismember (namespaceToKeyPrefix Validators) (toValue (Validator v)) >>= \case
     Right b -> pure b
     _ -> pure False
+isValidator _ = pure False
 
 getValidatorAddresses :: Redis [Address]
 getValidatorAddresses = do 
@@ -242,7 +246,7 @@ getValidatorAddresses = do
     Right keysBS -> (fmap userAddress . catMaybes) <$> (sequence $ (getCertFromParsedSet . fromValue) <$> keysBS)
 
 addValidators ::
-  [CM.ChainMemberParsedSet] ->
+  [Validator] ->
   Redis (Either Reply Status)
 addValidators [] = pure $ Right Ok
 addValidators vals =
@@ -251,7 +255,7 @@ addValidators vals =
     Left reply -> pure $ Left reply
 
 removeValidators ::
-  [CM.ChainMemberParsedSet] ->
+  [Validator] ->
   Redis (Either Reply Status)
 removeValidators [] = pure $ Right Ok
 removeValidators vals =
@@ -622,6 +626,10 @@ bestBlockInfoKey :: S8.ByteString
 bestBlockInfoKey = S8.pack "<best>"
 {-# INLINE bestBlockInfoKey #-}
 
+bestSequencedBlockInfoKey :: S8.ByteString
+bestSequencedBlockInfoKey = S8.pack "<best_sequenced>"
+{-# INLINE bestSequencedBlockInfoKey #-}
+
 getGenesisHash :: Redis (Maybe Keccak256)
 getGenesisHash = getCanonical 0
 
@@ -651,7 +659,7 @@ getSHAsByNumber n =
 
 getHeader ::
   Keccak256 ->
-  Redis (Maybe BlockData)
+  Redis (Maybe BlockHeader)
 getHeader sha =
   getInNamespace Headers sha >>= \case
     Left _ -> return Nothing
@@ -662,12 +670,12 @@ getHeader sha =
 
 getHeaders ::
   [Keccak256] ->
-  Redis [(Keccak256, Maybe BlockData)]
+  Redis [(Keccak256, Maybe BlockHeader)]
 getHeaders = zipMapM getHeader
 
 getHeadersByNumber ::
   Integer ->
-  Redis [(Keccak256, Maybe BlockData)]
+  Redis [(Keccak256, Maybe BlockHeader)]
 getHeadersByNumber n =
   getMembersInNamespace Numbers n >>= \case
     Left _ -> return []
@@ -675,7 +683,7 @@ getHeadersByNumber n =
 
 getHeadersByNumbers ::
   [Integer] ->
-  Redis [(Integer, [(Keccak256, Maybe BlockData)])]
+  Redis [(Integer, [(Keccak256, Maybe BlockHeader)])]
 getHeadersByNumbers = zipMapM getHeadersByNumber
 
 getTransactions ::
@@ -715,7 +723,7 @@ addPrivateTransactions ptxs = do
 
 getUncles ::
   Keccak256 ->
-  Redis (Maybe [BlockData])
+  Redis (Maybe [BlockHeader])
 getUncles sha =
   getInNamespace Uncles sha >>= \case
     Left _ -> return Nothing
@@ -770,7 +778,7 @@ getZippedParentChain mapper start limit = do
 getHeaderChain ::
   Keccak256 ->
   Int ->
-  Redis [(Keccak256, BlockData)]
+  Redis [(Keccak256, BlockHeader)]
 getHeaderChain = getZippedParentChain getHeader
 
 getBlockChain ::
@@ -790,7 +798,7 @@ getCanonical n =
 
 getCanonicalHeader ::
   Integer ->
-  Redis (Maybe BlockData)
+  Redis (Maybe BlockHeader)
 getCanonicalHeader n =
   getCanonical n >>= \case
     Nothing -> return Nothing
@@ -817,7 +825,7 @@ getZippedCanonicalChain mapper start limit = do
 getCanonicalHeaderChain ::
   Integer ->
   Int ->
-  Redis [(Keccak256, BlockData)]
+  Redis [(Keccak256, BlockHeader)]
 getCanonicalHeaderChain = getZippedCanonicalChain getHeader
 
 getChildren ::
@@ -868,19 +876,19 @@ getBlocksByNumbers ::
 getBlocksByNumbers = zipMapM getBlocksByNumber
 
 putHeader ::
-  BlockData ->
+  BlockHeader ->
   Redis (Either Reply Status)
 putHeader = uncurry insertHeader . (blockHeaderHash &&& id)
 
 putHeaders ::
   Traversable t =>
-  t BlockData ->
+  t BlockHeader ->
   Redis (t (Either Reply Status))
 putHeaders = mapM putHeader
 
 insertHeader ::
   Keccak256 ->
-  BlockData ->
+  BlockHeader ->
   Redis (Either Reply Status)
 insertHeader sha h = do
   let parent = blockHeaderParentHash h
@@ -899,7 +907,7 @@ insertHeader sha h = do
     TxError e -> pure . Left $ SingleLine (S8.pack $ "insertHeader - Error" ++ e)
 
 insertHeaders ::
-  M.Map Keccak256 BlockData ->
+  M.Map Keccak256 BlockHeader ->
   Redis (M.Map Keccak256 (Either Reply Status))
 insertHeaders = sequenceA . M.mapWithKey insertHeader
 
@@ -988,14 +996,13 @@ deleteBlocks = mapM deleteBlock
 putBestBlockInfo ::
   Keccak256 ->
   Integer ->
-  Integer ->
   Redis (Either Reply Status)
-putBestBlockInfo newSha newNumber newTDiff = do
+putBestBlockInfo newSha newNumber = do
   --liftIO . putStrLn . ("New args" ++) $ show (keccak256ToHex newSha, newNumber, newTDiff)
   oldBBI' <- getBestBlockInfo
   case oldBBI' of
     Nothing -> return (Left $ SingleLine "Got no block from getBetstBlockInfo")
-    Just (RedisBestBlock oldSha oldNumber _) -> do
+    Just (RedisBestBlock oldSha oldNumber) -> do
       --liftIO . putStrLn . ("Old args" ++) $ show (keccak256ToHex oldSha, oldNumber, oldTDiff)
       helper' <- commonAncestorHelper oldNumber newNumber oldSha newSha
       case helper' of
@@ -1006,7 +1013,7 @@ putBestBlockInfo newSha newNumber newTDiff = do
           res <- multiExec $ do
             forM_ updates $ \(sha, num) -> set (inNamespace Canonical $ num) (toValue sha)
             unless (null deletions) . void . del $ inNamespace Canonical . toKey <$> deletions
-            forceBestBlockInfo newSha newNumber newTDiff
+            forceBestBlockInfo newSha newNumber
           checkAndUpdateSyncStatus
           case res of
             TxSuccess _ -> return $ Right Ok
@@ -1081,15 +1088,22 @@ commonAncestorHelper oldNum newNum oldSha' newSha' = helper [oldSha'] [newSha'] 
 --validateChain (x:xs) = (validateLink x $ head xs) && (validateChain xs)
 
 -- | Used to seed the first bestBlock, e.g. genesis block in strato-setup
-forceBestBlockInfo :: RedisCtx m f => Keccak256 -> Integer -> Integer -> m (f Status)
-forceBestBlockInfo sha i j =
-  forceBestBlockInfo' bestBlockInfoKey (RedisBestBlock sha i j) --`totalRecall` (,,)
+forceBestBlockInfo :: RedisCtx m f => Keccak256 -> Integer -> m (f Status)
+forceBestBlockInfo sha i =
+  forceBestBlockInfo' bestBlockInfoKey (RedisBestBlock sha i) --`totalRecall` (,,)
 
 forceBestBlockInfo' :: RedisCtx m f => S8.ByteString -> RedisBestBlock -> m (f Status)
 forceBestBlockInfo' key = set key . toValue
 
 getBestBlockInfo :: Redis (Maybe RedisBestBlock)
 getBestBlockInfo = getBestBlockInfo' bestBlockInfoKey
+
+getBestSequencedBlockInfo :: Redis (Maybe RedisBestBlock)
+getBestSequencedBlockInfo = getBestBlockInfo' bestSequencedBlockInfoKey
+
+putBestSequencedBlockInfo :: RedisCtx m f => Keccak256 -> Integer -> m (f Status)
+putBestSequencedBlockInfo sha i =
+  forceBestBlockInfo' bestSequencedBlockInfoKey (RedisBestBlock sha i)
 
 getBestBlockInfo' :: S8.ByteString -> Redis (Maybe RedisBestBlock)
 getBestBlockInfo' key =
@@ -1099,9 +1113,9 @@ getBestBlockInfo' key =
       return Nothing
     Right r -> case r of
       Nothing -> return Nothing -- return . Left $ SingleLine "No BestBlock data set in RedisBlockDB"
-      Just bs -> return . Just $ RedisBestBlock sha num tdiff
+      Just bs -> return . Just $ RedisBestBlock sha num
         where
-          RedisBestBlock sha num tdiff = fromValue bs
+          RedisBestBlock sha num = fromValue bs
 
 releaseRedlockScript :: S8.ByteString
 releaseRedlockScript =
@@ -1174,8 +1188,8 @@ putVmGasCap g =
       Left _ -> return Nothing
       Right _ -> return . Just $ g
 
-updateWorldBestBlockInfo :: Keccak256 -> Integer -> Integer -> Redis (Either Reply Bool)
-updateWorldBestBlockInfo sha num tdiff = withRetryCount 0
+updateWorldBestBlockInfo :: Keccak256 -> Integer -> Redis (Either Reply Bool)
+updateWorldBestBlockInfo sha num = withRetryCount 0
   where
     withRetryCount :: Int -> Redis (Either Reply Bool)
     withRetryCount theRetryCount = do
@@ -1192,16 +1206,16 @@ updateWorldBestBlockInfo sha num tdiff = withRetryCount 0
           case maybeExistingWBBI of
             Nothing -> do
               liftLog $ $logWarnS "updateWorldBestBlockInfo" "No WorldBestBlock in Redis, will force"
-              void $ forceBestBlockInfo' worldBestBlockKey (RedisBestBlock sha num tdiff)
+              void $ forceBestBlockInfo' worldBestBlockKey (RedisBestBlock sha num)
               checkAndUpdateSyncStatus
               releaseAndFinalize lockID True
-            Just (RedisBestBlock _ _ oldTDiff) -> do
-              liftLog $ $logDebugS "updateWorldBestBlockInfo" $ T.pack ("oldTDiff = " ++ show oldTDiff ++ "; newTDiff = " ++ show tdiff)
-              let willUpdate = oldTDiff <= tdiff
+            Just (RedisBestBlock _ oldNumber) -> do
+              liftLog $ $logDebugS "updateWorldBestBlockInfo" $ T.pack ("oldNumber = " ++ show oldNumber ++ "; newNumber = " ++ show num)
+              let willUpdate = oldNumber <= num
               if willUpdate
                 then do
                   liftLog $ $logDebugS "updateWorldBestBlockInfo" . T.pack $ "Updating best block: " ++ show num
-                  void $ forceBestBlockInfo' worldBestBlockKey (RedisBestBlock sha num tdiff)
+                  void $ forceBestBlockInfo' worldBestBlockKey (RedisBestBlock sha num)
                   checkAndUpdateSyncStatus
                 else liftLog $ $logDebugS "updateWorldBestBlockInfo" "Not updating"
               releaseAndFinalize lockID willUpdate
@@ -1220,10 +1234,10 @@ checkAndUpdateSyncStatus = do
   status <- getSyncStatus
   nodeBestBlock <- getBestBlockInfo
   worldBestBlock <- getWorldBestBlockInfo
-  let nodeTotalDiff = bestBlockTotalDifficulty <$> nodeBestBlock
-      worldTotalDiff = bestBlockTotalDifficulty <$> worldBestBlock
+  let nodeNumber = bestBlockNumber <$> nodeBestBlock
+      worldNumber = bestBlockNumber <$> worldBestBlock
 
-  case (status, nodeTotalDiff, worldTotalDiff) of
+  case (status, nodeNumber, worldNumber) of
     (Just False, Just ntd, Just wtd) -> when (ntd >= wtd) (void $ putSyncStatus True)
     (Nothing, Just ntd, Just wtd) -> void $ putSyncStatus (ntd >= wtd)
     (Nothing, Nothing, Just _) -> void $ putSyncStatus False
@@ -1237,10 +1251,10 @@ getSyncStatusNow = do
     else do
       nodeBestBlock <- getBestBlockInfo
       worldBestBlock <- getWorldBestBlockInfo
-      let nodeTotalDiff = bestBlockTotalDifficulty <$> nodeBestBlock
-          worldTotalDiff = bestBlockTotalDifficulty <$> worldBestBlock
+      let nodeNumber = bestBlockNumber <$> nodeBestBlock
+          worldNumber = bestBlockNumber <$> worldBestBlock
       pure $
-        Just $ case (status, nodeTotalDiff, worldTotalDiff) of
+        Just $ case (status, nodeNumber, worldNumber) of
           (Just False, Just ntd, Just wtd) -> ntd >= wtd
           (Nothing, Just ntd, Just wtd) -> ntd >= wtd
           (Nothing, Nothing, Just _) -> False

@@ -3,7 +3,7 @@ def cleanOldWorkspaces(Integer olderThanNumDays = 4, Boolean hasNodeYarn = true)
   script {
     def diskspaceAvailableBefore = sh(
         returnStdout: true,
-        script: "df | grep /datadrive | awk '{print \$4}'"
+        script: "df -x overlay | grep /datadrive | awk '{print \$4}'"
     ).trim()
 
     echo "diskspaceAvailableBefore=$diskspaceAvailableBefore kilobytes"
@@ -53,7 +53,7 @@ def cleanOldWorkspaces(Integer olderThanNumDays = 4, Boolean hasNodeYarn = true)
     
     def diskspaceAvailableAfter = sh(
         returnStdout: true,
-        script: "df | grep /datadrive | awk '{print \$4}'"
+        script: "df -x overlay | grep /datadrive | awk '{print \$4}'"
     ).trim()
 
     echo "diskspaceAvailableAfter=$diskspaceAvailableAfter kilobytes"

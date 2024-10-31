@@ -1,27 +1,5 @@
 // Jest Snapshot v1, https://goo.gl/fbAQLP
 
-exports[`OauthAccounts: action faucet failure 1`] = `
-Object {
-  "err": "ERROR",
-  "type": "OAUTH_FAUCET_FAILURE",
-}
-`;
-
-exports[`OauthAccounts: action faucet request 1`] = `
-Object {
-  "address": "quxb0hj4dzgqwg83c52w0jvja6ukk022893z0w0k",
-  "chainId": "ff7ef45acb7a775018bc765b6fdeea432aaddfcd846cf6dd9442724266b1eac9",
-  "name": undefined,
-  "type": "OAUTH_FAUCET_REQUEST",
-}
-`;
-
-exports[`OauthAccounts: action faucet success 1`] = `
-Object {
-  "type": "OAUTH_FAUCET_SUCCESS",
-}
-`;
-
 exports[`OauthAccounts: action fetch Oauth account detail failure 1`] = `
 Object {
   "error": "ERROR",

@@ -34,6 +34,13 @@ router.get(
   MarketplaceController.getTopSellingProductsLoggedIn
 );
 
+router.post(
+  Marketplace.transferStrats,
+  authHandler.authorizeRequest(),
+  loadDapp,
+  MarketplaceController.transferStrats
+);
+
 router.get(
   Marketplace.getStratsBalance,
   authHandler.authorizeRequest(),
@@ -41,5 +48,18 @@ router.get(
   MarketplaceController.getStratsBalance
 );
 
+router.get(
+  Marketplace.getStratsAddress,
+  authHandler.authorizeRequest(),
+  loadDapp,
+  MarketplaceController.getStratsAddress
+);
+
+router.get(
+  Marketplace.getStratsTransactionHistory,
+  authHandler.authorizeRequest(),
+  loadDapp,
+  MarketplaceController.getStratsTransactionHistory
+);
 
 export default router;

@@ -3,14 +3,8 @@
 {-# LANGUAGE RecordWildCards #-}
 {-# OPTIONS_GHC -Wall #-}
 
-import BlockApps.Tools.Block as Block
-import BlockApps.Tools.BlockGO as BlockGO
-import BlockApps.Tools.CanonRedis
-import BlockApps.Tools.ChainHash
-import BlockApps.Tools.Checkpoints
+--import BlockApps.Tools.Checkpoints
 import BlockApps.Tools.Code as Code
-import BlockApps.Tools.DumpKafkaBlocks
-import BlockApps.Tools.DumpKafkaRaw
 import BlockApps.Tools.DumpKafkaSequencer
 import BlockApps.Tools.DumpKafkaStateDiff
 import BlockApps.Tools.DumpKafkaUnSequencer
@@ -20,9 +14,6 @@ import BlockApps.Tools.FRawMP as FRawMP
 import BlockApps.Tools.Hash as Hash
 import BlockApps.Tools.InsertP2P
 import BlockApps.Tools.InsertSeq
-import BlockApps.Tools.InsertTX
-import BlockApps.Tools.Kafka
-import BlockApps.Tools.Privacy
 import BlockApps.Tools.Psql
 import BlockApps.Tools.RLP as RLP
 import BlockApps.Tools.Raw as Raw
@@ -36,72 +27,52 @@ import Blockchain.Strato.Model.ChainMember
 import Blockchain.Strato.Model.Keccak256 hiding (hash)
 import qualified Data.ByteString as B
 import qualified Data.ByteString.Char8 as BC
-import Data.Int
 import qualified Data.Text as T
 import qualified LabeledError
 import System.Console.CmdArgs
+import System.Process
 
 data Options
-  = State {root :: String, db :: String}
-  | Block {hash :: String, db :: String}
-  | BlockGO {hash :: String, db :: String}
-  | Hash {hash :: String, db :: String}
-  | Code {hash :: String, db :: String}
-  | RawMP {stateRoot :: String, filename :: String}
-  | FRawMP {stateRoot :: String, filename :: String}
-  | Raw {filename :: String}
-  | RLP {filename :: String}
-  | Checkpoints {service :: CheckpointService, operation :: CheckpointOperation, offset :: Maybe Int64, cp :: Maybe String}
-  | DumpKafkaBlocks {startingBlock :: Int}
+  = AddTx {txJson :: String}
+  | AddBlocksFromFile {fileName :: String}
+  | AddGenesisFromFile {fileName :: String}
+  | AddTxsFromFile {fileName :: String}
+  | AskForBlocks {startBlock :: Integer, endBlock :: Integer, qOrg :: String, qOrgUnit :: String, qCommonName :: String}
+  | AskForTxs
+  | ChainHash
+--  | Checkpoints {service :: CheckpointService, operation :: CheckpointOperation, offset :: Maybe Int64, cp :: Maybe String}
+  | Code {hash :: String}
+  | DeleteDepBlock {valK :: String}
   | DumpKafkaVMEvents {startingBlock :: Int}
   | DumpKafkaSequencer {startingBlock :: Int}
   | DumpKafkaSequencerVM {startingBlock :: Int}
   | DumpKafkaSequencerP2P {startingBlock :: Int}
   | DumpKafkaUnSequencer {startingBlock :: Int}
-  | DumpKafkaRaw {streamName :: String, startingBlock :: Int}
+--  | DumpKafkaRaw {streamName :: String, startingBlock :: Int}
   | DumpKafkaStateDiff {startingBlock :: Int}
   | DumpRedis {databaseNumber :: Integer}
-  | CanonRedis {ipAddress :: String, start :: Int, range :: Int}
-  | Psql {}
+  | FRawMP {stateRoot :: String, filename :: String}
+  | Hash {hash :: String}
   | InsertTX {}
-  | AskForBlocks {startBlock :: Integer, endBlock :: Integer, qOrg :: String, qOrgUnit :: String, qCommonName :: String}
+  | Migrate {tables :: String}
   | PushBlocks {startBlock :: Integer, endBlock :: Integer, qOrg :: String, qOrgUnit :: String, qCommonName :: String}
-  | AskForTxs
+  | Raw {filename :: String}
+  | RawMP {stateRoot :: String, filename :: String}
+  | RLP {filename :: String}
   | Redis {key :: String}
   | RedisMatch {pattern :: String}
-  | Migrate {tables :: String}
-  | AddTx {txJson :: String}
-  | AddBlocksFromFile {fileName :: String}
-  | AddGenesisFromFile {fileName :: String}
-  | AddTxsFromFile {fileName :: String}
-  | SaveKafka {topic :: String, filename :: String}
-  | LoadKafka {topic :: String, filename :: String}
-  | VerifyKafkaFile {filename :: String}
   | SetParticipationMode {mode :: ParticipationMode}
-  | ChainHash
-  | CompressRoundChanges {infilename :: String, outfilename :: String}
+  | State {root :: String}
+  | ValidatorBehavior {valB :: Bool}
   | GetPrivacy {registry :: String, key :: String}
   | PutPrivacy {registry :: String, key :: String, value :: String}
-  | ValidatorBehavior {valB :: Bool}
-  | DeleteDepBlock {valK :: String}
   deriving (Show, Data, Typeable)
 
 stateOptions :: Annotate Ann
 stateOptions =
   record
-    State {root = undefined, db = undefined}
-    [ root := def += typ "StateRoot" += argPos 1,
-      db := def += typ "DBSTRING" += argPos 0
-    ]
-
-canonRedisOptions :: Annotate Ann
-canonRedisOptions =
-  record
-    CanonRedis {ipAddress = undefined, start = undefined, range = undefined}
-    [ ipAddress := def += typ "IPADDRESS" += argPos 0,
-      start := def += typ "STARTINGBLOCK" += argPos 1,
-      range := def += typ "RANGE" += argPos 2
-    ]
+    State {root = undefined}
+    [ root := def += typ "StateRoot" += argPos 0 ]
 
 dumpRedisOptions :: Annotate Ann
 dumpRedisOptions =
@@ -110,36 +81,18 @@ dumpRedisOptions =
     [ databaseNumber := 0 += typ "INT"
     ]
 
-blockOptions :: Annotate Ann
-blockOptions =
-  record
-    Block {hash = undefined, db = undefined}
-    [ hash := def += typ "FILENAME" += argPos 1 += opt ("-" :: String),
-      db := def += typ "DBSTRING" += argPos 0
-    ]
-
-blockGoOptions :: Annotate Ann
-blockGoOptions =
-  record
-    BlockGO {hash = undefined, db = undefined}
-    [ hash := def += typ "FILENAME" += argPos 1 += opt ("-" :: String),
-      db := def += typ "DBSTRING" += argPos 0
-    ]
-
 hashOptions :: Annotate Ann
 hashOptions =
   record
-    Hash {hash = undefined, db = undefined}
-    [ hash := def += typ "FILENAME" += argPos 1 += opt ("-" :: String),
-      db := def += typ "DBSTRING" += argPos 0
+    Hash {hash = undefined}
+    [ hash := def += typ "FILENAME" += argPos 0 += opt ("-" :: String)
     ]
 
 codeOptions :: Annotate Ann
 codeOptions =
   record
-    Code {hash = undefined, db = undefined}
-    [ hash := def += typ "USERAGENT" += argPos 1,
-      db := def += typ "DBSTRING" += argPos 0
+    Code {hash = undefined}
+    [ hash := def += typ "USERAGENT" += argPos 0
     ]
 
 rawOptions :: Annotate Ann
@@ -200,20 +153,13 @@ dumpKafkaUnSequencerOptions =
     [ startingBlock := 0 += typ "INT"
     ]
 
-dumpKafkaBlocksOptions :: Annotate Ann
-dumpKafkaBlocksOptions =
-  record
-    DumpKafkaBlocks {startingBlock = undefined}
-    [ startingBlock := 0 += typ "INT"
-    ]
-
 dumpKafkaVMEventsOptions :: Annotate Ann
 dumpKafkaVMEventsOptions =
   record
     DumpKafkaVMEvents {startingBlock = undefined}
     [ startingBlock := 0 += typ "INT"
     ]
-
+{-
 dumpKafkaRawOptions :: Annotate Ann
 dumpKafkaRawOptions =
   record
@@ -221,7 +167,7 @@ dumpKafkaRawOptions =
     [ startingBlock := 0 += typ "INT" += argPos 1,
       streamName := def += typ "DBSTRING" += argPos 0
     ]
-
+-}
 dumpKafkaStateDiffOptions :: Annotate Ann
 dumpKafkaStateDiffOptions =
   record
@@ -229,14 +175,10 @@ dumpKafkaStateDiffOptions =
     [ startingBlock := 0 += typ "INT"
     ]
 
-psqlOptions :: Annotate Ann
-psqlOptions =
-  record Psql {} []
-
 insertTXOptions :: Annotate Ann
 insertTXOptions =
   record InsertTX {} []
-
+{-
 checkpointOptions :: Annotate Ann
 checkpointOptions =
   record
@@ -248,7 +190,7 @@ checkpointOptions =
     ]
   where
     nil = undefined
-
+-}
 askOptions :: Annotate Ann
 askOptions =
   record
@@ -271,8 +213,8 @@ pushOptions =
       qCommonName := "" += typ "STRING" += explicit += name "commonName"
     ]
 
-txOptions :: Annotate Ann
-txOptions = record AskForTxs []
+askForTxOptions :: Annotate Ann
+askForTxOptions = record AskForTxs []
 
 redisOptions :: Annotate Ann
 redisOptions =
@@ -337,29 +279,6 @@ deleteDepBlockOptions =
     [ valK := error "valK" += typ "STRING" += argPos 0
     ]
 
-saveKafkaOptions :: Annotate Ann
-saveKafkaOptions =
-  record
-    SaveKafka {filename = error "unused filename", topic = error "unused topic"}
-    [ filename := error "savekafka --filename=<file> --topic=<topic>" += typ "PATH" += explicit += name "filename",
-      topic := error "savekafka --filename=<file> --topic=<topic>" += typ "TOPIC" += explicit += name "topic"
-    ]
-
-loadKafkaOptions :: Annotate Ann
-loadKafkaOptions =
-  record
-    LoadKafka {filename = error "unused filename", topic = error "unused topic"}
-    [ filename := error "loadkafka --filename=<file> --topic=<topic>" += typ "PATH" += explicit += name "filename",
-      topic := error "loadkafka --filename=<file> --topic=<topic>" += typ "TOPIC" += explicit += name "topic"
-    ]
-
-verifyKafkaFileOptions :: Annotate Ann
-verifyKafkaFileOptions =
-  record
-    VerifyKafkaFile {filename = error "unused filename"}
-    [ filename := error "verifykafkafile --filename=<file>" += typ "PATH" += explicit += name "filename"
-    ]
-
 setParticipationModeOptions :: Annotate Ann
 setParticipationModeOptions =
   record
@@ -372,14 +291,6 @@ setParticipationModeOptions =
 
 chainHashOptions :: Annotate Ann
 chainHashOptions = record ChainHash []
-
-compressRoundChangesOptions :: Annotate Ann
-compressRoundChangesOptions =
-  record
-    CompressRoundChanges {infilename = error "unused infilename", outfilename = error "unused outfilename"}
-    [ infilename := error "compressroundchanges --infilename=<file>" += typ "PATH" += explicit += name "infilename",
-      outfilename := error "compressroundchanges --outfilename=<file>" += typ "PATH" += explicit += name "outfilename"
-    ]
 
 getPrivacyOptions :: Annotate Ann
 getPrivacyOptions =
@@ -401,14 +312,18 @@ putPrivacyOptions =
 options :: Annotate Ann
 options =
   modes_
-    [ blockGoOptions,
-      blockOptions,
-      canonRedisOptions,
-      checkpointOptions,
+    [
+      addBlocksFromFileOptions,
+      addGenesisFromFileOptions,
+      addTxsFromFileOptions,
+      addTxOptions,
+      askOptions,
+      askForTxOptions,
+      chainHashOptions,
+--      checkpointOptions,
       codeOptions,
-      dumpKafkaBlocksOptions,
       dumpKafkaVMEventsOptions,
-      dumpKafkaRawOptions,
+--      dumpKafkaRawOptions,
       dumpKafkaSequencerOptions,
       dumpKafkaSequencerVmOptions,
       dumpKafkaSequencerP2pOptions,
@@ -418,94 +333,76 @@ options =
       fRawMPOptions,
       hashOptions,
       insertTXOptions,
-      psqlOptions,
       rawMPOptions,
       rawOptions,
-      rlpOptions,
-      stateOptions,
-      askOptions,
-      pushOptions,
-      txOptions,
       redisOptions,
       redisMatchOptions,
+      rlpOptions,
       migrateOptions,
-      addTxOptions,
-      addBlocksFromFileOptions,
-      addGenesisFromFileOptions,
-      addTxsFromFileOptions,
+      pushOptions,
+      stateOptions,
       validatorBehaviorOptions,
       deleteDepBlockOptions,
-      saveKafkaOptions,
-      loadKafkaOptions,
-      verifyKafkaFileOptions,
       setParticipationModeOptions,
-      chainHashOptions,
-      compressRoundChangesOptions,
       getPrivacyOptions,
       putPrivacyOptions
     ]
 
---      += summary "Apply shims, reorganize, and generate to the input"
 
 main :: IO ()
 main = do
+  -- the tools should use /tmp/.ethereumH/ to access levelDB data 
+  -- while avoiding the LOCK while the node is running
+  let (cmd, args') = ("cp", ["-r", "/var/lib/strato/.ethereumH/", "/tmp/.ethereumH/"])
+  (_, _, _, processHandle) <- createProcess (proc cmd args')
+  _ <- waitForProcess processHandle
   opts <- cmdArgs_ options
   run opts
 
--------------------
 
 run :: Options -> IO ()
-run State {..} = let sr = MP.StateRoot $ LabeledError.b16Decode "queryStrato/run" $ BC.pack root in State.doit db sr
-run DumpRedis {..} = dumpRedis databaseNumber
-run CanonRedis {..} = canonRedis ipAddress start range
-run Block {..} = Block.doit db hash
-run BlockGO {..} = BlockGO.doit hash
-run Hash {..} = Hash.doit db hash
-run Code {..} = Code.doit db hash
-run Raw {..} = Raw.doit filename
-run RLP {..} = RLP.doit filename
-run RawMP {..} = RawMP.doit filename (MP.StateRoot . LabeledError.b16Decode "queryStrato/run" $ BC.pack stateRoot)
-run FRawMP {..} = FRawMP.doit filename (MP.StateRoot . LabeledError.b16Decode "queryStrato/run" $ BC.pack stateRoot)
+run AddTx {..} = addTx txJson
+run AddBlocksFromFile {..} = addBlocksFromFile fileName
+run AddGenesisFromFile {} = error "strato-barometer: the addGenesisFromFile tool has been deprecated."
+run AddTxsFromFile {..} = addTxsFromFile fileName
+run AskForBlocks {..} =
+  let i = CommonName (T.pack qOrg) (T.pack qOrgUnit) (T.pack qCommonName) True
+   in insertP2P (P2pAskForBlocks startBlock endBlock i)
+run AskForTxs =
+  insertP2P . P2pGetTx
+    . map (unsafeCreateKeccak256FromByteString . LabeledError.b16Decode "strato-barometer/askForTxs")
+    . filter (not . B.null)
+    . BC.split '\n'
+    =<< B.getContents
+run ChainHash = error "strato-barometer: the chainhash tool has been deprecated."
+--run Checkpoints {..} = case operation of
+--  Get -> doCheckpointGet service
+--  Put -> doCheckpointPut service (fromIntegral <$> offset) cp
+--  NullOperation -> doCheckpointUsage
+run Code {..} = Code.doit hash
+run DeleteDepBlock {..} = deleteDepBlock valK
 run DumpKafkaSequencer {..} = dumpKafkaSequencer (fromIntegral startingBlock)
 run DumpKafkaSequencerVM {..} = dumpKafkaSequencerVM (fromIntegral startingBlock)
 run DumpKafkaSequencerP2P {..} = dumpKafkaSequencerP2P (fromIntegral startingBlock)
 run DumpKafkaUnSequencer {..} = dumpKafkaUnSequencer (fromIntegral startingBlock)
-run DumpKafkaBlocks {..} = dumpKafkaBlocks (fromIntegral startingBlock)
 run DumpKafkaVMEvents {..} = dumpKafkaVMEvents (fromIntegral startingBlock)
-run DumpKafkaRaw {..} = dumpKafkaRaw streamName (fromIntegral startingBlock)
+--run DumpKafkaRaw {..} = dumpKafkaRaw streamName (fromIntegral startingBlock)
 run DumpKafkaStateDiff {..} = dumpKafkaStateDiff $ fromIntegral startingBlock
-run Psql {} = psql
-run InsertTX {} = insertTX
-run ValidatorBehavior {..} = validatorBehavior valB
-run DeleteDepBlock {..} = deleteDepBlock valK
-run Checkpoints {..} = case operation of
-  Get -> doCheckpointGet service
-  Put -> doCheckpointPut service (fromIntegral <$> offset) cp
-  NullOperation -> doCheckpointUsage
-run AskForBlocks {..} =
-  let i = CommonName (T.pack qOrg) (T.pack qOrgUnit) (T.pack qCommonName) True
-   in insertP2P (P2pAskForBlocks startBlock endBlock i)
+run DumpRedis {..} = dumpRedis databaseNumber
+run InsertTX {} = error "strato-barometer: the insertTx tool has been deprecated."
+run Hash {..} = Hash.doit hash
+run Raw {..} = Raw.doit filename
+run Redis {..} = redis $ BC.pack key
+run RedisMatch {..} = redisMatch $ BC.pack pattern
+run RLP {..} = RLP.doit filename
+run RawMP {..} = RawMP.doit filename (MP.StateRoot . LabeledError.b16Decode "strato-barometer/RawMP" $ BC.pack stateRoot)
+run FRawMP {..} = FRawMP.doit filename (MP.StateRoot . LabeledError.b16Decode "strato-barometer/FRawMP" $ BC.pack stateRoot)
 run PushBlocks {..} =
   let i = CommonName (T.pack qOrg) (T.pack qOrgUnit) (T.pack qCommonName) True
    in insertP2P (P2pPushBlocks startBlock endBlock i)
-run AskForTxs =
-  insertP2P . P2pGetTx
-    . map (unsafeCreateKeccak256FromByteString . LabeledError.b16Decode "queryStrato/run")
-    . filter (not . B.null)
-    . BC.split '\n'
-    =<< B.getContents
-run Redis {..} = redis $ BC.pack key
-run RedisMatch {..} = redisMatch $ BC.pack pattern
-run Migrate {..} = migrate tables
-run AddTx {..} = addTx txJson
-run AddBlocksFromFile {..} = addBlocksFromFile fileName
-run AddGenesisFromFile {..} = addGenesisFromFile fileName
-run AddTxsFromFile {..} = addTxsFromFile fileName
-run SaveKafka {..} = saveKafka topic filename
-run LoadKafka {..} = loadKafka topic filename
-run VerifyKafkaFile {..} = verifyKafkaFile filename
 run SetParticipationMode {..} = remoteSetParticipationMode mode
-run ChainHash = chainHash
-run CompressRoundChanges {..} = compressRoundChanges infilename outfilename
-run GetPrivacy {..} = putStrLn =<< getPrivacy registry key True
-run PutPrivacy {..} = putStrLn =<< putPrivacy registry key value True
+run State {..} = let sr = MP.StateRoot $ LabeledError.b16Decode "strato-barometer/state" $ BC.pack root in State.doit sr
+run ValidatorBehavior {..} = validatorBehavior valB
+run Migrate {..} = migrate tables
+run GetPrivacy {} = error "strato-barometer: the getPrivacy tool has been deprecated."
+run PutPrivacy {} = error "strato-barometer: the putPrivacy tool has been deprecated."

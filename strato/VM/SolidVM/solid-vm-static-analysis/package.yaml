@@ -25,6 +25,7 @@ library:
   ghc-options: -Wall -O2
   dependencies:
   - containers
+  - Decimal
   - lens
   - mtl
   - solid-vm-model

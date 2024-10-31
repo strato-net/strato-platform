@@ -24,8 +24,8 @@ import Blockchain.Strato.Model.ChainId
 import Blockchain.Strato.Model.ChainMember
 import Blockchain.Strato.Model.ExtendedWord
 import Blockchain.Strato.Model.Keccak256
+import Blockchain.Strato.Model.Validator
 import qualified Blockchain.Strato.RedisBlockDB as RBDB
-import Control.Arrow ((&&&))
 import Control.Exception
 import Control.Monad
 import qualified Control.Monad.Change.Alter as A
@@ -45,7 +45,7 @@ instance HasSQLDB m => (Word256 `A.Alters` API ChainInfo) m where
   delete _ _ = liftIO . throwIO $ Delete "API" "Word256" "ChainInfo"
   insert _ cId (API cInfo) = void $ putChainInfo (ChainId cId) cInfo
 
-instance HasSQLDB m => (([ChainMemberParsedSet], [ChainMemberParsedSet]) `A.Alters` API (A.Proxy ValidatorRef)) m where
+instance HasSQLDB m => (([Validator], [Validator]) `A.Alters` API (A.Proxy ValidatorRef)) m where
   lookup _ _ = liftIO . throwIO $ Lookup "API" "Vals" "ValidatorRef"
   delete _ _ = liftIO . throwIO $ Delete "API" "Vals" "AddressStateRef"
   insert _ vals _ = void $ addRemoveValidator vals
@@ -53,16 +53,16 @@ instance HasSQLDB m => (([ChainMemberParsedSet], [ChainMemberParsedSet]) `A.Alte
 instance HasSQLDB m => (Keccak256 `A.Alters` API OutputBlock) m where
   lookup _ _ = liftIO . throwIO $ Lookup "API" "Keccak256" "OutputBlock"
   delete _ _ = liftIO . throwIO $ Delete "API" "Keccak256" "OutputBlock"
-  insert _ _ (API ob) = void $ putBlocks [(outputBlockToBlockRetainPayloads ob, obTotalDifficulty ob)] False
+  insert _ _ (API ob) = void $ putBlocks [outputBlockToBlockRetainPayloads ob] False
   insertMany _ =
     void
       . flip putBlocks False
-      . map ((outputBlockToBlockRetainPayloads &&& obTotalDifficulty) . unAPI)
+      . map (outputBlockToBlockRetainPayloads . unAPI)
       . M.elems
 
 instance (MonadIO m, HasRedis m) => Mod.Modifiable (P2P BestBlock) m where
   get _ = liftIO . throwIO $ Lookup "P2P" "()" "BestBlock"
-  put _ (P2P (BestBlock s n d)) = void . execRedis $ RBDB.putBestBlockInfo s n d
+  put _ (P2P (BestBlock s n)) = void . execRedis $ RBDB.putBestBlockInfo s n
 
 instance (MonadIO m, HasRedis m) => (Word256 `A.Alters` P2P ChainInfo) m where
   lookup _ _ = liftIO . throwIO $ Lookup "P2P" "Word256" "ChainInfo"

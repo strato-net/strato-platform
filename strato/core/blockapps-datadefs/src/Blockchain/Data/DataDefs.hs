@@ -24,7 +24,6 @@ module Blockchain.Data.DataDefs where
 
 --import BlockApps.Solidity.Xabi
 import Blockchain.Data.PersistTypes ()
-import Blockchain.Data.RLP
 import Blockchain.Data.TXOrigin
 import Blockchain.Data.TransactionResultStatus
 import Blockchain.MiscJSON ()
@@ -32,30 +31,22 @@ import Blockchain.SolidVM.Model
 import Blockchain.Strato.Model.Account
 import Blockchain.Strato.Model.Address
 import Blockchain.Strato.Model.ChainMember (ChainMemberParsedSet)
-import Blockchain.Strato.Model.Class
-import Blockchain.Strato.Model.Code
 import Blockchain.Strato.Model.CodePtr
 import Blockchain.Strato.Model.ExtendedWord
 import Blockchain.Strato.Model.Keccak256
 import Blockchain.Strato.Model.StateRoot
-import Control.DeepSeq
-import Control.Lens
+import Control.DeepSeq  
 import Control.Monad.Trans.Class (lift)
 import qualified Data.Binary as BIN
 import qualified Data.ByteString as BS
-import Data.Data
 import Data.Swagger hiding (Format, format)
 import Data.Text (Text)
 import Data.Time
-import Data.Time.Clock.POSIX
 import Data.Word
 import Database.Persist.Quasi
 import Database.Persist.Sql
 import Database.Persist.TH
 import GHC.Generics
-import Numeric
-import Text.Colors
-import Text.Format
 
 share
   [mkPersist sqlSettings, mkMigrate "migrateAuto"] -- annoying: postgres doesn't like tables called user
@@ -86,11 +77,7 @@ indexAll = do
   exec "CREATE INDEX CONCURRENTLY ON block_data_ref (number);"
   exec "CREATE INDEX CONCURRENTLY ON block_data_ref (hash);"
   exec "CREATE INDEX CONCURRENTLY ON block_data_ref (parent_hash);"
-  exec "CREATE INDEX CONCURRENTLY ON block_data_ref (coinbase_org);"
-  exec "CREATE INDEX CONCURRENTLY ON block_data_ref (coinbase_org_unit);"
-  exec "CREATE INDEX CONCURRENTLY ON block_data_ref (coinbase_common_name);"
-
-  exec "CREATE INDEX CONCURRENTLY ON block_data_ref (total_difficulty);"
+  exec "CREATE INDEX CONCURRENTLY ON block_data_ref (coinbase);"
 
   exec "CREATE INDEX CONCURRENTLY ON address_state_ref (address);"
 
@@ -110,16 +97,6 @@ type MapPair = (BS.ByteString, BS.ByteString)
 
 type TextPair = (Text, Text)
 
-makeLensesFor [("blockDataExtraData", "extraDataLens"), ("blockDataMixHash", "mixHashlens")] ''BlockData
-
-instance BIN.Binary UTCTime where
-  put = BIN.put . (round :: POSIXTime -> Integer) . utcTimeToPOSIXSeconds
-  get = (posixSecondsToUTCTime . fromInteger) <$> BIN.get
-
-instance BIN.Binary BlockData
-
-instance NFData BlockData
-
 instance NFData TXOrigin
 
 instance NFData RawTransaction
@@ -136,119 +113,3 @@ instance ToSchema LogDB where
 instance BIN.Binary LogDB
 
 instance BIN.Binary EventDB
-
-instance RLPSerializable BlockData where
-  rlpDecode (RLPArray [v1, v2, v3, v4, v5, v6, v7, v8, v9, v10, v11, v12, v13, v14, v15]) =
-    BlockData
-      { blockDataParentHash = rlpDecode v1,
-        blockDataUnclesHash = rlpDecode v2,
-        blockDataCoinbase = rlpDecode v3,
-        blockDataStateRoot = rlpDecode v4,
-        blockDataTransactionsRoot = rlpDecode v5,
-        blockDataReceiptsRoot = rlpDecode v6,
-        blockDataLogBloom = rlpDecode v7,
-        blockDataDifficulty = rlpDecode v8,
-        blockDataNumber = rlpDecode v9,
-        blockDataGasLimit = rlpDecode v10,
-        blockDataGasUsed = rlpDecode v11,
-        blockDataTimestamp = posixSecondsToUTCTime $ fromInteger $ rlpDecode v12,
-        blockDataExtraData = rlpDecode v13,
-        blockDataMixHash = rlpDecode v14,
-        blockDataNonce = bytesToWord64 $ BS.unpack $ rlpDecode v15
-      }
-  rlpDecode (RLPArray arr) = error ("Error in rlpDecode for Block: wrong number of items, expected 15, got " ++ show (length arr) ++ ", arr = " ++ format arr)
-  rlpDecode x = error ("rlp2BlockData called on non block object: " ++ show x)
-
-  rlpEncode bd =
-    RLPArray
-      [ rlpEncode $ blockDataParentHash bd,
-        rlpEncode $ blockDataUnclesHash bd,
-        rlpEncode $ blockDataCoinbase bd,
-        rlpEncode $ blockDataStateRoot bd,
-        rlpEncode $ blockDataTransactionsRoot bd,
-        rlpEncode $ blockDataReceiptsRoot bd,
-        rlpEncode $ blockDataLogBloom bd,
-        rlpEncode $ blockDataDifficulty bd,
-        rlpEncode $ blockDataNumber bd,
-        rlpEncode $ blockDataGasLimit bd,
-        rlpEncode $ blockDataGasUsed bd,
-        rlpEncode (round $ utcTimeToPOSIXSeconds $ blockDataTimestamp bd :: Integer),
-        rlpEncode $ blockDataExtraData bd,
-        rlpEncode $ blockDataMixHash bd,
-        rlpEncode $ BS.pack $ word64ToBytes $ blockDataNonce bd
-      ]
-
-instance Format BlockData where
-  format b =
-    "parentHash: " ++ format (blockDataParentHash b) ++ "\n"
-      ++ "unclesHash: "
-      ++ format (blockDataUnclesHash b)
-      ++ (if blockDataUnclesHash b == hash (BS.pack [0xc0]) then " (the empty array)\n" else "\n")
-      ++ "coinbase: "
-      ++ (format $ blockDataCoinbase b)
-      ++ "\n"
-      ++ "stateRoot: "
-      ++ format (blockDataStateRoot b)
-      ++ "\n"
-      ++ "transactionsRoot: "
-      ++ format (blockDataTransactionsRoot b)
-      ++ "\n"
-      ++ "receiptsRoot: "
-      ++ format (blockDataReceiptsRoot b)
-      ++ "\n"
-      ++ "difficulty: "
-      ++ show (blockDataDifficulty b)
-      ++ "\n"
-      ++ "gasLimit: "
-      ++ show (blockDataGasLimit b)
-      ++ "\n"
-      ++ "gasUsed: "
-      ++ show (blockDataGasUsed b)
-      ++ "\n"
-      ++ "timestamp: "
-      ++ show (blockDataTimestamp b)
-      ++ "\n"
-      ++ "extraData: "
-      ++ blue (format $ blockDataExtraData b)
-      ++ "\n"
-      ++ "nonce: "
-      ++ showHex (blockDataNonce b) ""
-      ++ "\n"
-
-instance BlockHeaderLike BlockData where
-  blockHeaderBlockNumber = blockDataNumber
-  blockHeaderParentHash = blockDataParentHash
-  blockHeaderOmmersHash = blockDataUnclesHash
-  blockHeaderBeneficiary = blockDataCoinbase -- blockHeaderBeneficiaryOrg      = blockDataCoinbaseOrg?
-  blockHeaderStateRoot = unboxStateRoot . blockDataStateRoot
-  blockHeaderTransactionsRoot = unboxStateRoot . blockDataTransactionsRoot
-  blockHeaderReceiptsRoot = unboxStateRoot . blockDataReceiptsRoot
-  blockHeaderLogsBloom = blockDataLogBloom
-  blockHeaderGasLimit = blockDataGasLimit
-  blockHeaderGasUsed = blockDataGasUsed
-  blockHeaderDifficulty = blockDataDifficulty
-  blockHeaderNonce = blockDataNonce
-  blockHeaderExtraData = blockDataExtraData
-  blockHeaderTimestamp = blockDataTimestamp
-  blockHeaderMixHash = blockDataMixHash
-
-  blockHeaderModifyExtra = over extraDataLens
-
-  morphBlockHeader h2 =
-    BlockData
-      { blockDataNumber = blockHeaderBlockNumber h2,
-        blockDataParentHash = blockHeaderParentHash h2,
-        blockDataUnclesHash = blockHeaderOmmersHash h2,
-        blockDataCoinbase = blockHeaderBeneficiary h2,
-        blockDataStateRoot = StateRoot $ blockHeaderStateRoot h2,
-        blockDataTransactionsRoot = StateRoot $ blockHeaderTransactionsRoot h2,
-        blockDataReceiptsRoot = StateRoot $ blockHeaderReceiptsRoot h2,
-        blockDataLogBloom = blockHeaderLogsBloom h2,
-        blockDataGasLimit = blockHeaderGasLimit h2,
-        blockDataGasUsed = blockHeaderGasUsed h2,
-        blockDataDifficulty = blockHeaderDifficulty h2,
-        blockDataNonce = blockHeaderNonce h2,
-        blockDataExtraData = blockHeaderExtraData h2,
-        blockDataTimestamp = blockHeaderTimestamp h2,
-        blockDataMixHash = blockHeaderMixHash h2
-      }

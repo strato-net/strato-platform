@@ -173,7 +173,7 @@ resolveFile getCCFromHash expr (seen, resolved) =
                   Just (SolidVMCode _ ch) -> do
                     rfu <- lift $ codeCollectionToFileUnits (Just acct) <$> getCCFromHash ch
                     pure (seen, M.insert (tShowExpr expr) (Right rfu) resolved)
-                  Just (EVMCode _) -> throwE . T.pack $ "Account referenced in import contains EVM code: " ++ show acct
+                  Just (ExternallyOwned _) -> throwE . T.pack $ "Account referenced in import contains EVM code: " ++ show acct
                   _ -> throwE . T.pack $ "Account referenced in import could not be resolved: " ++ show acct
           else throwE "Account imports can only come from the main chain"
       StringLiteral _ fileName' ->

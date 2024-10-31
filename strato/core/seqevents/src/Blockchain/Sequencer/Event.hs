@@ -8,15 +8,15 @@
 
 module Blockchain.Sequencer.Event where
 
-import BlockApps.X509.Certificate
 import qualified Blockchain.Blockstanbul as PBFT
 import qualified Blockchain.Data.Block as BDB
+import Blockchain.Data.BlockHeader
 import Blockchain.Data.ChainInfo
-import qualified Blockchain.Data.DataDefs as DD
 import Blockchain.Data.Json
 import Blockchain.Data.RLP
 import qualified Blockchain.Data.TXOrigin as TO
 import qualified Blockchain.Data.Transaction as TX
+import Blockchain.Database.MerklePatricia.NodeData (NodeData)
 import Blockchain.Sequencer.BinaryInstances ()
 import Blockchain.Sequencer.DB.Witnessable
 import qualified Blockchain.Strato.Model.Address as A
@@ -25,6 +25,8 @@ import Blockchain.Strato.Model.Class
 import Blockchain.Strato.Model.ExtendedWord (Word256)
 import Blockchain.Strato.Model.Keccak256 (Keccak256)
 import Blockchain.Strato.Model.MicroTime
+import Blockchain.Strato.Model.StateRoot
+import Blockchain.Strato.Model.Address
 import Control.DeepSeq
 import Control.Lens
 import Data.Aeson hiding (encode)
@@ -43,73 +45,83 @@ import Text.Tools
 
 data SeqLoopEvent
   = TimerFire PBFT.RoundNumber
-  | UnseqEvent IngestEvent
-  | WaitTerminated
+  | UnseqEvents [IngestEvent]
   deriving (Eq, Show, GHCG.Generic)
 
 instance Format SeqLoopEvent where
   format (TimerFire rn) = "TimerFire " ++ format rn
-  format (UnseqEvent ev) = "UnseqEvent " ++ format ev
-  format WaitTerminated = "WaitTerminated"
+  format (UnseqEvents ev) = "UnseqEvents " ++ format ev
+
+class ShowConstructor a where
+  showConstructor :: a -> String
 
 data IngestEvent
   = IETx Timestamp IngestTx
   | IEBlock IngestBlock
-  | IEGenesis IngestGenesis
-  | IENewCertRegistered A.Address X509CertInfoState
-  | IECertRevoked A.Address
-  | IENewChainOrgName Word256 ChainMemberParsedSet
-  | IEValidatorAdded Keccak256 ChainMemberParsedSet
-  | IEValidatorRemoved Keccak256 ChainMemberParsedSet
   | IEBlockstanbul PBFT.WireMessage
   | IEForcedConfigChange PBFT.ForcedConfigChange
   | IEValidatorBehavior PBFT.ForcedValidatorChange
   | IEDeleteDepBlock Keccak256
+  | IEGetMPNodes [StateRoot]
+  | IEGetMPNodesRequest TO.TXOrigin [StateRoot]
+  | IEMPNodesResponse TO.TXOrigin [NodeData]
+  | IEMPNodesReceived [NodeData]
+  | IEPreprepareResponse PBFT.PreprepareDecision
   deriving (Eq, Show, GHCG.Generic)
 
 data IngestEventType
   = IETTransaction
   | IETBlock
-  | IETGenesis
-  | IETNewCertRegistered
-  | IETCertRevoked
-  | IETNewChainOrgName
-  | IETValidatorAdded
-  | IETValidatorRemoved
+  | IETPreprepareResponse
   | IETBlockstanbul
   | IETForcedConfigChange
   | IETValidatorBehavior
   | IETDeleteDepBlock
+  | IETGetMPNodes
+  | IETGetMPNodesRequest
+  | IETMPNodesResponse
+  | IETMPNodesReceived
   deriving (Eq, Ord, Show)
 
 iEventType :: IngestEvent -> IngestEventType
 iEventType = \case
   IETx {} -> IETTransaction
   IEBlock {} -> IETBlock
-  IEGenesis {} -> IETGenesis
-  IENewCertRegistered {} -> IETNewCertRegistered
-  IECertRevoked {} -> IETCertRevoked
-  IENewChainOrgName {} -> IETNewChainOrgName
-  IEValidatorAdded {} -> IETValidatorAdded
-  IEValidatorRemoved {} -> IETValidatorRemoved
   IEBlockstanbul {} -> IETBlockstanbul
   IEForcedConfigChange {} -> IETForcedConfigChange
   IEValidatorBehavior {} -> IETValidatorBehavior
   IEDeleteDepBlock {} -> IETDeleteDepBlock
+  IEGetMPNodes {} -> IETGetMPNodes
+  IEGetMPNodesRequest {} -> IETGetMPNodesRequest
+  IEMPNodesResponse {} -> IETMPNodesResponse
+  IEMPNodesReceived {} -> IETMPNodesReceived
+  IEPreprepareResponse {} -> IETPreprepareResponse
 
 instance Format IngestEvent where
   format (IETx ts o) = show ts ++ " " ++ format o
   format (IEBlock o) = format o
-  format (IEGenesis o) = show o
-  format (IENewCertRegistered a e) = intercalate ", " [CL.yellow $ format a, show e]
-  format (IECertRevoked a) = CL.yellow $ format a
-  format (IENewChainOrgName c cm) = intercalate ", " [CL.yellow $ format c, format cm]
-  format (IEValidatorAdded b a) = intercalate ", " [CL.yellow $ format b, CL.yellow $ format a]
-  format (IEValidatorRemoved b a) = intercalate ", " [CL.yellow $ format b, CL.yellow $ format a]
   format (IEBlockstanbul o) = format o
   format (IEForcedConfigChange o) = format o
   format (IEValidatorBehavior o) = show o
   format (IEDeleteDepBlock o) = show o
+  format (IEGetMPNodes o) = format o
+  format (IEGetMPNodesRequest o s) = format o ++ "requested: " ++ format s
+  format (IEMPNodesResponse o n) = "Response to " ++ format o ++ ": " ++ show n
+  format (IEMPNodesReceived o) = show o
+  format (IEPreprepareResponse d) = format d
+
+instance ShowConstructor IngestEvent where
+  showConstructor IETx{} = "IETx"
+  showConstructor IEBlock{} = "IEBlock"
+  showConstructor IEBlockstanbul{} = "IEBlockstanbul"
+  showConstructor IEForcedConfigChange{} = "IEForcedConfigChange"
+  showConstructor IEValidatorBehavior{} = "IEValidatorBehavior"
+  showConstructor IEDeleteDepBlock{} = "IEDeleteDepBlock"
+  showConstructor IEGetMPNodes{} = "IEGetMPNodes"
+  showConstructor IEGetMPNodesRequest{} = "IEGetMPNodesRequest"
+  showConstructor IEMPNodesResponse{} = "IEMPNodesResponse"
+  showConstructor IEMPNodesReceived{} = "IEMPNodesReceived"
+  showConstructor IEPreprepareResponse{} = "IEPreprepareResponse"
 
 type Timestamp = Microtime
 
@@ -117,15 +129,15 @@ data IngestTx = IngestTx
   { itOrigin :: TO.TXOrigin,
     itTransaction :: TX.Transaction
   }
-  deriving (Eq, Read, Show, GHCG.Generic, Data)
+  deriving (Eq, Read, Show, GHCG.Generic)
 
 data IngestBlock = IngestBlock
   { ibOrigin :: TO.TXOrigin,
-    ibBlockData :: DD.BlockData,
+    ibBlockData :: BlockHeader,
     ibReceiptTransactions :: [TX.Transaction],
-    ibBlockUncles :: [DD.BlockData]
+    ibBlockUncles :: [BlockHeader]
   }
-  deriving (Eq, Read, Show, GHCG.Generic, Data)
+  deriving (Eq, Show, GHCG.Generic)
 
 data IngestGenesis = IngestGenesis
   { igOrigin :: TO.TXOrigin,
@@ -136,11 +148,11 @@ data IngestGenesis = IngestGenesis
 data SequencedBlock = SequencedBlock
   { sbOrigin :: TO.TXOrigin,
     sbHash :: Keccak256,
-    sbBlockData :: DD.BlockData,
+    sbBlockData :: BlockHeader,
     sbReceiptTransactions :: [OutputTx],
-    sbBlockUncles :: [DD.BlockData]
+    sbBlockUncles :: [BlockHeader]
   }
-  deriving (Read, Show, GHCG.Generic)
+  deriving (Show, GHCG.Generic)
 
 data JsonRpcCommand
   = JRCGetBalance {jrcAddress :: A.Address, jrcId :: String, jrcBlockString :: String}
@@ -161,7 +173,9 @@ data P2pEvent
   | -- Ask and push for inclusive ranges of blocks
     P2pAskForBlocks {askStart :: Integer, askEnd :: Integer, askPeer :: ChainMemberParsedSet}
   | P2pPushBlocks {pushStart :: Integer, pushEnd :: Integer, pushPeer :: ChainMemberParsedSet}
-  deriving (Eq, Show, GHCG.Generic, Data)
+  | P2pGetMPNodes [StateRoot]
+  | P2pMPNodesResponse TO.TXOrigin [NodeData]
+  deriving (Eq, Show, GHCG.Generic)
 
 instance Format P2pEvent where
   format (P2pTx o) = format o
@@ -171,7 +185,22 @@ instance Format P2pEvent where
   format (P2pGetTx shas) = "[" ++ (intercalate "," $ map format shas) ++ "]"
   format (P2pNewOrgName c cm) = intercalate ", " [CL.yellow $ format c, show cm]
   format (P2pBlockstanbul o) = format o
+  format (P2pGetMPNodes srs) = "[" ++ (intercalate "," $ map format srs) ++ "]"
+  format (P2pMPNodesResponse o nds) = "Response to " ++ show o ++ ": [" ++ (intercalate "," $ map show nds) ++ "]"
   format x = show x
+
+instance ShowConstructor P2pEvent where
+  showConstructor P2pTx{} = "P2pTx"
+  showConstructor P2pBlock{} = "P2pBlock"
+  showConstructor P2pGenesis{} = "P2pGenesis"
+  showConstructor P2pGetChain{} = "P2pGetChain"
+  showConstructor P2pGetTx{} = "P2pGetTx"
+  showConstructor P2pNewOrgName{} = "P2pNewOrgName"
+  showConstructor P2pBlockstanbul{} = "P2pBlockstanbul"
+  showConstructor P2pAskForBlocks{} = "P2pAskForBlocks"
+  showConstructor P2pPushBlocks{} = "P2pPushBlocks"
+  showConstructor P2pGetMPNodes{} = "P2pGetMPNodes"
+  showConstructor P2pMPNodesResponse{} = "P2pMPNodesResponse"
 
 data VmEvent
   = VmTx Timestamp OutputTx
@@ -180,13 +209,31 @@ data VmEvent
   | VmJsonRpcCommand JsonRpcCommand
   | VmCreateBlockCommand
   | VmPrivateTx OutputTx
-  deriving (Eq, Show, GHCG.Generic, Data)
+  | VmGetMPNodesRequest TO.TXOrigin [StateRoot]
+  | VmMPNodesReceived [NodeData]
+  | VmRunPreprepare BDB.Block
+  | VmSelfAddress Address
+  deriving (Eq, Show, GHCG.Generic)
 
 instance Format VmEvent where
   format (VmTx ts o) = show ts ++ " " ++ format o
   format (VmBlock o) = format o
   format (VmGenesis o) = show o
+  format (VmGetMPNodesRequest o srs) = show o ++ " requested: " ++ format srs
+  format (VmMPNodesReceived nds) = show nds
   format x = show x
+
+instance ShowConstructor VmEvent where
+  showConstructor VmTx{} = "VmTx"
+  showConstructor VmBlock{} = "VmBlock"
+  showConstructor VmGenesis{} = "VmGenesis"
+  showConstructor VmJsonRpcCommand{} = "VmJsonRpcCommand"
+  showConstructor VmCreateBlockCommand{} = "VmCreateBlockCommand"
+  showConstructor VmPrivateTx{} = "VmPrivateTx"
+  showConstructor VmGetMPNodesRequest{} = "VmGetMPNodesRequest"
+  showConstructor VmMPNodesReceived{} = "VmMPNodesReceived"
+  showConstructor VmRunPreprepare{} = "VmRunPreprepare"
+  showConstructor VmSelfAddress{} = "VmSelfAddress"
 
 data OutputTx = OutputTx
   { otOrigin :: TO.TXOrigin,
@@ -216,16 +263,14 @@ otxPrimeToOtx (OutputTx' o h s b mp) = OutputTx o h s (unTransaction' b) (unTran
 
 data OutputBlock = OutputBlock
   { obOrigin :: TO.TXOrigin,
-    obTotalDifficulty :: Integer,
-    obBlockData :: DD.BlockData,
+    obBlockData :: BlockHeader,
     obReceiptTransactions :: [OutputTx],
-    obBlockUncles :: [DD.BlockData]
+    obBlockUncles :: [BlockHeader]
   }
-  deriving (Eq, Read, Show, GHCG.Generic, Data)
+  deriving (Eq, Show, GHCG.Generic)
 
 data OutputBlock' = OutputBlock'
   { ob'Origin :: TO.TXOrigin,
-    ob'TotalDifficulty :: Integer,
     ob'BlockData :: BlockData',
     ob'ReceiptTransactions :: [OutputTx'],
     ob'BlockUncles :: [BlockData']
@@ -233,19 +278,17 @@ data OutputBlock' = OutputBlock'
   deriving (Eq, Show, GHCG.Generic)
 
 obToObPrime :: OutputBlock -> OutputBlock'
-obToObPrime (OutputBlock o td bd rt bu) =
+obToObPrime (OutputBlock o bd rt bu) =
   OutputBlock'
     o
-    td
     (BlockData' bd)
     (otxToOtxPrime <$> rt)
     (BlockData' <$> bu)
 
 obPrimeToOb :: OutputBlock' -> OutputBlock
-obPrimeToOb (OutputBlock' o td (BlockData' bd) rt bu) =
+obPrimeToOb (OutputBlock' o (BlockData' bd) rt bu) =
   OutputBlock
     o
-    td
     bd
     (otxPrimeToOtx <$> rt)
     ((\(BlockData' b) -> b) <$> bu)
@@ -279,11 +322,10 @@ ingestBlockToSequencedBlock ib = do
         sbBlockUncles = ibBlockUncles ib
       }
 
-sequencedBlockToOutputBlock :: SequencedBlock -> Integer -> OutputBlock
-sequencedBlockToOutputBlock sb totalDifficulty =
+sequencedBlockToOutputBlock :: SequencedBlock -> OutputBlock
+sequencedBlockToOutputBlock sb =
   OutputBlock
     { obOrigin = sbOrigin sb,
-      obTotalDifficulty = totalDifficulty,
       obBlockData = sbBlockData sb,
       obReceiptTransactions = sbReceiptTransactions sb,
       obBlockUncles = sbBlockUncles sb
@@ -294,7 +336,7 @@ sequencedBlockToBlock sb = BDB.Block (sbBlockData sb) (map otBaseTx $ sbReceiptT
 
 sequencedBlockShortName :: SequencedBlock -> String
 sequencedBlockShortName SequencedBlock {sbBlockData = d, sbHash = theHash} =
-  "Block #" ++ CL.yellow (show . DD.blockDataNumber $ d) ++ "/" ++ CL.blue (format theHash)
+  "Block #" ++ CL.yellow (show . number $ d) ++ "/" ++ CL.blue (format theHash)
 
 wrapTransaction :: Monad m => IngestTx -> m (Maybe OutputTx)
 wrapTransaction tx@IngestTx {} = do
@@ -356,7 +398,7 @@ wrapIngestBlockTransactionUnanchored hash tx =
           }
 
 parentHashBS :: SequencedBlock -> BS.ByteString
-parentHashBS = B.toStrict . encode . DD.blockDataParentHash . sbBlockData
+parentHashBS = B.toStrict . encode . parentHash . sbBlockData
 
 ingestBlockHash :: IngestBlock -> Keccak256
 ingestBlockHash = blockHeaderHash . ibBlockData
@@ -365,13 +407,13 @@ ingestBlockHashBS :: IngestBlock -> BS.ByteString
 ingestBlockHashBS = B.toStrict . encode . ingestBlockHash
 
 ingestBlockDifficulty :: IngestBlock -> Integer
-ingestBlockDifficulty = DD.blockDataDifficulty . ibBlockData
+ingestBlockDifficulty = difficulty . ibBlockData
 
 blockHashBS :: SequencedBlock -> BS.ByteString
 blockHashBS = B.toStrict . encode . sbHash
 
 sequencedBlockDifficulty :: SequencedBlock -> Integer
-sequencedBlockDifficulty = DD.blockDataDifficulty . sbBlockData
+sequencedBlockDifficulty = getBlockDifficulty . sbBlockData
 
 outputBlockHash :: OutputBlock -> Keccak256
 outputBlockHash = blockHeaderHash . obBlockData
@@ -392,8 +434,7 @@ quarryBlockToOutputBlock BDB.Block {BDB.blockBlockData = bd, BDB.blockReceiptTra
       { obOrigin = TO.Quarry,
         obBlockData = bd,
         obBlockUncles = us,
-        obReceiptTransactions = rtxs,
-        obTotalDifficulty = 0
+        obReceiptTransactions = rtxs
       }
   where
     wrapQuarryReceipt t = do
@@ -451,7 +492,7 @@ instance Format IngestBlock where
         ibReceiptTransactions = receipts,
         ibBlockUncles = uncles
       } =
-      CL.blue ("Block #" ++ show (DD.blockDataNumber bd)) ++ " (via " ++ format origin ++ ") "
+      CL.blue ("Block #" ++ show (number bd)) ++ " (via " ++ format origin ++ ") "
         ++ tab'
           ( format (ingestBlockHash b) ++ "\n"
               ++ format bd
@@ -469,12 +510,11 @@ instance Format OutputBlock where
   format
     b@OutputBlock
       { obOrigin = origin,
-        obTotalDifficulty = totDiff,
         obBlockData = bd,
         obReceiptTransactions = receipts,
         obBlockUncles = uncles
       } =
-      CL.blue ("OutputBlock #" ++ show (DD.blockDataNumber bd) ++ "; total diff " ++ show totDiff) ++ " (via " ++ format origin ++ ") "
+      CL.blue ("OutputBlock #" ++ show (number bd) ++ ";") ++ " (via " ++ format origin ++ ") "
         ++ tab'
           ( format (outputBlockHash b) ++ "\n"
               ++ format bd
@@ -542,13 +582,13 @@ instance RLPSerializable OutputBlock where
   rlpEncode = rlpEncode . (morphBlock :: OutputBlock -> BDB.Block)
   rlpDecode = morphBlock . (rlpDecode :: RLPObject -> BDB.Block)
 
-instance BlockLike DD.BlockData OutputTx OutputBlock where
+instance BlockLike BlockHeader OutputTx OutputBlock where
   blockHeader = obBlockData
   blockTransactions = obReceiptTransactions
   blockUncleHeaders = obBlockUncles
 
-  blockOrdering = DD.blockDataNumber . obBlockData
-  buildBlock = OutputBlock TO.Morphism 0
+  blockOrdering = number . obBlockData
+  buildBlock = OutputBlock TO.Morphism
 
 instance Arbitrary IngestEvent where
   arbitrary = genericArbitrary
@@ -595,7 +635,7 @@ instance Arbitrary JsonRpcCommand where
 -- has to go down here because of Lens TH shenanigans
 data BatchSeqLoopEvent = BatchSeqLoopEvent
   { _timerFires :: [PBFT.RoundNumber],
-    _ingestEvents :: [IngestEvent]
+    _ingestEvents :: [[IngestEvent]]
   }
 
 makeLenses ''BatchSeqLoopEvent
@@ -608,5 +648,4 @@ batchSeqLoopEvents = foldr f emptyBatchSeqLoopEvent
   where
     f s b = case s of
       TimerFire r -> (timerFires %~ (r :)) b
-      UnseqEvent r -> (ingestEvents %~ (r :)) b
-      WaitTerminated -> b
+      UnseqEvents r -> (ingestEvents %~ (r :)) b

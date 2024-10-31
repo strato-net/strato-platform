@@ -6,7 +6,6 @@ import {
   fetchAccountDetail,
   resetUserAddress,
   fetchOauthAccounts,
-  faucetRequest
 } from '../../accounts.actions';
 import mixpanelWrapper from '../../../../lib/mixpanelWrapper';
 import { connect } from 'react-redux';
@@ -136,7 +135,6 @@ class BlocAccounts extends Component {
 
 export function mapStateToProps(state) {
   return {
-    faucet: state.accounts.faucet,
     accounts: state.accounts.accounts,
     filter: state.accounts.filter,
     selectedChain: state.chains.selectedChain
@@ -152,6 +150,5 @@ export default withRouter(
       changeAccountFilter,
       resetUserAddress,
       fetchOauthAccounts,
-      faucetRequest
     }
   )(BlocAccounts));

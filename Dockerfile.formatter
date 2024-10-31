@@ -1,0 +1,9 @@
+ARG STACK_RESOLVER
+
+FROM fpco/stack-build:${STACK_RESOLVER}
+
+RUN stack upgrade # hotfix for issue with stack 2.13.1 (provided in fpco/stack-build <=22.04) not being able to find the haddock stackage bucket for stack install commands. The issue does not persist in stack v2.15.7
+
+RUN stack install ormolu implicit-hie
+
+WORKDIR /strato-platform

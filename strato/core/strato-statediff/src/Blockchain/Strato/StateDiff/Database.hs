@@ -9,6 +9,8 @@
 
 module Blockchain.Strato.StateDiff.Database
   ( commitSqlDiffs,
+    codePtrHash,
+    codePtrAddress
   )
 where
 
@@ -19,11 +21,10 @@ import Blockchain.Data.DataDefs
 import Blockchain.Database.MerklePatricia.StateRoot (emptyTriePtr)
 import Blockchain.SolidVM.Model
 import Blockchain.Strato.Model.Account
-import Blockchain.Strato.Model.Address
-import Blockchain.Strato.Model.CodePtr
 import Blockchain.Strato.Model.ExtendedWord
 import Blockchain.Strato.Model.Keccak256
 import Blockchain.Strato.StateDiff
+import Blockchain.Data.Transaction
 import Control.Lens ((^.))
 import Control.Monad
 import Control.Monad.IO.Class
@@ -44,24 +45,6 @@ commitSqlDiffs StateDiff {blockNumber, createdAccounts, deletedAccounts, updated
     createAccount blockNumber $ Map.toList createdAccounts
     sequence_ $ Map.mapWithKey (const . deleteAccount) deletedAccounts
     sequence_ $ Map.mapWithKey (updateAccount blockNumber) updatedAccounts
-
-codePtrHash :: CodePtr -> Maybe Keccak256
-codePtrHash (EVMCode k) = Just k
-codePtrHash (SolidVMCode _ k) = Just k
-codePtrHash _ = Nothing
-
-codePtrName :: CodePtr -> Maybe String
-codePtrName (SolidVMCode n _) = Just n
-codePtrName (CodeAtAccount _ n) = Just n
-codePtrName _ = Nothing
-
-codePtrAddress :: CodePtr -> Maybe Address
-codePtrAddress (CodeAtAccount a _) = Just $ a ^. accountAddress
-codePtrAddress _ = Nothing
-
-codePtrChainId :: CodePtr -> Maybe Word256
-codePtrChainId (CodeAtAccount a _) = a ^. accountChainId
-codePtrChainId _ = Nothing
 
 createAccount ::
   (MonadUnliftIO m, MonadLogger m) =>

@@ -15,12 +15,14 @@ import Blockchain.Data.Enode
 import Blockchain.Data.RLP
 import qualified Blockchain.Data.Transaction as TXD
 import Blockchain.Data.TransactionDef (formatChainId)
+import Blockchain.Blockstanbul.Model.Authentication
 import Blockchain.Strato.Model.Account
 import Blockchain.Strato.Model.Address
 import Blockchain.Strato.Model.ChainMember
 import Blockchain.Strato.Model.Class
 import Blockchain.Strato.Model.ExtendedWord
 import Blockchain.Strato.Model.Keccak256
+import Blockchain.Strato.Model.Validator (Validator)
 import Data.Binary
 import qualified Data.ByteString.Base16 as SB16
 import qualified Data.ByteString.Char8 as S8
@@ -94,6 +96,13 @@ instance RedisDBValuable ChainMemberParsedSet where
     fromValue = decode . fromStrict
 
 instance RedisDBKeyable ChainMemberParsedSet where
+  toKey = toStrict . encode
+
+instance RedisDBValuable Validator where
+    toValue = toStrict . encode
+    fromValue = decode . fromStrict
+
+instance RedisDBKeyable Validator where
   toKey = toStrict . encode
 
 instance RedisDBValuable Keccak256 where
@@ -185,13 +194,13 @@ instance (RLPSerializable a, RLPSerializable b) => RedisDBValuable (a, b) where
           [a, b] -> (rlpDecode a, rlpDecode b)
           _ -> error "fromValue: not a pair"
 
-newtype RedisHeader = RedisHeader BHD.BlockHeader deriving newtype (Eq, Read, Show, RLPSerializable, BlockHeaderLike)
+newtype RedisHeader = RedisHeader BHD.BlockHeader deriving newtype (Eq, Show, RLPSerializable, HasIstanbulExtra, BlockHeaderLike)
 
 newtype RedisTx = RedisTx TXD.Transaction deriving newtype (Eq, Read, Show, RLPSerializable, TransactionLike)
 
 newtype RedisTxs = RedisTxs [RedisTx] deriving newtype (Eq, Read, Show, RedisDBValuable)
 
-newtype RedisUncles = RedisUncles [RedisHeader] deriving newtype (Eq, Read, Show, RedisDBValuable)
+newtype RedisUncles = RedisUncles [RedisHeader] deriving newtype (Eq, Show, RedisDBValuable)
 
 newtype RedisChainInfo = RedisChainInfo ChainInfo deriving newtype (Eq, Show, RLPSerializable)
 
@@ -241,18 +250,17 @@ instance RLPSerializable RedisValidator where
 
 data RedisBestBlock = RedisBestBlock
   { bestBlockHash :: Keccak256,
-    bestBlockNumber :: Integer, -- todo: BlockNumber
-    bestBlockTotalDifficulty :: Integer -- todo: TotalDifficulty
+    bestBlockNumber :: Integer -- todo: BlockNumber
   }
   deriving (Eq, Read, Show)
 
 instance RedisDBValuable RedisBestBlock where
   toValue = rlpSerialize . wrap
     where
-      wrap (RedisBestBlock sha num total) = RLPArray [rlpEncode sha, rlpEncode num, rlpEncode total]
+      wrap (RedisBestBlock sha num) = RLPArray [rlpEncode sha, rlpEncode num]
   fromValue = unwrap . rlpDeserialize
     where
-      unwrap (RLPArray [sha, num, total]) = RedisBestBlock (rlpDecode sha) (rlpDecode num) (rlpDecode total)
+      unwrap (RLPArray [sha, num]) = RedisBestBlock (rlpDecode sha) (rlpDecode num)
       unwrap _ = error "we are clearly incapable of humane exception handling"
 
 displayForNamespace :: BlockDBNamespace -> S8.ByteString -> String

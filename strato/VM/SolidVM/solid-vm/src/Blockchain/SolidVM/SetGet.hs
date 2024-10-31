@@ -14,11 +14,13 @@ module Blockchain.SolidVM.SetGet
     weakGetVar,
     getVar,
     getInt,
+    getRealNum,
     getBool,
     deleteVar,
     toBasic,
     fromBasic,
     showSM,
+    jsonSM
   )
 where
 
@@ -30,6 +32,8 @@ import Control.Monad
 import Control.Monad.IO.Class
 import qualified Data.ByteString.Char8 as BC
 import qualified Data.ByteString.UTF8 as UTF8
+import Data.Bool (bool)
+import Data.Decimal
 import Data.Foldable (for_)
 import Data.List
 import qualified Data.Map as M
@@ -47,6 +51,7 @@ fromBasic :: MS.BasicValue -> Value
 fromBasic = \case
   MS.BInteger i -> SInteger i
   MS.BString s -> SString . BC.unpack $ s
+  MS.BDecimal v -> SDecimal $ read $ BC.unpack v
   MS.BBool b -> SBool b
   MS.BAccount a -> SAccount a False
   MS.BContract n a -> SContract n a
@@ -58,6 +63,7 @@ findDefault :: BasicType -> Value
 findDefault = \case
   TInteger -> SInteger 0
   TString -> SString ""
+  TDecimal -> SDecimal 0
   TBool -> SBool False
   TAccount -> (SAccount $ unspecifiedChain 0x0) False
   TContract n -> SContract n $ unspecifiedChain 0x0
@@ -70,6 +76,7 @@ toBasic :: Value -> Maybe MS.BasicValue
 toBasic = \case
   SInteger i -> Just $ MS.BInteger i
   SString s -> Just $ MS.BString (BC.pack s)
+  SDecimal v -> Just $ MS.BDecimal $ BC.pack $ show v
   SBool b -> Just $ MS.BBool b
   SAccount a _ -> Just $ MS.BAccount a
   SContract n a -> Just $ MS.BContract n a
@@ -144,7 +151,7 @@ setVal dst src = typeError "unknown case called in setVal (Probably tried to cha
 weakGetVar :: MonadIO m => Variable -> m Value
 weakGetVar (Constant c) = return c
 weakGetVar (Variable v) = liftIO $ readIORef v
-
+--fromm variable to value
 getVar :: MonadSM m => Variable -> m Value
 getVar (Constant (SReference addressedPath@(AccountPath addr key))) = do
   theValue <- getSolidStorageKeyVal' addr key
@@ -210,6 +217,14 @@ getInt p = do
     SInteger s -> return s
     _ -> typeError "getInt" (p, v)
 
+getRealNum :: MonadSM m => Variable -> m (Either Integer Decimal)
+getRealNum p = do
+  v <- getVar p
+  case v of
+    SInteger s -> return $ Left s
+    SDecimal s -> return $ Right s
+    _ -> typeError "getRealNum" (p, v)
+
 getBool :: MonadSM m => Variable -> m Bool
 getBool p = do
   v <- getVar p
@@ -240,6 +255,7 @@ showSM :: MonadSM m => Value -> m String
 showSM SNULL = return "NULL"
 showSM (SInteger v) = return $ show v
 showSM (SString v) = return v
+showSM (SDecimal v) = return $ show v
 showSM (SBool v) = return $ show v
 showSM (SEnumVal enumName valName num) =
   return $
@@ -287,3 +303,46 @@ showSM (SContractFunction maybeContractName address functionName) = do
   return $ "Contract function: " ++ labelToString contractName ++ "/" ++ format address ++ "." ++ labelToString functionName
 showSM (SVariadic xs) = ('[' :) . (++ "]") . intercalate ", " <$> traverse showSM xs
 showSM x = todo "showSM called for unsupported value: " x
+
+jsonSM :: MonadSM m => Value -> m String
+jsonSM = go False
+  where
+    go _ SNULL = return "null"
+    go _ (SInteger v) = return $ show v
+    go b (SString v) = return $ bool id show b v
+    go _ (SBool v) = return $ bool "false" "true" v
+    go _ (SEnumVal _ _ num) = return $ show num
+    go b (SAccount a _) = return . bool id show b $ show a
+    go _ (STuple v) = do
+      vals <- mapM getVar (V.toList v)
+      strings <- forM vals (go True)
+      return $ "[" ++ intercalate ", " strings ++ "]"
+    go _ (SArray _ v) = do
+      vals <- mapM getVar (V.toList v)
+      strings <- forM vals (go True)
+      return $ "[" ++ intercalate ", " strings ++ "]"
+    go _ (SStruct name m) = do
+      valStrings <-
+        forM (M.toList m) $ \(n, var) -> do
+          val <- getVar var
+          valString <- go True val
+          return (n, valString)
+      return $
+        labelToString name ++ "{"
+          ++ intercalate ", " (map (\(n, v) -> show (labelToString n) ++ ": " ++ v) valStrings)
+          ++ "}"
+    go _ (SMap _ m) = do
+      valStrings <-
+        forM (M.toList m) $ \(key, var) -> do
+          val <- getVar var
+          valString <- go True val
+          keyString <- go True key
+          return (keyString, valString)
+      return $
+        "{"
+          ++ intercalate ", " (map (\(k, v) -> k ++ ": " ++ v) valStrings)
+          ++ "}"
+    go b (SContract _ address) = return . bool id show b $ show address
+    go _ (SVariadic xs) = ('[' :) . (++ "]") . intercalate ", " <$> traverse (go True) xs
+    go _ (SDecimal v) = return $ show v
+    go _ _ = return "undefined"

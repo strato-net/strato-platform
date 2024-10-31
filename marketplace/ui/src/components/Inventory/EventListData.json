@@ -1,8 +1,0 @@
-{
-  "data": [
-    { "key": "1", "name": "Event A", "description": "Seeds Planted" },
-    { "key": "2", "name": "Event B", "description": "Harvest Begin Date" },
-    { "key": "3", "name": "Event C", "description": "Last Harvest Date" },
-    { "key": "4", "name": "Event D", "description": "Crop Confirmed " }
-  ]
-}

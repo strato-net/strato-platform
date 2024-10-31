@@ -161,13 +161,13 @@ spec = do
         parse = Ae.eitherDecode . Ae.encode
     it "can parse legacy digests" $
       parse [aesonQQ|"ebe299430c3281dd37a12fbc6fda1f5ad3875242b413c4b46100676df78176b1"|]
-        `shouldBe` Right (EVMCode $ unsafeCreateKeccak256FromWord256 0xebe299430c3281dd37a12fbc6fda1f5ad3875242b413c4b46100676df78176b1)
+        `shouldBe` Right (ExternallyOwned $ unsafeCreateKeccak256FromWord256 0xebe299430c3281dd37a12fbc6fda1f5ad3875242b413c4b46100676df78176b1)
 
     it "can parse evm object digests" $
       parse
         [aesonQQ|{"kind": "EVM",
                       "digest": "ebe299430c3281dd37a12fbc6fda1f5ad3875242b413c4b46100676df78176b1"}|]
-        `shouldBe` Right (EVMCode $ unsafeCreateKeccak256FromWord256 0xebe299430c3281dd37a12fbc6fda1f5ad3875242b413c4b46100676df78176b1)
+        `shouldBe` Right (ExternallyOwned $ unsafeCreateKeccak256FromWord256 0xebe299430c3281dd37a12fbc6fda1f5ad3875242b413c4b46100676df78176b1)
 
     it "can parse solidvm object digests" $
       parse
@@ -185,13 +185,13 @@ spec = do
     it "can read a legacy code hash PersistValue" $
       property $ \(w :: Word256) -> do
         (fromPersistValue . PersistText . T.pack $ showHex w "")
-          `shouldBe` Right (EVMCode $ unsafeCreateKeccak256FromWord256 w)
+          `shouldBe` Right (ExternallyOwned $ unsafeCreateKeccak256FromWord256 w)
 
     it "can read the legacy empty code hash PersistValue" $ do
       let codeHashStr = "c5d2460186f7233c927e7db2dcc703c0e500b653ca82273b7bfad8045d85a470"
           codeHashWord = 0xc5d2460186f7233c927e7db2dcc703c0e500b653ca82273b7bfad8045d85a470
       (fromPersistValue $ PersistText codeHashStr)
-        `shouldBe` Right (EVMCode $ unsafeCreateKeccak256FromWord256 codeHashWord)
+        `shouldBe` Right (ExternallyOwned $ unsafeCreateKeccak256FromWord256 codeHashWord)
 
   describe "secp256k1 operations (using secp256k1-haskell)" $ do
     let mPrv = importPrivateKey $ LabeledError.b16Decode "strato-model/Spec.hs" $ C8.pack $ "09e910621c2e988e9f7f6ffcd7024f54ec1461fa6e86a4b545e9e1fe21c28866"

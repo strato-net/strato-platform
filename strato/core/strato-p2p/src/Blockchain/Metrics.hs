@@ -5,8 +5,6 @@
 module Blockchain.Metrics
   ( recordEvent,
     recordMessage,
-    recordGossipRNG,
-    recordGossipFinal,
     addCanary,
     killCanary,
     recordException,
@@ -89,24 +87,9 @@ recordMessage' msgVect msg = do
         GetChainDetails _ -> "get_chain_details"
         ChainDetails _ -> "chain_details"
         GetTransactions _ -> "get_transactions"
+        GetMPNodes _ -> "get_mp_nodes"
+        MPNodes _ -> "mp_nodes"
   liftIO $ withLabel msgVect label incCounter
-
-gossipDecisions :: Vector Text Counter
-gossipDecisions =
-  unsafeRegister
-    . vector "decision"
-    . counter
-    $ Info "p2p_gossip_decisions" "Count of approves and rejects for gossip"
-
-recordGossipRNG :: (MonadIO m) => Bool -> m Bool
-recordGossipRNG dec = liftIO $ do
-  withLabel gossipDecisions (if dec then "approve" else "reject") incCounter
-  return $! dec
-
-recordGossipFinal :: (MonadIO m) => Bool -> m Bool
-recordGossipFinal dec = liftIO $ do
-  withLabel gossipDecisions (if dec then "approve_final" else "reject_final") incCounter
-  return $! dec
 
 {-# NOINLINE canaryCount #-}
 canaryCount :: Gauge

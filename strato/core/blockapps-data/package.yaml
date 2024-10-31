@@ -40,7 +40,6 @@ library:
   - labeled-error
   - lens
   - merkle-patricia-db
-  - milena
   - monad-alter
   - monad-logger
   - network
@@ -61,15 +60,6 @@ library:
   - unliftio
   - unliftio-core
   - vector
-
-executables:
-  global-db:
-    source-dirs: exec_src/
-    main: GlobalDB.hs
-    dependencies:
-      - blockapps-data
-      - strato-conf
-      - hflags
 
 tests:
   blockapps-data-test:

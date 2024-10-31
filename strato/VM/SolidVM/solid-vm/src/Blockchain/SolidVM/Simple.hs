@@ -38,11 +38,13 @@ module Blockchain.SolidVM.Simple
   )
 where
 
+import Blockchain.Data.BlockHeader
 import Blockchain.Data.DataDefs
 import Blockchain.Data.ExecResults
 import qualified Blockchain.Database.MerklePatricia as MP
 import qualified Blockchain.SolidVM as SolidVM
 import Blockchain.Strato.Model.Account
+import Blockchain.Strato.Model.Address
 import Blockchain.Strato.Model.ChainMember
 import Blockchain.Strato.Model.Code
 import Blockchain.Strato.Model.ExtendedWord
@@ -56,9 +58,9 @@ import qualified Data.Text as T
 import Data.Time.Clock.POSIX
 import GHC.Generics
 
-defaultBlockData :: BlockData
+defaultBlockData :: BlockHeader
 defaultBlockData =
-  BlockData
+  BlockHeader
     emptyHash
     emptyHash
     emptyChainMember
@@ -72,13 +74,14 @@ defaultBlockData =
     0
     (posixSecondsToUTCTime 0)
     ""
-    0
     emptyHash
+    0
 
 data SolidVMTxArgs = SolidVMTxArgs
-  { _argsBlockData :: BlockData,
+  { _argsBlockData :: BlockHeader,
     _argsSender :: Account,
     _argsOrigin :: Account,
+    _argsProposer :: Address,
     _argsTxHash :: Keccak256,
     _argsChainId :: Maybe Word256,
     _argsMetadata :: Maybe (M.Map T.Text T.Text)
@@ -93,6 +96,7 @@ instance Default SolidVMTxArgs where
       defaultBlockData
       (Account 0 Nothing)
       (Account 0 Nothing)
+      (Address 0)
       emptyHash
       Nothing
       Nothing
@@ -163,6 +167,7 @@ create s =
     (createErr "callDepth")
     (s ^. createArgs . argsSender)
     (s ^. createArgs . argsOrigin)
+    (s ^. createArgs . argsProposer)
     (createErr "value")
     (createErr "gasPrice")
     (Gas 100000000)
@@ -188,6 +193,7 @@ call s =
     (callErr "receiveAddress")
     (s ^. callCodeAddress)
     (s ^. callArgs . argsSender)
+    (s ^. callArgs . argsProposer)
     (callErr "value")
     (callErr "gasPrice")
     (callErr "theData")

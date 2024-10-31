@@ -13,7 +13,6 @@ module Blockchain.Strato.Indexer.P2PIndexer (
 import BlockApps.Logging
 import Blockchain.Data.Block (BestBlock (..), Private (..))
 import Blockchain.Data.ChainInfo
-import Blockchain.EthConf (lookupConsumerGroup)
 import Blockchain.Sequencer.Event
 import Blockchain.Strato.Indexer.IContext
 import Blockchain.Strato.Indexer.Kafka
@@ -43,7 +42,7 @@ p2pIndexerMainLoop ::
   ) =>
   m ()
 p2pIndexerMainLoop = forever $ do
-  consume "p2pIndexer" (lookupConsumerGroup "strato-p2p-indexer") targetTopicName $ \() idxEvents -> do
+  consume "p2pIndexer" "strato-p2p-indexer" targetTopicName $ \() idxEvents -> do
     indexP2P idxEvents
     return ()
 
@@ -67,10 +66,10 @@ indexP2P idxEvents = do
     RanBlock b -> do
       $logInfoS "p2pIndexer" . T.pack $ "Inserting Redis block with sha: " ++ format (blockHash b)
       A.insert (A.Proxy @(P2P OutputBlock)) (blockHash b) $ P2P b
-    NewBestBlock (sha, num, tdiff) -> do
+    NewBestBlock (sha, num) -> do
       $logInfoS "p2pIndexer" . T.pack $
-        "Updating RedisBestBlock as (" ++ format sha ++ ", " ++ show num ++ ", " ++ show tdiff ++ ")"
-      Mod.put (Mod.Proxy @(P2P BestBlock)) . P2P $ BestBlock sha num tdiff
+        "Updating RedisBestBlock as (" ++ format sha ++ ", " ++ show num ++ ")"
+      Mod.put (Mod.Proxy @(P2P BestBlock)) . P2P $ BestBlock sha num
     NewChainInfo cId cInfo -> do
       $logInfoS "p2pIndexer" . T.pack $
         "Inserting ChainInfo for chain " ++ format cId ++ ": " ++ show cInfo

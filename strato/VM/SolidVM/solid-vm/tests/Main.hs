@@ -5,6 +5,7 @@
 import Blockchain.VMOptions ()
 import Control.Monad
 -- for HFlags
+import Blockchain.Strato.Model.Options ()
 import Executable.EVMFlags ()
 import HFlags
 -- for HFlags

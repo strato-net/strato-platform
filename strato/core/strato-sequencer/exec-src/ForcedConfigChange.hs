@@ -6,8 +6,8 @@ import Blockchain.EthConf
 import Blockchain.Sequencer.Event
 import Blockchain.Sequencer.Kafka
 import Control.Monad
+import Control.Monad.Composable.Kafka
 import HFlags
-import Network.Kafka.Protocol as KP
 import System.Exit
 
 defineFlag
@@ -21,6 +21,10 @@ defineFlag
   \ This obviously is not ideal, and so this tool provides a way to circumvent the normal\
   \ PBFT controls in case of emergency. This tool is authenticated by being able to write\
   \ to the kafka topic instead of through signatures."
+defineFlag
+  "sequence_number"
+  (-1 :: Integer)
+  "Forced PBFT to transition to a specific sequence number."
 
 $(return [])
 
@@ -34,8 +38,16 @@ main = do
             . ForcedRound
             $ fromIntegral flags_round_number
     print msg
-    resp <- runKafkaConfigured (KP.KString "forced-config-change") $ do
-      writeUnseqEvents [msg]
+    resp <- runKafkaMConfigured (KString "forced-config-change") $ writeUnseqEvents [msg]
     print resp
-    exitSuccess
-  die "no config change flags provided"
+  when (flags_sequence_number >= 0) $ do
+    let msg =
+          IEForcedConfigChange
+            . ForcedSequence
+            $ fromIntegral flags_sequence_number
+    print msg
+    resp <- runKafkaMConfigured (KString "forced-config-change") $ writeUnseqEvents [msg]
+    print resp
+  if (flags_round_number >= 0 || flags_sequence_number >= 0)
+    then exitSuccess
+    else die "no config change flags provided"

@@ -24,7 +24,7 @@ data Type
   = Int {signed :: Maybe Bool, bytes :: Maybe Int32}
   | String {dynamic :: Maybe Bool}
   | Bytes {dynamic :: Maybe Bool, bytes :: Maybe Int32}
-  | Fixed {signed :: Maybe Bool, decimals :: Maybe (Int32, Int32)}
+  | Decimal
   | Bool
   | Address {isPayable :: Bool}
   | Account {isPayable :: Bool}

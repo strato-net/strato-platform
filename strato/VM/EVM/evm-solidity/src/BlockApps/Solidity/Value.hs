@@ -46,7 +46,7 @@ valueInt256 = ValueInt False (Just 32)
 
 valueBytes :: ByteString -> SimpleValue
 valueBytes = ValueBytes Nothing
-
+---use this, then wrap in mapping 
 data Value
   = SimpleValue SimpleValue
   | ValueArrayDynamic (I.IntMap Value) -- A sparse representation makes updates more efficient than O(n)
@@ -70,6 +70,7 @@ data SimpleValue
         intSize :: Maybe Integer,
         intVal :: Integer
       }
+  | ValueDecimal ByteString
   | ValueBytes
       { bytesSize :: Maybe Integer,
         bytesVal :: ByteString
@@ -84,6 +85,7 @@ zeroOf = \case
     ValueAccount {} -> ValueAccount $ unspecifiedChain 0x0
     ValueString {} -> ValueString ""
     ValueInt sign size _ -> ValueInt sign size 0
+    ValueDecimal _ -> ValueDecimal "0"
     ValueBytes size _ -> ValueBytes size ""
   ValueContract {} -> ValueContract $ unspecifiedChain 0x0
   ValueArrayDynamic {} -> ValueArrayDynamic I.empty
@@ -106,6 +108,7 @@ bytesToSimpleValue bs = \case
   TypeString -> Just $ ValueString (Text.decodeUtf8 bs)
   TypeInt s b -> Just . ValueInt s b $ bytesToNum s b
   TypeBytes b -> Just $ ValueBytes b bs
+  TypeDecimal -> Just $ ValueDecimal bs
   where
     bytesToNum :: Bool -> Maybe Integer -> Integer
     bytesToNum signed' bytes' =
@@ -268,6 +271,7 @@ simpleValueToText sv = case sv of
   ValueString tx -> '"' `Text.cons` escapeStringValue tx `Text.snoc` '"'
   ValueInt _ _ v -> Text.pack $ show v
   ValueBytes _ b -> Text.pack $ show . Base16.encode $ b
+  ValueDecimal v -> Text.pack $ show v 
 
 textToValue :: Maybe TypeDefs -> Text -> Type -> Either Text Value
 textToValue defs str = \case
@@ -322,6 +326,7 @@ textToSimpleValue str = \case
   TypeInt s b -> ValueInt s b <$> readNum
   TypeBytes (Just n) -> ValueBytes (Just n) <$> readBytes n
   TypeBytes Nothing -> ValueBytes Nothing <$> readBytesDyn
+  TypeDecimal -> Right $ ValueDecimal (Text.encodeUtf8 str)
   where
     readNum :: Either Text Integer
     readNum = case readMaybe (Text.unpack str) of
@@ -332,7 +337,6 @@ textToSimpleValue str = \case
       case Base16.decode (Text.encodeUtf8 str) of
         Right bytes' | ByteString.length bytes' == fromInteger n -> return bytes'
         _ -> Left $ "textToSimpleValue: could not decode as statically sized bytes: " <> str <> ", expected a Base16 encoded string of length " <> Text.pack (show $ 2 * n) <> ", which represents a bytestring of length " <> Text.pack (show n)
-
     readBytesDyn :: Either Text ByteString
     readBytesDyn =
       case Base16.decode (Text.encodeUtf8 str) of

@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Document, Page, Text, View, StyleSheet, Image } from '@react-pdf/renderer';
 import { getStringDate } from '../../helpers/utils';
-import { US_DATE_FORMAT } from '../../helpers/constants';
+import { US_DATE_FORMAT, STRATS_CONVERSION} from '../../helpers/constants';
 import { Images } from "../../images";
 
 const styles = StyleSheet.create({
@@ -12,7 +12,6 @@ const styles = StyleSheet.create({
   section: {
     margin: 10,
     padding: 0,
-    // flexGrow: 1,
   },
   totalSection: {
     margin: 10,
@@ -20,7 +19,6 @@ const styles = StyleSheet.create({
     padding: 0,
     flexDirection: 'row',
     justifyContent: 'flex-end',
-    // flexGrow: 1,
   },
   title: {
     fontSize: 24,
@@ -30,16 +28,10 @@ const styles = StyleSheet.create({
   label: {
     fontSize: 10,
     marginBottom: 5,
-    // textAlign:"center"
-  },
-  addressTitle: {
-    fontSize: 12,
-    marginBottom: 5,
   },
   value: {
     fontSize: 10,
     marginBottom: 10,
-    // textAlign:"center"
   },
   tableHeader: {
     backgroundColor: '#181EAC',
@@ -77,11 +69,6 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     width: "120px"
   },
-  addressTextSection: {
-    flexDirection: 'row',
-    justifyContent: 'flex-start',
-    flexWrap:'wrap',
-  },
   bottomSection: {
     margin: 0,
     padding: 0,
@@ -90,58 +77,29 @@ const styles = StyleSheet.create({
     fontSize: 10,
     marginBottom: 3,
   },
-  bottomLabelAddress: {
-    fontSize: 10,
-    marginBottom: 3,
-    width:"50px"
-  },
-  bottomLabelValue: {
-    fontSize: 10,
-    marginBottom: 3,
-  },
-  topSection: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignContent: 'center',
-    marginTop: 20
-  },
-  addressSection: {
-    width: "50%"
-  },
   totalText: {
     fontSize: 12,
     marginBottom: 10,
-    //  textAlign:"center"
   },
-  // separator: {
-  //   width: 1,
-  //   height: '100%',
-  //   backgroundColor: '#000000',
-  // },
-
 });
 
-const InvoiceComponent = ({ invoice, userAddress }) => {
+const InvoiceComponent = ({ invoice }) => {
   const [subtotal, setSubtotal] = useState(0);
   const [totalTax, settotalTax] = useState(0);
-  const [totalShipping, settotalShipping] = useState(0);
-
 
   useEffect(() => {
     let tax = 0;
-    let shipping = 0;
-    // invoice.orderLines.forEach(item => {
-    //   tax += item.tax;
-    //   shipping += item.shippingCharges;
-    // });
-   
+
     settotalTax(tax);
-    settotalShipping(shipping);
-    setSubtotal(invoice.order.totalPrice-tax-shipping);
+    if (invoice.order.currency === "STRATS") {
+      setSubtotal(((invoice.order.totalPrice - tax) * STRATS_CONVERSION).toFixed(0));
+    } else {
+      setSubtotal((invoice.order.totalPrice - tax).toFixed(2))
+    }
   }, [invoice])
-
-
-
+  const orderQuantities = invoice.order["BlockApps-Mercata-Order-quantities"] ?
+                          invoice.order["BlockApps-Mercata-Order-quantities"].map(item => item.value) :
+                          invoice.order.quantities;
   return (
     <Document>
       <Page size="A4" style={styles.page}>
@@ -156,89 +114,47 @@ const InvoiceComponent = ({ invoice, userAddress }) => {
             <Text style={styles.label}>Buyer: <Text style={styles.value}>{invoice.order.purchasersCommonName}</Text></Text>
             <Text style={styles.label}>Seller: <Text style={styles.value}>{invoice.order.sellersCommonName}</Text></Text>
           </View>
-          <View style={styles.topSection}>
-            <View style={styles.addressSection}>
-              <Text style={styles.addressTitle}>Address: </Text>
-              <View style={styles.addressTextSection}>
-                <Text style={styles.bottomLabelAddress}>Name: </Text>
-                <Text style={styles.bottomLabelValue}>{decodeURIComponent(userAddress.name)}</Text>
-              </View>
-              <View style={styles.addressTextSection}>
-                <Text style={styles.bottomLabelAddress}>Address: </Text>
-                <Text style={styles.bottomLabelValue}>
-                  { userAddress.addressLine2 ?
-                    decodeURIComponent(userAddress.addressLine1)+", "+decodeURIComponent(userAddress.addressLine2) 
-                    : decodeURIComponent(userAddress.addressLine1)
-                  }
-                </Text>
-              </View>
-              <View style={styles.addressTextSection}>
-                <Text style={styles.bottomLabelAddress}>City: </Text>
-                <Text style={styles.bottomLabelValue}>{decodeURIComponent(userAddress.city)}</Text>
-              </View>
-              <View style={styles.addressTextSection}>
-                <Text style={styles.bottomLabelAddress}>State: </Text>
-                <Text style={styles.bottomLabelValue}>{decodeURIComponent(userAddress.state)}</Text>
-              </View>
-              <View style={styles.addressTextSection}>
-                <Text style={styles.bottomLabelAddress}>Zip code: </Text>
-                <Text style={styles.bottomLabelValue}>{decodeURIComponent(userAddress.zipcode)}</Text>
-              </View>
-            </View>
-          </View>
         </View>
         <View style={styles.section}>
-          {/* <Text style={styles.title}>Items</Text> */}
           <View style={styles.tableHeader}>
             <Text style={[styles.label, styles.tableHeaderColumn]}>Product Name</Text>
-            <Text style={[styles.label, styles.tableHeaderColumn]}>Unit Price($)</Text>
+            <Text style={[styles.label, styles.tableHeaderColumn]}>Currency</Text>
+            <Text style={[styles.label, styles.tableHeaderColumn]}>Unit Price</Text>
             <Text style={[styles.label, styles.tableHeaderColumn]}>Quantity</Text>
-            <Text style={[styles.label, styles.tableHeaderColumn]}>Shipping($)</Text>
-            <Text style={[styles.label, styles.tableHeaderColumn]}>Tax($)</Text>
-            <Text style={[styles.label, styles.tableHeaderColumn]}>Amount($)</Text>
+            <Text style={[styles.label, styles.tableHeaderColumn]}>Amount</Text>
           </View>
-          {invoice.assets.map((asset, index) => (
-            <View style={styles.tableRow} key={asset.address}>
-              <Text style={[styles.value, styles.tableRowColumn]}>{decodeURIComponent(asset.name)}</Text>
-              {/* <View style={styles.separator} /> */}
-              <Text style={[styles.value, styles.tableRowColumn]}>${asset.price}</Text>
-              {/* <View style={styles.separator} /> */}
-              <Text style={[styles.value, styles.tableRowColumn]}>{invoice.order.quantities[index]}</Text>
-              {/* <View style={styles.separator} /> */}
-              <Text style={[styles.value, styles.tableRowColumn]}>${asset.shippingCharges ? asset.shippingCharges : 0}</Text>
-              {/* <View style={styles.separator} /> */}
-              <Text style={[styles.value, styles.tableRowColumn]}>${asset.tax ? asset.tax : 0}</Text>
-              {/* <View style={styles.separator} /> */}
-              <Text style={[styles.value, styles.tableRowColumn]}>${asset.price * invoice.order.quantities[index]}</Text>
-            </View>
-          ))}
-          {/* <View style={styles.tableRow} >
-              <Text style={[styles.totalText, styles.tableRowColumn]}>Total</Text>
-              <Text style={[styles.totalText, styles.tableRowColumn]}></Text>
-              <Text style={[styles.totalText, styles.tableRowColumn]}>$300</Text>
-              <Text style={[styles.totalText, styles.tableRowColumn]}></Text>
-              <Text style={[styles.totalText, styles.tableRowColumn]}>$30</Text>
-              <Text style={[styles.totalText, styles.tableRowColumn]}>$30</Text>
-              <Text style={[styles.totalText, styles.tableRowColumn]}>$360</Text>
-            </View> */}
+          {invoice.assets.map((asset, index) => {
+            const adjustedPrice = asset.data.quantityIsDecimal && asset.data.quantityIsDecimal === "True"
+              ? asset.price * 100
+              : asset.price;
+          
+            const quantity = asset.data.quantityIsDecimal && asset.data.quantityIsDecimal === "True"
+              ? orderQuantities[index] / 100
+              : orderQuantities[index];
+          
+            const totalPrice = invoice.order.currency === "STRATS"
+              ? (asset.price * STRATS_CONVERSION * orderQuantities[index]).toFixed(0)
+              : (asset.price * orderQuantities[index]).toFixed(2);
+            return (
+              <View style={styles.tableRow} key={asset.address}>
+                <Text style={[styles.value, styles.tableRowColumn]}>{decodeURIComponent(asset.name)}</Text>
+                <Text style={[styles.value, styles.tableRowColumn]}>{invoice.order.currency ? invoice.order.currency : "USD"}</Text>
+                <Text style={[styles.value, styles.tableRowColumn]}>{invoice.order.currency === "STRATS" ? (adjustedPrice * STRATS_CONVERSION).toFixed(0) : adjustedPrice.toFixed(2)}</Text>
+                <Text style={[styles.value, styles.tableRowColumn]}>{quantity}</Text>
+                <Text style={[styles.value, styles.tableRowColumn]}>{totalPrice}</Text>
+              </View>
+            )
+          })}
         </View>
         <View style={styles.totalSection}>
           <View style={styles.bottomSection}>
             <View style={styles.textSection}>
               <Text style={styles.bottomLabel}>Subtotal</Text>
-              <Text style={styles.bottomLabel}>${subtotal}</Text>
-            </View>
-            <View style={styles.textSection}>
-              <Text style={styles.bottomLabel}>Tax</Text>
-              <Text style={styles.bottomLabel}>${totalTax}</Text>
-            </View>
-            <View style={styles.textSection}>
-              <Text style={styles.bottomLabel}>Shipping</Text>
-              <Text style={styles.bottomLabel}>${totalShipping}</Text>
+              <Text style={styles.bottomLabel}>{subtotal}</Text>
             </View>
             <View style={styles.textSection}>
               <Text style={styles.bottomLabel}>Total</Text>
-              <Text style={styles.bottomLabel}>${invoice.order.totalPrice}</Text>
+              <Text style={styles.bottomLabel}>{invoice.order.currency === "STRATS" ? (invoice.order.totalPrice * STRATS_CONVERSION).toFixed(0) : (invoice.order.totalPrice).toFixed(2)}</Text>
             </View>
           </View>
         </View>

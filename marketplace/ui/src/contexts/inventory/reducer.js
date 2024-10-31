@@ -49,24 +49,24 @@ const reducer = (state, action) => {
         error: action.error,
         isInventoriesLoading: false
       };
-      case actionDescriptors.fetchInventoryForUser:
-        return {
-          ...state,
-          isUserInventoriesLoading: true
-        };
-      case actionDescriptors.fetchInventoryForUserSuccessful:
-        return {
-          ...state,
-          userInventories: action.payload.data,
-          userInventoriesTotal: action.payload.count,
-          isUserInventoriesLoading: false
-        };
-      case actionDescriptors.fetchInventoryForUserFailed:
-        return {
-          ...state,
-          error: action.error,
-          isUserInventoriesLoading: false
-        };
+    case actionDescriptors.fetchInventoryForUser:
+      return {
+        ...state,
+        isUserInventoriesLoading: true
+      };
+    case actionDescriptors.fetchInventoryForUserSuccessful:
+      return {
+        ...state,
+        userInventories: action.payload.data,
+        userInventoriesTotal: action.payload.count,
+        isUserInventoriesLoading: false
+      };
+    case actionDescriptors.fetchInventoryForUserFailed:
+      return {
+        ...state,
+        error: action.error,
+        isUserInventoriesLoading: false
+      };
     case actionDescriptors.fetchInventorySearch:
       return {
         ...state,
@@ -170,6 +170,40 @@ const reducer = (state, action) => {
         error: action.error,
         isReselling: false
       };
+    case actionDescriptors.fetchSupportedTokens:
+      return {
+        ...state,
+        isFetchingTokens: true
+      };
+    case actionDescriptors.fetchSupportedTokensSuccessful:
+      return {
+        ...state,
+        supportedTokens: action.payload,
+        isFetchingTokens: false
+      };
+    case actionDescriptors.fetchSupportedTokensFailed:
+      return {
+        ...state,
+        error: action.error,
+        isFetchingTokens: false
+      };
+    case actionDescriptors.bridgeInventory:
+      return {
+        ...state,
+        isBridging: true
+      };
+    case actionDescriptors.bridgeInventorySuccessful:
+      return {
+        ...state,
+        inventory: action.payload,
+        isBridging: false
+      };
+    case actionDescriptors.bridgeInventoryFailed:
+      return {
+        ...state,
+        error: action.error,
+        isBridging: false
+      };
     case actionDescriptors.transferInventory:
       return {
         ...state,
@@ -239,40 +273,6 @@ const reducer = (state, action) => {
         error: action.error,
         isInventoryDetailsLoading: false
       };
-    case actionDescriptors.onboardSellerToStripe:
-      return {
-        ...state,
-        isOnboardingSellerToStripe: true
-      };
-    case actionDescriptors.onboardSellerToStripeSuccessful:
-      return {
-        ...state,
-        onboardedSeller: action.payload,
-        isOnboardingSellerToStripe: false
-      };
-    case actionDescriptors.onboardSellerToStripeFailed:
-      return {
-        ...state,
-        error: action.error,
-        isOnboardingSellerToStripe: false
-      };
-    case actionDescriptors.sellerStripeStatus:
-      return {
-        ...state,
-        isLoadingStripeStatus: true
-      };
-    case actionDescriptors.sellerStripeStatusSuccessful:
-      return {
-        ...state,
-        stripeStatus: action.payload,
-        isLoadingStripeStatus: false
-      };
-    case actionDescriptors.sellerStripeStatusFailed:
-      return {
-        ...state,
-        error: action.error,
-        isLoadingStripeStatus: false
-      };
     case actionDescriptors.uploadImage:
       return {
         ...state,
@@ -321,7 +321,7 @@ const reducer = (state, action) => {
       return {
         ...state,
         isFetchingPriceHistory: false,
-      }; 
+      };
     default:
       throw new Error(`Unhandled action: '${action.type}'`);
   }

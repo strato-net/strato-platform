@@ -24,6 +24,7 @@ typeAesonOptions = defaultOptions
 data Type
   = Int {signed :: Maybe Bool, bytes :: Maybe Int32}
   | String {dynamic :: Maybe Bool}
+  | Decimal
   | Bytes {dynamic :: Maybe Bool, bytes :: Maybe Int32}
   | Bool
   | Address

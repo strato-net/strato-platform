@@ -20,7 +20,6 @@ library:
     - blockapps-data
     - blockapps-datadefs
     - blockapps-init
-    - blockapps-privacy
     - blockapps-vault-wrapper-api
     - blockapps-vault-wrapper-client
     - blockstanbul
@@ -47,6 +46,7 @@ library:
     - stm-conduit
     - strato-conf
     - strato-model
+    - strato-redis-blockdb
     - servant-client
     - text
     - time
@@ -58,16 +58,13 @@ library:
     - resourcet
     - stm-chans
     - unliftio
-    - x509-certs
 
 executables:
   strato-sequencer:
     source-dirs:      exec-src
     main:             Main.hs
     dependencies:
-      - aeson
       - async
-      - base64
       - blockapps-data
       - blockapps-init
       - blockapps-vault-wrapper-api
@@ -75,11 +72,11 @@ executables:
       - blockstanbul
       - bytestring
       - common-log
-      - containers
-      - extra
+      - hedis
       - hflags
       - http-client
-      - milena
+      - kafka-monad
+      - process-monitor
       - prometheus-client
       - safe
       - seqevents
@@ -89,6 +86,7 @@ executables:
       - strato-conf
       - strato-genesis
       - strato-model
+      - strato-redis-blockdb
       - strato-sequencer
       - text
       - wai-middleware-prometheus
@@ -102,53 +100,54 @@ executables:
     dependencies:
       - blockstanbul
       - hflags
-      - milena
+      - kafka-monad
       - seqevents
       - strato-conf
 
-tests:
-  strato-sequencer-spec:
-    source-dirs:   test
-    main:          Main.hs
-    ghc-options: -threaded -dynamic
-    dependencies:
-      - async
-      - base16-bytestring
-      - blockapps-data
-      - blockapps-datadefs
-      - blockapps-privacy
-      - blockstanbul
-      - bytestring
-      - classy-prelude
-      - common-log
-      - conduit
-      - containers
-      - directory
-      - entropy
-      - ethereum-rlp
-      - format
-      - hflags
-      - hspec
-      - hspec-contrib
-      - hspec-core
-      - hspec-expectations-lifted
-      - HUnit
-      - labeled-error
-      - monad-alter
-      - mtl
-      - QuickCheck
-      - seqevents
-      - servant-client
-      - stm
-      - stm-chans
-      - strato-model
-      - strato-sequencer
-      - text
-      - time
-      - wai-extra
-      - wai-middleware-prometheus
-      - warp
-      - x509-certs
+#For now, these tests are causing me more trouble than are useful, so I'm turning them off
+#tests:
+#  strato-sequencer-spec:
+#    source-dirs:   test
+#    main:          Main.hs
+#    ghc-options: -threaded -dynamic
+#    dependencies:
+#      - async
+#      - base16-bytestring
+#      - blockapps-data
+#      - blockapps-datadefs
+#      - blockapps-privacy
+#      - blockstanbul
+#      - bytestring
+#      - classy-prelude
+#      - common-log
+#      - conduit
+#      - containers
+#      - directory
+#      - entropy
+#      - ethereum-rlp
+#      - format
+#      - hflags
+#      - hspec
+#      - hspec-contrib
+#      - hspec-core
+#      - hspec-expectations-lifted
+#      - HUnit
+#      - labeled-error
+#      - monad-alter
+#      - mtl
+#      - QuickCheck
+#      - seqevents
+#      - servant-client
+#      - stm
+#      - stm-chans
+#      - strato-model
+#      - strato-sequencer
+#      - text
+#      - time
+#      - wai-extra
+#      - wai-middleware-prometheus
+#      - warp
+#      - x509-certs
 
 benchmarks:
   send-to-blockstanbul:

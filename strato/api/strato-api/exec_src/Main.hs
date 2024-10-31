@@ -56,11 +56,8 @@ import qualified Handlers.AccountInfo as Account
 import qualified Handlers.BatchTransactionResult as BatchTransactionResult
 import qualified Handlers.BlkLast as BlkLast
 import qualified Handlers.Block as Block
-import qualified Handlers.Chain as Chain
-import qualified Handlers.Coinbase as Coinbase
 import qualified Handlers.Faucet as Faucet
 import qualified Handlers.IdentityServerCallback as Identity
-import qualified Handlers.Log as Log
 import qualified Handlers.Metadata as Metadata
 import Handlers.Options
 import qualified Handlers.Peers as Peers
@@ -70,8 +67,7 @@ import qualified Handlers.Storage as Storage
 import qualified Handlers.Transaction as Transaction
 import qualified Handlers.TransactionResult as TransactionResult
 import qualified Handlers.TxLast as TxLast
-import qualified Handlers.UUID as UUID
-import qualified Handlers.Version as Version
+import Instrumentation
 import Network.HTTP.Types.Status
 import Network.Wai
 import Network.Wai.Handler.Warp
@@ -157,11 +153,8 @@ type CoreAPI =
            :<|> BatchTransactionResult.API
            :<|> BlkLast.API
            :<|> Block.API
-           :<|> Chain.API
-           :<|> Coinbase.API
            :<|> Faucet.API
            :<|> Identity.API
-           :<|> Log.API
            :<|> Metadata.API
            :<|> Peers.API
            :<|> QueuedTransactions.API
@@ -170,8 +163,6 @@ type CoreAPI =
            :<|> Transaction.API
            :<|> TransactionResult.API
            :<|> TxLast.API
-           :<|> UUID.API
-           :<|> Version.API
        )
 
 type FullAPI = CoreAPI :<|> "bloc" :> "v2.2" :> BlocAPI
@@ -191,21 +182,16 @@ coreServer =
     :<|> BatchTransactionResult.server
     :<|> BlkLast.server
     :<|> Block.server
-    :<|> Chain.server
-    :<|> Coinbase.server
     :<|> Faucet.server
     :<|> Identity.server
-    :<|> Log.server
     :<|> Metadata.server
     :<|> Peers.server
     :<|> QueuedTransactions.server
     :<|> Stats.server
     :<|> Storage.server
-    :<|> Transaction.server
+    :<|> Transaction.server flags_txSizeLimit
     :<|> TransactionResult.server
     :<|> TxLast.server
-    :<|> UUID.server
-    :<|> Version.server
 
 fullServer ::
   ( MonadLogger m,
@@ -262,19 +248,13 @@ main = do
   let urlMap = fromList
         [ ("vault", flags_vaultUrl),
           ("oauthDiscovery", flags_oauthDiscoveryUrl),
+          ("notificationServer", flags_notificationServerUrl),
           ( "fileServer",
             case (flags_fileServerUrl, computeNetworkID) of
               ("", 7596898649924658542) -> "https://fileserver.mercata-testnet2.blockapps.net/highway"
               ("", 6909499098523985262) -> "https://fileserver.mercata.blockapps.net/highway"
               ("", _) -> error "File server url was not provided and cannot be derived"
               (fileServer, _) -> fileServer
-          ),
-          ( "paymentServer",
-            case (flags_paymentServerUrl, computeNetworkID) of
-              ("", 7596898649924658542) -> "https://payments.mercata-testnet2.blockapps.net"
-              ("", 6909499098523985262) -> "https://payments.mercata.blockapps.net"
-              ("", _) -> error "Payment server url was not provided and cannot be derived"
-              (paymentServer, _) -> paymentServer
           ),
           ( "monitor",
             case computeNetworkID of
@@ -295,6 +275,7 @@ main = do
 
   -- print theDoc
   blockappsInit "core-api"
+  runInstrumentation "strato-api"
 
   let stateFetchLimit' = 100
       nonceCounterTimeout = 10

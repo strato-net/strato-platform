@@ -34,6 +34,7 @@ library:
     - filepath
     - http-client
     - http-conduit
+    - http-types
     - monad-logger
     - mtl
     - resourcet
@@ -44,6 +45,7 @@ library:
     - servant-server
     - text
     - unliftio-core
+    - wai-extra
 
 executables:
   blockapps-highway-server:
@@ -60,12 +62,14 @@ executables:
       - hflags
       - http-client
       - http-client-tls
+      - http-types
       - raw-strings-qq
       - servant-multipart
       - servant-multipart-client
       - servant-server
       - text
       - unliftio-core
+      - wai
       - wai-cors
       - wai-extra
       - wai-middleware-prometheus
@@ -76,3 +80,34 @@ tests:
   highway-spec:
     source-dirs: test/
     main: Spec.hs
+    dependencies:
+      - aws
+      - blockapps-highway-api
+      - blockapps-highway-client
+      - blockapps-highway-server
+      - bytestring 
+      - hflags
+      - HUnit
+      - hspec
+      - http-client
+      - http-client-tls
+      - http-types
+      - network
+      - random
+      - regex-compat
+      - resourcet
+      - servant-client
+      - servant-client-core
+      - servant-multipart
+      - servant-multipart-api
+      - servant-multipart-client
+      - servant-server
+      - stm
+      - strato-model
+      - text
+      - transformers
+      - utf8-string
+      - wai-cors
+      - wai-extra
+      - warp
+      - word8

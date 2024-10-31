@@ -1,0 +1,2 @@
+The public AWS cert for us-east1 region. See: 
+https://docs.aws.amazon.com/AmazonRDS/latest/UserGuide/UsingWithRDS.SSL.html#UsingWithRDS.SSL.CertificatesAllRegions

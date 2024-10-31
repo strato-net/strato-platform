@@ -3,7 +3,6 @@ packages:
 - api/bloc/bloc2api
 - api/bloc/bloc2client
 - api/core
-- api/ethereum-jsonrpc
 - api/strato-api
 
 - core/blockapps-data
@@ -16,7 +15,6 @@ packages:
 - core/fastMP
 - core/merkle-patricia-db
 - core/miner-ethash
-- core/privacy
 - core/seqevents
 - core/strato-conf
 - core/strato-genesis
@@ -51,13 +49,13 @@ packages:
 - libs/composable-monads/redis-monad
 - libs/composable-monads/sql-monad
 - libs/composable-monads/identity-monad
+- libs/composable-monads/notification-monad
 - libs/composable-monads/vault-monad
 - libs/ethereum-rlp
 - libs/format
 - libs/json-rpc-server
 - libs/json-rpc-client
 - libs/labeled-error
-- libs/logserver
 - libs/kafka/milena
 - libs/kafka/milena-tools
 - libs/monad-alter
@@ -67,12 +65,13 @@ packages:
 - libs/prometheus/cross-monitoring
 - libs/secp256k1-haskell
 - libs/type-lits
-- libs/x509-certs
 
-- simulator/strato-lite
+#removing for now, too hard to keep this up to date when making large changes elsewhere
+#- simulator/strato-lite
 
 - tools/blockapps-tools
 - tools/debugger-tools
+- tools/process-monitor
 - tools/x509-tools
 
 - vault/api
@@ -95,20 +94,25 @@ packages:
 
 
 extra-deps:
-- Crypto-4.2.5.2
+- bitwise-1.0.0.1
 - bytestring-arbitrary-0.1.3@sha256:14db64d4fe126fbad2eb8d3601bfd80a693f3131e2db0e76891feffe44f10df8,1773
-- global-lock-0.1@sha256:b7affe140763f53f17fd9c937dfe9b8023c7d209216fb3793933957e49a7446f,1327
-- hflags-0.4.3@sha256:f6b85fc7cbd170787f49225646e62d5589e5dd75abe6f26d16287e5fff3e678e,3121
-- monadIO-0.11.1.0@sha256:2407c8aee3a74f3eba897f7c87f702f502394aec8cd412f3d2334cc353f54f13,964
-- semver-range-0.2.8@sha256:44918080c220cf67b6e7c8ad16f01f3cfe1ac69d4f72e528e84d566348bb23c3,1941
-- servant-options-0.1.0.0@sha256:39f50166a68006250e79370372f553ca476f14d06d93fa0c401050253aeba803,914
-- lens-family-th-0.5.2.1@sha256:24338a7a9bb8c8bca0d5e713ce62df066058bad6c15e6eb609593fd7fe93b3cf,1294
-- ghc-debug-convention-0.5.0.0
+- contra-tracer-0.2.0.0
+- Crypto-4.2.5.2
+- Decimal-0.5.2
+- dom-lt-0.2.3
 - ghc-debug-client-0.5.0.0
 - ghc-debug-common-0.5.0.0
-- bitwise-1.0.0.1
-- contra-tracer-0.2.0.0
-- dom-lt-0.2.3
+- ghc-debug-convention-0.5.0.0
+- global-lock-0.1@sha256:b7affe140763f53f17fd9c937dfe9b8023c7d209216fb3793933957e49a7446f,1327
+- hflags-0.4.3@sha256:f6b85fc7cbd170787f49225646e62d5589e5dd75abe6f26d16287e5fff3e678e,3121
+- hoogle-5.0.18.4
+- lens-family-th-0.5.2.1@sha256:24338a7a9bb8c8bca0d5e713ce62df066058bad6c15e6eb609593fd7fe93b3cf,1294
+- monadIO-0.11.1.0@sha256:2407c8aee3a74f3eba897f7c87f702f502394aec8cd412f3d2334cc353f54f13,964
+- safe-0.3.21
+- semver-range-0.2.8@sha256:44918080c220cf67b6e7c8ad16f01f3cfe1ac69d4f72e528e84d566348bb23c3,1941
+- servant-options-0.1.0.0@sha256:39f50166a68006250e79370372f553ca476f14d06d93fa0c401050253aeba803,914
+- wai-extra-3.1.14@sha256:1b093366842dc0057cebb4a23dbf9a29269321d70fd242c7695ce0bbd80d32fb,8056
+
 
 
 #- git: https://github.com/blockapps/milena

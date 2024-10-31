@@ -164,7 +164,7 @@ async function checkNodeSyncStallStatus(syncStat) {
 async function getStratoMetadata() {
   const options = {
     method: "GET",
-    url: `http://strato:3000/eth/v1.2/metadata`,
+    url: `http://${process.env['STRATO_HOSTNAME']}:${process.env['STRATO_PORT_API']}/eth/v1.2/metadata`,
     followRedirects: false,
     timeout: config.healthCheck.requestTimeout - 100,
     json: true,
@@ -423,8 +423,27 @@ async function checkSystemInfo() {
         si.networkStats(),
       ]);
 
+      const prevMetrics = await models.CurrentHealth.findOne({
+        where: {
+          processName: "SystemInfoStat",
+        },
+        attributes: [
+          "latestHealthStatus",
+          "latestCheckTimestamp",
+          "lastFailureTimestamp",
+          "additionalInfo",
+        ],
+        raw: true,
+      });
+      
+      const prevSysInfo = prevMetrics ? JSON.parse(prevMetrics.additionalInfo) : {};
+  
     // MEMORY
     const useLevel = (1 - memdata.available / memdata.total) * 100;
+    const previousMemoryAlert = prevSysInfo.memory?.use?.isHealthy === false;
+    const memoryAlert = useLevel >= config.healthCheck.memoryUsedAlertLevel ||
+      (previousMemoryAlert && useLevel >= config.healthCheck.memoryUsedCloseLevel);
+
     sysInfoCollected.memory = {
       active: memdata.active,
       free: memdata.free,
@@ -432,13 +451,25 @@ async function checkSystemInfo() {
       total: memdata.total,
       use: {
         value: +useLevel.toFixed(2),
-        isHealthy: useLevel < config.healthCheck.memoryUsedAlertLevel,
+        isHealthy: !memoryAlert,
       },
     };
     if (!sysInfoCollected.memory.use.isHealthy) {
       isHealthy = false;
       additional_info.push(`Low Memory (used ${useLevel.toFixed(2)}%)`);
     }
+
+    const currentLoad = metadataLoad.currentLoad;
+    const avgLoad = (metadataLoad.avgLoad * 100) / cpudata.cores;
+    
+    const previousCpuCurrentLoadAlert = prevSysInfo.cpu?.currentLoad?.isHealthy === false;
+    const previousCpuAvgLoadAlert = prevSysInfo.cpu?.avgLoad?.isHealthy === false;
+
+    const cpuCurrentLoadAlert = currentLoad >= config.healthCheck.cpuCurrentLoadAlertLevel ||
+                                (previousCpuCurrentLoadAlert && currentLoad >= config.healthCheck.cpuCurrentLoadCloseLevel);
+
+    const cpuAvgLoadAlert = avgLoad >= config.healthCheck.cpuAvgLoadAlertLevel ||
+                            (previousCpuAvgLoadAlert && avgLoad >= config.healthCheck.cpuAvgLoadCloseLevel);
 
     // CPU
     sysInfoCollected.cpu = {
@@ -448,15 +479,11 @@ async function checkSystemInfo() {
       physicalCores: cpudata.physicalCores,
       currentLoad: {
         value: +metadataLoad.currentLoad.toFixed(2),
-        isHealthy:
-          metadataLoad.currentLoad <
-          config.healthCheck.cpuCurrentLoadAlertLevel,
+        isHealthy: !cpuCurrentLoadAlert
       },
       avgLoad: {
         value: +((metadataLoad.avgLoad * 100) / cpudata.cores).toFixed(2),
-        isHealthy:
-          metadataLoad.avgLoad <
-          (cpudata.cores * config.healthCheck.cpuAvgLoadAlertLevel) / 100,
+        isHealthy: !cpuAvgLoadAlert
       },
     };
     if (!sysInfoCollected.cpu.avgLoad.isHealthy) {
@@ -476,18 +503,21 @@ async function checkSystemInfo() {
     const fsData = [];
     metadataFs.forEach(function (fs) {
       if (fs.fs !== "overlay") {
-        const isDiskHealthy =
-          fs.use < config.healthCheck.diskspaceUsedAlertLevel;
+        const prevFsInfo = prevSysInfo.filesystem?.find(f => f.name === fs.fs);
+        const prevFsAlert = prevFsInfo?.use?.isHealthy === false;
+        const diskSpaceAlert = fs.use >= config.healthCheck.diskspaceUsedAlertLevel ||
+                               (prevFsAlert && fs.use >= config.healthCheck.diskspaceUsedCloseLevel);
+        
         fsData.push({
           name: fs.fs,
           size: fs.size,
           used: fs.used,
           use: {
             value: +fs.use.toFixed(2),
-            isHealthy: isDiskHealthy,
+            isHealthy: !diskSpaceAlert,
           },
         });
-        if (!isDiskHealthy) {
+        if (diskSpaceAlert) {
           isHealthy = false;
           additional_info.push(
             `Low Disk Space on ${fs.fs} (used ${fs.use.toFixed(2)}%)`

@@ -22,7 +22,6 @@ import Data.Binary
 import Data.Map.Strict (Map)
 import Data.Text (Text)
 import GHC.Generics
-import Network.Kafka.Protocol hiding (Key)
 import SolidVM.Model.CodeCollection
 import Text.Format
 import Text.Tools
@@ -32,10 +31,10 @@ data VMEvent
   | CodeCollectionAdded
       { codeCollection :: CodeCollectionF (),
         codePtr :: CodePtr,
-        organization :: Text,
+        creator :: Text,
         application :: Text,
         historyList :: [Text],
-        abstracts :: Map (Account, Text) (Text, Text),
+        abstracts :: Map (Account, Text) (Text, Text, [Text]),
         recordMappings :: [Text]
       }
   | DelegatecallMade Delegatecall
@@ -44,13 +43,13 @@ data VMEvent
 
 vmType :: CodePtr -> String
 vmType (SolidVMCode _ _) = "SolidVM"
-vmType (EVMCode _) = "EVM"
+vmType (ExternallyOwned _) = "EVM"
 vmType (CodeAtAccount _ _) = "CodeAtAccount"
 
 instance Format VMEvent where
   format (NewAction a) = "NewAction:\n" ++ tab (format a)
-  format (CodeCollectionAdded _ cp o a hl _ rm) =
-    "CodeCollectionAdded: (" ++ show o ++ "/" ++ show a ++ ") " ++ vmType cp
+  format (CodeCollectionAdded _ cp cr ap hl _ rm) =
+    "CodeCollectionAdded: (" ++ show cr ++ "/" ++ show ap ++ ") " ++ vmType cp
       ++ (if (not $ null hl) then " " ++ show hl else "")
       ++ (if (not $ null rm) then " " ++ show rm else "")
   format (DelegatecallMade d) =

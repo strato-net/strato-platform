@@ -67,17 +67,17 @@ async function uploadSaleContract(user, _constructorArgs, options) {
 
     const contract = await rest.createContract(user, contractArgs, copyOfOptions);
     contract.src = 'removed';
-    
+
     const searchOptions = {
         ...options,
         org: constants.blockAppsOrg,
         query: {
             address: `eq.${contract.address}`
         }
-      }
-      
-    await waitForAddress(user, {name: saleContract}, searchOptions);
-    
+    }
+
+    await waitForAddress(user, { name: saleContract }, searchOptions);
+
     return contract;
 }
 
@@ -194,7 +194,7 @@ async function unlistItem(user, _contract, args, options) {
             { callArgs }
         );
     }
-    
+
     const searchOptions = {
         ...options,
         org: constants.blockAppsOrg,
@@ -202,10 +202,10 @@ async function unlistItem(user, _contract, args, options) {
             address: `eq.${callArgs.contract.address}`,
             isOpen: `eq.false`
         }
-      }
-      
-    await waitForAddress(user, {name: saleContract}, searchOptions);
-    
+    }
+
+    await waitForAddress(user, { name: saleContract }, searchOptions);
+
     return unlistStatus;
 }
 
@@ -215,7 +215,7 @@ async function resellItem(user, contract, args, options) {
         method: "mintNewUnits",
         args: util.usc({ ...args }),
     };
-    
+
     const resellStatus = await rest.call(user, callArgs, options);
 
     if (parseInt(resellStatus, 10) !== RestStatus.OK) {
@@ -225,8 +225,28 @@ async function resellItem(user, contract, args, options) {
             { callArgs }
         );
     }
-    
+
     return resellStatus;
+}
+
+async function requestRedemption(user, contract, args, options) {
+    const callArgs = {
+        contract,
+        method: "requestRedemption",
+        args: util.usc({ ...args }),
+    };
+
+    const [requestRedemptionStatus, assetAddress] = await rest.call(user, callArgs, options);
+
+    if (parseInt(requestRedemptionStatus, 10) !== RestStatus.OK) {
+        throw new rest.RestError(
+            requestRedemptionStatus,
+            "Error while requesting redemption",
+            { callArgs }
+        );
+    }
+
+    return [requestRedemptionStatus, assetAddress];
 }
 
 async function transferItem(user, contract, args, options) {
@@ -244,18 +264,38 @@ async function transferItem(user, contract, args, options) {
             { callArgs }
         );
     }
-    
+
     const searchOptions = {
         ...options,
         org: constants.blockAppsOrg,
         query: {
-            address: `eq.${callArgs.contract.address}`
+            transferNumber: `eq.${args.transferNumber}`
         }
-      }
-      
-    await waitForAddress(user, {name: transferContractName}, searchOptions);
+    }
 
-    return transferStatus;
+    await waitForAddress(user, { name: transferContractName }, searchOptions);
+
+    return { transferStatus, transferNumber: args.transferNumber };
+}
+
+async function updateAssetStatus(user, contract, args, options) {
+    const callArgs = {
+        contract,
+        method: "updateStatus",
+        args: util.usc({ ...args }),
+    };
+
+    const [updateStatus] = await rest.call(user, callArgs, options);
+
+    if (parseInt(updateStatus, 10) !== RestStatus.OK) {
+        throw new rest.RestError(
+            updateStatus,
+            "Error while updating Asset Status",
+            { callArgs }
+        );
+    }
+
+    return [updateStatus];
 }
 
 async function updateInventory(user, contract, args, options) {
@@ -288,7 +328,7 @@ async function updateSale(admin, contract, _args, options) {
                 return agg | (base << 0)
             case 'price':
                 return agg | (base << 1)
-            case 'paymentProviders':
+            case 'paymentServices':
                 return agg | (base << 2)
             default:
                 return agg
@@ -324,10 +364,13 @@ async function get(user, args, options) {
     const newOptions = { ...options, org: 'BlockApps', app: 'Mercata' }
     let inventory;
 
-    const searchArgs = setSearchQueryOptions(restArgs, {
-        key: "address",
-        value: address,
-    });
+    const searchArgs = setSearchQueryOptions(restArgs, [
+        {
+            key: "address",
+            value: address,
+        },
+    ]);
+    searchArgs.queryOptions.select= constants.attachImagesAndFiles;
     inventory = await searchOne(contractName, searchArgs, newOptions, user);
 
     if (!inventory) {
@@ -342,7 +385,15 @@ async function get(user, args, options) {
             price: sale.price,
             saleAddress: sale.address,
             saleQuantity: sale.quantity,
+            paymentServices: sale ? (sale['BlockApps-Mercata-Sale-paymentServices'] ? sale['BlockApps-Mercata-Sale-paymentServices'] : null) : null
         }
+    }
+
+    // Sort the images and files by their order
+    if (inventory['BlockApps-Mercata-Asset-images']) {
+        inventory['BlockApps-Mercata-Asset-images'].sort((a, b) => {
+            return parseInt(a.key) - parseInt(b.key);
+        });
     }
 
     return marshalOut({
@@ -351,7 +402,7 @@ async function get(user, args, options) {
 }
 
 async function getAll(admin, args = {}, defaultOptions) {
-    const { range, ownerCommonName, assetAddresses, status, isMarketplaceSearch, isTrendingSearch, userProfile, userProfileGtField, userProfileGtValue, ...restArgs } = args;
+    const { range, ownerCommonName, assetAddresses, status, isMarketplaceSearch, isTrendingSearch, userProfile, userProfileGtField, userProfileGtValue, queryOptions, ...restArgs } = args;
     let isNullPriceRange = false; //TODO: find a better way to identify/handle this
     if (range !== undefined) {
         isNullPriceRange = range ? range[0].split(",")[1] == 0 : true;
@@ -362,138 +413,146 @@ async function getAll(admin, args = {}, defaultOptions) {
     const options = { ...defaultOptions, org: 'BlockApps', app: 'Mercata' };
 
     if (isTrendingSearch) {
-        // If it's a trending search, first search the sales
-        // Order them by creation date and set limit here
-
-        // added greater than query to make sure we only take the sales with quantity thats available to sell. 
-        // If the sale has 0 quantity it will throw an error when checking out, we will not show thee items for the trending search.
-        sales = await saleJs.getAll(admin, { range, isOpen: true, order: 'block_timestamp.desc', offset: '0', gtField: args.gtField, gtValue: args.gtValue}, options);
+        // Fetch the sales first
+        sales = await saleJs.getAll(admin, { range, isOpen: true, order: 'block_timestamp.desc', offset: '0', gtField: args.gtField, gtValue: args.gtValue }, options);
         const trendingAssetAddresses = sales.map(sale => sale.assetToBeSold);
 
-        // Match the inventory with the sales
+        // Fetch the inventories matching the sales
         inventories = await searchAllWithQueryArgs(contractName,
             {
                 ...restArgs,
+                queryOptions: {"select":constants.attachImagesAndFiles},
                 address: trendingAssetAddresses,
                 order: 'block_timestamp.desc',
                 limit: '25',
             }, options, admin);
-    } 
-    else {
-        // Original logic
+
+        // Combine the inventories and sales data
+        if (inventories) {
+            inventories.forEach(inventory => {
+                const itemSale = sales.find(sale => sale.assetToBeSold == inventory.address && sale.isOpen);
+                if (itemSale) {
+                    finalInventory.push({
+                        ...inventory,
+                        price: itemSale?.price,
+                        saleAddress: itemSale?.address,
+                        saleQuantity: itemSale?.quantity,
+                        saleDate: itemSale?.block_timestamp,
+                        paymentServices: itemSale ? (itemSale['BlockApps-Mercata-Sale-paymentServices'] ? itemSale['BlockApps-Mercata-Sale-paymentServices'] : null) : null,
+                        totalLockedQuantity: itemSale?.totalLockedQuantity
+                    });
+                }
+            });
+        }
+    } else {
+        // Fetch all Inventories and join sales table.
         if (ownerCommonName) {
             inventories = await searchAllWithQueryArgs(contractName,
                 {
                     ...restArgs,
+                    status,
                     ownerCommonName: ownerCommonName,
+                    queryOptions: queryOptions ? queryOptions : { select: constants.attachSalesAndImagesAndFiles }
                 }, options, admin);
-        }
-        else if (assetAddresses) {
+        } else if (assetAddresses) {
             inventories = await searchAllWithQueryArgs(contractName,
                 {
                     ...restArgs,
                     address: assetAddresses,
+                    queryOptions: { select: constants.attachSalesAndImagesAndFiles }
                 }, options, admin);
-        }
-        else {
+        } else {
             inventories = await searchAllWithQueryArgs(contractName,
                 {
                     ...restArgs,
+                    queryOptions: { select: constants.attachSalesAndImagesAndFiles }
                 }, options, admin);
         }
-        if (inventories && userProfile) {
-            const assetAddresses = inventories.map((inventory) => inventory.address);
-            // (sale.js): `getAll` method needs to be refactored as it has logic specific to passing `assetAddresses`
-            sales = await saleJs.getAll(admin, {  assetAddresses, range, saleGtField: userProfileGtField, saleGtValue: userProfileGtValue, isOpen: true, order: 'block_timestamp.desc' }, options);
-        }
-        else if (inventories) {
-            const assetAddresses = inventories.map((inventory) => inventory.address);
-            sales = await saleJs.getAll(admin, { assetAddresses, range, isOpen: true }, options);
-        }
-    }
 
-    if (inventories) {
-        inventories.forEach(inventory => {
-            const itemSale = sales.find(sale => sale.assetToBeSold == inventory.address && sale.isOpen);
-            if (itemSale) {
-                finalInventory.push({
-                    ...inventory,
-                    price: itemSale?.price,
-                    saleAddress: itemSale?.address,
-                    saleQuantity: itemSale?.quantity,
-                    saleDate: itemSale?.block_timestamp,
-                    totalLockedQuantity: itemSale?.totalLockedQuantity
-                });
-            }
-            else if (isMarketplaceSearch) {
-                if(isNullPriceRange){
+        // Currently can't filter on second table, so filtering sales fields here. 
+        // Sales only has price and quantity fields to filter, so better to join sales on asset table (asset has multiple filters for each route). 
+        if (inventories) {
+            inventories.forEach(inventory => {
+                if (inventory['BlockApps-Mercata-Sale'] && inventory['BlockApps-Mercata-Sale'].length > 0) {
+                    let sales = inventory['BlockApps-Mercata-Sale']
+                        .filter(sale => sale.isOpen === true);
+
+                    // Filter by quantity if userProfile is present
+                    if (userProfile) {
+                        sales = sales.filter(sale => sale.quantity > 0);
+                    }
+
+                    // Filter by price range if range is specified
+                    if (range && range.length > 0) {
+                        const [field, min, max] = range[0].split(",");
+                        if (field === 'price') {
+                            sales = sales.filter(sale => sale.price >= parseFloat(min) && sale.price <= parseFloat(max));
+                        }
+                    }
+
+                    // Combine the inventories with sales data if there are valid sales for user profile route
+                    if (userProfile) {
+                        if (sales.length > 0 && (sales.price !== null || undefined)) { // Only combine if there are sales. We don't list unpublished items for this route. 
+                            finalInventory.push({
+                                ...inventory,
+                                price: sales[0]?.price,
+                                saleAddress: sales[0]?.address,
+                                saleQuantity: sales[0]?.quantity,
+                                saleDate: sales[0]?.block_timestamp,
+                                totalLockedQuantity: sales[0]?.totalLockedQuantity,
+                                paymentServices: sales[0] ? (sales[0]['BlockApps-Mercata-Sale-paymentServices'] ? sales[0]['BlockApps-Mercata-Sale-paymentServices'] : null) : null,
+                                'BlockApps-Mercata-Sale': undefined  // Removing the nested sale data to avoid redundancy
+                            });
+                        }
+                    } else { // Just combine the data if userProfile is not present
+                        finalInventory.push({
+                            ...inventory,
+                            price: sales[0]?.price,
+                            saleAddress: sales[0]?.address,
+                            saleQuantity: sales[0]?.quantity,
+                            saleDate: sales[0]?.block_timestamp,
+                            totalLockedQuantity: sales[0]?.totalLockedQuantity,
+                            paymentServices: sales[0] ? (sales[0]['BlockApps-Mercata-Sale-paymentServices'] ? sales[0]['BlockApps-Mercata-Sale-paymentServices'] : null) : null,
+                            'BlockApps-Mercata-Sale': undefined  // Removing the nested sale data to avoid redundancy
+                        });
+                    }
+                } else if (isMarketplaceSearch && isNullPriceRange) {
                     finalInventory.push({
                         ...inventory,
                         price: null,
                         saleAddress: null,
                         saleQuantity: null,
                         saleDate: null,
-                        totalLockedQuantity: null
-                    })}
+                        totalLockedQuantity: null,
+                        paymentServices: null
+                    });
+                } else {
+                    finalInventory.push(inventory);
                 }
-             else {
-                finalInventory.push(inventory);
-            }
-        });
+            });
+        } 
     }
-
-    return finalInventory ? finalInventory.map((inventory) => marshalOut(inventory)) : undefined;
+    // Sort the images and files by their order
+    return finalInventory
+      ? finalInventory.map((inventory) => {
+          if (inventory["BlockApps-Mercata-Asset-images"]) {
+            inventory["BlockApps-Mercata-Asset-images"].sort(
+              (a, b) => parseInt(a.key) - parseInt(b.key)
+            );
+          }
+          return marshalOut(inventory);
+        })
+      : undefined;
 }
 
 
+
 async function getAllItemTransferEvents(admin, args = {}, defaultOptions) {
-    const options = { ...defaultOptions, org: 'BlockApps', app: 'Mercata' };
-
+    const options = { ...defaultOptions, org: 'BlockApps', app: 'Mercata' }
     let itemTransferEvents = await searchAllWithQueryArgs(`${contractName}.${contractEvents.ITEM_TRANSFER}`, args, options, admin);
+    itemTransferEvents = itemTransferEvents.map((item)=>({...item, type: 'Transfer'}))
 
-    //Extract sale prices such that:
-    //1- Check if Sales Fetched carries tx_hash, if so return the price of that sale
-    //2- Otherwise drill down into price history of sales to find tx_hash for a given address.
-    //    If a match is found, return the price of that sale
-    //3- return sale price as null (--) if not found
-
-    const salePrices = await Promise.all(itemTransferEvents.map(async (item) => {
-
-        //Fetch sales
-        const sales = await saleJs.getAll(admin, { assetToBeSold: item.address, order: "block_timestamp.asc" }, options);
-        //Check if it carries tx_hash
-        const matchingSale = sales.find(sale => sale.transaction_hash === item.transaction_hash);
-        if (matchingSale) {
-            //capture the price
-            return matchingSale.price;
-        } else {
-            // Fetch histories in parallel and filter out non-matching or missing histories
-            const potentialHistories = await Promise.all(sales.map(sale => 
-                saleJs.getSaleHistory(admin, { 
-                    contract: sale.contract_name, 
-                    assetToBeSold: item.address, 
-                    transaction_hash: item.transaction_hash 
-                }, options)
-                .then(historyObject => Object.values(historyObject))
-                .catch(() => []) // In case of error, return an empty array to keep the structure
-            ));
-
-            // Flatten and find the first matching history record
-            const matchingHistoryRecord = potentialHistories.flat().find(hist => hist.transaction_hash === item.transaction_hash);
-
-            // If a matching history record is found, then return the price
-            // Else return null(--) as price
-            return matchingHistoryRecord ? matchingHistoryRecord.price : null;
-        }
-    }));
-
-    // Updating itemTransferEvent data to include price fetched
-    itemTransferEvents = itemTransferEvents.map((item, index) => ({
-        ...item, 
-        price: salePrices[index]
-    }));
-
-    const total = await searchAllWithQueryArgs(`${contractName}.${contractEvents.ITEM_TRANSFER}`, 
+    const total = await searchAllWithQueryArgs(`${contractName}.${contractEvents.ITEM_TRANSFER}`,
         { ...args, limit: undefined, offset: 0, order: undefined, queryOptions: { select: "count" } }, options, admin);
 
     return { transfers: itemTransferEvents.map(marshalOut), total: total[0]?.count };
@@ -550,14 +609,14 @@ async function checkSaleQuantity(admin, args, defaultOptions) {
     let insufficientDetails = [];
 
     sales.forEach((sale, index) => {
-        const actualAvailableQuantity = sale.quantity; 
+        const actualAvailableQuantity = sale.quantity;
         const requestedQuantity = orderQuantity[index]; // Accessing requested quantity via sale address
 
         if (actualAvailableQuantity < requestedQuantity) {
             const asset = assets.find(asset => asset.sale === sale.address);
             if (asset) {
                 insufficientDetails.push({
-                    assetName: asset.name, 
+                    assetName: asset.name,
                     assetAddress: sale.assetToBeSold,
                     availableQuantity: actualAvailableQuantity,
                 });
@@ -593,7 +652,9 @@ export default {
     bindAddress,
     unlistItem,
     resellItem,
+    requestRedemption,
     transferItem,
+    updateAssetStatus,
     updateInventory,
     updateSale,
     checkSaleQuantity,

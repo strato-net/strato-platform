@@ -6,8 +6,9 @@ module Blockchain.SolidVM.Environment
   )
 where
 
-import Blockchain.Data.DataDefs (BlockData (..))
+import Blockchain.Data.BlockHeader
 import Blockchain.Strato.Model.Account
+import Blockchain.Strato.Model.Address
 import Blockchain.Strato.Model.Keccak256
 import qualified Data.Map as M
 import qualified Data.Text as T
@@ -17,7 +18,8 @@ newtype Sender = Sender {unSender :: Account}
 data Environment = Environment
   { sender :: Account,
     origin :: Account,
-    blockHeader :: BlockData,
+    proposer :: Address,
+    blockHeader :: BlockHeader,
     txHash :: Keccak256,
     metadata :: Maybe (M.Map T.Text T.Text),
     runningTests :: Bool

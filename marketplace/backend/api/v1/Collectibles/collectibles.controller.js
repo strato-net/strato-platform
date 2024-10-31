@@ -44,6 +44,8 @@ class CollectibleController {
         condition: Joi.string().required(),
         images: Joi.array().items(Joi.string().allow(null)).required(),
         files: Joi.array().items(Joi.string().allow(null)).required(),
+        fileNames: Joi.array().items(Joi.string().allow(null)).required(),
+        redemptionService: Joi.string().required(),
         quantity: Joi.number().positive().required(),
       }).required()
     });

@@ -35,17 +35,17 @@ const actionDescriptors = {
   transferInventory: "transfer_inventory",
   transferInventorySuccessful: "transfer_inventory_successful",
   transferInventoryFailed: "transfer_inventory_failed",
+  fetchSupportedTokens: "fetch_supported_tokens",
+  fetchSupportedTokensSuccessful: "fetch_supported_tokens_successful",
+  fetchSupportedTokensFailed: "fetch_supported_tokens_failed",
+  bridgeInventory: "bridge_inventory",
+  bridgeInventorySuccessful: "bridge_inventory_successful",
+  bridgeInventoryFailed: "bridge_inventory_failed",
   fetchItemTransfers: "fetch_item_transfers",
   fetchItemTransfersSuccessful: "fetch_item_transfers_successful",
   fetchItemTransfersFailed: "fetch_item_transfers_failed",
   resetMessage: "reset_message",
   setMessage: "set_message",
-  onboardSellerToStripe: "onboard_seller_to_stripe",
-  onboardSellerToStripeSuccessful: "onboard_seller_to_stripe_successful",
-  onboardSellerToStripeFailed: "onboard_seller_to_stripe_failed",
-  sellerStripeStatus: "seller_stripe_status",
-  sellerStripeStatusSuccessful: "seller_stripe_status_successful",
-  sellerStripeStatusFailed: "seller_stripe_status_failed",
   uploadImage: "upload_image",
   uploadImageSuccessful: "upload_image_successful",
   uploadImageFailed: "upload_image_failed",
@@ -57,7 +57,7 @@ const actionDescriptors = {
   fetchInventoryForUserFailed: "fetch_inventory_user_profile_failed",
   fetchPriceHistory: "fetch_price_history",
   fetchPriceHistorySuccessful: "fetch_price_history_successful",
-  fetchPriceHistoryFailed: "fetch_price_history_failed"  
+  fetchPriceHistoryFailed: "fetch_price_history_failed"
 
 };
 
@@ -532,6 +532,110 @@ const actions = {
       actions.setMessage(dispatch, "Error while publishing Item");
     }
   },
+  
+  fetchSupportedTokens: async (dispatch) => {
+    dispatch({ type: actionDescriptors.fetchSupportedTokens });
+  
+    try {
+      const response = await fetch(`${apiUrl}/inventory/supportedTokens`, {
+        method: "GET",
+        credentials: "same-origin",
+        headers: {
+          Accept: "application/json",
+          "Content-Type": "application/json",
+        },
+      });
+  
+      const body = await response.json();
+  
+      if (response.status === RestStatus.OK) {
+        dispatch({
+          type: actionDescriptors.fetchSupportedTokensSuccessful,
+          payload: body.data,
+        });
+        return true;
+      } else if (response.status === RestStatus.CONFLICT) {
+        dispatch({ type: actionDescriptors.fetchSupportedTokensFailed, error: body.error.message });
+        return false;
+      } else if (response.status === RestStatus.INTERNAL_SERVER_ERROR) {
+        dispatch({ type: actionDescriptors.fetchSupportedTokensFailed, error: "Error while fetching supported tokens" });
+        return false;
+      } else if (response.status === RestStatus.UNAUTHORIZED) {
+        dispatch({
+          type: actionDescriptors.fetchSupportedTokensFailed,
+          error: "Unauthorized while fetching supported tokens"
+        });
+        window.location.href = body.error.loginUrl;
+        return false;
+      }
+  
+      dispatch({
+        type: actionDescriptors.fetchSupportedTokensFailed,
+        error: body.error,
+      });
+      return false;
+    } catch (err) {
+      dispatch({
+        type: actionDescriptors.fetchSupportedTokensFailed,
+        error: "Error while fetching supported tokens",
+      });
+      return false;
+    }
+  },
+  
+  bridgeInventory: async (dispatch, payload) => {
+    dispatch({ type: actionDescriptors.bridgeInventory });
+
+    try {
+      const response = await fetch(`${apiUrl}/inventory/bridge`, {
+        method: HTTP_METHODS.POST,
+        credentials: "same-origin",
+        headers: {
+          Accept: "application/json",
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(payload),
+      });
+
+      const body = await response.json();
+
+      if (response.status === RestStatus.OK) {
+        dispatch({
+          type: actionDescriptors.bridgeInventorySuccessful,
+          payload: body.data,
+        });
+        actions.setMessage(dispatch, "Item has been bridged", true);
+        return true;
+      } else if (response.status === RestStatus.CONFLICT) {
+        dispatch({ type: actionDescriptors.bridgeInventoryFailed, error: body.error.message });
+        actions.setMessage(dispatch, body.error.message)
+        return false;
+      } else if (response.status === RestStatus.INTERNAL_SERVER_ERROR) {
+        dispatch({ type: actionDescriptors.bridgeInventoryFailed, error: "Error while bridging Item" });
+        actions.setMessage(dispatch, "Error while bridging Item")
+        return false;
+      } else if (response.status === RestStatus.UNAUTHORIZED) {
+        dispatch({
+          type: actionDescriptors.bridgeInventoryFailed,
+          error: "Unauthorized while bridging Item"
+        });
+        window.location.href = body.error.loginUrl;
+      }
+
+      dispatch({
+        type: actionDescriptors.bridgeInventoryFailed,
+        error: body.error
+      });
+      actions.setMessage(dispatch, body.error);
+      return false;
+    } catch (err) {
+      dispatch({
+        type: actionDescriptors.bridgeInventoryFailed,
+        error: "Error while bridging Item",
+      });
+      actions.setMessage(dispatch, "Error while bridging Item");
+    }
+  },
 
   transferInventory: async (dispatch, payload) => {
     dispatch({ type: actionDescriptors.transferInventory });
@@ -586,7 +690,6 @@ const actions = {
       actions.setMessage(dispatch, "Error while transferring Item");
     }
   },
-
 
   fetchItemTransfers: async (dispatch, limit, offset, ownerCommonName, order, date, search) => {
     dispatch({ type: actionDescriptors.fetchItemTransfers });
@@ -704,6 +807,7 @@ const actions = {
           type: actionDescriptors.fetchInventoryOwnershipHistoryFailed,
           error: "Unauthorized while fetching ownership history"
         });
+        window.location.href = body.error.loginUrl;
       }
 
       dispatch({
@@ -717,89 +821,6 @@ const actions = {
         error: "Error while fetching ownership history",
       });
       return false;
-    }
-  },
-
-  onboardSellerToStripe: async (dispatch) => {
-    dispatch({ type: actionDescriptors.onboardSellerToStripe });
-
-    try {
-      const response = await fetch(`${apiUrl}/payment/stripe/account`, {
-        // const response = await fetch(`${apiUrl}/inventory`, {
-        method: HTTP_METHODS.GET,
-      });
-
-      const body = await response.json();
-
-      if (response.status === RestStatus.OK) {
-        dispatch({
-          type: actionDescriptors.onboardSellerToStripeSuccessful,
-          payload: body.data,
-        });
-        return body.data;
-      } else if (response.status === RestStatus.INTERNAL_SERVER_ERROR) {
-        dispatch({
-          type: actionDescriptors.onboardSellerToStripeFailed,
-          error: "Error while trying to onboard to Stripe",
-        });
-        actions.setMessage(dispatch, "Error while trying to onboard to Stripe");
-        return null;
-      } else if (response.status === RestStatus.UNAUTHORIZED) {
-        dispatch({
-          type: actionDescriptors.onboardSellerToStripeFailed,
-          error: "Unauthorized while trying to onboard to Stripe"
-        });
-        window.location.href = body.error.loginUrl;
-      }
-
-      dispatch({
-        type: actionDescriptors.onboardSellerToStripeFailed,
-        error: body.error,
-      });
-      actions.setMessage(dispatch, body.error);
-      return null;
-    } catch (err) {
-      dispatch({
-        type: actionDescriptors.onboardSellerToStripeFailed,
-        error: "Error while trying to onboard to Stripe",
-      });
-    }
-  },
-
-  sellerStripeStatus: async (dispatch, username) => {
-    dispatch({ type: actionDescriptors.sellerStripeStatus });
-
-    try {
-      const response = await fetch(`${apiUrl}/payment/stripe/account/status/${username}`, {
-        method: HTTP_METHODS.GET,
-      });
-
-      const body = await response.json();
-
-      if (response.status === RestStatus.OK) {
-        dispatch({
-          type: actionDescriptors.sellerStripeStatusSuccessful,
-          payload: body.data,
-        });
-        return body.data;
-      } else if (response.status === RestStatus.UNAUTHORIZED) {
-        dispatch({
-          type: actionDescriptors.sellerStripeStatusFailed,
-          error: "Unauthorized while trying to get Stripe status"
-        });
-        window.location.href = body.error.loginUrl;
-      }
-
-      dispatch({
-        type: actionDescriptors.sellerStripeStatusFailed,
-        error: "Error while trying to get Stripe status",
-      });
-      return false;
-    } catch (err) {
-      dispatch({
-        type: actionDescriptors.sellerStripeStatusFailed,
-        error: "Error while trying to get Stripe status",
-      });
     }
   },
 
@@ -833,6 +854,12 @@ const actions = {
         });
         actions.setMessage(dispatch, "Error while uploading Image");
         return false;
+      } else if (response.status === RestStatus.UNAUTHORIZED) {
+        dispatch({
+          type: actionDescriptors.uploadImageFailed,
+          error: "Unauthorized while trying to upload image"
+        });
+        window.location.href = body.error.loginUrl;
       }
 
       dispatch({
@@ -881,6 +908,12 @@ const actions = {
         dispatch({ type: actionDescriptors.createItemFailed, error: "Error while creating Item" });
         actions.setMessage(dispatch, "Error while creating Item")
         return false;
+      } else if (response.status === RestStatus.UNAUTHORIZED) {
+        dispatch({
+          type: actionDescriptors.createItemFailed,
+          error: "Unauthorized while trying to create Item"
+        });
+        window.location.href = body.error.loginUrl;
       }
 
       dispatch({
@@ -912,7 +945,7 @@ const actions = {
           type: actionDescriptors.fetchPriceHistoryFailed,
           payload: "Error while fetching price history",
         });
-        return;
+        window.location.href = body.error.loginUrl;
       }
       if (response.status === RestStatus.OK) {
         dispatch({

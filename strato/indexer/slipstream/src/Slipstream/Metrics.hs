@@ -7,6 +7,7 @@ module Slipstream.Metrics
     recordCombinedAction,
     incNumTables,
     incNumMappingTables,
+    incNumArrayTables,
     incNumAbstractRowTables,
     incNumHistoryTables,
     incNumBloomWrites,
@@ -23,11 +24,11 @@ where
 import BlockApps.Crossmon
 import qualified Blockchain.Stream.Action as Action
 import Control.Monad
+import Control.Monad.Composable.Kafka
 import Control.Monad.IO.Class
 import qualified Data.Cache.LRU as LRU
 import qualified Data.Map.Strict as M
 import qualified Data.Text as T
-import Network.Kafka.Protocol (Offset)
 import Prometheus
 import Slipstream.Data.Action
 import Slipstream.Data.Globals
@@ -107,6 +108,9 @@ incNumTables = liftIO $ withLabel tablesCreated "normal" incCounter
 
 incNumMappingTables :: MonadIO m => m ()
 incNumMappingTables = liftIO $ withLabel tablesCreated "mapping" incCounter
+
+incNumArrayTables :: MonadIO m => m ()
+incNumArrayTables = liftIO $ withLabel tablesCreated "array" incCounter
 
 incNumAbstractRowTables :: MonadIO m => m ()
 incNumAbstractRowTables = liftIO $ withLabel tablesCreated "abstract" incCounter

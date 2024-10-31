@@ -1,0 +1,57 @@
+paths:
+  /tokens/:
+    get:
+      security:
+        - bearerAuth: []
+      tags:
+        - Tokens
+      summary: Retrieve tokens
+      produces:
+        - application/json
+      responses:
+        200:
+          description: Array of tokenss
+    post:
+      security:
+        - bearerAuth: []
+      tags:
+        - Tokens
+      summary: Create a tokens
+      produces:
+        - application/json
+      requestBody:
+        description: It enables user to create tokens
+        required: true
+        content:
+          'application/json':
+            schema:
+              $ref: '#/definitions/createTokens'
+      responses:
+        200:
+          description: Object of create tokens
+
+definitions:
+  createTokens:
+    type: object
+    properties:
+      machineArgs:
+        type: object
+        properties:
+          serialNumber:
+            type: string
+          name:
+            type: string
+          description:
+            type: string
+          quantity:
+            type: number
+          images:
+            type: array
+            items:
+              type: string
+          price:
+            type: number
+          paymentTypes:
+            type: array
+            items:
+              type: number

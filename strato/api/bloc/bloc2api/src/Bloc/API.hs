@@ -10,13 +10,11 @@ module Bloc.API
     module Bloc.API.Git,
     module Bloc.API.Users,
     module Bloc.API.Contracts,
-    module Bloc.API.Chain,
     module Bloc.API.Transaction,
     module Bloc.API.Utils,
   )
 where
 
-import Bloc.API.Chain
 import Bloc.API.Contracts
 import Bloc.API.Git
 import Bloc.API.Transaction
@@ -30,8 +28,6 @@ import Servant.Docs
 type BlocAPI =
   -- / endpoint, for smoke test. Also exports git details.
   GetGitInfo
-    -- /users endpoints
-    :<|> PostUsersFill
     -- /contracts endpoints
     :<|> GetContracts
     :<|> PostContractsBatchStates
@@ -49,15 +45,8 @@ type BlocAPI =
     -- /search endpoints
     :<|> GetBlocTransactionResult
     :<|> PostBlocTransactionResults
-    -- /chain endpoints
-    :<|> PostChainInfo
-    :<|> GetSingleChainInfo
-    -- /chains endpoints
-    :<|> PostChainInfos
-    :<|> GetChainInfo
     -- /transaction endpoints
     :<|> PostBlocTransactionParallel
-    :<|> PostBlocTransactionRaw
     :<|> PostBlocTransactionBody
     :<|> PostBlocTransactionUnsigned
     :<|> PostBlocTransaction

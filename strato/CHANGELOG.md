@@ -14,21 +14,161 @@ BlockApps engineers - for more context, see [here](https://blockappsdev.slack.co
 All changes merged to `develop` should be documented in "Unreleased" until the version is finalized
 so that they could be properly moved to their respective version's subsection.
 
-## [Unreleased] 
-
+## [Unrealeased]
 ### Added
-- POST `/transaction` allows users to create contracts by providing an address through the `codePtr` field
+- Partial support for ipv6
 
 ### Changed
 
 ### Fixed
+- Ethereum-discovery now looks at udp_enable_time instead of enable_time for bonded/available peers 
 
 ### Removed
+
+## [12.2] - 10/28/2024 
+### Added
+- Added block.proposer to SolidVM
+- Reintroduced wire cache to strato-p2p to reduce redundant blockstanbul messages sent to the sequencer
+- Added pragma solidvm 12.0 and cascading pragma set inclusion logic
+
+### Changed
+- Reduced Cirrus table indexing to top-level abstract contracts, or concrete contracts when there are no abstracts in the CC
+- Only genesis block contracts and top-level abstract contracts are now indexed by Slipstream
+- Set default nonce limit to 4000
+
+### Fixed
+- Bugfix in slipstream to support decoding structs
+- Foreign keys in cirrus properly updated
+- Bugfix in p2p to prevent peers from continuously attempting to connect to offline peers
+- Fixed solidvm 11.4 logic in the typechecker, including removing instances of error
+
+### Removed
+- Removed gossip fanout in p2p so now we broadcast transactions to all peers instead of attempting probabilistically
+
+## [12.0.0] - 9/23/2024
+### Added
+- Introduced BlockHeaderV2 constructor to BlockHeader type
+- Added support for BlockHeaderV2 fields to eth db and strato-api
+- Added BlockHeaderV2 fields to BlockView component in SMD
+- Added event array tables to Cirrus
+- Added Kafka composable monad
+- Added strict gas mode for the Bagger
+- Added capability to use `indexed` keyword in event declarations to index fields as primary keys, and indexed@ event tables
+- Added pragma solidvm 11.5
+- Added foreign keys in cirrus between event tables and contract tables
+- Added `<best_sequenced_block>` to reduce the redundant block requests in p2p
+- Added strict mode to sequencer that will cause crash on block authentication
+- Added `INSTRUMENTATION` flag to see finer-grained memory usage in processes
+
+### Changed
+- General cleanup of Kafka-related code
+- Bagger will now drop transactions that ran out of gas
+- Reduced data sent from vm to slipstream
+- Reduced redundant queries written to postgres
+
+### Fixed
+- Fixed bagger's more lucrative tx decision logic
+
+### Removed
+- Removed Globals from Slipstream
+- Removed block Kafka topic
+- txr-indexer no longer indexes events relating to chains, certificates (registered or revoked), or validators (added or removed)
+
+
+## [11.4.0] - 8/15/2024
+### Added
+- CodePtr transactions can be made
+- RawTransaction now stores CodePtr information
+- Added `pragma safeExternalCalls` for contracts that want to enforce extra type safety on external calls from other contracts
+- Added `pragma solidvm 11.4` that includes all existing pragmas and their features
+- Added decimal precision strictness to `pragma solidvm 11.4`
+- Added `truncate(uint)` built-in method for decimal numbers to `pragma solidvm 11.4`
+- Added typechecking to emit statements
+- Added typechecking to modifier definitions
+
+### Changed
+
+### Fixed
+- patched rare race condition where node updates sync status to true before running the last few blocks left in the sync
+- patched p2p bug where occassionally, threads erroring out would cause all the threads in p2p to die
+- Fixed truncate logic to actually use truncate rather than round
+
+### Removed
+
+## [11.3.1] - 7/10/2024 
+### Added
+
+### Changed
+- In Slipstream, index arrays in event tables within the event table, otherwise index them in a separate array table.
+
+### Fixed
+- try-catch exception handler in solidVM will throw excpetion in all cases instead of potentially `error`ing so node does not crash
+
+### Removed
+- Removed strato-api paymentServerUrl flag
+
+## [11.3.0] - 7/2/2024
+### Added
+- <address>.nonce accessor in SolidVM
+- Upgraded PostgREST to version 12.0
+- Support for `decimal` numbers type
+- Arrays in events are stored as is i.e without tables
+
+### Changed
+- Allow public keys to be passed to x509-generator in PEM format
+- default `accountNonceLimit` is 2,000
+- max kafka bytes returned to 32MB
+
+### Fixed
+- fixed logic for how p2p calculates if it is missing parents blocks and needs to backtrack its sync
+- `creator` and `root` get populated in collection tables
+- validators run block before voting for it
+
+### Removed
+
+
+## [11.2.1] - 5/16/2024
+### Added
+- Contract's `root` is available in slipstream tables
+
+### Changed
+- hard-coded `creatorForkBlockNumber` for prod network
+- unifying block header data definitions throughout platform
+
+### Fixed
+- Fixed the way arrays of strings & assets are displayed in slipstream
+
+### Removed
+- Removed block_data table from `eth` database
+
+
+## [11.2.0] - 5/15/2024 
+### Added
+- POST `/transaction` allows users to create contracts by providing an address through the `codePtr` field
+- `creatorForkBlockNumber` flag added to customize at which block :creator field should start referring to the common name and not org
+- can access an address's `creator` (uploader of original contract) and `root` (address of original contract) within SolidVM
+- `forced-config-change` executable can now update `sequence_number` in addition to `round_number` of sequencer view
+
+### Changed
+- Expansion of Concrete contract to Abstract contract is accomodated by Cirrus
+- `:creator` field refers to user's common name, not org (can be customized to occur after particular block number for backwards compatibility)
+- `eth_<random 20 bytes>` database is now just named `eth`
+- `queryStrato` is now `strato-barometer`
+- `strato-barometer` commands point to a copy of `./ethereumH` to access LevelDB data
+
+### Fixed
+- When a contract is created by a user, that user is the `:creator`. When a contract is created by another contract, `:creator` is the `:creator` of that contract
+
+### Removed
+- Removed 'block', 'blockGO', 'canonRedis', 'compressRoundChanges' commands from blockapps-tools
 - Removed `certInfo` flag from strato-sequencer (cert is now derived from genesis block or during sync)
 - Removed unused flags, such as `brokenRefundRenable`, `cacheTransactionResults`, `faucetEnabled`, `createTransactionResults`, `gasOn`, `splitinit`, and `useSyncMode`
+- unused api endpoints: `/version`, `/coinbase`, `/log`, `transactionList`, `/uuid`, `/transaction/raw`, and `/fill`
+- `logserver` package (fileserver for strato logs)
+- `blockchain` database in postgres (unused)
 
 
-## [11.1.0] - 3/28/2023
+## [11.1.0] - 3/28/2024
 
 ### Added
 - Custom `Show` instances for `CodeCollection`, `Function`, `Contract` data types
@@ -36,7 +176,7 @@ so that they could be properly moved to their respective version's subsection.
 - `VM_DEBUGGER=bool` flag added for connecting to the VM debugger + static analysis websocket
 - Derive service provider URLs from node's network ID for testnet and production nodes
 - Update foreign keys for `BlockApps-Mercata-Asset` + `Sale` contracts whenever there is a table expansion
-- functionality to enumerate threads and their details in `/threads` endpoint of `P2PAPI`
+- Functionality to enumerate threads and their details in `/threads` endpoint of `P2PAPI`
 - `/peers` endpoint in `P2PAPI` to list peer connections and their health
 - POST `/transaction` contract creation calls will now additionally check for address state ref table entry before resolving
 - Jenkins test to ensure slipstream post sync is consistent with boot node

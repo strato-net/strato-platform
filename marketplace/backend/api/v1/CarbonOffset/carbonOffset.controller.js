@@ -44,6 +44,8 @@ class CarbonOffsetController {
         quantity: Joi.number().integer().min(1).required(),
         images: Joi.array().items(Joi.string().allow(null)).required(),
         files: Joi.array().items(Joi.string().allow(null)).required(),
+        fileNames: Joi.array().items(Joi.string().allow(null)).required(),
+        redemptionService: Joi.string().required(),
       }).required()
     });
 

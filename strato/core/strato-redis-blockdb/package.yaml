@@ -8,7 +8,6 @@ description:         Functions to operate against the Redis-backed BlockDB
 dependencies:
   - base
   - blockapps-data
-  - blockapps-datadefs
   - containers
 
 library:
@@ -33,7 +32,6 @@ library:
   - strato-conf
   - strato-model
   - text
-  - x509-certs
   - Ranged-sets
   
 # I am removing this executable because the package `diagrams-html5` has not been upgraded, and

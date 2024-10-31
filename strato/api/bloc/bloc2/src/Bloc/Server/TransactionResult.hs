@@ -48,7 +48,6 @@ import Blockchain.Data.AddressStateDB
 import Blockchain.Data.DataDefs
 import Blockchain.Strato.Model.Account
 import Blockchain.Strato.Model.ChainId
-import Blockchain.Strato.Model.Code
 import Blockchain.Strato.Model.Keccak256
 import Control.Arrow
 import Control.Concurrent
@@ -73,6 +72,7 @@ import Data.Set (isSubsetOf)
 import Data.Source.Map
 import Data.Text (Text)
 import qualified Data.Text as Text
+import Data.Text.Encoding (encodeUtf8)
 import Data.Traversable
 import Handlers.AccountInfo
 import SQLM
@@ -140,7 +140,7 @@ getBlocTransactionResult ::
   Keccak256 ->
   Bool ->
   m BlocTransactionResult
-getBlocTransactionResult txHash resolve = fmap head $ postBlocTransactionResults resolve [txHash]
+getBlocTransactionResult txHash resolve = fmap head $ postBlocTransactionResults Nothing resolve [txHash]
 
 getBatchBlocTransactionResult' ::
   ( (Keccak256 `A.Selectable` SourceMap) m,
@@ -154,7 +154,7 @@ getBatchBlocTransactionResult' ::
   m [BlocTransactionResult]
 getBatchBlocTransactionResult' hashes resolve =
   if resolve
-    then postBlocTransactionResults True hashes
+    then postBlocTransactionResults Nothing True hashes
     else return $ map (\h -> BlocTransactionResult Pending h Nothing Nothing) hashes
 
 postBlocTransactionResults ::
@@ -164,10 +164,11 @@ postBlocTransactionResults ::
     MonadLogger m,
     HasSQL m
   ) =>
+  Maybe Text ->
   Bool ->
   [Keccak256] ->
   m [BlocTransactionResult]
-postBlocTransactionResults resolve hashes = recurseTRDs resolve hashes >>= evalAndReturn
+postBlocTransactionResults _ resolve hashes = recurseTRDs resolve hashes >>= evalAndReturn
 
 recurseTRDs ::
   (MonadLogger m, HasSQL m) =>
@@ -251,7 +252,7 @@ evalAndReturn list = forStateT emptyBatchState list $
       Nothing -> return $ BlocTransactionResult Pending txHash Nothing Nothing
       Just (r@RawTransaction {..}, txr) -> case (rawTransactionToAddress, rawTransactionCodeOrData) of
         (Nothing, _) -> contractResult i txHash txr (Map.fromList <$> rawTransactionMetadata)
-        (_, Code "") -> return $ BlocTransactionResult Success txHash (Just txr) (Just . Send $ rawTx2PostTx r)
+        (_, Just bs) | bs == ByteString.empty -> return $ BlocTransactionResult Success txHash (Just txr) (Just . Send $ rawTx2PostTx r)
         (Just addr, _) -> functionResult i txHash txr (Map.fromList <$> rawTransactionMetadata) (Account addr $ toMaybe 0 rawTransactionChainId)
 
 nth :: Integer -> Text
@@ -402,6 +403,7 @@ expressionToValue :: Expression -> Maybe Value
 expressionToValue (NumberLiteral _ n _) = Just $ SimpleValue $ ValueInt False Nothing n
 expressionToValue (BoolLiteral _ n) = Just $ SimpleValue $ ValueBool n
 expressionToValue (StringLiteral _ n) = Just $ SimpleValue $ ValueString $ Text.pack n
+expressionToValue (DecimalLiteral _ n) = Just $ SimpleValue $ ValueDecimal (encodeUtf8 $ Text.pack $ show $ unwrapDecimal n)
 expressionToValue (ArrayExpression _ n) = ValueArrayFixed (fromIntegral $ length n) <$> traverse expressionToValue n
 expressionToValue _ = Nothing
 
@@ -444,6 +446,7 @@ getArgValues argsMap argNamesTypes = do
               Xabi.Int (Just True) b -> Right . SimpleType . TypeInt True $ fmap toInteger b
               Xabi.Int _ b -> Right . SimpleType . TypeInt False $ fmap toInteger b
               Xabi.String _ -> Right . SimpleType $ TypeString
+              Xabi.Decimal -> Right . SimpleType $ TypeDecimal
               Xabi.Bytes _ b -> Right . SimpleType . TypeBytes $ fmap toInteger b
               Xabi.Bool -> Right . SimpleType $ TypeBool
               Xabi.Address -> Right . SimpleType $ TypeAddress
@@ -455,6 +458,7 @@ getArgValues argsMap argNamesTypes = do
                       Xabi.Int (Just True) b -> Right . SimpleType . TypeInt True $ fmap toInteger b
                       Xabi.Int _ b -> Right . SimpleType . TypeInt False $ fmap toInteger b
                       Xabi.String _ -> Right . SimpleType $ TypeString
+                      Xabi.Decimal -> Right . SimpleType $ TypeDecimal
                       Xabi.Bytes _ b -> Right . SimpleType . TypeBytes $ fmap toInteger b
                       Xabi.Bool -> Right . SimpleType $ TypeBool
                       Xabi.Address -> Right . SimpleType $ TypeAddress

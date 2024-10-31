@@ -1,20 +1,3 @@
-BlockData
-    parentHash Keccak256
-    unclesHash Keccak256
-    coinbase ChainMemberParsedSet
-    stateRoot StateRoot
-    transactionsRoot StateRoot
-    receiptsRoot StateRoot
-    logBloom BS.ByteString
-    difficulty Integer sqltype=numeric(1000,0)
-    number Integer sqltype=numeric(1000,0)
-    gasLimit Integer sqltype=numeric(1000,0)
-    gasUsed Integer sqltype=numeric(1000,0)
-    timestamp UTCTime
-    extraData BS.ByteString
-    nonce Word64
-    mixHash Keccak256
-    deriving Eq Read Show Generic Data
 
 ValidatorRef
     org Text
@@ -25,9 +8,7 @@ ValidatorRef
 BlockDataRef
     parentHash Keccak256
     unclesHash Keccak256
-    coinbaseOrg Text
-    coinbaseOrgUnit Text
-    coinbaseCommonName Text
+    coinbase Text
     stateRoot StateRoot
     transactionsRoot StateRoot
     receiptsRoot StateRoot
@@ -41,10 +22,48 @@ BlockDataRef
     nonce Word64
     mixHash Keccak256
     hash Keccak256
-    blockUncles [BlockData]
     powVerified Bool
     isConfirmed Bool
-    totalDifficulty Integer sqltype=numeric(1000,0)
+    version Int
+    deriving Eq Read Show
+
+BlockValidatorRef
+    blockDataRefId BlockDataRefId
+    commonName Text
+    deriving Eq Read Show
+
+ValidatorDeltaRef
+    blockDataRefId BlockDataRefId
+    commonName Text
+    direction Bool
+    deriving Eq Read Show
+
+CertificateAddedRef
+    blockDataRefId BlockDataRefId
+    commonName Text
+    userAddress Address
+    certString Text
+    deriving Eq Read Show
+
+CertificateRevokedRef
+    blockDataRefId BlockDataRefId
+    userAddress Address
+    deriving Eq Read Show
+
+ProposalSignatureRef
+    blockDataRefId BlockDataRefId
+    signer Address
+    r Word256
+    s Word256
+    v Word8
+    deriving Eq Read Show
+
+CommitmentSignatureRef
+    blockDataRefId BlockDataRefId
+    signer Address
+    r Word256
+    s Word256
+    v Word8
     deriving Eq Read Show
 
 BlockTransaction
@@ -80,7 +99,9 @@ RawTransaction
     gasLimit Integer sqltype=numeric(1000,0)
     toAddress Address Maybe
     value Integer sqltype=numeric(1000,0)
-    codeOrData Code
+    codeOrData BS.ByteString Maybe
+    contractName String Maybe
+    codePtrAddress Address Maybe
     chainId Word256
     r Integer
     s Integer
@@ -116,7 +137,7 @@ TransactionResult json
     status TransactionResultStatus Maybe
     chainId Word256 Maybe
     kind CodeKind Maybe
-    orgName String
+    creator String
     appName String
     deriving Eq Read Show Generic
 

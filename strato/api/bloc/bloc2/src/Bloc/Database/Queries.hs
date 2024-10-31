@@ -87,7 +87,7 @@ getCodeHashAndCollection codePtr =
     Nothing -> throwE . Text.pack $ "Could not resolve code pointer: " ++ show codePtr
     Just codeHash -> do
       ch <- case codeHash of
-        EVMCode _ -> throwE $ "EVM contracts no longer supported"
+        ExternallyOwned _ -> throwE $ "EVM contracts no longer supported"
         SolidVMCode _ ch -> pure ch
         CodeAtAccount acct _ -> throwE $ "Could not resolve code at account " <> Text.pack (show acct)
       srcMap <-

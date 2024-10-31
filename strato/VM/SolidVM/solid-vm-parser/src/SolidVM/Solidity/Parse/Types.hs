@@ -7,14 +7,12 @@
 module SolidVM.Solidity.Parse.Types where
 
 import Control.Monad
-import Data.Int (Int32)
 import Data.List
 import qualified SolidVM.Model.Type as SVMType
 import SolidVM.Solidity.Parse.Expression
 import SolidVM.Solidity.Parse.Lexer
 import SolidVM.Solidity.Parse.ParserTypes
 import Text.Parsec
-import Text.Read (readMaybe)
 
 --import SolidVM.Solidity.Parse.Lexer (identifier)
 
@@ -33,8 +31,7 @@ simpleType =
     <|> simple "account" (SVMType.Account False)
     <|> simple "string" (SVMType.String $ Just True)
     <|> bytes'
-    <|> fixedSuffixed "fixed" (SVMType.Fixed (Just True))
-    <|> fixedSuffixed "ufixed" (SVMType.Fixed (Just False))
+    <|> simple "decimal" SVMType.Decimal
     <|> intSuffixed "uint" (SVMType.Int (Just False))
     <|> intSuffixed "int" (SVMType.Int (Just True))
     <|> simple "variadic" SVMType.Variadic
@@ -100,30 +97,6 @@ simpleType =
             _ -> fail "invalid size"
 
         return $ baseType number
-
-    fixedSuffixed base baseType = lexeme $
-      try $ do
-        chars <- many1 alphaNum
-        unless (base `isPrefixOf` chars) $ fail "missing base"
-        decimals <- do
-          let afterFixed = drop (length base) chars
-          case afterFixed of
-            "" -> return $ Just (128 :: Int32, 18 :: Int32)
-            xs -> do
-              let mySplitFunc fs theMatch = mySplitFuncHelper ([], fs) theMatch
-                  mySplitFuncHelper (as, []) _ = (as, [])
-                  mySplitFuncHelper (as, y : ys) z = if y == z then (as, ys) else mySplitFuncHelper (as ++ [y], ys) z
-
-              let theSplit = xs `mySplitFunc` 'x'
-              when (null (fst theSplit) || null (snd theSplit)) $ fail "missing an additional argument"
-              let n1 = readMaybe (fst theSplit) :: Maybe Int32
-              let n2 = readMaybe (snd theSplit) :: Maybe Int32
-              case (n1, n2) of
-                (Just x, Just y) -> do
-                  when (notElem x [8, 16 .. 256] || notElem y [0 .. 80]) $ fail "invalid fixed sizes"
-                  return $ Just (x, y)
-                _ -> return Nothing
-        return $ baseType decimals
 
 -- | Parses array types, allowing arithmetic expressions to specify the
 -- array length so long as they only reference explicit numbers.  Note that

@@ -27,6 +27,9 @@ cradle:
     - path: "VM/SolidVM/solid-vm/bench/Paths_solid_vm.hs"
       component: "solid-vm:bench:codebench"
 
+    - path: "VM/SolidVM/solid-vm-compiler/src/"
+      component: "solid-vm-compiler:lib"
+
     - path: "VM/SolidVM/solid-vm-fuzzer/src/"
       component: "solid-vm-fuzzer:lib"
 
@@ -84,33 +87,6 @@ cradle:
     - path: "api/core/src"
       component: "core-api2:lib"
 
-    - path: "api/ethereum-jsonrpc/src/Main.hs"
-      component: "ethereum-jsonrpc:exe:ethereum-jsonrpc"
-
-    - path: "api/ethereum-jsonrpc/src/APIProxy.hs"
-      component: "ethereum-jsonrpc:exe:ethereum-jsonrpc"
-
-    - path: "api/ethereum-jsonrpc/src/Binary.hs"
-      component: "ethereum-jsonrpc:exe:ethereum-jsonrpc"
-
-    - path: "api/ethereum-jsonrpc/src/Commands.hs"
-      component: "ethereum-jsonrpc:exe:ethereum-jsonrpc"
-
-    - path: "api/ethereum-jsonrpc/src/RPC.hs"
-      component: "ethereum-jsonrpc:exe:ethereum-jsonrpc"
-
-    - path: "api/ethereum-jsonrpc/src/Server.hs"
-      component: "ethereum-jsonrpc:exe:ethereum-jsonrpc"
-
-    - path: "api/ethereum-jsonrpc/src/Paths_ethereum_jsonrpc.hs"
-      component: "ethereum-jsonrpc:exe:ethereum-jsonrpc"
-
-    - path: "api/strato-api/exec_src/PostRawTransaction.hs"
-      component: "strato-api:exe:post-raw-transaction"
-
-    - path: "api/strato-api/exec_src/Options.hs"
-      component: "strato-api:exe:post-raw-transaction"
-
     - path: "api/strato-api/exec_src/Main.hs"
       component: "strato-api:exe:strato-api"
 
@@ -119,12 +95,6 @@ cradle:
 
     - path: "core/blockapps-data/src/"
       component: "blockapps-data:lib"
-
-    - path: "core/blockapps-data/exec_src/GlobalDB.hs"
-      component: "blockapps-data:exe:global-db"
-
-    - path: "core/blockapps-data/exec_src/Paths_blockapps_data.hs"
-      component: "blockapps-data:exe:global-db"
 
     - path: "core/blockapps-data/test/"
       component: "blockapps-data:test:blockapps-data-test"
@@ -273,9 +243,6 @@ cradle:
     - path: "core/strato-init/src/"
       component: "strato-init:lib"
 
-    - path: "core/strato-init/exec_src/FromRestore.hs"
-      component: "strato-init:exe:from-restore"
-
     - path: "core/strato-init/exec_src/GenesisBuilder.hs"
       component: "strato-init:exe:genesis-builder"
 
@@ -312,9 +279,6 @@ cradle:
     - path: "core/strato-p2p/exec_src/Paths_strato_p2p.hs"
       component: "strato-p2p:exe:strato-p2p"
 
-    - path: "core/strato-p2p/test"
-      component: "strato-p2p:test:strato-p2p-client-test"
-
     - path: "core/strato-redis-blockdb/src"
       component: "strato-redis-blockdb:lib"
 
@@ -332,9 +296,6 @@ cradle:
 
     - path: "core/strato-sequencer/exec-src/Flags.hs"
       component: "strato-sequencer:exe:strato-sequencer"
-
-    - path: "core/strato-sequencer/test"
-      component: "strato-sequencer:test:strato-sequencer-spec"
 
     - path: "core/strato-sequencer/bench/BlockstanbulSend.hs"
       component: "strato-sequencer:bench:send-to-blockstanbul"
@@ -368,6 +329,24 @@ cradle:
 
     - path: "core/vm-tools/test/"
       component: "vm-tools:test:contextm-test"
+
+    - path: "highway/api/src"
+      component: "blockapps-highway-api:lib"
+
+    - path: "highway/client/src"
+      component: "blockapps-highway-client:lib"
+
+    - path: "highway/server/src"
+      component: "blockapps-highway-server:lib"
+
+    - path: "highway/server/app/Main.hs"
+      component: "blockapps-highway-server:exe:blockapps-highway-server"
+
+    - path: "highway/server/app/Options.hs"
+      component: "blockapps-highway-server:exe:blockapps-highway-server"
+
+    - path: "highway/server/test/"
+      component: "blockapps-highway-server:test:highway-spec"
 
     - path: "identity-provider/api/src"
       component: "blockapps-identity-provider-api:lib"
@@ -405,10 +384,19 @@ cradle:
     - path: "indexer/strato-index/exec_src/ApiIndexerMain.hs"
       component: "strato-index:exe:strato-api-indexer"
 
+    - path: "indexer/strato-index/exec_src/Wiring.hs"
+      component: "strato-index:exe:strato-api-indexer"
+
     - path: "indexer/strato-index/exec_src/P2PIndexerMain.hs"
       component: "strato-index:exe:strato-p2p-indexer"
 
+    - path: "indexer/strato-index/exec_src/Wiring.hs"
+      component: "strato-index:exe:strato-p2p-indexer"
+
     - path: "indexer/strato-index/exec_src/TxrIndexerMain.hs"
+      component: "strato-index:exe:strato-txr-indexer"
+
+    - path: "indexer/strato-index/exec_src/Wiring.hs"
       component: "strato-index:exe:strato-txr-indexer"
 
     - path: "indexer/strato-index/test/"
@@ -432,11 +420,17 @@ cradle:
     - path: "libs/common-log/test/"
       component: "common-log:test:common-log-test"
 
+    - path: "libs/composable-monads/composable-monads-base/src"
+      component: "composable-monads-base:lib"
+
     - path: "libs/composable-monads/identity-monad/src"
       component: "identity-monad:lib"
 
     - path: "libs/composable-monads/kafka-monad/src"
       component: "kafka-monad:lib"
+
+    - path: "libs/composable-monads/redis-monad/src"
+      component: "redis-monad:lib"
 
     - path: "libs/composable-monads/sql-monad/src"
       component: "sql-monad:lib"
@@ -501,12 +495,6 @@ cradle:
     - path: "libs/labeled-error/src"
       component: "labeled-error:lib"
 
-    - path: "libs/logserver/exec_src/LogServer.hs"
-      component: "logserver:exe:logserver"
-
-    - path: "libs/logserver/exec_src/Paths_logserver.hs"
-      component: "logserver:exe:logserver"
-
     - path: "libs/monad-alter/src"
       component: "monad-alter:lib"
 
@@ -534,24 +522,6 @@ cradle:
     - path: "libs/type-lits/src"
       component: "type-lits:lib"
 
-    - path: "libs/x509-certs/src"
-      component: "x509-certs:lib"
-
-    - path: "libs/x509-certs/test/"
-      component: "x509-certs:test:x509-test"
-
-    - path: "simulator/strato-lite/src/"
-      component: "strato-lite:lib"
-
-    - path: "simulator/strato-lite/exec_src/Main.hs"
-      component: "strato-lite:exe:strato-lite"
-
-    - path: "simulator/strato-lite/exec_src/Paths_strato_lite.hs"
-      component: "strato-lite:exe:strato-lite"
-
-    - path: "simulator/strato-lite/tests/"
-      component: "strato-lite:test:simulator-spec"
-
     - path: "tools/blockapps-tools/src/"
       component: "blockapps-tools:lib"
 
@@ -562,16 +532,13 @@ cradle:
       component: "blockapps-tools:exe:modifyDate"
 
     - path: "tools/blockapps-tools/exec_src/Main.hs"
-      component: "blockapps-tools:exe:queryStrato"
+      component: "blockapps-tools:exe:strato-barometer"
 
     - path: "tools/blockapps-tools/test/"
       component: "blockapps-tools:test:blockapps-tools-test"
 
     - path: "tools/debugger-tools/exec_src/ghc-debug.hs"
       component: "debugger-tools:exe:ghc-debug"
-
-    - path: "tools/x509-tools/exec_src/X509CertRegistry.hs"
-      component: "x509-tools:exe:x509-certificate-registry"
 
     - path: "tools/x509-tools/exec_src/X509CertGenerator.hs"
       component: "x509-tools:exe:x509-generator"

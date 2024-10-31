@@ -133,19 +133,6 @@ const reducer = (state, action) => {
           error: action.error,
           saleQuantityLoading: false,
         };
-    case actionDescriptors.updateOrderStatus:
-      return {
-        ...state,
-      };
-    case actionDescriptors.updateOrderStatusSuccessful:
-      return {
-        ...state,
-      };
-    case actionDescriptors.updateOrderStatusFailed:
-      return {
-        ...state,
-        error: action.error,
-      };
     case actionDescriptors.fetchOrderSold:
       return {
         ...state,
@@ -198,40 +185,6 @@ const reducer = (state, action) => {
         error: action.error,
         isOrderLineDetailsLoading: false,
       };
-    case actionDescriptors.updateBuyerDetails:
-      return {
-        ...state,
-        isbuyerDetailsUpdating: true,
-      };
-    case actionDescriptors.updateBuyerDetailsSuccessful:
-      return {
-        ...state,
-        buyerUpdateObject: action.payload,
-        isbuyerDetailsUpdating: false,
-      };
-    case actionDescriptors.updateBuyerDetailsFailed:
-      return {
-        ...state,
-        error: action.error,
-        isbuyerDetailsUpdating: false,
-      };
-    case actionDescriptors.updateSellerDetails:
-      return {
-        ...state,
-        issellerDetailsUpdating: true,
-      };
-    case actionDescriptors.updateSellerDetailsSuccessful:
-      return {
-        ...state,
-        sellerUpdateObject: action.payload,
-        issellerDetailsUpdating: false,
-      };
-    case actionDescriptors.updateSellerDetailsFailed:
-      return {
-        ...state,
-        error: action.error,
-        issellerDetailsUpdating: false,
-      };
     case actionDescriptors.executeSale:
       return {
         ...state,
@@ -248,6 +201,22 @@ const reducer = (state, action) => {
         error: action.error,
         isCreateOrderSubmitting: false,
       }
+      case actionDescriptors.waitForOrderEvent:
+        return {
+          ...state,
+          isOrderEventLoading: true,
+        }
+      case actionDescriptors.waitForOrderEventSuccessful:
+        return {
+          ...state,
+          isOrderEventLoading: false,
+        }
+      case actionDescriptors.waitForOrderEventFailed:
+        return {
+          ...state,
+          error: action.error,
+          isOrderEventLoading: false,
+        }      
     case actionDescriptors.updateOrderComment:
       return {
         ...state,
@@ -263,22 +232,6 @@ const reducer = (state, action) => {
         ...state,
         error: action.error,
         isUpdatingOrderComment: false,
-      }
-    case actionDescriptors.createSaleOrder:
-      return {
-        ...state,
-        isCreateOrderSubmitting: true,
-      }
-    case actionDescriptors.createSaleOrderSuccessful:
-      return {
-        ...state,
-        isCreateOrderSubmitting: false,
-      }
-    case actionDescriptors.createSaleOrderFailed:
-      return {
-        ...state,
-        error: action.error,
-        isCreateOrderSubmitting: false,
       }
     default:
       throw new Error(`Unhandled action: '${action.type}'`);

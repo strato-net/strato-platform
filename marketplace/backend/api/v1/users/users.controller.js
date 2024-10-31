@@ -1,8 +1,7 @@
 import { rest } from 'blockapps-rest'
-import { RestError } from 'blockapps-rest/dist/util/rest.util'
-import RestStatus from 'http-status-codes'
 import config from '../../../load.config'
-import { pollingHelper } from '../../../helpers/utils'
+import { pollingHelper, searchAllWithQueryArgs } from '../../../helpers/utils'
+import constants, { ISSUER_STATUS } from '../../../helpers/constants'
 
 const options = { config, cacheNonce: true }
 
@@ -23,10 +22,15 @@ class UsersController {
         rest.response.status400(res, { username })
       }
       else {
+        const walletSearchOptions = {commonName: user.commonName, notEqualsField: 'issuerStatus', notEqualsValue: 'null', sort: '-block_timestamp', limit: 1};
+        const walletResp = await searchAllWithQueryArgs(constants.userContractName, walletSearchOptions, options, accessToken);
+        
         rest.response.status200(res, {
           ...user,
           email: decodedToken.email,
           preferred_username: decodedToken.preferred_username,
+          issuerStatus: (walletResp[0] ? walletResp[0].issuerStatus : ISSUER_STATUS.UNAUTHORIZED),
+          isAdmin: (walletResp[0] ? walletResp[0].isAdmin : false)
         })
       }
       return next()
@@ -59,9 +63,9 @@ class UsersController {
 
   static async getAll(req, res, next) {
     try {
-      const { dapp } = req
+      const { dapp, query } = req
 
-      const users = await dapp.getCertificates();
+      const users = await dapp.getCertificates(query);
       return rest.response.status200(res, users)
     } catch (e) {
       return next(e)

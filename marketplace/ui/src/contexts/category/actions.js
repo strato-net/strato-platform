@@ -76,6 +76,12 @@ const actions = {
       } else if(response.status === RestStatus.INTERNAL_SERVER_ERROR) {
         dispatch({ type: actionDescriptors.fetchCategoryFailed, error: "Error while fetching category" });
         return false;
+      } else if(response.status === RestStatus.UNAUTHORIZED) {
+        dispatch({ 
+          type: actionDescriptors.fetchCategoryFailed, 
+          error: "Unauthorized while fetching categories" 
+        });
+        window.location.href = body.error.loginUrl;
       }
 
       dispatch({ type: actionDescriptors.fetchCategoryFailed, error: body.error });

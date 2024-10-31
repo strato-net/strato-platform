@@ -13,7 +13,6 @@ dependencies:
   - base16-bytestring
   - binary
   - blockapps-data
-  - blockapps-datadefs
   - blockapps-haskoin
   - blockapps-mpdbs
   - bytestring

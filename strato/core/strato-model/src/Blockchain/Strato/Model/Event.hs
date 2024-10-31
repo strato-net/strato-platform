@@ -24,20 +24,20 @@ import Text.Format
 
 data Event = Event
   { evBlockHash :: Keccak256,
-    evContractOrganization :: String,
+    evContractCreator :: String,
     evContractApplication :: String,
     evContractName :: String,
     evContractAccount :: Account,
     evName :: String,
-    evArgs :: [(String, String)] -- TODO: probably should use Solidity values here?
+    evArgs :: [(String, String, String)] -- TODO: probably should use Solidity values here?
   }
   deriving (Eq, Read, Show, Generic)
 
 instance Format Event where
   format Event {..} =
     "evBlockHash: " ++ format evBlockHash ++ "\n"
-      ++ "evContractOrganization: "
-      ++ evContractOrganization
+      ++ "evContractCreator: "
+      ++ evContractCreator
       ++ "\n"
       ++ "evContractApplication: "
       ++ evContractApplication
@@ -61,7 +61,7 @@ instance ToJSON Event where
   toJSON Event {..} =
     object
       [ "eventBlockHash" .= evBlockHash,
-        "eventContractOrganization" .= evContractOrganization,
+        "eventContractCreator" .= evContractCreator,
         "eventContractApplication" .= evContractApplication,
         "eventContractName" .= evContractName,
         "eventContractAccount" .= evContractAccount,
@@ -73,7 +73,7 @@ instance FromJSON Event where
   parseJSON (Object o) =
     Event
       <$> (o .: "eventBlockHash")
-      <*> (o .: "eventContractOrganization")
+      <*> (o .: "eventContractCreator")
       <*> (o .: "eventContractApplication")
       <*> (o .: "eventContractName")
       <*> (o .: "eventContractAccount")

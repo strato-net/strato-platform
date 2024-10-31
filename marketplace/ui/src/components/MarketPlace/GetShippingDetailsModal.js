@@ -146,9 +146,7 @@ const GetShippingDetailsModal = ({
             type="primary"
             className="h-9 bg-primary !hover:bg-primaryHover"
             onClick={formik.handleSubmit}
-          // disabled={isCreateEventSubmitting}
           >
-            {/* {isCreateEventSubmitting ? <Spin /> : "Add Address"} */}
             Add Shipping Address
           </Button>
         </Row>,

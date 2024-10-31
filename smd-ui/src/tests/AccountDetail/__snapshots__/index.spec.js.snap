@@ -14,10 +14,6 @@ Object {
     "nonce": 0,
     "source": "",
   },
-  "faucet": Object {
-    "accountAddress": "5d04537908d44f458acb24b0f2c863ccd2bd3a13",
-    "status": true,
-  },
   "name": "name",
   "oauthAccount": Object {
     "address": "5d04537908d44f458acb24b0f2c863ccd2bd3a13",
@@ -38,10 +34,6 @@ Object {
 exports[`Account: index mapStateToProps without values 1`] = `
 Object {
   "account": null,
-  "faucet": Object {
-    "accountAddress": null,
-    "status": true,
-  },
   "name": null,
   "oauthAccount": null,
   "selectedChain": null,
@@ -56,11 +48,6 @@ exports[`Account: index renders correctly (Oauth)  with empty values 1`] = `
         Address:    
         <HexText value={[undefined]} classes=\\"smd-pad-2\\" />
       </h4>
-    </div>
-    <div className=\\"col-sm-2 text-right\\">
-      <button className=\\"pt-button pt-intent-primary pt-small\\" onClick={[Function: onClick]} disabled={false}>
-        Faucet
-      </button>
     </div>
   </div>
   <table className=\\"pt-table pt-str\\">
@@ -114,11 +101,6 @@ exports[`Account: index renders correctly (Oauth)  with values 1`] = `
         Address:    
         <HexText value=\\"5d04537908d44f458acb24b0f2c863ccd2bd3a13\\" classes=\\"smd-pad-2\\" />
       </h4>
-    </div>
-    <div className=\\"col-sm-2 text-right\\">
-      <button className=\\"pt-button pt-intent-primary pt-small\\" onClick={[Function: onClick]} disabled={false}>
-        Faucet
-      </button>
     </div>
   </div>
   <table className=\\"pt-table pt-str\\">
@@ -177,11 +159,6 @@ exports[`Account: index renders correctly (non-oauth) with empty values 1`] = `
         <HexText value={[undefined]} classes=\\"smd-pad-2\\" />
       </h4>
     </div>
-    <div className=\\"col-sm-2 text-right\\">
-      <button className=\\"pt-button pt-intent-primary pt-small\\" onClick={[Function: onClick]} disabled={false}>
-        Faucet
-      </button>
-    </div>
   </div>
   <table className=\\"pt-table pt-str\\">
     <thead>
@@ -234,11 +211,6 @@ exports[`Account: index renders correctly (non-oauth) with values 1`] = `
         Address:    
         <HexText value=\\"5d04537908d44f458acb24b0f2c863ccd2bd3a13\\" classes=\\"smd-pad-2\\" />
       </h4>
-    </div>
-    <div className=\\"col-sm-2 text-right\\">
-      <button className=\\"pt-button pt-intent-primary pt-small\\" onClick={[Function: onClick]} disabled={false}>
-        Faucet
-      </button>
     </div>
   </div>
   <table className=\\"pt-table pt-str\\">

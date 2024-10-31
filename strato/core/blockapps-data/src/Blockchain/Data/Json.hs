@@ -1,29 +1,37 @@
 {-# LANGUAGE DataKinds #-}
 {-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 --TODO : Take this next line out
 {-# OPTIONS_GHC -fno-warn-orphans #-}
 
 module Blockchain.Data.Json where
 
+import BlockApps.X509
 import Blockchain.Data.Block
+import Blockchain.Data.BlockHeader
 import Blockchain.Data.DataDefs
 import Blockchain.Data.TXOrigin
 import Blockchain.Data.Transaction
 import Blockchain.Strato.Model.Address
 import Blockchain.Strato.Model.ChainId
 import Blockchain.Strato.Model.ChainMember
-import Blockchain.Strato.Model.Class (blockHeaderHash)
+import Blockchain.Strato.Model.Class (blockHeaderHash, DummyCertRevocation(..))
 import Blockchain.Strato.Model.Code
-import Blockchain.Strato.Model.ExtendedWord (Word256)
+import Blockchain.Strato.Model.ExtendedWord (Word256, word256ToBytes)
 import Blockchain.Strato.Model.Keccak256
+import Blockchain.Strato.Model.Secp256k1
+import Blockchain.Strato.Model.Validator
+import Control.DeepSeq
+import Control.Monad (join)
 import Data.Aeson
 import Data.Aeson.Types (Parser)
 import qualified Data.ByteString as B
 import qualified Data.Map.Strict as M
 import Data.Maybe
 import Data.Swagger hiding (format)
+import Data.Text.Encoding (encodeUtf8)
 import Data.Time.Calendar
 import Data.Time.Clock
 import Data.Word
@@ -40,13 +48,15 @@ data UnsignedRawTransaction' = UnsignedRawTransaction' RawTransaction deriving (
 
 {- note we keep the file MiscJSON around for the instances we don't want to export - ByteString, Point -}
 
+instance NFData RawTransaction'
+
 instance ToSchema RawTransaction' where
   declareNamedSchema _ =
     return $
       NamedSchema (Just "RawTransaction'") mempty
 
 instance ToJSON RawTransaction' where
-  toJSON (RawTransaction' rt@(RawTransaction t fa non gp gl (Just ta) val cod cid r s v md bn h o) next) =
+  toJSON (RawTransaction' rt@(RawTransaction t fa non gp gl (Just ta) val cod cName cpa cid r s v md bn h o) next) =
     object $
       [ "next" .= next,
         "from" .= fa,
@@ -56,6 +66,8 @@ instance ToJSON RawTransaction' where
         "to" .= ta,
         "value" .= show val,
         "codeOrData" .= cod,
+        "cName".= cName,
+        "cpa".= cpa,
         "r" .= showHex r "",
         "s" .= showHex s "",
         "v" .= showHex v "",
@@ -67,7 +79,7 @@ instance ToJSON RawTransaction' where
       ]
         ++ (("chainId" .=) <$> maybeToList (ChainId <$> if (0 == cid) then Nothing else Just cid))
         ++ (("metadata" .=) <$> maybeToList (M.fromList <$> md))
-  toJSON (RawTransaction' rt@(RawTransaction t fa non gp gl Nothing val cod cid r s v md bn h o) next) =
+  toJSON (RawTransaction' rt@(RawTransaction t fa non gp gl Nothing val cod cName cpa cid r s v md bn h o) next) =
     object $
       [ "next" .= next,
         "from" .= fa,
@@ -76,6 +88,8 @@ instance ToJSON RawTransaction' where
         "gasLimit" .= gl,
         "value" .= show val,
         "codeOrData" .= cod,
+        "cName".= cName,
+        "cpa".= cpa,
         "r" .= showHex r "",
         "s" .= showHex s "",
         "v" .= showHex v "",
@@ -102,7 +116,9 @@ instance FromJSON RawTransaction' where
     tgl <- t .:? "gasLimit" .!= 0
     tto <- t .:? "to"
     tval <- LabeledError.read "FromJSON/RawTransaction'" <$> t .:? "value" .!= "0"
-    tcd <- t .:? "codeOrData" .!= Code ""
+    tcd <- t .:? "codeOrData"
+    cName <- t .:? "cName" 
+    cpa <- t .:? "cpa"
     cid <- fmap (\(ChainId c) -> c) <$> (t .:? "chainId")
     (tr :: Integer) <- parseHexStr (t .: "r")
     (ts :: Integer) <- parseHexStr (t .: "s")
@@ -128,7 +144,9 @@ instance FromJSON RawTransaction' where
               (tgl :: Integer)
               (tto :: Maybe Address)
               (tval :: Integer)
-              (tcd :: Code)
+              (tcd :: Maybe B.ByteString)
+              (cName :: Maybe String)
+              (cpa :: Maybe Address)
               (fromMaybe 0 (cid :: Maybe Word256))
               (tr :: Integer)
               (ts :: Integer)
@@ -148,24 +166,28 @@ instance ToSchema UnsignedRawTransaction' where
       NamedSchema (Just "UnsignedRawTransaction'") mempty
 
 instance ToJSON UnsignedRawTransaction' where
-  toJSON (UnsignedRawTransaction' (RawTransaction _ _ non gp gl (Just ta) val cod cid _ _ _ md _ _ _)) =
+  toJSON (UnsignedRawTransaction' (RawTransaction _ _ non gp gl (Just ta) val cod cname cpa cid _ _ _ md _ _ _)) =
     object $
       [ "nonce" .= non,
         "gasPrice" .= gp,
         "gasLimit" .= gl,
         "to" .= ta,
         "value" .= show val,
-        "codeOrData" .= cod
+        "codeOrData" .= cod,
+        "contractName" .= cname,
+        "codePtrAddress" .= cpa
       ]
         ++ (("chainId" .=) <$> maybeToList (ChainId <$> if (0 == cid) then Nothing else Just cid))
         ++ (("metadata" .=) <$> maybeToList (M.fromList <$> md))
-  toJSON (UnsignedRawTransaction' (RawTransaction _ _ non gp gl Nothing val cod cid _ _ _ md _ _ _)) =
+  toJSON (UnsignedRawTransaction' (RawTransaction _ _ non gp gl Nothing val cod cname cpa cid _ _ _ md _ _ _)) =
     object $
       [ "nonce" .= non,
         "gasPrice" .= gp,
         "gasLimit" .= gl,
         "value" .= show val,
-        "codeOrData" .= cod
+        "codeOrData" .= cod,
+        "contractName" .= cname,
+        "codePtrAddress" .= cpa
       ]
         ++ (("chainId" .=) <$> maybeToList (ChainId <$> if (0 == cid) then Nothing else Just cid))
         ++ (("metadata" .=) <$> maybeToList (M.fromList <$> md))
@@ -178,7 +200,9 @@ instance FromJSON UnsignedRawTransaction' where
     tgl <- t .:? "gasLimit" .!= 0
     tto <- t .:? "to"
     tval <- LabeledError.read "FromJSON/UnsignedRawTransaction'" <$> t .:? "value" .!= "0"
-    tcd <- t .:? "codeOrData" .!= Code ""
+    tcd <- t .:? "codeOrData" 
+    cName <- t .:? "contractName"
+    cpa <- t .:? "codePtrAddress"
     cid <- fmap (\(ChainId c) -> c) <$> (t .:? "chainId")
     (tr :: Integer) <- parseHexStr (t .: "r")
     (ts :: Integer) <- parseHexStr (t .: "s")
@@ -203,7 +227,9 @@ instance FromJSON UnsignedRawTransaction' where
               (tgl :: Integer)
               (tto :: Maybe Address)
               (tval :: Integer)
-              (tcd :: Code)
+              (tcd :: Maybe B.ByteString)
+              (cName :: Maybe String)
+              (cpa :: Maybe Address)
               (fromMaybe 0 (cid :: Maybe Word256))
               (tr :: Integer)
               (ts :: Integer)
@@ -323,49 +349,70 @@ instance ToJSON Block' where
         "blockHash" .= blockHeaderHash bd
       ]
 
-blockDataRefToBlock :: BlockDataRef -> [Transaction] -> Block
-blockDataRefToBlock bdr txs =
-  Block
-    { blockBlockData =
-        BlockData
-          { blockDataParentHash = blockDataRefParentHash bdr,
-            blockDataUnclesHash = blockDataRefUnclesHash bdr,
-            blockDataCoinbase =
-              CommonName
-                (blockDataRefCoinbaseOrg bdr)
-                (blockDataRefCoinbaseOrgUnit bdr)
-                (blockDataRefCoinbaseCommonName bdr)
-                True,
-            blockDataStateRoot = blockDataRefStateRoot bdr,
-            blockDataTransactionsRoot = blockDataRefTransactionsRoot bdr,
-            blockDataReceiptsRoot = blockDataRefReceiptsRoot bdr,
-            blockDataLogBloom = blockDataRefLogBloom bdr,
-            blockDataDifficulty = blockDataRefDifficulty bdr,
-            blockDataNumber = blockDataRefNumber bdr,
-            blockDataGasLimit = blockDataRefGasLimit bdr,
-            blockDataGasUsed = blockDataRefGasUsed bdr,
-            blockDataTimestamp = blockDataRefTimestamp bdr,
-            blockDataExtraData = blockDataRefExtraData bdr,
-            blockDataNonce = blockDataRefNonce bdr,
-            blockDataMixHash = blockDataRefMixHash bdr
-          },
-      blockReceiptTransactions = txs,
-      blockBlockUncles = blockDataRefBlockUncles bdr
-    }
-
-bToBPrime :: String -> BlockDataRef -> [Transaction] -> Block'
-bToBPrime s x txs = Block' (blockDataRefToBlock x txs) s
-
-bToBPrime' :: BlockDataRef -> [Transaction] -> Block'
-bToBPrime' x txs = Block' (blockDataRefToBlock x txs) ""
+blockDataRefToBlock :: BlockDataRef ->
+                       [BlockValidatorRef] ->
+                       [ValidatorDeltaRef] ->
+                       [CertificateAddedRef] ->
+                       [CertificateRevokedRef] ->
+                       [ProposalSignatureRef] ->
+                       [CommitmentSignatureRef] ->
+                       [Transaction] ->
+                       Block
+blockDataRefToBlock bdr vs vd ca cr ps sigs txs = case vs of
+  [] -> -- this is a v1 block
+    Block
+      { blockBlockData =
+          BlockHeader
+            { parentHash = blockDataRefParentHash bdr,
+              ommersHash = blockDataRefUnclesHash bdr,
+              beneficiary = CommonName "" "" (blockDataRefCoinbase bdr) True,
+              stateRoot = blockDataRefStateRoot bdr,
+              transactionsRoot = blockDataRefTransactionsRoot bdr,
+              receiptsRoot = blockDataRefReceiptsRoot bdr,
+              logsBloom = blockDataRefLogBloom bdr,
+              difficulty = blockDataRefDifficulty bdr,
+              number = blockDataRefNumber bdr,
+              gasLimit = blockDataRefGasLimit bdr,
+              gasUsed = blockDataRefGasUsed bdr,
+              timestamp = blockDataRefTimestamp bdr,
+              extraData = blockDataRefExtraData bdr,
+              nonce = blockDataRefNonce bdr,
+              mixHash = blockDataRefMixHash bdr
+            },
+        blockReceiptTransactions = txs,
+        blockBlockUncles = []
+      }
+  _ ->
+    Block
+      { blockBlockData =
+          BlockHeaderV2
+            { parentHash = blockDataRefParentHash bdr,
+              stateRoot = blockDataRefStateRoot bdr,
+              transactionsRoot = blockDataRefTransactionsRoot bdr,
+              receiptsRoot = blockDataRefReceiptsRoot bdr,
+              logsBloom = blockDataRefLogBloom bdr,
+              number = blockDataRefNumber bdr,
+              timestamp = blockDataRefTimestamp bdr,
+              extraData = blockDataRefExtraData bdr,
+              currentValidators = bvr2v <$> vs,
+              newValidators = catMaybes $ vdr2v True <$> vd,
+              removedValidators = catMaybes $ vdr2v False <$> vd,
+              newCerts = catMaybes $ car2x509 <$> ca,
+              revokedCerts = crr2dcr <$> cr,
+              proposalSignature = join . listToMaybe $ psr2s <$> ps,
+              signatures = catMaybes $ csr2s <$> sigs
+            },
+        blockReceiptTransactions = txs,
+        blockBlockUncles = []
+      }
 
 bPrimeToB :: Block' -> Block
 bPrimeToB (Block' x _) = x
 
-data BlockData' = BlockData' BlockData deriving (Eq, Show)
+data BlockData' = BlockData' BlockHeader deriving (Eq, Show)
 
 instance ToJSON BlockData' where
-  toJSON (BlockData' (BlockData ph uh a sr tr rr _ d num gl gu ts ed non mh)) =
+  toJSON (BlockData' (BlockHeader ph uh a sr tr rr _ d num gl gu ts ed mh non)) =
     object
       [ "kind" .= ("BlockData" :: String),
         "parentHash" .= ph,
@@ -384,10 +431,29 @@ instance ToJSON BlockData' where
         "mixHash" .= mh
       ]
 
+  toJSON (BlockData' (BlockHeaderV2{..})) = 
+    object
+      [ "kind" .= ("BlockData" :: String),
+        "parentHash" .= parentHash,
+        "stateRoot" .= stateRoot,
+        "transactionsRoot" .= transactionsRoot,
+        "receiptsRoot" .= receiptsRoot,
+        "number" .= number,
+        "timestamp" .= timestamp,
+        "extraData" .= extraData,
+        "currentValidators" .= currentValidators,
+        "newValidators" .= newValidators,
+        "removedValidators" .= removedValidators,
+        "newCerts" .= newCerts,
+        "revokedCerts" .= revokedCerts,
+        "proposalSignature" .= proposalSignature,
+        "signatures" .= signatures
+      ]
+
 instance FromJSON BlockData' where
   parseJSON = withObject "BlockData'" $ \v ->
     BlockData'
-      <$> ( BlockData
+      <$> ( BlockHeader
               <$> v .: "parentHash"
               <*> v .: "unclesHash"
               <*> v .: "coinbase"
@@ -401,8 +467,8 @@ instance FromJSON BlockData' where
               <*> v .: "gasUsed"
               <*> v .: "timestamp"
               <*> v .: "extraData"
-              <*> v .: "nonce"
               <*> v .: "mixHash"
+              <*> v .: "nonce"
           )
 
 instance FromJSON Block' where
@@ -413,21 +479,19 @@ instance FromJSON Block' where
     next <- v .: "next"
     pure $ Block' (Block bData bTxs bUncles) next
 
-bdToBdPrime :: BlockData -> BlockData'
+bdToBdPrime :: BlockHeader -> BlockData'
 bdToBdPrime = BlockData'
 
-bdPrimeToBd :: BlockData' -> BlockData
+bdPrimeToBd :: BlockData' -> BlockHeader
 bdPrimeToBd (BlockData' bd) = bd
 
 data BlockDataRef' = BlockDataRef' BlockDataRef deriving (Eq, Show)
 
 instance ToJSON BlockDataRef' where
-  toJSON (BlockDataRef' (BlockDataRef ph uh co cu cc sr tr rr _ d num gl gu ts ed non mh h uncles pow isConf td)) =
+  toJSON (BlockDataRef' (BlockDataRef ph uh cc sr tr rr _ d num gl gu ts ed non mh h pow isConf v)) =
     object
       [ "parentHash" .= ph,
         "unclesHash" .= uh,
-        "coinbaseOrg" .= co,
-        "coinbaseOrgUnit" .= cu,
         "coinbaseCommonName" .= cc,
         "stateRoot" .= sr,
         "transactionsRoot" .= tr,
@@ -441,14 +505,37 @@ instance ToJSON BlockDataRef' where
         "nonce" .= non,
         "mixHash" .= mh,
         "hash" .= h,
-        "uncles" .= map bdToBdPrime uncles,
         "powVerified" .= pow,
         "isConfirmed" .= isConf,
-        "totalDifficulty" .= td
+        "version" .= v
       ]
 
 bdrToBdrPrime :: BlockDataRef -> BlockDataRef'
 bdrToBdrPrime = BlockDataRef'
+
+bvr2v :: BlockValidatorRef -> Validator
+bvr2v (BlockValidatorRef _ cn) = Validator cn
+
+vdr2v :: Bool -> ValidatorDeltaRef -> Maybe Validator
+vdr2v d' (ValidatorDeltaRef _ cn d) | d' == d = Just $ Validator cn
+vdr2v _ _ = Nothing
+
+car2x509 :: CertificateAddedRef -> Maybe X509Certificate
+car2x509 (CertificateAddedRef _ _ _ cs) =
+  either (const Nothing) Just . bsToCert $ encodeUtf8 cs
+
+crr2dcr :: CertificateRevokedRef -> DummyCertRevocation
+crr2dcr (CertificateRevokedRef _ ua) = DummyCertRevocation ua
+
+psr2s :: ProposalSignatureRef -> Maybe Signature
+psr2s (ProposalSignatureRef _ _ r s v) =
+  either (const Nothing) Just . importSignature $
+    word256ToBytes r <> word256ToBytes s <> B.singleton v
+
+csr2s :: CommitmentSignatureRef -> Maybe Signature
+csr2s (CommitmentSignatureRef _ _ r s v) =
+  either (const Nothing) Just . importSignature $
+    word256ToBytes r <> word256ToBytes s <> B.singleton v
 
 data AddressStateRef' = AddressStateRef' AddressStateRef String deriving (Eq, Show)
 
@@ -558,12 +645,12 @@ isAddr a = case a of
   Nothing -> False
 
 rawTransactionSemantics :: RawTransaction -> TransactionType
-rawTransactionSemantics (RawTransaction _ _ _ _ _ ta _ code _ _ _ _ _ _ _ _) = work
+rawTransactionSemantics rawtx = work
   where
     work
-      | (not (isAddr ta)) = Contract
-      | (isAddr ta) && ((B.length cod) > 0) = FunctionCall
+      | (not (isAddr (rawTransactionToAddress rawtx))) = Contract
+      | (isAddr (rawTransactionToAddress rawtx)) && ((B.length cod) > 0) = FunctionCall
       | otherwise = Transfer
-    cod = case code of
-      Code c -> c
+    cod = case (rawTransactionCodeOrData rawtx) of
+      Just c -> c
       _ -> ""

@@ -1,7 +1,8 @@
 import { util, rest } from '/blockapps-rest-plus';
 import RestStatus from 'http-status-codes';
 import { setSearchQueryOptions, searchOne, searchAllWithQueryArgs } from '/helpers/utils';
-import constants from '../../helpers/constants';
+import constants, { getOneYearAgoTime } from '../../helpers/constants';
+const pLimit = require('p-limit'); // Concurrency control library
 
 const contractName = constants.saleTableName;
 
@@ -109,9 +110,10 @@ async function get(user, args, options) {
     const newOptions = { ...options, org: 'BlockApps', app: 'Mercata' }
     let sale;
     let searchArgs;
+    const newArgs = { ...restArgs, queryOptions: { 'select': '*,BlockApps-Mercata-Sale-paymentServices(*)' } }
 
     if (assetToBeSold) {
-        searchArgs = setSearchQueryOptions(restArgs,
+        searchArgs = setSearchQueryOptions(newArgs,
             [{
                 key: "assetToBeSold",
                 value: assetToBeSold,
@@ -123,7 +125,7 @@ async function get(user, args, options) {
             ]);
     }
     else {
-        searchArgs = setSearchQueryOptions(restArgs,
+        searchArgs = setSearchQueryOptions(newArgs,
             [{
                 key: "address",
                 value: address,
@@ -148,20 +150,18 @@ async function get(user, args, options) {
 }
 
 async function getSaleHistory(user, args, options) {
-    const { contract, ...restArgs } = args;
-    
-    const newOptions = { ...options, org: undefined, app: undefined }
-    let historySale = await searchAllWithQueryArgs(`history@${contract}`, restArgs, newOptions, user);
-        
-  
+
+    const newOptions = { ...options, org: "history@BlockApps", app: "Mercata" }
+    let historySale = await searchAllWithQueryArgs(contractName, args, newOptions, user);
+
     if (!historySale) {
-      return undefined;
+        return undefined;
     }
-  
+
     return marshalOut({
-      ...historySale,
+        ...historySale,
     });
-  }
+}
 
 async function getAll(admin, args = {}, defaultOptions) {
     const { saleAddresses, assetAddresses, isOpen, range, saleGtField, saleGtValue, ...restArgs } = args;
@@ -173,16 +173,137 @@ async function getAll(admin, args = {}, defaultOptions) {
             gtField: saleGtField,
             gtValue: saleGtValue,
             isOpen: isOpen,
-            range: range
+            range: range,
+            queryOptions: { 'select': '*,BlockApps-Mercata-Sale-paymentServices(*)' }
         }, options, admin);
     }
     else {
-        sales = await searchAllWithQueryArgs(contractName, { address: saleAddresses, isOpen: isOpen, ...restArgs }, options, admin);
+        sales = await searchAllWithQueryArgs(contractName, {
+            address: saleAddresses,
+            isOpen: isOpen,
+            queryOptions: { 'select': '*,BlockApps-Mercata-Sale-paymentServices(*)' },
+            ...restArgs,
+        }, options, admin);
     }
 
     return sales ? sales.map((sale) => marshalOut(sale)) : undefined;
 }
 
+
+
+// Function to fetch sale histories in batches
+async function fetchSaleHistoriesInBatches(rawAdmin, args = {}, options = defaultOptions) {
+    const { assetToBeSold, filter = {}, maxConcurrency = 10 } = args;
+    const chunkSize = 15; // chunk size for sale histories
+    const limit = pLimit(maxConcurrency);  // Concurrency control
+  
+    // Split asset addresses into batches of chunkSize
+    const batches = [];
+    for (let i = 0; i < assetToBeSold.length; i += chunkSize) {
+      batches.push(assetToBeSold.slice(i, i + chunkSize));
+    }
+  
+    // Fetch history for each chunk of assets
+    const fetchHistoryChunk = async (chunk) => {
+      const historyPromises = chunk.map(address => {
+        if(filter.order)
+        {
+        // Fetch sale history based on the filters provided
+        return getSaleHistory(rawAdmin, {
+            ...filter,
+            assetToBeSold: address,
+            queryOptions: {
+                'select': 'address,block_timestamp,price,assetToBeSold,quantity,totalLockedQuantity'
+            }
+        }, options);
+        }
+        else{
+        // 12-Month Historical Data
+        return getSaleHistory(rawAdmin, {
+            assetToBeSold: address,
+            order: "block_timestamp.asc", 
+            gtField: "block_timestamp", 
+            gtValue: getOneYearAgoTime(),
+            queryOptions: {
+                'select': 'address,block_timestamp,price,assetToBeSold,quantity,totalLockedQuantity'
+            }
+        }, options);
+    }
+      });
+  
+      // Run history fetch requests in parallel for the current chunk
+      return await Promise.all(historyPromises);
+    };
+  
+    // Fetch all history chunks in parallel with concurrency control
+    const allHistoryChunks = await Promise.all(
+      batches.map(batch => limit(() => fetchHistoryChunk(batch)))
+    );
+  
+    // Flatten the array of results into a single array of histories
+    return allHistoryChunks.flat();
+  };
+  
+
+async function fetchSalesInBatches(rawAdmin, args = {}, options = defaultOptions) {
+    
+    const chunkSize = 30;  // Chunk size
+    const maxConcurrency = 20;  // Concurrency
+    
+    const { assetToBeSold, gtField, gtValue, order, salesFilter } = args;
+    
+    const batches = [];
+    for (let i = 0; i < assetToBeSold.length; i += chunkSize) {
+      batches.push(assetToBeSold.slice(i, i + chunkSize));
+    }
+  
+    console.log('Total number of batches:', batches.length);
+  
+    const limit = pLimit(maxConcurrency);  // Concurrency control setup
+  
+    const fetchChunkSales = async (chunk) => {
+      try {
+        console.log(`Fetching sales for chunk with ${chunk.length} assets`);
+        
+        let chunkSales;
+        if (gtField && gtValue) {
+          chunkSales = await getAll(rawAdmin, {
+            assetToBeSold: chunk,
+            gtField: gtField || salesFilter.gtField,
+            gtValue: gtValue || salesFilter.gtValue,
+            order: order || salesFilter.order,
+            queryOptions: { 'select': "block_timestamp,assetToBeSold,price" },
+            ...salesFilter
+          }, options);
+        } else {
+          chunkSales = await getAll(rawAdmin, {
+            assetToBeSold: chunk,
+            order: order || salesFilter.order,
+            queryOptions: { 'select': "block_timestamp,assetToBeSold,price" },
+          }, options);
+        }
+  
+        console.log(`Fetched ${chunkSales.length} sales for chunk`);
+        return chunkSales || [];
+      } catch (error) {
+        console.error(`Error fetching sales for chunk ${chunk.join(', ')}`, error);
+        return [];
+      }
+    };
+  
+    const allSalesChunks = await Promise.all(
+      batches.map(chunk => limit(() => fetchChunkSales(chunk)))
+    );
+  
+    const allSales = allSalesChunks.flat();
+    console.log('Completed fetching sales. Total sales:', allSales.length);
+    return allSales;
+  }
+  
+
+  
+  
+  
 
 /**
  * Get contract state in bloc.
@@ -201,5 +322,7 @@ export default {
     marshalIn,
     marshalOut,
     getHistory,
-    getSaleHistory
+    getSaleHistory,
+    fetchSalesInBatches,
+    fetchSaleHistoriesInBatches,
 }

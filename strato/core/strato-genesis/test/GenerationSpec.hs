@@ -68,7 +68,7 @@ spec = do
 
     it "should insert 1 contract" $
       let input = defaultGenesisInfo
-          want = [ContractWithStorage sharedStart 0 (EVMCode emptySourceHash) []]
+          want = [ContractWithStorage sharedStart 0 (ExternallyOwned emptySourceHash) []]
           got = insertContracts [[]] "x" emptySource emptyContractB16 sharedStart input
        in genesisInfoAccountInfo got `shouldBe` want
 
@@ -76,7 +76,7 @@ spec = do
       let total = 1000000 :: Int
           slots = replicate total []
           input = defaultGenesisInfo
-          want = map (\n -> ContractWithStorage (sharedStart + fromIntegral n) 0 (EVMCode emptySourceHash) []) [0 .. total - 1]
+          want = map (\n -> ContractWithStorage (sharedStart + fromIntegral n) 0 (ExternallyOwned emptySourceHash) []) [0 .. total - 1]
           got = insertContracts slots "x" emptySource emptyContractB16 sharedStart input
        in genesisInfoAccountInfo got `shouldBe` want
 

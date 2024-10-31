@@ -21,6 +21,12 @@ description:         Please see the README on GitHub at <https://github.com/gith
 dependencies:
 - base
 - blockapps-highway-api
+- bytestring
+- http-types
+- servant-client
+- servant-multipart
+- servant-multipart-client
+- text
 
 library:
   source-dirs: src

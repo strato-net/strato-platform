@@ -16,6 +16,7 @@ const buildOrderQueryOption = (args) => {
 
 export const waitForAddress = async (admin, contract, options) => {
   const org = options.org
+
   const app = options.app == contract.name ? undefined : options.app
 
   const tableName = org ?

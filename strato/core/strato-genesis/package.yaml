@@ -18,7 +18,6 @@ library:
       - base16-bytestring
       - binary
       - blockapps-data
-      - blockapps-datadefs
       - blockapps-mpdbs
       - common-log
       - containers
@@ -43,7 +42,6 @@ library:
       - solid-vm-compiler
       - solid-vm-model
       - ethereum-rlp
-      - x509-certs
       - lens
       - ordered-containers
 

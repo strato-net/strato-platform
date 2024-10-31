@@ -36,6 +36,7 @@ import Text.Format
 data BasicValue
   = BInteger !Integer
   | BString !B.ByteString
+  | BDecimal !B.ByteString
   | BBool !Bool
   | BAccount !NamedAccount
   | BEnumVal !SolidString !SolidString !Word32
@@ -49,6 +50,7 @@ data BasicValue
 isDefault :: BasicValue -> Bool
 isDefault (BInteger i) = i == 0
 isDefault (BString bs) = B.null bs
+isDefault (BDecimal v) = v == "0"
 isDefault (BBool b) = not b
 isDefault (BAccount a) = a == unspecifiedChain 0x0
 isDefault (BEnumVal _ _ w) = w == 0
@@ -59,6 +61,7 @@ isDefault BDefault = True
 instance Format BasicValue where
   format (BInteger i) = show i
   format (BString s) = ('"' :) . (++ "\"") $ UTF8.toString s
+  format (BDecimal v) = show v
   format (BBool True) = "true"
   format (BBool False) = "false"
   format (BAccount a) = "account(" ++ show a ++ ")"
@@ -66,7 +69,7 @@ instance Format BasicValue where
   format (BContract n a) = labelToString n ++ "(" ++ format a ++ ")"
   format BMappingSentinel = "<MappingSentinel>"
   format BDefault = "<unknown>"
-
+--function that gives index type, wrap in map index 
 data IndexType
   = INum Integer
   | IText B.ByteString
@@ -201,6 +204,7 @@ parseField = do
     )
     <|> ((string ":creator") *> pathParser)
     <|> ((string ":creatorAddress") *> pathParser)
+    <|> ((string ":originAddress") *> pathParser)
 
 parsePath :: B.ByteString -> Either String StoragePath
 parsePath = fmap StoragePath . parseOnly pathParser
@@ -277,6 +281,7 @@ instance RLPSerializable BasicValue where
     BContract n a -> RLPArray [RLPScalar 4, rlpEncode n, rlpEncode a]
     BEnumVal a b c -> RLPArray [RLPScalar 5, rlpEncode a, rlpEncode b, rlpEncode c]
     BMappingSentinel -> RLPArray [RLPScalar 6]
+    BDecimal v -> RLPArray [RLPScalar 7, rlpEncode v]
   rlpDecode x@(RLPArray ((RLPScalar t) : s)) =
     case (t, s) of
       (0, [f]) -> BInteger $ rlpDecode f
@@ -286,6 +291,7 @@ instance RLPSerializable BasicValue where
       (4, [f, a']) -> BContract (rlpDecode f) (rlpDecode a')
       (5, [f, s', c']) -> BEnumVal (rlpDecode f) (rlpDecode s') (rlpDecode c')
       (6, []) -> BMappingSentinel
+      (7, [f]) -> BDecimal (rlpDecode f)
       _ -> error $ "invalid type or data length for BasicValue: " ++ show x
   rlpDecode (RLPString "") = BDefault
   rlpDecode x = error $ "invalid shape for BasicValue: " ++ show x

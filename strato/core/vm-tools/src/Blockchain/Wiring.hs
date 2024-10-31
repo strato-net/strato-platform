@@ -1,10 +1,12 @@
 {-# LANGUAGE ConstraintKinds #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE FlexibleInstances #-}
+{-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE TupleSections #-}
+{-# LANGUAGE TypeApplications #-}
 {-# LANGUAGE TypeOperators #-}
 {-# LANGUAGE TypeSynonymInstances #-}
 {-# LANGUAGE UndecidableInstances #-}
@@ -57,6 +59,7 @@ import qualified Control.Monad.Change.Modify as Mod
 import Control.Monad.Composable.Base
 import Control.Monad.Composable.SQL
 import Control.Monad.IO.Class
+import Control.Monad.Reader (ReaderT)
 import qualified Data.ByteString as B
 import Data.Default
 import Data.Either.Extra
@@ -204,20 +207,20 @@ instance HasContext m => HasMemAddressStateDB m where
   getAddressStateBlockDBMap = gets $ view $ memDBs . stateBlockMap
   putAddressStateBlockDBMap theMap = modify $ memDBs . stateBlockMap .~ theMap
 
-instance HasContext m => (MP.StateRoot `A.Alters` MP.NodeData) m where
+instance MonadUnliftIO m => (MP.StateRoot `A.Alters` MP.NodeData) (ReaderT Context m) where
   lookup _ = MP.genericLookupDB $ getStateDB
   insert _ = MP.genericInsertDB $ getStateDB
   delete _ = MP.genericDeleteDB $ getStateDB
 
-instance (MonadLogger m, HasContext m) => (Account `A.Alters` AddressState) m where
+instance (MonadLogger m, HasContext m, (MP.StateRoot `A.Alters` MP.NodeData) m) => (Account `A.Alters` AddressState) m where
   lookup _ = getAddressStateMaybe
   insert _ = putAddressState
   delete _ = deleteAddressState
 
-instance (MonadLogger m, HasContext m) => A.Selectable Account AddressState m where
+instance (MonadLogger m, HasContext m, (MP.StateRoot `A.Alters` MP.NodeData) m) => A.Selectable Account AddressState m where
   select _ = getAddressStateMaybe
 
-instance (MonadLogger m, HasContext m) => (Maybe Word256 `A.Alters` MP.StateRoot) m where
+instance (MonadLogger m, HasContext m, (MP.StateRoot `A.Alters` MP.NodeData) m) => (Maybe Word256 `A.Alters` MP.StateRoot) m where
   lookup _ chainId = do
     mBH <- gets $ view $ memDBs . currentBlock
     fmap join . for mBH $ \(CurrentBlockHash bh) -> do
@@ -240,7 +243,7 @@ instance (MonadLogger m, HasContext m) => (Maybe Word256 `A.Alters` MP.StateRoot
         modify $ memDBs . stateRoots %~ M.delete (bh, chainId)
         deleteChainStateRoot chainId bh
 
-instance HasContext m => A.Selectable Word256 ParentChainIds m where
+instance (HasContext m, (MP.StateRoot `A.Alters` MP.NodeData) m) => A.Selectable Word256 ParentChainIds m where
   select _ chainId = fmap (\(_, _, p) -> ParentChainIds p) <$> getChainGenesisInfo (Just chainId)
 
 instance HasContext m => (Keccak256 `A.Alters` DBCode) m where
@@ -248,14 +251,14 @@ instance HasContext m => (Keccak256 `A.Alters` DBCode) m where
   insert _ = genericInsertCodeDB $ getCodeDB
   delete _ = genericDeleteCodeDB $ getCodeDB
 
-instance (MonadLogger m, HasContext m) => ((Address, T.Text) `A.Selectable` X509CertificateField) m where
+instance (MonadLogger m, HasContext m, (MP.StateRoot `A.Alters` MP.NodeData) m) => ((Address, T.Text) `A.Selectable` X509CertificateField) m where
   select _ (k, t) = do
     let certKey addr = ((Account addr Nothing),) . Text.encodeUtf8
     mCertAddress <- lookupX509AddrFromCBHash k
     fmap join . for mCertAddress $ \certAddress -> do
       maybe Nothing (readMaybe . T.unpack . Text.decodeUtf8) <$> A.lookup (A.Proxy) (certKey certAddress t)
 
-instance (MonadLogger m, HasContext m) => (Address `A.Selectable` X509Certificate) m where
+instance (MonadLogger m, HasContext m, (MP.StateRoot `A.Alters` MP.NodeData) m) => (Address `A.Selectable` X509Certificate) m where
   select _ k = do
     let certKey addr = ((Account addr Nothing),) . Text.encodeUtf8
     mCertAddress <- lookupX509AddrFromCBHash k
@@ -277,7 +280,7 @@ instance (HasContext m) => HasMemRawStorageDB m where
   getMemRawStorageBlockDB = gets $ view $ memDBs . storageBlockMap
   putMemRawStorageBlockMap theMap = modify $ memDBs . storageBlockMap .~ theMap
 
-instance (MonadLogger m, HasContext m) => (RawStorageKey `A.Alters` RawStorageValue) m where
+instance (MonadLogger m, HasContext m, (MP.StateRoot `A.Alters` MP.NodeData) m) => (RawStorageKey `A.Alters` RawStorageValue) m where
   lookup _ = genericLookupRawStorageDB
   insert _ = genericInsertRawStorageDB
   delete _ = genericDeleteRawStorageDB
@@ -297,8 +300,8 @@ instance HasContext m => Mod.Accessible RBDB.RedisConnection m where
 instance (MonadIO m, Mod.Accessible RBDB.RedisConnection m) => Mod.Accessible (Maybe WorldBestBlock) m where
   access _ = do
     mRBB <- RBDB.withRedisBlockDB RBDB.getWorldBestBlockInfo
-    for mRBB $ \(RedisBestBlock sha num diff) ->
-      return . WorldBestBlock $ BestBlock sha num diff
+    for mRBB $ \(RedisBestBlock sha num) ->
+      return . WorldBestBlock $ BestBlock sha num
 
 instance (MonadLogger m, HasContext m) => Mod.Modifiable GasCap m where
   get _ = contextGets (GasCap . _vmGasCap)
@@ -306,4 +309,3 @@ instance (MonadLogger m, HasContext m) => Mod.Modifiable GasCap m where
   put _ (GasCap g) = do
     contextModify (vmGasCap .~ g)
     $logDebugS "#### Mod.put @vmGasCap" . T.pack $ "VM Gas Cap updated to: " ++ show g
-

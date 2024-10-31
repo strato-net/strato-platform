@@ -20,6 +20,7 @@ library:
   - aeson-casing
   - bytestring
   - containers
+  - Decimal
   - extra
   - lens
   - parsec

@@ -1,6 +1,6 @@
 module Blockchain.Sequencer.ChainHelpers where
 
-import Blockchain.Data.DataDefs
+import Blockchain.Data.BlockHeader
 import Blockchain.Sequencer.Event
 import Blockchain.Strato.Model.Keccak256
 import Blockchain.Verification (ommersVerificationValue)
@@ -39,26 +39,26 @@ buildIngestChain seed depth maxSiblings = do
     return $ sibling : grandchildren
   return . join $ expanded
 
-mapIngestHeader :: (BlockData -> BlockData) -> IngestBlock -> IngestBlock
+mapIngestHeader :: (BlockHeader -> BlockHeader) -> IngestBlock -> IngestBlock
 mapIngestHeader f baseBlock = baseBlock {ibBlockData = (f . ibBlockData $ baseBlock)}
 
 setIngestBlockParentHash :: Keccak256 -> IngestBlock -> IngestBlock
-setIngestBlockParentHash hash' = mapIngestHeader $ \h -> h {blockDataParentHash = hash'}
+setIngestBlockParentHash hash' = mapIngestHeader $ \h -> h {parentHash = hash'}
 
 setIngestBlockUnclesHash :: Keccak256 -> IngestBlock -> IngestBlock
-setIngestBlockUnclesHash hash' = mapIngestHeader $ \h -> h {blockDataUnclesHash = hash'}
+setIngestBlockUnclesHash hash' = mapIngestHeader $ \h -> h {ommersHash = hash'}
 
 setIngestBlockDifficulty :: Integer -> IngestBlock -> IngestBlock
-setIngestBlockDifficulty diff = mapIngestHeader $ \h -> h {blockDataDifficulty = diff}
+setIngestBlockDifficulty diff = mapIngestHeader $ \h -> h {difficulty = diff}
 
 ingestBlockNumber :: IngestBlock -> Integer
-ingestBlockNumber = blockDataNumber . ibBlockData
+ingestBlockNumber = number . ibBlockData
 
 setIngestBlockNumber :: Integer -> IngestBlock -> IngestBlock
-setIngestBlockNumber number = mapIngestHeader $ \h -> h {blockDataNumber = number}
+setIngestBlockNumber number' = mapIngestHeader $ \h -> h {number = number'}
 
 setIngestBlockGasUsed :: Integer -> IngestBlock -> IngestBlock
-setIngestBlockGasUsed amount = mapIngestHeader $ \h -> h {blockDataGasUsed = amount}
+setIngestBlockGasUsed amount = mapIngestHeader $ \h -> h {gasUsed = amount}
 
 setIngestBlockNonce :: Integer -> IngestBlock -> IngestBlock
-setIngestBlockNonce val = mapIngestHeader $ \h -> h {blockDataNonce = fromIntegral val}
+setIngestBlockNonce val = mapIngestHeader $ \h -> h {nonce = fromIntegral val}

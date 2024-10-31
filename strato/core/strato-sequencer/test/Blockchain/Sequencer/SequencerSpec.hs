@@ -43,6 +43,7 @@ import           Blockchain.Blockstanbul.EventLoop
 import           Blockchain.Blockstanbul.Messages hiding (round)
 import           Blockchain.Blockstanbul.StateMachine
 import           Blockchain.Data.Block
+import           Blockchain.Data.BlockHeader
 import           Blockchain.Data.ChainInfo
 import           Blockchain.Data.DataDefs
 import           Blockchain.Data.RLP
@@ -65,6 +66,8 @@ import           Blockchain.Strato.Model.ExtendedWord
 import           Blockchain.Strato.Model.Keccak256
 import qualified Blockchain.Strato.Model.Keccak256         as Keccak256
 import           Blockchain.Strato.Model.Secp256k1
+import           Blockchain.Strato.Model.Validator (Validator)
+import qualified Blockchain.Strato.Model.Validator as Validator
 import qualified Data.ByteString.Char8               as C8
 import qualified LabeledError
 import           Network.Wai.Handler.Warp
@@ -140,10 +143,12 @@ withTemporaryDepBlockDB pbft genesisBlock m = do
                                , maxUsPerIter = 200
                                , maxEventsPerIter = 10
                                , vaultClient = Nothing
+                               , kafkaClientId = "dummyClientId"
+                               , redisConn = error "withTemporaryDepBlockDB: redisConn"
                                }
         myAddr = fromPrivateKey myPriv
         myCM = CommonName "BlockApps" "Engineering" "Admin" True
-        vals = [myCM]
+        vals = [chainMemberParsedSetToValidator myCM]
         ctx = newContext (Checkpoint (View 0 0) vals) Nothing True (Just myCM)
         mCtx = if pbft then Just ctx else Nothing
         hsh = blockHash . ingestBlockToBlock $ genesisBlock
@@ -170,9 +175,9 @@ mkBlk :: Keccak256 -> Integer -> SequencerM Block
 mkBlk parent num = do
   ctx <- fromMaybe (error "context required for PBFT") <$> getBlockstanbulContext
   let blk0 = makeBlock 2 1
-      blk1 = Block (blockBlockData blk0){blockDataParentHash = parent} (blockReceiptTransactions blk0) (blockBlockUncles blk0)
+      blk1 = Block (blockBlockData blk0){parentHash = parent} (blockReceiptTransactions blk0) (blockBlockUncles blk0)
       blk2 = addValidators (_validators ctx) blk1{
-                 blockBlockData = (blockBlockData blk1){blockDataNumber = num}}
+                 blockBlockData = (blockBlockData blk1){number = num}}
   pseal <- proposerSeal blk2
   let blk3 = addProposerSeal pseal blk2
   cseal <- commitmentSeal (blockHash blk3)
@@ -320,8 +325,8 @@ spec = do
 
       it "should forward new blocks to blockstanbul" . runPBFTTestMWithGenesis $ \h -> do
         let b' = makeBlock 1 1
-            b = Block (blockBlockData b'){ blockDataParentHash = h
-                                         , blockDataNumber = 1
+            b = Block (blockBlockData b'){ parentHash = h
+                                         , number = 1
                                          }
                       (blockReceiptTransactions b')
                       (blockBlockUncles b')
@@ -334,9 +339,9 @@ spec = do
       it "should replay old blocks in blockstanbul" . runPBFTTestMWithGenesis $ \h -> do
         ctx <- fromMaybe (error "context required for PBFT") <$> getBlockstanbulContext
         let blk0 = makeBlock 2 1
-            blk1 = Block (blockBlockData blk0){blockDataParentHash = h} (blockReceiptTransactions blk0) (blockBlockUncles blk0)
+            blk1 = Block (blockBlockData blk0){parentHash = h} (blockReceiptTransactions blk0) (blockBlockUncles blk0)
             blk2 = addValidators (_validators ctx) blk1{
-                      blockBlockData = (blockBlockData blk1){blockDataNumber = 1}}
+                      blockBlockData = (blockBlockData blk1){number = 1}}
         pseal <- proposerSeal blk2
         let blk3 = addProposerSeal pseal blk2
         cseal <- commitmentSeal (blockHash blk3)
@@ -408,29 +413,29 @@ spec = do
       (hashTx3, tx3) <- getChainTx chainId3
 
       let b1' = makeBlockWithTransactions [hashTx1]
-          blk1' h = Block (blockBlockData b1'){ blockDataParentHash = h
-                                              , blockDataNumber = 1
+          blk1' h = Block (blockBlockData b1'){ parentHash = h
+                                              , number = 1
                                               }
                       (blockReceiptTransactions b1')
                       (blockBlockUncles b1')
           iev1' = IEBlock . blockToIngestBlock TO.Morphism . blk1'
           b2' = makeBlockWithTransactions [hashTx1, hashTx2]
-          blk2' h = Block (blockBlockData b2'){ blockDataParentHash = h
-                                              , blockDataNumber = 1
+          blk2' h = Block (blockBlockData b2'){ parentHash = h
+                                              , number = 1
                                               }
                       (blockReceiptTransactions b2')
                       (blockBlockUncles b2')
           iev2' = IEBlock . blockToIngestBlock TO.Morphism . blk2'
           b3' = makeBlockWithTransactions [hashTx1, hashTx3]
-          blk3' h = Block (blockBlockData b3'){ blockDataParentHash = h
-                                              , blockDataNumber = 1
+          blk3' h = Block (blockBlockData b3'){ parentHash = h
+                                              , number = 1
                                               }
                       (blockReceiptTransactions b3')
                       (blockBlockUncles b3')
           iev3' = IEBlock . blockToIngestBlock TO.Morphism . blk3'
           b4' = makeBlockWithTransactions [hashTx3]
-          blk4' h = Block (blockBlockData b4'){ blockDataParentHash = h
-                                              , blockDataNumber = 1
+          blk4' h = Block (blockBlockData b4'){ parentHash = h
+                                              , number = 1
                                               }
                       (blockReceiptTransactions b4')
                       (blockBlockUncles b4')
@@ -591,15 +596,15 @@ spec = do
 
       it "should withhold child chain transactions when parent chain parent chain transactions are missing" . runPBFTTestMWithGenesis $ \h -> do
         let b5' = makeBlockWithTransactions [hashTx1]
-            blk5' = Block (blockBlockData b5'){ blockDataParentHash = h
-                                              , blockDataNumber = 1
+            blk5' = Block (blockBlockData b5'){ parentHash = h
+                                              , number = 1
                                               }
                       (blockReceiptTransactions b5')
                       (blockBlockUncles b5')
             iev5' = IEBlock $ blockToIngestBlock TO.Morphism blk5'
             b6' = makeBlockWithTransactions [hashTx3]
-            blk6' h' = Block (blockBlockData b6'){ blockDataParentHash = h'
-                                                 , blockDataNumber = 2
+            blk6' h' = Block (blockBlockData b6'){ parentHash = h'
+                                                 , number = 2
                                                  }
                          (blockReceiptTransactions b6')
                          (blockBlockUncles b6')
@@ -624,15 +629,15 @@ spec = do
 
       it "should withhold child chain transactions when parent chain parent chain info is missing" . runPBFTTestMWithGenesis $ \h -> do
         let b5' = makeBlockWithTransactions [hashTx1]
-            blk5' = Block (blockBlockData b5'){ blockDataParentHash = h
-                                              , blockDataNumber = 1
+            blk5' = Block (blockBlockData b5'){ parentHash = h
+                                              , number = 1
                                               }
                       (blockReceiptTransactions b5')
                       (blockBlockUncles b5')
             iev5' = IEBlock $ blockToIngestBlock TO.Morphism blk5'
             b6' = makeBlockWithTransactions [hashTx3]
-            blk6' h' = Block (blockBlockData b6'){ blockDataParentHash = h'
-                                                 , blockDataNumber = 2
+            blk6' h' = Block (blockBlockData b6'){ parentHash = h'
+                                                 , number = 2
                                                  }
                          (blockReceiptTransactions b6')
                          (blockBlockUncles b6')

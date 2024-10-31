@@ -36,7 +36,6 @@ library:
     - extra
     - format
     - hashable
-    - hflags
     - insert-ordered-containers
     - labeled-error
     - lens
@@ -64,7 +63,6 @@ library:
     - unliftio
     - vault-monad
     - vector
-    - x509-certs
 
 tests:
   blockapps-bloc22-server-test:

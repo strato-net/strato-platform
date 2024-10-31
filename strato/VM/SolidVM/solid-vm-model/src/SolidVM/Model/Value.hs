@@ -31,6 +31,7 @@ import Data.ByteString (ByteString)
 import qualified Data.ByteString as B
 import qualified Data.ByteString.Base16 as B16
 import qualified Data.ByteString.Char8 as BC
+import Data.Decimal
 import Data.Foldable (asum)
 import Data.IORef
 import Data.Map (Map)
@@ -97,6 +98,7 @@ instance Show Variable where
 
 data Value
   = SInteger Integer
+  | SDecimal Decimal
   | SString String
   | SBool Bool
   | SAccount NamedAccount Bool --isPayable
@@ -145,6 +147,7 @@ data Value
 instance Eq Value where
   (SInteger i1) == (SInteger i2) = i1 == i2
   (SString s1) == (SString s2) = s1 == s2
+  (SDecimal v1) == (SDecimal v2) = v1 == v2
   (SBool b1) == (SBool b2) = b1 == b2
   (SAccount a1 b1) == (SAccount a2 b2) = (a1 == a2 && b1 == b2)
   (SContract c1 a1) == (SContract c2 a2) = c1 == c2 && a1 == a2
@@ -154,6 +157,7 @@ instance Eq Value where
 instance Ord Value where
   compare (SInteger i1) (SInteger i2) = compare i1 i2
   compare (SString s1) (SString s2) = compare s1 s2
+  compare (SDecimal v1) (SDecimal v2) = compare v1 v2
   compare (SBool b1) (SBool b2) = compare b1 b2
   compare (SAccount a1 _) (SAccount a2 _) = compare a1 a2
   compare x y = todo "Value/Ord" (x, y)
@@ -175,6 +179,7 @@ coerceFromInt _ SInteger {} n = SInteger n
 coerceFromInt _ (SAccount a b) n = (SAccount $ (namedAccountAddress .~ fromIntegral n) a) b
 coerceFromInt _ SString {} 0 = SString ""
 coerceFromInt _ SString {} n = SString $ showHex n ""
+coerceFromInt _ SDecimal {} n = SDecimal $ Decimal 0 n
 coerceFromInt _ (SContract c a) n = SContract c $ (namedAccountAddress .~ fromIntegral n) a
 coerceFromInt ct (SEnumVal tipe _ _) n' =
   fromMaybe (typeError "missing enum val" (tipe, n')) $ do
@@ -194,6 +199,7 @@ coerceType ct xt = \case
     SVMType.Bytes {} -> case B16.decode (BC.pack s) of
       Right bs -> SString . BC.unpack $ B.takeWhile (/= 0) bs
       _ -> SString s
+    SVMType.Decimal {} -> SDecimal (read s :: Decimal)
     _ -> typeError "string literal must be string or bytes" (xt, s)
   v -> v
 
@@ -203,6 +209,7 @@ valEquals chainId ct lhs rhs = case (lhs, rhs) of
   (_, SInteger i) -> coerceFromInt ct lhs i == lhs
   (SBool s1, SBool s2) -> s1 == s2
   (SString s1, SString s2) -> s1 == s2
+  (SDecimal v1, SDecimal v2) -> v1 == v2
   (SAccount v1 b1, SAccount v2 b2) -> namedAccountToAccount chainId v1 == namedAccountToAccount chainId v2 && b1 == b2
   (SEnumVal e1 _ n1, SEnumVal e2 _ n2) -> e1 == e2 && n1 == n2
   (SContract _ a1, SAccount a2 _) -> namedAccountToAccount chainId a1 == namedAccountToAccount chainId a2
@@ -225,6 +232,7 @@ defaultValue _ (SVMType.Address _) = (SAccount $ unspecifiedChain (Address 0)) F
 defaultValue _ (SVMType.Account _) = (SAccount $ unspecifiedChain (Address 0)) False
 defaultValue _ (SVMType.String _) = SString ""
 defaultValue _ (SVMType.Bytes _ _) = SString ""
+defaultValue _ SVMType.Decimal = SDecimal 0
 defaultValue ctract (SVMType.UnknownLabel name _) =
   fromMaybe (SContract name $ unspecifiedChain 0x0) $
     asum
@@ -254,6 +262,7 @@ createDefaultValue _ _ (SVMType.Address _) = return $ (SAccount $ unspecifiedCha
 createDefaultValue _ _ (SVMType.Account _) = return $ (SAccount $ unspecifiedChain (Address 0)) False
 createDefaultValue _ _ (SVMType.String _) = return $ SString ""
 createDefaultValue _ _ (SVMType.Bytes _ _) = return $ SString ""
+createDefaultValue _ _ SVMType.Decimal = return $ SDecimal 0
 createDefaultValue cc ctract (SVMType.UnknownLabel name _) =
   case (M.lookup name $ CC._enums ctract, M.lookup name $ CC._structs ctract) of
     (Just ((val : _), _), _) -> return $ SEnumVal name val 0x0
@@ -302,6 +311,7 @@ data Typo
 data BasicType
   = TInteger
   | TString
+  | TDecimal
   | TBool
   | TAccount
   | TEnumVal SolidString

@@ -227,87 +227,6 @@ class CodeEditor extends Component {
         </span>
       </Tab2>
     })
-
-    const chainSelector = this.state.useSearch ? (
-      <div className="row smd-margin-16 col-sm-8" style={{ display: 'flex', alignItems: 'center', marginRight: '8px'}}>
-        <h4 className="text-left" style={{margin: '0 8px 0 0'}}>Shard {this.state.chainSearchQueryField == "chainid" ? "ID" : "Label"}:</h4>
-        <input 
-          className='pt-input smd-pad-4 pt-icon-search' 
-          type="search" 
-          name="chainQuery" 
-          placeholder={this.state.chainSearchQueryField == "chainid" ? "Shard ID" : "Shard Label"}
-          onChange={(e) => {
-            this.setState({chainQuery: e.target.value})
-          }}
-          value={this.state.chainQuery}
-        />
-        <div className="pt-select" style={{margin: '0 5px'}}>
-          <Field
-            className="pt-input"
-            component="select"
-            name="searchByChainId"
-            defaultValue={"chainid"}
-            onChange={
-              (e) => {
-                this.setState({chainSearchQueryField: e.target.value});
-              }
-            }
-            required
-            >
-            <option key={"chainid"} value={"chainid"}>Shard ID</option>
-            {/* get chains api does not accept this query param :( <option key={"label"} value={"label"}>Shard Label</option> */}
-          </Field>
-        </div>
-        <div>
-          <button className="pt-button" onClick={(e) => this.onChainSearch()}>Select Shard</button>
-        </div>
-      </div>) : 
-      
-          <div className='row smd-margin-16 col-sm-8' style={{ display: 'flex', alignItems: 'center', margin: '16px 0'}}>
-              <h4 className="text-left" style={{margin: '0 auto'}}>Shard:</h4>
-              <div className="pt-select" style={{margin: '0 5px'}}>
-                <Field
-                  className="pt-input select-chain"
-                  component="select"
-                  name="chainLabel"
-                  onChange={
-                    (e) => {
-                      const data = e.target.value === 'Main Chain' ? null : e.target.value;
-                      this.props.selectChain(data);
-                    }
-                  }
-                  required
-                  >
-                  <option>Main Chain </option>
-                  {
-                    this.props.chainIds.map((label, i) => {
-                      return (
-                        <option key={label.id} value={label.id}>{label.label}</option>
-                        )
-                      })
-                    }
-                </Field>
-              </div>
-            <div className="smd-pad-2 text-left">
-              <Button
-                onClick={this.onPrevChainClick}
-                className="pt-icon-arrow-left"
-                text="Previous"
-                disabled={!(this.state.chainOffset > 0)}
-                />
-            </div>
-            <div className="smd-pad-2 text-right">
-              <Button
-                onClick={this.onNextChainClick}
-                className="pt-icon-arrow-right"
-                text="Next"
-                disabled={this.props.chainIds.length < this.state.chainLimit}
-                />
-            </div>
-              <div className='col-sm-6'>
-                    &nbsp;
-              </div>
-          </div>
     return (
       <div className="container-fluid pt-dark">
         <div className="row">
@@ -316,7 +235,7 @@ class CodeEditor extends Component {
           </div>
           <div className="text-right col-md-10">
             <div className='smd-pad-16 ' style={{display: "inline-block"}}>
-              <Popover
+              {/* <Popover
                 position={Position.BOTTOM}
                 content={
                   <div>
@@ -328,14 +247,15 @@ class CodeEditor extends Component {
                     onClick={() => {this.compileCode("EVM")}}/>
                   </div>
                 }
-                >
+                > */}
                 <Button
                   className="pt-intent-primary"
                   disabled={false}
+                  onClick={() => {this.compileCode("SolidVM")}}
                   text="Compile">
-                    <Icon style={{margin: 0, padding: 0}} iconName="caret-down"/>
+                    {/* <Icon style={{margin: 0, padding: 0}} iconName="caret-down"/> */}
                 </Button>
-              </Popover>
+              {/* </Popover> */}
             </div>
           
             <DeployDapp
@@ -351,21 +271,6 @@ class CodeEditor extends Component {
               textFromEditor={sourceCode}
               sourceFromEditor={this.props.codeEditorData.response && this.props.codeEditorData.response.src} />
           </div>
-        </div>
-        <div className='row'>
-            <div className='row pt-dark chain-wrapper smd-pad-8' style={{ display: 'flex', alignItems: 'center', marginLeft: '8px'}}>
-              {chainSelector}
-              <div className="smd-pad-8 col-sm-6" style={{display: 'flex', alignItems: 'center'}}>
-                <Switch
-                  checked={this.state.useSearch}
-                  onChange={this.toggleChainQueryType}
-                  label="Search by Shard ID"
-                  />
-                </div>
-              <div className='col-sm-4 text-left'>
-                <strong>Shard:</strong> { this.props.selectedChain ? <HexText value={this.props.selectedChain}></HexText> : 'Main Chain'}
-              </div>
-            </div>
         </div>
         {this.renderFileHandlerButtons()}
         <div className="row">

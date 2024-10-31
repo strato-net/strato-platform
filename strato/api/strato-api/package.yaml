@@ -31,6 +31,7 @@ executables:
     - insert-ordered-containers
     - lens
     - monad-alter
+    - process-monitor
     - regex-compat
     - servant-client-core
     - servant-multipart
@@ -52,22 +53,3 @@ executables:
     # Don't touch this next setting, leave -threaded, otherwise it WILL NOT WORK
     # https://blockappsdev.slack.com/archives/G5E7K3ETX/p1645104924934129
     ghc-options: -threaded
-
-  post-raw-transaction:
-    main:                PostRawTransaction.hs
-    source-dirs:         exec_src
-    other-modules:
-    - Options
-    dependencies:
-    - aeson
-    - bloc2api
-    - blockapps-data
-    - bytestring
-    - containers
-    - format
-    - http-client
-    - servant-client
-    - split
-    - strato-model
-    - text
-    - x509-certs

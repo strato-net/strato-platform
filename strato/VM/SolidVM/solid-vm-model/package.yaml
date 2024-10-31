@@ -19,6 +19,7 @@ library:
   - containers
   - cryptonite
   - data-default
+  - Decimal
   - deepseq
   - ethereum-rlp
   - format

@@ -11,7 +11,6 @@ module Blockchain.EthConf.Model where
 import qualified Data.ByteString as B
 import qualified Data.ByteString.Char8 as C8
 import Data.Ratio
-import Data.Swagger hiding (host, port)
 import Data.Yaml
 import qualified Database.PostgreSQL.Simple as PS (ConnectInfo (..), postgreSQLConnectionString)
 import qualified Database.Redis as Redis
@@ -40,8 +39,7 @@ redisConnection r =
     }
 
 data EthConf = EthConf
-  { ethUniqueId :: EthUniqueId,
-    sqlConfig :: SqlConf,
+  { sqlConfig :: SqlConf,
     cirrusConfig :: SqlConf,
     redisBlockDBConfig :: RedisBlockDBConf,
     kafkaConfig :: KafkaConf,
@@ -83,18 +81,6 @@ data RedisBlockDBConf = RedisBlockDBConf
     redisMaxIdleTime :: Integer
   }
   deriving (Show, Eq, Generic, FromJSON, ToJSON)
-
-data EthUniqueId = EthUniqueId
-  { peerId :: String,
-    genesisHash :: String,
-    networkId :: Int
-  }
-  deriving (Show, Eq, Generic, FromJSON, ToJSON)
-
-instance ToSchema EthUniqueId where
-  declareNamedSchema _ =
-    return $
-      NamedSchema (Just "EthUniqueId") mempty
 
 data LevelDBConf = LevelDBConf
   { table :: String,

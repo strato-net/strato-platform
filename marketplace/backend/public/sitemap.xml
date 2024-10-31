@@ -6,659 +6,134 @@
      xmlns:video="http://www.google.com/schemas/sitemap-video/1.1">
      
      <url>
-       <loc>https://marketplace.mercata.blockapps.net/</loc>
-       <lastmod>2024-04-09T09:50:00.809Z</lastmod>
+       <loc>http://localhost/</loc>
+       <lastmod>2024-05-23T15:30:18.465Z</lastmod>
        <changefreq>daily</changefreq>
        <priority>0.5</priority>
      </url>
 
      <url>
-       <loc>https://marketplace.mercata.blockapps.net/c/all</loc>
-       <lastmod>2024-04-09T09:50:00.809Z</lastmod>
+       <loc>http://localhost/c/All</loc>
+       <lastmod>2024-05-23T15:30:18.465Z</lastmod>
        <changefreq>daily</changefreq>
        <priority>0.5</priority>
      </url>
 
      <url>
-       <loc>https://marketplace.mercata.blockapps.net/c/Carbon?sc=CarbonOffset%2CCarbonDAO</loc>
-       <lastmod>2024-04-09T09:50:00.809Z</lastmod>
+       <loc>http://localhost/c/Carbon?sc=CarbonOffset%2CCarbonDAO</loc>
+       <lastmod>2024-05-23T15:30:18.465Z</lastmod>
        <changefreq>daily</changefreq>
        <priority>0.5</priority>
      </url>
 
      <url>
-       <loc>https://marketplace.mercata.blockapps.net/c/Metals?sc=Metals</loc>
-       <lastmod>2024-04-09T09:50:00.809Z</lastmod>
+       <loc>http://localhost/c/Metals?sc=Metals</loc>
+       <lastmod>2024-05-23T15:30:18.465Z</lastmod>
        <changefreq>daily</changefreq>
        <priority>0.5</priority>
      </url>
 
      <url>
-       <loc>https://marketplace.mercata.blockapps.net/c/Clothing?sc=Clothing</loc>
-       <lastmod>2024-04-09T09:50:00.809Z</lastmod>
+       <loc>http://localhost/c/Clothing?sc=Clothing</loc>
+       <lastmod>2024-05-23T15:30:18.465Z</lastmod>
        <changefreq>daily</changefreq>
        <priority>0.5</priority>
      </url>
 
      <url>
-       <loc>https://marketplace.mercata.blockapps.net/c/Collectibles?sc=Collectibles</loc>
-       <lastmod>2024-04-09T09:50:00.809Z</lastmod>
+       <loc>http://localhost/c/Collectibles?sc=Collectibles</loc>
+       <lastmod>2024-05-23T15:30:18.465Z</lastmod>
        <changefreq>daily</changefreq>
        <priority>0.5</priority>
      </url>
 
      <url>
-       <loc>https://marketplace.mercata.blockapps.net/c/Art?sc=Art</loc>
-       <lastmod>2024-04-09T09:50:00.809Z</lastmod>
+       <loc>http://localhost/c/Art?sc=Art</loc>
+       <lastmod>2024-05-23T15:30:18.465Z</lastmod>
        <changefreq>daily</changefreq>
        <priority>0.5</priority>
      </url>
 
      <url>
-       <loc>https://marketplace.mercata.blockapps.net/c/Membership?sc=Membership</loc>
-       <lastmod>2024-04-09T09:50:00.809Z</lastmod>
+       <loc>http://localhost/c/Membership?sc=Membership</loc>
+       <lastmod>2024-05-23T15:30:18.465Z</lastmod>
        <changefreq>daily</changefreq>
        <priority>0.5</priority>
      </url>
 
      <url>
-       <loc>https://marketplace.mercata.blockapps.net/checkout</loc>
-       <lastmod>2024-04-09T09:50:00.809Z</lastmod>
+       <loc>http://localhost/checkout</loc>
+       <lastmod>2024-05-23T15:30:18.465Z</lastmod>
        <changefreq>daily</changefreq>
        <priority>0.5</priority>
      </url>
 
      <url>
-       <loc>https://marketplace.mercata.blockapps.net/dp/8d573f775ce07efd650bb93305ae11df0e385fc7/Blended%20Mercata%20Carbon%20Tonne%20February%202024</loc>
-       <lastmod>2024-04-09T09:50:02.951Z</lastmod>
+       <loc>http://localhost/dp/f89aa5f0b4f0d8deeeae3d266ae980b7e0e71b77/New%20Item%2041</loc>
+       <lastmod>2024-05-23T15:30:19.367Z</lastmod>
        <changefreq>daily</changefreq>
        <priority>0.5</priority>
      </url>
 
      <url>
-       <loc>https://marketplace.mercata.blockapps.net/dp/b0fb9c1f4f8aad85c65a0bd294c86ba521a4492b/Blended%20Mercata%20Carbon%20Tonne%20February%202024</loc>
-       <lastmod>2024-04-09T09:50:02.951Z</lastmod>
+       <loc>http://localhost/dp/ead76f264ac7011412ce7468794ec6504fb84c71/Gold%20Medal</loc>
+       <lastmod>2024-05-23T15:30:19.367Z</lastmod>
        <changefreq>daily</changefreq>
        <priority>0.5</priority>
      </url>
 
      <url>
-       <loc>https://marketplace.mercata.blockapps.net/dp/6bf427fc20d481946db2b043744c7eb242574a10/Blended%20Mercata%20Carbon%20Tonne%20February%202024</loc>
-       <lastmod>2024-04-09T09:50:02.951Z</lastmod>
+       <loc>http://localhost/dp/754ef9d22a79d70d86adbb21552f6e59ff3bb77c/Test%20Trending%20</loc>
+       <lastmod>2024-05-23T15:30:19.367Z</lastmod>
        <changefreq>daily</changefreq>
        <priority>0.5</priority>
      </url>
 
      <url>
-       <loc>https://marketplace.mercata.blockapps.net/dp/05023591e180e644512024b24e74f56acdb0ea4a/Carbon%20Neutral%20Silver%20-%20Fractional%20100%20oz%20Bars</loc>
-       <lastmod>2024-04-09T09:50:02.951Z</lastmod>
+       <loc>http://localhost/dp/60226fe3d90941b9b0c9c7332c03def36ec82b25/Test</loc>
+       <lastmod>2024-05-23T15:30:19.367Z</lastmod>
        <changefreq>daily</changefreq>
        <priority>0.5</priority>
      </url>
 
      <url>
-       <loc>https://marketplace.mercata.blockapps.net/dp/884cc837dfb52d23827d6425e2a00020f8cb0be7/Carbon%20Neutral%20Silver%20-%20Fractional%20100%20oz%20Bars</loc>
-       <lastmod>2024-04-09T09:50:02.951Z</lastmod>
+       <loc>http://localhost/dp/4095dc21ae9ad88a7974dcfd6ec2b494292d469b/SIlver%20Medal</loc>
+       <lastmod>2024-05-23T15:30:19.367Z</lastmod>
        <changefreq>daily</changefreq>
        <priority>0.5</priority>
      </url>
 
      <url>
-       <loc>https://marketplace.mercata.blockapps.net/dp/2c59ef92d08efde71fe1a1cb5b45f4f6d48fcc94/Silver%20-%20Fractional%20100%20oz%20Bars</loc>
-       <lastmod>2024-04-09T09:50:02.951Z</lastmod>
+       <loc>http://localhost/dp/b2477f3ce312bd57529ac3e9699aa33f447c144a/Test</loc>
+       <lastmod>2024-05-23T15:30:19.367Z</lastmod>
        <changefreq>daily</changefreq>
        <priority>0.5</priority>
      </url>
 
      <url>
-       <loc>https://marketplace.mercata.blockapps.net/dp/653d90953e3b7698bf6123712fcace53d56aab03/CNS%20Signature</loc>
-       <lastmod>2024-04-09T09:50:02.951Z</lastmod>
+       <loc>http://localhost/dp/e017a42a950f2598b7c6ac2bdf513d689d1c1676/Demo%20Test</loc>
+       <lastmod>2024-05-23T15:30:19.367Z</lastmod>
        <changefreq>daily</changefreq>
        <priority>0.5</priority>
      </url>
 
      <url>
-       <loc>https://marketplace.mercata.blockapps.net/dp/05fa658c89d88a1e78de9730234111cf4f158da4/Scarlet%20&amp;%20Violet%20Paldea%20Evolved%20Pokemon%20Booster%20Pack</loc>
-       <lastmod>2024-04-09T09:50:02.951Z</lastmod>
+       <loc>http://localhost/dp/eaff027203e011a0626ac273f2a198927535568f/SIlver%20Medal</loc>
+       <lastmod>2024-05-23T15:30:19.367Z</lastmod>
        <changefreq>daily</changefreq>
        <priority>0.5</priority>
      </url>
 
      <url>
-       <loc>https://marketplace.mercata.blockapps.net/dp/c3acb62ade5cf688df1068dfffd8ab3848970ce5/Lululemon%20Dual%20Pouch%20Wristlet%20Black</loc>
-       <lastmod>2024-04-09T09:50:02.951Z</lastmod>
+       <loc>http://localhost/dp/3a4a971bf19f82b10bfb1f6214e3bf0ff7e2f092/Thompson%20Whiskey%2010%20year</loc>
+       <lastmod>2024-05-23T15:30:19.367Z</lastmod>
        <changefreq>daily</changefreq>
        <priority>0.5</priority>
      </url>
 
      <url>
-       <loc>https://marketplace.mercata.blockapps.net/dp/68227826a392251aee9a06cfd2e4b2127913e320/SUPREME%20X%20AIR%20FORCE%201%20LOW%20SP%20&apos;BOX%20LOGO%20-%20WHEAT&apos;</loc>
-       <lastmod>2024-04-09T09:50:02.951Z</lastmod>
-       <changefreq>daily</changefreq>
-       <priority>0.5</priority>
-     </url>
-
-     <url>
-       <loc>https://marketplace.mercata.blockapps.net/dp/15cbbba226166bf44b71aaaddf6bbe6cc7aff7b3/SUPREME%20X%20AIR%20FORCE%201%20LOW%20SP%20&apos;BOX%20LOGO%20-%20WHEAT&apos;</loc>
-       <lastmod>2024-04-09T09:50:02.951Z</lastmod>
-       <changefreq>daily</changefreq>
-       <priority>0.5</priority>
-     </url>
-
-     <url>
-       <loc>https://marketplace.mercata.blockapps.net/dp/1fce37b6a9feb088946c436d7a263619611e8bdf/JORDAN%20HYDRO%208%20RETRO%20SLIDE%20&apos;PLAYOFF&apos;</loc>
-       <lastmod>2024-04-09T09:50:02.951Z</lastmod>
-       <changefreq>daily</changefreq>
-       <priority>0.5</priority>
-     </url>
-
-     <url>
-       <loc>https://marketplace.mercata.blockapps.net/dp/7a3d5afbe9a99bc80bb3a6f7c56e5a73489de6bd/Blended%20Mercata%20Carbon%20Tonne%20April%202024</loc>
-       <lastmod>2024-04-09T09:50:02.951Z</lastmod>
-       <changefreq>daily</changefreq>
-       <priority>0.5</priority>
-     </url>
-
-     <url>
-       <loc>https://marketplace.mercata.blockapps.net/dp/45b18eddec487ed4da720e42650a95a0211369e7/Obsidian%20Flames%20Pokemon%20Booster%20Pack</loc>
-       <lastmod>2024-04-09T09:50:02.951Z</lastmod>
-       <changefreq>daily</changefreq>
-       <priority>0.5</priority>
-     </url>
-
-     <url>
-       <loc>https://marketplace.mercata.blockapps.net/dp/1ac0d9883c91100bdc7a4b941c99a4923483d75c/Blackpink%20x%20Takashi%20Murakami%20Pandakashi%20600MMX600MM\&quot;%20PINK%20Print%20/1000</loc>
-       <lastmod>2024-04-09T09:50:02.951Z</lastmod>
-       <changefreq>daily</changefreq>
-       <priority>0.5</priority>
-     </url>
-
-     <url>
-       <loc>https://marketplace.mercata.blockapps.net/dp/36323582dfb082adc8461c83ca3813dac96b9a3a/🐉Dragon%20II%20by%20James%20Jean🐉%20Print%20Artwork%20(Limited%20Edition:Year%20of%20the%20Dragon)</loc>
-       <lastmod>2024-04-09T09:50:02.951Z</lastmod>
-       <changefreq>daily</changefreq>
-       <priority>0.5</priority>
-     </url>
-
-     <url>
-       <loc>https://marketplace.mercata.blockapps.net/dp/7f8a9d254a82e18d699ca21642186ba2f1d51204/SUPREME%20X%20AIR%20FORCE%201%20LOW%20SP%20&apos;BOX%20LOGO%20-%20WHEAT&apos;</loc>
-       <lastmod>2024-04-09T09:50:02.951Z</lastmod>
-       <changefreq>daily</changefreq>
-       <priority>0.5</priority>
-     </url>
-
-     <url>
-       <loc>https://marketplace.mercata.blockapps.net/dp/4144d8f999b0bd0ad8f15f61a42c2b24433dc5e9/AIR%20JORDAN%201%20HIGH%20GOLF%20&apos;BORDEAUX&apos;</loc>
-       <lastmod>2024-04-09T09:50:02.951Z</lastmod>
-       <changefreq>daily</changefreq>
-       <priority>0.5</priority>
-     </url>
-
-     <url>
-       <loc>https://marketplace.mercata.blockapps.net/dp/70a46102143a18f7ff1ee9d7f0687359ebcf68d7/AIR%20FORCE%201%20&apos;07%20&apos;TRIPLE%20WHITE&apos;</loc>
-       <lastmod>2024-04-09T09:50:02.951Z</lastmod>
-       <changefreq>daily</changefreq>
-       <priority>0.5</priority>
-     </url>
-
-     <url>
-       <loc>https://marketplace.mercata.blockapps.net/dp/f13f2c41baa847bfbdf345e3e08f81f829ab9725/JORDAN%20HYDRO%208%20RETRO%20SLIDE%20&apos;PLAYOFF&apos;</loc>
-       <lastmod>2024-04-09T09:50:02.951Z</lastmod>
-       <changefreq>daily</changefreq>
-       <priority>0.5</priority>
-     </url>
-
-     <url>
-       <loc>https://marketplace.mercata.blockapps.net/dp/102a036b96977072ddbaf1658c5ea793dc355ed5/AIR%20JORDAN%201%20LOW%20SE%20&apos;FLIGHT%20CLUB&apos;</loc>
-       <lastmod>2024-04-09T09:50:02.951Z</lastmod>
-       <changefreq>daily</changefreq>
-       <priority>0.5</priority>
-     </url>
-
-     <url>
-       <loc>https://marketplace.mercata.blockapps.net/dp/c507ac4d7b4b5f8026c76d1c2123cd4445ebfd56/JORDAN%20HYDRO%208%20RETRO%20SLIDE%20&apos;PLAYOFF&apos;</loc>
-       <lastmod>2024-04-09T09:50:02.951Z</lastmod>
-       <changefreq>daily</changefreq>
-       <priority>0.5</priority>
-     </url>
-
-     <url>
-       <loc>https://marketplace.mercata.blockapps.net/dp/0d75a067f20e8392b0caadf10881dc132302687a/10K%20Black%20Hills%20Onyx%20Eagle%20Ring%20</loc>
-       <lastmod>2024-04-09T09:50:02.951Z</lastmod>
-       <changefreq>daily</changefreq>
-       <priority>0.5</priority>
-     </url>
-
-     <url>
-       <loc>https://marketplace.mercata.blockapps.net/dp/d754eb888f528d7a046dad4e23d15da5b85c654f/Vintage%20Sterling%20Silver%20Dangle%20Earrings%20with%20Green%20Stone!</loc>
-       <lastmod>2024-04-09T09:50:02.951Z</lastmod>
-       <changefreq>daily</changefreq>
-       <priority>0.5</priority>
-     </url>
-
-     <url>
-       <loc>https://marketplace.mercata.blockapps.net/dp/f2087e743a7bd55f1e748ce022c4fa0566cba906/Vintage%20Sterling%20Silver%20Jesus%20Necklace%20and%20Charm!</loc>
-       <lastmod>2024-04-09T09:50:02.951Z</lastmod>
-       <changefreq>daily</changefreq>
-       <priority>0.5</priority>
-     </url>
-
-     <url>
-       <loc>https://marketplace.mercata.blockapps.net/dp/96033a0d3665d9a17f580bad166a90c181fee56b/Vintage%20Mother%20of%20Pearl%20and%20Bone%20Necklace</loc>
-       <lastmod>2024-04-09T09:50:02.951Z</lastmod>
-       <changefreq>daily</changefreq>
-       <priority>0.5</priority>
-     </url>
-
-     <url>
-       <loc>https://marketplace.mercata.blockapps.net/dp/de7e8a3a0cd92aded56167217c467655201e1cda/Vintage%20Antique%20Marcasite%20Sterling%20Silver%20Ring!!</loc>
-       <lastmod>2024-04-09T09:50:02.951Z</lastmod>
-       <changefreq>daily</changefreq>
-       <priority>0.5</priority>
-     </url>
-
-     <url>
-       <loc>https://marketplace.mercata.blockapps.net/dp/5ebe51fe8b5a0ec78c8a7dd62703087bdfed96d8/Vintage%20Sterling%20Silver%20Italian%20Cornicello%20Earrings!!</loc>
-       <lastmod>2024-04-09T09:50:02.951Z</lastmod>
-       <changefreq>daily</changefreq>
-       <priority>0.5</priority>
-     </url>
-
-     <url>
-       <loc>https://marketplace.mercata.blockapps.net/dp/3a3675e9b90683ae069250652a74334122e448c8/Vintage%20Green%20Bead%20Choker</loc>
-       <lastmod>2024-04-09T09:50:02.951Z</lastmod>
-       <changefreq>daily</changefreq>
-       <priority>0.5</priority>
-     </url>
-
-     <url>
-       <loc>https://marketplace.mercata.blockapps.net/dp/06e579b2fb6dd605869d15ddace773bfa90cfc08/Vintage%20Quartz%20&amp;%20Crystal%20Necklace%20</loc>
-       <lastmod>2024-04-09T09:50:02.951Z</lastmod>
-       <changefreq>daily</changefreq>
-       <priority>0.5</priority>
-     </url>
-
-     <url>
-       <loc>https://marketplace.mercata.blockapps.net/dp/2f73dea2461f4a9c83e44375abd5097766e59a83/Vintage%20Sterling%20Silver%20Hamsa%20Jewish%20Hand%20Pendant%20Necklace</loc>
-       <lastmod>2024-04-09T09:50:02.951Z</lastmod>
-       <changefreq>daily</changefreq>
-       <priority>0.5</priority>
-     </url>
-
-     <url>
-       <loc>https://marketplace.mercata.blockapps.net/dp/b91ae61610c8e1354a193df4e4ead63240379d55/Vintage%20Sterling%20Silver%20and%20Onyx%20Dangle%20Earrings</loc>
-       <lastmod>2024-04-09T09:50:02.951Z</lastmod>
-       <changefreq>daily</changefreq>
-       <priority>0.5</priority>
-     </url>
-
-     <url>
-       <loc>https://marketplace.mercata.blockapps.net/dp/3d74aacffa5ef0e01dafd166a7deeb0295719e54/Vintage%20Wood%20and%20Mother%20of%20Pearl%20Necklace</loc>
-       <lastmod>2024-04-09T09:50:02.951Z</lastmod>
-       <changefreq>daily</changefreq>
-       <priority>0.5</priority>
-     </url>
-
-     <url>
-       <loc>https://marketplace.mercata.blockapps.net/dp/ca0b61289d547d188e85be0d0b9511d955128079/Vintage%20Sterling%20Brown%20Crystal%20Ring</loc>
-       <lastmod>2024-04-09T09:50:02.951Z</lastmod>
-       <changefreq>daily</changefreq>
-       <priority>0.5</priority>
-     </url>
-
-     <url>
-       <loc>https://marketplace.mercata.blockapps.net/dp/d8235c828ee6ba6af545a45647f6a856f0c8a819/Stanley%20x%20Starbucks%20(Target%20Exclusive)%20Quencher%2040oz%20Tumbler%20Winter%20Pink%20(2024)</loc>
-       <lastmod>2024-04-09T09:50:02.951Z</lastmod>
-       <changefreq>daily</changefreq>
-       <priority>0.5</priority>
-     </url>
-
-     <url>
-       <loc>https://marketplace.mercata.blockapps.net/dp/60d30021a40b60a2b3894da8bf659dd31c905d61/Supreme%20Spalding%20Mini%20Basketball%20Hoop%20Red</loc>
-       <lastmod>2024-04-09T09:50:02.951Z</lastmod>
-       <changefreq>daily</changefreq>
-       <priority>0.5</priority>
-     </url>
-
-     <url>
-       <loc>https://marketplace.mercata.blockapps.net/dp/d1974f2dc742f86c0e7a1d4a5f7de875f4f2b668/Stanley%20Chocolate%20Flowstate%20Quencher%2040oz%20Tumbler%20Chocolate%20Gold</loc>
-       <lastmod>2024-04-09T09:50:02.951Z</lastmod>
-       <changefreq>daily</changefreq>
-       <priority>0.5</priority>
-     </url>
-
-     <url>
-       <loc>https://marketplace.mercata.blockapps.net/dp/9ac0ea0176cf28b6ffdc3d273a7eb38bd6f8f7cf/2003-04%20Topps%20Chrome%20Refractor%20#113%20Carmelo%20Anthony%20Rookie%20RC%20Gem%20Mint%20PSA%2010</loc>
-       <lastmod>2024-04-09T09:50:02.951Z</lastmod>
-       <changefreq>daily</changefreq>
-       <priority>0.5</priority>
-     </url>
-
-     <url>
-       <loc>https://marketplace.mercata.blockapps.net/dp/c523880ce97d2228a445dab060cd9357f657507a/2023%20Bandai%20One%20Piece%20Card%20Game%20Awakening%20of%20the%20New%20Era%20Booster%20Box%20(OP-05)%20English</loc>
-       <lastmod>2024-04-09T09:50:02.951Z</lastmod>
-       <changefreq>daily</changefreq>
-       <priority>0.5</priority>
-     </url>
-
-     <url>
-       <loc>https://marketplace.mercata.blockapps.net/dp/23886fc23700bfb35605cf7839d7e3b928bc59fe/BlockApps%20Hat%20&amp;%20T-Shirt%20Bundle</loc>
-       <lastmod>2024-04-09T09:50:02.951Z</lastmod>
-       <changefreq>daily</changefreq>
-       <priority>0.5</priority>
-     </url>
-
-     <url>
-       <loc>https://marketplace.mercata.blockapps.net/dp/07ad85c1a26f4e4a30150715cc9bfde2f4426846/BlockApps%20Hat%20&amp;%20T-Shirt%20Bundle</loc>
-       <lastmod>2024-04-09T09:50:02.951Z</lastmod>
-       <changefreq>daily</changefreq>
-       <priority>0.5</priority>
-     </url>
-
-     <url>
-       <loc>https://marketplace.mercata.blockapps.net/dp/22053103bf4a5310c07d00a2b14f4d57cfd32eea/White%20BlockApps%20Logo%20Hat%20</loc>
-       <lastmod>2024-04-09T09:50:02.951Z</lastmod>
-       <changefreq>daily</changefreq>
-       <priority>0.5</priority>
-     </url>
-
-     <url>
-       <loc>https://marketplace.mercata.blockapps.net/dp/c98d977cf8a446ca5653885e1b97456b3fbdc3a0/Grey%20BlockApps%20Logo%20Hat</loc>
-       <lastmod>2024-04-09T09:50:02.951Z</lastmod>
-       <changefreq>daily</changefreq>
-       <priority>0.5</priority>
-     </url>
-
-     <url>
-       <loc>https://marketplace.mercata.blockapps.net/dp/e2a5b3375ca7981a03234a90a06c051319e7256d/AIR%20JORDAN%2013%20RETRO%20&apos;BLACK%20FLINT&apos;</loc>
-       <lastmod>2024-04-09T09:50:02.951Z</lastmod>
-       <changefreq>daily</changefreq>
-       <priority>0.5</priority>
-     </url>
-
-     <url>
-       <loc>https://marketplace.mercata.blockapps.net/dp/6b86c9ebbd1f3aeffd4475cae901b1d26eaf7a66/YEEZY%20BOOST%20700%20MNVN%20LACELESS%20&apos;ANALOG&apos;</loc>
-       <lastmod>2024-04-09T09:50:02.951Z</lastmod>
-       <changefreq>daily</changefreq>
-       <priority>0.5</priority>
-     </url>
-
-     <url>
-       <loc>https://marketplace.mercata.blockapps.net/dp/9ae7a05bfaebce85ebab4c584a4a7aacf39c2757/The%20BlockApps%20Limited%20Edition%20T-shirt!</loc>
-       <lastmod>2024-04-09T09:50:02.951Z</lastmod>
-       <changefreq>daily</changefreq>
-       <priority>0.5</priority>
-     </url>
-
-     <url>
-       <loc>https://marketplace.mercata.blockapps.net/dp/0dffee692e62afcc665f4db7f1e49707b413ef30/The%20BlockApps%20Limited%20Edition%20T-shirt!%20</loc>
-       <lastmod>2024-04-09T09:50:02.951Z</lastmod>
-       <changefreq>daily</changefreq>
-       <priority>0.5</priority>
-     </url>
-
-     <url>
-       <loc>https://marketplace.mercata.blockapps.net/dp/79d918175fd96c871d8da4b7858ebba4b0a33ecd/Lululemon%20Dual%20Pouch%20Wristlet%20Teal/Storm</loc>
-       <lastmod>2024-04-09T09:50:02.951Z</lastmod>
-       <changefreq>daily</changefreq>
-       <priority>0.5</priority>
-     </url>
-
-     <url>
-       <loc>https://marketplace.mercata.blockapps.net/dp/3836d314c56516bd0c76d20e4494e7facaf47f46/Lululemon%20Dual%20Pouch%20Wristlet%20Raspberry%20Cream</loc>
-       <lastmod>2024-04-09T09:50:02.951Z</lastmod>
-       <changefreq>daily</changefreq>
-       <priority>0.5</priority>
-     </url>
-
-     <url>
-       <loc>https://marketplace.mercata.blockapps.net/dp/be286dbd22c31bab4220eb3d215fdb79ad24b9dc/WMNS%20AIR%20JORDAN%201%20RETRO%20HIGH%20OG%20&apos;SATIN%20BRED&apos;%202023</loc>
-       <lastmod>2024-04-09T09:50:02.951Z</lastmod>
-       <changefreq>daily</changefreq>
-       <priority>0.5</priority>
-     </url>
-
-     <url>
-       <loc>https://marketplace.mercata.blockapps.net/dp/a9d8e4b4b7446c4165f92b5f21835cf28bd8e87d/BILLIE%20EILISH%20X%20AIR%20FORCE%201%20LOW%20&apos;SEQUOIA&apos;</loc>
-       <lastmod>2024-04-09T09:50:02.951Z</lastmod>
-       <changefreq>daily</changefreq>
-       <priority>0.5</priority>
-     </url>
-
-     <url>
-       <loc>https://marketplace.mercata.blockapps.net/dp/0a83cabaa3544577a5237cf7d4d619c7cd185aee/AIR%20JORDAN%2013%20RETRO%20GS%20&apos;PLAYOFF&apos;%202023</loc>
-       <lastmod>2024-04-09T09:50:02.951Z</lastmod>
-       <changefreq>daily</changefreq>
-       <priority>0.5</priority>
-     </url>
-
-     <url>
-       <loc>https://marketplace.mercata.blockapps.net/dp/25de6090e1a9d31e2ad064d6fde10bcd7db8a743/AIR%20JORDAN%201%20LOW%20SE%20GS%20&apos;SKY%20J%20MAUVE&apos;</loc>
-       <lastmod>2024-04-09T09:50:02.951Z</lastmod>
-       <changefreq>daily</changefreq>
-       <priority>0.5</priority>
-     </url>
-
-     <url>
-       <loc>https://marketplace.mercata.blockapps.net/dp/9aa696cf78661dad8c7a3bf736c7ea50071f4a9b/AIR%20JORDAN%201%20LOW%20SE%20GS%20&apos;SKY%20J%20MAUVE&apos;</loc>
-       <lastmod>2024-04-09T09:50:02.951Z</lastmod>
-       <changefreq>daily</changefreq>
-       <priority>0.5</priority>
-     </url>
-
-     <url>
-       <loc>https://marketplace.mercata.blockapps.net/dp/8dee1bbd5625f42686ae859fe63d7df16d56be2f/NOCTA%20X%20AIR%20FORCE%201%20LOW%20&apos;CERTIFIED%20LOVER%20BOY&apos;</loc>
-       <lastmod>2024-04-09T09:50:02.951Z</lastmod>
-       <changefreq>daily</changefreq>
-       <priority>0.5</priority>
-     </url>
-
-     <url>
-       <loc>https://marketplace.mercata.blockapps.net/dp/b037f23c4fd6e982c66d0eec9e2b3194d7e1c1fe/AIR%20JORDAN%203%20RETRO%20&apos;FEAR&apos;%202023</loc>
-       <lastmod>2024-04-09T09:50:02.951Z</lastmod>
-       <changefreq>daily</changefreq>
-       <priority>0.5</priority>
-     </url>
-
-     <url>
-       <loc>https://marketplace.mercata.blockapps.net/dp/d0ff88594507f878934ace9a37f401b561d294d2/AIR%20JORDAN%203%20RETRO%20&apos;FEAR&apos;%202023</loc>
-       <lastmod>2024-04-09T09:50:02.951Z</lastmod>
-       <changefreq>daily</changefreq>
-       <priority>0.5</priority>
-     </url>
-
-     <url>
-       <loc>https://marketplace.mercata.blockapps.net/dp/8396ea35703510dc60f0bcf5c6a32df5bfd633e5/SUPREME%20X%20AIR%20FORCE%201%20LOW%20SP%20&apos;BOX%20LOGO%20-%20WHEAT&apos;</loc>
-       <lastmod>2024-04-09T09:50:02.951Z</lastmod>
-       <changefreq>daily</changefreq>
-       <priority>0.5</priority>
-     </url>
-
-     <url>
-       <loc>https://marketplace.mercata.blockapps.net/dp/7d87b9dee4ae0b315144aad92a4f994a83bf2072/JORDAN%20HYDRO%208%20RETRO%20SLIDE%20&apos;PLAYOFF&apos;</loc>
-       <lastmod>2024-04-09T09:50:02.951Z</lastmod>
-       <changefreq>daily</changefreq>
-       <priority>0.5</priority>
-     </url>
-
-     <url>
-       <loc>https://marketplace.mercata.blockapps.net/dp/cb68afad9e83b3a7296a75d3b94b787abfff0640/SUPREME%20X%20AIR%20FORCE%201%20LOW%20SP%20&apos;BOX%20LOGO%20-%20WHEAT&apos;</loc>
-       <lastmod>2024-04-09T09:50:02.951Z</lastmod>
-       <changefreq>daily</changefreq>
-       <priority>0.5</priority>
-     </url>
-
-     <url>
-       <loc>https://marketplace.mercata.blockapps.net/dp/ced726966a5bfba40a23d731cdb77bf085ef811e/SUPREME%20X%20AIR%20FORCE%201%20LOW%20SP%20&apos;BOX%20LOGO%20-%20WHEAT&apos;</loc>
-       <lastmod>2024-04-09T09:50:02.951Z</lastmod>
-       <changefreq>daily</changefreq>
-       <priority>0.5</priority>
-     </url>
-
-     <url>
-       <loc>https://marketplace.mercata.blockapps.net/dp/be40a7cafc43e734f8876c1a4a8c743fade97be0/AIR%20JORDAN%201%20LOW%20SE%20&apos;FLIGHT%20CLUB&apos;</loc>
-       <lastmod>2024-04-09T09:50:02.951Z</lastmod>
-       <changefreq>daily</changefreq>
-       <priority>0.5</priority>
-     </url>
-
-     <url>
-       <loc>https://marketplace.mercata.blockapps.net/dp/a5c5568e03a6e6c3fa4a72081df57161e4c2630d/AIR%20JORDAN%201%20LOW%20SE%20&apos;FLIGHT%20CLUB&apos;</loc>
-       <lastmod>2024-04-09T09:50:02.951Z</lastmod>
-       <changefreq>daily</changefreq>
-       <priority>0.5</priority>
-     </url>
-
-     <url>
-       <loc>https://marketplace.mercata.blockapps.net/dp/7a170d5c7c4fbf415db1842d91489d972552780e/AIR%20JORDAN%201%20LOW%20SE%20&apos;FLIGHT%20CLUB&apos;</loc>
-       <lastmod>2024-04-09T09:50:02.951Z</lastmod>
-       <changefreq>daily</changefreq>
-       <priority>0.5</priority>
-     </url>
-
-     <url>
-       <loc>https://marketplace.mercata.blockapps.net/dp/0a9ede8abbadec684ee5ba7798a66a14805fdd3a/AIR%20JORDAN%201%20LOW%20SE%20&apos;FLIGHT%20CLUB&apos;</loc>
-       <lastmod>2024-04-09T09:50:02.951Z</lastmod>
-       <changefreq>daily</changefreq>
-       <priority>0.5</priority>
-     </url>
-
-     <url>
-       <loc>https://marketplace.mercata.blockapps.net/dp/94b5ab919fa47f15e61d78222ba7ddbeff4bebec/AIR%20JORDAN%201%20LOW%20SE%20&apos;FLIGHT%20CLUB&apos;</loc>
-       <lastmod>2024-04-09T09:50:02.951Z</lastmod>
-       <changefreq>daily</changefreq>
-       <priority>0.5</priority>
-     </url>
-
-     <url>
-       <loc>https://marketplace.mercata.blockapps.net/dp/e96a552c4e794064ef29bca3c3df72913f13f791/AIR%20JORDAN%201%20LOW%20SE%20&apos;FLIGHT%20CLUB&apos;</loc>
-       <lastmod>2024-04-09T09:50:02.951Z</lastmod>
-       <changefreq>daily</changefreq>
-       <priority>0.5</priority>
-     </url>
-
-     <url>
-       <loc>https://marketplace.mercata.blockapps.net/dp/7077b9da354ee19c677c0ae45affbc3ad713c72b/KD%2016%20NRG%20&apos;AUNT%20PEARL&apos;</loc>
-       <lastmod>2024-04-09T09:50:02.951Z</lastmod>
-       <changefreq>daily</changefreq>
-       <priority>0.5</priority>
-     </url>
-
-     <url>
-       <loc>https://marketplace.mercata.blockapps.net/dp/eb6ae3652b2c9cdbbb20a22805464e9d0efcc602/AIR%20JORDAN%206%20RETRO%20GS%20&apos;GEORGETOWN&apos;</loc>
-       <lastmod>2024-04-09T09:50:02.951Z</lastmod>
-       <changefreq>daily</changefreq>
-       <priority>0.5</priority>
-     </url>
-
-     <url>
-       <loc>https://marketplace.mercata.blockapps.net/dp/550a63336f79f1c7de2b541c9c4ea03680eee116/WMNS%20AIR%20FORCE%201%20&apos;07%20&apos;TRIPLE%20WHITE&apos;</loc>
-       <lastmod>2024-04-09T09:50:02.951Z</lastmod>
-       <changefreq>daily</changefreq>
-       <priority>0.5</priority>
-     </url>
-
-     <url>
-       <loc>https://marketplace.mercata.blockapps.net/dp/7de5678d252ba60b60a7bf229110a744644ec677/WMNS%20AIR%20FORCE%201%20&apos;07%20&apos;TRIPLE%20WHITE&apos;</loc>
-       <lastmod>2024-04-09T09:50:02.951Z</lastmod>
-       <changefreq>daily</changefreq>
-       <priority>0.5</priority>
-     </url>
-
-     <url>
-       <loc>https://marketplace.mercata.blockapps.net/dp/f1a3dadeda171b1fe515303f3a423ca7197aa216/DUNK%20LOW%20&apos;POLAR%20BLUE&apos;</loc>
-       <lastmod>2024-04-09T09:50:02.951Z</lastmod>
-       <changefreq>daily</changefreq>
-       <priority>0.5</priority>
-     </url>
-
-     <url>
-       <loc>https://marketplace.mercata.blockapps.net/dp/9285d34255dbefc52529d82b8c1069795b2a7011/WMNS%20AIR%20JORDAN%201%20LOW%20&apos;SPORT%20BLUE%20GYM%20RED&apos;</loc>
-       <lastmod>2024-04-09T09:50:02.951Z</lastmod>
-       <changefreq>daily</changefreq>
-       <priority>0.5</priority>
-     </url>
-
-     <url>
-       <loc>https://marketplace.mercata.blockapps.net/dp/7e4663b87c9c9c713b5c40ba7f1c91d4d619bcd9/WMNS%20AIR%20JORDAN%201%20LOW%20&apos;BARELY%20GRAPE&apos;</loc>
-       <lastmod>2024-04-09T09:50:02.951Z</lastmod>
-       <changefreq>daily</changefreq>
-       <priority>0.5</priority>
-     </url>
-
-     <url>
-       <loc>https://marketplace.mercata.blockapps.net/dp/78d2768115e79e211c1d9ef98b19089857fe38ef/AIR%20JORDAN%201%20LOW%20SE%20&apos;FLIGHT%20CLUB&apos;</loc>
-       <lastmod>2024-04-09T09:50:02.951Z</lastmod>
-       <changefreq>daily</changefreq>
-       <priority>0.5</priority>
-     </url>
-
-     <url>
-       <loc>https://marketplace.mercata.blockapps.net/dp/c4863b76ad2189370bf635a70a81be8d9a89fe5a/YEEZY%20SLIDES%20&apos;SLATE%20GREY&apos;</loc>
-       <lastmod>2024-04-09T09:50:02.951Z</lastmod>
-       <changefreq>daily</changefreq>
-       <priority>0.5</priority>
-     </url>
-
-     <url>
-       <loc>https://marketplace.mercata.blockapps.net/dp/9bbc2c8e7e998daf75f914aa1ebd50620bb169a2/Pokémon%20TCG%20Scarlet%20&amp;%20Violet%20151%20Enhanced%20Expansion%20Pack%20(Japanese)</loc>
-       <lastmod>2024-04-09T09:50:02.951Z</lastmod>
-       <changefreq>daily</changefreq>
-       <priority>0.5</priority>
-     </url>
-
-     <url>
-       <loc>https://marketplace.mercata.blockapps.net/dp/3df3660b7172c8af52cb815c22e8477dba0afa0d/Pokémon%20TCG%20Sword%20&amp;%20Shield%20High%20Class%20Pack%20VSTAR%20Universe%20Box%20(Japanese)</loc>
-       <lastmod>2024-04-09T09:50:02.951Z</lastmod>
-       <changefreq>daily</changefreq>
-       <priority>0.5</priority>
-     </url>
-
-     <url>
-       <loc>https://marketplace.mercata.blockapps.net/dp/d0648df571ce9b1711cd90a789aacb819c6cbfdb/Pokémon%20TCG%20Scarlet%20&amp;%20Violet%20High%20Class%20Pack%20Shiny%20Treasure%20ex%20Booster%20Box%20(Japanese)</loc>
-       <lastmod>2024-04-09T09:50:02.951Z</lastmod>
-       <changefreq>daily</changefreq>
-       <priority>0.5</priority>
-     </url>
-
-     <url>
-       <loc>https://marketplace.mercata.blockapps.net/dp/98cc2140f3ec242f18e214b8e17139c98fb01a99/Disney%20Lorcana%20TCG%20The%20First%20Chapter%20Rise%20of%20the%20Floodborn%20Booster%20Box</loc>
-       <lastmod>2024-04-09T09:50:02.951Z</lastmod>
-       <changefreq>daily</changefreq>
-       <priority>0.5</priority>
-     </url>
-
-     <url>
-       <loc>https://marketplace.mercata.blockapps.net/dp/a8e78b9d95684b65b45ff7ce2c1277fe9a8d38ec/KAWS%20Companion%20Flayed%20Open%20Edition%20Vinyl%20Figure%20Brown</loc>
-       <lastmod>2024-04-09T09:50:02.951Z</lastmod>
-       <changefreq>daily</changefreq>
-       <priority>0.5</priority>
-     </url>
-
-     <url>
-       <loc>https://marketplace.mercata.blockapps.net/dp/29e9bc963220f0640da3057cc4907b77d18568ce/Shelley%20Dainty%20Celadon%20Green%20Cup%20and%20Saucer%20with%20Gold%20Handles%20x6%20Set%20</loc>
-       <lastmod>2024-04-09T09:50:02.951Z</lastmod>
-       <changefreq>daily</changefreq>
-       <priority>0.5</priority>
-     </url>
-
-     <url>
-       <loc>https://marketplace.mercata.blockapps.net/dp/1bd5fa1df8fa96eb55f0f246b86213d477f97c66/MATS%20JONASSON%20Lion%20Etched%20Swedish%20Frosted%20Crystal%20!%20SIGNED</loc>
-       <lastmod>2024-04-09T09:50:02.951Z</lastmod>
-       <changefreq>daily</changefreq>
-       <priority>0.5</priority>
-     </url>
-
-     <url>
-       <loc>https://marketplace.mercata.blockapps.net/dp/af786d105c69ed41348be24b5c64a7f61ce23752/Vintage%20Kosta%20Boda%20Crystal%20Vase%20SIGNED%2047848</loc>
-       <lastmod>2024-04-09T09:50:02.951Z</lastmod>
-       <changefreq>daily</changefreq>
-       <priority>0.5</priority>
-     </url>
-
-     <url>
-       <loc>https://marketplace.mercata.blockapps.net/dp/d66f156129abebb6cbfcb2b58b33a34113794a0c/WMNS%20AIR%20FORCE%201%20&apos;07%20&apos;TRIPLE%20WHITE&apos;</loc>
-       <lastmod>2024-04-09T09:50:02.951Z</lastmod>
+       <loc>http://localhost/dp/19531678a01c7345486bfd42790b59527b06d4a6/Thompson%20Whiskey%20</loc>
+       <lastmod>2024-05-23T15:30:19.367Z</lastmod>
        <changefreq>daily</changefreq>
        <priority>0.5</priority>
      </url>

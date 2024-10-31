@@ -1,6 +1,78 @@
 const models = require("../models");
 const winston = require("winston-color");
-const config = "../config/app.config";
+
+
+async function getLatestHealth() {
+  const [healthInfo, stallInfo, systemInfo, syncInfo, networkInfo] = await Promise.all([
+    models.CurrentHealth.findOne({
+      where: {
+        processName: "HealthStat",
+      },
+      attributes: [
+        "latestHealthStatus",
+        "latestCheckTimestamp",
+        "lastFailureTimestamp",
+        "additionalInfo",
+      ],
+      raw: true,
+    }),
+    
+    models.CurrentHealth.findOne({
+      where: {
+        processName: "StallStat",
+      },
+      attributes: [
+        "latestHealthStatus",
+        "latestCheckTimestamp",
+        "lastFailureTimestamp",
+        "validBlocksIncreased",
+        "hasPendingTxs",
+      ],
+      raw: true,
+    }),
+    
+    models.CurrentHealth.findOne({
+      where: {
+        processName: "SystemInfoStat",
+      },
+      attributes: [
+        "latestHealthStatus",
+        "latestCheckTimestamp",
+        "lastFailureTimestamp",
+        "additionalInfo",
+      ],
+      raw: true,
+    }),
+    
+    models.CurrentHealth.findOne({
+      where: {
+        processName: "SyncStat",
+      },
+      attributes: [
+        "latestHealthStatus",
+        "latestCheckTimestamp",
+        "lastFailureTimestamp",
+        "additionalInfo",
+      ],
+      raw: true,
+    }),
+    
+    models.CurrentHealth.findOne({
+      where: {
+        processName: "NetworkHealthStat",
+      },
+      attributes: [
+        "latestHealthStatus",
+        "latestCheckTimestamp",
+        "lastFailureTimestamp",
+        "additionalInfo",
+      ],
+      raw: true,
+    })
+  ]);
+  
+  return [healthInfo, stallInfo, systemInfo, syncInfo, networkInfo];
+}
 
 function consolidateHealthData(healthInfo, stallInfo, systemInfo, syncInfo) {
   const currentTime = Date.now();
@@ -79,5 +151,6 @@ function consolidateHealthData(healthInfo, stallInfo, systemInfo, syncInfo) {
 }
 
 module.exports = {
+  getLatestHealth,
   consolidateHealthData,
 };

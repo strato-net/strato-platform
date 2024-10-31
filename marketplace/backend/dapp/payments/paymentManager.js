@@ -2,7 +2,7 @@ import { importer, rest, util } from 'blockapps-rest'
 import RestStatus from 'http-status-codes'
 import paymentJs from './payment'
 import userAddressJs from "/dapp/addresses/userAddress.js";
-import paymentProviderJs from './paymentProvider';
+import paymentServiceJs from './paymentService';
 import { setSearchQueryOptions, searchOne, searchAll, searchAllWithQueryArgs } from '../../helpers/utils';
 
 
@@ -45,11 +45,11 @@ function bind(admin, _contract, contractOptions) {
   contract.createUserAddress = async function (args, options = contractOptions) {
     return createUserAddress(admin, contract, args, options)
   }
-  contract.createPaymentProvider = async function (args, options = contractOptions) {
-    return createPaymentProvider(admin, contract, args, options)
+  contract.createPaymentService = async function (args, options = contractOptions) {
+    return createPaymentService(admin, contract, args, options)
   }
-  contract.updatePaymentProvider = async function (args, options = contractOptions) {
-    return updatePaymentProvider(admin, contract, args, options)
+  contract.updatePaymentService = async function (args, options = contractOptions) {
+    return updatePaymentService(admin, contract, args, options)
   }
 
   return contract
@@ -173,30 +173,30 @@ async function createUserAddress(admin, contract, _args, baseOptions) {
   return [restStatus, userAddress];
 }
 
-async function createPaymentProvider(admin, contract, _args, baseOptions) {
-  const args = paymentProviderJs.marshalIn(_args)
+async function createPaymentService(admin, contract, _args, baseOptions) {
+  const args = paymentServiceJs.marshalIn(_args)
 
   const callArgs = {
     contract,
-    method: 'createPaymentProvider',
+    method: 'createPaymentService',
     args: util.usc(args),
   }
 
   const options = {
     ...baseOptions,
-    history: [paymentProviderJs.contractName],
+    history: [paymentServiceJs.contractName],
   }
 
-  const [restStatus, paymentProviderAddress] = await rest.call(admin, callArgs, options)
+  const [restStatus, paymentServiceAddress] = await rest.call(admin, callArgs, options)
 
   if (parseInt(restStatus, 10) !== RestStatus.CREATED) {
     throw new rest.RestError(restStatus, 0, { callArgs })
   }
 
-  return [restStatus, paymentProviderAddress];
+  return [restStatus, paymentServiceAddress];
 }
 
-async function updatePaymentProvider(admin, contract, _args, baseOptions) {
+async function updatePaymentService(admin, contract, _args, baseOptions) {
   const args = { ..._args }
 
   const scheme = Object.keys(_args).reduce((agg, key) => {
@@ -230,7 +230,7 @@ async function updatePaymentProvider(admin, contract, _args, baseOptions) {
     history: [contractName],
   };
 
-  const [restStatus, paymentProviderAddress] = await rest.call(
+  const [restStatus, paymentServiceAddress] = await rest.call(
     admin,
     callArgs,
     options
@@ -239,7 +239,7 @@ async function updatePaymentProvider(admin, contract, _args, baseOptions) {
   if (parseInt(restStatus, 10) !== RestStatus.OK)
     throw new rest.RestError(restStatus, 0, { callArgs });
 
-  return [restStatus, paymentProviderAddress];
+  return [restStatus, paymentServiceAddress];
 }
 
 
@@ -252,7 +252,7 @@ export default {
   getAll,
   createPayment,
   createUserAddress,
-  createPaymentProvider,
-  updatePaymentProvider,
+  createPaymentService,
+  updatePaymentService,
   contractName
 }

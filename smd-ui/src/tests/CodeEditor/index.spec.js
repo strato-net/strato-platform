@@ -74,10 +74,8 @@ describe('CodeEditor: index', () => {
       const wrapper = shallow(
         <CodeEditor.WrappedComponent {...props} />
       ).dive().dive().dive();
-      const popOver = wrapper.find('Popover').at(1)
-      console.log(wrapper.find('Popover').at(0).dive().find('Button').at(1).simulate('click'))
-      // wrapper.find('Button').forEach(n => console.log(n.debug()))
-      wrapper.find('Popover').at(0).find('Button').at(0).simulate('click')
+      const popOver = wrapper.find('Popover').at(0)
+      wrapper.find('Button').at(0).simulate('click')
       expect(props.onCompileFileLocally).toHaveBeenCalled()
       wrapper.find('Button').at(1).simulate('click')
       wrapper.find('Button').at(2).simulate('click')

@@ -17,6 +17,9 @@ Check [Keep a Changelog](http://keepachangelog.com/) for recommendations on how 
 - Ability to handle array arguments in constructors and function calls
 - All API calls should use the activeNode configuration field
 - Improved error handling when switching networks
+- Properly prompt function arguments in correct order
+- Properly parse enum values for API request
+- Fix `Nodes` view in response to recent Apex changes
 
 ### Changed
 

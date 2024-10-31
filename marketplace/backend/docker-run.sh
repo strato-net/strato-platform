@@ -5,7 +5,7 @@ export CONFIG_DIR_PATH=/config
 export DEPLOY_FILE_NAME=marketplace.deploy.yaml
 export STRATO_NODE_PROTOCOL=${STRATO_NODE_PROTOCOL:-http}
 export STRATO_NODE_HOST=${STRATO_NODE_HOST:-nginx}
-export BASE_CODE_COLLECTION=${BASE_CODE_COLLECTION:-9ed8a49bbd72fc4ca3ee7dcce9bc25be23014a7f} # Current deployment address on testnet2
+export BASE_CODE_COLLECTION=${BASE_CODE_COLLECTION:-e2890e18efc8c1aaea1d7a2ab56c05ca7cf92afb} # Current deployment address on prod
 export STRATO_HOSTNAME=${STRATO_HOSTNAME:-strato}
 export STRATO_PORT_API=${STRATO_PORT_API:-3000}
 
@@ -16,22 +16,18 @@ echo 'STRATO is available via nginx'
 # confirm strato api is up, then query the /eth/v1.2/metadata for urls of payment server and oauth discovery
 ETH_ENDPOINT=${STRATO_NODE_PROTOCOL}://${STRATO_HOSTNAME}:${STRATO_PORT_API}/eth/v1.2
 echo 'Waiting for STRATO API to be available...'
-until curl --silent --output /dev/null --fail --location ${ETH_ENDPOINT}/uuid ; do sleep 1; done
+until curl --silent --output /dev/null --fail --location ${ETH_ENDPOINT}/stats/totaltx ; do sleep 1; done
 echo 'STRATO API is available'
 METADATA=$(curl --silent --fail ${ETH_ENDPOINT}/metadata)
 
 # Set env vars with values from metadata (exporting and declaring separately - see https://github.com/koalaman/shellcheck/wiki/SC2155)
 networkID=$(echo ${METADATA} | jq -r .networkID)
+NOTIFICATION_SERVER_URL=$(echo ${METADATA} | jq -r .urls.notificationServer)
 export networkID
-STRIPE_PAYMENT_SERVER_URL=$(echo ${METADATA} | jq -r .urls.paymentServer)
-export STRIPE_PAYMENT_SERVER_URL
+export NOTIFICATION_SERVER_URL
 if [ -z "${networkID}" ]; then
   echo "Could not get networkID from strato api, but it is a required value"
   exit 19
-fi
-if [ -z "${STRIPE_PAYMENT_SERVER_URL}" ]; then
-  echo "Could not get payment server url from strato api, but it is a required value"
-  exit 20
 fi
 
 # Validate configuration

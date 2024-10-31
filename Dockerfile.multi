@@ -40,14 +40,11 @@ FROM base as strato
 COPY \
   ./usr/local/bin/blockapps-vault-proxy-server \
   ./usr/local/bin/ethereum-discover \
-  ./usr/local/bin/ethereum-jsonrpc \
   ./usr/local/bin/forced-config-change \
   ./usr/local/bin/ghc-debug \
-  ./usr/local/bin/global-db \
-  ./usr/local/bin/init-worker \
-  ./usr/local/bin/logserver \
-  ./usr/local/bin/post-raw-transaction \
-  ./usr/local/bin/queryStrato \
+  ./usr/local/bin/strato-barometer \
+  ./usr/local/bin/modifyDate \ 
+  ./usr/local/bin/process-monitor-exe \
   ./usr/local/bin/slipstream \
   ./usr/local/bin/strato-api \
   ./usr/local/bin/strato-api-indexer \
@@ -61,6 +58,7 @@ COPY \
   ./usr/local/bin/x509-keygen \
     /usr/local/bin/
 COPY ./strato /
+RUN ln -s /usr/local/bin/strato-barometer /usr/local/bin/queryStrato
 EXPOSE 30303 30303/udp 3000 3001 7065 8013 8050 8051 8052
 HEALTHCHECK --interval=5s --timeout=1s --start-period=20s \
   CMD pgrep vm-runner && pgrep slipstream || exit 1

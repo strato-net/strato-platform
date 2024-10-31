@@ -16,7 +16,6 @@ curl -X POST "$stratoURL/strato/v2.3/key" -H "accept: application/json;charset=u
 servicer=`curl -X GET "$stratoURL/strato/v2.3/users" -H "accept: application/json;charset=utf-8" -H "Authorization: Bearer $token" | jq '.[] | select(.username=="service-account-blockapps-test")' | jq '.address' | sed -e 's/^"//' -e 's/"$//'`
 #curl -i -X GET "$stratoURL/strato/v2.3/users" -H "accept: application/json;charset=utf-8" -H "Authorization: Bearer $token"
 #echo $servicer
-curl -X  POST "$stratoURL/bloc/v2.2/users/user/$servicer/fill?resolve=true" -H "accept: application/json;charset=utf-8" -H "Authorization: Bearer $token"
 # create an array with all the filer/dir inside ~/myDir
 declare arrContracts
 declare arrPayloads

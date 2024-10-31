@@ -20,9 +20,7 @@ library:
     - containers
     - hedis
     - kafka-monad
-    - milena
     - mtl
     - postgresql-simple
-    - swagger2
     - transformers
     - yaml

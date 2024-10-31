@@ -41,12 +41,13 @@ services:
     - prometheus
     - strato
     environment:
-    - NODE_HOST=${NODE_HOST}
+    - ADMIN_EMAIL=${ADMIN_EMAIL}
     - postgres_host=postgres
     - postgres_password=${postgres_password:-api}
     - postgres_port=5432
     - postgres_user=postgres
     - PROMETHEUS_HOST=${PROMETHEUS_HOST}
+    - SENDGRID_API_KEY=${SENDGRID_API_KEY}
     - STRATO_HOSTNAME=${STRATO_HOSTNAME}
     - STRATO_PORT_API=${STRATO_PORT_API}
     - STRATO_PORT_VAULT_PROXY=${STRATO_PORT_VAULT_PROXY:-8013}
@@ -84,7 +85,6 @@ services:
     - STRATO_PORT_API=${STRATO_PORT_API}
     - GLOBAL_ADMIN_NAME=${GLOBAL_ADMIN_NAME}
     - GLOBAL_ADMIN_PASSWORD=${GLOBAL_ADMIN_PASSWORD}
-    - SENDGRID_API_KEY=${SENDGRID_API_KEY}
     build: .
     image: ${MARKETPLACEBACKEND_IMAGE:-<REPO_URL>marketplace-backend:<VERSION>}
     restart: unless-stopped
@@ -138,6 +138,7 @@ services:
     - blockTime=${blockTime}
     - bootnode=${bootnode}
     - connectionTimeout=${connectionTimeout}
+    - creatorForkBlockNumber=${creatorForkBlockNumber}
     - debugFail=${debugFail}
     - debugPort=${debugPort}
     - debugWSHost=${debugWSHost}
@@ -150,6 +151,7 @@ services:
     - generateKey=${generateKey:-true}
     - genesis=${genesis}
     - idServerUrl=${idServerUrl}
+    - INSTRUMENTATION=${INSTRUMENTATION:-false}
     - kafkaHost=kafka
     - kafkaPort=9092
     - lazyBlocks=${lazyBlocks}
@@ -159,6 +161,7 @@ services:
     - minBlockDifficulty=${minBlockDifficulty}
     - network=${network}
     - networkID=${networkID}
+    - NOTIFICATION_SERVER_URL=${NOTIFICATION_SERVER_URL}
     - numMinPeers=${numMinPeers}
     - OAUTH_DISCOVERY_URL=${OAUTH_DISCOVERY_URL}
     - OAUTH_CLIENT_ID=${OAUTH_CLIENT_ID}
@@ -166,6 +169,7 @@ services:
     - OAUTH_VAULT_PROXY_ALT_CLIENT_ID=${OAUTH_VAULT_PROXY_ALT_CLIENT_ID}
     - OAUTH_VAULT_PROXY_ALT_CLIENT_SECRET=${OAUTH_VAULT_PROXY_ALT_CLIENT_SECRET}
     - OAUTH_RESERVE_SECONDS=${OAUTH_RESERVE_SECONDS}
+    - P2P_DEBUG_LOG=${P2P_DEBUG_LOG}
     - postgres_host=postgres
     - postgres_password=${postgres_password:-api}
     - postgres_port=5432
@@ -184,6 +188,9 @@ services:
     - SEQUENCER_DEBUG_LOG=${SEQUENCER_DEBUG_LOG:-false}
     - SLIPSTREAM_DEBUG_LOG=${SLIPSTREAM_DEBUG_LOG:-false}
     - SLIPSTREAM_OPTIONAL=${SLIPSTREAM_OPTIONAL}
+    - strictBlockstanbul=${strictBlockstanbul}
+    - strictGas=${strictGas}
+    - strictGasLimit=${strictGasLimit}
     - STRIPE_PAYMENT_SERVER_URL=${STRIPE_PAYMENT_SERVER_URL}
     - svmTrace=${svmTrace}
     - sqlDiff=${sqlDiff}
@@ -282,7 +289,6 @@ services:
     - STRATO_HOSTNAME=${STRATO_HOSTNAME}
     - STRATO_PORT_API=${STRATO_PORT_API}
     - STRATO_PORT_API2=${STRATO_PORT_API2}
-    - STRATO_PORT_BLOCKSTANBUL_VOTE=${STRATO_PORT_BLOCKSTANBUL_VOTE}
     - STRATO_PORT_LOGS=${STRATO_PORT_LOGS}
     - STRATO_PORT_VAULT_PROXY=${STRATO_PORT_VAULT_PROXY:-8013}
     - VM_DEBUGGER=${VM_DEBUGGER}
@@ -331,12 +337,12 @@ services:
       KAFKA_DELETE_TOPIC_ENABLE: "true"
       KAFKA_LOG_CLEANER_ENABLE: "true"
       KAFKA_LOG_DIRS: '/kafka/kafka-logs'
-      KAFKA_LOG_RETENTION_HOURS: 2147483647
+      KAFKA_LOG_RETENTION_HOURS: 168  # Set to 7 days
       KAFKA_OFFSET_METADATA_MAX_BYTES: 1048576
-      KAFKA_OFFSETS_RETENTION_MINUTES: 2147483647
-      KAFKA_MAX_REQUEST_SIZE: ${KAFKA_MAX_REQUEST_SIZE:-100663296}
-      KAFKA_MESSAGE_MAX_BYTES: ${KAFKA_MESSAGE_MAX_BYTES:-100663296}
-    image: wurstmeister/kafka:2.12-2.0.1
+      KAFKA_OFFSETS_RETENTION_MINUTES: 2147483647 # Leaving as infinite for now
+      KAFKA_MAX_REQUEST_SIZE: ${KAFKA_MAX_REQUEST_SIZE:-2500000}
+      KAFKA_MESSAGE_MAX_BYTES: ${KAFKA_MESSAGE_MAX_BYTES:-2500000}
+    image: registry-aws.blockapps.net:5000/blockapps-repo/kafka:2.12-2.0.1
     restart: unless-stopped
     volumes:
     - kafkadata:/kafka

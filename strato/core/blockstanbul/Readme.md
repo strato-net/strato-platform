@@ -36,7 +36,7 @@ resize the validator pool).
 
 Communication
 -------------
-The normal PBFT messages (PREPREPARE/PREPARE/COMMIT/ROUNDCHANGE) are exchanged
+The normal PBFT messages (PRE_PREPARE/PREPARE/COMMIT/ROUNDCHANGE) are exchanged
 on the topics between the sequencer and p2p, and are broadcast to all peers.
 The RLP instance for these should be the same as for the geth implementation of
 Istanbul, but its possible that they have an extra layer of RLP by the time it
@@ -46,11 +46,14 @@ used to bring a peer that's behind up to speed.
 
 The protocol between the sequencer and the VM has a MakeBlockCommand for
 PBFT to request a block when this node is the proposer, and the ToCommit
-message to finalize a block with the VM. When voting, a PendingVote
-will be authenticate by PBFT and forwarded to Bagger to be included in a block
-(this step could just be omitted by having the blockstanbul-vote tool write
-directly to kafka and simplify it by authenticating through ssh keys/docker
-access. It partly depends on how this is integrated into a UI).
+message to finalize a block with the VM. When it receives a PRE_PREPARE, the
+sequencer will decide if it should vote for the block by sending a RunPreprepare
+message to the VM. If the stateroot matches what is expected, the VM will respond
+with a AcceptPreprepare message, triggering the sequencer to send out a PREPARE
+to the other validators. On the other hand, if the VM sends back a RejectPreprepare,
+then the ending states did not match (at which point the sequencer will send out a
+ROUNDCHANGE to move along to the next proposer, who will hopefully provide a valid
+block).
 
 PBFT will set a timer with `ResetTimer RoundNumber` and then after the
 round period should receive `RoundTimeout RoundNumber`

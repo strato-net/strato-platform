@@ -21,3 +21,7 @@ max-rows = ${POSTGREST_MAX_ROWS}
 
 ## stored proc to exec immediately after auth
 # pre-request = "stored_proc_name"
+
+# allow aggregate queries
+db-aggregates-enabled = true
+statement_timeout = 5

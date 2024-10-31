@@ -27,7 +27,12 @@ module Blockchain.Data.Transaction
     transactionHash,
     partialTransactionHash,
     whoSignedThisTransactionEcrecover,
+    whoReallySignedThisTransactionEcrecover,
     getSigVals,
+    codePtrChainId,
+    codePtrAddress,
+    codePtrName,
+    codePtrHash
   )
 where
 
@@ -40,13 +45,16 @@ import Blockchain.Data.TXOrigin
 import Blockchain.Data.TransactionDef
 import Blockchain.Strato.Model.Address
 import Blockchain.Strato.Model.Class
+import Blockchain.Strato.Model.CodePtr
 import Blockchain.Strato.Model.Code
+import Blockchain.Strato.Model.Account
 import Blockchain.Strato.Model.ExtendedWord
 import Blockchain.Strato.Model.Keccak256
 import qualified Blockchain.Strato.Model.Secp256k1 as EC
 -- import qualified Data.ByteString.Short as B (ShortByteString, toShort, fromShort)
 import Control.DeepSeq
 import Control.Monad.IO.Class
+import Control.Lens ((^.))
 import Control.Monad.IO.Unlift
 import Control.Monad.Trans.Reader
 import qualified Crypto.Secp256k1 as SEC
@@ -131,25 +139,47 @@ instance TransactionLike Transaction where
       chainId = txChainId t
       md = txMetadata t
 
+codePtrHash :: CodePtr -> Maybe Keccak256
+codePtrHash (ExternallyOwned k) = Just k
+codePtrHash (SolidVMCode _ k) = Just k
+codePtrHash _ = Nothing
+
+codePtrName :: CodePtr -> Maybe String
+codePtrName (SolidVMCode n _) = Just n
+codePtrName (CodeAtAccount _ n) = Just n
+codePtrName _ = Nothing
+
+codePtrAddress :: CodePtr -> Maybe Address
+codePtrAddress (CodeAtAccount a _) = Just $ a ^. accountAddress
+codePtrAddress _ = Nothing
+
+codePtrChainId :: CodePtr -> Maybe Word256
+codePtrChainId (CodeAtAccount a _) = a ^. accountChainId
+codePtrChainId _ = Nothing
+
 rawTX2TX :: RawTransaction -> Transaction
-rawTX2TX (RawTransaction _ _ nonce' gp gl (Just to') val (Code dat) cid r s v md _ _ _) =
+rawTX2TX (RawTransaction _ _ nonce' gp gl (Just to') val (Just dat) _ _ cid r s v md _ _ _) =
   MessageTX nonce' gp gl to' val dat (if (0 == cid) then Nothing else Just cid) r s v (M.fromList <$> md)
-rawTX2TX (RawTransaction _ _ 0 0 0 Nothing 0 init' 0 h ch 0 Nothing _ _ _)
-  | init' == Code B.empty =
+rawTX2TX (RawTransaction _ _ 0 0 0 Nothing 0 (Just init') _ _ 0 h ch 0 Nothing _ _ _)
+  | init' == B.empty =
     PrivateHashTX (unsafeCreateKeccak256FromWord256 $ fromInteger h) (unsafeCreateKeccak256FromWord256 $ fromInteger ch)
-rawTX2TX (RawTransaction _ _ nonce' gp gl Nothing val init' cid r s v md _ _ _) =
-  ContractCreationTX nonce' gp gl val init' (if (0 == cid) then Nothing else Just cid) r s v (M.fromList <$> md)
+rawTX2TX (RawTransaction _ _ nonce' gp gl Nothing val (Just init') _ _ cid r s v md _ _ _) =
+  ContractCreationTX nonce' gp gl val (Code init') (if (0 == cid) then Nothing else Just cid) r s v (M.fromList <$> md)
+rawTX2TX (RawTransaction _ _ nonce' gp gl Nothing val Nothing (Just contractName') (Just codePtrAddress') cid r s v md _ _ _) =
+  ContractCreationTX nonce' gp gl val(PtrToCode $ CodeAtAccount (Account codePtrAddress' Nothing) contractName') (if (0 == cid) then Nothing else Just cid) r s v (M.fromList <$> md)
 rawTX2TX rt = error $ "rawTX2TX: " ++ show rt
 
 txAndTime2RawTX :: TXOrigin -> Transaction -> Integer -> UTCTime -> RawTransaction
 txAndTime2RawTX origin tx blkNum time =
   case tx of
     (MessageTX nonce' gp gl to' val dat cid r s v md) ->
-      RawTransaction time signer nonce' gp gl (Just to') val (Code dat) (fromMaybe 0 cid) r s v (M.toList <$> md) (fromIntegral blkNum) (txHash tx) origin
-    (ContractCreationTX nonce' gp gl val init' cid r s v md) ->
-      RawTransaction time signer nonce' gp gl Nothing val init' (fromMaybe 0 cid) r s v (M.toList <$> md) (fromIntegral blkNum) (txHash tx) origin
+      RawTransaction time signer nonce' gp gl (Just to') val (Just dat) Nothing Nothing (fromMaybe 0 cid) r s v (M.toList <$> md) (fromIntegral blkNum) (txHash tx) origin
+    (ContractCreationTX nonce' gp gl val( Code init') cid r s v md) ->
+      RawTransaction time signer nonce' gp gl Nothing val (Just init') Nothing Nothing  (fromMaybe 0 cid) r s v (M.toList <$> md) (fromIntegral blkNum) (txHash tx) origin
+    (ContractCreationTX nonce' gp gl val (PtrToCode init') cid r s v md) ->
+      RawTransaction time signer nonce' gp gl Nothing val Nothing (codePtrName init') (codePtrAddress init')  (fromMaybe 0 cid) r s v (M.toList <$> md) (fromIntegral blkNum) (txHash tx) origin
     (PrivateHashTX h ch) ->
-      RawTransaction time signer 0 0 0 Nothing 0 (Code B.empty) 0 (fromIntegral $ keccak256ToWord256 h) (fromIntegral $ keccak256ToWord256 ch) 0 Nothing (fromIntegral blkNum) (txHash tx) origin
+      RawTransaction time signer 0 0 0 Nothing 0 (Just B.empty) Nothing Nothing 0 (fromIntegral $ keccak256ToWord256 h) (fromIntegral $ keccak256ToWord256 ch) 0 Nothing (fromIntegral blkNum) (txHash tx) origin
   where
     signer = fromMaybe (Address (-1)) $ whoSignedThisTransaction tx
 
@@ -292,6 +322,13 @@ whoSignedThisTransactionEcrecover hsh r s v = fromPublicKey <$> EC.recoverPub si
   where
     intToBSS = BSS.toShort . word256ToBytes . fromInteger
     sig = EC.Signature (SEC.CompactRecSig (intToBSS $ r) (intToBSS $ s) (((fromInteger v) :: Word8) - 0x1b))
+    mesg = keccak256ToByteString $ hsh
+
+whoReallySignedThisTransactionEcrecover :: Keccak256 -> Word256 -> Word256 -> Word8 -> Maybe Address
+whoReallySignedThisTransactionEcrecover hsh r s v = fromPublicKey <$> EC.recoverPub sig mesg
+  where
+    word256ToBSS = BSS.toShort . word256ToBytes
+    sig = EC.Signature (SEC.CompactRecSig (word256ToBSS $ r) (word256ToBSS $ s) v)
     mesg = keccak256ToByteString $ hsh
 
 {-

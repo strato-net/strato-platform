@@ -1,0 +1,71 @@
+timeout: 600000
+VM: SolidVM
+configDirPath: <configDirPath_value>
+serverHost: <serverHost_value>
+dockerized: true
+
+stripe:
+  serviceName: <stripe_service_name_value>
+  serviceURL: <stripe_service_url_value>
+  onboardingRoute: <stripe_onboarding_route_value>
+  onboardingStatusRoute: <stripe_onboarding_status_route_value>
+  onboardingText: <stripe_onboarding_text_value>
+  checkoutRoute: <stripe_checkout_route_value>
+  checkoutText: <stripe_checkout_text_value>
+  orderStatusRoute: <stripe_order_status_route_value>
+  imageURL: <stripe_image_url_value>
+  primarySaleFeePercentage: <stripe_primary_sale_fee_percentage_value>
+  secondarySaleFeePercentage: <stripe_secondary_sale_fee_percentage_value>
+
+metamask:
+  serviceName: <metamask_service_name_value>
+  serviceURL: <metamask_service_url_value>
+  onboardingRoute: <metamask_onboarding_route_value>
+  onboardingStatusRoute: <metamask_onboarding_status_route_value>
+  onboardingText: <metamask_onboarding_text_value>
+  checkoutRoute: <metamask_checkout_route_value>
+  checkoutText: <metamask_checkout_text_value>
+  orderStatusRoute: <metamask_order_status_route_value>
+  imageURL: <metamask_image_url_value>
+  primarySaleFeePercentage: <metamask_primary_sale_fee_percentage_value>
+  secondarySaleFeePercentage: <metamask_secondary_sale_fee_percentage_value>
+
+strat:
+  stratAddress: <strat_strat_address_value>
+  stratsPerDollar: <strat_strats_per_dollar_value>
+  imageURL: <strat_image_url_value>
+  primarySaleFeePercentage: <strat_primary_sale_fee_percentage_value>
+  secondarySaleFeePercentage: <strat_secondary_sale_fee_percentage_value>
+  feeRecipient: <strat_fee_recipient_value>
+
+redemption:
+  closeRedemptionRoute: <redemptions_close_redemption_route_value>
+  createCustomerAddressRoute: <redemptions_create_customer_address_route_value>
+  createRedemptionRoute: <redemptions_create_redemption_route_value>
+  getCustomerAddressRoute: <redemptions_get_customer_address_route_value>
+  getRedemptionRoute: <redemptions_get_redemption_route_value>
+  imageURL: <redemptions_image_url_value>
+  incomingRedemptionsRoute: <redemptions_incoming_redemptions_route_value>
+  outgoingRedemptionsRoute: <redemptions_outgoing_redemptions_route_value>
+  redeemText: <redemptions_redeem_text_value>
+  serviceName: <redemptions_service_name_value>
+  serviceURL: <redemptions_service_url_value>
+
+nodes:
+  - id: 0
+    label: <node_label_value>
+    url: <node_url_value>
+    oauth:
+      appTokenCookieName: <oauth_appTokenCookieName_value>
+      appTokenCookieMaxAge: 7776000000
+      openIdDiscoveryUrl: >-
+        <oauth_openIdDiscoveryUrl_value>
+      clientId: <oauth_clientId_value>
+      clientSecret: <oauth_clientSecret_value>
+      scope: <oauth_scope_value>
+      serviceOAuthFlow: <oauth_serviceOAuthFlow_value>
+      redirectUri: <oauth_redirectUri_value>
+      logoutRedirectUri: <oauth_logoutRedirectUri_value>
+      tokenField: <oauth_tokenField_value>
+      tokenUsernameProperty: <oauth_tokenUsernameProperty_value>
+      tokenUsernamePropertyServiceFlow: <oauth_tokenUsernamePropertyServiceFlow_value>

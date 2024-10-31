@@ -5,7 +5,7 @@ import utc from 'dayjs/plugin/utc';
 
 dayjs.extend(utc);
 
-const PriceChartAndStats = ({ isFetchingPriceHistory, priceHistory }) => {
+const PriceChartAndStats = ({ isFetchingPriceHistory, priceHistory, isDecimal }) => {
   if (isFetchingPriceHistory || !priceHistory || !priceHistory.originRecords || priceHistory.originRecords.length === 0) {
     return <div className="h-full bg-gray-200 animate-pulse"></div>;
   }
@@ -18,8 +18,8 @@ const PriceChartAndStats = ({ isFetchingPriceHistory, priceHistory }) => {
       const currentRecord = records[i];
       const isoDate = currentRecord.block_timestamp.replace(' UTC', 'Z');
       const date = dayjs(isoDate).utc();
-      const price = currentRecord.price;
-  
+      const price = isDecimal ? currentRecord.price * 100 : currentRecord.price;
+   
       // Set the last known price if it's null (first iteration) or update it to the current record's price
       if (lastKnownPrice === null || price !== lastKnownPrice) {
         lastKnownPrice = price;
@@ -36,7 +36,7 @@ const PriceChartAndStats = ({ isFetchingPriceHistory, priceHistory }) => {
         const nextIsoDate = records[i + 1].block_timestamp.replace(' UTC', 'Z');
         const nextDate = dayjs(nextIsoDate).utc();
         let currentDate = date.add(1, 'day');
-  
+
         // Fill in the gaps with the last known price
         while (currentDate.isBefore(nextDate, 'day')) {
           filledData.push({
@@ -48,31 +48,29 @@ const PriceChartAndStats = ({ isFetchingPriceHistory, priceHistory }) => {
       }
     }
   
-    // Fill the gap until the current date with the last known price
-    let currentDate = dayjs(filledData[filledData.length - 1].x).add(1, 'day');
+    // Check if last record's date is the current date
+    const lastRecordDate = dayjs(filledData[filledData.length - 1].x);
     const today = dayjs().utc().endOf('day');
-    while (currentDate.isBefore(today, 'day')) {
-      filledData.push({
-        x: currentDate.valueOf(),
-        y: lastKnownPrice,
-      });
-      currentDate = currentDate.add(1, 'day');
+    if (!lastRecordDate.isSame(today, 'day')) {
+      // Fill the gap until the current date with the last known price
+      let currentDate = lastRecordDate.add(1, 'day');
+      while (currentDate.isBefore(today, 'day') || currentDate.isSame(today, 'day')) {
+        filledData.push({
+          x: currentDate.valueOf(),
+          y: lastKnownPrice,
+        });
+        currentDate = currentDate.add(1, 'day');
+      }
     }
+
   
     return filledData;
   };
-  
 
-  // Fill in the gaps in the original records
   const filledSeriesData = fillDataGaps(priceHistory.originRecords);
+  const useCategory = filledSeriesData.length <= 7;
+  const singleDataPoint = filledSeriesData.length === 1;
 
-  const series = [
-    {
-      name: 'Sale Price',
-      data: filledSeriesData,
-    },
-  ];
-  
 
   const options = {
     chart: {
@@ -80,36 +78,31 @@ const PriceChartAndStats = ({ isFetchingPriceHistory, priceHistory }) => {
       toolbar: {
         show: true
       },
-      height: 'auto', // Responsive height
+      height: 'auto',
       zoom: {
-        enabled: true, // Enable zooming
-        type: 'x', // Specify the type of zoom (x - horizontal, y - vertical, xy - both)
-        autoScaleXaxis: true // Automatically scale the Y axis as the chart zooms in and out
+        enabled: true,
+        type: 'x',
+        autoScaleXaxis: true
       },
       pan: {
-        enabled: true, // Enable panning
-        type: 'x', // Allow panning in horizontal direction
+        enabled: true,
+        type: 'x',
         dragType: 'pan'
       },
       toolbar: {
-        autoSelected: 'pan' // Default tool selected in the toolbar ('zoom', 'selection', 'pan', or 'none')
+        autoSelected: 'pan'
       }
     },
-    tools: {
-      download: true, // Show the download icon
-      selection: true, // Show the selection icon for zooming in
-      zoom: true, // zoom in icon
-      zoomin: false, // zoom in icon
-      zoomout: false, //  zoom out icon
-      pan: true, // allow panning
-      reset: true // Show the home icon for resetting the zoom
-    },
+    markers: (singleDataPoint)?{
+      size: 6
+    }:{},
+
     colors: ['#181EAC', '#FF4560'],
     dataLabels: {
       enabled: false
     },
     stroke: {
-      curve: 'smooth',
+      curve: 'straight',
       width: 3
     },
     fill: {
@@ -121,58 +114,62 @@ const PriceChartAndStats = ({ isFetchingPriceHistory, priceHistory }) => {
         stops: [0, 100]
       }
     },
-    xaxis: {
+    xaxis: useCategory ? {
+      type: 'category',
+      overwriteCategories: filledSeriesData.map(data => dayjs(data.x).format('MMMM D')), // Ensures categories are overwritten with date strings
+      
+      tickAmount: filledSeriesData.length
+    } : {
       type: 'datetime',
-      range: undefined,
-      tickPlacement: 'on',
+      tickAmount: undefined,
       labels: {
-        format: 'MMMM d', 
-      },
-      axisBorder: {
-        show: false
-      },
-      axisTicks: {
-        show: true
+        format: 'MMMM d'
       }
     },
-    
     yaxis: {
       labels: {
         formatter: function(value) {
-          return `$${value}`
+          return `$${value.toFixed(2)}`;
         }
-      },
-      axisBorder: {
-        show: false
-      },
+      }
     },
+
     tooltip: {
       x: {
-        format: 'MMMM d, yyyy' // Full date format for the tooltip
+        formatter: function(value, { series, seriesIndex, dataPointIndex, w }) {
+          // Check if using categories for the x-axis
+          if (useCategory) {
+            // Extract the timestamp from the data and format it
+            const timestamp = w.config.series[seriesIndex].data[dataPointIndex].x;
+            return dayjs(timestamp).format('MMMM D, YYYY');
+          } else {
+            // Directly use the value for datetime type since it's already formatted
+            return dayjs(value).format('MMMM D, YYYY');
+          }
+        }
       }
+    },
+    
+    grid: {
+      show: true
     },
     responsive: [{
       breakpoint: 480,
-    }],
-    grid: {
-      show: true
-    }
+    }]
   };
 
-  
+  const series = [{
+    name: 'Sale Price',
+    data: filledSeriesData,
+  }];
 
   return (
-    <div>
-      <div className="flex justify-center w-full">
-        <div className="w-full lg:h-[400px] xl:h-[475px]">
+    <div className="flex justify-center w-full">
+      <div className="w-full lg:h-[400px] xl:h-[475px]">
         <ReactApexChart options={options} series={series} type="area" height="400" />
       </div>
     </div>
-    </div>
-
   );
 };
 
 export default PriceChartAndStats;
-
-

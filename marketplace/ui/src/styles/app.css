@@ -386,6 +386,12 @@ body{
 .inventory_modal .ant-input{
   height: 42px !important;
 }
+
+.inventory_modal .ant-input-number .ant-input-number-input {
+  text-align: left !important;
+  height: 42px !important;
+}
+
 .ant-select-selector{
   height: 42px !important; 
   align-items: center;
@@ -445,3 +451,28 @@ body{
 :where(.css-9ntgx0).ant-menu-horizontal{
   border-bottom: 0px;
 }
+
+.no-select {
+  -webkit-user-select: none; /* Safari */
+  -moz-user-select: none;    /* Firefox */
+  -ms-user-select: none;     /* Internet Explorer/Edge */
+  user-select: none;         /* Standard syntax */
+}
+
+.items-select .ant-select-selector {
+  background-color: #181EAC !important;
+  color: white !important;
+}
+
+.items-select .ant-select-selector:hover {
+  background-color: #101481 !important;
+}
+
+.items-select.ant-select-open .ant-select-selection-item {
+  color: white !important;
+}
+
+.items-select .ant-select-arrow {
+  color: white;
+}
+

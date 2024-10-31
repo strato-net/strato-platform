@@ -36,4 +36,5 @@ typeToEvmType (SVMType.Array x y) = flip OLDXABI.Array y <$> typeToEvmType x
 typeToEvmType (SVMType.Contract x) = Just $ OLDXABI.Contract (labelToText x)
 typeToEvmType (SVMType.Mapping x y z) = OLDXABI.Mapping x <$> typeToEvmType y <*> typeToEvmType z
 typeToEvmType (SVMType.Variadic) = Just $ OLDXABI.Variadic
+typeToEvmType (SVMType.Decimal) = Just $ OLDXABI.Decimal
 typeToEvmType _ = Nothing

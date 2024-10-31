@@ -55,7 +55,6 @@ pipeline {
                 OAUTH_JWT_USERNAME_PROPERTY=email \
                 OAUTH_DISCOVERY_URL=https://keycloak.blockapps.net/auth/realms/strato-devel/.well-known/openid-configuration \
                 VAULT_URL=http://\$(</host):8093 \
-                STRIPE_PAYMENT_SERVER_URL='dummy' \
                 FILE_SERVER_URL='dummy' \
                 idServerUrl='dummy' \
                 ./strato --single

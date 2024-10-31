@@ -16,15 +16,23 @@ module.exports = {
     retentionHours: 1 * 24,
     stallCheckFrequency: 5 * 60 * 1000,
     memoryUsedAlertLevel: 80, // Alert when used memory (RAM) >= N%
+    memoryUsedCloseLevel: 75,
     diskspaceUsedAlertLevel: 80, // Alert when used diskspace >= N%
+    diskspaceUsedCloseLevel: 75,
     cpuAvgLoadAlertLevel: 97, // Alert when cpu avg load > N%
+    cpuAvgLoadCloseLevel: 90,
     cpuCurrentLoadAlertLevel: 99, // Alert when cpu current load > N%,
+    cpuCurrentLoadCloseLevel: 90,
     maxStalledIntervals: 80, //max number of failed stall checks before reporting stalled: 1200 seconds / poll freq (15) = 80, set to 20 minutess
   },
   networkHealthCheck: {
     requestTimeout: 3 * 1000,
     pollFrequency: 15 * 1000,
   },
+  emailNotifications: {
+    nodeHealthGracePeriod: 60 * 1000, // Grace period for node health after the node's start
+    pollFrequency: 15 * 1000,
+  }
   // Unused code notice. Node stats disabled, to be deprecated  #node-stats-deprecation
   // statistics: {
   //   apiCallCounterDbSaveTimer: 60 * 1000,

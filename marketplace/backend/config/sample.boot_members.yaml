@@ -1,9 +1,0 @@
-members:
-  - organization: 'BlockApps'
-    unit: 'Apps'
-    commonName: 'AppsNode1'
-  
-  - organization: 'AlphaCompany'
-  
-  - organization: 'BetaCompany'
-    unit: 'Engineering'

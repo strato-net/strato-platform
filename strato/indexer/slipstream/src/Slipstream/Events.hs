@@ -21,7 +21,9 @@ data Detail = Incremental | Eventual
 data ProcessedContract = ProcessedContract
   { address :: Address,
     codehash :: CodePtr,
-    organization :: Text,
+    creator :: Text,
+    cc_creator :: Maybe Text,
+    root :: Text,
     application :: Text,
     contractName :: Text,
     chain :: Text,

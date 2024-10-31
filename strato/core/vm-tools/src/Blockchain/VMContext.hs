@@ -39,6 +39,7 @@ module Blockchain.VMContext
     bestBlockInfo,
     vmGasCap,
     hasBlockstanbul,
+    selfAddress,
     blockRequested,
     runningTests,
     txRunResultsCache,
@@ -63,6 +64,7 @@ module Blockchain.VMContext
     checkIfRunningTests,
     lookupX509AddrFromCBHash,
     knownFailedTxs,
+    knownExpensiveTxs,
   )
 where
 
@@ -82,6 +84,7 @@ import Blockchain.DB.StateDB
 import Blockchain.DB.StorageDB
 import Blockchain.Data.AddressStateDB
 import Blockchain.Data.Block
+import Blockchain.Data.BlockHeader
 import Blockchain.Data.BlockSummary
 import Blockchain.Data.ChainInfo
 import Blockchain.Data.DataDefs
@@ -198,6 +201,14 @@ knownFailedTxs =
       keccak256FromHex "866ce8e521aee5a30284702dc38c4e8c160f40c9a17e52f4ba806dd22f0afed7"
     ]
 
+{-# NOINLINE knownExpensiveTxs #-}
+knownExpensiveTxs :: S.Set Keccak256
+knownExpensiveTxs =
+  S.fromList
+    [
+      keccak256FromHex "4f9e09efa40b1ddc9b9bbfb056161f87714f15bcb0d7fd7db3158528ed766065" -- testnet2 tx requiring ~1,000,000 gas
+    ]
+
 newtype CurrentBlockHash = CurrentBlockHash {unCurrentBlockHash :: Keccak256}
   deriving (Generic, NFData, Show)
 
@@ -210,8 +221,8 @@ newtype GasCap = GasCap {unVmGasCap :: Gas}
 instance NFData RBDB.RedisConnection where
   rnf (RBDB.RedisConnection c) = c `seq` ()
 
-data ContextBestBlockInfo = Unspecified | ContextBestBlockInfo !Keccak256 !BlockData !Integer !Int !Int
-  deriving (Eq, Read, Show, Generic, NFData)
+data ContextBestBlockInfo = Unspecified | ContextBestBlockInfo !Keccak256 !BlockHeader !Int
+  deriving (Eq, Show, Generic, NFData)
 
 instance Binary ContextBestBlockInfo
 
@@ -259,7 +270,8 @@ data ContextState = ContextState
     _blockRequested :: !Bool,
     _runningTests :: !Bool,
     _txRunResultsCache :: TRC.Cache,
-    _debugSettings :: !(Maybe DebugSettings)
+    _debugSettings :: !(Maybe DebugSettings),
+    _selfAddress :: !Address
   }
   deriving (Generic, NFData)
 
@@ -276,7 +288,8 @@ instance Default ContextState where
         _blockRequested = False,
         _runningTests = False,
         _txRunResultsCache = error "Default ContextState: accessing uninitialized txRunResultsCache",
-        _debugSettings = Nothing
+        _debugSettings = Nothing,
+        _selfAddress = Address 0
       }
 
 data QueueEvent
@@ -431,7 +444,8 @@ runTestContextM f = withSystemTempDirectory "test_evm_context" $ \tmpdir ->
               _blockRequested = False,
               _runningTests = True,
               _txRunResultsCache = cache,
-              _debugSettings = Nothing
+              _debugSettings = Nothing,
+              _selfAddress = Address 0
             }
       que <- newTQueueIO
       let ctx =
@@ -546,16 +560,16 @@ incrementNonce account = A.adjustWithDefault_ Mod.Proxy account $ \addressState 
 
 getNewAddress :: (MonadIO m, (Account `A.Alters` AddressState) m) => Account -> m Account
 getNewAddress account = do
-  nonce <- addressStateNonce <$> A.lookupWithDefault Mod.Proxy account
-  when flags_debug $ liftIO $ putStrLn $ "Creating new account: owner=" ++ format account ++ ", nonce=" ++ show nonce
-  let newAddress = getNewAddress_unsafe (account ^. accountAddress) nonce
+  nonce' <- addressStateNonce <$> A.lookupWithDefault Mod.Proxy account
+  when flags_debug $ liftIO $ putStrLn $ "Creating new account: owner=" ++ format account ++ ", nonce=" ++ show nonce'
+  let newAddress = getNewAddress_unsafe (account ^. accountAddress) nonce'
   incrementNonce account
   return $ (accountAddress .~ newAddress) account
 
 getNewAddressWithSalt :: (MonadIO m, MonadLogger m, (Account `A.Alters` AddressState) m) => Account -> Value -> Keccak256 -> String -> m Account
 getNewAddressWithSalt account salt hsh args = do
-  nonce <- addressStateNonce <$> A.lookupWithDefault Mod.Proxy account
-  when flags_debug $ liftIO $ putStrLn $ "Creating new account: owner=" ++ format account ++ ", nonce=" ++ show nonce
+  nonce' <- addressStateNonce <$> A.lookupWithDefault Mod.Proxy account
+  when flags_debug $ liftIO $ putStrLn $ "Creating new account: owner=" ++ format account ++ ", nonce=" ++ show nonce'
   let saltAsString = case salt of
         (SString s) -> s
         _ -> invalidArguments "big major bad" salt
@@ -581,4 +595,3 @@ putContextBestBlockInfo new = Mod.modifyStatefully_ Mod.Proxy $ assign bestBlock
 
 checkIfRunningTests :: (Functor m, Mod.Accessible ContextState m) => m Bool
 checkIfRunningTests = _runningTests <$> Mod.access Mod.Proxy
-

@@ -91,15 +91,15 @@ spec = do
             `L.shouldBe` AddressState
               { addressStateNonce = 0,
                 addressStateBalance = 0,
-                addressStateCodeHash = EVMCode (unsafeCreateKeccak256FromWord256 0x1b2d3c7f0269f98c8e9b627cc564b7d23a2c0c0501518d83e757c518135b7e51),
+                addressStateCodeHash = ExternallyOwned (unsafeCreateKeccak256FromWord256 0x1b2d3c7f0269f98c8e9b627cc564b7d23a2c0c0501518d83e757c518135b7e51),
                 addressStateContractRoot = MP.StateRoot $ word256ToBytes 0x56e81f171bcc55a6ff8345e692c0f86e5b48e01b996cadc001622fb5e363b421,
                 addressStateChainId = Nothing
               }
 
-          code <- getEVMCode $
+          code <- getExternallyOwned $
             case addressStateCodeHash addressState of
-              EVMCode x -> x
-              _ -> error "vm-runner tests only support EVMCode"
+              ExternallyOwned x -> x
+              _ -> error "vm-runner tests only support ExternallyOwned"
           code `L.shouldBe` B.drop 27 i -- I'd like this better if I knew why 27 was the offset of the payload, but disassembling wasn't helpful
           call
             isRunningTests

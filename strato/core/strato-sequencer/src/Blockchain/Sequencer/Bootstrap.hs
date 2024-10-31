@@ -7,16 +7,16 @@ import BlockApps.Logging
 import BlockApps.X509.Certificate
 import Blockchain.Constants
 import Blockchain.Data.Block
-import Blockchain.Data.DataDefs
 import qualified Blockchain.Data.TXOrigin as TO
 import qualified Blockchain.Data.Transaction as TX
 import Blockchain.EthConf as EC
-import Blockchain.Privacy.Monad
 import Blockchain.Sequencer.CablePackage
 import Blockchain.Sequencer.Constants
 import Blockchain.Sequencer.DB.DependentBlockDB
 import Blockchain.Sequencer.Event
+import Blockchain.Sequencer.ExtraCertsHack
 import Blockchain.Sequencer.Gregor
+import Blockchain.Sequencer.Kafka (writeSeqVmEvents, writeSeqP2pEvents)
 import Blockchain.Sequencer.Monad
 import Blockchain.Strato.Model.Address
 import Blockchain.Strato.Model.Class
@@ -49,11 +49,9 @@ bootstrapSequencer
           { obOrigin = TO.Direct,
             obBlockData = bd,
             obBlockUncles = us,
-            obTotalDifficulty = difficulty,
             obReceiptTransactions = map kludge txs
           }
       hash = blockHeaderHash bd
-      difficulty = blockDataDifficulty bd
       kludge t = fromMaybe fallback (wrapIngestBlockTransactionUnanchored hash t)
         where
           fallback =
@@ -85,24 +83,18 @@ bootstrapSequencer
                   cablePackage = pkg,
                   maxEventsPerIter = 65,
                   maxUsPerIter = 20000,
-                  vaultClient = Just clientEnv
+                  vaultClient = Just clientEnv,
+                  kafkaClientId = KString $ C8.pack defaultKafkaClientId',
+                  redisConn = error "initLevelDB: redisConn"
                 }
         runLoggingT . runSequencerM dummySequencerCfg Nothing $ do
-          bootstrapGenesisBlock hash difficulty
-          A.insert (A.Proxy @EmittedBlock) hash alreadyEmittedBlock
-          for_ extraCerts . uncurry $ A.insert (A.Proxy @X509CertInfoState)
+          bootstrapGenesisBlock hash
+          for_ (extraCerts ++ extraCertsHack) . uncurry $ A.insert (A.Proxy @X509CertInfoState)
           flushLdbBatchOps
       initKafka :: CablePackage -> IO ()
-      initKafka pkg = do
-        let clientId = KString $ C8.pack defaultKafkaClientId'
-            dummyGregorCfg =
-              GregorConfig
-                { kafkaAddress = Nothing,
-                  kafkaClientId = clientId,
-                  kafkaConsumerGroup = EC.lookupConsumerGroup clientId,
-                  cablePackage = pkg
-                }
-        runGregorM dummyGregorCfg $ do
-          assertTopicCreation
-          writeSeqVmEvents [VmBlock shortCircuit] -- todo handle the error :)
-          writeSeqP2pEvents [P2pBlock shortCircuit] -- todo handle the error :)
+      initKafka _ = do
+        runKafkaMConfigured (KString $ C8.pack defaultKafkaClientId') $ do
+          assertSequencerTopicsCreation
+          _ <- writeSeqVmEvents [VmBlock shortCircuit] -- todo handle the error :)
+          _ <- writeSeqP2pEvents [P2pBlock shortCircuit] -- todo handle the error :)
+          return ()

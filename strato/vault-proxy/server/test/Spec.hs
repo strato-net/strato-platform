@@ -31,13 +31,7 @@ instance HasVirginTokenCall (ReaderT Sock IO) where
     pure $
       VaultToken
         { accessToken = "",
-          expiresIn = 300,
-          refreshExpiresIn = 0,
-          refreshToken = "",
-          tokenType = "",
-          notBeforePolicy = 0,
-          sessionState = "",
-          scone = ""
+          expiresIn = 300
         }
 
 runGoodServer :: Sock -> IORef Int -> IO ()

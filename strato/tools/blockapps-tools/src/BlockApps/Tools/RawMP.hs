@@ -13,22 +13,18 @@ import Text.Format
 
 formatKV :: (N.NibbleString, RLPObject) -> String
 formatKV (key, val) =
-  format key ++ ": " ++ format (rlpDeserialize $ rlpDecode val)
+  format key ++ ":\n  " ++ format (rlpDeserialize $ rlpDecode val)
 
 showVals :: MonadIO m => DB.DB -> MP.StateRoot -> m ()
 showVals sdb sr = do
   kvs <- runReaderT (MP.unsafeGetKeyVals sr "") sdb
-  liftIO . print $ length kvs
-  --liftIO . putStrLn $ displayS (renderPretty 1.0 200 $ vsep $ formatKV <$> kvs) ""
   liftIO . putStrLn $ unlines $ formatKV <$> kvs
 
 
 doit :: String -> MP.StateRoot -> IO ()
 doit filename sr = DB.runResourceT $ do
-  --    dbs <- openDBs theType
-  --    homeDir <- liftIO getHomeDirectory
   sdb <-
     DB.open
-      filename
+      ("/tmp/.ethereumH/" ++ filename) 
       DB.defaultOptions {DB.cacheSize = 1024}
   showVals sdb sr

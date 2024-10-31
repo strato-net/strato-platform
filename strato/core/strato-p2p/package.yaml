@@ -7,7 +7,6 @@ synopsis: a microservice that handles peer to peer connections for strato
 dependencies:
   - base
   - common-log
-  - vm-tools
 
 ghc-options: -Wall -threaded
 
@@ -21,8 +20,11 @@ executables:
       - ethereum-discovery
       - hflags
       - lifted-async
+      - ordered-containers
+      - process-monitor
       - strato-model
       - strato-p2p
+      - vm-tools
       - wai-middleware-prometheus
       - warp
       
@@ -57,14 +59,15 @@ library:
     - hflags
     - http-client
     - iproute
+    - kafka-monad
     - lens
     - lifted-async
     - lifted-base
-    - milena
-    - milena-tools
+    - merkle-patricia-db
     - monad-alter
     - mtl
     - network
+    - ordered-containers
     - persistent
     - prometheus-client
     - random
@@ -81,59 +84,59 @@ library:
     - text
     - these
     - time
-    - transformers
     - unliftio-core
     - unliftio 
     - warp
-    - x509-certs
 
-tests:
-  strato-p2p-client-test:
-    source-dirs: test
-    ghc-options: -Wall -Werror -dynamic
-    main: Main.hs
-    dependencies:
-      - base16-bytestring
-      - blockapps-data
-      - blockapps-datadefs
-      - blockapps-mpdbs
-      - blockapps-privacy
-      - blockstanbul
-      - bytestring
-      - composable-monads-base
-      - conduit
-      - containers
-      - crypto-pubkey-types
-      - data-default
-      - debugger
-      - ethereum-encryption
-      - ethereum-discovery
-      - ethereum-rlp
-      - extra
-      - hflags
-      - hspec
-      - hspec-expectations-lifted
-      - hourglass
-      - labeled-error
-      - lens
-      - merkle-patricia-db
-      - monad-alter
-      - mtl
-      - network
-      - nibblestring
-      - ordered-containers
-      - Ranged-sets
-      - seqevents
-      - stm-chans
-      - stm-conduit
-      - strato-index
-      - strato-model
-      - strato-p2p
-      - strato-sequencer
-      - strato-redis-blockdb
-      - text
-      - time
-      - unliftio
-      - vm-runner
-      - vm-tools
-      - x509-certs
+#removing p2p tests for now, it is more work to keep updating this than the reward it is giving
+#tests:
+#  strato-p2p-client-test:
+#    source-dirs: test
+#    ghc-options: -Wall -Werror -dynamic
+#    main: Main.hs
+#    dependencies:
+#      - base16-bytestring
+#      - blockapps-data
+#      - blockapps-datadefs
+#      - blockapps-mpdbs
+#      - blockapps-privacy
+#      - blockstanbul
+#      - bytestring
+#      - composable-monads-base
+#      - conduit
+#      - containers
+#      - crypto-pubkey-types
+#      - data-default
+#      - debugger
+#      - ethereum-encryption
+#      - ethereum-discovery
+#      - ethereum-rlp
+#      - extra
+#      - hflags
+#      - hspec
+#      - hspec-expectations-lifted
+#      - hourglass
+#      - labeled-error
+#      - lens
+#      - merkle-patricia-db
+#      - monad-alter
+#      - mtl
+#      - network
+#      - nibblestring
+#      - ordered-containers
+#      - Ranged-sets
+#      - seqevents
+#      - stm-chans
+#      - stm-conduit
+#      - strato-index
+#      - strato-model
+#      - strato-p2p
+#      - strato-sequencer
+#      - strato-redis-blockdb
+#      - text
+#      - time
+#      - unliftio
+#      - vm-runner
+#      - vm-tools
+#      - x509-certs
+

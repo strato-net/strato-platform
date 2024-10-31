@@ -11,7 +11,7 @@ description:
 dependencies:
   - base >= 4 && < 5
   - bytestring
-  - x509-certs
+  - strato-model
 
 
 ghc-options: -Wall -Werror
@@ -39,24 +39,6 @@ executables:
     source-dirs: exec_src/
     main: X509CertInfo.hs
     other-modules: []
-
-  x509-certificate-registry:
-    source-dirs: exec_src/
-    main: X509CertRegistry.hs
-    other-modules: []
-    dependencies:
-      - aeson
-      - bloc2api
-      - blockapps-data
-      - blockapps-datadefs
-      - containers
-      - http-client
-      - optparse-applicative
-      - raw-strings-qq
-      - servant-client
-      - source-tools
-      - strato-model
-      - text
 
   x509-saltine-decrypt:
     source-dirs: exec_src/

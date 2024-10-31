@@ -10,6 +10,8 @@ export default {
   zeroAddress: '0000000000000000000000000000000000000000',
   certificateRegistryContractName: "OfficialCertificateRegistry",
   certificateContractName: "Certificate",
+  userContractName: 'BlockApps-UserRegistry-User',
+  mercataAdminContractName: 'MercataAdmin',
   emptyCert: '-----BEGIN CERTIFICATE-----\nMIIBVDCB+aADAgECAhBPjHUswOXtDsbDeQIsdepkMAwGCCqGSM49BAMCBQAwLDEJ\nMAcGA1UEAwwAMQkwBwYDVQQKDAAxCTAHBgNVBAsMADEJMAcGA1UEBgwAMB4XDTIx\nMDUyNTE1MzQxNVoXDTIyMDUyNTE1MzQxNVowLDEJMAcGA1UEAwwAMQkwBwYDVQQK\nDAAxCTAHBgNVBAsMADEJMAcGA1UEBgwAMFYwEAYHKoZIzj0CAQYFK4EEAAoDQgAE\n4X1p4KE8cB6vYqKzSHIl+V5fDUC9p0j8OfOQOUhCfkjG1ALuRyP68tTohz9TLPLk\nYCVKrCiueuZJbejnGsp21TAMBggqhkjOPQQDAgUAA0gAMEUCIQCVtizg/N3MBdLi\nfHto7tqu1ia6cZpMI/G2bLWSPErK9AIgcBw+S8iVqSjh61CkgBAS066Z7M/W9eeY\n+sm9OKHDfQQ=\n-----END CERTIFICATE-----',
   testCert1: '-----BEGIN CERTIFICATE-----\nMIIB0jCCAXegAwIBAgIQeEdWygiiwHQ9e5bfkQVdVTAMBggqhkjOPQQDAgUAMGsx\nEjAQBgNVBAMMCUJsb2NrQXBwczExMC8GA1UECgwoM2JhMzA0YjhlODc0MDViYmYy\nMzg4NzQzYjM5NmEyODEzMTcwYzAwZjEUMBIGA1UECwwLZW5naW5lZXJpbmcxDDAK\nBgNVBAYMA1VTQTAeFw0yMTEwMTkxNTE2MzZaFw0yMjEwMTkxNTE2MzZaMGsxEjAQ\nBgNVBAMMCUJsb2NrQXBwczExMC8GA1UECgwoM2JhMzA0YjhlODc0MDViYmYyMzg4\nNzQzYjM5NmEyODEzMTcwYzAwZjEUMBIGA1UECwwLZW5naW5lZXJpbmcxDDAKBgNV\nBAYMA1VTQTBWMBAGByqGSM49AgEGBSuBBAAKA0IABLsHOfw6jXFjQRAoLVDLwsmr\nKtHn5O6Cisa47lzxV0NfXVJXCcVP2N95GAB5/pmLsmE8rcdLQVBQFLWPjhGoCQ4w\nDAYIKoZIzj0EAwIFAANHADBEAiAChH6dQTLS/F/lNt7JkjMpC0uo6MEFI+zV5hCB\noNnc1gIgaMpLif4qKPRfAFjQJCJR8ORV1PEXf9xBK7XtPONqDQ0=\n-----END CERTIFICATE-----',
   testOrg1: '3ba304b8e87405bbf2388743b396a2813170c00f',
@@ -31,14 +33,17 @@ export default {
   blockAppsOrg: "BlockApps",
   prodNetworkId: "6909499098523985262",
   testnetNetworkId: "7596898649924658542",
-  prodStratsAddress: "b220195543f652f735b7847c4af399d0323e1ff6",
-  testnetStratsAddress: "488cd3909d94606051e0684cf6caa5763fb78613",
-  baUserNames: ['blockapps_carbon', 'blockapps_metals', 'blockapps_clothing', 'blockapps_collectibles', 'blockapps_memberships', 'blockapps_art'],
-  localHost: 'http://localhost'
+  prodStratsAddress: "d2810818e0401e85693f83107ed2b96faeed329c",
+  testnetStratsAddress: "5375b8b1c691201acf16a72612d82ed438951a04",
+  attachImagesAndFiles: "*,BlockApps-Mercata-Asset-files(*),BlockApps-Mercata-Asset-images(*),BlockApps-Mercata-Asset-fileNames(*)",
+  attachSalesAndImagesAndFiles: "*,BlockApps-Mercata-Asset-files(*),BlockApps-Mercata-Asset-images(*),BlockApps-Mercata-Asset-fileNames(*),BlockApps-Mercata-Sale!BlockApps-Mercata-Sale_BlockApps-Mercata-Asset_fk(*,BlockApps-Mercata-Sale-paymentServices(*))",
+  attach_saleAddresses_Quantities_completedSales_onOrder: "*,BlockApps-Mercata-Order-saleAddresses(*),BlockApps-Mercata-Order-quantities(*),BlockApps-Mercata-Order-completedSales(*)",
+  baUserNames: ['blockapps_carbon', 'blockapps_metals', 'blockapps_clothing', 'blockapps_collectibles', 'blockapps_memberships', 'blockapps_art', 'blockapps_spirits'],
+  localHost: 'http://localhost',
+  burnAddress: '6ec8bbe4a5b87be18d443408df43a45e5972fa1b',
+  testTokenServerUrl: 'https://campaigns-test.blockapps.net',
+  prodTokenServerUrl: 'https://campaigns.blockapps.net',
 };
-
-require('dotenv').config();
-export const STRIPE_PAYMENT_SERVER_URL = process.env.STRIPE_PAYMENT_SERVER_URL;
 
 export const unitOfMeasurement = {}
 unitOfMeasurement[unitOfMeasurement['LB'] = 1] = 'LB';
@@ -60,6 +65,18 @@ export const CHARGES = {
   "TAX": 0
 }
 
+export const ASSET_STATUS = {
+  "ACTIVE": 1,
+  "PENDING_REDEMPTION": 2,
+  "RETIRED": 3,
+}
+
+export const REDEMPTION_STATUS = {
+  "PENDING": 1,
+  "FULFILLED": 2,
+  "REJECTED": 3
+}
+
 export const ORDER_STATUS = {
   "AWAITING_FULFILLMENT": 1,
   "AWAITING_SHIPMENT": 2,
@@ -74,6 +91,12 @@ export const ITEM_STATUS = {
   "SOLD": 4
 }
 
+export const ISSUER_STATUS = {
+ "UNAUTHORIZED": "1",
+ "PENDING_REVIEW": "2",
+ "AUTHORIZED": "3" 
+}
+
 export const PAYMENT_TYPES = {
   "amex": "1",
   "discover": "2",
@@ -82,36 +105,78 @@ export const PAYMENT_TYPES = {
   "visa": "5",
 }
 
+// Orders: No comments initially
+export const DEFAULT_COMMENT = "";
+
 export const SERVICE_PROVIDERS = {}
 SERVICE_PROVIDERS[SERVICE_PROVIDERS['STRIPE'] = 1] = 'STRIPE';
 SERVICE_PROVIDERS[SERVICE_PROVIDERS['PAYPAL'] = 2] = 'PAYPAL';
 Object.freeze(SERVICE_PROVIDERS)
 
-// Helpers to calculate average price, range, units sold for Pirce History Stats
-export const calculateAveragePrice =(records)=> {
-  return records.reduce((sum, record) => sum + record.price, 0) / records.length;
-}
+export const calculateAverageSalePrice = (records) => {
 
-export const calculatePriceFluctuation =(records)=> {
+  // Track the last seen effective quantity (quantity + totalLockedQuantity)
+  const lastSeenEffectiveQuantities = {};
+
+  // Filter records where the effective purchase quantity decreases
+  const filteredRecords = records.filter(record => {
+    const key = `${record.address}-${record.assetToBeSold}`;
+    const currentEffectiveQuantity = record.quantity + record.totalLockedQuantity;
+    
+    if (!(key in lastSeenEffectiveQuantities)) {
+      // Update dictionary
+      lastSeenEffectiveQuantities[key] = currentEffectiveQuantity;
+      return false; // No previous record to compare
+    }
+    
+    // Check if the effective quantity has decreased
+    const hasDecreased = currentEffectiveQuantity < lastSeenEffectiveQuantities[key];
+    
+    // Update the last seen effective quantity
+    lastSeenEffectiveQuantities[key] = currentEffectiveQuantity;
+
+    return hasDecreased;
+  });
+
+  // Calculate the average sale price for the filtered records
+  if (filteredRecords.length === 0) {
+    return 0; // If there are no records with decreased effective quantity, return 0
+  }
+
+  const totalPrice = filteredRecords.reduce((sum, record) => sum + record.price, 0);
+  const averagePrice = totalPrice / filteredRecords.length;
+
+  return averagePrice;
+};
+
+
+
+export const calculatePriceFluctuation = (records) => {
   const prices = records.map(record => record.price);
   return { min: Math.min(...prices), max: Math.max(...prices) };
 }
 
 export const calculateVolumeTraded = (records) => {
-  return records.reduce((acc, record, index, array) => {
-    // Skip the first element as there's no previous element to compare with
-    if (index === 0) return acc;
+  
+  // Create a map to track the latest combined quantity for each address
+  const addressQuantityMap = new Map();
 
-    // Check if the current record and the previous record have the same address
-    // We shouldn't track quantity decreased for a new sale contract created
-    // (when user uses list for sale) as the lesser quantity can be listed for sale 
-    if (record.address === array[index - 1].address) {
-      const quantityDecrease = array[index - 1].quantity - record.quantity;
+  return records.reduce((acc, record) => {
+    // Calculate the combined quantity of quantity and totalLockedQuantity
+    const currentCombinedQuantity = record.quantity + record.totalLockedQuantity;
 
-      // Only add to the accumulator if there's a decrease in quantity
-      if (quantityDecrease > 0) {
-        acc += quantityDecrease;
-      }
+    // Get the previous combined quantity for this address, if any
+    const previousCombinedQuantity = addressQuantityMap.get(record.address) || currentCombinedQuantity;
+
+    // Update the map with the current combined quantity
+    addressQuantityMap.set(record.address, currentCombinedQuantity);
+
+    // Calculate the quantity decrease
+    const quantityDecrease = previousCombinedQuantity - currentCombinedQuantity;
+
+    // Only add to the accumulator if there's a decrease in quantity
+    if (quantityDecrease > 0) {
+      acc += quantityDecrease;
     }
 
     return acc;
@@ -119,27 +184,28 @@ export const calculateVolumeTraded = (records) => {
 };
 
 
+
 // Helpers to get time `x` months/years ago and date
-export const getOneYearAgoTime =()=>{
+export const getOneYearAgoTime = () => {
   const time = dayjs().utc().subtract(1, 'year').format('YYYY-MM-DD HH:mm:ss') + ' UTC';
   return time;
 }
-export const getSixMonthsAgoTime =()=>{
+export const getSixMonthsAgoTime = () => {
   const time = dayjs().utc().subtract(6, 'months').format('YYYY-MM-DD HH:mm:ss') + ' UTC';
   return time;
 }
-export const getDate = (record) =>{
+export const getDate = (record) => {
   const date = dayjs(record.block_timestamp).format('YYYY-MM-DD');
   return date;
 }
 
 //Helpers for timeFilter
-export const timeFilterForSixMonths = () =>{
+export const timeFilterForSixMonths = () => {
   return '1';
 }
-export const timeFilterForOneYear = () =>{
+export const timeFilterForOneYear = () => {
   return '2';
 }
-export const timeFilterForAll = () =>{
+export const timeFilterForAll = () => {
   return '3';
 }

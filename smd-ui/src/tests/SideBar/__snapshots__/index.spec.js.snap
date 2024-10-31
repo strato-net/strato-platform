@@ -30,15 +30,6 @@ exports[`SideBar: index render component for non oauth mode 1`] = `
         Transactions
       </span>
     </NavLink>
-    <NavLink id=\\"shards\\" to=\\"/shards\\" className=\\"menu-item\\" activeClassName=\\"active-menu-item\\" onClick={[undefined]}>
-      <i className=\\"fa fa-diagram-project\\">
-         
-      </i>
-      <span className=\\"menu-text\\">
-         
-        Private Shards
-      </span>
-    </NavLink>
     <NavLink id=\\"contracts\\" to=\\"/contracts\\" className=\\"menu-item\\" activeClassName=\\"active-menu-item\\" onClick={[undefined]}>
       <i className=\\"fa fa-file-contract\\">
          
@@ -113,15 +104,6 @@ exports[`SideBar: index render component for public mode 1`] = `
         Transactions
       </span>
     </NavLink>
-    <NavLink id=\\"shards\\" to=\\"/shards\\" className=\\"menu-item\\" activeClassName=\\"active-menu-item\\" onClick={[undefined]}>
-      <i className=\\"fa fa-diagram-project\\">
-         
-      </i>
-      <span className=\\"menu-text\\">
-         
-        Private Shards
-      </span>
-    </NavLink>
     <NavLink id=\\"contracts\\" to=\\"/contracts\\" className=\\"menu-item\\" activeClassName=\\"active-menu-item\\" onClick={[undefined]}>
       <i className=\\"fa fa-file-contract\\">
          
@@ -162,19 +144,20 @@ exports[`SideBar: index sequence of links for oauth and non-oauth mode eighth po
 <NavLink
   activeClassName="active-menu-item"
   className="menu-item"
-  id="external_storage"
-  onClick={[Function]}
-  to="/external_storage"
+  id="accounts"
+  onClick={undefined}
+  to="/accounts"
 >
   <i
-    className="fa fa-cloud-upload"
+    className="fa fa-users"
   >
      
   </i>
   <span
     className="menu-text"
   >
-    External Storage
+     
+    Users
   </span>
 </NavLink>
 `;
@@ -183,12 +166,12 @@ exports[`SideBar: index sequence of links for oauth and non-oauth mode fifth pos
 <NavLink
   activeClassName="active-menu-item"
   className="menu-item"
-  id="contracts"
+  id="blocks"
   onClick={undefined}
-  to="/contracts"
+  to="/blocks"
 >
   <i
-    className="fa fa-file-contract"
+    className="fa fa-cube"
   >
      
   </i>
@@ -196,7 +179,7 @@ exports[`SideBar: index sequence of links for oauth and non-oauth mode fifth pos
     className="menu-text"
   >
      
-    Contracts
+    Blocks
   </span>
 </NavLink>
 `;
@@ -227,12 +210,12 @@ exports[`SideBar: index sequence of links for oauth and non-oauth mode fourth po
 <NavLink
   activeClassName="active-menu-item"
   className="menu-item"
-  id="shards"
+  id="contracts"
   onClick={undefined}
-  to="/shards"
+  to="/contracts"
 >
   <i
-    className="fa fa-diagram-project"
+    className="fa fa-file-contract"
   >
      
   </i>
@@ -240,34 +223,33 @@ exports[`SideBar: index sequence of links for oauth and non-oauth mode fourth po
     className="menu-text"
   >
      
-    Private Shards
-  </span>
-</NavLink>
-`;
-
-exports[`SideBar: index sequence of links for oauth and non-oauth mode secound position /chains 1`] = `
-<NavLink
-  activeClassName="active-menu-item"
-  className="menu-item"
-  id="accounts"
-  onClick={undefined}
-  to="/accounts"
->
-  <i
-    className="fa fa-users"
-  >
-     
-  </i>
-  <span
-    className="menu-text"
-  >
-     
-    Users
+    Contracts
   </span>
 </NavLink>
 `;
 
 exports[`SideBar: index sequence of links for oauth and non-oauth mode seventh position /code_editor 1`] = `
+<NavLink
+  activeClassName="active-menu-item"
+  className="menu-item"
+  id="external_storage"
+  onClick={[Function]}
+  to="/external_storage"
+>
+  <i
+    className="fa fa-cloud-upload"
+  >
+     
+  </i>
+  <span
+    className="menu-text"
+  >
+    External Storage
+  </span>
+</NavLink>
+`;
+
+exports[`SideBar: index sequence of links for oauth and non-oauth mode sixth position /contracts 1`] = `
 <NavLink
   activeClassName="active-menu-item"
   className="menu-item"
@@ -285,28 +267,6 @@ exports[`SideBar: index sequence of links for oauth and non-oauth mode seventh p
   >
      
     Contract Editor
-  </span>
-</NavLink>
-`;
-
-exports[`SideBar: index sequence of links for oauth and non-oauth mode sixth position /contracts 1`] = `
-<NavLink
-  activeClassName="active-menu-item"
-  className="menu-item"
-  id="blocks"
-  onClick={undefined}
-  to="/blocks"
->
-  <i
-    className="fa fa-cube"
-  >
-     
-  </i>
-  <span
-    className="menu-text"
-  >
-     
-    Blocks
   </span>
 </NavLink>
 `;

@@ -32,6 +32,7 @@ import Blockchain.Sequencer.Event
 import Blockchain.Strato.Discovery.Data.Peer
 import Blockchain.Strato.Model.Options (computeNetworkID)
 import Blockchain.Strato.Model.Util
+import Blockchain.Threads
 import Conduit
 import Control.Monad (forever, when)
 import qualified Control.Monad.Change.Modify as Mod
@@ -95,12 +96,12 @@ handleMsgClientConduit myId peer = do
     Just Hello {} ->
       yield
         =<< lift
-          ( Mod.get (Mod.Proxy @BestBlock) >>= \(BestBlock bHash _ tdiff) -> do
+          ( Mod.get (Mod.Proxy @BestSequencedBlock) >>= \(BestSequencedBlock (BestBlock bHash highestBlockNum')) -> do
               (GenesisBlockHash genHash) <- Mod.access (Mod.Proxy @GenesisBlockHash)
               let s = Status
                       { protocolVersion = fromIntegral ethVersion,
                         networkID = computeNetworkID,
-                        totalDifficulty = fromIntegral tdiff,
+                        highestBlockNum = highestBlockNum',
                         latestHash = bHash,
                         genesisHash = genHash
                       }
@@ -108,15 +109,13 @@ handleMsgClientConduit myId peer = do
           )
     other -> assertHandshake other
   awaitMsg >>= \case
-    Just Status {totalDifficulty = peerTD, genesisHash = peerGH, latestHash = peerBestHash, networkID = networkID'} -> do
+    Just Status {highestBlockNum = highestBlockNum', genesisHash = peerGH, latestHash = peerBestHash, networkID = networkID'} -> do
       (GenesisBlockHash genHash) <- lift $ Mod.access (Mod.Proxy @GenesisBlockHash)
       when (peerGH /= genHash) $ throwIO WrongGenesisBlock
       when (networkID' /= computeNetworkID) $ throwIO $ NetworkIDMismatch
       -- we set to 0 cause we dont necessarily know the number yet
-      lift . Mod.put (Mod.Proxy @WorldBestBlock) . WorldBestBlock $ BestBlock peerBestHash 0 peerTD
-      (BestBlockNumber num) <- lift $ Mod.access (Mod.Proxy @BestBlockNumber)
-      (BestBlock _ num' _ ) <- lift $ Mod.get (Mod.Proxy @BestBlock)
-      let lastBlockNumber = max num num' -- BestBlockNumber not guaranteed to be > BestBlock (nor vice versa)
+      lift . Mod.put (Mod.Proxy @WorldBestBlock) . WorldBestBlock $ BestBlock peerBestHash highestBlockNum'
+      BestSequencedBlock (BestBlock _ lastBlockNumber) <- lift $ Mod.get (Mod.Proxy @BestSequencedBlock)
       mrh <- lift $ unMaxReturnedHeaders <$> Mod.access (Mod.Proxy @MaxReturnedHeaders)
       yield . Right $ GetBlockHeaders (BlockNumber (max (lastBlockNumber - flags_syncBacktrackNumber) 0)) mrh 0 Forward
       yield . Right $ GetChainDetails []
@@ -132,6 +131,13 @@ handleMsgServerConduit ::
   ConduitM Event (Either P2PCNC Message) m ()
 handleMsgServerConduit myPubkey peer = do
   $logDebugS "handleMsgServerConduit" $ T.pack $ "about to parse message"
+
+  numActivePeers <- liftIO $ fmap length getPeersByThreads
+
+  when (numActivePeers > flags_maxConn) $ do
+    yield $ Right $ Disconnect TooManyPeers
+    throwIO CurrentlyTooManyPeers
+    
   awaitMsg >>= \case
     Just Hello {} -> do
       $logInfoS "handshake/Hello{}" "received hello"
@@ -146,27 +152,25 @@ handleMsgServerConduit myPubkey peer = do
       yield $ Right helloMsg'
     other -> assertHandshake $ other
   awaitMsg >>= \case
-    Just Status {totalDifficulty = peerTD, genesisHash = peerGH, latestHash = peerBestHash, networkID = networkID'} -> do
+    Just Status {highestBlockNum = highestBlockNum'', genesisHash = peerGH, latestHash = peerBestHash, networkID = networkID'} -> do
       $logInfoS "serverHandshake/Status{}" "received status"
       yield
         =<< lift
-          ( Mod.get (Mod.Proxy @BestBlock) >>= \(BestBlock bHash _ tdiff) -> do
+          ( Mod.get (Mod.Proxy @BestSequencedBlock) >>= \(BestSequencedBlock (BestBlock bHash highestBlockNum')) -> do
               (GenesisBlockHash genHash) <- Mod.access (Mod.Proxy @GenesisBlockHash)
               -- we set to 0 cause we dont necessarily know the number yet
-              when (networkID' == computeNetworkID && genHash == peerGH) $ Mod.put (Mod.Proxy @WorldBestBlock) . WorldBestBlock $ BestBlock peerBestHash 0 peerTD
+              when (networkID' == computeNetworkID && genHash == peerGH) $ Mod.put (Mod.Proxy @WorldBestBlock) . WorldBestBlock $ BestBlock peerBestHash highestBlockNum''
               return $
                 Right
                   Status
                     { protocolVersion = fromIntegral ethVersion,
                       networkID = computeNetworkID,
-                      totalDifficulty = fromIntegral tdiff,
+                      highestBlockNum = highestBlockNum',
                       latestHash = bHash,
                       genesisHash = genHash
                     }
           )
-      (BestBlockNumber num) <- lift $ Mod.access (Mod.Proxy @BestBlockNumber)
-      (BestBlock _ num' _ ) <- lift $ Mod.get (Mod.Proxy @BestBlock)
-      let lastBlockNumber = max num num' -- BestBlockNumber not guaranteed to be > BestBlock (nor vice versa)
+      BestSequencedBlock (BestBlock _ lastBlockNumber) <- lift $ Mod.get (Mod.Proxy @BestSequencedBlock)
       mrh <- lift $ unMaxReturnedHeaders <$> Mod.access (Mod.Proxy @MaxReturnedHeaders)
       yield . Right $ GetBlockHeaders (BlockNumber (max (lastBlockNumber - flags_syncBacktrackNumber) 0)) mrh 0 Forward
       yield . Right $ GetChainDetails []

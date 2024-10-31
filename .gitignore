@@ -23,6 +23,14 @@ docker-compose.stripe-ps.yml
 docker-compose.stripe-ps.ecr.yml
 docker-compose.stripe-ps.push.yml
 docker-compose.stripe-ps.push.ecr.yml
+docker-compose.payment.ecr.yml
+docker-compose.payment.push.ecr.yml
+docker-compose.payment.push.yml
+docker-compose.payment.yml
+docker-compose.notification.ecr.yml
+docker-compose.notification.push.ecr.yml
+docker-compose.notification.push.yml
+docker-compose.notification.yml
 strato-platform-manifest.yaml
 eks-vault-deployment.yaml
 eks-identity-deployment.yaml

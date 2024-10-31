@@ -5,12 +5,12 @@ import {
   Pagination,
   notification,
   Spin,
-  Tooltip, 
+  Select,
   Tabs
 } from "antd";
+import { CheckCircleOutlined } from '@ant-design/icons';
 import InventoryCard from "./InventoryCard";
 import CreateInventoryModal from "./CreateInventoryModal";
-//categories
 import { actions as categoryActions } from "../../contexts/category/actions";
 import { useCategoryDispatch, useCategoryState } from "../../contexts/category";
 import useDebounce from "../UseDebounce";
@@ -19,21 +19,29 @@ import {
   useInventoryDispatch,
   useInventoryState,
 } from "../../contexts/inventory";
+import { usePaymentServiceDispatch, usePaymentServiceState } from "../../contexts/payment";
+import { actions as paymentServiceActions } from "../../contexts/payment/actions";
 import { Images } from "../../images";
-//items
-import { actions as itemActions } from "../../contexts/item/actions";
 import { useItemDispatch, useItemState } from "../../contexts/item";
+import { actions as itemActions } from "../../contexts/item/actions";
+import { actions as redemptionActions } from "../../contexts/redemption/actions";
+import { actions as issuerStatusActions } from "../../contexts/issuerStatus/actions";
+import { useRedemptionDispatch, useRedemptionState } from "../../contexts/redemption";
+import { useIssuerStatusState, useIssuerStatusDispatch } from "../../contexts/issuerStatus";
 import ClickableCell from "../ClickableCell";
 import routes from "../../helpers/routes";
 import { useNavigate } from "react-router-dom";
 import { useAuthenticateState } from "../../contexts/authentication";
-import CategoryCard from "../MarketPlace/CategoryCard";
 import HelmetComponent from "../Helmet/HelmetComponent";
 import { SEO } from "../../helpers/seoConstant";
+import RequestBeAuthorizedIssuerModal from "./RequestBeAuthorizedIssuerModal";
+import { ISSUER_STATUS } from '../../helpers/constants';
 
+const { Option } = Select;
 
 const Inventory = ({ user }) => {
   const [open, setOpen] = useState(false);
+  const [reqModOpen, setReqModOpen] = useState(false);
   const [queryValue, setQueryValue] = useState("");
   const debouncedSearchTerm = useDebounce(queryValue, 1000);
   const limit = 10;
@@ -46,19 +54,55 @@ const Inventory = ({ user }) => {
   const linkUrl = window.location.href;
   let { hasChecked, isAuthenticated, loginUrl } = useAuthenticateState();
 
-  //Categories
   const categoryDispatch = useCategoryDispatch();
-
   const { categorys } = useCategoryState();
-  const { inventories, isInventoriesLoading, message, success, isLoadingStripeStatus, stripeStatus, inventoriesTotal } =
+  const { inventories, isInventoriesLoading, message, success, inventoriesTotal, supportedTokens, isFetchingTokens } =
     useInventoryState();
-
-  //items
-  const itemDispatch = useItemDispatch();
   const {
-    message: itemMsg,
-    success: itemSuccess
-  } = useItemState();
+    paymentServices,
+    arePaymentServicesLoading,
+    notOnboarded,
+    areNotOnboardedLoading
+  } = usePaymentServiceState();
+  const paymentServiceDispatch = usePaymentServiceDispatch();
+  const [sortedPaymentServices, setSortedPaymentServices] = useState([]);
+
+  const isNotOnboarded = (service) => notOnboarded.some(n => n.serviceName === service.serviceName);
+
+  useEffect(() => {
+    // Create a set of not onboarded service names for quick lookup
+    const notOnboardedNames = new Set(notOnboarded.map(n => n.serviceName));
+
+    // Sort paymentServices array so that not onboarded services come first
+    const sortedServices = [...paymentServices].sort((a, b) => {
+      return isNotOnboarded(a) - isNotOnboarded(b);
+    }).map(service => ({
+      ...service,
+      isNotOnboarded: notOnboardedNames.has(service.serviceName),
+    }));
+
+    setSortedPaymentServices(sortedServices);
+  }, [paymentServices, notOnboarded]);
+
+  useEffect(() => {
+    if (user && user.commonName) {
+      paymentServiceActions.getPaymentServices(paymentServiceDispatch, true);
+      paymentServiceActions.getNotOnboarded(paymentServiceDispatch, user.commonName, 10, 0);
+    }
+  }, [paymentServiceDispatch, user]);
+
+  const itemDispatch = useItemDispatch();
+  const { message: itemMsg, success: itemSuccess } = useItemState();
+  const redemptionDispatch = useRedemptionDispatch();
+  const { message: redemptionMsg, success: redemptionSuccess } = useRedemptionState();
+  const [issuerStatus, setIssuerStatus] = useState(user?.issuerStatus);
+
+  useEffect(() => {
+    setIssuerStatus(user?.issuerStatus);
+  }, [user]);
+
+  const issuerStatusDispatch = useIssuerStatusDispatch();
+  const { message: issuerStatusMsg, success: issuerStatusSuccess } = useIssuerStatusState();
 
   useEffect(() => {
     categoryActions.fetchCategories(categoryDispatch);
@@ -68,36 +112,8 @@ const Inventory = ({ user }) => {
     if (isSearch) {
       actions.fetchInventorySearch(dispatch, limit, offset, debouncedSearchTerm);
     } else actions.fetchInventory(dispatch, limit, offset, "", category);
+    actions.fetchSupportedTokens(dispatch);
   }, [dispatch, limit, offset, debouncedSearchTerm, category]);
-
-  useEffect(() => {
-    actions.sellerStripeStatus(dispatch, user?.commonName);
-  }, [dispatch, user]);
-
-  useEffect(() => {
-    const placement = 'bottom'; // Set placement to 'bottomCenter'
-
-    if (stripeStatus !== null && stripeStatus !== undefined) {
-      const { chargesEnabled, detailsSubmitted, payoutsEnabled } = stripeStatus;
-
-      const isOnboardedSuccess = (chargesEnabled && detailsSubmitted && payoutsEnabled)
-      const isOnboardNotStarted = (!chargesEnabled && !detailsSubmitted && !payoutsEnabled)
-
-      if (!(isOnboardedSuccess || isOnboardNotStarted)) {
-
-        setTimeout(() => {
-
-          api.error({
-            key: 1,
-            message: "Something went wrong with your Stripe account.",
-            description: "Please connect again.",
-            onClose: () => actions.resetMessage(dispatch),
-            placement,
-          });
-        }, 1000);
-      }
-    }
-  }, [stripeStatus]);
 
   const showModal = () => {
     setOpen(true);
@@ -107,6 +123,31 @@ const Inventory = ({ user }) => {
     setOpen(false);
   };
 
+  const handleOnboard = async (service) => {
+    if (hasChecked && !isAuthenticated && loginUrl !== undefined) {
+      window.location.href = loginUrl;
+    } else {
+      const serviceURL = service.serviceURL || service.data.serviceURL;
+      const onboardingRoute = service.onboardingRoute || service.data.onboardingRoute;
+      if (serviceURL && onboardingRoute) {
+        const url = `${serviceURL}${onboardingRoute}?username=${user.commonName}&redirectUrl=${window.location.protocol}//${window.location.host}${window.location.pathname}`;
+        window.location.replace(url);
+      }
+    }
+  };
+
+  const handleChange = value => {
+    const service = notOnboarded.find(service => service.serviceName === value);
+    handleOnboard(service);
+  };
+
+  const showReqModModal = () => {
+    setReqModOpen(true);
+  };
+
+  const handleReqModCancel = () => {
+    setReqModOpen(false);
+  };
 
   const openToast = (placement) => {
     if (success) {
@@ -127,11 +168,7 @@ const Inventory = ({ user }) => {
   };
 
   const queryHandle = (e) => {
-    if (e.length === 0 || e === "") {
-      setIsSearch(false)
-    } else {
-      setIsSearch(true)
-    }
+    setIsSearch(e.length > 0);
     setQueryValue(e);
     setOffset(0);
     setPage(1);
@@ -160,115 +197,158 @@ const Inventory = ({ user }) => {
     }
   };
 
+  const redemptionToast = (placement) => {
+    if (redemptionSuccess) {
+      api.success({
+        message: redemptionMsg,
+        onClose: redemptionActions.resetMessage(redemptionDispatch),
+        placement,
+        key: 5,
+      });
+    } else {
+      api.error({
+        message: redemptionMsg,
+        onClose: redemptionActions.resetMessage(redemptionDispatch),
+        placement,
+        key: 6,
+      });
+    }
+  };
+
+  const issuerStatusToast = (placement) => {
+    if (issuerStatusSuccess) {
+      api.success({
+        message: issuerStatusMsg,
+        onClose: issuerStatusActions.resetMessage(issuerStatusDispatch),
+        placement,
+        key: 7,
+      });
+    } else {
+      api.error({
+        message: issuerStatusMsg,
+        onClose: issuerStatusActions.resetMessage(issuerStatusDispatch),
+        placement,
+        key: 8,
+      });
+    }
+  };
+
   const navigate = useNavigate();
 
-  const onboardSeller = async () => {
-    navigate(routes.OnboardingSellerToStripe.url)
+  const getAllSubcategories = (categories) => {
+    let subcategories = [];
+    categories.forEach(category => {
+      if (category.subCategories && category.subCategories.length > 0) {
+        subcategories = subcategories.concat(category.subCategories);
+      }
+    });
+    return subcategories;
   }
 
-const getAllSubcategories = (categories) => {
-  let subcategories = [];
-  categories.forEach(category => {
-      if (category.subCategories && category.subCategories.length > 0) {
-          subcategories = subcategories.concat(category.subCategories);
-      }
-  });
-  return subcategories;
-}
+  const allSubcategories = getAllSubcategories(categorys);
 
-const allSubcategories = getAllSubcategories(categorys);
-  
-  // ------------------ Tabs Start------------------
   const handleTabSelect = (key) => {
     setCategory(key);
     setOffset(0);
     setPage(1);
     return;
   };
-  // ------------------ Tabs END------------------
-const metaImg = category ? category : SEO.IMAGE_META
+
+  const metaImg = category ? category : SEO.IMAGE_META;
+
+  const renderImg = (service) => {
+    return service.imageURL && service.imageURL !== ''
+      ? <img src={service.imageURL} alt={service.serviceName} height="16px" width="16px" />
+      : ''
+  };
+
   return (
     <>
-     <HelmetComponent 
-          title={`${category ? `${category} |` :''} ${SEO.TITLE_META} `}
-          description={SEO.DESCRIPTION_META} 
-          link={linkUrl} />
+      <HelmetComponent
+        title={`${category ? `${category} |` : ''} ${SEO.TITLE_META} `}
+        description={SEO.DESCRIPTION_META}
+        link={linkUrl}
+      />
       {contextHolder}
-      {stripeStatus == null || isLoadingStripeStatus ? (
-        <div className="h-screen flex justify-center items-center">
-          <Spin size="large" />
-        </div>
-      ) : (
-        <>
-          <Breadcrumb className="mx-5 md:mx-14 mt-2 lg:mt-4">
-            <Breadcrumb.Item href="" onClick={e => e.preventDefault()}>
-              <ClickableCell href={routes.Marketplace.url}>
-                <p className="text-sm text-[#13188A] font-semibold">
-                  Home
-                </p>
-              </ClickableCell>
-            </Breadcrumb.Item>
-            <Breadcrumb.Item>
-              <p className="text-sm text-[#202020] font-medium">
-                My Items
+      <>
+        <Breadcrumb className="mx-5 md:mx-14 mt-2 lg:mt-4">
+          <Breadcrumb.Item href="" onClick={e => e.preventDefault()}>
+            <ClickableCell href={routes.Marketplace.url}>
+              <p className="text-sm text-[#13188A] font-semibold">
+                Home
               </p>
-            </Breadcrumb.Item>
-          </Breadcrumb>
-          <div className="w-full h-[116px] py-4 px-4 md:h-[96px] bg-[#F6F6F6] flex flex-col md:flex-row md:px-14  justify-between items-center mt-6 lg:mt-8">
-            <div className="flex justify-between w-full">
-              <Button className="!px-1 md:!px-0 flex items-center flex-row-reverse gap-[6px] text-lg md:text-2xl font-semibold !text-[#13188A] " 
-              type="link" 
-              icon={<img src={Images.ForwardIcon} 
-              alt={metaImg} 
-              title={metaImg}
-              className="hidden md:block w-6 h-6" />}> My Items
-              </Button>
+            </ClickableCell>
+          </Breadcrumb.Item>
+          <Breadcrumb.Item>
+            <p className="text-sm text-[#202020] font-medium">
+              My Items
+            </p>
+          </Breadcrumb.Item>
+        </Breadcrumb>
+        <div className="w-full h-[160px] py-4 px-4 md:h-[96px] bg-[#F6F6F6] flex flex-col md:flex-row md:px-14 justify-between items-center mt-6 lg:mt-8">
+          <div className="flex justify-between w-full">
+            <Button className="!px-1 md:!px-0 flex items-center flex-row-reverse gap-[6px] text-lg md:text-2xl font-semibold !text-[#13188A] "
+              type="link"
+              icon={<img src={Images.ForwardIcon}
+                alt={metaImg}
+                title={metaImg}
+                className="hidden md:block w-6 h-6" />}> My Items
+            </Button>
+          </div>
+          <div className="flex flex-col md:flex-row gap-3 items-center my-2 md:my-0">
+            <div className="flex gap-3 items-center">
+              {!areNotOnboardedLoading ? (
+                <Select
+                  className="items-select"
+                  style={{ width: 250, height: 40 }}
+                  onChange={handleChange}
+                  value={'Connect to Payment Provider'}
+                >
+                  {sortedPaymentServices.map(service => (
+                    <Option
+                      key={service.serviceName}
+                      value={service.serviceName}
+                      disabled={!service.isNotOnboarded}
+                    >
+                      {service.serviceName}
+                      {!service.isNotOnboarded && <CheckCircleOutlined style={{ color: '#28a745', position: 'absolute', right: '10px' }} />}
+                    </Option>
+                  ))}
+                </Select>
+              ) : (
+                <Spin size="large" />
+              )}
             </div>
-            <div className="flex gap-3">
-              <Button type="primary" className="w-40 h-9 "
+            <div className="flex gap-3 items-center">
+              <Button
+                type="primary"
+                id="createItem"
+                className="w-[250px] sm:w-40 flex items-center justify-center gap-[6px]"
+                style={{ height: 40 }}
                 onClick={() => {
                   if (hasChecked && !isAuthenticated && loginUrl !== undefined) {
                     window.location.href = loginUrl;
-                  } else {
-                    onboardSeller()
+                  } else if (issuerStatus != ISSUER_STATUS.AUTHORIZED) {
+                    showReqModModal()
+                  }
+                  else {
+                    showModal();
                   }
                 }}
-                disabled={stripeStatus.chargesEnabled && stripeStatus.detailsSubmitted && stripeStatus.payoutsEnabled}
               >
-                {"Connect Stripe"}
-              </Button>
-              <Tooltip
-                title={
-                  stripeStatus.chargesEnabled && stripeStatus.detailsSubmitted && stripeStatus.payoutsEnabled
-                    ? ""
-                    : "Please connect to Stripe first"
-                }
-                placement="bottom"
-              >
-                <Button
-                  type="primary"
-                  className="w-40 h-9 flex items-center justify-center gap-[6px]"
-                  onClick={() => {
-                    if (hasChecked && !isAuthenticated && loginUrl !== undefined) {
-                      window.location.href = loginUrl;
-                    } else {
-                      showModal()
-                    }
-                  }}
-                  disabled={!stripeStatus.chargesEnabled || !stripeStatus.detailsSubmitted || !stripeStatus.payoutsEnabled}
-                >
-                  <div className="flex items-center justify-center gap-[6px]">
-                    <img src={Images.CreateInventory} 
+                <div className="flex items-center justify-center gap-[6px]">
+                  <img src={Images.CreateInventory}
                     alt={metaImg}
                     title={metaImg}
-                    className="w-[18px] h-[18px]" />
-                    Create Item
-                  </div>
-                </Button>
-              </Tooltip>
+                    className="w-[18px] h-[18px]"
+                  />
+                  Create Item
+                </div>
+              </Button>
             </div>
           </div>
-          <div className="pt-6 mx-6 md:mx-5 md:px-10 mb-5 ">
+        </div>
+        <div className="pt-6 mx-6 md:mx-5 md:px-10 mb-5">
           <Tabs
             defaultActiveKey={category ? category : "All"}
             className="items"
@@ -278,29 +358,24 @@ const metaImg = category ? category : SEO.IMAGE_META
                 label: "All",
                 key: undefined,
                 children: (
-                  <div className="my-4 grid grid-cols-1 md:grid-cols-2 gap-6 lg:grid-cols-3 3xl:grid-cols-4 5xl:grid-cols-5 sm:place-items-center md:place-items-start  inventoryCard max-w-full">
-                    {!isInventoriesLoading ? (
-                      inventories.map((inventory, index) => {
-                        return (
-                          <InventoryCard
-                            id={index}
-                            limit={limit}
-                            offset={offset}
-                            inventory={inventory}
-                            category={category}
-                            key={index}
-                            debouncedSearchTerm={debouncedSearchTerm}
-                            paymentProviderAddress={
-                              stripeStatus ? stripeStatus.paymentProviderAddress : undefined
-                            }
-                            allSubcategories={allSubcategories}
-                          />
-                        );
-                      })
+                  <div className="my-4 grid grid-cols-1 md:grid-cols-2 gap-6 lg:grid-cols-3 3xl:grid-cols-4 5xl:grid-cols-5 sm:place-items-center md:place-items-start inventoryCard max-w-full">
+                    {!isInventoriesLoading && !isFetchingTokens ? (
+                      inventories.map((inventory, index) => (
+                        <InventoryCard
+                          id={index}
+                          limit={limit}
+                          offset={offset}
+                          inventory={inventory}
+                          category={category}
+                          key={index}
+                          debouncedSearchTerm={debouncedSearchTerm}
+                          allSubcategories={allSubcategories}
+                          user={user}
+                          supportedTokens={supportedTokens}
+                        />
+                      ))
                     ) : (
-                      <div className="absolute left-[50%] md:top-4">
-                        <Spin size="large" />
-                      </div>
+                      <Spin size="large" />
                     )}
                   </div>
                 ),
@@ -310,60 +385,65 @@ const metaImg = category ? category : SEO.IMAGE_META
                 key: categoryObject.name,
                 children: (
                   <div className="my-4 grid grid-cols-1 md:grid-cols-2 gap-6 lg:grid-cols-3 3xl:grid-cols-4 5xl:grid-cols-5 inventoryCard max-w-full">
-                    {!isInventoriesLoading ? (
-                      inventories.map((inventory, index) => {
-                        return (
-                          <InventoryCard
-                            id={index}
-                            inventory={inventory}
-                            category={category}
-                            key={index}
-                            debouncedSearchTerm={debouncedSearchTerm}
-                            paymentProviderAddress={
-                              stripeStatus ? stripeStatus.paymentProviderAddress : undefined
-                            }
-                            allSubcategories={allSubcategories}
-                          />
-                        );
-                      })
+                    {!isInventoriesLoading && !isFetchingTokens ? (
+                      inventories.map((inventory, index) => (
+                        <InventoryCard
+                          id={index}
+                          limit={limit}
+                          offset={offset}
+                          inventory={inventory}
+                          category={category}
+                          key={index}
+                          debouncedSearchTerm={debouncedSearchTerm}
+                          allSubcategories={allSubcategories}
+                          supportedTokens={supportedTokens}
+                          user={user}
+                        />
+                      ))
                     ) : (
-                      <div className="absolute left-[50%] md:top-4">
-                        <Spin size="large" />
-                      </div>
+                      <Spin size="large" />
                     )}
                   </div>
                 ),
               })),
             ]}
           />
-
-            <div className="flex justify-center pt-6">
-              <Pagination
-                current={page}
-                onChange={onPageChange}
-                total={inventoriesTotal}
-                showSizeChanger={false}
-                className="flex justify-center my-5 "
-              />
-            </div>
+          <div className="flex justify-center pt-6">
+            <Pagination
+              current={page}
+              onChange={onPageChange}
+              total={inventoriesTotal}
+              showSizeChanger={false}
+              className="flex justify-center my-5"
+            />
           </div>
-        </>
+        </div>
+      </>
+      {open && (
+        <CreateInventoryModal
+          open={open}
+          handleCancel={handleCancel}
+          categorys={categorys}
+          debouncedSearchTerm={debouncedSearchTerm}
+          resetPage={onPageChange}
+          page={page}
+          categoryName={category}
+        />
       )}
-      {
-        open && (
-          <CreateInventoryModal
-            open={open}
-            handleCancel={handleCancel}
-            categorys={categorys}
-            debouncedSearchTerm={debouncedSearchTerm}
-            resetPage={onPageChange}
-            page={page}
-            categoryName={category}
-          />
-        )
-      }
+      {reqModOpen && (
+        <RequestBeAuthorizedIssuerModal
+          open={reqModOpen}
+          handleCancel={handleReqModCancel}
+          commonName={user.commonName}
+          emailAddr={user.email}
+          issuerStatus={issuerStatus}
+          setIssuerStatus={setIssuerStatus}
+        />
+      )}
       {message && openToast("bottom")}
       {itemMsg && itemToast("bottom")}
+      {redemptionMsg && redemptionToast("bottom")}
+      {issuerStatusMsg && issuerStatusToast("bottom")}
     </>
   );
 };

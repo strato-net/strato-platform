@@ -26,8 +26,7 @@ module Blockchain.SolidVM.SM
     withCallInfo,
     withTempCallInfo,
     withUncheckedCallInfo,
-    pushLocalVars,
-    popLocalVars,
+    withLocalVars,
     getLocal,
     setLocal,
     getCurrentCallInfo,
@@ -83,6 +82,7 @@ import Blockchain.SolidVM.GasInfo
 import Blockchain.Strato.Model.Account
 import Blockchain.Strato.Model.Address
 import Blockchain.Strato.Model.Class
+import Blockchain.Strato.Model.Code
 import Blockchain.Strato.Model.Event
 import Blockchain.Strato.Model.ExtendedWord
 import Blockchain.Strato.Model.Keccak256
@@ -100,7 +100,6 @@ import qualified Control.Monad.Change.Modify as Mod
 import Control.Monad.Trans.Class
 import Control.Monad.Trans.Reader
 import Data.Bifunctor (first)
-import Data.ByteString (ByteString)
 import qualified Data.ByteString as B
 import qualified Data.ByteString.Char8 as BC
 import qualified Data.ByteString.UTF8 as UTF8
@@ -132,7 +131,6 @@ data CallInfo = CallInfo
     codeCollection :: CC.CodeCollection,
     collectionHash :: Keccak256,
     localVariables :: Map SolidString (SVMType.Type, Variable),
-    variableStack :: [Map SolidString (SVMType.Type, Variable)],
     readOnly :: Bool,
     isUncheckedSection :: Bool, -- TODO: Perform overflow/underflow checks for all arithmetic operations and revert if so, use this flag to disable checks
     currentSourcePos :: Maybe SourcePosition,
@@ -357,7 +355,7 @@ runSM ::
     Mod.Modifiable ContextState m,
     Mod.Modifiable GasCap m
   ) =>
-  (Maybe ByteString) ->
+  (Maybe Code) ->
   Env.Environment ->
   GasInfo ->
   Maybe Word256 ->
@@ -405,7 +403,7 @@ pushSender newSender mv = do
   Mod.put (Mod.Proxy @Env.Sender) oldSender
   return $ ret
 
-startingAction :: Maybe ByteString -> Env.Environment -> Maybe Word256 -> Action
+startingAction :: Maybe Code -> Env.Environment -> Maybe Word256 -> Action
 startingAction maybeCode env' chainId' =
   Action.Action
     { _blockHash = blockHeaderHash $ Env.blockHeader env',
@@ -417,8 +415,9 @@ startingAction maybeCode env' chainId' =
       _actionData = OMap.empty,
       _metadata =
         case maybeCode of
-          Just theCode ->
+          Just (Code theCode) ->
             Just $ M.insert "src" (T.pack $ UTF8.toString theCode) $ fromMaybe M.empty $ Env.metadata env'
+          Just (PtrToCode _) -> Env.metadata env'
           Nothing -> Env.metadata env',
       _events = Q.empty,
       _delegatecalls = Q.empty
@@ -486,6 +485,7 @@ getVariableOfName name = do
                        "account",
                        "uint",
                        "int",
+                       "decimal",
                        "bool",
                        "byte",
                        "bytes",
@@ -605,7 +605,7 @@ getTypeOfName' s (CC.CodeCollection ccs _ _ enms strcts _ _ _) =
           ]
       ctrs = map ContractTypo $ M.keys ccs
    in case concatMap lookInContract ccs ++ ctrs of
-        [] -> internalError "getTypeOfName" s
+        [] -> internalError "getTypeOfName' " s
         (typo : _) -> typo
 
 getTypeOfName :: MonadSM m => SolidString -> m Typo
@@ -651,7 +651,6 @@ addCallInfo a c fn hsh cc initialLocalVariables ro ff = do
             codeCollection = cc,
             collectionHash = hsh,
             localVariables = initialLocalVariables,
-            variableStack = [initialLocalVariables],
             readOnly = ro,
             isUncheckedSection = False, -- The rationale here is that unchecked sections only apply to the current stack frame
             currentSourcePos = Nothing,
@@ -675,30 +674,19 @@ popCallInfo = Mod.modify_ (Mod.Proxy @[CallInfo]) $ \case
   [] -> internalError "popCallInfo was called on an already empty stack" ()
   (_ : rest) -> pure rest
 
+withLocalVars :: MonadSM m => m a -> m a
+withLocalVars = bracket_ pushLocalVars popLocalVars
+
 pushLocalVars :: MonadSM m => m ()
 pushLocalVars = Mod.modify_ (Mod.Proxy @[CallInfo]) $ \case
   [] -> internalError "pushLocalVars was called with an empty stack" ()
-  (curFrame : rest) -> do
-    let localVariables' = localVariables curFrame
-        variableStack' = variableStack curFrame
-    {-- We save the local variables available in this scope to the 'stack',
-    which is simply a list of mappings from name to type/values
-    --}
-    pure $ curFrame {variableStack = (localVariables' : variableStack')} : rest
+  (curFrame : rest) -> pure $ curFrame : curFrame : rest
 
 -- The inverse operation as above, called when exiting a statement block and those declared variables need to be destroyed
 popLocalVars :: MonadSM m => m ()
 popLocalVars = Mod.modify_ (Mod.Proxy @[CallInfo]) $ \case
   [] -> internalError "popLocalVars was called with an empty stack" ()
-  (curFrame : rest) -> do
-    let (varFrame, st) = case variableStack curFrame of
-          (varFrame' : st') -> (varFrame', st')
-          [] -> (M.empty, [])
-    {-- Since all the variables from the previous scope are saved to the most recent stack frame (vars),
-    we simply reassign the local variables to the top frame of the stack
-    and the new stack's value is the rest of the frames
-    --}
-    pure $ (curFrame {localVariables = varFrame, variableStack = st} : rest)
+  (_ : rest) -> pure rest
 
 withTempCallInfo :: MonadSM m => Bool -> m a -> m a
 withTempCallInfo ro f = do
@@ -805,7 +793,7 @@ getCurrentCodeCollection = do
   cs <- Mod.get (Mod.Proxy @[CallInfo])
   case cs of
     (currentCallInfo : _) -> return (collectionHash currentCallInfo, codeCollection currentCallInfo)
-    _ -> internalError "getCurrentContract called with an empty stack" ()
+    _ -> internalError "getCurrentCodeCollection called with an empty stack" ()
 
 hintFromType :: MonadSM m => SVMType.Type -> m BasicType
 hintFromType = \case
@@ -815,6 +803,7 @@ hintFromType = \case
   SVMType.Bytes {} -> return TString
   SVMType.Int {} -> return TInteger
   SVMType.String {} -> return TString
+  SVMType.Decimal {} -> return TDecimal
   (SVMType.UserDefined _ SVMType.Bool {}) -> return TBool
   (SVMType.UserDefined _ SVMType.Int {}) -> return TString
   SVMType.UnknownLabel s _ -> do
@@ -899,15 +888,17 @@ initializeAction :: MonadSM m
                  => Account
                  -> String
                  -> String
+                 -> Maybe String
+                 -> String
+                 -> String
                  -> Keccak256
                  -> CC.CodeCollection
-                 -> Map (Account, T.Text) (T.Text, T.Text)
+                 -> Map (Account, T.Text) (T.Text, T.Text, [T.Text])
                  -> [T.Text]
                  -> [T.Text]
                  -> m ()
-initializeAction acct name appName hsh cc ab maps arrs = do
-  -- org name to be set later, b/c the lookup is complex
-  let newData = Action.ActionData (SolidVMCode name hsh) cc "" (T.pack appName) SolidVM (Action.SolidVMDiff M.empty) ab maps arrs []
+initializeAction acct name crtr cc_crtr root appName hsh cc ab maps arrs = do
+  let newData = Action.ActionData (SolidVMCode name hsh) cc (T.pack crtr) (fmap T.pack cc_crtr) (T.pack root) (T.pack appName) SolidVM (Action.SolidVMDiff M.empty) ab maps arrs []
   Mod.modifyStatefully_ (Mod.Proxy @Action) $
     Action.actionData %= Action.omapInsertWith Action.mergeActionData acct newData
 
@@ -977,15 +968,9 @@ getContractsForParents parents' cc =
   let getContractForParent parent = M.lookup parent cc
    in mapMaybe getContractForParent parents'
 
+-- Only get top-level abstract contracts (e.g. Asset, Sale), to reduce Cirrus table bloat
 getAbstractParentsFromContract :: CC.Contract -> CC.CodeCollection -> [CC.Contract]
-getAbstractParentsFromContract c cc =
-  -- recursively obtain parent + grandparent contracts
-  -- ex. B is A, C is B, then C should also be A
-  let go [] = []
-      go xs = xs ++ (go $ getContractsForParents (concatMap (CC._parents) xs) ccc)
-      ccc = CC._contracts cc
-      parents' = CC._parents c
-   in filter ((== CC.AbstractType) . CC._contractType) (go $ getContractsForParents parents' ccc)
+getAbstractParentsFromContract c cc = M.elems $ CC.getTopLevelAbstractsForContract cc c
 
 getMapNamesFromContract :: CC.Contract -> [T.Text]
 getMapNamesFromContract c =
@@ -995,13 +980,13 @@ getMapNamesFromContract c =
       listOfMappingsWithRecords = filter (\(_, vd) -> CC._isRecord vd) listOfMappings
    in T.pack . fst <$> listOfMappingsWithRecords
 
+--also needs to be changed for testnet3 to be only record
 getArrayNamesFromContract :: CC.Contract -> [T.Text]
 getArrayNamesFromContract c =
   let storageDefs' = c ^. CC.storageDefs
       storageDefsList = M.toList storageDefs'
       listOfArrays = filter (\(_, vd) -> case (CC._varType vd) of SVMType.Array _ _ -> True; _ -> False) storageDefsList
-      listOfArraysWithRecords = filter (\(_, vd) -> CC._isRecord vd) listOfArrays
-   in T.pack . fst <$> listOfArraysWithRecords
+   in T.pack . fst <$> listOfArrays -- we need to change this to filter on _isRecord on testnet3
 
 resolveNameParts ::
   MonadSM m =>
@@ -1009,25 +994,25 @@ resolveNameParts ::
   T.Text ->
   T.Text ->
   CC.Contract ->
-  m ((Account, T.Text), (T.Text, T.Text))
-resolveNameParts to' o a c = do
+  m ((Account, T.Text), (T.Text, T.Text, [T.Text]))
+resolveNameParts to' crtr app c = do
   let tName = T.pack . CC._contractName
   case c ^. CC.importedFrom of
-    Nothing -> pure ((to', tName c), (o, a))
+    Nothing -> pure ((to', tName c), (crtr, app, (map T.pack (M.keys $ CC._storageDefs c))))
     Just acct ->
       A.select (A.Proxy @AddressState) acct >>= \case
         Nothing -> do
           $logWarnS "processTheMessages/resolveNameParts" . T.pack $
             "Could not find address state for account " ++ show acct
-          pure ((acct, tName c),(o, a))
+          pure ((acct, tName c), (crtr, app, (map T.pack (M.keys $ CC._storageDefs c))))
         Just s ->
           resolveCodePtr (acct ^. accountChainId) (addressStateCodeHash s) >>= \case
             Just (SolidVMCode appName _) -> do
               appCreator <- getSolidStorageKeyVal' acct $ MS.StoragePath [MS.Field ":creator"]
               case appCreator of
-                MS.BString org' -> pure ((acct, tName c), (T.pack $ BC.unpack org', T.pack appName))
-                _ -> pure ((acct, tName c),("", T.pack appName))
+                MS.BString cn' -> pure ((acct, tName c), (T.pack $ BC.unpack cn', T.pack appName, (map T.pack (M.keys $ CC._storageDefs c))))
+                _ -> pure ((acct, tName c), (crtr, T.pack appName, (map T.pack (M.keys $ CC._storageDefs c))))
             _ -> do
               $logWarnS "resolveNameParts" . T.pack $
                 "Could not resolve code for account " ++ show acct
-              pure ((acct, tName c),(o, a))
+              pure ((acct, tName c), (crtr, app, (map T.pack (M.keys $ CC._storageDefs c))))

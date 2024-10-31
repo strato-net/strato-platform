@@ -26,6 +26,7 @@ library:
   dependencies:
   - bytestring
   - http-media
+  - http-types
   - servant
   - servant-multipart
   - servant-server

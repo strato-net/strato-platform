@@ -78,9 +78,6 @@ hashDBPath = "/hash/"
 codeDBPath :: String
 codeDBPath = "/code/"
 
-x509CertDBPath :: String
-x509CertDBPath = "/x509Cert/"
-
 sequencerDependentBlockDBPath :: String
 sequencerDependentBlockDBPath = "/sequencer_dependent_blocks/"
 
@@ -100,9 +97,6 @@ getConfDir = do
 
 dbDir :: String -> String
 dbDir "c" = ".ethereum"
---dbDir "c" = "Library/Application Support/Ethereum"
 dbDir "h" = ".ethereumH"
 dbDir "t" = "/tmp/tmpDB"
 dbDir x = error $ "Unknown DB specifier: " ++ show x
-
---"/Users/hutong/Library/Application Support/Ethereum/state/"

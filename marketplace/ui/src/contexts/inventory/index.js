@@ -9,6 +9,7 @@ const InventoriesProvider = ({ children }) => {
     inventory: null,
     isCreateInventorySubmitting: false,
     inventories: [],
+    supportedTokens: [],
     inventoriesTotal: 10,
     isInventoriesLoading: false,
     inventoryUpdateObject: null,
@@ -20,6 +21,8 @@ const InventoriesProvider = ({ children }) => {
     userInventoriesTotal: 0,
     isUserInventoriesLoading: false,
     isTransferring: false,
+    isFetchingTokens: false,
+    isBridging: false,
     inventoryDetails: null,
     inventoryOwnershipHistory: [],
     isInventoryDetailsLoading: false,
@@ -27,10 +30,6 @@ const InventoriesProvider = ({ children }) => {
     error: undefined,
     success: false,
     message: null,
-    isOnboardingSellerToStripe: false,
-    onboardedSeller: null,
-    stripeStatus: null,
-    isLoadingStripeStatus: false,
     uploadedImg : null,
     isUploadImageSubmitting: false,
     isTransferringItems: false,
@@ -38,7 +37,7 @@ const InventoriesProvider = ({ children }) => {
     totalItemsTransfered: 0,
     isFetchingItemTransfers: false,
     isFetchingPriceHistory: false,
-    priceHistory: []    
+    priceHistory: [],
   };
 
   const [state, dispatch] = useReducer(reducer, initialState);

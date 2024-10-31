@@ -10,14 +10,11 @@ description:
 
 dependencies:
   - base
-  - bytestring
-  - extra
   - ghc-debug-client
   - ghc-debug-common
   - containers
   - language-dot
   - mtl
-  - process
   - text
 
 executables:

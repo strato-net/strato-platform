@@ -25,7 +25,7 @@ module IdentityProvider.Server (identityProviderApp) where
 
 import Bloc.API.Transaction
 import Bloc.API.Users
-import Bloc.Client (postBlocTransactionParallelExternal)
+import Bloc.Client (postBlocTransactionParallelExternal, postBlocTransactionResults)
 import BlockApps.Logging
 import BlockApps.Solidity.ArgValue
 import BlockApps.X509 hiding (isValid)
@@ -35,6 +35,7 @@ import Control.Monad (void, when)
 import qualified Control.Monad.Change.Alter as A
 import Control.Monad.Change.Modify
 import Control.Monad.Composable.Vault
+import Control.Monad.Composable.Notification
 import Control.Monad.Reader
 import Control.Monad.Trans.Except
 import Data.Aeson hiding (Success)
@@ -42,6 +43,7 @@ import qualified Data.ByteString.Lazy as BL
 import qualified Data.Cache.LRU as LRU
 import Data.List (elemIndex)
 import qualified Data.Map as M
+import Data.Maybe (fromMaybe)
 import Data.Text (Text)
 import qualified Data.Text as T
 import Data.Text.Encoding (decodeUtf8, encodeUtf8)
@@ -170,6 +172,9 @@ instance Monad m => Accessible VaultData (VaultM m) where
 instance (Monad m, Accessible VaultData m) => Accessible VaultData (ReaderT IdentityServerData m) where
   access = lift . access
 
+instance Monad m => Accessible NotificationData (NotificationM m) where
+  access _ = ask
+
 getPingIdentity :: (MonadIO m) => m Int
 getPingIdentity = return 1
 
@@ -191,8 +196,9 @@ putIdentity ::
   Text ->
   Maybe Text ->
   Maybe Text ->
+  Maybe Bool ->
   m Address
-putIdentity accessToken uuid idProv name mEmail mCo = do
+putIdentity accessToken uuid idProv name mEmail mCo mSub = do
   time' <- liftIO getCurrentTime
   $logInfoS "putIdentity" $ "User " <> uuid <> " called PUT /identity with username " <> name <> " and company " <> T.pack (show mCo)
   -- check if a user exists in vault
@@ -224,11 +230,15 @@ putIdentity accessToken uuid idProv name mEmail mCo = do
           getVaultKey accessToken >>= \case
             Just (AddressAndKey a k) -> do
               -- has vault key, confirm also has cert
-              certInCirrus accessToken rd a >>= \case
+              certInCirrus accessToken rd a name' >>= \case
                 -- User has no cert, create cert and wallet.
                 [] -> do
                   createAndRegisterCert name' (T.unpack <$> mEmail) org uuid' realmToken rd k
                   registerUserWalletAsync realmToken rd name' realm uuid' a
+                  -- subscribe if can and should
+                  case (realmNoficicationServerUrl rd, fromMaybe True mSub) of 
+                    (Just url, True) -> void . async $ runNotificationM url $ subscribeUser accessToken (T.pack name')
+                    (_, _) -> return ()
                 -- User has a cert but no wallet, create wallet using cert's common name. This is for backwards compatibility with existing users.
                 [cert] -> do
                   hasWallet <- walletInCirrus accessToken rd (T.unpack $ certCommonName cert)
@@ -246,6 +256,10 @@ putIdentity accessToken uuid idProv name mEmail mCo = do
               AddressAndKey a k <- postVaultKey accessToken
               createAndRegisterCert name' (T.unpack <$> mEmail) org uuid' realmToken rd k
               registerUserWalletAsync realmToken rd name' realm uuid' a
+              -- subscribe if can and should
+              _ <- case (realmNoficicationServerUrl rd, fromMaybe True mSub) of 
+                (Just url, True) -> void . async $ runNotificationM url $ subscribeUser accessToken (T.pack name')
+                (_, _) -> return ()
               return a
         (_, Nothing) -> do
           $logErrorS "putIdentity" "uh oh! We couldn't retrieve an access token for our realm"
@@ -273,6 +287,7 @@ putIdentityExternal ::
     ((String, String) `A.Alters` Address) m
   ) =>
   Text ->
+  Maybe Bool ->
   m Address
 putIdentityExternal bearerToken = putIdentity (T.replace "Bearer " "" bearerToken) "" "" "" Nothing Nothing
 
@@ -311,8 +326,9 @@ certInCirrus ::
   Text ->
   RealmDetails ->
   Address ->
+  String ->
   m [CertificateInCirrus]
-certInCirrus token RealmDetails {associatedNodeUrl = nurl1, associatedFallback = nurl2} a = do
+certInCirrus token RealmDetails {associatedNodeUrl = nurl1, associatedFallback = nurl2} a name = do
   response1 <- callCirrus nurl1
   mCerts :: Maybe [CertificateInCirrus] <-
     if statusCode (responseStatus response1) == 200
@@ -326,13 +342,13 @@ certInCirrus token RealmDetails {associatedNodeUrl = nurl1, associatedFallback =
       $logErrorS "certInCirrus" "Unexpected response from cirrus query. This should never happen"
       throwIO $ IdentityError "Unable to decode cirrus query for user's cert. Something went very wrong"
   where
-    cirrusSearchPath :: Address -> String
-    cirrusSearchPath address =
-      "/cirrus/search/Certificate?userAddress=eq." <> show address <> "&order=block_timestamp.desc&limit=1"
+    cirrusSearchPath :: Address -> String -> String
+    cirrusSearchPath address commonName =
+      "/cirrus/search/Certificate?or=(userAddress.eq." <> show address <> ",commonName.eq." <> commonName <> ")&order=block_timestamp.desc&limit=1"
 
     callCirrus :: MonadIO m => BaseUrl -> m (HTTP.Response BL.ByteString)
     callCirrus nurl = do
-      let cirrusEndpoint = cirrusSearchPath a
+      let cirrusEndpoint = cirrusSearchPath a name
           url = showBaseUrl nurl {baseUrlPath = baseUrlPath nurl <> cirrusEndpoint}
       mgr <- liftIO $ case baseUrlScheme nurl of
         Http -> newManager defaultManagerSettings
@@ -465,9 +481,19 @@ registerCert cert token RealmDetails {associatedNodeUrl = nurl, associatedFallba
     Right response ->
       if all txSuccess response
         then $logInfoS "registerCert" $ T.pack $ "Response after registering cert was: " ++ show response
-        else do
-          $logErrorS "registerCert" $ T.pack $ "Failed to register cert for user; response was: " ++ show response
-          throwIO $ IdentityError "Failed to register cert"
+        else do -- got a pending or failure
+          let pending = [hash | BlocTxResult (BlocTransactionResult {blocTransactionStatus = Pending, blocTransactionHash = hash}) <- response]
+          if (not $ null pending) 
+            then do 
+              eresponse2 <- liftIO $ runClientM (postBlocTransactionResults (Just $ "Bearer " <> access_token token) True pending) clientEnv
+              case eresponse2 of 
+                Right response2 | all (\r -> blocTransactionStatus r == Success) response2 -> $logInfoS "registerCert" $ T.pack $ "Response after registering cert was: " ++ show response2
+                err -> do 
+                  $logErrorS "registerCert" $ T.pack $ "Failed to register cert for user; response was: " ++ show err
+                  throwIO $ IdentityError "Failed to register cert"
+            else do -- must've all been failures
+              $logErrorS "registerCert" $ T.pack $ "Failed to register cert for user; response was: " ++ show response
+              throwIO $ IdentityError "Failed to register cert"
     Left clienterr -> do
       $logErrorS "registerCert" $
         T.pack $
@@ -487,8 +513,7 @@ registerCert cert token RealmDetails {associatedNodeUrl = nurl, associatedFallba
           throwIO $ IdentityError "Failed to register cert"
 
 txSuccess :: BlocChainOrTransactionResult -> Bool
--- txSuccess BlocTxResult (BlocTransactionResult{blocTransactionStatus = stat}) | stat /= Failure = True
--- instead of this?
+-- txSuccess (BlocTxResult (BlocTransactionResult{blocTransactionStatus = stat})) | stat /= Failure = True
 txSuccess (BlocTxResult BlocTransactionResult {blocTransactionStatus = Success}) = True
 txSuccess _ = False
 
@@ -548,11 +573,21 @@ registerUserWallet
               . T.pack
               $ "Response after registering user wallet was: " ++ show response
             return True
-          else do
-            $logErrorS "registerUserWallet"
-              . T.pack
-              $ "Failed to register user wallet; response was: " ++ show response
-            return False
+          else do -- got a pending or failure
+            let pending = [hash | BlocTxResult (BlocTransactionResult {blocTransactionStatus = Pending, blocTransactionHash = hash}) <- response]
+            if (not $ null pending) 
+              then do 
+                eresponse2 <- liftIO $ runClientM (postBlocTransactionResults (Just $ "Bearer " <> access_token token) True pending) clientEnv
+                case eresponse2 of
+                  Right response2 | all (\r -> blocTransactionStatus r == Success) response2 -> do
+                    $logInfoS "registerUserWallet" $ T.pack $ "Response after registering user wallet was: " ++ show response2
+                    return True
+                  err -> do 
+                    $logErrorS "registerUserWallet" $ T.pack $ "Failed to register user wallet; response was: " ++ show err
+                    return False
+              else do -- must've all been failures
+                $logErrorS "registerUserWallet" $ T.pack $ "Failed to register user wallet; response was: " ++ show response
+                return False
       Left clienterr -> do
         $logErrorS "registerUserWallet" $
           T.pack $

@@ -5,6 +5,8 @@ import { useNavigate, useParams } from "react-router-dom";
 import SoldOrdersTable from "./SoldOrdersTable";
 import BoughtOrdersTable from "./BoughtOrdersTable";
 import TransfersTable from "./TransfersTable";
+import RedemptionsOutgoingTable from "./RedemptionsOutgoingTable";
+import RedemptionsIncomingTable from "./RedemptionsIncomingTable";
 import dayjs from "dayjs";
 import routes from "../../helpers/routes";
 import ClickableCell from "../ClickableCell";
@@ -46,7 +48,7 @@ const Order = ({ user }) => {
   const onDateChange = (date) => {
     setSelectedDate(date);
   };
-  
+
   // --------------------- EXPORT TO EXCEL AND CSV START ---------------------
   function getCategoryAndSubcategory(contractName) {
     for (const category of categorys) {
@@ -59,7 +61,7 @@ const Order = ({ user }) => {
     }
     return { category: 'Unknown', subCategory: 'Unknown' };
   }
-  
+
   function formatDataObject(dataObject) {
     let formattedObject = {};
     Object.keys(dataObject).forEach(key => {
@@ -69,7 +71,7 @@ const Order = ({ user }) => {
       } else if (key === 'comments') {
         value = decodeURIComponent(value);
       }
-      
+
       if (key === 'assetPrice') {
         formattedObject['Asset Price (Unit)'] = value;
       } else {
@@ -78,12 +80,25 @@ const Order = ({ user }) => {
     });
     return formattedObject;
   }
-  
+
   function mapOrderData(orders) {
     try {
-      return orders.flatMap(order => 
-        order.assets.map((asset, index) => {
+      return orders.flatMap(order => {
+        // Extract Quantities
+         let orderQuantities;
+         if(order["BlockApps-Mercata-Order-quantities"]?.length){
+          orderQuantities = order["BlockApps-Mercata-Order-quantities"].map(item => item.value)
+         }else if(order.quantities?.length){
+          orderQuantities = order.quantities[0] 
+         }
+         else{
+          orderQuantities = [0]
+         }
+  
+        
+        return order.assets.map((asset, index) => {
           const { category, subCategory } = getCategoryAndSubcategory(asset.contract_name);
+  
           return formatDataObject({
             orderNumber: order.orderId,
             purchaserName: order.purchasersCommonName,
@@ -91,7 +106,7 @@ const Order = ({ user }) => {
             subCategory,
             assetName: asset.name,
             assetPrice: asset.salePrice,
-            quantity: order.quantities[index],
+            quantity: orderQuantities[index],
             totalOrderAmount: order.totalPrice,
             orderDate: order.createdDate,
             orderFulfillmentDate: order.fulfillmentDate,
@@ -99,13 +114,16 @@ const Order = ({ user }) => {
             comments: order.comments,
             blockchainAddress: order.address
           });
-        })
-      );
+        });
+      });
     } catch (error) {
+      // logging the actual error for better debugging
+      console.error("Error during mapping order data:", error);
       throw new Error("Failed to map order data");
     }
   }
   
+
   function mapTransfersData(transfers) {
     try {
       return transfers.map(order => {
@@ -127,7 +145,7 @@ const Order = ({ user }) => {
     }
   }
 
-  
+
   useEffect(() => {
     if (allOrders && callExcel && !isAllOrdersLoading) {
       const wb = XLSX.utils.book_new();
@@ -167,17 +185,17 @@ const Order = ({ user }) => {
         return;
       }
       const wsTransferred = XLSX.utils.json_to_sheet(transferred ? transferred : []);
-    
+
       // Append each worksheet to the workbook
       XLSX.utils.book_append_sheet(wb, wsSold, 'Sold Orders');
       XLSX.utils.book_append_sheet(wb, wsBought, 'Bought Orders');
       XLSX.utils.book_append_sheet(wb, wsTransferred, 'Transfers');
-    
+
       // Write the workbook to a binary string
-      const wbout = XLSX.write(wb, {bookType: 'xls', type: 'binary'});
-    
+      const wbout = XLSX.write(wb, { bookType: 'xls', type: 'binary' });
+
       // Convert the binary string to a Blob and save it
-      const blob = new Blob([s2ab(wbout)], {type: 'application/vnd.ms-excel'});
+      const blob = new Blob([s2ab(wbout)], { type: 'application/vnd.ms-excel' });
       saveAs(blob, 'Mercata-Marketplace-Order-History.xls');
       setCallExcel(false);
       setCallCSV(false);
@@ -227,39 +245,39 @@ const Order = ({ user }) => {
       const wb = XLSX.utils.book_new();
       XLSX.utils.book_append_sheet(wb, ws, 'Orders');
 
-      const wbout = XLSX.write(wb, {bookType: 'csv', type: 'binary'});
-      const blob = new Blob([s2ab(wbout)], {type: 'text/csv'});
+      const wbout = XLSX.write(wb, { bookType: 'csv', type: 'binary' });
+      const blob = new Blob([s2ab(wbout)], { type: 'text/csv' });
       saveAs(blob, 'Mercata-Marketplace-Order-History.csv');
       setCallCSV(false);
       setCallExcel(false);
     }
   }, [allOrders, callExcel, callCSV, isAllOrdersLoading]);
-  
+
   const download = async (format) => {
     if (user?.commonName) {
       await actions.fetchAllOrders(
         dispatch
       );
-      if (format === 'xls'){
+      if (format === 'xls') {
         setCallExcel(true);
         setCallCSV(false);
-      } 
-      else if (format === 'csv'){
+      }
+      else if (format === 'csv') {
         setCallCSV(true);
         setCallExcel(false);
       }
-      
+
     }
   };
-  
+
   // Utility function to convert a binary string to an ArrayBuffer
   function s2ab(s) {
     const buf = new ArrayBuffer(s.length);
     const view = new Uint8Array(buf);
-    for (let i=0; i<s.length; i++) view[i] = s.charCodeAt(i) & 0xFF;
+    for (let i = 0; i < s.length; i++) view[i] = s.charCodeAt(i) & 0xFF;
     return buf;
   }
-  
+
   const menuItems = [
     {
       key: 'xls',
@@ -335,17 +353,27 @@ const Order = ({ user }) => {
           {
             label: <p id="sold-tab" className="font-semibold text-sm md:text-base">Orders (Sold)</p>,
             key: "sold",
-            children: <SoldOrdersTable user={user} selectedDate={dayjs(selectedDate).startOf('day').unix()} onDateChange={onDateChange} download={download} isAllOrdersLoading={isAllOrdersLoading}/>
+            children: <SoldOrdersTable user={user} selectedDate={dayjs(selectedDate).startOf('day').unix()} onDateChange={onDateChange} download={download} isAllOrdersLoading={isAllOrdersLoading} />
           },
           {
             label: <p id="bought-tab" className="font-semibold text-sm md:text-base">Orders (Bought)</p>,
             key: "bought",
-            children: <BoughtOrdersTable user={user} selectedDate={dayjs(selectedDate).startOf('day').unix()} onDateChange={onDateChange} download={download} isAllOrdersLoading={isAllOrdersLoading}/>
+            children: <BoughtOrdersTable user={user} selectedDate={dayjs(selectedDate).startOf('day').unix()} onDateChange={onDateChange} download={download} isAllOrdersLoading={isAllOrdersLoading} />
           },
           {
             label: <p id="transfers-tab" className="font-semibold text-sm md:text-base">Transfers</p>,
             key: "transfers",
-            children: <TransfersTable user={user} selectedDate={dayjs(selectedDate).startOf('day').unix()} download={download} isAllOrdersLoading={isAllOrdersLoading}/>
+            children: <TransfersTable user={user} selectedDate={dayjs(selectedDate).startOf('day').unix()} download={download} isAllOrdersLoading={isAllOrdersLoading} />
+          },
+          {
+            label: <p id="redemptions-outgoing-tab" className="font-semibold text-sm md:text-base">Redemptions (Outgoing)</p>,
+            key: "redemptions-outgoing",
+            children: <RedemptionsOutgoingTable user={user} selectedDate={dayjs(selectedDate).startOf('day').unix()} download={download} isAllOrdersLoading={isAllOrdersLoading} />
+          },
+          {
+            label: <p id="redemptions-incoming-tab" className="font-semibold text-sm md:text-base">Redemptions (Incoming)</p>,
+            key: "redemptions-incoming",
+            children: <RedemptionsIncomingTable user={user} selectedDate={dayjs(selectedDate).startOf('day').unix()} download={download} isAllOrdersLoading={isAllOrdersLoading} />
           }
         ]}
       />

@@ -5,15 +5,20 @@ import base64
 import time
 import sys
 
-def wait_for_slipstream_to_sync(node1_url, node2_url, headers1, headers2, attempts, sleep_time):
+def wait_for_slipstream_to_sync(node1_url, node2_url, token_info1, token_info2, attempts, sleep_time, table_name):
+    print(f"Trying for: {table_name}")
     attempts = int(attempts)
     sleep_time = int(sleep_time)
     attempt = 0
     while True:
         attempt += 1
         try:
-            response1 = requests.get(node1_url + "/cirrus/search/BlockApps-Mercata-Asset", headers=headers1, params={'order':'block_timestamp.desc', 'limit':1})
-            response2 = requests.get(node2_url + "/cirrus/search/BlockApps-Mercata-Asset", headers=headers2, params={'order':'block_timestamp.desc', 'limit':1})
+            token1 = get_auth_token(*token_info1)
+            token2 = get_auth_token(*token_info2)
+            headers1 = {'Authorization': f'Bearer {token1}'}
+            headers2 = {'Authorization': f'Bearer {token2}'}
+            response1 = requests.get(node1_url + f"/cirrus/search/{table_name}", headers=headers1, params={'order':'block_timestamp.desc', 'limit':1})
+            response2 = requests.get(node2_url + f"/cirrus/search/{table_name}", headers=headers2, params={'order':'block_timestamp.desc', 'limit':1})
             if response1.ok and response2.ok and response1:
                 response1_json = response1.json()
                 response2_json = response2.json()
@@ -31,6 +36,8 @@ def wait_for_slipstream_to_sync(node1_url, node2_url, headers1, headers2, attemp
                         print(f"Slipstream of node1 is at block {block_number1}, but Node2 is at block {block_number2} (attempt #{attempt} of {attempts})")
             else:
                 print(f"Failed to fetch data for one of the nodes (attempt #{attempt} of {attempts})")
+                print("Node 1 response: ", response1, response1.text)
+                print("Node 2 response: ", response2, response2.text)
         except Exception as e:
             print(f"Slipstream sync test exception occurred: {e}")
             sys.exit(1)
@@ -54,7 +61,7 @@ def get_auth_token(client_id, client_secret, realm_name):
     resp = requests.request("POST", url, headers=headers, data=payload)
     return resp.json()['access_token']
 
-def check_table(table):
+def check_table(table, headers1, headers2):
     discrepancies, count = False, False
     print("Checking table ", table)
     endpoint = "/cirrus/search/" + table
@@ -87,7 +94,7 @@ def check_table(table):
         else:
             if assets1[a] != assets2[a]:
                 print("inconsistency at ", a)
-                for k in assets1[a].keys():
+                for k in assets2[a].keys():
                     if assets1[a][k] != assets2[a][k]:
                         #Only on contract name for now
                         if k=='contract_name':
@@ -121,26 +128,84 @@ if __name__ == "__main__":
     node1_url = "http://localhost"
     node2_url = "https://node1.mercata-testnet2.blockapps.net"
 
-    token1 = get_auth_token(client_id1, client_secret1, realm_1)
-    token2 = get_auth_token(client_id2, client_secret2, realm_2)
+    token_info1 = (client_id1, client_secret1, realm_1)
+    token_info2 = (client_id2, client_secret2, realm_2)
+
+    # Wait until both nodes have the same latest block indexed in Slipstream
+    wait_for_slipstream_to_sync(node1_url, node2_url, token_info1, token_info2, attempts, sleep_time, "BlockApps-Mercata-Asset")
+    wait_for_slipstream_to_sync(node1_url, node2_url, token_info1, token_info2, attempts, sleep_time, "BlockApps-Mercata-PaymentService.Order")
+    wait_for_slipstream_to_sync(node1_url, node2_url, token_info1, token_info2, attempts, sleep_time, "BlockApps-Mercata-Sale")
+    wait_for_slipstream_to_sync(node1_url, node2_url, token_info1, token_info2, attempts, sleep_time, "BlockApps-Mercata-Asset.ItemTransfers")
+    wait_for_slipstream_to_sync(node1_url, node2_url, token_info1, token_info2, attempts, sleep_time, "BlockApps-Mercata-Asset-files")
+    wait_for_slipstream_to_sync(node1_url, node2_url, token_info1, token_info2, attempts, sleep_time, "BlockApps-Mercata-Asset-images")
+    wait_for_slipstream_to_sync(node1_url, node2_url, token_info1, token_info2, attempts, sleep_time, "BlockApps-Mercata-Asset-fileNames")
+
+    token1 = get_auth_token(*token_info1)
+    token2 = get_auth_token(*token_info2)
     headers1 = {'Authorization': f'Bearer {token1}'}
     headers2 = {'Authorization': f'Bearer {token2}'}
 
-    # Wait until both nodes have the same latest block indexed in Slipstream
-    wait_for_slipstream_to_sync(node1_url, node2_url, headers1, headers2, attempts, sleep_time)
+    discrepancies_asset, count_asset_discrepancy = check_table("BlockApps-Mercata-Asset", headers1, headers2)
+    discrepancies_sale, count_sale_discrepancy = check_table("BlockApps-Mercata-PaymentService.Order", headers1, headers2)
+    discrepancies_order, count_order_discrepancy = check_table("BlockApps-Mercata-Sale", headers1, headers2)
 
-    discrepancies_asset, count_asset_discrepancy = check_table("BlockApps-Mercata-Asset")
-    discrepancies_sale, count_sale_discrepancy = check_table("BlockApps-Mercata-Order")
-    discrepancies_order, count_order_discrepancy = check_table("BlockApps-Mercata-Sale")
+    #Event tables
+    discrepancies_asset_its, count_asset_its_discrepancy = check_table("BlockApps-Mercata-Asset.ItemTransfers", headers1, headers2)
+    discrepancies_asset_own, count_asset_own_discrepancy = check_table("BlockApps-Mercata-Asset.OwnershipTransfer", headers1, headers2)
+
+    #Colletion tables
+    discrepancies_asset_files, count_asset_files_discrepancy = check_table("BlockApps-Mercata-Asset-files", headers1, headers2)
+    discrepancies_asset_fileNames, count_asset_fileNames_discrepancy = check_table("BlockApps-Mercata-Asset-fileNames", headers1, headers2)
+    discrepancies_asset_images, count_asset_images_discrepancy = check_table("BlockApps-Mercata-Asset-images", headers1, headers2)
+
+    #Joins
+    discrepancies_join, count_join_discrepancy = check_table("BlockApps-Mercata-Asset?&select=*,BlockApps-Mercata-Asset-files(*),BlockApps-Mercata-Asset-images(*),BlockApps-Mercata-Asset-fileNames(*),BlockApps-Mercata-Sale!BlockApps-Mercata-Sale_BlockApps-Mercata-Asset_fk(*,BlockApps-Mercata-Sale-paymentProviders(*))"
+                                                             , headers1
+                                                             , headers2)
 
     # Print the results
-    print("\nFinal check summary:")
+    print("\n**Final check summary:**")
     print(f"Asset Discrepancies: {'Yes' if discrepancies_asset else 'No'}")
     print(f"Order Discrepancies: {'Yes' if discrepancies_order else 'No'}")
     print(f"Sale Discrepancies: {'Yes' if discrepancies_sale else 'No'}")
+    print(f"Asset.ItemTransfers Discrepancies: {'Yes' if discrepancies_asset_its else 'No'}")
+    print(f"Asset.OwnershipTransfer Discrepancies: {'Yes' if discrepancies_asset_own else 'No'}")
+    print(f"Asset-files Discrepancies: {'Yes' if discrepancies_asset_files else 'No'}")
+    print(f"Asset-fileNames Discrepancies: {'Yes' if discrepancies_asset_fileNames else 'No'}")
+    print(f"Asset-images Discrepancies: {'Yes' if discrepancies_asset_images else 'No'}")
+    print(f"The Join Discrepancies: {'Yes' if discrepancies_join else 'No'}")
+    print()
     print(f"Asset Count Match Discrepancies: {'Yes' if count_asset_discrepancy else 'No'}")
     print(f"Order Count Match Discrepancies: {'Yes' if count_order_discrepancy else 'No'}")
     print(f"Sale Count Match Discrepancies: {'Yes' if  count_sale_discrepancy else 'No'}")
+    print(f"Asset.ItemTransfers Count Match Discrepancies: {'Yes' if  count_asset_its_discrepancy else 'No'}")
+    print(f"Asset.OwnershipTransfer Count Match Discrepancies: {'Yes' if  count_asset_own_discrepancy else 'No'}")
+    print(f"Asset-files Count Match Discrepancies: {'Yes' if  count_asset_files_discrepancy else 'No'}")
+    print(f"Asset-fileNames Count Match Discrepancies: {'Yes' if  count_asset_fileNames_discrepancy else 'No'}")
+    print(f"Asset-images Count Match Discrepancies: {'Yes' if  count_asset_images_discrepancy else 'No'}")
+    print(f"The Join Count Discrepancies: {'Yes' if count_join_discrepancy else 'No'}")
 
-    if discrepancies_asset or discrepancies_sale or discrepancies_order or count_asset_discrepancy or count_sale_discrepancy or count_order_discrepancy:
+    if any(
+        [ 
+          discrepancies_asset,
+          count_asset_discrepancy,
+          discrepancies_sale,
+          count_sale_discrepancy,
+          discrepancies_order,
+          count_order_discrepancy,
+          discrepancies_asset_its,
+          count_asset_its_discrepancy,
+          discrepancies_asset_own,
+          count_asset_own_discrepancy,
+          discrepancies_asset_files,
+          count_asset_files_discrepancy,
+          discrepancies_asset_fileNames,
+          count_asset_fileNames_discrepancy,
+          discrepancies_asset_images,
+          count_asset_images_discrepancy,
+          discrepancies_join,
+          count_join_discrepancy
+        ]
+    ):
+        print("ERROR - one or more discrepancies detected")
         sys.exit(1)

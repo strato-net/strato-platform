@@ -21,7 +21,6 @@ library:
     - blockapps-data
     - blockapps-datadefs
     - blockapps-mpdbs
-    - blockapps-privacy
     - blockstanbul
     - bytestring
     - common-log
@@ -39,9 +38,8 @@ library:
     - leveldb-haskell
     - memory
     - merkle-patricia-db
-    - milena
-    - milena-tools
     - monad-alter
+    - monad-logger
     - monad-loops
     - nibblestring
     - persistent-postgresql
@@ -61,7 +59,7 @@ library:
     - vm-tools
 
 executables:
-  queryStrato:
+  strato-barometer:
     source-dirs: exec_src/
     main: Main.hs
     other-modules: []
@@ -71,6 +69,7 @@ executables:
       - cmdargs
       - labeled-error
       - merkle-patricia-db
+      - process
       - seqevents
       - strato-model
       - strato-p2p
@@ -84,7 +83,7 @@ executables:
       - bytestring
       - labeled-error
     other-modules: []
-
+   
   modifyDate:
     source-dirs: exec_src/
     main: ModifyDate.hs
@@ -93,16 +92,3 @@ executables:
       - hflags
       - time
     other-modules: []
-
-tests:
-  blockapps-tools-test:
-    source-dirs: test/
-    main: KafkaSpec.hs
-    ghc-options: -dynamic
-    dependencies:
-      - QuickCheck
-      - blockapps-tools
-      - bytestring
-      - bytestring-arbitrary
-      - hspec
-      - temporary

@@ -1,9 +1,16 @@
 /* eslint-disable no-await-in-loop */
 /* eslint-disable no-console */
 import rp from 'request-promise';
-import { rest, util, importer } from 'blockapps-rest';
+import {rest, util, importer, oauthUtil} from 'blockapps-rest';
 
 const { getAccounts } = rest;
+
+import config from '../loadConfig';
+
+const CACHED_DATA = {
+  serviceToken: null,
+  serviceTokenExpiresAt: null,
+}
 
 async function getAccountDetails(user, config) {
   const account = await getAccounts(user, {
@@ -68,9 +75,68 @@ async function createContractArgs(contract, size, initialNonce, batchNum) {
   return txs;
 }
 
+const getServiceToken = async (req = null) => {
+  const oauth = req ? req.app.oauth : await oauthUtil.init(config.nodes[0].oauth)
+  let token = CACHED_DATA.serviceToken
+  const expiresAt = CACHED_DATA.serviceTokenExpiresAt
+  if (
+      !token
+      || !expiresAt
+      || expiresAt
+      <= Math.floor(Date.now() / 1000)
+      + constants.tokenLifetimeReserveSeconds
+  ) {
+    const tokenObj = await oauth.getAccessTokenByClientSecret()
+    token = tokenObj.token[
+        config.nodes[0].oauth.tokenField
+            ? config.nodes[0].oauth.tokenField
+            : 'access_token'
+        ]
+    CACHED_DATA.serviceToken = token
+    CACHED_DATA.serviceTokenExpiresAt = Math.floor(
+        tokenObj.token.expires_at / 1000,
+    )
+  }
+  return token
+}
+
+const getUserToken = async (username, password, req = null) => {
+  const oauth = req ? req.app.oauth : await oauthUtil.init(config.nodes[0].oauth)
+  const userTokenData = CACHED_DATA[`${username}`]
+  
+  if (
+      userTokenData
+      && userTokenData.token
+      && userTokenData.expiresAt
+      && userTokenData.expiresAt
+      > Math.floor(Date.now() / 1000)
+      + constants.tokenLifetimeReserveSeconds
+  ) {
+    console.log('returning cached token')
+    return userTokenData.token
+  }
+  const tokenObj = await oauth.getAccessTokenByResourceOwnerCredential(
+      username,
+      password,
+  )
+  const token = tokenObj.token[
+      config.nodes[0].oauth.tokenField
+          ? config.nodes[0].oauth.tokenField
+          : 'access_token'
+      ]
+  CACHED_DATA[`${username}`] = {
+    token,
+    expiresAt: Math.floor(tokenObj.token.expires_at / 1000),
+  }
+  console.log('returning new token')
+  return token
+}
+
 export default {
   callApi,
   createContractArgs,
   getAccountDetails,
   waitResult,
+  getServiceToken,
+  getUserToken
 };

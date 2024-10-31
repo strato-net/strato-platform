@@ -28,8 +28,8 @@ import Blockchain.DB.SolidStorageDB
 import Blockchain.DB.StateDB
 import Blockchain.Data.AddressStateDB
 import Blockchain.Data.Block
+import Blockchain.Data.BlockHeader
 import Blockchain.Data.BlockSummary
-import Blockchain.Data.DataDefs (BlockData (..))
 import Blockchain.Data.ExecResults
 import Blockchain.Data.GenesisInfo
 import Blockchain.Data.RLP
@@ -185,6 +185,10 @@ anyImmutableError :: Selector HandledException
 anyImmutableError (HE Blockchain.SolidVM.Exception.ImmutableError {}) = True
 anyImmutableError _ = False
 
+specificTypeError :: String -> Selector HandledException
+specificTypeError str (HE (Blockchain.SolidVM.Exception.TypeError _ mes)) = mes == str
+specificTypeError _ _ = False 
+
 failedToAttainRunTimCodeError :: Selector HandledException
 failedToAttainRunTimCodeError (HE Blockchain.SolidVM.Exception.FailedToAttainRunTimCode {}) = True
 failedToAttainRunTimCodeError _ = False
@@ -203,6 +207,9 @@ failedAssertion _ = False
 
 sender :: Account
 sender = Account 0xdeadbeef Nothing
+
+proposer :: Address
+proposer = Address 0xdeadbeef2
 
 privateChainAcc :: Account
 privateChainAcc = Account 0xdeadbeef (Just 0x776622233444)
@@ -262,22 +269,22 @@ generateGBlock :: (MonadLogger m, HasStateDB m) => GenesisInfo -> m (Block, Outp
 generateGBlock gi = do
   sr <- A.lookupWithDefault (Proxy @StateRoot) (Nothing :: Maybe Word256)
   let bData =
-        BlockData
-          { blockDataParentHash = genesisInfoParentHash gi,
-            blockDataUnclesHash = genesisInfoUnclesHash gi,
-            blockDataCoinbase = genesisInfoCoinbase gi,
-            blockDataStateRoot = sr,
-            blockDataTransactionsRoot = genesisInfoTransactionRoot gi,
-            blockDataReceiptsRoot = genesisInfoReceiptsRoot gi,
-            blockDataLogBloom = genesisInfoLogBloom gi,
-            blockDataDifficulty = genesisInfoDifficulty gi,
-            blockDataNumber = genesisInfoNumber gi,
-            blockDataGasLimit = genesisInfoGasLimit gi,
-            blockDataGasUsed = genesisInfoGasUsed gi,
-            blockDataTimestamp = genesisInfoTimestamp gi,
-            blockDataExtraData = i2bs_unsized $ genesisInfoExtraData gi,
-            blockDataMixHash = genesisInfoMixHash gi,
-            blockDataNonce = genesisInfoNonce gi
+        BlockHeader
+          { parentHash = genesisInfoParentHash gi,
+            ommersHash = genesisInfoUnclesHash gi,
+            beneficiary = genesisInfoCoinbase gi,
+            stateRoot = sr,
+            transactionsRoot = genesisInfoTransactionRoot gi,
+            receiptsRoot = genesisInfoReceiptsRoot gi,
+            logsBloom = genesisInfoLogBloom gi,
+            difficulty = genesisInfoDifficulty gi,
+            number = genesisInfoNumber gi,
+            gasLimit = genesisInfoGasLimit gi,
+            gasUsed = genesisInfoGasUsed gi,
+            timestamp = genesisInfoTimestamp gi,
+            extraData = i2bs_unsized $ genesisInfoExtraData gi,
+            mixHash = genesisInfoMixHash gi,
+            nonce = genesisInfoNonce gi
           }
   return
     ( Block
@@ -287,7 +294,6 @@ generateGBlock gi = do
         },
       OutputBlock
         { obOrigin = TXO.Direct,
-          obTotalDifficulty = 0,
           obBlockData = bData,
           obReceiptTransactions = [],
           obBlockUncles = []
@@ -298,9 +304,8 @@ writeBlockSummary :: HasBlockSummaryDB m => OutputBlock -> m ()
 writeBlockSummary block =
   let sha = outputBlockHash block
       header = obBlockData block
-      td = obTotalDifficulty block
       txCnt = fromIntegral $ length (obReceiptTransactions block)
-   in putBSum sha (blockHeaderToBSum header td txCnt)
+   in putBSum sha (blockHeaderToBSum header txCnt)
 
 instance {-# OVERLAPPING #-} Monad m => AccessibleEnv SQLDB (ReaderT Context m) where
   accessEnv = fmap (view $ dbs . sqldb) accessEnv
@@ -321,11 +326,11 @@ runTestWithTimeout timeout f = do
 
       (blockCreated, outputBlock) <- generateGBlock gi'
       MP.initializeBlank
-      setStateDBStateRoot Nothing $ blockDataStateRoot $ blockBlockData $ blockCreated
+      setStateDBStateRoot Nothing $ stateRoot $ blockBlockData $ blockCreated
       writeBlockSummary outputBlock
       let genHash = rlpHash $ (blockCreated)
-      bhr <- bootstrapChainDB genHash [(Nothing, (blockDataStateRoot $ blockBlockData $ blockCreated))]
-      putContextBestBlockInfo $ ContextBestBlockInfo genHash (blockBlockData $ blockCreated) 0 0 0
+      bhr <- bootstrapChainDB genHash [(Nothing, (stateRoot $ blockBlockData $ blockCreated))]
+      putContextBestBlockInfo $ ContextBestBlockInfo genHash (blockBlockData $ blockCreated) 0
       Mod.put (Mod.Proxy @BlockHashRoot) $ bhr
       processNewBestBlock genHash (blockBlockData $ blockCreated) [] -- bootstrap Bagger with genesis block
       withCurrentBlockHash genHash $ do
@@ -381,22 +386,22 @@ runArgsWithSenderBeef acc args bs = do
       isHomestead = error "TODO: isHomestead"
       suicides = error "TODO: suicides"
       blockData =
-        BlockData
-          { blockDataParentHash = unsafeCreateKeccak256FromWord256 0x0,
-            blockDataUnclesHash = unsafeCreateKeccak256FromWord256 0x0,
-            blockDataCoinbase = emptyChainMember,
-            blockDataStateRoot = "",
-            blockDataTransactionsRoot = "",
-            blockDataReceiptsRoot = "",
-            blockDataLogBloom = "",
-            blockDataDifficulty = 900,
-            blockDataNumber = 8033,
-            blockDataGasLimit = 1000000,
-            blockDataGasUsed = 10000,
-            blockDataExtraData = "",
-            blockDataNonce = 22,
-            blockDataMixHash = unsafeCreateKeccak256FromWord256 0x0,
-            blockDataTimestamp = posixSecondsToUTCTime 0x4000
+        BlockHeader
+          { parentHash = unsafeCreateKeccak256FromWord256 0x0,
+            ommersHash = unsafeCreateKeccak256FromWord256 0x0,
+            beneficiary = emptyChainMember,
+            stateRoot = "",
+            transactionsRoot = "",
+            receiptsRoot = "",
+            logsBloom = "",
+            difficulty = 900,
+            number = 8033,
+            gasLimit = 1000000,
+            gasUsed = 10000,
+            extraData = "",
+            nonce = 22,
+            mixHash = unsafeCreateKeccak256FromWord256 0x0,
+            timestamp = posixSecondsToUTCTime 0x4000
           }
       callDepth = 0
       value = error "TODO: value"
@@ -416,6 +421,7 @@ runArgsWithSenderBeef acc args bs = do
       callDepth
       sender
       origin
+      proposer
       value
       gasPrice
       availableGas
@@ -435,22 +441,22 @@ runArgsWithSender acc args bs = do
       isHomestead = error "TODO: isHomestead"
       suicides = error "TODO: suicides"
       blockData =
-        BlockData
-          { blockDataParentHash = unsafeCreateKeccak256FromWord256 0x0,
-            blockDataUnclesHash = unsafeCreateKeccak256FromWord256 0x0,
-            blockDataCoinbase = emptyChainMember,
-            blockDataStateRoot = "",
-            blockDataTransactionsRoot = "",
-            blockDataReceiptsRoot = "",
-            blockDataLogBloom = "",
-            blockDataDifficulty = 900,
-            blockDataNumber = 8033,
-            blockDataGasLimit = 1000000,
-            blockDataGasUsed = 10000,
-            blockDataExtraData = "",
-            blockDataNonce = 22,
-            blockDataMixHash = unsafeCreateKeccak256FromWord256 0x0,
-            blockDataTimestamp = posixSecondsToUTCTime 0x4000
+        BlockHeader
+          { parentHash = unsafeCreateKeccak256FromWord256 0x0,
+            ommersHash = unsafeCreateKeccak256FromWord256 0x0,
+            beneficiary = emptyChainMember,
+            stateRoot = "",
+            transactionsRoot = "",
+            receiptsRoot = "",
+            logsBloom = "",
+            difficulty = 900,
+            number = 8033,
+            gasLimit = 1000000,
+            gasUsed = 10000,
+            extraData = "",
+            nonce = 22,
+            mixHash = unsafeCreateKeccak256FromWord256 0x0,
+            timestamp = posixSecondsToUTCTime 0x4000
           }
       callDepth = 0
       value = error "TODO: value"
@@ -460,7 +466,7 @@ runArgsWithSender acc args bs = do
       chainId = Nothing
       metadata = Just $ M.fromList [("name", "qq"), ("args", args)]
   
-  insert (Proxy @BlockSummary) (unsafeCreateKeccak256FromWord256 0x0) (blockHeaderToBSum blockData 900 1)
+  insert (Proxy @BlockSummary) (unsafeCreateKeccak256FromWord256 0x0) (blockHeaderToBSum blockData 1)
 
   newAddress <- getNewAddress acc
   er <-
@@ -472,6 +478,7 @@ runArgsWithSender acc args bs = do
       callDepth
       sender
       origin
+      proposer
       value
       gasPrice
       availableGas
@@ -490,22 +497,22 @@ runArgsWithOrigin orig acc args bs = do
       isHomestead = error "TODO: isHomestead"
       suicides = error "TODO: suicides"
       blockData =
-        BlockData
-          { blockDataParentHash = unsafeCreateKeccak256FromWord256 0x0,
-            blockDataUnclesHash = unsafeCreateKeccak256FromWord256 0x0,
-            blockDataCoinbase = emptyChainMember,
-            blockDataStateRoot = "",
-            blockDataTransactionsRoot = "",
-            blockDataReceiptsRoot = "",
-            blockDataLogBloom = "",
-            blockDataDifficulty = 900,
-            blockDataNumber = 8033,
-            blockDataGasLimit = 1000000,
-            blockDataGasUsed = 10000,
-            blockDataExtraData = "",
-            blockDataNonce = 22,
-            blockDataMixHash = unsafeCreateKeccak256FromWord256 0x0,
-            blockDataTimestamp = posixSecondsToUTCTime 0x4000
+        BlockHeader
+          { parentHash = unsafeCreateKeccak256FromWord256 0x0,
+            ommersHash = unsafeCreateKeccak256FromWord256 0x0,
+            beneficiary = emptyChainMember,
+            stateRoot = "",
+            transactionsRoot = "",
+            receiptsRoot = "",
+            logsBloom = "",
+            difficulty = 900,
+            number = 8033,
+            gasLimit = 1000000,
+            gasUsed = 10000,
+            extraData = "",
+            nonce = 22,
+            mixHash = unsafeCreateKeccak256FromWord256 0x0,
+            timestamp = posixSecondsToUTCTime 0x4000
           }
       callDepth = 0
       value = error "TODO: value"
@@ -525,6 +532,7 @@ runArgsWithOrigin orig acc args bs = do
       callDepth
       sender
       orig
+      proposer
       value
       gasPrice
       availableGas
@@ -610,22 +618,22 @@ runCall funcName callArgs bs = do
       isRCC = False
       suicides = error "TODO: suicides"
       blockData =
-        BlockData
-          { blockDataParentHash = unsafeCreateKeccak256FromWord256 0x0,
-            blockDataUnclesHash = unsafeCreateKeccak256FromWord256 0x0,
-            blockDataCoinbase = emptyChainMember,
-            blockDataStateRoot = "",
-            blockDataTransactionsRoot = "",
-            blockDataReceiptsRoot = "",
-            blockDataLogBloom = "",
-            blockDataDifficulty = 900,
-            blockDataNumber = 8033,
-            blockDataGasLimit = 1000000,
-            blockDataGasUsed = 10000,
-            blockDataExtraData = "",
-            blockDataNonce = 22,
-            blockDataMixHash = unsafeCreateKeccak256FromWord256 0x0,
-            blockDataTimestamp = posixSecondsToUTCTime 0x4000
+        BlockHeader
+          { parentHash = unsafeCreateKeccak256FromWord256 0x0,
+            ommersHash = unsafeCreateKeccak256FromWord256 0x0,
+            beneficiary = emptyChainMember,
+            stateRoot = "",
+            transactionsRoot = "",
+            receiptsRoot = "",
+            logsBloom = "",
+            difficulty = 900,
+            number = 8033,
+            gasLimit = 1000000,
+            gasUsed = 10000,
+            extraData = "",
+            nonce = 22,
+            mixHash = unsafeCreateKeccak256FromWord256 0x0,
+            timestamp = posixSecondsToUTCTime 0x4000
           }
       callDepth = 0
       value = error "TODO: value"
@@ -649,6 +657,7 @@ runCall funcName callArgs bs = do
       callDepth
       sender
       origin
+      proposer
       value
       gasPrice
       availableGas
@@ -672,6 +681,7 @@ runCall funcName callArgs bs = do
       receiveAddress
       newAddress
       sender
+      proposer
       value
       gasPrice
       theData
@@ -694,22 +704,22 @@ runCall' funcName callArgs bs = do
       isRCC = False
       suicides = error "TODO: suicides"
       blockData =
-        BlockData
-          { blockDataParentHash = unsafeCreateKeccak256FromWord256 0x0,
-            blockDataUnclesHash = unsafeCreateKeccak256FromWord256 0x0,
-            blockDataCoinbase = emptyChainMember,
-            blockDataStateRoot = "",
-            blockDataTransactionsRoot = "",
-            blockDataReceiptsRoot = "",
-            blockDataLogBloom = "",
-            blockDataDifficulty = 900,
-            blockDataNumber = 8033,
-            blockDataGasLimit = 1000000,
-            blockDataGasUsed = 10000,
-            blockDataExtraData = "",
-            blockDataNonce = 22,
-            blockDataMixHash = unsafeCreateKeccak256FromWord256 0x0,
-            blockDataTimestamp = posixSecondsToUTCTime 0x4000
+        BlockHeader
+          { parentHash = unsafeCreateKeccak256FromWord256 0x0,
+            ommersHash = unsafeCreateKeccak256FromWord256 0x0,
+            beneficiary = emptyChainMember,
+            stateRoot = "",
+            transactionsRoot = "",
+            receiptsRoot = "",
+            logsBloom = "",
+            difficulty = 900,
+            number = 8033,
+            gasLimit = 1000000,
+            gasUsed = 10000,
+            extraData = "",
+            nonce = 22,
+            mixHash = unsafeCreateKeccak256FromWord256 0x0,
+            timestamp = posixSecondsToUTCTime 0x4000
           }
       callDepth = 0
       value = error "TODO: value"
@@ -733,6 +743,7 @@ runCall' funcName callArgs bs = do
       callDepth
       sender
       origin
+      proposer
       value
       gasPrice
       availableGas
@@ -756,6 +767,7 @@ runCall' funcName callArgs bs = do
       receiveAddress
       newAddress
       sender
+      proposer
       value
       gasPrice
       theData
@@ -780,22 +792,22 @@ call2 funcName callArgs contractAddress = do
       isRCC = False
       suicides = error "TODO: suicides"
       blockData =
-        BlockData
-          { blockDataParentHash = unsafeCreateKeccak256FromWord256 0x0,
-            blockDataUnclesHash = unsafeCreateKeccak256FromWord256 0x0,
-            blockDataCoinbase = emptyChainMember,
-            blockDataStateRoot = "",
-            blockDataTransactionsRoot = "",
-            blockDataReceiptsRoot = "",
-            blockDataLogBloom = "",
-            blockDataDifficulty = 900,
-            blockDataNumber = 8033,
-            blockDataGasLimit = 1000000,
-            blockDataGasUsed = 10000,
-            blockDataExtraData = "",
-            blockDataNonce = 22,
-            blockDataMixHash = unsafeCreateKeccak256FromWord256 0x0,
-            blockDataTimestamp = posixSecondsToUTCTime 0x4000
+        BlockHeader
+          { parentHash = unsafeCreateKeccak256FromWord256 0x0,
+            ommersHash = unsafeCreateKeccak256FromWord256 0x0,
+            beneficiary = emptyChainMember,
+            stateRoot = "",
+            transactionsRoot = "",
+            receiptsRoot = "",
+            logsBloom = "",
+            difficulty = 900,
+            number = 8033,
+            gasLimit = 1000000,
+            gasUsed = 10000,
+            extraData = "",
+            nonce = 22,
+            mixHash = unsafeCreateKeccak256FromWord256 0x0,
+            timestamp = posixSecondsToUTCTime 0x4000
           }
       callDepth = 0
       value = error "TODO: value"
@@ -819,6 +831,7 @@ call2 funcName callArgs contractAddress = do
       receiveAddress
       contractAddress
       sender
+      proposer
       value
       gasPrice
       theData
@@ -6117,7 +6130,7 @@ contract qq {
     ( runTest $ do
         ( runBS
             [r|
-
+pragma solidvm 11.4;
 contract qq {
   modifier myModifier() {  // line 4
     return 7;
@@ -6132,7 +6145,7 @@ contract qq {
 }|]
           )
     )
-      `shouldThrow` anyModifierError
+      `shouldThrow` anyTypeError
 
   it "can use a modifier as part of a function" . runTest $ do
     runCall'
@@ -7534,7 +7547,7 @@ contract qq {
   function randomFunction(uint checker)
   {
     if(a==checker)
-      revert({x:"logic flag"});
+      revert("logic flag");
   }
 }|]
       )
@@ -8209,7 +8222,7 @@ contract qq {
 }
 |]
     getFields ["x"] `shouldReturn` [BInteger 4]
-
+    
   it "can use libraries" . runTest $ do
     runBS
       [r|
@@ -8515,6 +8528,7 @@ contract qq {
       SomeContract p = new SomeContract();
       b = p.x()[0];
   }
+
 }
 |]) `shouldThrow` anyTypeError
 
@@ -8534,7 +8548,6 @@ contract qq {
     delete arr2;
     delete xyz;
     delete b;
-    delete yy;
   }
 }|]
       getFields ["res", "arr2"] `shouldReturn` [BDefault, BDefault]) 
@@ -8574,3 +8587,572 @@ contract qq {
   string hsh = blockhash(900000);
   constructor() {}
 }|]) `shouldThrow` anyInvalidArgumentsError
+
+  it "can use decimal numbers" $ runTest ( do
+    runBS [r|
+contract qq {
+  decimal x = 1.123123;
+  decimal negativeX = -1.123123;
+  decimal y = 0.0000003;
+  decimal z;
+  decimal copyOfX;
+  decimal funcResult;
+  decimal[] decimalArray;
+  decimal elementOne;
+  decimal elementTwo;
+  
+  constructor() {
+    copyOfX = x;
+    funcResult = test(x);
+    decimalArray.push(3.2);
+    decimalArray.push(2.1);
+    elementOne = decimalArray[0];
+    elementTwo = decimalArray[1];
+  }
+
+  function test(decimal _x) returns (decimal) {
+    return _x;
+  }
+}
+|]
+    getFields ["x", "negativeX", "y", "z", "copyOfX", "funcResult", "elementOne", "elementTwo"]
+      `shouldReturn` [BDecimal "1.123123",
+                      BDecimal "-1.123123",
+                      BDecimal "0.0000003",
+                      BDefault,
+                      BDecimal "1.123123",
+                      BDecimal "1.123123",
+                      BDecimal "3.2",
+                      BDecimal "2.1"
+                    ])
+
+  it "can use decimal numbers with arithmetic operators" $ runTest ( do
+    runBS [r|
+contract qq {
+  decimal x = 1.123123;
+  decimal y = 2.0;
+  decimal sum;
+  decimal diff;
+  decimal product;
+  decimal quotient;
+  decimal negative;
+
+  constructor() {
+    sum = x + y;
+    diff = x - y;
+    product = x * y;
+    quotient = x / y;
+    negative = -y;
+  }
+}
+|]
+    getFields ["x", "y", "sum", "diff", "product", "quotient", "negative"] 
+      `shouldReturn` [BDecimal "1.123123",
+                      BDecimal "2.0",
+                      BDecimal "3.123123",
+                      BDecimal "-0.876877",
+                      BDecimal "2.246246",
+                      BDecimal "0.5615615",
+                      BDecimal "-2"
+                     ])
+
+  it "can use decimal numbers with assignment operators" $ runTest ( do
+    runBS [r|
+contract qq {
+  decimal x = 2.0;
+  decimal sum = 3.3;
+  decimal diff = 3.3;
+  decimal product = 3.3;
+  decimal quotient = 3.3;
+
+  constructor() {
+    sum += x;
+    diff -= x;
+    product *= x;
+    quotient /= x;
+  }
+}
+|]
+    getFields ["x", "sum", "diff", "product", "quotient"] 
+      `shouldReturn` [BDecimal "2.0",
+                      BDecimal "5.3",
+                      BDecimal "1.3",
+                      BDecimal "6.6",
+                      BDecimal "1.65"
+                     ])
+
+  it "can use decimal literals in expressions" $ runTest ( do
+    runBS [r|
+contract qq {
+  decimal x = 2;
+  decimal sum;
+  decimal sumTwo;
+  decimal sumThree;
+  decimal diff;
+  decimal diffTwo;
+  decimal product;
+  decimal productTwo;
+  decimal quotient;
+  decimal quotientTwo;
+  decimal quotientThree;
+
+  constructor() {
+    sum = x + 3.3;
+    sumTwo = 1.0 + 3.3;
+    sumThree += 2.8;
+    diff = x - 1.2;
+    diffTwo = 3.3 - 1.2;
+    product = x * 3.2;
+    productTwo = -1.2 * 2.3;
+    quotient = x / 2.3;
+    quotientTwo = 4.6 / 2.3;
+    quotientThree = quotientTwo / 0.32;
+  }
+}
+|]
+    getFields ["x", "sum", "sumTwo", "sumThree", "diff", "diffTwo", "product", "productTwo", "quotient", "quotientTwo", "quotientThree"] 
+      `shouldReturn` [BInteger 2,
+                      BDecimal "5.3",
+                      BDecimal "4.3",
+                      BDecimal "2.8",
+                      BDecimal "0.8",
+                      BDecimal "2.1",
+                      BDecimal "6.4",
+                      BDecimal "-2.76",
+                      BDecimal "0.869565217391304347826086956521739130434782608695652173913043478260869565217391304347826086956521739130434782608695652173913043478260869565217391304347826086956521739130434782608695652173913043478260869565217391304347826086956521739130434782608695652173913",
+                      BDecimal "2",
+                      BDecimal "6.25"
+                     ])
+
+  it "can use comparison operators with decimal numbers" $ runTest ( do
+    runBS [r|
+contract qq {
+  decimal x = 2.1;
+  decimal y = 3.2;
+  bool testOne;
+  bool testTwo;
+  bool testThree;
+  bool testFour;
+  bool testFive;
+  bool testSix;
+
+  constructor() {
+    testOne = x <= y;
+    testTwo = x < y;
+    testThree = x == y;
+    testFour = x != y;
+    testFive = x >= y;
+    testSix = x > y;
+  }
+}
+|]
+    getFields ["x", "y", "testOne", "testTwo", "testThree", "testFour", "testFive", "testSix"] 
+      `shouldReturn` [BDecimal "2.1",
+                      BDecimal "3.2",
+                      BBool True,
+                      BBool True,
+                      BDefault,
+                      BBool True,
+                      BDefault,
+                      BDefault
+                     ])
+
+  it "cannot divide by zero using decimal numbers" $ runTest ( do
+    runBS [r|
+contract qq {
+  decimal x;
+
+  constructor() {
+    x = 3.0 / 0.0;
+  }
+}
+|])
+    `shouldThrow` anyDivideByZeroError
+
+  it "can do arithmetics with decimal and integer literals" $ runTest ( do
+    runBS [r|
+contract qq {
+  decimal x;
+
+  constructor() {
+    x = 3.2 + 6 + 6.2;
+  }
+}
+|]
+    getFields ["x"] 
+      `shouldReturn` [BDecimal "15.4"])
+
+  it "cannot use int without casting in arithmetic expressions involving decimals" $ runTest ( do
+    runBS [r|
+contract qq {
+  decimal x;
+  uint y = 6;
+
+  constructor() {
+    x = 5.2 + y;
+  }
+}
+|])
+    `shouldThrow` anyTypeError
+
+  it "can use int with casting in arithmetic expressions involving decimals" $ runTest ( do
+    runBS [r|
+contract qq {
+  decimal x;
+  uint y = 6;
+
+  constructor() {
+    x = 5.2 + decimal(y);
+  }
+}
+|]
+    getFields ["x"]
+      `shouldReturn` [BDecimal "11.2"])
+
+  it "can cast string to decimal" $ runTest ( do
+    runBS [r|
+contract qq {
+  decimal x;
+
+  constructor() {
+    x = decimal("3.5");
+  }
+}
+|]
+    getFields ["x"]
+      `shouldReturn` [BDecimal "3.5"])
+
+  it "should throw an error when casting bad string to decimal" $ runTest ( do
+    runBS [r|
+contract qq {
+  decimal x;
+
+  constructor() {
+    x = decimal("hey");
+  }
+}
+|]) `shouldThrow` anyTypeError
+
+
+  it "can externally return decimals" . runTest $ do
+    runCall'
+      "f"
+      "()"
+      [r|
+contract qq {
+  function f() returns (decimal) {
+    decimal k = 0.5;
+    return k;
+  }
+}|]
+      `shouldReturn` Just "(0.5)"
+      
+  it "can use decimal numbers with the modulo operator" $ runTest ( do
+    runBS [r|
+contract qq {
+  decimal x = 1.123123;
+  decimal y = 2.0;
+  decimal modulo;
+
+  constructor() {
+    modulo = x % y;
+  }
+}
+|]
+    getFields ["x", "y", "modulo"] 
+      `shouldReturn` [BDecimal "1.123123",
+                      BDecimal "2.0",
+                      BDecimal "1.123123"])
+--test for modulo 
+  it "can use different numbers with the modulo operator" $ runTest ( do
+    runBS [r|
+contract qq {
+  decimal xDec = 5.75;
+  decimal yDec = 1.5;
+  decimal moduloDec;
+
+  int xInt = 7;
+  int yInt = 3;
+  int moduloInt;
+
+  constructor() {
+    moduloDec = xDec % yDec;
+    moduloInt = xInt % yInt;
+  }
+}
+|]
+    getFields ["xDec", "yDec", "moduloDec", "xInt", "yInt", "moduloInt"] 
+      `shouldReturn` [BDecimal "5.75",
+                      BDecimal "1.5",
+                      BDecimal "1.25",
+                      BInteger 7,
+                      BInteger 3,
+                      BInteger 1])
+--test for modulo assign                      
+  it "can use different numbers with the modulo assign operator" $ runTest ( do
+    runBS [r|
+contract qq {
+  decimal xDec = 5.75;
+  decimal yDec = 1.5;
+  decimal moduloDec;
+
+  int xInt = 7;
+  int yInt = 3;
+  int moduloInt;
+
+  constructor() {
+    xDec %= yDec;
+    xInt %= yInt;
+    moduloDec = xDec;
+    moduloInt = xInt;
+  }
+}
+|]
+    getFields ["xDec", "yDec", "moduloDec", "xInt", "yInt", "moduloInt"] 
+      `shouldReturn` [BDecimal "1.25",
+                      BDecimal "1.5",
+                      BDecimal "1.25",
+                      BInteger 1,
+                      BInteger 3,
+                      BInteger 1])
+                      
+  it "can cast decimals to int or uint" $ runTest ( do
+    runBS [r|
+contract qq {
+  decimal x = 5.2;
+  uint y;
+  int z;
+
+  constructor() {
+    y = uint(x);
+    z = int(x);
+  }
+}
+|]
+    getFields ["y", "z"]
+      `shouldReturn` [BInteger 5, BInteger 5])
+
+  it "can't assign decimals to int or uint" $ runTest ( do
+    runBS [r|
+contract qq {
+  constructor() {
+    int d = 5.5 + 5;
+  }
+}
+|]) `shouldThrow` anyTypeError
+
+  it "respects the number of decimal places during arithmetic operations" $ runTest ( do
+    runBS [r|
+pragma solidvm 11.4;
+contract qq {
+  decimal a;
+  decimal b;
+  decimal c;
+  decimal d;
+  decimal e;
+  decimal f;
+  decimal g;
+  decimal h;
+  decimal i;
+  decimal j;
+
+  constructor() {
+    a = 1 + 1;
+    b = 1 + 1.0;
+    c = 1 - 0.1;
+    d = 1 - 0.10;
+    e = 1 * 2.00;
+    f = 1.0 * 2.00;
+    g = 3.14159 * 2.5;
+    h = 1.0 / 3;
+    i = 1.00 / 3;
+    j = 1 / 3;
+  }
+}
+|]
+    getFields ["a", "b", "c", "d", "e", "f", "g", "h", "i", "j"]
+      `shouldReturn` [BInteger 2, 
+                      BDecimal "2.0",
+                      BDecimal "0.9",
+                      BDecimal "0.90",
+                      BDecimal "2.00",
+                      BDecimal "2.00",
+                      BDecimal "7.85398",
+                      BDecimal "0.3",
+                      BDecimal "0.33",
+                      BDefault])
+
+  it "can use built-in truncate functions on decimals" $ runTest ( do
+    runBS [r|
+pragma solidvm 11.4;
+contract qq {
+  decimal a = 5.2825;
+  decimal b = 5.2825;
+  decimal c;
+  decimal d;
+  decimal e;
+  decimal f;
+  uint g = 1;
+
+  constructor() {
+    a = a.truncate(3);
+    b = b.truncate(g);
+    c = decimal(3.256).truncate(2);
+    d = decimal(6.27).truncate(g);
+    e = decimal(3.24).truncate(5);
+    f = decimal(3.24).truncate(300);
+  }
+}
+|]
+    getFields ["a", "b", "c", "d", "e", "f"]
+      `shouldReturn` [BDecimal "5.282", 
+                      BDecimal "5.2", 
+                      BDecimal "3.25", 
+                      BDecimal "6.2",
+                      BDecimal "3.24000",
+                      BDecimal "3.24000000000000000000000000000000000000000000"])
+
+  it "can error handle improperly referenced overloaded contracts" $ runTest ( do 
+    let getAddressFromResult :: ExecResults -> Maybe Address 
+        getAddressFromResult res = _accountAddress <$> erNewContractAccount res
+
+    res <- runBS' [r|
+pragma safeExternalCalls;
+contract qq {
+    bool public myVal;
+
+    function changeMyVal(bool b){
+        myVal = b;
+    }
+}|]
+
+    case getAddressFromResult res of
+      Nothing -> error "No address returned"
+      Just address -> runCall' "changeMyValOfTest" (T.pack $ "(0x"++ formatAddressWithoutColor address ++", 3 )" ) [r|
+contract Test {
+    int public myVal;
+
+    function changeMyVal(int b){
+        myVal = b;
+    }
+}
+contract qq {
+    function changeMyValOfTest(address a, int v) returns (int) {
+        Test(a).changeMyVal(v);
+        return Test(a).myVal();
+    }
+}|]) `shouldThrow` anyTypeError
+
+  it "can use es6 imports with solidvm 11.4 pragma" $ runTest ( do
+    runBS [r|
+pragma solidvm 11.4;
+import { someFunc } from <123>;
+
+contract qq {
+  int x = 0;
+
+  constructor() {
+    x = 5;
+  }
+}
+|]) `shouldThrow` specificTypeError "\"Could not find file <0000000000000000000000000000000000000123>\""
+
+  it "can use strict modifiers with solidvm 11.4 pragma" $ runTest ( do
+    runBS [r|
+pragma solidvm 11.4;
+
+contract A {
+  int y = 5;
+  
+  function getY() private returns (int) {
+    return y;
+  }
+}
+
+contract qq is A {
+  A a = new A();
+  int x = 0;
+
+  constructor() {
+    x = a.getY();
+  }
+}
+|]) `shouldThrow` specificTypeError "\" (line 17, column 9) - (line 17, column 10): \\\"Missing label: ABottom ( (line 17, column 9) - (line 17, column 10): \\\\\\\"cannot access function getY because it is marked as private\\\\\\\"  :| []) is not a known enum, struct, or contract.\\\" \""
+
+  it "can use create and create2 built-in function calls with solidvm 11.4 pragma" . runTest $ do
+    runBS
+      [r|
+pragma solidvm 11.4;
+
+contract qq {
+  account a;
+  account b;
+
+  constructor() {
+    a = create("A", "contract A {\n uint x = 1;\n string y;\n constructor (uint _x, string _y) {\n  x = _x;\n  y = _y;\n }\n}", "(3, 'hi')");
+    b = create2("salt", "B", "contract B {\n uint x = 2;\n constructor (uint _x) {\n  x = _x;\n }\n}", "(4)");
+  }
+}|]
+    getFields ["b"]
+      `shouldReturn` [BAccount $ NamedAccount (deriveAddressWithSalt (stringAddress "e8279be14e9fe2ad2d8e52e42ca96fb33a813bbe") "salt" (Just . hash $ BC.pack "contract B {\n uint x = 2;\n constructor (uint _x) {\n  x = _x;\n }\n}") (Just "OrderedVals [SInteger 4]")) UnspecifiedChain]
+    [BAccount a] <- getFields ["a"]
+    [BAccount b] <- getFields ["b"]
+    getSolidStorageKeyVal' (namedAccountToAccount Nothing a) (singleton "x") `shouldReturn` BInteger 3
+    getSolidStorageKeyVal' (namedAccountToAccount Nothing a) (singleton "y") `shouldReturn` BString "hi"
+    getSolidStorageKeyVal' (namedAccountToAccount Nothing b) (singleton "x") `shouldReturn` BInteger 4
+
+  it "can error handle improperly referenced overloaded contracts using solidvm 11.4 pragma" $ runTest ( do 
+    let getAddressFromResult :: ExecResults -> Maybe Address 
+        getAddressFromResult res = _accountAddress <$> erNewContractAccount res
+
+    res <- runBS' [r|
+pragma solidvm 11.4;
+contract qq {
+    bool public myVal;
+
+    function changeMyVal(bool b){
+        myVal = b;
+    }
+}|]
+
+    case getAddressFromResult res of
+      Nothing -> error "No address returned"
+      Just address -> runCall' "changeMyValOfTest" (T.pack $ "(0x"++ formatAddressWithoutColor address ++", 3 )" ) [r|
+contract Test {
+    int public myVal;
+
+    function changeMyVal(int b){
+        myVal = b;
+    }
+}
+contract qq {
+    function changeMyValOfTest(address a, int v) returns (int) {
+        Test(a).changeMyVal(v);
+        return Test(a).myVal();
+    }
+}|]) `shouldThrow` anyTypeError
+
+  it "can access maps" $ runTest ( do
+    runBS [r| 
+
+contract Map {
+  mapping(uint => uint) public myMap;
+
+  constructor(uint i) {
+      myMap[i] = i;
+  }
+}
+
+contract qq {
+  address map;
+  uint x;
+  constructor() {
+      uint i = 5;
+      Map m = new Map(i);
+      map = address(m);
+      x = Map(map).myMap(i);
+  }
+}
+|]
+    getFields ["x"]
+      `shouldReturn` [BInteger 5])

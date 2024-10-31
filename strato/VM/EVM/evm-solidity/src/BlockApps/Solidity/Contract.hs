@@ -38,6 +38,7 @@ getPositionAndSize _ p (SimpleType TypeAccount) = (getNextAvailablePosition p 20
 getPositionAndSize _ p (SimpleType (TypeBytes (Just b))) = (getNextAvailablePosition p b, fromInteger b)
 getPositionAndSize _ p (SimpleType (TypeBytes Nothing)) = (getNextAvailablePosition p 32, 32)
 getPositionAndSize _ p (SimpleType TypeString) = (getNextAvailablePosition p 32, 32)
+getPositionAndSize _ p (SimpleType TypeDecimal) = (getNextAvailablePosition p 32, 32)
 getPositionAndSize TypeDefs {..} p (TypeEnum name) =
   case Map.lookup name enumDefs of
     Nothing -> error $ "Contract is using an enum that wasn't defined: " ++ T.unpack name ++ "\nenums is " ++ show enumDefs

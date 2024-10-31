@@ -7,6 +7,13 @@ import loadDapp from "../../middleware/loadDappHandler";
 const router = express.Router();
 
 router.get(
+  Inventory.supportedTokens,
+  authHandler.authorizeRequest(),
+  loadDapp,
+  InventoryController.getSupportedTokens
+);
+
+router.get(
   Inventory.get,
   authHandler.authorizeRequest(true),
   loadDapp,
@@ -67,6 +74,13 @@ router.post(
   authHandler.authorizeRequest(),
   loadDapp,
   InventoryController.transfer
+);
+
+router.post(
+  Inventory.bridge,
+  authHandler.authorizeRequest(),
+  loadDapp,
+  InventoryController.bridge
 );
 
 router.get(

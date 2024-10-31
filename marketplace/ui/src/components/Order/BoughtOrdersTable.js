@@ -3,21 +3,19 @@ import classNames from "classnames";
 import { EyeOutlined, DownOutlined, UpOutlined, DownloadOutlined, SearchOutlined } from "@ant-design/icons";
 import routes from "../../helpers/routes";
 import DataTableComponent from "../DataTableComponent";
-import { getStatus, getStatusByName } from "./constant";
+import { getStatus } from "./constant";
 import { getStringDate } from "../../helpers/utils";
 import { useNavigate, Link, useParams, useLocation } from "react-router-dom";
 import { actions } from "../../contexts/order/actions";
 import { useOrderDispatch, useOrderState } from "../../contexts/order";
 import useDebounce from "../UseDebounce";
-import { apiUrl, HTTP_METHODS, US_DATE_FORMAT } from "../../helpers/constants";
+import { US_DATE_FORMAT, STRATS_CONVERSION } from "../../helpers/constants";
 import { Pagination, Button, Dropdown, Space, Typography, Input, DatePicker } from "antd";
 import TagManager from "react-gtm-module";
 import "./ordersTable.css"
 import { FilterIcon } from "../../images/SVGComponents";
-import { ResponsiveOrderCard } from "./ResponsiveOrdersCard";
 import dayjs from "dayjs";
 import { ResponsiveBoughtOrderCard } from "./ResponsiveBoughtOrdersCard";
-import RestStatus from "http-status-codes";
 import { Images } from "../../images";
 
 
@@ -49,7 +47,7 @@ const BoughtOrdersTable = ({ user, selectedDate, onDateChange, download, isAllOr
   const { orders, isordersLoading, orderBoughtTotal } = useOrderState();
 
   useEffect(() => {
-    if (user?.commonName && type==='bought') {
+    if (user?.commonName && type === 'bought') {
       actions.fetchOrder(
         dispatch,
         limit,
@@ -65,11 +63,11 @@ const BoughtOrdersTable = ({ user, selectedDate, onDateChange, download, isAllOr
 
   useEffect(() => {
     const timeout = setTimeout(() => {
-    if (search.length === 0) {
-      navigate(`/order/${type}`)
-    } else {
-      navigate(`/order/${type}?search=${search}`)
-    }
+      if (search.length === 0) {
+        navigate(`/order/${type}`)
+      } else {
+        navigate(`/order/${type}?search=${search}`)
+      }
 
     }, 1000)
     return () => {
@@ -77,102 +75,25 @@ const BoughtOrdersTable = ({ user, selectedDate, onDateChange, download, isAllOr
     }
   }, [search])
 
-  useEffect(() => {
-    const intervalId = setInterval(() => {
-      orders.map(async (order) => {
-        if (order.paymentSessionId !== "" && getStatus(parseInt(order.status)) === getStatusByName("Payment Pending")) {
-          try {
-            setIsLoading(true);
-            await validatePayment(order);
-          } catch (err) {
-            console.error(err);
-          }
-        }
-        setIsLoading(false);
-      })
-    }, 10000); // Poll every 30 seconds, adjust as needed
-
-    return () => clearInterval(intervalId); // Clear interval on component unmount
-  }, [orders]); // Dependency array
-
   const [data, setdata] = useState([]);
 
 
-  const validatePayment = async (order) => {
-    const response1 = await fetch(
-      `${apiUrl}/order/payment/session/${order.paymentSessionId}/${order.sellersCommonName}`,
-      {
-        method: HTTP_METHODS.GET,
-      }
-    );
-
-    const body = await response1.json();
-
-    if (response1.status === RestStatus.OK) {
-      if (
-        body.data["payment_status"] === "paid" &&
-        getStatus(parseInt(order.status)) === getStatusByName("Payment Pending")
-      ) {
-        // Update order status
-        const isDone = await actions.updateOrderStatus(dispatch, {
-          saleOrderAddress: order.address,
-          status: 1,
-        });
-
-        if (isDone.includes('200')) {
-          setShouldRefetch(!shouldRefetch);
-        }
-      }
-      else {
-        const response2 = await fetch(
-          `${apiUrl}/order/payment/intent/${order.paymentSessionId}/${order.sellersCommonName}`,
-          { method: HTTP_METHODS.GET }
-        );
-        const intentBody = await response2.json();
-        const paymentErrorAndRequiresMethod = intentBody.data.last_payment_error?.message && intentBody.data.status === 'requires_payment_method';
-
-        if (paymentErrorAndRequiresMethod) {
-          // Update order status
-          const body = {
-            saleOrderAddress: order.address,
-            comments: encodeURIComponent('Stripe: ' + intentBody.data.last_payment_error.message),
-          };
-          //Update Order Details and change the Order Status to 'Canceled' from 'Payment Pending'
-          let isDone = await actions.cancelSale(dispatch, body);
-
-          if (isDone) {
-            setShouldRefetch(!shouldRefetch);
-          }
-        }
-      }
-    }
-  }
-
   useEffect(() => {
     const fetchDataBought = async () => {
-      const updatedDataBought = await Promise.all(
-        orders.map(async (order) => {
-          if (order.paymentSessionId !== "" && getStatus(parseInt(order.status)) === getStatusByName("Payment Pending")) {
-            try {
-              setIsLoading(true);
-              await validatePayment(order);
-            } catch (err) {
-              console.error(err);
-            }
-          }
-          return {
-            address: order.address,
-            chainId: order.chainId,
-            key: order.address,
-            orderNumber: order,
-            sellersCommonName: order.sellersCommonName,
-            orderTotal: order.totalPrice,
-            date: getStringDate(order.createdDate, US_DATE_FORMAT),
-            status: getStatus(parseInt(order.status)),
-            invoice: order
-          };
-        })
-      );
+      const updatedDataBought = orders.map((order) => {
+        return {
+          address: order.id ? order.transaction_hash : order.address,
+          chainId: order.chainId,
+          key: order.id ? order.transaction_hash : order.address,
+          orderNumber: order,
+          sellersCommonName: order.sellersCommonName,
+          orderTotal: order.currency === "STRATS" ? (order.totalPrice * STRATS_CONVERSION).toFixed(0) : order.totalPrice,
+          date: getStringDate(order.createdDate, US_DATE_FORMAT),
+          status: getStatus(parseInt(order.status)),
+          invoice: order.id ? order.transaction_hash : order.address,
+          currency: order.currency ? order.currency : "USD"
+        };
+      });
       setIsLoading(false);
       setdata(updatedDataBought);
     };
@@ -210,12 +131,12 @@ const BoughtOrdersTable = ({ user, selectedDate, onDateChange, download, isAllOr
           id={order.orderId}
           onClick={() => {
             navigate(
-              `${routes.BoughtOrderDetails.url.replace(":id", order.address)}`
+              `${routes.BoughtOrderDetails.url.replace(":id", order.id ? order.transaction_hash : order.address)}`
             );
           }}
           className="text-primary hover:text-primaryHover cursor-pointer"
         >
-          {`#${order.orderId}`}
+          {`#${`${order.orderId}`.substring(0, 6)}`}
         </p>
       ),
     },
@@ -225,18 +146,18 @@ const BoughtOrdersTable = ({ user, selectedDate, onDateChange, download, isAllOr
       key: "sellersCommonName",
       // render: (text) => <p onClick={()=>{navigate(`${routes.MarketplaceUserProfile.url.replace(":commonName", text)}`, { state: { from: location.pathname } })}}>{text}</p>,
       render: (text) => (
-        <a 
+        <a
           href={`${window.location.origin}/profile/${encodeURIComponent(text)}`}
           onClick={(e) => {
             e.preventDefault();
             const userProfileUrl = `/profile/${encodeURIComponent(text)}`;
-      
+
             if (e.ctrlKey || e.metaKey) {
               // Open in a new tab if Ctrl/Cmd is pressed
               window.open(`${window.location.origin}${userProfileUrl}`, '_blank');
             } else {
               // Use navigate for a normal click, without Ctrl/Cmd
-              navigate(routes.MarketplaceUserProfile.url.replace(':commonName',text), { state: { from: location.pathname } });
+              navigate(routes.MarketplaceUserProfile.url.replace(':commonName', text), { state: { from: location.pathname } });
             }
           }}
           style={{ textDecoration: 'underline', color: 'black', cursor: 'pointer' }}
@@ -246,10 +167,16 @@ const BoughtOrdersTable = ({ user, selectedDate, onDateChange, download, isAllOr
       ),
     },
     {
-      title: "Order Total ($)",
+      title: "Currency",
+      dataIndex: "currency",
+      key: "currency",
+      align: "center",
+    },
+    {
+      title: "Order Total",
       dataIndex: "orderTotal",
       key: "orderTotal",
-      render: (text) => <p className="sm:w-20 lg:w-28 lg:pr-5 text-right">{text}</p>,
+      align: "center",
     },
     {
       dataIndex: "date",
@@ -287,7 +214,7 @@ const BoughtOrdersTable = ({ user, selectedDate, onDateChange, download, isAllOr
           }}
         >
           <Link
-            to={`${routes.Invoice.url.replace(":id", text.address)}`}
+            to={`${routes.Invoice.url.replace(":id", text)}`}
             target="_blank"
           >
             <div className="flex items-center cursor-pointer hover:text-primary">
@@ -314,33 +241,33 @@ const BoughtOrdersTable = ({ user, selectedDate, onDateChange, download, isAllOr
   ];
 
   const statusComponent = (status) => {
-    let textClass = "bg-[#FFF6EC]";
-    if (status === "Awaiting Shipment") {
-      textClass = "bg-[#EBF7FF]";
-    } else if (status === "Awaiting Fulfillment") {
-      textClass = "bg-[#FF8C0033]"
-    } else if (status === "Payment Pending") {
-      textClass = "bg-[#FF8C0033]"
-    } else if (status === "Closed") {
-      textClass = "bg-[#119B2D33]";
-    } else if (status === "Canceled") {
-      textClass = "bg-[#FFF0F0]";
-    }
-    let bgClass = "bg-[#119B2D]";
-    if (status === "Awaiting Shipment") {
-      bgClass = "bg-[#13188A]";
-    } else if (status === "Payment Pending") {
-      bgClass = "bg-[#FF8C00]"
-    } else if (status === "Awaiting Fulfillment") {
-      bgClass = "bg-[#FF8C00]"
-    } else if (status === "Closed") {
-      bgClass = "bg-[#119B2D]";
-    } else if (status === "Canceled") {
-      bgClass = "bg-[#FF0000]";
-    }
+    const statusClasses = {
+      ["Awaiting Shipment"]: {
+        textClass: "bg-[#EBF7FF]",
+        bgClass: "bg-[#13188A]"
+      },
+      ["Awaiting Fulfillment"]: {
+        textClass: "bg-[#FF8C0033]",
+        bgClass: "bg-[#FF8C00]"
+      },
+      ["Payment Pending"]: {
+        textClass: "bg-[#FF8C0033]",
+        bgClass: "bg-[#FF8C00]"
+      },
+      ["Closed"]: {
+        textClass: "bg-[#119B2D33]",
+        bgClass: "bg-[#119B2D]"
+      },
+      ["Canceled"]: {
+        textClass: "bg-[#FFF0F0]",
+        bgClass: "bg-[#FF0000]"
+      },
+    };
+
+    const { textClass, bgClass } = statusClasses[status] || { textClass: "bg-[#FFF6EC]", bgClass: "bg-[#119B2D]" };
 
     return (
-      <div className={classNames(textClass, "w-max text-center py-1 rounded-xl flex justify-start items-center gap-1 p-3")}>
+      <div id={status} className={classNames(textClass, "w-max text-center py-1 rounded-xl flex justify-start items-center gap-1 p-3")}>
         <div className={classNames(bgClass, "h-3 w-3 rounded-sm")}></div>
         <p>{status}</p>
       </div>
@@ -352,7 +279,7 @@ const BoughtOrdersTable = ({ user, selectedDate, onDateChange, download, isAllOr
     if (searchVal) {
       baseUrl.searchParams.set("search", searchVal);
     }
-  
+
     baseUrl.searchParams.set("page", page);
     const url = baseUrl.pathname + baseUrl.search;
     navigate(url, { new: true });
@@ -362,7 +289,7 @@ const BoughtOrdersTable = ({ user, selectedDate, onDateChange, download, isAllOr
     const value = e.target.value;
     setSearch(value)
   }
-  
+
   const menuItems = [
     {
       key: 'xls',
@@ -397,11 +324,10 @@ const BoughtOrdersTable = ({ user, selectedDate, onDateChange, download, isAllOr
         </Dropdown>
         <div className="text-xs flex items-center md:hidden">
           <DatePicker
-          className="h-[32px] w-[33px] custom-picker"
+            className="h-[32px] w-[33px] custom-picker"
             disabledDate={(current) => {
               const currentDate = dayjs().startOf('day'); // Get the start of today
               const selectedDate = dayjs(current).startOf('day');
-
               return selectedDate.isAfter(currentDate);
             }}
             onChange={onDateChange}

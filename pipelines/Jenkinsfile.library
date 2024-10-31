@@ -15,7 +15,6 @@ def deployStratoWithS3(nodeData, versionTag) {
     sh "sudo ./strato --pull"
 
     withCredentials([
-      usernamePassword(credentialsId: 'stripe-key', passwordVariable: 'STRIPE_SECRET_KEY', usernameVariable: 'STRIPE_PUBLISHABLE_KEY'),
       usernamePassword(credentialsId: 'marketplace-testnet2-aws-iam-user', passwordVariable: 'AWS_IAM_USER_ACCESS_KEY', usernameVariable: 'AWS_IAM_USER_KEY_ID')
     ]) {
       writeFile file: "run.sh", text: """#!/bin/bash
@@ -26,8 +25,6 @@ def deployStratoWithS3(nodeData, versionTag) {
           OAUTH_CLIENT_ID="${nodeData.OAUTH_CLIENT_ID}" \\
           OAUTH_CLIENT_SECRET="${nodeData.OAUTH_CLIENT_SECRET}" \\
           VAULT_URL="https://vault.blockapps.net:8093" \\
-          STRIPE_PUBLISHABLE_KEY='${STRIPE_PUBLISHABLE_KEY}' \\
-          STRIPE_SECRET_KEY='${STRIPE_SECRET_KEY}' \\
           CLIENT_URL="https://${nodeData.STRATO_HOSTNAME}" \\
           ssl="true" \\
           connectionTimeout=300 \\
@@ -1248,7 +1245,7 @@ def registerTestUserCert(stratoPlatformPath='.', OAuthDiscoveryUrl, clientId, cl
       CERT_ESCAPED=$(echo "${CERT_ESCAPED:2: -2}")
       ADMIN_TOKEN=$(curl --fail -L -X POST "$(<_oauth_token_endpoint_tmp)" -H 'Content-Type: application/x-www-form-urlencoded' -H "Authorization: Basic $(<_admin_client_b64string_tmp)" --data-urlencode 'grant_type=client_credentials' | jq -r .access_token)
       
-      docker exec strato-nginx-1 curl --fail -X POST "localhost/strato/v2.3/transaction?resolve=true" \\
+      docker exec strato-nginx-1 curl --fail -X POST "localhost/strato/v2.3/transaction/parallel?resolve=true" \\
         -H 'Accept: application/json' \\
         -H "Authorization: Bearer ${ADMIN_TOKEN}" \\
         -H 'Content-Type: application/json' \\
@@ -1267,23 +1264,21 @@ def runSyncTester() {
   sh '''#!/usr/bin/env bash
   counter=0
   # make sure started syncing (have 1+ active connections to peers)
-  ETH_DB_NAME=$(sudo docker exec strato-postgres-1 psql -U postgres -t -c "select datname from pg_database where datname like '%eth_%';" | tr -d "[:space:]")
-  NUM_ACTIVE_PEERS=$(sudo docker exec strato-postgres-1 psql -U postgres -t -d $ETH_DB_NAME -c "select count(ip) from p_peer where active_state > 0;" | tr -d "[:space:]")
-  until [[ -n $ETH_DB_NAME && $NUM_ACTIVE_PEERS -gt 0 ]]
+  NUM_ACTIVE_PEERS=$(sudo docker exec strato-postgres-1 psql -U postgres -t -d eth -c "select count(ip) from p_peer where active_state > 0;" | tr -d "[:space:]")
+  until [[ $NUM_ACTIVE_PEERS -gt 0 ]]
   do
       if (( $counter >= 120 )) ; then
           echo "Failure: STRATO node did not connect to any peers in 2 minutes. Something is preventing sync from starting"
           exit 3
       fi
       sleep 1
-      ETH_DB_NAME=$(sudo docker exec strato-postgres-1 psql -U postgres -t -c "select datname from pg_database where datname like '%eth_%';" | tr -d "[:space:]")
-      NUM_ACTIVE_PEERS=$(sudo docker exec strato-postgres-1 psql -U postgres -t -d $ETH_DB_NAME -c "select count(ip) from p_peer where active_state > 0;" | tr -d "[:space:]")
+      NUM_ACTIVE_PEERS=$(sudo docker exec strato-postgres-1 psql -U postgres -t -d eth -c "select count(ip) from p_peer where active_state > 0;" | tr -d "[:space:]")
       counter=$((++counter))
   done
 
   WAIT_TIME=30
   STALLED_INTERVALS=0
-  MAX_STALLED_INTERVALS=15
+  MAX_STALLED_INTERVALS=50
 
   LAST_VM_BLOCK_NUM=0
   LAST_SEQ_BLOCK_NUM=0
@@ -1384,28 +1379,37 @@ def spinUpFileServer() {
 
 def spinUpPaymentServer() {
   withCredentials([
-    string(credentialsId: 'STRIPE_PUBLISHABLE_KEY_TESTNET2', variable:'STRIPE_PUBLISHABLE_KEY_TESTNET2'),
     string(credentialsId: 'STRIPE_SECRET_KEY_TESTNET2', variable:'STRIPE_SECRET_KEY_TESTNET2'),
     usernamePassword(credentialsId: 'AWS_RDS_PAYMENT_SERVER_CREDENTIALS_DEV', passwordVariable: 'AWS_RDS_PAYMENT_SERVER_CREDENTIALS_DEV_PASSWORD', usernameVariable: 'AWS_RDS_PAYMENT_SERVER_CREDENTIALS_DEV_USER'),
     string(credentialsId: 'AWS_RDS_PAYMENT_SERVER_URL_DEV', variable:'AWS_RDS_PAYMENT_SERVER_URL_DEV'),
+    usernamePassword(credentialsId: 'keycloak-strato-devel-dev-client', passwordVariable: 'KEYCLOAK_STRATODEVEL_DEV_SECRET', usernameVariable: 'KEYCLOAK_STRATODEVEL_DEV_ID'),
   ]) {
-    writeFile file: "run-stripe-ps.sh", text: """#!/bin/bash
+    writeFile file: "run-payment-server.sh", text: """#!/bin/bash
       sudo \\
-        STRIPE_PUBLISHABLE_KEY='${STRIPE_PUBLISHABLE_KEY_TESTNET2}' \\
+        SERVER_HOST=https://\$(</host):44301 \\
+        HTTPS_PORT=44301 \\
+        OAUTH_DISCOVERY_URL=https://keycloak.blockapps.net/auth/realms/strato-devel/.well-known/openid-configuration \\
+        OAUTH_CLIENT_ID="${KEYCLOAK_STRATODEVEL_DEV_ID}" \\
+        OAUTH_CLIENT_SECRET="${KEYCLOAK_STRATODEVEL_DEV_SECRET}" \\
+        STRATO_HOST="http://172.17.0.1" \\
         STRIPE_SECRET_KEY='${STRIPE_SECRET_KEY_TESTNET2}' \\
         ssl=true \\
-        HTTPS_PORT=44301 \\
-        POSTGRESQL_SERVER_URL='${AWS_RDS_PAYMENT_SERVER_URL_DEV}' \\
-        POSTGRESQL_PORT=5432 \\
-        POSTGRESQL_USER='${AWS_RDS_PAYMENT_SERVER_CREDENTIALS_DEV_USER}' \\
-        POSTGRESQL_PASSWORD='${AWS_RDS_PAYMENT_SERVER_CREDENTIALS_DEV_PASSWORD}' \\
-        POSTGRESQL_DBNAME=postgres \\
-        ./stripe-ps
+        POSTGRES_SERVER_URL='${AWS_RDS_PAYMENT_SERVER_URL_DEV}' \\
+        POSTGRES_PORT=5432 \\
+        POSTGRES_USER='${AWS_RDS_PAYMENT_SERVER_CREDENTIALS_DEV_USER}' \\
+        POSTGRES_PASSWORD='${AWS_RDS_PAYMENT_SERVER_CREDENTIALS_DEV_PASSWORD}' \\
+        POSTGRES_DBNAME=payments_dev \\
+        TABLE_PREFIX="Test-Mercata-" \\
+        SKIP_CONTRACT_VALIDATION="true" \\
+        SKIP_DEPLOYMENT="true" \\
+        STRAT_ADDRESS=488cd3909d94606051e0684cf6caa5763fb78613 \\
+        STRAT_FEE_RECIPIENT=4ec8dc980621032ef75cac175f02e8062e028aef \\
+        ./payment-server
     """
   }
 
-  sh 'chmod +x run-stripe-ps.sh'
-  sh './run-stripe-ps.sh'
+  sh 'chmod +x run-payment-server.sh'
+  sh './run-payment-server.sh'
   sh 'docker ps'
 
   writeFile file: "check_availability_payment.sh", text: '''#!/bin/bash -le
@@ -1437,12 +1441,13 @@ def spinUpIdentityServer(rootCert, rootPriv) {
     string(credentialsId: 'SENDGRID_APIKEY_TESTNET2', variable:'SENDGRID_APIKEY_TESTNET2'),
     usernamePassword(credentialsId: 'keycloak-strato-devel-dev-client', passwordVariable: 'KEYCLOAK_STRATODEVEL_DEV_SECRET', usernameVariable: 'KEYCLOAK_STRATODEVEL_DEV_ID')
   ]) {
+  def hostname=sh(returnStdout: true, script: "cat </host")
   writeFile file: "identity-provider/idconf.yaml", text: """
     - realmName: strato-devel
       discoveryUrl: https://keycloak.blockapps.net/auth/realms/strato-devel/.well-known/openid-configuration
       clientId: ${KEYCLOAK_STRATODEVEL_DEV_ID}
       clientSecret: ${KEYCLOAK_STRATODEVEL_DEV_SECRET}
-      nodeUrl: https://\$(</host)
+      nodeUrl: https://${hostname}
   """
   writeFile file: "run-identity.sh", text: """#!/bin/bash
     sudo \\
@@ -1504,7 +1509,7 @@ def replaceServerPortsDocker() {
   '''
 
   sh 'chmod +x replace_server_ports_docker.sh'
-  sh './replace_server_ports_docker.sh docker-compose.highway.yml docker-compose.stripe-ps.yml'
+  sh './replace_server_ports_docker.sh docker-compose.highway.yml docker-compose.payment.yml'
 }
 
 return this

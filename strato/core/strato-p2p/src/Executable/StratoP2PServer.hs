@@ -17,7 +17,7 @@ where
 
 import BlockApps.Logging
 import Blockchain.CommunicationConduit
-import Blockchain.Context
+import Blockchain.Context hiding (Inbound, Outbound)
 import Blockchain.Data.PubKey (secPubKeyToPoint)
 import Blockchain.Display (displayMessage, MsgDirection(..))
 import Blockchain.EthEncryptionException
@@ -104,6 +104,10 @@ ethServerHandler pSource pSink seqSrc ipAsText@(IPAsText i) = do
                     lengthenPeerDisable p
                   e' | Just PeerDisconnected <- fromException e' -> do
                     disErr <- storeDisableException p (T.pack "PeerDisconnected")
+                    whenLeft disErr $ \err2 -> $logErrorS "stratoP2PClient/runEthServer" . T.pack $ "Unable to store disable exception: " ++ show err2
+                    lengthenPeerDisableBy (fromIntegral $ 2 * flags_connectionTimeout) p
+                  e' | Just CurrentlyTooManyPeers <- fromException e' -> do
+                    disErr <- storeDisableException p (T.pack "CurrentlyTooManyPeers")
                     whenLeft disErr $ \err2 -> $logErrorS "stratoP2PClient/runEthServer" . T.pack $ "Unable to store disable exception: " ++ show err2
                     lengthenPeerDisableBy (fromIntegral $ 2 * flags_connectionTimeout) p
                   e' | Just NoPeerCertificate <- fromException e' -> do

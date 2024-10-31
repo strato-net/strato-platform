@@ -7,7 +7,6 @@
 import Blockchain.Data.ArbitraryInstances ()
 import Blockchain.Data.BlockHeader
 import Blockchain.Data.ChainInfo
-import Blockchain.Data.DataDefs (BlockData)
 import Blockchain.Data.Enode
 import Blockchain.Data.Json
 import Blockchain.Data.RLP
@@ -37,7 +36,6 @@ import qualified Data.Text as T
 import qualified Data.Text.Encoding as T
 import qualified Data.Vector as V
 import Data.Word
-import Database.Persist.Sql
 import qualified LabeledError
 import Test.Hspec
 import Test.Hspec.QuickCheck
@@ -112,7 +110,6 @@ main = hspecWith (configAddFilter predicate defaultConfig) $ do
     addressTesting
     rawtxRoundTrip
     blockDataRoundTrip
-    blockDataRoundTripPersist
     txRoundTrip
     matchingHash
     blockRoundTrip
@@ -385,12 +382,6 @@ blockDataRoundTrip = it "preserves blockdata in json -> hs -> json" $ do
   let input = C8.pack rawInput
   let block = Ae.eitherDecode input :: Either String [BlockData']
   compareJSON input block
-
-blockDataRoundTripPersist :: Spec
-blockDataRoundTripPersist = it "can roundtrip BlockData to/from PersistValue" $
-  property $ \(bd :: BlockData) -> do
-    (fromPersistValue $ toPersistValue bd)
-      `shouldBe` Right bd
 
 txRoundTrip :: Spec
 txRoundTrip = it "preserves transactions in json -> hs -> json" $ do

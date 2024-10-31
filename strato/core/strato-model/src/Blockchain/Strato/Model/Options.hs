@@ -9,6 +9,9 @@ import HFlags
 defineFlag "network" ("mercata" :: String) "Choose a network to join"
 defineFlag "networkID" (-1 :: Integer) "set a custom network ID for the client"
 defineFlag "testnet" False "connect to testnet"
+defineFlag "txSizeLimit" (150000 :: Int) "The maximum length of a valid RLP encoded transaction bytestring"
+defineFlag "accountNonceLimit" (4000 :: Integer) "The maximum number of transactions an account can make"
+defineFlag "gasLimit" (1000000 :: Integer) "The maximum amount of gas a transaction can use"
 
 computeNetworkID :: Integer
 computeNetworkID =

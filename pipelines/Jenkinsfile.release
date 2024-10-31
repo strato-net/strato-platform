@@ -6,6 +6,7 @@ pipeline {
   parameters {
     string(name: 'GIT_TAG', defaultValue: 'tags/10.0-rc0', description: 'The strato-platform git tag to build as a release candidate. Use `tags/<tag_name>` format. NOTE: Other Refspec types are not supported.')
     string(name: 'RELEASE_VERSION', defaultValue: '10.0', description: 'The version tag for the future release')
+    string(name: 'RELEASE_TYPE', defaultValue: 'master', description: 'The type of release to perform. Use \'master\' for validator releases and \'marketplace-master\' for marketplace releases')
   }
   stages {
     stage('Prepare') {
@@ -13,6 +14,11 @@ pipeline {
         script {
           if (!env.GIT_TAG.contains("tags/")) {
             echo "Unexpected GIT_TAG format: ${env.GIT_TAG}, expected to include 'tags/'. Exit 1."
+            currentBuild.result = 'FAILURE'
+            sh "exit 1"
+          }
+          if(env.RELEASE_TYPE != 'master' && env.RELEASE_TYPE != 'marketplace-master') {
+            echo "Unexpected RELEASE_TYPE: ${env.RELEASE_TYPE}, expected 'master' or 'marketplace-master'. Exit 1."
             currentBuild.result = 'FAILURE'
             sh "exit 1"
           }
@@ -69,7 +75,8 @@ pipeline {
           cp strato-worktree/docker-compose.vault.yml strato-getting-started/
           cp strato-worktree/docker-compose.highway.yml strato-getting-started/
           cp strato-worktree/docker-compose.identity.yml strato-getting-started/
-          cp strato-worktree/docker-compose.stripe-ps.yml strato-getting-started/
+          cp strato-worktree/docker-compose.payment.yml strato-getting-started/
+          cp strato-worktree/docker-compose.notification.yml strato-getting-started/
         '''
         dir("strato-getting-started") {
           // Copy .pem and .key for SSL
@@ -80,7 +87,6 @@ pipeline {
             lib.spinUpVault()
             lib.replaceServerPortsDocker()
             lib.spinUpFileServer()
-            lib.spinUpPaymentServer()
             lib.spinUpIdentityServer("${env.WORKSPACE}/strato/tools/x509-generator/rootCert.pem", "${env.WORKSPACE}/strato/tools/x509-generator/rootPriv.pem")
           }
 
@@ -99,7 +105,6 @@ pipeline {
                 OAUTH_CLIENT_SECRET='${KEYCLOAK_STRATODEVEL_DEV_SECRET}' \\
                 VAULT_URL=https://\$(</host):8093 \\
                 VAULT_PROXY_DEBUG=true \\
-                STRIPE_PAYMENT_SERVER_URL=https://\$(</host):44301 \\
                 FILE_SERVER_URL=https://\$(</host):44300/highway \\
                 idServerUrl=https://\$(</host):8001 \\
                 GLOBAL_ADMIN_NAME='${GLOBAL_ADMIN_NAME}' \\
@@ -186,6 +191,11 @@ pipeline {
             // Unlock the marketplace deploy script:
             sh 'docker exec strato-marketplace-backend-1 rm -f _deploy_blocked_while_I_exist'
           }
+          dir("strato-getting-started") {
+            script {
+              lib.spinUpPaymentServer()
+            }
+          }
         }
       }
     }
@@ -214,45 +224,53 @@ pipeline {
               docker compose -f docker-compose.vault.push.yml push 2>&1
               docker compose -f docker-compose.identity.push.yml push 2>&1
               docker compose -f docker-compose.highway.push.yml push 2>&1
-              docker compose -f docker-compose.stripe-ps.push.yml push 2>&1
+              docker compose -f docker-compose.payment.push.yml push 2>&1
+              docker compose -f docker-compose.notification.push.yml push 2>&1
               AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID} AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY} AWS_DEFAULT_REGION="us-east-1" aws ecr get-login-password --region us-east-1 | docker login --username AWS --password-stdin 406773134706.dkr.ecr.us-east-1.amazonaws.com
               docker compose -f docker-compose.push.ecr.yml push 2>&1
               docker compose -f docker-compose.vault.push.ecr.yml push 2>&1
               docker compose -f docker-compose.identity.push.ecr.yml push 2>&1
               docker compose -f docker-compose.highway.push.ecr.yml push 2>&1
-              docker compose -f docker-compose.stripe-ps.push.ecr.yml push 2>&1
+              docker compose -f docker-compose.payment.push.ecr.yml push 2>&1
+              docker compose -f docker-compose.notification.push.ecr.yml push 2>&1
             '''
 
             // Release to blockapps/strato-getting-started
             sh '''#!/bin/bash -le
               set -x
               RELEASE_VERSION=$(<VERSION)
+              RELEASE_SUFFIX=""
+              if [ "${RELEASE_TYPE}" == "marketplace-master" ]; then
+                RELEASE_SUFFIX="-marketplace"
+              fi
               STRATOGS_RELEASE_DETAILS_STABLE="--user blockapps --repo strato-getting-started --tag ${RELEASE_VERSION}"
               github-release delete $STRATOGS_RELEASE_DETAILS_STABLE || true
-              github-release release $STRATOGS_RELEASE_DETAILS_STABLE --name "${RELEASE_VERSION}"
+              github-release release $STRATOGS_RELEASE_DETAILS_STABLE --name "${RELEASE_VERSION}${RELEASE_SUFFIX}"
               sleep 5
               github-release upload $STRATOGS_RELEASE_DETAILS_STABLE --name "docker-compose.yml" --file ./docker-compose.yml
               github-release upload $STRATOGS_RELEASE_DETAILS_STABLE --name "docker-compose.vault.yml" --file ./docker-compose.vault.yml
               github-release upload $STRATOGS_RELEASE_DETAILS_STABLE --name "docker-compose.identity.yml" --file ./docker-compose.identity.yml
               github-release upload $STRATOGS_RELEASE_DETAILS_STABLE --name "docker-compose.highway.yml" --file ./docker-compose.highway.yml
-              github-release upload $STRATOGS_RELEASE_DETAILS_STABLE --name "docker-compose.stripe-ps.yml" --file ./docker-compose.stripe-ps.yml
+              github-release upload $STRATOGS_RELEASE_DETAILS_STABLE --name "docker-compose.payment.yml" --file ./docker-compose.payment.yml
+              github-release upload $STRATOGS_RELEASE_DETAILS_STABLE --name "docker-compose.notification.yml" --file ./docker-compose.notification.yml
               github-release upload $STRATOGS_RELEASE_DETAILS_STABLE --name "docker-compose.ecr.yml" --file ./docker-compose.ecr.yml
               github-release upload $STRATOGS_RELEASE_DETAILS_STABLE --name "docker-compose.vault.ecr.yml" --file ./docker-compose.vault.ecr.yml
               github-release upload $STRATOGS_RELEASE_DETAILS_STABLE --name "docker-compose.identity.ecr.yml" --file ./docker-compose.identity.ecr.yml
               github-release upload $STRATOGS_RELEASE_DETAILS_STABLE --name "docker-compose.highway.ecr.yml" --file ./docker-compose.highway.ecr.yml
-              github-release upload $STRATOGS_RELEASE_DETAILS_STABLE --name "docker-compose.stripe-ps.ecr.yml" --file ./docker-compose.stripe-ps.ecr.yml
+              github-release upload $STRATOGS_RELEASE_DETAILS_STABLE --name "docker-compose.payment.ecr.yml" --file ./docker-compose.payment.ecr.yml
+              github-release upload $STRATOGS_RELEASE_DETAILS_STABLE --name "docker-compose.notification.ecr.yml" --file ./docker-compose.notification.ecr.yml
             '''
 
-            // Merge release code to master
+            // Merge release code to ${env.RELEASE_TYPE}
             sh 'git checkout VERSION'
-            // Make sure no master branch exists with random/old code, we want code from origin/master
-            sh 'git branch -D master || true'
-            sh 'git checkout master'
+            // Make sure no ${env.RELEASE_TYPE} branch exists with random/old code, we want code from origin/${env.RELEASE_TYPE}
+            sh "git branch -D ${env.RELEASE_TYPE} || true"
+            sh "git checkout ${env.RELEASE_TYPE}"
             sh "git merge ${env.GIT_TAG}"
             sh "echo ${env.RELEASE_VERSION} > VERSION"
             sh 'git add VERSION'
             sh "git -c user.name=${GITHUB_USERNAME} -c user.email=\'cd@blockapps\' commit VERSION -m 'Update latest release version to ${env.RELEASE_VERSION}' --allow-empty"
-            sh 'git push https://$GITHUB_USERNAME:$GITHUB_TOKEN@github.com/blockapps/strato-platform master'
+            sh "git push https://$GITHUB_USERNAME:$GITHUB_TOKEN@github.com/blockapps/strato-platform ${env.RELEASE_TYPE}"
             sh "git tag ${env.RELEASE_VERSION}"
             sh 'git push https://$GITHUB_USERNAME:$GITHUB_TOKEN@github.com/blockapps/strato-platform --tags'
 
@@ -262,12 +280,13 @@ pipeline {
             // Merge VERSION change back to develop
             sh 'git checkout develop'
             sh 'git pull https://$GITHUB_USERNAME:$GITHUB_TOKEN@github.com/blockapps/strato-platform develop'
-            sh 'git merge master'
-            
-            // The following step requires `cd-blockapps` user to be able to push directly to develop bypassing the required Status Check to pass ("continuous-integration/jenkins/pr-merge")
-            // This can't be bypassed based on the GitHub branch settings as it is done for pull requests. So we are manually temporary disabling that check ("Require status checks to pass before merging") for develop branch on Github to execute it.
-            // any ideas how to avoid that?
-            sh 'git push https://$GITHUB_USERNAME:$GITHUB_TOKEN@github.com/blockapps/strato-platform develop'
+            sh "git merge ${env.RELEASE_TYPE}"
+          
+          
+          // The following step requires `cd-blockapps` user to be able to push directly to develop bypassing the required Status Check to pass ("continuous-integration/jenkins/pr-merge")
+          // This can't be bypassed based on the GitHub branch settings as it is done for pull requests. So we are manually temporary disabling that check ("Require status checks to pass before merging") for develop branch on Github to execute it.
+          // any ideas how to avoid that?
+          sh 'git push https://$GITHUB_USERNAME:$GITHUB_TOKEN@github.com/blockapps/strato-platform develop'
           }
         }
       }

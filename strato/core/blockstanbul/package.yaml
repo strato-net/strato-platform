@@ -12,7 +12,6 @@ library:
   - aeson
   - binary
   - blockapps-data
-  - blockapps-datadefs
   - bytestring
   - common-log
   - conduit
@@ -25,6 +24,7 @@ library:
   - extra
   - format
   - generic-arbitrary
+  - hflags
   - lens
   - mtl
   - prometheus-client
@@ -32,7 +32,6 @@ library:
   - text
   - transformers
   - monad-alter
-  - x509-certs
 
 tests:
   blockstanbul-test:

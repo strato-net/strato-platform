@@ -34,6 +34,7 @@ import Blockchain.Strato.Model.Address
 import Blockchain.Strato.Model.ChainMember
 import Blockchain.Strato.Model.CodePtr
 import Blockchain.Strato.Model.ExtendedWord
+import Blockchain.Strato.Model.Validator (Validator(..))
 import qualified Blockchain.Strato.Model.Keccak256 as KECCAK256
 import Blockchain.Strato.Model.UserRegistry
 import qualified Data.Aeson as Ae
@@ -199,7 +200,7 @@ insertContracts slotss name src code start gi =
           Right v -> v
           _ -> error ("bytecode not encoded in base16:" ++ show code)
       codeHash = KECCAK256.hash decoded
-      mkContract (addr, slots) = ContractWithStorage addr 0 (EVMCode codeHash) slots
+      mkContract (addr, slots) = ContractWithStorage addr 0 (ExternallyOwned codeHash) slots
       addrs = map (start +) [0 ..]
       addrsAndSlots = zip addrs slotss
    in gi
@@ -218,20 +219,15 @@ readCertsFromGenesisInfo gi = catMaybes . flip map (genesisInfoAccountInfo gi) $
       _ -> Nothing
   _ -> Nothing
 
-readValidatorsFromGenesisInfo :: GenesisInfo -> [ChainMemberParsedSet]
+readValidatorsFromGenesisInfo :: GenesisInfo -> [Validator]
 readValidatorsFromGenesisInfo gi = catMaybes . flip map (genesisInfoAccountInfo gi) $ \case
   SolidVMContractWithStorage _ _ (SolidVMCode "MercataValidator" _) storage -> do
     let storageMap = M.fromList storage
         rlpUnwrap = rlpDecode . rlpDeserialize
-    o <- rlpUnwrap <$> M.lookup ".org" storageMap
-    u <- rlpUnwrap <$> M.lookup ".orgUnit" storageMap
     c <- rlpUnwrap <$> M.lookup ".commonName" storageMap
-    case (o, u, c) of
-      (BString o', BString u', BString c') -> do
-        let o'' = decodeUtf8 o'
-            u'' = decodeUtf8 u'
-            c'' = decodeUtf8 c'
-        pure $ (CommonName o'' u'' c'' True)
+    case c of
+      BString c' -> do
+        pure $ (Validator $ decodeUtf8 c')
       _ -> Nothing
   _ -> Nothing
 

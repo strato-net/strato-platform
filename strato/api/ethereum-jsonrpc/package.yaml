@@ -21,7 +21,7 @@ executables:
       - http-client
       - http-types
       - json-rpc-server
-      - milena
+      - kafka-monad
       - mtl
       - random
       - strato-conf

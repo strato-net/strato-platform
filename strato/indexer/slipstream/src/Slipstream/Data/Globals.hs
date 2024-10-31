@@ -22,6 +22,7 @@ import Database.PostgreSQL.Typed (PGConnection)
 import GHC.Generics
 import Slipstream.Data.GlobalsColdStorage (Handle)
 import SolidVM.Model.CodeCollection
+import Slipstream.QueryFormatHelper
 
 instance NFData (LRU key val) where
   rnf = (`seq` ()) -- LRU is already pretty strict
@@ -45,35 +46,3 @@ data Globals = Globals
     cirrusHandle :: CirrusHandle
   }
   deriving (Generic, NFData)
-
-data TableName
-  = IndexTableName
-      { itOrganization :: T.Text,
-        itApplication :: T.Text,
-        itContractName :: T.Text
-      }
-  | HistoryTableName -- technically the same as index, but logically different
-      { htOrganization :: T.Text,
-        htApplication :: T.Text,
-        htContractName :: T.Text
-      }
-  | EventTableName
-      { etOrganization :: T.Text,
-        etApplication :: T.Text,
-        etContractName :: T.Text,
-        etEventName :: T.Text
-      }
-  | MappingTableName
-      { mtOrganization :: T.Text,
-        mtApplication :: T.Text,
-        mtContractName :: T.Text,
-        mtMappingName :: T.Text
-      }
-  | AbstractTableName
-      { atOrganization :: T.Text,
-        atApplication :: T.Text,
-        atContractName :: T.Text
-      }
-  deriving (Show, Eq, Ord)
-
-type TableColumns = [T.Text]

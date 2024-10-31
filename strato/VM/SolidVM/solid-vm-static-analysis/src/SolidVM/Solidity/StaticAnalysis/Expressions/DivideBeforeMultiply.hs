@@ -106,6 +106,7 @@ expressionHelper (Ternary _ a b c) =
   concat [expressionHelper a, expressionHelper b, expressionHelper c]
 expressionHelper (BoolLiteral _ _) = []
 expressionHelper (NumberLiteral _ _ _) = []
+expressionHelper (DecimalLiteral _ _) = []
 expressionHelper (StringLiteral _ _) = []
 expressionHelper (AccountLiteral _ _) = []
 expressionHelper (TupleExpression _ es) =

@@ -13,20 +13,70 @@ pragma es6;
 pragma strict;
 pragma builtinCreates;
 
-import { Certificate, CertificateRegistry } from <509>;
+enum IssuerStatus {
+    NULL,
+    UNAUTHORIZED,
+    PENDING_REVIEW,
+    AUTHORIZED
+}
 
 contract UserRegistry {
+    constructor() { 
+        // create the first issuer approver
+        string _commonName = getUserCert(msg.sender)["commonName"];
+        User newUser = new User{salt: _commonName}(_commonName);
+        newUser.setIsAdmin(true);
+    }
+        
     function createUser(string _commonName) public returns (address) {
         User newUser = new User{salt: _commonName}(_commonName);
         return address(newUser);
     }
+
+    modifier cameFromAdmin() { // note to self: update this logic once governance tokens are established
+        string _commonName = getUserCert(msg.sender)["commonName"];
+        User user = User(this.derive(_commonName, _commonName));
+        bool isActiveAdmin;
+        try {
+            isActiveAdmin = user.isAdmin();
+        } catch {
+            isActiveAdmin = false;
+        }
+        require (isActiveAdmin, "Only an admin can call this function");
+        _;
+    }
+
+    function setIsAdmin(string _commonName, bool b) cameFromAdmin {
+        User user = User( this.derive(_commonName, _commonName) );
+        user.setIsAdmin(b);
+    }
+
+    function authorizeIssuer(string _commonName) cameFromAdmin {
+        User user = User( this.derive(_commonName, _commonName) );
+        user.authorizeIssuer();
+    }
+
+    function deauthorizeIssuer(string _commonName) cameFromAdmin {
+        User user = User( this.derive(_commonName, _commonName) );
+        user.deauthorizeIssuer();
+    }
 }
 
 contract User {
+    address private owner;
     string public commonName;
+    IssuerStatus public issuerStatus;
+    bool public isAdmin;
 
     constructor(string _commonName) {
         commonName = _commonName;
+        issuerStatus = IssuerStatus.UNAUTHORIZED;
+        owner = msg.sender;
+    }
+
+    modifier onlyOwner() {
+        require(msg.sender == owner);
+        _;
     }
 
     modifier authenticated() {
@@ -50,10 +100,24 @@ contract User {
 
     // Checks if the caller is indeed the user the wallet belongs to.
     function authenticate() internal returns (bool) {
-        Certificate cert = CertificateRegistry(address(0x509)).getCertByAddress(msg.sender);
-        if (address(cert) != address(0)) {
-            return cert.commonName() == commonName;
-        }
-        return false;
+        mapping (string => string) cert = getUserCert(msg.sender);
+        return cert["commonName"] == commonName;
+    }
+
+    function requestReview() public authenticated {
+        require(issuerStatus != IssuerStatus.AUTHORIZED, "You are already an authorized issuer");
+        issuerStatus = IssuerStatus.PENDING_REVIEW;
+    }
+    
+    function authorizeIssuer() public onlyOwner {
+        issuerStatus = IssuerStatus.AUTHORIZED;
+    }
+
+    function deauthorizeIssuer() public onlyOwner {
+        issuerStatus = IssuerStatus.UNAUTHORIZED;
+    }
+
+    function setIsAdmin(bool b) onlyOwner {
+        isAdmin = b;
     }
 }|]

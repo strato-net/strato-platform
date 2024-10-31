@@ -4,9 +4,9 @@ module Executable.EVMCheckpoint (
   EVMCheckpoint(..)
   ) where
 
-import qualified Blockchain.Data.DataDefs as DD
+import Blockchain.Data.BlockHeader
 
-import qualified Blockchain.Database.MerklePatricia as MP
+import Blockchain.Strato.Model.Class
 import Blockchain.Strato.Model.Keccak256
 import Blockchain.VMContext (ContextBestBlockInfo (..))
 import Data.Binary
@@ -15,16 +15,14 @@ import qualified Text.Colors as CL
 import Text.Format
 
 data EVMCheckpoint = EVMCheckpoint
-  { checkpointSHA :: Keccak256,
-    checkpointHead :: DD.BlockData,
-    ctxBestBlockInfo :: ContextBestBlockInfo,
-    ctxChainDBStateRoot :: MP.StateRoot
+  { checkpointHead :: BlockHeader,
+    ctxBestBlockInfo :: ContextBestBlockInfo
   }
-  deriving (Read, Show, Generic)
+  deriving (Show, Generic)
 
 instance Format EVMCheckpoint where -- todo add format instance for ContextBestBlockInfo and show it here as well.
-  format (EVMCheckpoint sha _ _ _) =
-    "EVMCheckpoint " ++ CL.red (short sha)
+  format (EVMCheckpoint header _) =
+    "EVMCheckpoint " ++ CL.red (short $ blockHeaderHash header)
     where
       short = take 16 . formatKeccak256WithoutColor
 

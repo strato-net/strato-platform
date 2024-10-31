@@ -45,6 +45,20 @@
             ]           
         },
         {
+            "name": "Tokens",
+            "imageKey": "",
+            "subCategories": [
+                {
+                    "name": "Tokens",
+                    "contract": "Tokens"
+                },
+                {
+                    "name": "STRATS",
+                    "contract": "STRATSTokens"
+                }
+            ]
+        },
+        {
             "name": "Art",
             "imageKey": "",
             "subCategories": [
@@ -63,6 +77,16 @@
                     "contract": "Membership"
                 }
             ]            
+        },
+        {
+            "name": "Spirits",
+            "imageKey": "",
+            "subCategories": [
+                {
+                    "name": "Spirits",
+                    "contract": "Spirits"
+                }
+            ]
         }
     ]
 }
