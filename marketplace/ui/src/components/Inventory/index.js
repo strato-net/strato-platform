@@ -6,7 +6,8 @@ import {
   notification,
   Spin,
   Select,
-  Tabs
+  Tabs,
+  Input,
 } from "antd";
 import { CheckCircleOutlined } from '@ant-design/icons';
 import InventoryCard from "./InventoryCard";
@@ -109,9 +110,7 @@ const Inventory = ({ user }) => {
   }, [categoryDispatch]);
 
   useEffect(() => {
-    if (isSearch) {
-      actions.fetchInventorySearch(dispatch, limit, offset, debouncedSearchTerm);
-    } else actions.fetchInventory(dispatch, limit, offset, "", category);
+    actions.fetchInventory(dispatch, limit, offset, debouncedSearchTerm, category);
     actions.fetchSupportedTokens(dispatch);
   }, [dispatch, limit, offset, debouncedSearchTerm, category]);
 
@@ -167,12 +166,21 @@ const Inventory = ({ user }) => {
     }
   };
 
-  const queryHandle = (e) => {
-    setIsSearch(e.length > 0);
-    setQueryValue(e);
+  const queryHandleEnter = (e) => {
+    const value = e.target.value;
+    setQueryValue(value);
     setOffset(0);
     setPage(1);
   };
+  
+  const queryHandleChange = (e) => {
+    const value = e.target.value;
+    if (value.length === 0 && queryValue.length > 0) {
+      setQueryValue(value);
+      setOffset(0);
+      setPage(1);
+    }
+  }
 
   const onPageChange = (page) => {
     setOffset((page - 1) * limit);
@@ -348,7 +356,21 @@ const Inventory = ({ user }) => {
             </div>
           </div>
         </div>
-        <div className="pt-6 mx-6 md:mx-5 md:px-10 mb-5">
+        <div className="mx-6 md:mx-5 md:px-10 mt-5">
+          <Input
+            // key={searchQueryValue || categoryQueryValue}
+            // ref={inputRef}
+            size="large"
+            type="search"
+            placeholder="Search"
+            defaultValue={debouncedSearchTerm}
+            onChange={(e) => { queryHandleChange(e) }}
+            onPressEnter={(e) => { queryHandleEnter(e) }}
+            suffix={<img src={Images.Header_Search} alt={SEO.TITLE_META} title={SEO.TITLE_META} className="w-[18px] h-[18px]" />}
+            className="bg-[#F6F6F6] outline-none"
+          />
+        </div>
+        <div className="mx-6 md:mx-5 md:px-10 mb-5">
           <Tabs
             defaultActiveKey={category ? category : "All"}
             className="items"
