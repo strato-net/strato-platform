@@ -138,7 +138,7 @@ If running non-dockerized, use `npm run start` or `npm run dev`.
 If running dockerized, provide a `docker-compose.payment-server.yml` file and use `docker-compose -f docker-compose.payment-server.yml up -d --remove-orphans`.
 
 ## Script
-To manually run the scripts below, first copy the necessary config files by running:
+To manually run the script below, first copy the necessary config files by running:
 ```
 cp /config/config.yaml config.yaml
 cp /config/deploy.yaml config/deploy.yaml
@@ -147,16 +147,6 @@ cp /config/deploy.yaml config/deploy.yaml
 To offboard a seller, run the following command:
 ```
 SELLER_NAME="sellerCommonName" yarn offboard
-```
-
-To deploy smart contracts, run the following command:
-```
-yarn deploy
-```
-
-To deactiavate current active smart contracts, run the following command:
-```
-yarn deactivate
 ```
 
 ## Testing
