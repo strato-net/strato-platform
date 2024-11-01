@@ -1,6 +1,12 @@
 version: "3.9"
+
+volumes:
+  hydra_pgdata:
+    driver: local
+  kratos_pgdata:
+    driver: local
+
 services:
-  
   hydra:
     depends_on:
       - postgresd
@@ -10,7 +16,7 @@ services:
     volumes:
       - ./hydra.yml:/etc/config/hydra/hydra.yml
     environment:
-      - DSN=postgres://hydra:secret@postgresd:5432/hydra?sslmode=disable&max_conns=20&max_idle_conns=4
+      - DSN=postgres://hydra:secret@postgresd:5432/hydra?sslmode=disable&max_conns=20&max_idle_conns=4  # TODO: replace at boot time
       - STRATEGIES_ACCESS_TOKEN=jwt
     restart: unless-stopped
 
@@ -31,6 +37,8 @@ services:
       - POSTGRES_USER=hydra
       - POSTGRES_PASSWORD=secret  # TODO: replace at boot time
       - POSTGRES_DB=hydra
+    volumes:
+      - hydra_pgdata:/var/lib/postgresql/data
 
   nginx:
     depends_on:
@@ -104,5 +112,7 @@ services:
       - POSTGRES_USER=kratos
       - POSTGRES_PASSWORD=secret  # TODO: replace at boot time
       - POSTGRES_DB=kratos
+    volumes:
+      - kratos_pgdata:/var/lib/postgresql/data
 
 
