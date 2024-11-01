@@ -4,7 +4,7 @@ const { createContract } = rest;
 import config from './load.config.js';
 import oauthHelper from "./helpers/oauthHelper.js";
 import { yamlWrite, yamlSafeDumpSync } from "./helpers/config.js";
-import { replaceInFiles } from './helpers/replaceInFiles.js';
+import { replaceInFiles, deleteFilesInDir } from './helpers/replaceInFiles.js';
 
 const contractDir = config.contractDirPath || '/usr/src/payment-server/dapp/mercata-base-contracts/Templates';
 const assetsDir = config.assetsDirPath || '/usr/src/payment-server/dapp/items/contracts';
@@ -84,8 +84,8 @@ describe("Payment Server - deploy contracts", function () {
 
   after(async () => {
     try {
-      replaceInFiles(contractDir, process.env.BASE_CODE_COLLECTION, 'BASE_CODE_COLLECTION');
-      replaceInFiles(assetsDir, process.env.BASE_CODE_COLLECTION, 'BASE_CODE_COLLECTION');
+      deleteFilesInDir(contractDir);
+      deleteFilesInDir(assetsDir);
     } catch (e) {
       console.error("ERROR: unable to remove BASE_CODE_COLLECTION address from contract files", e)
     }
