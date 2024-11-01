@@ -1,7 +1,6 @@
 {-# LANGUAGE BangPatterns #-}
 {-# LANGUAGE ConstraintKinds #-}
 {-# LANGUAGE DataKinds #-}
-{-# LANGUAGE DeriveAnyClass #-}
 {-# LANGUAGE DeriveFunctor #-}
 {-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE DuplicateRecordFields #-}
@@ -30,6 +29,7 @@ import BlockApps.Logging
 import BlockApps.Solidity.ArgValue
 import BlockApps.X509 hiding (isValid)
 import Blockchain.Strato.Model.Address (deriveAddressWithSalt)
+import Blockchain.Strato.Model.Keccak256 (Keccak256)
 import Blockchain.Strato.Model.Secp256k1 hiding (HasVault)
 import Control.Monad (void, when)
 import qualified Control.Monad.Change.Alter as A
@@ -40,18 +40,18 @@ import Control.Monad.Reader
 import Control.Monad.Trans.Except
 import Data.Aeson hiding (Success)
 import qualified Data.ByteString.Lazy as BL
-import qualified Data.Cache.LRU as LRU
 import Data.List (elemIndex)
 import qualified Data.Map as M
 import Data.Maybe (fromMaybe)
 import Data.Text (Text)
 import qualified Data.Text as T
 import Data.Text.Encoding (decodeUtf8, encodeUtf8)
-import Data.Time (diffUTCTime, getCurrentTime)
+import Data.Time (getCurrentTime)
 import GHC.Generics
 import qualified IdentityProvider.API as IDAPI
 import IdentityProvider.Email
 import IdentityProvider.OAuth hiding (issuer)
+import IdentityProvider.Server.Types
 import Network.HTTP.Client hiding (Proxy)
 import qualified Network.HTTP.Client as HTTP (Response)
 import Network.HTTP.Client.TLS
@@ -63,10 +63,6 @@ import SolidVM.Model.Value (ValList (..), Value (..))
 import Strato.Strato23.API
 import Strato.Strato23.Client
 import UnliftIO hiding (Handler)
-
-data IdentityError
-  = IdentityError Text
-  deriving (Show, Exception)
 
 getDefaultEmptyOrg :: String -> String -> String
 getDefaultEmptyOrg name uuid = "Mercata Account " ++ getDefaultEmptyOrgOld name uuid
@@ -99,73 +95,6 @@ getSubject name org pk =
         subPub = pk
       }
 
-data IdentityServerData = IdentityServerData
-  { issuer :: Issuer, -- issuer of signing cert
-    issuerCert :: X509Certificate, -- the signing cert
-    issuerPrivKey :: PrivateKey, -- the signing private key
-    realmNameToDetails :: RealmMap,
-    sendgridAPIKey :: Maybe SendgridAPIKey
-  }
-
-instance Monad m => Accessible Issuer (ReaderT IdentityServerData m) where
-  access _ = asks issuer
-
-instance Monad m => Accessible X509Certificate (ReaderT IdentityServerData m) where
-  access _ = asks issuerCert
-
-instance Monad m => Accessible PrivateKey (ReaderT IdentityServerData m) where
-  access _ = asks issuerPrivKey
-
-instance Monad m => Accessible RealmMap (ReaderT IdentityServerData m) where
-  access _ = asks realmNameToDetails
-
-instance Monad m => Accessible (Maybe SendgridAPIKey) (ReaderT IdentityServerData m) where
-  access _ = asks sendgridAPIKey
-
-instance MonadIO m => (String `A.Selectable` AccessToken) (ReaderT IdentityServerData m) where
-  select _ realm = do
-    realmMap <- asks realmNameToDetails
-    case M.lookup realm realmMap of
-      Just
-        RealmDetails
-          { realmEndpoints = ep,
-            realmClientId = id',
-            realmClientSecret = s,
-            accessTokenRef = ref
-          } -> do
-          now <- liftIO getCurrentTime
-          readIORef ref >>= \case
-            (Just a@AccessToken {expires_in = ex}, timeRetrieved)
-              | (now `diffUTCTime` timeRetrieved) < (fromIntegral ex) ->
-                  return $ Just a
-            _ -> do
-              token <- getAccessToken id' s (token_endpoint ep)
-              atomicWriteIORef ref (token, now)
-              return token
-      Nothing -> return Nothing
-
-instance MonadIO m => ((String, String) `A.Alters` Address) (ReaderT IdentityServerData m) where
-  lookup _ (realm, k) = do
-    realmMap <- asks realmNameToDetails
-    case M.lookup realm realmMap of
-      Just RealmDetails {cacheRef = ref} -> do
-        cache <- readIORef ref
-        let (!newCache, !mAdd) = LRU.lookup k cache
-        atomicWriteIORef ref newCache
-        return mAdd
-      Nothing -> return Nothing
-
-  insert _ (realm, k) v = do
-    realmMap <- asks realmNameToDetails
-    case M.lookup realm realmMap of
-      Just RealmDetails {cacheRef = ref} -> atomicModifyIORef' ref (\lru -> (LRU.insert k v lru, ()))
-      Nothing -> return ()
-  delete _ (realm, k) = do
-    realmMap <- asks realmNameToDetails
-    case M.lookup realm realmMap of
-      Just RealmDetails {cacheRef = ref} -> void $ atomicModifyIORef' ref (\lru -> LRU.delete k lru)
-      Nothing -> return ()
-
 instance Monad m => Accessible VaultData (VaultM m) where
   access _ = ask
 
@@ -185,12 +114,11 @@ putIdentity ::
     Accessible Issuer m,
     Accessible X509Certificate m,
     Accessible PrivateKey m,
-    Accessible RealmMap m,
+    Accessible IdentityServerData m,
     Accessible (Maybe SendgridAPIKey) m,
-    (String `A.Selectable` AccessToken) m,
-    ((String, String) `A.Alters` Address) m
+    Accessible (Maybe AccessToken) m,
+    (String `A.Alters` Address) m
   ) =>
-  Text ->
   Text ->
   Text ->
   Text ->
@@ -198,12 +126,11 @@ putIdentity ::
   Maybe Text ->
   Maybe Bool ->
   m Address
-putIdentity accessToken uuid idProv name mEmail mCo mSub = do
+putIdentity accessToken uuid name mEmail mCo mSub = do
   time' <- liftIO getCurrentTime
   $logInfoS "putIdentity" $ "User " <> uuid <> " called PUT /identity with username " <> name <> " and company " <> T.pack (show mCo)
   -- check if a user exists in vault
-  let realm = extractRealmName $ T.unpack idProv
-      name' = T.unpack name
+  let name' = T.unpack name
       uuid' = T.unpack uuid
       org = case mCo of
         Just o | o /= "" -> T.unpack o
@@ -212,7 +139,6 @@ putIdentity accessToken uuid idProv name mEmail mCo mSub = do
         T.intercalate
           ","
           [ T.pack $ show time',
-            T.pack realm,
             uuid,
             name,
             T.pack org
@@ -220,32 +146,32 @@ putIdentity accessToken uuid idProv name mEmail mCo mSub = do
   $logInfoS "putIdentity/csv" csvLogMsg
 
   -- check if cached user
-  A.lookup Proxy (realm, uuid') >>= \case
+  A.lookup Proxy uuid' >>= \case
     Just a -> return a
     Nothing -> do
-      mRealmDets <- M.lookup realm <$> access (Proxy @RealmMap)
-      mToken <- A.select (Proxy @AccessToken) realm
-      case (mRealmDets, mToken) of
-        (Just rd, Just realmToken) -> do
+      IdentityServerData{notificationServerUrl = mNotifUrl} <- access Proxy
+      mToken <- access (Proxy @(Maybe AccessToken))
+      case mToken of
+        Just realmToken -> do
           getVaultKey accessToken >>= \case
             Just (AddressAndKey a k) -> do
               -- has vault key, confirm also has cert
-              certInCirrus accessToken rd a name' >>= \case
+              certInCirrus accessToken a name' >>= \case
                 -- User has no cert, create cert and wallet.
                 [] -> do
-                  createAndRegisterCert name' (T.unpack <$> mEmail) org uuid' realmToken rd k
-                  registerUserWalletAsync realmToken rd name' realm uuid' a
+                  createAndRegisterCert name' (T.unpack <$> mEmail) org uuid' realmToken k
+                  registerUserWalletAsync realmToken name' uuid' a
                   -- subscribe if can and should
-                  case (realmNoficicationServerUrl rd, fromMaybe True mSub) of 
+                  case (mNotifUrl, fromMaybe True mSub) of 
                     (Just url, True) -> void . async $ runNotificationM url $ subscribeUser accessToken (T.pack name')
                     (_, _) -> return ()
                 -- User has a cert but no wallet, create wallet using cert's common name. This is for backwards compatibility with existing users.
                 [cert] -> do
-                  hasWallet <- walletInCirrus accessToken rd (T.unpack $ certCommonName cert)
+                  hasWallet <- walletInCirrus accessToken (T.unpack $ certCommonName cert)
                   if hasWallet
-                    then A.insert Proxy (realm, uuid') a
+                    then A.insert Proxy uuid' a
                     else do
-                      registerUserWalletAsync realmToken rd (T.unpack $ certCommonName cert) realm uuid' a
+                      registerUserWalletAsync realmToken (T.unpack $ certCommonName cert) uuid' a
                 -- Query returned multiple certs even though cirrus query should return only the latest one, fix the logic please.
                 _ -> do
                   $logErrorS "putIdentity" "Yikes! How can we have multiple certs if we're only limiting the search to one?"
@@ -254,19 +180,16 @@ putIdentity accessToken uuid idProv name mEmail mCo mSub = do
             Nothing -> do
               -- no vault key, so make key and register cert
               AddressAndKey a k <- postVaultKey accessToken
-              createAndRegisterCert name' (T.unpack <$> mEmail) org uuid' realmToken rd k
-              registerUserWalletAsync realmToken rd name' realm uuid' a
+              createAndRegisterCert name' (T.unpack <$> mEmail) org uuid' realmToken k
+              registerUserWalletAsync realmToken name' uuid' a
               -- subscribe if can and should
-              _ <- case (realmNoficicationServerUrl rd, fromMaybe True mSub) of 
+              _ <- case (mNotifUrl, fromMaybe True mSub) of 
                 (Just url, True) -> void . async $ runNotificationM url $ subscribeUser accessToken (T.pack name')
                 (_, _) -> return ()
               return a
-        (_, Nothing) -> do
+        Nothing -> do
           $logErrorS "putIdentity" "uh oh! We couldn't retrieve an access token for our realm"
           throwIO $ IdentityError "Something is wrong with the provided access credentials for the current realm. Have a network administrator look into this."
-        (Nothing, _) -> do
-          $logErrorS "putIdentity" . T.pack $ "this identity server does not support realm " <> realm
-          throwIO $ IdentityError "Identity server does not support this realm"
 
 -- This is just a dummy function
 -- This never gets called on the sevrvant backend
@@ -281,15 +204,15 @@ putIdentityExternal ::
     Accessible Issuer m,
     Accessible X509Certificate m,
     Accessible PrivateKey m,
-    Accessible RealmMap m,
+    Accessible IdentityServerData m,
     Accessible (Maybe SendgridAPIKey) m,
-    (String `A.Selectable` AccessToken) m,
-    ((String, String) `A.Alters` Address) m
+    Accessible (Maybe AccessToken) m,
+    (String `A.Alters` Address) m
   ) =>
   Text ->
   Maybe Bool ->
   m Address
-putIdentityExternal bearerToken = putIdentity (T.replace "Bearer " "" bearerToken) "" "" "" Nothing Nothing
+putIdentityExternal bearerToken = putIdentity (T.replace "Bearer " "" bearerToken) "" "" Nothing Nothing
 
 blocEndpoint :: String
 blocEndpoint = "/bloc/v2.2"
@@ -322,18 +245,21 @@ instance FromJSON WalletInCirrus where
 instance ToJSON WalletInCirrus
 
 certInCirrus ::
-  (MonadIO m, MonadLogger m) =>
+  (MonadIO m
+  , MonadLogger m
+  , Accessible IdentityServerData m) =>
   Text ->
-  RealmDetails ->
   Address ->
   String ->
   m [CertificateInCirrus]
-certInCirrus token RealmDetails {associatedNodeUrl = nurl1, associatedFallback = nurl2} a name = do
+certInCirrus token a name = do
+  IdentityServerData{nodeUrl = nurl1, fallbackNodeUrl = mNurl2} <- access (Proxy @IdentityServerData)
   response1 <- callCirrus nurl1
-  mCerts :: Maybe [CertificateInCirrus] <-
-    if statusCode (responseStatus response1) == 200
-      then return . decode $ responseBody response1
-      else callCirrus nurl2 >>= return . decode . responseBody
+  mCerts :: Maybe [CertificateInCirrus] <- 
+    case (statusCode (responseStatus response1), mNurl2) of 
+      (200, _) -> return . decode $ responseBody response1
+      (_, Just nurl2) -> callCirrus nurl2 >>= return . decode . responseBody
+      (_, Nothing) -> return Nothing
   case mCerts of
     Just certs -> do
       $logInfoS "certInCirrus" $ T.pack $ "Checked for user's cert in Cirrus; response was: " <> show certs
@@ -358,55 +284,53 @@ certInCirrus token RealmDetails {associatedNodeUrl = nurl1, associatedFallback =
       liftIO $ httpLbs request {requestHeaders = rHead} mgr
 
 walletInCirrus ::
-  ( MonadIO m,
-    MonadLogger m
-  ) =>
+  ( MonadIO m
+  , MonadLogger m
+  , Accessible IdentityServerData m) =>
   Text ->
-  RealmDetails ->
   String ->
   m Bool
-walletInCirrus
-  token
-  RealmDetails
-    { associatedNodeUrl = nurl1,
-      associatedFallback = nurl2,
-      realmUserTableName = userTableName,
-      realmUserRegAddr = userRegAddr,
-      realmUserRegCodeHash = mHash
-    }
-  commonName = do
-    response1 <- callCirrus nurl1
-    mWallet :: Maybe [WalletInCirrus] <-
-      if statusCode (responseStatus response1) == 200
-        then return . decode $ responseBody response1
-        else callCirrus nurl2 >>= return . decode . responseBody
-    case mWallet of
-      Just wallet -> do
-        $logInfoS "walletInCirrus" $ T.pack $ "Checked for user's wallet in Cirrus; response was: " <> show wallet
-        return . not $ null wallet -- maybe can also check if cert is valid and matches user attributes
-      Nothing -> do
-        $logErrorS "walletInCirrus" "Unexpected response from cirrus query. This should never happen"
-        throwIO $ IdentityError "Unable to decode cirrus query for user's wallet. Something went very wrong"
-    where
-      cirrusSearchPath :: (MonadLogger m) => m String
-      cirrusSearchPath = do
-        let derivedAddr = deriveAddressWithSalt (Just userRegAddr) commonName mHash (Just . show $ OrderedVals [SString $ commonName])
-            derivedAddr' = show derivedAddr
-            path = "/cirrus/search/" <> userTableName <> "?address=eq." <> derivedAddr' 
-        $logDebugS "walletInCirrus/cirrusSearchPath" $ "Derived address is " <> T.pack derivedAddr'
-        $logDebugS "walletInCirrus/cirrusSearchPath" $ "Cirrus search path is " <> T.pack path
-        return path
+walletInCirrus token commonName = do
+  IdentityServerData
+    { nodeUrl = nurl1,
+      fallbackNodeUrl = mNurl2,
+      userTableName = utn,
+      userRegAddr = ura,
+      userRegCodeHash = urch
+    } <- access Proxy
+  response1 <- callCirrus ura urch utn nurl1
+  mWallet :: Maybe [WalletInCirrus] <-
+    case (statusCode (responseStatus response1), mNurl2) of
+      (200, _) -> return . decode $ responseBody response1
+      (_, Just nurl2) -> callCirrus ura urch utn nurl2 >>= return . decode . responseBody
+      (_, Nothing) -> return Nothing
+  case mWallet of
+    Just wallet -> do
+      $logInfoS "walletInCirrus" $ T.pack $ "Checked for user's wallet in Cirrus; response was: " <> show wallet
+      return . not $ null wallet -- maybe can also check if cert is valid and matches user attributes
+    Nothing -> do
+      $logErrorS "walletInCirrus" "Unexpected response from cirrus query. This should never happen"
+      throwIO $ IdentityError "Unable to decode cirrus query for user's wallet. Something went very wrong"
+  where
+    cirrusSearchPath :: (MonadLogger m) => Address -> Maybe Keccak256 -> String -> m String
+    cirrusSearchPath ura urch utn = do
+      let derivedAddr = deriveAddressWithSalt (Just ura) commonName urch (Just . show $ OrderedVals [SString $ commonName])
+          derivedAddr' = show derivedAddr
+          path = "/cirrus/search/" <> utn <> "?address=eq." <> derivedAddr' 
+      $logDebugS "walletInCirrus/cirrusSearchPath" $ "Derived address is " <> T.pack derivedAddr'
+      $logDebugS "walletInCirrus/cirrusSearchPath" $ "Cirrus search path is " <> T.pack path
+      return path
 
-      callCirrus :: (MonadIO m, MonadLogger m) => BaseUrl -> m (HTTP.Response BL.ByteString)
-      callCirrus nurl = do
-        cirrusEndpoint <- cirrusSearchPath
-        let url = showBaseUrl nurl {baseUrlPath = baseUrlPath nurl <> cirrusEndpoint}
-        mgr <- liftIO $ case baseUrlScheme nurl of
-          Http -> newManager defaultManagerSettings
-          Https -> newManager tlsManagerSettings
-        request <- liftIO $ parseRequest url
-        let rHead = [(hContentType, "application/json"), (hAuthorization, encodeUtf8 $ "Bearer " <> token)]
-        liftIO $ httpLbs request {requestHeaders = rHead} mgr
+    callCirrus :: (MonadIO m, MonadLogger m) => Address -> Maybe Keccak256 -> String -> BaseUrl -> m (HTTP.Response BL.ByteString)
+    callCirrus ura mH utn nurl = do
+      cirrusEndpoint <- cirrusSearchPath ura mH utn
+      let url = showBaseUrl nurl {baseUrlPath = baseUrlPath nurl <> cirrusEndpoint}
+      mgr <- liftIO $ case baseUrlScheme nurl of
+        Http -> newManager defaultManagerSettings
+        Https -> newManager tlsManagerSettings
+      request <- liftIO $ parseRequest url
+      let rHead = [(hContentType, "application/json"), (hAuthorization, encodeUtf8 $ "Bearer " <> token)]
+      liftIO $ httpLbs request {requestHeaders = rHead} mgr
 
 createAndRegisterCert ::
   ( MonadIO m,
@@ -414,21 +338,21 @@ createAndRegisterCert ::
     Accessible Issuer m,
     Accessible X509Certificate m,
     Accessible PrivateKey m,
-    Accessible (Maybe SendgridAPIKey) m
+    Accessible (Maybe SendgridAPIKey) m,
+    Accessible IdentityServerData m
   ) =>
   String ->
   Maybe String ->
   String ->
   String ->
   AccessToken ->
-  RealmDetails ->
   PublicKey ->
   m ()
-createAndRegisterCert name mEmail org uuid realmToken rd k = do
+createAndRegisterCert name mEmail org uuid realmToken k = do
   sub <- getSubject name org k
   createNewCert sub >>= \case
     Just newCert -> do
-      registerCert newCert realmToken rd
+      registerCert newCert realmToken
       mEmailK <- access (Proxy @(Maybe SendgridAPIKey))
       case (mEmail, mEmailK) of
         (Just email, Just emailK) -> sendWelcomeEmail email name uuid emailK
@@ -453,12 +377,14 @@ createNewCert sub = do
   makeSignedCertSigF signWIssuerPrivKey Nothing (Just c) i sub
 
 registerCert ::
-  (MonadIO m, MonadLogger m) =>
+  ( MonadIO m
+  , MonadLogger m
+  , Accessible IdentityServerData m) =>
   X509Certificate ->
   AccessToken ->
-  RealmDetails ->
   m ()
-registerCert cert token RealmDetails {associatedNodeUrl = nurl, associatedFallback = nurl2} = do
+registerCert cert token = do
+  IdentityServerData {nodeUrl = nurl, fallbackNodeUrl = mNurl2} <- access Proxy
   mgr <- liftIO $ case baseUrlScheme nurl of
     Http -> newManager defaultManagerSettings
     Https -> newManager tlsManagerSettings
@@ -497,20 +423,24 @@ registerCert cert token RealmDetails {associatedNodeUrl = nurl, associatedFallba
     Left clienterr -> do
       $logErrorS "registerCert" $
         T.pack $
-          "Attempting to register on fallback node because recieved the following error when registering cert on primary node: "
+          "Recieved the following error when registering cert on primary node: "
             ++ show clienterr
-      mgr2 <- liftIO $ case baseUrlScheme nurl2 of
-        Http -> newManager defaultManagerSettings
-        Https -> newManager tlsManagerSettings
-      let clientEnv2 = mkClientEnv mgr2 nurl2 {baseUrlPath = baseUrlPath nurl2 <> blocEndpoint}
-      eresponse2 <- liftIO $ postBlocTx clientEnv2
-      case eresponse2 of
-        Right response2 | all txSuccess response2 -> $logInfoS "registerCert" $ T.pack $ "Response from fallback node was " ++ show response2
-        err -> do
-          $logErrorS "registerCert" $
-            T.pack $
-              "Received following error when trying to register cert on fallback node: " ++ show err
-          throwIO $ IdentityError "Failed to register cert"
+      case mNurl2 of
+        Nothing -> throwIO $ IdentityError "Failed to register cert"
+        Just nurl2 -> do
+          $logInfoS "registerCert" "Attempting ot register cert on fallback node"
+          mgr2 <- liftIO $ case baseUrlScheme nurl2 of
+            Http -> newManager defaultManagerSettings
+            Https -> newManager tlsManagerSettings
+          let clientEnv2 = mkClientEnv mgr2 nurl2 {baseUrlPath = baseUrlPath nurl2 <> blocEndpoint}
+          eresponse2 <- liftIO $ postBlocTx clientEnv2
+          case eresponse2 of
+            Right response2 | all txSuccess response2 -> $logInfoS "registerCert" $ T.pack $ "Response from fallback node was " ++ show response2
+            err -> do
+              $logErrorS "registerCert" $
+                T.pack $
+                  "Received following error when trying to register cert on fallback node: " ++ show err
+              throwIO $ IdentityError "Failed to register cert"
 
 txSuccess :: BlocChainOrTransactionResult -> Bool
 -- txSuccess (BlocTxResult (BlocTransactionResult{blocTransactionStatus = stat})) | stat /= Failure = True
@@ -520,93 +450,95 @@ txSuccess _ = False
 registerUserWalletAsync ::
   ( MonadUnliftIO m,
     MonadLogger m,
-    ((String, String) `A.Alters` Address) m
+    (String `A.Alters` Address) m,
+    Accessible IdentityServerData m
   ) =>
   AccessToken ->
-  RealmDetails ->
-  String ->
   String ->
   String ->
   Address ->
   m ()
-registerUserWalletAsync realmToken rd name' realm uuid' a = void . async $ do
-  regSuccess <- registerUserWallet realmToken rd name'
-  when regSuccess $ A.insert Proxy (realm, uuid') a
+registerUserWalletAsync realmToken name' uuid' a = void . async $ do
+  regSuccess <- registerUserWallet realmToken name'
+  when regSuccess $ A.insert Proxy uuid' a
 
 registerUserWallet ::
-  (MonadUnliftIO m, MonadLogger m) =>
+  (MonadUnliftIO m
+  , MonadLogger m
+  , Accessible IdentityServerData m) =>
   AccessToken ->
-  RealmDetails ->
   String ->
   m Bool
-registerUserWallet
-  token
-  RealmDetails
-    { associatedNodeUrl = nurl,
-      associatedFallback = nurl2,
-      realmUserRegAddr = userRegAddr
-    }
-  commonName = do
-    mgr <- liftIO $ case baseUrlScheme nurl of
-      Http -> newManager defaultManagerSettings
-      Https -> newManager tlsManagerSettings
-    let clientEnv = mkClientEnv mgr nurl {baseUrlPath = baseUrlPath nurl <> blocEndpoint}
-        txPayload =
-          BlocFunction
-            FunctionPayload
-              { functionpayloadContractAddress = userRegAddr,
-                functionpayloadMethod = "createUser",
-                functionpayloadArgs = M.singleton "_commonName" (ArgString $ T.pack commonName),
-                functionpayloadValue = Nothing,
-                functionpayloadTxParams = Nothing,
-                functionpayloadChainid = Nothing,
-                functionpayloadMetadata = Nothing
-              }
-        txRequest = PostBlocTransactionRequest Nothing [txPayload] Nothing Nothing
-        postBlocTx = runClientM (postBlocTransactionParallel (Just $ "Bearer " <> access_token token) Nothing Nothing True False txRequest)
-    eresponse <- liftIO $ postBlocTx clientEnv
-    case eresponse of
-      Right response ->
-        if all txSuccess response
-          then do
-            $logInfoS "registerUserWallet"
-              . T.pack
-              $ "Response after registering user wallet was: " ++ show response
-            return True
-          else do -- got a pending or failure
-            let pending = [hash | BlocTxResult (BlocTransactionResult {blocTransactionStatus = Pending, blocTransactionHash = hash}) <- response]
-            if (not $ null pending) 
-              then do 
-                eresponse2 <- liftIO $ runClientM (postBlocTransactionResults (Just $ "Bearer " <> access_token token) True pending) clientEnv
-                case eresponse2 of
-                  Right response2 | all (\r -> blocTransactionStatus r == Success) response2 -> do
-                    $logInfoS "registerUserWallet" $ T.pack $ "Response after registering user wallet was: " ++ show response2
-                    return True
-                  err -> do 
-                    $logErrorS "registerUserWallet" $ T.pack $ "Failed to register user wallet; response was: " ++ show err
-                    return False
-              else do -- must've all been failures
-                $logErrorS "registerUserWallet" $ T.pack $ "Failed to register user wallet; response was: " ++ show response
-                return False
-      Left clienterr -> do
-        $logErrorS "registerUserWallet" $
-          T.pack $
-            "Attempting to register on fallback node because recieved the following error when registering user wallet on primary node: "
-              ++ show clienterr
-        mgr2 <- liftIO $ case baseUrlScheme nurl2 of
-          Http -> newManager defaultManagerSettings
-          Https -> newManager tlsManagerSettings
-        let clientEnv2 = mkClientEnv mgr2 nurl2 {baseUrlPath = baseUrlPath nurl2 <> blocEndpoint}
-        eresponse2 <- liftIO $ postBlocTx clientEnv2
-        case eresponse2 of
-          Right response2 | all txSuccess response2 -> do
-            $logInfoS "registerUserWallet" . T.pack $ "Response from fallback node was " ++ show response2
-            return True
-          err -> do
-            $logErrorS "registerUserWallet"
-              . T.pack
-              $ "Failed to register user wallet; response was: " ++ show err
-            return False
+registerUserWallet token commonName = do
+  IdentityServerData
+    { nodeUrl = nurl,
+      fallbackNodeUrl = mNurl2,
+      userRegAddr = userRegAddr
+    } <- access Proxy
+  mgr <- liftIO $ case baseUrlScheme nurl of
+    Http -> newManager defaultManagerSettings
+    Https -> newManager tlsManagerSettings
+  let clientEnv = mkClientEnv mgr nurl {baseUrlPath = baseUrlPath nurl <> blocEndpoint}
+      txPayload =
+        BlocFunction
+          FunctionPayload
+            { functionpayloadContractAddress = userRegAddr,
+              functionpayloadMethod = "createUser",
+              functionpayloadArgs = M.singleton "_commonName" (ArgString $ T.pack commonName),
+              functionpayloadValue = Nothing,
+              functionpayloadTxParams = Nothing,
+              functionpayloadChainid = Nothing,
+              functionpayloadMetadata = Nothing
+            }
+      txRequest = PostBlocTransactionRequest Nothing [txPayload] Nothing Nothing
+      postBlocTx = runClientM (postBlocTransactionParallel (Just $ "Bearer " <> access_token token) Nothing Nothing True False txRequest)
+  eresponse <- liftIO $ postBlocTx clientEnv
+  case eresponse of
+    Right response ->
+      if all txSuccess response
+        then do
+          $logInfoS "registerUserWallet"
+            . T.pack
+            $ "Response after registering user wallet was: " ++ show response
+          return True
+        else do -- got a pending or failure
+          let pending = [hash | BlocTxResult (BlocTransactionResult {blocTransactionStatus = Pending, blocTransactionHash = hash}) <- response]
+          if (not $ null pending) 
+            then do 
+              eresponse2 <- liftIO $ runClientM (postBlocTransactionResults (Just $ "Bearer " <> access_token token) True pending) clientEnv
+              case eresponse2 of
+                Right response2 | all (\r -> blocTransactionStatus r == Success) response2 -> do
+                  $logInfoS "registerUserWallet" $ T.pack $ "Response after registering user wallet was: " ++ show response2
+                  return True
+                err -> do 
+                  $logErrorS "registerUserWallet" $ T.pack $ "Failed to register user wallet; response was: " ++ show err
+                  return False
+            else do -- must've all been failures
+              $logErrorS "registerUserWallet" $ T.pack $ "Failed to register user wallet; response was: " ++ show response
+              return False
+    Left clienterr -> do
+      $logErrorS "registerUserWallet" $
+        T.pack $
+          "Recieved the following error when registering user wallet on primary node: "
+            ++ show clienterr
+      case mNurl2 of
+        Nothing -> return False
+        Just nurl2 -> do
+          $logInfoS "registerUserWallet" "Attempting to register user wallet on fallback node"
+          mgr2 <- liftIO $ case baseUrlScheme nurl2 of
+            Http -> newManager defaultManagerSettings
+            Https -> newManager tlsManagerSettings
+          let clientEnv2 = mkClientEnv mgr2 nurl2 {baseUrlPath = baseUrlPath nurl2 <> blocEndpoint}
+          eresponse2 <- liftIO $ postBlocTx clientEnv2
+          case eresponse2 of
+            Right response2 | all txSuccess response2 -> do
+              $logInfoS "registerUserWallet" . T.pack $ "Response from fallback node was " ++ show response2
+              return True
+            err -> do
+              $logErrorS "registerUserWallet"
+                . T.pack
+                $ "Failed to register user wallet; response was: " ++ show err
+              return False
 
 getVaultKey :: (MonadIO m, MonadLogger m, HasVault m) => Text -> m (Maybe AddressAndKey)
 getVaultKey accessToken = do
@@ -644,23 +576,19 @@ server ::
     Accessible Issuer m,
     Accessible X509Certificate m,
     Accessible PrivateKey m,
-    Accessible RealmMap m,
+    Accessible IdentityServerData m,
     Accessible (Maybe SendgridAPIKey) m,
-    (String `A.Selectable` AccessToken) m,
-    ((String, String) `A.Alters` Address) m
+    Accessible (Maybe AccessToken) m,
+    (String `A.Alters` Address) m
   ) =>
   ServerT IDAPI.IdentityProviderAPI m
 server = getPingIdentity :<|> putIdentity :<|> putIdentityExternal
 
 hoistCoreServer ::
   String ->
-  Issuer ->
-  X509Certificate ->
-  PrivateKey ->
-  RealmMap ->
-  Maybe SendgridAPIKey ->
+  IdentityServerData ->
   Server IDAPI.IdentityProviderAPI
-hoistCoreServer vaulturl iss cert privk rd mEmailK =
+hoistCoreServer vaulturl idData =
   hoistServer (Proxy :: Proxy IDAPI.IdentityProviderAPI) (convertErrors runM') server
   where
     convertErrors r x = Handler $ do
@@ -669,30 +597,23 @@ hoistCoreServer vaulturl iss cert privk rd mEmailK =
         Right a -> return a
         Left e -> throwE $ reThrowError e
     runM' :: ReaderT IdentityServerData (VaultM (LoggingT IO)) x -> IO x
-    runM' x = runLoggingT . runVaultM vaulturl $ runIdentityM iss cert privk rd mEmailK x
+    runM' x = runLoggingT . runVaultM vaulturl $ runIdentityM idData x
     reThrowError :: IdentityError -> ServerError
     reThrowError =
       \case
         IdentityError err -> err400 {errBody = BL.fromStrict $ encodeUtf8 err}
+        ExistingIdentity err -> err422 {errBody = BL.fromStrict $ encodeUtf8 err}
 
 runIdentityM ::
-  Issuer ->
-  X509Certificate ->
-  PrivateKey ->
-  RealmMap ->
-  Maybe SendgridAPIKey ->
+  IdentityServerData ->
   ReaderT IdentityServerData m a ->
   m a
-runIdentityM iss cert privk rd mEmailK x =
-  runReaderT x $ IdentityServerData iss cert privk rd mEmailK
+runIdentityM idData x =
+  runReaderT x idData
 
 identityProviderApp ::
   String ->
-  Issuer ->
-  X509Certificate ->
-  PrivateKey ->
-  RealmMap ->
-  Maybe SendgridAPIKey ->
+  IdentityServerData ->
   Application
-identityProviderApp vurl iss cert pk rd mEmailK =
-  serve (Proxy :: Proxy IDAPI.IdentityProviderAPI) $ hoistCoreServer vurl iss cert pk rd mEmailK
+identityProviderApp vurl idData =
+  serve (Proxy :: Proxy IDAPI.IdentityProviderAPI) $ hoistCoreServer vurl idData

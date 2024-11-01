@@ -4,13 +4,12 @@ MAINTAINER BlockApps Inc.
 ENV DEBIAN_FRONTEND=noninteractive
 
 RUN apt-get update && \
-    apt-get install -y apache2-utils curl wget vim nano openresty-opm dnsutils python3 python3-pip && \
+    apt-get install -y apache2-utils curl wget vim nano openresty-opm dnsutils && \
     apt-get clean && \
     rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/* && \
     mkdir -p /usr/local/openresty/nginx/lua && \
     wget -P /usr/local/openresty/nginx/lua https://raw.githubusercontent.com/knyar/nginx-lua-prometheus/0.20181120/prometheus.lua && \
     rm /usr/local/openresty/nginx/conf/nginx.conf && \
-    pip3 install pyyaml requests && \
     opm get zmartzone/lua-resty-openidc=1.7.4 && \
     opm remove bungle/lua-resty-session && \
     opm get bungle/lua-resty-session=3.10    
@@ -24,9 +23,7 @@ HEALTHCHECK --interval=5s --timeout=1s --start-period=180s \
 
 COPY nginx.tpl.conf openid.tpl.lua /tmp/
 
-COPY cfg-loader.lua /usr/local/openresty/nginx/lua/
-
-COPY docker-run.sh createRealmConfig.py /
+COPY docker-run.sh /
 
 COPY licenses /licenses
 

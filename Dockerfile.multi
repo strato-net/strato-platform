@@ -92,8 +92,7 @@ COPY \
 RUN apt-get -y update \
   && apt-get install -y wget \
   && apt-get autoremove \
-  && apt-get clean \
-  && wget https://github.com/mikefarah/yq/releases/download/v4.35.1/yq_linux_amd64 -O /usr/local/bin/yq && chmod +x /usr/local/bin/yq 
+  && apt-get clean
 COPY ./identity-provider /identity-provider
 EXPOSE 8014
 HEALTHCHECK --interval=5s --timeout=1s --start-period=180s \
@@ -108,8 +107,7 @@ COPY \
 RUN apt-get -y update \
   && apt-get install -y wget \
   && apt-get autoremove \
-  && apt-get clean \
-  && wget https://github.com/mikefarah/yq/releases/download/v4.35.1/yq_linux_amd64 -O /usr/local/bin/yq && chmod +x /usr/local/bin/yq 
+  && apt-get clean
 COPY ./identity-service /identity-service
 EXPOSE 8014
 HEALTHCHECK --interval=5s --timeout=1s --start-period=180s \

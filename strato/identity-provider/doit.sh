@@ -25,11 +25,30 @@ function runIdentityServer {
   identity-provider:
   --minLogLevel="${minLogLevel}" \
   --port="${identityProviderPort}"
-  --vaultProxyUrl="${vaultProxyUrl}"
+  --nodeUrl=${NODE_URL} \
+  --userRegistryAddress=${USER_REGISTRY_ADDRESS} \
+  --userRegistryCodeHash=${USER_REGISTRY_CODEHASH} \
+  --userContractName=${USER_CONTRACT_NAME} \
+  --oauthDiscoveryUrl=${OAUTH_DISCOVERY_URL}
   "
   
-  if [ -n "${vaultProxyUrl}" ]; then
-      vpFlag="--vaultProxyUrl=${vaultProxyUrl}"
+  if [ -n "${NODE_URL}" ]; then
+      nuFlag="--nodeUrl=${NODE_URL}"
+  fi 
+  if [ -n "${FALLBACK_NODE_URL}" ]; then
+      fnuFlag="--fallbackNodeUrl=${FALLBACK_NODE_URL}"
+  fi
+  if [ -n "${USER_REGISTERY_ADDRESS}" ]; then
+      uraFlag="--userRegistryAddress=${USER_REGISTERY_ADDRESS}"
+  fi
+  if [ -n "${USER_REGISTRY_CODEHASH}" ]; then
+      urchFlag="--userRegistryCodeHas=${USER_REGISTRY_CODEHASH}"
+  fi
+  if [ -n "${USER_CONTRACT_NAME}" ]; then
+      ucnFlag="--userContractName=${USER_CONTRACT_NAME}"
+  fi
+  if [ -n "${NOTIFICATION_SERVER_URL}" ]; then
+      nsFlag="--notificationServerUrl=${NOTIFICATION_SERVER_URL}"
   fi
   if [ -n "${SENDGRID_APIKEY}" ]; then
       sgFlag="--SENDGRID_APIKEY=${SENDGRID_APIKEY}"
@@ -39,12 +58,9 @@ function runIdentityServer {
   fi  
   RED='\033[0;31m'
   NC='\033[0m' # No Color
-  OAUTH_DISCOVERY_URL=$(yq '.[0].discoveryUrl // "" ' /identity-provider/idconf.yaml )
-  OAUTH_CLIENT_ID=$(yq '.[0].clientId // "" ' /identity-provider/idconf.yaml )
-  OAUTH_CLIENT_SECRET=$(yq '.[0].clientSecret // "" ' /identity-provider/idconf.yaml )
 
   if [[ -z ${OAUTH_DISCOVERY_URL} || -z ${OAUTH_CLIENT_ID} || -z ${OAUTH_CLIENT_SECRET} ]]; then
-    echo "FATAL ERROR: You MUST provide details for at least one OAuth realm in idconf.yaml, including the discoveryUrl, clientId, and clientSecret"
+    echo "FATAL ERROR: You MUST provide OAUTH_DISCOVERY_URL, OAUTH_CLIENT_ID, and OAUTH_CLIENT_SECRET"
     exit 1
   fi
 
@@ -71,8 +87,15 @@ function runIdentityServer {
   
   echo "Running identity-provider-server..."
   runBackgroundProcess identity-provider-server \
-    --minLogLevel=${minLogLevel} --port="${identityProviderPort}" \
-    "${vpFlag}" "${sgFlag}" "${csFlag}" &>> logs/identity-provider-server
+    --minLogLevel=${minLogLevel} \
+    --port="${identityProviderPort}" \
+    --oauthDiscoveryUrl="${OAUTH_DISCOVERY_URL}" \
+    --oauthClientId="${OAUTH_CLIENT_ID}" \
+    --oauthClientSecret="${OAUTH_CLIENT_SECRET}" \
+    "${nuFlag}" "${fnuFlag}" \
+    "${uraFlag}" "${urchFlag}" "${ucnFlag}" \
+    "${sgFlag}" "${csFlag}" "${nsFlag}" \
+    &>> logs/identity-provider-server
   
   echo "Configuring log rotation..."
   runBackgroundProcess logRotation

@@ -4,7 +4,7 @@ set -e
 
 ssl=${ssl:-false}
 sslCertFileType=${sslCertFileType:-pem}
-# OAUTH_DISCOVERY_URL=${OAUTH_DISCOVERY_URL:-NULL}
+OAUTH_DISCOVERY_URL=${OAUTH_DISCOVERY_URL:-NULL}
 # OAUTH_CLIENT_ID=${OAUTH_CLIENT_ID:-NULL}
 # OAUTH_CLIENT_SECRET=${OAUTH_CLIENT_SECRET:-NULL}
 # OAUTH_SCOPE=${OAUTH_SCOPE:-openid email profile}
@@ -13,9 +13,6 @@ IDENTITY_PORT=${IDENTITY_PORT:-8014}
 
 # If container is running for the first time - generate config:
 if [ ! -f /usr/local/openresty/nginx/conf/nginx.conf ]; then
-  if [ "$IDENTITY_PROVIDER_HOSTNAME" != "identity-service" ]; then
-    python3 createRealmConfig.py #TODO: error handling?
-  fi
 
   ########
   ### Generate nginx.conf from template according to configuration provided
@@ -47,6 +44,7 @@ if [ ! -f /usr/local/openresty/nginx/conf/nginx.conf ]; then
   ########
   if [ "$IDENTITY_PROVIDER_HOSTNAME" != "identity-service" ]; then
     cp /tmp/openid.tpl.lua /tmp/openid.lua
+    sed -i 's*<OAUTH_DISCOVERY_URL_PLACEHOLDER>*'"$OAUTH_DISCOVERY_URL"'*g' /tmp/openid.lua
 
     if [ "$ssl" = true ] ; then
       sed -i 's/<IS_SSL_PLACEHOLDER_YES_NO>/yes/g' /tmp/openid.lua
