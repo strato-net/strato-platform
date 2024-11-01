@@ -46,10 +46,13 @@ class InventoryController {
   static async getAll(req, res, next) {
     try {
       const { dapp, query } = req
+      const { limit, offset, ...restQuery } = query;
 
-      const inventories = await dapp.getInventories({ ...query })
-      const inventoriesWithImageUrl = inventories?.inventories
-      rest.response.status200(res, { inventoriesWithImageUrl: inventoriesWithImageUrl, count: inventories.inventoryCount })
+      const inventories = await dapp.getInventories({ ...restQuery })
+      const inventoriesWithImageUrl = inventories?.inventories;
+      const paginatedInventories = inventoriesWithImageUrl.slice(offset, parseInt(offset) + parseInt(limit));
+
+      rest.response.status200(res, { inventoriesWithImageUrl: paginatedInventories, count: inventories.inventoryCount })
 
       return next()
     } catch (e) {

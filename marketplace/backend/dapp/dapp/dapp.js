@@ -240,9 +240,14 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
 
   contract.getInventories = async function (args, options = optionsNoChainIds) {
     const getOptions = { ...options, app: contractName };
-    const inventories = await inventoryJs.getAll(rawAdmin, { ...args, ownerCommonName: userCert.commonName, sort: '-createdDate' }, getOptions);
-    const inventoryCount = await inventoryJs.inventoryCount(rawAdmin, { ...args, ownerCommonName: userCert.commonName, sort: '-createdDate' }, getOptions);
-    return { inventories: inventories, inventoryCount: inventoryCount }
+    const stratsOriginAddress = await STRATSJs.getStratsAddress();
+
+    const inventories = await inventoryJs.getAll(rawAdmin, { ...args, ownerCommonName: userCert.commonName, creator: process.env.SELLER, sort: '-createdDate' }, getOptions);
+    const inventoryCount = await inventoryJs.inventoryCount(rawAdmin, { ...args, ownerCommonName: userCert.commonName, creator: process.env.SELLER, sort: '-createdDate' }, getOptions);
+    const stratInventories = await inventoryJs.getAll(rawAdmin, { ownerCommonName: userCert.commonName, originAddress: stratsOriginAddress, sort: '-createdDate' }, getOptions);
+    const stratInventoryCount = await inventoryJs.inventoryCount(rawAdmin, { ...args, ownerCommonName: userCert.commonName, originAddress: stratsOriginAddress, sort: '-createdDate' }, getOptions);
+
+    return { inventories: inventories.concat(stratInventories), inventoryCount: inventoryCount + stratInventoryCount }
   };
 
   contract.getAllInventories = async function (args, options = optionsNoChainIds) {
@@ -254,9 +259,15 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
 
   contract.getInventoriesForUser = async function (args, options = optionsNoChainIds) {
     const getOptions = { ...options, app: contractName };
+    const stratsOriginAddress = await STRATSJs.getStratsAddress();
+
     const { ownerCommonName, ...restArgs } = args;
-    const newArgs = { ...restArgs, ownerCommonName: ownerCommonName, notEqualsField: 'sale', notEqualsValue: constants.zeroAddress, userProfile: true }//'0000000000000000000000000000000000000000'
-    return marketplaceJs.getAll(rawAdmin, newArgs, getOptions);
+    const newArgs = { ...restArgs, ownerCommonName: ownerCommonName, creator: process.env.SELLER, notEqualsField: 'sale', notEqualsValue: constants.zeroAddress, userProfile: true }
+    const inventories = await marketplaceJs.getAll(rawAdmin, newArgs, getOptions);
+    const stratArgs = { ...restArgs, ownerCommonName, ownerCommonName, notEqualsField: 'sale', notEqualsValue: constants.zeroAddress, userProfile: true, originAddress: stratsOriginAddress  }
+    const stratInventories = await marketplaceJs.getAll(rawAdmin, stratArgs, getOptions);
+
+    return { inventoryResults: inventories.inventoryResults.concat(stratInventories.inventoryResults), inventoryCount: inventories.inventoryCount + stratInventories.inventoryCount };
   };
 
   contract.getOwnershipHistory = async function (args, options = optionsNoChainIds) {
@@ -530,39 +541,33 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
 
   contract.getMarketplaceInventories = async function (args = {}, options = optionsNoChainIds) {
     const getOptions = { ...options, app: contractName };
-    //for ba sellers, get all assets - display For Sale and Sold Out
-    const newArgs = { ...args, ownerCommonName: constants.baUserNames }
+
+    const newArgs = { ...args, notEqualsField: ['sale'], notEqualsValue: [constants.zeroAddress], creator: process.env.SELLER }
     const all = await marketplaceJs.getAll(rawAdmin, newArgs, getOptions);
 
-    // for non-ba sellers, get assets with valid sale & saleQty > 0 - display only For Sale records
-    const newArgs1 = { ...args, notEqualsField: ['ownerCommonName', 'sale'], notEqualsValue: [constants.baUserNames, constants.zeroAddress] }
-    const all2 = await marketplaceJs.getAll(rawAdmin, newArgs1, getOptions);
-
-    return { inventoryResults: all.inventoryResults.concat(all2.inventoryResults), inventoryCount: all.inventoryCount + all2.inventoryCount };
+    return { inventoryResults: all.inventoryResults, inventoryCount: all.inventoryCount };
   };
 
   contract.getMarketplaceInventoriesLoggedIn = async function (args = {}, options = optionsNoChainIds) {
     const getOptions = { ...options, app: contractName };
-    let usersArr = constants.baUserNames.filter(user => user !== userCommonName)
-    const newArgs = { ...args, ownerCommonName: usersArr }
-    const all = await marketplaceJs.getAll(rawAdmin, newArgs, getOptions);
 
-    const newArgs1 = { ...args, notEqualsField: ['ownerCommonName', 'sale'], notEqualsValue: [[userCommonName, ...constants.baUserNames], constants.zeroAddress] }
-    const all2 = await marketplaceJs.getAll(rawAdmin, newArgs1, getOptions);
-    return { inventoryResults: all.inventoryResults.concat(all2.inventoryResults), inventoryCount: all.inventoryCount + all2.inventoryCount };
+    const newArgs = { ...args, creator: process.env.SELLER, notEqualsField: ['sale'], notEqualsValue: [constants.zeroAddress] }
+    const all = await marketplaceJs.getAll(rawAdmin, newArgs, getOptions);
+    return { inventoryResults: all.inventoryResults, inventoryCount: all.inventoryCount };
   };
 
   contract.getTopSellingProducts = async function (args = {}, options = optionsNoChainIds) {
     const getOptions = { ...options, app: contractName }
-    const newArgs = { ...args, notEqualsField: 'sale', notEqualsValue: constants.zeroAddress, ownerCommonName: constants.baUserNames }
+    const newArgs = { ...args, notEqualsField: 'sale', notEqualsValue: constants.zeroAddress, creator: process.env.SELLER }
     return marketplaceJs.getTopSellingProducts(rawAdmin, newArgs, getOptions)
   }
 
   contract.getTopSellingProductsLoggedIn = async function (args = {}, options = optionsNoChainIds) {
     const getOptions = { ...options, app: contractName }
     const newArgs = {
-      ...args, notEqualsField: ['sale', 'ownerCommonName'],
-      notEqualsValue: [constants.zeroAddress, userCommonName],
+      ...args, notEqualsField: ['sale'],
+      notEqualsValue: [constants.zeroAddress],
+      creator: process.env.SELLER
     }
     return marketplaceJs.getTopSellingProducts(rawAdmin, newArgs, getOptions)
   }
