@@ -8,8 +8,7 @@ services:
     image: oryd/hydra:v2.2.0
     command: serve -c /etc/config/hydra/hydra.yml all --dev
     volumes:
-      # TODO: limit what files are mapped in every service
-      - ./:/etc/config/hydra
+      - ./hydra.yml:/etc/config/hydra/hydra.yml
     environment:
       - DSN=postgres://hydra:secret@postgresd:5432/hydra?sslmode=disable&max_conns=20&max_idle_conns=4
       - STRATEGIES_ACCESS_TOKEN=jwt
@@ -23,8 +22,7 @@ services:
       - DSN=postgres://hydra:secret@postgresd:5432/hydra?sslmode=disable&max_conns=20&max_idle_conns=4  # TODO: replace at boot time
     command: migrate -c /etc/config/hydra/hydra.yml sql -e --yes
     volumes:
-      # TODO: limit what files are mapped in every service
-      - ./:/etc/config/hydra
+      - ./hydra.yml:/etc/config/hydra/hydra.yml
     restart: on-failure
 
   postgresd:
@@ -71,7 +69,6 @@ services:
       - COOKIE_SECRET=changeme  # TODO: replace at boot time
       - CSRF_COOKIE_NAME=__host-${domainName}-x-csrf-token
       - CSRF_COOKIE_SECRET=changemetoo  # TODO: replace at boot time
-      - DANGEROUSLY_DISABLE_SECURE_CSRF_COOKIES=true # TODO: remove??
     restart: unless-stopped
 
   kratos-migrate:
@@ -81,8 +78,8 @@ services:
     environment:
       - DSN=postgres://kratos:secret@kpostgresd:5432/kratos?sslmode=disable&max_conns=20&max_idle_conns=4  # TODO: replace at boot time
     volumes:
-      # TODO: limit what files are mapped in every service
-      - ./:/etc/config/kratos
+      - ./kratos.yml:/etc/config/kratos/kratos.yml
+      - ./default.schema.json:/etc/config/kratos/default.schema.json
     command:
       -c /etc/config/kratos/kratos.yml migrate sql -e --yes
     restart: on-failure
