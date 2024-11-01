@@ -2,7 +2,6 @@
   "scripts": {
     "mocha-babel": "node_modules/.bin/mocha --require @babel/register --inline-diffs --exit",
     "start": "babel-node index",
-    "start:dev": "nodemon --exec babel-node index",
     "sitemap": "babel-node sitemap/getSitemap.js",
     "start:prod": "NODE_ENV=production babel-node index",
     "deploy": "cp config/${CONFIG:-localhost}.config.yaml ${CONFIG_DIR_PATH:-.}/config.yaml && yarn mocha-babel dapp/dapp/dapp.deploy.js --config ${CONFIG_DIR_PATH:-.}/config.yaml",
@@ -37,10 +36,6 @@
   "main": "index.js",
   "license": "MIT",
   "private": true,
-  "engines": {
-    "npm": ">=10.5.0 <11.0.0",
-    "node": ">=21.7.1 <22.0.0"
-  },
   "dependencies": {
     "@babel/cli": "^7.20.7",
     "@babel/core": "^7.20.7",
@@ -81,8 +76,5 @@
     "swagger-ui-express": "^4.6.0",
     "winston": "^3.8.2",
     "ws": "^8.13.0"
-  },
-  "devDependencies": {
-    "nodemon": "^3.1.7"
   }
 }
