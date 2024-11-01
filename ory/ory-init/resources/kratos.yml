@@ -1,4 +1,3 @@
-
 version: v1.1.0
 
 dsn: memory
@@ -12,9 +11,9 @@ serve:
     base_url: http://kratos:4434
 
 selfservice:
-  default_browser_return_url: https://${domainName}:8443/ui/
+  default_browser_return_url: https://${domainName}/
   allowed_return_urls:
-    - https://${domainName}:8443/ui/
+    - https://${domainName}/
 
   methods:
     password:
@@ -46,7 +45,11 @@ identity:
 
 courier:
   smtp:
-    connection_uri: "smtp://abcd"
+    connection_uri: "smtp://abcd"  # TODO: replace at boot time ("smtp://username:password@smtp.example.com:587")
 
 log:
-  level: debug
+  level: info
+  # TODO: Cleanup
+  #level: debug
+  #leak_sensitive_values: true
+  format: json

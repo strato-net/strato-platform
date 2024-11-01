@@ -1,82 +1,88 @@
 version: "3.9"
 services:
+  
   hydra:
+    depends_on:
+      - postgresd
+      - hydra-migrate
     image: oryd/hydra:v2.2.0
     command: serve -c /etc/config/hydra/hydra.yml all --dev
     volumes:
       # TODO: limit what files are mapped in every service
-      - type: bind
-        source: .
-        target: /etc/config/hydra
+      - ./:/etc/config/hydra
     environment:
       - DSN=postgres://hydra:secret@postgresd:5432/hydra?sslmode=disable&max_conns=20&max_idle_conns=4
       - STRATEGIES_ACCESS_TOKEN=jwt
     restart: unless-stopped
-    depends_on:
-      - hydra-migrate
+
   hydra-migrate:
+    depends_on:
+      - postgresd
     image: oryd/hydra:v2.2.0
     environment:
-      - DSN=postgres://hydra:secret@postgresd:5432/hydra?sslmode=disable&max_conns=20&max_idle_conns=4
+      - DSN=postgres://hydra:secret@postgresd:5432/hydra?sslmode=disable&max_conns=20&max_idle_conns=4  # TODO: replace at boot time
     command: migrate -c /etc/config/hydra/hydra.yml sql -e --yes
     volumes:
       # TODO: limit what files are mapped in every service
-      - type: bind
-        source: .
-        target: /etc/config/hydra
+      - ./:/etc/config/hydra
     restart: on-failure
+
   postgresd:
     image: postgres:11.8
-    ports:
-      - "5432:5432" # TODO: REMOVE!
     environment:
       - POSTGRES_USER=hydra
-      - POSTGRES_PASSWORD=secret
+      - POSTGRES_PASSWORD=secret  # TODO: replace at boot time
       - POSTGRES_DB=hydra
+
   nginx:
     depends_on:
       - hydra
       - kratos
       - kratos-selfservice-ui-node
     environment:
-    - ssl=true
-    - sslCertFileType=${sslCertFileType}
+      - ssl=true
+      - sslCertFileType=${sslCertFileType}
     image: nginx:1.27-alpine
     command: ["nginx", "-g", "daemon off;"]
     ports:
-    - "8443:8443"
+      - "8443:8443"
     volumes:
-    - ${sslDir}:/etc/ssl:ro
-    - ./nginx.conf:/etc/nginx/nginx.conf:ro
+      - ${sslDir}:/etc/ssl:ro
+      - ./nginx.conf:/etc/nginx/nginx.conf:ro
     restart: unless-stopped
     logging:
       driver: "json-file"
       options:
         max-size: "100m"
         max-file: "3"
+
   kratos-selfservice-ui-node:
-    image: oryd/kratos-selfservice-ui-node:v1.1.0
+    depends_on:
+      - kratos
+      - hydra
+    image: oryd/kratos-selfservice-ui-node:v1.3.1
     environment:
       - BASE_PATH=/ui
       - PORT=4455
       - HYDRA_ADMIN_URL=http://hydra:4445
+      - KRATOS_ADMIN_URL=http://kratos:4434
       - KRATOS_PUBLIC_URL=http://kratos:4433
       - KRATOS_BROWSER_URL=https://${domainName}:8443
-      - COOKIE_SECRET=changeme
-      - CSRF_COOKIE_NAME=cookie_name
-      - CSRF_COOKIE_SECRET=changeme
-      - DANGEROUSLY_DISABLE_SECURE_CSRF_COOKIES=true
-    restart: on-failure
+      - COOKIE_SECRET=changeme  # TODO: replace at boot time
+      - CSRF_COOKIE_NAME=__host-${domainName}-x-csrf-token
+      - CSRF_COOKIE_SECRET=changemetoo  # TODO: replace at boot time
+      - DANGEROUSLY_DISABLE_SECURE_CSRF_COOKIES=true # TODO: remove??
+    restart: unless-stopped
+
   kratos-migrate:
-    image: oryd/kratos:v1.1.0
+    depends_on:
+      - kpostgresd
+    image: oryd/kratos:v1.3.1
     environment:
-      - DSN=postgres://kratos:secret@kpostgresd:5432/kratos?sslmode=disable&max_conns=20&max_idle_conns=4
+      - DSN=postgres://kratos:secret@kpostgresd:5432/kratos?sslmode=disable&max_conns=20&max_idle_conns=4  # TODO: replace at boot time
     volumes:
       # TODO: limit what files are mapped in every service
-      -
-        type: bind
-        source: .
-        target: /etc/config/kratos
+      - ./:/etc/config/kratos
     command:
       -c /etc/config/kratos/kratos.yml migrate sql -e --yes
     restart: on-failure
@@ -84,24 +90,22 @@ services:
   kratos:
     depends_on:
       - kratos-migrate
-    image: oryd/kratos:v1.1.0
+      - kpostgresd
+    image: oryd/kratos:v1.3.1
     restart: unless-stopped
     environment:
-      - DSN=postgres://kratos:secret@kpostgresd:5432/kratos?sslmode=disable&max_conns=20&max_idle_conns=4
+      - DSN=postgres://kratos:secret@kpostgresd:5432/kratos?sslmode=disable&max_conns=20&max_idle_conns=4  # TODO: replace at boot time
       - OAUTH2_PROVIDER_URL=http://hydra:4445/
     command:
       serve -c /etc/config/kratos/kratos.yml --dev
     volumes:
-      -
-        type: bind
-        source: .
-        target: /etc/config/kratos
+      - ./:/etc/config/kratos
 
   kpostgresd:
     image: postgres:11.8
     environment:
       - POSTGRES_USER=kratos
-      - POSTGRES_PASSWORD=secret
+      - POSTGRES_PASSWORD=secret  # TODO: replace at boot time
       - POSTGRES_DB=kratos
 
 

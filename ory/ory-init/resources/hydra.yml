@@ -1,6 +1,7 @@
 serve:
   cookies:
     same_site_mode: Lax
+    domain: ${domainName}
 
 urls:
   self:
@@ -11,7 +12,7 @@ urls:
 
 secrets:
   system:
-    - youReallyNeedToChangeThis
+    - youReallyNeedToChangeThis  # TODO: replace at boot time
 
 oidc:
   subject_identifiers:
@@ -19,4 +20,11 @@ oidc:
       - pairwise
       - public
     pairwise:
-      salt: youReallyNeedToChangeThis
+      salt: youReallyNeedToChangeThis  # TODO: replace at boot time
+
+log:
+  level: info
+  # TODO: Cleanup
+  #level: debug
+  #leak_sensitive_values: true
+  format: json
