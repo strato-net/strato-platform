@@ -6,7 +6,7 @@ import {
   notification,
   Spin,
   Select,
-  Tabs,
+  Space,
   Input,
   Table,
 } from "antd";
@@ -140,9 +140,15 @@ const Inventory = ({ user }) => {
   }, [categoryDispatch]);
 
   useEffect(() => {
-    actions.fetchInventory(dispatch, limit, offset, debouncedSearchTerm, category);
+    actions.fetchInventory(
+      dispatch,
+      limit,
+      offset,
+      debouncedSearchTerm,
+      category
+    );
     actions.fetchSupportedTokens(dispatch);
-  }, [dispatch, limit, offset, category]);
+  }, [dispatch, limit, offset, debouncedSearchTerm, category]);
 
   const showModal = () => {
     setOpen(true);
@@ -213,7 +219,15 @@ const Inventory = ({ user }) => {
       setOffset(0);
       setPage(1);
     }
-  }
+  };
+
+  const handleTabSelect = (key) => {
+    if (key === "All") key = undefined;
+    setCategory(key);
+    setOffset(0);
+    setPage(1);
+    return;
+  };
 
   const onPageChange = (page, pageSize) => {
     setLimit(pageSize);
@@ -472,20 +486,36 @@ const Inventory = ({ user }) => {
             </div>
           </div>
         </div>
-        <div className="mx-6 md:mx-5 md:px-10 mt-5">
-          <Input
-            // key={searchQueryValue || categoryQueryValue}
-            // ref={inputRef}
-            size="large"
-            type="search"
-            placeholder="Search"
-            defaultValue={debouncedSearchTerm}
-            onChange={(e) => { queryHandleChange(e) }}
-            onPressEnter={(e) => { queryHandleEnter(e) }}
-            suffix={<img src={Images.Header_Search} alt={SEO.TITLE_META} title={SEO.TITLE_META} className="w-[18px] h-[18px]" />}
-            className="bg-[#F6F6F6] outline-none"
+        <Space.Compact className="mx-6 md:mx-5 md:px-10 mt-5 flex" size="large">
+          <Select
+            defaultValue="All"
+            style={{ width: 170, height: "auto" }}
+            onChange={handleTabSelect}
+            options={[
+              { label: "All", value: "All" },
+              ...categorys.map((category) => ({
+                label: category.name,
+                value: category.name,
+              })),
+            ]}
+            value={category}
           />
-        </div>
+          <Input
+            placeholder="Search"
+            type="search"
+            defaultValue={debouncedSearchTerm}
+            onChange={queryHandleChange}
+            onPressEnter={queryHandleEnter}
+            suffix={
+              <img
+                src={Images.Header_Search}
+                alt={SEO.TITLE_META}
+                title={SEO.TITLE_META}
+                className="w-[18px] h-[18px]"
+              />
+            }
+          />
+        </Space.Compact>
         <div className="pt-6 mx-6 md:mx-5 md:px-10 mb-5">
           <Table
             columns={columns}
