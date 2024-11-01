@@ -1,17 +1,18 @@
 serve:
   cookies:
     same_site_mode: Lax
+    domain: ${domainName}
 
 urls:
   self:
-    issuer: https://${domainName}:4444
-  consent: https://${domainName}:4455/consent
-  login: https://${domainName}:4455/login
-  logout: https://${domainName}:4444/logout
+    issuer: https://${domainName}:8443
+  consent: https://${domainName}:8443/ui/consent
+  login: https://${domainName}:8443/ui/login
+  logout: https://${domainName}:8443/ui/logout
 
 secrets:
   system:
-    - youReallyNeedToChangeThis
+    - youReallyNeedToChangeThis  # TODO: replace at boot time
 
 oidc:
   subject_identifiers:
@@ -19,4 +20,11 @@ oidc:
       - pairwise
       - public
     pairwise:
-      salt: youReallyNeedToChangeThis
+      salt: youReallyNeedToChangeThis  # TODO: replace at boot time
+
+log:
+  level: info
+  # TODO: Cleanup
+  #level: debug
+  #leak_sensitive_values: true
+  format: json

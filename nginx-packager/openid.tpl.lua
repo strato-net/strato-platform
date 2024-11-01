@@ -21,8 +21,8 @@ local authenticate_opts = {
   token_endpoint_auth_method = "client_secret_basic",
   ssl_verify = "<IS_SSL_PLACEHOLDER_YES_NO>",
   redirect_uri_scheme = "<REDIRECT_URI_SCHEME_PLACEHOLDER_HTTP_HTTPS>",
-  -- 'id_token' to get user data; 'access_token' for access and refresh tokens; 'user' to get additional user data (some providers include 'email' in user object instead of id_token)
-  session_contents = {access_token=true}, -- comment out to keep everything; other options: user=true, id_token=true, enc_id_token=true
+  -- 'id_token' to get user data; 'access_token' for access and refresh tokens; 'user' to get additional user data (some providers include 'email' in user object instead of id_token), enc_id_token - required for ory logout (id_token_hint)
+  session_contents = {access_token=true, enc_id_token=true},
   renew_access_token_on_expiry = true,
   access_token_expires_in = 300,
   access_token_expires_leeway = 3,
