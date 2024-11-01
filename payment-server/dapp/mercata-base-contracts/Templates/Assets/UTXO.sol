@@ -36,17 +36,16 @@ abstract contract UTXO is Asset {
         // Create a new UTXO with a portion of the units
         try {
             // This is a hack to prevent the splitted UTXO from infinitely creating new UTXOs
-            assert(UTXO(owner).utxoMagicNumber() == utxoMagicNumber);
-            owner = _newOwner;
-            ownerCommonName = getCommonName(_newOwner);
+            assert(UTXO(getCurrentOwner()).utxoMagicNumber() == utxoMagicNumber);
+            changeOwner(_newOwner);
         } catch {
             
             if(_isUserTransfer && _transferNumber>0){
             // Emit ItemTransfers Event
                 emit ItemTransfers(
                     originAddress,
-                    owner,
-                    ownerCommonName,
+                    getCurrentOwner(),
+                    getCurrentOwnerCommonName(),
                     _newOwner,
                     getCommonName(_newOwner),
                     name,
@@ -61,8 +60,8 @@ abstract contract UTXO is Asset {
 
             emit OwnershipTransfer(
                 originAddress,
-                owner,
-                ownerCommonName,
+                getCurrentOwner(),
+                getCurrentOwnerCommonName(),
                 _newOwner,
                 getCommonName(_newOwner),
                 itemNumber,
@@ -72,6 +71,13 @@ abstract contract UTXO is Asset {
             quantity -= _quantity;
             itemNumber += _quantity;
         }
+    }
+
+        // Updated function to add a sale to the whitelist
+    function attachSale() public virtual override requireOwnerOrigin("attach sale") {
+        require(sale == address(0), "Sale is already assigned for this asset");
+        sale = msg.sender;
+        proposerFee = 0.01 * MercataProposerFee(feeAddress).getProposerFee();;
     }
 
     function _callMint(address _newOwner, uint _quantity) internal virtual{

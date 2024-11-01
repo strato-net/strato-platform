@@ -225,7 +225,7 @@ contract StratPaymentService is PaymentService {
         return stratsPerDollar * 100;
     }
 
-    function updateStratsPerDollar(decimal _stratsPerDollar) requireOwner() public returns (uint) {
+    function updateStratsPerDollar(decimal _stratsPerDollar) requireOwner("Only the owner can ") public returns (uint) {
       stratsPerDollar = _stratsPerDollar;
       return RestStatus.OK;
     }

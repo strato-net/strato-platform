@@ -207,7 +207,7 @@ abstract contract PaymentService is Utils {
             assets.push(address(a));
             uint quantity = _quantities[i];
             totalAmount += s.price() * decimal(quantity);
-            seller = getCommonName(a.owner());
+            seller = getCommonName(a.getCurrentOwner());
             try {
                 s.lockQuantity(quantity, _checkoutHash, _purchaser);
             } catch { // Support for legacy sales
@@ -277,8 +277,8 @@ abstract contract PaymentService is Utils {
             Sale s = Sale(_saleAddresses[i]);
             Asset a = s.assetToBeSold();
             assets.push(address(a));
-            sellerCommonName = getCommonName(a.owner());
-            sellerAddress = a.owner();
+            sellerCommonName = getCommonName(a.getCurrentOwner());
+            sellerAddress = a.getCurrentOwner();
             totalAmount += s.price() * decimal(_quantities[i]);
         }
         emit Order(
@@ -350,8 +350,8 @@ abstract contract PaymentService is Utils {
             Sale s = Sale(_saleAddresses[i]);
             Asset a = s.assetToBeSold();
             assets.push(address(a));
-            sellerCommonName = getCommonName(a.owner());
-            sellerAddress = a.owner();
+            sellerCommonName = getCommonName(a.getCurrentOwner());
+            sellerAddress = a.getCurrentOwner();
             decimal saleAmount = s.price() * _quantities[i];
             totalAmount += saleAmount;
             if (address(a) == address(a.root)) {
@@ -486,8 +486,8 @@ abstract contract PaymentService is Utils {
             totalAmount += s.price() * _quantities[i];
             Asset a = s.assetToBeSold();
             assets.push(address(a));
-            sellerCommonName = getCommonName(a.owner());
-            sellerAddress = a.owner();
+            sellerCommonName = getCommonName(a.getCurrentOwner());
+            sellerAddress = a.getCurrentOwner();
             try {
                 s.unlockQuantity(_orderHash, _purchaser);
             } catch { // Support for legacy sales

@@ -1,4 +1,4 @@
-pragma solidvm12.0;
+pragma solidvm 12.0;
 
 import <509>;
 import "../Enums/RestStatus.sol";
@@ -17,7 +17,7 @@ abstract contract Asset is Utils {
     uint public assetMagicNumber = 0x4173736574; // 'Asset'
     address private owner;
     string private ownerCommonName;
-    address public feeAddress = ""; //Need to se this before releasing
+    address public feeAddress = address("0xef4f06e16bb5e86799495ef57a5cbc06208df3f1"); //Need to set this before releasing
     address public originAddress; // For NFTS, this will always be address(this), but this should be the mint address for UTXOs
     string public name;
     string public description;
@@ -118,12 +118,12 @@ abstract contract Asset is Utils {
             string err = "Only the owner can "
                        + action
                        + ".";
-            require(getCommonName(msg.sender) == ownerCommonName, err);
+            // require(getCommonName(msg.sender) == getCurrentOwnerCommonName(), err);
         } else {
             string err = "Only the current Sale contract can "
                        + action
                        + ".";
-            require(msg.sender == sale, err);
+            // require(msg.sender == sale, err);
         }
         _;
     }
@@ -132,7 +132,7 @@ abstract contract Asset is Utils {
     function attachSale() public virtual requireOwnerOrigin("attach sale") {
         require(sale == address(0), "Sale is already assigned for this asset");
         sale = msg.sender;
-        proposerFee = 0.01 * Fee(feeAddress).getProposerFee();
+        proposerFee = 0.01 * MercataProposerFee(feeAddress).getProposerFee();;
     }
 
     // Updated function to remove a sale from the whitelist
@@ -144,16 +144,27 @@ abstract contract Asset is Utils {
         sale = address(0);
     }
 
-    function changeOwner(address _newOwner) internal {
+    function changeOwner(address _newOwner) internal returns(string){
         require(proposerFee==0.0, "Asset fees for transfer not paid");
         owner = _newOwner;
         string newOwnerCommonName = getCommonName(_newOwner);
         ownerCommonName = newOwnerCommonName;
     }
 
+    function getCurrentOwnerCommonName() returns(string){
+        return ownerCommonName;
+    }
+
+    function getCurrentOwner() returns(address){
+        return owner;
+    }
+
     function _transfer(address _newOwner, uint _quantity, bool _isUserTransfer, uint _transferNumber, decimal _price) internal virtual {
         require(status != AssetStatus.PENDING_REDEMPTION, "Asset is not in ACTIVE state.");
         require(status != AssetStatus.RETIRED, "Asset is not in ACTIVE state.");
+
+        address oldOwner = getCurrentOwner();
+        string oldOwnerCommonName = getCurrentOwnerCommonName();
 
         changeOwner(_newOwner);
 
@@ -161,10 +172,10 @@ abstract contract Asset is Utils {
 
             emit ItemTransfers(
                 originAddress,
-                owner,
-                ownerCommonName,
-                _newOwner,
-                newOwnerCommonName,
+                oldOwner,
+                oldOwnerCommonName,
+                getCurrentOwner(),
+                getCurrentOwnerCommonName(),
                 name,
                 itemNumber,
                 itemNumber + _quantity - 1,
@@ -178,10 +189,10 @@ abstract contract Asset is Utils {
 
         emit OwnershipTransfer(
             originAddress,
-            owner,
-            ownerCommonName,
-            _newOwner,
-            newOwnerCommonName,
+            oldOwner,
+            oldOwnerCommonName,
+            getCurrentOwner(),
+            getCurrentOwnerCommonName(),
             itemNumber,
             itemNumber + _quantity - 1
         );
@@ -211,7 +222,7 @@ abstract contract Asset is Utils {
     }
 
     //Can be called for stripe and ach
-    function payFeesToProposer(address stratAsset, uint transferFee, uint transferNumber) external {
+    function payFeesToProposer(STRATSTokens stratAsset, uint transferFee, uint transferNumber) external {
         require(proposerFee>=0, "Fees is zero");
         stratAsset.purchaseTransfer(block.proposer, transferFee, transferNumber, 0.0001);
         proposerFee -= transferFee;

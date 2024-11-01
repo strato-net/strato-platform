@@ -37,7 +37,7 @@ export default {
   // prodStratsAddress: "b220195543f652f735b7847c4af399d0323e1ff6",
   testnetStratsAddress: "0bf7ce10b2723e3a8629bd744ce5ded6844a1577",
   attachImagesAndFiles: "*,david nallapu-Mercata-Asset-files(*),david nallapu-Mercata-Asset-images(*),david nallapu-Mercata-Asset-fileNames(*)",
-  attachSalesAndImagesAndFiles: "*,david nallapu-Mercata-Asset-files(*),david nallapu-Mercata-Asset-images(*),david nallapu-Mercata-Asset-fileNames(*),david nallapu-Mercata-Sale!david nallapu-Mercata-Sale_David Nallapu-Mercata-Asset_fk(*,david nallapu-Mercata-Sale-paymentServices(*))",
+  attachSalesAndImagesAndFiles: "*,david nallapu-Mercata-Asset-files(*),david nallapu-Mercata-Asset-images(*),david nallapu-Mercata-Asset-fileNames(*),david nallapu-Mercata-Sale!david nallapu-Mercata-Sale_david nallapu-Mercata-Asset_fk(*,david nallapu-Mercata-Sale-paymentServices(*))",
   attach_saleAddresses_Quantities_completedSales_onOrder: "*,david nallapu-Mercata-Order-saleAddresses(*),david nallapu-Mercata-Order-quantities(*),david nallapu-Mercata-Order-completedSales(*)",
   baUserNames: ['david nallapu'],
   localHost: 'http://localhost',

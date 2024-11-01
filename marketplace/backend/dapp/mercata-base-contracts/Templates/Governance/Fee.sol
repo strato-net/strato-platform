@@ -102,7 +102,7 @@ contract MercataProposerFee {
         proposerFee=5;
     }
 
-    function getProposerFee() returns (uint){
+    function getProposerFee() public returns (uint){
         return proposerFee;
     }
 }

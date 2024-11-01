@@ -71,7 +71,7 @@ const App = () => {
 
   return (
     <BrowserRouter basename="/">
-      <Layout className="overflow-auto">
+      <Layout>
         <UsersProvider>
           <CategorysProvider>
             <HeaderComponent

@@ -98,7 +98,7 @@ newtype BondedPeers = BondedPeers {unBondedPeers :: [PPeer]}
 
 newtype BondedPeersForUDP = BondedPeersForUDP {unBondedPeersForUDP :: [PPeer]}
 
-newtype UnbondedPeers = UnbondedPeers {unUnbondedPeers :: [PPeer]}
+newtype UnbondedPeersForUDP = UnbondedPeersForUDP {unUnbondedPeers :: [PPeer]}
 
 newtype ClosestPeers = ClosestPeers {unClosestPeers :: [PPeer]}
 
@@ -118,7 +118,7 @@ type HasPeerDB m = (
   A.Selectable (IPAsText, Point) PeerBondingState m,
   Mod.Accessible BondedPeers m,
   Mod.Accessible BondedPeersForUDP m,
-  Mod.Accessible UnbondedPeers m,
+  Mod.Accessible UnbondedPeersForUDP m,
   A.Selectable Point ClosestPeers m,
   A.Replaceable PPeer UdpEnableTime m,
   A.Replaceable PPeer TcpEnableTime m,
@@ -252,8 +252,8 @@ getBondedPeers = try $ unBondedPeers <$> Mod.access (Mod.Proxy @BondedPeers)
 getBondedPeersForUDP :: (MonadUnliftIO m, Mod.Accessible BondedPeersForUDP m) => m (Either SomeException [PPeer])
 getBondedPeersForUDP = try $ unBondedPeersForUDP <$> Mod.access (Mod.Proxy @BondedPeersForUDP)
 
-getUnbondedPeers :: (MonadUnliftIO m, Mod.Accessible UnbondedPeers m) => m [PPeer]
-getUnbondedPeers = unUnbondedPeers <$> Mod.access (Mod.Proxy @UnbondedPeers)
+getUnbondedPeers :: (MonadUnliftIO m, Mod.Accessible UnbondedPeersForUDP m) => m [PPeer]
+getUnbondedPeers = unUnbondedPeers <$> Mod.access (Mod.Proxy @UnbondedPeersForUDP)
 
 thisPeer :: PPeer -> [SQL.Filter PPeer]
 thisPeer peer = [PPeerIp SQL.==. pPeerIp peer, PPeerTcpPort SQL.==. pPeerTcpPort peer]

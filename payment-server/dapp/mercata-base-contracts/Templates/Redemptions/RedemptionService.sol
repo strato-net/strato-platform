@@ -103,7 +103,7 @@ abstract contract RedemptionService is Utils {
             _redemptionId,
             Asset(msg.sender),
             msg.sender.creator,
-            asset.ownerCommonName(),
+            asset.getCurrentOwnerCommonName(),
             asset.quantity()
         );
     }

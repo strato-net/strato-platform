@@ -1,7 +1,7 @@
 pragma es6;
 pragma strict;
 
-
+import <3c7025100519c985573fe8cdb7a42ee27788abd9>;
 
 /// @title A representation of Art assets
 contract Art is Redeemable {

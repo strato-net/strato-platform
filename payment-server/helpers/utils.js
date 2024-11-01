@@ -1,19 +1,17 @@
-import client from '../db/index.js';
+import client from "../db/index.js";
 import { rest, util } from "blockapps-rest";
-import { 
-  DEFAULT_OPTIONS, 
+import {
+  DEFAULT_OPTIONS,
   CHECKOUT_EVENT_TABLE,
-  SELLER_ONBOARDED_TABLE, 
-  TABLE_PREFIX, 
+  SELLER_ONBOARDED_TABLE,
+  TABLE_PREFIX,
   STRIPE_CONTRACT_ADDRESS,
-  SENDGRID_ENV } from "./constants.js";
-import ADMIN from './oauth.js';
-import lodash from 'lodash';
+} from "./constants.js";
+import ADMIN from "./oauth.js";
+import lodash from "lodash";
 const { get } = lodash;
-import sgMail from "@sendgrid/mail";
-import oauthHelper from './oauthHelper.js';
-import axios from 'axios';
-sgMail.setApiKey(SENDGRID_ENV.API_KEY);
+import oauthHelper from "./oauthHelper.js";
+import axios from "axios";
 
 // Fetches Asset Name based on sale address
 const getAsset = async(saleAddress)=>{

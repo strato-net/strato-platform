@@ -59,8 +59,8 @@ abstract contract Mintable is Redeemable {
             originAddress,
             address(0),
             "",
-            owner,
-            ownerCommonName,
+            getCurrentOwner(),
+            getCurrentOwnerCommonName(),
             itemNumber + quantity,
             itemNumber + quantity + _quantity - 1
         );
@@ -78,5 +78,11 @@ abstract contract Mintable is Redeemable {
     
     function checkCondition() internal virtual override returns (bool){
         return true;   
+    }
+
+    function attachSale() public virtual override requireOwnerOrigin("attach sale") {
+        require(sale == address(0), "Sale is already assigned for this asset");
+        sale = msg.sender;
+        proposerFee = 0.01 * MercataProposerFee(feeAddress).getProposerFee();;
     }
 }

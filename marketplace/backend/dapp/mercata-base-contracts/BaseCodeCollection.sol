@@ -1,6 +1,4 @@
-pragma es6;
-pragma strict;
-pragma builtinCreates;
+pragma solidvm 12.0;
 
 import <509>;
 import "Templates/Assets/Asset.sol";
@@ -12,6 +10,7 @@ import "Templates/Payments/PaymentService.sol";
 import "Templates/Payments/StratPaymentService.sol";
 import "Templates/Redemptions/RedemptionService.sol";
 import "Templates/Sales/Sale.sol";
+import "Templates/Sales/SimpleSale.sol";
 import "Templates/Utils/Utils.sol";
 import "../items/contracts/Art.sol";
 import "../items/contracts/CarbonDAO.sol";

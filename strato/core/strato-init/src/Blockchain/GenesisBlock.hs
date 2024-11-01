@@ -30,6 +30,7 @@ import Blockchain.Data.Extra
 import Blockchain.Data.GenesisBlock
 import Blockchain.Data.GenesisInfo
 import Blockchain.Data.RLP
+import qualified Blockchain.Data.TXOrigin as Origin
 import Blockchain.Data.ValidatorRef
 import qualified Blockchain.Database.MerklePatricia as MP
 import qualified Blockchain.Database.MerklePatricia.ForEach as MP
@@ -42,7 +43,7 @@ import Blockchain.Generation
     readValidatorsFromGenesisInfo,
   )
 import Blockchain.Sequencer.Bootstrap (bootstrapSequencer)
-import Blockchain.Sequencer.Event (OutputBlock)
+import Blockchain.Sequencer.Event (OutputBlock(..))
 import Blockchain.SolidVM.CodeCollectionDB
 import qualified Blockchain.Strato.Indexer.ApiIndexer as ApiIndexer
 import qualified Blockchain.Strato.Indexer.Kafka as IdxKafka
@@ -172,7 +173,7 @@ initializeGenesisBlock genesisBlockName = do
   obGB <- liftIO $ bootstrapSequencer extraCertInfoStates genesisBlock
   putGenesisHash $ blockHash genesisBlock
   $logInfoS "initgen" "Initial merkle patricia tries successfully created"
-  void $ putBlocks [(genesisBlock, difficulty (blockBlockData genesisBlock))] False
+  void $ putBlocks [genesisBlock] False
   $logInfoS "initgen" "Genesis Block put"
   $logInfoS "initgen" "State diff has been generated"
 
@@ -180,11 +181,19 @@ initializeGenesisBlock genesisBlockName = do
 
   let genesisChainId = Nothing -- TODO: It's possible that we would call this function for private chain creation
   $logInfoS "initgen" "Beginning to write to redis"
-  void . execRedis $
+  void . execRedis $ do
     RBDB.forceBestBlockInfo
       (blockHash genesisBlock)
       (number . blockBlockData $ genesisBlock)
-      (difficulty . blockBlockData $ genesisBlock)
+
+  void . execRedis $
+    RBDB.putBlock OutputBlock
+    { obOrigin = Origin.Direct,
+      obBlockData = blockBlockData genesisBlock,
+      obReceiptTransactions = [],
+      obBlockUncles = []
+    }
+
   $logInfoS "initgen" "best block info inserted"
   liftIO $ bootstrapIndexer obGB
   $logInfoS "initgen" "indexer has been bootstrapped"

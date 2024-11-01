@@ -14,22 +14,19 @@
 {-# OPTIONS_GHC -fno-warn-incomplete-uni-patterns #-}
 {-# OPTIONS_GHC -fno-warn-orphans #-}
 
-module Blockchain.Sequencer where
+module Blockchain.Sequencer (
+  sequencer
+  ) where
 
 import BlockApps.Logging
 import BlockApps.X509.Certificate
 import Blockchain.Blockstanbul 
 import qualified Blockchain.Data.Block as BDB
 import Blockchain.Data.BlockHeader
-import Blockchain.Data.ChainInfo (chainInfo, creationBlock, parentChains)
-import qualified Blockchain.Data.RLP as RL
 import qualified Blockchain.Data.TXOrigin as TO
 import qualified Blockchain.Data.TransactionDef as TD
-import Blockchain.Partitioner
-import Blockchain.Privacy
 import Blockchain.Sequencer.CablePackage
 import Blockchain.Sequencer.DB.DependentBlockDB
-import Blockchain.Sequencer.DB.GetChainsDB
 import Blockchain.Sequencer.DB.GetTransactionsDB
 import Blockchain.Sequencer.DB.SeenTransactionDB
 import Blockchain.Sequencer.DB.Witnessable
@@ -40,31 +37,27 @@ import Blockchain.Sequencer.Monad
 import Blockchain.Strato.Model.ChainMember
 import Blockchain.Strato.Model.Class as BDB
 import Blockchain.Strato.Model.Keccak256
-import Blockchain.Strato.Model.Secp256k1
 import Blockchain.Strato.Model.Validator
 import ClassyPrelude (atomically)
 import Conduit
 import Control.Concurrent hiding (yield)
-import Control.Concurrent.STM.TBQueue
 import Control.Concurrent.STM.TQueue
-import Control.Lens
-import Control.Monad (forM, join, unless, when)
+import Control.Monad (forever, forM, unless, when)
 import qualified Control.Monad.Change.Alter as A
 import qualified Control.Monad.Change.Modify as Mod
+import Control.Monad.Composable.Kafka
+import Control.Monad.State.Class
 import Control.Monad.Reader
 import Data.Foldable
-import qualified Data.Map.Strict as M
 import Data.Maybe
 import Data.Proxy
-import qualified Data.Set as S
+import Data.Sequence (Seq)
 import qualified Data.Text as T
---import Data.Tuple.Extra ((&&&))
 import Data.Time.Clock
+import Database.LevelDB.Types
 import Prometheus as P
-import qualified Text.Colors as CL
 import Text.Format
 import Text.Printf
---import Blockchain.Data.Block (Block(blockBlockData))
 
 instance MonadMonitor m => MonadMonitor (ConduitT i o m) where
   doIO = lift . doIO
@@ -88,37 +81,6 @@ instance HasBlockstanbulContext m => HasBlockstanbulContext (ConduitT i o m) whe
   getBlockstanbulContext = lift getBlockstanbulContext
   putBlockstanbulContext = lift . putBlockstanbulContext
 
-instance (Monad m, HasPrivateHashDB m) => HasPrivateHashDB (ConduitT i o m) where
-  requestChain = lift . requestChain
-  requestTransaction = lift . requestTransaction
-
-data SeqEvent
-  = ToVm VmEvent
-  | ToP2p P2pEvent
-  | ToUnseq Checkpoint
-
-data BatchSeqEvent = BatchSeqEvent
-  { _toVm :: [VmEvent],
-    _toP2p :: [P2pEvent],
-    _toUnseq :: [Checkpoint]
-  }
-
-makeLenses ''BatchSeqEvent
-
-emptyBatchSeqEvent :: BatchSeqEvent
-emptyBatchSeqEvent = BatchSeqEvent [] [] []
-
-batchSeqEvents :: [SeqEvent] -> BatchSeqEvent
-batchSeqEvents = foldr f emptyBatchSeqEvent
-  where
-    f e b = case e of
-      ToVm v -> (toVm %~ (v :)) b
-      ToP2p p -> (toP2p %~ (p :)) b
-      ToUnseq u -> (toUnseq %~ (u :)) b
-
-runBatch :: Monad m => ConduitT () SeqEvent m () -> m BatchSeqEvent
-runBatch c = fmap batchSeqEvents . runConduit $ c .| sinkList
-
 logFF :: MonadLogger m => T.Text -> String -> m ()
 logFF str = $logInfoS str . T.pack
 
@@ -129,10 +91,8 @@ type MonadSequencer m =
   ( MonadLogger m,
     MonadMonitor m,
     MonadBlockstanbul m,
-    HasFullPrivacy m,
     (Keccak256 `A.Alters` DependentBlockEntry) m,
-    (Keccak256 `A.Alters` ()) m,
-    HasVault m
+    (Keccak256 `A.Alters` ()) m
   )
 
 sequencer :: [Validator] -> SequencerM ()
@@ -154,129 +114,101 @@ sequencer validators = do
             putBlockstanbulContext $ ctx { _selfCert = Just chainm }
       Nothing -> logF "Awaiting node identity verification..."
   logF "Sequencer startup"
-  source <- sealConduitT <$> fuseChannels
+  source <- fuseChannels
   bootstrapBlockstanbul
   logF "Sequencer initialized"
   flush
-  go source
-  where
-    go :: SealedConduitT () SeqLoopEvent SequencerM () -> SequencerM ()
-    go src = oneSequencerIter src >>= go
+  runConduit $ source .| oneSequencerIter
 
-oneSequencerIter :: SealedConduitT () SeqLoopEvent SequencerM () -> SequencerM (SealedConduitT () SeqLoopEvent SequencerM ())
-oneSequencerIter src = timeAction seqLoopTiming $ do
-  (src', events) <- readEventsInBufferedWindow src
-  BatchSeqEvent {..} <- runSequencerBatch events
-  chainIds <- unGetChainsDB <$> Mod.get (Mod.Proxy @GetChainsDB)
+oneSequencerIter :: (
+                     MonadFail m,
+                     MonadReader SequencerConfig m,
+                     HasKafka m,
+                     HasDependentBlockDB m,
+                     Mod.Modifiable GetTransactionsDB m,
+                     MonadSequencer m,
+                     Mod.Modifiable (Seq BatchOp) m,
+                     MonadState SequencerContext m
+                    ) =>
+                    ConduitT SeqLoopEvent Void m ()
+oneSequencerIter = forever $ timeAction seqLoopTiming $ do
+  logFF "sequencer/events" "Reading from fused channels..."
+  maybeEvent <- await
+  let event = fromMaybe (error "input stream to sequencer closed, this shouldn't happen") maybeEvent
+
+  $logDebugS "sequencer/events" . T.pack $ format event
+
+  runSequencerBatch [event]
   txHashes <- unGetTransactionsDB <$> Mod.get (Mod.Proxy @GetTransactionsDB)
-  let chainIdsList = toList chainIds
-      txHashesList = toList txHashes
-      getChains = if null chainIdsList then [] else [P2pGetChain chainIdsList]
+  let txHashesList = toList txHashes
       getTxs = if null txHashesList then [] else [P2pGetTx txHashesList]
-      toP2p' = getChains ++ getTxs ++ _toP2p
-  flushLdbBatchOps
-  prunePrivacyDBs
 
-  unless (null _toVm) $ do
-    _ <- writeSeqVmEvents _toVm
-    $logDebugS "sequencer" . T.pack $ "Wrote " ++ format _toVm ++ " SeqEvents to VM"
-  unless (null toP2p') $ do
-    _ <- writeSeqP2pEvents toP2p'
-    $logDebugS "sequencer" . T.pack $ "Wrote " ++ format toP2p' ++ " SeqEvents to P2P"
-  unless (null _toUnseq) $ writeUnseqCheckpoints _toUnseq
+  lift flushLdbBatchOps
+
+  unless (null getTxs) $ do
+    _ <- writeSeqP2pEvents getTxs
+    return ()
   flush
-  return src'
 
-flush :: SequencerM ()
+flush :: (Mod.Modifiable GetTransactionsDB m, MonadState SequencerContext m) =>
+         m ()
 flush =
   clearDBERegistry
-    >> clearGetChainsDB
     >> clearGetTransactionsDB
 
-readEventsInBufferedWindow :: SealedConduitT () SeqLoopEvent SequencerM () -> SequencerM (SealedConduitT () SeqLoopEvent SequencerM (), [SeqLoopEvent])
-readEventsInBufferedWindow src = do
-  let logF = logFF "sequencer/events"
-  logF "Reading from fused channels..."
-  dt <- asks maxUsPerIter
-  uch <- asks $ unseqEvents . cablePackage
-  top <- atomically . tryPeekTBQueue $ uch
-  $logDebugS "sequencer/events" . T.pack $ "top event is: " ++ show top
-  -- There may be WaitTerminateds left over from the last iteration
-  -- This will block indefinitely if there are no real messages to process,
-  -- so `src` must be the only source of input to this thread.
-  (src', ()) <- src $$++ dropWhileC (== WaitTerminated)
-  -- Only append the WaitTerminateds once we are certain that we will not drop them
-  -- again
-  createWaitTimer dt
-  maxEvents <- asks maxEventsPerIter
-  -- Takes up to maxEvents for a single buffer, waiting only as long as maxUsPerIter
-  (src'', events) <-
-    src' $$++ takeWhileC (/= WaitTerminated)
-      .| takeC maxEvents
-      .| sinkList
-  $logDebugS "sequencer/events" . T.pack $ format events
-  logF . printf "read %d events from fused channels" $ length events
-  return (src'', events)
-
 runSequencerBatch ::
-  MonadSequencer m =>
-  [SeqLoopEvent] ->
-  m BatchSeqEvent
-runSequencerBatch events = runBatch $ do
+  (MonadSequencer m, MonadReader SequencerConfig m, HasKafka m) =>
+  [SeqLoopEvent] -> m ()
+runSequencerBatch events = do
   let BatchSeqLoopEvent {..} = batchSeqLoopEvents events
   checkForTimeouts _timerFires
-  checkForUnseq _ingestEvents
+  forM_ _ingestEvents checkForUnseq
 
 checkForTimeouts ::
   ( MonadLogger m,
     MonadMonitor m,
     MonadBlockstanbul m,
-    HasFullPrivacy m,
-    (Keccak256 `A.Alters` DependentBlockEntry) m
+    (Keccak256 `A.Alters` DependentBlockEntry) m,
+    MonadReader SequencerConfig m,
+    HasKafka m
   ) =>
-  [RoundNumber] ->
-  ConduitT a SeqEvent m ()
+  [RoundNumber] -> m ()
 checkForTimeouts rns = do
   withLabel seqLoopEvents "timeout" (flip unsafeAddCounter . fromIntegral . length $ rns)
   blockstanbulSend . map Timeout $ rns
 
 checkForUnseq ::
-  MonadSequencer m =>
-  [IngestEvent] ->
-  ConduitT a SeqEvent m ()
+  (MonadSequencer m, MonadReader SequencerConfig m, HasKafka m) =>
+  [IngestEvent] -> m ()
 checkForUnseq inEvents = do
   withLabel seqLoopEvents "unseq" (flip unsafeAddCounter . fromIntegral . length $ inEvents)
   timeAction seqSplitEventsTiming $ splitEvents inEvents
 
-bootstrapBlockstanbul :: SequencerM ()
+bootstrapBlockstanbul :: (MonadBlockstanbul m, Mod.Accessible View m, HasKafka m) =>
+                         m ()
 bootstrapBlockstanbul = do
   _ <- writeSeqVmEvents [VmCreateBlockCommand]
   createFirstTimer
 
 blockstanbulSend ::
   ( MonadLogger m,
-    MonadMonitor m,
     MonadBlockstanbul m,
-    HasFullPrivacy m,
-    (Keccak256 `A.Alters` DependentBlockEntry) m
+    (Keccak256 `A.Alters` DependentBlockEntry) m,
+    MonadReader SequencerConfig m,
+    HasKafka m
   ) =>
-  [InEvent] ->
-  ConduitT a SeqEvent m ()
+  [InEvent] -> m ()
 blockstanbulSend = mapM_ $ \ie -> do
-  ses <-
-    runConduit $
       blockstanbulSend' ie
-        .| hydrateAndEmit
-        .| sinkList
-  yieldMany ses
 
 blockstanbulSend' ::
   ( MonadLogger m,
     MonadBlockstanbul m,
-    (Keccak256 `A.Alters` DependentBlockEntry) m
+    (Keccak256 `A.Alters` DependentBlockEntry) m,
+    MonadReader SequencerConfig m,
+    HasKafka m
   ) =>
-  InEvent ->
-  ConduitT a SeqEvent m ()
+  InEvent -> m ()
 blockstanbulSend' msg = do
   resp <- sendAllMessages [msg]
   let blocks = [b | ToCommit b <- resp]
@@ -313,14 +245,15 @@ blockstanbulSend' msg = do
       when (now < tNext) $
         liftIO . threadDelay . round $ 1e6 * diffUTCTime tNext now
       Mod.put (Mod.Proxy @BDB.BestSequencedBlock) . BDB.BestSequencedBlock $
-        BDB.BestBlock (BDB.blockHeaderHash bh) (BDB.blockHeaderBlockNumber bh) (obTotalDifficulty b)
+        BDB.BestBlock (BDB.blockHeaderHash bh) (BDB.blockHeaderBlockNumber bh)
 
   $logDebugS "seq/pbft/send_checkpoints" . T.pack $ show ckpts
-  yieldMany $ ToUnseq <$> ckpts
+  writeUnseqCheckpoints ckpts
   $logDebugS "seq/pbft/send_p2p" . T.pack $ format p2pevs
-  yieldMany $ ToP2p <$> p2pevs
+  _ <- writeSeqP2pEvents p2pevs
   $logDebugS "seq/pbft/send_vm" . T.pack $ format vmevs
-  yieldMany $ ToVm <$> vmevs
+  _ <- writeSeqVmEvents vmevs
+  return ()
   where
     vmEvenP2pCheckptFilterHelper :: [OutEvent] -> ([VmEvent], [P2pEvent], [Checkpoint])
     vmEvenP2pCheckptFilterHelper (x : xs) = do
@@ -334,39 +267,13 @@ blockstanbulSend' msg = do
         _ -> (vms, p2ps, ctxs)
     vmEvenP2pCheckptFilterHelper [] = ([], [], [])
 
-privateWitnessableHash :: Keccak256 -> Keccak256 -> Keccak256
-privateWitnessableHash tHash cHash =
-  hash
-    . RL.rlpSerialize
-    $ RL.RLPArray [RL.rlpEncode tHash, RL.rlpEncode cHash]
-
-transformPrivateHashTXs ::
-  ( MonadLogger m,
-    HasPrivateHashDB m,
-    (Keccak256 `A.Alters` ChainHashEntry) m,
-    (Keccak256 `A.Alters` ()) m
-  ) =>
-  [(Timestamp, IngestTx)] ->
-  ConduitT a SeqEvent m ()
-transformPrivateHashTXs pairs = forM_ pairs $ \(ts, t@(IngestTx _ (TD.PrivateHashTX th' ch'))) -> do
-  motx <- wrapTransaction t
-  for_ motx $ \otx -> do
-    let privateWitnessHash = privateWitnessableHash th' ch'
-    pwitnessed <- wasTransactionHashWitnessed privateWitnessHash
-    unless pwitnessed $ do
-      witnessTransactionHash privateWitnessHash
-      runPrivateHashTX th' ch'
-      yield . ToP2p $ P2pTx otx
-      yield . ToVm $ VmTx ts otx
-
 transformFullTransactions ::
   ( MonadLogger m,
     MonadMonitor m,
-    HasFullPrivacy m,
-    (Keccak256 `A.Alters` ()) m
+    (Keccak256 `A.Alters` ()) m,
+    HasKafka m
   ) =>
-  [(Timestamp, IngestTx)] ->
-  ConduitT a SeqEvent m ()
+  [(Timestamp, IngestTx)] -> m ()
 transformFullTransactions pairs = do
   let logF = logFF "transformEvents/emitTxs"
   mOtxs <- forM pairs $ \(ts, itx) ->
@@ -384,112 +291,20 @@ transformFullTransactions pairs = do
             witnessTransactionHash witnessHash
             P.incCounter seqTxsUnwitnessed
             return $ Just (ts, otx)
-  let otxs = catMaybes mOtxs
-  forM_ (partitionWith (isPrivateChainTX . otBaseTx . snd) otxs) $ \(isPrivateChain, txs) ->
-    if not isPrivateChain
-      then do
-        logF $ "Sending " ++ show (length txs) ++ " public transactions to P2P and the VM"
-        yieldMany $ (ToVm . pairToVmTx) <$> txs
-        yieldMany $ (ToP2p . P2pTx . snd) <$> txs
-      else forM_ (partitionWith (TD.transactionChainId . otBaseTx . snd) txs) $ \(Just chainId, ptxs) -> do
-        logF . concat $
-          [ "Transforming ",
-            show (length txs),
-            " private transactions on chain ",
-            CL.yellow $ format chainId
-          ]
-        mapM_ (insertTransaction . snd) ptxs
-        yieldMany $ (ToVm . VmPrivateTx . snd) <$> ptxs -- we want to get these transactions into the
-        -- P2P indexer ASAP so we can return them to
-        -- peers requesting them
-        mcInfo <- join . fmap _chainIdInfo <$> A.lookup (Proxy :: Proxy ChainIdEntry) chainId
-        case mcInfo of
-          Nothing -> do
-            logF . concat $
-              [ "We haven't seen the details for chain ",
-                CL.yellow $ format chainId,
-                ". Inserting the chain Id into the GetChains list"
-              ]
-            requestChain chainId
-          Just cInfo -> do
-            forM_ ptxs $ \(ts, ptx) -> do
-              logF . concat $
-                [ "We know the details for chain ",
-                  CL.yellow $ format chainId,
-                  ". Sending to P2P."
-                ]
-              yield . ToP2p $ P2pTx ptx
-              --liftIO $ withLabel txMetrics "private_hash" incCounter
-              when (otOrigin ptx == TO.API) $ do
-                cHash <-
-                  getNewChainHash chainId >>= \case
-                    Nothing -> do
-                      let iHash = generateInitialChainHash cInfo
-                      logF . concat $
-                        [ "transformFullTransactions: ",
-                          "Encountered empty chain hash buffer for chain ID ",
-                          "Could not acquire new chain hash for chain ID ",
-                          TD.formatChainId $ Just chainId,
-                          ". Using initial chain hash instead: ",
-                          format iHash
-                        ]
-                      return iHash
-                    Just ch -> return ch
-                let tHash = txHash ptx
-                    th' = txHash ptx
-                    ch' = cHash
-                    phtx = ptx {otBaseTx = TD.PrivateHashTX th' ch'}
-                    privateWitnessHash = privateWitnessableHash th' ch'
-                witnessTransactionHash privateWitnessHash
-                logF . concat $
-                  [ "Created chain hash ",
-                    format cHash,
-                    " for transaction ",
-                    format tHash
-                  ]
-                yield . ToVm $ pairToVmTx (ts, phtx)
-                yield . ToP2p $ P2pTx phtx
-            yieldMany . map (ToVm . VmBlock) =<< runBlocks chainId
 
-transformTransactions ::
-  ( MonadLogger m,
-    MonadMonitor m,
-    HasFullPrivacy m,
-    (Keccak256 `A.Alters` ()) m
-  ) =>
-  [(Timestamp, IngestTx)] ->
-  ConduitT a SeqEvent m ()
-transformTransactions events = forM_ (partitionWith (isPrivateHashTX . itTransaction . snd) events) $ \(isPrivateHash, pairs) ->
-  if isPrivateHash
-    then transformPrivateHashTXs pairs
-    else transformFullTransactions pairs
-
-runBlockWithConsensus ::
-  ( MonadLogger m,
-    MonadMonitor m,
-    MonadBlockstanbul m,
-    HasFullPrivacy m,
-    (Keccak256 `A.Alters` DependentBlockEntry) m
-  ) =>
-  SequencedBlock ->
-  ConduitT a SeqEvent m ()
-runBlockWithConsensus sb = do
-  ses <-
-    runConduit
-      ( yield sb
-          .| runConsensus
-          .| hydrateAndEmit
-          .| sinkList
-      )
-  yieldMany ses
+            
+  let txs = catMaybes mOtxs
+  logF $ "Sending " ++ show (length txs) ++ " public transactions to P2P and the VM"
+  _ <- writeSeqVmEvents $ map pairToVmTx txs
+  _ <- writeSeqP2pEvents $ map (P2pTx . snd) txs
+  return ()
 
 expandBlock ::
   ( MonadLogger m,
     MonadMonitor m,
     (Keccak256 `A.Alters` DependentBlockEntry) m
   ) =>
-  SequencedBlock ->
-  m [OutputBlock]
+  SequencedBlock -> m [OutputBlock]
 expandBlock sb = do
   readiness <- enqueueIfParentNotEmitted sb
   case readiness of
@@ -497,9 +312,9 @@ expandBlock sb = do
       $logWarnS "expandBlock" . T.pack $ prettyBlock sb ++ " is not yet ready to emit."
       P.incCounter seqBlocksEnqueued
       return []
-    (ReadyToEmit totalPastDifficulty) -> do
+    ReadyToEmit -> do
       -- TODO: buildEmissionChain needs to do all of this so that we don't emit blocks missing transactions prematurely
-      dryChain <- buildEmissionChain sb totalPastDifficulty
+      dryChain <- buildEmissionChain sb
       if dryChain /= []
         then do
           $logInfoS "expandBlock" . T.pack $ prettyBlock sb ++ " is ready to emit! Emitting it and chain of dependents."
@@ -512,62 +327,40 @@ runConsensus ::
   ( MonadLogger m,
     MonadMonitor m,
     MonadBlockstanbul m,
-    (Keccak256 `A.Alters` DependentBlockEntry) m
+    (Keccak256 `A.Alters` DependentBlockEntry) m,
+    MonadReader SequencerConfig m,
+    HasKafka m
   ) =>
-  ConduitT SequencedBlock SeqEvent m ()
-runConsensus = awaitForever $ \sb -> do
-  hasPBFT <- lift blockstanbulRunning
+  SequencedBlock -> m ()
+runConsensus sb = do
+  hasPBFT <- blockstanbulRunning
   if not hasPBFT
     then do
-      obs <- lift $ expandBlock sb
-      traverse_ (yield . ToP2p . P2pBlock) obs
-      yieldMany $ ToVm . VmBlock <$> obs
+      obs <- expandBlock sb
+      flip traverse_ obs $ \ob -> do
+        _ <- writeSeqP2pEvents [P2pBlock ob]
+        return ()
+      _ <- writeSeqVmEvents $ map VmBlock obs
+      return ()
     else do
       let blk = sequencedBlockToBlock sb
       routed <-
         if isHistoricBlock blk
-          then lift $ map (PreviousBlock . outputBlockToBlock) <$> expandBlock sb
+          then map (PreviousBlock . outputBlockToBlock) <$> expandBlock sb
           else pure [UnannouncedBlock blk]
       -- Blockstanbul will check that the seals and validators match up before
       -- announcing it to the network or forwarding to the EVM.
       traverse_ blockstanbulSend' routed
 
-hydrateAndEmit ::
-  ( MonadLogger m,
-    MonadMonitor m,
-    HasFullPrivacy m
-  ) =>
-  ConduitT SeqEvent SeqEvent m ()
-hydrateAndEmit = awaitForever $ \case
-  ToVm (VmBlock ob) -> do
-    let logF = logFF "hydrateAndEmit"
-    let obHash = blockHash ob
-        orig = obOrigin ob
-    logF $ "Emitting block " ++ format obHash
-    chainsToEmit <- fmap _blockDependentChains . A.repsert (A.Proxy @EmittedBlock) obHash $ \case
-      Nothing -> pure $ EmittedBlock True M.empty
-      Just (EmittedBlock _ chains) -> pure $ EmittedBlock True chains
-    logF $ "Emitting block " ++ format obHash ++ ". Chains to emit: " ++ show (format <$> M.keys chainsToEmit)
-    ob' <- lift $ hydratePrivateHashes Nothing ob
-    case ob' of
-      Nothing ->
-        $logErrorS "hydrateAndEmit" . T.pack $
-          "hydratePrivateHashes didn't return a block for the main chain. This probably means there is a bug in the platform"
-      Just ob'' -> yield . ToVm $ VmBlock ob''
-    -- use ob's origin because we don't hold on to chain's original origin
-    transformGenesis . map (\(cId, info) -> IngestGenesis orig (cId, info)) $ M.toList chainsToEmit
-    lift . A.adjustStatefully_ (A.Proxy @EmittedBlock) obHash $ blockDependentChains .= M.empty
-  oe -> yield oe
-
 transformBlocks ::
   ( MonadLogger m,
     MonadMonitor m,
     MonadBlockstanbul m,
-    HasFullPrivacy m,
-    (Keccak256 `A.Alters` DependentBlockEntry) m
+    (Keccak256 `A.Alters` DependentBlockEntry) m,
+    MonadReader SequencerConfig m,
+    HasKafka m
   ) =>
-  [IngestBlock] ->
-  ConduitT a SeqEvent m ()
+  [IngestBlock] -> m ()
 -- ingestBlockToSequencedBlock :: IngestBlock -> Maybe SequencedBlock
 -- forM_ :: (Foldable t, Monad m) => t a -> (a -> m b) -> m ()
 transformBlocks ibs = do
@@ -578,68 +371,18 @@ transformBlocks ibs = do
           "Could not ECRecover the pubkey of certain Txs in Block " ++ prettyIBlock ib ++ "; not emitting"
         P.incCounter seqBlocksEcrfail -- couldnt ecrecover some transactions in this block. block is likely garbage
       Just sb -> do
-        runBlockWithConsensus sb
-
-transformGenesis ::
-  ( MonadLogger m,
-    MonadMonitor m,
-    HasFullPrivacy m
-  ) =>
-  [IngestGenesis] ->
-  ConduitT a SeqEvent m ()
-transformGenesis chains = forM_ chains $ \ig -> do
-  let logF = logFF "transformGenesis"
-  let og = ingestGenesisToOutputGenesis ig
-      (chainId, cInfo) = ogGenesisInfo og
-  logF $ "Transforming ChainInfo for chain " ++ CL.yellow (format chainId) ++ " with info " ++ show cInfo
-  lookupSeenChain chainId >>= \case
-    True -> do
-      logF "We've seen this chain before. Not emitting to VM"
-      chainsToEmit <- maybe [] (M.toList . _chainDependentChains) <$> A.lookup (A.Proxy @ChainIdEntry) chainId
-      transformGenesis $ map (\ci -> ig {igGenesisInfo = ci}) chainsToEmit
-      lift . A.adjustStatefully_ (A.Proxy @ChainIdEntry) chainId $ chainDependentChains .= M.empty
-    False -> do
-      logF "We haven't seen this chain before. Inserting into SeenChainDB and emitting to VM, P2P"
-      logF $ "Checking emission status of block " ++ format (creationBlock $ chainInfo cInfo)
-      seenCreationBlock <- fmap _emitted . lift . A.repsert (A.Proxy @EmittedBlock) (creationBlock $ chainInfo cInfo) $ \case
-        Nothing -> pure $ EmittedBlock False (M.singleton chainId cInfo)
-        Just (EmittedBlock emitted' depChains)
-          | emitted' -> pure $ EmittedBlock emitted' M.empty
-          | otherwise -> pure $ EmittedBlock emitted' (M.insert chainId cInfo depChains)
-      logF $ "Emission status of block " ++ format (creationBlock $ chainInfo cInfo) ++ ": " ++ show seenCreationBlock
-      let parentChainIds = M.elems . parentChains $ chainInfo cInfo
-      seenParentChains <- and <$> traverse (hasAllAncestorChains . Just) parentChainIds
-      logF $ "hasAllAncestorChains: " ++ show seenParentChains
-      if seenParentChains
-        then when seenCreationBlock $ do
-          yield . ToVm $ VmGenesis og
-          yield . ToP2p $ P2pGenesis og
-          yieldMany . map (ToVm . VmBlock) =<< insertNewChainInfo chainId cInfo
-          chainsToEmit <- maybe [] (M.toList . _chainDependentChains) <$> A.lookup (A.Proxy @ChainIdEntry) chainId
-          transformGenesis $ map (\ci -> ig {igGenesisInfo = ci}) chainsToEmit
-          lift . A.adjustStatefully_ (A.Proxy @ChainIdEntry) chainId $ chainDependentChains .= M.empty
-        else case parentChainIds of
-          [] ->
-            $logErrorS "transformGenesis" . T.pack $
-              concat
-                [ "The database claims to be missing parent chain info for chain ",
-                  format chainId,
-                  ", but its parent chain is the main chain. This probably means there is a bug in the platform."
-                ]
-          pChains -> for_ pChains $ \pChain -> A.repsert_ (A.Proxy @ChainIdEntry) pChain $ \case
-            Nothing -> pure $ ChainIdEntry Nothing emptyCircularBuffer S.empty $ M.singleton chainId cInfo
-            Just cie@ChainIdEntry {} -> pure $ cie & chainDependentChains %~ M.insert chainId cInfo
+        runConsensus sb
 
 splitEvents ::
   ( MonadLogger m,
     MonadMonitor m,
     MonadBlockstanbul m,
-    HasFullPrivacy m,
     (Keccak256 `A.Alters` DependentBlockEntry) m,
-    (Keccak256 `A.Alters` ()) m
+    (Keccak256 `A.Alters` ()) m,
+    MonadReader SequencerConfig m,
+    HasKafka m
   ) =>
-  [IngestEvent] ->
-  ConduitT a SeqEvent m () -- splitWith iEventType es) --> (IET, [IE]) ()IET, IE)
+  [IngestEvent] -> m ()
 splitEvents es = forM_ (splitWith iEventType es) $ \(eventType, events) ->
   let num = length events
       record :: (MonadIO m, MonadLogger m) => T.Text -> T.Text -> m ()
@@ -649,16 +392,10 @@ splitEvents es = forM_ (splitWith iEventType es) $ \(eventType, events) ->
    in case eventType of
         IETTransaction -> do
           record "inevent_type_transaction" "IngestTransactions"
-          transformTransactions $ map (\(IETx ts tx) -> (ts, tx)) events
+          transformFullTransactions $ map (\(IETx ts tx) -> (ts, tx)) events
         IETBlock -> do
           record "inevent_type_block" "IngestBlocks"
           transformBlocks $ map (\(IEBlock ob) -> ob) events
-        IETGenesis -> do
-          record "inevent_type_genesis" "IngestGenesises"
-          transformGenesis $ map (\(IEGenesis og) -> og) events
-        IETNewChainOrgName -> do
-          record "inevent_type_new_org_name" "IngestNewChainOrgName"
-          yieldMany $ map (\(IENewChainOrgName c cm) -> ToP2p $ P2pNewOrgName c cm) events
         IETBlockstanbul -> do
           record "inevent_type_blockstanbul" "IngestBlockstanbuls"
           blockstanbulSend $ map (\(IEBlockstanbul (WireMessage a m)) -> IMsg a m) events
@@ -673,28 +410,26 @@ splitEvents es = forM_ (splitWith iEventType es) $ \(eventType, events) ->
           traverse_ (\(IEDeleteDepBlock k) -> A.delete (A.Proxy @DependentBlockEntry) k) events
         IETGetMPNodes -> do
           record "inevent_type_get_mp_nodes" "GetMPNodes"
-          yieldMany $ map (\(IEGetMPNodes srs) -> ToP2p $ P2pGetMPNodes srs) events
+          _ <- writeSeqP2pEvents $ map (\(IEGetMPNodes srs) -> P2pGetMPNodes srs) events
+          return ()
         IETGetMPNodesRequest -> do
           record "inevent_type_get_mp_nodes_request" "GetMPNodesRequest"
-          yieldMany $ map (\(IEGetMPNodesRequest o srs) -> ToVm $ VmGetMPNodesRequest o srs) events
+          _ <- writeSeqVmEvents $ map (\(IEGetMPNodesRequest o srs) -> VmGetMPNodesRequest o srs) events
+          return ()
         IETMPNodesResponse -> do
           record "inevent_type_mp_nodes_response" "MPNodesResponse"
-          yieldMany $ map (\(IEMPNodesResponse o nds) -> ToP2p $ P2pMPNodesResponse o nds) events
+          _ <- writeSeqP2pEvents $ map (\(IEMPNodesResponse o nds) -> P2pMPNodesResponse o nds) events
+          return ()
         IETMPNodesReceived -> do
           record "inevent_type_mp_nodes_received" "MPNodesReceived"
-          yieldMany $ map (\(IEMPNodesReceived nds) -> ToVm $ VmMPNodesReceived nds) events
+          _ <- writeSeqVmEvents $ map (\(IEMPNodesReceived nds) -> VmMPNodesReceived nds) events
+          return ()
         IETPreprepareResponse -> do
           record "inevent_type_preprepare_response" "PreprepareResponse"
           blockstanbulSend $ map (\(IEPreprepareResponse decis) -> PreprepareResponse decis) events
 
 prettyIBlock :: IngestBlock -> String
 prettyIBlock IngestBlock {ibOrigin = o, ibBlockData = bd, ibReceiptTransactions = txs} = "Block #" ++ blockNonce ++ "/" ++ bHash ++ " (via " ++ format o ++ ", " ++ show (length txs) ++ " txs)"
-  where
-    blockNonce = show . number $ bd
-    bHash = format . BDB.blockHeaderHash $ bd
-
-prettyOBlock :: OutputBlock -> String
-prettyOBlock OutputBlock {obOrigin = o, obBlockData = bd, obReceiptTransactions = txs} = "Block #" ++ blockNonce ++ "/" ++ bHash ++ " (via " ++ format o ++ ", " ++ show (length txs) ++ " txs)"
   where
     blockNonce = show . number $ bd
     bHash = format . BDB.blockHeaderHash $ bd
@@ -715,17 +450,8 @@ prettyTx IngestTx {itOrigin = o, itTransaction = t} = prefix t ++ " via " ++ sho
     shortOrigin (TO.PeerString peer) = "Peer " ++ take 8 peer
     shortOrigin x = format x
 
-prettyOTx :: OutputTx -> String
-prettyOTx OutputTx {otOrigin = o, otBaseTx = t} = prefix t ++ " via " ++ shortOrigin o
-  where
-    prefix TD.MessageTX {} = "MessageTx [" ++ (format $ txHash t) ++ "]"
-    prefix TD.ContractCreationTX {} = "CreationTx[" ++ (format $ txHash t) ++ "]"
-    prefix TD.PrivateHashTX {} = "PrivateHashTx[" ++ (format $ txHash t) ++ "]"
-
-    shortOrigin (TO.PeerString peer) = "Peer " ++ take 8 peer
-    shortOrigin x = format x
-
-writeUnseqCheckpoints :: [Checkpoint] -> SequencerM ()
+writeUnseqCheckpoints :: (MonadIO m, MonadReader SequencerConfig m) =>
+                         [Checkpoint] -> m ()
 writeUnseqCheckpoints events = do
   ch <- asks (unseqCheckpoints . cablePackage)
   atomically . mapM_ (writeTQueue ch) $ events

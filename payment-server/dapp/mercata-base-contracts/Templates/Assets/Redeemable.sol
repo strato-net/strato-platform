@@ -59,7 +59,7 @@ abstract contract Redeemable is UTXO {
 
         UTXO newAsset = mint(_quantity);
         quantity -= _quantity;
-        uint restStatus = Redeemable(newAsset).issueRedemptionRequest(_redemptionId, owner);
+        uint restStatus = Redeemable(newAsset).issueRedemptionRequest(_redemptionId, getCurrentOwner());
 
         return (restStatus, address(newAsset));
     }
@@ -73,5 +73,11 @@ abstract contract Redeemable is UTXO {
         status = AssetStatus.PENDING_REDEMPTION;
 
         return RestStatus.OK;
+    }
+
+        function attachSale() public virtual override requireOwnerOrigin("attach sale") {
+        require(sale == address(0), "Sale is already assigned for this asset");
+        sale = msg.sender;
+        proposerFee = 0.01 * MercataProposerFee(feeAddress).getProposerFee();;
     }
 }

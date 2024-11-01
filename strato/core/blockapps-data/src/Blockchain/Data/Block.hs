@@ -82,8 +82,7 @@ instance BlockLike BlockHeader Transaction Block where
 
 data BestBlock = BestBlock
   { bestBlockHash :: Keccak256,
-    bestBlockNumber :: Integer,
-    bestBlockTotalDifficulty :: Integer
+    bestBlockNumber :: Integer
   }
   deriving (Eq, Show)
 

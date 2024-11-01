@@ -12,13 +12,23 @@ const { sendEmail, getUserName } = require("../helper/utils.js");
 const baseUrl = NODE_ENV === "prod" ? prodMarketplaceUrl : testnetMarketplaceUrl;
 
 async function handleOrderRewards(event, token) {
-  const purchaser = event.eventEvent.eventArgs.find(
-    (arg) => arg[0] === "purchaser"
-  )?.[1];
+  const purchaser = {
+    purchaserAddress: event.eventEvent.eventArgs.find(
+      (arg) => arg[0] === "purchaser"
+    )?.[1],
+    purchasersCommonName: event.eventEvent.eventArgs.find(
+      (arg) => arg[0] === "purchasersCommonName"
+    )?.[1]
+  };
 
-  const seller = event.eventEvent.eventArgs.find(
-    (arg) => arg[0] === "sellerAddress"
-  )?.[1];
+  const seller = {
+    sellerAddress: event.eventEvent.eventArgs.find(
+      (arg) => arg[0] === "sellerAddress"
+    )?.[1],
+    sellersCommonName: event.eventEvent.eventArgs.find(
+      (arg) => arg[0] === "sellersCommonName"
+    )?.[1]
+  };
 
   const status = event.eventEvent.eventArgs.find(
     (arg) => arg[0] === "status"
@@ -62,8 +72,7 @@ async function handleOrderRewards(event, token) {
 
   if (queryBody[0].count === 1) {
     console.log("User's first order");
-    const purchaserName = await getUserName(baseUrl, purchaser, token)
-    sendEmail(baseUrl, notificationUrl, 'firstPurchase', purchaserName, token);
+    sendEmail(baseUrl, notificationUrl, 'firstPurchase', purchaser.purchasersCommonName, token);
     eventKey = "FirstOrder";
   }
 
@@ -129,15 +138,15 @@ async function handleOrderReward(
 ) {
   try {
     console.log(
-      `Sending ${eventKey} reward to , ${purchaser}, ${buyerReward / 100}STRATS`
+      `Sending ${eventKey} reward to , ${purchaser.purchasersCommonName}, ${buyerReward / 100}STRATS`
     );
     console.log(
-      `Sending sale reward to , ${seller}, ${sellerReward / 100}STRATS`
+      `Sending sale reward to , ${seller.sellersCommonName}, ${sellerReward / 100}STRATS`
     );
 
     const transactions = [
-      {toAddress: seller, value: sellerReward },
-      {toAddress: purchaser, value: buyerReward }
+      {toAddress: seller.sellerAddress, value: sellerReward },
+      {toAddress: purchaser.purchaserAddress, value: buyerReward }
     ];
 
     const transactionResponse = await createTransactionPayload(
@@ -161,14 +170,11 @@ async function handleOrderReward(
     if (allSuccessful) {
       console.log("All reward transactions were successful:", response);
 
-      const purchaserName = await getUserName(baseUrl, purchaser, token);
-      const sellerName = await getUserName(baseUrl, seller, token);
-
       // To Purchaser
-      sendEmail(baseUrl, notificationUrl, 'additionalPurchase', purchaserName, token);
+      sendEmail(baseUrl, notificationUrl, 'additionalPurchase', purchaser.purchasersCommonName, token);
 
       // To Seller
-      sendEmail(baseUrl, notificationUrl, 'sellerReward', sellerName, token);
+      sendEmail(baseUrl, notificationUrl, 'sellerReward', seller.sellersCommonName, token);
 
     } else {
       console.log("Some reward transactions were not successful:", response);
@@ -176,10 +182,10 @@ async function handleOrderReward(
     return response;
   } catch (error) {
     console.log(
-      `Failed to send ${eventKey} reward to ${purchaser}, ${buyerReward / 100}STRATS`
+      `Failed to send ${eventKey} reward to ${purchaser.purchasersCommonName}, ${buyerReward / 100}STRATS`
     );
     console.log(
-      `Failed to send sale reward to ${seller}, ${sellerReward / 100}STRATS`
+      `Failed to send sale reward to ${seller.sellersCommonName}, ${sellerReward / 100}STRATS`
     );
     console.error("Error processing transaction:", error.message);
     throw error;

@@ -2,4 +2,4 @@ url: http://localhost:8080
 dapp:
   contract:
     name: Mercata
-    address: a3f917a3663eb66dbaa657dfa60c1250b310729c
+    address: 29af601eb00b77c887d125efbf02036dd53428dc
