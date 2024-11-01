@@ -145,7 +145,7 @@ const Inventory = ({ user }) => {
       limit,
       offset,
       debouncedSearchTerm,
-      category
+      category && category !== "All" ? category : undefined
     );
     actions.fetchSupportedTokens(dispatch);
   }, [dispatch, limit, offset, debouncedSearchTerm, category]);
@@ -222,7 +222,6 @@ const Inventory = ({ user }) => {
   };
 
   const handleTabSelect = (key) => {
-    if (key === "All") key = undefined;
     setCategory(key);
     setOffset(0);
     setPage(1);
