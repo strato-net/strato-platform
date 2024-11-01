@@ -84,20 +84,8 @@ describe("Payment Server - deploy contracts", function () {
 
   after(async () => {
     try {
-      fs.rm(contractDir, { recursive: true, force: true }, (err) => {
-        if (err) {
-          console.error("ERROR: unable to remove contract directory", err);
-        } else {
-          console.log("Contract directory removed successfully");
-        }
-      });
-      fs.rm(assetsDir, { recursive: true, force: true }, (err) => {
-        if (err) {
-          console.error("ERROR: unable to remove assets directory", err);
-        } else {
-          console.log("Assets directory removed successfully");
-        }
-      });
+      replaceInFiles(contractDir, process.env.BASE_CODE_COLLECTION, 'BASE_CODE_COLLECTION');
+      replaceInFiles(assetsDir, process.env.BASE_CODE_COLLECTION, 'BASE_CODE_COLLECTION');
     } catch (e) {
       console.error("ERROR: unable to remove BASE_CODE_COLLECTION address from contract files", e)
     }
