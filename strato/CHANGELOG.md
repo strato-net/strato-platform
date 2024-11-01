@@ -30,6 +30,8 @@ so that they could be properly moved to their respective version's subsection.
 - Added block.proposer to SolidVM
 - Reintroduced wire cache to strato-p2p to reduce redundant blockstanbul messages sent to the sequencer
 - Added pragma solidvm 12.0 and cascading pragma set inclusion logic
+- creation_block_timestamp added to all tables
+- block number updated to bigint
 
 ### Changed
 - Reduced Cirrus table indexing to top-level abstract contracts, or concrete contracts when there are no abstracts in the CC
