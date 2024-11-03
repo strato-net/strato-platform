@@ -9,16 +9,12 @@
 module Blockchain.Sequencer.DB.DependentBlockDB (
   DependentBlockDB,
   DependentBlockEntry,
-  HasDependentBlockDB,
+  HasDependentBlockDB(..),
   EmissionReadiness(..),
   bootstrapGenesisBlock,
-  getDependentBlockDB,
-  getWriteOptions,
-  getReadOptions,
   genericLookupDependentBlockDB,
   genericBatchInsertDependentBlockDB,
   genericBatchDeleteDependentBlockDB,
-  applyLDBBatchWrites,
   insertEmitted,
   enqueueIfParentNotEmitted,
   buildEmissionChain

@@ -22,13 +22,11 @@ module Blockchain.Sequencer.Monad
     RoundPeriod (..),
     runSequencerM,
     pairToVmTx,
-    clearLdbBatchOps,
     flushLdbBatchOps,
     clearDBERegistry,
     createFirstTimer,
     createNewTimer,
     fuseChannels,
-    loopTimeout,
   )
 where
 
@@ -94,7 +92,6 @@ data SequencerContext = SequencerContext
     _x509certInfoState :: !(Map Address (Modification X509CertInfoState)), --map to pubkey
     _ldbBatchOps :: !(Q.Seq LDB.BatchOp),
     _blockstanbulContext :: Maybe BlockstanbulContext,
-    _loopTimeout :: TMChan (),
     _latestRoundNumber :: IORef RoundNumber
   }
 
@@ -321,7 +318,6 @@ runSequencerM c mbc m = do
     dbPath <- asks depBlockDBPath
     stxSize <- asks seenTransactionDBSize
     depBlock <- LDB.open dbPath LDB.defaultOptions {LDB.createIfMissing = True, LDB.cacheSize = dbCS}
-    loopCh <- atomically newTMChan
     latestRound <- liftIO $ newIORef 0
     runStateT
       m
@@ -332,7 +328,6 @@ runSequencerM c mbc m = do
           _x509certInfoState = M.empty,
           _ldbBatchOps = Q.empty,
           _blockstanbulContext = mbc,
-          _loopTimeout = loopCh,
           _latestRoundNumber = latestRound
         }
 
