@@ -16,11 +16,16 @@ class TransactionController {
         try {
             const { dapp, params, query } = req
             const { limit = '2000', offset = '0', order, search = '', type, user, startDate, endDate } = query;
+
+            const queryData = { creator: process.env.SELLER, offset:0 }
+            const { inventories } = await dapp.getAllInventories({ ...queryData })
+            const assetsAddressArr = inventories.map(item=>item.address); 
+            const inventoriesWithImageUrl = inventories;
+
             let transactionQuery = {
                 limit: limit,
                 offset: offset,
                 order: 'createdDate.desc',
-                // or: `(sellersCommonName.eq.${user},purchasersCommonName.eq.${user})`,
                 id: search,
             }
 
@@ -34,7 +39,6 @@ class TransactionController {
             const TransferQuery = {
                 limit: limit,
                 offset: offset,
-                // or: `(oldOwnerCommonName.eq.${user},newOwnerCommonName.eq.${user})`,
                 order: 'transferDate.desc',
                 id: search
             }
@@ -44,31 +48,46 @@ class TransactionController {
                 TransferQuery['range'] = [`transferDate,${startDate},${endDate}`]
             }
 
-            let orderData, itemTransfers, outgoingRedemptions, incomingRedemptions, count=0;
+            let orderData = [], itemTransferData = [], count=0;
             let data = []
+            let redemptionData = [];
             if (type === 'Order' || !type) {
-                orderData = await dapp.getSaleOrders({ ...transactionQuery });
+                orderData = await dapp.getSaleOrders({ ...transactionQuery, assetAddress: assetsAddressArr });
                 count = count + orderData.count;
-                data = [...data, ...orderData.data]
+                data = [...data, ...orderData.data];                
             }
             if (type === 'Transfer' || !type) {
-                itemTransfers = await dapp.getAllItemTransferEvents(TransferQuery);
-                count = count + itemTransfers.total;
-                data = [...data, ...itemTransfers.transfers]
+                for(let i=0; i<assetsAddressArr.length; i= i + 100){
+                    const currentAddresses = assetsAddressArr.slice(i, i + 100);
+                const itemTransfers = await dapp.getAllItemTransferEvents({...TransferQuery, assetAddress: currentAddresses});
+                itemTransferData.push(...itemTransfers?.transfers)
+                }
+                count = count + itemTransferData.length;
+                data = [...data, ...itemTransferData]
             }
             if (type === 'Redemption' || !type) {
-                // outgoingRedemptions = await dapp.getOutgoingRedemptionRequests(redemptionQuery)
-                // incomingRedemptions = await dapp.getIncomingRedemptionRequests(redemptionQuery)
-                const allRedemptions = await dapp.getAllRedemptionRequests(redemptionQuery)
-                count = count + Number(allRedemptions.count);
+                for(let i=0; i<assetsAddressArr.length; i= i + 100){
+                    const currentAddresses = assetsAddressArr.slice(i, i + 100);
+                const allRedemptions = await dapp.getAllRedemptionRequests({...redemptionQuery, assetAddress: currentAddresses})
+                
                 let redemptions = [...allRedemptions.data];
+                redemptionData.push(...redemptions)
                 redemptions = redemptions.filter((value, index, self) =>
                     index === self.findIndex((t) => (
                         t.redemption_id === value.redemption_id
                     ))
                 );
-                data = [...data, ...redemptions]
+                };
+
+                redemptionData = redemptionData.filter((value, index, self) =>
+                    index === self.findIndex((t) => (
+                        t.redemption_id === value.redemption_id
+                    ))
+                );
+                count = count + Number(redemptionData?.length);
+                data = [...data, ...redemptionData]
             }
+            
             let assetAddress = data.filter((item)=>{
                 if(item.assetAddress){
                     return item.assetAddress
@@ -80,10 +99,6 @@ class TransactionController {
             assetAddress = assetAddress.map((item)=>item.assetAddress || item.assetAddresses[0])
             assetAddress = [...new Set(assetAddress)]
 
-            const queryData = {address: assetAddress, creator: process.env.SELLER, limit:2000, offset:0 }
-            const { inventories } = await dapp.getAllInventories({ ...queryData })
-            const assetsAddressArr = inventories.map(item=>item.address); 
-            const inventoriesWithImageUrl = inventories;
             let sortData = data.sort((a, b) => ( b?.transferDate || b?.redemptionDate || b?.createdDate) - ( a?.transferDate || a?.redemptionDate || a?.createdDate));
             sortData = sortData.filter(item=>assetsAddressArr.includes(item?.assetAddress || item?.assetAddresses[0]))  
             const newData = sortData.map((item) => {

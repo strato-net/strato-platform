@@ -166,16 +166,23 @@ async function getSaleHistory(user, args, options) {
 async function getAll(admin, args = {}, defaultOptions) {
     const { saleAddresses, assetAddresses, isOpen, range, saleGtField, saleGtValue, ...restArgs } = args;
     const options = { ...defaultOptions, org: 'BlockApps', app: 'Mercata' }
+    let salesArr = [];
     let sales;
     if (assetAddresses) {
+
+    for(let i=0; i<assetAddresses.length; i= i + 100){
+        const currentAddresses = assetAddresses.slice(i, i + 100);
         sales = await searchAllWithQueryArgs(contractName, {
-            assetToBeSold: assetAddresses,
+            assetToBeSold: currentAddresses,
             gtField: saleGtField,
             gtValue: saleGtValue,
             isOpen: isOpen,
             range: range,
             queryOptions: { 'select': '*,BlockApps-Mercata-Sale-paymentServices(*)' }
         }, options, admin);
+        salesArr.push(...sales)
+    }
+
     }
     else {
         sales = await searchAllWithQueryArgs(contractName, {
@@ -184,9 +191,10 @@ async function getAll(admin, args = {}, defaultOptions) {
             queryOptions: { 'select': '*,BlockApps-Mercata-Sale-paymentServices(*)' },
             ...restArgs,
         }, options, admin);
+        salesArr.push(...sales)
     }
 
-    return sales ? sales.map((sale) => marshalOut(sale)) : undefined;
+    return salesArr ? salesArr?.map((sale) => marshalOut(sale)) : undefined;
 }
 
 

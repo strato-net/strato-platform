@@ -465,7 +465,7 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
   };
 
   contract.getAllRedemptionRequests = async function (args, options = optionsNoChainIds) {
-    const { order, search, range, limit, offset } = args;
+    const { order, search, range, limit, offset,assetAddress } = args;
     const queryParams = new URLSearchParams({
       redemptionId: search,
       order: order,
@@ -476,7 +476,7 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
     try {
       let redemptions = [];
       let count = 0;
-      const redemptionEvents = await redemptionServiceJs.getRedemptions(rawAdmin,{ limit }, options);
+      const redemptionEvents = await redemptionServiceJs.getRedemptions(rawAdmin,{ limit, asset:assetAddress }, options);
       const redemptionServiceAddresses = redemptionEvents.map(r => r.address);
       let redemptionServices = await redemptionServiceJs.getAll(rawAdmin, { address: redemptionServiceAddresses }, options);
 
@@ -515,7 +515,6 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
         redemptions.sort((a, b) => a.createdDate - b.createdDate);
       else
         redemptions.sort((a, b) => b.createdDate - a.createdDate);
-
 
       return {data:redemptions, count};
     } catch (error) {
@@ -947,7 +946,9 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
     }
   })
 
-  const sales = await saleJs.getAll(rawAdmin, { saleAddresses: saleAddressArr }, options);
+  const sales = await saleJs.getAll(rawAdmin, { saleAddresses: saleAddressArr, assetAddresses:assetAddress }, options);
+  let salesAssetAddress = sales.map(item=>item?.assetToBeSold);
+  let uniqueSalesAssetAddress = Array.from(new Set(salesAssetAddress));
 
   let assets = [];
       for (const sale of sales) {
@@ -968,6 +969,12 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
         return {...item, ...saleData }
       })
 
+      data = data.filter((item)=>{
+        if(item?.assetAddress){
+          return item
+        }
+      })
+      
   return {data:data, count: total};
   }
 
