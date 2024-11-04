@@ -200,13 +200,17 @@ pipeline {
       }
     }
 
-//    stage('Some quick tests') {
-//      steps {
-//        parallel(
-//
-//        )
-//      }
-//    }
+    stage('Some quick tests') {
+      parallel {
+        stage('Node Status') {
+          steps {
+            script {
+              lib.checkNodeStatusHealth()
+            }
+          }
+        }
+      }
+    }
 
     stage('Release') {
       steps {

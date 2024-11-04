@@ -66,10 +66,10 @@ indexP2P idxEvents = do
     RanBlock b -> do
       $logInfoS "p2pIndexer" . T.pack $ "Inserting Redis block with sha: " ++ format (blockHash b)
       A.insert (A.Proxy @(P2P OutputBlock)) (blockHash b) $ P2P b
-    NewBestBlock (sha, num, tdiff) -> do
+    NewBestBlock (sha, num) -> do
       $logInfoS "p2pIndexer" . T.pack $
-        "Updating RedisBestBlock as (" ++ format sha ++ ", " ++ show num ++ ", " ++ show tdiff ++ ")"
-      Mod.put (Mod.Proxy @(P2P BestBlock)) . P2P $ BestBlock sha num tdiff
+        "Updating RedisBestBlock as (" ++ format sha ++ ", " ++ show num ++ ")"
+      Mod.put (Mod.Proxy @(P2P BestBlock)) . P2P $ BestBlock sha num
     NewChainInfo cId cInfo -> do
       $logInfoS "p2pIndexer" . T.pack $
         "Inserting ChainInfo for chain " ++ format cId ++ ": " ++ show cInfo

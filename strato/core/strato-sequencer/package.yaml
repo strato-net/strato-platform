@@ -20,7 +20,6 @@ library:
     - blockapps-data
     - blockapps-datadefs
     - blockapps-init
-    - blockapps-privacy
     - blockapps-vault-wrapper-api
     - blockapps-vault-wrapper-client
     - blockstanbul

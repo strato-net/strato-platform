@@ -12,7 +12,6 @@ import {
   ContractDefinition,
   TransactionResultHash,
   CallArgs,
-  Chain,
   SendTx
 } from "./types";
 
@@ -97,7 +96,6 @@ import {
  * @property {String} method Name of the method to call
  * @property {Object} args Arguments for the method call
  * @property {Number} [value] Number of tokens to send to the smart contract
- * @property {String} [chainid] Chain ID of the private chain if the contract is being called on a private chain
  * @property {module:rest~TxParams} [txParams] Defines gas limit and gas price for transaction execution
  */
 
@@ -123,7 +121,6 @@ import {
   * @property {String} toAddress Address of the receiver
   * @property {Number} value Amount of tokens to transfer in wei
   * @property {module:rest~TxParams} [txParams] Defines gas limit and gas price for transaction execution
-  * @property {String} [chainid] Chain ID of the private chain if the transfer is being executed on a private chain
   */
 
  /**
@@ -149,7 +146,6 @@ import {
  * @property {String} stateDiff The hash of the new state-diff from this transaction
  * @property {String} time Amount of time the VM took to execute this transaction
  * @property {String} kind Type of VM used to execute this transaction. `SolidVM` or `EVM`
- * @property {String} chainid Chain ID (present if transaction was executed on a private chain)
  * @property {String} response Raw output of executing transaction
  * @property {String} blockHash Block hash of the block in which this transaction was finalized
  * @property {String} transactionHash Transaction hash
@@ -171,50 +167,10 @@ import {
  * @typedef {Object} UploadedContract This object describes the result of uploading one contract in a list of smart
  * contracts being uploaded to STRATO
  * @property {String} name Name of the smart contract
- * @property {String} chainId Chain identifier if the smart contract is being uploaded to a private chain.
- * This property is `null` for main chain smart contracts
  * @property {String} [address] Contract address. Populated by uploading a contract to STRATO.
  * @property {module:rest~CodeHash} codeHash Describes the codehash and the VM used to generate the code hash
  * @property {String} bin The compiled Solidity byte code
  * @property {Object} xabi An object defining the contract metadata
- */
-
- /**
- * 
- * @typedef {Object} Member The object containing the member info for a chain
- * @property {String} address The address of a user
- * @property {String} enode The 'enode' address of the user - This is their node's IP address and public key 
- * concatenated an "@" sign  
- */
-
- /**
- * 
- * @typedef {Object} Balance The object containing the balance info for each member of a chain
- * @property {String} address The address of a member
- * @property {Number} balance The balance in wei of the member  
- */
-
-/**
-  * 
-  * @typedef {Object} CodePtr The object containing information about a Code Pointer for a private chain's Governance contract
-  * @property {String} name The name of the contract being referenced
-  * @property {String} account The account address of the contract being referenced
-*/
-
- /**
- * @typedef {Object} Chain The object containing arguments of a chain
- * @property {String} label The name of the chain 
- * @property {String} [src] Source contract - Not included if using a Code Pointer
- * @property {String} [contractName] The name of the contract - Not included if using a Code Pointer
- * @property {Object} args The args for the source contract constructor
- * @property {Array} members Array containing the members of the chain
- * @property {Array} balances Array containng the balances of each member of the chain
- * @property {module:rest~CodePtr} [codePtr] An object containing the contract name and account of the code poitner to be used for this chain
- */
-
- /**
- * @typedef {Object} ChainHash The hash of a chain
- * @property {String} hash The hash of a chain
  */
 
 // =====================================================================
@@ -280,7 +236,6 @@ function assertTxResultList(txResultList) {
  * //    stateDiff: '',
  * //    time: 0.000694605,
  * //    kind: 'EVM',
- * //    chainId: null,
  * //    response:
  * //     '608060405260043...a6504300c1825957a56e0c10029',
  * //    blockHash:
@@ -296,7 +251,6 @@ function assertTxResultList(txResultList) {
  * //  { tag: 'Upload',
  * //    contents:
  * //     { bin: 'bin removed.',
- * //       chainId: null,
  * //       address: 'bf68d882d8e95d94926379538ccab45932e26c03',
  * //       'bin-runtime': 'bin-runtime removed.',
  * //       codeHash: [Object],
@@ -341,7 +295,6 @@ async function resolveResult(user, pendingTxResult, options:Options) {
  * //    stateDiff: '',
  * //    time: 0.000694605,
  * //    kind: 'EVM',
- * //    chainId: null,
  * //    response:
  * //     '608060405260043...a6504300c1825957a56e0c10029',
  * //    blockHash:
@@ -357,7 +310,6 @@ async function resolveResult(user, pendingTxResult, options:Options) {
  * //  { tag: 'Upload',
  * //    contents:
  * //     { bin: 'bin removed.',
- * //       chainId: null,
  * //       address: 'bf68d882d8e95d94926379538ccab45932e26c03',
  * //       'bin-runtime': 'bin-runtime removed.',
  * //       codeHash: [Object],
@@ -591,7 +543,6 @@ async function createContractResolve(user:OAuthUser, pendingTxResult, options:Op
  * // returns
  * // [{ bin:
  * //     '608060405234801561001057600080...6504300c1825957a56e0c10029',
- * //    chainId: null,
  * //    address: 'b728ad420aadd7082380e2024b935dd2898f6117',
  * //    'bin-runtime':
  * //     '6080604052600436106049576000357...6504300c1825957a56e0c10029',
@@ -755,15 +706,14 @@ async function getBlocResults(user:OAuthUser, hashes:string[], options:Options) 
 
 /**
  * @static
- * This call gets the list of smart contract names on a particular chain
+ * This call gets the list of smart contract names on the chain
  *
  * @param {module:rest~User} user This must contain the token for the user
- * @param chainId The chainId of the chain to query.
  * @param {module:rest~Options} options This identifies the options and configurations for this call
  * @returns {Object} Returns an object with all contract names on the chain as keys.
  */
-async function getContracts(user:OAuthUser, chainId, options:Options) {
-  return api.getContracts(user, chainId, options);
+async function getContracts(user:OAuthUser, options:Options) {
+  return api.getContracts(user, options);
 }
 
 /**
@@ -773,12 +723,11 @@ async function getContracts(user:OAuthUser, chainId, options:Options) {
  * @param {module:rest~User} user This must contain the token for the user
  * @param name The name of the contract to query.
  * @param addresss The address of the contract to query.
- * @param chainId The chainId of the contract to query.
  * @param {module:rest~Options} options This identifies the options and configurations for this call
  * @returns {Object} Returns an object with the contract source, code pointer info, and xabi
  */
-async function getContractsContract(user:OAuthUser, name, address, chainId, options:Options) {
-  return api.getContractsContract(user, name, address, chainId, options);
+async function getContractsContract(user:OAuthUser, name, address, options:Options) {
+  return api.getContractsContract(user, name, address, options);
 }
 
 /**
@@ -1050,7 +999,6 @@ async function callListResolve(user:BlockChainUser, pendingTxResultList, options
  * //  '168f76ccf50582953d2fc9cbdc3bb60bd777562662dd9a2330ef29edab282a5c',
  * // gasLimit: 32100000000,
  * // codeOrData: '',
- * // chainId: null,
  * // gasPrice: 1,
  * // to: 'cdc7e277d9aecbce6aba5b9b16de815cadad3d2b',
  * // value: '100000000',
@@ -1068,7 +1016,7 @@ async function callListResolve(user:BlockChainUser, pendingTxResultList, options
  * // xabi: 'xabi removed.' }
  *
  * @param {module:rest~User} user This must contain the token for the user
- * @param {module:rest~SendArgs} sendTx This describes the recipient, amount of tokens and the chain id (optional) for
+ * @param {module:rest~SendArgs} sendTx This describes the recipient, and the amount of tokens for
  * the token transfer
  * @param {module:rest~Options} options This identifies the options and configurations for this call
  * @returns {module:rest~TxResultWrapper} If `options.async` is set, only the hashes are populated, otherwise all the
@@ -1101,7 +1049,6 @@ async function send(user, sendTx:SendTx, options:Options) {
  * //  '168f76ccf50582953d2fc9cbdc3bb60bd777562662dd9a2330ef29edab282a5c',
  * // gasLimit: 32100000000,
  * // codeOrData: '',
- * // chainId: null,
  * // gasPrice: 1,
  * // to: 'cdc7e277d9aecbce6aba5b9b16de815cadad3d2b',
  * // value: '100000000',
@@ -1119,7 +1066,7 @@ async function send(user, sendTx:SendTx, options:Options) {
  * // xabi: 'xabi removed.' }]
  *
  * @param {module:rest~User} user This must contain the token for the user
- * @param {module:rest~SendArgs[]} sendTx This describes the recipient, amount of tokens and the chain id (optional) for
+ * @param {module:rest~SendArgs[]} sendTx This describes the recipient, and the amount of tokens for
  * the token transfer
  * @param {module:rest~Options} options This identifies the options and configurations for this call
  * @returns {module:rest~TxResultWrapper[]} If `options.async` is set, only the hashes are populated, otherwise all the
@@ -1164,7 +1111,6 @@ async function sendMany(user, sendTxs:SendTx[], options:Options) {
  * );
  * // Returns
  * // [ { address: '2793d0f3afc31720ef18f6736073154e9131b21e',
- * //     chainId: '',
  * //     block_hash:
  * //      '5f306c319d9493fa77d14516e6fa12accc9e6a1b31b3e32ea016270e529b5cda',
  * //     block_timestamp: '2020-08-04 15:59:20 UTC',
@@ -1209,7 +1155,6 @@ async function search(user:OAuthUser, contract:Contract, options:Options) {
  * const result = await rest.searchUntil(stratoUser, {name: "SimpleStorage"}, predicate, queryOptions);
  * // Returns
  * // [ { address: '60fb089dc62858df014819d618aa3f43391ddb9c',
- * //     chainId: '',
  * //     block_hash:
  * //      'fb7edc20a2678ca60024f81d926d1637eb418012beae2fedb7e7c4250406ea82',
  * //     block_timestamp: '2020-08-04 20:48:18 UTC',
@@ -1251,7 +1196,6 @@ async function searchUntil(user:OAuthUser, contract:Contract, predicate, options
  * // Returns
  * // { data:
  * //    [ { address: '1db4cdb5051bceb5fd0cfa8f186472bd47b5a29e',
- * //        chainId: '',
  * //        block_hash:
  * //         '202f910a94fe10b5f0e2fa1ab40cfad94dada3d5cd38a46255bfbb168d7f2229',
  * //        block_timestamp: '2020-08-06 14:41:05 UTC',
@@ -1300,7 +1244,6 @@ async function searchWithContentRange(user:OAuthUser, contract:Contract, options
  * // Returns
  * // { data:
  * //    [ { address: '07c9cb29ac43fe2257143074fb344203accb53eb',
- * //        chainId: '',
  * //        block_hash:
  * //         '0e39030b10d80e5abaaf90a4b2d2322644fbb7b3b5cc0c8ea52a95d91adcd4ff',
  * //        block_timestamp: '2020-08-05 16:49:28 UTC',
@@ -1312,7 +1255,6 @@ async function searchWithContentRange(user:OAuthUser, contract:Contract, options
  * //        intValue: 2000,
  * //        stringValue: '_2000_' },
  * //      { address: '64560dd4c8789663303e97937f732976d98dab95',
- * //        chainId: '',
  * //        block_hash:
  * //         '6840a306239c9f0e31359f9950a12e2a3595690273d38ce52bae970e26cd80e6',
  * //        block_timestamp: '2020-08-05 16:49:29 UTC',
@@ -1324,7 +1266,6 @@ async function searchWithContentRange(user:OAuthUser, contract:Contract, options
  * //        intValue: 2001,
  * //        stringValue: '_2001_' },
  * //      { address: '9f7f1f4a6479463145bab645b64acecc230f9332',
- * //        chainId: '',
  * //        block_hash:
  * //         '50c25b7e693904b545bc7b9003c0eb57a6149d0bd42f12aac72962e01ae8588a',
  * //        block_timestamp: '2020-08-05 16:49:30 UTC',
@@ -1336,7 +1277,6 @@ async function searchWithContentRange(user:OAuthUser, contract:Contract, options
  * //        intValue: 2002,
  * //        stringValue: '_2002_' },
  * //      { address: 'c1307553863b1a932f2a5d994926b64ecedc890e',
- * //        chainId: '',
  * //        block_hash:
  * //         '1e674f96f42c08897d51ede082c95756493c26deb552588f854c44aa6f5adc4a',
  * //        block_timestamp: '2020-08-05 16:49:31 UTC',
@@ -1363,129 +1303,6 @@ async function searchWithContentRangeUntil(user:OAuthUser, contract:Contract, pr
 
   const results = await util.until(predicate, action, options);
   return results;
-}
-
-// =====================================================================
-//   Chains
-// =====================================================================
-
-/**
- * @static
- * This function returns info about a private chain given its chainID
- * @example
- *
- * const globalConfig = fsUtil.getYaml("config.yaml");
- * const options = { config: globalConfig, logger: console };
- * const queryOptions = {
- *   ...options,
- *   query: {}
- * };
- * const chainId = await rest.createChain(stratoUser, chain, contract, options);
- * const result = await rest.getChain(stratoUser, chainId, options);
- * // Returns
- * // { id:
- * //    'f99d95cf739bb7cc66fe16e352cd346def7d3c4b3f145f859072a2aae7119344',
- * //   info:
- * //    { balances: [ [Object], [Object] ],
- * //      members: [ [Object] ],
- * //      label: 'airline-2' } }
- * @param {module:rest~User} user This must contain the token for the user
- * @param {module:rest~ChainHash} chainID This must be the chainID of an existing private chain
- * @param {module:rest~Options} options This identifies the options and configurations for this call
- * @returns {module:rest~ChainInfo} Info about requested chain
- */
-
-async function getChain(user:OAuthUser, chainId:string, options:Options) {
-  const results = await api.getChains([chainId], setAuthHeaders(user, options));
-  return results && results.length > 0 ? results[0] : {};
-}
-
-/**
- * @static
- * This function returns info about multiple private chains given an array of chain IDs
- * @example
- *
- * const globalConfig = fsUtil.getYaml("config.yaml");
- * const options = { config: globalConfig, logger: console };
- * const queryOptions = {
- *   ...options,
- *   query: {}
- * };
- * const result = await rest.getChains(stratoUser, [], options);
- * // Returns
- * // [ { id:
- * //      'f99d95cf739bb7cc66fe16e352cd346def7d3c4b3f145f859072a2aae7119344',
- * //     info: { balances: [Array], members: [Array], label: 'airline-2' } },
- * //   { id:
- * //      'a72d6955662b1d2da4d338f8c87833592ebc490938308a42d3d528180ae55530',
- * //     info: { balances: [Array], members: [Array], label: 'airline-3' } },
- * //   { id:
- * //      '9f3a050a34faaab7d6d4c5c17bd70b0d1c2c9a6d40c1681323167fb43407bf18',
- * //     info: { balances: [Array], members: [Array], label: 'airline-5' } } ]
- * @param {module:rest~User} user This must contain the token for the user
- * @param {module:rest~ChainHash[]} chainIDs This must be the array of chainIDs of existing private chains
- * @param {module:rest~Options} options This identifies the options and configurations for this call
- * @returns {module:rest~ChainInfo[]} Info about requested chain(s)
- */
-
-async function getChains(user:OAuthUser, chainIds:string[], options:Options) {
-  const results = await api.getChains(chainIds, setAuthHeaders(user, options));
-  return results;
-}
-
-/**
- * @static
- * This function creates a private chain based on arguments given
- * @example
- * const createChainArgs = (uid, members) => {
- *  const contractName = `TestContract_${uid}`;
- *  const memberList = members.map(address => {
- *    return { address: address, enode };
- *  });
- *  const balanceList = members.map(address => {
- *    return { address: address, balance };
- *  });
- *
- *  const chain = {
- *    label: `airline-${uid}`,
- *    src: `contract ${contractName} { }`,
- *    members: memberList,
- *    balances: balanceList,
- *    contractName
- *  };
- *
- *  return { chain, contractName };
- *
- *  };
- *  const uid = 5;
- *  const { chain, contractName: name } = createChainArgs(uid, [
- *    stratoUser.address
- *  ]);
- * const chainId = await rest.createChain(stratoUser, chain, contract, options);
- * // Returns
- * // "a72d6955662b1d2da4d338f8c87833592ebc490938308a42d3d528180ae55530"
- * @param {module:rest~User} user This must contain the token for the user
- * @param {module:rest~Chain} chain This must be the object containing the arguments for the chain
- * @param {module:rest~Contract} contract This must be the name of the contract
- * @param {module:rest~Options} options This identifies the options and configurations for this call
- * @returns {module:rest~ChainHash} Hash of the newly created chain
- */
-
-async function createChain(user:OAuthUser, chain:Chain, contract:Contract, options:Options) {
-  const result = await api.createChain(
-    {
-      ...chain,
-      contract: contract.name,
-      metadata: constructMetadata(options, contract.name)
-    },
-    setAuthHeaders(user, options)
-  );
-  return result;
-}
-
-async function createChains(user, chains, options:Options) {
-  const result = await api.createChains(chains, setAuthHeaders(user, options));
-  return result;
 }
 
 // =====================================================================
@@ -1645,7 +1462,6 @@ async function debugPostFuzz(user:OAuthUser, args, options:Options) {
  *
  * // Returns
  * // { address: '2b755e392056c9b58f4f71da7ea8f47f553dd50b',
- * //   chainId: '',
  * //   block_hash:
  * //    '4cd55ea1189677fc32be1b4bbd9f93d75c81610c7bafb4f09964197a6b3096fa',
  * //   block_timestamp: '2020-08-12 16:14:16 UTC',
@@ -1736,11 +1552,6 @@ export default {
   searchUntil,
   searchWithContentRange,
   searchWithContentRangeUntil,
-  //
-  createChain,
-  createChains,
-  getChain,
-  getChains,
   //
   pingOauth,
   //

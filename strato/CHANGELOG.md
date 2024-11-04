@@ -14,7 +14,18 @@ BlockApps engineers - for more context, see [here](https://blockappsdev.slack.co
 All changes merged to `develop` should be documented in "Unreleased" until the version is finalized
 so that they could be properly moved to their respective version's subsection.
 
-## [Unreleased] 
+## [Unrealeased]
+### Added
+- Partial support for ipv6
+
+### Changed
+
+### Fixed
+- Ethereum-discovery now looks at udp_enable_time instead of enable_time for bonded/available peers 
+
+### Removed
+
+## [12.2] - 10/28/2024 
 ### Added
 - Added block.proposer to SolidVM
 - Reintroduced wire cache to strato-p2p to reduce redundant blockstanbul messages sent to the sequencer
