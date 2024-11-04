@@ -141,7 +141,7 @@ spec = do
   it "should be able to process array sentinels" $ do
     valueToSolidityValue (V.ValueArrayDynamic $ I.singleton 2 (V.ValueArraySentinel 2))
       `shouldBe` SolidityArray [SolidityNum 0, SolidityNum 0]
-
+  
   describe "Array serialization" $ do
     it "should create JSON entries" $ do
       let testAdd = Address $ fst . head . readHex $ "ADDRESS"
@@ -175,11 +175,14 @@ spec = do
                   ]
               )
             
-
-      --  
-      [vehicleCreate, _, _, _, vehicleInsert] <- runLoggingT . runConduit $ createInserts  input .| sinkList
+      [vehicleCreate, _, _, _, vehicleInsert] <- runLoggingT . runConduit $ createInserts input .| sinkList
       vehicleCreate
         `shouldBe` [r|CREATE TABLE IF NOT EXISTS "Vehicle" (address text,
+    creation_block_hash text,
+    creation_block_timestamp text,
+    creation_block_number bigint,
+    creation_transaction_hash text,
+    creation_`transaction_sender text,
     block_hash text,
     block_timestamp text,
     block_number bigint,
@@ -191,6 +194,11 @@ spec = do
 
       vehicleInsert
         `shouldBe` [r|INSERT INTO "Vehicle" ("address",
+    "creation_block_hash",
+    "creation_block_timestamp",
+    "creation_block_number",
+    "creation_transaction_hash",
+    "creation_transaction_sender",
     "block_hash",
     "block_timestamp",
     "block_number",
@@ -199,6 +207,11 @@ spec = do
     "creator",
     "root")
   VALUES ('0000000000000000000000000000000000000add',
+    '2b47410f675ac98038c44d14a87eac6855e0bfcbb0473649c22e147a789a9f08',
+    '2018-09-16 18:28:52.607875 UTC',
+    '123',
+    '242d201a68fa4440fcb3c77610785eb207b5a8b9f88208a3525efe6a7677ed59',
+    '0000000000000000000000000000000000000add',
     '2b47410f675ac98038c44d14a87eac6855e0bfcbb0473649c22e147a789a9f08',
     '2018-09-16 18:28:52.607875 UTC',
     '123',
@@ -255,6 +268,11 @@ spec = do
 
       vehicleCreate
         `shouldBe` [r|CREATE TABLE IF NOT EXISTS "Vehicle2" (address text,
+    creation_block_hash text,
+    creation_block_timestamp text,
+    creation_block_number bigint,
+    creation_transaction_hash text,
+    creation_`transaction_sender text,
     block_hash text,
     block_timestamp text,
     block_number bigint,
@@ -267,6 +285,7 @@ spec = do
       historyCreate
         `shouldBe` [r|CREATE TABLE IF NOT EXISTS "history@Vehicle2" (address text,
     block_hash text,
+    creation_block_timestamp text,
     block_timestamp text,
     block_number bigint,
     transaction_hash text,
@@ -304,6 +323,11 @@ FOR EACH ROW EXECUTE PROCEDURE "insert_or_update_Vehicle2_history_table"();|]
 
       vehicleInsert
         `shouldBe` [r|INSERT INTO "Vehicle2" ("address",
+    "creation_block_hash",
+    "creation_block_timestamp",
+    "creation_block_number",
+    "creation_transaction_hash",
+    "creation_transaction_sender",
     "block_hash",
     "block_timestamp",
     "block_number",
@@ -312,6 +336,11 @@ FOR EACH ROW EXECUTE PROCEDURE "insert_or_update_Vehicle2_history_table"();|]
     "creator",
     "root")
   VALUES ('0000000000000000000000000000000000000add',
+    '2b47410f675ac98038c44d14a87eac6855e0bfcbb0473649c22e147a789a9f08',
+    '2018-09-16 18:28:52.607875 UTC',
+    '123',
+    '242d201a68fa4440fcb3c77610785eb207b5a8b9f88208a3525efe6a7677ed59',
+    '0000000000000000000000000000000000000add',
     '2b47410f675ac98038c44d14a87eac6855e0bfcbb0473649c22e147a789a9f08',
     '2018-09-16 18:28:52.607875 UTC',
     '123',
@@ -366,6 +395,11 @@ FOR EACH ROW EXECUTE PROCEDURE "insert_or_update_Vehicle2_history_table"();|]
         runLoggingT . runConduit $ createInserts  input .| sinkList
       vehicleCreate
         `shouldBe` [r|CREATE TABLE IF NOT EXISTS "\"Vehicle''''" (address text,
+    creation_block_hash text,
+    creation_block_timestamp text,
+    creation_block_number bigint,
+    creation_transaction_hash text,
+    creation_`transaction_sender text,
     block_hash text,
     block_timestamp text,
     block_number bigint,
@@ -377,6 +411,11 @@ FOR EACH ROW EXECUTE PROCEDURE "insert_or_update_Vehicle2_history_table"();|]
 
       vehicleInsert
         `shouldBe` [r|INSERT INTO "\"Vehicle''''" ("address",
+    "creation_block_hash",
+    "creation_block_timestamp",
+    "creation_block_number",
+    "creation_transaction_hash",
+    "creation_transaction_sender",
     "block_hash",
     "block_timestamp",
     "block_number",
@@ -385,6 +424,11 @@ FOR EACH ROW EXECUTE PROCEDURE "insert_or_update_Vehicle2_history_table"();|]
     "creator",
     "root")
   VALUES ('0000000000000000000000000000000000000add',
+    '2b47410f675ac98038c44d14a87eac6855e0bfcbb0473649c22e147a789a9f08',
+    '2018-09-16 18:28:52.607875 UTC',
+    '123',
+    '242d201a68fa4440fcb3c77610785eb207b5a8b9f88208a3525efe6a7677ed59',
+    '0000000000000000000000000000000000000add',
     '2b47410f675ac98038c44d14a87eac6855e0bfcbb0473649c22e147a789a9f08',
     '2018-09-16 18:28:52.607875 UTC',
     '123',
@@ -466,6 +510,11 @@ FOR EACH ROW EXECUTE PROCEDURE "insert_or_update_Vehicle2_history_table"();|]
 
     swissArmyCreate
       `shouldBe` [r|CREATE TABLE IF NOT EXISTS "MyOrg-MyApp-SwissArmy" (address text,
+    creation_block_hash text,
+    creation_block_timestamp text,
+    creation_block_number bigint,
+    creation_transaction_hash text,
+    creation_`transaction_sender text,
     block_hash text,
     block_timestamp text,
     block_number bigint,
@@ -484,6 +533,11 @@ FOR EACH ROW EXECUTE PROCEDURE "insert_or_update_Vehicle2_history_table"();|]
 
     swissArmyInsert
       `shouldBe` [r|INSERT INTO "MyOrg-MyApp-SwissArmy" ("address",
+    "creation_block_hash",
+    "creation_block_timestamp",
+    "creation_block_number",
+    "creation_transaction_hash",
+    "creation_transaction_sender",
     "block_hash",
     "block_timestamp",
     "block_number",
@@ -499,6 +553,11 @@ FOR EACH ROW EXECUTE PROCEDURE "insert_or_update_Vehicle2_history_table"();|]
     "str",
     "strukt")
   VALUES ('000000000000000000000000000000098eaddede',
+    '2b47410f675ac98038c44d14a87eac6855e0bfcbb0473649c22e147a789a9f08',
+    '2018-09-16 18:28:52.607875 UTC',
+    '123',
+    '242d201a68fa4440fcb3c77610785eb207b5a8b9f88208a3525efe6a7677ed59',
+    '000000000000000000000000000000098eaddede',
     '2b47410f675ac98038c44d14a87eac6855e0bfcbb0473649c22e147a789a9f08',
     '2018-09-16 18:28:52.607875 UTC',
     '123',
@@ -680,6 +739,11 @@ FOR EACH ROW EXECUTE PROCEDURE "insert_or_update_Vehicle2_history_table"();|]
 
     swissArmyCreate
       `shouldBe` [r|CREATE TABLE IF NOT EXISTS "SwissArmy" (address text,
+    creation_block_hash text,
+    creation_block_timestamp text,
+    creation_block_number bigint,
+    creation_transaction_hash text,
+    creation_`transaction_sender text,
     block_hash text,
     block_timestamp text,
     block_number bigint,
@@ -698,6 +762,11 @@ FOR EACH ROW EXECUTE PROCEDURE "insert_or_update_Vehicle2_history_table"();|]
 
     swissArmyInsert
       `shouldBe` [r|INSERT INTO "SwissArmy" ("address",
+    "creation_block_hash",
+    "creation_block_timestamp",
+    "creation_block_number",
+    "creation_transaction_hash",
+    "creation_transaction_sender",
     "block_hash",
     "block_timestamp",
     "block_number",
@@ -713,6 +782,11 @@ FOR EACH ROW EXECUTE PROCEDURE "insert_or_update_Vehicle2_history_table"();|]
     "str",
     "strukt")
   VALUES ('000000000000000000000000000000098eaddede',
+    '2b47410f675ac98038c44d14a87eac6855e0bfcbb0473649c22e147a789a9f08',
+    '2018-09-16 18:28:52.607875 UTC',
+    '123',
+    '242d201a68fa4440fcb3c77610785eb207b5a8b9f88208a3525efe6a7677ed59',
+    '000000000000000000000000000000098eaddede',
     '2b47410f675ac98038c44d14a87eac6855e0bfcbb0473649c22e147a789a9f08',
     '2018-09-16 18:28:52.607875 UTC',
     '123',
@@ -769,6 +843,11 @@ FOR EACH ROW EXECUTE PROCEDURE "insert_or_update_Vehicle2_history_table"();|]
         runLoggingT . runConduit $ createInsertsCollection  input .| sinkList
 
     swissArmyMappingCreate `shouldBe` [r|CREATE TABLE IF NOT EXISTS "creator-SwissArmy-SwissArmyMapping" (address text,
+    creation_block_hash text,
+    creation_block_timestamp text,
+    creation_block_number bigint,
+    creation_transaction_hash text,
+    creation_`transaction_sender text,
     block_hash text,
     block_timestamp text,
     block_number bigint,
@@ -784,6 +863,11 @@ FOR EACH ROW EXECUTE PROCEDURE "insert_or_update_Vehicle2_history_table"();|]
   PRIMARY KEY (address, key));|]
 
     swissArmyMappingRowInsert `shouldBe` [r|INSERT INTO "cc_creator-SwissArmy-SwissArmyMapping" ("address",
+    "creation_block_hash",
+    "creation_block_timestamp",
+    "creation_block_number",
+    "creation_transaction_hash",
+    "creation_transaction_sender",
     "block_hash",
     "block_timestamp",
     "block_number",
@@ -797,6 +881,11 @@ FOR EACH ROW EXECUTE PROCEDURE "insert_or_update_Vehicle2_history_table"();|]
     "key",
     "value")
   VALUES ('000000000000000000000000000000098eaddede',
+    '2b47410f675ac98038c44d14a87eac6855e0bfcbb0473649c22e147a789a9f08',
+    '2018-09-16 18:28:52.607875 UTC',
+    '123',
+    '242d201a68fa4440fcb3c77610785eb207b5a8b9f88208a3525efe6a7677ed59',
+    '000000000000000000000000000000098eaddede',
     '2b47410f675ac98038c44d14a87eac6855e0bfcbb0473649c22e147a789a9f08',
     '2018-09-16 18:28:52.607875 UTC',
     '123',
@@ -868,6 +957,11 @@ FOR EACH ROW EXECUTE PROCEDURE "insert_or_update_Vehicle2_history_table"();|]
         runLoggingT . runConduit $ createInsertsAbstract  input inherited .| sinkList
 
     swissArmyCreateAbstract `shouldBe` [r|CREATE TABLE IF NOT EXISTS "SwissArmy" (address text,
+    creation_block_hash text,
+    creation_block_timestamp text,
+    creation_block_number bigint,
+    creation_transaction_hash text,
+    creation_`transaction_sender text,
     block_hash text,
     block_timestamp text,
     block_number bigint,
@@ -881,6 +975,11 @@ FOR EACH ROW EXECUTE PROCEDURE "insert_or_update_Vehicle2_history_table"();|]
   PRIMARY KEY (address));|]
 
     swissArmyInsertAbstract `shouldBe` [r|INSERT INTO SwissArmy ("address",
+    "creation_block_hash",
+    "creation_block_timestamp",
+    "creation_block_number",
+    "creation_transaction_hash",
+    "creation_transaction_sender",
     "block_hash",
     "block_timestamp",
     "block_number",
@@ -891,6 +990,11 @@ FOR EACH ROW EXECUTE PROCEDURE "insert_or_update_Vehicle2_history_table"();|]
     "contract_name",
     "data")
   VALUES ('000000000000000000000000000000098eaddede',
+    '2b47410f675ac98038c44d14a87eac6855e0bfcbb0473649c22e147a789a9f08',
+    '2018-09-16 18:28:52.607875 UTC',
+    '123',
+    '242d201a68fa4440fcb3c77610785eb207b5a8b9f88208a3525efe6a7677ed59',
+    '000000000000000000000000000000098eaddede',
     '2b47410f675ac98038c44d14a87eac6855e0bfcbb0473649c22e147a789a9f08',
     '2018-09-16 18:28:52.607875 UTC',
     '123',

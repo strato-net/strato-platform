@@ -249,8 +249,12 @@ outputDataDedup conn c = runConduit $ c `fuseUpstream` (dedupC .| mapM_C (dbQuer
 baseColumns :: TableColumns
 baseColumns =
   [ "address",
-    "block_hash",
+    "creation_block_hash",
     "creation_block_timestamp",
+    "creation_block_number",
+    "creation_transaction_hash",
+    "creation_transaction_sender",
+    "block_hash",
     "block_timestamp",
     "block_number",
     "transaction_hash",
@@ -262,8 +266,12 @@ baseColumns =
 baseEventColumns :: TableColumns
 baseEventColumns =
   [ "address",
-    "block_hash",
+    "creation_block_hash",
     "creation_block_timestamp",
+    "creation_block_number",
+    "creation_transaction_hash",
+    "creation_transaction_sender",
+    "block_hash",
     "block_timestamp",
     "block_number",
     "transaction_hash",
@@ -283,8 +291,12 @@ baseEventCollectionColumns =
 baseMappingColumns :: TableColumns
 baseMappingColumns =
   [ "address",
-    "block_hash",
+    "creation_block_hash",
     "creation_block_timestamp",
+    "creation_block_number",
+    "creation_transaction_hash",
+    "creation_transaction_sender",
+    "block_hash",
     "block_timestamp",
     "block_number",
     "transaction_hash",
@@ -299,8 +311,12 @@ baseMappingColumns =
 baseAbstractColumns :: TableColumns
 baseAbstractColumns =
   [ "address",
-    "block_hash",
+    "creation_block_hash",
     "creation_block_timestamp",
+    "creation_block_number",
+    "creation_transaction_hash",
+    "creation_transaction_sender",
+    "block_hash",
     "block_timestamp",
     "block_number",
     "transaction_hash",
@@ -911,6 +927,24 @@ baseColumnsQuery :: [Text]
 baseColumnsQuery = 
   [ 
     "address text",
+    "creation_block_hash text",
+    "creation_block_timestamp text",
+    "creation_block_number bigint",
+    "creation_transaction_hash text",
+    "creation_`transaction_sender text",
+    "block_hash text",
+    "block_timestamp text",
+    "block_number bigint",
+    "transaction_hash text",
+    "transaction_sender text",
+    "creator text",
+    "root text"
+  ]
+
+baseHistoryColumnsQuery :: [Text]
+baseHistoryColumnsQuery = 
+  [ 
+    "address text",
     "block_hash text",
     "creation_block_timestamp text",
     "block_timestamp text",
@@ -929,12 +963,24 @@ abstractBaseColumnsQuery =
     "data jsonb"
   ]
 
+abstractHistoryBaseColumnsQuery :: [Text]
+abstractHistoryBaseColumnsQuery = 
+  baseHistoryColumnsQuery ++ 
+  [
+    "contract_name text",
+    "data jsonb"
+  ]
+
 eventBaseColumnsQuery :: [Text]
 eventBaseColumnsQuery =
   [
     "address text",
-    "block_hash text",
+    "creation_block_hash text",
     "creation_block_timestamp text",
+    "creation_block_number bigint",
+    "creation_transaction_hash text",
+    "creation_`transaction_sender text",
+    "block_hash text",
     "block_timestamp text",
     "block_number bigint",
     "transaction_hash text",
@@ -1029,7 +1075,7 @@ createHistoryTableQuery isAbstract (creator, a, n) cols =
           tableNameToDoubleQuoteText historyTableName',
           " (",
           csv $
-            (bool baseColumnsQuery abstractBaseColumnsQuery isAbstract)
+            (bool baseHistoryColumnsQuery abstractHistoryBaseColumnsQuery isAbstract)
               ++ cols,
           ");\n\n",
           -- Create or replace the function for handling insert and update triggers
@@ -1099,7 +1145,11 @@ insertIndexTableQuery cs =
                 baseVals =
                   [ tshow . E.address,
                     T.pack . keccak256ToHex . E.blockHash,
-                    tshow . E.blockTimestamp, --creation
+                    tshow . E.blockTimestamp,
+                    tshow . E.blockNumber,
+                    T.pack . keccak256ToHex . E.transactionHash,
+                    tshow . E.transactionSender,
+                    T.pack . keccak256ToHex . E.blockHash,
                     tshow . E.blockTimestamp,
                     tshow . E.blockNumber,
                     T.pack . keccak256ToHex . E.transactionHash,
@@ -1155,7 +1205,11 @@ insertMappingTableQuery ms =
                 baseVals =
                   [ tshow . address,
                     T.pack . keccak256ToHex . blockHash,
-                    tshow . blockTimestamp, --creation
+                    tshow . blockTimestamp,
+                    tshow . blockNumber,
+                    T.pack . keccak256ToHex . transactionHash,
+                    tshow . transactionSender,
+                    T.pack . keccak256ToHex . blockHash,
                     tshow . blockTimestamp,
                     tshow . blockNumber,
                     T.pack . keccak256ToHex . transactionHash,
@@ -1210,7 +1264,11 @@ insertArrayTableQuery ms =
                 baseVals =
                   [ tshow . address,
                     T.pack . keccak256ToHex . blockHash,
-                    tshow . blockTimestamp, --creation
+                    tshow . blockTimestamp,
+                    tshow . blockNumber,
+                    T.pack . keccak256ToHex . transactionHash,
+                    tshow . transactionSender,
+                    T.pack . keccak256ToHex . blockHash,
                     tshow . blockTimestamp,
                     tshow . blockNumber,
                     T.pack . keccak256ToHex . transactionHash,
@@ -1306,7 +1364,11 @@ insertAbstractTableQuery cs =
                 baseVals =
                   [ tshow . E.address,
                     T.pack . keccak256ToHex . E.blockHash,
-                    tshow . E.blockTimestamp, --creation
+                    tshow . E.blockTimestamp,
+                    tshow . E.blockNumber,
+                    T.pack . keccak256ToHex . E.transactionHash,
+                    tshow . E.transactionSender,
+                    T.pack . keccak256ToHex . E.blockHash,
                     tshow . E.blockTimestamp,
                     tshow . E.blockNumber,
                     T.pack . keccak256ToHex . E.transactionHash,
@@ -1661,6 +1723,12 @@ insertEventTableQuery agEv@AggregateEvent {eventEvent = ev} =
       keySt = wrapAndEscapeDouble . map escapeQuotes $ baseTableColumnsForEvent ++ filledArgs
       baseVals =
         [ tshow . _accountAddress . Action.evContractAccount . eventEvent,
+          T.pack . keccak256ToHex . eventBlockHash,
+          tshow . eventBlockTimestamp,
+          tshow . eventBlockTimestamp,
+          tshow . eventBlockNumber,
+          T.pack . keccak256ToHex . eventTxHash,
+          tshow . eventTxSender,
           T.pack . keccak256ToHex . eventBlockHash,
           tshow . eventBlockTimestamp,
           tshow . eventBlockTimestamp,
