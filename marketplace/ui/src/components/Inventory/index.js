@@ -6,6 +6,8 @@ import {
   notification,
   Spin,
   Select,
+  Space,
+  Input,
   Table,
 } from "antd";
 import { CheckCircleOutlined } from "@ant-design/icons";
@@ -138,9 +140,15 @@ const Inventory = ({ user }) => {
   }, [categoryDispatch]);
 
   useEffect(() => {
-    actions.fetchInventory(dispatch, limit, offset, "", category);
+    actions.fetchInventory(
+      dispatch,
+      limit,
+      offset,
+      debouncedSearchTerm,
+      category && category !== "All" ? category : undefined
+    );
     actions.fetchSupportedTokens(dispatch);
-  }, [dispatch, limit, offset, category]);
+  }, [dispatch, limit, offset, debouncedSearchTerm, category]);
 
   const showModal = () => {
     setOpen(true);
@@ -195,6 +203,29 @@ const Inventory = ({ user }) => {
         key: 2,
       });
     }
+  };
+
+  const queryHandleEnter = (e) => {
+    const value = e.target.value;
+    setQueryValue(value);
+    setOffset(0);
+    setPage(1);
+  };
+  
+  const queryHandleChange = (e) => {
+    const value = e.target.value;
+    if (value.length === 0 && queryValue.length > 0) {
+      setQueryValue(value);
+      setOffset(0);
+      setPage(1);
+    }
+  };
+
+  const handleTabSelect = (key) => {
+    setCategory(key);
+    setOffset(0);
+    setPage(1);
+    return;
   };
 
   const onPageChange = (page, pageSize) => {
@@ -454,6 +485,36 @@ const Inventory = ({ user }) => {
             </div>
           </div>
         </div>
+        <Space.Compact className="mx-6 md:mx-5 md:px-10 mt-5 flex" size="large">
+          <Select
+            defaultValue="All"
+            style={{ width: 170, height: "auto" }}
+            onChange={handleTabSelect}
+            options={[
+              { label: "All", value: "All" },
+              ...categorys.map((category) => ({
+                label: category.name,
+                value: category.name,
+              })),
+            ]}
+            value={category}
+          />
+          <Input
+            placeholder="Search"
+            type="search"
+            defaultValue={debouncedSearchTerm}
+            onChange={queryHandleChange}
+            onPressEnter={queryHandleEnter}
+            suffix={
+              <img
+                src={Images.Header_Search}
+                alt={SEO.TITLE_META}
+                title={SEO.TITLE_META}
+                className="w-[18px] h-[18px]"
+              />
+            }
+          />
+        </Space.Compact>
         <div className="pt-6 mx-6 md:mx-5 md:px-10 mb-5">
           <Table
             columns={columns}
