@@ -116,7 +116,6 @@ main = do
           { depBlockDBCacheSize = flags_depblockcachesize,
             depBlockDBPath = flags_depblockdbpath,
             seenTransactionDBSize = flags_txdedupwindow,
-            syncWrites = flags_syncwrites,
             blockstanbulBlockPeriod = BlockPeriod $ fromIntegral flags_blockstanbul_block_period_ms / 1000.0,
             blockstanbulRoundPeriod = RoundPeriod $ fromIntegral flags_blockstanbul_round_period_s,
             blockstanbulTimeouts = cht,

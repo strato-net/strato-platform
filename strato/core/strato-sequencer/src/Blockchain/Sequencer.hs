@@ -115,7 +115,6 @@ sequencer validators = do
   source <- fuseChannels
   bootstrapBlockstanbul
   logF "Sequencer initialized"
-  flush
   runConduit $ source .| eventHandler
 
 eventHandler :: (
@@ -144,8 +143,6 @@ eventHandler = forever $ timeAction seqLoopTiming $ do
       timeAction seqSplitEventsTiming $ unseqEventHandler unseqEvents
 
   lift flushLdbBatchOps
-
-  flush
 
 unseqEventHandler ::
   ( MonadLogger m,
@@ -208,10 +205,6 @@ unseqEventHandler events = do
         (IEPreprepareResponse decis) -> do
           record "inevent_type_preprepare_response" "PreprepareResponse" 1
           blockstanbulSend [PreprepareResponse decis]
-
-flush :: MonadState SequencerContext m =>
-         m ()
-flush = clearDBERegistry
 
 bootstrapBlockstanbul :: (MonadBlockstanbul m, Mod.Accessible View m, HasKafka m) =>
                          m ()

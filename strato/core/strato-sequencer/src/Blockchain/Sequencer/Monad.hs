@@ -23,7 +23,6 @@ module Blockchain.Sequencer.Monad
     runSequencerM,
     pairToVmTx,
     flushLdbBatchOps,
-    clearDBERegistry,
     createFirstTimer,
     createNewTimer,
     fuseChannels,
@@ -88,7 +87,6 @@ data Modification a = Modification a | Deletion deriving (Show)
 data SequencerContext = SequencerContext
   { _dependentBlockDB :: DependentBlockDB,
     _seenTransactionDB :: !SeenTransactionDB,
-    _dbeRegistry :: !(Map Keccak256 DependentBlockEntry),
     _x509certInfoState :: !(Map Address (Modification X509CertInfoState)), --map to pubkey
     _ldbBatchOps :: !(Q.Seq LDB.BatchOp),
     _blockstanbulContext :: Maybe BlockstanbulContext,
@@ -118,7 +116,6 @@ data SequencerConfig = SequencerConfig
   { depBlockDBCacheSize :: Int,
     depBlockDBPath :: String,
     seenTransactionDBSize :: Int,
-    syncWrites :: Bool,
     blockstanbulBlockPeriod :: BlockPeriod,
     blockstanbulRoundPeriod :: RoundPeriod,
     blockstanbulTimeouts :: TMChan RoundNumber,
@@ -134,8 +131,6 @@ type SequencerM = StateT SequencerContext (ReaderT SequencerConfig (KafkaM (Reso
 
 instance HasDependentBlockDB SequencerM where
   getDependentBlockDB = use dependentBlockDB
-  getWriteOptions = LDB.WriteOptions . syncWrites <$> ask
-  getReadOptions = return LDB.defaultReadOptions
 
 instance Mod.Accessible LDB.DB SequencerM where
   access _ = use dependentBlockDB
@@ -224,17 +219,9 @@ instance A.Selectable Address X509CertInfoState SequencerM where
   select = A.lookup
 
 instance (Keccak256 `A.Alters` DependentBlockEntry) SequencerM where
-  lookup _ k = do
-    mv <- use $ dbeRegistry . at k
-    case mv of
-      Just v -> return $ Just v
-      Nothing -> genericLookupDependentBlockDB k
-  insert _ k v = do
-    modify' $ dbeRegistry . at k ?~ v
-    addLdbBatchOps . (: []) $ genericBatchInsertDependentBlockDB k v
-  delete _ k = do
-    modify' $ dbeRegistry . at k .~ Nothing
-    addLdbBatchOps . (: []) $ genericBatchDeleteDependentBlockDB k
+  lookup _ k = lookupDependentBlockDB k
+  insert _ k v = insertDependentBlockDB k v
+  delete _ k = deleteDependentBlockDB k
 
 instance Mod.Modifiable SeenTransactionDB SequencerM where
   get _ = use seenTransactionDB
@@ -324,7 +311,6 @@ runSequencerM c mbc m = do
       SequencerContext
         { _dependentBlockDB = depBlock,
           _seenTransactionDB = mkSeenTxDB stxSize,
-          _dbeRegistry = M.empty,
           _x509certInfoState = M.empty,
           _ldbBatchOps = Q.empty,
           _blockstanbulContext = mbc,
@@ -335,9 +321,6 @@ runSequencerM c mbc m = do
 
 pairToVmTx :: (Timestamp, OutputTx) -> VmEvent
 pairToVmTx = uncurry VmTx
-
-clearDBERegistry :: MonadState SequencerContext m => m ()
-clearDBERegistry = modify' $ dbeRegistry .~ M.empty
 
 createFirstTimer ::
   ( MonadBlockstanbul m,

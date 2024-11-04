@@ -76,7 +76,6 @@ bootstrapSequencer
                 { depBlockDBCacheSize = 0,
                   depBlockDBPath = dbDir "h" ++ sequencerDependentBlockDBPath,
                   seenTransactionDBSize = 10,
-                  syncWrites = False,
                   blockstanbulBlockPeriod = BlockPeriod 0,
                   blockstanbulRoundPeriod = RoundPeriod 0,
                   blockstanbulTimeouts = tch,
