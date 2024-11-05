@@ -42,7 +42,7 @@ const ResellModal = ({ open, handleCancel, inventory, categoryName, limit, offse
         let isDone = await actions.resellInventory(inventoryDispatch, body);
         if (isDone) {
             await actions.fetchInventory(inventoryDispatch, limit, offset, "", categoryName);
-            await actions.fetchInventoryForUser(inventoryDispatch, user.commonName);
+            await actions.fetchInventoryForUser(inventoryDispatch, 10000, 0, "", undefined);
             handleCancel();
         }
     }

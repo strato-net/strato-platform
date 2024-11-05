@@ -115,7 +115,7 @@ const UpdateInventoryModal = ({
 
     if (isDone) {
       await actions.fetchInventory(dispatch, limit, offset, debouncedSearchTerm, categoryName);
-      await actions.fetchInventoryForUser(dispatch, user.commonName);
+      await actions.fetchInventoryForUser(inventoryDispatch, 10000, 0, "", undefined);
 
       handleCancel();
     }

@@ -244,7 +244,7 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
 
     const inventories = await inventoryJs.getAll(rawAdmin, { ...args, ownerCommonName: userCert.commonName, creator: process.env.SELLER, sort: '-createdDate' }, getOptions);
     const inventoryCount = await inventoryJs.inventoryCount(rawAdmin, { ...args, ownerCommonName: userCert.commonName, creator: process.env.SELLER, sort: '-createdDate' }, getOptions);
-    const stratInventories = await inventoryJs.getAll(rawAdmin, { ownerCommonName: userCert.commonName, originAddress: stratsOriginAddress, sort: '-createdDate' }, getOptions);
+    const stratInventories = await inventoryJs.getAll(rawAdmin, { ...args, ownerCommonName: userCert.commonName, originAddress: stratsOriginAddress, sort: '-createdDate' }, getOptions);
     const stratInventoryCount = await inventoryJs.inventoryCount(rawAdmin, { ...args, ownerCommonName: userCert.commonName, originAddress: stratsOriginAddress, sort: '-createdDate' }, getOptions);
 
     return { inventories: inventories.concat(stratInventories), inventoryCount: inventoryCount + stratInventoryCount }
@@ -261,10 +261,9 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
     const getOptions = { ...options, app: contractName };
     const stratsOriginAddress = await STRATSJs.getStratsAddress();
 
-    const { ownerCommonName, ...restArgs } = args;
-    const newArgs = { ...restArgs, ownerCommonName: ownerCommonName, creator: process.env.SELLER, notEqualsField: 'sale', notEqualsValue: constants.zeroAddress, userProfile: true }
+    const newArgs = { ...args, ownerCommonName: userCert.commonName, creator: process.env.SELLER, notEqualsField: 'sale', notEqualsValue: constants.zeroAddress, userProfile: true }
     const inventories = await marketplaceJs.getAll(rawAdmin, newArgs, getOptions);
-    const stratArgs = { ...restArgs, ownerCommonName, ownerCommonName, notEqualsField: 'sale', notEqualsValue: constants.zeroAddress, userProfile: true, originAddress: stratsOriginAddress  }
+    const stratArgs = { ...args, ownerCommonName: userCert.commonName, notEqualsField: 'sale', notEqualsValue: constants.zeroAddress, userProfile: true, originAddress: stratsOriginAddress  }
     const stratInventories = await marketplaceJs.getAll(rawAdmin, stratArgs, getOptions);
 
     return { inventoryResults: inventories.inventoryResults.concat(stratInventories.inventoryResults), inventoryCount: inventories.inventoryCount + stratInventories.inventoryCount };

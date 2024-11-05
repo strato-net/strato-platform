@@ -219,14 +219,18 @@ const actions = {
     }
   },
 
-  fetchInventoryForUser: async (dispatch, queryValue) => {
-    const query = queryValue ? `&ownerCommonName=${encodeURIComponent(queryValue)}` : ``;
+  fetchInventoryForUser: async (dispatch, limit, offset, queryValue, category) => {
+    const query = queryValue
+    ? `&queryValue=${queryValue}&queryFields=name`
+    : "";
+
+    const categoryQuery = category ? `category[]=${category}` : "";
 
     dispatch({ type: actionDescriptors.fetchInventoryForUser });
 
     try {
       const response = await fetch(
-        `${apiUrl}/inventory/user/inventories?gtField=quantity&gtValue=0${query}&isMint=true`,
+        `${apiUrl}/inventory/user/inventories?${categoryQuery}&limit=${limit}&offset=${offset}${query}&isMint=true`,
         {
           method: HTTP_METHODS.GET,
         }

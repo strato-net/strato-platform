@@ -153,9 +153,7 @@ const UserProfile = ({user}) => {
   
     // Inventories For Sale fetch
     useEffect(() => {
-      if(commonName){
-          inventoryActions.fetchInventoryForUser(dispatch, commonName);
-        }
+      inventoryActions.fetchInventoryForUser(dispatch, 10000, 0, "", undefined);
       }, [dispatch, hasChecked, isAuthenticated, loginUrl, commonName]);
   
     // Tab selection

@@ -10,6 +10,7 @@ import {
   Input,
   Table,
   Popover,
+  Checkbox,
 } from "antd";
 import {
   DollarOutlined,
@@ -19,7 +20,7 @@ import {
   StopOutlined,
   SwapOutlined,
   RetweetOutlined,
-  CheckCircleOutlined
+  CheckCircleOutlined,
 } from "@ant-design/icons";
 import image_placeholder from "../../images/resources/image_placeholder.png";
 import CreateInventoryModal from "./CreateInventoryModal";
@@ -73,6 +74,7 @@ const Inventory = ({ user }) => {
   const [limit, setLimit] = useState(10);
   const [offset, setOffset] = useState(0);
   const [page, setPage] = useState(1);
+  const [showPublished, setShowPublished] = useState(false);
   const dispatch = useInventoryDispatch();
   const [api, contextHolder] = notification.useNotification();
   const [category, setCategory] = useState(undefined);
@@ -90,6 +92,8 @@ const Inventory = ({ user }) => {
     message,
     success,
     inventoriesTotal,
+    userInventories,
+    isUserInventoriesLoading,
     supportedTokens,
     isFetchingTokens,
   } = useInventoryState();
@@ -154,15 +158,25 @@ const Inventory = ({ user }) => {
   }, [categoryDispatch]);
 
   useEffect(() => {
-    actions.fetchInventory(
-      dispatch,
-      limit,
-      offset,
-      debouncedSearchTerm,
-      category && category !== "All" ? category : undefined
-    );
+    if (showPublished) {
+      actions.fetchInventoryForUser(
+        dispatch,
+        limit,
+        offset,
+        debouncedSearchTerm,
+        category && category !== "All" ? category : undefined
+      );
+    } else {
+      actions.fetchInventory(
+        dispatch,
+        limit,
+        offset,
+        debouncedSearchTerm,
+        category && category !== "All" ? category : undefined
+      );
+    }
     actions.fetchSupportedTokens(dispatch);
-  }, [dispatch, limit, offset, debouncedSearchTerm, category]);
+  }, [dispatch, limit, offset, debouncedSearchTerm, category, showPublished]);
 
   const showModal = () => {
     setOpen(true);
@@ -246,6 +260,10 @@ const Inventory = ({ user }) => {
     setLimit(pageSize);
     setOffset((page - 1) * pageSize);
     setPage(page);
+  };
+
+  const handleCheckboxChange = (e) => {
+    setShowPublished(e.target.checked);
   };
 
   const itemToast = (placement) => {
@@ -374,23 +392,6 @@ const Inventory = ({ user }) => {
       },
     },
     {
-      title: "Quantity Owned",
-      align: "center",
-      render: (text, record) => <div>{record.quantity || "N/A"}</div>,
-    },
-    {
-      title: "Quantity Available for Sale",
-      align: "center",
-      render: (text, record) => (
-        <div>{record.quantity - record.totalLockedQuantity || "N/A"}</div>
-      ),
-    },
-    {
-      title: "Quantity Listed for Sale",
-      align: "center",
-      render: (text, record) => <div>{record.saleQuantity || "N/A"}</div>,
-    },
-    {
       title: "Price",
       align: "center",
       render: (text, record) => (
@@ -407,6 +408,23 @@ const Inventory = ({ user }) => {
           )}
         </div>
       ),
+    },
+    {
+      title: "Quantity Owned",
+      align: "center",
+      render: (text, record) => <div>{record.quantity || 0}</div>,
+    },
+    {
+      title: "Quantity Available for Sale",
+      align: "center",
+      render: (text, record) => (
+        <div>{record.quantity - record.totalLockedQuantity || 0}</div>
+      ),
+    },
+    {
+      title: "Quantity Listed for Sale",
+      align: "center",
+      render: (text, record) => <div>{record.saleQuantity || 0}</div>,
     },
     {
       title: "Status",
@@ -590,10 +608,11 @@ const Inventory = ({ user }) => {
           />
         </Space.Compact>
         <div className="pt-6 mx-6 md:mx-5 md:px-10 mb-5">
+          <Checkbox onChange={handleCheckboxChange}>Published</Checkbox>
           <Table
             columns={columns}
-            dataSource={inventories}
-            loading={isInventoriesLoading}
+            dataSource={showPublished ? userInventories : inventories}
+            loading={isInventoriesLoading || isUserInventoriesLoading}
             className="custom-table"
             pagination={false}
           />
