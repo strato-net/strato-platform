@@ -62,6 +62,7 @@ import {
   STRATS_CONVERSION,
   ASSET_STATUS,
 } from "../../helpers/constants";
+import ItemActions from "./ItemActions";
 import "./index.css";
 
 const { Option } = Select;
@@ -93,6 +94,7 @@ const Inventory = ({ user }) => {
     success,
     inventoriesTotal,
     userInventories,
+    userInventoriesTotal,
     isUserInventoriesLoading,
     supportedTokens,
     isFetchingTokens,
@@ -266,6 +268,18 @@ const Inventory = ({ user }) => {
     setShowPublished(e.target.checked);
   };
 
+  const getAllSubcategories = (categories) => {
+    let subcategories = [];
+    categories.forEach((category) => {
+      if (category.subCategories && category.subCategories.length > 0) {
+        subcategories = subcategories.concat(category.subCategories);
+      }
+    });
+    return subcategories;
+  };
+
+  const allSubcategories = getAllSubcategories(categorys);
+
   const itemToast = (placement) => {
     if (itemSuccess) {
       api.success({
@@ -319,29 +333,6 @@ const Inventory = ({ user }) => {
       });
     }
   };
-
-  const actionsContent = (
-    <div className="flex gap-2">
-      <Button type="link" className="text-[#13188A] font-semibold">
-        <DollarOutlined /> Sell
-      </Button>
-      <Button type="link" className="text-[#13188A] font-semibold">
-        <StopOutlined /> Unlist
-      </Button>
-      <Button type="link" className="text-[#13188A] font-semibold">
-        <PieChartOutlined /> Mint
-      </Button>
-      <Button type="link" className="text-[#13188A] font-semibold">
-        <SwapOutlined /> Transfer
-      </Button>
-      <Button type="link" className="text-[#13188A] font-semibold">
-        <SendOutlined /> Redeem
-      </Button>
-      <Button type="link" className="text-[#13188A] font-semibold">
-        <RetweetOutlined /> Bridge
-      </Button>
-    </div>
-  );
 
   const columns = [
     {
@@ -415,13 +406,6 @@ const Inventory = ({ user }) => {
       render: (text, record) => <div>{record.quantity || 0}</div>,
     },
     {
-      title: "Quantity Available for Sale",
-      align: "center",
-      render: (text, record) => (
-        <div>{record.quantity - record.totalLockedQuantity || 0}</div>
-      ),
-    },
-    {
       title: "Quantity Listed for Sale",
       align: "center",
       render: (text, record) => <div>{record.saleQuantity || 0}</div>,
@@ -467,7 +451,21 @@ const Inventory = ({ user }) => {
       title: "Actions",
       align: "center",
       render: (text, record) => (
-        <Popover placement="topRight" content={actionsContent}>
+        <Popover
+          placement="topRight"
+          content={
+            <ItemActions
+              inventory={record}
+              limit={limit}
+              offset={offset}
+              debouncedSearchTerm={debouncedSearchTerm}
+              category={category}
+              allSubcategories={allSubcategories}
+              user={user}
+              supportedTokens={supportedTokens}
+            />
+          }
+        >
           <Button type="primary">Actions</Button>
         </Popover>
       ),
@@ -619,7 +617,7 @@ const Inventory = ({ user }) => {
           <Pagination
             current={page}
             onChange={onPageChange}
-            total={inventoriesTotal}
+            total={showPublished ? userInventoriesTotal : inventoriesTotal}
             showTotal={(total) => `Total ${total} items`}
             className="flex justify-center my-5 custom-pagination"
           />

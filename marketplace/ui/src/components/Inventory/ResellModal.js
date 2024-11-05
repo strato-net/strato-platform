@@ -4,7 +4,7 @@ import { actions } from "../../contexts/inventory/actions";
 import { useInventoryDispatch, useInventoryState } from "../../contexts/inventory";
 import { useAuthenticateState } from "../../contexts/authentication";
 
-const ResellModal = ({ open, handleCancel, inventory, categoryName, limit, offset }) => {
+const ResellModal = ({ open, handleCancel, inventory, category, debouncedSearchTerm, limit, offset }) => {
     const [quantity, setQuantity] = useState(1);
     const inventoryDispatch = useInventoryDispatch();
     const [canResell, setCanResell] = useState(true);
@@ -41,8 +41,8 @@ const ResellModal = ({ open, handleCancel, inventory, categoryName, limit, offse
         };
         let isDone = await actions.resellInventory(inventoryDispatch, body);
         if (isDone) {
-            await actions.fetchInventory(inventoryDispatch, limit, offset, "", categoryName);
-            await actions.fetchInventoryForUser(inventoryDispatch, 10000, 0, "", undefined);
+            await actions.fetchInventory(inventoryDispatch, limit, offset, debouncedSearchTerm, category && category !== "All" ? category : undefined);
+            await actions.fetchInventoryForUser(inventoryDispatch, limit, offset, debouncedSearchTerm, category && category !== "All" ? category : undefined);
             handleCancel();
         }
     }

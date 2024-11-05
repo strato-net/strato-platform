@@ -15,7 +15,7 @@ import { Images } from "../../images";
 import { REDEMPTION_STATUS } from "../../helpers/constants";
 import { handleQuantityInput } from "../../helpers/utils";
 
-const RedeemModal = ({ open, handleCancel, inventory, categoryName, limit, offset }) => {
+const RedeemModal = ({ open, handleCancel, inventory, category, debouncedSearchTerm, limit, offset }) => {
     const [data, setData] = useState([inventory]);
     const [quantity, setQuantity] = useState(1);
     const [comments, setComments] = useState("");
@@ -121,8 +121,8 @@ const RedeemModal = ({ open, handleCancel, inventory, categoryName, limit, offse
         if (quantity > 0 && quantity <= inventory.quantity) {
             let isDone = await redemptionActions.requestRedemption(redemptionDispatch, body);
             if (isDone) {
-                await actions.fetchInventory(inventoryDispatch, limit, offset, "", categoryName);
-                await actions.fetchInventoryForUser(inventoryDispatch, 10000, 0, "", undefined);
+                await actions.fetchInventory(inventoryDispatch, limit, offset, debouncedSearchTerm, category && category !== "All" ? category : undefined);
+            await actions.fetchInventoryForUser(inventoryDispatch, limit, offset, debouncedSearchTerm, category && category !== "All" ? category : undefined);
                 handleCancel();
             }
         }

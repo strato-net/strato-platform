@@ -5,7 +5,7 @@ import { useInventoryDispatch, useInventoryState } from "../../contexts/inventor
 import { useAuthenticateState } from "../../contexts/authentication";
 import { handleQuantityInput, handleWalletAddressInput } from "../../helpers/utils";
 
-const BridgeModal = ({ open, handleCancel, inventory, categoryName, limit, offset }) => {
+const BridgeModal = ({ open, handleCancel, inventory, category, debouncedSearchTerm, limit, offset }) => {
     const [data, setData] = useState([inventory]);
     const [quantity, setQuantity] = useState(1);
     const [userAddress, setUserAddress] = useState("");
@@ -110,8 +110,8 @@ const BridgeModal = ({ open, handleCancel, inventory, categoryName, limit, offse
         if (quantity > 0 && quantity <= inventory.quantity && userAddress) {
             let isDone = await actions.bridgeInventory(inventoryDispatch, body);
             if (isDone) {
-                await actions.fetchInventory(inventoryDispatch, limit, offset, "", categoryName);
-                await actions.fetchInventoryForUser(inventoryDispatch, 10000, 0, "", undefined);
+                await actions.fetchInventory(inventoryDispatch, limit, offset, debouncedSearchTerm, category && category !== "All" ? category : undefined);
+                await actions.fetchInventoryForUser(inventoryDispatch, limit, offset, debouncedSearchTerm, category && category !== "All" ? category : undefined);
                 handleCancel();
             }
         }

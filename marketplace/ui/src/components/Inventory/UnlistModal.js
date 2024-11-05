@@ -3,7 +3,7 @@ import { actions } from "../../contexts/inventory/actions";
 import { useInventoryDispatch, useInventoryState } from "../../contexts/inventory";
 import { useAuthenticateState } from "../../contexts/authentication";
 
-const UnlistModal = ({ open, handleCancel, inventory, saleAddress, categoryName, limit, offset }) => {
+const UnlistModal = ({ open, handleCancel, inventory, saleAddress, category, debouncedSearchTerm, limit, offset }) => {
     const inventoryDispatch = useInventoryDispatch();
     const {
         isUnlisting
@@ -16,8 +16,8 @@ const UnlistModal = ({ open, handleCancel, inventory, saleAddress, categoryName,
         };
         let isDone = await actions.unlistInventory(inventoryDispatch, body);
         if (isDone) {
-            await actions.fetchInventory(inventoryDispatch, limit, offset, "", categoryName);
-            await actions.fetchInventoryForUser(inventoryDispatch, 10000, 0, "", undefined);
+            await actions.fetchInventory(inventoryDispatch, limit, offset, debouncedSearchTerm, category && category !== "All" ? category : undefined);
+            await actions.fetchInventoryForUser(inventoryDispatch, limit, offset, debouncedSearchTerm, category && category !== "All" ? category : undefined);
             handleCancel();
         }
     }
