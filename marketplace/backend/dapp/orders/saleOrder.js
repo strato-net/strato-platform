@@ -241,7 +241,7 @@ async function getAll(admin, args = {}, options) {
   if (totalCount !== 0) {
     const uniqueOrderArgs = {
       ...args,
-      limit: limit,
+      limit: undefined,
       offset: 0,
       queryOptions: {
         select: 'id:id.max(),orderHash,createdDate',
