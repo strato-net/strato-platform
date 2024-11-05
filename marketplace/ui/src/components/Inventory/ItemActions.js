@@ -29,6 +29,7 @@ const ItemActions = ({
   allSubcategories,
   user,
   supportedTokens,
+  togglePopover
 }) => {
   const itemData = inventory.data;
   const isStrats =
@@ -99,6 +100,7 @@ const ItemActions = ({
   }
 
   const showListModal = () => {
+    togglePopover(false);
     setListModalOpen(true);
   };
 
@@ -107,6 +109,7 @@ const ItemActions = ({
   };
 
   const showUnlistModal = () => {
+    togglePopover(false);
     setUnlistModalOpen(true);
   };
 
@@ -115,6 +118,7 @@ const ItemActions = ({
   };
 
   const showResellModal = () => {
+    togglePopover(false);
     setResellModalOpen(true);
   };
 
@@ -123,6 +127,7 @@ const ItemActions = ({
   };
 
   const showTransferModal = () => {
+    togglePopover(false);
     setTransferModalOpen(true);
   };
 
@@ -131,6 +136,7 @@ const ItemActions = ({
   };
 
   const showRedeemModal = () => {
+    togglePopover(false);
     setRedeemModalOpen(true);
   };
 
@@ -139,6 +145,7 @@ const ItemActions = ({
   };
 
   const showBridgeModal = () => {
+    togglePopover(false);
     setBridgeModalOpen(true);
   };
 

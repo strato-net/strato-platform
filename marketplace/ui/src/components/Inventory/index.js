@@ -76,6 +76,7 @@ const Inventory = ({ user }) => {
   const [offset, setOffset] = useState(0);
   const [page, setPage] = useState(1);
   const [showPublished, setShowPublished] = useState(false);
+  const [popoverVisible, setPopoverVisible] = useState({});
   const dispatch = useInventoryDispatch();
   const [api, contextHolder] = notification.useNotification();
   const [category, setCategory] = useState(undefined);
@@ -268,6 +269,10 @@ const Inventory = ({ user }) => {
     setShowPublished(e.target.checked);
   };
 
+  const togglePopover = (id, visible) => {
+    setPopoverVisible((prev) => ({ ...prev, [id]: visible }));
+  };
+
   const getAllSubcategories = (categories) => {
     let subcategories = [];
     categories.forEach((category) => {
@@ -453,6 +458,8 @@ const Inventory = ({ user }) => {
       render: (text, record) => (
         <Popover
           placement="topRight"
+          open={popoverVisible[record.address] || false}
+          onOpenChange={(visible) => togglePopover(record.address, visible)}
           content={
             <ItemActions
               inventory={record}
@@ -463,10 +470,13 @@ const Inventory = ({ user }) => {
               allSubcategories={allSubcategories}
               user={user}
               supportedTokens={supportedTokens}
+              togglePopover={(visible) => togglePopover(record.address, visible)}
             />
           }
         >
-          <Button type="primary">Actions</Button>
+          <Button type="primary">
+            Actions
+          </Button>
         </Popover>
       ),
     },
@@ -606,7 +616,9 @@ const Inventory = ({ user }) => {
           />
         </Space.Compact>
         <div className="pt-6 mx-6 md:mx-5 md:px-10 mb-5">
-          <Checkbox onChange={handleCheckboxChange}>Published</Checkbox>
+          <Checkbox className="mb-4" onChange={handleCheckboxChange}>
+            Published
+          </Checkbox>
           <Table
             columns={columns}
             dataSource={showPublished ? userInventories : inventories}
