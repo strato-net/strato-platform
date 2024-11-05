@@ -32,9 +32,9 @@ const actions = {
     if (offset) {
       query += `&offset=${offset}`
     }
-    if (commonName) {
-      query += `&user=${encodedCommonName}`
-    }
+    // if (commonName) {
+    //   query += `&user=${encodedCommonName}`
+    // }
     if(dateRange){
       query += `&startDate=${dateRange[0]}&endDate=${dateRange[1]}`
     }

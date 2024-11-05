@@ -18,11 +18,12 @@ class TransactionController {
         try {
             const { dapp, params, query } = req
             const { limit = '2000', offset = '0', order, search = '', type, user, startDate, endDate } = query;
+            const seller = process.env.SELLER;
             let transactionQuery = {
                 limit: limit,
                 offset: offset,
                 order: 'createdDate.desc',
-                or: `(sellersCommonName.eq.${user},purchasersCommonName.eq.${user})`,
+                or: `(sellersCommonName.eq.${seller},purchasersCommonName.eq.${seller})`,
                 id: search,
             }
 
@@ -30,13 +31,14 @@ class TransactionController {
                 limit: limit,
                 offset: offset,
                 order: 'DESC',
-                search: search
+                search: search,
+                seller: seller
             }
 
             const TransferQuery = {
                 limit: limit,
                 offset: offset,
-                or: `(oldOwnerCommonName.eq.${user},newOwnerCommonName.eq.${user})`,
+                or: `(oldOwnerCommonName.eq.${seller},newOwnerCommonName.eq.${seller})`,
                 order: 'transferDate.desc',
                 id: search
             }
@@ -46,7 +48,7 @@ class TransactionController {
                 TransferQuery['range'] = [`transferDate,${startDate},${endDate}`]
             }
 
-            let orderData, itemTransfers, outgoingRedemptions, incomingRedemptions
+            let orderData, itemTransfers, redemptions, outgoingRedemptions, incomingRedemptions, count = 0;
             let data = []
             if (type === 'Order' || !type) {
                 orderData = await dapp.getSaleOrders({ ...transactionQuery });
@@ -59,8 +61,9 @@ class TransactionController {
             if (type === 'Redemption' || !type) {
                 outgoingRedemptions = await dapp.getOutgoingRedemptionRequests(redemptionQuery)
                 incomingRedemptions = await dapp.getIncomingRedemptionRequests(redemptionQuery)
-                let redemptions = [...outgoingRedemptions, ...incomingRedemptions];
-                redemptions = redemptions.filter((value, index, self) =>
+                redemptions = [...outgoingRedemptions, ...incomingRedemptions];
+                count = count + Number(redemptions.count);
+                redemptions = redemptions?.data.filter((value, index, self) =>
                     index === self.findIndex((t) => (
                         t.redemption_id === value.redemption_id
                     ))
@@ -82,20 +85,25 @@ class TransactionController {
             const queryData = {address: assetAddress, limit:2000, offset:0 }
             const inventories = await dapp.getAllInventories({ ...queryData })
             const inventoriesWithImageUrl = inventories?.inventories
-            const sortData = data.sort((a, b) => ( b?.transferDate || b?.redemptionDate || b?.createdDate) - ( a?.transferDate || a?.redemptionDate || a?.createdDate));
+            let sortData = data.sort((a, b) => ( b?.transferDate || b?.redemptionDate || b?.createdDate) - ( a?.transferDate || a?.redemptionDate || a?.createdDate));
+            // sortData = sortData.filter((item)=>{
+            //     const asset = inventoriesWithImageUrl.find((assetItem)=>{
+            //         return (assetItem.address === (item?.assetAddress || item?.assetAddresses[0]))
+            //     });
+
+            //     if (asset && asset.originAddress === stratsOriginAddress) {
+            //         // continue since this is a STRATs Asset
+            //     } else {
+            //         if (asset.creator === process.env.SELLER) {
+            //             return item; 
+            //         }
+            //     }
+            // });
+
             const newData = sortData.map((item) => {
                 const asset = inventoriesWithImageUrl.find((assetItem)=>{
                     return (assetItem.address === (item?.assetAddress || item?.assetAddresses[0]))
                 });
-
-                if (asset && asset.originAddress === stratsOriginAddress) {
-                    // continue since this is a STRATs Asset
-                } else {
-                    if (asset.creator !== process.env.SELLER) {
-                        return null; 
-                    }
-                }
-
 
                 const getImage=(assetItem)=> {
                     if(assetItem && assetItem["BlockApps-Mercata-Asset-images"]?.length ){

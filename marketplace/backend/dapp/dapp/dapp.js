@@ -355,7 +355,7 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
   }
 
   contract.getOutgoingRedemptionRequests = async function (args, options = optionsNoChainIds) {
-    const { order, search, range } = args;
+    const { order, search, range, seller } = args;
     const queryParams = new URLSearchParams({
       redemptionId: search,
       order: order
@@ -364,7 +364,7 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
     try {
       let redemptions = [];
       let redemptionServiceAddresses = [];
-      const redemptionEvents = await redemptionServiceJs.getRedemptions(rawAdmin, { owner: userCert.commonName }, options);
+      const redemptionEvents = await redemptionServiceJs.getRedemptions(rawAdmin, { owner: seller }, options);
       redemptionEvents.map(r => {
         if (!redemptionServiceAddresses.includes(r.address)) {
           redemptionServiceAddresses.push(r.address);
@@ -380,7 +380,7 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
       const redemptionPromises = redemptionServices.map(async (rs) => {
         const serviceUrl = rs.serviceURL || rs.data.serviceURL;
         const getOutgoingRedemptionRoute = rs.outgoingRedemptionsRoute || rs.data.outgoingRedemptionsRoute;
-        let res = await axios.get(new URL(`${serviceUrl}${getOutgoingRedemptionRoute}/${userCert.commonName}?${queryParams}`).href);
+        let res = await axios.get(new URL(`${serviceUrl}${getOutgoingRedemptionRoute}/${seller}?${queryParams}`).href);
         if (res.status === 200)
           return res.data.data.map((item) => {
             const date = new Date(item.createdDate);
@@ -417,7 +417,7 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
   };
 
   contract.getIncomingRedemptionRequests = async function (args, options = optionsNoChainIds) {
-    const { order, search, range } = args;
+    const { order, search, range, seller } = args;
     const queryParams = new URLSearchParams({
       redemptionId: search,
       order: order
@@ -425,7 +425,7 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
 
     try {
       let redemptions = [];
-      const redemptionEvents = await redemptionServiceJs.getRedemptions(rawAdmin, { issuer: userCert.commonName }, options);
+      const redemptionEvents = await redemptionServiceJs.getRedemptions(rawAdmin, { issuer: seller }, options);
       const redemptionServiceAddresses = redemptionEvents.map(r => r.address);
       let redemptionServices = await redemptionServiceJs.getAll(rawAdmin, { address: redemptionServiceAddresses }, options);
 
@@ -437,7 +437,7 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
       const redemptionPromises = redemptionServices.map(async (rs) => {
         const serviceUrl = rs.serviceURL || rs.data.serviceURL;
         const getIncomingRedemptionRoute = rs.incomingRedemptionsRoute || rs.data.incomingRedemptionsRoute;
-        const res = await axios.get(new URL(`${serviceUrl}${getIncomingRedemptionRoute}/${userCert.commonName}?${queryParams}`).href);
+        const res = await axios.get(new URL(`${serviceUrl}${getIncomingRedemptionRoute}/${seller}?${queryParams}`).href);
         if (res.status === 200) {
           return res.data.data.map((item) => {
             const date = new Date(item.createdDate);
@@ -472,6 +472,69 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
         throw new rest.RestError(error.response.status, error.response.statusText);
       }
       throw new rest.RestError(RestStatus.BAD_REQUEST, `Error while fetching incoming redemptions: ${JSON.stringify(error)} `);
+    }
+  };
+
+  contract.getAllRedemptionRequests = async function (args, options = optionsNoChainIds) {
+    const { order, search, range, limit, offset } = args;
+    const queryParams = new URLSearchParams({
+      redemptionId: search,
+      order: order,
+      limit,
+      offset
+    }).toString();
+
+    try {
+      let redemptions = [];
+      let count = 0;
+      const redemptionEvents = await redemptionServiceJs.getRedemptions(rawAdmin,{ limit }, options);
+      const redemptionServiceAddresses = redemptionEvents.map(r => r.address);
+      let redemptionServices = await redemptionServiceJs.getAll(rawAdmin, { address: redemptionServiceAddresses }, options);
+
+      // handle backwards compatibility case
+      if (Object.keys(redemptionServices).length === 0) {
+        redemptionServices = await redemptionServiceJs.getAll(rawAdmin, { isActive: true, ownerCommonName: "Server", limit }, options);
+      }
+
+      const redemptionPromises = redemptionServices.map(async (rs) => {
+        const serviceUrl = rs.serviceURL || rs.data.serviceURL;
+        const res = await axios.get(`${serviceUrl}/redemption/all?${queryParams}`);
+        if (res.status === 200) {
+          count = res.data.count; 
+          return res.data.data.map((item) => {
+            const date = new Date(item.createdDate);
+            const unixTimestamp = Math.floor(date.getTime() / 1000);
+            return { ...item, redemptionDate: unixTimestamp, type: 'Redemption', block_timestamp: new Date(item.createdDate) }
+          })
+        } else {
+          return [];
+        }
+      });
+
+      const allRedemptions = await Promise.all(redemptionPromises);
+      redemptions = allRedemptions.flat();
+      if(range){
+      redemptions = redemptions.filter((item)=>{
+        const dateRange = range[0].split(',')
+        const startRange = dateRange[1];
+        const endRange = dateRange[2];
+        if(item.redemptionDate > startRange && item.redemptionDate < endRange){
+          return item;
+        }
+      })
+      }
+      if (order && order === 'ASC')
+        redemptions.sort((a, b) => a.createdDate - b.createdDate);
+      else
+        redemptions.sort((a, b) => b.createdDate - a.createdDate);
+
+
+      return {data:redemptions, count};
+    } catch (error) {
+      if (error.response) {
+        throw new rest.RestError(error.response.status, error.response.statusText);
+      }
+      throw new rest.RestError(RestStatus.BAD_REQUEST, `Error while fetching All redemptions: ${JSON.stringify(error)} `);
     }
   };
 
