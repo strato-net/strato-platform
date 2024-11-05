@@ -9,8 +9,18 @@ import {
   Space,
   Input,
   Table,
+  Popover,
 } from "antd";
-import { CheckCircleOutlined } from "@ant-design/icons";
+import {
+  DollarOutlined,
+  EditOutlined,
+  SendOutlined,
+  PieChartOutlined,
+  StopOutlined,
+  SwapOutlined,
+  RetweetOutlined,
+  CheckCircleOutlined
+} from "@ant-design/icons";
 import image_placeholder from "../../images/resources/image_placeholder.png";
 import CreateInventoryModal from "./CreateInventoryModal";
 import { actions as categoryActions } from "../../contexts/category/actions";
@@ -46,7 +56,11 @@ import { useAuthenticateState } from "../../contexts/authentication";
 import HelmetComponent from "../Helmet/HelmetComponent";
 import { SEO } from "../../helpers/seoConstant";
 import RequestBeAuthorizedIssuerModal from "./RequestBeAuthorizedIssuerModal";
-import { ISSUER_STATUS, STRATS_CONVERSION } from "../../helpers/constants";
+import {
+  ISSUER_STATUS,
+  STRATS_CONVERSION,
+  ASSET_STATUS,
+} from "../../helpers/constants";
 import "./index.css";
 
 const { Option } = Select;
@@ -211,7 +225,7 @@ const Inventory = ({ user }) => {
     setOffset(0);
     setPage(1);
   };
-  
+
   const queryHandleChange = (e) => {
     const value = e.target.value;
     if (value.length === 0 && queryValue.length > 0) {
@@ -287,6 +301,29 @@ const Inventory = ({ user }) => {
       });
     }
   };
+
+  const actionsContent = (
+    <div className="flex gap-2">
+      <Button type="link" className="text-[#13188A] font-semibold">
+        <DollarOutlined /> Sell
+      </Button>
+      <Button type="link" className="text-[#13188A] font-semibold">
+        <StopOutlined /> Unlist
+      </Button>
+      <Button type="link" className="text-[#13188A] font-semibold">
+        <PieChartOutlined /> Mint
+      </Button>
+      <Button type="link" className="text-[#13188A] font-semibold">
+        <SwapOutlined /> Transfer
+      </Button>
+      <Button type="link" className="text-[#13188A] font-semibold">
+        <SendOutlined /> Redeem
+      </Button>
+      <Button type="link" className="text-[#13188A] font-semibold">
+        <RetweetOutlined /> Bridge
+      </Button>
+    </div>
+  );
 
   const columns = [
     {
@@ -373,13 +410,49 @@ const Inventory = ({ user }) => {
     },
     {
       title: "Status",
-      dataIndex: "value",
-      key: "value",
+      align: "center",
+      render: (text, record) => (
+        <div className="pt-[7px] lg:pt-0 items-center gap-[5px]">
+          {record.price ? (
+            <div className="flex items-center justify-center gap-2 bg-[#1548C329] p-[6px] rounded-md">
+              <div className="w-[7px] h-[7px] rounded-full bg-[#119B2D]"></div>
+              <p className="text-[#4D4D4D] text-[13px]">Published</p>
+            </div>
+          ) : record.status == ASSET_STATUS.PENDING_REDEMPTION ? (
+            <div className="flex items-center justify-center gap-2 bg-[#FFA50029] p-[6px] rounded-md">
+              <div className="w-[8px] h-[7px] rounded-full bg-[#FFA500]"></div>
+              <p className="text-[#4D4D4D] text-[13px]">Pending Redemption</p>
+            </div>
+          ) : record.status == ASSET_STATUS.RETIRED ? (
+            <div className="flex items-center justify-center gap-2 bg-[#c3152129] p-[6px] rounded-md">
+              <div className="w-[7px] h-[7px] rounded-full bg-[#ff4d4f]"></div>
+              <p className="text-[#4D4D4D] text-[13px]">Retired</p>
+            </div>
+          ) : (record.data.isMint &&
+              record.data.isMint === "False" &&
+              record.quantity === 0) ||
+            (!record.data.isMint && record.quantity === 0) ? (
+            <div className="flex items-center justify-center gap-2 bg-[#FFA50029] p-[6px] rounded-md">
+              <div className="w-[7px] h-[7px] rounded-full bg-[#FFA500]"></div>
+              <p className="text-[#4D4D4D] text-[13px]">Sold Out</p>
+            </div>
+          ) : (
+            <div className="flex items-center justify-center gap-2 bg-[#1548C329] p-[6px] rounded-md">
+              <div className="w-[7px] h-[7px] rounded-full bg-[#ff4d4f]"></div>
+              <p className="text-[#4D4D4D] text-[13px]">Unpublished</p>
+            </div>
+          )}
+        </div>
+      ),
     },
     {
       title: "Actions",
-      dataIndex: "value",
-      key: "value",
+      align: "center",
+      render: (text, record) => (
+        <Popover placement="topRight" content={actionsContent}>
+          <Button type="primary">Actions</Button>
+        </Popover>
+      ),
     },
   ];
 
@@ -505,6 +578,7 @@ const Inventory = ({ user }) => {
             defaultValue={debouncedSearchTerm}
             onChange={queryHandleChange}
             onPressEnter={queryHandleEnter}
+            className="bg-[#F6F6F6]"
             suffix={
               <img
                 src={Images.Header_Search}
