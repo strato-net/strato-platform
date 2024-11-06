@@ -13,6 +13,8 @@ abstract contract OracleService is Utils {
     
     string public name;
 
+    bool public isActive;
+
     constructor(
         string _name
     ) {
@@ -20,6 +22,11 @@ abstract contract OracleService is Utils {
         ownerCommonName = getCommonName(msg.sender);
 
         name = _name;
+        isActive = true;
+    }
+
+    function _deactivate() internal {
+        isActive = false;
     }
 
     function _submitPrice(decimal _price) internal {

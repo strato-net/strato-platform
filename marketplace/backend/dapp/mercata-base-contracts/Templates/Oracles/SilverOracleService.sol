@@ -18,6 +18,10 @@ contract SilverOracleService is OracleService {
         _;
     }
 
+    function deactivate() public requireOwner("deactivate") {
+        _deactivate();
+    }
+
     function submitPrice(decimal _price) public requireOwner("submit price") {
         _submitPrice(_price);
     }
