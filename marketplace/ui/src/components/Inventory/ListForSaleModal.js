@@ -236,6 +236,7 @@ const ListForSaleModal = ({ open, handleCancel, inventory, categoryName, limit, 
                         value={quantity}
                         controls={false}
                         min={1}
+                        max={inventory.quantity}
                         onChange={(value) => {
                             if (value) {
                                 setQuantity(parseInt(value, 10));
@@ -254,13 +255,14 @@ const ListForSaleModal = ({ open, handleCancel, inventory, categoryName, limit, 
                         value={pricePerUnit}
                         controls={false}
                         min={0.01}
+                        formatter={(value) => {
+                            if (!value) return '0';
+                            const [integerPart, decimalPart] = value.toString().split('.');
+                            return decimalPart ? `${integerPart}.${decimalPart.slice(0, 2)}` : integerPart;
+                        }}
+                        parser={(value) => value ? parseFloat(value).toFixed(2) : ''}
                         onChange={(value) => {
-                            const stringValue = value ? value.toString() : '';
-                            if (/^\d+(\.\d{0,2})?$/.test(stringValue)) {
-                                setpricePerUnit(value);
-                            } else {
-                                setpricePerUnit(0);
-                            }
+                            setpricePerUnit(value || 0);
                         }}
                     />
                 )
@@ -334,6 +336,7 @@ const ListForSaleModal = ({ open, handleCancel, inventory, categoryName, limit, 
                         value={quantity}
                         controls={false}
                         min={1}
+                        max={inventory.quantity}
                         onChange={(value) => {
                             if (value) {
                                 setQuantity(parseInt(value, 10));
@@ -350,13 +353,14 @@ const ListForSaleModal = ({ open, handleCancel, inventory, categoryName, limit, 
                         value={pricePerUnit}
                         controls={false}
                         min={.01}
+                        formatter={(value) => {
+                            if (!value) return '0';
+                            const [integerPart, decimalPart] = value.toString().split('.');
+                            return decimalPart ? `${integerPart}.${decimalPart.slice(0, 2)}` : integerPart;
+                        }}
+                        parser={(value) => value ? parseFloat(value).toFixed(2) : ''}
                         onChange={(value) => {
-                            const stringValue = value ? value.toString() : '';
-                            if (/^\d+(\.\d{0,2})?$/.test(stringValue)) {
-                                setpricePerUnit(value);
-                            } else {
-                                setpricePerUnit(0);
-                            }
+                            setpricePerUnit(value || 0);
                         }}
                     />
                 </div >
