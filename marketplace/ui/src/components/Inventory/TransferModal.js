@@ -130,13 +130,8 @@ const TransferModal = ({ open, handleCancel, inventory, categoryName = "", limit
                     controls={false}
                     min={1}
                     max={inventory.quantity}
-                    onChange={(value) => {
-                        if (value) {
-                            setQuantity(parseInt(value, 10));
-                        } else {
-                            setQuantity(0);
-                        }
-                    }}
+                    onChange={(value) => setQuantity(value)}
+                    precision={0}
                 />
             )
         },
@@ -148,15 +143,8 @@ const TransferModal = ({ open, handleCancel, inventory, categoryName = "", limit
                     value={price}
                     controls={false}
                     min={0.01}
-                    formatter={(value) => {
-                        if (!value) return '0';
-                        const [integerPart, decimalPart] = value.toString().split('.');
-                        return decimalPart ? `${integerPart}.${decimalPart.slice(0, 2)}` : integerPart;
-                    }}
-                    parser={(value) => value ? parseFloat(value).toFixed(2) : ''}
-                    onChange={(value) => {
-                        setPrice(value || 0);
-                    }}
+                    onChange={(value) => setPrice(value)}
+                    precision={2}
                 />
             )
         },
@@ -249,13 +237,8 @@ const TransferModal = ({ open, handleCancel, inventory, categoryName = "", limit
                             controls={false}
                             min={1}
                             max={inventory.quantity}
-                            onChange={(value) => {
-                                if (value) {
-                                    setQuantity(parseInt(value, 10));
-                                } else {
-                                    setQuantity(0);
-                                }
-                            }}
+                            onChange={(value) => setQuantity(value)}
+                            precision={0}
                         />
                     </div>
                 </div>
@@ -267,15 +250,8 @@ const TransferModal = ({ open, handleCancel, inventory, categoryName = "", limit
                             value={price}
                             controls={false}
                             min={.01}
-                            formatter={(value) => {
-                                if (!value) return '0';
-                                const [integerPart, decimalPart] = value.toString().split('.');
-                                return decimalPart ? `${integerPart}.${decimalPart.slice(0, 2)}` : integerPart;
-                            }}
-                            parser={(value) => value ? parseFloat(value).toFixed(2) : ''}
-                            onChange={(value) => {
-                                setPrice(value || 0);
-                            }}
+                            onChange={(value) => setPrice(value)}
+                            precision={2}
                         />
                     </div>
                 </div>

@@ -66,13 +66,8 @@ const RedeemModal = ({ open, handleCancel, inventory, categoryName, limit, offse
                     controls={false}
                     min={1}
                     max={inventory.quantity}
-                    onChange={(value) => {
-                        if (value) {
-                            setQuantity(parseInt(value, 10));
-                        } else {
-                            setQuantity(0);
-                        }
-                    }}
+                    onChange={(value) => setQuantity(value)}
+                    precision={0}
                 />
             )
         },
@@ -196,13 +191,8 @@ const RedeemModal = ({ open, handleCancel, inventory, categoryName, limit, offse
                             controls={false}
                             min={1}
                             max={inventory.quantity}
-                            onChange={(value) => {
-                                if (value) {
-                                    setQuantity(parseInt(value, 10));
-                                } else {
-                                    setQuantity(0);
-                                }
-                            }}
+                            onChange={(value) => setQuantity(value)}
+                            precision={0}
                         />
                     </div>
                 </div>
