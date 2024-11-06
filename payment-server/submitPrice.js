@@ -51,9 +51,9 @@ describe("Payment Server - Fetch Prices for Oracle", function () {
         const token = await oauthHelper.getServiceToken();
 
         // Fetch the silver price using API key from config
-        const apiUrl = `https://metals-api.com/api/latest?access_key=${process.env.METALS_API_KEY}&base=USD&symbols=XAG`;
+        const apiUrl = `https://api.metals.dev/v1/metal/spot?metal=silver&api_key=${process.env.METALS_API_KEY}&currency=USD&unit=toz`;
         const response = await axios.get(apiUrl);
-        const silverPrice = response.data.rates.XAG;
+        const silverPrice = response.data.rates.price;
         console.log(`Current Silver Price: $${silverPrice} per ounce`);
 
         await submitPrice(token, silverOracle, { price: silverPrice });
