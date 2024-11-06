@@ -40,7 +40,6 @@ import Control.Monad.Reader
 import Control.Monad.Trans.Except
 import Data.Aeson hiding (Success)
 import qualified Data.ByteString.Lazy as BL
-import Data.List (elemIndex)
 import qualified Data.Map as M
 import Data.Maybe (fromMaybe)
 import Data.Text (Text)
@@ -63,16 +62,6 @@ import SolidVM.Model.Value (ValList (..), Value (..))
 import Strato.Strato23.API
 import Strato.Strato23.Client
 import UnliftIO hiding (Handler)
-
-getDefaultEmptyOrg :: String -> String -> String
-getDefaultEmptyOrg name uuid = "Mercata Account " ++ getDefaultEmptyOrgOld name uuid
-
-getDefaultEmptyOrgOld :: String -> String -> String
-getDefaultEmptyOrgOld name uuid = case elemIndex ' ' name of
-  Nothing -> head name : take 8 uuid
-  Just idx ->
-    let lastNs = drop (idx + 1) name
-     in head name : lastNs ++ take 8 uuid
 
 getSubject ::
   ( MonadIO m,
@@ -132,9 +121,7 @@ putIdentity accessToken uuid name mEmail mCo mSub = do
   -- check if a user exists in vault
   let name' = T.unpack name
       uuid' = T.unpack uuid
-      org = case mCo of
-        Just o | o /= "" -> T.unpack o
-        _ -> getDefaultEmptyOrg name' uuid'
+      org = fromMaybe "" $ T.unpack <$> mCo
       csvLogMsg =
         T.intercalate
           ","
