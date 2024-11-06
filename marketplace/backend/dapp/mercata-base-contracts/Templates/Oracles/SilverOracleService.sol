@@ -6,7 +6,7 @@ import <BASE_CODE_COLLECTION>;
 contract SilverOracleService is OracleService {
     constructor(
 	    string _name
-    ) public Oracle (_name) {}
+    ) public OracleService (_name) {}
 
     modifier requireOwner(string action) {
         string err = "Only the owner of the asset can "
