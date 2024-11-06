@@ -108,14 +108,15 @@ putIdentity ::
     Accessible (Maybe AccessToken) m,
     (String `A.Alters` Address) m
   ) =>
-  Text ->
-  Text ->
-  Text ->
-  Maybe Text ->
+  HeaderList ->
   Maybe Text ->
   Maybe Bool ->
   m Address
-putIdentity accessToken uuid name mEmail mCo mSub = do
+putIdentity headers mCo mSub = do
+  let accessToken = fromMaybe "" $ getHeader "X-USER-ACCESS-TOKEN" headers
+      uuid = fromMaybe "" $ getHeader "X-USER-UNIQUE-NAME" headers
+      name = fromMaybe "" $ getHeader "X-USER-COMMON-NAME" headers
+      mEmail = getHeader "X-USER-EMAIL" headers
   time' <- liftIO getCurrentTime
   $logInfoS "putIdentity" $ "User " <> uuid <> " called PUT /identity with username " <> name <> " and company " <> T.pack (show mCo)
   -- check if a user exists in vault
@@ -178,28 +179,6 @@ putIdentity accessToken uuid name mEmail mCo mSub = do
           $logErrorS "putIdentity" "uh oh! We couldn't retrieve an access token for our realm"
           throwIO $ IdentityError "Something is wrong with the provided access credentials for the current realm. Have a network administrator look into this."
 
--- This is just a dummy function
--- This never gets called on the sevrvant backend
--- This is created for the client binding
--- which is used within the strato node to form a request
--- which Identity server's nginx transforms the headers
--- which patterns matches with putIdentity
-putIdentityExternal ::
-  ( MonadUnliftIO m,
-    MonadLogger m,
-    HasVault m,
-    Accessible Issuer m,
-    Accessible X509Certificate m,
-    Accessible PrivateKey m,
-    Accessible IdentityServerData m,
-    Accessible (Maybe SendgridAPIKey) m,
-    Accessible (Maybe AccessToken) m,
-    (String `A.Alters` Address) m
-  ) =>
-  Text ->
-  Maybe Bool ->
-  m Address
-putIdentityExternal bearerToken = putIdentity (T.replace "Bearer " "" bearerToken) "" "" Nothing Nothing
 
 blocEndpoint :: String
 blocEndpoint = "/bloc/v2.2"
@@ -568,15 +547,16 @@ server ::
     Accessible (Maybe AccessToken) m,
     (String `A.Alters` Address) m
   ) =>
+  Proxy IDAPI.IdentityInternalHeaders ->
   ServerT IDAPI.IdentityProviderAPI m
-server = getPingIdentity :<|> putIdentity :<|> putIdentityExternal
+server p = getPingIdentity :<|> embedServer p putIdentity
 
 hoistCoreServer ::
   String ->
   IdentityServerData ->
   Server IDAPI.IdentityProviderAPI
 hoistCoreServer vaulturl idData =
-  hoistServer (Proxy :: Proxy IDAPI.IdentityProviderAPI) (convertErrors runM') server
+  hoistServer (Proxy :: Proxy IDAPI.IdentityProviderAPI) (convertErrors runM') (server (Proxy :: Proxy IDAPI.IdentityInternalHeaders))
   where
     convertErrors r x = Handler $ do
       eRes <- liftIO . try $ r x

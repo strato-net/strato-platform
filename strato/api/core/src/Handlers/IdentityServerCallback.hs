@@ -51,7 +51,7 @@ redirect accessToken = do
   --Historical note: we decided to wait for ID serer response, but ignore any bad response
   --As the fail safe should catch any ID server failure
   -- ?subscribe=true <-> Just True 
-  idServerResult <- liftIO $ (try (runLoggingT $ (flip runReaderT (IdentityData url mgr) $ identitytWrapper $ putIdentityExternal ("Bearer " <> accessToken) (Just True))) :: IO (Either SomeException Address)) 
+  idServerResult <- liftIO $ (try (runLoggingT $ (flip runReaderT (IdentityData url mgr) $ identitytWrapper $ putIdentity ("Bearer " <> accessToken) Nothing (Just True))) :: IO (Either SomeException Address)) 
   case idServerResult of
     Left e -> do
       logErrorCS callStack $ "Error calling Identity Server: " <> pack (show e)

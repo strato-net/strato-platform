@@ -20,6 +20,7 @@ library:
   source-dirs: src
   dependencies:
   - aeson
+  - parametric-apis
   - servant
   - strato-model
   - text
