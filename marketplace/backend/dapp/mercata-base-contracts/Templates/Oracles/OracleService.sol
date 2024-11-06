@@ -7,6 +7,7 @@ import "../Utils/Utils.sol";
 
 abstract contract OracleService is Utils {
     decimal public consensusPrice;
+    uint public consensusPriceTimestamp;
 
     address public owner;
     string public ownerCommonName;
@@ -30,10 +31,11 @@ abstract contract OracleService is Utils {
     }
 
     function _submitPrice(decimal _price) internal {
+        consensusPriceTimestamp = block.timestamp;
     	consensusPrice = _price;
     }
 
-    function getLatestPrice() external view returns (decimal) {
-    	return consensusPrice;
+    function getLatestPrice() external view returns (decimal, uint) {
+        return (consensusPrice, consensusPriceTimestamp);
     }
 }
