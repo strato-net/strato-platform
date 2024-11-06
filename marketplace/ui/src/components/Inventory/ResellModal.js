@@ -31,8 +31,8 @@ const ResellModal = ({ open, handleCancel, inventory, categoryName, limit, offse
                     <InputNumber value={quantity} controls={false} min={1} onChange={(value) => setQuantity(value)} precision={0} />
                 )
             },
-        ]
-    };
+        ];
+    };    
 
     const handleSubmit = async () => {
         let body = {
