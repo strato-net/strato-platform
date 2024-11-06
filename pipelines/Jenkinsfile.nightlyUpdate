@@ -14,7 +14,7 @@ pipeline {
         
         dir ('/datadrive/testnet2/strato-getting-started') {
           sh 'sudo ./strato --pull'
-          sh 'sudo ./strato --wipe && sudo ./run.sh'
+          sh 'sudo ./strato --wipe && sudo ./strato-run.sh'
         }
         sh 'sudo docker image prune'
       }
@@ -65,18 +65,18 @@ pipeline {
       agent { label "mercata-testnet2-rewards" }
       steps {
         withCredentials([usernamePassword(credentialsId: 'blockapps-cd-github', passwordVariable: 'GITHUB_TOKEN', usernameVariable: 'GITHUB_USERNAME')]) {
-            dir ('/home/ec2-user/strato-platform/rewards-server') {
-                sh """
-                set -xe
-                git checkout develop
-                git pull https://${GITHUB_USERNAME}:${GITHUB_TOKEN}@github.com/blockapps/strato-platform.git
-                sudo docker compose up --build -d
-              """
-              }
-            }
+          dir ('/home/ec2-user/strato-platform/rewards-server') {
+            sh """
+            set -xe
+            git checkout develop
+            git pull https://${GITHUB_USERNAME}:${GITHUB_TOKEN}@github.com/blockapps/strato-platform.git
+            sudo docker compose up --build -d
+          """
           }
+        }
         sh 'sudo docker image prune'
       }
+    }
 
       stage('Update Testnet2 Notification Server') {
       agent { label "mercata-testnet2-notification" }

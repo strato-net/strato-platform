@@ -42,6 +42,7 @@ contract Clothing is Mintable {
     }
 
     function mint(uint _quantity) internal override returns (UTXO) {
+        require(_quantity > 0, "Quantity must be greater than 0");
         Clothing newAsset = new Clothing(
             name,
             description,

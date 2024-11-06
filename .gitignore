@@ -44,3 +44,4 @@ strato/haddock
 strato/hpc
 *.cabal
 *~
+rewards-server/src/config/latestBlock.json
