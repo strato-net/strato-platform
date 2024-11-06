@@ -9,5 +9,6 @@ import "../items/contracts/Tokens.sol";
 import "Templates/Payments/ExternalPaymentService.sol";
 import "Templates/Payments/StratPaymentService.sol";
 import "Templates/Payments/TokenPaymentService.sol";
+import "Templates/Oracles/SilverOracle.sol";
 import "Templates/Redemptions/ExternalRedemptionService.sol";
 import "Templates/Sales/SimpleSale.sol";

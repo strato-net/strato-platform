@@ -42,6 +42,9 @@ export STRAT_IMAGE_URL_VALUE=${STRAT_IMAGE_URL_VALUE:-'https://blockapps.net/wp-
 export STRAT_PRIMARY_SALE_FEE_PERCENTAGE_VALUE=${STRAT_PRIMARY_SALE_FEE_PERCENTAGE_VALUE:-10.0}
 export STRAT_SECONDARY_SALE_FEE_PERCENTAGE_VALUE=${STRAT_SECONDARY_SALE_FEE_PERCENTAGE_VALUE:-3.0}
 export STRAT_FEE_RECIPIENT=${STRAT_FEE_RECIPIENT}
+export METALS_API_KEY=${METALS_API_KEY}
+export SILVER_ORACLE_NAME_VALUE=${SILVER_ORACLE_NAME_VALUE:-'Silver'}
+export SILVER_ORACLE_FETCH_INTERVAL=${SILVER_ORACLE_FETCH_INTERVAL:-'60000'}
 export REDEMPTIONS_CLOSE_REDEMPTION_ROUTE_VALUE=${REDEMPTIONS_CLOSE_REDEMPTION_ROUTE_VALUE:-'/redemption/close'}
 export REDEMPTIONS_CREATE_CUSTOMER_ADDRESS_ROUTE_VALUE=${REDEMPTIONS_CREATE_CUSTOMER_ADDRESS_ROUTE_VALUE:-'/customer/address'}
 export REDEMPTIONS_CREATE_REDEMPTION_ROUTE_VALUE=${REDEMPTIONS_CREATE_REDEMPTION_ROUTE_VALUE:-'/redemption/create'}
@@ -133,6 +136,8 @@ sed -i 's*<strat_image_url_value>*'"${STRAT_IMAGE_URL_VALUE}"'*g' /tmp/tmp.confi
 sed -i 's*<strat_primary_sale_fee_percentage_value>*'"${STRAT_PRIMARY_SALE_FEE_PERCENTAGE_VALUE}"'*g' /tmp/tmp.config.yaml
 sed -i 's*<strat_secondary_sale_fee_percentage_value>*'"${STRAT_SECONDARY_SALE_FEE_PERCENTAGE_VALUE}"'*g' /tmp/tmp.config.yaml
 sed -i 's*<strat_fee_recipient_value>*'"${STRAT_FEE_RECIPIENT}"'*g' /tmp/tmp.config.yaml
+sed -i 's*<silver_oracle_name_value>*'"${SILVER_ORACLE_NAME_VALUE}"'*g' /tmp/tmp.config.yaml
+sed -i 's*<silver_oracle_fetch_interval_value>*'"${SILVER_ORACLE_FETCH_INTERVAL}"'*g' /tmp/tmp.config.yaml
 sed -i 's*<redemptions_close_redemption_route_value>*'"${REDEMPTIONS_CLOSE_REDEMPTION_ROUTE_VALUE}"'*g' /tmp/tmp.config.yaml
 sed -i 's*<redemptions_create_customer_address_route_value>*'"${REDEMPTIONS_CREATE_CUSTOMER_ADDRESS_ROUTE_VALUE}"'*g' /tmp/tmp.config.yaml
 sed -i 's*<redemptions_create_redemption_route_value>*'"${REDEMPTIONS_CREATE_REDEMPTION_ROUTE_VALUE}"'*g' /tmp/tmp.config.yaml
@@ -164,6 +169,9 @@ elif [ "${SKIP_DEPLOYMENT}" != "true" ]; then
 else
   echo 'SKIP_DEPLOYMENT is true. Skipping deployment...'
 fi
+
+echo 'Starting price submission script...'
+yarn submit-price &  # (&) Runs the script in the background
 
 echo 'Starting payment server...'
 yarn start
