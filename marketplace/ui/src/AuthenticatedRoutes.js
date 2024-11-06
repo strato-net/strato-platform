@@ -181,7 +181,7 @@ const AuthenticatedRoutes = ({ user, users, isAuthenticated }) => {
       />
       <Route
         exact
-        path={routes.MyItems.url}
+        path={routes.MyWallet.url}
         element={
           <UsersProvider>
             <CategorysProvider>

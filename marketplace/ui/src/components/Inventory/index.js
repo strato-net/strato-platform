@@ -498,7 +498,7 @@ const Inventory = ({ user }) => {
             </ClickableCell>
           </Breadcrumb.Item>
           <Breadcrumb.Item>
-            <p className="text-sm text-[#202020] font-medium">My Items</p>
+            <p className="text-sm text-[#202020] font-medium">My Wallet</p>
           </Breadcrumb.Item>
         </Breadcrumb>
         <div className="w-full h-[160px] py-4 px-4 md:h-[96px] bg-[#F6F6F6] flex flex-col md:flex-row md:px-14 justify-between items-center mt-6 lg:mt-8">
@@ -516,7 +516,7 @@ const Inventory = ({ user }) => {
               }
             >
               {" "}
-              My Items
+              My Wallet
             </Button>
           </div>
           <div className="flex flex-col md:flex-row gap-3 items-center my-2 md:my-0">

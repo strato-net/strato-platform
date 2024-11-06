@@ -136,7 +136,7 @@ const UserProfile = ({user}) => {
       setPage(page);
     };
 
-    // Tab Selection for MyItems tab
+    // Tab Selection for MyWallet tab
     const handleTabSelectForOwner = (key) => {
       setCategory(key);
       setOffset(0);
@@ -393,12 +393,12 @@ const UserProfile = ({user}) => {
       >
 
 
-              {/* MyItems Section- For Owners */}
+              {/* MyWallet Section- For Owners */}
 
     {isOwner && (
-      <TabPane tab="My Items" key="0">
+      <TabPane tab="My Wallet" key="0">
             
-            {/* MyItems Assets of the Owner Profile */}
+            {/* MyWallet Assets of the Owner Profile */}
 
           <Tabs
             defaultActiveKey={category ? category : "All"}

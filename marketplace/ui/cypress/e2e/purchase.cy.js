@@ -29,7 +29,7 @@ describe('Create a new Asset', () => {
     cy.get('#avatar')
     cy.url('').should("exist");
     cy.get('#Inventory').should("exist").click();
-    cy.url().should("exist", "myitems");
+    cy.url().should("exist", "mywallet");
     cy.get('#createItem').should('not.have.attr', 'disabled');
     cy.get('#createItem').click();
     cy.get('#name').type(productName);
@@ -63,7 +63,7 @@ describe('Create a new Asset', () => {
     cy.wait(7000)
 
     // List for sale
-    cy.url().should("exist", "myitems");
+    cy.url().should("exist", "mywallet");
     cy.get(`#asset-${productName}`)
     cy.get(`#asset-${productName}`).within(() => {
       cy.get("#sell-listing-btn").click();
@@ -151,7 +151,7 @@ describe('Create a new Asset', () => {
     });
     cy.wait(3000);
     cy.get('#Inventory').should("exist").click();
-    cy.url().should("exist", "myitems");
+    cy.url().should("exist", "mywallet");
     cy.get(`#asset-${productName}`).should("exist")
     cy.wait(3000);
   });

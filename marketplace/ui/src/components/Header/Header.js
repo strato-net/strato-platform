@@ -97,7 +97,7 @@ const HeaderComponent = ({ user, loginUrl, showMenu, handleSubMenu, handleMenuTa
   const navUrls = [
     routes.Marketplace.url,
     routes.Transactions.url,
-    routes.MyItems.url,
+    routes.MyWallet.url,
     routes.Products.url,
   ];
 
@@ -120,7 +120,7 @@ const HeaderComponent = ({ user, loginUrl, showMenu, handleSubMenu, handleMenuTa
     let pathName = window.location.pathname;
     if (pathName.includes("/transactions")) {
       setSelectedTab("1");
-    } else if (pathName.includes("/myitems")) {
+    } else if (pathName.includes("/mywallet")) {
       setSelectedTab("2");
     } else if (pathName.includes("/products")) {
       setSelectedTab("3");
@@ -238,7 +238,7 @@ const HeaderComponent = ({ user, loginUrl, showMenu, handleSubMenu, handleMenuTa
 
   const subMenuItems = [
     { value: "transactions", path: routes.Transactions.url, label: "My Transactions" },
-    { value: "myitems", path: routes.MyItems.url, label: "My Items" },
+    { value: "mywallet", path: routes.MyWallet.url, label: "My Wallet" },
     user ? {
       value: "my-profile",
       path: routes.MarketplaceUserProfile.url.replace(':commonName', user.commonName),
