@@ -1,10 +1,10 @@
-import { Button, Input, InputNumber, Modal, Select, Spin, Tag, Table, Typography } from "antd";
-import { useEffect, useRef, useState } from "react";
+import { Button, InputNumber, Modal, Select, Spin, Tag, Table, Typography } from "antd";
+import { useEffect, useState } from "react";
 import { actions } from "../../contexts/inventory/actions";
 import { useInventoryDispatch, useInventoryState } from "../../contexts/inventory";
 import { usePaymentServiceDispatch, usePaymentServiceState } from "../../contexts/payment";
 import { actions as paymentServiceActions } from "../../contexts/payment/actions";
-import { handlePriceInput, handleQuantityInput } from "../../helpers/utils";
+import { CheckCircleOutlined } from '@ant-design/icons';
 
 const { Option } = Select;
 
@@ -45,10 +45,6 @@ const ListForSaleModal = ({ open, handleCancel, inventory, categoryName, limit, 
         areNotOnboardedLoading
     } = usePaymentServiceState();
     const paymentServiceDispatch = usePaymentServiceDispatch();
-    const inputPriceDesktopRef = useRef(null);
-    const inputPriceMobileRef = useRef(null);
-    const inputQuantityDesktopRef = useRef(null);
-    const inputQuantityMobileRef = useRef(null);
 
     useEffect(() => {
         paymentServiceActions.getPaymentServices(paymentServiceDispatch, true);
@@ -67,87 +63,123 @@ const ListForSaleModal = ({ open, handleCancel, inventory, categoryName, limit, 
         };
     }, [quantity, pricePerUnit, paymentTypes])
 
-    useEffect(() => {
-        const excludeStrats = inventory.contract_name && inventory.contract_name.toLowerCase().includes('strats');
-        
-        const diff = paymentServices.filter(ps => {
-            const isNotOnboarded = !notOnboarded.some(x => x.address === ps.address);
-            const isStratsService = excludeStrats && ps.serviceName.toLowerCase().includes('strats');
-            return isNotOnboarded && !isStratsService;
-        });
-        setAvailablePaymentServices(diff);
-
-
-        const inventoryPaymentServices = inventory.paymentServices
-            ? inventory.paymentServices.filter(provider => provider.value).map(provider => provider.value)
-            : [];
-        const selectedPaymentServiceIndices = inventoryPaymentServices.map(inventoryPS =>
-            diff.findIndex(ps => ps.creator === inventoryPS.creator && ps.serviceName === inventoryPS.serviceName)
-        );
-        setPaymentTypes(selectedPaymentServiceIndices);
-
-    }, [paymentServices, notOnboarded, inventory.paymentServices]);
-
-    useEffect(() => {
-        const priceInputElements = [inputPriceDesktopRef.current, inputPriceMobileRef.current];
-        const quantityInputElements = [inputQuantityDesktopRef.current, inputQuantityMobileRef.current];
-        
-        priceInputElements.forEach(inputElement => {
-            if (inputElement) {
-                inputElement.addEventListener('input', handlePriceInput(setpricePerUnit));
-            }
-        });
-
-        quantityInputElements.forEach(inputElement => {
-            if (inputElement) {
-                inputElement.addEventListener('input', handleQuantityInput(setQuantity));
-            }
-        });
-
-        return () => {
-            priceInputElements.forEach(inputElement => {
-                if (inputElement) {
-                    inputElement.removeEventListener('input', handlePriceInput(setpricePerUnit));
-                }
-            });
-
-            quantityInputElements.forEach(inputElement => {
-                if (inputElement) {
-                    inputElement.removeEventListener('input', handleQuantityInput(setQuantity));
-                }
-            });
-        };
-    }, [inputPriceDesktopRef, inputPriceMobileRef, inputQuantityDesktopRef, inputQuantityMobileRef]);
-
     const renderImg = (service) => {
         return service.imageURL && service.imageURL !== ''
             ? <img src={service.imageURL} alt={service.serviceName} height="16px" width="16px" />
             : ''
     }
 
+    const handleSelect = (values) => {
+        const stratsIndex = availablePaymentServices.findIndex(service => service.serviceName.toLowerCase().includes('strats'));
+
+        // Ensure 'strats' service is always selected
+        if (stratsIndex !== -1 && !values.includes(stratsIndex)) {
+            values = [stratsIndex, ...values];
+        }
+        setPaymentTypes(values);
+    };
+
+   
+    useEffect(() => {
+        const excludeStrats = inventory.contract_name && inventory.contract_name.toLowerCase().includes('strats');
+
+        const diff = paymentServices.filter(ps => {
+            const isNotOnboarded = !notOnboarded.some(x => x.address === ps.address);
+            const isStratsService = excludeStrats && ps.serviceName.toLowerCase().includes('strats');
+            return isNotOnboarded && !isStratsService;
+        });
+
+        setAvailablePaymentServices(diff);
+
+        const inventoryPaymentServices = inventory.paymentServices
+            ? inventory.paymentServices.filter(provider => provider.value).map(provider => provider.value)
+            : [];
+
+        const selectedPaymentServiceIndices = inventoryPaymentServices.map(inventoryPS =>
+            diff.findIndex(ps => ps.creator === inventoryPS.creator && ps.serviceName === inventoryPS.serviceName)
+        );
+
+        const stratsIndex = diff.findIndex(ps => ps.serviceName.toLowerCase().includes('strats'));
+
+        // Auto-select 'strats' if it exists
+        if (stratsIndex !== -1 && !selectedPaymentServiceIndices.includes(stratsIndex)) {
+            selectedPaymentServiceIndices.push(stratsIndex);
+        }
+
+        setPaymentTypes(selectedPaymentServiceIndices);
+
+    }, [paymentServices, notOnboarded, inventory.paymentServices]);
+
+    
     const tagRender = (props) => {
         const { value, closable, onClose } = props;
         const service = availablePaymentServices[value];
+        const isStratsService = service?.serviceName.toLowerCase().includes('strats');
         const onPreventMouseDown = (event) => {
             event.preventDefault();
             event.stopPropagation();
         };
-        return <> {service ? (
+
+        return service ? (
             <Tag
                 onMouseDown={onPreventMouseDown}
-                closable={closable}
+                closable={!isStratsService && closable} // prevent closing if it's 'strats'
                 onClose={onClose}
                 className="flex items-center mr-1"
             >
                 {service.serviceName}&nbsp;
                 {renderImg(service)}
             </Tag>
-        ) : ''}
-        </>;
+        ) : '';
     };
 
-    const handleSelect = (values) => {
-        setPaymentTypes(values);
+    
+    const handleSubmit = async () => {
+        const stratsService = availablePaymentServices.find(service => service.serviceName.toLowerCase().includes('strats'));
+
+        let body = {
+            paymentServices: paymentTypes
+                .filter((p) => availablePaymentServices[p])
+                .map((p) => {
+                    return {
+                        creator: availablePaymentServices[p].creator,
+                        serviceName: availablePaymentServices[p].serviceName,
+                    };
+                }),
+            price: inventory.data.quantityIsDecimal && inventory.data.quantityIsDecimal === "True" ? pricePerUnit / 100 : pricePerUnit,
+        };
+
+        // Ensure 'strats' is included in the submission
+        if (stratsService && !body.paymentServices.some(service => service.serviceName.toLowerCase().includes('strats'))) {
+            body.paymentServices.push({
+                creator: stratsService.creator,
+                serviceName: stratsService.serviceName
+            });
+        }
+
+        if (inventory.saleAddress) {
+            body = { ...body, saleAddress: inventory.saleAddress }
+        } else {
+            body = { ...body, assetToBeSold: inventory.address }
+        }
+
+        body = {
+            ...body,
+            quantity: inventory.data.quantityIsDecimal && inventory.data.quantityIsDecimal === "True" ? quantity * 100 : quantity,
+        }
+
+        let isDone;
+
+        if (inventory.saleAddress) {
+            isDone = await actions.updateSale(inventoryDispatch, body);
+        } else {
+            isDone = await actions.listInventory(inventoryDispatch, body);
+        }
+
+        if (isDone) {
+            await actions.fetchInventory(inventoryDispatch, limit, offset, "", categoryName);
+            handleCancel();
+        }
     };
 
     const columns = () => {
@@ -155,7 +187,7 @@ const ListForSaleModal = ({ open, handleCancel, inventory, categoryName, limit, 
             {
                 title: "Payment Type (s)",
                 align: "center",
-                render: () => (
+                render: () => (                    
                     <Select
                         id="paymentTypes"
                         mode="multiple"
@@ -167,13 +199,24 @@ const ListForSaleModal = ({ open, handleCancel, inventory, categoryName, limit, 
                         onChange={handleSelect}
                         showSearch={false}
                         className="w-64"
+                        popupClassName="custom-select-no-tick"
                     >
                         {!arePaymentServicesLoading ? (
                             availablePaymentServices.map((e, index) => (
-                                <Option value={index}>
-                                    <div className="flex items-center mr-1">
-                                        {e.serviceName}&nbsp;
-                                        {renderImg(e)}
+                                <Option 
+                                    key={index}
+                                    value={index} 
+                                    disabled={e.serviceName.toLowerCase().includes('strats')}
+                                >
+                                    <div className="flex items-center justify-between">
+                                        <div className="flex items-center">
+                                            {e.serviceName}&nbsp;
+                                            {renderImg(e)}
+                                        </div>
+                                        {paymentTypes.includes(index) && (
+                                            <CheckCircleOutlined className="custom-check-icon" />
+
+                                        )}
                                     </div>
                                 </Option>
                             ))
@@ -191,14 +234,11 @@ const ListForSaleModal = ({ open, handleCancel, inventory, categoryName, limit, 
                 render: () => (
                     <InputNumber
                         value={quantity}
-                        ref={inputQuantityDesktopRef}
                         controls={false}
                         min={1}
-                        onChange={(value) => {
-                            if (value) {
-                                setQuantity(parseInt(value, 10));
-                            }
-                        }}
+                        max={inventory.quantity}
+                        onChange={(value) => setQuantity(value)}
+                        precision={0}
                     />
                 )
             },
@@ -207,16 +247,11 @@ const ListForSaleModal = ({ open, handleCancel, inventory, categoryName, limit, 
                 align: "center",
                 render: () => (
                     <InputNumber
-                        ref={inputPriceDesktopRef}
                         value={pricePerUnit}
                         controls={false}
                         min={0.01}
-                        onChange={(value) => {
-                            const stringValue = value ? value.toString() : '';
-                            if (/^\d+(\.\d{0,2})?$/.test(stringValue)) {
-                                setpricePerUnit(value);
-                            }
-                        }}
+                        onChange={(value) => setpricePerUnit(value)}
+                        precision={2}
                     />
                 )
             }
@@ -224,40 +259,6 @@ const ListForSaleModal = ({ open, handleCancel, inventory, categoryName, limit, 
 
         return finalColumns;
     };
-
-    const handleSubmit = async () => {
-        let body = {
-            paymentServices: paymentTypes
-            .filter((p) => availablePaymentServices[p])
-            .map((p) => {
-              return {
-                creator: availablePaymentServices[p].creator,
-                serviceName: availablePaymentServices[p].serviceName,
-              };
-            }),
-          price: inventory.data.quantityIsDecimal && inventory.data.quantityIsDecimal === "True" ? pricePerUnit / 100 : pricePerUnit,
-        };
-        if (inventory.saleAddress) {
-            body = { ...body, saleAddress: inventory.saleAddress }
-        } else {
-            body = { ...body, assetToBeSold: inventory.address }
-        }
-        body = {
-            ...body,
-            quantity: inventory.data.quantityIsDecimal && inventory.data.quantityIsDecimal === "True" ? quantity * 100 : quantity,
-        }
-        let isDone
-
-        if (inventory.saleAddress) {
-            isDone = await actions.updateSale(inventoryDispatch, body);
-        } else {
-            isDone = await actions.listInventory(inventoryDispatch, body);
-        }
-        if (isDone) {
-            await actions.fetchInventory(inventoryDispatch, limit, offset, "", categoryName);
-            handleCancel();
-        }
-    }
 
     return (
         <Modal
@@ -294,14 +295,25 @@ const ListForSaleModal = ({ open, handleCancel, inventory, categoryName, limit, 
                         onChange={handleSelect}
                         showSearch={false}
                         className="w-full"
+                        popupClassName="custom-select-no-tick"
                     >
                         {availablePaymentServices.map((e, index) => (
-                            <Option value={index}>
-                                <div className="flex items-center mr-1">
+                        <Option 
+                            key={index}
+                            value={index} 
+                            disabled={e.serviceName.toLowerCase().includes('strats')}
+                        >
+                            <div className="flex items-center justify-between">
+                                <div className="flex items-center">
                                     {e.serviceName}&nbsp;
                                     {renderImg(e)}
                                 </div>
-                            </Option>
+                                
+                                {paymentTypes.includes(index) && (
+                                    <CheckCircleOutlined className="custom-check-icon" />
+                                )}
+                            </div>
+                        </Option>
                         ))}
                     </Select>
                 </div>
@@ -310,14 +322,11 @@ const ListForSaleModal = ({ open, handleCancel, inventory, categoryName, limit, 
                     <InputNumber
                         className="w-full h-9"
                         value={quantity}
-                        ref={inputQuantityMobileRef}
                         controls={false}
                         min={1}
-                        onChange={(value) => {
-                            if (value) {
-                                setQuantity(parseInt(value, 10));
-                            }
-                        }}
+                        max={inventory.quantity}
+                        onChange={(value) => setQuantity(value)}
+                        precision={0}
                     />
                 </div>
                 <div>
@@ -325,15 +334,10 @@ const ListForSaleModal = ({ open, handleCancel, inventory, categoryName, limit, 
                     <InputNumber
                         className="w-full h-9"
                         value={pricePerUnit}
-                        ref={inputPriceMobileRef}
                         controls={false}
                         min={.01}
-                        onChange={(value) => {
-                            const stringValue = value ? value.toString() : '';
-                            if (/^\d+(\.\d{0,2})?$/.test(stringValue)) {
-                                setpricePerUnit(value);
-                            }
-                        }}
+                        onChange={(value) => setpricePerUnit(value)}
+                        precision={2}
                     />
                 </div >
 

@@ -200,13 +200,17 @@ pipeline {
       }
     }
 
-//    stage('Some quick tests') {
-//      steps {
-//        parallel(
-//
-//        )
-//      }
-//    }
+    stage('Some quick tests') {
+      parallel {
+        stage('Node Status') {
+          steps {
+            script {
+              lib.checkNodeStatusHealth()
+            }
+          }
+        }
+      }
+    }
 
     stage('Release') {
       steps {
@@ -240,7 +244,7 @@ pipeline {
               set -x
               RELEASE_VERSION=$(<VERSION)
               RELEASE_SUFFIX=""
-              if [ "${env.RELEASE_TYPE}" == "marketplace-master" ]; then
+              if [ "${RELEASE_TYPE}" == "marketplace-master" ]; then
                 RELEASE_SUFFIX="-marketplace"
               fi
               STRATOGS_RELEASE_DETAILS_STABLE="--user blockapps --repo strato-getting-started --tag ${RELEASE_VERSION}"

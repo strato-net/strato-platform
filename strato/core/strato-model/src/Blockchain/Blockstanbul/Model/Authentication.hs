@@ -132,6 +132,9 @@ proposalMessage =
     . rlpHash
     . execIstanbulExtra scrubAllSeals
 
+proposalHash :: (RLPHashable h, HasIstanbulExtra h) => h -> Keccak256
+proposalHash = rlpHash . execIstanbulExtra scrubAllSeals
+
 verifyProposerSeal :: (RLPHashable h, HasIstanbulExtra h) => h -> Signature -> Maybe Address
 verifyProposerSeal h sig =
   let mesg = proposalMessage h

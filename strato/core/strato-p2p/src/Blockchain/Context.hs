@@ -1,3 +1,4 @@
+{-# LANGUAGE BangPatterns #-}
 {-# LANGUAGE ConstraintKinds #-}
 {-# LANGUAGE DataKinds #-}
 {-# LANGUAGE FlexibleContexts #-}
@@ -12,6 +13,8 @@
 
 module Blockchain.Context
     ( MonadP2P
+    , Inbound(..)
+    , Outbound(..)
     , IsValidator(..)
     , Context(..)
     , Config(..)
@@ -73,6 +76,7 @@ import qualified Data.Map.Strict                       as M
 import           Data.Maybe
 import           Data.Proxy
 import           Data.Ranged
+import qualified Data.Set.Ordered as S
 import           Data.String
 import qualified Data.Text                             as T
 import           Data.Time.Clock
@@ -81,6 +85,7 @@ import           GHC.Exts                              (Constraint)
 import           BlockApps.Logging
 import           BlockApps.X509.Certificate
 
+import           Blockchain.Blockstanbul               (WireMessage)
 import           Blockchain.Data.Block
 import           Blockchain.Data.BlockHeader
 import           Blockchain.Data.ChainInfo
@@ -135,6 +140,10 @@ type family All2 (ks :: [DK.Type -> DK.Type -> (DK.Type -> DK.Type) -> Constrain
   All2 (k ': '[]) ts m = All2' k ts m
   All2 (k ': ks) ts m = (All2' k ts m, All2 ks ts m)
 
+newtype Inbound a = Inbound {unInbound :: a}
+
+newtype Outbound a = Outbound {unOutbound :: a}
+
 newtype IsValidator = IsValidator {unIsValidator :: Bool}
 
 data Config = Config
@@ -144,6 +153,7 @@ data Config = Config
     configMaxReturnedHeaders :: MaxReturnedHeaders,
     configVaultClient :: ClientEnv,
     configContext :: IORef Context,
+    configBlockstanbulWireMessages :: IORef (S.OSet Keccak256),
     configPubKey :: PublicKey
   }
 
@@ -169,6 +179,7 @@ data Context = Context
   , remainingBlockHeaders    :: (RemainingBlockHeaders, UTCTime) -- keep track when last updated global headers cache
   , actionTimestamp          :: ActionTimestamp
   , _blockstanbulPeerAddr    :: PeerAddress
+  , _outboundWireMessages :: S.OSet (T.Text, Keccak256)
   }
 
 makeLenses ''Context
@@ -234,10 +245,10 @@ instance MonadIO m => (Keccak256 `A.Alters` BlockHeader) (ReaderT Config m) wher
 instance (MonadIO m, MonadLogger m) => Mod.Modifiable WorldBestBlock (ReaderT Config m) where
   get _ =
     RBDB.withRedisBlockDB RBDB.getWorldBestBlockInfo <&> \case
-      Nothing -> WorldBestBlock $ BestBlock (unsafeCreateKeccak256FromWord256 0) (-1) 0
-      Just (RedisBestBlock s n d) -> WorldBestBlock $ BestBlock s n d
-  put _ (WorldBestBlock (BestBlock s n d)) =
-    RBDB.withRedisBlockDB (RBDB.updateWorldBestBlockInfo s n d) >>= \case
+      Nothing -> WorldBestBlock $ BestBlock (unsafeCreateKeccak256FromWord256 0) (-1)
+      Just (RedisBestBlock s n) -> WorldBestBlock $ BestBlock s n
+  put _ (WorldBestBlock (BestBlock s n)) =
+    RBDB.withRedisBlockDB (RBDB.updateWorldBestBlockInfo s n) >>= \case
       Left _ -> $logInfoS "ContextM.put WorldBestBlock" $ T.pack "Failed to update WorldBestBlockInfo"
       Right False -> $logInfoS "ContextM.put WorldBestBlock" $ T.pack "NewBlock is not better than existing WorldBestBlock"
       Right True -> return ()
@@ -245,10 +256,10 @@ instance (MonadIO m, MonadLogger m) => Mod.Modifiable WorldBestBlock (ReaderT Co
 instance (MonadIO m, MonadLogger m) => Mod.Modifiable BestBlock (ReaderT Config m) where
   get _ =
     RBDB.withRedisBlockDB RBDB.getBestBlockInfo <&> \case
-      Nothing -> BestBlock (unsafeCreateKeccak256FromWord256 0) (-1) 0
-      Just (RedisBestBlock s n d) -> BestBlock s n d
-  put _ (BestBlock s n d) =
-    RBDB.withRedisBlockDB (RBDB.putBestBlockInfo s n d) >>= \case
+      Nothing -> BestBlock (unsafeCreateKeccak256FromWord256 0) (-1)
+      Just (RedisBestBlock s n) -> BestBlock s n
+  put _ (BestBlock s n) =
+    RBDB.withRedisBlockDB (RBDB.putBestBlockInfo s n) >>= \case
       Left _ -> $logInfoS "ContextM.put BestBlock" $ T.pack "Failed to update BestBlock"
       Right _ -> return ()
 
@@ -256,9 +267,9 @@ instance (MonadIO m, MonadLogger m) => Mod.Modifiable BestSequencedBlock (Reader
   get _ =
     RBDB.withRedisBlockDB RBDB.getBestSequencedBlockInfo >>= \case
       Nothing -> BestSequencedBlock <$> Mod.get (Mod.Proxy @BestBlock)
-      Just (RedisBestBlock s n d) -> pure . BestSequencedBlock $ BestBlock s n d
-  put _ (BestSequencedBlock (BestBlock s n d)) =
-    RBDB.withRedisBlockDB (RBDB.putBestSequencedBlockInfo s n d) >>= \case
+      Just (RedisBestBlock s n) -> pure . BestSequencedBlock $ BestBlock s n
+  put _ (BestSequencedBlock (BestBlock s n)) =
+    RBDB.withRedisBlockDB (RBDB.putBestSequencedBlockInfo s n) >>= \case
       Left _ -> $logInfoS "ContextM.put BestSequencedBlock" $ T.pack "Failed to update BestSequencedBlock"
       Right _ -> return ()
 
@@ -333,6 +344,45 @@ instance MonadIO m => A.Selectable ChainMemberParsedSet [ChainMemberParsedSet] (
 
 instance MonadIO m => A.Selectable ChainMemberParsedSet IsValidator (ReaderT Config m) where
   select _ = fmap (Just . IsValidator) . RBDB.withRedisBlockDB . RBDB.isValidator
+
+instance MonadIO m => (Keccak256 `A.Alters` (Proxy (Inbound WireMessage))) (ReaderT Config m) where
+  lookup _ k = do
+    wms <- readIORef =<< asks configBlockstanbulWireMessages
+    let b = S.member k wms
+    pure $ if b then Just (Proxy @(Inbound WireMessage)) else Nothing
+  insert _ k _ =
+    asks configBlockstanbulWireMessages
+      >>= flip
+        atomicModifyIORef'
+        ( \wms ->
+            let s = S.size wms
+                wms' = if s >= 2000 then S.delete (head $ toList wms) wms else wms
+                !wms'' = wms' S.>| k
+             in (wms'', ())
+        )
+  delete _ k =
+    asks configBlockstanbulWireMessages
+      >>= flip
+        atomicModifyIORef'
+        ( \wms ->
+            let !wms' = S.delete k wms
+             in (wms', ())
+        )
+
+instance MonadIO m => ((T.Text, Keccak256) `A.Alters` (Proxy (Outbound WireMessage))) (ReaderT Config m) where
+  lookup _ k = do
+    wms <- _outboundWireMessages <$> Mod.get (Mod.Proxy @Context)
+    let b = S.member k wms
+    pure $ if b then Just (Proxy @(Outbound WireMessage)) else Nothing
+  insert _ k _ = Mod.modifyStatefully_ (Mod.Proxy @Context) $ do
+    wms <- use outboundWireMessages
+    let s = S.size wms
+        wms' = if s >= 2000 then S.delete (head $ toList wms) wms else wms
+        !wms'' = wms' S.>| k
+    assign outboundWireMessages wms''
+  delete _ k =
+    Mod.modifyStatefully_ (Mod.Proxy @Context) $
+      outboundWireMessages %= S.delete k
 
 instance
   ( MonadUnliftIO m
@@ -526,6 +576,8 @@ type MonadP2P m =
       '[A.Alters]
       '[ '(Keccak256, BlockHeader),
          '(Keccak256, OutputBlock),
+         '(Keccak256, Proxy (Inbound WireMessage)),
+         '((T.Text, Keccak256), Proxy (Outbound WireMessage)),
          '((IPAsText, TCPPort), ActivityState)
        ]
       m
@@ -563,8 +615,8 @@ runContextM ::
   m ()
 runContextM r = void . runResourceT . flip runReaderT r
 
-initConfig :: (MonadLogger m, MonadUnliftIO m) => Int -> m Config
-initConfig maxHeaders = do
+initConfig :: (MonadLogger m, MonadUnliftIO m) => IORef (S.OSet Keccak256) -> Int -> m Config
+initConfig wireMessagesRef maxHeaders = do
   dbs <- openDBs
   redisBDBPool <- liftIO (Redis.checkedConnect lookupRedisBlockDBConfig)
   vaultClient <- do
@@ -584,6 +636,7 @@ initConfig maxHeaders = do
     , configMaxReturnedHeaders = MaxReturnedHeaders maxHeaders
     , configVaultClient = vaultClient
     , configContext = initStateF
+    , configBlockstanbulWireMessages = wireMessagesRef
     , configPubKey = nodePubKey
     }
 
@@ -598,7 +651,8 @@ initContext = do
             , blockHeaders = ([], jamshidBirth)
             , remainingBlockHeaders = (RemainingBlockHeaders [], jamshidBirth)
             , _blockstanbulPeerAddr = PeerAddress Nothing
-            }
+            , _outboundWireMessages = S.empty
+          }
 
 getPeerByIP ::
   A.Selectable IPAsText PPeer m =>

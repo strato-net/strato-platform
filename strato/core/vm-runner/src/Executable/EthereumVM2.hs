@@ -22,6 +22,7 @@ import BlockApps.Logging
 import qualified Blockchain.Bagger as Bagger
 import qualified Blockchain.Bagger.BaggerState as B
 import Blockchain.BlockChain
+import Blockchain.Blockstanbul.Model.Authentication
 import Blockchain.Blockstanbul (PreprepareDecision(..))
 import Blockchain.DB.BlockSummaryDB
 import Blockchain.DB.ChainDB
@@ -37,8 +38,9 @@ import Blockchain.Data.DataDefs (TransactionResult (..))
 import Blockchain.Data.ExecResults
 import Blockchain.Data.GenesisBlock
 import Blockchain.Data.TransactionResultStatus
+import Blockchain.Data.Transaction
 import qualified Blockchain.Database.MerklePatricia as MP
-import Blockchain.Event
+import Blockchain.Event hiding (selfAddress)
 import Blockchain.JsonRpcCommand
 import Blockchain.Sequencer.Event
 import qualified Blockchain.SolidVM as SolidVM
@@ -132,11 +134,23 @@ handleVmEvents = awaitForever $ \InBatch {..} -> do
                               stateRoot = bSumStateRoot summ,
                               number = bSumNumber summ
                             }
+            let pHash = proposalHash bHeader
+                mSig = getProposerSeal bHeader  -- Signature is Maybe type
+            proposer <- case mSig of
+                            Just sig -> do
+                                let (r, s, v) = getSigVals sig
+                                    proposerAddress = whoReallySignedThisTransactionEcrecover pHash r s (v - 0x1b)
+                                case proposerAddress of
+                                  Just addr ->  return addr
+                                  Nothing -> error "no proposer"
+                            Nothing -> error "no proposer"
             res <- Bagger.runFromStateRoot 
+              --account
               mineTransactions 
               (bSumGasLimit summ) 
               bHeader'
               otxs 
+              proposer
             case res of 
               Right (sr, trrs, _) -> do 
                 $logDebugS "handleVmEvents/preprepareBlock" . T.pack $ "Stateroot we got: " <> format sr
@@ -151,6 +165,7 @@ handleVmEvents = awaitForever $ \InBatch {..} -> do
   $logDebugS "handleVmEvents/mPreDec" . T.pack $ format mPreDec
   traverse_ (yield . OutPreprepareResponse) mPreDec
 
+  mSelfAddress <- _selfAddress <$> Mod.get (Mod.Proxy @ContextState)
   mNewBlock <- lift $ do
     Mod.modify_ (Mod.Proxy @ContextState) $ pure . (blockRequested ||~ createBlock)
     -- todo: perhaps we shouldnt even add TXs to the mempool, it might make for a VERY large checkpoint
@@ -188,7 +203,7 @@ handleVmEvents = awaitForever $ \InBatch {..} -> do
     if shouldOutputBlocks
       then do
         $logInfoS "evm/loop/newBlock" "calling Bagger.makeNewBlock"
-        newBlock <- Bagger.makeNewBlock mineTransactions
+        newBlock <- Bagger.makeNewBlock mineTransactions mSelfAddress
         pure $ Just newBlock 
       else pure Nothing
     
@@ -447,6 +462,7 @@ runChainConstructors cId cInfo = do
           (Account 0 $ Just cId) --receiveAddress
           (Account addr $ Just cId) --codeAddress
           sender
+          (Address 0)
           0 --value
           1 --gasPrice
           ""
@@ -476,7 +492,6 @@ writeBlockSummary :: HasBlockSummaryDB m => OutputBlock -> m ()
 writeBlockSummary block =
   let sha = outputBlockHash block
       header = obBlockData block
-      td = obTotalDifficulty block
       txCnt = fromIntegral $ length (obReceiptTransactions block)
-   in putBSum sha (blockHeaderToBSum header td txCnt)
+   in putBSum sha (blockHeaderToBSum header txCnt)
 

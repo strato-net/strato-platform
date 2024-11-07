@@ -3,17 +3,32 @@ const {
   NODE_ENV,
   prodMarketplaceUrl,
   testnetMarketplaceUrl,
+  notificationUrl
 } = require("../config");
 const { getRewards } = require("../helper/googleSheet.js");
+const axios = require("axios");
+const { sendEmail, getUserName } = require("../helper/utils.js");
+
+const baseUrl = NODE_ENV === "prod" ? prodMarketplaceUrl : testnetMarketplaceUrl;
 
 async function handleOrderRewards(event, token) {
-  const purchaser = event.eventEvent.eventArgs.find(
-    (arg) => arg[0] === "purchaser"
-  )?.[1];
+  const purchaser = {
+    purchaserAddress: event.eventEvent.eventArgs.find(
+      (arg) => arg[0] === "purchaser"
+    )?.[1],
+    purchasersCommonName: event.eventEvent.eventArgs.find(
+      (arg) => arg[0] === "purchasersCommonName"
+    )?.[1]
+  };
 
-  const seller = event.eventEvent.eventArgs.find(
-    (arg) => arg[0] === "sellerAddress"
-  )?.[1];
+  const seller = {
+    sellerAddress: event.eventEvent.eventArgs.find(
+      (arg) => arg[0] === "sellerAddress"
+    )?.[1],
+    sellersCommonName: event.eventEvent.eventArgs.find(
+      (arg) => arg[0] === "sellersCommonName"
+    )?.[1]
+  };
 
   const status = event.eventEvent.eventArgs.find(
     (arg) => arg[0] === "status"
@@ -36,27 +51,29 @@ async function handleOrderRewards(event, token) {
   );
 
   // Check if the purchaser has made a first order before
-  const checkFirstPurchase = await fetch(
-    `https://${
-      NODE_ENV === "prod" ? prodMarketplaceUrl : testnetMarketplaceUrl
-    }/cirrus/search/BlockApps-Mercata-PaymentService.Order?purchaser=eq.${purchaser}&status=eq.3&select=count`,
+  const checkFirstPurchase = await axios.get(
+    `https://${baseUrl}/cirrus/search/BlockApps-Mercata-PaymentService.Order`,
     {
-      method: "GET",
-      credentials: "same-origin",
-      headers: {
-        Accept: "application/json",
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${token}`,
+      params: {
+        purchaser: `eq.${purchaser.purchaserAddress}`,
+        status: 'eq.3',
+        select: 'count'
       },
+      headers: {
+        Accept: 'application/json',
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${token}`
+      }
     }
   );
 
-  const queryBody = await checkFirstPurchase.json();
+  const queryBody = checkFirstPurchase.data;
 
   let eventKey = "RegularOrder";
 
   if (queryBody[0].count === 1) {
     console.log("User's first order");
+    sendEmail(baseUrl, notificationUrl, 'firstPurchase', purchaser.purchasersCommonName, token);
     eventKey = "FirstOrder";
   }
 
@@ -122,15 +139,15 @@ async function handleOrderReward(
 ) {
   try {
     console.log(
-      `Sending ${eventKey} reward to , ${purchaser}, ${buyerReward / 100}STRATS`
+      `Sending ${eventKey} reward to , ${purchaser.purchasersCommonName}, ${buyerReward / 100}STRATS`
     );
     console.log(
-      `Sending sale reward to , ${seller}, ${sellerReward / 100}STRATS`
+      `Sending sale reward to , ${seller.sellersCommonName}, ${sellerReward / 100}STRATS`
     );
 
     const transactions = [
-      {toAddress: seller, value: sellerReward },
-      {toAddress: purchaser, value: buyerReward }
+      {toAddress: seller.sellerAddress, value: sellerReward },
+      {toAddress: purchaser.purchaserAddress, value: buyerReward }
     ];
 
     const transactionResponse = await createTransactionPayload(
@@ -138,7 +155,7 @@ async function handleOrderReward(
       transactions
     );
 
-    if (!transactionResponse.ok) {
+    if (transactionResponse.status !== 200) {
       const errorText = await transactionResponse.text();
       console.error(
         `Error: ${transactionResponse.status} ${transactionResponse.statusText}`
@@ -149,20 +166,27 @@ async function handleOrderReward(
       );
     }
 
-    const response = await transactionResponse.json();
+    const response = await transactionResponse.data;
     const allSuccessful = response.every((tx) => tx.status === "Success");
     if (allSuccessful) {
       console.log("All reward transactions were successful:", response);
+
+      // To Purchaser
+      sendEmail(baseUrl, notificationUrl, 'additionalPurchase', purchaser.purchasersCommonName, token);
+
+      // To Seller
+      sendEmail(baseUrl, notificationUrl, 'sellerReward', seller.sellersCommonName, token);
+
     } else {
       console.log("Some reward transactions were not successful:", response);
     }
     return response;
   } catch (error) {
     console.log(
-      `Failed to send ${eventKey} reward to ${purchaser}, ${buyerReward / 100}STRATS`
+      `Failed to send ${eventKey} reward to ${purchaser.purchasersCommonName}, ${buyerReward / 100}STRATS`
     );
     console.log(
-      `Failed to send sale reward to ${seller}, ${sellerReward / 100}STRATS`
+      `Failed to send sale reward to ${seller.sellersCommonName}, ${sellerReward / 100}STRATS`
     );
     console.error("Error processing transaction:", error.message);
     throw error;

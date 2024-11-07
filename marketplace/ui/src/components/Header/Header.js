@@ -66,10 +66,6 @@ const HeaderComponent = ({ user, loginUrl, showMenu, handleSubMenu, handleMenuTa
   const { categorys } = useCategoryState();
   let { isAuthenticated } = useAuthenticateState();
 
-  // const storedData = useMemo(() => {
-  //   return window.localStorage.getItem("cartList") == null ? [] : JSON.parse(window.localStorage.getItem("cartList"));
-  // }, []);
-
   useEffect(() => {
     if (user) {
       marketplaceActions.fetchStratsBalance(marketplaceDispatch);
@@ -91,8 +87,6 @@ const HeaderComponent = ({ user, loginUrl, showMenu, handleSubMenu, handleMenuTa
   const [categories, setCategories] = useState([]);
   const [selectedCategory, setSelectedCategory] = useState(categoryQueryValue);
   const [isModalVisible, setIsModalVisible] = useState(false);
-  const [isTransferStratsModalVisible, setIsTransferStratsModalVisible] = useState(false);
-  const [isStratsTransactionHistoryModalVisible, setIsStratsTransactionHistoryModalVisible] = useState(false);
   const [originAddress, setOriginAddress] = useState();
   const stratsBalance = (Object.keys(strats).length > 0) ? strats : 0
 
@@ -101,6 +95,7 @@ const HeaderComponent = ({ user, loginUrl, showMenu, handleSubMenu, handleMenuTa
   }, [categoryQueryValue])
 
   const navUrls = [
+    routes.Marketplace.url,
     routes.Transactions.url,
     routes.MyItems.url,
     routes.Products.url,
@@ -123,7 +118,7 @@ const HeaderComponent = ({ user, loginUrl, showMenu, handleSubMenu, handleMenuTa
 
   useEffect(() => {
     let pathName = window.location.pathname;
-    if (pathName.includes("/order") || pathName.includes("/orders") || pathName.includes('sold-orders') || pathName.includes('bought-orders')) {
+    if (pathName.includes("/transactions")) {
       setSelectedTab("1");
     } else if (pathName.includes("/myitems")) {
       setSelectedTab("2");
@@ -252,7 +247,7 @@ const HeaderComponent = ({ user, loginUrl, showMenu, handleSubMenu, handleMenuTa
 
   const subMenuItems = [
     { value: "transactions", path: routes.Transactions.url, label: "My Transactions" },
-    { value: "myitems", path: "/myitems", label: "My Items" },
+    { value: "myitems", path: routes.MyItems.url, label: "My Items" },
     user ? {
       value: "my-profile",
       path: routes.MarketplaceUserProfile.url.replace(':commonName', user.commonName),
@@ -341,15 +336,8 @@ const HeaderComponent = ({ user, loginUrl, showMenu, handleSubMenu, handleMenuTa
   };
 
   const handleClose = () => {
+    setSelectedTab('0')
     setIsModalVisible(false);
-  };
-
-  const handleCloseTransferStratsModal = () => {
-    setIsTransferStratsModalVisible(false);
-  };
-
-  const handleCloseStratsTransactionHistoryModal = () => {
-    setIsStratsTransactionHistoryModalVisible(false);
   };
 
   return (
@@ -393,8 +381,7 @@ const HeaderComponent = ({ user, loginUrl, showMenu, handleSubMenu, handleMenuTa
         </Row>
         <Menu
           mode="horizontal"
-          defaultSelectedKeys={["0"]}
-          selectedKeys={[selectedTab]}
+          selectedKeys={selectedTab}
           disabledOverflow={true}
           className="h-16 bg-white text-base mx-10 md:flex hidden"
           onClick={(item) => {
@@ -404,21 +391,21 @@ const HeaderComponent = ({ user, loginUrl, showMenu, handleSubMenu, handleMenuTa
               setIsModalVisible(true);
             } else {
               // These pages will be tracked automatically with lucky orange, no need to create an event here unless we want to include additional metadata
-              if (item.key === "0") {
+              if (item.key === "1") {
                 TagManager.dataLayer({
                   dataLayer: {
                     event: 'view_orders_page',
                   },
                 });
               }
-              if (item.key === "1") {
+              if (item.key === "2") {
                 TagManager.dataLayer({
                   dataLayer: {
                     event: 'view_inventory_page',
                   },
                 });
               }
-              if (item.key === "2") {
+              if (item.key === "3") {
                 TagManager.dataLayer({
                   dataLayer: {
                     event: 'view_products_page',
@@ -434,33 +421,6 @@ const HeaderComponent = ({ user, loginUrl, showMenu, handleSubMenu, handleMenuTa
           {<div className="flex md:hidden mx-2" onClick={() => handleSearchShow(true)}>
             <img src={Images.Responsive_search} alt={IMG_META} title={IMG_META} className="w-6 h-6" />
           </div>}
-          
-          {/* TODO: uncomment the code to show the cart */}
-          {/* <Badge
-            className="cursor-pointer mr-3 md:mr-1"
-            count={cartList.length}
-            onClick={() => {
-              TagManager.dataLayer({
-                dataLayer: {
-                  event: 'view_shopping_cart',
-                },
-              });
-              navigate("/checkout");
-              window.scrollTo(0, 0);
-            }}
-          >
-            <div id='avatar' className="md:hidden">
-              <Avatar
-                icon={<img src={Images.Responsive_cart} alt={IMG_META} title={IMG_META} className="w-6 h-6" />}
-              />
-            </div>
-            <div id='avatar' className="hidden md:inline-block">
-              <Avatar
-                icon={<img src={Images.Header_cart} alt={IMG_META} title={IMG_META} className="w-6 h-6" />}
-              />
-            </div>
-          </Badge> */}
-
           {(roleIndex !== undefined && roleIndex !== 1)
             && <Dropdown menu={{ items: stratsItem }} placement="bottomRight" trigger={["click"]} className="xs:mt-5 md:mt-0" overlayStyle={{ position: 'fixed' }}>
               <a className="md:flex mx-1 text-base text-white" id="strats-dropdown">
@@ -516,19 +476,7 @@ const HeaderComponent = ({ user, loginUrl, showMenu, handleSubMenu, handleMenuTa
         onCancel={handleClose}
         onLogin={handleLogin}
       />
-      {isTransferStratsModalVisible &&
-        <TransferStratsModal
-          visible={isTransferStratsModalVisible}
-          onCancel={handleCloseTransferStratsModal}
-          balance={stratsBalance}
-        />}
-      {isStratsTransactionHistoryModalVisible &&
-        <StratsTransactionHistoryModal
-          visible={isStratsTransactionHistoryModalVisible}
-          onCancel={handleCloseStratsTransactionHistoryModal}
-        />}
     </>
-
   );
 };
 

@@ -115,7 +115,7 @@ tFormFieldType (CCVarfDef.FieldType x typ) = XabiType.FieldType x (tFormTypeToTy
 tFormModifer :: SolidF.Modifier -> EVMXabi.Modifier
 tFormModifer SolidF.Modifier {..} =
   EVMXabi.Modifier
-    { modifierArgs = M.map tFormIndexedType _modifierArgs,
+    { modifierArgs = M.fromList $ fmap tFormIndexedType <$> _modifierArgs,
       modifierSelector = _modifierSelector,
       modifierVals = M.empty, -- :: Map Text Xabi.IndexedType __TODO!!!!
       modifierContents = case _modifierContents of

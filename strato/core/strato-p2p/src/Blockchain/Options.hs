@@ -19,12 +19,6 @@ defineFlag "maxReturnedHeaders" (500 :: Int) "Number of headers to return from a
 defineFlag "maxHeadersTxsLens" (2500 :: Int) "Number of txs size to return from a BlockHeader request"
 defineFlag "averageTxsPerBlock" (40 :: Int) "Average number of txs per block"
 defineFlag "vaultWrapperUrl" ("http://localhost:8013/strato/v2.3" :: String) "The Vault-Wrapper URL"
-defineFlag
-  "txGossipFanout"
-  (-1 :: Int)
-  "Maxmimum number of peers to forward transactions to. Only\
-  \ applicable for transactions received from peers, not\
-  \ originating on this node."
 
 
 defineEQFlag

@@ -1,130 +1,96 @@
 import { Spin, notification } from "antd";
-import React, { useEffect, useState, useMemo } from "react";
-import { useNavigate, useMatch, useLocation } from "react-router-dom";
+import React, { useEffect, useState, useMemo, useCallback } from "react";
+import { useNavigate, useLocation } from "react-router-dom";
 import routes from "../../helpers/routes";
 import { actions as orderActions } from "../../contexts/order/actions";
 import { useOrderDispatch, useOrderState } from "../../contexts/order";
-import { actions } from "../../contexts/marketplace/actions";
-import { useMarketplaceDispatch, useMarketplaceState } from "../../contexts/marketplace";
+import { actions as marketplaceActions } from "../../contexts/marketplace/actions";
+import { useMarketplaceDispatch } from "../../contexts/marketplace";
 
 function useQuery() {
   const { search } = useLocation();
-
   return useMemo(() => new URLSearchParams(search), [search]);
 }
 
-const ProcessingOrder = ({ user }) => {
-
+const ProcessingOrder = () => {
+  const query = useQuery();
   const navigate = useNavigate();
-  const [assetAddresses, setAssetAddresses] = useState([]);
   const orderDispatch = useOrderDispatch();
   const marketplaceDispatch = useMarketplaceDispatch();
-  const [error, setError] = useState(null)
+
+  const [error, setError] = useState(null);
   const { message, success, isOrderEventLoading } = useOrderState();
   const [api, contextHolder] = notification.useNotification();
-  const [called, setCalled] = useState(false);
-  const { cartList } = useMarketplaceState();
-  const [orderHash, setOrderHash] = useState("");
 
-  // const storedData = useMemo(() => {
-  //   return JSON.parse(window.localStorage.getItem("cartList") ?? []);
-  // }, []);
+  // Memoized values for orderHash and assetAddresses
+  const orderHash = useMemo(() => query.get("orderHash"), [query]);
+  const assetAddresses = useMemo(
+    () => query.get("assets")?.split(",") || [],
+    [query]
+  );
 
   const storedConfirmList = useMemo(() => {
-    return JSON.parse(window.localStorage.getItem("confirmOrderList") ?? []);
+    const data = window.localStorage.getItem("confirmOrderList");
+    return data ? JSON.parse(data) : [];
   }, []);
 
-  const routeMatch = useMatch({
-    path: routes.ProcessingOrder.url,
-    strict: true,
-  });
-
-  const query = useQuery();
-
-  useEffect(() => {
-    setAssetAddresses(query.get("assets"));
-    setOrderHash(query.get("orderHash"));
-  }, [routeMatch, query]);
-  
-  useEffect(() => {
-    if (orderHash) {
-      orderActions.waitForOrderEvent(orderDispatch, orderHash);
-    }
-  }, [orderHash]);
-  
-  useEffect(() => {
-    if (assetAddresses !== undefined && user !== undefined && !called) {
-      setCalled(true);
-    }
-  }, [assetAddresses, user, called]);
-  
-  useEffect(() => {
-    const errorMsg = query.get("error");
-    if (errorMsg) {
-      setError(new Error(errorMsg));
-    }
-  }, [query]);
-  
-  useEffect(() => {
-    // Trigger getCartData when isOrderEventLoading changes to false
-    if (!isOrderEventLoading && called) {
-      getCartData();
-    }
-  }, [isOrderEventLoading, called]);
-  
-  const getCartData = async () => {
+  const getCartData = useCallback(async () => {
     try {
-      if (orderHash) {
-        let updatedCart = [];
-        storedConfirmList.forEach(cart => {
-          if (!assetAddresses.includes(cart.action)) {
-            updatedCart.push(cart);
-          }
-        });
-        actions.addItemToCart(marketplaceDispatch, updatedCart);
-  
-        // Navigate to transaction once the cart is updated
-        navigate(routes.Transactions.url);
-      } else {
-        setTimeout(() => {
-          navigate(routes.Checkout.url);
-        }, 3000);
-      }
+      const updatedCart = storedConfirmList.filter(
+        (cart) => !assetAddresses.includes(cart.action)
+      );
+      marketplaceActions.addItemToCart(marketplaceDispatch, updatedCart);
+
+      // Navigate to Transactions after cart update
+      navigate(routes.Transactions.url);
     } catch (err) {
       setError(err);
     }
-  };
-  
-  const openToastMarketplace = (placement) => {
-    if (error != null) {
-      api.error({
-        message: error.message,
-        onClose: setError(null),
-        placement,
-        key: 2,
-      });
-    }
-  };
+  }, [storedConfirmList, assetAddresses, marketplaceDispatch, navigate]);
 
-  const openToastOrder = (placement) => {
-    if (success) {
-      api.success({
-        message: message,
-        onClose: orderActions.resetMessage(orderDispatch),
-        placement,
-        key: 1,
-      });
+  useEffect(() => {
+    if (orderHash && assetAddresses.length) {
+      orderActions.waitForOrderEvent(orderDispatch, orderHash);
     } else {
-      api.error({
-        message: message,
-        onClose: orderActions.resetMessage(orderDispatch),
-        placement,
-        key: 2,
-      });
+      const timer = setTimeout(() => navigate(routes.Marketplace.url), 3000);
+      return () => clearTimeout(timer); // Cleanup timeout
     }
-  };
+  }, [orderHash, assetAddresses, orderDispatch, navigate]);
 
+  useEffect(() => {
+    const errorMsg = query.get("error");
+    if (errorMsg) setError(new Error(errorMsg));
+  }, [query]);
 
+  useEffect(() => {
+    if (!isOrderEventLoading && orderHash && assetAddresses.length) {
+      getCartData();
+    }
+  }, [isOrderEventLoading, orderHash, assetAddresses, getCartData]);
+
+  const openNotification = useCallback(
+    (type, placement, content) => {
+      api[type]({
+        message: content,
+        onClose: type === "error" ? () => setError(null) : undefined,
+        placement,
+        key: type === "error" ? 2 : 1,
+      });
+    },
+    [api]
+  );
+
+  useEffect(() => {
+    if (error) openNotification("error", "bottom", error.message);
+  }, [error, openNotification]);
+
+  useEffect(() => {
+    if (message) {
+      const notificationType = success ? "success" : "error";
+      openNotification(notificationType, "bottom", message);
+      orderActions.resetMessage(orderDispatch);
+    }
+  }, [message, success, openNotification, orderDispatch]);
 
   return (
     <div>
@@ -133,8 +99,6 @@ const ProcessingOrder = ({ user }) => {
         <Spin spinning={true} size="large" />
         <p className="mt-4">Please wait while your order is being processed</p>
       </div>
-      {error && openToastMarketplace("bottom")}
-      {message && openToastOrder("bottom")}
     </div>
   );
 };

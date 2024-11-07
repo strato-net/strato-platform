@@ -24,6 +24,7 @@ contract Membership is SemiFungible {
     }
 
     function mint(uint _quantity) internal override returns(UTXO) {
+        require(_quantity > 0, "Quantity must be greater than 0");
         Membership newAsset = new Membership(
             name,
             description,

@@ -5,6 +5,7 @@
 {-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE TypeApplications #-}
 {-# LANGUAGE TypeOperators #-}
@@ -35,7 +36,7 @@ import Blockchain.Strato.Discovery.UDP (processDataStream')
 import Blockchain.Strato.Model.Secp256k1
 import qualified Blockchain.Strato.RedisBlockDB as RBDB
 import Control.Concurrent (threadDelay)
-import Control.Exception
+import Control.Exception hiding (catch)
 import Control.Monad (void)
 import Control.Monad.Catch hiding (bracket)
 import qualified Control.Monad.Change.Alter as A
@@ -102,7 +103,7 @@ instance MonadUnliftIO m => A.Replaceable IPAsText PPeer (ReaderT ContextLite m)
             [ PPeerPubkey SQL.=. pPeerPubkey peer
             ]
           return (SQL.entityKey peer')
-      getPeerByIP :: HasSQLDB m => String -> m (Maybe (SQL.Entity PPeer))
+      getPeerByIP :: String -> ReaderT ContextLite m (Maybe (SQL.Entity PPeer))
       getPeerByIP ipStr = listToMaybe <$> sqlQuery actions'
         where
           actions' = SQL.selectList [PPeerIp SQL.==. T.pack ipStr] []
@@ -110,7 +111,7 @@ instance MonadUnliftIO m => A.Replaceable IPAsText PPeer (ReaderT ContextLite m)
 instance MonadUnliftIO m => A.Selectable String PPeer (ReaderT ContextLite m) where
   select _ ip = getPeerByIP ip
     where
-      getPeerByIP :: HasSQLDB m => String -> m (Maybe PPeer)
+      getPeerByIP :: String -> ReaderT ContextLite m (Maybe PPeer)
       getPeerByIP ipStr =
         sqlQuery actions >>= \case
           [] -> return Nothing
@@ -121,14 +122,21 @@ instance MonadUnliftIO m => A.Selectable String PPeer (ReaderT ContextLite m) wh
 instance MonadIO m => A.Replaceable SockAddr B.ByteString (ReaderT ContextLite m) where
   replace _ addr packet = do
     sock' <- asks sock
-    void . liftIO $ NB.sendTo sock' packet addr
+    liftIO $ catch 
+      (void $ NB.sendTo sock' packet addr) 
+      (\(err :: IOError) -> runLoggingT . $logErrorS "NB.sendTo" . T.pack $ "Could not send data to " <> show addr <> "; got error: " <> show err)
 
 instance A.Selectable (IPAsText, UDPPort, B.ByteString) Point IO where
-  select _ (IPAsText domain, UDPPort udpPortNum, theMsg) = withSocketsDo $ bracket getSocket close (talk theMsg)
+  select _ (IPAsText domain, UDPPort udpPortNum, theMsg) = catch
+    (withSocketsDo $ bracket getSocket close (talk theMsg))
+    (\(err :: IOError) -> runLoggingT ($logErrorS "withSocketsDo" . T.pack $ "Got error: " <> show err) >> return Nothing)
     where
       getSocket :: IO Socket
       getSocket = do
-        (serveraddr : _) <- getAddrInfo Nothing (Just $ T.unpack domain) (Just $ show udpPortNum)
+        (serveraddr : _) <- getAddrInfo 
+          (Just defaultHints {addrFlags = [AI_ALL]})
+          (Just $ T.unpack domain)
+          (Just $ show udpPortNum)
         s <- socket (addrFamily serveraddr) Datagram defaultProtocol
         _ <- connect s (addrAddress serveraddr)
         return s
@@ -148,11 +156,12 @@ instance MonadIO m => A.Selectable (Maybe IPAsText, UDPPort) SockAddr (ReaderT C
         Nothing
         (Just (show udpPortNum))
   select _ (Just (IPAsText ip), UDPPort udpPortNum) = do
-    fmap (fmap addrAddress . listToMaybe) . liftIO $
-      getAddrInfo
-        Nothing
+    fmap (fmap addrAddress . listToMaybe) . liftIO $ catch
+      (getAddrInfo
+        (Just defaultHints {addrFlags = [AI_ALL]})
         (Just $ T.unpack ip)
-        (Just $ show udpPortNum)
+        (Just $ show udpPortNum))
+      ((\(err :: IOError) -> runLoggingT ($logErrorS "getAddrInfo" . T.pack $ "Got error: " <> show err) >> return []))
 
 instance MonadIO m => A.Selectable (IPAsText, UDPPort, B.ByteString) Point (ReaderT ContextLite m) where
   select p = liftIO . A.select p
