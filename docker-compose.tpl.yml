@@ -70,7 +70,7 @@ services:
     - MP_DELAY_DEPLOYMENT=${MP_DELAY_DEPLOYMENT}
     - MP_SERVER_HOST=${NODE_HOST}
     - MP_SERVER_SSL=${ssl}
-    - SELLER={SELLER}
+    - SELLER=${SELLER}
     - STRATO_NODE_PROTOCOL=${STRATO_NODE_PROTOCOL}
     - STRATO_NODE_HOST=${STRATO_NODE_HOST}
     - NODE_LABEL=${NODE_NAME} # TODO: obsolete? (label is not used from config.yaml)
