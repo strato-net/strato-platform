@@ -3,6 +3,13 @@ set -e
 
 export DOCKERIZED="true"
 
+export ORACLE_MODE=${ORACLE_MODE:-false}
+export METALS_API_KEY=${METALS_API_KEY}
+export UPGRADE_ORACLE_CONTRACTS=${UPGRADE_ORACLE_CONTRACTS:-false}
+export SKIP_ORACLE_DEPLOYMENT=${SKIP_ORACLE_DEPLOYMENT:-false}
+export SILVER_ORACLE_NAME_VALUE=${SILVER_ORACLE_NAME_VALUE:-'Silver'}
+export SILVER_ORACLE_FETCH_INTERVAL=${SILVER_ORACLE_FETCH_INTERVAL:-'600000'}
+
 export CONFIG_DIR_PATH=/config
 export SERVER_HOST=${SERVER_HOST}
 export STRATO_HOST=${STRATO_HOST}
@@ -42,9 +49,6 @@ export STRAT_IMAGE_URL_VALUE=${STRAT_IMAGE_URL_VALUE:-'https://blockapps.net/wp-
 export STRAT_PRIMARY_SALE_FEE_PERCENTAGE_VALUE=${STRAT_PRIMARY_SALE_FEE_PERCENTAGE_VALUE:-10.0}
 export STRAT_SECONDARY_SALE_FEE_PERCENTAGE_VALUE=${STRAT_SECONDARY_SALE_FEE_PERCENTAGE_VALUE:-3.0}
 export STRAT_FEE_RECIPIENT=${STRAT_FEE_RECIPIENT}
-export METALS_API_KEY=${METALS_API_KEY}
-export SILVER_ORACLE_NAME_VALUE=${SILVER_ORACLE_NAME_VALUE:-'Silver'}
-export SILVER_ORACLE_FETCH_INTERVAL=${SILVER_ORACLE_FETCH_INTERVAL:-'60000'}
 export REDEMPTIONS_CLOSE_REDEMPTION_ROUTE_VALUE=${REDEMPTIONS_CLOSE_REDEMPTION_ROUTE_VALUE:-'/redemption/close'}
 export REDEMPTIONS_CREATE_CUSTOMER_ADDRESS_ROUTE_VALUE=${REDEMPTIONS_CREATE_CUSTOMER_ADDRESS_ROUTE_VALUE:-'/customer/address'}
 export REDEMPTIONS_CREATE_REDEMPTION_ROUTE_VALUE=${REDEMPTIONS_CREATE_REDEMPTION_ROUTE_VALUE:-'/redemption/create'}
@@ -92,21 +96,24 @@ if [ -z "${STRAT_FEE_RECIPIENT}" ]; then
   exit 18
 fi
 
-sed -i 's*<configDirPath_value>*'"${CONFIG_DIR_PATH}"'*g' /tmp/tmp.config.yaml
-sed -i 's*<serverHost_value>*'"${SERVER_HOST}"'*g' /tmp/tmp.config.yaml
-sed -i 's*<node_label_value>*'"${NODE_LABEL}"'*g' /tmp/tmp.config.yaml
-sed -i 's*<node_url_value>*'"${STRATO_HOST}"'*g' /tmp/tmp.config.yaml
-sed -i 's*<oauth_appTokenCookieName_value>*'"${OAUTH_APP_TOKEN_COOKIE_NAME}"'*g' /tmp/tmp.config.yaml
-sed -i 's*<oauth_openIdDiscoveryUrl_value>*'"${OAUTH_DISCOVERY_URL}"'*g' /tmp/tmp.config.yaml
-sed -i 's*<oauth_clientId_value>*'"${OAUTH_CLIENT_ID}"'*g' /tmp/tmp.config.yaml
-sed -i 's*<oauth_clientSecret_value>*'"${OAUTH_CLIENT_SECRET}"'*g' /tmp/tmp.config.yaml
-sed -i 's*<oauth_scope_value>*'"${OAUTH_SCOPE}"'*g' /tmp/tmp.config.yaml
-sed -i 's*<oauth_serviceOAuthFlow_value>*'"${OAUTH_SERVICE_OAUTH_FLOW}"'*g' /tmp/tmp.config.yaml
-sed -i 's*<oauth_redirectUri_value>*'"${SERVER_HOST}/login/"'*g' /tmp/tmp.config.yaml
-sed -i 's*<oauth_logoutRedirectUri_value>*'"${SERVER_HOST}"'*g' /tmp/tmp.config.yaml
-sed -i 's*<oauth_tokenField_value>*'"${OAUTH_TOKEN_FIELD}"'*g' /tmp/tmp.config.yaml
-sed -i 's*<oauth_tokenUsernameProperty_value>*'"${OAUTH_TOKEN_USERNAME_PROPERTY}"'*g' /tmp/tmp.config.yaml
-sed -i 's*<oauth_tokenUsernamePropertyServiceFlow_value>*'"${OAUTH_TOKEN_USERNAME_PROPERTY_SERVICE_FLOW}"'*g' /tmp/tmp.config.yaml
+sed -i 's*<silver_oracle_name_value>*'"${SILVER_ORACLE_NAME_VALUE}"'*g' /tmp/tmp.oracle_config.yaml
+sed -i 's*<silver_oracle_fetch_interval_value>*'"${SILVER_ORACLE_FETCH_INTERVAL}"'*g' /tmp/tmp.oracle_config.yaml
+
+sed -i 's*<configDirPath_value>*'"${CONFIG_DIR_PATH}"'*g' /tmp/tmp.config.yaml /tmp/tmp.oracle_config.yaml
+sed -i 's*<serverHost_value>*'"${SERVER_HOST}"'*g' /tmp/tmp.config.yaml /tmp/tmp.oracle_config.yaml
+sed -i 's*<node_label_value>*'"${NODE_LABEL}"'*g' /tmp/tmp.config.yaml /tmp/tmp.oracle_config.yaml
+sed -i 's*<node_url_value>*'"${STRATO_HOST}"'*g' /tmp/tmp.config.yaml /tmp/tmp.oracle_config.yaml
+sed -i 's*<oauth_appTokenCookieName_value>*'"${OAUTH_APP_TOKEN_COOKIE_NAME}"'*g' /tmp/tmp.config.yaml /tmp/tmp.oracle_config.yaml
+sed -i 's*<oauth_openIdDiscoveryUrl_value>*'"${OAUTH_DISCOVERY_URL}"'*g' /tmp/tmp.config.yaml /tmp/tmp.oracle_config.yaml
+sed -i 's*<oauth_clientId_value>*'"${OAUTH_CLIENT_ID}"'*g' /tmp/tmp.config.yaml /tmp/tmp.oracle_config.yaml
+sed -i 's*<oauth_clientSecret_value>*'"${OAUTH_CLIENT_SECRET}"'*g' /tmp/tmp.config.yaml /tmp/tmp.oracle_config.yaml
+sed -i 's*<oauth_scope_value>*'"${OAUTH_SCOPE}"'*g' /tmp/tmp.config.yaml /tmp/tmp.oracle_config.yaml
+sed -i 's*<oauth_serviceOAuthFlow_value>*'"${OAUTH_SERVICE_OAUTH_FLOW}"'*g' /tmp/tmp.config.yaml /tmp/tmp.oracle_config.yaml
+sed -i 's*<oauth_redirectUri_value>*'"${SERVER_HOST}/login/"'*g' /tmp/tmp.config.yaml /tmp/tmp.oracle_config.yaml
+sed -i 's*<oauth_logoutRedirectUri_value>*'"${SERVER_HOST}"'*g' /tmp/tmp.config.yaml /tmp/tmp.oracle_config.yaml
+sed -i 's*<oauth_tokenField_value>*'"${OAUTH_TOKEN_FIELD}"'*g' /tmp/tmp.config.yaml /tmp/tmp.oracle_config.yaml
+sed -i 's*<oauth_tokenUsernameProperty_value>*'"${OAUTH_TOKEN_USERNAME_PROPERTY}"'*g' /tmp/tmp.config.yaml /tmp/tmp.oracle_config.yaml
+sed -i 's*<oauth_tokenUsernamePropertyServiceFlow_value>*'"${OAUTH_TOKEN_USERNAME_PROPERTY_SERVICE_FLOW}"'*g' /tmp/tmp.config.yaml /tmp/tmp.oracle_config.yaml
 sed -i 's*<stripe_service_name_value>*'"${STRIPE_SERVICE_NAME_VALUE}"'*g' /tmp/tmp.config.yaml
 sed -i 's*<stripe_service_url_value>*'"${SERVER_HOST}"'*g' /tmp/tmp.config.yaml
 sed -i 's*<stripe_onboarding_route_value>*'"${STRIPE_ONBOARDING_ROUTE_VALUE}"'*g' /tmp/tmp.config.yaml
@@ -136,8 +143,6 @@ sed -i 's*<strat_image_url_value>*'"${STRAT_IMAGE_URL_VALUE}"'*g' /tmp/tmp.confi
 sed -i 's*<strat_primary_sale_fee_percentage_value>*'"${STRAT_PRIMARY_SALE_FEE_PERCENTAGE_VALUE}"'*g' /tmp/tmp.config.yaml
 sed -i 's*<strat_secondary_sale_fee_percentage_value>*'"${STRAT_SECONDARY_SALE_FEE_PERCENTAGE_VALUE}"'*g' /tmp/tmp.config.yaml
 sed -i 's*<strat_fee_recipient_value>*'"${STRAT_FEE_RECIPIENT}"'*g' /tmp/tmp.config.yaml
-sed -i 's*<silver_oracle_name_value>*'"${SILVER_ORACLE_NAME_VALUE}"'*g' /tmp/tmp.config.yaml
-sed -i 's*<silver_oracle_fetch_interval_value>*'"${SILVER_ORACLE_FETCH_INTERVAL}"'*g' /tmp/tmp.config.yaml
 sed -i 's*<redemptions_close_redemption_route_value>*'"${REDEMPTIONS_CLOSE_REDEMPTION_ROUTE_VALUE}"'*g' /tmp/tmp.config.yaml
 sed -i 's*<redemptions_create_customer_address_route_value>*'"${REDEMPTIONS_CREATE_CUSTOMER_ADDRESS_ROUTE_VALUE}"'*g' /tmp/tmp.config.yaml
 sed -i 's*<redemptions_create_redemption_route_value>*'"${REDEMPTIONS_CREATE_REDEMPTION_ROUTE_VALUE}"'*g' /tmp/tmp.config.yaml
@@ -155,23 +160,57 @@ cp ./config/generated.config.yaml ${CONFIG_DIR_PATH}/config.yaml
 
 ls dapp
 
-if [ -f "${CONFIG_DIR_PATH}/deploy.yaml" ]; then
-  echo 'deploy.yaml already exists.'
-  cat ${CONFIG_DIR_PATH}/deploy.yaml
-  if [ "${UPGRADE_CONTRACTS}" = "true" ]; then
-    echo 'Upgrading payment server contracts...'
-    yarn deactivate
-    yarn deploy
+if [ "$ORACLE_MODE" = "true" ]; then
+  echo 'ORACLE_MODE is true. Skipping payment server deployment.'
+
+  # Check if METALS_API_KEY is present
+  if [ -z "$METALS_API_KEY" ]; then
+    echo 'Error: METALS_API_KEY is not set. Exiting...'
+    exit 1
+  else
+    echo 'METALS_API_KEY is set.'
   fi
-elif [ "${SKIP_DEPLOYMENT}" != "true" ]; then
-  echo 'deploy.yaml does not exist. Deploying payment server contracts...'
-  yarn deploy
+
+  # Check for oracle_deploy.yaml and manage oracle deployment or upgrades
+  if [ -f "${CONFIG_DIR_PATH}/oracle_deploy.yaml" ]; then
+    echo 'oracle_deploy.yaml already exists for oracle.'
+    cat ${CONFIG_DIR_PATH}/oracle_deploy.yaml
+    if [ "${UPGRADE_ORACLE_CONTRACTS}" = "true" ]; then
+      echo 'Upgrading oracle contracts...'
+      yarn deactivateOracle
+      yarn deployOracle
+    fi
+  elif [ "${SKIP_ORACLE_DEPLOYMENT}" != "true" ]; then
+    echo 'oracle_deploy.yaml does not exist. Deploying oracle contracts...'
+    yarn deployOracle
+  else
+    echo 'SKIP_DEPLOYMENT is true. Skipping oracle deployment...'
+  fi
+
+  # Start the price submission script
+  echo 'Starting price submission script...'
+  yarn submit-price &
+
 else
-  echo 'SKIP_DEPLOYMENT is true. Skipping deployment...'
+  # Payment server deployment and start-up process
+  if [ -f "${CONFIG_DIR_PATH}/deploy.yaml" ]; then
+    echo 'deploy.yaml already exists.'
+    cat ${CONFIG_DIR_PATH}/deploy.yaml
+    if [ "${UPGRADE_CONTRACTS}" = "true" ]; then
+      echo 'Upgrading payment server contracts...'
+      yarn deactivate
+      yarn deploy
+    fi
+  elif [ "${SKIP_DEPLOYMENT}" != "true" ]; then
+    echo 'deploy.yaml does not exist. Deploying payment server contracts...'
+    yarn deploy
+  else
+    echo 'SKIP_DEPLOYMENT is true. Skipping deployment...'
+  fi
+
+  echo 'Starting price submission script...'
+  yarn submit-price &
+
+  echo 'Starting payment server...'
+  yarn start
 fi
-
-echo 'Starting price submission script...'
-yarn submit-price &  # (&) Runs the script in the background
-
-echo 'Starting payment server...'
-yarn start

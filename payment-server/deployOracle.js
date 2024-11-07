@@ -53,11 +53,8 @@ describe("Payment Server - deploy contracts", function () {
   this.timeout(config.timeout)
 
   let token
-  let stripe
-  // TODO: Disabled for initial payment server release
-  // let metamask
-  let strat
-  let redemption
+
+  let silverOracle
 
   before(async () => {
     assert.isDefined(
@@ -91,30 +88,16 @@ describe("Payment Server - deploy contracts", function () {
     }
   })
 
-  it('Deploy Stripe ExternalPaymentService', async () => {
-    stripe = await uploadContract(token, 'External', 'Payment', config.stripe)
+  it('Deploy Silver Oracle', async () => {
+    const silverOracleName = config.silverOracle.name;
+    silverOracle = await uploadContract(token, 'Silver', 'Oracle', { name: silverOracleName })
   })
 
-  // TODO: Disabled for initial payment server release
-  // it('Deploy MetaMask ExternalPaymentService', async () => {
-  //   metamask = await uploadContract(token, 'Payment', config.metamask)
-  // })
-
-  it('Deploy STRATS StratPaymentService', async () => {
-    strat = await uploadContract(token, 'Strat', 'Payment', config.strat)
-  })
-
-  it('Deploy ExternalRedemptionService', async () => {
-    redemption = await uploadContract(token, 'External', 'Redemption', config.redemption)
-  })
-
-  it('Create deploy.yaml', async () => {
+  // Create oracle_deploy.yaml
+  it('Create oracle_deploy.yaml', async () => {
     const deployArgs = {
-      deployFilePath: `${config.configDirPath}/deploy.yaml`,
-      stripe,
-      // metamask, // TODO: Disabled for initial payment server release
-      strat,
-      redemption
+      deployFilePath: `${config.configDirPath}/oracle_deploy.yaml`,
+      silverOracle
     }
     const deployment = deploy(deployArgs, config)
     assert.isDefined(deployment)

@@ -38,10 +38,6 @@ strat:
   secondarySaleFeePercentage: <strat_secondary_sale_fee_percentage_value>
   feeRecipient: <strat_fee_recipient_value>
 
-silverOracle:
-  name: <silver_oracle_name_value>
-  fetchInterval: <silver_oracle_fetch_interval_value>
-
 redemption:
   closeRedemptionRoute: <redemptions_close_redemption_route_value>
   createCustomerAddressRoute: <redemptions_create_customer_address_route_value>
