@@ -180,12 +180,12 @@ if [ "$ORACLE_MODE" = "true" ]; then
     cat ${CONFIG_DIR_PATH}/oracle_deploy.yaml
     if [ "${UPGRADE_ORACLE_CONTRACTS}" = "true" ]; then
       echo 'Upgrading oracle contracts...'
-      yarn deactivateOracle
-      yarn deployOracle
+      yarn deactivate-oracle
+      yarn deploy-oracle
     fi
   elif [ "${SKIP_ORACLE_DEPLOYMENT}" != "true" ]; then
     echo 'oracle_deploy.yaml does not exist. Deploying oracle contracts...'
-    yarn deployOracle
+    yarn deploy-oracle
   else
     echo 'SKIP_DEPLOYMENT is true. Skipping oracle deployment...'
   fi
