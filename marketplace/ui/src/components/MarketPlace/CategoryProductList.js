@@ -442,7 +442,7 @@ const AvailabilityFilter = () =>
         <div className="flex flex-col gap-3">
           {subCategories?.map(({name,contract}, index) => (
             <Checkbox value={contract} key={index} className="m-0 Sub-Category" onChange={onChangeSubCategory}>
-              {name}
+              {name==='STRATS' ? 'STRAT' : name}
             </Checkbox>
           ))}
         </div>
