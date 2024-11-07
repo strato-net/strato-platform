@@ -1,7 +1,7 @@
 pragma es6;
 pragma strict;
 
-import <4f53bb81d6c382bc9030d792c0e1d79ad7ce49bb>;
+import <BASE_CODE_COLLECTION>;
 
 /// @title A representation of Collectible assets
 contract Collectibles is Mintable {
