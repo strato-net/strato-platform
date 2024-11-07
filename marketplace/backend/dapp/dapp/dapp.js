@@ -502,6 +502,7 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
 
       const allRedemptions = await Promise.all(redemptionPromises);
       redemptions = allRedemptions.flat();
+      if(range){
       redemptions = redemptions.filter((item)=>{
         const dateRange = range[0].split(',')
         const startRange = dateRange[1];
@@ -510,6 +511,7 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
           return item;
         }
       })
+     }
 
       if (order && order === 'ASC')
         redemptions.sort((a, b) => a.createdDate - b.createdDate);
