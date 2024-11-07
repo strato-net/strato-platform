@@ -32,7 +32,7 @@ data IdentityError
 data IdentityServerData = IdentityServerData
   { issuer :: Issuer, -- issuer of signing cert
     issuerCert :: X509Certificate, -- the signing cert
-    issuerPrivKey :: PrivateKey, -- the signing private key
+    mIssuerPrivKey :: Maybe PrivateKey, -- the signing private key
     nodeUrl :: BaseUrl,
     fallbackNodeUrl :: Maybe BaseUrl,
     userRegAddr :: Address,
@@ -56,8 +56,8 @@ instance Monad m => Accessible Issuer (ReaderT IdentityServerData m) where
 instance Monad m => Accessible X509Certificate (ReaderT IdentityServerData m) where
   access _ = asks issuerCert
 
-instance Monad m => Accessible PrivateKey (ReaderT IdentityServerData m) where
-  access _ = asks issuerPrivKey
+instance Monad m => Accessible (Maybe PrivateKey) (ReaderT IdentityServerData m) where
+  access _ = asks mIssuerPrivKey
 
 instance Monad m => Accessible (Maybe SendgridAPIKey) (ReaderT IdentityServerData m) where
   access _ = asks sendgridAPIKey

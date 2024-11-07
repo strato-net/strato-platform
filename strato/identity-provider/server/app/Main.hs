@@ -11,6 +11,7 @@ import BlockApps.Logging ()
 import BlockApps.X509
 import Blockchain.Strato.Model.Address
 import Blockchain.Strato.Model.Keccak256
+import Control.Exception (IOException, catch)
 import qualified Data.ByteString as B
 import qualified Data.ByteString.Char8 as C8
 import Data.Cache.LRU
@@ -42,10 +43,15 @@ main = do
   iss <- case getCertIssuer crt of
     Nothing -> error "Could not deduce issuer from provided cert. Perhaps it is malformed?"
     Just iss -> return iss
-  privBS <- B.readFile "/identity-provider/certs/rootPriv.pem"
-  privk <- case bsToPriv privBS of
-    Left err -> error $ "Error parsing issuer private key: " <> err
-    Right privk -> return privk
+  
+  mPrivk <- catch 
+    (do
+      privBS <- B.readFile "/identity-provider/certs/rootPriv.pem"
+      case bsToPriv privBS of
+        Left _ -> return Nothing
+        Right privk -> return $ Just privk
+    ) 
+    (\(_ :: IOException) -> return Nothing)
 
   nurl <- parseBaseUrl flags_nodeUrl
   mNurl2 <- case flags_fallbackNodeUrl of 
@@ -75,7 +81,7 @@ main = do
     IdentityServerData 
       iss 
       crt 
-      privk 
+      mPrivk
       nurl
       mNurl2
       ura

@@ -1,3 +1,4 @@
+{-# LANGUAGE BlockArguments #-}
 {-# LANGUAGE BangPatterns #-}
 {-# LANGUAGE ConstraintKinds #-}
 {-# LANGUAGE DataKinds #-}
@@ -102,7 +103,7 @@ putIdentity ::
     HasVault m,
     Accessible Issuer m,
     Accessible X509Certificate m,
-    Accessible PrivateKey m,
+    Accessible (Maybe PrivateKey) m,
     Accessible IdentityServerData m,
     Accessible (Maybe SendgridAPIKey) m,
     Accessible (Maybe AccessToken) m,
@@ -303,9 +304,10 @@ createAndRegisterCert ::
     MonadLogger m,
     Accessible Issuer m,
     Accessible X509Certificate m,
-    Accessible PrivateKey m,
+    Accessible (Maybe PrivateKey) m,
     Accessible (Maybe SendgridAPIKey) m,
-    Accessible IdentityServerData m
+    Accessible IdentityServerData m,
+    Accessible VaultData m
   ) =>
   String ->
   Maybe String ->
@@ -331,16 +333,24 @@ createNewCert ::
   ( MonadIO m,
     Accessible Issuer m,
     Accessible X509Certificate m,
-    Accessible PrivateKey m
+    Accessible (Maybe PrivateKey) m,
+    Accessible VaultData m
   ) =>
   Subject ->
   m (Maybe X509Certificate)
 createNewCert sub = do
   i <- access (Proxy @Issuer)
   c <- access (Proxy @X509Certificate)
-  iK <- access (Proxy @PrivateKey)
-  let signWIssuerPrivKey bs = return $ signMsg iK bs
-  makeSignedCertSigF signWIssuerPrivKey Nothing (Just c) i sub
+  mK <- access (Proxy @(Maybe PrivateKey))
+  signingFunc <- case mK of 
+    Just k -> do
+      let signWIssuerPrivKey bs = return $ signMsg k bs
+      return signWIssuerPrivKey
+    Nothing -> do
+      VaultData url mgr <- access Proxy
+      let signWVault bs = liftIO $ (either (error . show) id) <$>  runClientM (postSignature Nothing (MsgHash bs)) (mkClientEnv mgr url)
+      return signWVault
+  makeSignedCertSigF signingFunc Nothing (Just c) i sub
 
 registerCert ::
   ( MonadIO m
@@ -541,7 +551,7 @@ server ::
     HasVault m,
     Accessible Issuer m,
     Accessible X509Certificate m,
-    Accessible PrivateKey m,
+    Accessible (Maybe PrivateKey) m,
     Accessible IdentityServerData m,
     Accessible (Maybe SendgridAPIKey) m,
     Accessible (Maybe AccessToken) m,
