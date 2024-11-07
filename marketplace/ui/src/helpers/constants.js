@@ -287,6 +287,38 @@ const bannerConfig = [
 
 export const BANNER = [
   {
+    label: "Batman",
+    link: '/c/Clothing?sc=Clothing',
+    text: <div className="clothing_banner_text banner-text">
+      <h1> The Official DC Drop </h1>
+      <h1> is Live </h1>
+    </div>,
+    desktopText: "Explore More",
+    mobileText: "Explore",
+    alt: metaImg,
+    title: metaImg,
+    desktopImg: Images.BatmanX1600,
+    laptopImg: Images.BatmanX1440,
+    tabletImg: Images.BatmanX768,
+    mobileImg: Images.BatmanX394,
+  },
+  {
+    label: "Rick and Morty",
+    link: '/c/Clothing?sc=Clothing',
+    text: <div className="clothing_banner_text banner-text">
+      <h1> Limited Release </h1>
+      <h1> Warner Bros Apparel </h1>
+    </div>,
+    desktopText: "Explore More",
+    mobileText: "Explore",
+    alt: metaImg,
+    title: metaImg,
+    desktopImg: Images.RickAndMortyX1600,
+    laptopImg: Images.RickAndMortyX1440,
+    tabletImg: Images.RickAndMortyX768,
+    mobileImg: Images.RickAndMortyX394,
+  },
+  {
     label: "Liquid Gold",
     link: '/c/Spirits?sc=Spirits',
     text: <div className="liquid_gold_text_box banner-text">

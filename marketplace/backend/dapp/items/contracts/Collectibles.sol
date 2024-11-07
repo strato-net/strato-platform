@@ -33,6 +33,7 @@ contract Collectibles is Mintable {
     }
 
     function mint(uint _quantity) internal override returns (UTXO) {
+        require(_quantity > 0, "Quantity must be greater than 0");
         Collectibles newAsset = new Collectibles(
             name,
             description,
