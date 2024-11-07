@@ -3,7 +3,7 @@ import { rest, util } from "blockapps-rest";
 import config from "./load.config.js";
 import deployment from "./load.deploy.js";
 import oauthHelper from "./helpers/oauthHelper.js";
-const axios = require("axios");
+import axios from "axios";
 
 /**
  * Submit price to the smart contract.
