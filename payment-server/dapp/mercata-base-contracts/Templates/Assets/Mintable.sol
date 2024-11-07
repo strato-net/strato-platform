@@ -83,6 +83,6 @@ abstract contract Mintable is Redeemable {
     function attachSale() public virtual override requireOwnerOrigin("attach sale") {
         require(sale == address(0), "Sale is already assigned for this asset");
         sale = msg.sender;
-        proposerFee = 0.01 * MercataProposerFee(feeAddress).getProposerFee();;
+        proposerFee = 0.01 * decimal(MercataProposerFee(feeAddress).getProposerFee());
     }
 }

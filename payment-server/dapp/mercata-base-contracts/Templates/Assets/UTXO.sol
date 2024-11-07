@@ -73,13 +73,6 @@ abstract contract UTXO is Asset {
         }
     }
 
-        // Updated function to add a sale to the whitelist
-    function attachSale() public virtual override requireOwnerOrigin("attach sale") {
-        require(sale == address(0), "Sale is already assigned for this asset");
-        sale = msg.sender;
-        proposerFee = 0.01 * MercataProposerFee(feeAddress).getProposerFee();;
-    }
-
     function _callMint(address _newOwner, uint _quantity) internal virtual{
         UTXO newAsset = mint(_quantity);
         Asset(newAsset).transferOwnership(_newOwner, _quantity, false, 0, 0);
@@ -87,5 +80,11 @@ abstract contract UTXO is Asset {
 
     function checkCondition() internal virtual returns (bool){
         return true;
+    }
+    
+    function attachSale() public virtual override requireOwnerOrigin("attach sale") {
+        require(sale == address(0), "Sale is already assigned for this asset");
+        sale = msg.sender;
+        proposerFee = 0.01 * decimal(MercataProposerFee(feeAddress).getProposerFee());
     }
 }

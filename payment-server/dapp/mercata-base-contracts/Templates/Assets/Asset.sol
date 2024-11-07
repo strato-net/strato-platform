@@ -17,7 +17,7 @@ abstract contract Asset is Utils {
     uint public assetMagicNumber = 0x4173736574; // 'Asset'
     address private owner;
     string private ownerCommonName;
-    address public feeAddress = address("0xef4f06e16bb5e86799495ef57a5cbc06208df3f1"); //Need to set this before releasing
+    address public feeAddress = address(0xef4f06e16bb5e86799495ef57a5cbc06208df3f1); //Need to set this before releasing
     address public originAddress; // For NFTS, this will always be address(this), but this should be the mint address for UTXOs
     string public name;
     string public description;
@@ -101,7 +101,7 @@ abstract contract Asset is Utils {
         string err = "Only the owner of the asset can "
                    + action
                    + ".";
-        require(getCommonName(msg.sender) == ownerCommonName, err);
+        require(getCommonName(msg.sender) == getCurrentOwnerCommonName(), err);
         _;
     }
 
@@ -109,7 +109,7 @@ abstract contract Asset is Utils {
         string err = "Only the owner of the asset can "
                    + action
                    + ".";
-        require(getCommonName(tx.origin) == ownerCommonName, err);
+        require(getCommonName(tx.origin) == getCurrentOwnerCommonName(), err);
         _;
     }
 
@@ -118,12 +118,12 @@ abstract contract Asset is Utils {
             string err = "Only the owner can "
                        + action
                        + ".";
-            // require(getCommonName(msg.sender) == getCurrentOwnerCommonName(), err);
+            require(getCommonName(msg.sender) == getCurrentOwnerCommonName(), err);
         } else {
             string err = "Only the current Sale contract can "
                        + action
                        + ".";
-            // require(msg.sender == sale, err);
+            require(msg.sender == sale, err);
         }
         _;
     }
@@ -132,7 +132,7 @@ abstract contract Asset is Utils {
     function attachSale() public virtual requireOwnerOrigin("attach sale") {
         require(sale == address(0), "Sale is already assigned for this asset");
         sale = msg.sender;
-        proposerFee = 0.01 * MercataProposerFee(feeAddress).getProposerFee();;
+        proposerFee = 0.01 * decimal(MercataProposerFee(feeAddress).getProposerFee());
     }
 
     // Updated function to remove a sale from the whitelist

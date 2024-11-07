@@ -111,7 +111,7 @@ class InventoryController {
   static async list(req, res, next) {
     try {
       const { dapp, body } = req
-
+      console.log("ariya2");
       InventoryController.validateListItemArgs(body)
 
       const result = await dapp.listItem(body)

@@ -7,77 +7,105 @@
      
      <url>
        <loc>http://localhost/</loc>
-       <lastmod>2024-10-31T18:28:21.650Z</lastmod>
+       <lastmod>2024-11-05T17:00:00.854Z</lastmod>
        <changefreq>daily</changefreq>
        <priority>0.5</priority>
      </url>
 
      <url>
        <loc>http://localhost/c/All</loc>
-       <lastmod>2024-10-31T18:28:21.650Z</lastmod>
+       <lastmod>2024-11-05T17:00:00.854Z</lastmod>
        <changefreq>daily</changefreq>
        <priority>0.5</priority>
      </url>
 
      <url>
        <loc>http://localhost/c/Carbon?sc=CarbonOffset%2CCarbonDAO</loc>
-       <lastmod>2024-10-31T18:28:21.650Z</lastmod>
+       <lastmod>2024-11-05T17:00:00.854Z</lastmod>
        <changefreq>daily</changefreq>
        <priority>0.5</priority>
      </url>
 
      <url>
        <loc>http://localhost/c/Metals?sc=Metals</loc>
-       <lastmod>2024-10-31T18:28:21.650Z</lastmod>
+       <lastmod>2024-11-05T17:00:00.854Z</lastmod>
        <changefreq>daily</changefreq>
        <priority>0.5</priority>
      </url>
 
      <url>
        <loc>http://localhost/c/Clothing?sc=Clothing</loc>
-       <lastmod>2024-10-31T18:28:21.650Z</lastmod>
+       <lastmod>2024-11-05T17:00:00.854Z</lastmod>
        <changefreq>daily</changefreq>
        <priority>0.5</priority>
      </url>
 
      <url>
        <loc>http://localhost/c/Collectibles?sc=Collectibles</loc>
-       <lastmod>2024-10-31T18:28:21.650Z</lastmod>
+       <lastmod>2024-11-05T17:00:00.854Z</lastmod>
        <changefreq>daily</changefreq>
        <priority>0.5</priority>
      </url>
 
      <url>
        <loc>http://localhost/c/Art?sc=Art</loc>
-       <lastmod>2024-10-31T18:28:21.650Z</lastmod>
+       <lastmod>2024-11-05T17:00:00.854Z</lastmod>
        <changefreq>daily</changefreq>
        <priority>0.5</priority>
      </url>
 
      <url>
        <loc>http://localhost/c/Membership?sc=Membership</loc>
-       <lastmod>2024-10-31T18:28:21.650Z</lastmod>
+       <lastmod>2024-11-05T17:00:00.854Z</lastmod>
        <changefreq>daily</changefreq>
        <priority>0.5</priority>
      </url>
 
      <url>
        <loc>http://localhost/checkout</loc>
-       <lastmod>2024-10-31T18:28:21.650Z</lastmod>
+       <lastmod>2024-11-05T17:00:00.854Z</lastmod>
        <changefreq>daily</changefreq>
        <priority>0.5</priority>
      </url>
 
      <url>
-       <loc>http://localhost/dp/bc4b807c31059b5ef8510375c0b0c6cb0455cbc6/Batmobile</loc>
-       <lastmod>2024-10-31T18:28:22.082Z</lastmod>
+       <loc>http://localhost/dp/3c7025100519c985573fe8cdb7a42ee27788abd9/ART1</loc>
+       <lastmod>2024-11-05T17:00:01.231Z</lastmod>
        <changefreq>daily</changefreq>
        <priority>0.5</priority>
      </url>
 
      <url>
-       <loc>http://localhost/dp/ebe49de37d09c3d0d7a58d6461d2ab30e6c23649/STRATS</loc>
-       <lastmod>2024-10-31T18:28:22.082Z</lastmod>
+       <loc>http://localhost/dp/1d55f57d809a23341561417b152a6a353bcc5c78/STRATS</loc>
+       <lastmod>2024-11-05T17:00:01.232Z</lastmod>
+       <changefreq>daily</changefreq>
+       <priority>0.5</priority>
+     </url>
+
+     <url>
+       <loc>http://localhost/dp/98edde0bbc6b509f7640e52edeb495e75e20bac4/Batmobile</loc>
+       <lastmod>2024-11-05T17:00:01.232Z</lastmod>
+       <changefreq>daily</changefreq>
+       <priority>0.5</priority>
+     </url>
+
+     <url>
+       <loc>http://localhost/dp/731cfa19cad4760930eef8dac90ba1c54c3fcc23/Batmobile2</loc>
+       <lastmod>2024-11-05T17:00:01.232Z</lastmod>
+       <changefreq>daily</changefreq>
+       <priority>0.5</priority>
+     </url>
+
+     <url>
+       <loc>http://localhost/dp/8c876004f0b808bb8772168099fddce0604d0fa3/Batmobile3</loc>
+       <lastmod>2024-11-05T17:00:01.232Z</lastmod>
+       <changefreq>daily</changefreq>
+       <priority>0.5</priority>
+     </url>
+
+     <url>
+       <loc>http://localhost/dp/31659f4791e737275ca0d95bd732f94e80081da0/David%20Nallapu</loc>
+       <lastmod>2024-11-05T17:00:01.232Z</lastmod>
        <changefreq>daily</changefreq>
        <priority>0.5</priority>
      </url>
