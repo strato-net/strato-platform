@@ -47,7 +47,7 @@ const TransactionTable = ({ user, download }) => {
   const [offset, setOffset] = useState(0);
   const [currentPage, setCurrentPage] = useState(1);
   const [type, setType] = useState("");
-  const [dateQuery, setDateQuery] = useState("");
+  const [dateQuery, setDateQuery] = useState(urlDate || "");
   const [transactions, setTransactions] = useState(userTransactions)
   const [originAddress, setOriginAddress] = useState("");
   const [search, setSearch] = useState("")
