@@ -64,7 +64,8 @@ echo $OAUTH_DISCOVERY_URL
 
 # Generating the ./config/generated.config.yaml - an intermediate step to avoid removing CONFIG var (that would break the non-docker deployment)
 cp ./config/template.config.yaml /tmp/tmp.config.yaml
-  
+cp ./config/template.oracle_config.yaml /tmp/tmp.oracle_config.yaml
+
 # Validate the env vars
 # TODO: check if EVERY env var is provided (in the for loop - refactor)
 if [ -z "${SERVER_HOST}" ]; then
@@ -156,7 +157,9 @@ sed -i 's*<redemptions_service_name_value>*'"${REDEMPTIONS_SERVICE_NAME_VALUE}"'
 sed -i 's*<redemptions_service_url_value>*'"${SERVER_HOST}"'*g' /tmp/tmp.config.yaml
 
 mv /tmp/tmp.config.yaml ./config/generated.config.yaml
+mv /tmp/tmp.oracle_config.yaml ./config/generated.oracle_config.yaml
 cp ./config/generated.config.yaml ${CONFIG_DIR_PATH}/config.yaml
+cp ./config/generated.oracle_config.yaml ${CONFIG_DIR_PATH}/oracle_config.yaml
 
 ls dapp
 
