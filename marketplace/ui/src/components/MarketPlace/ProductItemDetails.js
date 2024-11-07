@@ -43,12 +43,6 @@ const ProductItemDetails = ({ categoryName, itemData }) => {
         case "Collectibles":
             return (
                 <Space direction="vertical" className="py-[15px] px-[14px] w-full sm:w-[388px] md:w-[417px] border border-[#E9E9E9] rounded-md">
-                    {itemData?.collectiblesType && 
-                    <Space className="flex justify-between">
-                        <DescTitle text="Type" />
-                        <Text className="text-[13px] text-[#202020] font-medium">{itemData?.collectiblesType}</Text>
-                    </Space>
-                    }
                     <Space className="flex justify-between">
                         <DescTitle text="Condition" />
                         <Text className="text-[13px] text-[#202020] font-medium">{itemData?.condition}</Text>

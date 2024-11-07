@@ -6,7 +6,6 @@ import <BASE_CODE_COLLECTION>;
 /// @title A representation of Collectible assets
 contract Collectibles is Mintable {
     string public condition;
-    string public collectiblesType;
 
     event OwnershipUpdate(
         string seller,
@@ -24,12 +23,10 @@ contract Collectibles is Mintable {
         uint _createdDate,
         uint _quantity,
         string _condition,
-        string _collectiblesType,
         AssetStatus _status,
         address _redemptionService
     ) public Mintable(_name, _description, _images, _files, _fileNames, _createdDate, _quantity, _status, _redemptionService) {
         condition = _condition;
-        collectiblesType = _collectiblesType;
     }
 
     function mint(uint _quantity) internal override returns (UTXO) {
@@ -43,7 +40,6 @@ contract Collectibles is Mintable {
             createdDate,
             _quantity,
             condition,
-            collectiblesType,
             status,
             address(redemptionService)
         );

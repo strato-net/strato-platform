@@ -214,7 +214,6 @@ export const INVENTORY_MODAL_INITIAL_VALUES = {
   size: null,
   skuNumber: null,
   condition: null,
-  collectiblesType: null,
   brand: null,
 }
 

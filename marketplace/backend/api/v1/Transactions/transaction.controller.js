@@ -1,4 +1,3 @@
-import STRATSJs from "/dapp/items/STRATS";
 
 
 const getItemQuantity = (item) => {
@@ -75,7 +74,6 @@ class TransactionController {
                 }
             })
 
-            const stratsOriginAddress = await STRATSJs.getStratsAddress();
             assetAddress = assetAddress.map((item)=>item.assetAddress || item.assetAddresses[0])
             assetAddress = [...new Set(assetAddress)]
 
@@ -87,15 +85,6 @@ class TransactionController {
                 const asset = inventoriesWithImageUrl.find((assetItem)=>{
                     return (assetItem.address === (item?.assetAddress || item?.assetAddresses[0]))
                 });
-
-                if (asset && asset.originAddress === stratsOriginAddress) {
-                    // continue since this is a STRATs Asset
-                } else {
-                    if (asset.creator !== process.env.SELLER) {
-                        return null; 
-                    }
-                }
-
 
                 const getImage=(assetItem)=> {
                     if(assetItem && assetItem["BlockApps-Mercata-Asset-images"]?.length ){
@@ -126,7 +115,7 @@ class TransactionController {
                 assetOriginAddress: asset?.originAddress,
                 assetContractName: asset?.contract_name,
                 quantityIsDecimal: asset?.data.quantityIsDecimal
-            }}).filter(Boolean);
+            }});
 
             res.status(200).json({ success: true, message: "Fetched Transactions successfully", data: newData })
             return next()

@@ -306,33 +306,6 @@ export const categoricalProperties = (form, handleClothingTypeChange, clothingTy
             return (
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
                     <Form.Item
-                        label="Type"
-                        name="collectiblesType"
-                        rules={[
-                            {
-                                required: true,
-                                message: 'Please select a collectibles type',
-                            },
-                        ]}
-                    >
-                        <Select
-                            placeholder="Select Type of Collectibles"
-                        >
-                            <Option value="Cards">Cards</Option>
-                            <Option value="Electronics">Electronics</Option>
-                            <Option value="Figures/Toys">Figures/Toys</Option>
-                            <Option value="Home">Home</Option>
-                            <Option value="Beauty">Beauty</Option>
-                            <Option value="Vintage">Vintage</Option>
-                            <Option value="Tools">Tools</Option>
-                            <Option value="Books/Comics">Books/Comics</Option>
-                            <Option value="Gaming">Gaming</Option>
-                            <Option value="Memorabilia">Memorabilia</Option>
-                            <Option value="Autographs">Autographs</Option>
-                            <Option value="Other">Other</Option>
-                        </Select>
-                    </Form.Item>
-                    <Form.Item
                         label="Condition"
                         name="condition"
                         rules={[
