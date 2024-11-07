@@ -192,7 +192,7 @@ if [ "$ORACLE_MODE" = "true" ]; then
 
   # Start the price submission script
   echo 'Starting price submission script...'
-  yarn submit-price &
+  yarn submit-price
 
 else
   # Payment server deployment and start-up process
