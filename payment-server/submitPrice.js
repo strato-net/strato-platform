@@ -22,7 +22,6 @@ async function submitPrice(token, contract, args) {
 }
 
 describe("Payment Server - Fetch Prices for Oracle", function () {
-  this.timeout(config.timeout);
 
   before(async () => {
     assert.isDefined(
