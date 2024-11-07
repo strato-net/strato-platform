@@ -28,11 +28,11 @@ const ResellModal = ({ open, handleCancel, inventory, categoryName, limit, offse
                 title: "Units",
                 align: "center",
                 render: () => (
-                    <InputNumber value={quantity} controls={false} min={1} onChange={(value) => setQuantity(value)} />
+                    <InputNumber value={quantity} controls={false} min={1} onChange={(value) => setQuantity(value)} precision={0} />
                 )
             },
-        ]
-    };
+        ];
+    };    
 
     const handleSubmit = async () => {
         let body = {

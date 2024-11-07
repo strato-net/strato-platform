@@ -59,7 +59,6 @@ class AuthenticationController {
           console.log('Cert not found in first attempt')
           await new Promise(resolve => setTimeout(resolve, 3000));
           cert = await certificateJs.getCertificateMe(user)
-          console.log('Cert content from second attempt', cert)
 
           if (!cert) {
             console.log('Cert not found even in second attempt')
@@ -106,7 +105,6 @@ class AuthenticationController {
     let adminUserToken
     try {
       adminUserToken = await oauthHelper.getUserToken(adminUserName, adminUserPassword)
-      console.log("adminUserToken", adminUserToken)
     } catch (e) {
       console.error("ERROR: Unable to fetch the user token, check your username and password in your .env", e)
       return next(e)
@@ -120,8 +118,6 @@ class AuthenticationController {
       console.error("ERROR: Unable to fetch the user from the token, check your username and password in your .env", e)
       return next(e)
     }
-
-    console.log("adminResponse: ", adminResponse)
 
     let dapp
     try {

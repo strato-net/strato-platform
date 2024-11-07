@@ -156,14 +156,14 @@ class InventoryController {
   static async transfer(req, res, next) {
     try {
       const { dapp, body } = req;
-      const { senderCommonName, recipientCommonName,
+      const { senderCommonName, recipientCommonName, isDecimal,
          itemName, quantity, price, ...restData } = body;
       const payload = { quantity, price, ...restData }
       InventoryController.validateTransferItemArgs(payload)
       const result = await dapp.transferItem(payload)
 
-      const TransferSenderTemplate = TransferSender(senderCommonName, itemName, quantity, price, recipientCommonName);
-      const TransferRecipientTemplate = TransferRecipient(recipientCommonName, itemName, quantity, price, senderCommonName);
+      const TransferSenderTemplate = TransferSender(senderCommonName, itemName, quantity, price, recipientCommonName, isDecimal);
+      const TransferRecipientTemplate = TransferRecipient(recipientCommonName, itemName, quantity, price, senderCommonName, isDecimal);
       await sendEmail(senderCommonName, 'Your Item Transfer Confirmation', TransferSenderTemplate)
       await sendEmail(recipientCommonName, 'You’ve Received an Item Transfer!', TransferRecipientTemplate)
       rest.response.status200(res, result.transferStatus)

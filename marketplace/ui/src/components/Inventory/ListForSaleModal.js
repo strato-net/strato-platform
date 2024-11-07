@@ -1,10 +1,9 @@
-import { Button, Input, InputNumber, Modal, Select, Spin, Tag, Table, Typography } from "antd";
-import { useEffect, useRef, useState } from "react";
+import { Button, InputNumber, Modal, Select, Spin, Tag, Table, Typography } from "antd";
+import { useEffect, useState } from "react";
 import { actions } from "../../contexts/inventory/actions";
 import { useInventoryDispatch, useInventoryState } from "../../contexts/inventory";
 import { usePaymentServiceDispatch, usePaymentServiceState } from "../../contexts/payment";
 import { actions as paymentServiceActions } from "../../contexts/payment/actions";
-import { handlePriceInput, handleQuantityInput } from "../../helpers/utils";
 import { CheckCircleOutlined } from '@ant-design/icons';
 
 const { Option } = Select;
@@ -46,10 +45,6 @@ const ListForSaleModal = ({ open, handleCancel, inventory, categoryName, limit, 
         areNotOnboardedLoading
     } = usePaymentServiceState();
     const paymentServiceDispatch = usePaymentServiceDispatch();
-    const inputPriceDesktopRef = useRef(null);
-    const inputPriceMobileRef = useRef(null);
-    const inputQuantityDesktopRef = useRef(null);
-    const inputQuantityMobileRef = useRef(null);
 
     useEffect(() => {
         paymentServiceActions.getPaymentServices(paymentServiceDispatch, true);
@@ -67,38 +62,6 @@ const ListForSaleModal = ({ open, handleCancel, inventory, categoryName, limit, 
             setCanList(true);
         };
     }, [quantity, pricePerUnit, paymentTypes])
-
-
-    useEffect(() => {
-        const priceInputElements = [inputPriceDesktopRef.current, inputPriceMobileRef.current];
-        const quantityInputElements = [inputQuantityDesktopRef.current, inputQuantityMobileRef.current];
-        
-        priceInputElements.forEach(inputElement => {
-            if (inputElement) {
-                inputElement.addEventListener('input', handlePriceInput(setpricePerUnit));
-            }
-        });
-
-        quantityInputElements.forEach(inputElement => {
-            if (inputElement) {
-                inputElement.addEventListener('input', handleQuantityInput(setQuantity));
-            }
-        });
-
-        return () => {
-            priceInputElements.forEach(inputElement => {
-                if (inputElement) {
-                    inputElement.removeEventListener('input', handlePriceInput(setpricePerUnit));
-                }
-            });
-
-            quantityInputElements.forEach(inputElement => {
-                if (inputElement) {
-                    inputElement.removeEventListener('input', handleQuantityInput(setQuantity));
-                }
-            });
-        };
-    }, [inputPriceDesktopRef, inputPriceMobileRef, inputQuantityDesktopRef, inputQuantityMobileRef]);
 
     const renderImg = (service) => {
         return service.imageURL && service.imageURL !== ''
@@ -271,14 +234,11 @@ const ListForSaleModal = ({ open, handleCancel, inventory, categoryName, limit, 
                 render: () => (
                     <InputNumber
                         value={quantity}
-                        ref={inputQuantityDesktopRef}
                         controls={false}
                         min={1}
-                        onChange={(value) => {
-                            if (value) {
-                                setQuantity(parseInt(value, 10));
-                            }
-                        }}
+                        max={inventory.quantity}
+                        onChange={(value) => setQuantity(value)}
+                        precision={0}
                     />
                 )
             },
@@ -287,16 +247,11 @@ const ListForSaleModal = ({ open, handleCancel, inventory, categoryName, limit, 
                 align: "center",
                 render: () => (
                     <InputNumber
-                        ref={inputPriceDesktopRef}
                         value={pricePerUnit}
                         controls={false}
                         min={0.01}
-                        onChange={(value) => {
-                            const stringValue = value ? value.toString() : '';
-                            if (/^\d+(\.\d{0,2})?$/.test(stringValue)) {
-                                setpricePerUnit(value);
-                            }
-                        }}
+                        onChange={(value) => setpricePerUnit(value)}
+                        precision={2}
                     />
                 )
             }
@@ -367,14 +322,11 @@ const ListForSaleModal = ({ open, handleCancel, inventory, categoryName, limit, 
                     <InputNumber
                         className="w-full h-9"
                         value={quantity}
-                        ref={inputQuantityMobileRef}
                         controls={false}
                         min={1}
-                        onChange={(value) => {
-                            if (value) {
-                                setQuantity(parseInt(value, 10));
-                            }
-                        }}
+                        max={inventory.quantity}
+                        onChange={(value) => setQuantity(value)}
+                        precision={0}
                     />
                 </div>
                 <div>
@@ -382,15 +334,10 @@ const ListForSaleModal = ({ open, handleCancel, inventory, categoryName, limit, 
                     <InputNumber
                         className="w-full h-9"
                         value={pricePerUnit}
-                        ref={inputPriceMobileRef}
                         controls={false}
                         min={.01}
-                        onChange={(value) => {
-                            const stringValue = value ? value.toString() : '';
-                            if (/^\d+(\.\d{0,2})?$/.test(stringValue)) {
-                                setpricePerUnit(value);
-                            }
-                        }}
+                        onChange={(value) => setpricePerUnit(value)}
+                        precision={2}
                     />
                 </div >
 

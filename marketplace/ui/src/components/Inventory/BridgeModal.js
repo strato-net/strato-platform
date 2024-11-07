@@ -1,9 +1,8 @@
 import { Button, Input, InputNumber, Modal, Table } from "antd";
-import { useEffect, useRef,useState } from "react";
+import { useEffect, useState } from "react";
 import { actions } from "../../contexts/inventory/actions";
 import { useInventoryDispatch, useInventoryState } from "../../contexts/inventory";
 import { useAuthenticateState } from "../../contexts/authentication";
-import { handleQuantityInput, handleWalletAddressInput } from "../../helpers/utils";
 
 const BridgeModal = ({ open, handleCancel, inventory, categoryName, limit, offset }) => {
     const [data, setData] = useState([inventory]);
@@ -17,10 +16,6 @@ const BridgeModal = ({ open, handleCancel, inventory, categoryName, limit, offse
     const {
         isBridging
     } = useInventoryState();
-    const inputQuantityDesktopRef = useRef(null);
-    const inputQuantityMobileRef = useRef(null);
-    const inputAddressDesktopRef = useRef(null);
-    const inputAddressMobileRef = useRef(null);
 
     useEffect(() => {
         if (quantity > inventory.quantity || quantity <= 0 || !userAddress) {
@@ -30,35 +25,6 @@ const BridgeModal = ({ open, handleCancel, inventory, categoryName, limit, offse
             setCanTransfer(true);
         };
     }, [quantity, userAddress]);
-
-    useEffect(() => {
-        const quantityInputElements = [inputQuantityDesktopRef.current, inputQuantityMobileRef.current];
-        const addressInputElements = [inputAddressDesktopRef.current, inputAddressMobileRef.current];
-
-        quantityInputElements.forEach(inputElement => {
-            if (inputElement) {
-                inputElement.addEventListener('input', handleQuantityInput(setQuantity));
-            }
-        });
-        addressInputElements.forEach(inputElement => {
-            if (inputElement) {
-                inputElement.addEventListener('input', handleWalletAddressInput(setUserAddress));
-            }
-        });
-
-        return () => {
-            quantityInputElements.forEach(inputElement => {
-                if (inputElement) {
-                    inputElement.removeEventListener('input', handleQuantityInput(setQuantity));
-                }
-            });
-            addressInputElements.forEach(inputElement => {
-                if (inputElement) {
-                    inputElement.removeEventListener('input', handleWalletAddressInput(setUserAddress));
-                }
-            });
-        };
-    }, [inputQuantityDesktopRef, inputQuantityMobileRef]);
 
     const columns = [
         {
@@ -72,14 +38,11 @@ const BridgeModal = ({ open, handleCancel, inventory, categoryName, limit, offse
             render: () => (
                 <InputNumber
                     value={quantity}
-                    ref={inputQuantityDesktopRef}
                     controls={false}
                     min={1}
-                    onChange={(value) => {
-                        if (value) {
-                            setQuantity(parseInt(value, 10));
-                        }
-                    }}
+                    max={inventory.quantity}
+                    onChange={(value) => setQuantity(value)}
+                    precision={0}
                 />
             )
         },
@@ -151,14 +114,11 @@ const BridgeModal = ({ open, handleCancel, inventory, categoryName, limit, offse
                         <InputNumber
                             className="w-full h-9"
                             value={quantity}
-                            ref={inputQuantityMobileRef}
                             controls={false}
                             min={1}
-                            onChange={(value) => {
-                                if (value) {
-                                    setQuantity(parseInt(value, 10));
-                                }
-                            }}
+                            max={inventory.quantity}
+                            onChange={(value) => setQuantity(value)}
+                            precision={0}
                         />
                     </div>
                 </div>

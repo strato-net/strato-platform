@@ -1249,7 +1249,7 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
       await axios.post(new URL(createCustomerAddressRoute, serviceURL).href, { commonName: userCert.commonName, ...restArgs })
         .then(function (res) {
           if (res.status === 200) {
-            console.log(res.data);
+            // Success case
           } else {
             throw new rest.RestError(RestStatus.BAD_REQUEST, `Payment server call failed: ${res.statusText}`);
           }
