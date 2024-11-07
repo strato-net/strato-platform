@@ -35,7 +35,7 @@ abstract contract OracleService is Utils {
     	consensusPrice = _price;
     }
 
-    function getLatestPrice() external view returns (decimal, uint) {
+    function _getLatestPrice() internal view returns (decimal, uint) {
         return (consensusPrice, consensusPriceTimestamp);
     }
 }

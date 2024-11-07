@@ -16,11 +16,23 @@ contract SilverOracleService is OracleService {
         _;
     }
 
-    function deactivate() public requireOwner("deactivate") {
+    modifier requireActive(string action) {
+        string err = "The oracle service must be active to "
+                   + action
+                   + ".";
+        require(isActive, err);
+        _;
+    }
+
+    function deactivate() public requireOwner("deactivate") requireActive("deactivate") {
         _deactivate();
     }
 
-    function submitPrice(decimal _price) public requireOwner("submit price") {
+    function submitPrice(decimal _price) public requireOwner("submit price") requireActive("submit price") {
         _submitPrice(_price);
+    }
+
+    function getLatestPrice() public view requireActive("get latest price") returns (decimal, uint) {
+        return _getLatestPrice();
     }
 }
