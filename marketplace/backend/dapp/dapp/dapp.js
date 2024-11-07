@@ -255,8 +255,7 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
 
   contract.getInventoriesForUser = async function (args, options = optionsNoChainIds) {
     const getOptions = { ...options, app: contractName };
-    const { ownerCommonName, ...restArgs } = args;
-    const newArgs = { ...restArgs, ownerCommonName: ownerCommonName, notEqualsField: 'sale', notEqualsValue: constants.zeroAddress, userProfile: true }
+    const newArgs = { ...args, ownerCommonName: userCert.commonName, notEqualsField: 'sale', notEqualsValue: constants.zeroAddress, userProfile: true }
 
     return marketplaceJs.getAll(rawAdmin, newArgs, getOptions);
   };
