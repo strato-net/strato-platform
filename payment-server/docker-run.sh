@@ -211,9 +211,6 @@ else
     echo 'SKIP_DEPLOYMENT is true. Skipping deployment...'
   fi
 
-  echo 'Starting price submission script...'
-  yarn submit-price &
-
   echo 'Starting payment server...'
   yarn start
 fi
