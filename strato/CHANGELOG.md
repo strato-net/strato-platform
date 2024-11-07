@@ -19,11 +19,13 @@ so that they could be properly moved to their respective version's subsection.
 - Partial support for ipv6
 
 ### Changed
+- Total difficulty now refers to block number (corresponds to ethVersion now being 63)
 
 ### Fixed
 - Ethereum-discovery now looks at udp_enable_time instead of enable_time for bonded/available peers 
 
 ### Removed
+- Removed private chain endpoints
 
 ## [12.2] - 10/28/2024 
 ### Added

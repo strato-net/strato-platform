@@ -71,7 +71,7 @@ const actions = {
     }
   },
 
-  fetchGlobalTransaction: async (dispatch, limit, offset, dateRange, type) => {
+  fetchGlobalTransaction: async (dispatch, limit, offset, type) => {
     dispatch({ type: actionDescriptors.fetchGlobalTransaction });
 
     let query = "";
@@ -80,9 +80,6 @@ const actions = {
     }
     if (offset) {
       query += `&offset=${offset}`
-    }
-    if(dateRange){
-      query += `&startDate=${dateRange[0]}&endDate=${dateRange[1]}`
     }
     if(type?.length){
       query += `&type=${type}`

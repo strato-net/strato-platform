@@ -2,8 +2,6 @@ import React, { useEffect, useState } from "react";
 import { Button, Dropdown, Space, Input, Row, Col, Popover, Card, Tooltip, Select, DatePicker, Spin, Typography } from "antd";
 import { CloseOutlined, DownloadOutlined, FilterOutlined, SearchOutlined } from "@ant-design/icons";
 import { useNavigate, useLocation } from "react-router-dom";
-import classNames from "classnames";
-import dayjs from "dayjs";
 // Components
 import DataTableComponent from "../DataTableComponent";
 import InfiniteScroll from 'react-infinite-scroll-component';
@@ -65,18 +63,12 @@ const GlobalTransaction = ({ user }) => {
   }, [marketplaceDispatch]);
 
   useEffect(() => {
-    const startOfMonth = dayjs().subtract(2, 'month').startOf('month').unix();
-    const endOfMonth = dayjs().endOf('month').unix();
-    const dateArr = [startOfMonth, endOfMonth];
-
     transactionAction.fetchGlobalTransaction(
       transactionDispatch,
       limit,
       offset,
-      dateArr,
       selectedFilters
     )
-
   }, [dateQuery, limit, offset, selectedFilters])
   
 

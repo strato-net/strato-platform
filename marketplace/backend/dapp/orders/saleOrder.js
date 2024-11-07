@@ -301,11 +301,16 @@ async function getAll(admin, args = {}, options) {
       const serviceUrl = ppro.serviceURL || ppro.data.serviceURL;
       const statusRoute = ppro.orderStatusRoute || ppro.data.orderStatusRoute;
       const tokens = encodeURIComponent(JSON.stringify(paymentServicesToOrderHashes[ppro.address]));
-      const statusRes = await axios.get(new URL(`${serviceUrl}${statusRoute}?orderHashes=${tokens}`).href).then(function (res) {
-        if (res.status === 200) {
-          paymentServiceRes = { ...paymentServiceRes, ...res.data }
-        }
-      })
+      try {
+        const statusRes = await axios.get(new URL(`${serviceUrl}${statusRoute}?orderHashes=${tokens}`).href).then(function (res) {
+          if (res.status === 200) {
+            paymentServiceRes = { ...paymentServiceRes, ...res.data }
+          }
+        })
+      } catch (error) {
+        console.log("error", error)
+      }
+     
     });
   }
   if (Object.keys(paymentServiceRes).length > 0) {
