@@ -80,6 +80,8 @@ if [ "$ORACLE_MODE" = "true" ]; then
 
 else
   # Payment server-specific configurations
+  export DOCKERIZED="true"
+
   export CONFIG_DIR_PATH=/config
   export SERVER_HOST=${SERVER_HOST}
   export STRATO_HOST=${STRATO_HOST}
