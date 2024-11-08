@@ -41,7 +41,7 @@ describe("Payment Server - Fetch Prices for Oracle", function () {
     }
 
     // Run the price submission every minute
-    const fetchInterval = config.silverOracle.fetchInterval
+    const fetchInterval = Number(config.silverOracle.fetchInterval)
 
     // Function to fetch the token and price, then submit to contract
     const submitPricePeriodically = async () => {
