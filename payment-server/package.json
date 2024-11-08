@@ -9,7 +9,7 @@
     "deploy": "yarn mocha-babel deploy.js",
     "deactivate": "yarn mocha-babel deactivate.js",
     "offboard": "yarn mocha-babel offboard.js",
-    "submit-price": "yarn mocha-babel submitPrice.js",
+    "submit-price": "node submitPrice.js",
     "deploy-oracle": "yarn mocha-babel deployOracle.js",
     "deactivate-oracle": "yarn mocha-babel deactivateOracle.js",
     "start": "node server.js",
