@@ -5,6 +5,7 @@ import {
   Pagination,
   notification,
   Select,
+  Spin,
   Space,
   Input,
   Table,
@@ -52,6 +53,7 @@ import {
   ASSET_STATUS,
 } from "../../helpers/constants";
 import ItemActions from "./ItemActions";
+import InventoryCard from "./InventoryCard";
 import "./index.css";
 
 const { Option } = Select;
@@ -557,55 +559,117 @@ const Inventory = ({ user }) => {
             </div>
           </div>
         </div>
-        <Space.Compact className="mx-6 md:mx-5 md:px-10 mt-5 flex" size="large">
-          <Select
-            defaultValue="All"
-            style={{ width: 170, height: "auto" }}
-            onChange={handleTabSelect}
-            options={[
-              { label: "All", value: "All" },
-              ...categorys.map((category) => ({
-                label: category.name,
-                value: category.name,
-              })),
-            ]}
-            value={category}
-          />
-          <Input
-            placeholder="Search"
-            type="search"
-            defaultValue={debouncedSearchTerm}
-            onChange={queryHandleChange}
-            onPressEnter={queryHandleEnter}
-            className="bg-[#F6F6F6]"
-            suffix={
-              <img
-                src={Images.Header_Search}
-                alt={SEO.TITLE_META}
-                title={SEO.TITLE_META}
-                className="w-[18px] h-[18px]"
+        <div className="">
+          <Space.Compact
+            className="mx-6 md:mx-5 md:px-10 mt-5 flex"
+            size="large"
+          >
+            <Select
+              defaultValue="All"
+              style={{ width: 170, height: "auto" }}
+              onChange={handleTabSelect}
+              options={[
+                { label: "All", value: "All" },
+                ...categorys.map((category) => ({
+                  label: category.name,
+                  value: category.name,
+                })),
+              ]}
+              value={category}
+            />
+            <Input
+              placeholder="Search"
+              type="search"
+              defaultValue={debouncedSearchTerm}
+              onChange={queryHandleChange}
+              onPressEnter={queryHandleEnter}
+              className="bg-[#F6F6F6]"
+              suffix={
+                <img
+                  src={Images.Header_Search}
+                  alt={SEO.TITLE_META}
+                  title={SEO.TITLE_META}
+                  className="w-[18px] h-[18px]"
+                />
+              }
+            />
+          </Space.Compact>
+          <div className="pt-6 mx-6 md:mx-5 md:px-10 mb-5">
+            <Checkbox className="mb-4" onChange={handleCheckboxChange}>
+              Published
+            </Checkbox>
+            <div className="hidden md:block">
+              <Table
+                columns={columns}
+                dataSource={showPublished ? userInventories : inventories}
+                loading={isInventoriesLoading || isUserInventoriesLoading}
+                className="custom-table"
+                pagination={false}
               />
-            }
-          />
-        </Space.Compact>
-        <div className="pt-6 mx-6 md:mx-5 md:px-10 mb-5">
-          <Checkbox className="mb-4" onChange={handleCheckboxChange}>
-            Published
-          </Checkbox>
-          <Table
-            columns={columns}
-            dataSource={showPublished ? userInventories : inventories}
-            loading={isInventoriesLoading || isUserInventoriesLoading}
-            className="custom-table"
-            pagination={false}
-          />
-          <Pagination
-            current={page}
-            onChange={onPageChange}
-            total={showPublished ? userInventoriesTotal : inventoriesTotal}
-            showTotal={(total) => `Total ${total} items`}
-            className="flex justify-center my-5 custom-pagination"
-          />
+              <Pagination
+                current={page}
+                onChange={onPageChange}
+                total={showPublished ? userInventoriesTotal : inventoriesTotal}
+                showTotal={(total) => `Total ${total} items`}
+                className="flex justify-center my-5 custom-pagination"
+              />
+            </div>
+            <div className="md:hidden">
+              <div className="my-4 grid grid-cols-1 md:grid-cols-2 gap-6 lg:grid-cols-3 3xl:grid-cols-4 5xl:grid-cols-5 sm:place-items-center md:place-items-start inventoryCard max-w-full">
+                {!showPublished ? (
+                  !isInventoriesLoading && !isFetchingTokens ? (
+                    inventories.map((inventory, index) => (
+                      <InventoryCard
+                        id={index}
+                        limit={limit}
+                        offset={offset}
+                        inventory={inventory}
+                        category={category}
+                        key={index}
+                        debouncedSearchTerm={debouncedSearchTerm}
+                        allSubcategories={allSubcategories}
+                        user={user}
+                        supportedTokens={supportedTokens}
+                      />
+                    ))
+                  ) : (
+                    <Spin size="large" />
+                  )
+                ) : null}
+                {showPublished ? (
+                  !isUserInventoriesLoading && !isFetchingTokens ? (
+                    userInventories.map((inventory, index) => (
+                      <InventoryCard
+                        id={index}
+                        limit={limit}
+                        offset={offset}
+                        inventory={inventory}
+                        category={category}
+                        key={index}
+                        debouncedSearchTerm={debouncedSearchTerm}
+                        allSubcategories={allSubcategories}
+                        user={user}
+                        supportedTokens={supportedTokens}
+                      />
+                    ))
+                  ) : (
+                    <Spin size="large" />
+                  )
+                ) : null}
+                <div className="flex justify-center pt-6">
+                  <Pagination
+                    current={page}
+                    onChange={onPageChange}
+                    total={
+                      showPublished ? userInventoriesTotal : inventoriesTotal
+                    }
+                    showSizeChanger={false}
+                    className="flex justify-center my-5"
+                  />
+                </div>
+              </div>
+            </div>
+          </div>
         </div>
       </>
       {open && (
