@@ -53,7 +53,6 @@ const ResponsiveAddAddress = ({ close, redemptionService }) => {
         event: "add_shipping_address",
       },
     });
-    console.log(body, "body")
     let res = await actions.addShippingAddress(marketplaceDispatch, body);
     if (res != null) {
       await actions.fetchUserAddresses(marketplaceDispatch, redemptionService);
