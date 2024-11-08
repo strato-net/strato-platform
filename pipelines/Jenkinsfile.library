@@ -1442,19 +1442,16 @@ def spinUpIdentityServer(rootCert, rootPriv) {
     usernamePassword(credentialsId: 'keycloak-strato-devel-dev-client', passwordVariable: 'KEYCLOAK_STRATODEVEL_DEV_SECRET', usernameVariable: 'KEYCLOAK_STRATODEVEL_DEV_ID')
   ]) {
   def hostname=sh(returnStdout: true, script: "cat </host")
-  writeFile file: "identity-provider/idconf.yaml", text: """
-    - realmName: strato-devel
-      discoveryUrl: https://keycloak.blockapps.net/auth/realms/strato-devel/.well-known/openid-configuration
-      clientId: ${KEYCLOAK_STRATODEVEL_DEV_ID}
-      clientSecret: ${KEYCLOAK_STRATODEVEL_DEV_SECRET}
-      nodeUrl: https://${hostname}
-  """
   writeFile file: "run-identity.sh", text: """#!/bin/bash
     sudo \\
       ssl=true \\
       VAULT_URL=https://\$(</host):8093 \\
       SENDGRID_APIKEY='${SENDGRID_APIKEY_TESTNET2}' \\
       HTTPS_PORT=8001 \\
+      OAUTH_DISCOVERY_URL=https://keycloak.blockapps.net/auth/realms/strato-devel/.well-known/openid-configuration \\
+      OAUTH_CLIENT_ID="${KEYCLOAK_STRATODEVEL_DEV_ID}" \\
+      OAUTH_CLIENT_SECRET="${KEYCLOAK_STRATODEVEL_DEV_SECRET}" \\
+      NODE_URL="https://${hostname}" \\
       ./identity
   """
   }
