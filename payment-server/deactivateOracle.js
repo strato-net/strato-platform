@@ -32,8 +32,8 @@ describe("Oracle - deactivate contracts", function () {
   })
 
   it('Deactivate SilverOracleSerivce', async () => {
-    if (deployment.contracts.silver) {
-      await deactivate(token, deployment.contracts.silver)
+    if (deployment.contracts.silverOracle) {
+      await deactivate(token, deployment.contracts.silverOracle)
     }
   })
 })
