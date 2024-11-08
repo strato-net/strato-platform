@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { Button } from "antd";
+import { Button, Popover } from "antd";
 import {
   DollarOutlined,
   EditOutlined,
@@ -8,6 +8,7 @@ import {
   StopOutlined,
   SwapOutlined,
   RetweetOutlined,
+  MoreOutlined,
 } from "@ant-design/icons";
 import {
   ASSET_STATUS,
@@ -29,7 +30,7 @@ const ItemActions = ({
   allSubcategories,
   user,
   supportedTokens,
-  togglePopover
+  // togglePopover,
 }) => {
   const itemData = inventory.data;
   const isStrats =
@@ -48,6 +49,11 @@ const ItemActions = ({
   const [transferModalOpen, setTransferModalOpen] = useState(false);
   const [redeemModalOpen, setRedeemModalOpen] = useState(false);
   const [bridgeModalOpen, setBridgeModalOpen] = useState(false);
+  const [popoverVisible, setPopoverVisible] = useState({});
+
+  const togglePopover = (id, visible) => {
+    setPopoverVisible((prev) => ({ ...prev, [id]: visible }));
+  };
 
   const getCategory = () => {
     const parts = inventory.contract_name.split("-");
@@ -154,7 +160,7 @@ const ItemActions = ({
   };
 
   return (
-    <div className="flex gap-2">
+    <div className="flex">
       <Button
         type="link"
         className="text-[#13188A] font-semibold"
@@ -172,28 +178,6 @@ const ItemActions = ({
             <DollarOutlined /> Sell
           </>
         )}
-      </Button>
-      <Button
-        type="link"
-        className="text-[#13188A] font-semibold"
-        onClick={showUnlistModal}
-        disabled={!inventory.price || !isActive()}
-      >
-        <StopOutlined /> Unlist
-      </Button>
-      <Button
-        type="link"
-        className="text-[#13188A] font-semibold"
-        onClick={showResellModal}
-        disabled={
-          !(
-            itemData.isMint &&
-            itemData.isMint == "True" &&
-            !disableSADDOGS(inventory)
-          ) || !isActive()
-        }
-      >
-        <PieChartOutlined /> Mint
       </Button>
       <Button
         type="link"
@@ -216,16 +200,50 @@ const ItemActions = ({
       >
         <SendOutlined /> Redeem
       </Button>
-      <Button
-        type="link"
-        className={`text-[#13188A] font-semibold ${
-          !isTokenSupported(inventory.root) ? "hidden" : ""
-        }`}
-        onClick={showBridgeModal}
+      <Popover
+        placement="topRight"
+        open={popoverVisible[inventory.address] || false}
+        onOpenChange={(visible) => togglePopover(inventory.address, visible)}
+        content={
+          <div className="flex gap-2">
+            <Button
+              type="link"
+              className="text-[#13188A] font-semibold"
+              onClick={showUnlistModal}
+              disabled={!inventory.price || !isActive()}
+            >
+              <StopOutlined /> Unlist
+            </Button>
+            <Button
+              type="link"
+              className="text-[#13188A] font-semibold"
+              onClick={showResellModal}
+              disabled={
+                !(
+                  itemData.isMint &&
+                  itemData.isMint == "True" &&
+                  !disableSADDOGS(inventory)
+                ) || !isActive()
+              }
+            >
+              <PieChartOutlined /> Mint
+            </Button>
+            <Button
+              type="link"
+              className={`text-[#13188A] font-semibold ${
+                !isTokenSupported(inventory.root) ? "hidden" : ""
+              }`}
+              onClick={showBridgeModal}
+            >
+              <RetweetOutlined /> Bridge
+            </Button>
+          </div>
+        }
       >
-        <RetweetOutlined /> Bridge
-      </Button>
-
+        <Button className="text-[#13188A] font-semibold" type="link">
+          <MoreOutlined /> More
+        </Button>
+      </Popover>
       {listModalOpen && (
         <ListForSaleModal
           open={listModalOpen}

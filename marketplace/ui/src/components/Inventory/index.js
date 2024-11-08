@@ -4,24 +4,13 @@ import {
   Button,
   Pagination,
   notification,
-  Spin,
   Select,
   Space,
   Input,
   Table,
-  Popover,
   Checkbox,
 } from "antd";
-import {
-  DollarOutlined,
-  EditOutlined,
-  SendOutlined,
-  PieChartOutlined,
-  StopOutlined,
-  SwapOutlined,
-  RetweetOutlined,
-  CheckCircleOutlined,
-} from "@ant-design/icons";
+import { CheckCircleOutlined } from "@ant-design/icons";
 import image_placeholder from "../../images/resources/image_placeholder.png";
 import CreateInventoryModal from "./CreateInventoryModal";
 import { actions as categoryActions } from "../../contexts/category/actions";
@@ -76,7 +65,6 @@ const Inventory = ({ user }) => {
   const [offset, setOffset] = useState(0);
   const [page, setPage] = useState(1);
   const [showPublished, setShowPublished] = useState(false);
-  const [popoverVisible, setPopoverVisible] = useState({});
   const dispatch = useInventoryDispatch();
   const [api, contextHolder] = notification.useNotification();
   const [category, setCategory] = useState(undefined);
@@ -269,10 +257,6 @@ const Inventory = ({ user }) => {
     setShowPublished(e.target.checked);
   };
 
-  const togglePopover = (id, visible) => {
-    setPopoverVisible((prev) => ({ ...prev, [id]: visible }));
-  };
-
   const getAllSubcategories = (categories) => {
     let subcategories = [];
     categories.forEach((category) => {
@@ -406,14 +390,34 @@ const Inventory = ({ user }) => {
       ),
     },
     {
-      title: "Quantity Owned",
+      title: "Owned",
       align: "center",
       render: (text, record) => <div>{record.quantity || 0}</div>,
     },
     {
-      title: "Quantity Listed for Sale",
+      title: "Listed for Sale",
       align: "center",
-      render: (text, record) => <div>{record.saleQuantity || 0}</div>,
+      render: (text, record) => (
+        <div className="w-24">{record.saleQuantity || 0}</div>
+      ),
+    },
+    {
+      title: "Actions",
+      align: "center",
+      render: (text, record) => (
+        <div>
+          <ItemActions
+            inventory={record}
+            limit={limit}
+            offset={offset}
+            debouncedSearchTerm={debouncedSearchTerm}
+            category={category}
+            allSubcategories={allSubcategories}
+            user={user}
+            supportedTokens={supportedTokens}
+          />
+        </div>
+      ),
     },
     {
       title: "Status",
@@ -450,34 +454,6 @@ const Inventory = ({ user }) => {
             </div>
           )}
         </div>
-      ),
-    },
-    {
-      title: "Actions",
-      align: "center",
-      render: (text, record) => (
-        <Popover
-          placement="topRight"
-          open={popoverVisible[record.address] || false}
-          onOpenChange={(visible) => togglePopover(record.address, visible)}
-          content={
-            <ItemActions
-              inventory={record}
-              limit={limit}
-              offset={offset}
-              debouncedSearchTerm={debouncedSearchTerm}
-              category={category}
-              allSubcategories={allSubcategories}
-              user={user}
-              supportedTokens={supportedTokens}
-              togglePopover={(visible) => togglePopover(record.address, visible)}
-            />
-          }
-        >
-          <Button type="primary">
-            Actions
-          </Button>
-        </Popover>
       ),
     },
   ];
@@ -521,35 +497,32 @@ const Inventory = ({ user }) => {
           </div>
           <div className="flex flex-col md:flex-row gap-3 items-center my-2 md:my-0">
             <div className="flex gap-3 items-center">
-              {!areNotOnboardedLoading ? (
-                <Select
-                  className="items-select"
-                  style={{ width: 250, height: 40 }}
-                  onChange={handleChange}
-                  value={"Connect to Payment Provider"}
-                >
-                  {sortedPaymentServices.map((service) => (
-                    <Option
-                      key={service.serviceName}
-                      value={service.serviceName}
-                      disabled={!service.isNotOnboarded}
-                    >
-                      {service.serviceName}
-                      {!service.isNotOnboarded && (
-                        <CheckCircleOutlined
-                          style={{
-                            color: "#28a745",
-                            position: "absolute",
-                            right: "10px",
-                          }}
-                        />
-                      )}
-                    </Option>
-                  ))}
-                </Select>
-              ) : (
-                <Spin size="large" />
-              )}
+              <Select
+                loading={areNotOnboardedLoading}
+                className="items-select"
+                style={{ width: 250, height: 40 }}
+                onChange={handleChange}
+                value={"Connect to Payment Provider"}
+              >
+                {sortedPaymentServices.map((service) => (
+                  <Option
+                    key={service.serviceName}
+                    value={service.serviceName}
+                    disabled={!service.isNotOnboarded}
+                  >
+                    {service.serviceName}
+                    {!service.isNotOnboarded && (
+                      <CheckCircleOutlined
+                        style={{
+                          color: "#28a745",
+                          position: "absolute",
+                          right: "10px",
+                        }}
+                      />
+                    )}
+                  </Option>
+                ))}
+              </Select>
             </div>
             <div className="flex gap-3 items-center">
               <Button
