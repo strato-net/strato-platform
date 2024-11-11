@@ -43,7 +43,7 @@ abstract contract OracleService is Utils {
     	consensusPrice = _price;
     }
 
-    function _getLatestPrice() internal view  requireActive("deactivate") returns (decimal, uint) {
+    function getLatestPrice() public view  requireActive("deactivate") returns (decimal, uint) {
         return (consensusPrice, consensusPriceTimestamp);
     }
 }

@@ -23,8 +23,4 @@ contract SilverOracleService is OracleService {
     function submitPrice(decimal _price) public requireOwner("submit price") {
         _submitPrice(_price);
     }
-
-    function getLatestPrice() public view returns (decimal, uint) {
-        return _getLatestPrice();
-    }
 }
