@@ -42,6 +42,10 @@ contract Escrow is Sale {
         Asset(_silverAsset).attachSale();
     }
 
+    function getAssetAmount() public view returns (uint) {
+        return silverAmount;
+    }
+
     function releaseCollateral(address requester) external onlyReserve {
         Asset(assetToBeSold).transferOwnership(requester, silverAmount, false, 0, 0);
         emit CollateralReleased(requester, silverAmount);
