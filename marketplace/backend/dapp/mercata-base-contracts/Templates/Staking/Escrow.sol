@@ -6,7 +6,7 @@ import "../Utils/Utils.sol";
 // TODO: Security review
 // TODO: Add the Oracle?
 
-contract Escrow is Sale {
+contract Escrow is Sale {//Comment
     address public reserve;
     address public borrower;
     uint public silverAmount;
