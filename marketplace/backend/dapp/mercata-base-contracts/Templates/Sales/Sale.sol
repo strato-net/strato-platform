@@ -13,7 +13,7 @@ abstract contract Sale is Utils {
         string creator;
     }
 
-    Asset public assetToBeSold;
+    Asset[] public assetsToBeSold;
     decimal public price;
     uint public quantity;
     PaymentService[] public paymentServices;
@@ -29,18 +29,24 @@ abstract contract Sale is Utils {
         PaymentService[] _paymentServices
     ) {    
         require(_quantity > 0, "Quantity must be greater than 0");
-        require(assetToBeSold.quantity() >= _quantity, "Cannot sell more units than what are owned.");
-        assetToBeSold = Asset(_assetToBeSold);
-        price = _price;
+        uint totalQuantityOwned = 0;
+        for (uint i = 0; i < _assetsToBeSold.length; i++) {
+            totalQuantityOwned += _assetsToBeSold[i].quantity();
+        }
+        require(totalQuantityOwned >= _quantity, "Cannot sell more units than what are owned.");
+        assetsToBeSold = _assetsToBeSold;
         quantity = _quantity;
+        price = _price;
         totalLockedQuantity = 0;
         isOpen = true;
         addPaymentServices(_paymentServices);
-        assetToBeSold.attachSale();
+        for (uint i = 0; i < assetsToBeSold.length; i++) {
+            assetsToBeSold[i].attachSale();
+        }
     }
 
     modifier requireSeller(string action) {
-        string sellersCommonName = assetToBeSold.ownerCommonName();
+        string sellersCommonName = assetsToBeSold[0].ownerCommonName();
         string err = "Only "
                    + sellersCommonName
                    + " can perform "
@@ -56,7 +62,7 @@ abstract contract Sale is Utils {
     }
 
     modifier requireSellerOrPaymentService(string action) {
-        string sellersCommonName = assetToBeSold.ownerCommonName();
+        string sellersCommonName = assetsToBeSold[0].ownerCommonName();
         string commonName = getCommonName(msg.sender);
         bool isAuthorized = commonName == sellersCommonName
                          || isPaymentService(msg.sender);
@@ -120,33 +126,62 @@ abstract contract Sale is Utils {
         uint orderQuantity = takeLockedQuantity(orderHash, purchaser);
         // regular transfer - isUserTransfer: false, transferNumber: 0, transferPrice: 0
         try {
-            assetToBeSold.transferOwnership(purchaser, orderQuantity, false, 0, 0);
+            assetsToBeSold[0].transferOwnership(purchaser, orderQuantity, false, 0, 0);
         } catch { // Backwards compatibility for old assets
-            address(assetToBeSold).call("transferOwnership", purchaser, orderQuantity, false, 0);
+            address(assetsToBeSold[0]).call("transferOwnership", purchaser, orderQuantity, false, 0);
         }
         closeSaleIfEmpty();
         return RestStatus.OK;
     }
 
-    function automaticTransfer(address _newOwner, decimal _price, uint _quantity, uint _transferNumber) public returns (uint) {
-        require(msg.sender == address(assetToBeSold), "Only the underlying Asset can call automaticTransfer.");
-        require(_quantity > 0, "Quantity must be greater than 0");
-        uint assetQuantity = assetToBeSold.quantity();
-        require(_quantity <= assetQuantity - totalLockedQuantity, "Cannot transfer more units than are available.");
-        if (_quantity > quantity) { // We can transfer more than the Sale quantity
-            quantity = 0;
-        } else {
-            quantity -= _quantity;
+    function automaticTransfer(
+    address _newOwner,
+    decimal _price,
+    uint _quantity,
+    uint _transferNumber
+) public returns (uint) {
+    // Ensure the caller is one of the assets in assetsToBeSold
+    bool isAuthorized = false;
+    for (uint i = 0; i < assetsToBeSold.length; i++) {
+        if (msg.sender == address(assetsToBeSold[i])) {
+            isAuthorized = true;
+            break;
         }
-        // transfer feature - isUserTransfer: true, transferNumber: _transferNumber, transferPrice: _price
-        try {
-            assetToBeSold.transferOwnership(_newOwner, _quantity, true, _transferNumber, _price);
-        } catch { // Backwards compatibility for old assets
-            address(assetToBeSold).call("transferOwnership", _newOwner, _quantity, true, _transferNumber);
-        }
-        closeSaleIfEmpty();
-        return RestStatus.OK;
     }
+    require(isAuthorized, "Only the underlying Assets can call automaticTransfer.");
+    require(_quantity > 0, "Quantity must be greater than 0");
+
+    uint totalAssetQuantity = getTotalAssetQuantity();
+    require(_quantity <= totalAssetQuantity - totalLockedQuantity, "Cannot transfer more units than are available.");
+
+    // Deduct quantity from the sale's available quantity
+    if (_quantity > quantity) { 
+        quantity = 0;
+    } else {
+        quantity -= _quantity;
+    }
+
+    uint remainingQuantity = _quantity;
+    
+    // Distribute the transfer across multiple assets in assetsToBeSold
+    for (uint i = 0; i < assetsToBeSold.length && remainingQuantity > 0; i++) {
+        uint assetQuantity = assetsToBeSold[i].quantity();
+        uint transferQuantity = remainingQuantity > assetQuantity ? assetQuantity : remainingQuantity;
+        remainingQuantity -= transferQuantity;
+
+        // Perform the transfer
+        try {
+            assetsToBeSold[i].transferOwnership(_newOwner, transferQuantity, true, _transferNumber, _price);
+        } catch { 
+            address(assetsToBeSold[i]).call("transferOwnership", _newOwner, transferQuantity, true, _transferNumber);
+        }
+    }
+
+    // Check if the sale should be closed after the transfer
+    closeSaleIfEmpty();
+    return RestStatus.OK;
+}
+
 
     function closeSaleIfEmpty() internal {
         if (quantity == 0 && totalLockedQuantity == 0) {
@@ -157,15 +192,16 @@ abstract contract Sale is Utils {
 
     function closeSale() public requireSeller("close sale") returns (uint) {
         close();
-        isOpen = false;
+        isOpen = false; 
         return RestStatus.OK;
     }
 
     function close() internal {
-        try {
-            assetToBeSold.closeSale();
-        } catch {
-
+        for (uint i = 0; i < assetsToBeSold.length; i++) {
+            try {
+                assetsToBeSold[i].closeSale();
+            } catch {
+            }
         }
     }
 
@@ -224,7 +260,8 @@ abstract contract Sale is Utils {
       }
 
       if ((_scheme & (1 << 0)) == (1 << 0)) {
-        require(_quantity + totalLockedQuantity <= assetToBeSold.quantity(), "Cannot sell more units than owned");
+        uint totalQuantity = getTotalAssetQuantity();
+        require(_quantity + totalLockedQuantity <= totalQuantity, "Cannot sell more units than owned");
         quantity = _quantity;
       }
       if ((_scheme & (1 << 1)) == (1 << 1)) {
@@ -235,5 +272,13 @@ abstract contract Sale is Utils {
         addPaymentServices(_paymentServices);
       }
       return RestStatus.OK;
+    }
+
+    function getTotalAssetQuantity() internal returns (uint) {
+        uint total = 0;
+        for (uint i = 0; i < assetsToBeSold.length; i++) {
+            total += assetsToBeSold[i].quantity();
+        }
+        return total;
     }
 }
