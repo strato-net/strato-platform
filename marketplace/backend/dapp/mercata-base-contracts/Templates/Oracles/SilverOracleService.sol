@@ -1,7 +1,7 @@
 pragma es6;
 pragma strict;
 
-import <5761f9a2e0e5e17ceecd772146c95caf7127ea2e>;
+import <BASE_CODE_COLLECTION>;
 
 contract SilverOracleService is OracleService {
     constructor(
