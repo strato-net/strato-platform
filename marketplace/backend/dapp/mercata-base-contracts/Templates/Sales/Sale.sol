@@ -39,21 +39,10 @@ abstract contract Sale is Utils {
         price = _price;
         totalLockedQuantity = 0;
         isOpen = true;
-        addPaymentServices(_paymentServices);
+        _addPaymentServices(_paymentServices);
         for (uint i = 0; i < assetsToBeSold.length; i++) {
             assetsToBeSold[i].attachSale();
         }
-    }
-
-    modifier requireSeller(string action) {
-        string sellersCommonName = assetsToBeSold[0].ownerCommonName();
-        string err = "Only "
-                   + sellersCommonName
-                   + " can perform "
-                   + action
-                   + ".";
-        string commonName = getCommonName(msg.sender);
-        require(commonName == sellersCommonName, err);
     }
 
     modifier requirePaymentService(string action) {
@@ -70,22 +59,12 @@ abstract contract Sale is Utils {
         _;
     }
 
-    function getLock (
-        string _orderHash,
-        address _purchaser
-    ) internal returns (string) {
-        return keccak256(
-            string(this),
-            _orderHash,
-            string(_purchaser)
-        );
+    function isPaymentService(address _paymentService) public returns (bool) {
+        string _serviceName = _paymentService.call("serviceName");
+        return paymentServicesMap[_serviceName][_paymentService.creator] != 0;
     }
 
-    function changePrice(decimal _price) public requireSeller("change price"){
-        price=_price;
-    }
-
-    function addPaymentServices(PaymentService[] _paymentServices) public requireSeller("add payment services") {
+    function _addPaymentServices(PaymentService[] _paymentServices) internal {
         for (uint i = 0; i < _paymentServices.length; i++) {
             PaymentService p = _paymentServices[i];
             paymentServices.push(p);
@@ -93,19 +72,7 @@ abstract contract Sale is Utils {
         }
     }
 
-    function removePaymentServices(PaymentService[] _paymentServices) public requireSeller("remove payment services") {
-        for (uint i = 0; i < _paymentServices.length; i++) {
-            PaymentService p = _paymentServices[i];
-            uint x = paymentServicesMap[p.serviceName][p.creator];
-            if (x > 0) {
-                paymentServices[x-1].creator = "";
-                paymentServices[x-1].serviceName = "";
-                paymentServicesMap[p.serviceName][p.creator] = 0;
-            }
-        }
-    }
-
-    function clearPaymentServices() public requireSeller("clear payment services") {
+    function _clearPaymentServices() internal {
         for(uint i = 0; i < paymentServices.length; i++) {
             paymentServicesMap[paymentServices[i].serviceName][paymentServices[i].creator] = 0;
             paymentServices[i].creator = "";
@@ -114,86 +81,15 @@ abstract contract Sale is Utils {
         paymentServices = [];
     }
 
-    function isPaymentService(address _paymentService) public returns (bool) {
-        string _serviceName = _paymentService.call("serviceName");
-        return paymentServicesMap[_serviceName][_paymentService.creator] != 0;
-    }
+    function completeSale(string memory orderHash, address purchaser) public virtual returns (uint);
 
-    function completeSale(
-        string orderHash,
-        address purchaser
-    ) public requirePaymentService("complete sale") returns (uint) {
-        uint orderQuantity = takeLockedQuantity(orderHash, purchaser);
-        // regular transfer - isUserTransfer: false, transferNumber: 0, transferPrice: 0
-        try {
-            assetsToBeSold[0].transferOwnership(purchaser, orderQuantity, false, 0, 0);
-        } catch { // Backwards compatibility for old assets
-            address(assetsToBeSold[0]).call("transferOwnership", purchaser, orderQuantity, false, 0);
-        }
-        closeSaleIfEmpty();
-        return RestStatus.OK;
-    }
-
-    function automaticTransfer(
-    address _newOwner,
-    decimal _price,
-    uint _quantity,
-    uint _transferNumber
-) public returns (uint) {
-    // Ensure the caller is one of the assets in assetsToBeSold
-    bool isAuthorized = false;
-    for (uint i = 0; i < assetsToBeSold.length; i++) {
-        if (msg.sender == address(assetsToBeSold[i])) {
-            isAuthorized = true;
-            break;
-        }
-    }
-    require(isAuthorized, "Only the underlying Assets can call automaticTransfer.");
-    require(_quantity > 0, "Quantity must be greater than 0");
-
-    uint totalAssetQuantity = getTotalAssetQuantity();
-    require(_quantity <= totalAssetQuantity - totalLockedQuantity, "Cannot transfer more units than are available.");
-
-    // Deduct quantity from the sale's available quantity
-    if (_quantity > quantity) { 
-        quantity = 0;
-    } else {
-        quantity -= _quantity;
-    }
-
-    uint remainingQuantity = _quantity;
-    
-    // Distribute the transfer across multiple assets in assetsToBeSold
-    for (uint i = 0; i < assetsToBeSold.length && remainingQuantity > 0; i++) {
-        uint assetQuantity = assetsToBeSold[i].quantity();
-        uint transferQuantity = remainingQuantity > assetQuantity ? assetQuantity : remainingQuantity;
-        remainingQuantity -= transferQuantity;
-
-        // Perform the transfer
-        try {
-            assetsToBeSold[i].transferOwnership(_newOwner, transferQuantity, true, _transferNumber, _price);
-        } catch { 
-            address(assetsToBeSold[i]).call("transferOwnership", _newOwner, transferQuantity, true, _transferNumber);
-        }
-    }
-
-    // Check if the sale should be closed after the transfer
-    closeSaleIfEmpty();
-    return RestStatus.OK;
-}
-
+    function automaticTransfer(address newOwner, decimal price, uint quantity, uint transferNumber) public virtual returns (uint);
 
     function closeSaleIfEmpty() internal {
         if (quantity == 0 && totalLockedQuantity == 0) {
             close();
             isOpen = false;
         }
-    }
-
-    function closeSale() public requireSeller("close sale") returns (uint) {
-        close();
-        isOpen = false; 
-        return RestStatus.OK;
     }
 
     function close() internal {
@@ -203,6 +99,17 @@ abstract contract Sale is Utils {
             } catch {
             }
         }
+    }
+
+    function getLock (
+        string _orderHash,
+        address _purchaser
+    ) internal returns (string) {
+        return keccak256(
+            string(this),
+            _orderHash,
+            string(_purchaser)
+        );
     }
 
     function lockQuantity(
@@ -240,14 +147,6 @@ abstract contract Sale is Utils {
         quantity += quantityToReturn;
     }
 
-    function cancelOrder(
-        string orderHash,
-        address purchaser
-    ) public requireSellerOrPaymentService("cancel order") returns (uint) {
-        unlockQuantity(orderHash, purchaser);
-        return RestStatus.OK;
-    }
-
     function update(
         uint _quantity,
         decimal _price,
@@ -268,8 +167,8 @@ abstract contract Sale is Utils {
         price = _price;
       }
       if ((_scheme & (1 << 2)) == (1 << 2)) {
-        clearPaymentServices();
-        addPaymentServices(_paymentServices);
+        _clearPaymentServices();
+        _addPaymentServices(_paymentServices);
       }
       return RestStatus.OK;
     }
