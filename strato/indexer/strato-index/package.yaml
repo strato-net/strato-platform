@@ -22,7 +22,6 @@ library:
   - extra
   - format
   - kafka-monad
-  - milena
   - monad-alter
   - redis-monad
   - seqevents

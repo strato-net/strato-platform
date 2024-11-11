@@ -9,7 +9,7 @@ import System.FilePath
 stratoVersionString = "Ethereum(G)/v?.?.?/linux/Haskell"
 
 ethVersion :: Integer
-ethVersion = 62
+ethVersion = 63
 
 shhVersion :: Integer
 shhVersion = 2

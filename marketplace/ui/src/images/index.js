@@ -63,6 +63,16 @@ export const Images = {
   'banner_arrow': require('./resources/banner_arrow.png'),
   'carousel_arrow': require('./resources/carouselArrow.png'),
 
+  'BatmanX394': require("./resources/Banner/BatmanX394.png"),
+  'BatmanX768': require("./resources/Banner/BatmanX768.png"),
+  'BatmanX1440': require("./resources/Banner/BatmanX1440.png"),
+  'BatmanX1600': require("./resources/Banner/BatmanX1600.png"),
+
+  'RickAndMortyX394': require("./resources/Banner/RickAndMortyX394.png"),
+  'RickAndMortyX768': require("./resources/Banner/RickAndMortyX768.png"),
+  'RickAndMortyX1440': require("./resources/Banner/RickAndMortyX1440.png"),
+  'RickAndMortyX1600': require("./resources/Banner/RickAndMortyX1600.png"),
+
   'CollectiblesX394': require("./resources/Banner/CollectiblesX394.png"),
   'CollectiblesX768': require("./resources/Banner/CollectiblesX768.png"),
   'CollectiblesX1440': require("./resources/Banner/CollectiblesX1440.png"),

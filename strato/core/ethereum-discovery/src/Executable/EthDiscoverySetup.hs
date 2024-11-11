@@ -13,6 +13,7 @@ import Control.Monad
 import Control.Monad.IO.Unlift
 import qualified Data.Text as T
 import Database.Persist.Postgresql
+import Network.URI (isIPv6address)
 
 setup :: (MonadLoggerIO m, MonadUnliftIO m) => Maybe [String] -> m ()
 setup maybeStratoNodes = do
@@ -41,7 +42,7 @@ setup maybeStratoNodes = do
               Just stratoNodes -> zip (repeat "") stratoNodes
 
       forM_ nodesPubkeys $ \(pubkey, node) -> do
-        let peer = createPeer $ "enode://" ++ (if null pubkey then "" else pubkey ++ "@") ++ node ++ ":30303"
+        let peer = createPeer $ "enode://" ++ (if null pubkey then "" else pubkey ++ "@") ++ (if isIPv6address node then "[" ++ node ++ "]" else node) ++ ":30303"
         case peer of
           (Left err) -> logWarnN (T.pack err)
           (Right p) -> void $ insert p

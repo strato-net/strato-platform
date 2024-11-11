@@ -18,6 +18,7 @@ import websocket from "./websocket";
 import axios from "axios";
 import { cronSyncCall } from "./helpers/cronSyncCall";
 import cronFunc from "./cron";
+import jwtDecode from 'jwt-decode'
 const isLocalHost = config.serverHost === constants.localHost;
 
 let server
@@ -42,14 +43,31 @@ let server
   app.use(helmet());
   app.use(cors());
   app.use(bodyParser.json());
-  app.use(cookieParser())
+  app.use(cookieParser());
   
   // Setup logging
   app.use(
     expressWinston.logger({
       transports: [new winston.transports.Console()],
-      meta: true,
-      expressFormat: true
+      meta: false,
+      expressFormat: true,
+      dynamicMeta: (req, res) => {
+        let token;
+        try {
+          token = jwtDecode(req.headers['x-user-access-token']);
+        } catch (err) {
+          token = null;
+          console.warn("Failed to decode token:", err);
+        }
+
+        return {
+          userAgent: req.headers['user-agent'],
+          cfIp: req.headers['cf-connecting-ip'] || req.headers['cf-connecting-ipv6'],
+          xForwardedFor: req.headers['x-forwarded-for'],
+          referrer: req.headers['referer'] || req.headers['referrer'],
+          user: token?.preferred_username ? token.preferred_username : (token?.email ? token.email : "")
+        };
+      }
     })
   );
   

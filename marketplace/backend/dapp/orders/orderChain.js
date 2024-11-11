@@ -61,7 +61,6 @@ const getChainArgs = (getKeyResponse, deploy, myCert, args) => {
 async function createOrder(user, args, options) {
     const getKeyResponse = await rest.getKey(user, options);
     const deploy = getYamlFile(`${config.configDirPath}/${config.deployFilename}`);
-    console.log("user\n\n\n\n\n", user);
     const myCert = await certificateJs.getCertificateMe(user)
 
     const chainArgs = getChainArgs(getKeyResponse, deploy, myCert, args);

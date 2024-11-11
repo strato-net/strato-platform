@@ -30,10 +30,12 @@ abstract contract Redeemable is UTXO {
     }
 
     function mint(uint _quantity) internal virtual override returns (UTXO) {
+        require(_quantity > 0, "Quantity must be greater than 0");
         return UTXO(new Redeemable(name, description, images, files, fileNames, createdDate, _quantity, status, address(redemptionService)));
     }
 
     function _callMint(address _newOwner, uint _quantity) internal virtual override {
+        require(_quantity > 0, "Quantity must be greater than 0");
         UTXO newAsset = mint(_quantity);
         Asset(newAsset).transferOwnership(_newOwner, _quantity, false, 0, 0);
     }
@@ -56,6 +58,7 @@ abstract contract Redeemable is UTXO {
     function requestRedemption(string _redemptionId, uint _quantity) requireOwner("request redemption") public returns (uint, address) {
         require(status != AssetStatus.PENDING_REDEMPTION, "Asset is not in ACTIVE state.");
         require(status != AssetStatus.RETIRED, "Asset is not in ACTIVE state.");
+        require(_quantity > 0, "Quantity must be greater than 0");
 
         UTXO newAsset = mint(_quantity);
         quantity -= _quantity;

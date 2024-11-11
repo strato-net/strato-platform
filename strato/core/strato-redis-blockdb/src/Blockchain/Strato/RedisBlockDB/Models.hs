@@ -250,18 +250,17 @@ instance RLPSerializable RedisValidator where
 
 data RedisBestBlock = RedisBestBlock
   { bestBlockHash :: Keccak256,
-    bestBlockNumber :: Integer, -- todo: BlockNumber
-    bestBlockTotalDifficulty :: Integer -- todo: TotalDifficulty
+    bestBlockNumber :: Integer -- todo: BlockNumber
   }
   deriving (Eq, Read, Show)
 
 instance RedisDBValuable RedisBestBlock where
   toValue = rlpSerialize . wrap
     where
-      wrap (RedisBestBlock sha num total) = RLPArray [rlpEncode sha, rlpEncode num, rlpEncode total]
+      wrap (RedisBestBlock sha num) = RLPArray [rlpEncode sha, rlpEncode num]
   fromValue = unwrap . rlpDeserialize
     where
-      unwrap (RLPArray [sha, num, total]) = RedisBestBlock (rlpDecode sha) (rlpDecode num) (rlpDecode total)
+      unwrap (RLPArray [sha, num]) = RedisBestBlock (rlpDecode sha) (rlpDecode num)
       unwrap _ = error "we are clearly incapable of humane exception handling"
 
 displayForNamespace :: BlockDBNamespace -> S8.ByteString -> String
