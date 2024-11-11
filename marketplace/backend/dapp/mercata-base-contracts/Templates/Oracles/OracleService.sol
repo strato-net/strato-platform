@@ -26,16 +26,24 @@ abstract contract OracleService is Utils {
         isActive = true;
     }
 
-    function _deactivate() internal {
+    modifier requireActive(string action) {
+        string err = "The oracle service must be active to "
+                   + action
+                   + ".";
+        require(isActive, err);
+        _;
+    }
+
+    function _deactivate() internal requireActive("deactivate") {
         isActive = false;
     }
 
-    function _submitPrice(decimal _price) internal {
+    function _submitPrice(decimal _price) internal  requireActive("deactivate") {
         consensusPriceTimestamp = block.timestamp;
     	consensusPrice = _price;
     }
 
-    function _getLatestPrice() internal view returns (decimal, uint) {
+    function _getLatestPrice() internal view  requireActive("deactivate") returns (decimal, uint) {
         return (consensusPrice, consensusPriceTimestamp);
     }
 }

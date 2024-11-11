@@ -1,7 +1,7 @@
 pragma es6;
 pragma strict;
 
-import <BASE_CODE_COLLECTION>;
+import <5761f9a2e0e5e17ceecd772146c95caf7127ea2e>;
 
 contract SilverOracleService is OracleService {
     constructor(
@@ -16,23 +16,15 @@ contract SilverOracleService is OracleService {
         _;
     }
 
-    modifier requireActive(string action) {
-        string err = "The oracle service must be active to "
-                   + action
-                   + ".";
-        require(isActive, err);
-        _;
-    }
-
-    function deactivate() public requireOwner("deactivate") requireActive("deactivate") {
+    function deactivate() public requireOwner("deactivate") {
         _deactivate();
     }
 
-    function submitPrice(decimal _price) public requireOwner("submit price") requireActive("submit price") {
+    function submitPrice(decimal _price) public requireOwner("submit price") {
         _submitPrice(_price);
     }
 
-    function getLatestPrice() public view requireActive("get latest price") returns (decimal, uint) {
+    function getLatestPrice() public view returns (decimal, uint) {
         return _getLatestPrice();
     }
 }
