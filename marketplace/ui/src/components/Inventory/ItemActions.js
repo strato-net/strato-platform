@@ -20,6 +20,8 @@ import ResellModal from "./ResellModal";
 import TransferModal from "./TransferModal";
 import RedeemModal from "./RedeemModal";
 import BridgeModal from "./BridgeModal";
+import StakeModal from "./StakeModal";
+
 
 const ItemActions = ({
   inventory,
@@ -45,6 +47,8 @@ const ItemActions = ({
     : inventory.saleQuantity;
   const [listModalOpen, setListModalOpen] = useState(false);
   const [unlistModalOpen, setUnlistModalOpen] = useState(false);
+  const [stakeType, setStakeType] = useState('Stake')
+  const [stakeModalOpen, setStakeModalOpen] = useState(false);
   const [resellModalOpen, setResellModalOpen] = useState(false);
   const [transferModalOpen, setTransferModalOpen] = useState(false);
   const [redeemModalOpen, setRedeemModalOpen] = useState(false);
@@ -117,6 +121,16 @@ const ItemActions = ({
   const showUnlistModal = () => {
     togglePopover(false);
     setUnlistModalOpen(true);
+  };
+
+  const showStakeModal = (type) => {
+    togglePopover(false);
+    setStakeModalOpen(true);
+    setStakeType(type);
+  };
+
+  const handleStakeModalClose = () => {
+    setStakeModalOpen(false);
   };
 
   const handleUnlistModalClose = () => {
@@ -237,6 +251,23 @@ const ItemActions = ({
             >
               <RetweetOutlined /> Bridge
             </Button>
+            <Button
+              type="link"
+              className="text-[#13188A] font-semibold"
+              onClick={()=>showStakeModal('Stake')}
+              // disabled={!inventory.price || !isActive()}
+            >
+              <StopOutlined /> Stake
+            </Button>
+
+            <Button
+              type="link"
+              className="text-[#13188A] font-semibold"
+              onClick={()=>showStakeModal('Unstake')}
+              // disabled={!inventory.price || !isActive()}
+            >
+              <StopOutlined /> Unstake
+            </Button>
           </div>
         }
       >
@@ -260,6 +291,19 @@ const ItemActions = ({
         <UnlistModal
           open={unlistModalOpen}
           handleCancel={handleUnlistModalClose}
+          limit={limit}
+          offset={offset}
+          inventory={inventory}
+          debouncedSearchTerm={debouncedSearchTerm}
+          saleAddress={inventory.saleAddress}
+          category={category}
+        />
+      )}
+        {stakeModalOpen && (
+        <StakeModal
+          open={stakeModalOpen}
+          type={stakeType} // Stake / Unstake handle the modal functionality based on this.
+          handleCancel={handleStakeModalClose}
           limit={limit}
           offset={offset}
           inventory={inventory}
