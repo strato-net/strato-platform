@@ -12,6 +12,7 @@ const TransactionsProvider = ({ children }) => {
     isTransactionLoading: false,
     userTransactions: [],
     globalTransactions: [],
+    count: 0
   };
 
   const [state, dispatch] = useReducer(reducer, initialState);

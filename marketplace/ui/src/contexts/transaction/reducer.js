@@ -22,7 +22,8 @@ const reducer = (state, action) => {
     case actionDescriptors.fetchUserTransactionSuccessful:
       return {
         ...state,
-        userTransactions: action.payload,
+        userTransactions: action.payload?.data,
+        count: action.payload?.count,
         isTransactionLoading: false,
       };
     case actionDescriptors.fetchUserTransactionFailed:

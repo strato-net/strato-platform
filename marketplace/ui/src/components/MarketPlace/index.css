@@ -1198,6 +1198,9 @@ img.ant-image-preview-img {
   margin-top: 140px;
 }
 
+.ant-table-pagination{
+  justify-content: center !important;
+}
 
 .custom-select-no-tick .ant-select-item-option-selected .ant-select-item-option-state {
   display: none !important;
