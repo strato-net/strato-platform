@@ -257,7 +257,7 @@ export const STRATS_CONVERSION = 100;
 
 export const navItems = [
   { label: <div id="Transactions">My Transactions</div>, key: '1' },
-  { label: <div id="Inventory">My Items</div>, key: '2' }
+  { label: <div id="Inventory">My Wallet</div>, key: '2' }
 ];
 
 const metaImg = SEO.IMAGE_META

@@ -175,8 +175,7 @@ const CreateInventoryModal = ({
 
     if (isDone) {
       if (page === 1)
-        await actions.fetchInventory(dispatch, 10, 0, debouncedSearchTerm, categoryName);
-      resetPage(1);
+        await actions.fetchInventory(dispatch, 10, 0, debouncedSearchTerm, categoryName && categoryName !== "All" ? categoryName : undefined);
       handleCancel();
     }
   };
