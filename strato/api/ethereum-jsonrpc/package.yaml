@@ -22,7 +22,6 @@ executables:
       - http-types
       - json-rpc-server
       - kafka-monad
-      - milena
       - mtl
       - random
       - strato-conf

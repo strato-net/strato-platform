@@ -240,6 +240,7 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
 
   contract.getInventories = async function (args, options = optionsNoChainIds) {
     const getOptions = { ...options, app: contractName };
+
     const inventories = await inventoryJs.getAll(rawAdmin, { ...args, ownerCommonName: userCert.commonName, sort: '-createdDate' }, getOptions);
     const inventoryCount = await inventoryJs.inventoryCount(rawAdmin, { ...args, ownerCommonName: userCert.commonName, sort: '-createdDate' }, getOptions);
     return { inventories: inventories, inventoryCount: inventoryCount }
@@ -254,8 +255,8 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
 
   contract.getInventoriesForUser = async function (args, options = optionsNoChainIds) {
     const getOptions = { ...options, app: contractName };
-    const { ownerCommonName, ...restArgs } = args;
-    const newArgs = { ...restArgs, ownerCommonName: ownerCommonName, notEqualsField: 'sale', notEqualsValue: constants.zeroAddress, userProfile: true }//'0000000000000000000000000000000000000000'
+    const newArgs = { ...args, ownerCommonName: userCert.commonName, notEqualsField: 'sale', notEqualsValue: constants.zeroAddress, userProfile: true }
+
     return marketplaceJs.getAll(rawAdmin, newArgs, getOptions);
   };
 
@@ -554,7 +555,7 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
 
   contract.getTopSellingProducts = async function (args = {}, options = optionsNoChainIds) {
     const getOptions = { ...options, app: contractName }
-    const newArgs = { ...args, notEqualsField: 'sale', notEqualsValue: constants.zeroAddress, ownerCommonName: constants.baUserNames }
+    const newArgs = { ...args, notEqualsField: 'sale', notEqualsValue: constants.zeroAddress, ownerCommonName: constants.baUserNames}
     return marketplaceJs.getTopSellingProducts(rawAdmin, newArgs, getOptions)
   }
 
@@ -585,8 +586,6 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
       }, options);
 
       // Fetch sales (12 months) for stats
-      console.log("Fetched origin yearly sales:", allAssetSales.length, "sales");
-
       let salesFilter = { order: "block_timestamp.asc" };
 
       // Sales Filter modification based on timeFilter
@@ -897,7 +896,7 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
 
   let assets = [];
       for (const sale of sales) {
-        const history = await saleJs.getSaleHistory(rawAdmin, { contract: sale.contract_name, transaction_hash: sale.transaction_hash, assetToBeSold: sale.assetToBeSold }, options);
+        const history = await saleJs.getSaleHistory(rawAdmin, { transaction_hash: sale.transaction_hash, assetToBeSold: sale.assetToBeSold }, options);
         const price = history['0'] ? history['0'].price : null;
 
         assets.push({
@@ -1002,7 +1001,7 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
           const sale = sales.find(sale => sale.address === saleAddress);
           if (!sale) return undefined;
 
-          const history = await saleJs.getAllSaleHistory(rawAdmin, {
+          const history = await saleJs.getSaleHistory(rawAdmin, {
             transaction_hash: order.transaction_hash,
             assetToBeSold: sale.assetToBeSold
           }, options);
@@ -1238,7 +1237,7 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
       await axios.post(new URL(createCustomerAddressRoute, serviceURL).href, { commonName: userCert.commonName, ...restArgs })
         .then(function (res) {
           if (res.status === 200) {
-            console.log(res.data);
+            // Success case
           } else {
             throw new rest.RestError(RestStatus.BAD_REQUEST, `Payment server call failed: ${res.statusText}`);
           }

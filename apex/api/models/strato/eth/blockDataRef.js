@@ -62,9 +62,6 @@ const BlockDataRef = db.sequelize.define('block_data_ref', {
   is_confirmed: {
     type: db.Sequelize.BOOLEAN
   },
-  total_difficulty: {
-    type: db.Sequelize.BIGINT
-  }
 }, { freezeTableName: true, timestamps: false });
 
 module.exports = BlockDataRef;

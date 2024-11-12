@@ -161,10 +161,9 @@ export const setSearchQueryOptions = (args = {}, _queryOptionsArray) => {
       }
     }
     if (key === 'category') {
-      const categoryQueries = value.map(category => 'contract_name.like.' + category);
       return {
         ...agg,
-        ['or']: `(${categoryQueries.join(',')})`
+        ['contract_name']: `ilike(any).{${value.join(',')}}`
       }
     }
     if (key === 'subcategory' || key === 'subCategory') {
@@ -240,7 +239,7 @@ export const setSearchQueryOptionsPrime = (args) => {
     }
 
     if (key === 'category' && Array.isArray(args[key])) {
-      const categories = args[key][0].split(',').map(category => '%-' + category + '%');
+      const categories = args[key][0].split(',').map(category => '%' + category + '%');
       result.push({ key, value: categories, predicate: 'or', subPredicate: 'like' })
     }
 
@@ -384,7 +383,7 @@ export const searchAllWithQueryArgs = async (contractName, args, options, user) 
     }
 
     if (key === 'category' && Array.isArray(args[key])) {
-      const categories = args[key][0].split(',').map(category => '%-' + category + '%');
+      const categories = args[key][0].split(',').map(category => '%' + category + '%');
       result.push({ key, value: categories, predicate: 'or', subPredicate: 'like' })
     }
 

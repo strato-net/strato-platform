@@ -24,8 +24,6 @@ const Endpoint = {
   SEND_PARALLEL: `${strato23Url}/transaction/parallel`,
   KEY: `${strato23Url}/key`,
   SEARCH: `${cirrusUrl}/:name`,
-  CHAIN: `${blocUrl}/chain`,
-  CHAINS: `${blocUrl}/chains`,
   COMPILE: `${blocUrl}/contracts/compile`,
   XABI: `${blocUrl}/contracts/xabi`,
   DEBUG_STATUS: `${debugUrl}/status`,
@@ -63,32 +61,8 @@ function constructQuerySearch(options:Options) {
     return "";
   }
 
-  const chainIds = options.chainIds;
-  if (
-    chainIds !== undefined &&
-    chainIds.length !== undefined &&
-    chainIds.length > 0
-  ) {
-    if (chainIds.length == 1) {
-      const queryObject = Object.assign(
-        { chainId: `eq.${chainIds[0]}` },
-        options.query
-      );
-      const query = `?${queryString.stringify(queryObject)}`;
-      return query;
-    } else {
-      const joinedChainIds = chainIds.join();
-      const queryObject = Object.assign(
-        { chainId: `in.${joinedChainIds}` },
-        options.query
-      );
-      const query = `?${queryString.stringify(queryObject)}`;
-      return query;
-    }
-  } else {
-    const query = `?${queryString.stringify(options.query)}`;
-    return query;
-  }
+  const query = `?${queryString.stringify(options.query)}`;
+  return query;
 }
 
 function constructQuery(options:Options) {
@@ -96,7 +70,7 @@ function constructQuery(options:Options) {
     return "";
   }
   const queryObject = Object.assign(
-    { chainid: options.chainIds },
+    {},
     !options.isAsync ? { resolve: true } : {},
     options.stateQuery,
     options.query
