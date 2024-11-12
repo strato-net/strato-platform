@@ -195,3 +195,10 @@ export const UserActivity = {
   prefix: '/userActivity',
   getAll: '/',
 }
+
+export const Governance = {
+  prefix: '/governance',
+  get: '/',
+  stake: '/stake',
+  unstake: '/unstake',
+}

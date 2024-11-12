@@ -41,6 +41,7 @@ import inventoryJs from "/dapp/products/inventory";
 import marketplaceJs from "/dapp/marketplace/marketplace.js";
 import paymentServiceJs from '/dapp/payments/paymentService';
 import redemptionServiceJs from '/dapp/redemptions/redemptionService';
+import governanceJs from '/dapp/governance/governance';
 
 import strats from "../strats/strats";
 
@@ -1310,6 +1311,22 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
     return res;
   }
 
+  //----------------------------- Governance START -------------------------------
+  contract.getGovernance = async function (options = defaultOptions) {
+    const res = await governanceJs.get(rawAdmin, options);
+    return res;
+  };
+
+  contract.stake = async function (args, options = defaultOptions) {
+    const res = await governanceJs.stake(rawAdmin, args, options);
+    return res;
+  };
+
+  contract.unstake = async function (args, options = defaultOptions) {
+    const res = await governanceJs.unstake(rawAdmin, args, options);
+    return res;
+  };
+  // ---------------------------- Governance END   -------------------------------
   return contract;
 };
 
