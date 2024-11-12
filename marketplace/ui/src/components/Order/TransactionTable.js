@@ -46,7 +46,8 @@ const TransactionTable = ({ user, download }) => {
   const pageSize =  urlDate ? 10 : 20;
   const [offset, setOffset] = useState(0);
   const [currentPage, setCurrentPage] = useState(1);
-  const [type, setType] = useState("");
+  const [type, setType] = useState(urlDate ? "" : undefined);
+  const [filterSelected, setFilterSelected] = useState(false)
   const [dateQuery, setDateQuery] = useState(urlDate || "");
   const [transactions, setTransactions] = useState(userTransactions)
   const [originAddress, setOriginAddress] = useState("");
@@ -87,7 +88,7 @@ const TransactionTable = ({ user, download }) => {
 
   useEffect(() => {
     // Update state based on URL params, but skip empty values
-    setType(urlType && urlType !== "all" ? urlType : "");
+    setType(urlType ? urlType : filterSelected ? "" : urlDate ? "" : undefined);
     setDateQuery(urlDate || "");
   }, [location.search]);
 
@@ -138,6 +139,7 @@ const TransactionTable = ({ user, download }) => {
     const currentType = type || ""; // Use the current type value or empty if not set
     navigate(`/transactions?type=${currentType}&date=${formattedDate}`);
     setDateQuery(formattedDate); // Update the date state
+    setType("")
   };
 
   const dateReturn = (date) => {
@@ -324,13 +326,14 @@ const TransactionTable = ({ user, download }) => {
     const queryParams = new URLSearchParams();
     if (val && val !== "all") {
       queryParams.set("type", val);
+      setFilterSelected(true)
     }
     if (currentDateQuery) {
       queryParams.set("date", currentDateQuery);
     }
 
     navigate(`/transactions?${queryParams.toString()}`);
-    setType(val === "all" ? "" : val); // Set empty type for "All"
+    setType(val === "" ? (filterSelected ? "" : urlDate ? "" : undefined) : val); // Set empty type for "All"
   };
 
   const metaImg = SEO.IMAGE_META;
@@ -361,7 +364,7 @@ const TransactionTable = ({ user, download }) => {
               <Col xs={24} xl={24}>
                 <Row className="w-full md:w-auto md:flex md:justify-between items-center mb-5 mt-4">
                   <Col xs={24} md={7} className="flex justify-center mt-2 md:mt-0">
-                    <Select className="block lg:block w-full md:w-4/5 rounded-md mx-auto" onChange={(val) => { handleFilter(val) }} placeholder="Select Type" value={type} defaultValue={type || ''}>
+                    <Select className="block lg:block w-full md:w-4/5 rounded-md mx-auto" onChange={(val) => { handleFilter(val) }} placeholder="Select Type" value={type} defaultValue={type}>
                       {TRANSACTION_FILTER.map(({ label, value }) =>
                         <Select.Option value={value}> {label} </Select.Option>
                       )}
