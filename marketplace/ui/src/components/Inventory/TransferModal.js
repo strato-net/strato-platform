@@ -70,9 +70,9 @@ const TransferModal = ({
       },
     ]);
     setTimeout(() => {
-      const scrollRow = document.querySelector('.scroll-row');
+      const scrollRow = document.querySelector(".scroll-row");
       if (scrollRow) {
-        scrollRow.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        scrollRow.scrollIntoView({ behavior: "smooth", block: "start" });
       }
     }, 0);
   };
@@ -88,9 +88,9 @@ const TransferModal = ({
       }));
     });
     setTimeout(() => {
-      const scrollRow = document.querySelector('.scroll-row');
+      const scrollRow = document.querySelector(".scroll-row");
       if (scrollRow) {
-        scrollRow.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        scrollRow.scrollIntoView({ behavior: "smooth", block: "start" });
       }
     }, 0);
   };
@@ -385,13 +385,13 @@ const TransferModal = ({
       <div className="head hidden md:block">
         <Table
           rowClassName={(record, index) =>
-            index === transfers.length - 1 ? 'scroll-row' : ''
+            index === transfers.length - 1 ? "scroll-row" : ""
           }
           columns={columns}
           dataSource={transfers}
           pagination={false}
           scroll={{
-            x: 'max-content',
+            x: "max-content",
             y: 300,
           }}
         />

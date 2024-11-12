@@ -240,6 +240,7 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
 
   contract.getInventories = async function (args, options = optionsNoChainIds) {
     const getOptions = { ...options, app: contractName };
+
     const inventories = await inventoryJs.getAll(rawAdmin, { ...args, ownerCommonName: userCert.commonName, sort: '-createdDate' }, getOptions);
     const inventoryCount = await inventoryJs.inventoryCount(rawAdmin, { ...args, ownerCommonName: userCert.commonName, sort: '-createdDate' }, getOptions);
     return { inventories: inventories, inventoryCount: inventoryCount }
@@ -254,8 +255,8 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
 
   contract.getInventoriesForUser = async function (args, options = optionsNoChainIds) {
     const getOptions = { ...options, app: contractName };
-    const { ownerCommonName, ...restArgs } = args;
-    const newArgs = { ...restArgs, ownerCommonName: ownerCommonName, notEqualsField: 'sale', notEqualsValue: constants.zeroAddress, userProfile: true }//'0000000000000000000000000000000000000000'
+    const newArgs = { ...args, ownerCommonName: userCert.commonName, notEqualsField: 'sale', notEqualsValue: constants.zeroAddress, userProfile: true }
+
     return marketplaceJs.getAll(rawAdmin, newArgs, getOptions);
   };
 
@@ -556,7 +557,7 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
 
   contract.getTopSellingProducts = async function (args = {}, options = optionsNoChainIds) {
     const getOptions = { ...options, app: contractName }
-    const newArgs = { ...args, notEqualsField: 'sale', notEqualsValue: constants.zeroAddress, ownerCommonName: constants.baUserNames }
+    const newArgs = { ...args, notEqualsField: 'sale', notEqualsValue: constants.zeroAddress, ownerCommonName: constants.baUserNames}
     return marketplaceJs.getTopSellingProducts(rawAdmin, newArgs, getOptions)
   }
 
@@ -1238,7 +1239,7 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
       await axios.post(new URL(createCustomerAddressRoute, serviceURL).href, { commonName: userCert.commonName, ...restArgs })
         .then(function (res) {
           if (res.status === 200) {
-            console.log(res.data);
+            // Success case
           } else {
             throw new rest.RestError(RestStatus.BAD_REQUEST, `Payment server call failed: ${res.statusText}`);
           }

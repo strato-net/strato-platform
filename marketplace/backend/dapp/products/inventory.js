@@ -426,7 +426,7 @@ async function get(user, args, options) {
 }
 
 async function getAll(admin, args = {}, defaultOptions) {
-    const { range, ownerCommonName, assetAddresses, status, isMarketplaceSearch, isTrendingSearch, userProfile, userProfileGtField, userProfileGtValue, queryOptions, ...restArgs } = args;
+    const { range, ownerCommonName, assetAddresses, status, isMarketplaceSearch, isTrendingSearch, userProfile, queryOptions, ...restArgs } = args;
     let isNullPriceRange = false; //TODO: find a better way to identify/handle this
     if (range !== undefined) {
         isNullPriceRange = range ? range[0].split(",")[1] == 0 : true;
@@ -600,7 +600,7 @@ async function getOwnershipHistory(user, args, options) {
 
 async function inventoryCount(admin, args = {}, defaultOptions) {
     const options = { ...defaultOptions, org: 'BlockApps', app: 'Mercata' }
-    const { range, userProfile, userProfileGtField, userProfileGtValue, ...newArgs } = args;
+    const { range, userProfile, ...newArgs } = args;
     const queryArgs = setSearchQueryOptionsPrime({
         ...newArgs,
         limit: undefined,

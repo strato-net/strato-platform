@@ -46,10 +46,13 @@ class InventoryController {
   static async getAll(req, res, next) {
     try {
       const { dapp, query } = req
+      const { limit, offset, ...restQuery } = query;
 
-      const inventories = await dapp.getInventories({ ...query })
-      const inventoriesWithImageUrl = inventories?.inventories
-      rest.response.status200(res, { inventoriesWithImageUrl: inventoriesWithImageUrl, count: inventories.inventoryCount })
+      const inventories = await dapp.getInventories({ ...restQuery })
+      const inventoriesWithImageUrl = inventories?.inventories;
+      const paginatedInventories = inventoriesWithImageUrl.slice(offset, parseInt(offset) + parseInt(limit));
+
+      rest.response.status200(res, { inventoriesWithImageUrl: paginatedInventories, count: inventories.inventoryCount })
 
       return next()
     } catch (e) {
@@ -60,17 +63,18 @@ class InventoryController {
   static async getAllUserInventories(req, res, next) {
     try {
       const { dapp, query } = req
-      const { gtField, gtValue, ...restQuery } = query;
+      const { limit, offset, ...restQuery } = query;
 
-      const inventories = await dapp.getInventoriesForUser({ userProfileGtField: gtField, userProfileGtValue: gtValue, ...restQuery });
+      const inventories = await dapp.getInventoriesForUser({ ...restQuery });
       const sortedInventories = inventories?.inventoryResults.sort((a, b) => {
         if (a.saleDate && b.saleDate) {
           return b.saleDate.localeCompare(a.saleDate);
         }
         return a.saleDate ? -1 : 1; // Move items without saleDate to the end
       });
+      const paginatedInventories = sortedInventories.slice(offset, parseInt(offset) + parseInt(limit));
 
-      rest.response.status200(res, { inventoriesWithImageUrl: sortedInventories, count: sortedInventories.length })
+      rest.response.status200(res, { inventoriesWithImageUrl: paginatedInventories, count: paginatedInventories.length })
 
 
       return next()
