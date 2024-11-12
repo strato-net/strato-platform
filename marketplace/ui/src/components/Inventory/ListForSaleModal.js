@@ -8,7 +8,7 @@ import { CheckCircleOutlined } from '@ant-design/icons';
 
 const { Option } = Select;
 
-const ListForSaleModal = ({ open, handleCancel, inventory, categoryName, limit, offset, user }) => {
+const ListForSaleModal = ({ open, handleCancel, inventory, categoryName, limit, offset, user, debouncedSearchTerm, category }) => {
     const [data, setData] = useState([inventory]);
     const [quantity, setQuantity] = useState(() => {
       const selectedQuantity = inventory.saleAddress
@@ -177,7 +177,7 @@ const ListForSaleModal = ({ open, handleCancel, inventory, categoryName, limit, 
         }
 
         if (isDone) {
-            await actions.fetchInventory(inventoryDispatch, limit, offset, "", categoryName);
+            await actions.fetchInventory(inventoryDispatch, limit, offset, debouncedSearchTerm, category && category !== "All" ? category : undefined);
             handleCancel();
         }
     };

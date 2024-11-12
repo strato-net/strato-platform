@@ -22,7 +22,7 @@ export default {
   ConfirmOrder: { label: "Confirm Order", url: "/confirmOrder" },
   Products: { label: "Product", url: "/products" },
   ProductDetail: { label: "Product Detail", url: "/products/:id" },
-  MyItems: { label: "Inventory", url: "/myitems" },
+  MyWallet: { label: "Inventory", url: "/mywallet" },
   InventoryDetail: { label: "Inventory Detail", url: "/inventories/:id/:name" },
   Items: { label: "Item", url: "/items" },
   Orders: { label: "Order", url: "/order/:type" },
