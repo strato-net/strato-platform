@@ -42,8 +42,8 @@ const TransactionTable = ({ user, download }) => {
   const urlDate = searchParams.get("date");
 
   const currentMonth = dayjs().startOf('month').unix();
-  const limit = urlDate ? '' : 5;
-  const pageSize =  urlDate ? 10 : 20;
+  const limit = 20;
+  const pageSize =  10;
   const [offset, setOffset] = useState(0);
   const [currentPage, setCurrentPage] = useState(1);
   const [type, setType] = useState(urlDate ? "" : undefined);
@@ -415,18 +415,17 @@ const TransactionTable = ({ user, download }) => {
           {isTransactionLoading ? <Spin className="mx-auto" />
             : <div className="flex flex-col mx-auto">
               <TransactionResponsive data={paginatedTransactions} user={user} />
-              {urlDate && <Pagination
+              <Pagination
                 className="mx-auto mt-5"
                 total={transactions.length}
                 current={currentPage}
                 pageSize={pageSize}
                 onChange={handlePageChange}
                 showSizeChanger={false}
-              />}
+              />
             </div>}
         </div>
-        <div className="hidden flex flex-col md:block mx:auto">
-          <Spin spinning={isTransactionLoading} delay={500} size="large">
+        <div className="hidden md:flex md:flex-col mx:auto">
             <DataTableComponent
               columns={column}
               data={paginatedTransactions}
@@ -434,15 +433,14 @@ const TransactionTable = ({ user, download }) => {
               pagination={false}
               scrollX="100%"
             />
-            <div className="flex justify-between">{urlDate && <Pagination
+            <div className="flex justify-between"> <Pagination
                 className="mx-auto w-88 mt-5"
                 total={transactions.length}
                 current={currentPage}
                 pageSize={pageSize}
                 onChange={handlePageChange}
                 showSizeChanger={false}
-              />}</div>
-          </Spin>
+              /></div>
         </div>
       </Col>
     </Row>
