@@ -333,8 +333,6 @@ const TransactionTable = ({ user, download }) => {
     navigate(`/transactions?${queryParams.toString()}`);
     setType(val === "all" ? "" : val); // Set empty type for "All"
   };
-  
-  
 
   const metaImg = SEO.IMAGE_META;
 

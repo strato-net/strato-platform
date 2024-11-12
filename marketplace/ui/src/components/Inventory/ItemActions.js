@@ -22,7 +22,6 @@ import RedeemModal from "./RedeemModal";
 import BridgeModal from "./BridgeModal";
 import StakeModal from "./StakeModal";
 
-
 const ItemActions = ({
   inventory,
   limit,
@@ -47,7 +46,7 @@ const ItemActions = ({
     : inventory.saleQuantity;
   const [listModalOpen, setListModalOpen] = useState(false);
   const [unlistModalOpen, setUnlistModalOpen] = useState(false);
-  const [stakeType, setStakeType] = useState('Stake')
+  const [stakeType, setStakeType] = useState("Stake");
   const [stakeModalOpen, setStakeModalOpen] = useState(false);
   const [resellModalOpen, setResellModalOpen] = useState(false);
   const [transferModalOpen, setTransferModalOpen] = useState(false);
@@ -214,6 +213,24 @@ const ItemActions = ({
       >
         <SendOutlined /> Redeem
       </Button>
+
+      {!inventory.isStake && <Button
+        type="link"
+        className="text-[#13188A] font-semibold"
+        onClick={() => showStakeModal("Stake")}
+        // disabled={!inventory.price || !isActive()}
+      >
+        <StopOutlined /> Stake
+      </Button>}
+
+     {inventory.isStake && <Button
+        type="link"
+        className="text-[#13188A] font-semibold"
+        onClick={() => showStakeModal("Unstake")}
+        // disabled={!inventory.price || !isActive()}
+      >
+        <StopOutlined /> Unstake
+      </Button>}
       <Popover
         placement="topRight"
         open={popoverVisible[inventory.address] || false}
@@ -251,23 +268,6 @@ const ItemActions = ({
             >
               <RetweetOutlined /> Bridge
             </Button>
-            <Button
-              type="link"
-              className="text-[#13188A] font-semibold"
-              onClick={()=>showStakeModal('Stake')}
-              // disabled={!inventory.price || !isActive()}
-            >
-              <StopOutlined /> Stake
-            </Button>
-
-            <Button
-              type="link"
-              className="text-[#13188A] font-semibold"
-              onClick={()=>showStakeModal('Unstake')}
-              // disabled={!inventory.price || !isActive()}
-            >
-              <StopOutlined /> Unstake
-            </Button>
           </div>
         }
       >
@@ -299,7 +299,7 @@ const ItemActions = ({
           category={category}
         />
       )}
-        {stakeModalOpen && (
+      {stakeModalOpen && (
         <StakeModal
           open={stakeModalOpen}
           type={stakeType} // Stake / Unstake handle the modal functionality based on this.
