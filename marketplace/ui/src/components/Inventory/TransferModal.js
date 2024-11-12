@@ -232,7 +232,7 @@ const TransferModal = ({
       title: "Quantity Available",
       dataIndex: "quantity",
       align: "center",
-      width: 150,
+      width: 175,
       render: (_, record, index) => {
         // Calculate the quantity available for each row
         const availableQuantity = quantityIsDecimal
@@ -270,7 +270,7 @@ const TransferModal = ({
       ),
     },
     {
-      title: "Unit Price ($)",
+      title: <span className="whitespace-nowrap">Unit Price ($)</span>,
       align: "center",
       render: (record, _, index) => (
         <InputNumber
