@@ -11,7 +11,7 @@ import { SearchOutlined } from '@ant-design/icons';
 import { handlePriceInput, handleQuantityInput } from "../../helpers/utils";
 import { OLD_SADDOG_ORIGIN_ADDRESS } from "../../helpers/constants";
 
-const TransferModal = ({ open, handleCancel, inventory, categoryName = "", limit = 0, offset = 0 }) => {
+const TransferModal = ({ open, handleCancel, inventory, category, debouncedSearchTerm, limit = 0, offset = 0 }) => {
     const [data, setData] = useState(inventory);
     const [quantity, setQuantity] = useState(1);
     const [price, setPrice] = useState(0);
@@ -190,8 +190,8 @@ const TransferModal = ({ open, handleCancel, inventory, categoryName = "", limit
             };
             isDone = await actions.transferInventory(inventoryDispatch, body);
             if (isDone) {
-                await actions.fetchInventory(inventoryDispatch, limit, offset, "", categoryName);
-                await actions.fetchInventoryForUser(inventoryDispatch, user.commonName);
+                await actions.fetchInventory(inventoryDispatch, limit, offset, debouncedSearchTerm, category && category !== "All" ? category : undefined);
+                await actions.fetchInventoryForUser(inventoryDispatch, limit, offset, debouncedSearchTerm, category && category !== "All" ? category : undefined);
                 await marketplaceActions.fetchStratsBalance(marketplaceDispatch);
             }
 

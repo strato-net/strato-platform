@@ -429,11 +429,11 @@ const ProductDetails = ({ user, users }) => {
               {
                 isCalledFromInventory ?
                   <Breadcrumb.Item href="" onClick={e => e.preventDefault()}>
-                    <ClickableCell href={routes.MyItems.url}>
+                    <ClickableCell href={routes.MyWallet.url}>
                       <p
                         className="text-[#13188A]  text-sm font-semibold "
                       >
-                        My Items
+                        My Wallet
                       </p>
                     </ClickableCell>
                   </Breadcrumb.Item> : null
