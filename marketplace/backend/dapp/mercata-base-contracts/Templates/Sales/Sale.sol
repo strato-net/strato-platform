@@ -13,7 +13,7 @@ abstract contract Sale is Utils {
         string creator;
     }
 
-    Asset[] public assetsToBeSold;
+    Asset public assetToBeSold;
     decimal public price;
     uint public quantity;
     PaymentService[] public paymentServices;
@@ -22,27 +22,34 @@ abstract contract Sale is Utils {
     uint totalLockedQuantity;
     bool isOpen;
 
+    address public governance;
+
     constructor(
         address _assetToBeSold,
         decimal _price,
         uint _quantity,
         PaymentService[] _paymentServices
     ) {    
+        assetToBeSold = Asset(_assetToBeSold);
         require(_quantity > 0, "Quantity must be greater than 0");
-        uint totalQuantityOwned = 0;
-        for (uint i = 0; i < _assetsToBeSold.length; i++) {
-            totalQuantityOwned += _assetsToBeSold[i].quantity();
-        }
-        require(totalQuantityOwned >= _quantity, "Cannot sell more units than what are owned.");
-        assetsToBeSold = _assetsToBeSold;
-        quantity = _quantity;
+        require(assetToBeSold.quantity() >= _quantity, "Cannot sell more units than what are owned.");
         price = _price;
+        quantity = _quantity;
         totalLockedQuantity = 0;
         isOpen = true;
         _addPaymentServices(_paymentServices);
-        for (uint i = 0; i < assetsToBeSold.length; i++) {
-            assetsToBeSold[i].attachSale();
-        }
+        assetToBeSold.attachSale();
+    }
+
+    modifier requireSeller(string action) {
+        string sellersCommonName = assetToBeSold.ownerCommonName();
+        string err = "Only "
+                   + sellersCommonName
+                   + " can perform "
+                   + action
+                   + ".";
+        string commonName = getCommonName(msg.sender);
+        require(commonName == sellersCommonName, err);
     }
 
     modifier requirePaymentService(string action) {
@@ -51,7 +58,7 @@ abstract contract Sale is Utils {
     }
 
     modifier requireSellerOrPaymentService(string action) {
-        string sellersCommonName = assetsToBeSold[0].ownerCommonName();
+        string sellersCommonName = assetToBeSold.ownerCommonName();
         string commonName = getCommonName(msg.sender);
         bool isAuthorized = commonName == sellersCommonName
                          || isPaymentService(msg.sender);
@@ -59,9 +66,15 @@ abstract contract Sale is Utils {
         _;
     }
 
-    function isPaymentService(address _paymentService) public returns (bool) {
-        string _serviceName = _paymentService.call("serviceName");
-        return paymentServicesMap[_serviceName][_paymentService.creator] != 0;
+    function getLock (
+        string _orderHash,
+        address _purchaser
+    ) internal returns (string) {
+        return keccak256(
+            string(this),
+            _orderHash,
+            string(_purchaser)
+        );
     }
 
     function _addPaymentServices(PaymentService[] _paymentServices) internal {
@@ -81,9 +94,16 @@ abstract contract Sale is Utils {
         paymentServices = [];
     }
 
-    function completeSale(string memory orderHash, address purchaser) public virtual returns (uint);
+    function isPaymentService(address _paymentService) public returns (bool) {
+        string _serviceName = _paymentService.call("serviceName");
+        return paymentServicesMap[_serviceName][_paymentService.creator] != 0;
+    }
 
-    function automaticTransfer(address newOwner, decimal price, uint quantity, uint transferNumber) public virtual returns (uint);
+    function completeSale( string orderHash, address purchaser ) public virtual requirePaymentService("complete sale") returns (uint);
+
+    function automaticTransfer(address _newOwner, decimal _price, uint _quantity, uint _transferNumber) public virtual returns (uint);
+
+    function closeSale() external virtual returns (uint);
 
     function closeSaleIfEmpty() internal {
         if (quantity == 0 && totalLockedQuantity == 0) {
@@ -92,24 +112,18 @@ abstract contract Sale is Utils {
         }
     }
 
-    function close() internal {
-        for (uint i = 0; i < assetsToBeSold.length; i++) {
-            try {
-                assetsToBeSold[i].closeSale();
-            } catch {
-            }
-        }
+    function _closeSale() internal returns (uint) {
+        close();
+        isOpen = false;
+        return RestStatus.OK;
     }
 
-    function getLock (
-        string _orderHash,
-        address _purchaser
-    ) internal returns (string) {
-        return keccak256(
-            string(this),
-            _orderHash,
-            string(_purchaser)
-        );
+    function close() internal {
+        try {
+            assetToBeSold.closeSale();
+        } catch {
+
+        }
     }
 
     function lockQuantity(
@@ -147,20 +161,27 @@ abstract contract Sale is Utils {
         quantity += quantityToReturn;
     }
 
-    function update(
+    function _cancelOrder(
+        string orderHash,
+        address purchaser
+    ) internal returns (uint) {
+        unlockQuantity(orderHash, purchaser);
+        return RestStatus.OK;
+    }
+
+    function _update(
         uint _quantity,
         decimal _price,
         PaymentService[] _paymentServices,
         uint _scheme
-    ) returns (uint) {
+    ) internal returns (uint) {
 
       if (_scheme == 0) {
         return RestStatus.OK;
       }
 
       if ((_scheme & (1 << 0)) == (1 << 0)) {
-        uint totalQuantity = getTotalAssetQuantity();
-        require(_quantity + totalLockedQuantity <= totalQuantity, "Cannot sell more units than owned");
+        require(_quantity + totalLockedQuantity <= assetToBeSold.quantity(), "Cannot sell more units than owned");
         quantity = _quantity;
       }
       if ((_scheme & (1 << 1)) == (1 << 1)) {
@@ -171,13 +192,5 @@ abstract contract Sale is Utils {
         _addPaymentServices(_paymentServices);
       }
       return RestStatus.OK;
-    }
-
-    function getTotalAssetQuantity() internal returns (uint) {
-        uint total = 0;
-        for (uint i = 0; i < assetsToBeSold.length; i++) {
-            total += assetsToBeSold[i].quantity();
-        }
-        return total;
     }
 }

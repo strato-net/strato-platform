@@ -31,16 +31,18 @@ contract StratPaymentService is PaymentService {
 
     function unStake(
         address[] _stratsAssetAddresses,
-        address _escrowAddress,
+        address _escrowAddress
     ) requireActive("unstake") external returns (uint) {
         require(_stratsAssetAddresses.length > 0, "Pass at least one STRATs token address");
         Sale escrow = Sale(_escrowAddress);
-        address borrower = escrow.borrower();
         address governance = escrow.governance();
-        uint quantity = escrow.quantity;
+        uint quantity = escrow.quantity();
 
         decimal gross = escrow.price() * decimal(quantity);
         uint stratAmountNet = uint(gross * stratsPerDollar * 100);
+        uint stratQuantity = 0;
+        uint transferNumber = 0;
+        uint transferAmount = 0;
 
         for (uint j = 0; j < _stratsAssetAddresses.length; j++) {
             STRATSTokens stratAsset = STRATSTokens(_stratsAssetAddresses[j]);
@@ -48,7 +50,7 @@ contract StratPaymentService is PaymentService {
             require(stratAsset.ownerCommonName() == getCommonName(msg.sender), "Purchaser doesn't own STRATS");
 
             stratQuantity = stratAsset.quantity();
-            transferNumber = (uint(_escrowAddress, 16) + j) % 1000000;
+            transferNumber = (uint(string(_escrowAddress), 16) + j + block.timestamp) % 1000000;
 
             transferAmount = stratQuantity >= stratAmountNet ? stratAmountNet : stratQuantity;
             stratAsset.purchaseTransfer(governance, transferAmount, transferNumber, 0.0001);
@@ -61,7 +63,7 @@ contract StratPaymentService is PaymentService {
         require(stratAmountNet == 0, "Your STRATS balance is not high enough to cover the purchase.");
 
         // Transfer assets
-        escrow.unstake(borrower);
+        escrow.closeSale();
     }
 
     function _checkoutInitialized (
