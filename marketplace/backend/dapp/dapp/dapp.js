@@ -240,9 +240,10 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
 
   contract.getInventories = async function (args, options = optionsNoChainIds) {
     const getOptions = { ...options, app: contractName };
+    const config = {assetAddresses: ['e71870c2716faf0600ca842468d627ef3b9de760', '13d7f78f951adfd2369ef40b339165a477cc3a8a']}
 
-    const inventories = await inventoryJs.getAll(rawAdmin, { ...args, ownerCommonName: userCert.commonName, sort: '-createdDate' }, getOptions);
-    const inventoryCount = await inventoryJs.inventoryCount(rawAdmin, { ...args, ownerCommonName: userCert.commonName, sort: '-createdDate' }, getOptions);
+    const inventories = await inventoryJs.getAll(rawAdmin, { ...args, ...config, ownerCommonName: userCert.commonName, sort: '-createdDate' }, getOptions);
+    const inventoryCount = await inventoryJs.inventoryCount(rawAdmin, { ...args, ...config, ownerCommonName: userCert.commonName, sort: '-createdDate' }, getOptions);
     return { inventories: inventories, inventoryCount: inventoryCount }
   };
 
