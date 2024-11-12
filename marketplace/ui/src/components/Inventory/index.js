@@ -107,15 +107,13 @@ const Inventory = ({ user }) => {
     const notOnboardedNames = new Set(notOnboarded.map((n) => n.serviceName));
 
     // Sort paymentServices array so that not onboarded services come first
-    const sortedServices = [...paymentServices]
-      .sort((a, b) => {
-        return isNotOnboarded(a) - isNotOnboarded(b);
-      })
-      .map((service) => ({
-        ...service,
-        isNotOnboarded: notOnboardedNames.has(service.serviceName),
-      }));
-
+    const sortedServices = [...paymentServices].sort((a, b) => {
+      return isNotOnboarded(a) - isNotOnboarded(b);
+    }).map(service => ({
+      ...service,
+      isNotOnboarded: notOnboardedNames.has(service.serviceName),
+      serviceName: service?.serviceName === 'STRATS' ? 'STRAT' : service?.serviceName
+    }));
     setSortedPaymentServices(sortedServices);
   }, [paymentServices, notOnboarded]);
 

@@ -191,7 +191,7 @@ const HeaderComponent = ({ user, loginUrl, showMenu, handleSubMenu, handleMenuTa
         <div>
           {user &&
             <p className="text-xs mt-1">
-              STRATS: {stratsBalance}
+              STRATs: {stratsBalance}
             </p>
           }
         </div>
@@ -206,7 +206,7 @@ const HeaderComponent = ({ user, loginUrl, showMenu, handleSubMenu, handleMenuTa
             <div>
               {user && originAddress &&
                 <p className="text-xs mt-1">
-                  Buy STRATS
+                  Buy STRATs
                 </p>
               }
             </div>

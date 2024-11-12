@@ -105,7 +105,7 @@ const ListForSaleModal = ({ open, handleCancel, inventory, categoryName, limit, 
         if (stratsIndex !== -1 && !selectedPaymentServiceIndices.includes(stratsIndex)) {
             selectedPaymentServiceIndices.push(stratsIndex);
         }
-
+        
         setPaymentTypes(selectedPaymentServiceIndices);
 
     }, [paymentServices, notOnboarded, inventory.paymentServices]);
@@ -127,7 +127,7 @@ const ListForSaleModal = ({ open, handleCancel, inventory, categoryName, limit, 
                 onClose={onClose}
                 className="flex items-center mr-1"
             >
-                {service.serviceName}&nbsp;
+                {service.serviceName === 'STRATS' ? 'STRAT' : service.serviceName}&nbsp;
                 {renderImg(service)}
             </Tag>
         ) : '';
@@ -210,7 +210,7 @@ const ListForSaleModal = ({ open, handleCancel, inventory, categoryName, limit, 
                                 >
                                     <div className="flex items-center justify-between">
                                         <div className="flex items-center">
-                                            {e.serviceName}&nbsp;
+                                        {e.serviceName === 'STRATS' ? 'STRAT' : e.serviceName}&nbsp;
                                             {renderImg(e)}
                                         </div>
                                         {paymentTypes.includes(index) && (
@@ -305,7 +305,7 @@ const ListForSaleModal = ({ open, handleCancel, inventory, categoryName, limit, 
                         >
                             <div className="flex items-center justify-between">
                                 <div className="flex items-center">
-                                    {e.serviceName}&nbsp;
+                                {e.serviceName === 'STRATS' ? 'STRAT' : e.serviceName}&nbsp;
                                     {renderImg(e)}
                                 </div>
                                 
