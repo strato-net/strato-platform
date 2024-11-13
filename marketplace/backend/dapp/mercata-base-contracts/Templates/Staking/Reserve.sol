@@ -35,7 +35,7 @@ abstract contract Reserve is Utils {
         decimal stratsLoanAmount = (decimal(assetAmount) * _assetPrice * decimal(loanToValueRatio)) / 100;
         uint cataReward = calculateCATAReward(assetAmount);
 
-        // Create the Escrow contract but do not attach assets or transfer STRATS
+        // Create the Escrow contract but and attach asset
         Escrow escrow = new Escrow(msg.sender, stratsLoanAmount, cataReward, address(this), address(stratsToken), _assetToBeSold, _price, _quantity, [stratPaymentService]);
 
         stakeAsset(address(escrow));
