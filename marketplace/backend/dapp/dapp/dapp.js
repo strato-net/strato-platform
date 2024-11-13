@@ -1330,6 +1330,11 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
     return res;
   };
 
+  contract.calculate = async function (args, options = defaultOptions) {
+    const res = await governanceJs.calculate(rawAdmin, args, options);
+    return res;
+  };
+
   contract.stake = async function (args, options = defaultOptions) {
     const res = await governanceJs.stake(rawAdmin, args, options);
     return res;

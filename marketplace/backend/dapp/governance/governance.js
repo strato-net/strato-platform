@@ -132,6 +132,29 @@ async function getState(user, contract, options) {
 }
 
 /**
+ * calculate
+ */
+async function calculate(user, args, options) {
+  const callArgs = {
+    contract: args.contract,
+    method: "calculate",
+    args: util.usc({ ...args }),
+  };
+
+  const reponse = await rest.call(user, callArgs, options);
+
+  if (parseInt(reponse, 10) !== RestStatus.OK) {
+    throw new rest.RestError(
+      reponse,
+      "Failed to calculate stake preview.",
+      { callArgs }
+    );
+  }
+
+  return reponse;
+}
+
+/**
  * stake
  */
 async function stake(user, args, options) {
@@ -146,7 +169,7 @@ async function stake(user, args, options) {
   if (parseInt(reponse, 10) !== RestStatus.OK) {
     throw new rest.RestError(
       reponse,
-      "You cannot resell the item because it has already been sold by the original owner.",
+      "Failed to stake.",
       { callArgs }
     );
   }
@@ -169,7 +192,7 @@ async function unstake(user, args, options) {
   if (parseInt(reponse, 10) !== RestStatus.OK) {
     throw new rest.RestError(
       reponse,
-      "You cannot resell the item because it has already been sold by the original owner.",
+      "Failed to unstake.",
       { callArgs }
     );
   }
@@ -184,4 +207,7 @@ export default {
   marshalIn,
   marshalOut,
   getHistory,
+  calculate,
+  stake,
+  unstake,
 };
