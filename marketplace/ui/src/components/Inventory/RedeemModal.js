@@ -30,6 +30,10 @@ const RedeemModal = ({ open, handleCancel, inventory, category, debouncedSearchT
     const { userAddresses, isLoadingUserAddresses } = useMarketplaceState();
     const { TextArea } = Input;
 
+    // Determine if `isStrats` is true based on inventory data
+    const isStrats = inventory.data.quantityIsDecimal && inventory.data.quantityIsDecimal === "True";
+    const displayQuantity = isStrats ? parseFloat((inventory.quantity / 100).toFixed(2)) : inventory.quantity;
+
     const closeAddressModel = () => {
         setshowModal(false);
     }
@@ -43,7 +47,7 @@ const RedeemModal = ({ open, handleCancel, inventory, category, debouncedSearchT
     }, [marketplaceDispatch]);
 
     useEffect(() => {
-        if (quantity > inventory.quantity || quantity <= 0) {
+        if (quantity > displayQuantity || quantity <= 0) {
             setCanRedeem(false);
         }
         else {
@@ -55,7 +59,8 @@ const RedeemModal = ({ open, handleCancel, inventory, category, debouncedSearchT
         {
             title: "Quantity Available",
             dataIndex: "quantity",
-            align: "center"
+            align: "center",
+            render: () => <div>{displayQuantity}</div>
         },
         {
             title: "Set Quantity",
@@ -65,7 +70,7 @@ const RedeemModal = ({ open, handleCancel, inventory, category, debouncedSearchT
                     value={quantity}
                     controls={false}
                     min={1}
-                    max={inventory.quantity}
+                    max={displayQuantity}
                     onChange={(value) => setQuantity(value)}
                     precision={0}
                 />
@@ -86,7 +91,7 @@ const RedeemModal = ({ open, handleCancel, inventory, category, debouncedSearchT
             redemptionService: inventory.data.redemptionService,
             assetName: inventory.name,
             status: REDEMPTION_STATUS.PENDING,
-            quantity: quantity,
+            quantity: isStrats ? parseFloat(quantity * 100) : quantity,
             shippingAddressId: userAddresses[selectedAddress].address_id,
             ownerCommonName: user.commonName,
             issuerCommonName: inventory.creator,
@@ -94,7 +99,7 @@ const RedeemModal = ({ open, handleCancel, inventory, category, debouncedSearchT
             userAddress: user.userAddress
         };
 
-        if (quantity > 0 && quantity <= inventory.quantity) {
+        if (quantity > 0 && quantity <= displayQuantity) {
             let isDone = await redemptionActions.requestRedemption(redemptionDispatch, body);
             if (isDone) {
                 await actions.fetchInventory(inventoryDispatch, limit, offset, debouncedSearchTerm, category && category !== "All" ? category : undefined);
@@ -176,7 +181,7 @@ const RedeemModal = ({ open, handleCancel, inventory, category, debouncedSearchT
                     <div>
                         <InputNumber
                             className="w-full h-9"
-                            value={data[0].quantity}
+                            value={displayQuantity}
                             min={1}
                             disabled
                         />
@@ -190,7 +195,7 @@ const RedeemModal = ({ open, handleCancel, inventory, category, debouncedSearchT
                             value={quantity}
                             controls={false}
                             min={1}
-                            max={inventory.quantity}
+                            max={displayQuantity}
                             onChange={(value) => setQuantity(value)}
                             precision={0}
                         />

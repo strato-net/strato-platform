@@ -80,7 +80,8 @@ export const Redemption = {
 
 export const Transaction = {
   prefix: '/transaction',
-  get: '/',
+  getUser: '/user',
+  getGlobal: '/global',
 }
 
 export const Item = {

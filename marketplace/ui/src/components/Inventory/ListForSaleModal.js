@@ -324,7 +324,9 @@ const ListForSaleModal = ({ open, handleCancel, inventory, categoryName, limit, 
                         value={quantity}
                         controls={false}
                         min={1}
-                        max={inventory.quantity}
+                        max={inventory.data.quantityIsDecimal &&
+                            inventory.data.quantityIsDecimal === "True"
+                            ? parseFloat(inventory.quantity / 100).toFixed(2) : inventory.quantity}
                         onChange={(value) => setQuantity(value)}
                         precision={0}
                     />

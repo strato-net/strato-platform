@@ -120,6 +120,59 @@ class RedemptionsController {
         }
     }
 
+    static async getAllRedemptionRequests(req, res, next) {
+        try {
+
+            let orderByClause = '';
+            const {order, limit, offset } = req.query;
+
+            if (order === 'ASC' || order === 'DESC') {
+                orderByClause = `ORDER BY createdDate ${order} LIMIT ${limit} OFFSET ${offset}`;
+            }
+
+            const query = `SELECT * FROM redemptions ${orderByClause}`;
+            const countQuery = `SELECT COUNT(*) AS total_count FROM redemptions`
+            const result = await client.query(query);
+            const count = await client.query(countQuery);
+
+            // fix casing in columns
+            const formattedRows = result.rows.map(row => {
+                const date = new Date(row["createddate"]);
+                const formattedDate = date.toLocaleDateString('en-US', {
+                    month: '2-digit',
+                    day: '2-digit',
+                    year: 'numeric'
+                });
+
+                const newRow = {
+                    ...row,
+                    ownerComments: row["ownercomments"],
+                    issuerComments: row["issuercomments"],
+                    ownerCommonName: row["ownercommonname"],
+                    issuerCommonName: row["issuercommonname"],
+                    assetAddresses: row["assetaddresses"],
+                    assetName: row["assetname"],
+                    shippingAddressId: row["shippingaddressid"],
+                    redemptionService: REDEMPTION_CONTRACT_ADDRESS,
+                    createdDate: formattedDate
+                }
+                const { ownercomments, issuercomments, ownercommonname, issuercommonname, assetaddresses, assetname, shippingaddressid, createddate, ...rest } = newRow;
+                return rest;
+            });
+
+            res.status(200).json({
+                message: 'success',
+                data: formattedRows || [],
+                count: count.rows[0].total_count
+            });
+
+            return next();
+        } catch (error) {
+            console.error('DB Error:', error.message);
+            next(error);
+        }
+    }
+
     static async getRedemption(req, res, next) {
         try {
             if (!req.params.id) {

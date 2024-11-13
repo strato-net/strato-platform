@@ -1,5 +1,7 @@
 import dayjs from "dayjs";
 import { US_DATE_FORMAT } from "./constants";
+import relativeTime from "dayjs/plugin/relativeTime";
+dayjs.extend(relativeTime);
 
 export function getStringDate(time, format) {
   const timestamp = Number(time);
@@ -8,6 +10,15 @@ export function getStringDate(time, format) {
   }
   const adjustedTime = time < 1000000000000 ? time * 1000 : time;
   return dayjs(Number(adjustedTime)).format(format);
+}
+
+export function getAgoTime(time, format) {
+  const timestamp = Number(time);
+  if (Number.isNaN(timestamp)) {
+    return "";
+  }
+  const adjustedTime = time < 1000000000000 ? time * 1000 : time;
+  return dayjs(Number(adjustedTime)).fromNow();
 }
 
 export function arrayToStr(arr) {

@@ -32,18 +32,19 @@ const reducer = (state, action) => {
         error: action.error,
         isTransactionLoading: false,
       };
-      case actionDescriptors.fetchGlobalTransaction:
+    case actionDescriptors.fetchGlobalTransaction:
         return {
           ...state,
           isTransactionLoading: true,
         };
-      case actionDescriptors.fetchGlobalTransactionSuccessful:
+    case actionDescriptors.fetchGlobalTransactionSuccessful:
         return {
           ...state,
-          globalTransaction: action.payload,
+          globalTransactions: action.payload?.data,
+          count: action.payload?.count,
           isTransactionLoading: false,
         };
-      case actionDescriptors.fetchGlobalTransactionFailed:
+    case actionDescriptors.fetchGlobalTransactionFailed:
         return {
           ...state,
           error: action.error,
