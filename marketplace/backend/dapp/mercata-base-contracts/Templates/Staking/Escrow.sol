@@ -36,15 +36,11 @@ contract Escrow is Sale {
         reserve = _reserve;
     }
 
-    function getLoanAmount() public returns (uint) {
-        return stratsLoanAmount;
-    }
-
     function attachEscrowToAsset(address asset) public onlyReserve {
         // Attach the Escrow contract to the specified asset
         Asset(asset).attachSale();
     }
-    
+
     function closeSale() external override requirePaymentService("complete sale") returns (uint) {
         _closeSale();
     }
