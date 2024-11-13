@@ -3,7 +3,6 @@ pragma strict;
 
 import <BASE_CODE_COLLECTION>;
 import "../../../items/contracts/STRATS.sol";
-import "../Staking/Escrow.sol";
 
 contract StratPaymentService is PaymentService {
     address public stratAddress;
@@ -35,7 +34,7 @@ contract StratPaymentService is PaymentService {
         address _escrowAddress
     ) requireActive("unstake") external returns (uint) {
         require(_stratsAssetAddresses.length > 0, "Pass at least one STRATs token address");
-        Escrow escrow = Escrow(_escrowAddress);
+        Sale escrow = Sale(_escrowAddress);
         uint stratAmountNet = uint(escrow.stratsLoanAmount() * stratsPerDollar * 100);
         uint stratQuantity = 0;
         uint transferNumber = 0;
@@ -60,7 +59,7 @@ contract StratPaymentService is PaymentService {
         require(stratAmountNet == 0, "Your STRATS balance is not high enough to cover the purchase.");
 
         // Transfer assets
-        Escrow.closeSale();
+        escrow.closeSale();
     }
 
     function _checkoutInitialized (
