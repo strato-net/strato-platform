@@ -1,4 +1,3 @@
-
 pragma es6;
 pragma strict;
 
@@ -20,9 +19,8 @@ abstract contract Reserve is Utils {
 
     event StakeCreated(address indexed user, address escrow, uint assetAmount, decimal stratsLoan, uint cataReward);
 
-    constructor(address _assetOracle, address _stratsToken, address _cataToken, address _owner) {
+    constructor(address _assetOracle, address _cataToken, address _owner) {
         oracle = OracleService(_assetOracle);
-        stratsToken = Asset(_stratsToken);
         cataToken = _cataToken;
         owner = _owner;
     }
@@ -77,8 +75,13 @@ abstract contract Reserve is Utils {
 
         return (stratsLoanAmount, cataReward);
     }
+    
+    function getStratsToken() public view returns (Asset) {
+        return stratsToken;
+    }
 
-    // function sendCataRewards(){
-
-    // }
+    function setStratsToken(address _newStratsToken) public {
+        require(msg.sender == owner, "Only owner can update STRATS token");
+        stratsToken = Asset(_newStratsToken);
+    }
 }

@@ -6,9 +6,5 @@ import <BASE_CODE_COLLECTION>;
 contract SimpleReserve is Reserve{
 
     constructor(address _assetOracle, address _stratsToken, address _cataToken, address _owner) Reserve (_assetOracle, _stratsToken, _cataToken, _owner){
-        oracle = OracleService(_assetOracle);
-        stratsToken = STRATSTokens(_stratsToken);
-        cataToken = _cataToken;
-        owner = _owner;
     }
 }
