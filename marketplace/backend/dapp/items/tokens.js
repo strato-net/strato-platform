@@ -200,10 +200,7 @@ async function transferOwnership(user, contract, options, newOwner) {
         args: util.usc({ addr: newOwner }), // could be transferOwnershipDate
     };
     const transferStatus = await rest.call(user, callArgs, options);
-    // Ariya TODO: remove logs
-    console.log('transferStatus', transferStatus);
-    console.log(parseInt(transferStatus, 10));
-    console.log(RestStatus.OK);
+    
     if (parseInt(transferStatus, 10) !== RestStatus.OK) {
         throw new rest.RestError(transferStatus, 'You cannot transfer the ownership of a Item you don\'t own', { newOwner })
     }

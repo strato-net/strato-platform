@@ -397,6 +397,11 @@ body{
   align-items: center;
 }
 
+.transfer_modal .ant-select-selector{
+  height: auto !important;
+  align-items: center;
+}
+
 .ant-select-selection-search{
   display: flex;
   align-items: center;
