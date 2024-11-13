@@ -1341,7 +1341,9 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
   };
 
   contract.unstake = async function (args, options = defaultOptions) {
-    const res = await governanceJs.unstake(rawAdmin, args, options);
+    const { stratsPaymentService, restArgs} = args;
+    const contract = { address: stratsPaymentService, name: 'StratPaymentService' };
+    const res = await governanceJs.unstake(rawAdmin, contract, restArgs, options);
     return res;
   };
   // ---------------------------- Governance END   -------------------------------

@@ -34,7 +34,7 @@ class GovernanceController {
       const { dapp, body } = req;
       GovernanceController.validateStakeArgs(body);
 
-      const result = await dapp.getPaymentServices(body);
+      const result = await dapp.stake(body);
       rest.response.status200(res, result);
       next();
     } catch (e) {
@@ -69,6 +69,10 @@ class GovernanceController {
         "any.required": "Asset Address is required and must be a string.",
         "string.base": "Asset Address must be a valid string.",
       }),
+      governance: Joi.string().required().messages({
+        "any.required": "Governance is required and must be a string.",
+        "string.base": "Governance must be a valid string.",
+      }),
     });
     GovernanceController.validateArgs(args, schema, "Calculate");
   }
@@ -89,6 +93,10 @@ class GovernanceController {
           "Strats Payment Service is required and must be a string.",
         "string.base": "Strats Payment Service must be a valid string.",
       }),
+      governance: Joi.string().required().messages({
+        "any.required": "Governance is required and must be a string.",
+        "string.base": "Governance must be a valid string.",
+      }),
     });
     GovernanceController.validateArgs(args, schema, "Stake");
   }
@@ -103,6 +111,11 @@ class GovernanceController {
       escrow: Joi.string().required().messages({
         "any.required": "Escrow is required and must be a string.",
         "string.base": "Escrow must be a valid string.",
+      }),
+      stratsPaymentService: Joi.string().required().messages({
+        "any.required":
+          "Strats Payment Service is required and must be a string.",
+        "string.base": "Strats Payment Service must be a valid string.",
       }),
     });
     GovernanceController.validateArgs(args, schema, "Unstake");

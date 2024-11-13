@@ -135,10 +135,12 @@ async function getState(user, contract, options) {
  * calculate
  */
 async function calculate(user, args, options) {
+  const { governance, ...restArgs } = args;
+  const contract = { name: contractName, address: governance };
   const callArgs = {
-    contract: args.contract,
+    contract,
     method: "calculate",
-    args: util.usc({ ...args }),
+    args: util.usc({ ...restArgs }),
   };
 
   const reponse = await rest.call(user, callArgs, options);
@@ -158,10 +160,12 @@ async function calculate(user, args, options) {
  * stake
  */
 async function stake(user, args, options) {
+  const { governance, ...restArgs } = args;
+  const contract = { name: contractName, address: governance };
   const callArgs = {
-    contract: args.contract,
+    contract,
     method: "stake",
-    args: util.usc({ ...args }),
+    args: util.usc({ ...restArgs }),
   };
 
   const reponse = await rest.call(user, callArgs, options);
@@ -180,9 +184,9 @@ async function stake(user, args, options) {
 /**
  * unstake
  */
-async function unstake(user, args, options) {
+async function unstake(user, contract,  args, options) {
   const callArgs = {
-    contract: args.contract,
+    contract,
     method: "unstake",
     args: util.usc({ ...args }),
   };
