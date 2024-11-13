@@ -112,7 +112,7 @@ abstract contract Sale is Utils {
         }
     }
 
-    function _closeSale() internal returns (uint) {
+    function _closeSale() internal virtual returns (uint) {
         close();
         isOpen = false;
         return RestStatus.OK;

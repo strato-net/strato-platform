@@ -1,19 +1,22 @@
-pragma solidity ^0.8.0;
 
+pragma es6;
+pragma strict;
+
+import <509>;
 import "../Assets/Asset.sol";
 import "../Items/STRATS.sol";
 import "./Escrow.sol";
 import "../Utils/Utils.sol";
+import "../Oracle/OracleService.sol";
 
-contract Reserve is Utils {
+abstract contract Reserve is Utils {
     OracleService public oracle; // Asset Oracle service for fetching price data
     STRATSTokens public stratsToken;
-    address public cataToken;
+    address public cataToken;//Manual for now
     address public owner; // Owner (BlockApps) as source of STRATS tokens
 
     uint public loanToValueRatio = 50; // LTV ratio as percentage
     uint public cataAPYRate = 10; // 10% APY for CATA rewards
-    mapping(address => address) public assetEscrows;
 
     event StakeCreated(address indexed user, address escrow, uint assetAmount, uint stratsLoan, uint cataReward);
     event UnstakeProcessed(address indexed user, address escrow, uint assetAmount, uint repayment);
@@ -26,46 +29,53 @@ contract Reserve is Utils {
     }
 
     function createEscrow(uint assetAmount, address assetAddress) public returns (address) {
-        require(assetEscrows[assetAddress] == address(0), "Escrow already exists for this asset");
 
+        // Calculate required values
         uint assetPrice = oracle.getLatestPrice();
         uint stratsLoanAmount = (assetAmount * assetPrice * loanToValueRatio) / 100;
         uint cataReward = calculateCATAReward(assetAmount);
 
-        // Transfer STRATS from owner (BlockApps) to the borrower
-        stratsToken.transfer(owner, stratsLoanAmount);
-
-        // Create new Escrow contract
+        // Create the Escrow contract but do not attach assets or transfer STRATS
         Escrow escrow = new Escrow(msg.sender, assetAmount, assetAddress, stratsLoanAmount, cataReward, address(this));
-        assetEscrows[assetAddress] = address(escrow);
 
-        // Attach the escrow to both the Asset and STRATS assets
-        escrow.attachEscrowToAsset(assetAddress);
-        escrow.attachEscrowToAsset(address(stratsToken));
-
-        emit StakeCreated(msg.sender, address(escrow), assetAmount, stratsLoanAmount, cataReward);
+        stakeAsset(address(escrow));
 
         return address(escrow);
     }
 
+    function stakeAsset(address escrowAddress) internal {
+
+        // Retrieve escrow details
+        Escrow escrow = Escrow(escrowAddress);
+        uint stratsLoanAmount = escrow.getLoanAmount();
+
+        // Transfer STRATS from owner (BlockApps) to the borrower
+        stratsToken.transfer(owner, stratsLoanAmount);
+
+        // Attach the escrow to both the Asset and STRATS assets
+        escrow.attachEscrowToAsset(escrow.getAssetAddress());
+        escrow.attachEscrowToAsset(address(stratsToken));
+
+        // Emit the StakeCreated event
+        emit StakeCreated(msg.sender, escrowAddress, escrow.getAssetAmount(), stratsLoanAmount, escrow.getCataReward());
+    }
+    
     function calculateCATAReward(uint assetAmount) internal view returns (uint) {
         // Calculate reward based on 10% APY over a specific period
         // Placeholder calculation, assuming a yearly rate
         return (assetAmount * cataAPYRate) / 100;
     }
 
-    function processUnstake(uint repayment, address escrow) external {
-        require(assetEscrows[escrow] != address(0), "Unauthorized Unstake request");
-        
-        Escrow escrowContract = Escrow(escrow);
-        require(escrowContract.getLoanAmount() == repayment, "Repayment amount mismatch");
+    //FUNCTION to get calculation of strats, rewards before they click the stake button
+    function previewStake(uint assetAmount, address assetAddress) public view returns (uint stratsLoanAmount, uint cataReward) {
+        uint assetPrice = oracle.getLatestPrice();  // Get the latest price from the oracle
+        stratsLoanAmount = (assetAmount * assetPrice * loanToValueRatio) / 100;  // Calculate the STRATS loan amount
+        cataReward = calculateCATAReward(assetAmount);  // Calculate the CATA reward based on APY rate
 
-        // Transfer STRATS back to owner
-        stratsToken.transfer(owner, repayment);
-
-        // Release the collateral back to the borrower
-        escrowContract.releaseCollateral(msg.sender);
-
-        emit UnstakeProcessed(msg.sender, escrow, escrowContract.getAssetAmount(), repayment);
+        return (stratsLoanAmount, cataReward);
     }
+
+    // function sendCataRewards(){
+
+    // }
 }
