@@ -1,14 +1,16 @@
 pragma es6;
 pragma strict;
 
-import <BASE_CODE_COLLECTION>;
 import "../../../items/contracts/STRATS.sol";
+import "../Staking/Escrow.sol";
 
 contract StratPaymentService is PaymentService {
     address public stratAddress;
     decimal public stratsPerDollar;
 
     address public feeRecipient;
+
+    event UnstakeProcessed(address indexed user, address escrow, uint assetAmount, decimal repayment);
 
     constructor (
         address _stratAddress,
@@ -31,10 +33,11 @@ contract StratPaymentService is PaymentService {
 
     function unStake(
         address[] _stratsAssetAddresses,
-        address _escrowAddress
+        address _escrowAddress,
+        address reserve
     ) requireActive("unstake") external returns (uint) {
         require(_stratsAssetAddresses.length > 0, "Pass at least one STRATs token address");
-        Sale escrow = Sale(_escrowAddress);
+        Escrow escrow = Escrow(_escrowAddress);
         uint stratAmountNet = uint(escrow.stratsLoanAmount() * stratsPerDollar * 100);
         uint stratQuantity = 0;
         uint transferNumber = 0;
@@ -60,6 +63,8 @@ contract StratPaymentService is PaymentService {
 
         // Transfer assets
         escrow.closeSale();
+
+        emit UnstakeProcessed(msg.sender, _escrowAddress, escrow.quantity(), escrow.stratsLoanAmount());
     }
 
     function _checkoutInitialized (
@@ -148,26 +153,14 @@ contract StratPaymentService is PaymentService {
                 transferNumber = (uint(_checkoutHash, 16) + j) % 1000000;
                 if (remainingStratsToTransfer > 0) {
                     transferAmount = stratQuantity >= remainingStratsToTransfer ? remainingStratsToTransfer : stratQuantity;
-                    escrowIfItExists = stratAsset.sale();
-                    stratAsset.closeSale();
                     stratAsset.purchaseTransfer(sellerAddress, transferAmount, transferNumber, 0.0001);
-                    // Re-attach escrow if the escrow was previously attached
-                    if (escrowIfItExists != address(0)) {
-                        Escrow(escrowIfItExists).attachEscrowToAsset(address(stratAsset));
-                    }
                     remainingStratsToTransfer -= transferAmount;
                 }
                 stratQuantity = stratQuantity - transferAmount;
                 if (remainingFeeToTransfer > 0 && stratQuantity > 0) {
                     transferNumber = (uint(_checkoutHash, 16) + j + block.timestamp) % 1000000;
                     transferFee = stratQuantity >= remainingFeeToTransfer ? remainingFeeToTransfer : stratQuantity;
-                    escrowIfItExists = stratAsset.sale();
-                    stratAsset.closeSale();
                     stratAsset.purchaseTransfer(feeRecipient, transferFee, transferNumber, 0.0001);
-                    // Re-attach escrow if the escrow was previously attached
-                    if (escrowIfItExists != address(0)) {
-                        Escrow(escrowIfItExists).attachEscrowToAsset(address(stratAsset));
-                    }
                     remainingFeeToTransfer -= transferFee;
                 }
                 transferAmount = 0;

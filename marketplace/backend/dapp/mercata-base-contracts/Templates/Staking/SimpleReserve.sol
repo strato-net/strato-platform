@@ -1,7 +1,7 @@
 pragma es6;
 pragma strict;
 
-import <BASE_CODE_COLLECTION>;
+import <db8c36e0e8c136afc1d3e4417dc1940f952aafd7>;
 
 contract SimpleReserve is Reserve{
 

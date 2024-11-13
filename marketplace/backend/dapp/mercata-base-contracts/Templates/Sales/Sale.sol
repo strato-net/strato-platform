@@ -5,18 +5,14 @@ import <509>;
 import "../Assets/Asset.sol";
 import "../Enums/RestStatus.sol";
 import "../Utils/Utils.sol";
+import "../Structs/Structs.sol";
 
-
-abstract contract Sale is Utils { 
-    struct PaymentService {
-        string serviceName;
-        string creator;
-    }
+abstract contract Sale is Utils, Structs { 
 
     Asset public assetToBeSold;
     decimal public price;
     uint public quantity;
-    PaymentService[] public paymentServices;
+    PaymentServiceInfo[] public paymentServices;
     mapping (string => mapping (string => uint)) paymentServicesMap;
     mapping (string => uint) lockedQuantity;
     uint totalLockedQuantity;
@@ -28,7 +24,7 @@ abstract contract Sale is Utils {
         address _assetToBeSold,
         decimal _price,
         uint _quantity,
-        PaymentService[] _paymentServices
+        PaymentServiceInfo[] _paymentServices
     ) {    
         assetToBeSold = Asset(_assetToBeSold);
         require(_quantity > 0, "Quantity must be greater than 0");
@@ -77,9 +73,9 @@ abstract contract Sale is Utils {
         );
     }
 
-    function _addPaymentServices(PaymentService[] _paymentServices) internal {
+    function _addPaymentServices(PaymentServiceInfo[] _paymentServices) internal {
         for (uint i = 0; i < _paymentServices.length; i++) {
-            PaymentService p = _paymentServices[i];
+            PaymentServiceInfo p = _paymentServices[i];
             paymentServices.push(p);
             paymentServicesMap[p.serviceName][p.creator] = paymentServices.length;
         }
@@ -172,7 +168,7 @@ abstract contract Sale is Utils {
     function _update(
         uint _quantity,
         decimal _price,
-        PaymentService[] _paymentServices,
+        PaymentServiceInfo[] _paymentServices,
         uint _scheme
     ) internal returns (uint) {
 

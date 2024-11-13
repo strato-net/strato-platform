@@ -3,38 +3,38 @@ pragma es6;
 pragma strict;
 
 import <509>;
+
 import "../Assets/Asset.sol";
-import "../../../items/contracts/STRATS.sol";
 import "./Escrow.sol";
 import "../Utils/Utils.sol";
 import "../Oracle/OracleService.sol";
 
 abstract contract Reserve is Utils {
     OracleService public oracle; // Asset Oracle service for fetching price data
-    STRATSTokens public stratsToken;
+    Asset public stratsToken;
     address public cataToken;//Manual for now
     address public owner; // Owner (BlockApps) as source of STRATS tokens
 
     uint public loanToValueRatio = 50; // LTV ratio as percentage
     uint public cataAPYRate = 10; // 10% APY for CATA rewards
 
-    event StakeCreated(address indexed user, address escrow, uint assetAmount, uint stratsLoan, uint cataReward);
-    event UnstakeProcessed(address indexed user, address escrow, uint assetAmount, uint repayment);
+    event StakeCreated(address indexed user, address escrow, uint assetAmount, decimal stratsLoan, uint cataReward);
 
     constructor(address _assetOracle, address _stratsToken, address _cataToken, address _owner) {
         oracle = OracleService(_assetOracle);
-        stratsToken = STRATSTokens(_stratsToken);
+        stratsToken = Asset(_stratsToken);
         cataToken = _cataToken;
         owner = _owner;
     }
 
-    function createEscrow(uint assetAmount, address assetAddress, address stratPaymentService) public returns (address) {
+    function createEscrow(uint assetAmount, address assetAddress, PaymentService stratPaymentService) public returns (address) {
 
         // Calculate required values
         Asset _assetToBeSold = Asset(assetAddress);
         uint _quantity = _assetToBeSold.quantity();
-        uint _price = oracle.getLatestPrice()*quantity;
-        uint stratsLoanAmount = (assetAmount * assetPrice * loanToValueRatio) / 100;
+        (decimal _assetPrice, uint _priceTimestamp) = oracle.getLatestPrice();
+        decimal _price = _assetPrice * decimal(_assetToBeSold.quantity());
+        decimal stratsLoanAmount = (decimal(assetAmount) * _assetPrice * decimal(loanToValueRatio)) / 100;
         uint cataReward = calculateCATAReward(assetAmount);
 
         // Create the Escrow contract but do not attach assets or transfer STRATS
@@ -49,17 +49,18 @@ abstract contract Reserve is Utils {
 
         // Retrieve escrow details
         Escrow escrow = Escrow(escrowAddress);
-        uint stratsLoanAmount = escrow.getLoanAmount();
-
+        decimal stratsLoanAmount = escrow.stratsLoanAmount();
+        uint transferNumber = (uint(block.number + 16)) % 1000000;
+        
         // Transfer STRATS from owner (BlockApps) to the borrower
-        stratsToken.transfer(owner, stratsLoanAmount);
+        stratsToken.transferOwnership(owner, stratsLoanAmount*100, false, transferNumber, stratsLoanAmount);
 
         // Attach the escrow to both the Asset and STRATS assets
-        escrow.attachEscrowToAsset(escrow.getAssetAddress());
-        escrow.attachEscrowToAsset(address(stratsToken));
+        escrow.attachEscrowToAsset(escrow.assetToBeSold());
+        // escrow.attachEscrowToAsset(Asset(stratsToken));//needs to be done off chain
 
         // Emit the StakeCreated event
-        emit StakeCreated(msg.sender, escrowAddress, escrow.getAssetAmount(), stratsLoanAmount, escrow.getCataReward());
+        emit StakeCreated(msg.sender, escrowAddress, escrow.quantity(), stratsLoanAmount, escrow.cataReward());
     }
     
     function calculateCATAReward(uint assetAmount) internal view returns (uint) {
@@ -69,9 +70,9 @@ abstract contract Reserve is Utils {
     }
 
     //FUNCTION to get calculation of strats, rewards before they click the stake button
-    function previewStake(uint assetAmount, address assetAddress) public view returns (uint stratsLoanAmount, uint cataReward) {
-        uint assetPrice = oracle.getLatestPrice();  // Get the latest price from the oracle
-        stratsLoanAmount = (assetAmount * assetPrice * loanToValueRatio) / 100;  // Calculate the STRATS loan amount
+    function previewStake(decimal assetAmount, address assetAddress) public view returns (decimal stratsLoanAmount, uint cataReward) {
+        (decimal _assetPrice, uint _priceTimestamp) = oracle.getLatestPrice();
+        stratsLoanAmount = (assetAmount * _assetPrice * decimal(loanToValueRatio)) / 100;  // Calculate the STRATS loan amount
         cataReward = calculateCATAReward(assetAmount);  // Calculate the CATA reward based on APY rate
 
         return (stratsLoanAmount, cataReward);

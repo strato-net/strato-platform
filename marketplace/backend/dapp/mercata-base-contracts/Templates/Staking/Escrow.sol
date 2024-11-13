@@ -1,7 +1,8 @@
 pragma es6;
 pragma strict;
 
-import <BASE_CODE_COLLECTION>;
+import "../Sales/Sale.sol";
+import "../Assets/Asset.sol";
 
 contract Escrow is Sale {
     address public reserve;
@@ -24,7 +25,7 @@ contract Escrow is Sale {
         uint _cataReward,
         address _reserve,
         address _stratsAddress,
-        address _assetToBeSold,
+        Asset _assetToBeSold,
         decimal _price,
         uint _quantity,
         PaymentService[] _paymentServices
@@ -36,9 +37,9 @@ contract Escrow is Sale {
         reserve = _reserve;
     }
 
-    function attachEscrowToAsset(address asset) public onlyReserve {
+    function attachEscrowToAsset(Asset asset) public onlyReserve {
         // Attach the Escrow contract to the specified asset
-        Asset(asset).attachSale();
+        asset.attachSale();
     }
 
     function closeSale() external override requirePaymentService("complete sale") returns (uint) {
