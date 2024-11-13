@@ -347,15 +347,18 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
   }
 
   contract.getOutgoingRedemptionRequests = async function (args, options = optionsNoChainIds) {
-    const { order, search, range } = args;
+    const { order, search, range, limit, offset } = args;
     const queryParams = new URLSearchParams({
       redemptionId: search,
-      order: order
+      order: order,
+      limit,
+      offset
     }).toString();
 
     try {
       let redemptions = [];
       let redemptionServiceAddresses = [];
+      let count = 0;
       const redemptionEvents = await redemptionServiceJs.getRedemptions(rawAdmin, { owner: userCert.commonName }, options);
       redemptionEvents.map(r => {
         if (!redemptionServiceAddresses.includes(r.address)) {
@@ -373,33 +376,36 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
         const serviceUrl = rs.serviceURL || rs.data.serviceURL;
         const getOutgoingRedemptionRoute = rs.outgoingRedemptionsRoute || rs.data.outgoingRedemptionsRoute;
         let res = await axios.get(new URL(`${serviceUrl}${getOutgoingRedemptionRoute}/${userCert.commonName}?${queryParams}`).href);
-        if (res.status === 200)
+        if (res.status === 200){
+          count = res.data.count; 
           return res.data.data.map((item) => {
             const date = new Date(item.createdDate);
             const unixTimestamp = Math.floor(date.getTime() / 1000);
             return { ...item, redemptionDate: unixTimestamp, type:'Redemption', block_timestamp: new Date(item.createdDate) }
-          })
+          })}
         else
           return [];
       });
 
       const allRedemptions = await Promise.all(redemptionPromises);
       redemptions = allRedemptions.flat();
-      redemptions = redemptions.filter((item)=>{
-        const dateRange = range[0].split(',')
-        const startRange = dateRange[1];
-        const endRange = dateRange[2];
-        if(item.redemptionDate > startRange && item.redemptionDate < endRange){
-          return item;
-        }
-      })
+      if (range?.length) {
+        redemptions = redemptions.filter((item) => {
+          const dateRange = range[0].split(',')
+          const startRange = dateRange[1];
+          const endRange = dateRange[2];
+          if (item.redemptionDate > startRange && item.redemptionDate < endRange) {
+            return item;
+          }
+        })
+      }
 
       if (order && order === 'ASC')
         redemptions.sort((a, b) => a.createdDate - b.createdDate);
       else
         redemptions.sort((a, b) => b.createdDate - a.createdDate);
 
-      return redemptions;
+      return { data: redemptions, count };
     } catch (error) {
       if (error.response) {
         throw new rest.RestError(error.response.status, error.response.statusText);
@@ -409,14 +415,17 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
   };
 
   contract.getIncomingRedemptionRequests = async function (args, options = optionsNoChainIds) {
-    const { order, search, range } = args;
+    const { order, search, range, limit, offset } = args;
     const queryParams = new URLSearchParams({
       redemptionId: search,
-      order: order
+      order: order,
+      limit,
+      offset
     }).toString();
 
     try {
       let redemptions = [];
+      let count = 0;
       const redemptionEvents = await redemptionServiceJs.getRedemptions(rawAdmin, { issuer: userCert.commonName }, options);
       const redemptionServiceAddresses = redemptionEvents.map(r => r.address);
       let redemptionServices = await redemptionServiceJs.getAll(rawAdmin, { address: redemptionServiceAddresses }, options);
@@ -431,6 +440,7 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
         const getIncomingRedemptionRoute = rs.incomingRedemptionsRoute || rs.data.incomingRedemptionsRoute;
         const res = await axios.get(new URL(`${serviceUrl}${getIncomingRedemptionRoute}/${userCert.commonName}?${queryParams}`).href);
         if (res.status === 200) {
+          count = res.data.count; 
           return res.data.data.map((item) => {
             const date = new Date(item.createdDate);
             const unixTimestamp = Math.floor(date.getTime() / 1000);
@@ -443,14 +453,16 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
 
       const allRedemptions = await Promise.all(redemptionPromises);
       redemptions = allRedemptions.flat();
-      redemptions = redemptions.filter((item)=>{
-        const dateRange = range[0].split(',')
-        const startRange = dateRange[1];
-        const endRange = dateRange[2];
-        if(item.redemptionDate > startRange && item.redemptionDate < endRange){
-          return item;
-        }
-      })
+      if (range?.length) {
+        redemptions = redemptions.filter((item) => {
+          const dateRange = range[0].split(',')
+          const startRange = dateRange[1];
+          const endRange = dateRange[2];
+          if (item.redemptionDate > startRange && item.redemptionDate < endRange) {
+            return item;
+          }
+        })
+      }
 
       if (order && order === 'ASC')
         redemptions.sort((a, b) => a.createdDate - b.createdDate);
@@ -458,7 +470,7 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
         redemptions.sort((a, b) => b.createdDate - a.createdDate);
 
 
-      return redemptions;
+      return { data: redemptions, count };
     } catch (error) {
       if (error.response) {
         throw new rest.RestError(error.response.status, error.response.statusText);
@@ -878,19 +890,20 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
     const getOptions = { ...options, app: contractName, };
 
 
-   let data = await saleOrderJs.getAll(rawAdmin, args, getOptions);
+    let { orders, total } = await saleOrderJs.getAll(rawAdmin, args, getOptions);
+    let data;
    let saleAddressArr = [];
-   data = data.orders.map((item)=> {
+   data = orders.map((item)=> {
     if(item?.saleAddresses?.length){
       saleAddressArr.push(item?.saleAddresses[0])
-     return {...item,saleAddress:item?.saleAddresses[0]}
-    }else if(item["BlockApps-Mercata-Order-saleAddresses"]){
+     return {...item,saleAddress:item?.saleAddresses[0] }
+    }else if(item["BlockApps-Mercata-Order-saleAddresses"]) {
       const address = item["BlockApps-Mercata-Order-saleAddresses"][0]?.value
       saleAddressArr.push(address)
-     return {...item, saleAddress:address  }
+     return {...item, saleAddress:address }
     }else{
       saleAddressArr.push(item?.saleAddresses)
-      return {...item,saleAddress:item?.saleAddresses}
+      return {...item,saleAddress:item?.saleAddresses }
     }
   })
 
@@ -901,21 +914,21 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
         const history = await saleJs.getSaleHistory(rawAdmin, { transaction_hash: sale.transaction_hash, assetToBeSold: sale.assetToBeSold }, options);
         const price = history['0'] ? history['0'].price : null;
 
-        assets.push({
-          assetAddress: sale.assetToBeSold,
-          price: price,
-          assetPrice: sale?.price,
-          saleQuantity: sale.quantity,
-          saleAddress: sale.address,
-        });
-      }
+      assets.push({
+        assetAddress: sale.assetToBeSold,
+        price: price,
+        assetPrice: sale?.price,
+        saleQuantity: sale.quantity,
+        saleAddress: sale.address,
+      });
+    }
 
-      data = data.map((item)=>{
-        const saleData = assets.find((asset)=> asset.saleAddress === item.saleAddress) 
-        return {...item, ...saleData }
-      })
+    data = data.map((item)=>{
+      const saleData = assets.find((asset)=> asset.saleAddress === item.saleAddress)
+      return {...item, ...saleData }
+    })
 
-  return data;
+  return { orderData:data, total };;
   }
 
   contract.checkSaleQuantity = async function (args, options = defaultOptions) {
@@ -1293,9 +1306,9 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
     }
   };
 
-  contract.getStratsBalance = async function ( args, options = defaultOptions ) {
+  contract.getStratsBalance = async function (args, options = defaultOptions) {
     const stratsOriginAddress = await STRATSJs.getStratsAddress();
-    const balance = await inventoryJs.getAll(rawAdmin, { ownerCommonName: userCert.commonName, originAddress: stratsOriginAddress, queryOptions: { select: "quantity.sum()" }}, options);
+    const balance = await inventoryJs.getAll(rawAdmin, { ownerCommonName: userCert.commonName, originAddress: stratsOriginAddress, queryOptions: { select: "quantity.sum()" } }, options);
     return balance[0].sum ? `${balance[0].sum/100}` : 0;
   }
 

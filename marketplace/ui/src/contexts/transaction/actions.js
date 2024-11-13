@@ -21,7 +21,7 @@ const actions = {
     dispatch({ type: actionDescriptors.setMessage, message, success });
   },
 
-  fetchUserTransaction: async (dispatch, limit, offset, commonName, dateRange) => {
+  fetchUserTransaction: async (dispatch, limit, offset, commonName, dateRange, type) => {
     dispatch({ type: actionDescriptors.fetchUserTransaction });
 
     const encodedCommonName = encodeURIComponent(commonName);
@@ -38,6 +38,9 @@ const actions = {
     if(dateRange){
       query += `&startDate=${dateRange[0]}&endDate=${dateRange[1]}`
     }
+    if (type) {
+      query += `&type=${type}`
+    }
 
     try {
       const response = await fetch(
@@ -52,7 +55,7 @@ const actions = {
       if (response.status === RestStatus.OK) {
         dispatch({
           type: actionDescriptors.fetchUserTransactionSuccessful,
-          payload: body.data,
+          payload: body,
         });
         return;
       } else if (response.status === RestStatus.UNAUTHORIZED) {
