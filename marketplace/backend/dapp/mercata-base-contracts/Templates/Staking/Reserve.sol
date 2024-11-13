@@ -36,7 +36,7 @@ abstract contract Reserve is Utils {
         uint cataReward = calculateCATAReward(assetAmount);
 
         // Create the Escrow contract but and attach asset
-        Escrow escrow = new Escrow(msg.sender, stratsLoanAmount, cataReward, address(this), address(stratsToken), _assetToBeSold, _price, _quantity, [stratPaymentService]);
+        Escrow escrow = new Escrow(msg.sender, uint(stratsLoanAmount), cataReward, address(this), address(stratsToken), _assetToBeSold, _price, _quantity, [stratPaymentService]);
 
         stakeAsset(address(escrow));
 
@@ -47,7 +47,7 @@ abstract contract Reserve is Utils {
 
         // Retrieve escrow details
         Escrow escrow = Escrow(escrowAddress);
-        decimal stratsLoanAmount = escrow.stratsLoanAmount();
+        uint stratsLoanAmount = escrow.stratsLoanAmount();
         uint transferNumber = (uint(block.number + 16)) % 1000000;
         
         // Transfer STRATS from owner (BlockApps) to the borrower
@@ -68,12 +68,12 @@ abstract contract Reserve is Utils {
     }
 
     //FUNCTION to get calculation of strats, rewards before they click the stake button
-    function previewStake(decimal assetAmount, address assetAddress) public view returns (decimal stratsLoanAmount, uint cataReward) {
+    function previewStake(uint assetAmount, address assetAddress) public view returns (decimal stratsLoanAmount, uint cataReward) {
         (decimal _assetPrice, uint _priceTimestamp) = oracle.getLatestPrice();
-        stratsLoanAmount = (assetAmount * _assetPrice * decimal(loanToValueRatio)) / 100;  // Calculate the STRATS loan amount
+        decimal stratsLoanAmount = (decimal(assetAmount) * _assetPrice * decimal(loanToValueRatio)) / 100;  // Calculate the STRATS loan amount
         cataReward = calculateCATAReward(assetAmount);  // Calculate the CATA reward based on APY rate
 
-        return (stratsLoanAmount, cataReward);
+        return (uint(stratsLoanAmount), cataReward);
     }
 
     function getStratsToken() public view returns (Asset) {
