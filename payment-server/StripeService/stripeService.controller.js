@@ -357,8 +357,12 @@ class StripeServiceController {
                 comments: ERROR_MESSAGE,
               } 
         
-              const cancelOrderStatus = await cancelOrder(STRIPE_CONTRACT_ADDRESS, callArgs);
-              console.log("cancelOrderStatus", cancelOrderStatus);
+              try {
+                const cancelOrderStatus = await cancelOrder(STRIPE_CONTRACT_ADDRESS, callArgs);
+                console.log("cancelOrderStatus", cancelOrderStatus);
+              } catch (err) {
+                console.log(err, "(probably a backwards compatibility issue)")
+              }
         
               // Update payment status in DB
               const updateResult = await updateStripePayment(p.orderHash, "CANCELED");
