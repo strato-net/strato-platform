@@ -28,15 +28,17 @@ abstract contract Reserve is Utils {
         owner = _owner;
     }
 
-    function createEscrow(uint assetAmount, address assetAddress) public returns (address) {
+    function createEscrow(uint assetAmount, address assetAddress, address stratPaymentService) public returns (address) {
 
         // Calculate required values
-        uint assetPrice = oracle.getLatestPrice();
+        Asset _assetToBeSold = Asset(assetAddress);
+        uint _quantity = _assetToBeSold.quantity();
+        uint _price = oracle.getLatestPrice()*quantity;
         uint stratsLoanAmount = (assetAmount * assetPrice * loanToValueRatio) / 100;
         uint cataReward = calculateCATAReward(assetAmount);
 
         // Create the Escrow contract but do not attach assets or transfer STRATS
-        Escrow escrow = new Escrow(msg.sender, assetAmount, assetAddress, stratsLoanAmount, cataReward, address(this));
+        Escrow escrow = new Escrow(msg.sender, stratsLoanAmount, cataReward, address(this), address(stratsToken), _assetToBeSold, _price, _quantity, [stratPaymentService]);
 
         stakeAsset(address(escrow));
 
