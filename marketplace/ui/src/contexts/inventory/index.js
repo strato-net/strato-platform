@@ -23,6 +23,8 @@ const InventoriesProvider = ({ children }) => {
     isTransferring: false,
     isFetchingTokens: false,
     isBridging: false,
+    isStaking: false,
+    isUnstaking: false,
     inventoryDetails: null,
     inventoryOwnershipHistory: [],
     isInventoryDetailsLoading: false,

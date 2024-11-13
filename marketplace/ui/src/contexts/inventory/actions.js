@@ -29,6 +29,12 @@ const actionDescriptors = {
   unlistInventory: "unlist_inventory",
   unlistInventorySuccessful: "unlist_inventory_successful",
   unlistInventoryFailed: "unlist_inventory_failed",
+  stakeInventory: "stake_inventory", // Staking
+  stakeInventorySuccessful: "stake_inventory_successful",
+  stakeInventoryFailed: "stake_inventory_failed",
+  unstakeInventory: "unstake_inventory", // Unstaking
+  unstakeInventorySuccessful: "unstake_inventory_successful",
+  unstakeInventoryFailed: "unstake_inventory_failed",
   resellInventory: "resell_inventory",
   resellInventorySuccessful: "resell_inventory_successful",
   resellInventoryFailed: "resell_inventory_failed",
@@ -691,6 +697,114 @@ const actions = {
         error: "Error while transferring Item",
       });
       actions.setMessage(dispatch, "Error while transferring Item");
+    }
+  },
+
+  stakeInventory: async (dispatch, payload) => {
+    dispatch({ type: actionDescriptors.stakeInventory });
+
+    try {
+      const response = await fetch(`${apiUrl}/governance/stake`, { //Stake
+        method: HTTP_METHODS.POST,
+        credentials: "same-origin",
+        headers: {
+          Accept: "application/json",
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(payload),
+      });
+
+      const body = await response.json();
+
+      if (response.status === RestStatus.OK) {
+        dispatch({
+          type: actionDescriptors.stakeInventorySuccessful,
+          payload: body.data,
+        });
+        actions.setMessage(dispatch, "Item has been Staked Successfully", true);
+        return true;
+      } else if (response.status === RestStatus.CONFLICT) {
+        dispatch({ type: actionDescriptors.stakeInventoryFailed, error: body.error.message });
+        actions.setMessage(dispatch, body.error.message)
+        return false;
+      } else if (response.status === RestStatus.INTERNAL_SERVER_ERROR) {
+        dispatch({ type: actionDescriptors.stakeInventoryFailed, error: "Error while Staking Item" });
+        actions.setMessage(dispatch, "Error while Staking Item")
+        return false;
+      } else if (response.status === RestStatus.UNAUTHORIZED) {
+        dispatch({
+          type: actionDescriptors.stakeInventoryFailed,
+          error: "Unauthorized while Staking Item"
+        });
+        window.location.href = body.error.loginUrl;
+      }
+
+      dispatch({
+        type: actionDescriptors.stakeInventoryFailed,
+        error: body.error
+      });
+      actions.setMessage(dispatch, body.error);
+      return false;
+    } catch (err) {
+      dispatch({
+        type: actionDescriptors.stakeInventoryFailed,
+        error: "Error while Staking Item",
+      });
+      actions.setMessage(dispatch, "Error while Staking Item");
+    }
+  },
+
+  UnstakeInventory: async (dispatch, payload) => {
+    dispatch({ type: actionDescriptors.unstakeInventory });
+
+    try {
+      const response = await fetch(`${apiUrl}/governance/unstake`, {
+        method: HTTP_METHODS.POST,
+        credentials: "same-origin",
+        headers: {
+          Accept: "application/json",
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(payload),
+      });
+
+      const body = await response.json();
+
+      if (response.status === RestStatus.OK) {
+        dispatch({
+          type: actionDescriptors.unstakeInventorySuccessful,
+          payload: body.data,
+        });
+        actions.setMessage(dispatch, "Item has been Unstaked", true);
+        return true;
+      } else if (response.status === RestStatus.CONFLICT) {
+        dispatch({ type: actionDescriptors.unstakeInventoryFailed, error: body.error.message });
+        actions.setMessage(dispatch, body.error.message)
+        return false;
+      } else if (response.status === RestStatus.INTERNAL_SERVER_ERROR) {
+        dispatch({ type: actionDescriptors.unstakeInventoryFailed, error: "Error while Unstaking Item" });
+        actions.setMessage(dispatch, "Error while Unstaking Item")
+        return false;
+      } else if (response.status === RestStatus.UNAUTHORIZED) {
+        dispatch({
+          type: actionDescriptors.unstakeInventoryFailed,
+          error: "Unauthorized while Unstaking Item"
+        });
+        window.location.href = body.error.loginUrl;
+      }
+
+      dispatch({
+        type: actionDescriptors.unstakeInventoryFailed,
+        error: body.error
+      });
+      actions.setMessage(dispatch, body.error);
+      return false;
+    } catch (err) {
+      dispatch({
+        type: actionDescriptors.unstakeInventoryFailed,
+        error: "Error while Unstaking Item",
+      });
+      actions.setMessage(dispatch, "Error while Unstaking Item");
     }
   },
 

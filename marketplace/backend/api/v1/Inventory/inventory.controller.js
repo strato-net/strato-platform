@@ -50,9 +50,8 @@ class InventoryController {
 
       const inventories = await dapp.getInventories({ ...restQuery })
       let inventoriesWithImageUrl = inventories?.inventories;
-      inventoriesWithImageUrl = inventoriesWithImageUrl.map((item) => ({ ...item, isStake: true }));
+      inventoriesWithImageUrl = inventoriesWithImageUrl.map(( item, index ) => ({ ...item, isStake: index == 0 ? true : false })); // TODO: remove after testing.
       const paginatedInventories = inventoriesWithImageUrl.slice(offset, parseInt(offset) + parseInt(limit));
-
       rest.response.status200(res, { inventoriesWithImageUrl: paginatedInventories, count: inventories.inventoryCount })
 
       return next()
