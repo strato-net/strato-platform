@@ -8,8 +8,8 @@ contract Escrow is Sale {
     address public reserve;
     address public borrower;
     uint public stratsLoanAmount;
-    uint public cataReward;
-    uint public cataWeeklyReward;
+    decimal public cataReward;
+    decimal public cataWeeklyReward;
     address public stratsAddress;
 
     event CollateralReleased(address indexed borrower, uint totalSilverAmount);
@@ -22,7 +22,7 @@ contract Escrow is Sale {
     constructor(
         address _borrower,
         uint _stratsLoanAmount,
-        uint _cataReward,
+        decimal _cataReward,
         address _reserve,
         address _stratsAddress,
         Asset _assetToBeSold,

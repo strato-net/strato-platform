@@ -35,8 +35,7 @@ contract StratPaymentService is PaymentService {
 
     function unStake(
         address[] _stratsAssetAddresses,
-        address _escrowAddress,
-        address reserve
+        address _escrowAddress
     ) requireActive("unstake") external returns (uint) {
         require(_stratsAssetAddresses.length > 0, "Pass at least one STRATs token address");
         Escrow escrow = Escrow(_escrowAddress);
@@ -54,7 +53,7 @@ contract StratPaymentService is PaymentService {
             transferNumber = (uint(string(_escrowAddress), 16) + j + block.timestamp) % 1000000;
 
             transferAmount = stratQuantity >= stratAmountNet ? stratAmountNet : stratQuantity;
-            stratAsset.purchaseTransfer(reserve, transferAmount, transferNumber, 0.0001);
+            stratAsset.purchaseTransfer(escrow.reserve(), transferAmount, transferNumber, 0.0001);
             stratAmountNet -= transferAmount;
 
             if (stratAmountNet == 0) {
@@ -155,6 +154,7 @@ contract StratPaymentService is PaymentService {
                 transferNumber = (uint(_checkoutHash, 16) + j) % 1000000;
                 if (remainingStratsToTransfer > 0) {
                     transferAmount = stratQuantity >= remainingStratsToTransfer ? remainingStratsToTransfer : stratQuantity;
+                    unStake(_stratsAssetAddresses, _escrowAddress, sellerAddress);
                     stratAsset.purchaseTransfer(sellerAddress, transferAmount, transferNumber, 0.0001);
                     remainingStratsToTransfer -= transferAmount;
                 }
