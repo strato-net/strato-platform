@@ -94,19 +94,17 @@ const StakeModal = ({ open, handleCancel, inventory, category, debouncedSearchTe
                 />
             </div>
             <div className="flex flex-col gap-[18px] md:hidden mt-5">
-                <div> <p className="text-[#202020] font-medium text-sm">Quantity Available</p>
+                <div> <p className="text-[#202020] font-medium text-sm">Quantity {type === 'Stake' ? 'Available' : 'to Unstake'}</p>
                     <div className="border border-[#d9d9d9] h-[42px] rounded-md flex items-center justify-center">
                         <p> {inventory?.quantity}</p>
                     </div>
                 </div>
-                <div>
-                    <p className="text-[#202020] font-medium text-sm">Liquidity</p>
-                    <div>
-                       30000 STRATs
-                    </div>
+                <div className="w-full">
+                    <p className=" w-full text-[#202020] font-medium text-sm ">Liquidity</p>
+                    <div className="border border-[#d9d9d9] h-[42px] rounded-md flex items-center justify-center "> 
+                        <div className="flex mx-auto">3000 {logo} </div> </div> 
                 </div>
-                <div>
-                    <p className="text-[#202020] font-medium text-sm">Action</p>
+                <div className="w-full flex justify-center items-center">
                     <Button type="primary" className="w-32 h-9" onClick={handleSubmit}  loading={false}>
                         {type}
                     </Button>

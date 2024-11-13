@@ -17,6 +17,7 @@ import ResellModal from "./ResellModal";
 import TransferModal from "./TransferModal";
 import RedeemModal from "./RedeemModal";
 import BridgeModal from "./BridgeModal";
+import StakeModal from "./StakeModal";
 import routes from "../../helpers/routes";
 import { ASSET_STATUS, STRATS_CONVERSION, OLD_SADDOG_ORIGIN_ADDRESS } from "../../helpers/constants";
 import image_placeholder from "../../images/resources/image_placeholder.png";
@@ -29,10 +30,12 @@ const InventoryCard = ({ inventory, category, debouncedSearchTerm, id, allSubcat
   const [open, setOpen] = useState(false);
   const [listModalOpen, setListModalOpen] = useState(false);
   const [unlistModalOpen, setUnlistModalOpen] = useState(false);
+  const [stakeType, setStakeType] = useState("Stake");
   const [resellModalOpen, setResellModalOpen] = useState(false);
   const [transferModalOpen, setTransferModalOpen] = useState(false);
   const [redeemModalOpen, setRedeemModalOpen] = useState(false);
   const [bridgeModalOpen, setBridgeModalOpen] = useState(false);
+  const [stakeModalOpen, setStakeModalOpen] = useState(false);
   const navigate = useNavigate();
   const naviroute = routes.InventoryDetail.url;
   const imgMeta = category ? category : SEO.TITLE_META
@@ -65,6 +68,16 @@ const InventoryCard = ({ inventory, category, debouncedSearchTerm, id, allSubcat
 
   const showUnlistModal = () => {
     setUnlistModalOpen(true);
+  };
+
+  const showStakeModal = (type) => {
+    // togglePopover(false);
+    setStakeModalOpen(true);
+    setStakeType(type);
+  };
+
+  const handleStakeModalClose = () => {
+    setStakeModalOpen(false);
   };
 
   const handleUnlistModalClose = () => {
@@ -235,6 +248,29 @@ const InventoryCard = ({ inventory, category, debouncedSearchTerm, id, allSubcat
                 <Button type="link" className={`text-[#13188A] text-left px-0 font-semibold text-sm h-6 ${!isTokenSupported(inventory.root) ? 'hidden' : ''}`} onClick={showBridgeModal}>
                   <><RetweetOutlined /> Bridge</>
                 </Button>
+                {/* <Button id="asset-card-unlist-btn" type="link" className="text-[#13188A] text-left px-0 font-semibold text-sm h-6" onClick={showUnlistModal} disabled={!inventory.price || !isActive()}>
+                  <><StopOutlined /> Stake</>
+                </Button>
+                <Button id="asset-card-unlist-btn" type="link" className="text-[#13188A] text-left px-0 font-semibold text-sm h-6" onClick={showUnlistModal} disabled={!inventory.price || !isActive()}>
+                  <><StopOutlined /> Unstake</>
+                </Button> */}
+                 {!inventory.isStake && <Button
+        type="link"
+        className="text-[#13188A] font-semibold"
+        onClick={() => showStakeModal("Stake")}
+        // disabled={!inventory.price || !isActive()}
+      >
+        <StopOutlined /> Stake
+      </Button>}
+
+     {inventory.isStake && <Button
+        type="link"
+        className="text-[#13188A] font-semibold"
+        onClick={() => showStakeModal("Unstake")}
+        // disabled={!inventory.price || !isActive()}
+      >
+        <StopOutlined /> Unstake
+      </Button>}
               </div>
             }
           </div>
@@ -356,6 +392,19 @@ const InventoryCard = ({ inventory, category, debouncedSearchTerm, id, allSubcat
           inventory={inventory}
           categoryName={category}
 
+        />
+      )}
+      {stakeModalOpen && (
+        <StakeModal
+          open={stakeModalOpen}
+          type={stakeType} // Stake / Unstake handle the modal functionality based on this.
+          handleCancel={handleStakeModalClose}
+          limit={limit}
+          offset={offset}
+          inventory={inventory}
+          debouncedSearchTerm={debouncedSearchTerm}
+          saleAddress={inventory.saleAddress}
+          category={category}
         />
       )}
       {transferModalOpen && (
