@@ -29,6 +29,43 @@ contract StratPaymentService is PaymentService {
         feeRecipient = _feeRecipient;
     }
 
+    function unStake(
+        address[] _stratsAssetAddresses,
+        address _escrowAddress
+    ) requireActive("unstake") external returns (uint) {
+        require(_stratsAssetAddresses.length > 0, "Pass at least one STRATs token address");
+        Sale escrow = Sale(_escrowAddress);
+        address governance = escrow.governance();
+        uint quantity = escrow.quantity();
+
+        decimal gross = escrow.price() * decimal(quantity);
+        uint stratAmountNet = uint(gross * stratsPerDollar * 100);
+        uint stratQuantity = 0;
+        uint transferNumber = 0;
+        uint transferAmount = 0;
+
+        for (uint j = 0; j < _stratsAssetAddresses.length; j++) {
+            STRATSTokens stratAsset = STRATSTokens(_stratsAssetAddresses[j]);
+            require(stratAsset.root == stratAddress, "Asset is not a STRATS asset");
+            require(stratAsset.ownerCommonName() == getCommonName(msg.sender), "Purchaser doesn't own STRATS");
+
+            stratQuantity = stratAsset.quantity();
+            transferNumber = (uint(string(_escrowAddress), 16) + j + block.timestamp) % 1000000;
+
+            transferAmount = stratQuantity >= stratAmountNet ? stratAmountNet : stratQuantity;
+            stratAsset.purchaseTransfer(governance, transferAmount, transferNumber, 0.0001);
+            stratAmountNet -= transferAmount;
+
+            if (stratAmountNet == 0) {
+                break;
+            }
+        }
+        require(stratAmountNet == 0, "Your STRATS balance is not high enough to cover the purchase.");
+
+        // Transfer assets
+        escrow.closeSale();
+    }
+
     function _checkoutInitialized (
         address[] _stratsAssetAddresses,
         string _checkoutHash,
