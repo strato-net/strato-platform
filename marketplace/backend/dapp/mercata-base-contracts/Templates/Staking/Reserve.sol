@@ -54,7 +54,7 @@ abstract contract Reserve is Utils {
         stratsToken.transferOwnership(escrow.borrower(), stratsLoanAmount*100, false, transferNumber, stratsLoanAmount);
 
         // Attach the escrow to both the Asset and STRATS assets
-        escrow.attachEscrowToAsset(escrow.assetToBeSold());
+        // escrow.attachEscrowToAsset(escrow.assetToBeSold());
         // escrow.attachEscrowToAsset(Asset(stratsToken));//needs to be done off chain
 
         // Emit the StakeCreated event
