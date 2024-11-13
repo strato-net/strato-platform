@@ -54,12 +54,12 @@ contract Escrow is Sale {
         Asset(asset).attachSale();
     }
 
-    function detachEscrowFromAssets() external requirePaymentService {
-        // Detach this Escrow contract from all assets upon loan repayment
-        for (uint i = 0; i < assetsToBeSold.length; i++) {
-            Asset(assetsToBeSold[i]).closeSale();
-        }
-    }
+    // function detachEscrowFromAssets() external requirePaymentService {
+    //     // Detach this Escrow contract from all assets upon loan repayment
+    //     for (uint i = 0; i < assetsToBeSold.length; i++) {
+    //         Asset(assetsToBeSold[i]).closeSale();
+    //     }
+    // }
 
     function closeSale() external override requirePaymentService("complete sale") returns (uint) {
         _closeSale();
