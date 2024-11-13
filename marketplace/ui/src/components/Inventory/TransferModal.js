@@ -129,7 +129,7 @@ const TransferModal = ({ open, handleCancel, inventory, category, debouncedSearc
                     value={quantity}
                     controls={false}
                     min={1}
-                    max={inventory.quantity}
+                    max={quantityIsDecimal ? parseFloat(inventory.quantity / 100).toFixed(2) : inventory.quantity}
                     onChange={(value) => setQuantity(value)}
                     precision={0}
                 />
@@ -226,7 +226,7 @@ const TransferModal = ({ open, handleCancel, inventory, category, debouncedSearc
             <div className="flex flex-col gap-[18px] md:hidden mt-5">
                 <div> <p className="text-[#202020] font-medium text-sm">Quantity Available</p>
                     <div className="border border-[#d9d9d9] h-[42px] rounded-md flex items-center justify-center">
-                        <p> {inventory?.quantity}</p>
+                        <p> {quantityIsDecimal ? parseFloat(inventory?.quantity / 100) : inventory?.quantity}</p>
                     </div>
                 </div>
                 <div>
@@ -237,7 +237,7 @@ const TransferModal = ({ open, handleCancel, inventory, category, debouncedSearc
                             value={quantity}
                             controls={false}
                             min={1}
-                            max={inventory.quantity}
+                            max={quantityIsDecimal ? parseFloat(inventory?.quantity / 100) : inventory?.quantity}
                             onChange={(value) => setQuantity(value)}
                             precision={0}
                         />
