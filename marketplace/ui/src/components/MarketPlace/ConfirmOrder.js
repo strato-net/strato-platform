@@ -125,13 +125,13 @@ const ConfirmOrder = ({ paymentServices = [], data, columns }) => {
       let itemTotal = (itemPrice * itemQty).toFixed(2);
 
       concatenatedOrderString += `${itemName}:\n`;
-      concatenatedOrderString += `$${itemTotal} (${(itemTotal * 100).toFixed(0)} STRATS)<br>`;
-      concatenatedOrderString += `Qty: ${itemQty} &nbsp; $${itemPrice} each (${(itemPrice * 100).toFixed(0)} STRATS each)<br><br>`;
+      concatenatedOrderString = `$${itemTotal} (${(itemTotal * 100).toFixed(0)} ${((itemTotal * 100).toFixed(0) == 1) ? 'STRAT' : 'STRATs'})<br>`;
+      concatenatedOrderString += `Qty: ${itemQty} &nbsp; $${itemPrice} each (${(itemPrice * 100).toFixed(0)} ${((itemPrice * 100).toFixed(0) == 1) ? 'STRAT' : 'STRATs'} each)<br><br>`;
       orderTotal += parseFloat(itemTotal);
       if (i === cartData.length - 1) {
         concatenatedOrderString += `<hr style="border-top: 1px dotted #0A1B71; min-width: 80%; max-width: 80%; margin-left: 15px;">`;
         concatenatedOrderString += `Shipping Fee: <i><strong>Free</strong></i><br><br>`;
-        concatenatedOrderString += `Order Total: $${orderTotal.toFixed(2)} (${(orderTotal * 100).toFixed(0)} STRATS)<br>`;
+        concatenatedOrderString += `Order Total: $${orderTotal.toFixed(2)} (${(orderTotal * 100).toFixed(0)} ${((orderTotal * 100).toFixed(0) == 1) ? 'STRAT' : 'STRATs'})<br>`;
       }
     }
 
@@ -261,10 +261,10 @@ const handlePlaceOrder = async () => {
   }
 }
 
-const totalAmount = selectedProvider?.serviceName === 'STRATS' || selectedProvider?.serviceName?.includes('STRATS') ? 
-      `${(subTotal * 100).toFixed(0)} STRATS` :  
-      selectedProvider?.serviceName === 'Stripe' ? `${subTotal} USD` : 
-      `${subTotal} ${selectedProvider?.serviceName || 'USD'}`
+const totalAmount = selectedProvider?.serviceName === 'STRATS' || selectedProvider?.serviceName?.includes('STRATS') 
+  ? `${(subTotal * 100).toFixed(0)} ${((subTotal * 100).toFixed(0) == 1) ? 'STRAT' : 'STRATs'}` 
+  : selectedProvider?.serviceName === 'Stripe' 
+  ? `${subTotal} USD` : `${subTotal} ${selectedProvider?.serviceName || 'USD'}`;
 
   return (
     <>

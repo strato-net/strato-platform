@@ -362,7 +362,7 @@ const SoldOrderDetails = ({ user, users }) => {
                   value={details.order.sellersCommonName}
                 />
                 <Divider type="vertical" className="h-14 bg-secondryD" />
-                <OrderData title="Currency" value={details.order.currency ? details.order.currency : "USD"} />
+                <OrderData title="Currency" value={details.order.currency === 'STRATS' ? 'STRAT' : details.order.currency ? details.order.currency : "USD"} />
                 <Divider type="vertical" className="h-14 bg-secondryD" />
                 <OrderData title="Total" value={details.order.currency === "STRATS" ? (details.order.totalPrice * STRATS_CONVERSION).toFixed(0) : details.order.totalPrice} />
                 <Divider type="vertical" className="h-14 bg-secondryD" />

@@ -189,7 +189,7 @@ export const PAYMENT_TYPE = [
 
 export const PAYMENT_LABEL = {
   'Stripe': 'Pay with Credit Card / ACH',
-  'STRATS': 'Pay with STRATS (Express Checkout)'
+  'STRATS': 'Pay with STRATs (Express Checkout)'
 }
 
 export const SIZES = {
