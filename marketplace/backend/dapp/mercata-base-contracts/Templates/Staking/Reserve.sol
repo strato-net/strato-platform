@@ -4,7 +4,7 @@ pragma strict;
 
 import <509>;
 import "../Assets/Asset.sol";
-import "../Items/STRATS.sol";
+import "../../../items/contracts/STRATS.sol";
 import "./Escrow.sol";
 import "../Utils/Utils.sol";
 import "../Oracle/OracleService.sol";
