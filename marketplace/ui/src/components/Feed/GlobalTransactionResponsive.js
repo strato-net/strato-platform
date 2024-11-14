@@ -21,7 +21,9 @@ const GlobalTransactionResponsive = ({
   isTransactionLoading,
   fetchData,
 }) => {
-  const StratsIcon = <img src={Images.logo} alt="" className="mx-1 w-3 h-3" />;
+  const StratsIcon = (
+    <img src={Images.strats} alt="STRATs" className="mx-1 w-4 h-4" />
+  );
   const navigate = useNavigate();
   const [expandedRows, setExpandedRows] = useState({});
 
@@ -113,9 +115,15 @@ const GlobalTransactionResponsive = ({
               const handleDetailRedirection = () => {
                 let route;
                 if (type === 'Order' && from === user.commonName) {
-                  route = `${routes.SoldOrderDetails.url.replace(':id', address ? transaction_hash : address)}`;
+                  route = `${routes.SoldOrderDetails.url.replace(
+                    ':id',
+                    address ? transaction_hash : address
+                  )}`;
                 } else if (type === 'Order' && from !== user.commonName) {
-                  route = `${routes.BoughtOrderDetails.url.replace(':id', address ? transaction_hash : address)}`;
+                  route = `${routes.BoughtOrderDetails.url.replace(
+                    ':id',
+                    address ? transaction_hash : address
+                  )}`;
                 } else if (type === 'Transfer') {
                 } else if (type === 'Redemption' && to === user.commonName) {
                   route = `${routes.RedemptionsIncomingDetails.url
@@ -140,7 +148,9 @@ const GlobalTransactionResponsive = ({
               return (
                 <Row
                   key={reference}
-                  className={`bg-red-300 w-full ${isExpanded ? '' : 'h-36'} rounded-xl px-2 py-2 shadow-2xl border-2 `}
+                  className={`bg-red-300 w-full ${
+                    isExpanded ? '' : 'h-36'
+                  } rounded-xl px-2 py-2 shadow-2xl border-2 `}
                 >
                   <Col span={6} className="flex justify-center bg-grey-400">
                     <img
@@ -165,7 +175,11 @@ const GlobalTransactionResponsive = ({
                     </p>
                     <p
                       style={{ color: '#13188A' }}
-                      className={`font-semibold ${type === 'Transfer' ? 'cursor-default' : 'cursor-pointer'}`}
+                      className={`font-semibold ${
+                        type === 'Transfer'
+                          ? 'cursor-default'
+                          : 'cursor-pointer'
+                      }`}
                       onClick={() => {
                         handleDetailRedirection();
                       }}
