@@ -1,5 +1,5 @@
-url: https://marketplace.mercata-testnet2.blockapps.net/
+url: 'https://marketplace.mercata-testnet2.blockapps.net/'
 dapp:
   contract:
     name: Mercata
-    address: efcf49a654fdba8f229b23877fee7f8cf490a55e
+    address: 76f36fb2cb8f35bd3f76f46fe05c206bc7db9be5

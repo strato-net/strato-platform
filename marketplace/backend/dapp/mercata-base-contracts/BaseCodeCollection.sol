@@ -9,9 +9,13 @@ import "Templates/Assets/SemiFungible.sol";
 import "Templates/Assets/UTXO.sol";
 import "Templates/Enums/RestStatus.sol";
 import "Templates/Payments/PaymentService.sol";
+import "Templates/Oracles/OracleService.sol";
 import "Templates/Redemptions/RedemptionService.sol";
 import "Templates/Sales/Sale.sol";
+import "Templates/Sales/Escrow.sol";
+import "Templates/Staking/Reserve.sol";
 import "Templates/Utils/Utils.sol";
+import "Templates/Structs/Structs.sol";
 // Uncomment to test whether all non-base contracts typecheck
 // import "All.sol";
 

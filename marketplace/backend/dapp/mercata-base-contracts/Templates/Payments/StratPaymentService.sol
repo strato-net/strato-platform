@@ -10,6 +10,8 @@ contract StratPaymentService is PaymentService {
 
     address public feeRecipient;
 
+    event UnstakeProcessed(address indexed user, address escrow, uint assetAmount, decimal repayment);
+
     constructor (
         address _stratAddress,
         decimal _stratsPerDollar,
@@ -27,6 +29,41 @@ contract StratPaymentService is PaymentService {
         stratAddress = _stratAddress;
         stratsPerDollar = _stratsPerDollar;
         feeRecipient = _feeRecipient;
+    }
+
+    function unStake(
+        address[] _stratsAssetAddresses,
+        address _escrowAddress
+    ) requireActive("unstake") external returns (uint) {
+        require(_stratsAssetAddresses.length > 0, "Pass at least one STRATs token address");
+        Escrow escrow = Escrow(_escrowAddress);
+        uint stratAmountNet = uint(escrow.stratsLoanAmount() * stratsPerDollar * 100);
+        uint stratQuantity = 0;
+        uint transferNumber = 0;
+        uint transferAmount = 0;
+
+        for (uint j = 0; j < _stratsAssetAddresses.length; j++) {
+            STRATSTokens stratAsset = STRATSTokens(_stratsAssetAddresses[j]);
+            require(stratAsset.root == stratAddress, "Asset is not a STRATS asset");
+            require(stratAsset.ownerCommonName() == getCommonName(msg.sender), "Purchaser doesn't own STRATS");
+
+            stratQuantity = stratAsset.quantity();
+            transferNumber = (uint(string(_escrowAddress), 16) + j + block.timestamp) % 1000000;
+
+            transferAmount = stratQuantity >= stratAmountNet ? stratAmountNet : stratQuantity;
+            stratAsset.purchaseTransfer(escrow.reserve(), transferAmount, transferNumber, 0.0001);
+            stratAmountNet -= transferAmount;
+
+            if (stratAmountNet == 0) {
+                break;
+            }
+        }
+        require(stratAmountNet == 0, "Your STRATS balance is not high enough to cover the purchase.");
+
+        // Transfer assets
+        escrow.closeSale();
+
+        emit UnstakeProcessed(msg.sender, _escrowAddress, escrow.quantity(), escrow.stratsLoanAmount());
     }
 
     function _checkoutInitialized (
@@ -115,6 +152,7 @@ contract StratPaymentService is PaymentService {
                 transferNumber = (uint(_checkoutHash, 16) + j) % 1000000;
                 if (remainingStratsToTransfer > 0) {
                     transferAmount = stratQuantity >= remainingStratsToTransfer ? remainingStratsToTransfer : stratQuantity;
+                    unStake(_stratsAssetAddresses, _escrowAddress, sellerAddress);
                     stratAsset.purchaseTransfer(sellerAddress, transferAmount, transferNumber, 0.0001);
                     remainingStratsToTransfer -= transferAmount;
                 }
