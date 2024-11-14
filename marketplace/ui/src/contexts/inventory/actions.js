@@ -871,7 +871,7 @@ const actions = {
   },
 
   calculateValue: async (dispatch, payload) => {
-    dispatch({ type: actionDescriptors.stakeInventory });
+    dispatch({ type: actionDescriptors.getCalculatedValue });
 
     try {
       const response = await fetch(`${apiUrl}/governance/calculate`, { //Stake
