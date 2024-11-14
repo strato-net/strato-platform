@@ -44,6 +44,7 @@ export const UNIT_OF_MEASUREMENTS = {
 };
 
 export const US_DATE_FORMAT = "MM/DD/YYYY";
+export const DATE_TIME_FORMAT = "MMM D, YYYY h:mm A";
 
 export const MAX_QUANTITY = 1000000;
 export const MAX_PRICE = 100000000;
@@ -188,7 +189,7 @@ export const PAYMENT_TYPE = [
 
 export const PAYMENT_LABEL = {
   'Stripe': 'Pay with Credit Card / ACH',
-  'STRATS': 'Pay with STRATS (Express Checkout)'
+  'STRATS': 'Pay with STRATs (Express Checkout)'
 }
 
 export const SIZES = {
@@ -256,7 +257,7 @@ export const STRATS_CONVERSION = 100;
 
 export const navItems = [
   { label: <div id="Transactions">My Transactions</div>, key: '1' },
-  { label: <div id="Inventory">My Items</div>, key: '2' }
+  { label: <div id="Inventory">My Wallet</div>, key: '2' }
 ];
 
 const metaImg = SEO.IMAGE_META

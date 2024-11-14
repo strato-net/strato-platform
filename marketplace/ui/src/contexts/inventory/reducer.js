@@ -212,7 +212,6 @@ const reducer = (state, action) => {
     case actionDescriptors.transferInventorySuccessful:
       return {
         ...state,
-        inventory: action.payload,
         isTransferring: false
       };
     case actionDescriptors.transferInventoryFailed:

@@ -8,7 +8,7 @@ import { CheckCircleOutlined } from '@ant-design/icons';
 
 const { Option } = Select;
 
-const ListForSaleModal = ({ open, handleCancel, inventory, categoryName, limit, offset, user }) => {
+const ListForSaleModal = ({ open, handleCancel, inventory, categoryName, limit, offset, user, debouncedSearchTerm, category }) => {
     const [data, setData] = useState([inventory]);
     const [quantity, setQuantity] = useState(() => {
       const selectedQuantity = inventory.saleAddress
@@ -105,7 +105,7 @@ const ListForSaleModal = ({ open, handleCancel, inventory, categoryName, limit, 
         if (stratsIndex !== -1 && !selectedPaymentServiceIndices.includes(stratsIndex)) {
             selectedPaymentServiceIndices.push(stratsIndex);
         }
-
+        
         setPaymentTypes(selectedPaymentServiceIndices);
 
     }, [paymentServices, notOnboarded, inventory.paymentServices]);
@@ -127,7 +127,7 @@ const ListForSaleModal = ({ open, handleCancel, inventory, categoryName, limit, 
                 onClose={onClose}
                 className="flex items-center mr-1"
             >
-                {service.serviceName}&nbsp;
+                {service.serviceName === 'STRATS' ? 'STRAT' : service.serviceName}&nbsp;
                 {renderImg(service)}
             </Tag>
         ) : '';
@@ -177,7 +177,7 @@ const ListForSaleModal = ({ open, handleCancel, inventory, categoryName, limit, 
         }
 
         if (isDone) {
-            await actions.fetchInventory(inventoryDispatch, limit, offset, "", categoryName);
+            await actions.fetchInventory(inventoryDispatch, limit, offset, debouncedSearchTerm, category && category !== "All" ? category : undefined);
             handleCancel();
         }
     };
@@ -210,7 +210,7 @@ const ListForSaleModal = ({ open, handleCancel, inventory, categoryName, limit, 
                                 >
                                     <div className="flex items-center justify-between">
                                         <div className="flex items-center">
-                                            {e.serviceName}&nbsp;
+                                        {e.serviceName === 'STRATS' ? 'STRAT' : e.serviceName}&nbsp;
                                             {renderImg(e)}
                                         </div>
                                         {paymentTypes.includes(index) && (
@@ -305,7 +305,7 @@ const ListForSaleModal = ({ open, handleCancel, inventory, categoryName, limit, 
                         >
                             <div className="flex items-center justify-between">
                                 <div className="flex items-center">
-                                    {e.serviceName}&nbsp;
+                                {e.serviceName === 'STRATS' ? 'STRAT' : e.serviceName}&nbsp;
                                     {renderImg(e)}
                                 </div>
                                 
@@ -324,7 +324,9 @@ const ListForSaleModal = ({ open, handleCancel, inventory, categoryName, limit, 
                         value={quantity}
                         controls={false}
                         min={1}
-                        max={inventory.quantity}
+                        max={inventory.data.quantityIsDecimal &&
+                            inventory.data.quantityIsDecimal === "True"
+                            ? parseFloat(inventory.quantity / 100).toFixed(2) : inventory.quantity}
                         onChange={(value) => setQuantity(value)}
                         precision={0}
                     />

@@ -429,11 +429,11 @@ const ProductDetails = ({ user, users }) => {
               {
                 isCalledFromInventory ?
                   <Breadcrumb.Item href="" onClick={e => e.preventDefault()}>
-                    <ClickableCell href={routes.MyItems.url}>
+                    <ClickableCell href={routes.MyWallet.url}>
                       <p
                         className="text-[#13188A]  text-sm font-semibold "
                       >
-                        My Items
+                        My Wallet
                       </p>
                     </ClickableCell>
                   </Breadcrumb.Item> : null
@@ -525,7 +525,7 @@ const ProductDetails = ({ user, users }) => {
                         <>
                           ${adjustedPrice} 
                           <span className="font-normal text-xs mr-2 text-primary">
-                            <b> ({(adjustedPrice * STRATS_CONVERSION).toFixed(0)} STRATS)</b>
+                          <b>({(adjustedPrice * STRATS_CONVERSION).toFixed(0)} {(adjustedPrice * STRATS_CONVERSION).toFixed(0) == 1 ? 'STRAT' : 'STRATs'})</b>
                           </span>
                         </>
                       );

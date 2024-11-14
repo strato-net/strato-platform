@@ -249,33 +249,57 @@ async function requestRedemption(user, contract, args, options) {
     return [requestRedemptionStatus, assetAddress];
 }
 
-async function transferItem(user, contract, args, options) {
-    const callArgs = {
-        contract,
-        method: "automaticTransfer",
-        args: util.usc({ ...args }),
-    };
-    const transferStatus = await rest.call(user, callArgs, options);
+async function transferItem(user, argsArray, options) {
+  try {
+    // Prepare transfer call arguments
+    const callArgsArray = argsArray.map((args) => ({
+      contract: args.contract,
+      method: "automaticTransfer",
+      args: util.usc({ ...args, contract: undefined }),
+    }));
 
-    if (parseInt(transferStatus, 10) !== RestStatus.OK) {
-        throw new rest.RestError(
-            transferStatus,
-            "You cannot transfer the item",
-            { callArgs }
-        );
+    // Make the transfer requests
+    options.isDetailed = true;
+    const transferStatuses = await rest.callList(user, callArgsArray, options);
+
+    // Verify that all transfer responses are successful
+    const allSuccessful = transferStatuses.every((transfer) => {
+      return transfer.data.contents && transfer.data.contents.length > 0 && 
+             parseInt(transfer.data.contents[0], 10) === RestStatus.OK;
+    });
+    if (!allSuccessful) {
+      throw new rest.RestError(
+        transferStatuses,
+        "One or more transfers failed.",
+        { callArgsArray }
+      );
     }
-
-    const searchOptions = {
+    
+    // Wait for each transfer to be reflected in the contract state
+    const searchPromises = transferStatuses.map((transfer) => {
+      const searchOptions = {
         ...options,
         org: constants.blockAppsOrg,
         query: {
-            transferNumber: `eq.${args.transferNumber}`
-        }
+          transaction_hash: `eq.${transfer.hash}`,
+        },
+      };
+      return waitForAddress(
+        user,
+        { name: transferContractName },
+        searchOptions
+      );
+    });
+    await Promise.all(searchPromises);
+
+    return argsArray.map((statusArray) => statusArray.transferNumber);
+  } catch (error) {
+    if (error.response && error.response.statusText.includes("SString")) {
+      const extractedText = error.response.statusText.match(/"([^"]+)"/)[1];
+      error.response.statusText = extractedText;
     }
-
-    await waitForAddress(user, { name: transferContractName }, searchOptions);
-
-    return { transferStatus, transferNumber: args.transferNumber };
+    throw error;
+  }
 }
 
 async function updateAssetStatus(user, contract, args, options) {
@@ -402,7 +426,7 @@ async function get(user, args, options) {
 }
 
 async function getAll(admin, args = {}, defaultOptions) {
-    const { range, ownerCommonName, assetAddresses, status, isMarketplaceSearch, isTrendingSearch, userProfile, userProfileGtField, userProfileGtValue, queryOptions, ...restArgs } = args;
+    const { range, ownerCommonName, assetAddresses, status, isMarketplaceSearch, isTrendingSearch, userProfile, queryOptions, ...restArgs } = args;
     let isNullPriceRange = false; //TODO: find a better way to identify/handle this
     if (range !== undefined) {
         isNullPriceRange = range ? range[0].split(",")[1] == 0 : true;
@@ -576,7 +600,7 @@ async function getOwnershipHistory(user, args, options) {
 
 async function inventoryCount(admin, args = {}, defaultOptions) {
     const options = { ...defaultOptions, org: 'BlockApps', app: 'Mercata' }
-    const { range, userProfile, userProfileGtField, userProfileGtValue, ...newArgs } = args;
+    const { range, userProfile, ...newArgs } = args;
     const queryArgs = setSearchQueryOptionsPrime({
         ...newArgs,
         limit: undefined,

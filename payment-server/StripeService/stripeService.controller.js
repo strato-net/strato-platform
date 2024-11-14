@@ -357,8 +357,13 @@ class StripeServiceController {
                 comments: ERROR_MESSAGE,
               } 
         
-              const cancelOrderStatus = await cancelOrder(STRIPE_CONTRACT_ADDRESS, callArgs);
-              console.log("cancelOrderStatus", cancelOrderStatus);
+              try {
+                const cancelOrderStatus = await cancelOrder(STRIPE_CONTRACT_ADDRESS, callArgs);
+                console.log("cancelOrderStatus", cancelOrderStatus);
+              } catch (err) {
+                // this is left empty without any logging because it will flood the payment server with useless
+                // error logs
+              }
         
               // Update payment status in DB
               const updateResult = await updateStripePayment(p.orderHash, "CANCELED");

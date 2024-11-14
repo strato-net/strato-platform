@@ -171,12 +171,11 @@ const actions = {
   },
 
   fetchInventory: async (dispatch, limit, offset, queryValue, category) => {
-    // let temp = [category]
-    const query = queryValue ? `&productId=${queryValue}` : ``;
-    // const categoryQuery = category ? `category[]=${temp}` : "";
-
-    // Added query to filter based on the field "contract_name"
-    const categoryQuery = category ? `&queryValue=${category}&queryFields=contract_name` : "";
+    const query = queryValue
+    ? `&queryValue=${queryValue}&queryFields=name`
+    : "";
+    
+    const categoryQuery = category ? `category[]=${category}` : "";
 
     dispatch({ type: actionDescriptors.fetchInventory });
 
@@ -220,14 +219,18 @@ const actions = {
     }
   },
 
-  fetchInventoryForUser: async (dispatch, queryValue) => {
-    const query = queryValue ? `&ownerCommonName=${encodeURIComponent(queryValue)}` : ``;
+  fetchInventoryForUser: async (dispatch, limit, offset, queryValue, category) => {
+    const query = queryValue
+    ? `&queryValue=${queryValue}&queryFields=name`
+    : "";
+
+    const categoryQuery = category ? `category[]=${category}` : "";
 
     dispatch({ type: actionDescriptors.fetchInventoryForUser });
 
     try {
       const response = await fetch(
-        `${apiUrl}/inventory/user/inventories?gtField=quantity&gtValue=0${query}&isMint=true`,
+        `${apiUrl}/inventory/user/inventories?${categoryQuery}&limit=${limit}&offset=${offset}${query}&isMint=true`,
         {
           method: HTTP_METHODS.GET,
         }
@@ -654,10 +657,7 @@ const actions = {
       const body = await response.json();
 
       if (response.status === RestStatus.OK) {
-        dispatch({
-          type: actionDescriptors.transferInventorySuccessful,
-          payload: body.data,
-        });
+        dispatch({ type: actionDescriptors.transferInventorySuccessful });
         actions.setMessage(dispatch, "Item has been transferred", true);
         return true;
       } else if (response.status === RestStatus.CONFLICT) {

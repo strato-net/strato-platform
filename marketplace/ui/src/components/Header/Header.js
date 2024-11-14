@@ -97,7 +97,7 @@ const HeaderComponent = ({ user, loginUrl, showMenu, handleSubMenu, handleMenuTa
   const navUrls = [
     routes.Marketplace.url,
     routes.Transactions.url,
-    routes.MyItems.url,
+    routes.MyWallet.url,
     routes.Products.url,
   ];
 
@@ -120,7 +120,7 @@ const HeaderComponent = ({ user, loginUrl, showMenu, handleSubMenu, handleMenuTa
     let pathName = window.location.pathname;
     if (pathName.includes("/transactions")) {
       setSelectedTab("1");
-    } else if (pathName.includes("/myitems")) {
+    } else if (pathName.includes("/mywallet")) {
       setSelectedTab("2");
     } else if (pathName.includes("/products")) {
       setSelectedTab("3");
@@ -143,13 +143,22 @@ const HeaderComponent = ({ user, loginUrl, showMenu, handleSubMenu, handleMenuTa
 
   const items = user ? [
     {
-      key: '3',
+      key: '4',
       label: (
         <div>
           <p>My Profile</p>
         </div>
       ),
       onClick: () => navigate(`${routes.MarketplaceUserProfile.url.replace(":commonName", user.commonName)}`)
+    },
+    {
+      key: '3',
+      label: (
+        <div>
+          <p>Global Transactions</p>
+        </div>
+      ),
+      onClick: () => navigate(routes.GlobalTransactions.url)
     },
     {
       key: '2',
@@ -191,7 +200,7 @@ const HeaderComponent = ({ user, loginUrl, showMenu, handleSubMenu, handleMenuTa
         <div>
           {user &&
             <p className="text-xs mt-1">
-              STRATS: {stratsBalance}
+              STRATs: {stratsBalance}
             </p>
           }
         </div>
@@ -206,7 +215,7 @@ const HeaderComponent = ({ user, loginUrl, showMenu, handleSubMenu, handleMenuTa
             <div>
               {user && originAddress &&
                 <p className="text-xs mt-1">
-                  Buy STRATS
+                  Buy STRATs
                 </p>
               }
             </div>
@@ -238,12 +247,13 @@ const HeaderComponent = ({ user, loginUrl, showMenu, handleSubMenu, handleMenuTa
 
   const subMenuItems = [
     { value: "transactions", path: routes.Transactions.url, label: "My Transactions" },
-    { value: "myitems", path: routes.MyItems.url, label: "My Items" },
+    { value: "mywallet", path: routes.MyWallet.url, label: "My Wallet" },
     user ? {
       value: "my-profile",
       path: routes.MarketplaceUserProfile.url.replace(':commonName', user.commonName),
       label: (<div> <p className="!mb-0"> My Profile </p> </div>)
     } : null,
+    { value: "GlobalTransactions", path: "/globalTransactions", label: "Global Transactions" },
     user ? {
       value: "logout",
       path: "/logout",
@@ -420,7 +430,7 @@ const HeaderComponent = ({ user, loginUrl, showMenu, handleSubMenu, handleMenuTa
                   count={stratsBalance}
                   overflowCount={9999999}
                 >
-                  <img src={Images.logo} alt={IMG_META} title={IMG_META} className="w-[30px] h-[30px] " />
+                  <img src={Images.strats} alt={IMG_META} title={IMG_META} className="w-[35px] h-[35px] " />
                 </Badge>
               </a>
             </Dropdown>

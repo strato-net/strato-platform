@@ -14,7 +14,7 @@ import ResponsiveAddAddress from "../MarketPlace/ResponsiveAddAddress"
 import { Images } from "../../images";
 import { REDEMPTION_STATUS } from "../../helpers/constants";
 
-const RedeemModal = ({ open, handleCancel, inventory, categoryName, limit, offset }) => {
+const RedeemModal = ({ open, handleCancel, inventory, category, debouncedSearchTerm, limit, offset }) => {
     const [data, setData] = useState([inventory]);
     const [quantity, setQuantity] = useState(1);
     const [comments, setComments] = useState("");
@@ -30,6 +30,10 @@ const RedeemModal = ({ open, handleCancel, inventory, categoryName, limit, offse
     const { userAddresses, isLoadingUserAddresses } = useMarketplaceState();
     const { TextArea } = Input;
 
+    // Determine if `isStrats` is true based on inventory data
+    const isStrats = inventory.data.quantityIsDecimal && inventory.data.quantityIsDecimal === "True";
+    const displayQuantity = isStrats ? parseFloat((inventory.quantity / 100).toFixed(2)) : inventory.quantity;
+
     const closeAddressModel = () => {
         setshowModal(false);
     }
@@ -43,7 +47,7 @@ const RedeemModal = ({ open, handleCancel, inventory, categoryName, limit, offse
     }, [marketplaceDispatch]);
 
     useEffect(() => {
-        if (quantity > inventory.quantity || quantity <= 0) {
+        if (quantity > displayQuantity || quantity <= 0) {
             setCanRedeem(false);
         }
         else {
@@ -55,7 +59,8 @@ const RedeemModal = ({ open, handleCancel, inventory, categoryName, limit, offse
         {
             title: "Quantity Available",
             dataIndex: "quantity",
-            align: "center"
+            align: "center",
+            render: () => <div>{displayQuantity}</div>
         },
         {
             title: "Set Quantity",
@@ -65,7 +70,7 @@ const RedeemModal = ({ open, handleCancel, inventory, categoryName, limit, offse
                     value={quantity}
                     controls={false}
                     min={1}
-                    max={inventory.quantity}
+                    max={displayQuantity}
                     onChange={(value) => setQuantity(value)}
                     precision={0}
                 />
@@ -86,7 +91,7 @@ const RedeemModal = ({ open, handleCancel, inventory, categoryName, limit, offse
             redemptionService: inventory.data.redemptionService,
             assetName: inventory.name,
             status: REDEMPTION_STATUS.PENDING,
-            quantity: quantity,
+            quantity: isStrats ? parseFloat(quantity * 100) : quantity,
             shippingAddressId: userAddresses[selectedAddress].address_id,
             ownerCommonName: user.commonName,
             issuerCommonName: inventory.creator,
@@ -94,11 +99,11 @@ const RedeemModal = ({ open, handleCancel, inventory, categoryName, limit, offse
             userAddress: user.userAddress
         };
 
-        if (quantity > 0 && quantity <= inventory.quantity) {
+        if (quantity > 0 && quantity <= displayQuantity) {
             let isDone = await redemptionActions.requestRedemption(redemptionDispatch, body);
             if (isDone) {
-                await actions.fetchInventory(inventoryDispatch, limit, offset, "", categoryName);
-                await actions.fetchInventoryForUser(inventoryDispatch, user.commonName);
+                await actions.fetchInventory(inventoryDispatch, limit, offset, debouncedSearchTerm, category && category !== "All" ? category : undefined);
+            await actions.fetchInventoryForUser(inventoryDispatch, limit, offset, debouncedSearchTerm, category && category !== "All" ? category : undefined);
                 handleCancel();
             }
         }
@@ -176,7 +181,7 @@ const RedeemModal = ({ open, handleCancel, inventory, categoryName, limit, offse
                     <div>
                         <InputNumber
                             className="w-full h-9"
-                            value={data[0].quantity}
+                            value={displayQuantity}
                             min={1}
                             disabled
                         />
@@ -190,7 +195,7 @@ const RedeemModal = ({ open, handleCancel, inventory, categoryName, limit, offse
                             value={quantity}
                             controls={false}
                             min={1}
-                            max={inventory.quantity}
+                            max={displayQuantity}
                             onChange={(value) => setQuantity(value)}
                             precision={0}
                         />

@@ -46,10 +46,13 @@ class InventoryController {
   static async getAll(req, res, next) {
     try {
       const { dapp, query } = req
+      const { limit, offset, ...restQuery } = query;
 
-      const inventories = await dapp.getInventories({ ...query })
-      const inventoriesWithImageUrl = inventories?.inventories
-      rest.response.status200(res, { inventoriesWithImageUrl: inventoriesWithImageUrl, count: inventories.inventoryCount })
+      const inventories = await dapp.getInventories({ ...restQuery })
+      const inventoriesWithImageUrl = inventories?.inventories;
+      const paginatedInventories = inventoriesWithImageUrl.slice(offset, parseInt(offset) + parseInt(limit));
+
+      rest.response.status200(res, { inventoriesWithImageUrl: paginatedInventories, count: inventories.inventoryCount })
 
       return next()
     } catch (e) {
@@ -60,17 +63,18 @@ class InventoryController {
   static async getAllUserInventories(req, res, next) {
     try {
       const { dapp, query } = req
-      const { gtField, gtValue, ...restQuery } = query;
+      const { limit, offset, ...restQuery } = query;
 
-      const inventories = await dapp.getInventoriesForUser({ userProfileGtField: gtField, userProfileGtValue: gtValue, ...restQuery });
+      const inventories = await dapp.getInventoriesForUser({ ...restQuery });
       const sortedInventories = inventories?.inventoryResults.sort((a, b) => {
         if (a.saleDate && b.saleDate) {
           return b.saleDate.localeCompare(a.saleDate);
         }
         return a.saleDate ? -1 : 1; // Move items without saleDate to the end
       });
+      const paginatedInventories = sortedInventories.slice(offset, parseInt(offset) + parseInt(limit));
 
-      rest.response.status200(res, { inventoriesWithImageUrl: sortedInventories, count: sortedInventories.length })
+      rest.response.status200(res, { inventoriesWithImageUrl: paginatedInventories, count: paginatedInventories.length })
 
 
       return next()
@@ -156,17 +160,20 @@ class InventoryController {
   static async transfer(req, res, next) {
     try {
       const { dapp, body } = req;
-      const { senderCommonName, recipientCommonName, isDecimal,
-         itemName, quantity, price, ...restData } = body;
-      const payload = { quantity, price, ...restData }
-      InventoryController.validateTransferItemArgs(payload)
-      const result = await dapp.transferItem(payload)
+      InventoryController.validateTransferItemArgs(body)
 
-      const TransferSenderTemplate = TransferSender(senderCommonName, itemName, quantity, price, recipientCommonName, isDecimal);
-      const TransferRecipientTemplate = TransferRecipient(recipientCommonName, itemName, quantity, price, senderCommonName, isDecimal);
-      await sendEmail(senderCommonName, 'Your Item Transfer Confirmation', TransferSenderTemplate)
-      await sendEmail(recipientCommonName, 'You’ve Received an Item Transfer!', TransferRecipientTemplate)
-      rest.response.status200(res, result.transferStatus)
+      const transfers = body.map(({ assetAddress, newOwner, quantity, price }) => ({ assetAddress, newOwner, quantity, price }));
+      await dapp.transferItem(transfers)
+
+      // Send individual emails to each recipient
+      await Promise.all(body.map(async ({ recipientCommonName, itemName, quantity, price, senderCommonName }) => {
+        const TransferSenderTemplate = TransferSender(senderCommonName, itemName, quantity, price, recipientCommonName);
+        const TransferRecipientTemplate = TransferRecipient(recipientCommonName, itemName, quantity, price, senderCommonName);
+        await sendEmail(senderCommonName, 'Your Item Transfer Confirmation', TransferSenderTemplate)
+        await sendEmail(recipientCommonName, 'You’ve Received an Item Transfer!', TransferRecipientTemplate)
+      }));
+
+      rest.response.status200(res)
       return next()
     } catch (e) {
       return next(e)
@@ -211,17 +218,13 @@ class InventoryController {
           price: body.price,
       };
 
-      const result = await dapp.transferItem(transferPayload);
-
-      if (result.transferStatus[0] !== '200') {
-          throw new Error(`Transfer failed with status: ${result.transferStatus[0]}`);
-      }
+      const result = await dapp.transferItem([transferPayload]);
 
       const payload = {
           tokenSymbol: body.rootAddress,
           quantity: body.quantity,
           baseAddress: body.baseAddress,
-          transferNumber: result.transferNumber.toString(),
+          transferNumber: result[0].toString(),
           mercataAddress: body.mercataAddress,
       };
       const url = await getTokenServerUrl();
@@ -436,12 +439,15 @@ class InventoryController {
   }
 
   static validateTransferItemArgs(args) {
-    const transferItemSchema = Joi.object({
+    const transferItemSchema = Joi.array().min(1).items(Joi.object({
       assetAddress: Joi.string().required(),
       newOwner: Joi.string().required(),
       quantity: Joi.number().integer().greater(0).required(),
       price: Joi.number().greater(0).precision(4).required(),
-    });
+      senderCommonName: Joi.string().required(),
+      recipientCommonName: Joi.string().required(),
+      itemName: Joi.string().required()
+    }));
 
     const validation = transferItemSchema.validate(args);
 
