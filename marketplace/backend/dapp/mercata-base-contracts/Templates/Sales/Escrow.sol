@@ -1,9 +1,6 @@
 pragma es6;
 pragma strict;
 
-import "../Sales/Sale.sol";
-import "../Assets/Asset.sol";
-
 contract Escrow is Sale {
     address public reserve;
     address public borrower;
@@ -28,7 +25,7 @@ contract Escrow is Sale {
         Asset _assetToBeSold,
         decimal _price,
         uint _quantity,
-        PaymentService[] _paymentServices
+        PaymentServiceInfo[] _paymentServices
     ) Sale(_assetToBeSold, _price, _quantity, _paymentServices) {
         borrower = _borrower;
         stratsLoanAmount = _stratsLoanAmount;

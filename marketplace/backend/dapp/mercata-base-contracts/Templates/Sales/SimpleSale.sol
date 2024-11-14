@@ -8,11 +8,11 @@ contract SimpleSale is Sale {
         address _assetToBeSold,
         decimal _price,
         uint _quantity,
-        PaymentService[] _paymentServices
+        PaymentServiceInfo[] _paymentServices
     ) Sale(_assetToBeSold, _price, _quantity, _paymentServices) {
     }
 
-    function addPaymentServices(PaymentService[] _paymentServices) external requireSeller("add payment services") {
+    function addPaymentServices(PaymentServiceInfo[] _paymentServices) external requireSeller("add payment services") {
         _addPaymentServices(_paymentServices);
     }
 
@@ -34,7 +34,7 @@ contract SimpleSale is Sale {
     function update(
         uint _quantity,
         decimal _price,
-        PaymentService[] _paymentServices,
+        PaymentServiceInfo[] _paymentServices,
         uint _scheme
     ) external requireSeller("Update Sale") returns (uint) {
         _update(_quantity, _price, _paymentServices, _scheme);

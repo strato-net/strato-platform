@@ -2,9 +2,7 @@ pragma es6;
 pragma strict;
 
 import <BASE_CODE_COLLECTION>;
-
 import "../../../items/contracts/STRATS.sol";
-import "../Staking/Escrow.sol";
 
 contract StratPaymentService is PaymentService {
     address public stratAddress;
