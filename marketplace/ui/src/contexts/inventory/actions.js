@@ -29,12 +29,23 @@ const actionDescriptors = {
   unlistInventory: "unlist_inventory",
   unlistInventorySuccessful: "unlist_inventory_successful",
   unlistInventoryFailed: "unlist_inventory_failed",
-  stakeInventory: "stake_inventory", // Staking
+//------------------------------------------------------------
+  stakeInventory: "stake_inventory", 
   stakeInventorySuccessful: "stake_inventory_successful",
   stakeInventoryFailed: "stake_inventory_failed",
-  unstakeInventory: "unstake_inventory", // Unstaking
+
+  unstakeInventory: "unstake_inventory", 
   unstakeInventorySuccessful: "unstake_inventory_successful",
   unstakeInventoryFailed: "unstake_inventory_failed",
+
+  getGovernanceAddress: "get_governance_address",
+  getGovernanceAddressSuccessful: "get_governance_address_successful",
+  getGovernanceAddressFailed: "get_governance_address_failed",
+
+  getCalculatedValue: "get_calculated_value",
+  getCalculatedValueSuccessful: "get_calculated_value_successful",
+  getCalculatedValueFailed: "get_calculated_value_failed",
+//------------------------------------------------------------
   resellInventory: "resell_inventory",
   resellInventorySuccessful: "resell_inventory_successful",
   resellInventoryFailed: "resell_inventory_failed",
@@ -696,12 +707,12 @@ const actions = {
       actions.setMessage(dispatch, "Error while transferring Item");
     }
   },
-
+// ------------------------------------------------------------------------------------------------------------------------------------------
   stakeInventory: async (dispatch, payload) => {
     dispatch({ type: actionDescriptors.stakeInventory });
 
     try {
-      const response = await fetch(`${apiUrl}/governance/stake`, { //Stake
+      const response = await fetch(`${apiUrl}/governance/stake`, {
         method: HTTP_METHODS.POST,
         credentials: "same-origin",
         headers: {
@@ -805,6 +816,114 @@ const actions = {
     }
   },
 
+  getGovernanceAddress: async (dispatch, payload) => {
+    dispatch({ type: actionDescriptors.getGovernanceAddress });
+
+    try {
+      const response = await fetch(`${apiUrl}/governance`, {
+        method: HTTP_METHODS.GET,
+        credentials: "same-origin",
+        headers: {
+          Accept: "application/json",
+          "Content-Type": "application/json",
+        },
+        // body: JSON.stringify(payload),
+      });
+
+      const body = await response.json();
+
+      if (response.status === RestStatus.OK) {
+        dispatch({
+          type: actionDescriptors.getGovernanceAddressSuccessful,
+          payload: body.data,
+        });
+        // actions.setMessage(dispatch, "Item has been Staked Successfully", true);
+        return true;
+      } else if (response.status === RestStatus.CONFLICT) {
+        dispatch({ type: actionDescriptors.getGovernanceAddressFailed, error: body.error.message });
+        actions.setMessage(dispatch, body.error.message)
+        return false;
+      } else if (response.status === RestStatus.INTERNAL_SERVER_ERROR) {
+        dispatch({ type: actionDescriptors.getGovernanceAddressFailed, error: "Error while fetching the governance Address" });
+        actions.setMessage(dispatch, "Errorwhile fetching the governance Address")
+        return false;
+      } else if (response.status === RestStatus.UNAUTHORIZED) {
+        dispatch({
+          type: actionDescriptors.getGovernanceAddressFailed,
+          error: "Unauthorized while fetching the governance Address"
+        });
+        window.location.href = body.error.loginUrl;
+      }
+
+      dispatch({
+        type: actionDescriptors.getGovernanceAddressFailed,
+        error: body.error
+      });
+      actions.setMessage(dispatch, body.error);
+      return false;
+    } catch (err) {
+      dispatch({
+        type: actionDescriptors.getGovernanceAddressFailed,
+        error: "Error while fetching the governance Address",
+      });
+      actions.setMessage(dispatch, "Error while fetching the governance Address");
+    }
+  },
+
+  calculateValue: async (dispatch, payload) => {
+    dispatch({ type: actionDescriptors.stakeInventory });
+
+    try {
+      const response = await fetch(`${apiUrl}/governance/calculate`, { //Stake
+        method: HTTP_METHODS.GET,
+        credentials: "same-origin",
+        headers: {
+          Accept: "application/json",
+          "Content-Type": "application/json",
+        },
+        // body: JSON.stringify(payload),
+      });
+
+      const body = await response.json();
+
+      if (response.status === RestStatus.OK) {
+        dispatch({
+          type: actionDescriptors.getCalculatedValue,
+          payload: body.data,
+        });
+        // actions.setMessage(dispatch, "Item has been Staked Successfully", true);
+        return true;
+      } else if (response.status === RestStatus.CONFLICT) {
+        dispatch({ type: actionDescriptors.getCalculatedValueFailed, error: body.error.message });
+        actions.setMessage(dispatch, body.error.message)
+        return false;
+      } else if (response.status === RestStatus.INTERNAL_SERVER_ERROR) {
+        dispatch({ type: actionDescriptors.getCalculatedValueFailed, error: "Error while fetching the calculated value" });
+        actions.setMessage(dispatch, "Error while fetching the calculated value")
+        return false;
+      } else if (response.status === RestStatus.UNAUTHORIZED) {
+        dispatch({
+          type: actionDescriptors.getCalculatedValueFailed,
+          error: "Unauthorized while fetching the calculated value"
+        });
+        window.location.href = body.error.loginUrl;
+      }
+
+      dispatch({
+        type: actionDescriptors.getCalculatedValueFailed,
+        error: body.error
+      });
+      actions.setMessage(dispatch, body.error);
+      return false;
+    } catch (err) {
+      dispatch({
+        type: actionDescriptors.getCalculatedValueFailed,
+        error: "Error while fetching the calculated value",
+      });
+      actions.setMessage(dispatch, "Error while fetching the calculated value");
+    }
+  },
+// ------------------------------------------------------------------------------------------------------------------------------------------
   fetchItemTransfers: async (dispatch, limit, offset, ownerCommonName, order, date, search) => {
     dispatch({ type: actionDescriptors.fetchItemTransfers });
 

@@ -10,13 +10,28 @@ import { Images } from "../../images";
 const logo = <img src={Images.logo} alt={''} title={''} className=" ml-1 mt-1 w-[15px] h-[15px] " />
 
 const StakeModal = ({ open, handleCancel, inventory, category, debouncedSearchTerm, limit = 0, offset = 0, type }) => {
+    const { isStaking, isUnstaking, isGovernanceAddress, isCalculatedValue, governanceAddress, calculatedValue} = useInventoryState();
     const [data, setData] = useState(inventory);
     const inventoryDispatch = useInventoryDispatch();
     const [api, contextHolder] = notification.useNotification();
+    // const [govAddress, setGovAddress] = useState(null)
     const quantityIsDecimal = data.data.quantityIsDecimal && data.data.quantityIsDecimal === "True";
-
+    const isLoader = isStaking || isUnstaking || isCalculatedValue;
     const originAddress = inventory.originAddress?.toLowerCase();
     const itemName = decodeURIComponent(inventory.name)
+    
+    useEffect(()=>{
+        inventoryActions.getGovernanceAddress(inventoryDispatch);
+    },[]);
+
+    useEffect(()=>{
+        const body = {
+            amount:inventory?.price,
+            assetAddress:inventory?.address,
+            governance: governanceAddress
+        }
+        inventoryActions.calculateValue(inventoryDispatch, body);
+    },[governanceAddress]);
 
     // const filteredUsersList = filterDuplicateUserAddresses(usersList);
     // const [userAddress, setUserAddress] = useState(
@@ -59,21 +74,32 @@ const StakeModal = ({ open, handleCancel, inventory, category, debouncedSearchTe
             title: "Actions",
             align: "center",
             render: () => (
-                <Button type="primary" className="w-32 h-9" onClick={handleSubmit} disabled={false} loading={false}>
+                <Button type="primary" className="w-32 h-9" onClick={handleSubmit} disabled={isLoader} loading={isLoader}>
                          {type}
                 </Button>
             )
         }
     ];
 
-
     const handleSubmit = async () => {
         if(type==='Stake'){
-          const isStaked = await inventoryActions.stakeInventory(inventoryDispatch)
+            const body = {
+                amount: inventory?.price,
+                assetAddress: inventory?.address,
+                stratsPaymentService: "",
+                governance: governanceAddress
+            }
+
+          const isStaked = await inventoryActions.stakeInventory(inventoryDispatch, body);
         }
 
         if(type==='Unstake'){
-            const isUnstaked = await inventoryActions.UnstakeInventory(inventoryDispatch) 
+            const body = {
+                strats: "",
+                escrow: "",
+                stratsPaymentService: ""
+            }
+            const isUnstaked = await inventoryActions.UnstakeInventory(inventoryDispatch);
         }
     };
 

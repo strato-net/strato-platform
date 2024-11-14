@@ -153,6 +153,80 @@ const reducer = (state, action) => {
         error: action.error,
         isUnlisting: false
       };
+
+     // ------------------------------------------------------------------------------------------------------
+    case actionDescriptors.stakeInventory:
+      return {
+        ...state,
+        isStaking: true
+      };
+    case actionDescriptors.stakeInventorySuccessful:
+      return {
+        ...state,
+        // stake: action.payload,
+        isStaking: false
+      };
+    case actionDescriptors.stakeInventoryFailed:
+      return {
+        ...state,
+        error: action.error,
+        isStaking: false
+      };
+    
+    case actionDescriptors.unstakeInventory:
+      return {
+        ...state,
+        isUnstaking: true
+      };
+    case actionDescriptors.unstakeInventorySuccessful:
+      return {
+        ...state,
+        // stake: action.payload,
+        isUnstaking: false
+      };
+    case actionDescriptors.unstakeInventoryFailed:
+      return {
+        ...state,
+        error: action.error,
+        isUnstaking: false
+      };
+    
+    case actionDescriptors.getGovernanceAddress:
+        return {
+          ...state,
+          isGovernanceAddress: true
+        };
+    case actionDescriptors.getGovernanceAddressSuccessful:
+        return {
+          ...state,
+          governanceAddress: action.payload,
+          isGovernanceAddress: false
+        };
+    case actionDescriptors.getGovernanceAddressFailed:
+        return {
+          ...state,
+          error: action.error,
+          isGovernanceAddress: false
+        };
+    
+    case actionDescriptors.getCalculatedValue:
+          return {
+            ...state,
+            isCalculatedValues: true
+          };
+    case actionDescriptors.getCalculatedValueSuccessful:
+          return {
+            ...state,
+            calculatedValue: action.payload,
+            isCalculatedValue: false
+          };
+    case actionDescriptors.getCalculatedValueFailed:
+          return {
+            ...state,
+            error: action.error,
+            isCalculatedValue: false
+          };    
+    // ------------------------------------------------------------------------------------------------------
     case actionDescriptors.resellInventory:
       return {
         ...state,
