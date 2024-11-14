@@ -371,7 +371,9 @@ const Inventory = ({ user }) => {
       render: (text, record) => {
         const parts = record.contract_name.split('-');
         const contractName = parts[parts.length - 1];
-        return <div>{contractName}</div>;
+        return (
+          <div>{contractName === 'STRATSTokens' ? 'STRAT' : contractName}</div>
+        );
       },
     },
     {

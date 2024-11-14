@@ -629,7 +629,7 @@ const ProductDetails = ({ user, users }) => {
                               ${adjustedPrice}
                               <span className="font-normal text-xs mr-2 text-primary">
                                 <b>
-                                  (
+                                {' '}(
                                   {(adjustedPrice * STRATS_CONVERSION).toFixed(
                                     0
                                   )}{' '}
