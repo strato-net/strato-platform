@@ -52,7 +52,7 @@ abstract contract Reserve is Utils, Structs {
         uint transferNumber = (uint(block.number + 16)) % 1000000;
         
         // Transfer STRATS from owner (BlockApps) to the borrower
-        stratsToken.transferOwnership(escrow.borrower(), stratsLoanAmount*100, false, transferNumber, 0.0001);
+        stratsToken.transferOwnership(escrow.borrower(), stratsLoanAmount*100, true, transferNumber, 0.0001);
 
         // Emit the StakeCreated event
         emit StakeCreated(msg.sender, _escrowAddress, escrow.quantity(), stratsLoanAmount, escrow.cataReward());
