@@ -12,3 +12,4 @@ import "Templates/Payments/TokenPaymentService.sol";
 import "Templates/Oracles/SilverOracleService.sol";
 import "Templates/Redemptions/ExternalRedemptionService.sol";
 import "Templates/Sales/SimpleSale.sol";
+import "Templates/Staking/SimpleReserve.sol";

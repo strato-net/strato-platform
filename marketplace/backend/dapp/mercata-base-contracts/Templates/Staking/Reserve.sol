@@ -4,11 +4,12 @@ pragma strict;
 import <509>;
 
 import "../Assets/Asset.sol";
-import "./Escrow.sol";
+import "../Sales/Escrow.sol";
 import "../Utils/Utils.sol";
+import "../Structs/Structs.sol";
 import "../Oracle/OracleService.sol";
 
-abstract contract Reserve is Utils {
+abstract contract Reserve is Utils, Structs {
     OracleService public oracle; // Asset Oracle service for fetching price data
     Asset public stratsToken;
     address public cataToken;//Manual for now
@@ -19,13 +20,13 @@ abstract contract Reserve is Utils {
 
     event StakeCreated(address indexed user, address escrow, uint assetAmount, decimal stratsLoan, uint cataReward);
 
-    constructor(address _assetOracle, address _cataToken, address _owner) {
+    constructor(address _assetOracle, address _cataToken) {
         oracle = OracleService(_assetOracle);
         cataToken = _cataToken;
-        owner = _owner;
+        owner = msg.sender;
     }
 
-    function createEscrow(uint assetAmount, address assetAddress, PaymentService stratPaymentService) public returns (address) {
+    function createEscrow(uint assetAmount, address assetAddress, PaymentServiceInfo stratPaymentService) public returns (address) {
 
         // Calculate required values
         Asset _assetToBeSold = Asset(assetAddress);
@@ -52,10 +53,6 @@ abstract contract Reserve is Utils {
         
         // Transfer STRATS from owner (BlockApps) to the borrower
         stratsToken.transferOwnership(escrow.borrower(), stratsLoanAmount*100, false, transferNumber, 0.0001);
-
-        // Attach the escrow to both the Asset and STRATS assets
-        // escrow.attachEscrowToAsset(escrow.assetToBeSold());
-        // escrow.attachEscrowToAsset(Asset(stratsToken));//needs to be done off chain
 
         // Emit the StakeCreated event
         emit StakeCreated(msg.sender, escrowAddress, escrow.quantity(), stratsLoanAmount, escrow.cataReward());
