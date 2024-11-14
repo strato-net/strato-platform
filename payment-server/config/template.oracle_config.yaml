@@ -2,6 +2,7 @@ timeout: 600000
 VM: SolidVM
 configDirPath: <configDirPath_value>
 serverHost: <serverHost_value>
+cacheNonce: true
 dockerized: true
 
 silverOracle:
