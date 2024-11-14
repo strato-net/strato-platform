@@ -89,7 +89,7 @@ class ReserveController {
         "any.required": "Asset Address is required and must be a string.",
         "string.base": "Asset Address must be a valid string.",
       }),
-      stratsPaymentService: Joi.object({
+      stratPaymentService: Joi.object({
             creator: Joi.string().required(),
             serviceName: Joi.string().required(),
         }).required(),

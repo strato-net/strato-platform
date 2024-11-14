@@ -1412,10 +1412,10 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
     const stratsOriginAddress = await STRATSJs.getStratsAddress();
 
     // Retrieve all sales data
-    const salesData = await saleJs.getAll(rawAdmin, { escrow }, options);
+    const salesData = await saleJs.getAll(rawAdmin, { address: escrow }, options);
     console.log("salesData123: ", salesData);
     // Calculate the total order amount
-    const orderTotal = salesData.reduce((acc, sale, index) => sale.stratsLoanAmount, 0);
+    const orderTotal = salesData.reduce((acc, sale, index) => sale?.data?.stratsLoanAmount, 0);
     console.log("orderTotal: ", orderTotal);
     // Retrieve the user's active STRATS asset addresses with non-zero quantities
     const userStratsAssets = await inventoryJs.getAll(
@@ -1447,7 +1447,7 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
       throw new rest.RestError(RestStatus.BAD_REQUEST, "You don't have enough STRATS balance to make this purchase");
     }
 
-    const res = await reserveJs.unstake(rawAdmin, contract, {stratsAssetAddresses: stratsAssetAddressesToUse, ...restArgs}, options);
+    const res = await reserveJs.unstake(rawAdmin, contract, {stratsAssetAddresses: stratsAssetAddressesToUse, escrowAddress: escrow}, options);
     return res;
   };
   // ---------------------------- Reserve END   -------------------------------

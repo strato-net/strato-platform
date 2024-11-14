@@ -214,7 +214,7 @@ const ItemActions = ({
         <SendOutlined /> Redeem
       </Button>
 
-      {!inventory.isStake && <Button
+      {!inventory.stratsLoanAmount && <Button
         type="link"
         className="text-[#13188A] font-semibold"
         onClick={() => showStakeModal("Stake")}
@@ -223,7 +223,7 @@ const ItemActions = ({
         <StopOutlined /> Stake
       </Button>}
 
-     {inventory.isStake && <Button
+     {inventory.stratsLoanAmount && <Button
         type="link"
         className="text-[#13188A] font-semibold"
         onClick={() => showStakeModal("Unstake")}

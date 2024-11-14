@@ -884,10 +884,10 @@ const actions = {
       });
 
       const body = await response.json();
-
+      
       if (response.status === RestStatus.OK) {
         dispatch({
-          type: actionDescriptors.getCalculatedValue,
+          type: actionDescriptors.getCalculatedValueSuccessful,
           payload: body.data,
         });
         // actions.setMessage(dispatch, "Item has been Staked Successfully", true);

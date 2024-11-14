@@ -95,7 +95,7 @@ const StakeModal = ({ open, handleCancel, inventory, category, debouncedSearchTe
             const body = {
                 assetAmount: inventory?.quantity,
                 assetAddress: inventory?.address,
-                stratsPaymentService: {creator: stratsService.creator, serviceName: stratsService.serviceName},
+                stratPaymentService: {creator: stratsService.creator, serviceName: stratsService.serviceName},
                 reserve: reserveAddress[0].address
             }
 

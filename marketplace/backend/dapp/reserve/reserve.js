@@ -1,5 +1,6 @@
 import { util, rest } from "/blockapps-rest-plus";
 import { searchAllWithQueryArgs } from "/helpers/utils";
+import RestStatus from 'http-status-codes';
 
 const contractName = "BlockApps-Mercata-Reserve";
 const contract = "Reserve";
@@ -61,7 +62,7 @@ function marshalOut(_args) {
 async function get(user, options) {
   const reserve = await searchAllWithQueryArgs(
     contractName,
-    { creator: "BlockApps" },
+    { address: "ea9fbacc92df225e1d8885edad401e7c0343796d" },
     options,
     user
   );
@@ -90,16 +91,7 @@ async function calculate(user, args, options) {
   };
 
   const reponse = await rest.call(user, callArgs, options);
-
-  if (parseInt(reponse, 10) !== RestStatus.OK) {
-    throw new rest.RestError(
-      reponse,
-      "Failed to calculate stake preview.",
-      { callArgs }
-    );
-  }
-
-  return reponse;
+  return reponse[0];
 }
 
 /**
@@ -115,16 +107,7 @@ async function stake(user, args, options) {
   };
 
   const reponse = await rest.call(user, callArgs, options);
-
-  if (parseInt(reponse, 10) !== RestStatus.OK) {
-    throw new rest.RestError(
-      reponse,
-      "Failed to stake.",
-      { callArgs }
-    );
-  }
-
-  return reponse;
+  return reponse[0];
 }
 
 /**
@@ -133,20 +116,11 @@ async function stake(user, args, options) {
 async function unstake(user, contract,  args, options) {
   const callArgs = {
     contract,
-    method: "unstake",
+    method: "unStake",
     args: util.usc({ ...args }),
   };
 
   const reponse = await rest.call(user, callArgs, options);
-
-  if (parseInt(reponse, 10) !== RestStatus.OK) {
-    throw new rest.RestError(
-      reponse,
-      "Failed to unstake.",
-      { callArgs }
-    );
-  }
-
   return reponse;
 }
 
