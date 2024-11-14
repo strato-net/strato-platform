@@ -395,7 +395,7 @@ const CreateInventoryModal = ({
                             value={e.contract}
                             key={index}
                           >
-                            {e.name}
+                            {e.name === "STRATS" ? "STRAT" : e.name}
                           </Option>
                         ))
                       : null

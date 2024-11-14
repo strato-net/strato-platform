@@ -187,7 +187,7 @@ const InvoiceComponent = ({ invoice }) => {
                   {decodeURIComponent(asset.name)}
                 </Text>
                 <Text style={[styles.value, styles.tableRowColumn]}>
-                  {invoice.order.currency ? invoice.order.currency : 'USD'}
+                  {invoice.order.currency ? 'STRAT' : 'USD'}
                 </Text>
                 <Text style={[styles.value, styles.tableRowColumn]}>
                   {invoice.order.currency === 'STRATS'
