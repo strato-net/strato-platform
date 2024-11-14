@@ -1,6 +1,8 @@
 import { Button, Select, InputNumber, Modal, Table, notification } from "antd";
 import { useEffect, useState } from "react";
+import { usePaymentServiceDispatch, usePaymentServiceState } from "../../contexts/payment";
 import { actions as inventoryActions } from "../../contexts/inventory/actions";
+import { actions as paymentServiceActions } from "../../contexts/payment/actions";
 import { useInventoryDispatch, useInventoryState } from "../../contexts/inventory";
 import { useMarketplaceDispatch, useMarketplaceState } from "../../contexts/marketplace";
 import { useUsersDispatch, useUsersState } from "../../contexts/users";
@@ -11,9 +13,12 @@ const logo = <img src={Images.logo} alt={''} title={''} className=" ml-1 mt-1 w-
 
 const StakeModal = ({ open, handleCancel, inventory, category, debouncedSearchTerm, limit = 0, offset = 0, type }) => {
     const { isStaking, isUnstaking, isGovernanceAddress, isCalculatedValue, governanceAddress, calculatedValue} = useInventoryState();
+
     const [data, setData] = useState(inventory);
     const inventoryDispatch = useInventoryDispatch();
+    const paymentServiceDispatch = usePaymentServiceDispatch();
     const [api, contextHolder] = notification.useNotification();
+    const { paymentServices, arePaymentServicesLoading } = usePaymentServiceState();
     // const [govAddress, setGovAddress] = useState(null)
     const quantityIsDecimal = data.data.quantityIsDecimal && data.data.quantityIsDecimal === "True";
     const isLoader = isStaking || isUnstaking || isCalculatedValue;
@@ -21,6 +26,7 @@ const StakeModal = ({ open, handleCancel, inventory, category, debouncedSearchTe
     const itemName = decodeURIComponent(inventory.name)
     
     useEffect(()=>{
+        paymentServiceActions.getPaymentServices(paymentServiceDispatch, true);
         inventoryActions.getGovernanceAddress(inventoryDispatch);
     },[]);
 
@@ -82,11 +88,12 @@ const StakeModal = ({ open, handleCancel, inventory, category, debouncedSearchTe
     ];
 
     const handleSubmit = async () => {
+        const stratsService = paymentServices.find((item)=>item.serviceName==='STRATS')
         if(type==='Stake'){
             const body = {
                 amount: inventory?.price,
                 assetAddress: inventory?.address,
-                stratsPaymentService: "",
+                stratsPaymentService: stratsService.address,
                 governance: governanceAddress
             }
 
@@ -97,9 +104,9 @@ const StakeModal = ({ open, handleCancel, inventory, category, debouncedSearchTe
             const body = {
                 strats: "",
                 escrow: "",
-                stratsPaymentService: ""
+                stratsPaymentService: stratsService.address
             }
-            const isUnstaked = await inventoryActions.UnstakeInventory(inventoryDispatch);
+            const isUnstaked = await inventoryActions.UnstakeInventory(inventoryDispatch, body);
         }
     };
 
