@@ -1,5 +1,5 @@
-import React, { useState } from "react";
-import { Button, Popover } from "antd";
+import React, { useState } from 'react';
+import { Button, Popover } from 'antd';
 import {
   DollarOutlined,
   EditOutlined,
@@ -9,17 +9,17 @@ import {
   SwapOutlined,
   RetweetOutlined,
   MoreOutlined,
-} from "@ant-design/icons";
+} from '@ant-design/icons';
 import {
   ASSET_STATUS,
   OLD_SADDOG_ORIGIN_ADDRESS,
-} from "../../helpers/constants";
-import ListForSaleModal from "./ListForSaleModal";
-import UnlistModal from "./UnlistModal";
-import ResellModal from "./ResellModal";
-import TransferModal from "./TransferModal";
-import RedeemModal from "./RedeemModal";
-import BridgeModal from "./BridgeModal";
+} from '../../helpers/constants';
+import ListForSaleModal from './ListForSaleModal';
+import UnlistModal from './UnlistModal';
+import ResellModal from './ResellModal';
+import TransferModal from './TransferModal';
+import RedeemModal from './RedeemModal';
+import BridgeModal from './BridgeModal';
 
 const ItemActions = ({
   inventory,
@@ -34,7 +34,7 @@ const ItemActions = ({
 }) => {
   const itemData = inventory.data;
   const isStrats =
-    itemData.quantityIsDecimal && itemData.quantityIsDecimal === "True";
+    itemData.quantityIsDecimal && itemData.quantityIsDecimal === 'True';
   const quantity = isStrats
     ? parseFloat((inventory.quantity / 100).toFixed(2))
     : inventory.quantity;
@@ -56,7 +56,7 @@ const ItemActions = ({
   };
 
   const getCategory = () => {
-    const parts = inventory.contract_name.split("-");
+    const parts = inventory.contract_name.split('-');
     const contractName = parts[parts.length - 1];
 
     return allSubcategories?.find((c) => c.contract === contractName)?.name;
@@ -64,8 +64,8 @@ const ItemActions = ({
 
   function isEditSellDisabled() {
     return (
-      getCategory() === "Carbon Offset" &&
-      !(itemData.isMint && itemData.isMint === "True")
+      getCategory() === 'Carbon Offset' &&
+      !(itemData.isMint && itemData.isMint === 'True')
     );
   }
 
@@ -221,7 +221,7 @@ const ItemActions = ({
               disabled={
                 !(
                   itemData.isMint &&
-                  itemData.isMint == "True" &&
+                  itemData.isMint == 'True' &&
                   !disableSADDOGS(inventory)
                 ) || !isActive()
               }
@@ -231,7 +231,7 @@ const ItemActions = ({
             <Button
               type="link"
               className={`text-[#13188A] font-semibold ${
-                !isTokenSupported(inventory.root) ? "hidden" : ""
+                !isTokenSupported(inventory.root) ? 'hidden' : ''
               }`}
               onClick={showBridgeModal}
             >

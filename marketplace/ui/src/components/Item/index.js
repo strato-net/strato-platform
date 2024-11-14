@@ -1,11 +1,11 @@
-import React, { useEffect, useState, useMemo } from "react";
-import DataTableComponent from "../DataTableComponent";
-import { Breadcrumb, Spin, Input, notification, Pagination } from "antd";
-import { actions } from "../../contexts/item/actions";
-import { useItemDispatch, useItemState } from "../../contexts/item";
-import { useLocation } from "react-router-dom";
-import ClickableCell from "../ClickableCell";
-import routes from "../../helpers/routes";
+import React, { useEffect, useState, useMemo } from 'react';
+import DataTableComponent from '../DataTableComponent';
+import { Breadcrumb, Spin, Input, notification, Pagination } from 'antd';
+import { actions } from '../../contexts/item/actions';
+import { useItemDispatch, useItemState } from '../../contexts/item';
+import { useLocation } from 'react-router-dom';
+import ClickableCell from '../ClickableCell';
+import routes from '../../helpers/routes';
 
 function useQuery() {
   const { search } = useLocation();
@@ -47,28 +47,28 @@ const Item = () => {
   const query = useQuery();
 
   useEffect(() => {
-    setinventoryId(query.get("inventoryId"));
+    setinventoryId(query.get('inventoryId'));
     if (inventoryId !== undefined) {
       actions.fetchItem(dispatch, limit, offset, inventoryId);
     }
   }, [dispatch, limit, offset, inventoryId, query]);
 
   for (const value in Object.values(items)) {
-    if (items[value].ownerOrganizationalUnit === "") {
-      items[value].ownerOrganizationalUnit = "N/A";
+    if (items[value].ownerOrganizationalUnit === '') {
+      items[value].ownerOrganizationalUnit = 'N/A';
     }
   }
 
   let columns = [
     {
-      title: "Serial Number".toUpperCase(),
-      dataIndex: "serialNumber",
-      align: "center",
+      title: 'Serial Number'.toUpperCase(),
+      dataIndex: 'serialNumber',
+      align: 'center',
     },
     {
-      title: "Item Number".toUpperCase(),
-      dataIndex: "itemNumber",
-      align: "center",
+      title: 'Item Number'.toUpperCase(),
+      dataIndex: 'itemNumber',
+      align: 'center',
     },
   ];
 
@@ -91,12 +91,10 @@ const Item = () => {
       <div className="mx-16 mt-14">
         <div className="flex justify-between">
           <Breadcrumb>
-          <Breadcrumb.Item href="" onClick={e => e.preventDefault()}>
-            <ClickableCell href={routes.Marketplace.url}>
-              Home
-            </ClickableCell>
+            <Breadcrumb.Item href="" onClick={(e) => e.preventDefault()}>
+              <ClickableCell href={routes.Marketplace.url}>Home</ClickableCell>
             </Breadcrumb.Item>
-            <Breadcrumb.Item href="" onClick={e => e.preventDefault()}>
+            <Breadcrumb.Item href="" onClick={(e) => e.preventDefault()}>
               <ClickableCell href={routes.Inventories.url}>
                 Inventory
               </ClickableCell>
@@ -135,7 +133,7 @@ const Item = () => {
         </div>
       </div>
 
-      {message && openToast("bottom")}
+      {message && openToast('bottom')}
     </div>
   );
 };

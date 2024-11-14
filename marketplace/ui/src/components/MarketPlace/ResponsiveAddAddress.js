@@ -1,27 +1,27 @@
-import React, { useState } from "react";
-import TagManager from "react-gtm-module";
-import { Button, Form, Input } from "antd";
-import { useFormik } from "formik";
-import * as yup from "yup";
-import { actions } from "../../contexts/marketplace/actions";
-import { useMarketplaceDispatch } from "../../contexts/marketplace";
+import React, { useState } from 'react';
+import TagManager from 'react-gtm-module';
+import { Button, Form, Input } from 'antd';
+import { useFormik } from 'formik';
+import * as yup from 'yup';
+import { actions } from '../../contexts/marketplace/actions';
+import { useMarketplaceDispatch } from '../../contexts/marketplace';
 
 const ResponsiveAddAddress = ({ close, redemptionService }) => {
   const [showAddress, setshowAddress] = useState(false);
   const marketplaceDispatch = useMarketplaceDispatch();
   const ShippingDetailsSchema = () => {
     return yup.object().shape({
-      name: yup.string().required("Name is required"),
+      name: yup.string().required('Name is required'),
       zipcode: yup
         .string()
         .max(15)
-        .required("Zipcode is required")
-        .required("Zipcode is required"),
-      addressLine1: yup.string().required("Address Line 1 is required"),
+        .required('Zipcode is required')
+        .required('Zipcode is required'),
+      addressLine1: yup.string().required('Address Line 1 is required'),
       addressLine2: yup.string().notRequired(),
-      city: yup.string().required("City is required"),
-      state: yup.string().required("State is required"),
-      country: yup.string().required("Country is required"),
+      city: yup.string().required('City is required'),
+      state: yup.string().required('State is required'),
+      country: yup.string().required('Country is required'),
     });
   };
 
@@ -37,20 +37,22 @@ const ResponsiveAddAddress = ({ close, redemptionService }) => {
       country: encodeURIComponent(values.country),
       addressLine1: encodeURIComponent(values.addressLine1),
       addressLine2: encodeURIComponent(values.addressLine2),
-      redemptionService: redemptionService ? encodeURIComponent(redemptionService): redemptionService,
+      redemptionService: redemptionService
+        ? encodeURIComponent(redemptionService)
+        : redemptionService,
     };
 
     window.LOQ.push([
-      "ready",
+      'ready',
       async (LO) => {
         // Track an event
-        await LO.$internal.ready("events");
-        LO.events.track("Add Shipping Address");
+        await LO.$internal.ready('events');
+        LO.events.track('Add Shipping Address');
       },
     ]);
     TagManager.dataLayer({
       dataLayer: {
-        event: "add_shipping_address",
+        event: 'add_shipping_address',
       },
     });
     let res = await actions.addShippingAddress(marketplaceDispatch, body);
@@ -61,13 +63,13 @@ const ResponsiveAddAddress = ({ close, redemptionService }) => {
   const formik = useFormik({
     initialValues: {
       sameAddress: true,
-      state: "",
-      name: "",
-      zipcode: "",
-      addressLine1: "",
-      addressLine2: "",
-      city: "",
-      country: "",
+      state: '',
+      name: '',
+      zipcode: '',
+      addressLine1: '',
+      addressLine2: '',
+      city: '',
+      country: '',
     },
     validationSchema: ShippingDetailsSchema,
     onSubmit: function (values, { resetForm }) {
@@ -79,10 +81,14 @@ const ResponsiveAddAddress = ({ close, redemptionService }) => {
   return (
     <Form layout="horizontal" className="">
       <div className="pt-2 px-4 overflow-y-auto">
-        <p className="text-base md:text-xl lg:text-2xl text-[#202020] font-semibold mb-6">Add New Address</p>
+        <p className="text-base md:text-xl lg:text-2xl text-[#202020] font-semibold mb-6">
+          Add New Address
+        </p>
         <div className="flex flex-col gap-[18px]">
           <Form.Item name="name" className="">
-            <p className="text-left text-[#202020]  text-sm font-medium">Name</p>
+            <p className="text-left text-[#202020]  text-sm font-medium">
+              Name
+            </p>
             <Input
               label="name"
               name="name"
@@ -137,7 +143,9 @@ const ResponsiveAddAddress = ({ close, redemptionService }) => {
             )}
           </Form.Item>
           <Form.Item label="" name="city" className="">
-            <p className="text-[#202020]  text-sm font-medium text-left">City</p>
+            <p className="text-[#202020]  text-sm font-medium text-left">
+              City
+            </p>
             <Input
               label="city"
               name="city"

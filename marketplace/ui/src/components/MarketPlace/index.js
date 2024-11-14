@@ -1,20 +1,20 @@
-import { Button, Image, Typography, Spin, notification } from "antd";
-import CategoryCard from "./CategoryCard";
-import TopSellingProductCard from "./TopSellingProductCard";
-import { Images } from "../../images";
-import React, { useEffect } from "react";
-import { actions } from "../../contexts/category/actions";
-import { useCategoryDispatch, useCategoryState } from "../../contexts/category";
-import useDebounce from "../UseDebounce";
-import { useNavigate } from "react-router-dom";
-import routes from "../../helpers/routes";
-import "react-responsive-carousel/lib/styles/carousel.min.css";
-import { Carousel } from "react-responsive-carousel";
-import { Fade } from "react-awesome-reveal";
-import HelmetComponent from "../Helmet/HelmetComponent";
-import { SEO } from "../../helpers/seoConstant";
-import { BANNER } from "../../helpers/constants";
-import { bannerArrow } from "../../images/SVGComponents";
+import { Button, Image, Typography, Spin, notification } from 'antd';
+import CategoryCard from './CategoryCard';
+import TopSellingProductCard from './TopSellingProductCard';
+import { Images } from '../../images';
+import React, { useEffect } from 'react';
+import { actions } from '../../contexts/category/actions';
+import { useCategoryDispatch, useCategoryState } from '../../contexts/category';
+import useDebounce from '../UseDebounce';
+import { useNavigate } from 'react-router-dom';
+import routes from '../../helpers/routes';
+import 'react-responsive-carousel/lib/styles/carousel.min.css';
+import { Carousel } from 'react-responsive-carousel';
+import { Fade } from 'react-awesome-reveal';
+import HelmetComponent from '../Helmet/HelmetComponent';
+import { SEO } from '../../helpers/seoConstant';
+import { BANNER } from '../../helpers/constants';
+import { bannerArrow } from '../../images/SVGComponents';
 
 // ----------------------------------------------------------
 
@@ -30,12 +30,12 @@ import 'swiper/css/autoplay';
 // import required modules
 import { EffectFade, Navigation, Pagination, Autoplay } from 'swiper/modules';
 
-
 const MarketPlace = ({ user, isAuthenticated }) => {
-  const limit = 10, offset = 0;
+  const limit = 10,
+    offset = 0;
   const navigate = useNavigate();
   const dispatch = useCategoryDispatch();
-  const debouncedSearchTerm = useDebounce("", 1000);
+  const debouncedSearchTerm = useDebounce('', 1000);
   const { iscategorysLoading } = useCategoryState();
 
   useEffect(() => {
@@ -45,7 +45,8 @@ const MarketPlace = ({ user, isAuthenticated }) => {
       if (!loginCount) {
         // Show the notification
         notification.open({
-          description: 'Click here to review some updates on your Assets and Orders!',
+          description:
+            'Click here to review some updates on your Assets and Orders!',
           icon: null,
           btn: (
             <Button
@@ -71,7 +72,9 @@ const MarketPlace = ({ user, isAuthenticated }) => {
   }, [isAuthenticated, navigate]);
 
   const navigateToUserProfile = () => {
-    navigate(`${routes.MarketplaceUserProfile.url.replace(":commonName", user.commonName)}?tab=my-activity`);
+    navigate(
+      `${routes.MarketplaceUserProfile.url.replace(':commonName', user.commonName)}?tab=my-activity`
+    );
   };
 
   useEffect(() => {
@@ -81,28 +84,30 @@ const MarketPlace = ({ user, isAuthenticated }) => {
   const linkUrl = window.location.href;
   // const navRoute = routes.MarketplaceCategoryProductList.url.replace(':category', 'All');
 
-  const ButtonElement = ({ desktopText, mobileText, url }) => <div className="relative flex top-[156px] sm:top-[250px] xl:top-[65%] 3xl:top-[70%] left-[4%] sm:left-[7.5%] md:left-[7%] md:top-60 z-50">
-    <Button
-      id="viewMore"
-      onClick={() => {
-        navigate(url);
-        sessionStorage.setItem('scrollPosition', 0);
-      }}
-      className="gradient-button border-0 h-auto md:h-11 border-primary bg-white text-primary hover:text-white"
-    >
-      <div className="flex items-center">
-        <div className="hidden sm:block font-semibold text-lg banner-btn-text">
-          {desktopText}
+  const ButtonElement = ({ desktopText, mobileText, url }) => (
+    <div className="relative flex top-[156px] sm:top-[250px] xl:top-[65%] 3xl:top-[70%] left-[4%] sm:left-[7.5%] md:left-[7%] md:top-60 z-50">
+      <Button
+        id="viewMore"
+        onClick={() => {
+          navigate(url);
+          sessionStorage.setItem('scrollPosition', 0);
+        }}
+        className="gradient-button border-0 h-auto md:h-11 border-primary bg-white text-primary hover:text-white"
+      >
+        <div className="flex items-center">
+          <div className="hidden sm:block font-semibold text-lg banner-btn-text">
+            {desktopText}
+          </div>
+          <div className="sm:hidden font-semibold text-base banner-btn-text">
+            {mobileText}
+          </div>
+          <span className="ml-1">{bannerArrow}</span>
         </div>
-        <div className="sm:hidden font-semibold text-base banner-btn-text">
-          {mobileText}
-        </div>
-        <span className="ml-1">{bannerArrow}</span>
-      </div>
-    </Button>
-  </div>
+      </Button>
+    </div>
+  );
 
-  const CarouselElement = ({ scrollT }) =>
+  const CarouselElement = ({ scrollT }) => (
     <Swiper
       spaceBetween={30}
       effect={'fade'}
@@ -120,8 +125,15 @@ const MarketPlace = ({ user, isAuthenticated }) => {
     >
       {BANNER.map((item, index) => (
         <SwiperSlide>
-          <div key={index} className="no-select relative p-2 h-[222px] sm:h-[380px] 3xl:h-[480px] mx-1 md:mx-2 md:mt-6 lg:mx-3">
-            <ButtonElement desktopText={item.desktopText} mobileText={item.mobileText} url={item.link} />
+          <div
+            key={index}
+            className="no-select relative p-2 h-[222px] sm:h-[380px] 3xl:h-[480px] mx-1 md:mx-2 md:mt-6 lg:mx-3"
+          >
+            <ButtonElement
+              desktopText={item.desktopText}
+              mobileText={item.mobileText}
+              url={item.link}
+            />
             {item.text}
             <div className="sm:hidden">
               <img
@@ -171,15 +183,17 @@ const MarketPlace = ({ user, isAuthenticated }) => {
         </SwiperSlide>
       ))}
     </Swiper>
+  );
 
   return (
     <>
       <HelmetComponent
         title={SEO.TITLE_META}
         description={SEO.DESCRIPTION_META}
-        link={linkUrl} />
+        link={linkUrl}
+      />
       <Fade triggerOnce>
-          <CarouselElement scrollT={130} />
+        <CarouselElement scrollT={130} />
       </Fade>
       {iscategorysLoading ? (
         <div className="h-96 flex justify-center items-center">

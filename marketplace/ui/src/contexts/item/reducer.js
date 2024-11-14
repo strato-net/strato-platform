@@ -1,4 +1,4 @@
-import { actionDescriptors } from "./actions";
+import { actionDescriptors } from './actions';
 
 const reducer = (state, action) => {
   switch (action.type) {
@@ -6,30 +6,30 @@ const reducer = (state, action) => {
       return {
         ...state,
         success: false,
-        message: null
+        message: null,
       };
     case actionDescriptors.setMessage:
       return {
         ...state,
         success: action.success,
-        message: action.message
+        message: action.message,
       };
     case actionDescriptors.fetchItem:
       return {
         ...state,
-        isItemsLoading: true
+        isItemsLoading: true,
       };
     case actionDescriptors.fetchItemSuccessful:
       return {
         ...state,
         items: action.payload,
-        isItemsLoading: false
+        isItemsLoading: false,
       };
     case actionDescriptors.fetchItemFailed:
       return {
         ...state,
         error: action.error,
-        isItemsLoading: false
+        isItemsLoading: false,
       };
     case actionDescriptors.fetchSerialNumbers:
       return {
@@ -103,7 +103,7 @@ const reducer = (state, action) => {
     case actionDescriptors.setActualRawMaterials:
       return {
         ...state,
-        actualRawMaterials: action.payload
+        actualRawMaterials: action.payload,
       };
     case actionDescriptors.transferOwnership:
       return {

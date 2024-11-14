@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect } from 'react';
 
 import {
   Breadcrumb,
@@ -9,23 +9,21 @@ import {
   Image,
   Typography,
   Pagination,
-} from "antd";
-import ProductCard from "./ProductCard";
-import CreateProductModal from "./CreateProductModal";
-import { actions } from "../../contexts/product/actions";
-import { useProductDispatch, useProductState } from "../../contexts/product";
-import useDebounce from "../UseDebounce";
+} from 'antd';
+import ProductCard from './ProductCard';
+import CreateProductModal from './CreateProductModal';
+import { actions } from '../../contexts/product/actions';
+import { useProductDispatch, useProductState } from '../../contexts/product';
+import useDebounce from '../UseDebounce';
 //categories
-import { actions as categoryActions } from "../../contexts/category/actions";
-import { useCategoryDispatch, useCategoryState } from "../../contexts/category";
+import { actions as categoryActions } from '../../contexts/category/actions';
+import { useCategoryDispatch, useCategoryState } from '../../contexts/category';
 //sub-categories
-import {
-  useSubCategoryState,
-} from "../../contexts/subCategory";
-import { Images } from "../../images";
-import ClickableCell from "../ClickableCell";
-import routes from "../../helpers/routes";
-import { useAuthenticateState } from "../../contexts/authentication";
+import { useSubCategoryState } from '../../contexts/subCategory';
+import { Images } from '../../images';
+import ClickableCell from '../ClickableCell';
+import routes from '../../helpers/routes';
+import { useAuthenticateState } from '../../contexts/authentication';
 
 const { Search } = Input;
 const { Title, Text } = Typography;
@@ -34,7 +32,7 @@ const Product = () => {
   const [open, setOpen] = useState(false);
   const dispatch = useProductDispatch();
   const [api, contextHolder] = notification.useNotification();
-  const [queryValue, setQueryValue] = useState("");
+  const [queryValue, setQueryValue] = useState('');
   const limit = 10;
   const [offset, setOffset] = useState(0);
   const [isSearch, setIsSearch] = useState(false);
@@ -74,15 +72,15 @@ const Product = () => {
     }
   };
 
-  const { products, isProductsLoading, message, success, productsTotal } = useProductState();
+  const { products, isProductsLoading, message, success, productsTotal } =
+    useProductState();
 
   useEffect(() => {
     if (isSearch) {
       setOffset(0);
       actions.fetchProduct(dispatch, limit, 0, debouncedSearchTerm);
-      setIsSearch(false)
-    } else
-      actions.fetchProduct(dispatch, limit, offset, debouncedSearchTerm);
+      setIsSearch(false);
+    } else actions.fetchProduct(dispatch, limit, offset, debouncedSearchTerm);
   }, [dispatch, limit, offset, debouncedSearchTerm]);
 
   useEffect(() => {
@@ -94,7 +92,9 @@ const Product = () => {
   }, [products]);
 
   const showModal = () => {
-    hasChecked && !isAuthenticated && loginUrl !== undefined ? window.location.href = loginUrl : setOpen(true)
+    hasChecked && !isAuthenticated && loginUrl !== undefined
+      ? (window.location.href = loginUrl)
+      : setOpen(true);
   };
 
   const handleCancel = () => {
@@ -103,7 +103,7 @@ const Product = () => {
 
   const queryHandle = (e) => {
     setQueryValue(e.target.value);
-    setIsSearch(true)
+    setIsSearch(true);
     setPage(1);
   };
 
@@ -133,10 +133,14 @@ const Product = () => {
                 type="primary"
                 className="w-44 h-9 bg-primary !hover:bg-primaryHover mt-6"
                 onClick={() => {
-                  if (hasChecked && !isAuthenticated && loginUrl !== undefined) {
+                  if (
+                    hasChecked &&
+                    !isAuthenticated &&
+                    loginUrl !== undefined
+                  ) {
                     window.location.href = loginUrl;
                   } else {
-                    showModal()
+                    showModal();
                   }
                 }}
               >
@@ -147,15 +151,13 @@ const Product = () => {
             <>
               <div className="flex justify-between">
                 <Breadcrumb>
-                  <Breadcrumb.Item href="" onClick={e => e.preventDefault()}>
+                  <Breadcrumb.Item href="" onClick={(e) => e.preventDefault()}>
                     <ClickableCell href={routes.Marketplace.url}>
                       Home
                     </ClickableCell>
                   </Breadcrumb.Item>
-                  <Breadcrumb.Item href="" onClick={e => e.preventDefault()}>
-                    <p className="text-primary">
-                      Products
-                    </p>
+                  <Breadcrumb.Item href="" onClick={(e) => e.preventDefault()}>
+                    <p className="text-primary">Products</p>
                   </Breadcrumb.Item>
                 </Breadcrumb>
                 <div className="flex">
@@ -166,12 +168,19 @@ const Product = () => {
                     onChange={queryHandle}
                     value={queryValue}
                   />
-                  <Button id="add-product-button" type="primary" className="w-48"
+                  <Button
+                    id="add-product-button"
+                    type="primary"
+                    className="w-48"
                     onClick={() => {
-                      if (hasChecked && !isAuthenticated && loginUrl !== undefined) {
+                      if (
+                        hasChecked &&
+                        !isAuthenticated &&
+                        loginUrl !== undefined
+                      ) {
                         window.location.href = loginUrl;
                       } else {
-                        showModal()
+                        showModal();
                       }
                     }}
                   >
@@ -220,7 +229,7 @@ const Product = () => {
           debouncedSearchTerm={debouncedSearchTerm}
         />
       )}
-      {message && openToast("bottom")}
+      {message && openToast('bottom')}
     </>
   );
 };

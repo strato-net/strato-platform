@@ -1,4 +1,4 @@
-import { actionDescriptors } from "./actions";
+import { actionDescriptors } from './actions';
 
 const reducer = (state, action) => {
   switch (action.type) {
@@ -33,23 +33,23 @@ const reducer = (state, action) => {
         isTransactionLoading: false,
       };
     case actionDescriptors.fetchGlobalTransaction:
-        return {
-          ...state,
-          isTransactionLoading: true,
-        };
+      return {
+        ...state,
+        isTransactionLoading: true,
+      };
     case actionDescriptors.fetchGlobalTransactionSuccessful:
-        return {
-          ...state,
-          globalTransactions: action.payload?.data,
-          count: action.payload?.count,
-          isTransactionLoading: false,
-        };
+      return {
+        ...state,
+        globalTransactions: action.payload?.data,
+        count: action.payload?.count,
+        isTransactionLoading: false,
+      };
     case actionDescriptors.fetchGlobalTransactionFailed:
-        return {
-          ...state,
-          error: action.error,
-          isTransactionLoading: false,
-        };  
+      return {
+        ...state,
+        error: action.error,
+        isTransactionLoading: false,
+      };
     default:
       throw new Error(`Unhandled action: '${action.type}'`);
   }

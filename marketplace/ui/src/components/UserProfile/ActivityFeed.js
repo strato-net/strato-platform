@@ -1,5 +1,9 @@
 import React from 'react';
-import { ShoppingCartOutlined, CalendarOutlined, SwapOutlined } from '@ant-design/icons';
+import {
+  ShoppingCartOutlined,
+  CalendarOutlined,
+  SwapOutlined,
+} from '@ant-design/icons';
 import { Typography, Button } from 'antd';
 
 const { Text } = Typography;
@@ -18,7 +22,6 @@ const ActivityIcon = ({ type }) => {
 };
 
 const ActivityFeed = ({ type, description, timestamp, href }) => {
-
   return (
     <div className="activity-item flex items-center py-4 border-b">
       <div className="activity-icon mr-4">
@@ -29,7 +32,10 @@ const ActivityFeed = ({ type, description, timestamp, href }) => {
           <Text>{description}</Text>
         </div>
         <div className="activity-time">
-        <Text type="secondary">{new Date(timestamp.replace(/-/g, "/")).toLocaleString()}</Text>        </div>
+          <Text type="secondary">
+            {new Date(timestamp.replace(/-/g, '/')).toLocaleString()}
+          </Text>{' '}
+        </div>
       </div>
       <div className="activity-action">
         <a href={href} target="_blank" rel="noopener noreferrer">

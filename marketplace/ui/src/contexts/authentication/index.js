@@ -1,6 +1,6 @@
-import React, { createContext, useContext, useReducer, useEffect } from "react";
-import { actions } from "./actions";
-import reducer from "./reducer";
+import React, { createContext, useContext, useReducer, useEffect } from 'react';
+import { actions } from './actions';
+import reducer from './reducer';
 
 const AuthenticationStateContext = createContext();
 const AuthenticationDispatchContext = createContext();
@@ -15,7 +15,7 @@ const AuthenticationProvider = ({ children }) => {
     users: [],
     isUsersLoading: false,
     loginUrl: undefined,
-    logoutUrl: undefined
+    logoutUrl: undefined,
   };
   const [state, dispatch] = useReducer(reducer, initialState);
 
