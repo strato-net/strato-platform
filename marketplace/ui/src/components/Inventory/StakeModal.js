@@ -13,7 +13,7 @@ const logo = <img src={Images.logo} alt={''} title={''} className=" ml-1 mt-1 w-
 
 const StakeModal = ({ open, handleCancel, inventory, category, debouncedSearchTerm, limit = 0, offset = 0, type }) => {
     const { isStaking, isUnstaking, isGovernanceAddress, isCalculatedValue, governanceAddress, calculatedValue} = useInventoryState();
-
+    
     const [data, setData] = useState(inventory);
     const inventoryDispatch = useInventoryDispatch();
     const paymentServiceDispatch = usePaymentServiceDispatch();
@@ -138,7 +138,7 @@ const StakeModal = ({ open, handleCancel, inventory, category, debouncedSearchTe
                         <div className="flex mx-auto">3000 {logo} </div> </div> 
                 </div>
                 <div className="w-full flex justify-center items-center">
-                    <Button type="primary" className="w-32 h-9" onClick={handleSubmit}  loading={false}>
+                    <Button type="primary" className="w-32 h-9" onClick={handleSubmit} disabled={isLoader} loading={isLoader}>
                         {type}
                     </Button>
                 </div>
