@@ -107,13 +107,16 @@ const Inventory = ({ user }) => {
     const notOnboardedNames = new Set(notOnboarded.map((n) => n.serviceName));
 
     // Sort paymentServices array so that not onboarded services come first
-    const sortedServices = [...paymentServices].sort((a, b) => {
-      return isNotOnboarded(a) - isNotOnboarded(b);
-    }).map(service => ({
-      ...service,
-      isNotOnboarded: notOnboardedNames.has(service.serviceName),
-      serviceName: service?.serviceName === 'STRATS' ? 'STRAT' : service?.serviceName
-    }));
+    const sortedServices = [...paymentServices]
+      .sort((a, b) => {
+        return isNotOnboarded(a) - isNotOnboarded(b);
+      })
+      .map((service) => ({
+        ...service,
+        isNotOnboarded: notOnboardedNames.has(service.serviceName),
+        serviceName:
+          service?.serviceName === "STRATS" ? "STRAT" : service?.serviceName,
+      }));
     setSortedPaymentServices(sortedServices);
   }, [paymentServices, notOnboarded]);
 
@@ -374,32 +377,56 @@ const Inventory = ({ user }) => {
     {
       title: "Price",
       align: "center",
-      render: (text, record) => (
-        <div>
-          {record.price ? (
-            <>
-              ${record.price}{" "}
-              <span className="text-xs">
-                ({(record.price * STRATS_CONVERSION).toFixed(0)} STRATs)
-              </span>
-            </>
-          ) : (
-            "N/A"
-          )}
-        </div>
-      ),
+      render: (_, record) => {
+        const isStrats =
+          record.data.quantityIsDecimal &&
+          record.data.quantityIsDecimal === "True";
+        const price = record.price
+          ? isStrats
+            ? parseFloat(record.price * 100).toFixed(2)
+            : record.price
+          : "N/A";
+        return (
+          <div>
+            {price !== "N/A" ? (
+              <>
+                ${price}{" "}
+                <span className="text-xs">
+                  ({(price * STRATS_CONVERSION).toFixed(0)} STRATs)
+                </span>
+              </>
+            ) : (
+              "N/A"
+            )}
+          </div>
+        );
+      },
     },
     {
       title: "Owned",
       align: "center",
-      render: (text, record) => <div>{record.quantity || 0}</div>,
+      render: (_, record) => {
+        const isStrats =
+          record.data.quantityIsDecimal &&
+          record.data.quantityIsDecimal === "True";
+        const quantity = isStrats
+          ? parseFloat((record.quantity / 100).toFixed(2))
+          : record.quantity;
+        return <div>{quantity || 0}</div>;
+      },
     },
     {
       title: "Listed for Sale",
       align: "center",
-      render: (text, record) => (
-        <div className="w-24">{record.saleQuantity || 0}</div>
-      ),
+      render: (_, record) => {
+        const isStrats =
+          record.data.quantityIsDecimal &&
+          record.data.quantityIsDecimal === "True";
+        const saleQuantity = isStrats
+          ? parseFloat((record.saleQuantity / 100).toFixed(2))
+          : record.saleQuantity;
+        return <div className="w-24">{saleQuantity || 0}</div>;
+      },
     },
     {
       title: "Actions",

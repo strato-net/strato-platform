@@ -79,9 +79,10 @@ export const Redemption = {
 };
 
 export const Transaction = {
-  prefix: "/transaction",
-  get: "/",
-};
+  prefix: '/transaction',
+  getUser: '/user',
+  getGlobal: '/global',
+}
 
 export const Item = {
   prefix: "/item",

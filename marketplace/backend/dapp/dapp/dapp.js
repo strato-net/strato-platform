@@ -283,11 +283,13 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
   }
 
   contract.transferItem = async function (args, options = defaultOptions) {
-    const { assetAddress, ...restArgs } = args;
-    const transferNumber = parseInt(util.uid())
-    const finalArgs = { transferNumber: transferNumber, ...restArgs };
-    const contract = { address: assetAddress };
-    return inventoryJs.transferItem(rawAdmin, contract, finalArgs, options);
+    const finalArgs = args.map(arg => {
+      const { assetAddress, ...restArgs } = arg;
+      const transferNumber = parseInt(util.uid())
+      const contract = { address: assetAddress };
+      return { contract: contract, transferNumber: transferNumber, ...restArgs };
+    });
+    return inventoryJs.transferItem(rawAdmin, finalArgs, options);
   }
 
   contract.getAllItemTransferEvents = function (args, options = defaultOptions) {
@@ -476,6 +478,70 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
         throw new rest.RestError(error.response.status, error.response.statusText);
       }
       throw new rest.RestError(RestStatus.BAD_REQUEST, `Error while fetching incoming redemptions: ${JSON.stringify(error)} `);
+    }
+  };
+
+  contract.getAllRedemptionRequests = async function (args, options = optionsNoChainIds) {
+    const { order, search, range, limit, offset } = args;
+    const queryParams = new URLSearchParams({
+      redemptionId: search,
+      order: order,
+      limit,
+      offset
+    }).toString();
+
+    try {
+      let redemptions = [];
+      let count = 0;
+      const redemptionEvents = await redemptionServiceJs.getRedemptions(rawAdmin,{ limit }, options);
+      const redemptionServiceAddresses = redemptionEvents.map(r => r.address);
+      let redemptionServices = await redemptionServiceJs.getAll(rawAdmin, { address: redemptionServiceAddresses }, options);
+
+      // handle backwards compatibility case
+      if (Object.keys(redemptionServices).length === 0) {
+        redemptionServices = await redemptionServiceJs.getAll(rawAdmin, { isActive: true, ownerCommonName: "Server", limit }, options);
+      }
+
+      const redemptionPromises = redemptionServices.map(async (rs) => {
+        const serviceUrl = rs.serviceURL || rs.data.serviceURL;
+        const res = await axios.get(`${serviceUrl}/redemption/all?${queryParams}`);
+        if (res.status === 200) {
+          count = res.data.count; 
+          return res.data.data.map((item) => {
+            const date = new Date(item.createdDate);
+            const unixTimestamp = Math.floor(date.getTime() / 1000);
+            return { ...item, redemptionDate: unixTimestamp, type: 'Redemption', block_timestamp: new Date(item.createdDate) }
+          })
+        } else {
+          return [];
+        }
+      });
+
+      const allRedemptions = await Promise.all(redemptionPromises);
+      redemptions = allRedemptions.flat();
+      if(range){
+      redemptions = redemptions.filter((item)=>{
+        const dateRange = range[0].split(',')
+        const startRange = dateRange[1];
+        const endRange = dateRange[2];
+        if(item.redemptionDate > startRange && item.redemptionDate < endRange){
+          return item;
+        }
+      })
+     }
+
+      if (order && order === 'ASC')
+        redemptions.sort((a, b) => a.createdDate - b.createdDate);
+      else
+        redemptions.sort((a, b) => b.createdDate - a.createdDate);
+
+
+      return {data:redemptions, count};
+    } catch (error) {
+      if (error.response) {
+        throw new rest.RestError(error.response.status, error.response.statusText);
+      }
+      throw new rest.RestError(RestStatus.BAD_REQUEST, `Error while fetching All redemptions: ${JSON.stringify(error)} `);
     }
   };
 
@@ -889,11 +955,10 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
   contract.getSaleOrders = async function (args, options = defaultOptions) {
     const getOptions = { ...options, app: contractName, };
 
-
-    let { orders, total } = await saleOrderJs.getAll(rawAdmin, args, getOptions);
-    let data;
+   let {orders, total} = await saleOrderJs.getAll(rawAdmin, args, getOptions);
+   let data;
    let saleAddressArr = [];
-   data = orders.map((item)=> {
+   data = orders?.map((item)=> {
     if(item?.saleAddresses?.length){
       saleAddressArr.push(item?.saleAddresses[0])
      return {...item,saleAddress:item?.saleAddresses[0] }
