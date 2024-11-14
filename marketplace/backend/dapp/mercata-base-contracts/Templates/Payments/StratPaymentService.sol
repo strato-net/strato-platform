@@ -152,7 +152,6 @@ contract StratPaymentService is PaymentService {
                 transferNumber = (uint(_checkoutHash, 16) + j) % 1000000;
                 if (remainingStratsToTransfer > 0) {
                     transferAmount = stratQuantity >= remainingStratsToTransfer ? remainingStratsToTransfer : stratQuantity;
-                    unStake(_stratsAssetAddresses, _escrowAddress, sellerAddress);
                     stratAsset.purchaseTransfer(sellerAddress, transferAmount, transferNumber, 0.0001);
                     remainingStratsToTransfer -= transferAmount;
                 }
