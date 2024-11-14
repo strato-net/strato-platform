@@ -6,31 +6,36 @@ import config from '../../../util/load.config';
 import * as permissionedHashmapJs from '../permissionedHashmap';
 import { getCredentialArgs } from '../../../util/util';
 
-
 const adminArgs = getCredentialArgs(util.uid(), 'Admin', '1234');
 const masterArgs = getCredentialArgs(util.uid(), 'Master', '5678');
 const attackerArgs = getCredentialArgs(util.uid(), 'Attacker', '9090');
 
 describe('PermissionedHashmap tests', function () {
-  this.timeout(config.timeout)
+  this.timeout(config.timeout);
 
-  const options = { config }
-  let admin, master, attacker, hashmapPermissionManager
+  const options = { config };
+  let admin, master, attacker, hashmapPermissionManager;
 
   // get ready:  admin-user and manager-contract
   before(async function () {
-    console.log('creating admin')
-    admin = await createUser(adminArgs, options)
-    console.log('creating master')
-    master = await createUser(masterArgs, options)
-    console.log('creating attacker')
-    attacker = await createUser(attackerArgs, options)
+    console.log('creating admin');
+    admin = await createUser(adminArgs, options);
+    console.log('creating master');
+    master = await createUser(masterArgs, options);
+    console.log('creating attacker');
+    attacker = await createUser(attackerArgs, options);
     // pm
-    hashmapPermissionManager = await createHashmapPermissionManager(admin, master)
-  })
+    hashmapPermissionManager = await createHashmapPermissionManager(
+      admin,
+      master
+    );
+  });
 
   it('put', async function () {
-    const contract = await permissionedHashmapJs.uploadContract(admin, hashmapPermissionManager)
+    const contract = await permissionedHashmapJs.uploadContract(
+      admin,
+      hashmapPermissionManager
+    );
     const iuid = util.iuid();
     const args = factory.createEntity(iuid);
     await contract.put(args);
@@ -40,17 +45,20 @@ describe('PermissionedHashmap tests', function () {
   });
 
   it('put - unauthorized', async function () {
-    const contract = await permissionedHashmapJs.uploadContract(admin, hashmapPermissionManager)
+    const contract = await permissionedHashmapJs.uploadContract(
+      admin,
+      hashmapPermissionManager
+    );
     const iuid = util.iuid();
     const args = factory.createEntity(iuid);
 
     const callArgs = {
       contract,
       method: 'put',
-      args: util.usc(args)
-    }
+      args: util.usc(args),
+    };
 
-    const result = await call(attacker, callArgs, options)
+    const result = await call(attacker, callArgs, options);
 
     const state = await contract.getState();
     assert.equal(state.values.length, 1, 'length 1 - did not put');
@@ -58,7 +66,10 @@ describe('PermissionedHashmap tests', function () {
   });
 
   it('get', async function () {
-    const contract = await permissionedHashmapJs.uploadContract(admin, hashmapPermissionManager)
+    const contract = await permissionedHashmapJs.uploadContract(
+      admin,
+      hashmapPermissionManager
+    );
     const iuid = util.iuid();
     const args = factory.createEntity(iuid);
     // put
@@ -71,7 +82,10 @@ describe('PermissionedHashmap tests', function () {
   });
 
   it('contains', async function () {
-    const contract = await permissionedHashmapJs.uploadContract(admin, hashmapPermissionManager)
+    const contract = await permissionedHashmapJs.uploadContract(
+      admin,
+      hashmapPermissionManager
+    );
     const iuid = util.iuid();
     const args = factory.createEntity(iuid);
     //put
@@ -84,7 +98,10 @@ describe('PermissionedHashmap tests', function () {
   });
 
   it('size', async function () {
-    const contract = await permissionedHashmapJs.uploadContract(admin, hashmapPermissionManager)
+    const contract = await permissionedHashmapJs.uploadContract(
+      admin,
+      hashmapPermissionManager
+    );
     const iuid = util.iuid();
     const args = factory.createEntity(iuid);
     await contract.put(args);
@@ -97,12 +114,15 @@ describe('PermissionedHashmap tests', function () {
   });
 
   it('remove', async function () {
-    const contract = await permissionedHashmapJs.uploadContract(admin, hashmapPermissionManager)
+    const contract = await permissionedHashmapJs.uploadContract(
+      admin,
+      hashmapPermissionManager
+    );
     const iuid = util.iuid();
     const putArgs = factory.createEntity(iuid);
     // put
     await contract.put(putArgs);
-    const args = { key: putArgs.key }
+    const args = { key: putArgs.key };
     // contains
     {
       const result = await contract.contains(args);
@@ -110,7 +130,7 @@ describe('PermissionedHashmap tests', function () {
     }
     // remove
     await contract.remove(args);
-    await contract.getState()
+    await contract.getState();
     // contains not
     {
       const result = await contract.contains(args);
@@ -119,12 +139,15 @@ describe('PermissionedHashmap tests', function () {
   });
 
   it('remove - unauthorized', async function () {
-    const contract = await permissionedHashmapJs.uploadContract(admin, hashmapPermissionManager)
+    const contract = await permissionedHashmapJs.uploadContract(
+      admin,
+      hashmapPermissionManager
+    );
     const iuid = util.iuid();
     const putArgs = factory.createEntity(iuid);
     // put
     await contract.put(putArgs);
-    const args = { key: putArgs.key }
+    const args = { key: putArgs.key };
     // contains
     {
       const result = await contract.contains(args);
@@ -134,19 +157,18 @@ describe('PermissionedHashmap tests', function () {
     const callArgs = {
       contract,
       method: 'remove',
-      args: util.usc(args)
-    }
-    const result = await call(attacker, callArgs, options)
+      args: util.usc(args),
+    };
+    const result = await call(attacker, callArgs, options);
 
-    await contract.getState()
+    await contract.getState();
     // still contained - was not removed
     {
       const result = await contract.contains(args);
       assert.equal(result, true, 'contains: true');
     }
   });
-
-})
+});
 
 /**
  * creating a TEST permission manager that provides a real canModifyMap() implementation
@@ -161,16 +183,18 @@ async function createHashmapPermissionManager(admin, master) {
   const args = {
     owner: admin.address,
     master: master.address,
-  }
+  };
 
   const contractArgs = {
     name: contractName,
     source: await importer.combine(contractFilename),
-    args: util.usc(args)
-  }
+    args: util.usc(args),
+  };
 
-  const hashmapPermissionManager = await createContract(admin, contractArgs, { config });
-  return hashmapPermissionManager
+  const hashmapPermissionManager = await createContract(admin, contractArgs, {
+    config,
+  });
+  return hashmapPermissionManager;
 }
 
 const factory = {
@@ -178,7 +202,7 @@ const factory = {
     const args = {
       key: `Key_${iuid}`,
       value: iuid,
-    }
-    return args
+    };
+    return args;
   },
-}
+};

@@ -1,8 +1,8 @@
-import express from "express";
-import STRATSController from "./STRATS.controller";
-import { STRATS } from "../endpoints";
-import authHandler from "../../middleware/authHandler";
-import loadDapp from "../../middleware/loadDappHandler";
+import express from 'express';
+import STRATSController from './STRATS.controller';
+import { STRATS } from '../endpoints';
+import authHandler from '../../middleware/authHandler';
+import loadDapp from '../../middleware/loadDappHandler';
 
 const router = express.Router();
 

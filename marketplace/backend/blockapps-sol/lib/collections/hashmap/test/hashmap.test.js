@@ -16,9 +16,9 @@ describe('Hashmap', function () {
   let otherAdmin;
 
   before(async function () {
-    console.log('creating admin')
+    console.log('creating admin');
     admin = await createUser(adminArgs, options);
-    console.log('creating user')
+    console.log('creating user');
     otherAdmin = await createUser(otherAdminArgs, options);
   });
 
@@ -89,7 +89,7 @@ describe('Hashmap', function () {
     await hashmap.transferOwnership({ newOwner: otherAdmin.address });
 
     const result = await hashmap.get({ key: args.key });
-    assert.equal(result.toString(), "0000000000000000000000000000000000000000");
+    assert.equal(result.toString(), '0000000000000000000000000000000000000000');
   });
 
   it('reject put from original admin', async function () {
@@ -99,10 +99,12 @@ describe('Hashmap', function () {
     const args = factory.createEntity(iuid);
 
     await hashmap.put(args);
-    const result = await hashmapJs.get(otherAdmin, hashmap, { key: args.key })
-    assert.equal(result.toString(), "0000000000000000000000000000000000000000");
+    const result = await hashmapJs.get(otherAdmin, hashmap, { key: args.key });
+    assert.equal(result.toString(), '0000000000000000000000000000000000000000');
 
-    const result2 = await hashmapJs.size(otherAdmin, hashmap, { key: args.key })
+    const result2 = await hashmapJs.size(otherAdmin, hashmap, {
+      key: args.key,
+    });
     assert.equal(result2, 0);
   });
 
@@ -125,15 +127,20 @@ describe('Hashmap', function () {
     await hashmap.transferOwnership({ newOwner: otherAdmin.address });
 
     const result = await hashmap.size({});
-    assert.equal(result, 0)
+    assert.equal(result, 0);
   });
 
   it('reject transferOwnership from original admin', async function () {
-    const newAdmin = await createUser({ username: util.uid('newAdmin'), password: '4321' }, options);
+    const newAdmin = await createUser(
+      { username: util.uid('newAdmin'), password: '4321' },
+      options
+    );
     const hashmap = await hashmapJs.uploadContract(admin);
     await hashmap.transferOwnership({ newOwner: otherAdmin.address });
 
-    const result = await hashmap.transferOwnership({ newOwner: newAdmin.address });
+    const result = await hashmap.transferOwnership({
+      newOwner: newAdmin.address,
+    });
     assert.equal(result, false);
   });
 });

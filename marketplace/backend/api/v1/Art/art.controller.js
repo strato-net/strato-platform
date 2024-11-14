@@ -1,36 +1,36 @@
-import { rest } from 'blockapps-rest'
-import Joi from '@hapi/joi'
-import RestStatus from 'http-status-codes'
-import config from '../../../load.config'
+import { rest } from 'blockapps-rest';
+import Joi from '@hapi/joi';
+import RestStatus from 'http-status-codes';
+import config from '../../../load.config';
 
-const options = { config, cacheNonce: true }
+const options = { config, cacheNonce: true };
 
 class ArtController {
   static async getAll(req, res, next) {
     try {
-      const { dapp, query } = req
+      const { dapp, query } = req;
 
-      const arts = await dapp.getArts({ ...query })
-      rest.response.status200(res, arts)
+      const arts = await dapp.getArts({ ...query });
+      rest.response.status200(res, arts);
 
-      return next()
+      return next();
     } catch (e) {
-      return next(e)
+      return next(e);
     }
   }
 
   static async create(req, res, next) {
     try {
-      const { dapp, body } = req
+      const { dapp, body } = req;
 
-      ArtController.validateCreateArtArgs(body)
+      ArtController.validateCreateArtArgs(body);
 
-      const result = await dapp.createArt(body)
-      rest.response.status200(res, result)
+      const result = await dapp.createArt(body);
+      rest.response.status200(res, result);
 
-      return next()
+      return next();
     } catch (e) {
-      return next(e)
+      return next(e);
     }
   }
 
@@ -39,7 +39,7 @@ class ArtController {
   static validateCreateArtArgs(args) {
     const createArtSchema = Joi.object({
       itemArgs: Joi.object({
-        serialNumber: Joi.string().allow("").optional(),
+        serialNumber: Joi.string().allow('').optional(),
         name: Joi.string().required(),
         description: Joi.string().required(),
         artist: Joi.string().required(),
@@ -47,16 +47,20 @@ class ArtController {
         files: Joi.array().items(Joi.string()).required(),
         fileNames: Joi.array().items(Joi.string()).required(),
         redemptionService: Joi.string().required(),
-      }).required()
+      }).required(),
     });
 
     const validation = createArtSchema.validate(args);
 
     if (validation.error) {
       console.log(validation.error.message);
-      throw new rest.RestError(RestStatus.BAD_REQUEST, 'Create Art Argument Validation Error', {
-        message: `Missing args or bad format: ${validation.error.message}`,
-      })
+      throw new rest.RestError(
+        RestStatus.BAD_REQUEST,
+        'Create Art Argument Validation Error',
+        {
+          message: `Missing args or bad format: ${validation.error.message}`,
+        }
+      );
     }
   }
 }

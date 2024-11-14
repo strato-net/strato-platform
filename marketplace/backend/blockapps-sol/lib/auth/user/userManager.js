@@ -17,8 +17,8 @@ async function uploadContract(admin) {
   const contractArgs = {
     name: contractName,
     source: await importer.combine(contractFilename),
-    args: util.usc(args)
-  }
+    args: util.usc(args),
+  };
   const contract = await createContract(admin, contractArgs, options);
   contract.src = 'removed';
   return bind(admin, contract);
@@ -27,22 +27,22 @@ async function uploadContract(admin) {
 function bind(admin, contract) {
   contract.getState = async function () {
     return await getState(contract, options);
-  }
+  };
   contract.createUser = async function (args) {
     return await createUser(admin, contract, args);
-  }
+  };
   contract.exists = async function (username) {
     return await exists(admin, contract, username);
-  }
+  };
   contract.getUser = async function (username) {
     return await getUser(admin, contract, username);
-  }
+  };
   contract.getUsers = async function () {
     return await getUsers(admin, contract);
-  }
+  };
   contract.authenticate = async function (args) {
     return await authenticate(admin, contract, args);
-  }
+  };
   return contract;
 }
 
@@ -53,8 +53,8 @@ async function createUser(admin, contract, args) {
   const callArgs = {
     contract,
     method: 'createUser',
-    args: util.usc(args)
-  }
+    args: util.usc(args),
+  };
 
   // create the user, with the eth account
   const [restStatus] = await call(admin, callArgs, options);
@@ -76,11 +76,11 @@ async function exists(admin, contract, username) {
   const callArgs = {
     contract,
     method: 'exists',
-    args: util.usc(args)
-  }
+    args: util.usc(args),
+  };
 
   const result = await call(admin, callArgs, options);
-  const exist = (result[0] === true);
+  const exist = result[0] === true;
   return exist;
 }
 
@@ -93,8 +93,8 @@ async function getUser(admin, contract, username) {
   const callArgs = {
     contract,
     method: 'getUser',
-    args: util.usc(args)
-  }
+    args: util.usc(args),
+  };
 
   // get the use address
   const [address] = await call(admin, callArgs, options);
@@ -107,7 +107,10 @@ async function getUser(admin, contract, username) {
 
 async function getUsers(admin, contract) {
   const { users: usersHashmap } = await rest.getState(contract, options);
-  const { values } = await getState({ name: 'Hashmap', address: usersHashmap }, options);
+  const { values } = await getState(
+    { name: 'Hashmap', address: usersHashmap },
+    options
+  );
   const addresses = values.slice(1);
   return await userJs.getUsers(addresses);
 }
@@ -117,15 +120,11 @@ async function authenticate(admin, contract, args) {
   const callArgs = {
     contract,
     method: 'authenticate',
-    args: util.usc(args)
-  }
+    args: util.usc(args),
+  };
   const [result] = await call(admin, callArgs, options);
-  const isOK = (result == true);
+  const isOK = result == true;
   return isOK;
 }
 
-export {
-  uploadContract,
-  contractName,
-  bind
-};
+export { uploadContract, contractName, bind };
