@@ -41,7 +41,7 @@ import inventoryJs from "/dapp/products/inventory";
 import marketplaceJs from "/dapp/marketplace/marketplace.js";
 import paymentServiceJs from '/dapp/payments/paymentService';
 import redemptionServiceJs from '/dapp/redemptions/redemptionService';
-import governanceJs from '/dapp/governance/governance';
+import reserveJs from '/dapp/reserve/reserve';
 
 import strats from "../strats/strats";
 
@@ -160,7 +160,7 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
   const admin = { ...rawAdmin };
 
   // --------------------------- DAPP MANAGEMENT --------------------------------
-  // governance - single add
+  // reserve - single add
   contract.addOrg = async function (orgName) {
     return addOrg(admin, contract, defaultOptions, orgName);
   };
@@ -180,7 +180,7 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
     return removeMember(admin, contract, defaultOptions, orgName, orgUnit, commonName);
   };
 
-  // governance - multiple adds
+  // reserve - multiple adds
   contract.addOrgs = async function (orgNames) {
     return addOrgs(admin, contract, defaultOptions, orgNames);
   };
@@ -1388,19 +1388,19 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
     return res;
   }
 
-  //----------------------------- Governance START -------------------------------
-  contract.getGovernance = async function (options = defaultOptions) {
-    const res = await governanceJs.get(rawAdmin, options);
+  //----------------------------- Reserve START -------------------------------
+  contract.getReserve = async function (options = defaultOptions) {
+    const res = await reserveJs.get(rawAdmin, options);
     return res;
   };
 
   contract.calculate = async function (args, options = defaultOptions) {
-    const res = await governanceJs.calculate(rawAdmin, args, options);
+    const res = await reserveJs.calculate(rawAdmin, args, options);
     return res;
   };
 
   contract.stake = async function (args, options = defaultOptions) {
-    const res = await governanceJs.stake(rawAdmin, args, options);
+    const res = await reserveJs.stake(rawAdmin, args, options);
     return res;
   };
 
@@ -1447,10 +1447,10 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
       throw new rest.RestError(RestStatus.BAD_REQUEST, "You don't have enough STRATS balance to make this purchase");
     }
 
-    const res = await governanceJs.unstake(rawAdmin, contract, {stratsAssetAddresses: stratsAssetAddressesToUse, ...restArgs}, options);
+    const res = await reserveJs.unstake(rawAdmin, contract, {stratsAssetAddresses: stratsAssetAddressesToUse, ...restArgs}, options);
     return res;
   };
-  // ---------------------------- Governance END   -------------------------------
+  // ---------------------------- Reserve END   -------------------------------
   return contract;
 };
 

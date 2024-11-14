@@ -12,7 +12,7 @@ import { Images } from "../../images";
 const logo = <img src={Images.logo} alt={''} title={''} className=" ml-1 mt-1 w-[15px] h-[15px] " />
 
 const StakeModal = ({ open, handleCancel, inventory, category, debouncedSearchTerm, limit = 0, offset = 0, type }) => {
-    const { isStaking, isUnstaking, isGovernanceAddress, isCalculatedValue, governanceAddress, calculatedValue} = useInventoryState();
+    const { isStaking, isUnstaking, isReserveAddress, isCalculatedValue, reserveAddress, calculatedValue} = useInventoryState();
 
     const [data, setData] = useState(inventory);
     const inventoryDispatch = useInventoryDispatch();
@@ -27,19 +27,19 @@ const StakeModal = ({ open, handleCancel, inventory, category, debouncedSearchTe
     
     useEffect(()=>{
         paymentServiceActions.getPaymentServices(paymentServiceDispatch, true);
-        inventoryActions.getGovernanceAddress(inventoryDispatch);
+        inventoryActions.getReserveAddress(inventoryDispatch);
     },[]);
 
     useEffect(()=>{
-        if (governanceAddress && inventory.data) {
+        if (reserveAddress && inventory.data) {
             const body = {
                 assetAmount:inventory?.quantity,
                 assetAddress:inventory?.address,
-                governance: governanceAddress[0].address
+                reserve: reserveAddress[0].address
             }
             inventoryActions.calculateValue(inventoryDispatch, body);
         }
-    },[governanceAddress]);
+    },[reserveAddress]);
 
     // const filteredUsersList = filterDuplicateUserAddresses(usersList);
     // const [userAddress, setUserAddress] = useState(
@@ -96,7 +96,7 @@ const StakeModal = ({ open, handleCancel, inventory, category, debouncedSearchTe
                 assetAmount: inventory?.quantity,
                 assetAddress: inventory?.address,
                 stratsPaymentService: {creator: stratsService.creator, serviceName: stratsService.serviceName},
-                governance: governanceAddress[0].address
+                reserve: reserveAddress[0].address
             }
 
           const isStaked = await inventoryActions.stakeInventory(inventoryDispatch, body);

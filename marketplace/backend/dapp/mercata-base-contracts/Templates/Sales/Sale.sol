@@ -18,8 +18,6 @@ abstract contract Sale is Utils, Structs {
     uint totalLockedQuantity;
     bool isOpen;
 
-    address public governance;
-
     constructor(
         address _assetToBeSold,
         decimal _price,

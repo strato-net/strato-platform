@@ -59,13 +59,13 @@ function marshalOut(_args) {
  * @returns Contract state in cirrus
  */
 async function get(user, options) {
-  const governance = await searchAllWithQueryArgs(
+  const reserve = await searchAllWithQueryArgs(
     contractName,
     { creator: "BlockApps" },
     options,
     user
   );
-  return governance.map((governance) => marshalOut(governance));
+  return reserve.map((reserve) => marshalOut(reserve));
 }
 
 /**
@@ -81,8 +81,8 @@ async function getState(user, contract, options) {
  * calculate
  */
 async function calculate(user, args, options) {
-  const { governance, ...restArgs } = args;
-  const contractObj = { name: contract, address: governance };
+  const { reserve, ...restArgs } = args;
+  const contractObj = { name: contract, address: reserve };
   const callArgs = {
     contract: contractObj,
     method: "previewStake",
@@ -106,8 +106,8 @@ async function calculate(user, args, options) {
  * stake
  */
 async function stake(user, args, options) {
-  const { governance, ...restArgs } = args;
-  const contract = { name: contractName, address: governance };
+  const { reserve, ...restArgs } = args;
+  const contract = { name: contractName, address: reserve };
   const callArgs = {
     contract,
     method: "createEscrow",

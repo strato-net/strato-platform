@@ -2,12 +2,12 @@ import { rest } from "blockapps-rest";
 import Joi from "@hapi/joi";
 import RestStatus from "http-status-codes";
 
-class GovernanceController {
-  // Retrieve governance contract Address
+class ReserveController {
+  // Retrieve reserve contract Address
   static async get(req, res, next) {
     try {
       const { dapp } = req;
-      const result = await dapp.getGovernance();
+      const result = await dapp.getReserve();
       rest.response.status200(res, result);
       next();
     } catch (e) {
@@ -19,7 +19,7 @@ class GovernanceController {
   static async calculate(req, res, next) {
     try {
       const { dapp, body } = req;
-      GovernanceController.validateCalculateArgs(body);
+      ReserveController.validateCalculateArgs(body);
 
       const result = await dapp.calculate(body);
       rest.response.status200(res, result);
@@ -29,11 +29,11 @@ class GovernanceController {
     }
   }
 
-  // Stake in the governance system
+  // Stake in the reserve system
   static async stake(req, res, next) {
     try {
       const { dapp, body } = req;
-      GovernanceController.validateStakeArgs(body);
+      ReserveController.validateStakeArgs(body);
 
       const result = await dapp.stake(body);
       rest.response.status200(res, result);
@@ -43,11 +43,11 @@ class GovernanceController {
     }
   }
 
-  // Unstake from the governance system
+  // Unstake from the reserve system
   static async unstake(req, res, next) {
     try {
       const { dapp, body } = req;
-      GovernanceController.validateUnstakeArgs(body);
+      ReserveController.validateUnstakeArgs(body);
 
       const result = await dapp.unstake(body);
       rest.response.status200(res, result);
@@ -70,12 +70,12 @@ class GovernanceController {
         "any.required": "Asset Address is required and must be a string.",
         "string.base": "Asset Address must be a valid string.",
       }),
-      governance: Joi.string().required().messages({
-        "any.required": "Governance is required and must be a string.",
-        "string.base": "Governance must be a valid string.",
+      reserve: Joi.string().required().messages({
+        "any.required": "Reserve is required and must be a string.",
+        "string.base": "Reserve must be a valid string.",
       }),
     });
-    GovernanceController.validateArgs(args, schema, "Calculate");
+    ReserveController.validateArgs(args, schema, "Calculate");
   }
 
   static validateStakeArgs(args) {
@@ -93,12 +93,12 @@ class GovernanceController {
             creator: Joi.string().required(),
             serviceName: Joi.string().required(),
         }).required(),
-      governance: Joi.string().required().messages({
-        "any.required": "Governance is required and must be a string.",
-        "string.base": "Governance must be a valid string.",
+      reserve: Joi.string().required().messages({
+        "any.required": "Reserve is required and must be a string.",
+        "string.base": "Reserve must be a valid string.",
       }),
     });
-    GovernanceController.validateArgs(args, schema, "Stake");
+    ReserveController.validateArgs(args, schema, "Stake");
   }
 
   static validateUnstakeArgs(args) {
@@ -113,7 +113,7 @@ class GovernanceController {
         "string.base": "Strats Payment Service must be a valid string.",
       }),
     });
-    GovernanceController.validateArgs(args, schema, "Unstake");
+    ReserveController.validateArgs(args, schema, "Unstake");
   }
 
   static validateArgs(args, schema, action) {
@@ -128,4 +128,4 @@ class GovernanceController {
   }
 }
 
-export default GovernanceController;
+export default ReserveController;

@@ -27,7 +27,7 @@ import paymentService from './PaymentService'
 import userActivity from './UserActivity'
 import redemption from './Redemption'
 import transaction from "./Transactions"
-import governance from './Governance'
+import reserve from './Reserve'
 
 import {
   Authentication,
@@ -54,7 +54,7 @@ import {
   UserActivity,
   Redemption,
   Transaction,
-  Governance
+  Reserve
 } from './endpoints'
 
 
@@ -84,7 +84,7 @@ router.use(PaymentService.prefix, paymentService)
 router.use(UserActivity.prefix, userActivity)
 router.use(Redemption.prefix, redemption)
 router.use(Transaction.prefix, transaction)
-router.use(Governance.prefix, governance)
+router.use(Reserve.prefix, reserve)
 
 
 router.get(`/health`, (req, res) => {

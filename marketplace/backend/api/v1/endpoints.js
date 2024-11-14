@@ -197,8 +197,8 @@ export const UserActivity = {
   getAll: "/",
 };
 
-export const Governance = {
-  prefix: "/governance",
+export const Reserve = {
+  prefix: "/reserve",
   get: "/",
   calculate: "/calculate",
   stake: "/stake",

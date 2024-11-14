@@ -1,37 +1,37 @@
 import express from "express";
-import GovernanceController from "./governance.controller";
-import { Governance } from "../endpoints";
+import ReserveController from "./reserve.controller";
+import { Reserve } from "../endpoints";
 import authHandler from "../../middleware/authHandler";
 import loadDapp from "../../middleware/loadDappHandler";
 
 const router = express.Router();
 
 router.get(
-  Governance.get,
+  Reserve.get,
   authHandler.authorizeRequest(),
   loadDapp,
-  GovernanceController.get
+  ReserveController.get
 );
 
 router.post(
-  Governance.calculate,
+  Reserve.calculate,
   authHandler.authorizeRequest(),
   loadDapp,
-  GovernanceController.calculate
+  ReserveController.calculate
 );
 
 router.post(
-  Governance.stake,
+  Reserve.stake,
   authHandler.authorizeRequest(),
   loadDapp,
-  GovernanceController.stake
+  ReserveController.stake
 );
 
 router.post(
-  Governance.unstake,
+  Reserve.unstake,
   authHandler.authorizeRequest(),
   loadDapp,
-  GovernanceController.unstake
+  ReserveController.unstake
 );
 
 export default router;

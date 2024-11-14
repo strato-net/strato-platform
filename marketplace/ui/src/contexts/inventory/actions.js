@@ -38,9 +38,9 @@ const actionDescriptors = {
   unstakeInventorySuccessful: "unstake_inventory_successful",
   unstakeInventoryFailed: "unstake_inventory_failed",
 
-  getGovernanceAddress: "get_governance_address",
-  getGovernanceAddressSuccessful: "get_governance_address_successful",
-  getGovernanceAddressFailed: "get_governance_address_failed",
+  getReserveAddress: "get_reserve_address",
+  getReserveAddressSuccessful: "get_reserve_address_successful",
+  getReserveAddressFailed: "get_reserve_address_failed",
 
   getCalculatedValue: "get_calculated_value",
   getCalculatedValueSuccessful: "get_calculated_value_successful",
@@ -712,7 +712,7 @@ const actions = {
     dispatch({ type: actionDescriptors.stakeInventory });
 
     try {
-      const response = await fetch(`${apiUrl}/governance/stake`, {
+      const response = await fetch(`${apiUrl}/reserve/stake`, {
         method: HTTP_METHODS.POST,
         credentials: "same-origin",
         headers: {
@@ -766,7 +766,7 @@ const actions = {
     dispatch({ type: actionDescriptors.unstakeInventory });
 
     try {
-      const response = await fetch(`${apiUrl}/governance/unstake`, {
+      const response = await fetch(`${apiUrl}/reserve/unstake`, {
         method: HTTP_METHODS.POST,
         credentials: "same-origin",
         headers: {
@@ -816,11 +816,11 @@ const actions = {
     }
   },
 
-  getGovernanceAddress: async (dispatch) => {
-    dispatch({ type: actionDescriptors.getGovernanceAddress });
+  getReserveAddress: async (dispatch) => {
+    dispatch({ type: actionDescriptors.getReserveAddress });
 
     try {
-      const response = await fetch(`${apiUrl}/governance`, {
+      const response = await fetch(`${apiUrl}/reserve`, {
         method: HTTP_METHODS.GET,
         credentials: "same-origin",
         headers: {
@@ -833,39 +833,39 @@ const actions = {
 
       if (response.status === RestStatus.OK) {
         dispatch({
-          type: actionDescriptors.getGovernanceAddressSuccessful,
+          type: actionDescriptors.getReserveAddressSuccessful,
           payload: body.data,
         });
         // actions.setMessage(dispatch, "Item has been Staked Successfully", true);
         return true;
       } else if (response.status === RestStatus.CONFLICT) {
-        dispatch({ type: actionDescriptors.getGovernanceAddressFailed, error: body.error.message });
+        dispatch({ type: actionDescriptors.getReserveAddressFailed, error: body.error.message });
         actions.setMessage(dispatch, body.error.message)
         return false;
       } else if (response.status === RestStatus.INTERNAL_SERVER_ERROR) {
-        dispatch({ type: actionDescriptors.getGovernanceAddressFailed, error: "Error while fetching the governance Address" });
-        actions.setMessage(dispatch, "Errorwhile fetching the governance Address")
+        dispatch({ type: actionDescriptors.getReserveAddressFailed, error: "Error while fetching the reserve Address" });
+        actions.setMessage(dispatch, "Errorwhile fetching the reserve Address")
         return false;
       } else if (response.status === RestStatus.UNAUTHORIZED) {
         dispatch({
-          type: actionDescriptors.getGovernanceAddressFailed,
-          error: "Unauthorized while fetching the governance Address"
+          type: actionDescriptors.getReserveAddressFailed,
+          error: "Unauthorized while fetching the reserve Address"
         });
         window.location.href = body.error.loginUrl;
       }
 
       dispatch({
-        type: actionDescriptors.getGovernanceAddressFailed,
+        type: actionDescriptors.getReserveAddressFailed,
         error: body.error
       });
       actions.setMessage(dispatch, body.error);
       return false;
     } catch (err) {
       dispatch({
-        type: actionDescriptors.getGovernanceAddressFailed,
-        error: "Error while fetching the governance Address",
+        type: actionDescriptors.getReserveAddressFailed,
+        error: "Error while fetching the reserve Address",
       });
-      actions.setMessage(dispatch, "Error while fetching the governance Address");
+      actions.setMessage(dispatch, "Error while fetching the reserve Address");
     }
   },
 
@@ -873,7 +873,7 @@ const actions = {
     dispatch({ type: actionDescriptors.getCalculatedValue });
 
     try {
-      const response = await fetch(`${apiUrl}/governance/calculate`, { //Stake
+      const response = await fetch(`${apiUrl}/reserve/calculate`, { //Stake
         method: HTTP_METHODS.POST,
         credentials: "same-origin",
         headers: {

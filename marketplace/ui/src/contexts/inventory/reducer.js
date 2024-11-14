@@ -191,22 +191,22 @@ const reducer = (state, action) => {
         isUnstaking: false
       };
     
-    case actionDescriptors.getGovernanceAddress:
+    case actionDescriptors.getReserveAddress:
         return {
           ...state,
-          isGovernanceAddress: true
+          isReserveAddress: true
         };
-    case actionDescriptors.getGovernanceAddressSuccessful:
+    case actionDescriptors.getReserveAddressSuccessful:
         return {
           ...state,
-          governanceAddress: action.payload,
-          isGovernanceAddress: false
+          reserveAddress: action.payload,
+          isReserveAddress: false
         };
-    case actionDescriptors.getGovernanceAddressFailed:
+    case actionDescriptors.getReserveAddressFailed:
         return {
           ...state,
           error: action.error,
-          isGovernanceAddress: false
+          isReserveAddress: false
         };
     
     case actionDescriptors.getCalculatedValue:

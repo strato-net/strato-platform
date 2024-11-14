@@ -26,9 +26,9 @@ const InventoriesProvider = ({ children }) => {
    //------------------------
     isStaking: false,
     isUnstaking: false,
-    isGovernanceAddress: null,
+    isReserveAddress: null,
     isCalculatedValue: null,
-    governanceAddress: null,
+    reserveAddress: null,
     calculatedValue : 0,
     //------------------------
     inventoryDetails: null,
