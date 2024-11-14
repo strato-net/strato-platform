@@ -1,36 +1,36 @@
-import { rest } from 'blockapps-rest'
-import Joi from '@hapi/joi'
-import RestStatus from 'http-status-codes'
-import config from '../../../load.config'
+import { rest } from 'blockapps-rest';
+import Joi from '@hapi/joi';
+import RestStatus from 'http-status-codes';
+import config from '../../../load.config';
 
-const options = { config, cacheNonce: true }
+const options = { config, cacheNonce: true };
 
 class MetalsController {
   static async getAll(req, res, next) {
     try {
-      const { dapp, query } = req
+      const { dapp, query } = req;
 
-      const metals = await dapp.getMetals({ ...query })
-      rest.response.status200(res, metals)
+      const metals = await dapp.getMetals({ ...query });
+      rest.response.status200(res, metals);
 
-      return next()
+      return next();
     } catch (e) {
-      return next(e)
+      return next(e);
     }
   }
 
   static async create(req, res, next) {
     try {
-      const { dapp, body } = req
+      const { dapp, body } = req;
 
-      MetalsController.validateCreateMetalsArgs(body)
+      MetalsController.validateCreateMetalsArgs(body);
 
-      const result = await dapp.createMetals(body)
-      rest.response.status200(res, result)
+      const result = await dapp.createMetals(body);
+      rest.response.status200(res, result);
 
-      return next()
+      return next();
     } catch (e) {
-      return next(e)
+      return next(e);
     }
   }
 
@@ -50,16 +50,20 @@ class MetalsController {
         files: Joi.array().items(Joi.string().allow(null)).required(),
         fileNames: Joi.array().items(Joi.string().allow(null)).required(),
         redemptionService: Joi.string().required(),
-      }).required()
+      }).required(),
     });
 
     const validation = createMetalsSchema.validate(args);
 
     if (validation.error) {
       console.log(validation.error.message);
-      throw new rest.RestError(RestStatus.BAD_REQUEST, 'Create Metals Argument Validation Error', {
-        message: `Missing args or bad format: ${validation.error.message}`,
-      })
+      throw new rest.RestError(
+        RestStatus.BAD_REQUEST,
+        'Create Metals Argument Validation Error',
+        {
+          message: `Missing args or bad format: ${validation.error.message}`,
+        }
+      );
     }
   }
 }

@@ -1,29 +1,25 @@
-import RestStatus from "http-status-codes";
-import { apiUrl, HTTP_METHODS } from "../../helpers/constants";
+import RestStatus from 'http-status-codes';
+import { apiUrl, HTTP_METHODS } from '../../helpers/constants';
 
 const actionDescriptors = {
-  getPaymentServices: "get_payment_services",
-  getPaymentServicesSuccessful: "get_payment_services_successful",
-  getPaymentServicesFailed: "get_payment_services_failed",
-  getNotOnboarded: "get_not_onboarded",
-  getNotOnboardedSuccessful: "get_not_onboarded_successful",
-  getNotOnboardedFailed: "get_not_onboarded_failed",
+  getPaymentServices: 'get_payment_services',
+  getPaymentServicesSuccessful: 'get_payment_services_successful',
+  getPaymentServicesFailed: 'get_payment_services_failed',
+  getNotOnboarded: 'get_not_onboarded',
+  getNotOnboardedSuccessful: 'get_not_onboarded_successful',
+  getNotOnboardedFailed: 'get_not_onboarded_failed',
 };
 
 const actions = {
-
   getPaymentServices: async (dispatch, queryValue) => {
     const query = queryValue ? `&onlyActive=${queryValue}` : ``;
 
     dispatch({ type: actionDescriptors.getPaymentServices });
 
     try {
-      const response = await fetch(
-        `${apiUrl}/payment?${query}`,
-        {
-          method: HTTP_METHODS.GET,
-        }
-      );
+      const response = await fetch(`${apiUrl}/payment?${query}`, {
+        method: HTTP_METHODS.GET,
+      });
 
       const body = await response.json();
 
@@ -36,12 +32,12 @@ const actions = {
       } else if (response.status === RestStatus.INTERNAL_SERVER_ERROR) {
         dispatch({
           type: actionDescriptors.getPaymentServicesFailed,
-          error: "Error while fetching payment services",
+          error: 'Error while fetching payment services',
         });
       } else if (response.status === RestStatus.UNAUTHORIZED) {
         dispatch({
           type: actionDescriptors.getPaymentServicesFailed,
-          error: "Unauthorized while fetching payment services"
+          error: 'Unauthorized while fetching payment services',
         });
         window.location.href = body.error.loginUrl;
       }
@@ -52,7 +48,7 @@ const actions = {
     } catch (err) {
       dispatch({
         type: actionDescriptors.getPaymentServicesFailed,
-        error: "Error while fetching payment services",
+        error: 'Error while fetching payment services',
       });
     }
   },
@@ -81,12 +77,12 @@ const actions = {
       } else if (response.status === RestStatus.INTERNAL_SERVER_ERROR) {
         dispatch({
           type: actionDescriptors.getNotOnboardedFailed,
-          error: "Error while fetching unonboarded payment services",
+          error: 'Error while fetching unonboarded payment services',
         });
       } else if (response.status === RestStatus.UNAUTHORIZED) {
         dispatch({
           type: actionDescriptors.getNotOnboardedFailed,
-          error: "Unauthorized while fetching unonboarded payment services"
+          error: 'Unauthorized while fetching unonboarded payment services',
         });
         window.location.href = body.error.loginUrl;
       }
@@ -97,11 +93,10 @@ const actions = {
     } catch (err) {
       dispatch({
         type: actionDescriptors.getNotOnboardedFailed,
-        error: "Error while fetching unonboarded payment services",
+        error: 'Error while fetching unonboarded payment services',
       });
     }
   },
-
 };
 
 export { actionDescriptors, actions };

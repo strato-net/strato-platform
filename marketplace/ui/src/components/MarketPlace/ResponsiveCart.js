@@ -1,14 +1,23 @@
-import { Button, Row, Typography, InputNumber, Select, Spin, Col, Radio } from "antd";
-import { useState, useEffect } from "react";
-import { Images } from "../../images";
-import { useMarketplaceDispatch } from "../../contexts/marketplace";
-import { useAuthenticateState } from "../../contexts/authentication";
-import TagManager from "react-gtm-module";
-import { actions } from "../../contexts/marketplace/actions";
-import { actions as orderActions } from "../../contexts/order/actions";
-import { useOrderDispatch, useOrderState } from "../../contexts/order";
-import { generateHtmlContent } from "../../helpers/emailTemplate";
-import { PAYMENT_LABEL } from "../../helpers/constants";
+import {
+  Button,
+  Row,
+  Typography,
+  InputNumber,
+  Select,
+  Spin,
+  Col,
+  Radio,
+} from 'antd';
+import { useState, useEffect } from 'react';
+import { Images } from '../../images';
+import { useMarketplaceDispatch } from '../../contexts/marketplace';
+import { useAuthenticateState } from '../../contexts/authentication';
+import TagManager from 'react-gtm-module';
+import { actions } from '../../contexts/marketplace/actions';
+import { actions as orderActions } from '../../contexts/order/actions';
+import { useOrderDispatch, useOrderState } from '../../contexts/order';
+import { generateHtmlContent } from '../../helpers/emailTemplate';
+import { PAYMENT_LABEL } from '../../helpers/constants';
 
 const { Option } = Select;
 
@@ -20,16 +29,22 @@ const ResponsiveCart = ({
   MinusQty,
   ValueQty,
   removeCartList,
-  openToastOrder
+  openToastOrder,
 }) => {
   // temporary fix to put STRATs as top payment option, will be updated in next release
-  const activePaymentProviders = (paymentServices[0] !== undefined) ? paymentServices.filter(paymentProvider => paymentProvider?.isActive) : [];
-  const stratsIndex = activePaymentProviders.findIndex(service => service.serviceName.toLowerCase().includes('strats'));
+  const activePaymentProviders =
+    paymentServices[0] !== undefined
+      ? paymentServices.filter((paymentProvider) => paymentProvider?.isActive)
+      : [];
+  const stratsIndex = activePaymentProviders.findIndex((service) =>
+    service.serviceName.toLowerCase().includes('strats')
+  );
   if (stratsIndex > 0) {
     const [stratsObject] = activePaymentProviders.splice(stratsIndex, 1);
     activePaymentProviders.unshift(stratsObject);
   }
-  const initialPaymentState = activePaymentProviders?.length !==0 ? activePaymentProviders[0] : '' 
+  const initialPaymentState =
+    activePaymentProviders?.length !== 0 ? activePaymentProviders[0] : '';
   const [selectedProvider, setSelectedProvider] = useState(initialPaymentState);
   const marketplaceDispatch = useMarketplaceDispatch();
   const [tax, setTax] = useState(0);
@@ -37,10 +52,13 @@ const ResponsiveCart = ({
   const [total, setTotal] = useState(0);
   const orderDispatch = useOrderDispatch();
   let { hasChecked, isAuthenticated, loginUrl, user } = useAuthenticateState();
-  const { isCreatePaymentSubmitting, isCreateOrderSubmitting } = useOrderState();
+  const { isCreatePaymentSubmitting, isCreateOrderSubmitting } =
+    useOrderState();
   const userOrganization = user?.organization;
   const [cartData, setCartData] = useState(data);
-  const [faqOpenState, setFaqOpenState] = useState(Array(cartData.length).fill(false));
+  const [faqOpenState, setFaqOpenState] = useState(
+    Array(cartData.length).fill(false)
+  );
 
   useEffect(() => {
     setCartData(data);
@@ -74,7 +92,7 @@ const ResponsiveCart = ({
     let customerFirstName = username;
 
     // Construct Email with order details
-    let concatenatedOrderString = "";
+    let concatenatedOrderString = '';
     let orderTotal = 0;
     for (let i = 0; i < cartData.length; i++) {
       let orderItem = cartData[i];
@@ -85,7 +103,7 @@ const ResponsiveCart = ({
 
       concatenatedOrderString += `${itemName}:\n`;
       concatenatedOrderString += `$${itemTotal} <br>`;
-      concatenatedOrderString += `Qty: ${itemQty} &nbsp; $${itemPrice} each (${(itemPrice * 100).toFixed(0)} ${((itemPrice * 100).toFixed(0) == 1) ? 'STRAT' : 'STRATs'})<br><br>`;
+      concatenatedOrderString += `Qty: ${itemQty} &nbsp; $${itemPrice} each (${(itemPrice * 100).toFixed(0)} ${(itemPrice * 100).toFixed(0) == 1 ? 'STRAT' : 'STRATs'})<br><br>`;
       orderTotal += parseFloat(itemTotal);
       if (i === cartData.length - 1) {
         concatenatedOrderString += `<hr style="border-top: 1px dotted #0A1B71; min-width: 80%; max-width: 80%; margin-left: 15px;">`;
@@ -94,8 +112,9 @@ const ResponsiveCart = ({
       }
     }
 
-
-    htmlContents.push(generateHtmlContent(customerFirstName, concatenatedOrderString));
+    htmlContents.push(
+      generateHtmlContent(customerFirstName, concatenatedOrderString)
+    );
   };
 
   const handlePaymentConfirm = async (paymentService) => {
@@ -103,17 +122,26 @@ const ResponsiveCart = ({
     let orderList = [];
     cartData.forEach((item) => {
       orderList.push({
-        quantity: item.quantityIsDecimal && item.quantityIsDecimal === "True" ? item.qty * 100 : item.qty,
+        quantity:
+          item.quantityIsDecimal && item.quantityIsDecimal === 'True'
+            ? item.qty * 100
+            : item.qty,
         assetAddress: item.key,
         firstSale: item.firstSale,
-        unitPrice: item.quantityIsDecimal && item.quantityIsDecimal === "True" ? item.unitPrice / 100 : item.unitPrice
+        unitPrice:
+          item.quantityIsDecimal && item.quantityIsDecimal === 'True'
+            ? item.unitPrice / 100
+            : item.unitPrice,
       });
     });
 
-    generate_HTML_Content(user.commonName)
+    generate_HTML_Content(user.commonName);
 
     let body = {
-      paymentService: { address: paymentService.address, serviceName: paymentService.serviceName },
+      paymentService: {
+        address: paymentService.address,
+        serviceName: paymentService.serviceName,
+      },
       buyerOrganization: userOrganization,
       orderList,
       orderTotal: total,
@@ -123,32 +151,49 @@ const ResponsiveCart = ({
       htmlContents: htmlContents,
     };
 
-    window.LOQ.push(['ready', async LO => {
-      // Track an event
-      await LO.$internal.ready('events')
-      LO.events.track('Buy Now Button')
-    }])
+    window.LOQ.push([
+      'ready',
+      async (LO) => {
+        // Track an event
+        await LO.$internal.ready('events');
+        LO.events.track('Buy Now Button');
+      },
+    ]);
     TagManager.dataLayer({
       dataLayer: {
         event: 'pay_now_button',
       },
     });
-    let checkoutHashAndAssets = await orderActions.createPayment(orderDispatch, body);
+    let checkoutHashAndAssets = await orderActions.createPayment(
+      orderDispatch,
+      body
+    );
     if (checkoutHashAndAssets && checkoutHashAndAssets !== false) {
       const [checkoutHash, assets] = checkoutHashAndAssets;
-      let serviceURL = paymentService.serviceURL || paymentService.data.serviceURL;
-      let checkoutRoute = paymentService.checkoutRoute || paymentService.data.checkoutRoute;
-      if (serviceURL && serviceURL !== '' && checkoutRoute && checkoutRoute !== '') {
+      let serviceURL =
+        paymentService.serviceURL || paymentService.data.serviceURL;
+      let checkoutRoute =
+        paymentService.checkoutRoute || paymentService.data.checkoutRoute;
+      if (
+        serviceURL &&
+        serviceURL !== '' &&
+        checkoutRoute &&
+        checkoutRoute !== ''
+      ) {
         const url = `${serviceURL}${checkoutRoute}?email=${encodeURIComponent(user.email)}&checkoutHash=${checkoutHash}&redirectUrl=${window.location.protocol}//${window.location.host}/order/status`;
         window.location.replace(url);
       } else {
-        window.location.replace(`/order/status?assets=${assets}&orderHash=${checkoutHash}`);
+        window.location.replace(
+          `/order/status?assets=${assets}&orderHash=${checkoutHash}`
+        );
       }
     }
   };
 
   const handleChange = async (value) => {
-    const provider = paymentServices.find(provider => provider?.serviceName === value);
+    const provider = paymentServices.find(
+      (provider) => provider?.serviceName === value
+    );
     setSelectedProvider(provider);
   };
 
@@ -162,18 +207,25 @@ const ResponsiveCart = ({
         saleAddresses.push(item.saleAddress);
         quantities.push(item.qty);
       });
-      const checkQuantity = await orderActions.fetchSaleQuantity(orderDispatch, saleAddresses, quantities);
+      const checkQuantity = await orderActions.fetchSaleQuantity(
+        orderDispatch,
+        saleAddresses,
+        quantities
+      );
       if (checkQuantity === true) {
-        if (selectedProvider?.serviceName === "Stripe" && total < 0.50) {
-          openToastOrder("bottom", "The minimum order amount is $0.50. Please increase the item quantity to account for this.");
+        if (selectedProvider?.serviceName === 'Stripe' && total < 0.5) {
+          openToastOrder(
+            'bottom',
+            'The minimum order amount is $0.50. Please increase the item quantity to account for this.'
+          );
         } else {
           await handlePaymentConfirm(provider);
         }
       } else {
-        let insufficientQuantityMessage = "";
-        let outOfStockMessage = "";
+        let insufficientQuantityMessage = '';
+        let outOfStockMessage = '';
 
-        checkQuantity.forEach(detail => {
+        checkQuantity.forEach((detail) => {
           if (detail.availableQuantity === 0) {
             outOfStockMessage += `Product ${detail.assetName}\n`;
           } else {
@@ -181,27 +233,29 @@ const ResponsiveCart = ({
           }
         });
 
-        let errorMessage = "";
+        let errorMessage = '';
         if (insufficientQuantityMessage) {
           errorMessage += `The following item(s) in your cart have limited quantity available and will need to be adjusted. Please reduce the quantity to proceed:\n${insufficientQuantityMessage}`;
         }
         if (outOfStockMessage) {
-          if (errorMessage) errorMessage += "\n"; // Add a new line if there's already an error message
+          if (errorMessage) errorMessage += '\n'; // Add a new line if there's already an error message
           errorMessage += `The following item(s) are temporarily out of stock and should be removed:\n${outOfStockMessage}`;
         }
-        openToastOrder("bottom", errorMessage);
+        openToastOrder('bottom', errorMessage);
       }
     }
-  }
+  };
 
-  const totalAmount = selectedProvider?.serviceName === 'STRATS' || selectedProvider?.serviceName?.includes('STRATS') ? 
-            `${(subTotal * 100).toFixed(0)} ${(subTotal * 100).toFixed(0) == 1 ? 'STRAT' : 'STRATs'}`  :  
-             selectedProvider?.serviceName === 'Stripe' ? `${subTotal} USD` : 
-             `${subTotal} ${selectedProvider?.serviceName || 'USD'}`
+  const totalAmount =
+    selectedProvider?.serviceName === 'STRATS' ||
+    selectedProvider?.serviceName?.includes('STRATS')
+      ? `${(subTotal * 100).toFixed(0)} ${(subTotal * 100).toFixed(0) == 1 ? 'STRAT' : 'STRATs'}`
+      : selectedProvider?.serviceName === 'Stripe'
+        ? `${subTotal} USD`
+        : `${subTotal} ${selectedProvider?.serviceName || 'USD'}`;
 
   return (
     <div className=" rounded-md mt-3 flex flex-col gap-[18px] sm:w-[400px] md:w-[450px] items-center">
-      
       {cartData.map((element, index) => {
         let qty = element.qty;
         let product = element;
@@ -281,7 +335,7 @@ const ResponsiveCart = ({
                     <img
                       src={Images.Dropdown}
                       alt=""
-                      className={`w-5 h-5 transition-transform transform ${faqOpenState[index] ? "rotate-180" : "rotate-0"}`}
+                      className={`w-5 h-5 transition-transform transform ${faqOpenState[index] ? 'rotate-180' : 'rotate-0'}`}
                       onClick={() => {
                         toggleFaq(index);
                       }}
@@ -292,16 +346,22 @@ const ResponsiveCart = ({
 
               {faqOpenState[index] && (
                 <div
-                  className={`overflow-hidden ${faqOpenState[index] ? "max-h-[145px] open" : "max-h-0 faq-container"}`}
+                  className={`overflow-hidden ${faqOpenState[index] ? 'max-h-[145px] open' : 'max-h-0 faq-container'}`}
                 >
                   <div className="bg-[#F6F6F6] rounded-b-md flex flex-col gap-3 px-3 py-2">
                     <div className="w-full bg-[#BABABA] h-[1px]"></div>
                     <div className="flex justify-between">
-                      <Typography className="text-sm text-[#202020] font-medium">Seller:</Typography>
-                      <Typography className="text-sm text-[#202020] font-semibold w-[130px] sm:w-[200px] text-right overflow-hidden whitespace-nowrap text-ellipsis">{element?.sellersCommonName}</Typography>
+                      <Typography className="text-sm text-[#202020] font-medium">
+                        Seller:
+                      </Typography>
+                      <Typography className="text-sm text-[#202020] font-semibold w-[130px] sm:w-[200px] text-right overflow-hidden whitespace-nowrap text-ellipsis">
+                        {element?.sellersCommonName}
+                      </Typography>
                     </div>
                     <div className="flex justify-between">
-                      <Typography className="text-sm text-[#202020] font-medium">Unit Price($):</Typography>
+                      <Typography className="text-sm text-[#202020] font-medium">
+                        Unit Price($):
+                      </Typography>
                       <Typography className="text-sm text-[#202020] font-semibold">{`$${(element?.unitPrice).toFixed(2)}`}</Typography>
                     </div>
                   </div>
@@ -311,43 +371,60 @@ const ResponsiveCart = ({
           </div>
         );
       })}
-     <div className="w-full bg-[#d8cbcb] h-[1px]"></div>
+      <div className="w-full bg-[#d8cbcb] h-[1px]"></div>
       <div className="w-full px-2">
         <div className="checkout-card">
-          <h3 className="text-lg p-2 font-semibold mb-4 h-12 bg-[#EEEFFA]">Payment Method</h3>
+          <h3 className="text-lg p-2 font-semibold mb-4 h-12 bg-[#EEEFFA]">
+            Payment Method
+          </h3>
           <div className="p-2">
-          <div className="rounded-lg shadow-md w-full">
-            <Radio.Group
-              onChange={(e) => { handleChange(e.target.value) }}
-              value={selectedProvider?.serviceName}
-              className="w-full">
-              <div className="flex flex-col space-y-4">
-                {activePaymentProviders && activePaymentProviders.map(provider => (
-                  provider &&
-                  <Radio value={provider?.serviceName} className="w-full">
-                    <p className="flex text-base font-normal items-center"> 
-                    <span className="ml-2 text-sm font-normal"> 
-                    {PAYMENT_LABEL[provider?.serviceName] 
-                    ? PAYMENT_LABEL[provider?.serviceName] 
-                    : `Pay with ${provider?.serviceName}`} </span></p>
-                  </Radio>
-                ))}
-              </div>
-            </Radio.Group>
+            <div className="rounded-lg shadow-md w-full">
+              <Radio.Group
+                onChange={(e) => {
+                  handleChange(e.target.value);
+                }}
+                value={selectedProvider?.serviceName}
+                className="w-full"
+              >
+                <div className="flex flex-col space-y-4">
+                  {activePaymentProviders &&
+                    activePaymentProviders.map(
+                      (provider) =>
+                        provider && (
+                          <Radio
+                            value={provider?.serviceName}
+                            className="w-full"
+                          >
+                            <p className="flex text-base font-normal items-center">
+                              <span className="ml-2 text-sm font-normal">
+                                {PAYMENT_LABEL[provider?.serviceName]
+                                  ? PAYMENT_LABEL[provider?.serviceName]
+                                  : `Pay with ${provider?.serviceName}`}{' '}
+                              </span>
+                            </p>
+                          </Radio>
+                        )
+                    )}
+                </div>
+              </Radio.Group>
+            </div>
+            <div className="flex justify-between items-center mt-10 mb-3 p-2">
+              <span className="text-base font-normal">Order Total :</span>
+              <span className="text-base font-normal">{totalAmount} </span>
+            </div>
+            <Button
+              type="primary"
+              disabled={
+                !activePaymentProviders || activePaymentProviders?.length === 0
+              }
+              className="w-full mt-3 mb-6 bg-blue-800 text-white h-10 text-lg"
+              onClick={() => {
+                handlePlaceOrder(selectedProvider);
+              }}
+            >
+              Place Order
+            </Button>
           </div>
-          <div className="flex justify-between items-center mt-10 mb-3 p-2">
-            <span className="text-base font-normal">Order Total :</span>
-            <span className="text-base font-normal">{totalAmount} </span>
-          </div>
-          <Button
-            type="primary"
-            disabled={!activePaymentProviders || activePaymentProviders?.length===0}
-            className="w-full mt-3 mb-6 bg-blue-800 text-white h-10 text-lg"
-            onClick={()=>{handlePlaceOrder(selectedProvider)}}
-          >
-            Place Order
-          </Button>
-        </div>
         </div>
       </div>
     </div>

@@ -1,36 +1,36 @@
-import { rest } from 'blockapps-rest'
-import Joi from '@hapi/joi'
-import RestStatus from 'http-status-codes'
-import config from '../../../load.config'
+import { rest } from 'blockapps-rest';
+import Joi from '@hapi/joi';
+import RestStatus from 'http-status-codes';
+import config from '../../../load.config';
 
-const options = { config, cacheNonce: true }
+const options = { config, cacheNonce: true };
 
 class CarbonDAOController {
   static async getAll(req, res, next) {
     try {
-      const { dapp, query } = req
+      const { dapp, query } = req;
 
-      const carbonDAOs = await dapp.getCarbonDAOs({ ...query })
-      rest.response.status200(res, carbonDAOs)
+      const carbonDAOs = await dapp.getCarbonDAOs({ ...query });
+      rest.response.status200(res, carbonDAOs);
 
-      return next()
+      return next();
     } catch (e) {
-      return next(e)
+      return next(e);
     }
   }
 
   static async create(req, res, next) {
     try {
-      const { dapp, body } = req
+      const { dapp, body } = req;
 
-      CarbonDAOController.validateCreateCarbonDAOArgs(body)
+      CarbonDAOController.validateCreateCarbonDAOArgs(body);
 
-      const result = await dapp.createCarbonDAO(body)
-      rest.response.status200(res, result)
+      const result = await dapp.createCarbonDAO(body);
+      rest.response.status200(res, result);
 
-      return next()
+      return next();
     } catch (e) {
-      return next(e)
+      return next(e);
     }
   }
 
@@ -46,16 +46,20 @@ class CarbonDAOController {
         files: Joi.array().items(Joi.string().allow(null)).required(),
         fileNames: Joi.array().items(Joi.string().allow(null)).required(),
         redemptionService: Joi.string().required(),
-      }).required()
+      }).required(),
     });
 
     const validation = createCarbonDAOSchema.validate(args);
 
     if (validation.error) {
       console.log(validation.error.message);
-      throw new rest.RestError(RestStatus.BAD_REQUEST, 'Create CarbonDAO Argument Validation Error', {
-        message: `Missing args or bad format: ${validation.error.message}`,
-      })
+      throw new rest.RestError(
+        RestStatus.BAD_REQUEST,
+        'Create CarbonDAO Argument Validation Error',
+        {
+          message: `Missing args or bad format: ${validation.error.message}`,
+        }
+      );
     }
   }
 }

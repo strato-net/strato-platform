@@ -1,10 +1,9 @@
-import React from "react";
-import { DeleteOutlined } from "@ant-design/icons";
-import { Modal, Spin } from "antd";
-import { actions } from "../../contexts/product/actions";
-import { useProductDispatch, useProductState } from "../../contexts/product";
-import TagManager from "react-gtm-module";
-
+import React from 'react';
+import { DeleteOutlined } from '@ant-design/icons';
+import { Modal, Spin } from 'antd';
+import { actions } from '../../contexts/product/actions';
+import { useProductDispatch, useProductState } from '../../contexts/product';
+import TagManager from 'react-gtm-module';
 
 const DeleteProductModal = ({
   open,
@@ -20,11 +19,14 @@ const DeleteProductModal = ({
       const body = {
         productAddress: product.address,
       };
-     
-      window.LOQ.push(['ready', async LO => {
-        await LO.$internal.ready('events')
-        LO.events.track('Delete Product')
-      }])
+
+      window.LOQ.push([
+        'ready',
+        async (LO) => {
+          await LO.$internal.ready('events');
+          LO.events.track('Delete Product');
+        },
+      ]);
       TagManager.dataLayer({
         dataLayer: {
           event: 'delete_product',
@@ -51,7 +53,7 @@ const DeleteProductModal = ({
             id="delete-product-yes"
             className="w-48 border border-primary rounded text-primary px-4 py-2 text-center cursor-pointer hover:text-white hover:bg-primary"
           >
-            {isProductDeleting ? <Spin /> : "Yes"}
+            {isProductDeleting ? <Spin /> : 'Yes'}
           </div>
           <div
             onClick={handleCancel}

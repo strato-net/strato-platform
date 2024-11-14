@@ -1,9 +1,9 @@
-import { rest } from 'blockapps-rest'
-import Joi from '@hapi/joi'
-import RestStatus from 'http-status-codes'
-import config from '../../../load.config'
+import { rest } from 'blockapps-rest';
+import Joi from '@hapi/joi';
+import RestStatus from 'http-status-codes';
+import config from '../../../load.config';
 
-const options = { config, cacheNonce: true }
+const options = { config, cacheNonce: true };
 
 class ItemController {
   //unused route
@@ -31,114 +31,115 @@ class ItemController {
 
   static async getAll(req, res, next) {
     try {
-      const { dapp, query } = req
+      const { dapp, query } = req;
 
-      const items = await dapp.getItems({ ...query })
-      rest.response.status200(res, items)
+      const items = await dapp.getItems({ ...query });
+      rest.response.status200(res, items);
 
-      return next()
+      return next();
     } catch (e) {
-      return next(e)
+      return next(e);
     }
   }
 
   static async getOwnershipHistory(req, res, next) {
     try {
-      const { dapp, params } = req
+      const { dapp, params } = req;
       console.log('#### I am coming here for some reason?');
-      ItemController.validateGetItemOwnershipHistoryArgs(params)
-      const { address } = params
+      ItemController.validateGetItemOwnershipHistoryArgs(params);
+      const { address } = params;
 
-      const items = await dapp.getItemOwnershipHistory({ itemAddress: address })
-      rest.response.status200(res, items)
+      const items = await dapp.getItemOwnershipHistory({
+        itemAddress: address,
+      });
+      rest.response.status200(res, items);
 
-      return next()
+      return next();
     } catch (e) {
-      return next(e)
+      return next(e);
     }
   }
 
   static async getAllItemTransferEvents(req, res, next) {
     try {
-      const { dapp, query } = req
+      const { dapp, query } = req;
 
-      const itemTransfers = await dapp.getAllItemTransferEvents(query)
+      const itemTransfers = await dapp.getAllItemTransferEvents(query);
 
-      rest.response.status200(res, itemTransfers)
+      rest.response.status200(res, itemTransfers);
 
-      return next()
+      return next();
     } catch (e) {
-      return next(e)
+      return next(e);
     }
   }
 
   static async create(req, res, next) {
     try {
-      const { dapp, body } = req
+      const { dapp, body } = req;
 
-      ItemController.validateCreateItemArgs(body)
+      ItemController.validateCreateItemArgs(body);
 
-      const result = await dapp.addItem(body)
-      rest.response.status200(res, result)
+      const result = await dapp.addItem(body);
+      rest.response.status200(res, result);
 
-      return next()
+      return next();
     } catch (e) {
-      return next(e)
+      return next(e);
     }
   }
 
   static async update(req, res, next) {
     try {
-      const { dapp, body } = req
+      const { dapp, body } = req;
 
-      ItemController.validateUpdateItemArgs(body)
+      ItemController.validateUpdateItemArgs(body);
 
-      const result = await dapp.updateItem(body, options)
+      const result = await dapp.updateItem(body, options);
 
-      rest.response.status200(res, result)
-      return next()
+      rest.response.status200(res, result);
+      return next();
     } catch (e) {
-      return next(e)
+      return next(e);
     }
   }
 
   static async audit(req, res, next) {
     try {
-      const { dapp, params } = req
-      const { address, chainId } = params
+      const { dapp, params } = req;
+      const { address, chainId } = params;
 
-      const result = await dapp.auditItem({ address, chainId }, options)
-      rest.response.status200(res, result)
+      const result = await dapp.auditItem({ address, chainId }, options);
+      rest.response.status200(res, result);
     } catch (e) {
-      return next(e)
+      return next(e);
     }
   }
 
   static async transferOwnership(req, res, next) {
     try {
-      const { dapp, body } = req
+      const { dapp, body } = req;
 
-      ItemController.validateTransferOwnershipArgs(body)
-      const result = await dapp.transferOwnershipItem(body, options)
-      rest.response.status200(res, result)
+      ItemController.validateTransferOwnershipArgs(body);
+      const result = await dapp.transferOwnershipItem(body, options);
+      rest.response.status200(res, result);
     } catch (e) {
-      return next(e)
+      return next(e);
     }
   }
 
   static async getAllRawMaterials(req, res, next) {
     try {
-      const { dapp, query } = req
+      const { dapp, query } = req;
 
-      const items = await dapp.getRawMaterials({ ...query })
-      rest.response.status200(res, items)
+      const items = await dapp.getRawMaterials({ ...query });
+      rest.response.status200(res, items);
 
-      return next()
+      return next();
     } catch (e) {
-      return next(e)
+      return next(e);
     }
   }
-
 
   // ----------------------- ARG VALIDATION ------------------------
 
@@ -149,30 +150,38 @@ class ItemController {
         inventoryId: Joi.string().required(),
         serialNumber: Joi.string().required(),
         status: Joi.number().integer().min(1).max(4).required(),
-        comment: Joi.string().required()
-      })
+        comment: Joi.string().required(),
+      }),
     });
 
     const validation = createItemSchema.validate(args);
 
     if (validation.error) {
-      throw new rest.RestError(RestStatus.BAD_REQUEST, 'Create Item Argument Validation Error', {
-        message: `Missing args or bad format: ${validation.error.message}`,
-      })
+      throw new rest.RestError(
+        RestStatus.BAD_REQUEST,
+        'Create Item Argument Validation Error',
+        {
+          message: `Missing args or bad format: ${validation.error.message}`,
+        }
+      );
     }
   }
 
   static validateGetItemOwnershipHistoryArgs(args) {
     const getItemOwnershipHistorySchema = Joi.object({
-      address: Joi.string().required()
+      address: Joi.string().required(),
     });
 
     const validation = getItemOwnershipHistorySchema.validate(args);
 
     if (validation.error) {
-      throw new rest.RestError(RestStatus.BAD_REQUEST, 'Get Item Ownership History Argument Validation Error', {
-        message: `Missing args or bad format: ${validation.error.message}`,
-      })
+      throw new rest.RestError(
+        RestStatus.BAD_REQUEST,
+        'Get Item Ownership History Argument Validation Error',
+        {
+          message: `Missing args or bad format: ${validation.error.message}`,
+        }
+      );
     }
   }
 
@@ -181,16 +190,20 @@ class ItemController {
       itemAddress: Joi.string().required(),
       updates: Joi.object({
         status: Joi.number().integer().min(1).max(4),
-        comment: Joi.string()
-      }).required()
+        comment: Joi.string(),
+      }).required(),
     });
 
     const validation = updateItemSchema.validate(args);
 
     if (validation.error) {
-      throw new rest.RestError(RestStatus.BAD_REQUEST, 'Update Item Argument Validation Error', {
-        message: `Missing args or bad format: ${validation.error.message}`,
-      })
+      throw new rest.RestError(
+        RestStatus.BAD_REQUEST,
+        'Update Item Argument Validation Error',
+        {
+          message: `Missing args or bad format: ${validation.error.message}`,
+        }
+      );
     }
   }
 
@@ -200,16 +213,20 @@ class ItemController {
       itemsAddress: Joi.array().items(Joi.string()).required(),
       newOwner: Joi.string().required(),
       newQuantity: Joi.number().integer().min(1).required(),
-    })
+    });
 
     const validation = transferOwnershipItemSchema.validate(args);
 
     if (validation.error) {
-      throw new rest.RestError(RestStatus.BAD_REQUEST, 'Transfer Ownership Item Argument Validation Error', {
-        message: `Missing args or bad format: ${validation.error.message}`,
-      })
+      throw new rest.RestError(
+        RestStatus.BAD_REQUEST,
+        'Transfer Ownership Item Argument Validation Error',
+        {
+          message: `Missing args or bad format: ${validation.error.message}`,
+        }
+      );
     }
   }
 }
 
-export default ItemController
+export default ItemController;

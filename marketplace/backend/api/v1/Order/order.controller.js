@@ -1,201 +1,222 @@
-import { rest } from 'blockapps-rest'
-import Joi from '@hapi/joi'
-import RestStatus from 'http-status-codes'
-import config from '../../../load.config'
-import sendEmail from '../../../helpers/email'
-import constants from '../../../helpers/constants'
-const options = { config, cacheNonce: true }
+import { rest } from 'blockapps-rest';
+import Joi from '@hapi/joi';
+import RestStatus from 'http-status-codes';
+import config from '../../../load.config';
+import sendEmail from '../../../helpers/email';
+import constants from '../../../helpers/constants';
+const options = { config, cacheNonce: true };
 
 class OrderController {
-
   static async get(req, res, next) {
     try {
-      const { dapp, params } = req
-      const { address } = params
+      const { dapp, params } = req;
+      const { address } = params;
 
       let args;
       let chainOptions = options;
 
       if (address) {
-        args = { address }
+        args = { address };
       }
 
       const order = await dapp.getOrder(args, chainOptions);
-      
-      const assetsWithImageUrl = order.assets
-      const result = { ...order, assets: assetsWithImageUrl }
-      rest.response.status200(res, result)
 
-      return next()
+      const assetsWithImageUrl = order.assets;
+      const result = { ...order, assets: assetsWithImageUrl };
+      rest.response.status200(res, result);
+
+      return next();
     } catch (e) {
-      return next(e)
+      return next(e);
     }
   }
 
   static async getAll(req, res, next) {
     try {
-      const { dapp, query } = req
-      const {orders, total} = await dapp.getSaleOrders({ ...query });
-      
-      rest.response.status200(res, {orders, total})
-      return next()
+      const { dapp, query } = req;
+      const { orders, total } = await dapp.getSaleOrders({ ...query });
+
+      rest.response.status200(res, { orders, total });
+      return next();
     } catch (e) {
-      return next(e)
+      return next(e);
     }
   }
 
   static async payment(req, res, next) {
     try {
-      const { dapp, body, accessToken } = req
+      const { dapp, body, accessToken } = req;
       const originUrl = req.headers.origin || config.serverHost;
-      const { htmlContents, ...restArgs} = body;
-      OrderController.validatePaymentArgs(restArgs)
+      const { htmlContents, ...restArgs } = body;
+      OrderController.validatePaymentArgs(restArgs);
 
-      const result = await dapp.paymentCheckout(originUrl, restArgs, options, accessToken)
+      const result = await dapp.paymentCheckout(
+        originUrl,
+        restArgs,
+        options,
+        accessToken
+      );
       const [checkoutHash, assets] = result;
-      rest.response.status200(res, result)
+      rest.response.status200(res, result);
       // check orderEvent.status is 3 and sendEmail
       // Only send email if order is created successfully(STRATS Orders)
-      const orderEvent = await dapp.getStratsOrderEvent({orderHash: checkoutHash, paymentService: restArgs.paymentService.address}, options)
-       if(orderEvent && orderEvent.length === 1 && orderEvent[0].status === "3" &&  orderEvent[0].currency === "STRATS")
-      {
-            await sendEmail(body.email, "Your Order Confirmation", htmlContents[0]);
-            console.log("*Buyer placed order*",orderEvent);
+      const orderEvent = await dapp.getStratsOrderEvent(
+        {
+          orderHash: checkoutHash,
+          paymentService: restArgs.paymentService.address,
+        },
+        options
+      );
+      if (
+        orderEvent &&
+        orderEvent.length === 1 &&
+        orderEvent[0].status === '3' &&
+        orderEvent[0].currency === 'STRATS'
+      ) {
+        await sendEmail(body.email, 'Your Order Confirmation', htmlContents[0]);
+        console.log('*Buyer placed order*', orderEvent);
       }
-      return next()
-
+      return next();
     } catch (e) {
-      return next(e)
+      return next(e);
     }
   }
 
   static async waitForOrderEvent(req, res, next) {
     try {
-      const { dapp, query } = req
+      const { dapp, query } = req;
       const { orderHash } = query;
-      const orderEvent = await dapp.waitForOrderEvent({orderHash: orderHash}, options)
-       if(orderEvent && orderEvent.length === 1)
-      {
-        rest.response.status200(res, orderEvent)
+      const orderEvent = await dapp.waitForOrderEvent(
+        { orderHash: orderHash },
+        options
+      );
+      if (orderEvent && orderEvent.length === 1) {
+        rest.response.status200(res, orderEvent);
       }
-      return next()
+      return next();
     } catch (e) {
-      return next(e)
+      return next(e);
     }
   }
-  
+
   static async export(req, res, next) {
     try {
-      const { dapp } = req
-      const orders = await dapp.export()
-      rest.response.status200(res, orders)
+      const { dapp } = req;
+      const orders = await dapp.export();
+      rest.response.status200(res, orders);
 
-      return next()
+      return next();
     } catch (e) {
-      return next(e)
+      return next(e);
     }
   }
 
   static async createUserAddress(req, res, next) {
     try {
-      const { dapp, body } = req
+      const { dapp, body } = req;
 
-      OrderController.validateCreateUserAddressArgs(body)
+      OrderController.validateCreateUserAddressArgs(body);
 
-      const result = await dapp.createUserAddress(body)
-      rest.response.status200(res, result)
+      const result = await dapp.createUserAddress(body);
+      rest.response.status200(res, result);
 
-      return next()
+      return next();
     } catch (e) {
-      return next(e)
+      return next(e);
     }
   }
 
   static async getUserAddress(req, res, next) {
     try {
-      const { dapp, query } = req
+      const { dapp, query } = req;
       const { redemptionService, shippingAddressId } = req.params;
 
-      const orders = await dapp.getUserAddress({ ...query, redemptionService, shippingAddressId})
-      rest.response.status200(res, orders)
+      const orders = await dapp.getUserAddress({
+        ...query,
+        redemptionService,
+        shippingAddressId,
+      });
+      rest.response.status200(res, orders);
 
-      return next()
+      return next();
     } catch (e) {
-      return next(e)
+      return next(e);
     }
   }
 
   static async getAllUserAddress(req, res, next) {
     try {
-      const { dapp, query } = req
+      const { dapp, query } = req;
       const { redemptionService } = req.params;
 
-      const orders = await dapp.getAllUserAddress({ ...query, redemptionService })
-      rest.response.status200(res, orders)
+      const orders = await dapp.getAllUserAddress({
+        ...query,
+        redemptionService,
+      });
+      rest.response.status200(res, orders);
 
-      return next()
+      return next();
     } catch (e) {
-      return next(e)
+      return next(e);
     }
   }
 
   static async cancelSaleOrder(req, res, next) {
     try {
-      const { dapp, body } = req
+      const { dapp, body } = req;
 
-      OrderController.validateCancelSaleOrderArgs(body)
+      OrderController.validateCancelSaleOrderArgs(body);
 
-      const result = await dapp.cancelSaleOrder(body)
-      rest.response.status200(res, result)
+      const result = await dapp.cancelSaleOrder(body);
+      rest.response.status200(res, result);
 
-      return next()
+      return next();
     } catch (e) {
-      return next(e)
+      return next(e);
     }
   }
 
   static async executeSale(req, res, next) {
     try {
-      const { dapp, body } = req
+      const { dapp, body } = req;
 
-      OrderController.validateExecuteSaleArgs(body)
+      OrderController.validateExecuteSaleArgs(body);
 
-      const result = await dapp.completeOrder(body)
-      rest.response.status200(res, result)
+      const result = await dapp.completeOrder(body);
+      rest.response.status200(res, result);
 
-      return next()
+      return next();
     } catch (e) {
-      return next(e)
+      return next(e);
     }
   }
 
   static async updateOrderComment(req, res, next) {
     try {
-      const { dapp, body } = req
+      const { dapp, body } = req;
 
-      OrderController.validateUpdateOrderCommentArgs(body)
+      OrderController.validateUpdateOrderCommentArgs(body);
 
-      const result = await dapp.updateOrderComment(body)
-      rest.response.status200(res, result)
+      const result = await dapp.updateOrderComment(body);
+      rest.response.status200(res, result);
 
-      return next()
+      return next();
     } catch (e) {
-      return next(e)
+      return next(e);
     }
   }
 
   static async checkSaleQuantity(req, res, next) {
     try {
-      const { dapp, body} = req;
-      const saleQuantity = await dapp.checkSaleQuantity(body)
-      rest.response.status200(res, saleQuantity)
+      const { dapp, body } = req;
+      const saleQuantity = await dapp.checkSaleQuantity(body);
+      rest.response.status200(res, saleQuantity);
 
-      return next()
+      return next();
     } catch (e) {
-      return next(e)
+      return next(e);
     }
   }
-
 
   // ----------------------- ARG VALIDATION ------------------------
 
@@ -206,12 +227,17 @@ class OrderController {
         serviceName: Joi.string().required(),
       }).required(),
       buyerOrganization: Joi.string().required(),
-      orderList: Joi.array().min(1).items(Joi.object({
-        quantity: Joi.number().required(),
-        assetAddress: Joi.string().required(),
-        firstSale: Joi.boolean().required(),
-        unitPrice: Joi.number().required()
-      })).required(),
+      orderList: Joi.array()
+        .min(1)
+        .items(
+          Joi.object({
+            quantity: Joi.number().required(),
+            assetAddress: Joi.string().required(),
+            firstSale: Joi.boolean().required(),
+            unitPrice: Joi.number().required(),
+          })
+        )
+        .required(),
       orderTotal: Joi.number().required(),
       tax: Joi.number().required(),
       user: Joi.string().required(),
@@ -222,9 +248,13 @@ class OrderController {
 
     if (validation.error) {
       console.log(validation.error.message);
-      throw new rest.RestError(RestStatus.BAD_REQUEST, 'Create Payment Argument Validation Error', {
-        message: `Missing args or bad format: ${validation.error.message}`,
-      })
+      throw new rest.RestError(
+        RestStatus.BAD_REQUEST,
+        'Create Payment Argument Validation Error',
+        {
+          message: `Missing args or bad format: ${validation.error.message}`,
+        }
+      );
     }
   }
 
@@ -235,7 +265,7 @@ class OrderController {
       state: Joi.string().required(),
       city: Joi.string().required(),
       addressLine1: Joi.string().required(),
-      addressLine2: Joi.string().allow(""),
+      addressLine2: Joi.string().allow(''),
       country: Joi.string().required(),
       redemptionService: Joi.string().optional(),
     }).required();
@@ -243,12 +273,15 @@ class OrderController {
     const validation = createUserAddressSchema.validate(args);
 
     if (validation.error) {
-      throw new rest.RestError(RestStatus.BAD_REQUEST, 'Create User Address Argument Validation Error', {
-        message: `Missing args or bad format: ${validation.error.message}`,
-      })
+      throw new rest.RestError(
+        RestStatus.BAD_REQUEST,
+        'Create User Address Argument Validation Error',
+        {
+          message: `Missing args or bad format: ${validation.error.message}`,
+        }
+      );
     }
   }
-
 
   static validateUpdateOrderCommentArgs(args) {
     const updateOrderCommentSchema = Joi.object({
@@ -259,9 +292,13 @@ class OrderController {
     const validation = updateOrderCommentSchema.validate(args);
 
     if (validation.error) {
-      throw new rest.RestError(RestStatus.BAD_REQUEST, 'Update Order Comment Argument Validation Error', {
-        message: `Missing args or bad format: ${validation.error.message}`,
-      })
+      throw new rest.RestError(
+        RestStatus.BAD_REQUEST,
+        'Update Order Comment Argument Validation Error',
+        {
+          message: `Missing args or bad format: ${validation.error.message}`,
+        }
+      );
     }
   }
 
@@ -269,18 +306,21 @@ class OrderController {
     const executeSaleSchema = Joi.object({
       orderAddress: Joi.string().required(),
       fulfillmentDate: Joi.number().required(),
-      comments: Joi.string().allow(""),
+      comments: Joi.string().allow(''),
     }).required();
 
     const validation = executeSaleSchema.validate(args);
 
     if (validation.error) {
-      throw new rest.RestError(RestStatus.BAD_REQUEST, 'Execute Sale Argument Validation Error', {
-        message: `Missing args or bad format: ${validation.error.message}`,
-      })
+      throw new rest.RestError(
+        RestStatus.BAD_REQUEST,
+        'Execute Sale Argument Validation Error',
+        {
+          message: `Missing args or bad format: ${validation.error.message}`,
+        }
+      );
     }
   }
-
 }
 
-export default OrderController
+export default OrderController;

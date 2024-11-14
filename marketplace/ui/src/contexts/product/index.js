@@ -1,5 +1,5 @@
-import React, { createContext, useContext, useReducer } from "react";
-import reducer from "./reducer";
+import React, { createContext, useContext, useReducer } from 'react';
+import reducer from './reducer';
 
 const ProductStateContext = createContext();
 const ProductDispatchContext = createContext();
@@ -12,14 +12,14 @@ const ProductsProvider = ({ children }) => {
     productsTotal: 10,
     isProductsLoading: false,
     isProductsForFilterLoading: false,
-    productsForFilter:[],
+    productsForFilter: [],
     categoryBasedProducts: [],
     isCategoryBasedProductsLoading: false,
     productDetails: null,
     isproductDetailsLoading: false,
     isProductDeleting: false,
     productDeleteObject: null,
-    uploadedImg : null,
+    uploadedImg: null,
     isuploadImageSubmitting: false,
     deletedImg: null,
     isdeletedImageSubmitting: false,
@@ -46,9 +46,7 @@ const ProductsProvider = ({ children }) => {
 const useProductState = () => {
   const context = useContext(ProductStateContext);
   if (context === undefined) {
-    throw new Error(
-      `'useProductState' must be used within a ProductsProvider`
-    );
+    throw new Error(`'useProductState' must be used within a ProductsProvider`);
   }
   return context;
 };

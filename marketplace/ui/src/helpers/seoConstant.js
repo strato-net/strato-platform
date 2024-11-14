@@ -4,15 +4,15 @@ export const SEO = {
     fractionalized assets. Expand your collection or find buyers for your rare carbon,  
     metals, art, collectibles, and clothing.`,
   IMAGE_META: `STRATO Mercata Marketplace Banner`,
-  SEO_ROUTES:[
-    "/",
-    "/c/All",
-    "/c/Carbon?sc=CarbonOffset%2CCarbonDAO",
-    "/c/Metals?sc=Metals",
-    "/c/Clothing?sc=Clothing",
-    "/c/Collectibles?sc=Collectibles",
-    "/c/Art?sc=Art",
-    "/c/Membership?sc=Membership",
-    "/checkout",
-  ]
-}
+  SEO_ROUTES: [
+    '/',
+    '/c/All',
+    '/c/Carbon?sc=CarbonOffset%2CCarbonDAO',
+    '/c/Metals?sc=Metals',
+    '/c/Clothing?sc=Clothing',
+    '/c/Collectibles?sc=Collectibles',
+    '/c/Art?sc=Art',
+    '/c/Membership?sc=Membership',
+    '/checkout',
+  ],
+};

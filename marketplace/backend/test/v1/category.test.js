@@ -1,55 +1,57 @@
-import { assert, rest } from 'blockapps-rest'
-import { util } from '/blockapps-rest-plus'
-import dotenv from 'dotenv'
-import config from '../../load.config'
-import oauthHelper from '/helpers/oauthHelper'
+import { assert, rest } from 'blockapps-rest';
+import { util } from '/blockapps-rest-plus';
+import dotenv from 'dotenv';
+import config from '../../load.config';
+import oauthHelper from '/helpers/oauthHelper';
 import RestStatus from 'http-status-codes';
-import { get } from '/helpers/rest'
-import dappJs from '../../dapp/dapp/dapp'
-import { Category } from '../../api/v1/endpoints'
+import { get } from '/helpers/rest';
+import dappJs from '../../dapp/dapp/dapp';
+import { Category } from '../../api/v1/endpoints';
 
-const options = { config }
+const options = { config };
 
-const loadEnv = dotenv.config()
-assert.isUndefined(loadEnv.error)
+const loadEnv = dotenv.config();
+assert.isUndefined(loadEnv.error);
 
 describe('Category End-To-End Tests', function () {
-  this.timeout(config.timeout)
-  let globalAdmin
+  this.timeout(config.timeout);
+  let globalAdmin;
 
   before(async () => {
-    let globalAdminToken
+    let globalAdminToken;
     try {
       globalAdminToken = await oauthHelper.getUserToken(
         `${process.env.GLOBAL_ADMIN_NAME}`,
-        `${process.env.GLOBAL_ADMIN_PASSWORD}`,
-      )
+        `${process.env.GLOBAL_ADMIN_PASSWORD}`
+      );
     } catch (e) {
       console.error(
         'ERROR: Unable to fetch the  user token, check your OAuth settings in config',
-        e,
-      )
-      throw e
+        e
+      );
+      throw e;
     }
 
-    const globalAdminCredentials = { token: globalAdminToken }
+    const globalAdminCredentials = { token: globalAdminToken };
 
-    const globalAdminResponse = await oauthHelper.getStratoUserFromToken(globalAdminCredentials.token)
-    const dapp = await dappJs.loadFromDeployment(globalAdminCredentials, `${config.configDirPath}/${config.deployFilename}`, options);
+    const globalAdminResponse = await oauthHelper.getStratoUserFromToken(
+      globalAdminCredentials.token
+    );
+    const dapp = await dappJs.loadFromDeployment(
+      globalAdminCredentials,
+      `${config.configDirPath}/${config.deployFilename}`,
+      options
+    );
 
     assert.strictEqual(
       globalAdminResponse.status,
       RestStatus.OK,
       globalAdminResponse.message
-    )
-    globalAdmin = { ...globalAdminResponse.user, ...globalAdminCredentials }
-
-  })
-
-
+    );
+    globalAdmin = { ...globalAdminResponse.user, ...globalAdminCredentials };
+  });
 
   // it('Get a Category', async () => {
-
 
   //   // get
   //   const category = await get(
@@ -73,15 +75,11 @@ describe('Category End-To-End Tests', function () {
       Category.prefix,
       Category.getAll,
       {},
-      globalAdmin.token,
-    )
+      globalAdmin.token
+    );
 
     assert.equal(category.status, 200, 'should be 200');
     assert.isDefined(category.body, 'body should be defined');
     assert.isDefined(category.body.data, 'body should be defined');
-  })
-
-
-
-
-})
+  });
+});

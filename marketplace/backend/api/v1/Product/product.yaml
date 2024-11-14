@@ -1,119 +1,119 @@
 paths:
   /product/:
     get:
-      security:              
-        - bearerAuth: []                    
-      tags:               
-        - Product        
+      security:
+        - bearerAuth: []
+      tags:
+        - Product
       summary: Retrieve product
       produces:
-      - application/json
-      responses:         
+        - application/json
+      responses:
         200:
           description: Array of products
-    post:  
-      security:              
-        - bearerAuth: []                  
-      tags:               
-        - Product        
+    post:
+      security:
+        - bearerAuth: []
+      tags:
+        - Product
       summary: Create a product
       produces:
-      - application/json
-      requestBody:         
+        - application/json
+      requestBody:
         description: It enable user to create product
         required: true
         content:
-          'application/json': 
-            schema:       
-              $ref: '#/definitions/createProduct' 
-      responses:         
+          'application/json':
+            schema:
+              $ref: '#/definitions/createProduct'
+      responses:
         200:
           description: Object of create product
   /product/{address}/{chainId}:
-    get:                 
-      security:              
-        - bearerAuth: []   
-      tags:               
-        - Product        
+    get:
+      security:
+        - bearerAuth: []
+      tags:
+        - Product
       summary: Retrieve a product
       produces:
-      - application/json
-      parameters:         
-      - in: path          
-        name: address     
-        description: address to retrieve the product
-        required: true
-      - in: path          
-        name: chainId     
-        description: chainId corresponding to the address
-        required: true
-        schema:       
-          $ref: '#/definitions/fetchProduct' 
-      responses:         
+        - application/json
+      parameters:
+        - in: path
+          name: address
+          description: address to retrieve the product
+          required: true
+        - in: path
+          name: chainId
+          description: chainId corresponding to the address
+          required: true
+          schema:
+            $ref: '#/definitions/fetchProduct'
+      responses:
         200:
           description: Retrieve a product
   /product/update:
-    put:    
-      security:              
-        - bearerAuth: []                
-      tags:               
-        - Product        
+    put:
+      security:
+        - bearerAuth: []
+      tags:
+        - Product
       summary: Update a product
       produces:
-      - application/json
-      requestBody:         
+        - application/json
+      requestBody:
         description: It enable user to update a product
         required: true
         content:
           'application/json':
-            schema:       
-              $ref: '#/definitions/updateProduct' 
-      responses:         
+            schema:
+              $ref: '#/definitions/updateProduct'
+      responses:
         200:
           description: Retrieve a updated product
   /product/{address}/{chainId}/audit:
-    get:     
-      security:              
-        - bearerAuth: []               
-      tags:               
-        - Product        
+    get:
+      security:
+        - bearerAuth: []
+      tags:
+        - Product
       summary: Audit product
       produces:
-      - application/json
-      parameters:         
-      - in: path          
-        name: address     
-        description: address to retrieve the product
-        required: true
-      - in: path          
-        name: chainId     
-        description: chainId corresponding to the address
-        required: true
-        schema:       
-          $ref: '#/definitions/auditProduct' 
-      responses:         
+        - application/json
+      parameters:
+        - in: path
+          name: address
+          description: address to retrieve the product
+          required: true
+        - in: path
+          name: chainId
+          description: chainId corresponding to the address
+          required: true
+          schema:
+            $ref: '#/definitions/auditProduct'
+      responses:
         200:
           description: List of audit
   /product/transferOwnership:
-    post:              
-      security:              
-        - bearerAuth: []      
-      tags:               
-        - Product        
+    post:
+      security:
+        - bearerAuth: []
+      tags:
+        - Product
       summary: Transfer ownership
       produces:
-      - application/json
-      requestBody:         
+        - application/json
+      requestBody:
         description: It enable user to transfer ownership
         required: true
         content:
           'application/json':
-            schema:       
-              $ref: '#/definitions/transferOwnership' 
-      responses:         
+            schema:
+              $ref: '#/definitions/transferOwnership'
+      responses:
         200:
           description: indicates success of transfer ownership
-definitions:        
+definitions:
   fetchProduct:
     address:
       type: string

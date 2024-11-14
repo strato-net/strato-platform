@@ -1,18 +1,15 @@
-import express from 'express'
-import AuthenticationController from './authentication.controller'
-import authHandler from '../../middleware/authHandler'
+import express from 'express';
+import AuthenticationController from './authentication.controller';
+import authHandler from '../../middleware/authHandler';
 
-const router = express.Router()
+const router = express.Router();
 
-router.get(
-  '/callback',
-  AuthenticationController.callback,
-)
+router.get('/callback', AuthenticationController.callback);
 
 router.get(
   '/logout',
   authHandler.authorizeRequest(),
-  AuthenticationController.logout,
-)
+  AuthenticationController.logout
+);
 
-export default router
+export default router;

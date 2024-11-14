@@ -1,17 +1,17 @@
-import React, { useEffect, useRef, useState } from "react";
-import { Typography, Spin, notification, Button } from "antd";
-import { actions } from "../../contexts/marketplace/actions";
+import React, { useEffect, useRef, useState } from 'react';
+import { Typography, Spin, notification, Button } from 'antd';
+import { actions } from '../../contexts/marketplace/actions';
 import {
   useMarketplaceDispatch,
   useMarketplaceState,
-} from "../../contexts/marketplace";
-import { useNavigate } from "react-router-dom";
-import routes from "../../helpers/routes";
-import { useAuthenticateState } from "../../contexts/authentication";
-import NewTrendingCard from "./NewTrendingCard";
-import { actions as orderActions } from "../../contexts/order/actions";
-import { useOrderDispatch } from "../../contexts/order";
-import { Fade } from "react-awesome-reveal";
+} from '../../contexts/marketplace';
+import { useNavigate } from 'react-router-dom';
+import routes from '../../helpers/routes';
+import { useAuthenticateState } from '../../contexts/authentication';
+import NewTrendingCard from './NewTrendingCard';
+import { actions as orderActions } from '../../contexts/order/actions';
+import { useOrderDispatch } from '../../contexts/order';
+import { Fade } from 'react-awesome-reveal';
 
 const { Title } = Typography;
 
@@ -145,13 +145,12 @@ const TopSellingProductCard = () => {
   //   }
   // };
 
-
   const addItemToCart = async (product, quantity) => {
-        const  items = [{ product, qty: quantity }]
-        actions.addItemToCart(marketplaceDispatch, items);
-        navigate('/checkout');
-        window.scrollTo(0, 0);
-  }
+    const items = [{ product, qty: quantity }];
+    actions.addItemToCart(marketplaceDispatch, items);
+    navigate('/checkout');
+    window.scrollTo(0, 0);
+  };
 
   const [prevVisible, setPrevVisible] = useState(false);
   const [nextVisible, setNextVisible] = useState(true);
@@ -162,14 +161,14 @@ const TopSellingProductCard = () => {
       setPrevVisible(parent.scrollLeft !== 0);
       setNextVisible(
         Math.round(parent.offsetWidth + parent.scrollLeft) !==
-        parent.scrollWidth
+          parent.scrollWidth
       );
     };
 
     // Scroll listener to change visibility of left and right arrow button
-    parent?.addEventListener("scroll", handleScroll);
+    parent?.addEventListener('scroll', handleScroll);
     return () => {
-      parent?.removeEventListener("scroll", handleScroll);
+      parent?.removeEventListener('scroll', handleScroll);
     };
   }, [topSellingProducts]);
 
@@ -177,12 +176,15 @@ const TopSellingProductCard = () => {
     containerRef.current.scrollBy({
       top: 0,
       left,
-      behavior: "smooth",
+      behavior: 'smooth',
     });
   };
 
-  const navRoute = routes.MarketplaceCategoryProductList.url.replace(':category','All')
-  
+  const navRoute = routes.MarketplaceCategoryProductList.url.replace(
+    ':category',
+    'All'
+  );
+
   return (
     <div>
       {contextHolder}
@@ -232,36 +234,45 @@ const TopSellingProductCard = () => {
                     <NewTrendingCard
                       topSellingProduct={topSellingProduct}
                       addItemToCart={addItemToCart}
-                      parent={"Marketplace"}
+                      parent={'Marketplace'}
                     />
                   );
                 })}
             </div>
             <Button
-              type='primary'
+              type="primary"
               onClick={() => scroll(-300)}
-              className={`${!prevVisible ? "hidden" : "md:flex hidden"
-                } cursor-pointer absolute z-10 justify-center items-center top-48 left-24 h-12 w-12 text-2xl bg-[#6A6A6A] rounded-full text-white`}
+              className={`${
+                !prevVisible ? 'hidden' : 'md:flex hidden'
+              } cursor-pointer absolute z-10 justify-center items-center top-48 left-24 h-12 w-12 text-2xl bg-[#6A6A6A] rounded-full text-white`}
             >
-              {"<"}
+              {'<'}
             </Button>
             <Button
-              type='primary'
+              type="primary"
               onClick={() => scroll(300)}
-              className={`${!nextVisible ? "hidden" : "md:flex hidden"
-                } cursor-pointer absolute justify-center items-center top-48 right-24 h-12 w-12 text-2xl bg-[#6A6A6A] rounded-full text-white z-20`}
+              className={`${
+                !nextVisible ? 'hidden' : 'md:flex hidden'
+              } cursor-pointer absolute justify-center items-center top-48 right-24 h-12 w-12 text-2xl bg-[#6A6A6A] rounded-full text-white z-20`}
             >
-              {">"}
+              {'>'}
             </Button>
           </div>
         </Fade>
       )}
       <h3 className="text-center text-gray-500 mt-8">
-        Is there an item you would like to see on the marketplace? 
-        <a href="https://forms.gle/biuEtUHrFdLpX1d36" rel="noreferrer" target="_blank" className="text-blue"> Let us know!</a>
+        Is there an item you would like to see on the marketplace?
+        <a
+          href="https://forms.gle/biuEtUHrFdLpX1d36"
+          rel="noreferrer"
+          target="_blank"
+          className="text-blue"
+        >
+          {' '}
+          Let us know!
+        </a>
       </h3>
     </div>
-
   );
 };
 
