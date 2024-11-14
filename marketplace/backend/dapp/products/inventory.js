@@ -476,7 +476,6 @@ async function getAll(admin, args = {}, defaultOptions) {
                     ...restArgs,
                     status,
                     ownerCommonName: ownerCommonName,
-                    address: assetAddresses,
                     queryOptions: queryOptions ? queryOptions : { select: constants.attachSalesAndImagesAndFiles }
                 }, options, admin);
         } else if (assetAddresses) {
@@ -601,10 +600,9 @@ async function getOwnershipHistory(user, args, options) {
 
 async function inventoryCount(admin, args = {}, defaultOptions) {
     const options = { ...defaultOptions, org: 'BlockApps', app: 'Mercata' }
-    const { range, userProfile,assetAddresses, ...newArgs } = args;
+    const { range, userProfile, ...newArgs } = args;
     const queryArgs = setSearchQueryOptionsPrime({
         ...newArgs,
-        address: args?.assetAddresses,
         limit: undefined,
         offset: 0,
         order: undefined,

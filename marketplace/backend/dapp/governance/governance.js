@@ -1,7 +1,8 @@
 import { util, rest } from "/blockapps-rest-plus";
 import { searchAllWithQueryArgs } from "/helpers/utils";
 
-const contractName = "Governance";
+const contractName = "BlockApps-Mercata-Reserve";
+const contract = "Reserve";
 
 /**
  * Augment contract arguments before they are used to post a contract.
@@ -34,23 +35,6 @@ function marshalIn(_args) {
   return args;
 }
 
-async function getHistory(user, chainId, address, options) {
-  const contractArgs = {
-    name: `history@${contractName}`,
-  };
-
-  const copyOfOptions = {
-    ...options,
-    query: {
-      address: `eq.${address}`,
-    },
-    chainIds: [chainId],
-  };
-
-  const history = await rest.search(user, contractArgs, copyOfOptions);
-  return history;
-}
-
 /**
  * Augment returned contract state before it is returned.
  * Its counterpart is {@link marshalIn `marshalIn`}.
@@ -70,44 +54,6 @@ function marshalOut(_args) {
 }
 
 /**
- * Bind functions relevant for payment to the _contract object.
- * @param user User token
- * @param _contract Contract object from `rest.createContract()` etc.
- * @param options Payment deployment options (found in _/config/*.config.yaml_ via _load.config.js_)
- */
-
-function bind(user, _contract, options) {
-  const contract = { ..._contract };
-
-  contract.get = async (args = { address: contract.address }) =>
-    get(user, args, options);
-  contract.getState = async () => getState(user, contract, options);
-  contract.getHistory = async (args, options = contractOptions) =>
-    getHistory(user, chainId, args, options);
-  contract.chainIds = options.chainIds;
-
-  return contract;
-}
-
-/**
- * Bind an existing Payment contract to a new user token. Useful for having multiple users test
- * the same contract.
- * @example <caption>Create an admin and user bound to the same new payment contract.</caption>
- * const adminBoundContract = uploadContract(adminToken, args, options);
- * const userBoundContract = bindAddress(userToken, adminBoundContract.address, options);
- * @param user User token
- * @param address Address of the Payment contract
- * @param options Payment deployment options (found in _/config/*.config.yaml_ via _load.config.js_)
- */
-function bindAddress(user, address, options) {
-  const contract = {
-    name: contractName,
-    address,
-  };
-  return bind(user, contract, options);
-}
-
-/**
  * Get contract state via cirrus. A proper chainId is typically already provided in options.
  * @param args Lookup with an address or uniqueEventID.
  * @returns Contract state in cirrus
@@ -115,7 +61,7 @@ function bindAddress(user, address, options) {
 async function get(user, options) {
   const governance = await searchAllWithQueryArgs(
     contractName,
-    { isActive: true, creator: "BlockApps" },
+    { creator: "BlockApps" },
     options,
     user
   );
@@ -136,10 +82,10 @@ async function getState(user, contract, options) {
  */
 async function calculate(user, args, options) {
   const { governance, ...restArgs } = args;
-  const contract = { name: contractName, address: governance };
+  const contractObj = { name: contract, address: governance };
   const callArgs = {
-    contract,
-    method: "calculate",
+    contract: contractObj,
+    method: "previewStake",
     args: util.usc({ ...restArgs }),
   };
 
@@ -164,7 +110,7 @@ async function stake(user, args, options) {
   const contract = { name: contractName, address: governance };
   const callArgs = {
     contract,
-    method: "stake",
+    method: "createEscrow",
     args: util.usc({ ...restArgs }),
   };
 
@@ -206,11 +152,9 @@ async function unstake(user, contract,  args, options) {
 
 export default {
   contractName,
-  bindAddress,
   get,
   marshalIn,
   marshalOut,
-  getHistory,
   calculate,
   stake,
   unstake,

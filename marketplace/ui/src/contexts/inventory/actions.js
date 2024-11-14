@@ -816,7 +816,7 @@ const actions = {
     }
   },
 
-  getGovernanceAddress: async (dispatch, payload) => {
+  getGovernanceAddress: async (dispatch) => {
     dispatch({ type: actionDescriptors.getGovernanceAddress });
 
     try {
@@ -827,7 +827,6 @@ const actions = {
           Accept: "application/json",
           "Content-Type": "application/json",
         },
-        // body: JSON.stringify(payload),
       });
 
       const body = await response.json();
@@ -875,13 +874,13 @@ const actions = {
 
     try {
       const response = await fetch(`${apiUrl}/governance/calculate`, { //Stake
-        method: HTTP_METHODS.GET,
+        method: HTTP_METHODS.POST,
         credentials: "same-origin",
         headers: {
           Accept: "application/json",
           "Content-Type": "application/json",
         },
-        // body: JSON.stringify(payload),
+        body: JSON.stringify(payload),
       });
 
       const body = await response.json();

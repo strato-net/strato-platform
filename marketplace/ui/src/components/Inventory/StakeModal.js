@@ -13,7 +13,7 @@ const logo = <img src={Images.logo} alt={''} title={''} className=" ml-1 mt-1 w-
 
 const StakeModal = ({ open, handleCancel, inventory, category, debouncedSearchTerm, limit = 0, offset = 0, type }) => {
     const { isStaking, isUnstaking, isGovernanceAddress, isCalculatedValue, governanceAddress, calculatedValue} = useInventoryState();
-    
+
     const [data, setData] = useState(inventory);
     const inventoryDispatch = useInventoryDispatch();
     const paymentServiceDispatch = usePaymentServiceDispatch();
@@ -31,12 +31,14 @@ const StakeModal = ({ open, handleCancel, inventory, category, debouncedSearchTe
     },[]);
 
     useEffect(()=>{
-        const body = {
-            amount:inventory?.price,
-            assetAddress:inventory?.address,
-            governance: governanceAddress
+        if (governanceAddress && inventory.data) {
+            const body = {
+                assetAmount:inventory?.quantity,
+                assetAddress:inventory?.address,
+                governance: governanceAddress[0].address
+            }
+            inventoryActions.calculateValue(inventoryDispatch, body);
         }
-        inventoryActions.calculateValue(inventoryDispatch, body);
     },[governanceAddress]);
 
     // const filteredUsersList = filterDuplicateUserAddresses(usersList);
@@ -73,7 +75,7 @@ const StakeModal = ({ open, handleCancel, inventory, category, debouncedSearchTe
             title: "Liquidity",
             align: "center",
             render: () => (
-                <div className="flex justify-center"> <div className="flex mx-auto">3000 {logo} </div> </div> // hardcoded STRATs
+                <div className="flex justify-center"> <div className="flex mx-auto">{calculatedValue} {logo} </div> </div> // hardcoded STRATs
             )
         },
         {
@@ -88,13 +90,13 @@ const StakeModal = ({ open, handleCancel, inventory, category, debouncedSearchTe
     ];
 
     const handleSubmit = async () => {
-        const stratsService = paymentServices.find((item)=>item.serviceName==='STRATS')
+        const stratsService = paymentServices.find((item)=>item.serviceName==='STRATS' && item.creator==='Server');
         if(type==='Stake'){
             const body = {
-                amount: inventory?.price,
+                assetAmount: inventory?.quantity,
                 assetAddress: inventory?.address,
-                stratsPaymentService: stratsService.address,
-                governance: governanceAddress
+                stratsPaymentService: {creator: stratsService.creator, serviceName: stratsService.serviceName},
+                governance: governanceAddress[0].address
             }
 
           const isStaked = await inventoryActions.stakeInventory(inventoryDispatch, body);
@@ -102,9 +104,8 @@ const StakeModal = ({ open, handleCancel, inventory, category, debouncedSearchTe
 
         if(type==='Unstake'){
             const body = {
-                strats: "",
-                escrow: "",
-                stratsPaymentService: stratsService.address
+                escrow: inventory?.sale,
+                stratsPaymentService: stratsService.address,
             }
             const isUnstaked = await inventoryActions.UnstakeInventory(inventoryDispatch, body);
         }

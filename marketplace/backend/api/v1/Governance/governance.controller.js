@@ -4,8 +4,9 @@ import RestStatus from "http-status-codes";
 
 class GovernanceController {
   // Retrieve governance contract Address
-  static async get(_, res, next) {
+  static async get(req, res, next) {
     try {
+      const { dapp } = req;
       const result = await dapp.getGovernance();
       rest.response.status200(res, result);
       next();
@@ -17,10 +18,10 @@ class GovernanceController {
   // Calculate staking preview
   static async calculate(req, res, next) {
     try {
-      const { dapp, query } = req;
-      GovernanceController.validateCalculateArgs(query);
+      const { dapp, body } = req;
+      GovernanceController.validateCalculateArgs(body);
 
-      const result = await dapp.calculate(query);
+      const result = await dapp.calculate(body);
       rest.response.status200(res, result);
       next();
     } catch (e) {
@@ -60,7 +61,7 @@ class GovernanceController {
 
   static validateCalculateArgs(args) {
     const schema = Joi.object({
-      amount: Joi.number().positive().required().messages({
+      assetAmount: Joi.number().positive().required().messages({
         "any.required": "Amount is required and must be a number.",
         "number.base": "Amount must be a valid number.",
         "number.positive": "Amount must be a positive number.",
@@ -79,7 +80,7 @@ class GovernanceController {
 
   static validateStakeArgs(args) {
     const schema = Joi.object({
-      amount: Joi.number().positive().required().messages({
+      assetAmount: Joi.number().positive().required().messages({
         "any.required": "Amount is required and must be a positive number.",
         "number.base": "Amount must be a valid number.",
         "number.positive": "Amount must be a positive number.",
@@ -88,11 +89,10 @@ class GovernanceController {
         "any.required": "Asset Address is required and must be a string.",
         "string.base": "Asset Address must be a valid string.",
       }),
-      stratsPaymentService: Joi.string().required().messages({
-        "any.required":
-          "Strats Payment Service is required and must be a string.",
-        "string.base": "Strats Payment Service must be a valid string.",
-      }),
+      stratsPaymentService: Joi.object({
+            creator: Joi.string().required(),
+            serviceName: Joi.string().required(),
+        }).required(),
       governance: Joi.string().required().messages({
         "any.required": "Governance is required and must be a string.",
         "string.base": "Governance must be a valid string.",
@@ -103,11 +103,6 @@ class GovernanceController {
 
   static validateUnstakeArgs(args) {
     const schema = Joi.object({
-      strats: Joi.array().items(Joi.string()).required().messages({
-        "any.required": "Strats must be provided as an array of strings.",
-        "array.base": "Strats must be an array.",
-        "array.includes": "Each strat must be a valid string.",
-      }),
       escrow: Joi.string().required().messages({
         "any.required": "Escrow is required and must be a string.",
         "string.base": "Escrow must be a valid string.",

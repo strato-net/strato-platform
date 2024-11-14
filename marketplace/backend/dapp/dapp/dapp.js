@@ -241,10 +241,9 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
 
   contract.getInventories = async function (args, options = optionsNoChainIds) {
     const getOptions = { ...options, app: contractName };
-    const config = {assetAddresses: ['e71870c2716faf0600ca842468d627ef3b9de760', '13d7f78f951adfd2369ef40b339165a477cc3a8a']}
 
-    const inventories = await inventoryJs.getAll(rawAdmin, { ...args, ...config, ownerCommonName: userCert.commonName, sort: '-createdDate' }, getOptions);
-    const inventoryCount = await inventoryJs.inventoryCount(rawAdmin, { ...args, ...config, ownerCommonName: userCert.commonName, sort: '-createdDate' }, getOptions);
+    const inventories = await inventoryJs.getAll(rawAdmin, { ...args, ownerCommonName: userCert.commonName, sort: '-createdDate' }, getOptions);
+    const inventoryCount = await inventoryJs.inventoryCount(rawAdmin, { ...args, ownerCommonName: userCert.commonName, sort: '-createdDate' }, getOptions);
     return { inventories: inventories, inventoryCount: inventoryCount }
   };
 
@@ -1406,9 +1405,49 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
   };
 
   contract.unstake = async function (args, options = defaultOptions) {
-    const { stratsPaymentService, restArgs} = args;
+    const { stratsPaymentService, escrow } = args;
     const contract = { address: stratsPaymentService, name: 'StratPaymentService' };
-    const res = await governanceJs.unstake(rawAdmin, contract, restArgs, options);
+
+    // Get User's STRATS Asset Address
+    const stratsOriginAddress = await STRATSJs.getStratsAddress();
+
+    // Retrieve all sales data
+    const salesData = await saleJs.getAll(rawAdmin, { escrow }, options);
+    console.log("salesData123: ", salesData);
+    // Calculate the total order amount
+    const orderTotal = salesData.reduce((acc, sale, index) => sale.stratsLoanAmount, 0);
+    console.log("orderTotal: ", orderTotal);
+    // Retrieve the user's active STRATS asset addresses with non-zero quantities
+    const userStratsAssets = await inventoryJs.getAll(
+      rawAdmin,
+      {
+        ownerCommonName: userCert.commonName,
+        originAddress: stratsOriginAddress,
+        status: ASSET_STATUS.ACTIVE,
+        queryOptions: { select: "address, quantity" },
+        notEqualsField: "quantity",
+        notEqualsValue: "0",
+        order: 'block_timestamp.desc'
+      },
+      options
+    );
+
+    // Accumulate STRATS asset addresses to cover the order total
+    let accumulatedTotal = 0;
+    const stratsAssetAddressesToUse = userStratsAssets.reduce((addresses, asset) => {
+      if (accumulatedTotal >= orderTotal) return addresses;
+      
+      addresses.push(asset.address);
+      accumulatedTotal += asset.quantity / 10000;
+
+      return addresses;
+    }, []);
+
+    if (accumulatedTotal < orderTotal) {
+      throw new rest.RestError(RestStatus.BAD_REQUEST, "You don't have enough STRATS balance to make this purchase");
+    }
+
+    const res = await governanceJs.unstake(rawAdmin, contract, {stratsAssetAddresses: stratsAssetAddressesToUse, ...restArgs}, options);
     return res;
   };
   // ---------------------------- Governance END   -------------------------------

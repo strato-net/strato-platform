@@ -13,7 +13,7 @@ router.get(
   GovernanceController.get
 );
 
-router.get(
+router.post(
   Governance.calculate,
   authHandler.authorizeRequest(),
   loadDapp,
