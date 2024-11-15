@@ -60,7 +60,7 @@ function marshalOut(_args) {
 async function get(user, options) {
   const reserve = await searchAllWithQueryArgs(
     contractName,
-    { address: "ea9fbacc92df225e1d8885edad401e7c0343796d" },
+    { creator: "BlockApps", isActive: true },
     options,
     user
   );

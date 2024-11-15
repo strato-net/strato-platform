@@ -1409,7 +1409,7 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
   
     // Retrieve sales data associated with the escrow address
     const salesData = await saleJs.getAll(rawAdmin, { address: escrow }, options);
-    const orderTotal = salesData.reduce((total, sale) => total + sale?.data?.stratsLoanAmount, 0);
+    const orderTotal = salesData.reduce((total, sale) => total + parseFloat(sale?.data?.stratsLoanAmount), 0);
   
     // Get user's active STRATS assets with non-zero quantities
     const userStratsAssets = await inventoryJs.getAll(
@@ -1432,7 +1432,7 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
         if (acc.accumulatedTotal >= orderTotal) return acc;
   
         acc.addressesToUse.push(asset.address);
-        acc.accumulatedTotal += asset.quantity / 10000;
+        acc.accumulatedTotal += asset.quantity / 100;
   
         return acc;
       },
