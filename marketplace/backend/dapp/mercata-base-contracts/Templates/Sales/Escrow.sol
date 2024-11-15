@@ -7,21 +7,11 @@ contract Escrow is Sale {
     uint public stratsLoanAmount;
     decimal public cataReward;
     decimal public cataWeeklyReward;
-    address public stratsAddress;
-
-    event CollateralReleased(address indexed borrower, uint totalSilverAmount);
-
-    modifier onlyReserve() {
-        require(msg.sender == reserve, "Only the Reserve contract can call this");
-        _;
-    }
 
     constructor(
         address _borrower,
         uint _stratsLoanAmount,
         decimal _cataReward,
-        address _reserve,
-        address _stratsAddress,
         Asset _assetToBeSold,
         decimal _price,
         uint _quantity,
@@ -31,12 +21,7 @@ contract Escrow is Sale {
         stratsLoanAmount = _stratsLoanAmount;
         cataReward = _cataReward;
         cataWeeklyReward = (cataReward * 10) / 52;  // Assuming the CATA reward rate is provided externally
-        reserve = _reserve;
-    }
-
-    function attachEscrowToAsset(Asset asset) public onlyReserve {
-        // Attach the Escrow contract to the specified asset
-        asset.attachSale();
+        reserve = msg.sender;
     }
 
     function closeSale() external override requirePaymentService("complete sale") returns (uint) {
