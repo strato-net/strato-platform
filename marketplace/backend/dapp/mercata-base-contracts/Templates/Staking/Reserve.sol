@@ -10,52 +10,60 @@ import "../Structs/Structs.sol";
 import "../Oracle/OracleService.sol";
 
 abstract contract Reserve is Utils, Structs {
-    OracleService public oracle; // Asset Oracle service for fetching price data
+    OracleService public oracle;
+    address public owner;
+    string public name;
+    bool public isActive = true;
+
     Asset public stratsToken;
     address public cataToken;//Manual for now
-    address public owner; // Owner (BlockApps) as source of STRATS tokens
-
     uint public loanToValueRatio = 50; // LTV ratio as percentage
     uint public cataAPYRate = 10; // 10% APY for CATA rewards
 
     event StakeCreated(address indexed user, address escrow, uint assetAmount, decimal stratsLoan, uint cataReward);
 
-    constructor(address _assetOracle, address _cataToken) {
+    constructor(address _assetOracle, address _cataToken, string _name) {
         oracle = OracleService(_assetOracle);
         cataToken = _cataToken;
         owner = msg.sender;
+        name = _name;
     }
 
-    function createEscrow(uint _assetAmount, address _assetAddress, PaymentServiceInfo _stratPaymentService) public returns (address) {
+    modifier requireActive() {
+        require(isActive, "Reserve is not active");
+        _;
+    }
 
+    modifier requireOwner(string action) {
+        require(msg.sender == owner, "Only owner can " + action + ".");
+        _;
+    }
+
+    function createEscrow(address _assetAddress, PaymentServiceInfo _stratPaymentService) public requireActive() returns (address) {
         // Calculate required values
         Asset _assetToBeSold = Asset(_assetAddress);
         uint _quantity = _assetToBeSold.quantity();
         (decimal _assetPrice, uint _priceTimestamp) = oracle.getLatestPrice();
-        decimal _price = _assetPrice;
-        decimal stratsLoanAmount = (decimal(_assetAmount) * _assetPrice * decimal(loanToValueRatio)) / 100;
-        decimal cataReward = calculateCATAReward(_assetAmount, stratsLoanAmount);
+        uint stratsLoanAmount = uint((decimal(_quantity) * _assetPrice * decimal(loanToValueRatio)) / 100);
+        decimal cataReward = decimal(_quantity * stratsLoanAmount * cataAPYRate) / 100;
 
         // Create the Escrow contract but do not attach assets or transfer STRATS
-        Escrow escrow = new Escrow(msg.sender, uint(stratsLoanAmount), cataReward, address(this), address(stratsToken), _assetToBeSold, _price, _quantity, [_stratPaymentService]);
+        Escrow escrow = new Escrow(msg.sender, stratsLoanAmount, cataReward, _assetToBeSold, _assetPrice, _quantity, [_stratPaymentService]);
 
-        stakeAsset(address(escrow));
+        stakeAsset(escrow);
 
         return address(escrow);
     }
 
-    function stakeAsset(address _escrowAddress) internal {
-
-        // Retrieve escrow details
-        Escrow escrow = Escrow(_escrowAddress);
-        decimal stratsLoanAmount = escrow.stratsLoanAmount();
+    function stakeAsset(Escrow _escrow) internal {
+        uint stratsLoanAmount = _escrow.stratsLoanAmount();
         uint transferNumber = (uint(block.number + 16)) % 1000000;
         
         // Transfer STRATS from owner (BlockApps) to the borrower
-        stratsToken.transferOwnership(escrow.borrower(), stratsLoanAmount*100, true, transferNumber, 0.0001);
+        stratsToken.transferOwnership(_escrow.borrower(), stratsLoanAmount*100, true, transferNumber, 0.0001);
 
         // Emit the StakeCreated event
-        emit StakeCreated(msg.sender, _escrowAddress, escrow.quantity(), stratsLoanAmount, escrow.cataReward());
+        emit StakeCreated(msg.sender, address(_escrow), _escrow.quantity(), stratsLoanAmount, _escrow.cataReward());
     }
     
     function calculateCATAReward(uint _assetAmount, decimal _stratsLoanAmount) internal view returns (decimal) {
@@ -64,26 +72,19 @@ abstract contract Reserve is Utils, Structs {
         return (decimal(_assetAmount) * _stratsLoanAmount * decimal(cataAPYRate)) / 100;
     }
 
-    //FUNCTION to get calculation of strats, rewards before they click the stake button
-    function previewStake(decimal _assetAmount, address _assetAddress) public view returns (uint _stratsLoanAmount, decimal _cataReward) {
-        (decimal _assetPrice, uint _priceTimestamp) = oracle.getLatestPrice();
-        _stratsLoanAmount = uint((_assetAmount * _assetPrice * decimal(loanToValueRatio)) / 100);  // Calculate the STRATS loan amount
-        _cataReward = calculateCATAReward(_assetAmount, _stratsLoanAmount);  // Calculate the CATA reward based on APY rate
-        return (_stratsLoanAmount, _cataReward);
-    }
-
     function getStratsToken() public view returns (Asset) {
         return stratsToken;
     }
 
-    function setStratsToken(address _newStratsToken) public {
-        require(msg.sender == owner, "Only owner can update STRATS token");
+    function setStratsToken(address _newStratsToken) public requireOwner("update STRATS token") {
         stratsToken = Asset(_newStratsToken);
     }
 
-    function transferSTRATSbacktoOwner(uint _amount) public {
-        require(msg.sender == owner, "Only owner can transfer STRATS back");
+    function transferSTRATSbacktoOwner(uint _amount) public requireOwner("transfer STRATS back") {
         stratsToken.transferOwnership(owner, _amount, false, 0, 0);
     }
 
+    function deactivate() public requireActive() requireOwner("deactivate reserve") {
+        isActive = false;
+    }
 }

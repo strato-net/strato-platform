@@ -37,7 +37,7 @@ contract StratPaymentService is PaymentService {
     ) requireActive("unstake") external returns (uint) {
         require(_stratsAssetAddresses.length > 0, "Pass at least one STRATs token address");
         Escrow escrow = Escrow(_escrowAddress);
-        uint stratAmountNet = uint(escrow.stratsLoanAmount());
+        uint stratAmountNet = escrow.stratsLoanAmount();
         uint stratQuantity = 0;
         uint transferNumber = 0;
         uint transferAmount = 0;
@@ -59,8 +59,7 @@ contract StratPaymentService is PaymentService {
             }
         }
         require(stratAmountNet == 0, "Your STRATS balance is not high enough to cover the purchase.");
-
-        // Transfer assets
+        
         escrow.closeSale();
 
         emit UnstakeProcessed(msg.sender, _escrowAddress, escrow.quantity(), escrow.stratsLoanAmount());
