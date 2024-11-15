@@ -7,7 +7,6 @@ contract Escrow is Sale {
     uint public stratsLoanAmount;
     decimal public cataRewardInDollars;
     decimal public escrowPrice;
-    uint public escrowQuantity;
 
     constructor(
         address _borrower,
@@ -19,7 +18,6 @@ contract Escrow is Sale {
         PaymentServiceInfo[] _paymentServices
     ) Sale(_assetToBeSold, 0, _escrowQuantity, _paymentServices) {
         escrowPrice = _escrowPrice;
-        escrowQuantity = _escrowQuantity;
         borrower = _borrower;
         stratsLoanAmount = _stratsLoanAmount;
         cataRewardInDollars = _cataRewardInDollars; // Assuming the CATA reward rate is provided externally
