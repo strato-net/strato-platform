@@ -17,7 +17,7 @@ contract Escrow is Sale {
         decimal _escrowPrice,
         uint _escrowQuantity,
         PaymentServiceInfo[] _paymentServices
-    ) Sale(_assetToBeSold, 0, 0, _paymentServices) {
+    ) Sale(_assetToBeSold, 0, _escrowQuantity, _paymentServices) {
         escrowPrice = _escrowPrice;
         escrowQuantity = _escrowQuantity;
         borrower = _borrower;
