@@ -396,7 +396,7 @@ const Inventory = ({ user }) => {
           <div>
             {price !== "N/A" ? (
              <p className="flex justify-center">
-             <span>${price}</span> <p className="flex text-xs items-center"> &nbsp;({(price * STRATS_CONVERSION).toFixed(0)} {((price * STRATS_CONVERSION).toFixed(0) == 1) } {StratsIcon}) </p>
+             <span>${price}</span> <p className="flex text-xs items-center"> &nbsp;({(price * STRATS_CONVERSION).toFixed(0)}  {StratsIcon}) </p>
            </p>
             ) : (
               "N/A"
