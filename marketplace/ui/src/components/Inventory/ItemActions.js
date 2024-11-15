@@ -83,7 +83,8 @@ const ItemActions = ({
   function isActive() {
     if (
       inventory.status == ASSET_STATUS.PENDING_REDEMPTION ||
-      inventory.status == ASSET_STATUS.RETIRED
+      inventory.status == ASSET_STATUS.RETIRED ||
+      inventory.stratsLoanAmount
     ) {
       return false;
     } else {
@@ -262,7 +263,7 @@ const ItemActions = ({
             <Button
               type="link"
               className={`text-[#13188A] font-semibold ${
-                !isTokenSupported(inventory.root) ? "hidden" : ""
+                !isTokenSupported(inventory.root) || inventory.stratsLoanAmount ? "hidden" : ""
               }`}
               onClick={showBridgeModal}
             >
