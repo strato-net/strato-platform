@@ -107,6 +107,6 @@ main = do
             kafkaClientId = fromString flags_kafkaclientid,
             redisConn = RBDB.RedisConnection redisBDBPool
           }
-  race_ (runLoggingT (runSequencerM seqCfg mCtx (sequencer validators)))
+  race_ (runLoggingT (runSequencerM seqCfg mCtx sequencer ))
     . run 8050
     $ metricsApp
