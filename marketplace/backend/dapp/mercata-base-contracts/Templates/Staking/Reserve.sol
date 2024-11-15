@@ -86,10 +86,6 @@ abstract contract Reserve is Utils, Structs {
         return (_stratsLoanAmount, _cataReward);
     }
 
-    function getStratsToken() public view returns (Asset) {
-        return stratsToken;
-    }
-
     function setStratsToken(address _newStratsToken) public requireOwner("update STRATS token") {
         stratsToken = Asset(_newStratsToken);
     }
@@ -100,5 +96,10 @@ abstract contract Reserve is Utils, Structs {
 
     function deactivate() public requireActive() requireOwner("deactivate reserve") {
         isActive = false;
+    }
+
+    function setOracle(address _newOracle) public requireOwner("update oracle") {
+        require(_newOracle != address(0), "Invalid oracle address");
+        oracle = OracleService(_newOracle);
     }
 }
