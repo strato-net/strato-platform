@@ -439,7 +439,7 @@ async function getAll(admin, args = {}, defaultOptions) {
     if (isTrendingSearch) {
         // Fetch the sales first
         sales = await saleJs.getAll(admin, { range, isOpen: true, order: 'block_timestamp.desc', offset: '0', gtField: args.gtField, gtValue: args.gtValue }, options);
-        sales = sales.filter(sale => sale.data?.stratsLoanAmount !== null);
+        sales = sales.filter(sale => !sale.data?.stratsLoanAmount);
         const trendingAssetAddresses = sales.map(sale => sale.assetToBeSold);
 
         // Fetch the inventories matching the sales
