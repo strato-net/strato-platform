@@ -303,7 +303,7 @@ const ItemActions = ({
       {stakeModalOpen && (
         <StakeModal
           open={stakeModalOpen}
-          type={stakeType} // Stake / Unstake handle the modal functionality based on this.
+          type={stakeType}
           handleCancel={handleStakeModalClose}
           limit={limit}
           offset={offset}

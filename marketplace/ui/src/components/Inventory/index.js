@@ -10,6 +10,7 @@ import {
   Input,
   Table,
   Checkbox,
+  Tooltip,
 } from "antd";
 import { CheckCircleOutlined } from "@ant-design/icons";
 import image_placeholder from "../../images/resources/image_placeholder.png";
@@ -57,6 +58,7 @@ import InventoryCard from "./InventoryCard";
 import "./index.css";
 
 const { Option } = Select;
+const StratsIcon = <img src={Images.strats} alt="STRATS" className="w-5 h-5" />
 
 const Inventory = ({ user }) => {
   const [open, setOpen] = useState(false);
@@ -359,7 +361,11 @@ const Inventory = ({ user }) => {
                 className="text-xs sm:text-sm text-[#13188A] hover:underline cursor-pointer"
                 onClick={callDetailPage}
               >
-                {record.name}
+                <Tooltip title={record.name}>
+                    <span className="w-48 whitespace-nowrap overflow-hidden text-ellipsis block">
+                    {record.name}
+                    </span>
+                  </Tooltip>
               </span>
             </div>
           </div>
@@ -389,12 +395,9 @@ const Inventory = ({ user }) => {
         return (
           <div>
             {price !== "N/A" ? (
-              <>
-                ${price}{" "}
-                <span className="text-xs">
-                  ({(price * STRATS_CONVERSION).toFixed(0)} STRATs)
-                </span>
-              </>
+             <p className="flex justify-center">
+             <span>${price}</span> <p className="flex text-xs items-center"> &nbsp;({(price * STRATS_CONVERSION).toFixed(0)} {((price * STRATS_CONVERSION).toFixed(0) == 1) } {StratsIcon}) </p>
+           </p>
             ) : (
               "N/A"
             )}
@@ -425,7 +428,7 @@ const Inventory = ({ user }) => {
         const saleQuantity = isStrats
           ? parseFloat((record.saleQuantity / 100).toFixed(2))
           : record.saleQuantity;
-        return <div className="w-24">{saleQuantity || 0}</div>;
+        return <div className="w-40">{saleQuantity || 0}</div>;
       },
     },
     {
@@ -454,7 +457,7 @@ const Inventory = ({ user }) => {
           {record.price ? (
             <div className="flex items-center justify-center gap-2 bg-[#1548C329] p-[6px] rounded-md">
               <div className="w-[7px] h-[7px] rounded-full bg-[#119B2D]"></div>
-              <p className="text-[#4D4D4D] text-[13px]">Published</p>
+              <p className="text-[#4D4D4D] text-[13px]"> {record?.stratsLoanAmount ? 'Staked' : 'Published'} </p>
             </div>
           ) : record.status == ASSET_STATUS.PENDING_REDEMPTION ? (
             <div className="flex items-center justify-center gap-2 bg-[#FFA50029] p-[6px] rounded-md">

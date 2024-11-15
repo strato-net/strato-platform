@@ -10,7 +10,7 @@ import moment from "moment";
 import InfiniteScroll from "react-infinite-scroll-component";
 
 const GlobalTransactionResponsive = ({ data, user,isTransactionLoading,fetchData }) => {
-  const StratsIcon = <img src={Images.logo} alt="" className="mx-1 w-3 h-3" />;
+  const StratsIcon = <img src={Images.strats} alt="" className="w-5 h-5" />;
   const navigate = useNavigate();
   const [expandedRows, setExpandedRows] = useState({});
 

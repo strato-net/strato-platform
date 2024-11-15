@@ -212,7 +212,7 @@ const reducer = (state, action) => {
     case actionDescriptors.getCalculatedValue:
           return {
             ...state,
-            isCalculatedValues: true
+            isCalculatedValue: true
           };
     case actionDescriptors.getCalculatedValueSuccessful:
           return {

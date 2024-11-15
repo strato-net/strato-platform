@@ -23,6 +23,8 @@ import { ASSET_STATUS, STRATS_CONVERSION, OLD_SADDOG_ORIGIN_ADDRESS } from "../.
 import image_placeholder from "../../images/resources/image_placeholder.png";
 import "react-responsive-carousel/lib/styles/carousel.min.css";
 import { SEO } from "../../helpers/seoConstant";
+import { Images } from "../../images";
+const StratsIcon = <img src={Images.strats} alt="STRATS" className="w-5 h-5" />
 
 const InventoryCard = ({ inventory, category, debouncedSearchTerm, id, allSubcategories, limit, offset, user, supportedTokens }) => {
   const textRef = useRef(null);
@@ -248,29 +250,13 @@ const InventoryCard = ({ inventory, category, debouncedSearchTerm, id, allSubcat
                 <Button type="link" className={`text-[#13188A] text-left px-0 font-semibold text-sm h-6 ${!isTokenSupported(inventory.root) ? 'hidden' : ''}`} onClick={showBridgeModal}>
                   <><RetweetOutlined /> Bridge</>
                 </Button>
-                {/* <Button id="asset-card-unlist-btn" type="link" className="text-[#13188A] text-left px-0 font-semibold text-sm h-6" onClick={showUnlistModal} disabled={!inventory.price || !isActive()}>
-                  <><StopOutlined /> Stake</>
-                </Button>
-                <Button id="asset-card-unlist-btn" type="link" className="text-[#13188A] text-left px-0 font-semibold text-sm h-6" onClick={showUnlistModal} disabled={!inventory.price || !isActive()}>
-                  <><StopOutlined /> Unstake</>
-                </Button> */}
-                 {!inventory.isStake && <Button
-        type="link"
-        className="text-[#13188A] font-semibold"
-        onClick={() => showStakeModal("Stake")}
-        // disabled={!inventory.price || !isActive()}
-      >
-        <StopOutlined /> Stake
-      </Button>}
-
-     {inventory.isStake && <Button
-        type="link"
-        className="text-[#13188A] font-semibold"
-        onClick={() => showStakeModal("Unstake")}
-        // disabled={!inventory.price || !isActive()}
-      >
-        <StopOutlined /> Unstake
-      </Button>}
+                {!inventory.stratsLoanAmount && <Button type="link" className="text-[#13188A] text-left px-0 font-semibold text-sm h-6"
+                   onClick={() => showStakeModal("Stake")}><StopOutlined /> Stake
+                </Button>}
+                {inventory.stratsLoanAmount && <Button type="link" className="text-[#13188A] text-left px-0 font-semibold text-sm h-6"
+                   onClick={() => showStakeModal("Unstake")}>
+                <StopOutlined /> Unstake
+                </Button>}
               </div>
             }
           </div>
@@ -296,7 +282,7 @@ const InventoryCard = ({ inventory, category, debouncedSearchTerm, id, allSubcat
             {inventory.price ?
               <div className="flex items-center justify-center gap-2 bg-[#1548C329] p-[6px] rounded-md">
                 <div className="w-[7px] h-[7px] rounded-full bg-[#119B2D]"></div>
-                <p className="text-[#4D4D4D] text-[13px]">Published</p>
+                <p className="text-[#4D4D4D] text-[13px]">{inventory?.stratsLoanAmount ? 'Staked' : 'Published'}</p>
               </div>
               :
               (inventory.status == ASSET_STATUS.PENDING_REDEMPTION) ?
@@ -341,9 +327,9 @@ const InventoryCard = ({ inventory, category, debouncedSearchTerm, id, allSubcat
             <p className="text-[#6A6A6A]">Price</p>
             <p className="text-[#202020] font-semibold">
               {price ? (
-                <>
-                  ${price} <span className="text-xs">({(price * STRATS_CONVERSION).toFixed(0)} {((price * STRATS_CONVERSION).toFixed(0) == 1) ? 'STRAT' : 'STRATs'})</span>
-                </>
+                <p className="flex">
+                  <span>${price}</span> <p className="flex text-xs items-center"> &nbsp;({(price * STRATS_CONVERSION).toFixed(0)} {((price * STRATS_CONVERSION).toFixed(0) == 1) } {StratsIcon}) </p>
+                </p>
               ) : (
                 "N/A"
               )}
@@ -397,7 +383,7 @@ const InventoryCard = ({ inventory, category, debouncedSearchTerm, id, allSubcat
       {stakeModalOpen && (
         <StakeModal
           open={stakeModalOpen}
-          type={stakeType} // Stake / Unstake handle the modal functionality based on this.
+          type={stakeType}
           handleCancel={handleStakeModalClose}
           limit={limit}
           offset={offset}

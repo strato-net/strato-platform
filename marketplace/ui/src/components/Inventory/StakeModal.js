@@ -4,34 +4,38 @@ import { usePaymentServiceDispatch, usePaymentServiceState } from "../../context
 import { actions as inventoryActions } from "../../contexts/inventory/actions";
 import { actions as paymentServiceActions } from "../../contexts/payment/actions";
 import { useInventoryDispatch, useInventoryState } from "../../contexts/inventory";
+import { actions as marketplaceActions } from "../../contexts/marketplace/actions";
 import { useMarketplaceDispatch, useMarketplaceState } from "../../contexts/marketplace";
 import { useUsersDispatch, useUsersState } from "../../contexts/users";
 import { useAuthenticateState } from "../../contexts/authentication";
 import { Images } from "../../images";
 
-const logo = <img src={Images.logo} alt={''} title={''} className=" ml-1 mt-1 w-[15px] h-[15px] " />
+const logo = <img src={Images.strats} alt={''} title={''} className="w-5 h-5 " />
 
-const StakeModal = ({ open, handleCancel, inventory, category, debouncedSearchTerm, limit = 0, offset = 0, type }) => {
-    const { isStaking, isUnstaking, isReserveAddress, isCalculatedValue, reserveAddress, calculatedValue} = useInventoryState();
+const StakeModal = ({ open, handleCancel, inventory, category, debouncedSearchTerm, limit, offset, type }) => {
+    const { isStaking, isUnstaking, isReserveAddress, isCalculatedValue, reserveAddress, calculatedValue } = useInventoryState();
 
     const [data, setData] = useState(inventory);
+    // Dispatch
     const inventoryDispatch = useInventoryDispatch();
     const paymentServiceDispatch = usePaymentServiceDispatch();
+    const marketplaceDispatch = useMarketplaceDispatch();
+
     const [api, contextHolder] = notification.useNotification();
     const { paymentServices, arePaymentServicesLoading } = usePaymentServiceState();
-    // const [govAddress, setGovAddress] = useState(null)
+
     const quantityIsDecimal = data.data.quantityIsDecimal && data.data.quantityIsDecimal === "True";
-    const isLoader = isStaking || isUnstaking || isCalculatedValue;
-    const originAddress = inventory.originAddress?.toLowerCase();
+    const isLoader = isStaking || isUnstaking || isCalculatedValue || isReserveAddress;
     const itemName = decodeURIComponent(inventory.name)
-    
+    const resAddress = reserveAddress?.length ? reserveAddress[0]?.address : null
+
     useEffect(()=>{
         paymentServiceActions.getPaymentServices(paymentServiceDispatch, true);
         inventoryActions.getReserveAddress(inventoryDispatch);
     },[]);
 
     useEffect(()=>{
-        if (reserveAddress && inventory.data) {
+        if (reserveAddress && inventory.data && !isReserveAddress) {
             const body = {
                 assetAmount:inventory?.quantity,
                 assetAddress:inventory?.address,
@@ -39,30 +43,7 @@ const StakeModal = ({ open, handleCancel, inventory, category, debouncedSearchTe
             }
             inventoryActions.calculateValue(inventoryDispatch, body);
         }
-    },[reserveAddress]);
-
-    // const filteredUsersList = filterDuplicateUserAddresses(usersList);
-    // const [userAddress, setUserAddress] = useState(
-    //     isBurner && filteredUsersList.length > 0 ? filteredUsersList[0].value : ""
-    // );
-
-    // const marketplaceToast = (placement) => {
-    //     if (marketplaceSuccess) {
-    //         api.success({
-    //             message: "marketplaceMsg",
-    //             onClose: marketplaceActions.resetMessage(marketplaceDispatch),
-    //             placement,
-    //             key: 1,
-    //         });
-    //     } else {
-    //         api.error({
-    //             message: "marketplaceMsg",
-    //             onClose: marketplaceActions.resetMessage(marketplaceDispatch),
-    //             placement,
-    //             key: 2,
-    //         });
-    //     }
-    // };
+    },[resAddress]);
 
     const columns = [
         {
@@ -75,7 +56,7 @@ const StakeModal = ({ open, handleCancel, inventory, category, debouncedSearchTe
             title: "Liquidity",
             align: "center",
             render: () => (
-                <div className="flex justify-center"> <div className="flex mx-auto">{calculatedValue} {logo} </div> </div> // hardcoded STRATs
+                <div className="flex justify-center"> <div className="flex mx-auto">{calculatedValue} {logo} </div> </div>
             )
         },
         {
@@ -100,6 +81,11 @@ const StakeModal = ({ open, handleCancel, inventory, category, debouncedSearchTe
             }
 
           const isStaked = await inventoryActions.stakeInventory(inventoryDispatch, body);
+          if(isStaked){
+            await inventoryActions.fetchInventory(inventoryDispatch, limit, offset, debouncedSearchTerm, category && category !== "All" ? category : undefined);
+            await marketplaceActions.fetchStratsBalance(marketplaceDispatch);
+            handleCancel();
+          }
         }
 
         if(type==='Unstake'){
@@ -108,6 +94,11 @@ const StakeModal = ({ open, handleCancel, inventory, category, debouncedSearchTe
                 stratsPaymentService: stratsService.address,
             }
             const isUnstaked = await inventoryActions.UnstakeInventory(inventoryDispatch, body);
+            if(isUnstaked){
+                await inventoryActions.fetchInventory(inventoryDispatch, limit, offset, debouncedSearchTerm, category && category !== "All" ? category : undefined);
+                await marketplaceActions.fetchStratsBalance(marketplaceDispatch);
+                handleCancel();
+              }
         }
     };
 
@@ -136,14 +127,13 @@ const StakeModal = ({ open, handleCancel, inventory, category, debouncedSearchTe
                 <div className="w-full">
                     <p className=" w-full text-[#202020] font-medium text-sm ">Liquidity</p>
                     <div className="border border-[#d9d9d9] h-[42px] rounded-md flex items-center justify-center "> 
-                        <div className="flex mx-auto">3000 {logo} </div> </div> 
+                        <div className="flex mx-auto">{calculatedValue} {logo} </div> </div> 
                 </div>
                 <div className="w-full flex justify-center items-center">
                     <Button type="primary" className="w-32 h-9" onClick={handleSubmit} disabled={isLoader} loading={isLoader}>
                         {type}
                     </Button>
                 </div>
-
             </div>
             {contextHolder}
             {/* {marketplaceMsg && marketplaceToast("bottom")} */}

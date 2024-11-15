@@ -27,7 +27,7 @@ import { SEO } from "../../helpers/seoConstant";
 import { getStringDate } from "../../helpers/utils";
 
 const TransactionTable = ({ user, download }) => {
-  const StratsIcon = <img src={Images.logo} alt="" className="mx-1 w-3 h-3" />
+  const StratsIcon = <img src={Images.strats} alt="" className="mx-1 w-3 h-3" />
   // Dispatch
   const transactionDispatch = useTransactionDispatch();
   const marketplaceDispatch = useMarketplaceDispatch();
