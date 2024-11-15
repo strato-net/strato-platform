@@ -23,4 +23,8 @@ contract SilverOracleService is OracleService {
     function submitPrice(decimal _price) public requireOwner("submit price") {
         _submitPrice(_price);
     }
+
+    function transferOwnership(address _newOwner) public requireOwner("transfer owneship") {
+        _transferOwnership(_newOwner);
+    }
 }

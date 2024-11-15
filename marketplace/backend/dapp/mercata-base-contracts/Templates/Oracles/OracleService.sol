@@ -43,6 +43,11 @@ abstract contract OracleService is Utils {
     	consensusPrice = _price;
     }
 
+    function _transferOwnership(address _newOwner) internal requireActive("deactivate") {
+        owner = _newOwner;
+        ownerCommonName = getCommonName(_newOwner);
+    }
+
     function getLatestPrice() public view requireActive("deactivate") returns (decimal, uint) {
         return (consensusPrice, consensusPriceTimestamp);
     }
