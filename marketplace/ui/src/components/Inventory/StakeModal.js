@@ -26,6 +26,7 @@ const StakeModal = ({ open, handleCancel, inventory, category, debouncedSearchTe
 
     const quantityIsDecimal = data.data.quantityIsDecimal && data.data.quantityIsDecimal === "True";
     const isLoader = isStaking || isUnstaking || isCalculatedValue || isReserveAddress;
+    const isStaked = inventory.stratsLoanAmount && inventory.stratsLoanAmount > 0;
     const itemName = decodeURIComponent(inventory.name)
     const resAddress = reserveAddress?.length ? reserveAddress[0]?.address : null
 
@@ -35,7 +36,7 @@ const StakeModal = ({ open, handleCancel, inventory, category, debouncedSearchTe
     },[]);
 
     useEffect(()=>{
-        if (reserveAddress && inventory.data && !isReserveAddress) {
+        if (reserveAddress && inventory.data && !isReserveAddress && !isStaked) {
             const body = {
                 assetAmount:inventory?.quantity,
                 assetAddress:inventory?.address,
@@ -55,8 +56,8 @@ const StakeModal = ({ open, handleCancel, inventory, category, debouncedSearchTe
         {
             title: "Liquidity",
             align: "center",
-            render: () => (
-                <div className="flex justify-center"> <div className="flex mx-auto">{calculatedValue} {logo} </div> </div>
+            render: (text, record) => (
+                <div className="flex justify-center"> <div className="flex mx-auto">{isStaked ? record.stratsLoanAmount : calculatedValue} {logo} </div> </div>
             )
         },
         {
