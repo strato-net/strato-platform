@@ -43,14 +43,14 @@ abstract contract Reserve is Utils, Structs {
 
         // Calculate required values
         Asset _assetToBeSold = Asset(_assetAddress);
-        uint _quantity = _assetToBeSold.quantity();
-        (decimal _assetPrice, uint _priceTimestamp) = oracle.getLatestPrice();
-        decimal _price = _assetPrice;
-        decimal stratsLoanAmount = (decimal(_assetAmount) * _assetPrice * decimal(loanToValueRatio)) / 100;
-        decimal cataReward = calculateCATAReward(_assetAmount, stratsLoanAmount);
+        uint _escrowQuantity = _assetToBeSold.quantity();//Taking all the quantity of the asset for now
+        (decimal _escrowPrice, uint _priceTimestamp) = oracle.getLatestPrice();
+        uint _loanAmount = uint((decimal(_assetAmount) * _escrowPrice * decimal(loanToValueRatio)) / 100);  // Calculate the loan amount
+        uint _stratsLoanAmount = _loanAmount * 100;
+        decimal _cataReward = calculateCATAReward(_assetAmount, _loanAmount);
 
         // Create the Escrow contract but do not attach assets or transfer STRATS
-        Escrow escrow = new Escrow(msg.sender, uint(stratsLoanAmount), cataReward, _assetToBeSold, _price, _quantity, [_stratPaymentService]);
+        Escrow escrow = new Escrow(msg.sender, _stratsLoanAmount, _cataReward, _assetToBeSold, _escrowPrice, _escrowQuantity, [_stratPaymentService]);
 
         stakeAsset(address(escrow));
 
@@ -68,20 +68,21 @@ abstract contract Reserve is Utils, Structs {
         stratsToken.transferOwnership(escrow.borrower(), stratsLoanAmount*100, true, transferNumber, 0.0001);
 
         // Emit the StakeCreated event
-        emit StakeCreated(msg.sender, _escrowAddress, escrow.quantity(), stratsLoanAmount, escrow.cataReward());
+        emit StakeCreated(msg.sender, _escrowAddress, escrow.quantity(), stratsLoanAmount, escrow.cataRewardInDollars());
     }
     
-    function calculateCATAReward(uint _assetAmount, decimal _stratsLoanAmount) internal view returns (decimal) {
+    function calculateCATAReward(uint _assetAmount, uint _loanAmount) internal view returns (decimal) {
         // Calculate reward based on 10% APY over a specific period
         // Placeholder calculation, assuming a yearly rate
-        return (decimal(_assetAmount) * _stratsLoanAmount * decimal(cataAPYRate)) / 100;
+        return (decimal(_assetAmount) * decimal(_loanAmount) * decimal(cataAPYRate)) / 100;
     }
 
     //FUNCTION to get calculation of strats, rewards before they click the stake button
     function previewStake(decimal _assetAmount, address _assetAddress) public view returns (uint _stratsLoanAmount, decimal _cataReward) {
-        (decimal _assetPrice, uint _priceTimestamp) = oracle.getLatestPrice();
-        _stratsLoanAmount = uint((_assetAmount * _assetPrice * decimal(loanToValueRatio)) / 100);  // Calculate the STRATS loan amount
-        _cataReward = calculateCATAReward(_assetAmount, _stratsLoanAmount);  // Calculate the CATA reward based on APY rate
+        (decimal _escrowPrice, uint _priceTimestamp) = oracle.getLatestPrice();
+        uint _loanAmount = uint((decimal(_assetAmount) * _escrowPrice * decimal(loanToValueRatio)) / 100);  // Calculate the loan amount
+        uint _stratsLoanAmount = _loanAmount * 100;
+        decimal _cataReward = calculateCATAReward(_assetAmount, _loanAmount);
         return (_stratsLoanAmount, _cataReward);
     }
 
