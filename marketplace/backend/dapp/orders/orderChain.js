@@ -44,7 +44,7 @@ const getChainArgs = (getKeyResponse, deploy, myCert, args) => {
                   balance: 100000000000000000000000000000,
               },
               {
-                  address: constants.reserveAddress,
+                  address: constants.governanceAddress,
                   balance: 100000000000000000000000000000,
               },
           ],
@@ -86,9 +86,9 @@ async function createOrder(user, args, options) {
         ...options, 
         chainIds: [chainId],
     }
-    const response = await waitForAddress(user, { address: constants.reserveAddress, name: orderJs.contractName }, waitOptions);
+    const response = await waitForAddress(user, { address: constants.governanceAddress, name: orderJs.contractName }, waitOptions);
 
-    return orderJs.bindAddress(user, constants.reserveAddress, { ...options, chainIds: [chainId] });
+    return orderJs.bindAddress(user, constants.governanceAddress, { ...options, chainIds: [chainId] });
 }
 
 export default {

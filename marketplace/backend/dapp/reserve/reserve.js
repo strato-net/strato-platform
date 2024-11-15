@@ -1,9 +1,7 @@
 import { util, rest } from "/blockapps-rest-plus";
 import { searchAllWithQueryArgs } from "/helpers/utils";
-import RestStatus from 'http-status-codes';
 
 const contractName = "BlockApps-Mercata-Reserve";
-const contract = "Reserve";
 
 /**
  * Augment contract arguments before they are used to post a contract.
@@ -70,22 +68,12 @@ async function get(user, options) {
 }
 
 /**
- * Get contract state in bloc.
- * @deprecated Use {@link get `get`} instead.
- */
-async function getState(user, contract, options) {
-  const state = await rest.getState(user, contract, options);
-  return marshalOut(state);
-}
-
-/**
  * calculate
  */
 async function calculate(user, args, options) {
   const { reserve, ...restArgs } = args;
-  const contractObj = { name: contract, address: reserve };
   const callArgs = {
-    contract: contractObj,
+    contract: { address: reserve },
     method: "previewStake",
     args: util.usc({ ...restArgs }),
   };
@@ -99,9 +87,8 @@ async function calculate(user, args, options) {
  */
 async function stake(user, args, options) {
   const { reserve, ...restArgs } = args;
-  const contract = { name: contractName, address: reserve };
   const callArgs = {
-    contract,
+    contract: { address: reserve },
     method: "createEscrow",
     args: util.usc({ ...restArgs }),
   };
@@ -113,7 +100,7 @@ async function stake(user, args, options) {
 /**
  * unstake
  */
-async function unstake(user, contract,  args, options) {
+async function unstake(user, contract, args, options) {
   const callArgs = {
     contract,
     method: "unStake",

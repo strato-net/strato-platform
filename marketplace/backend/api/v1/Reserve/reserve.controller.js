@@ -62,9 +62,9 @@ class ReserveController {
   static validateCalculateArgs(args) {
     const schema = Joi.object({
       assetAmount: Joi.number().positive().required().messages({
-        "any.required": "Amount is required and must be a number.",
+        "any.required": "Amount is required and must be a positive number.",
         "number.base": "Amount must be a valid number.",
-        "number.positive": "Amount must be a positive number.",
+        "number.positive": "Amount must be positive.",
       }),
       assetAddress: Joi.string().required().messages({
         "any.required": "Asset Address is required and must be a string.",
@@ -81,18 +81,22 @@ class ReserveController {
   static validateStakeArgs(args) {
     const schema = Joi.object({
       assetAmount: Joi.number().positive().required().messages({
-        "any.required": "Amount is required and must be a positive number.",
+        "any.required": "Amount is required and must be positive.",
         "number.base": "Amount must be a valid number.",
-        "number.positive": "Amount must be a positive number.",
+        "number.positive": "Amount must be positive.",
       }),
       assetAddress: Joi.string().required().messages({
         "any.required": "Asset Address is required and must be a string.",
         "string.base": "Asset Address must be a valid string.",
       }),
       stratPaymentService: Joi.object({
-            creator: Joi.string().required(),
-            serviceName: Joi.string().required(),
-        }).required(),
+        creator: Joi.string().required().messages({
+          "any.required": "Creator is required and must be a string.",
+        }),
+        serviceName: Joi.string().required().messages({
+          "any.required": "Service Name is required and must be a string.",
+        }),
+      }).required(),
       reserve: Joi.string().required().messages({
         "any.required": "Reserve is required and must be a string.",
         "string.base": "Reserve must be a valid string.",

@@ -160,7 +160,7 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
   const admin = { ...rawAdmin };
 
   // --------------------------- DAPP MANAGEMENT --------------------------------
-  // reserve - single add
+  // governance - single add
   contract.addOrg = async function (orgName) {
     return addOrg(admin, contract, defaultOptions, orgName);
   };
@@ -180,7 +180,7 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
     return removeMember(admin, contract, defaultOptions, orgName, orgUnit, commonName);
   };
 
-  // reserve - multiple adds
+  // governance - multiple adds
   contract.addOrgs = async function (orgNames) {
     return addOrgs(admin, contract, defaultOptions, orgNames);
   };
@@ -1390,34 +1390,28 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
 
   //----------------------------- Reserve START -------------------------------
   contract.getReserve = async function (options = defaultOptions) {
-    const res = await reserveJs.get(rawAdmin, options);
-    return res;
+    return await reserveJs.get(rawAdmin, options);
   };
-
+  
   contract.calculate = async function (args, options = defaultOptions) {
-    const res = await reserveJs.calculate(rawAdmin, args, options);
-    return res;
+    return await reserveJs.calculate(rawAdmin, args, options);
   };
-
+  
   contract.stake = async function (args, options = defaultOptions) {
-    const res = await reserveJs.stake(rawAdmin, args, options);
-    return res;
+    return await reserveJs.stake(rawAdmin, args, options);
   };
-
+  
   contract.unstake = async function (args, options = defaultOptions) {
     const { stratsPaymentService, escrow } = args;
-    const contract = { address: stratsPaymentService, name: 'StratPaymentService' };
-
-    // Get User's STRATS Asset Address
+  
+    // Fetch user's STRATS asset origin address
     const stratsOriginAddress = await STRATSJs.getStratsAddress();
-
-    // Retrieve all sales data
+  
+    // Retrieve sales data associated with the escrow address
     const salesData = await saleJs.getAll(rawAdmin, { address: escrow }, options);
-    console.log("salesData123: ", salesData);
-    // Calculate the total order amount
-    const orderTotal = salesData.reduce((acc, sale, index) => sale?.data?.stratsLoanAmount, 0);
-    console.log("orderTotal: ", orderTotal);
-    // Retrieve the user's active STRATS asset addresses with non-zero quantities
+    const orderTotal = salesData.reduce((total, sale) => total + sale?.data?.stratsLoanAmount, 0);
+  
+    // Get user's active STRATS assets with non-zero quantities
     const userStratsAssets = await inventoryJs.getAll(
       rawAdmin,
       {
@@ -1431,24 +1425,32 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
       },
       options
     );
-
+  
     // Accumulate STRATS asset addresses to cover the order total
-    let accumulatedTotal = 0;
-    const stratsAssetAddressesToUse = userStratsAssets.reduce((addresses, asset) => {
-      if (accumulatedTotal >= orderTotal) return addresses;
-      
-      addresses.push(asset.address);
-      accumulatedTotal += asset.quantity / 10000;
-
-      return addresses;
-    }, []);
-
+    const { addressesToUse, accumulatedTotal } = userStratsAssets.reduce(
+      (acc, asset) => {
+        if (acc.accumulatedTotal >= orderTotal) return acc;
+  
+        acc.addressesToUse.push(asset.address);
+        acc.accumulatedTotal += asset.quantity / 10000;
+  
+        return acc;
+      },
+      { addressesToUse: [], accumulatedTotal: 0 }
+    );
+  
+    // Check if accumulated total meets the order requirement
     if (accumulatedTotal < orderTotal) {
-      throw new rest.RestError(RestStatus.BAD_REQUEST, "You don't have enough STRATS balance to make this purchase");
+      throw new rest.RestError(RestStatus.BAD_REQUEST, "Insufficient STRATS balance to complete the purchase.");
     }
-
-    const res = await reserveJs.unstake(rawAdmin, contract, {stratsAssetAddresses: stratsAssetAddressesToUse, escrowAddress: escrow}, options);
-    return res;
+  
+    // Proceed with unstake if sufficient assets are accumulated
+    return await reserveJs.unstake(
+      rawAdmin,
+      { address: stratsPaymentService },
+      { stratsAssetAddresses: addressesToUse, escrowAddress: escrow },
+      options
+    );
   };
   // ---------------------------- Reserve END   -------------------------------
   return contract;
