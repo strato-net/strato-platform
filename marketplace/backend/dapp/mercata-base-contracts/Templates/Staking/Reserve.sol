@@ -46,7 +46,7 @@ abstract contract Reserve is Utils, Structs {
         uint _quantity = _assetToBeSold.quantity();
         (decimal _assetPrice, uint _priceTimestamp) = oracle.getLatestPrice();
         decimal _price = _assetPrice;
-        decimal stratsLoanAmount = (decimal(_assetAmount) * _assetPrice * decimal(loanToValueRatio)) / 100;
+        decimal stratsLoanAmount = decimal(_assetAmount) * _assetPrice * decimal(loanToValueRatio);
         decimal cataReward = calculateCATAReward(_assetAmount, stratsLoanAmount);
 
         // Create the Escrow contract but do not attach assets or transfer STRATS
@@ -65,7 +65,7 @@ abstract contract Reserve is Utils, Structs {
         uint transferNumber = (uint(block.number + 16)) % 1000000;
         
         // Transfer STRATS from owner (BlockApps) to the borrower
-        stratsToken.transferOwnership(escrow.borrower(), stratsLoanAmount*100, true, transferNumber, 0.0001);
+        stratsToken.transferOwnership(escrow.borrower(), stratsLoanAmount, true, transferNumber, 0.0001);
 
         // Emit the StakeCreated event
         emit StakeCreated(msg.sender, _escrowAddress, escrow.quantity(), stratsLoanAmount, escrow.cataReward());
