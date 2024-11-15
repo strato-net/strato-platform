@@ -37,7 +37,7 @@ abstract contract Reserve is Utils, Structs {
         decimal cataReward = calculateCATAReward(_assetAmount, stratsLoanAmount);
 
         // Create the Escrow contract but do not attach assets or transfer STRATS
-        Escrow escrow = new Escrow(msg.sender, stratsLoanAmount, cataReward, address(this), address(stratsToken), _assetToBeSold, _price, _quantity, [_stratPaymentService]);
+        Escrow escrow = new Escrow(msg.sender, uint(stratsLoanAmount), cataReward, address(this), address(stratsToken), _assetToBeSold, _price, _quantity, [_stratPaymentService]);
 
         stakeAsset(address(escrow));
 
@@ -52,7 +52,7 @@ abstract contract Reserve is Utils, Structs {
         uint transferNumber = (uint(block.number + 16)) % 1000000;
         
         // Transfer STRATS from owner (BlockApps) to the borrower
-        stratsToken.transferOwnership(escrow.borrower(), stratsLoanAmount*100, false, transferNumber, 0.0001);
+        stratsToken.transferOwnership(escrow.borrower(), stratsLoanAmount*100, true, transferNumber, 0.0001);
 
         // Emit the StakeCreated event
         emit StakeCreated(msg.sender, _escrowAddress, escrow.quantity(), stratsLoanAmount, escrow.cataReward());
@@ -65,12 +65,13 @@ abstract contract Reserve is Utils, Structs {
     }
 
     //FUNCTION to get calculation of strats, rewards before they click the stake button
-    function previewStake(decimal _assetAmount, address _assetAddress) public view returns (decimal _stratsLoanAmount, uint _cataReward) {
+    function previewStake(decimal _assetAmount, address _assetAddress) public view returns (uint _stratsLoanAmount, decimal _cataReward) {
         (decimal _assetPrice, uint _priceTimestamp) = oracle.getLatestPrice();
-        _stratsLoanAmount = (_assetAmount * _assetPrice * decimal(loanToValueRatio)) / 100;  // Calculate the STRATS loan amount
+        _stratsLoanAmount = uint((_assetAmount * _assetPrice * decimal(loanToValueRatio)) / 100);  // Calculate the STRATS loan amount
         _cataReward = calculateCATAReward(_assetAmount, _stratsLoanAmount);  // Calculate the CATA reward based on APY rate
         return (_stratsLoanAmount, _cataReward);
     }
+
     function getStratsToken() public view returns (Asset) {
         return stratsToken;
     }
@@ -79,4 +80,10 @@ abstract contract Reserve is Utils, Structs {
         require(msg.sender == owner, "Only owner can update STRATS token");
         stratsToken = Asset(_newStratsToken);
     }
+
+    function transferSTRATSbacktoOwner(uint _amount) public {
+        require(msg.sender == owner, "Only owner can transfer STRATS back");
+        stratsToken.transferOwnership(owner, _amount, false, 0, 0);
+    }
+
 }

@@ -12,8 +12,6 @@ contract Escrow is Sale {
     decimal public cataWeeklyReward;
     address public stratsAddress;
 
-    event CollateralReleased(address indexed borrower, uint totalSilverAmount);
-
     modifier onlyReserve() {
         require(msg.sender == reserve, "Only the Reserve contract can call this");
         _;

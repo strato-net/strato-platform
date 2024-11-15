@@ -37,7 +37,7 @@ contract StratPaymentService is PaymentService {
     ) requireActive("unstake") external returns (uint) {
         require(_stratsAssetAddresses.length > 0, "Pass at least one STRATs token address");
         Escrow escrow = Escrow(_escrowAddress);
-        uint stratAmountNet = uint(escrow.stratsLoanAmount() * stratsPerDollar * 100);
+        uint stratAmountNet = uint(escrow.stratsLoanAmount());
         uint stratQuantity = 0;
         uint transferNumber = 0;
         uint transferAmount = 0;
