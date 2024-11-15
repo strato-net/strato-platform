@@ -39,7 +39,7 @@ abstract contract Reserve is Utils, Structs {
         _;
     }
 
-    function createEscrow(uint _assetAmount, address _assetAddress, PaymentServiceInfo _stratPaymentService) public returns (address) {
+    function createEscrow(uint _assetAmount, address _assetAddress, PaymentServiceInfo _stratPaymentService) public requireActive() returns (address) {
 
         // Calculate required values
         Asset _assetToBeSold = Asset(_assetAddress);
