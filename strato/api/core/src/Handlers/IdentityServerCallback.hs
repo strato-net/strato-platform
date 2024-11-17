@@ -37,6 +37,7 @@ type PostRedirect (code :: Nat) loc = Verb 'GET code '[JSON] (Headers '[Header "
 type API =
   "identity"
     :> Header' '[Required, Strict] "X-USER-ACCESS-TOKEN" Text
+    :> Header' '[Required, Strict] "X-USER-COMMON-NAME" Text
     :> PostRedirect 302 String
 
 server :: (MonadIO m, MonadLogger m, HasIdentity m) => ServerT API m
@@ -45,13 +46,14 @@ server = return =<< redirect
 redirect ::
   (MonadIO m, MonadLogger m, HasIdentity m) =>
   Text ->
+  Text ->
   m (Headers '[Header "Location" String] Address)
-redirect accessToken = do
+redirect accessToken commonName = do
   IdentityData url mgr <- access Proxy
   --Historical note: we decided to wait for ID serer response, but ignore any bad response
   --As the fail safe should catch any ID server failure
   -- ?subscribe=true <-> Just True 
-  idServerResult <- liftIO $ (try (runLoggingT $ (flip runReaderT (IdentityData url mgr) $ identitytWrapper $ putIdentity ("Bearer " <> accessToken) Nothing (Just True))) :: IO (Either SomeException Address)) 
+  idServerResult <- liftIO $ (try (runLoggingT $ (flip runReaderT (IdentityData url mgr) $ identitytWrapper $ putIdentity ("Bearer " <> accessToken) commonName Nothing (Just True))) :: IO (Either SomeException Address)) 
   case idServerResult of
     Left e -> do
       logErrorCS callStack $ "Error calling Identity Server: " <> pack (show e)

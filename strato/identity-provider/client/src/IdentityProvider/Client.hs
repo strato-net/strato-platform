@@ -18,8 +18,8 @@ getPing :: ClientM Int
 getPing = client (Proxy @GetPingIdentity)
 
 putIdentity :: 
-  ServerEmbed ExternalHeaders
+  ServerEmbed '["Authorization", "CUSTOM-COMMON-NAME"]
   (Maybe Text ->
    Maybe Bool ->
    ClientM Address)
-putIdentity = client (Proxy @(PutIdentity '[Required, Strict] ExternalHeaders))
+putIdentity = client (Proxy @(PutIdentity '[Required, Strict] '["Authorization", "CUSTOM-COMMON-NAME"]))
