@@ -38,17 +38,17 @@ abstract contract OracleService is Utils {
         isActive = false;
     }
 
-    function _submitPrice(decimal _price) internal  requireActive("deactivate") {
+    function _submitPrice(decimal _price) internal  requireActive("submit price") {
         consensusPriceTimestamp = block.timestamp;
     	consensusPrice = _price;
     }
 
-    function _transferOwnership(address _newOwner) internal requireActive("deactivate") {
+    function _transferOwnership(address _newOwner) internal requireActive("transfer ownership") {
         owner = _newOwner;
         ownerCommonName = getCommonName(_newOwner);
     }
 
-    function getLatestPrice() public view requireActive("deactivate") returns (decimal, uint) {
+    function getLatestPrice() public view requireActive("get latest price") returns (decimal, uint) {
         return (consensusPrice, consensusPriceTimestamp);
     }
 }
