@@ -31,7 +31,7 @@ const ItemActions = ({
   allSubcategories,
   user,
   supportedTokens,
-  // togglePopover,
+  reserveAddress,
 }) => {
   const itemData = inventory.data;
   const isStrats =
@@ -44,6 +44,8 @@ const ItemActions = ({
       ? parseFloat((inventory.saleQuantity / 100).toFixed(2))
       : undefined
     : inventory.saleQuantity;
+  const stakeable =
+    inventory.root && inventory.root === reserveAddress[0].assetRootAddress;
   const [listModalOpen, setListModalOpen] = useState(false);
   const [unlistModalOpen, setUnlistModalOpen] = useState(false);
   const [stakeType, setStakeType] = useState("Stake");
@@ -201,43 +203,63 @@ const ItemActions = ({
       >
         <SwapOutlined /> Transfer
       </Button>
-      <Button
-        type="link"
-        className="text-[#13188A] font-semibold"
-        onClick={showRedeemModal}
-        disabled={
-          inventory.price ||
-          inventory.address === inventory.originAddress ||
-          !isActive() ||
-          disableSADDOGS(inventory)
-        }
-      >
-        <SendOutlined /> Redeem
-      </Button>
+      {!stakeable && (
+        <Button
+          type="link"
+          className="text-[#13188A] font-semibold"
+          onClick={showRedeemModal}
+          disabled={
+            inventory.price ||
+            inventory.address === inventory.originAddress ||
+            !isActive() ||
+            disableSADDOGS(inventory)
+          }
+        >
+          <SendOutlined /> Redeem
+        </Button>
+      )}
 
-      {!inventory.stratsLoanAmount && <Button
-        type="link"
-        className="text-[#13188A] font-semibold"
-        onClick={() => showStakeModal("Stake")}
-        // disabled={!inventory.price || !isActive()}
-      >
-        <StopOutlined /> Stake
-      </Button>}
+      {stakeable && (
+        <Button
+          type="link"
+          className="text-[#13188A] font-semibold"
+          onClick={() => showStakeModal("Stake")}
+          disabled={inventory.price || !isActive()}
+        >
+          <StopOutlined /> Stake
+        </Button>
+      )}
 
-     {inventory.stratsLoanAmount && <Button
-        type="link"
-        className="text-[#13188A] font-semibold"
-        onClick={() => showStakeModal("Unstake")}
-        // disabled={!inventory.price || !isActive()}
-      >
-        <StopOutlined /> Unstake
-      </Button>}
+      {inventory.stratsLoanAmount && stakeable && (
+        <Button
+          type="link"
+          className="text-[#13188A] font-semibold"
+          onClick={() => showStakeModal("Unstake")}
+        >
+          <StopOutlined /> Unstake
+        </Button>
+      )}
       <Popover
         placement="topRight"
         open={popoverVisible[inventory.address] || false}
         onOpenChange={(visible) => togglePopover(inventory.address, visible)}
         content={
           <div className="flex gap-2">
+            {stakeable && (
+              <Button
+                type="link"
+                className="text-[#13188A] font-semibold"
+                onClick={showRedeemModal}
+                disabled={
+                  inventory.price ||
+                  inventory.address === inventory.originAddress ||
+                  !isActive() ||
+                  disableSADDOGS(inventory)
+                }
+              >
+                <SendOutlined /> Redeem
+              </Button>
+            )}
             <Button
               type="link"
               className="text-[#13188A] font-semibold"
@@ -263,7 +285,9 @@ const ItemActions = ({
             <Button
               type="link"
               className={`text-[#13188A] font-semibold ${
-                !isTokenSupported(inventory.root) || inventory.stratsLoanAmount ? "hidden" : ""
+                !isTokenSupported(inventory.root) || inventory.stratsLoanAmount
+                  ? "hidden"
+                  : ""
               }`}
               onClick={showBridgeModal}
             >

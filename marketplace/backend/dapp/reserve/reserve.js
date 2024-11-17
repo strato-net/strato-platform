@@ -2,6 +2,7 @@ import { util, rest } from "/blockapps-rest-plus";
 import { searchAllWithQueryArgs } from "/helpers/utils";
 
 const contractName = "BlockApps-Mercata-Reserve";
+const OracleContractName = "BlockApps-Mercata-OracleService";
 
 /**
  * Augment contract arguments before they are used to post a contract.
@@ -71,15 +72,24 @@ async function get(user, options) {
  * calculate
  */
 async function calculate(user, args, options) {
-  const { reserve, ...restArgs } = args;
-  const callArgs = {
-    contract: { address: reserve },
-    method: "previewStake",
-    args: util.usc({ ...restArgs }),
-  };
-
-  const reponse = await rest.call(user, callArgs, options);
-  return reponse[0];
+  try {
+    const { assetAmount, loanToValueRatio } = args;
+    const oracleResponse = await searchAllWithQueryArgs(
+      OracleContractName,
+      { creator: "Server", isActive: true },
+      options,
+      user
+    );
+    if (!oracleResponse || oracleResponse.length === 0) {
+      throw new Error("No oracle response found");
+    }
+    const price = oracleResponse[0].consensusPrice;
+    const result = Math.floor(price * assetAmount * loanToValueRatio);
+    return result;
+  } catch (error) {
+    console.error("Error in calculate function:", error);
+    throw error;
+  }
 }
 
 /**

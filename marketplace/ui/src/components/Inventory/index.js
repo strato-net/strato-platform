@@ -91,6 +91,8 @@ const Inventory = ({ user }) => {
     isUserInventoriesLoading,
     supportedTokens,
     isFetchingTokens,
+    isReserveAddress,
+    reserveAddress
   } = useInventoryState();
   const {
     paymentServices,
@@ -171,6 +173,7 @@ const Inventory = ({ user }) => {
         category && category !== "All" ? category : undefined
       );
     }
+    actions.getReserveAddress(dispatch);
     actions.fetchSupportedTokens(dispatch);
   }, [dispatch, limit, offset, debouncedSearchTerm, category, showPublished]);
 
@@ -445,6 +448,7 @@ const Inventory = ({ user }) => {
             allSubcategories={allSubcategories}
             user={user}
             supportedTokens={supportedTokens}
+            reserveAddress={reserveAddress}
           />
         </div>
       ),
@@ -630,7 +634,7 @@ const Inventory = ({ user }) => {
               <Table
                 columns={columns}
                 dataSource={showPublished ? userInventories : inventories}
-                loading={isInventoriesLoading || isUserInventoriesLoading}
+                loading={isInventoriesLoading || isUserInventoriesLoading || isReserveAddress}
                 className="custom-table"
                 pagination={false}
               />

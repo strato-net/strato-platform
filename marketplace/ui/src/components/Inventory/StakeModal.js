@@ -55,15 +55,13 @@ const StakeModal = ({
 
   useEffect(() => {
     paymentServiceActions.getPaymentServices(paymentServiceDispatch, true);
-    inventoryActions.getReserveAddress(inventoryDispatch);
   }, []);
 
   useEffect(() => {
     if (reserveAddress && inventory.data && !isReserveAddress && !isStaked) {
       const body = {
         assetAmount: inventory?.quantity,
-        assetAddress: inventory?.address,
-        reserve: reserveAddress[0].address,
+        loanToValueRatio: reserveAddress[0].loanToValueRatio,
       };
       inventoryActions.calculateValue(inventoryDispatch, body);
     }

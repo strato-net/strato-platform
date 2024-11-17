@@ -66,14 +66,11 @@ class ReserveController {
         "number.base": "Amount must be a valid number.",
         "number.positive": "Amount must be positive.",
       }),
-      assetAddress: Joi.string().required().messages({
-        "any.required": "Asset Address is required and must be a string.",
-        "string.base": "Asset Address must be a valid string.",
-      }),
-      reserve: Joi.string().required().messages({
-        "any.required": "Reserve is required and must be a string.",
-        "string.base": "Reserve must be a valid string.",
-      }),
+      loanToValueRatio: Joi.number().positive().required().messages({
+        "any.required": "loanToValueRatio is required and must be a positive number.",
+       "number.base": "loanToValueRatio must be a valid number.",
+        "number.positive": "loanToValueRatio must be positive.",
+      })
     });
     ReserveController.validateArgs(args, schema, "Calculate");
   }
