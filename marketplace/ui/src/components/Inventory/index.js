@@ -398,9 +398,9 @@ const Inventory = ({ user }) => {
         return (
           <div>
             {price !== "N/A" ? (
-             <p className="flex justify-center">
-             <span>${price}</span> <p className="flex text-xs items-center"> &nbsp;({(price * STRATS_CONVERSION).toFixed(0)}  {StratsIcon}) </p>
-           </p>
+              <>
+                <span>${price}</span> <p className="flex text-xs items-center"> &nbsp;({(price * STRATS_CONVERSION).toFixed(0)}  {StratsIcon}) </p>
+              </>
             ) : (
               "N/A"
             )}
@@ -431,7 +431,7 @@ const Inventory = ({ user }) => {
         const saleQuantity = isStrats
           ? parseFloat((record.saleQuantity / 100).toFixed(2))
           : record.saleQuantity;
-        return <div className="w-40">{saleQuantity || 0}</div>;
+        return <div className="w-24">{saleQuantity || 0}</div>;
       },
     },
     {
