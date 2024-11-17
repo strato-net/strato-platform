@@ -9,8 +9,7 @@ contract SimpleSale is Sale {
         decimal _price,
         uint _quantity,
         PaymentServiceInfo[] _paymentServices
-    ) Sale(_assetToBeSold, _price, _quantity, _paymentServices) {
-    }
+    ) Sale(_assetToBeSold, _price, _quantity, _paymentServices) {}
 
     function addPaymentServices(PaymentServiceInfo[] _paymentServices) external requireSeller("add payment services") {
         _addPaymentServices(_paymentServices);
@@ -21,14 +20,14 @@ contract SimpleSale is Sale {
     }
 
     function closeSale() external override requireSeller("close sale") returns (uint) {
-        _closeSale();
+        return _closeSale();
     }
 
     function cancelOrder(
         string orderHash,
         address purchaser
     ) public requireSellerOrPaymentService("cancel order") returns (uint) {
-        _cancelOrder(orderHash, purchaser);
+        return _cancelOrder(orderHash, purchaser);
     }
 
     function update(
@@ -37,7 +36,7 @@ contract SimpleSale is Sale {
         PaymentServiceInfo[] _paymentServices,
         uint _scheme
     ) external requireSeller("Update Sale") returns (uint) {
-        _update(_quantity, _price, _paymentServices, _scheme);
+        return _update(_quantity, _price, _paymentServices, _scheme);
     }
 
     function completeSale(

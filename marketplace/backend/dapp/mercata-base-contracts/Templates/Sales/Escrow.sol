@@ -4,7 +4,7 @@ pragma strict;
 contract Escrow is Sale {
     address public reserve; //Can be used to distinguish between Sale and Escrow
     address public borrower;
-    uint public stratsLoanAmount;
+    decimal public stratsLoanAmount;
     decimal public cataRewardInDollars;
     decimal public escrowPrice;
 
