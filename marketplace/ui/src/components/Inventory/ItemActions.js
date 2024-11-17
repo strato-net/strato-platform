@@ -219,7 +219,7 @@ const ItemActions = ({
         </Button>
       )}
 
-      {stakeable && (
+      {!inventory.stratsLoanAmount && stakeable && (
         <Button
           type="link"
           className="text-[#13188A] font-semibold w-full text-left"
