@@ -4,9 +4,12 @@ pragma strict;
 import <BASE_CODE_COLLECTION>;
 
 contract SilverOracleService is OracleService {
+    mapping(address => bool) private priceSetters;
     constructor(
 	    string _name
-    ) public OracleService (_name) {}
+    ) public OracleService (_name) {
+        priceSetters[msg.sender] = true;
+    }
 
     modifier requireOwner(string action) {
         string err = "Only the owner of the asset can "
@@ -16,11 +19,24 @@ contract SilverOracleService is OracleService {
         _;
     }
 
+    modifier requirePriceSetter(string action) {
+        string err = "Only authorized price setters can "
+                   + action
+                   + ".";
+        require(priceSetters[msg.sender], err);
+        _;
+    }
+
+    function addPriceSetter(address _priceSetter) public requireOwner("add price setter") {
+        require(_priceSetter != address(0), "Invalid address");
+        priceSetters[_priceSetter] = true;
+    }
+
     function deactivate() public requireOwner("deactivate") {
         _deactivate();
     }
 
-    function submitPrice(decimal _price) public requireOwner("submit price") {
+    function submitPrice(decimal _price) public requirePriceSetter("submit price") {
         _submitPrice(_price);
     }
 
