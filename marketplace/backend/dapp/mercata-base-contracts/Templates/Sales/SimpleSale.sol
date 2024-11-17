@@ -10,6 +10,8 @@ contract SimpleSale is Sale {
         uint _quantity,
         PaymentServiceInfo[] _paymentServices
     ) Sale(_assetToBeSold, _price, _quantity, _paymentServices) {
+        Asset assetToBeSold = Asset(_assetToBeSold);
+        require(assetToBeSold.owner() == msg.sender, "Only the owner of the asset can create a sale.");
     }
 
     function addPaymentServices(PaymentServiceInfo[] _paymentServices) external requireSeller("add payment services") {
