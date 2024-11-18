@@ -84,7 +84,7 @@ async function calculate(user, args, options) {
       throw new Error("No oracle response found");
     }
     const price = oracleResponse[0].consensusPrice;
-    const result = Math.floor(price * assetAmount * loanToValueRatio);
+    const result = (price * assetAmount * loanToValueRatio).toFixed(2);
     return result;
   } catch (error) {
     console.error("Error in calculate function:", error);

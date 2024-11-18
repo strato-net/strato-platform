@@ -27,6 +27,7 @@ const StakeModal = ({
   limit,
   offset,
   type,
+  productDetailPage,
 }) => {
   const {
     isStaking,
@@ -69,14 +70,14 @@ const StakeModal = ({
 
   const columns = [
     {
-      title: `Quantity ${type === "Stake" ? "to Stake" : "to Unstake"}`,
+      title: "Quantity",
       dataIndex: "quantity",
       align: "center",
       render: (text, record) =>
         quantityIsDecimal ? record.quantity / 100 : record.quantity,
     },
     {
-      title: "Amount to Borrow",
+      title: "Loan Amount (STRATs)",
       align: "center",
       render: (text, record) => (
         <div className="flex justify-center">
@@ -123,13 +124,18 @@ const StakeModal = ({
         body
       );
       if (isStaked) {
-        await inventoryActions.fetchInventory(
-          inventoryDispatch,
-          limit,
-          offset,
-          debouncedSearchTerm,
-          category && category !== "All" ? category : undefined
-        );
+        if (productDetailPage) {
+          await inventoryActions.fetchInventoryDetail(inventoryDispatch, productDetailPage);
+        }
+        else{
+          await inventoryActions.fetchInventory(
+            inventoryDispatch,
+            limit,
+            offset,
+            debouncedSearchTerm,
+            category && category !== "All" ? category : undefined
+          );
+        }
         await marketplaceActions.fetchStratsBalance(marketplaceDispatch);
         handleCancel();
       }
@@ -145,13 +151,17 @@ const StakeModal = ({
         body
       );
       if (isUnstaked) {
-        await inventoryActions.fetchInventory(
-          inventoryDispatch,
-          limit,
-          offset,
-          debouncedSearchTerm,
-          category && category !== "All" ? category : undefined
-        );
+        if (productDetailPage) {
+          await inventoryActions.fetchInventoryDetail(inventoryDispatch, productDetailPage);
+        } else{
+          await inventoryActions.fetchInventory(
+            inventoryDispatch,
+            limit,
+            offset,
+            debouncedSearchTerm,
+            category && category !== "All" ? category : undefined
+          );
+        }
         await marketplaceActions.fetchStratsBalance(marketplaceDispatch);
         handleCancel();
       }

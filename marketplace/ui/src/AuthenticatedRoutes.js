@@ -153,13 +153,15 @@ const AuthenticatedRoutes = ({ user, users, isAuthenticated }) => {
           <UsersProvider>
             <CategorysProvider>
               <SubCategorysProvider>
-                <InventoriesProvider>
-                  <ItemsProvider>
-                    <OrdersProvider>
-                      <ProductDetails user={user} users={users} />
-                    </OrdersProvider>
-                  </ItemsProvider>
-                </InventoriesProvider>
+                <PaymentServicesProvider>
+                  <InventoriesProvider>
+                    <ItemsProvider>
+                      <OrdersProvider>
+                        <ProductDetails user={user} users={users} />
+                      </OrdersProvider>
+                    </ItemsProvider>
+                  </InventoriesProvider>
+                </PaymentServicesProvider>
               </SubCategorysProvider>
             </CategorysProvider>
           </UsersProvider>
@@ -212,13 +214,15 @@ const AuthenticatedRoutes = ({ user, users, isAuthenticated }) => {
           <UsersProvider>
             <CategorysProvider>
               <SubCategorysProvider>
-                <InventoriesProvider>
-                  <ItemsProvider>
-                    <OrdersProvider>
-                      <ProductDetails user={user} users={users} />
-                    </OrdersProvider>
-                  </ItemsProvider>
-                </InventoriesProvider>
+                <PaymentServicesProvider>
+                  <InventoriesProvider>
+                    <ItemsProvider>
+                      <OrdersProvider>
+                        <ProductDetails user={user} users={users} />
+                      </OrdersProvider>
+                    </ItemsProvider>
+                  </InventoriesProvider>
+                </PaymentServicesProvider>
               </SubCategorysProvider>
             </CategorysProvider>
           </UsersProvider>

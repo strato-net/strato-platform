@@ -25,6 +25,7 @@ import ClickableCell from "../ClickableCell";
 import TimeRangeTabs from "./TimeRangeTabs";
 import Statistics from "./Statistics";
 import LoginModal from './LoginModal';
+import StakeModal from '../Inventory/StakeModal';
 // other
 import { setCookie } from "../../helpers/cookie";
 import routes from "../../helpers/routes";
@@ -66,8 +67,17 @@ const ProductDetails = ({ user, users }) => {
   const marketplaceDispatch = useMarketplaceDispatch();
   // state
   const { categorys, iscategorysLoading } = useCategoryState();
-  const { inventoryDetails, isInventoryDetailsLoading, isInventoryOwnershipHistoryLoading,
-    inventoryOwnershipHistory, priceHistory, isFetchingPriceHistory
+  const {
+    success,
+    message,
+    inventoryDetails,
+    isInventoryDetailsLoading,
+    isInventoryOwnershipHistoryLoading,
+    inventoryOwnershipHistory,
+    priceHistory,
+    isFetchingPriceHistory,
+    isReserveAddress,
+    reserveAddress,
   } = useInventoryState();
   const { cartList } = useMarketplaceState();
 
@@ -77,9 +87,15 @@ const ProductDetails = ({ user, users }) => {
   const [itemData, setItemData] = useState({});
   const [Id, setId] = useState(undefined);
   const [qty, setQty] = useState(1);
+  const [stakeModalOpen, setStakeModalOpen] = useState(false);
+  const [stakeType, setStakeType] = useState(null);
   // For Wishlist Icon Rendering
   const [isWishlisted, setIsWishlisted] = useState(false);
   const [availableQuantity, setAvailableQuantity] = useState(1);
+
+  // Stakeable
+  const isStaked = inventoryDetails?.stratsLoanAmount && inventoryDetails?.stratsLoanAmount > 0;
+  const isStakeable = inventoryDetails?.root && reserveAddress && inventoryDetails?.root === reserveAddress[0]?.assetRootAddress;
 
   let isCalledFromInventory = false;
   if (state !== null && state !== undefined) {
@@ -119,6 +135,7 @@ const ProductDetails = ({ user, users }) => {
   useEffect(() => {
     if (Id !== undefined) {
       inventoryActions.fetchInventoryDetail(dispatch, Id);
+      inventoryActions.getReserveAddress(dispatch);
       // TODO: Uncomment this when we have serial numbers working
       // if (user) {
       //   itemsActions.fetchSerialNumbers(itemDispatch, Id);
@@ -209,6 +226,15 @@ const ProductDetails = ({ user, users }) => {
     }
   };
 
+  const showStakeModal = (type) => {
+    setStakeModalOpen(true);
+    setStakeType(type);
+  };
+
+  const handleStakeModalClose = () => {
+    setStakeModalOpen(false);
+  };
+
   const handleCancel = () => {
     setIsModalVisible(false);
   };
@@ -246,6 +272,24 @@ const ProductDetails = ({ user, users }) => {
         message: msg,
         placement,
         key: 1,
+      });
+    }
+  };
+
+  const openToastInventory = (placement) => {
+    if (success) {
+      api.success({
+        message: message,
+        onClose: inventoryActions.resetMessage(dispatch),
+        placement,
+        key: 1,
+      });
+    } else {
+      api.error({
+        message: message,
+        onClose: inventoryActions.resetMessage(dispatch),
+        placement,
+        key: 2,
       });
     }
   };
@@ -515,7 +559,7 @@ const ProductDetails = ({ user, users }) => {
                 <div className=" pt-4 lg:pt-[22px]">
 
                   <Paragraph level={4} id="price" className=" text-[#13188A] text-xl font-bold lg:text-2xl lg:font-semibold">
-                  {details?.price ? (
+                  {details?.price || isStaked ? (
                     (() => {
                       const adjustedPrice = details.data.quantityIsDecimal && details.data.quantityIsDecimal === "True" 
                         ? details.price * 100 
@@ -523,9 +567,9 @@ const ProductDetails = ({ user, users }) => {
 
                       return (
                         <>
-                          ${adjustedPrice} 
+                          ${isStaked ? (details.stratsLoanAmount/100).toFixed(4) : adjustedPrice} 
                           <span className="font-normal text-xs mr-2 text-primary">
-                          <b>({(adjustedPrice * STRATS_CONVERSION).toFixed(0)} {(adjustedPrice * STRATS_CONVERSION).toFixed(0) == 1 ? 'STRAT' : 'STRATs'})</b>
+                          <b>({isStaked ? details.stratsLoanAmount : (adjustedPrice * STRATS_CONVERSION).toFixed(0)} {(isStaked ? details.stratsLoanAmount : (adjustedPrice * STRATS_CONVERSION).toFixed(0)) == 1 ? 'STRAT' : 'STRATs'})</b>
                           </span>
                         </>
                       );
@@ -575,8 +619,13 @@ const ProductDetails = ({ user, users }) => {
                   <div className="flex gap-4 justify-between lg:justify-start  pt-4 w-full">
                     <Button
                       type="primary"
-                      className={`w-[100%]  h-9  ${isAvailableForSale ? '!bg-[#808080]' : '!bg-[#13188A]'} !hover:bg-primaryHover !text-white`}
+                      className={`w-[100%]  h-9  ${isAvailableForSale && !(isStakeable && !isStaked) ? '!bg-[#808080]' : '!bg-[#13188A]'} !hover:bg-primaryHover !text-white`}
                       onClick={async () => {
+                        if (isStakeable && ownerSameAsUser()) {
+                          isStaked ? showStakeModal("Unstake") : showStakeModal("Stake");
+                          return;
+                        }
+
                         window.LOQ.push(['ready', async LO => {
                           // Track an event
                           await LO.$internal.ready('events')
@@ -606,10 +655,10 @@ const ProductDetails = ({ user, users }) => {
                           }
                         }
                       }}
-                      disabled={ownerSameAsUser() || isAvailableForSale}
+                      disabled={ownerSameAsUser() && (isAvailableForSale && !(isStakeable && !isStaked))}
                       id="buyNow"
                     >
-                      Buy Now
+                      {isStakeable && ownerSameAsUser() ? (isStaked ? "Unstake" : "Stake"): "Buy Now" }
                     </Button>
                   {/* TODO:- Remove Comment to show the Add-to-Cart Button */}
                   {/* {ownerSameAsUser() ?
@@ -838,6 +887,16 @@ const ProductDetails = ({ user, users }) => {
         onCancel={handleCancel}
         onLogin={handleLogin}
       />
+      {stakeModalOpen && (
+        <StakeModal
+          open={stakeModalOpen}
+          type={stakeType}
+          handleCancel={handleStakeModalClose}
+          productDetailPage={Id}
+          inventory={inventoryDetails}
+        />
+      )}
+      {message && openToastInventory("bottom")}
     </>
   );
 };

@@ -409,6 +409,7 @@ async function get(user, args, options) {
             price: sale.price,
             saleAddress: sale.address,
             saleQuantity: sale.quantity,
+            stratsLoanAmount: sale?.data?.stratsLoanAmount,
             paymentServices: sale ? (sale['BlockApps-Mercata-Sale-paymentServices'] ? sale['BlockApps-Mercata-Sale-paymentServices'] : null) : null
         }
     }
