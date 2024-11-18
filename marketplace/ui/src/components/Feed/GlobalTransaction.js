@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useRef } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   Button,
   Row,
@@ -68,7 +68,6 @@ const GlobalTransaction = ({ user }) => {
   const [isFilterActive, setIsFilterActive] = useState(false);
   const formatter = new Intl.NumberFormat('en-US');
   const formattedNum = (num) => formatter.format(num);
-  const isInitialRender = useRef(true);
 
   const getWeekRange = (offset) => {
     const now = dayjs();
@@ -95,11 +94,6 @@ const GlobalTransaction = ({ user }) => {
   }, [marketplaceDispatch]);
 
   useEffect(() => {
-    if (isInitialRender.current) {
-      isInitialRender.current = false;
-      return;
-    }
-
     transactionAction.fetchGlobalTransaction(
       transactionDispatch,
       limit,
