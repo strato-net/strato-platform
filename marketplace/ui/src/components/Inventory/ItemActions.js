@@ -206,7 +206,7 @@ const ItemActions = ({
       {!stakeable && (
         <Button
           type="link"
-          className="text-[#13188A] font-semibold w-full text-left"
+          className="text-[#13188A] font-semibold w-1/4"
           onClick={showRedeemModal}
           disabled={
             inventory.price ||
@@ -221,8 +221,8 @@ const ItemActions = ({
 
       {!inventory.stratsLoanAmount && stakeable && (
         <Button
-          type="link"
-          className="text-[#13188A] font-semibold w-full text-left"
+          type="primary"
+          className="font-semibold w-1/4"
           onClick={() => showStakeModal("Stake")}
           disabled={inventory.price || !isActive()}
         >
@@ -232,8 +232,8 @@ const ItemActions = ({
 
       {inventory.stratsLoanAmount && stakeable && (
         <Button
-          type="link"
-          className="text-[#13188A] font-semibold w-full text-left"
+          type="primary"
+          className="text-[#13188A] font-semibold w-1/4"
           onClick={() => showStakeModal("Unstake")}
         >
           <StopOutlined /> Unstake
