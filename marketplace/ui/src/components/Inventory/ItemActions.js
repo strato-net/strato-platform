@@ -9,6 +9,7 @@ import {
   SwapOutlined,
   RetweetOutlined,
   MoreOutlined,
+  RiseOutlined,
 } from "@ant-design/icons";
 import {
   ASSET_STATUS,
@@ -206,7 +207,7 @@ const ItemActions = ({
       {!stakeable && (
         <Button
           type="link"
-          className="text-[#13188A] font-semibold w-1/4"
+          className="text-[#13188A] font-semibold w-1/4 flex items-center justify-center"
           onClick={showRedeemModal}
           disabled={
             inventory.price ||
@@ -222,18 +223,18 @@ const ItemActions = ({
       {!inventory.stratsLoanAmount && stakeable && (
         <Button
           type="primary"
-          className="font-semibold w-1/4"
+          className="font-semibold w-1/4 flex items-center justify-center"
           onClick={() => showStakeModal("Stake")}
           disabled={inventory.price || !isActive()}
         >
-          <StopOutlined /> Stake
+          <RiseOutlined /> Stake
         </Button>
       )}
 
       {inventory.stratsLoanAmount && stakeable && (
         <Button
           type="primary"
-          className="text-[#13188A] font-semibold w-1/4"
+          className="font-semibold w-1/4 flex items-center justify-center"
           onClick={() => showStakeModal("Unstake")}
         >
           <StopOutlined /> Unstake
