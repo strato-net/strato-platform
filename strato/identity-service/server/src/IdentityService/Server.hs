@@ -41,8 +41,9 @@ import Control.Monad.Reader
 import Control.Monad.Trans.Except
 import Data.Aeson hiding (Success)
 import qualified Data.ByteString.Lazy as BL
+import Data.List (find)
 import qualified Data.Map as M
-import Data.Maybe (catMaybes, fromMaybe, maybeToList)
+import Data.Maybe (fromMaybe, maybeToList)
 import qualified Data.Text as T
 import Data.Text.Encoding (decodeUtf8, encodeUtf8)
 import Data.Time (getCurrentTime)
@@ -73,26 +74,20 @@ instance Monad m => HasVault (ReaderT IdentityServerData m) where
     pure $ derivePublicKey pk
   getShared _ = error "The Identity Server should not need to create a shared key"
 
--- instance (MonadIO m, Accessible IdentityServerData m) => Accessible (Maybe AccessToken) (ReaderT IdentityServerData m) where
---   access _ = do
---     te <- asks tokenEndpoint
---     ci <- asks clientId
---     cs <- asks clientSecret
---     getAccessToken ci cs te
 
 getPingIdentity :: (MonadIO m) => m Int
 getPingIdentity = return 1
 
-postIdentity ::
+putIdentity ::
   ( MonadUnliftIO m,
     MonadLogger m,
     MonadThrow m,
     HasVault m,
     Accessible IdentityServerData m
   ) =>
-  PostIdentityRequest ->
-  m PostIdentityResponse
-postIdentity (PostIdentityRequest eMsg) = do
+  PutIdentityRequest ->
+  m PutIdentityResponse
+putIdentity (PutIdentityRequest eMsg) = do
   time' <- liftIO getCurrentTime
   let sac = case eMsg of
               Left s -> unsigned s
@@ -108,14 +103,14 @@ postIdentity (PostIdentityRequest eMsg) = do
 
   let username = T.pack $ subCommonName sub
       addr = fromPublicKey $ subPub sub
-  $logInfoS "postIdentity" $ "User " <> (T.pack $ format addr) <> " called POST /identity with username " <> username
+  $logInfoS "putIdentity" $ "User " <> (T.pack $ format addr) <> " called POST /identity with username " <> username
   let csvLogMsg =
         T.intercalate
           ","
           [ T.pack $ show time',
             username
           ]
-  $logInfoS "postIdentity/csv" csvLogMsg
+  $logInfoS "putIdentity/csv" csvLogMsg
 
   cert <- case eMsg of
     Left s@(Signed _ _) -> case recoverAddress s of -- new identity
@@ -126,29 +121,26 @@ postIdentity (PostIdentityRequest eMsg) = do
           if domainValid 
             then createAndRegisterCert sub
             else throwIO $ IdentityError "Public key at metadata endpoint not match one used to sign request"
-        (cert:_) -> do
-          let sub' = getCertSubject cert
-              err =
-                if (T.pack . subCommonName <$> sub') == Just username
-                  then "A cert already exists for username " <> username
-                    <> ". Please register using a different username"
-                    <> ", or sign the cert subject information with a private key "
-                    <> "tied to an existing cert tied to that username."
-                  else
-                    if (fromPublicKey . subPub <$> sub') == Just addr
-                      then "A cert already exists for user address " <> T.pack (show addr)
-                        <> ". Please register using a different key pair."
-                      else "A cert already exists, but does not match the username "
-                        <> "or address of the provided Subject information."
-          $logErrorS "postIdentity" err
-          throwIO $ ExistingIdentity err
+        certs -> do
+          case find (\c -> a == certUserAddress c && username == certCommonName c) certs of 
+            Just cert -> return $ certificateString cert -- cert for this user claimed, so just return cert again
+            Nothing -> do -- somebody else already claimed common name, or pk associated w/ diff common name
+              let err = "One of the following has occurred: "
+                      <> "A cert already exists for user address " <> T.pack (show a)
+                      <> ". Please register using a different key pair."
+                      <> " Or, a cert already exists for username " <> username
+                      <> ". Please register using a different username"
+                      <> ", or sign the cert subject information with a private key "
+                      <> "tied to an existing cert tied to that username."
+              $logErrorS "putIdentity" err
+              throwIO $ ExistingIdentity err
       Nothing -> do
         let err = "Could not recover address from signature"
-        $logErrorS "postIdentity" err
+        $logErrorS "putIdentity" err
         throwIO $ IdentityError err
       _ -> do
         let err = "Signer does not match public key in Subject"
-        $logErrorS "postIdentity" err
+        $logErrorS "putIdentity" err
         throwIO $ IdentityError err
     Right s'@(Signed s@(Signed _ _) _) -> case (,) <$> (recoverSigned s) <*> (recoverSigned s') of -- existing identity
       Just (existingPK, newPK) | newPK == subPub sub -> do 
@@ -157,7 +149,7 @@ postIdentity (PostIdentityRequest eMsg) = do
         certInCirrus (Second newA) >>= \case
           [] -> certInCirrus (Product (subCommonName sub) existingA) >>= \case
             (c:_) -> do
-              let existingCN = (subCommonName <$> getCertSubject c)
+              let existingCN = (subCommonName <$> getCertSubject (certificateString c))
                   newCN = subCommonName sub
               if existingCN == Just newCN
                 then do
@@ -171,25 +163,27 @@ postIdentity (PostIdentityRequest eMsg) = do
                         <> " in the existing cert, and "
                         <> (T.pack newCN)
                         <> " in the subject info"
-                  $logErrorS "postIdentity" err
+                  $logErrorS "putIdentity" err
                   throwIO $ ExistingIdentity err
             _ -> do
               let err = "There is no existing cert for address " <> T.pack (format existingA)
-              $logErrorS "postIdentity" err
+              $logErrorS "putIdentity" err
               throwIO $ IdentityError err
-          _ -> do
-            let err = "A cert already exists for address " <> T.pack (format newA)
-            $logErrorS "postIdentity" err
-            throwIO $ ExistingIdentity err
+          certs -> case find (\c -> newA == certUserAddress c && username == certCommonName c) certs of 
+              Just cert -> return $ certificateString cert
+              Nothing -> do 
+                let err = "A cert already exists for address " <> T.pack (format newA)
+                $logErrorS "putIdentity" err
+                throwIO $ ExistingIdentity err
       Nothing -> do
         let err = "Could not recover address from signature"
-        $logErrorS "postIdentity" err
+        $logErrorS "putIdentity" err
         throwIO $ IdentityError err
       _ -> do
         let err = "Signer does not match public key in Subject"
-        $logErrorS "postIdentity" err
+        $logErrorS "putIdentity" err
         throwIO $ IdentityError err
-  pure $ PostIdentityResponse cert
+  pure $ PutIdentityResponse cert
 
 checkDomain ::
   ( MonadIO m
@@ -216,7 +210,8 @@ blocEndpoint = "/bloc/v2.2"
 
 data CertificateInCirrus = CertificateInCirrus
   { certCommonName :: T.Text,
-    certificateString :: T.Text,
+    certificateString :: X509Certificate,
+    certUserAddress :: Address,
     isValid :: Bool
   }
   deriving (Show, Generic)
@@ -225,8 +220,9 @@ instance FromJSON CertificateInCirrus where
   parseJSON = withObject "CertificateInCirrus" $ \v -> do
     commonName <- v .: "commonName"
     certString <- v .: "certificateString"
+    userAddress <- v .: "userAddress"
     valid <- v .: "isValid"
-    return $ CertificateInCirrus commonName certString valid
+    return $ CertificateInCirrus commonName (either (error . show) id (bsToCert $ encodeUtf8 certString)) userAddress valid
 
 instance ToJSON CertificateInCirrus
 
@@ -236,7 +232,7 @@ certInCirrus ::
   , Accessible IdentityServerData m
   ) =>
   BinaryOp String Address ->
-  m [X509Certificate]
+  m [CertificateInCirrus]
 certInCirrus op = do
   IdentityServerData{nodeUrl = nurl1, tokenEndpoint = te, clientId = ci, clientSecret = cs} <- access (Proxy @IdentityServerData)
   mToken <- getAccessToken ci cs te
@@ -252,14 +248,13 @@ certInCirrus op = do
   case mCerts of
     Right certs -> do
       $logInfoS "certInCirrus" $ T.pack $ "Checked for user's cert in Cirrus; response was: " <> show certs
-      let getCert = either (const Nothing) Just . bsToCert . encodeUtf8 . certificateString
-      return . catMaybes $ getCert <$> certs
+      return certs
     Left str -> do
       $logErrorS "certInCirrus" . T.pack $ "Unexpected response from cirrus query: " ++ str
       throwIO $ IdentityError . T.pack $ "Unexpected response from cirrus query: " ++ str
   where
     cirrusBasePath = "/cirrus/search/Certificate"
-    restOfQuery = "&order=block_timestamp.desc&limit=1"
+    restOfQuery = "&order=block_timestamp.desc"
     cirrusSearchPath :: BinaryOp String Address -> String
     cirrusSearchPath (First username) =
       cirrusBasePath <> "?commonName=eq." <> username <> restOfQuery
@@ -374,7 +369,7 @@ server ::
     Accessible IdentityServerData m
   ) =>
   ServerT IdentityServiceAPI m
-server = getPingIdentity :<|> postIdentity
+server = getPingIdentity :<|> putIdentity
 
 hoistCoreServer ::
   IdentityServerData ->

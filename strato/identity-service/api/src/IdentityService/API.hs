@@ -5,7 +5,7 @@
 module IdentityService.API
   ( IdentityServiceAPI,
     GetPingIdentity,
-    PostIdentity
+    PutIdentity
   )
 where
 
@@ -14,9 +14,9 @@ import Servant.API
 
 type GetPingIdentity = "ping" :> Get '[JSON] Int
 
-type PostIdentity =
+type PutIdentity =
   "identity"
-    :> ReqBody '[JSON] PostIdentityRequest
-    :> Post '[JSON] PostIdentityResponse
+    :> ReqBody '[JSON] PutIdentityRequest
+    :> Put '[JSON] PutIdentityResponse
 
-type IdentityServiceAPI = GetPingIdentity :<|> PostIdentity
+type IdentityServiceAPI = GetPingIdentity :<|> PutIdentity

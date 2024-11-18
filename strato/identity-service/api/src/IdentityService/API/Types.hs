@@ -3,8 +3,8 @@
 {-# LANGUAGE TypeOperators #-}
 
 module IdentityService.API.Types
-  ( PostIdentityRequest(..),
-    PostIdentityResponse(..)
+  ( PutIdentityRequest(..),
+    PutIdentityResponse(..)
   )
 where
 
@@ -13,19 +13,19 @@ import Blockchain.Strato.Model.Secp256k1
 import Control.Applicative ((<|>))
 import Data.Aeson
 
-newtype PostIdentityRequest = PostIdentityRequest (Either (Signed SubjectAndCert) (Signed (Signed SubjectAndCert)))
+newtype PutIdentityRequest = PutIdentityRequest (Either (Signed SubjectAndCert) (Signed (Signed SubjectAndCert)))
 
-newtype PostIdentityResponse = PostIdentityResponse X509Certificate
+newtype PutIdentityResponse = PutIdentityResponse X509Certificate
 
-instance ToJSON PostIdentityRequest where
-  toJSON (PostIdentityRequest (Left sub)) = toJSON sub
-  toJSON (PostIdentityRequest (Right ssub)) = toJSON ssub
+instance ToJSON PutIdentityRequest where
+  toJSON (PutIdentityRequest (Left sub)) = toJSON sub
+  toJSON (PutIdentityRequest (Right ssub)) = toJSON ssub
 
-instance FromJSON PostIdentityRequest where
-  parseJSON o = fmap PostIdentityRequest $ (Left <$> parseJSON o) <|> (Right <$> parseJSON o)
+instance FromJSON PutIdentityRequest where
+  parseJSON o = fmap PutIdentityRequest $ (Left <$> parseJSON o) <|> (Right <$> parseJSON o)
 
-instance ToJSON PostIdentityResponse where
-  toJSON (PostIdentityResponse b) = toJSON b
+instance ToJSON PutIdentityResponse where
+  toJSON (PutIdentityResponse b) = toJSON b
 
-instance FromJSON PostIdentityResponse where
-  parseJSON = fmap PostIdentityResponse . parseJSON
+instance FromJSON PutIdentityResponse where
+  parseJSON = fmap PutIdentityResponse . parseJSON

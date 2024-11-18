@@ -2,7 +2,7 @@
 
 module IdentityService.Client
   ( getPing,
-    postIdentity
+    putIdentity
   )
 where
 
@@ -14,5 +14,5 @@ import Servant.Client
 getPing :: ClientM Int
 getPing = client (Proxy @GetPingIdentity)
 
-postIdentity :: PostIdentityRequest -> ClientM PostIdentityResponse
-postIdentity = client (Proxy @PostIdentity)
+putIdentity :: PutIdentityRequest -> ClientM PutIdentityResponse
+putIdentity = client (Proxy @PutIdentity)
