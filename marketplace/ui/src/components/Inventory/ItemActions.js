@@ -10,6 +10,7 @@ import {
   RetweetOutlined,
   MoreOutlined,
   RiseOutlined,
+  LogoutOutlined,
 } from "@ant-design/icons";
 import {
   ASSET_STATUS,
@@ -237,7 +238,7 @@ const ItemActions = ({
           className="font-semibold w-1/4 flex items-center justify-center"
           onClick={() => showStakeModal("Unstake")}
         >
-          <StopOutlined /> Unstake
+          <LogoutOutlined /> Unstake
         </Button>
       )}
       <Popover
