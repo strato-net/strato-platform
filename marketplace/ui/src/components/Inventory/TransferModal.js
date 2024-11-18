@@ -329,6 +329,7 @@ const TransferModal = ({
       senderCommonName: user.commonName,
       recipientCommonName: transfer.recipientCommonName,
       itemName,
+      isDecimal: quantityIsDecimal,
     }));
 
     isDone = await actions.transferInventory(inventoryDispatch, body);
