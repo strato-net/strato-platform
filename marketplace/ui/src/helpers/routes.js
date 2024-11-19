@@ -27,9 +27,9 @@ export default {
   Items: { label: 'Item', url: '/items' },
   Orders: { label: 'Order', url: '/order/:type' },
   Transactions: { label: 'Transactions', url: '/transactions' },
-  GlobalTransactions: {
-    label: 'Global Transactions',
-    url: '/globalTransactions',
+  ActivityFeed: {
+    label: 'Activity Feed',
+    url: '/activityFeed',
   },
   RedemptionsOutgoingDetails: {
     label: 'Redemption Outgoing Detail',

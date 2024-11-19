@@ -288,7 +288,7 @@ const AuthenticatedRoutes = ({ user, users, isAuthenticated }) => {
       />
       <Route
         exact
-        path={routes.GlobalTransactions.url}
+        path={routes.ActivityFeed.url}
         element={
           <UsersProvider>
             <CategorysProvider>
