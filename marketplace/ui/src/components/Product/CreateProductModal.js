@@ -1,16 +1,25 @@
-import React, { useState } from "react";
-import { useFormik, getIn } from "formik";
-import { Form, Modal, Input, Select, Radio, Button, Upload, Spin, notification } from "antd";
-import TextArea from "antd/es/input/TextArea";
-import { PictureOutlined } from "@ant-design/icons";
-import getSchema from "./ProductSchema";
+import React, { useState } from 'react';
+import { useFormik, getIn } from 'formik';
+import {
+  Form,
+  Modal,
+  Input,
+  Select,
+  Radio,
+  Button,
+  Upload,
+  Spin,
+  notification,
+} from 'antd';
+import TextArea from 'antd/es/input/TextArea';
+import { PictureOutlined } from '@ant-design/icons';
+import getSchema from './ProductSchema';
 
 //sub-categories
-import { actions } from "../../contexts/product/actions";
-import { useProductDispatch, useProductState } from "../../contexts/product";
-import { unitOfMeasures } from "../../helpers/constants";
-import TagManager from "react-gtm-module";
-
+import { actions } from '../../contexts/product/actions';
+import { useProductDispatch, useProductState } from '../../contexts/product';
+import { unitOfMeasures } from '../../helpers/constants';
+import TagManager from 'react-gtm-module';
 
 const { Option } = Select;
 
@@ -31,24 +40,24 @@ const CreateProductModal = ({
 
   const initialValues = {
     image: null,
-    name: "",
+    name: '',
     category: {
       name: null,
-      address: "",
+      address: '',
     },
     subCategory: {
       name: null,
-      address: "",
+      address: '',
     },
-    manufacturer: "",
+    manufacturer: '',
     unitofmeasurement: {
       name: null,
-      value: "",
+      value: '',
     },
-    leastSellableUnit: "",
-    description: "",
+    leastSellableUnit: '',
+    description: '',
     active: true,
-    userUniqueProductCode:""
+    userUniqueProductCode: '',
   };
 
   const formik = useFormik({
@@ -62,7 +71,7 @@ const CreateProductModal = ({
 
   const handleCreateFormSubmit = async (values) => {
     const formData = new FormData();
-    formData.append("fileUpload", formik.values.image);
+    formData.append('fileUpload', formik.values.image);
 
     let imageData = await actions.uploadImage(dispatch, formData);
     if (imageData) {
@@ -77,17 +86,20 @@ const CreateProductModal = ({
           isActive: values.active,
           category: values.category.name,
           subCategory: values.subCategory.name,
-          userUniqueProductCode:values.userUniqueProductCode,
+          userUniqueProductCode: values.userUniqueProductCode,
         },
       };
-      window.LOQ.push(['ready', async LO => {
-        await LO.$internal.ready('events')
-        LO.events.track('Create Product', {
-          product: values.name,
-          category: values.category.name,
-          subCategory: values.subCategory.name
-        })
-      }])
+      window.LOQ.push([
+        'ready',
+        async (LO) => {
+          await LO.$internal.ready('events');
+          LO.events.track('Create Product', {
+            product: values.name,
+            category: values.category.name,
+            subCategory: values.subCategory.name,
+          });
+        },
+      ]);
       TagManager.dataLayer({
         dataLayer: {
           event: 'create_product',
@@ -113,11 +125,11 @@ const CreateProductModal = ({
   function beforeUpload(file) {
     const isJpgOrPng = file.type === 'image/jpeg' || file.type === 'image/png';
     if (!isJpgOrPng) {
-      openToast("bottom","Image must be of jpeg or png format");
+      openToast('bottom', 'Image must be of jpeg or png format');
     }
     const isLt1M = file.size / 1024 / 1024 < 1;
     if (!isLt1M) {
-      openToast("bottom","Cannot upload an image of size more than 1mb");
+      openToast('bottom', 'Cannot upload an image of size more than 1mb');
     }
     return isJpgOrPng && isLt1M;
   }
@@ -149,7 +161,7 @@ const CreateProductModal = ({
             onClick={formik.handleSubmit}
             disabled={disabled}
           >
-            {disabled ? <Spin /> : "Create Product"}
+            {disabled ? <Spin /> : 'Create Product'}
           </Button>
         </div>,
       ]}
@@ -172,7 +184,7 @@ const CreateProductModal = ({
                     <img
                       alt="Product"
                       src={selectedImage}
-                      style={{ width: "100%", height: "100%" }}
+                      style={{ width: '100%', height: '100%' }}
                     />
                     <br />
                   </div>
@@ -182,10 +194,10 @@ const CreateProductModal = ({
                 <Upload
                   onChange={(e) => {
                     setSelectedImage(URL.createObjectURL(e.file.originFileObj));
-                    formik.setFieldValue("image", e.file.originFileObj);
+                    formik.setFieldValue('image', e.file.originFileObj);
                   }}
-                  customRequest={() => { }}
-                  style={{ display: "none" }}
+                  customRequest={() => {}}
+                  style={{ display: 'none' }}
                   accept="image/png, image/jpeg"
                   maxCount={1}
                   showUploadList={false}
@@ -235,8 +247,8 @@ const CreateProductModal = ({
                   name="category.name"
                   value={formik.values.category.name}
                   onChange={(value) => {
-                    formik.setFieldValue("category.name", value);
-                    formik.setFieldValue("subCategory.name", null);
+                    formik.setFieldValue('category.name', value);
+                    formik.setFieldValue('subCategory.name', null);
                   }}
                 >
                   {categorys.map((e, index) => (
@@ -245,10 +257,10 @@ const CreateProductModal = ({
                     </Option>
                   ))}
                 </Select>
-                {getIn(formik.touched, "category.name") &&
-                  getIn(formik.errors, "category.name") && (
+                {getIn(formik.touched, 'category.name') &&
+                  getIn(formik.errors, 'category.name') && (
                     <span className="text-error text-xs">
-                      {getIn(formik.errors, "category.name")}
+                      {getIn(formik.errors, 'category.name')}
                     </span>
                   )}
               </Form.Item>
@@ -267,21 +279,23 @@ const CreateProductModal = ({
                   name="subCategory.name"
                   value={formik.values.subCategory.name}
                   onChange={(value) => {
-                    formik.setFieldValue("subCategory.name", value);
+                    formik.setFieldValue('subCategory.name', value);
                   }}
                 >
                   {categorys.map((category) =>
-                    category.name === formik.values.category.name ? category.subCategories.map((e, index) => (
-                      <Option value={e.name} key={index}>
-                        {e.name}
-                      </Option>
-                    )) : null
+                    category.name === formik.values.category.name
+                      ? category.subCategories.map((e, index) => (
+                          <Option value={e.name} key={index}>
+                            {e.name}
+                          </Option>
+                        ))
+                      : null
                   )}
                 </Select>
-                {getIn(formik.touched, "subCategory.name") &&
-                  getIn(formik.errors, "subCategory.name") && (
+                {getIn(formik.touched, 'subCategory.name') &&
+                  getIn(formik.errors, 'subCategory.name') && (
                     <span className="text-error text-xs">
-                      {getIn(formik.errors, "subCategory.name")}
+                      {getIn(formik.errors, 'subCategory.name')}
                     </span>
                   )}
               </Form.Item>
@@ -317,9 +331,14 @@ const CreateProductModal = ({
                   name="unitofmeasurement.name"
                   value={formik.values.unitofmeasurement.name}
                   onChange={(value) => {
-                    let selectedUOM = unitOfMeasures.find(u => u.value === value);
-                    formik.setFieldValue("unitofmeasurement.name", selectedUOM.name);
-                    formik.setFieldValue("unitofmeasurement.value", value);
+                    let selectedUOM = unitOfMeasures.find(
+                      (u) => u.value === value
+                    );
+                    formik.setFieldValue(
+                      'unitofmeasurement.name',
+                      selectedUOM.name
+                    );
+                    formik.setFieldValue('unitofmeasurement.value', value);
                   }}
                 >
                   {unitOfMeasures.map((e, index) => (
@@ -328,10 +347,10 @@ const CreateProductModal = ({
                     </Option>
                   ))}
                 </Select>
-                {getIn(formik.touched, "unitofmeasurement.name") &&
-                  getIn(formik.errors, "unitofmeasurement.name") && (
+                {getIn(formik.touched, 'unitofmeasurement.name') &&
+                  getIn(formik.errors, 'unitofmeasurement.name') && (
                     <span className="text-error text-xs">
-                      {getIn(formik.errors, "unitofmeasurement.name")}
+                      {getIn(formik.errors, 'unitofmeasurement.name')}
                     </span>
                   )}
               </Form.Item>
@@ -370,22 +389,22 @@ const CreateProductModal = ({
               )}
             </Form.Item>
             <div className="flex justify-between mt-4 items-center">
-            <Form.Item label="Active" name="active">
-              <Radio.Group
-                value={formik.values.active}
-                onChange={formik.handleChange}
-                name="active"
-              >
-                <Radio value={true}>Yes</Radio>
-                <Radio value={false}>No</Radio>
-              </Radio.Group>
+              <Form.Item label="Active" name="active">
+                <Radio.Group
+                  value={formik.values.active}
+                  onChange={formik.handleChange}
+                  name="active"
+                >
+                  <Radio value={true}>Yes</Radio>
+                  <Radio value={false}>No</Radio>
+                </Radio.Group>
 
-              {formik.touched.active && formik.errors.active && (
-                <span className="text-error text-xs">
-                  {formik.errors.active}
-                </span>
-              )}
-            </Form.Item>
+                {formik.touched.active && formik.errors.active && (
+                  <span className="text-error text-xs">
+                    {formik.errors.active}
+                  </span>
+                )}
+              </Form.Item>
               <Form.Item
                 label="Unique Product Code"
                 name="userUniqueProductCode"
@@ -398,14 +417,14 @@ const CreateProductModal = ({
                   value={formik.values.userUniqueProductCode}
                   onChange={formik.handleChange}
                 />
-                {formik.touched.userUniqueProductCode && formik.errors.userUniqueProductCode && (
-                  <span className="text-error text-xs">
-                    {formik.errors.userUniqueProductCode}
-                  </span>
-                )}
+                {formik.touched.userUniqueProductCode &&
+                  formik.errors.userUniqueProductCode && (
+                    <span className="text-error text-xs">
+                      {formik.errors.userUniqueProductCode}
+                    </span>
+                  )}
               </Form.Item>
             </div>
-           
           </div>
         </div>
       </Form>

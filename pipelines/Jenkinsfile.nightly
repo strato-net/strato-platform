@@ -322,7 +322,15 @@ pipeline {
             }
           }
         }
-
+        
+        stage('Node Status') {
+          steps{
+            script{
+              lib.checkNodeStatusHealth()
+            }
+          }
+        }
+        
         stage('Apex tests') {
           steps{
             sh '''#!/bin/bash -le

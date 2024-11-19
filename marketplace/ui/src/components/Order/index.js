@@ -1,29 +1,38 @@
-import { Tabs, DatePicker, Breadcrumb, Button, Dropdown, Space, notification } from "antd";
+import {
+  Tabs,
+  DatePicker,
+  Breadcrumb,
+  Button,
+  Dropdown,
+  Space,
+  notification,
+} from 'antd';
 import { DownloadOutlined } from '@ant-design/icons';
-import React, { useEffect, useState } from "react";
-import { useNavigate, useParams } from "react-router-dom";
-import SoldOrdersTable from "./SoldOrdersTable";
-import BoughtOrdersTable from "./BoughtOrdersTable";
-import TransfersTable from "./TransfersTable";
-import RedemptionsOutgoingTable from "./RedemptionsOutgoingTable";
-import RedemptionsIncomingTable from "./RedemptionsIncomingTable";
-import dayjs from "dayjs";
-import routes from "../../helpers/routes";
-import ClickableCell from "../ClickableCell";
-import { Images } from "../../images";
+import React, { useEffect, useState } from 'react';
+import { useNavigate, useParams } from 'react-router-dom';
+import SoldOrdersTable from './SoldOrdersTable';
+import BoughtOrdersTable from './BoughtOrdersTable';
+import TransfersTable from './TransfersTable';
+import RedemptionsOutgoingTable from './RedemptionsOutgoingTable';
+import RedemptionsIncomingTable from './RedemptionsIncomingTable';
+import dayjs from 'dayjs';
+import routes from '../../helpers/routes';
+import ClickableCell from '../ClickableCell';
+import { Images } from '../../images';
 import { saveAs } from 'file-saver';
 import * as XLSX from 'xlsx';
-import { actions } from "../../contexts/order/actions";
-import { useOrderDispatch, useOrderState } from "../../contexts/order";
-import { actions as categoryActions } from "../../contexts/category/actions";
-import { useCategoryState, useCategoryDispatch } from "../../contexts/category";
+import { actions } from '../../contexts/order/actions';
+import { useOrderDispatch, useOrderState } from '../../contexts/order';
+import { actions as categoryActions } from '../../contexts/category/actions';
+import { useCategoryState, useCategoryDispatch } from '../../contexts/category';
 import startCase from 'lodash/startCase';
-import { epochToDate } from "../../helpers/utils";
-import { ORDER_STATUS } from "../../helpers/constants";
-const INVERTED_ORDER_STATUS = Object.fromEntries(Object.entries(ORDER_STATUS).map(([key, value]) => [value, key]));
+import { epochToDate } from '../../helpers/utils';
+import { ORDER_STATUS } from '../../helpers/constants';
+const INVERTED_ORDER_STATUS = Object.fromEntries(
+  Object.entries(ORDER_STATUS).map(([key, value]) => [value, key])
+);
 
 const Order = ({ user }) => {
-
   const navigate = useNavigate();
   const params = useParams();
   const { type } = params;
@@ -39,11 +48,10 @@ const Order = ({ user }) => {
   }, [categoryDispatch]);
 
   const onChange = (key) => {
-    navigate(`/order/${key}`)
+    navigate(`/order/${key}`);
   };
 
-  const [selectedDate, setSelectedDate] = useState("");
-
+  const [selectedDate, setSelectedDate] = useState('');
 
   const onDateChange = (date) => {
     setSelectedDate(date);
@@ -64,7 +72,7 @@ const Order = ({ user }) => {
 
   function formatDataObject(dataObject) {
     let formattedObject = {};
-    Object.keys(dataObject).forEach(key => {
+    Object.keys(dataObject).forEach((key) => {
       let value = dataObject[key];
       if (key.endsWith('Date')) {
         value = epochToDate(value);
@@ -83,22 +91,24 @@ const Order = ({ user }) => {
 
   function mapOrderData(orders) {
     try {
-      return orders.flatMap(order => {
+      return orders.flatMap((order) => {
         // Extract Quantities
-         let orderQuantities;
-         if(order["BlockApps-Mercata-Order-quantities"]?.length){
-          orderQuantities = order["BlockApps-Mercata-Order-quantities"].map(item => item.value)
-         }else if(order.quantities?.length){
-          orderQuantities = order.quantities[0] 
-         }
-         else{
-          orderQuantities = [0]
-         }
-  
-        
+        let orderQuantities;
+        if (order['BlockApps-Mercata-Order-quantities']?.length) {
+          orderQuantities = order['BlockApps-Mercata-Order-quantities'].map(
+            (item) => item.value
+          );
+        } else if (order.quantities?.length) {
+          orderQuantities = order.quantities[0];
+        } else {
+          orderQuantities = [0];
+        }
+
         return order.assets.map((asset, index) => {
-          const { category, subCategory } = getCategoryAndSubcategory(asset.contract_name);
-  
+          const { category, subCategory } = getCategoryAndSubcategory(
+            asset.contract_name
+          );
+
           return formatDataObject({
             orderNumber: order.orderId,
             purchaserName: order.purchasersCommonName,
@@ -110,24 +120,25 @@ const Order = ({ user }) => {
             totalOrderAmount: order.totalPrice,
             orderDate: order.createdDate,
             orderFulfillmentDate: order.fulfillmentDate,
-            orderStatus: INVERTED_ORDER_STATUS[order.status] || "Unknown",
+            orderStatus: INVERTED_ORDER_STATUS[order.status] || 'Unknown',
             comments: order.comments,
-            blockchainAddress: order.address
+            blockchainAddress: order.address,
           });
         });
       });
     } catch (error) {
       // logging the actual error for better debugging
-      console.error("Error during mapping order data:", error);
-      throw new Error("Failed to map order data");
+      console.error('Error during mapping order data:', error);
+      throw new Error('Failed to map order data');
     }
   }
-  
 
   function mapTransfersData(transfers) {
     try {
-      return transfers.map(order => {
-        const { category, subCategory } = getCategoryAndSubcategory(order.contract_name);
+      return transfers.map((order) => {
+        const { category, subCategory } = getCategoryAndSubcategory(
+          order.contract_name
+        );
         return formatDataObject({
           transferNumber: order.id,
           transferDate: order.transferDate,
@@ -137,14 +148,13 @@ const Order = ({ user }) => {
           quantity: order.quantity,
           sender: order.oldOwnerCommonName,
           recipient: order.newOwnerCommonName,
-          blockchainAddress: order.address
+          blockchainAddress: order.address,
         });
       });
     } catch (error) {
-      throw new Error("Failed to map transfers data");
+      throw new Error('Failed to map transfers data');
     }
   }
-
 
   useEffect(() => {
     if (allOrders && callExcel && !isAllOrdersLoading) {
@@ -153,38 +163,40 @@ const Order = ({ user }) => {
       let bought;
       let transferred;
       try {
-        sold = mapOrderData(allOrders.bodySold)
+        sold = mapOrderData(allOrders.bodySold);
       } catch (error) {
         api.error({
           message: 'Data Processing Error',
           description: 'Failed to process order data. Please contact support.',
-          placement: 'bottom'
+          placement: 'bottom',
         });
         return;
       }
       const wsSold = XLSX.utils.json_to_sheet(sold ? sold : []);
       try {
-        bought = mapOrderData(allOrders.bodyBought)
+        bought = mapOrderData(allOrders.bodyBought);
       } catch (error) {
         api.error({
           message: 'Data Processing Error',
           description: 'Failed to process order data. Please contact support.',
-          placement: 'bottom'
+          placement: 'bottom',
         });
         return;
       }
       const wsBought = XLSX.utils.json_to_sheet(bought ? bought : []);
       try {
-        transferred = mapTransfersData(allOrders.bodyTransfers)
+        transferred = mapTransfersData(allOrders.bodyTransfers);
       } catch (error) {
         api.error({
           message: 'Data Processing Error',
           description: 'Failed to process order data. Please contact support.',
-          placement: 'bottom'
+          placement: 'bottom',
         });
         return;
       }
-      const wsTransferred = XLSX.utils.json_to_sheet(transferred ? transferred : []);
+      const wsTransferred = XLSX.utils.json_to_sheet(
+        transferred ? transferred : []
+      );
 
       // Append each worksheet to the workbook
       XLSX.utils.book_append_sheet(wb, wsSold, 'Sold Orders');
@@ -195,50 +207,56 @@ const Order = ({ user }) => {
       const wbout = XLSX.write(wb, { bookType: 'xls', type: 'binary' });
 
       // Convert the binary string to a Blob and save it
-      const blob = new Blob([s2ab(wbout)], { type: 'application/vnd.ms-excel' });
+      const blob = new Blob([s2ab(wbout)], {
+        type: 'application/vnd.ms-excel',
+      });
       saveAs(blob, 'Mercata-Marketplace-Order-History.xls');
       setCallExcel(false);
       setCallCSV(false);
     }
     if (allOrders && callCSV && !isAllOrdersLoading) {
       // Adding an extra column to distinguish data
-      const addTypeColumn = (data, type) => data.map(row => ({ ...row, Type: type }));
+      const addTypeColumn = (data, type) =>
+        data.map((row) => ({ ...row, Type: type }));
       let sold;
       let bought;
       let transferred;
       try {
-        sold = mapOrderData(allOrders.bodySold)
+        sold = mapOrderData(allOrders.bodySold);
       } catch (error) {
         api.error({
           message: 'Data Processing Error',
           description: 'Failed to process order data. Please contact support.',
-          placement: 'bottom'
+          placement: 'bottom',
         });
         return;
       }
       try {
-        bought = mapOrderData(allOrders.bodyBought)
+        bought = mapOrderData(allOrders.bodyBought);
       } catch (error) {
         api.error({
           message: 'Data Processing Error',
           description: 'Failed to process order data. Please contact support.',
-          placement: 'bottom'
+          placement: 'bottom',
         });
         return;
       }
       try {
-        transferred = mapTransfersData(allOrders.bodyTransfers)
+        transferred = mapTransfersData(allOrders.bodyTransfers);
       } catch (error) {
         api.error({
           message: 'Data Processing Error',
           description: 'Failed to process order data. Please contact support.',
-          placement: 'bottom'
+          placement: 'bottom',
         });
         return;
       }
       const soldData = addTypeColumn(sold ? sold : [], 'Sold');
       const boughtData = addTypeColumn(bought ? bought : [], 'Bought');
-      const transferredData = addTypeColumn(transferred ? transferred : [], 'Transferred');
+      const transferredData = addTypeColumn(
+        transferred ? transferred : [],
+        'Transferred'
+      );
 
       const combinedData = [...soldData, ...boughtData, ...transferredData];
       const ws = XLSX.utils.json_to_sheet(combinedData);
@@ -255,18 +273,14 @@ const Order = ({ user }) => {
 
   const download = async (format) => {
     if (user?.commonName) {
-      await actions.fetchAllOrders(
-        dispatch
-      );
+      await actions.fetchAllOrders(dispatch);
       if (format === 'xls') {
         setCallExcel(true);
         setCallCSV(false);
-      }
-      else if (format === 'csv') {
+      } else if (format === 'csv') {
         setCallCSV(true);
         setCallExcel(false);
       }
-
     }
   };
 
@@ -274,7 +288,7 @@ const Order = ({ user }) => {
   function s2ab(s) {
     const buf = new ArrayBuffer(s.length);
     const view = new Uint8Array(buf);
-    for (let i = 0; i < s.length; i++) view[i] = s.charCodeAt(i) & 0xFF;
+    for (let i = 0; i < s.length; i++) view[i] = s.charCodeAt(i) & 0xff;
     return buf;
   }
 
@@ -297,14 +311,12 @@ const Order = ({ user }) => {
       {contextHolder}
       <div className="px-4 md:px-20 lg:py-2 lg:mt-3 orders">
         <Breadcrumb>
-          <Breadcrumb.Item href="" onClick={e => e.preventDefault()}>
+          <Breadcrumb.Item href="" onClick={(e) => e.preventDefault()}>
             <ClickableCell href={routes.Marketplace.url}>
-              <p className="text-sm text-[#13188A] font-semibold">
-                Home
-              </p>
+              <p className="text-sm text-[#13188A] font-semibold">Home</p>
             </ClickableCell>
           </Breadcrumb.Item>
-          <Breadcrumb.Item href="" onClick={e => e.preventDefault()}>
+          <Breadcrumb.Item href="" onClick={(e) => e.preventDefault()}>
             <p className=" text-sm text-[#202020] font-medium">
               {'Orders (' + type + ')'}
             </p>
@@ -333,10 +345,8 @@ const Order = ({ user }) => {
 
             <DatePicker
               className="md:flex hidden"
-              style={{ backgroundColor: "#F6F6F6" }}
-              value={
-                selectedDate
-              }
+              style={{ backgroundColor: '#F6F6F6' }}
+              value={selectedDate}
               disabledDate={(current) => {
                 const currentDate = dayjs().startOf('day'); // Get the start of today
                 const selectedDate = dayjs(current).startOf('day');
@@ -345,36 +355,109 @@ const Order = ({ user }) => {
               }}
               onChange={onDateChange}
               disabled={false}
-              suffixIcon={<img src={Images.calender} alt="calender" className=" w-[18px] h-5" style={{ maxWidth: "none" }} />}
+              suffixIcon={
+                <img
+                  src={Images.calender}
+                  alt="calender"
+                  className=" w-[18px] h-5"
+                  style={{ maxWidth: 'none' }}
+                />
+              }
             />
           </div>
         }
         items={[
           {
-            label: <p id="sold-tab" className="font-semibold text-sm md:text-base">Orders (Sold)</p>,
-            key: "sold",
-            children: <SoldOrdersTable user={user} selectedDate={dayjs(selectedDate).startOf('day').unix()} onDateChange={onDateChange} download={download} isAllOrdersLoading={isAllOrdersLoading} />
+            label: (
+              <p id="sold-tab" className="font-semibold text-sm md:text-base">
+                Orders (Sold)
+              </p>
+            ),
+            key: 'sold',
+            children: (
+              <SoldOrdersTable
+                user={user}
+                selectedDate={dayjs(selectedDate).startOf('day').unix()}
+                onDateChange={onDateChange}
+                download={download}
+                isAllOrdersLoading={isAllOrdersLoading}
+              />
+            ),
           },
           {
-            label: <p id="bought-tab" className="font-semibold text-sm md:text-base">Orders (Bought)</p>,
-            key: "bought",
-            children: <BoughtOrdersTable user={user} selectedDate={dayjs(selectedDate).startOf('day').unix()} onDateChange={onDateChange} download={download} isAllOrdersLoading={isAllOrdersLoading} />
+            label: (
+              <p id="bought-tab" className="font-semibold text-sm md:text-base">
+                Orders (Bought)
+              </p>
+            ),
+            key: 'bought',
+            children: (
+              <BoughtOrdersTable
+                user={user}
+                selectedDate={dayjs(selectedDate).startOf('day').unix()}
+                onDateChange={onDateChange}
+                download={download}
+                isAllOrdersLoading={isAllOrdersLoading}
+              />
+            ),
           },
           {
-            label: <p id="transfers-tab" className="font-semibold text-sm md:text-base">Transfers</p>,
-            key: "transfers",
-            children: <TransfersTable user={user} selectedDate={dayjs(selectedDate).startOf('day').unix()} download={download} isAllOrdersLoading={isAllOrdersLoading} />
+            label: (
+              <p
+                id="transfers-tab"
+                className="font-semibold text-sm md:text-base"
+              >
+                Transfers
+              </p>
+            ),
+            key: 'transfers',
+            children: (
+              <TransfersTable
+                user={user}
+                selectedDate={dayjs(selectedDate).startOf('day').unix()}
+                download={download}
+                isAllOrdersLoading={isAllOrdersLoading}
+              />
+            ),
           },
           {
-            label: <p id="redemptions-outgoing-tab" className="font-semibold text-sm md:text-base">Redemptions (Outgoing)</p>,
-            key: "redemptions-outgoing",
-            children: <RedemptionsOutgoingTable user={user} selectedDate={dayjs(selectedDate).startOf('day').unix()} download={download} isAllOrdersLoading={isAllOrdersLoading} />
+            label: (
+              <p
+                id="redemptions-outgoing-tab"
+                className="font-semibold text-sm md:text-base"
+              >
+                Redemptions (Outgoing)
+              </p>
+            ),
+            key: 'redemptions-outgoing',
+            children: (
+              <RedemptionsOutgoingTable
+                user={user}
+                selectedDate={dayjs(selectedDate).startOf('day').unix()}
+                download={download}
+                isAllOrdersLoading={isAllOrdersLoading}
+              />
+            ),
           },
           {
-            label: <p id="redemptions-incoming-tab" className="font-semibold text-sm md:text-base">Redemptions (Incoming)</p>,
-            key: "redemptions-incoming",
-            children: <RedemptionsIncomingTable user={user} selectedDate={dayjs(selectedDate).startOf('day').unix()} download={download} isAllOrdersLoading={isAllOrdersLoading} />
-          }
+            label: (
+              <p
+                id="redemptions-incoming-tab"
+                className="font-semibold text-sm md:text-base"
+              >
+                Redemptions (Incoming)
+              </p>
+            ),
+            key: 'redemptions-incoming',
+            children: (
+              <RedemptionsIncomingTable
+                user={user}
+                selectedDate={dayjs(selectedDate).startOf('day').unix()}
+                download={download}
+                isAllOrdersLoading={isAllOrdersLoading}
+              />
+            ),
+          },
         ]}
       />
     </div>

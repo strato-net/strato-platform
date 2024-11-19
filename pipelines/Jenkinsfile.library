@@ -1318,6 +1318,17 @@ def runSyncTester() {
 '''
 }
 
+def checkNodeStatusHealth() {
+  sh '''#!/bin/bash -le
+    set -x
+    STATUS=$(sudo docker exec strato-apex-1 curl -s -f http://localhost:3009/status )
+    if [[ $(jq -r .healthData.healthChecks.health <<< ${STATUS}) != true ]]; then
+      echo "Failure: STRATO Status could not be obtained or the STRATO health is not \"true\". If you don't see the output above - the /apex-api/status endpoint is probably not available."
+      exit 1
+    fi
+  '''
+}
+
 def spinUpVault() {
   writeFile file: "run-vault.sh", text: """#!/bin/bash
   sudo \\

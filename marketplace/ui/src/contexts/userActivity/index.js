@@ -1,5 +1,5 @@
-import React, { createContext, useContext, useReducer } from "react";
-import reducer from "./reducer"; // Ensure this points to the reducer we just created
+import React, { createContext, useContext, useReducer } from 'react';
+import reducer from './reducer'; // Ensure this points to the reducer we just created
 
 // Adjusting context names to reflect their purpose for user activities
 const UserActivityStateContext = createContext();

@@ -22,8 +22,24 @@ router.post("/notify", async (req, res) => {
       return res.status(400).send("Bad Request: Missing usernames or message");
     }
 
-    // Get emails from db using usernames
-    const emails = await getEmailsByUsernames(usernames);
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    let emails = [];
+
+    // Iterate over each username
+    for (const username of usernames) {
+      if (emailRegex.test(username)) {
+        // If the username is a valid email, add it directly to the emails array
+        emails.push(username);
+      } else {
+        // If the username is not a valid email, fetch the corresponding email using getEmailsByUsernames
+        const fetchedEmails = await getEmailsByUsernames([username]);
+        emails = emails.concat(fetchedEmails);
+      }
+    }
+
+    // GO BACK TO THIS METHOD
+    // Get emails from db using usernames 
+    // const emails = await getEmailsByUsernames(usernames);
     // const numbers = await getNumbersByUsernames(usernames);
 
     if (!emails.length) {

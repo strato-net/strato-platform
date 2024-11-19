@@ -9,10 +9,15 @@ const TimeRangeTabs = ({ onChange, activeKey }) => {
   };
 
   return (
-    <Tabs defaultActiveKey="1" activeKey={activeKey} onChange={handleChange} centered>
-      <TabPane tab="6M" key="1"/>
-      <TabPane tab="1Y" key="2"/>
-      <TabPane tab={<Button type="primary">All</Button>} key="3"/>
+    <Tabs
+      defaultActiveKey="1"
+      activeKey={activeKey}
+      onChange={handleChange}
+      centered
+    >
+      <TabPane tab="6M" key="1" />
+      <TabPane tab="1Y" key="2" />
+      <TabPane tab={<Button type="primary">All</Button>} key="3" />
     </Tabs>
   );
 };

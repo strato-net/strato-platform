@@ -14,7 +14,7 @@ pipeline {
         
         dir ('/datadrive/testnet2/strato-getting-started') {
           sh 'sudo ./strato --pull'
-          sh 'sudo ./strato --wipe && sudo ./run.sh'
+          sh 'sudo ./strato --wipe && sudo ./strato-run.sh'
         }
         sh 'sudo docker image prune'
       }

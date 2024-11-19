@@ -101,14 +101,14 @@ stringToIAddr x
   | URI.isIPv4address x = case map read $ splitOn "." x of
     [a, b, c, d] -> IPV4Addr $ a + (b `shift` 8) + (c `shift` 16) + (d `shift` 24)
     _ -> error $ "Invalid IPV4: " ++ x
-  | URI.isIPv6address x = case map (read . ("0x" ++)) $ splitOn ":" x of
+  | URI.isIPv6address x = case map (read . ("0x0" ++)) $ splitOn ":" x of
     [a, b, c, d, e, f, g, h] -> IPV6Addr $ tupleToHostAddress6 (a, b, c, d, e, f, g, h)
-    _ -> error $ "Invalid IPV6: " ++ x
+    _ -> error $ "Invalid IPV6: " ++ x --Note to future dev: we don't support shortened ipv6 notation
   | otherwise = HostName x
 
 instance RLPSerializable IAddr where
   rlpEncode (IPV4Addr x) = rlpEncode $ fromBE32 x
-  rlpEncode x@(IPV6Addr _) = error $ "case not yet covered for rlpEncode for IPV6: " ++ format x
+  rlpEncode (IPV6Addr (x1, x2, x3, x4)) = rlpEncode $ B.toStrict $ encode x4 <> encode x3 <> encode x2 <> encode x1
   rlpEncode (HostName s) = rlpEncode $ (B.pack [255, 255, 255, 255] `B.append` BC.pack s)
   rlpDecode o@(RLPString s)
     | B.length s == 4 = IPV4Addr $ fromBE32 $ rlpDecode o

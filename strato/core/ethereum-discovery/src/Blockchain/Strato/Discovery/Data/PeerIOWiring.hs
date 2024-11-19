@@ -49,7 +49,7 @@ instance MonadIO m => Mod.Accessible AvailablePeers m where
     currentTime <- liftIO getCurrentTime
     fmap (AvailablePeers . map SQL.entityVal) $
       flip runSqlPool sqldb $
-        SQL.selectList [PPeerBondState SQL.==. 2, PPeerEnableTime SQL.<. currentTime] []
+        SQL.selectList [PPeerBondState SQL.==. 2, PPeerUdpEnableTime SQL.<. currentTime] []
 
 instance MonadIO m => A.Replaceable (IPAsText, TCPPort) ActivityState m where
   replace _ (IPAsText ip, TCPPort port) state = liftIO $ withGlobalSQLPool . runSqlPool $ do
@@ -89,12 +89,12 @@ instance MonadIO m => Mod.Accessible BondedPeersForUDP m where
       flip runSqlPool sqldb $
         SQL.selectList [PPeerBondState SQL.==. 2, PPeerUdpEnableTime SQL.<. currentTime] []
 
-instance MonadIO m => Mod.Accessible UnbondedPeers m where
+instance MonadIO m => Mod.Accessible UnbondedPeersForUDP m where
   access _ = liftIO $ withGlobalSQLPool $ \sqldb -> do
     currentTime <- getCurrentTime
-    fmap (UnbondedPeers . map SQL.entityVal) $
+    fmap (UnbondedPeersForUDP . map SQL.entityVal) $
       flip runSqlPool sqldb $
-        SQL.selectList [PPeerBondState SQL.==. 0, PPeerUdpEnableTime SQL.<. currentTime, PPeerEnableTime SQL.<. currentTime] []
+        SQL.selectList [PPeerBondState SQL.==. 0, PPeerUdpEnableTime SQL.<. currentTime] []
 
 instance MonadIO m => A.Selectable Point ClosestPeers m where
   select _ point = liftIO $ withGlobalSQLPool $ \sqldb ->

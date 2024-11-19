@@ -8,7 +8,7 @@ The following tools should be preinstalled to run Marketplace:
 
 1. Docker Engine v24+
 2. Docker Compose V2
-3. NodeJS 14.21.3 (for development mode only)
+3. NodeJS 21.7.1 (for development mode only)
 4. yarn (for development mode only)
 
 *NOTE* the required NodeJS version. The app may not work properly on the newer or older Node versions. Refer to Dockerfile first line to check what is tested for Production deployment.

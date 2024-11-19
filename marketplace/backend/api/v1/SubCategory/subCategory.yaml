@@ -1,119 +1,119 @@
 paths:
   /subCategory/:
     get:
-      security:              
-        - bearerAuth: []                    
-      tags:               
-        - SubCategory        
+      security:
+        - bearerAuth: []
+      tags:
+        - SubCategory
       summary: Retrieve subCategory
       produces:
-      - application/json
-      responses:         
+        - application/json
+      responses:
         200:
           description: Array of subCategorys
-    post:  
-      security:              
-        - bearerAuth: []                  
-      tags:               
-        - SubCategory        
+    post:
+      security:
+        - bearerAuth: []
+      tags:
+        - SubCategory
       summary: Create a subCategory
       produces:
-      - application/json
-      requestBody:         
+        - application/json
+      requestBody:
         description: It enable user to create subCategory
         required: true
         content:
-          'application/json': 
-            schema:       
-              $ref: '#/definitions/createSubCategory' 
-      responses:         
+          'application/json':
+            schema:
+              $ref: '#/definitions/createSubCategory'
+      responses:
         200:
           description: Object of create subCategory
   /subCategory/{address}/{chainId}:
-    get:                 
-      security:              
-        - bearerAuth: []   
-      tags:               
-        - SubCategory        
+    get:
+      security:
+        - bearerAuth: []
+      tags:
+        - SubCategory
       summary: Retrieve a subCategory
       produces:
-      - application/json
-      parameters:         
-      - in: path          
-        name: address     
-        description: address to retrieve the subCategory
-        required: true
-      - in: path          
-        name: chainId     
-        description: chainId corresponding to the address
-        required: true
-        schema:       
-          $ref: '#/definitions/fetchSubCategory' 
-      responses:         
+        - application/json
+      parameters:
+        - in: path
+          name: address
+          description: address to retrieve the subCategory
+          required: true
+        - in: path
+          name: chainId
+          description: chainId corresponding to the address
+          required: true
+          schema:
+            $ref: '#/definitions/fetchSubCategory'
+      responses:
         200:
           description: Retrieve a subCategory
   /subCategory/update:
-    put:    
-      security:              
-        - bearerAuth: []                
-      tags:               
-        - SubCategory        
+    put:
+      security:
+        - bearerAuth: []
+      tags:
+        - SubCategory
       summary: Update a subCategory
       produces:
-      - application/json
-      requestBody:         
+        - application/json
+      requestBody:
         description: It enable user to update a subCategory
         required: true
         content:
           'application/json':
-            schema:       
-              $ref: '#/definitions/updateSubCategory' 
-      responses:         
+            schema:
+              $ref: '#/definitions/updateSubCategory'
+      responses:
         200:
           description: Retrieve a updated subCategory
   /subCategory/{address}/{chainId}/audit:
-    get:     
-      security:              
-        - bearerAuth: []               
-      tags:               
-        - SubCategory        
+    get:
+      security:
+        - bearerAuth: []
+      tags:
+        - SubCategory
       summary: Audit subCategory
       produces:
-      - application/json
-      parameters:         
-      - in: path          
-        name: address     
-        description: address to retrieve the subCategory
-        required: true
-      - in: path          
-        name: chainId     
-        description: chainId corresponding to the address
-        required: true
-        schema:       
-          $ref: '#/definitions/auditSubCategory' 
-      responses:         
+        - application/json
+      parameters:
+        - in: path
+          name: address
+          description: address to retrieve the subCategory
+          required: true
+        - in: path
+          name: chainId
+          description: chainId corresponding to the address
+          required: true
+          schema:
+            $ref: '#/definitions/auditSubCategory'
+      responses:
         200:
           description: List of audit
   /subCategory/transferOwnership:
-    post:              
-      security:              
-        - bearerAuth: []      
-      tags:               
-        - SubCategory        
+    post:
+      security:
+        - bearerAuth: []
+      tags:
+        - SubCategory
       summary: Transfer ownership
       produces:
-      - application/json
-      requestBody:         
+        - application/json
+      requestBody:
         description: It enable user to transfer ownership
         required: true
         content:
           'application/json':
-            schema:       
-              $ref: '#/definitions/transferOwnership' 
-      responses:         
+            schema:
+              $ref: '#/definitions/transferOwnership'
+      responses:
         200:
           description: indicates success of transfer ownership
-definitions:        
+definitions:
   fetchSubCategory:
     address:
       type: string

@@ -1,38 +1,39 @@
-import { Route, Routes, Navigate } from "react-router-dom";
-import routes from "./helpers/routes";
-import CategoryProductList from "./components/MarketPlace/CategoryProductList";
-import { CategorysProvider } from "./contexts/category";
-import { SubCategorysProvider } from "./contexts/subCategory";
-import MarketPlace from "./components/MarketPlace";
-import Product from "./components/Product";
-import { ProductsProvider } from "./contexts/product";
-import Inventory from "./components/Inventory";
-import { InventoriesProvider } from "./contexts/inventory";
-import { PaymentServicesProvider } from "./contexts/payment";
-import Item from "./components/Item";
-import { ItemsProvider } from "./contexts/item";
-import Order from "./components/Order";
-import SoldOrderDetails from "./components/Order/SoldOrderDetails";
-import BoughtOrderDetails from "./components/Order/BoughtOrderDetails";
-import RedemptionsOutgoingDetails from "./components/Order/RedemptionsOutgoingDetails";
-import RedemptionsIncomingDetails from "./components/Order/RedemptionsIncomingDetails";
-import { OrdersProvider } from "./contexts/order";
-import { UsersProvider } from "./contexts/users";
-import { UserActivityProvider } from "./contexts/userActivity";
-import AuthorizeIssuer from "./components/AuthorizeIssuer";
-import { IssuerStatusProvider } from "./contexts/issuerStatus";
-import ProductDetails from "./components/MarketPlace/ProductDetails";
-import Checkout from "./components/MarketPlace/Checkout";
-import ConfirmOrder from "./components/MarketPlace/ConfirmOrder";
-import ProcessingOrder from "./components/MarketPlace/ProcessingOrder";
-import Invoice from "./components/Order/Invoice";
-import { RedemptionsProvider } from "./contexts/redemption";
-import LoginRedirect from "./components/LoginRedirect";
-import UserProfile from "./components/UserProfile";
-import Error from "./components/404";
-import FAQ from "./components/FAQ/index";
-import { TransactionsProvider } from "./contexts/transaction";
-import Transaction from "./components/Order/Transaction";
+import { Route, Routes, Navigate } from 'react-router-dom';
+import routes from './helpers/routes';
+import CategoryProductList from './components/MarketPlace/CategoryProductList';
+import { CategorysProvider } from './contexts/category';
+import { SubCategorysProvider } from './contexts/subCategory';
+import MarketPlace from './components/MarketPlace';
+import Product from './components/Product';
+import { ProductsProvider } from './contexts/product';
+import Inventory from './components/Inventory';
+import { InventoriesProvider } from './contexts/inventory';
+import { PaymentServicesProvider } from './contexts/payment';
+import Item from './components/Item';
+import { ItemsProvider } from './contexts/item';
+import Order from './components/Order';
+import SoldOrderDetails from './components/Order/SoldOrderDetails';
+import BoughtOrderDetails from './components/Order/BoughtOrderDetails';
+import RedemptionsOutgoingDetails from './components/Order/RedemptionsOutgoingDetails';
+import RedemptionsIncomingDetails from './components/Order/RedemptionsIncomingDetails';
+import { OrdersProvider } from './contexts/order';
+import { UsersProvider } from './contexts/users';
+import { UserActivityProvider } from './contexts/userActivity';
+import AuthorizeIssuer from './components/AuthorizeIssuer';
+import { IssuerStatusProvider } from './contexts/issuerStatus';
+import ProductDetails from './components/MarketPlace/ProductDetails';
+import Checkout from './components/MarketPlace/Checkout';
+import ConfirmOrder from './components/MarketPlace/ConfirmOrder';
+import ProcessingOrder from './components/MarketPlace/ProcessingOrder';
+import Invoice from './components/Order/Invoice';
+import { RedemptionsProvider } from './contexts/redemption';
+import LoginRedirect from './components/LoginRedirect';
+import UserProfile from './components/UserProfile';
+import Error from './components/404';
+import FAQ from './components/FAQ/index';
+import { TransactionsProvider } from './contexts/transaction';
+import Transaction from './components/Order/Transaction';
+import Feed from './components/Feed/Feed';
 
 const AuthenticatedRoutes = ({ user, users, isAuthenticated }) => {
   return (
@@ -134,17 +135,19 @@ const AuthenticatedRoutes = ({ user, users, isAuthenticated }) => {
           </UsersProvider>
         }
       />
-      {user?.isAdmin && (<Route
-        exact
-        path={routes.Admin.url}
-        element={
-          <UsersProvider>
-            <IssuerStatusProvider>
-              <AuthorizeIssuer />
-            </IssuerStatusProvider>
-          </UsersProvider>
-        }
-      />)}
+      {user?.isAdmin && (
+        <Route
+          exact
+          path={routes.Admin.url}
+          element={
+            <UsersProvider>
+              <IssuerStatusProvider>
+                <AuthorizeIssuer />
+              </IssuerStatusProvider>
+            </UsersProvider>
+          }
+        />
+      )}
       <Route
         exact
         path={routes.MarketplaceProductDetail.url}
@@ -181,7 +184,7 @@ const AuthenticatedRoutes = ({ user, users, isAuthenticated }) => {
       />
       <Route
         exact
-        path={routes.MyItems.url}
+        path={routes.MyWallet.url}
         element={
           <UsersProvider>
             <CategorysProvider>
@@ -274,6 +277,27 @@ const AuthenticatedRoutes = ({ user, users, isAuthenticated }) => {
                     <InventoriesProvider>
                       <RedemptionsProvider>
                         <Transaction user={user} users={users} />
+                      </RedemptionsProvider>
+                    </InventoriesProvider>
+                  </ItemsProvider>
+                </OrdersProvider>
+              </TransactionsProvider>
+            </CategorysProvider>
+          </UsersProvider>
+        }
+      />
+      <Route
+        exact
+        path={routes.GlobalTransactions.url}
+        element={
+          <UsersProvider>
+            <CategorysProvider>
+              <TransactionsProvider>
+                <OrdersProvider>
+                  <ItemsProvider>
+                    <InventoriesProvider>
+                      <RedemptionsProvider>
+                        <Feed user={user} users={users} />
                       </RedemptionsProvider>
                     </InventoriesProvider>
                   </ItemsProvider>

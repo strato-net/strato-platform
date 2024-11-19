@@ -1,5 +1,5 @@
-import React, { createContext, useContext, useReducer } from "react";
-import reducer from "./reducer";
+import React, { createContext, useContext, useReducer } from 'react';
+import reducer from './reducer';
 
 const TransactionStateContext = createContext();
 const TransactionDispatchContext = createContext();
@@ -12,6 +12,7 @@ const TransactionsProvider = ({ children }) => {
     isTransactionLoading: false,
     userTransactions: [],
     globalTransactions: [],
+    count: 0,
   };
 
   const [state, dispatch] = useReducer(reducer, initialState);
@@ -28,7 +29,9 @@ const TransactionsProvider = ({ children }) => {
 const useTransactionState = () => {
   const context = useContext(TransactionStateContext);
   if (context === undefined) {
-    throw new Error(`'useTransactionState' must be used within a TransactionsProvider`);
+    throw new Error(
+      `'useTransactionState' must be used within a TransactionsProvider`
+    );
   }
   return context;
 };
@@ -36,7 +39,9 @@ const useTransactionState = () => {
 const useTransactionDispatch = () => {
   const context = useContext(TransactionDispatchContext);
   if (context === undefined) {
-    throw new Error(`'useTransactionDispatch' must be used within a TransactionsProvider`);
+    throw new Error(
+      `'useTransactionDispatch' must be used within a TransactionsProvider`
+    );
   }
   return context;
 };
@@ -45,4 +50,9 @@ const useTransactionUnit = () => {
   return [useTransactionState(), useTransactionDispatch()];
 };
 
-export { useTransactionDispatch, useTransactionState, useTransactionUnit, TransactionsProvider };
+export {
+  useTransactionDispatch,
+  useTransactionState,
+  useTransactionUnit,
+  TransactionsProvider,
+};

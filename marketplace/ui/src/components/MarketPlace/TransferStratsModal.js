@@ -1,21 +1,21 @@
 import React, { useState, useEffect } from 'react';
 import { Button, Card, InputNumber, Modal, Select, notification } from 'antd';
-import { useMarketplaceDispatch, useMarketplaceState } from "../../contexts/marketplace";
-import { actions } from "../../contexts/marketplace/actions";
-import { actions as userActions } from "../../contexts/users/actions";
-import { useUsersDispatch, useUsersState } from "../../contexts/users";
-import { useAuthenticateState } from "../../contexts/authentication";
+import {
+  useMarketplaceDispatch,
+  useMarketplaceState,
+} from '../../contexts/marketplace';
+import { actions } from '../../contexts/marketplace/actions';
+import { actions as userActions } from '../../contexts/users/actions';
+import { useUsersDispatch, useUsersState } from '../../contexts/users';
+import { useAuthenticateState } from '../../contexts/authentication';
 
 const TransferStratsModal = ({ visible, onCancel }) => {
   const marketplaceDispatch = useMarketplaceDispatch();
-  const { isTransferringStrats, strats, message, success } = useMarketplaceState();
+  const { isTransferringStrats, strats, message, success } =
+    useMarketplaceState();
   const userDispatch = useUsersDispatch();
-  const {
-    user
-  } = useAuthenticateState();
-  const {
-    users
-  } = useUsersState();
+  const { user } = useAuthenticateState();
+  const { users } = useUsersState();
 
   const [receiverAddress, setReceiverAddress] = useState('');
   const [amount, setAmount] = useState(0);
@@ -42,7 +42,14 @@ const TransferStratsModal = ({ visible, onCancel }) => {
     }
   };
 
-  const usersList = (users || []).map((record) => ((user || {}).commonName !== record.commonName ? { label: `${record.commonName} - ${record.organization}`, value: record.userAddress } : {}));
+  const usersList = (users || []).map((record) =>
+    (user || {}).commonName !== record.commonName
+      ? {
+          label: `${record.commonName} - ${record.organization}`,
+          value: record.userAddress,
+        }
+      : {}
+  );
   const filterDuplicateUserAddresses = (arr) => {
     return [...new Map(arr.map((u) => [u.value, u])).values()];
   };
@@ -53,32 +60,38 @@ const TransferStratsModal = ({ visible, onCancel }) => {
   }, []);
 
   useEffect(() => {
-    if (amount > strats || strats <= 0 || amount <= 0 || !strats || Object.keys(strats).length === 0 || !receiverAddress) {
+    if (
+      amount > strats ||
+      strats <= 0 ||
+      amount <= 0 ||
+      !strats ||
+      Object.keys(strats).length === 0 ||
+      !receiverAddress
+    ) {
       setCanTransfer(false);
-    }
-    else {
+    } else {
       setCanTransfer(true);
-    };
-  }, [strats, amount, receiverAddress])
+    }
+  }, [strats, amount, receiverAddress]);
 
   const onSearch = (value) => {
     setSearchInput(value);
     setDropdownOpen(!!value);
-  }
+  };
 
   const handleChange = (value) => {
     setAmount(value);
-  }
+  };
 
   const handleSelect = (e) => {
     setReceiverAddress(e);
     setDropdownOpen(false);
-  }
+  };
 
   const handleSubmit = async (e) => {
     const payload = {
       to: receiverAddress,
-      value: amount !== undefined ? (amount * 100).toFixed(0) : 0
+      value: amount !== undefined ? (amount * 100).toFixed(0) : 0,
     };
 
     if (amount > 0 && amount <= strats && receiverAddress) {
@@ -98,29 +111,37 @@ const TransferStratsModal = ({ visible, onCancel }) => {
   };
 
   const filteredOptions = searchInput
-    ? filteredUsersList.filter(option =>
-      option.label && option.label.toLowerCase().includes(searchInput.toLowerCase())
-    )
+    ? filteredUsersList.filter(
+        (option) =>
+          option.label &&
+          option.label.toLowerCase().includes(searchInput.toLowerCase())
+      )
     : [];
 
   return (
     <Modal
-      title="Transfer STRATS"
+      title="Transfer STRATs"
       open={visible}
       onCancel={handleCancel}
       footer={[
-        <Button key="submit" type="primary" onClick={handleSubmit} loading={isTransferringStrats} disabled={!canTransfer}>
+        <Button
+          key="submit"
+          type="primary"
+          onClick={handleSubmit}
+          loading={isTransferringStrats}
+          disabled={!canTransfer}
+        >
           Submit
         </Button>,
       ]}
     >
       {contextHolder}
-      <Card className='h-[200px]'>
-        <div className='flex items-center flex-col justify-center'>
+      <Card className="h-[200px]">
+        <div className="flex items-center flex-col justify-center">
           <div>
             <p className="text-[#202020] font-medium text-sm">Recipient</p>
             <Select
-              className='w-[20rem] mb-[10px]'
+              className="w-[20rem] mb-[10px]"
               placeholder={'Select Recipient'}
               showSearch
               size="large"
@@ -129,7 +150,9 @@ const TransferStratsModal = ({ visible, onCancel }) => {
               options={filteredOptions}
               optionFilterProp="value"
               filterOption={(input, option) =>
-                (option?.label ?? '').toLowerCase().includes(input.toLowerCase())
+                (option?.label ?? '')
+                  .toLowerCase()
+                  .includes(input.toLowerCase())
               }
               open={dropdownOpen}
               onFocus={() => setDropdownOpen(!!searchInput)}
@@ -140,10 +163,10 @@ const TransferStratsModal = ({ visible, onCancel }) => {
           <div>
             <p className="text-[#202020] font-medium text-sm">Amount</p>
             <InputNumber
-              className='w-[20rem] mb-[10px]'
+              className="w-[20rem] mb-[10px]"
               controls={false}
-              size={"large"}
-              min={0.00}
+              size={'large'}
+              min={0.0}
               precision={2}
               defaultValue={amount}
               onChange={(e) => handleChange(e)}
@@ -152,7 +175,7 @@ const TransferStratsModal = ({ visible, onCancel }) => {
           </div>
         </div>
       </Card>
-      {message && openToast("bottom")}
+      {message && openToast('bottom')}
     </Modal>
   );
 };

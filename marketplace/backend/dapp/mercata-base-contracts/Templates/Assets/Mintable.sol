@@ -46,6 +46,7 @@ abstract contract Mintable is Redeemable {
     }
 
     function mint(uint _quantity) internal virtual override returns (UTXO) {
+        require(_quantity > 0, "Quantity must be greater than 0");
         Mintable m = new Mintable(name, description, images, files, fileNames, createdDate, _quantity, status, address(redemptionService));
         return UTXO(address(m));
     }
@@ -54,6 +55,7 @@ abstract contract Mintable is Redeemable {
         require(isMint, "Only the mint contract can mint new units");
         require(status != AssetStatus.PENDING_REDEMPTION, "Asset is not in ACTIVE state.");
         require(status != AssetStatus.RETIRED, "Asset is not in ACTIVE state.");
+        require(_quantity > 0, "Quantity must be greater than 0");
         require(getCommonName(msg.sender) == minterCommonName, "Only the minter can mint new units");
         emit OwnershipTransfer(
             originAddress,
