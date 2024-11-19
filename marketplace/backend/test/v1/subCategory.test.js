@@ -1,53 +1,55 @@
-import { assert } from 'blockapps-rest'
-import dotenv from 'dotenv'
-import config from '../../load.config'
-import oauthHelper from '/helpers/oauthHelper'
+import { assert } from 'blockapps-rest';
+import dotenv from 'dotenv';
+import config from '../../load.config';
+import oauthHelper from '/helpers/oauthHelper';
 import RestStatus from 'http-status-codes';
-import { get } from '/helpers/rest'
-import dappJs from '../../dapp/dapp/dapp'
+import { get } from '/helpers/rest';
+import dappJs from '../../dapp/dapp/dapp';
 
-import { SubCategory } from '../../api/v1/endpoints'
+import { SubCategory } from '../../api/v1/endpoints';
 
-const options = { config }
+const options = { config };
 
-const loadEnv = dotenv.config()
-assert.isUndefined(loadEnv.error)
+const loadEnv = dotenv.config();
+assert.isUndefined(loadEnv.error);
 
 describe('Category End-To-End Tests', function () {
-  this.timeout(config.timeout)
-  let globalAdmin
+  this.timeout(config.timeout);
+  let globalAdmin;
 
   before(async () => {
-    let globalAdminToken
+    let globalAdminToken;
     try {
       globalAdminToken = await oauthHelper.getUserToken(
         `${process.env.GLOBAL_ADMIN_NAME}`,
-        `${process.env.GLOBAL_ADMIN_PASSWORD}`,
-      )
+        `${process.env.GLOBAL_ADMIN_PASSWORD}`
+      );
     } catch (e) {
       console.error(
         'ERROR: Unable to fetch the org user token, check your OAuth settings in config',
-        e,
-      )
-      throw e
+        e
+      );
+      throw e;
     }
 
-    const globalAdminCredentials = { token: globalAdminToken }
+    const globalAdminCredentials = { token: globalAdminToken };
 
-    const globalAdminResponse = await oauthHelper.getStratoUserFromToken(globalAdminCredentials.token)
-    const dapp = await dappJs.loadFromDeployment(globalAdminCredentials, `${config.configDirPath}/${config.deployFilename}`, options);
-
+    const globalAdminResponse = await oauthHelper.getStratoUserFromToken(
+      globalAdminCredentials.token
+    );
+    const dapp = await dappJs.loadFromDeployment(
+      globalAdminCredentials,
+      `${config.configDirPath}/${config.deployFilename}`,
+      options
+    );
 
     assert.strictEqual(
       globalAdminResponse.status,
       RestStatus.OK,
       globalAdminResponse.message
-    )
-    globalAdmin = { ...globalAdminResponse.user, ...globalAdminCredentials }
-
-  })
-
-
+    );
+    globalAdmin = { ...globalAdminResponse.user, ...globalAdminCredentials };
+  });
 
   // it('get a subCategory', async () => {
   //   const createArgs = {
@@ -104,36 +106,34 @@ describe('Category End-To-End Tests', function () {
     const subCategory = await get(
       SubCategory.prefix,
       SubCategory.getAll,
-      {category:"Art"},
-      globalAdmin.token,
-    )
+      { category: 'Art' },
+      globalAdmin.token
+    );
 
     assert.equal(subCategory.status, 200, 'should be 200');
     assert.isDefined(subCategory.body, 'body should be defined');
     assert.isDefined(subCategory.body.data, 'body should be defined');
-    })
-  
-//   const subCategory = await get(
-//     SubCategory.prefix,
-//     SubCategory.getAll,
-//     {category:"Carbon"},
-//     globalAdmin.token,
-//   )
+  });
 
-//   assert.equal(subCategory.status, 200, 'should be 200');
-//   assert.isDefined(subCategory.body, 'body should be defined');
-//   assert.isDefined(subCategory.body.data, 'body should be defined');
-// })
-// const subCategory = await get(
-//   SubCategory.prefix,
-//   SubCategory.getAll,
-//   {category:"Real Estate"},
-//   globalAdmin.token,
-// )
+  //   const subCategory = await get(
+  //     SubCategory.prefix,
+  //     SubCategory.getAll,
+  //     {category:"Carbon"},
+  //     globalAdmin.token,
+  //   )
 
-// assert.equal(subCategory.status, 200, 'should be 200');
-// assert.isDefined(subCategory.body, 'body should be defined');
-// assert.isDefined(subCategory.body.data, 'body should be defined');
+  //   assert.equal(subCategory.status, 200, 'should be 200');
+  //   assert.isDefined(subCategory.body, 'body should be defined');
+  //   assert.isDefined(subCategory.body.data, 'body should be defined');
+  // })
+  // const subCategory = await get(
+  //   SubCategory.prefix,
+  //   SubCategory.getAll,
+  //   {category:"Real Estate"},
+  //   globalAdmin.token,
+  // )
 
-
-})
+  // assert.equal(subCategory.status, 200, 'should be 200');
+  // assert.isDefined(subCategory.body, 'body should be defined');
+  // assert.isDefined(subCategory.body.data, 'body should be defined');
+});

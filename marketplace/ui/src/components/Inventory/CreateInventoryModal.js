@@ -1,27 +1,27 @@
-import React, { useEffect, useState } from "react";
-import {
-  Form,
-  Modal,
-  Input,
-  Select,
-  Button,
-  Upload,
-  notification,
-} from "antd";
-import TagManager from "react-gtm-module";
+import React, { useEffect, useState } from 'react';
+import { Form, Modal, Input, Select, Button, Upload, notification } from 'antd';
+import TagManager from 'react-gtm-module';
 
 import {
   useInventoryDispatch,
   useInventoryState,
-} from "../../contexts/inventory";
-import { useRedemptionDispatch, useRedemptionState } from "../../contexts/redemption";
-import { actions as redemptionActions } from "../../contexts/redemption/actions";
-import { actions } from "../../contexts/inventory/actions";
-import TextArea from "antd/es/input/TextArea";
-import { INVENTORY_MODAL_INITIAL_VALUES, SIZES, unitOfMeasures, unitOfSpiritMeasures } from "../../helpers/constants";
-import { categoricalProperties } from "./CategoryFields";
-import RichEditor from "../RichEditor";
-import { UPLOAD_ERROR } from "../../helpers/msgConstants";
+} from '../../contexts/inventory';
+import {
+  useRedemptionDispatch,
+  useRedemptionState,
+} from '../../contexts/redemption';
+import { actions as redemptionActions } from '../../contexts/redemption/actions';
+import { actions } from '../../contexts/inventory/actions';
+import TextArea from 'antd/es/input/TextArea';
+import {
+  INVENTORY_MODAL_INITIAL_VALUES,
+  SIZES,
+  unitOfMeasures,
+  unitOfSpiritMeasures,
+} from '../../helpers/constants';
+import { categoricalProperties } from './CategoryFields';
+import RichEditor from '../RichEditor';
+import { UPLOAD_ERROR } from '../../helpers/msgConstants';
 
 const { Option } = Select;
 
@@ -40,25 +40,27 @@ const CreateInventoryModal = ({
   const { isCreateInventorySubmitting, isUploadImageSubmitting } =
     useInventoryState();
 
-  const [uploadErr, setUploadErr] = useState("");
+  const [uploadErr, setUploadErr] = useState('');
   const [selectedImages, setSelectedImages] = useState(null);
   const [selectedFiles, setSelectedFiles] = useState(null);
   const [clothingType, setClothingType] = useState(null);
   const [sizeOptions, setSizeOptions] = useState([]);
-  const [categoryValue, setCategoryValue] = useState("Art");
-  const [subCategoryValue, setSubCategoryValue] = useState(form.getFieldValue("subCategory"));
+  const [categoryValue, setCategoryValue] = useState('Art');
+  const [subCategoryValue, setSubCategoryValue] = useState(
+    form.getFieldValue('subCategory')
+  );
   const [measureUnit, setMeasureUnit] = useState(unitOfMeasures);
 
-
   const redemptionDispatch = useRedemptionDispatch();
-  const { redemptionServices, isFetchingRedemptionServices } = useRedemptionState();
+  const { redemptionServices, isFetchingRedemptionServices } =
+    useRedemptionState();
 
   useEffect(() => {
     redemptionActions.fetchRedemptionServices(redemptionDispatch);
   }, [redemptionDispatch]);
 
   const beforeImageUpload = (file) => {
-    const isJpgOrPng = file.type === "image/jpeg" || file.type === "image/png";
+    const isJpgOrPng = file.type === 'image/jpeg' || file.type === 'image/png';
     const isLt5M = file.size / 1024 / 1024 < 5;
     const isNameLengthValid = file.name.length <= 100;
 
@@ -71,12 +73,12 @@ const CreateInventoryModal = ({
       return Upload.LIST_IGNORE;
     }
 
-    setUploadErr("");
+    setUploadErr('');
     return false;
   };
 
   const beforeFileUpload = (file) => {
-    const isPdf = file.type === "application/pdf";
+    const isPdf = file.type === 'application/pdf';
     const isLt5M = file.size / 1024 / 1024 < 5; // Check if the file size is less than 6 MB
     const isNameLengthValid = file.name.length <= 100;
 
@@ -92,22 +94,28 @@ const CreateInventoryModal = ({
       setUploadErr(UPLOAD_ERROR.nameErr);
       return Upload.LIST_IGNORE;
     }
-    setUploadErr("");
+    setUploadErr('');
     return false;
   };
 
   const handleImageChange = (info) => {
     setSelectedImages(info.fileList);
-    form.setFieldValue("images", info.fileList.map((e) => e.originFileObj))
+    form.setFieldValue(
+      'images',
+      info.fileList.map((e) => e.originFileObj)
+    );
   };
 
   const handleFileChange = (info) => {
     setSelectedFiles(info.fileList);
-    form.setFieldValue("files", info.fileList.map((e) => e.originFileObj))
+    form.setFieldValue(
+      'files',
+      info.fileList.map((e) => e.originFileObj)
+    );
   };
 
   const handleCreateFormSubmit = async (values) => {
-    let imageKeys = []
+    let imageKeys = [];
     if (values.images && values.images.length > 0) {
       for (const img of values.images) {
         const formData = new FormData();
@@ -116,13 +124,13 @@ const CreateInventoryModal = ({
         if (imageData) {
           imageKeys.push(imageData);
         } else {
-          throw new Error("Image upload failed");
+          throw new Error('Image upload failed');
         }
       }
     }
 
-    let fileKeys = []
-    let fileNamesArr = []
+    let fileKeys = [];
+    let fileNamesArr = [];
     if (values.files && values.files.length > 0) {
       for (const file of values.files) {
         const formData = new FormData();
@@ -132,30 +140,32 @@ const CreateInventoryModal = ({
           fileKeys.push(fileData);
           fileNamesArr.push(file.name);
         } else {
-          throw new Error("File upload failed");
+          throw new Error('File upload failed');
         }
       }
     }
 
     const { category, subCategory, images, files, ...body } = values;
-    const redemptionService = redemptionServices ? (redemptionServices[0] || {}).address : undefined;
+    const redemptionService = redemptionServices
+      ? (redemptionServices[0] || {}).address
+      : undefined;
     const newBody = {
       itemArgs: {
         images: imageKeys || [],
         files: fileKeys || [],
         fileNames: fileNamesArr || [],
         redemptionService,
-        ...body
+        ...body,
       },
     };
 
     window.LOQ = window.LOQ || [];
     window.LOQ.push([
-      "ready",
+      'ready',
       async (LO) => {
         // Track an event
-        await LO.$internal.ready("events");
-        LO.events.track("Create Inventory", {
+        await LO.$internal.ready('events');
+        LO.events.track('Create Inventory', {
           category: values.category.name,
           product: values.productName.name,
         });
@@ -163,19 +173,21 @@ const CreateInventoryModal = ({
     ]);
     TagManager.dataLayer({
       dataLayer: {
-        event: "create_item",
+        event: 'create_item',
       },
     });
 
-    let isDone = await actions.createItem(
-      dispatch,
-      newBody,
-      subCategory
-    );
+    let isDone = await actions.createItem(dispatch, newBody, subCategory);
 
     if (isDone) {
       if (page === 1)
-        await actions.fetchInventory(dispatch, 10, 0, debouncedSearchTerm, categoryName && categoryName !== "All" ? categoryName : undefined);
+        await actions.fetchInventory(
+          dispatch,
+          10,
+          0,
+          debouncedSearchTerm,
+          categoryName && categoryName !== 'All' ? categoryName : undefined
+        );
       handleCancel();
     }
   };
@@ -183,7 +195,7 @@ const CreateInventoryModal = ({
   const openToast = (placement) => {
     api.error({
       message: uploadErr,
-      onClose: setUploadErr(""),
+      onClose: setUploadErr(''),
       placement,
       key: 1,
     });
@@ -191,13 +203,13 @@ const CreateInventoryModal = ({
 
   const handleClothingTypeChange = (value) => {
     setClothingType(value);
-    form.setFieldValue("clothingType", value);
-    form.setFieldValue("size", null);
+    form.setFieldValue('clothingType', value);
+    form.setFieldValue('size', null);
     updateSizeOptions(value);
   };
 
   const updateSizeOptions = (type) => {
-    if (type === "Shoes") {
+    if (type === 'Shoes') {
       setSizeOptions(SIZES.shoes);
     } else {
       setSizeOptions(SIZES.other);
@@ -205,33 +217,43 @@ const CreateInventoryModal = ({
   };
 
   const handleCategory = (value) => {
-    form.setFieldValue("category", value);
+    form.setFieldValue('category', value);
     setCategoryValue(value);
     if (value === 'Carbon' || value === 'Tokens') {
-      form.setFieldValue("subCategory", null);
+      form.setFieldValue('subCategory', null);
       setSubCategoryValue(null);
     } else {
-      if (value === "Metals") {
-        setMeasureUnit(unitOfMeasures)
+      if (value === 'Metals') {
+        setMeasureUnit(unitOfMeasures);
       }
-      if (value === "Spirits") {
-        setMeasureUnit(unitOfSpiritMeasures)
+      if (value === 'Spirits') {
+        setMeasureUnit(unitOfSpiritMeasures);
       }
 
-      const subCat = categorys.find(item => item.name === value).subCategories[0].name
-      form.setFieldValue("subCategory", subCat);
+      const subCat = categorys.find((item) => item.name === value)
+        .subCategories[0].name;
+      form.setFieldValue('subCategory', subCat);
       setSubCategoryValue(subCat);
     }
-  }
+  };
 
-  const UploadFormItem = ({ label, name, fileList, accept, multiple, maxCount, beforeUpload, onChange }) => (
+  const UploadFormItem = ({
+    label,
+    name,
+    fileList,
+    accept,
+    multiple,
+    maxCount,
+    beforeUpload,
+    onChange,
+  }) => (
     <Form.Item
       label={label}
       name={name}
       className="w-full sm:w-[200px] md:w-72"
       rules={[
         {
-          required: label==="Upload Images"? true : false,
+          required: label === 'Upload Images' ? true : false,
           message: `Please ${label.toLowerCase()}`,
         },
       ]}
@@ -254,7 +276,7 @@ const CreateInventoryModal = ({
       <div className="flex items-start">
         <p className="mt-1 text-xs italic font-medium">Note:</p>
         <p className="mt-1 text-xs italic ml-1 mr-4">
-          {accept === "image/png, image/jpeg"
+          {accept === 'image/png, image/jpeg'
             ? 'Use jpg, png format of size less than 5mb. Limit of 10.'
             : 'Use pdf files with total size of less than 5mb. Limit of 10 files.'}
         </p>
@@ -279,18 +301,20 @@ const CreateInventoryModal = ({
               onClick={() => {
                 form.validateFields().then((values) => {
                   handleCreateFormSubmit(values);
-                })
+                });
               }}
-              loading={isCreateInventorySubmitting || isUploadImageSubmitting || isFetchingRedemptionServices}
+              loading={
+                isCreateInventorySubmitting ||
+                isUploadImageSubmitting ||
+                isFetchingRedemptionServices
+              }
             >
               Create Item
             </Button>
           </div>,
         ]}
       >
-        <h1 className=" font-semibold text-lg text-[#202020]">
-          Create Item
-        </h1>
+        <h1 className=" font-semibold text-lg text-[#202020]">Create Item</h1>
         <hr className="text-secondryD mt-3" />
         <Form
           form={form}
@@ -331,7 +355,7 @@ const CreateInventoryModal = ({
                   allowClear
                   value={categoryValue}
                   onChange={(value) => {
-                    handleCategory(value)
+                    handleCategory(value);
                   }}
                 >
                   {categorys.map((e, index) => (
@@ -359,21 +383,33 @@ const CreateInventoryModal = ({
                   allowClear
                   value={subCategoryValue}
                   onChange={(value) => {
-                    form.setFieldValue("subCategory", value);
+                    form.setFieldValue('subCategory', value);
                     setSubCategoryValue(value);
                   }}
                 >
                   {categorys.map((category) =>
-                    category.name === categoryValue ? category.subCategories.map((e, index) => (
-                      <Option id="subCategory-options" value={e.contract} key={index}>
-                        {e.name}
-                      </Option>
-                    )) : null
+                    category.name === categoryValue
+                      ? category.subCategories.map((e, index) => (
+                          <Option
+                            id="subCategory-options"
+                            value={e.contract}
+                            key={index}
+                          >
+                            {e.name === "STRATS" ? "STRAT" : e.name}
+                          </Option>
+                        ))
+                      : null
                   )}
                 </Select>
               </Form.Item>
             </div>
-            {categoricalProperties(form, handleClothingTypeChange, clothingType, sizeOptions, measureUnit)}
+            {categoricalProperties(
+              form,
+              handleClothingTypeChange,
+              clothingType,
+              sizeOptions,
+              measureUnit
+            )}
             <div className="flex justify-between mt-4 !list-disc">
               <Form.Item
                 label="Description"
@@ -391,7 +427,7 @@ const CreateInventoryModal = ({
                   onChange={(content) => {
                     form.setFieldsValue({ description: content });
                   }}
-                  initialValue={form.getFieldValue("description") || ""}
+                  initialValue={form.getFieldValue('description') || ''}
                 />
               </Form.Item>
             </div>
@@ -420,7 +456,7 @@ const CreateInventoryModal = ({
           </div>
         </Form>
       </Modal>
-      {uploadErr && openToast("bottom")}
+      {uploadErr && openToast('bottom')}
     </>
   );
 };

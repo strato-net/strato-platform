@@ -1,40 +1,40 @@
-import { rest } from 'blockapps-rest'
-import Joi from '@hapi/joi'
-import RestStatus from 'http-status-codes'
-import config from '../../../load.config'
+import { rest } from 'blockapps-rest';
+import Joi from '@hapi/joi';
+import RestStatus from 'http-status-codes';
+import config from '../../../load.config';
 
-const options = { config, cacheNonce: true }
+const options = { config, cacheNonce: true };
 
 class STRATSController {
   static async getAll(req, res, next) {
     try {
-      const { dapp, query } = req
+      const { dapp, query } = req;
 
-      const STRATS = await dapp.getSTRATS({ ...query })
-      rest.response.status200(res, STRATS)
+      const STRATS = await dapp.getSTRATS({ ...query });
+      rest.response.status200(res, STRATS);
 
-      return next()
+      return next();
     } catch (e) {
-      return next(e)
+      return next(e);
     }
   }
 
   static async create(req, res, next) {
     try {
-      const { dapp, body } = req
+      const { dapp, body } = req;
 
-      STRATSController.validateCreateSTRATSArgs(body)
+      STRATSController.validateCreateSTRATSArgs(body);
 
-      const result = await dapp.createSTRATS(body)
-      rest.response.status200(res, result)
+      const result = await dapp.createSTRATS(body);
+      rest.response.status200(res, result);
 
-      return next()
+      return next();
     } catch (e) {
-      return next(e)
+      return next(e);
     }
   }
 
-  // ----------------------- ARG VALIDATION ------------------------  
+  // ----------------------- ARG VALIDATION ------------------------
 
   static validateCreateSTRATSArgs(args) {
     const createSTRATSSchema = Joi.object({
@@ -48,16 +48,20 @@ class STRATSController {
         redemptionService: Joi.string().required(),
         paymentServiceCreator: Joi.string().required(),
         paymentServiceName: Joi.string().required(),
-      }).required()
+      }).required(),
     });
 
     const validation = createSTRATSSchema.validate(args);
 
     if (validation.error) {
       console.log(validation.error.message);
-      throw new rest.RestError(RestStatus.BAD_REQUEST, 'Create STRATS Argument Validation Error', {
-        message: `Missing args or bad format: ${validation.error.message}`,
-      })
+      throw new rest.RestError(
+        RestStatus.BAD_REQUEST,
+        'Create STRATS Argument Validation Error',
+        {
+          message: `Missing args or bad format: ${validation.error.message}`,
+        }
+      );
     }
   }
 }

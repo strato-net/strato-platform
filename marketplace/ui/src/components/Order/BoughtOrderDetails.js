@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect } from 'react';
 import {
   Card,
   Row,
@@ -11,31 +11,30 @@ import {
   Button,
   Spin,
   Tabs,
-} from "antd";
-import { Link, useLocation, useMatch } from "react-router-dom";
-import { actions } from "../../contexts/order/actions";
-import { useOrderDispatch, useOrderState } from "../../contexts/order";
-import routes from "../../helpers/routes";
-import classNames from "classnames";
-import { EyeOutlined } from "@ant-design/icons";
-import DataTableComponent from "../DataTableComponent";
-import { getStringDate } from "../../helpers/utils";
-import { getStatus } from "./constant";
-import { useNavigate } from "react-router-dom";
-import { US_DATE_FORMAT, STRATS_CONVERSION } from "../../helpers/constants";
-import ClickableCell from "../ClickableCell";
-import image_placeholder from "../../images/resources/image_placeholder.png";
-import dayjs from "dayjs";
-import TransfersTable from "./TransfersTable";
-import SoldOrdersTable from "./SoldOrdersTable";
-import RedemptionsOutgoingTable from "./RedemptionsOutgoingTable";
-import RedemptionsIncomingTable from "./RedemptionsIncomingTable";
-import { ResponsiveOrderDetailCard } from "./ResponsiveOrderDetailCard";
-import { LeftArrow } from "../../images/SVGComponents";
-
+} from 'antd';
+import { Link, useLocation, useMatch } from 'react-router-dom';
+import { actions } from '../../contexts/order/actions';
+import { useOrderDispatch, useOrderState } from '../../contexts/order';
+import routes from '../../helpers/routes';
+import classNames from 'classnames';
+import { EyeOutlined } from '@ant-design/icons';
+import DataTableComponent from '../DataTableComponent';
+import { getStringDate } from '../../helpers/utils';
+import { getStatus } from './constant';
+import { useNavigate } from 'react-router-dom';
+import { US_DATE_FORMAT, STRATS_CONVERSION } from '../../helpers/constants';
+import ClickableCell from '../ClickableCell';
+import image_placeholder from '../../images/resources/image_placeholder.png';
+import dayjs from 'dayjs';
+import TransfersTable from './TransfersTable';
+import SoldOrdersTable from './SoldOrdersTable';
+import RedemptionsOutgoingTable from './RedemptionsOutgoingTable';
+import RedemptionsIncomingTable from './RedemptionsIncomingTable';
+import { ResponsiveOrderDetailCard } from './ResponsiveOrderDetailCard';
+import { LeftArrow } from '../../images/SVGComponents';
 
 const BoughtOrderDetails = ({ user, users }) => {
-  const [comment, setcomment] = useState("");
+  const [comment, setcomment] = useState('');
   const [Id, setId] = useState(undefined);
   const [data, setdata] = useState([]);
   const dispatch = useOrderDispatch();
@@ -43,9 +42,9 @@ const BoughtOrderDetails = ({ user, users }) => {
   const [api, contextHolder] = notification.useNotification();
   const [status, setStatus] = useState(getStatus(0));
   const { TextArea } = Input;
-  const [paid, setPaid] = useState("Processing");
-  const [selectedDate, setSelectedDate] = useState("");
-  const { state } = useLocation()
+  const [paid, setPaid] = useState('Processing');
+  const [selectedDate, setSelectedDate] = useState('');
+  const { state } = useLocation();
 
   const navigate = useNavigate();
 
@@ -81,10 +80,8 @@ const BoughtOrderDetails = ({ user, users }) => {
     strict: true,
   });
 
-
   useEffect(() => {
     setId(routeMatch?.params?.id);
-
   }, [routeMatch]);
 
   useEffect(() => {
@@ -102,25 +99,49 @@ const BoughtOrderDetails = ({ user, users }) => {
       const statusInt = parseInt(orderDetails.order.status);
       setStatus(getStatus(statusInt));
       if (statusInt === 3) {
-        setPaid("Paid");
+        setPaid('Paid');
       } else if (statusInt === 4) {
-        setPaid("Canceled");
+        setPaid('Canceled');
       }
       setcomment(orderDetails.order.comments);
-      const orderQuantities = orderDetails.order.quantities ? orderDetails.order.quantities : orderDetails.order["BlockApps-Mercata-Order-quantities"].map(item => item.value);
+      const orderQuantities = orderDetails.order.quantities
+        ? orderDetails.order.quantities
+        : orderDetails.order['BlockApps-Mercata-Order-quantities'].map(
+            (item) => item.value
+          );
       let items = [];
       orderDetails.assets.forEach((prod, index) => {
-        const quantityIsDecimal = prod.data.quantityIsDecimal && prod.data.quantityIsDecimal === "True";
+        const quantityIsDecimal =
+          prod.data.quantityIsDecimal && prod.data.quantityIsDecimal === 'True';
         items.push({
           address: prod.address,
           chainId: prod.chainId,
           key: prod.address,
-          productImage: prod["BlockApps-Mercata-Asset-images"].length > 0 ? prod["BlockApps-Mercata-Asset-images"][0].value : image_placeholder,
+          productImage:
+            prod['BlockApps-Mercata-Asset-images'].length > 0
+              ? prod['BlockApps-Mercata-Asset-images'][0].value
+              : image_placeholder,
           productName: prod,
           name: prod.name,
-          unitPrice: orderDetails.order.currency === "STRATS" ? (prod.price * (quantityIsDecimal ? 100 : 1) * STRATS_CONVERSION).toFixed(0) : (prod.price * (quantityIsDecimal ? 100 : 1)).toFixed(2),
-          quantity: quantityIsDecimal ? orderQuantities[index] / 100 : parseInt(orderQuantities[index]),
-          amount: (orderDetails.order.currency === "STRATS" ? (prod.price * STRATS_CONVERSION * parseInt(orderQuantities[index])).toFixed(0) : (prod.price * parseInt(orderQuantities[index])).toFixed(2)),
+          unitPrice:
+            orderDetails.order.currency === 'STRATS'
+              ? (
+                  prod.price *
+                  (quantityIsDecimal ? 100 : 1) *
+                  STRATS_CONVERSION
+                ).toFixed(0)
+              : (prod.price * (quantityIsDecimal ? 100 : 1)).toFixed(2),
+          quantity: quantityIsDecimal
+            ? orderQuantities[index] / 100
+            : parseInt(orderQuantities[index]),
+          amount:
+            orderDetails.order.currency === 'STRATS'
+              ? (
+                  prod.price *
+                  STRATS_CONVERSION *
+                  parseInt(orderQuantities[index])
+                ).toFixed(0)
+              : (prod.price * parseInt(orderQuantities[index])).toFixed(2),
           serialNumber: prod,
           tax: prod.tax ? prod.tax : 0,
         });
@@ -135,16 +156,16 @@ const BoughtOrderDetails = ({ user, users }) => {
     audits.forEach((val) => {
       if (users && users.length) {
         const sender = users.find(
-          (data) => val["transaction_sender"] === data.userAdress
+          (data) => val['transaction_sender'] === data.userAdress
         );
-        audits["sender"] = sender;
+        audits['sender'] = sender;
       }
     });
   }
 
   if (Id !== undefined && !isorderDetailsLoading && details !== null) {
-    if (details["ownerOrganizationalUnit"] === "") {
-      details["ownerOrganizationalUnit"] = "N/A";
+    if (details['ownerOrganizationalUnit'] === '') {
+      details['ownerOrganizationalUnit'] = 'N/A';
     }
   }
 
@@ -152,7 +173,12 @@ const BoughtOrderDetails = ({ user, users }) => {
     return (
       <Col>
         <Text className="block text-[#6A6A6A] text-[13px] mb-2">{title}</Text>
-        <Text id={title} className="block text-[#202020] text-[17px] font-semibold">{value}</Text>
+        <Text
+          id={title}
+          className="block text-[#202020] text-[17px] font-semibold"
+        >
+          {value}
+        </Text>
       </Col>
     );
   };
@@ -163,32 +189,40 @@ const BoughtOrderDetails = ({ user, users }) => {
 
   const statusComponent = (status) => {
     const statusClasses = {
-      ["Awaiting Shipment"]: {
-        textClass: "bg-[#EBF7FF]",
-        bgClass: "bg-[#13188A]"
+      ['Awaiting Shipment']: {
+        textClass: 'bg-[#EBF7FF]',
+        bgClass: 'bg-[#13188A]',
       },
-      ["Awaiting Fulfillment"]: {
-        textClass: "bg-[#FF8C0033]",
-        bgClass: "bg-[#FF8C00]"
+      ['Awaiting Fulfillment']: {
+        textClass: 'bg-[#FF8C0033]',
+        bgClass: 'bg-[#FF8C00]',
       },
-      ["Payment Pending"]: {
-        textClass: "bg-[#FF8C0033]",
-        bgClass: "bg-[#FF8C00]"
+      ['Payment Pending']: {
+        textClass: 'bg-[#FF8C0033]',
+        bgClass: 'bg-[#FF8C00]',
       },
-      ["Closed"]: {
-        textClass: "bg-[#119B2D33]",
-        bgClass: "bg-[#119B2D]"
+      ['Closed']: {
+        textClass: 'bg-[#119B2D33]',
+        bgClass: 'bg-[#119B2D]',
       },
-      ["Canceled"]: {
-        textClass: "bg-[#FFF0F0]",
-        bgClass: "bg-[#FF0000]"
+      ['Canceled']: {
+        textClass: 'bg-[#FFF0F0]',
+        bgClass: 'bg-[#FF0000]',
       },
     };
 
-    const { textClass, bgClass } = statusClasses[status] || { textClass: "bg-[#FFF6EC]", bgClass: "bg-[#119B2D]" };
+    const { textClass, bgClass } = statusClasses[status] || {
+      textClass: 'bg-[#FFF6EC]',
+      bgClass: 'bg-[#119B2D]',
+    };
     return (
-      <div className={classNames(textClass, "status_contain w-max h-max text-center py-1 px-3 rounded-md md:rounded-xl flex justify-start items-center gap-1 p-1")}>
-        <div className={classNames(bgClass, "h-3 w-3 rounded-sm")}></div>
+      <div
+        className={classNames(
+          textClass,
+          'status_contain w-max h-max text-center py-1 px-3 rounded-md md:rounded-xl flex justify-start items-center gap-1 p-1'
+        )}
+      >
+        <div className={classNames(bgClass, 'h-3 w-3 rounded-sm')}></div>
         <p className="!mb-0 text-[11px] md:text-sm">{status}</p>
       </div>
     );
@@ -196,63 +230,79 @@ const BoughtOrderDetails = ({ user, users }) => {
 
   const statusComponentForPayment = (status) => {
     const statusClasses = {
-      ["Processing"]: {
-        textClass: "bg-[#FF8C0033]",
-        bgClass: "bg-[#FF8C00]"
+      ['Processing']: {
+        textClass: 'bg-[#FF8C0033]',
+        bgClass: 'bg-[#FF8C00]',
       },
-      ["Paid"]: {
-        textClass: "bg-[#119B2D33]",
-        bgClass: "bg-[#119B2D]"
+      ['Paid']: {
+        textClass: 'bg-[#119B2D33]',
+        bgClass: 'bg-[#119B2D]',
       },
-      ["Payment Failed"]: {
-        textClass: "bg-[#FFF0F0]",
-        bgClass: "bg-[#FF0000]"
+      ['Payment Failed']: {
+        textClass: 'bg-[#FFF0F0]',
+        bgClass: 'bg-[#FF0000]',
       },
-      ["Canceled"]: {
-        textClass: "bg-[#FFF0F0]",
-        bgClass: "bg-[#FF0000]"
+      ['Canceled']: {
+        textClass: 'bg-[#FFF0F0]',
+        bgClass: 'bg-[#FF0000]',
       },
     };
 
-    const { textClass, bgClass } = statusClasses[status] || { textClass: "bg-[#FFF6EC]", bgClass: "bg-[#119B2D]" };
+    const { textClass, bgClass } = statusClasses[status] || {
+      textClass: 'bg-[#FFF6EC]',
+      bgClass: 'bg-[#119B2D]',
+    };
     return (
-      <div className={classNames(textClass, "status_contain w-max h-max text-center py-1 px-3 rounded-md md:rounded-xl flex justify-start items-center gap-1 p-1")}>
-        <div className={classNames(bgClass, "h-3 w-3 rounded-sm")}></div>
+      <div
+        className={classNames(
+          textClass,
+          'status_contain w-max h-max text-center py-1 px-3 rounded-md md:rounded-xl flex justify-start items-center gap-1 p-1'
+        )}
+      >
+        <div className={classNames(bgClass, 'h-3 w-3 rounded-sm')}></div>
         <p className="!mb-0 text-xs md:text-sm">{status}</p>
       </div>
     );
   };
 
   const onChange = (key) => {
-    navigate(routes.Transactions.url)
+    navigate(routes.Transactions.url);
   };
 
   const NewOrderData = ({ title, value, className }) => {
     return (
       <div className={className}>
         <Text className="block text-[#6A6A6A] text-[12px] mb-1">{title}</Text>
-        <Text className="block text-[#202020] text-[13px] font-semibold">{value}</Text>
+        <Text className="block text-[#202020] text-[13px] font-semibold">
+          {value}
+        </Text>
       </div>
     );
   };
 
   let column = [
     {
-      title: "",
-      dataIndex: "productImage",
-      key: "productImage",
-      render: (text) => <img className="w-[75px] h-[60px] object-contain" alt="" src={text} />,
+      title: '',
+      dataIndex: 'productImage',
+      key: 'productImage',
+      render: (text) => (
+        <img className="w-[75px] h-[60px] object-contain" alt="" src={text} />
+      ),
     },
     {
       title: <Text className="text-primaryC text-[13px]">Product Name</Text>,
-      dataIndex: "productName",
-      key: "productName",
+      dataIndex: 'productName',
+      key: 'productName',
       render: (text) => (
         <p
           // href={routes.BoughtOrderDetails.url}
           id="detail-productName"
           className="text-primary text-[17px] cursor-pointer"
-          onClick={() => { navigate(`${routes.MarketplaceProductDetail.url.replace(":address", text.address).replace(":name", encodeURIComponent(text.name))}`) }}
+          onClick={() => {
+            navigate(
+              `${routes.MarketplaceProductDetail.url.replace(':address', text.address).replace(':name', encodeURIComponent(text.name))}`
+            );
+          }}
         >
           {decodeURIComponent(text.name)}
         </p>
@@ -260,17 +310,19 @@ const BoughtOrderDetails = ({ user, users }) => {
     },
     {
       title: <Text className="text-primaryC text-[13px]">Serial Number</Text>,
-      dataIndex: "serialNumber",
-      key: "serialNumber",
-      align: "center",
+      dataIndex: 'serialNumber',
+      key: 'serialNumber',
+      align: 'center',
       render: (text) => (
         <div className="flex items-center justify-center">
           <EyeOutlined className="mr-2 hover:text-primaryHover cursor-pointer" />
           <p
             onClick={() => {
               navigate(
-                `${routes.BoughtOrderItemDetail.url
-                  .replace(":id", text.address)}`,
+                `${routes.BoughtOrderItemDetail.url.replace(
+                  ':id',
+                  text.address
+                )}`,
                 // .replace(":chainId", text.chainId)}`,
                 { state: { orderId: details.orderId, address: Id } }
               );
@@ -284,33 +336,33 @@ const BoughtOrderDetails = ({ user, users }) => {
     },
     {
       title: <Text className="text-primaryC text-[13px]">Unit Price</Text>,
-      dataIndex: "unitPrice",
-      key: "unitPrice",
-      align: "center",
+      dataIndex: 'unitPrice',
+      key: 'unitPrice',
+      align: 'center',
       render: (text) => <p>{text}</p>,
     },
     {
       title: <Text className="text-primaryC text-[13px]">Quantity</Text>,
-      dataIndex: "quantity",
-      key: "quantity",
-      align: "center",
+      dataIndex: 'quantity',
+      key: 'quantity',
+      align: 'center',
       render: (text) => <p>{text}</p>,
     },
     {
       title: <Text className="text-primaryC text-[13px]">Amount</Text>,
-      dataIndex: "amount",
-      key: "amount",
-      align: "center",
-      render: (text) => <p id="detail-amount" >{text}</p>,
+      dataIndex: 'amount',
+      key: 'amount',
+      align: 'center',
+      render: (text) => <p id="detail-amount">{text}</p>,
     },
     {
-      title: "Invoice",
-      dataIndex: "invoice",
-      key: "invoice",
+      title: 'Invoice',
+      dataIndex: 'invoice',
+      key: 'invoice',
       render: (text) => (
         <button>
           <Link
-            to={`${routes.Invoice.url.replace(":id", routeMatch?.params?.id)}`}
+            to={`${routes.Invoice.url.replace(':id', routeMatch?.params?.id)}`}
             target="_blank"
           >
             <div className="flex items-center cursor-pointer hover:text-primary">
@@ -324,7 +376,7 @@ const BoughtOrderDetails = ({ user, users }) => {
   ];
 
   if (data[0] && !data[0].serialNumber.containsSerialNumber) {
-    column = column.filter(col => col.dataIndex !== "serialNumber")
+    column = column.filter((col) => col.dataIndex !== 'serialNumber');
   }
 
   const handleCancelOrder = async () => {
@@ -342,7 +394,7 @@ const BoughtOrderDetails = ({ user, users }) => {
     };
     let isDone = await actions.cancelSale(dispatch, body);
     if (isDone) {
-      setStatus("Canceled");
+      setStatus('Canceled');
     }
   };
 
@@ -351,15 +403,17 @@ const BoughtOrderDetails = ({ user, users }) => {
       {contextHolder}
       <div>
         <Breadcrumb className="text-sm ml-4 md:ml-20 mt-4 md:mt-5 mb-2">
-          <Breadcrumb.Item href="" onClick={e => e.preventDefault()}>
+          <Breadcrumb.Item href="" onClick={(e) => e.preventDefault()}>
             <ClickableCell href={routes.Marketplace.url}>
-              <p className="text-sm text-[#13188A] font-semibold">
-                Home
-              </p>
+              <p className="text-sm text-[#13188A] font-semibold">Home</p>
             </ClickableCell>
           </Breadcrumb.Item>
-          <Breadcrumb.Item href="" onClick={e => e.preventDefault()}>
-            <div onClick={() => { navigate(routes.Transactions.url) }}>
+          <Breadcrumb.Item href="" onClick={(e) => e.preventDefault()}>
+            <div
+              onClick={() => {
+                navigate(routes.Transactions.url);
+              }}
+            >
               <p className="text-sm text-[#13188A] font-semibold">
                 My Transactions
               </p>
@@ -371,8 +425,16 @@ const BoughtOrderDetails = ({ user, users }) => {
         </Breadcrumb>
 
         <div className="mb-10 lg:px-10">
-          <Button type="ghost" onClick={() => onChange('bought')} className="cursor-pointer mb-1 px-2 flex md:hidden items-center gap-2 text-sm font-semibold"><LeftArrow /> Back</Button>
-          {details === null || isorderDetailsLoading || isbuyerDetailsUpdating ? (
+          <Button
+            type="ghost"
+            onClick={() => onChange('bought')}
+            className="cursor-pointer mb-1 px-2 flex md:hidden items-center gap-2 text-sm font-semibold"
+          >
+            <LeftArrow /> Back
+          </Button>
+          {details === null ||
+          isorderDetailsLoading ||
+          isbuyerDetailsUpdating ? (
             <div className="h-screen flex justify-center items-center">
               <Spin
                 spinning={isorderDetailsLoading || isbuyerDetailsUpdating}
@@ -384,13 +446,20 @@ const BoughtOrderDetails = ({ user, users }) => {
               <div className="flex flex-col md:flex-row md:justify-between">
                 <div className="flex flex-col">
                   <div className="flex">
-                    <Text className="bg-[#E9E9E9] md:bg-white py-2 px-3 w-full md:w-3.5/5 md:bg-none font-semibold text-sm md:text-lg text-primaryB flex gap-4 items-center">Order Details</Text>
-                    <Text className="hidden md:flex mt-2">{statusComponentForPayment(paid)}</Text>
+                    <Text className="bg-[#E9E9E9] md:bg-white py-2 px-3 w-full md:w-3.5/5 md:bg-none font-semibold text-sm md:text-lg text-primaryB flex gap-4 items-center">
+                      Order Details
+                    </Text>
+                    <Text className="hidden md:flex mt-2">
+                      {statusComponentForPayment(paid)}
+                    </Text>
                   </div>
                 </div>
               </div>
               <Row className="hidden md:flex my-6 justify-between bg-[#F6F6F6] p-4 pb-2 rounded">
-                <OrderData title="Order Number" value={`#${`${details.order.orderId}`.substring(0, 6)}`} />
+                <OrderData
+                  title="Order Number"
+                  value={`#${`${details.order.orderId}`.substring(0, 6)}`}
+                />
                 <Divider type="vertical" className="h-14 bg-secondryD" />
                 <OrderData
                   title="Buyer"
@@ -402,13 +471,34 @@ const BoughtOrderDetails = ({ user, users }) => {
                   value={details.order.sellersCommonName}
                 />
                 <Divider type="vertical" className="h-14 bg-secondryD" />
-                <OrderData title="Currency" value={details.order.currency === 'STRATS' ? 'STRAT' : details.order.currency ? details.order.currency : "USD"} />
+                <OrderData
+                  title="Currency"
+                  value={
+                    details.order.currency === 'STRATS'
+                      ? 'STRAT'
+                      : details.order.currency
+                        ? details.order.currency
+                        : 'USD'
+                  }
+                />
                 <Divider type="vertical" className="h-14 bg-secondryD" />
-                <OrderData title="Total" value={details.order.currency === "STRATS" ? (details.order.totalPrice * STRATS_CONVERSION).toFixed(0) : details.order.totalPrice} />
+                <OrderData
+                  title="Total"
+                  value={
+                    details.order.currency === 'STRATS'
+                      ? (details.order.totalPrice * STRATS_CONVERSION).toFixed(
+                          0
+                        )
+                      : details.order.totalPrice
+                  }
+                />
                 <Divider type="vertical" className="h-14 bg-secondryD" />
                 <OrderData
                   title="Date"
-                  value={getStringDate(details.order.createdDate, US_DATE_FORMAT)}
+                  value={getStringDate(
+                    details.order.createdDate,
+                    US_DATE_FORMAT
+                  )}
                 />
                 <Divider type="vertical" className="h-14 bg-secondryD" />
                 <Col>
@@ -419,11 +509,13 @@ const BoughtOrderDetails = ({ user, users }) => {
                 </Col>
               </Row>
               <Row className="my-2 md:hidden flex-col gap-[6px] justify-between p-4 pb-0 rounded">
-              <Col span={24} className="bg-[#E9E9E9]">
-                  <div className="flex justify-between items-center px-2 h-12 rounded-xl"> <span>Invoice</span>
+                <Col span={24} className="bg-[#E9E9E9]">
+                  <div className="flex justify-between items-center px-2 h-12 rounded-xl">
+                    {' '}
+                    <span>Invoice</span>
                     <button>
                       <Link
-                        to={`${routes.Invoice.url.replace(":id", routeMatch?.params?.id)}`}
+                        to={`${routes.Invoice.url.replace(':id', routeMatch?.params?.id)}`}
                         target="_blank"
                       >
                         <div className="flex items-center cursor-pointer hover:text-primary">
@@ -431,23 +523,67 @@ const BoughtOrderDetails = ({ user, users }) => {
                           <p>View</p>
                         </div>
                       </Link>
-                    </button> </div>
+                    </button>{' '}
+                  </div>
                 </Col>
                 <div className="flex gap-4">
-                  <NewOrderData className="w-2/4" title="Order Number" value={'#' + `${details.order.orderId}`.substring(0, 6)} />
-                  <NewOrderData className="w-2/4" title="Buyer" value={details.order.purchasersCommonName} />
+                  <NewOrderData
+                    className="w-2/4"
+                    title="Order Number"
+                    value={'#' + `${details.order.orderId}`.substring(0, 6)}
+                  />
+                  <NewOrderData
+                    className="w-2/4"
+                    title="Buyer"
+                    value={details.order.purchasersCommonName}
+                  />
                 </div>
                 <div className="flex gap-4">
-                  <NewOrderData className="w-2/4" title="Seller" value={details.order.sellersCommonName} />
-                  <NewOrderData className="w-2/4" title="Currency" value={details.order.currency ? details.order.currency : "USD"} />
+                  <NewOrderData
+                    className="w-2/4"
+                    title="Seller"
+                    value={details.order.sellersCommonName}
+                  />
+                  <NewOrderData
+                    className="w-2/4"
+                    title="Currency"
+                    value={
+                      details.order.currency ? details.order.currency : 'USD'
+                    }
+                  />
                 </div>
                 <div className="flex gap-4">
-                  <NewOrderData className="w-2/4" title="Total" value={details.order.currency === "STRATS" ? (details.order.totalPrice * STRATS_CONVERSION).toFixed(0) : details.order.totalPrice} />
-                  <NewOrderData className="w-2/4" title="Date" value={getStringDate(details.order.createdDate, US_DATE_FORMAT)} />
+                  <NewOrderData
+                    className="w-2/4"
+                    title="Total"
+                    value={
+                      details.order.currency === 'STRATS'
+                        ? (
+                            details.order.totalPrice * STRATS_CONVERSION
+                          ).toFixed(0)
+                        : details.order.totalPrice
+                    }
+                  />
+                  <NewOrderData
+                    className="w-2/4"
+                    title="Date"
+                    value={getStringDate(
+                      details.order.createdDate,
+                      US_DATE_FORMAT
+                    )}
+                  />
                 </div>
                 <div className="flex gap-4">
-                  <NewOrderData className="w-2/4" title="Payment Status" value={statusComponentForPayment(paid)} />
-                  <NewOrderData className="w-2/4" title="Status" value={statusComponent(status)} />
+                  <NewOrderData
+                    className="w-2/4"
+                    title="Payment Status"
+                    value={statusComponentForPayment(paid)}
+                  />
+                  <NewOrderData
+                    className="w-2/4"
+                    title="Status"
+                    value={statusComponent(status)}
+                  />
                 </div>
               </Row>
               <Row className="flex-nowrap items-center justify-between mb-2 md:mb-6 p-2">
@@ -473,18 +609,18 @@ const BoughtOrderDetails = ({ user, users }) => {
                   data={data}
                   isLoading={false}
                   scrollX="100%"
-                /></div>
+                />
+              </div>
             </Card>
           )}
-          {data?.length > 0 && data?.map((item) => {
-            return (
-              <ResponsiveOrderDetailCard data={item} />)
-          })}
+          {data?.length > 0 &&
+            data?.map((item) => {
+              return <ResponsiveOrderDetailCard data={item} />;
+            })}
         </div>
-
       </div>
 
-      {message && openToastOrder("bottom")}
+      {message && openToastOrder('bottom')}
     </div>
   );
 };

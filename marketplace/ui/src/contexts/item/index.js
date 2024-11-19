@@ -1,5 +1,5 @@
-import React, { createContext, useContext, useReducer } from "react";
-import reducer from "./reducer";
+import React, { createContext, useContext, useReducer } from 'react';
+import reducer from './reducer';
 
 const ItemStateContext = createContext();
 const ItemDispatchContext = createContext();
@@ -12,17 +12,17 @@ const ItemsProvider = ({ children }) => {
     error: undefined,
     success: false,
     message: null,
-    serialNumbers:[],
+    serialNumbers: [],
     isSerialNumbersLoading: false,
-    ownershipHistory:[],
+    ownershipHistory: [],
     isOwnershipHistoryLoading: false,
-    rawMaterials:[],
+    rawMaterials: [],
     isRawMaterialsLoading: false,
     actualRawMaterials: [],
     isTransferringItems: false,
     itemTransfers: [],
     totalItemsTransfered: 0,
-    isFetchingItemTransfers: false
+    isFetchingItemTransfers: false,
   };
 
   const [state, dispatch] = useReducer(reducer, initialState);

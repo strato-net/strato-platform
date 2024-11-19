@@ -82,7 +82,7 @@ export const Transaction = {
   prefix: '/transaction',
   getUser: '/user',
   getGlobal: '/global',
-}
+};
 
 export const Item = {
   prefix: "/item",

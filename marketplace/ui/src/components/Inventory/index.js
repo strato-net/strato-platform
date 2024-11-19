@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect } from 'react';
 import {
   Breadcrumb,
   Button,
@@ -22,40 +22,40 @@ import { actions } from "../../contexts/inventory/actions";
 import {
   useInventoryDispatch,
   useInventoryState,
-} from "../../contexts/inventory";
+} from '../../contexts/inventory';
 import {
   usePaymentServiceDispatch,
   usePaymentServiceState,
-} from "../../contexts/payment";
-import { actions as paymentServiceActions } from "../../contexts/payment/actions";
-import { Images } from "../../images";
-import { useItemDispatch, useItemState } from "../../contexts/item";
-import { actions as itemActions } from "../../contexts/item/actions";
-import { actions as redemptionActions } from "../../contexts/redemption/actions";
-import { actions as issuerStatusActions } from "../../contexts/issuerStatus/actions";
+} from '../../contexts/payment';
+import { actions as paymentServiceActions } from '../../contexts/payment/actions';
+import { Images } from '../../images';
+import { useItemDispatch, useItemState } from '../../contexts/item';
+import { actions as itemActions } from '../../contexts/item/actions';
+import { actions as redemptionActions } from '../../contexts/redemption/actions';
+import { actions as issuerStatusActions } from '../../contexts/issuerStatus/actions';
 import {
   useRedemptionDispatch,
   useRedemptionState,
-} from "../../contexts/redemption";
+} from '../../contexts/redemption';
 import {
   useIssuerStatusState,
   useIssuerStatusDispatch,
-} from "../../contexts/issuerStatus";
-import ClickableCell from "../ClickableCell";
-import routes from "../../helpers/routes";
-import { useNavigate } from "react-router-dom";
-import { useAuthenticateState } from "../../contexts/authentication";
-import HelmetComponent from "../Helmet/HelmetComponent";
-import { SEO } from "../../helpers/seoConstant";
-import RequestBeAuthorizedIssuerModal from "./RequestBeAuthorizedIssuerModal";
+} from '../../contexts/issuerStatus';
+import ClickableCell from '../ClickableCell';
+import routes from '../../helpers/routes';
+import { useNavigate } from 'react-router-dom';
+import { useAuthenticateState } from '../../contexts/authentication';
+import HelmetComponent from '../Helmet/HelmetComponent';
+import { SEO } from '../../helpers/seoConstant';
+import RequestBeAuthorizedIssuerModal from './RequestBeAuthorizedIssuerModal';
 import {
   ISSUER_STATUS,
   STRATS_CONVERSION,
   ASSET_STATUS,
-} from "../../helpers/constants";
-import ItemActions from "./ItemActions";
-import InventoryCard from "./InventoryCard";
-import "./index.css";
+} from '../../helpers/constants';
+import ItemActions from './ItemActions';
+import InventoryCard from './InventoryCard';
+import './index.css';
 
 const { Option } = Select;
 const StratsIcon = <img src={Images.strats} alt="STRATS" className="w-5 h-5" />
@@ -63,7 +63,7 @@ const StratsIcon = <img src={Images.strats} alt="STRATS" className="w-5 h-5" />
 const Inventory = ({ user }) => {
   const [open, setOpen] = useState(false);
   const [reqModOpen, setReqModOpen] = useState(false);
-  const [queryValue, setQueryValue] = useState("");
+  const [queryValue, setQueryValue] = useState('');
   const debouncedSearchTerm = useDebounce(queryValue, 1000);
   const [limit, setLimit] = useState(10);
   const [offset, setOffset] = useState(0);
@@ -119,7 +119,7 @@ const Inventory = ({ user }) => {
         ...service,
         isNotOnboarded: notOnboardedNames.has(service.serviceName),
         serviceName:
-          service?.serviceName === "STRATS" ? "STRAT" : service?.serviceName,
+          service?.serviceName === 'STRATS' ? 'STRAT' : service?.serviceName,
       }));
     setSortedPaymentServices(sortedServices);
   }, [paymentServices, notOnboarded]);
@@ -162,7 +162,7 @@ const Inventory = ({ user }) => {
         limit,
         offset,
         debouncedSearchTerm,
-        category && category !== "All" ? category : undefined
+        category && category !== 'All' ? category : undefined
       );
     } else {
       actions.fetchInventory(
@@ -170,7 +170,7 @@ const Inventory = ({ user }) => {
         limit,
         offset,
         debouncedSearchTerm,
-        category && category !== "All" ? category : undefined
+        category && category !== 'All' ? category : undefined
       );
     }
     actions.getReserveAddress(dispatch);
@@ -333,13 +333,13 @@ const Inventory = ({ user }) => {
 
   const columns = [
     {
-      title: "Item",
+      title: 'Item',
       render: (text, record) => {
         const callDetailPage = () => {
           navigate(
             `${naviroute
-              .replace(":id", record.address)
-              .replace(":name", encodeURIComponent(record.name))}`,
+              .replace(':id', record.address)
+              .replace(':name', encodeURIComponent(record.name))}`,
             {
               state: { isCalledFromInventory: true },
             }
@@ -350,12 +350,12 @@ const Inventory = ({ user }) => {
             <div className="mr-2 w-[74px] h-[52px] flex items-center justify-center">
               <img
                 src={
-                  record["BlockApps-Mercata-Asset-images"] &&
-                  record["BlockApps-Mercata-Asset-images"].length > 0
-                    ? record["BlockApps-Mercata-Asset-images"][0].value
+                  record['BlockApps-Mercata-Asset-images'] &&
+                  record['BlockApps-Mercata-Asset-images'].length > 0
+                    ? record['BlockApps-Mercata-Asset-images'][0].value
                     : image_placeholder
                 }
-                alt={"Asset image..."}
+                alt={'Asset image...'}
                 className="rounded-md w-full h-full object-contain"
               />
             </div>
@@ -376,45 +376,47 @@ const Inventory = ({ user }) => {
       },
     },
     {
-      title: "Category",
+      title: 'Category',
       render: (text, record) => {
-        const parts = record.contract_name.split("-");
+        const parts = record.contract_name.split('-');
         const contractName = parts[parts.length - 1];
-        return <div>{contractName}</div>;
+        return (
+          <div>{contractName === 'STRATSTokens' ? 'STRAT' : contractName}</div>
+        );
       },
     },
     {
-      title: "Price",
-      align: "center",
+      title: 'Price',
+      align: 'center',
       render: (_, record) => {
         const isStrats =
           record.data.quantityIsDecimal &&
-          record.data.quantityIsDecimal === "True";
+          record.data.quantityIsDecimal === 'True';
         const price = record.price
           ? isStrats
             ? parseFloat(record.price * 100).toFixed(2)
             : record.price
-          : "N/A";
+          : 'N/A';
         return (
           <div>
-            {price !== "N/A" ? (
+            {price !== 'N/A' ? (
               <>
                 <span>${price}</span> <p className="flex text-xs items-center"> &nbsp;({(price * STRATS_CONVERSION).toFixed(0)}  {StratsIcon}) </p>
               </>
             ) : (
-              "N/A"
+              'N/A'
             )}
           </div>
         );
       },
     },
     {
-      title: "Owned",
-      align: "center",
+      title: 'Owned',
+      align: 'center',
       render: (_, record) => {
         const isStrats =
           record.data.quantityIsDecimal &&
-          record.data.quantityIsDecimal === "True";
+          record.data.quantityIsDecimal === 'True';
         const quantity = isStrats
           ? parseFloat((record.quantity / 100).toFixed(2))
           : record.quantity;
@@ -422,12 +424,12 @@ const Inventory = ({ user }) => {
       },
     },
     {
-      title: "Listed for Sale",
-      align: "center",
+      title: 'Listed for Sale',
+      align: 'center',
       render: (_, record) => {
         const isStrats =
           record.data.quantityIsDecimal &&
-          record.data.quantityIsDecimal === "True";
+          record.data.quantityIsDecimal === 'True';
         const saleQuantity = isStrats
           ? parseFloat((record.saleQuantity / 100).toFixed(2))
           : record.saleQuantity;
@@ -435,8 +437,8 @@ const Inventory = ({ user }) => {
       },
     },
     {
-      title: "Actions",
-      align: "center",
+      title: 'Actions',
+      align: 'center',
       render: (text, record) => (
         <div>
           <ItemActions
@@ -454,8 +456,8 @@ const Inventory = ({ user }) => {
       ),
     },
     {
-      title: "Status",
-      align: "center",
+      title: 'Status',
+      align: 'center',
       render: (text, record) => (
         <div className="pt-[7px] lg:pt-0 items-center gap-[5px]">
           {record.price || record?.stratsLoanAmount ? (
@@ -474,7 +476,7 @@ const Inventory = ({ user }) => {
               <p className="text-[#4D4D4D] text-[13px]">Retired</p>
             </div>
           ) : (record.data.isMint &&
-              record.data.isMint === "False" &&
+              record.data.isMint === 'False' &&
               record.quantity === 0) ||
             (!record.data.isMint && record.quantity === 0) ? (
             <div className="flex items-center justify-center gap-2 bg-[#FFA50029] p-[6px] rounded-md">
@@ -525,7 +527,7 @@ const Inventory = ({ user }) => {
                 />
               }
             >
-              {" "}
+              {' '}
               My Wallet
             </Button>
           </div>
@@ -536,7 +538,7 @@ const Inventory = ({ user }) => {
                 className="items-select"
                 style={{ width: 250, height: 40 }}
                 onChange={handleChange}
-                value={"Connect to Payment Provider"}
+                value={'Connect to Payment Provider'}
               >
                 {sortedPaymentServices.map((service) => (
                   <Option
@@ -548,9 +550,9 @@ const Inventory = ({ user }) => {
                     {!service.isNotOnboarded && (
                       <CheckCircleOutlined
                         style={{
-                          color: "#28a745",
-                          position: "absolute",
-                          right: "10px",
+                          color: '#28a745',
+                          position: 'absolute',
+                          right: '10px',
                         }}
                       />
                     )}
@@ -598,10 +600,10 @@ const Inventory = ({ user }) => {
           >
             <Select
               defaultValue="All"
-              style={{ width: 170, height: "auto" }}
+              style={{ width: 170, height: 'auto' }}
               onChange={handleTabSelect}
               options={[
-                { label: "All", value: "All" },
+                { label: 'All', value: 'All' },
                 ...categorys.map((category) => ({
                   label: category.name,
                   value: category.name,
@@ -725,10 +727,10 @@ const Inventory = ({ user }) => {
           setIssuerStatus={setIssuerStatus}
         />
       )}
-      {message && openToast("bottom")}
-      {itemMsg && itemToast("bottom")}
-      {redemptionMsg && redemptionToast("bottom")}
-      {issuerStatusMsg && issuerStatusToast("bottom")}
+      {message && openToast('bottom')}
+      {itemMsg && itemToast('bottom')}
+      {redemptionMsg && redemptionToast('bottom')}
+      {issuerStatusMsg && issuerStatusToast('bottom')}
     </>
   );
 };

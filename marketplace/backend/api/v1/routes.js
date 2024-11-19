@@ -1,7 +1,7 @@
-import express from "express"
-import dayjs from "dayjs"
-import * as packageJson from "../../package.json"
-import { deployParamName } from "../../helpers/constants"
+import express from 'express';
+import dayjs from 'dayjs';
+import * as packageJson from '../../package.json';
+import { deployParamName } from '../../helpers/constants';
 
 import category from './Category'
 import subCategory from './SubCategory'
@@ -57,7 +57,6 @@ import {
   Reserve
 } from './endpoints'
 
-
 const router = express.Router()
 
 router.use(Authentication.prefix, authentication)
@@ -94,9 +93,8 @@ router.get(`/health`, (req, res) => {
     description: packageJson.description,
     version: packageJson.version,
     timestamp: dayjs().unix(),
-    deployment
+    deployment,
   });
 });
-
 
 export default router;

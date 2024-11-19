@@ -1,5 +1,5 @@
-import React, { createContext, useContext, useReducer } from "react";
-import reducer from "./reducer";
+import React, { createContext, useContext, useReducer } from 'react';
+import reducer from './reducer';
 
 const InventoryStateContext = createContext();
 const InventoryDispatchContext = createContext();
@@ -38,7 +38,7 @@ const InventoriesProvider = ({ children }) => {
     error: undefined,
     success: false,
     message: null,
-    uploadedImg : null,
+    uploadedImg: null,
     isUploadImageSubmitting: false,
     isTransferringItems: false,
     itemTransfers: [],

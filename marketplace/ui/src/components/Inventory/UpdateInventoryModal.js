@@ -1,21 +1,17 @@
-import React, { useEffect, useState } from "react";
-import { useFormik, getIn } from "formik";
-import { Form, Modal, Input, Select, Radio, Button, Spin, Tag } from "antd";
-import getSchema from "./UpdateInventorySchema";
-import { actions } from "../../contexts/inventory/actions";
+import React, { useEffect, useState } from 'react';
+import { useFormik, getIn } from 'formik';
+import { Form, Modal, Input, Select, Radio, Button, Spin, Tag } from 'antd';
+import getSchema from './UpdateInventorySchema';
+import { actions } from '../../contexts/inventory/actions';
 import {
   useInventoryDispatch,
   useInventoryState,
-} from "../../contexts/inventory";
-import {
-  useCategoryDispatch,
-  useCategoryState,
-} from "../../contexts/category";
-import { actions as categoryActions } from "../../contexts/category/actions";
-import { useProductState } from "../../contexts/product";
-import TagManager from "react-gtm-module";
-import { useAuthenticateState } from "../../contexts/authentication";
-
+} from '../../contexts/inventory';
+import { useCategoryDispatch, useCategoryState } from '../../contexts/category';
+import { actions as categoryActions } from '../../contexts/category/actions';
+import { useProductState } from '../../contexts/product';
+import TagManager from 'react-gtm-module';
+import { useAuthenticateState } from '../../contexts/authentication';
 
 const { Option } = Select;
 
@@ -26,7 +22,7 @@ const UpdateInventoryModal = ({
   inventoryToUpdate,
   categoryName,
   limit,
-  offset
+  offset,
 }) => {
   const schema = getSchema();
   const [formState, setFormState] = useState(null);
@@ -36,10 +32,9 @@ const UpdateInventoryModal = ({
   const { categorys, iscategorysLoading } = useCategoryState();
   const { categoryBasedProducts, isCategoryBasedProductsLoading } =
     useProductState();
-  
+
   const { user } = useAuthenticateState();
-  const { isinventoryUpdating, isReselling } =
-    useInventoryState();
+  const { isinventoryUpdating, isReselling } = useInventoryState();
 
   const initialValues = {
     category: {
@@ -48,10 +43,10 @@ const UpdateInventoryModal = ({
     },
     productName: {
       name: null,
-      address: "",
+      address: '',
     },
     availableQuantity: null,
-    batchId: "",
+    batchId: '',
   };
 
   const formik = useFormik({
@@ -74,7 +69,9 @@ const UpdateInventoryModal = ({
 
   useEffect(() => {
     if (inventoryToUpdate) {
-      const data = inventoryToUpdate.inventory.data ? inventoryToUpdate.inventory.data : {};
+      const data = inventoryToUpdate.inventory.data
+        ? inventoryToUpdate.inventory.data
+        : {};
       let nextState = {
         category: {
           name: getCategory(),
@@ -86,7 +83,7 @@ const UpdateInventoryModal = ({
         availableQuantity: data?.quantity ?? null,
         batchId: inventoryToUpdate.inventory.batchId,
       };
-    
+
       setFormState(nextState);
     }
   }, [inventoryToUpdate]);
@@ -95,17 +92,22 @@ const UpdateInventoryModal = ({
     const body = {
       itemContract: values.category.name,
       itemAddress: inventoryToUpdate.inventory.address,
-      updates: {
-      },
+      updates: {},
     };
-  
-    window.LOQ = window.LOQ || []
-    window.LOQ.push(['ready', async LO => {
+
+    window.LOQ = window.LOQ || [];
+    window.LOQ.push([
+      'ready',
+      async (LO) => {
         // Track an event
-        await LO.$internal.ready('events')
-        LO.events.track('Update Inventory', {category: values.category.name, product: values.productName.name})
-    }])
-  
+        await LO.$internal.ready('events');
+        LO.events.track('Update Inventory', {
+          category: values.category.name,
+          product: values.productName.name,
+        });
+      },
+    ]);
+
     TagManager.dataLayer({
       dataLayer: {
         event: 'update_inventory',
@@ -114,8 +116,20 @@ const UpdateInventoryModal = ({
     let isDone = await actions.updateInventory(dispatch, body);
 
     if (isDone) {
-      await actions.fetchInventory(dispatch, limit, offset, debouncedSearchTerm, categoryName);
-      await actions.fetchInventoryForUser(inventoryDispatch, 10000, 0, "", undefined);
+      await actions.fetchInventory(
+        dispatch,
+        limit,
+        offset,
+        debouncedSearchTerm,
+        categoryName
+      );
+      await actions.fetchInventoryForUser(
+        inventoryDispatch,
+        10000,
+        0,
+        '',
+        undefined
+      );
 
       handleCancel();
     }
@@ -136,7 +150,7 @@ const UpdateInventoryModal = ({
             onClick={formik.handleSubmit}
             disabled={isinventoryUpdating}
           >
-            {isinventoryUpdating || isReselling ? <Spin /> : "Update Inventory"}
+            {isinventoryUpdating || isReselling ? <Spin /> : 'Update Inventory'}
           </Button>
         </div>,
       ]}
@@ -163,8 +177,8 @@ const UpdateInventoryModal = ({
                   disabled={true}
                   value={formik.values.category.name}
                   onChange={(value) => {
-                    formik.setFieldValue("category.name", value);
-                    formik.setFieldValue("subCategory.name", null);
+                    formik.setFieldValue('category.name', value);
+                    formik.setFieldValue('subCategory.name', null);
                   }}
                 >
                   {categorys.map((e, index) => (
@@ -173,10 +187,10 @@ const UpdateInventoryModal = ({
                     </Option>
                   ))}
                 </Select>
-                {getIn(formik.touched, "category.name") &&
-                  getIn(formik.errors, "category.name") && (
+                {getIn(formik.touched, 'category.name') &&
+                  getIn(formik.errors, 'category.name') && (
                     <span className="text-error text-xs">
-                      {getIn(formik.errors, "category.name")}
+                      {getIn(formik.errors, 'category.name')}
                     </span>
                   )}
               </Form.Item>
@@ -195,18 +209,18 @@ const UpdateInventoryModal = ({
                   loading={isCategoryBasedProductsLoading}
                   disabled={true}
                   onChange={(value) => {
-                    let selectedProduct = { address: "" };
+                    let selectedProduct = { address: '' };
                     if (value) {
                       selectedProduct = categoryBasedProducts.find(
                         (e) => e.name === value
                       );
                     }
-                    formik.setFieldValue("productName.name", value);
+                    formik.setFieldValue('productName.name', value);
                     formik.setFieldValue(
-                      "productName.address",
+                      'productName.address',
                       selectedProduct.address
                     );
-                    formik.setFieldTouched("productName.name", false, false);
+                    formik.setFieldTouched('productName.name', false, false);
                   }}
                 >
                   {categoryBasedProducts.map((e, index) => (
@@ -216,16 +230,20 @@ const UpdateInventoryModal = ({
                   ))}
                 </Select>
 
-                {getIn(formik.touched, "productName.name") &&
-                  getIn(formik.errors, "productName.name") && (
+                {getIn(formik.touched, 'productName.name') &&
+                  getIn(formik.errors, 'productName.name') && (
                     <span className="text-error text-xs">
-                      {getIn(formik.errors, "productName.name")}
+                      {getIn(formik.errors, 'productName.name')}
                     </span>
                   )}
               </Form.Item>
             </div>
             <div className="flex justify-between mt-4 ">
-              <Form.Item label="Quantity" name="availableQuantity" className="w-72">
+              <Form.Item
+                label="Quantity"
+                name="availableQuantity"
+                className="w-72"
+              >
                 <Input
                   label="availableQuantity"
                   placeholder="Enter Quantity"
@@ -234,11 +252,12 @@ const UpdateInventoryModal = ({
                   value={formik.values.availableQuantity}
                   onChange={formik.handleChange}
                 />
-                {formik.touched.availableQuantity && formik.errors.availableQuantity && (
-                  <span className="text-error text-xs">
-                    {formik.errors.availableQuantity}
-                  </span>
-                )}
+                {formik.touched.availableQuantity &&
+                  formik.errors.availableQuantity && (
+                    <span className="text-error text-xs">
+                      {formik.errors.availableQuantity}
+                    </span>
+                  )}
               </Form.Item>
             </div>
           </div>

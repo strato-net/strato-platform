@@ -1,4 +1,4 @@
-import { rest, util, importer } from "blockapps-rest";
+import { rest, util, importer } from 'blockapps-rest';
 const { createContract } = rest;
 import constants, {
   calculatePriceFluctuation,
@@ -13,41 +13,41 @@ import constants, {
   ASSET_STATUS,
   REDEMPTION_STATUS,
   DEFAULT_COMMENT,
-} from "/helpers/constants";
-import { yamlWrite, yamlSafeDumpSync, getYamlFile } from "/helpers/config";
-import { pollingHelper } from "/helpers/utils";
+} from '/helpers/constants';
+import { yamlWrite, yamlSafeDumpSync, getYamlFile } from '/helpers/config';
+import { pollingHelper } from '/helpers/utils';
 
 import axios from 'axios';
 import dayjs from 'dayjs';
 import utc from 'dayjs/plugin/utc';
 import RestStatus from 'http-status-codes';
-import certificateJs from "/dapp/certificates/certificate";
+import certificateJs from '/dapp/certificates/certificate';
 
-import artJs from "/dapp/items/art";
-import tokensJs from "/dapp/items/tokens";
-import STRATSJs from "/dapp/items/STRATS";
-import carbonOffsetJs from "/dapp/items/carbonOffset";
-import metalsJs from "/dapp/items/metals";
-import spiritsJs from "/dapp/items/spirits";
-import clothingJs from "/dapp/items/clothing";
-import membershipJs from "/dapp/items/membership";
-import carbonDAOJs from "/dapp/items/carbonDAO";
-import collectibleJs from "dapp/items/collectibles";
+import artJs from '/dapp/items/art';
+import tokensJs from '/dapp/items/tokens';
+import STRATSJs from '/dapp/items/STRATS';
+import carbonOffsetJs from '/dapp/items/carbonOffset';
+import metalsJs from '/dapp/items/metals';
+import spiritsJs from '/dapp/items/spirits';
+import clothingJs from '/dapp/items/clothing';
+import membershipJs from '/dapp/items/membership';
+import carbonDAOJs from '/dapp/items/carbonDAO';
+import collectibleJs from 'dapp/items/collectibles';
 
-import saleJs from "/dapp/orders/sale";
-import saleOrderJs from "/dapp/orders/saleOrder";
+import saleJs from '/dapp/orders/sale';
+import saleOrderJs from '/dapp/orders/saleOrder';
 
-import inventoryJs from "/dapp/products/inventory";
-import marketplaceJs from "/dapp/marketplace/marketplace.js";
+import inventoryJs from '/dapp/products/inventory';
+import marketplaceJs from '/dapp/marketplace/marketplace.js';
 import paymentServiceJs from '/dapp/payments/paymentService';
 import redemptionServiceJs from '/dapp/redemptions/redemptionService';
 import reserveJs from '/dapp/reserve/reserve';
 
-import strats from "../strats/strats";
+import strats from '../strats/strats';
 
 const allAssetNames = [];
 dayjs.extend(utc);
-const contractName = "Mercata";
+const contractName = 'Mercata';
 const contractFileName = `dapp/mercata-base-contracts/BaseCodeCollection.sol`;
 
 const balance = 100000000000000000000;
@@ -69,13 +69,13 @@ function deploy(contract, args, options) {
     dapp: {
       contract: {
         name: contract.name,
-        address: contract.address
+        address: contract.address,
       },
-    }
+    },
   };
 
   if (options.config.apiDebug) {
-    console.log("deploy filename:", deployFilePath);
+    console.log('deploy filename:', deployFilePath);
     console.log(yamlSafeDumpSync(deployment));
   }
 
@@ -105,7 +105,7 @@ async function uploadDappContract(token, options) {
   };
 
   const contract = await createContract(token, contractArgs, copyOfOptions);
-  contract.src = "removed";
+  contract.src = 'removed';
 
   return await bind(token, contract, options);
 }
@@ -124,33 +124,46 @@ async function uploadContract(token, options) {
   };
 
   const contract = await createContract(token, contractArgs, options);
-  contract.src = "removed";
+  contract.src = 'removed';
 
   return await bind(token, contract, options);
 }
 
 async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
   const contract = _contract;
-  let userOrganization
-  let userCommonName
+  let userOrganization;
+  let userCommonName;
 
   if (!serviceUser) {
-
-    let userCertificate = await pollingHelper(certificateJs.getCertificateMe, [rawAdmin]);
+    let userCertificate = await pollingHelper(certificateJs.getCertificateMe, [
+      rawAdmin,
+    ]);
 
     //We are not guaranteed the user will have a certificate
     //99% chance they do, but if this this their first login
     //the node might not have a certificate in time
-    if (!(userCertificate === null || userCertificate === undefined || userCertificate.commonName === null || userCertificate.commonName === undefined)) {
-      contract.userOrganization = userCertificate.organization
-      userOrganization = userCertificate.organization
-      userCommonName = userCertificate.commonName
-      userCert = userCertificate;//Attaching user cert to dapp to save from needing make another call to get it
+    if (
+      !(
+        userCertificate === null ||
+        userCertificate === undefined ||
+        userCertificate.commonName === null ||
+        userCertificate.commonName === undefined
+      )
+    ) {
+      contract.userOrganization = userCertificate.organization;
+      userOrganization = userCertificate.organization;
+      userCommonName = userCertificate.commonName;
+      userCert = userCertificate; //Attaching user cert to dapp to save from needing make another call to get it
     }
   }
 
   // includes the org+app for cirrus namespacing (helpers/utils.js will prepend to cirrus queries)
-  const defaultOptions = { ..._defaultOptions, app: contractName, chainIds: [], cacheNonce: true };
+  const defaultOptions = {
+    ..._defaultOptions,
+    app: contractName,
+    chainIds: [],
+    cacheNonce: true,
+  };
   // for querying data not on the dapp shard
   const optionsNoChainIds = {
     ...defaultOptions,
@@ -168,7 +181,14 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
     return addOrgUnit(admin, contract, defaultOptions, orgName, orgUnit);
   };
   contract.addMember = async function (orgName, orgUnit, commonName) {
-    return addMember(admin, contract, defaultOptions, orgName, orgUnit, commonName);
+    return addMember(
+      admin,
+      contract,
+      defaultOptions,
+      orgName,
+      orgUnit,
+      commonName
+    );
   };
   contract.removeOrg = async function (orgName) {
     return removeOrg(admin, contract, defaultOptions, orgName);
@@ -177,7 +197,14 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
     return removeOrgUnit(admin, contract, defaultOptions, orgName, orgUnit);
   };
   contract.removeMember = async function (orgName, orgUnit, commonName) {
-    return removeMember(admin, contract, defaultOptions, orgName, orgUnit, commonName);
+    return removeMember(
+      admin,
+      contract,
+      defaultOptions,
+      orgName,
+      orgUnit,
+      commonName
+    );
   };
 
   // governance - multiple adds
@@ -188,7 +215,14 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
     return addOrgUnits(admin, contract, defaultOptions, orgNames, orgUnits);
   };
   contract.addMembers = async function (orgNames, orgUnits, commonNames) {
-    return addMembers(admin, contract, defaultOptions, orgNames, orgUnits, commonNames);
+    return addMembers(
+      admin,
+      contract,
+      defaultOptions,
+      orgNames,
+      orgUnits,
+      commonNames
+    );
   };
   contract.removeOrgs = async function (orgNames) {
     return removeOrgs(admin, contract, defaultOptions, orgNames);
@@ -197,7 +231,14 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
     return removeOrgUnits(admin, contract, defaultOptions, orgNames, orgUnits);
   };
   contract.removeMembers = async function (orgNames, orgUnits, commonNames) {
-    return removeMembers(admin, contract, defaultOptions, orgNames, orgUnits, commonNames);
+    return removeMembers(
+      admin,
+      contract,
+      defaultOptions,
+      orgNames,
+      orgUnits,
+      commonNames
+    );
   };
 
   // state and deployment
@@ -213,9 +254,11 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
   contract.getCertificate = async function (args) {
     return certificateJs.getCertificate(admin, args);
   };
-  contract.getCertificateMe = (!(userCert === null || userCert === undefined)) ? userCert : async function () {
-    return certificateJs.getCertificateMe(admin);
-  };
+  contract.getCertificateMe = !(userCert === null || userCert === undefined)
+    ? userCert
+    : async function () {
+        return certificateJs.getCertificateMe(admin);
+      };
   contract.getCertificates = async function (args) {
     return certificateJs.getCertificates(admin, args);
   };
@@ -230,69 +273,107 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
   };
   contract.setIsAdmin = async function (args) {
     return certificateJs.setIsAdmin(admin, args);
-  }
+  };
 
   // -------------------------- INVENTORY --------------------------------
 
   contract.getInventory = async function (args, options = optionsNoChainIds) {
-    const getOptions = { ...options, app: contractName, };
+    const getOptions = { ...options, app: contractName };
     return await inventoryJs.get(rawAdmin, { ...args }, getOptions);
   };
 
   contract.getInventories = async function (args, options = optionsNoChainIds) {
     const getOptions = { ...options, app: contractName };
 
-    const inventories = await inventoryJs.getAll(rawAdmin, { ...args, ownerCommonName: userCert.commonName, sort: '-createdDate' }, getOptions);
-    const inventoryCount = await inventoryJs.inventoryCount(rawAdmin, { ...args, ownerCommonName: userCert.commonName, sort: '-createdDate' }, getOptions);
-    return { inventories: inventories, inventoryCount: inventoryCount }
+    const inventories = await inventoryJs.getAll(
+      rawAdmin,
+      { ...args, ownerCommonName: userCert.commonName, sort: '-createdDate' },
+      getOptions
+    );
+    const inventoryCount = await inventoryJs.inventoryCount(
+      rawAdmin,
+      { ...args, ownerCommonName: userCert.commonName, sort: '-createdDate' },
+      getOptions
+    );
+    return { inventories: inventories, inventoryCount: inventoryCount };
   };
 
-  contract.getAllInventories = async function (args, options = optionsNoChainIds) {
+  contract.getAllInventories = async function (
+    args,
+    options = optionsNoChainIds
+  ) {
     const getOptions = { ...options, app: contractName };
-    const inventories = await inventoryJs.getAll(rawAdmin, { ...args, sort: '-createdDate' }, getOptions);
-    const inventoryCount = await inventoryJs.inventoryCount(rawAdmin, { ...args, sort: '-createdDate' }, getOptions);
-    return { inventories: inventories, inventoryCount: inventoryCount }
+    const inventories = await inventoryJs.getAll(
+      rawAdmin,
+      { ...args, sort: '-createdDate' },
+      getOptions
+    );
+    const inventoryCount = await inventoryJs.inventoryCount(
+      rawAdmin,
+      { ...args, sort: '-createdDate' },
+      getOptions
+    );
+    return { inventories: inventories, inventoryCount: inventoryCount };
   };
 
-  contract.getInventoriesForUser = async function (args, options = optionsNoChainIds) {
+  contract.getInventoriesForUser = async function (
+    args,
+    options = optionsNoChainIds
+  ) {
     const getOptions = { ...options, app: contractName };
-    const newArgs = { ...args, ownerCommonName: userCert.commonName, notEqualsField: 'sale', notEqualsValue: constants.zeroAddress, userProfile: true }
+    const newArgs = {
+      ...args,
+      ownerCommonName: userCert.commonName,
+      notEqualsField: 'sale',
+      notEqualsValue: constants.zeroAddress,
+      userProfile: true,
+    };
 
     return marketplaceJs.getAll(rawAdmin, newArgs, getOptions);
   };
 
-  contract.getOwnershipHistory = async function (args, options = optionsNoChainIds) {
+  contract.getOwnershipHistory = async function (
+    args,
+    options = optionsNoChainIds
+  ) {
     return await inventoryJs.getOwnershipHistory(rawAdmin, args, options);
   };
 
   contract.listItem = async function (args, options = defaultOptions) {
     return await inventoryJs.uploadSaleContract(rawAdmin, args, options);
-  }
+  };
 
   contract.unlistItem = async function (args, options = defaultOptions) {
     const { saleAddress, ...restArgs } = args;
     const contract = { address: saleAddress };
     return await inventoryJs.unlistItem(rawAdmin, contract, restArgs, options);
-  }
+  };
 
   contract.resellItem = async function (args, options = defaultOptions) {
     const { assetAddress, ...restArgs } = args;
     const contract = { address: assetAddress };
     return await inventoryJs.resellItem(rawAdmin, contract, restArgs, options);
-  }
+  };
 
   contract.transferItem = async function (args, options = defaultOptions) {
-    const finalArgs = args.map(arg => {
+    const finalArgs = args.map((arg) => {
       const { assetAddress, ...restArgs } = arg;
-      const transferNumber = parseInt(util.uid())
+      const transferNumber = parseInt(util.uid());
       const contract = { address: assetAddress };
-      return { contract: contract, transferNumber: transferNumber, ...restArgs };
+      return {
+        contract: contract,
+        transferNumber: transferNumber,
+        ...restArgs,
+      };
     });
     return inventoryJs.transferItem(rawAdmin, finalArgs, options);
-  }
+  };
 
-  contract.getAllItemTransferEvents = function (args, options = defaultOptions) {
-    const getOptions = { ...options, app: contractName, };
+  contract.getAllItemTransferEvents = function (
+    args,
+    options = defaultOptions
+  ) {
+    const getOptions = { ...options, app: contractName };
     return inventoryJs.getAllItemTransferEvents(rawAdmin, args, getOptions);
   };
 
@@ -300,18 +381,30 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
     const { saleAddress, ...restArgs } = args;
     const contract = { address: saleAddress };
     return await inventoryJs.updateSale(rawAdmin, contract, restArgs, options);
-  }
+  };
 
   contract.updateInventory = async function (args, options = defaultOptions) {
     const { itemContract, itemAddress, ...restArgs } = args;
     const contract = { name: itemContract, address: itemAddress };
-    return await inventoryJs.updateInventory(rawAdmin, contract, restArgs, options);
-  }
+    return await inventoryJs.updateInventory(
+      rawAdmin,
+      contract,
+      restArgs,
+      options
+    );
+  };
 
-  contract.getRedemptionServices = async function (args, options = defaultOptions) {
-    const redemptionServices = await redemptionServiceJs.getAll(rawAdmin, args, options);
+  contract.getRedemptionServices = async function (
+    args,
+    options = defaultOptions
+  ) {
+    const redemptionServices = await redemptionServiceJs.getAll(
+      rawAdmin,
+      args,
+      options
+    );
     return redemptionServices;
-  }
+  };
 
   contract.requestRedemption = async function (args, options = defaultOptions) {
     const { assetAddresses, redemptionService, quantity, ...restArgs } = args;
@@ -319,134 +412,224 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
     const contract = { address: assetAddresses[0] };
     const redemptionId = util.uid();
     const contractArgs = { quantity, redemptionId };
-    const [requestRedemptionStatus, assetAddress] = await inventoryJs.requestRedemption(rawAdmin, contract, contractArgs, options);
+    const [requestRedemptionStatus, assetAddress] =
+      await inventoryJs.requestRedemption(
+        rawAdmin,
+        contract,
+        contractArgs,
+        options
+      );
 
-    const finalArgs = { redemption_id: parseInt(redemptionId), assetAddresses: [assetAddress], quantity, ...restArgs }
+    const finalArgs = {
+      redemption_id: parseInt(redemptionId),
+      assetAddresses: [assetAddress],
+      quantity,
+      ...restArgs,
+    };
 
     if (requestRedemptionStatus) {
       try {
-        const { serviceURL, createRedemptionRoute = '' } = await redemptionServiceJs.get(rawAdmin, { address: redemptionService }, options);
-        await axios.post(new URL(createRedemptionRoute, serviceURL).href, { ...finalArgs })
+        const { serviceURL, createRedemptionRoute = '' } =
+          await redemptionServiceJs.get(
+            rawAdmin,
+            { address: redemptionService },
+            options
+          );
+        await axios
+          .post(new URL(createRedemptionRoute, serviceURL).href, {
+            ...finalArgs,
+          })
           .then(function (res) {
             if (res.status === 200) {
               console.log(res.data);
             } else {
-              throw new rest.RestError(RestStatus.BAD_REQUEST, `Payment server call failed: ${res.statusText}`);
+              throw new rest.RestError(
+                RestStatus.BAD_REQUEST,
+                `Payment server call failed: ${res.statusText}`
+              );
             }
           });
-        return {}
+        return {};
       } catch (error) {
         // The AssetStaus is initially switched to PENDING_REDEMPTION but must be reverted if Redemption creation fails
-        const [updateStatus] = await inventoryJs.updateAssetStatus(rawAdmin, { address: assetAddress }, { status: ASSET_STATUS.ACTIVE }, options);
+        const [updateStatus] = await inventoryJs.updateAssetStatus(
+          rawAdmin,
+          { address: assetAddress },
+          { status: ASSET_STATUS.ACTIVE },
+          options
+        );
 
         if (error.response) {
-          throw new rest.RestError(error.response.status, error.response.statusText);
+          throw new rest.RestError(
+            error.response.status,
+            error.response.statusText
+          );
         }
-        throw new rest.RestError(RestStatus.BAD_REQUEST, `Error while creating redemption record: ${JSON.stringify(error)} `);
+        throw new rest.RestError(
+          RestStatus.BAD_REQUEST,
+          `Error while creating redemption record: ${JSON.stringify(error)} `
+        );
       }
     }
-  }
+  };
 
-  contract.getOutgoingRedemptionRequests = async function (args, options = optionsNoChainIds) {
+  contract.getOutgoingRedemptionRequests = async function (
+    args,
+    options = optionsNoChainIds
+  ) {
     const { order, search, range, limit, offset } = args;
     const queryParams = new URLSearchParams({
       redemptionId: search,
       order: order,
       limit,
-      offset
+      offset,
     }).toString();
 
     try {
       let redemptions = [];
       let redemptionServiceAddresses = [];
       let count = 0;
-      const redemptionEvents = await redemptionServiceJs.getRedemptions(rawAdmin, { owner: userCert.commonName }, options);
-      redemptionEvents.map(r => {
+      const redemptionEvents = await redemptionServiceJs.getRedemptions(
+        rawAdmin,
+        { owner: userCert.commonName },
+        options
+      );
+      redemptionEvents.map((r) => {
         if (!redemptionServiceAddresses.includes(r.address)) {
           redemptionServiceAddresses.push(r.address);
         }
       });
-      let redemptionServices = await redemptionServiceJs.getAll(rawAdmin, { address: redemptionServiceAddresses }, options);
+      let redemptionServices = await redemptionServiceJs.getAll(
+        rawAdmin,
+        { address: redemptionServiceAddresses },
+        options
+      );
 
       // handle backwards compatibility case
       if (Object.keys(redemptionServices).length === 0) {
-        redemptionServices = await redemptionServiceJs.getAll(rawAdmin, { isActive: true, ownerCommonName: "Server" }, options);
+        redemptionServices = await redemptionServiceJs.getAll(
+          rawAdmin,
+          { isActive: true, ownerCommonName: 'Server' },
+          options
+        );
       }
 
       const redemptionPromises = redemptionServices.map(async (rs) => {
         const serviceUrl = rs.serviceURL || rs.data.serviceURL;
-        const getOutgoingRedemptionRoute = rs.outgoingRedemptionsRoute || rs.data.outgoingRedemptionsRoute;
-        let res = await axios.get(new URL(`${serviceUrl}${getOutgoingRedemptionRoute}/${userCert.commonName}?${queryParams}`).href);
-        if (res.status === 200){
-          count = res.data.count; 
+        const getOutgoingRedemptionRoute =
+          rs.outgoingRedemptionsRoute || rs.data.outgoingRedemptionsRoute;
+        let res = await axios.get(
+          new URL(
+            `${serviceUrl}${getOutgoingRedemptionRoute}/${userCert.commonName}?${queryParams}`
+          ).href
+        );
+        if (res.status === 200) {
+          count = res.data.count;
           return res.data.data.map((item) => {
             const date = new Date(item.createdDate);
             const unixTimestamp = Math.floor(date.getTime() / 1000);
-            return { ...item, redemptionDate: unixTimestamp, type:'Redemption', block_timestamp: new Date(item.createdDate) }
-          })}
-        else
-          return [];
+            return {
+              ...item,
+              redemptionDate: unixTimestamp,
+              type: 'Redemption',
+              block_timestamp: new Date(item.createdDate),
+            };
+          });
+        } else return [];
       });
 
       const allRedemptions = await Promise.all(redemptionPromises);
       redemptions = allRedemptions.flat();
       if (range?.length) {
         redemptions = redemptions.filter((item) => {
-          const dateRange = range[0].split(',')
+          const dateRange = range[0].split(',');
           const startRange = dateRange[1];
           const endRange = dateRange[2];
-          if (item.redemptionDate > startRange && item.redemptionDate < endRange) {
+          if (
+            item.redemptionDate > startRange &&
+            item.redemptionDate < endRange
+          ) {
             return item;
           }
-        })
+        });
       }
 
       if (order && order === 'ASC')
         redemptions.sort((a, b) => a.createdDate - b.createdDate);
-      else
-        redemptions.sort((a, b) => b.createdDate - a.createdDate);
+      else redemptions.sort((a, b) => b.createdDate - a.createdDate);
 
       return { data: redemptions, count };
     } catch (error) {
       if (error.response) {
-        throw new rest.RestError(error.response.status, error.response.statusText);
+        throw new rest.RestError(
+          error.response.status,
+          error.response.statusText
+        );
       }
-      throw new rest.RestError(RestStatus.BAD_REQUEST, `Error while fetching outgoing redemptions: ${JSON.stringify(error)} `);
+      throw new rest.RestError(
+        RestStatus.BAD_REQUEST,
+        `Error while fetching outgoing redemptions: ${JSON.stringify(error)} `
+      );
     }
   };
 
-  contract.getIncomingRedemptionRequests = async function (args, options = optionsNoChainIds) {
+  contract.getIncomingRedemptionRequests = async function (
+    args,
+    options = optionsNoChainIds
+  ) {
     const { order, search, range, limit, offset } = args;
     const queryParams = new URLSearchParams({
       redemptionId: search,
       order: order,
       limit,
-      offset
+      offset,
     }).toString();
 
     try {
       let redemptions = [];
       let count = 0;
-      const redemptionEvents = await redemptionServiceJs.getRedemptions(rawAdmin, { issuer: userCert.commonName }, options);
-      const redemptionServiceAddresses = redemptionEvents.map(r => r.address);
-      let redemptionServices = await redemptionServiceJs.getAll(rawAdmin, { address: redemptionServiceAddresses }, options);
+      const redemptionEvents = await redemptionServiceJs.getRedemptions(
+        rawAdmin,
+        { issuer: userCert.commonName },
+        options
+      );
+      const redemptionServiceAddresses = redemptionEvents.map((r) => r.address);
+      let redemptionServices = await redemptionServiceJs.getAll(
+        rawAdmin,
+        { address: redemptionServiceAddresses },
+        options
+      );
 
       // handle backwards compatibility case
       if (Object.keys(redemptionServices).length === 0) {
-        redemptionServices = await redemptionServiceJs.getAll(rawAdmin, { isActive: true, ownerCommonName: "Server" }, options);
+        redemptionServices = await redemptionServiceJs.getAll(
+          rawAdmin,
+          { isActive: true, ownerCommonName: 'Server' },
+          options
+        );
       }
 
       const redemptionPromises = redemptionServices.map(async (rs) => {
         const serviceUrl = rs.serviceURL || rs.data.serviceURL;
-        const getIncomingRedemptionRoute = rs.incomingRedemptionsRoute || rs.data.incomingRedemptionsRoute;
-        const res = await axios.get(new URL(`${serviceUrl}${getIncomingRedemptionRoute}/${userCert.commonName}?${queryParams}`).href);
+        const getIncomingRedemptionRoute =
+          rs.incomingRedemptionsRoute || rs.data.incomingRedemptionsRoute;
+        const res = await axios.get(
+          new URL(
+            `${serviceUrl}${getIncomingRedemptionRoute}/${userCert.commonName}?${queryParams}`
+          ).href
+        );
         if (res.status === 200) {
-          count = res.data.count; 
+          count = res.data.count;
           return res.data.data.map((item) => {
             const date = new Date(item.createdDate);
             const unixTimestamp = Math.floor(date.getTime() / 1000);
-            return { ...item, redemptionDate: unixTimestamp, type: 'Redemption', block_timestamp: new Date(item.createdDate) }
-          })
+            return {
+              ...item,
+              redemptionDate: unixTimestamp,
+              type: 'Redemption',
+              block_timestamp: new Date(item.createdDate),
+            };
+          });
         } else {
           return [];
         }
@@ -456,61 +639,90 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
       redemptions = allRedemptions.flat();
       if (range?.length) {
         redemptions = redemptions.filter((item) => {
-          const dateRange = range[0].split(',')
+          const dateRange = range[0].split(',');
           const startRange = dateRange[1];
           const endRange = dateRange[2];
-          if (item.redemptionDate > startRange && item.redemptionDate < endRange) {
+          if (
+            item.redemptionDate > startRange &&
+            item.redemptionDate < endRange
+          ) {
             return item;
           }
-        })
+        });
       }
 
       if (order && order === 'ASC')
         redemptions.sort((a, b) => a.createdDate - b.createdDate);
-      else
-        redemptions.sort((a, b) => b.createdDate - a.createdDate);
-
+      else redemptions.sort((a, b) => b.createdDate - a.createdDate);
 
       return { data: redemptions, count };
     } catch (error) {
       if (error.response) {
-        throw new rest.RestError(error.response.status, error.response.statusText);
+        throw new rest.RestError(
+          error.response.status,
+          error.response.statusText
+        );
       }
-      throw new rest.RestError(RestStatus.BAD_REQUEST, `Error while fetching incoming redemptions: ${JSON.stringify(error)} `);
+      throw new rest.RestError(
+        RestStatus.BAD_REQUEST,
+        `Error while fetching incoming redemptions: ${JSON.stringify(error)} `
+      );
     }
   };
 
-  contract.getAllRedemptionRequests = async function (args, options = optionsNoChainIds) {
+  contract.getAllRedemptionRequests = async function (
+    args,
+    options = optionsNoChainIds
+  ) {
     const { order, search, range, limit, offset } = args;
     const queryParams = new URLSearchParams({
       redemptionId: search,
       order: order,
       limit,
-      offset
+      offset,
     }).toString();
 
     try {
       let redemptions = [];
       let count = 0;
-      const redemptionEvents = await redemptionServiceJs.getRedemptions(rawAdmin,{ limit }, options);
-      const redemptionServiceAddresses = redemptionEvents.map(r => r.address);
-      let redemptionServices = await redemptionServiceJs.getAll(rawAdmin, { address: redemptionServiceAddresses }, options);
+      const redemptionEvents = await redemptionServiceJs.getRedemptions(
+        rawAdmin,
+        { limit },
+        options
+      );
+      const redemptionServiceAddresses = redemptionEvents.map((r) => r.address);
+      let redemptionServices = await redemptionServiceJs.getAll(
+        rawAdmin,
+        { address: redemptionServiceAddresses },
+        options
+      );
 
       // handle backwards compatibility case
       if (Object.keys(redemptionServices).length === 0) {
-        redemptionServices = await redemptionServiceJs.getAll(rawAdmin, { isActive: true, ownerCommonName: "Server", limit }, options);
+        redemptionServices = await redemptionServiceJs.getAll(
+          rawAdmin,
+          { isActive: true, ownerCommonName: 'Server', limit },
+          options
+        );
       }
 
       const redemptionPromises = redemptionServices.map(async (rs) => {
         const serviceUrl = rs.serviceURL || rs.data.serviceURL;
-        const res = await axios.get(`${serviceUrl}/redemption/all?${queryParams}`);
+        const res = await axios.get(
+          `${serviceUrl}/redemption/all?${queryParams}`
+        );
         if (res.status === 200) {
-          count = res.data.count; 
+          count = res.data.count;
           return res.data.data.map((item) => {
             const date = new Date(item.createdDate);
             const unixTimestamp = Math.floor(date.getTime() / 1000);
-            return { ...item, redemptionDate: unixTimestamp, type: 'Redemption', block_timestamp: new Date(item.createdDate) }
-          })
+            return {
+              ...item,
+              redemptionDate: unixTimestamp,
+              type: 'Redemption',
+              block_timestamp: new Date(item.createdDate),
+            };
+          });
         } else {
           return [];
         }
@@ -518,54 +730,87 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
 
       const allRedemptions = await Promise.all(redemptionPromises);
       redemptions = allRedemptions.flat();
-      if(range){
-      redemptions = redemptions.filter((item)=>{
-        const dateRange = range[0].split(',')
-        const startRange = dateRange[1];
-        const endRange = dateRange[2];
-        if(item.redemptionDate > startRange && item.redemptionDate < endRange){
-          return item;
-        }
-      })
-     }
+      if (range) {
+        redemptions = redemptions.filter((item) => {
+          const dateRange = range[0].split(',');
+          const startRange = dateRange[1];
+          const endRange = dateRange[2];
+          if (
+            item.redemptionDate > startRange &&
+            item.redemptionDate < endRange
+          ) {
+            return item;
+          }
+        });
+      }
 
       if (order && order === 'ASC')
         redemptions.sort((a, b) => a.createdDate - b.createdDate);
-      else
-        redemptions.sort((a, b) => b.createdDate - a.createdDate);
+      else redemptions.sort((a, b) => b.createdDate - a.createdDate);
 
-
-      return {data:redemptions, count};
+      return { data: redemptions, count };
     } catch (error) {
       if (error.response) {
-        throw new rest.RestError(error.response.status, error.response.statusText);
+        throw new rest.RestError(
+          error.response.status,
+          error.response.statusText
+        );
       }
-      throw new rest.RestError(RestStatus.BAD_REQUEST, `Error while fetching All redemptions: ${JSON.stringify(error)} `);
+      throw new rest.RestError(
+        RestStatus.BAD_REQUEST,
+        `Error while fetching All redemptions: ${JSON.stringify(error)} `
+      );
     }
   };
 
   contract.getRedemption = async function (args, options = optionsNoChainIds) {
     const { redemptionService } = args;
     try {
-      const { serviceURL, getRedemptionRoute = '' } = await redemptionServiceJs.get(rawAdmin, { address: redemptionService }, options);
-      const redemption = await axios.get(new URL(`${getRedemptionRoute}/${args.id}`, serviceURL).href).then(function (res) {
-        if (res.status === 200) {
-          return res.data.data;
-        } else {
-          throw new rest.RestError(RestStatus.BAD_REQUEST, `Payment server call failed: ${res.statusText}`);
-        }
-      });
+      const { serviceURL, getRedemptionRoute = '' } =
+        await redemptionServiceJs.get(
+          rawAdmin,
+          { address: redemptionService },
+          options
+        );
+      const redemption = await axios
+        .get(new URL(`${getRedemptionRoute}/${args.id}`, serviceURL).href)
+        .then(function (res) {
+          if (res.status === 200) {
+            return res.data.data;
+          } else {
+            throw new rest.RestError(
+              RestStatus.BAD_REQUEST,
+              `Payment server call failed: ${res.statusText}`
+            );
+          }
+        });
       return redemption;
     } catch (error) {
       if (error.response) {
-        throw new rest.RestError(error.response.status, error.response.statusText);
+        throw new rest.RestError(
+          error.response.status,
+          error.response.statusText
+        );
       }
-      throw new rest.RestError(RestStatus.BAD_REQUEST, `Error while fetching redemption details: ${JSON.stringify(error)} `);
+      throw new rest.RestError(
+        RestStatus.BAD_REQUEST,
+        `Error while fetching redemption details: ${JSON.stringify(error)} `
+      );
     }
   };
 
-  contract.closeRedemption = async function (args, options = optionsNoChainIds) {
-    const { id, assetAddresses, redemptionService, status, issuerCommonName, ...restArgs } = args;
+  contract.closeRedemption = async function (
+    args,
+    options = optionsNoChainIds
+  ) {
+    const {
+      id,
+      assetAddresses,
+      redemptionService,
+      status,
+      issuerCommonName,
+      ...restArgs
+    } = args;
 
     let assetStatus;
     if (status === REDEMPTION_STATUS.FULFILLED) {
@@ -575,106 +820,183 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
     }
 
     if (issuerCommonName !== userCert.commonName) {
-      throw new rest.RestError(RestStatus.UNAUTHORIZED, 'Only the issuer can close a redemption request');
+      throw new rest.RestError(
+        RestStatus.UNAUTHORIZED,
+        'Only the issuer can close a redemption request'
+      );
     }
 
     const contract = { address: assetAddresses[0] };
-    const [updateStatus] = await inventoryJs.updateAssetStatus(rawAdmin, contract, { status: assetStatus }, options);
+    const [updateStatus] = await inventoryJs.updateAssetStatus(
+      rawAdmin,
+      contract,
+      { status: assetStatus },
+      options
+    );
 
-    const finalArgs = { status, ...restArgs }
+    const finalArgs = { status, ...restArgs };
 
     if (updateStatus) {
       try {
-        const { serviceURL, closeRedemptionRoute = '' } = await redemptionServiceJs.get(rawAdmin, { address: redemptionService }, options);
-        const redemption = await axios.put(new URL(`${closeRedemptionRoute}/${id}`, serviceURL).href, { ...finalArgs })
+        const { serviceURL, closeRedemptionRoute = '' } =
+          await redemptionServiceJs.get(
+            rawAdmin,
+            { address: redemptionService },
+            options
+          );
+        const redemption = await axios
+          .put(new URL(`${closeRedemptionRoute}/${id}`, serviceURL).href, {
+            ...finalArgs,
+          })
           .then(function (res) {
             if (res.status === 200) {
               return res.data.data;
             } else {
-              throw new rest.RestError(RestStatus.BAD_REQUEST, `Payment server call failed: ${res.statusText}`);
+              throw new rest.RestError(
+                RestStatus.BAD_REQUEST,
+                `Payment server call failed: ${res.statusText}`
+              );
             }
           });
         return redemption;
       } catch (error) {
         if (error.response) {
-          throw new rest.RestError(error.response.status, error.response.statusText);
+          throw new rest.RestError(
+            error.response.status,
+            error.response.statusText
+          );
         }
-        throw new rest.RestError(RestStatus.BAD_REQUEST, `Error while closing redemption: ${JSON.stringify(error)} `);
+        throw new rest.RestError(
+          RestStatus.BAD_REQUEST,
+          `Error while closing redemption: ${JSON.stringify(error)} `
+        );
       }
     } else {
-      throw new rest.RestError(RestStatus.BAD_REQUEST, "Error while updating Asset Status");
+      throw new rest.RestError(
+        RestStatus.BAD_REQUEST,
+        'Error while updating Asset Status'
+      );
     }
   };
 
   // ------------------------------ INVENTORY ENDS--------------------------------
 
-  contract.getMarketplaceInventories = async function (args = {}, options = optionsNoChainIds) {
+  contract.getMarketplaceInventories = async function (
+    args = {},
+    options = optionsNoChainIds
+  ) {
     const getOptions = { ...options, app: contractName };
     //for ba sellers, get all assets - display For Sale and Sold Out
-    const newArgs = { ...args, ownerCommonName: constants.baUserNames }
+    const newArgs = { ...args, ownerCommonName: constants.baUserNames };
     const all = await marketplaceJs.getAll(rawAdmin, newArgs, getOptions);
 
     // for non-ba sellers, get assets with valid sale & saleQty > 0 - display only For Sale records
-    const newArgs1 = { ...args, notEqualsField: ['ownerCommonName', 'sale'], notEqualsValue: [constants.baUserNames, constants.zeroAddress] }
+    const newArgs1 = {
+      ...args,
+      notEqualsField: ['ownerCommonName', 'sale'],
+      notEqualsValue: [constants.baUserNames, constants.zeroAddress],
+    };
     const all2 = await marketplaceJs.getAll(rawAdmin, newArgs1, getOptions);
 
-    return { inventoryResults: all.inventoryResults.concat(all2.inventoryResults), inventoryCount: all.inventoryCount + all2.inventoryCount };
+    return {
+      inventoryResults: all.inventoryResults.concat(all2.inventoryResults),
+      inventoryCount: all.inventoryCount + all2.inventoryCount,
+    };
   };
 
-  contract.getMarketplaceInventoriesLoggedIn = async function (args = {}, options = optionsNoChainIds) {
+  contract.getMarketplaceInventoriesLoggedIn = async function (
+    args = {},
+    options = optionsNoChainIds
+  ) {
     const getOptions = { ...options, app: contractName };
-    let usersArr = constants.baUserNames.filter(user => user !== userCommonName)
-    const newArgs = { ...args, ownerCommonName: usersArr }
+    let usersArr = constants.baUserNames.filter(
+      (user) => user !== userCommonName
+    );
+    const newArgs = { ...args, ownerCommonName: usersArr };
     const all = await marketplaceJs.getAll(rawAdmin, newArgs, getOptions);
 
-    const newArgs1 = { ...args, notEqualsField: ['ownerCommonName', 'sale'], notEqualsValue: [[userCommonName, ...constants.baUserNames], constants.zeroAddress] }
+    const newArgs1 = {
+      ...args,
+      notEqualsField: ['ownerCommonName', 'sale'],
+      notEqualsValue: [
+        [userCommonName, ...constants.baUserNames],
+        constants.zeroAddress,
+      ],
+    };
     const all2 = await marketplaceJs.getAll(rawAdmin, newArgs1, getOptions);
-    return { inventoryResults: all.inventoryResults.concat(all2.inventoryResults), inventoryCount: all.inventoryCount + all2.inventoryCount };
+    return {
+      inventoryResults: all.inventoryResults.concat(all2.inventoryResults),
+      inventoryCount: all.inventoryCount + all2.inventoryCount,
+    };
   };
 
-  contract.getTopSellingProducts = async function (args = {}, options = optionsNoChainIds) {
-    const getOptions = { ...options, app: contractName }
-    const newArgs = { ...args, notEqualsField: 'sale', notEqualsValue: constants.zeroAddress, ownerCommonName: constants.baUserNames}
-    return marketplaceJs.getTopSellingProducts(rawAdmin, newArgs, getOptions)
-  }
-
-  contract.getTopSellingProductsLoggedIn = async function (args = {}, options = optionsNoChainIds) {
-    const getOptions = { ...options, app: contractName }
+  contract.getTopSellingProducts = async function (
+    args = {},
+    options = optionsNoChainIds
+  ) {
+    const getOptions = { ...options, app: contractName };
     const newArgs = {
-      ...args, notEqualsField: ['sale', 'ownerCommonName'],
+      ...args,
+      notEqualsField: 'sale',
+      notEqualsValue: constants.zeroAddress,
+      ownerCommonName: constants.baUserNames,
+    };
+    return marketplaceJs.getTopSellingProducts(rawAdmin, newArgs, getOptions);
+  };
+
+  contract.getTopSellingProductsLoggedIn = async function (
+    args = {},
+    options = optionsNoChainIds
+  ) {
+    const getOptions = { ...options, app: contractName };
+    const newArgs = {
+      ...args,
+      notEqualsField: ['sale', 'ownerCommonName'],
       notEqualsValue: [constants.zeroAddress, userCommonName],
-    }
-    return marketplaceJs.getTopSellingProducts(rawAdmin, newArgs, getOptions)
-  }
+    };
+    return marketplaceJs.getTopSellingProducts(rawAdmin, newArgs, getOptions);
+  };
 
   contract.getPriceHistory = async function (args, options = defaultOptions) {
     try {
       const { assetAddress, timeFilter } = args;
 
-      const assetWithoutQuantity = await inventoryJs.get(rawAdmin, { address: assetAddress }, options);
+      const assetWithoutQuantity = await inventoryJs.get(
+        rawAdmin,
+        { address: assetAddress },
+        options
+      );
       const originAddress = assetWithoutQuantity.originAddress;
-      const assetsOfOriginAsset = await inventoryJs.getAll(rawAdmin, { originAddress: originAddress }, options);
-      const assetsAddressArr = assetsOfOriginAsset.map(item => item.address);
+      const assetsOfOriginAsset = await inventoryJs.getAll(
+        rawAdmin,
+        { originAddress: originAddress },
+        options
+      );
+      const assetsAddressArr = assetsOfOriginAsset.map((item) => item.address);
       // Aggregate sales for all associated assets
 
-      const allAssetSales = await saleJs.fetchSalesInBatches(rawAdmin, {
-        assetToBeSold: assetsAddressArr,
-        order: "block_timestamp.asc",
-        gtField: "block_timestamp",
-        gtValue: getOneYearAgoTime()
-      }, options);
+      const allAssetSales = await saleJs.fetchSalesInBatches(
+        rawAdmin,
+        {
+          assetToBeSold: assetsAddressArr,
+          order: 'block_timestamp.asc',
+          gtField: 'block_timestamp',
+          gtValue: getOneYearAgoTime(),
+        },
+        options
+      );
 
       // Fetch sales (12 months) for stats
-      let salesFilter = { order: "block_timestamp.asc" };
+      let salesFilter = { order: 'block_timestamp.asc' };
 
       // Sales Filter modification based on timeFilter
       if (timeFilter === timeFilterForSixMonths()) {
         // Applying 6-month filter
-        salesFilter.gtField = "block_timestamp";
+        salesFilter.gtField = 'block_timestamp';
         salesFilter.gtValue = getSixMonthsAgoTime();
       } else if (timeFilter === timeFilterForOneYear()) {
         //Applying 1-year filter
-        salesFilter.gtField = "block_timestamp";
+        salesFilter.gtField = 'block_timestamp';
         salesFilter.gtValue = getOneYearAgoTime();
       } else if (timeFilter === timeFilterForAll()) {
         // For 'All', no changes to salesFilter required
@@ -683,30 +1005,46 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
         return;
       }
 
-      const timeRangeSales = await saleJs.fetchSalesInBatches(rawAdmin, {
-        assetToBeSold: assetsAddressArr,
-        ...salesFilter
-      }, options);
+      const timeRangeSales = await saleJs.fetchSalesInBatches(
+        rawAdmin,
+        {
+          assetToBeSold: assetsAddressArr,
+          ...salesFilter,
+        },
+        options
+      );
 
       // Fetch sales based on filter
 
       // Process records such that for a given date the most recent sale price is fetched
       // This method processes sales passed, drills down into history table for each sale
-      const processSalesHistory = async (sales, filter = {}, shouldAggregate = true, options = defaultOptions) => {
+      const processSalesHistory = async (
+        sales,
+        filter = {},
+        shouldAggregate = true,
+        options = defaultOptions
+      ) => {
         // Fetch sale histories in batches using the new fetchSaleHistoriesInBatches function
-        const histories = await saleJs.fetchSaleHistoriesInBatches(rawAdmin, {
-          assetToBeSold: sales.map(sale => sale.assetToBeSold),  // Pass assetToBeSold from sales
-          filter,  // Apply filter
-          maxConcurrency: 10  // Number of concurrent requests
-        }, options);
-      
+        const histories = await saleJs.fetchSaleHistoriesInBatches(
+          rawAdmin,
+          {
+            assetToBeSold: sales.map((sale) => sale.assetToBeSold), // Pass assetToBeSold from sales
+            filter, // Apply filter
+            maxConcurrency: 10, // Number of concurrent requests
+          },
+          options
+        );
+
         if (shouldAggregate) {
           // Flatten records and aggregate by date, keeping the latest sale record for each date
           return histories.flat().reduce((acc, recordContainer) => {
-            Object.values(recordContainer).forEach(record => {
+            Object.values(recordContainer).forEach((record) => {
               const date = getDate(record);
               if (!date) return;
-              if (!acc[date] || acc[date].block_timestamp < record.block_timestamp) {
+              if (
+                !acc[date] ||
+                acc[date].block_timestamp < record.block_timestamp
+              ) {
                 acc[date] = record;
               }
             });
@@ -714,40 +1052,61 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
           }, {});
         } else {
           // Return history data without processing
-          return histories.flat().map(recordContainer => Object.values(recordContainer)).flat();
+          return histories
+            .flat()
+            .map((recordContainer) => Object.values(recordContainer))
+            .flat();
         }
       };
 
       // Get the histories
       // Driver to fetch history sales for- plotting data points, stats
       const processedSalesResults = await Promise.allSettled([
-        processSalesHistory(timeRangeSales, salesFilter, true),// for data points to be plotted
-        processSalesHistory(allAssetSales, {}, false) // for 12-month historical data
+        processSalesHistory(timeRangeSales, salesFilter, true), // for data points to be plotted
+        processSalesHistory(allAssetSales, {}, false), // for 12-month historical data
       ]);
 
-
-      // Time Filter Records  
-      const originRecordsSorted = processedSalesResults[0].status === 'fulfilled' ?
-        Object.values(processedSalesResults[0].value).sort((a, b) => new Date(a.block_timestamp) - new Date(b.block_timestamp)) : [];
+      // Time Filter Records
+      const originRecordsSorted =
+        processedSalesResults[0].status === 'fulfilled'
+          ? Object.values(processedSalesResults[0].value).sort(
+              (a, b) =>
+                new Date(a.block_timestamp) - new Date(b.block_timestamp)
+            )
+          : [];
       // Only send price, timestamp as a part of the record
-      const originRecords = originRecordsSorted ? Object.values(originRecordsSorted).map(({ price, block_timestamp }) => ({ price, block_timestamp })) : [];
+      const originRecords = originRecordsSorted
+        ? Object.values(originRecordsSorted).map(
+            ({ price, block_timestamp }) => ({ price, block_timestamp })
+          )
+        : [];
 
       // 12 month historical data
-      const twelveMonthHistoryRecords = processedSalesResults[1].status === 'fulfilled' ?
-        Object.values(processedSalesResults[1].value).sort((a, b) => new Date(a.block_timestamp) - new Date(b.block_timestamp)) : [];
+      const twelveMonthHistoryRecords =
+        processedSalesResults[1].status === 'fulfilled'
+          ? Object.values(processedSalesResults[1].value).sort(
+              (a, b) =>
+                new Date(a.block_timestamp) - new Date(b.block_timestamp)
+            )
+          : [];
       // Only send Range, Units Sold, Average Price as the stats record
       const records = {
-        originFluctuation: calculatePriceFluctuation(Object.values(twelveMonthHistoryRecords)),
-        originVolume: calculateVolumeTraded(Object.values(twelveMonthHistoryRecords)),
-        originAveragePrice: calculateAverageSalePrice(Object.values(twelveMonthHistoryRecords))
+        originFluctuation: calculatePriceFluctuation(
+          Object.values(twelveMonthHistoryRecords)
+        ),
+        originVolume: calculateVolumeTraded(
+          Object.values(twelveMonthHistoryRecords)
+        ),
+        originAveragePrice: calculateAverageSalePrice(
+          Object.values(twelveMonthHistoryRecords)
+        ),
       };
 
       return { records, originRecords };
     } catch (error) {
-      console.error("Error fetching price history:", error);
+      console.error('Error fetching price history:', error);
     }
   };
-
 
   // ------------------------------ ART STARTS ------------------------------
 
@@ -757,13 +1116,13 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
       ...args.itemArgs,
       createdDate,
       owner: rawAdmin.address,
-      status: ASSET_STATUS.ACTIVE
+      status: ASSET_STATUS.ACTIVE,
     };
     return artJs.uploadContract(rawAdmin, newArgs, options);
   };
 
   contract.getArts = async function (args = {}, options = optionsNoChainIds) {
-    const getOptions = { ...options, app: contractName, };
+    const getOptions = { ...options, app: contractName };
     return artJs.getAll(rawAdmin, args, getOptions);
   };
 
@@ -776,18 +1135,18 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
     const newArgs = {
       ...args.itemArgs,
       createdDate,
-      status: ASSET_STATUS.ACTIVE
+      status: ASSET_STATUS.ACTIVE,
     };
     return tokensJs.uploadContract(rawAdmin, newArgs, options);
   };
 
   contract.getTokens = async function (args = {}, options = optionsNoChainIds) {
-    const getOptions = { ...options, app: contractName, };
+    const getOptions = { ...options, app: contractName };
     return tokensJs.getAll(rawAdmin, args, getOptions);
   };
 
   // ------------------------------ TOKENS ENDS --------------------------------
-  
+
   // ------------------------------ STRATS STARTS ------------------------------
 
   contract.createSTRATS = async function (args, options = defaultOptions) {
@@ -795,13 +1154,13 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
     const newArgs = {
       ...args.itemArgs,
       createdDate,
-      status: ASSET_STATUS.ACTIVE
+      status: ASSET_STATUS.ACTIVE,
     };
     return STRATSJs.uploadContract(rawAdmin, newArgs, options);
   };
 
   contract.getSTRATS = async function (args = {}, options = optionsNoChainIds) {
-    const getOptions = { ...options, app: contractName, };
+    const getOptions = { ...options, app: contractName };
     return STRATSJs.getAll(rawAdmin, args, getOptions);
   };
 
@@ -809,18 +1168,24 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
 
   // ------------------------------ CARBONOFFSET STARTS------------------------------
 
-  contract.createCarbonOffset = async function (args, options = defaultOptions) {
+  contract.createCarbonOffset = async function (
+    args,
+    options = defaultOptions
+  ) {
     const createdDate = Math.floor(Date.now() / 1000);
     const newArgs = {
       ...args.itemArgs,
       createdDate,
-      status: ASSET_STATUS.ACTIVE
+      status: ASSET_STATUS.ACTIVE,
     };
     return carbonOffsetJs.uploadContract(rawAdmin, newArgs, options);
   };
 
-  contract.getCarbonOffsets = async function (args = {}, options = optionsNoChainIds) {
-    const getOptions = { ...options, app: contractName, };
+  contract.getCarbonOffsets = async function (
+    args = {},
+    options = optionsNoChainIds
+  ) {
+    const getOptions = { ...options, app: contractName };
     return carbonOffsetJs.getAll(rawAdmin, args, getOptions);
   };
 
@@ -834,13 +1199,13 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
       ...args.itemArgs,
       createdDate,
       owner: rawAdmin.address,
-      status: ASSET_STATUS.ACTIVE
+      status: ASSET_STATUS.ACTIVE,
     };
     return metalsJs.uploadContract(rawAdmin, newArgs, options);
   };
 
   contract.getMetals = async function (args = {}, options = optionsNoChainIds) {
-    const getOptions = { ...options, app: contractName, };
+    const getOptions = { ...options, app: contractName };
     return metalsJs.getAll(rawAdmin, args, getOptions);
   };
 
@@ -854,12 +1219,15 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
       ...args.itemArgs,
       createdDate,
       owner: rawAdmin.address,
-      status: ASSET_STATUS.ACTIVE
+      status: ASSET_STATUS.ACTIVE,
     };
     return spiritsJs.uploadContract(rawAdmin, newArgs, options);
   };
 
-  contract.getSpirits = async function (args = {}, options = optionsNoChainIds) {
+  contract.getSpirits = async function (
+    args = {},
+    options = optionsNoChainIds
+  ) {
     const getOptions = { ...options };
     return spiritsJs.getAll(rawAdmin, args, getOptions);
   };
@@ -873,13 +1241,16 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
     const newArgs = {
       ...args.itemArgs,
       createdDate,
-      status: ASSET_STATUS.ACTIVE
+      status: ASSET_STATUS.ACTIVE,
     };
     return clothingJs.uploadContract(rawAdmin, newArgs, options);
   };
 
-  contract.getClothings = async function (args = {}, options = optionsNoChainIds) {
-    const getOptions = { ...options, app: contractName, };
+  contract.getClothings = async function (
+    args = {},
+    options = optionsNoChainIds
+  ) {
+    const getOptions = { ...options, app: contractName };
     return clothingJs.getAll(rawAdmin, args, getOptions);
   };
 
@@ -893,13 +1264,16 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
       ...args.itemArgs,
       createdDate,
       owner: rawAdmin.address,
-      status: ASSET_STATUS.ACTIVE
+      status: ASSET_STATUS.ACTIVE,
     };
     return membershipJs.uploadContract(rawAdmin, newArgs, options);
   };
 
-  contract.getMemberships = async function (args = {}, options = optionsNoChainIds) {
-    const getOptions = { ...options, app: contractName, };
+  contract.getMemberships = async function (
+    args = {},
+    options = optionsNoChainIds
+  ) {
+    const getOptions = { ...options, app: contractName };
     return membershipJs.getAll(rawAdmin, args, getOptions);
   };
 
@@ -912,13 +1286,16 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
     const newArgs = {
       ...args.itemArgs,
       createdDate,
-      status: ASSET_STATUS.ACTIVE
+      status: ASSET_STATUS.ACTIVE,
     };
     return carbonDAOJs.uploadContract(rawAdmin, newArgs, options);
   };
 
-  contract.getCarbonDAOs = async function (args = {}, options = optionsNoChainIds) {
-    const getOptions = { ...options, app: contractName, };
+  contract.getCarbonDAOs = async function (
+    args = {},
+    options = optionsNoChainIds
+  ) {
+    const getOptions = { ...options, app: contractName };
     return carbonDAOJs.getAll(rawAdmin, args, getOptions);
   };
 
@@ -931,13 +1308,16 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
     const newArgs = {
       ...args.itemArgs,
       createdDate,
-      status: ASSET_STATUS.ACTIVE
+      status: ASSET_STATUS.ACTIVE,
     };
     return collectibleJs.uploadContract(rawAdmin, newArgs, options);
   };
 
-  contract.getCollectibles = async function (args = {}, options = optionsNoChainIds) {
-    const getOptions = { ...options, app: contractName, };
+  contract.getCollectibles = async function (
+    args = {},
+    options = optionsNoChainIds
+  ) {
+    const getOptions = { ...options, app: contractName };
     return collectibleJs.getAll(rawAdmin, args, getOptions);
   };
 
@@ -947,36 +1327,54 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
 
   contract.cancelSaleOrder = async function (args, options = defaultOptions) {
     const { paymentService, ...restArgs } = args;
-    const contract = { name: saleOrderJs.paymentServiceContractName, address: paymentService.address }
+    const contract = {
+      name: saleOrderJs.paymentServiceContractName,
+      address: paymentService.address,
+    };
     return saleOrderJs.cancelOrder(rawAdmin, contract, restArgs, options);
-  }
+  };
 
   contract.getSaleOrders = async function (args, options = defaultOptions) {
-    const getOptions = { ...options, app: contractName, };
+    const getOptions = { ...options, app: contractName };
 
-   let {orders, total} = await saleOrderJs.getAll(rawAdmin, args, getOptions);
-   let data;
-   let saleAddressArr = [];
-   data = orders?.map((item)=> {
-    if(item?.saleAddresses?.length){
-      saleAddressArr.push(item?.saleAddresses[0])
-     return {...item,saleAddress:item?.saleAddresses[0] }
-    }else if(item["BlockApps-Mercata-Order-saleAddresses"]) {
-      const address = item["BlockApps-Mercata-Order-saleAddresses"][0]?.value
-      saleAddressArr.push(address)
-     return {...item, saleAddress:address }
-    }else{
-      saleAddressArr.push(item?.saleAddresses)
-      return {...item,saleAddress:item?.saleAddresses }
-    }
-  })
+    let { orders, total } = await saleOrderJs.getAll(
+      rawAdmin,
+      args,
+      getOptions
+    );
+    let data;
+    let saleAddressArr = [];
+    data = orders?.map((item) => {
+      if (item?.saleAddresses?.length) {
+        saleAddressArr.push(item?.saleAddresses[0]);
+        return { ...item, saleAddress: item?.saleAddresses[0] };
+      } else if (item['BlockApps-Mercata-Order-saleAddresses']) {
+        const address = item['BlockApps-Mercata-Order-saleAddresses'][0]?.value;
+        saleAddressArr.push(address);
+        return { ...item, saleAddress: address };
+      } else {
+        saleAddressArr.push(item?.saleAddresses);
+        return { ...item, saleAddress: item?.saleAddresses };
+      }
+    });
 
-  const sales = await saleJs.getAll(rawAdmin, { saleAddresses: saleAddressArr }, options);
+    const sales = await saleJs.getAll(
+      rawAdmin,
+      { saleAddresses: saleAddressArr },
+      options
+    );
 
-  let assets = [];
-      for (const sale of sales) {
-        const history = await saleJs.getSaleHistory(rawAdmin, { transaction_hash: sale.transaction_hash, assetToBeSold: sale.assetToBeSold }, options);
-        const price = history['0'] ? history['0'].price : null;
+    let assets = [];
+    for (const sale of sales) {
+      const history = await saleJs.getSaleHistory(
+        rawAdmin,
+        {
+          transaction_hash: sale.transaction_hash,
+          assetToBeSold: sale.assetToBeSold,
+        },
+        options
+      );
+      const price = history['0'] ? history['0'].price : null;
 
       assets.push({
         assetAddress: sale.assetToBeSold,
@@ -987,34 +1385,55 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
       });
     }
 
-    data = data.map((item)=>{
-      const saleData = assets.find((asset)=> asset.saleAddress === item.saleAddress)
-      return {...item, ...saleData }
-    })
+    data = data.map((item) => {
+      const saleData = assets.find(
+        (asset) => asset.saleAddress === item.saleAddress
+      );
+      return { ...item, ...saleData };
+    });
 
-  return { orderData:data, total };;
-  }
+    return { orderData: data, total };
+  };
 
   contract.checkSaleQuantity = async function (args, options = defaultOptions) {
-    const getOptions = { ...options, app: contractName }
-    return inventoryJs.checkSaleQuantity(rawAdmin, args, getOptions)
-  }
+    const getOptions = { ...options, app: contractName };
+    return inventoryJs.checkSaleQuantity(rawAdmin, args, getOptions);
+  };
 
   contract.getOrder = async function (args, options = defaultOptions) {
     try {
       const order = await saleOrderJs.get(rawAdmin, args, options);
 
       // Extracting the sale addresses
-      const saleAddresses = order.saleAddresses ? order.saleAddresses : order["BlockApps-Mercata-Order-saleAddresses"].map(item => item.value);
-      const sales = await saleJs.getAll(rawAdmin, { saleAddresses: saleAddresses }, options);
+      const saleAddresses = order.saleAddresses
+        ? order.saleAddresses
+        : order['BlockApps-Mercata-Order-saleAddresses'].map(
+            (item) => item.value
+          );
+      const sales = await saleJs.getAll(
+        rawAdmin,
+        { saleAddresses: saleAddresses },
+        options
+      );
       let assets = [];
 
       for (const sale of sales) {
-        const history = await saleJs.getSaleHistory(rawAdmin, { transaction_hash: order.transaction_hash, assetToBeSold: sale.assetToBeSold }, options);
+        const history = await saleJs.getSaleHistory(
+          rawAdmin,
+          {
+            transaction_hash: order.transaction_hash,
+            assetToBeSold: sale.assetToBeSold,
+          },
+          options
+        );
         const price = history['0'] ? history['0'].price : null;
 
         const assetAddress = sale.assetToBeSold;
-        const assetWithoutQuantity = await inventoryJs.get(rawAdmin, { address: assetAddress }, options);
+        const assetWithoutQuantity = await inventoryJs.get(
+          rawAdmin,
+          { address: assetAddress },
+          options
+        );
 
         assets.push({
           ...assetWithoutQuantity,
@@ -1025,14 +1444,24 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
         });
       }
 
-      const result = { userContactAddress: order.shippingAddress, order, assets };
+      const result = {
+        userContactAddress: order.shippingAddress,
+        order,
+        assets,
+      };
 
       return result;
     } catch (error) {
       if (error.response) {
-        throw new rest.RestError(error.response.status, error.response.statusText);
+        throw new rest.RestError(
+          error.response.status,
+          error.response.statusText
+        );
       }
-      throw new rest.RestError(RestStatus.BAD_REQUEST, "Error while fetching the order");
+      throw new rest.RestError(
+        RestStatus.BAD_REQUEST,
+        'Error while fetching the order'
+      );
     }
   };
 
@@ -1040,10 +1469,21 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
     return saleOrderJs.completeOrder(rawAdmin, args, options);
   };
 
-  contract.updateOrderComment = async function (args, options = defaultOptions) {
+  contract.updateOrderComment = async function (
+    args,
+    options = defaultOptions
+  ) {
     const { saleOrderAddress, comments, ...restArgs } = args;
-    const contract = { name: saleOrderJs.contractName, address: saleOrderAddress }
-    return saleOrderJs.updateOrderComment(rawAdmin, contract, options, comments);
+    const contract = {
+      name: saleOrderJs.contractName,
+      address: saleOrderAddress,
+    };
+    return saleOrderJs.updateOrderComment(
+      rawAdmin,
+      contract,
+      options,
+      comments
+    );
   };
 
   contract.export = async function (options = defaultOptions) {
@@ -1056,109 +1496,206 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
       }
       let saleAddresses = [];
 
-      orders.orders.forEach(order => {
-        if (order['BlockApps-Mercata-Order-saleAddresses'] && Array.isArray(order['BlockApps-Mercata-Order-saleAddresses'])) {
-          order['BlockApps-Mercata-Order-saleAddresses'].forEach(saleAddress => {
-            if (saleAddress.value) {
-              saleAddresses.push(saleAddress.value);
+      orders.orders.forEach((order) => {
+        if (
+          order['BlockApps-Mercata-Order-saleAddresses'] &&
+          Array.isArray(order['BlockApps-Mercata-Order-saleAddresses'])
+        ) {
+          order['BlockApps-Mercata-Order-saleAddresses'].forEach(
+            (saleAddress) => {
+              if (saleAddress.value) {
+                saleAddresses.push(saleAddress.value);
+              }
             }
-          });
+          );
         }
-        if(order.saleAddresses?.length){
+        if (order.saleAddresses?.length) {
           saleAddresses.push(order.saleAddresses[0]);
         }
       });
 
       const sales = await saleJs.getAll(rawAdmin, { saleAddresses }, options);
 
-      const uniqueAssetAddresses = [...new Set(sales.map(sale => sale.assetToBeSold))];
-      const assets = await inventoryJs.getAll(rawAdmin, { assetAddresses: uniqueAssetAddresses }, options);
-      const assetLookup = new Map(assets.map(asset => [asset.address, asset]));
+      const uniqueAssetAddresses = [
+        ...new Set(sales.map((sale) => sale.assetToBeSold)),
+      ];
+      const assets = await inventoryJs.getAll(
+        rawAdmin,
+        { assetAddresses: uniqueAssetAddresses },
+        options
+      );
+      const assetLookup = new Map(
+        assets.map((asset) => [asset.address, asset])
+      );
 
       for (const order of orders.orders) {
         const assetsPromises = saleAddresses.map(async (saleAddress) => {
-          const sale = sales.find(sale => sale.address === saleAddress);
+          const sale = sales.find((sale) => sale.address === saleAddress);
           if (!sale) return undefined;
 
-          const history = await saleJs.getSaleHistory(rawAdmin, {
-            transaction_hash: order.transaction_hash,
-            assetToBeSold: sale.assetToBeSold
-          }, options);
+          const history = await saleJs.getSaleHistory(
+            rawAdmin,
+            {
+              transaction_hash: order.transaction_hash,
+              assetToBeSold: sale.assetToBeSold,
+            },
+            options
+          );
 
           const asset = assetLookup.get(sale.assetToBeSold);
-          return asset ? { ...asset, salePrice: history['0']?.price || 0 } : undefined;
+          return asset
+            ? { ...asset, salePrice: history['0']?.price || 0 }
+            : undefined;
         });
 
-        order.assets = (await Promise.all(assetsPromises)).filter(asset => asset !== undefined);
+        order.assets = (await Promise.all(assetsPromises)).filter(
+          (asset) => asset !== undefined
+        );
       }
 
       return orders.orders;
     };
 
     const getItemTransferEventsWithAssetInfo = async (orderArg) => {
-      const itemTransferEvents = await inventoryJs.getAllItemTransferEvents(rawAdmin, orderArg, getOptions);
+      const itemTransferEvents = await inventoryJs.getAllItemTransferEvents(
+        rawAdmin,
+        orderArg,
+        getOptions
+      );
       if (itemTransferEvents.transfers.length === 0) {
         return [];
       }
-      const assetAddresses = itemTransferEvents.transfers.map(event => event.assetAddress);
+      const assetAddresses = itemTransferEvents.transfers.map(
+        (event) => event.assetAddress
+      );
       const uniqueAssetAddresses = [...new Set(assetAddresses)];
-      const assets = await inventoryJs.getAll(rawAdmin, { assetAddresses: uniqueAssetAddresses }, getOptions);
+      const assets = await inventoryJs.getAll(
+        rawAdmin,
+        { assetAddresses: uniqueAssetAddresses },
+        getOptions
+      );
 
-      const assetInfoMap = new Map(assets.map(asset => [asset.address, { contract_name: asset.contract_name }]));
-      return itemTransferEvents.transfers.map(event => {
-        return { ...event, contract_name: assetInfoMap.get(event.assetAddress)?.contract_name };
+      const assetInfoMap = new Map(
+        assets.map((asset) => [
+          asset.address,
+          { contract_name: asset.contract_name },
+        ])
+      );
+      return itemTransferEvents.transfers.map((event) => {
+        return {
+          ...event,
+          contract_name: assetInfoMap.get(event.assetAddress)?.contract_name,
+        };
       });
     };
 
-    let soldOrderArgs = { limit: 2000, offset: 0, order: 'createdDate.desc', sellersCommonName: userCommonName };
+    let soldOrderArgs = {
+      limit: 2000,
+      offset: 0,
+      order: 'createdDate.desc',
+      sellersCommonName: userCommonName,
+    };
     const soldOrders = await processOrders(soldOrderArgs);
 
-    let boughtOrderArgs = { limit: 2000, offset: 0, order: 'createdDate.desc', purchasersCommonName: userCommonName };
+    let boughtOrderArgs = {
+      limit: 2000,
+      offset: 0,
+      order: 'createdDate.desc',
+      purchasersCommonName: userCommonName,
+    };
     const boughtOrders = await processOrders(boughtOrderArgs);
 
-    let transferArgs = { limit: 2000, offset: 0, order: 'transferDate.desc', or: `(oldOwnerCommonName.eq.${userCommonName},newOwnerCommonName.eq.${userCommonName})` };
-    const itemTransferEvents = await getItemTransferEventsWithAssetInfo(transferArgs);
+    let transferArgs = {
+      limit: 2000,
+      offset: 0,
+      order: 'transferDate.desc',
+      or: `(oldOwnerCommonName.eq.${userCommonName},newOwnerCommonName.eq.${userCommonName})`,
+    };
+    const itemTransferEvents =
+      await getItemTransferEventsWithAssetInfo(transferArgs);
 
     return {
       soldOrders: soldOrders ? soldOrders : [],
       boughtOrders: boughtOrders ? boughtOrders : [],
-      transfers: itemTransferEvents ? itemTransferEvents : []
+      transfers: itemTransferEvents ? itemTransferEvents : [],
     };
   };
 
   // ------------------------------ SALE TEST ENDS ------------------------------
 
   /* ------------------------ User Activity Starts ------------------------ */
-  contract.getAllUserActivity = async function (args, options = defaultOptions) {
+  contract.getAllUserActivity = async function (
+    args,
+    options = defaultOptions
+  ) {
     const getOptions = { ...options, app: contractName };
-    const { sellersCommonName, purchasersCommonName, newOwnerCommonName } = args
+    const { sellersCommonName, purchasersCommonName, newOwnerCommonName } =
+      args;
 
     const currentDate = dayjs(); // Get the current date with dayjs
     const tenDaysAgoDate = currentDate.subtract(10, 'day'); // Subtract 10 days
-    const tenDaysAgoTimestamp = tenDaysAgoDate.utc().format('YYYY-MM-DD HH:mm:ss') + ' UTC'; // Format the date
+    const tenDaysAgoTimestamp =
+      tenDaysAgoDate.utc().format('YYYY-MM-DD HH:mm:ss') + ' UTC'; // Format the date
 
     // Need to fetch purchases, closed orders, transfers for the user.
-    // New Purchases of User's Products---Fetch Orders with filters of sellersCommonName, block_timestamp and Order Status = AWAITING_FULFILLMENT (1) 
-    const purchaseArgs = { sellersCommonName, status: 1, gtField: "block_timestamp", gtValue: tenDaysAgoTimestamp }
-    const purchases = await saleOrderJs.getAll(rawAdmin, purchaseArgs, getOptions);
+    // New Purchases of User's Products---Fetch Orders with filters of sellersCommonName, block_timestamp and Order Status = AWAITING_FULFILLMENT (1)
+    const purchaseArgs = {
+      sellersCommonName,
+      status: 1,
+      gtField: 'block_timestamp',
+      gtValue: tenDaysAgoTimestamp,
+    };
+    const purchases = await saleOrderJs.getAll(
+      rawAdmin,
+      purchaseArgs,
+      getOptions
+    );
 
     // These are my orders that ave been closed by a seller
-    const orderArgs = { purchasersCommonName, status: 3, gtField: "block_timestamp", gtValue: tenDaysAgoTimestamp }
+    const orderArgs = {
+      purchasersCommonName,
+      status: 3,
+      gtField: 'block_timestamp',
+      gtValue: tenDaysAgoTimestamp,
+    };
     const orders = await saleOrderJs.getAll(rawAdmin, orderArgs, getOptions);
 
     // These are transfers the usre has recieved
-    const transferArgs = { newOwnerCommonName, gtField: "block_timestamp", gtValue: tenDaysAgoTimestamp };
-    const transfers = await inventoryJs.getAllItemTransferEvents(rawAdmin, transferArgs, getOptions);
+    const transferArgs = {
+      newOwnerCommonName,
+      gtField: 'block_timestamp',
+      gtValue: tenDaysAgoTimestamp,
+    };
+    const transfers = await inventoryJs.getAllItemTransferEvents(
+      rawAdmin,
+      transferArgs,
+      getOptions
+    );
 
     // Fetch activities and add type to each item
-    const purchasesWithTypes = purchases.orders.map(p => ({ ...p, type: 'sold' }));
-    const ordersWithTypes = orders.orders.map(o => ({ ...o, type: 'bought' }));
-    const transfersWithTypes = transfers.transfers.map(t => ({ ...t, type: 'transfer' }));
+    const purchasesWithTypes = purchases.orders.map((p) => ({
+      ...p,
+      type: 'sold',
+    }));
+    const ordersWithTypes = orders.orders.map((o) => ({
+      ...o,
+      type: 'bought',
+    }));
+    const transfersWithTypes = transfers.transfers.map((t) => ({
+      ...t,
+      type: 'transfer',
+    }));
 
     // Combine all activities into one array
-    const allActivities = [...purchasesWithTypes, ...ordersWithTypes, ...transfersWithTypes];
+    const allActivities = [
+      ...purchasesWithTypes,
+      ...ordersWithTypes,
+      ...transfersWithTypes,
+    ];
     // Sort by block_timestamp
-    allActivities.sort((a, b) => new Date(b.block_timestamp) - new Date(a.block_timestamp));
+    allActivities.sort(
+      (a, b) => new Date(b.block_timestamp) - new Date(a.block_timestamp)
+    );
 
     return allActivities;
   };
@@ -1167,55 +1704,92 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
 
   // //-----------------------------PAYMENT starts here -------------------------------
 
-  contract.getPaymentServices = async function (args, options = defaultOptions) {
-    const paymentServices = await paymentServiceJs.getAll(rawAdmin, args, options);
+  contract.getPaymentServices = async function (
+    args,
+    options = defaultOptions
+  ) {
+    const paymentServices = await paymentServiceJs.getAll(
+      rawAdmin,
+      args,
+      options
+    );
     return paymentServices;
-  }
+  };
 
-  contract.getNotOnboardedPaymentServices = async function (args, options = defaultOptions) {
-    const paymentServices = await paymentServiceJs.getNotOnboarded(rawAdmin, args, options);
+  contract.getNotOnboardedPaymentServices = async function (
+    args,
+    options = defaultOptions
+  ) {
+    const paymentServices = await paymentServiceJs.getNotOnboarded(
+      rawAdmin,
+      args,
+      options
+    );
     return paymentServices;
-  }
+  };
 
-  contract.paymentCheckout = async function (originUrl, args, options = defaultOptions) {
+  contract.paymentCheckout = async function (
+    originUrl,
+    args,
+    options = defaultOptions
+  ) {
     try {
+      const {
+        paymentService,
+        orderList,
+        orderTotal: recievedOrderTotal,
+      } = args;
 
-      const { paymentService, orderList, orderTotal: recievedOrderTotal } = args;
+      const assetAddresses = orderList.map((o) => o.assetAddress);
+      const quantities = orderList.map((o) => o.quantity);
 
-      const assetAddresses = orderList.map(o => o.assetAddress);
-      const quantities = orderList.map(o => o.quantity);
+      const assets = await inventoryJs.getAll(
+        rawAdmin,
+        { assetAddresses: assetAddresses },
+        options
+      );
 
-      const assets = await inventoryJs.getAll(rawAdmin, { assetAddresses: assetAddresses }, options);
-
-      const saleAddresses = assets.map(a => a.saleAddress);
+      const saleAddresses = assets.map((a) => a.saleAddress);
 
       if (assets.length == 0 || assets.length != orderList.length) {
-        throw new rest.RestError(RestStatus.NOT_FOUND, "Inventory not found")
+        throw new rest.RestError(RestStatus.NOT_FOUND, 'Inventory not found');
       }
 
       const sellerName = assets[0].ownerCommonName;
       for (const currInventory of assets) {
-
         if (currInventory.ownerCommonName == userCert.commonName) {
-          throw new rest.RestError(RestStatus.BAD_REQUEST, "Seller cannot buy his own product",);
+          throw new rest.RestError(
+            RestStatus.BAD_REQUEST,
+            'Seller cannot buy his own product'
+          );
         }
 
         /* User shouldn't be allowed buy products from multiple sellers  */
         if (sellerName != currInventory.ownerCommonName) {
-          throw new rest.RestError(RestStatus.BAD_REQUEST, "Cannot buy products from multiple sellers in the same Order/Checkout",);
+          throw new rest.RestError(
+            RestStatus.BAD_REQUEST,
+            'Cannot buy products from multiple sellers in the same Order/Checkout'
+          );
         }
       }
 
       let stratsAssetAddressesToUse = [];
-      if (paymentService.serviceName.toLowerCase().includes("strats")) {
+      if (paymentService.serviceName.toLowerCase().includes('strats')) {
         // Get User's STRATS Asset Address
         const stratsOriginAddress = await STRATSJs.getStratsAddress();
 
         // Retrieve all sales data
-        const salesData = await saleJs.getAll(rawAdmin, { saleAddresses }, options);
+        const salesData = await saleJs.getAll(
+          rawAdmin,
+          { saleAddresses },
+          options
+        );
 
         // Calculate the total order amount
-        const orderTotal = salesData.reduce((acc, sale, index) => acc + (sale.price * quantities[index]), 0);
+        const orderTotal = salesData.reduce(
+          (acc, sale, index) => acc + sale.price * quantities[index],
+          0
+        );
 
         // Retrieve the user's active STRATS asset addresses with non-zero quantities
         const userStratsAssets = await inventoryJs.getAll(
@@ -1224,30 +1798,36 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
             ownerCommonName: userCert.commonName,
             originAddress: stratsOriginAddress,
             status: ASSET_STATUS.ACTIVE,
-            queryOptions: { select: "address, quantity" },
-            notEqualsField: "quantity",
-            notEqualsValue: "0",
-            order: 'block_timestamp.desc'
+            queryOptions: { select: 'address, quantity' },
+            notEqualsField: 'quantity',
+            notEqualsValue: '0',
+            order: 'block_timestamp.desc',
           },
           options
         );
 
         // Accumulate STRATS asset addresses to cover the order total
         let accumulatedTotal = 0;
-        stratsAssetAddressesToUse = userStratsAssets.reduce((addresses, asset) => {
-          if (accumulatedTotal >= orderTotal) return addresses;
-          
-          addresses.push(asset.address);
-          accumulatedTotal += asset.quantity / 10000;
+        stratsAssetAddressesToUse = userStratsAssets.reduce(
+          (addresses, asset) => {
+            if (accumulatedTotal >= orderTotal) return addresses;
 
-          return addresses;
-        }, []);
+            addresses.push(asset.address);
+            accumulatedTotal += asset.quantity / 10000;
+
+            return addresses;
+          },
+          []
+        );
 
         if (accumulatedTotal < orderTotal) {
-          throw new rest.RestError(RestStatus.BAD_REQUEST, "You don't have enough STRATS balance to make this purchase");
+          throw new rest.RestError(
+            RestStatus.BAD_REQUEST,
+            "You don't have enough STRATS balance to make this purchase"
+          );
         }
       }
-      
+
       const createdDate = Math.floor(Date.now() / 1000);
       const paymentParameters = {
         address: paymentService.address,
@@ -1257,27 +1837,44 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
         quantities,
         createdDate,
         comments: DEFAULT_COMMENT,
-      }
-      const checkoutHashAndAssets = await paymentServiceJs.createPayment(rawAdmin, paymentParameters, options);
+      };
+      const checkoutHashAndAssets = await paymentServiceJs.createPayment(
+        rawAdmin,
+        paymentParameters,
+        options
+      );
 
       return checkoutHashAndAssets;
-
     } catch (error) {
       console.log(error);
       if (error.response) {
-        throw new rest.RestError(error.response.status, error.response.statusText);
+        throw new rest.RestError(
+          error.response.status,
+          error.response.statusText
+        );
       }
-      throw new rest.RestError(RestStatus.BAD_REQUEST, "Error while updating the order");
+      throw new rest.RestError(
+        RestStatus.BAD_REQUEST,
+        'Error while updating the order'
+      );
     }
   };
 
-  contract.getStratsOrderEvent = async function (args, options = defaultOptions) {
-
-    const currentPaymentService = await paymentServiceJs.getAll(rawAdmin, { address: args.paymentService }, options);
-    if (currentPaymentService[0].contract_name.includes('StratPaymentService')) {
+  contract.getStratsOrderEvent = async function (
+    args,
+    options = defaultOptions
+  ) {
+    const currentPaymentService = await paymentServiceJs.getAll(
+      rawAdmin,
+      { address: args.paymentService },
+      options
+    );
+    if (
+      currentPaymentService[0].contract_name.includes('StratPaymentService')
+    ) {
       const orderEvent = await rest.searchUntil(
         rawAdmin,
-        { name: "BlockApps-Mercata-PaymentService.Order" },
+        { name: 'BlockApps-Mercata-PaymentService.Order' },
         (r) => r.length === 1,
         {
           ...options,
@@ -1285,108 +1882,185 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
             limit: 1,
             orderHash: `eq.${args.orderHash}`,
             currency: 'eq.STRATS',
-          }
+          },
         }
       );
       return orderEvent;
     }
-  }
-
+  };
 
   contract.waitForOrderEvent = async function (args, options = defaultOptions) {
-      const orderEvent = await rest.searchUntil(
-        rawAdmin,
-        { name: "BlockApps-Mercata-PaymentService.Order" },
-        (r) => r.length === 1,
-        {
-          ...options,
-          query: {
-            limit: 1,
-            orderHash: `eq.${args.orderHash}`,
-          }
-        }
-      );
-      return orderEvent;
-  }
+    const orderEvent = await rest.searchUntil(
+      rawAdmin,
+      { name: 'BlockApps-Mercata-PaymentService.Order' },
+      (r) => r.length === 1,
+      {
+        ...options,
+        query: {
+          limit: 1,
+          orderHash: `eq.${args.orderHash}`,
+        },
+      }
+    );
+    return orderEvent;
+  };
 
   contract.createUserAddress = async function (args, options = defaultOptions) {
     const { redemptionService, ...restArgs } = args;
     try {
-      const { serviceURL, createCustomerAddressRoute = '' } = await redemptionServiceJs.get(rawAdmin, { address: redemptionService }, options);
-      await axios.post(new URL(createCustomerAddressRoute, serviceURL).href, { commonName: userCert.commonName, ...restArgs })
+      const { serviceURL, createCustomerAddressRoute = '' } =
+        await redemptionServiceJs.get(
+          rawAdmin,
+          { address: redemptionService },
+          options
+        );
+      await axios
+        .post(new URL(createCustomerAddressRoute, serviceURL).href, {
+          commonName: userCert.commonName,
+          ...restArgs,
+        })
         .then(function (res) {
           if (res.status === 200) {
             // Success case
           } else {
-            throw new rest.RestError(RestStatus.BAD_REQUEST, `Payment server call failed: ${res.statusText}`);
+            throw new rest.RestError(
+              RestStatus.BAD_REQUEST,
+              `Payment server call failed: ${res.statusText}`
+            );
           }
         });
-      return {}
+      return {};
     } catch (error) {
       if (error.response) {
-        throw new rest.RestError(error.response.status, error.response.statusText);
+        throw new rest.RestError(
+          error.response.status,
+          error.response.statusText
+        );
       }
-      throw new rest.RestError(RestStatus.BAD_REQUEST, `Error while adding address: ${JSON.stringify(error)} `);
+      throw new rest.RestError(
+        RestStatus.BAD_REQUEST,
+        `Error while adding address: ${JSON.stringify(error)} `
+      );
     }
   };
 
   contract.getUserAddress = async function (args, options = optionsNoChainIds) {
     const { redemptionService, shippingAddressId } = args;
     try {
-      const { serviceURL, getCustomerAddressRoute = '' } = await redemptionServiceJs.get(rawAdmin, { address: redemptionService }, options);
-      const userAddress = await axios.get(new URL(`${getCustomerAddressRoute}/id/${shippingAddressId}`, serviceURL).href).then(function (res) {
-        if (res.status === 200) {
-          return res.data.data;
-        } else {
-          throw new rest.RestError(RestStatus.BAD_REQUEST, `Payment server call failed: ${res.statusText}`);
-        }
-      });
+      const { serviceURL, getCustomerAddressRoute = '' } =
+        await redemptionServiceJs.get(
+          rawAdmin,
+          { address: redemptionService },
+          options
+        );
+      const userAddress = await axios
+        .get(
+          new URL(
+            `${getCustomerAddressRoute}/id/${shippingAddressId}`,
+            serviceURL
+          ).href
+        )
+        .then(function (res) {
+          if (res.status === 200) {
+            return res.data.data;
+          } else {
+            throw new rest.RestError(
+              RestStatus.BAD_REQUEST,
+              `Payment server call failed: ${res.statusText}`
+            );
+          }
+        });
       return userAddress;
     } catch (error) {
       if (error.response) {
-        throw new rest.RestError(error.response.status, error.response.statusText);
+        throw new rest.RestError(
+          error.response.status,
+          error.response.statusText
+        );
       }
-      throw new rest.RestError(RestStatus.BAD_REQUEST, `Error while fetching shipping address: ${JSON.stringify(error)} `);
+      throw new rest.RestError(
+        RestStatus.BAD_REQUEST,
+        `Error while fetching shipping address: ${JSON.stringify(error)} `
+      );
     }
   };
 
-  contract.getAllUserAddress = async function (args, options = optionsNoChainIds) {
+  contract.getAllUserAddress = async function (
+    args,
+    options = optionsNoChainIds
+  ) {
     const { redemptionService } = args;
     try {
-      const { serviceURL, getCustomerAddressRoute = '' } = await redemptionServiceJs.get(rawAdmin, { address: redemptionService }, options);
-      const userAddresses = await axios.get(new URL(`${getCustomerAddressRoute}/${userCert.commonName}`, serviceURL).href).then(function (res) {
-        if (res.status === 200) {
-          return res.data.data;
-        } else {
-          throw new rest.RestError(RestStatus.BAD_REQUEST, `Payment server call failed: ${res.statusText}`);
-        }
-      });
+      const { serviceURL, getCustomerAddressRoute = '' } =
+        await redemptionServiceJs.get(
+          rawAdmin,
+          { address: redemptionService },
+          options
+        );
+      const userAddresses = await axios
+        .get(
+          new URL(
+            `${getCustomerAddressRoute}/${userCert.commonName}`,
+            serviceURL
+          ).href
+        )
+        .then(function (res) {
+          if (res.status === 200) {
+            return res.data.data;
+          } else {
+            throw new rest.RestError(
+              RestStatus.BAD_REQUEST,
+              `Payment server call failed: ${res.statusText}`
+            );
+          }
+        });
       return userAddresses;
     } catch (error) {
       if (error.response) {
-        throw new rest.RestError(error.response.status, error.response.statusText);
+        throw new rest.RestError(
+          error.response.status,
+          error.response.statusText
+        );
       }
-      throw new rest.RestError(RestStatus.BAD_REQUEST, `Error while fetching shipping addresses: ${JSON.stringify(error)} `);
+      throw new rest.RestError(
+        RestStatus.BAD_REQUEST,
+        `Error while fetching shipping addresses: ${JSON.stringify(error)} `
+      );
     }
   };
 
   contract.getStratsBalance = async function (args, options = defaultOptions) {
     const stratsOriginAddress = await STRATSJs.getStratsAddress();
-    const balance = await inventoryJs.getAll(rawAdmin, { ownerCommonName: userCert.commonName, originAddress: stratsOriginAddress, queryOptions: { select: "quantity.sum()" } }, options);
-    return balance[0].sum ? `${balance[0].sum/100}` : 0;
-  }
+    const balance = await inventoryJs.getAll(
+      rawAdmin,
+      {
+        ownerCommonName: userCert.commonName,
+        originAddress: stratsOriginAddress,
+        queryOptions: { select: 'quantity.sum()' },
+      },
+      options
+    );
+    return balance[0].sum ? `${balance[0].sum / 100}` : 0;
+  };
 
-  contract.getStratsTransactionHistory = async function (args, options = defaultOptions) {
-    const getOptions = { ...options, org: "TestCompany", app: '' };
-    const transactionHistory = await strats.getStratsTransactionHistory(rawAdmin, args, getOptions);
+  contract.getStratsTransactionHistory = async function (
+    args,
+    options = defaultOptions
+  ) {
+    const getOptions = { ...options, org: 'TestCompany', app: '' };
+    const transactionHistory = await strats.getStratsTransactionHistory(
+      rawAdmin,
+      args,
+      getOptions
+    );
 
     return transactionHistory;
-  }
+  };
 
   contract.transferStrats = async function (args, options = defaultOptions) {
-    const res = await strats.transferStrats(rawAdmin, args, options)
+    const res = await strats.transferStrats(rawAdmin, args, options);
     return res;
-  }
+  };
 
   //----------------------------- Reserve START -------------------------------
   contract.getReserve = async function (options = defaultOptions) {
@@ -1454,15 +2128,14 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
   };
   // ---------------------------- Reserve END   -------------------------------
   return contract;
-};
-
+}
 
 /**
  * Add a new organization to a tCommerce contract/chain.
  * @param {string} orgName The new organization to add
  */
 async function addOrg(user, contract, options, orgName) {
-  const callArgs = { contract, method: "addOrg", args: util.usc({ orgName }), };
+  const callArgs = { contract, method: 'addOrg', args: util.usc({ orgName }) };
   return rest.call(user, callArgs, options);
 }
 
@@ -1472,7 +2145,11 @@ async function addOrg(user, contract, options, orgName) {
  * @param {string} orgUnit The new organization unit to add
  */
 async function addOrgUnit(user, contract, options, orgName, orgUnit) {
-  const callArgs = { contract, method: "addOrgUnit", args: util.usc({ orgName, orgUnit }), };
+  const callArgs = {
+    contract,
+    method: 'addOrgUnit',
+    args: util.usc({ orgName, orgUnit }),
+  };
   return rest.call(user, callArgs, options);
 }
 
@@ -1482,8 +2159,19 @@ async function addOrgUnit(user, contract, options, orgName, orgUnit) {
  * @param {string} orgUnit The organization unit the member to add belongs to
  * @param {string} commonName The common name of the member to add
  */
-async function addMember(user, contract, options, orgName, orgUnit, commonName) {
-  const callArgs = { contract, method: "addMember", args: util.usc({ orgName, orgUnit, commonName }), };
+async function addMember(
+  user,
+  contract,
+  options,
+  orgName,
+  orgUnit,
+  commonName
+) {
+  const callArgs = {
+    contract,
+    method: 'addMember',
+    args: util.usc({ orgName, orgUnit, commonName }),
+  };
   return rest.call(user, callArgs, options);
 }
 
@@ -1492,7 +2180,11 @@ async function addMember(user, contract, options, orgName, orgUnit, commonName) 
  * @param {string} orgName The organization to remove
  */
 async function removeOrg(user, contract, options, orgName) {
-  const callArgs = { contract, method: "removeOrg", args: util.usc({ orgName }), };
+  const callArgs = {
+    contract,
+    method: 'removeOrg',
+    args: util.usc({ orgName }),
+  };
   return rest.call(user, callArgs, options);
 }
 
@@ -1502,7 +2194,11 @@ async function removeOrg(user, contract, options, orgName) {
  * @param {string} orgUnit The organization unit to remove
  */
 async function removeOrgUnit(user, contract, options, orgName, orgUnit) {
-  const callArgs = { contract, method: "removeOrgUnit", args: util.usc({ orgName, orgUnit }), };
+  const callArgs = {
+    contract,
+    method: 'removeOrgUnit',
+    args: util.usc({ orgName, orgUnit }),
+  };
   return rest.call(user, callArgs, options);
 }
 
@@ -1512,8 +2208,19 @@ async function removeOrgUnit(user, contract, options, orgName, orgUnit) {
  * @param {string} orgUnit The organization unit the member to remove belongs to
  * @param {string} commonName The common name of the member to remove
  */
-async function removeMember(user, contract, options, orgName, orgUnit, commonName) {
-  const callArgs = { contract, method: "removeMember", args: util.usc({ orgName, orgUnit, commonName }), };
+async function removeMember(
+  user,
+  contract,
+  options,
+  orgName,
+  orgUnit,
+  commonName
+) {
+  const callArgs = {
+    contract,
+    method: 'removeMember',
+    args: util.usc({ orgName, orgUnit, commonName }),
+  };
   return rest.call(user, callArgs, options);
 }
 
@@ -1522,7 +2229,11 @@ async function removeMember(user, contract, options, orgName, orgUnit, commonNam
  * @param {string} orgNames An array of new organizations to add
  */
 async function addOrgs(user, contract, options, orgNames) {
-  const callArgs = { contract, method: "addOrgs", args: util.usc({ orgNames }), };
+  const callArgs = {
+    contract,
+    method: 'addOrgs',
+    args: util.usc({ orgNames }),
+  };
   return rest.call(user, callArgs, options);
 }
 
@@ -1532,7 +2243,11 @@ async function addOrgs(user, contract, options, orgNames) {
  * @param {string} orgUnits An array of new organization units to add
  */
 async function addOrgUnits(user, contract, options, orgNames, orgUnits) {
-  const callArgs = { contract, method: "addOrgUnits", args: util.usc({ orgNames, orgUnits }), };
+  const callArgs = {
+    contract,
+    method: 'addOrgUnits',
+    args: util.usc({ orgNames, orgUnits }),
+  };
   return rest.call(user, callArgs, options);
 }
 
@@ -1542,8 +2257,19 @@ async function addOrgUnits(user, contract, options, orgNames, orgUnits) {
  * @param {string} orgUnits An array of organization units the members to add belongs to
  * @param {string} commonNames An array of the common names of the members to add
  */
-async function addMembers(user, contract, options, orgNames, orgUnits, commonNames) {
-  const callArgs = { contract, method: "addMembers", args: util.usc({ orgNames, orgUnits, commonNames }), };
+async function addMembers(
+  user,
+  contract,
+  options,
+  orgNames,
+  orgUnits,
+  commonNames
+) {
+  const callArgs = {
+    contract,
+    method: 'addMembers',
+    args: util.usc({ orgNames, orgUnits, commonNames }),
+  };
   return rest.call(user, callArgs, options);
 }
 
@@ -1552,7 +2278,11 @@ async function addMembers(user, contract, options, orgNames, orgUnits, commonNam
  * @param {string} orgNames An array of organizations to remove
  */
 async function removeOrgs(user, contract, options, orgNames) {
-  const callArgs = { contract, method: "removeOrgs", args: util.usc({ orgNames }), };
+  const callArgs = {
+    contract,
+    method: 'removeOrgs',
+    args: util.usc({ orgNames }),
+  };
   return rest.call(user, callArgs, options);
 }
 
@@ -1562,7 +2292,11 @@ async function removeOrgs(user, contract, options, orgNames) {
  * @param {string} orgUnits An array of organization units to remove
  */
 async function removeOrgUnits(user, contract, options, orgNames, orgUnits) {
-  const callArgs = { contract, method: "removeOrgUnits", args: util.usc({ orgNames, orgUnits }), };
+  const callArgs = {
+    contract,
+    method: 'removeOrgUnits',
+    args: util.usc({ orgNames, orgUnits }),
+  };
   return rest.call(user, callArgs, options);
 }
 
@@ -1572,8 +2306,19 @@ async function removeOrgUnits(user, contract, options, orgNames, orgUnits) {
  * @param {string} orgUnits An array of organization units the members to remove belongs to
  * @param {string} commonNames An array of the common names of the members to remove
  */
-async function removeMembers(user, contract, options, orgNames, orgUnits, commonNames) {
-  const callArgs = { contract, method: "removeMembers", args: util.usc({ orgNames, orgUnits, commonNames }), };
+async function removeMembers(
+  user,
+  contract,
+  options,
+  orgNames,
+  orgUnits,
+  commonNames
+) {
+  const callArgs = {
+    contract,
+    method: 'removeMembers',
+    args: util.usc({ orgNames, orgUnits, commonNames }),
+  };
   return rest.call(user, callArgs, options);
 }
 
@@ -1592,11 +2337,13 @@ async function getChains(user, chainIds = []) {
     if (e.response.status === 500) {
       chains = [];
     }
-    console.error("Error getting chainInfo:", e);
+    console.error('Error getting chainInfo:', e);
   }
 
   const filtered = chains.reduce((acc, c) => {
-    const member = c.info.members.find((m) => { return m.address === keyResponse; });
+    const member = c.info.members.find((m) => {
+      return m.address === keyResponse;
+    });
     if (member !== undefined) {
       acc.push(c);
     }
@@ -1620,5 +2367,5 @@ export default {
   uploadContract,
   bindAddress,
   contractName,
-  uploadDappContract
+  uploadDappContract,
 };

@@ -1,4 +1,4 @@
-import React from "react";
+import React from 'react';
 import {
   Breadcrumb,
   Typography,
@@ -7,25 +7,28 @@ import {
   Image,
   InputNumber,
   Button,
-} from "antd";
+} from 'antd';
 import {
   useMarketplaceState,
   useMarketplaceDispatch,
-} from "../../contexts/marketplace";
-import { useOrderState, useOrderDispatch } from "../../contexts/order";
-import { actions } from "../../contexts/marketplace/actions";
-import { Images } from "../../images";
-import { useState, useEffect, useMemo } from "react";
-import "./index.css";
-import { CHARGES } from "../../helpers/constants";
-import ClickableCell from "../ClickableCell";
-import routes from "../../helpers/routes";
-import ConfirmOrder from "./ConfirmOrder";
-import TagManager from "react-gtm-module";
-import image_placeholder from "../../images/resources/image_placeholder.png";
-import ResponsiveCart from "./ResponsiveCart";
-import { usePaymentServiceDispatch, usePaymentServiceState } from "../../contexts/payment";
-import { actions as paymentServiceActions } from "../../contexts/payment/actions";
+} from '../../contexts/marketplace';
+import { useOrderState, useOrderDispatch } from '../../contexts/order';
+import { actions } from '../../contexts/marketplace/actions';
+import { Images } from '../../images';
+import { useState, useEffect, useMemo } from 'react';
+import './index.css';
+import { CHARGES } from '../../helpers/constants';
+import ClickableCell from '../ClickableCell';
+import routes from '../../helpers/routes';
+import ConfirmOrder from './ConfirmOrder';
+import TagManager from 'react-gtm-module';
+import image_placeholder from '../../images/resources/image_placeholder.png';
+import ResponsiveCart from './ResponsiveCart';
+import {
+  usePaymentServiceDispatch,
+  usePaymentServiceState,
+} from '../../contexts/payment';
+import { actions as paymentServiceActions } from '../../contexts/payment/actions';
 import Decimal from 'decimal.js';
 
 const { Title, Text } = Typography;
@@ -33,7 +36,8 @@ const { Title, Text } = Typography;
 const Checkout = () => {
   const marketplaceDispatch = useMarketplaceDispatch();
   const orderDispatch = useOrderDispatch();
-  const { paymentServices, arePaymentServicesLoading } = usePaymentServiceState();
+  const { paymentServices, arePaymentServicesLoading } =
+    usePaymentServiceState();
   const paymentServiceDispatch = usePaymentServiceDispatch();
   const [api, contextHolder] = notification.useNotification();
   const { cartList } = useMarketplaceState();
@@ -42,7 +46,12 @@ const Checkout = () => {
   const [mapData, setmapData] = useState([]);
 
   const calculateTax = (item) => {
-    let price = new Decimal(item.product.data.quantityIsDecimal && item.product.data.quantityIsDecimal === "True" ? (item.product.price * 100) : item.product.price);
+    let price = new Decimal(
+      item.product.data.quantityIsDecimal &&
+      item.product.data.quantityIsDecimal === 'True'
+        ? item.product.price * 100
+        : item.product.price
+    );
     let tax = new Decimal(CHARGES.TAX);
     let result = price.mul(tax).div(100);
 
@@ -50,12 +59,17 @@ const Checkout = () => {
   };
 
   const calculateAmount = (item) => {
-    let price = new Decimal(item.product.data.quantityIsDecimal && item.product.data.quantityIsDecimal === "True" ? (item.product.price * 100) : item.product.price,);
+    let price = new Decimal(
+      item.product.data.quantityIsDecimal &&
+      item.product.data.quantityIsDecimal === 'True'
+        ? item.product.price * 100
+        : item.product.price
+    );
     let tax = calculateTax(item);
     let result = price.mul(item.qty).plus(tax);
 
     return parseFloat(result);
-  }
+  };
 
   // const storedData = useMemo(() => {
   //   const cartListData = window.localStorage.getItem("cartList");
@@ -85,13 +99,15 @@ const Checkout = () => {
     const map = new Map();
     for (const obj of cartList) {
       const org = obj.product.ownerCommonName;
-      const newPPs = new Set(obj.product.paymentServices)
+      const newPPs = new Set(obj.product.paymentServices);
       if (!map.has(org)) {
         map.set(org, { paymentServices: newPPs, items: [] });
       }
       const oldPPs = map.get(org).paymentServices;
       map.get(org).items.push(obj);
-      map.get(org).paymentServices = new Set([...oldPPs].filter(x => newPPs.has(x)))
+      map.get(org).paymentServices = new Set(
+        [...oldPPs].filter((x) => newPPs.has(x))
+      );
     }
     const mapDataArray = Array.from(map, (entry, index) => {
       // Modify the values and keys as needed
@@ -99,24 +115,35 @@ const Checkout = () => {
       const { paymentServices, items } = value;
       let modifiedValue = [];
       items.forEach((item) => {
-        const parts = item.product.contract_name.split("-");
-        let amount = calculateAmount(item)
+        const parts = item.product.contract_name.split('-');
+        let amount = calculateAmount(item);
 
         modifiedValue.push({
           key: item.product.address,
           item: {
             name: item.product.name,
-            image: (item.product["BlockApps-Mercata-Asset-images"] && item.product["BlockApps-Mercata-Asset-images"].length > 0)
-              ? item.product["BlockApps-Mercata-Asset-images"][0].value
-              : image_placeholder,
-            status: "Active",
+            image:
+              item.product['BlockApps-Mercata-Asset-images'] &&
+              item.product['BlockApps-Mercata-Asset-images'].length > 0
+                ? item.product['BlockApps-Mercata-Asset-images'][0].value
+                : image_placeholder,
+            status: 'Active',
           },
           category: parts[parts.length - 1],
-          firstSale: item.product.address === item.product.originAddress ? true : false,
+          firstSale:
+            item.product.address === item.product.originAddress ? true : false,
           sellersCommonName: item.product.ownerCommonName,
           unitOfMeasure: item.product.unitOfMeasurement,
-          unitPrice: item.product.data.quantityIsDecimal && item.product.data.quantityIsDecimal === "True" ? (item.product.price * 100) : item.product.price,
-          quantity: item.product.data.quantityIsDecimal && item.product.data.quantityIsDecimal === "True" ? (item.product.saleQuantity / 100) : item.product.saleQuantity,
+          unitPrice:
+            item.product.data.quantityIsDecimal &&
+            item.product.data.quantityIsDecimal === 'True'
+              ? item.product.price * 100
+              : item.product.price,
+          quantity:
+            item.product.data.quantityIsDecimal &&
+            item.product.data.quantityIsDecimal === 'True'
+              ? item.product.saleQuantity / 100
+              : item.product.saleQuantity,
           saleAddress: item.product.saleAddress,
           tax: calculateTax(item),
           amount: amount,
@@ -127,7 +154,10 @@ const Checkout = () => {
       });
 
       // Return the new object
-      return { key: key, value: { paymentServices: [...paymentServices], items: modifiedValue } };
+      return {
+        key: key,
+        value: { paymentServices: [...paymentServices], items: modifiedValue },
+      };
     });
     setmapData(mapDataArray);
   }, [marketplaceDispatch, cartList]);
@@ -165,11 +195,11 @@ const Checkout = () => {
       items.findIndex(function (i) {
         window.LOQ = window.LOQ || [];
         window.LOQ.push([
-          "ready",
+          'ready',
           async (LO) => {
             // Track an event
-            await LO.$internal.ready("events");
-            LO.events.track("Delete Cart Item", {
+            await LO.$internal.ready('events');
+            LO.events.track('Delete Cart Item', {
               product: i.product.name,
               category: i.product.category,
             });
@@ -177,7 +207,7 @@ const Checkout = () => {
         ]);
         TagManager.dataLayer({
           dataLayer: {
-            event: "delete_item_from_cart",
+            event: 'delete_item_from_cart',
             product_name: i.product.name,
             category: i.product.category,
           },
@@ -195,7 +225,7 @@ const Checkout = () => {
     cartList.forEach((element, index) => {
       if (element.product.address === product.key) {
         const availableQuantity = product.quantity ? product.quantity : 1;
-        if (!e || e === "" || e === 0) {
+        if (!e || e === '' || e === 0) {
           items[index].qty = 1;
           actions.addItemToCart(marketplaceDispatch, items);
         } else if (e <= availableQuantity) {
@@ -234,8 +264,8 @@ const Checkout = () => {
           Items
         </Text>
       ),
-      dataIndex: "item",
-      width: "230px",
+      dataIndex: 'item',
+      width: '230px',
       render: (text) => {
         return (
           <div className="flex gap-3 items-center ml-3">
@@ -255,8 +285,8 @@ const Checkout = () => {
       title: (
         <Text className="text-[#202020] text-base font-semibold">Seller</Text>
       ),
-      dataIndex: "sellersCommonName",
-      align: "center",
+      dataIndex: 'sellersCommonName',
+      align: 'center',
       render: (text) => (
         <p className="text-center font-semibold text-sm">{text}</p>
       ),
@@ -267,11 +297,11 @@ const Checkout = () => {
           Unit Price($)
         </Text>
       ),
-      dataIndex: "unitPrice",
-      align: "center",
+      dataIndex: 'unitPrice',
+      align: 'center',
       render: (text) => (
         <p className=" text-sm text-[#202020] font-semibold font-sans">
-          {"$" + text.toFixed(2)}
+          {'$' + text.toFixed(2)}
         </p>
       ),
     },
@@ -279,8 +309,8 @@ const Checkout = () => {
       title: (
         <Text className="text-[#202020] text-base font-semibold">Quantity</Text>
       ),
-      dataIndex: "quantity",
-      align: "center",
+      dataIndex: 'quantity',
+      align: 'center',
       render: (text, product) => {
         let qty = product.qty;
         return (
@@ -317,9 +347,9 @@ const Checkout = () => {
     },
     {
       title: <Text className="text-[#202020] text-base font-semibold "></Text>,
-      dataIndex: "action",
-      align: "",
-      width: "4%",
+      dataIndex: 'action',
+      align: '',
+      width: '4%',
       render: (text) => {
         return (
           <Button
@@ -336,10 +366,16 @@ const Checkout = () => {
   ];
 
   const filterPaymentServices = (e) => {
-    const filteredPaymentServices = e.map(assetPaymentServices => paymentServices.find(paymentService => paymentService.creator === assetPaymentServices.value.creator && paymentService.serviceName === assetPaymentServices.value.serviceName));
+    const filteredPaymentServices = e.map((assetPaymentServices) =>
+      paymentServices.find(
+        (paymentService) =>
+          paymentService.creator === assetPaymentServices.value.creator &&
+          paymentService.serviceName === assetPaymentServices.value.serviceName
+      )
+    );
 
     return filteredPaymentServices;
-  }
+  };
 
   return (
     <div className="mx-4 my-2 lg:mx-8 xl:mx-14">
@@ -380,14 +416,18 @@ const Checkout = () => {
                 <React.Fragment key={e.key}>
                   <div className={`hidden lg:block`}>
                     <ConfirmOrder
-                      paymentServices={filterPaymentServices(e.value.paymentServices)}
+                      paymentServices={filterPaymentServices(
+                        e.value.paymentServices
+                      )}
                       data={e.value.items}
                       columns={columns}
                     />
                   </div>
                   <div className="lg:hidden">
                     <ResponsiveCart
-                      paymentServices={filterPaymentServices(e.value.paymentServices)}
+                      paymentServices={filterPaymentServices(
+                        e.value.paymentServices
+                      )}
                       data={e.value.items}
                       AddQty={AddQty}
                       MinusQty={MinusQty}
@@ -402,7 +442,7 @@ const Checkout = () => {
           </div>
         </div>
       )}
-      {message && openToastOrder("bottom", message)}
+      {message && openToastOrder('bottom', message)}
     </div>
   );
 };
