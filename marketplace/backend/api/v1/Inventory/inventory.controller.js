@@ -176,11 +176,12 @@ class InventoryController {
       InventoryController.validateTransferItemArgs(body);
 
       const transfers = body.map(
-        ({ assetAddress, newOwner, quantity, price }) => ({
+        ({ assetAddress, newOwner, quantity, price, isDecimal }) => ({
           assetAddress,
           newOwner,
           quantity,
           price,
+          isDecimal,
         })
       );
       await dapp.transferItem(transfers);
@@ -194,20 +195,23 @@ class InventoryController {
             quantity,
             price,
             senderCommonName,
+            isDecimal
           }) => {
             const TransferSenderTemplate = TransferSender(
               senderCommonName,
               itemName,
               quantity,
               price,
-              recipientCommonName
+              recipientCommonName,
+              isDecimal
             );
             const TransferRecipientTemplate = TransferRecipient(
               recipientCommonName,
               itemName,
               quantity,
               price,
-              senderCommonName
+              senderCommonName,
+              isDecimal
             );
             await sendEmail(
               senderCommonName,
@@ -545,6 +549,7 @@ class InventoryController {
           senderCommonName: Joi.string().required(),
           recipientCommonName: Joi.string().required(),
           itemName: Joi.string().required(),
+          isDecimal: Joi.boolean().required()
         })
       );
 
