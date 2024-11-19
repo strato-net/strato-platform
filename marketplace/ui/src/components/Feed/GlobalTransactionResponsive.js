@@ -87,6 +87,7 @@ const GlobalTransactionResponsive = ({
                 to,
                 status,
                 transaction_hash,
+                quantityIsDecimal,
                 type,
                 price,
                 redemptionService,
@@ -212,14 +213,33 @@ const GlobalTransactionResponsive = ({
                     </Button>
                     {price ? (
                       <p className={`text-right flex justify-end items-center`}>
-                        $ {price} ({formattedNum(price * 100)} {StratsIcon})
+                        ${' '}
+                        {formattedNum(
+                          quantityIsDecimal && quantityIsDecimal === 'True'
+                            ? price * 100
+                            : price
+                        )}{' '}
+                        (
+                        {formattedNum(
+                          quantityIsDecimal && quantityIsDecimal === 'True'
+                            ? price * 10000
+                            : price
+                        )}{' '}
+                        {StratsIcon})
                       </p>
                     ) : (
                       <p className="text-right text-[#13188A] font-bold text-sm">
                         No Price Available
                       </p>
                     )}
-                    <p className="text-right">Qty: {formattedNum(quantity)}</p>
+                    <p className="text-right">
+                      Qty:{' '}
+                      {formattedNum(
+                        quantityIsDecimal && quantityIsDecimal === 'True'
+                          ? quantity / 100
+                          : quantity
+                      )}
+                    </p>
                     <p className="text-right">
                       {moment(block_timestamp.replace(/-/g, '/')).format('lll')}
                     </p>
