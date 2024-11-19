@@ -1,8 +1,8 @@
-import express from "express";
-import RedemptionController from "./redemption.controller";
-import { Redemption } from "../endpoints";
-import authHandler from "../../middleware/authHandler";
-import loadDapp from "../../middleware/loadDappHandler";
+import express from 'express';
+import RedemptionController from './redemption.controller';
+import { Redemption } from '../endpoints';
+import authHandler from '../../middleware/authHandler';
+import loadDapp from '../../middleware/loadDappHandler';
 
 const router = express.Router();
 

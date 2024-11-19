@@ -1,21 +1,20 @@
-import { rest } from 'blockapps-rest'
-import Joi from '@hapi/joi'
-import RestStatus from 'http-status-codes'
-import CategoriesJson from  "../../../category-utility/categories.json"
+import { rest } from 'blockapps-rest';
+import Joi from '@hapi/joi';
+import RestStatus from 'http-status-codes';
+import CategoriesJson from '../../../category-utility/categories.json';
 
 class CategoryController {
-
   static async get(req, res, next) {
     try {
-      const { params } = req
-      const { address } = params
+      const { params } = req;
+      const { address } = params;
 
       let result;
-      rest.response.status200(res, result)
+      rest.response.status200(res, result);
 
-      return next()
+      return next();
     } catch (e) {
-      return next(e)
+      return next(e);
     }
   }
 
@@ -23,12 +22,11 @@ class CategoryController {
     try {
       rest.response.status200(res, CategoriesJson.categories);
 
-      return next()
+      return next();
     } catch (e) {
-      return next(e)
+      return next(e);
     }
   }
-
 
   // ----------------------- ARG VALIDATION ------------------------
 
@@ -36,15 +34,19 @@ class CategoryController {
     const createCategorySchema = Joi.object({
       name: Joi.string().required(),
       description: Joi.string().required(),
-      imageKey: Joi.string().required()
+      imageKey: Joi.string().required(),
     });
 
     const validation = createCategorySchema.validate(args);
 
     if (validation.error) {
-      throw new rest.RestError(RestStatus.BAD_REQUEST, 'Create Category Argument Validation Error', {
-        message: `Missing args or bad format: ${validation.error.message}`,
-      })
+      throw new rest.RestError(
+        RestStatus.BAD_REQUEST,
+        'Create Category Argument Validation Error',
+        {
+          message: `Missing args or bad format: ${validation.error.message}`,
+        }
+      );
     }
   }
 
@@ -54,20 +56,22 @@ class CategoryController {
       updates: Joi.object({
         name: Joi.string(),
         description: Joi.string(),
-        imageKey: Joi.string()
+        imageKey: Joi.string(),
       }).required(),
     });
 
     const validation = updateCategorySchema.validate(args);
 
     if (validation.error) {
-      throw new rest.RestError(RestStatus.BAD_REQUEST, 'Update Category Argument Validation Error', {
-        message: `Missing args or bad format: ${validation.error.message}`,
-      })
+      throw new rest.RestError(
+        RestStatus.BAD_REQUEST,
+        'Update Category Argument Validation Error',
+        {
+          message: `Missing args or bad format: ${validation.error.message}`,
+        }
+      );
     }
   }
-
-
 }
 
-export default CategoryController
+export default CategoryController;

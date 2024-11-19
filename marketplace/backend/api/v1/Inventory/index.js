@@ -1,8 +1,8 @@
-import express from "express";
-import InventoryController from "./inventory.controller";
-import { Inventory } from "../endpoints";
-import authHandler from "../../middleware/authHandler";
-import loadDapp from "../../middleware/loadDappHandler";
+import express from 'express';
+import InventoryController from './inventory.controller';
+import { Inventory } from '../endpoints';
+import authHandler from '../../middleware/authHandler';
+import loadDapp from '../../middleware/loadDappHandler';
 
 const router = express.Router();
 
@@ -95,14 +95,14 @@ router.put(
   authHandler.authorizeRequest(),
   loadDapp,
   InventoryController.update
-)
+);
 
 router.put(
   Inventory.updateSale,
   authHandler.authorizeRequest(),
   loadDapp,
   InventoryController.updateSale
-)
+);
 
 router.get(
   Inventory.getPriceHistory,

@@ -1,36 +1,36 @@
-import { rest } from 'blockapps-rest'
-import Joi from '@hapi/joi'
-import RestStatus from 'http-status-codes'
-import config from '../../../load.config'
+import { rest } from 'blockapps-rest';
+import Joi from '@hapi/joi';
+import RestStatus from 'http-status-codes';
+import config from '../../../load.config';
 
-const options = { config, cacheNonce: true }
+const options = { config, cacheNonce: true };
 
 class CarbonOffsetController {
   static async getAll(req, res, next) {
     try {
-      const { dapp, query } = req
+      const { dapp, query } = req;
 
-      const carbonOffsets = await dapp.getCarbonOffsets({ ...query })
-      rest.response.status200(res, carbonOffsets)
+      const carbonOffsets = await dapp.getCarbonOffsets({ ...query });
+      rest.response.status200(res, carbonOffsets);
 
-      return next()
+      return next();
     } catch (e) {
-      return next(e)
+      return next(e);
     }
   }
 
   static async create(req, res, next) {
     try {
-      const { dapp, body } = req
+      const { dapp, body } = req;
 
-      CarbonOffsetController.validateCreateCarbonOffsetArgs(body)
+      CarbonOffsetController.validateCreateCarbonOffsetArgs(body);
 
-      const result = await dapp.createCarbonOffset(body)
-      rest.response.status200(res, result)
+      const result = await dapp.createCarbonOffset(body);
+      rest.response.status200(res, result);
 
-      return next()
+      return next();
     } catch (e) {
-      return next(e)
+      return next(e);
     }
   }
 
@@ -46,16 +46,20 @@ class CarbonOffsetController {
         files: Joi.array().items(Joi.string().allow(null)).required(),
         fileNames: Joi.array().items(Joi.string().allow(null)).required(),
         redemptionService: Joi.string().required(),
-      }).required()
+      }).required(),
     });
 
     const validation = createCarbonOffsetSchema.validate(args);
 
     if (validation.error) {
       console.log(validation.error.message);
-      throw new rest.RestError(RestStatus.BAD_REQUEST, 'Create CarbonOffset Argument Validation Error', {
-        message: `Missing args or bad format: ${validation.error.message}`,
-      })
+      throw new rest.RestError(
+        RestStatus.BAD_REQUEST,
+        'Create CarbonOffset Argument Validation Error',
+        {
+          message: `Missing args or bad format: ${validation.error.message}`,
+        }
+      );
     }
   }
 }

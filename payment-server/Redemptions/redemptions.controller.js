@@ -10,16 +10,19 @@ class RedemptionsController {
             }
 
             let orderByClause = '';
-            const order = req.query.order;
+            const {order, limit, offset } = req.query;
 
             if (order === 'ASC' || order === 'DESC') {
-                orderByClause = `ORDER BY createdDate ${order}`;
+                orderByClause = `ORDER BY createdDate ${order} LIMIT ${limit} OFFSET ${offset}`;
             }
 
             const query = `SELECT * FROM redemptions WHERE ownerCommonName = $1 AND ($2 = '' OR redemption_id::text = $2) ${orderByClause}`;
+            const countQuery = `SELECT COUNT(*) AS total_count FROM redemptions WHERE ownerCommonName = $1 AND ($2 = '' OR redemption_id::text = $2)`
+
             const values = [req.params.commonName, req.query.redemptionId];
 
             const result = await client.query(query, values);
+            const count = await client.query(countQuery, values);
 
             // fix casing in columns
             const formattedRows = result.rows.map(row => {
@@ -49,6 +52,7 @@ class RedemptionsController {
             res.status(200).json({
                 message: 'success',
                 data: formattedRows || [],
+                count: count.rows[0].total_count
             });
 
             return next();
@@ -65,16 +69,18 @@ class RedemptionsController {
             }
 
             let orderByClause = '';
-            const order = req.query.order;
+            const {order, limit, offset } = req.query;
 
             if (order === 'ASC' || order === 'DESC') {
-                orderByClause = `ORDER BY createdDate ${order}`;
+                orderByClause = `ORDER BY createdDate ${order} LIMIT ${limit} OFFSET ${offset}`;
             }
 
             const query = `SELECT * FROM redemptions WHERE issuerCommonName = $1 AND ($2 = '' OR redemption_id::text = $2) ${orderByClause}`;
+            const countQuery = `SELECT COUNT(*) AS total_count FROM redemptions WHERE issuerCommonName = $1 AND ($2 = '' OR redemption_id::text = $2)`
             const values = [req.params.commonName, req.query.redemptionId];
 
             const result = await client.query(query, values);
+            const count = await client.query(countQuery, values);
 
             // fix casing in columns
             const formattedRows = result.rows.map(row => {
@@ -104,6 +110,60 @@ class RedemptionsController {
             res.status(200).json({
                 message: 'success',
                 data: formattedRows || [],
+                count: count.rows[0].total_count
+            });
+
+            return next();
+        } catch (error) {
+            console.error('DB Error:', error.message);
+            next(error);
+        }
+    }
+
+    static async getAllRedemptionRequests(req, res, next) {
+        try {
+
+            let orderByClause = '';
+            const {order, limit, offset } = req.query;
+
+            if (order === 'ASC' || order === 'DESC') {
+                orderByClause = `ORDER BY createdDate ${order} LIMIT ${limit} OFFSET ${offset}`;
+            }
+
+            const query = `SELECT * FROM redemptions ${orderByClause}`;
+            const countQuery = `SELECT COUNT(*) AS total_count FROM redemptions`
+            const result = await client.query(query);
+            const count = await client.query(countQuery);
+
+            // fix casing in columns
+            const formattedRows = result.rows.map(row => {
+                const date = new Date(row["createddate"]);
+                const formattedDate = date.toLocaleDateString('en-US', {
+                    month: '2-digit',
+                    day: '2-digit',
+                    year: 'numeric'
+                });
+
+                const newRow = {
+                    ...row,
+                    ownerComments: row["ownercomments"],
+                    issuerComments: row["issuercomments"],
+                    ownerCommonName: row["ownercommonname"],
+                    issuerCommonName: row["issuercommonname"],
+                    assetAddresses: row["assetaddresses"],
+                    assetName: row["assetname"],
+                    shippingAddressId: row["shippingaddressid"],
+                    redemptionService: REDEMPTION_CONTRACT_ADDRESS,
+                    createdDate: formattedDate
+                }
+                const { ownercomments, issuercomments, ownercommonname, issuercommonname, assetaddresses, assetname, shippingaddressid, createddate, ...rest } = newRow;
+                return rest;
+            });
+
+            res.status(200).json({
+                message: 'success',
+                data: formattedRows || [],
+                count: count.rows[0].total_count
             });
 
             return next();

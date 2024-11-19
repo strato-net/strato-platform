@@ -1,18 +1,18 @@
-import { util, rest, importer } from "/blockapps-rest-plus";
-import config from "/load.config";
-import RestStatus from "http-status-codes";
+import { util, rest, importer } from '/blockapps-rest-plus';
+import config from '/load.config';
+import RestStatus from 'http-status-codes';
 import {
   setSearchQueryOptions,
   searchOne,
   searchAll,
   searchAllWithQueryArgs,
-} from "/helpers/utils";
-import dayjs from "dayjs";
+} from '/helpers/utils';
+import dayjs from 'dayjs';
 
-import productJs from "./product";
-import inventoryJs from "./inventory";
+import productJs from './product';
+import inventoryJs from './inventory';
 
-const contractName = "ProductManager";
+const contractName = 'ProductManager';
 const contractFilename = `${util.cwd}/dapp/products/contracts/ProductManager.sol`;
 
 /**
@@ -32,7 +32,7 @@ async function uploadContract(user, _constructorArgs, options) {
   let error = [];
 
   if (error.length) {
-    throw new Error(error.join("\n"));
+    throw new Error(error.join('\n'));
   }
 
   const copyOfOptions = {
@@ -41,7 +41,7 @@ async function uploadContract(user, _constructorArgs, options) {
   };
 
   const contract = await rest.createContract(user, contractArgs, copyOfOptions);
-  contract.src = "removed";
+  contract.src = 'removed';
 
   return bind(user, contract, copyOfOptions);
 }
@@ -128,7 +128,7 @@ function bind(user, _contract, options) {
 async function createProduct(admin, contract, _args, baseOptions) {
   const callArgs = {
     contract,
-    method: "addProduct",
+    method: 'addProduct',
     args: util.usc({
       ..._args,
     }),
@@ -159,13 +159,13 @@ async function updateProduct(admin, contract, _args, baseOptions) {
   const scheme = Object.keys(_args).reduce((agg, key) => {
     const base = 1;
     switch (key) {
-      case "description":
+      case 'description':
         return agg | (base << 0);
-      case "imageKey":
+      case 'imageKey':
         return agg | (base << 1);
-      case "isActive":
+      case 'isActive':
         return agg | (base << 2);
-      case "userUniqueProductCode":
+      case 'userUniqueProductCode':
         return agg | (base << 3);
       default:
         return agg;
@@ -174,7 +174,7 @@ async function updateProduct(admin, contract, _args, baseOptions) {
 
   const callArgs = {
     contract,
-    method: "updateProduct",
+    method: 'updateProduct',
     args: util.usc({
       scheme,
       ..._args,
@@ -186,11 +186,7 @@ async function updateProduct(admin, contract, _args, baseOptions) {
     history: [contractName],
   };
 
-  const [restStatus] = await rest.call(
-    admin,
-    callArgs,
-    options
-  );
+  const [restStatus] = await rest.call(admin, callArgs, options);
 
   if (parseInt(restStatus, 10) !== RestStatus.OK)
     throw new rest.RestError(restStatus, 0, { callArgs });
@@ -204,7 +200,7 @@ async function updateProduct(admin, contract, _args, baseOptions) {
 async function deleteProduct(admin, contract, _args, baseOptions) {
   const callArgs = {
     contract,
-    method: "deleteProduct",
+    method: 'deleteProduct',
     args: util.usc({
       ..._args,
     }),
@@ -229,7 +225,7 @@ async function deleteProduct(admin, contract, _args, baseOptions) {
 async function createInventory(admin, contract, _args, baseOptions) {
   const callArgs = {
     contract,
-    method: "addInventory",
+    method: 'addInventory',
     args: util.usc({
       ..._args,
     }),
@@ -246,7 +242,9 @@ async function createInventory(admin, contract, _args, baseOptions) {
   );
 
   if (restStatus == 409)
-    throw new rest.RestError(RestStatus.CONFLICT, { message: "repeated serial numbers found" });
+    throw new rest.RestError(RestStatus.CONFLICT, {
+      message: 'repeated serial numbers found',
+    });
 
   if (parseInt(restStatus, 10) !== RestStatus.OK)
     throw new rest.RestError(restStatus, 0, { callArgs });
@@ -266,9 +264,9 @@ async function updateInventory(admin, contract, _args, baseOptions) {
   const scheme = Object.keys(_args).reduce((agg, key) => {
     const base = 1;
     switch (key) {
-      case "pricePerUnit":
+      case 'pricePerUnit':
         return agg | (base << 0);
-      case "status":
+      case 'status':
         return agg | (base << 1);
       default:
         return agg;
@@ -276,7 +274,7 @@ async function updateInventory(admin, contract, _args, baseOptions) {
   }, 0);
   const callArgs = {
     contract,
-    method: "updateInventory",
+    method: 'updateInventory',
     args: util.usc({
       scheme,
       ..._args,
@@ -305,7 +303,7 @@ async function updateInventory(admin, contract, _args, baseOptions) {
 async function resellInventory(admin, contract, _args, baseOptions) {
   const callArgs = {
     contract,
-    method: "resellInventory",
+    method: 'resellInventory',
     args: util.usc({
       ..._args,
     }),
@@ -371,7 +369,7 @@ async function getInventory(user, contract, args, options) {
   try {
     const inventory = await inventoryJs.get(user, args, options);
     if (!inventory) {
-      throw new Error("product Id should be defined in inventory");
+      throw new Error('product Id should be defined in inventory');
     }
     const product = await contract.getProduct(
       { address: inventory.productId },
@@ -417,11 +415,15 @@ async function getInventories(admin, contract, args = {}, options) {
   }
 }
 
-async function updateInventoriesQuantities(admin, contract, _args, baseOptions) {
-
+async function updateInventoriesQuantities(
+  admin,
+  contract,
+  _args,
+  baseOptions
+) {
   const callArgs = {
     contract,
-    method: "updateInventoriesQuantities",
+    method: 'updateInventoriesQuantities',
     args: util.usc({
       ..._args,
     }),
@@ -431,11 +433,7 @@ async function updateInventoriesQuantities(admin, contract, _args, baseOptions) 
     ...baseOptions,
     history: [contractName],
   };
-  const [restStatus] = await rest.call(
-    admin,
-    callArgs,
-    options
-  );
+  const [restStatus] = await rest.call(admin, callArgs, options);
 
   if (parseInt(restStatus, 10) !== RestStatus.OK)
     throw new rest.RestError(restStatus, 0, { callArgs });
@@ -455,5 +453,5 @@ export default {
   createInventory,
   updateInventory,
   resellInventory,
-  updateInventoriesQuantities
+  updateInventoriesQuantities,
 };

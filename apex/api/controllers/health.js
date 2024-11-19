@@ -16,7 +16,7 @@ module.exports = {
   findView,
   nodeStatus: async function (req, res, next) {
     try {
-      //get node's block number, best block hash, best block parent hash, total difficulty
+      //get node's block number, best block hash, best block parent hash
       const lastBlock = await BlockDataRef.findOne({
         where: {
           pow_verified: true,
@@ -27,7 +27,6 @@ module.exports = {
           "number",
           "hash",
           "parent_hash",
-          "total_difficulty",
           "nonce",
         ],
         raw: true,
@@ -91,7 +90,6 @@ module.exports = {
           number: lastBlock.number,
           hash: lastBlock.hash,
           parentHash: lastBlock.parent_hash,
-          totalDifficulty: lastBlock.total_difficulty,
           nonce: lastBlock.nonce,
         },
         pbftData: findView(pbftData),

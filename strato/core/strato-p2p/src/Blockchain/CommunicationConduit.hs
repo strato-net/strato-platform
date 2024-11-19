@@ -51,7 +51,7 @@ import UnliftIO.Exception
 import UnliftIO.STM
 
 ethVersion :: Int
-ethVersion = 62
+ethVersion = 63
 {-# INLINE ethVersion #-}
 
 blockstanbulVersion :: Int
@@ -109,12 +109,13 @@ handleMsgClientConduit myId peer = do
           )
     other -> assertHandshake other
   awaitMsg >>= \case
-    Just Status {highestBlockNum = highestBlockNum', genesisHash = peerGH, latestHash = peerBestHash, networkID = networkID'} -> do
+    Just Status {protocolVersion = ver, highestBlockNum = highestBlockNum', genesisHash = peerGH, latestHash = peerBestHash, networkID = networkID'} -> do
       (GenesisBlockHash genHash) <- lift $ Mod.access (Mod.Proxy @GenesisBlockHash)
       when (peerGH /= genHash) $ throwIO WrongGenesisBlock
       when (networkID' /= computeNetworkID) $ throwIO $ NetworkIDMismatch
-      -- we set to 0 cause we dont necessarily know the number yet
-      lift . Mod.put (Mod.Proxy @WorldBestBlock) . WorldBestBlock $ BestBlock peerBestHash highestBlockNum'
+      -- starting at protocol version 63, total difficulty is exactly block number (not 8192 more)
+      let highestBlockNum'' = if ver < 63 then highestBlockNum' - 8192 else highestBlockNum'
+      lift . Mod.put (Mod.Proxy @WorldBestBlock) . WorldBestBlock $ BestBlock peerBestHash highestBlockNum''
       BestSequencedBlock (BestBlock _ lastBlockNumber) <- lift $ Mod.get (Mod.Proxy @BestSequencedBlock)
       mrh <- lift $ unMaxReturnedHeaders <$> Mod.access (Mod.Proxy @MaxReturnedHeaders)
       yield . Right $ GetBlockHeaders (BlockNumber (max (lastBlockNumber - flags_syncBacktrackNumber) 0)) mrh 0 Forward
@@ -152,20 +153,21 @@ handleMsgServerConduit myPubkey peer = do
       yield $ Right helloMsg'
     other -> assertHandshake $ other
   awaitMsg >>= \case
-    Just Status {highestBlockNum = highestBlockNum'', genesisHash = peerGH, latestHash = peerBestHash, networkID = networkID'} -> do
+    Just Status {protocolVersion = ver, highestBlockNum = theirHighestBlockNum, genesisHash = peerGH, latestHash = peerBestHash, networkID = networkID'} -> do
       $logInfoS "serverHandshake/Status{}" "received status"
       yield
         =<< lift
-          ( Mod.get (Mod.Proxy @BestSequencedBlock) >>= \(BestSequencedBlock (BestBlock bHash highestBlockNum')) -> do
+          ( Mod.get (Mod.Proxy @BestSequencedBlock) >>= \(BestSequencedBlock (BestBlock bHash myHighestBlockNum)) -> do
               (GenesisBlockHash genHash) <- Mod.access (Mod.Proxy @GenesisBlockHash)
-              -- we set to 0 cause we dont necessarily know the number yet
-              when (networkID' == computeNetworkID && genHash == peerGH) $ Mod.put (Mod.Proxy @WorldBestBlock) . WorldBestBlock $ BestBlock peerBestHash highestBlockNum''
+              -- starting at protocol version 63, total difficulty is exactly block number (not 8192 more)
+              let highestBlockNum' = if ver < 63 then theirHighestBlockNum - 8192 else theirHighestBlockNum
+              when (networkID' == computeNetworkID && genHash == peerGH) $ Mod.put (Mod.Proxy @WorldBestBlock) . WorldBestBlock $ BestBlock peerBestHash highestBlockNum'
               return $
                 Right
                   Status
                     { protocolVersion = fromIntegral ethVersion,
                       networkID = computeNetworkID,
-                      highestBlockNum = highestBlockNum',
+                      highestBlockNum = myHighestBlockNum,
                       latestHash = bHash,
                       genesisHash = genHash
                     }

@@ -1,6 +1,6 @@
 // Define the function
 function generateHtmlContent(customerFirstName, concatenatedOrderString) {
-    return `
+  return `
     <!DOCTYPE html>
     <html lang="en">
     <head>
@@ -70,13 +70,13 @@ function generateHtmlContent(customerFirstName, concatenatedOrderString) {
     </body>
     </html>
     `;
-  }
-  
-  // Define the function
-function generateHtmlContentNickel(customerFirstName, nickel ) {
-    const weight = nickel.itemQty * 5;
-    let itemName = nickel.itemName.replace(/%20/g, ' '); 
-    return `
+}
+
+// Define the function
+function generateHtmlContentNickel(customerFirstName, nickel) {
+  const weight = nickel.itemQty * 5;
+  let itemName = nickel.itemName.replace(/%20/g, ' ');
+  return `
     <!DOCTYPE html>
     <html lang="en">
     <head>
@@ -147,8 +147,7 @@ function generateHtmlContentNickel(customerFirstName, nickel ) {
     </body>
     </html>
     `;
-  }
-  
-  // Export the function
-  export { generateHtmlContent, generateHtmlContentNickel };
-  
+}
+
+// Export the function
+export { generateHtmlContent, generateHtmlContentNickel };

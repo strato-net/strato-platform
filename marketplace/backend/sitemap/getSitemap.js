@@ -1,3 +1,3 @@
-const generateSitemap = require("./generateSitemaps.js");
+const generateSitemap = require('./generateSitemaps.js');
 
-generateSitemap()
+generateSitemap();

@@ -1,12 +1,10 @@
-import { fsUtil } from "blockapps-rest";
+import { fsUtil } from 'blockapps-rest';
 
 let config;
 
 if (!config) {
   config = fsUtil.getYaml(
-    `config/${
-      process.env.CONFIG ? process.env.CONFIG : "mercata"
-    }.config.yaml`
+    `config/${process.env.CONFIG ? process.env.CONFIG : 'mercata'}.config.yaml`
   );
 }
 

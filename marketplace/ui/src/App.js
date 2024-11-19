@@ -1,42 +1,43 @@
-import React, { useEffect, useState } from "react";
-import { useAuthenticateState } from "./contexts/authentication";
-import AuthenticatedRoutes from "./AuthenticatedRoutes";
-import "@shopify/polaris/build/esm/styles.css";
-import { BrowserRouter, Route, Routes } from "react-router-dom";
-import "./styles/app.css";
-import { Layout } from "antd";
-import HeaderComponent from "./components/Header/Header";
-import FooterComponent from "./components/Footer/FooterComponent";
-import TagManager from "react-gtm-module";
-import { UsersProvider } from "./contexts/users";
-import { useMarketplaceState } from "./contexts/marketplace";
-import { getCookie, delete_cookie } from "./helpers/cookie";
-import InternalError from "./components/500";
-import { CategorysProvider } from "./contexts/category";
+import React, { useEffect, useState } from 'react';
+import { useAuthenticateState } from './contexts/authentication';
+import AuthenticatedRoutes from './AuthenticatedRoutes';
+import '@shopify/polaris/build/esm/styles.css';
+import { BrowserRouter, Route, Routes } from 'react-router-dom';
+import './styles/app.css';
+import { Layout } from 'antd';
+import HeaderComponent from './components/Header/Header';
+import FooterComponent from './components/Footer/FooterComponent';
+import TagManager from 'react-gtm-module';
+import { UsersProvider } from './contexts/users';
+import { useMarketplaceState } from './contexts/marketplace';
+import { getCookie, delete_cookie } from './helpers/cookie';
+import InternalError from './components/500';
+import { CategorysProvider } from './contexts/category';
 
 const { Content } = Layout;
 
 const App = () => {
-  const [showMenu, setShowMenu] = useState(false)
+  const [showMenu, setShowMenu] = useState(false);
   const { isMarketplaceLoading } = useMarketplaceState();
   const tagManagerArgs = {
-    gtmId: "GTM-NHBZ2BX",
+    gtmId: 'GTM-NHBZ2BX',
   };
 
   TagManager.initialize(tagManagerArgs);
 
-  const { user, loginUrl, users, isAuthenticated, error } = useAuthenticateState();
+  const { user, loginUrl, users, isAuthenticated, error } =
+    useAuthenticateState();
 
   window.LOQ = window.LOQ || [];
   window.LOQ.push([
-    "ready",
+    'ready',
     async (LO) => {
-      await LO.$internal.ready("visitor");
+      await LO.$internal.ready('visitor');
       if (user) {
         LO.visitor.identify({
           email: user.email,
           name: user.commonName,
-          username: user.preferred_username
+          username: user.preferred_username,
         });
       }
     },
@@ -45,29 +46,29 @@ const App = () => {
   // Using this to delete our returnUrl cookie after login
   if (getCookie('returnUrl') && isAuthenticated) {
     window.location.href = getCookie('returnUrl');
-    delete_cookie("returnUrl");
+    delete_cookie('returnUrl');
   }
 
   useEffect(() => {
     const referrer = document.referrer;
-    const specificReferralURL = "https://mercatacarbon.com/";
+    const specificReferralURL = 'https://mercatacarbon.com/';
 
     if (referrer === specificReferralURL) {
       TagManager.dataLayer({
         dataLayer: {
-          event: "redirected_from_mercata_carbon",
+          event: 'redirected_from_mercata_carbon',
         },
       });
     }
   }, []);
 
   const handleSubMenu = () => {
-    setShowMenu(!showMenu)
-  }
+    setShowMenu(!showMenu);
+  };
 
   const handleMenuTab = (data) => {
-    setShowMenu(false)
-  }
+    setShowMenu(false);
+  };
 
   return (
     <BrowserRouter basename="/">
@@ -85,14 +86,22 @@ const App = () => {
             />
           </CategorysProvider>
         </UsersProvider>
-        {error === "Internal Server Error 101"
-          ? <InternalError />
-          : <Content className={`${showMenu ? 'overflow-y-hidden md:overflow-auto h-[100vh] md:h-auto w-[100vw] md:w-auto bg-[#00000020] md:bg-white relative mt-0 md:mt-28' : 'mt-[89px] md:mt-[98px] '}`}>
-            <AuthenticatedRoutes user={user} users={users} isAuthenticated={isAuthenticated} />
-          </Content>}
+        {error === 'Internal Server Error 101' ? (
+          <InternalError />
+        ) : (
+          <Content
+            className={`${showMenu ? 'overflow-y-hidden md:overflow-auto h-[100vh] md:h-auto w-[100vw] md:w-auto bg-[#00000020] md:bg-white relative mt-0 md:mt-28' : 'mt-[89px] md:mt-[98px] '}`}
+          >
+            <AuthenticatedRoutes
+              user={user}
+              users={users}
+              isAuthenticated={isAuthenticated}
+            />
+          </Content>
+        )}
         {!isMarketplaceLoading && <FooterComponent />}
       </Layout>
-    </BrowserRouter >
+    </BrowserRouter>
   );
 };
 export default App;

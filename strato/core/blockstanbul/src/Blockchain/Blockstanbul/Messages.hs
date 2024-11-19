@@ -347,6 +347,8 @@ data Checkpoint = Checkpoint
   }
   deriving (Show, Eq, Generic, NFData, Ae.ToJSON, Ae.FromJSON, Data)
 
+instance Binary Checkpoint where
+
 instance Default Checkpoint where
   def = Checkpoint (View 0 0) []
 
