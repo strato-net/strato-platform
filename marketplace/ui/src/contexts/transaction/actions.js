@@ -111,12 +111,6 @@ const actions = {
           payload: body,
         });
         return;
-      } else if (response.status === RestStatus.UNAUTHORIZED) {
-        dispatch({
-          type: actionDescriptors.fetchGlobalTransactionFailed,
-          error: 'Unauthorized while fetching UserTransaction',
-        });
-        window.location.href = body.error.loginUrl;
       }
       dispatch({
         type: actionDescriptors.fetchGlobalTransactionFailed,

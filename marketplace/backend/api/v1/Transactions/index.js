@@ -15,7 +15,7 @@ router.get(
 
 router.get(
   Transaction.getGlobal,
-  authHandler.authorizeRequest(),
+  authHandler.authorizeRequest(true),
   loadDapp,
   TransactionController.getGlobalTransactions
 );

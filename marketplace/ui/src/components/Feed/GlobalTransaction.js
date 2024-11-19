@@ -20,13 +20,11 @@ import dayjs from 'dayjs';
 import { Images } from '../../images';
 // Actions
 import { actions as transactionAction } from '../../contexts/transaction/actions';
-import { actions as marketplaceActions } from '../../contexts/marketplace/actions';
 // Dispatch & States
 import {
   useTransactionDispatch,
   useTransactionState,
 } from '../../contexts/transaction';
-import { useMarketplaceDispatch } from '../../contexts/marketplace';
 // Utils & Constants
 import {
   STRATS_CONVERSION,
@@ -36,7 +34,6 @@ import {
 import { SEO } from '../../helpers/seoConstant';
 import { getStringDate } from '../../helpers/utils';
 import { TRANSACTION_FILTER } from '../Order/constant';
-import { useCategoryState } from '../../contexts/category';
 import GlobalTransactionResponsive from './GlobalTransactionResponsive';
 
 const { Title } = Typography;
@@ -45,11 +42,9 @@ const GlobalTransaction = ({ user }) => {
   const StratsIcon = <img src={Images.strats} alt="STRATs" className="mx-1 w-5 h-5" />
   // Dispatch
   const transactionDispatch = useTransactionDispatch();
-  const marketplaceDispatch = useMarketplaceDispatch();
   // States
   const { globalTransactions, isTransactionLoading, count } =
     useTransactionState();
-  const { categorys } = useCategoryState();
 
   const navigate = useNavigate();
 
@@ -57,7 +52,6 @@ const GlobalTransaction = ({ user }) => {
   const [offset, setOffset] = useState(0);
   const [list, setList] = useState([]);
   const [transactions, setTransactions] = useState(globalTransactions);
-  const [originAddress, setOriginAddress] = useState('');
   const [selectedFilters, setSelectedFilters] = useState([
     'Order',
     'Transfer',
@@ -79,17 +73,6 @@ const GlobalTransaction = ({ user }) => {
       .unix();
     return [startDate, endDate];
   };
-
-  useEffect(() => {
-    async function fetchStratsAddress() {
-      const stratsAddress = await marketplaceActions.fetchStratsAddress(
-        marketplaceDispatch
-      );
-      await marketplaceActions.fetchStratsBalance(marketplaceDispatch);
-      setOriginAddress(stratsAddress);
-    }
-    fetchStratsAddress();
-  }, [marketplaceDispatch]);
 
   useEffect(() => {
     transactionAction.fetchGlobalTransaction(
@@ -414,7 +397,7 @@ const GlobalTransaction = ({ user }) => {
               }
             >
               {' '}
-              Global Transactions
+              Activity Feed
             </Button>
           </Col>
         </Row>

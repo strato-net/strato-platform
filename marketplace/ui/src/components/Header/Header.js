@@ -109,7 +109,7 @@ const HeaderComponent = ({
     routes.Marketplace.url,
     routes.Transactions.url,
     routes.MyWallet.url,
-    routes.GlobalTransactions.url,
+    routes.ActivityFeed.url,
   ];
 
   const logout = () => {
@@ -136,7 +136,7 @@ const HeaderComponent = ({
       setSelectedTab('1');
     } else if (pathName.includes('/mywallet')) {
       setSelectedTab('2');
-    } else if (pathName.includes('/globalTransactions')) {
+    } else if (pathName.includes('/activityFeed')) {
       setSelectedTab('3');
     } else {
       setSelectedTab('0');
@@ -278,9 +278,9 @@ const HeaderComponent = ({
         }
       : null,
     {
-      value: 'globalTransactions',
-      path: routes.GlobalTransactions.url,
-      label: 'Global Transactions',
+      value: 'activityFeed',
+      path: routes.ActivityFeed.url,
+      label: 'Activity Feed',
     },
     user
       ? {
@@ -298,17 +298,13 @@ const HeaderComponent = ({
   ].filter(Boolean);
 
   const handleIntMenuTab = (data) => {
-    if (roleIndex === 1) {
+    if (roleIndex === 1 && data.value !== 'activityFeed') {
       // User is not logged in
-      data.value === 'orders' ? setSelectedTab(0) : setSelectedTab(1);
+      setSelectedTab(1);
       setIsModalVisible(true);
     } else {
       data.value === 'logout'
         ? logout()
-        : data.value === 'orders'
-        ? navigate(routes.Orders.url.replace(':type', 'sold'), {
-            state: { defaultKey: 'Sold' },
-          })
         : navigate(data.path);
       handleMenuTab(data);
     }
@@ -457,7 +453,7 @@ const HeaderComponent = ({
           className="h-16 bg-white text-base mx-10 md:flex hidden"
           onClick={(item) => {
             setSelectedTab(item.key);
-            if (roleIndex === 1) {
+            if (roleIndex === 1 && item.key !== '3') {
               // User is not logged in
               setIsModalVisible(true);
             } else {
