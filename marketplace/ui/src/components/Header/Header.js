@@ -1,11 +1,10 @@
-import React, { useState, useEffect, useMemo, useRef } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   Layout,
   Input,
   Menu,
   Space,
   Badge,
-  Avatar,
   Dropdown,
   Button,
   Typography,
@@ -34,8 +33,6 @@ import { useCategoryDispatch, useCategoryState } from '../../contexts/category';
 import { SEO } from '../../helpers/seoConstant';
 import LoginModal from '../MarketPlace/LoginModal';
 import { setCookie } from '../../helpers/cookie';
-import TransferStratsModal from '../MarketPlace/TransferStratsModal';
-import StratsTransactionHistoryModal from '../MarketPlace/StratsTransactionHistoryModal';
 
 import { navItems } from '../../helpers/constants';
 import routes from '../../helpers/routes';
@@ -86,8 +83,9 @@ const HeaderComponent = ({
 
   useEffect(() => {
     async function fetchStratsAddress() {
-      const stratsAddress =
-        await marketplaceActions.fetchStratsAddress(marketplaceDispatch);
+      const stratsAddress = await marketplaceActions.fetchStratsAddress(
+        marketplaceDispatch
+      );
       setOriginAddress(stratsAddress);
     }
     fetchStratsAddress();
@@ -111,7 +109,7 @@ const HeaderComponent = ({
     routes.Marketplace.url,
     routes.Transactions.url,
     routes.MyWallet.url,
-    routes.Products.url,
+    routes.GlobalTransactions.url,
   ];
 
   const logout = () => {
@@ -138,7 +136,7 @@ const HeaderComponent = ({
       setSelectedTab('1');
     } else if (pathName.includes('/mywallet')) {
       setSelectedTab('2');
-    } else if (pathName.includes('/products')) {
+    } else if (pathName.includes('/globalTransactions')) {
       setSelectedTab('3');
     } else {
       setSelectedTab('0');
@@ -171,17 +169,11 @@ const HeaderComponent = ({
           ),
           onClick: () =>
             navigate(
-              `${routes.MarketplaceUserProfile.url.replace(':commonName', user.commonName)}`
+              `${routes.MarketplaceUserProfile.url.replace(
+                ':commonName',
+                user.commonName
+              )}`
             ),
-        },
-        {
-          key: '3',
-          label: (
-            <div>
-              <p>Global Transactions</p>
-            </div>
-          ),
-          onClick: () => navigate(routes.GlobalTransactions.url),
         },
         {
           key: '2',
@@ -230,7 +222,9 @@ const HeaderComponent = ({
           key: '2',
           onClick: async () => {
             navigate(
-              `${routes.MarketplaceProductDetail.url.replace(':address', originAddress).replace(':name', 'STRATS')}`
+              `${routes.MarketplaceProductDetail.url
+                .replace(':address', originAddress)
+                .replace(':name', 'STRATS')}`
             );
           },
           label: (
@@ -284,8 +278,8 @@ const HeaderComponent = ({
         }
       : null,
     {
-      value: 'GlobalTransactions',
-      path: '/globalTransactions',
+      value: 'globalTransactions',
+      path: routes.GlobalTransactions.url,
       label: 'Global Transactions',
     },
     user
@@ -312,10 +306,10 @@ const HeaderComponent = ({
       data.value === 'logout'
         ? logout()
         : data.value === 'orders'
-          ? navigate(routes.Orders.url.replace(':type', 'sold'), {
-              state: { defaultKey: 'Sold' },
-            })
-          : navigate(data.path);
+        ? navigate(routes.Orders.url.replace(':type', 'sold'), {
+            state: { defaultKey: 'Sold' },
+          })
+        : navigate(data.path);
       handleMenuTab(data);
     }
   };
@@ -385,7 +379,9 @@ const HeaderComponent = ({
   return (
     <>
       <Header
-        className={`fixed z-[100] !bg-[#ffffff] !pl-2 w-full !pr-4 md:px-12 flex md:!mb-10 ${showMenu ? '' : 'shadow-header'} items-center justify-between md:justify-start`}
+        className={`fixed z-[100] !bg-[#ffffff] !pl-2 w-full !pr-4 md:px-12 flex md:!mb-10 ${
+          showMenu ? '' : 'shadow-header'
+        } items-center justify-between md:justify-start`}
       >
         <Row className="relative flex-grow-0 md:flex-1 ml-2 md:ml-5">
           <Col
@@ -410,7 +406,11 @@ const HeaderComponent = ({
             xs={showSearch ? 24 : 4}
             md={12}
             lg={18}
-            className={`lg:ml-4 mf:ml-20 md:ml-1 bg-[#F6F6F6] shadow-md flex-1 header-search ${showSearch ? ' fixed top-[13px] left-0 flex w-[100vw] z-50 mb-2' : 'hidden md:flex '}`}
+            className={`lg:ml-4 mf:ml-20 md:ml-1 bg-[#F6F6F6] shadow-md flex-1 header-search ${
+              showSearch
+                ? ' fixed top-[13px] left-0 flex w-[100vw] z-50 mb-2'
+                : 'hidden md:flex '
+            }`}
           >
             <Select
               defaultValue="All"
@@ -479,10 +479,11 @@ const HeaderComponent = ({
               if (item.key === '3') {
                 TagManager.dataLayer({
                   dataLayer: {
-                    event: 'view_products_page',
+                    event: 'view_global_transactions_page',
                   },
                 });
-              } else navigate(navUrls[item.key]);
+              }  
+              navigate(navUrls[item.key]);
             }
           }}
           items={navItems}
@@ -602,7 +603,9 @@ const HeaderComponent = ({
             {subMenuItems.map((item) => (
               <Typography
                 onClick={() => handleIntMenuTab(item)}
-                className={`text-base py-3 px-4 cursor-pointer ${item ? '' : 'hidden'}`}
+                className={`text-base py-3 px-4 cursor-pointer ${
+                  item ? '' : 'hidden'
+                }`}
               >
                 {item?.label}
               </Typography>

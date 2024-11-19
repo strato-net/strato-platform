@@ -1,31 +1,22 @@
 import React, { useEffect, useState } from 'react';
 import {
   Button,
-  Dropdown,
-  Space,
-  Input,
   Row,
   Col,
   Popover,
   Card,
   Tooltip,
-  Select,
-  DatePicker,
   Spin,
   Typography,
 } from 'antd';
-import {
-  CloseOutlined,
-  DownloadOutlined,
-  FilterOutlined,
-  SearchOutlined,
-} from '@ant-design/icons';
-import { useNavigate, useLocation } from 'react-router-dom';
+import { CloseOutlined, FilterOutlined } from '@ant-design/icons';
+import { useNavigate } from 'react-router-dom';
 // Components
 import DataTableComponent from '../DataTableComponent';
 import InfiniteScroll from 'react-infinite-scroll-component';
 import './../Order/ordersTable.css';
 import routes from '../../helpers/routes';
+import dayjs from 'dayjs';
 import { Images } from '../../images';
 // Actions
 import { actions as transactionAction } from '../../contexts/transaction/actions';
@@ -39,17 +30,11 @@ import { useMarketplaceDispatch } from '../../contexts/marketplace';
 // Utils & Constants
 import {
   STRATS_CONVERSION,
-  TRANSACTION_STATUS,
-  TRANSACTION_STATUS_CLASSES,
   TRANSACTION_STATUS_COLOR,
-  DOWNLOAD_OPTIONS,
-  REDEMPTION_STATUS,
-  REDEMPTION_STATUS_CLASSES,
-  US_DATE_FORMAT,
   DATE_TIME_FORMAT,
 } from '../../helpers/constants';
 import { SEO } from '../../helpers/seoConstant';
-import { getAgoTime, getStringDate } from '../../helpers/utils';
+import { getStringDate } from '../../helpers/utils';
 import { TRANSACTION_FILTER } from '../Order/constant';
 import { useCategoryState } from '../../contexts/category';
 import GlobalTransactionResponsive from './GlobalTransactionResponsive';
@@ -67,14 +52,10 @@ const GlobalTransaction = ({ user }) => {
   const { categorys } = useCategoryState();
 
   const navigate = useNavigate();
-  // const location = useLocation();
 
-  // const currentMonth = dayjs().startOf('month').unix();
-  const [limit, setLimit] = useState(15);
+  const [limit, setLimit] = useState(200);
   const [offset, setOffset] = useState(0);
-  const [type, setType] = useState('');
   const [list, setList] = useState([]);
-  const [dateQuery, setDateQuery] = useState('');
   const [transactions, setTransactions] = useState(globalTransactions);
   const [originAddress, setOriginAddress] = useState('');
   const [selectedFilters, setSelectedFilters] = useState([
@@ -86,10 +67,24 @@ const GlobalTransaction = ({ user }) => {
   const formatter = new Intl.NumberFormat('en-US');
   const formattedNum = (num) => formatter.format(num);
 
+  const getWeekRange = (offset) => {
+    const now = dayjs();
+    const startDate = now
+      .subtract((offset + 1) * 7, 'day')
+      .startOf('day')
+      .unix();
+    const endDate = now
+      .subtract(offset * 7, 'day')
+      .endOf('day')
+      .unix();
+    return [startDate, endDate];
+  };
+
   useEffect(() => {
     async function fetchStratsAddress() {
-      const stratsAddress =
-        await marketplaceActions.fetchStratsAddress(marketplaceDispatch);
+      const stratsAddress = await marketplaceActions.fetchStratsAddress(
+        marketplaceDispatch
+      );
       await marketplaceActions.fetchStratsBalance(marketplaceDispatch);
       setOriginAddress(stratsAddress);
     }
@@ -101,9 +96,10 @@ const GlobalTransaction = ({ user }) => {
       transactionDispatch,
       limit,
       offset,
-      selectedFilters
+      selectedFilters,
+      getWeekRange(offset)
     );
-  }, [dateQuery, limit, offset, selectedFilters]);
+  }, [offset, selectedFilters]);
 
   useEffect(() => {
     let filteredData = globalTransactions;
@@ -231,7 +227,15 @@ const GlobalTransaction = ({ user }) => {
       align: 'right',
       width: '100px',
       render: (data, { quantity, quantityIsDecimal }) => (
-        <span>{quantity ? parseInt(quantity) : '--'}</span>
+        <span>
+          {quantity
+            ? formattedNum(
+                quantityIsDecimal && quantityIsDecimal === 'True'
+                  ? quantity / 100
+                  : quantity
+              )
+            : '--'}
+        </span>
       ),
     },
     {
@@ -256,7 +260,11 @@ const GlobalTransaction = ({ user }) => {
           </p>
           <p className="text-xs">
             {price
-              ? `${formattedNum(quantityIsDecimal && quantityIsDecimal === 'True' ? price * 100 : price)} $`
+              ? `${formattedNum(
+                  quantityIsDecimal && quantityIsDecimal === 'True'
+                    ? price * 100
+                    : price
+                )} $`
               : '--'}
           </p>
         </>
@@ -328,7 +336,9 @@ const GlobalTransaction = ({ user }) => {
                 onClick={() => {
                   handleFilter(label);
                 }}
-                className={`border-lg p-2 m-2 rounded-lg ${bgColor(label)} cursor-pointer`}
+                className={`border-lg p-2 m-2 rounded-lg ${bgColor(
+                  label
+                )} cursor-pointer`}
                 key={label}
               >
                 {' '}
@@ -380,7 +390,7 @@ const GlobalTransaction = ({ user }) => {
   };
 
   const fetchData = () => {
-    setOffset((prev) => prev + 15);
+    setOffset(offset + 1);
   };
 
   return (

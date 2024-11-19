@@ -328,10 +328,20 @@ class StripeServiceController {
               createdDate: Math.floor(Date.now() / 1000),
               comments: PAYMENT_RECEIVED_MESSAGE,
             } 
-            const returnStatus = await completeOrder(STRIPE_CONTRACT_ADDRESS, callArgs);
+            try {
+              const returnStatus = await completeOrder(STRIPE_CONTRACT_ADDRESS, callArgs);
+            } catch (err) {
+              // this is left empty without any logging because it will flood the payment server with useless
+              // error logs
+            }
 
             // Update payment status in DB
-            const updateResult = await updateStripePayment(p.orderhash, 'PAID');
+            try {
+              const updateResult = await updateStripePayment(p.orderhash, 'PAID');
+            } catch (err) {
+              // this is left empty without any logging because it will flood the payment server with useless
+              // error logs
+            }
             statuses[p.orderhash] = PAYMENT_STATUS['PAID'];
           }
           else{
