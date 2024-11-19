@@ -418,16 +418,20 @@ async function get(user, args, options) {
     newOptions
   );
 
-    if (sale) {
-        inventory = {
-            ...inventory,
-            price: sale.price,
-            saleAddress: sale.address,
-            saleQuantity: sale.quantity,
-            stratsLoanAmount: sale?.data?.stratsLoanAmount,
-            paymentServices: sale ? (sale['BlockApps-Mercata-Sale-paymentServices'] ? sale['BlockApps-Mercata-Sale-paymentServices'] : null) : null
-        }
-    }
+  if (sale) {
+    inventory = {
+      ...inventory,
+      price: sale.price,
+      saleAddress: sale.address,
+      saleQuantity: sale.quantity,
+      stratsLoanAmount: sale?.data?.stratsLoanAmount,
+      paymentServices: sale
+        ? sale['BlockApps-Mercata-Sale-paymentServices']
+          ? sale['BlockApps-Mercata-Sale-paymentServices']
+          : null
+        : null,
+    };
+  }
 
   // Sort the images and files by their order
   if (inventory['BlockApps-Mercata-Asset-images']) {
@@ -462,11 +466,22 @@ async function getAll(admin, args = {}, defaultOptions) {
   let finalInventory = [];
   const options = { ...defaultOptions, org: 'BlockApps', app: 'Mercata' };
 
-    if (isTrendingSearch) {
-        // Fetch the sales first
-        sales = await saleJs.getAll(admin, { range, isOpen: true, order: 'block_timestamp.desc', offset: '0', gtField: args.gtField, gtValue: args.gtValue }, options);
-        sales = sales.filter(sale => !sale.data?.stratsLoanAmount);
-        const trendingAssetAddresses = sales.map(sale => sale.assetToBeSold);
+  if (isTrendingSearch) {
+    // Fetch the sales first
+    sales = await saleJs.getAll(
+      admin,
+      {
+        range,
+        isOpen: true,
+        order: 'block_timestamp.desc',
+        offset: '0',
+        gtField: args.gtField,
+        gtValue: args.gtValue,
+      },
+      options
+    );
+    sales = sales.filter((sale) => !sale.data?.stratsLoanAmount);
+    const trendingAssetAddresses = sales.map((sale) => sale.assetToBeSold);
 
     // Fetch the inventories matching the sales
     inventories = await searchAllWithQueryArgs(
@@ -502,97 +517,8 @@ async function getAll(admin, args = {}, defaultOptions) {
               : null,
             totalLockedQuantity: itemSale?.totalLockedQuantity,
           });
-        }})
-    }  
-     else {
-        // Fetch all Inventories and join sales table.
-        if (ownerCommonName) {
-            inventories = await searchAllWithQueryArgs(contractName,
-                {
-                    ...restArgs,
-                    status,
-                    ownerCommonName: ownerCommonName,
-                    queryOptions: queryOptions ? queryOptions : { select: constants.attachSalesAndImagesAndFiles }
-                }, options, admin);
-        } else if (assetAddresses) {
-            inventories = await searchAllWithQueryArgs(contractName,
-                {
-                    ...restArgs,
-                    address: assetAddresses,
-                    queryOptions: { select: constants.attachSalesAndImagesAndFiles }
-                }, options, admin);
-        } else {
-            inventories = await searchAllWithQueryArgs(contractName,
-                {
-                    ...restArgs,
-                    queryOptions: { select: constants.attachSalesAndImagesAndFiles }
-                }, options, admin);
         }
-
-        // Currently can't filter on second table, so filtering sales fields here. 
-        // Sales only has price and quantity fields to filter, so better to join sales on asset table (asset has multiple filters for each route). 
-        if (inventories) {
-            inventories.forEach(inventory => {
-                if (inventory['BlockApps-Mercata-Sale'] && inventory['BlockApps-Mercata-Sale'].length > 0) {
-                    let sales = inventory['BlockApps-Mercata-Sale']
-                        .filter(sale => sale.isOpen === true);
-
-                    // Filter by quantity if userProfile is present
-                    if (userProfile) {
-                        sales = sales.filter(sale => sale.quantity > 0);
-                    }
-
-                    // Filter by price range if range is specified
-                    if (range && range.length > 0) {
-                        const [field, min, max] = range[0].split(",");
-                        if (field === 'price') {
-                            sales = sales.filter(sale => sale.price >= parseFloat(min) && sale.price <= parseFloat(max));
-                        }
-                    }
-
-                    // Combine the inventories with sales data if there are valid sales for user profile route
-                    if (userProfile) {
-                        if (sales.length > 0 && (sales.price !== null || undefined)) { // Only combine if there are sales. We don't list unpublished items for this route. 
-                            finalInventory.push({
-                                ...inventory,
-                                price: sales[0]?.price,
-                                saleAddress: sales[0]?.address,
-                                saleQuantity: sales[0]?.quantity,
-                                stratsLoanAmount: sales[0]?.stratsLoanAmount,
-                                saleDate: sales[0]?.block_timestamp,
-                                totalLockedQuantity: sales[0]?.totalLockedQuantity,
-                                paymentServices: sales[0] ? (sales[0]['BlockApps-Mercata-Sale-paymentServices'] ? sales[0]['BlockApps-Mercata-Sale-paymentServices'] : null) : null,
-                                'BlockApps-Mercata-Sale': undefined  // Removing the nested sale data to avoid redundancy
-                            });
-                        }
-                    } else { // Just combine the data if userProfile is not present
-                        finalInventory.push({
-                            ...inventory,
-                            price: sales[0]?.price,
-                            saleAddress: sales[0]?.address,
-                            saleQuantity: sales[0]?.quantity,
-                            stratsLoanAmount: sales[0]?.data?.stratsLoanAmount,
-                            saleDate: sales[0]?.block_timestamp,
-                            totalLockedQuantity: sales[0]?.totalLockedQuantity,
-                            paymentServices: sales[0] ? (sales[0]['BlockApps-Mercata-Sale-paymentServices'] ? sales[0]['BlockApps-Mercata-Sale-paymentServices'] : null) : null,
-                            'BlockApps-Mercata-Sale': undefined  // Removing the nested sale data to avoid redundancy
-                        });
-                    }
-                } else if (isMarketplaceSearch && isNullPriceRange) {
-                    finalInventory.push({
-                        ...inventory,
-                        price: null,
-                        saleAddress: null,
-                        saleQuantity: null,
-                        saleDate: null,
-                        totalLockedQuantity: null,
-                        paymentServices: null
-                    });
-                } else {
-                    finalInventory.push(inventory);
-                }
-            });
-        } 
+      });
     }
   } else {
     // Fetch all Inventories and join sales table.
@@ -670,6 +596,7 @@ async function getAll(admin, args = {}, defaultOptions) {
                 price: sales[0]?.price,
                 saleAddress: sales[0]?.address,
                 saleQuantity: sales[0]?.quantity,
+                stratsLoanAmount: sales[0]?.data?.stratsLoanAmount,
                 saleDate: sales[0]?.block_timestamp,
                 totalLockedQuantity: sales[0]?.totalLockedQuantity,
                 paymentServices: sales[0]
@@ -687,6 +614,7 @@ async function getAll(admin, args = {}, defaultOptions) {
               price: sales[0]?.price,
               saleAddress: sales[0]?.address,
               saleQuantity: sales[0]?.quantity,
+              stratsLoanAmount: sales[0]?.data?.stratsLoanAmount,
               saleDate: sales[0]?.block_timestamp,
               totalLockedQuantity: sales[0]?.totalLockedQuantity,
               paymentServices: sales[0]
