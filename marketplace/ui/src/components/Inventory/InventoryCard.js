@@ -24,6 +24,7 @@ import image_placeholder from "../../images/resources/image_placeholder.png";
 import "react-responsive-carousel/lib/styles/carousel.min.css";
 import { SEO } from "../../helpers/seoConstant";
 import { Images } from "../../images";
+import { useInventoryState } from '../../contexts/inventory';
 const StratsIcon = <img src={Images.strats} alt="STRATs" className="w-5 h-5" />
 
 const InventoryCard = ({
@@ -38,6 +39,7 @@ const InventoryCard = ({
   supportedTokens,
 }) => {
   const textRef = useRef(null);
+  const { isReserveAddress, reserveAddress } = useInventoryState()
   const [isOverflowing, setIsOverflowing] = useState(false);
   const [open, setOpen] = useState(false);
   const [listModalOpen, setListModalOpen] = useState(false);
@@ -72,6 +74,8 @@ const InventoryCard = ({
       ? (inventory.totalLockedQuantity / 100).toFixed(2)
       : inventory.totalLockedQuantity
     : 0;
+  const stakeable =
+  inventory.root && inventory.root === reserveAddress[0].assetRootAddress;
 
   const handleCancel = () => {
     setOpen(false);
@@ -366,10 +370,10 @@ const InventoryCard = ({
                     <RetweetOutlined /> Bridge
                   </>
                 </Button>
-                {!inventory.stratsLoanAmount && <Button type="link" className="text-[#13188A] text-left px-0 font-semibold text-sm h-6"
+                {!inventory.stratsLoanAmount && stakeable && <Button type="link" className="text-[#13188A] text-left px-0 font-semibold text-sm h-6"
                    onClick={() => showStakeModal("Stake")}><StopOutlined /> Stake
                 </Button>}
-                {inventory.stratsLoanAmount && <Button type="link" className="text-[#13188A] text-left px-0 font-semibold text-sm h-6"
+                {inventory.stratsLoanAmount && stakeable && <Button type="link" className="text-[#13188A] text-left px-0 font-semibold text-sm h-6"
                    onClick={() => showStakeModal("Unstake")}>
                 <StopOutlined /> Unstake
                 </Button>}

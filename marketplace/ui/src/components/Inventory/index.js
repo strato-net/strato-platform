@@ -664,6 +664,7 @@ const Inventory = ({ user }) => {
                         allSubcategories={allSubcategories}
                         user={user}
                         supportedTokens={supportedTokens}
+                        reserveAddress={reserveAddress}
                       />
                     ))
                   ) : (
@@ -684,6 +685,7 @@ const Inventory = ({ user }) => {
                         allSubcategories={allSubcategories}
                         user={user}
                         supportedTokens={supportedTokens}
+                        reserveAddress={reserveAddress}
                       />
                     ))
                   ) : (
