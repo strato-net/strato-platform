@@ -30,7 +30,7 @@ const Feed = ({ user }) => {
           </Breadcrumb.Item>
           <Breadcrumb.Item href="" onClick={(e) => e.preventDefault()}>
             <p className=" text-sm text-[#202020] font-medium">
-              Global Transactions
+              Activity Feed
             </p>
           </Breadcrumb.Item>
         </Breadcrumb>
