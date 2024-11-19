@@ -51,7 +51,7 @@ contract StratPaymentService is PaymentService {
             transferNumber = (uint(string(_escrowAddress), 16) + j + block.timestamp) % 1000000;
 
             transferAmount = stratQuantity >= stratAmountNet ? stratAmountNet : stratQuantity;
-            stratAsset.purchaseTransfer(escrow.reserve(), transferAmount, transferNumber, 0.0001);
+            stratAsset.purchaseTransfer(Reserve(escrow.reserve()).owner(), transferAmount, transferNumber, 0.0001);
             stratAmountNet -= transferAmount;
 
             if (stratAmountNet == 0) {
