@@ -896,7 +896,12 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
       notEqualsField: ['ownerCommonName', 'sale'],
       notEqualsValue: [constants.baUserNames, constants.zeroAddress],
     };
-    const all2 = await marketplaceJs.getAll(rawAdmin, newArgs1, getOptions);
+    let all2 = await marketplaceJs.getAll(rawAdmin, newArgs1, getOptions);
+    // filter out assets with price <= 0 (This works because we don't have an offset for number of assets)
+    all2.inventoryResults = all2.inventoryResults.filter(
+      ({ price }) => price > 0
+    );
+    all2.inventoryCount = all2.inventoryResults.length;
 
     return {
       inventoryResults: all.inventoryResults.concat(all2.inventoryResults),
@@ -923,7 +928,12 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
         constants.zeroAddress,
       ],
     };
-    const all2 = await marketplaceJs.getAll(rawAdmin, newArgs1, getOptions);
+    let all2 = await marketplaceJs.getAll(rawAdmin, newArgs1, getOptions);
+    // filter out assets with price <= 0 (This works because we don't have an offset for number of assets)
+    all2.inventoryResults = all2.inventoryResults.filter(
+      ({ price }) => price > 0
+    );
+    all2.inventoryCount = all2.inventoryResults.length;
     return {
       inventoryResults: all.inventoryResults.concat(all2.inventoryResults),
       inventoryCount: all.inventoryCount + all2.inventoryCount,

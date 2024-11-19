@@ -183,7 +183,7 @@ const StakeModal = ({
         <div>
           {" "}
           <p className="text-[#202020] font-medium text-sm">
-            Quantity {type === "Stake" ? "Available" : "to Unstake"}
+            Quantity
           </p>
           <div className="border border-[#d9d9d9] h-[42px] rounded-md flex items-center justify-center">
             <p> {inventory?.quantity}</p>
@@ -191,11 +191,11 @@ const StakeModal = ({
         </div>
         <div className="w-full">
           <p className=" w-full text-[#202020] font-medium text-sm ">
-            Liquidity
+            Loan Amount (STRATs)
           </p>
           <div className="border border-[#d9d9d9] h-[42px] rounded-md flex items-center justify-center ">
             <div className="flex mx-auto">
-              {calculatedValue} {logo}{" "}
+              {isStaked ? inventory.stratsLoanAmount : calculatedValue} {logo}{" "}
             </div>{" "}
           </div>
         </div>

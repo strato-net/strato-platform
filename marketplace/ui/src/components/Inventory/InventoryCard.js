@@ -7,7 +7,9 @@ import {
   PieChartOutlined,
   StopOutlined,
   SwapOutlined,
-  RetweetOutlined
+  RetweetOutlined,
+  LogoutOutlined,
+  RiseOutlined,
 } from "@ant-design/icons";
 import PreviewInventoryModal from "./PreviewInventoryModal";
 import { useNavigate } from "react-router-dom";
@@ -75,7 +77,7 @@ const InventoryCard = ({
       : inventory.totalLockedQuantity
     : 0;
   const stakeable =
-  inventory.root && inventory.root === reserveAddress[0].assetRootAddress;
+  inventory.root && reserveAddress && inventory.root === reserveAddress[0].assetRootAddress;
 
   const handleCancel = () => {
     setOpen(false);
@@ -198,7 +200,8 @@ const InventoryCard = ({
   function isActive() {
     if (
       inventory.status == ASSET_STATUS.PENDING_REDEMPTION ||
-      inventory.status == ASSET_STATUS.RETIRED
+      inventory.status == ASSET_STATUS.RETIRED ||
+      inventory.stratsLoanAmount
     ) {
       return false;
     } else {
@@ -371,11 +374,11 @@ const InventoryCard = ({
                   </>
                 </Button>
                 {!inventory.stratsLoanAmount && stakeable && <Button type="link" className="text-[#13188A] text-left px-0 font-semibold text-sm h-6"
-                   onClick={() => showStakeModal("Stake")}><StopOutlined /> Stake
+                   onClick={() => showStakeModal("Stake")}><RiseOutlined /> Stake
                 </Button>}
                 {inventory.stratsLoanAmount && stakeable && <Button type="link" className="text-[#13188A] text-left px-0 font-semibold text-sm h-6"
                    onClick={() => showStakeModal("Unstake")}>
-                <StopOutlined /> Unstake
+                <LogoutOutlined /> Unstake
                 </Button>}
               </div>
             )}
@@ -399,7 +402,7 @@ const InventoryCard = ({
           </div>
 
           <div className="pt-[7px] lg:pt-0 items-center gap-[5px]">
-            {inventory.price ? (
+            {inventory.price || inventory?.stratsLoanAmount ? (
               <div className="flex items-center justify-center gap-2 bg-[#1548C329] p-[6px] rounded-md">
                 <div className="w-[7px] h-[7px] rounded-full bg-[#119B2D]"></div>
                 <p className="text-[#4D4D4D] text-[13px]">{inventory?.stratsLoanAmount ? 'Staked' : 'Published'}</p>
