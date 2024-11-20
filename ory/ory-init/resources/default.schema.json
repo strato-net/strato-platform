@@ -6,6 +6,7 @@
         "email": {
           "type": "string",
           "format": "email",
+          "title": "Email Address",
           "ory.sh/kratos": {
             "credentials": {
               "password": {
@@ -16,8 +17,20 @@
               "via": "email"
             }
           }
+        },
+        "username": {
+          "type": "string",
+          "title": "Username",
+          "ory.sh/kratos": {
+            "credentials": {
+              "password": {
+                "identifier": true
+              }
+            }
+          }
         }
-      }
+      },
+      "required": ["email", "username"]
     }
   }
 }
