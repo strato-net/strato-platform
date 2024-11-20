@@ -264,6 +264,11 @@ const ConfirmOrder = ({ paymentServices = [], data, columns }) => {
   };
 
   const handlePlaceOrder = async () => {
+    TagManager.dataLayer({ // for testing
+      dataLayer: {
+        event: 'pay_now_button',
+      },
+    });
     if (hasChecked && !isAuthenticated && loginUrl !== undefined) {
       countDown();
     } else {
