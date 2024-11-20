@@ -20,6 +20,7 @@ executables:
       - ethereum-discovery
       - hflags
       - lifted-async
+      - ordered-containers
       - process-monitor
       - strato-model
       - strato-p2p
@@ -66,6 +67,7 @@ library:
     - monad-alter
     - mtl
     - network
+    - ordered-containers
     - persistent
     - prometheus-client
     - random

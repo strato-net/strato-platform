@@ -1,16 +1,16 @@
 export const status = {
-  1: "Awaiting Fulfillment",
-  2: "Payment Pending",
-  3: "Closed",
-  4: "Canceled",
-  5: "Discarded"
+  1: 'Awaiting Fulfillment',
+  2: 'Payment Pending',
+  3: 'Closed',
+  4: 'Canceled',
+  5: 'Discarded',
 };
 
 export const statusByName = {
-  "Awaiting Fulfillment": "Awaiting Fulfillment",
-  "Payment Pending": "Payment Pending",
-  "Closed": "Closed",
-  "Canceled": "Canceled",
+  'Awaiting Fulfillment': 'Awaiting Fulfillment',
+  'Payment Pending': 'Payment Pending',
+  Closed: 'Closed',
+  Canceled: 'Canceled',
 };
 
 export const getStatusByName = (name) => {
@@ -26,15 +26,15 @@ export const getStatusByValue = (value) => {
 };
 
 export const TYPE_COLOR = {
-  Order: "#2A53FF",
-  Transfer: "#FF0000",
-  Redemption: "#001C76"
-}
+  Order: '#2A53FF',
+  Transfer: '#FF0000',
+  Redemption: '#001C76',
+};
 
 export const TRANSACTION_FILTER = [
-  { value: "", label: "All" },
-  { value: "Order", label: "Order" },
-  { value: "Transfer", label: "Transfer" },
-  { value: "Redemption", label: "Redemption" },
-  { value: "STRATS", label: "STRATS" },];
-
+  { value: '', label: 'All' },
+  { value: 'Order', label: 'Order' },
+  { value: 'Transfer', label: 'Transfer' },
+  { value: 'Redemption', label: 'Redemption' },
+  { value: 'STRATS', label: 'STRAT' },
+];

@@ -208,6 +208,9 @@ failedAssertion _ = False
 sender :: Account
 sender = Account 0xdeadbeef Nothing
 
+proposer :: Address
+proposer = Address 0xdeadbeef2
+
 privateChainAcc :: Account
 privateChainAcc = Account 0xdeadbeef (Just 0x776622233444)
 
@@ -291,7 +294,6 @@ generateGBlock gi = do
         },
       OutputBlock
         { obOrigin = TXO.Direct,
-          obTotalDifficulty = 0,
           obBlockData = bData,
           obReceiptTransactions = [],
           obBlockUncles = []
@@ -302,9 +304,8 @@ writeBlockSummary :: HasBlockSummaryDB m => OutputBlock -> m ()
 writeBlockSummary block =
   let sha = outputBlockHash block
       header = obBlockData block
-      td = obTotalDifficulty block
       txCnt = fromIntegral $ length (obReceiptTransactions block)
-   in putBSum sha (blockHeaderToBSum header td txCnt)
+   in putBSum sha (blockHeaderToBSum header txCnt)
 
 instance {-# OVERLAPPING #-} Monad m => AccessibleEnv SQLDB (ReaderT Context m) where
   accessEnv = fmap (view $ dbs . sqldb) accessEnv
@@ -329,7 +330,7 @@ runTestWithTimeout timeout f = do
       writeBlockSummary outputBlock
       let genHash = rlpHash $ (blockCreated)
       bhr <- bootstrapChainDB genHash [(Nothing, (stateRoot $ blockBlockData $ blockCreated))]
-      putContextBestBlockInfo $ ContextBestBlockInfo genHash (blockBlockData $ blockCreated) 0 0 0
+      putContextBestBlockInfo $ ContextBestBlockInfo genHash (blockBlockData $ blockCreated) 0
       Mod.put (Mod.Proxy @BlockHashRoot) $ bhr
       processNewBestBlock genHash (blockBlockData $ blockCreated) [] -- bootstrap Bagger with genesis block
       withCurrentBlockHash genHash $ do
@@ -420,6 +421,7 @@ runArgsWithSenderBeef acc args bs = do
       callDepth
       sender
       origin
+      proposer
       value
       gasPrice
       availableGas
@@ -464,7 +466,7 @@ runArgsWithSender acc args bs = do
       chainId = Nothing
       metadata = Just $ M.fromList [("name", "qq"), ("args", args)]
   
-  insert (Proxy @BlockSummary) (unsafeCreateKeccak256FromWord256 0x0) (blockHeaderToBSum blockData 900 1)
+  insert (Proxy @BlockSummary) (unsafeCreateKeccak256FromWord256 0x0) (blockHeaderToBSum blockData 1)
 
   newAddress <- getNewAddress acc
   er <-
@@ -476,6 +478,7 @@ runArgsWithSender acc args bs = do
       callDepth
       sender
       origin
+      proposer
       value
       gasPrice
       availableGas
@@ -529,6 +532,7 @@ runArgsWithOrigin orig acc args bs = do
       callDepth
       sender
       orig
+      proposer
       value
       gasPrice
       availableGas
@@ -653,6 +657,7 @@ runCall funcName callArgs bs = do
       callDepth
       sender
       origin
+      proposer
       value
       gasPrice
       availableGas
@@ -676,6 +681,7 @@ runCall funcName callArgs bs = do
       receiveAddress
       newAddress
       sender
+      proposer
       value
       gasPrice
       theData
@@ -737,6 +743,7 @@ runCall' funcName callArgs bs = do
       callDepth
       sender
       origin
+      proposer
       value
       gasPrice
       availableGas
@@ -760,6 +767,7 @@ runCall' funcName callArgs bs = do
       receiveAddress
       newAddress
       sender
+      proposer
       value
       gasPrice
       theData
@@ -823,6 +831,7 @@ call2 funcName callArgs contractAddress = do
       receiveAddress
       contractAddress
       sender
+      proposer
       value
       gasPrice
       theData

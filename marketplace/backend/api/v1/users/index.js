@@ -1,8 +1,8 @@
-import express from "express";
-import UsersController from "./users.controller";
-import { Users } from "../endpoints";
-import authHandler from "../../middleware/authHandler";
-import loadDapp from "../../middleware/loadDappHandler";
+import express from 'express';
+import UsersController from './users.controller';
+import { Users } from '../endpoints';
+import authHandler from '../../middleware/authHandler';
+import loadDapp from '../../middleware/loadDappHandler';
 
 const router = express.Router();
 
@@ -15,15 +15,15 @@ router.get(
 
 router.get(
   Users.get,
-  authHandler.authorizeRequest(), 
-  loadDapp, 
+  authHandler.authorizeRequest(),
+  loadDapp,
   UsersController.get
 );
 
 router.get(
   Users.getAll,
-  authHandler.authorizeRequest(), 
-  loadDapp, 
+  authHandler.authorizeRequest(),
+  loadDapp,
   UsersController.getAll
 );
 

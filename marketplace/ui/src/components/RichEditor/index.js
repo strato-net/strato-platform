@@ -1,19 +1,25 @@
-import React, { useState, useEffect } from "react";
-import { useEditor, EditorContent, BubbleMenu, Extension } from "@tiptap/react";
-import StarterKit from "@tiptap/starter-kit";
-import Color from "@tiptap/extension-color";
-import TextStyle from "@tiptap/extension-text-style";
-import ListItem from "@tiptap/extension-list-item";
-import TextAlign from "@tiptap/extension-text-align";
-import Link from "@tiptap/extension-link";
-import Heading from "@tiptap/extension-heading";
-import Underline from "@tiptap/extension-underline";
-import Paragraph from "@tiptap/extension-paragraph";
-import Document from "@tiptap/extension-document";
-import Text from "@tiptap/extension-text";
-import { FontFamily, FontSize, BlockquoteNode, UnorderedListNode, OrderedListNode } from "./customExtensions.js";
+import React, { useState, useEffect } from 'react';
+import { useEditor, EditorContent, BubbleMenu, Extension } from '@tiptap/react';
+import StarterKit from '@tiptap/starter-kit';
+import Color from '@tiptap/extension-color';
+import TextStyle from '@tiptap/extension-text-style';
+import ListItem from '@tiptap/extension-list-item';
+import TextAlign from '@tiptap/extension-text-align';
+import Link from '@tiptap/extension-link';
+import Heading from '@tiptap/extension-heading';
+import Underline from '@tiptap/extension-underline';
+import Paragraph from '@tiptap/extension-paragraph';
+import Document from '@tiptap/extension-document';
+import Text from '@tiptap/extension-text';
+import {
+  FontFamily,
+  FontSize,
+  BlockquoteNode,
+  UnorderedListNode,
+  OrderedListNode,
+} from './customExtensions.js';
 
-import "./index.css";
+import './index.css';
 import {
   BoldOutlined,
   ItalicOutlined,
@@ -25,8 +31,8 @@ import {
   OrderedListOutlined,
   UnorderedListOutlined,
   LinkOutlined,
-} from "@ant-design/icons";
-import MenuBar from "./MenuBar.js";
+} from '@ant-design/icons';
+import MenuBar from './MenuBar.js';
 
 const RichEditor = ({ onChange, initialValue }) => {
   const editor = useEditor({
@@ -34,7 +40,7 @@ const RichEditor = ({ onChange, initialValue }) => {
       StarterKit,
       Color.configure({ types: [TextStyle.name, ListItem.name] }),
       TextStyle.configure({ types: [ListItem.name] }),
-      TextAlign.configure({ types: ["heading", "paragraph"] }),
+      TextAlign.configure({ types: ['heading', 'paragraph'] }),
       FontFamily,
       FontSize,
       Link,
@@ -117,14 +123,14 @@ const RichEditor = ({ onChange, initialValue }) => {
 
   const addLink = () => {
     // Prompt the user for a URL
-    const url = window.prompt("Enter the URL");
+    const url = window.prompt('Enter the URL');
 
     // Check if a URL was provided
     if (url) {
       editor
         .chain()
         .focus()
-        .extendMarkRange("link")
+        .extendMarkRange('link')
         .setLink({ href: url })
         .run();
     }
@@ -141,7 +147,7 @@ const RichEditor = ({ onChange, initialValue }) => {
         <button
           onClick={() => editor.chain().focus().toggleBold().run()}
           disabled={!editor.can().chain().focus().toggleBold().run()}
-          className={editor.isActive("bold") ? "is-active" : ""}
+          className={editor.isActive('bold') ? 'is-active' : ''}
         >
           <BoldOutlined />
         </button>
@@ -150,7 +156,7 @@ const RichEditor = ({ onChange, initialValue }) => {
         <button
           onClick={() => editor.chain().focus().toggleItalic().run()}
           disabled={!editor.can().chain().focus().toggleItalic().run()}
-          className={editor.isActive("italic") ? "is-active" : ""}
+          className={editor.isActive('italic') ? 'is-active' : ''}
         >
           <ItalicOutlined />
         </button>
@@ -158,7 +164,7 @@ const RichEditor = ({ onChange, initialValue }) => {
         <button
           onClick={() => editor.chain().focus().toggleUnderline().run()}
           disabled={!editor.can().chain().focus().toggleUnderline().run()}
-          className={editor.isActive("underline") ? "is-active" : ""}
+          className={editor.isActive('underline') ? 'is-active' : ''}
         >
           <UnderlineOutlined />
         </button>
@@ -167,24 +173,24 @@ const RichEditor = ({ onChange, initialValue }) => {
         <button
           onClick={() => editor.chain().focus().toggleStrike().run()}
           disabled={!editor.can().chain().focus().toggleStrike().run()}
-          className={editor.isActive("strike") ? "is-active" : ""}
+          className={editor.isActive('strike') ? 'is-active' : ''}
         >
           <StrikethroughOutlined />
         </button>
 
         {/* Align Text */}
         <button
-          onClick={() => editor.chain().focus().setTextAlign("left").run()}
+          onClick={() => editor.chain().focus().setTextAlign('left').run()}
         >
           <AlignLeftOutlined />
         </button>
         <button
-          onClick={() => editor.chain().focus().setTextAlign("center").run()}
+          onClick={() => editor.chain().focus().setTextAlign('center').run()}
         >
           <AlignCenterOutlined />
         </button>
         <button
-          onClick={() => editor.chain().focus().setTextAlign("right").run()}
+          onClick={() => editor.chain().focus().setTextAlign('right').run()}
         >
           <AlignRightOutlined />
         </button>
@@ -192,13 +198,13 @@ const RichEditor = ({ onChange, initialValue }) => {
         {/* Lists */}
         <button
           onClick={() => editor.chain().focus().toggleBulletList().run()}
-          className={editor.isActive("bulletList") ? "is-active" : ""}
+          className={editor.isActive('bulletList') ? 'is-active' : ''}
         >
           <UnorderedListOutlined />
         </button>
         <button
           onClick={() => editor.chain().focus().toggleOrderedList().run()}
-          className={editor.isActive("orderedList") ? "is-active" : ""}
+          className={editor.isActive('orderedList') ? 'is-active' : ''}
         >
           <OrderedListOutlined />
         </button>

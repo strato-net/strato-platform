@@ -41,7 +41,6 @@ import Control.Monad.Trans.Except
 import Data.Aeson hiding (Success)
 import qualified Data.ByteString.Lazy as BL
 import qualified Data.Cache.LRU as LRU
-import Data.List (elemIndex)
 import qualified Data.Map as M
 import Data.Maybe (fromMaybe)
 import Data.Text (Text)
@@ -67,17 +66,7 @@ import UnliftIO hiding (Handler)
 data IdentityError
   = IdentityError Text
   deriving (Show, Exception)
-
-getDefaultEmptyOrg :: String -> String -> String
-getDefaultEmptyOrg name uuid = "Mercata Account " ++ getDefaultEmptyOrgOld name uuid
-
-getDefaultEmptyOrgOld :: String -> String -> String
-getDefaultEmptyOrgOld name uuid = case elemIndex ' ' name of
-  Nothing -> head name : take 8 uuid
-  Just idx ->
-    let lastNs = drop (idx + 1) name
-     in head name : lastNs ++ take 8 uuid
-
+  
 getSubject ::
   ( MonadIO m,
     MonadLogger m
@@ -205,9 +194,7 @@ putIdentity accessToken uuid idProv name mEmail mCo mSub = do
   let realm = extractRealmName $ T.unpack idProv
       name' = T.unpack name
       uuid' = T.unpack uuid
-      org = case mCo of
-        Just o | o /= "" -> T.unpack o
-        _ -> getDefaultEmptyOrg name' uuid'
+      org = fromMaybe "" $ T.unpack <$> mCo
       csvLogMsg =
         T.intercalate
           ","

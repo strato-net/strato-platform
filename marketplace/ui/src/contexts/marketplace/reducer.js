@@ -1,4 +1,4 @@
-import { actionDescriptors } from "./actions";
+import { actionDescriptors } from './actions';
 
 const reducer = (state, action) => {
   switch (action.type) {
@@ -226,15 +226,15 @@ const reducer = (state, action) => {
       };
     case actionDescriptors.fetchStratsAddress:
       return {
-        ...state
+        ...state,
       };
     case actionDescriptors.fetchStratsAddressSuccessful:
       return {
-        ...state
+        ...state,
       };
     case actionDescriptors.fetchStratsAddressFailed:
       return {
-        ...state
+        ...state,
       };
     case actionDescriptors.fetchStratsTransactionHistory:
       return {
@@ -266,7 +266,7 @@ const reducer = (state, action) => {
       return {
         ...state,
         isTransferringStrats: false,
-        error: action.error
+        error: action.error,
       };
     default:
       throw new Error(`Unhandled action: '${action.type}'`);

@@ -1,4 +1,4 @@
-import { actionDescriptors } from "./actions";
+import { actionDescriptors } from './actions';
 
 const reducer = (state, action) => {
   switch (action.type) {
@@ -23,7 +23,7 @@ const reducer = (state, action) => {
         isAuthenticated: false,
         isCheckingAuthentication: false,
         hasChecked: true,
-        error: action.error
+        error: action.error,
       };
     case actionDescriptors.checkSuccessful:
       return {
@@ -31,7 +31,7 @@ const reducer = (state, action) => {
         user: action.payload,
         isAuthenticated: true,
         isCheckingAuthentication: false,
-        hasChecked: true
+        hasChecked: true,
       };
     case actionDescriptors.fetchUsers:
       return {

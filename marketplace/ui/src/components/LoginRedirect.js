@@ -2,7 +2,7 @@ import React from 'react';
 
 class LoginRedirect extends React.Component {
   componentDidMount() {
-    window.location.replace("/")
+    window.location.replace('/');
   }
 
   render() {

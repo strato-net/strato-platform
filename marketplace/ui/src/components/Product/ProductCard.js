@@ -1,16 +1,12 @@
-import React, { useEffect, useState } from "react";
-import classNames from "classnames";
-import { Card, Popover, Spin } from "antd";
-import { MoreOutlined, EditOutlined, DeleteOutlined } from "@ant-design/icons";
-import DeleteProductModal from "./DeleteProductModal";
-import UpdateProductModal from "./UpdateProductModal";
-import { UNIT_OF_MEASUREMENTS } from "../../helpers/constants";
+import React, { useEffect, useState } from 'react';
+import classNames from 'classnames';
+import { Card, Popover, Spin } from 'antd';
+import { MoreOutlined, EditOutlined, DeleteOutlined } from '@ant-design/icons';
+import DeleteProductModal from './DeleteProductModal';
+import UpdateProductModal from './UpdateProductModal';
+import { UNIT_OF_MEASUREMENTS } from '../../helpers/constants';
 
-const ProductCard = ({
-  product,
-  categorys,
-  debouncedSearchTerm,
-}) => {
+const ProductCard = ({ product, categorys, debouncedSearchTerm }) => {
   const [state, setState] = useState(null);
   const [editModalOpen, setEditModalOpen] = useState(false);
   const [open, setOpen] = useState(false);
@@ -45,7 +41,6 @@ const ProductCard = ({
     setState(product);
   }, [product]);
 
-
   return (
     <>
       {state === null ? (
@@ -55,11 +50,7 @@ const ProductCard = ({
       ) : (
         <Card className="w-full mt-6" id="product">
           <div className="flex">
-            <img
-              className="w-52 object-cover"
-              alt=""
-              src={state.imageUrl}
-            />
+            <img className="w-52 object-cover" alt="" src={state.imageUrl} />
             <div className="ml-12 w-full">
               <div className="flex justify-between items-center">
                 <div className="flex items-center">
@@ -100,12 +91,16 @@ const ProductCard = ({
                 </Popover>
               </div>
               <p className="text-sm text-secondryB mt-1.5">
-              {decodeURIComponent(state.description).replace(/%0A/g, "\n").split('\n').map((line, index) => (
-                  <React.Fragment key={index}>
-                    {line}
-                    <br />
-                  </React.Fragment>
-                ))}              </p>
+                {decodeURIComponent(state.description)
+                  .replace(/%0A/g, '\n')
+                  .split('\n')
+                  .map((line, index) => (
+                    <React.Fragment key={index}>
+                      {line}
+                      <br />
+                    </React.Fragment>
+                  ))}{' '}
+              </p>
               <div className="flex mt-1.5 items-center">
                 <p className="text-primaryC text-sm w-40">Sub Category</p>
                 <p text-secondryB text-sm>
@@ -149,12 +144,12 @@ const ProductCard = ({
               <div
                 className={classNames(
                   state.isActive
-                    ? "text-success bg-[#EAFFEE]"
-                    : "text-orange bg-[#FFF6EC]",
-                  "text-center py-1 rounded w-24 text-sm mt-2.5"
+                    ? 'text-success bg-[#EAFFEE]'
+                    : 'text-orange bg-[#FFF6EC]',
+                  'text-center py-1 rounded w-24 text-sm mt-2.5'
                 )}
               >
-                <p>{state.isActive ? "Active" : "Inactive"}</p>
+                <p>{state.isActive ? 'Active' : 'Inactive'}</p>
               </div>
             </div>
           </div>

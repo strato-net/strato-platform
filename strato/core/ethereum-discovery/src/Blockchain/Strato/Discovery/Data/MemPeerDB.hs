@@ -48,7 +48,7 @@ instance HasMemPeerDB m => Mod.Accessible AvailablePeers m where
     currentTime <- liftIO getCurrentTime
     IPAsText ip <- accessEnvVar p2pMyIPAddress
     peerMap <- readIORef =<< fmap stringPPeerMap accessEnv
-    return $ AvailablePeers $ filter ((< currentTime) . pPeerEnableTime) $ filter ((/= ip) . pPeerIp) $ M.elems peerMap
+    return $ AvailablePeers $ filter ((< currentTime) . pPeerUdpEnableTime) $ filter ((/= ip) . pPeerIp) $ M.elems peerMap
 
 instance A.Replaceable (IPAsText, TCPPort) ActivityState m where
   replace = error "'A.Replaceable (IPAsText, TCPPort) ActivityState m' not implemented"
@@ -96,13 +96,13 @@ instance HasMemPeerDB m => Mod.Accessible BondedPeersForUDP m where
     peerMap <- readIORef =<< fmap stringPPeerMap accessEnv
     return $ BondedPeersForUDP $ filter f $ M.elems peerMap
 
-instance HasMemPeerDB m => Mod.Accessible UnbondedPeers m where
+instance HasMemPeerDB m => Mod.Accessible UnbondedPeersForUDP m where
   access _ = do
     currentTime <- liftIO getCurrentTime
     IPAsText ip <- accessEnvVar p2pMyIPAddress
-    let f p = pPeerBondState p == 0 && pPeerEnableTime p < currentTime && pPeerIp p /= ip
+    let f p = pPeerBondState p == 0 && pPeerUdpEnableTime p < currentTime && pPeerIp p /= ip
     peerMap <- readIORef =<< fmap stringPPeerMap accessEnv
-    return $ UnbondedPeers $ filter f $ M.elems $ peerMap
+    return $ UnbondedPeersForUDP $ filter f $ M.elems $ peerMap
 
 instance HasMemPeerDB m => A.Selectable IPAsText ClosestPeers m where
   select _ (IPAsText t) = do

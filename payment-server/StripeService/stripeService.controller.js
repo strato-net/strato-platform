@@ -15,7 +15,7 @@ import {
   generateIntermediateOrder,
   cancelOrder,
   discardCheckoutQuantity,
-  getAssetName,
+  getAsset,
   prepareOrderData,
   sendEmail,
 } from '../helpers/utils.js';
@@ -69,7 +69,7 @@ class StripeServiceController {
 
       const hasSellerOnboarded = await checkSellerOnboarded(username);
 
-      if (!hasSellerOnboarded || hasSellerOnboarded.length === 0) {
+      if (!hasSellerOnboarded || hasSellerOnboarded.length === 0 || hasSellerOnboarded[0].isActive === false) {
         const userDetails = await stripeService.getStripeConnectAccountDetail(userAccount);
 
         if (userDetails.charges_enabled && userDetails.details_submitted && userDetails.payouts_enabled) {
@@ -211,9 +211,9 @@ class StripeServiceController {
         // EMAIL CONFIRMATION
         // Prepare HTML content and sendEmail
         try {
-          const assetName = await getAssetName(checkoutEvent[0].saleAddresses[0]);
-          const orderString = prepareOrderData(checkoutEvent, assetName);
-          const htmlContents = buildConcatenatedOrderString(checkoutEvent[0].purchasersCommonName, orderString);
+          const assetData = await getAsset(checkoutEvent[0].saleAddresses[0]);
+          const orderString = prepareOrderData(checkoutEvent, assetData);
+          const htmlContents = buildConcatenatedOrderString(checkoutEvent[0].purchasersCommonName, orderString, assetData);
       
           await sendEmail(email, "Your Order Confirmation", htmlContents);
           console.log("*Buyer placed order*");
@@ -247,9 +247,9 @@ class StripeServiceController {
         // EMAIL CONFIRMATION
         // Prepare HTML content and sendEmail
         try {
-          const assetName = await getAssetName(checkoutEvent[0].saleAddresses[0]);
-          const orderString = prepareOrderData(checkoutEvent, assetName);
-          const htmlContents = buildConcatenatedOrderString(checkoutEvent[0].purchasersCommonName, orderString);
+          const assetData = await getAsset(checkoutEvent[0].saleAddresses[0]);
+          const orderString = prepareOrderData(checkoutEvent, assetData);
+          const htmlContents = buildConcatenatedOrderString(checkoutEvent[0].purchasersCommonName, orderString, assetData);
       
           await sendEmail(email, "Your Order Confirmation", htmlContents);
           console.log("*Buyer placed order*");
@@ -328,10 +328,20 @@ class StripeServiceController {
               createdDate: Math.floor(Date.now() / 1000),
               comments: PAYMENT_RECEIVED_MESSAGE,
             } 
-            const returnStatus = await completeOrder(STRIPE_CONTRACT_ADDRESS, callArgs);
+            try {
+              const returnStatus = await completeOrder(STRIPE_CONTRACT_ADDRESS, callArgs);
+            } catch (err) {
+              // this is left empty without any logging because it will flood the payment server with useless
+              // error logs
+            }
 
             // Update payment status in DB
-            const updateResult = await updateStripePayment(p.orderhash, 'PAID');
+            try {
+              const updateResult = await updateStripePayment(p.orderhash, 'PAID');
+            } catch (err) {
+              // this is left empty without any logging because it will flood the payment server with useless
+              // error logs
+            }
             statuses[p.orderhash] = PAYMENT_STATUS['PAID'];
           }
           else{
@@ -357,8 +367,13 @@ class StripeServiceController {
                 comments: ERROR_MESSAGE,
               } 
         
-              const cancelOrderStatus = await cancelOrder(STRIPE_CONTRACT_ADDRESS, callArgs);
-              console.log("cancelOrderStatus", cancelOrderStatus);
+              try {
+                const cancelOrderStatus = await cancelOrder(STRIPE_CONTRACT_ADDRESS, callArgs);
+                console.log("cancelOrderStatus", cancelOrderStatus);
+              } catch (err) {
+                // this is left empty without any logging because it will flood the payment server with useless
+                // error logs
+              }
         
               // Update payment status in DB
               const updateResult = await updateStripePayment(p.orderHash, "CANCELED");

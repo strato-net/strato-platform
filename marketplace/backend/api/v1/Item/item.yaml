@@ -1,119 +1,119 @@
 paths:
   /item/:
     get:
-      security:              
-        - bearerAuth: []                    
-      tags:               
-        - Item        
+      security:
+        - bearerAuth: []
+      tags:
+        - Item
       summary: Retrieve item
       produces:
-      - application/json
-      responses:         
+        - application/json
+      responses:
         200:
           description: Array of items
-    post:  
-      security:              
-        - bearerAuth: []                  
-      tags:               
-        - Item        
+    post:
+      security:
+        - bearerAuth: []
+      tags:
+        - Item
       summary: Create a item
       produces:
-      - application/json
-      requestBody:         
+        - application/json
+      requestBody:
         description: It enable user to create item
         required: true
         content:
-          'application/json': 
-            schema:       
-              $ref: '#/definitions/createItem' 
-      responses:         
+          'application/json':
+            schema:
+              $ref: '#/definitions/createItem'
+      responses:
         200:
           description: Object of create item
   /item/{address}/{chainId}:
-    get:                 
-      security:              
-        - bearerAuth: []   
-      tags:               
-        - Item        
+    get:
+      security:
+        - bearerAuth: []
+      tags:
+        - Item
       summary: Retrieve a item
       produces:
-      - application/json
-      parameters:         
-      - in: path          
-        name: address     
-        description: address to retrieve the item
-        required: true
-      - in: path          
-        name: chainId     
-        description: chainId corresponding to the address
-        required: true
-        schema:       
-          $ref: '#/definitions/fetchItem' 
-      responses:         
+        - application/json
+      parameters:
+        - in: path
+          name: address
+          description: address to retrieve the item
+          required: true
+        - in: path
+          name: chainId
+          description: chainId corresponding to the address
+          required: true
+          schema:
+            $ref: '#/definitions/fetchItem'
+      responses:
         200:
           description: Retrieve a item
   /item/update:
-    put:    
-      security:              
-        - bearerAuth: []                
-      tags:               
-        - Item        
+    put:
+      security:
+        - bearerAuth: []
+      tags:
+        - Item
       summary: Update a item
       produces:
-      - application/json
-      requestBody:         
+        - application/json
+      requestBody:
         description: It enable user to update a item
         required: true
         content:
           'application/json':
-            schema:       
-              $ref: '#/definitions/updateItem' 
-      responses:         
+            schema:
+              $ref: '#/definitions/updateItem'
+      responses:
         200:
           description: Retrieve a updated item
   /item/{address}/{chainId}/audit:
-    get:     
-      security:              
-        - bearerAuth: []               
-      tags:               
-        - Item        
+    get:
+      security:
+        - bearerAuth: []
+      tags:
+        - Item
       summary: Audit item
       produces:
-      - application/json
-      parameters:         
-      - in: path          
-        name: address     
-        description: address to retrieve the item
-        required: true
-      - in: path          
-        name: chainId     
-        description: chainId corresponding to the address
-        required: true
-        schema:       
-          $ref: '#/definitions/auditItem' 
-      responses:         
+        - application/json
+      parameters:
+        - in: path
+          name: address
+          description: address to retrieve the item
+          required: true
+        - in: path
+          name: chainId
+          description: chainId corresponding to the address
+          required: true
+          schema:
+            $ref: '#/definitions/auditItem'
+      responses:
         200:
           description: List of audit
   /item/transferOwnership:
-    post:              
-      security:              
-        - bearerAuth: []      
-      tags:               
-        - Item        
+    post:
+      security:
+        - bearerAuth: []
+      tags:
+        - Item
       summary: Transfer ownership
       produces:
-      - application/json
-      requestBody:         
+        - application/json
+      requestBody:
         description: It enable user to transfer ownership
         required: true
         content:
           'application/json':
-            schema:       
-              $ref: '#/definitions/transferOwnership' 
-      responses:         
+            schema:
+              $ref: '#/definitions/transferOwnership'
+      responses:
         200:
           description: indicates success of transfer ownership
-definitions:        
+definitions:
   fetchItem:
     address:
       type: string

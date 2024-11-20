@@ -1,12 +1,12 @@
-import React from "react";
-import ReactDOM from "react-dom/client";
-import App from "./App";
-import { AuthenticationProvider } from "./contexts/authentication";
-import reportWebVitals from "./reportWebVitals";
-import "./styles/app.css";
-import { MarketplaceProvider } from "./contexts/marketplace";
+import React from 'react';
+import ReactDOM from 'react-dom/client';
+import App from './App';
+import { AuthenticationProvider } from './contexts/authentication';
+import reportWebVitals from './reportWebVitals';
+import './styles/app.css';
+import { MarketplaceProvider } from './contexts/marketplace';
 
-const root = ReactDOM.createRoot(document.getElementById("root"));
+const root = ReactDOM.createRoot(document.getElementById('root'));
 
 root.render(
   <React.StrictMode>
@@ -15,7 +15,7 @@ root.render(
         <App />
       </MarketplaceProvider>
     </AuthenticationProvider>
-  </React.StrictMode>,
+  </React.StrictMode>
   // document.getElementById("root")
 );
 

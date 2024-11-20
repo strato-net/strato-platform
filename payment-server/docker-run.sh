@@ -38,7 +38,7 @@ export STRIPE_SECONDARY_SALE_FEE_PERCENTAGE_VALUE=${STRIPE_SECONDARY_SALE_FEE_PE
 # export METAMASK_SECONDARY_SALE_FEE_PERCENTAGE_VALUE=${METAMASK_SECONDARY_SALE_FEE_PERCENTAGE_VALUE:-3.0}
 export STRAT_ADDRESS=${STRAT_ADDRESS}
 export STRAT_STRATS_PER_DOLLAR=${STRAT_STRATS_PER_DOLLAR:-100}
-export STRAT_IMAGE_URL_VALUE=${STRAT_IMAGE_URL_VALUE:-'https://blockapps.net/wp-content/uploads/2022/08/favicon.png'}
+export STRAT_IMAGE_URL_VALUE=${STRAT_IMAGE_URL_VALUE:-'https://blockapps-public-assets.s3.us-east-1.amazonaws.com/icons/stratFinished.png'}
 export STRAT_PRIMARY_SALE_FEE_PERCENTAGE_VALUE=${STRAT_PRIMARY_SALE_FEE_PERCENTAGE_VALUE:-10.0}
 export STRAT_SECONDARY_SALE_FEE_PERCENTAGE_VALUE=${STRAT_SECONDARY_SALE_FEE_PERCENTAGE_VALUE:-3.0}
 export STRAT_FEE_RECIPIENT=${STRAT_FEE_RECIPIENT}
@@ -148,7 +148,7 @@ sed -i 's*<redemptions_service_url_value>*'"${SERVER_HOST}"'*g' /tmp/tmp.config.
 mv /tmp/tmp.config.yaml ./config/generated.config.yaml
 cp ./config/generated.config.yaml ${CONFIG_DIR_PATH}/config.yaml
 
-ls contracts
+ls dapp
 
 if [ -f "${CONFIG_DIR_PATH}/deploy.yaml" ]; then
   echo 'deploy.yaml already exists.'

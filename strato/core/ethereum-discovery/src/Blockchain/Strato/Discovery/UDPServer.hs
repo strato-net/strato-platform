@@ -59,7 +59,14 @@ connectMe (UDPPort port') = do
   (serveraddr : _) <-
     liftIO $
       getAddrInfo
-        (Just (defaultHints {addrFlags = [AI_PASSIVE]}))
+        (Just 
+          (defaultHints {addrFlags = [AI_PASSIVE] 
+          -- NOTE: I believe on day, we will want to use ipv6 addresses by default. Alas, today is not the day.
+          -- But I will leave this line here with this comment in the hopes that when we do decide the day has come,
+          -- all we need to do is uncomment the line below (will make platform prefer ipv6 over ipv4, so be prepared
+          -- for some confusion :D)
+          -- , addrFamily = AF_INET6  -- AF_INET6 + Datagram allows both ipv4 and ipv6 to be handled by same socket
+          }))
         Nothing
         (Just (show port'))
   sock <- liftIO $ socket (addrFamily serveraddr) Datagram defaultProtocol
@@ -95,7 +102,7 @@ attemptBond = do
     mServerAddr <- A.select (A.Proxy @SockAddr) (Nothing :: Maybe IPAsText, udpPort)
     forM_ mServerAddr \serverAddr ->
       case getHostAddress serverAddr of
-        Left err -> $logInfoS "attemptBond" $ T.pack . show $ err
+        Left err -> $logErrorS "attemptBond" $ T.pack . show $ err
         Right hostAddress -> do
           when (pPeerLastMsg p == T.pack "Ping") $ do
             -- if we've pinged before w/o a response, wait longer before next ping

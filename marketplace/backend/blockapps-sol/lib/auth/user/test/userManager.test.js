@@ -13,7 +13,7 @@ const blocArgs = getCredentialArgs(util.uid(), 'Bloc', '4567');
 describe('UserManager tests', function () {
   this.timeout(config.timeout);
 
-  const options = { config }
+  const options = { config };
 
   let admin;
   let contract;
@@ -23,7 +23,9 @@ describe('UserManager tests', function () {
   // get ready:  admin-user and manager-contract
   before(async function () {
     // Parse fields
-    const restStatusSource = fsUtil.get(`${util.cwd}/${config.libPath}/rest/contracts/RestStatus.sol`)
+    const restStatusSource = fsUtil.get(
+      `${util.cwd}/${config.libPath}/rest/contracts/RestStatus.sol`
+    );
     RestStatus = await parser.parseFields(restStatusSource);
 
     admin = await createUser(adminArgs, options);
@@ -50,8 +52,8 @@ describe('UserManager tests', function () {
     const callArgs = {
       contract,
       method: 'createUser',
-      args: util.usc(args)
-    }
+      args: util.usc(args),
+    };
 
     // create user UNAUTHORIZED
     const [restStatus] = await call(attacker, callArgs, options);
@@ -66,7 +68,11 @@ describe('UserManager tests', function () {
     try {
       await contract.createUser(args);
     } catch (e) {
-      assert.equal(e.response.status, RestStatus.BAD_REQUEST, 'should Throws 404 Not found')
+      assert.equal(
+        e.response.status,
+        RestStatus.BAD_REQUEST,
+        'should Throws 404 Not found'
+      );
     }
   });
 
@@ -83,7 +89,7 @@ describe('UserManager tests', function () {
     const user = await contract.createUser(args);
     // should exist
     exists = await contract.exists(args.username);
-    assert.equal(exists, true, 'should exist')
+    assert.equal(exists, true, 'should exist');
   });
 
   it('Test exists() with special characters', async function () {
@@ -100,7 +106,7 @@ describe('UserManager tests', function () {
     const user = await contract.createUser(args);
     // should exist
     exists = await contract.exists(args.username);
-    assert.equal(exists, true, 'should exist')
+    assert.equal(exists, true, 'should exist');
   });
 
   it('Create Duplicate User', async function () {
@@ -110,7 +116,11 @@ describe('UserManager tests', function () {
     try {
       await contract.createUser(args);
     } catch (e) {
-      assert.equal(e.response.status, RestStatus.BAD_REQUEST, 'should Throws 404 Not found')
+      assert.equal(
+        e.response.status,
+        RestStatus.BAD_REQUEST,
+        'should Throws 404 Not found'
+      );
     }
   });
 
@@ -122,7 +132,11 @@ describe('UserManager tests', function () {
     try {
       await contract.getUser(args.username);
     } catch (e) {
-      assert.equal(e.response.status, RestStatus.NOT_FOUND, 'should Throws 404 Not found')
+      assert.equal(
+        e.response.status,
+        RestStatus.NOT_FOUND,
+        'should Throws 404 Not found'
+      );
     }
     // create user
     await contract.createUser(args);
@@ -141,7 +155,11 @@ describe('UserManager tests', function () {
       const found = users.filter(function (user) {
         return user.username === args.username;
       });
-      assert.equal(found.length, 0, 'user list should NOT contain ' + args.username);
+      assert.equal(
+        found.length,
+        0,
+        'user list should NOT contain ' + args.username
+      );
     }
     // create user
     const user = await contract.createUser(args);
@@ -151,7 +169,11 @@ describe('UserManager tests', function () {
       const found = users.filter(function (user) {
         return user.username === args.username;
       });
-      assert.equal(found.length, 1, 'user list should contain ' + args.username);
+      assert.equal(
+        found.length,
+        1,
+        'user list should contain ' + args.username
+      );
     }
   });
 
@@ -178,9 +200,15 @@ describe('UserManager tests', function () {
 
     // get all users
     const resultUsers = await contract.getUsers(admin, contract);
-    const comparator = function (a, b) { return a.username == b.username; };
-    const notFound = util.filter.isContained(users, resultUsers, comparator, true);
+    const comparator = function (a, b) {
+      return a.username == b.username;
+    };
+    const notFound = util.filter.isContained(
+      users,
+      resultUsers,
+      comparator,
+      true
+    );
     assert.equal(notFound.length, 0, JSON.stringify(notFound));
   });
-
 });

@@ -1,10 +1,10 @@
-import RestStatus from "http-status-codes";
-import { apiUrl, HTTP_METHODS } from "../../helpers/constants";
+import RestStatus from 'http-status-codes';
+import { apiUrl, HTTP_METHODS } from '../../helpers/constants';
 
 const actionDescriptors = {
-  fetchUsers: "users/fetch_users",
-  fetchUsersSuccessful: "users/fetch_users_successful",
-  fetchUsersFailed: "users/fetch_users_failed"
+  fetchUsers: 'users/fetch_users',
+  fetchUsersSuccessful: 'users/fetch_users_successful',
+  fetchUsersFailed: 'users/fetch_users_failed',
 };
 
 const actions = {
@@ -12,7 +12,9 @@ const actions = {
     dispatch({ type: actionDescriptors.fetchUsers });
 
     try {
-      const query = search ? `?limit=10&queryFields=commonName&queryValue=${search}` : ''
+      const query = search
+        ? `?limit=10&queryFields=commonName&queryValue=${search}`
+        : '';
       const response = await fetch(`${apiUrl}/users${query}`, {
         method: HTTP_METHODS.GET,
       });
@@ -25,18 +27,23 @@ const actions = {
           payload: body.data,
         });
         return;
-      } else if(response.status === RestStatus.UNAUTHORIZED) {
-        dispatch({ 
-          type: actionDescriptors.fetchUsersFailed, 
-          error: "Unauthorized while fetching users" 
+      } else if (response.status === RestStatus.UNAUTHORIZED) {
+        dispatch({
+          type: actionDescriptors.fetchUsersFailed,
+          error: 'Unauthorized while fetching users',
         });
         window.location.href = body.error.loginUrl;
       }
-      dispatch({ type: actionDescriptors.fetchUsersFailed, payload: 'users request failed' });
+      dispatch({
+        type: actionDescriptors.fetchUsersFailed,
+        payload: 'users request failed',
+      });
     } catch (err) {
-      dispatch({ type: actionDescriptors.fetchUsersFailed, payload: 'users request failed' });
+      dispatch({
+        type: actionDescriptors.fetchUsersFailed,
+        payload: 'users request failed',
+      });
     }
-
   },
 };
 

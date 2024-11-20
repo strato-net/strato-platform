@@ -5,7 +5,7 @@ configDirPath: <configDirPath_value>
 deployFilename: <deployFilename_value>
 serverHost: <serverHost_value>
 dockerized: true
-marketplaceUiUrlPrefix: "/"
+marketplaceUiUrlPrefix: '/'
 
 nodes:
   - id: 0

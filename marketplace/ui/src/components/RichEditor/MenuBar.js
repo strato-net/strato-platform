@@ -1,35 +1,35 @@
-import React, { useState } from "react";
-import { Dropdown } from "antd";
-import { DownOutlined } from "@ant-design/icons";
-import "./index.css";
+import React, { useState } from 'react';
+import { Dropdown } from 'antd';
+import { DownOutlined } from '@ant-design/icons';
+import './index.css';
 
 const MenuBar = ({ editor, addLink }) => {
-  const [selectedFontSize, setSelectedFontSize] = useState("12px");
-  const [selectedFontFamily, setSelectedFontFamily] = useState("Arial");
+  const [selectedFontSize, setSelectedFontSize] = useState('12px');
+  const [selectedFontFamily, setSelectedFontFamily] = useState('Arial');
 
   if (!editor) {
     return;
   }
 
-  editor.on("selectionUpdate", ({ editor }) => {
-    const attrs = editor.getAttributes("textStyle");
+  editor.on('selectionUpdate', ({ editor }) => {
+    const attrs = editor.getAttributes('textStyle');
 
-    setSelectedFontSize(attrs.fontSize || "");
+    setSelectedFontSize(attrs.fontSize || '');
     setSelectedFontFamily(
-      attrs.fontFamily ? attrs.fontFamily.split(",")[0] : ""
+      attrs.fontFamily ? attrs.fontFamily.split(',')[0] : ''
     );
   });
 
   const fontSizes = [
-    "12px",
-    "14px",
-    "16px",
-    "18px",
-    "20px",
-    "24px",
-    "28px",
-    "32px",
-    "36px",
+    '12px',
+    '14px',
+    '16px',
+    '18px',
+    '20px',
+    '24px',
+    '28px',
+    '32px',
+    '36px',
   ];
 
   const handleFontSizeClick = (key) => {
@@ -44,12 +44,12 @@ const MenuBar = ({ editor, addLink }) => {
   }));
 
   const fontFamilies = [
-    "Arial, sans-serif",
-    "Georgia, serif",
-    "Impact, sans-serif",
-    "Tahoma, sans-serif",
-    "Times New Roman, serif",
-    "Verdana, sans-serif",
+    'Arial, sans-serif',
+    'Georgia, serif',
+    'Impact, sans-serif',
+    'Tahoma, sans-serif',
+    'Times New Roman, serif',
+    'Verdana, sans-serif',
   ];
 
   const handleFontFamilyClick = (key) => {
@@ -64,10 +64,11 @@ const MenuBar = ({ editor, addLink }) => {
   }));
 
   const buttonStyling = (type) => {
-    return `py-[2.5px] px-[5px] m-1 border border-gray rounded cursor-pointer font-arial font-extralight text-sm transition duration-300 ease-in-out hover:bg-tertiary ${editor.isActive(type) ? "bg-primaryB text-white" : "bg-white text-[#616161]"}`
-  }
+    return `py-[2.5px] px-[5px] m-1 border border-gray rounded cursor-pointer font-arial font-extralight text-sm transition duration-300 ease-in-out hover:bg-tertiary ${editor.isActive(type) ? 'bg-primaryB text-white' : 'bg-white text-[#616161]'}`;
+  };
 
-  const nonActiveButtonStyling = "py-[2.5px] px-[5px] mx-1 border border-gray rounded cursor-pointer font-arial font-extralight bg-white text-[#616161] text-sm transition duration-300 ease-in-out hover:bg-tertiary";
+  const nonActiveButtonStyling =
+    'py-[2.5px] px-[5px] mx-1 border border-gray rounded cursor-pointer font-arial font-extralight bg-white text-[#616161] text-sm transition duration-300 ease-in-out hover:bg-tertiary';
 
   return (
     <>
@@ -75,7 +76,7 @@ const MenuBar = ({ editor, addLink }) => {
       <button
         onClick={() => editor.chain().focus().toggleBold().run()}
         disabled={!editor.can().chain().focus().toggleBold().run()}
-        className={buttonStyling("bold")}
+        className={buttonStyling('bold')}
       >
         Bold
       </button>
@@ -84,7 +85,7 @@ const MenuBar = ({ editor, addLink }) => {
       <button
         onClick={() => editor.chain().focus().toggleItalic().run()}
         disabled={!editor.can().chain().focus().toggleItalic().run()}
-        className={buttonStyling("italic")}
+        className={buttonStyling('italic')}
       >
         Italic
       </button>
@@ -92,7 +93,7 @@ const MenuBar = ({ editor, addLink }) => {
       {/* Underline Button */}
       <button
         onClick={() => editor.chain().focus().toggleUnderline().run()}
-        className={buttonStyling("underline")}
+        className={buttonStyling('underline')}
       >
         Underline
       </button>
@@ -100,27 +101,27 @@ const MenuBar = ({ editor, addLink }) => {
       <button
         onClick={() => editor.chain().focus().toggleStrike().run()}
         disabled={!editor.can().chain().focus().toggleStrike().run()}
-        className={buttonStyling("strike")}
+        className={buttonStyling('strike')}
       >
         Strike
       </button>
 
       {/* Text Alignment */}
       <button
-        onClick={() => editor.chain().focus().setTextAlign("left").run()}
-        className={buttonStyling({ textAlign: "left" })}
+        onClick={() => editor.chain().focus().setTextAlign('left').run()}
+        className={buttonStyling({ textAlign: 'left' })}
       >
         Left
       </button>
       <button
-        onClick={() => editor.chain().focus().setTextAlign("center").run()}
-        className={buttonStyling({ textAlign: "center" })}
+        onClick={() => editor.chain().focus().setTextAlign('center').run()}
+        className={buttonStyling({ textAlign: 'center' })}
       >
         Center
       </button>
       <button
-        onClick={() => editor.chain().focus().setTextAlign("right").run()}
-        className={buttonStyling({ textAlign: "right" })}
+        onClick={() => editor.chain().focus().setTextAlign('right').run()}
+        className={buttonStyling({ textAlign: 'right' })}
       >
         Right
       </button>
@@ -130,13 +131,13 @@ const MenuBar = ({ editor, addLink }) => {
           items: fontSizeMenuItems,
           onClick: ({ key }) => handleFontSizeClick(key),
         }}
-        trigger={["click"]}
+        trigger={['click']}
       >
         <button
           onClick={(e) => e.preventDefault()}
           className={nonActiveButtonStyling}
         >
-          {selectedFontSize || "12px"} <DownOutlined />
+          {selectedFontSize || '12px'} <DownOutlined />
         </button>
       </Dropdown>
 
@@ -145,13 +146,13 @@ const MenuBar = ({ editor, addLink }) => {
           items: fontFamilyMenuItems,
           onClick: ({ key }) => handleFontFamilyClick(key),
         }}
-        trigger={["click"]}
+        trigger={['click']}
       >
         <button
           onClick={(e) => e.preventDefault()}
           className={nonActiveButtonStyling}
         >
-          {selectedFontFamily ? selectedFontFamily.split(",")[0] : "Arial"}{" "}
+          {selectedFontFamily ? selectedFontFamily.split(',')[0] : 'Arial'}{' '}
           <DownOutlined />
         </button>
       </Dropdown>
@@ -159,7 +160,7 @@ const MenuBar = ({ editor, addLink }) => {
       {/* Bullet List */}
       <button
         onClick={() => editor.chain().focus().toggleBulletList().run()}
-        className={buttonStyling("bulletList")}
+        className={buttonStyling('bulletList')}
       >
         Bullet List
       </button>
@@ -167,7 +168,7 @@ const MenuBar = ({ editor, addLink }) => {
       {/* Ordered List */}
       <button
         onClick={() => editor.chain().focus().toggleOrderedList().run()}
-        className={buttonStyling("orderedList")}
+        className={buttonStyling('orderedList')}
       >
         Ordered List
       </button>
@@ -175,16 +176,13 @@ const MenuBar = ({ editor, addLink }) => {
       {/* Blockquote */}
       <button
         onClick={() => editor.chain().focus().toggleBlockquote().run()}
-        className={buttonStyling("blockquote")}
+        className={buttonStyling('blockquote')}
       >
         Blockquote
       </button>
 
       {/* Button for inserting links */}
-      <button
-        onClick={addLink}
-        className={nonActiveButtonStyling}
-      >
+      <button onClick={addLink} className={nonActiveButtonStyling}>
         Insert Link
       </button>
 
@@ -241,7 +239,9 @@ const MenuBar = ({ editor, addLink }) => {
       <button className={nonActiveButtonStyling}>
         <input
           type="color"
-          onInput={event => editor.chain().focus().setColor(event.target.value).run()}
+          onInput={(event) =>
+            editor.chain().focus().setColor(event.target.value).run()
+          }
           value={editor.getAttributes('textStyle').color}
           data-testid="setColor"
         />

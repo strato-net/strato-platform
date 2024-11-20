@@ -14,7 +14,6 @@ import Blockchain.EthConf
 import Blockchain.Generation
 import Blockchain.Sequencer
 import Blockchain.Sequencer.CablePackage
-import Blockchain.Sequencer.Gregor
 import Blockchain.Sequencer.Monad
 import Blockchain.Strato.Model.Options (flags_network)
 import qualified Blockchain.Strato.RedisBlockDB as RBDB
@@ -31,7 +30,6 @@ import Instrumentation
 import Network.HTTP.Client (defaultManagerSettings, newManager)
 import Network.Wai.Handler.Warp
 import Network.Wai.Middleware.Prometheus
-import Safe
 import Servant.Client
 import qualified Strato.Strato23.API as VC
 import qualified Strato.Strato23.Client as VC
@@ -62,30 +60,18 @@ main = do
   putStrLn $ "strato-sequencer validatorBehavior: " ++ show flags_validatorBehavior
 
   pkg <- atomically newCablePackage
-  let kafkaClientId' = flags_kafkaclientid
-      mKafkaAddress = case span (/= ':') flags_kafkaaddress of
-        (_, "") -> Nothing
-        (khost, kport) ->
-          Just (fromString khost, fromInteger $ readDef 9092 $ drop 1 kport)
-      gregorCfg =
-        GregorConfig
-          { kafkaAddress = mKafkaAddress,
-            kafkaClientId = fromString kafkaClientId',
-            kafkaConsumerGroup = fromString kafkaClientId',
-            cablePackage = pkg
-          }
 
   -- setup the connection with vault-proxy
   mgr <- newManager defaultManagerSettings
   vaultWrapperUrl <- parseBaseUrl flags_vaultWrapperUrl
   let clientEnv = mkClientEnv mgr vaultWrapperUrl
 
-  selfAddress <- do
+  selfAddress <- do --send to vm with kafka
     addrAndKey <- waitOnVault $ runClientM (VC.getKey Nothing Nothing) clientEnv
     return $ VC.unAddress addrAndKey
-
+  
   putStrLn $ "strato-sequencer nodeAddress: " ++ show selfAddress
-
+  
   mCtx <-
     if not flags_blockstanbul
       then return Nothing
@@ -96,9 +82,8 @@ main = do
           "--blockstanbul_round_period_s must be positive"
 
         putStrLn $ "ACTUAL validators list: " ++ show validators
-
-        ckpt <- runGregorM gregorCfg $ initializeCheckpoint validators
-        putStrLn $ "Checkpoint: " ++ show ckpt
+      
+        let ckpt = def {checkpointValidators = validators}
 
         return $ Just $ newContext flags_network ckpt (Just selfAddress) flags_validatorBehavior Nothing
 
@@ -119,10 +104,9 @@ main = do
             maxEventsPerIter = flags_seq_max_events_per_iter,
             maxUsPerIter = flags_seq_max_us_per_iter,
             vaultClient = Just clientEnv,
-            kafkaClientId = fromString kafkaClientId',
+            kafkaClientId = fromString flags_kafkaclientid,
             redisConn = RBDB.RedisConnection redisBDBPool
           }
-  race_ (runTheGregor gregorCfg)
-    . race_ (runLoggingT (runSequencerM seqCfg mCtx (sequencer validators)))
+  race_ (runLoggingT (runSequencerM seqCfg mCtx sequencer ))
     . run 8050
     $ metricsApp

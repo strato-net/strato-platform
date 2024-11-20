@@ -1,11 +1,10 @@
-import express from "express";
-import ItemController from "./item.controller";
-import { Item } from "../endpoints";
-import authHandler from "../../middleware/authHandler";
-import loadDapp from "../../middleware/loadDappHandler";
+import express from 'express';
+import ItemController from './item.controller';
+import { Item } from '../endpoints';
+import authHandler from '../../middleware/authHandler';
+import loadDapp from '../../middleware/loadDappHandler';
 
 const router = express.Router();
-
 
 router.get(
   Item.getAll,
@@ -40,26 +39,22 @@ router.put(
   authHandler.authorizeRequest(),
   loadDapp,
   ItemController.transferOwnership
-)
+);
 
 router.put(
   Item.update,
   authHandler.authorizeRequest(),
   loadDapp,
   ItemController.update
-)
+);
 
-router.get(
-  Item.audit,
-  loadDapp,
-  ItemController.audit
-)
+router.get(Item.audit, loadDapp, ItemController.audit);
 
 router.get(
   Item.getRawMaterials,
   authHandler.authorizeRequest(),
   loadDapp,
   ItemController.getAllRawMaterials
-)
+);
 
 export default router;

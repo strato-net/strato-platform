@@ -15,7 +15,6 @@ module Handlers.Stats
   )
 where
 
-import Blockchain.DB.DetailsDB
 import Blockchain.DB.SQLDB
 import Blockchain.Data.DataDefs
 import Control.Monad.Change.Modify
@@ -55,15 +54,11 @@ instance ToSchema TransactionCount where
 
 type API =
   "stats" :> "totaltx" :> Get '[JSON] TransactionCount
-    :<|> "stats" :> "difficulty" :> Get '[JSON] TotalDifficulty
 
 server :: HasSQL m => ServerT API m
-server = getStatTx :<|> getStatDiff
+server = getStatTx
 
 ---------------------
-
-instance HasSQL m => Accessible TotalDifficulty m where
-  access _ = TotalDifficulty . blockDataRefTotalDifficulty <$> getBestBlock
 
 instance HasSQL m => Accessible TransactionCount m where
   access _ = do
@@ -72,9 +67,6 @@ instance HasSQL m => Accessible TransactionCount m where
     where
       myval ((E.Value v) : _) = v
       myval _ = 0
-
-getStatDiff :: Accessible TotalDifficulty m => m TotalDifficulty
-getStatDiff = access (Proxy @TotalDifficulty)
 
 getStatTx :: Accessible TransactionCount m => m TransactionCount
 getStatTx = access (Proxy @TransactionCount)

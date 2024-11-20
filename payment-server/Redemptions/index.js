@@ -13,6 +13,11 @@ router.get(
   RedemptionsController.getIncomingRedemptionRequests
 );
 
+router.get(
+  '/all', 
+  RedemptionsController.getAllRedemptionRequests
+);
+
 router.post(
   '/create', 
   RedemptionsController.createRedemption

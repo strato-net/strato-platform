@@ -12,8 +12,6 @@
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE TypeOperators #-}
 
-{-# OPTIONS -fno-warn-orphans #-}
-
 module Handlers.Transaction
   ( TxsFilterParams (..),
     txsFilterParams,
@@ -36,7 +34,7 @@ import Blockchain.Data.TXOrigin
 import Blockchain.Data.Transaction
 import Blockchain.EthConf (runKafkaMConfigured)
 import Blockchain.Sequencer.Event (IngestEvent (IETx), IngestTx (..), Timestamp)
-import Blockchain.Sequencer.Kafka (writeUnseqEventsWithLimits)
+import Blockchain.Sequencer.Kafka (writeUnseqEvents)
 import Blockchain.Strato.Model.Address
 import Blockchain.Strato.Model.ChainId
 import Blockchain.Strato.Model.Keccak256 hiding (hash)
@@ -45,7 +43,6 @@ import Control.DeepSeq
 import qualified Control.Exception as E
 import Control.Monad (when)
 import Control.Monad.Change.Alter
-import Control.Monad.Composable.Kafka
 import Control.Monad.Composable.SQL
 import Control.Monad.IO.Class
 import Data.Aeson
@@ -138,8 +135,6 @@ server txSizeLimit = getTransaction :<|> postTransaction (Just txSizeLimit)
 
 ---------------------------
 
-instance NFData RawTransaction'
-
 data NamedChainId
   = UnnamedChainIds [ChainId]
   | MainChain
@@ -204,15 +199,16 @@ instance HasSQL m => Selectable TxsFilterParams [RawTransaction] m where
 
       return . Just $ nub txs
 
-postTransactionC :: (MonadIO m, MonadLogger m) => Maybe Int -> RawTransaction' -> ConduitT a B.ByteString m Keccak256
+postTransactionC :: (MonadIO m, MonadLogger m) => Maybe Int -> RawTransaction' -> ConduitT a IngestEvent m Keccak256
 postTransactionC limit (RawTransaction' raw "") = do
   let tx' = rawTX2TX raw
       h = transactionHash tx'
   ts <- liftIO getCurrentMicrotime
-  let encodedTx = BL.toStrict . Bin.encode . IETx ts $ IngestTx API tx'
-  when (isJust limit && (B.length encodedTx) >= (fromJust limit)) $
-    throwIO $ TxSizeError $ T.pack $ "The transaction size limit is " ++ (show $ fromJust limit) ++ " but your transaction size is " ++ show (B.length encodedTx)
-  yield encodedTx
+  let ieTx = IETx ts $ IngestTx API tx'
+      payloadSize = B.length $ BL.toStrict $ Bin.encode ieTx
+  when (isJust limit && payloadSize >= (fromJust limit)) $
+    throwIO $ TxSizeError $ T.pack $ "The transaction size limit is " ++ (show $ fromJust limit) ++ " but your transaction size is " ++ show payloadSize
+  yield ieTx
   $logInfoS "postTransaction" . T.pack $ "Successfully inserted tx: " ++ format h
   return h
 postTransactionC _ _ =
@@ -225,7 +221,7 @@ postTransaction ::
   m Keccak256
 postTransaction limit rt = runConduit $ postTransactionC limit rt `fuseUpstream` emitKafkaTransactions
 
-postTransactionListC :: (MonadIO m, MonadLogger m) => Maybe Int -> [RawTransaction'] -> ConduitT a B.ByteString m [Keccak256]
+postTransactionListC :: (MonadIO m, MonadLogger m) => Maybe Int -> [RawTransaction'] -> ConduitT a IngestEvent m [Keccak256]
 postTransactionListC limit raws = do
   handlerStart <- liftIO $ getTime Realtime
 
@@ -241,8 +237,8 @@ postTransactionListC limit raws = do
   $logDebug $ T.pack $ "Inserted " ++ (show (num - num')) ++ " of the transactions"
   $logDebug $ T.pack $ "Kafkaing txs: \n" ++ (unlines $ format <$> ((transactionHash . snd) <$> txr))
   ts <- liftIO getCurrentMicrotime
-  encodedTxs <- makeEncodedTxs ts txs limit
-  yieldMany encodedTxs
+  ieTxs <- makeEncodedTxs ts txs limit
+  yieldMany ieTxs
   sendResponseStart <- liftIO $ getTime Realtime
   let times =
         ( map toNanoSecs $
@@ -259,15 +255,16 @@ postTransactionListC limit raws = do
         String _ -> True
         _ -> False
 
-makeEncodedTxs :: (MonadIO m) => Timestamp -> [Transaction] -> Maybe Int -> m [B.ByteString]
+makeEncodedTxs :: (MonadIO m) => Timestamp -> [Transaction] -> Maybe Int -> m [IngestEvent]
 makeEncodedTxs ts txs limit =
   pure $
     map
       ( \tx ->
-          let encodedTx = BL.toStrict $ Bin.encode $ IETx ts $ IngestTx API tx
-           in if (isJust limit && (B.length encodedTx) >= (fromJust limit))
-                then E.throw $ TxSizeError $ T.pack $ "The transaction size limit is " ++ (show $ fromJust limit) ++ " but your transaction size is " ++ show (B.length encodedTx)
-                else encodedTx
+          let ieTx = IETx ts $ IngestTx API tx
+              payloadSize = B.length $ BL.toStrict $ Bin.encode ieTx
+          in if (isJust limit && payloadSize >= (fromJust limit))
+                then E.throw $ TxSizeError $ T.pack $ "The transaction size limit is " ++ (show $ fromJust limit) ++ " but your transaction size is " ++ show payloadSize
+                else ieTx
       )
       txs
 
@@ -329,7 +326,7 @@ transactionQueryParams =
     "chainid"
   ]
 
-emitKafkaTransactions :: (MonadIO m, MonadLogger m) => ConduitT B.ByteString Void m ()
+emitKafkaTransactions :: (MonadIO m, MonadLogger m) => ConduitT IngestEvent Void m ()
 emitKafkaTransactions = loop id
   where
     -- this is essentially the same as sinkList,
@@ -337,5 +334,5 @@ emitKafkaTransactions = loop id
     loop front = await >>= maybe (emit $ front []) (\x -> loop $ front . (x :))
     emit txs = do
       $logDebugS "writeUnseqEventsBegin" . T.pack $ "Writing " ++ show (length txs) ++ " faucet tx(s) to unseqevents"
-      resps <- liftIO $ runKafkaMConfigured "strato-api" $ execKafka $ writeUnseqEventsWithLimits txs
+      resps <- liftIO $ runKafkaMConfigured "strato-api" $ writeUnseqEvents txs
       $logDebug $ T.pack $ "writeUnseqEventsEnd Kafka commit: " ++ show resps

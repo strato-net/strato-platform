@@ -29,8 +29,9 @@ abstract contract Sale is Utils {
         PaymentService[] _paymentServices
     ) {    
         assetToBeSold = Asset(_assetToBeSold);
-        price = _price;
+        require(_quantity > 0, "Quantity must be greater than 0");
         require(assetToBeSold.quantity() >= _quantity, "Cannot sell more units than what are owned.");
+        price = _price;
         quantity = _quantity;
         totalLockedQuantity = 0;
         isOpen = true;
@@ -107,8 +108,9 @@ abstract contract Sale is Utils {
         paymentServices = [];
     }
 
-    function isPaymentService(PaymentService _paymentService) public returns (bool) {
-        return paymentServicesMap[_paymentService.serviceName][_paymentService.creator] != 0;
+    function isPaymentService(address _paymentService) public returns (bool) {
+        string _serviceName = _paymentService.call("serviceName");
+        return paymentServicesMap[_serviceName][_paymentService.creator] != 0;
     }
 
     function completeSale(
@@ -128,6 +130,7 @@ abstract contract Sale is Utils {
 
     function automaticTransfer(address _newOwner, decimal _price, uint _quantity, uint _transferNumber) public returns (uint) {
         require(msg.sender == address(assetToBeSold), "Only the underlying Asset can call automaticTransfer.");
+        require(_quantity > 0, "Quantity must be greater than 0");
         uint assetQuantity = assetToBeSold.quantity();
         require(_quantity <= assetQuantity - totalLockedQuantity, "Cannot transfer more units than are available.");
         if (_quantity > quantity) { // We can transfer more than the Sale quantity
