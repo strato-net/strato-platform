@@ -225,18 +225,28 @@ pipeline {
               set -x
               docker login -u $DOCKER_USER -p $DOCKER_PASSWD registry-aws.blockapps.net:5000
               docker compose -f docker-compose.push.yml push 2>&1
+              docker compose -f docker-compose.server.push.yml push 2>&1
+              docker compose -f docker-compose.client.push.yml push 2>&1
               docker compose -f docker-compose.vault.push.yml push 2>&1
               docker compose -f docker-compose.identity.push.yml push 2>&1
+              docker compose -f docker-compose.identity-service.push.yml push 2>&1
+              docker compose -f docker-compose.subject-signing-tool.push.yml push 2>&1
               docker compose -f docker-compose.highway.push.yml push 2>&1
               docker compose -f docker-compose.payment.push.yml push 2>&1
               docker compose -f docker-compose.notification.push.yml push 2>&1
+              docker compose -f docker-compose.cfginit.push.yml push 2>&1
               AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID} AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY} AWS_DEFAULT_REGION="us-east-1" aws ecr get-login-password --region us-east-1 | docker login --username AWS --password-stdin 406773134706.dkr.ecr.us-east-1.amazonaws.com
               docker compose -f docker-compose.push.ecr.yml push 2>&1
+              docker compose -f docker-compose.server.push.ecr.yml push 2>&1
+              docker compose -f docker-compose.client.push.ecr.yml push 2>&1
               docker compose -f docker-compose.vault.push.ecr.yml push 2>&1
               docker compose -f docker-compose.identity.push.ecr.yml push 2>&1
+              docker compose -f docker-compose.identity-service.push.ecr.yml push 2>&1
+              docker compose -f docker-compose.subject-signing-tool.push.ecr.yml push 2>&1
               docker compose -f docker-compose.highway.push.ecr.yml push 2>&1
               docker compose -f docker-compose.payment.push.ecr.yml push 2>&1
               docker compose -f docker-compose.notification.push.ecr.yml push 2>&1
+              docker compose -f docker-compose.cfginit.push.ecr.yml push 2>&1
             '''
 
             // Release to blockapps/strato-getting-started
@@ -252,17 +262,27 @@ pipeline {
               github-release release $STRATOGS_RELEASE_DETAILS_STABLE --name "${RELEASE_VERSION}${RELEASE_SUFFIX}"
               sleep 5
               github-release upload $STRATOGS_RELEASE_DETAILS_STABLE --name "docker-compose.yml" --file ./docker-compose.yml
+              github-release upload $STRATOGS_RELEASE_DETAILS_STABLE --name "docker-compose.server.yml" --file ./docker-compose.server.yml
+              github-release upload $STRATOGS_RELEASE_DETAILS_STABLE --name "docker-compose.client.yml" --file ./docker-compose.client.yml
               github-release upload $STRATOGS_RELEASE_DETAILS_STABLE --name "docker-compose.vault.yml" --file ./docker-compose.vault.yml
               github-release upload $STRATOGS_RELEASE_DETAILS_STABLE --name "docker-compose.identity.yml" --file ./docker-compose.identity.yml
+              github-release upload $STRATOGS_RELEASE_DETAILS_STABLE --name "docker-compose.identity-service.yml" --file ./docker-compose.identity-service.yml
+              github-release upload $STRATOGS_RELEASE_DETAILS_STABLE --name "docker-compose.subject-signing-tool.yml" --file ./docker-compose.subject-signing-tool.yml
               github-release upload $STRATOGS_RELEASE_DETAILS_STABLE --name "docker-compose.highway.yml" --file ./docker-compose.highway.yml
               github-release upload $STRATOGS_RELEASE_DETAILS_STABLE --name "docker-compose.payment.yml" --file ./docker-compose.payment.yml
               github-release upload $STRATOGS_RELEASE_DETAILS_STABLE --name "docker-compose.notification.yml" --file ./docker-compose.notification.yml
+              github-release upload $STRATOGS_RELEASE_DETAILS_STABLE --name "docker-compose.cfginit.yml" --file ./docker-compose.cfginit.yml
               github-release upload $STRATOGS_RELEASE_DETAILS_STABLE --name "docker-compose.ecr.yml" --file ./docker-compose.ecr.yml
+              github-release upload $STRATOGS_RELEASE_DETAILS_STABLE --name "docker-compose.server.ecr.yml" --file ./docker-compose.server.ecr.yml
+              github-release upload $STRATOGS_RELEASE_DETAILS_STABLE --name "docker-compose.client.ecr.yml" --file ./docker-compose.client.ecr.yml
               github-release upload $STRATOGS_RELEASE_DETAILS_STABLE --name "docker-compose.vault.ecr.yml" --file ./docker-compose.vault.ecr.yml
               github-release upload $STRATOGS_RELEASE_DETAILS_STABLE --name "docker-compose.identity.ecr.yml" --file ./docker-compose.identity.ecr.yml
+              github-release upload $STRATOGS_RELEASE_DETAILS_STABLE --name "docker-compose.identity-service.ecr.yml" --file ./docker-compose.identity-service.ecr.yml
+              github-release upload $STRATOGS_RELEASE_DETAILS_STABLE --name "docker-compose.subject-signing-tool.ecr.yml" --file ./docker-compose.subject-signing-tool.ecr.yml
               github-release upload $STRATOGS_RELEASE_DETAILS_STABLE --name "docker-compose.highway.ecr.yml" --file ./docker-compose.highway.ecr.yml
               github-release upload $STRATOGS_RELEASE_DETAILS_STABLE --name "docker-compose.payment.ecr.yml" --file ./docker-compose.payment.ecr.yml
               github-release upload $STRATOGS_RELEASE_DETAILS_STABLE --name "docker-compose.notification.ecr.yml" --file ./docker-compose.notification.ecr.yml
+              github-release upload $STRATOGS_RELEASE_DETAILS_STABLE --name "docker-compose.cfginit.ecr.yml" --file ./docker-compose.cfginit.ecr.yml
             '''
 
             // Merge release code to ${env.RELEASE_TYPE}
