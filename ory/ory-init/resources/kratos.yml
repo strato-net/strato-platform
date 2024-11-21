@@ -37,6 +37,23 @@ selfservice:
 
     registration:
       ui_url: https://${domainName}:8443/ui/registration
+      after:
+        password:
+          hooks:
+            - hook: session
+        webauthn:
+          hooks:
+            - hook: session
+        passkey:
+          hooks:
+            - hook: session
+        oidc:
+          hooks:
+            - hook: session
+        code:
+          hooks:
+            - hook: session
+        
 
 identity:
   schemas:
