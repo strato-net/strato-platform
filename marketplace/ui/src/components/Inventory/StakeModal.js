@@ -1,21 +1,21 @@
-import { Button, Modal, Table, notification } from "antd";
-import { useEffect, useState } from "react";
+import { Button, Modal } from 'antd';
+import { useEffect, useState } from 'react';
 import {
   usePaymentServiceDispatch,
   usePaymentServiceState,
-} from "../../contexts/payment";
-import { actions as inventoryActions } from "../../contexts/inventory/actions";
-import { actions as paymentServiceActions } from "../../contexts/payment/actions";
+} from '../../contexts/payment';
+import { actions as inventoryActions } from '../../contexts/inventory/actions';
+import { actions as paymentServiceActions } from '../../contexts/payment/actions';
 import {
   useInventoryDispatch,
   useInventoryState,
-} from "../../contexts/inventory";
-import { actions as marketplaceActions } from "../../contexts/marketplace/actions";
-import { useMarketplaceDispatch } from "../../contexts/marketplace";
-import { Images } from "../../images";
+} from '../../contexts/inventory';
+import { actions as marketplaceActions } from '../../contexts/marketplace/actions';
+import { useMarketplaceDispatch } from '../../contexts/marketplace';
+import { Images } from '../../images';
 
 const logo = (
-  <img src={Images.strats} alt={""} title={""} className="w-5 h-5 " />
+  <img src={Images.strats} alt={''} title={''} className="w-5 h-5 " />
 );
 
 const StakeModal = ({
@@ -37,17 +37,12 @@ const StakeModal = ({
     reserveAddress,
     calculatedValue,
   } = useInventoryState();
-
-  const [data, setData] = useState(inventory);
   // Dispatch
   const inventoryDispatch = useInventoryDispatch();
   const paymentServiceDispatch = usePaymentServiceDispatch();
   const marketplaceDispatch = useMarketplaceDispatch();
 
   const { paymentServices } = usePaymentServiceState();
-
-  const quantityIsDecimal =
-    data.data.quantityIsDecimal && data.data.quantityIsDecimal === "True";
   const isLoader =
     isStaking || isUnstaking || isCalculatedValue || isReserveAddress;
   const isStaked = inventory.stratsLoanAmount && inventory.stratsLoanAmount > 0;
@@ -68,47 +63,11 @@ const StakeModal = ({
     }
   }, [resAddress]);
 
-  const columns = [
-    {
-      title: "Quantity",
-      dataIndex: "quantity",
-      align: "center",
-      render: (text, record) =>
-        quantityIsDecimal ? record.quantity / 100 : record.quantity,
-    },
-    {
-      title: "Loan Amount (STRATs)",
-      align: "center",
-      render: (text, record) => (
-        <div className="flex justify-center">
-          {" "}
-          <div className="flex mx-auto">
-            {isStaked ? record.stratsLoanAmount : calculatedValue} {logo}{" "}
-          </div>{" "}
-        </div>
-      ),
-    },
-    {
-      align: "center",
-      render: () => (
-        <Button
-          type="primary"
-          className="w-32 h-9"
-          onClick={handleSubmit}
-          disabled={isLoader}
-          loading={isLoader}
-        >
-          {type}
-        </Button>
-      ),
-    },
-  ];
-
   const handleSubmit = async () => {
     const stratsService = paymentServices.find(
-      (item) => item.serviceName === "STRATS" && item.creator === "Server"
+      (item) => item.serviceName === 'STRATS' && item.creator === 'Server'
     );
-    if (type === "Stake") {
+    if (type === 'Stake') {
       const body = {
         assetAmount: inventory?.quantity,
         assetAddress: inventory?.address,
@@ -125,15 +84,17 @@ const StakeModal = ({
       );
       if (isStaked) {
         if (productDetailPage) {
-          await inventoryActions.fetchInventoryDetail(inventoryDispatch, productDetailPage);
-        }
-        else{
+          await inventoryActions.fetchInventoryDetail(
+            inventoryDispatch,
+            productDetailPage
+          );
+        } else {
           await inventoryActions.fetchInventory(
             inventoryDispatch,
             limit,
             offset,
             debouncedSearchTerm,
-            category && category !== "All" ? category : undefined
+            category && category !== 'All' ? category : undefined
           );
         }
         await marketplaceActions.fetchStratsBalance(marketplaceDispatch);
@@ -141,7 +102,7 @@ const StakeModal = ({
       }
     }
 
-    if (type === "Unstake") {
+    if (type === 'Unstake') {
       const body = {
         escrow: inventory?.sale,
         stratsPaymentService: stratsService.address,
@@ -152,14 +113,17 @@ const StakeModal = ({
       );
       if (isUnstaked) {
         if (productDetailPage) {
-          await inventoryActions.fetchInventoryDetail(inventoryDispatch, productDetailPage);
-        } else{
+          await inventoryActions.fetchInventoryDetail(
+            inventoryDispatch,
+            productDetailPage
+          );
+        } else {
           await inventoryActions.fetchInventory(
             inventoryDispatch,
             limit,
             offset,
             debouncedSearchTerm,
-            category && category !== "All" ? category : undefined
+            category && category !== 'All' ? category : undefined
           );
         }
         await marketplaceActions.fetchStratsBalance(marketplaceDispatch);
@@ -172,43 +136,113 @@ const StakeModal = ({
     <Modal
       open={open}
       onCancel={handleCancel}
-      title={`${type} - ${itemName}`}
+      title={
+        <div className="text-2xl md:text-3xl font-bold text-gray-900 pl-4">
+          Collateral: {itemName}
+        </div>
+      }
       width={1000}
-      footer={[]}
+      centered={true}
+      footer={null}
     >
-      <div className="head hidden md:block">
-        <Table columns={columns} dataSource={[data]} pagination={false} />
-      </div>
-      <div className="flex flex-col gap-[18px] md:hidden mt-5">
-        <div>
-          {" "}
-          <p className="text-[#202020] font-medium text-sm">
-            Quantity
-          </p>
-          <div className="border border-[#d9d9d9] h-[42px] rounded-md flex items-center justify-center">
-            <p> {inventory?.quantity}</p>
+      <div className="flex flex-col md:flex-row gap-6 p-4">
+        {/* Left Section (2/3 Width) */}
+        <div className="w-full md:w-2/3 grid grid-cols-2 gap-y-6 gap-x-8">
+          <div className="col-span-2 flex items-end">
+            <span className="text-2xl font-semibold text-gray-900">$30</span>
+            <span className="text-xl text-gray-500 ml-4">
+              Market Price (Valid for 3 minutes)
+            </span>
+          </div>
+          {/* Row 1 */}
+          <div className="flex flex-col">
+            <span className="text-2xl font-semibold text-gray-900">
+              {reserveAddress[0]?.loanToValueRatio}% (Max{' '}
+              {reserveAddress[0]?.loanToValueRatio}%)
+            </span>
+            <span className="text-sm text-gray-500">Loan to Value Ratio</span>
+          </div>
+          <div className="flex flex-col">
+            <span className="text-2xl font-semibold text-gray-900">2%</span>
+            <span className="text-sm text-gray-500">Interest on Loan</span>
+          </div>
+
+          {/* Column 2 */}
+          <div className="flex flex-col">
+            <span className="text-2xl font-semibold text-gray-900">10%</span>
+            <span className="text-sm text-gray-500">Liquidation Penalty</span>
+          </div>
+          <div className="flex flex-col">
+            <span className="text-2xl font-semibold text-gray-900">$28</span>
+            <span className="text-sm text-gray-500">Liquidation Price</span>
+          </div>
+
+          {/* Row 3 */}
+          <div className="flex flex-col">
+            <span className="text-2xl font-semibold text-gray-900">
+              {reserveAddress[0]?.cataAPYRate}%
+            </span>
+            <span className="text-sm text-gray-500">Cata Reward (APY)</span>
+          </div>
+          <div className="flex flex-col">
+            <span className="text-2xl font-semibold text-gray-900">12 Months</span>
+            <span className="text-sm text-gray-500">Term</span>
+          </div>
+
+          {/* Row 4 */}
+          <div className="flex flex-col">
+            <span className="text-2xl font-semibold text-gray-900">
+              {inventory?.quantity}
+            </span>
+            <span className="text-sm text-gray-500">Available to Deposit</span>
+          </div>
+          <div className="flex flex-col">
+            <span className="text-2xl font-semibold text-gray-900 flex items-center">
+              <span>{calculatedValue}</span>
+              <img
+                src={Images.strats}
+                alt={''}
+                title={''}
+                className="w-8 h-8 "
+              />
+            </span>
+            <span className="text-sm text-gray-500">Available to Borrow</span>
           </div>
         </div>
-        <div className="w-full">
-          <p className=" w-full text-[#202020] font-medium text-sm ">
-            Loan Amount (STRATs)
-          </p>
-          <div className="border border-[#d9d9d9] h-[42px] rounded-md flex items-center justify-center ">
-            <div className="flex mx-auto">
-              {isStaked ? inventory.stratsLoanAmount : calculatedValue} {logo}{" "}
-            </div>{" "}
+
+        {/* Right Section (1/3 Width) */}
+        <div className="w-full md:w-1/3 flex flex-col items-center gap-6 border border-gray-200 rounded-lg p-6 shadow-md">
+          <h3 className="text-lg font-semibold text-gray-900">
+            Configure Borrow Position
+          </h3>
+          <div className="w-full">
+            <p className="text-sm text-gray-500 mb-2">
+              Deposit {inventory?.name}
+            </p>
+            <div className="border border-gray-300 h-12 rounded-md flex items-center justify-center">
+              <p>{inventory?.quantity}</p>
+            </div>
           </div>
-        </div>
-        <div className="w-full flex justify-center items-center">
-          <Button
-            type="primary"
-            className="w-32 h-9"
-            onClick={handleSubmit}
-            disabled={isLoader}
-            loading={isLoader}
-          >
-            {type}
-          </Button>
+          <div className="w-full">
+            <p className="text-sm text-gray-500 mb-2">Borrow (STRATs)</p>
+            <div className="border border-gray-300 h-12 rounded-md flex items-center justify-center">
+              <div className="flex items-center">
+                <p>{isStaked ? inventory.stratsLoanAmount : calculatedValue}</p>
+                {logo}
+              </div>
+            </div>
+          </div>
+          <div className="flex justify-center w-full">
+            <Button
+              type="primary"
+              className="w-full px-6 h-10 font-medium"
+              onClick={handleSubmit}
+              disabled={isLoader}
+              loading={isLoader}
+            >
+              Borrow
+            </Button>
+          </div>
         </div>
       </div>
     </Modal>
