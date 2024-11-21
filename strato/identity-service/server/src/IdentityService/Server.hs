@@ -366,11 +366,11 @@ getUsernameAvailable ::
     MonadLogger m,
     Accessible IdentityServerData m
   ) =>
-  GetUsernameAvailableRequest -> m Bool
+  GetUsernameAvailableRequest -> m Availability
 getUsernameAvailable (GetUsernameAvailableRequest username) = 
   certInCirrus (First username) >>= \case
-    [] -> return True
-    _ -> throwIO $ ExistingIdentity "username not available to claim"
+    [] -> return (Availability True)
+    _ -> throwIO . ExistingIdentity . decodeUtf8 . BL.toStrict $ encode (Availability False)
 
 server ::
   ( MonadUnliftIO m,

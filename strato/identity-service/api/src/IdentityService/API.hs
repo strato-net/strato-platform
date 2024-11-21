@@ -22,6 +22,6 @@ type PutIdentity =
 
 type GetUsernameAvailable = "username-available" 
       :> ReqBody '[JSON] GetUsernameAvailableRequest
-      :> Get '[JSON] Bool
+      :> Get '[JSON] Availability
 
 type IdentityServiceAPI = GetPingIdentity :<|> PutIdentity :<|> GetUsernameAvailable

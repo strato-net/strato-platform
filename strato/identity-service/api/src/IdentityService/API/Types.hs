@@ -6,7 +6,8 @@
 module IdentityService.API.Types
   ( PutIdentityRequest(..),
     PutIdentityResponse(..),
-    GetUsernameAvailableRequest(..)
+    GetUsernameAvailableRequest(..),
+    Availability(..)
   )
 where
 
@@ -21,6 +22,8 @@ newtype PutIdentityRequest = PutIdentityRequest (Either (Signed SubjectAndCert) 
 newtype PutIdentityResponse = PutIdentityResponse X509Certificate
 
 newtype GetUsernameAvailableRequest = GetUsernameAvailableRequest {username :: String} deriving Generic
+
+newtype Availability = Availability {available :: Bool} deriving Generic
 
 instance ToJSON PutIdentityRequest where
   toJSON (PutIdentityRequest (Left sub)) = toJSON sub
@@ -37,3 +40,6 @@ instance FromJSON PutIdentityResponse where
 
 instance ToJSON GetUsernameAvailableRequest where
 instance FromJSON GetUsernameAvailableRequest where
+
+instance ToJSON Availability where
+instance FromJSON Availability where

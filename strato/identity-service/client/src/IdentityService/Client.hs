@@ -18,5 +18,5 @@ getPing = client (Proxy @GetPingIdentity)
 putIdentity :: PutIdentityRequest -> ClientM PutIdentityResponse
 putIdentity = client (Proxy @PutIdentity)
 
-getUsernameAvailable :: GetUsernameAvailableRequest -> ClientM Bool
+getUsernameAvailable :: GetUsernameAvailableRequest -> ClientM Availability
 getUsernameAvailable = client (Proxy @GetUsernameAvailable)
