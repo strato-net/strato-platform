@@ -44,15 +44,12 @@ import Control.Monad (forever, forM, when)
 import qualified Control.Monad.Change.Alter as A
 import qualified Control.Monad.Change.Modify as Mod
 import Control.Monad.Composable.Kafka
-import Control.Monad.State.Class
 import Control.Monad.Reader
 import Data.Foldable
 import Data.Maybe
 import Data.Proxy
-import Data.Sequence (Seq)
 import qualified Data.Text as T
 import Data.Time.Clock
-import Database.LevelDB.Types
 import Prometheus as P
 import Text.Format
 import Text.Printf
@@ -121,10 +118,7 @@ eventHandler :: (
   MonadFail m,
   MonadReader SequencerConfig m,
   HasKafka m,
-  HasDependentBlockDB m,
-  MonadSequencer m,
-  Mod.Modifiable (Seq BatchOp) m,
-  MonadState SequencerContext m
+  MonadSequencer m
   ) =>
   ConduitT SeqLoopEvent Void m ()
 eventHandler = forever $ timeAction seqLoopTiming $ do
@@ -141,8 +135,6 @@ eventHandler = forever $ timeAction seqLoopTiming $ do
     UnseqEvents unseqEvents -> do
       withLabel seqLoopEvents "unseq" (flip unsafeAddCounter . fromIntegral . length $ unseqEvents)
       timeAction seqSplitEventsTiming $ unseqEventHandler unseqEvents
-
-  lift flushLdbBatchOps
 
 unseqEventHandler ::
   ( MonadLogger m,

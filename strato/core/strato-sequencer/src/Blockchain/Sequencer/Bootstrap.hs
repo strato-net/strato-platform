@@ -89,7 +89,6 @@ bootstrapSequencer
         runLoggingT . runSequencerM dummySequencerCfg Nothing $ do
           bootstrapGenesisBlock hash
           for_ (extraCerts ++ extraCertsHack) . uncurry $ A.insert (A.Proxy @X509CertInfoState)
-          flushLdbBatchOps
       initKafka :: CablePackage -> IO ()
       initKafka _ = do
         runKafkaMConfigured (KString $ C8.pack defaultKafkaClientId') $ do

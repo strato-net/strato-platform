@@ -5,13 +5,10 @@
 {-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE OverloadedStrings #-}
-{-# LANGUAGE RankNTypes #-}
-{-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE TypeApplications #-}
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE TypeOperators #-}
-{-# OPTIONS_GHC -fno-warn-orphans #-}
 
 module Blockchain.Sequencer.Monad
   ( MonadBlockstanbul,
@@ -22,7 +19,6 @@ module Blockchain.Sequencer.Monad
     RoundPeriod (..),
     runSequencerM,
     pairToVmTx,
-    flushLdbBatchOps,
     createFirstTimer,
     createNewTimer,
     fuseChannels,
@@ -40,7 +36,6 @@ import Blockchain.Sequencer.DB.DependentBlockDB
 import Blockchain.Sequencer.DB.SeenTransactionDB
 import Blockchain.Sequencer.Event
 import Blockchain.Sequencer.Kafka
-import Blockchain.Sequencer.Metrics
 import Blockchain.Strato.Model.Address
 import Blockchain.Strato.Model.Keccak256
 import Blockchain.Strato.Model.Secp256k1
@@ -63,18 +58,13 @@ import qualified Data.ByteString as B
 import qualified Data.ByteString.Char8 as C8
 import qualified Data.ByteString.Lazy as BL
 import Data.Conduit.TMChan
-import Data.Foldable (foldl', toList)
 import Data.IORef
-import Data.Map (Map)
-import qualified Data.Map as M
 import Data.Maybe
-import qualified Data.Sequence as Q
 import Data.String
 import qualified Data.Text as T
 import Data.Time.Clock
 import qualified Database.LevelDB as LDB
 import qualified LabeledError
-import Prometheus
 import Servant.Client
 import qualified Strato.Strato23.API.Types as VC hiding (Address (..))
 import qualified Strato.Strato23.Client as VC
@@ -87,8 +77,6 @@ data Modification a = Modification a | Deletion deriving (Show)
 data SequencerContext = SequencerContext
   { _dependentBlockDB :: DependentBlockDB,
     _seenTransactionDB :: !SeenTransactionDB,
-    _x509certInfoState :: !(Map Address (Modification X509CertInfoState)), --map to pubkey
-    _ldbBatchOps :: !(Q.Seq LDB.BatchOp),
     _blockstanbulContext :: Maybe BlockstanbulContext,
     _latestRoundNumber :: IORef RoundNumber
   }
@@ -152,68 +140,33 @@ lookupInLDB ::
   Mod.Proxy a ->
   NSKey a ->
   m (Maybe a)
-lookupInLDB p k =
-  Mod.access Mod.Proxy >>= \db ->
-    fmap (decode . BL.fromStrict) <$> LDB.get db LDB.defaultReadOptions (namespaced p k)
+lookupInLDB p k = do
+  db <- Mod.access Mod.Proxy
+  fmap (decode . BL.fromStrict) <$> LDB.get db LDB.defaultReadOptions (namespaced p k)
 
-batchInsertInLDB :: (Binary a, HasNamespace a) => Mod.Proxy a -> NSKey a -> a -> LDB.BatchOp
-batchInsertInLDB p k v = LDB.Put (namespaced p k) (BL.toStrict $ encode v)
-
-batchDeleteInLDB ::
-  HasNamespace a =>
-  Mod.Proxy a ->
-  NSKey a ->
-  LDB.BatchOp
-batchDeleteInLDB p k = LDB.Del (namespaced p k)
-
-genericLookupSequencer ::
-  (Ord (NSKey a), Binary a, HasNamespace a) =>
-  Lens' SequencerContext (Map (NSKey a) (Modification a)) ->
-  Mod.Proxy a ->
-  NSKey a ->
-  SequencerM (Maybe a)
-genericLookupSequencer registry p k =
-  use (registry . at k) >>= \case
-    Just Deletion -> return Nothing
-    Just (Modification a) -> return $ Just a
-    Nothing ->
-      lookupInLDB p k >>= \case
-        Nothing -> return Nothing
-        Just a -> do
-          registry . at k ?= Modification a
-          return $ Just a
-
-genericInsertSequencer ::
-  (Ord (NSKey a), Binary a, HasNamespace a) =>
-  Lens' SequencerContext (Map (NSKey a) (Modification a)) ->
+insertInLDB ::
+  (Binary a, HasNamespace a, MonadIO m, Mod.Accessible LDB.DB m) =>
   Mod.Proxy a ->
   NSKey a ->
   a ->
-  SequencerM ()
-genericInsertSequencer registry p k a = do
-  modify' $ registry . at k ?~ Modification a
-  addLdbBatchOps . (: []) $ batchInsertInLDB p k a
+  m ()
+insertInLDB p k v = do
+  db <- Mod.access Mod.Proxy
+  LDB.put db LDB.defaultWriteOptions (namespaced p k) $ BL.toStrict $ encode v
 
-genericDeleteSequencer ::
-  (Ord (NSKey a), HasNamespace a) =>
-  Lens' SequencerContext (Map (NSKey a) (Modification a)) ->
+deleteInLDB ::
+  (HasNamespace a, MonadIO m, Mod.Accessible LDB.DB m) =>
   Mod.Proxy a ->
   NSKey a ->
-  SequencerM ()
-genericDeleteSequencer registry p k = do
-  modify' $ registry . at k ?~ Deletion
-  addLdbBatchOps . (: []) $ batchDeleteInLDB p k
+  m ()
+deleteInLDB p k = do
+  db <- Mod.access Mod.Proxy
+  LDB.delete db LDB.defaultWriteOptions (namespaced p k)
 
 instance (Address `A.Alters` X509CertInfoState) SequencerM where
-  lookup = genericLookupSequencer x509certInfoState
-  insert p k v = do
-    genericInsertSequencer x509certInfoState p k v
-    sz <- M.size <$> use x509certInfoState
-    liftIO $ withLabel x509CertInfoStateRegistrySize "X509CertInfoState_registry" (flip setGauge (fromIntegral sz))
-  delete p k = do
-    genericDeleteSequencer x509certInfoState p k
-    sz <- M.size <$> use x509certInfoState
-    liftIO $ withLabel x509CertInfoStateRegistrySize "X509CertInfoState_registry" (flip setGauge (fromIntegral sz))
+  lookup = lookupInLDB
+  insert p k v = insertInLDB p k v
+  delete p k = deleteInLDB p k
 
 instance A.Selectable Address X509CertInfoState SequencerM where
   select = A.lookup
@@ -226,10 +179,6 @@ instance (Keccak256 `A.Alters` DependentBlockEntry) SequencerM where
 instance Mod.Modifiable SeenTransactionDB SequencerM where
   get _ = use seenTransactionDB
   put _ = modify' . (.~) seenTransactionDB
-
-instance Mod.Modifiable (Q.Seq LDB.BatchOp) SequencerM where
-  get _ = use ldbBatchOps
-  put _ = modify' . (.~) ldbBatchOps
 
 instance Mod.Accessible (IORef RoundNumber) SequencerM where
   access _ = use latestRoundNumber
@@ -311,8 +260,6 @@ runSequencerM c mbc m = do
       SequencerContext
         { _dependentBlockDB = depBlock,
           _seenTransactionDB = mkSeenTxDB stxSize,
-          _x509certInfoState = M.empty,
-          _ldbBatchOps = Q.empty,
           _blockstanbulContext = mbc,
           _latestRoundNumber = latestRound
         }
@@ -353,22 +300,6 @@ createNewTimer rn = do
   alarm <- liftIO $ newAlarmClock act
   next <- addUTCTime dt <$> liftIO getCurrentTime
   liftIO $ setAlarm alarm next
-
-clearLdbBatchOps :: Mod.Modifiable (Q.Seq LDB.BatchOp) m => m ()
-clearLdbBatchOps = Mod.put (Mod.Proxy @(Q.Seq LDB.BatchOp)) Q.empty
-
-flushLdbBatchOps :: (MonadMonitor m, HasDependentBlockDB m, Mod.Modifiable (Q.Seq LDB.BatchOp) m, MonadState SequencerContext m) => m ()
-flushLdbBatchOps = do
-  pendingLDBWrites <- use ldbBatchOps
-  applyLDBBatchWrites $ toList pendingLDBWrites
-  incCounter seqLdbBatchWrites
-  setGauge seqLdbBatchSize . fromIntegral $ length pendingLDBWrites
-  $logInfoS "flushLdbBatchOps" "Applied pending LDB writes"
-  clearLdbBatchOps
-
-addLdbBatchOps :: Mod.Modifiable (Q.Seq LDB.BatchOp) m => [LDB.BatchOp] -> m ()
-addLdbBatchOps ops = Mod.modify_ (Mod.Proxy @(Q.Seq LDB.BatchOp)) $ \existingOps ->
-  pure $ foldl' (Q.|>) existingOps ops
 
 fuseChannels :: (MonadIO m, MonadReader SequencerConfig m) =>
                 m (ConduitM () SeqLoopEvent SequencerM ())
