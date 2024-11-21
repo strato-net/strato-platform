@@ -33,6 +33,8 @@ if [ ! -f /usr/local/openresty/nginx/conf/nginx.conf ]; then
 
   if [ "$IDENTITY_PROVIDER_HOSTNAME" = "identity-service" ]; then
     sed -i '/#TEMPLATE_PEM_MODE/d' /tmp/nginx.conf
+  else 
+    sed -i '/#TEMPLATE_OAUTH_MODE/d' /tmp/nginx.conf
   fi
 
   # Replacing HOST NAME PLACEHOLDERS

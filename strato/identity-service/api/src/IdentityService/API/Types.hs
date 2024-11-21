@@ -1,10 +1,12 @@
 {-# LANGUAGE DataKinds #-}
+{-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE TypeOperators #-}
 
 module IdentityService.API.Types
   ( PutIdentityRequest(..),
-    PutIdentityResponse(..)
+    PutIdentityResponse(..),
+    GetUsernameAvailableRequest(..)
   )
 where
 
@@ -12,10 +14,13 @@ import BlockApps.X509
 import Blockchain.Strato.Model.Secp256k1
 import Control.Applicative ((<|>))
 import Data.Aeson
+import GHC.Generics
 
 newtype PutIdentityRequest = PutIdentityRequest (Either (Signed SubjectAndCert) (Signed (Signed SubjectAndCert)))
 
 newtype PutIdentityResponse = PutIdentityResponse X509Certificate
+
+newtype GetUsernameAvailableRequest = GetUsernameAvailableRequest {username :: String} deriving Generic
 
 instance ToJSON PutIdentityRequest where
   toJSON (PutIdentityRequest (Left sub)) = toJSON sub
@@ -29,3 +34,6 @@ instance ToJSON PutIdentityResponse where
 
 instance FromJSON PutIdentityResponse where
   parseJSON = fmap PutIdentityResponse . parseJSON
+
+instance ToJSON GetUsernameAvailableRequest where
+instance FromJSON GetUsernameAvailableRequest where

@@ -361,6 +361,17 @@ txSuccess :: BlocChainOrTransactionResult -> Bool
 txSuccess (BlocTxResult BlocTransactionResult {blocTransactionStatus = Success}) = True
 txSuccess _ = False
 
+getUsernameAvailable :: 
+  ( MonadIO m,
+    MonadLogger m,
+    Accessible IdentityServerData m
+  ) =>
+  GetUsernameAvailableRequest -> m Bool
+getUsernameAvailable (GetUsernameAvailableRequest username) = 
+  certInCirrus (First username) >>= \case
+    [] -> return True
+    _ -> throwIO $ ExistingIdentity "username not available to claim"
+
 server ::
   ( MonadUnliftIO m,
     MonadLogger m,
@@ -369,7 +380,7 @@ server ::
     Accessible IdentityServerData m
   ) =>
   ServerT IdentityServiceAPI m
-server = getPingIdentity :<|> putIdentity
+server = getPingIdentity :<|> putIdentity :<|> getUsernameAvailable
 
 hoistCoreServer ::
   IdentityServerData ->

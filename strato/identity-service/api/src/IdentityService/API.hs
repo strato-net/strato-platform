@@ -5,7 +5,8 @@
 module IdentityService.API
   ( IdentityServiceAPI,
     GetPingIdentity,
-    PutIdentity
+    PutIdentity,
+    GetUsernameAvailable
   )
 where
 
@@ -19,4 +20,8 @@ type PutIdentity =
     :> ReqBody '[JSON] PutIdentityRequest
     :> Put '[JSON] PutIdentityResponse
 
-type IdentityServiceAPI = GetPingIdentity :<|> PutIdentity
+type GetUsernameAvailable = "username-available" 
+      :> ReqBody '[JSON] GetUsernameAvailableRequest
+      :> Get '[JSON] Bool
+
+type IdentityServiceAPI = GetPingIdentity :<|> PutIdentity :<|> GetUsernameAvailable
