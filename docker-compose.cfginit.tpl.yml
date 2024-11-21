@@ -1,0 +1,8 @@
+#strato-version:<VERSION>
+#strato-getting-started-min-version:5.0.0
+version: "3"
+services:
+  cfginit:
+    build: .
+    image: ${CFGINIT_IMAGE:-<REPO_URL>cfginit:<VERSION>}
+    restart: "no"

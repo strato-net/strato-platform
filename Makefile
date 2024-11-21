@@ -34,11 +34,11 @@ all: build_all docker-compose eks
 
 all_develop: build_develop docker-compose eks
 
-build_all: strato apex highway highway-nginx nginx postgrest prometheus smd marketplace-backend marketplace-ui vault-wrapper vault-nginx identity-provider identity-service identity-nginx payment-server payment-server-nginx subject-signing-tool notification-server notification-server-nginx
+build_all: strato apex highway highway-nginx nginx postgrest prometheus smd marketplace-backend marketplace-ui vault-wrapper vault-nginx identity-provider identity-service identity-nginx payment-server payment-server-nginx subject-signing-tool notification-server notification-server-nginx cfginit
 
-build_develop: develop apex highway highway-nginx nginx postgrest prometheus smd marketplace-backend marketplace-ui vault-wrapper vault-nginx identity-provider identity-service identity-nginx payment-server payment-server-nginx subject-signing-tool notification-server notification-server-nginx
+build_develop: develop apex highway highway-nginx nginx postgrest prometheus smd marketplace-backend marketplace-ui vault-wrapper vault-nginx identity-provider identity-service identity-nginx payment-server payment-server-nginx subject-signing-tool notification-server notification-server-nginx cfginit
 
-.PHONY: strato apex highway highway-nginx ory nginx postgrest prometheus smd marketplace-backend marketplace-ui vault-wrapper vault-nginx identity-provider identity-service identity-nginx payment-server payment-server-nginx subject-signing-tool notification-server notification-server-nginx build_buildbase build_common build_common_profiled eks
+.PHONY: strato apex highway highway-nginx ory nginx postgrest prometheus smd marketplace-backend marketplace-ui vault-wrapper vault-nginx identity-provider identity-service identity-nginx payment-server payment-server-nginx subject-signing-tool notification-server notification-server-nginx build_buildbase build_common build_common_profiled eks ory-init cfginit
 
 apex:
 	@echo Now building apex...
@@ -199,8 +199,17 @@ vault-nginx:
 	@echo Now building vault-nginx...
 	BASIL_DOCKER_TAG=${REPO_URL}vault-nginx:${VERSION} ECR_DOCKER_TAG=${REPO_AWS_ECR_URL}vault-nginx:${VERSION} make --directory=vault-nginx/
 
+# ory-init build and install locally (for development)
 ory:
 	cd ory && stack install
+
+ory-init:
+	cd ory && \
+	  stack build --copy-bins --local-bin-path=${FAKEROOT}/usr/local/bin
+
+cfginit: ory-init
+	docker build --target cfginit --tag ${REPO_URL}cfginit:${VERSION} --file Dockerfile.multi ${FAKEROOT}
+	docker tag ${REPO_URL}cfginit:${VERSION} ${REPO_AWS_ECR_URL}cfginit:${VERSION}
 
 identity-provider: build_common
 	@echo Now building Identity Server...
@@ -241,6 +250,8 @@ docker-compose:
 	sed -e 's|<REPO_URL>|'"${REPO_AWS_ECR_URL}"'|g' -e 's|<VERSION>|'"${VERSION}"'|g' docker-compose.payment.tpl.yml > docker-compose.payment.push.ecr.yml
 	sed -e 's|<REPO_URL>|'"${REPO_URL}"'|g' -e 's|<VERSION>|'"${VERSION}"'|g' docker-compose.notification.tpl.yml > docker-compose.notification.push.yml
 	sed -e 's|<REPO_URL>|'"${REPO_AWS_ECR_URL}"'|g' -e 's|<VERSION>|'"${VERSION}"'|g' docker-compose.notification.tpl.yml > docker-compose.notification.push.ecr.yml
+  sed -e 's|<REPO_URL>|'"${REPO_URL}"'|g' -e 's|<VERSION>|'"${VERSION}"'|g' docker-compose.cfginit.tpl.yml > docker-compose.cfginit.push.yml
+  sed -e 's|<REPO_URL>|'"${REPO_AWS_ECR_URL}"'|g' -e 's|<VERSION>|'"${VERSION}"'|g' docker-compose.cfginit.tpl.yml > docker-compose.cfginit.push.ecr.yml
 
 	@echo Creating the final docker-compose.yml...
 	awk '/build: ./{getline} 1' docker-compose.push.yml > docker-compose.yml
@@ -263,6 +274,8 @@ docker-compose:
 	awk '/build: ./{getline} 1' docker-compose.payment.push.ecr.yml > docker-compose.payment.ecr.yml
 	awk '/build: ./{getline} 1' docker-compose.notification.push.yml > docker-compose.notification.yml
 	awk '/build: ./{getline} 1' docker-compose.notification.push.ecr.yml > docker-compose.notification.ecr.yml
+  awk '/build: ./{getline} 1' docker-compose.cfginit.push.yml > docker-compose.cfginit.yml
+  awk '/build: ./{getline} 1' docker-compose.cfginit.push.ecr.yml > docker-compose.cfginit.ecr.yml
 
 docker-build:
 	cp -fr strato/extraFiles/* ${STRATODIR}
