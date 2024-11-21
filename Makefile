@@ -205,7 +205,7 @@ ory:
 
 ory-init:
 	cd ory && \
-	  stack build --copy-bins --local-bin-path=${FAKEROOT}/usr/local/bin
+		stack build --copy-bins --local-bin-path=${FAKEROOT}/usr/local/bin
 
 cfginit: ory-init
 	docker build --target cfginit --tag ${REPO_URL}cfginit:${VERSION} --file Dockerfile.multi ${FAKEROOT}
@@ -250,8 +250,8 @@ docker-compose:
 	sed -e 's|<REPO_URL>|'"${REPO_AWS_ECR_URL}"'|g' -e 's|<VERSION>|'"${VERSION}"'|g' docker-compose.payment.tpl.yml > docker-compose.payment.push.ecr.yml
 	sed -e 's|<REPO_URL>|'"${REPO_URL}"'|g' -e 's|<VERSION>|'"${VERSION}"'|g' docker-compose.notification.tpl.yml > docker-compose.notification.push.yml
 	sed -e 's|<REPO_URL>|'"${REPO_AWS_ECR_URL}"'|g' -e 's|<VERSION>|'"${VERSION}"'|g' docker-compose.notification.tpl.yml > docker-compose.notification.push.ecr.yml
-  sed -e 's|<REPO_URL>|'"${REPO_URL}"'|g' -e 's|<VERSION>|'"${VERSION}"'|g' docker-compose.cfginit.tpl.yml > docker-compose.cfginit.push.yml
-  sed -e 's|<REPO_URL>|'"${REPO_AWS_ECR_URL}"'|g' -e 's|<VERSION>|'"${VERSION}"'|g' docker-compose.cfginit.tpl.yml > docker-compose.cfginit.push.ecr.yml
+	sed -e 's|<REPO_URL>|'"${REPO_URL}"'|g' -e 's|<VERSION>|'"${VERSION}"'|g' docker-compose.cfginit.tpl.yml > docker-compose.cfginit.push.yml
+	sed -e 's|<REPO_URL>|'"${REPO_AWS_ECR_URL}"'|g' -e 's|<VERSION>|'"${VERSION}"'|g' docker-compose.cfginit.tpl.yml > docker-compose.cfginit.push.ecr.yml
 
 	@echo Creating the final docker-compose.yml...
 	awk '/build: ./{getline} 1' docker-compose.push.yml > docker-compose.yml
@@ -274,8 +274,8 @@ docker-compose:
 	awk '/build: ./{getline} 1' docker-compose.payment.push.ecr.yml > docker-compose.payment.ecr.yml
 	awk '/build: ./{getline} 1' docker-compose.notification.push.yml > docker-compose.notification.yml
 	awk '/build: ./{getline} 1' docker-compose.notification.push.ecr.yml > docker-compose.notification.ecr.yml
-  awk '/build: ./{getline} 1' docker-compose.cfginit.push.yml > docker-compose.cfginit.yml
-  awk '/build: ./{getline} 1' docker-compose.cfginit.push.ecr.yml > docker-compose.cfginit.ecr.yml
+	awk '/build: ./{getline} 1' docker-compose.cfginit.push.yml > docker-compose.cfginit.yml
+	awk '/build: ./{getline} 1' docker-compose.cfginit.push.ecr.yml > docker-compose.cfginit.ecr.yml
 
 docker-build:
 	cp -fr strato/extraFiles/* ${STRATODIR}
