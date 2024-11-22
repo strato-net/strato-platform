@@ -18,6 +18,7 @@ import BlockApps.X509
 import Blockchain.Strato.Model.Secp256k1
 import Control.Applicative ((<|>))
 import Data.Aeson hiding (Success, Error)
+import qualified Data.Map as M
 import GHC.Generics
 
 newtype PutIdentityRequest = PutIdentityRequest (Either (Signed SubjectAndCert) (Signed (Signed SubjectAndCert)))
@@ -31,8 +32,9 @@ data OryMessage = OryMessage {
   instance_ptr :: String,
   messages :: [OryMessageDetail]
 } deriving Generic
-data OryMessageDetail = OryMessageDetail Int String OryMessageType
+data OryMessageDetail = OryMessageDetail Int String OryMessageType OryMessageContext
 data OryMessageType = Error | Info | Success deriving Generic
+type OryMessageContext = M.Map String String
 
 instance ToJSON PutIdentityRequest where
   toJSON (PutIdentityRequest (Left sub)) = toJSON sub
@@ -60,18 +62,20 @@ instance ToJSON OryMessage where
 instance FromJSON OryMessage where
 
 instance ToJSON OryMessageDetail where
-  toJSON (OryMessageDetail i t t') = 
+  toJSON (OryMessageDetail i t t' c) = 
     object [
       "id" .= i,
       "text" .= t,
-      "type" .= show t'
+      "type" .= show t',
+      "conext" .= c
     ]
 instance FromJSON OryMessageDetail where
   parseJSON = withObject "OryMessageDetail" $ \v -> do 
     i <- v .: "id"
     t <- v .: "text"
     t' <- v .: "type"
-    return $ OryMessageDetail i t t'
+    c <- v .: "context"
+    return $ OryMessageDetail i t t' c
 
 instance ToJSON OryMessageType where
 instance FromJSON OryMessageType where
@@ -81,12 +85,12 @@ instance Show OryMessageType where
   show Success = "success"
 
 successOryMessage :: OryMessages
-successOryMessage = OryMessages [OryMessage "#/username" [OryMessageDetail 1 "" Success]]
+successOryMessage = OryMessages [OryMessage "#/username" [OryMessageDetail 1 "" Success M.empty]]
 
 errorOryMessage :: String -> OryMessages
 errorOryMessage errString = 
   OryMessages [
     OryMessage 
       "#/username" 
-      [OryMessageDetail 2 errString Error]
+      [OryMessageDetail 2 errString Error (M.singleton "value" "any")]
     ]
