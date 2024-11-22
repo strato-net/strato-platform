@@ -21,6 +21,7 @@
         "username": {
           "type": "string",
           "title": "Username",
+          "readOnly": true,
           "ory.sh/kratos": {
             "credentials": {
               "password": {
