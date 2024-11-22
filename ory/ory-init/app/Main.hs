@@ -25,7 +25,8 @@ data Options =
   Options {
     basePath :: String,
     sslDir :: String,
-    domainName :: String
+    domainName :: String,
+    identityServerUrl :: String
   } deriving (Data, Generic)
 
 instance AESON.FromJSON Options where
@@ -38,7 +39,8 @@ defaultOptions =
   Options {
     basePath = "ory" &= argPos 0,
     sslDir = "",
-    domainName = ""
+    domainName = "",
+    identityServerUrl = ""
   }
 
 substitutionStrings :: AESON.Value -> [(Text, Text)]
@@ -56,6 +58,7 @@ main = do
 
   when (sslDir options == "") $ error "You need to supply a ssldir parameter"
   when (domainName options == "") $ error "You need to supply a domainname parameter"
+  when (identityServerUrl options == "") $ error "You need to supply a identityserverurl parameter"
 
   images <- getGitImages
 
