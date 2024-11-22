@@ -85,12 +85,12 @@ instance Show OryMessageType where
   show Success = "success"
 
 successOryMessage :: OryMessages
-successOryMessage = OryMessages [OryMessage "#/identity/traits/username" [OryMessageDetail 1 "" Success M.empty]]
+successOryMessage = OryMessages [OryMessage "#/traits/username" [OryMessageDetail 1 "" Success M.empty]]
 
 errorOryMessage :: String -> OryMessages
 errorOryMessage errString = 
   OryMessages [
     OryMessage 
-      "#/identity/traits/username" 
+      "#/traits/username" 
       [OryMessageDetail 2 errString Error (M.singleton "value" "any")]
     ]
