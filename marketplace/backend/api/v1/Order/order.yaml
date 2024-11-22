@@ -1,157 +1,157 @@
 paths:
   /order/:
     get:
-      security:              
-        - bearerAuth: []                    
-      tags:               
-        - Order        
+      security:
+        - bearerAuth: []
+      tags:
+        - Order
       summary: Retrieve order
       produces:
-      - application/json
-      responses:         
+        - application/json
+      responses:
         200:
           description: Array of orders
-    post:  
-      security:              
-        - bearerAuth: []                  
-      tags:               
-        - Order        
+    post:
+      security:
+        - bearerAuth: []
+      tags:
+        - Order
       summary: Create a order
       produces:
-      - application/json
-      requestBody:         
+        - application/json
+      requestBody:
         description: It enable user to create order
         required: true
         content:
-          'application/json': 
-            schema:       
-              $ref: '#/definitions/createOrder' 
-      responses:         
+          'application/json':
+            schema:
+              $ref: '#/definitions/createOrder'
+      responses:
         200:
           description: Object of create order
   /order/{address}/{chainId}:
-    get:                 
-      security:              
-        - bearerAuth: []   
-      tags:               
-        - Order        
+    get:
+      security:
+        - bearerAuth: []
+      tags:
+        - Order
       summary: Retrieve a order
       produces:
-      - application/json
-      parameters:         
-      - in: path          
-        name: address     
-        description: address to retrieve the order
-        required: true
-      - in: path          
-        name: chainId     
-        description: chainId corresponding to the address
-        required: true
-        schema:       
-          $ref: '#/definitions/fetchOrder' 
-      responses:         
+        - application/json
+      parameters:
+        - in: path
+          name: address
+          description: address to retrieve the order
+          required: true
+        - in: path
+          name: chainId
+          description: chainId corresponding to the address
+          required: true
+          schema:
+            $ref: '#/definitions/fetchOrder'
+      responses:
         200:
           description: Retrieve a order
   /order/update:
-    put:    
-      security:              
-        - bearerAuth: []                
-      tags:               
-        - Order        
+    put:
+      security:
+        - bearerAuth: []
+      tags:
+        - Order
       summary: Update a order
       produces:
-      - application/json
-      requestBody:         
+        - application/json
+      requestBody:
         description: It enable user to update a order
         required: true
         content:
           'application/json':
-            schema:       
-              $ref: '#/definitions/updateOrder' 
-      responses:         
+            schema:
+              $ref: '#/definitions/updateOrder'
+      responses:
         200:
           description: Retrieve a updated order
   /order/{address}/{chainId}/audit:
-    get:     
-      security:              
-        - bearerAuth: []               
-      tags:               
-        - Order        
+    get:
+      security:
+        - bearerAuth: []
+      tags:
+        - Order
       summary: Audit order
       produces:
-      - application/json
-      parameters:         
-      - in: path          
-        name: address     
-        description: address to retrieve the order
-        required: true
-      - in: path          
-        name: chainId     
-        description: chainId corresponding to the address
-        required: true
-        schema:       
-          $ref: '#/definitions/auditOrder' 
-      responses:         
+        - application/json
+      parameters:
+        - in: path
+          name: address
+          description: address to retrieve the order
+          required: true
+        - in: path
+          name: chainId
+          description: chainId corresponding to the address
+          required: true
+          schema:
+            $ref: '#/definitions/auditOrder'
+      responses:
         200:
           description: List of audit
   /order/transferOwnership:
-    post:              
-      security:              
-        - bearerAuth: []      
-      tags:               
-        - Order        
+    post:
+      security:
+        - bearerAuth: []
+      tags:
+        - Order
       summary: Transfer ownership
       produces:
-      - application/json
-      requestBody:         
+        - application/json
+      requestBody:
         description: It enable user to transfer ownership
         required: true
         content:
           'application/json':
-            schema:       
-              $ref: '#/definitions/transferOwnership' 
-      responses:         
+            schema:
+              $ref: '#/definitions/transferOwnership'
+      responses:
         200:
           description: indicates success of transfer ownership
   /order/sale:
     post:
-      security:              
-        - bearerAuth: []      
-      tags:               
-        - Order        
+      security:
+        - bearerAuth: []
+      tags:
+        - Order
       summary: Creates a Sale Order
       produces:
-      - application/json
-      requestBody:         
+        - application/json
+      requestBody:
         description: It creates a sale order
         required: true
         content:
           'application/json':
-            schema:       
-              $ref: '#/definitions/createSaleOrder' 
-      responses:         
+            schema:
+              $ref: '#/definitions/createSaleOrder'
+      responses:
         200:
           description: indicates success of create sale order
   /order/closeSale:
     post:
-      security:              
-        - bearerAuth: []      
-      tags:               
-        - Order        
+      security:
+        - bearerAuth: []
+      tags:
+        - Order
       summary: Call transferOwnership on Sale Order
       produces:
-      - application/json
-      requestBody:         
+        - application/json
+      requestBody:
         description: It enable user to transfer ownership
         required: true
         content:
           'application/json':
-            schema:       
-              $ref: '#/definitions/executeSale' 
-      responses:         
+            schema:
+              $ref: '#/definitions/executeSale'
+      responses:
         200:
           description: indicates success of transfer ownership
-definitions:        
+definitions:
   fetchOrder:
     address:
       type: string
@@ -247,11 +247,11 @@ definitions:
         items:
           type: object
           properties:
-            quantity: 
+            quantity:
               type: number
-            assetAddress: 
+            assetAddress:
               type: string
-            category: 
+            category:
               type: string
       paymentMethod:
         type: string

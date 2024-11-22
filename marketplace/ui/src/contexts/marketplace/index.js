@@ -1,5 +1,5 @@
-import React, { createContext, useContext, useReducer } from "react";
-import reducer from "./reducer";
+import React, { createContext, useContext, useReducer } from 'react';
+import reducer from './reducer';
 
 const MarketplaceStateContext = createContext();
 const MarketplaceDispatchContext = createContext();
@@ -11,22 +11,22 @@ const MarketplaceProvider = ({ children }) => {
     isMarketplaceLoading: false,
     isTopSellingProductsLoading: false,
     topSellingProducts: [],
-    isAddingShippingAddress : false,
+    isAddingShippingAddress: false,
     shippingAddress: null,
     error: undefined,
     success: false,
     message: null,
     cartList: [],
     confirmOrderList: [],
-    userAddress:null,
-    isLoadingUserAddress:false,
-    userAddresses:[],
-    isLoadingUserAddresses:false,
+    userAddress: null,
+    isLoadingUserAddress: false,
+    userAddresses: [],
+    isLoadingUserAddresses: false,
     isFetchingStrats: false,
     isTransferringStrats: false,
     strats: 0,
     isFetchingStratsTransactionHistory: false,
-    stratsTransactionHistory: []
+    stratsTransactionHistory: [],
   };
 
   const [state, dispatch] = useReducer(reducer, initialState);

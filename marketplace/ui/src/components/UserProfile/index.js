@@ -1,40 +1,56 @@
-import React, { useEffect, useState } from "react";
-import { Button, Avatar, Tabs, Spin, notification, Row, Col, Typography, Pagination, Breadcrumb } from "antd";
-import { UserOutlined, EditOutlined } from "@ant-design/icons";
-import { Images } from "../../images";
-import routes from "../../helpers/routes";
-import { actions as userActivityActions } from "../../contexts/userActivity/actions";
-import { actions as orderActions } from "../../contexts/order/actions";
-import { useOrderDispatch } from "../../contexts/order";
+import React, { useEffect, useState } from 'react';
+import {
+  Button,
+  Avatar,
+  Tabs,
+  Spin,
+  notification,
+  Row,
+  Col,
+  Typography,
+  Pagination,
+  Breadcrumb,
+} from 'antd';
+import { UserOutlined, EditOutlined } from '@ant-design/icons';
+import { Images } from '../../images';
+import routes from '../../helpers/routes';
+import { actions as userActivityActions } from '../../contexts/userActivity/actions';
+import { actions as orderActions } from '../../contexts/order/actions';
+import { useOrderDispatch } from '../../contexts/order';
 import {
   useUserActivityDispatch,
   useUserActivityState,
-} from "../../contexts/userActivity";
-import ActivityFeed from "./ActivityFeed";
-import { actions as inventoryActions } from "../../contexts/inventory/actions";
-import { actions as marketplaceActions } from "../../contexts/marketplace/actions";
-import { useAuthenticateState } from "../../contexts/authentication";
-import { Link, useLocation, useMatch, useParams } from "react-router-dom";
-import { useNavigate } from "react-router-dom";
-import { useInventoryDispatch, useInventoryState } from '../../contexts/inventory';
+} from '../../contexts/userActivity';
+import ActivityFeed from './ActivityFeed';
+import { actions as inventoryActions } from '../../contexts/inventory/actions';
+import { actions as marketplaceActions } from '../../contexts/marketplace/actions';
+import { useAuthenticateState } from '../../contexts/authentication';
+import { Link, useLocation, useMatch, useParams } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
+import {
+  useInventoryDispatch,
+  useInventoryState,
+} from '../../contexts/inventory';
 import {
   useMarketplaceDispatch,
   useMarketplaceState,
-} from "../../contexts/marketplace";
-import NewTrendingCard from "../MarketPlace/NewTrendingCard";
-import { useCategoryDispatch, useCategoryState } from "../../contexts/category";
-import { actions as categoryActions } from "../../contexts/category/actions";
-import InventoryCard from "../Inventory/InventoryCard";
-import { useItemDispatch, useItemState } from "../../contexts/item";
-import { actions as itemActions } from "../../contexts/item/actions";
-import ClickableCell from "../ClickableCell";
-import { homeUrl, soldOrderDetailssBaseUrl, boughtOrderDetailssBaseUrl, ordersBaseUrl, transfersBaseUrl } from "../../helpers/constants";
+} from '../../contexts/marketplace';
+import NewTrendingCard from '../MarketPlace/NewTrendingCard';
+import { useCategoryDispatch, useCategoryState } from '../../contexts/category';
+import { actions as categoryActions } from '../../contexts/category/actions';
+import InventoryCard from '../Inventory/InventoryCard';
+import { useItemDispatch, useItemState } from '../../contexts/item';
+import { actions as itemActions } from '../../contexts/item/actions';
+import ClickableCell from '../ClickableCell';
+import {
+  homeUrl,
+  soldOrderDetailssBaseUrl,
+  boughtOrderDetailssBaseUrl,
+  ordersBaseUrl,
+  transfersBaseUrl,
+} from '../../helpers/constants';
 
-
-
-const UserProfile = ({user}) => {
-
-
+const UserProfile = ({ user }) => {
   const [commonName, setCommonName] = useState(undefined);
   const [activeTab, setActiveTab] = useState('1');
   const dispatch = useInventoryDispatch();
@@ -43,7 +59,17 @@ const UserProfile = ({user}) => {
   const { cartList } = useMarketplaceState();
   const [api, contextHolder] = notification.useNotification();
   const marketplaceDispatch = useMarketplaceDispatch();
-  const { userInventories, isUserInventoriesLoading, inventories, isInventoriesLoading, message, success, inventoriesTotal, supportedTokens, isFetchingTokens } = useInventoryState();
+  const {
+    userInventories,
+    isUserInventoriesLoading,
+    inventories,
+    isInventoriesLoading,
+    message,
+    success,
+    inventoriesTotal,
+    supportedTokens,
+    isFetchingTokens,
+  } = useInventoryState();
   let { hasChecked, isAuthenticated, loginUrl } = useAuthenticateState();
   const { TabPane } = Tabs;
   const orderDispatch = useOrderDispatch();
@@ -57,253 +83,254 @@ const UserProfile = ({user}) => {
   const userActivityDispatch = useUserActivityDispatch();
   const { userActivity } = useUserActivityState();
   const [wishlistData, setWishlistData] = useState([]);
-  const routeMatch = useMatch({ path: routes.MarketplaceUserProfile.url, strict: true });
-  const [breadcrumbs, setBreadcrumbs] = useState([{ text: 'Home', path: homeUrl }]);
-  
+  const routeMatch = useMatch({
+    path: routes.MarketplaceUserProfile.url,
+    strict: true,
+  });
+  const [breadcrumbs, setBreadcrumbs] = useState([
+    { text: 'Home', path: homeUrl },
+  ]);
+
   const params = useParams();
 
-
-    //items
+  //items
   const itemDispatch = useItemDispatch();
-  const {
-    message: itemMsg,
-    success: itemSuccess
-  } = useItemState();
+  const { message: itemMsg, success: itemSuccess } = useItemState();
 
-/********************************************************************************************************************************************************
+  /********************************************************************************************************************************************************
                                    useEffects and Helper Methods
-/*******************************************************************************************************************************************************/ 
+/*******************************************************************************************************************************************************/
 
-    // This gets our wishlist data
-    useEffect(() => {
-      const storedWishlist = localStorage.getItem('wishList');
-      const parsedWishlist = storedWishlist ? JSON.parse(storedWishlist) : [];
-      setWishlistData(parsedWishlist);
-    }, []);
+  // This gets our wishlist data
+  useEffect(() => {
+    const storedWishlist = localStorage.getItem('wishList');
+    const parsedWishlist = storedWishlist ? JSON.parse(storedWishlist) : [];
+    setWishlistData(parsedWishlist);
+  }, []);
 
-
-    // Notification Pop-Up redirect
-    useEffect(() => {
-      const searchParams = new URLSearchParams(window.location.search);
-      const tab = searchParams.get('tab');
-      // Check if the 'tab' query parameter is set to 'my-activity'
-      if (tab === 'my-activity') {
-        setActiveTab('2'); // Set '2' to open the "My Activity" tab
-      }
-      }, [commonName]);
-
-    // helper
-    const ownerSameAsUser = (commonNameOfUser) => {
-        if (user?.commonName === commonNameOfUser) {
-          setIsOwner(true);
-          return true;
-        }
-        setIsOwner(false);
-        return false;
-      };
-
-    // helper
-    const getAllSubcategories = (categories) => {
-      let subcategories = [];
-      categories.forEach(category => {
-          if (category.subCategories && category.subCategories.length > 0) {
-              subcategories = subcategories.concat(category.subCategories);
-          }
-      });
-      return subcategories;
+  // Notification Pop-Up redirect
+  useEffect(() => {
+    const searchParams = new URLSearchParams(window.location.search);
+    const tab = searchParams.get('tab');
+    // Check if the 'tab' query parameter is set to 'my-activity'
+    if (tab === 'my-activity') {
+      setActiveTab('2'); // Set '2' to open the "My Activity" tab
     }
+  }, [commonName]);
 
-    const allSubcategories = getAllSubcategories(categorys);
+  // helper
+  const ownerSameAsUser = (commonNameOfUser) => {
+    if (user?.commonName === commonNameOfUser) {
+      setIsOwner(true);
+      return true;
+    }
+    setIsOwner(false);
+    return false;
+  };
 
-    //Fetch inventories for owner previewing their own profile
-    useEffect(() => {
-      if(isOwner) 
-        {
-          inventoryActions.fetchInventory(dispatch, limit, offset, "",category);
-          inventoryActions.fetchSupportedTokens(dispatch);
-        }
-      }, [dispatch, limit, offset, category, isOwner]);
+  // helper
+  const getAllSubcategories = (categories) => {
+    let subcategories = [];
+    categories.forEach((category) => {
+      if (category.subCategories && category.subCategories.length > 0) {
+        subcategories = subcategories.concat(category.subCategories);
+      }
+    });
+    return subcategories;
+  };
 
+  const allSubcategories = getAllSubcategories(categorys);
 
-    // Fetch Categories
-    useEffect(() => {
-      categoryActions.fetchCategories(categoryDispatch);
-    }, [categoryDispatch]);
+  //Fetch inventories for owner previewing their own profile
+  useEffect(() => {
+    if (isOwner) {
+      inventoryActions.fetchInventory(dispatch, limit, offset, '', category);
+      inventoryActions.fetchSupportedTokens(dispatch);
+    }
+  }, [dispatch, limit, offset, category, isOwner]);
 
-    //helper
-    const onPageChange = (page) => {
-      setOffset((page - 1) * limit);
-      setPage(page);
-    };
+  // Fetch Categories
+  useEffect(() => {
+    categoryActions.fetchCategories(categoryDispatch);
+  }, [categoryDispatch]);
 
-    // Tab Selection for MyItems tab
-    const handleTabSelectForOwner = (key) => {
-      setCategory(key);
-      setOffset(0);
-      setPage(1);
+  //helper
+  const onPageChange = (page) => {
+    setOffset((page - 1) * limit);
+    setPage(page);
+  };
+
+  // Tab Selection for MyWallet tab
+  const handleTabSelectForOwner = (key) => {
+    setCategory(key);
+    setOffset(0);
+    setPage(1);
+    return;
+  };
+
+  //set Common Name to Fetch Inventories
+  useEffect(() => {
+    setCommonName(routeMatch?.params?.commonName);
+    ownerSameAsUser(routeMatch?.params?.commonName);
+  }, [routeMatch]);
+
+  // Inventories For Sale fetch
+  useEffect(() => {
+    inventoryActions.fetchInventoryForUser(dispatch, 10000, 0, '', undefined);
+  }, [dispatch, hasChecked, isAuthenticated, loginUrl, commonName]);
+
+  // Tab selection
+  const handleTabSelect = (key) => {
+    setActiveTab(key);
+  };
+
+  // User Activity Fetch
+  useEffect(() => {
+    if (!user) {
       return;
-      };
+    }
+    const profile = user.commonName;
+    userActivityActions.fetchUserActivity(userActivityDispatch, profile);
+  }, [userActivityDispatch, user]);
 
-    
-    //set Common Name to Fetch Inventories
-    useEffect(() => {
-      setCommonName(routeMatch?.params?.commonName);
-      ownerSameAsUser(routeMatch?.params?.commonName);
-      }, [routeMatch]);
-  
-    // Inventories For Sale fetch
-    useEffect(() => {
-      if(commonName){
-          inventoryActions.fetchInventoryForUser(dispatch, commonName);
-        }
-      }, [dispatch, hasChecked, isAuthenticated, loginUrl, commonName]);
-  
-    // Tab selection
-    const handleTabSelect = (key) => {
-      setActiveTab(key);
-      };    
-    
-    // User Activity Fetch
-    useEffect(() => {
-      if (!user) {
-        return
-      }
-      const profile = user.commonName
-      userActivityActions.fetchUserActivity(userActivityDispatch, profile);
-      
-    }, [userActivityDispatch, user]);
+  // Bread Crumbs logic
+  useEffect(() => {
+    let initialBreadcrumbs = [{ text: 'Home', path: homeUrl }];
+    const referrer = location.state?.from || location.pathname;
 
-    // Bread Crumbs logic
-    useEffect(() => {
-      let initialBreadcrumbs = [{ text: 'Home', path: homeUrl }];
-      const referrer = location.state?.from || location.pathname;
+    if (referrer.includes('/dp/')) {
+      const segments = referrer.split('/'); // Split the referrer by '/'
+      const productID = segments[2];
+      const productName = segments.pop(); // Get the last segment, which should be the address
 
-      if (referrer.includes('/dp/')) {
-        const segments = referrer.split('/'); // Split the referrer by '/'
-        const productID = segments[2];
-        const productName = segments.pop(); // Get the last segment, which should be the address
-    
-        // productID check before pushing to breadcrumbs
-        if (productID) {
-          const productDetailsPath = new URL(`/dp/${productID}/${productName}`, window.location.origin).toString();
-          initialBreadcrumbs.push({ text: 'Product Details', path: productDetailsPath });
-        }
-      } else if (referrer.includes(ordersBaseUrl)) {
-        initialBreadcrumbs.push({ text: 'Orders', path: ordersBaseUrl });
-      } else if (referrer.includes(transfersBaseUrl)) {
-        initialBreadcrumbs.push({ text: 'Transfers', path: transfersBaseUrl });
-      }
-      
-      initialBreadcrumbs.push({ text: isOwner ? 'My Profile' : 'Profile', path: '' });
-  
-      setBreadcrumbs(initialBreadcrumbs);
-    }, [location, isOwner]);
-  
-    
-    //helper
-    const itemToast = (placement) => {
-      if (itemSuccess) {
-        api.success({
-          message: itemMsg,
-          onClose: itemActions.resetMessage(itemDispatch),
-          placement,
-          key: 3,
-        });
-      } else {
-        api.error({
-          message: itemMsg,
-          onClose: itemActions.resetMessage(itemDispatch),
-          placement,
-          key: 4,
+      // productID check before pushing to breadcrumbs
+      if (productID) {
+        const productDetailsPath = new URL(
+          `/dp/${productID}/${productName}`,
+          window.location.origin
+        ).toString();
+        initialBreadcrumbs.push({
+          text: 'Product Details',
+          path: productDetailsPath,
         });
       }
-    };
-
-    //helper
-    const openToast = (placement,success,message) => {
-      if (success) {
-        api.success({
-          message: message,
-          onClose: inventoryActions.resetMessage(dispatch),
-          placement,
-          key: 1,
-        });
-      } else {
-        api.error({
-          message: message,
-          onClose: inventoryActions.resetMessage(dispatch),
-          placement,
-          key: 2,
-        });
-      }
-    };
-
-    //helper
-    // const addItemToCart = async (product, quantity) => {
-    //   if (product.ownerCommonName === user?.commonName) {
-    //     openToast("bottom", false, "Cannot buy your own item");
-    //     return false;
-    //   }
-
-    //   // Search for the product in the cart
-    //   let foundIndex = cartList.findIndex((item) => item.product.address === product.address);
-    //   let items = [...cartList]; 
-
-    //   if (foundIndex === -1) {
-    //     // Product not found, check quantity before adding
-    //     const checkQuantity = await orderActions.fetchSaleQuantity(orderDispatch, [product.saleAddress], [quantity]);
-    //     if (checkQuantity === true) {
-    //       // Quantity check passed, add new item to the cart
-    //       // Adding single object to keep single product in cart
-    //       items = [{ product, qty: quantity }];
-    //       marketplaceActions.addItemToCart(marketplaceDispatch, items);
-    //       openToast("bottom", true, "Item added to cart");
-    //       return true;
-    //     } else {
-    //       // Not enough quantity, inform the user
-    //       openToast("bottom", false, `Currently available quantity for ${product.name}: ${checkQuantity[0].availableQuantity}. Try lowering the quantity to continue.`);
-    //       setTimeout(() => {
-    //         navigate('/checkout')
-    //       }, 2000);
-    //       return false;
-    //     }
-    //   } else {
-    //     // Product found, prepare to update quantity after check
-    //     const potentialNewQty = items[foundIndex].qty + quantity;
-    //     const checkQuantity = await orderActions.fetchSaleQuantity(orderDispatch, [product.saleAddress], [potentialNewQty]);
-    //     if (checkQuantity === true) {
-    //       // Quantity check passed, update item quantity in the cart
-    //       items[foundIndex].qty = potentialNewQty;
-    //       marketplaceActions.addItemToCart(marketplaceDispatch, items);
-    //       openToast("bottom", true, "Item updated in cart");
-    //       return true;
-    //     } else {
-    //       // Not enough quantity, inform the user
-    //       openToast("bottom", false, `Currently available quantity for ${product.name}: ${checkQuantity[0].availableQuantity}. Try lowering the quantity to continue.`);
-    //       setTimeout(() => {
-    //         navigate('/checkout')
-    //       }, 2000);
-    //       return false;
-    //     }
-    //   }
-    // };
-
-    const addItemToCart = async (product, quantity) => {
-          const items = [{ product, qty: quantity }];
-          marketplaceActions.addItemToCart(marketplaceDispatch, items);
-          navigate('/checkout');
-          window.scrollTo(0, 0);
+    } else if (referrer.includes(ordersBaseUrl)) {
+      initialBreadcrumbs.push({ text: 'Orders', path: ordersBaseUrl });
+    } else if (referrer.includes(transfersBaseUrl)) {
+      initialBreadcrumbs.push({ text: 'Transfers', path: transfersBaseUrl });
     }
 
-/**************************************************************************************************************************************************************************************
+    initialBreadcrumbs.push({
+      text: isOwner ? 'My Profile' : 'Profile',
+      path: '',
+    });
+
+    setBreadcrumbs(initialBreadcrumbs);
+  }, [location, isOwner]);
+
+  //helper
+  const itemToast = (placement) => {
+    if (itemSuccess) {
+      api.success({
+        message: itemMsg,
+        onClose: itemActions.resetMessage(itemDispatch),
+        placement,
+        key: 3,
+      });
+    } else {
+      api.error({
+        message: itemMsg,
+        onClose: itemActions.resetMessage(itemDispatch),
+        placement,
+        key: 4,
+      });
+    }
+  };
+
+  //helper
+  const openToast = (placement, success, message) => {
+    if (success) {
+      api.success({
+        message: message,
+        onClose: inventoryActions.resetMessage(dispatch),
+        placement,
+        key: 1,
+      });
+    } else {
+      api.error({
+        message: message,
+        onClose: inventoryActions.resetMessage(dispatch),
+        placement,
+        key: 2,
+      });
+    }
+  };
+
+  //helper
+  // const addItemToCart = async (product, quantity) => {
+  //   if (product.ownerCommonName === user?.commonName) {
+  //     openToast("bottom", false, "Cannot buy your own item");
+  //     return false;
+  //   }
+
+  //   // Search for the product in the cart
+  //   let foundIndex = cartList.findIndex((item) => item.product.address === product.address);
+  //   let items = [...cartList];
+
+  //   if (foundIndex === -1) {
+  //     // Product not found, check quantity before adding
+  //     const checkQuantity = await orderActions.fetchSaleQuantity(orderDispatch, [product.saleAddress], [quantity]);
+  //     if (checkQuantity === true) {
+  //       // Quantity check passed, add new item to the cart
+  //       // Adding single object to keep single product in cart
+  //       items = [{ product, qty: quantity }];
+  //       marketplaceActions.addItemToCart(marketplaceDispatch, items);
+  //       openToast("bottom", true, "Item added to cart");
+  //       return true;
+  //     } else {
+  //       // Not enough quantity, inform the user
+  //       openToast("bottom", false, `Currently available quantity for ${product.name}: ${checkQuantity[0].availableQuantity}. Try lowering the quantity to continue.`);
+  //       setTimeout(() => {
+  //         navigate('/checkout')
+  //       }, 2000);
+  //       return false;
+  //     }
+  //   } else {
+  //     // Product found, prepare to update quantity after check
+  //     const potentialNewQty = items[foundIndex].qty + quantity;
+  //     const checkQuantity = await orderActions.fetchSaleQuantity(orderDispatch, [product.saleAddress], [potentialNewQty]);
+  //     if (checkQuantity === true) {
+  //       // Quantity check passed, update item quantity in the cart
+  //       items[foundIndex].qty = potentialNewQty;
+  //       marketplaceActions.addItemToCart(marketplaceDispatch, items);
+  //       openToast("bottom", true, "Item updated in cart");
+  //       return true;
+  //     } else {
+  //       // Not enough quantity, inform the user
+  //       openToast("bottom", false, `Currently available quantity for ${product.name}: ${checkQuantity[0].availableQuantity}. Try lowering the quantity to continue.`);
+  //       setTimeout(() => {
+  //         navigate('/checkout')
+  //       }, 2000);
+  //       return false;
+  //     }
+  //   }
+  // };
+
+  const addItemToCart = async (product, quantity) => {
+    const items = [{ product, qty: quantity }];
+    marketplaceActions.addItemToCart(marketplaceDispatch, items);
+    navigate('/checkout');
+    window.scrollTo(0, 0);
+  };
+
+  /**************************************************************************************************************************************************************************************
                                                    RENDER UI
-/**************************************************************************************************************************************************************************************/ 
+/**************************************************************************************************************************************************************************************/
 
   return (
-    
     <div className="container mx-auto">
       {contextHolder}
-        {/* Bread Crumb Navigation */}
+      {/* Bread Crumb Navigation */}
       <div className="px-6 md:px-5 lg:py-1 lg:mt-3 orders">
         <Breadcrumb>
           {breadcrumbs.map((breadcrumb, index) => {
@@ -312,12 +339,17 @@ const UserProfile = ({user}) => {
               <Breadcrumb.Item key={index}>
                 {breadcrumb.path && !isLast ? (
                   // If it has a path and it's not the last breadcrumb, it's styled as a clickable link
-                  <Link to={breadcrumb.path} className="text-sm !text-[#13188A] font-semibold">
-                      {breadcrumb.text}
-                    </Link>
+                  <Link
+                    to={breadcrumb.path}
+                    className="text-sm !text-[#13188A] font-semibold"
+                  >
+                    {breadcrumb.text}
+                  </Link>
                 ) : (
                   // Last breadcrumb or if it has no path
-                  <p className={`text-sm ${isLast ? 'text-black' : 'text-[#13188A]'} ${isLast ? 'font-normal' : 'font-semibold'}`}>
+                  <p
+                    className={`text-sm ${isLast ? 'text-black' : 'text-[#13188A]'} ${isLast ? 'font-normal' : 'font-semibold'}`}
+                  >
                     {breadcrumb.text}
                   </p>
                 )}
@@ -327,23 +359,23 @@ const UserProfile = ({user}) => {
         </Breadcrumb>
       </div>
 
-
-
-      
       {/* User Cover */}
       <div className="relative mb-6 px-6">
-        <img 
-          className="w-full h-36 sm:h-52 md:h-60 lg:h-68 object-cover rounded-lg" 
-          src={Images.blockapps_cover} 
+        <img
+          className="w-full h-36 sm:h-52 md:h-60 lg:h-68 object-cover rounded-lg"
+          src={Images.blockapps_cover}
           alt="Cover"
         />
 
         {/* Profile Picture */}
-        <div className="absolute left-1/2 transform -translate-x-1/2 -translate-y-1/2" style={{ bottom: '-90px' }}>
-          <Avatar 
-            size={100} 
-            // src={profileImage} 
-            icon={<UserOutlined />} 
+        <div
+          className="absolute left-1/2 transform -translate-x-1/2 -translate-y-1/2"
+          style={{ bottom: '-90px' }}
+        >
+          <Avatar
+            size={100}
+            // src={profileImage}
+            icon={<UserOutlined />}
             className="border-4 border-black"
           />
         </div>
@@ -351,13 +383,19 @@ const UserProfile = ({user}) => {
 
       {/* User Name and Edit Profile */}
       <div className="text-center my-12">
-        <h1 className="text-lg sm:text-xl md:text-2xl font-bold">{commonName}</h1>
+        <h1 className="text-lg sm:text-xl md:text-2xl font-bold">
+          {commonName}
+        </h1>
         {/* <p className="text-gray-600">Joined Oct 2023</p> */}
-        <Button disabled type="primary" icon={<EditOutlined />} className="mt-4">Edit Profile</Button>
+        <Button
+          disabled
+          type="primary"
+          icon={<EditOutlined />}
+          className="mt-4"
+        >
+          Edit Profile
+        </Button>
       </div>
-
-
-
 
       {/* Search Bar and Filter */}
 
@@ -387,112 +425,108 @@ const UserProfile = ({user}) => {
 
       {/* TABS Start */}
 
-     
-     <Tabs
+      <Tabs
         defaultActiveKey={activeTab}
         onChange={handleTabSelect}
         className="p-3 mx-1 lg:mx-6 mb-6"
       >
+        {/* MyWallet Section- For Owners */}
 
+        {isOwner && (
+          <TabPane tab="My Wallet" key="0">
+            {/* MyWallet Assets of the Owner Profile */}
 
-              {/* MyItems Section- For Owners */}
-
-    {isOwner && (
-      <TabPane tab="My Items" key="0">
-            
-            {/* MyItems Assets of the Owner Profile */}
-
-          <Tabs
-            defaultActiveKey={category ? category : "All"}
-            className="items"
-            onChange={(key) => handleTabSelectForOwner(key)}
-            items={[
-              {
-                label: "All",
-                key: undefined,
-                children: (
-                  <div className="my-4 grid grid-cols-1 md:grid-cols-2 gap-6 lg:grid-cols-2 xl:grid-cols-3 3xl:grid-cols-4 5xl:grid-cols-5 sm:place-items-center md:place-items-start  inventoryCard max-w-full">
-                    {!isInventoriesLoading && !isFetchingTokens ? (
-                      inventories.map((inventory, index) => {
-                        return (
-                          <InventoryCard
-                            id={index}
-                            inventory={inventory}
-                            category={category}
-                            key={index}
-                            // debouncedSearchTerm={debouncedSearchTerm}
-                            allSubcategories={allSubcategories}
-                            supportedTokens={supportedTokens}
-                            user={user}
-                          />
-                        );
-                      })
-                    ) : (
-                      <div className="absolute left-[50%] md:top-4">
-                        <Spin size="large" />
-                      </div>
-                    )}
-                  </div>
-                ),
-              },
-              {
-                label: "For Sale",
-                key: 'For Sale',
-                children: (
-                  <div className="my-4 grid grid-cols-1 md:grid-cols-2 gap-6 lg:grid-cols-3 3xl:grid-cols-4 5xl:grid-cols-5 sm:place-items-center md:place-items-start  inventoryCard max-w-full">
-                    {!isUserInventoriesLoading && !isFetchingTokens ? (
-                      userInventories.map((inventory, index) => {
-                        return (
-                          <InventoryCard
-                            id={index}
-                            inventory={inventory}
-                            category={category}
-                            key={index}
-                            // debouncedSearchTerm={debouncedSearchTerm}
-                            allSubcategories={allSubcategories}
-                            supportedTokens={supportedTokens}
-                            user={user}
-                          />
-                        );
-                      })
-                    ) : (
-                      <div className="absolute left-[50%] md:top-4">
-                        <Spin size="large" />
-                      </div>
-                    )}
-                  </div>
-                ),
-              },
-              ...categorys.map((categoryObject, index) => ({
-                label: categoryObject.name,
-                key: categoryObject.name,
-                children: (
-                  <div className="my-4 grid grid-cols-1 md:grid-cols-2 gap-6 lg:grid-cols-3 3xl:grid-cols-4 5xl:grid-cols-5 inventoryCard max-w-full">
-                    {!isInventoriesLoading && !isFetchingTokens ? (
-                      inventories.map((inventory, index) => {
-                        return (
-                          <InventoryCard
-                            id={index}
-                            inventory={inventory}
-                            category={category}
-                            key={index}
-                            // debouncedSearchTerm={debouncedSearchTerm}
-                            allSubcategories={allSubcategories}
-                            supportedTokens={supportedTokens}
-                            user={user}
-                          />
-                        );
-                      })
-                    ) : (
-                      <div className="absolute left-[50%] md:top-4">
-                        <Spin size="large" />
-                      </div>
-                    )}
-                  </div>
-                ),
-              })),
-            ]}
-          />
+            <Tabs
+              defaultActiveKey={category ? category : 'All'}
+              className="items"
+              onChange={(key) => handleTabSelectForOwner(key)}
+              items={[
+                {
+                  label: 'All',
+                  key: undefined,
+                  children: (
+                    <div className="my-4 grid grid-cols-1 md:grid-cols-2 gap-6 lg:grid-cols-2 xl:grid-cols-3 3xl:grid-cols-4 5xl:grid-cols-5 sm:place-items-center md:place-items-start  inventoryCard max-w-full">
+                      {!isInventoriesLoading && !isFetchingTokens ? (
+                        inventories.map((inventory, index) => {
+                          return (
+                            <InventoryCard
+                              id={index}
+                              inventory={inventory}
+                              category={category}
+                              key={index}
+                              // debouncedSearchTerm={debouncedSearchTerm}
+                              allSubcategories={allSubcategories}
+                              supportedTokens={supportedTokens}
+                              user={user}
+                            />
+                          );
+                        })
+                      ) : (
+                        <div className="absolute left-[50%] md:top-4">
+                          <Spin size="large" />
+                        </div>
+                      )}
+                    </div>
+                  ),
+                },
+                {
+                  label: 'For Sale',
+                  key: 'For Sale',
+                  children: (
+                    <div className="my-4 grid grid-cols-1 md:grid-cols-2 gap-6 lg:grid-cols-3 3xl:grid-cols-4 5xl:grid-cols-5 sm:place-items-center md:place-items-start  inventoryCard max-w-full">
+                      {!isUserInventoriesLoading && !isFetchingTokens ? (
+                        userInventories.map((inventory, index) => {
+                          return (
+                            <InventoryCard
+                              id={index}
+                              inventory={inventory}
+                              category={category}
+                              key={index}
+                              // debouncedSearchTerm={debouncedSearchTerm}
+                              allSubcategories={allSubcategories}
+                              supportedTokens={supportedTokens}
+                              user={user}
+                            />
+                          );
+                        })
+                      ) : (
+                        <div className="absolute left-[50%] md:top-4">
+                          <Spin size="large" />
+                        </div>
+                      )}
+                    </div>
+                  ),
+                },
+                ...categorys.map((categoryObject, index) => ({
+                  label: categoryObject.name,
+                  key: categoryObject.name,
+                  children: (
+                    <div className="my-4 grid grid-cols-1 md:grid-cols-2 gap-6 lg:grid-cols-3 3xl:grid-cols-4 5xl:grid-cols-5 inventoryCard max-w-full">
+                      {!isInventoriesLoading && !isFetchingTokens ? (
+                        inventories.map((inventory, index) => {
+                          return (
+                            <InventoryCard
+                              id={index}
+                              inventory={inventory}
+                              category={category}
+                              key={index}
+                              // debouncedSearchTerm={debouncedSearchTerm}
+                              allSubcategories={allSubcategories}
+                              supportedTokens={supportedTokens}
+                              user={user}
+                            />
+                          );
+                        })
+                      ) : (
+                        <div className="absolute left-[50%] md:top-4">
+                          <Spin size="large" />
+                        </div>
+                      )}
+                    </div>
+                  ),
+                })),
+              ]}
+            />
 
             <div className="flex justify-center pt-6">
               <Pagination
@@ -503,25 +537,20 @@ const UserProfile = ({user}) => {
                 className="flex justify-center my-5 "
               />
             </div>
-          
           </TabPane>
-    )}
+        )}
 
-
-              {/* Assets For Sale Content - For All Users */}
-
+        {/* Assets For Sale Content - For All Users */}
 
         {!isOwner && (
-
-        <TabPane tab="Assets For Sale" key="1">
-          
+          <TabPane tab="Assets For Sale" key="1">
             {/* Assets of the User */}
 
-            {isUserInventoriesLoading ?
+            {isUserInventoriesLoading ? (
               <div className="h-96 w-full flex justify-center items-center">
                 <Spin spinning={isUserInventoriesLoading} size="large" />
               </div>
-              :
+            ) : (
               <div className="mt-4 md:mt-4 mb-8 w-full" id="product-list">
                 {userInventories?.length > 0 ? (
                   <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
@@ -540,12 +569,11 @@ const UserProfile = ({user}) => {
                   </div>
                 )}
               </div>
-            }
-
-        </TabPane>
+            )}
+          </TabPane>
         )}
 
-            {/* Wishlist Section - For Owners */}
+        {/* Wishlist Section - For Owners */}
         {isOwner && (
           <TabPane tab="Wishlist" key="3">
             <div className="mt-4 md:mt-4 mb-8 w-full" id="wishlist">
@@ -568,31 +596,31 @@ const UserProfile = ({user}) => {
           </TabPane>
         )}
 
-              {/* Activity Section - For Owners */}
+        {/* Activity Section - For Owners */}
         {isOwner && (
           <TabPane tab="My Activity" key="2">
-              {/* Activity Content */}
-              {userActivity && userActivity.length > 0 ? (
+            {/* Activity Content */}
+            {userActivity && userActivity.length > 0 ? (
               <div className="activity-list">
                 {userActivity.map((activity, index) => {
                   let description;
                   let href;
                   switch (activity.type) {
-                    case "sold":
+                    case 'sold':
                       description = `You have received a new order ${activity.orderId} from ${activity.purchasersCommonName}.`;
                       href = `${soldOrderDetailssBaseUrl}/${activity.transaction_hash}`;
                       break;
-                    case "bought":
+                    case 'bought':
                       description = `Your order ${activity.orderId} was fulfilled by ${activity.sellersCommonName}.`;
                       href = `${boughtOrderDetailssBaseUrl}/${activity.transaction_hash}`;
                       break;
-                    case "transfer":
+                    case 'transfer':
                       description = `You have received one or more items as a free transfer from ${activity.oldOwnerCommonName}.`;
-                      href = transfersBaseUrl; 
+                      href = transfersBaseUrl;
                       break;
                     default:
-                      description = "Activity occurred";
-                      href = "#";
+                      description = 'Activity occurred';
+                      href = '#';
                   }
                   return (
                     <ActivityFeed
@@ -605,20 +633,20 @@ const UserProfile = ({user}) => {
                   );
                 })}
               </div>
-              ) : (
-                <div className="no-activity-message">
-                  <Typography.Text type="secondary">
-                    You have no recent activity.
-                  </Typography.Text>
-                </div>
-              )}
-        </TabPane>
-      )}
+            ) : (
+              <div className="no-activity-message">
+                <Typography.Text type="secondary">
+                  You have no recent activity.
+                </Typography.Text>
+              </div>
+            )}
+          </TabPane>
+        )}
       </Tabs>
 
       {/* TABS End */}
-      {message && openToast("bottom", success, message)}
-      {itemMsg && itemToast("bottom")}
+      {message && openToast('bottom', success, message)}
+      {itemMsg && itemToast('bottom')}
     </div>
   );
 };

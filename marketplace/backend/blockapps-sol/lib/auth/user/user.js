@@ -11,8 +11,8 @@ async function uploadContract(admin, args) {
   const contractArgs = {
     name: contractName,
     source: await importer.combine(contractFilename),
-    args: util.usc(args)
-  }
+    args: util.usc(args),
+  };
 
   const contract = await createContract(admin, contractArgs, options);
   contract.src = 'removed';
@@ -22,14 +22,15 @@ async function uploadContract(admin, args) {
 function bind(admin, contract) {
   contract.getState = async function () {
     return await getState(contract, options);
-  }
+  };
   contract.authenticate = async function (pwHash) {
     return await authenticate(admin, contract, pwHash);
-  }
+  };
   return contract;
 }
 
-async function getUsers(addresses) { // FIXME must break to batches of 50 addresses
+async function getUsers(addresses) {
+  // FIXME must break to batches of 50 addresses
   const csv = util.toCsv(addresses); // generate csv string
 
   function predicate(response) {
@@ -37,9 +38,12 @@ async function getUsers(addresses) { // FIXME must break to batches of 50 addres
   }
 
   const contract = {
-    name: contractName
-  }
-  const results = await searchUntil(contract, predicate, { config, query: { address: `in.${csv}` } });
+    name: contractName,
+  };
+  const results = await searchUntil(contract, predicate, {
+    config,
+    query: { address: `in.${csv}` },
+  });
   return results;
 }
 
@@ -51,10 +55,15 @@ async function getUser(username) {
   }
 
   const contract = {
-    name: contractName
-  }
+    name: contractName,
+  };
 
-  const response = (await searchUntil(contract, predicate, { config, query: { username: `eq.${username}` } }))[0];
+  const response = (
+    await searchUntil(contract, predicate, {
+      config,
+      query: { username: `eq.${username}` },
+    })
+  )[0];
   return response;
 }
 
@@ -66,9 +75,15 @@ async function getUserByAddress(address) {
   }
 
   const contract = {
-    name: contractName, address
-  }
-  const response = (await searchUntil(contract, predicate, { config, query: { address: `eq.${address}` } }))[0];
+    name: contractName,
+    address,
+  };
+  const response = (
+    await searchUntil(contract, predicate, {
+      config,
+      query: { address: `eq.${address}` },
+    })
+  )[0];
   return response;
 }
 
@@ -80,13 +95,12 @@ async function authenticate(admin, contract, pwHash) {
   const callArgs = {
     contract,
     method: 'authenticate',
-    args: util.usc(args)
-  }
+    args: util.usc(args),
+  };
   const result = await call(admin, callArgs, options);
-  const isAuthenticated = (result[0] === true);
+  const isAuthenticated = result[0] === true;
   return isAuthenticated;
 }
-
 
 export {
   uploadContract,
@@ -98,5 +112,5 @@ export {
   authenticate,
   getUserByAddress,
   getUsers,
-  getUser
+  getUser,
 };

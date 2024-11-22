@@ -1,8 +1,8 @@
-import express from "express";
-import CategoryController from "./category.controller";
-import { Category } from "../endpoints";
-import authHandler from "../../middleware/authHandler";
-import loadDapp from "../../middleware/loadDappHandler";
+import express from 'express';
+import CategoryController from './category.controller';
+import { Category } from '../endpoints';
+import authHandler from '../../middleware/authHandler';
+import loadDapp from '../../middleware/loadDappHandler';
 
 const router = express.Router();
 
@@ -19,6 +19,5 @@ router.get(
   loadDapp,
   CategoryController.getAll
 );
-
 
 export default router;

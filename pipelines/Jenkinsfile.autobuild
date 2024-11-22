@@ -321,8 +321,7 @@ pipeline {
                                 ]) {
                         // Now CLIENT_ID1, CLIENT_SECRET1, and CLIENT_SECRET2 are available as environment variables
                         sh "pip3 install -r requirements.txt"
-                        // TODO: Uncomment once validators are updated
-                        // sh "python3 slipstream_sync.py '${KEYCLOAK_STRATODEVEL_DEV_ID}' '${KEYCLOAK_MERCATATESTNET2_LOCALHOST_ID}' '${KEYCLOAK_STRATODEVEL_DEV_SECRET}' '${KEYCLOAK_MERCATATESTNET2_LOCALHOST_SECRET}' 'strato-devel' 'mercata-testnet2' 40 30"
+                        sh "python3 slipstream_sync.py '${KEYCLOAK_STRATODEVEL_DEV_ID}' '${KEYCLOAK_MERCATATESTNET2_LOCALHOST_ID}' '${KEYCLOAK_STRATODEVEL_DEV_SECRET}' '${KEYCLOAK_MERCATATESTNET2_LOCALHOST_SECRET}' 'strato-devel' 'mercata-testnet2' 40 30"
                       }
                     } 
                 
@@ -343,7 +342,15 @@ pipeline {
             }
           }
         }
-
+        
+        stage('Node Status') {
+          steps{
+            script{
+              lib.checkNodeStatusHealth()
+            }
+          }
+        }
+        
         stage('Apex tests') {
           steps{
             sh '''#!/bin/bash -le

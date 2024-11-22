@@ -1,17 +1,17 @@
-import RestStatus from "http-status-codes";
-import { apiUrl, HTTP_METHODS } from "../../helpers/constants";
+import RestStatus from 'http-status-codes';
+import { apiUrl, HTTP_METHODS } from '../../helpers/constants';
 
 const actionDescriptors = {
-  check: "auth/check",
-  checkSuccessful: "auth/check_successful",
-  checkFailed: "auth/check_failed",
-  checkFailedInternalServerError: "auth/check_failed_internal_server_error",
-  fetchUsers: "FETCH_USERS",
-  fetchUsersSuccessful: "FETCH_USERS_SUCCESSFUL",
-  fetchUsersFailed: "FETCH_USERS_FAILED",
-  logoutCheck: "auth/logout_check",
-  logoutSuccessful: "auth/logout_success",
-  logoutFailed: "auth/logout_failed",
+  check: 'auth/check',
+  checkSuccessful: 'auth/check_successful',
+  checkFailed: 'auth/check_failed',
+  checkFailedInternalServerError: 'auth/check_failed_internal_server_error',
+  fetchUsers: 'FETCH_USERS',
+  fetchUsersSuccessful: 'FETCH_USERS_SUCCESSFUL',
+  fetchUsersFailed: 'FETCH_USERS_FAILED',
+  logoutCheck: 'auth/logout_check',
+  logoutSuccessful: 'auth/logout_success',
+  logoutFailed: 'auth/logout_failed',
 };
 
 const actions = {
@@ -20,27 +20,30 @@ const actions = {
     try {
       let response = await fetch(`${apiUrl}/users/me`, {
         method: HTTP_METHODS.GET,
-        credentials: "same-origin",
+        credentials: 'same-origin',
       });
       const body = await response.json();
-      if (response.status === RestStatus.INTERNAL_SERVER_ERROR) {{
-        dispatch({
-          type: actionDescriptors.checkFailedInternalServerError,
-          error: body.error,
-        });
-        return;
-      }}
-      else if (response.status === RestStatus.UNAUTHORIZED || response.status === RestStatus.FORBIDDEN) {
+      if (response.status === RestStatus.INTERNAL_SERVER_ERROR) {
+        {
+          dispatch({
+            type: actionDescriptors.checkFailedInternalServerError,
+            error: body.error,
+          });
+          return;
+        }
+      } else if (
+        response.status === RestStatus.UNAUTHORIZED ||
+        response.status === RestStatus.FORBIDDEN
+      ) {
         dispatch({
           type: actionDescriptors.checkFailed,
           payload: body.error.loginUrl,
         });
         return;
-      }
-      else if (response.status === RestStatus.OK) {
+      } else if (response.status === RestStatus.OK) {
         dispatch({
           type: actionDescriptors.checkSuccessful,
-          payload: {...body.data}
+          payload: { ...body.data },
         });
         return;
       }
@@ -54,7 +57,7 @@ const actions = {
     try {
       const response = await fetch(`${apiUrl}/users`, {
         method: HTTP_METHODS.GET,
-        credentials: "same-origin",
+        credentials: 'same-origin',
       });
       const body = await response.json();
       if (response.status === RestStatus.OK) {
@@ -63,35 +66,44 @@ const actions = {
           payload: body.data,
         });
         return;
-      } else if(response.status === RestStatus.UNAUTHORIZED) {
-        dispatch({ 
-          type: actionDescriptors.fetchUsersFailed, 
-          error: "Unauthorized while fetching users" 
+      } else if (response.status === RestStatus.UNAUTHORIZED) {
+        dispatch({
+          type: actionDescriptors.fetchUsersFailed,
+          error: 'Unauthorized while fetching users',
         });
         window.location.href = body.error.loginUrl;
       }
-      dispatch({ type: actionDescriptors.fetchUsersFailed, payload: undefined });
+      dispatch({
+        type: actionDescriptors.fetchUsersFailed,
+        payload: undefined,
+      });
     } catch (err) {
-      dispatch({ type: actionDescriptors.fetchUsersFailed, payload: undefined });
+      dispatch({
+        type: actionDescriptors.fetchUsersFailed,
+        payload: undefined,
+      });
     }
   },
   logout: async (dispatch) => {
     dispatch({ type: actionDescriptors.logoutCheck });
     try {
       const response = await fetch(`${apiUrl}/authentication/logout`, {
-          method: HTTP_METHODS.GET,
-          credentials: "same-origin",
+        method: HTTP_METHODS.GET,
+        credentials: 'same-origin',
       });
       const body = await response.json();
       if (response.status === RestStatus.OK) {
         window.location.href = body.data.logoutUrl;
         localStorage.removeItem('loginCount');
-        dispatch({ type: actionDescriptors.logoutSuccessful, payload: body.data.logoutUrl });
+        dispatch({
+          type: actionDescriptors.logoutSuccessful,
+          payload: body.data.logoutUrl,
+        });
         return;
-      } else if(response.status === RestStatus.UNAUTHORIZED) {
-        dispatch({ 
-          type: actionDescriptors.logoutFailed, 
-          error: "Unauthorized while logging out" 
+      } else if (response.status === RestStatus.UNAUTHORIZED) {
+        dispatch({
+          type: actionDescriptors.logoutFailed,
+          error: 'Unauthorized while logging out',
         });
         window.location.href = body.error.loginUrl;
       }

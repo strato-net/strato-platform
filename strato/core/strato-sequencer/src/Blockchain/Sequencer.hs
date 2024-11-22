@@ -24,7 +24,6 @@ import qualified Blockchain.Data.Block as BDB
 import Blockchain.Data.BlockHeader
 import qualified Blockchain.Data.TXOrigin as TO
 import qualified Blockchain.Data.TransactionDef as TD
-import Blockchain.Sequencer.CablePackage
 import Blockchain.Sequencer.DB.DependentBlockDB
 import Blockchain.Sequencer.DB.SeenTransactionDB
 import Blockchain.Sequencer.DB.Witnessable
@@ -35,19 +34,16 @@ import Blockchain.Sequencer.Monad
 import Blockchain.Strato.Model.ChainMember
 import Blockchain.Strato.Model.Class as BDB
 import Blockchain.Strato.Model.Keccak256
-import Blockchain.Strato.Model.Validator
-import ClassyPrelude (atomically)
 import Conduit
 import Control.Concurrent hiding (yield)
-import Control.Concurrent.STM.TQueue
 import Control.Monad (forever, forM, when)
 import qualified Control.Monad.Change.Alter as A
 import qualified Control.Monad.Change.Modify as Mod
 import Control.Monad.Composable.Kafka
-import Control.Monad.Reader
 import Data.Foldable
 import Data.Maybe
 import Data.Proxy
+import qualified Data.Set as S
 import qualified Data.Text as T
 import Data.Time.Clock
 import Prometheus as P
@@ -90,24 +86,35 @@ type MonadSequencer m =
     (Keccak256 `A.Alters` ()) m
   )
 
-sequencer :: [Validator] -> SequencerM ()
-sequencer validators = do
+sequencer :: SequencerM ()
+sequencer = do
   let logF = logFF "sequencer"
   hasPBFT <- isJust <$> getBlockstanbulContext
   when (hasPBFT) $ do
     ctx <- fromJust <$> getBlockstanbulContext
-    maybeCert <- A.lookup (A.Proxy @X509CertInfoState) (fromJust $ _selfAddr ctx)
-    case maybeCert of
+    let selfAddr = fromJust $ _selfAddr ctx
+    _ <- writeSeqVmEvents [VmSelfAddress selfAddr]
+    -- check checkpoint in ldb
+    mChckpt <- A.lookup (A.Proxy @Checkpoint) ()
+    ctx' <- case mChckpt of 
+      Just (Checkpoint v vals) -> do 
+        return ctx { _view = v, _validators = S.fromList vals}
+      Nothing -> return ctx
+    -- check for own cert and if val
+    maybeCert <- A.lookup (A.Proxy @X509CertInfoState) selfAddr
+    ctx'' <- case maybeCert of
       Just cert -> do
         let chainm = getChainMemberFromX509 cert
         logF $ "Node identity verified: " ++ show chainm
-        case chainMemberParsedSetToValidator chainm `elem` validators of
+        case chainMemberParsedSetToValidator chainm `S.member` _validators ctx' of
           True -> do
-            putBlockstanbulContext $ ctx { _selfCert = Just chainm, _isValidator = True }
             logF "You are a validator in this network!"
-          False -> do
-            putBlockstanbulContext $ ctx { _selfCert = Just chainm }
-      Nothing -> logF "Awaiting node identity verification..."
+            return ctx' { _selfCert = Just chainm, _isValidator = True }
+          False -> return ctx' { _selfCert = Just chainm }
+      Nothing -> do
+        logF "Awaiting node identity verification..."
+        return ctx'
+    putBlockstanbulContext ctx''
   logF "Sequencer startup"
   source <- fuseChannels
   bootstrapBlockstanbul
@@ -116,9 +123,9 @@ sequencer validators = do
 
 eventHandler :: (
   MonadFail m,
-  MonadReader SequencerConfig m,
   HasKafka m,
-  MonadSequencer m
+  MonadSequencer m,
+  (() `A.Alters` Checkpoint) m
   ) =>
   ConduitT SeqLoopEvent Void m ()
 eventHandler = forever $ timeAction seqLoopTiming $ do
@@ -137,14 +144,9 @@ eventHandler = forever $ timeAction seqLoopTiming $ do
       timeAction seqSplitEventsTiming $ unseqEventHandler unseqEvents
 
 unseqEventHandler ::
-  ( MonadLogger m,
-    MonadMonitor m,
-    MonadBlockstanbul m,
-    (Keccak256 `A.Alters` DependentBlockEntry) m,
-    (Keccak256 `A.Alters` ()) m,
-    MonadReader SequencerConfig m,
-    HasKafka m
-  ) =>
+  ( MonadSequencer m, 
+    (() `A.Alters` Checkpoint) m,
+    HasKafka m) =>
   [IngestEvent] -> m ()
 unseqEventHandler events = do
   let record :: (MonadIO m, MonadLogger m) => T.Text -> T.Text -> Int -> m ()
@@ -169,12 +171,12 @@ unseqEventHandler events = do
         (IEBlockstanbul (WireMessage a m))-> do
           record "inevent_type_blockstanbul" "IngestBlockstanbuls" 1
           blockstanbulSend [IMsg a m]
-        (IEForcedConfigChange cc) -> do
-          record "inevent_type_forced_config_change" "ForcedConfigChanges" 1
-          blockstanbulSend [ForcedConfigChange cc]
         (IEValidatorBehavior vc) -> do
           record "inevent_type_validator_behavior" "ValidatorBehaviorChange" 1
           blockstanbulSend [ValidatorBehaviorChange vc]
+        (IEForcedConfigChange cc) -> do
+          record "inevent_type_forced_config_change" "ForcedConfigChanges" 1
+          blockstanbulSend [ForcedConfigChange cc]
         (IEDeleteDepBlock k) -> do
           record "inevent_type_delete_dep_block" "DeleteDepBlock" 1
           A.delete (A.Proxy @DependentBlockEntry) k
@@ -208,7 +210,7 @@ blockstanbulSend ::
   ( MonadLogger m,
     MonadBlockstanbul m,
     (Keccak256 `A.Alters` DependentBlockEntry) m,
-    MonadReader SequencerConfig m,
+    (() `A.Alters` Checkpoint) m,
     HasKafka m
   ) =>
   [InEvent] -> m ()
@@ -219,7 +221,7 @@ blockstanbulSend' ::
   ( MonadLogger m,
     MonadBlockstanbul m,
     (Keccak256 `A.Alters` DependentBlockEntry) m,
-    MonadReader SequencerConfig m,
+    (() `A.Alters` Checkpoint) m,
     HasKafka m
   ) =>
   InEvent -> m ()
@@ -262,7 +264,7 @@ blockstanbulSend' msg = do
         BDB.BestBlock (BDB.blockHeaderHash bh) (BDB.blockHeaderBlockNumber bh)
 
   $logDebugS "seq/pbft/send_checkpoints" . T.pack $ show ckpts
-  writeUnseqCheckpoints ckpts
+  forM_ ckpts (A.insert (A.Proxy @Checkpoint) ())
   $logDebugS "seq/pbft/send_p2p" . T.pack $ format p2pevs
   _ <- writeSeqP2pEvents p2pevs
   $logDebugS "seq/pbft/send_vm" . T.pack $ format vmevs
@@ -342,7 +344,7 @@ runConsensus ::
     MonadMonitor m,
     MonadBlockstanbul m,
     (Keccak256 `A.Alters` DependentBlockEntry) m,
-    MonadReader SequencerConfig m,
+    (() `A.Alters` Checkpoint) m,
     HasKafka m
   ) =>
   SequencedBlock -> m ()
@@ -371,12 +373,10 @@ transformBlocks ::
     MonadMonitor m,
     MonadBlockstanbul m,
     (Keccak256 `A.Alters` DependentBlockEntry) m,
-    MonadReader SequencerConfig m,
+    (() `A.Alters` Checkpoint) m,
     HasKafka m
   ) =>
   [IngestBlock] -> m ()
--- ingestBlockToSequencedBlock :: IngestBlock -> Maybe SequencedBlock
--- forM_ :: (Foldable t, Monad m) => t a -> (a -> m b) -> m ()
 transformBlocks ibs = do
   forM_ ibs $ \ib ->
     case (ingestBlockToSequencedBlock ib) of
@@ -408,9 +408,3 @@ prettyTx IngestTx {itOrigin = o, itTransaction = t} = prefix t ++ " via " ++ sho
 
     shortOrigin (TO.PeerString peer) = "Peer " ++ take 8 peer
     shortOrigin x = format x
-
-writeUnseqCheckpoints :: (MonadIO m, MonadReader SequencerConfig m) =>
-                         [Checkpoint] -> m ()
-writeUnseqCheckpoints events = do
-  ch <- asks (unseqCheckpoints . cablePackage)
-  atomically . mapM_ (writeTQueue ch) $ events

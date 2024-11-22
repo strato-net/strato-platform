@@ -25,6 +25,7 @@ abstract contract UTXO is Asset {
     }
 
     function mint(uint _quantity) internal virtual returns (UTXO) {
+        require(_quantity > 0, "Quantity must be greater than 0");
         return new UTXO(name, description, images, files, fileNames, createdDate, _quantity, status);
     }
 
@@ -32,6 +33,7 @@ abstract contract UTXO is Asset {
     function _transfer(address _newOwner, uint _quantity, bool _isUserTransfer, uint _transferNumber, decimal _price) internal override {
         require(status != AssetStatus.PENDING_REDEMPTION, "Asset is not in ACTIVE state.");
         require(status != AssetStatus.RETIRED, "Asset is not in ACTIVE state.");
+        require(_quantity > 0, "Quantity must be greater than 0");
         require(checkCondition(), "Condition is not met");
         // Create a new UTXO with a portion of the units
         try {
@@ -75,6 +77,7 @@ abstract contract UTXO is Asset {
     }
 
     function _callMint(address _newOwner, uint _quantity) internal virtual{
+        require(_quantity > 0, "Quantity must be greater than 0");
         UTXO newAsset = mint(_quantity);
         Asset(newAsset).transferOwnership(_newOwner, _quantity, false, 0, 0);
     }

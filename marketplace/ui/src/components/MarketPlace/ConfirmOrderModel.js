@@ -1,7 +1,7 @@
-import React from "react";
+import React from 'react';
 
-import { Modal } from "antd";
-import { CheckoutIcon } from "../../images/SVGComponents";
+import { Modal } from 'antd';
+import { CheckoutIcon } from '../../images/SVGComponents';
 
 const ConfirmOrderModel = ({ open, handleCancel, handleConfirm }) => {
   return (
@@ -27,7 +27,10 @@ const ConfirmOrderModel = ({ open, handleCancel, handleConfirm }) => {
         </div>,
       ]}
     >
-      <h1 id="modal-title" className="text-center font-semibold text-lg text-primaryB">
+      <h1
+        id="modal-title"
+        className="text-center font-semibold text-lg text-primaryB"
+      >
         Confirm Order
       </h1>
       <hr className="text-secondryD mt-3" />

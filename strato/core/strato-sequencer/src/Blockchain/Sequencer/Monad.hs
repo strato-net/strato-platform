@@ -135,6 +135,10 @@ instance HasNamespace X509CertInfoState where
   type NSKey X509CertInfoState = Address
   namespace _ = "cis:" -- make a namespace instance for new mapping
 
+instance HasNamespace Checkpoint where
+  type NSKey Checkpoint = ()
+  namespace _ = "chkpt"
+
 lookupInLDB ::
   (Binary a, HasNamespace a, MonadIO m, Mod.Accessible LDB.DB m) =>
   Mod.Proxy a ->
@@ -216,6 +220,11 @@ instance Mod.Modifiable BestSequencedBlock SequencerM where
     RBDB.withRedisBlockDB (RBDB.putBestSequencedBlockInfo s n) >>= \case
       Left _ -> $logInfoS "ContextM.put BestSequencedBlock" $ T.pack "Failed to update BestSequencedBlock"
       Right _ -> return ()
+
+instance (() `A.Alters` Checkpoint) SequencerM where
+  lookup = lookupInLDB
+  insert p k v = insertInLDB p k v
+  delete p k = deleteInLDB p k
 
 -- If there is no vault client (i.e. in hspec tests), the HasVault instance will use this key,
 -- I know, it's ugly...the SequencerSpec test uses SequencerM itself, so this was a lot

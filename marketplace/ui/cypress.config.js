@@ -1,4 +1,4 @@
-const { defineConfig } = require("cypress");
+const { defineConfig } = require('cypress');
 
 module.exports = defineConfig({
   video: false,
@@ -10,7 +10,7 @@ module.exports = defineConfig({
   pageLoadTimeout: 90000,
   defaultCommandTimeout: 90000,
   e2e: {
-    baseUrl: "http://localhost",
+    baseUrl: 'http://localhost',
     experimentalSessionAndOrigin: true,
   },
   chromeWebSecurity: false,

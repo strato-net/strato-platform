@@ -1,8 +1,8 @@
-import express from "express";
-import ProductController from "./product.controller";
-import { Product } from "../endpoints";
-import authHandler from "../../middleware/authHandler";
-import loadDapp from "../../middleware/loadDappHandler";
+import express from 'express';
+import ProductController from './product.controller';
+import { Product } from '../endpoints';
+import authHandler from '../../middleware/authHandler';
+import loadDapp from '../../middleware/loadDappHandler';
 
 const router = express.Router();
 
@@ -39,13 +39,13 @@ router.put(
   authHandler.authorizeRequest(),
   loadDapp,
   ProductController.update
-)
+);
 
 router.put(
   Product.delete,
   authHandler.authorizeRequest(),
   loadDapp,
   ProductController.delete
-)
+);
 
 export default router;

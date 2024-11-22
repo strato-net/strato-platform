@@ -1,8 +1,8 @@
-import express from "express";
-import { Spirits } from "../endpoints";
-import authHandler from "../../middleware/authHandler";
-import loadDapp from "../../middleware/loadDappHandler";
-import SpiritsController from "./spirits.controller";
+import express from 'express';
+import { Spirits } from '../endpoints';
+import authHandler from '../../middleware/authHandler';
+import loadDapp from '../../middleware/loadDappHandler';
+import SpiritsController from './spirits.controller';
 
 const router = express.Router();
 

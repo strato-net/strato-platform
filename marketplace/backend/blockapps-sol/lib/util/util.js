@@ -3,10 +3,8 @@ const getCredentialArgs = function (uid, name, password) {
 
   return {
     username,
-    password
+    password,
   };
-}
+};
 
-export {
-  getCredentialArgs
-}
+export { getCredentialArgs };

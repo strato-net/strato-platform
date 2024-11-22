@@ -1,10 +1,10 @@
-import RestStatus from "http-status-codes";
-import { apiUrl, HTTP_METHODS } from "../../helpers/constants";
+import RestStatus from 'http-status-codes';
+import { apiUrl, HTTP_METHODS } from '../../helpers/constants';
 
 const actionDescriptors = {
-  fetchUserActivity: "fetch_user",
-  fetchUserActivitySuccessful: "fetch_user_successful",
-  fetchUserActivityFailed: "fetch_user_failed",
+  fetchUserActivity: 'fetch_user',
+  fetchUserActivitySuccessful: 'fetch_user_successful',
+  fetchUserActivityFailed: 'fetch_user_failed',
 };
 
 const actions = {
@@ -34,13 +34,12 @@ const actions = {
           payload: bodysold.data,
         });
         return;
-      }
-      else if (bodysold.status === RestStatus.UNAUTHORIZED) {
+      } else if (bodysold.status === RestStatus.UNAUTHORIZED) {
         dispatch({
           type: actionDescriptors.fetchUserActivityFailed,
-          error: "Unauthorized while fetching all orders"
+          error: 'Unauthorized while fetching all orders',
         });
-        window.location.href = bodysold.error.loginUrl
+        window.location.href = bodysold.error.loginUrl;
       }
       dispatch({
         type: actionDescriptors.fetchUserActivityFailed,

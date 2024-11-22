@@ -15,8 +15,7 @@ import Blockchain.Sequencer.Constants
 import Blockchain.Sequencer.DB.DependentBlockDB
 import Blockchain.Sequencer.Event
 import Blockchain.Sequencer.ExtraCertsHack
-import Blockchain.Sequencer.Gregor
-import Blockchain.Sequencer.Kafka (writeSeqVmEvents, writeSeqP2pEvents)
+import Blockchain.Sequencer.Kafka (writeSeqVmEvents, writeSeqP2pEvents, assertSequencerTopicsCreation)
 import Blockchain.Sequencer.Monad
 import Blockchain.Strato.Model.Address
 import Blockchain.Strato.Model.Class
@@ -92,7 +91,7 @@ bootstrapSequencer
       initKafka :: CablePackage -> IO ()
       initKafka _ = do
         runKafkaMConfigured (KString $ C8.pack defaultKafkaClientId') $ do
-          assertSequencerTopicsCreation
+          _ <- assertSequencerTopicsCreation
           _ <- writeSeqVmEvents [VmBlock shortCircuit] -- todo handle the error :)
           _ <- writeSeqP2pEvents [P2pBlock shortCircuit] -- todo handle the error :)
           return ()
