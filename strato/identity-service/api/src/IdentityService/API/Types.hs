@@ -1,20 +1,23 @@
 {-# LANGUAGE DataKinds #-}
 {-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE FlexibleInstances #-}
+{-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE TypeOperators #-}
 
 module IdentityService.API.Types
   ( PutIdentityRequest(..),
     PutIdentityResponse(..),
     GetUsernameAvailableRequest(..),
-    Availability(..)
+    OryMessages(..),
+    successOryMessage,
+    errorOryMessage
   )
 where
 
 import BlockApps.X509
 import Blockchain.Strato.Model.Secp256k1
 import Control.Applicative ((<|>))
-import Data.Aeson
+import Data.Aeson hiding (Success, Error)
 import GHC.Generics
 
 newtype PutIdentityRequest = PutIdentityRequest (Either (Signed SubjectAndCert) (Signed (Signed SubjectAndCert)))
@@ -23,7 +26,13 @@ newtype PutIdentityResponse = PutIdentityResponse X509Certificate
 
 newtype GetUsernameAvailableRequest = GetUsernameAvailableRequest {username :: String} deriving Generic
 
-newtype Availability = Availability {available :: Bool} deriving Generic
+newtype OryMessages = OryMessages [OryMessage]
+data OryMessage = OryMessage {
+  instance_ptr :: String,
+  messages :: [OryMessageDetail]
+} deriving Generic
+data OryMessageDetail = OryMessageDetail Int String OryMessageType
+data OryMessageType = Error | Info | Success deriving Generic
 
 instance ToJSON PutIdentityRequest where
   toJSON (PutIdentityRequest (Left sub)) = toJSON sub
@@ -41,5 +50,43 @@ instance FromJSON PutIdentityResponse where
 instance ToJSON GetUsernameAvailableRequest where
 instance FromJSON GetUsernameAvailableRequest where
 
-instance ToJSON Availability where
-instance FromJSON Availability where
+
+instance ToJSON OryMessages where
+  toJSON (OryMessages ms) = object ["messages" .= ms]
+instance FromJSON OryMessages where
+  parseJSON = withObject "OryMessages" $ \v -> OryMessages <$> v .: "messages"
+
+instance ToJSON OryMessage where
+instance FromJSON OryMessage where
+
+instance ToJSON OryMessageDetail where
+  toJSON (OryMessageDetail i t t') = 
+    object [
+      "id" .= i,
+      "text" .= t,
+      "type" .= show t'
+    ]
+instance FromJSON OryMessageDetail where
+  parseJSON = withObject "OryMessageDetail" $ \v -> do 
+    i <- v .: "id"
+    t <- v .: "text"
+    t' <- v .: "type"
+    return $ OryMessageDetail i t t'
+
+instance ToJSON OryMessageType where
+instance FromJSON OryMessageType where
+instance Show OryMessageType where 
+  show Error = "error"
+  show Info = "info"
+  show Success = "success"
+
+successOryMessage :: OryMessages
+successOryMessage = OryMessages [OryMessage "#/username" [OryMessageDetail 1 "" Success]]
+
+errorOryMessage :: String -> OryMessages
+errorOryMessage errString = 
+  OryMessages [
+    OryMessage 
+      "#/username" 
+      [OryMessageDetail 2 errString Error]
+    ]

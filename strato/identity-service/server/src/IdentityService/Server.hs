@@ -366,11 +366,11 @@ getUsernameAvailable ::
     MonadLogger m,
     Accessible IdentityServerData m
   ) =>
-  GetUsernameAvailableRequest -> m Availability
+  GetUsernameAvailableRequest -> m OryMessages
 getUsernameAvailable (GetUsernameAvailableRequest username) = 
   certInCirrus (First username) >>= \case
-    [] -> return (Availability True)
-    _ -> throwIO . ExistingIdentity . decodeUtf8 . BL.toStrict $ encode (Availability False)
+    [] -> return successOryMessage
+    _ -> throwIO . ExistingIdentity . decodeUtf8 . BL.toStrict . encode $ errorOryMessage "Username is already used on-chain by another user"
 
 server ::
   ( MonadUnliftIO m,
