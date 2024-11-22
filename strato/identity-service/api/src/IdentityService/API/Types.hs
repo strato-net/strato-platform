@@ -7,7 +7,7 @@
 module IdentityService.API.Types
   ( PutIdentityRequest(..),
     PutIdentityResponse(..),
-    GetUsernameAvailableRequest(..),
+    PostUsernameAvailableRequest(..),
     OryMessages(..),
     successOryMessage,
     errorOryMessage
@@ -24,7 +24,7 @@ newtype PutIdentityRequest = PutIdentityRequest (Either (Signed SubjectAndCert) 
 
 newtype PutIdentityResponse = PutIdentityResponse X509Certificate
 
-newtype GetUsernameAvailableRequest = GetUsernameAvailableRequest {username :: String} deriving Generic
+newtype PostUsernameAvailableRequest = PostUsernameAvailableRequest {username :: String} deriving Generic
 
 newtype OryMessages = OryMessages [OryMessage]
 data OryMessage = OryMessage {
@@ -47,8 +47,8 @@ instance ToJSON PutIdentityResponse where
 instance FromJSON PutIdentityResponse where
   parseJSON = fmap PutIdentityResponse . parseJSON
 
-instance ToJSON GetUsernameAvailableRequest where
-instance FromJSON GetUsernameAvailableRequest where
+instance ToJSON PostUsernameAvailableRequest where
+instance FromJSON PostUsernameAvailableRequest where
 
 
 instance ToJSON OryMessages where

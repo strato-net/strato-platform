@@ -3,7 +3,7 @@
 module IdentityService.Client
   ( getPing,
     putIdentity,
-    getUsernameAvailable
+    postUsernameAvailable
   )
 where
 
@@ -18,5 +18,5 @@ getPing = client (Proxy @GetPingIdentity)
 putIdentity :: PutIdentityRequest -> ClientM PutIdentityResponse
 putIdentity = client (Proxy @PutIdentity)
 
-getUsernameAvailable :: GetUsernameAvailableRequest -> ClientM OryMessages
-getUsernameAvailable = client (Proxy @GetUsernameAvailable)
+postUsernameAvailable :: PostUsernameAvailableRequest -> ClientM OryMessages
+postUsernameAvailable = client (Proxy @PostUsernameAvailable)

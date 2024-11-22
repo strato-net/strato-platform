@@ -361,13 +361,13 @@ txSuccess :: BlocChainOrTransactionResult -> Bool
 txSuccess (BlocTxResult BlocTransactionResult {blocTransactionStatus = Success}) = True
 txSuccess _ = False
 
-getUsernameAvailable :: 
+postUsernameAvailable :: 
   ( MonadIO m,
     MonadLogger m,
     Accessible IdentityServerData m
   ) =>
-  GetUsernameAvailableRequest -> m OryMessages
-getUsernameAvailable (GetUsernameAvailableRequest username) = 
+  PostUsernameAvailableRequest -> m OryMessages
+postUsernameAvailable (PostUsernameAvailableRequest username) = 
   certInCirrus (First username) >>= \case
     [] -> return successOryMessage
     _ -> throwIO . ExistingIdentity . decodeUtf8 . BL.toStrict . encode $ errorOryMessage "Username is already used on-chain by another user"
@@ -380,7 +380,7 @@ server ::
     Accessible IdentityServerData m
   ) =>
   ServerT IdentityServiceAPI m
-server = getPingIdentity :<|> putIdentity :<|> getUsernameAvailable
+server = getPingIdentity :<|> putIdentity :<|> postUsernameAvailable
 
 hoistCoreServer ::
   IdentityServerData ->
