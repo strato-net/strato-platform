@@ -91,8 +91,8 @@ const Inventory = ({ user }) => {
     isUserInventoriesLoading,
     supportedTokens,
     isFetchingTokens,
-    isReserveAddress,
-    reserveAddress
+    isReservesLoading,
+    reserves
   } = useInventoryState();
   const {
     paymentServices,
@@ -173,7 +173,7 @@ const Inventory = ({ user }) => {
         category && category !== 'All' ? category : undefined
       );
     }
-    actions.getReserveAddress(dispatch);
+    actions.getAllReserve(dispatch);
     actions.fetchSupportedTokens(dispatch);
   }, [dispatch, limit, offset, debouncedSearchTerm, category, showPublished]);
 
@@ -450,7 +450,7 @@ const Inventory = ({ user }) => {
             allSubcategories={allSubcategories}
             user={user}
             supportedTokens={supportedTokens}
-            reserveAddress={reserveAddress}
+            reserves={reserves}
           />
         </div>
       ),
@@ -636,7 +636,7 @@ const Inventory = ({ user }) => {
               <Table
                 columns={columns}
                 dataSource={showPublished ? userInventories : inventories}
-                loading={isInventoriesLoading || isUserInventoriesLoading || isReserveAddress}
+                loading={isInventoriesLoading || isUserInventoriesLoading || isReservesLoading}
                 className="custom-table"
                 pagination={false}
               />
@@ -664,7 +664,7 @@ const Inventory = ({ user }) => {
                         allSubcategories={allSubcategories}
                         user={user}
                         supportedTokens={supportedTokens}
-                        reserveAddress={reserveAddress}
+                        reserves={reserves}
                       />
                     ))
                   ) : (
@@ -685,7 +685,7 @@ const Inventory = ({ user }) => {
                         allSubcategories={allSubcategories}
                         user={user}
                         supportedTokens={supportedTokens}
-                        reserveAddress={reserveAddress}
+                        reserves={reserves}
                       />
                     ))
                   ) : (

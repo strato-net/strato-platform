@@ -32,9 +32,9 @@ const StakeModal = ({
   const {
     isStaking,
     isUnstaking,
-    isReserveAddress,
+    isreservessLoading,
     isCalculatedValue,
-    reserveAddress,
+    reserves,
     calculatedValue,
   } = useInventoryState();
   // Dispatch
@@ -44,20 +44,20 @@ const StakeModal = ({
 
   const { paymentServices } = usePaymentServiceState();
   const isLoader =
-    isStaking || isUnstaking || isCalculatedValue || isReserveAddress;
+    isStaking || isUnstaking || isCalculatedValue || isreservessLoading;
   const isStaked = inventory.stratsLoanAmount && inventory.stratsLoanAmount > 0;
   const itemName = decodeURIComponent(inventory.name);
-  const resAddress = reserveAddress?.length ? reserveAddress[0]?.address : null;
+  const resAddress = reserves?.length ? reserves[0]?.address : null;
 
   useEffect(() => {
     paymentServiceActions.getPaymentServices(paymentServiceDispatch, true);
   }, []);
 
   useEffect(() => {
-    if (reserveAddress && inventory.data && !isReserveAddress && !isStaked) {
+    if (reserves && inventory.data && !isreservessLoading && !isStaked) {
       const body = {
         assetAmount: inventory?.quantity,
-        loanToValueRatio: reserveAddress[0].loanToValueRatio,
+        loanToValueRatio: reserves[0].loanToValueRatio,
       };
       inventoryActions.calculateValue(inventoryDispatch, body);
     }
@@ -75,7 +75,7 @@ const StakeModal = ({
           creator: stratsService.creator,
           serviceName: stratsService.serviceName,
         },
-        reserve: reserveAddress[0].address,
+        reserve: reserves[0].address,
       };
 
       const isStaked = await inventoryActions.stakeInventory(
@@ -157,8 +157,8 @@ const StakeModal = ({
           {/* Row 1 */}
           <div className="flex flex-col">
             <span className="text-2xl font-semibold text-gray-900">
-              {reserveAddress[0]?.loanToValueRatio}% (Max{' '}
-              {reserveAddress[0]?.loanToValueRatio}%)
+              {reserves[0]?.loanToValueRatio}% (Max{' '}
+              {reserves[0]?.loanToValueRatio}%)
             </span>
             <span className="text-sm text-gray-500">Loan to Value Ratio</span>
           </div>
@@ -180,7 +180,7 @@ const StakeModal = ({
           {/* Row 3 */}
           <div className="flex flex-col">
             <span className="text-2xl font-semibold text-gray-900">
-              {reserveAddress[0]?.cataAPYRate}%
+              {reserves[0]?.cataAPYRate}%
             </span>
             <span className="text-sm text-gray-500">Cata Reward (APY)</span>
           </div>
@@ -240,7 +240,7 @@ const StakeModal = ({
               disabled={isLoader}
               loading={isLoader}
             >
-              Borrow
+              {type}
             </Button>
           </div>
         </div>

@@ -24,6 +24,7 @@ export default {
   ProductDetail: { label: 'Product Detail', url: '/products/:id' },
   MyWallet: { label: 'Inventory', url: '/mywallet' },
   InventoryDetail: { label: 'Inventory Detail', url: '/inventories/:id/:name' },
+  VaultDetail: { label: 'Vault Detail', url: '/vaults/:address' },
   Items: { label: 'Item', url: '/items' },
   Orders: { label: 'Order', url: '/order/:type' },
   Transactions: { label: 'Transactions', url: '/transactions' },

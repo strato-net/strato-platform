@@ -190,23 +190,41 @@ const reducer = (state, action) => {
         error: action.error,
         isUnstaking: false
       };
-    
-    case actionDescriptors.getReserveAddress:
+
+    case actionDescriptors.getReserve:
         return {
           ...state,
-          isReserveAddress: true
+          isReserveLoading: true
         };
-    case actionDescriptors.getReserveAddressSuccessful:
+    case actionDescriptors.getReserveSuccessful:
         return {
           ...state,
-          reserveAddress: action.payload,
-          isReserveAddress: false
+          reserve: action.payload,
+          isReserveLoading: false
         };
-    case actionDescriptors.getReserveAddressFailed:
+    case actionDescriptors.getReserveFailed:
         return {
           ...state,
           error: action.error,
-          isReserveAddress: false
+          isReserveLoading: false
+        };
+    
+    case actionDescriptors.getAllReserve:
+        return {
+          ...state,
+          isReservesLoading: true
+        };
+    case actionDescriptors.getAllReserveSuccessful:
+        return {
+          ...state,
+          reserves: action.payload,
+          isReservesLoading: false
+        };
+    case actionDescriptors.getAllReserveFailed:
+        return {
+          ...state,
+          error: action.error,
+          isReservesLoading: false
         };
     
     case actionDescriptors.getCalculatedValue:

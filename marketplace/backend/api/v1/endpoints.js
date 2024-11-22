@@ -199,7 +199,8 @@ export const UserActivity = {
 
 export const Reserve = {
   prefix: "/reserve",
-  get: "/",
+  get: "/:address",
+  getAll: "/",
   calculate: "/calculate",
   stake: "/stake",
   unstake: "/unstake",

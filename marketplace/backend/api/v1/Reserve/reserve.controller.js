@@ -3,11 +3,28 @@ import Joi from "@hapi/joi";
 import RestStatus from "http-status-codes";
 
 class ReserveController {
-  // Retrieve reserve contract Address
+  // Retrieve reserve contract using address
   static async get(req, res, next) {
     try {
+      const { dapp, params } = req;
+      const { address } = params;
+      
+      // Validate address presence and type
+      ReserveController.validateGetArgs({ address });
+
+      const result = await dapp.getReserve(address);
+      rest.response.status200(res, result);
+      next();
+    } catch (e) {
+      next(e);
+    }
+  }
+
+  // Retrieve all reserve contracts
+  static async getAll(req, res, next) {
+    try {
       const { dapp } = req;
-      const result = await dapp.getReserve();
+      const result = await dapp.getAllReserve();
       rest.response.status200(res, result);
       next();
     } catch (e) {
@@ -58,6 +75,15 @@ class ReserveController {
   }
 
   // ----------------------- ARGUMENT VALIDATION ------------------------
+  static validateGetArgs(args) {
+    const schema = Joi.object({
+      address: Joi.string().required().messages({
+        "any.required": "Address is required and must be a string.",
+        "string.base": "Address must be a valid string.",
+      }),
+    });
+    ReserveController.validateArgs(args, schema, "Get");
+  }
 
   static validateCalculateArgs(args) {
     const schema = Joi.object({

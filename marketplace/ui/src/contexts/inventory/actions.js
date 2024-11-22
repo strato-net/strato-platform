@@ -38,9 +38,13 @@ const actionDescriptors = {
   unstakeInventorySuccessful: "unstake_inventory_successful",
   unstakeInventoryFailed: "unstake_inventory_failed",
 
-  getReserveAddress: "get_reserve_address",
-  getReserveAddressSuccessful: "get_reserve_address_successful",
-  getReserveAddressFailed: "get_reserve_address_failed",
+  getAllReserve: "get_all_reserve_address",
+  getAllReserveSuccessful: "get_all_reserve_address_successful",
+  getAllReserveFailed: "get_all_reserve_address_failed",
+
+  getReserve: "get_reserve_address",
+  getReserveSuccessful: "get_reserve_address_successful",
+  getReserveFailed: "get_reserve_address_failed",
 
   getCalculatedValue: "get_calculated_value",
   getCalculatedValueSuccessful: "get_calculated_value_successful",
@@ -873,8 +877,61 @@ const actions = {
     }
   },
 
-  getReserveAddress: async (dispatch) => {
-    dispatch({ type: actionDescriptors.getReserveAddress });
+  getReserve: async (dispatch, address) => {
+    dispatch({ type: actionDescriptors.getReserve });
+
+    try {
+      const response = await fetch(`${apiUrl}/reserve/${address}`, {
+        method: HTTP_METHODS.GET,
+        credentials: "same-origin",
+        headers: {
+          Accept: "application/json",
+          "Content-Type": "application/json",
+        },
+      });
+
+      const body = await response.json();
+
+      if (response.status === RestStatus.OK) {
+        dispatch({
+          type: actionDescriptors.getReserveSuccessful,
+          payload: body.data,
+        });
+        // actions.setMessage(dispatch, "Item has been Staked Successfully", true);
+        return true;
+      } else if (response.status === RestStatus.CONFLICT) {
+        dispatch({ type: actionDescriptors.getAllReserveFailed, error: body.error.message });
+        actions.setMessage(dispatch, body.error.message)
+        return false;
+      } else if (response.status === RestStatus.INTERNAL_SERVER_ERROR) {
+        dispatch({ type: actionDescriptors.getReserveFailed, error: "Error while fetching the reserve Address" });
+        actions.setMessage(dispatch, "Errorwhile fetching the reserve Address")
+        return false;
+      } else if (response.status === RestStatus.UNAUTHORIZED) {
+        dispatch({
+          type: actionDescriptors.getReserveFailed,
+          error: "Unauthorized while fetching the reserve Address"
+        });
+        window.location.href = body.error.loginUrl;
+      }
+
+      dispatch({
+        type: actionDescriptors.getAllReserveFailed,
+        error: body.error
+      });
+      actions.setMessage(dispatch, body.error);
+      return false;
+    } catch (err) {
+      dispatch({
+        type: actionDescriptors.getAllReserveFailed,
+        error: "Error while fetching the reserve Address",
+      });
+      actions.setMessage(dispatch, "Error while fetching the reserve Address");
+    }
+  },
+
+  getAllReserve: async (dispatch) => {
+    dispatch({ type: actionDescriptors.getAllReserve });
 
     try {
       const response = await fetch(`${apiUrl}/reserve`, {
@@ -890,36 +947,36 @@ const actions = {
 
       if (response.status === RestStatus.OK) {
         dispatch({
-          type: actionDescriptors.getReserveAddressSuccessful,
+          type: actionDescriptors.getAllReserveSuccessful,
           payload: body.data,
         });
         // actions.setMessage(dispatch, "Item has been Staked Successfully", true);
         return true;
       } else if (response.status === RestStatus.CONFLICT) {
-        dispatch({ type: actionDescriptors.getReserveAddressFailed, error: body.error.message });
+        dispatch({ type: actionDescriptors.getAllReserveFailed, error: body.error.message });
         actions.setMessage(dispatch, body.error.message)
         return false;
       } else if (response.status === RestStatus.INTERNAL_SERVER_ERROR) {
-        dispatch({ type: actionDescriptors.getReserveAddressFailed, error: "Error while fetching the reserve Address" });
+        dispatch({ type: actionDescriptors.getAllReserveFailed, error: "Error while fetching the reserve Address" });
         actions.setMessage(dispatch, "Errorwhile fetching the reserve Address")
         return false;
       } else if (response.status === RestStatus.UNAUTHORIZED) {
         dispatch({
-          type: actionDescriptors.getReserveAddressFailed,
+          type: actionDescriptors.getAllReserveFailed,
           error: "Unauthorized while fetching the reserve Address"
         });
         window.location.href = body.error.loginUrl;
       }
 
       dispatch({
-        type: actionDescriptors.getReserveAddressFailed,
+        type: actionDescriptors.getAllReserveFailed,
         error: body.error
       });
       actions.setMessage(dispatch, body.error);
       return false;
     } catch (err) {
       dispatch({
-        type: actionDescriptors.getReserveAddressFailed,
+        type: actionDescriptors.getAllReserveFailed,
         error: "Error while fetching the reserve Address",
       });
       actions.setMessage(dispatch, "Error while fetching the reserve Address");

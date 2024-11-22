@@ -1,8 +1,9 @@
-import { util, rest } from "/blockapps-rest-plus";
-import { searchAllWithQueryArgs } from "/helpers/utils";
+import { util, rest } from '/blockapps-rest-plus';
+import { searchAllWithQueryArgs } from '/helpers/utils';
+import constants from '../../helpers/constants';
 
-const contractName = "BlockApps-Mercata-Reserve";
-const OracleContractName = "BlockApps-Mercata-OracleService";
+const contractName = 'BlockApps-Mercata-Reserve';
+const OracleContractName = 'BlockApps-Mercata-OracleService';
 
 /**
  * Augment contract arguments before they are used to post a contract.
@@ -18,14 +19,14 @@ const OracleContractName = "BlockApps-Mercata-OracleService";
 
 function marshalIn(_args) {
   const defaultArgs = {
-    paymentSessionId: "",
-    paymentService: "",
-    paymentStatus: "",
-    sessionStatus: "",
-    amount: "",
+    paymentSessionId: '',
+    paymentService: '',
+    paymentStatus: '',
+    sessionStatus: '',
+    amount: '',
     expiresAt: 0,
     createdDate: 0,
-    sellerAccountId: "",
+    sellerAccountId: '',
   };
 
   const args = {
@@ -54,18 +55,108 @@ function marshalOut(_args) {
 }
 
 /**
- * Get contract state via cirrus. A proper chainId is typically already provided in options.
- * @param args Lookup with an address or uniqueEventID.
- * @returns Contract state in cirrus
+ * Retrieve contract state via Cirrus.
+ * @param {Object} user - User context for the request.
+ * @param {Object} options - Search options including chainId.
+ * @returns {Array} - List of reserves with attached asset information.
+ * @throws {Error} - Throws if no reserves are found.
  */
-async function get(user, options) {
-  const reserve = await searchAllWithQueryArgs(
-    contractName,
-    { creator: "BlockApps", isActive: true },
-    options,
-    user
+async function get(user, address, options) {
+  // Define search options for active reserves
+  const searchOptions = {
+    ...options,
+    query: {
+      creator: 'eq.BlockApps',
+      isActive: 'eq.true',
+      address: 'eq.' + address,
+    },
+  };
+
+  // Fetch reserves from Cirrus
+  const reserves = await rest.search(
+    user,
+    { name: contractName },
+    searchOptions
   );
-  return reserve.map((reserve) => marshalOut(reserve));
+
+  if (!reserves || reserves.length === 0) {
+    throw new Error('No reserves found');
+  }
+
+  // Fetch asset information and attach it to the reserve
+  const reserve = reserves[0];
+  console.log('reserve123', reserve);
+  const asset = await rest.search(
+    user,
+    { name: 'BlockApps-Mercata-Asset' },
+    {
+      ...options,
+      query: {
+        address: `eq.${reserve.assetRootAddress}`,
+        select: constants.attachImagesAndFiles,
+      },
+    }
+  );
+
+  // Attach the first matching asset (or null) to the reserve
+  return {
+    ...reserve,
+    asset: asset && asset[0] ? marshalOut(asset[0]) : null,
+  };
+}
+
+/**
+ * Retrieve contract states via Cirrus.
+ * @param {Object} user - User context for the request.
+ * @param {Object} options - Search options including chainId.
+ * @returns {Array} - List of reserves with attached asset information.
+ * @throws {Error} - Throws if no reserves are found.
+ */
+async function getAll(user, options) {
+  // Define search options for active reserves
+  const searchOptions = {
+    ...options,
+    query: {
+      creator: 'eq.BlockApps',
+      isActive: 'eq.true',
+    },
+  };
+
+  // Fetch reserves from Cirrus
+  const reserves = await rest.search(
+    user,
+    { name: contractName },
+    searchOptions
+  );
+
+  if (!reserves || reserves.length === 0) {
+    throw new Error('No reserves found');
+  }
+
+  // Fetch asset information and attach it to each reserve
+  const reservesWithAssets = await Promise.all(
+    reserves.map(async (reserve) => {
+      const asset = await rest.search(
+        user,
+        { name: 'BlockApps-Mercata-Asset' },
+        {
+          ...options,
+          query: {
+            address: `eq.${reserve.assetRootAddress}`,
+            select: constants.attachImagesAndFiles,
+          },
+        }
+      );
+
+      // Attach the first matching asset (or null) to the reserve
+      return {
+        ...reserve,
+        asset: asset && asset[0] ? marshalOut(asset[0]) : null,
+      };
+    })
+  );
+
+  return reservesWithAssets;
 }
 
 /**
@@ -76,18 +167,18 @@ async function calculate(user, args, options) {
     const { assetAmount, loanToValueRatio } = args;
     const oracleResponse = await searchAllWithQueryArgs(
       OracleContractName,
-      { creator: "Server", isActive: true },
+      { creator: 'Server', isActive: true },
       options,
       user
     );
     if (!oracleResponse || oracleResponse.length === 0) {
-      throw new Error("No oracle response found");
+      throw new Error('No oracle response found');
     }
     const price = oracleResponse[0].consensusPrice;
     const result = (price * assetAmount * loanToValueRatio).toFixed(2);
     return result;
   } catch (error) {
-    console.error("Error in calculate function:", error);
+    console.error('Error in calculate function:', error);
     throw error;
   }
 }
@@ -99,7 +190,7 @@ async function stake(user, args, options) {
   const { reserve, ...restArgs } = args;
   const callArgs = {
     contract: { address: reserve },
-    method: "createEscrow",
+    method: 'createEscrow',
     args: util.usc({ ...restArgs }),
   };
 
@@ -113,7 +204,7 @@ async function stake(user, args, options) {
 async function unstake(user, contract, args, options) {
   const callArgs = {
     contract,
-    method: "unStake",
+    method: 'unStake',
     args: util.usc({ ...args }),
   };
 
@@ -124,6 +215,7 @@ async function unstake(user, contract, args, options) {
 export default {
   contractName,
   get,
+  getAll,
   marshalIn,
   marshalOut,
   calculate,

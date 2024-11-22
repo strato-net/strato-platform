@@ -41,7 +41,7 @@ const InventoryCard = ({
   supportedTokens,
 }) => {
   const textRef = useRef(null);
-  const { isReserveAddress, reserveAddress } = useInventoryState()
+  const { isReserveLoading, reserves } = useInventoryState()
   const [isOverflowing, setIsOverflowing] = useState(false);
   const [open, setOpen] = useState(false);
   const [listModalOpen, setListModalOpen] = useState(false);
@@ -77,7 +77,7 @@ const InventoryCard = ({
       : inventory.totalLockedQuantity
     : 0;
   const stakeable =
-  inventory.root && reserveAddress && inventory.root === reserveAddress[0].assetRootAddress;
+  inventory.root && reserves && inventory.root === reserves[0].assetRootAddress;
 
   const handleCancel = () => {
     setOpen(false);
