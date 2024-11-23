@@ -165,7 +165,7 @@ const VaultDetails = ({ user, users }) => {
     marketPlaceActions.fetchCartItems(marketplaceDispatch, cartList);
   }, [marketplaceDispatch, cartList]);
 
-  const details = reserve.asset;
+  const details = reserve  && reserve.asset;
   let fileValues = [];
   let fileNames = [];
   console.log('reserve', reserve);
@@ -274,90 +274,6 @@ const VaultDetails = ({ user, users }) => {
     window.scrollTo(0, 0);
   };
 
-  const ownershipDetailColumn = [
-    {
-      title: <Text className="text-primaryC text-[13px]">Seller</Text>,
-      dataIndex: 'sellerCommonName',
-      key: 'sellerCommonName',
-      align: 'center',
-      render: (text) => (
-        <a
-          href={`${window.location.origin}/profile/${encodeURIComponent(text)}`}
-          onClick={(e) => {
-            e.preventDefault();
-            const userProfileUrl = `/profile/${encodeURIComponent(text)}`;
-
-            if (e.ctrlKey || e.metaKey) {
-              // Open in a new tab if Ctrl/Cmd is pressed
-              window.open(
-                `${window.location.origin}${userProfileUrl}`,
-                '_blank'
-              );
-            } else {
-              // Use navigate for a normal click, without Ctrl/Cmd
-              navigate(
-                routes.MarketplaceUserProfile.url.replace(':commonName', text),
-                { state: { from: pathname } }
-              );
-            }
-          }}
-          style={{
-            textDecoration: 'underline',
-            color: 'black',
-            cursor: 'pointer',
-          }}
-        >
-          {text}
-        </a>
-      ),
-    },
-    {
-      title: <Text className="text-primaryC text-[13px]">Owner</Text>,
-      dataIndex: 'purchaserCommonName',
-      key: 'purchaserCommonName',
-      align: 'center',
-      render: (text) => (
-        <a
-          href={`${window.location.origin}/profile/${encodeURIComponent(text)}`}
-          onClick={(e) => {
-            e.preventDefault();
-            const userProfileUrl = `/profile/${encodeURIComponent(text)}`;
-
-            if (e.ctrlKey || e.metaKey) {
-              // Open in a new tab if Ctrl/Cmd is pressed
-              window.open(
-                `${window.location.origin}${userProfileUrl}`,
-                '_blank'
-              );
-            } else {
-              // Use navigate for a normal click, without Ctrl/Cmd
-              navigate(
-                routes.MarketplaceUserProfile.url.replace(':commonName', text),
-                { state: { from: pathname } }
-              );
-            }
-          }}
-          style={{
-            textDecoration: 'underline',
-            color: 'black',
-            cursor: 'pointer',
-          }}
-        >
-          {text}
-        </a>
-      ),
-    },
-    {
-      title: (
-        <Text className="text-primaryC text-[13px]">Ownership Start Date</Text>
-      ),
-      dataIndex: 'block_timestamp',
-      key: 'block_timestamp',
-      align: 'center',
-      render: (epoch) => <p>{epoch.split(' ')[0]}</p>,
-    },
-  ];
-
   const getCategory = (data) => {
     const parts = data.contract_name.split('-');
     return parts[parts.length - 1];
@@ -411,7 +327,7 @@ const VaultDetails = ({ user, users }) => {
                 </Breadcrumb.Item>
               ) : null}
               <Breadcrumb.Item className="text-[#202020]  text-sm font-semibold ">
-                Product Detail
+                Vault Detail
               </Breadcrumb.Item>
               <Breadcrumb.Item className="text-[#202020]  text-sm font-semibold ">
                 {decodeURIComponent(details.name)}
@@ -477,60 +393,6 @@ const VaultDetails = ({ user, users }) => {
                   >
                     {decodeURIComponent(details?.name)}
                   </Title>
-                  <div className="flex pt-[6px] ">
-                    <span className="text-xs  self-center">
-                      Owned By:&nbsp;
-                    </span>
-                    <div
-                      style={{
-                        cursor:
-                          details?.ownerCommonName &&
-                          details.ownerCommonName !== 'N/A'
-                            ? 'pointer'
-                            : 'default',
-                        color: 'black',
-                        textDecoration:
-                          details?.ownerCommonName &&
-                          details.ownerCommonName !== 'N/A'
-                            ? 'underline'
-                            : 'none',
-                      }}
-                      onClick={(e) => {
-                        if (
-                          details?.ownerCommonName &&
-                          details.ownerCommonName !== 'N/A'
-                        ) {
-                          e.preventDefault();
-                          const userProfileUrl = `/profile/${encodeURIComponent(
-                            details.ownerCommonName
-                          )}`;
-                          const fullUrl = `${window.location.origin}${userProfileUrl}`;
-
-                          if (e.ctrlKey || e.metaKey) {
-                            // Open in a new tab if Ctrl/Cmd is pressed
-                            window.open(fullUrl, '_blank');
-                          } else {
-                            // Use navigate for a normal click, without Ctrl/Cmd
-                            navigate(
-                              routes.MarketplaceUserProfile.url.replace(
-                                ':commonName',
-                                details?.ownerCommonName
-                              ),
-                              { state: { from: pathname } }
-                            );
-                          }
-                        }
-                      }}
-                    >
-                      <Text className="text-[#202020] text-xs font-medium  self-center">
-                        {details?.ownerCommonName || 'N/A'}
-                      </Text>
-                    </div>
-
-                    <Text className="text-[#202020] text-xs  font-medium">
-                      {details?.ownerOrganization}
-                    </Text>
-                  </div>
                 </div>
                 <div className=" pt-4 lg:pt-[22px]">
                   <Paragraph
@@ -757,124 +619,10 @@ const VaultDetails = ({ user, users }) => {
                         />
                       </div>
                     ),
-                  },
-                  {
-                    label: (
-                      <span className="text-sm md:text-base">
-                        Ownership History
-                      </span>
-                    ),
-                    key: '2',
-                    children: user ? (
-                      <div>
-                        <DataTableComponent
-                          columns={ownershipDetailColumn}
-                          scrollX="100%"
-                          data={inventoryOwnershipHistory}
-                          isLoading={isInventoryOwnershipHistoryLoading}
-                          pagination={{
-                            defaultPageSize: 10,
-                            position: ['bottomCenter'],
-                            showSizeChanger: false,
-                          }}
-                        />
-                      </div>
-                    ) : (
-                      <div className="text-center p-4">
-                        <p>
-                          Please{' '}
-                          <span
-                            className="text-blue hover:text-blue cursor-pointer hover:underline"
-                            onClick={() => {
-                              setCookie(
-                                'returnUrl',
-                                window.location.pathname,
-                                10
-                              );
-                              window.location.href = loginUrl;
-                            }}
-                          >
-                            login
-                          </span>{' '}
-                          to view ownership history.
-                        </p>
-                      </div>
-                    ),
-                  },
-                  {
-                    label: (
-                      <span className="text-sm md:text-base">
-                        Additional Information
-                      </span>
-                    ),
-                    key: '3',
-                    children: (
-                      <div>
-                        <List
-                          size="small"
-                          boardered
-                          dataSource={fileValues?.length > 0 ? fileValues : []}
-                          renderItem={(item) => (
-                            <List.Item>
-                              <a
-                                href={item.url}
-                                rel="noreferrer"
-                                target="_blank"
-                                className="hover:underline break-all text-[#1e40af]"
-                              >
-                                <Button
-                                  className="!text-blue border-blue"
-                                  icon={<FilePdfOutlined />}
-                                >
-                                  {item.name}
-                                </Button>
-                              </a>
-                            </List.Item>
-                          )}
-                        />
-                      </div>
-                    ),
-                  },
+                  }
                 ]}
               />
             </div>
-            {/* {isFetchingPriceHistory ? (
-              <div className="flex justify-center items-center h-full w-full">
-                <Spin spinning={true} size="large" />
-              </div>
-            ) : (
-              <>
-                {priceHistory?.originRecords?.length !== 0 &&
-                  priceHistory?.records && (
-                    <div className="w-full h-full">
-                      <h2 className="w-full text-center font-bold text-2xl">
-                        Price History
-                      </h2>
-                      <TimeRangeTabs
-                        onChange={handleTimeFilterChange}
-                        activeKey={timeFilter}
-                      />
-                      <PriceChartAndStats
-                        priceHistory={priceHistory}
-                        isDecimal={details?.data?.quantityIsDecimal === 'True'}
-                      />
-                    </div>
-                  )}
-                <div>
-                  {priceHistory?.originRecords?.length !== 0 && (
-                    <>
-                      <h2 className="w-full text-center font-bold text-2xl">
-                        12-Month Historical Data
-                      </h2>
-                      <Statistics
-                        priceHistory={priceHistory}
-                        isDecimal={details?.data?.quantityIsDecimal === 'True'}
-                      />
-                    </>
-                  )}
-                </div>
-              </>
-            )} */}
           </div>
         </div>
       )}
