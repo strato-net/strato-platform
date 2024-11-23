@@ -1,21 +1,22 @@
-import { Button, Modal, Table, notification } from "antd";
-import { useEffect, useState } from "react";
+import { Button, Modal, Tooltip } from 'antd';
+import { QuestionCircleOutlined } from '@ant-design/icons';
+import { useEffect } from 'react';
 import {
   usePaymentServiceDispatch,
   usePaymentServiceState,
-} from "../../contexts/payment";
-import { actions as inventoryActions } from "../../contexts/inventory/actions";
-import { actions as paymentServiceActions } from "../../contexts/payment/actions";
+} from '../../contexts/payment';
+import { actions as inventoryActions } from '../../contexts/inventory/actions';
+import { actions as paymentServiceActions } from '../../contexts/payment/actions';
 import {
   useInventoryDispatch,
   useInventoryState,
-} from "../../contexts/inventory";
-import { actions as marketplaceActions } from "../../contexts/marketplace/actions";
-import { useMarketplaceDispatch } from "../../contexts/marketplace";
-import { Images } from "../../images";
+} from '../../contexts/inventory';
+import { actions as marketplaceActions } from '../../contexts/marketplace/actions';
+import { useMarketplaceDispatch } from '../../contexts/marketplace';
+import { Images } from '../../images';
 
 const logo = (
-  <img src={Images.strats} alt={""} title={""} className="w-5 h-5 " />
+  <img src={Images.strats} alt={''} title={''} className="w-5 h-5" />
 );
 
 const StakeModal = ({
@@ -32,83 +33,119 @@ const StakeModal = ({
   const {
     isStaking,
     isUnstaking,
-    isReserveAddress,
+    isreservessLoading,
     isCalculatedValue,
-    reserveAddress,
+    reserves,
     calculatedValue,
   } = useInventoryState();
-
-  const [data, setData] = useState(inventory);
   // Dispatch
   const inventoryDispatch = useInventoryDispatch();
   const paymentServiceDispatch = usePaymentServiceDispatch();
   const marketplaceDispatch = useMarketplaceDispatch();
 
   const { paymentServices } = usePaymentServiceState();
-
-  const quantityIsDecimal =
-    data.data.quantityIsDecimal && data.data.quantityIsDecimal === "True";
   const isLoader =
-    isStaking || isUnstaking || isCalculatedValue || isReserveAddress;
+    isStaking || isUnstaking || isCalculatedValue || isreservessLoading;
   const isStaked = inventory.stratsLoanAmount && inventory.stratsLoanAmount > 0;
   const itemName = decodeURIComponent(inventory.name);
-  const resAddress = reserveAddress?.length ? reserveAddress[0]?.address : null;
+  const resAddress = reserves?.length ? reserves[0]?.address : null;
 
   useEffect(() => {
     paymentServiceActions.getPaymentServices(paymentServiceDispatch, true);
   }, []);
 
   useEffect(() => {
-    if (reserveAddress && inventory.data && !isReserveAddress && !isStaked) {
+    if (reserves && inventory.data && !isreservessLoading && !isStaked) {
       const body = {
         assetAmount: inventory?.quantity,
-        loanToValueRatio: reserveAddress[0].loanToValueRatio,
+        loanToValueRatio: reserves[0].loanToValueRatio,
       };
       inventoryActions.calculateValue(inventoryDispatch, body);
     }
   }, [resAddress]);
 
-  const columns = [
-    {
-      title: "Quantity",
-      dataIndex: "quantity",
-      align: "center",
-      render: (text, record) =>
-        quantityIsDecimal ? record.quantity / 100 : record.quantity,
-    },
-    {
-      title: "Loan Amount (STRATs)",
-      align: "center",
-      render: (text, record) => (
-        <div className="flex justify-center">
-          {" "}
-          <div className="flex mx-auto">
-            {isStaked ? record.stratsLoanAmount : calculatedValue} {logo}{" "}
-          </div>{" "}
-        </div>
-      ),
-    },
-    {
-      align: "center",
-      render: () => (
-        <Button
-          type="primary"
-          className="w-32 h-9"
-          onClick={handleSubmit}
-          disabled={isLoader}
-          loading={isLoader}
-        >
-          {type}
-        </Button>
-      ),
-    },
-  ];
+  const dataForItems =
+    type === 'Stake'
+      ? [
+          {
+            label: `# of ${inventory?.name} to Collateralize`,
+            description: 'The number of assets to use as collateral',
+            value: `${inventory?.quantity}`,
+          },
+          {
+            label: `Market Value of ${inventory?.name} x ${inventory?.quantity}`,
+            description: 'The total market value of the collateral',
+            value: `$${((calculatedValue * 2) / 100).toFixed(2)}`,
+          },
+          {
+            label: 'Estimated Loan in STRATs',
+            description: 'The estimated amount of STRATs to borrow',
+            value: (
+              <div className="flex -mr-1">
+                {isStaked ? inventory.stratsLoanAmount : calculatedValue}
+                {logo}
+              </div>
+            ),
+          },
+          {
+            label: 'Dailt Estimated Reward (CATA)',
+            description: 'The estimated amount of CATA to earn daily',
+            value: (
+              <div className="flex -mr-1">
+                {(
+                  ((inventory?.quantity *
+                    (isStaked ? inventory.stratsLoanAmount : calculatedValue)) /
+                    100) *
+                  (reserves[0]?.cataAPYRate / 100)
+                ).toFixed(2)}
+
+                {logo}
+              </div>
+            ),
+          },
+        ]
+      : [
+          {
+            label: `# of ${inventory?.name} to Unstake`,
+            description: 'The number of assets to unstake',
+            value: `${inventory?.quantity}`,
+          },
+          {
+            label: 'Remaining Loan in STRATs',
+            description: 'The remaining value after unstaking',
+            value: (
+              <div className="flex -mr-1">
+                {isStaked ? inventory.stratsLoanAmount : calculatedValue}
+                {logo}
+              </div>
+            ),
+          },
+        ];
+
+  const dataForSummary =
+    type === 'Stake'
+      ? [
+          {
+            label: `Market price per ${inventory?.name}`,
+            description: 'The current market price of the asset',
+            value: `$${((calculatedValue * 0.02) / inventory?.quantity).toFixed(
+              2
+            )}`,
+          },
+          {
+            label: 'Loan to Value Ratio',
+            description:
+              'The ratio of the loan amount to the market value of the collateral',
+            value: `${reserves[0]?.loanToValueRatio}%`,
+          },
+        ]
+      : [];
 
   const handleSubmit = async () => {
     const stratsService = paymentServices.find(
-      (item) => item.serviceName === "STRATS" && item.creator === "Server"
+      (item) => item.serviceName === 'STRATS' && item.creator === 'Server'
     );
-    if (type === "Stake") {
+    if (type === 'Stake') {
       const body = {
         assetAmount: inventory?.quantity,
         assetAddress: inventory?.address,
@@ -116,7 +153,7 @@ const StakeModal = ({
           creator: stratsService.creator,
           serviceName: stratsService.serviceName,
         },
-        reserve: reserveAddress[0].address,
+        reserve: reserves[0].address,
       };
 
       const isStaked = await inventoryActions.stakeInventory(
@@ -125,15 +162,17 @@ const StakeModal = ({
       );
       if (isStaked) {
         if (productDetailPage) {
-          await inventoryActions.fetchInventoryDetail(inventoryDispatch, productDetailPage);
-        }
-        else{
+          await inventoryActions.fetchInventoryDetail(
+            inventoryDispatch,
+            productDetailPage
+          );
+        } else {
           await inventoryActions.fetchInventory(
             inventoryDispatch,
             limit,
             offset,
             debouncedSearchTerm,
-            category && category !== "All" ? category : undefined
+            category && category !== 'All' ? category : undefined
           );
         }
         await marketplaceActions.fetchStratsBalance(marketplaceDispatch);
@@ -141,7 +180,7 @@ const StakeModal = ({
       }
     }
 
-    if (type === "Unstake") {
+    if (type === 'Unstake') {
       const body = {
         escrow: inventory?.sale,
         stratsPaymentService: stratsService.address,
@@ -152,14 +191,17 @@ const StakeModal = ({
       );
       if (isUnstaked) {
         if (productDetailPage) {
-          await inventoryActions.fetchInventoryDetail(inventoryDispatch, productDetailPage);
-        } else{
+          await inventoryActions.fetchInventoryDetail(
+            inventoryDispatch,
+            productDetailPage
+          );
+        } else {
           await inventoryActions.fetchInventory(
             inventoryDispatch,
             limit,
             offset,
             debouncedSearchTerm,
-            category && category !== "All" ? category : undefined
+            category && category !== 'All' ? category : undefined
           );
         }
         await marketplaceActions.fetchStratsBalance(marketplaceDispatch);
@@ -172,43 +214,67 @@ const StakeModal = ({
     <Modal
       open={open}
       onCancel={handleCancel}
-      title={`${type} - ${itemName}`}
-      width={1000}
-      footer={[]}
+      title={
+        <div className="text-2xl md:text-3xl font-bold pl-4">
+          Collateral: {itemName}
+        </div>
+      }
+      width={600}
+      centered
+      footer={null}
     >
-      <div className="head hidden md:block">
-        <Table columns={columns} dataSource={[data]} pagination={false} />
-      </div>
-      <div className="flex flex-col gap-[18px] md:hidden mt-5">
-        <div>
-          {" "}
-          <p className="text-[#202020] font-medium text-sm">
-            Quantity
-          </p>
-          <div className="border border-[#d9d9d9] h-[42px] rounded-md flex items-center justify-center">
-            <p> {inventory?.quantity}</p>
+      <div className="flex flex-col px-4 pt-4">
+        <p className="text-sm text-gray-500">
+          Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do
+          eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad
+          minim veniam, quis nostrud exercitation ullamco laboris nisi ut
+          aliquip ex ea commodo consequat. Duis aute irure dolor in
+          reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla
+          pariatur. Excepteur sint occaecat cupidatat non proident, sunt in
+          culpa qui officia deserunt mollit anim id est laborum.
+        </p>
+        <h3 className="text-xl font-bold mt-4 mb-2">Borrow Position</h3>
+        <div className="flex flex-col gap-2">
+          {dataForItems.map((item, index) => (
+            <div key={index} className="w-full flex justify-between">
+              <div className="flex items-center">
+                <p className="text-sm text-gray-500">
+                  <strong>{item.label}</strong>
+                </p>
+                <Tooltip title={item.description}>
+                  <QuestionCircleOutlined className="ml-1 text-gray-400 cursor-pointer" />
+                </Tooltip>
+              </div>
+              <p className="flex items-center">
+                <strong>{item.value}</strong>
+              </p>
+            </div>
+          ))}
+
+          <div className="flex justify-center w-full">
+            <Button
+              type="primary"
+              className="w-full px-6 h-10 font-bold"
+              onClick={handleSubmit}
+              disabled={isLoader}
+              loading={isLoader}
+            >
+              {type}
+            </Button>
           </div>
         </div>
-        <div className="w-full">
-          <p className=" w-full text-[#202020] font-medium text-sm ">
-            Loan Amount (STRATs)
-          </p>
-          <div className="border border-[#d9d9d9] h-[42px] rounded-md flex items-center justify-center ">
-            <div className="flex mx-auto">
-              {isStaked ? inventory.stratsLoanAmount : calculatedValue} {logo}{" "}
-            </div>{" "}
-          </div>
-        </div>
-        <div className="w-full flex justify-center items-center">
-          <Button
-            type="primary"
-            className="w-32 h-9"
-            onClick={handleSubmit}
-            disabled={isLoader}
-            loading={isLoader}
-          >
-            {type}
-          </Button>
+        <div className="w-full flex flex-col justify-between mt-4 text-xs">
+          {dataForSummary.map((item, index) => (
+            <div key={index} className="w-full flex justify-between">
+              <div className="flex items-center">
+                <p>{item.label}</p>
+                <Tooltip title={item.description}>
+                  <QuestionCircleOutlined className="ml-1 text-gray-400 cursor-pointer" />
+                </Tooltip>
+              </div>
+              <p className="flex items-center">{item.value}</p>
+            </div>
+          ))}
         </div>
       </div>
     </Modal>

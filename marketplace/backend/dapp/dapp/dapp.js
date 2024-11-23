@@ -2073,8 +2073,12 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
   };
 
   //----------------------------- Reserve START -------------------------------
-  contract.getReserve = async function (options = defaultOptions) {
-    return await reserveJs.get(rawAdmin, options);
+  contract.getReserve = async function (address, options = defaultOptions) {
+    return await reserveJs.get(rawAdmin, address, options);
+  };
+  
+  contract.getAllReserve = async function (options = defaultOptions) {
+    return await reserveJs.getAll(rawAdmin, options);
   };
   
   contract.calculate = async function (args, options = defaultOptions) {

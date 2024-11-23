@@ -91,8 +91,8 @@ const ProductDetails = ({ user, users }) => {
     inventoryOwnershipHistory,
     priceHistory,
     isFetchingPriceHistory,
-    isReserveAddress,
-    reserveAddress,
+    isReserveLoading,
+    reserve,
   } = useInventoryState();
   const { cartList } = useMarketplaceState();
 
@@ -109,7 +109,7 @@ const ProductDetails = ({ user, users }) => {
 
   // Stakeable
   const isStaked = inventoryDetails?.stratsLoanAmount && inventoryDetails?.stratsLoanAmount > 0;
-  const isStakeable = inventoryDetails?.root && reserveAddress && inventoryDetails?.root === reserveAddress[0]?.assetRootAddress;
+  const isStakeable = inventoryDetails?.root && reserve && inventoryDetails?.root === reserve[0]?.assetRootAddress;
 
   let isCalledFromInventory = false;
   if (state !== null && state !== undefined) {
@@ -147,7 +147,7 @@ const ProductDetails = ({ user, users }) => {
   useEffect(() => {
     if (Id !== undefined) {
       inventoryActions.fetchInventoryDetail(dispatch, Id);
-      inventoryActions.getReserveAddress(dispatch);
+      inventoryActions.getAllReserve(dispatch);
       // TODO: Uncomment this when we have serial numbers working
       // if (user) {
       //   itemsActions.fetchSerialNumbers(itemDispatch, Id);

@@ -13,6 +13,13 @@ router.get(
   ReserveController.get
 );
 
+router.get(
+  Reserve.getAll,
+  authHandler.authorizeRequest(),
+  loadDapp,
+  ReserveController.getAll
+);
+
 router.post(
   Reserve.calculate,
   authHandler.authorizeRequest(),

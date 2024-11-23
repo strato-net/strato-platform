@@ -5,7 +5,7 @@ dayjs.extend(utc);
 export default {
   baseUrl: `/api/v1`,
   deployParamName: "deploy",
-  reserveAddress: '0000000000000000000000000000000000000100',
+  reserve: '0000000000000000000000000000000000000100',
   zeroAddress: '0000000000000000000000000000000000000000',
   certificateRegistryContractName: 'OfficialCertificateRegistry',
   certificateContractName: 'Certificate',
