@@ -60,8 +60,8 @@ contract StratPaymentService is PaymentService {
         }
         require(stratAmountNet == 0, "Your STRATS balance is not high enough to cover the repayment.");
 
-        // Update borrowed amount instead of closing the escrow
-        escrow.updateBorrowedAmount(-escrow.borrowedAmount());
+        // Clear loan
+        escrow.clearLoan();
 
         emit LoanRepaid(msg.sender, _escrowAddress, escrow.quantity(), escrow.borrowedAmount());
     }
