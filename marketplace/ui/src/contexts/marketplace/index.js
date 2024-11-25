@@ -23,8 +23,10 @@ const MarketplaceProvider = ({ children }) => {
     userAddresses: [],
     isLoadingUserAddresses: false,
     isFetchingStrats: false,
+    isFetchingCata: false,
     isTransferringStrats: false,
     strats: 0,
+    cata: 0,
     isFetchingStratsTransactionHistory: false,
     stratsTransactionHistory: [],
   };

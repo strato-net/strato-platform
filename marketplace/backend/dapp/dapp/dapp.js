@@ -26,6 +26,7 @@ import certificateJs from '/dapp/certificates/certificate';
 import artJs from '/dapp/items/art';
 import tokensJs from '/dapp/items/tokens';
 import STRATSJs from '/dapp/items/STRATS';
+import CATAJs from '/dapp/items/CATA';
 import carbonOffsetJs from '/dapp/items/carbonOffset';
 import metalsJs from '/dapp/items/metals';
 import spiritsJs from '/dapp/items/spirits';
@@ -2046,6 +2047,20 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
       {
         ownerCommonName: userCert.commonName,
         originAddress: stratsOriginAddress,
+        queryOptions: { select: 'quantity.sum()' },
+      },
+      options
+    );
+    return balance[0].sum ? `${balance[0].sum / 100}` : 0;
+  };
+
+  contract.getCataBalance = async function (args, options = defaultOptions) {
+    const CataOriginAddress = await CATAJs.getCataAddress();
+    const balance = await inventoryJs.getAll(
+      rawAdmin,
+      {
+        ownerCommonName: userCert.commonName,
+        originAddress: CataOriginAddress,
         queryOptions: { select: 'quantity.sum()' },
       },
       options
