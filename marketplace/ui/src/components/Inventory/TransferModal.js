@@ -263,7 +263,7 @@ const TransferModal = ({
             return availableQuantity - allocatedQuantity;
           })()}
           step={1}
-          precision={0}
+          precision={inventory?.contract_name?.includes('STRATSTokens') ? 2 : 0 }
           onChange={(value) => handleQuantityChange(record.id, value)}
           disabled={index !== transfers.length - 1}
         />
@@ -324,7 +324,7 @@ const TransferModal = ({
     const body = transfers.map((transfer) => ({
       assetAddress: inventory.address,
       newOwner: transfer.recipient,
-      quantity: quantityIsDecimal ? transfer.quantity * 100 : transfer.quantity,
+      quantity: quantityIsDecimal ? (transfer.quantity * 100).toFixed(0) : transfer.quantity,
       price: quantityIsDecimal ? transfer.price / 100 : transfer.price,
       senderCommonName: user.commonName,
       recipientCommonName: transfer.recipientCommonName,
