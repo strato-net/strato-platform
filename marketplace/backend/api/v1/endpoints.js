@@ -202,7 +202,7 @@ export const Reserve = {
   prefix: "/reserve",
   get: "/:address",
   getAll: "/",
-  oraclePrice: "/oraclePrice",
+  oraclePrice: "/oraclePrice/:address",
   stake: "/stake",
   unstake: "/unstake",
   borrow: "/borrow",

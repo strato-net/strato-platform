@@ -163,7 +163,6 @@ const reducer = (state, action) => {
     case actionDescriptors.stakeInventorySuccessful:
       return {
         ...state,
-        // stake: action.payload,
         isStaking: false
       };
     case actionDescriptors.stakeInventoryFailed:
@@ -181,7 +180,6 @@ const reducer = (state, action) => {
     case actionDescriptors.unstakeInventorySuccessful:
       return {
         ...state,
-        // stake: action.payload,
         isUnstaking: false
       };
     case actionDescriptors.unstakeInventoryFailed:
@@ -190,6 +188,40 @@ const reducer = (state, action) => {
         error: action.error,
         isUnstaking: false
       };
+    
+    case actionDescriptors.borrow:
+      return {
+        ...state,
+        isBorrowing: true
+      };
+    case actionDescriptors.borrowSuccessful:
+      return {
+        ...state,
+        isBorrowing: false
+      };
+    case actionDescriptors.borrowFailed:
+      return {
+        ...state,
+        error: action.error,
+        isBorrowing: false
+      };
+    
+    case actionDescriptors.repay:
+      return {
+        ...state,
+        isRepaying: true
+      };
+    case actionDescriptors.repaySuccessful:
+      return {
+        ...state,
+        isRepaying: false
+      };
+    case actionDescriptors.repayFailed:
+        return {
+          ...state,
+          error: action.error,
+          isRepaying: false
+        };
 
     case actionDescriptors.getReserve:
         return {
@@ -227,22 +259,22 @@ const reducer = (state, action) => {
           isReservesLoading: false
         };
     
-    case actionDescriptors.getCalculatedValue:
+    case actionDescriptors.getOracle:
           return {
             ...state,
-            isCalculatedValue: true
+            isFetchingOracle: true
           };
-    case actionDescriptors.getCalculatedValueSuccessful:
+    case actionDescriptors.getOracleSuccessful:
           return {
             ...state,
-            calculatedValue: action.payload,
-            isCalculatedValue: false
+            oracle: action.payload,
+            isFetchingOracle: false
           };
-    case actionDescriptors.getCalculatedValueFailed:
+    case actionDescriptors.getOracleFailed:
           return {
             ...state,
             error: action.error,
-            isCalculatedValue: false
+            isFetchingOracle: false
           };    
     // ------------------------------------------------------------------------------------------------------
     case actionDescriptors.resellInventory:

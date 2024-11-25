@@ -2,84 +2,85 @@ import RestStatus from 'http-status-codes';
 import { apiUrl, fileServerUrl, HTTP_METHODS } from '../../helpers/constants';
 
 const actionDescriptors = {
-  createInventory: "create_inventory",
-  createInventorySuccessful: "create_inventory_successful",
-  createInventoryFailed: "create_inventory_failed",
-  fetchInventory: "fetch_inventories",
-  fetchInventorySuccessful: "fetch_inventory_successful",
-  fetchInventoryFailed: "fetch_inventory_failed",
-  fetchInventorySearch: "fetch_inventory_search",
-  fetchInventorySearchSuccessful: "fetch_inventory_search_successful",
-  fetchInventorySearchFailed: "fetch_inventory_search_failed",
-  fetchInventoryDetail: "fetch_inventory_detail",
-  fetchInventoryDetailSuccessful: "fetch_inventory_detail_successful",
-  fetchInventoryDetailFailed: "fetch_inventory_detail_failed",
-  fetchInventoryOwnershipHistory: "fetch_inventory_ownership_history",
-  fetchInventoryOwnershipHistorySuccessful: "fetch_inventory_ownership_history_successful",
-  fetchInventoryOwnershipHistoryFailed: "fetch_inventory_ownership_history_failed",
-  updateInventory: "update_inventory",
-  updateInventorySuccessful: "update_inventory_successful",
-  updateInventoryFailed: "update_inventory_failed",
-  updateSale: "update_sale",
-  updateSaleSuccessful: "update_sale_successful",
-  updateSaleFailed: "update_sale_failed",
-  listInventory: "list_inventory",
-  listInventorySuccessful: "list_inventory_successful",
-  listInventoryFailed: "list_inventory_failed",
-  unlistInventory: "unlist_inventory",
-  unlistInventorySuccessful: "unlist_inventory_successful",
-  unlistInventoryFailed: "unlist_inventory_failed",
-//------------------------------------------------------------
-  stakeInventory: "stake_inventory", 
-  stakeInventorySuccessful: "stake_inventory_successful",
-  stakeInventoryFailed: "stake_inventory_failed",
+  createInventory: 'create_inventory',
+  createInventorySuccessful: 'create_inventory_successful',
+  createInventoryFailed: 'create_inventory_failed',
+  fetchInventory: 'fetch_inventories',
+  fetchInventorySuccessful: 'fetch_inventory_successful',
+  fetchInventoryFailed: 'fetch_inventory_failed',
+  fetchInventorySearch: 'fetch_inventory_search',
+  fetchInventorySearchSuccessful: 'fetch_inventory_search_successful',
+  fetchInventorySearchFailed: 'fetch_inventory_search_failed',
+  fetchInventoryDetail: 'fetch_inventory_detail',
+  fetchInventoryDetailSuccessful: 'fetch_inventory_detail_successful',
+  fetchInventoryDetailFailed: 'fetch_inventory_detail_failed',
+  fetchInventoryOwnershipHistory: 'fetch_inventory_ownership_history',
+  fetchInventoryOwnershipHistorySuccessful:
+    'fetch_inventory_ownership_history_successful',
+  fetchInventoryOwnershipHistoryFailed:
+    'fetch_inventory_ownership_history_failed',
+  updateInventory: 'update_inventory',
+  updateInventorySuccessful: 'update_inventory_successful',
+  updateInventoryFailed: 'update_inventory_failed',
+  updateSale: 'update_sale',
+  updateSaleSuccessful: 'update_sale_successful',
+  updateSaleFailed: 'update_sale_failed',
+  listInventory: 'list_inventory',
+  listInventorySuccessful: 'list_inventory_successful',
+  listInventoryFailed: 'list_inventory_failed',
+  unlistInventory: 'unlist_inventory',
+  unlistInventorySuccessful: 'unlist_inventory_successful',
+  unlistInventoryFailed: 'unlist_inventory_failed',
+  //------------------------------------------------------------
+  stakeInventory: 'stake_inventory',
+  stakeInventorySuccessful: 'stake_inventory_successful',
+  stakeInventoryFailed: 'stake_inventory_failed',
 
-  unstakeInventory: "unstake_inventory", 
-  unstakeInventorySuccessful: "unstake_inventory_successful",
-  unstakeInventoryFailed: "unstake_inventory_failed",
+  unstakeInventory: 'unstake_inventory',
+  unstakeInventorySuccessful: 'unstake_inventory_successful',
+  unstakeInventoryFailed: 'unstake_inventory_failed',
 
-  getAllReserve: "get_all_reserve_address",
-  getAllReserveSuccessful: "get_all_reserve_address_successful",
-  getAllReserveFailed: "get_all_reserve_address_failed",
+  getAllReserve: 'get_all_reserve_address',
+  getAllReserveSuccessful: 'get_all_reserve_address_successful',
+  getAllReserveFailed: 'get_all_reserve_address_failed',
 
-  getReserve: "get_reserve_address",
-  getReserveSuccessful: "get_reserve_address_successful",
-  getReserveFailed: "get_reserve_address_failed",
+  getReserve: 'get_reserve_address',
+  getReserveSuccessful: 'get_reserve_address_successful',
+  getReserveFailed: 'get_reserve_address_failed',
 
-  getCalculatedValue: "get_calculated_value",
-  getCalculatedValueSuccessful: "get_calculated_value_successful",
-  getCalculatedValueFailed: "get_calculated_value_failed",
-//------------------------------------------------------------
-  resellInventory: "resell_inventory",
-  resellInventorySuccessful: "resell_inventory_successful",
-  resellInventoryFailed: "resell_inventory_failed",
-  transferInventory: "transfer_inventory",
-  transferInventorySuccessful: "transfer_inventory_successful",
-  transferInventoryFailed: "transfer_inventory_failed",
-  fetchSupportedTokens: "fetch_supported_tokens",
-  fetchSupportedTokensSuccessful: "fetch_supported_tokens_successful",
-  fetchSupportedTokensFailed: "fetch_supported_tokens_failed",
-  bridgeInventory: "bridge_inventory",
-  bridgeInventorySuccessful: "bridge_inventory_successful",
-  bridgeInventoryFailed: "bridge_inventory_failed",
-  fetchItemTransfers: "fetch_item_transfers",
-  fetchItemTransfersSuccessful: "fetch_item_transfers_successful",
-  fetchItemTransfersFailed: "fetch_item_transfers_failed",
-  resetMessage: "reset_message",
-  setMessage: "set_message",
-  uploadImage: "upload_image",
-  uploadImageSuccessful: "upload_image_successful",
-  uploadImageFailed: "upload_image_failed",
-  createItem: "create_item",
-  createItemSuccessful: "create_item_successful",
-  createItemFailed: "create_item_failed",
-  fetchInventoryForUser: "fetch_inventory_user_profile",
-  fetchInventoryForUserSuccessful: "fetch_inventory_user_profile_success",
-  fetchInventoryForUserFailed: "fetch_inventory_user_profile_failed",
-  fetchPriceHistory: "fetch_price_history",
-  fetchPriceHistorySuccessful: "fetch_price_history_successful",
-  fetchPriceHistoryFailed: "fetch_price_history_failed"
-
+  getOracle: 'get_oracle',
+  getOracleSuccessful: 'get_oracle_successful',
+  getOracleFailed: 'get_oracle_failed',
+  //------------------------------------------------------------
+  resellInventory: 'resell_inventory',
+  resellInventorySuccessful: 'resell_inventory_successful',
+  resellInventoryFailed: 'resell_inventory_failed',
+  transferInventory: 'transfer_inventory',
+  transferInventorySuccessful: 'transfer_inventory_successful',
+  transferInventoryFailed: 'transfer_inventory_failed',
+  fetchSupportedTokens: 'fetch_supported_tokens',
+  fetchSupportedTokensSuccessful: 'fetch_supported_tokens_successful',
+  fetchSupportedTokensFailed: 'fetch_supported_tokens_failed',
+  bridgeInventory: 'bridge_inventory',
+  bridgeInventorySuccessful: 'bridge_inventory_successful',
+  bridgeInventoryFailed: 'bridge_inventory_failed',
+  fetchItemTransfers: 'fetch_item_transfers',
+  fetchItemTransfersSuccessful: 'fetch_item_transfers_successful',
+  fetchItemTransfersFailed: 'fetch_item_transfers_failed',
+  resetMessage: 'reset_message',
+  setMessage: 'set_message',
+  uploadImage: 'upload_image',
+  uploadImageSuccessful: 'upload_image_successful',
+  uploadImageFailed: 'upload_image_failed',
+  createItem: 'create_item',
+  createItemSuccessful: 'create_item_successful',
+  createItemFailed: 'create_item_failed',
+  fetchInventoryForUser: 'fetch_inventory_user_profile',
+  fetchInventoryForUserSuccessful: 'fetch_inventory_user_profile_success',
+  fetchInventoryForUserFailed: 'fetch_inventory_user_profile_failed',
+  fetchPriceHistory: 'fetch_price_history',
+  fetchPriceHistorySuccessful: 'fetch_price_history_successful',
+  fetchPriceHistoryFailed: 'fetch_price_history_failed',
 };
 
 const actions = {
@@ -768,17 +769,18 @@ const actions = {
       actions.setMessage(dispatch, 'Error while transferring Item');
     }
   },
-// ------------------------------------------------------------------------------------------------------------------------------------------
+
+  // ---------------------------------------------------STAKING START-----------------------------------------------------------------
   stakeInventory: async (dispatch, payload) => {
     dispatch({ type: actionDescriptors.stakeInventory });
 
     try {
       const response = await fetch(`${apiUrl}/reserve/stake`, {
         method: HTTP_METHODS.POST,
-        credentials: "same-origin",
+        credentials: 'same-origin',
         headers: {
-          Accept: "application/json",
-          "Content-Type": "application/json",
+          Accept: 'application/json',
+          'Content-Type': 'application/json',
         },
         body: JSON.stringify(payload),
       });
@@ -790,36 +792,42 @@ const actions = {
           type: actionDescriptors.stakeInventorySuccessful,
           payload: body.data,
         });
-        actions.setMessage(dispatch, "Item has been Staked Successfully", true);
+        actions.setMessage(dispatch, 'Item has been Staked Successfully', true);
         return true;
       } else if (response.status === RestStatus.CONFLICT) {
-        dispatch({ type: actionDescriptors.stakeInventoryFailed, error: body.error.message });
-        actions.setMessage(dispatch, body.error.message)
+        dispatch({
+          type: actionDescriptors.stakeInventoryFailed,
+          error: body.error.message,
+        });
+        actions.setMessage(dispatch, body.error.message);
         return false;
       } else if (response.status === RestStatus.INTERNAL_SERVER_ERROR) {
-        dispatch({ type: actionDescriptors.stakeInventoryFailed, error: "Error while Staking Item" });
-        actions.setMessage(dispatch, "Error while Staking Item")
+        dispatch({
+          type: actionDescriptors.stakeInventoryFailed,
+          error: 'Error while Staking Item',
+        });
+        actions.setMessage(dispatch, 'Error while Staking Item');
         return false;
       } else if (response.status === RestStatus.UNAUTHORIZED) {
         dispatch({
           type: actionDescriptors.stakeInventoryFailed,
-          error: "Unauthorized while Staking Item"
+          error: 'Unauthorized while Staking Item',
         });
         window.location.href = body.error.loginUrl;
       }
 
       dispatch({
         type: actionDescriptors.stakeInventoryFailed,
-        error: body.error
+        error: body.error,
       });
       actions.setMessage(dispatch, body.error);
       return false;
     } catch (err) {
       dispatch({
         type: actionDescriptors.stakeInventoryFailed,
-        error: "Error while Staking Item",
+        error: 'Error while Staking Item',
       });
-      actions.setMessage(dispatch, "Error while Staking Item");
+      actions.setMessage(dispatch, 'Error while Staking Item');
     }
   },
 
@@ -829,10 +837,10 @@ const actions = {
     try {
       const response = await fetch(`${apiUrl}/reserve/unstake`, {
         method: HTTP_METHODS.POST,
-        credentials: "same-origin",
+        credentials: 'same-origin',
         headers: {
-          Accept: "application/json",
-          "Content-Type": "application/json",
+          Accept: 'application/json',
+          'Content-Type': 'application/json',
         },
         body: JSON.stringify(payload),
       });
@@ -844,36 +852,42 @@ const actions = {
           type: actionDescriptors.unstakeInventorySuccessful,
           payload: body.data,
         });
-        actions.setMessage(dispatch, "Item has been Unstaked", true);
+        actions.setMessage(dispatch, 'Item has been Unstaked', true);
         return true;
       } else if (response.status === RestStatus.CONFLICT) {
-        dispatch({ type: actionDescriptors.unstakeInventoryFailed, error: body.error.message });
-        actions.setMessage(dispatch, body.error.message)
+        dispatch({
+          type: actionDescriptors.unstakeInventoryFailed,
+          error: body.error.message,
+        });
+        actions.setMessage(dispatch, body.error.message);
         return false;
       } else if (response.status === RestStatus.INTERNAL_SERVER_ERROR) {
-        dispatch({ type: actionDescriptors.unstakeInventoryFailed, error: "Error while Unstaking Item" });
-        actions.setMessage(dispatch, "Error while Unstaking Item")
+        dispatch({
+          type: actionDescriptors.unstakeInventoryFailed,
+          error: 'Error while Unstaking Item',
+        });
+        actions.setMessage(dispatch, 'Error while Unstaking Item');
         return false;
       } else if (response.status === RestStatus.UNAUTHORIZED) {
         dispatch({
           type: actionDescriptors.unstakeInventoryFailed,
-          error: "Unauthorized while Unstaking Item"
+          error: 'Unauthorized while Unstaking Item',
         });
         window.location.href = body.error.loginUrl;
       }
 
       dispatch({
         type: actionDescriptors.unstakeInventoryFailed,
-        error: body.error
+        error: body.error,
       });
       actions.setMessage(dispatch, body.error);
       return false;
     } catch (err) {
       dispatch({
         type: actionDescriptors.unstakeInventoryFailed,
-        error: "Error while Unstaking Item",
+        error: 'Error while Unstaking Item',
       });
-      actions.setMessage(dispatch, "Error while Unstaking Item");
+      actions.setMessage(dispatch, 'Error while Unstaking Item');
     }
   },
 
@@ -883,10 +897,10 @@ const actions = {
     try {
       const response = await fetch(`${apiUrl}/reserve/${address}`, {
         method: HTTP_METHODS.GET,
-        credentials: "same-origin",
+        credentials: 'same-origin',
         headers: {
-          Accept: "application/json",
-          "Content-Type": "application/json",
+          Accept: 'application/json',
+          'Content-Type': 'application/json',
         },
       });
 
@@ -897,36 +911,41 @@ const actions = {
           type: actionDescriptors.getReserveSuccessful,
           payload: body.data,
         });
-        // actions.setMessage(dispatch, "Item has been Staked Successfully", true);
         return true;
       } else if (response.status === RestStatus.CONFLICT) {
-        dispatch({ type: actionDescriptors.getAllReserveFailed, error: body.error.message });
-        actions.setMessage(dispatch, body.error.message)
+        dispatch({
+          type: actionDescriptors.getReserveFailed,
+          error: body.error.message,
+        });
+        actions.setMessage(dispatch, body.error.message);
         return false;
       } else if (response.status === RestStatus.INTERNAL_SERVER_ERROR) {
-        dispatch({ type: actionDescriptors.getReserveFailed, error: "Error while fetching the reserve Address" });
-        actions.setMessage(dispatch, "Errorwhile fetching the reserve Address")
+        dispatch({
+          type: actionDescriptors.getReserveFailed,
+          error: 'Error while fetching the reserve',
+        });
+        actions.setMessage(dispatch, 'Errorwhile fetching the reserve');
         return false;
       } else if (response.status === RestStatus.UNAUTHORIZED) {
         dispatch({
           type: actionDescriptors.getReserveFailed,
-          error: "Unauthorized while fetching the reserve Address"
+          error: 'Unauthorized while fetching the reserve',
         });
         window.location.href = body.error.loginUrl;
       }
 
       dispatch({
-        type: actionDescriptors.getAllReserveFailed,
-        error: body.error
+        type: actionDescriptors.getReserveFailed,
+        error: body.error,
       });
       actions.setMessage(dispatch, body.error);
       return false;
     } catch (err) {
       dispatch({
-        type: actionDescriptors.getAllReserveFailed,
-        error: "Error while fetching the reserve Address",
+        type: actionDescriptors.getReserveFailed,
+        error: 'Error while fetching the reserve',
       });
-      actions.setMessage(dispatch, "Error while fetching the reserve Address");
+      actions.setMessage(dispatch, 'Error while fetching the reserve');
     }
   },
 
@@ -936,10 +955,10 @@ const actions = {
     try {
       const response = await fetch(`${apiUrl}/reserve`, {
         method: HTTP_METHODS.GET,
-        credentials: "same-origin",
+        credentials: 'same-origin',
         headers: {
-          Accept: "application/json",
-          "Content-Type": "application/json",
+          Accept: 'application/json',
+          'Content-Type': 'application/json',
         },
       });
 
@@ -950,94 +969,211 @@ const actions = {
           type: actionDescriptors.getAllReserveSuccessful,
           payload: body.data,
         });
-        // actions.setMessage(dispatch, "Item has been Staked Successfully", true);
         return true;
       } else if (response.status === RestStatus.CONFLICT) {
-        dispatch({ type: actionDescriptors.getAllReserveFailed, error: body.error.message });
-        actions.setMessage(dispatch, body.error.message)
+        dispatch({
+          type: actionDescriptors.getAllReserveFailed,
+          error: body.error.message,
+        });
+        actions.setMessage(dispatch, body.error.message);
         return false;
       } else if (response.status === RestStatus.INTERNAL_SERVER_ERROR) {
-        dispatch({ type: actionDescriptors.getAllReserveFailed, error: "Error while fetching the reserve Address" });
-        actions.setMessage(dispatch, "Errorwhile fetching the reserve Address")
+        dispatch({
+          type: actionDescriptors.getAllReserveFailed,
+          error: 'Error while fetching the reserves',
+        });
+        actions.setMessage(dispatch, 'Errorwhile fetching the reserves');
         return false;
       } else if (response.status === RestStatus.UNAUTHORIZED) {
         dispatch({
           type: actionDescriptors.getAllReserveFailed,
-          error: "Unauthorized while fetching the reserve Address"
+          error: 'Unauthorized while fetching the reserves',
         });
         window.location.href = body.error.loginUrl;
       }
 
       dispatch({
         type: actionDescriptors.getAllReserveFailed,
-        error: body.error
+        error: body.error,
       });
       actions.setMessage(dispatch, body.error);
       return false;
     } catch (err) {
       dispatch({
         type: actionDescriptors.getAllReserveFailed,
-        error: "Error while fetching the reserve Address",
+        error: 'Error while fetching the reserve Address',
       });
-      actions.setMessage(dispatch, "Error while fetching the reserve Address");
+      actions.setMessage(dispatch, 'Error while fetching the reserve Address');
     }
   },
 
-  calculateValue: async (dispatch, payload) => {
-    dispatch({ type: actionDescriptors.getCalculatedValue });
+  getOracle: async (dispatch, payload) => {
+    dispatch({ type: actionDescriptors.getOracle });
 
     try {
-      const response = await fetch(`${apiUrl}/reserve/calculate`, { //Stake
-        method: HTTP_METHODS.POST,
-        credentials: "same-origin",
+      const response = await fetch(`${apiUrl}/reserve/oraclePrice/${address}`, {
+        method: HTTP_METHODS.GET,
+        credentials: 'same-origin',
         headers: {
-          Accept: "application/json",
-          "Content-Type": "application/json",
+          Accept: 'application/json',
+          'Content-Type': 'application/json',
         },
         body: JSON.stringify(payload),
       });
 
       const body = await response.json();
-      
+
       if (response.status === RestStatus.OK) {
         dispatch({
-          type: actionDescriptors.getCalculatedValueSuccessful,
+          type: actionDescriptors.getOracleSuccessful,
           payload: body.data,
         });
-        // actions.setMessage(dispatch, "Item has been Staked Successfully", true);
-        return true;
       } else if (response.status === RestStatus.CONFLICT) {
-        dispatch({ type: actionDescriptors.getCalculatedValueFailed, error: body.error.message });
-        actions.setMessage(dispatch, body.error.message)
-        return false;
+        dispatch({
+          type: actionDescriptors.getOracleFailed,
+          error: body.error.message,
+        });
+        actions.setMessage(dispatch, body.error.message);
       } else if (response.status === RestStatus.INTERNAL_SERVER_ERROR) {
-        dispatch({ type: actionDescriptors.getCalculatedValueFailed, error: "Error while fetching the calculated value" });
-        actions.setMessage(dispatch, "Error while fetching the calculated value")
-        return false;
+        dispatch({
+          type: actionDescriptors.getOracleFailed,
+          error: 'Error while fetching the Oracle',
+        });
+        actions.setMessage(dispatch, 'Error while fetching the Oracle');
       } else if (response.status === RestStatus.UNAUTHORIZED) {
         dispatch({
-          type: actionDescriptors.getCalculatedValueFailed,
-          error: "Unauthorized while fetching the calculated value"
+          type: actionDescriptors.getOracleFailed,
+          error: 'Unauthorized while fetching the Oracle',
         });
         window.location.href = body.error.loginUrl;
       }
 
       dispatch({
-        type: actionDescriptors.getCalculatedValueFailed,
-        error: body.error
+        type: actionDescriptors.getOracleFailed,
+        error: body.error,
+      });
+      actions.setMessage(dispatch, body.error);
+    } catch (err) {
+      dispatch({
+        type: actionDescriptors.getOracleFailed,
+        error: 'Error while fetching the Oracle',
+      });
+      actions.setMessage(dispatch, 'Error while fetching the Oracle');
+    }
+  },
+
+  borrow: async (dispatch, payload) => {
+    dispatch({ type: actionDescriptors.borrow });
+
+    try {
+      const response = await fetch(`${apiUrl}/reserve/borrow`, {
+        method: HTTP_METHODS.POST,
+        credentials: 'same-origin',
+        headers: {
+          Accept: 'application/json',
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(payload),
+      });
+
+      const body = await response.json();
+
+      if (response.status === RestStatus.OK) {
+        dispatch({ type: actionDescriptors.borrowSuccessful });
+        actions.setMessage(dispatch, 'STRATs successfully borrowed', true);
+        return true;
+      } else if (response.status === RestStatus.CONFLICT) {
+        dispatch({
+          type: actionDescriptors.borrowFailed,
+          error: body.error.message,
+        });
+        actions.setMessage(dispatch, body.error.message);
+        return false;
+      } else if (response.status === RestStatus.INTERNAL_SERVER_ERROR) {
+        dispatch({
+          type: actionDescriptors.borrowFailed,
+          error: 'Error while borrowing STRATs',
+        });
+        actions.setMessage(dispatch, 'Error while borrowing STRATs');
+        return false;
+      }
+
+      dispatch({
+        type: actionDescriptors.borrowFailed,
+        error: body.error,
       });
       actions.setMessage(dispatch, body.error);
       return false;
     } catch (err) {
       dispatch({
-        type: actionDescriptors.getCalculatedValueFailed,
-        error: "Error while fetching the calculated value",
+        type: actionDescriptors.borrowFailed,
+        error: 'Error while borrowing STRATs',
       });
-      actions.setMessage(dispatch, "Error while fetching the calculated value");
+      actions.setMessage(dispatch, 'Error while borrowing STRATs');
     }
   },
-// ------------------------------------------------------------------------------------------------------------------------------------------
-  fetchItemTransfers: async (dispatch, limit, offset, ownerCommonName, order, date, search) => {
+
+  repay: async (dispatch, payload) => {
+    dispatch({ type: actionDescriptors.repay });
+
+    try {
+      const response = await fetch(`${apiUrl}/reserve/repay`, {
+        method: HTTP_METHODS.POST,
+        credentials: 'same-origin',
+        headers: {
+          Accept: 'application/json',
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(payload),
+      });
+
+      const body = await response.json();
+
+      if (response.status === RestStatus.OK) {
+        dispatch({ type: actionDescriptors.repaySuccessful });
+        actions.setMessage(dispatch, 'STRATs successfully repaid', true);
+        return true;
+      } else if (response.status === RestStatus.CONFLICT) {
+        dispatch({
+          type: actionDescriptors.repayFailed,
+          error: body.error.message,
+        });
+        actions.setMessage(dispatch, body.error.message);
+        return false;
+      } else if (response.status === RestStatus.INTERNAL_SERVER_ERROR) {
+        dispatch({
+          type: actionDescriptors.repayFailed,
+          error: 'Error while repaying STRATs',
+        });
+        actions.setMessage(dispatch, 'Error while repaying STRATs');
+        return false;
+      }
+
+      dispatch({
+        type: actionDescriptors.repayFailed,
+        error: body.error,
+      });
+      actions.setMessage(dispatch, body.error);
+      return false;
+    } catch (err) {
+      dispatch({
+        type: actionDescriptors.repayFailed,
+        error: 'Error while repaying STRATs',
+      });
+      actions.setMessage(dispatch, 'Error while repaying STRATs');
+    }
+  },
+
+  // ----------------------------------------------------------------STAKING END----------------------------------------------------------
+  fetchItemTransfers: async (
+    dispatch,
+    limit,
+    offset,
+    ownerCommonName,
+    order,
+    date,
+    search
+  ) => {
     dispatch({ type: actionDescriptors.fetchItemTransfers });
 
     try {
@@ -1057,7 +1193,9 @@ const actions = {
             : '';
         }
       }
-      let url = `${apiUrl}/inventory/transfers/items?limit=${limit}&order=transferDate.${order}&offset=${offset}&or=(oldOwnerCommonName.eq.${ownerCommonName},newOwnerCommonName.eq.${ownerCommonName})${search ? searchQuery : ''}${date ? range : ''}`;
+      let url = `${apiUrl}/inventory/transfers/items?limit=${limit}&order=transferDate.${order}&offset=${offset}&or=(oldOwnerCommonName.eq.${ownerCommonName},newOwnerCommonName.eq.${ownerCommonName})${
+        search ? searchQuery : ''
+      }${date ? range : ''}`;
 
       const response = await fetch(url, {
         method: HTTP_METHODS.GET,

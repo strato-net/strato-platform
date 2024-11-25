@@ -34,9 +34,9 @@ const StakeModal = ({
     isStaking,
     isUnstaking,
     isreservessLoading,
-    isCalculatedValue,
+    isFetchingOracle,
     reserves,
-    calculatedValue,
+    oracle,
   } = useInventoryState();
   // Dispatch
   const inventoryDispatch = useInventoryDispatch();
@@ -45,7 +45,7 @@ const StakeModal = ({
 
   const { paymentServices } = usePaymentServiceState();
   const isLoader =
-    isStaking || isUnstaking || isCalculatedValue || isreservessLoading;
+    isStaking || isUnstaking || isFetchingOracle || isreservessLoading;
   const isStaked = inventory.stratsLoanAmount && inventory.stratsLoanAmount > 0;
   const itemName = decodeURIComponent(inventory.name);
   const resAddress = reserves?.length ? reserves[0]?.address : null;
@@ -60,7 +60,7 @@ const StakeModal = ({
         assetAmount: inventory?.quantity,
         loanToValueRatio: reserves[0].loanToValueRatio,
       };
-      inventoryActions.calculateValue(inventoryDispatch, body);
+      inventoryActions.getOracle(inventoryDispatch, body);
     }
   }, [resAddress]);
 
@@ -75,14 +75,14 @@ const StakeModal = ({
           {
             label: `Market Value of ${inventory?.name} x ${inventory?.quantity}`,
             description: 'The total market value of the collateral',
-            value: `$${((calculatedValue * 2) / 100).toFixed(2)}`,
+            value: `$${(oracle.consensusPrice).toFixed(2) * inventory?.quantity}`,
           },
           {
             label: 'Estimated Loan in STRATs',
             description: 'The estimated amount of STRATs to borrow',
             value: (
               <div className="flex -mr-1">
-                {isStaked ? inventory.stratsLoanAmount : calculatedValue}
+                {isStaked ? inventory.stratsLoanAmount : (oracle.consensusPrice).toFixed(2) * reserves[0]?.loanToValueRatio}
                 {logo}
               </div>
             ),
@@ -94,7 +94,7 @@ const StakeModal = ({
               <div className="flex -mr-1">
                 {(
                   ((inventory?.quantity *
-                    (isStaked ? inventory.stratsLoanAmount : calculatedValue)) /
+                    (isStaked ? inventory.stratsLoanAmount : (oracle.consensusPrice).toFixed(2) * reserves[0]?.loanToValueRatio)) /
                     100) *
                   (reserves[0]?.cataAPYRate / 100)
                 ).toFixed(2)}
@@ -115,7 +115,7 @@ const StakeModal = ({
             description: 'The remaining value after unstaking',
             value: (
               <div className="flex -mr-1">
-                {isStaked ? inventory.stratsLoanAmount : calculatedValue}
+                {isStaked ? inventory.stratsLoanAmount : (oracle.consensusPrice).toFixed(2) * reserves[0]?.loanToValueRatio}
                 {logo}
               </div>
             ),
@@ -128,7 +128,7 @@ const StakeModal = ({
           {
             label: `Market price per ${inventory?.name}`,
             description: 'The current market price of the asset',
-            value: `$${((calculatedValue * 0.02) / inventory?.quantity).toFixed(
+            value: `$${(oracle.consensusPrice).toFixed(
               2
             )}`,
           },
