@@ -11,14 +11,14 @@ import {
   Table,
   Checkbox,
   Tooltip,
-} from "antd";
-import { CheckCircleOutlined } from "@ant-design/icons";
-import image_placeholder from "../../images/resources/image_placeholder.png";
-import CreateInventoryModal from "./CreateInventoryModal";
-import { actions as categoryActions } from "../../contexts/category/actions";
-import { useCategoryDispatch, useCategoryState } from "../../contexts/category";
-import useDebounce from "../UseDebounce";
-import { actions } from "../../contexts/inventory/actions";
+} from 'antd';
+import { CheckCircleOutlined } from '@ant-design/icons';
+import image_placeholder from '../../images/resources/image_placeholder.png';
+import CreateInventoryModal from './CreateInventoryModal';
+import { actions as categoryActions } from '../../contexts/category/actions';
+import { useCategoryDispatch, useCategoryState } from '../../contexts/category';
+import useDebounce from '../UseDebounce';
+import { actions } from '../../contexts/inventory/actions';
 import {
   useInventoryDispatch,
   useInventoryState,
@@ -43,7 +43,7 @@ import {
 } from '../../contexts/issuerStatus';
 import ClickableCell from '../ClickableCell';
 import routes from '../../helpers/routes';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuthenticateState } from '../../contexts/authentication';
 import HelmetComponent from '../Helmet/HelmetComponent';
 import { SEO } from '../../helpers/seoConstant';
@@ -58,7 +58,7 @@ import InventoryCard from './InventoryCard';
 import './index.css';
 
 const { Option } = Select;
-const StratsIcon = <img src={Images.strats} alt="STRATS" className="w-5 h-5" />
+const StratsIcon = <img src={Images.strats} alt="STRATS" className="w-5 h-5" />;
 
 const Inventory = ({ user }) => {
   const [open, setOpen] = useState(false);
@@ -78,6 +78,11 @@ const Inventory = ({ user }) => {
   const naviroute = routes.InventoryDetail.url;
   let { hasChecked, isAuthenticated, loginUrl } = useAuthenticateState();
 
+  const location = useLocation();
+  const queryParams = new URLSearchParams(location.search);
+  const searchQueryValue = queryParams.get('st') || '';
+  const [showStakeable, setShowStakeable] = useState(searchQueryValue);
+
   const categoryDispatch = useCategoryDispatch();
   const { categorys } = useCategoryState();
   const {
@@ -92,7 +97,7 @@ const Inventory = ({ user }) => {
     supportedTokens,
     isFetchingTokens,
     isReservesLoading,
-    reserves
+    reserves,
   } = useInventoryState();
   const {
     paymentServices,
@@ -156,26 +161,42 @@ const Inventory = ({ user }) => {
   }, [categoryDispatch]);
 
   useEffect(() => {
-    if (showPublished) {
-      actions.fetchInventoryForUser(
-        dispatch,
-        limit,
-        offset,
-        debouncedSearchTerm,
-        category && category !== 'All' ? category : undefined
-      );
-    } else {
-      actions.fetchInventory(
-        dispatch,
-        limit,
-        offset,
-        debouncedSearchTerm,
-        category && category !== 'All' ? category : undefined
-      );
-    }
     actions.getAllReserve(dispatch);
+  }, []);
+
+  useEffect(() => {
+    if (reserves) {
+      if (showPublished) {
+        actions.fetchInventoryForUser(
+          dispatch,
+          limit,
+          offset,
+          debouncedSearchTerm,
+          category && category !== 'All' ? category : undefined,
+          showStakeable === 'true' ? reserves[0].assetRootAddress : ''
+        );
+      } else {
+        actions.fetchInventory(
+          dispatch,
+          limit,
+          offset,
+          debouncedSearchTerm,
+          category && category !== 'All' ? category : undefined,
+          showStakeable === 'true' ? reserves[0].assetRootAddress : ''
+        );
+      }
+    }
     actions.fetchSupportedTokens(dispatch);
-  }, [dispatch, limit, offset, debouncedSearchTerm, category, showPublished]);
+  }, [
+    dispatch,
+    limit,
+    offset,
+    debouncedSearchTerm,
+    category,
+    showPublished,
+    showStakeable,
+    reserves,
+  ]);
 
   const showModal = () => {
     setOpen(true);
@@ -261,8 +282,17 @@ const Inventory = ({ user }) => {
     setPage(page);
   };
 
-  const handleCheckboxChange = (e) => {
+  const handlePublishedCheckboxChange = (e) => {
     setShowPublished(e.target.checked);
+  };
+
+  const handleStakeableCheckboxChange = (e) => {
+    const baseUrl = new URL(`/mywallet`, window.location.origin);
+    const value = e.target.checked;
+    baseUrl.searchParams.set('st', value);
+    const url = baseUrl.pathname + baseUrl.search;
+    navigate(url, { replace: true });
+    setShowStakeable(value ? 'true' : 'false');
   };
 
   const getAllSubcategories = (categories) => {
@@ -365,10 +395,10 @@ const Inventory = ({ user }) => {
                 onClick={callDetailPage}
               >
                 <Tooltip title={record.name}>
-                    <span className="w-48 whitespace-nowrap overflow-hidden text-ellipsis block">
+                  <span className="w-48 whitespace-nowrap overflow-hidden text-ellipsis block">
                     {record.name}
-                    </span>
-                  </Tooltip>
+                  </span>
+                </Tooltip>
               </span>
             </div>
           </div>
@@ -401,7 +431,11 @@ const Inventory = ({ user }) => {
           <div>
             {price !== 'N/A' ? (
               <>
-                <span>${price}</span> <p className="flex text-xs items-center"> &nbsp;({(price * STRATS_CONVERSION).toFixed(0)}  {StratsIcon}) </p>
+                <span>${price}</span>{' '}
+                <p className="flex text-xs items-center">
+                  {' '}
+                  &nbsp;({(price * STRATS_CONVERSION).toFixed(0)} {StratsIcon}){' '}
+                </p>
               </>
             ) : (
               'N/A'
@@ -463,7 +497,10 @@ const Inventory = ({ user }) => {
           {record.price || record?.stratsLoanAmount ? (
             <div className="flex items-center justify-center gap-2 bg-[#1548C329] p-[6px] rounded-md">
               <div className="w-[7px] h-[7px] rounded-full bg-[#119B2D]"></div>
-              <p className="text-[#4D4D4D] text-[13px]"> {record?.stratsLoanAmount ? 'Staked' : 'Published'} </p>
+              <p className="text-[#4D4D4D] text-[13px]">
+                {' '}
+                {record?.stratsLoanAmount ? 'Staked' : 'Published'}{' '}
+              </p>
             </div>
           ) : record.status == ASSET_STATUS.PENDING_REDEMPTION ? (
             <div className="flex items-center justify-center gap-2 bg-[#FFA50029] p-[6px] rounded-md">
@@ -629,14 +666,25 @@ const Inventory = ({ user }) => {
             />
           </Space.Compact>
           <div className="pt-6 mx-6 md:mx-5 md:px-10 mb-5">
-            <Checkbox className="mb-4" onChange={handleCheckboxChange}>
+            <Checkbox className="mb-4" onChange={handlePublishedCheckboxChange}>
               Published
+            </Checkbox>
+            <Checkbox
+              className="pl-4"
+              checked={showStakeable === 'true'}
+              onChange={handleStakeableCheckboxChange}
+            >
+              Stakeable
             </Checkbox>
             <div className="hidden md:block">
               <Table
                 columns={columns}
                 dataSource={showPublished ? userInventories : inventories}
-                loading={isInventoriesLoading || isUserInventoriesLoading || isReservesLoading}
+                loading={
+                  isInventoriesLoading ||
+                  isUserInventoriesLoading ||
+                  isReservesLoading
+                }
                 className="custom-table"
                 pagination={false}
               />

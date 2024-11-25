@@ -114,6 +114,7 @@ const HeaderComponent = ({
     routes.Transactions.url,
     routes.MyWallet.url,
     routes.ActivityFeed.url,
+    routes.MyWalletStakeable.url,
   ];
 
   const logout = () => {
@@ -258,11 +259,21 @@ const HeaderComponent = ({
     {
       key: '1',
       label: (
-        <>{user &&
-        <Row className='flex flex-col'>
-        <Col Col={24}> <p className="text-xs mt-1">CATA: {cataBalance}</p></Col>
-        <Col Col={24}> <p className="text-xs mt-3">Balance: ${formattedNum(cataBalance * 10)}</p></Col>
-        </Row>}
+        <>
+          {user && (
+            <Row className="flex flex-col">
+              <Col Col={24}>
+                {' '}
+                <p className="text-xs mt-1">CATA: {cataBalance}</p>
+              </Col>
+              <Col Col={24}>
+                {' '}
+                <p className="text-xs mt-3">
+                  Balance: ${formattedNum(cataBalance * 10)}
+                </p>
+              </Col>
+            </Row>
+          )}
         </>
       ),
     },
@@ -321,9 +332,7 @@ const HeaderComponent = ({
       setSelectedTab(1);
       setIsModalVisible(true);
     } else {
-      data.value === 'logout'
-        ? logout()
-        : navigate(data.path);
+      data.value === 'logout' ? logout() : navigate(data.path);
       handleMenuTab(data);
     }
   };
@@ -496,12 +505,15 @@ const HeaderComponent = ({
                     event: 'view_global_transactions_page',
                   },
                 });
-              }  
+              }
               navigate(navUrls[item.key]);
             }
           }}
           items={navItems}
         />
+        <Button type="primary" className="w-20 hidden md:block" onClick={() => navigate(routes.MyWalletStakeable.url)}>
+          Stake
+        </Button>
         <Space size="large" className="!gap-0 md:!gap-4 mr-0 -ml-3">
           {
             <div
