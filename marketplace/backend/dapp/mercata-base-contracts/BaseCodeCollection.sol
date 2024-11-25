@@ -1,6 +1,4 @@
-pragma es6;
-pragma strict;
-pragma builtinCreates;
+pragma solidvm 11.5;
 
 import <509>;
 import "Templates/Assets/Asset.sol";
