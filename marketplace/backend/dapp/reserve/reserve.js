@@ -177,7 +177,7 @@ async function oraclePrice(user, address, options) {
     // Fetch reserves from Cirrus
     const oracles = await rest.search(
       user,
-      { name: contractName },
+      { name: OracleContractName },
       searchOptions
     );
 
@@ -189,7 +189,7 @@ async function oraclePrice(user, address, options) {
 
     return oracle;
   } catch (error) {
-    console.error('Error in calculate function:', error);
+    console.error('Error in oraclePrice function:', error);
     throw error;
   }
 }
@@ -212,10 +212,10 @@ async function stake(user, args, options) {
 /**
  * unstake
  */
-async function unstake(user, contract, args, options) {
+async function unstake(user, args, options) {
   const { reserve, ...restArgs } = args;
   const callArgs = {
-    contract,
+    contract: { address: reserve },
     method: 'unstake',
     args: util.usc({ ...restArgs }),
   };

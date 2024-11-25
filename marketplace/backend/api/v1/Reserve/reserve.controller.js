@@ -170,6 +170,10 @@ class ReserveController {
         'any.required': 'Escrow Address is required and must be a string.',
         'string.base': 'Escrow Address must be a valid string.',
       }),
+      reserve: Joi.string().required().messages({
+        'any.required': 'Reserve is required and must be a string.',
+        'string.base': 'Reserve must be a valid string.',
+      }),
     });
     ReserveController.validateArgs(args, schema, 'Unstake');
   }

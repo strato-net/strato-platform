@@ -1023,7 +1023,7 @@ const actions = {
     }
   },
 
-  getOracle: async (dispatch, payload) => {
+  getOracle: async (dispatch, address) => {
     dispatch({ type: actionDescriptors.getOracle });
 
     try {
@@ -1033,8 +1033,7 @@ const actions = {
         headers: {
           Accept: 'application/json',
           'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(payload),
+        }
       });
 
       const body = await response.json();
