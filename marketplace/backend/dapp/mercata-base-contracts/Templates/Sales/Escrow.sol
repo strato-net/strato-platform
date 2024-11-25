@@ -7,6 +7,7 @@ contract Escrow is Sale {
     decimal public stratsLoanAmount;
     decimal public cataRewardInDollars;
     decimal public escrowPrice;
+    decimal public borrowedAmount;
 
     constructor(
         address _borrower,
@@ -16,7 +17,7 @@ contract Escrow is Sale {
         decimal _escrowPrice,
         uint _escrowQuantity,
         PaymentServiceInfo[] _paymentServices
-    ) Sale(_assetToBeSold, 0, _escrowQuantity, _paymentServices) {
+    ) Sale("Escrow", _assetToBeSold, 0, _escrowQuantity, _paymentServices) {
         escrowPrice = _escrowPrice;
         borrower = _borrower;
         stratsLoanAmount = _stratsLoanAmount;
@@ -26,5 +27,11 @@ contract Escrow is Sale {
 
     function closeSale() external override requirePaymentService("complete sale") returns (uint) {
         _closeSale();
+    }
+
+    function updateBorrowedAmount(decimal _borrowAmount) external {
+        require(msg.sender == reserve, "Only reserve can update borrowed amount");
+        require(borrowedAmount + _borrowAmount <= stratsLoanAmount, "Cannot borrow more than loan amount");
+        borrowedAmount += _borrowAmount;
     }
 }
