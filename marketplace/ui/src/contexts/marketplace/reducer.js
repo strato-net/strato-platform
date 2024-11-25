@@ -224,6 +224,22 @@ const reducer = (state, action) => {
         ...state,
         isFetchingStrats: false,
       };
+      case actionDescriptors.fetchCataBalance:
+        return {
+          ...state,
+          isFetchingCata: true,
+        };
+      case actionDescriptors.fetchCataBalanceSuccessful:
+        return {
+          ...state,
+          isFetchingCata: false,
+          cata: action.payload,
+        };
+      case actionDescriptors.fetchCataBalanceFailed:
+        return {
+          ...state,
+          isFetchingCata: false,
+        };  
     case actionDescriptors.fetchStratsAddress:
       return {
         ...state,
