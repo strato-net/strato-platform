@@ -25,7 +25,8 @@ contract Escrow is Sale {
         reserve = msg.sender;
     }
 
-    function closeSale() external override requirePaymentService("complete sale") returns (uint) {
+    function closeSale() external override returns (uint) {
+        require(msg.sender == reserve, "Only reserve can close Escrow");
         _closeSale();
     }
 
