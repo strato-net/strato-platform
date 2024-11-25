@@ -71,13 +71,14 @@ const HeaderComponent = ({
   const categoryDispatch = useCategoryDispatch();
   const userDispatch = useAuthenticateDispatch();
   //States
-  const { cartList, strats } = useMarketplaceState();
+  const { cartList, strats, cata } = useMarketplaceState();
   const { categorys } = useCategoryState();
   let { isAuthenticated } = useAuthenticateState();
 
   useEffect(() => {
     if (user) {
       marketplaceActions.fetchStratsBalance(marketplaceDispatch);
+      marketplaceActions.fetchCataBalance(marketplaceDispatch);
     }
   }, [user]);
 
@@ -100,6 +101,7 @@ const HeaderComponent = ({
   const [isModalVisible, setIsModalVisible] = useState(false);
   const [originAddress, setOriginAddress] = useState();
   const stratsBalance = Object.keys(strats).length > 0 ? strats : 0;
+  const cataBalance = cata || 0;
 
   useEffect(() => {
     setSelectedCategory(categoryQueryValue);
@@ -215,6 +217,7 @@ const HeaderComponent = ({
       label: (
         <div>
           {user && <p className="text-xs mt-1">STRATs: {stratsBalance}</p>}
+          {user && <p className="text-xs mt-1">CATA: {cataBalance}</p>}
         </div>
       ),
       children: [

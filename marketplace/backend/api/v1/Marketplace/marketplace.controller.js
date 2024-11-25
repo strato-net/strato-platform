@@ -105,6 +105,19 @@ class MarketplaceController {
     }
   }
 
+  static async getCataBalance(req, res, next) {
+    try {
+      const { dapp, address: userAddress } = req;
+      let cataBalance = 0;
+
+      cataBalance = await dapp.getCataBalance({ userAddress: userAddress });
+
+      return rest.response.status200(res, cataBalance);
+    } catch (e) {
+      return next(e);
+    }
+  }
+
   static async getStratsAddress(req, res, next) {
     try {
       const address = await STRATSJs.getStratsAddress();
