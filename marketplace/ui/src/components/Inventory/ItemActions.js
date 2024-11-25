@@ -181,7 +181,7 @@ const ItemActions = ({
 
   return (
     <div className="flex justify-center">
-      {!stakeable && (
+      {(!stakeable || (!inventory.stratsLoanAmount && stakeable)) && (
         <>
           <Button
             type="link"
@@ -209,32 +209,33 @@ const ItemActions = ({
           >
             <SwapOutlined /> Transfer
           </Button>
-
-          <Button
-            type="link"
-            className="text-[#13188A] font-semibold w-1/4 flex items-center justify-center"
-            onClick={showRedeemModal}
-            disabled={
-              inventory.price ||
-              inventory.address === inventory.originAddress ||
-              !isActive() ||
-              disableSADDOGS(inventory)
-            }
-          >
-            <SendOutlined /> Redeem
-          </Button>
         </>
+      )}
+      {!stakeable && (
+        <Button
+          type="link"
+          className="text-[#13188A] font-semibold w-1/4 flex items-center justify-center"
+          onClick={showRedeemModal}
+          disabled={
+            inventory.price ||
+            inventory.address === inventory.originAddress ||
+            !isActive() ||
+            disableSADDOGS(inventory)
+          }
+        >
+          <SendOutlined /> Redeem
+        </Button>
       )}
 
       {!inventory.stratsLoanAmount && stakeable && (
-          <Button
-            type="primary"
-            className="font-semibold flex items-center justify-center"
-            onClick={() => showStakeModal('Stake')}
-            disabled={inventory.price || !isActive()}
-          >
-            <RiseOutlined /> Stake
-          </Button>
+        <Button
+          type="primary"
+          className="font-semibold flex items-center justify-center"
+          onClick={() => showStakeModal('Stake')}
+          disabled={inventory.price || !isActive()}
+        >
+          <RiseOutlined /> Stake
+        </Button>
       )}
 
       {inventory.stratsLoanAmount && stakeable && (
@@ -254,7 +255,7 @@ const ItemActions = ({
           </Button>
         </div>
       )}
-      {!stakeable && (
+      {(!stakeable || (!inventory.stratsLoanAmount && stakeable)) && (
         <Popover
           placement="topRight"
           open={popoverVisible[inventory.address] || false}
