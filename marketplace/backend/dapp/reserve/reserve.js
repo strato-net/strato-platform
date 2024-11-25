@@ -85,7 +85,7 @@ async function get(user, address, options) {
 
   // Fetch asset information and attach it to the reserve
   const reserve = reserves[0];
-  console.log('reserve123', reserve);
+
   const asset = await rest.search(
     user,
     { name: 'BlockApps-Mercata-Asset' },
@@ -160,23 +160,34 @@ async function getAll(user, options) {
 }
 
 /**
- * calculate
+ * Get live Oracle price
  */
-async function calculate(user, args, options) {
+async function oraclePrice(user, address, options) {
   try {
-    const { assetAmount, loanToValueRatio } = args;
-    const oracleResponse = await searchAllWithQueryArgs(
-      OracleContractName,
-      { creator: 'Server', isActive: true },
-      options,
-      user
+    // Define search options for active reserves
+    const searchOptions = {
+      ...options,
+      query: {
+        creator: 'eq.Server',
+        isActive: 'eq.true',
+        address: 'eq.' + address,
+      },
+    };
+
+    // Fetch reserves from Cirrus
+    const oracles = await rest.search(
+      user,
+      { name: contractName },
+      searchOptions
     );
-    if (!oracleResponse || oracleResponse.length === 0) {
-      throw new Error('No oracle response found');
+
+    if (!oracles || oracles.length === 0) {
+      throw new Error('No oracles found');
     }
-    const price = oracleResponse[0].consensusPrice;
-    const result = (price * assetAmount * loanToValueRatio).toFixed(2);
-    return result;
+
+    const oracle = oracles[0];
+
+    return oracle;
   } catch (error) {
     console.error('Error in calculate function:', error);
     throw error;
@@ -190,7 +201,7 @@ async function stake(user, args, options) {
   const { reserve, ...restArgs } = args;
   const callArgs = {
     contract: { address: reserve },
-    method: 'createEscrow',
+    method: 'stakeAsset',
     args: util.usc({ ...restArgs }),
   };
 
@@ -202,9 +213,39 @@ async function stake(user, args, options) {
  * unstake
  */
 async function unstake(user, contract, args, options) {
+  const { reserve, ...restArgs } = args;
   const callArgs = {
     contract,
-    method: 'unStake',
+    method: 'unstake',
+    args: util.usc({ ...restArgs }),
+  };
+
+  const reponse = await rest.call(user, callArgs, options);
+  return reponse;
+}
+
+/**
+ * Borrow
+ */
+async function borrow(user, args, options) {
+  const { reserve, ...restArgs } = args;
+  const callArgs = {
+    contract: { address: reserve },
+    method: 'borrow',
+    args: util.usc({ ...restArgs }),
+  };
+
+  const reponse = await rest.call(user, callArgs, options);
+  return reponse;
+}
+
+/**
+ * Pay Loan
+ */
+async function payLoan(user, contract, args, options) {
+  const callArgs = {
+    contract,
+    method: 'repayLoan',
     args: util.usc({ ...args }),
   };
 
@@ -218,7 +259,9 @@ export default {
   getAll,
   marshalIn,
   marshalOut,
-  calculate,
+  oraclePrice,
   stake,
   unstake,
+  borrow,
+  payLoan,
 };

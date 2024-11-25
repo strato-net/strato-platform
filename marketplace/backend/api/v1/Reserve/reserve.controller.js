@@ -1,6 +1,6 @@
-import { rest } from "blockapps-rest";
-import Joi from "@hapi/joi";
-import RestStatus from "http-status-codes";
+import { rest } from 'blockapps-rest';
+import Joi from '@hapi/joi';
+import RestStatus from 'http-status-codes';
 
 class ReserveController {
   // Retrieve reserve contract using address
@@ -8,7 +8,7 @@ class ReserveController {
     try {
       const { dapp, params } = req;
       const { address } = params;
-      
+
       // Validate address presence and type
       ReserveController.validateGetArgs({ address });
 
@@ -32,13 +32,16 @@ class ReserveController {
     }
   }
 
-  // Calculate staking preview
-  static async calculate(req, res, next) {
+  // Calculate borrow preview
+  static async oraclePrice(req, res, next) {
     try {
-      const { dapp, body } = req;
-      ReserveController.validateCalculateArgs(body);
+      const { dapp, params } = req;
+      const { address } = params;
 
-      const result = await dapp.calculate(body);
+      // Validate address presence and type
+      ReserveController.validateGetArgs({ address });
+
+      const result = await dapp.oraclePrice(address);
       rest.response.status200(res, result);
       next();
     } catch (e) {
@@ -74,73 +77,132 @@ class ReserveController {
     }
   }
 
+  // Borrow STRATs from reserve
+  static async borrow(req, res, next) {
+    try {
+      const { dapp, body } = req;
+      ReserveController.validateBorrowArgs(body);
+
+      const result = await dapp.borrow(body);
+      rest.response.status200(res, result);
+      next();
+    } catch (e) {
+      next(e);
+    }
+  }
+
+  // Pay STRATs Loan to reserve
+  static async payLoan(req, res, next) {
+    try {
+      const { dapp, body } = req;
+      ReserveController.validatePayLoanArgs(body);
+
+      const result = await dapp.payLoan(body);
+      rest.response.status200(res, result);
+      next();
+    } catch (e) {
+      next(e);
+    }
+  }
+
   // ----------------------- ARGUMENT VALIDATION ------------------------
   static validateGetArgs(args) {
     const schema = Joi.object({
       address: Joi.string().required().messages({
-        "any.required": "Address is required and must be a string.",
-        "string.base": "Address must be a valid string.",
+        'any.required': 'Address is required and must be a string.',
+        'string.base': 'Address must be a valid string.',
       }),
     });
-    ReserveController.validateArgs(args, schema, "Get");
+    ReserveController.validateArgs(args, schema, 'Get');
   }
 
-  static validateCalculateArgs(args) {
+  static validateCalculateBorrowArgs(args) {
     const schema = Joi.object({
       assetAmount: Joi.number().positive().required().messages({
-        "any.required": "Amount is required and must be a positive number.",
-        "number.base": "Amount must be a valid number.",
-        "number.positive": "Amount must be positive.",
+        'any.required': 'Amount is required and must be a positive number.',
+        'number.base': 'Amount must be a valid number.',
+        'number.positive': 'Amount must be positive.',
       }),
       loanToValueRatio: Joi.number().positive().required().messages({
-        "any.required": "loanToValueRatio is required and must be a positive number.",
-       "number.base": "loanToValueRatio must be a valid number.",
-        "number.positive": "loanToValueRatio must be positive.",
-      })
+        'any.required':
+          'loanToValueRatio is required and must be a positive number.',
+        'number.base': 'loanToValueRatio must be a valid number.',
+        'number.positive': 'loanToValueRatio must be positive.',
+      }),
+      oracleAddress: Joi.string().required().messages({
+        'any.required': 'Oracle Address is required and must be a string.',
+        'string.base': 'Oracle Address must be a valid string.',
+      }),
     });
-    ReserveController.validateArgs(args, schema, "Calculate");
+    ReserveController.validateArgs(args, schema, 'Calculate');
   }
 
   static validateStakeArgs(args) {
     const schema = Joi.object({
       assetAmount: Joi.number().positive().required().messages({
-        "any.required": "Amount is required and must be positive.",
-        "number.base": "Amount must be a valid number.",
-        "number.positive": "Amount must be positive.",
+        'any.required': 'Amount is required and must be positive.',
+        'number.base': 'Amount must be a valid number.',
+        'number.positive': 'Amount must be positive.',
       }),
       assetAddress: Joi.string().required().messages({
-        "any.required": "Asset Address is required and must be a string.",
-        "string.base": "Asset Address must be a valid string.",
+        'any.required': 'Asset Address is required and must be a string.',
+        'string.base': 'Asset Address must be a valid string.',
       }),
       stratPaymentService: Joi.object({
         creator: Joi.string().required().messages({
-          "any.required": "Creator is required and must be a string.",
+          'any.required': 'Creator is required and must be a string.',
         }),
         serviceName: Joi.string().required().messages({
-          "any.required": "Service Name is required and must be a string.",
+          'any.required': 'Service Name is required and must be a string.',
         }),
       }).required(),
       reserve: Joi.string().required().messages({
-        "any.required": "Reserve is required and must be a string.",
-        "string.base": "Reserve must be a valid string.",
+        'any.required': 'Reserve is required and must be a string.',
+        'string.base': 'Reserve must be a valid string.',
       }),
     });
-    ReserveController.validateArgs(args, schema, "Stake");
+    ReserveController.validateArgs(args, schema, 'Stake');
   }
 
   static validateUnstakeArgs(args) {
     const schema = Joi.object({
-      escrow: Joi.string().required().messages({
-        "any.required": "Escrow is required and must be a string.",
-        "string.base": "Escrow must be a valid string.",
-      }),
-      stratsPaymentService: Joi.string().required().messages({
-        "any.required":
-          "Strats Payment Service is required and must be a string.",
-        "string.base": "Strats Payment Service must be a valid string.",
+      escrowAddress: Joi.string().required().messages({
+        'any.required': 'Escrow Address is required and must be a string.',
+        'string.base': 'Escrow Address must be a valid string.',
       }),
     });
-    ReserveController.validateArgs(args, schema, "Unstake");
+    ReserveController.validateArgs(args, schema, 'Unstake');
+  }
+
+  static validateBorrowArgs(args) {
+    const schema = Joi.object({
+      escrowAddress: Joi.string().required().messages({
+        'any.required': 'Escrow is required and must be a string.',
+        'string.base': 'Escrow must be a valid string.',
+      }),
+      borrowAmount: Joi.number().positive().required().messages({
+        'any.required':
+          'Borrow Amount is required and must be a positive number.',
+        'number.base': 'Borrow Amount must be a valid number.',
+        'number.positive': 'Borrow Amount must be positive.',
+      }),
+    });
+    ReserveController.validateArgs(args, schema, 'Borrow');
+  }
+
+  static validatePayLoanArgs(args) {
+    const schema = Joi.object({
+      escrowAddress: Joi.string().required().messages({
+        'any.required': 'Escrow is required and must be a string.',
+        'string.base': 'Escrow must be a valid string.',
+      }),
+      stratsPaymentService: Joi.string().required().messages({
+        'any.required':
+          'Strats Payment Service is required and must be a string.',
+        'string.base': 'Strats Payment Service must be a valid string.',
+      }),
+    });
+    ReserveController.validateArgs(args, schema, 'PayLoan');
   }
 
   static validateArgs(args, schema, action) {

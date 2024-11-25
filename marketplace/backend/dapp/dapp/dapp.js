@@ -2081,15 +2081,23 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
     return await reserveJs.getAll(rawAdmin, options);
   };
   
-  contract.calculate = async function (args, options = defaultOptions) {
-    return await reserveJs.calculate(rawAdmin, args, options);
+  contract.oraclePrice = async function (args, options = defaultOptions) {
+    return await reserveJs.oraclePrice(rawAdmin, args, options);
   };
   
   contract.stake = async function (args, options = defaultOptions) {
     return await reserveJs.stake(rawAdmin, args, options);
   };
-  
+
   contract.unstake = async function (args, options = defaultOptions) {
+    return await reserveJs.unstake(rawAdmin, args, options);
+  };
+
+  contract.borrow = async function (args, options = defaultOptions) {
+    return await reserveJs.borrow(rawAdmin, args, options);
+  };
+  
+  contract.payLoan = async function (args, options = defaultOptions) {
     const { stratsPaymentService, escrow } = args;
   
     // Fetch user's STRATS asset origin address
@@ -2133,7 +2141,7 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
     }
   
     // Proceed with unstake if sufficient assets are accumulated
-    return await reserveJs.unstake(
+    return await reserveJs.payLoan(
       rawAdmin,
       { address: stratsPaymentService },
       { stratsAssetAddresses: addressesToUse, escrowAddress: escrow },
