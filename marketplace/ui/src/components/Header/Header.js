@@ -101,7 +101,7 @@ const HeaderComponent = ({
   const [isModalVisible, setIsModalVisible] = useState(false);
   const [originAddress, setOriginAddress] = useState();
   const stratsBalance = Object.keys(strats).length > 0 ? strats : 0;
-  const cataBalance = cata || 0;
+  const cataBalance = Object.keys(cata).length > 0 ? cata : 0;
 
   useEffect(() => {
     setSelectedCategory(categoryQueryValue);
