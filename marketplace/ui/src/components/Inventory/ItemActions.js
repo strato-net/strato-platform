@@ -11,18 +11,18 @@ import {
   MoreOutlined,
   RiseOutlined,
   LogoutOutlined,
-} from "@ant-design/icons";
+} from '@ant-design/icons';
 import {
   ASSET_STATUS,
   OLD_SADDOG_ORIGIN_ADDRESS,
-} from "../../helpers/constants";
-import ListForSaleModal from "./ListForSaleModal";
-import UnlistModal from "./UnlistModal";
-import ResellModal from "./ResellModal";
-import TransferModal from "./TransferModal";
-import RedeemModal from "./RedeemModal";
-import BridgeModal from "./BridgeModal";
-import StakeModal from "./StakeModal";
+} from '../../helpers/constants';
+import ListForSaleModal from './ListForSaleModal';
+import UnlistModal from './UnlistModal';
+import ResellModal from './ResellModal';
+import TransferModal from './TransferModal';
+import RedeemModal from './RedeemModal';
+import BridgeModal from './BridgeModal';
+import StakeModal from './StakeModal';
 
 const ItemActions = ({
   inventory,
@@ -47,10 +47,12 @@ const ItemActions = ({
       : undefined
     : inventory.saleQuantity;
   const stakeable =
-    inventory.root && reserves && inventory.root === reserves[0].assetRootAddress;
+    inventory.root &&
+    reserves &&
+    inventory.root === reserves[0].assetRootAddress;
   const [listModalOpen, setListModalOpen] = useState(false);
   const [unlistModalOpen, setUnlistModalOpen] = useState(false);
-  const [stakeType, setStakeType] = useState("Stake");
+  const [stakeType, setStakeType] = useState('Stake');
   const [stakeModalOpen, setStakeModalOpen] = useState(false);
   const [resellModalOpen, setResellModalOpen] = useState(false);
   const [transferModalOpen, setTransferModalOpen] = useState(false);
@@ -178,130 +180,144 @@ const ItemActions = ({
   };
 
   return (
-    <div className="flex">
-      <Button
-        type="link"
-        className="text-[#13188A] font-semibold"
-        onClick={showListModal}
-        disabled={
-          isEditSellDisabled() || !isActive() || disableSADDOGS(inventory)
-        }
-      >
-        {inventory.price ? (
-          <>
-            <EditOutlined /> Edit
-          </>
-        ) : (
-          <>
-            <DollarOutlined /> Sell
-          </>
-        )}
-      </Button>
-      <Button
-        type="link"
-        className="text-[#13188A] font-semibold"
-        onClick={showTransferModal}
-        disabled={isTransferDisabled() || !isActive()}
-      >
-        <SwapOutlined /> Transfer
-      </Button>
+    <div className="flex justify-center">
       {!stakeable && (
-        <Button
-          type="link"
-          className="text-[#13188A] font-semibold w-1/4 flex items-center justify-center"
-          onClick={showRedeemModal}
-          disabled={
-            inventory.price ||
-            inventory.address === inventory.originAddress ||
-            !isActive() ||
-            disableSADDOGS(inventory)
-          }
-        >
-          <SendOutlined /> Redeem
-        </Button>
+        <>
+          <Button
+            type="link"
+            className="text-[#13188A] font-semibold"
+            onClick={showListModal}
+            disabled={
+              isEditSellDisabled() || !isActive() || disableSADDOGS(inventory)
+            }
+          >
+            {inventory.price ? (
+              <>
+                <EditOutlined /> Edit
+              </>
+            ) : (
+              <>
+                <DollarOutlined /> Sell
+              </>
+            )}
+          </Button>
+          <Button
+            type="link"
+            className="text-[#13188A] font-semibold"
+            onClick={showTransferModal}
+            disabled={isTransferDisabled() || !isActive()}
+          >
+            <SwapOutlined /> Transfer
+          </Button>
+
+          <Button
+            type="link"
+            className="text-[#13188A] font-semibold w-1/4 flex items-center justify-center"
+            onClick={showRedeemModal}
+            disabled={
+              inventory.price ||
+              inventory.address === inventory.originAddress ||
+              !isActive() ||
+              disableSADDOGS(inventory)
+            }
+          >
+            <SendOutlined /> Redeem
+          </Button>
+        </>
       )}
 
       {!inventory.stratsLoanAmount && stakeable && (
-        <Button
-          type="primary"
-          className="font-semibold w-1/4 flex items-center justify-center"
-          onClick={() => showStakeModal("Stake")}
-          disabled={inventory.price || !isActive()}
-        >
-          <RiseOutlined /> Stake
-        </Button>
+          <Button
+            type="primary"
+            className="font-semibold flex items-center justify-center"
+            onClick={() => showStakeModal('Stake')}
+            disabled={inventory.price || !isActive()}
+          >
+            <RiseOutlined /> Stake
+          </Button>
       )}
 
       {inventory.stratsLoanAmount && stakeable && (
-        <Button
-          type="primary"
-          className="font-semibold w-1/4 flex items-center justify-center"
-          onClick={() => showStakeModal("Unstake")}
-        >
-          <LogoutOutlined /> Unstake
-        </Button>
+        <div className="flex justify-center gap-3">
+          <Button
+            type="primary"
+            className="font-semibold"
+            onClick={() => showStakeModal('Unstake')}
+          >
+            <LogoutOutlined /> Unstake
+          </Button>
+          <Button type="primary" className="font-semibold">
+            <LogoutOutlined /> Borrow
+          </Button>
+          <Button type="primary" className="font-semibold">
+            <LogoutOutlined /> Pay Loan
+          </Button>
+        </div>
       )}
-      <Popover
-        placement="topRight"
-        open={popoverVisible[inventory.address] || false}
-        onOpenChange={(visible) => togglePopover(inventory.address, visible)}
-        content={
-          <div className="flex gap-2">
-            {stakeable && (
+      {!stakeable && (
+        <Popover
+          placement="topRight"
+          open={popoverVisible[inventory.address] || false}
+          onOpenChange={(visible) => togglePopover(inventory.address, visible)}
+          content={
+            <div className="flex gap-2">
+              {stakeable && (
+                <Button
+                  type="link"
+                  className="text-[#13188A] font-semibold"
+                  onClick={showRedeemModal}
+                  disabled={
+                    inventory.price ||
+                    inventory.address === inventory.originAddress ||
+                    !isActive() ||
+                    disableSADDOGS(inventory)
+                  }
+                >
+                  <SendOutlined /> Redeem
+                </Button>
+              )}
               <Button
                 type="link"
                 className="text-[#13188A] font-semibold"
-                onClick={showRedeemModal}
+                onClick={showUnlistModal}
+                disabled={!inventory.price || !isActive()}
+              >
+                <StopOutlined /> Unlist
+              </Button>
+              <Button
+                type="link"
+                className="text-[#13188A] font-semibold"
+                onClick={showResellModal}
                 disabled={
-                  inventory.price ||
-                  inventory.address === inventory.originAddress ||
-                  !isActive() ||
-                  disableSADDOGS(inventory)
+                  !(
+                    itemData.isMint &&
+                    itemData.isMint == 'True' &&
+                    !disableSADDOGS(inventory)
+                  ) || !isActive()
                 }
               >
-                <SendOutlined /> Redeem
+                <PieChartOutlined /> Mint
               </Button>
-            )}
-            <Button
-              type="link"
-              className="text-[#13188A] font-semibold"
-              onClick={showUnlistModal}
-              disabled={!inventory.price || !isActive()}
-            >
-              <StopOutlined /> Unlist
-            </Button>
-            <Button
-              type="link"
-              className="text-[#13188A] font-semibold"
-              onClick={showResellModal}
-              disabled={
-                !(
-                  itemData.isMint &&
-                  itemData.isMint == 'True' &&
-                  !disableSADDOGS(inventory)
-                ) || !isActive()
-              }
-            >
-              <PieChartOutlined /> Mint
-            </Button>
-            <Button
-              type="link"
-              className={`text-[#13188A] font-semibold ${
-                !isTokenSupported(inventory.root) || inventory.stratsLoanAmount
-                  ? "hidden"
-                  : ""
-              }`}
-              onClick={showBridgeModal}
-            >
-              <RetweetOutlined /> Bridge
-            </Button>
-          </div>
-        }
-      >
-        <Button className="text-[#13188A] font-semibold" type="link">
-          <MoreOutlined /> More
-        </Button>
-      </Popover>
+              <Button
+                type="link"
+                className={`text-[#13188A] font-semibold ${
+                  !isTokenSupported(inventory.root) ||
+                  inventory.stratsLoanAmount
+                    ? 'hidden'
+                    : ''
+                }`}
+                onClick={showBridgeModal}
+              >
+                <RetweetOutlined /> Bridge
+              </Button>
+            </div>
+          }
+        >
+          <Button className="text-[#13188A] font-semibold" type="link">
+            <MoreOutlined /> More
+          </Button>
+        </Popover>
+      )}
       {listModalOpen && (
         <ListForSaleModal
           open={listModalOpen}
