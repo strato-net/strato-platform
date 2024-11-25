@@ -135,4 +135,29 @@ abstract contract Reserve is Utils, Structs {
         require(_newOracle != address(0), "Invalid oracle address");
         oracle = OracleService(_newOracle);
     }
+
+    //Setters for state variables
+    function setCataToken(address _newCataToken) public requireOwner("update CATA token") {
+        require(_newCataToken != address(0), "Invalid CATA token address");
+        cataToken = _newCataToken;
+    }
+
+    function setName(string _newName) public requireOwner("update name") {
+        name = _newName;
+    }
+
+    function setAssetRootAddress(address _newAssetRootAddress) public requireOwner("update asset root address") {
+        require(_newAssetRootAddress != address(0), "Invalid asset root address");
+        assetRootAddress = _newAssetRootAddress;
+    }
+
+    function setLoanToValueRatio(uint _newRatio) public requireOwner("update LTV ratio") {
+        require(_newRatio > 0 && _newRatio <= 100, "LTV ratio must be between 1 and 100");
+        loanToValueRatio = _newRatio;
+    }
+
+    function setCataAPYRate(uint _newRate) public requireOwner("update CATA APY rate") {
+        require(_newRate > 0, "APY rate must be greater than 0");
+        cataAPYRate = _newRate;
+    }
 }
