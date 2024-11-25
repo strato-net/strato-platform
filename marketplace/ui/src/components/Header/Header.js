@@ -217,7 +217,7 @@ const HeaderComponent = ({
       label: (
         <div>
           {user && <p className="text-xs mt-1">STRATs: {stratsBalance}</p>}
-          {user && <p className="text-xs mt-1">CATA: {cataBalance}</p>}
+          {/* {user && <p className="text-xs mt-1">CATA: {cataBalance}</p>} */}
         </div>
       ),
       children: [
@@ -250,6 +250,52 @@ const HeaderComponent = ({
           ),
         },
       ],
+    },
+  ];
+
+  const cataItem = [
+    {
+      key: '1',
+      type: 'group',
+      label: (
+        <>{user &&
+        <Row className='flex flex-col'>
+        <Col Col={24}> <p className="text-xs mt-1">Balance: {cataBalance}</p></Col>
+        <Col Col={24}> <p className="text-xs mt-1">Quantity: {cataBalance}</p></Col>
+        <Col Col={24}> <p className="text-xs mt-1">CATA: {cataBalance}</p></Col>
+        </Row>}
+        </>
+      ),
+      // children: [
+      //   {
+      //     key: '2',
+      //     onClick: async () => {
+      //       navigate(
+      //         `${routes.MarketplaceProductDetail.url
+      //           .replace(':address', originAddress)
+      //           .replace(':name', 'STRATS')}`
+      //       );
+      //     },
+      //     label: (
+      //       <div>
+      //         {user && originAddress && (
+      //           <p className="text-xs mt-1">Buy STRATs</p>
+      //         )}
+      //       </div>
+      //     ),
+      //   },
+      //   {
+      //     key: '3',
+      //     onClick: async () => {
+      //       navigate(`${routes.Transactions.url}?type=STRATS`);
+      //     },
+      //     label: (
+      //       <div>
+      //         {user && <p className="text-xs mt-1">Transaction History</p>}
+      //       </div>
+      //     ),
+      //   },
+      // ],
     },
   ];
 
@@ -501,6 +547,34 @@ const HeaderComponent = ({
               />
             </div>
           }
+          {roleIndex !== undefined && roleIndex !== 1 && (
+            <Dropdown
+              menu={{ items: cataItem }}
+              placement="bottomRight"
+              trigger={['click']}
+              className="xs:mt-5 md:mt-0"
+              overlayStyle={{ position: 'fixed' }}
+            >
+              <a
+                className="md:flex mx-1 text-base text-white"
+                id="strats-dropdown"
+              >
+                <Badge
+                  style={{ backgroundColor: '#13188A' }}
+                  className="cursor-pointer mt-7 md:mt-0 mx-2"
+                  count={cataBalance}
+                  overflowCount={9999999}
+                >
+                  <img
+                    src={Images.strats}
+                    alt={IMG_META}
+                    title={IMG_META}
+                    className="w-[35px] h-[35px] "
+                  />
+                </Badge>
+              </a>
+            </Dropdown>
+          )}
           {roleIndex !== undefined && roleIndex !== 1 && (
             <Dropdown
               menu={{ items: stratsItem }}
