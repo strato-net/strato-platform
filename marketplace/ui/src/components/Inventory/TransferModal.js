@@ -263,7 +263,7 @@ const TransferModal = ({
             return availableQuantity - allocatedQuantity;
           })()}
           step={1}
-          precision={0}
+          precision={inventory?.contract_name?.includes('STRATSTokens') ? 2 : 0 }
           onChange={(value) => handleQuantityChange(record.id, value)}
           disabled={index !== transfers.length - 1}
         />
