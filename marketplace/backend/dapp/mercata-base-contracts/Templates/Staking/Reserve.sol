@@ -23,6 +23,7 @@ abstract contract Reserve is Utils, Structs {
     uint public cataAPYRate = 10; // 10% APY for CATA rewards
     
     event StakeCreated(address indexed user, address escrow, uint assetAmount, decimal stratsLoan, uint cataReward);
+    event StakeUnlocked(address indexed user, address escrow);
 
     constructor(address _assetOracle, address _cataToken, string _name, address _assetRootAddress) {
         oracle = OracleService(_assetOracle);
@@ -51,7 +52,7 @@ abstract contract Reserve is Utils, Structs {
         Asset _assetToBeSold,
         decimal _escrowPrice,
         uint _escrowQuantity
-    ) public requireActive() returns (address) {
+    ) internal requireActive() returns (address) {
         // Create Escrow without transferring STRATS
         Escrow escrow = new Escrow(
             msg.sender,
@@ -74,7 +75,7 @@ abstract contract Reserve is Utils, Structs {
         
         uint _escrowQuantity = _assetToBeSold.quantity();
         (decimal _escrowPrice, uint _priceTimestamp) = oracle.getLatestPrice();
-        decimal _maxStratsLoanAmount = decimal(_assetAmount) * _escrowPrice * decimal(loanToValueRatio);
+        decimal _maxStratsLoanAmount = decimal(_assetAmount) * _escrowPrice.truncate(2) * decimal(loanToValueRatio);
         decimal _cataReward = calculateCATAReward(_assetAmount, _maxStratsLoanAmount/100);
 
         // Create Escrow with all required parameters
@@ -82,10 +83,10 @@ abstract contract Reserve is Utils, Structs {
             _assetAmount,
             _assetAddress,
             _stratPaymentService,
-            _maxStratsLoanAmount,
-            _cataReward,
+            _maxStratsLoanAmount.truncate(2),
+            _cataReward.truncate(2),
             _assetToBeSold,
-            _escrowPrice,
+            _escrowPrice.truncate(2),
             _escrowQuantity
         );
 
@@ -159,5 +160,16 @@ abstract contract Reserve is Utils, Structs {
     function setCataAPYRate(uint _newRate) public requireOwner("update CATA APY rate") {
         require(_newRate > 0, "APY rate must be greater than 0");
         cataAPYRate = _newRate;
+    }
+
+    function unstake(address _escrowAddress) public requireActive() {
+        Escrow escrow = Escrow(_escrowAddress);
+        require(escrow.borrower() == msg.sender, "Only the borrower can unstake");
+        require(escrow.borrowedAmount() == 0, "Must repay borrowed STRATS before unstaking");
+
+        escrow.closeSale();
+
+        // Emit unstake event
+        emit StakeUnlocked(msg.sender, _escrowAddress);
     }
 }

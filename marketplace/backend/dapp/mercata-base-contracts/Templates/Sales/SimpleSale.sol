@@ -9,7 +9,7 @@ contract SimpleSale is Sale {
         decimal _price,
         uint _quantity,
         PaymentServiceInfo[] _paymentServices
-    ) Sale("Simple Sale", _assetToBeSold, _price, _quantity, _paymentServices) {}
+    ) Sale("SimpleSale", _assetToBeSold, _price, _quantity, _paymentServices) {}
 
     function addPaymentServices(PaymentServiceInfo[] _paymentServices) external requireSeller("add payment services") {
         _addPaymentServices(_paymentServices);

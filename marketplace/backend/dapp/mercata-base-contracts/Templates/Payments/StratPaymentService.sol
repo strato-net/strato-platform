@@ -10,7 +10,7 @@ contract StratPaymentService is PaymentService {
 
     address public feeRecipient;
 
-    event UnstakeProcessed(address indexed user, address escrow, uint assetAmount, decimal repayment);
+    event LoanRepaid(address indexed user, address escrow, uint assetAmount, decimal repayment);
 
     constructor (
         address _stratAddress,
@@ -31,13 +31,13 @@ contract StratPaymentService is PaymentService {
         feeRecipient = _feeRecipient;
     }
 
-    function unStake(
+    function repayLoan(
         address[] _stratsAssetAddresses,
         address _escrowAddress
-    ) requireActive("unstake") external returns (uint) {
+    ) requireActive("repayloan") external returns (uint) {
         require(_stratsAssetAddresses.length > 0, "Pass at least one STRATs token address");
         Escrow escrow = Escrow(_escrowAddress);
-        uint stratAmountNet = uint(escrow.stratsLoanAmount() * 100);
+        uint stratAmountNet = uint(escrow.borrowedAmount() * 100);
         uint stratQuantity = 0;
         uint transferNumber = 0;
         uint transferAmount = 0;
@@ -58,12 +58,12 @@ contract StratPaymentService is PaymentService {
                 break;
             }
         }
-        require(stratAmountNet == 0, "Your STRATS balance is not high enough to cover the purchase.");
+        require(stratAmountNet == 0, "Your STRATS balance is not high enough to cover the repayment.");
 
-        // Transfer assets
-        escrow.closeSale();
+        // Update borrowed amount instead of closing the escrow
+        escrow.updateBorrowedAmount(-escrow.borrowedAmount());
 
-        emit UnstakeProcessed(msg.sender, _escrowAddress, escrow.quantity(), escrow.stratsLoanAmount());
+        emit LoanRepaid(msg.sender, _escrowAddress, escrow.quantity(), escrow.borrowedAmount());
     }
 
     function _checkoutInitialized (
