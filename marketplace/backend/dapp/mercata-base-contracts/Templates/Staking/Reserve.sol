@@ -21,8 +21,9 @@ abstract contract Reserve is Utils, Structs {
 
     uint public loanToValueRatio = 50; // LTV ratio as percentage
     uint public cataAPYRate = 10; // 10% APY for CATA rewards
-
+    
     event StakeCreated(address indexed user, address escrow, uint assetAmount, decimal stratsLoan, uint cataReward);
+    event StakeUnlocked(address indexed user, address escrow);
 
     constructor(address _assetOracle, address _cataToken, string _name, address _assetRootAddress) {
         oracle = OracleService(_assetOracle);
@@ -42,39 +43,77 @@ abstract contract Reserve is Utils, Structs {
         _;
     }
 
-    function createEscrow(uint _assetAmount, address _assetAddress, PaymentServiceInfo _stratPaymentService) public requireActive() returns (address) {
-
-        // Calculate required values
-        Asset _assetToBeSold = Asset(_assetAddress);
-        require(_assetToBeSold.ownerCommonName() == getCommonName(msg.sender), "Only the owner of the asset can stake it");
-        require (_assetToBeSold.root == assetRootAddress, "Asset does not belong to the root address");
-        uint _escrowQuantity = _assetToBeSold.quantity();//Taking all the quantity of the asset for now
-        (decimal _escrowPrice, uint _priceTimestamp) = oracle.getLatestPrice(); // needs to have logic to use timestamp to make sure price is not stale/old
-        decimal _stratsLoanAmount = decimal(_assetAmount) * _escrowPrice * decimal(loanToValueRatio);  // Calculate the loan amount in STRATS
-        decimal _cataReward = calculateCATAReward(_assetAmount, _stratsLoanAmount/100);
-
-        // Create the Escrow contract but do not attach assets or transfer STRATS
-        Escrow escrow = new Escrow(msg.sender, _stratsLoanAmount, _cataReward, _assetToBeSold, _escrowPrice, _escrowQuantity, [_stratPaymentService]);
-
-        stakeAsset(address(escrow));
+    function createEscrow(
+        uint _assetAmount, 
+        address _assetAddress, 
+        PaymentServiceInfo _stratPaymentService,
+        decimal _maxStratsLoanAmount,
+        decimal _cataReward,
+        address _assetToBeSold,
+        decimal _escrowPrice,
+        uint _escrowQuantity
+    ) internal requireActive() returns (address) {
+        // Create Escrow without transferring STRATS
+        Escrow escrow = new Escrow(
+            msg.sender,
+            _maxStratsLoanAmount,
+            _cataReward,
+            _assetToBeSold,
+            _escrowPrice,
+            _escrowQuantity,
+            [_stratPaymentService]
+        );
 
         return address(escrow);
     }
 
-    function stakeAsset(address _escrowAddress) internal {
+    function stakeAsset(uint _assetAmount, address _assetAddress, PaymentServiceInfo _stratPaymentService) public requireActive() returns (address) {
+        // Calculate required values
+        Asset _assetToBeSold = Asset(_assetAddress);
+        require(_assetToBeSold.ownerCommonName() == getCommonName(msg.sender), "Only the owner of the asset can stake it");
+        require(_assetToBeSold.root == assetRootAddress, "Asset does not belong to the root address");
+        
+        uint _escrowQuantity = _assetToBeSold.quantity();
+        (decimal _escrowPrice, uint _priceTimestamp) = oracle.getLatestPrice();
+        decimal _maxStratsLoanAmount = decimal(_assetAmount) * _escrowPrice.truncate(2) * decimal(loanToValueRatio);
+        decimal _cataReward = calculateCATAReward(_assetAmount, _maxStratsLoanAmount/100);
 
-        // Retrieve escrow details
+        // Create Escrow with all required parameters
+        address escrow = createEscrow(
+            _assetAmount,
+            _assetAddress,
+            _stratPaymentService,
+            _maxStratsLoanAmount.truncate(2),
+            _cataReward.truncate(2),
+            address(_assetToBeSold),
+            _escrowPrice.truncate(2),
+            _escrowQuantity
+        );
+
+        emit StakeCreated(msg.sender, address(escrow), _assetAmount, _maxStratsLoanAmount, _cataReward);
+        return escrow;
+    }
+
+    function borrow(address _escrowAddress, decimal _borrowAmount) public requireActive() {
         Escrow escrow = Escrow(_escrowAddress);
-        decimal stratsLoanAmount = escrow.stratsLoanAmount();
+        require(escrow.borrower() == msg.sender, "Only borrower can borrow against this escrow");
+        require(_borrowAmount <= escrow.stratsLoanAmount(), "Cannot borrow more than max loan amount");
+        
         uint transferNumber = (uint(block.number + 16)) % 1000000;
         
-        // Transfer STRATS from owner (BlockApps) to the borrower
-        stratsToken.transferOwnership(escrow.borrower(), uint(stratsLoanAmount*100), true, transferNumber, 0.0001);
-
-        // Emit the StakeCreated event
-        emit StakeCreated(msg.sender, _escrowAddress, escrow.quantity(), stratsLoanAmount, escrow.cataRewardInDollars());
+        // Transfer STRATS from owner to borrower
+        stratsToken.transferOwnership(
+            escrow.borrower(),
+            uint(_borrowAmount * 100),
+            true,
+            transferNumber,
+            0.0001
+        );
+        
+        // Update borrowed amount in escrow
+        escrow.updateBorrowedAmount(_borrowAmount);
     }
-    
+
     function calculateCATAReward(uint _assetAmount, decimal _loanAmount) internal view returns (decimal) {
         // Calculate reward based on 10% APY over a specific period
         // Placeholder calculation, assuming a yearly rate
@@ -96,5 +135,41 @@ abstract contract Reserve is Utils, Structs {
     function setOracle(address _newOracle) public requireOwner("update oracle") {
         require(_newOracle != address(0), "Invalid oracle address");
         oracle = OracleService(_newOracle);
+    }
+
+    //Setters for state variables
+    function setCataToken(address _newCataToken) public requireOwner("update CATA token") {
+        require(_newCataToken != address(0), "Invalid CATA token address");
+        cataToken = _newCataToken;
+    }
+
+    function setName(string _newName) public requireOwner("update name") {
+        name = _newName;
+    }
+
+    function setAssetRootAddress(address _newAssetRootAddress) public requireOwner("update asset root address") {
+        require(_newAssetRootAddress != address(0), "Invalid asset root address");
+        assetRootAddress = _newAssetRootAddress;
+    }
+
+    function setLoanToValueRatio(uint _newRatio) public requireOwner("update LTV ratio") {
+        require(_newRatio > 0 && _newRatio <= 100, "LTV ratio must be between 1 and 100");
+        loanToValueRatio = _newRatio;
+    }
+
+    function setCataAPYRate(uint _newRate) public requireOwner("update CATA APY rate") {
+        require(_newRate > 0, "APY rate must be greater than 0");
+        cataAPYRate = _newRate;
+    }
+
+    function unstake(address _escrowAddress) public requireActive() {
+        Escrow escrow = Escrow(_escrowAddress);
+        require(escrow.borrower() == msg.sender, "Only the borrower can unstake");
+        require(escrow.borrowedAmount() == 0, "Must repay borrowed STRATS before unstaking");
+
+        escrow.closeSale();
+
+        // Emit unstake event
+        emit StakeUnlocked(msg.sender, _escrowAddress);
     }
 }
