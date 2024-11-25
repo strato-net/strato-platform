@@ -93,7 +93,7 @@ import Data.Time.Clock
 import qualified Data.Vector as V
 import GHC.Stack
 import Handlers.AccountInfo
-import Handlers.SyncStatus
+import Handlers.Metadata
 import Handlers.Transaction
 import SQLM
 import SolidVM.Model.CodeCollection.Contract
@@ -1418,6 +1418,6 @@ getResultAndRespond txHashes resolve = do
     (Pending, _, _) -> return result
 
 checkIsSynced :: (MonadIO m, MonadLogger m, HasStrato m, HasCallStack) => m ()
-checkIsSynced = blocStrato getSyncStatusClient >>= \case
-  SyncStatus (Just False) (Just wtd) (Just ntd) -> throwIO $ NotYetSynced ntd wtd
+checkIsSynced = blocStrato getMetaDataClient >>= \case
+  MetadataResponse {isSynced = False} -> throwIO NotYetSynced
   _ -> pure ()

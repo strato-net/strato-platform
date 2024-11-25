@@ -70,7 +70,6 @@ import qualified Handlers.Peers as Peers
 import qualified Handlers.QueuedTransactions as QueuedTransactions
 import qualified Handlers.Stats as Stats
 import qualified Handlers.Storage as Storage
-import qualified Handlers.SyncStatus as SyncStatus
 import qualified Handlers.Transaction as Transaction
 import qualified Handlers.TransactionResult as TransactionResult
 import qualified Handlers.TxLast as TxLast
@@ -170,7 +169,6 @@ type CoreAPI =
            :<|> QueuedTransactions.API
            :<|> Stats.API
            :<|> Storage.API
-           :<|> SyncStatus.API
            :<|> Transaction.API
            :<|> TransactionResult.API
            :<|> TxLast.API
@@ -205,7 +203,6 @@ coreServer =
     :<|> QueuedTransactions.server
     :<|> Stats.server
     :<|> Storage.server
-    :<|> SyncStatus.server
     :<|> Transaction.server flags_txSizeLimit
     :<|> TransactionResult.server
     :<|> TxLast.server
@@ -241,7 +238,6 @@ coreProxyServer =
     :<|> (blocStrato $ client (Proxy @QueuedTransactions.API))
     :<|> (blocStrato $ client (Proxy @Stats.API))
     :<|> (\a b c d e f g h i j k -> blocStrato $ client (Proxy @Storage.API) a b c d e f g h i j k)
-    :<|> (blocStrato $ client (Proxy @SyncStatus.API))
     :<|> ((\a b c d e f g h i j k l m n o p q -> blocStrato $ client (Proxy @Transaction.GetTransaction) a b c d e f g h i j k l m n o p q)
       :<|> (\a -> blocStrato $ client (Proxy @Transaction.PostTransaction) a)
       :<|> (\a -> blocStrato $ client (Proxy @Transaction.PostTransactionList) a))
