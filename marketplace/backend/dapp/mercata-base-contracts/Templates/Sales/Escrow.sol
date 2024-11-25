@@ -13,7 +13,7 @@ contract Escrow is Sale {
         address _borrower,
         uint _stratsLoanAmount,
         decimal _cataRewardInDollars,
-        Asset _assetToBeSold,
+        address _assetToBeSold,
         decimal _escrowPrice,
         uint _escrowQuantity,
         PaymentServiceInfo[] _paymentServices

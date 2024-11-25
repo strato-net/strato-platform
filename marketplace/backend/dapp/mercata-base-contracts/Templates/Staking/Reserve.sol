@@ -49,7 +49,7 @@ abstract contract Reserve is Utils, Structs {
         PaymentServiceInfo _stratPaymentService,
         decimal _maxStratsLoanAmount,
         decimal _cataReward,
-        Asset _assetToBeSold,
+        address _assetToBeSold,
         decimal _escrowPrice,
         uint _escrowQuantity
     ) internal requireActive() returns (address) {
@@ -85,7 +85,7 @@ abstract contract Reserve is Utils, Structs {
             _stratPaymentService,
             _maxStratsLoanAmount.truncate(2),
             _cataReward.truncate(2),
-            _assetToBeSold,
+            address(_assetToBeSold),
             _escrowPrice.truncate(2),
             _escrowQuantity
         );
