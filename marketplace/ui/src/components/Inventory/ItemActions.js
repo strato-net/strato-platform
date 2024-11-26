@@ -23,6 +23,8 @@ import TransferModal from './TransferModal';
 import RedeemModal from './RedeemModal';
 import BridgeModal from './BridgeModal';
 import StakeModal from './StakeModal';
+import BorrowModal from './BorrowModal';
+import PayLoanModal from './PayLoanModal';
 
 const ItemActions = ({
   inventory,
@@ -54,6 +56,8 @@ const ItemActions = ({
   const [unlistModalOpen, setUnlistModalOpen] = useState(false);
   const [stakeType, setStakeType] = useState('Stake');
   const [stakeModalOpen, setStakeModalOpen] = useState(false);
+  const [borrowModalOpen, setBorrowModalOpen] = useState(false);
+  const [payLoanModalOpen, setPayLoanModalOpen] = useState(false);
   const [resellModalOpen, setResellModalOpen] = useState(false);
   const [transferModalOpen, setTransferModalOpen] = useState(false);
   const [redeemModalOpen, setRedeemModalOpen] = useState(false);
@@ -137,6 +141,24 @@ const ItemActions = ({
 
   const handleStakeModalClose = () => {
     setStakeModalOpen(false);
+  };
+
+  const showBorrowModal = () => {
+    togglePopover(false);
+    setBorrowModalOpen(true);
+  };
+
+  const handleBorrowModalClose = () => {
+    setBorrowModalOpen(false);
+  };
+
+  const showPayLoanModal = () => {
+    togglePopover(false);
+    setPayLoanModalOpen(true);
+  };
+
+  const handlePayLoanModalClose = () => {
+    setPayLoanModalOpen(false);
   };
 
   const handleUnlistModalClose = () => {
@@ -247,10 +269,18 @@ const ItemActions = ({
           >
             <LogoutOutlined /> Unstake
           </Button>
-          <Button type="primary" className="font-semibold">
+          <Button
+            type="primary"
+            className="font-semibold"
+            onClick={() => showBorrowModal('Unstake')}
+          >
             <LogoutOutlined /> Borrow
           </Button>
-          <Button type="primary" className="font-semibold">
+          <Button
+            type="primary"
+            className="font-semibold"
+            onClick={() => showPayLoanModal('Unstake')}
+          >
             <LogoutOutlined /> Pay Loan
           </Button>
         </div>
@@ -348,6 +378,30 @@ const ItemActions = ({
           open={stakeModalOpen}
           type={stakeType}
           handleCancel={handleStakeModalClose}
+          limit={limit}
+          offset={offset}
+          inventory={inventory}
+          debouncedSearchTerm={debouncedSearchTerm}
+          saleAddress={inventory.saleAddress}
+          category={category}
+        />
+      )}
+      {borrowModalOpen && (
+        <BorrowModal
+          open={borrowModalOpen}
+          handleCancel={handleBorrowModalClose}
+          limit={limit}
+          offset={offset}
+          inventory={inventory}
+          debouncedSearchTerm={debouncedSearchTerm}
+          saleAddress={inventory.saleAddress}
+          category={category}
+        />
+      )}
+      {payLoanModalOpen && (
+        <PayLoanModal
+          open={payLoanModalOpen}
+          handleCancel={handlePayLoanModalClose}
           limit={limit}
           offset={offset}
           inventory={inventory}
