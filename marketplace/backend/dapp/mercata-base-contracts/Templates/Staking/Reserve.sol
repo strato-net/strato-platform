@@ -128,6 +128,10 @@ abstract contract Reserve is Utils, Structs {
         stratsToken.transferOwnership(owner, _amount, false, 0, 0);
     }
 
+    function transferSTRATStoAnotherReserve(address _newOwner, uint _amount) public requireOwner("transfer STRATS to another reserve") {
+        stratsToken.transferOwnership(_newOwner, _amount, false, 0, 0);
+    }
+
     function deactivate() public requireActive() requireOwner("deactivate reserve") {
         isActive = false;
     }
