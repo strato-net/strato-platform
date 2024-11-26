@@ -48,17 +48,17 @@ const BorrowModal = ({
 
   const dataForItems = [
     {
-      label: `# of ${itemName} to Collateralize`,
+      label: `Quantity to Collateralize`,
       description: 'The number of assets to use as collateral',
       value: `${inventory?.quantity}`,
     },
     {
-      label: `Market Value of (${itemName} x ${inventory?.quantity})`,
+      label: `Market Value`,
       description: 'The total market value of the collateral',
       value: `$${(oracleData.consensusPrice.toFixed(2) * inventory?.quantity).toFixed(2)}`,
     },
     {
-      label: 'Estimated Loan Amount in STRATs',
+      label: 'Estimated Loan (in STRATs)',
       description: 'The estimated amount of CATA to earn daily',
       value: (
         <div className="flex -mr-1">
@@ -71,7 +71,7 @@ const BorrowModal = ({
 
   const dataForSummary = [
     {
-      label: `Market price per ${itemName}`,
+      label: `Market price (per unit)`,
       description: 'The current market price of the asset',
       value: `$${oracleData.consensusPrice.toFixed(2)}`,
     },
@@ -116,7 +116,7 @@ const BorrowModal = ({
       onCancel={handleCancel}
       title={
         <div className="text-2xl md:text-3xl font-bold pl-4">
-          Borrow Position
+          Borrow Position: {itemName}
         </div>
       }
       width={600}

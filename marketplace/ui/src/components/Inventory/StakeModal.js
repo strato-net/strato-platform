@@ -62,12 +62,12 @@ const StakeModal = ({
     type === 'Stake'
       ? [
           {
-            label: `# of ${inventory?.name} to Stake`,
+            label: `Quantity to Stake`,
             description: 'The number of assets to use to stake',
             value: `${inventory?.quantity}`,
           },
           {
-            label: `Market Value of (${inventory?.name} x ${inventory?.quantity})`,
+            label: `Market Value`,
             description: 'The total market value of the staked assets',
             value: `$${
               (oracleData.consensusPrice.toFixed(2) * inventory?.quantity).toFixed(2)
@@ -95,7 +95,7 @@ const StakeModal = ({
         ]
       : [
           {
-            label: `# of ${inventory?.name} to Unstake`,
+            label: `Quantity to Unstake`,
             description: 'The number of assets to unstake',
             value: `${inventory?.quantity}`,
           },
@@ -105,7 +105,7 @@ const StakeModal = ({
     type === 'Stake'
       ? [
           {
-            label: `Market price per ${inventory?.name}`,
+            label: `Market price (per unit)`,
             description: 'The current market price of the asset',
             value: `$${oracleData.consensusPrice.toFixed(2)}`,
           },
