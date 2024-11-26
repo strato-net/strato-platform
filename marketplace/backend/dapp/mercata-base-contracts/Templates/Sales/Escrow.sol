@@ -22,7 +22,6 @@ contract Escrow is Sale {
     ) Sale("Escrow", _assetToBeSold, 0, _escrowQuantity, _paymentServices) {
         collateralAmount = _collateralAmount;
         oraclePrice = _oraclePrice;
-        loanToValueRatio = _loanToValueRatio;
         borrower = _borrower;
         maxStratsLoanAmount = _maxStratsLoanAmount;
         totalCataRewardInDollars = 0.0; // Assuming the CATA reward rate is provided externally
