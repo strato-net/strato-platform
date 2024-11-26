@@ -23,20 +23,15 @@ abstract contract OracleService is Utils {
     address[] public subscribers;
     mapping (address => uint) subscriberMap;
 
-    uint public interval; //needed for cata formula
-
     address public reserve;
 
     constructor(
-        string _name,
-        uint _interval //should be same and stored in oracle too
-    ) {
+        string _name    ) {
         owner = msg.sender;
         ownerCommonName = getCommonName(msg.sender);
 
         name = _name;
         isActive = true;
-        interval = _interval;
     }
 
     modifier requireActive(string action) {

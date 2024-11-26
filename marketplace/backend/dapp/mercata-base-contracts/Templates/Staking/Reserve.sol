@@ -14,6 +14,10 @@ abstract contract Reserve is Utils, Structs, OracleSubscriber {
     Asset public stratsToken;
     Asset public cataToken;
 
+    decimal public priceOfCATA = 0.1; //cata price in dollars
+
+    Liquidation public liquidation;
+
     address public owner; // Owner (BlockApps) as source of STRATS tokens
     string public name;
     bool public isActive = true;
@@ -21,9 +25,11 @@ abstract contract Reserve is Utils, Structs, OracleSubscriber {
 
     uint public loanToValueRatio = 50; // LTV ratio as percentage
     uint public cataAPYRate = 10; // 10% APY for CATA rewards
+    uint public lastUpdatedTimestamp = 0;
     
-    event StakeCreated(address indexed user, address escrow, uint assetAmount, decimal stratsLoan, uint cataReward);
+    event StakeCreated(address indexed user, address escrow, uint assetAmount, decimal stratsLoan);
     event StakeUnlocked(address indexed user, address escrow);
+    event CataTransferred(address indexed from, address indexed to, uint amount);
 
     Escrow[] public escrows;
     mapping (address => uint) escrowMap;
@@ -53,16 +59,6 @@ abstract contract Reserve is Utils, Structs, OracleSubscriber {
         _;
     }
 
-    function oraclePriceUpdated(decimal _price, uint _timestamp) public override {
-        require(msg.sender == address(oracle), "Only the oracle can call oraclePriceUpdated");
-        for (uint i = 0; i < escrows.length; i++) {
-            if (address(escrows[i]) != address(0)) {
-                escrows[i].updatePriceInfo(_price, _timestamp);
-            }
-            // mint and disburse CATA
-        }
-    }
-
     function createEscrow(
         uint _assetAmount,
         address _assetAddress, 
@@ -88,24 +84,36 @@ abstract contract Reserve is Utils, Structs, OracleSubscriber {
         return address(escrow);
     }
 
-    function oraclePriceUpdated(decimal _newPrice, uint interval) external {
+    function oraclePriceUpdated(decimal _newPrice, uint _timestamp) external override {
         // Update the price of the collateral in the escrow
-        interval = 365*24; //if hours
+        require(msg.sender == address(oracle), "Only the oracle can call oraclePriceUpdated");
+        
+        if(lastUpdatedTimestamp == 0){
+            lastUpdatedTimestamp = _timestamp;
+        }
+
+        uint delta = _timestamp - lastUpdatedTimestamp;
+
+        if(delta > 0){
         for (uint i = 0; i < escrows.length; i++) {
-            escrows[i].updateOnPriceChange(_newPrice, interval);
-            //get cata reward from escrow
-                decimal cataReward = calculateCATAReward(escrows[i].collateralAmount(), _newPrice.truncate(2), cataAPYRate, interval);
-                escrows[i].updateCataReward(cataReward * 100);
+            if (address(escrows[i]) != address(0)) {
+                escrows[i].updateOnPriceChange(_newPrice, loanToValueRatio);
+                //get cata reward from escrow
+                decimal cataReward = calculateCATAReward(escrows[i].collateralAmount(), _newPrice.truncate(2), delta);
+                escrows[i].updateTotalCataReward(cataReward * 100);
                 // Transfer Cata from reserve to borrower
                 cataToken.transferOwnership(
-                escrows[i].borrower(),
-                cataReward * 100,
-                true,
-                0,
-                0.0001
-            );
-        
+                    escrows[i].borrower(),
+                    cataReward * 100,
+                    true,
+                    0,
+                    0.0001
+                    );
+                emit CataTransferred(address(this), escrows[i].borrower(), uint(cataReward * 100));
+                }
+            }
         }
+        lastUpdatedTimestamp = _timestamp;
     }
 
     function stakeAsset(uint _assetAmount, address _assetAddress, PaymentServiceInfo _stratPaymentService) public requireActive() returns (address) {
@@ -134,7 +142,7 @@ abstract contract Reserve is Utils, Structs, OracleSubscriber {
         escrows.push(Escrow(escrow));
         escrowMap[escrow] = escrows.length;
 
-        emit StakeCreated(msg.sender, address(escrow), _assetAmount, _maxStratsLoanAmount, _cataReward);
+        emit StakeCreated(msg.sender, escrow, _assetAmount, _maxStratsLoanAmount); 
         return escrow;
     }
 
@@ -176,10 +184,12 @@ abstract contract Reserve is Utils, Structs, OracleSubscriber {
 
     function transferCATAbacktoOwner(uint _amount) public requireOwner("transfer CATA back") {
         cataToken.transferOwnership(owner, _amount, false, 0, 0);
+        emit CataTransferred(address(this), owner, _amount);
     }
 
     function transferCATAtoAnotherReserve(address _newOwner, uint _amount) public requireOwner("transfer CATA to another reserve") {
         cataToken.transferOwnership(_newOwner, _amount, false, 0, 0);
+        emit CataTransferred(address(this), _newOwner, _amount);
     }
 
     function deactivate() public requireActive() requireOwner("deactivate reserve") {
@@ -189,14 +199,16 @@ abstract contract Reserve is Utils, Structs, OracleSubscriber {
 
     function setOracle(address _newOracle) public requireOwner("update oracle") {
         require(_newOracle != address(0), "Invalid oracle address");
+        oracle.unsubscribe();
+
         oracle = OracleService(_newOracle);
-        oracle.registerReserve(address(this));
+        oracle.subscribe(); 
     }
 
     //Setters for state variables
     function setCataToken(address _newCataToken) public requireOwner("update CATA token") {
         require(_newCataToken != address(0), "Invalid CATA token address");
-        cataToken = _newCataToken;
+        cataToken = Asset(_newCataToken);
     }
 
     function setName(string _newName) public requireOwner("update name") {
@@ -238,11 +250,11 @@ abstract contract Reserve is Utils, Structs, OracleSubscriber {
     function calculateCATAReward(
         decimal collateralAmount,
         decimal livePriceOfCollateral,
-        uint apy,
-        uint interval,
-        decimal priceOfCATA
-    ) internal pure returns (decimal) {
-        // Calculate the reward in CATA
-        return (collateralAmount * livePriceOfCollateral * decimlal(apy)/100.0) / (decimal(interval) * priceOfCATA);
+        uint delta
+    ) internal view returns (decimal) {
+        // Calculate the reward in CATA using the new formula
+        uint secondsPerYear = 31536000; // Number of seconds in a year
+        return (collateralAmount * livePriceOfCollateral * decimal(cataAPYRate) * decimal(delta)) / 
+               (priceOfCATA * decimal(secondsPerYear));
     }
 }
