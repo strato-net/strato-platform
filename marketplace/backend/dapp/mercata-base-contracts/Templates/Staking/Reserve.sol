@@ -9,7 +9,7 @@ import "../Utils/Utils.sol";
 import "../Structs/Structs.sol";
 import "../Oracle/OracleService.sol";
 
-abstract contract Reserve is Utils, Structs {
+abstract contract Reserve is Utils, Structs, OracleSubscriber {
     OracleService public oracle; // Asset Oracle service for fetching price data
     Asset public stratsToken;
     address public cataToken;//Manual for now
@@ -25,8 +25,12 @@ abstract contract Reserve is Utils, Structs {
     event StakeCreated(address indexed user, address escrow, uint assetAmount, decimal stratsLoan, uint cataReward);
     event StakeUnlocked(address indexed user, address escrow);
 
+    Escrow[] public escrows;
+    mapping (address => uint) escrowMap;
+
     constructor(address _assetOracle, address _cataToken, string _name, address _assetRootAddress) {
         oracle = OracleService(_assetOracle);
+        oracle.subscribe();
         cataToken = _cataToken;
         owner = msg.sender;
         name = _name;
@@ -41,6 +45,16 @@ abstract contract Reserve is Utils, Structs {
     modifier requireOwner(string action) {
         require(msg.sender == owner, "Only owner can " + action + ".");
         _;
+    }
+
+    function oraclePriceUpdated(decimal _price, uint _timestamp) public override {
+        require(msg.sender == address(oracle), "Only the oracle can call oraclePriceUpdated");
+        for (uint i = 0; i < escrows.length; i++) {
+            if (address(escrows[i]) != address(0)) {
+                escrows[i].updatePriceInfo(_price, _timestamp);
+            }
+            // mint and disburse CATA
+        }
     }
 
     function createEscrow(
@@ -90,6 +104,9 @@ abstract contract Reserve is Utils, Structs {
             _escrowQuantity
         );
 
+        escrows.push(Escrow(escrow));
+        escrowMap[escrow] = escrows.length;
+
         emit StakeCreated(msg.sender, address(escrow), _assetAmount, _maxStratsLoanAmount, _cataReward);
         return escrow;
     }
@@ -134,6 +151,7 @@ abstract contract Reserve is Utils, Structs {
 
     function deactivate() public requireActive() requireOwner("deactivate reserve") {
         isActive = false;
+        oracle.unsubscribe();
     }
 
     function setOracle(address _newOracle) public requireOwner("update oracle") {
@@ -172,6 +190,12 @@ abstract contract Reserve is Utils, Structs {
         require(escrow.borrowedAmount() == 0, "Must repay borrowed STRATS before unstaking");
 
         escrow.closeSale();
+
+        uint index = escrowMap[address(escrow)];
+        if (index > 0) {
+            escrows[index - 1] = Escrow(address(0));
+            escrowMap[address(escrow)] = 0;
+        }
 
         // Emit unstake event
         emit StakeUnlocked(msg.sender, _escrowAddress);
