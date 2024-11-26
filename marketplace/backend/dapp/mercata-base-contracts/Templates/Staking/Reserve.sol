@@ -14,7 +14,7 @@ abstract contract Reserve is Utils, Structs, OracleSubscriber {
     Asset public stratsToken;
     Asset public cataToken;
 
-    decimal public priceOfCATA = 0.1; //cata price in dollars
+    decimal public priceOfCATA = 0.10; //cata price in dollars
 
     Liquidation public liquidation;
 
