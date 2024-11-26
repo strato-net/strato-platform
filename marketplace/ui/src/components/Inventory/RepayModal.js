@@ -32,12 +32,6 @@ const RepayModal = ({
   productDetailPage,
 }) => {
   const {
-    isStaking,
-    isUnstaking,
-    isreservessLoading,
-    isFetchingOracle,
-    reserves,
-    oracle,
     isRepaying
   } = useInventoryState();
   // Dispatch
@@ -46,7 +40,6 @@ const RepayModal = ({
   const paymentServiceDispatch = usePaymentServiceDispatch();
 
   const { paymentServices } = usePaymentServiceState();
-  const isLoader = !paymentServices || isreservessLoading || isRepaying;
   const isStaked = inventory.sale && inventory.price <= 0;
   const itemName = decodeURIComponent(inventory.name);
 
@@ -133,8 +126,7 @@ const RepayModal = ({
               type="primary"
               className="w-full px-6 h-10 font-bold"
               onClick={handleSubmit}
-              disabled={isLoader}
-              loading={isLoader}
+              loading={isRepaying}
             >
               Repay
             </Button>

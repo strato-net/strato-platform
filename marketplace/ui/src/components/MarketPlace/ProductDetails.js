@@ -5,15 +5,21 @@ import {
   Button,
   Typography,
   Tabs,
-  Space,
   Spin,
   notification,
   InputNumber,
   List,
 } from 'antd';
-import { HeartTwoTone, HeartFilled, FilePdfOutlined } from '@ant-design/icons';
+import {
+  HeartTwoTone,
+  HeartFilled,
+  FilePdfOutlined,
+  LogoutOutlined,
+  BankOutlined,
+  SolutionOutlined,
+  RiseOutlined,
+} from '@ant-design/icons';
 import { useMatch, useNavigate, useLocation } from 'react-router-dom';
-import { Carousel } from 'react-responsive-carousel';
 import TagManager from 'react-gtm-module';
 //actions
 import { actions as inventoryActions } from '../../contexts/inventory/actions';
@@ -43,6 +49,8 @@ import TimeRangeTabs from './TimeRangeTabs';
 import Statistics from './Statistics';
 import LoginModal from './LoginModal';
 import StakeModal from '../Inventory/StakeModal';
+import BorrowModal from '../Inventory/BorrowModal';
+import RepayModal from '../Inventory/RepayModal';
 // other
 import { setCookie } from '../../helpers/cookie';
 import routes from '../../helpers/routes';
@@ -51,9 +59,8 @@ import './index.css';
 import image_placeholder from '../../images/resources/image_placeholder.png';
 import 'react-responsive-carousel/lib/styles/carousel.min.css'; // requires a loader
 
-import { Images } from '../../images';
 import { SEO } from '../../helpers/seoConstant';
-import { STRATS_CONVERSION } from '../../helpers/constants';
+import { STRATS_CONVERSION, ASSET_STATUS } from '../../helpers/constants';
 import { TOAST_MSG } from '../../helpers/msgConstants';
 
 import { Swiper, SwiperSlide } from 'swiper/react';
@@ -92,7 +99,7 @@ const ProductDetails = ({ user, users }) => {
     priceHistory,
     isFetchingPriceHistory,
     isReserveLoading,
-    reserve,
+    reserves,
   } = useInventoryState();
   const { cartList } = useMarketplaceState();
 
@@ -103,13 +110,20 @@ const ProductDetails = ({ user, users }) => {
   const [qty, setQty] = useState(1);
   const [stakeModalOpen, setStakeModalOpen] = useState(false);
   const [stakeType, setStakeType] = useState(null);
+  const [borrowModalOpen, setBorrowModalOpen] = useState(false);
+  const [repayModalOpen, setRepayModalOpen] = useState(false);
   // For Wishlist Icon Rendering
   const [isWishlisted, setIsWishlisted] = useState(false);
   const [availableQuantity, setAvailableQuantity] = useState(1);
 
   // Stakeable
-  const isStaked = inventoryDetails?.stratsLoanAmount && inventoryDetails?.stratsLoanAmount > 0;
-  const isStakeable = inventoryDetails?.root && reserve && inventoryDetails?.root === reserve[0]?.assetRootAddress;
+  const isStaked =
+    inventoryDetails?.stratsLoanAmount &&
+    inventoryDetails?.stratsLoanAmount > 0;
+  const isStakeable =
+    inventoryDetails?.root &&
+    reserves &&
+    inventoryDetails?.root === reserves[0]?.assetRootAddress;
 
   let isCalledFromInventory = false;
   if (state !== null && state !== undefined) {
@@ -135,6 +149,18 @@ const ProductDetails = ({ user, users }) => {
     return false;
   };
 
+  function isActive() {
+    if (
+      inventoryDetails.status == ASSET_STATUS.PENDING_REDEMPTION ||
+      inventoryDetails.status == ASSET_STATUS.RETIRED ||
+      inventoryDetails.stratsLoanAmount
+    ) {
+      return false;
+    } else {
+      return true;
+    }
+  }
+
   useEffect(() => {
     if (isCalledFromInventory) setId(routeMatch1?.params?.id);
     else setId(routeMatch?.params?.address);
@@ -148,10 +174,6 @@ const ProductDetails = ({ user, users }) => {
     if (Id !== undefined) {
       inventoryActions.fetchInventoryDetail(dispatch, Id);
       inventoryActions.getAllReserve(dispatch);
-      // TODO: Uncomment this when we have serial numbers working
-      // if (user) {
-      //   itemsActions.fetchSerialNumbers(itemDispatch, Id);
-      // }
     }
   }, [Id, dispatch]);
 
@@ -253,6 +275,22 @@ const ProductDetails = ({ user, users }) => {
     setStakeModalOpen(false);
   };
 
+  const showBorrowModal = (type) => {
+    setBorrowModalOpen(true);
+  };
+
+  const handleBorrowModalClose = () => {
+    setBorrowModalOpen(false);
+  };
+
+  const showRepayModal = (type) => {
+    setRepayModalOpen(true);
+  };
+
+  const handleRepayModalClose = () => {
+    setRepayModalOpen(false);
+  };
+
   const handleCancel = () => {
     setIsModalVisible(false);
   };
@@ -266,12 +304,14 @@ const ProductDetails = ({ user, users }) => {
   };
 
   const subtract = () => {
-    const value = Math.max(qty - 1, 1);
-    setQty(value);
+    if (!isStakeable) {
+      const value = Math.max(qty - 1, 1);
+      setQty(value);
+    }
   };
 
   const add = () => {
-    if (qty + 1 <= availableQuantity) {
+    if (qty + 1 <= availableQuantity && !isStakeable) {
       let value = qty + 1;
       setQty(value);
     } else {
@@ -311,62 +351,6 @@ const ProductDetails = ({ user, users }) => {
       });
     }
   };
-
-  // const addItemToCart = async () => {
-  //   let found = false;
-  //   for (var i = 0; i < cartList.length; i++) {
-  //     if (cartList[i].product.address === details.address) {
-  //       found = true;
-  //       break;
-  //     }
-  //   }
-  //   let items = [];
-  //   if (!found) {
-  //     items = [{ product: details, qty }];
-
-  //     marketPlaceActions.addItemToCart(marketplaceDispatch, items);
-  //     setQty(1);
-  //     openToast("bottom", false, TOAST_MSG.ITEM_ADDED_TO_CART);
-  //     setTimeout(() => {
-  //       navigate('/checkout')
-  //     }, 2000);
-  //   } else {
-  //     items = [...cartList];
-  //     const quantity = cartList[0].qty + qty;
-  //     const checkQuantity = await orderActions.fetchSaleQuantity(orderDispatch, [details.saleAddress], [quantity])
-  //     cartList.forEach((element, index) => {
-  //       if (element.product.address === details.address) {
-  //         if(checkQuantity[0].availableQuantity > quantity){
-  //           items[index].qty += qty;
-  //           marketPlaceActions.addItemToCart(marketplaceDispatch, items);
-  //           setQty(1);
-  //           openToast("bottom", false, TOAST_MSG.ITEM_UPDATED_IN_CART);
-  //           setTimeout(() => {
-  //             navigate('/checkout')
-  //           }, 2000);
-  //         }else{
-  //           if (checkQuantity[0].availableQuantity === 0) {
-  //             openToast(
-  //               "bottom",
-  //               true,
-  //               `Unfortunately, ${details.name} is currently out of stock. We recommend checking back soon or browsing similar items available now.`
-  //             );
-  //           } else {
-  //             // Case 2: We are trying to add too much quantity
-  //             openToast(
-  //               "bottom",
-  //               true,
-  //               `Unfortunately, only ${checkQuantity[0].availableQuantity} units of ${details.name} are available. Please update your cart quantity accordingly.`
-  //             );
-  //             setTimeout(() => {
-  //               navigate('/checkout')
-  //             }, 2000);
-  //           }
-  //         }
-  //       }
-  //     });
-  //   }
-  // };
 
   const addItemToCart = async () => {
     const items = [{ product: details, qty }];
@@ -620,7 +604,9 @@ const ProductDetails = ({ user, users }) => {
                           details.ownerCommonName !== 'N/A'
                         ) {
                           e.preventDefault();
-                          const userProfileUrl = `/profile/${encodeURIComponent(details.ownerCommonName)}`;
+                          const userProfileUrl = `/profile/${encodeURIComponent(
+                            details.ownerCommonName
+                          )}`;
                           const fullUrl = `${window.location.origin}${userProfileUrl}`;
 
                           if (e.ctrlKey || e.metaKey) {
@@ -649,35 +635,58 @@ const ProductDetails = ({ user, users }) => {
                     </Text>
                   </div>
                 </div>
-                <div className=" pt-4 lg:pt-[22px]">
-                  <Paragraph level={4} id="price" className=" text-[#13188A] text-xl font-bold lg:text-2xl lg:font-semibold">
-                  {details?.price || isStaked ? (
-                    (() => {
-                      const adjustedPrice = details.data.quantityIsDecimal && details.data.quantityIsDecimal === "True" 
-                        ? details.price * 100 
-                        : details.price;
+                {!isStakeable && (
+                  <div className=" pt-4 lg:pt-[22px]">
+                    <Paragraph
+                      level={4}
+                      id="price"
+                      className=" text-[#13188A] text-xl font-bold lg:text-2xl lg:font-semibold"
+                    >
+                      {details?.price || isStaked
+                        ? (() => {
+                            const adjustedPrice =
+                              details.data.quantityIsDecimal &&
+                              details.data.quantityIsDecimal === 'True'
+                                ? details.price * 100
+                                : details.price;
 
-                      return (
-                        <>
-                          ${isStaked ? (details.stratsLoanAmount/100).toFixed(4) : adjustedPrice} 
-                          <span className="font-normal text-xs mr-2 text-primary">
-                          <b>({isStaked ? details.stratsLoanAmount : (adjustedPrice * STRATS_CONVERSION).toFixed(0)} {(isStaked ? details.stratsLoanAmount : (adjustedPrice * STRATS_CONVERSION).toFixed(0)) == 1 ? 'STRAT' : 'STRATs'})</b>
-                          </span>
-                        </>
-                      );
-                    })()
-                  ) : (
-                    "No Price Available"
-                  )}
-                  </Paragraph>
-                  {isAvailableForSale && (
-                    <Text type="danger" strong>
-                      {' '}
-                      Sold Out{' '}
-                    </Text>
-                  )}
-                </div>
-
+                            return (
+                              <>
+                                $
+                                {isStaked
+                                  ? (details.stratsLoanAmount / 100).toFixed(2)
+                                  : adjustedPrice}
+                                <span className="font-normal text-xs mr-2 text-primary">
+                                  <b>
+                                    (
+                                    {isStaked
+                                      ? details.stratsLoanAmount
+                                      : (
+                                          adjustedPrice * STRATS_CONVERSION
+                                        ).toFixed(0)}{' '}
+                                    {(isStaked
+                                      ? details.stratsLoanAmount
+                                      : (
+                                          adjustedPrice * STRATS_CONVERSION
+                                        ).toFixed(0)) == 1
+                                      ? 'STRAT'
+                                      : 'STRATs'}
+                                    )
+                                  </b>
+                                </span>
+                              </>
+                            );
+                          })()
+                        : 'No Price Available'}
+                    </Paragraph>
+                    {isAvailableForSale && (
+                      <Text type="danger" strong>
+                        {' '}
+                        Sold Out{' '}
+                      </Text>
+                    )}
+                  </div>
+                )}
                 {availableQuantity !== 0 ? (
                   <div
                     className="flex justify-between lg:justify-start  w-full gap-3 lg:gap-[15px] pt-6 lg:pt-[18px]"
@@ -685,7 +694,11 @@ const ProductDetails = ({ user, users }) => {
                   >
                     <div
                       onClick={subtract}
-                      className={`h-9 w-11 md:h-10 md:w-12 lg:h-[46px] lg:w-[52px] rounded-lg flex justify-center items-center border border-[#00000029] text-center cursor-pointer ${qty > 1 ? '' : 'cursor-not-allowed opacity-50'}`}
+                      className={`h-9 w-11 md:h-10 md:w-12 lg:h-[46px] lg:w-[52px] rounded-lg flex justify-center items-center border border-[#00000029] text-center cursor-pointer ${
+                        qty > 1 && !isStakeable
+                          ? ''
+                          : 'cursor-not-allowed opacity-50'
+                      }`}
                     >
                       <p className=" text-2xl md:text-3xl lg:text-4xl font-semibold lg:text-[#202020] text-[#989898]">
                         -
@@ -695,7 +708,10 @@ const ProductDetails = ({ user, users }) => {
                       className="w-full md:w-[280px] h-9 md:h-10 lg:h-[46px] border text-[#6A6A6A] border-[#00000029] text-center flex flex-col justify-center font-semibold !rounded-lg"
                       min={1}
                       max={availableQuantity}
-                      value={`${qty}`}
+                      disabled={isStakeable}
+                      value={
+                        !isStakeable ? `${qty}` : inventoryDetails.quantity
+                      }
                       defaultValue={`${qty}`}
                       controls={false}
                       onChange={(e) => {
@@ -708,7 +724,11 @@ const ProductDetails = ({ user, users }) => {
                     />
                     <div
                       onClick={add}
-                      className={`h-9 w-11 md:h-10 md:w-12 lg:h-[46px] lg:w-[52px] rounded-lg flex justify-center items-center border border-[#00000029] text-center cursor-pointer ${qty < availableQuantity ? '' : 'cursor-not-allowed opacity-50'}`}
+                      className={`h-9 w-11 md:h-10 md:w-12 lg:h-[46px] lg:w-[52px] rounded-lg flex justify-center items-center border border-[#00000029] text-center cursor-pointer ${
+                        qty < availableQuantity && !isStakeable
+                          ? ''
+                          : 'cursor-not-allowed opacity-50'
+                      }`}
                     >
                       <p className="text-2xl md:text-3xl lg:text-4xl font-semibold lg:text-[#202020] text-[#989898]">
                         +
@@ -725,181 +745,177 @@ const ProductDetails = ({ user, users }) => {
                     contact our sales team at sales@blockapps.net
                   </Paragraph>
                 )}
-                {availableQuantity !== 0 ? (
-                  <div className="flex gap-4 justify-between lg:justify-start  pt-4 w-full">
-                    <Button
-                      type="primary"
-                      className={`w-[100%]  h-9  ${isAvailableForSale && !(isStakeable && !isStaked) ? '!bg-[#808080]' : '!bg-[#13188A]'} !hover:bg-primaryHover !text-white`}
-                      onClick={async () => {
-                        if (isStakeable && ownerSameAsUser()) {
-                          isStaked ? showStakeModal("Unstake") : showStakeModal("Stake");
-                          return;
-                        }
 
-                        window.LOQ.push(['ready', async LO => {
-                          // Track an event
-                          await LO.$internal.ready('events')
-                          LO.events.track('Buy Now (from Product Details)', {
-                            product: details.name,
-                            category: details.category,
-                            productId: details.productId
-                          })
-                        }])
-                        TagManager.dataLayer({
-                          dataLayer: {
-                            event: 'buy_now_from_product_details',
-                            product_name: details.name,
-                            category: details.category,
-                            productId: details.productId,
-                          },
-                        });
+                {!isStakeable && (
+                  <div>
+                    {availableQuantity !== 0 ? (
+                      <div className="flex gap-4 justify-between lg:justify-start  pt-4 w-full">
+                        <Button
+                          type="primary"
+                          className={`w-[100%]  h-9  ${
+                            isAvailableForSale
+                              ? '!bg-[#808080]'
+                              : '!bg-[#13188A]'
+                          } !hover:bg-primaryHover !text-white`}
+                          onClick={async () => {
+                            window.LOQ.push([
+                              'ready',
+                              async (LO) => {
+                                // Track an event
+                                await LO.$internal.ready('events');
+                                LO.events.track(
+                                  'Buy Now (from Product Details)',
+                                  {
+                                    product: details.name,
+                                    category: details.category,
+                                    productId: details.productId,
+                                  }
+                                );
+                              },
+                            ]);
+                            TagManager.dataLayer({
+                              dataLayer: {
+                                event: 'buy_now_from_product_details',
+                                product_name: details.name,
+                                category: details.category,
+                                productId: details.productId,
+                              },
+                            });
 
-                        const checkQuantity =
-                          await orderActions.fetchSaleQuantity(
-                            orderDispatch,
-                            [details.saleAddress],
-                            [qty]
-                          );
-                        if (checkQuantity === true) {
-                          addItemToCart();
-                        } else {
-                          if (checkQuantity[0].availableQuantity === 0) {
-                            openToast(
-                              'bottom',
-                              true,
-                              TOAST_MSG.OUT_OF_STOCK(details)
-                            );
-                          } else {
-                            // Case 2: We are trying to add too much quantity
-                            openToast(
-                              'bottom',
-                              true,
-                              TOAST_MSG.TOO_MUCH_QUANTITY(
-                                checkQuantity,
-                                details
-                              )
-                            );
-                          }
-                        }
-                      }}
-                      disabled={ownerSameAsUser() && (isAvailableForSale && !(isStakeable && !isStaked))}
-                      id="buyNow"
-                    >
-                      {isStakeable && ownerSameAsUser() ? (isStaked ? "Unstake" : "Stake"): "Buy Now" }
-                    </Button>
-                    {/* TODO:- Remove Comment to show the Add-to-Cart Button */}
-                    {/* {ownerSameAsUser() ?
-                      <Button
-                        icon={<div className="flex justify-center items-center">
-                          <img src={Images.Cart} alt={`${assetName} | Image`} title={`${assetName} | Image`} width={18} height={18} className="object-contain" />
-                        </div>}
-                        className={`!w-9 h-9 border border-primary ${isAvailableForSale ? '!bg-[#808080]' : '!bg-[#13188A]'} rounded-md`}
-                        disabled={true}
-                        id="addToCart"
-                        onClick={async () => {
-                          window.LOQ.push(['ready', async LO => {
-                            // Track an event
-                            await LO.$internal.ready('events')
-                            LO.events.track('Add to Cart (from Product Details)', {
-                              product: details.name,
-                              category: details.category,
-                              productId: details.productId
-                            })
-                          }])
-                          TagManager.dataLayer({
-                            dataLayer: {
-                              event: 'add_to_cart_from_product_details',
-                              product_name: details?.name,
-                              category: details?.category,
-                              productId: details?.productId
-                            },
-                          });
-                          const checkQuantity = await orderActions.fetchSaleQuantity(orderDispatch, [details.saleAddress], [qty])
-                          if (checkQuantity === true) {
-                            addItemToCart();
-                          } else {
-                            if (checkQuantity[0].availableQuantity === 0) {
-                              openToast("bottom", true, TOAST_MSG.OUT_OF_STOCK(details));
-                            } else { // Case 2: We are trying to add too much quantity
-                              openToast("bottom", true, TOAST_MSG.TOO_MUCH_QUANTITY(checkQuantity, details));
+                            const checkQuantity =
+                              await orderActions.fetchSaleQuantity(
+                                orderDispatch,
+                                [details.saleAddress],
+                                [qty]
+                              );
+                            if (checkQuantity === true) {
+                              addItemToCart();
+                            } else {
+                              if (checkQuantity[0].availableQuantity === 0) {
+                                openToast(
+                                  'bottom',
+                                  true,
+                                  TOAST_MSG.OUT_OF_STOCK(details)
+                                );
+                              } else {
+                                // Case 2: We are trying to add too much quantity
+                                openToast(
+                                  'bottom',
+                                  true,
+                                  TOAST_MSG.TOO_MUCH_QUANTITY(
+                                    checkQuantity,
+                                    details
+                                  )
+                                );
+                              }
                             }
-                          }
-                        }}
-                      />
-                      :
-                      <Button
-                        icon={<div className="flex justify-center items-center">
-                          <img src={Images.Cart} alt={`${assetName} | Image`} title={`${assetName} | Image`} width={18} height={18} className="object-contain" />
-                        </div>}
-                        className={`!w-9 h-9 rounded-md  ${isAvailableForSale ? '!bg-[#808080]' : '!bg-[#13188A]'}  `}
-                        disabled={isAvailableForSale}
-                        onClick={async () => {
-                          window.LOQ.push(['ready', async LO => {
-                            // Track an event
-                            await LO.$internal.ready('events')
-                            LO.events.track('Add to Cart (from Product Details)', {
-                              product: details?.name,
-                              category: details?.category,
-                              productId: details?.productId
-                            })
-                          }])
-                          TagManager.dataLayer({
-                            dataLayer: {
-                              event: 'add_to_cart_from_product_details',
-                              product_name: details?.name,
-                              category: details?.category,
-                              productId: details?.productId
-                            },
-                          });
-                          const checkQuantity = await orderActions.fetchSaleQuantity(orderDispatch, [details.saleAddress], [qty])
-                          if (checkQuantity === true) {
-                            addItemToCart();
-                          } else {
-                            if (checkQuantity[0].availableQuantity === 0) {
-                              openToast("bottom", true, TOAST_MSG.OUT_OF_STOCK(details));
-                            } else { // Case 2: We are trying to add too much quantity
-                              openToast("bottom", true, TOAST_MSG.TOO_MUCH_QUANTITY(checkQuantity, details));
-                            }
-                          }
-                        }}
-                      />
-
-                    } */}
-                  </div>
-                ) : (
-                  <div className="flex ">
-                    <Button
-                      type="primary"
-                      className="w-[80%] md:w-[365px] h-9 m-3 mt-10 !bg-primary !hover:bg-primaryHover"
-                      href={`mailto:sales@blockapps.net`}
-                      onClick={() => {
-                        window.LOQ.push([
-                          'ready',
-                          async (LO) => {
-                            await LO.$internal.ready('events');
-                            LO.events.track(
-                              'Contact Sales (from Product Details)',
-                              {
-                                product: details?.name,
+                          }}
+                          disabled={ownerSameAsUser() || isAvailableForSale}
+                          id="buyNow"
+                        >
+                          Buy Now
+                        </Button>
+                      </div>
+                    ) : (
+                      <div className="flex ">
+                        <Button
+                          type="primary"
+                          className="w-[80%] md:w-[365px] h-9 m-3 mt-10 !bg-primary !hover:bg-primaryHover"
+                          href={`mailto:sales@blockapps.net`}
+                          onClick={() => {
+                            window.LOQ.push([
+                              'ready',
+                              async (LO) => {
+                                await LO.$internal.ready('events');
+                                LO.events.track(
+                                  'Contact Sales (from Product Details)',
+                                  {
+                                    product: details?.name,
+                                    category: details?.category,
+                                    productId: details?.productId,
+                                  }
+                                );
+                              },
+                            ]);
+                            TagManager.dataLayer({
+                              dataLayer: {
+                                event: 'contact_sales_from_product_details',
+                                product_name: details?.name,
                                 category: details?.category,
                                 productId: details?.productId,
-                              }
-                            );
-                          },
-                        ]);
-                        TagManager.dataLayer({
-                          dataLayer: {
-                            event: 'contact_sales_from_product_details',
-                            product_name: details?.name,
-                            category: details?.category,
-                            productId: details?.productId,
-                          },
-                        });
-                      }}
-                    >
-                      Contact to Buy
-                    </Button>
+                              },
+                            });
+                          }}
+                        >
+                          Contact to Buy
+                        </Button>
+                      </div>
+                    )}
                   </div>
+                )}
+                {isStakeable && (
+                  <>
+                    <div className="flex gap-4 justify-between lg:justify-start  pt-4 w-full">
+                      <Button
+                        type="primary"
+                        className={`w-[100%]  h-9  ${
+                          !ownerSameAsUser() ? '!bg-[#808080]' : '!bg-[#13188A]'
+                        } !hover:bg-primaryHover !text-white`}
+                        onClick={async () => {
+                          if (isStakeable && ownerSameAsUser()) {
+                            isStaked
+                              ? showStakeModal('Unstake')
+                              : showStakeModal('Stake');
+                            return;
+                          }
+                        }}
+                        disabled={
+                          !ownerSameAsUser() ||
+                          (!isStaked &&
+                            (inventoryDetails.price || !isActive())) ||
+                          (isStaked &&
+                            inventoryDetails?.borrowedAmount &&
+                            inventoryDetails?.borrowedAmount > 0)
+                        }
+                      >
+                        {isStaked ? (
+                          <div>
+                            <LogoutOutlined /> Unstake
+                          </div>
+                        ) : (
+                          <div>
+                            <RiseOutlined /> Stake
+                          </div>
+                        )}
+                      </Button>
+                    </div>
+                    {isStaked && (
+                      <div className="flex justify-between mt-4">
+                        <Button
+                          className="bg-[#13188A] text-white w-48 h-10"
+                          onClick={() => showBorrowModal()}
+                          disabled={
+                            inventoryDetails?.borrowedAmount &&
+                            inventoryDetails?.borrowedAmount > 0
+                          }
+                        >
+                          <BankOutlined />
+                          Borrow
+                        </Button>
+                        <Button
+                          className="bg-[#13188A] text-white w-48 h-10"
+                          onClick={() => showRepayModal()}
+                          disabled={
+                            inventoryDetails?.borrowedAmount &&
+                            inventoryDetails?.borrowedAmount <= 0
+                          }
+                        >
+                          <SolutionOutlined />
+                          Repay
+                        </Button>
+                      </div>
+                    )}
+                  </>
                 )}
               </div>
             </div>
@@ -1063,7 +1079,23 @@ const ProductDetails = ({ user, users }) => {
           inventory={inventoryDetails}
         />
       )}
-      {message && openToastInventory("bottom")}
+      {borrowModalOpen && (
+        <BorrowModal
+          open={borrowModalOpen}
+          handleCancel={handleBorrowModalClose}
+          productDetailPage={Id}
+          inventory={inventoryDetails}
+        />
+      )}
+      {repayModalOpen && (
+        <RepayModal
+          open={repayModalOpen}
+          handleCancel={handleRepayModalClose}
+          productDetailPage={Id}
+          inventory={inventoryDetails}
+        />
+      )}
+      {message && openToastInventory('bottom')}
     </>
   );
 };

@@ -70,7 +70,7 @@ const StakeModal = ({
             label: `Market Value of (${inventory?.name} x ${inventory?.quantity})`,
             description: 'The total market value of the staked assets',
             value: `$${
-              oracleData.consensusPrice.toFixed(2) * inventory?.quantity
+              (oracleData.consensusPrice.toFixed(2) * inventory?.quantity).toFixed(2)
             }`,
           },
           {
