@@ -8,9 +8,7 @@ import {
   Spin,
   notification,
   InputNumber,
-  List,
 } from 'antd';
-import { FilePdfOutlined } from '@ant-design/icons';
 import { useMatch, useNavigate, useLocation } from 'react-router-dom';
 import TagManager from 'react-gtm-module';
 //actions
@@ -19,7 +17,6 @@ import {
   useInventoryDispatch,
   useInventoryState,
 } from '../../contexts/inventory';
-import { actions as categoryActions } from '../../contexts/category/actions';
 import { actions as marketPlaceActions } from '../../contexts/marketplace/actions';
 import { actions as orderActions } from '../../contexts/order/actions';
 // dispatch & state
@@ -32,13 +29,9 @@ import { useCategoryDispatch, useCategoryState } from '../../contexts/category';
 import { useAuthenticateState } from '../../contexts/authentication';
 // components
 import HelmetComponent from '../Helmet/HelmetComponent';
-import DataTableComponent from '../DataTableComponent';
 import ProductItemDetails from './ProductItemDetails';
-import PriceChartAndStats from './PriceChartAndStats';
 import PreviewMode from '../RichEditor/PreviewMode';
 import ClickableCell from '../ClickableCell';
-import TimeRangeTabs from './TimeRangeTabs';
-import Statistics from './Statistics';
 import LoginModal from './LoginModal';
 import StakeModal from '../Inventory/StakeModal';
 // other
@@ -74,7 +67,6 @@ const VaultDetails = ({ user, users }) => {
   const { hasChecked, isAuthenticated, loginUrl } = useAuthenticateState();
   // dispatch
   const dispatch = useInventoryDispatch();
-  const categoryDispatch = useCategoryDispatch();
   const orderDispatch = useOrderDispatch();
   const marketplaceDispatch = useMarketplaceDispatch();
   // state
@@ -84,15 +76,9 @@ const VaultDetails = ({ user, users }) => {
     message,
     inventoryDetails,
     isInventoryDetailsLoading,
-    isInventoryOwnershipHistoryLoading,
-    inventoryOwnershipHistory,
-    priceHistory,
-    isFetchingPriceHistory,
-    isReserveLoading,
     reserve,
   } = useInventoryState();
   const { cartList } = useMarketplaceState();
-  console.log('inventoryDetails', inventoryDetails);
   const [isModalVisible, setIsModalVisible] = useState(false);
   const [timeFilter, setTimeFilter] = useState('1');
   const [itemData, setItemData] = useState({});
@@ -146,10 +132,6 @@ const VaultDetails = ({ user, users }) => {
     }
   }, [Id, dispatch, timeFilter]);
 
-  const handleTimeFilterChange = (key) => {
-    setTimeFilter(key);
-  };
-
   useEffect(() => {
     if (inventoryDetails) {
       inventoryActions.fetchInventoryOwnershipHistory(dispatch, {
@@ -168,7 +150,6 @@ const VaultDetails = ({ user, users }) => {
   const details = reserve  && reserve.asset;
   let fileValues = [];
   let fileNames = [];
-  console.log('reserve', reserve);
   if (reserve && Array.isArray(reserve.asset['BlockApps-Mercata-Asset-fileNames'])) {
     fileNames = reserve.asset['BlockApps-Mercata-Asset-fileNames'];
   }
@@ -185,7 +166,6 @@ const VaultDetails = ({ user, users }) => {
 
   useEffect(() => {
     if (categorys.length && details) {
-      const prodCategory = categorys.find((c) => c.name === details.category);
       const detailsData = details.data;
       setItemData(detailsData);
       if (details.saleQuantity) {
