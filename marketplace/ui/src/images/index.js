@@ -64,6 +64,8 @@ export const Images = {
   banner_arrow: require('./resources/banner_arrow.png'),
   carousel_arrow: require('./resources/carouselArrow.png'),
 
+  StakingX1600: require('./resources/Banner/StakingX1600.png'),
+
   BatmanX394: require('./resources/Banner/BatmanX394.png'),
   BatmanX768: require('./resources/Banner/BatmanX768.png'),
   BatmanX1440: require('./resources/Banner/BatmanX1440.png'),

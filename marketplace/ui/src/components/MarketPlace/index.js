@@ -118,7 +118,7 @@ const MarketPlace = ({ user, isAuthenticated }) => {
         clickable: true,
       }}
       autoplay={{
-        delay: 4000,
+        delay: 8000,
         disableOnInteraction: false,
       }}
       modules={[Autoplay, EffectFade, Navigation, Pagination]}

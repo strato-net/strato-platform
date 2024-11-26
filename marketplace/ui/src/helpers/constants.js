@@ -339,6 +339,25 @@ const bannerConfig = [
 
 export const BANNER = [
   {
+    label: 'Staking',
+    link: '/mywallet?st=true',
+    text: (
+      <div className="staking_banner_text banner-text">
+        <h1> RWA X DeFi </h1>
+        <h1 className='text-base w-5/6 md:text-3xl'> Staking is Here! </h1>
+        <h1 className='text-base w-5/6 md:text-3xl'> Stake silver to earn and gain access to our governance token...coming soon! </h1>
+      </div>
+    ),
+    desktopText: 'Explore More',
+    mobileText: 'Explore',
+    alt: metaImg,
+    title: metaImg,
+    desktopImg: Images.StakingX1600,
+    laptopImg: Images.StakingX1600,
+    tabletImg: Images.StakingX1600,
+    mobileImg: Images.StakingX1600,
+  },
+  {
     label: 'Batman',
     link: '/c/Clothing?sc=Clothing',
     text: (
