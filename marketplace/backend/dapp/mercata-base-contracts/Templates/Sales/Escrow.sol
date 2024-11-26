@@ -4,24 +4,28 @@ pragma strict;
 contract Escrow is Sale {
     address public reserve; //Can be used to distinguish between Sale and Escrow
     address public borrower;
-    decimal public stratsLoanAmount;
-    decimal public cataRewardInDollars;
-    decimal public escrowPrice;
+    uint public loanToValueRatio;
+    decimal public collateralAmount;
+    uint public maxStratsLoanAmount;
+    decimal public totalCataRewardInDollars;
+    decimal public oraclePrice;
     decimal public borrowedAmount;
 
     constructor(
         address _borrower,
-        uint _stratsLoanAmount,
-        decimal _cataRewardInDollars,
+        decimal _collateralAmount,
+        uint _maxStratsLoanAmount,
         address _assetToBeSold,
-        decimal _escrowPrice,
+        decimal _oraclePrice,
         uint _escrowQuantity,
         PaymentServiceInfo[] _paymentServices
     ) Sale("Escrow", _assetToBeSold, 0, _escrowQuantity, _paymentServices) {
-        escrowPrice = _escrowPrice;
+        collateralAmount = _collateralAmount;
+        oraclePrice = _oraclePrice;
+        loanToValueRatio = _loanToValueRatio;
         borrower = _borrower;
-        stratsLoanAmount = _stratsLoanAmount;
-        cataRewardInDollars = _cataRewardInDollars; // Assuming the CATA reward rate is provided externally
+        maxStratsLoanAmount = _maxStratsLoanAmount;
+        totalCataRewardInDollars = 0.0; // Assuming the CATA reward rate is provided externally
         reserve = msg.sender;
     }
 
@@ -33,12 +37,29 @@ contract Escrow is Sale {
     function updateBorrowedAmount(decimal _borrowAmount) external {
         require(msg.sender == reserve, "Only reserve can update borrowed amount");
         require(_borrowAmount >= 0.0, "Borrowed amount cannot be negative");
-        require(borrowedAmount + _borrowAmount <= stratsLoanAmount, "Cannot borrow more than loan amount");
+        require(borrowedAmount + _borrowAmount <= maxStratsLoanAmount, "Cannot borrow more than loan amount");
         borrowedAmount += _borrowAmount;
     }
 
     function clearLoan() external requirePaymentService ("clear loan") {
         borrowedAmount = 0.0;
     }
+
+    function updateOnPriceChange(decimal _newPrice, uint interval) external {
+        require(msg.sender == reserve, "Only reserve can update collateral price");
+        oraclePrice = _newPrice;
+
+        decimal truncatedPrice = _newPrice.truncate(2);
+
+        collateralAmount = collateralAmount * truncatedPrice;
+
+        maxStratsLoanAmount = uint(collateralAmount * decimal(loanToValueRatio) / 100);
+    }
+
+    function updateCataReward(uint _newCataReward) external {
+        require(msg.sender == reserve, "Only reserve can update CATA reward");
+        totalCataRewardInDollars += _newCataReward;
+    }
+
 
 }

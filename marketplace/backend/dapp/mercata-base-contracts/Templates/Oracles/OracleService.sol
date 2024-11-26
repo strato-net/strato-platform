@@ -16,14 +16,20 @@ abstract contract OracleService is Utils {
 
     bool public isActive;
 
+    uint public interval; //needed for cata formula
+
+    address public reserve;
+
     constructor(
-        string _name
+        string _name,
+        uint _interval //should be same and stored in oracle too
     ) {
         owner = msg.sender;
         ownerCommonName = getCommonName(msg.sender);
 
         name = _name;
         isActive = true;
+        interval = _interval;
     }
 
     modifier requireActive(string action) {
@@ -50,5 +56,9 @@ abstract contract OracleService is Utils {
 
     function getLatestPrice() public view requireActive("get latest price") returns (decimal, uint) {
         return (consensusPrice, consensusPriceTimestamp);
+    }
+
+    function registerReserve(address _reserve) public requireActive("register reserve") {
+        reserve = _reserve;
     }
 }
