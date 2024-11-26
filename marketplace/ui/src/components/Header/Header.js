@@ -11,8 +11,13 @@ import {
   Select,
   Row,
   Col,
+  Tooltip,
 } from 'antd';
-import { ArrowLeftOutlined, LogoutOutlined } from '@ant-design/icons';
+import {
+  ArrowLeftOutlined,
+  LogoutOutlined,
+  RiseOutlined,
+} from '@ant-design/icons';
 import { useLocation, useNavigate } from 'react-router-dom';
 import TagManager from 'react-gtm-module';
 // actions
@@ -300,11 +305,13 @@ const HeaderComponent = ({
           ),
           label: (
             <div>
-              {' '}
-              <p className="!mb-0"> My Profile </p>{' '}
+              <p className="!mb-0"> My Profile </p>
             </div>
           ),
         }
+      : null,
+    user
+      ? { value: 'stake', path: routes.MyWalletStakeable.url, label: 'Stake' }
       : null,
     {
       value: 'activityFeed',
@@ -511,9 +518,15 @@ const HeaderComponent = ({
           }}
           items={navItems}
         />
-        <Button type="primary" className="w-20 hidden md:block" onClick={() => navigate(routes.MyWalletStakeable.url)}>
-          Stake
-        </Button>
+        <Tooltip title={'Stake'}>
+          <Button
+            type="primary"
+            className="w-20 rounded-full hidden md:block"
+            onClick={() => navigate(routes.MyWalletStakeable.url)}
+          >
+            <RiseOutlined />
+          </Button>
+        </Tooltip>
         <Space size="large" className="!gap-0 md:!gap-4 mr-0 -ml-3">
           {
             <div
