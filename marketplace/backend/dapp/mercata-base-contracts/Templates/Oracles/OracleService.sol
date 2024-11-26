@@ -5,6 +5,10 @@ import <509>;
 import "../Enums/RestStatus.sol";
 import "../Utils/Utils.sol";
 
+interface OracleSubscriber {
+    function oraclePriceUpdated(decimal _price, uint _timestamp) public virtual;
+}
+
 abstract contract OracleService is Utils {
     decimal public consensusPrice;
     uint public consensusPriceTimestamp;
@@ -15,6 +19,9 @@ abstract contract OracleService is Utils {
     string public name;
 
     bool public isActive;
+
+    address[] public subscribers;
+    mapping (address => uint) subscriberMap;
 
     uint public interval; //needed for cata formula
 
@@ -47,6 +54,11 @@ abstract contract OracleService is Utils {
     function _submitPrice(decimal _price) internal  requireActive("submit price") {
         consensusPriceTimestamp = block.timestamp;
     	consensusPrice = _price;
+        for (uint i = 0; i < subscribers.length; i++) {
+            if (subscribers[i] != address(0)) {
+                OracleSubscriber(subscribers[i]).oraclePriceUpdated(consensusPrice, consensusPriceTimestamp);
+            }
+        }
     }
 
     function _transferOwnership(address _newOwner) internal requireActive("transfer ownership") {
@@ -58,7 +70,18 @@ abstract contract OracleService is Utils {
         return (consensusPrice, consensusPriceTimestamp);
     }
 
-    function registerReserve(address _reserve) public requireActive("register reserve") {
-        reserve = _reserve;
+    function subscribe() public {
+        if (subscriberMap[msg.sender] == 0) {
+            subscribers.push(msg.sender);
+            subscriberMap[msg.sender] = subscribers.length;
+        }
+    }
+
+    function unsubscribe() public {
+        uint index = subscriberMap[msg.sender];
+        if (index > 0) {
+            subscribers[index - 1] = address(0);
+            subscriberMap[msg.sender] = 0;
+        }
     }
 }

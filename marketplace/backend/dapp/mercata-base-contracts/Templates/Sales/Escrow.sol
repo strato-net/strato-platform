@@ -28,6 +28,27 @@ contract Escrow is Sale {
         reserve = msg.sender;
     }
 
+    function calculateCATAReward(uint _cataAPYRate, uint _assetAmount, decimal _loanAmount) internal view returns (decimal) {
+        // Calculate reward based on 10% APY over a specific period
+        // Placeholder calculation, assuming a yearly rate
+        return decimal(_assetAmount) * _loanAmount * decimal(_cataAPYRate) / 100;
+    }
+
+    function updatePriceInfo(decimal _price, uint _timestamp, uint _loanToValueRatio, uint _cataAPYRate) public {
+        require(msg.sender == reserve, "Only the reserve can call updatePriceInfo");
+        uint loanToValueRatio = msg.sender
+        uint cataAPYRate = 10; // 10% APY for CATA rewards
+        escrowPrice = _price;
+        stratsLoanAmount = decimal(quantity) * escrowPrice.truncate(2) * decimal(_loanToValueRatio);
+        cataRewardInDollars = calculateCATAReward(_cataAPYRate, quantity, _maxStratsLoanAmount/100);
+
+        if (borrowedAmount > stratsLoanAmount) {
+            initiateLiquidation(); // essentially gfy
+        }
+    }
+
+    function initiateLiquidation() internal { } // stub for now
+
     function closeSale() external override returns (uint) {
         require(msg.sender == reserve, "Only reserve can close Escrow");
         _closeSale();
