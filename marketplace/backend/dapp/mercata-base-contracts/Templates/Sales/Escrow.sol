@@ -55,7 +55,7 @@ contract Escrow is Sale {
         maxStratsLoanAmount = uint(collateralAmount * decimal(loanToValueRatio) / 100);
     }
 
-    function updateCataReward(uint _newCataReward) external {
+    function updateCataReward(decimal _newCataReward) external {
         require(msg.sender == reserve, "Only reserve can update CATA reward");
         totalCataRewardInDollars += _newCataReward;
     }

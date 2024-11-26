@@ -79,11 +79,11 @@ abstract contract Reserve is Utils, Structs {
             escrows[i].updateOnPriceChange(_newPrice, interval);
             //get cata reward from escrow
                 decimal cataReward = calculateCATAReward(escrows[i].collateralAmount(), _newPrice.truncate(2), cataAPYRate, interval);
-                escrows[i].updateCataReward(uint(cataReward * 100));
+                escrows[i].updateCataReward(cataReward * 100);
                 // Transfer Cata from reserve to borrower
                 cataToken.transferOwnership(
                 escrows[i].borrower(),
-                uint(cataReward * 100),
+                cataReward * 100,
                 true,
                 0,
                 0.0001
@@ -212,11 +212,11 @@ abstract contract Reserve is Utils, Structs {
     function calculateCATAReward(
         decimal collateralAmount,
         decimal livePriceOfCollateral,
-        decimal apy,
+        uint apy,
         uint interval,
         decimal priceOfCATA
     ) internal pure returns (decimal) {
         // Calculate the reward in CATA
-        return (collateralAmount * livePriceOfCollateral * apy) / (interval * priceOfCATA);
+        return (collateralAmount * livePriceOfCollateral * decimlal(apy)/100.0) / (decimal(interval) * priceOfCATA);
     }
 }
