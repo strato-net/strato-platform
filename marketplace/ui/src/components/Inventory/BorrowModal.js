@@ -32,13 +32,14 @@ const BorrowModal = ({
     isFetchingOracle,
     reserves,
     oracle,
+    isBorrowing
   } = useInventoryState();
   // Dispatch
   const inventoryDispatch = useInventoryDispatch();
   const marketplaceDispatch = useMarketplaceDispatch();
 
   const isLoader =
-    isStaking || isUnstaking || isFetchingOracle || isreservessLoading;
+    isStaking || isUnstaking || isFetchingOracle || isreservessLoading || isBorrowing;
   const isStaked = inventory.sale && inventory.price <= 0;
   const itemName = decodeURIComponent(inventory.name);
   const resAddress = reserves?.length ? reserves[0]?.address : null;
@@ -59,7 +60,7 @@ const BorrowModal = ({
     {
       label: `Market Value of (${itemName} x ${inventory?.quantity})`,
       description: 'The total market value of the collateral',
-      value: `$${oracleData.consensusPrice.toFixed(2) * inventory?.quantity}`,
+      value: `$${(oracleData.consensusPrice.toFixed(2) * inventory?.quantity).toFixed(2)}`,
     },
     {
       label: 'Estimated Loan Amount in STRATs',

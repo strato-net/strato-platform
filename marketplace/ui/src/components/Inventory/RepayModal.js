@@ -21,7 +21,7 @@ const logo = (
   <img src={Images.strats} alt={''} title={''} className="w-5 h-5" />
 );
 
-const PayLoanModal = ({
+const RepayModal = ({
   open,
   handleCancel,
   inventory,
@@ -38,6 +38,7 @@ const PayLoanModal = ({
     isFetchingOracle,
     reserves,
     oracle,
+    isRepaying
   } = useInventoryState();
   // Dispatch
   const inventoryDispatch = useInventoryDispatch();
@@ -45,7 +46,7 @@ const PayLoanModal = ({
   const paymentServiceDispatch = usePaymentServiceDispatch();
 
   const { paymentServices } = usePaymentServiceState();
-  const isLoader = !paymentServices || isreservessLoading;
+  const isLoader = !paymentServices || isreservessLoading || isRepaying;
   const isStaked = inventory.sale && inventory.price <= 0;
   const itemName = decodeURIComponent(inventory.name);
 
@@ -135,7 +136,7 @@ const PayLoanModal = ({
               disabled={isLoader}
               loading={isLoader}
             >
-              Pay Loan
+              Repay
             </Button>
           </div>
         </div>
@@ -157,4 +158,4 @@ const PayLoanModal = ({
   );
 };
 
-export default PayLoanModal;
+export default RepayModal;

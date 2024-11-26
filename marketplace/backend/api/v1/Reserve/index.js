@@ -49,10 +49,10 @@ router.post(
 );
 
 router.post(
-  Reserve.payLoan,
+  Reserve.repay,
   authHandler.authorizeRequest(),
   loadDapp,
-  ReserveController.payLoan
+  ReserveController.repay
 );
 
 export default router;

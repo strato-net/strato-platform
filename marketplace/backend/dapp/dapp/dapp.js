@@ -2112,7 +2112,7 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
     return await reserveJs.borrow(rawAdmin, args, options);
   };
   
-  contract.payLoan = async function (args, options = defaultOptions) {
+  contract.repay = async function (args, options = defaultOptions) {
     const { stratsPaymentService, escrow } = args;
   
     // Fetch user's STRATS asset origin address
@@ -2156,7 +2156,7 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
     }
   
     // Proceed with unstake if sufficient assets are accumulated
-    return await reserveJs.payLoan(
+    return await reserveJs.repay(
       rawAdmin,
       { address: stratsPaymentService },
       { stratsAssetAddresses: addressesToUse, escrowAddress: escrow },

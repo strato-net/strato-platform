@@ -34,7 +34,7 @@ import 'react-responsive-carousel/lib/styles/carousel.min.css';
 import { SEO } from '../../helpers/seoConstant';
 import { Images } from '../../images';
 import { useInventoryState } from '../../contexts/inventory';
-import PayLoanModal from './PayLoanModal';
+import RepayModal from './RepayModal';
 import BorrowModal from './BorrowModal';
 const StratsIcon = <img src={Images.strats} alt="STRATs" className="w-5 h-5" />;
 
@@ -57,7 +57,7 @@ const InventoryCard = ({
   const [unlistModalOpen, setUnlistModalOpen] = useState(false);
   const [stakeType, setStakeType] = useState('Stake');
   const [borrowModalOpen, setBorrowModalOpen] = useState(false);
-  const [payLoanModalOpen, setPayLoanModalOpen] = useState(false);
+  const [repayModalOpen, setRepayModalOpen] = useState(false);
   const [resellModalOpen, setResellModalOpen] = useState(false);
   const [transferModalOpen, setTransferModalOpen] = useState(false);
   const [redeemModalOpen, setRedeemModalOpen] = useState(false);
@@ -124,12 +124,12 @@ const InventoryCard = ({
     setBorrowModalOpen(false);
   };
 
-  const showPayLoanModal = () => {
-    setPayLoanModalOpen(true);
+  const showRepayModal = () => {
+    setRepayModalOpen(true);
   };
 
-  const handlePayLoanModalClose = () => {
-    setPayLoanModalOpen(false);
+  const handleRepayModalClose = () => {
+    setRepayModalOpen(false);
   };
 
 
@@ -396,10 +396,10 @@ const InventoryCard = ({
           <Button
             type="link"
             className="text-[#13188A]  text-left px-0 font-semibold text-sm h-6"
-            onClick={() => showPayLoanModal('Unstake')}
+            onClick={() => showRepayModal('Unstake')}
             disabled={inventory?.borrowedAmount && inventory?.borrowedAmount <= 0}
           >
-            <SolutionOutlined />Pay Loan
+            <SolutionOutlined />Repay
           </Button>
         </>
       )}
@@ -590,10 +590,10 @@ const InventoryCard = ({
           category={category}
         />
       )}
-      {payLoanModalOpen && (
-        <PayLoanModal
-          open={payLoanModalOpen}
-          handleCancel={handlePayLoanModalClose}
+      {repayModalOpen && (
+        <RepayModal
+          open={repayModalOpen}
+          handleCancel={handleRepayModalClose}
           limit={limit}
           offset={offset}
           inventory={inventory}

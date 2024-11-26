@@ -206,5 +206,5 @@ export const Reserve = {
   stake: "/stake",
   unstake: "/unstake",
   borrow: "/borrow",
-  payLoan: "/payLoan",
+  repay: "/repay",
 };

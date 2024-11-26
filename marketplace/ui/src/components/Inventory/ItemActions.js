@@ -26,7 +26,7 @@ import RedeemModal from './RedeemModal';
 import BridgeModal from './BridgeModal';
 import StakeModal from './StakeModal';
 import BorrowModal from './BorrowModal';
-import PayLoanModal from './PayLoanModal';
+import RepayModal from './RepayModal';
 
 const ItemActions = ({
   inventory,
@@ -59,7 +59,7 @@ const ItemActions = ({
   const [stakeType, setStakeType] = useState('Stake');
   const [stakeModalOpen, setStakeModalOpen] = useState(false);
   const [borrowModalOpen, setBorrowModalOpen] = useState(false);
-  const [payLoanModalOpen, setPayLoanModalOpen] = useState(false);
+  const [repayModalOpen, setRepayModalOpen] = useState(false);
   const [resellModalOpen, setResellModalOpen] = useState(false);
   const [transferModalOpen, setTransferModalOpen] = useState(false);
   const [redeemModalOpen, setRedeemModalOpen] = useState(false);
@@ -154,13 +154,13 @@ const ItemActions = ({
     setBorrowModalOpen(false);
   };
 
-  const showPayLoanModal = () => {
+  const showRepayModal = () => {
     togglePopover(false);
-    setPayLoanModalOpen(true);
+    setRepayModalOpen(true);
   };
 
-  const handlePayLoanModalClose = () => {
-    setPayLoanModalOpen(false);
+  const handleRepayModalClose = () => {
+    setRepayModalOpen(false);
   };
 
   const handleUnlistModalClose = () => {
@@ -283,10 +283,10 @@ const ItemActions = ({
           <Button
             type="link"
             className="text-[#13188A] font-semibold"
-            onClick={() => showPayLoanModal('Unstake')}
+            onClick={() => showRepayModal('Unstake')}
             disabled={inventory?.borrowedAmount && inventory?.borrowedAmount <= 0}
           >
-            <SolutionOutlined />Pay Loan
+            <SolutionOutlined />Repay
           </Button>
         </div>
       )}
@@ -403,10 +403,10 @@ const ItemActions = ({
           category={category}
         />
       )}
-      {payLoanModalOpen && (
-        <PayLoanModal
-          open={payLoanModalOpen}
-          handleCancel={handlePayLoanModalClose}
+      {repayModalOpen && (
+        <RepayModal
+          open={repayModalOpen}
+          handleCancel={handleRepayModalClose}
           limit={limit}
           offset={offset}
           inventory={inventory}

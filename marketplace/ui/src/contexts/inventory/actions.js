@@ -1141,7 +1141,7 @@ const actions = {
     dispatch({ type: actionDescriptors.repay });
 
     try {
-      const response = await fetch(`${apiUrl}/reserve/payLoan`, {
+      const response = await fetch(`${apiUrl}/reserve/repay`, {
         method: HTTP_METHODS.POST,
         credentials: 'same-origin',
         headers: {

@@ -239,9 +239,9 @@ async function borrow(user, args, options) {
 }
 
 /**
- * Pay Loan
+ * Repay
  */
-async function payLoan(user, contract, args, options) {
+async function repay(user, contract, args, options) {
 const callArgs = {
     contract,
     method: 'repayLoan',
@@ -262,5 +262,5 @@ export default {
   stake,
   unstake,
   borrow,
-  payLoan,
+  repay,
 };

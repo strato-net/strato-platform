@@ -92,12 +92,12 @@ class ReserveController {
   }
 
   // Pay STRATs Loan to reserve
-  static async payLoan(req, res, next) {
+  static async repay(req, res, next) {
     try {
       const { dapp, body } = req;
-      ReserveController.validatePayLoanArgs(body);
+      ReserveController.validateRepayArgs(body);
 
-      const result = await dapp.payLoan(body);
+      const result = await dapp.repay(body);
       rest.response.status200(res, result);
       next();
     } catch (e) {
@@ -199,7 +199,7 @@ class ReserveController {
     ReserveController.validateArgs(args, schema, 'Borrow');
   }
 
-  static validatePayLoanArgs(args) {
+  static validateRepayArgs(args) {
     const schema = Joi.object({
       escrow: Joi.string().required().messages({
         'any.required': 'Escrow is required and must be a string.',
@@ -211,7 +211,7 @@ class ReserveController {
         'string.base': 'Strats Payment Service must be a valid string.',
       }),
     });
-    ReserveController.validateArgs(args, schema, 'PayLoan');
+    ReserveController.validateArgs(args, schema, 'Repay');
   }
 
   static validateArgs(args, schema, action) {
