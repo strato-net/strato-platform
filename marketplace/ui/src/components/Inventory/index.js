@@ -169,7 +169,7 @@ const Inventory = ({ user }) => {
           offset,
           debouncedSearchTerm,
           category && category !== 'All' ? category : undefined,
-          showStakeable === 'true' ? reserves[0].assetRootAddress : ''
+          queryParams.get('st') === 'true' ? reserves[0].assetRootAddress : ''
         );
       } else {
         actions.fetchInventory(
@@ -178,9 +178,10 @@ const Inventory = ({ user }) => {
           offset,
           debouncedSearchTerm,
           category && category !== 'All' ? category : undefined,
-          showStakeable === 'true' ? reserves[0].assetRootAddress : ''
+          queryParams.get('st') === 'true' ? reserves[0].assetRootAddress : ''
         );
       }
+      setShowStakeable(queryParams.get('st'))
     }
   }, [
     dispatch,
@@ -191,6 +192,7 @@ const Inventory = ({ user }) => {
     showPublished,
     showStakeable,
     reserves,
+    location.search
   ]);
 
   const showModal = () => {

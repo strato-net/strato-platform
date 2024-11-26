@@ -518,7 +518,7 @@ const HeaderComponent = ({
           }}
           items={navItems}
         />
-        <Tooltip title={'Stake'}>
+        <Tooltip placement='bottom' title={'Stake'}>
           <Button
             type="primary"
             className="w-20 rounded-full hidden md:block"
