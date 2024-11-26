@@ -11,6 +11,8 @@ import {
   MoreOutlined,
   RiseOutlined,
   LogoutOutlined,
+  BankOutlined,
+  SolutionOutlined,
 } from '@ant-design/icons';
 import {
   ASSET_STATUS,
@@ -252,7 +254,7 @@ const ItemActions = ({
       {!inventory.stratsLoanAmount && stakeable && (
         <Button
           type="primary"
-          className="font-semibold flex items-center justify-center"
+          className="font-semibold w-1/4 flex items-center justify-center"
           onClick={() => showStakeModal('Stake')}
           disabled={inventory.price || !isActive()}
         >
@@ -263,25 +265,28 @@ const ItemActions = ({
       {inventory.stratsLoanAmount && stakeable && (
         <div className="flex justify-center gap-3">
           <Button
-            type="primary"
-            className="font-semibold"
+            type="link"
+            className="text-[#13188A] font-semibold"
             onClick={() => showStakeModal('Unstake')}
+            disabled={inventory?.borrowedAmount && inventory?.borrowedAmount > 0}
           >
             <LogoutOutlined /> Unstake
           </Button>
           <Button
-            type="primary"
-            className="font-semibold"
+            type="link"
+            className="text-[#13188A] font-semibold"
             onClick={() => showBorrowModal('Unstake')}
+            disabled={inventory?.borrowedAmount && inventory?.borrowedAmount > 0}
           >
-            <LogoutOutlined /> Borrow
+            <BankOutlined /> Borrow
           </Button>
           <Button
-            type="primary"
-            className="font-semibold"
+            type="link"
+            className="text-[#13188A] font-semibold"
             onClick={() => showPayLoanModal('Unstake')}
+            disabled={inventory?.borrowedAmount && inventory?.borrowedAmount <= 0}
           >
-            <LogoutOutlined /> Pay Loan
+            <SolutionOutlined />Pay Loan
           </Button>
         </div>
       )}

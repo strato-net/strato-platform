@@ -425,6 +425,7 @@ async function get(user, args, options) {
       saleAddress: sale.address,
       saleQuantity: sale.quantity,
       stratsLoanAmount: sale?.data?.stratsLoanAmount,
+      borrowedAmount: sale?.data?.borrowedAmount,
       paymentServices: sale
         ? sale['BlockApps-Mercata-Sale-paymentServices']
           ? sale['BlockApps-Mercata-Sale-paymentServices']
@@ -597,6 +598,7 @@ async function getAll(admin, args = {}, defaultOptions) {
                 saleAddress: sales[0]?.address,
                 saleQuantity: sales[0]?.quantity,
                 stratsLoanAmount: sales[0]?.data?.stratsLoanAmount,
+                borrowedAmount: sales[0]?.data?.borrowedAmount,
                 saleDate: sales[0]?.block_timestamp,
                 totalLockedQuantity: sales[0]?.totalLockedQuantity,
                 paymentServices: sales[0]
@@ -615,6 +617,7 @@ async function getAll(admin, args = {}, defaultOptions) {
               saleAddress: sales[0]?.address,
               saleQuantity: sales[0]?.quantity,
               stratsLoanAmount: sales[0]?.data?.stratsLoanAmount,
+              borrowedAmount: sales[0]?.data?.borrowedAmount,
               saleDate: sales[0]?.block_timestamp,
               totalLockedQuantity: sales[0]?.totalLockedQuantity,
               paymentServices: sales[0]

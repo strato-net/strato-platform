@@ -181,14 +181,19 @@ class ReserveController {
   static validateBorrowArgs(args) {
     const schema = Joi.object({
       escrowAddress: Joi.string().required().messages({
-        'any.required': 'Escrow is required and must be a string.',
-        'string.base': 'Escrow must be a valid string.',
+      'any.required': 'Escrow is required and must be a string.',
+      'string.base': 'Escrow must be a valid string.',
       }),
-      borrowAmount: Joi.number().positive().required().messages({
-        'any.required':
-          'Borrow Amount is required and must be a positive number.',
-        'number.base': 'Borrow Amount must be a valid number.',
-        'number.positive': 'Borrow Amount must be positive.',
+      borrowAmount: Joi.number().positive().precision(2).required().messages({
+      'any.required':
+        'Borrow Amount is required and must be a positive number.',
+      'number.base': 'Borrow Amount must be a valid number.',
+      'number.positive': 'Borrow Amount must be positive.',
+      'number.precision': 'Borrow Amount can have up to two decimal places.',
+      }),
+      reserve: Joi.string().required().messages({
+        'any.required': 'Reserve is required and must be a string.',
+        'string.base': 'Reserve must be a valid string.',
       }),
     });
     ReserveController.validateArgs(args, schema, 'Borrow');
@@ -196,7 +201,7 @@ class ReserveController {
 
   static validatePayLoanArgs(args) {
     const schema = Joi.object({
-      escrowAddress: Joi.string().required().messages({
+      escrow: Joi.string().required().messages({
         'any.required': 'Escrow is required and must be a string.',
         'string.base': 'Escrow must be a valid string.',
       }),

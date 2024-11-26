@@ -51,6 +51,15 @@ const actionDescriptors = {
   getOracle: 'get_oracle',
   getOracleSuccessful: 'get_oracle_successful',
   getOracleFailed: 'get_oracle_failed',
+
+  borrow: 'borrow',
+  borrowSuccessful: 'borrow_successful',
+  borrowFailed: 'borrow_failed',
+
+  repay: 'repay',
+  repaySuccessful: 'repay_successful',
+  repayFailed: 'repay_failed',
+
   //------------------------------------------------------------
   resellInventory: 'resell_inventory',
   resellInventorySuccessful: 'resell_inventory_successful',
@@ -1132,7 +1141,7 @@ const actions = {
     dispatch({ type: actionDescriptors.repay });
 
     try {
-      const response = await fetch(`${apiUrl}/reserve/repay`, {
+      const response = await fetch(`${apiUrl}/reserve/payLoan`, {
         method: HTTP_METHODS.POST,
         credentials: 'same-origin',
         headers: {

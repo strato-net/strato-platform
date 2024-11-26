@@ -11,8 +11,6 @@ import {
   useInventoryDispatch,
   useInventoryState,
 } from '../../contexts/inventory';
-import { actions as marketplaceActions } from '../../contexts/marketplace/actions';
-import { useMarketplaceDispatch } from '../../contexts/marketplace';
 import { Images } from '../../images';
 
 const logo = (
@@ -41,7 +39,6 @@ const StakeModal = ({
   // Dispatch
   const inventoryDispatch = useInventoryDispatch();
   const paymentServiceDispatch = usePaymentServiceDispatch();
-  const marketplaceDispatch = useMarketplaceDispatch();
 
   const { paymentServices } = usePaymentServiceState();
   const isLoader =
@@ -65,33 +62,28 @@ const StakeModal = ({
     type === 'Stake'
       ? [
           {
-            label: `# of ${inventory?.name} to Collateralize`,
-            description: 'The number of assets to use as collateral',
+            label: `# of ${inventory?.name} to Stake`,
+            description: 'The number of assets to use to stake',
             value: `${inventory?.quantity}`,
           },
           {
-            label: `Market Value of ${inventory?.name} x ${inventory?.quantity}`,
-            description: 'The total market value of the collateral',
-            value: `$${(oracleData.consensusPrice).toFixed(2) * inventory?.quantity}`,
+            label: `Market Value of (${inventory?.name} x ${inventory?.quantity})`,
+            description: 'The total market value of the staked assets',
+            value: `$${
+              oracleData.consensusPrice.toFixed(2) * inventory?.quantity
+            }`,
           },
           {
-            label: 'Estimated Loan in STRATs',
-            description: 'The estimated amount of STRATs to borrow',
-            value: (
-              <div className="flex -mr-1">
-                {isStaked ? inventory.stratsLoanAmount : (oracleData.consensusPrice).toFixed(2) * reserves[0]?.loanToValueRatio}
-                {logo}
-              </div>
-            ),
-          },
-          {
-            label: 'Dailt Estimated Reward (CATA)',
+            label: 'Daily Estimated Reward (CATA)',
             description: 'The estimated amount of CATA to earn daily',
             value: (
               <div className="flex -mr-1">
                 {(
                   ((inventory?.quantity *
-                    (isStaked ? inventory.stratsLoanAmount : (oracleData.consensusPrice).toFixed(2) * reserves[0]?.loanToValueRatio)) /
+                    (isStaked
+                      ? inventory.stratsLoanAmount
+                      : oracleData.consensusPrice.toFixed(2) *
+                        reserves[0]?.loanToValueRatio)) /
                     100) *
                   (reserves[0]?.cataAPYRate / 100)
                 ).toFixed(2)}
@@ -107,16 +99,6 @@ const StakeModal = ({
             description: 'The number of assets to unstake',
             value: `${inventory?.quantity}`,
           },
-          {
-            label: 'Remaining Loan in STRATs',
-            description: 'The remaining value after unstaking',
-            value: (
-              <div className="flex -mr-1">
-                {isStaked ? inventory.stratsLoanAmount : (oracleData.consensusPrice).toFixed(2) * reserves[0]?.loanToValueRatio}
-                {logo}
-              </div>
-            ),
-          },
         ];
 
   const dataForSummary =
@@ -125,15 +107,7 @@ const StakeModal = ({
           {
             label: `Market price per ${inventory?.name}`,
             description: 'The current market price of the asset',
-            value: `$${(oracleData.consensusPrice).toFixed(
-              2
-            )}`,
-          },
-          {
-            label: 'Loan to Value Ratio',
-            description:
-              'The ratio of the loan amount to the market value of the collateral',
-            value: `${reserves[0]?.loanToValueRatio}%`,
+            value: `$${oracleData.consensusPrice.toFixed(2)}`,
           },
         ]
       : [];
@@ -172,7 +146,6 @@ const StakeModal = ({
             category && category !== 'All' ? category : undefined
           );
         }
-        await marketplaceActions.fetchStratsBalance(marketplaceDispatch);
         handleCancel();
       }
     }
@@ -201,7 +174,6 @@ const StakeModal = ({
             category && category !== 'All' ? category : undefined
           );
         }
-        await marketplaceActions.fetchStratsBalance(marketplaceDispatch);
         handleCancel();
       }
     }
@@ -216,21 +188,11 @@ const StakeModal = ({
           Collateral: {itemName}
         </div>
       }
-      width={600}
+      width={500}
       centered
       footer={null}
     >
       <div className="flex flex-col px-4 pt-4">
-        <p className="text-sm text-gray-500">
-          Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do
-          eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad
-          minim veniam, quis nostrud exercitation ullamco laboris nisi ut
-          aliquip ex ea commodo consequat. Duis aute irure dolor in
-          reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla
-          pariatur. Excepteur sint occaecat cupidatat non proident, sunt in
-          culpa qui officia deserunt mollit anim id est laborum.
-        </p>
-        <h3 className="text-xl font-bold mt-4 mb-2">Borrow Position</h3>
         <div className="flex flex-col gap-2">
           {dataForItems.map((item, index) => (
             <div key={index} className="w-full flex justify-between">

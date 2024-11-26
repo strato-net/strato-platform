@@ -1,5 +1,4 @@
 import { util, rest } from '/blockapps-rest-plus';
-import { searchAllWithQueryArgs } from '/helpers/utils';
 import constants from '../../helpers/constants';
 
 const contractName = 'BlockApps-Mercata-Reserve';
@@ -243,7 +242,7 @@ async function borrow(user, args, options) {
  * Pay Loan
  */
 async function payLoan(user, contract, args, options) {
-  const callArgs = {
+const callArgs = {
     contract,
     method: 'repayLoan',
     args: util.usc({ ...args }),
