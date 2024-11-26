@@ -138,6 +138,8 @@ const Inventory = ({ user }) => {
         10,
         0
       );
+
+      setIssuerStatus(user?.issuerStatus);
     }
   }, [paymentServiceDispatch, user]);
 
@@ -148,20 +150,14 @@ const Inventory = ({ user }) => {
     useRedemptionState();
   const [issuerStatus, setIssuerStatus] = useState(user?.issuerStatus);
 
-  useEffect(() => {
-    setIssuerStatus(user?.issuerStatus);
-  }, [user]);
-
   const issuerStatusDispatch = useIssuerStatusDispatch();
   const { message: issuerStatusMsg, success: issuerStatusSuccess } =
     useIssuerStatusState();
 
   useEffect(() => {
-    categoryActions.fetchCategories(categoryDispatch);
-  }, [categoryDispatch]);
-
-  useEffect(() => {
     actions.getAllReserve(dispatch);
+    actions.fetchSupportedTokens(dispatch);
+    categoryActions.fetchCategories(categoryDispatch);
   }, []);
 
   useEffect(() => {
@@ -186,7 +182,6 @@ const Inventory = ({ user }) => {
         );
       }
     }
-    actions.fetchSupportedTokens(dispatch);
   }, [
     dispatch,
     limit,

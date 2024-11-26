@@ -15,7 +15,7 @@ const NewVaultCard = ({ reserveItem, parent = '', contextHolder }) => {
   const navigate = useNavigate();
   const { hasChecked, isAuthenticated, loginUrl, user } =
     useAuthenticateState();
-  console.log('reserveItem', reserveItem);
+  
   const [isModalVisible, setIsModalVisible] = useState(false);
 
   const queryParams = new URLSearchParams(location.search);
