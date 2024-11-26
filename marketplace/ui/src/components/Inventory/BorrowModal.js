@@ -67,7 +67,6 @@ const BorrowModal = ({
       value: (
         <div className="flex -mr-1">
           {parseFloat(inventory?.stratsLoanAmount).toFixed(2)}
-
           {logo}
         </div>
       ),

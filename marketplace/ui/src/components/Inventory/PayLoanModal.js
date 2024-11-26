@@ -60,7 +60,6 @@ const PayLoanModal = ({
       value: (
         <div className="flex -mr-1">
           {inventory?.borrowedAmount}
-
           {logo}
         </div>
       ),
