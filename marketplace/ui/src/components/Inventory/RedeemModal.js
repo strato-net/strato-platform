@@ -19,6 +19,7 @@ import AddAddressModal from '../MarketPlace/AddAddressModal';
 import ResponsiveAddAddress from '../MarketPlace/ResponsiveAddAddress';
 import { Images } from '../../images';
 import { REDEMPTION_STATUS } from '../../helpers/constants';
+import { useLocation } from 'react-router-dom';
 
 const RedeemModal = ({
   open,
@@ -28,8 +29,11 @@ const RedeemModal = ({
   debouncedSearchTerm,
   limit,
   offset,
+  reserves
 }) => {
   const [data, setData] = useState([inventory]);
+  const location = useLocation();
+  const queryParams = new URLSearchParams(location.search);
   const [quantity, setQuantity] = useState(1);
   const [comments, setComments] = useState('');
   const inventoryDispatch = useInventoryDispatch();
@@ -133,7 +137,8 @@ const RedeemModal = ({
           limit,
           offset,
           debouncedSearchTerm,
-          category && category !== 'All' ? category : undefined
+          category && category !== 'All' ? category : undefined,
+          queryParams.get('st') === 'true' ? reserves[0].assetRootAddress : ''
         );
         await actions.fetchInventoryForUser(
           inventoryDispatch,

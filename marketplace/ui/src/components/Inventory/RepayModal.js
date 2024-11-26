@@ -16,6 +16,7 @@ import { actions as paymentServiceActions } from '../../contexts/payment/actions
 import { actions as marketplaceActions } from '../../contexts/marketplace/actions';
 import { useMarketplaceDispatch } from '../../contexts/marketplace';
 import { Images } from '../../images';
+import { useLocation } from 'react-router-dom';
 
 const logo = (
   <img src={Images.strats} alt={''} title={''} className="w-5 h-5" />
@@ -30,6 +31,7 @@ const RepayModal = ({
   limit,
   offset,
   productDetailPage,
+  reserves
 }) => {
   const {
     isRepaying
@@ -42,6 +44,8 @@ const RepayModal = ({
   const { paymentServices } = usePaymentServiceState();
   const isStaked = inventory.sale && inventory.price <= 0;
   const itemName = decodeURIComponent(inventory.name);
+  const location = useLocation();
+  const queryParams = new URLSearchParams(location.search);
 
   useEffect(() => {
     paymentServiceActions.getPaymentServices(paymentServiceDispatch, true);
@@ -84,7 +88,8 @@ const RepayModal = ({
           limit,
           offset,
           debouncedSearchTerm,
-          category && category !== 'All' ? category : undefined
+          category && category !== 'All' ? category : undefined,
+          queryParams.get('st') === 'true' ? reserves[0].assetRootAddress : ''
         );
       }
       await marketplaceActions.fetchStratsBalance(marketplaceDispatch);

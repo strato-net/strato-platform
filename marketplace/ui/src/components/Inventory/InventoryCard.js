@@ -565,6 +565,7 @@ const InventoryCard = ({
           inventory={inventory}
           categoryName={category}
           user={user}
+          reserves={reserves}
         />
       )}
       {unlistModalOpen && (
@@ -576,6 +577,7 @@ const InventoryCard = ({
           inventory={inventory}
           saleAddress={inventory.saleAddress}
           categoryName={category}
+          reserves={reserves}
         />
       )}
       {borrowModalOpen && (
@@ -600,6 +602,7 @@ const InventoryCard = ({
           debouncedSearchTerm={debouncedSearchTerm}
           saleAddress={inventory.saleAddress}
           category={category}
+          reserves={reserves}
         />
       )}
       {resellModalOpen && (
@@ -610,6 +613,7 @@ const InventoryCard = ({
           offset={offset}
           inventory={inventory}
           categoryName={category}
+          reserves={reserves}
         />
       )}
       {stakeModalOpen && (
@@ -633,6 +637,7 @@ const InventoryCard = ({
           offset={offset}
           inventory={inventory}
           categoryName={category}
+          reserves={reserves}
         />
       )}
       {redeemModalOpen && (
@@ -643,6 +648,7 @@ const InventoryCard = ({
           offset={offset}
           inventory={inventory}
           categoryName={category}
+          reserves={reserves}
         />
       )}
       {bridgeModalOpen && (
@@ -653,6 +659,7 @@ const InventoryCard = ({
           offset={offset}
           inventory={inventory}
           categoryName={category}
+          reserves={reserves}
         />
       )}
     </div>
