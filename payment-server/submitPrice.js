@@ -40,7 +40,10 @@ async function main() {
       const silverPrice = response.data.rate.price;
       console.log(`Current Silver Price: $${silverPrice} per ounce`);
 
-      await submitPrice(token, silverOracle, { price: silverPrice });
+      const timestampInSeconds = Math.floor(Date.now() / 1000);
+      console.log(`Current Timestamp: ${timestampInSeconds}`);
+
+      await submitPrice(token, silverOracle, { price: silverPrice, timestamp: timestampInSeconds });
       console.log(`Price submitted for silver at ${new Date().toISOString()}`);
     } catch (error) {
       console.error("ERROR: Failed to submit price for silver:", error);
