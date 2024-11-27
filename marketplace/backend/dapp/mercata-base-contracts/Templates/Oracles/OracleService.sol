@@ -46,8 +46,8 @@ abstract contract OracleService is Utils {
         isActive = false;
     }
 
-    function _submitPrice(decimal _price) internal  requireActive("submit price") {
-        consensusPriceTimestamp = block.timestamp;
+    function _submitPrice(decimal _price, uint _timestamp) internal  requireActive("submit price") {
+        consensusPriceTimestamp = _timestamp;
     	consensusPrice = _price;
         for (uint i = 0; i < subscribers.length; i++) {
             if (subscribers[i] != address(0)) {
