@@ -68,7 +68,7 @@ abstract contract Reserve is Utils, Structs, OracleSubscriber {
                 decimal cataReward = calculateCATAReward(escrows[i].collateralQuantity(), _newPrice.truncate(2), delta); //per day 0.08, per hour 0.0033, per 10 minutes 0.00055
                 escrows[i].updateTotalCataReward(cataReward * 10**18);
 
-                uint transferNumber = (uint(block.number + 16) + block.timestamp) % 1000000;
+                uint transferNumber = (uint(block.number + 16 + i) + block.timestamp) % 1000000;
 
                 // Transfer Cata from reserve to borrower
                 cataToken.transferOwnership(
