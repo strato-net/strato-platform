@@ -47,11 +47,15 @@ async function main() {
     }
   };
 
-  await submitPricePeriodically(); // Immediate first run
-  setInterval(submitPricePeriodically, fetchInterval);
+  const sleep = function (ms) {
+    return new Promise(resolve => setTimeout(resolve, ms));
+  };
 
   while (true) {
-
+    console.log('Fetching silver price');
+    await submitPricePeriodically(); // Immediate first run
+    console.log(`Sleeping for ${fetchInterval} ms`);
+    await sleep(fetchInterval);
   }
 }
 
