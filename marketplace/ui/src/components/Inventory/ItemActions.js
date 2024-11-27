@@ -96,7 +96,7 @@ const ItemActions = ({
     if (
       inventory.status == ASSET_STATUS.PENDING_REDEMPTION ||
       inventory.status == ASSET_STATUS.RETIRED ||
-      inventory.stratsLoanAmount
+      inventory.maxStratsLoanAmount
     ) {
       return false;
     } else {
@@ -205,7 +205,7 @@ const ItemActions = ({
 
   return (
     <div className="flex justify-center">
-      {(!stakeable || (!inventory.stratsLoanAmount && stakeable)) && (
+      {(!stakeable || (!inventory.maxStratsLoanAmount && stakeable)) && (
         <>
           <Button
             type="link"
@@ -251,7 +251,7 @@ const ItemActions = ({
         </Button>
       )}
 
-      {!inventory.stratsLoanAmount && stakeable && (
+      {!inventory.maxStratsLoanAmount && stakeable && (
         <Button
           type="primary"
           className="font-semibold w-1/4 flex items-center justify-center"
@@ -262,7 +262,7 @@ const ItemActions = ({
         </Button>
       )}
 
-      {inventory.stratsLoanAmount && stakeable && (
+      {inventory.maxStratsLoanAmount && stakeable && (
         <div className="flex justify-center gap-3">
           <Button
             type="link"
@@ -290,7 +290,7 @@ const ItemActions = ({
           </Button>
         </div>
       )}
-      {(!stakeable || (!inventory.stratsLoanAmount && stakeable)) && (
+      {(!stakeable || (!inventory.maxStratsLoanAmount && stakeable)) && (
         <Popover
           placement="topRight"
           open={popoverVisible[inventory.address] || false}
@@ -338,7 +338,7 @@ const ItemActions = ({
                 type="link"
                 className={`text-[#13188A] font-semibold ${
                   !isTokenSupported(inventory.root) ||
-                  inventory.stratsLoanAmount
+                  inventory.maxStratsLoanAmount
                     ? 'hidden'
                     : ''
                 }`}

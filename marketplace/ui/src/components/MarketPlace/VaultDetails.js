@@ -90,8 +90,8 @@ const VaultDetails = ({ user, users }) => {
 
   // Stakeable
   const isStaked =
-    inventoryDetails?.stratsLoanAmount &&
-    inventoryDetails?.stratsLoanAmount > 0;
+    inventoryDetails?.maxStratsLoanAmount &&
+    inventoryDetails?.maxStratsLoanAmount > 0;
   const isStakeable =
     inventoryDetails?.root &&
     reserve &&
@@ -392,18 +392,18 @@ const VaultDetails = ({ user, users }) => {
                             <>
                               $
                               {isStaked
-                                ? (details.stratsLoanAmount / 100).toFixed(4)
+                                ? (details.maxStratsLoanAmount / 100).toFixed(4)
                                 : adjustedPrice}
                               <span className="font-normal text-xs mr-2 text-primary">
                                 <b>
                                   (
                                   {isStaked
-                                    ? details.stratsLoanAmount
+                                    ? details.maxStratsLoanAmount
                                     : (
                                         adjustedPrice * STRATS_CONVERSION
                                       ).toFixed(0)}{' '}
                                   {(isStaked
-                                    ? details.stratsLoanAmount
+                                    ? details.maxStratsLoanAmount
                                     : (
                                         adjustedPrice * STRATS_CONVERSION
                                       ).toFixed(0)) == 1

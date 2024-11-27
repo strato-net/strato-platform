@@ -231,7 +231,7 @@ const InventoryCard = ({
     if (
       inventory.status == ASSET_STATUS.PENDING_REDEMPTION ||
       inventory.status == ASSET_STATUS.RETIRED ||
-      inventory.stratsLoanAmount
+      inventory.maxStratsLoanAmount
     ) {
       return false;
     } else {
@@ -318,7 +318,7 @@ const InventoryCard = ({
             </div>
           </div>
           <div className="mt-3 grid grid-cols-3 gap-1 w-full">
-          {(!stakeable || (!inventory.stratsLoanAmount && stakeable)) && (
+          {(!stakeable || (!inventory.maxStratsLoanAmount && stakeable)) && (
         <>
           <Button
             type="link"
@@ -364,7 +364,7 @@ const InventoryCard = ({
         </Button>
       )}
 
-      {!inventory.stratsLoanAmount && stakeable && (
+      {!inventory.maxStratsLoanAmount && stakeable && (
         <Button
           type="primary"
           className="font-semibold w-full flex items-center justify-center"
@@ -375,7 +375,7 @@ const InventoryCard = ({
         </Button>
       )}
 
-      {inventory.stratsLoanAmount && stakeable && (
+      {inventory.maxStratsLoanAmount && stakeable && (
         <>
           <Button
             type="link"
@@ -403,7 +403,7 @@ const InventoryCard = ({
           </Button>
         </>
       )}
-      {(!stakeable || (!inventory.stratsLoanAmount && stakeable)) && (
+      {(!stakeable || (!inventory.maxStratsLoanAmount && stakeable)) && (
        <>
        {stakeable && (
          <Button
@@ -446,7 +446,7 @@ const InventoryCard = ({
          type="link"
          className={`text-[#13188A]  text-left px-0 font-semibold text-sm h-6 ${
            !isTokenSupported(inventory.root) ||
-           inventory.stratsLoanAmount
+           inventory.maxStratsLoanAmount
              ? 'hidden'
              : ''
          }`}
@@ -480,11 +480,11 @@ const InventoryCard = ({
           </div>
 
           <div className="pt-[7px] lg:pt-0 items-center gap-[5px]">
-            {inventory.price || inventory?.stratsLoanAmount ? (
+            {inventory.price || inventory?.maxStratsLoanAmount ? (
               <div className="flex items-center justify-center gap-2 bg-[#1548C329] p-[6px] rounded-md">
                 <div className="w-[7px] h-[7px] rounded-full bg-[#119B2D]"></div>
                 <p className="text-[#4D4D4D] text-[13px]">
-                  {inventory?.stratsLoanAmount ? 'Staked' : 'Published'}
+                  {inventory?.maxStratsLoanAmount ? 'Staked' : 'Published'}
                 </p>
               </div>
             ) : inventory.status == ASSET_STATUS.PENDING_REDEMPTION ? (

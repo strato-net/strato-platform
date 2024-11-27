@@ -48,7 +48,7 @@ const BorrowModal = ({
       inventoryActions.getOracle(inventoryDispatch, reserves[0].oracle);
     }
   }, [resAddress]);
-
+  console.log('maxStratsLoanAmount: ', inventory?.maxStratsLoanAmount);
   const dataForItems = [
     {
       label: `Quantity to Collateralize`,
@@ -65,7 +65,7 @@ const BorrowModal = ({
       description: "The projected amount of STRAT tokens you can borrow against your staked RWAs.",
       value: (
         <div className="flex -mr-1">
-          {parseFloat(inventory?.stratsLoanAmount).toFixed(2)}
+          {parseFloat(inventory?.maxStratsLoanAmount).toFixed(2)}
           {logo}
         </div>
       ),
@@ -75,7 +75,7 @@ const BorrowModal = ({
       description: "The projected amount of USD you can borrow against your staked RWAs.",
       value: (
         <div className="flex -mr-1">
-          {parseFloat(inventory?.stratsLoanAmount/100).toFixed(2)}
+          {parseFloat(inventory?.maxStratsLoanAmount/100).toFixed(2)}
           {logo}
         </div>
       ),
@@ -98,7 +98,7 @@ const BorrowModal = ({
   const handleSubmit = async () => {
     const body = {
       escrowAddress: inventory?.sale,
-      borrowAmount: Math.floor(Number(parseFloat(inventory?.stratsLoanAmount)) * 100) / 100,
+      borrowAmount: Math.floor(Number(parseFloat(inventory?.maxStratsLoanAmount)) * 100) / 100,
       reserve: reserves[0].address,
     };
 

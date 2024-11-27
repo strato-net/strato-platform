@@ -44,7 +44,7 @@ const StakeModal = ({
   const { paymentServices } = usePaymentServiceState();
   const isLoader =
     isStaking || isUnstaking || isFetchingOracle || isreservessLoading;
-  const isStaked = inventory.stratsLoanAmount && inventory.stratsLoanAmount > 0;
+  const isStaked = inventory.maxStratsLoanAmount && inventory.maxStratsLoanAmount > 0;
   const itemName = decodeURIComponent(inventory.name);
   const resAddress = reserves?.length ? reserves[0]?.address : null;
   const oracleData = oracle ? oracle : { consensusPrice: 0 };
@@ -66,30 +66,25 @@ const StakeModal = ({
       ? [
           {
             label: `Quantity to Stake`,
-            description: 'The amount of Real World Assets (RWAs) you are staking.',
+            description:
+              'The amount of Real World Assets (RWAs) you are staking.',
             value: `${inventory?.quantity}`,
           },
           {
             label: `Market Value`,
-            description: 'The total value of your staked assets, calculated as Quantity x Oracle Price.',
-            value: `$${
-              (oracleData.consensusPrice.toFixed(2) * inventory?.quantity).toFixed(2)
-            }`,
+            description:
+              'The total value of your staked assets, calculated as Quantity x Oracle Price.',
+            value: `$${(
+              oracleData.consensusPrice.toFixed(2) * inventory?.quantity
+            ).toFixed(2)}`,
           },
           {
             label: 'Daily Estimated Reward (CATA)',
-            description: 'The expected daily earnings in CATA tokens from staking your RWAs.',
+            description:
+              'The expected daily earnings in CATA tokens from staking your RWAs.',
             value: (
               <div className="flex -mr-1">
-                {(
-                  ((inventory?.quantity *
-                    (isStaked
-                      ? inventory.stratsLoanAmount
-                      : oracleData.consensusPrice.toFixed(2) *
-                        reserves[0]?.loanToValueRatio)) /
-                    100) *
-                  (reserves[0]?.cataAPYRate / 100)
-                ).toFixed(2)}
+                {(inventory?.quantity * oracleData.consensusPrice * reserves[0].cataAPYRate / 365).toFixed(6)}
 
                 {logo}
               </div>
@@ -99,7 +94,8 @@ const StakeModal = ({
       : [
           {
             label: `Quantity to Unstake`,
-            description: 'The amount of Real World Assets (RWAs) you are unstaking.',
+            description:
+              'The amount of Real World Assets (RWAs) you are unstaking.',
             value: `${inventory?.quantity}`,
           },
         ];
