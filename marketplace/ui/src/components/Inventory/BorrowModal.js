@@ -75,7 +75,7 @@ const BorrowModal = ({
       description: "The projected amount of USD you can borrow against your staked RWAs.",
       value: (
         <div className="flex -mr-1">
-          {parseFloat(inventory?.maxStratsLoanAmount/100).toFixed(2)}
+          ${parseFloat(inventory?.maxStratsLoanAmount/100).toFixed(2)}
         </div>
       ),
     }
