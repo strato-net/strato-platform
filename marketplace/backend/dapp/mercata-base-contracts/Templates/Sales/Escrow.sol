@@ -42,12 +42,12 @@ contract Escrow is Sale {
         borrowedAmount = 0.0;
     }
 
-    function updateOnPriceChange(decimal _newPrice, decimal _loanToValueRatio) external {
+    function updateOnPriceChange(decimal _newPrice, uint _loanToValueRatio) external {
         require(msg.sender == reserve, "Only reserve can update collateral price");
 
         collateralValue = collateralQuantity * _newPrice.truncate(2);
 
-        maxStratsLoanAmount = uint(collateralValue * _loanToValueRatio);
+        maxStratsLoanAmount = uint(collateralValue * decimal(_loanToValueRatio));
     }
 
     function updateTotalCataReward(decimal _newCataReward) external {
