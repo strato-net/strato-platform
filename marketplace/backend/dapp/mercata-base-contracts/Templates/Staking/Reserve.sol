@@ -50,31 +50,6 @@ abstract contract Reserve is Utils, Structs, OracleSubscriber {
         _;
     }
 
-    function createEscrow(
-        uint _assetAmount,
-        address _assetAddress, 
-        PaymentServiceInfo _stratPaymentService,
-        decimal _collateralAmount,
-        decimal _maxStratsLoanAmount,
-        address _assetToBeSold,
-        decimal _oraclePrice,
-        uint _escrowQuantity
-    ) internal requireActive() returns (address) {
-        // Create Escrow without transferring STRATS
-        Escrow escrow = new Escrow(
-            msg.sender,
-            _collateralAmount,
-            uint(_maxStratsLoanAmount),
-            _assetToBeSold,
-            _oraclePrice,
-            _escrowQuantity,
-            [_stratPaymentService]
-        );
-        escrows.push(escrow);
-
-        return address(escrow);
-    }
-
     function oraclePriceUpdated(decimal _newPrice, uint _timestamp) external override {
         // Update the price of the collateral in the escrow
         require(msg.sender == address(oracle), "Only the oracle can call oraclePriceUpdated");
@@ -90,7 +65,7 @@ abstract contract Reserve is Utils, Structs, OracleSubscriber {
             if (address(escrows[i]) != address(0)) {
                 escrows[i].updateOnPriceChange(_newPrice, loanToValueRatio);
                 //get cata reward from escrow
-                decimal cataReward = calculateCATAReward(escrows[i].collateralAmount(), _newPrice.truncate(2), delta); //per day 0.08, per hour 0.0033, per 10 minutes 0.00055
+                decimal cataReward = calculateCATAReward(escrows[i].collateralQuantity(), _newPrice.truncate(2), delta); //per day 0.08, per hour 0.0033, per 10 minutes 0.00055
                 escrows[i].updateTotalCataReward(cataReward * 10**18);
                 // Transfer Cata from reserve to borrower
                 cataToken.transferOwnership(
@@ -107,34 +82,31 @@ abstract contract Reserve is Utils, Structs, OracleSubscriber {
         lastUpdatedTimestamp = _timestamp;
     }
 
-    function stakeAsset(uint _assetAmount, address _assetAddress, PaymentServiceInfo _stratPaymentService) public requireActive() returns (address) {
+    function stakeAsset(uint _collateralQuantity, address _assetAddress, PaymentServiceInfo _stratPaymentService) public requireActive() returns (address) {
         // Calculate required values
         Asset _assetToBeSold = Asset(_assetAddress);
         require(_assetToBeSold.ownerCommonName() == getCommonName(msg.sender), "Only the owner of the asset can stake it");
         require(_assetToBeSold.root == assetRootAddress, "Asset does not belong to the root address");
         
-        uint _escrowQuantity = _assetToBeSold.quantity();
         (decimal _oraclePrice, uint _priceTimestamp) = oracle.getLatestPrice();
-        decimal _collateralAmount = decimal(_assetAmount) * _oraclePrice.truncate(2); 
-        decimal _maxStratsLoanAmount = _collateralAmount * decimal(loanToValueRatio);
+        decimal _collateralValue = decimal(_collateralQuantity) * _oraclePrice.truncate(2); 
+        decimal _maxStratsLoanAmount = _collateralValue * decimal(loanToValueRatio);
 
         // Create Escrow with all required parameters
-        address escrow = createEscrow(
-            _assetAmount,
-            _assetAddress,
-            _stratPaymentService,
-            _collateralAmount,
-            _maxStratsLoanAmount.truncate(2),
+        Escrow escrow = new Escrow(
+            msg.sender,
+            _collateralQuantity,
+            _collateralValue,
+            uint(_maxStratsLoanAmount),
             address(_assetToBeSold),
-            _oraclePrice.truncate(2),
-            _escrowQuantity
+            [_stratPaymentService]
         );
 
         escrows.push(Escrow(escrow));
-        escrowMap[escrow] = escrows.length;
+        escrowMap[address(escrow)] = escrows.length;
 
-        emit StakeCreated(msg.sender, escrow, _assetAmount, _maxStratsLoanAmount); 
-        return escrow;
+        emit StakeCreated(msg.sender, address(escrow), _collateralQuantity, _maxStratsLoanAmount); 
+        return address(escrow);
     }
 
     function borrow(address _escrowAddress, decimal _borrowAmount) public requireActive() {
@@ -239,13 +211,13 @@ abstract contract Reserve is Utils, Structs, OracleSubscriber {
     }
 
     function calculateCATAReward(
-        decimal collateralAmount,
+        uint collateralQuantity,
         decimal livePriceOfCollateral,
         uint delta
     ) internal view returns (decimal) {
         // Calculate the reward in CATA using the new formula
         uint secondsPerYear = 31536000; // Number of seconds in a year
-        return (collateralAmount * livePriceOfCollateral * decimal(cataAPYRate/100) * decimal(delta)) / 
+        return (decimal(collateralQuantity) * livePriceOfCollateral * decimal(cataAPYRate)/100.00 * decimal(delta)) / 
                (priceOfCATA * decimal(secondsPerYear));
     }
 }

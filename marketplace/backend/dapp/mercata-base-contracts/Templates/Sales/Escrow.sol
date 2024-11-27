@@ -4,23 +4,22 @@ pragma strict;
 contract Escrow is Sale {
     address public reserve; //Can be used to distinguish between Sale and Escrow
     address public borrower;
-    decimal public collateralAmount;
+    uint public collateralQuantity;
+    decimal public collateralValue;
     uint public maxStratsLoanAmount;
     decimal public totalCataRewardInDollars;
-    decimal public oraclePrice;
     decimal public borrowedAmount;
 
     constructor(
         address _borrower,
-        decimal _collateralAmount,
+        uint _collateralQuantity,
+        decimal _collateralValue,
         uint _maxStratsLoanAmount,
         address _assetToBeSold,
-        decimal _oraclePrice,
-        uint _escrowQuantity,
         PaymentServiceInfo[] _paymentServices
-    ) Sale("Escrow", _assetToBeSold, 0, _escrowQuantity, _paymentServices) {
-        collateralAmount = _collateralAmount;
-        oraclePrice = _oraclePrice;
+    ) Sale("Escrow", _assetToBeSold, 0, _collateralQuantity, _paymentServices) {
+        collateralQuantity = _collateralQuantity;
+        collateralValue = _collateralValue;
         borrower = _borrower;
         maxStratsLoanAmount = _maxStratsLoanAmount;
         totalCataRewardInDollars = 0.0; // Assuming the CATA reward rate is provided externally
@@ -46,9 +45,9 @@ contract Escrow is Sale {
     function updateOnPriceChange(decimal _newPrice, decimal _loanToValueRatio) external {
         require(msg.sender == reserve, "Only reserve can update collateral price");
 
-        collateralAmount = collateralAmount * _newPrice.truncate(2);
+        collateralValue = collateralQuantity * _newPrice.truncate(2);
 
-        maxStratsLoanAmount = uint(collateralAmount * _loanToValueRatio / 100);
+        maxStratsLoanAmount = uint(collateralValue * _loanToValueRatio / 100);
     }
 
     function updateTotalCataReward(decimal _newCataReward) external {
