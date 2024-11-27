@@ -95,7 +95,7 @@ abstract contract Reserve is Utils, Structs, OracleSubscriber {
                 // Transfer Cata from reserve to borrower
                 cataToken.transferOwnership(
                     escrows[i].borrower(),
-                    cataReward * 100,
+                    uint(cataReward * 100),
                     true,
                     0,
                     0.0001
@@ -140,7 +140,7 @@ abstract contract Reserve is Utils, Structs, OracleSubscriber {
     function borrow(address _escrowAddress, decimal _borrowAmount) public requireActive() {
         Escrow escrow = Escrow(_escrowAddress);
         require(escrow.borrower() == msg.sender, "Only borrower can borrow against this escrow");
-        require(_borrowAmount <= escrow.maxStratsLoanAmount(), "Cannot borrow more than max loan amount");
+        require(uint(_borrowAmount) <= escrow.maxStratsLoanAmount(), "Cannot borrow more than max loan amount");
         
         uint transferNumber = (uint(block.number + 16)) % 1000000;
         

@@ -35,7 +35,7 @@ contract Escrow is Sale {
     function updateBorrowedAmount(decimal _borrowAmount) external {
         require(msg.sender == reserve, "Only reserve can update borrowed amount");
         require(_borrowAmount >= 0.0, "Borrowed amount cannot be negative");
-        require(borrowedAmount + _borrowAmount <= maxStratsLoanAmount, "Cannot borrow more than loan amount");
+        require(uint(borrowedAmount + _borrowAmount) <= maxStratsLoanAmount, "Cannot borrow more than loan amount");
         borrowedAmount += _borrowAmount;
     }
 
