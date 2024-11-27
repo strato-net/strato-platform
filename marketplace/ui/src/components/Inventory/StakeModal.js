@@ -63,19 +63,19 @@ const StakeModal = ({
       ? [
           {
             label: `Quantity to Stake`,
-            description: 'The number of assets to use to stake',
+            description: 'The amount of Real World Assets (RWAs) you are staking.',
             value: `${inventory?.quantity}`,
           },
           {
             label: `Market Value`,
-            description: 'The total market value of the staked assets',
+            description: 'The total value of your staked assets, calculated as Quantity x Oracle Price.',
             value: `$${
               (oracleData.consensusPrice.toFixed(2) * inventory?.quantity).toFixed(2)
             }`,
           },
           {
             label: 'Daily Estimated Reward (CATA)',
-            description: 'The estimated amount of CATA to earn daily',
+            description: 'The expected daily earnings in CATA tokens from staking your RWAs.',
             value: (
               <div className="flex -mr-1">
                 {(
@@ -96,7 +96,7 @@ const StakeModal = ({
       : [
           {
             label: `Quantity to Unstake`,
-            description: 'The number of assets to unstake',
+            description: 'The amount of Real World Assets (RWAs) you are unstaking.',
             value: `${inventory?.quantity}`,
           },
         ];
@@ -106,7 +106,7 @@ const StakeModal = ({
       ? [
           {
             label: `Market price (per unit)`,
-            description: 'The current market price of the asset',
+            description: ' The current price of one unit of your RWA, as determined by the oracle.',
             value: `$${oracleData.consensusPrice.toFixed(2)}`,
           },
         ]
@@ -185,7 +185,7 @@ const StakeModal = ({
       onCancel={handleCancel}
       title={
         <div className="text-2xl md:text-3xl font-bold pl-4">
-          Collateral: {itemName}
+          Collateral
         </div>
       }
       width={500}

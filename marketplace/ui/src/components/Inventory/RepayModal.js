@@ -50,10 +50,20 @@ const RepayModal = ({
   const dataForItems = [
     {
       label: `Loan to pay off in STRATs`,
-      description: 'The amount of CATA to pay off the loan',
+      description: 'The amount of STRATs to pay off the loan',
       value: (
         <div className="flex -mr-1">
           {inventory?.borrowedAmount}
+          {logo}
+        </div>
+      ),
+    },
+    {
+      label: `Loan to pay off in $`,
+      description: 'The amount of USD to pay off the loan',
+      value: (
+        <div className="flex -mr-1">
+          {parseFloat(inventory?.borrowedAmount/100).toFixed(2)}
           {logo}
         </div>
       ),

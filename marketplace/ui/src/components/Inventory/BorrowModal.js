@@ -49,17 +49,17 @@ const BorrowModal = ({
   const dataForItems = [
     {
       label: `Quantity to Collateralize`,
-      description: 'The number of assets to use as collateral',
+      description: 'The amount of Real World Assets (RWAs) you are collateralizing.',
       value: `${inventory?.quantity}`,
     },
     {
       label: `Market Value`,
-      description: 'The total market value of the collateral',
+      description: ' The total value of your staked assets, calculated as Quantity x Oracle Price.',
       value: `$${(oracleData.consensusPrice.toFixed(2) * inventory?.quantity).toFixed(2)}`,
     },
     {
       label: 'Estimated Loan (in STRATs)',
-      description: 'The estimated amount of CATA to earn daily',
+      description: "The projected amount of STRAT tokens you can borrow against your staked RWAs.",
       value: (
         <div className="flex -mr-1">
           {parseFloat(inventory?.stratsLoanAmount).toFixed(2)}
@@ -67,17 +67,27 @@ const BorrowModal = ({
         </div>
       ),
     },
+    {
+      label: 'Estimated Loan (in $)',
+      description: "The projected amount of USD you can borrow against your staked RWAs.",
+      value: (
+        <div className="flex -mr-1">
+          {parseFloat(inventory?.stratsLoanAmount/100).toFixed(2)}
+          {logo}
+        </div>
+      ),
+    }
   ];
 
   const dataForSummary = [
     {
       label: `Market price (per unit)`,
-      description: 'The current market price of the asset',
+      description: 'The current price of one unit of your RWA, as determined by the oracle.',
       value: `$${oracleData.consensusPrice.toFixed(2)}`,
     },
     {
       label: 'Loan to Value Ratio',
-      description: 'The ratio of the loan amount to the collateral value',
+      description: 'Indicates you can borrow up to 50% of the market value of your staked RWAs.',
       value: `${reserves[0]?.loanToValueRatio}%`,
     },
   ];
@@ -116,7 +126,7 @@ const BorrowModal = ({
       onCancel={handleCancel}
       title={
         <div className="text-2xl md:text-3xl font-bold pl-4">
-          Borrow Position: {itemName}
+          Borrow Position
         </div>
       }
       width={600}
