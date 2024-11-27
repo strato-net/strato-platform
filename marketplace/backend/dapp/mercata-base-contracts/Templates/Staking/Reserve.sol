@@ -25,9 +25,8 @@ abstract contract Reserve is Utils, Structs {
     event StakeCreated(address indexed user, address escrow, uint assetAmount, decimal stratsLoan, uint cataReward);
     event StakeUnlocked(address indexed user, address escrow);
 
-    constructor(address _assetOracle, address _cataToken, string _name, address _assetRootAddress) {
+    constructor(address _assetOracle, string _name, address _assetRootAddress) {
         oracle = OracleService(_assetOracle);
-        cataToken = _cataToken;
         owner = msg.sender;
         name = _name;
         assetRootAddress = _assetRootAddress;
