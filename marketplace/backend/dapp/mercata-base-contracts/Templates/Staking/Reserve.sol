@@ -73,7 +73,7 @@ abstract contract Reserve is Utils, Structs, OracleSubscriber {
                     uint(cataReward * 10**18), //per day 8, per hour 0.33, per 10 minutes 0.055
                     true,
                     0,
-                    0.1 / 10**18
+                    0.1000000000000000000 / 10**18
                     );
                 emit CataTransferred(address(this), escrows[i].borrower(), uint(cataReward * 10**18));
                 }
@@ -216,8 +216,8 @@ abstract contract Reserve is Utils, Structs, OracleSubscriber {
         uint delta
     ) internal view returns (decimal) {
         // Calculate the reward in CATA using the new formula
-        uint secondsPerYear = 31536000; // Number of seconds in a year
-        return (decimal(collateralQuantity) * livePriceOfCollateral * decimal(cataAPYRate)/100.00 * decimal(delta)) / 
-               (priceOfCATA * decimal(secondsPerYear));
+        decimal secondsPerYear = 31536000.0000000000000000000; // Number of seconds in a year
+        return (decimal(collateralQuantity) * livePriceOfCollateral * decimal(cataAPYRate)/100.0000000000000000000 * decimal(delta)) / 
+               (priceOfCATA * secondsPerYear);
     }
 }
