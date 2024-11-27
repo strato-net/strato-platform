@@ -250,7 +250,7 @@ abstract contract Reserve is Utils, Structs, OracleSubscriber {
     ) internal view returns (decimal) {
         // Calculate the reward in CATA using the new formula
         uint secondsPerYear = 31536000; // Number of seconds in a year
-        return (collateralAmount * livePriceOfCollateral * decimal(cataAPYRate) * decimal(delta)) / 
+        return (collateralAmount * livePriceOfCollateral * decimal(cataAPYRate/100) * decimal(delta)) / 
                (priceOfCATA * decimal(secondsPerYear));
     }
 }
