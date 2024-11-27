@@ -49,6 +49,10 @@ async function main() {
 
   await submitPricePeriodically(); // Immediate first run
   setInterval(submitPricePeriodically, fetchInterval);
+
+  while (true) {
+
+  }
 }
 
 main();
