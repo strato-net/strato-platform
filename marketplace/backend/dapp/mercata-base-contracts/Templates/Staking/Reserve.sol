@@ -162,7 +162,7 @@ abstract contract Reserve is Utils, Structs, OracleSubscriber {
     }
 
     function setCATAToken(address _newCATAToken) public requireOwner("update STRATS token") {
-        cataToken = Asset(_newStratsToken);
+        cataToken = Asset(_newCATAToken);
     }
 
     function transferSTRATSbacktoOwner(uint _amount) public requireOwner("transfer STRATS back") {
