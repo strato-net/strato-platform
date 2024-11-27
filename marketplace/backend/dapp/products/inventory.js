@@ -481,7 +481,7 @@ async function getAll(admin, args = {}, defaultOptions) {
       },
       options
     );
-    sales = sales.filter((sale) => !sale.data?.maxStratsLoanAmount);
+    sales = sales.filter((sale) => !sale.saleType || sale.saleType !== 'Escrow');
     const trendingAssetAddresses = sales.map((sale) => sale.assetToBeSold);
 
     // Fetch the inventories matching the sales
