@@ -139,7 +139,7 @@ class ReserveController {
 
   static validateStakeArgs(args) {
     const schema = Joi.object({
-      assetAmount: Joi.number().positive().required().messages({
+      collateralQuantity: Joi.number().positive().required().messages({
         'any.required': 'Amount is required and must be positive.',
         'number.base': 'Amount must be a valid number.',
         'number.positive': 'Amount must be positive.',

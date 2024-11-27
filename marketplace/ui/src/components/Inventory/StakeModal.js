@@ -117,7 +117,7 @@ const StakeModal = ({
     );
     if (type === 'Stake') {
       const body = {
-        assetAmount: inventory?.quantity,
+        collateralQuantity: inventory?.quantity,
         assetAddress: inventory?.address,
         stratPaymentService: {
           creator: stratsService.creator,

@@ -68,7 +68,6 @@ const RepayModal = ({
       value: (
         <div className="flex -mr-1">
           {parseFloat(inventory?.borrowedAmount/100).toFixed(2)}
-          {logo}
         </div>
       ),
     },
