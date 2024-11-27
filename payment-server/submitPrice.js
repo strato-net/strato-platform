@@ -30,7 +30,7 @@ async function main() {
     return;
   }
 
-  const fetchInterval = Number(config.silverOracle.fetchInterval) || 6000000; // Default to 1 minute
+  const fetchInterval = Number(config.silverOracle.fetchInterval) || 60000; // Default to 1 minute
 
   const submitPricePeriodically = async () => {
     try {
