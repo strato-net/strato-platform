@@ -23,8 +23,6 @@ abstract contract OracleService is Utils {
     address[] public subscribers;
     mapping (address => uint) subscriberMap;
 
-    address public reserve;
-
     constructor(
         string _name    ) {
         owner = msg.sender;
