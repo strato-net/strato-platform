@@ -36,8 +36,8 @@ contract SilverOracleService is OracleService {
         _deactivate();
     }
 
-    function submitPrice(decimal _price) public requirePriceSetter("submit price") {
-        _submitPrice(_price);
+    function submitPrice(decimal _price, uint _timestamp) public requirePriceSetter("submit price") {
+        _submitPrice(_price, _timestamp);
     }
 
     function transferOwnership(address _newOwner) public requireOwner("transfer owneship") {
