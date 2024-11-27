@@ -16,8 +16,6 @@ abstract contract Reserve is Utils, Structs, OracleSubscriber {
 
     decimal public priceOfCATA = 0.10; //cata price in dollars
 
-    Liquidation public liquidation;
-
     address public owner; // Owner (BlockApps) as source of STRATS tokens
     string public name;
     bool public isActive = true;
