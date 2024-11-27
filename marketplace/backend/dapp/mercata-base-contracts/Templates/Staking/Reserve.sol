@@ -32,12 +32,7 @@ abstract contract Reserve is Utils, Structs, OracleSubscriber {
     Escrow[] public escrows;
     mapping (address => uint) escrowMap;
 
-    Escrow[] public escrows;
-    mapping (address => uint) escrowMap;
-
-    Escrow[] public escrows;
-
-    constructor(address _assetOracle, string _name, address _assetRootAddress) {
+    constructor(address _assetOracle, address _stratsToken, address _cataToken, string _name, address _assetRootAddress) {
         oracle = OracleService(_assetOracle);
         oracle.subscribe();
         owner = msg.sender;
