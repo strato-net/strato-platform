@@ -6,6 +6,7 @@ import {
   useInventoryState,
 } from '../../contexts/inventory';
 import { useAuthenticateState } from '../../contexts/authentication';
+import { useLocation } from 'react-router-dom';
 
 const ResellModal = ({
   open,
@@ -15,12 +16,15 @@ const ResellModal = ({
   debouncedSearchTerm,
   limit,
   offset,
+  reserves
 }) => {
   const [quantity, setQuantity] = useState(1);
   const inventoryDispatch = useInventoryDispatch();
   const [canResell, setCanResell] = useState(true);
   const { isReselling } = useInventoryState();
   const { user } = useAuthenticateState();
+  const location = useLocation();
+  const queryParams = new URLSearchParams(location.search);
 
   useEffect(() => {
     if (quantity <= 0) {
@@ -64,7 +68,8 @@ const ResellModal = ({
         limit,
         offset,
         debouncedSearchTerm,
-        category && category !== 'All' ? category : undefined
+        category && category !== 'All' ? category : undefined,
+        queryParams.get('st') === 'true' ? reserves[0].assetRootAddress : ''
       );
       await actions.fetchInventoryForUser(
         inventoryDispatch,

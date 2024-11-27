@@ -10,6 +10,7 @@ import {
 import { actions as marketplaceActions } from '../../contexts/marketplace/actions';
 import { useMarketplaceDispatch } from '../../contexts/marketplace';
 import { Images } from '../../images';
+import { useLocation } from 'react-router-dom';
 
 const logo = (
   <img src={Images.strats} alt={''} title={''} className="w-5 h-5" />
@@ -39,6 +40,8 @@ const BorrowModal = ({
   const itemName = decodeURIComponent(inventory.name);
   const resAddress = reserves?.length ? reserves[0]?.address : null;
   const oracleData = oracle ? oracle : { consensusPrice: 0 };
+  const location = useLocation();
+  const queryParams = new URLSearchParams(location.search);
 
   useEffect(() => {
     if (reserves && inventory.data && !isreservessLoading && isStaked) {
@@ -112,7 +115,8 @@ const BorrowModal = ({
           limit,
           offset,
           debouncedSearchTerm,
-          category && category !== 'All' ? category : undefined
+          category && category !== 'All' ? category : undefined,
+          queryParams.get('st') === 'true' ? reserves[0].assetRootAddress : ''
         );
       }
       await marketplaceActions.fetchStratsBalance(marketplaceDispatch);

@@ -20,6 +20,7 @@ import {
 } from '../../contexts/payment';
 import { actions as paymentServiceActions } from '../../contexts/payment/actions';
 import { CheckCircleOutlined } from '@ant-design/icons';
+import { useLocation } from 'react-router-dom';
 
 const { Option } = Select;
 
@@ -33,8 +34,11 @@ const ListForSaleModal = ({
   user,
   debouncedSearchTerm,
   category,
+  reserves
 }) => {
   const [data, setData] = useState([inventory]);
+  const location = useLocation();
+  const queryParams = new URLSearchParams(location.search);
   const [quantity, setQuantity] = useState(() => {
     const selectedQuantity = inventory.saleAddress
       ? inventory.saleQuantity
@@ -261,7 +265,8 @@ const ListForSaleModal = ({
         limit,
         offset,
         debouncedSearchTerm,
-        category && category !== 'All' ? category : undefined
+        category && category !== 'All' ? category : undefined,
+        queryParams.get('st') === 'true' ? reserves[0].assetRootAddress : ''
       );
       handleCancel();
     }

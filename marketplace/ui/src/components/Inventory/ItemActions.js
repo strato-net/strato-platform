@@ -364,6 +364,7 @@ const ItemActions = ({
           debouncedSearchTerm={debouncedSearchTerm}
           category={category}
           user={user}
+          reserves={reserves}
         />
       )}
       {unlistModalOpen && (
@@ -376,6 +377,7 @@ const ItemActions = ({
           debouncedSearchTerm={debouncedSearchTerm}
           saleAddress={inventory.saleAddress}
           category={category}
+          reserves={reserves}
         />
       )}
       {stakeModalOpen && (
@@ -413,6 +415,7 @@ const ItemActions = ({
           debouncedSearchTerm={debouncedSearchTerm}
           saleAddress={inventory.saleAddress}
           category={category}
+          reserves={reserves}
         />
       )}
       {resellModalOpen && (
@@ -424,6 +427,7 @@ const ItemActions = ({
           inventory={inventory}
           debouncedSearchTerm={debouncedSearchTerm}
           category={category}
+          reserves={reserves}
         />
       )}
       {transferModalOpen && (
@@ -435,6 +439,7 @@ const ItemActions = ({
           inventory={inventory}
           debouncedSearchTerm={debouncedSearchTerm}
           category={category}
+          reserves={reserves}
         />
       )}
       {redeemModalOpen && (
@@ -446,6 +451,7 @@ const ItemActions = ({
           inventory={inventory}
           debouncedSearchTerm={debouncedSearchTerm}
           category={category}
+          reserves={reserves}
         />
       )}
       {bridgeModalOpen && (
@@ -457,6 +463,7 @@ const ItemActions = ({
           inventory={inventory}
           debouncedSearchTerm={debouncedSearchTerm}
           category={category}
+          reserves={reserves}
         />
       )}
     </div>

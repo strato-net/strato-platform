@@ -15,6 +15,7 @@ import { useUsersDispatch, useUsersState } from '../../contexts/users';
 import { useAuthenticateState } from '../../contexts/authentication';
 import { SearchOutlined, DeleteOutlined } from '@ant-design/icons';
 import { OLD_SADDOG_ORIGIN_ADDRESS } from '../../helpers/constants';
+import { useLocation } from 'react-router-dom';
 
 const TransferModal = ({
   open,
@@ -23,7 +24,10 @@ const TransferModal = ({
   categoryName = '',
   limit = 0,
   offset = 0,
+  reserves
 }) => {
+  const location = useLocation();
+  const queryParams = new URLSearchParams(location.search);
   // Get the inventory state and dispatch
   const inventoryDispatch = useInventoryDispatch();
   const marketplaceDispatch = useMarketplaceDispatch();
@@ -339,7 +343,8 @@ const TransferModal = ({
         limit,
         offset,
         '',
-        categoryName
+        categoryName,
+        queryParams.get('st') === 'true' ? reserves[0].assetRootAddress : ''
       );
       await actions.fetchInventoryForUser(inventoryDispatch, user.commonName);
       await marketplaceActions.fetchStratsBalance(marketplaceDispatch);
