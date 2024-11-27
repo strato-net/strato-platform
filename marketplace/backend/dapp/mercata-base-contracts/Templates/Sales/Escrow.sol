@@ -47,7 +47,7 @@ contract Escrow is Sale {
 
         collateralValue = collateralQuantity * _newPrice.truncate(2);
 
-        maxStratsLoanAmount = uint(collateralValue * _loanToValueRatio / 100);
+        maxStratsLoanAmount = uint(collateralValue * _loanToValueRatio);
     }
 
     function updateTotalCataReward(decimal _newCataReward) external {
