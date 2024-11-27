@@ -17,9 +17,11 @@ so that they could be properly moved to their respective version's subsection.
 ## [Unrealeased]
 ### Added
 - Partial support for ipv6
+- Introduced different STRATO modes: `FULL`, `SERVER`, and `CLIENT`
 
 ### Changed
 - Total difficulty now refers to block number (corresponds to ethVersion now being 63)
+- Bloc api calls strato-api
 
 ### Fixed
 - Ethereum-discovery now looks at udp_enable_time instead of enable_time for bonded/available peers 
