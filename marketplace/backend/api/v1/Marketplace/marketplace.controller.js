@@ -1,6 +1,7 @@
 import { rest } from 'blockapps-rest';
 import constants from '../../../helpers/constants';
 import STRATSJs from '../../../dapp/items/STRATS';
+import Decimal from "decimal.js";
 
 class MarketplaceController {
   static async getAll(req, res, next) {
@@ -111,6 +112,9 @@ class MarketplaceController {
       let cataBalance = 0;
 
       cataBalance = await dapp.getCataBalance({ userAddress: userAddress });
+      const divisorStr = 10 ** 18;
+      cataBalance = new Decimal(cataBalance).dividedBy(new Decimal(divisorStr));
+      cataBalance = cataBalance.toFixed(2);
 
       return rest.response.status200(res, cataBalance);
     } catch (e) {

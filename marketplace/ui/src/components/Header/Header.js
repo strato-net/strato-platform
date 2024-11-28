@@ -109,8 +109,6 @@ const HeaderComponent = ({
   const formattedNum = (num) => formatter.format(num);
   const stratsBalance = Object.keys(strats).length > 0 ? strats : 0;
   const cataBalance = Object.keys(cata).length > 0 ? cata : 0;
-  const divisor = 10 ** 18;
-  const cataBal = cataBalance / divisor;
 
   useEffect(() => {
     setSelectedCategory(categoryQueryValue);
@@ -270,11 +268,11 @@ const HeaderComponent = ({
           {user && (
             <Row className="flex flex-col">
               <Col Col={24}>
-                <p className="text-xs mt-1">CATA: {cataBal}</p>
+                <p className="text-xs mt-1">CATA: {cataBalance}</p>
               </Col>
               <Col Col={24}>
                 <p className="text-xs mt-3">
-                  Balance: ${formattedNum(cataBal * 10)}
+                  Balance: ${formattedNum(cataBalance * 10)}
                 </p>
               </Col>
             </Row>
