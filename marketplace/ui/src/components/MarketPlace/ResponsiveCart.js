@@ -147,7 +147,6 @@ const ResponsiveCart = ({
       orderTotal: total,
       tax: tax,
       user: user.commonName,
-      email: user.email,
       htmlContents: htmlContents,
     };
 
