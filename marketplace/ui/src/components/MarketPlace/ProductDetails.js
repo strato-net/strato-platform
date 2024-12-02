@@ -121,11 +121,11 @@ const ProductDetails = ({ user, users }) => {
     inventoryDetails?.maxStratsLoanAmount &&
     inventoryDetails?.maxStratsLoanAmount > 0;
   const isStakeable =
-    inventoryDetails.root &&
+    inventoryDetails?.root &&
     reserves &&
     reserves.length > 0 &&
     reserves.some(
-      (reserve) => inventoryDetails.root === reserve.assetRootAddress
+      (reserve) => inventoryDetails?.root === reserve.assetRootAddress
     );
 
   let isCalledFromInventory = false;
