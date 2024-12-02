@@ -22,11 +22,13 @@ module Bloc.Monad
     HasBlocEnv,
     blocMaybe,
     getBlocEnv,
+    blocStrato,
     blocVaultWrapper,
     BlocEnv (..),
   )
 where
 
+import API.Parametric
 import Bloc.API.Transaction
 import BlockApps.Logging
 import Blockchain.Strato.Model.Account
@@ -35,6 +37,7 @@ import Blockchain.Strato.Model.ChainId
 import Blockchain.Strato.Model.Keccak256
 import Blockchain.Strato.Model.Nonce
 import Control.Monad.Change.Modify hiding (modify)
+import Control.Monad.Composable.Strato hiding (httpManager)
 import Control.Monad.Composable.Vault hiding (httpManager)
 import Control.Monad.Reader
 import Data.Cache
@@ -58,13 +61,24 @@ data BlocEnv = BlocEnv
     accountNonceLimit :: Integer,
     gasLimit :: Integer,
     globalNonceCounter :: Cache Account Nonce,
-    txTBQueue :: TBQueue (Maybe Text, Maybe ChainId, Maybe Bool, Bool, PostBlocTransactionRequest),
+    txTBQueue :: TBQueue (HeaderList, Maybe ChainId, Maybe Bool, Bool, PostBlocTransactionRequest),
     userRegistryAddress :: Address,
     userRegistryCodeHash :: Maybe Keccak256,
     useWalletsByDefault :: Bool
   }
 
 --------------------------------------------------------------------------------
+
+blocStrato ::
+  (MonadIO m, MonadLogger m, HasStrato m, HasCallStack) =>
+  ClientM x ->
+  m x
+blocStrato client' = do
+  logInfoCS callStack "Querying STRATO"
+  StratoData url mgr <- access Proxy
+  resultEither <-
+    liftIO $ runClientM client' (mkClientEnv mgr url)
+  either (blocError . StratoError) return resultEither
 
 blocVaultWrapper ::
   (MonadIO m, MonadLogger m, HasVault m, HasCallStack) =>

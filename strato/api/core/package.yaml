@@ -17,6 +17,7 @@ library:
   - blockapps-data
   - blockapps-datadefs
   - bytestring
+  - base16-bytestring
   - clock
   - common-log
   - conduit

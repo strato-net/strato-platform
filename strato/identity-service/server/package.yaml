@@ -1,0 +1,86 @@
+name:                blockapps-identity-service-server
+version:             0.1.0.0
+github:              "githubuser/blockapps-identity-service-server"
+author:              "Author name here"
+maintainer:          "example@example.com"
+copyright:           "2024 Author name here"
+
+extra-source-files:
+- README.md
+- CHANGELOG.md
+
+# Metadata used when publishing your package
+# synopsis:            Short description of your package
+# category:            Web
+
+# To avoid duplicated efforts in documentation and dealing with the
+# complications of embedding Haddock markup inside cabal files, it is
+# common to point users to the README.md file.
+description:         Please see the README on GitHub at <https://github.com/githubuser/identity-provider#readme>
+
+dependencies:
+- base
+- blockapps-identity-provider-server
+
+
+library:
+  source-dirs: src
+  dependencies:
+  - aeson
+  - base64
+  - bloc2api
+  - bloc2client
+  - blockapps-identity-service-api
+  - blockapps-vault-wrapper-client
+  - blockapps-vault-wrapper-api
+  - bytestring
+  - common-log
+  - containers
+  - core-api2
+  - evm-solidity
+  - exceptions
+  - format
+  - http-client
+  - http-client-tls
+  - http-types
+  - monad-alter
+  - mtl
+  - servant-client
+  - servant-server
+  - solid-vm-model
+  - split
+  - strato-model
+  - text
+  - time
+  - transformers
+  - unliftio
+  - utf8-string
+  - vault-monad
+
+executables:
+  identity-service-server:
+    main:                Main.hs
+    source-dirs:         app
+    other-modules: [Options]
+    ghc-options:
+    - -threaded
+    dependencies:
+    - blockapps-identity-service-server
+    - bytestring
+    - common-log
+    - containers
+    - hflags
+    - servant-client
+    - strato-model
+    - warp
+    - wai-cors
+    - yaml
+
+tests:
+  identity-service-test:
+    main:                Spec.hs
+    source-dirs:         test
+    ghc-options:
+    - -threaded
+    - -rtsopts
+    - -with-rtsopts=-N

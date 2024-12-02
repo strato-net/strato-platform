@@ -7,9 +7,11 @@ BLOCK_TIME_MULTIPLIER_FOR_TIMEOUT=10
 blockTime=${blockTime:-13} # keep default the same as strato
 ssl=${ssl:-false}
 sslCertFileType=${sslCertFileType:-pem}
+AUTH_MODE=${AUTH_MODE:-OAUTH}
+STRATO_MODE=${STRATO_MODE:-FULL}
 OAUTH_CLIENT_ID=${OAUTH_CLIENT_ID:-NULL}
 OAUTH_CLIENT_SECRET=${OAUTH_CLIENT_SECRET:-NULL}
-OAUTH_SCOPE=${OAUTH_SCOPE:-openid email profile}
+OAUTH_SCOPE=${OAUTH_SCOPE:-openid profile}
 VM_DEBUG=${VM_DEBUGGER:-false}
 debugPort=${debugPort:-8051}
 debugWSHost=${debugWSHost:-strato}
@@ -35,11 +37,13 @@ if [ ! -f /usr/local/openresty/nginx/conf/nginx.conf ]; then
   ########
   ### Check the validity of variables combination
   ########
-  if [[ ${OAUTH_CLIENT_ID} = NULL || ${OAUTH_CLIENT_SECRET} = NULL ]] ; then
-    echo 'OAUTH_CLIENT_ID and OAUTH_CLIENT_SECRET are required for OAuth. Exit'
-    exit 4
+  if [ "${AUTH_MODE}" = "OAUTH" ]; then
+    if [[ ${OAUTH_CLIENT_ID} = NULL || ${OAUTH_CLIENT_SECRET} = NULL ]] ; then
+      echo 'OAUTH_CLIENT_ID and OAUTH_CLIENT_SECRET are required for OAuth. Exit'
+      exit 4
+    fi
+    # get oauth discovery url from strato api
   fi
-  # get oauth discovery url from strato api
   echo "Waiting for Strato api to be available..."
   ETH_ENDPOINT=http://${STRATO_HOSTNAME}:${STRATO_PORT_API}/eth/v1.2
   until curl --silent --output /dev/null --fail --location ${ETH_ENDPOINT}/stats/totaltx
@@ -48,15 +52,17 @@ if [ ! -f /usr/local/openresty/nginx/conf/nginx.conf ]; then
     sleep 1
   done
   echo "Strato api is available"
-  OAUTH_DISCOVERY_URL=$(curl --silent --fail ${ETH_ENDPOINT}/metadata | jq -r .urls.oauthDiscovery)
-  if [ -z "${OAUTH_DISCOVERY_URL}" ]; then
-    echo "Could not get OAuth discovery url from strato api, but it is a required value"
-    exit 5
-  fi
-  if ! curl --silent --output /dev/null --fail --location ${OAUTH_DISCOVERY_URL}
-  then
-    echo "OAuth OpenID Connect Discovery URL is unreachable: ${OAUTH_DISCOVERY_URL}. Exit"
-    exit 6
+  if [ "${AUTH_MODE}" = "OAUTH" ]; then
+    OAUTH_DISCOVERY_URL=$(curl --silent --fail ${ETH_ENDPOINT}/metadata | jq -r .urls.oauthDiscovery)
+    if [ -z "${OAUTH_DISCOVERY_URL}" ]; then
+      echo "Could not get OAuth discovery url from strato api, but it is a required value"
+      exit 5
+    fi
+    if ! curl --silent --output /dev/null --fail --location ${OAUTH_DISCOVERY_URL}
+    then
+      echo "OAuth OpenID Connect Discovery URL is unreachable: ${OAUTH_DISCOVERY_URL}. Exit"
+      exit 6
+    fi
   fi
 
   ########
@@ -72,6 +78,19 @@ if [ ! -f /usr/local/openresty/nginx/conf/nginx.conf ]; then
 
   # This is used to remove lines from the nginx.conf
   # without having to put the entire replacement string in this file
+  if [ "${AUTH_MODE}" = "PEM" ]; then
+    sed -i '/#TEMPLATE_PEM_MODE/d' /tmp/nginx.conf
+  fi
+
+  if [ "${STRATO_MODE}" = "SERVER" ]; then
+    sed -i '/#TEMPLATE_SERVER_MODE/d' /tmp/nginx.conf
+  elif [ "${STRATO_MODE}" = "CLIENT" ]; then
+    sed -i '/#TEMPLATE_CLIENT_MODE/d' /tmp/nginx.conf
+    sed -i 's|__SERVER_NODE_URL__|'"$SERVER_NODE_URL"'|g' /tmp/nginx.conf
+  else
+    sed -i '/#TEMPLATE_FULL_MODE/d' /tmp/nginx.conf
+  fi
+
   if [ "$SMD_DEV_MODE" != true ]; then
     sed -i '/#TEMPLATE_SMD_DEV_MODE/d' /tmp/nginx.conf
 
@@ -90,10 +109,6 @@ if [ ! -f /usr/local/openresty/nginx/conf/nginx.conf ]; then
   # Remove Stats lines if running in STATS_ENABLED=false
   if [ "$STATS_ENABLED" != true ] ; then
     sed -i '/#TEMPLATE_MARK_STATS_ENABLED/d' /tmp/nginx.conf
-  fi
-
-  if [ "$blockstanbul" != true ]; then
-    sed -i '/#TEMPLATE_MARK_BLOCKSTANBUL/d' /tmp/nginx.conf
   fi
 
   if [ "$SERVE_LOGS" != true ]; then
@@ -151,12 +166,14 @@ if [ ! -f /usr/local/openresty/nginx/conf/nginx.conf ]; then
   fi
 fi
 
-echo 'Waiting for apex to be available...'
-until curl --silent --output /dev/null --fail --location http://${APEX_HOST}/_ping
-do
-  sleep 0.5
-done
-echo 'apex is available'
+if [ -z "${SERVER_NODE_URL}" ]; then
+  echo 'Waiting for apex to be available...'
+  until curl --silent --output /dev/null --fail --location http://${APEX_HOST}/_ping
+  do
+    sleep 0.5
+  done
+  echo 'apex is available'
+fi
 
 echo 'Waiting for VaultProxy to be available with node key added to Vault...'
 until curl --silent --output /dev/null --fail --location http://${STRATO_HOSTNAME}:${STRATO_PORT_VAULT_PROXY}/strato/v2.3/key

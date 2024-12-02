@@ -1,3 +1,4 @@
+{-# LANGUAGE AllowAmbiguousTypes #-}
 {-# LANGUAGE DataKinds #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE OverloadedStrings #-}
@@ -8,6 +9,7 @@
 
 module Bloc.Server where
 
+import API.Parametric
 import Bloc.API
 import Bloc.Monad
 import Bloc.Server.Contracts
@@ -19,31 +21,34 @@ import Blockchain.Data.CirrusDefs
 import Blockchain.Strato.Model.Account
 import Blockchain.Strato.Model.Address
 import Blockchain.Strato.Model.Keccak256
-import Control.Lens (makeLenses, over, (&), (.~), (?~))
+import Control.Lens (makeLenses, over)
 import Control.Monad.Change.Alter
-import Control.Monad.Composable.SQL
+import Control.Monad.Composable.Strato
 import Control.Monad.Composable.Vault
 import Control.Monad.Logger
 import Data.HashMap.Strict.InsOrd
 import Data.Source.Map
 import Data.Swagger
+import GHC.Stack
 import Servant
-import Servant.Swagger
 import SolidVM.Model.CodeCollection.Contract
+import UnliftIO
 
-bloc ::
-  ( MonadLogger m,
+blocOauth ::
+  ( MonadUnliftIO m,
+    MonadLogger m,
     HasBlocEnv m,
     HasVault m,
-    HasSQL m,
+    HasStrato m,
+    HasCallStack,
     Selectable Account Contract m,
     Selectable Account AddressState m,
     Selectable Address Certificate m,
     HasCodeDB m,
     (Keccak256 `Selectable` SourceMap) m
   ) =>
-  ServerT BlocAPI m
-bloc =
+  Proxy InternalHeaders -> ServerT (BlocAPI '[Required, Strict] InternalHeaders) m
+blocOauth p =
   return gitInfo
     :<|> getContracts
     :<|> postContractsBatchStates
@@ -60,19 +65,46 @@ bloc =
     :<|> postContractsXabi
     :<|> getBlocTransactionResult
     :<|> postBlocTransactionResults
-    :<|> postBlocTransactionParallel
-    :<|> postBlocTransactionBody
-    :<|> postBlocTransactionUnsigned
-    :<|> postBlocTransaction
-    :<|> postBlocTransactionParallelExternal
+    :<|> embedServer p postBlocTransactionParallel
+    :<|> embedServer p postBlocTransactionBody
+    :<|> embedServer p postBlocTransactionUnsigned
+    :<|> embedServer p postBlocTransaction
 
-blocSwagger :: Swagger
-blocSwagger =
-  toSwagger (Proxy @BlocAPI)
-    & info . title .~ "Bloc API"
-    & info . version .~ "2.2"
-    & info . description ?~ "This is the V2.2 API for the BlocH"
-    & basePath ?~ "/bloc/v2.2"
+blocSimple ::
+  ( MonadUnliftIO m,
+    MonadLogger m,
+    HasBlocEnv m,
+    HasVault m,
+    HasStrato m,
+    HasCallStack,
+    Selectable Account Contract m,
+    Selectable Account AddressState m,
+    Selectable Address Certificate m,
+    HasCodeDB m,
+    (Keccak256 `Selectable` SourceMap) m
+  ) =>
+  Proxy ('[] :: [Symbol]) -> ServerT (BlocAPI '[Required, Strict] '[]) m
+blocSimple p =
+  return gitInfo
+    :<|> getContracts
+    :<|> postContractsBatchStates
+    :<|> getContractsData
+    :<|> getContractsContract
+    :<|> getContractsState
+    :<|> getContractsDetails
+    :<|> getContractsFunctions
+    :<|> getContractsSymbols
+    :<|> getContractsStateMapping
+    :<|> getContractsStates
+    :<|> getContractsEnum
+    :<|> postContractsCompile
+    :<|> postContractsXabi
+    :<|> getBlocTransactionResult
+    :<|> postBlocTransactionResults
+    :<|> embedServer p postBlocTransactionParallel
+    :<|> embedServer p postBlocTransactionBody
+    :<|> embedServer p postBlocTransactionUnsigned
+    :<|> embedServer p postBlocTransaction
 
 type BlocDocsAPI = "swagger.json" :> Get '[JSON] Swagger
 

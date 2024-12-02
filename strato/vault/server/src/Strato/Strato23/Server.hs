@@ -21,16 +21,15 @@ import Strato.Strato23.Server.Signature
 import Strato.Strato23.Server.User
 
 vaultWrapper :: ServerT VaultWrapperAPI VaultM
-vaultWrapper =
-  getPing
-    :<|> getKey'
-    :<|> getKeys'
-    :<|> postKey'
-    :<|> getSharedKey'
-    :<|> getUsers'
-    :<|> postSignature'
-    :<|> postPassword
-    :<|> verifyPassword
+vaultWrapper = getPing
+          :<|> getKey
+          :<|> getKeys
+          :<|> postKey
+          :<|> getSharedKey
+          :<|> getUsers
+          :<|> postSignature
+          :<|> postPassword
+          :<|> verifyPassword
 
 serveVaultWrapper :: VaultWrapperEnv -> Server VaultWrapperAPI
 serveVaultWrapper env = hoistServer serverProxy (enterVaultWrapper env) vaultWrapper

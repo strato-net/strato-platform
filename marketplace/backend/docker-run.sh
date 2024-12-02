@@ -1,6 +1,7 @@
 #!/bin/sh
 set -e
 
+if [ "${AUTH_MODE}" = "OAUTH" ]; then
 export CONFIG_DIR_PATH=/config
 export DEPLOY_FILE_NAME=marketplace.deploy.yaml
 export STRATO_NODE_PROTOCOL=${STRATO_NODE_PROTOCOL:-http}
@@ -86,14 +87,16 @@ if [ ! -f "${CONFIG_DIR_PATH}/config.yaml" ]; then
     exit 18
   fi
   
-  if [ -z "${OAUTH_CLIENT_ID}" ]; then
-    echo "OAUTH_CLIENT_ID is empty but is a required value"
-    exit 15
-  fi
+  if [ "${AUTH_MODE}" == "OAUTH" ]; then
+    if [ -z "${OAUTH_CLIENT_ID}" ]; then
+      echo "OAUTH_CLIENT_ID is empty but is a required value"
+      exit 15
+    fi
   
-  if [ -z "${OAUTH_CLIENT_SECRET}" ]; then
-    echo "OAUTH_CLIENT_SECRET is empty but is a required value"
-    exit 16
+    if [ -z "${OAUTH_CLIENT_SECRET}" ]; then
+      echo "OAUTH_CLIENT_SECRET is empty but is a required value"
+      exit 16
+    fi
   fi
   
   # Create /etc/hosts record to resolve STRATO_HOST to STRATO_LOCAL_IP
@@ -107,10 +110,12 @@ if [ ! -f "${CONFIG_DIR_PATH}/config.yaml" ]; then
   [[ "${MP_SERVER_SSL}" = "true" ]] && SERVER_PROTOCOL="https" || SERVER_PROTOCOL="http"
   SERVER_URL="${SERVER_PROTOCOL}://${MP_SERVER_HOST}"
 
-  OAUTH_OPENID_DISCOVERY_URL=$(echo ${METADATA} | jq -r .urls.oauthDiscovery)
-  if [ -z "${OAUTH_OPENID_DISCOVERY_URL}" ]; then
-    echo "Could not get OAuth discovery url from strato api, but it is a required value"
-    exit 21
+  if [ "${AUTH_MODE}" == "OAUTH" ]; then
+    OAUTH_OPENID_DISCOVERY_URL=$(echo ${METADATA} | jq -r .urls.oauthDiscovery)
+    if [ -z "${OAUTH_OPENID_DISCOVERY_URL}" ]; then
+      echo "Could not get OAuth discovery url from strato api, but it is a required value"
+      exit 21
+    fi
   fi
 
   sed -i 's*<apiDebug_value>*'"${MP_API_DEBUG}"'*g' /tmp/tmp.config.yaml
@@ -119,17 +124,19 @@ if [ ! -f "${CONFIG_DIR_PATH}/config.yaml" ]; then
   sed -i 's*<serverHost_value>*'"${SERVER_URL}"'*g' /tmp/tmp.config.yaml
   sed -i 's*<node_label_value>*'"${NODE_LABEL}"'*g' /tmp/tmp.config.yaml
   sed -i 's*<node_url_value>*'"${STRATO_NODE_PROTOCOL}://${STRATO_NODE_HOST}"'*g' /tmp/tmp.config.yaml
-  sed -i 's*<oauth_appTokenCookieName_value>*'"${OAUTH_APP_TOKEN_COOKIE_NAME}"'*g' /tmp/tmp.config.yaml
-  sed -i 's*<oauth_openIdDiscoveryUrl_value>*'"${OAUTH_OPENID_DISCOVERY_URL}"'*g' /tmp/tmp.config.yaml
-  sed -i 's*<oauth_clientId_value>*'"${OAUTH_CLIENT_ID}"'*g' /tmp/tmp.config.yaml
-  sed -i 's*<oauth_clientSecret_value>*'"${OAUTH_CLIENT_SECRET}"'*g' /tmp/tmp.config.yaml
-  sed -i 's*<oauth_scope_value>*'"${OAUTH_SCOPE}"'*g' /tmp/tmp.config.yaml
-  sed -i 's*<oauth_serviceOAuthFlow_value>*'"${OAUTH_SERVICE_OAUTH_FLOW}"'*g' /tmp/tmp.config.yaml
-  sed -i 's*<oauth_redirectUri_value>*'"${SERVER_URL}/mp-login/"'*g' /tmp/tmp.config.yaml
-  sed -i 's*<oauth_logoutRedirectUri_value>*'"${SERVER_URL}"'*g' /tmp/tmp.config.yaml
-  sed -i 's*<oauth_tokenField_value>*'"${OAUTH_TOKEN_FIELD}"'*g' /tmp/tmp.config.yaml
-  sed -i 's*<oauth_tokenUsernameProperty_value>*'"${OAUTH_TOKEN_USERNAME_PROPERTY}"'*g' /tmp/tmp.config.yaml
-  sed -i 's*<oauth_tokenUsernamePropertyServiceFlow_value>*'"${OAUTH_TOKEN_USERNAME_PROPERTY_SERVICE_FLOW}"'*g' /tmp/tmp.config.yaml
+  if [ "${AUTH_MODE}" == "OAUTH" ]; then
+    sed -i 's*<oauth_appTokenCookieName_value>*'"${OAUTH_APP_TOKEN_COOKIE_NAME}"'*g' /tmp/tmp.config.yaml
+    sed -i 's*<oauth_openIdDiscoveryUrl_value>*'"${OAUTH_OPENID_DISCOVERY_URL}"'*g' /tmp/tmp.config.yaml
+    sed -i 's*<oauth_clientId_value>*'"${OAUTH_CLIENT_ID}"'*g' /tmp/tmp.config.yaml
+    sed -i 's*<oauth_clientSecret_value>*'"${OAUTH_CLIENT_SECRET}"'*g' /tmp/tmp.config.yaml
+    sed -i 's*<oauth_scope_value>*'"${OAUTH_SCOPE}"'*g' /tmp/tmp.config.yaml
+    sed -i 's*<oauth_serviceOAuthFlow_value>*'"${OAUTH_SERVICE_OAUTH_FLOW}"'*g' /tmp/tmp.config.yaml
+    sed -i 's*<oauth_redirectUri_value>*'"${SERVER_URL}/mp-login/"'*g' /tmp/tmp.config.yaml
+    sed -i 's*<oauth_logoutRedirectUri_value>*'"${SERVER_URL}"'*g' /tmp/tmp.config.yaml
+    sed -i 's*<oauth_tokenField_value>*'"${OAUTH_TOKEN_FIELD}"'*g' /tmp/tmp.config.yaml
+    sed -i 's*<oauth_tokenUsernameProperty_value>*'"${OAUTH_TOKEN_USERNAME_PROPERTY}"'*g' /tmp/tmp.config.yaml
+    sed -i 's*<oauth_tokenUsernamePropertyServiceFlow_value>*'"${OAUTH_TOKEN_USERNAME_PROPERTY_SERVICE_FLOW}"'*g' /tmp/tmp.config.yaml
+  fi
 
   mv /tmp/tmp.config.yaml ./config/generated.config.yaml
   
@@ -173,3 +180,9 @@ touch ${CONFIG_DIR_PATH}/.deployed
 
 echo 'Starting backend server...'
 yarn start:prod
+else
+while [ 1 ]
+do
+    sleep 60
+done
+fi

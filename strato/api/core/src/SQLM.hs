@@ -50,7 +50,7 @@ data ApiError
   | RuntimeError SomeException
   | UnavailableError Text
   | InternalError Text
-  | NotYetSynced Integer Integer
+  | NotYetSynced
   | VMError Text
   | Timeout Text
   deriving (Show, Exception)
@@ -213,15 +213,14 @@ apiErrorToServantErr = \case
                 T.unpack err
               ]
       }
-  NotYetSynced n d ->
+  NotYetSynced ->
     err503
       { errBody =
           JSON.encode $
             unlines
               [ "Not Yet Synced!",
                 "Transactions cannot be posted to this node until it has synced with the network.",
-                "Please wait or use another node.",
-                concat ["Total Difficulty: ", show n, " / ", show d]
+                "Please wait or use another node."
               ]
       }
   VMError err -> err422 {errBody = JSON.encode err}

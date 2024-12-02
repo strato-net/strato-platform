@@ -71,6 +71,29 @@ executables:
       - warp
     ghc-options: -threaded
       
+  blockapps-pem-vault-wrapper-server:
+    source-dirs: app
+    main: PemMain.hs
+    other-modules: [Options, PemOptions]
+    dependencies:
+      - blockapps-vault-wrapper-api
+      - blockapps-vault-wrapper-server
+      - blockapps-init
+      - bytestring
+      - clock
+      - common-log
+      - hflags
+      - http-client
+      - servant-options
+      - servant-server
+      - strato-model
+      - text
+      - wai-cors
+      - wai-extra
+      - wai-middleware-prometheus
+      - warp
+    ghc-options: -threaded
+
   migrate-keys:
     source-dirs: app
     main: MigrateKeys.hs

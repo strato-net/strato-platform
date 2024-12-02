@@ -1,5 +1,6 @@
 {-# LANGUAGE DataKinds #-}
 {-# LANGUAGE DeriveGeneric #-}
+{-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE ScopedTypeVariables #-}
@@ -451,12 +452,12 @@ instance ToJSON BlockData' where
       ]
 
 instance FromJSON BlockData' where
-  parseJSON = withObject "BlockData'" $ \v ->
-    BlockData'
+  parseJSON = withObject "BlockData'" $ \v -> v .:? "coinbase" >>= \case
+    Just cb -> BlockData'
       <$> ( BlockHeader
               <$> v .: "parentHash"
               <*> v .: "unclesHash"
-              <*> v .: "coinbase"
+              <*> (pure cb)
               <*> v .: "stateRoot"
               <*> v .: "transactionsRoot"
               <*> v .: "receiptsRoot"
@@ -469,6 +470,24 @@ instance FromJSON BlockData' where
               <*> v .: "extraData"
               <*> v .: "mixHash"
               <*> v .: "nonce"
+          )
+    Nothing -> BlockData'
+      <$> ( BlockHeaderV2
+              <$> v .: "parentHash"
+              <*> v .: "stateRoot"
+              <*> v .: "transactionsRoot"
+              <*> v .: "receiptsRoot"
+              <*> v .:? "logBloom" .!= (B.replicate 64 0x30) -- this is what log blooms currently get set to
+              <*> v .: "number"
+              <*> v .: "timestamp"
+              <*> v .: "extraData"
+              <*> v .: "currentValidators"
+              <*> v .: "newValidators"
+              <*> v .: "removedValidators"
+              <*> v .: "newCerts"
+              <*> v .: "revokedCerts"
+              <*> v .: "proposalSignature"
+              <*> v .: "signatures"
           )
 
 instance FromJSON Block' where
@@ -617,6 +636,9 @@ asrToAsrPrime (s, x) = AddressStateRef' x s
 
 asrToAsrPrime' :: AddressStateRef -> AddressStateRef'
 asrToAsrPrime' x = AddressStateRef' x ""
+
+asrPrimeToAsr :: AddressStateRef' -> AddressStateRef
+asrPrimeToAsr (AddressStateRef' x _) = x
 
 data Address' = Address' Address String deriving (Eq, Show)
 

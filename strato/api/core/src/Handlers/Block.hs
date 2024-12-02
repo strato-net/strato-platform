@@ -14,6 +14,8 @@ module Handlers.Block
     blocksFilterParams,
     getBlocksFilter,
     server,
+    getBlockInfoClient,
+    getBlockInfoClient'
   )
 where
 
@@ -250,6 +252,34 @@ getBlockInfo a b c d e f g h i j k l m n o p q r s t =
 
 getBlockInfo' :: Selectable BlocksFilterParams [Block] m => BlocksFilterParams -> m [Block']
 getBlockInfo' b = map (flip Block' "") . fromMaybe [] <$> select (Proxy @[Block]) b
+
+getBlockInfoClient ::
+  Maybe Address ->
+  Maybe Text ->
+  Maybe Address ->
+  Maybe Text ->
+  Maybe Keccak256 ->
+  Maybe Natural ->
+  Maybe Natural ->
+  Maybe Natural ->
+  Maybe Natural ->
+  Maybe Natural ->
+  Maybe Natural ->
+  Maybe Natural ->
+  Maybe Natural ->
+  Maybe Natural ->
+  Maybe Natural ->
+  Maybe Natural ->
+  Maybe Natural ->
+  Maybe Int ->
+  Maybe ChainId ->
+  Maybe Sortby ->
+  ClientM [Block']
+getBlockInfoClient = client (Proxy @API)
+
+getBlockInfoClient' :: BlocksFilterParams -> ClientM [Block']
+getBlockInfoClient' (BlocksFilterParams a b c d e f g h i j k l m n o p q r s t) =
+  getBlockInfoClient a b c d e f g h i j k l m n o p q r s t
 
 blockQueryParams :: [Text]
 blockQueryParams =

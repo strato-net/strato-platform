@@ -1,0 +1,30 @@
+serve:
+  cookies:
+    same_site_mode: Lax
+    domain: ${domainName}
+
+urls:
+  self:
+    issuer: https://${domainName}:8443
+  consent: https://${domainName}:8443/ui/consent
+  login: https://${domainName}:8443/ui/login
+  logout: https://${domainName}:8443/ui/logout
+
+secrets:
+  system:
+    - youReallyNeedToChangeThis  # TODO: replace at boot time
+
+oidc:
+  subject_identifiers:
+    supported_types:
+      - pairwise
+      - public
+    pairwise:
+      salt: youReallyNeedToChangeThis  # TODO: replace at boot time
+
+log:
+  level: info
+  # TODO: Cleanup
+  #level: debug
+  #leak_sensitive_values: true
+  format: json

@@ -20,6 +20,8 @@ import Data.Text as T
 import GHC.Generics
 import Network.HTTP.Client
 
+import Debug.Trace
+
 --This is the received information from the OpenId Connect response
 data VaultToken = VaultToken
   { accessToken :: T.Text,
@@ -30,7 +32,7 @@ data VaultToken = VaultToken
 -- makeLenses ''VaultToken
 
 instance FromJSON VaultToken where
-  parseJSON (Object o) = do
+  parseJSON (Object o) | trace ("parseJSON object is " ++ show o) True = do
     ao <- o .: DAK.fromString "access_token"
     ei <- o .: DAK.fromString "expires_in"
     --Ensure the correct data types are coming into the system

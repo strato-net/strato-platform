@@ -1,0 +1,18 @@
+#strato-version:<VERSION>
+#strato-getting-started-min-version:4.4.0
+version: "3"
+services:
+  subject-signing-tool:
+    environment:
+    - MERCATA_USERNAME=${MERCATA_USERNAME}
+    build: .
+    image: ${SUBJECT_SIGNING_TOOL_IMAGE:-<REPO_URL>subject-signing-tool:<VERSION>}
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "100m"
+        max-file: "3"
+    volumes:
+      - ${PEM_FILE:-./priv.pem}:/priv.pem
+      - ${BACKUP_PEM_FILE:-./priv.pem}:/backup_priv.pem
+      - ${SSL_CERT:-./priv.pem}:/ssl.pem

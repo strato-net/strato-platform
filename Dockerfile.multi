@@ -1,5 +1,6 @@
-FROM ubuntu:22.04 as base
+FROM ubuntu:22.04 AS os
 
+FROM os AS base
 RUN apt-get -y update && apt-get install -y \
       autoconf \
       curl \
@@ -36,8 +37,9 @@ ENV LANG="en_US.UTF-8" \
     LANGUAGE="en_US:en" \
     LC_ALL="en_US.UTF-8"
 
-FROM base as strato
+FROM base AS strato
 COPY \
+  ./usr/local/bin/blockapps-pem-vault-wrapper-server \
   ./usr/local/bin/blockapps-vault-proxy-server \
   ./usr/local/bin/ethereum-discover \
   ./usr/local/bin/forced-config-change \
@@ -56,16 +58,17 @@ COPY \
   ./usr/local/bin/vm-runner \
   ./usr/local/bin/x509-generator \
   ./usr/local/bin/x509-keygen \
+  ./usr/local/bin/x509-sign-subject \
     /usr/local/bin/
 COPY ./strato /
 RUN ln -s /usr/local/bin/strato-barometer /usr/local/bin/queryStrato
 EXPOSE 30303 30303/udp 3000 3001 7065 8013 8050 8051 8052
 HEALTHCHECK --interval=5s --timeout=1s --start-period=20s \
-  CMD pgrep vm-runner && pgrep slipstream || exit 1
+  CMD pgrep strato-api || exit 1
 WORKDIR /var/lib/strato
 ENTRYPOINT ["/strato/doit.sh"]
 
-FROM base as highway
+FROM base AS highway
 COPY usr/local/bin/blockapps-highway-server /usr/local/bin/
 COPY ./highway /highway
 EXPOSE 8080
@@ -74,7 +77,7 @@ HEALTHCHECK --interval=5s --timeout=1s --start-period=180s \
 ENTRYPOINT ["/highway/doit.sh"]
 
 
-FROM base as vault-wrapper
+FROM base AS vault-wrapper
 COPY usr/local/bin/blockapps-vault-wrapper-server /usr/local/bin/
 COPY ./vault-wrapper /vault-wrapper
 EXPOSE 8000
@@ -82,7 +85,7 @@ HEALTHCHECK --interval=5s --timeout=1s --start-period=180s \
   CMD curl --silent --output /dev/null --fail localhost:8000/strato/v2.3/_ping || exit 1
 ENTRYPOINT ["/vault-wrapper/doit.sh"]
 
-FROM base as identity-provider
+FROM base AS identity-provider
 COPY \
   usr/local/bin/identity-provider-server \
   usr/local/bin/blockapps-vault-proxy-server \
@@ -90,11 +93,39 @@ COPY \
 RUN apt-get -y update \
   && apt-get install -y wget \
   && apt-get autoremove \
-  && apt-get clean \
-  && wget https://github.com/mikefarah/yq/releases/download/v4.35.1/yq_linux_amd64 -O /usr/local/bin/yq && chmod +x /usr/local/bin/yq 
+  && apt-get clean
 COPY ./identity-provider /identity-provider
 EXPOSE 8014
 HEALTHCHECK --interval=5s --timeout=1s --start-period=180s \
   CMD curl --silent --output /dev/null --fail localhost:8014/ping || exit 1
 WORKDIR /var/lib/identity
 ENTRYPOINT ["/identity-provider/doit.sh"]
+
+FROM base AS identity-service
+COPY \
+  usr/local/bin/identity-service-server \
+    /usr/local/bin/
+RUN apt-get -y update \
+  && apt-get install -y wget \
+  && apt-get autoremove \
+  && apt-get clean
+COPY ./identity-service /identity-service
+EXPOSE 8014
+HEALTHCHECK --interval=5s --timeout=1s --start-period=180s \
+  CMD curl --silent --output /dev/null --fail localhost:8014/ping || exit 1
+WORKDIR /var/lib/identity
+ENTRYPOINT ["/identity-service/doit.sh"]
+
+FROM base AS subject-signing-tool
+COPY \
+  ./usr/local/bin/x509-sign-subject \
+    /usr/local/bin/
+COPY ./strato /
+WORKDIR /
+ENTRYPOINT ["/strato/subject-signing-tool.sh"]
+
+FROM os AS cfginit
+RUN mkdir /cfg
+WORKDIR /cfg
+COPY usr/local/bin/ory-init /usr/local/bin/
+

@@ -7,20 +7,27 @@ volumes:
 services:
   identity-provider:
     environment:
+    - cacheSize=${cacheSize}
     - IDENTITYPROVIDER_DEBUG=${IDENTITYPROVIDER_DEBUG}
     - identityProviderPort=${identityProviderPort}
-    - vaultProxyUrl=${vaultProxyUrl}
+    - FALLBACK_NODE_URL=${FALLBACK_NODE_URL}
+    - NODE_URL=${NODE_URL}
+    - NOTIFICATION_SERVER_URL=${NOTIFICATION_SERVER_URL}
+    - OAUTH_CLIENT_ID=${OAUTH_CLIENT_ID}
+    - OAUTH_CLIENT_SECRET=${OAUTH_CLIENT_SECRET}
+    - OAUTH_DISCOVERY_URL=${OAUTH_DISCOVERY_URL}
     - PROCESS_MONITORING=${PROCESS_MONITORING}
+    - SENDGRID_APIKEY=${SENDGRID_APIKEY}
+    - USER_REGISTRY_ADDRESS=${USER_REGISTRY_ADDRESS}
+    - USER_REGISTRY_CODEHASH=${USER_REGISTRY_CODEHASH}
+    - USER_CONTRACT_NAME=${USER_CONTRACT_NAME}
     - VAULT_PROXY_DEBUG=${VAULT_PROXY_DEBUG}
     - VAULT_URL=${VAULT_URL}
-    - SENDGRID_APIKEY=${SENDGRID_APIKEY}
-    - cacheSize=${cacheSize}
     build: .
     image: ${IDENTTIYPROVIDER_IMAGE:-<REPO_URL>identity-provider:<VERSION>}
     restart: unless-stopped
     volumes: 
       - ./identity-provider/certs:/identity-provider/certs:ro
-      - ./identity-provider/idconf.yaml:/identity-provider/idconf.yaml:ro
     logging:
       driver: "json-file"
       options:
@@ -33,7 +40,7 @@ services:
     - ssl=${ssl}
     - sslCertFileType=${sslCertFileType}
     - IDENTITY_PROVIDER_HOSTNAME=${IDENTITY_PROVIDER_HOSTNAME}
-    - IDENTITY_PORT_VAULT_PROXY=${IDENTITY_PORT_VAULT_PROXY}
+    - OAUTH_DISCOVERY_URL=${OAUTH_DISCOVERY_URL}
     build: .
     image: ${IDENTITYNGINX_IMAGE:-<REPO_URL>identity-nginx:<VERSION>}
     ports:
@@ -42,7 +49,6 @@ services:
     volumes:
     - ./ssl:/tmp/ssl:ro
     - idpconfig:/config
-    - ./identity-provider/idconf.yaml:/tmp/idconf.yaml
     restart: unless-stopped
     logging:
       driver: "json-file"

@@ -18,6 +18,7 @@ module BlockApps.X509.Certificate
     SignedCertificate,
     Issuer (..),
     Subject (..),
+    SubjectAndCert(..),
     x509CertToCertInfoState,
     HasSelectX509CertDB,
     HasSelectX509FieldDB,
@@ -35,6 +36,8 @@ module BlockApps.X509.Certificate
     makeSignedCertSigF,
     getCertSubject,
     getCertSubjects,
+    unsafeGetCertSubjectUndefinedPubKey,
+    unsafeGetCertSubjectsUndefinedPubKey,
     getCertValidity,
     getCertIssuer,
     getCertIssuers,
@@ -54,7 +57,7 @@ import BlockApps.X509.Keys
 import Blockchain.Data.RLP
 import Blockchain.Strato.Model.Address
 import Blockchain.Strato.Model.ChainMember hiding (commonName, orgName, orgUnit)
-import Blockchain.Strato.Model.Secp256k1
+import Blockchain.Strato.Model.Secp256k1 hiding (Signed)
 import Control.Applicative ((<|>))
 import Control.DeepSeq
 import qualified Control.Lens as Lens
@@ -274,6 +277,23 @@ instance ToSchema Subject where
             subPub = fromMaybe undefined $ importPublicKey "-----BEGIN PUBLIC KEY-----\nMFYwEAYHKoZIzj0CAQYFK4EEAAoDQgAEGOKeu5dSCBFHVQuy/q1A8BeTb99G83tD\nVecvHHne6sKfmBZN1AIjhpHGKO22vBfdq3dMn/QBqb2TdR9w3WvMXQ==\n-----END PUBLIC KEY-----\n"
           }
 
+instance RLPSerializable Subject where
+  rlpEncode (Subject cn o u c p) = RLPArray [
+    rlpEncode cn,
+    rlpEncode o,
+    rlpEncode u,
+    rlpEncode c,
+    rlpEncode p
+    ]
+
+  rlpDecode (RLPArray [cn, o, u, c, p]) = Subject
+    (rlpDecode cn)
+    (rlpDecode o)
+    (rlpDecode u)
+    (rlpDecode c)
+    (rlpDecode p)
+  rlpDecode x = error $ "rlpDecode for Subject failed: expected RLPArray of 5 elements, got " ++ show x
+
 instance RLPSerializable X509Certificate where
   rlpEncode = RLPString . certToBytes
 
@@ -325,6 +345,28 @@ instance ToSample X509Certificate where
           "prz3Yc03zv5VJ5rP/55A",
           "-----END CERTIFICATE-----"
         ]
+
+data SubjectAndCert = SubjectAndCert
+  { sacSubject     :: Subject
+  , sacCertificate :: Maybe X509Certificate
+  } deriving (Eq, Show)
+
+instance ToJSON SubjectAndCert where
+  toJSON (SubjectAndCert s c) = object
+    [ "subject" .= s
+    , "certificate" .= c
+    ]
+
+instance FromJSON SubjectAndCert where
+  parseJSON = withObject "SubjectAndCert" $ \o -> SubjectAndCert
+    <$> (o .: "subject")
+    <*> (o .:? "certificate")
+
+instance RLPSerializable SubjectAndCert where
+  rlpEncode (SubjectAndCert s Nothing)  = rlpEncode s
+  rlpEncode (SubjectAndCert s (Just c)) = RLPArray [rlpEncode s, rlpEncode c]
+  rlpDecode (RLPArray [s, c])           = SubjectAndCert (rlpDecode s) (Just $ rlpDecode c)
+  rlpDecode s                           = SubjectAndCert (rlpDecode s) Nothing
 
 ----------------------------------------------------------------------------------------------
 ---------------------------------------- ROOT CERT -------------------------------------------
@@ -508,6 +550,27 @@ getCertSubjects certs = for (x509ToSigneds certs) $ \cert -> do
         subUnit = extractDn cert DnOrganizationUnit,
         subCountry = extractDn cert DnCountry,
         subPub = pubKey
+      }
+  where
+    extractDn :: SignedCertificate -> DnElement -> Maybe String
+    extractDn cert dn = fmap fromASN1CS . getDnElement dn . certSubjectDN $ getCertificate cert
+
+-- Get the (first) subject of the certificate
+unsafeGetCertSubjectUndefinedPubKey :: X509Certificate -> Maybe Subject
+unsafeGetCertSubjectUndefinedPubKey cert = listToMaybe =<< unsafeGetCertSubjectsUndefinedPubKey cert
+
+-- without cn and org, subject and issuer are invalid, but the other fields can be Nothing
+unsafeGetCertSubjectsUndefinedPubKey :: X509Certificate -> Maybe [Subject]
+unsafeGetCertSubjectsUndefinedPubKey certs = for (x509ToSigneds certs) $ \cert -> do
+  cn <- extractDn cert DnCommonName
+  let org = fromMaybe "" $ extractDn cert DnOrganization -- domain-level SSL certs often don't have an organization field
+  return $
+    Subject
+      { subCommonName = cn,
+        subOrg = org,
+        subUnit = extractDn cert DnOrganizationUnit,
+        subCountry = extractDn cert DnCountry,
+        subPub = error "You called a function named 'unsafeGetCertSubjectsUndefinedPubKey' and evaluated the PubKey... what did you expect to happen?!"
       }
   where
     extractDn :: SignedCertificate -> DnElement -> Maybe String

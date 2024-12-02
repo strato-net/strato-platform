@@ -18,18 +18,19 @@ local authenticate_opts = {
   client_id = "<CLIENT_ID_PLACEHOLDER>",
   client_secret = "<CLIENT_SECRET_PLACEHOLDER>",
   scope = "<OAUTH_SCOPE_PLACEHOLDER>",
-  token_endpoint_auth_method = "client_secret_post",
+  token_endpoint_auth_method = "client_secret_basic",
   ssl_verify = "<IS_SSL_PLACEHOLDER_YES_NO>",
   redirect_uri_scheme = "<REDIRECT_URI_SCHEME_PLACEHOLDER_HTTP_HTTPS>",
-  -- 'id_token' to get user data; 'access_token' for access and refresh tokens; 'user' to get additional user data (some providers include 'email' in user object instead of id_token)
-  session_contents = {access_token=true}, -- comment out to keep everything; other options: user=true, id_token=true, enc_id_token=true
+  -- 'id_token' to get user data; 'access_token' for access and refresh tokens; 'user' to get additional user data (some providers include 'email' in user object instead of id_token), enc_id_token - required for ory logout (id_token_hint)
+  session_contents = {access_token=true, enc_id_token=true, id_token=true},
   renew_access_token_on_expiry = true,
   access_token_expires_in = 300,
   access_token_expires_leeway = 3,
   logout_path = "/auth/logout",
   post_logout_redirect_uri = node_host_with_protocol,
   -- redirect_after_logout_uri = "/", -- URI to redirect after app and oauth provider logouts, otherwise show "Logged Out" text message on logout_path URI
-  revoke_tokens_on_logout = true
+  revoke_tokens_on_logout = true,
+  authorization_params = { claims="preferred_username" }
 }
 
 -- If it is a direct call to APIs (with access_token provided as Bearer token in Authorization header)
@@ -80,6 +81,9 @@ else
 
   if authenticate_res ~= nil and authenticate_res.access_token then
     user_access_token = authenticate_res.access_token
+    if authenticate_res.id_token then
+      ngx.req.set_header("X-USER-COMMON-NAME", authenticate_res.id_token['preferred_username'])
+    end
   else
     -- not expected to get here if not allow_optional_anon_access
     if ngx.var.allow_optional_anon_access ~= "true" then

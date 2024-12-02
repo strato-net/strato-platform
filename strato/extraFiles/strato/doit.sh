@@ -13,26 +13,30 @@ echo 'export PS1="⛓ \w> "' >> /root/.bashrc
 
 declare -A MONITORED_PIDS
 MONITORING_TIMER=5;
-PSQL_CONNECTION_PARAMS="-h ${postgres_host} -p ${postgres_port} -U ${postgres_user}"
-
-echo 'Waiting for Postgres to be available...'
-until pg_isready ${PSQL_CONNECTION_PARAMS}
-do
-  echo "Check at $(date)"
-  sleep 0.5
-done
-echo 'Postgres is available'
+if [ "${STRATO_MODE}" != "CLIENT" ]; then
+  PSQL_CONNECTION_PARAMS="-h ${postgres_host} -p ${postgres_port} -U ${postgres_user}"
+  
+  echo 'Waiting for Postgres to be available...'
+  until pg_isready ${PSQL_CONNECTION_PARAMS}
+  do
+    echo "Check at $(date)"
+    sleep 0.5
+  done
+  echo 'Postgres is available'
+fi
 # Check if this container was initialized before
 if [ ! -f _container_initialized ]; then
-  # Check if need to wipe slipstream ("cirrus") db (NOT REQUIRED if in-place update with containers re-created and all volumes intact; REQUIRED in case of re-sync after --drop-chains)
-  if [ ! -f /volume_data/_volume_initialized ]; then
-    # drop slipstream db if already exists
-    PGPASSWORD=${postgres_password} dropdb ${PSQL_CONNECTION_PARAMS} --if-exists ${postgres_slipstream_db}
-    # Create the database for slipstream
-    PGPASSWORD=${postgres_password} createdb ${PSQL_CONNECTION_PARAMS} ${postgres_slipstream_db}
-    # Make sure the volume dir exists
-    mkdir -p /volume_data
-    date '+%Y-%m-%d %H:%M:%S' >  /volume_data/_volume_initialized
+  if [ "${STRATO_MODE}" != "CLIENT" ]; then
+    # Check if need to wipe slipstream ("cirrus") db (NOT REQUIRED if in-place update with containers re-created and all volumes intact; REQUIRED in case of re-sync after --drop-chains)
+    if [ ! -f /volume_data/_volume_initialized ]; then
+      # drop slipstream db if already exists
+      PGPASSWORD=${postgres_password} dropdb ${PSQL_CONNECTION_PARAMS} --if-exists ${postgres_slipstream_db}
+      # Create the database for slipstream
+      PGPASSWORD=${postgres_password} createdb ${PSQL_CONNECTION_PARAMS} ${postgres_slipstream_db}
+      # Make sure the volume dir exists
+      mkdir -p /volume_data
+      date '+%Y-%m-%d %H:%M:%S' >  /volume_data/_volume_initialized
+    fi
   fi
   # Create logs directory
   mkdir /logs
@@ -52,30 +56,40 @@ function newnode {
   mkdir -p logs
 
   echo "trying to see if the alternative OAUTH parameters are available"
-  if [[ -z ${OAUTH_VAULT_PROXY_ALT_CLIENT_ID:-${OAUTH_CLIENT_ID}} || -z ${OAUTH_VAULT_PROXY_ALT_CLIENT_SECRET:-${OAUTH_CLIENT_SECRET}} ]]; then
-    echo "Could not obtain OAUTH parameters for Vault Proxy"
-    exit 2
-  elif [[ -z ${OAUTH_DISCOVERY_URL} ]]; then
-    if [ "${network}" == "mercata-hydrogen" ] || [ "${networkID}" == "7596898649924658542" ]; then # connecting to testnet
-      OAUTH_DISCOVERY_URL="https://keycloak.blockapps.net/auth/realms/mercata-testnet2/.well-known/openid-configuration"
-    elif [ -n "${network}" -a "${network}" != "mercata" ] || [ -n "${networkID}" -a "${networkID}" != "6909499098523985262" ]; then # connecting to...not prod
-      echo "OAUTH_DISCOVERY_URL was not provided and could not be derived"
-      exit 3
+  if [ "${AUTH_MODE}" = "OAUTH" ]; then
+    if [[ -z ${OAUTH_VAULT_PROXY_ALT_CLIENT_ID:-${OAUTH_CLIENT_ID}} || -z ${OAUTH_VAULT_PROXY_ALT_CLIENT_SECRET:-${OAUTH_CLIENT_SECRET}} ]]; then
+      echo "Could not obtain OAUTH parameters for Vault Proxy"
+      exit 2
+    elif [[ -z ${OAUTH_DISCOVERY_URL} ]]; then
+      if [ "${network}" == "mercata-hydrogen" ] || [ "${networkID}" == "7596898649924658542" ]; then # connecting to testnet
+        OAUTH_DISCOVERY_URL="https://keycloak.blockapps.net/auth/realms/mercata-testnet2/.well-known/openid-configuration"
+      elif [ -n "${network}" -a "${network}" != "mercata" ] || [ -n "${networkID}" -a "${networkID}" != "6909499098523985262" ]; then # connecting to...not prod
+        echo "OAUTH_DISCOVERY_URL was not provided and could not be derived"
+        exit 3
+      else
+        OAUTH_DISCOVERY_URL="https://keycloak.blockapps.net/auth/realms/mercata/.well-known/openid-configuration"
+      fi
     else
-      OAUTH_DISCOVERY_URL="https://keycloak.blockapps.net/auth/realms/mercata/.well-known/openid-configuration"
+      echo "OAUTH parameters for Vault Proxy are available"
     fi
-  else
-    echo "OAUTH parameters for Vault Proxy are available"
-  fi
 
-  runBackgroundProcess blockapps-vault-proxy-server \
-    --OAUTH_DISCOVERY_URL=${OAUTH_DISCOVERY_URL} \
-    --OAUTH_CLIENT_ID=${OAUTH_CLIENT_ID} \
-    --OAUTH_CLIENT_SECRET=${OAUTH_CLIENT_SECRET} \
-    --OAUTH_RESERVE_SECONDS=${OAUTH_RESERVE_SECONDS:-13} \
-    --VAULT_URL=${VAULT_URL} \
-    --VAULT_PROXY_PORT=8013 \
-    --VAULT_PROXY_DEBUG=${VAULT_PROXY_DEBUG:-false} &>> logs/vault-proxy
+    runBackgroundProcess blockapps-vault-proxy-server \
+      --OAUTH_DISCOVERY_URL=${OAUTH_DISCOVERY_URL} \
+      --OAUTH_CLIENT_ID=${OAUTH_CLIENT_ID} \
+      --OAUTH_CLIENT_SECRET=${OAUTH_CLIENT_SECRET} \
+      --OAUTH_RESERVE_SECONDS=${OAUTH_RESERVE_SECONDS:-13} \
+      --VAULT_URL=${VAULT_URL} \
+      --VAULT_PROXY_PORT=8013 \
+      --VAULT_PROXY_DEBUG=${VAULT_PROXY_DEBUG:-false} &>> logs/vault-proxy
+
+  else
+    echo "OAUTH mode is disabled; using ${AUTH_MODE} instead"
+
+    runBackgroundProcess blockapps-pem-vault-wrapper-server \
+      --port=8013 \
+      --PEM_FILE=priv.pem &>> logs/vault-proxy
+
+  fi
 
   set +x
   echo 'Waiting for vault-proxy to rise and shine at http://localhost:8013...'
@@ -93,20 +107,22 @@ function newnode {
   echo 'vault-proxy is available'
   set -x
 
-  if [[ ! -f .initialized ]] ; then
-    # if node is being updated from the earlier version that did not have `.initialized` flag implemented (pre-7.0):
-    if [[ -d .ethereumH && -d config && ! -f .initNotFinished ]]; then
-      touch .initialized
-      sleep 10
-    else
-      touch .initNotFinished
-      cleanupDB
-      doInit
-      touch .initialized
-      rm .initNotFinished
-    fi
-  else
-    sleep 10
+  if [ "${STRATO_MODE}" != "CLIENT" ]; then
+      if [[ ! -f .initialized ]] ; then
+        # if node is being updated from the earlier version that did not have `.initialized` flag implemented (pre-7.0):
+        if [[ -d .ethereumH && -d config && ! -f .initNotFinished ]]; then
+          touch .initialized
+          sleep 10
+        else
+          touch .initNotFinished
+          cleanupDB
+          doInit
+          touch .initialized
+          rm .initNotFinished
+        fi
+      else
+        sleep 10
+      fi
   fi
 
   echo "Starting Strato processes. All output is logged to $PWD/logs."
@@ -134,54 +150,56 @@ function newnode {
   then vmMinLogLevel=LevelDebug
   fi
 
-  if ${P2P_DEBUG_LOG:-false} || ${FULL_DEBUG_LOG:-false}; 
-  then p2pMinLogLevel=LevelDebug
+  if [ "${STRATO_MODE}" != "CLIENT" ]; then
+    if ${P2P_DEBUG_LOG:-false} || ${FULL_DEBUG_LOG:-false}; 
+    then p2pMinLogLevel=LevelDebug
+    fi
+
+    if [ -n "${INSTRUMENTATION}" ]; then
+        iFlag="+RTS -T -RTS"
+    fi
+
+    echo "Starting ethereum-discover"
+    runBackgroundProcess ethereum-discover "${iFlag}" &>> logs/ethereum-discover
+
+    echo "Starting strato-p2p"
+    runBackgroundProcess strato-p2p \
+       --averageTxsPerBlock=${averageTxsPerBlock:-40} \
+       --connectionTimeout=${connectionTimeout:-30} \
+       --debugFail=${debugFail:-true}  \
+       --maxConn=${maxConn:-1000} \
+       --maxReturnedHeaders=${maxReturnedHeaders:-500} \
+       --networkID=${networkID:--1} \
+       --sqlPeers=true \
+       --minLogLevel=$p2pMinLogLevel \
+       ${networkFlag} "${iFlag}" &>> logs/strato-p2p
+
+    if [ -n "${strictBlockstanbul}" ]; then
+        sBFlag="--strictBlockstanbul=${strictBlockstanbul}"
+    fi
+
+    echo "Starting strato-sequencer"
+    runBackgroundProcess strato-sequencer \
+      --blockstanbul=true \
+      --blockstanbul_block_period_ms=${blockstanbulBlockPeriodMs:-1000} \
+      --blockstanbul_round_period_s=${blockstanbulRoundPeriodS:-10} \
+      --genesisBlockName=${genesis:-gettingStarted} \
+      --minLogLevel=$seqMinLogLevel \
+      --seq_max_events_per_iter=${seqMaxEventsPerIter:-500} \
+      --seq_max_us_per_iter=${seqMaxUsPerIter:-50000} \
+      --validatorBehavior=${validatorBehavior:-true} \
+      "${networkFlag}" "${iFlag}" "${sBFlag}" \
+      +RTS "${seqRTSOPTs:-}" -N1 &>> logs/strato-sequencer
+
+    echo "Starting strato-api-indexer"
+    runBackgroundProcess strato-api-indexer "${iFlag}" +RTS -N1 >> logs/strato-api-indexer 2>&1
+
+    echo "Starting strato-p2p-indexer"
+    runBackgroundProcess strato-p2p-indexer "${iFlag}" +RTS -N1 >> logs/strato-p2p-indexer 2>&1
+
+    echo "Starting strato-txr-indexer"
+    runBackgroundProcess strato-txr-indexer "${iFlag}" +RTS -N1 >> logs/strato-txr-indexer 2>&1
   fi
-
-  if [ -n "${INSTRUMENTATION}" ]; then
-      iFlag="+RTS -T -RTS"
-  fi
-
-  echo "Starting ethereum-discover"
-  runBackgroundProcess ethereum-discover "${iFlag}" &>> logs/ethereum-discover
-
-  echo "Starting strato-p2p"
-  runBackgroundProcess strato-p2p \
-     --averageTxsPerBlock=${averageTxsPerBlock:-40} \
-     --connectionTimeout=${connectionTimeout:-30} \
-     --debugFail=${debugFail:-true}  \
-     --maxConn=${maxConn:-1000} \
-     --maxReturnedHeaders=${maxReturnedHeaders:-500} \
-     --networkID=${networkID:--1} \
-     --sqlPeers=true \
-     --minLogLevel=$p2pMinLogLevel \
-     ${networkFlag} "${iFlag}" &>> logs/strato-p2p
-
-  if [ -n "${strictBlockstanbul}" ]; then
-      sBFlag="--strictBlockstanbul=${strictBlockstanbul}"
-  fi
-
-  echo "Starting strato-sequencer"
-  runBackgroundProcess strato-sequencer \
-    --blockstanbul=true \
-    --blockstanbul_block_period_ms=${blockstanbulBlockPeriodMs:-1000} \
-    --blockstanbul_round_period_s=${blockstanbulRoundPeriodS:-10} \
-    --genesisBlockName=${genesis:-gettingStarted} \
-    --minLogLevel=$seqMinLogLevel \
-    --seq_max_events_per_iter=${seqMaxEventsPerIter:-500} \
-    --seq_max_us_per_iter=${seqMaxUsPerIter:-50000} \
-    --validatorBehavior=${validatorBehavior:-true} \
-    "${networkFlag}" "${iFlag}" "${sBFlag}" \
-    +RTS "${seqRTSOPTs:-}" -N1 &>> logs/strato-sequencer
-
-  echo "Starting strato-api-indexer"
-  runBackgroundProcess strato-api-indexer "${iFlag}" +RTS -N1 >> logs/strato-api-indexer 2>&1
-
-  echo "Starting strato-p2p-indexer"
-  runBackgroundProcess strato-p2p-indexer "${iFlag}" +RTS -N1 >> logs/strato-p2p-indexer 2>&1
-
-  echo "Starting strato-txr-indexer"
-  runBackgroundProcess strato-txr-indexer "${iFlag}" +RTS -N1 >> logs/strato-txr-indexer 2>&1
 
   if [ -n "${svmDev}" ]; then
     svdFlag="--svmDev=${svmDev}"
@@ -226,34 +244,39 @@ function newnode {
       sglFlag="--strictGasLimit=${strictGasLimit}"
   fi
 
-  echo "Starting vm-runner"
-  runBackgroundProcess vm-runner \
-    --blockstanbul=true \
-    --debug=${evmDebugMode:-false} \
-    --debugEnabled=${VM_DEBUGGER:-false} \
-    --debugPort=${debugPort:-8051} \
-    --debugWSHost=${debugWSHost:-strato} \
-    --debugWSPort=${debugWSPort:-8052} \
-    --diffPublish=${diffPublish:-true} \
-    --maxTxsPerBlock=${maxTxsPerBlock:-500} \
-    --minLogLevel=${vmMinLogLevel} \
-    --networkID=${networkID:--1} \
-    --seqEventsBatchSize=${seqEventsBatchSize:--1} \
-    --seqEventsCostHeuristic=${seqEventsCostHeuristic:-20000} \
-    --sqlDiff=${sqlDiff:-true} \
-    --svmDev=${svmDev:-false} \
-    --svmTrace=${svmTrace:-false} \
-    --requireCerts=${requireCerts:-true} \
-    ${networkFlag} \
-    "${aclFlag}" \
-    "${txsFlag}" \
-    "${gasFlag}" \
-    "${creatorFlag}" \
-    "${iFlag}" \
-    "${sgFlag}" \
-    "${sglFlag}" \
-    +RTS "${vmRunnerRTSOPTs:-}" -I2 -N1 &>> logs/vm-runner
+  if [ "${STRATO_MODE}" != "CLIENT" ]; then
+      echo "Starting vm-runner"
+      runBackgroundProcess vm-runner \
+        --blockstanbul=true \
+        --debug=${evmDebugMode:-false} \
+        --debugEnabled=${VM_DEBUGGER:-false} \
+        --debugPort=${debugPort:-8051} \
+        --debugWSHost=${debugWSHost:-strato} \
+        --debugWSPort=${debugWSPort:-8052} \
+        --diffPublish=${diffPublish:-true} \
+        --maxTxsPerBlock=${maxTxsPerBlock:-500} \
+        --minLogLevel=${vmMinLogLevel} \
+        --networkID=${networkID:--1} \
+        --seqEventsBatchSize=${seqEventsBatchSize:--1} \
+        --seqEventsCostHeuristic=${seqEventsCostHeuristic:-20000} \
+        --sqlDiff=${sqlDiff:-true} \
+        --svmDev=${svmDev:-false} \
+        --svmTrace=${svmTrace:-false} \
+        --requireCerts=${requireCerts:-true} \
+        ${networkFlag} \
+        "${aclFlag}" \
+        "${txsFlag}" \
+        "${gasFlag}" \
+        "${creatorFlag}" \
+        "${iFlag}" \
+        "${sgFlag}" \
+        "${sglFlag}" \
+        +RTS "${vmRunnerRTSOPTs:-}" -I2 -N1 &>> logs/vm-runner
+  fi
 
+  if [ "${STRATO_MODE}" = "CLIENT" ]; then
+      apiFlag="--stratoUrl=${SERVER_NODE_URL}/strato-api"
+  fi
   # Leave the +RTS -N1, it is important
   echo "Starting strato-api"
   runBackgroundProcess strato-api \
@@ -261,6 +284,8 @@ function newnode {
     --networkID=${networkID:--1} \
     --vaultUrl=${VAULT_URL} \
     --oauthDiscoveryUrl=${OAUTH_DISCOVERY_URL} \
+    --authMode=${AUTH_MODE} \
+    --stratoMode=${STRATO_MODE} \
     "${networkFlag}" \
     "${aclFlag}" \
     "${txsFlag}" \
@@ -271,26 +296,29 @@ function newnode {
     "${ubFlag}" \
     "${udFlag}" \
     "${fsFlag}" \
+    "${apiFlag}" \
     "${nsFlag}" \
     "${iFlag}" +RTS -N1 >> logs/strato-api 2>&1
 
-  SLIPSTREAM_CMD="slipstream \
-  --database=${postgres_slipstream_db} \
-  --kafkahost=${kafkaHost} \
-  --kafkaport=${kafkaPort} \
-  --minLogLevel=${slipMinLogLevel} \
-  --pghost=${postgres_host} \
-  --pgport=${postgres_port} \
-  --pguser=${postgres_user} \
-  --password=${postgres_password} \
-  --stratourl=http://localhost:3000/eth/v1.2 \
-  ${iFlag}"
+  if [ "${STRATO_MODE}" != "CLIENT" ]; then
+      SLIPSTREAM_CMD="slipstream \
+      --database=${postgres_slipstream_db} \
+      --kafkahost=${kafkaHost} \
+      --kafkaport=${kafkaPort} \
+      --minLogLevel=${slipMinLogLevel} \
+      --pghost=${postgres_host} \
+      --pgport=${postgres_port} \
+      --pguser=${postgres_user} \
+      --password=${postgres_password} \
+      --stratourl=http://localhost:3000/eth/v1.2 \
+      ${iFlag}"
 
-  echo "Starting slipstream"
-  if [ "${SLIPSTREAM_OPTIONAL}" = true ]; then
-      $SLIPSTREAM_CMD &>> logs/slipstream &
-  else
-      runBackgroundProcess $SLIPSTREAM_CMD &>> logs/slipstream
+      echo "Starting slipstream"
+      if [ "${SLIPSTREAM_OPTIONAL}" = true ]; then
+          $SLIPSTREAM_CMD &>> logs/slipstream &
+      else
+          runBackgroundProcess $SLIPSTREAM_CMD &>> logs/slipstream
+      fi
   fi
 
   echo "Starting process monitoring..."
@@ -453,24 +481,26 @@ stratoBootnode=${bootnode:+--stratoBootnode=$bootnode}
 mkdir -p /var/lib/strato
 cd /var/lib/strato
 
-if [[ -n $genesisBlock ]]
-then echo "$genesisBlock" > ${genesis:-gettingStarted}Genesis.json
+if [ "${STRATO_MODE}" != "CLIENT" ]; then
+  if [[ -n $genesisBlock ]]
+  then echo "$genesisBlock" > ${genesis:-gettingStarted}Genesis.json
+  fi
+  
+  until nc -z $zkHost 2181 >&/dev/null
+  do  echo "Waiting for Zookeeper to become available"
+      sleep 1
+  done
+  
+  until nc -z $kafkaHost 9092 >&/dev/null
+  do  echo "Waiting for Kafka to become available"
+      sleep 1
+  done
+  
+  until PGPASSWORD=$pgPass psql -h "$pgHost" -U "$pgUser" -c '\l'; do
+    >&2 echo "Waiting for Postgres to become available"
+    sleep 1
+  done
 fi
-
-until nc -z $zkHost 2181 >&/dev/null
-do  echo "Waiting for Zookeeper to become available"
-    sleep 1
-done
-
-until nc -z $kafkaHost 9092 >&/dev/null
-do  echo "Waiting for Kafka to become available"
-    sleep 1
-done
-
-until PGPASSWORD=$pgPass psql -h "$pgHost" -U "$pgUser" -c '\l'; do
-  >&2 echo "Waiting for Postgres to become available"
-  sleep 1
-done
 
 # Main entry point
 newnode

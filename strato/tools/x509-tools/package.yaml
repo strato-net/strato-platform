@@ -34,6 +34,23 @@ executables:
     dependencies:
       - aeson
       - strato-model
+
+  x509-sign-subject:
+    source-dirs: exec_src/
+    main: SignSubject.hs
+    other-modules: [SignSubjectOptions]
+    dependencies:
+      - aeson
+      - blockapps-vault-wrapper-api
+      - blockapps-vault-wrapper-client
+      - bytestring
+      - ethereum-rlp
+      - hflags
+      - monad-alter
+      - strato-model
+      - servant-client
+      - transformers
+      - vault-monad
     
   x509-info:
     source-dirs: exec_src/

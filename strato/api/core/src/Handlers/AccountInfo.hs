@@ -26,10 +26,13 @@ import Blockchain.Strato.Model.Keccak256
 import Control.Lens
 import Control.Monad.Change.Alter
 import Control.Monad.Composable.SQL
+import Data.Aeson
 import qualified Data.ByteString as B
+import qualified Data.ByteString.Base16 as B16
 import Data.List
 import Data.Maybe
 import Data.Source.Map
+import Data.Swagger
 import Data.Text (Text)
 import qualified Data.Text as T
 import Data.Text.Encoding (decodeUtf8)
@@ -116,8 +119,8 @@ accountsFilterParams =
     Nothing
     Nothing
 
-getAccountsFilter :: AccountsFilterParams -> ClientM [AddressStateRef']
-getAccountsFilter = uncurryAccountsFilterParams (client $ Proxy @API)
+getAccountsClient :: AccountsFilterParams -> ClientM [AddressStateRef']
+getAccountsClient = uncurryAccountsFilterParams (client $ Proxy @API)
 
 uncurryAccountsFilterParams ::
   ( Maybe Address ->
@@ -283,11 +286,35 @@ type CodeAPI =
   "code" :> Capture "codeHash" Keccak256
     :> Get '[JSON] SourceMap
 
-codeServer :: (MonadIO m, Selectable Keccak256 SourceMap m) => ServerT CodeAPI m
+type RawCodeAPI =
+  "code" :> "raw" :> Capture "codeHash" Keccak256
+    :> Get '[JSON] Text
+
+type GetX509 =
+  "x509" :> Capture "address" Address
+    :> Get '[JSON] Certificate
+
+instance ToSchema Certificate
+instance ToJSON Certificate
+instance FromJSON Certificate
+
+codeServer :: HasSQL m => ServerT CodeAPI m
 codeServer cHash =
-  select (Proxy @SourceMap) cHash >>= \case
+  getCodeFromPostgres cHash >>= \case
     Nothing -> throwIO . CouldNotFind $ "Could not find code for code hash " <> T.pack (show cHash)
     Just srcMap -> pure srcMap
+
+rawCodeServer :: HasSQL m => ServerT RawCodeAPI m
+rawCodeServer cHash =
+  getCodeByteStringFromPostgres cHash >>= \case
+    Nothing -> throwIO . CouldNotFind $ "Could not find code for code hash " <> T.pack (show cHash)
+    Just bs -> pure . decodeUtf8 $ B16.encode bs
+
+getX509Server :: HasCirrus m => ServerT GetX509 m
+getX509Server addr =
+  getX509CertForAccount addr >>= \case
+    Nothing -> throwIO . CouldNotFind $ "Could not find X.509 certificate for address " <> T.pack (show addr)
+    Just c -> pure c
 
 getCodeFromPostgres :: HasSQL m => Keccak256 -> m (Maybe SourceMap)
 getCodeFromPostgres cHash =

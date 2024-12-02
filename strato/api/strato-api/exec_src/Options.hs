@@ -24,6 +24,9 @@ defineFlag "userRegistryAddress" ("4be508b4b59039cbacf5f18ccd9b67ab48e86e6d" :: 
 defineFlag "userRegistryCodeHash" ("02946aa18081cd1c540f931e600d58e1c1e21a447620fb318ddf57b29126720b" :: String) "Code hash of UserRegistry contract code collection"
 defineFlag "useBuiltinUserRegistry" (True :: Bool) "Whether to use the code hash for the standard UserRegistry contracts"
 defineFlag "useWalletsByDefault" (False :: Bool) "Whether to redirect transactions to user wallet contracts by default"
+defineFlag "authMode" ("OAUTH" :: String) "Whether to run server using OAuth"
+defineFlag "stratoMode" ("FULL" :: String) "Whether the node is running as a client, server, or full"
+defineFlag "stratoUrl" ("http://strato:3000" :: String) "URL of STRATO API Bloc should connect to (defaults to internal)"
 
 getIdentityServerUrl :: String 
 getIdentityServerUrl = if null flags_identityServerUrl

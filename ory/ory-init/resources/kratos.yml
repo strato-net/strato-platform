@@ -1,0 +1,107 @@
+version: v1.1.0
+
+dsn: memory
+
+serve:
+  public:
+    base_url: https://${domainName}:8443
+    cors:
+      enabled: true
+  admin:
+    base_url: http://kratos:4434
+
+selfservice:
+  default_browser_return_url: https://${domainName}/
+  allowed_return_urls:
+    - https://${domainName}/
+
+  methods:
+    password:
+      enabled: true
+      config:
+        min_password_length: 6
+        identifier_similarity_check_enabled: false
+        haveibeenpwned_enabled: false
+
+  flows:
+    error:
+      ui_url: https://${domainName}:8443/ui/error
+
+    settings:
+      ui_url: https://${domainName}:8443/ui/settings
+      privileged_session_max_age: 15m
+      required_aal: highest_available
+
+    login:
+      ui_url: https://${domainName}:8443/ui/login
+
+    registration:
+      ui_url: https://${domainName}:8443/ui/registration
+      after:
+        password:
+          hooks:
+            - hook: web_hook
+              config:
+                url: ${identityServerUrl}/username-available
+                method: POST
+                body: base64://ZnVuY3Rpb24oY3R4KSB7IHVzZXJuYW1lOiBjdHguaWRlbnRpdHkudHJhaXRzLnVzZXJuYW1lIH0=
+                response:
+                  parse: true
+            - hook: session
+        webauthn:
+          hooks:
+            - hook: web_hook
+              config:
+                url: ${identityServerUrl}/username-available
+                method: POST
+                body: base64://ZnVuY3Rpb24oY3R4KSB7IHVzZXJuYW1lOiBjdHguaWRlbnRpdHkudHJhaXRzLnVzZXJuYW1lIH0=
+                response:
+                  parse: true
+            - hook: session
+        passkey:
+          hooks:
+            - hook: web_hook
+              config:
+                url: ${identityServerUrl}/username-available
+                method: POST
+                body: base64://ZnVuY3Rpb24oY3R4KSB7IHVzZXJuYW1lOiBjdHguaWRlbnRpdHkudHJhaXRzLnVzZXJuYW1lIH0=
+                response:
+                  parse: true
+            - hook: session
+        oidc:
+          hooks:
+            - hook: web_hook
+              config:
+                url: ${identityServerUrl}/username-available
+                method: POST
+                body: base64://ZnVuY3Rpb24oY3R4KSB7IHVzZXJuYW1lOiBjdHguaWRlbnRpdHkudHJhaXRzLnVzZXJuYW1lIH0=
+                response:
+                  parse: true
+            - hook: session
+        code:
+          hooks:
+            - hook: web_hook
+              config:
+                url: ${identityServerUrl}/username-available
+                method: POST
+                body: base64://ZnVuY3Rpb24oY3R4KSB7IHVzZXJuYW1lOiBjdHguaWRlbnRpdHkudHJhaXRzLnVzZXJuYW1lIH0=
+                response:
+                  parse: true
+            - hook: session
+        
+
+identity:
+  schemas:
+    - id: default
+      url: file:///etc/config/kratos/default.schema.json
+
+courier:
+  smtp:
+    connection_uri: "smtp://abcd"  # TODO: replace at boot time ("smtp://username:password@smtp.example.com:587")
+
+log:
+  level: info
+  # TODO: Cleanup
+  #level: debug
+  #leak_sensitive_values: true
+  format: json

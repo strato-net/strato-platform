@@ -3,33 +3,39 @@
 {-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE OverloadedStrings #-}
-{-# LANGUAGE TypeOperators #-}
-{-# OPTIONS_GHC -fno-warn-orphans #-}
+{-# LANGUAGE PolyKinds         #-}
+{-# LANGUAGE TypeFamilies      #-}
+{-# LANGUAGE TypeOperators     #-}
 
 module Strato.Strato23.API.Types
-  ( module Strato.Strato23.API.Types,
-    Address (..),
-    Signature (..), -- TODO: remove, ideally
-    PublicKey (..), --       same
-    SharedKey (..), --       same
-    Version (..),
-  )
-where
+  ( module Strato.Strato23.API.Types
+  , module API.Parametric -- TODO: import directly in files that require API.Parametric, and remove from here
+  , Address(..)
+  , Signature(..) -- TODO: remove, ideally
+  , PublicKey(..) --       same
+  , SharedKey(..) --       same
+  , Version(..)
+  ) where
 
-import Blockchain.Strato.Model.Address
-import Blockchain.Strato.Model.Secp256k1
-import Control.Lens ((&), (?~))
-import Data.Aeson.Casing
-import Data.Aeson.Casing.Internal (dropFPrefix)
-import Data.Aeson.Types hiding (fieldLabelModifier)
-import qualified Data.ByteString as B
-import qualified Data.ByteString.Base16 as B16
-import qualified Data.ByteString.Char8 as C8
-import Data.Swagger
-import Data.Swagger.Internal.Schema (named)
-import qualified Data.Text as T
-import GHC.Generics
+import           API.Parametric
+import           Control.Lens                 ((&), (?~))
+import           Data.Aeson.Casing
+import           Data.Aeson.Casing.Internal   (dropFPrefix)
+import           Data.Aeson.Types             hiding (fieldLabelModifier)
+import qualified Data.ByteString              as B
+import qualified Data.ByteString.Base16       as B16
+import qualified Data.ByteString.Char8        as C8
+import qualified Data.Text                    as T
+import           Data.Swagger
+import           Data.Swagger.Internal.Schema (named)
+
+import           GHC.Generics
+
+import           Blockchain.Strato.Model.Address
+import           Blockchain.Strato.Model.Secp256k1
 import qualified LabeledError
+
+type VaultHeaders = '["X-USER-UNIQUE-NAME", "X-IDENTITY-PROVIDER-ID"]
 
 vaultWrapperSchemaOptions :: SchemaOptions
 vaultWrapperSchemaOptions = defaultSchemaOptions {fieldLabelModifier = camelCase . dropFPrefix}

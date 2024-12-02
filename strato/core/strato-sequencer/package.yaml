@@ -147,7 +147,6 @@ executables:
 #      - wai-extra
 #      - wai-middleware-prometheus
 #      - warp
-#      - x509-certs
 
 benchmarks:
   send-to-blockstanbul:

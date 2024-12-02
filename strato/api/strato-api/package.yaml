@@ -20,6 +20,7 @@ executables:
     - blockapps-mpdbs
     - blockapps-init
     - bytestring
+    - base16-bytestring
     - cache
     - clock
     - common-log
@@ -31,17 +32,22 @@ executables:
     - insert-ordered-containers
     - lens
     - monad-alter
+    - parametric-apis
     - process-monitor
     - regex-compat
+    - servant-client
     - servant-client-core
     - servant-multipart
+    - servant-multipart-client  
     - servant-server
     - servant-swagger
     - servant-swagger-ui
     - solid-vm-model
     - sql-monad
     - strato-model
+    - strato-monad
     - swagger2
+    - text
     - transformers
     - unliftio
     - vault-monad

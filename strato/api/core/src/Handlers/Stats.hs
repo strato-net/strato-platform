@@ -24,20 +24,6 @@ import Data.Swagger
 import qualified Database.Esqueleto.Legacy as E
 import Servant
 
-newtype TotalDifficulty = TotalDifficulty Integer
-
-instance ToJSON TotalDifficulty where
-  toJSON (TotalDifficulty td) = object ["difficulty" .= td]
-
-instance FromJSON TotalDifficulty where
-  parseJSON (Object o) = TotalDifficulty <$> o .: "difficulty"
-  parseJSON e = fail $ "FromJSON TotalDifficulty: Expected object, got " ++ show e
-
-instance ToSchema TotalDifficulty where
-  declareNamedSchema _ =
-    return $
-      NamedSchema (Just "TotalDifficulty") mempty
-
 newtype TransactionCount = TransactionCount Integer
 
 instance ToJSON TransactionCount where

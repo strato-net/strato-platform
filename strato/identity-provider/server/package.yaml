@@ -44,6 +44,7 @@ library:
   - monad-alter
   - mtl
   - notification-monad
+  - parametric-apis
   - servant-client
   - servant-server
   - solid-vm-model
@@ -69,9 +70,11 @@ executables:
     - common-log
     - containers
     - hflags
+    - lrucache
+    - servant-client
     - strato-model
+    - time
     - warp
-    - yaml
 
 tests:
   identity-provider-test:

@@ -17,7 +17,7 @@
 module Handlers.Metadata
   ( API,
     getMetaDataClient,
-    MetadataResponse,
+    MetadataResponse(..),
     server,
     UrlMap,
   )

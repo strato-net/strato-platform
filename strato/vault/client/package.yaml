@@ -20,6 +20,7 @@ description:         Please see the README on GitHub at <https://github.com/gith
 
 dependencies:
 - base
+- servant
 - servant-client
 - text
 - blockapps-vault-wrapper-api

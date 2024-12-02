@@ -36,6 +36,10 @@ packages:
 - identity-provider/server
 - identity-provider/client
 
+- identity-service/api
+- identity-service/server
+- identity-service/client
+
 - indexer/slipstream
 - indexer/strato-index
 
@@ -48,6 +52,7 @@ packages:
 - libs/composable-monads/kafka-monad
 - libs/composable-monads/redis-monad
 - libs/composable-monads/sql-monad
+- libs/composable-monads/strato-monad
 - libs/composable-monads/identity-monad
 - libs/composable-monads/notification-monad
 - libs/composable-monads/vault-monad
@@ -60,6 +65,7 @@ packages:
 - libs/kafka/milena-tools
 - libs/monad-alter
 - libs/nibblestring
+- libs/parametric-apis
 - libs/partitioner
 - libs/prometheus/blockapps-init
 - libs/prometheus/cross-monitoring

@@ -15,6 +15,7 @@ HIGHWAYDIR=${FAKEROOT}/highway
 STRATODIR=${FAKEROOT}/strato
 VAULTDIR=${FAKEROOT}/vault-wrapper
 IDENTITYDIR=${FAKEROOT}/identity-provider
+IDENTITYSERVICEDIR=${FAKEROOT}/identity-service
 
 ifndef VERSION
   ifeq ($(REPO),public)
@@ -33,11 +34,11 @@ all: build_all docker-compose eks
 
 all_develop: build_develop docker-compose eks
 
-build_all: strato apex highway highway-nginx nginx postgrest prometheus smd marketplace-backend marketplace-ui vault-wrapper vault-nginx identity-provider identity-nginx payment-server payment-server-nginx notification-server notification-server-nginx
+build_all: strato apex highway highway-nginx nginx postgrest prometheus smd marketplace-backend marketplace-ui vault-wrapper vault-nginx identity-provider identity-service identity-nginx payment-server payment-server-nginx subject-signing-tool notification-server notification-server-nginx cfginit
 
-build_develop: develop apex highway highway-nginx nginx postgrest prometheus smd marketplace-backend marketplace-ui vault-wrapper vault-nginx identity-provider identity-nginx payment-server payment-server-nginx notification-server notification-server-nginx
+build_develop: develop apex highway highway-nginx nginx postgrest prometheus smd marketplace-backend marketplace-ui vault-wrapper vault-nginx identity-provider identity-service identity-nginx payment-server payment-server-nginx subject-signing-tool notification-server notification-server-nginx cfginit
 
-.PHONY: strato apex highway highway-nginx nginx postgrest prometheus smd marketplace-backend marketplace-ui vault-wrapper vault-nginx identity-provider identity-nginx payment-server payment-server-nginx notification-server notification-server-nginx build_buildbase build_common build_common_profiled eks
+.PHONY: strato apex highway highway-nginx ory nginx postgrest prometheus smd marketplace-backend marketplace-ui vault-wrapper vault-nginx identity-provider identity-service identity-nginx payment-server payment-server-nginx subject-signing-tool notification-server notification-server-nginx build_buildbase build_common build_common_profiled eks ory-init cfginit
 
 apex:
 	@echo Now building apex...
@@ -107,6 +108,7 @@ build_common: build_buildbase
 	mkdir -p ${STRATODIR}
 	mkdir -p ${VAULTDIR}
 	mkdir -p ${IDENTITYDIR}
+	mkdir -p ${IDENTITYSERVICEDIR}
 	cd strato && stack build \
 		--test --no-run-tests \
 		--copy-bins --local-bin-path=${FAKEROOT}/usr/local/bin
@@ -117,6 +119,7 @@ build_common_profiled: build_buildbase
 	mkdir -p ${STRATODIR}
 	mkdir -p ${VAULTDIR}
 	mkdir -p ${IDENTITYDIR}
+	mkdir -p ${IDENTITYSERVICEDIR}
 	cd strato && stack build \
 		--profile --work-dir .stack-work-profile \
 		--copy-bins --local-bin-path=${FAKEROOT}/usr/local/bin
@@ -126,6 +129,7 @@ build_common_fast: build_buildbase
 	mkdir -p ${STRATODIR}
 	mkdir -p ${VAULTDIR}
 	mkdir -p ${IDENTITYDIR}
+	mkdir -p ${IDENTITYSERVICEDIR}
 	cd strato && stack build \
 		--fast --no-run-tests \
 		--copy-bins --local-bin-path=${FAKEROOT}/usr/local/bin
@@ -167,6 +171,12 @@ strato: build_common
 	docker build --target strato --tag ${REPO_URL}strato:${VERSION} --file Dockerfile.multi ${FAKEROOT}
 	docker tag ${REPO_URL}strato:${VERSION} ${REPO_AWS_ECR_URL}strato:${VERSION}
 
+subject-signing-tool: build_common
+	@echo Now building core-strato...
+	cp -fr strato/extraFiles/* ${STRATODIR}
+	docker build --target subject-signing-tool --tag ${REPO_URL}subject-signing-tool:${VERSION} --file Dockerfile.multi ${FAKEROOT}
+	docker tag ${REPO_URL}subject-signing-tool:${VERSION} ${REPO_AWS_ECR_URL}subject-signing-tool:${VERSION}
+
 develop: build_common_fast
 	@echo Now building core-strato using --fast...
 	cp -fr strato/extraFiles/* ${STRATODIR}
@@ -189,11 +199,29 @@ vault-nginx:
 	@echo Now building vault-nginx...
 	BASIL_DOCKER_TAG=${REPO_URL}vault-nginx:${VERSION} ECR_DOCKER_TAG=${REPO_AWS_ECR_URL}vault-nginx:${VERSION} make --directory=vault-nginx/
 
+# ory-init build and install locally (for development)
+ory:
+	cd ory && stack install
+
+ory-init:
+	cd ory && \
+		stack build --copy-bins --local-bin-path=${FAKEROOT}/usr/local/bin
+
+cfginit: ory-init
+	docker build --target cfginit --tag ${REPO_URL}cfginit:${VERSION} --file Dockerfile.multi ${FAKEROOT}
+	docker tag ${REPO_URL}cfginit:${VERSION} ${REPO_AWS_ECR_URL}cfginit:${VERSION}
+
 identity-provider: build_common
 	@echo Now building Identity Server...
 	cp strato/identity-provider/doit.sh ${IDENTITYDIR}
 	docker build --target identity-provider --tag ${REPO_URL}identity-provider:${VERSION} --file Dockerfile.multi ${FAKEROOT}
 	docker tag ${REPO_URL}identity-provider:${VERSION} ${REPO_AWS_ECR_URL}identity-provider:${VERSION}
+
+identity-service: build_common
+	@echo Now building OAuth-less Identity Server...
+	cp strato/identity-service/doit.sh ${IDENTITYSERVICEDIR}
+	docker build --target identity-service --tag ${REPO_URL}identity-service:${VERSION} --file Dockerfile.multi ${FAKEROOT}
+	docker tag ${REPO_URL}identity-service:${VERSION} ${REPO_AWS_ECR_URL}identity-service:${VERSION}
 
 identity-nginx:
 	@echo Now building identity-nginx...
@@ -204,30 +232,50 @@ docker-compose:
 	@echo Creating the image-push-ready docker-compose.push.yml...
 	sed -e 's|<REPO_URL>|'"${REPO_URL}"'|g' -e 's|<VERSION>|'"${VERSION}"'|g' docker-compose.tpl.yml > docker-compose.push.yml
 	sed -e 's|<REPO_URL>|'"${REPO_AWS_ECR_URL}"'|g' -e 's|<VERSION>|'"${VERSION}"'|g' docker-compose.tpl.yml > docker-compose.push.ecr.yml
+	sed -e 's|<REPO_URL>|'"${REPO_URL}"'|g' -e 's|<VERSION>|'"${VERSION}"'|g' docker-compose.server.tpl.yml > docker-compose.server.push.yml
+	sed -e 's|<REPO_URL>|'"${REPO_AWS_ECR_URL}"'|g' -e 's|<VERSION>|'"${VERSION}"'|g' docker-compose.server.tpl.yml > docker-compose.server.push.ecr.yml
+	sed -e 's|<REPO_URL>|'"${REPO_URL}"'|g' -e 's|<VERSION>|'"${VERSION}"'|g' docker-compose.client.tpl.yml > docker-compose.client.push.yml
+	sed -e 's|<REPO_URL>|'"${REPO_AWS_ECR_URL}"'|g' -e 's|<VERSION>|'"${VERSION}"'|g' docker-compose.client.tpl.yml > docker-compose.client.push.ecr.yml
 	sed -e 's|<REPO_URL>|'"${REPO_URL}"'|g' -e 's|<VERSION>|'"${VERSION}"'|g' docker-compose.vault.tpl.yml > docker-compose.vault.push.yml
 	sed -e 's|<REPO_URL>|'"${REPO_AWS_ECR_URL}"'|g' -e 's|<VERSION>|'"${VERSION}"'|g' docker-compose.vault.tpl.yml > docker-compose.vault.push.ecr.yml
 	sed -e 's|<REPO_URL>|'"${REPO_URL}"'|g' -e 's|<VERSION>|'"${VERSION}"'|g' docker-compose.identity.tpl.yml > docker-compose.identity.push.yml
 	sed -e 's|<REPO_URL>|'"${REPO_AWS_ECR_URL}"'|g' -e 's|<VERSION>|'"${VERSION}"'|g' docker-compose.identity.tpl.yml > docker-compose.identity.push.ecr.yml
+	sed -e 's|<REPO_URL>|'"${REPO_URL}"'|g' -e 's|<VERSION>|'"${VERSION}"'|g' docker-compose.identity-service.tpl.yml > docker-compose.identity-service.push.yml
+	sed -e 's|<REPO_URL>|'"${REPO_AWS_ECR_URL}"'|g' -e 's|<VERSION>|'"${VERSION}"'|g' docker-compose.identity-service.tpl.yml > docker-compose.identity-service.push.ecr.yml
+	sed -e 's|<REPO_URL>|'"${REPO_URL}"'|g' -e 's|<VERSION>|'"${VERSION}"'|g' docker-compose.subject-signing-tool.tpl.yml > docker-compose.subject-signing-tool.push.yml
+	sed -e 's|<REPO_URL>|'"${REPO_AWS_ECR_URL}"'|g' -e 's|<VERSION>|'"${VERSION}"'|g' docker-compose.subject-signing-tool.tpl.yml > docker-compose.subject-signing-tool.push.ecr.yml
 	sed -e 's|<REPO_URL>|'"${REPO_URL}"'|g' -e 's|<VERSION>|'"${VERSION}"'|g' docker-compose.highway.tpl.yml > docker-compose.highway.push.yml
 	sed -e 's|<REPO_URL>|'"${REPO_AWS_ECR_URL}"'|g' -e 's|<VERSION>|'"${VERSION}"'|g' docker-compose.highway.tpl.yml > docker-compose.highway.push.ecr.yml
 	sed -e 's|<REPO_URL>|'"${REPO_URL}"'|g' -e 's|<VERSION>|'"${VERSION}"'|g' docker-compose.payment.tpl.yml > docker-compose.payment.push.yml
 	sed -e 's|<REPO_URL>|'"${REPO_AWS_ECR_URL}"'|g' -e 's|<VERSION>|'"${VERSION}"'|g' docker-compose.payment.tpl.yml > docker-compose.payment.push.ecr.yml
 	sed -e 's|<REPO_URL>|'"${REPO_URL}"'|g' -e 's|<VERSION>|'"${VERSION}"'|g' docker-compose.notification.tpl.yml > docker-compose.notification.push.yml
 	sed -e 's|<REPO_URL>|'"${REPO_AWS_ECR_URL}"'|g' -e 's|<VERSION>|'"${VERSION}"'|g' docker-compose.notification.tpl.yml > docker-compose.notification.push.ecr.yml
+	sed -e 's|<REPO_URL>|'"${REPO_URL}"'|g' -e 's|<VERSION>|'"${VERSION}"'|g' docker-compose.cfginit.tpl.yml > docker-compose.cfginit.push.yml
+	sed -e 's|<REPO_URL>|'"${REPO_AWS_ECR_URL}"'|g' -e 's|<VERSION>|'"${VERSION}"'|g' docker-compose.cfginit.tpl.yml > docker-compose.cfginit.push.ecr.yml
 
 	@echo Creating the final docker-compose.yml...
 	awk '/build: ./{getline} 1' docker-compose.push.yml > docker-compose.yml
 	awk '/build: ./{getline} 1' docker-compose.push.ecr.yml > docker-compose.ecr.yml
+	awk '/build: ./{getline} 1' docker-compose.server.push.yml > docker-compose.server.yml
+	awk '/build: ./{getline} 1' docker-compose.server.push.ecr.yml > docker-compose.server.ecr.yml
+	awk '/build: ./{getline} 1' docker-compose.client.push.yml > docker-compose.client.yml
+	awk '/build: ./{getline} 1' docker-compose.client.push.ecr.yml > docker-compose.client.ecr.yml
 	awk '/build: ./{getline} 1' docker-compose.vault.push.yml > docker-compose.vault.yml
 	awk '/build: ./{getline} 1' docker-compose.vault.push.ecr.yml > docker-compose.vault.ecr.yml
 	awk '/build: ./{getline} 1' docker-compose.identity.push.yml > docker-compose.identity.yml
 	awk '/build: ./{getline} 1' docker-compose.identity.push.ecr.yml > docker-compose.identity.ecr.yml
+	awk '/build: ./{getline} 1' docker-compose.identity-service.push.yml > docker-compose.identity-service.yml
+	awk '/build: ./{getline} 1' docker-compose.identity-service.push.ecr.yml > docker-compose.identity-service.ecr.yml
+	awk '/build: ./{getline} 1' docker-compose.subject-signing-tool.push.yml > docker-compose.subject-signing-tool.yml
+	awk '/build: ./{getline} 1' docker-compose.subject-signing-tool.push.ecr.yml > docker-compose.subject-signing-tool.ecr.yml
 	awk '/build: ./{getline} 1' docker-compose.highway.push.yml > docker-compose.highway.yml
 	awk '/build: ./{getline} 1' docker-compose.highway.push.ecr.yml > docker-compose.highway.ecr.yml
 	awk '/build: ./{getline} 1' docker-compose.payment.push.yml > docker-compose.payment.yml
 	awk '/build: ./{getline} 1' docker-compose.payment.push.ecr.yml > docker-compose.payment.ecr.yml
 	awk '/build: ./{getline} 1' docker-compose.notification.push.yml > docker-compose.notification.yml
 	awk '/build: ./{getline} 1' docker-compose.notification.push.ecr.yml > docker-compose.notification.ecr.yml
+	awk '/build: ./{getline} 1' docker-compose.cfginit.push.yml > docker-compose.cfginit.yml
+	awk '/build: ./{getline} 1' docker-compose.cfginit.push.ecr.yml > docker-compose.cfginit.ecr.yml
 
 docker-build:
 	cp -fr strato/extraFiles/* ${STRATODIR}

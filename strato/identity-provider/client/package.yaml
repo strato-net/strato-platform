@@ -11,10 +11,12 @@ extra-source-files:
 
 dependencies:
 - base
+- servant
 - servant-client
 - text
 - blockapps-identity-provider-api
 - strato-model
+- parametric-apis
 
 library:
   source-dirs: src

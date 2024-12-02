@@ -27,6 +27,7 @@ library:
   - gitrev
   - http-api-data
   - lens
+  - parametric-apis
   - quickcheck-instances
   - servant
   - servant-docs

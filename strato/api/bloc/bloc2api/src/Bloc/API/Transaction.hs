@@ -13,6 +13,7 @@
 
 module Bloc.API.Transaction where
 
+import API.Parametric
 import Bloc.API.SwaggerSchema
 import Bloc.API.TypeWrappers
 import Bloc.API.Users
@@ -40,7 +41,6 @@ import Data.Text (Text)
 import Data.Word
 import GHC.Generics
 import qualified Generic.Random as GR
-import Numeric.Natural
 import Servant.API as S
 import Servant.Docs
 import Test.QuickCheck hiding (Success)
@@ -65,28 +65,27 @@ instance ToParam (QueryFlag "queue") where
   toParam _ =
     DocQueryParam "queue" ["true", "false", ""] "flag for queueing a transaction request" Flag
 
-type PostBlocTransactionParallelCommon tokenHeaderName = 
+type PostBlocTransactionParallel r hs = 
   "transaction"
     :> "parallel"
-    :> S.Header tokenHeaderName Text
-    :> QueryParam "chainid" ChainId
+    :> ApiEmbed r hs
+     ( QueryParam "chainid" ChainId
     :> QueryParam "use_wallet" Bool -- Using QueryParam here to distinguish between Nothing and Just False
     :> QueryFlag "resolve"
     :> QueryFlag "queue"
     :> ReqBody '[JSON] PostBlocTransactionRequest
     :> Post '[JSON] [BlocChainOrTransactionResult]
+     )
 
-type PostBlocTransactionParallel = PostBlocTransactionParallelCommon "X-USER-ACCESS-TOKEN"
-type PostBlocTransactionParallelExternal = PostBlocTransactionParallelCommon "Authorization"
-
-type PostBlocTransaction =
+type PostBlocTransaction r hs =
   "transaction"
-    :> S.Header "X-USER-ACCESS-TOKEN" Text
-    :> QueryParam "chainid" ChainId
+    :> ApiEmbed r hs
+     ( QueryParam "chainid" ChainId
     :> QueryParam "use_wallet" Bool -- Using QueryParam here to distinguish between Nothing and Just False
     :> QueryFlag "resolve"
     :> ReqBody '[JSON] PostBlocTransactionRequest
     :> Post '[JSON] [BlocChainOrTransactionResult]
+     )
 
 
 -- | PostBlocTransactionBody should return a list of signed transaction hashes,
@@ -94,28 +93,30 @@ type PostBlocTransaction =
 -- posting the transactions to the VM
 --
 -- This was made at the request of Stably for their API integration
-type PostBlocTransactionBody =
+type PostBlocTransactionBody r hs =
   -- | Transaction results
   "transaction"
     :> "body" -- /transaction/body
-    :> S.Header "X-USER-ACCESS-TOKEN" Text -- jwt
-    :> QueryParam "chainid" ChainId -- shard ID (optional)
+    :> ApiEmbed r hs
+     ( QueryParam "chainid" ChainId -- shard ID (optional)
     :> ReqBody '[JSON] PostBlocTransactionRequest -- SolidVM transaction
     :> Post '[JSON] [BlocTransactionBodyResult]
+     )
 
 -- | PostBlocTransactionUnsigned should return a list of unsigned transaction hashes,
 -- along with the unsigned transaction data, without
 -- posting the transactions to the VM
 --
 -- This was made at the request of Stably for their API integration
-type PostBlocTransactionUnsigned =
+type PostBlocTransactionUnsigned r hs =
   -- | Transaction results
   "transaction"
     :> "unsigned" -- /transaction/unsigned
-    :> S.Header "X-USER-ACCESS-TOKEN" Text -- jwt
-    :> QueryParam "chainid" ChainId -- shard ID (optional)
+    :> ApiEmbed r hs
+     ( QueryParam "chainid" ChainId -- shard ID (optional)
     :> ReqBody '[JSON] PostBlocTransactionRequest -- SolidVM transaction
     :> Post '[JSON] [BlocTransactionUnsignedResult]
+     )
 
 data PostBlocTransactionRawRequest = PostBlocTransactionRawRequest
   { postbloctransactionrawrequestAddress :: Address,

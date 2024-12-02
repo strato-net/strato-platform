@@ -14,6 +14,7 @@ module Blockchain.Strato.Model.Address
     AddressPayable,
     fromPrivateKey,
     fromPublicKey,
+    recoverAddress,
     formatAddressWithoutColor,
     stringAddress,
     getNewAddress_unsafe,
@@ -93,6 +94,9 @@ fromPrivateKey =
 
 fromPublicKey :: PublicKey -> Address
 fromPublicKey = Address . fromIntegral . SHA.keccak256ToWord256 . SHA.hash . B.drop 1 . exportPublicKey False
+
+recoverAddress :: RLPSerializable a => Signed a -> Maybe Address
+recoverAddress = fmap fromPublicKey . recoverSigned
 
 {-
  Was necessary to make Address a primary key - which we no longer do (but rather index on the address field).

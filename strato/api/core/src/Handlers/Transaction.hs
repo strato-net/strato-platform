@@ -15,7 +15,14 @@
 module Handlers.Transaction
   ( TxsFilterParams (..),
     txsFilterParams,
+    GetTransaction,
+    PostTransaction,
+    PostTransactionList,
     API,
+    getTransactionClient,
+    getTransactionClient',
+    postTransactionClient,
+    postTransactionListClient,
     getTransaction,
     getTransaction',
     postTransaction,
@@ -24,7 +31,7 @@ module Handlers.Transaction
   )
 where
 
--- import           Servant.Client
+import           Servant.Client
 
 import BlockApps.Logging
 import Blockchain.DB.SQLDB
@@ -65,8 +72,10 @@ import System.Clock
 import Text.Format
 import UnliftIO
 
-type API =
-  "transaction" :> QueryParam "address" Address
+type API = GetTransaction :<|> PostTransaction :<|> PostTransactionList
+
+type GetTransaction = "transaction"
+    :> QueryParam "address" Address
     :> QueryParam "from" Address
     :> QueryParam "to" Address
     :> QueryParam "hash" Keccak256
@@ -84,9 +93,45 @@ type API =
     :> QueryParams "chainids" ChainId
     :> QueryParam "sortby" Sortby
     :> Get '[JSON] [RawTransaction']
-    :<|> "transaction"
+
+type PostTransaction = "transaction"
     :> ReqBody '[JSON] RawTransaction'
     :> Post '[JSON, PlainText] Keccak256
+
+type PostTransactionList = "transactionList"
+    :> ReqBody '[JSON] [RawTransaction']
+    :> Post '[JSON] [Keccak256]
+
+getTransactionClient ::
+  Maybe Address ->
+  Maybe Address ->
+  Maybe Address ->
+  Maybe Keccak256 ->
+  Maybe Natural ->
+  Maybe Natural ->
+  Maybe Natural ->
+  Maybe Natural ->
+  Maybe Natural ->
+  Maybe Natural ->
+  Maybe Natural ->
+  Maybe Natural ->
+  Maybe Natural ->
+  Maybe Natural ->
+  Maybe (MaybeNamed ChainId) ->
+  [ChainId] ->
+  Maybe Sortby ->
+  ClientM [RawTransaction']
+getTransactionClient = client (Proxy @GetTransaction)
+
+getTransactionClient' :: TxsFilterParams -> ClientM [RawTransaction']
+getTransactionClient' (TxsFilterParams a b c d e f g h i j k l m n o p q) =
+  getTransactionClient a b c d e f g h i j k l m n o p q
+
+postTransactionClient :: RawTransaction' -> ClientM Keccak256
+postTransactionClient = client (Proxy @PostTransaction)
+
+postTransactionListClient :: [RawTransaction'] -> ClientM [Keccak256]
+postTransactionListClient = client (Proxy @PostTransactionList)
 
 data TxsFilterParams = TxsFilterParams
   { qtAddress :: Maybe Address,
@@ -131,7 +176,7 @@ txsFilterParams =
     Nothing
 
 server :: (MonadLogger m, HasSQL m) => Int -> ServerT API m
-server txSizeLimit = getTransaction :<|> postTransaction (Just txSizeLimit)
+server txSizeLimit = getTransaction :<|> postTransaction (Just txSizeLimit) :<|> postTransactionList (Just txSizeLimit)
 
 ---------------------------
 

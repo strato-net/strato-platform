@@ -262,10 +262,10 @@ processDataStream' bs =
       eSignature = importSignature sigBS
    in case eSignature of
         Left err -> error err
-        Right signature ->
+        Right sig ->
           let (rlp, _) = rlpSplit rest
               messageHash = hash $ B.singleton theType <> rlpSerialize rlp
-              publicKey = recoverPub signature $ keccak256ToByteString messageHash
+              publicKey = recoverPub sig $ keccak256ToByteString messageHash
               theHash' = hash $ sigBS <> B.singleton theType <> rlpSerialize rlp
            in if theHash /= keccak256ToWord256 theHash'
                 then error "bad UDP data sent from peer, the hash isn't correct"

@@ -44,7 +44,7 @@ class (RLPSerializable b, BlockHeaderLike h, TransactionLike t) => BlockLike h t
   morphBlock :: (BlockLike h2 t2 b2) => b2 -> b
   morphBlock b2 = buildBlock' (blockHeader b2) (blockTransactions b2) (blockUncleHeaders b2)
 
-newtype DummyCertRevocation = DummyCertRevocation Address deriving (Show, Read, Eq, NFData, Generic, Data, ToJSON, RLPSerializable)
+newtype DummyCertRevocation = DummyCertRevocation Address deriving (Show, Read, Eq, NFData, Generic, Data, ToJSON, FromJSON, RLPSerializable)
 
 class (RLPSerializable h, HasIstanbulExtra h) => BlockHeaderLike h where
   blockHeaderBlockNumber :: h -> Integer

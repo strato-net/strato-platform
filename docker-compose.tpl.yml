@@ -64,6 +64,7 @@ services:
     depends_on:
     - nginx
     environment:
+    - AUTH_MODE=${AUTH_MODE:-OAUTH}
     - BASE_CODE_COLLECTION=${BASE_CODE_COLLECTION}
     - MP_IS_BOOTNODE=${MP_IS_BOOTNODE:-false}
     - MP_API_DEBUG=${MP_API_DEBUG:-false}
@@ -99,6 +100,7 @@ services:
     depends_on:
       - marketplace-backend
     environment:
+      - AUTH_MODE=${AUTH_MODE:-OAUTH}
       - SITE_ID=${SITE_ID:-038fe3fa}
       - STRATO_HOSTNAME=${STRATO_HOSTNAME}
       - STRATO_PORT_API=${STRATO_PORT_API}
@@ -131,6 +133,7 @@ services:
     - addBootnodes=${addBootnodes}
     - API_DEBUG_LOG=${API_DEBUG_LOG:-false}
     - appFetchLimit=${appFetchLimit}
+    - AUTH_MODE=${AUTH_MODE:-OAUTH}
     - averageTxsPerBlock=${averageTxsPerBlock}
     - blockstanbul=${blockstanbul}
     - blockstanbulBlockPeriodMs=${blockstanbulBlockPeriodMs}
@@ -145,6 +148,7 @@ services:
     - debugWSPort=${debugWSPort}
     - validatorBehavior=${validatorBehavior:-true}
     - evmDebugMode=${evmDebugMode}
+    - SERVER_NODE_URL=${SERVER_NODE_URL}
     - FILE_SERVER_URL=${FILE_SERVER_URL}
     - FULL_DEBUG_LOG=${FULL_DEBUG_LOG:-false}
     - gasLimit=${gasLimit}
@@ -188,6 +192,7 @@ services:
     - SEQUENCER_DEBUG_LOG=${SEQUENCER_DEBUG_LOG:-false}
     - SLIPSTREAM_DEBUG_LOG=${SLIPSTREAM_DEBUG_LOG:-false}
     - SLIPSTREAM_OPTIONAL=${SLIPSTREAM_OPTIONAL}
+    - STRATO_MODE=${STRATO_MODE:-FULL}
     - strictBlockstanbul=${strictBlockstanbul}
     - strictGas=${strictGas}
     - strictGasLimit=${strictGasLimit}
@@ -196,6 +201,7 @@ services:
     - sqlDiff=${sqlDiff}
     - svmDev=${svmDev}
     - txSizeLimit=${txSizeLimit}
+    - MERCATA_USERNAME=${MERCATA_USERNAME}
     - userRegistryAddress=${userRegistryAddress}
     - userRegistryCodeHash=${userRegistryCodeHash}
     - useBuiltinUserRegistry=${useBuiltinUserRegistry}
@@ -220,6 +226,9 @@ services:
     volumes:
       - stratodata:/var/lib/strato
       - ./genesis-block.json:/var/lib/strato/${genesis:-gettingStarted}Genesis.json
+      - ${PEM_FILE:-./blank.pem}:/var/lib/strato/priv.pem
+      - ${BACKUP_PEM_FILE:-./blank.pem}:/var/lib/strato/backup_priv.pem
+      - ${SSL_CERT:-./blank.cert}:/var/lib/strato/ssl.pem
   postgrest:
     depends_on:
     - postgres
@@ -267,11 +276,13 @@ services:
     - strato
     environment:
     - APEX_HOST=${APEX_HOST}
+    - AUTH_MODE=${AUTH_MODE:-OAUTH}
     - blockstanbul=${blockstanbul}
     - blockTime=${blockTime}
     - debugPort=${debugPort}
     - debugWSPort=${debugWSPort}
     - DOCS_HOST=${DOCS_HOST}
+    - SERVER_NODE_URL=${SERVER_NODE_URL}
     - MARKETPLACE_BACKEND_HOST=${MARKETPLACE_BACKEND_HOST}
     - MARKETPLACE_UI_HOST=${MARKETPLACE_UI_HOST}
     - OAUTH_CLIENT_ID=${OAUTH_CLIENT_ID}
@@ -286,6 +297,7 @@ services:
     - ssl=${ssl}
     - sslCertFileType=${sslCertFileType}
     - STATS_ENABLED=${STATS_ENABLED}
+    - STRATO_MODE=${STRATO_MODE:-FULL}
     - STRATO_HOSTNAME=${STRATO_HOSTNAME}
     - STRATO_PORT_API=${STRATO_PORT_API}
     - STRATO_PORT_API2=${STRATO_PORT_API2}
