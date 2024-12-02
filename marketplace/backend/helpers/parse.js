@@ -1,18 +1,18 @@
-import { fsUtil, parser } from 'blockapps-rest'
+import { fsUtil, parser } from 'blockapps-rest';
 
 const getEnums = (filePath) => {
-  const assetErrorSource = fsUtil.get(filePath)
-  return parser.parseEnum(assetErrorSource)
-}
+  const assetErrorSource = fsUtil.get(filePath);
+  return parser.parseEnum(assetErrorSource);
+};
 
 const getEnumsCached = (filePath) => {
-  let cachedEnum
+  let cachedEnum;
   return () => {
     if (!cachedEnum) {
-      cachedEnum = getEnums(filePath)
+      cachedEnum = getEnums(filePath);
     }
-    return cachedEnum
-  }
-}
+    return cachedEnum;
+  };
+};
 
-export { getEnums, getEnumsCached }
+export { getEnums, getEnumsCached };

@@ -14,6 +14,7 @@ module SolidVM.Solidity.Parse.ParserTypes where
 
 --import Debug.Trace
 import qualified Data.Map as M
+import SolidVM.Model.CodeCollection (resolveSolidVMVersion)
 import Text.Parsec
 
 -- | Source file names; also source file /paths/.
@@ -82,13 +83,6 @@ addPragma k v = do
           newPragmas = pragmaList ++ pragmas
       in putState $ ParserState contractName pragmaVersion newPragmas userDefinedTypes contractSrcLength
     _ -> putState $ ParserState contractName pragmaVersion ((k,v):pragmas) userDefinedTypes contractSrcLength
-  where
-    resolveSolidVMVersion :: String -> [(String, String)]
-    resolveSolidVMVersion version =
-      case version of
-        "11.5" -> ("solidvm", "11.5") : resolveSolidVMVersion "11.4"
-        "11.4" -> [("solidvm", "11.4"), ("es6", ""), ("strict", ""), ("builtinCreates", ""), ("safeExternalCalls", "")]
-        ver -> [("solidvm", ver)]
 
 addUserDefinedType :: String -> String -> SolidityParser ()
 addUserDefinedType k v =

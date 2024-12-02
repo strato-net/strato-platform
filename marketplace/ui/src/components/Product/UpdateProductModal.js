@@ -1,17 +1,16 @@
-import React, { useEffect, useState } from "react";
-import { useFormik, getIn } from "formik";
-import { Form, Modal, Input, Select, Radio, Button, Upload, Spin } from "antd";
-import TextArea from "antd/es/input/TextArea";
-import { PictureOutlined } from "@ant-design/icons";
-import getSchema from "./ProductSchema";
+import React, { useEffect, useState } from 'react';
+import { useFormik, getIn } from 'formik';
+import { Form, Modal, Input, Select, Radio, Button, Upload, Spin } from 'antd';
+import TextArea from 'antd/es/input/TextArea';
+import { PictureOutlined } from '@ant-design/icons';
+import getSchema from './ProductSchema';
 
 //sub-categories
-import { useSubCategoryState } from "../../contexts/subCategory";
-import { actions } from "../../contexts/product/actions";
-import { useProductDispatch, useProductState } from "../../contexts/product";
-import { UNIT_OF_MEASUREMENTS, unitOfMeasures } from "../../helpers/constants";
-import TagManager from "react-gtm-module";
-
+import { useSubCategoryState } from '../../contexts/subCategory';
+import { actions } from '../../contexts/product/actions';
+import { useProductDispatch, useProductState } from '../../contexts/product';
+import { UNIT_OF_MEASUREMENTS, unitOfMeasures } from '../../helpers/constants';
+import TagManager from 'react-gtm-module';
 
 const { Option } = Select;
 
@@ -31,31 +30,28 @@ const UpdateProductModal = ({
   //Sub-categories
   const { issubCategorysLoading } = useSubCategoryState();
 
-  const {
-    isproductUpdating,
-    isupdateImageSubmitting
-  } = useProductState();
+  const { isproductUpdating, isupdateImageSubmitting } = useProductState();
 
   const initialValues = {
     image: null,
-    name: "",
+    name: '',
     category: {
       name: null,
-      address: "",
+      address: '',
     },
     subCategory: {
       name: null,
-      address: "",
+      address: '',
     },
-    manufacturer: "",
-    unitofmeasurement:{
+    manufacturer: '',
+    unitofmeasurement: {
       name: null,
-      value: "",
+      value: '',
     },
-    leastSellableUnit: "",
-    description: "",
+    leastSellableUnit: '',
+    description: '',
     active: true,
-    userUniqueProductCode:""
+    userUniqueProductCode: '',
   };
 
   const formik = useFormik({
@@ -78,15 +74,15 @@ const UpdateProductModal = ({
           name: productToUpdate.subCategory,
         },
         manufacturer: decodeURIComponent(productToUpdate.manufacturer),
-        unitofmeasurement:{
-         name: UNIT_OF_MEASUREMENTS[productToUpdate.unitOfMeasurement],
-         value: productToUpdate.unitOfMeasurement
+        unitofmeasurement: {
+          name: UNIT_OF_MEASUREMENTS[productToUpdate.unitOfMeasurement],
+          value: productToUpdate.unitOfMeasurement,
         },
         leastSellableUnit: productToUpdate.leastSellableUnit,
         description: decodeURIComponent(productToUpdate.description),
         active: productToUpdate.isActive,
         image: productToUpdate.imageUrl,
-        userUniqueProductCode:productToUpdate.userUniqueProductCode
+        userUniqueProductCode: productToUpdate.userUniqueProductCode,
       };
       setFormState(nextState);
       setSelectedImage(productToUpdate.imageUrl);
@@ -97,10 +93,13 @@ const UpdateProductModal = ({
     let imageData;
     if (isImgChanged) {
       const formData = new FormData();
-      formData.append("fileUpload", formik.values.image);
+      formData.append('fileUpload', formik.values.image);
 
-      imageData = await actions.updateImage(dispatch, formData, productToUpdate.imageKey);
-
+      imageData = await actions.updateImage(
+        dispatch,
+        formData,
+        productToUpdate.imageKey
+      );
     } else {
       imageData = {
         imageKey: productToUpdate.imageKey,
@@ -111,7 +110,6 @@ const UpdateProductModal = ({
     if (imageData) {
       // If the image is changed we send the old image to be deleted.
       if (isImgChanged) {
-
         body = {
           productAddress: productToUpdate.address,
           updates: {
@@ -121,7 +119,7 @@ const UpdateProductModal = ({
             userUniqueProductCode: values.userUniqueProductCode,
             oldImageKey: productToUpdate.imageKey,
           },
-        }
+        };
       } else {
         body = {
           productAddress: productToUpdate.address,
@@ -131,12 +129,15 @@ const UpdateProductModal = ({
             isActive: values.active,
             userUniqueProductCode: values.userUniqueProductCode,
           },
-        }
+        };
       }
-      window.LOQ.push(['ready', async LO => {
-        await LO.$internal.ready('events')
-        LO.events.track('Update Product')
-      }])
+      window.LOQ.push([
+        'ready',
+        async (LO) => {
+          await LO.$internal.ready('events');
+          LO.events.track('Update Product');
+        },
+      ]);
       TagManager.dataLayer({
         dataLayer: {
           event: 'update_product',
@@ -152,8 +153,7 @@ const UpdateProductModal = ({
     }
   };
 
-  const disabled =
-    isproductUpdating || isupdateImageSubmitting;
+  const disabled = isproductUpdating || isupdateImageSubmitting;
 
   const closeModal = () => {
     handleCancel();
@@ -175,12 +175,15 @@ const UpdateProductModal = ({
             onClick={formik.handleSubmit}
             disabled={disabled}
           >
-            {disabled ? <Spin /> : "Update Product"}
+            {disabled ? <Spin /> : 'Update Product'}
           </Button>
         </div>,
       ]}
     >
-      <h1 id="modal-title" className="text-center font-semibold text-lg text-primaryB">
+      <h1
+        id="modal-title"
+        className="text-center font-semibold text-lg text-primaryB"
+      >
         Edit Product
       </h1>
       <hr className="text-secondryD mt-3" />
@@ -194,7 +197,7 @@ const UpdateProductModal = ({
                     <img
                       alt="Product"
                       src={selectedImage}
-                      style={{ width: "100%", height: "100%" }}
+                      style={{ width: '100%', height: '100%' }}
                     />
                     <br />
                   </div>
@@ -204,11 +207,11 @@ const UpdateProductModal = ({
                 <Upload
                   onChange={(e) => {
                     setSelectedImage(URL.createObjectURL(e.file.originFileObj));
-                    formik.setFieldValue("image", e.file.originFileObj);
+                    formik.setFieldValue('image', e.file.originFileObj);
                     setIsImgChanged(true);
                   }}
-                  customRequest={() => { }}
-                  style={{ display: "none" }}
+                  customRequest={() => {}}
+                  style={{ display: 'none' }}
                   accept="image/png, image/jpeg"
                   maxCount={1}
                   showUploadList={false}
@@ -221,9 +224,7 @@ const UpdateProductModal = ({
 
               <div className="flex items-center">
                 <p className="mt-1 text-xs italic font-medium ">Note:</p>
-                <p className="mt-1 text-xs italic ml-1">
-                  use jpg, png format
-                </p>
+                <p className="mt-1 text-xs italic ml-1">use jpg, png format</p>
               </div>
               {formik.touched.image && formik.errors.image && (
                 <span className="text-error text-xs">
@@ -258,8 +259,8 @@ const UpdateProductModal = ({
                   name="category.name"
                   value={formik.values.category.name}
                   onChange={(value) => {
-                    formik.setFieldValue("category.name", value);
-                    formik.setFieldValue("subCategory.name", null);
+                    formik.setFieldValue('category.name', value);
+                    formik.setFieldValue('subCategory.name', null);
                   }}
                 >
                   {categorys.map((e, index) => (
@@ -268,10 +269,10 @@ const UpdateProductModal = ({
                     </Option>
                   ))}
                 </Select>
-                {getIn(formik.touched, "category.name") &&
-                  getIn(formik.errors, "category.name") && (
+                {getIn(formik.touched, 'category.name') &&
+                  getIn(formik.errors, 'category.name') && (
                     <span className="text-error text-xs">
-                      {getIn(formik.errors, "category.name")}
+                      {getIn(formik.errors, 'category.name')}
                     </span>
                   )}
               </Form.Item>
@@ -291,21 +292,23 @@ const UpdateProductModal = ({
                   loading={issubCategorysLoading}
                   value={formik.values.subCategory.name}
                   onChange={(value) => {
-                    formik.setFieldValue("subCategory.name", value);
+                    formik.setFieldValue('subCategory.name', value);
                   }}
                 >
                   {categorys.map((category) =>
-                    category.name === formik.values.category.name ? category.subCategories.map((e, index) => (
-                      <Option value={e.name} key={index}>
-                        {e.name}
-                      </Option>
-                    )) : null
+                    category.name === formik.values.category.name
+                      ? category.subCategories.map((e, index) => (
+                          <Option value={e.name} key={index}>
+                            {e.name}
+                          </Option>
+                        ))
+                      : null
                   )}
                 </Select>
-                {getIn(formik.touched, "subCategory.name") &&
-                  getIn(formik.errors, "subCategory.name") && (
+                {getIn(formik.touched, 'subCategory.name') &&
+                  getIn(formik.errors, 'subCategory.name') && (
                     <span className="text-error text-xs">
-                      {getIn(formik.errors, "subCategory.name")}
+                      {getIn(formik.errors, 'subCategory.name')}
                     </span>
                   )}
               </Form.Item>
@@ -348,10 +351,10 @@ const UpdateProductModal = ({
                     </Option>
                   ))}
                 </Select>
-                {getIn(formik.touched, "unitofmeasurement.name") &&
-                  getIn(formik.errors, "unitofmeasurement.name") && (
+                {getIn(formik.touched, 'unitofmeasurement.name') &&
+                  getIn(formik.errors, 'unitofmeasurement.name') && (
                     <span className="text-error text-xs">
-                      {getIn(formik.errors, "unitofmeasurement.name")}
+                      {getIn(formik.errors, 'unitofmeasurement.name')}
                     </span>
                   )}
               </Form.Item>
@@ -391,23 +394,23 @@ const UpdateProductModal = ({
               )}
             </Form.Item>
             <div className="flex justify-between mt-4 ">
-            <Form.Item label="Active" name="active" className="mt-4">
-              <Radio.Group
-                value={formik.values.active}
-                onChange={formik.handleChange}
-                name="active"
-              >
-                <Radio value={true}>Yes</Radio>
-                <Radio value={false}>No</Radio>
-              </Radio.Group>
+              <Form.Item label="Active" name="active" className="mt-4">
+                <Radio.Group
+                  value={formik.values.active}
+                  onChange={formik.handleChange}
+                  name="active"
+                >
+                  <Radio value={true}>Yes</Radio>
+                  <Radio value={false}>No</Radio>
+                </Radio.Group>
 
-              {formik.touched.active && formik.errors.active && (
-                <span className="text-error text-xs">
-                  {formik.errors.active}
-                </span>
-              )}
-            </Form.Item>
-            <Form.Item
+                {formik.touched.active && formik.errors.active && (
+                  <span className="text-error text-xs">
+                    {formik.errors.active}
+                  </span>
+                )}
+              </Form.Item>
+              <Form.Item
                 label="Unique Product Code"
                 name="userUniqueProductCode"
                 className="w-72"
@@ -419,13 +422,14 @@ const UpdateProductModal = ({
                   value={formik.values.userUniqueProductCode}
                   onChange={formik.handleChange}
                 />
-                {formik.touched.userUniqueProductCode && formik.errors.userUniqueProductCode && (
-                  <span className="text-error text-xs">
-                    {formik.errors.userUniqueProductCode}
-                  </span>
-                )}
+                {formik.touched.userUniqueProductCode &&
+                  formik.errors.userUniqueProductCode && (
+                    <span className="text-error text-xs">
+                      {formik.errors.userUniqueProductCode}
+                    </span>
+                  )}
               </Form.Item>
-              </div>
+            </div>
           </div>
         </div>
       </Form>

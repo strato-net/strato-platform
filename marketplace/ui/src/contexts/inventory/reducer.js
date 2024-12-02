@@ -1,4 +1,4 @@
-import { actionDescriptors } from "./actions";
+import { actionDescriptors } from './actions';
 
 const reducer = (state, action) => {
   switch (action.type) {
@@ -6,219 +6,219 @@ const reducer = (state, action) => {
       return {
         ...state,
         success: false,
-        message: null
+        message: null,
       };
     case actionDescriptors.setMessage:
       return {
         ...state,
         success: action.success,
-        message: action.message
+        message: action.message,
       };
     case actionDescriptors.createInventory:
       return {
         ...state,
-        isCreateInventorySubmitting: true
+        isCreateInventorySubmitting: true,
       };
     case actionDescriptors.createInventorySuccessful:
       return {
         ...state,
         inventory: action.payload,
-        isCreateInventorySubmitting: false
+        isCreateInventorySubmitting: false,
       };
     case actionDescriptors.createInventoryFailed:
       return {
         ...state,
         error: action.error,
-        isCreateInventorySubmitting: false
+        isCreateInventorySubmitting: false,
       };
     case actionDescriptors.fetchInventory:
       return {
         ...state,
-        isInventoriesLoading: true
+        isInventoriesLoading: true,
       };
     case actionDescriptors.fetchInventorySuccessful:
       return {
         ...state,
         inventories: action.payload.data,
         inventoriesTotal: action.payload.count,
-        isInventoriesLoading: false
+        isInventoriesLoading: false,
       };
     case actionDescriptors.fetchInventoryFailed:
       return {
         ...state,
         error: action.error,
-        isInventoriesLoading: false
+        isInventoriesLoading: false,
       };
     case actionDescriptors.fetchInventoryForUser:
       return {
         ...state,
-        isUserInventoriesLoading: true
+        isUserInventoriesLoading: true,
       };
     case actionDescriptors.fetchInventoryForUserSuccessful:
       return {
         ...state,
         userInventories: action.payload.data,
         userInventoriesTotal: action.payload.count,
-        isUserInventoriesLoading: false
+        isUserInventoriesLoading: false,
       };
     case actionDescriptors.fetchInventoryForUserFailed:
       return {
         ...state,
         error: action.error,
-        isUserInventoriesLoading: false
+        isUserInventoriesLoading: false,
       };
     case actionDescriptors.fetchInventorySearch:
       return {
         ...state,
-        isInventoriesLoading: true
+        isInventoriesLoading: true,
       };
     case actionDescriptors.fetchInventorySearchSuccessful:
       return {
         ...state,
         inventories: action.payload.data,
         inventoriesTotal: action.payload.count,
-        isInventoriesLoading: false
+        isInventoriesLoading: false,
       };
     case actionDescriptors.fetchInventorySearchFailed:
       return {
         ...state,
         error: action.error,
-        isInventoriesLoading: false
+        isInventoriesLoading: false,
       };
     case actionDescriptors.updateInventory:
       return {
         ...state,
-        isinventoryUpdating: true
+        isinventoryUpdating: true,
       };
     case actionDescriptors.updateInventorySuccessful:
       return {
         ...state,
         inventoryUpdateObject: action.payload,
-        isinventoryUpdating: false
+        isinventoryUpdating: false,
       };
     case actionDescriptors.updateInventoryFailed:
       return {
         ...state,
         error: action.error,
-        isinventoryUpdating: false
+        isinventoryUpdating: false,
       };
     case actionDescriptors.updateSale:
       return {
         ...state,
-        issaleUpdating: true
+        issaleUpdating: true,
       };
     case actionDescriptors.updateSaleSuccessful:
       return {
         ...state,
         saleUpdateObject: action.payload,
-        issaleUpdating: false
+        issaleUpdating: false,
       };
     case actionDescriptors.updateSaleFailed:
       return {
         ...state,
         error: action.error,
-        issaleUpdating: false
+        issaleUpdating: false,
       };
     case actionDescriptors.listInventory:
       return {
         ...state,
-        isListing: true
+        isListing: true,
       };
     case actionDescriptors.listInventorySuccessful:
       return {
         ...state,
         inventory: action.payload,
-        isListing: false
+        isListing: false,
       };
     case actionDescriptors.listInventoryFailed:
       return {
         ...state,
         error: action.error,
-        isListing: false
+        isListing: false,
       };
     case actionDescriptors.unlistInventory:
       return {
         ...state,
-        isUnlisting: true
+        isUnlisting: true,
       };
     case actionDescriptors.unlistInventorySuccessful:
       return {
         ...state,
         inventory: action.payload,
-        isUnlisting: false
+        isUnlisting: false,
       };
     case actionDescriptors.unlistInventoryFailed:
       return {
         ...state,
         error: action.error,
-        isUnlisting: false
+        isUnlisting: false,
       };
     case actionDescriptors.resellInventory:
       return {
         ...state,
-        isReselling: true
+        isReselling: true,
       };
     case actionDescriptors.resellInventorySuccessful:
       return {
         ...state,
         inventory: action.payload,
-        isReselling: false
+        isReselling: false,
       };
     case actionDescriptors.resellInventoryFailed:
       return {
         ...state,
         error: action.error,
-        isReselling: false
+        isReselling: false,
       };
     case actionDescriptors.fetchSupportedTokens:
       return {
         ...state,
-        isFetchingTokens: true
+        isFetchingTokens: true,
       };
     case actionDescriptors.fetchSupportedTokensSuccessful:
       return {
         ...state,
         supportedTokens: action.payload,
-        isFetchingTokens: false
+        isFetchingTokens: false,
       };
     case actionDescriptors.fetchSupportedTokensFailed:
       return {
         ...state,
         error: action.error,
-        isFetchingTokens: false
+        isFetchingTokens: false,
       };
     case actionDescriptors.bridgeInventory:
       return {
         ...state,
-        isBridging: true
+        isBridging: true,
       };
     case actionDescriptors.bridgeInventorySuccessful:
       return {
         ...state,
         inventory: action.payload,
-        isBridging: false
+        isBridging: false,
       };
     case actionDescriptors.bridgeInventoryFailed:
       return {
         ...state,
         error: action.error,
-        isBridging: false
+        isBridging: false,
       };
     case actionDescriptors.transferInventory:
       return {
         ...state,
-        isTransferring: true
+        isTransferring: true,
       };
     case actionDescriptors.transferInventorySuccessful:
       return {
         ...state,
-        isTransferring: false
+        isTransferring: false,
       };
     case actionDescriptors.transferInventoryFailed:
       return {
         ...state,
         error: action.error,
-        isTransferring: false
+        isTransferring: false,
       };
     case actionDescriptors.fetchItemTransfers:
       return {
@@ -241,36 +241,36 @@ const reducer = (state, action) => {
     case actionDescriptors.fetchInventoryOwnershipHistory:
       return {
         ...state,
-        isInventoryOwnershipHistoryLoading: true
+        isInventoryOwnershipHistoryLoading: true,
       };
     case actionDescriptors.fetchInventoryOwnershipHistorySuccessful:
       return {
         ...state,
         inventoryOwnershipHistory: action.payload,
-        isInventoryOwnershipHistoryLoading: false
+        isInventoryOwnershipHistoryLoading: false,
       };
     case actionDescriptors.fetchInventoryOwnershipHistoryFailed:
       return {
         ...state,
         error: action.error,
-        isInventoryOwnershipHistoryLoading: false
+        isInventoryOwnershipHistoryLoading: false,
       };
     case actionDescriptors.fetchInventoryDetail:
       return {
         ...state,
-        isInventoryDetailsLoading: true
+        isInventoryDetailsLoading: true,
       };
     case actionDescriptors.fetchInventoryDetailSuccessful:
       return {
         ...state,
         inventoryDetails: action.payload,
-        isInventoryDetailsLoading: false
+        isInventoryDetailsLoading: false,
       };
     case actionDescriptors.fetchInventoryDetailFailed:
       return {
         ...state,
         error: action.error,
-        isInventoryDetailsLoading: false
+        isInventoryDetailsLoading: false,
       };
     case actionDescriptors.uploadImage:
       return {
@@ -293,18 +293,18 @@ const reducer = (state, action) => {
       return {
         ...state,
         isCreateInventorySubmitting: true,
-      }
+      };
     case actionDescriptors.createItemSuccessful:
       return {
         ...state,
         isCreateInventorySubmitting: false,
-      }
+      };
     case actionDescriptors.createItemFailed:
       return {
         ...state,
         error: action.error,
         isCreateInventorySubmitting: false,
-      }
+      };
     case actionDescriptors.fetchPriceHistory:
       return {
         ...state,

@@ -1,119 +1,119 @@
 paths:
   /category/:
     get:
-      security:              
-        - bearerAuth: []                    
-      tags:               
-        - Category        
+      security:
+        - bearerAuth: []
+      tags:
+        - Category
       summary: Retrieve category
       produces:
-      - application/json
-      responses:         
+        - application/json
+      responses:
         200:
           description: Array of categorys
-    post:  
-      security:              
-        - bearerAuth: []                  
-      tags:               
-        - Category        
+    post:
+      security:
+        - bearerAuth: []
+      tags:
+        - Category
       summary: Create a category
       produces:
-      - application/json
-      requestBody:         
+        - application/json
+      requestBody:
         description: It enable user to create category
         required: true
         content:
-          'application/json': 
-            schema:       
-              $ref: '#/definitions/createCategory' 
-      responses:         
+          'application/json':
+            schema:
+              $ref: '#/definitions/createCategory'
+      responses:
         200:
           description: Object of create category
   /category/{address}/{chainId}:
-    get:                 
-      security:              
-        - bearerAuth: []   
-      tags:               
-        - Category        
+    get:
+      security:
+        - bearerAuth: []
+      tags:
+        - Category
       summary: Retrieve a category
       produces:
-      - application/json
-      parameters:         
-      - in: path          
-        name: address     
-        description: address to retrieve the category
-        required: true
-      - in: path          
-        name: chainId     
-        description: chainId corresponding to the address
-        required: true
-        schema:       
-          $ref: '#/definitions/fetchCategory' 
-      responses:         
+        - application/json
+      parameters:
+        - in: path
+          name: address
+          description: address to retrieve the category
+          required: true
+        - in: path
+          name: chainId
+          description: chainId corresponding to the address
+          required: true
+          schema:
+            $ref: '#/definitions/fetchCategory'
+      responses:
         200:
           description: Retrieve a category
   /category/update:
-    put:    
-      security:              
-        - bearerAuth: []                
-      tags:               
-        - Category        
+    put:
+      security:
+        - bearerAuth: []
+      tags:
+        - Category
       summary: Update a category
       produces:
-      - application/json
-      requestBody:         
+        - application/json
+      requestBody:
         description: It enable user to update a category
         required: true
         content:
           'application/json':
-            schema:       
-              $ref: '#/definitions/updateCategory' 
-      responses:         
+            schema:
+              $ref: '#/definitions/updateCategory'
+      responses:
         200:
           description: Retrieve a updated category
   /category/{address}/{chainId}/audit:
-    get:     
-      security:              
-        - bearerAuth: []               
-      tags:               
-        - Category        
+    get:
+      security:
+        - bearerAuth: []
+      tags:
+        - Category
       summary: Audit category
       produces:
-      - application/json
-      parameters:         
-      - in: path          
-        name: address     
-        description: address to retrieve the category
-        required: true
-      - in: path          
-        name: chainId     
-        description: chainId corresponding to the address
-        required: true
-        schema:       
-          $ref: '#/definitions/auditCategory' 
-      responses:         
+        - application/json
+      parameters:
+        - in: path
+          name: address
+          description: address to retrieve the category
+          required: true
+        - in: path
+          name: chainId
+          description: chainId corresponding to the address
+          required: true
+          schema:
+            $ref: '#/definitions/auditCategory'
+      responses:
         200:
           description: List of audit
   /category/transferOwnership:
-    post:              
-      security:              
-        - bearerAuth: []      
-      tags:               
-        - Category        
+    post:
+      security:
+        - bearerAuth: []
+      tags:
+        - Category
       summary: Transfer ownership
       produces:
-      - application/json
-      requestBody:         
+        - application/json
+      requestBody:
         description: It enable user to transfer ownership
         required: true
         content:
           'application/json':
-            schema:       
-              $ref: '#/definitions/transferOwnership' 
-      responses:         
+            schema:
+              $ref: '#/definitions/transferOwnership'
+      responses:
         200:
           description: indicates success of transfer ownership
-definitions:        
+definitions:
   fetchCategory:
     address:
       type: string

@@ -1,94 +1,95 @@
-
 .tiptap {
-    /* This helps the links appear as they should. They are being overwritten in the editor without this */
-    a {
-        color: #1677ff !important;
-        text-decoration: none !important;
-        background-color: transparent !important;
-        outline: none !important;
-        cursor: pointer !important;
-        transition: color 0.3s !important;
-        -webkit-text-decoration-skip: objects !important;
-    }
-  
-    h1, h2, h3, h4, h5, h6 {
-      line-height: 1.1;
-    }
-  
-    code {
-      background-color: rgba(97, 97, 97, 0.1);
-      color: #616161;
-    }
-  
-    pre {
-      background: #0D0D0D;
-      color: #FFF;
-      font-family: 'JetBrainsMono', monospace;
-      padding: 0.75rem 1rem;
-      border-radius: 0.5rem;
-  
-      code {
-        color: inherit;
-        padding: 0;
-        background: none;
-        font-size: 0.8rem;
-      }
-    }
-  
-    img {
-      max-width: 100%;
-      height: auto;
-    }
-  
-    hr {
-      border: none;
-      border-top: 2px solid rgba(13, 13, 13, 0.1);
-      margin: 2rem 0;
-    }
-  
+  /* This helps the links appear as they should. They are being overwritten in the editor without this */
+  a {
+    color: #1677ff !important;
+    text-decoration: none !important;
+    background-color: transparent !important;
+    outline: none !important;
+    cursor: pointer !important;
+    transition: color 0.3s !important;
+    -webkit-text-decoration-skip: objects !important;
   }
-  
-  .editor-container {
-    padding: 20px; /* Adjust padding as needed */
-    border: 1px solid #ccc; /* Optional: adds a border around the editor */
-    margin: auto; /* Center the editor in the page */
-    width: 80%; /* Adjust width as needed */
-    min-height: 400px; /* Adjust minimum height as needed */
+
+  h1,
+  h2,
+  h3,
+  h4,
+  h5,
+  h6 {
+    line-height: 1.1;
   }
-  
-  /* Additional style to increase the inner padding of the contenteditable area */
-  .ProseMirror {
-    padding: 20px; /* Inner padding */
-    min-height: 100%; /* Ensures the padding applies even when the editor is empty */
-    border: 1px solid #ccc;
+
+  code {
+    background-color: rgba(97, 97, 97, 0.1);
+    color: #616161;
   }
-  
-  .toolbar-color-picker {
-    position: relative;
-    display: inline-block;
-    margin: 0;
-  }
-  
-  
-  
-  .bubble-menu {
-    display: flex;
-    background-color: #0D0D0D;
-    padding: 0.2rem;
+
+  pre {
+    background: #0d0d0d;
+    color: #fff;
+    font-family: 'JetBrainsMono', monospace;
+    padding: 0.75rem 1rem;
     border-radius: 0.5rem;
-  
-    button {
-      border: none;
+
+    code {
+      color: inherit;
+      padding: 0;
       background: none;
-      color: #FFF;
-      font-size: 0.85rem;
-      font-weight: 500;
-      padding: 0 0.2rem;
-      opacity: 0.6;
-  
-      &:hover,
-      &.is-active {
-        opacity: 1;
-      }
+      font-size: 0.8rem;
     }
   }
+
+  img {
+    max-width: 100%;
+    height: auto;
+  }
+
+  hr {
+    border: none;
+    border-top: 2px solid rgba(13, 13, 13, 0.1);
+    margin: 2rem 0;
+  }
+}
+
+.editor-container {
+  padding: 20px; /* Adjust padding as needed */
+  border: 1px solid #ccc; /* Optional: adds a border around the editor */
+  margin: auto; /* Center the editor in the page */
+  width: 80%; /* Adjust width as needed */
+  min-height: 400px; /* Adjust minimum height as needed */
+}
+
+/* Additional style to increase the inner padding of the contenteditable area */
+.ProseMirror {
+  padding: 20px; /* Inner padding */
+  min-height: 100%; /* Ensures the padding applies even when the editor is empty */
+  border: 1px solid #ccc;
+}
+
+.toolbar-color-picker {
+  position: relative;
+  display: inline-block;
+  margin: 0;
+}
+
+.bubble-menu {
+  display: flex;
+  background-color: #0d0d0d;
+  padding: 0.2rem;
+  border-radius: 0.5rem;
+
+  button {
+    border: none;
+    background: none;
+    color: #fff;
+    font-size: 0.85rem;
+    font-weight: 500;
+    padding: 0 0.2rem;
+    opacity: 0.6;
+
+    &:hover,
+    &.is-active {
+      opacity: 1;
+    }
+  }
+}

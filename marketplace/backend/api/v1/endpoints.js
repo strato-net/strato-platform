@@ -2,7 +2,7 @@ export const Authentication = {
   prefix: '/authentication',
   callback: '/callback',
   logout: '/logout',
-}
+};
 
 export const IssuerStatus = {
   prefix: '/issuerstatus',
@@ -10,14 +10,14 @@ export const IssuerStatus = {
   authorizeIssuer: '/authorizeIssuer',
   deauthorizeIssuer: '/deauthorizeIssuer',
   admin: '/admin',
-}
+};
 
 export const Users = {
   prefix: '/users',
   me: '/me',
   get: '/:address',
   getAll: '',
-}
+};
 
 export const Category = {
   prefix: '/category',
@@ -25,7 +25,7 @@ export const Category = {
   getAll: '/',
   audit: '/:address/:chainId/audit',
   transferOwnership: '/transferOwnership',
-}
+};
 
 export const SubCategory = {
   prefix: '/subcategory',
@@ -35,7 +35,7 @@ export const SubCategory = {
   update: '/update',
   audit: '/:address/:chainId/audit',
   transferOwnership: '/transferOwnership',
-}
+};
 
 export const Product = {
   prefix: '/product',
@@ -47,7 +47,7 @@ export const Product = {
   delete: '/delete',
   // audit: '/:address/:chainId/audit',
   // transferOwnership: '/transferOwnership'
-}
+};
 
 export const Inventory = {
   prefix: '/inventory',
@@ -66,7 +66,7 @@ export const Inventory = {
   bridge: '/bridge',
   updateSale: '/updateSale',
   getPriceHistory: '/price/history',
-}
+};
 
 export const Redemption = {
   prefix: '/redemption',
@@ -75,14 +75,14 @@ export const Redemption = {
   getRedemptionServices: '/services',
   getOutgoingRedemptionRequests: '/outgoing',
   getIncomingRedemptionRequests: '/incoming',
-  close: '/close'
-}
+  close: '/close',
+};
 
 export const Transaction = {
   prefix: '/transaction',
   getUser: '/user',
   getGlobal: '/global',
-}
+};
 
 export const Item = {
   prefix: '/item',
@@ -94,68 +94,68 @@ export const Item = {
   audit: '/:address/:chainId/audit',
   transferOwnership: '/transferOwnership',
   transfers: '/transfers',
-  getRawMaterials: '/rawmaterials'
-}
+  getRawMaterials: '/rawmaterials',
+};
 
 export const Art = {
   prefix: '/art',
   getAll: '/',
-  create: '/'
-}
+  create: '/',
+};
 
 export const Tokens = {
   prefix: '/tokens',
   getAll: '/',
-  create: '/'
-}
+  create: '/',
+};
 
 export const STRATS = {
   prefix: '/STRATSTokens',
   getAll: '/',
-  create: '/'
-}
+  create: '/',
+};
 
 export const CarbonOffset = {
   prefix: '/carbonOffset',
   getAll: '/',
-  create: '/'
-}
+  create: '/',
+};
 
 export const Metals = {
   prefix: '/metals',
   getAll: '/',
-  create: '/'
-}
+  create: '/',
+};
 
 export const Spirits = {
   prefix: '/spirits',
   getAll: '/',
-  create: '/'
-}
+  create: '/',
+};
 
 export const Clothing = {
   prefix: '/clothing',
   getAll: '/',
-  create: '/'
-}
+  create: '/',
+};
 
 export const Membership = {
   prefix: '/membership',
   getAll: '/',
-  create: '/'
-}
+  create: '/',
+};
 
 export const CarbonDAO = {
   prefix: '/carbonDAO',
   getAll: '/',
-  create: '/'
-}
+  create: '/',
+};
 
 export const Collectibles = {
   prefix: '/collectibles',
   getAll: '/',
-  create: '/'
-}
+  create: '/',
+};
 
 export const Order = {
   prefix: '/order',
@@ -171,8 +171,8 @@ export const Order = {
   executeSale: '/closeSale',
   waitForOrderEvent: '/wait/event',
   updateOrderComment: '/updateComment',
-  export: '/exportOrders'
-}
+  export: '/exportOrders',
+};
 
 export const Marketplace = {
   prefix: '/marketplace',
@@ -183,16 +183,16 @@ export const Marketplace = {
   transferStrats: '/strats/transfer',
   getStratsBalance: '/strats',
   getStratsAddress: '/strats/address',
-  getStratsTransactionHistory: '/strats/history'
-}
+  getStratsTransactionHistory: '/strats/history',
+};
 
 export const PaymentService = {
   prefix: '/payment',
   getAll: '/',
   getNotOnboarded: '/onboarding',
-}
+};
 
 export const UserActivity = {
   prefix: '/userActivity',
   getAll: '/',
-}
+};

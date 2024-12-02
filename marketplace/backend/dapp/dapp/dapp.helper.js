@@ -2,7 +2,7 @@ const fs = require('fs');
 const path = require('path');
 
 function replaceInFiles(directory, searchString, replacement) {
-  fs.readdirSync(directory).forEach(file => {
+  fs.readdirSync(directory).forEach((file) => {
     const filePath = path.join(directory, file);
     const stats = fs.statSync(filePath);
     if (stats.isDirectory()) {

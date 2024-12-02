@@ -121,7 +121,7 @@ class StripeServiceController {
     try {
       // Validation
       StripeServiceController.validateStripeCheckoutArgs(req.query);
-      const { checkoutHash, redirectUrl, email } = req.query;
+      const { checkoutHash, redirectUrl } = req.query;
 
       // Check if the payment session already exists for the token
       const paymentDetails = await getStripePaymentFromToken(checkoutHash);
@@ -162,7 +162,7 @@ class StripeServiceController {
       }
 
       // Create checkout session and store in DB
-      const session = await stripeService.initiatePayment(redirectUrl, checkoutHash, orderDetails, email, sellerAccount);
+      const session = await stripeService.initiatePayment(redirectUrl, checkoutHash, orderDetails, sellerAccount);
       const insertResult = await insertStripePayment(checkoutHash, session.id, sellerCommonName);
 
       // Redirect to Stripe payment session
@@ -177,7 +177,7 @@ class StripeServiceController {
     try {
       // Validation
       StripeServiceController.validateStripeCheckoutConfirmArgs(req.query);
-      const { checkoutHash, redirectUrl, email } = req.query;
+      const { checkoutHash, redirectUrl } = req.query;
 
       // Retrieve the session
       const paymentDetails = await getStripePaymentFromToken(checkoutHash);
@@ -215,7 +215,7 @@ class StripeServiceController {
           const orderString = prepareOrderData(checkoutEvent, assetData);
           const htmlContents = buildConcatenatedOrderString(checkoutEvent[0].purchasersCommonName, orderString, assetData);
       
-          await sendEmail(email, "Your Order Confirmation", htmlContents);
+          await sendEmail(checkoutEvent[0].purchasersCommonName, "Your Order Confirmation", htmlContents);
           console.log("*Buyer placed order*");
         } catch (emailError) {
           console.error("Error sending email confirmation for credit card:", emailError);
@@ -251,7 +251,7 @@ class StripeServiceController {
           const orderString = prepareOrderData(checkoutEvent, assetData);
           const htmlContents = buildConcatenatedOrderString(checkoutEvent[0].purchasersCommonName, orderString, assetData);
       
-          await sendEmail(email, "Your Order Confirmation", htmlContents);
+          await sendEmail(checkoutEvent[0].purchasersCommonName, "Your Order Confirmation", htmlContents);
           console.log("*Buyer placed order*");
         } catch (emailError) {
           console.error("Error sending email confirmation for ACH:", emailError);
@@ -328,10 +328,20 @@ class StripeServiceController {
               createdDate: Math.floor(Date.now() / 1000),
               comments: PAYMENT_RECEIVED_MESSAGE,
             } 
-            const returnStatus = await completeOrder(STRIPE_CONTRACT_ADDRESS, callArgs);
+            try {
+              const returnStatus = await completeOrder(STRIPE_CONTRACT_ADDRESS, callArgs);
+            } catch (err) {
+              // this is left empty without any logging because it will flood the payment server with useless
+              // error logs
+            }
 
             // Update payment status in DB
-            const updateResult = await updateStripePayment(p.orderhash, 'PAID');
+            try {
+              const updateResult = await updateStripePayment(p.orderhash, 'PAID');
+            } catch (err) {
+              // this is left empty without any logging because it will flood the payment server with useless
+              // error logs
+            }
             statuses[p.orderhash] = PAYMENT_STATUS['PAID'];
           }
           else{
@@ -423,7 +433,6 @@ class StripeServiceController {
     const stripeCheckoutSchema = Joi.object({
       checkoutHash: Joi.string().required(),
       redirectUrl: Joi.string().required(),
-      email: Joi.string().required(),
     });
 
     const validation = stripeCheckoutSchema.validate(args);
@@ -437,7 +446,6 @@ class StripeServiceController {
     const stripeCheckoutConfirmSchema = Joi.object({
       checkoutHash: Joi.string().required(),
       redirectUrl: Joi.string().required(),
-      email: Joi.string().required(),
     });
 
     const validation = stripeCheckoutConfirmSchema.validate(args);

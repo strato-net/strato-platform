@@ -12,8 +12,6 @@ import qualified SolidVM.Solidity.StaticAnalysis.Contracts.ParentConstructors as
 import qualified SolidVM.Solidity.StaticAnalysis.Expressions.BooleanLiterals as BooleanLiterals
 import qualified SolidVM.Solidity.StaticAnalysis.Expressions.DivideBeforeMultiply as DivideBeforeMultiply
 import qualified SolidVM.Solidity.StaticAnalysis.Functions.ConstantFunctions as ConstantFunctions
-import qualified SolidVM.Solidity.StaticAnalysis.Functions.Unimplemented.Continue as Continue
-import qualified SolidVM.Solidity.StaticAnalysis.Functions.Unimplemented.Modifiers as Modifiers
 import qualified SolidVM.Solidity.StaticAnalysis.Pragmas.IncorrectSolidityVersion as IncorrectSolidityVersion
 import qualified SolidVM.Solidity.StaticAnalysis.Statements.StateVariableShadowing as StateVariableShadowing
 import qualified SolidVM.Solidity.StaticAnalysis.Statements.UninitializedLocalVariables as UninitializedLocalVariables
@@ -31,8 +29,6 @@ parserDetectors =
 compilerWarningDetectors :: [CompilerDetector]
 compilerWarningDetectors =
   [ Trivial.detector,
-    Continue.detector,
-    Modifiers.detector,
     ParentConstructors.detector,
     BooleanLiterals.detector,
     DivideBeforeMultiply.detector,

@@ -1,17 +1,17 @@
-import { util, rest, importer } from "/blockapps-rest-plus";
-import config from "/load.config";
-import RestStatus from "http-status-codes";
+import { util, rest, importer } from '/blockapps-rest-plus';
+import config from '/load.config';
+import RestStatus from 'http-status-codes';
 import {
   setSearchQueryOptions,
   searchOne,
   searchAll,
   searchAllWithQueryArgs,
-  setSearchQueryOptionsPrime
-} from "/helpers/utils";
-import dayjs from "dayjs";
-import constants from "../../helpers/constants";
+  setSearchQueryOptionsPrime,
+} from '/helpers/utils';
+import dayjs from 'dayjs';
+import constants from '../../helpers/constants';
 
-const contractName = "Order";
+const contractName = 'Order';
 const contractFilename = `${util.cwd}/dapp/orders/contracts/Order.sol`;
 
 /**
@@ -33,7 +33,7 @@ async function uploadContract(user, _constructorArgs, options) {
   let error = [];
 
   if (error.length) {
-    throw new Error(error.join("\n"));
+    throw new Error(error.join('\n'));
   }
 
   const copyOfOptions = {
@@ -42,7 +42,7 @@ async function uploadContract(user, _constructorArgs, options) {
   };
 
   const contract = await rest.createContract(user, contractArgs, copyOfOptions);
-  contract.src = "removed";
+  contract.src = 'removed';
 
   return bind(user, contract, copyOfOptions);
 }
@@ -59,22 +59,21 @@ async function uploadContract(user, _constructorArgs, options) {
  * @param args - Contract state
  */
 
-
 function marshalIn(_args) {
   const defaultArgs = {
-    orderId: "",
-    buyerOrganization: "",
-    sellerOrganization: "",
+    orderId: '',
+    buyerOrganization: '',
+    sellerOrganization: '',
     orderDate: 0,
     orderTotal: 0,
     orderShippingCharges: 0,
     status: 1,
     amountPaid: 0,
-    buyerComments: "",
-    sellerComments: "",
+    buyerComments: '',
+    sellerComments: '',
     createdDate: 0,
-    paymentSessionId: "",
-    shippingAddress: 0
+    paymentSessionId: '',
+    shippingAddress: 0,
   };
 
   const args = {
@@ -171,13 +170,13 @@ async function get(user, args, options) {
 
   if (address) {
     const searchArgs = setSearchQueryOptions(restArgs, {
-      key: "address",
+      key: 'address',
       value: address,
     });
     order = await searchOne(contractName, searchArgs, options, user);
   } else {
     const searchArgs = setSearchQueryOptions(restArgs, {
-      key: "uniqueOrderID",
+      key: 'uniqueOrderID',
       value: uniqueOrderID,
     });
     order = await searchOne(contractName, searchArgs, options, user);
@@ -202,19 +201,22 @@ async function getAll(admin, args = {}, options) {
   const queryArgs = await searchAllWithQueryArgs(
     contractName,
     {
-    ...args,
-    limit: undefined,
-    offset: 0,
-    order: undefined,
-    queryOptions: {
-      select: "count",
-      }
+      ...args,
+      limit: undefined,
+      offset: 0,
+      order: undefined,
+      queryOptions: {
+        select: 'count',
+      },
     },
     options,
     admin
   );
 
-  return { orders: orders.map((order) => marshalOut(order)), total: queryArgs[0].count}
+  return {
+    orders: orders.map((order) => marshalOut(order)),
+    total: queryArgs[0].count,
+  };
 }
 
 /**
@@ -236,12 +238,12 @@ async function transferOwnership(user, contract, options, newOwner) {
 
   const callArgs = {
     contract,
-    method: "transferOwnership",
+    method: 'transferOwnership',
     args: util.usc({ addr: newOwner }), // could be transferOwnershipDate
   };
   const transferStatus = await rest.call(user, callArgs, options);
 
-  console.log("transferStatus", transferStatus);
+  console.log('transferStatus', transferStatus);
   console.log(parseInt(transferStatus, 10));
   console.log(RestStatus.OK);
   if (parseInt(transferStatus, 10) !== RestStatus.OK) {

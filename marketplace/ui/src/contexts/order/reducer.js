@@ -1,4 +1,4 @@
-import { actionDescriptors } from "./actions";
+import { actionDescriptors } from './actions';
 
 const reducer = (state, action) => {
   switch (action.type) {
@@ -118,21 +118,21 @@ const reducer = (state, action) => {
       };
     case actionDescriptors.fetchSaleQuantity:
       return {
-        ...state, 
+        ...state,
         saleQuantityLoading: true,
       };
-      case actionDescriptors.fetchSaleQuantitySuccessful:
-        return {
-          ...state,
-          saleQuantity: action.payload,
-          saleQuantityLoading: false,
-        };
-      case actionDescriptors.fetchSaleQuantityFailed:
-        return {
-          ...state, 
-          error: action.error,
-          saleQuantityLoading: false,
-        };
+    case actionDescriptors.fetchSaleQuantitySuccessful:
+      return {
+        ...state,
+        saleQuantity: action.payload,
+        saleQuantityLoading: false,
+      };
+    case actionDescriptors.fetchSaleQuantityFailed:
+      return {
+        ...state,
+        error: action.error,
+        saleQuantityLoading: false,
+      };
     case actionDescriptors.fetchOrderSold:
       return {
         ...state,
@@ -189,50 +189,50 @@ const reducer = (state, action) => {
       return {
         ...state,
         isCreateOrderSubmitting: true,
-      }
+      };
     case actionDescriptors.executeSaleSuccessful:
       return {
         ...state,
         isCreateOrderSubmitting: false,
-      }
+      };
     case actionDescriptors.executeSaleFailed:
       return {
         ...state,
         error: action.error,
         isCreateOrderSubmitting: false,
-      }
-      case actionDescriptors.waitForOrderEvent:
-        return {
-          ...state,
-          isOrderEventLoading: true,
-        }
-      case actionDescriptors.waitForOrderEventSuccessful:
-        return {
-          ...state,
-          isOrderEventLoading: false,
-        }
-      case actionDescriptors.waitForOrderEventFailed:
-        return {
-          ...state,
-          error: action.error,
-          isOrderEventLoading: false,
-        }      
+      };
+    case actionDescriptors.waitForOrderEvent:
+      return {
+        ...state,
+        isOrderEventLoading: true,
+      };
+    case actionDescriptors.waitForOrderEventSuccessful:
+      return {
+        ...state,
+        isOrderEventLoading: false,
+      };
+    case actionDescriptors.waitForOrderEventFailed:
+      return {
+        ...state,
+        error: action.error,
+        isOrderEventLoading: false,
+      };
     case actionDescriptors.updateOrderComment:
       return {
         ...state,
         isUpdatingOrderComment: true,
-      }
+      };
     case actionDescriptors.updateOrderCommentSuccessful:
       return {
         ...state,
         isUpdatingOrderComment: false,
-      }
+      };
     case actionDescriptors.updateOrderCommentFailed:
       return {
         ...state,
         error: action.error,
         isUpdatingOrderComment: false,
-      }
+      };
     default:
       throw new Error(`Unhandled action: '${action.type}'`);
   }

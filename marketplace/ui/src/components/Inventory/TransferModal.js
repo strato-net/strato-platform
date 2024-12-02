@@ -1,26 +1,26 @@
-import { Button, Select, InputNumber, Modal, Table, notification } from "antd";
-import { useEffect, useState } from "react";
-import { actions } from "../../contexts/inventory/actions";
-import { actions as marketplaceActions } from "../../contexts/marketplace/actions";
-import { actions as userActions } from "../../contexts/users/actions";
+import { Button, Select, InputNumber, Modal, Table, notification } from 'antd';
+import { useEffect, useState } from 'react';
+import { actions } from '../../contexts/inventory/actions';
+import { actions as marketplaceActions } from '../../contexts/marketplace/actions';
+import { actions as userActions } from '../../contexts/users/actions';
 import {
   useInventoryDispatch,
   useInventoryState,
-} from "../../contexts/inventory";
+} from '../../contexts/inventory';
 import {
   useMarketplaceDispatch,
   useMarketplaceState,
-} from "../../contexts/marketplace";
-import { useUsersDispatch, useUsersState } from "../../contexts/users";
-import { useAuthenticateState } from "../../contexts/authentication";
-import { SearchOutlined, DeleteOutlined } from "@ant-design/icons";
-import { OLD_SADDOG_ORIGIN_ADDRESS } from "../../helpers/constants";
+} from '../../contexts/marketplace';
+import { useUsersDispatch, useUsersState } from '../../contexts/users';
+import { useAuthenticateState } from '../../contexts/authentication';
+import { SearchOutlined, DeleteOutlined } from '@ant-design/icons';
+import { OLD_SADDOG_ORIGIN_ADDRESS } from '../../helpers/constants';
 
 const TransferModal = ({
   open,
   handleCancel,
   inventory,
-  categoryName = "",
+  categoryName = '',
   limit = 0,
   offset = 0,
 }) => {
@@ -43,7 +43,7 @@ const TransferModal = ({
   const [canRemoveRow, setCanRemoveRow] = useState(false);
   const quantityIsDecimal =
     inventory.data.quantityIsDecimal &&
-    inventory.data.quantityIsDecimal === "True";
+    inventory.data.quantityIsDecimal === 'True';
   const [transfers, setTransfers] = useState([
     {
       id: 1,
@@ -70,9 +70,9 @@ const TransferModal = ({
       },
     ]);
     setTimeout(() => {
-      const scrollRow = document.querySelector(".scroll-row");
+      const scrollRow = document.querySelector('.scroll-row');
       if (scrollRow) {
-        scrollRow.scrollIntoView({ behavior: "smooth", block: "start" });
+        scrollRow.scrollIntoView({ behavior: 'smooth', block: 'start' });
       }
     }, 0);
   };
@@ -88,9 +88,9 @@ const TransferModal = ({
       }));
     });
     setTimeout(() => {
-      const scrollRow = document.querySelector(".scroll-row");
+      const scrollRow = document.querySelector('.scroll-row');
       if (scrollRow) {
-        scrollRow.scrollIntoView({ behavior: "smooth", block: "start" });
+        scrollRow.scrollIntoView({ behavior: 'smooth', block: 'start' });
       }
     }, 0);
   };
@@ -107,7 +107,7 @@ const TransferModal = ({
   const usersList = users
     .filter((record) =>
       isBurner
-        ? record.commonName.toLowerCase() === "burner"
+        ? record.commonName.toLowerCase() === 'burner'
         : user.commonName !== record.commonName
     )
     .map((record) => ({
@@ -177,7 +177,7 @@ const TransferModal = ({
 
   // Helper function to handle price change
   const handlePriceChange = (id, value) => {
-    const stringValue = value ? value.toString() : "";
+    const stringValue = value ? value.toString() : '';
     if (!/^\d+(\.\d{0,2})?$/.test(stringValue)) return;
 
     setTransfers((transfers) => {
@@ -191,7 +191,7 @@ const TransferModal = ({
   const handleRecipientSelect = (id, value) => {
     setTransfers((transfers) => {
       const user = filteredUsersList.find((item) => item.value === value);
-      const recipientCommonName = user ? user.label.split("-")[0].trim() : "";
+      const recipientCommonName = user ? user.label.split('-')[0].trim() : '';
 
       return transfers.map((transfer) =>
         transfer.id === id
@@ -229,9 +229,9 @@ const TransferModal = ({
   // Columns definition
   const columns = [
     {
-      title: "Quantity Available",
-      dataIndex: "quantity",
-      align: "center",
+      title: 'Quantity Available',
+      dataIndex: 'quantity',
+      align: 'center',
       width: 175,
       render: (_, record, index) => {
         // Calculate the quantity available for each row
@@ -245,8 +245,8 @@ const TransferModal = ({
       },
     },
     {
-      title: "Set Quantity",
-      align: "center",
+      title: 'Set Quantity',
+      align: 'center',
       render: (record, _, index) => (
         <InputNumber
           value={record.quantity}
@@ -271,7 +271,7 @@ const TransferModal = ({
     },
     {
       title: <span className="whitespace-nowrap">Unit Price ($)</span>,
-      align: "center",
+      align: 'center',
       render: (record, _, index) => (
         <InputNumber
           value={record.price}
@@ -283,8 +283,8 @@ const TransferModal = ({
       ),
     },
     {
-      title: "Select Recipient",
-      align: "center",
+      title: 'Select Recipient',
+      align: 'center',
       render: (record, _, index) => (
         <Select
           className="transfer_modal w-[390px]"
@@ -295,7 +295,7 @@ const TransferModal = ({
           options={filteredUsersList}
           optionFilterProp="value"
           filterOption={(input, option) =>
-            (option?.label ?? "").toLowerCase().includes(input.toLowerCase())
+            (option?.label ?? '').toLowerCase().includes(input.toLowerCase())
           }
           open={record.openDropdown}
           suffixIcon={<SearchOutlined />}
@@ -329,6 +329,7 @@ const TransferModal = ({
       senderCommonName: user.commonName,
       recipientCommonName: transfer.recipientCommonName,
       itemName,
+      isDecimal: quantityIsDecimal || false,
     }));
 
     isDone = await actions.transferInventory(inventoryDispatch, body);
@@ -337,7 +338,7 @@ const TransferModal = ({
         inventoryDispatch,
         limit,
         offset,
-        "",
+        '',
         categoryName
       );
       await actions.fetchInventoryForUser(inventoryDispatch, user.commonName);
@@ -385,13 +386,13 @@ const TransferModal = ({
       <div className="head hidden md:block">
         <Table
           rowClassName={(record, index) =>
-            index === transfers.length - 1 ? "scroll-row" : ""
+            index === transfers.length - 1 ? 'scroll-row' : ''
           }
           columns={columns}
           dataSource={transfers}
           pagination={false}
           scroll={{
-            x: "max-content",
+            x: 'max-content',
             y: 300,
           }}
         />
@@ -400,7 +401,7 @@ const TransferModal = ({
       {/* Mobile View */}
       <div className="flex flex-col gap-[18px] md:hidden mt-5">
         <div>
-          {" "}
+          {' '}
           <p className="text-[#202020] font-medium text-sm">
             Quantity Available
           </p>
@@ -455,7 +456,7 @@ const TransferModal = ({
             options={filteredUsersList}
             optionFilterProp="value"
             filterOption={(input, option) =>
-              (option?.label ?? "").toLowerCase().includes(input.toLowerCase())
+              (option?.label ?? '').toLowerCase().includes(input.toLowerCase())
             }
             open={mobileTransfer.openDropdown}
             suffixIcon={<SearchOutlined />}
@@ -467,7 +468,7 @@ const TransferModal = ({
         </div>
       </div>
       {contextHolder}
-      {marketplaceMsg && marketplaceToast("bottom")}
+      {marketplaceMsg && marketplaceToast('bottom')}
     </Modal>
   );
 };

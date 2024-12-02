@@ -1,8 +1,8 @@
-import express from "express";
-import SubCategoryController from "./subCategory.controller";
-import { SubCategory } from "../endpoints";
-import authHandler from "../../middleware/authHandler";
-import loadDapp from "../../middleware/loadDappHandler";
+import express from 'express';
+import SubCategoryController from './subCategory.controller';
+import { SubCategory } from '../endpoints';
+import authHandler from '../../middleware/authHandler';
+import loadDapp from '../../middleware/loadDappHandler';
 const router = express.Router();
 
 router.get(
@@ -31,6 +31,6 @@ router.put(
   authHandler.authorizeRequest(),
   loadDapp,
   SubCategoryController.update
-)
+);
 
 export default router;

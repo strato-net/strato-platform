@@ -1,5 +1,5 @@
-import React, { createContext, useContext, useReducer } from "react";
-import reducer from "./reducer";
+import React, { createContext, useContext, useReducer } from 'react';
+import reducer from './reducer';
 
 const OrderStateContext = createContext();
 const OrderDispatchContext = createContext();
@@ -8,7 +8,7 @@ const OrdersProvider = ({ children }) => {
   const initialState = {
     order: null,
     isCreateOrderSubmitting: false,
-    payment:null,
+    payment: null,
     isCreatePaymentSubmitting: false,
     orders: [],
     orderSoldTotal: 10,

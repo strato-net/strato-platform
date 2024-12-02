@@ -1,5 +1,5 @@
 const createUserArgs = function (accountAddress, uid, role = 1) {
-  const username = `User_${uid}`
+  const username = `User_${uid}`;
 
   // function User(address _account, string _username)
   const args = {
@@ -7,8 +7,6 @@ const createUserArgs = function (accountAddress, uid, role = 1) {
     username: username,
   };
   return args;
-}
+};
 
-export {
-  createUserArgs
-}
+export { createUserArgs };
