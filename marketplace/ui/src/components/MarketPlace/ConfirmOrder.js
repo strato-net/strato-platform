@@ -200,7 +200,6 @@ const ConfirmOrder = ({ paymentServices = [], data, columns }) => {
       orderTotal: total,
       tax: tax,
       user: user.commonName,
-      email: user.email,
       htmlContents: htmlContents,
     };
 
@@ -234,7 +233,7 @@ const ConfirmOrder = ({ paymentServices = [], data, columns }) => {
         checkoutRoute &&
         checkoutRoute !== ''
       ) {
-        const url = `${serviceURL}${checkoutRoute}?email=${encodeURIComponent(user.email)}&checkoutHash=${checkoutHash}&redirectUrl=${window.location.protocol}//${window.location.host}/order/status`;
+        const url = `${serviceURL}${checkoutRoute}?checkoutHash=${checkoutHash}&redirectUrl=${window.location.protocol}//${window.location.host}/order/status`;
         window.location.replace(url);
       } else {
         window.location.replace(
