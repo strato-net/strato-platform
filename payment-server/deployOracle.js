@@ -55,6 +55,7 @@ describe("Payment Server - deploy contracts", function () {
   let token
 
   let silverOracle
+  let goldOracle
 
   before(async () => {
     assert.isDefined(
