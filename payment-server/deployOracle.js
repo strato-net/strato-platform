@@ -9,8 +9,8 @@ import { replaceInFiles } from './helpers/replaceInFiles.js';
 const contractDir = config.contractDirPath || '/usr/src/payment-server/dapp/mercata-base-contracts/Templates';
 const assetsDir = config.assetsDirPath || '/usr/src/payment-server/dapp/items/contracts';
 
-async function uploadContract(token, location, type, args) {
-  const contractName = `${location}${type}Service`;
+async function uploadContract(token, type, args) {
+  const contractName = `SimpleOracleService`;
   const filename = `${contractDir}/${type}s/${contractName}.sol`
   const source = await importer.combine(filename);
   const contractArgs = {
@@ -90,14 +90,20 @@ describe("Payment Server - deploy contracts", function () {
 
   it('Deploy Silver Oracle', async () => {
     const silverOracleName = config.silverOracle.name;
-    silverOracle = await uploadContract(token, 'Silver', 'Oracle', { name: silverOracleName })
+    silverOracle = await uploadContract(token, 'Oracle', { name: silverOracleName })
+  })
+
+  it('Deploy Gold Oracle', async () => {
+    const goldOracleName = config.goldOracle.name;
+    goldOracle = await uploadContract(token, 'Oracle', { name: goldOracleName })
   })
 
   // Create oracle_deploy.yaml
   it('Create oracle_deploy.yaml', async () => {
     const deployArgs = {
       deployFilePath: `${config.configDirPath}/oracle_deploy.yaml`,
-      silverOracle
+      silverOracle,
+      goldOracle
     }
     const deployment = deploy(deployArgs, config)
     assert.isDefined(deployment)
