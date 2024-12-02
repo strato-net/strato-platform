@@ -8,21 +8,21 @@ const router = express.Router();
 
 router.get(
   Reserve.get,
-  authHandler.authorizeRequest(),
+  authHandler.authorizeRequest(true),
   loadDapp,
   ReserveController.get
 );
 
 router.get(
   Reserve.getAll,
-  authHandler.authorizeRequest(),
+  authHandler.authorizeRequest(true),
   loadDapp,
   ReserveController.getAll
 );
 
 router.get(
   Reserve.oraclePrice,
-  authHandler.authorizeRequest(),
+  authHandler.authorizeRequest(true),
   loadDapp,
   ReserveController.oraclePrice
 );
