@@ -518,13 +518,13 @@ const HeaderComponent = ({
           }}
           items={navItems}
         />
-        <Tooltip placement='bottom' title={'Stake'}>
+        <Tooltip placement="bottom" title={'Stake'}>
           <Button
             type="primary"
-            className="w-20 rounded-full hidden md:block"
+            className="font-semibold hidden md:block"
             onClick={() => navigate(routes.MyWalletStakeable.url)}
           >
-            <RiseOutlined />
+            <RiseOutlined /> Stake
           </Button>
         </Tooltip>
         <Space size="large" className="!gap-0 md:!gap-4 mr-0 -ml-3">
