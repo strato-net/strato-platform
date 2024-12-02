@@ -99,6 +99,7 @@ const Inventory = ({ user }) => {
     isReservesLoading,
     reserves,
   } = useInventoryState();
+  console.log('reserves', reserves);
   const {
     paymentServices,
     arePaymentServicesLoading,
@@ -169,7 +170,7 @@ const Inventory = ({ user }) => {
           offset,
           debouncedSearchTerm,
           category && category !== 'All' ? category : undefined,
-          queryParams.get('st') === 'true' ? reserves[0].assetRootAddress : ''
+          queryParams.get('st') === 'true' ? reserves.map(reserve => reserve.assetRootAddress) : ''
         );
       } else {
         actions.fetchInventory(
@@ -178,7 +179,7 @@ const Inventory = ({ user }) => {
           offset,
           debouncedSearchTerm,
           category && category !== 'All' ? category : undefined,
-          queryParams.get('st') === 'true' ? reserves[0].assetRootAddress : ''
+          queryParams.get('st') === 'true' ? reserves.map(reserve => reserve.assetRootAddress) : ''
         );
       }
       setShowStakeable(queryParams.get('st'))

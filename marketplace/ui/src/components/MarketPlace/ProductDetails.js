@@ -121,9 +121,12 @@ const ProductDetails = ({ user, users }) => {
     inventoryDetails?.maxStratsLoanAmount &&
     inventoryDetails?.maxStratsLoanAmount > 0;
   const isStakeable =
-    inventoryDetails?.root &&
+    inventoryDetails.root &&
     reserves &&
-    inventoryDetails?.root === reserves[0]?.assetRootAddress;
+    reserves.length > 0 &&
+    reserves.some(
+      (reserve) => inventoryDetails.root === reserve.assetRootAddress
+    );
 
   let isCalledFromInventory = false;
   if (state !== null && state !== undefined) {
