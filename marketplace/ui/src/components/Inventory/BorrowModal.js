@@ -48,7 +48,6 @@ const BorrowModal = ({
       inventoryActions.getOracle(inventoryDispatch, reserves[0].oracle);
     }
   }, [resAddress]);
-  console.log('maxStratsLoanAmount: ', inventory?.maxStratsLoanAmount);
   const dataForItems = [
     {
       label: `Quantity to Collateralize`,

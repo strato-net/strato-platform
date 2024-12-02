@@ -304,14 +304,14 @@ const ProductDetails = ({ user, users }) => {
   };
 
   const subtract = () => {
-    if (!isStakeable) {
+    if (!isStakeable || !ownerSameAsUser()) {
       const value = Math.max(qty - 1, 1);
       setQty(value);
     }
   };
 
   const add = () => {
-    if (qty + 1 <= availableQuantity && !isStakeable) {
+    if (qty + 1 <= availableQuantity && (!isStakeable || !ownerSameAsUser())) {
       let value = qty + 1;
       setQty(value);
     } else {
@@ -635,7 +635,7 @@ const ProductDetails = ({ user, users }) => {
                     </Text>
                   </div>
                 </div>
-                {!isStakeable && (
+                {(!isStakeable || !ownerSameAsUser()) && (
                   <div className=" pt-4 lg:pt-[22px]">
                     <Paragraph
                       level={4}
@@ -695,7 +695,7 @@ const ProductDetails = ({ user, users }) => {
                     <div
                       onClick={subtract}
                       className={`h-9 w-11 md:h-10 md:w-12 lg:h-[46px] lg:w-[52px] rounded-lg flex justify-center items-center border border-[#00000029] text-center cursor-pointer ${
-                        qty > 1 && !isStakeable
+                        qty > 1 && (!isStakeable || !ownerSameAsUser())
                           ? ''
                           : 'cursor-not-allowed opacity-50'
                       }`}
@@ -708,9 +708,9 @@ const ProductDetails = ({ user, users }) => {
                       className="w-full md:w-[280px] h-9 md:h-10 lg:h-[46px] border text-[#6A6A6A] border-[#00000029] text-center flex flex-col justify-center font-semibold !rounded-lg"
                       min={1}
                       max={availableQuantity}
-                      disabled={isStakeable}
+                      disabled={isStakeable && ownerSameAsUser()}
                       value={
-                        !isStakeable ? `${qty}` : inventoryDetails.quantity
+                        (!isStakeable || !ownerSameAsUser()) ? `${qty}` : inventoryDetails.quantity
                       }
                       defaultValue={`${qty}`}
                       controls={false}
@@ -725,7 +725,7 @@ const ProductDetails = ({ user, users }) => {
                     <div
                       onClick={add}
                       className={`h-9 w-11 md:h-10 md:w-12 lg:h-[46px] lg:w-[52px] rounded-lg flex justify-center items-center border border-[#00000029] text-center cursor-pointer ${
-                        qty < availableQuantity && !isStakeable
+                        qty < availableQuantity && (!isStakeable || !ownerSameAsUser())
                           ? ''
                           : 'cursor-not-allowed opacity-50'
                       }`}
@@ -746,7 +746,7 @@ const ProductDetails = ({ user, users }) => {
                   </Paragraph>
                 )}
 
-                {!isStakeable && (
+                {(!isStakeable || !ownerSameAsUser()) && (
                   <div>
                     {availableQuantity !== 0 ? (
                       <div className="flex gap-4 justify-between lg:justify-start  pt-4 w-full">
@@ -853,7 +853,7 @@ const ProductDetails = ({ user, users }) => {
                     )}
                   </div>
                 )}
-                {isStakeable && (
+                {(isStakeable && ownerSameAsUser()) && (
                   <>
                     <div className="flex gap-4 justify-between lg:justify-start  pt-4 w-full">
                       <Button
