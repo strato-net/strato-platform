@@ -14,48 +14,54 @@ async function submitPrice(token, contract, args) {
   await rest.call(token, callArgs, { config });
 }
 
-// Main function to handle price fetching and submission
+// Function to fetch and submit price
+async function fetchAndSubmitPrice(metal, apiKey, oracleContract, token) {
+  try {
+    const apiUrl = `https://api.metals.dev/v1/metal/spot?metal=${metal}&api_key=${apiKey}&currency=USD&unit=toz`;
+    const response = await axios.get(apiUrl);
+    const metalPrice = response.data.rate.price;
+    console.log(`Current ${metal} Price: $${metalPrice} per ounce`);
+
+    const timestampInSeconds = Math.floor(Date.now() / 1000);
+    console.log(`Current Timestamp: ${timestampInSeconds}`);
+
+    await submitPrice(token, oracleContract, { price: metalPrice, timestamp: timestampInSeconds });
+    console.log(`Price submitted for ${metal} at ${new Date().toISOString()}`);
+  } catch (error) {
+    console.error(`ERROR: Failed to submit price for ${metal}:`, error);
+  }
+}
+
+// Main function to handle periodic fetching and submission
 async function main() {
-  assert.isDefined(
-    process.env.METALS_API_KEY,
-    "API key for metals API is missing. Set in .env"
-  );
+  assert.isDefined(process.env.METALS_API_KEY, "API key for metals API is missing. Set in .env");
 
-  const { silverOracle } = deployment.contracts;
+  const { silverOracle, goldOracle } = deployment.contracts;
 
-  if (!silverOracle) {
-    console.warn(
-      "WARN: Silver Oracle contract is not deployed. Skipping price submission."
-    );
+  if (!silverOracle && !goldOracle) {
+    console.warn("WARN: No oracle contracts are deployed. Skipping price submission.");
     return;
   }
 
-  const fetchInterval = Number(config.silverOracle.fetchInterval) || 60000; // Default to 1 minute
+  const fetchInterval = Number(config.fetchInterval) || 60000; // Default to 1 minute
+
+  const sleep = (ms) => new Promise(resolve => setTimeout(resolve, ms));
 
   const submitPricePeriodically = async () => {
-    try {
-      const token = await oauthHelper.getServiceToken();
-      const apiUrl = `https://api.metals.dev/v1/metal/spot?metal=silver&api_key=${process.env.METALS_API_KEY}&currency=USD&unit=toz`;
-      const response = await axios.get(apiUrl);
-      const silverPrice = response.data.rate.price;
-      console.log(`Current Silver Price: $${silverPrice} per ounce`);
+    const token = await oauthHelper.getServiceToken();
 
-      const timestampInSeconds = Math.floor(Date.now() / 1000);
-      console.log(`Current Timestamp: ${timestampInSeconds}`);
+    if (silverOracle) {
+      console.log("Fetching silver price");
+      await fetchAndSubmitPrice("silver", process.env.METALS_API_KEY, silverOracle, token);
+    }
 
-      await submitPrice(token, silverOracle, { price: silverPrice, timestamp: timestampInSeconds });
-      console.log(`Price submitted for silver at ${new Date().toISOString()}`);
-    } catch (error) {
-      console.error("ERROR: Failed to submit price for silver:", error);
+    if (goldOracle) {
+      console.log("Fetching gold price");
+      await fetchAndSubmitPrice("gold", process.env.METALS_API_KEY, goldOracle, token);
     }
   };
 
-  const sleep = function (ms) {
-    return new Promise(resolve => setTimeout(resolve, ms));
-  };
-
   while (true) {
-    console.log('Fetching silver price');
     await submitPricePeriodically(); // Immediate first run
     console.log(`Sleeping for ${fetchInterval} ms`);
     await sleep(fetchInterval);
