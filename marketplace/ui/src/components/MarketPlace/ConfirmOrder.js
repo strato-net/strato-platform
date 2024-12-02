@@ -200,7 +200,6 @@ const ConfirmOrder = ({ paymentServices = [], data, columns }) => {
       orderTotal: total,
       tax: tax,
       user: user.commonName,
-      email: user.email,
       htmlContents: htmlContents,
     };
 
