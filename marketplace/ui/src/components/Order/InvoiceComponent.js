@@ -161,17 +161,17 @@ const InvoiceComponent = ({ invoice }) => {
             <Text style={[styles.label, styles.tableHeaderColumn]}>Amount</Text>
           </View>
           {invoice.assets.map((asset, index) => {
-            const adjustedPrice =
-              asset.data.quantityIsDecimal &&
-              asset.data.quantityIsDecimal === 'True'
-                ? asset.price * 100
-                : asset.price;
+            const adjustedPrice =  asset.price;
+              // asset.data.quantityIsDecimal &&
+              // asset.data.quantityIsDecimal === 'True'
+              //   ? asset.price * 100
+              //   : asset.price;
 
-            const quantity =
-              asset.data.quantityIsDecimal &&
-              asset.data.quantityIsDecimal === 'True'
-                ? orderQuantities[index] / 100
-                : orderQuantities[index];
+            const quantity = orderQuantities[index];
+              // asset.data.quantityIsDecimal &&
+              // asset.data.quantityIsDecimal === 'True'
+              //   ? orderQuantities[index] / 100
+              //   : orderQuantities[index];
 
             const totalPrice =
               invoice.order.currency === 'STRATS'
@@ -190,9 +190,10 @@ const InvoiceComponent = ({ invoice }) => {
                   {invoice.order.currency ? 'STRAT' : 'USD'}
                 </Text>
                 <Text style={[styles.value, styles.tableRowColumn]}>
-                  {invoice.order.currency === 'STRATS'
-                    ? (adjustedPrice * STRATS_CONVERSION).toFixed(0)
-                    : adjustedPrice.toFixed(2)}
+                     {invoice.order.currency === 'STRATS'
+                  ? (adjustedPrice * STRATS_CONVERSION).toFixed(0) 
+                   : invoice.order.currency === 'CATA' ? (adjustedPrice * Math.pow(10, 18)).toFixed(2) 
+                  : adjustedPrice.toFixed(2)}
                 </Text>
                 <Text style={[styles.value, styles.tableRowColumn]}>
                   {quantity}
@@ -214,7 +215,8 @@ const InvoiceComponent = ({ invoice }) => {
               <Text style={styles.bottomLabel}>Total</Text>
               <Text style={styles.bottomLabel}>
                 {invoice.order.currency === 'STRATS'
-                  ? (invoice.order.totalPrice * STRATS_CONVERSION).toFixed(0)
+                  ? (invoice.order.totalPrice * STRATS_CONVERSION).toFixed(0) 
+                   : invoice.order.currency === 'CATA' ? (invoice.order.totalPrice * Math.pow(10, 18)).toFixed(2) 
                   : invoice.order.totalPrice.toFixed(2)}
               </Text>
             </View>
