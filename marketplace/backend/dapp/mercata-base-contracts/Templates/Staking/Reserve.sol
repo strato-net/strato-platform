@@ -38,7 +38,7 @@ abstract contract Reserve is Utils, Structs {
         owner = msg.sender;
         name = _name;
         assetRootAddress = _assetRootAddress;
-        unitConversionRate = _unitConversionRate
+        unitConversionRate = _unitConversionRate;
     }
 
     modifier requireActive() {
@@ -227,7 +227,7 @@ abstract contract Reserve is Utils, Structs {
         } else {
             tal -= _newTal;  // Subtract _newTal from tal if add is false
         }
-        tvl = tal * lastUpdatedOraclePrice;  // Update tvl based on the new tal value
+        tvl = decimal(tal) * lastUpdatedOraclePrice;  // Update tvl based on the new tal value
     }
     
     function migrateReserve(address _newReserve, address[] _escrows) external requireOwner("migrate the Reserve") {
