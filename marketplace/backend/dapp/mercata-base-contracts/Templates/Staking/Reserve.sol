@@ -204,4 +204,10 @@ abstract contract Reserve is Utils, Structs {
         return (decimal(collateralQuantity) * livePriceOfCollateral * decimal(cataAPYRate)/100.0000000000000000000 * decimal(delta)) / 
                (priceOfCATA * secondsPerYear);
     }
+
+    function migrateReserve(address _newReserve, address[] _escrows) external requireOwner("migrate the Reserve") {
+        for (uint i = 0; i < _escrows.length; i++) {
+            Escrow(_escrows[i]).updateReserve(_newReserve);
+        }
+    }
 }
