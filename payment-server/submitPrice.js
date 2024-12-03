@@ -24,14 +24,36 @@ async function distributeRewards(token, contract, args) {
 }
 
 // Function to fetch all escrow addresses for a given reserve and call distributeRewards
-async function fetchAndSubmitEscrowAddresses(reserveContract, token) {
+async function fetchAndSubmitEscrowAddresses(oracleContract, token) {
+  const reserveSearchOptions = {
+    config,
+    query: {
+      creator: "eq.BlockApps",
+      isActive: "eq.true",
+      oracle: "eq." + oracleContract.address,
+    },
+  };
+
+  const reserves = await rest.search(
+    user,
+    { name: "BlockApps-Mercata-Reserve" },
+    reserveSearchOptions
+  );
+
+  if (!reserves || reserves.length === 0) {
+    throw new Error("No reserves found");
+  }
+
+  const reserveName = reserves[0].name;
+  const reserveAddress = reserves[0].address;
+
   // Define search options for active escrows
   const searchOptions = {
-    ...options,
+    config,
     query: {
       creator: "eq.BlockApps",
       isOpen: "eq.true",
-      "data->>reserve": "eq." + reserveContract.address,
+      "data->>reserve": "eq." + reserveAddress,
     },
   };
 
@@ -49,11 +71,13 @@ async function fetchAndSubmitEscrowAddresses(reserveContract, token) {
   const escrowAddresses = escrows.map((escrow) => escrow.address);
   console.log(`Escrow Addresses: ${JSON.stringify(escrowAddresses)}`);
 
-  await distributeRewards(token, reserveContract, { escrowAddresses });
+  await distributeRewards(
+    token,
+    { address: reserveAddress, name: reserveName },
+    { escrowAddresses }
+  );
   console.log(
-    `Escrow Addresses submitted for ${
-      reserveContract.name
-    } at ${new Date().toISOString()}`
+    `Escrow Addresses submitted for ${reserveName} at ${new Date().toISOString()}`
   );
 }
 
