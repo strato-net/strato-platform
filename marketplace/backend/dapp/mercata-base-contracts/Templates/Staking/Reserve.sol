@@ -23,16 +23,18 @@ abstract contract Reserve is Utils, Structs {
 
     uint public loanToValueRatio = 50; // LTV ratio as percentage
     uint public cataAPYRate = 10; // 10% APY for CATA rewards
+    decimal public unitConversionRate = 1; // 1 oz of gold in grams
     
     event StakeCreated(address indexed user, address escrow, uint assetAmount, decimal stratsLoan);
     event StakeUnlocked(address indexed user, address escrow);
     event CataTransferred(address indexed from, address indexed to, uint amount);
 
-    constructor(address _assetOracle, string _name, address _assetRootAddress) {
+    constructor(address _assetOracle, string _name, address _assetRootAddress, decimal _unitConversionRate) {
         oracle = OracleService(_assetOracle);
         owner = msg.sender;
         name = _name;
         assetRootAddress = _assetRootAddress;
+        unitConversionRate = _unitConversionRate
     }
 
     modifier requireActive() {
@@ -48,7 +50,7 @@ abstract contract Reserve is Utils, Structs {
     function distributeRewards(address[] _escrowAddresses) external {
         // Update the price of the collateral in the escrow
         (decimal oraclePrice, uint oracleTimestamp) = oracle.getLatestPrice();
-
+        oraclePrice = oraclePrice / unitConversionRate;
         for (uint i = 0; i < _escrowAddresses.length; i++) {
             Escrow escrow = Escrow(_escrowAddresses[i]);
             require(address(escrow).creator == this.creator, "Escrow contract " + string(address(escrow)) + " was not created by a valid Reserve contract");
@@ -86,6 +88,7 @@ abstract contract Reserve is Utils, Structs {
         require(_assetToBeSold.root == assetRootAddress, "Asset does not belong to the root address");
         
         (decimal _oraclePrice, uint _priceTimestamp) = oracle.getLatestPrice();
+        _oraclePrice = _oraclePrice / unitConversionRate;
         decimal _collateralValue = decimal(_collateralQuantity) * _oraclePrice.truncate(2); 
         decimal _maxStratsLoanAmount = _collateralValue * decimal(loanToValueRatio);
 
