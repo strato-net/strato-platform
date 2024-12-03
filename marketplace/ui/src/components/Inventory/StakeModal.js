@@ -46,7 +46,9 @@ const StakeModal = ({
     isStaking || isUnstaking || isFetchingOracle || isreservessLoading;
   const isStaked = inventory.maxStratsLoanAmount && inventory.maxStratsLoanAmount > 0;
   const itemName = decodeURIComponent(inventory.name);
-  const resAddress = reserves?.length ? reserves[0]?.address : null;
+  const matchedReserve = reserves?.length ? reserves.find(
+    (reserve) => reserve.assetRootAddress === inventory.root
+  ) : null;
   const oracleData = oracle ? oracle : { consensusPrice: 0 };
   const location = useLocation();
   const queryParams = new URLSearchParams(location.search);
@@ -57,9 +59,9 @@ const StakeModal = ({
 
   useEffect(() => {
     if (reserves && inventory.data && !isreservessLoading && !isStaked) {
-      inventoryActions.getOracle(inventoryDispatch, reserves[0].oracle);
+      inventoryActions.getOracle(inventoryDispatch, matchedReserve?.oracle);
     }
-  }, [resAddress]);
+  }, [matchedReserve]);
 
   const dataForItems =
     type === 'Stake'
@@ -84,7 +86,7 @@ const StakeModal = ({
               'The expected daily earnings in CATA tokens from staking your RWAs.',
             value: (
               <div className="flex -mr-1">
-                {(inventory?.quantity * oracleData.consensusPrice * reserves[0].cataAPYRate / 365).toFixed(6)}
+                {(inventory?.quantity * oracleData.consensusPrice * matchedReserve?.cataAPYRate / 365).toFixed(6)}
 
                 {logo}
               </div>
@@ -123,7 +125,7 @@ const StakeModal = ({
           creator: stratsService.creator,
           serviceName: stratsService.serviceName,
         },
-        reserve: reserves[0].address,
+        reserve: matchedReserve?.address,
       };
 
       const isStaked = await inventoryActions.stakeInventory(
@@ -143,7 +145,7 @@ const StakeModal = ({
             offset,
             debouncedSearchTerm,
             category && category !== 'All' ? category : undefined,
-            queryParams.get('st') === 'true' ? reserves[0].assetRootAddress : ''
+            queryParams.get('st') === 'true' ? queryParams.get('st') === 'true' ? reserves.map(reserve => reserve.assetRootAddress) : '' : ''
           );
         }
         handleCancel();
@@ -153,7 +155,7 @@ const StakeModal = ({
     if (type === 'Unstake') {
       const body = {
         escrowAddress: inventory?.sale,
-        reserve: reserves[0].address,
+        reserve: matchedReserve?.address,
       };
       const isUnstaked = await inventoryActions.UnstakeInventory(
         inventoryDispatch,
@@ -172,7 +174,7 @@ const StakeModal = ({
             offset,
             debouncedSearchTerm,
             category && category !== 'All' ? category : undefined,
-            queryParams.get('st') === 'true' ? reserves[0].assetRootAddress : ''
+            queryParams.get('st') === 'true' ? queryParams.get('st') === 'true' ? reserves.map(reserve => reserve.assetRootAddress) : '' : ''
           );
         }
         handleCancel();

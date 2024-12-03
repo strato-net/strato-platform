@@ -4,10 +4,13 @@ configDirPath: <configDirPath_value>
 serverHost: <serverHost_value>
 cacheNonce: true
 dockerized: true
+fetchInterval: <oracleFetchInterval_value>
 
 silverOracle:
   name: <silver_oracle_name_value>
-  fetchInterval: <silver_oracle_fetch_interval_value>
+
+goldOracle:
+  name: <gold_oracle_name_value>
 
 nodes:
   - id: 0

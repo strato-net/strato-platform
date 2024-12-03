@@ -100,7 +100,8 @@ const InventoryCard = ({
   const stakeable =
     inventory.root &&
     reserves &&
-    inventory.root === reserves[0].assetRootAddress;
+    reserves.length > 0 &&
+    reserves.some((reserve) => inventory.root === reserve.assetRootAddress);
 
   const handleCancel = () => {
     setOpen(false);

@@ -3,7 +3,7 @@ pragma strict;
 
 import <BASE_CODE_COLLECTION>;
 
-contract SilverOracleService is OracleService {
+contract SimpleOracleService is OracleService {
     mapping(address => bool) private priceSetters;
     constructor(
 	    string _name

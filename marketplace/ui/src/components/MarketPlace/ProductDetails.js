@@ -123,7 +123,10 @@ const ProductDetails = ({ user, users }) => {
   const isStakeable =
     inventoryDetails?.root &&
     reserves &&
-    inventoryDetails?.root === reserves[0]?.assetRootAddress;
+    reserves.length > 0 &&
+    reserves.some(
+      (reserve) => inventoryDetails?.root === reserve.assetRootAddress
+    );
 
   let isCalledFromInventory = false;
   if (state !== null && state !== undefined) {

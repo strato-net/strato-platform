@@ -79,6 +79,9 @@ const RepayModal = ({
     const stratsService = paymentServices.find(
       (item) => item.serviceName === 'STRATS' && item.creator === 'Server'
     );
+    const matchedReserve = reserves?.length ? reserves.find(
+      (reserve) => reserve.assetRootAddress === inventory.root
+    ) : null;
     const body = {
       escrow: inventory?.sale,
       stratsPaymentService: stratsService.address,
@@ -98,7 +101,7 @@ const RepayModal = ({
           offset,
           debouncedSearchTerm,
           category && category !== 'All' ? category : undefined,
-          queryParams.get('st') === 'true' ? reserves[0].assetRootAddress : ''
+          queryParams.get('st') === 'true' ? queryParams.get('st') === 'true' ? reserves.map(reserve => reserve.assetRootAddress) : '' : ''
         );
       }
       await marketplaceActions.fetchStratsBalance(marketplaceDispatch);

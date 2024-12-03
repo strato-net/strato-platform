@@ -38,16 +38,18 @@ const BorrowModal = ({
 
   const isStaked = inventory.sale && inventory.price <= 0;
   const itemName = decodeURIComponent(inventory.name);
-  const resAddress = reserves?.length ? reserves[0]?.address : null;
+  const matchedReserve = reserves?.length ? reserves.find(
+    (reserve) => reserve.assetRootAddress === inventory.root
+  ) : null;
   const oracleData = oracle ? oracle : { consensusPrice: 0 };
   const location = useLocation();
   const queryParams = new URLSearchParams(location.search);
 
   useEffect(() => {
     if (reserves && inventory.data && !isreservessLoading && isStaked) {
-      inventoryActions.getOracle(inventoryDispatch, reserves[0].oracle);
+      inventoryActions.getOracle(inventoryDispatch, matchedReserve.oracle);
     }
-  }, [resAddress]);
+  }, [matchedReserve]);
   const dataForItems = [
     {
       label: `Quantity to Collateralize`,
@@ -89,7 +91,7 @@ const BorrowModal = ({
     {
       label: 'Loan to Value Ratio',
       description: 'Indicates you can borrow up to 50% of the market value of your staked RWAs.',
-      value: `${reserves[0]?.loanToValueRatio}%`,
+      value: `${matchedReserve?.loanToValueRatio}%`,
     },
   ];
 
@@ -97,7 +99,7 @@ const BorrowModal = ({
     const body = {
       escrowAddress: inventory?.sale,
       borrowAmount: Math.floor(Number(parseFloat(inventory?.maxStratsLoanAmount)) * 100) / 100,
-      reserve: reserves[0].address,
+      reserve: matchedReserve?.address,
     };
 
     const borrowed = await inventoryActions.borrow(inventoryDispatch, body);
@@ -114,7 +116,7 @@ const BorrowModal = ({
           offset,
           debouncedSearchTerm,
           category && category !== 'All' ? category : undefined,
-          queryParams.get('st') === 'true' ? reserves[0].assetRootAddress : ''
+          queryParams.get('st') === 'true' ? queryParams.get('st') === 'true' ? reserves.map(reserve => reserve.assetRootAddress) : '' : ''
         );
       }
       await marketplaceActions.fetchStratsBalance(marketplaceDispatch);

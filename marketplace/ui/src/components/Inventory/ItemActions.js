@@ -59,7 +59,8 @@ const ItemActions = ({
   const stakeable =
     inventory.root &&
     reserves &&
-    inventory.root === reserves[0].assetRootAddress;
+    reserves.length > 0 &&
+    reserves.some((reserve) => inventory.root === reserve.assetRootAddress);
   const [listModalOpen, setListModalOpen] = useState(false);
   const [unlistModalOpen, setUnlistModalOpen] = useState(false);
   const [stakeType, setStakeType] = useState('Stake');

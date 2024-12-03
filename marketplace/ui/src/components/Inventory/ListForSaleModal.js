@@ -271,7 +271,7 @@ const ListForSaleModal = ({
         offset,
         debouncedSearchTerm,
         category && category !== 'All' ? category : undefined,
-        queryParams.get('st') === 'true' ? reserves[0].assetRootAddress : ''
+        queryParams.get('st') === 'true' ? reserves.map(reserve => reserve.assetRootAddress) : ''
       );
       handleCancel();
     }

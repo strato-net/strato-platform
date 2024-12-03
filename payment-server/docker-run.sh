@@ -19,16 +19,18 @@ if [ "$ORACLE_MODE" = "true" ]; then
   export BASE_CODE_COLLECTION=${BASE_CODE_COLLECTION}
   export UPGRADE_ORACLE_CONTRACTS=${UPGRADE_ORACLE_CONTRACTS:-false}
 
+  export ORACLE_FETCH_INTERVAL=${ORACLE_FETCH_INTERVAL:-60000}
   export SILVER_ORACLE_NAME_VALUE=${SILVER_ORACLE_NAME_VALUE:-'Silver'}
-  export SILVER_ORACLE_FETCH_INTERVAL=${SILVER_ORACLE_FETCH_INTERVAL:-60000}
+  export GOLD_ORACLE_NAME_VALUE=${GOLD_ORACLE_NAME_VALUE:-'Gold'}
 
   echo $OAUTH_DISCOVERY_URL
 
   cp ./config/template.oracle_config.yaml /tmp/tmp.oracle_config.yaml
 
   # Replace placeholders in Oracle config template
+  sed -i 's*<oracleFetchInterval_value>*'"${ORACLE_FETCH_INTERVAL}"'*g' /tmp/tmp.oracle_config.yaml
   sed -i 's*<silver_oracle_name_value>*'"${SILVER_ORACLE_NAME_VALUE}"'*g' /tmp/tmp.oracle_config.yaml
-  sed -i 's*<silver_oracle_fetch_interval_value>*'"${SILVER_ORACLE_FETCH_INTERVAL}"'*g' /tmp/tmp.oracle_config.yaml
+  sed -i 's*<gold_oracle_name_value>*'"${GOLD_ORACLE_NAME_VALUE}"'*g' /tmp/tmp.oracle_config.yaml
 
   sed -i 's*<configDirPath_value>*'"${CONFIG_DIR_PATH}"'*g' /tmp/tmp.oracle_config.yaml
   sed -i 's*<serverHost_value>*'"${SERVER_HOST}"'*g' /tmp/tmp.oracle_config.yaml
