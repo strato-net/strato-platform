@@ -15,8 +15,17 @@ import { useNavigate } from 'react-router-dom';
 import moment from 'moment';
 import InfiniteScroll from 'react-infinite-scroll-component';
 
-const GlobalTransactionResponsive = ({ data, user,isTransactionLoading,fetchData }) => {
-  const StratsIcon = <img src={Images.strats} alt="STRATs" className="w-5 h-5" />;
+const GlobalTransactionResponsive = ({
+  data,
+  user,
+  isTransactionLoading,
+  fetchData,
+  stratAddress,
+  cataAddress,
+}) => {
+  const StratsIcon = (
+    <img src={Images.strats} alt="STRATs" className="w-5 h-5" />
+  );
   const navigate = useNavigate();
   const [expandedRows, setExpandedRows] = useState({});
 
@@ -81,6 +90,7 @@ const GlobalTransactionResponsive = ({ data, user,isTransactionLoading,fetchData
                 status,
                 transaction_hash,
                 quantityIsDecimal,
+                assetOriginAddress,
                 type,
                 price,
                 redemptionService,
@@ -105,6 +115,8 @@ const GlobalTransactionResponsive = ({ data, user,isTransactionLoading,fetchData
                   type,
                 },
               ];
+              const isStrat = assetOriginAddress === stratAddress;
+              const isCata = assetOriginAddress === cataAddress;
 
               const handleDetailRedirection = () => {
                 let route;
@@ -208,14 +220,18 @@ const GlobalTransactionResponsive = ({ data, user,isTransactionLoading,fetchData
                       <p className={`text-right flex justify-end items-center`}>
                         ${' '}
                         {formattedNum(
-                          quantityIsDecimal && quantityIsDecimal === 'True'
-                            ? price * 100
+                          isStrat
+                            ? (price * 100).toFixed(2)
+                            : isCata
+                            ? (price * Math.pow(10, 18)).toFixed(2)
                             : price
                         )}{' '}
                         (
                         {formattedNum(
-                          quantityIsDecimal && quantityIsDecimal === 'True'
-                            ? price * 10000
+                          isStrat
+                            ? (price * 100 * 100).toFixed(2)
+                            : isCata
+                            ? (price * Math.pow(10, 18) * 100).toFixed(2)
                             : price
                         )}{' '}
                         {StratsIcon})
@@ -228,8 +244,10 @@ const GlobalTransactionResponsive = ({ data, user,isTransactionLoading,fetchData
                     <p className="text-right">
                       Qty:{' '}
                       {formattedNum(
-                        quantityIsDecimal && quantityIsDecimal === 'True'
-                          ? quantity / 100
+                        isStrat
+                          ? (quantity / 100).toFixed(2)
+                          : isCata
+                          ? (quantity / Math.pow(10, 18)).toFixed(2)
                           : quantity
                       )}
                     </p>

@@ -33,6 +33,8 @@ import { useItemDispatch, useItemState } from '../../contexts/item';
 import { actions as itemActions } from '../../contexts/item/actions';
 import { actions as redemptionActions } from '../../contexts/redemption/actions';
 import { actions as issuerStatusActions } from '../../contexts/issuerStatus/actions';
+import { actions as marketplaceActions } from '../../contexts/marketplace/actions';
+import { useMarketplaceDispatch } from '../../contexts/marketplace';
 import {
   useRedemptionDispatch,
   useRedemptionState,
@@ -107,6 +109,24 @@ const Inventory = ({ user }) => {
   } = usePaymentServiceState();
   const paymentServiceDispatch = usePaymentServiceDispatch();
   const [sortedPaymentServices, setSortedPaymentServices] = useState([]);
+  const marketplaceDispatch = useMarketplaceDispatch();
+  const [stratAddress, setStratAddress] = useState('');
+  const [cataAddress, setCataAddress] = useState('');
+
+  useEffect(() => {
+    const fetchAddresses = async () => {
+      const stratAddress = await marketplaceActions.fetchStratsAddress(
+        marketplaceDispatch
+      );
+      const cataAddress = await marketplaceActions.fetchCataAddress(
+        marketplaceDispatch
+      );
+      setStratAddress(stratAddress);
+      setCataAddress(cataAddress);
+    };
+
+    fetchAddresses();
+  }, []);
 
   const isNotOnboarded = (service) =>
     notOnboarded.some((n) => n.serviceName === service.serviceName);
@@ -181,7 +201,7 @@ const Inventory = ({ user }) => {
           queryParams.get('st') === 'true' ? reserves[0].assetRootAddress : ''
         );
       }
-      setShowStakeable(queryParams.get('st'))
+      setShowStakeable(queryParams.get('st'));
     }
   }, [
     dispatch,
@@ -192,7 +212,7 @@ const Inventory = ({ user }) => {
     showPublished,
     showStakeable,
     reserves,
-    location.search
+    location.search,
   ]);
 
   const showModal = () => {
@@ -416,11 +436,11 @@ const Inventory = ({ user }) => {
       title: 'Price',
       align: 'center',
       render: (_, record) => {
-        const isStrats =
+        const isDecimal =
           record.data.quantityIsDecimal &&
           record.data.quantityIsDecimal === 'True';
         const price = record.price
-          ? isStrats
+          ? isDecimal
             ? parseFloat(record.price * 100).toFixed(2)
             : record.price
           : 'N/A';
@@ -445,11 +465,12 @@ const Inventory = ({ user }) => {
       title: 'Owned',
       align: 'center',
       render: (_, record) => {
-        const isStrats =
-          record.data.quantityIsDecimal &&
-          record.data.quantityIsDecimal === 'True';
+        const isStrats = record.originAddress === stratAddress;
+        const isCata = record.originAddress === cataAddress;
         const quantity = isStrats
           ? parseFloat((record.quantity / 100).toFixed(2))
+          : isCata
+          ? parseFloat((record.quantity / Math.pow(10, 18)).toFixed(2))
           : record.quantity;
         return <div>{quantity || 0}</div>;
       },
@@ -482,6 +503,8 @@ const Inventory = ({ user }) => {
             user={user}
             supportedTokens={supportedTokens}
             reserves={reserves}
+            stratAddress={stratAddress}
+            cataAddress={cataAddress}
           />
         </div>
       ),
@@ -710,6 +733,8 @@ const Inventory = ({ user }) => {
                         user={user}
                         supportedTokens={supportedTokens}
                         reserves={reserves}
+                        stratAddress={stratAddress}
+                        cataAddress={cataAddress}
                       />
                     ))
                   ) : (
@@ -731,6 +756,8 @@ const Inventory = ({ user }) => {
                         user={user}
                         supportedTokens={supportedTokens}
                         reserves={reserves}
+                        stratAddress={stratAddress}
+                        cataAddress={cataAddress}
                       />
                     ))
                   ) : (

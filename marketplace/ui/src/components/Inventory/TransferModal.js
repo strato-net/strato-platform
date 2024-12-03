@@ -24,10 +24,14 @@ const TransferModal = ({
   categoryName = '',
   limit = 0,
   offset = 0,
-  reserves
+  reserves,
+  stratAddress,
+  cataAddress,
 }) => {
   const location = useLocation();
   const queryParams = new URLSearchParams(location.search);
+  const isStrat = inventory.originAddress === stratAddress;
+  const isCata = inventory.originAddress === cataAddress;
   // Get the inventory state and dispatch
   const inventoryDispatch = useInventoryDispatch();
   const marketplaceDispatch = useMarketplaceDispatch();
@@ -155,8 +159,10 @@ const TransferModal = ({
       (total, transfer) => total + (transfer.quantity || 0),
       0
     );
-    const availableQuantity = quantityIsDecimal
+    const availableQuantity = isStrat
       ? inventory.quantity / 100
+      : isCata
+      ? inventory.quantity / Math.pow(10, 18)
       : inventory.quantity;
 
     setCanTransfer(isValidTransfer && totalQuantity <= availableQuantity);
@@ -166,7 +172,7 @@ const TransferModal = ({
         isValidTransfer
     );
     setCanRemoveRow(transfers.length > 1);
-  }, [transfers, inventory, quantityIsDecimal]);
+  }, [transfers, inventory]);
 
   // Helper function to handle quantity change
   const handleQuantityChange = (id, value) => {
@@ -239,8 +245,10 @@ const TransferModal = ({
       width: 175,
       render: (_, record, index) => {
         // Calculate the quantity available for each row
-        const availableQuantity = quantityIsDecimal
-          ? inventory.quantity / 100
+        const availableQuantity = isStrat
+          ? (inventory.quantity / 100).toFixed(2)
+          : isCata
+          ? (inventory.quantity / Math.pow(10, 18)).toFixed(2)
           : inventory.quantity;
         const allocatedQuantity = transfers
           .slice(0, index)
@@ -258,8 +266,10 @@ const TransferModal = ({
           min={1}
           max={(() => {
             // Calculate available quantity for this record
-            const availableQuantity = quantityIsDecimal
-              ? inventory.quantity / 100
+            const availableQuantity = isStrat
+              ? (inventory.quantity / 100).toFixed(2)
+              : isCata
+              ? (inventory.quantity / Math.pow(10, 18)).toFixed(2)
               : inventory.quantity;
             const allocatedQuantity = transfers
               .slice(0, index)
@@ -267,7 +277,7 @@ const TransferModal = ({
             return availableQuantity - allocatedQuantity;
           })()}
           step={1}
-          precision={inventory?.contract_name?.includes('STRATSTokens') ? 2 : 0 }
+          precision={inventory?.contract_name?.includes('STRATSTokens') ? 2 : 0}
           onChange={(value) => handleQuantityChange(record.id, value)}
           disabled={index !== transfers.length - 1}
         />
@@ -328,8 +338,12 @@ const TransferModal = ({
     const body = transfers.map((transfer) => ({
       assetAddress: inventory.address,
       newOwner: transfer.recipient,
-      quantity: quantityIsDecimal ? (transfer.quantity * 100).toFixed(0) : transfer.quantity,
-      price: quantityIsDecimal ? transfer.price / 100 : transfer.price,
+      quantity: (isStrat
+        ? (transfer.quantity * 100).toFixed(0)
+        : isCata
+        ? (transfer.quantity * Math.pow(10, 18)).toFixed(0)
+        : transfer.quantity).toString(),
+      price: isStrat ? transfer.price / 100 : isCata ? transfer.price / Math.pow(10, 18) : transfer.price,
       senderCommonName: user.commonName,
       recipientCommonName: transfer.recipientCommonName,
       itemName,
@@ -412,8 +426,10 @@ const TransferModal = ({
           </p>
           <div className="border border-[#d9d9d9] h-[42px] rounded-md flex items-center justify-center">
             <p>
-              {quantityIsDecimal
-                ? inventory.quantity / 100
+              {isStrat
+                ? (inventory.quantity / 100).toFixed(2)
+                : isCata
+                ? (inventory.quantity / Math.pow(10, 18)).toFixed(2)
                 : inventory.quantity}
             </p>
           </div>
@@ -427,8 +443,10 @@ const TransferModal = ({
               controls={false}
               min={1}
               max={
-                quantityIsDecimal
-                  ? inventory.quantity / 100
+                isStrat
+                  ? (inventory.quantity / 100).toFixed(2)
+                  : isCata
+                  ? (inventory.quantity / Math.pow(10, 18)).toFixed(2)
                   : inventory.quantity
               }
               step={1}

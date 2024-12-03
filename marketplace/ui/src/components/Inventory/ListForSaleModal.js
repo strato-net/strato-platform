@@ -34,20 +34,25 @@ const ListForSaleModal = ({
   user,
   debouncedSearchTerm,
   category,
-  reserves
+  reserves,
+  stratAddress,
+  cataAddress,
 }) => {
   const [data, setData] = useState([inventory]);
   const location = useLocation();
   const queryParams = new URLSearchParams(location.search);
+  const isStrat = inventory.originAddress === stratAddress;
+  const isCata = inventory.originAddress === cataAddress;
   const [quantity, setQuantity] = useState(() => {
     const selectedQuantity = inventory.saleAddress
       ? inventory.saleQuantity
       : inventory.quantity;
 
     return selectedQuantity !== undefined
-      ? inventory.data.quantityIsDecimal &&
-        inventory.data.quantityIsDecimal === 'True'
+      ? isStrat
         ? Math.floor(selectedQuantity / 100)
+        : isCata
+        ? Math.floor(selectedQuantity / Math.pow(10, 18))
         : selectedQuantity
       : undefined;
   });
@@ -326,7 +331,13 @@ const ListForSaleModal = ({
             value={quantity}
             controls={false}
             min={1}
-            max={inventory.quantity}
+            max={
+              isStrat
+                ? Math.floor(inventory.quantity / 100)
+                : isCata
+                ? Math.floor(inventory.quantity / Math.pow(10, 18))
+                : inventory.quantity
+            }
             onChange={(value) => setQuantity(value)}
             precision={0}
           />
@@ -354,7 +365,9 @@ const ListForSaleModal = ({
     <Modal
       open={open}
       onCancel={handleCancel}
-      title={`${inventory.saleAddress ? 'Update' : 'List'} - ${decodeURIComponent(inventory.name)}`}
+      title={`${
+        inventory.saleAddress ? 'Update' : 'List'
+      } - ${decodeURIComponent(inventory.name)}`}
       width={650}
       footer={[
         <div className="flex justify-center md:block">
@@ -422,9 +435,10 @@ const ListForSaleModal = ({
             controls={false}
             min={1}
             max={
-              inventory.data.quantityIsDecimal &&
-              inventory.data.quantityIsDecimal === 'True'
-                ? parseFloat(inventory.quantity / 100).toFixed(2)
+              isStrat
+                ? Math.floor(inventory.quantity / 100)
+                : isCata
+                ? Math.floor(inventory.quantity / Math.pow(10, 18))
                 : inventory.quantity
             }
             onChange={(value) => setQuantity(value)}

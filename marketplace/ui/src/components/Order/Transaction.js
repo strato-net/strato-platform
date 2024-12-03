@@ -15,9 +15,30 @@ import {
 } from '../../helpers/constants';
 import TransactionTable from './TransactionTable';
 import { useTransactionState } from '../../contexts/transaction';
+import { actions as marketplaceActions } from '../../contexts/marketplace/actions';
+import { useMarketplaceDispatch } from '../../contexts/marketplace';
 
 const Transaction = ({ user }) => {
   const categoryDispatch = useCategoryDispatch();
+
+  const marketplaceDispatch = useMarketplaceDispatch();
+  const [stratAddress, setStratAddress] = useState('');
+  const [cataAddress, setCataAddress] = useState('');
+
+  useEffect(() => {
+    const fetchAddresses = async () => {
+      const stratAddress = await marketplaceActions.fetchStratsAddress(
+        marketplaceDispatch
+      );
+      const cataAddress = await marketplaceActions.fetchCataAddress(
+        marketplaceDispatch
+      );
+      setStratAddress(stratAddress);
+      setCataAddress(cataAddress);
+    };
+
+    fetchAddresses();
+  }, []);
 
   const { userTransactions, isTransactionLoading } = useTransactionState();
   const [callExcel, setCallExcel] = useState(false);
@@ -90,8 +111,8 @@ const Transaction = ({ user }) => {
             transaction?.type === 'Transfer'
               ? 'Closed'
               : transaction?.type === 'Redemption'
-                ? REDEMPTION_STATUS[transaction.status]
-                : TRANSACTION_STATUS[transaction.status],
+              ? REDEMPTION_STATUS[transaction.status]
+              : TRANSACTION_STATUS[transaction.status],
         });
       });
     } catch (error) {
@@ -201,7 +222,12 @@ const Transaction = ({ user }) => {
           </Breadcrumb.Item>
         </Breadcrumb>
       </div>
-      <TransactionTable user={user} download={download} />
+      <TransactionTable
+        user={user}
+        download={download}
+        stratAddress={stratAddress}
+        cataAddress={cataAddress}
+      />
     </div>
   );
 };

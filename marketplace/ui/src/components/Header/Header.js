@@ -11,7 +11,6 @@ import {
   Select,
   Row,
   Col,
-  Tooltip,
 } from 'antd';
 import {
   ArrowLeftOutlined,
@@ -274,7 +273,7 @@ const HeaderComponent = ({
               <Col Col={24}>
                 {' '}
                 <p className="text-xs mt-3">
-                  Balance: ${formattedNum(cataBalance * 10)}
+                  Balance: ${formattedNum(cataBalance / 10)}
                 </p>
               </Col>
             </Row>
@@ -518,15 +517,13 @@ const HeaderComponent = ({
           }}
           items={navItems}
         />
-        <Tooltip placement="bottom" title={'Stake'}>
-          <Button
-            type="primary"
-            className="font-semibold hidden md:block"
-            onClick={() => navigate(routes.MyWalletStakeable.url)}
-          >
-            <RiseOutlined /> Stake
-          </Button>
-        </Tooltip>
+        <Button
+          type="primary"
+          className="font-semibold hidden md:block"
+          onClick={() => navigate(routes.MyWalletStakeable.url)}
+        >
+          <RiseOutlined /> Stake
+        </Button>
         <Space size="large" className="!gap-0 md:!gap-4 mr-0 -ml-3">
           {
             <div

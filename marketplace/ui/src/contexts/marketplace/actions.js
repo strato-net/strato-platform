@@ -51,6 +51,9 @@ const actionDescriptors = {
   fetchStratsAddress: 'fetch_strats_address',
   fetchStratsAddressSuccessful: 'fetch_strats_address_successful',
   fetchStratsAddressFailed: 'fetch_strats_address_failed',
+  fetchCataAddress: 'fetch_cata_address',
+  fetchCataAddressSuccessful: 'fetch_cata_address_successful',
+  fetchCataAddressFailed: 'fetch_cata_address_failed',
   fetchStratsTransactionHistory: 'fetch_strats_transaction_history',
   fetchStratsTransactionHistorySuccessful:
     'fetch_strats_transaction_history_successful',
@@ -605,6 +608,46 @@ const actions = {
       dispatch({
         type: actionDescriptors.fetchStratsAddressFailed,
         payload: 'Error while fetching STRATS address',
+      });
+      return null;
+    }
+  },
+  fetchCataAddress: async (dispatch) => {
+    dispatch({ type: actionDescriptors.fetchCataAddress });
+    try {
+      let response = await fetch(`${apiUrl}/marketplace/cata/address`, {
+        method: HTTP_METHODS.GET,
+        credentials: 'same-origin',
+      });
+
+      const body = await response.json();
+      if (
+        response.status === RestStatus.UNAUTHORIZED ||
+        response.status === RestStatus.FORBIDDEN
+      ) {
+        dispatch({
+          type: actionDescriptors.fetchCataAddressFailed,
+          payload: 'Error while fetching CATA address',
+        });
+        return null;
+      }
+
+      if (response.status === RestStatus.OK) {
+        dispatch({
+          type: actionDescriptors.fetchCataAddressSuccessful,
+        });
+        return body.data;
+      }
+
+      dispatch({
+        type: actionDescriptors.fetchCataAddressFailed,
+        payload: 'Error while fetching CATA address',
+      });
+      return null;
+    } catch (err) {
+      dispatch({
+        type: actionDescriptors.fetchCataAddressFailed,
+        payload: 'Error while fetching CATA address',
       });
       return null;
     }

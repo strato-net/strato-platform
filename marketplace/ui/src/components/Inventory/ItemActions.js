@@ -38,17 +38,23 @@ const ItemActions = ({
   user,
   supportedTokens,
   reserves,
+  stratAddress,
+  cataAddress,
 }) => {
   const itemData = inventory.data;
-  const isStrats =
-    itemData.quantityIsDecimal && itemData.quantityIsDecimal === 'True';
+  const isStrats = inventory.originAddress === stratAddress;
+  const isCata = inventory.originAddress === cataAddress;
   const quantity = isStrats
     ? parseFloat((inventory.quantity / 100).toFixed(2))
+    : isCata
+    ? parseFloat((inventory.quantity / Math.pow(10, 18)).toFixed(2))
     : inventory.quantity;
   const saleQuantity = isStrats
     ? inventory.saleQuantity !== undefined
       ? parseFloat((inventory.saleQuantity / 100).toFixed(2))
       : undefined
+    : isCata
+    ? parseFloat((inventory.quantity / Math.pow(10, 18)).toFixed(2))
     : inventory.saleQuantity;
   const stakeable =
     inventory.root &&
@@ -244,7 +250,9 @@ const ItemActions = ({
             inventory.price ||
             inventory.address === inventory.originAddress ||
             !isActive() ||
-            disableSADDOGS(inventory)
+            disableSADDOGS(inventory) ||
+            isStrats ||
+            isCata
           }
         >
           <SendOutlined /> Redeem
@@ -268,7 +276,9 @@ const ItemActions = ({
             type="link"
             className="text-[#13188A] font-semibold"
             onClick={() => showStakeModal('Unstake')}
-            disabled={inventory?.borrowedAmount && inventory?.borrowedAmount > 0}
+            disabled={
+              inventory?.borrowedAmount && inventory?.borrowedAmount > 0
+            }
           >
             <LogoutOutlined /> Unstake
           </Button>
@@ -276,7 +286,9 @@ const ItemActions = ({
             type="link"
             className="text-[#13188A] font-semibold"
             onClick={() => showBorrowModal('Unstake')}
-            disabled={inventory?.borrowedAmount && inventory?.borrowedAmount > 0}
+            disabled={
+              inventory?.borrowedAmount && inventory?.borrowedAmount > 0
+            }
           >
             <BankOutlined /> Borrow
           </Button>
@@ -284,9 +296,12 @@ const ItemActions = ({
             type="link"
             className="text-[#13188A] font-semibold"
             onClick={() => showRepayModal('Unstake')}
-            disabled={inventory?.borrowedAmount && inventory?.borrowedAmount <= 0}
+            disabled={
+              inventory?.borrowedAmount && inventory?.borrowedAmount <= 0
+            }
           >
-            <SolutionOutlined />Repay
+            <SolutionOutlined />
+            Repay
           </Button>
         </div>
       )}
@@ -306,7 +321,9 @@ const ItemActions = ({
                     inventory.price ||
                     inventory.address === inventory.originAddress ||
                     !isActive() ||
-                    disableSADDOGS(inventory)
+                    disableSADDOGS(inventory) ||
+                    isStrats ||
+                    isCata
                   }
                 >
                   <SendOutlined /> Redeem
@@ -365,6 +382,8 @@ const ItemActions = ({
           category={category}
           user={user}
           reserves={reserves}
+          stratAddress={stratAddress}
+          cataAddress={cataAddress}
         />
       )}
       {unlistModalOpen && (
@@ -440,6 +459,8 @@ const ItemActions = ({
           debouncedSearchTerm={debouncedSearchTerm}
           category={category}
           reserves={reserves}
+          stratAddress={stratAddress}
+          cataAddress={cataAddress}
         />
       )}
       {redeemModalOpen && (

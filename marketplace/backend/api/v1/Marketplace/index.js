@@ -63,6 +63,13 @@ router.get(
 );
 
 router.get(
+  Marketplace.getCataAddress,
+  authHandler.authorizeRequest(),
+  loadDapp,
+  MarketplaceController.getCataAddress
+);
+
+router.get(
   Marketplace.getStratsTransactionHistory,
   authHandler.authorizeRequest(),
   loadDapp,

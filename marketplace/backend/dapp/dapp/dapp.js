@@ -1622,8 +1622,9 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
       order: 'transferDate.desc',
       or: `(oldOwnerCommonName.eq.${userCommonName},newOwnerCommonName.eq.${userCommonName})`,
     };
-    const itemTransferEvents =
-      await getItemTransferEventsWithAssetInfo(transferArgs);
+    const itemTransferEvents = await getItemTransferEventsWithAssetInfo(
+      transferArgs
+    );
 
     return {
       soldOrders: soldOrders ? soldOrders : [],
@@ -2065,7 +2066,7 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
       },
       options
     );
-    return balance[0].sum ? `${balance[0].sum / 100}` : 0;
+    return balance[0].sum ? `${(balance[0].sum / Math.pow(10, 18)).toFixed(2)}` : 0;
   };
 
   contract.getStratsTransactionHistory = async function (
@@ -2091,15 +2092,15 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
   contract.getReserve = async function (address, options = defaultOptions) {
     return await reserveJs.get(rawAdmin, address, options);
   };
-  
+
   contract.getAllReserve = async function (options = defaultOptions) {
     return await reserveJs.getAll(rawAdmin, options);
   };
-  
+
   contract.oraclePrice = async function (args, options = defaultOptions) {
     return await reserveJs.oraclePrice(rawAdmin, args, options);
   };
-  
+
   contract.stake = async function (args, options = defaultOptions) {
     return await reserveJs.stake(rawAdmin, args, options);
   };
@@ -2111,17 +2112,24 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
   contract.borrow = async function (args, options = defaultOptions) {
     return await reserveJs.borrow(rawAdmin, args, options);
   };
-  
+
   contract.repay = async function (args, options = defaultOptions) {
     const { stratsPaymentService, escrow } = args;
-  
+
     // Fetch user's STRATS asset origin address
     const stratsOriginAddress = await STRATSJs.getStratsAddress();
-  
+
     // Retrieve sales data associated with the escrow address
-    const salesData = await saleJs.getAll(rawAdmin, { address: escrow }, options);
-    const orderTotal = salesData.reduce((total, sale) => total + parseFloat(sale?.data?.maxStratsLoanAmount), 0);
-  
+    const salesData = await saleJs.getAll(
+      rawAdmin,
+      { address: escrow },
+      options
+    );
+    const orderTotal = salesData.reduce(
+      (total, sale) => total + parseFloat(sale?.data?.maxStratsLoanAmount),
+      0
+    );
+
     // Get user's active STRATS assets with non-zero quantities
     const userStratsAssets = await inventoryJs.getAll(
       rawAdmin,
@@ -2129,32 +2137,35 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
         ownerCommonName: userCert.commonName,
         originAddress: stratsOriginAddress,
         status: ASSET_STATUS.ACTIVE,
-        queryOptions: { select: "address, quantity" },
-        notEqualsField: "quantity",
-        notEqualsValue: "0",
-        order: 'block_timestamp.desc'
+        queryOptions: { select: 'address, quantity' },
+        notEqualsField: 'quantity',
+        notEqualsValue: '0',
+        order: 'block_timestamp.desc',
       },
       options
     );
-  
+
     // Accumulate STRATS asset addresses to cover the order total
     const { addressesToUse, accumulatedTotal } = userStratsAssets.reduce(
       (acc, asset) => {
         if (acc.accumulatedTotal >= orderTotal) return acc;
-  
+
         acc.addressesToUse.push(asset.address);
         acc.accumulatedTotal += asset.quantity / 100;
-  
+
         return acc;
       },
       { addressesToUse: [], accumulatedTotal: 0 }
     );
-  
+
     // Check if accumulated total meets the order requirement
     if (accumulatedTotal < orderTotal) {
-      throw new rest.RestError(RestStatus.BAD_REQUEST, "Insufficient STRATS balance to complete the purchase.");
+      throw new rest.RestError(
+        RestStatus.BAD_REQUEST,
+        'Insufficient STRATS balance to complete the purchase.'
+      );
     }
-  
+
     // Proceed with unstake if sufficient assets are accumulated
     return await reserveJs.repay(
       rawAdmin,
