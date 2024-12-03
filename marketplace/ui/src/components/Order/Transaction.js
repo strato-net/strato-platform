@@ -88,20 +88,23 @@ const Transaction = ({ user }) => {
         const { category, subCategory } = getCategoryAndSubcategory(
           transaction.assetContractName
         );
-        let quantityIsDecimal =
-          transaction.quantityIsDecimal &&
-          transaction.quantityIsDecimal === 'True';
+        let isStrat = transaction.assetOriginAddress === stratAddress;
+        let isCata = transaction.assetOriginAddress === cataAddress;
         return formatDataObject({
           reference: transaction?.reference,
           type: transaction?.type,
           category,
           subCategory,
           assetName: transaction?.assetName,
-          Price: quantityIsDecimal
+          Price: isStrat
             ? Number((transaction?.price * 100).toFixed(2))
+            : isCata
+            ? Number((transaction?.price * Math.pow(10, 18)).toFixed(2))
             : transaction?.price,
-          quantity: quantityIsDecimal
+          quantity: isStrat
             ? Number((transaction?.quantity / 100).toFixed(2))
+            : isCata
+            ? Number((transaction?.price / Math.pow(10, 18)).toFixed(2))
             : transaction?.quantity,
           from: transaction.from,
           to: transaction.to,
