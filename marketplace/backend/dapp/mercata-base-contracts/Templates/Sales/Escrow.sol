@@ -9,6 +9,7 @@ contract Escrow is Sale {
     uint public maxStratsLoanAmount;
     decimal public totalCataRewardInDollars;
     decimal public borrowedAmount;
+    uint public lastRewardTimestamp;
 
     constructor(
         address _borrower,
@@ -23,6 +24,7 @@ contract Escrow is Sale {
         borrower = _borrower;
         maxStratsLoanAmount = _maxStratsLoanAmount;
         totalCataRewardInDollars = 0.0; // Assuming the CATA reward rate is provided externally
+        lastRewardTimestamp = block.timestamp;
         reserve = msg.sender;
     }
 
@@ -48,6 +50,8 @@ contract Escrow is Sale {
         collateralValue = collateralQuantity * _newPrice.truncate(2);
 
         maxStratsLoanAmount = uint(collateralValue * decimal(_loanToValueRatio));
+
+        lastRewardTimestamp = block.timestamp;
     }
 
     function updateTotalCataReward(decimal _newCataReward) external {
@@ -55,5 +59,9 @@ contract Escrow is Sale {
         totalCataRewardInDollars += _newCataReward;
     }
 
+    function updateReserve(address _newReserve) external {
+        require(msg.sender == reserve, "Only the existing reserve can update the reserve address");
+        reserve = _newReserve;
+    }
 
 }

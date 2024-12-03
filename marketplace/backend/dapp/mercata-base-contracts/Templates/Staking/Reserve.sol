@@ -9,7 +9,7 @@ import "../Utils/Utils.sol";
 import "../Structs/Structs.sol";
 import "../Oracle/OracleService.sol";
 
-abstract contract Reserve is Utils, Structs, OracleSubscriber {
+abstract contract Reserve is Utils, Structs {
     OracleService public oracle; // Asset Oracle service for fetching price data
     Asset public stratsToken;
     Asset public cataToken;
@@ -33,12 +33,8 @@ abstract contract Reserve is Utils, Structs, OracleSubscriber {
     event StakeUnlocked(address indexed user, address escrow);
     event CataTransferred(address indexed from, address indexed to, uint amount);
 
-    Escrow[] public escrows;
-    mapping (address => uint) escrowMap;
-
     constructor(address _assetOracle, string _name, address _assetRootAddress) {
         oracle = OracleService(_assetOracle);
-        oracle.subscribe();
         owner = msg.sender;
         name = _name;
         assetRootAddress = _assetRootAddress;
@@ -54,43 +50,43 @@ abstract contract Reserve is Utils, Structs, OracleSubscriber {
         _;
     }
 
-    function oraclePriceUpdated(decimal _newPrice, uint _timestamp) external {
+    function distributeRewards(address[] _escrowAddresses) external {
         // Update the price of the collateral in the escrow
-        require(msg.sender == address(oracle), "Only the oracle can call oraclePriceUpdated");
-        
-        if(lastUpdatedTimestamp == 0){
-            lastUpdatedTimestamp = _timestamp;
-            lastUpdatedOraclePrice = _newPrice;
-        }
+        (decimal oraclePrice, uint oracleTimestamp) = oracle.getLatestPrice();
 
-        uint delta = _timestamp - lastUpdatedTimestamp;
-
-        if(delta > 0){
-        for (uint i = 0; i < escrows.length; i++) {
-            if (address(escrows[i]) != address(0)) {
-                escrows[i].updateOnPriceChange(_newPrice, loanToValueRatio);
+        for (uint i = 0; i < _escrowAddresses.length; i++) {
+            Escrow escrow = Escrow(_escrowAddresses[i]);
+            require(address(escrow).creator == this.creator, "Escrow contract " + string(address(escrow)) + " was not created by a valid Reserve contract");
+            try {
+                uint lastRewardTimestamp = escrow.lastRewardTimestamp();
+                uint delta = block.timestamp - lastRewardTimestamp;
+                escrow.updateOnPriceChange(oraclePrice, loanToValueRatio);
                 //get cata reward from escrow
-                decimal cataReward = calculateCATAReward(escrows[i].collateralQuantity(), _newPrice.truncate(2), delta); //per day 0.08, per hour 0.0033, per 10 minutes 0.00055
-                escrows[i].updateTotalCataReward(cataReward * 10**18);
+                if (delta > 0) {
+                    decimal cataReward = calculateCATAReward(escrow.collateralQuantity(), oraclePrice.truncate(2), delta); //per day 0.08, per hour 0.0033, per 10 minutes 0.00055
+                    escrow.updateTotalCataReward(cataReward * 10**18);
 
-                uint transferNumber = (uint(block.number + 16 + i) + block.timestamp) % 1000000;
+                    uint transferNumber = (uint(block.number + 16 + i) + block.timestamp) % 1000000;
 
-                // Transfer Cata from reserve to borrower
-                cataToken.transferOwnership(
-                    escrows[i].borrower(),
-                    uint(cataReward * 10**18), //per day 8, per hour 0.33, per 10 minutes 0.055
-                    true,
-                    transferNumber,
-                    0.1000000000000000000 / 10**18
-                    );
-                emit CataTransferred(address(this), escrows[i].borrower(), uint(cataReward * 10**18));
+                    // Transfer Cata from reserve to borrower
+                    cataToken.transferOwnership(
+                        escrow.borrower(),
+                        uint(cataReward * 10**18), //per day 8, per hour 0.33, per 10 minutes 0.055
+                        true,
+                        transferNumber,
+                        0.1000000000000000000 / 10**18
+                        );
+                    emit CataTransferred(address(this), escrow.borrower(), uint(cataReward * 10**18));
                 }
+            } catch {
+                revert("Rewards distribution failed for escrow contract " + string(address(escrow)));
             }
         }
+
         lastUpdatedTimestamp = _timestamp;
         lastUpdatedOraclePrice = _newPrice;
 
-        _updateTvl(tal);
+        _updateTvl(0);
     }
 
     function stakeAsset(uint _collateralQuantity, address _assetAddress, PaymentServiceInfo _stratPaymentService) public requireActive() returns (address) {
@@ -112,9 +108,6 @@ abstract contract Reserve is Utils, Structs, OracleSubscriber {
             address(_assetToBeSold),
             [_stratPaymentService]
         );
-
-        escrows.push(Escrow(escrow));
-        escrowMap[address(escrow)] = escrows.length;
 
         // Update tvl: total value locked
         _updateTvl(_collateralQuantity);
@@ -171,15 +164,11 @@ abstract contract Reserve is Utils, Structs, OracleSubscriber {
 
     function deactivate() public requireActive() requireOwner("deactivate reserve") {
         isActive = false;
-        oracle.unsubscribe();
     }
 
     function setOracle(address _newOracle) public requireOwner("update oracle") {
         require(_newOracle != address(0), "Invalid oracle address");
-        oracle.unsubscribe();
-
         oracle = OracleService(_newOracle);
-        oracle.subscribe(); 
     }
 
     //Setters for state variables
@@ -214,14 +203,8 @@ abstract contract Reserve is Utils, Structs, OracleSubscriber {
 
         escrow.closeSale();
 
-        uint index = escrowMap[address(escrow)];
-        if (index > 0) {
-            escrows[index - 1] = Escrow(address(0));
-            escrowMap[address(escrow)] = 0;
-        }
-
         // Update tvl: total value locked
-        _updateTvl((escrow.collateralQuantity() * -1));
+        _updateTvl(escrow.collateralQuantity(), false);
 
         // Emit unstake event
         emit StakeUnlocked(msg.sender, _escrowAddress);
@@ -238,8 +221,15 @@ abstract contract Reserve is Utils, Structs, OracleSubscriber {
                (priceOfCATA * secondsPerYear);
     }
 
-    function _updateTvl(uint _newTal) internal {
+
+    function _updateTvl(uint _newTal, bool add) internal {
         tal += _newTal;
         tvl = tal * lastUpdatedOraclePrice;
+    }
+    
+    function migrateReserve(address _newReserve, address[] _escrows) external requireOwner("migrate the Reserve") {
+        for (uint i = 0; i < _escrows.length; i++) {
+            Escrow(_escrows[i]).updateReserve(_newReserve);
+        }
     }
 }
