@@ -75,7 +75,7 @@ const HeaderComponent = ({
   const categoryDispatch = useCategoryDispatch();
   const userDispatch = useAuthenticateDispatch();
   //States
-  const { cartList, strats, cata } = useMarketplaceState();
+  const { cartList, strats, cata, cataAddress, stratsAddress } = useMarketplaceState();
   const { categorys } = useCategoryState();
   let { isAuthenticated } = useAuthenticateState();
 
@@ -83,17 +83,12 @@ const HeaderComponent = ({
     if (user) {
       marketplaceActions.fetchStratsBalance(marketplaceDispatch);
       marketplaceActions.fetchCataBalance(marketplaceDispatch);
+      marketplaceActions.fetchStratsAddress(marketplaceDispatch);
+      marketplaceActions.fetchCataAddress(marketplaceDispatch);
     }
   }, [user]);
 
   useEffect(() => {
-    async function fetchStratsAddress() {
-      const stratsAddress = await marketplaceActions.fetchStratsAddress(
-        marketplaceDispatch
-      );
-      setOriginAddress(stratsAddress);
-    }
-    fetchStratsAddress();
     marketplaceActions.fetchCartItems(marketplaceDispatch, cartList);
   }, [marketplaceDispatch, cartList]);
 
@@ -103,7 +98,7 @@ const HeaderComponent = ({
   const [categories, setCategories] = useState([]);
   const [selectedCategory, setSelectedCategory] = useState(categoryQueryValue);
   const [isModalVisible, setIsModalVisible] = useState(false);
-  const [originAddress, setOriginAddress] = useState();
+  // const [originAddress, setOriginAddress] = useState(stratsAddress);
   const formatter = new Intl.NumberFormat('en-US');
   const formattedNum = (num) => formatter.format(num);
   const stratsBalance = Object.keys(strats).length > 0 ? strats : 0;
@@ -232,13 +227,13 @@ const HeaderComponent = ({
           onClick: async () => {
             navigate(
               `${routes.MarketplaceProductDetail.url
-                .replace(':address', originAddress)
+                .replace(':address', stratsAddress)
                 .replace(':name', 'STRATS')}`
             );
           },
           label: (
             <div>
-              {user && originAddress && (
+              {user && stratsAddress && (
                 <p className="text-xs mt-1">Buy STRATs</p>
               )}
             </div>

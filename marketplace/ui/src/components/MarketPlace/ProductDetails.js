@@ -101,7 +101,7 @@ const ProductDetails = ({ user, users }) => {
     isReserveLoading,
     reserves,
   } = useInventoryState();
-  const { cartList } = useMarketplaceState();
+  const { cartList, stratsAddress, cataAddress } = useMarketplaceState();
 
   const [isModalVisible, setIsModalVisible] = useState(false);
   const [timeFilter, setTimeFilter] = useState('1');
@@ -206,6 +206,9 @@ const ProductDetails = ({ user, users }) => {
   }, [marketplaceDispatch, cartList]);
 
   const details = inventoryDetails;
+  const isCata = details.originAddress === cataAddress;
+  const isStrat = details.originAddress === stratsAddress;
+  
   let fileValues = [];
   let fileNames = [];
 
@@ -229,11 +232,7 @@ const ProductDetails = ({ user, users }) => {
       const detailsData = details.data;
       setItemData(detailsData);
       if (details.saleQuantity) {
-        let saleQuantity =
-          details.data.quantityIsDecimal &&
-          details.data.quantityIsDecimal === 'True'
-            ? details.saleQuantity / 100
-            : details.saleQuantity;
+        let saleQuantity = isStrat ? details.saleQuantity / 100 : isCata ? details.saleQuantity / Math.pow(10, 18) : details.saleQuantity
         setAvailableQuantity(saleQuantity || 1);
       }
     }
@@ -647,12 +646,7 @@ const ProductDetails = ({ user, users }) => {
                     >
                       {details?.price || isStaked
                         ? (() => {
-                            const adjustedPrice =
-                              details.data.quantityIsDecimal &&
-                              details.data.quantityIsDecimal === 'True'
-                                ? details.price * 100
-                                : details.price;
-
+                            const adjustedPrice = isStrat ? details.price * 100 : isCata ? details.price * Math.pow(10, 18) : details.price
                             return (
                               <>
                                 $

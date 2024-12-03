@@ -244,9 +244,10 @@ const reducer = (state, action) => {
       return {
         ...state,
       };
-    case actionDescriptors.fetchStratsAddressSuccessful:
+    case actionDescriptors.fetchStratsAddressSuccessful:      
       return {
         ...state,
+        stratsAddress:action.payload
       };
     case actionDescriptors.fetchStratsAddressFailed:
       return {
@@ -259,6 +260,7 @@ const reducer = (state, action) => {
     case actionDescriptors.fetchCataAddressSuccessful:
       return {
         ...state,
+        cataAddress:action.payload
       };
     case actionDescriptors.fetchCataAddressFailed:
       return {

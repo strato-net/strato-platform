@@ -595,6 +595,7 @@ const actions = {
       if (response.status === RestStatus.OK) {
         dispatch({
           type: actionDescriptors.fetchStratsAddressSuccessful,
+          payload: body?.data
         });
         return body.data;
       }
@@ -632,9 +633,10 @@ const actions = {
         return null;
       }
 
-      if (response.status === RestStatus.OK) {
+      if (response.status === RestStatus.OK) {        
         dispatch({
           type: actionDescriptors.fetchCataAddressSuccessful,
+          payload: body?.data
         });
         return body.data;
       }

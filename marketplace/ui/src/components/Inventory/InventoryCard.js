@@ -654,6 +654,8 @@ const InventoryCard = ({
           debouncedSearchTerm={debouncedSearchTerm}
           saleAddress={inventory.saleAddress}
           category={category}
+          stratAddress={stratAddress}
+          cataAddress={cataAddress}
         />
       )}
       {transferModalOpen && (

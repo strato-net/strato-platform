@@ -34,7 +34,7 @@ import { actions as itemActions } from '../../contexts/item/actions';
 import { actions as redemptionActions } from '../../contexts/redemption/actions';
 import { actions as issuerStatusActions } from '../../contexts/issuerStatus/actions';
 import { actions as marketplaceActions } from '../../contexts/marketplace/actions';
-import { useMarketplaceDispatch } from '../../contexts/marketplace';
+import { useMarketplaceDispatch, useMarketplaceState } from '../../contexts/marketplace';
 import {
   useRedemptionDispatch,
   useRedemptionState,
@@ -79,11 +79,16 @@ const Inventory = ({ user }) => {
   const navigate = useNavigate();
   const naviroute = routes.InventoryDetail.url;
   let { hasChecked, isAuthenticated, loginUrl } = useAuthenticateState();
-
+  const { stratsAddress, cataAddress } = useMarketplaceState();
+  // console.log("{ stratsAddress, cataAddress }", { stratsAddress, cataAddress });
+  const formatter = new Intl.NumberFormat('en-US');
+  const formattedNum = (num) => formatter.format(num);
+  
   const location = useLocation();
   const queryParams = new URLSearchParams(location.search);
   const searchQueryValue = queryParams.get('st') || '';
   const [showStakeable, setShowStakeable] = useState(searchQueryValue);
+
 
   const categoryDispatch = useCategoryDispatch();
   const { categorys } = useCategoryState();
@@ -101,7 +106,7 @@ const Inventory = ({ user }) => {
     isReservesLoading,
     reserves,
   } = useInventoryState();
-  console.log('reserves', reserves);
+  
   const {
     paymentServices,
     arePaymentServicesLoading,
@@ -110,24 +115,6 @@ const Inventory = ({ user }) => {
   } = usePaymentServiceState();
   const paymentServiceDispatch = usePaymentServiceDispatch();
   const [sortedPaymentServices, setSortedPaymentServices] = useState([]);
-  const marketplaceDispatch = useMarketplaceDispatch();
-  const [stratAddress, setStratAddress] = useState('');
-  const [cataAddress, setCataAddress] = useState('');
-
-  useEffect(() => {
-    const fetchAddresses = async () => {
-      const stratAddress = await marketplaceActions.fetchStratsAddress(
-        marketplaceDispatch
-      );
-      const cataAddress = await marketplaceActions.fetchCataAddress(
-        marketplaceDispatch
-      );
-      setStratAddress(stratAddress);
-      setCataAddress(cataAddress);
-    };
-
-    fetchAddresses();
-  }, []);
 
   const isNotOnboarded = (service) =>
     notOnboarded.some((n) => n.serviceName === service.serviceName);
@@ -437,22 +424,26 @@ const Inventory = ({ user }) => {
       title: 'Price',
       align: 'center',
       render: (_, record) => {
-        const isDecimal =
-          record.data.quantityIsDecimal &&
-          record.data.quantityIsDecimal === 'True';
+        const isCata = record?.originAddress === cataAddress
+        const isStrats = record?.originAddress === stratsAddress
+        
         const price = record.price
-          ? isDecimal
-            ? parseFloat(record.price * 100).toFixed(2)
-            : record.price
+          ? formattedNum(
+            record?.originAddress === stratsAddress
+              ? (record.price * 100).toFixed(2)
+              : record?.originAddress === cataAddress
+              ? (record.price * Math.pow(10, 18)).toFixed(2)
+              : record.price
+          )
           : 'N/A';
         return (
           <div>
             {price !== 'N/A' ? (
               <>
-                <span>${price}</span>{' '}
-                <p className="flex text-xs items-center">
-                  {' '}
-                  &nbsp;({(price * STRATS_CONVERSION).toFixed(0)} {StratsIcon}){' '}
+                {/* <span>${price}</span> */}
+                <p className="flex text-xs items-center"> 
+                  &nbsp;({price} {StratsIcon}) 
+                  {/* &nbsp;({price} {isStrats ? StratsIcon : isCata ? 'CATA' : '' })  */}
                 </p>
               </>
             ) : (
@@ -466,7 +457,7 @@ const Inventory = ({ user }) => {
       title: 'Owned',
       align: 'center',
       render: (_, record) => {
-        const isStrats = record.originAddress === stratAddress;
+        const isStrats = record.originAddress === stratsAddress;
         const isCata = record.originAddress === cataAddress;
         const quantity = isStrats
           ? parseFloat((record.quantity / 100).toFixed(2))
@@ -480,12 +471,9 @@ const Inventory = ({ user }) => {
       title: 'Listed for Sale',
       align: 'center',
       render: (_, record) => {
-        const isStrats =
-          record.data.quantityIsDecimal &&
-          record.data.quantityIsDecimal === 'True';
-        const saleQuantity = isStrats
-          ? parseFloat((record.saleQuantity / 100).toFixed(2))
-          : record.saleQuantity;
+        const isCata = record?.originAddress === cataAddress
+        const isStrat = record?.originAddress === stratsAddress
+        const saleQuantity = isStrat ? record.saleQuantity / 100 : isCata ? record.saleQuantity / Math.pow(10, 18) : record.saleQuantity;
         return <div className="w-24">{saleQuantity || 0}</div>;
       },
     },
@@ -504,7 +492,7 @@ const Inventory = ({ user }) => {
             user={user}
             supportedTokens={supportedTokens}
             reserves={reserves}
-            stratAddress={stratAddress}
+            stratAddress={stratsAddress}
             cataAddress={cataAddress}
           />
         </div>
@@ -734,7 +722,7 @@ const Inventory = ({ user }) => {
                         user={user}
                         supportedTokens={supportedTokens}
                         reserves={reserves}
-                        stratAddress={stratAddress}
+                        stratAddress={stratsAddress}
                         cataAddress={cataAddress}
                       />
                     ))
@@ -757,7 +745,7 @@ const Inventory = ({ user }) => {
                         user={user}
                         supportedTokens={supportedTokens}
                         reserves={reserves}
-                        stratAddress={stratAddress}
+                        stratAddress={stratsAddress}
                         cataAddress={cataAddress}
                       />
                     ))

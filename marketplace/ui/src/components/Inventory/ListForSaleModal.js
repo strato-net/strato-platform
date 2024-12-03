@@ -63,10 +63,7 @@ const ListForSaleModal = ({
       ? inventory.price
       : inventory.pricePerUnit;
 
-    return selectedPrice !== undefined &&
-      inventory.data.quantityIsDecimal === 'True'
-      ? selectedPrice * 100
-      : selectedPrice;
+    return selectedPrice !== undefined && isStrat ? selectedPrice * 100 : isCata ? selectedPrice * Math.pow(10, 18) : selectedPrice
   });
 
   const inventoryDispatch = useInventoryDispatch();
@@ -221,11 +218,7 @@ const ListForSaleModal = ({
             serviceName: availablePaymentServices[p].serviceName,
           };
         }),
-      price:
-        inventory.data.quantityIsDecimal &&
-        inventory.data.quantityIsDecimal === 'True'
-          ? pricePerUnit / 100
-          : pricePerUnit,
+      price: pricePerUnit !== undefined && isStrat ? pricePerUnit / 100 : isCata ? pricePerUnit / Math.pow(10, 18) : pricePerUnit,
     };
 
     // Ensure 'strats' is included in the submission
@@ -249,11 +242,7 @@ const ListForSaleModal = ({
 
     body = {
       ...body,
-      quantity:
-        inventory.data.quantityIsDecimal &&
-        inventory.data.quantityIsDecimal === 'True'
-          ? quantity * 100
-          : quantity,
+      quantity: quantity !== undefined && isStrat ? quantity * 100 : isCata ? quantity * Math.pow(10, 18) : quantity
     };
 
     let isDone;
