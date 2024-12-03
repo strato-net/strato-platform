@@ -464,7 +464,7 @@ const Inventory = ({ user }) => {
         const quantity = isStrats
           ? parseFloat((record.quantity / 100).toFixed(2))
           : isCata
-          ? parseFloat((record.quantity / Math.pow(10, 18)).toFixed(2))
+          ? parseFloat((record.quantity / Math.pow(10, 18)).toFixed(18))
           : record.quantity;
         return <div>{quantity || 0}</div>;
       },
