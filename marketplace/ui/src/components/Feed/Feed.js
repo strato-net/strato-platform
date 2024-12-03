@@ -3,26 +3,23 @@ import React, { useEffect, useState } from 'react';
 import routes from '../../helpers/routes';
 import ClickableCell from '../ClickableCell';
 import { actions as marketplaceActions } from '../../contexts/marketplace/actions';
-import { useMarketplaceDispatch } from '../../contexts/marketplace';
+import { useMarketplaceDispatch, useMarketplaceState } from '../../contexts/marketplace';
 import GlobalTransaction from './GlobalTransaction';
 
 const Feed = ({ user }) => {
   const [api, contextHolder] = notification.useNotification();
+  const { stratsAddress, cataAddress } = useMarketplaceState();
 
   const marketplaceDispatch = useMarketplaceDispatch();
-  const [stratAddress, setStratAddress] = useState('');
-  const [cataAddress, setCataAddress] = useState('');
 
   useEffect(() => {
     const fetchAddresses = async () => {
-      const stratAddress = await marketplaceActions.fetchStratsAddress(
+      marketplaceActions.fetchStratsAddress(
         marketplaceDispatch
       );
-      const cataAddress = await marketplaceActions.fetchCataAddress(
+      marketplaceActions.fetchCataAddress(
         marketplaceDispatch
       );
-      setStratAddress(stratAddress);
-      setCataAddress(cataAddress);
     };
 
     fetchAddresses();
@@ -43,11 +40,12 @@ const Feed = ({ user }) => {
           </Breadcrumb.Item>
         </Breadcrumb>
       </div>
+      {stratsAddress && cataAddress && 
       <GlobalTransaction
         user={user}
-        stratAddress={stratAddress}
+        stratAddress={stratsAddress}
         cataAddress={cataAddress}
-      />
+      />}
     </div>
   );
 };
