@@ -10,6 +10,8 @@ import {
 import { getStringDate } from '../../helpers/utils';
 import { US_DATE_FORMAT, STRATS_CONVERSION } from '../../helpers/constants';
 import { Images } from '../../images';
+// import { useMarketplaceState } from '../../contexts/marketplace';
+
 
 const styles = StyleSheet.create({
   page: {
@@ -93,6 +95,9 @@ const styles = StyleSheet.create({
 const InvoiceComponent = ({ invoice }) => {
   const [subtotal, setSubtotal] = useState(0);
   const [totalTax, settotalTax] = useState(0);
+  // const { stratsAddress,cataAddress } = useMarketplaceState()
+  // const isStrat = {data:'tet'}?.assetOriginAddress === stratsAddress || true;
+  // const isCata = {data:"tes"}?.assetOriginAddress === cataAddress || true; 
 
   useEffect(() => {
     let tax = 0;

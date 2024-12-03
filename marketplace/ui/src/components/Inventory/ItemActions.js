@@ -448,6 +448,8 @@ const ItemActions = ({
           debouncedSearchTerm={debouncedSearchTerm}
           category={category}
           reserves={reserves}
+          stratAddress={stratAddress}
+          cataAddress={cataAddress}
         />
       )}
       {transferModalOpen && (
