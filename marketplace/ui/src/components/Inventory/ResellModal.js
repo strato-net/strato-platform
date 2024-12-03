@@ -16,8 +16,12 @@ const ResellModal = ({
   debouncedSearchTerm,
   limit,
   offset,
-  reserves
+  reserves,
+  stratAddress,
+  cataAddress,
 }) => {
+  const isStrat = inventory.originAddress === stratAddress;
+  const isCata = inventory.originAddress === cataAddress;
   const [quantity, setQuantity] = useState(1);
   const inventoryDispatch = useInventoryDispatch();
   const [canResell, setCanResell] = useState(true);
@@ -56,10 +60,11 @@ const ResellModal = ({
     let body = {
       assetAddress: inventory.address,
       quantity:
-        inventory.data.quantityIsDecimal &&
-        inventory.data.quantityIsDecimal === 'True'
-          ? quantity * 100
-          : quantity,
+      isStrat
+      ? (quantity * 100).toFixed(0)
+      : isCata
+      ? (quantity * Math.pow(10, 18)).toFixed(0)
+      : quantity,
     };
     let isDone = await actions.resellInventory(inventoryDispatch, body);
     if (isDone) {

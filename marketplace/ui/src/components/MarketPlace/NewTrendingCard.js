@@ -6,6 +6,7 @@ import TagManager from 'react-gtm-module';
 import DOMPurify from 'dompurify';
 // State
 import { useAuthenticateState } from '../../contexts/authentication';
+import { useMarketplaceState } from '../../contexts/marketplace';
 // Assets
 import images_placeholder from '../../images/resources/image_placeholder.png';
 import { Images } from '../../images';
@@ -28,7 +29,7 @@ const NewTrendingCard = ({
   const navigate = useNavigate();
   const location = useLocation();
   const { Text } = Typography;
-
+  const { stratsAddress, cataAddress } = useMarketplaceState();
   const { hasChecked, isAuthenticated, loginUrl, user } =
     useAuthenticateState();
   const { reserves } = useInventoryState();
@@ -36,11 +37,10 @@ const NewTrendingCard = ({
 
   const [isModalVisible, setIsModalVisible] = useState(false);
   const [isWishlisted, setIsWishlisted] = useState(false);
-  const saleQuantity =
-    topSellingProduct.data.quantityIsDecimal &&
-    topSellingProduct.data.quantityIsDecimal === 'True'
-      ? topSellingProduct.saleQuantity / 100
-      : topSellingProduct.saleQuantity;
+  const isDecimal = topSellingProduct.data.quantityIsDecimal && topSellingProduct.data.quantityIsDecimal === 'True';
+  const isStrat = topSellingProduct.originAddress === stratsAddress;
+  const isCata = topSellingProduct.originAddress === cataAddress;
+  const saleQuantity = isStrat ? topSellingProduct.saleQuantity / 100 : isCata ? topSellingProduct.saleQuantity / Math.pow(10, 18) : topSellingProduct.saleQuantity
   const [quantity, setQuantity] = useState(1);
 
   const ownerSameAsUser = () => {
@@ -210,11 +210,7 @@ const NewTrendingCard = ({
         <div style={{ display: 'flex', justifyContent: 'space-between' }}>
           {topSellingProduct?.price
             ? (() => {
-                const adjustedPrice =
-                  topSellingProduct.data.quantityIsDecimal &&
-                  topSellingProduct.data.quantityIsDecimal === 'True'
-                    ? topSellingProduct.price * 100
-                    : topSellingProduct.price;
+                const adjustedPrice = isDecimal ? (topSellingProduct.price * 100).toFixed(2) : topSellingProduct.price
 
                 return (
                   <Typography className="font-semibold">

@@ -37,6 +37,11 @@ import { useItemDispatch, useItemState } from '../../contexts/item';
 import { actions as itemActions } from '../../contexts/item/actions';
 import { actions as redemptionActions } from '../../contexts/redemption/actions';
 import { actions as issuerStatusActions } from '../../contexts/issuerStatus/actions';
+import { actions as marketplaceActions } from '../../contexts/marketplace/actions';
+import {
+  useMarketplaceDispatch,
+  useMarketplaceState,
+} from '../../contexts/marketplace';
 import {
   useRedemptionDispatch,
   useRedemptionState,
@@ -81,6 +86,10 @@ const Inventory = ({ user }) => {
   const navigate = useNavigate();
   const naviroute = routes.InventoryDetail.url;
   let { hasChecked, isAuthenticated, loginUrl } = useAuthenticateState();
+  const { stratsAddress, cataAddress } = useMarketplaceState();
+  // console.log("{ stratsAddress, cataAddress }", { stratsAddress, cataAddress });
+  const formatter = new Intl.NumberFormat('en-US');
+  const formattedNum = (num) => formatter.format(num);
 
   const location = useLocation();
   const queryParams = new URLSearchParams(location.search);
@@ -103,6 +112,7 @@ const Inventory = ({ user }) => {
     isReservesLoading,
     reserves,
   } = useInventoryState();
+
   const {
     paymentServices,
     arePaymentServicesLoading,
@@ -438,11 +448,11 @@ const Inventory = ({ user }) => {
       title: 'Price',
       align: 'center',
       render: (_, record) => {
-        const isStrats =
+        const isDecimal =
           record.data.quantityIsDecimal &&
           record.data.quantityIsDecimal === 'True';
         const price = record.price
-          ? isStrats
+          ? isDecimal
             ? parseFloat(record.price * 100).toFixed(2)
             : record.price
           : 'N/A';
@@ -467,11 +477,12 @@ const Inventory = ({ user }) => {
       title: 'Owned',
       align: 'center',
       render: (_, record) => {
-        const isStrats =
-          record.data.quantityIsDecimal &&
-          record.data.quantityIsDecimal === 'True';
+        const isStrats = record.originAddress === stratsAddress;
+        const isCata = record.originAddress === cataAddress;
         const quantity = isStrats
           ? parseFloat((record.quantity / 100).toFixed(2))
+          : isCata
+          ? parseFloat((record.quantity / Math.pow(10, 18)).toFixed(18))
           : record.quantity;
         return <div>{quantity || 0}</div>;
       },
@@ -504,6 +515,8 @@ const Inventory = ({ user }) => {
             user={user}
             supportedTokens={supportedTokens}
             reserves={reserves}
+            stratAddress={stratsAddress}
+            cataAddress={cataAddress}
           />
         </div>
       ),
@@ -740,6 +753,8 @@ const Inventory = ({ user }) => {
                         user={user}
                         supportedTokens={supportedTokens}
                         reserves={reserves}
+                        stratAddress={stratsAddress}
+                        cataAddress={cataAddress}
                       />
                     ))
                   ) : (
@@ -761,6 +776,8 @@ const Inventory = ({ user }) => {
                         user={user}
                         supportedTokens={supportedTokens}
                         reserves={reserves}
+                        stratAddress={stratsAddress}
+                        cataAddress={cataAddress}
                       />
                     ))
                   ) : (

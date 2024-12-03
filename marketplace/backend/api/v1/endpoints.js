@@ -184,6 +184,7 @@ export const Marketplace = {
   getStratsBalance: "/strats",
   getCataBalance: "/cata",
   getStratsAddress: "/strats/address",
+  getCataAddress: "/cata/address",
   getStratsTransactionHistory: "/strats/history",
 };
 

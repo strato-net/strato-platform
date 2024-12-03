@@ -100,7 +100,7 @@ const ProductDetails = ({ user, users }) => {
     isFetchingPriceHistory,
     reserves,
   } = useInventoryState();
-  const { cartList } = useMarketplaceState();
+  const { cartList, stratsAddress, cataAddress } = useMarketplaceState();
 
   const [isModalVisible, setIsModalVisible] = useState(false);
   const [timeFilter, setTimeFilter] = useState('1');
@@ -205,6 +205,7 @@ const ProductDetails = ({ user, users }) => {
   }, [marketplaceDispatch, cartList]);
 
   const details = inventoryDetails;
+
   let fileValues = [];
   let fileNames = [];
 
@@ -651,7 +652,6 @@ const ProductDetails = ({ user, users }) => {
                               details.data.quantityIsDecimal === 'True'
                                 ? details.price * 100
                                 : details.price;
-
                             return (
                               <>
                                 $

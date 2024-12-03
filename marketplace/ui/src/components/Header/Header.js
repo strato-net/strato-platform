@@ -11,7 +11,6 @@ import {
   Select,
   Row,
   Col,
-  Tooltip,
 } from 'antd';
 import {
   ArrowLeftOutlined,
@@ -76,7 +75,7 @@ const HeaderComponent = ({
   const categoryDispatch = useCategoryDispatch();
   const userDispatch = useAuthenticateDispatch();
   //States
-  const { cartList, strats, cata } = useMarketplaceState();
+  const { cartList, strats, cata, cataAddress, stratsAddress } = useMarketplaceState();
   const { categorys } = useCategoryState();
   let { isAuthenticated } = useAuthenticateState();
 
@@ -84,17 +83,12 @@ const HeaderComponent = ({
     if (user) {
       marketplaceActions.fetchStratsBalance(marketplaceDispatch);
       marketplaceActions.fetchCataBalance(marketplaceDispatch);
+      marketplaceActions.fetchStratsAddress(marketplaceDispatch);
+      marketplaceActions.fetchCataAddress(marketplaceDispatch);
     }
   }, [user]);
 
   useEffect(() => {
-    async function fetchStratsAddress() {
-      const stratsAddress = await marketplaceActions.fetchStratsAddress(
-        marketplaceDispatch
-      );
-      setOriginAddress(stratsAddress);
-    }
-    fetchStratsAddress();
     marketplaceActions.fetchCartItems(marketplaceDispatch, cartList);
   }, [marketplaceDispatch, cartList]);
 
@@ -104,7 +98,7 @@ const HeaderComponent = ({
   const [categories, setCategories] = useState([]);
   const [selectedCategory, setSelectedCategory] = useState(categoryQueryValue);
   const [isModalVisible, setIsModalVisible] = useState(false);
-  const [originAddress, setOriginAddress] = useState();
+  // const [originAddress, setOriginAddress] = useState(stratsAddress);
   const formatter = new Intl.NumberFormat('en-US');
   const formattedNum = (num) => formatter.format(num);
   const stratsBalance = Object.keys(strats).length > 0 ? strats : 0;
@@ -233,13 +227,13 @@ const HeaderComponent = ({
           onClick: async () => {
             navigate(
               `${routes.MarketplaceProductDetail.url
-                .replace(':address', originAddress)
+                .replace(':address', stratsAddress)
                 .replace(':name', 'STRATS')}`
             );
           },
           label: (
             <div>
-              {user && originAddress && (
+              {user && stratsAddress && (
                 <p className="text-xs mt-1">Buy STRATs</p>
               )}
             </div>
@@ -274,7 +268,7 @@ const HeaderComponent = ({
               <Col Col={24}>
                 {' '}
                 <p className="text-xs mt-3">
-                  Balance: ${formattedNum(cataBalance * 10)}
+                  Balance: ${formattedNum(cataBalance / 10)}
                 </p>
               </Col>
             </Row>
@@ -518,15 +512,13 @@ const HeaderComponent = ({
           }}
           items={navItems}
         />
-        <Tooltip placement="bottom" title={'Stake'}>
-          <Button
-            type="primary"
-            className="font-semibold hidden md:block"
-            onClick={() => navigate(routes.MyWalletStakeable.url)}
-          >
-            <RiseOutlined /> Stake
-          </Button>
-        </Tooltip>
+        <Button
+          type="primary"
+          className="font-semibold hidden md:block"
+          onClick={() => navigate(routes.MyWalletStakeable.url)}
+        >
+          <RiseOutlined /> Stake
+        </Button>
         <Space size="large" className="!gap-0 md:!gap-4 mr-0 -ml-3">
           {
             <div

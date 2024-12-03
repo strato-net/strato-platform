@@ -48,6 +48,8 @@ const InventoryCard = ({
   offset,
   user,
   supportedTokens,
+  stratAddress,
+  cataAddress,
 }) => {
   const textRef = useRef(null);
   const { isReserveLoading, reserves } = useInventoryState();
@@ -64,18 +66,20 @@ const InventoryCard = ({
   const [bridgeModalOpen, setBridgeModalOpen] = useState(false);
   const [stakeModalOpen, setStakeModalOpen] = useState(false);
   const [popoverVisible, setPopoverVisible] = useState({});
-  
+
   const navigate = useNavigate();
   const naviroute = routes.InventoryDetail.url;
   const imgMeta = category ? category : SEO.TITLE_META;
   const itemData = inventory.data;
-  const isStrats =
-    itemData.quantityIsDecimal && itemData.quantityIsDecimal === 'True';
+  const isStrats = inventory.originAddress === stratAddress;
+  const isCata = inventory.originAddress === cataAddress;
   const quantity = isStrats
     ? parseFloat((inventory.quantity / 100).toFixed(2))
+    : isCata
+    ? parseFloat((inventory.quantity / Math.pow(10, 18)).toFixed(2))
     : inventory.quantity;
   const price = inventory?.price
-    ? isStrats
+    ? isStrats || isCata
       ? parseFloat(inventory?.price * 100).toFixed(2)
       : inventory?.price
     : undefined;
@@ -83,10 +87,14 @@ const InventoryCard = ({
     ? inventory.saleQuantity !== undefined
       ? parseFloat((inventory.saleQuantity / 100).toFixed(2))
       : undefined
+    : isCata
+    ? parseFloat((inventory.saleQuantity / Math.pow(10, 18)).toFixed(2))
     : inventory.saleQuantity;
   const totalLockedQuantity = inventory.totalLockedQuantity
     ? isStrats
       ? (inventory.totalLockedQuantity / 100).toFixed(2)
+      : isCata
+      ? (inventory.totalLockedQuantity / Math.pow(10, 18)).toFixed(2)
       : inventory.totalLockedQuantity
     : 0;
   const stakeable =
@@ -135,7 +143,6 @@ const InventoryCard = ({
   const handleRepayModalClose = () => {
     setRepayModalOpen(false);
   };
-
 
   const handleUnlistModalClose = () => {
     setUnlistModalOpen(false);
@@ -322,144 +329,157 @@ const InventoryCard = ({
             </div>
           </div>
           <div className="mt-3 grid grid-cols-3 gap-1 w-full">
-          {(!stakeable || (!inventory.maxStratsLoanAmount && stakeable)) && (
-        <>
-          <Button
-            type="link"
-            className="text-[#13188A]  text-left px-0 font-semibold text-sm h-6"
-            onClick={showListModal}
-            disabled={
-              isEditSellDisabled() || !isActive() || disableSADDOGS(inventory)
-            }
-          >
-            {inventory.price ? (
+            {(!stakeable || (!inventory.maxStratsLoanAmount && stakeable)) && (
               <>
-                <EditOutlined /> Edit
-              </>
-            ) : (
-              <>
-                <DollarOutlined /> Sell
+                <Button
+                  type="link"
+                  className="text-[#13188A]  text-left px-0 font-semibold text-sm h-6"
+                  onClick={showListModal}
+                  disabled={
+                    isEditSellDisabled() ||
+                    !isActive() ||
+                    disableSADDOGS(inventory)
+                  }
+                >
+                  {inventory.price ? (
+                    <>
+                      <EditOutlined /> Edit
+                    </>
+                  ) : (
+                    <>
+                      <DollarOutlined /> Sell
+                    </>
+                  )}
+                </Button>
+                <Button
+                  type="link"
+                  className="text-[#13188A]  text-left px-0 font-semibold text-sm h-6"
+                  onClick={showTransferModal}
+                  disabled={isTransferDisabled() || !isActive()}
+                >
+                  <SwapOutlined /> Transfer
+                </Button>
               </>
             )}
-          </Button>
-          <Button
-            type="link"
-            className="text-[#13188A]  text-left px-0 font-semibold text-sm h-6"
-            onClick={showTransferModal}
-            disabled={isTransferDisabled() || !isActive()}
-          >
-            <SwapOutlined /> Transfer
-          </Button>
-        </>
-      )}
-      {!stakeable && (
-        <Button
-          type="link"
-          className="text-[#13188A]  text-left px-0 font-semibold text-sm h-6"
-          onClick={showRedeemModal}
-          disabled={
-            inventory.price ||
-            inventory.address === inventory.originAddress ||
-            !isActive() ||
-            disableSADDOGS(inventory)
-          }
-        >
-          <SendOutlined /> Redeem
-        </Button>
-      )}
+            {!stakeable && (
+              <Button
+                type="link"
+                className="text-[#13188A]  text-left px-0 font-semibold text-sm h-6"
+                onClick={showRedeemModal}
+                disabled={
+                  inventory.price ||
+                  inventory.address === inventory.originAddress ||
+                  !isActive() ||
+                  disableSADDOGS(inventory) ||
+                  isStrats ||
+                  isCata
+                }
+              >
+                <SendOutlined /> Redeem
+              </Button>
+            )}
 
-      {!inventory.maxStratsLoanAmount && stakeable && (
-        <Button
-          type="primary"
-          className="font-semibold w-full flex items-center justify-center"
-          onClick={() => showStakeModal('Stake')}
-          disabled={inventory.price || !isActive()}
-        >
-          <RiseOutlined /> Stake
-        </Button>
-      )}
+            {!inventory.maxStratsLoanAmount && stakeable && (
+              <Button
+                type="primary"
+                className="font-semibold w-full flex items-center justify-center"
+                onClick={() => showStakeModal('Stake')}
+                disabled={inventory.price || !isActive()}
+              >
+                <RiseOutlined /> Stake
+              </Button>
+            )}
 
-      {inventory.maxStratsLoanAmount && stakeable && (
-        <>
-          <Button
-            type="link"
-            className="text-[#13188A]  text-left px-0 font-semibold text-sm h-6"
-            onClick={() => showStakeModal('Unstake')}
-            disabled={inventory?.borrowedAmount && inventory?.borrowedAmount > 0}
-          >
-            <LogoutOutlined /> Unstake
-          </Button>
-          <Button
-            type="link"
-            className="text-[#13188A]  text-left px-0 font-semibold text-sm h-6"
-            onClick={() => showBorrowModal('Unstake')}
-            disabled={inventory?.borrowedAmount && inventory?.borrowedAmount > 0}
-          >
-            <BankOutlined /> Borrow
-          </Button>
-          <Button
-            type="link"
-            className="text-[#13188A]  text-left px-0 font-semibold text-sm h-6"
-            onClick={() => showRepayModal('Unstake')}
-            disabled={inventory?.borrowedAmount && inventory?.borrowedAmount <= 0}
-          >
-            <SolutionOutlined />Repay
-          </Button>
-        </>
-      )}
-      {(!stakeable || (!inventory.maxStratsLoanAmount && stakeable)) && (
-       <>
-       {stakeable && (
-         <Button
-           type="link"
-           className="text-[#13188A]  text-left px-0 font-semibold text-sm h-6"
-           onClick={showRedeemModal}
-           disabled={
-             inventory.price ||
-             inventory.address === inventory.originAddress ||
-             !isActive() ||
-             disableSADDOGS(inventory)
-           }
-         >
-           <SendOutlined /> Redeem
-         </Button>
-       )}
-       <Button
-         type="link"
-         className="text-[#13188A]  text-left px-0 font-semibold text-sm h-6"
-         onClick={showUnlistModal}
-         disabled={!inventory.price || !isActive()}
-       >
-         <StopOutlined /> Unlist
-       </Button>
-       <Button
-         type="link"
-         className="text-[#13188A]  text-left px-0 font-semibold text-sm h-6"
-         onClick={showResellModal}
-         disabled={
-           !(
-             itemData.isMint &&
-             itemData.isMint == 'True' &&
-             !disableSADDOGS(inventory)
-           ) || !isActive()
-         }
-       >
-         <PieChartOutlined /> Mint
-       </Button>
-       <Button
-         type="link"
-         className={`text-[#13188A]  text-left px-0 font-semibold text-sm h-6 ${
-           !isTokenSupported(inventory.root) ||
-           inventory.maxStratsLoanAmount
-             ? 'hidden'
-             : ''
-         }`}
-         onClick={showBridgeModal}
-       >
-         <RetweetOutlined /> Bridge
-       </Button>
-     </>
-      )}
+            {inventory.maxStratsLoanAmount && stakeable && (
+              <>
+                <Button
+                  type="link"
+                  className="text-[#13188A]  text-left px-0 font-semibold text-sm h-6"
+                  onClick={() => showStakeModal('Unstake')}
+                  disabled={
+                    inventory?.borrowedAmount && inventory?.borrowedAmount > 0
+                  }
+                >
+                  <LogoutOutlined /> Unstake
+                </Button>
+                <Button
+                  type="link"
+                  className="text-[#13188A]  text-left px-0 font-semibold text-sm h-6"
+                  onClick={() => showBorrowModal('Unstake')}
+                  disabled={
+                    inventory?.borrowedAmount && inventory?.borrowedAmount > 0
+                  }
+                >
+                  <BankOutlined /> Borrow
+                </Button>
+                <Button
+                  type="link"
+                  className="text-[#13188A]  text-left px-0 font-semibold text-sm h-6"
+                  onClick={() => showRepayModal('Unstake')}
+                  disabled={
+                    inventory?.borrowedAmount && inventory?.borrowedAmount <= 0
+                  }
+                >
+                  <SolutionOutlined />
+                  Repay
+                </Button>
+              </>
+            )}
+            {(!stakeable || (!inventory.maxStratsLoanAmount && stakeable)) && (
+              <>
+                {stakeable && (
+                  <Button
+                    type="link"
+                    className="text-[#13188A]  text-left px-0 font-semibold text-sm h-6"
+                    onClick={showRedeemModal}
+                    disabled={
+                      inventory.price ||
+                      inventory.address === inventory.originAddress ||
+                      !isActive() ||
+                      disableSADDOGS(inventory) ||
+                      isStrats ||
+                      isCata
+                    }
+                  >
+                    <SendOutlined /> Redeem
+                  </Button>
+                )}
+                <Button
+                  type="link"
+                  className="text-[#13188A]  text-left px-0 font-semibold text-sm h-6"
+                  onClick={showUnlistModal}
+                  disabled={!inventory.price || !isActive()}
+                >
+                  <StopOutlined /> Unlist
+                </Button>
+                <Button
+                  type="link"
+                  className="text-[#13188A]  text-left px-0 font-semibold text-sm h-6"
+                  onClick={showResellModal}
+                  disabled={
+                    !(
+                      itemData.isMint &&
+                      itemData.isMint == 'True' &&
+                      !disableSADDOGS(inventory)
+                    ) || !isActive()
+                  }
+                >
+                  <PieChartOutlined /> Mint
+                </Button>
+                <Button
+                  type="link"
+                  className={`text-[#13188A]  text-left px-0 font-semibold text-sm h-6 ${
+                    !isTokenSupported(inventory.root) ||
+                    inventory.maxStratsLoanAmount
+                      ? 'hidden'
+                      : ''
+                  }`}
+                  onClick={showBridgeModal}
+                >
+                  <RetweetOutlined /> Bridge
+                </Button>
+              </>
+            )}
           </div>
         </div>
       </div>
@@ -542,7 +562,8 @@ const InventoryCard = ({
                 <p className="flex">
                   <span>${price}</span>
                   <p className="flex text-xs items-center">
-                    &nbsp;({(price * STRATS_CONVERSION).toFixed(0)} {StratsIcon})
+                    &nbsp;({(price * STRATS_CONVERSION).toFixed(0)} {StratsIcon}
+                    )
                   </p>
                 </p>
               ) : (
@@ -570,6 +591,8 @@ const InventoryCard = ({
           categoryName={category}
           user={user}
           reserves={reserves}
+          stratAddress={stratAddress}
+          cataAddress={cataAddress}
         />
       )}
       {unlistModalOpen && (
@@ -631,6 +654,8 @@ const InventoryCard = ({
           debouncedSearchTerm={debouncedSearchTerm}
           saleAddress={inventory.saleAddress}
           category={category}
+          stratAddress={stratAddress}
+          cataAddress={cataAddress}
         />
       )}
       {transferModalOpen && (
@@ -642,6 +667,8 @@ const InventoryCard = ({
           inventory={inventory}
           categoryName={category}
           reserves={reserves}
+          stratAddress={stratAddress}
+          cataAddress={cataAddress}
         />
       )}
       {redeemModalOpen && (

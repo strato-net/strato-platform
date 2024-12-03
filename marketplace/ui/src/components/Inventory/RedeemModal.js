@@ -29,7 +29,7 @@ const RedeemModal = ({
   debouncedSearchTerm,
   limit,
   offset,
-  reserves
+  reserves,
 }) => {
   const [data, setData] = useState([inventory]);
   const location = useLocation();
@@ -48,13 +48,7 @@ const RedeemModal = ({
   const { userAddresses, isLoadingUserAddresses } = useMarketplaceState();
   const { TextArea } = Input;
 
-  // Determine if `isStrats` is true based on inventory data
-  const isStrats =
-    inventory.data.quantityIsDecimal &&
-    inventory.data.quantityIsDecimal === 'True';
-  const displayQuantity = isStrats
-    ? parseFloat((inventory.quantity / 100).toFixed(2))
-    : inventory.quantity;
+  const displayQuantity = inventory.quantity;
 
   const closeAddressModel = () => {
     setshowModal(false);
@@ -118,7 +112,7 @@ const RedeemModal = ({
       redemptionService: inventory.data.redemptionService,
       assetName: inventory.name,
       status: REDEMPTION_STATUS.PENDING,
-      quantity: isStrats ? parseFloat(quantity * 100) : quantity,
+      quantity: quantity,
       shippingAddressId: userAddresses[selectedAddress].address_id,
       ownerCommonName: user.commonName,
       issuerCommonName: inventory.creator,
@@ -222,7 +216,11 @@ const RedeemModal = ({
             {userAddresses.map((add, index) => (
               <div key={index}>
                 <div
-                  className={`w-[307px] h-[200px] overflow-x-auto hide-Scroll py-3 px-[14px] rounded-[4px] ${index !== selectedAddress ? ' cursor-pointer border border-[#0000002E] ' : ' border border-primary cursor-pointer'}`}
+                  className={`w-[307px] h-[200px] overflow-x-auto hide-Scroll py-3 px-[14px] rounded-[4px] ${
+                    index !== selectedAddress
+                      ? ' cursor-pointer border border-[#0000002E] '
+                      : ' border border-primary cursor-pointer'
+                  }`}
                   onClick={() => {
                     setSelectedAddress(index);
                   }}
@@ -322,7 +320,11 @@ const RedeemModal = ({
                   {userAddresses.map((add, index) => (
                     <div key={index}>
                       <div
-                        className={`w-full h-[200px] overflow-x-auto hide-Scroll py-3 px-[14px] rounded-[4px] ${index !== selectedAddress ? ' cursor-pointer border border-[#0000002E] ' : ' border border-primary cursor-pointer'}`}
+                        className={`w-full h-[200px] overflow-x-auto hide-Scroll py-3 px-[14px] rounded-[4px] ${
+                          index !== selectedAddress
+                            ? ' cursor-pointer border border-[#0000002E] '
+                            : ' border border-primary cursor-pointer'
+                        }`}
                         onClick={() => {
                           setSelectedAddress(index);
                         }}

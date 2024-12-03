@@ -2,21 +2,28 @@ import { Breadcrumb, notification } from 'antd';
 import React, { useEffect, useState } from 'react';
 import routes from '../../helpers/routes';
 import ClickableCell from '../ClickableCell';
-import { actions as categoryActions } from '../../contexts/category/actions';
-import { useCategoryState, useCategoryDispatch } from '../../contexts/category';
-import { useTransactionState } from '../../contexts/transaction';
+import { actions as marketplaceActions } from '../../contexts/marketplace/actions';
+import { useMarketplaceDispatch, useMarketplaceState } from '../../contexts/marketplace';
 import GlobalTransaction from './GlobalTransaction';
 
 const Feed = ({ user }) => {
-  const categoryDispatch = useCategoryDispatch();
-
-  const { userTransactions, isTransactionLoading } = useTransactionState();
-  const { categorys } = useCategoryState();
   const [api, contextHolder] = notification.useNotification();
+  const { stratsAddress, cataAddress } = useMarketplaceState();
+
+  const marketplaceDispatch = useMarketplaceDispatch();
 
   useEffect(() => {
-    categoryActions.fetchCategories(categoryDispatch);
-  }, [categoryDispatch]);
+    const fetchAddresses = async () => {
+      marketplaceActions.fetchStratsAddress(
+        marketplaceDispatch
+      );
+      marketplaceActions.fetchCataAddress(
+        marketplaceDispatch
+      );
+    };
+
+    fetchAddresses();
+  }, []);
 
   return (
     <div>
@@ -29,16 +36,16 @@ const Feed = ({ user }) => {
             </ClickableCell>
           </Breadcrumb.Item>
           <Breadcrumb.Item href="" onClick={(e) => e.preventDefault()}>
-            <p className=" text-sm text-[#202020] font-medium">
-              Activity Feed
-            </p>
+            <p className=" text-sm text-[#202020] font-medium">Activity Feed</p>
           </Breadcrumb.Item>
         </Breadcrumb>
       </div>
+      {stratsAddress && cataAddress && 
       <GlobalTransaction
         user={user}
-        isAllOrdersLoading={isTransactionLoading}
-      />
+        stratAddress={stratsAddress}
+        cataAddress={cataAddress}
+      />}
     </div>
   );
 };
