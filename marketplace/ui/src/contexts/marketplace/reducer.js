@@ -156,6 +156,41 @@ const reducer = (state, action) => {
         isTopSellingProductsLoading: false,
       };
 
+    case actionDescriptors.fetchStakeableProducts:
+      return {
+        ...state,
+        isStakeableProductsLoading: true,
+      };
+    case actionDescriptors.fetchStakeableProductsSuccessful:
+      return {
+        ...state,
+        stakeableProducts: action.payload,
+        isStakeableProductsLoading: false,
+      };
+    case actionDescriptors.fetchStakeableProductsFailed:
+      return {
+        ...state,
+        error: action.error,
+        isStakeableProductsLoading: false,
+      };
+    case actionDescriptors.fetchStakeableProductsLoggedIn:
+      return {
+        ...state,
+        isStakeableProductsLoading: true,
+      };
+    case actionDescriptors.fetchStakeableProductsLoggedInSuccessful:
+      return {
+        ...state,
+        stakeableProducts: action.payload,
+        isStakeableProductsLoading: false,
+      };
+    case actionDescriptors.fetchStakeableProductsLoggedInFailed:
+      return {
+        ...state,
+        error: action.error,
+        isStakeableProductsLoading: false,
+      };
+
     //shipping address adding
     case actionDescriptors.addShippingAddress:
       return {

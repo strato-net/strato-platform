@@ -1,6 +1,7 @@
 import { Button, Image, Typography, Spin, notification } from 'antd';
 import CategoryCard from './CategoryCard';
 import TopSellingProductCard from './TopSellingProductCard';
+import StakeableProductCards from './StakeableProductCards';
 import TrendingVaultCard from './TrendingVaultCard';
 import { Images } from '../../images';
 import React, { useEffect } from 'react';
@@ -74,7 +75,10 @@ const MarketPlace = ({ user, isAuthenticated }) => {
 
   const navigateToUserProfile = () => {
     navigate(
-      `${routes.MarketplaceUserProfile.url.replace(':commonName', user.commonName)}?tab=my-activity`
+      `${routes.MarketplaceUserProfile.url.replace(
+        ':commonName',
+        user.commonName
+      )}?tab=my-activity`
     );
   };
 
@@ -201,11 +205,26 @@ const MarketPlace = ({ user, isAuthenticated }) => {
           <Spin spinning={iscategorysLoading} size="large" />
         </div>
       ) : (
-        <div className="px-3 md:px-0 py-30 mt-6 md:mt-10 mb-10">
-          {/* <CategoryCard /> */}
-          {/* <TrendingVaultCard /> */}
-          <TopSellingProductCard />
-        </div>
+        <>
+          <div className="px-3 md:px-0 py-30 mt-6 md:mt-10 mb-10">
+            {/* <CategoryCard /> */}
+            {/* <TrendingVaultCard /> */}
+            <StakeableProductCards />
+            <TopSellingProductCard />
+          </div>
+          <h3 className="text-center text-gray-500 mt-8 mb-4">
+            Is there an item you would like to see on the marketplace?
+            <a
+              href="https://forms.gle/biuEtUHrFdLpX1d36"
+              rel="noreferrer"
+              target="_blank"
+              className="text-blue"
+            >
+              {' '}
+              Let us know!
+            </a>
+          </h3>
+        </>
       )}
     </>
   );
