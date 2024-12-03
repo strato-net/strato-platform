@@ -1,10 +1,15 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { Typography, Spin, notification, Button } from 'antd';
 import { actions } from '../../contexts/marketplace/actions';
+import { actions as inventoryActions } from '../../contexts/inventory/actions';
 import {
   useMarketplaceDispatch,
   useMarketplaceState,
 } from '../../contexts/marketplace';
+import {
+  useInventoryDispatch,
+  useInventoryState,
+} from '../../contexts/inventory';
 import { useNavigate } from 'react-router-dom';
 import routes from '../../helpers/routes';
 import { useAuthenticateState } from '../../contexts/authentication';
@@ -13,28 +18,46 @@ import { Fade } from 'react-awesome-reveal';
 
 const { Title } = Typography;
 
-const TopSellingProductCard = () => {
+const StakeableProductCards = () => {
   const containerRef = useRef(null);
   const [offset, setOffset] = useState(0);
   const limit = 25;
 
   const marketplaceDispatch = useMarketplaceDispatch();
-  const { topSellingProducts, isTopSellingProductsLoading, cartList } =
+  const { stakeableProducts, isStakeableProductsLoading } =
     useMarketplaceState();
+  const { reserves } = useInventoryState();
+  const inventoryDispatch = useInventoryDispatch();
   let { hasChecked, isAuthenticated, loginUrl, user } = useAuthenticateState();
   const [api, contextHolder] = notification.useNotification();
 
   useEffect(() => {
-    if (hasChecked && !isAuthenticated) {
-      actions.fetchTopSellingProducts(marketplaceDispatch, offset, limit);
-    } else if (hasChecked && isAuthenticated) {
-      actions.fetchTopSellingProductsLoggedIn(
-        marketplaceDispatch,
-        offset,
-        limit
-      );
+    inventoryActions.getAllReserve(inventoryDispatch);
+  }, []);
+
+  useEffect(() => {
+    if (reserves) {
+      const checkThis = reserves.map((reserve) => reserve.assetRootAddress)
+      console.log(checkThis);
+      if (hasChecked && !isAuthenticated) {
+        actions.fetchStakeableProducts(marketplaceDispatch, offset, limit);
+      } else if (hasChecked && isAuthenticated) {
+        actions.fetchStakeableProductsLoggedIn(
+          marketplaceDispatch,
+          offset,
+          limit,
+          reserves.map((reserve) => reserve.assetRootAddress)
+        );
+      }
     }
-  }, [marketplaceDispatch, offset, hasChecked, isAuthenticated, loginUrl]);
+  }, [
+    marketplaceDispatch,
+    offset,
+    hasChecked,
+    isAuthenticated,
+    loginUrl,
+    reserves,
+  ]);
 
   const navigate = useNavigate();
 
@@ -63,7 +86,7 @@ const TopSellingProductCard = () => {
     return () => {
       parent?.removeEventListener('scroll', handleScroll);
     };
-  }, [topSellingProducts]);
+  }, [stakeableProducts]);
 
   const scroll = (left) => {
     containerRef.current.scrollBy({
@@ -84,34 +107,13 @@ const TopSellingProductCard = () => {
       <Fade triggerOnce>
         <div className="pt-5 pr-2 md:pr-10 flex justify-between">
           <Title className="md:px-10 !text-xl md:!text-4xl !text-left">
-            Trending Items
+            Stakeable Items
           </Title>
-          <Button
-            size="large"
-            id="viewAll"
-            onClick={() => {
-              navigate(navRoute);
-              sessionStorage.setItem('scrollPosition', 0);
-            }}
-            className="text-black hover:!text-black border-grayDark hidden md:flex"
-          >
-            View All
-          </Button>
-          <Button
-            size="small"
-            onClick={() => {
-              navigate(navRoute);
-              sessionStorage.setItem('scrollPosition', 0);
-            }}
-            className="text-black hover:!text-black border-grayDark flex md:hidden"
-          >
-            View All
-          </Button>
         </div>
       </Fade>
-      {isTopSellingProductsLoading ? (
+      {isStakeableProductsLoading ? (
         <div className="h-52 flex justify-center items-center">
-          <Spin spinning={isTopSellingProductsLoading} size="large" />
+          <Spin spinning={isStakeableProductsLoading} size="large" />
         </div>
       ) : (
         <Fade direction="right" triggerOnce>
@@ -120,7 +122,7 @@ const TopSellingProductCard = () => {
               ref={containerRef}
               className="overflow-x-auto gap-6 px-1 py-2 flex trending_cards"
             >
-              {topSellingProducts
+              {stakeableProducts
                 .filter((product) => product.saleQuantity > 0)
                 .map((topSellingProduct) => {
                   return (
@@ -157,4 +159,4 @@ const TopSellingProductCard = () => {
   );
 };
 
-export default TopSellingProductCard;
+export default StakeableProductCards;

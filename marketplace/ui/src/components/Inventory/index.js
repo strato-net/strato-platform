@@ -99,7 +99,6 @@ const Inventory = ({ user }) => {
     isReservesLoading,
     reserves,
   } = useInventoryState();
-  console.log('reserves', reserves);
   const {
     paymentServices,
     arePaymentServicesLoading,
