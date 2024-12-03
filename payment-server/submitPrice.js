@@ -44,41 +44,45 @@ async function fetchAndSubmitEscrowAddresses(oracleContract, token) {
     throw new Error("No reserves found");
   }
 
-  const reserveName = reserves[0].name;
-  const reserveAddress = reserves[0].address;
+  for (const reserve of reserves) {
+    const reserveName = reserve.name;
+    const reserveAddress = reserve.address;
 
-  // Define search options for active escrows
-  const searchOptions = {
-    config,
-    query: {
-      creator: "eq.BlockApps",
-      isOpen: "eq.true",
-      "data->>reserve": "eq." + reserveAddress,
-    },
-  };
+    // Define search options for active escrows
+    const searchOptions = {
+      config,
+      query: {
+        creator: "eq.BlockApps",
+        isOpen: "eq.true",
+        "data->>reserve": "eq." + reserveAddress,
+      },
+    };
 
-  // Fetch escrows from Cirrus
-  const escrows = await rest.search(
-    user,
-    { name: "BlockApps-Mercata-Sale" },
-    searchOptions
-  );
+    // Fetch escrows from Cirrus
+    const escrows = await rest.search(
+      user,
+      { name: "BlockApps-Mercata-Sale" },
+      searchOptions
+    );
 
-  if (!escrows || escrows.length === 0) {
-    throw new Error("No escrows found");
+    if (!escrows || escrows.length === 0) {
+      console.log(`No escrows found for reserve ${reserveName}`);
+      continue;
+    }
+
+    // Extract escrow addresses
+    const escrowAddresses = escrows.map((escrow) => escrow.address);
+    console.log(`Escrow Addresses for ${reserveName}: ${JSON.stringify(escrowAddresses)}`);
+
+    await distributeRewards(
+      token,
+      { address: reserveAddress, name: reserveName },
+      { escrowAddresses }
+    );
+    console.log(
+      `Escrow Addresses submitted for ${reserveName} at ${new Date().toISOString()}`
+    );
   }
-  // Extract escrow addresses
-  const escrowAddresses = escrows.map((escrow) => escrow.address);
-  console.log(`Escrow Addresses: ${JSON.stringify(escrowAddresses)}`);
-
-  await distributeRewards(
-    token,
-    { address: reserveAddress, name: reserveName },
-    { escrowAddresses }
-  );
-  console.log(
-    `Escrow Addresses submitted for ${reserveName} at ${new Date().toISOString()}`
-  );
 }
 
 // Function to fetch and submit price
@@ -110,12 +114,6 @@ async function main() {
   );
 
   const { contracts } = deployment;
-  if (!silverOracle && !goldOracle) {
-    console.warn(
-      "WARN: No oracle contracts are deployed. Skipping price submission."
-    );
-    return;
-  }
 
   const fetchInterval = Number(config.fetchInterval) || 60000; // Default to 1 minute
 
