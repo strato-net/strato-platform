@@ -86,7 +86,7 @@ abstract contract Reserve is Utils, Structs {
         lastUpdatedTimestamp = _timestamp;
         lastUpdatedOraclePrice = _newPrice;
 
-        _updateTvl(0);
+        _updateTvl(0, true);
     }
 
     function stakeAsset(uint _collateralQuantity, address _assetAddress, PaymentServiceInfo _stratPaymentService) public requireActive() returns (address) {
@@ -110,7 +110,7 @@ abstract contract Reserve is Utils, Structs {
         );
 
         // Update tvl: total value locked
-        _updateTvl(_collateralQuantity);
+        _updateTvl(_collateralQuantity, true);
 
         emit StakeCreated(msg.sender, address(escrow), _collateralQuantity, _maxStratsLoanAmount); 
         return address(escrow);
@@ -221,10 +221,13 @@ abstract contract Reserve is Utils, Structs {
                (priceOfCATA * secondsPerYear);
     }
 
-
     function _updateTvl(uint _newTal, bool add) internal {
-        tal += _newTal;
-        tvl = tal * lastUpdatedOraclePrice;
+        if (add) {
+            tal += _newTal;  // Add _newTal to tal if add is true
+        } else {
+            tal -= _newTal;  // Subtract _newTal from tal if add is false
+        }
+        tvl = tal * lastUpdatedOraclePrice;  // Update tvl based on the new tal value
     }
     
     function migrateReserve(address _newReserve, address[] _escrows) external requireOwner("migrate the Reserve") {
