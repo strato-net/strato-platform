@@ -45,12 +45,12 @@ abstract contract Reserve is Utils, Structs {
         _;
     }
 
-    function distributeRewards(address[] _escrows) external {
+    function distributeRewards(address[] _escrowAddresses) external {
         // Update the price of the collateral in the escrow
         (decimal oraclePrice, uint oracleTimestamp) = oracle.getLatestPrice();
 
-        for (uint i = 0; i < _escrows.length; i++) {
-            Escrow escrow = Escrow(_escrows[i]);
+        for (uint i = 0; i < _escrowAddresses.length; i++) {
+            Escrow escrow = Escrow(_escrowAddresses[i]);
             require(address(escrow).creator == this.creator, "Escrow contract " + string(address(escrow)) + " was not created by a valid Reserve contract");
             try {
                 uint lastRewardTimestamp = escrow.lastRewardTimestamp();
