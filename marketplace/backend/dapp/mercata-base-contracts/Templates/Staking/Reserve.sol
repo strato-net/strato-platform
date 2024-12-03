@@ -24,6 +24,10 @@ abstract contract Reserve is Utils, Structs, OracleSubscriber {
     uint public loanToValueRatio = 50; // LTV ratio as percentage
     uint public cataAPYRate = 10; // 10% APY for CATA rewards
     uint public lastUpdatedTimestamp = 0;
+    decimal public lastUpdatedOraclePrice = 0;
+
+    decimal public tvl = 0; // Total value locked
+    uint public tal = 0; // Total asset (quantity) locked
     
     event StakeCreated(address indexed user, address escrow, uint assetAmount, decimal stratsLoan);
     event StakeUnlocked(address indexed user, address escrow);
@@ -50,12 +54,13 @@ abstract contract Reserve is Utils, Structs, OracleSubscriber {
         _;
     }
 
-    function oraclePriceUpdated(decimal _newPrice, uint _timestamp) external override {
+    function oraclePriceUpdated(decimal _newPrice, uint _timestamp) external {
         // Update the price of the collateral in the escrow
         require(msg.sender == address(oracle), "Only the oracle can call oraclePriceUpdated");
         
         if(lastUpdatedTimestamp == 0){
             lastUpdatedTimestamp = _timestamp;
+            lastUpdatedOraclePrice = _newPrice;
         }
 
         uint delta = _timestamp - lastUpdatedTimestamp;
@@ -83,6 +88,9 @@ abstract contract Reserve is Utils, Structs, OracleSubscriber {
             }
         }
         lastUpdatedTimestamp = _timestamp;
+        lastUpdatedOraclePrice = _newPrice;
+
+        _updateTvl(tal);
     }
 
     function stakeAsset(uint _collateralQuantity, address _assetAddress, PaymentServiceInfo _stratPaymentService) public requireActive() returns (address) {
@@ -107,6 +115,9 @@ abstract contract Reserve is Utils, Structs, OracleSubscriber {
 
         escrows.push(Escrow(escrow));
         escrowMap[address(escrow)] = escrows.length;
+
+        // Update tvl: total value locked
+        _updateTvl(_collateralQuantity);
 
         emit StakeCreated(msg.sender, address(escrow), _collateralQuantity, _maxStratsLoanAmount); 
         return address(escrow);
@@ -209,6 +220,9 @@ abstract contract Reserve is Utils, Structs, OracleSubscriber {
             escrowMap[address(escrow)] = 0;
         }
 
+        // Update tvl: total value locked
+        _updateTvl((escrow.collateralQuantity() * -1));
+
         // Emit unstake event
         emit StakeUnlocked(msg.sender, _escrowAddress);
     }
@@ -222,5 +236,10 @@ abstract contract Reserve is Utils, Structs, OracleSubscriber {
         decimal secondsPerYear = 31536000.0000000000000000000; // Number of seconds in a year
         return (decimal(collateralQuantity) * livePriceOfCollateral * decimal(cataAPYRate)/100.0000000000000000000 * decimal(delta)) / 
                (priceOfCATA * secondsPerYear);
+    }
+
+    function _updateTvl(uint _newTal) internal {
+        tal += _newTal;
+        tvl = tal * lastUpdatedOraclePrice;
     }
 }
