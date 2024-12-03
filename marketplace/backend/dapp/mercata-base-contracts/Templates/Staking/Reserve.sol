@@ -23,9 +23,8 @@ abstract contract Reserve is Utils, Structs {
 
     uint public loanToValueRatio = 50; // LTV ratio as percentage
     uint public cataAPYRate = 10; // 10% APY for CATA rewards
-    uint public lastUpdatedTimestamp = 0;
-    decimal public lastUpdatedOraclePrice = 0;
 
+    decimal public lastUpdatedOraclePrice = 0;
     decimal public tvl = 0; // Total value locked
     uint public tal = 0; // Total asset (quantity) locked
     
@@ -83,9 +82,7 @@ abstract contract Reserve is Utils, Structs {
             }
         }
 
-        lastUpdatedTimestamp = _timestamp;
-        lastUpdatedOraclePrice = _newPrice;
-
+        lastUpdatedOraclePrice = oraclePrice;
         _updateTvl(0, true);
     }
 
