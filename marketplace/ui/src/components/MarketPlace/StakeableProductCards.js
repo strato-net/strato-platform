@@ -38,7 +38,7 @@ const StakeableProductCards = () => {
   useEffect(() => {
     if (reserves) {
       if (hasChecked && !isAuthenticated) {
-        actions.fetchStakeableProducts(marketplaceDispatch, offset, limit);
+        actions.fetchStakeableProducts(marketplaceDispatch, offset, limit, reserves.map((reserve) => reserve.assetRootAddress));
       } else if (hasChecked && isAuthenticated) {
         actions.fetchStakeableProductsLoggedIn(
           marketplaceDispatch,
@@ -54,7 +54,6 @@ const StakeableProductCards = () => {
     hasChecked,
     isAuthenticated,
     loginUrl,
-    reserves,
   ]);
 
   const navigate = useNavigate();

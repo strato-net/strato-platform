@@ -12,7 +12,11 @@ import {
   Checkbox,
   Tooltip,
 } from 'antd';
-import { CheckCircleOutlined } from '@ant-design/icons';
+import {
+  CheckCircleOutlined,
+  DollarOutlined,
+  GiftOutlined,
+} from '@ant-design/icons';
 import image_placeholder from '../../images/resources/image_placeholder.png';
 import CreateInventoryModal from './CreateInventoryModal';
 import { actions as categoryActions } from '../../contexts/category/actions';
@@ -58,7 +62,7 @@ import InventoryCard from './InventoryCard';
 import './index.css';
 
 const { Option } = Select;
-const StratsIcon = <img src={Images.strats} alt="STRATS" className="w-5 h-5" />;
+const StratsIcon = <img src={Images.strats} alt="STRATS" className="w-4 h-4" />;
 
 const Inventory = ({ user }) => {
   const [open, setOpen] = useState(false);
@@ -169,7 +173,9 @@ const Inventory = ({ user }) => {
           offset,
           debouncedSearchTerm,
           category && category !== 'All' ? category : undefined,
-          queryParams.get('st') === 'true' ? reserves.map(reserve => reserve.assetRootAddress) : ''
+          queryParams.get('st') === 'true'
+            ? reserves.map((reserve) => reserve.assetRootAddress)
+            : ''
         );
       } else {
         actions.fetchInventory(
@@ -178,10 +184,12 @@ const Inventory = ({ user }) => {
           offset,
           debouncedSearchTerm,
           category && category !== 'All' ? category : undefined,
-          queryParams.get('st') === 'true' ? reserves.map(reserve => reserve.assetRootAddress) : ''
+          queryParams.get('st') === 'true'
+            ? reserves.map((reserve) => reserve.assetRootAddress)
+            : ''
         );
       }
-      setShowStakeable(queryParams.get('st'))
+      setShowStakeable(queryParams.get('st'));
     }
   }, [
     dispatch,
@@ -192,7 +200,7 @@ const Inventory = ({ user }) => {
     showPublished,
     showStakeable,
     reserves,
-    location.search
+    location.search,
   ]);
 
   const showModal = () => {
@@ -362,6 +370,13 @@ const Inventory = ({ user }) => {
     {
       title: 'Item',
       render: (text, record) => {
+        const isStakeable =
+          record.originAddress &&
+          reserves &&
+          reserves.length > 0 &&
+          reserves.some(
+            (reserve) => record.originAddress === reserve.assetRootAddress
+          );
         const callDetailPage = () => {
           navigate(
             `${naviroute
@@ -373,32 +388,39 @@ const Inventory = ({ user }) => {
           );
         };
         return (
-          <div className="flex items-center">
-            <div className="mr-2 w-[74px] h-[52px] flex items-center justify-center">
-              <img
-                src={
-                  record['BlockApps-Mercata-Asset-images'] &&
-                  record['BlockApps-Mercata-Asset-images'].length > 0
-                    ? record['BlockApps-Mercata-Asset-images'][0].value
-                    : image_placeholder
-                }
-                alt={'Asset image...'}
-                className="rounded-md w-full h-full object-contain"
-              />
+          <>
+            <div className="flex items-center">
+              <div className="mr-2 w-[74px] h-[52px] flex items-center justify-center">
+                <img
+                  src={
+                    record['BlockApps-Mercata-Asset-images'] &&
+                    record['BlockApps-Mercata-Asset-images'].length > 0
+                      ? record['BlockApps-Mercata-Asset-images'][0].value
+                      : image_placeholder
+                  }
+                  alt={'Asset image...'}
+                  className="rounded-md w-full h-full object-contain"
+                />
+              </div>
+              <div>
+                <span
+                  className="text-xs sm:text-sm text-[#13188A] hover:underline cursor-pointer"
+                  onClick={callDetailPage}
+                >
+                  <Tooltip title={record.name}>
+                    <span className="w-48 whitespace-nowrap overflow-hidden text-ellipsis block">
+                      {record.name}
+                    </span>
+                  </Tooltip>
+                </span>
+              </div>
             </div>
-            <div>
-              <span
-                className="text-xs sm:text-sm text-[#13188A] hover:underline cursor-pointer"
-                onClick={callDetailPage}
-              >
-                <Tooltip title={record.name}>
-                  <span className="w-48 whitespace-nowrap overflow-hidden text-ellipsis block">
-                    {record.name}
-                  </span>
-                </Tooltip>
-              </span>
-            </div>
-          </div>
+            {isStakeable && (
+              <>
+                <div> Borrowed Amount: $33,516 </div>
+              </>
+            )}
+          </>
         );
       },
     },
@@ -429,7 +451,7 @@ const Inventory = ({ user }) => {
             {price !== 'N/A' ? (
               <>
                 <span>${price}</span>{' '}
-                <p className="flex text-xs items-center">
+                <p className="flex text-xs items-center gap-1">
                   {' '}
                   &nbsp;({(price * STRATS_CONVERSION).toFixed(0)} {StratsIcon}){' '}
                 </p>
@@ -548,9 +570,9 @@ const Inventory = ({ user }) => {
           </Breadcrumb.Item>
         </Breadcrumb>
         <div className="w-full h-[160px] py-4 px-4 md:h-[96px] bg-[#F6F6F6] flex flex-col md:flex-row md:px-14 justify-between items-center mt-6 lg:mt-8">
-          <div className="flex justify-between w-full">
+          <div className="flex w-full">
             <Button
-              className="!px-1 md:!px-0 flex items-center flex-row-reverse gap-[6px] text-lg md:text-2xl font-semibold !text-[#13188A] "
+              className="!px-1 md:!px-0 flex items-center flex-row-reverse gap-[6px] text-xl md:text-2xl font-semibold !text-[#13188A] "
               type="link"
               icon={
                 <img
@@ -564,6 +586,14 @@ const Inventory = ({ user }) => {
               {' '}
               My Wallet
             </Button>
+            <p className="text-xl !text-[#13188A] flex items-center ml-4 font-semibold">
+              <DollarOutlined className="!text-[#13188A] mr-2" />
+              Total Rewards (CATA): $334,133
+            </p>
+            <p className="text-xl !text-[#13188A] flex items-center ml-4 font-semibold">
+              <GiftOutlined className="!text-[#13188A] mr-2" />
+              Est. Daily Reward (CATA): $1,321
+            </p>
           </div>
           <div className="flex flex-col md:flex-row gap-3 items-center my-2 md:my-0">
             <div className="flex gap-3 items-center">

@@ -109,6 +109,20 @@ const MarketPlace = ({ user, isAuthenticated }) => {
           <span className="ml-1">{bannerArrow}</span>
         </div>
       </Button>
+      <div className="flex flex-col sm:flex-row items-center justify-center gap-8 sm:gap-16 ml-32">
+        <div className="text-center">
+          <div className="font-bold text-4xl text-white">$318.7M</div>
+          <div className="text-sm text-white">Total Value Locked (TVL)</div>
+        </div>
+        <div className="text-center">
+          <div className="font-bold text-4xl text-white">10%</div>
+          <div className="text-sm text-white">Est. APY</div>
+        </div>
+        <div className="text-center">
+          <div className="font-bold text-4xl text-white">$478.7M</div>
+          <div className="text-sm text-white">Rewards Issued (CATA)</div>
+        </div>
+      </div>
     </div>
   );
 

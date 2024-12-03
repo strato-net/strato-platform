@@ -347,13 +347,13 @@ export const BANNER = [
         <h1 className="text-base w-5/6 md:text-3xl"> Staking is Here! </h1>
         <h1 className="text-base w-full md:text-3xl">
           {' '}
-          Stake silver and gold to earn and gain access to our governance
-          token...coming soon!{' '}
+          Stake silver and gold to earn and gain access to CATA, our governance
+          token!{' '}
         </h1>
       </div>
     ),
-    desktopText: 'Explore More',
-    mobileText: 'Explore',
+    desktopText: 'Stake now', // Stake now
+    mobileText: 'Stake',
     alt: metaImg,
     title: metaImg,
     desktopImg: Images.StakingX1600,
@@ -379,8 +379,8 @@ export const BANNER = [
         </h1>
       </div>
     ),
-    desktopText: 'Explore More',
-    mobileText: 'Explore',
+    desktopText: 'Stake now',
+    mobileText: 'Stake',
     alt: metaImg,
     title: metaImg,
     desktopImg: Images.StakingX1600,
@@ -406,8 +406,8 @@ export const BANNER = [
         </h1>
       </div>
     ),
-    desktopText: 'Explore More',
-    mobileText: 'Explore',
+    desktopText: 'Stake now',
+    mobileText: 'Stake',
     alt: metaImg,
     title: metaImg,
     desktopImg: Images.StakingX1600,
@@ -427,13 +427,13 @@ export const BANNER = [
         </h1>
         <h1 className="text-base w-5/6 md:text-xl">
           {' '}
-          Earn rewards, borrow liquidity, or both. Customize your financial
+          Earn rewards, access liquidity, or both. Customize your financial
           strategy while keeping your assets working for you.{' '}
         </h1>
       </div>
     ),
-    desktopText: 'Explore More',
-    mobileText: 'Explore',
+    desktopText: 'Stake now',
+    mobileText: 'Stake',
     alt: metaImg,
     title: metaImg,
     desktopImg: Images.StakingX1600,
