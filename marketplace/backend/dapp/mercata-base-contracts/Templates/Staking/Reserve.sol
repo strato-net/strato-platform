@@ -24,6 +24,10 @@ abstract contract Reserve is Utils, Structs {
     uint public loanToValueRatio = 50; // LTV ratio as percentage
     uint public cataAPYRate = 10; // 10% APY for CATA rewards
     decimal public unitConversionRate = 1; // 1 oz of gold in grams
+
+    decimal public lastUpdatedOraclePrice = 0;
+    decimal public tvl = 0; // Total value locked
+    uint public tal = 0; // Total asset (quantity) locked
     
     event StakeCreated(address indexed user, address escrow, uint assetAmount, decimal stratsLoan);
     event StakeUnlocked(address indexed user, address escrow);
@@ -79,6 +83,9 @@ abstract contract Reserve is Utils, Structs {
                 revert("Rewards distribution failed for escrow contract " + string(address(escrow)));
             }
         }
+
+        lastUpdatedOraclePrice = oraclePrice;
+        _updateTvl(0, true);
     }
 
     function stakeAsset(uint _collateralQuantity, address _assetAddress, PaymentServiceInfo _stratPaymentService) public requireActive() returns (address) {
@@ -101,6 +108,9 @@ abstract contract Reserve is Utils, Structs {
             address(_assetToBeSold),
             [_stratPaymentService]
         );
+
+        // Update tvl: total value locked
+        _updateTvl(_collateralQuantity, true);
 
         emit StakeCreated(msg.sender, address(escrow), _collateralQuantity, _maxStratsLoanAmount); 
         return address(escrow);
@@ -193,6 +203,9 @@ abstract contract Reserve is Utils, Structs {
 
         escrow.closeSale();
 
+        // Update tvl: total value locked
+        _updateTvl(escrow.collateralQuantity(), false);
+
         // Emit unstake event
         emit StakeUnlocked(msg.sender, _escrowAddress);
     }
@@ -208,6 +221,15 @@ abstract contract Reserve is Utils, Structs {
                (priceOfCATA * secondsPerYear);
     }
 
+    function _updateTvl(uint _newTal, bool add) internal {
+        if (add) {
+            tal += _newTal;  // Add _newTal to tal if add is true
+        } else {
+            tal -= _newTal;  // Subtract _newTal from tal if add is false
+        }
+        tvl = tal * lastUpdatedOraclePrice;  // Update tvl based on the new tal value
+    }
+    
     function migrateReserve(address _newReserve, address[] _escrows) external requireOwner("migrate the Reserve") {
         for (uint i = 0; i < _escrows.length; i++) {
             Escrow(_escrows[i]).updateReserve(_newReserve);
