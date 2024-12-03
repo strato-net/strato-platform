@@ -34,6 +34,7 @@ const NewTrendingCard = ({
 
   const [isModalVisible, setIsModalVisible] = useState(false);
   const [isWishlisted, setIsWishlisted] = useState(false);
+  const isDecimal = topSellingProduct.data.quantityIsDecimal && topSellingProduct.data.quantityIsDecimal === 'True';
   const isStrat = topSellingProduct.originAddress === stratsAddress;
   const isCata = topSellingProduct.originAddress === cataAddress;
   const saleQuantity = isStrat ? topSellingProduct.saleQuantity / 100 : isCata ? topSellingProduct.saleQuantity / Math.pow(10, 18) : topSellingProduct.saleQuantity
@@ -190,7 +191,7 @@ const NewTrendingCard = ({
         <div style={{ display: 'flex', justifyContent: 'space-between' }}>
           {topSellingProduct?.price
             ? (() => {
-                const adjustedPrice = isStrat ? topSellingProduct.price * 100 : isCata ? topSellingProduct.price * Math.pow(10, 18) : topSellingProduct.price
+                const adjustedPrice = isDecimal ? (topSellingProduct.price * 100).toFixed(2) : topSellingProduct.price
 
                 return (
                   <Typography className="font-semibold">
@@ -260,7 +261,7 @@ const NewTrendingCard = ({
               controls={false}
             />
             <Typography
-              className={`px-2 bg-[#EEEFFA] rounded-sm ${quantity >= Math.min(saleQuantity, topSellingProduct.quantity) ? 'cursor-not-allowed opacity-50' : 'cursor-pointer'}`}
+              className={`px-2 bg-[#EEEFFA] rounded-sm ${quantity >= Math.min(saleQuantity) ? 'cursor-not-allowed opacity-50' : 'cursor-pointer'}`}
               onClick={() => {
                 if (
                   quantity + 1 <= saleQuantity &&

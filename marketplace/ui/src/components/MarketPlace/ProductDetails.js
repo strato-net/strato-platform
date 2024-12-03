@@ -206,9 +206,7 @@ const ProductDetails = ({ user, users }) => {
   }, [marketplaceDispatch, cartList]);
 
   const details = inventoryDetails;
-  const isCata = details.originAddress === cataAddress;
-  const isStrat = details.originAddress === stratsAddress;
-  
+
   let fileValues = [];
   let fileNames = [];
 
@@ -232,7 +230,11 @@ const ProductDetails = ({ user, users }) => {
       const detailsData = details.data;
       setItemData(detailsData);
       if (details.saleQuantity) {
-        let saleQuantity = isStrat ? details.saleQuantity / 100 : isCata ? details.saleQuantity / Math.pow(10, 18) : details.saleQuantity
+        let saleQuantity =
+          details.data.quantityIsDecimal &&
+          details.data.quantityIsDecimal === 'True'
+            ? details.saleQuantity / 100
+            : details.saleQuantity;
         setAvailableQuantity(saleQuantity || 1);
       }
     }
@@ -646,12 +648,18 @@ const ProductDetails = ({ user, users }) => {
                     >
                       {details?.price || isStaked
                         ? (() => {
-                            const adjustedPrice = isStrat ? details.price * 100 : isCata ? details.price * Math.pow(10, 18) : details.price
+                            const adjustedPrice =
+                              details.data.quantityIsDecimal &&
+                              details.data.quantityIsDecimal === 'True'
+                                ? details.price * 100
+                                : details.price;
                             return (
                               <>
                                 $
                                 {isStaked
-                                  ? (details.maxStratsLoanAmount / 100).toFixed(2)
+                                  ? (details.maxStratsLoanAmount / 100).toFixed(
+                                      2
+                                    )
                                   : adjustedPrice}
                                 <span className="font-normal text-xs mr-2 text-primary">
                                   <b>
@@ -707,7 +715,9 @@ const ProductDetails = ({ user, users }) => {
                       max={availableQuantity}
                       disabled={isStakeable && ownerSameAsUser()}
                       value={
-                        (!isStakeable || !ownerSameAsUser()) ? `${qty}` : inventoryDetails.quantity
+                        !isStakeable || !ownerSameAsUser()
+                          ? `${qty}`
+                          : inventoryDetails.quantity
                       }
                       defaultValue={`${qty}`}
                       controls={false}
@@ -722,7 +732,8 @@ const ProductDetails = ({ user, users }) => {
                     <div
                       onClick={add}
                       className={`h-9 w-11 md:h-10 md:w-12 lg:h-[46px] lg:w-[52px] rounded-lg flex justify-center items-center border border-[#00000029] text-center cursor-pointer ${
-                        qty < availableQuantity && (!isStakeable || !ownerSameAsUser())
+                        qty < availableQuantity &&
+                        (!isStakeable || !ownerSameAsUser())
                           ? ''
                           : 'cursor-not-allowed opacity-50'
                       }`}
@@ -850,7 +861,7 @@ const ProductDetails = ({ user, users }) => {
                     )}
                   </div>
                 )}
-                {(isStakeable && ownerSameAsUser()) && (
+                {isStakeable && ownerSameAsUser() && (
                   <>
                     <div className="flex gap-4 justify-between lg:justify-start  pt-4 w-full">
                       <Button
