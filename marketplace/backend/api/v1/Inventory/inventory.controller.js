@@ -544,8 +544,8 @@ class InventoryController {
         Joi.object({
           assetAddress: Joi.string().required(),
           newOwner: Joi.string().required(),
-          quantity: Joi.number().greater(0).required(),
-          price: Joi.number().greater(0).precision(4).required(),
+          quantity: Joi.string().pattern(/^\d+$/).required(),
+          price: Joi.number().greater(0).precision(30).required(),
           senderCommonName: Joi.string().required(),
           recipientCommonName: Joi.string().required(),
           itemName: Joi.string().required(),

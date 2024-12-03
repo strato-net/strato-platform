@@ -101,7 +101,7 @@ const ProductDetails = ({ user, users }) => {
     isReserveLoading,
     reserves,
   } = useInventoryState();
-  const { cartList } = useMarketplaceState();
+  const { cartList, stratsAddress, cataAddress } = useMarketplaceState();
 
   const [isModalVisible, setIsModalVisible] = useState(false);
   const [timeFilter, setTimeFilter] = useState('1');
@@ -206,6 +206,7 @@ const ProductDetails = ({ user, users }) => {
   }, [marketplaceDispatch, cartList]);
 
   const details = inventoryDetails;
+
   let fileValues = [];
   let fileNames = [];
 
@@ -652,12 +653,13 @@ const ProductDetails = ({ user, users }) => {
                               details.data.quantityIsDecimal === 'True'
                                 ? details.price * 100
                                 : details.price;
-
                             return (
                               <>
                                 $
                                 {isStaked
-                                  ? (details.maxStratsLoanAmount / 100).toFixed(2)
+                                  ? (details.maxStratsLoanAmount / 100).toFixed(
+                                      2
+                                    )
                                   : adjustedPrice}
                                 <span className="font-normal text-xs mr-2 text-primary">
                                   <b>
@@ -713,7 +715,9 @@ const ProductDetails = ({ user, users }) => {
                       max={availableQuantity}
                       disabled={isStakeable && ownerSameAsUser()}
                       value={
-                        (!isStakeable || !ownerSameAsUser()) ? `${qty}` : inventoryDetails.quantity
+                        !isStakeable || !ownerSameAsUser()
+                          ? `${qty}`
+                          : inventoryDetails.quantity
                       }
                       defaultValue={`${qty}`}
                       controls={false}
@@ -728,7 +732,8 @@ const ProductDetails = ({ user, users }) => {
                     <div
                       onClick={add}
                       className={`h-9 w-11 md:h-10 md:w-12 lg:h-[46px] lg:w-[52px] rounded-lg flex justify-center items-center border border-[#00000029] text-center cursor-pointer ${
-                        qty < availableQuantity && (!isStakeable || !ownerSameAsUser())
+                        qty < availableQuantity &&
+                        (!isStakeable || !ownerSameAsUser())
                           ? ''
                           : 'cursor-not-allowed opacity-50'
                       }`}
@@ -856,7 +861,7 @@ const ProductDetails = ({ user, users }) => {
                     )}
                   </div>
                 )}
-                {(isStakeable && ownerSameAsUser()) && (
+                {isStakeable && ownerSameAsUser() && (
                   <>
                     <div className="flex gap-4 justify-between lg:justify-start  pt-4 w-full">
                       <Button

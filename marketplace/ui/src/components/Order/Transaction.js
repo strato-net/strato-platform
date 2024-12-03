@@ -15,9 +15,30 @@ import {
 } from '../../helpers/constants';
 import TransactionTable from './TransactionTable';
 import { useTransactionState } from '../../contexts/transaction';
+import { actions as marketplaceActions } from '../../contexts/marketplace/actions';
+import { useMarketplaceDispatch } from '../../contexts/marketplace';
 
 const Transaction = ({ user }) => {
   const categoryDispatch = useCategoryDispatch();
+
+  const marketplaceDispatch = useMarketplaceDispatch();
+  const [stratAddress, setStratAddress] = useState('');
+  const [cataAddress, setCataAddress] = useState('');
+
+  useEffect(() => {
+    const fetchAddresses = async () => {
+      const stratAddress = await marketplaceActions.fetchStratsAddress(
+        marketplaceDispatch
+      );
+      const cataAddress = await marketplaceActions.fetchCataAddress(
+        marketplaceDispatch
+      );
+      setStratAddress(stratAddress);
+      setCataAddress(cataAddress);
+    };
+
+    fetchAddresses();
+  }, []);
 
   const { userTransactions, isTransactionLoading } = useTransactionState();
   const [callExcel, setCallExcel] = useState(false);
@@ -67,20 +88,23 @@ const Transaction = ({ user }) => {
         const { category, subCategory } = getCategoryAndSubcategory(
           transaction.assetContractName
         );
-        let quantityIsDecimal =
-          transaction.quantityIsDecimal &&
-          transaction.quantityIsDecimal === 'True';
+        let isStrat = transaction.assetOriginAddress === stratAddress;
+        let isCata = transaction.assetOriginAddress === cataAddress;
         return formatDataObject({
           reference: transaction?.reference,
           type: transaction?.type,
           category,
           subCategory,
           assetName: transaction?.assetName,
-          Price: quantityIsDecimal
+          Price: isStrat
             ? Number((transaction?.price * 100).toFixed(2))
+            : isCata
+            ? Number((transaction?.price * Math.pow(10, 18)).toFixed(2))
             : transaction?.price,
-          quantity: quantityIsDecimal
+          quantity: isStrat
             ? Number((transaction?.quantity / 100).toFixed(2))
+            : isCata
+            ? Number((transaction?.price / Math.pow(10, 18)).toFixed(2))
             : transaction?.quantity,
           from: transaction.from,
           to: transaction.to,
@@ -90,8 +114,8 @@ const Transaction = ({ user }) => {
             transaction?.type === 'Transfer'
               ? 'Closed'
               : transaction?.type === 'Redemption'
-                ? REDEMPTION_STATUS[transaction.status]
-                : TRANSACTION_STATUS[transaction.status],
+              ? REDEMPTION_STATUS[transaction.status]
+              : TRANSACTION_STATUS[transaction.status],
         });
       });
     } catch (error) {
@@ -201,7 +225,12 @@ const Transaction = ({ user }) => {
           </Breadcrumb.Item>
         </Breadcrumb>
       </div>
-      <TransactionTable user={user} download={download} />
+      <TransactionTable
+        user={user}
+        download={download}
+        stratAddress={stratAddress}
+        cataAddress={cataAddress}
+      />
     </div>
   );
 };

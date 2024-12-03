@@ -279,11 +279,25 @@ const reducer = (state, action) => {
       return {
         ...state,
       };
-    case actionDescriptors.fetchStratsAddressSuccessful:
+    case actionDescriptors.fetchStratsAddressSuccessful:      
+      return {
+        ...state,
+        stratsAddress:action.payload
+      };
+    case actionDescriptors.fetchStratsAddressFailed:
       return {
         ...state,
       };
-    case actionDescriptors.fetchStratsAddressFailed:
+    case actionDescriptors.fetchCataAddress:
+      return {
+        ...state,
+      };
+    case actionDescriptors.fetchCataAddressSuccessful:
+      return {
+        ...state,
+        cataAddress:action.payload
+      };
+    case actionDescriptors.fetchCataAddressFailed:
       return {
         ...state,
       };
