@@ -37,8 +37,6 @@ const StakeableProductCards = () => {
 
   useEffect(() => {
     if (reserves) {
-      const checkThis = reserves.map((reserve) => reserve.assetRootAddress)
-      console.log(checkThis);
       if (hasChecked && !isAuthenticated) {
         actions.fetchStakeableProducts(marketplaceDispatch, offset, limit);
       } else if (hasChecked && isAuthenticated) {

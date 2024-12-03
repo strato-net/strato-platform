@@ -44,11 +44,12 @@ const StakeModal = ({
   const { paymentServices } = usePaymentServiceState();
   const isLoader =
     isStaking || isUnstaking || isFetchingOracle || isreservessLoading;
-  const isStaked = inventory.maxStratsLoanAmount && inventory.maxStratsLoanAmount > 0;
+  const isStaked =
+    inventory.maxStratsLoanAmount && inventory.maxStratsLoanAmount > 0;
   const itemName = decodeURIComponent(inventory.name);
-  const matchedReserve = reserves?.length ? reserves.find(
-    (reserve) => reserve.assetRootAddress === inventory.root
-  ) : null;
+  const matchedReserve = reserves?.length
+    ? reserves.find((reserve) => reserve.assetRootAddress === inventory.root)
+    : null;
   const oracleData = oracle ? oracle : { consensusPrice: 0 };
   const location = useLocation();
   const queryParams = new URLSearchParams(location.search);
@@ -86,7 +87,12 @@ const StakeModal = ({
               'The expected daily earnings in CATA tokens from staking your RWAs.',
             value: (
               <div className="flex -mr-1">
-                {(inventory?.quantity * oracleData.consensusPrice * matchedReserve?.cataAPYRate / 365).toFixed(6)}
+                {(
+                  (inventory?.quantity *
+                    oracleData.consensusPrice *
+                    matchedReserve?.cataAPYRate) /
+                  365
+                ).toFixed(6)}
 
                 {logo}
               </div>
@@ -107,7 +113,8 @@ const StakeModal = ({
       ? [
           {
             label: `Market price (per unit)`,
-            description: ' The current price of one unit of your RWA, as determined by the oracle.',
+            description:
+              ' The current price of one unit of your RWA, as determined by the oracle.',
             value: `$${oracleData.consensusPrice.toFixed(2)}`,
           },
         ]
@@ -145,7 +152,11 @@ const StakeModal = ({
             offset,
             debouncedSearchTerm,
             category && category !== 'All' ? category : undefined,
-            queryParams.get('st') === 'true' ? queryParams.get('st') === 'true' ? reserves.map(reserve => reserve.assetRootAddress) : '' : ''
+            queryParams.get('st') === 'true'
+              ? queryParams.get('st') === 'true'
+                ? reserves.map((reserve) => reserve.assetRootAddress)
+                : ''
+              : ''
           );
         }
         handleCancel();
@@ -174,7 +185,11 @@ const StakeModal = ({
             offset,
             debouncedSearchTerm,
             category && category !== 'All' ? category : undefined,
-            queryParams.get('st') === 'true' ? queryParams.get('st') === 'true' ? reserves.map(reserve => reserve.assetRootAddress) : '' : ''
+            queryParams.get('st') === 'true'
+              ? queryParams.get('st') === 'true'
+                ? reserves.map((reserve) => reserve.assetRootAddress)
+                : ''
+              : ''
           );
         }
         handleCancel();
@@ -187,9 +202,7 @@ const StakeModal = ({
       open={open}
       onCancel={handleCancel}
       title={
-        <div className="text-2xl md:text-3xl font-bold pl-4">
-          Collateral
-        </div>
+        <div className="text-2xl md:text-3xl font-bold pl-4">Collateral</div>
       }
       width={500}
       centered
@@ -198,7 +211,10 @@ const StakeModal = ({
       <div className="flex flex-col px-4 pt-4">
         <div className="flex flex-col gap-4">
           {dataForItems.map((item, index) => (
-            <div key={index} className="w-full flex justify-between items-start">
+            <div
+              key={index}
+              className="w-full flex justify-between items-start"
+            >
               <div className="flex items-center">
                 <p className="text-sm w-44 md:w-full text-gray-500">
                   <strong>{item.label}</strong>
@@ -237,6 +253,17 @@ const StakeModal = ({
               <p className="flex items-center">{item.value}</p>
             </div>
           ))}
+          <br />
+          By staking your RWAs, you earn daily rewards in CATA tokens, our
+          governance token, generating passive income without needing to sell
+          your assets. Additionally, you have the option to borrow(interest-free
+          for a limited time!) up to 50% of the market value of your staked RWAs
+          in STRAT tokens, our stablecoin, providing immediate liquidity while
+          your assets remain staked and continue to earn CATA rewards. If you
+          prefer not to borrow, you can simply stake your RWAs to benefit from
+          the daily CATA rewards, allowing you to tailor your strategy according
+          to your financial objectives—whether that's generating passive income,
+          accessing liquidity, or both.
         </div>
       </div>
     </Modal>

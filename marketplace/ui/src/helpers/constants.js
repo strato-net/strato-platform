@@ -344,8 +344,92 @@ export const BANNER = [
     text: (
       <div className="staking_banner_text banner-text">
         <h1> RWA X DeFi </h1>
-        <h1 className='text-base w-5/6 md:text-3xl'> Staking is Here! </h1>
-        <h1 className='text-base w-full md:text-3xl'> Stake silver and gold to earn and gain access to our governance token...coming soon! </h1>
+        <h1 className="text-base w-5/6 md:text-3xl"> Staking is Here! </h1>
+        <h1 className="text-base w-full md:text-3xl">
+          {' '}
+          Stake silver and gold to earn and gain access to our governance
+          token...coming soon!{' '}
+        </h1>
+      </div>
+    ),
+    desktopText: 'Explore More',
+    mobileText: 'Explore',
+    alt: metaImg,
+    title: metaImg,
+    desktopImg: Images.StakingX1600,
+    laptopImg: Images.StakingX1600,
+    tabletImg: Images.StakingX1600,
+    mobileImg: Images.StakingX1600,
+  },
+  {
+    label: 'Staking 2',
+    link: '/mywallet?st=true',
+    text: (
+      <div className="staking_banner_text banner-text">
+        <h1> Stake and Earn </h1>
+        <h1 className="text-base w-5/6 md:text-3xl">
+          {' '}
+          Unlock Passive Income with RWA Staking{' '}
+        </h1>
+        <h1 className="text-base w-5/6 md:text-xl">
+          {' '}
+          Stake your Real World Assets (RWAs) and earn daily rewards in CATA
+          tokens, our governance token. No borrowing required—start earning
+          effortlessly!{' '}
+        </h1>
+      </div>
+    ),
+    desktopText: 'Explore More',
+    mobileText: 'Explore',
+    alt: metaImg,
+    title: metaImg,
+    desktopImg: Images.StakingX1600,
+    laptopImg: Images.StakingX1600,
+    tabletImg: Images.StakingX1600,
+    mobileImg: Images.StakingX1600,
+  },
+  {
+    label: 'Staking 3',
+    link: '/mywallet?st=true',
+    text: (
+      <div className="staking_banner_text banner-text">
+        <h1> Borrow with Flexibility </h1>
+        <h1 className="text-base w-5/6 md:text-3xl">
+          {' '}
+          Access Liquidity from Your Staked RWAs{' '}
+        </h1>
+        <h1 className="text-base w-5/6 md:text-xl">
+          {' '}
+          Borrow up to 50% of your staked RWA value in STRAT stablecoins,
+          interest-free for a limited time! Keep earning rewards while accessing
+          immediate liquidity.{' '}
+        </h1>
+      </div>
+    ),
+    desktopText: 'Explore More',
+    mobileText: 'Explore',
+    alt: metaImg,
+    title: metaImg,
+    desktopImg: Images.StakingX1600,
+    laptopImg: Images.StakingX1600,
+    tabletImg: Images.StakingX1600,
+    mobileImg: Images.StakingX1600,
+  },
+  {
+    label: 'Staking 4',
+    link: '/mywallet?st=true',
+    text: (
+      <div className="staking_banner_text banner-text">
+        <h1> Flexible Financial Solutions </h1>
+        <h1 className="text-base w-5/6 md:text-3xl">
+          {' '}
+          Leverage RWAs Your Way{' '}
+        </h1>
+        <h1 className="text-base w-5/6 md:text-xl">
+          {' '}
+          Earn rewards, borrow liquidity, or both. Customize your financial
+          strategy while keeping your assets working for you.{' '}
+        </h1>
       </div>
     ),
     desktopText: 'Explore More',
