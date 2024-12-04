@@ -77,7 +77,7 @@ migrate_reserve() {
   # Fetch escrows associated with the reserve
   local escrows_json=$(curl -s -H "Authorization: Bearer $access_token" \
     -H "Content-Type: application/json" \
-    "https://node1.mercata-testnet2.blockapps.net/cirrus/search/BlockApps-Mercata-Sale?data->>reserveAddress=eq.$prev_reserve&isOpen=eq.true&creator=eq.BlockApps&select=address")
+    "https://node1.mercata-testnet2.blockapps.net/cirrus/search/BlockApps-Mercata-Escrow?reserve=eq.$prev_reserve&isActive=eq.true&creator=eq.BlockApps&select=address")
 
   if ! echo "$escrows_json" | jq empty 2>/dev/null; then
     echo "Error: Failed to fetch escrows for reserve $prev_reserve."
