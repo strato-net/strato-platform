@@ -11,8 +11,9 @@ abstract contract Escrow is Utils {
     decimal public collateralValue;
     uint public maxLoanAmount;
     decimal public totalCataRewardInDollars;
-    decimal public borrowedAmount;
+    uint public borrowedAmount;
     uint public lastRewardTimestamp;
+    bool public isActive;
 
     address public borrower;
     string public borrowerCommonName;
@@ -32,6 +33,7 @@ abstract contract Escrow is Utils {
         attachAssets(_assets, _collateralQuantity, _assetPrice, _loanToValueRatio);
         require(collateralQuantity > 0, "No collateral has been staked");
         totalCataRewardInDollars = 0.0; // Assuming the CATA reward rate is provided externally
+        isActive = true;
     }
 
     function attachAssets(
@@ -102,7 +104,7 @@ abstract contract Escrow is Utils {
 
         collateralQuantity -= quantityToUnlock - unallocatedQuantity;
         _updateOnPriceChange(_assetPrice, _loanToValueRatio);
-        require(uint(borrowedAmount) <= maxLoanAmount, "Invalid unstaking attempt: unstaking "
+        require(borrowedAmount <= maxLoanAmount, "Invalid unstaking attempt: unstaking "
                                                + string(quantityToUnlock)
                                                + " units would result in undercollateralization."
                                                + "\nCurrent loan balance: "
@@ -111,13 +113,16 @@ abstract contract Escrow is Utils {
                                                + string(collateralValue)
                                                + "\nMaximum loan amount after unstaking: "
                                                + string(maxLoanAmount));
+        if (collateralQuantity == 0) {
+            closeEscrow();
+        }
     }
 
-    function updateBorrowedAmount(decimal _borrowAmount, bool add) external {
+    function updateBorrowedAmount(uint _borrowAmount, bool add) external {
         require(msg.sender == reserve, "Only reserve can update borrowed amount");
-        require(_borrowAmount >= 0.0, "Borrowed amount cannot be negative");
+        require(_borrowAmount >= 0, "Borrowed amount cannot be negative");
         if (add) {
-            require(uint(borrowedAmount + _borrowAmount) <= maxLoanAmount, "Cannot borrow more than loan amount");
+            require(borrowedAmount + _borrowAmount <= maxLoanAmount, "Cannot borrow more than loan amount");
             borrowedAmount += _borrowAmount;
         } else {
             require(borrowedAmount >= _borrowAmount, "Cannot pay back more than loan amount");
@@ -144,6 +149,11 @@ abstract contract Escrow is Utils {
     function updateReserve(address _newReserve) external {
         require(msg.sender == reserve, "Only the existing reserve can update the reserve address");
         reserve = _newReserve;
+    }
+
+    function closeEscrow() external {
+        require(msg.sender == reserve, "Only the reserve can close the escrow");
+        isActive = false;
     }
 
 }
