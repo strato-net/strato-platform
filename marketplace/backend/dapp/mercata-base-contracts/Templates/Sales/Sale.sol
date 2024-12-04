@@ -17,16 +17,13 @@ abstract contract Sale is Utils, Structs {
     mapping (string => uint) lockedQuantity;
     uint totalLockedQuantity;
     bool isOpen;
-    string public saleType;
 
     constructor(
-        string _saleType,
         address _assetToBeSold,
         decimal _price,
         uint _quantity,
         PaymentServiceInfo[] _paymentServices
     ) {    
-        saleType = _saleType;
         assetToBeSold = Asset(_assetToBeSold);
         require(_quantity > 0, "Quantity must be greater than 0");
         require(assetToBeSold.quantity() >= _quantity, "Cannot sell more units than what are owned.");

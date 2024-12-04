@@ -267,7 +267,7 @@ const ItemActions = ({
           type="primary"
           className="font-semibold w-1/4 flex items-center justify-center"
           onClick={() => showStakeModal('Stake')}
-          disabled={inventory.price || !isActive()}
+          disabled={inventory?.escrow || !isActive()}
         >
           <RiseOutlined /> Stake
         </Button>

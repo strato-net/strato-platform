@@ -12,6 +12,7 @@ import {
 import dayjs from 'dayjs';
 import constants from '../../helpers/constants';
 import saleJs from '../orders/sale';
+import escrowJs from '../escrow/escrow';
 
 const contractName = constants.assetTableName;
 const transferContractName = `${contractName}.ItemTransfers`;
@@ -481,7 +482,7 @@ async function getAll(admin, args = {}, defaultOptions) {
       },
       options
     );
-    sales = sales.filter((sale) => !sale.saleType || sale.saleType !== 'Escrow');
+    sales = sales.filter((sale) => !sale.saleType || sale.saleType !== 'Escrow'); // Only relevant for testnet2
     const trendingAssetAddresses = sales.map((sale) => sale.assetToBeSold);
 
     // Fetch the inventories matching the sales
@@ -563,7 +564,8 @@ async function getAll(admin, args = {}, defaultOptions) {
     // Currently can't filter on second table, so filtering sales fields here.
     // Sales only has price and quantity fields to filter, so better to join sales on asset table (asset has multiple filters for each route).
     if (inventories) {
-      inventories.forEach((inventory) => {
+      for (let i=0; i < inventories.length; i++) {
+        const inventory = inventories[i];
         if (
           inventory['BlockApps-Mercata-Sale'] &&
           inventory['BlockApps-Mercata-Sale'].length > 0
@@ -590,7 +592,7 @@ async function getAll(admin, args = {}, defaultOptions) {
 
           // Combine the inventories with sales data if there are valid sales for user profile route
           if (userProfile) {
-            if (sales.length > 0 && (sales.price !== null || undefined)) {
+            if (sales.length > 0 && sales.price !== null && sales.price !== undefined) {
               // Only combine if there are sales. We don't list unpublished items for this route.
               finalInventory.push({
                 ...inventory,
@@ -610,6 +612,14 @@ async function getAll(admin, args = {}, defaultOptions) {
               });
             }
           } else {
+            let escrow;
+            if (sales.length === 0 || sales.price === null || sales.price === undefined) {
+              escrow = await escrowJs.getEscrowForAsset(
+                admin,
+                inventory.address,
+                options
+              );
+            }
             // Just combine the data if userProfile is not present
             finalInventory.push({
               ...inventory,
@@ -626,22 +636,35 @@ async function getAll(admin, args = {}, defaultOptions) {
                   : null
                 : null,
               'BlockApps-Mercata-Sale': undefined, // Removing the nested sale data to avoid redundancy
+              escrow,
             });
           }
         } else if (isMarketplaceSearch && isNullPriceRange) {
-          finalInventory.push({
-            ...inventory,
-            price: null,
-            saleAddress: null,
-            saleQuantity: null,
-            saleDate: null,
-            totalLockedQuantity: null,
-            paymentServices: null,
-          });
+          const escrow = await escrowJs.getEscrowForAsset(
+                admin,
+                inventory.address,
+                options
+              );
+          if (!escrow) {
+            finalInventory.push({
+              ...inventory,
+              price: null,
+              saleAddress: null,
+              saleQuantity: null,
+              saleDate: null,
+              totalLockedQuantity: null,
+              paymentServices: null,
+            });
+          }
         } else {
-          finalInventory.push(inventory);
+          const escrow = await escrowJs.getEscrowForAsset(
+                admin,
+                inventory.address,
+                options
+              );
+          finalInventory.push({ escrow, ...inventory});
         }
-      });
+      }
     }
   }
   // Sort the images and files by their order

@@ -197,11 +197,11 @@ async function oraclePrice(user, address, options) {
  * stake
  */
 async function stake(user, args, options) {
-  const { reserve, ...restArgs } = args;
+  const { reserve, escrowAddress, ...restArgs } = args;
   const callArgs = {
     contract: { address: reserve },
     method: 'stakeAsset',
-    args: util.usc({ ...restArgs }),
+    args: util.usc({ escrowAddress: escrowAddress || constants.zeroAddress, ...restArgs }),
   };
 
   const reponse = await rest.call(user, callArgs, options);
@@ -241,9 +241,10 @@ async function borrow(user, args, options) {
 /**
  * Repay
  */
-async function repay(user, contract, args, options) {
-const callArgs = {
-    contract,
+async function repay(user, args, options) {
+  const { reserve, ...restArgs } = args;
+  const callArgs = {
+    contract: { address: reserve },
     method: 'repayLoan',
     args: util.usc({ ...args }),
   };

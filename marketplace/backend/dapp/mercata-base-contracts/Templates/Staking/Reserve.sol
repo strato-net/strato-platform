@@ -4,10 +4,10 @@ pragma strict;
 import <509>;
 
 import "../Assets/Asset.sol";
-import "../Sales/Escrow.sol";
-import "../Utils/Utils.sol";
+import "../Escrows/Escrow.sol";
+import "../Oracles/OracleService.sol";
 import "../Structs/Structs.sol";
-import "../Oracle/OracleService.sol";
+import "../Utils/Utils.sol";
 
 abstract contract Reserve is Utils, Structs {
     OracleService public oracle; // Asset Oracle service for fetching price data
@@ -26,12 +26,11 @@ abstract contract Reserve is Utils, Structs {
     decimal public unitConversionRate = 1; // 1 oz of gold in grams
 
     decimal public lastUpdatedOraclePrice = 0;
-    decimal public tvl = 0; // Total value locked
-    uint public tal = 0; // Total asset (quantity) locked
     
     event StakeCreated(address indexed user, address escrow, uint assetAmount, decimal stratsLoan);
-    event StakeUnlocked(address indexed user, address escrow);
+    event StakeUnlocked(address indexed user, address escrow, uint quantity);
     event CataTransferred(address indexed from, address indexed to, uint amount);
+    event LoanRepaid(address indexed user, address escrow, uint assetAmount, decimal repayment);
 
     constructor(address _assetOracle, string _name, address _assetRootAddress, decimal _unitConversionRate) {
         oracle = OracleService(_assetOracle);
@@ -85,41 +84,46 @@ abstract contract Reserve is Utils, Structs {
         }
 
         lastUpdatedOraclePrice = oraclePrice;
-        _updateTvl(0, true);
     }
 
-    function stakeAsset(uint _collateralQuantity, address _assetAddress, PaymentServiceInfo _stratPaymentService) public requireActive() returns (address) {
+    function stakeAsset(address _escrowAddress, address[] _assets, uint _collateralQuantity) public requireActive() returns (address) {
         // Calculate required values
-        Asset _assetToBeSold = Asset(_assetAddress);
-        require(_assetToBeSold.ownerCommonName() == getCommonName(msg.sender), "Only the owner of the asset can stake it");
+        Asset _assetToBeSold = Asset(_assets[0]);
+        require(_assetToBeSold.ownerCommonName() == getCommonName(msg.sender), "Only the owner of the assets can stake the assets");
         require(_assetToBeSold.root == assetRootAddress, "Asset does not belong to the root address");
         
         (decimal _oraclePrice, uint _priceTimestamp) = oracle.getLatestPrice();
         _oraclePrice = _oraclePrice / unitConversionRate;
-        decimal _collateralValue = decimal(_collateralQuantity) * _oraclePrice.truncate(2); 
-        decimal _maxStratsLoanAmount = _collateralValue * decimal(loanToValueRatio);
+        lastUpdatedOraclePrice = _oraclePrice;
 
-        // Create Escrow with all required parameters
-        Escrow escrow = new Escrow(
-            msg.sender,
-            _collateralQuantity,
-            _collateralValue,
-            uint(_maxStratsLoanAmount),
-            address(_assetToBeSold),
-            [_stratPaymentService]
-        );
+        Escrow escrow = Escrow(_escrowAddress);
+        if (_escrowAddress == address(0)) {
+            // Create Escrow with all required parameters
+            escrow = new Escrow(
+                _assets,
+                _collateralQuantity,
+                _oraclePrice,
+                loanToValueRatio
+            );
+        } else {
+            escrow.attachAssets(
+                _assets,
+                _collateralQuantity,
+                _oraclePrice,
+                loanToValueRatio
+            );
+        }
 
-        // Update tvl: total value locked
-        _updateTvl(_collateralQuantity, true);
+        uint escrowQuantity = escrow.collateralQuantity();
 
-        emit StakeCreated(msg.sender, address(escrow), _collateralQuantity, _maxStratsLoanAmount); 
+        emit StakeCreated(escrow.borrower(), address(escrow), escrowQuantity, escrow.maxLoanAmount()); 
         return address(escrow);
     }
 
     function borrow(address _escrowAddress, decimal _borrowAmount) public requireActive() {
         Escrow escrow = Escrow(_escrowAddress);
         require(escrow.borrower() == msg.sender, "Only borrower can borrow against this escrow");
-        require(uint(_borrowAmount) <= escrow.maxStratsLoanAmount(), "Cannot borrow more than max loan amount");
+        require(uint(_borrowAmount) <= escrow.maxLoanAmount(), "Cannot borrow more than max loan amount");
         
         uint transferNumber = (uint(block.number + 16)) % 1000000;
         
@@ -133,7 +137,51 @@ abstract contract Reserve is Utils, Structs {
         );
         
         // Update borrowed amount in escrow
-        escrow.updateBorrowedAmount(_borrowAmount);
+        escrow.updateBorrowedAmount(_borrowAmount, true);
+    }
+
+    function repayLoan(
+        address[] _stratsAssetAddresses,
+        address _escrowAddress
+    ) requireActive() external returns (uint) {
+        require(_stratsAssetAddresses.length > 0, "Pass at least one STRATs token address");
+        Escrow escrow = Escrow(_escrowAddress);
+        uint stratAmountOwed = uint(escrow.borrowedAmount() * 100);
+        uint stratAmountNet = stratAmountOwed;
+        uint stratQuantity = 0;
+        uint transferNumber = 0;
+        uint transferAmount = 0;
+
+        for (uint j = 0; j < _stratsAssetAddresses.length; j++) {
+            Asset stratAsset = Asset(_stratsAssetAddresses[j]);
+            require(stratAsset.root == stratsToken.root, "Asset is not a STRATS asset");
+            require(stratAsset.ownerCommonName() == getCommonName(msg.sender), "Purchaser doesn't own STRATS");
+
+            stratQuantity = stratAsset.quantity();
+            transferNumber = (uint(string(_escrowAddress), 16) + j + block.timestamp) % 1000000;
+
+            transferAmount = stratQuantity >= stratAmountNet ? stratAmountNet : stratQuantity;
+            stratAsset.attachSale();
+            if (stratQuantity > stratAmountNet) {
+                stratAsset.transferOwnership(owner, stratAmountNet, false, transferNumber, 0.0001);
+                stratAsset.closeSale();
+                stratAmountNet = 0;
+            } else {
+                stratAsset.transferOwnership(owner, stratQuantity, false, transferNumber, 0.0001);
+                stratAmountNet -= stratQuantity;
+            }
+
+            if (stratAmountNet == 0) {
+                break;
+            }
+        }
+        // require(stratAmountNet == 0, "Your STRATS balance is not high enough to cover the repayment."); // Allow partial repayments
+
+        // Clear loan
+        uint stratAmountRepaid = stratAmountOwed - stratAmountNet;
+        escrow.updateBorrowedAmount(stratAmountRepaid, false);
+
+        emit LoanRepaid(msg.sender, _escrowAddress, escrow.collateralQuantity(), stratAmountRepaid);
     }
 
     function setStratsToken(address _newStratsToken) public requireOwner("update STRATS token") {
@@ -196,18 +244,22 @@ abstract contract Reserve is Utils, Structs {
         cataAPYRate = _newRate;
     }
 
-    function unstake(address _escrowAddress) public requireActive() {
+    function unstake(address _escrowAddress, uint _quantity) public requireActive() {
         Escrow escrow = Escrow(_escrowAddress);
         require(escrow.borrower() == msg.sender, "Only the borrower can unstake");
-        require(escrow.borrowedAmount() == 0, "Must repay borrowed STRATS before unstaking");
+        // require(escrow.borrowedAmount() == 0, "Must repay borrowed STRATS before unstaking"); // The escrow function unstakeAssets() performs a check on the rebalanced collateralization ratio
 
-        escrow.closeSale();
+        (decimal _oraclePrice, uint _priceTimestamp) = oracle.getLatestPrice();
+        _oraclePrice = _oraclePrice / unitConversionRate;
+        lastUpdatedOraclePrice = _oraclePrice;
 
-        // Update tvl: total value locked
-        _updateTvl(escrow.collateralQuantity(), false);
+        uint startingQuantity = escrow.collateralQuantity();
+        escrow.unlockAssets(_quantity, _oraclePrice, loanToValueRatio);
+        uint endingQuantity = escrow.collateralQuantity();
+        uint releasedQuantity = startingQuantity - endingQuantity;
 
         // Emit unstake event
-        emit StakeUnlocked(msg.sender, _escrowAddress);
+        emit StakeUnlocked(msg.sender, _escrowAddress, releasedQuantity);
     }
 
     function calculateCATAReward(
@@ -219,15 +271,6 @@ abstract contract Reserve is Utils, Structs {
         decimal secondsPerYear = 31536000.0000000000000000000; // Number of seconds in a year
         return (decimal(collateralQuantity) * livePriceOfCollateral * decimal(cataAPYRate)/100.0000000000000000000 * decimal(delta)) / 
                (priceOfCATA * secondsPerYear);
-    }
-
-    function _updateTvl(uint _newTal, bool add) internal {
-        if (add) {
-            tal += _newTal;  // Add _newTal to tal if add is true
-        } else {
-            tal -= _newTal;  // Subtract _newTal from tal if add is false
-        }
-        tvl = decimal(tal) * lastUpdatedOraclePrice;  // Update tvl based on the new tal value
     }
     
     function migrateReserve(address _newReserve, address[] _escrows) external requireOwner("migrate the Reserve") {
