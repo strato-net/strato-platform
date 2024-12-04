@@ -6,6 +6,7 @@ import {
   Table,
   Tooltip,
   Typography,
+  Pagination,
 } from 'antd';
 import image_placeholder from '../../images/resources/image_placeholder.png';
 import useDebounce from '../UseDebounce';
@@ -27,29 +28,36 @@ import '../Inventory/index.css';
 import PurchasableStakeItems from './PurchasableStakeItems';
 import StakeSteps from './StakeSteps';
 
-const { Option } = Select;
 const { Title } = Typography;
 const StratsIcon = <img src={Images.strats} alt="STRATS" className="w-4 h-4" />;
 
 const Stake = ({ user }) => {
   const inventoryDispatch = useInventoryDispatch();
-  const { reserves, inventories, isInventoriesLoading, isReservesLoading } =
+  const { reserves, inventories, isInventoriesLoading, inventoriesTotal } =
     useInventoryState();
   const { stratsAddress, cataAddress } = useMarketplaceState();
   const linkUrl = window.location.href;
-  const metaImg = SEO.IMAGE_META;
   const [api, contextHolder] = notification.useNotification();
   const [limit, setLimit] = useState(10);
   const [offset, setOffset] = useState(0);
+  const [page, setPage] = useState(1);
   const [queryValue, setQueryValue] = useState('');
   const debouncedSearchTerm = useDebounce(queryValue, 1000);
   const navigate = useNavigate();
 
+  const onPageChange = (page, pageSize) => {
+    setLimit(pageSize);
+    setOffset((page - 1) * pageSize);
+    setPage(page);
+  };
+
   useEffect(() => {
-    if (!reserves) {
+    if (!reserves || reserves.length === 0) {
       inventoryActions.getAllReserve(inventoryDispatch);
     }
+  }, []);
 
+  useEffect(() => {
     if (reserves) {
       inventoryActions.fetchInventory(
         inventoryDispatch,
@@ -265,17 +273,17 @@ const Stake = ({ user }) => {
             <Table
               columns={columns}
               dataSource={inventories}
-              loading={isInventoriesLoading || isReservesLoading}
+              loading={isInventoriesLoading}
               className="custom-table"
               pagination={false}
             />
-            {/* <Pagination
+            <Pagination
               current={page}
               onChange={onPageChange}
-              total={showPublished ? userInventoriesTotal : inventoriesTotal}
+              total={inventoriesTotal}
               showTotal={(total) => `Total ${total} items`}
               className="flex justify-center my-5 custom-pagination"
-            /> */}
+            />
           </div>
         </div>
       </div>
@@ -285,41 +293,6 @@ const Stake = ({ user }) => {
 
 export default Stake;
 
-{
-  /*********************** HEADER ***********************/
-}
-{
-  /* <div className="w-full h-[160px] py-4 px-4 md:h-[96px] bg-[#F6F6F6] flex flex-col md:flex-row md:px-14 justify-between items-center mt-6 lg:mt-8">
-          <div className="flex w-full items-center">
-            <Button
-              className="!px-1 md:!px-0 flex items-center flex-row-reverse gap-[6px] text-lg md:text-xl font-semibold !text-[#13188A]"
-              type="link"
-              icon={
-                <img
-                  src={Images.ForwardIcon}
-                  alt={metaImg}
-                  title={metaImg}
-                  className="hidden md:block w-5 h-5"
-                />
-              }
-            >
-              Stake
-            </Button>
-
-            <p className="flex items-center ml-4 font-semibold text-base md:text-lg bg-[#E6F0FF] border border-[#13188A] rounded-md px-3 py-1 text-[#13188A] shadow-sm">
-              <DollarOutlined className="!text-[#13188A] mr-2 text-lg" />
-              Total Rewards (CATA):
-              <span className="ml-2 font-bold">$334,133</span>
-            </p>
-
-            <p className="flex items-center ml-4 font-semibold text-base md:text-lg bg-[#FFE6E6] border border-[#D32F2F] rounded-md px-3 py-1 text-[#D32F2F] shadow-sm">
-              <GiftOutlined className="!text-[#D32F2F] mr-2 text-lg" />
-              Est. Daily Reward (CATA):
-              <span className="ml-2 font-bold">$1,321</span>
-            </p>
-          </div>
-        </div> */
-}
 {
   /*********************** SEARCH ***********************/
 }
@@ -358,31 +331,6 @@ export default Stake;
               }
             />
           </Space.Compact> */
-}
-{
-  /*********************** DESKTOP TABLE OF ITEMS ***********************/
-}
-{
-  /* <div className="hidden md:block">
-              <Table
-                columns={columns}
-                dataSource={showPublished ? userInventories : inventories}
-                loading={
-                  isInventoriesLoading ||
-                  isUserInventoriesLoading ||
-                  isReservesLoading
-                }
-                className="custom-table"
-                pagination={false}
-              />
-              <Pagination
-                current={page}
-                onChange={onPageChange}
-                total={showPublished ? userInventoriesTotal : inventoriesTotal}
-                showTotal={(total) => `Total ${total} items`}
-                className="flex justify-center my-5 custom-pagination"
-              />
-            </div> */
 }
 {
   /*********************** MOBILE INVENTORY CARDS ***********************/

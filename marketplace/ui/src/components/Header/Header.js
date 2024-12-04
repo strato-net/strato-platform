@@ -517,6 +517,7 @@ const HeaderComponent = ({
           type="primary"
           className="font-semibold hidden md:block"
           onClick={() => {
+            window.scrollTo({ top: 0 });
             navigate(routes.Stake.url);
             setSelectedTab(0)
           }}

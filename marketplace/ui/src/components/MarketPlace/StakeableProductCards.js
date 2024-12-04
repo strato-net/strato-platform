@@ -7,7 +7,6 @@ import {
 } from '../../contexts/marketplace';
 import { useInventoryState } from '../../contexts/inventory';
 import { useNavigate } from 'react-router-dom';
-import { useAuthenticateState } from '../../contexts/authentication';
 import NewTrendingCard from './NewTrendingCard';
 import { Fade } from 'react-awesome-reveal';
 
@@ -15,42 +14,20 @@ const { Title } = Typography;
 
 const StakeableProductCards = () => {
   const containerRef = useRef(null);
-  const [offset, setOffset] = useState(0);
-  const limit = 25;
-
   const marketplaceDispatch = useMarketplaceDispatch();
   const { stakeableProducts, isStakeableProductsLoading } =
     useMarketplaceState();
   const { reserves } = useInventoryState();
-  let { hasChecked, isAuthenticated, loginUrl, user } = useAuthenticateState();
   const [api, contextHolder] = notification.useNotification();
 
   useEffect(() => {
     if (reserves) {
-      if (hasChecked && !isAuthenticated) {
-        actions.fetchStakeableProducts(
-          marketplaceDispatch,
-          offset,
-          limit,
-          reserves.map((reserve) => reserve.assetRootAddress)
-        );
-      } else if (hasChecked && isAuthenticated) {
-        actions.fetchStakeableProductsLoggedIn(
-          marketplaceDispatch,
-          offset,
-          limit,
-          reserves.map((reserve) => reserve.assetRootAddress)
-        );
-      }
+      actions.fetchStakeableProducts(
+        marketplaceDispatch,
+        reserves.map((reserve) => reserve.assetRootAddress)
+      );
     }
-  }, [
-    marketplaceDispatch,
-    offset,
-    hasChecked,
-    isAuthenticated,
-    loginUrl,
-    reserves,
-  ]);
+  }, [marketplaceDispatch, reserves]);
 
   const navigate = useNavigate();
 

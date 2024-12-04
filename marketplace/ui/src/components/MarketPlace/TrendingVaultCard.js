@@ -5,7 +5,6 @@ import {
   useInventoryDispatch,
   useInventoryState,
 } from '../../contexts/inventory';
-import { useAuthenticateState } from '../../contexts/authentication';
 import NewVaultCard from './NewVaultCard';
 import { Fade } from 'react-awesome-reveal';
 
@@ -16,11 +15,10 @@ const TrendingVaultCard = () => {
 
   const dispatch = useInventoryDispatch();
   const { isReservesLoading, reserves } = useInventoryState();
-  let { hasChecked, isAuthenticated, loginUrl, user } = useAuthenticateState();
 
   useEffect(() => {
     actions.getAllReserve(dispatch);
-  }, [dispatch, hasChecked, isAuthenticated, loginUrl]);
+  }, [dispatch]);
 
   return (
     <div>

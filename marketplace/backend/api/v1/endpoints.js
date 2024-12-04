@@ -186,6 +186,7 @@ export const Marketplace = {
   getStratsAddress: "/strats/address",
   getCataAddress: "/cata/address",
   getStratsTransactionHistory: "/strats/history",
+  getStakeableProducts: "/stake"
 };
 
 export const PaymentService = {

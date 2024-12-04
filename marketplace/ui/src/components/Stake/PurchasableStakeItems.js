@@ -9,7 +9,6 @@ import {
   useMarketplaceDispatch,
   useMarketplaceState,
 } from '../../contexts/marketplace';
-import { useAuthenticateState } from '../../contexts/authentication';
 import NewVaultCard from '../MarketPlace/NewVaultCard';
 import { Fade } from 'react-awesome-reveal';
 
@@ -17,22 +16,16 @@ const { Title } = Typography;
 
 const PurchasableStakeItems = () => {
   const containerRef = useRef(null);
-  const [offset, setOffset] = useState(0);
-  const limit = 25;
 
-  const inventoryDispatch = useInventoryDispatch();
   const marketplaceDispatch = useMarketplaceDispatch();
-  const { isReservesLoading, reserves } = useInventoryState();
+  const { reserves } = useInventoryState();
   const { stakeableProducts, isStakeableProductsLoading } =
     useMarketplaceState();
-  let { hasChecked, isAuthenticated, loginUrl, user } = useAuthenticateState();
 
   useEffect(() => {
-    if (hasChecked && isAuthenticated && reserves) {
-      marketplaceActions.fetchStakeableProductsLoggedIn(
+    if (reserves) {
+      marketplaceActions.fetchStakeableProducts(
         marketplaceDispatch,
-        offset,
-        limit,
         reserves.map((reserve) => reserve.assetRootAddress)
       );
     }
@@ -47,9 +40,9 @@ const PurchasableStakeItems = () => {
           </Title>
         </div>
       </Fade>
-      {isStakeableProductsLoading || !stakeableProducts ? (
+      {!stakeableProducts ? (
         <div className="h-52 flex justify-center items-center">
-          <Spin spinning={isStakeableProductsLoading} size="large" />
+          {/* <Spin spinning={isStakeableProductsLoading} size="large" /> */}
         </div>
       ) : (
         <Fade direction="right" triggerOnce>

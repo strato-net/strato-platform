@@ -34,6 +34,13 @@ router.get(
   MarketplaceController.getTopSellingProductsLoggedIn
 );
 
+router.get(
+  Marketplace.getStakeableProducts,
+  authHandler.authorizeRequest(),
+  loadDapp,
+  MarketplaceController.getStakeableProducts
+);
+
 router.post(
   Marketplace.transferStrats,
   authHandler.authorizeRequest(),
