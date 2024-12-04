@@ -1,0 +1,190 @@
+import { util, rest } from '/blockapps-rest-plus';
+import constants from '../../helpers/constants';
+
+const contractName = 'BlockApps-Mercata-Escrow';
+const assetsArrayName = 'BlockApps-Mercata-Escrow-assets';
+
+/**
+ * Augment contract arguments before they are used to post a contract.
+ * Its counterpart is {@link marshalOut `marshalOut`}.
+ *
+ * As our arguments come into the payment contract they first pass through `marshalIn` and
+ * when we retrieve contract state they pass through {@link marshalOut `marshalOut`}.
+ *
+ * (A mathematical analogy: `marshalIn` and {@link marshalOut `marshalOut`} form something like a
+ * homomorphism)
+ * @param args - Contract state
+ */
+
+function marshalIn(_args) {
+  const defaultArgs = {
+  };
+
+  const args = {
+    ...defaultArgs,
+    ..._args,
+  };
+  return args;
+}
+
+/**
+ * Augment returned contract state before it is returned.
+ * Its counterpart is {@link marshalIn `marshalIn`}.
+ *
+ * As our arguments come into the payment contract they first pass through {@link marshalIn `marshalIn`}
+ * and when we retrieve contract state they pass through `marshalOut`.
+ *
+ * (A mathematical analogy: {@link marshalIn `marshalIn`} and `marshalOut` form something like a
+ * homomorphism)
+ * @param _args - Contract state
+ */
+function marshalOut(_args) {
+  const args = {
+    ..._args,
+  };
+  return args;
+}
+
+/**
+ * Retrieve contract state via Cirrus.
+ * @param {Object} user - User context for the request.
+ * @param {Object} options - Search options including chainId.
+ * @returns {Array} - List of escrows with attached asset information.
+ * @throws {Error} - Throws if no escrows are found.
+ */
+async function get(user, address, options) {
+  // Define search options for active escrows
+  const searchOptions = {
+    ...options,
+    query: {
+      select: `*,${assetsArrayName}(*)`,
+      isActive: 'eq.true',
+      address: 'eq.' + address,
+    },
+  };
+
+  // Fetch escrows from Cirrus
+  const escrows = await rest.search(
+    user,
+    { name: contractName },
+    searchOptions
+  );
+
+  if (!escrows || escrows.length === 0) {
+    return undefined;
+  }
+
+  // Fetch asset information and attach it to the escrow
+  const escrow = escrows[0];
+
+  const asset = await rest.search(
+    user,
+    { name: 'BlockApps-Mercata-Asset' },
+    {
+      ...options,
+      query: {
+        address: `eq.${escrow.assetRootAddress}`,
+        select: constants.attachImagesAndFiles,
+      },
+    }
+  );
+
+  // Attach the first matching asset (or null) to the escrow
+  return {
+    ...escrow,
+    asset: asset && asset[0] ? marshalOut(asset[0]) : null,
+  };
+}
+
+/**
+ * Retrieve contract states via Cirrus.
+ * @param {Object} user - User context for the request.
+ * @param {Object} options - Search options including chainId.
+ * @returns {Array} - List of escrows with attached asset information.
+ * @throws {Error} - Throws if no escrows are found.
+ */
+async function getAll(user, options) {
+  // Define search options for active escrows
+  const searchOptions = {
+    ...options,
+    query: {
+      select: `*,${assetsArrayName}(*)`,
+      isActive: 'eq.true',
+    },
+  };
+
+  // Fetch escrows from Cirrus
+  const escrows = await rest.search(
+    user,
+    { name: contractName },
+    searchOptions
+  );
+
+  if (!escrows || escrows.length === 0) {
+    throw new Error('No escrows found');
+  }
+
+  // Fetch asset information and attach it to each escrow
+  const escrowsWithAssets = await Promise.all(
+    escrows.map(async (escrow) => {
+      const asset = await rest.search(
+        user,
+        { name: 'BlockApps-Mercata-Asset' },
+        {
+          ...options,
+          query: {
+            address: `eq.${escrow.assetRootAddress}`,
+            select: constants.attachImagesAndFiles,
+          },
+        }
+      );
+
+      // Attach the first matching asset (or null) to the escrow
+      return {
+        ...escrow,
+        asset: asset && asset[0] ? marshalOut(asset[0]) : null,
+      };
+    })
+  );
+
+  return escrowsWithAssets;
+}
+
+/**
+ * Retrieve contract state via Cirrus.
+ * @param {Object} user - User context for the request.
+ * @param {Object} options - Search options including chainId.
+ * @returns {Object} - Escrow with attached asset information, or undefined if none exists.
+ * @throws {Error} - Throws if no escrows are found.
+ */
+async function getEscrowForAsset(user, address, options) {
+  // Define search options for active escrows
+  const searchOptions = {
+    ...options,
+    query: {
+      value: 'eq.' + address,
+    },
+  };
+
+  // Fetch escrows from Cirrus
+  const assets = await rest.search(
+    user,
+    { name: assetsArrayName },
+    searchOptions
+  );
+
+  if (!assets || assets.length === 0) {
+    return undefined;
+  }
+
+  return get(user, assets[0].address, options);
+}
+
+export default {
+  contractName,
+  get,
+  getAll,
+  getEscrowForAsset,
+  marshalIn,
+  marshalOut,
+};
