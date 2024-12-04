@@ -35,7 +35,7 @@ async function fetchAndSubmitEscrowAddresses(oracleContract, token) {
   };
 
   const reserves = await rest.search(
-    user,
+    token,
     { name: "BlockApps-Mercata-Reserve" },
     reserveSearchOptions
   );
@@ -60,7 +60,7 @@ async function fetchAndSubmitEscrowAddresses(oracleContract, token) {
 
     // Fetch escrows from Cirrus
     const escrows = await rest.search(
-      user,
+      token,
       { name: "BlockApps-Mercata-Sale" },
       searchOptions
     );
