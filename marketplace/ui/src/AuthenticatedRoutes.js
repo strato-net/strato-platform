@@ -11,7 +11,7 @@ import { InventoriesProvider } from './contexts/inventory';
 import { PaymentServicesProvider } from './contexts/payment';
 import Item from './components/Item';
 import { ItemsProvider } from './contexts/item';
-import Order from './components/Order';
+import Stake from './components/Stake';
 import SoldOrderDetails from './components/Order/SoldOrderDetails';
 import BoughtOrderDetails from './components/Order/BoughtOrderDetails';
 import RedemptionsOutgoingDetails from './components/Order/RedemptionsOutgoingDetails';
@@ -130,7 +130,9 @@ const AuthenticatedRoutes = ({ user, users, isAuthenticated }) => {
               <SubCategorysProvider>
                 <ProductsProvider>
                   <OrdersProvider>
-                    <CategoryProductList user={user} users={users} />
+                    <InventoriesProvider>
+                      <CategoryProductList user={user} users={users} />
+                    </InventoriesProvider>
                   </OrdersProvider>
                 </ProductsProvider>
               </SubCategorysProvider>
@@ -201,6 +203,31 @@ const AuthenticatedRoutes = ({ user, users, isAuthenticated }) => {
                         <PaymentServicesProvider>
                           <IssuerStatusProvider>
                             <Inventory user={user} users={users} />
+                          </IssuerStatusProvider>
+                        </PaymentServicesProvider>
+                      </RedemptionsProvider>
+                    </InventoriesProvider>
+                  </ProductsProvider>
+                </ItemsProvider>
+              </SubCategorysProvider>
+            </CategorysProvider>
+          </UsersProvider>
+        }
+      />
+      <Route
+        exact
+        path={routes.Stake.url}
+        element={
+          <UsersProvider>
+            <CategorysProvider>
+              <SubCategorysProvider>
+                <ItemsProvider>
+                  <ProductsProvider>
+                    <InventoriesProvider>
+                      <RedemptionsProvider>
+                        <PaymentServicesProvider>
+                          <IssuerStatusProvider>
+                            <Stake user={user} />
                           </IssuerStatusProvider>
                         </PaymentServicesProvider>
                       </RedemptionsProvider>

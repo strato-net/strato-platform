@@ -87,7 +87,6 @@ const Inventory = ({ user }) => {
   const naviroute = routes.InventoryDetail.url;
   let { hasChecked, isAuthenticated, loginUrl } = useAuthenticateState();
   const { stratsAddress, cataAddress } = useMarketplaceState();
-  // console.log("{ stratsAddress, cataAddress }", { stratsAddress, cataAddress });
   const formatter = new Intl.NumberFormat('en-US');
   const formattedNum = (num) => formatter.format(num);
 
@@ -583,31 +582,35 @@ const Inventory = ({ user }) => {
           </Breadcrumb.Item>
         </Breadcrumb>
         <div className="w-full h-[160px] py-4 px-4 md:h-[96px] bg-[#F6F6F6] flex flex-col md:flex-row md:px-14 justify-between items-center mt-6 lg:mt-8">
-          <div className="flex w-full">
+          <div className="flex w-full items-center">
             <Button
-              className="!px-1 md:!px-0 flex items-center flex-row-reverse gap-[6px] text-xl md:text-2xl font-semibold !text-[#13188A] "
+              className="!px-1 md:!px-0 flex items-center flex-row-reverse gap-[6px] text-lg md:text-xl font-semibold !text-[#13188A]"
               type="link"
               icon={
                 <img
                   src={Images.ForwardIcon}
                   alt={metaImg}
                   title={metaImg}
-                  className="hidden md:block w-6 h-6"
+                  className="hidden md:block w-5 h-5"
                 />
               }
             >
-              {' '}
               My Wallet
             </Button>
-            <p className="text-xl !text-[#13188A] flex items-center ml-4 font-semibold">
-              <DollarOutlined className="!text-[#13188A] mr-2" />
-              Total Rewards (CATA): $334,133
+
+            <p className="flex items-center ml-4 font-semibold text-base md:text-lg bg-[#E6F0FF] border border-[#13188A] rounded-md px-3 py-1 text-[#13188A] shadow-sm">
+              <DollarOutlined className="!text-[#13188A] mr-2 text-lg" />
+              Total Rewards (CATA):
+              <span className="ml-2 font-bold">334,133</span>
             </p>
-            <p className="text-xl !text-[#13188A] flex items-center ml-4 font-semibold">
-              <GiftOutlined className="!text-[#13188A] mr-2" />
-              Est. Daily Reward (CATA): $1,321
+
+            <p className="flex items-center ml-4 font-semibold text-base md:text-lg bg-[#FFE6E6] border border-[#D32F2F] rounded-md px-3 py-1 text-[#D32F2F] shadow-sm">
+              <GiftOutlined className="!text-[#D32F2F] mr-2 text-lg" />
+              Est. Daily Reward (CATA):
+              <span className="ml-2 font-bold">1,321</span>
             </p>
           </div>
+
           <div className="flex flex-col md:flex-row gap-3 items-center my-2 md:my-0">
             <div className="flex gap-3 items-center">
               <Select

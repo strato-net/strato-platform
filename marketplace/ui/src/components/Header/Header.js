@@ -75,7 +75,8 @@ const HeaderComponent = ({
   const categoryDispatch = useCategoryDispatch();
   const userDispatch = useAuthenticateDispatch();
   //States
-  const { cartList, strats, cata, cataAddress, stratsAddress } = useMarketplaceState();
+  const { cartList, strats, cata, cataAddress, stratsAddress } =
+    useMarketplaceState();
   const { categorys } = useCategoryState();
   let { isAuthenticated } = useAuthenticateState();
 
@@ -305,7 +306,7 @@ const HeaderComponent = ({
         }
       : null,
     user
-      ? { value: 'stake', path: routes.MyWalletStakeable.url, label: 'Stake' }
+      ? { value: 'stake', path: routes.Stake.url, label: 'Stake' }
       : null,
     {
       value: 'activityFeed',
@@ -515,7 +516,10 @@ const HeaderComponent = ({
         <Button
           type="primary"
           className="font-semibold hidden md:block"
-          onClick={() => navigate(routes.MyWalletStakeable.url)}
+          onClick={() => {
+            navigate(routes.Stake.url);
+            setSelectedTab(0)
+          }}
         >
           <RiseOutlined /> Stake
         </Button>
@@ -552,7 +556,7 @@ const HeaderComponent = ({
                   overflowCount={9999999}
                 >
                   <img
-                    src={Images.strats}
+                    src={Images.cata}
                     alt={IMG_META}
                     title={IMG_META}
                     className="w-[35px] h-[35px] "

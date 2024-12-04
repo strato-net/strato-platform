@@ -9,13 +9,14 @@ import images_placeholder from '../../images/resources/image_placeholder.png';
 import { setCookie } from '../../helpers/cookie';
 import { SEO } from '../../helpers/seoConstant';
 import LoginModal from './LoginModal';
+import routes from '../../helpers/routes';
 
 const NewVaultCard = ({ reserveItem, parent = '', contextHolder }) => {
   const location = useLocation();
   const navigate = useNavigate();
   const { hasChecked, isAuthenticated, loginUrl, user } =
     useAuthenticateState();
-  
+
   const [isModalVisible, setIsModalVisible] = useState(false);
 
   const queryParams = new URLSearchParams(location.search);
@@ -41,7 +42,11 @@ const NewVaultCard = ({ reserveItem, parent = '', contextHolder }) => {
   };
 
   const handleCardClick = () => {
-    navigate(`vaults/${reserveItem.address}`);
+    navigate(
+      `${routes.MarketplaceProductDetail.url
+        .replace(':address', reserveItem.address)
+        .replace(':name', reserveItem.name)}`
+    );
   };
 
   return (
@@ -59,8 +64,8 @@ const NewVaultCard = ({ reserveItem, parent = '', contextHolder }) => {
           <img
             className="h-[60px] w-[60px] object-contain rounded-md cursor-pointer"
             src={
-              reserveItem.asset['BlockApps-Mercata-Asset-images']?.length > 0
-                ? reserveItem.asset['BlockApps-Mercata-Asset-images'][0].value
+              reserveItem['BlockApps-Mercata-Asset-images']?.length > 0
+                ? reserveItem['BlockApps-Mercata-Asset-images'][0].value
                 : images_placeholder
             }
             alt={imgMeta}
@@ -75,12 +80,12 @@ const NewVaultCard = ({ reserveItem, parent = '', contextHolder }) => {
             <div className="flex justify-between items-center w-full">
               {/* Interest */}
               <Typography className="font-semibold text-gray-600 overflow-hidden cursor-pointer whitespace-nowrap text-ellipsis">
-                Interest: 2% {/* TODO: Replace with actual data */}
+                TVL: $3.32M {/* TODO: Replace with actual data */}
               </Typography>
 
-              {/* Cata APY */}
+              {/* CATA APY */}
               <Typography className="font-semibold text-gray-600 overflow-hidden cursor-pointer whitespace-nowrap text-ellipsis">
-                Cata APY: {reserveItem.cataAPYRate}%
+                Est. APY: 10%
               </Typography>
             </div>
           </div>

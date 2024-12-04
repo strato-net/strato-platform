@@ -1,17 +1,12 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { Typography, Spin, notification, Button } from 'antd';
 import { actions } from '../../contexts/marketplace/actions';
-import { actions as inventoryActions } from '../../contexts/inventory/actions';
 import {
   useMarketplaceDispatch,
   useMarketplaceState,
 } from '../../contexts/marketplace';
-import {
-  useInventoryDispatch,
-  useInventoryState,
-} from '../../contexts/inventory';
+import { useInventoryState } from '../../contexts/inventory';
 import { useNavigate } from 'react-router-dom';
-import routes from '../../helpers/routes';
 import { useAuthenticateState } from '../../contexts/authentication';
 import NewTrendingCard from './NewTrendingCard';
 import { Fade } from 'react-awesome-reveal';
@@ -27,18 +22,18 @@ const StakeableProductCards = () => {
   const { stakeableProducts, isStakeableProductsLoading } =
     useMarketplaceState();
   const { reserves } = useInventoryState();
-  const inventoryDispatch = useInventoryDispatch();
   let { hasChecked, isAuthenticated, loginUrl, user } = useAuthenticateState();
   const [api, contextHolder] = notification.useNotification();
 
   useEffect(() => {
-    inventoryActions.getAllReserve(inventoryDispatch);
-  }, []);
-
-  useEffect(() => {
     if (reserves) {
       if (hasChecked && !isAuthenticated) {
-        actions.fetchStakeableProducts(marketplaceDispatch, offset, limit, reserves.map((reserve) => reserve.assetRootAddress));
+        actions.fetchStakeableProducts(
+          marketplaceDispatch,
+          offset,
+          limit,
+          reserves.map((reserve) => reserve.assetRootAddress)
+        );
       } else if (hasChecked && isAuthenticated) {
         actions.fetchStakeableProductsLoggedIn(
           marketplaceDispatch,
@@ -54,6 +49,7 @@ const StakeableProductCards = () => {
     hasChecked,
     isAuthenticated,
     loginUrl,
+    reserves,
   ]);
 
   const navigate = useNavigate();
@@ -92,11 +88,6 @@ const StakeableProductCards = () => {
       behavior: 'smooth',
     });
   };
-
-  const navRoute = routes.MarketplaceCategoryProductList.url.replace(
-    ':category',
-    'All'
-  );
 
   return (
     <div>

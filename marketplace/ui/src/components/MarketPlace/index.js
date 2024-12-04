@@ -17,6 +17,8 @@ import HelmetComponent from '../Helmet/HelmetComponent';
 import { SEO } from '../../helpers/seoConstant';
 import { BANNER } from '../../helpers/constants';
 import { bannerArrow } from '../../images/SVGComponents';
+import { actions as inventoryActions } from '../../contexts/inventory/actions';
+import { useInventoryDispatch } from '../../contexts/inventory';
 
 // ----------------------------------------------------------
 
@@ -39,6 +41,11 @@ const MarketPlace = ({ user, isAuthenticated }) => {
   const dispatch = useCategoryDispatch();
   const debouncedSearchTerm = useDebounce('', 1000);
   const { iscategorysLoading } = useCategoryState();
+  const inventoryDispatch = useInventoryDispatch();
+
+  useEffect(() => {
+    inventoryActions.getAllReserve(inventoryDispatch);
+  }, []);
 
   useEffect(() => {
     if (isAuthenticated) {
@@ -119,7 +126,7 @@ const MarketPlace = ({ user, isAuthenticated }) => {
           <div className="text-sm text-white">Est. APY</div>
         </div>
         <div className="text-center">
-          <div className="font-bold text-4xl text-white">$478.7M</div>
+          <div className="font-bold text-4xl text-white">478.7M</div>
           <div className="text-sm text-white">Rewards Issued (CATA)</div>
         </div>
       </div>

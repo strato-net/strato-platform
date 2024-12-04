@@ -1,5 +1,6 @@
 export const Images = {
   strats: require('./resources/stratLight.png'),
+  cata: require('./resources/cata.png'),
   logo: require('./resources/logo.png'),
   noProductSymbol: require('./resources/noProductSymbol.png'),
   noEventPageSymbol: require('./resources/no_event.png'),
