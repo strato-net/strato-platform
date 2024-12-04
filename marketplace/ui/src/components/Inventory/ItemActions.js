@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { Button, Popover } from 'antd';
+import BigNumber from 'bignumber.js';
 import {
   DollarOutlined,
   EditOutlined,
@@ -42,20 +43,21 @@ const ItemActions = ({
   cataAddress,
 }) => {
   const itemData = inventory.data;
-  const isStrats = inventory.originAddress === stratAddress;
+  const isStrat = inventory.originAddress === stratAddress;
   const isCata = inventory.originAddress === cataAddress;
-  const quantity = isStrats
-    ? parseFloat((inventory.quantity / 100).toFixed(2))
+  const quantity = isStrat
+    ? new BigNumber(inventory.quantity).dividedBy(100)
     : isCata
-    ? parseFloat((inventory.quantity / Math.pow(10, 18)).toFixed(2))
-    : inventory.quantity;
-  const saleQuantity = isStrats
-    ? inventory.saleQuantity !== undefined
-      ? parseFloat((inventory.saleQuantity / 100).toFixed(2))
-      : undefined
-    : isCata
-    ? parseFloat((inventory.quantity / Math.pow(10, 18)).toFixed(2))
-    : inventory.saleQuantity;
+    ? new BigNumber(inventory.quantity).dividedBy(new BigNumber(10).pow(18))
+    : new BigNumber(inventory.quantity);
+  const saleQuantity =
+    inventory.saleQuantity !== undefined
+      ? isStrat
+        ? new BigNumber(inventory.saleQuantity).dividedBy(100)
+        : isCata
+        ? new BigNumber(inventory.saleQuantity).dividedBy(new BigNumber(10).pow(18))
+        : new BigNumber(inventory.saleQuantity)
+      : undefined;  
   const stakeable =
     inventory.root &&
     reserves &&
@@ -94,8 +96,8 @@ const ItemActions = ({
   function isTransferDisabled() {
     return !(
       quantity &&
-      quantity > 0 &&
-      (!inventory.saleAddress || (inventory.saleAddress && saleQuantity > 0))
+      quantity.gt(0) &&
+      (!inventory.saleAddress || (inventory.saleAddress && saleQuantity.gt(0)))
     );
   }
 
@@ -252,7 +254,7 @@ const ItemActions = ({
             inventory.address === inventory.originAddress ||
             !isActive() ||
             disableSADDOGS(inventory) ||
-            isStrats ||
+            isStrat ||
             isCata
           }
         >
@@ -323,7 +325,7 @@ const ItemActions = ({
                     inventory.address === inventory.originAddress ||
                     !isActive() ||
                     disableSADDOGS(inventory) ||
-                    isStrats ||
+                    isStrat ||
                     isCata
                   }
                 >

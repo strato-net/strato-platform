@@ -1,5 +1,6 @@
 import { Button, Select, InputNumber, Modal, Table, notification } from 'antd';
 import { useEffect, useState } from 'react';
+import BigNumber from 'bignumber.js';
 import { actions } from '../../contexts/inventory/actions';
 import { actions as marketplaceActions } from '../../contexts/marketplace/actions';
 import { actions as userActions } from '../../contexts/users/actions';
@@ -32,6 +33,11 @@ const TransferModal = ({
   const queryParams = new URLSearchParams(location.search);
   const isStrat = inventory.originAddress === stratAddress;
   const isCata = inventory.originAddress === cataAddress;
+  const availableQuantity = isStrat
+    ? new BigNumber(inventory.quantity).dividedBy(100)
+    : isCata
+    ? new BigNumber(inventory.quantity).dividedBy(new BigNumber(10).pow(18))
+    : new BigNumber(inventory.quantity);
   // Get the inventory state and dispatch
   const inventoryDispatch = useInventoryDispatch();
   const marketplaceDispatch = useMarketplaceDispatch();
@@ -49,13 +55,10 @@ const TransferModal = ({
   const [canTransfer, setCanTransfer] = useState(false);
   const [canAddRow, setCanAddRow] = useState(false);
   const [canRemoveRow, setCanRemoveRow] = useState(false);
-  const quantityIsDecimal =
-    inventory.data.quantityIsDecimal &&
-    inventory.data.quantityIsDecimal === 'True';
   const [transfers, setTransfers] = useState([
     {
       id: 1,
-      quantity: 1,
+      quantity: availableQuantity,
       price: 0.01,
       recipient: undefined,
       openDropdown: false,
@@ -67,11 +70,27 @@ const TransferModal = ({
 
   // Functions to change Tansfer State
   const handleAddTransfer = () => {
+    // Calculate allocated quantity from previous transfers
+    const allocatedQuantity = transfers.reduce(
+      (total, transfer) => new BigNumber(total).plus(new BigNumber(transfer.quantity || 0)),
+      new BigNumber(0)
+    );
+
+    // Calculate remaining quantity
+    const remainingQuantity = availableQuantity.minus(allocatedQuantity);
+
+    // Prevent adding transfer if no available quantity remains
+    if (remainingQuantity <= 0) {
+      console.warn('No remaining quantity available for transfer.');
+      return;
+    }
+
+    // Update transfers state
     setTransfers((prevTransfers) => [
       ...prevTransfers,
       {
-        id: transfers.length + 1,
-        quantity: 1,
+        id: prevTransfers.length + 1,
+        quantity: remainingQuantity,
         price: 0.01,
         recipient: undefined,
         openDropdown: false,
@@ -155,20 +174,15 @@ const TransferModal = ({
       (transfer) =>
         transfer.quantity > 0 && transfer.price > 0 && transfer.recipient
     );
-    const totalQuantity = transfers.reduce(
-      (total, transfer) => total + (transfer.quantity || 0),
-      0
+    const allocatedQuantity = transfers.reduce(
+      (total, transfer) => new BigNumber(total).plus(new BigNumber(transfer.quantity || 0)),
+      new BigNumber(0)
     );
-    const availableQuantity = isStrat
-      ? inventory.quantity / 100
-      : isCata
-      ? inventory.quantity / Math.pow(10, 18)
-      : inventory.quantity;
 
-    setCanTransfer(isValidTransfer && totalQuantity <= availableQuantity);
+    setCanTransfer(isValidTransfer && allocatedQuantity.lte(availableQuantity));
     setCanAddRow(
       transfers.length < 10 &&
-        totalQuantity < availableQuantity &&
+      allocatedQuantity.lt(availableQuantity) &&
         isValidTransfer
     );
     setCanRemoveRow(transfers.length > 1);
@@ -243,17 +257,17 @@ const TransferModal = ({
       dataIndex: 'quantity',
       align: 'center',
       width: 175,
-      render: (_, record, index) => {
-        // Calculate the quantity available for each row
-        const availableQuantity = isStrat
-          ? (inventory.quantity / 100).toFixed(2)
-          : isCata
-          ? (inventory.quantity / Math.pow(10, 18)).toFixed(2)
-          : inventory.quantity;
-        const allocatedQuantity = transfers
-          .slice(0, index)
-          .reduce((total, transfer) => total + (transfer.quantity || 0), 0);
-        return availableQuantity - allocatedQuantity;
+      render: (_, __, index) => {
+        const allocatedQuantity = new BigNumber(
+          transfers
+            .slice(0, index)
+            .reduce(
+              (total, transfer) =>
+                total.plus(new BigNumber(transfer.quantity || 0)),
+              new BigNumber(0)
+            )
+        );
+        return availableQuantity.minus(allocatedQuantity).toString();
       },
     },
     {
@@ -263,22 +277,20 @@ const TransferModal = ({
         <InputNumber
           value={record.quantity}
           controls={false}
-          min={1}
           max={(() => {
-            // Calculate available quantity for this record
-            const availableQuantity = isStrat
-              ? (inventory.quantity / 100).toFixed(2)
-              : isCata
-              ? (inventory.quantity / Math.pow(10, 18)).toFixed(2)
-              : inventory.quantity;
-            const allocatedQuantity = transfers
-              .slice(0, index)
-              .reduce((total, transfer) => total + (transfer.quantity || 0), 0);
-            return availableQuantity - allocatedQuantity;
+            const allocatedQuantity = new BigNumber(
+              transfers
+                .slice(0, index)
+                .reduce(
+                  (total, transfer) =>
+                    total.plus(new BigNumber(transfer.quantity || 0)),
+                  new BigNumber(0)
+                )
+            );
+            return availableQuantity.minus(allocatedQuantity);
           })()}
-          step={1}
-          precision={inventory?.contract_name?.includes('STRATSTokens') ? 2 : 0}
-          onChange={(value) => handleQuantityChange(record.id, value)}
+          precision={isStrat ? 2 : isCata ? 18 : 0}
+          onChange={(value) => handleQuantityChange(record.id, new BigNumber(value))}
           disabled={index !== transfers.length - 1}
         />
       ),
@@ -339,15 +351,20 @@ const TransferModal = ({
       assetAddress: inventory.address,
       newOwner: transfer.recipient,
       quantity: (isStrat
-        ? (transfer.quantity * 100).toFixed(0)
+        ? (transfer.quantity).multipliedBy(new BigNumber(100))
         : isCata
-        ? (transfer.quantity * Math.pow(10, 18)).toFixed(0)
-        : transfer.quantity).toString(),
-      price: isStrat ? transfer.price / 100 : isCata ? transfer.price / Math.pow(10, 18) : transfer.price,
+        ? (transfer.quantity).multipliedBy(new BigNumber(10).pow(18))
+        : transfer.quantity
+      ).toFixed(0),
+      price: isStrat
+        ? transfer.price / 100
+        : isCata
+        ? transfer.price / Math.pow(10, 18)
+        : transfer.price,
       senderCommonName: user.commonName,
       recipientCommonName: transfer.recipientCommonName,
       itemName,
-      isDecimal: quantityIsDecimal || false,
+      decimal: (isStrat ? new BigNumber(100) : isCata ? new BigNumber(10).pow(18) : new BigNumber(10)).toString(),
     }));
 
     isDone = await actions.transferInventory(inventoryDispatch, body);
@@ -358,7 +375,9 @@ const TransferModal = ({
         offset,
         '',
         categoryName,
-        queryParams.get('st') === 'true' ? reserves.map(reserve => reserve.assetRootAddress) : ''
+        queryParams.get('st') === 'true'
+          ? reserves.map((reserve) => reserve.assetRootAddress)
+          : ''
       );
       await actions.fetchInventoryForUser(inventoryDispatch, user.commonName);
       await marketplaceActions.fetchStratsBalance(marketplaceDispatch);
