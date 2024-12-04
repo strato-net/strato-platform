@@ -12,7 +12,11 @@ import {
   Row,
   Col,
 } from 'antd';
-import { ArrowLeftOutlined, LogoutOutlined } from '@ant-design/icons';
+import {
+  ArrowLeftOutlined,
+  LogoutOutlined,
+  RiseOutlined,
+} from '@ant-design/icons';
 import { useLocation, useNavigate } from 'react-router-dom';
 import TagManager from 'react-gtm-module';
 // actions
@@ -71,24 +75,20 @@ const HeaderComponent = ({
   const categoryDispatch = useCategoryDispatch();
   const userDispatch = useAuthenticateDispatch();
   //States
-  const { cartList, strats } = useMarketplaceState();
+  const { cartList, strats, cata, cataAddress, stratsAddress } = useMarketplaceState();
   const { categorys } = useCategoryState();
   let { isAuthenticated } = useAuthenticateState();
 
   useEffect(() => {
     if (user) {
       marketplaceActions.fetchStratsBalance(marketplaceDispatch);
+      marketplaceActions.fetchCataBalance(marketplaceDispatch);
+      marketplaceActions.fetchStratsAddress(marketplaceDispatch);
+      marketplaceActions.fetchCataAddress(marketplaceDispatch);
     }
   }, [user]);
 
   useEffect(() => {
-    async function fetchStratsAddress() {
-      const stratsAddress = await marketplaceActions.fetchStratsAddress(
-        marketplaceDispatch
-      );
-      setOriginAddress(stratsAddress);
-    }
-    fetchStratsAddress();
     marketplaceActions.fetchCartItems(marketplaceDispatch, cartList);
   }, [marketplaceDispatch, cartList]);
 
@@ -98,8 +98,11 @@ const HeaderComponent = ({
   const [categories, setCategories] = useState([]);
   const [selectedCategory, setSelectedCategory] = useState(categoryQueryValue);
   const [isModalVisible, setIsModalVisible] = useState(false);
-  const [originAddress, setOriginAddress] = useState();
+  // const [originAddress, setOriginAddress] = useState(stratsAddress);
+  const formatter = new Intl.NumberFormat('en-US');
+  const formattedNum = (num) => formatter.format(num);
   const stratsBalance = Object.keys(strats).length > 0 ? strats : 0;
+  const cataBalance = Object.keys(cata).length > 0 ? cata : 0;
 
   useEffect(() => {
     setSelectedCategory(categoryQueryValue);
@@ -110,6 +113,7 @@ const HeaderComponent = ({
     routes.Transactions.url,
     routes.MyWallet.url,
     routes.ActivityFeed.url,
+    routes.MyWalletStakeable.url,
   ];
 
   const logout = () => {
@@ -223,13 +227,13 @@ const HeaderComponent = ({
           onClick: async () => {
             navigate(
               `${routes.MarketplaceProductDetail.url
-                .replace(':address', originAddress)
+                .replace(':address', stratsAddress)
                 .replace(':name', 'STRATS')}`
             );
           },
           label: (
             <div>
-              {user && originAddress && (
+              {user && stratsAddress && (
                 <p className="text-xs mt-1">Buy STRATs</p>
               )}
             </div>
@@ -247,6 +251,30 @@ const HeaderComponent = ({
           ),
         },
       ],
+    },
+  ];
+
+  const cataItem = [
+    {
+      key: '1',
+      label: (
+        <>
+          {user && (
+            <Row className="flex flex-col">
+              <Col Col={24}>
+                {' '}
+                <p className="text-xs mt-1">CATA: {cataBalance}</p>
+              </Col>
+              <Col Col={24}>
+                {' '}
+                <p className="text-xs mt-3">
+                  Balance: ${formattedNum(cataBalance / 10)}
+                </p>
+              </Col>
+            </Row>
+          )}
+        </>
+      ),
     },
   ];
 
@@ -271,11 +299,13 @@ const HeaderComponent = ({
           ),
           label: (
             <div>
-              {' '}
-              <p className="!mb-0"> My Profile </p>{' '}
+              <p className="!mb-0"> My Profile </p>
             </div>
           ),
         }
+      : null,
+    user
+      ? { value: 'stake', path: routes.MyWalletStakeable.url, label: 'Stake' }
       : null,
     {
       value: 'activityFeed',
@@ -303,9 +333,7 @@ const HeaderComponent = ({
       setSelectedTab(1);
       setIsModalVisible(true);
     } else {
-      data.value === 'logout'
-        ? logout()
-        : navigate(data.path);
+      data.value === 'logout' ? logout() : navigate(data.path);
       handleMenuTab(data);
     }
   };
@@ -478,12 +506,19 @@ const HeaderComponent = ({
                     event: 'view_global_transactions_page',
                   },
                 });
-              }  
+              }
               navigate(navUrls[item.key]);
             }
           }}
           items={navItems}
         />
+        <Button
+          type="primary"
+          className="font-semibold hidden md:block"
+          onClick={() => navigate(routes.MyWalletStakeable.url)}
+        >
+          <RiseOutlined /> Stake
+        </Button>
         <Space size="large" className="!gap-0 md:!gap-4 mr-0 -ml-3">
           {
             <div
@@ -498,6 +533,34 @@ const HeaderComponent = ({
               />
             </div>
           }
+          {roleIndex !== undefined && roleIndex !== 1 && (
+            <Dropdown
+              menu={{ items: cataItem }}
+              placement="bottomRight"
+              trigger={['click']}
+              className="xs:mt-5 md:mt-0"
+              overlayStyle={{ position: 'fixed' }}
+            >
+              <a
+                className="md:flex mx-1 text-base text-white"
+                id="strats-dropdown"
+              >
+                <Badge
+                  style={{ backgroundColor: '#13188A' }}
+                  className="cursor-pointer mt-7 md:mt-0 mx-2"
+                  count={cataBalance}
+                  overflowCount={9999999}
+                >
+                  <img
+                    src={Images.strats}
+                    alt={IMG_META}
+                    title={IMG_META}
+                    className="w-[35px] h-[35px] "
+                  />
+                </Badge>
+              </a>
+            </Dropdown>
+          )}
           {roleIndex !== undefined && roleIndex !== 1 && (
             <Dropdown
               menu={{ items: stratsItem }}

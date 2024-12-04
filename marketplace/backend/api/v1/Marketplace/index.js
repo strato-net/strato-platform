@@ -49,10 +49,24 @@ router.get(
 );
 
 router.get(
+  Marketplace.getCataBalance,
+  authHandler.authorizeRequest(),
+  loadDapp,
+  MarketplaceController.getCataBalance
+);
+
+router.get(
   Marketplace.getStratsAddress,
   authHandler.authorizeRequest(),
   loadDapp,
   MarketplaceController.getStratsAddress
+);
+
+router.get(
+  Marketplace.getCataAddress,
+  authHandler.authorizeRequest(),
+  loadDapp,
+  MarketplaceController.getCataAddress
 );
 
 router.get(

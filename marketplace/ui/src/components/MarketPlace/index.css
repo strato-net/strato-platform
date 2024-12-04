@@ -152,6 +152,10 @@ img.ant-image-preview-img {
   -webkit-text-fill-color: transparent;
 }
 
+.staking_banner_text {
+  font-weight: 900;
+}
+
 .clothing_banner_text {
   font-weight: 900;
 }
@@ -390,6 +394,13 @@ img.ant-image-preview-img {
     top: 15%;
   }
 
+  .staking_banner_text {
+    font-size: 48px;
+    left: 7%;
+    top: 7%;
+    line-height: 52px;
+  }
+
   .clothing_banner_text {
     width: 485px;
     font-size: 48px;
@@ -466,6 +477,13 @@ img.ant-image-preview-img {
     left: 7%;
     top: 5%;
     line-height: 42px;
+  }
+
+  .staking_banner_text {
+    font-size: 48px;
+    left: 7%;
+    top: 5%;
+    line-height: 52px;
   }
 
   .clothing_banner_text {
@@ -584,6 +602,13 @@ img.ant-image-preview-img {
     line-height: 42px;
   }
 
+  .staking_banner_text {
+    font-size: 44px;
+    left: 7%;
+    top: 8%;
+    line-height: 42px;
+  }
+
   .clothing_banner_text {
     width: 360px;
     font-size: 44px;
@@ -690,6 +715,13 @@ img.ant-image-preview-img {
 @media (min-width: 600px) and (max-width: 768px) {
   .collectible_banner_text {
     width: 300px;
+    font-size: 40px;
+    left: 7%;
+    top: 10%;
+    line-height: 44px;
+  }
+
+  .staking_banner_text {
     font-size: 40px;
     left: 7%;
     top: 10%;
@@ -803,6 +835,13 @@ img.ant-image-preview-img {
   .collectible_banner_text {
     width: 250px;
     font-size: 36px;
+    left: 7%;
+    top: 20%;
+    line-height: 36px;
+  }
+
+  .staking_banner_text {
+    font-size: 32px;
     left: 7%;
     top: 20%;
     line-height: 36px;
@@ -926,6 +965,13 @@ img.ant-image-preview-img {
     line-height: 24px;
   }
 
+  .staking_banner_text {
+    font-size: 24px;
+    left: 4%;
+    top: 5%;
+    line-height: 24px;
+  }
+
   .clothing_banner_text {
     width: 220px;
     font-size: 24px;
@@ -1043,6 +1089,13 @@ img.ant-image-preview-img {
     font-size: 24px;
     left: 4%;
     top: 8%;
+    line-height: 24px;
+  }
+
+  .staking_banner_text {
+    font-size: 24px;
+    left: 4%;
+    top: 10%;
     line-height: 24px;
   }
 

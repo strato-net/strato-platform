@@ -424,6 +424,8 @@ async function get(user, args, options) {
       price: sale.price,
       saleAddress: sale.address,
       saleQuantity: sale.quantity,
+      maxStratsLoanAmount: sale?.data?.maxStratsLoanAmount,
+      borrowedAmount: sale?.data?.borrowedAmount,
       paymentServices: sale
         ? sale['BlockApps-Mercata-Sale-paymentServices']
           ? sale['BlockApps-Mercata-Sale-paymentServices']
@@ -479,6 +481,7 @@ async function getAll(admin, args = {}, defaultOptions) {
       },
       options
     );
+    sales = sales.filter((sale) => !sale.saleType || sale.saleType !== 'Escrow');
     const trendingAssetAddresses = sales.map((sale) => sale.assetToBeSold);
 
     // Fetch the inventories matching the sales
@@ -594,6 +597,8 @@ async function getAll(admin, args = {}, defaultOptions) {
                 price: sales[0]?.price,
                 saleAddress: sales[0]?.address,
                 saleQuantity: sales[0]?.quantity,
+                maxStratsLoanAmount: sales[0]?.data?.maxStratsLoanAmount,
+                borrowedAmount: sales[0]?.data?.borrowedAmount,
                 saleDate: sales[0]?.block_timestamp,
                 totalLockedQuantity: sales[0]?.totalLockedQuantity,
                 paymentServices: sales[0]
@@ -611,6 +616,8 @@ async function getAll(admin, args = {}, defaultOptions) {
               price: sales[0]?.price,
               saleAddress: sales[0]?.address,
               saleQuantity: sales[0]?.quantity,
+              maxStratsLoanAmount: sales[0]?.data?.maxStratsLoanAmount,
+              borrowedAmount: sales[0]?.data?.borrowedAmount,
               saleDate: sales[0]?.block_timestamp,
               totalLockedQuantity: sales[0]?.totalLockedQuantity,
               paymentServices: sales[0]

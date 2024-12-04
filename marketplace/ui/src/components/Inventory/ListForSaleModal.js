@@ -20,6 +20,7 @@ import {
 } from '../../contexts/payment';
 import { actions as paymentServiceActions } from '../../contexts/payment/actions';
 import { CheckCircleOutlined } from '@ant-design/icons';
+import { useLocation } from 'react-router-dom';
 
 const { Option } = Select;
 
@@ -33,17 +34,25 @@ const ListForSaleModal = ({
   user,
   debouncedSearchTerm,
   category,
+  reserves,
+  stratAddress,
+  cataAddress,
 }) => {
   const [data, setData] = useState([inventory]);
+  const location = useLocation();
+  const queryParams = new URLSearchParams(location.search);
+  const isStrat = inventory.originAddress === stratAddress;
+  const isCata = inventory.originAddress === cataAddress;
   const [quantity, setQuantity] = useState(() => {
     const selectedQuantity = inventory.saleAddress
       ? inventory.saleQuantity
       : inventory.quantity;
 
     return selectedQuantity !== undefined
-      ? inventory.data.quantityIsDecimal &&
-        inventory.data.quantityIsDecimal === 'True'
+      ? isStrat
         ? Math.floor(selectedQuantity / 100)
+        : isCata
+        ? Math.floor(selectedQuantity / Math.pow(10, 18))
         : selectedQuantity
       : undefined;
   });
@@ -54,10 +63,7 @@ const ListForSaleModal = ({
       ? inventory.price
       : inventory.pricePerUnit;
 
-    return selectedPrice !== undefined &&
-      inventory.data.quantityIsDecimal === 'True'
-      ? selectedPrice * 100
-      : selectedPrice;
+    return selectedPrice !== undefined && isStrat ? selectedPrice * 100 : isCata ? selectedPrice * Math.pow(10, 18) : selectedPrice
   });
 
   const inventoryDispatch = useInventoryDispatch();
@@ -212,11 +218,7 @@ const ListForSaleModal = ({
             serviceName: availablePaymentServices[p].serviceName,
           };
         }),
-      price:
-        inventory.data.quantityIsDecimal &&
-        inventory.data.quantityIsDecimal === 'True'
-          ? pricePerUnit / 100
-          : pricePerUnit,
+      price: pricePerUnit !== undefined && isStrat ? pricePerUnit / 100 : isCata ? pricePerUnit / Math.pow(10, 18) : pricePerUnit,
     };
 
     // Ensure 'strats' is included in the submission
@@ -240,11 +242,7 @@ const ListForSaleModal = ({
 
     body = {
       ...body,
-      quantity:
-        inventory.data.quantityIsDecimal &&
-        inventory.data.quantityIsDecimal === 'True'
-          ? quantity * 100
-          : quantity,
+      quantity: quantity !== undefined && isStrat ? quantity * 100 : isCata ? quantity * Math.pow(10, 18) : quantity
     };
 
     let isDone;
@@ -261,7 +259,8 @@ const ListForSaleModal = ({
         limit,
         offset,
         debouncedSearchTerm,
-        category && category !== 'All' ? category : undefined
+        category && category !== 'All' ? category : undefined,
+        queryParams.get('st') === 'true' ? reserves.map(reserve => reserve.assetRootAddress) : ''
       );
       handleCancel();
     }
@@ -321,7 +320,13 @@ const ListForSaleModal = ({
             value={quantity}
             controls={false}
             min={1}
-            max={inventory.quantity}
+            max={
+              isStrat
+                ? Math.floor(inventory.quantity / 100)
+                : isCata
+                ? Math.floor(inventory.quantity / Math.pow(10, 18))
+                : inventory.quantity
+            }
             onChange={(value) => setQuantity(value)}
             precision={0}
           />
@@ -349,7 +354,9 @@ const ListForSaleModal = ({
     <Modal
       open={open}
       onCancel={handleCancel}
-      title={`${inventory.saleAddress ? 'Update' : 'List'} - ${decodeURIComponent(inventory.name)}`}
+      title={`${
+        inventory.saleAddress ? 'Update' : 'List'
+      } - ${decodeURIComponent(inventory.name)}`}
       width={650}
       footer={[
         <div className="flex justify-center md:block">
@@ -417,9 +424,10 @@ const ListForSaleModal = ({
             controls={false}
             min={1}
             max={
-              inventory.data.quantityIsDecimal &&
-              inventory.data.quantityIsDecimal === 'True'
-                ? parseFloat(inventory.quantity / 100).toFixed(2)
+              isStrat
+                ? Math.floor(inventory.quantity / 100)
+                : isCata
+                ? Math.floor(inventory.quantity / Math.pow(10, 18))
                 : inventory.quantity
             }
             onChange={(value) => setQuantity(value)}

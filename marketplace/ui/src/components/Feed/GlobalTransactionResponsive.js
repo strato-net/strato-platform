@@ -20,9 +20,11 @@ const GlobalTransactionResponsive = ({
   user,
   isTransactionLoading,
   fetchData,
+  stratAddress,
+  cataAddress,
 }) => {
   const StratsIcon = (
-    <img src={Images.strats} alt="STRATs" className="mx-1 w-4 h-4" />
+    <img src={Images.strats} alt="STRATs" className="w-5 h-5" />
   );
   const navigate = useNavigate();
   const [expandedRows, setExpandedRows] = useState({});
@@ -78,7 +80,6 @@ const GlobalTransactionResponsive = ({
                 reference,
                 address,
                 assetImage,
-                totalAmount,
                 assetName,
                 assetAddress,
                 assetDescription,
@@ -87,7 +88,7 @@ const GlobalTransactionResponsive = ({
                 to,
                 status,
                 transaction_hash,
-                quantityIsDecimal,
+                assetOriginAddress,
                 type,
                 price,
                 redemptionService,
@@ -112,6 +113,8 @@ const GlobalTransactionResponsive = ({
                   type,
                 },
               ];
+              const isStrat = assetOriginAddress === stratAddress;
+              const isCata = assetOriginAddress === cataAddress;
 
               const handleDetailRedirection = () => {
                 let route;
@@ -215,14 +218,18 @@ const GlobalTransactionResponsive = ({
                       <p className={`text-right flex justify-end items-center`}>
                         ${' '}
                         {formattedNum(
-                          quantityIsDecimal && quantityIsDecimal === 'True'
-                            ? price * 100
+                          isStrat
+                            ? (price * 100).toFixed(2)
+                            : isCata
+                            ? (price * Math.pow(10, 18)).toFixed(2)
                             : price
                         )}{' '}
                         (
                         {formattedNum(
-                          quantityIsDecimal && quantityIsDecimal === 'True'
-                            ? price * 10000
+                          isStrat
+                            ? (price * 100 * 100).toFixed(2)
+                            : isCata
+                            ? (price * Math.pow(10, 18) * 100).toFixed(2)
                             : price
                         )}{' '}
                         {StratsIcon})
@@ -235,8 +242,10 @@ const GlobalTransactionResponsive = ({
                     <p className="text-right">
                       Qty:{' '}
                       {formattedNum(
-                        quantityIsDecimal && quantityIsDecimal === 'True'
-                          ? quantity / 100
+                        isStrat
+                          ? (quantity / 100).toFixed(2)
+                          : isCata
+                          ? (quantity / Math.pow(10, 18)).toFixed(2)
                           : quantity
                       )}
                     </p>
