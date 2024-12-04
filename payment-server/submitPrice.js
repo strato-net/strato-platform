@@ -131,16 +131,20 @@ async function main() {
         continue;
       }
 
-      const metal = oracle.name.toLowerCase(); // Assumes oracle name matches metal type (e.g., "silverOracle" -> "silver")
-      console.log(`Fetching price for ${metal}`);
-
-      await fetchAndSubmitPrice(
-        metal,
-        process.env.METALS_API_KEY,
-        oracle,
-        token
-      );
-      await fetchAndSubmitEscrowAddresses(oracle, token);
+      try {
+        const metal = oracle.name.toLowerCase();
+        console.log(`Fetching price for ${metal}`);
+  
+        await fetchAndSubmitPrice(
+          metal,
+          process.env.METALS_API_KEY,
+          oracle,
+          token
+        );
+        await fetchAndSubmitEscrowAddresses(oracle, token);
+      } catch (error) {
+        console.error(`ERROR: Failed to process oracle ${key}:`, error);
+      }
     }
   };
 
