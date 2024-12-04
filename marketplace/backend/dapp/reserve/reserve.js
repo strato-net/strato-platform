@@ -241,9 +241,10 @@ async function borrow(user, args, options) {
 /**
  * Repay
  */
-async function repay(user, contract, args, options) {
-const callArgs = {
-    contract,
+async function repay(user, args, options) {
+  const { reserve, ...restArgs } = args;
+  const callArgs = {
+    contract: { address: reserve },
     method: 'repayLoan',
     args: util.usc({ ...args }),
   };

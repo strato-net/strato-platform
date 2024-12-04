@@ -113,16 +113,16 @@ abstract contract Escrow is Utils {
                                                + string(maxLoanAmount));
     }
 
-    function updateBorrowedAmount(decimal _borrowAmount) external {
+    function updateBorrowedAmount(decimal _borrowAmount, bool add) external {
         require(msg.sender == reserve, "Only reserve can update borrowed amount");
         require(_borrowAmount >= 0.0, "Borrowed amount cannot be negative");
-        require(uint(borrowedAmount + _borrowAmount) <= maxLoanAmount, "Cannot borrow more than loan amount");
-        borrowedAmount += _borrowAmount;
-    }
-
-    function clearLoan() external {
-        require(msg.sender == reserve, "Only reserve can clear the loan");
-        borrowedAmount = 0.0;
+        if (add) {
+            require(uint(borrowedAmount + _borrowAmount) <= maxLoanAmount, "Cannot borrow more than loan amount");
+            borrowedAmount += _borrowAmount;
+        } else {
+            require(borrowedAmount >= _borrowAmount, "Cannot pay back more than loan amount");
+            borrowedAmount -= _borrowAmount;
+        }
     }
 
     function updateOnPriceChange(decimal _newPrice, uint _loanToValueRatio) external {

@@ -30,6 +30,7 @@ abstract contract Reserve is Utils, Structs {
     event StakeCreated(address indexed user, address escrow, uint assetAmount, decimal stratsLoan);
     event StakeUnlocked(address indexed user, address escrow, uint quantity);
     event CataTransferred(address indexed from, address indexed to, uint amount);
+    event LoanRepaid(address indexed user, address escrow, uint assetAmount, decimal repayment);
 
     constructor(address _assetOracle, string _name, address _assetRootAddress, decimal _unitConversionRate) {
         oracle = OracleService(_assetOracle);
@@ -136,7 +137,51 @@ abstract contract Reserve is Utils, Structs {
         );
         
         // Update borrowed amount in escrow
-        escrow.updateBorrowedAmount(_borrowAmount);
+        escrow.updateBorrowedAmount(_borrowAmount, true);
+    }
+
+    function repayLoan(
+        address[] _stratsAssetAddresses,
+        address _escrowAddress
+    ) requireActive() external returns (uint) {
+        require(_stratsAssetAddresses.length > 0, "Pass at least one STRATs token address");
+        Escrow escrow = Escrow(_escrowAddress);
+        uint stratAmountOwed = uint(escrow.borrowedAmount() * 100);
+        uint stratAmountNet = stratAmountOwed;
+        uint stratQuantity = 0;
+        uint transferNumber = 0;
+        uint transferAmount = 0;
+
+        for (uint j = 0; j < _stratsAssetAddresses.length; j++) {
+            Asset stratAsset = Asset(_stratsAssetAddresses[j]);
+            require(stratAsset.root == stratsToken.root, "Asset is not a STRATS asset");
+            require(stratAsset.ownerCommonName() == getCommonName(msg.sender), "Purchaser doesn't own STRATS");
+
+            stratQuantity = stratAsset.quantity();
+            transferNumber = (uint(string(_escrowAddress), 16) + j + block.timestamp) % 1000000;
+
+            transferAmount = stratQuantity >= stratAmountNet ? stratAmountNet : stratQuantity;
+            stratAsset.attachSale();
+            if (stratQuantity > stratAmountNet) {
+                stratAsset.transferOwnership(owner, stratAmountNet, false, transferNumber, 0.0001);
+                stratAsset.closeSale();
+                stratAmountNet = 0;
+            } else {
+                stratAsset.transferOwnership(owner, stratQuantity, false, transferNumber, 0.0001);
+                stratAmountNet -= stratQuantity;
+            }
+
+            if (stratAmountNet == 0) {
+                break;
+            }
+        }
+        // require(stratAmountNet == 0, "Your STRATS balance is not high enough to cover the repayment."); // Allow partial repayments
+
+        // Clear loan
+        uint stratAmountRepaid = stratAmountOwed - stratAmountNet;
+        escrow.updateBorrowedAmount(stratAmountRepaid, false);
+
+        emit LoanRepaid(msg.sender, _escrowAddress, escrow.collateralQuantity(), stratAmountRepaid);
     }
 
     function setStratsToken(address _newStratsToken) public requireOwner("update STRATS token") {

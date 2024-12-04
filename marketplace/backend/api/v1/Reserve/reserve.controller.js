@@ -203,10 +203,9 @@ class ReserveController {
         'any.required': 'Escrow is required and must be a string.',
         'string.base': 'Escrow must be a valid string.',
       }),
-      stratsPaymentService: Joi.string().required().messages({
-        'any.required':
-          'Strats Payment Service is required and must be a string.',
-        'string.base': 'Strats Payment Service must be a valid string.',
+      reserve: Joi.string().required().messages({
+        'any.required': 'Reserve is required and must be a string.',
+        'string.base': 'Reserve must be a valid string.',
       }),
     });
     ReserveController.validateArgs(args, schema, 'Repay');
