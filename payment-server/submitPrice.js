@@ -47,6 +47,8 @@ async function fetchAndSubmitEscrowAddresses(oracleContract, token) {
   for (const reserve of reserves) {
     const reserveName = reserve.name;
     const reserveAddress = reserve.address;
+    console.log(`Processing reserve: ${reserveName}`);
+    console.log(`Reserve Address: ${reserveAddress}`);
 
     // Define search options for active escrows
     const searchOptions = {
