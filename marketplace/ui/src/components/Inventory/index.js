@@ -12,6 +12,7 @@ import {
   Checkbox,
   Tooltip,
 } from 'antd';
+import BigNumber from 'bignumber.js';
 import { CheckCircleOutlined } from '@ant-design/icons';
 import image_placeholder from '../../images/resources/image_placeholder.png';
 import CreateInventoryModal from './CreateInventoryModal';
@@ -430,13 +431,14 @@ const Inventory = ({ user }) => {
       title: 'Price',
       align: 'center',
       render: (_, record) => {
-        const isDecimal =
-          record.data.quantityIsDecimal &&
-          record.data.quantityIsDecimal === 'True';
+        const isStrats = record.originAddress === stratsAddress;
+        const isCata = record.originAddress === cataAddress;
         const price = record.price
-          ? isDecimal
+          ? isStrats
             ? parseFloat(record.price * 100).toFixed(2)
-            : record.price
+            : isCata
+              ? parseFloat(record.price * 10 ** 18).toFixed(2)
+              : record.price
           : 'N/A';
         return (
           <div>
@@ -461,11 +463,12 @@ const Inventory = ({ user }) => {
       render: (_, record) => {
         const isStrats = record.originAddress === stratsAddress;
         const isCata = record.originAddress === cataAddress;
-        const quantity = isStrats
-          ? parseFloat((record.quantity / 100).toFixed(2))
+        const quantity = (isStrats
+          ? (new BigNumber(record.quantity)).dividedBy(new BigNumber(100))
           : isCata
-          ? parseFloat((record.quantity / Math.pow(10, 18)).toFixed(18))
-          : record.quantity;
+          ? (new BigNumber(record.quantity)).dividedBy(new BigNumber(10).pow(18))
+          : new BigNumber(record.quantity)
+        ).toString();
         return <div>{quantity || 0}</div>;
       },
     },
@@ -473,12 +476,15 @@ const Inventory = ({ user }) => {
       title: 'Listed for Sale',
       align: 'center',
       render: (_, record) => {
-        const isStrats =
-          record.data.quantityIsDecimal &&
-          record.data.quantityIsDecimal === 'True';
-        const saleQuantity = isStrats
-          ? parseFloat((record.saleQuantity / 100).toFixed(2))
-          : record.saleQuantity;
+        const isStrats = record.originAddress === stratsAddress;
+        const isCata = record.originAddress === cataAddress;
+        const saleQuantity = record.saleQuantity
+          ? isStrats
+            ? parseFloat(record.saleQuantity * 100).toFixed(2)
+            : isCata
+              ? parseFloat(record.saleQuantity * 10 ** 18).toFixed(2)
+              : record.saleQuantity
+          : 0;
         return <div className="w-24">{saleQuantity || 0}</div>;
       },
     },
