@@ -120,17 +120,17 @@ abstract contract Reserve is Utils, Structs {
         return address(escrow);
     }
 
-    function borrow(address _escrowAddress, decimal _borrowAmount) public requireActive() {
+    function borrow(address _escrowAddress, uint _borrowAmount) public requireActive() {
         Escrow escrow = Escrow(_escrowAddress);
         require(escrow.borrower() == msg.sender, "Only borrower can borrow against this escrow");
-        require(uint(_borrowAmount) <= escrow.maxLoanAmount(), "Cannot borrow more than max loan amount");
+        require(_borrowAmount <= escrow.maxLoanAmount(), "Cannot borrow more than max loan amount");
         
         uint transferNumber = (uint(block.number + 16)) % 1000000;
         
         // Transfer STRATS from owner to borrower
         stratsToken.transferOwnership(
             escrow.borrower(),
-            uint(_borrowAmount * 100),
+            _borrowAmount * 100,
             true,
             transferNumber,
             0.0001
@@ -146,7 +146,7 @@ abstract contract Reserve is Utils, Structs {
     ) requireActive() external returns (uint) {
         require(_stratsAssetAddresses.length > 0, "Pass at least one STRATs token address");
         Escrow escrow = Escrow(_escrowAddress);
-        uint stratAmountOwed = uint(escrow.borrowedAmount() * 100);
+        uint stratAmountOwed = escrow.borrowedAmount() * 100;
         uint stratAmountNet = stratAmountOwed;
         uint stratQuantity = 0;
         uint transferNumber = 0;
@@ -258,6 +258,10 @@ abstract contract Reserve is Utils, Structs {
         uint endingQuantity = escrow.collateralQuantity();
         uint releasedQuantity = startingQuantity - endingQuantity;
 
+        // Close escrow if collateral quantity is 0
+        if (endingQuantity == 0) {
+            escrow.closeEscrow();
+        }
         // Emit unstake event
         emit StakeUnlocked(msg.sender, _escrowAddress, releasedQuantity);
     }
