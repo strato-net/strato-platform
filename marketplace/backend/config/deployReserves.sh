@@ -10,6 +10,7 @@ ASSET_ROOT_ADDRESS=$ASSET_ROOT_ADDRESS
 NAME=$NAME
 ASSET_ORACLE_ADDRESS=$ASSET_ORACLE_ADDRESS
 UNIT_CONVERSION_RATE=$UNIT_CONVERSION_RATE
+SKIP_TOKENS=$SKIP_TOKENS
 
 
 # Get access token
@@ -53,48 +54,51 @@ SIMPLE_RESERVE_ADDRESS=$(curl -X POST "https://node1.mercata-testnet2.blockapps.
 
 echo "SimpleReserve for $NAME contract deployed at address: $SIMPLE_RESERVE_ADDRESS"
 
-# Use the access token to call purchaseTransfer for STRATS
-NEW_STRATS_RESULT=$(curl -X POST "https://node1.mercata-testnet2.blockapps.net/bloc/v2.2/transaction?resolve=true" \
-  -H 'Content-Type: application/json' \
-  -H "Authorization: Bearer $ACCESS_TOKEN" \
-  -d '{"txs":[{"payload":{"contractAddress":"'"$BA_STRATS_ADDRESS"'","method":"automaticTransfer","args":{"_newOwner":"'"$SIMPLE_RESERVE_ADDRESS"'","_quantity":'"$STRATS_QUANTITY"',"_transferNumber":'"$TRANSFER_NUMBER"',"_price":0.01}},"type":"FUNCTION"}],"txParams":{"gasLimit":10000000000,"gasPrice":1}}')
+# if SKIP_TOKENS is not set, deploy STRATS and CATA tokens
+if [ "$SKIP_TOKENS" != "true" ]; then
+  # Use the access token to call purchaseTransfer for STRATS
+  NEW_STRATS_RESULT=$(curl -X POST "https://node1.mercata-testnet2.blockapps.net/bloc/v2.2/transaction?resolve=true" \
+    -H 'Content-Type: application/json' \
+    -H "Authorization: Bearer $ACCESS_TOKEN" \
+    -d '{"txs":[{"payload":{"contractAddress":"'"$BA_STRATS_ADDRESS"'","method":"automaticTransfer","args":{"_newOwner":"'"$SIMPLE_RESERVE_ADDRESS"'","_quantity":'"$STRATS_QUANTITY"',"_transferNumber":'"$TRANSFER_NUMBER"',"_price":0.01}},"type":"FUNCTION"}],"txParams":{"gasLimit":10000000000,"gasPrice":1}}')
 
-echo "NEW_STRATS_RESULT: $NEW_STRATS_RESULT"
+  echo "NEW_STRATS_RESULT: $NEW_STRATS_RESULT"
 
-NEW_STRATS_ADDRESS=$(echo $NEW_STRATS_RESULT | jq -r '.[0].txResult.contractsCreated')
+  NEW_STRATS_ADDRESS=$(echo $NEW_STRATS_RESULT | jq -r '.[0].txResult.contractsCreated')
 
-echo "NEW_STRATS_ADDRESS: $NEW_STRATS_ADDRESS"
+  echo "NEW_STRATS_ADDRESS: $NEW_STRATS_ADDRESS"
 
-# Use the access token to call purchaseTransfer for CATA
-NEW_CATA_RESULT=$(curl -X POST "https://node1.mercata-testnet2.blockapps.net/bloc/v2.2/transaction?resolve=true" \
-  -H 'Content-Type: application/json' \
-  -H "Authorization: Bearer $ACCESS_TOKEN" \
-  -d '{"txs":[{"payload":{"contractAddress":"'"$BA_CATA_ADDRESS"'","method":"automaticTransfer","args":{"_newOwner":"'"$SIMPLE_RESERVE_ADDRESS"'","_quantity":'"$CATA_QUANTITY"',"_transferNumber":'"$TRANSFER_NUMBER"',"_price":0.1}},"type":"FUNCTION"}],"txParams":{"gasLimit":10000000000,"gasPrice":1}}')
+  # Use the access token to call purchaseTransfer for CATA
+  NEW_CATA_RESULT=$(curl -X POST "https://node1.mercata-testnet2.blockapps.net/bloc/v2.2/transaction?resolve=true" \
+    -H 'Content-Type: application/json' \
+    -H "Authorization: Bearer $ACCESS_TOKEN" \
+    -d '{"txs":[{"payload":{"contractAddress":"'"$BA_CATA_ADDRESS"'","method":"automaticTransfer","args":{"_newOwner":"'"$SIMPLE_RESERVE_ADDRESS"'","_quantity":'"$CATA_QUANTITY"',"_transferNumber":'"$TRANSFER_NUMBER"',"_price":0.1}},"type":"FUNCTION"}],"txParams":{"gasLimit":10000000000,"gasPrice":1}}')
 
-echo "NEW_CATA_RESULT: $NEW_CATA_RESULT"
+  echo "NEW_CATA_RESULT: $NEW_CATA_RESULT"
 
-NEW_CATA_ADDRESS=$(echo $NEW_CATA_RESULT | jq -r '.[0].txResult.contractsCreated')
+  NEW_CATA_ADDRESS=$(echo $NEW_CATA_RESULT | jq -r '.[0].txResult.contractsCreated')
 
-echo "NEW_CATA_ADDRESS: $NEW_CATA_ADDRESS"
+  echo "NEW_CATA_ADDRESS: $NEW_CATA_ADDRESS"
 
-# Fetch and parse the new STRATS address
-# NEW_STRATS_ADDRESS=$(curl -s "https://node1.mercata-testnet2.blockapps.net/cirrus/search/BlockApps-Mercata-Asset?name=eq.STRATS&owner=eq.$SIMPLE_RESERVE_ADDRESS" | jq -r '.address')
+  # Fetch and parse the new STRATS address
+  # NEW_STRATS_ADDRESS=$(curl -s "https://node1.mercata-testnet2.blockapps.net/cirrus/search/BlockApps-Mercata-Asset?name=eq.STRATS&owner=eq.$SIMPLE_RESERVE_ADDRESS" | jq -r '.address')
 
-# Fetch and parse the new CATA address
-# NEW_CATA_ADDRESS=$(curl -s "https://node1.mercata-testnet2.blockapps.net/cirrus/search/BlockApps-Mercata-Asset?name=eq.CATA&owner=eq.$SIMPLE_RESERVE_ADDRESS" | jq -r '.address')
+  # Fetch and parse the new CATA address
+  # NEW_CATA_ADDRESS=$(curl -s "https://node1.mercata-testnet2.blockapps.net/cirrus/search/BlockApps-Mercata-Asset?name=eq.CATA&owner=eq.$SIMPLE_RESERVE_ADDRESS" | jq -r '.address')
 
-# Update STRATS token address
-UPDATE_STRATS_RESULT=$(curl -X POST "https://node1.mercata-testnet2.blockapps.net/bloc/v2.2/transaction?resolve=true" \
-  -H 'Content-Type: application/json' \
-  -H "Authorization: Bearer $ACCESS_TOKEN" \
-  -d '{"txs":[{"payload":{"contractAddress":"'"$SIMPLE_RESERVE_ADDRESS"'","method":"setStratsToken","args":{"_newStratsToken":"'"$NEW_STRATS_ADDRESS"'"}},"type":"FUNCTION"}],"txParams":{"gasLimit":10000000000,"gasPrice":1}}')
+  # Update STRATS token address
+  UPDATE_STRATS_RESULT=$(curl -X POST "https://node1.mercata-testnet2.blockapps.net/bloc/v2.2/transaction?resolve=true" \
+    -H 'Content-Type: application/json' \
+    -H "Authorization: Bearer $ACCESS_TOKEN" \
+    -d '{"txs":[{"payload":{"contractAddress":"'"$SIMPLE_RESERVE_ADDRESS"'","method":"setStratsToken","args":{"_newStratsToken":"'"$NEW_STRATS_ADDRESS"'"}},"type":"FUNCTION"}],"txParams":{"gasLimit":10000000000,"gasPrice":1}}')
 
-echo "UPDATE_STRATS_RESULT: $UPDATE_STRATS_RESULT"
+  echo "UPDATE_STRATS_RESULT: $UPDATE_STRATS_RESULT"
 
-# Update CATA token address
-UPDATE_CATA_RESULT=$(curl -X POST "https://node1.mercata-testnet2.blockapps.net/bloc/v2.2/transaction?resolve=true" \
-  -H 'Content-Type: application/json' \
-  -H "Authorization: Bearer $ACCESS_TOKEN" \
-  -d '{"txs":[{"payload":{"contractAddress":"'"$SIMPLE_RESERVE_ADDRESS"'","method":"setCataToken","args":{"_newCataToken":"'"$NEW_CATA_ADDRESS"'"}},"type":"FUNCTION"}],"txParams":{"gasLimit":10000000000,"gasPrice":1}}')
+  # Update CATA token address
+  UPDATE_CATA_RESULT=$(curl -X POST "https://node1.mercata-testnet2.blockapps.net/bloc/v2.2/transaction?resolve=true" \
+    -H 'Content-Type: application/json' \
+    -H "Authorization: Bearer $ACCESS_TOKEN" \
+    -d '{"txs":[{"payload":{"contractAddress":"'"$SIMPLE_RESERVE_ADDRESS"'","method":"setCataToken","args":{"_newCataToken":"'"$NEW_CATA_ADDRESS"'"}},"type":"FUNCTION"}],"txParams":{"gasLimit":10000000000,"gasPrice":1}}')
 
-echo "UPDATE_CATA_RESULT: $UPDATE_CATA_RESULT"
+  echo "UPDATE_CATA_RESULT: $UPDATE_CATA_RESULT"
+fi

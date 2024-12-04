@@ -79,9 +79,9 @@ deactivate_reserve() {
   echo "Deactivating reserve $prev_reserve and transferring to $new_reserve..."
 
   # Transfer STRATS
-  if [ "$strats_token" != "null" ]; then
+  if [ "$strats_token" != "null" ] && [ "$strats_token" -gt 0 ]; then
     echo "Transferring STRATS..."
-    curl -X POST "https://node1.mercata-testnet2.blockapps.net/bloc/v2.2/transaction?resolve=true" \
+    NEW_STRATS_RESULT=$(curl -X POST "https://node1.mercata-testnet2.blockapps.net/bloc/v2.2/transaction?resolve=true" \
       -H 'Content-Type: application/json' \
       -H "Authorization: Bearer $access_token" \
       -d '{
@@ -100,15 +100,30 @@ deactivate_reserve() {
           "gasLimit": 10000000000,
           "gasPrice": 1
         }
-      }'
+      }')
+    NEW_STRATS_ADDRESS=$(echo $NEW_STRATS_RESULT | jq -r '.[0].txResult.contractsCreated')
+
+    echo "NEW_STRATS_ADDRESS: $NEW_STRATS_ADDRESS"
+
+    echo "Updating reserve token addresses..."
+    UPDATE_STRATS_RESULT=$(curl -X POST "https://node1.mercata-testnet2.blockapps.net/bloc/v2.2/transaction?resolve=true" \
+      -H 'Content-Type: application/json' \
+      -H "Authorization: Bearer $access_token" \
+      -d '{"txs":[{"payload":{"contractAddress":"'"$new_reserve"'","method":"setStratsToken","args":{"_newStratsToken":"'"$NEW_STRATS_ADDRESS"'"}},"type":"FUNCTION"}],"txParams":{"gasLimit":10000000000,"gasPrice":1}}')
+    
+    if [ "$(echo "$UPDATE_STRATS_RESULT" | jq -r '.[0].status')" != "Success" ]; then
+      echo "Error: Failed to update STRATS token address for reserve $new_reserve."
+      exit 1
+    fi
+    echo "New reserve strat token updated."
   else
     echo "No STRATS token to transfer for reserve $prev_reserve."
   fi
 
   # Transfer CATA
-  if [ "$cata_token" != "null" ]; then
+  if [ "$cata_token" != "null" ] && [ "$cata_token" -gt 0 ]; then
     echo "Transferring CATA..."
-    curl -X POST "https://node1.mercata-testnet2.blockapps.net/bloc/v2.2/transaction?resolve=true" \
+    NEW_CATA_RESULT=$(curl -X POST "https://node1.mercata-testnet2.blockapps.net/bloc/v2.2/transaction?resolve=true" \
       -H 'Content-Type: application/json' \
       -H "Authorization: Bearer $access_token" \
       -d '{
@@ -127,14 +142,29 @@ deactivate_reserve() {
           "gasLimit": 10000000000,
           "gasPrice": 1
         }
-      }'
+      }')
+
+    NEW_CATA_ADDRESS=$(echo $NEW_CATA_RESULT | jq -r '.[0].txResult.contractsCreated')
+
+    echo "NEW_CATA_ADDRESS: $NEW_CATA_ADDRESS"
+
+    UPDATE_CATA_RESULT=$(curl -X POST "https://node1.mercata-testnet2.blockapps.net/bloc/v2.2/transaction?resolve=true" \
+      -H 'Content-Type: application/json' \
+      -H "Authorization: Bearer $access_token" \
+      -d '{"txs":[{"payload":{"contractAddress":"'"$new_reserve"'","method":"setCataToken","args":{"_newCataToken":"'"$NEW_CATA_ADDRESS"'"}},"type":"FUNCTION"}],"txParams":{"gasLimit":10000000000,"gasPrice":1}}')
+
+    if [ "$(echo "$UPDATE_CATA_RESULT" | jq -r '.[0].status')" != "Success" ]; then
+      echo "Error: Failed to update STRATS token address for reserve $new_reserve."
+      exit 1
+    fi
+    echo "New reserve cata token updated."
   else
     echo "No CATA token to transfer for reserve $prev_reserve."
   fi
 
   # Deactivate Reserve
   echo "Deactivating reserve $prev_reserve..."
-  curl -X POST "https://node1.mercata-testnet2.blockapps.net/bloc/v2.2/transaction?resolve=true" \
+  DEACTIVATE_RESERVE_RESULT=$(curl -X POST "https://node1.mercata-testnet2.blockapps.net/bloc/v2.2/transaction?resolve=true" \
     -H 'Content-Type: application/json' \
     -H "Authorization: Bearer $access_token" \
     -d '{
@@ -150,8 +180,11 @@ deactivate_reserve() {
         "gasLimit": 10000000000,
         "gasPrice": 1
       }
-    }'
-
+    }')
+  if [ "$(echo "$DEACTIVATE_RESERVE_RESULT" | jq -r '.[0].status')" != "Success" ]; then
+    echo "Error: Failed to deactivate reserve $new_reserve."
+    exit 1
+  fi
   echo "Reserve $prev_reserve deactivated."
 }
 
