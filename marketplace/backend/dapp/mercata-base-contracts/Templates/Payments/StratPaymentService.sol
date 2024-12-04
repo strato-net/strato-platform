@@ -31,41 +31,6 @@ contract StratPaymentService is PaymentService {
         feeRecipient = _feeRecipient;
     }
 
-    function repayLoan(
-        address[] _stratsAssetAddresses,
-        address _escrowAddress
-    ) requireActive("repayloan") external returns (uint) {
-        require(_stratsAssetAddresses.length > 0, "Pass at least one STRATs token address");
-        Escrow escrow = Escrow(_escrowAddress);
-        uint stratAmountNet = uint(escrow.borrowedAmount() * 100);
-        uint stratQuantity = 0;
-        uint transferNumber = 0;
-        uint transferAmount = 0;
-
-        for (uint j = 0; j < _stratsAssetAddresses.length; j++) {
-            STRATSTokens stratAsset = STRATSTokens(_stratsAssetAddresses[j]);
-            require(stratAsset.root == stratAddress, "Asset is not a STRATS asset");
-            require(stratAsset.ownerCommonName() == getCommonName(msg.sender), "Purchaser doesn't own STRATS");
-
-            stratQuantity = stratAsset.quantity();
-            transferNumber = (uint(string(_escrowAddress), 16) + j + block.timestamp) % 1000000;
-
-            transferAmount = stratQuantity >= stratAmountNet ? stratAmountNet : stratQuantity;
-            stratAsset.purchaseTransfer(Reserve(escrow.reserve()).owner(), transferAmount, transferNumber, 0.0001);
-            stratAmountNet -= transferAmount;
-
-            if (stratAmountNet == 0) {
-                break;
-            }
-        }
-        require(stratAmountNet == 0, "Your STRATS balance is not high enough to cover the repayment.");
-
-        // Clear loan
-        escrow.clearLoan();
-
-        emit LoanRepaid(msg.sender, _escrowAddress, escrow.quantity(), escrow.borrowedAmount());
-    }
-
     function _checkoutInitialized (
         address[] _stratsAssetAddresses,
         string _checkoutHash,

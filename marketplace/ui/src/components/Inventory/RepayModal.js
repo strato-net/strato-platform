@@ -76,15 +76,12 @@ const RepayModal = ({
   const dataForSummary = [];
 
   const handleSubmit = async () => {
-    const stratsService = paymentServices.find(
-      (item) => item.serviceName === 'STRATS' && item.creator === 'Server'
-    );
     const matchedReserve = reserves?.length ? reserves.find(
       (reserve) => reserve.assetRootAddress === inventory.root
     ) : null;
     const body = {
       escrow: inventory?.sale,
-      stratsPaymentService: stratsService.address,
+      reserve: matchedReserve,
     };
 
     const borrowed = await inventoryActions.repay(inventoryDispatch, body);

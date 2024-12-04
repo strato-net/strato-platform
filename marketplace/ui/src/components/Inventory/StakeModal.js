@@ -121,17 +121,11 @@ const StakeModal = ({
       : [];
 
   const handleSubmit = async () => {
-    const stratsService = paymentServices.find(
-      (item) => item.serviceName === 'STRATS' && item.creator === 'Server'
-    );
     if (type === 'Stake') {
       const body = {
+        escrowAddress: inventory?.escrow?.address,
         collateralQuantity: inventory?.quantity,
-        assetAddress: inventory?.address,
-        stratPaymentService: {
-          creator: stratsService.creator,
-          serviceName: stratsService.serviceName,
-        },
+        assets: inventory ? [inventory.address] : [],
         reserve: matchedReserve?.address,
       };
 
