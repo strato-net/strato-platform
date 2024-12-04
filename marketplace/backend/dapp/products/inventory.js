@@ -564,7 +564,8 @@ async function getAll(admin, args = {}, defaultOptions) {
     // Currently can't filter on second table, so filtering sales fields here.
     // Sales only has price and quantity fields to filter, so better to join sales on asset table (asset has multiple filters for each route).
     if (inventories) {
-      inventories.forEach(async (inventory) => {
+      for (let i=0; i < inventories.length; i++) {
+        const inventory = inventories[i];
         if (
           inventory['BlockApps-Mercata-Sale'] &&
           inventory['BlockApps-Mercata-Sale'].length > 0
@@ -663,7 +664,7 @@ async function getAll(admin, args = {}, defaultOptions) {
               );
           finalInventory.push({ escrow, ...inventory});
         }
-      });
+      }
     }
   }
   // Sort the images and files by their order
