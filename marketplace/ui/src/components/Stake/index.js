@@ -27,14 +27,25 @@ import ItemActions from '../Inventory/ItemActions';
 import '../Inventory/index.css';
 import PurchasableStakeItems from './PurchasableStakeItems';
 import StakeSteps from './StakeSteps';
+import InventoryCard from '../Inventory/InventoryCard';
+import { useCategoryState, useCategoryDispatch } from '../../contexts/category';
+import { actions as categoryActions } from '../../contexts/category/actions';
 
 const { Title } = Typography;
 const StratsIcon = <img src={Images.strats} alt="STRATS" className="w-4 h-4" />;
 
 const Stake = ({ user }) => {
   const inventoryDispatch = useInventoryDispatch();
-  const { reserves, inventories, isInventoriesLoading, inventoriesTotal } =
-    useInventoryState();
+  const categoryDispatch = useCategoryDispatch();
+  const {
+    reserves,
+    inventories,
+    isInventoriesLoading,
+    inventoriesTotal,
+    message,
+    success,
+  } = useInventoryState();
+  const { categorys } = useCategoryState();
   const { stratsAddress, cataAddress } = useMarketplaceState();
   const linkUrl = window.location.href;
   const [api, contextHolder] = notification.useNotification();
@@ -55,6 +66,7 @@ const Stake = ({ user }) => {
     if (!reserves || reserves.length === 0) {
       inventoryActions.getAllReserve(inventoryDispatch);
     }
+    categoryActions.fetchCategories(categoryDispatch);
   }, []);
 
   useEffect(() => {
@@ -69,6 +81,36 @@ const Stake = ({ user }) => {
       );
     }
   }, [reserves]);
+
+  const openToast = (placement) => {
+    if (success) {
+      api.success({
+        message: message,
+        onClose: inventoryActions.resetMessage(inventoryDispatch),
+        placement,
+        key: 1,
+      });
+    } else {
+      api.error({
+        message: message,
+        onClose: inventoryActions.resetMessage(inventoryDispatch),
+        placement,
+        key: 2,
+      });
+    }
+  };
+
+  const getAllSubcategories = (categories) => {
+    let subcategories = [];
+    categories.forEach((category) => {
+      if (category.subCategories && category.subCategories.length > 0) {
+        subcategories = subcategories.concat(category.subCategories);
+      }
+    });
+    return subcategories;
+  };
+
+  const allSubcategories = getAllSubcategories(categorys);
 
   const columns = [
     {
@@ -285,116 +327,31 @@ const Stake = ({ user }) => {
               className="flex justify-center my-5 custom-pagination"
             />
           </div>
+          <div className="md:hidden my-4 grid grid-cols-1 gap-6 sm:place-items-center inventoryCard max-w-full">
+            <Title className="px-3 !text-3xl !text-left mt-10">
+              My Stakeable Items
+            </Title>
+            {inventories.map((inventory, index) => (
+              <InventoryCard
+                id={index}
+                limit={limit}
+                offset={offset}
+                inventory={inventory}
+                key={index}
+                debouncedSearchTerm={debouncedSearchTerm}
+                allSubcategories={allSubcategories}
+                user={user}
+                reserves={reserves}
+                stratAddress={stratsAddress}
+                cataAddress={cataAddress}
+              />
+            ))}
+          </div>
         </div>
       </div>
+      {message && openToast('bottom')}
     </>
   );
 };
 
 export default Stake;
-
-{
-  /*********************** SEARCH ***********************/
-}
-{
-  /* <Space.Compact
-            className="mx-6 md:mx-5 md:px-10 mt-5 flex"
-            size="large"
-          >
-            <Select
-              defaultValue="All"
-              style={{ width: 170, height: 'auto' }}
-              onChange={handleTabSelect}
-              options={[
-                { label: 'All', value: 'All' },
-                ...categorys.map((category) => ({
-                  label: category.name,
-                  value: category.name,
-                })),
-              ]}
-              value={category}
-            />
-            <Input
-              placeholder="Search"
-              type="search"
-              defaultValue={debouncedSearchTerm}
-              onChange={queryHandleChange}
-              onPressEnter={queryHandleEnter}
-              className="bg-[#F6F6F6]"
-              suffix={
-                <img
-                  src={Images.Header_Search}
-                  alt={SEO.TITLE_META}
-                  title={SEO.TITLE_META}
-                  className="w-[18px] h-[18px]"
-                />
-              }
-            />
-          </Space.Compact> */
-}
-{
-  /*********************** MOBILE INVENTORY CARDS ***********************/
-}
-{
-  /* <div className="md:hidden">
-              <div className="my-4 grid grid-cols-1 md:grid-cols-2 gap-6 lg:grid-cols-3 3xl:grid-cols-4 5xl:grid-cols-5 sm:place-items-center md:place-items-start inventoryCard max-w-full">
-                {!showPublished ? (
-                  !isInventoriesLoading && !isFetchingTokens ? (
-                    inventories.map((inventory, index) => (
-                      <InventoryCard
-                        id={index}
-                        limit={limit}
-                        offset={offset}
-                        inventory={inventory}
-                        category={category}
-                        key={index}
-                        debouncedSearchTerm={debouncedSearchTerm}
-                        allSubcategories={allSubcategories}
-                        user={user}
-                        supportedTokens={supportedTokens}
-                        reserves={reserves}
-                        stratAddress={stratsAddress}
-                        cataAddress={cataAddress}
-                      />
-                    ))
-                  ) : (
-                    <Spin size="large" />
-                  )
-                ) : null}
-                {showPublished ? 
-                  !isUserInventoriesLoading && !isFetchingTokens ? (
-                    userInventories.map((inventory, index) => (
-                      <InventoryCard
-                        id={index}
-                        limit={limit}
-                        offset={offset}
-                        inventory={inventory}
-                        category={category}
-                        key={index}
-                        debouncedSearchTerm={debouncedSearchTerm}
-                        allSubcategories={allSubcategories}
-                        user={user}
-                        supportedTokens={supportedTokens}
-                        reserves={reserves}
-                        stratAddress={stratsAddress}
-                        cataAddress={cataAddress}
-                      />
-                    ))
-                  ) : (
-                    <Spin size="large" />
-                  )
-                ) : null}
-                <div className="flex justify-center pt-6">
-                  <Pagination
-                    current={page}
-                    onChange={onPageChange}
-                    total={
-                      showPublished ? userInventoriesTotal : inventoriesTotal
-                    }
-                    showSizeChanger={false}
-                    className="flex justify-center my-5"
-                  />
-                </div>
-              </div>
-            </div> */
-}
