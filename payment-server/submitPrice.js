@@ -53,7 +53,7 @@ async function fetchAndSubmitEscrowAddresses(oracleContract, token) {
       config,
       query: {
         creator: "eq.BlockApps",
-        isOpen: "eq.true",
+        isActive: "eq.true",
         "data->>reserve": "eq." + reserveAddress,
       },
     };
@@ -61,7 +61,7 @@ async function fetchAndSubmitEscrowAddresses(oracleContract, token) {
     // Fetch escrows from Cirrus
     const escrows = await rest.search(
       token,
-      { name: "BlockApps-Mercata-Sale" },
+      { name: "BlockApps-Mercata-Escrow" },
       searchOptions
     );
 
