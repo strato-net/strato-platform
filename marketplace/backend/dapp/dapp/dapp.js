@@ -2075,9 +2075,7 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
       },
       options
     );
-    return balance[0].sum
-      ? `${(balance[0].sum / Math.pow(10, 18)).toFixed(2)}`
-      : 0;
+    return balance[0].sum ? `${balance[0].sum / Math.pow(10, 18)}` : 0;
   };
 
   contract.getStratsTransactionHistory = async function (
@@ -2125,7 +2123,7 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
   };
 
   contract.repay = async function (args, options = defaultOptions) {
-    const { stratsPaymentService, escrow } = args;
+    const { stratsPaymentService, escrow, reserve } = args;
 
     // Fetch user's STRATS asset origin address
     const stratsOriginAddress = await STRATSJs.getStratsAddress();
@@ -2180,8 +2178,7 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
     // Proceed with unstake if sufficient assets are accumulated
     return await reserveJs.repay(
       rawAdmin,
-      { address: stratsPaymentService },
-      { stratsAssetAddresses: addressesToUse, escrowAddress: escrow },
+      { stratsAssetAddresses: addressesToUse, escrowAddress: escrow, reserve },
       options
     );
   };

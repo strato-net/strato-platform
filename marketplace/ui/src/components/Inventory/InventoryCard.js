@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Button, Typography, Tooltip, Popover } from 'antd';
+import { BigNumber } from 'bignumber.js';
 import {
   DollarOutlined,
   EditOutlined,
@@ -71,32 +72,41 @@ const InventoryCard = ({
   const naviroute = routes.InventoryDetail.url;
   const imgMeta = category ? category : SEO.TITLE_META;
   const itemData = inventory.data;
-  const isStrats = inventory.originAddress === stratAddress;
+  const isStrat = inventory.originAddress === stratAddress;
   const isCata = inventory.originAddress === cataAddress;
-  const quantity = isStrats
-    ? parseFloat((inventory.quantity / 100).toFixed(2))
+  const quantity = isStrat
+    ? new BigNumber(inventory.quantity).dividedBy(100)
     : isCata
-    ? parseFloat((inventory.quantity / Math.pow(10, 18)).toFixed(2))
-    : inventory.quantity;
+    ? new BigNumber(inventory.quantity).dividedBy(new BigNumber(10).pow(18))
+    : new BigNumber(inventory.quantity);
   const price = inventory?.price
-    ? isStrats || isCata
-      ? parseFloat(inventory?.price * 100).toFixed(2)
-      : inventory?.price
-    : undefined;
-  const saleQuantity = isStrats
-    ? inventory.saleQuantity !== undefined
-      ? parseFloat((inventory.saleQuantity / 100).toFixed(2))
-      : undefined
-    : isCata
-    ? parseFloat((inventory.saleQuantity / Math.pow(10, 18)).toFixed(2))
-    : inventory.saleQuantity;
-  const totalLockedQuantity = inventory.totalLockedQuantity
-    ? isStrats
-      ? (inventory.totalLockedQuantity / 100).toFixed(2)
+    ? isStrat
+      ? new BigNumber(inventory.price).multipliedBy(100)
       : isCata
-      ? (inventory.totalLockedQuantity / Math.pow(10, 18)).toFixed(2)
-      : inventory.totalLockedQuantity
-    : 0;
+      ? new BigNumber(inventory.quantity).multipliedBy(
+          new BigNumber(10).pow(18)
+        )
+      : new BigNumber(inventory.quantity)
+    : undefined;
+  const saleQuantity =
+    inventory.saleQuantity !== undefined
+      ? isStrat
+        ? new BigNumber(inventory.saleQuantity).dividedBy(100)
+        : isCata
+        ? new BigNumber(inventory.saleQuantity).dividedBy(
+            new BigNumber(10).pow(18)
+          )
+        : new BigNumber(inventory.saleQuantity)
+      : undefined;
+  const totalLockedQuantity = inventory.totalLockedQuantity
+    ? isStrat
+      ? new BigNumber(inventory.totalLockedQuantity).dividedBy(100)
+      : isCata
+      ? new BigNumber(inventory.totalLockedQuantity).dividedBy(
+          new BigNumber(10).pow(18)
+        )
+      : new BigNumber(inventory.totalLockedQuantity)
+    : new BigNumber(0);
   const stakeable =
     inventory.root &&
     reserves &&
@@ -233,8 +243,8 @@ const InventoryCard = ({
   function isTransferDisabled() {
     return !(
       quantity &&
-      quantity > 0 &&
-      (!inventory.saleAddress || (inventory.saleAddress && saleQuantity > 0))
+      quantity.gt(0) &&
+      (!inventory.saleAddress || (inventory.saleAddress && saleQuantity.gt(0)))
     );
   }
 
@@ -371,7 +381,7 @@ const InventoryCard = ({
                   inventory.address === inventory.originAddress ||
                   !isActive() ||
                   disableSADDOGS(inventory) ||
-                  isStrats ||
+                  isStrat ||
                   isCata
                 }
               >
@@ -437,7 +447,7 @@ const InventoryCard = ({
                       inventory.address === inventory.originAddress ||
                       !isActive() ||
                       disableSADDOGS(inventory) ||
-                      isStrats ||
+                      isStrat ||
                       isCata
                     }
                   >
@@ -523,8 +533,8 @@ const InventoryCard = ({
               </div>
             ) : (inventory.data.isMint &&
                 inventory.data.isMint === 'False' &&
-                quantity === 0) ||
-              (!inventory.data.isMint && quantity === 0) ? (
+                quantity.eq(0)) ||
+              (!inventory.data.isMint && quantity.eq(0)) ? (
               <div className="flex items-center justify-center gap-2 bg-[#FFA50029] p-[6px] rounded-md">
                 <div className="w-[7px] h-[7px] rounded-full bg-[#FFA500]"></div>
                 <p className="text-[#4D4D4D] text-[13px]">Sold Out</p>
@@ -541,18 +551,18 @@ const InventoryCard = ({
         <div className="flex flex-col justify-between gap-4 px-[18px] py-4 border border-[#E9E9E9] rounded-md w-full ">
           <div className="flex justify-between  ">
             <p className="text-[#6A6A6A]">Quantity Owned</p>
-            <p className="text-[#202020] font-semibold">{quantity || 'N/A'}</p>
+            <p className="text-[#202020] font-semibold">{quantity.toString() || 'N/A'}</p>
           </div>
           <div className="flex justify-between  ">
             <p className="text-[#6A6A6A]">Quantity Available for Sale </p>
             <p className="text-[#202020] font-semibold">
-              {quantity - totalLockedQuantity || 'N/A'}
+              {quantity.minus(totalLockedQuantity).toString() || 'N/A'}
             </p>
           </div>
           <div className="flex justify-between  ">
             <p className="text-[#6A6A6A]">Quantity Listed for Sale</p>
             <p className="text-[#202020] font-semibold">
-              {saleQuantity || 'N/A'}
+              {saleQuantity ? saleQuantity.toString() : 'N/A'}
             </p>
           </div>
           <div className="flex justify-between  ">
@@ -560,9 +570,9 @@ const InventoryCard = ({
             <p className="text-[#202020] font-semibold">
               {price ? (
                 <p className="flex">
-                  <span>${price}</span>
+                  <span>${price.toString()}</span>
                   <p className="flex text-xs items-center">
-                    &nbsp;({(price * STRATS_CONVERSION).toFixed(0)} {StratsIcon}
+                    &nbsp;({(price.multipliedBy(STRATS_CONVERSION)).toString()} {StratsIcon}
                     )
                   </p>
                 </p>

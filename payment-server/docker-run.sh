@@ -55,13 +55,6 @@ if [ "$ORACLE_MODE" = "true" ]; then
 
   echo 'ORACLE_MODE is true. Skipping payment server deployment.'
 
-  if [ -z "$METALS_API_KEY" ]; then
-    echo 'Error: METALS_API_KEY is not set. Exiting...'
-    exit 1
-  else
-    echo 'METALS_API_KEY is set.'
-  fi
-
   if [ -f "${CONFIG_DIR_PATH}/oracle_deploy.yaml" ]; then
     echo 'oracle_deploy.yaml already exists for oracle.'
     cat ${CONFIG_DIR_PATH}/oracle_deploy.yaml
@@ -77,8 +70,13 @@ if [ "$ORACLE_MODE" = "true" ]; then
     echo 'SKIP_ORACLE_DEPLOYMENT is true. Skipping oracle deployment...'
   fi
 
-  echo 'Starting price submission script...'
-  yarn submit-price
+  if [ -z "$METALS_API_KEY" ]; then
+    echo 'Error: METALS_API_KEY is not set. submit-price script will not run.'
+  else
+    echo 'METALS_API_KEY is set.'
+    echo 'Starting price submission script...'
+    yarn submit-price
+  fi
 
 else
   # Payment server-specific configurations

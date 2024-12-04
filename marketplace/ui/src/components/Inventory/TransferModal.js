@@ -90,7 +90,7 @@ const TransferModal = ({
       ...prevTransfers,
       {
         id: prevTransfers.length + 1,
-        quantity: remainingQuantity,
+        quantity: remainingQuantity, // TODO: cast to string for testing big numbers to remove trailing zeros
         price: 0.01,
         recipient: undefined,
         openDropdown: false,
@@ -445,11 +445,7 @@ const TransferModal = ({
           </p>
           <div className="border border-[#d9d9d9] h-[42px] rounded-md flex items-center justify-center">
             <p>
-              {isStrat
-                ? (inventory.quantity / 100).toFixed(2)
-                : isCata
-                ? (inventory.quantity / Math.pow(10, 18)).toFixed(2)
-                : inventory.quantity}
+              {availableQuantity.toString()}
             </p>
           </div>
         </div>
@@ -460,17 +456,10 @@ const TransferModal = ({
               className="w-full h-9"
               value={mobileTransfer.quantity}
               controls={false}
-              min={1}
-              max={
-                isStrat
-                  ? (inventory.quantity / 100).toFixed(2)
-                  : isCata
-                  ? (inventory.quantity / Math.pow(10, 18)).toFixed(2)
-                  : inventory.quantity
-              }
+              max={availableQuantity}
               step={1}
               onChange={(value) =>
-                handleQuantityChange(mobileTransfer.id, value)
+                handleQuantityChange(mobileTransfer.id, new BigNumber(value))
               }
             />
           </div>
