@@ -54,7 +54,7 @@ async function fetchAndSubmitEscrowAddresses(oracleContract, token) {
       query: {
         creator: "eq.BlockApps",
         isActive: "eq.true",
-        "data->>reserve": "eq." + reserveAddress,
+        reserve: "eq." + reserveAddress,
       },
     };
 
