@@ -27,7 +27,7 @@ async function uploadContract(token, type, args) {
   const { address } = await createContract(token, contractArgs, options);
 
   return {
-    name: contractName,
+    name: args.name,
     address
   };
 }
