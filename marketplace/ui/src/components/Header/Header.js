@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
+import { BigNumber } from 'bignumber.js';
 import {
   Layout,
   Input,
@@ -263,12 +264,13 @@ const HeaderComponent = ({
             <Row className="flex flex-col">
               <Col Col={24}>
                 {' '}
-                <p className="text-xs mt-1">CATA: {cataBalance}</p>
+                <p className="text-xs mt-1">CATA: {new BigNumber(cataBalance).toString()}</p>
               </Col>
               <Col Col={24}>
                 {' '}
                 <p className="text-xs mt-3">
-                  Balance: ${formattedNum(cataBalance / 10)}
+                  Balance: $
+                  {(new BigNumber(cataBalance).dividedBy(new BigNumber(10))).toString()}
                 </p>
               </Col>
             </Row>
@@ -548,7 +550,12 @@ const HeaderComponent = ({
                 <Badge
                   style={{ backgroundColor: '#13188A' }}
                   className="cursor-pointer mt-7 md:mt-0 mx-2"
-                  count={cataBalance}
+                  count={
+                    parseFloat(cataBalance).toString().includes('.') &&
+                    parseFloat(cataBalance).toString().split('.')[1].length > 4
+                      ? `${parseFloat(cataBalance).toFixed(4)}...`
+                      : parseFloat(cataBalance).toFixed(4).replace(/\.?0+$/, '')
+                  }
                   overflowCount={9999999}
                 >
                   <img
