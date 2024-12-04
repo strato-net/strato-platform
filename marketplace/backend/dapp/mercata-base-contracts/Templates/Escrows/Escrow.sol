@@ -151,7 +151,7 @@ abstract contract Escrow is Utils {
         reserve = _newReserve;
     }
 
-    function closeEscrow() external {
+    function closeEscrow() internal {
         require(msg.sender == reserve, "Only the reserve can close the escrow");
         isActive = false;
     }
