@@ -5,10 +5,12 @@ import deployment from './load.deploy.js';
 import oauthHelper from "./helpers/oauthHelper.js";
 
 async function deactivate(token, contract) {
+  const { metal, ...restContract } = contract;
+
   const callArgs = {
-      contract,
-      method: 'deactivate',
-      args: {},
+    contract: restContract,
+    method: 'deactivate',
+    args: {},
   };
   await rest.call(token, callArgs, { config });
 }

@@ -102,7 +102,7 @@ abstract contract Escrow is Utils {
 
         collateralQuantity -= quantityToUnlock - unallocatedQuantity;
         _updateOnPriceChange(_assetPrice, _loanToValueRatio);
-        require(borrowedAmount <= maxLoanAmount, "Invalid unstaking attempt: unstaking "
+        require(uint(borrowedAmount) <= maxLoanAmount, "Invalid unstaking attempt: unstaking "
                                                + string(quantityToUnlock)
                                                + " units would result in undercollateralization."
                                                + "\nCurrent loan balance: "

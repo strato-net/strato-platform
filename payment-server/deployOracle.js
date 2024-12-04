@@ -28,6 +28,7 @@ async function uploadContract(token, type, args) {
 
   return {
     name: contractName,
+    metal: args.name,
     address
   };
 }
