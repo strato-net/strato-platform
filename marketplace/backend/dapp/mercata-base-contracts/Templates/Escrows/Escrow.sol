@@ -128,12 +128,12 @@ abstract contract Escrow is Utils {
     function updateOnPriceChange(decimal _newPrice, uint _loanToValueRatio) external {
         require(msg.sender == reserve, "Only reserve can update collateral price");
         _updateOnPriceChange(_newPrice, _loanToValueRatio);
+        lastRewardTimestamp = block.timestamp;
     }
 
     function _updateOnPriceChange(decimal _newPrice, uint _loanToValueRatio) internal {
         collateralValue = collateralQuantity * _newPrice.truncate(2);
         maxLoanAmount = uint(collateralValue * decimal(_loanToValueRatio));
-        lastRewardTimestamp = block.timestamp;
     }
 
     function updateTotalCataReward(decimal _newCataReward) external {
