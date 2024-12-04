@@ -113,6 +113,9 @@ abstract contract Escrow is Utils {
                                                + string(collateralValue)
                                                + "\nMaximum loan amount after unstaking: "
                                                + string(maxLoanAmount));
+        if (collateralQuantity == 0) {
+            closeEscrow();
+        }
     }
 
     function updateBorrowedAmount(uint _borrowAmount, bool add) external {

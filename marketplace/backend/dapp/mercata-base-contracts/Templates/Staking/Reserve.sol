@@ -257,11 +257,7 @@ abstract contract Reserve is Utils, Structs {
         escrow.unlockAssets(_quantity, _oraclePrice, loanToValueRatio);
         uint endingQuantity = escrow.collateralQuantity();
         uint releasedQuantity = startingQuantity - endingQuantity;
-
-        // Close escrow if collateral quantity is 0
-        if (endingQuantity == 0) {
-            escrow.closeEscrow();
-        }
+        
         // Emit unstake event
         emit StakeUnlocked(msg.sender, _escrowAddress, releasedQuantity);
     }
