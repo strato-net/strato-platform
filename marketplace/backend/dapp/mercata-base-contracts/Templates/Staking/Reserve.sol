@@ -85,7 +85,7 @@ abstract contract Reserve is Utils, Structs {
         lastUpdatedOraclePrice = oraclePrice;
     }
 
-    function stakeAsset(address _escrow, address[] _assets, uint _collateralQuantity) public requireActive() returns (address) {
+    function stakeAsset(address _escrowAddress, address[] _assets, uint _collateralQuantity) public requireActive() returns (address) {
         // Calculate required values
         Asset _assetToBeSold = Asset(_assets[0]);
         require(_assetToBeSold.ownerCommonName() == getCommonName(msg.sender), "Only the owner of the assets can stake the assets");
@@ -95,8 +95,8 @@ abstract contract Reserve is Utils, Structs {
         _oraclePrice = _oraclePrice / unitConversionRate;
         lastUpdatedOraclePrice = _oraclePrice;
 
-        Escrow escrow = Escrow(_escrow);
-        if (_escrow == address(0)) {
+        Escrow escrow = Escrow(_escrowAddress);
+        if (_escrowAddress == address(0)) {
             // Create Escrow with all required parameters
             escrow = new Escrow(
                 _assets,

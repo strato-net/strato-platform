@@ -144,18 +144,11 @@ class ReserveController {
         'number.base': 'Amount must be a valid number.',
         'number.positive': 'Amount must be positive.',
       }),
-      assetAddress: Joi.string().required().messages({
-        'any.required': 'Asset Address is required and must be a string.',
-        'string.base': 'Asset Address must be a valid string.',
+      escrowAddress: Joi.string().optional(),
+      assets: Joi.array().items(Joi.string()).required().messages({
+        'any.required': 'assets is required and must be a string array.',
+        'string.base': 'assets must be a valid string array.',
       }),
-      stratPaymentService: Joi.object({
-        creator: Joi.string().required().messages({
-          'any.required': 'Creator is required and must be a string.',
-        }),
-        serviceName: Joi.string().required().messages({
-          'any.required': 'Service Name is required and must be a string.',
-        }),
-      }).required(),
       reserve: Joi.string().required().messages({
         'any.required': 'Reserve is required and must be a string.',
         'string.base': 'Reserve must be a valid string.',
@@ -166,6 +159,11 @@ class ReserveController {
 
   static validateUnstakeArgs(args) {
     const schema = Joi.object({
+      quantity: Joi.number().positive().required().messages({
+        'any.required': 'quantity is required and must be positive.',
+        'number.base': 'quantity must be a valid number.',
+        'number.positive': 'quantity must be positive.',
+      }),
       escrowAddress: Joi.string().required().messages({
         'any.required': 'Escrow Address is required and must be a string.',
         'string.base': 'Escrow Address must be a valid string.',
