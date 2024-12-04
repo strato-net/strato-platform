@@ -126,13 +126,13 @@ async function main() {
       console.log(`Processing oracle: ${key}`);
 
       // Ensure the oracle contract has the necessary structure
-      if (!oracle.name || !oracle.address) {
+      if (!oracle.metal || !oracle.address) {
         console.warn(`WARN: Skipping invalid oracle ${key}`);
         continue;
       }
 
       try {
-        const metal = oracle.name.toLowerCase();
+        const metal = oracle.metal.toLowerCase();
         console.log(`Fetching price for ${metal}`);
   
         await fetchAndSubmitPrice(
