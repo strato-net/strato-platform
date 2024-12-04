@@ -1,0 +1,3 @@
+Silver:bd60ff1bf2fc9ba4bef58af41ed2d2f3cd51f00c
+Gold Ounce:22fd7595110444defc6dbcf4b94c8ac2b39ccad8
+Gold Gram:80ba104005e8fe83d358272ce69a4bd8f10523ba

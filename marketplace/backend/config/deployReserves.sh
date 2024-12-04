@@ -10,7 +10,7 @@ ASSET_ROOT_ADDRESS=$ASSET_ROOT_ADDRESS
 NAME=$NAME
 ASSET_ORACLE_ADDRESS=$ASSET_ORACLE_ADDRESS
 UNIT_CONVERSION_RATE=$UNIT_CONVERSION_RATE
-
+OLD_RESERVE_ADDRESS=$OLD_RESERVE_ADDRESS
 
 # Get access token
 ACCESS_TOKEN=$(curl -L -X POST "https://keycloak.blockapps.net/auth/realms/mercata-testnet2/protocol/openid-connect/token" \
@@ -98,3 +98,56 @@ UPDATE_CATA_RESULT=$(curl -X POST "https://node1.mercata-testnet2.blockapps.net/
   -d '{"txs":[{"payload":{"contractAddress":"'"$SIMPLE_RESERVE_ADDRESS"'","method":"setCataToken","args":{"_newCataToken":"'"$NEW_CATA_ADDRESS"'"}},"type":"FUNCTION"}],"txParams":{"gasLimit":10000000000,"gasPrice":1}}')
 
 echo "UPDATE_CATA_RESULT: $UPDATE_CATA_RESULT"
+
+# Migrate escrows and deactivate old reserve only if OLD_RESERVE_ADDRESS is set
+if [ ! -z "$OLD_RESERVE_ADDRESS" ]; then
+    echo "Migrating escrows from old reserve to new reserve..."
+
+    MIGRATE_RESULT=$(curl -X POST "https://node1.mercata-testnet2.blockapps.net/bloc/v2.2/transaction?resolve=true" \
+      -H 'Content-Type: application/json' \
+      -H "Authorization: Bearer $ACCESS_TOKEN" \
+      -d '{
+        "txs":[{
+          "payload":{
+            "contractAddress":"'"$OLD_RESERVE_ADDRESS"'",
+            "method":"migrateReserve",
+            "args":{
+              "_newReserve":"'"$SIMPLE_RESERVE_ADDRESS"'",
+              "_escrows":[]
+            }
+          },
+          "type":"FUNCTION"
+        }],
+        "txParams":{"gasLimit":10000000000,"gasPrice":1}
+      }')
+
+    echo "MIGRATE_RESULT: $MIGRATE_RESULT"
+
+    # Deactivate old reserve
+    DEACTIVATE_RESULT=$(curl -X POST "https://node1.mercata-testnet2.blockapps.net/bloc/v2.2/transaction?resolve=true" \
+      -H 'Content-Type: application/json' \
+      -H "Authorization: Bearer $ACCESS_TOKEN" \
+      -d '{
+        "txs":[{
+          "payload":{
+            "contractAddress":"'"$OLD_RESERVE_ADDRESS"'",
+            "method":"deactivate",
+            "args":{}
+          },
+          "type":"FUNCTION"
+        }],
+        "txParams":{"gasLimit":10000000000,"gasPrice":1}
+      }')
+
+    echo "DEACTIVATE_RESULT: $DEACTIVATE_RESULT"
+fi
+
+# After deploying new reserve, store its address
+if grep -q "^$NAME:" reserve_addresses.txt; then
+    # If entry exists, replace the address
+    sed -i "s|^$NAME:.*|$NAME:$SIMPLE_RESERVE_ADDRESS|" reserve_addresses.txt
+else
+    # If entry doesn't exist, append new line
+    echo "$NAME:$SIMPLE_RESERVE_ADDRESS" >> reserve_addresses.txt
+fi
+
