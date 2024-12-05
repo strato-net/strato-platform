@@ -91,21 +91,21 @@ const InventoryCard = ({
   const saleQuantity =
     inventory.saleQuantity !== undefined
       ? isStrat
-        ? new BigNumber(inventory.saleQuantity).dividedBy(100)
+        ? new BigNumber(inventory.saleQuantity || 0).dividedBy(100)
         : isCata
-        ? new BigNumber(inventory.saleQuantity).dividedBy(
+        ? new BigNumber(inventory.saleQuantity || 0).dividedBy(
             new BigNumber(10).pow(18)
           )
-        : new BigNumber(inventory.saleQuantity)
+        : new BigNumber(inventory.saleQuantity || 0)
       : undefined;
   const totalLockedQuantity = inventory.totalLockedQuantity
     ? isStrat
-      ? new BigNumber(inventory.totalLockedQuantity).dividedBy(100)
+      ? new BigNumber(inventory.totalLockedQuantity || 0).dividedBy(100)
       : isCata
-      ? new BigNumber(inventory.totalLockedQuantity).dividedBy(
+      ? new BigNumber(inventory.totalLockedQuantity || 0).dividedBy(
           new BigNumber(10).pow(18)
         )
-      : new BigNumber(inventory.totalLockedQuantity)
+      : new BigNumber(inventory.totalLockedQuantity || 0)
     : new BigNumber(0);
   const stakeable =
     inventory.root &&

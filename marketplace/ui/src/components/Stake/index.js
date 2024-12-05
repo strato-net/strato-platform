@@ -126,6 +126,7 @@ const Stake = ({ user }) => {
           reserves.some(
             (reserve) => record.originAddress === reserve.assetRootAddress
           );
+        const borrowedAmount = (record?.escrow?.borrowedAmount || 0) / 10000;
         const callDetailPage = () => {
           navigate(
             `${routes.InventoryDetail.url
@@ -166,7 +167,7 @@ const Stake = ({ user }) => {
             </div>
             {isStakeable && (
               <>
-                <div> Borrowed Amount: $33,516 </div>
+                <div> Borrowed Amount: ${borrowedAmount.toLocaleString('en-US',{minimumFractionDigits: 2})} </div>
               </>
             )}
           </>

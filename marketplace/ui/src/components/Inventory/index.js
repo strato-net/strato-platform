@@ -387,6 +387,7 @@ const Inventory = ({ user }) => {
           reserves.some(
             (reserve) => record.originAddress === reserve.assetRootAddress
           );
+        const borrowedAmount = (record?.escrow?.borrowedAmount || 0) / 10000;
         const callDetailPage = () => {
           navigate(
             `${naviroute
@@ -427,7 +428,7 @@ const Inventory = ({ user }) => {
             </div>
             {isStakeable && (
               <>
-                <div> Borrowed Amount: $33,516 </div>
+                <div> Borrowed Amount: ${borrowedAmount.toLocaleString('en-US',{minimumFractionDigits: 2})} </div>
               </>
             )}
           </>
@@ -500,12 +501,12 @@ const Inventory = ({ user }) => {
         const isCata = record.originAddress === cataAddress;
         const saleQuantity = (
           isStrats
-            ? new BigNumber(record.saleQuantity).dividedBy(new BigNumber(100))
+            ? new BigNumber(record.saleQuantity || 0).dividedBy(new BigNumber(100))
             : isCata
-            ? new BigNumber(record.saleQuantity).dividedBy(
+            ? new BigNumber(record.saleQuantity || 0).dividedBy(
                 new BigNumber(10).pow(18)
               )
-            : new BigNumber(record.saleQuantity)
+            : new BigNumber(record.saleQuantity || 0)
         ).toString();
 
         return <div className="w-24">{saleQuantity}</div>;
