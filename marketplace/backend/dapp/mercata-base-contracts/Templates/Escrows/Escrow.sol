@@ -34,6 +34,7 @@ abstract contract Escrow is Utils {
         require(collateralQuantity > 0, "No collateral has been staked");
         totalCataReward = 0; // Assuming the CATA reward rate is provided externally
         isActive = true;
+        lastRewardTimestamp = block.timestamp;
     }
 
     function attachAssets(
