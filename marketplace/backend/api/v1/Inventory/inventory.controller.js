@@ -456,8 +456,8 @@ class InventoryController {
           })
         )
         .required(),
-      price: Joi.number().greater(0).precision(4).required(),
-      quantity: Joi.number().integer().greater(0).optional(),
+      price: Joi.number().greater(0).precision(30).required(),
+      quantity: Joi.string().pattern(/^\d+$/).required(),
     });
 
     const validation = listItemSchema.validate(args);
@@ -603,8 +603,8 @@ class InventoryController {
           })
         )
         .required(),
-      price: Joi.number().greater(0).precision(4).optional(),
-      quantity: Joi.number().integer().greater(0).optional(),
+      price: Joi.number().greater(0).precision(30).optional(),
+      quantity: Joi.string().pattern(/^\d+$/).required(),
     });
 
     const validation = updateSaleItemSchema.validate(args);
