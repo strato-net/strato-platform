@@ -12,7 +12,7 @@ class EscrowController {
       // Validate address presence and type
       EscrowController.validateGetForAssetArgs({ assetRootAddress });
 
-      const result = await dapp.getEscrowForAsset(assetRootAddress);
+      const result = await dapp.getEscrowForAsset({assetRootAddress});
       rest.response.status200(res, result);
       next();
     } catch (e) {
