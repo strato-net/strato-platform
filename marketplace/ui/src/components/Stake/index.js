@@ -7,6 +7,8 @@ import {
   Tooltip,
   Typography,
   Pagination,
+  Row,
+  Col,
 } from 'antd';
 import image_placeholder from '../../images/resources/image_placeholder.png';
 import useDebounce from '../UseDebounce';
@@ -30,6 +32,7 @@ import StakeSteps from './StakeSteps';
 import InventoryCard from '../Inventory/InventoryCard';
 import { useCategoryState, useCategoryDispatch } from '../../contexts/category';
 import { actions as categoryActions } from '../../contexts/category/actions';
+import { DollarOutlined, GiftOutlined } from '@ant-design/icons';
 
 const { Title } = Typography;
 const StratsIcon = <img src={Images.strats} alt="STRATS" className="w-4 h-4" />;
@@ -305,6 +308,22 @@ const Stake = ({ user }) => {
         </Breadcrumb.Item>
       </Breadcrumb>
       <div>
+      <Row className='w-[95%] mt-10 mx-auto flex justify-start'>
+        <Col className='w-full sm:w-auto'>
+        <p className="flex items-center ml-4 font-semibold text-base md:text-lg bg-[#E6F0FF] border border-[#13188A] rounded-md px-3 py-1 text-[#13188A] shadow-sm">
+          <DollarOutlined className="!text-[#13188A] mr-2 text-lg" />
+          Total Rewards (CATA):
+          <span className="ml-2 font-bold">334,133</span>
+        </p>
+        </Col>
+        <Col className='mt-5 sm:mt-0 w-full sm:w-auto'>
+        <p className="flex items-center ml-4 font-semibold text-base md:text-lg bg-[#FFE6E6] border border-[#D32F2F] rounded-md px-3 py-1 text-[#D32F2F] shadow-sm">
+          <GiftOutlined className="!text-[#D32F2F] mr-2 text-lg" />
+          Est. Daily Reward (CATA):
+          <span className="ml-2 font-bold">1,321</span>
+        </p>
+        </Col>
+      </Row>
         <div className="pt-6 mx-6 md:mx-5 md:px-10 mb-5">
           <StakeSteps />
           <PurchasableStakeItems />
