@@ -926,7 +926,7 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
       ...args,
       notEqualsField: ['ownerCommonName', 'sale'],
       notEqualsValue: [
-        [inventory.addressuserCommonName, ...constants.baUserNames],
+        [userCommonName, ...constants.baUserNames],
         constants.zeroAddress,
       ],
     };
