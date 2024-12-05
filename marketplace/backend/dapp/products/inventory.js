@@ -566,11 +566,6 @@ async function getAll(admin, args = {}, defaultOptions) {
     if (inventories) {
       for (let i=0; i < inventories.length; i++) {
         const inventory = inventories[i];
-        const escrow = await escrowJs.getEscrowForAsset(
-          admin,
-          { value: `eq.${inventory.address}` },
-          options
-        );
         if (
           inventory['BlockApps-Mercata-Sale'] &&
           inventory['BlockApps-Mercata-Sale'].length > 0
@@ -612,7 +607,6 @@ async function getAll(admin, args = {}, defaultOptions) {
                     : null
                   : null,
                 'BlockApps-Mercata-Sale': undefined, // Removing the nested sale data to avoid redundancy
-                escrow,
               });
             }
           } else {
@@ -630,23 +624,32 @@ async function getAll(admin, args = {}, defaultOptions) {
                   : null
                 : null,
               'BlockApps-Mercata-Sale': undefined, // Removing the nested sale data to avoid redundancy
-              escrow,
-            });
-          }
-        } else if (isMarketplaceSearch && isNullPriceRange) {
-          if (!escrow) {
-            finalInventory.push({
-              ...inventory,
-              price: null,
-              saleAddress: null,
-              saleQuantity: null,
-              saleDate: null,
-              totalLockedQuantity: null,
-              paymentServices: null,
             });
           }
         } else {
-          finalInventory.push({ escrow, ...inventory});
+          let escrow;
+          if (inventory.sale && inventory.sale !== constants.zeroAddress) {
+            escrow = await escrowJs.getEscrowForAsset(
+              admin,
+              { value: `eq.${inventory.address}` },
+              options
+            );
+          }
+          if (isMarketplaceSearch && isNullPriceRange) {
+            if (!escrow) {
+              finalInventory.push({
+                ...inventory,
+                price: null,
+                saleAddress: null,
+                saleQuantity: null,
+                saleDate: null,
+                totalLockedQuantity: null,
+                paymentServices: null,
+              });
+            }
+          } else {
+            finalInventory.push({ escrow, ...inventory});
+          }
         }
       }
     }
