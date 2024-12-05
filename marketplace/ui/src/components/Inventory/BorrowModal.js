@@ -66,7 +66,7 @@ const BorrowModal = ({
       description: "The projected amount of STRAT tokens you can borrow against your staked RWAs.",
       value: (
         <div className="flex -mr-1">
-          {parseFloat(inventory?.escrow?.maxLoanAmount).toFixed(2)}
+          {parseFloat(inventory?.escrow?.maxLoanAmount/100).toFixed(2)}
           {logo}
         </div>
       ),
@@ -76,7 +76,7 @@ const BorrowModal = ({
       description: "The projected amount of USD you can borrow against your staked RWAs.",
       value: (
         <div className="flex -mr-1">
-          ${parseFloat(inventory?.escrow?.maxLoanAmount/100).toFixed(2)}
+          ${parseFloat(inventory?.escrow?.maxLoanAmount/10000).toFixed(2)}
         </div>
       ),
     }
@@ -98,7 +98,7 @@ const BorrowModal = ({
   const handleSubmit = async () => {
     const body = {
       escrowAddress: inventory?.sale,
-      borrowAmount: Math.floor(Number(parseFloat(inventory?.escrow?.maxLoanAmount)) * 100) / 100,
+      borrowAmount: maxLoanAmount,
       reserve: matchedReserve?.address,
     };
 

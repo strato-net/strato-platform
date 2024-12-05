@@ -132,7 +132,7 @@ abstract contract Reserve is Utils, Structs {
         // Transfer STRATS from owner to borrower
         stratsToken.transferOwnership(
             escrow.borrower(),
-            _borrowAmount * 100,
+            _borrowAmount,
             true,
             transferNumber,
             0.0001
@@ -148,7 +148,7 @@ abstract contract Reserve is Utils, Structs {
     ) requireActive() external returns (uint) {
         require(_stratsAssetAddresses.length > 0, "Pass at least one STRATs token address");
         Escrow escrow = Escrow(_escrowAddress);
-        uint stratAmountOwed = escrow.borrowedAmount() * 100;
+        uint stratAmountOwed = escrow.borrowedAmount();
         uint stratAmountNet = stratAmountOwed;
         uint stratQuantity = 0;
         uint transferNumber = 0;

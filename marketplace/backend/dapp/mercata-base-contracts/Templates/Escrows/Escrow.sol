@@ -8,7 +8,7 @@ import "../Utils/Utils.sol";
 abstract contract Escrow is Utils {
     address public reserve;
     uint public collateralQuantity;
-    decimal public collateralValue;
+    uint public collateralValue;
     uint public maxLoanAmount;
     decimal public totalCataRewardInDollars;
     uint public borrowedAmount;
@@ -76,6 +76,13 @@ abstract contract Escrow is Utils {
         _updateOnPriceChange(_assetPrice, _loanToValueRatio);
     }
 
+    function showSTRATValue(uint _value) internal returns (string) {
+        return string(_value / 100)
+             + "."
+             + string(_value % 100)
+             + " STRATS";
+    }
+
     function unlockAssets(
         uint _quantity,
         decimal _assetPrice,
@@ -108,11 +115,11 @@ abstract contract Escrow is Utils {
                                                + string(quantityToUnlock)
                                                + " units would result in undercollateralization."
                                                + "\nCurrent loan balance: "
-                                               + string(borrowedAmount)
+                                               + showSTRATValue(borrowedAmount)
                                                + "\nCollateral value after unstaking: "
-                                               + string(collateralValue)
+                                               + showSTRATValue(collateralValue)
                                                + "\nMaximum loan amount after unstaking: "
-                                               + string(maxLoanAmount));
+                                               + showSTRATValue(maxLoanAmount));
         if (collateralQuantity == 0) {
             closeEscrow();
         }
@@ -137,8 +144,8 @@ abstract contract Escrow is Utils {
     }
 
     function _updateOnPriceChange(decimal _newPrice, uint _loanToValueRatio) internal {
-        collateralValue = collateralQuantity * _newPrice.truncate(2);
-        maxLoanAmount = uint(collateralValue * decimal(_loanToValueRatio));
+        collateralValue = uint((decimal(collateralQuantity).truncate(4) * _newPrice * 10000.0000).truncate(0)); // 100 STRATs per dollar * 100 STRAT units per STRAT = 10000 
+        maxLoanAmount = collateralValue * _loanToValueRatio;
     }
 
     function updateTotalCataReward(decimal _newCataReward) external {
@@ -152,7 +159,6 @@ abstract contract Escrow is Utils {
     }
 
     function closeEscrow() internal {
-        require(msg.sender == reserve, "Only the reserve can close the escrow");
         isActive = false;
     }
 
