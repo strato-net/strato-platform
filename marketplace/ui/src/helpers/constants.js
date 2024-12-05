@@ -340,106 +340,34 @@ const bannerConfig = [
 export const BANNER = [
   {
     label: 'Staking',
-    link: '/mywallet?st=true',
+    link: '/stake',
     text: (
-      <div className="staking_banner_text banner-text">
-        <h1> RWA X DeFi </h1>
-        <h1 className="text-base w-5/6 md:text-3xl"> Staking is Here! </h1>
-        <h1 className="text-base w-full md:text-3xl">
-          {' '}
-          Stake silver and gold to earn and gain access to our governance
-          token...coming soon!{' '}
-        </h1>
+      <div className="staking_banner_text banner-text flex justify-between">
+        <div className="banner-text">
+          <h1 className="title"> RWA X DeFi </h1>
+          <h1 className="w-3/4 mt-1 md:text-3xl font-medium sm:text-2xl text-sm">
+            Stake silver and gold to earn and gain access to CATA, our
+            governance token!
+          </h1>
+        </div>
+        <div>
+          <img
+            src={Images.cata}
+            alt={'Cata...'}
+            title={'Cata'}
+            className="md:w-[160px] md:h-[160px] w-[120px] h-[120px] z-[11] relative md:mr-64 mr-48"
+          />
+        </div>
       </div>
     ),
-    desktopText: 'Explore More',
-    mobileText: 'Explore',
+    desktopText: 'Stake now',
+    mobileText: 'Stake',
     alt: metaImg,
     title: metaImg,
     desktopImg: Images.StakingX1600,
-    laptopImg: Images.StakingX1600,
-    tabletImg: Images.StakingX1600,
-    mobileImg: Images.StakingX1600,
-  },
-  {
-    label: 'Staking 2',
-    link: '/mywallet?st=true',
-    text: (
-      <div className="staking_banner_text banner-text">
-        <h1> Stake and Earn </h1>
-        <h1 className="text-base w-5/6 md:text-3xl">
-          {' '}
-          Unlock Passive Income with RWA Staking{' '}
-        </h1>
-        <h1 className="text-base w-5/6 md:text-xl">
-          {' '}
-          Stake your Real World Assets (RWAs) and earn daily rewards in CATA
-          tokens, our governance token. No borrowing required—start earning
-          effortlessly!{' '}
-        </h1>
-      </div>
-    ),
-    desktopText: 'Explore More',
-    mobileText: 'Explore',
-    alt: metaImg,
-    title: metaImg,
-    desktopImg: Images.StakingX1600,
-    laptopImg: Images.StakingX1600,
-    tabletImg: Images.StakingX1600,
-    mobileImg: Images.StakingX1600,
-  },
-  {
-    label: 'Staking 3',
-    link: '/mywallet?st=true',
-    text: (
-      <div className="staking_banner_text banner-text">
-        <h1> Borrow with Flexibility </h1>
-        <h1 className="text-base w-5/6 md:text-3xl">
-          {' '}
-          Access Liquidity from Your Staked RWAs{' '}
-        </h1>
-        <h1 className="text-base w-5/6 md:text-xl">
-          {' '}
-          Borrow up to 50% of your staked RWA value in STRAT stablecoins,
-          interest-free for a limited time! Keep earning rewards while accessing
-          immediate liquidity.{' '}
-        </h1>
-      </div>
-    ),
-    desktopText: 'Explore More',
-    mobileText: 'Explore',
-    alt: metaImg,
-    title: metaImg,
-    desktopImg: Images.StakingX1600,
-    laptopImg: Images.StakingX1600,
-    tabletImg: Images.StakingX1600,
-    mobileImg: Images.StakingX1600,
-  },
-  {
-    label: 'Staking 4',
-    link: '/mywallet?st=true',
-    text: (
-      <div className="staking_banner_text banner-text">
-        <h1> Flexible Financial Solutions </h1>
-        <h1 className="text-base w-5/6 md:text-3xl">
-          {' '}
-          Leverage RWAs Your Way{' '}
-        </h1>
-        <h1 className="text-base w-5/6 md:text-xl">
-          {' '}
-          Earn rewards, borrow liquidity, or both. Customize your financial
-          strategy while keeping your assets working for you.{' '}
-        </h1>
-      </div>
-    ),
-    desktopText: 'Explore More',
-    mobileText: 'Explore',
-    alt: metaImg,
-    title: metaImg,
-    desktopImg: Images.StakingX1600,
-    laptopImg: Images.StakingX1600,
-    tabletImg: Images.StakingX1600,
-    mobileImg: Images.StakingX1600,
+    laptopImg: Images.StakingX1440,
+    tabletImg: Images.StakingX768,
+    mobileImg: Images.StakingX394,
   },
   // {
   //   label: 'Batman',

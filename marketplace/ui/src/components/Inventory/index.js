@@ -12,8 +12,12 @@ import {
   Checkbox,
   Tooltip,
 } from 'antd';
+import {
+  CheckCircleOutlined,
+  DollarOutlined,
+  GiftOutlined,
+} from '@ant-design/icons';
 import BigNumber from 'bignumber.js';
-import { CheckCircleOutlined } from '@ant-design/icons';
 import image_placeholder from '../../images/resources/image_placeholder.png';
 import CreateInventoryModal from './CreateInventoryModal';
 import { actions as categoryActions } from '../../contexts/category/actions';
@@ -64,7 +68,7 @@ import InventoryCard from './InventoryCard';
 import './index.css';
 
 const { Option } = Select;
-const StratsIcon = <img src={Images.strats} alt="STRATS" className="w-5 h-5" />;
+const StratsIcon = <img src={Images.strat} alt="STRATS" className="w-4 h-4" />;
 
 const Inventory = ({ user }) => {
   const [open, setOpen] = useState(false);
@@ -84,7 +88,6 @@ const Inventory = ({ user }) => {
   const naviroute = routes.InventoryDetail.url;
   let { hasChecked, isAuthenticated, loginUrl } = useAuthenticateState();
   const { stratsAddress, cataAddress } = useMarketplaceState();
-  // console.log("{ stratsAddress, cataAddress }", { stratsAddress, cataAddress });
   const formatter = new Intl.NumberFormat('en-US');
   const formattedNum = (num) => formatter.format(num);
 
@@ -377,6 +380,13 @@ const Inventory = ({ user }) => {
     {
       title: 'Item',
       render: (text, record) => {
+        const isStakeable =
+          record.originAddress &&
+          reserves &&
+          reserves.length > 0 &&
+          reserves.some(
+            (reserve) => record.originAddress === reserve.assetRootAddress
+          );
         const callDetailPage = () => {
           navigate(
             `${naviroute
@@ -388,32 +398,39 @@ const Inventory = ({ user }) => {
           );
         };
         return (
-          <div className="flex items-center">
-            <div className="mr-2 w-[74px] h-[52px] flex items-center justify-center">
-              <img
-                src={
-                  record['BlockApps-Mercata-Asset-images'] &&
-                  record['BlockApps-Mercata-Asset-images'].length > 0
-                    ? record['BlockApps-Mercata-Asset-images'][0].value
-                    : image_placeholder
-                }
-                alt={'Asset image...'}
-                className="rounded-md w-full h-full object-contain"
-              />
+          <>
+            <div className="flex items-center">
+              <div className="mr-2 w-[74px] h-[52px] flex items-center justify-center">
+                <img
+                  src={
+                    record['BlockApps-Mercata-Asset-images'] &&
+                    record['BlockApps-Mercata-Asset-images'].length > 0
+                      ? record['BlockApps-Mercata-Asset-images'][0].value
+                      : image_placeholder
+                  }
+                  alt={'Asset image...'}
+                  className="rounded-md w-full h-full object-contain"
+                />
+              </div>
+              <div>
+                <span
+                  className="text-xs sm:text-sm text-[#13188A] hover:underline cursor-pointer"
+                  onClick={callDetailPage}
+                >
+                  <Tooltip title={record.name}>
+                    <span className="w-48 whitespace-nowrap overflow-hidden text-ellipsis block">
+                      {record.name}
+                    </span>
+                  </Tooltip>
+                </span>
+              </div>
             </div>
-            <div>
-              <span
-                className="text-xs sm:text-sm text-[#13188A] hover:underline cursor-pointer"
-                onClick={callDetailPage}
-              >
-                <Tooltip title={record.name}>
-                  <span className="w-48 whitespace-nowrap overflow-hidden text-ellipsis block">
-                    {record.name}
-                  </span>
-                </Tooltip>
-              </span>
-            </div>
-          </div>
+            {isStakeable && (
+              <>
+                <div> Borrowed Amount: $33,516 </div>
+              </>
+            )}
+          </>
         );
       },
     },
@@ -445,7 +462,7 @@ const Inventory = ({ user }) => {
             {price !== 'N/A' ? (
               <>
                 <span>${price}</span>{' '}
-                <p className="flex text-xs items-center">
+                <p className="flex text-xs items-center gap-1">
                   {' '}
                   &nbsp;({(price * STRATS_CONVERSION).toFixed(0)} {StratsIcon}){' '}
                 </p>
@@ -557,6 +574,24 @@ const Inventory = ({ user }) => {
     },
   ];
 
+  const Rewards = () => {
+    return (
+      <div className="flex flex-row">
+        <p className="flex items-center ml-4 font-semibold text-base xl:text-lg bg-[#E6F0FF] border border-[#13188A] rounded-md px-3 py-1 text-[#13188A] shadow-sm">
+          <DollarOutlined className="!text-[#13188A] mr-2 text-lg" />
+          Total Rewards (CATA):
+          <span className="ml-2 font-bold">334,133</span>
+        </p>
+
+        <p className="flex items-center ml-4 font-semibold text-base xl:text-lg bg-[#FFE6E6] border border-[#D32F2F] rounded-md px-3 py-1 text-[#D32F2F] shadow-sm">
+          <GiftOutlined className="!text-[#D32F2F] mr-2 text-lg" />
+          Est. Daily Reward (CATA):
+          <span className="ml-2 font-bold">1,321</span>
+        </p>
+      </div>
+    );
+  };
+
   return (
     <>
       <HelmetComponent
@@ -576,24 +611,30 @@ const Inventory = ({ user }) => {
             <p className="text-sm text-[#202020] font-medium">My Wallet</p>
           </Breadcrumb.Item>
         </Breadcrumb>
+        <div className="mt-5 ml-5 flex xl:hidden">
+          <Rewards />
+        </div>
         <div className="w-full h-[160px] py-4 px-4 md:h-[96px] bg-[#F6F6F6] flex flex-col md:flex-row md:px-14 justify-between items-center mt-6 lg:mt-8">
-          <div className="flex justify-between w-full">
+          <div className="flex w-full items-center">
             <Button
-              className="!px-1 md:!px-0 flex items-center flex-row-reverse gap-[6px] text-lg md:text-2xl font-semibold !text-[#13188A] "
+              className="!px-1 md:!px-0 flex items-center flex-row-reverse gap-[6px] text-lg md:text-xl font-semibold !text-[#13188A]"
               type="link"
               icon={
                 <img
                   src={Images.ForwardIcon}
                   alt={metaImg}
                   title={metaImg}
-                  className="hidden md:block w-6 h-6"
+                  className="hidden md:block w-5 h-5"
                 />
               }
             >
-              {' '}
               My Wallet
             </Button>
+            <div className="hidden xl:flex">
+              <Rewards />
+            </div>
           </div>
+
           <div className="flex flex-col md:flex-row gap-3 items-center my-2 md:my-0">
             <div className="flex gap-3 items-center">
               <Select

@@ -24,7 +24,7 @@ const GlobalTransactionResponsive = ({
   cataAddress,
 }) => {
   const StratsIcon = (
-    <img src={Images.strats} alt="STRATs" className="w-5 h-5" />
+    <img src={Images.strat} alt="STRATs" className="w-5 h-5" />
   );
   const navigate = useNavigate();
   const [expandedRows, setExpandedRows] = useState({});

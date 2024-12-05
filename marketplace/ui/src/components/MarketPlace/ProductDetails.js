@@ -98,7 +98,6 @@ const ProductDetails = ({ user, users }) => {
     inventoryOwnershipHistory,
     priceHistory,
     isFetchingPriceHistory,
-    isReserveLoading,
     reserves,
   } = useInventoryState();
   const { cartList, stratsAddress, cataAddress } = useMarketplaceState();
@@ -660,7 +659,7 @@ const ProductDetails = ({ user, users }) => {
                                   ? (details.escrow?.maxLoanAmount / 100).toFixed(
                                       2
                                     )
-                                  : adjustedPrice}
+                                  : adjustedPrice}{' '}
                                 <span className="font-normal text-xs mr-2 text-primary">
                                   <b>
                                     (
@@ -679,6 +678,14 @@ const ProductDetails = ({ user, users }) => {
                                     )
                                   </b>
                                 </span>
+                                {isStakeable && (
+                                  <>
+                                    <div className="text-lg">Est. APY: 10%</div>
+                                    <div className="text-lg">
+                                      TVL: $34,523,523
+                                    </div>
+                                  </>
+                                )}
                               </>
                             );
                           })()

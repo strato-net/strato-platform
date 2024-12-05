@@ -90,7 +90,11 @@ const App = () => {
           <InternalError />
         ) : (
           <Content
-            className={`${showMenu ? 'overflow-y-hidden md:overflow-auto h-[100vh] md:h-auto w-[100vw] md:w-auto bg-[#00000020] md:bg-white relative mt-0 md:mt-28' : 'mt-[89px] md:mt-[98px] '}`}
+            className={`${
+              showMenu
+                ? 'overflow-y-hidden md:overflow-auto h-[100vh] md:h-auto w-[100vw] md:w-auto bg-[#00000020] md:bg-white relative mt-0 md:mt-28'
+                : 'mt-[89px] md:mt-[84px] '
+            }`}
           >
             <AuthenticatedRoutes
               user={user}

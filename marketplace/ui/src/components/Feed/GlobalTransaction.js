@@ -40,7 +40,7 @@ const { Title } = Typography;
 
 const GlobalTransaction = ({ user, stratAddress, cataAddress }) => {
   const StratsIcon = (
-    <img src={Images.strats} alt="STRATs" className="mx-1 w-5 h-5" />
+    <img src={Images.strat} alt="STRATs" className="mx-1 w-4 h-4" />
   );
   // Dispatch
   const transactionDispatch = useTransactionDispatch();

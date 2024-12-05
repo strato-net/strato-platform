@@ -211,20 +211,16 @@ const Transaction = ({ user }) => {
   return (
     <div>
       {contextHolder}
-      <div className="px-4 md:px-10 lg:py-2 lg:mt-3 orders">
-        <Breadcrumb>
-          <Breadcrumb.Item href="" onClick={(e) => e.preventDefault()}>
-            <ClickableCell href={routes.Marketplace.url}>
-              <p className="text-sm text-[#13188A] font-semibold">Home</p>
-            </ClickableCell>
-          </Breadcrumb.Item>
-          <Breadcrumb.Item href="" onClick={(e) => e.preventDefault()}>
-            <p className=" text-sm text-[#202020] font-medium">
-              My Transactions
-            </p>
-          </Breadcrumb.Item>
-        </Breadcrumb>
-      </div>
+      <Breadcrumb className="mx-5 md:mx-14 mt-2 lg:mt-4">
+        <Breadcrumb.Item href="" onClick={(e) => e.preventDefault()}>
+          <ClickableCell href={routes.Marketplace.url}>
+            <p className="text-sm text-[#13188A] font-semibold">Home</p>
+          </ClickableCell>
+        </Breadcrumb.Item>
+        <Breadcrumb.Item href="" onClick={(e) => e.preventDefault()}>
+          <p className=" text-sm text-[#202020] font-medium">My Transactions</p>
+        </Breadcrumb.Item>
+      </Breadcrumb>
       <TransactionTable
         user={user}
         download={download}

@@ -24,6 +24,7 @@ export default {
   ProductDetail: { label: 'Product Detail', url: '/products/:id' },
   MyWallet: { label: 'Inventory', url: '/mywallet' },
   MyWalletStakeable: { label: 'Inventory Stakeable', url: '/mywallet?st=true' },
+  Stake: { label: 'Stake', url: '/stake' },
   InventoryDetail: { label: 'Inventory Detail', url: '/inventories/:id/:name' },
   VaultDetail: { label: 'Vault Detail', url: '/vaults/:address' },
   Items: { label: 'Item', url: '/items' },

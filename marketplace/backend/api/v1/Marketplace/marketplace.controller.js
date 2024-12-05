@@ -93,6 +93,24 @@ class MarketplaceController {
     }
   }
 
+  static async getStakeableProducts(req, res, next) {
+    try {
+      const { dapp, query } = req;
+      const inventories = await dapp.getStakeableProducts({
+        ...query,
+      });
+      const productsWithImageUrl = inventories.sort((a, b) => {
+        return b.saleDate.localeCompare(a.saleDate);
+      });
+
+      rest.response.status200(res, productsWithImageUrl);
+
+      return next();
+    } catch (e) {
+      return next(e);
+    }
+  }
+
   static async getStratsBalance(req, res, next) {
     try {
       const { dapp, address: userAddress } = req;

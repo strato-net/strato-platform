@@ -12,7 +12,6 @@ import {
   Select,
   DatePicker,
   Spin,
-  Table,
   Pagination,
 } from 'antd';
 import { DownloadOutlined, SearchOutlined } from '@ant-design/icons';
@@ -52,14 +51,13 @@ import { getStringDate } from '../../helpers/utils';
 
 const TransactionTable = ({ user, download, stratAddress, cataAddress }) => {
   const StratsIcon = (
-    <img src={Images.strats} alt="STRATs" className="mx-1 w-6 h-6" />
+    <img src={Images.strat} alt="STRATs" className="mx-1 w-4 h-4" />
   );
   // Dispatch
   const transactionDispatch = useTransactionDispatch();
   const marketplaceDispatch = useMarketplaceDispatch();
   // States
-  const { userTransactions, globalTransaction, count, isTransactionLoading } =
-    useTransactionState();
+  const { userTransactions, isTransactionLoading } = useTransactionState();
 
   const navigate = useNavigate();
   const location = useLocation();
@@ -68,7 +66,6 @@ const TransactionTable = ({ user, download, stratAddress, cataAddress }) => {
   const urlType = searchParams.get('type');
   const urlDate = searchParams.get('date');
 
-  const currentMonth = dayjs().startOf('month').unix();
   const limit = 20;
   const pageSize = 10;
   const [offset, setOffset] = useState(0);

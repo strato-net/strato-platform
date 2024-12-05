@@ -969,6 +969,15 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
     return marketplaceJs.getTopSellingProducts(rawAdmin, newArgs, getOptions);
   };
 
+  contract.getStakeableProducts = async function (
+    args = {},
+    options = optionsNoChainIds
+  ) {
+    const getOptions = { ...options, app: contractName };
+
+    return inventoryJs.getAll(rawAdmin, args, getOptions);
+  };
+
   contract.getPriceHistory = async function (args, options = defaultOptions) {
     try {
       const { assetAddress, timeFilter } = args;
@@ -2067,7 +2076,7 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
       },
       options
     );
-    return balance[0].sum ? `${(balance[0].sum / Math.pow(10, 18))}` : 0;
+    return balance[0].sum ? `${balance[0].sum / Math.pow(10, 18)}` : 0;
   };
 
   contract.getStratsTransactionHistory = async function (

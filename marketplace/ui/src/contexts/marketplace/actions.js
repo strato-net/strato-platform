@@ -19,11 +19,6 @@ const actionDescriptors = {
   fetchStakeableProducts: 'fetch_stakeable_products',
   fetchStakeableProductsSuccessful: 'fetch_stakeable_products_successful',
   fetchStakeableProductsFailed: 'fetch_stakeable_products_failed',
-  fetchStakeableProductsLoggedIn: 'fetch_stakeable_products_logged_in',
-  fetchStakeableProductsLoggedInSuccessful:
-    'fetch_stakeable_products_logged_in_successful',
-  fetchStakeableProductsLoggedInFailed:
-    'fetch_stakeable_products_logged_in_failed',
   resetMessage: 'reset_message',
   setMessage: 'set_message',
   addItemToCart: 'add_item_to_cart',
@@ -361,16 +356,17 @@ const actions = {
     }
   },
 
-  fetchStakeableProducts: async (dispatch, offset, limit, originAddress) => {
+  fetchStakeableProducts: async (
+    dispatch,
+    assetAddresses
+  ) => {
     dispatch({ type: actionDescriptors.fetchStakeableProducts });
 
-    const originAddressQuery = originAddress
-      ? `&originAddress[]=${originAddress}`
-      : '';
+    const addressQuery = assetAddresses ? `assetAddresses[]=${assetAddresses}` : '';
 
     try {
       const response = await fetch(
-        `${apiUrl}/marketplace/topselling?offset=${offset}&limit=${limit}&gtField=quantity&gtValue=0${originAddressQuery}`,
+        `${apiUrl}/marketplace/stake?${addressQuery}`,
         {
           method: HTTP_METHODS.GET,
         }
@@ -384,61 +380,20 @@ const actions = {
           payload: body.data,
         });
         return;
-      }
-      dispatch({
-        type: actionDescriptors.fetchStakeableProductsFailed,
-        error: undefined,
-      });
-    } catch (err) {
-      dispatch({
-        type: actionDescriptors.fetchStakeableProductsFailed,
-        error: undefined,
-      });
-    }
-  },
-
-  fetchStakeableProductsLoggedIn: async (
-    dispatch,
-    offset,
-    limit,
-    originAddress
-  ) => {
-    dispatch({ type: actionDescriptors.fetchStakeableProductsLoggedIn });
-
-    const originAddressQuery = originAddress
-      ? `&originAddress[]=${originAddress}`
-      : '';
-
-    try {
-      const response = await fetch(
-        `${apiUrl}/marketplace/user/topselling?offset=${offset}&limit=${limit}&gtField=quantity&gtValue=0${originAddressQuery}`,
-        {
-          method: HTTP_METHODS.GET,
-        }
-      );
-
-      const body = await response.json();
-
-      if (response.status === RestStatus.OK) {
-        dispatch({
-          type: actionDescriptors.fetchStakeableProductsLoggedInSuccessful,
-          payload: body.data,
-        });
-        return;
       } else if (response.status === RestStatus.UNAUTHORIZED) {
         dispatch({
-          type: actionDescriptors.fetchStakeableProductsLoggedInFailed,
+          type: actionDescriptors.fetchStakeableProductsFailed,
           error: 'Unauthorized while fetching trending items',
         });
         window.location.href = body.error.loginUrl;
       }
       dispatch({
-        type: actionDescriptors.fetchStakeableProductsLoggedInFailed,
+        type: actionDescriptors.fetchStakeableProductsFailed,
         error: undefined,
       });
     } catch (err) {
       dispatch({
-        type: actionDescriptors.fetchStakeableProductsLoggedInFailed,
+        type: actionDescriptors.fetchStakeableProductsFailed,
         error: undefined,
       });
     }
@@ -686,7 +641,7 @@ const actions = {
       if (response.status === RestStatus.OK) {
         dispatch({
           type: actionDescriptors.fetchStratsAddressSuccessful,
-          payload: body?.data
+          payload: body?.data,
         });
         return body.data;
       }
@@ -724,10 +679,10 @@ const actions = {
         return null;
       }
 
-      if (response.status === RestStatus.OK) {        
+      if (response.status === RestStatus.OK) {
         dispatch({
           type: actionDescriptors.fetchCataAddressSuccessful,
-          payload: body?.data
+          payload: body?.data,
         });
         return body.data;
       }

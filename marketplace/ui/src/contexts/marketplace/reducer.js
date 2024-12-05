@@ -173,23 +173,6 @@ const reducer = (state, action) => {
         error: action.error,
         isStakeableProductsLoading: false,
       };
-    case actionDescriptors.fetchStakeableProductsLoggedIn:
-      return {
-        ...state,
-        isStakeableProductsLoading: true,
-      };
-    case actionDescriptors.fetchStakeableProductsLoggedInSuccessful:
-      return {
-        ...state,
-        stakeableProducts: action.payload,
-        isStakeableProductsLoading: false,
-      };
-    case actionDescriptors.fetchStakeableProductsLoggedInFailed:
-      return {
-        ...state,
-        error: action.error,
-        isStakeableProductsLoading: false,
-      };
 
     //shipping address adding
     case actionDescriptors.addShippingAddress:
@@ -279,10 +262,10 @@ const reducer = (state, action) => {
       return {
         ...state,
       };
-    case actionDescriptors.fetchStratsAddressSuccessful:      
+    case actionDescriptors.fetchStratsAddressSuccessful:
       return {
         ...state,
-        stratsAddress:action.payload
+        stratsAddress: action.payload,
       };
     case actionDescriptors.fetchStratsAddressFailed:
       return {
@@ -295,7 +278,7 @@ const reducer = (state, action) => {
     case actionDescriptors.fetchCataAddressSuccessful:
       return {
         ...state,
-        cataAddress:action.payload
+        cataAddress: action.payload,
       };
     case actionDescriptors.fetchCataAddressFailed:
       return {
