@@ -362,13 +362,11 @@ const TransactionTable = ({ user, download, stratAddress, cataAddress }) => {
       render: (data, { quantity, assetOriginAddress }) => (
         <span>
           {quantity
-            ? formattedNum(
-                assetOriginAddress === stratAddress
-                  ? (quantity / 100).toFixed(2)
-                  : assetOriginAddress === cataAddress
-                  ? (quantity / Math.pow(10, 18)).toFixed(2)
-                  : quantity
-              )
+            ? assetOriginAddress === stratAddress
+              ? (quantity / 100).toString()
+              : assetOriginAddress === cataAddress
+              ? (quantity / Math.pow(10, 18)).toString()
+              : quantity.toString()
             : '--'}
         </span>
       ),
