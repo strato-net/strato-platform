@@ -72,15 +72,19 @@ async function fetchAndSubmitEscrowAddresses(oracleContract, token) {
       continue;
     }
 
-    // Extract escrow addresses
-    const escrowAddresses = escrows.map((escrow) => escrow.address);
-    console.log(`Escrow Addresses for ${reserveName}: ${JSON.stringify(escrowAddresses)}`);
+    // Extract escrow addresses in batches of 20
+    const batchSize = 20;
+    for (let i = 0; i < escrows.length; i += batchSize) {
+      const batch = escrows.slice(i, i + batchSize);
+      const escrowAddresses = batch.map((escrow) => escrow.address);
+      console.log(`Escrow Addresses for ${reserveName} (batch ${i / batchSize + 1}): ${JSON.stringify(escrowAddresses)}`);
 
-    await distributeRewards(
+      await distributeRewards(
       token,
       { address: reserveAddress, name: reserveName },
       { escrowAddresses }
-    );
+      );
+    }
     console.log(
       `Escrow Addresses submitted for ${reserveName} at ${new Date().toISOString()}`
     );

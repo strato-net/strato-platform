@@ -27,7 +27,7 @@ const BorrowModal = ({
   productDetailPage,
 }) => {
   const {
-    isreservessLoading,
+    isReservesLoading,
     reserves,
     oracle,
     isBorrowing
@@ -46,7 +46,7 @@ const BorrowModal = ({
   const queryParams = new URLSearchParams(location.search);
 
   useEffect(() => {
-    if (reserves && inventory.data && !isreservessLoading && isStaked) {
+    if (reserves && inventory.data && !isReservesLoading && isStaked) {
       inventoryActions.getOracle(inventoryDispatch, matchedReserve.oracle);
     }
   }, [matchedReserve]);
@@ -59,14 +59,14 @@ const BorrowModal = ({
     {
       label: `Market Value`,
       description: ' The total value of your staked assets, calculated as Quantity x Oracle Price.',
-      value: `$${(oracleData.consensusPrice.toFixed(2) * inventory?.quantity).toFixed(2)}`,
+      value: `$${(inventory?.escrow?.collateralValue / 10000).toFixed(2)}`,
     },
     {
       label: 'Estimated Loan (in STRATs)',
       description: "The projected amount of STRAT tokens you can borrow against your staked RWAs.",
       value: (
         <div className="flex -mr-1">
-          {parseFloat(inventory?.maxStratsLoanAmount).toFixed(2)}
+          {parseFloat(inventory?.escrow?.maxLoanAmount/100).toFixed(2)}
           {logo}
         </div>
       ),
@@ -76,7 +76,7 @@ const BorrowModal = ({
       description: "The projected amount of USD you can borrow against your staked RWAs.",
       value: (
         <div className="flex -mr-1">
-          ${parseFloat(inventory?.maxStratsLoanAmount/100).toFixed(2)}
+          ${parseFloat(inventory?.escrow?.maxLoanAmount/10000).toFixed(2)}
         </div>
       ),
     }
@@ -86,7 +86,7 @@ const BorrowModal = ({
     {
       label: `Market price (per unit)`,
       description: 'The current price of one unit of your RWA, as determined by the oracle.',
-      value: `$${oracleData.consensusPrice.toFixed(2)}`,
+      value: `$${(inventory?.escrow?.collateralValue / 10000).toFixed(2)}`,
     },
     {
       label: 'Loan to Value Ratio',
@@ -98,7 +98,7 @@ const BorrowModal = ({
   const handleSubmit = async () => {
     const body = {
       escrowAddress: inventory?.sale,
-      borrowAmount: Math.floor(Number(parseFloat(inventory?.maxStratsLoanAmount)) * 100) / 100,
+      borrowAmount: inventory?.escrow?.maxLoanAmount,
       reserve: matchedReserve?.address,
     };
 

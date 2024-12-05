@@ -209,3 +209,8 @@ export const Reserve = {
   borrow: "/borrow",
   repay: "/repay",
 };
+
+export const Escrow = {
+  prefix: "/escrow",
+  getEscrowForAsset: "/:assetRootAddress",
+};

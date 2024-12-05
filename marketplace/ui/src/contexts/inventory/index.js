@@ -26,10 +26,12 @@ const InventoriesProvider = ({ children }) => {
    //------------------------
     isStaking: false,
     isUnstaking: false,
+    isEscrowLoading: false,
     isReservesLoading: false,
     isFetchingOracle: false,
     reserves: null,
     reserve: null,
+    escrow: null,
     isReserveLoading: false,
     oracle : null,
     isBorrowing: false,

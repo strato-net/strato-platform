@@ -57,7 +57,7 @@ const RepayModal = ({
       description: 'The amount of STRATs to pay off the loan',
       value: (
         <div className="flex -mr-1">
-          {inventory?.borrowedAmount}
+          {(inventory?.escrow?.borrowedAmount / 100).toFixed(2)}
           {logo}
         </div>
       ),
@@ -67,7 +67,7 @@ const RepayModal = ({
       description: 'The amount of USD to pay off the loan',
       value: (
         <div className="flex -mr-1">
-          {parseFloat(inventory?.borrowedAmount/100).toFixed(2)}
+          {parseFloat(inventory?.escrow?.borrowedAmount/10000).toFixed(2)}
         </div>
       ),
     },
@@ -81,7 +81,7 @@ const RepayModal = ({
     ) : null;
     const body = {
       escrow: inventory?.sale,
-      reserve: matchedReserve,
+      reserve: matchedReserve?.address,
     };
 
     const borrowed = await inventoryActions.repay(inventoryDispatch, body);

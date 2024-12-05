@@ -105,7 +105,7 @@ const ItemActions = ({
     if (
       inventory.status == ASSET_STATUS.PENDING_REDEMPTION ||
       inventory.status == ASSET_STATUS.RETIRED ||
-      inventory.maxStratsLoanAmount
+      inventory.escrow
     ) {
       return false;
     } else {
@@ -280,7 +280,7 @@ const ItemActions = ({
             className="text-[#13188A] font-semibold"
             onClick={() => showStakeModal('Unstake')}
             disabled={
-              inventory?.borrowedAmount && inventory?.borrowedAmount > 0
+              inventory?.escrow?.borrowedAmount > 0
             }
           >
             <LogoutOutlined /> Unstake
@@ -290,7 +290,7 @@ const ItemActions = ({
             className="text-[#13188A] font-semibold"
             onClick={() => showBorrowModal('Unstake')}
             disabled={
-              inventory?.borrowedAmount && inventory?.borrowedAmount > 0
+              inventory?.escrow?.borrowedAmount > 0
             }
           >
             <BankOutlined /> Borrow
@@ -300,7 +300,7 @@ const ItemActions = ({
             className="text-[#13188A] font-semibold"
             onClick={() => showRepayModal('Unstake')}
             disabled={
-              inventory?.borrowedAmount && inventory?.borrowedAmount <= 0
+              inventory?.escrow?.borrowedAmount <= 0
             }
           >
             <SolutionOutlined />
@@ -308,7 +308,7 @@ const ItemActions = ({
           </Button>
         </div>
       )}
-      {(!stakeable || (!inventory.maxStratsLoanAmount && stakeable)) && (
+      {(!stakeable || (!inventory.escrow && stakeable)) && (
         <Popover
           placement="topRight"
           open={popoverVisible[inventory.address] || false}
@@ -357,8 +357,7 @@ const ItemActions = ({
               <Button
                 type="link"
                 className={`text-[#13188A] font-semibold ${
-                  !isTokenSupported(inventory.root) ||
-                  inventory.maxStratsLoanAmount
+                  !isTokenSupported(inventory.root) || inventory.escrow
                     ? 'hidden'
                     : ''
                 }`}

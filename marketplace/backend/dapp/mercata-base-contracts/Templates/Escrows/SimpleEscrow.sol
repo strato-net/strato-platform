@@ -1,6 +1,6 @@
 pragma solidvm 11.5;
 
-import <BASE_CODE_COLLECTION>;
+import "Escrow.sol";
 
 contract SimpleEscrow is Escrow {
     constructor(
@@ -8,6 +8,6 @@ contract SimpleEscrow is Escrow {
         uint _collateralQuantity,
         decimal _assetPrice,
         uint _loanToValueRatio
-    ) SimpleEscrow(_assets, _collateralQuantity, _assetPrice, _loanToValueRatio) {
+    ) Escrow(_assets, _collateralQuantity, _assetPrice, _loanToValueRatio) {
     }
 }

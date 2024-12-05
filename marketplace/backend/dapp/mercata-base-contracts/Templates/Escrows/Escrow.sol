@@ -8,9 +8,9 @@ import "../Utils/Utils.sol";
 abstract contract Escrow is Utils {
     address public reserve;
     uint public collateralQuantity;
-    decimal public collateralValue;
+    uint public collateralValue;
     uint public maxLoanAmount;
-    decimal public totalCataRewardInDollars;
+    uint public totalCataReward;
     uint public borrowedAmount;
     uint public lastRewardTimestamp;
     bool public isActive;
@@ -32,8 +32,9 @@ abstract contract Escrow is Utils {
         assetRootAddress = address(0);
         attachAssets(_assets, _collateralQuantity, _assetPrice, _loanToValueRatio);
         require(collateralQuantity > 0, "No collateral has been staked");
-        totalCataRewardInDollars = 0.0; // Assuming the CATA reward rate is provided externally
+        totalCataReward = 0; // Assuming the CATA reward rate is provided externally
         isActive = true;
+        lastRewardTimestamp = block.timestamp;
     }
 
     function attachAssets(
@@ -76,12 +77,19 @@ abstract contract Escrow is Utils {
         _updateOnPriceChange(_assetPrice, _loanToValueRatio);
     }
 
+    function showSTRATValue(uint _value) internal returns (string) {
+        return string(_value / 100)
+             + "."
+             + string(_value % 100)
+             + " STRATS";
+    }
+
     function unlockAssets(
         uint _quantity,
         decimal _assetPrice,
         uint _loanToValueRatio
     ) public {
-        require(msg.sender == reserve, "Only the reserve can attach assets to the escrow");
+        require(msg.sender == reserve, "Only the reserve can unlock assets from the escrow");
         uint quantityToUnlock = _quantity;
         if (_quantity > collateralQuantity) {
             quantityToUnlock = collateralQuantity;
@@ -90,15 +98,16 @@ abstract contract Escrow is Utils {
 
         for (uint i = 0; i < assets.length && unallocatedQuantity > 0; i++) {
             Asset asset = Asset(assets[i]);
-
-            uint assetQuantity = asset.quantity();
-            if (assetQuantity > unallocatedQuantity) { // split
-                asset.transferOwnership(asset.owner(), unallocatedQuantity, false, 0, 0.0); // Here we want to transfer the amount we want to unlock, and retain the locked amount
-                unallocatedQuantity = 0;
-            } else {
-                asset.closeSale();
-                assets[i] = Asset(address(0));
-                unallocatedQuantity -= assetQuantity;
+            if (address(asset) != address(0)) {
+                uint assetQuantity = asset.quantity();
+                if (assetQuantity > unallocatedQuantity) { // split
+                    asset.transferOwnership(asset.owner(), unallocatedQuantity, false, 0, 0.0); // Here we want to transfer the amount we want to unlock, and retain the locked amount
+                    unallocatedQuantity = 0;
+                } else {
+                    asset.closeSale();
+                    assets[i] = Asset(address(0));
+                    unallocatedQuantity -= assetQuantity;
+                }
             }
         }
 
@@ -108,13 +117,13 @@ abstract contract Escrow is Utils {
                                                + string(quantityToUnlock)
                                                + " units would result in undercollateralization."
                                                + "\nCurrent loan balance: "
-                                               + string(borrowedAmount)
+                                               + showSTRATValue(uint(borrowedAmount))
                                                + "\nCollateral value after unstaking: "
-                                               + string(collateralValue)
+                                               + showSTRATValue(uint(collateralValue))
                                                + "\nMaximum loan amount after unstaking: "
-                                               + string(maxLoanAmount));
+                                               + showSTRATValue(uint(maxLoanAmount)));
         if (collateralQuantity == 0) {
-            closeEscrow();
+            isActive = false;
         }
     }
 
@@ -137,23 +146,18 @@ abstract contract Escrow is Utils {
     }
 
     function _updateOnPriceChange(decimal _newPrice, uint _loanToValueRatio) internal {
-        collateralValue = collateralQuantity * _newPrice.truncate(2);
-        maxLoanAmount = uint(collateralValue * decimal(_loanToValueRatio));
+        uint newCollateralValue = uint((decimal(collateralQuantity).truncate(4) * _newPrice * 10000.0000).truncate(0)); // 100 STRATs per dollar * 100 STRAT units per STRAT = 10000 
+        collateralValue = uint(newCollateralValue);
+        maxLoanAmount = uint(collateralValue * _loanToValueRatio / 100);
     }
 
-    function updateTotalCataReward(decimal _newCataReward) external {
+    function updateTotalCataReward(uint _newCataReward) external {
         require(msg.sender == reserve, "Only reserve can update CATA reward");
-        totalCataRewardInDollars += _newCataReward;
+        totalCataReward += _newCataReward;
     }
 
     function updateReserve(address _newReserve) external {
         require(msg.sender == reserve, "Only the existing reserve can update the reserve address");
         reserve = _newReserve;
     }
-
-    function closeEscrow() internal {
-        require(msg.sender == reserve, "Only the reserve can close the escrow");
-        isActive = false;
-    }
-
 }

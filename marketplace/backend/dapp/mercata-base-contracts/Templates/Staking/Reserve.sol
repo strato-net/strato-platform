@@ -5,6 +5,7 @@ import <509>;
 
 import "../Assets/Asset.sol";
 import "../Escrows/Escrow.sol";
+import "../Escrows/SimpleEscrow.sol";
 import "../Oracles/OracleService.sol";
 import "../Structs/Structs.sol";
 import "../Utils/Utils.sol";
@@ -57,29 +58,26 @@ abstract contract Reserve is Utils, Structs {
         for (uint i = 0; i < _escrowAddresses.length; i++) {
             Escrow escrow = Escrow(_escrowAddresses[i]);
             require(address(escrow).creator == this.creator, "Escrow contract " + string(address(escrow)) + " was not created by a valid Reserve contract");
-            try {
-                uint lastRewardTimestamp = escrow.lastRewardTimestamp();
-                uint delta = block.timestamp - lastRewardTimestamp;
-                escrow.updateOnPriceChange(oraclePrice, loanToValueRatio);
-                //get cata reward from escrow
-                if (delta > 0) {
-                    decimal cataReward = calculateCATAReward(escrow.collateralQuantity(), oraclePrice.truncate(2), delta); //per day 0.08, per hour 0.0033, per 10 minutes 0.00055
-                    escrow.updateTotalCataReward(cataReward * 10**18);
+            uint lastRewardTimestamp = escrow.lastRewardTimestamp();
+            uint delta = block.timestamp - lastRewardTimestamp;
+            escrow.updateOnPriceChange(oraclePrice, loanToValueRatio);
+            //get cata reward from escrow
+            if (delta > 0) {
+                decimal cataRewardDecimal = calculateCATAReward(escrow.collateralQuantity(), oraclePrice.truncate(2), delta);
+                uint cataReward = uint(cataRewardDecimal * 10**18);
+                escrow.updateTotalCataReward(cataReward);
 
-                    uint transferNumber = (uint(block.number + 16 + i) + block.timestamp) % 1000000;
+                uint transferNumber = (uint(block.number + 16 + i) + block.timestamp) % 1000000;
 
-                    // Transfer Cata from reserve to borrower
-                    cataToken.transferOwnership(
-                        escrow.borrower(),
-                        uint(cataReward * 10**18), //per day 8, per hour 0.33, per 10 minutes 0.055
-                        true,
-                        transferNumber,
-                        0.1000000000000000000 / 10**18
-                        );
-                    emit CataTransferred(address(this), escrow.borrower(), uint(cataReward * 10**18));
-                }
-            } catch {
-                revert("Rewards distribution failed for escrow contract " + string(address(escrow)));
+                // Transfer Cata from reserve to borrower
+                cataToken.transferOwnership(
+                    escrow.borrower(),
+                    cataReward,
+                    true,
+                    transferNumber,
+                    0.1000000000000000000 / 10**18
+                    );
+                emit CataTransferred(address(this), escrow.borrower(), cataReward);
             }
         }
 
@@ -99,12 +97,13 @@ abstract contract Reserve is Utils, Structs {
         Escrow escrow = Escrow(_escrowAddress);
         if (_escrowAddress == address(0)) {
             // Create Escrow with all required parameters
-            escrow = new Escrow(
+            SimpleEscrow simpleEscrow = new SimpleEscrow(
                 _assets,
                 _collateralQuantity,
                 _oraclePrice,
                 loanToValueRatio
             );
+            escrow = Escrow(simpleEscrow);
         } else {
             escrow.attachAssets(
                 _assets,
@@ -130,7 +129,7 @@ abstract contract Reserve is Utils, Structs {
         // Transfer STRATS from owner to borrower
         stratsToken.transferOwnership(
             escrow.borrower(),
-            _borrowAmount * 100,
+            _borrowAmount,
             true,
             transferNumber,
             0.0001
@@ -146,7 +145,7 @@ abstract contract Reserve is Utils, Structs {
     ) requireActive() external returns (uint) {
         require(_stratsAssetAddresses.length > 0, "Pass at least one STRATs token address");
         Escrow escrow = Escrow(_escrowAddress);
-        uint stratAmountOwed = escrow.borrowedAmount() * 100;
+        uint stratAmountOwed = escrow.borrowedAmount();
         uint stratAmountNet = stratAmountOwed;
         uint stratQuantity = 0;
         uint transferNumber = 0;

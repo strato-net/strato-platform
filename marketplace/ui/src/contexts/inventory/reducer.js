@@ -259,6 +259,24 @@ const reducer = (state, action) => {
           isReservesLoading: false
         };
     
+    case actionDescriptors.getEscrowForAsset:
+        return {
+          ...state,
+          isEscrowLoading: true
+        };
+    case actionDescriptors.getEscrowForAssetSuccessful:
+        return {
+          ...state,
+          escrow: action.payload,
+          isEscrowLoading: false
+        };
+    case actionDescriptors.getEscrowForAssetFailed:
+        return {
+          ...state,
+          error: action.error,
+          isEscrowLoading: false
+        };
+    
     case actionDescriptors.getOracle:
           return {
             ...state,

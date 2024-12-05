@@ -32,9 +32,11 @@ const StakeModal = ({
   const {
     isStaking,
     isUnstaking,
-    isreservessLoading,
+    isReservesLoading,
     isFetchingOracle,
+    isEscrowLoading,
     reserves,
+    escrow,
     oracle,
   } = useInventoryState();
   // Dispatch
@@ -43,9 +45,9 @@ const StakeModal = ({
 
   const { paymentServices } = usePaymentServiceState();
   const isLoader =
-    isStaking || isUnstaking || isFetchingOracle || isreservessLoading;
+    isStaking || isUnstaking || isFetchingOracle || isReservesLoading || isEscrowLoading;
   const isStaked =
-    inventory.maxStratsLoanAmount && inventory.maxStratsLoanAmount > 0;
+    inventory.escrow && inventory.escrow.isActive;
   const itemName = decodeURIComponent(inventory.name);
   const matchedReserve = reserves?.length
     ? reserves.find((reserve) => reserve.assetRootAddress === inventory.root)
@@ -59,10 +61,14 @@ const StakeModal = ({
   }, []);
 
   useEffect(() => {
-    if (reserves && inventory.data && !isreservessLoading && !isStaked) {
+    if (reserves && inventory.data && !isReservesLoading && !isStaked) {
       inventoryActions.getOracle(inventoryDispatch, matchedReserve?.oracle);
     }
   }, [matchedReserve]);
+
+  useEffect(() => {
+    inventoryActions.getEscrowForAsset(inventoryDispatch, inventory.root);
+  }, [inventory]);
 
   const dataForItems =
     type === 'Stake'
@@ -123,7 +129,7 @@ const StakeModal = ({
   const handleSubmit = async () => {
     if (type === 'Stake') {
       const body = {
-        escrowAddress: inventory?.escrow?.address,
+        escrowAddress: escrow ? escrow.address : '0000000000000000000000000000000000000000',
         collateralQuantity: inventory?.quantity,
         assets: inventory ? [inventory.address] : [],
         reserve: matchedReserve?.address,
