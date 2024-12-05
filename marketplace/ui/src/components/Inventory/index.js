@@ -498,14 +498,17 @@ const Inventory = ({ user }) => {
       render: (_, record) => {
         const isStrats = record.originAddress === stratsAddress;
         const isCata = record.originAddress === cataAddress;
-        const saleQuantity = record.saleQuantity
-          ? isStrats
-            ? parseFloat(record.saleQuantity * 100).toFixed(2)
+        const saleQuantity = (
+          isStrats
+            ? new BigNumber(record.saleQuantity).dividedBy(new BigNumber(100))
             : isCata
-            ? parseFloat(record.saleQuantity * 10 ** 18).toFixed(2)
-            : record.saleQuantity
-          : 0;
-        return <div className="w-24">{saleQuantity || 0}</div>;
+            ? new BigNumber(record.saleQuantity).dividedBy(
+                new BigNumber(10).pow(18)
+              )
+            : new BigNumber(record.saleQuantity)
+        ).toString();
+
+        return <div className="w-24">{saleQuantity}</div>;
       },
     },
     {
@@ -571,21 +574,23 @@ const Inventory = ({ user }) => {
     },
   ];
 
-  const Rewards = () =>{
-   return <div className='flex flex-row'>
-            <p className="flex items-center ml-4 font-semibold text-base xl:text-lg bg-[#E6F0FF] border border-[#13188A] rounded-md px-3 py-1 text-[#13188A] shadow-sm">
-              <DollarOutlined className="!text-[#13188A] mr-2 text-lg" />
-              Total Rewards (CATA):
-              <span className="ml-2 font-bold">334,133</span>
-            </p>
+  const Rewards = () => {
+    return (
+      <div className="flex flex-row">
+        <p className="flex items-center ml-4 font-semibold text-base xl:text-lg bg-[#E6F0FF] border border-[#13188A] rounded-md px-3 py-1 text-[#13188A] shadow-sm">
+          <DollarOutlined className="!text-[#13188A] mr-2 text-lg" />
+          Total Rewards (CATA):
+          <span className="ml-2 font-bold">334,133</span>
+        </p>
 
-            <p className="flex items-center ml-4 font-semibold text-base xl:text-lg bg-[#FFE6E6] border border-[#D32F2F] rounded-md px-3 py-1 text-[#D32F2F] shadow-sm">
-              <GiftOutlined className="!text-[#D32F2F] mr-2 text-lg" />
-              Est. Daily Reward (CATA):
-              <span className="ml-2 font-bold">1,321</span>
-            </p>
-            </div>
-  }
+        <p className="flex items-center ml-4 font-semibold text-base xl:text-lg bg-[#FFE6E6] border border-[#D32F2F] rounded-md px-3 py-1 text-[#D32F2F] shadow-sm">
+          <GiftOutlined className="!text-[#D32F2F] mr-2 text-lg" />
+          Est. Daily Reward (CATA):
+          <span className="ml-2 font-bold">1,321</span>
+        </p>
+      </div>
+    );
+  };
 
   return (
     <>
@@ -606,7 +611,9 @@ const Inventory = ({ user }) => {
             <p className="text-sm text-[#202020] font-medium">My Wallet</p>
           </Breadcrumb.Item>
         </Breadcrumb>
-        <div className='mt-5 ml-5 flex xl:hidden'><Rewards/></div>
+        <div className="mt-5 ml-5 flex xl:hidden">
+          <Rewards />
+        </div>
         <div className="w-full h-[160px] py-4 px-4 md:h-[96px] bg-[#F6F6F6] flex flex-col md:flex-row md:px-14 justify-between items-center mt-6 lg:mt-8">
           <div className="flex w-full items-center">
             <Button
@@ -623,7 +630,9 @@ const Inventory = ({ user }) => {
             >
               My Wallet
             </Button>
-           <div className='hidden xl:flex'><Rewards/></div>
+            <div className="hidden xl:flex">
+              <Rewards />
+            </div>
           </div>
 
           <div className="flex flex-col md:flex-row gap-3 items-center my-2 md:my-0">

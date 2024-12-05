@@ -214,7 +214,7 @@ const ItemActions = ({
 
   return (
     <div className="flex justify-center">
-      {(!stakeable || (!inventory.maxStratsLoanAmount && stakeable)) && (
+      {(!stakeable || (!inventory?.escrow && stakeable)) && (
         <>
           <Button
             type="link"
@@ -262,7 +262,7 @@ const ItemActions = ({
         </Button>
       )}
 
-      {!inventory.maxStratsLoanAmount && stakeable && (
+      {!inventory?.escrow && stakeable && (
         <Button
           type="primary"
           className="font-semibold w-1/4 flex items-center justify-center"
@@ -273,7 +273,7 @@ const ItemActions = ({
         </Button>
       )}
 
-      {inventory.maxStratsLoanAmount && stakeable && (
+      {inventory?.escrow && stakeable && (
         <div className="flex justify-center gap-3">
           <Button
             type="link"

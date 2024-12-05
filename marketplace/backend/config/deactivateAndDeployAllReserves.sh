@@ -77,7 +77,7 @@ migrate_reserve() {
   # Fetch escrows associated with the reserve
   local escrows_json=$(curl -s -H "Authorization: Bearer $access_token" \
     -H "Content-Type: application/json" \
-    "https://node1.mercata-testnet2.blockapps.net/cirrus/search/BlockApps-Mercata-Sale?data->>reserveAddress=eq.$prev_reserve&isOpen=eq.true&creator=eq.BlockApps&select=address")
+    "https://node1.mercata-testnet2.blockapps.net/cirrus/search/BlockApps-Mercata-Escrow?reserve=eq.$prev_reserve&isActive=eq.true&creator=eq.BlockApps&select=address")
 
   if ! echo "$escrows_json" | jq empty 2>/dev/null; then
     echo "Error: Failed to fetch escrows for reserve $prev_reserve."
@@ -293,6 +293,6 @@ PASSWORD="Bl0ck@pps"
 ACCESS_TOKEN=$(get_access_token "$USERNAME" "$PASSWORD")
 echo "Successfully fetched access token."
 
-deploy_reserve "8e07e5a157982e3a8db4491f674632a750e863fe" "Silver" "67242231385bf8ce692a246933e9181fea3742d7" 1.0 "$ACCESS_TOKEN"
-deploy_reserve "41e97a61f035172b9ee0a2bc8d0b3436ba7954cb" "Gold Ounce" "13dc729f78501023fba0e289c881a0144513edfe" 1.0 "$ACCESS_TOKEN"
-deploy_reserve "e0de5687060d9a70cc3e4979cffa36e4660bc5b2" "Gold Gram" "13dc729f78501023fba0e289c881a0144513edfe" 28.3495 "$ACCESS_TOKEN"
+deploy_reserve "8e07e5a157982e3a8db4491f674632a750e863fe" "Silver" "dbd6851cb62254c8ba96d03702cc1eb6426783d9" 1.0 "$ACCESS_TOKEN"
+deploy_reserve "41e97a61f035172b9ee0a2bc8d0b3436ba7954cb" "Gold Ounce" "ab5a6bc0132650b9d5d0b7176f02e491a10eed7a" 1.0 "$ACCESS_TOKEN"
+deploy_reserve "e0de5687060d9a70cc3e4979cffa36e4660bc5b2" "Gold Gram" "ab5a6bc0132650b9d5d0b7176f02e491a10eed7a" 28.3495 "$ACCESS_TOKEN"

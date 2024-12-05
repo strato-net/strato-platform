@@ -102,10 +102,10 @@ const Transaction = ({ user }) => {
             ? Number((transaction?.price * Math.pow(10, 18)).toFixed(2))
             : transaction?.price,
           quantity: isStrat
-            ? Number((transaction?.quantity / 100).toFixed(2))
+            ? (transaction?.quantity / 100).toString()
             : isCata
-            ? Number((transaction?.price / Math.pow(10, 18)).toFixed(2))
-            : transaction?.quantity,
+            ? (transaction?.quantity / Math.pow(10, 18)).toString()
+            : transaction?.quantity.toString(),
           from: transaction.from,
           to: transaction.to,
           hash: transaction.transaction_hash,

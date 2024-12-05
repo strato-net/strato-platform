@@ -159,6 +159,7 @@ const StakeModal = ({
 
     if (type === 'Unstake') {
       const body = {
+        quantity: inventory?.quantity,
         escrowAddress: inventory?.sale,
         reserve: matchedReserve?.address,
       };

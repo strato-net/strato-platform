@@ -127,10 +127,10 @@ const TransactionResponsive = ({ data, user, stratAddress, cataAddress }) => {
             },
           ];
           if (assetOriginAddress === stratAddress) {
-            quantity = (quantity / 100).toFixed(2);
+            quantity = (quantity / 100).toString();
             price = (price * 100).toFixed(2);
           } else if (assetOriginAddress === cataAddress) {
-            quantity = (quantity / Math.pow(10, 18)).toFixed(2);
+            quantity = (quantity / Math.pow(10, 18)).toString();
             price = (price * Math.pow(10, 18)).toFixed(2);
           }
 
@@ -230,7 +230,7 @@ const TransactionResponsive = ({ data, user, stratAddress, cataAddress }) => {
                     No Price Available
                   </p>
                 )}
-                <p className="text-right">Qty: {formattedNum(quantity)}</p>
+                <p className="text-right">Qty: {quantity}</p>
                 <p className="text-right">
                   {moment(block_timestamp.replace(/-/g, '/')).format('L')}
                 </p>

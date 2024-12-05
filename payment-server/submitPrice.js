@@ -47,21 +47,23 @@ async function fetchAndSubmitEscrowAddresses(oracleContract, token) {
   for (const reserve of reserves) {
     const reserveName = reserve.name;
     const reserveAddress = reserve.address;
+    console.log(`Processing reserve: ${reserveName}`);
+    console.log(`Reserve Address: ${reserveAddress}`);
 
     // Define search options for active escrows
     const searchOptions = {
       config,
       query: {
         creator: "eq.BlockApps",
-        isOpen: "eq.true",
-        "data->>reserve": "eq." + reserveAddress,
+        isActive: "eq.true",
+        reserve: "eq." + reserveAddress,
       },
     };
 
     // Fetch escrows from Cirrus
     const escrows = await rest.search(
       token,
-      { name: "BlockApps-Mercata-Sale" },
+      { name: "BlockApps-Mercata-Escrow" },
       searchOptions
     );
 
