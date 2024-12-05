@@ -157,12 +157,12 @@ async function getAll(user, options) {
  * @returns {Object} - Escrow with attached asset information, or undefined if none exists.
  * @throws {Error} - Throws if no escrows are found.
  */
-async function getEscrowForAsset(user, address, options) {
+async function getEscrowForAsset(user, queryArgs, options) {
   // Define search options for active escrows
   const searchOptions = {
     ...options,
     query: {
-      value: 'eq.' + address,
+      ...queryArgs
     },
   };
 

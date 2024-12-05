@@ -520,12 +520,12 @@ const Inventory = ({ user }) => {
       align: 'center',
       render: (text, record) => (
         <div className="pt-[7px] lg:pt-0 items-center gap-[5px]">
-          {record.price || record?.maxStratsLoanAmount ? (
+          {record.price || record?.escrow?.maxLoanAmount ? (
             <div className="flex items-center justify-center gap-2 bg-[#1548C329] p-[6px] rounded-md">
               <div className="w-[7px] h-[7px] rounded-full bg-[#119B2D]"></div>
               <p className="text-[#4D4D4D] text-[13px]">
                 {' '}
-                {record?.maxStratsLoanAmount ? 'Staked' : 'Published'}{' '}
+                {record?.escrow?.maxLoanAmount ? 'Staked' : 'Published'}{' '}
               </p>
             </div>
           ) : record.status == ASSET_STATUS.PENDING_REDEMPTION ? (

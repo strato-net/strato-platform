@@ -48,6 +48,10 @@ const actionDescriptors = {
   getReserveSuccessful: 'get_reserve_address_successful',
   getReserveFailed: 'get_reserve_address_failed',
 
+  getEscrowForAsset: 'get_escrow_for_asset',
+  getEscrowForAssetSuccessful: 'get_escrow_for_asset_successful',
+  getEscrowForAssetFailed: 'get_escrow_for_asset_failed',
+
   getOracle: 'get_oracle',
   getOracleSuccessful: 'get_oracle_successful',
   getOracleFailed: 'get_oracle_failed',
@@ -1029,6 +1033,64 @@ const actions = {
         error: 'Error while fetching the reserve Address',
       });
       actions.setMessage(dispatch, 'Error while fetching the reserve Address');
+    }
+  },
+
+  getEscrowForAsset: async (dispatch, assetRootAddress) => {
+    dispatch({ type: actionDescriptors.getEscrowForAsset });
+
+    try {
+      const response = await fetch(`${apiUrl}/escrow/${assetRootAddress}`, {
+        method: HTTP_METHODS.GET,
+        credentials: 'same-origin',
+        headers: {
+          Accept: 'application/json',
+          'Content-Type': 'application/json',
+        },
+      });
+
+      const body = await response.json();
+
+      if (response.status === RestStatus.OK) {
+        dispatch({
+          type: actionDescriptors.getEscrowForAssetSuccessful,
+          payload: body.data,
+        });
+        return true;
+      } else if (response.status === RestStatus.CONFLICT) {
+        dispatch({
+          type: actionDescriptors.getEscrowForAssetFailed,
+          error: body.error.message,
+        });
+        actions.setMessage(dispatch, body.error.message);
+        return false;
+      } else if (response.status === RestStatus.INTERNAL_SERVER_ERROR) {
+        dispatch({
+          type: actionDescriptors.getEscrowForAssetFailed,
+          error: 'Error while fetching the escrow',
+        });
+        actions.setMessage(dispatch, 'Errorwhile fetching the escrow');
+        return false;
+      } else if (response.status === RestStatus.UNAUTHORIZED) {
+        dispatch({
+          type: actionDescriptors.getEscrowForAssetFailed,
+          error: 'Unauthorized while fetching the escrow',
+        });
+        window.location.href = body.error.loginUrl;
+      }
+
+      dispatch({
+        type: actionDescriptors.getEscrowForAssetFailed,
+        error: body.error,
+      });
+      actions.setMessage(dispatch, body.error);
+      return false;
+    } catch (err) {
+      dispatch({
+        type: actionDescriptors.getEscrowForAssetFailed,
+        error: 'Error while fetching the escrow Address',
+      });
+      actions.setMessage(dispatch, 'Error while fetching the escrow Address');
     }
   },
 

@@ -57,7 +57,7 @@ const RepayModal = ({
       description: 'The amount of STRATs to pay off the loan',
       value: (
         <div className="flex -mr-1">
-          {inventory?.borrowedAmount}
+          {inventory?.escrow?.borrowedAmount}
           {logo}
         </div>
       ),
@@ -67,7 +67,7 @@ const RepayModal = ({
       description: 'The amount of USD to pay off the loan',
       value: (
         <div className="flex -mr-1">
-          {parseFloat(inventory?.borrowedAmount/100).toFixed(2)}
+          {parseFloat(inventory?.escrow?.borrowedAmount/100).toFixed(2)}
         </div>
       ),
     },

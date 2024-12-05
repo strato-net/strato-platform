@@ -43,6 +43,7 @@ import marketplaceJs from '/dapp/marketplace/marketplace.js';
 import paymentServiceJs from '/dapp/payments/paymentService';
 import redemptionServiceJs from '/dapp/redemptions/redemptionService';
 import reserveJs from '/dapp/reserve/reserve';
+import escrowJs from '/dapp/escrow/escrow';
 
 import strats from '../strats/strats';
 
@@ -925,7 +926,7 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
       ...args,
       notEqualsField: ['ownerCommonName', 'sale'],
       notEqualsValue: [
-        [userCommonName, ...constants.baUserNames],
+        [inventory.addressuserCommonName, ...constants.baUserNames],
         constants.zeroAddress,
       ],
     };
@@ -2097,6 +2098,16 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
     return await reserveJs.getAll(rawAdmin, options);
   };
 
+  contract.getEscrowForAsset = async function (args, options = defaultOptions) {
+    const { assetRootAddress } = args;
+    const queryArgs = { 
+      select: '*,BlockApps-Mercata-Asset(*)',
+      ['BlockApps-Mercata-Asset.root']: `eq.${assetRootAddress}`,
+      ['BlockApps-Mercata-Asset.ownerCommonName']: `eq.${userCommonName}`,
+    };
+    return await escrowJs.getEscrowForAsset(rawAdmin, queryArgs, options);
+  };
+
   contract.oraclePrice = async function (args, options = defaultOptions) {
     return await reserveJs.oraclePrice(rawAdmin, args, options);
   };
@@ -2114,21 +2125,18 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
   };
 
   contract.repay = async function (args, options = defaultOptions) {
-    const { stratsPaymentService, escrow, reserve } = args;
+    const { escrow, reserve } = args;
 
     // Fetch user's STRATS asset origin address
     const stratsOriginAddress = await STRATSJs.getStratsAddress();
 
-    // Retrieve sales data associated with the escrow address
-    const salesData = await saleJs.getAll(
+    // Retrieve escrow data associated with the escrow address
+    const escrowData = await escrowJs.get(
       rawAdmin,
-      { address: escrow },
+      escrow,
       options
     );
-    const orderTotal = salesData.reduce(
-      (total, sale) => total + parseFloat(sale?.data?.maxStratsLoanAmount),
-      0
-    );
+    const orderTotal = escrowData ? escrowData.borrowedAmount : 0;
 
     // Get user's active STRATS assets with non-zero quantities
     const userStratsAssets = await inventoryJs.getAll(
@@ -2158,13 +2166,14 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
       { addressesToUse: [], accumulatedTotal: 0 }
     );
 
+    // Allow partial repayment of loans
     // Check if accumulated total meets the order requirement
-    if (accumulatedTotal < orderTotal) {
-      throw new rest.RestError(
-        RestStatus.BAD_REQUEST,
-        'Insufficient STRATS balance to complete the purchase.'
-      );
-    }
+    // if (accumulatedTotal < orderTotal) {
+    //   throw new rest.RestError(
+    //     RestStatus.BAD_REQUEST,
+    //     'Insufficient STRATS balance to repay the loan.'
+    //   );
+    // }
 
     // Proceed with unstake if sufficient assets are accumulated
     return await reserveJs.repay(

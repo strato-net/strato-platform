@@ -419,19 +419,20 @@ async function get(user, args, options) {
     newOptions
   );
 
+  const escrow = await escrowJs.getEscrowForAsset(user, { value: `eq.${inventory.address}` }, options);
+
   if (sale) {
     inventory = {
       ...inventory,
       price: sale.price,
       saleAddress: sale.address,
       saleQuantity: sale.quantity,
-      maxStratsLoanAmount: sale?.data?.maxStratsLoanAmount,
-      borrowedAmount: sale?.data?.borrowedAmount,
       paymentServices: sale
         ? sale['BlockApps-Mercata-Sale-paymentServices']
           ? sale['BlockApps-Mercata-Sale-paymentServices']
           : null
         : null,
+      escrow
     };
   }
 
@@ -566,6 +567,11 @@ async function getAll(admin, args = {}, defaultOptions) {
     if (inventories) {
       for (let i=0; i < inventories.length; i++) {
         const inventory = inventories[i];
+        const escrow = await escrowJs.getEscrowForAsset(
+          admin,
+          { value: `eq.${inventory.address}` },
+          options
+        );
         if (
           inventory['BlockApps-Mercata-Sale'] &&
           inventory['BlockApps-Mercata-Sale'].length > 0
@@ -599,8 +605,6 @@ async function getAll(admin, args = {}, defaultOptions) {
                 price: sales[0]?.price,
                 saleAddress: sales[0]?.address,
                 saleQuantity: sales[0]?.quantity,
-                maxStratsLoanAmount: sales[0]?.data?.maxStratsLoanAmount,
-                borrowedAmount: sales[0]?.data?.borrowedAmount,
                 saleDate: sales[0]?.block_timestamp,
                 totalLockedQuantity: sales[0]?.totalLockedQuantity,
                 paymentServices: sales[0]
@@ -609,25 +613,16 @@ async function getAll(admin, args = {}, defaultOptions) {
                     : null
                   : null,
                 'BlockApps-Mercata-Sale': undefined, // Removing the nested sale data to avoid redundancy
+                escrow,
               });
             }
           } else {
-            let escrow;
-            if (sales.length === 0 || sales.price === null || sales.price === undefined) {
-              escrow = await escrowJs.getEscrowForAsset(
-                admin,
-                inventory.address,
-                options
-              );
-            }
             // Just combine the data if userProfile is not present
             finalInventory.push({
               ...inventory,
               price: sales[0]?.price,
               saleAddress: sales[0]?.address,
               saleQuantity: sales[0]?.quantity,
-              maxStratsLoanAmount: sales[0]?.data?.maxStratsLoanAmount,
-              borrowedAmount: sales[0]?.data?.borrowedAmount,
               saleDate: sales[0]?.block_timestamp,
               totalLockedQuantity: sales[0]?.totalLockedQuantity,
               paymentServices: sales[0]
@@ -640,11 +635,6 @@ async function getAll(admin, args = {}, defaultOptions) {
             });
           }
         } else if (isMarketplaceSearch && isNullPriceRange) {
-          const escrow = await escrowJs.getEscrowForAsset(
-                admin,
-                inventory.address,
-                options
-              );
           if (!escrow) {
             finalInventory.push({
               ...inventory,
@@ -657,11 +647,6 @@ async function getAll(admin, args = {}, defaultOptions) {
             });
           }
         } else {
-          const escrow = await escrowJs.getEscrowForAsset(
-                admin,
-                inventory.address,
-                options
-              );
           finalInventory.push({ escrow, ...inventory});
         }
       }

@@ -252,7 +252,7 @@ const InventoryCard = ({
     if (
       inventory.status == ASSET_STATUS.PENDING_REDEMPTION ||
       inventory.status == ASSET_STATUS.RETIRED ||
-      inventory.maxStratsLoanAmount
+      inventory.escrow
     ) {
       return false;
     } else {
@@ -339,7 +339,7 @@ const InventoryCard = ({
             </div>
           </div>
           <div className="mt-3 grid grid-cols-3 gap-1 w-full">
-            {(!stakeable || (!inventory.maxStratsLoanAmount && stakeable)) && (
+            {(!stakeable || (!inventory.escrow && stakeable)) && (
               <>
                 <Button
                   type="link"
@@ -389,7 +389,7 @@ const InventoryCard = ({
               </Button>
             )}
 
-            {!inventory.maxStratsLoanAmount && stakeable && (
+            {!inventory.escrow && stakeable && (
               <Button
                 type="primary"
                 className="font-semibold w-full flex items-center justify-center"
@@ -400,14 +400,14 @@ const InventoryCard = ({
               </Button>
             )}
 
-            {inventory.maxStratsLoanAmount && stakeable && (
+            {inventory.escrow && stakeable && (
               <>
                 <Button
                   type="link"
                   className="text-[#13188A]  text-left px-0 font-semibold text-sm h-6"
                   onClick={() => showStakeModal('Unstake')}
                   disabled={
-                    inventory?.borrowedAmount && inventory?.borrowedAmount > 0
+                    inventory?.escrow?.borrowedAmount && inventory?.escrow?.borrowedAmount > 0
                   }
                 >
                   <LogoutOutlined /> Unstake
@@ -417,7 +417,7 @@ const InventoryCard = ({
                   className="text-[#13188A]  text-left px-0 font-semibold text-sm h-6"
                   onClick={() => showBorrowModal('Unstake')}
                   disabled={
-                    inventory?.borrowedAmount && inventory?.borrowedAmount > 0
+                    inventory?.escrow?.borrowedAmount && inventory?.escrow?.borrowedAmount > 0
                   }
                 >
                   <BankOutlined /> Borrow
@@ -427,7 +427,7 @@ const InventoryCard = ({
                   className="text-[#13188A]  text-left px-0 font-semibold text-sm h-6"
                   onClick={() => showRepayModal('Unstake')}
                   disabled={
-                    inventory?.borrowedAmount && inventory?.borrowedAmount <= 0
+                    inventory?.escrow?.borrowedAmount && inventory?.escrow?.borrowedAmount <= 0
                   }
                 >
                   <SolutionOutlined />
@@ -435,7 +435,7 @@ const InventoryCard = ({
                 </Button>
               </>
             )}
-            {(!stakeable || (!inventory.maxStratsLoanAmount && stakeable)) && (
+            {(!stakeable || (!inventory.escrow && stakeable)) && (
               <>
                 {stakeable && (
                   <Button
@@ -480,7 +480,7 @@ const InventoryCard = ({
                   type="link"
                   className={`text-[#13188A]  text-left px-0 font-semibold text-sm h-6 ${
                     !isTokenSupported(inventory.root) ||
-                    inventory.maxStratsLoanAmount
+                    inventory.escrow
                       ? 'hidden'
                       : ''
                   }`}
@@ -514,11 +514,11 @@ const InventoryCard = ({
           </div>
 
           <div className="pt-[7px] lg:pt-0 items-center gap-[5px]">
-            {inventory.price || inventory?.maxStratsLoanAmount ? (
+            {inventory.price || inventory?.escrow ? (
               <div className="flex items-center justify-center gap-2 bg-[#1548C329] p-[6px] rounded-md">
                 <div className="w-[7px] h-[7px] rounded-full bg-[#119B2D]"></div>
                 <p className="text-[#4D4D4D] text-[13px]">
-                  {inventory?.maxStratsLoanAmount ? 'Staked' : 'Published'}
+                  {inventory?.escrow ? 'Staked' : 'Published'}
                 </p>
               </div>
             ) : inventory.status == ASSET_STATUS.PENDING_REDEMPTION ? (

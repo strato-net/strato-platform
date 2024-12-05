@@ -118,8 +118,8 @@ const ProductDetails = ({ user, users }) => {
 
   // Stakeable
   const isStaked =
-    inventoryDetails?.maxStratsLoanAmount &&
-    inventoryDetails?.maxStratsLoanAmount > 0;
+    inventoryDetails?.escrow &&
+    inventoryDetails?.escrow?.collateralQuantity > 0;
   const isStakeable =
     inventoryDetails?.root &&
     reserves &&
@@ -156,7 +156,7 @@ const ProductDetails = ({ user, users }) => {
     if (
       inventoryDetails.status == ASSET_STATUS.PENDING_REDEMPTION ||
       inventoryDetails.status == ASSET_STATUS.RETIRED ||
-      inventoryDetails.maxStratsLoanAmount
+      inventoryDetails.escrow
     ) {
       return false;
     } else {
@@ -657,7 +657,7 @@ const ProductDetails = ({ user, users }) => {
                               <>
                                 $
                                 {isStaked
-                                  ? (details.maxStratsLoanAmount / 100).toFixed(
+                                  ? (details.escrow?.maxLoanAmount / 100).toFixed(
                                       2
                                     )
                                   : adjustedPrice}
@@ -665,12 +665,12 @@ const ProductDetails = ({ user, users }) => {
                                   <b>
                                     (
                                     {isStaked
-                                      ? details.maxStratsLoanAmount
+                                      ? details.escrow?.maxLoanAmount
                                       : (
                                           adjustedPrice * STRATS_CONVERSION
                                         ).toFixed(0)}{' '}
                                     {(isStaked
-                                      ? details.maxStratsLoanAmount
+                                      ? details.escrow?.maxLoanAmount
                                       : (
                                           adjustedPrice * STRATS_CONVERSION
                                         ).toFixed(0)) == 1
@@ -882,8 +882,8 @@ const ProductDetails = ({ user, users }) => {
                           (!isStaked &&
                             (inventoryDetails.price || !isActive())) ||
                           (isStaked &&
-                            inventoryDetails?.borrowedAmount &&
-                            inventoryDetails?.borrowedAmount > 0)
+                            inventoryDetails?.escrow?.borrowedAmount &&
+                            inventoryDetails?.escrow?.borrowedAmount > 0)
                         }
                       >
                         {isStaked ? (
@@ -903,8 +903,8 @@ const ProductDetails = ({ user, users }) => {
                           className="bg-[#13188A] text-white w-48 h-10"
                           onClick={() => showBorrowModal()}
                           disabled={
-                            inventoryDetails?.borrowedAmount &&
-                            inventoryDetails?.borrowedAmount > 0
+                            inventoryDetails?.escrow?.borrowedAmount &&
+                            inventoryDetails?.escrow?.borrowedAmount > 0
                           }
                         >
                           <BankOutlined />
@@ -914,8 +914,8 @@ const ProductDetails = ({ user, users }) => {
                           className="bg-[#13188A] text-white w-48 h-10"
                           onClick={() => showRepayModal()}
                           disabled={
-                            inventoryDetails?.borrowedAmount &&
-                            inventoryDetails?.borrowedAmount <= 0
+                            inventoryDetails?.escrow?.borrowedAmount &&
+                            inventoryDetails?.escrow?.borrowedAmount <= 0
                           }
                         >
                           <SolutionOutlined />

@@ -28,6 +28,7 @@ import userActivity from './UserActivity'
 import redemption from './Redemption'
 import transaction from "./Transactions"
 import reserve from './Reserve'
+import escrow from './Escrow'
 
 import {
   Authentication,
@@ -54,7 +55,8 @@ import {
   UserActivity,
   Redemption,
   Transaction,
-  Reserve
+  Reserve,
+  Escrow,
 } from './endpoints'
 
 const router = express.Router()
@@ -84,6 +86,7 @@ router.use(UserActivity.prefix, userActivity)
 router.use(Redemption.prefix, redemption)
 router.use(Transaction.prefix, transaction)
 router.use(Reserve.prefix, reserve)
+router.use(Escrow.prefix, escrow)
 
 
 router.get(`/health`, (req, res) => {
