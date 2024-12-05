@@ -174,7 +174,7 @@ const Stake = ({ user }) => {
         );
       },
     },
-    {
+    /*{
       title: 'Price',
       align: 'center',
       render: (_, record) => {
@@ -202,7 +202,7 @@ const Stake = ({ user }) => {
           </div>
         );
       },
-    },
+    },*/
     {
       title: 'Owned',
       align: 'center',
