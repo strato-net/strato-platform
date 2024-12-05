@@ -13,4 +13,11 @@ router.get(
   EscrowController.getEscrowForAsset
 );
 
+router.get(
+  Escrow.getCataRewards,
+  authHandler.authorizeRequest(true),
+  loadDapp,
+  EscrowController.getCataRewards
+);
+
 export default router;

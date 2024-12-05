@@ -210,12 +210,65 @@ async function searchEscrow(user, queryArgs, options) {
   return get(user, assets[0].address, options);
 }
 
+
+// Get Total CATA Rewards for a user
+async function userCataRewards(user, userCommonName, options) {
+  const searchOptionsTotalCataReward = {
+    ...options,
+    query: {
+      borrower: `eq.${userCommonName}`,
+      select: `totalCataReward.sum()`,
+    },
+  };
+
+  const totalCataRewardResult = await rest.search(
+    user,
+    { name: contractName },
+    searchOptionsTotalCataReward
+  );
+
+  if (!totalCataRewardResult || totalCataRewardResult.length === 0) {
+    return undefined;
+  }
+
+  const totalCataReward = totalCataRewardResult[0].sum
+    ? totalCataRewardResult[0].sum / 10 ** 18
+    : 0;
+
+  const searchOptionsDailyCataReward = {
+    ...options,
+    query: {
+      borrower: `eq.${userCommonName}`,
+      isActive: 'eq.true',
+      select: `collateralValue.sum()`,
+    },
+  };
+
+  const dailyCataRewardResult = await rest.search(
+    user,
+    { name: contractName },
+    searchOptionsDailyCataReward
+  );
+
+  if (!dailyCataRewardResult || dailyCataRewardResult.length === 0) {
+    return undefined;
+  }
+
+  const totalCurrentColleteralValue = dailyCataRewardResult[0].sum
+    ? dailyCataRewardResult[0].sum
+    : 0;
+  const dailyCataReward = totalCurrentColleteralValue / 10000 / 365;
+
+  return { totalCataReward, dailyCataReward };
+}
+
 export default {
   contractName,
   get,
   getAll,
   getEscrowForAsset,
   searchEscrow,
+  userCataRewards,
   marshalIn,
   marshalOut,
 };

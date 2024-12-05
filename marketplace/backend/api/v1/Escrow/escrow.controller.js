@@ -20,6 +20,23 @@ class EscrowController {
     }
   }
 
+  // Get CATA rewards for a user
+  static async getCataRewards(req, res, next) {
+    try {
+      const { dapp, params } = req;
+      const { userCommonName } = params;
+
+      // Validate address presence and type
+      EscrowController.validateGetCataRewardsArgs({ userCommonName });
+
+      const result = await dapp.userCataRewards({userCommonName});
+      rest.response.status200(res, result);
+      next();
+    } catch (e) {
+      next(e);
+    }
+  }
+
   // ----------------------- ARGUMENT VALIDATION ------------------------
   static validateGetForAssetArgs(args) {
     const schema = Joi.object({
@@ -29,6 +46,16 @@ class EscrowController {
       }),
     });
     EscrowController.validateArgs(args, schema, 'GetForAsset');
+  }
+
+  static validateGetCataRewardsArgs(args) {
+    const schema = Joi.object({
+      userCommonName: Joi.string().required().messages({
+        'any.required': 'userCommonName is required and must be a string.',
+        'string.base': 'userCommonName must be a valid string.',
+      }),
+    });
+    EscrowController.validateArgs(args, schema, 'GetRewards');
   }
 
   static validateArgs(args, schema, action) {
