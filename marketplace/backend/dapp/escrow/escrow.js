@@ -58,7 +58,7 @@ async function get(user, address, options) {
     ...options,
     query: {
       select: `*,${assetsArrayName}(*)`,
-      // isActive: 'eq.true',
+      isActive: 'eq.true',
       address: 'eq.' + address,
     },
   };

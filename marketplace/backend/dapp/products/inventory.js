@@ -483,7 +483,6 @@ async function getAll(admin, args = {}, defaultOptions) {
       },
       options
     );
-    sales = sales.filter((sale) => !sale.saleType || sale.saleType !== 'Escrow'); // Only relevant for testnet2
     const trendingAssetAddresses = sales.map((sale) => sale.assetToBeSold);
 
     // Fetch the inventories matching the sales
