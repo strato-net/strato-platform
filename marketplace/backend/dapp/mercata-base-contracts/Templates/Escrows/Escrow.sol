@@ -98,15 +98,16 @@ abstract contract Escrow is Utils {
 
         for (uint i = 0; i < assets.length && unallocatedQuantity > 0; i++) {
             Asset asset = Asset(assets[i]);
-
-            uint assetQuantity = asset.quantity();
-            if (assetQuantity > unallocatedQuantity) { // split
-                asset.transferOwnership(asset.owner(), unallocatedQuantity, false, 0, 0.0); // Here we want to transfer the amount we want to unlock, and retain the locked amount
-                unallocatedQuantity = 0;
-            } else {
-                asset.closeSale();
-                assets[i] = Asset(address(0));
-                unallocatedQuantity -= assetQuantity;
+            if (address(asset) != address(0)) {
+                uint assetQuantity = asset.quantity();
+                if (assetQuantity > unallocatedQuantity) { // split
+                    asset.transferOwnership(asset.owner(), unallocatedQuantity, false, 0, 0.0); // Here we want to transfer the amount we want to unlock, and retain the locked amount
+                    unallocatedQuantity = 0;
+                } else {
+                    asset.closeSale();
+                    assets[i] = Asset(address(0));
+                    unallocatedQuantity -= assetQuantity;
+                }
             }
         }
 
