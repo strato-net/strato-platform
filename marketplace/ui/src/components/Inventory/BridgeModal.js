@@ -6,6 +6,7 @@ import {
   useInventoryState,
 } from '../../contexts/inventory';
 import { useAuthenticateState } from '../../contexts/authentication';
+import { useLocation } from 'react-router-dom';
 
 const BridgeModal = ({
   open,
@@ -15,8 +16,11 @@ const BridgeModal = ({
   debouncedSearchTerm,
   limit,
   offset,
+  reserves
 }) => {
   const [data, setData] = useState([inventory]);
+  const location = useLocation();
+  const queryParams = new URLSearchParams(location.search);
   const [quantity, setQuantity] = useState(1);
   const [userAddress, setUserAddress] = useState('');
   const inventoryDispatch = useInventoryDispatch();
@@ -83,7 +87,8 @@ const BridgeModal = ({
           limit,
           offset,
           debouncedSearchTerm,
-          category && category !== 'All' ? category : undefined
+          category && category !== 'All' ? category : undefined,
+          queryParams.get('st') === 'true' ? reserves.map(reserve => reserve.assetRootAddress) : ''
         );
         await actions.fetchInventoryForUser(
           inventoryDispatch,

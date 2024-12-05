@@ -16,6 +16,9 @@ const actionDescriptors = {
     'fetch_top_selling_products_logged_in_successful',
   fetchTopSellingProductsLoggedInFailed:
     'fetch_top_selling_products_logged_in_failed',
+  fetchStakeableProducts: 'fetch_stakeable_products',
+  fetchStakeableProductsSuccessful: 'fetch_stakeable_products_successful',
+  fetchStakeableProductsFailed: 'fetch_stakeable_products_failed',
   resetMessage: 'reset_message',
   setMessage: 'set_message',
   addItemToCart: 'add_item_to_cart',
@@ -45,9 +48,15 @@ const actionDescriptors = {
   fetchStratsBalance: 'fetch_strats_balance',
   fetchStratsBalanceSuccessful: 'fetch_strats_balance_successful',
   fetchStratsBalanceFailed: 'fetch_strats_balance_failed',
+  fetchCataBalance: 'fetch_cata_balance',
+  fetchCataBalanceSuccessful: 'fetch_cata_balance_successful',
+  fetchCataBalanceFailed: 'fetch_cata_balance_failed',
   fetchStratsAddress: 'fetch_strats_address',
   fetchStratsAddressSuccessful: 'fetch_strats_address_successful',
   fetchStratsAddressFailed: 'fetch_strats_address_failed',
+  fetchCataAddress: 'fetch_cata_address',
+  fetchCataAddressSuccessful: 'fetch_cata_address_successful',
+  fetchCataAddressFailed: 'fetch_cata_address_failed',
   fetchStratsTransactionHistory: 'fetch_strats_transaction_history',
   fetchStratsTransactionHistorySuccessful:
     'fetch_strats_transaction_history_successful',
@@ -347,6 +356,49 @@ const actions = {
     }
   },
 
+  fetchStakeableProducts: async (
+    dispatch,
+    assetAddresses
+  ) => {
+    dispatch({ type: actionDescriptors.fetchStakeableProducts });
+
+    const addressQuery = assetAddresses ? `assetAddresses[]=${assetAddresses}` : '';
+
+    try {
+      const response = await fetch(
+        `${apiUrl}/marketplace/stake?${addressQuery}`,
+        {
+          method: HTTP_METHODS.GET,
+        }
+      );
+
+      const body = await response.json();
+
+      if (response.status === RestStatus.OK) {
+        dispatch({
+          type: actionDescriptors.fetchStakeableProductsSuccessful,
+          payload: body.data,
+        });
+        return;
+      } else if (response.status === RestStatus.UNAUTHORIZED) {
+        dispatch({
+          type: actionDescriptors.fetchStakeableProductsFailed,
+          error: 'Unauthorized while fetching trending items',
+        });
+        window.location.href = body.error.loginUrl;
+      }
+      dispatch({
+        type: actionDescriptors.fetchStakeableProductsFailed,
+        error: undefined,
+      });
+    } catch (err) {
+      dispatch({
+        type: actionDescriptors.fetchStakeableProductsFailed,
+        error: undefined,
+      });
+    }
+  },
+
   addShippingAddress: async (dispatch, payload) => {
     dispatch({ type: actionDescriptors.addShippingAddress });
     try {
@@ -531,6 +583,41 @@ const actions = {
       });
     }
   },
+  fetchCataBalance: async (dispatch) => {
+    dispatch({ type: actionDescriptors.fetchCataBalance });
+    try {
+      let response = await fetch(`${apiUrl}/marketplace/cata`, {
+        method: HTTP_METHODS.GET,
+        credentials: 'same-origin',
+      });
+      const body = await response.json();
+      if (
+        response.status === RestStatus.UNAUTHORIZED ||
+        response.status === RestStatus.FORBIDDEN
+      ) {
+        dispatch({
+          type: actionDescriptors.fetchCataBalanceFailed,
+          payload: 'Error while fetching CATA',
+        });
+      }
+      if (response.status === RestStatus.OK) {
+        dispatch({
+          type: actionDescriptors.fetchCataBalanceSuccessful,
+          payload: body.data,
+        });
+        return;
+      }
+      dispatch({
+        type: actionDescriptors.fetchCataBalanceFailed,
+        payload: 'Error while fetching CATA',
+      });
+    } catch (err) {
+      dispatch({
+        type: actionDescriptors.fetchCataBalanceFailed,
+        payload: 'Error while fetching CATA',
+      });
+    }
+  },
   fetchStratsAddress: async (dispatch) => {
     dispatch({ type: actionDescriptors.fetchStratsAddress });
     try {
@@ -554,6 +641,7 @@ const actions = {
       if (response.status === RestStatus.OK) {
         dispatch({
           type: actionDescriptors.fetchStratsAddressSuccessful,
+          payload: body?.data,
         });
         return body.data;
       }
@@ -567,6 +655,47 @@ const actions = {
       dispatch({
         type: actionDescriptors.fetchStratsAddressFailed,
         payload: 'Error while fetching STRATS address',
+      });
+      return null;
+    }
+  },
+  fetchCataAddress: async (dispatch) => {
+    dispatch({ type: actionDescriptors.fetchCataAddress });
+    try {
+      let response = await fetch(`${apiUrl}/marketplace/cata/address`, {
+        method: HTTP_METHODS.GET,
+        credentials: 'same-origin',
+      });
+
+      const body = await response.json();
+      if (
+        response.status === RestStatus.UNAUTHORIZED ||
+        response.status === RestStatus.FORBIDDEN
+      ) {
+        dispatch({
+          type: actionDescriptors.fetchCataAddressFailed,
+          payload: 'Error while fetching CATA address',
+        });
+        return null;
+      }
+
+      if (response.status === RestStatus.OK) {
+        dispatch({
+          type: actionDescriptors.fetchCataAddressSuccessful,
+          payload: body?.data,
+        });
+        return body.data;
+      }
+
+      dispatch({
+        type: actionDescriptors.fetchCataAddressFailed,
+        payload: 'Error while fetching CATA address',
+      });
+      return null;
+    } catch (err) {
+      dispatch({
+        type: actionDescriptors.fetchCataAddressFailed,
+        payload: 'Error while fetching CATA address',
       });
       return null;
     }

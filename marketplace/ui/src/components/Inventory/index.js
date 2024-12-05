@@ -10,8 +10,14 @@ import {
   Input,
   Table,
   Checkbox,
+  Tooltip,
 } from 'antd';
-import { CheckCircleOutlined } from '@ant-design/icons';
+import {
+  CheckCircleOutlined,
+  DollarOutlined,
+  GiftOutlined,
+} from '@ant-design/icons';
+import BigNumber from 'bignumber.js';
 import image_placeholder from '../../images/resources/image_placeholder.png';
 import CreateInventoryModal from './CreateInventoryModal';
 import { actions as categoryActions } from '../../contexts/category/actions';
@@ -32,6 +38,11 @@ import { useItemDispatch, useItemState } from '../../contexts/item';
 import { actions as itemActions } from '../../contexts/item/actions';
 import { actions as redemptionActions } from '../../contexts/redemption/actions';
 import { actions as issuerStatusActions } from '../../contexts/issuerStatus/actions';
+import { actions as marketplaceActions } from '../../contexts/marketplace/actions';
+import {
+  useMarketplaceDispatch,
+  useMarketplaceState,
+} from '../../contexts/marketplace';
 import {
   useRedemptionDispatch,
   useRedemptionState,
@@ -42,7 +53,7 @@ import {
 } from '../../contexts/issuerStatus';
 import ClickableCell from '../ClickableCell';
 import routes from '../../helpers/routes';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuthenticateState } from '../../contexts/authentication';
 import HelmetComponent from '../Helmet/HelmetComponent';
 import { SEO } from '../../helpers/seoConstant';
@@ -57,6 +68,7 @@ import InventoryCard from './InventoryCard';
 import './index.css';
 
 const { Option } = Select;
+const StratsIcon = <img src={Images.strat} alt="STRATS" className="w-4 h-4" />;
 
 const Inventory = ({ user }) => {
   const [open, setOpen] = useState(false);
@@ -75,6 +87,14 @@ const Inventory = ({ user }) => {
   const navigate = useNavigate();
   const naviroute = routes.InventoryDetail.url;
   let { hasChecked, isAuthenticated, loginUrl } = useAuthenticateState();
+  const { stratsAddress, cataAddress } = useMarketplaceState();
+  const formatter = new Intl.NumberFormat('en-US');
+  const formattedNum = (num) => formatter.format(num);
+
+  const location = useLocation();
+  const queryParams = new URLSearchParams(location.search);
+  const searchQueryValue = queryParams.get('st') || '';
+  const [showStakeable, setShowStakeable] = useState(searchQueryValue);
 
   const categoryDispatch = useCategoryDispatch();
   const { categorys } = useCategoryState();
@@ -89,7 +109,10 @@ const Inventory = ({ user }) => {
     isUserInventoriesLoading,
     supportedTokens,
     isFetchingTokens,
+    isReservesLoading,
+    reserves,
   } = useInventoryState();
+
   const {
     paymentServices,
     arePaymentServicesLoading,
@@ -129,6 +152,8 @@ const Inventory = ({ user }) => {
         10,
         0
       );
+
+      setIssuerStatus(user?.issuerStatus);
     }
   }, [paymentServiceDispatch, user]);
 
@@ -139,38 +164,54 @@ const Inventory = ({ user }) => {
     useRedemptionState();
   const [issuerStatus, setIssuerStatus] = useState(user?.issuerStatus);
 
-  useEffect(() => {
-    setIssuerStatus(user?.issuerStatus);
-  }, [user]);
-
   const issuerStatusDispatch = useIssuerStatusDispatch();
   const { message: issuerStatusMsg, success: issuerStatusSuccess } =
     useIssuerStatusState();
 
   useEffect(() => {
+    actions.getAllReserve(dispatch);
+    actions.fetchSupportedTokens(dispatch);
     categoryActions.fetchCategories(categoryDispatch);
-  }, [categoryDispatch]);
+  }, []);
 
   useEffect(() => {
-    if (showPublished) {
-      actions.fetchInventoryForUser(
-        dispatch,
-        limit,
-        offset,
-        debouncedSearchTerm,
-        category && category !== 'All' ? category : undefined
-      );
-    } else {
-      actions.fetchInventory(
-        dispatch,
-        limit,
-        offset,
-        debouncedSearchTerm,
-        category && category !== 'All' ? category : undefined
-      );
+    if (reserves) {
+      if (showPublished) {
+        actions.fetchInventoryForUser(
+          dispatch,
+          limit,
+          offset,
+          debouncedSearchTerm,
+          category && category !== 'All' ? category : undefined,
+          queryParams.get('st') === 'true'
+            ? reserves.map((reserve) => reserve.assetRootAddress)
+            : ''
+        );
+      } else {
+        actions.fetchInventory(
+          dispatch,
+          limit,
+          offset,
+          debouncedSearchTerm,
+          category && category !== 'All' ? category : undefined,
+          queryParams.get('st') === 'true'
+            ? reserves.map((reserve) => reserve.assetRootAddress)
+            : ''
+        );
+      }
+      setShowStakeable(queryParams.get('st'));
     }
-    actions.fetchSupportedTokens(dispatch);
-  }, [dispatch, limit, offset, debouncedSearchTerm, category, showPublished]);
+  }, [
+    dispatch,
+    limit,
+    offset,
+    debouncedSearchTerm,
+    category,
+    showPublished,
+    showStakeable,
+    reserves,
+    location.search,
+  ]);
 
   const showModal = () => {
     setOpen(true);
@@ -256,8 +297,17 @@ const Inventory = ({ user }) => {
     setPage(page);
   };
 
-  const handleCheckboxChange = (e) => {
+  const handlePublishedCheckboxChange = (e) => {
     setShowPublished(e.target.checked);
+  };
+
+  const handleStakeableCheckboxChange = (e) => {
+    const baseUrl = new URL(`/mywallet`, window.location.origin);
+    const value = e.target.checked;
+    baseUrl.searchParams.set('st', value);
+    const url = baseUrl.pathname + baseUrl.search;
+    navigate(url, { replace: true });
+    setShowStakeable(value ? 'true' : 'false');
   };
 
   const getAllSubcategories = (categories) => {
@@ -330,6 +380,13 @@ const Inventory = ({ user }) => {
     {
       title: 'Item',
       render: (text, record) => {
+        const isStakeable =
+          record.originAddress &&
+          reserves &&
+          reserves.length > 0 &&
+          reserves.some(
+            (reserve) => record.originAddress === reserve.assetRootAddress
+          );
         const callDetailPage = () => {
           navigate(
             `${naviroute
@@ -341,28 +398,39 @@ const Inventory = ({ user }) => {
           );
         };
         return (
-          <div className="flex items-center">
-            <div className="mr-2 w-[74px] h-[52px] flex items-center justify-center">
-              <img
-                src={
-                  record['BlockApps-Mercata-Asset-images'] &&
-                  record['BlockApps-Mercata-Asset-images'].length > 0
-                    ? record['BlockApps-Mercata-Asset-images'][0].value
-                    : image_placeholder
-                }
-                alt={'Asset image...'}
-                className="rounded-md w-full h-full object-contain"
-              />
+          <>
+            <div className="flex items-center">
+              <div className="mr-2 w-[74px] h-[52px] flex items-center justify-center">
+                <img
+                  src={
+                    record['BlockApps-Mercata-Asset-images'] &&
+                    record['BlockApps-Mercata-Asset-images'].length > 0
+                      ? record['BlockApps-Mercata-Asset-images'][0].value
+                      : image_placeholder
+                  }
+                  alt={'Asset image...'}
+                  className="rounded-md w-full h-full object-contain"
+                />
+              </div>
+              <div>
+                <span
+                  className="text-xs sm:text-sm text-[#13188A] hover:underline cursor-pointer"
+                  onClick={callDetailPage}
+                >
+                  <Tooltip title={record.name}>
+                    <span className="w-48 whitespace-nowrap overflow-hidden text-ellipsis block">
+                      {record.name}
+                    </span>
+                  </Tooltip>
+                </span>
+              </div>
             </div>
-            <div>
-              <span
-                className="text-xs sm:text-sm text-[#13188A] hover:underline cursor-pointer"
-                onClick={callDetailPage}
-              >
-                {record.name}
-              </span>
-            </div>
-          </div>
+            {isStakeable && (
+              <>
+                <div> Borrowed Amount: $33,516 </div>
+              </>
+            )}
+          </>
         );
       },
     },
@@ -380,22 +448,24 @@ const Inventory = ({ user }) => {
       title: 'Price',
       align: 'center',
       render: (_, record) => {
-        const isStrats =
-          record.data.quantityIsDecimal &&
-          record.data.quantityIsDecimal === 'True';
+        const isStrats = record.originAddress === stratsAddress;
+        const isCata = record.originAddress === cataAddress;
         const price = record.price
           ? isStrats
             ? parseFloat(record.price * 100).toFixed(2)
+            : isCata
+            ? parseFloat(record.price * 10 ** 18).toFixed(2)
             : record.price
           : 'N/A';
         return (
           <div>
             {price !== 'N/A' ? (
               <>
-                ${price}{' '}
-                <span className="text-xs">
-                  ({(price * STRATS_CONVERSION).toFixed(0)} STRATs)
-                </span>
+                <span>${price}</span>{' '}
+                <p className="flex text-xs items-center gap-1">
+                  {' '}
+                  &nbsp;({(price * STRATS_CONVERSION).toFixed(0)} {StratsIcon}){' '}
+                </p>
               </>
             ) : (
               'N/A'
@@ -408,12 +478,17 @@ const Inventory = ({ user }) => {
       title: 'Owned',
       align: 'center',
       render: (_, record) => {
-        const isStrats =
-          record.data.quantityIsDecimal &&
-          record.data.quantityIsDecimal === 'True';
-        const quantity = isStrats
-          ? parseFloat((record.quantity / 100).toFixed(2))
-          : record.quantity;
+        const isStrats = record.originAddress === stratsAddress;
+        const isCata = record.originAddress === cataAddress;
+        const quantity = (
+          isStrats
+            ? new BigNumber(record.quantity).dividedBy(new BigNumber(100))
+            : isCata
+            ? new BigNumber(record.quantity).dividedBy(
+                new BigNumber(10).pow(18)
+              )
+            : new BigNumber(record.quantity)
+        ).toString();
         return <div>{quantity || 0}</div>;
       },
     },
@@ -421,13 +496,19 @@ const Inventory = ({ user }) => {
       title: 'Listed for Sale',
       align: 'center',
       render: (_, record) => {
-        const isStrats =
-          record.data.quantityIsDecimal &&
-          record.data.quantityIsDecimal === 'True';
-        const saleQuantity = isStrats
-          ? parseFloat((record.saleQuantity / 100).toFixed(2))
-          : record.saleQuantity;
-        return <div className="w-24">{saleQuantity || 0}</div>;
+        const isStrats = record.originAddress === stratsAddress;
+        const isCata = record.originAddress === cataAddress;
+        const saleQuantity = (
+          isStrats
+            ? new BigNumber(record.saleQuantity).dividedBy(new BigNumber(100))
+            : isCata
+            ? new BigNumber(record.saleQuantity).dividedBy(
+                new BigNumber(10).pow(18)
+              )
+            : new BigNumber(record.saleQuantity)
+        ).toString();
+
+        return <div className="w-24">{saleQuantity}</div>;
       },
     },
     {
@@ -444,6 +525,9 @@ const Inventory = ({ user }) => {
             allSubcategories={allSubcategories}
             user={user}
             supportedTokens={supportedTokens}
+            reserves={reserves}
+            stratAddress={stratsAddress}
+            cataAddress={cataAddress}
           />
         </div>
       ),
@@ -453,10 +537,13 @@ const Inventory = ({ user }) => {
       align: 'center',
       render: (text, record) => (
         <div className="pt-[7px] lg:pt-0 items-center gap-[5px]">
-          {record.price ? (
+          {record.price || record?.escrow?.maxLoanAmount ? (
             <div className="flex items-center justify-center gap-2 bg-[#1548C329] p-[6px] rounded-md">
               <div className="w-[7px] h-[7px] rounded-full bg-[#119B2D]"></div>
-              <p className="text-[#4D4D4D] text-[13px]">Published</p>
+              <p className="text-[#4D4D4D] text-[13px]">
+                {' '}
+                {record?.escrow?.maxLoanAmount ? 'Staked' : 'Published'}{' '}
+              </p>
             </div>
           ) : record.status == ASSET_STATUS.PENDING_REDEMPTION ? (
             <div className="flex items-center justify-center gap-2 bg-[#FFA50029] p-[6px] rounded-md">
@@ -487,6 +574,24 @@ const Inventory = ({ user }) => {
     },
   ];
 
+  const Rewards = () => {
+    return (
+      <div className="flex flex-row">
+        <p className="flex items-center ml-4 font-semibold text-base xl:text-lg bg-[#E6F0FF] border border-[#13188A] rounded-md px-3 py-1 text-[#13188A] shadow-sm">
+          <DollarOutlined className="!text-[#13188A] mr-2 text-lg" />
+          Total Rewards (CATA):
+          <span className="ml-2 font-bold">334,133</span>
+        </p>
+
+        <p className="flex items-center ml-4 font-semibold text-base xl:text-lg bg-[#FFE6E6] border border-[#D32F2F] rounded-md px-3 py-1 text-[#D32F2F] shadow-sm">
+          <GiftOutlined className="!text-[#D32F2F] mr-2 text-lg" />
+          Est. Daily Reward (CATA):
+          <span className="ml-2 font-bold">1,321</span>
+        </p>
+      </div>
+    );
+  };
+
   return (
     <>
       <HelmetComponent
@@ -506,24 +611,30 @@ const Inventory = ({ user }) => {
             <p className="text-sm text-[#202020] font-medium">My Wallet</p>
           </Breadcrumb.Item>
         </Breadcrumb>
+        <div className="mt-5 ml-5 flex xl:hidden">
+          <Rewards />
+        </div>
         <div className="w-full h-[160px] py-4 px-4 md:h-[96px] bg-[#F6F6F6] flex flex-col md:flex-row md:px-14 justify-between items-center mt-6 lg:mt-8">
-          <div className="flex justify-between w-full">
+          <div className="flex w-full items-center">
             <Button
-              className="!px-1 md:!px-0 flex items-center flex-row-reverse gap-[6px] text-lg md:text-2xl font-semibold !text-[#13188A] "
+              className="!px-1 md:!px-0 flex items-center flex-row-reverse gap-[6px] text-lg md:text-xl font-semibold !text-[#13188A]"
               type="link"
               icon={
                 <img
                   src={Images.ForwardIcon}
                   alt={metaImg}
                   title={metaImg}
-                  className="hidden md:block w-6 h-6"
+                  className="hidden md:block w-5 h-5"
                 />
               }
             >
-              {' '}
               My Wallet
             </Button>
+            <div className="hidden xl:flex">
+              <Rewards />
+            </div>
           </div>
+
           <div className="flex flex-col md:flex-row gap-3 items-center my-2 md:my-0">
             <div className="flex gap-3 items-center">
               <Select
@@ -622,14 +733,25 @@ const Inventory = ({ user }) => {
             />
           </Space.Compact>
           <div className="pt-6 mx-6 md:mx-5 md:px-10 mb-5">
-            <Checkbox className="mb-4" onChange={handleCheckboxChange}>
+            <Checkbox className="mb-4" onChange={handlePublishedCheckboxChange}>
               Published
+            </Checkbox>
+            <Checkbox
+              className="pl-4"
+              checked={showStakeable === 'true'}
+              onChange={handleStakeableCheckboxChange}
+            >
+              Stakeable
             </Checkbox>
             <div className="hidden md:block">
               <Table
                 columns={columns}
                 dataSource={showPublished ? userInventories : inventories}
-                loading={isInventoriesLoading || isUserInventoriesLoading}
+                loading={
+                  isInventoriesLoading ||
+                  isUserInventoriesLoading ||
+                  isReservesLoading
+                }
                 className="custom-table"
                 pagination={false}
               />
@@ -657,6 +779,9 @@ const Inventory = ({ user }) => {
                         allSubcategories={allSubcategories}
                         user={user}
                         supportedTokens={supportedTokens}
+                        reserves={reserves}
+                        stratAddress={stratsAddress}
+                        cataAddress={cataAddress}
                       />
                     ))
                   ) : (
@@ -677,6 +802,9 @@ const Inventory = ({ user }) => {
                         allSubcategories={allSubcategories}
                         user={user}
                         supportedTokens={supportedTokens}
+                        reserves={reserves}
+                        stratAddress={stratsAddress}
+                        cataAddress={cataAddress}
                       />
                     ))
                   ) : (

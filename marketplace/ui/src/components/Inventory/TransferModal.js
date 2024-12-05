@@ -1,5 +1,6 @@
 import { Button, Select, InputNumber, Modal, Table, notification } from 'antd';
 import { useEffect, useState } from 'react';
+import BigNumber from 'bignumber.js';
 import { actions } from '../../contexts/inventory/actions';
 import { actions as marketplaceActions } from '../../contexts/marketplace/actions';
 import { actions as userActions } from '../../contexts/users/actions';
@@ -15,6 +16,7 @@ import { useUsersDispatch, useUsersState } from '../../contexts/users';
 import { useAuthenticateState } from '../../contexts/authentication';
 import { SearchOutlined, DeleteOutlined } from '@ant-design/icons';
 import { OLD_SADDOG_ORIGIN_ADDRESS } from '../../helpers/constants';
+import { useLocation } from 'react-router-dom';
 
 const TransferModal = ({
   open,
@@ -23,7 +25,19 @@ const TransferModal = ({
   categoryName = '',
   limit = 0,
   offset = 0,
+  reserves,
+  stratAddress,
+  cataAddress,
 }) => {
+  const location = useLocation();
+  const queryParams = new URLSearchParams(location.search);
+  const isStrat = inventory.originAddress === stratAddress;
+  const isCata = inventory.originAddress === cataAddress;
+  const availableQuantity = isStrat
+    ? new BigNumber(inventory.quantity).dividedBy(100)
+    : isCata
+    ? new BigNumber(inventory.quantity).dividedBy(new BigNumber(10).pow(18))
+    : new BigNumber(inventory.quantity);
   // Get the inventory state and dispatch
   const inventoryDispatch = useInventoryDispatch();
   const marketplaceDispatch = useMarketplaceDispatch();
@@ -41,13 +55,10 @@ const TransferModal = ({
   const [canTransfer, setCanTransfer] = useState(false);
   const [canAddRow, setCanAddRow] = useState(false);
   const [canRemoveRow, setCanRemoveRow] = useState(false);
-  const quantityIsDecimal =
-    inventory.data.quantityIsDecimal &&
-    inventory.data.quantityIsDecimal === 'True';
   const [transfers, setTransfers] = useState([
     {
       id: 1,
-      quantity: 1,
+      quantity: availableQuantity,
       price: 0.01,
       recipient: undefined,
       openDropdown: false,
@@ -59,11 +70,27 @@ const TransferModal = ({
 
   // Functions to change Tansfer State
   const handleAddTransfer = () => {
+    // Calculate allocated quantity from previous transfers
+    const allocatedQuantity = transfers.reduce(
+      (total, transfer) => new BigNumber(total).plus(new BigNumber(transfer.quantity || 0)),
+      new BigNumber(0)
+    );
+
+    // Calculate remaining quantity
+    const remainingQuantity = availableQuantity.minus(allocatedQuantity);
+
+    // Prevent adding transfer if no available quantity remains
+    if (remainingQuantity <= 0) {
+      console.warn('No remaining quantity available for transfer.');
+      return;
+    }
+
+    // Update transfers state
     setTransfers((prevTransfers) => [
       ...prevTransfers,
       {
-        id: transfers.length + 1,
-        quantity: 1,
+        id: prevTransfers.length + 1,
+        quantity: remainingQuantity, // TODO: cast to string for testing big numbers to remove trailing zeros
         price: 0.01,
         recipient: undefined,
         openDropdown: false,
@@ -147,22 +174,19 @@ const TransferModal = ({
       (transfer) =>
         transfer.quantity > 0 && transfer.price > 0 && transfer.recipient
     );
-    const totalQuantity = transfers.reduce(
-      (total, transfer) => total + (transfer.quantity || 0),
-      0
+    const allocatedQuantity = transfers.reduce(
+      (total, transfer) => new BigNumber(total).plus(new BigNumber(transfer.quantity || 0)),
+      new BigNumber(0)
     );
-    const availableQuantity = quantityIsDecimal
-      ? inventory.quantity / 100
-      : inventory.quantity;
 
-    setCanTransfer(isValidTransfer && totalQuantity <= availableQuantity);
+    setCanTransfer(isValidTransfer && allocatedQuantity.lte(availableQuantity));
     setCanAddRow(
       transfers.length < 10 &&
-        totalQuantity < availableQuantity &&
+      allocatedQuantity.lt(availableQuantity) &&
         isValidTransfer
     );
     setCanRemoveRow(transfers.length > 1);
-  }, [transfers, inventory, quantityIsDecimal]);
+  }, [transfers, inventory]);
 
   // Helper function to handle quantity change
   const handleQuantityChange = (id, value) => {
@@ -233,15 +257,17 @@ const TransferModal = ({
       dataIndex: 'quantity',
       align: 'center',
       width: 175,
-      render: (_, record, index) => {
-        // Calculate the quantity available for each row
-        const availableQuantity = quantityIsDecimal
-          ? inventory.quantity / 100
-          : inventory.quantity;
-        const allocatedQuantity = transfers
-          .slice(0, index)
-          .reduce((total, transfer) => total + (transfer.quantity || 0), 0);
-        return availableQuantity - allocatedQuantity;
+      render: (_, __, index) => {
+        const allocatedQuantity = new BigNumber(
+          transfers
+            .slice(0, index)
+            .reduce(
+              (total, transfer) =>
+                total.plus(new BigNumber(transfer.quantity || 0)),
+              new BigNumber(0)
+            )
+        );
+        return availableQuantity.minus(allocatedQuantity).toString();
       },
     },
     {
@@ -251,20 +277,20 @@ const TransferModal = ({
         <InputNumber
           value={record.quantity}
           controls={false}
-          min={1}
           max={(() => {
-            // Calculate available quantity for this record
-            const availableQuantity = quantityIsDecimal
-              ? inventory.quantity / 100
-              : inventory.quantity;
-            const allocatedQuantity = transfers
-              .slice(0, index)
-              .reduce((total, transfer) => total + (transfer.quantity || 0), 0);
-            return availableQuantity - allocatedQuantity;
+            const allocatedQuantity = new BigNumber(
+              transfers
+                .slice(0, index)
+                .reduce(
+                  (total, transfer) =>
+                    total.plus(new BigNumber(transfer.quantity || 0)),
+                  new BigNumber(0)
+                )
+            );
+            return availableQuantity.minus(allocatedQuantity);
           })()}
-          step={1}
-          precision={0}
-          onChange={(value) => handleQuantityChange(record.id, value)}
+          precision={isStrat ? 2 : isCata ? 18 : 0}
+          onChange={(value) => handleQuantityChange(record.id, new BigNumber(value))}
           disabled={index !== transfers.length - 1}
         />
       ),
@@ -324,12 +350,21 @@ const TransferModal = ({
     const body = transfers.map((transfer) => ({
       assetAddress: inventory.address,
       newOwner: transfer.recipient,
-      quantity: quantityIsDecimal ? transfer.quantity * 100 : transfer.quantity,
-      price: quantityIsDecimal ? transfer.price / 100 : transfer.price,
+      quantity: (isStrat
+        ? (transfer.quantity).multipliedBy(new BigNumber(100))
+        : isCata
+        ? (transfer.quantity).multipliedBy(new BigNumber(10).pow(18))
+        : transfer.quantity
+      ).toFixed(0),
+      price: isStrat
+        ? transfer.price / 100
+        : isCata
+        ? transfer.price / Math.pow(10, 18)
+        : transfer.price,
       senderCommonName: user.commonName,
       recipientCommonName: transfer.recipientCommonName,
       itemName,
-      isDecimal: quantityIsDecimal || false,
+      decimal: (isStrat ? new BigNumber(100) : isCata ? new BigNumber(10).pow(18) : new BigNumber(10)).toString(),
     }));
 
     isDone = await actions.transferInventory(inventoryDispatch, body);
@@ -339,7 +374,10 @@ const TransferModal = ({
         limit,
         offset,
         '',
-        categoryName
+        categoryName,
+        queryParams.get('st') === 'true'
+          ? reserves.map((reserve) => reserve.assetRootAddress)
+          : ''
       );
       await actions.fetchInventoryForUser(inventoryDispatch, user.commonName);
       await marketplaceActions.fetchStratsBalance(marketplaceDispatch);
@@ -407,9 +445,7 @@ const TransferModal = ({
           </p>
           <div className="border border-[#d9d9d9] h-[42px] rounded-md flex items-center justify-center">
             <p>
-              {quantityIsDecimal
-                ? inventory.quantity / 100
-                : inventory.quantity}
+              {availableQuantity.toString()}
             </p>
           </div>
         </div>
@@ -420,15 +456,10 @@ const TransferModal = ({
               className="w-full h-9"
               value={mobileTransfer.quantity}
               controls={false}
-              min={1}
-              max={
-                quantityIsDecimal
-                  ? inventory.quantity / 100
-                  : inventory.quantity
-              }
+              max={availableQuantity}
               step={1}
               onChange={(value) =>
-                handleQuantityChange(mobileTransfer.id, value)
+                handleQuantityChange(mobileTransfer.id, new BigNumber(value))
               }
             />
           </div>

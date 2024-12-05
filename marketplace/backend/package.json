@@ -51,6 +51,7 @@
     "@sendgrid/mail": "^7.7.0",
     "axios": "^1.6.8",
     "babel-plugin-module-resolver": "^4.1.0",
+    "bignumber.js": "^9.1.2",
     "blockapps-rest": "8.4.0",
     "body-parser": "^1.20.1",
     "chai": "^4.3.7",

@@ -5,6 +5,7 @@ import {
   useInventoryState,
 } from '../../contexts/inventory';
 import { useAuthenticateState } from '../../contexts/authentication';
+import { useLocation } from 'react-router-dom';
 
 const UnlistModal = ({
   open,
@@ -15,10 +16,13 @@ const UnlistModal = ({
   debouncedSearchTerm,
   limit,
   offset,
+  reserves
 }) => {
   const inventoryDispatch = useInventoryDispatch();
   const { isUnlisting } = useInventoryState();
   const { user } = useAuthenticateState();
+  const location = useLocation();
+  const queryParams = new URLSearchParams(location.search);
 
   const handleSubmit = async () => {
     let body = {
@@ -31,7 +35,8 @@ const UnlistModal = ({
         limit,
         offset,
         debouncedSearchTerm,
-        category && category !== 'All' ? category : undefined
+        category && category !== 'All' ? category : undefined,
+        queryParams.get('st') === 'true' ? reserves.map(reserve => reserve.assetRootAddress) : ''
       );
       await actions.fetchInventoryForUser(
         inventoryDispatch,

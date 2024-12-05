@@ -6,6 +6,7 @@ import TagManager from 'react-gtm-module';
 import DOMPurify from 'dompurify';
 // State
 import { useAuthenticateState } from '../../contexts/authentication';
+import { useMarketplaceState } from '../../contexts/marketplace';
 // Assets
 import images_placeholder from '../../images/resources/image_placeholder.png';
 import { Images } from '../../images';
@@ -15,6 +16,7 @@ import { setCookie } from '../../helpers/cookie';
 import { SEO } from '../../helpers/seoConstant';
 import routes from '../../helpers/routes';
 import LoginModal from './LoginModal';
+import { useInventoryState } from '../../contexts/inventory';
 
 const NewTrendingCard = ({
   topSellingProduct,
@@ -27,17 +29,18 @@ const NewTrendingCard = ({
   const navigate = useNavigate();
   const location = useLocation();
   const { Text } = Typography;
-
+  const { stratsAddress, cataAddress } = useMarketplaceState();
   const { hasChecked, isAuthenticated, loginUrl, user } =
     useAuthenticateState();
+  const { reserves } = useInventoryState();
+  const [isReserve, setIsReserve] = useState(false);
 
   const [isModalVisible, setIsModalVisible] = useState(false);
   const [isWishlisted, setIsWishlisted] = useState(false);
-  const saleQuantity =
-    topSellingProduct.data.quantityIsDecimal &&
-    topSellingProduct.data.quantityIsDecimal === 'True'
-      ? topSellingProduct.saleQuantity / 100
-      : topSellingProduct.saleQuantity;
+  const isDecimal = topSellingProduct.data.quantityIsDecimal && topSellingProduct.data.quantityIsDecimal === 'True';
+  const isStrat = topSellingProduct.originAddress === stratsAddress;
+  const isCata = topSellingProduct.originAddress === cataAddress;
+  const saleQuantity = isStrat ? topSellingProduct.saleQuantity / 100 : isCata ? topSellingProduct.saleQuantity / Math.pow(10, 18) : topSellingProduct.saleQuantity
   const [quantity, setQuantity] = useState(1);
 
   const ownerSameAsUser = () => {
@@ -77,7 +80,14 @@ const NewTrendingCard = ({
       (product) => product.address === topSellingProduct?.address
     );
     setIsWishlisted(productInWishlist);
-  }, [topSellingProduct]);
+    if (reserves) {
+      setIsReserve(
+        reserves.some(
+          (reserve) => reserve.assetRootAddress === topSellingProduct.address
+        )
+      );
+    }
+  }, [topSellingProduct, reserves]);
 
   const toggleWishlist = () => {
     if (!isAuthenticated || !user) {
@@ -116,7 +126,9 @@ const NewTrendingCard = ({
     <>
       <div
         id="productCard"
-        className={`relative trending_cards_container_card bg-white p-3 ${parent === 'Marketplace' ? 'min-w-[300px] w-auto' : 'min-w-[230px]'}  min-w-[320px] md:min-w-[300px] rounded-md flex flex-col gap-2 md:gap-3 shadow-card_shadow h-max`}
+        className={`relative trending_cards_container_card bg-white p-3 ${
+          parent === 'Marketplace' ? 'min-w-[300px] w-auto' : 'min-w-[230px]'
+        }  min-w-[320px] md:min-w-[300px] rounded-md flex flex-col gap-2 md:gap-3 shadow-card_shadow h-max`}
       >
         {contextHolder}
         {!ownerSameAsUser() && (
@@ -135,7 +147,9 @@ const NewTrendingCard = ({
           </div>
         )}
         <a
-          href={`${naviroute.replace(':address', topSellingProduct.address).replace(':name', topSellingProduct.name)}`}
+          href={`${naviroute
+            .replace(':address', topSellingProduct.address)
+            .replace(':name', topSellingProduct.name)}`}
           onClick={(e) => {
             // Check if Command (metaKey) or Ctrl (ctrlKey) is pressed
             if (e.metaKey || e.ctrlKey) {
@@ -143,7 +157,12 @@ const NewTrendingCard = ({
             } else {
               e.preventDefault();
               navigate(
-                `${naviroute.replace(':address', topSellingProduct.address).replace(':name', encodeURIComponent(topSellingProduct.name))}`,
+                `${naviroute
+                  .replace(':address', topSellingProduct.address)
+                  .replace(
+                    ':name',
+                    encodeURIComponent(topSellingProduct.name)
+                  )}`,
                 { state: { isCalledFromInventory: false } }
               );
               window.scrollTo(0, 0);
@@ -191,17 +210,17 @@ const NewTrendingCard = ({
         <div style={{ display: 'flex', justifyContent: 'space-between' }}>
           {topSellingProduct?.price
             ? (() => {
-                const adjustedPrice =
-                  topSellingProduct.data.quantityIsDecimal &&
-                  topSellingProduct.data.quantityIsDecimal === 'True'
-                    ? topSellingProduct.price * 100
-                    : topSellingProduct.price;
+                const adjustedPrice = isDecimal ? (topSellingProduct.price * 100).toFixed(2) : topSellingProduct.price
 
                 return (
                   <Typography className="font-semibold">
                     {`$${adjustedPrice} `}{' '}
                     <span className="font-normal text-xs mr-2 text-primary">
-                      <b>{`(${(adjustedPrice * STRATS_CONVERSION).toFixed(0)} ${(adjustedPrice * STRATS_CONVERSION).toFixed(0) == 1 ? 'STRAT' : 'STRATs'})`}</b>
+                      <b>{`(${(adjustedPrice * STRATS_CONVERSION).toFixed(0)} ${
+                        (adjustedPrice * STRATS_CONVERSION).toFixed(0) == 1
+                          ? 'STRAT'
+                          : 'STRATs'
+                      })`}</b>
                     </span>
                   </Typography>
                 );
@@ -224,6 +243,12 @@ const NewTrendingCard = ({
             </Typography>
           )}
         </div>
+        {isReserve && (
+          <div className="flex justify-between">
+            <p>Est. APY: 10%</p>
+            <p>TVL: $34,523,523</p>
+          </div>
+        )}
         <div style={customStyle} className="custom-typography">
           <div
             dangerouslySetInnerHTML={{ __html: sanitizedDescription }}
@@ -234,7 +259,11 @@ const NewTrendingCard = ({
           <Typography>Quantity:</Typography>
           <div className="flex gap-3 p-1 bg-white">
             <Typography
-              className={`px-2 bg-[#EEEFFA] rounded-sm ${quantity === 1 ? 'cursor-not-allowed opacity-50' : 'cursor-pointer'}`}
+              className={`px-2 bg-[#EEEFFA] rounded-sm ${
+                quantity === 1
+                  ? 'cursor-not-allowed opacity-50'
+                  : 'cursor-pointer'
+              }`}
               onClick={() => {
                 setQuantity(Math.max(quantity - 1, 1));
               }}
@@ -265,7 +294,11 @@ const NewTrendingCard = ({
               controls={false}
             />
             <Typography
-              className={`px-2 bg-[#EEEFFA] rounded-sm ${quantity >= Math.min(saleQuantity, topSellingProduct.quantity) ? 'cursor-not-allowed opacity-50' : 'cursor-pointer'}`}
+              className={`px-2 bg-[#EEEFFA] rounded-sm ${
+                quantity >= Math.min(saleQuantity, topSellingProduct.quantity)
+                  ? 'cursor-not-allowed opacity-50'
+                  : 'cursor-pointer'
+              }`}
               onClick={() => {
                 if (
                   quantity + 1 <= saleQuantity &&
@@ -284,7 +317,11 @@ const NewTrendingCard = ({
             id={`${topSellingProduct?.name?.replace(/ /g, '_')}-buy-now`}
             disabled={isAvailableForSale || ownerSameAsUser()}
             type="primary"
-            className={`flex-1 h-9 ${isAvailableForSale ? '!bg-[#808080]' : '!bg-[#13188A]'} !text-white ${ownerSameAsUser() ? 'cursor-not-allowed' : 'cursor-pointer'}`}
+            className={`flex-1 h-9 ${
+              isAvailableForSale ? '!bg-[#808080]' : '!bg-[#13188A]'
+            } !text-white ${
+              ownerSameAsUser() ? 'cursor-not-allowed' : 'cursor-pointer'
+            }`}
             onClick={async () => {
               const dataLayerEventName = isUserProfile
                 ? 'buy_now_from_user_profile'

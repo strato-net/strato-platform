@@ -1,6 +1,8 @@
 import { Button, Image, Typography, Spin, notification } from 'antd';
 import CategoryCard from './CategoryCard';
 import TopSellingProductCard from './TopSellingProductCard';
+import StakeableProductCards from './StakeableProductCards';
+import TrendingVaultCard from './TrendingVaultCard';
 import { Images } from '../../images';
 import React, { useEffect } from 'react';
 import { actions } from '../../contexts/category/actions';
@@ -15,6 +17,8 @@ import HelmetComponent from '../Helmet/HelmetComponent';
 import { SEO } from '../../helpers/seoConstant';
 import { BANNER } from '../../helpers/constants';
 import { bannerArrow } from '../../images/SVGComponents';
+import { actions as inventoryActions } from '../../contexts/inventory/actions';
+import { useInventoryDispatch } from '../../contexts/inventory';
 
 // ----------------------------------------------------------
 
@@ -37,6 +41,11 @@ const MarketPlace = ({ user, isAuthenticated }) => {
   const dispatch = useCategoryDispatch();
   const debouncedSearchTerm = useDebounce('', 1000);
   const { iscategorysLoading } = useCategoryState();
+  const inventoryDispatch = useInventoryDispatch();
+
+  useEffect(() => {
+    inventoryActions.getAllReserve(inventoryDispatch);
+  }, []);
 
   useEffect(() => {
     if (isAuthenticated) {
@@ -73,7 +82,10 @@ const MarketPlace = ({ user, isAuthenticated }) => {
 
   const navigateToUserProfile = () => {
     navigate(
-      `${routes.MarketplaceUserProfile.url.replace(':commonName', user.commonName)}?tab=my-activity`
+      `${routes.MarketplaceUserProfile.url.replace(
+        ':commonName',
+        user.commonName
+      )}?tab=my-activity`
     );
   };
 
@@ -85,14 +97,14 @@ const MarketPlace = ({ user, isAuthenticated }) => {
   // const navRoute = routes.MarketplaceCategoryProductList.url.replace(':category', 'All');
 
   const ButtonElement = ({ desktopText, mobileText, url }) => (
-    <div className="relative flex top-[156px] sm:top-[250px] xl:top-[65%] 3xl:top-[70%] left-[4%] sm:left-[7.5%] md:left-[7%] md:top-60 z-50">
+    <div className="w-[90%] relative flex justify-between top-[156px] sm:top-[250px] xl:top-[65%] 3xl:top-[70%] left-[4%] sm:left-[7.5%] md:left-[7%] md:top-60 z-50">
       <Button
         id="viewMore"
         onClick={() => {
           navigate(url);
           sessionStorage.setItem('scrollPosition', 0);
         }}
-        className="gradient-button border-0 h-auto md:h-11 border-primary bg-white text-primary hover:text-white"
+        className="gradient-button border-0  md:h-11 min-h-[44px] border-primary bg-white text-primary hover:text-white"
       >
         <div className="flex items-center">
           <div className="hidden sm:block font-semibold text-lg banner-btn-text">
@@ -104,6 +116,30 @@ const MarketPlace = ({ user, isAuthenticated }) => {
           <span className="ml-1">{bannerArrow}</span>
         </div>
       </Button>
+      <div className="stake-banner-stats md:gap-8 lg:gap-16">
+        <div className="text-center">
+          <div className="stake-banner-stats-value font-bold text-white">
+            $318.7M
+          </div>
+          <div className="stake-banner-stats-title text-white">
+            Total Value Locked (TVL)
+          </div>
+        </div>
+        <div className="text-center">
+          <div className="stake-banner-stats-value font-bold text-white">
+            10%
+          </div>
+          <div className="stake-banner-stats-title text-white">Est. APY</div>
+        </div>
+        <div className="text-center">
+          <div className="stake-banner-stats-value font-bold text-white">
+            478.7M
+          </div>
+          <div className="stake-banner-stats-title text-white">
+            Rewards Issued (CATA)
+          </div>
+        </div>
+      </div>
     </div>
   );
 
@@ -117,7 +153,7 @@ const MarketPlace = ({ user, isAuthenticated }) => {
         clickable: true,
       }}
       autoplay={{
-        delay: 4000,
+        delay: 8000,
         disableOnInteraction: false,
       }}
       modules={[Autoplay, EffectFade, Navigation, Pagination]}
@@ -200,10 +236,26 @@ const MarketPlace = ({ user, isAuthenticated }) => {
           <Spin spinning={iscategorysLoading} size="large" />
         </div>
       ) : (
-        <div className="px-3 md:px-0 py-30 mt-6 md:mt-10 mb-10">
-          {/* <CategoryCard /> */}
-          <TopSellingProductCard />
-        </div>
+        <>
+          <div className="px-3 md:px-0 py-30 mt-6 md:mt-10 mb-10">
+            {/* <CategoryCard /> */}
+            {/* <TrendingVaultCard /> */}
+            <StakeableProductCards />
+            <TopSellingProductCard />
+          </div>
+          <h3 className="text-center text-gray-500 mt-8 mb-4">
+            Is there an item you would like to see on the marketplace?
+            <a
+              href="https://forms.gle/biuEtUHrFdLpX1d36"
+              rel="noreferrer"
+              target="_blank"
+              className="text-blue"
+            >
+              {' '}
+              Let us know!
+            </a>
+          </h3>
+        </>
       )}
     </>
   );

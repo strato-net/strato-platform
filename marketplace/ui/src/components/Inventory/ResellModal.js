@@ -6,6 +6,7 @@ import {
   useInventoryState,
 } from '../../contexts/inventory';
 import { useAuthenticateState } from '../../contexts/authentication';
+import { useLocation } from 'react-router-dom';
 
 const ResellModal = ({
   open,
@@ -15,12 +16,19 @@ const ResellModal = ({
   debouncedSearchTerm,
   limit,
   offset,
+  reserves,
+  stratAddress,
+  cataAddress,
 }) => {
+  const isStrat = inventory.originAddress === stratAddress;
+  const isCata = inventory.originAddress === cataAddress;
   const [quantity, setQuantity] = useState(1);
   const inventoryDispatch = useInventoryDispatch();
   const [canResell, setCanResell] = useState(true);
   const { isReselling } = useInventoryState();
   const { user } = useAuthenticateState();
+  const location = useLocation();
+  const queryParams = new URLSearchParams(location.search);
 
   useEffect(() => {
     if (quantity <= 0) {
@@ -52,10 +60,11 @@ const ResellModal = ({
     let body = {
       assetAddress: inventory.address,
       quantity:
-        inventory.data.quantityIsDecimal &&
-        inventory.data.quantityIsDecimal === 'True'
-          ? quantity * 100
-          : quantity,
+      isStrat
+      ? (quantity * 100).toFixed(0)
+      : isCata
+      ? (quantity * Math.pow(10, 18)).toFixed(0)
+      : quantity,
     };
     let isDone = await actions.resellInventory(inventoryDispatch, body);
     if (isDone) {
@@ -64,7 +73,8 @@ const ResellModal = ({
         limit,
         offset,
         debouncedSearchTerm,
-        category && category !== 'All' ? category : undefined
+        category && category !== 'All' ? category : undefined,
+        queryParams.get('st') === 'true' ? reserves.map(reserve => reserve.assetRootAddress) : ''
       );
       await actions.fetchInventoryForUser(
         inventoryDispatch,
