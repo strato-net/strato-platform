@@ -98,7 +98,7 @@ const BorrowModal = ({
   const handleSubmit = async () => {
     const body = {
       escrowAddress: inventory?.sale,
-      borrowAmount: maxLoanAmount,
+      borrowAmount: inventory?.escrow?.maxLoanAmount,
       reserve: matchedReserve?.address,
     };
 
