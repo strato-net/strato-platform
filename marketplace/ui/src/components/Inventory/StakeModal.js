@@ -15,7 +15,7 @@ import { Images } from '../../images';
 import { useLocation } from 'react-router-dom';
 
 const logo = (
-  <img src={Images.strat} alt={''} title={''} className="w-5 h-5" />
+  <img src={Images.cata} alt={''} title={''} className="w-5 h-5" />
 );
 
 const StakeModal = ({
@@ -93,14 +93,14 @@ const StakeModal = ({
               'The expected daily earnings in CATA tokens from staking your RWAs.',
             value: (
               <div className="flex -mr-1">
+                {logo}
+
                 {(
                   (inventory?.quantity *
                     oracleData.consensusPrice *
                     matchedReserve?.cataAPYRate) /
                   365
                 ).toFixed(6)}
-
-                {logo}
               </div>
             ),
           },

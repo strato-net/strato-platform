@@ -66,8 +66,8 @@ const BorrowModal = ({
       description: "The projected amount of STRAT tokens you can borrow against your staked RWAs.",
       value: (
         <div className="flex -mr-1">
-          {parseFloat(inventory?.escrow?.maxLoanAmount/100).toFixed(2)}
           {logo}
+          {parseFloat(inventory?.escrow?.maxLoanAmount/100).toFixed(2)}
         </div>
       ),
     },
