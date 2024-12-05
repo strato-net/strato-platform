@@ -180,11 +180,42 @@ async function getEscrowForAsset(user, queryArgs, options) {
   return get(user, assets[0].address, options);
 }
 
+/**
+ * Retrieve contract state via Cirrus.
+ * @param {Object} user - User context for the request.
+ * @param {Object} options - Search options including chainId.
+ * @returns {Object} - Escrow with attached asset information, or undefined if none exists.
+ * @throws {Error} - Throws if no escrows are found.
+ */
+async function searchEscrow(user, queryArgs, options) {
+  // Define search options for active escrows
+  const searchOptions = {
+    ...options,
+    query: {
+      ...queryArgs
+    },
+  };
+
+  // Fetch escrows from Cirrus
+  const assets = await rest.search(
+    user,
+    { name: contractName },
+    searchOptions
+  );
+
+  if (!assets || assets.length === 0) {
+    return undefined;
+  }
+
+  return get(user, assets[0].address, options);
+}
+
 export default {
   contractName,
   get,
   getAll,
   getEscrowForAsset,
+  searchEscrow,
   marshalIn,
   marshalOut,
 };

@@ -2101,11 +2101,11 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
   contract.getEscrowForAsset = async function (args, options = defaultOptions) {
     const { assetRootAddress } = args;
     const queryArgs = { 
-      select: '*,BlockApps-Mercata-Escrow(*)',
-      ['BlockApps-Mercata-Escrow.assetRootAddress']: `eq.${assetRootAddress}`,
-      ['BlockApps-Mercata-Escrow.borrowerCommonName']: `eq.${userCommonName}`,
+      select: '*,BlockApps-Mercata-Escrow-assets(*)',
+      ['assetRootAddress']: `like.${assetRootAddress}*`,
+      ['borrowerCommonName']: `eq.${userCommonName}`,
     };
-    return await escrowJs.getEscrowForAsset(rawAdmin, queryArgs, options);
+    return await escrowJs.searchEscrow(rawAdmin, queryArgs, options);
   };
 
   contract.oraclePrice = async function (args, options = defaultOptions) {
