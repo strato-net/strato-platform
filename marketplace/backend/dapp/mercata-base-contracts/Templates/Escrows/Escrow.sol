@@ -88,7 +88,7 @@ abstract contract Escrow is Utils {
         decimal _assetPrice,
         uint _loanToValueRatio
     ) public {
-        require(msg.sender == reserve, "Only the reserve can attach assets to the escrow");
+        require(msg.sender == reserve, "Only the reserve can unlock assets from the escrow");
         uint quantityToUnlock = _quantity;
         if (_quantity > collateralQuantity) {
             quantityToUnlock = collateralQuantity;
