@@ -10,7 +10,7 @@ abstract contract Escrow is Utils {
     uint public collateralQuantity;
     uint public collateralValue;
     uint public maxLoanAmount;
-    decimal public totalCataRewardInDollars;
+    uint public totalCataReward;
     uint public borrowedAmount;
     uint public lastRewardTimestamp;
     bool public isActive;
@@ -32,7 +32,7 @@ abstract contract Escrow is Utils {
         assetRootAddress = address(0);
         attachAssets(_assets, _collateralQuantity, _assetPrice, _loanToValueRatio);
         require(collateralQuantity > 0, "No collateral has been staked");
-        totalCataRewardInDollars = 0.0; // Assuming the CATA reward rate is provided externally
+        totalCataReward = 0.0; // Assuming the CATA reward rate is provided externally
         isActive = true;
     }
 
@@ -148,9 +148,9 @@ abstract contract Escrow is Utils {
         maxLoanAmount = collateralValue * _loanToValueRatio;
     }
 
-    function updateTotalCataReward(decimal _newCataReward) external {
+    function updateTotalCataReward(uint _newCataReward) external {
         require(msg.sender == reserve, "Only reserve can update CATA reward");
-        totalCataRewardInDollars += _newCataReward;
+        totalCataReward += _newCataReward;
     }
 
     function updateReserve(address _newReserve) external {

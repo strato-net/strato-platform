@@ -65,7 +65,7 @@ abstract contract Reserve is Utils, Structs {
                 //get cata reward from escrow
                 if (delta > 0) {
                     decimal cataReward = calculateCATAReward(escrow.collateralQuantity(), oraclePrice.truncate(2), delta); //per day 0.08, per hour 0.0033, per 10 minutes 0.00055
-                    escrow.updateTotalCataReward(cataReward * 10**18);
+                    escrow.updateTotalCataReward(uint(cataReward * 10**18));
 
                     uint transferNumber = (uint(block.number + 16 + i) + block.timestamp) % 1000000;
 
