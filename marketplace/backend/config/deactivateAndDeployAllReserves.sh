@@ -170,7 +170,7 @@ deactivate_reserve() {
   fi
 
   # Transfer CATA
-  if [ "$cata_token" != "null" ] && [ "$cata_token" -gt 0 ]; then
+  if [[ "$cata_token" =~ ^[0-9]+$ ]] && echo "$cata_token > 0" | bc -l; then
     echo "Transferring CATA..."
     NEW_CATA_RESULT=$(curl -X POST "https://node1.mercata-testnet2.blockapps.net/bloc/v2.2/transaction?resolve=true" \
       -H 'Content-Type: application/json' \
