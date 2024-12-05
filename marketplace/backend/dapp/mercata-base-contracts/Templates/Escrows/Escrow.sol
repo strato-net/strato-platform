@@ -146,7 +146,7 @@ abstract contract Escrow is Utils {
     function _updateOnPriceChange(decimal _newPrice, uint _loanToValueRatio) internal {
         uint newCollateralValue = uint((decimal(collateralQuantity).truncate(4) * _newPrice * 10000.0000).truncate(0)); // 100 STRATs per dollar * 100 STRAT units per STRAT = 10000 
         collateralValue = uint(newCollateralValue);
-        maxLoanAmount = collateralValue * _loanToValueRatio;
+        maxLoanAmount = uint(collateralValue * _loanToValueRatio / 100);
     }
 
     function updateTotalCataReward(uint _newCataReward) external {

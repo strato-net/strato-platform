@@ -59,7 +59,7 @@ const BorrowModal = ({
     {
       label: `Market Value`,
       description: ' The total value of your staked assets, calculated as Quantity x Oracle Price.',
-      value: `$${(oracleData.consensusPrice.toFixed(2) * inventory?.quantity).toFixed(2)}`,
+      value: `$${(inventory?.escrow?.collateralValue / 10000).toFixed(2)}`,
     },
     {
       label: 'Estimated Loan (in STRATs)',
@@ -86,7 +86,7 @@ const BorrowModal = ({
     {
       label: `Market price (per unit)`,
       description: 'The current price of one unit of your RWA, as determined by the oracle.',
-      value: `$${oracleData.consensusPrice.toFixed(2)}`,
+      value: `$${(inventory?.escrow?.collateralValue / 10000).toFixed(2)}`,
     },
     {
       label: 'Loan to Value Ratio',
