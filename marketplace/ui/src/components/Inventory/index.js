@@ -68,7 +68,7 @@ import InventoryCard from './InventoryCard';
 import './index.css';
 
 const { Option } = Select;
-const StratsIcon = <img src={Images.strats} alt="STRATS" className="w-4 h-4" />;
+const StratsIcon = <img src={Images.strat} alt="STRATS" className="w-4 h-4" />;
 
 const Inventory = ({ user }) => {
   const [open, setOpen] = useState(false);

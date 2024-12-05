@@ -592,7 +592,7 @@ const HeaderComponent = ({
                   overflowCount={9999999}
                 >
                   <img
-                    src={Images.strats}
+                    src={Images.strat}
                     alt={IMG_META}
                     title={IMG_META}
                     className="w-[35px] h-[35px] "

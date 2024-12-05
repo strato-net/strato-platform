@@ -161,19 +161,19 @@ img.ant-image-preview-img {
   padding: 12px;
   border-radius: 12px;
   position: relative;
-  top: -20px;
-  right: -20px;
+  top: -28px !important;
+  left: -360px;
   display: flex;
   justify-content: space-between;
 }
 
 .stake-banner-stats-title{
-  font-size: 12px;
+  font-size: 15px;
   /* color: white; */
 }
 
 .stake-banner-stats-value{
-  font-size: 24px;
+  font-size: 30px;
   /* color: white; */
 }
 
@@ -522,7 +522,7 @@ img.ant-image-preview-img {
 
   .stake-banner-stats{
     top: -20px;
-    right: -20px;
+    left: -120px !important;
   }
 
   .clothing_banner_text {
@@ -645,8 +645,8 @@ img.ant-image-preview-img {
   }
 
   .stake-banner-stats{
-    top: -20px;
-    right: -20px;
+    top: -20px !important;
+    left: -60px;
   }
 
   .stake-banner-stats-title{
@@ -670,8 +670,8 @@ img.ant-image-preview-img {
   }
 
   .stake-banner-stats{
-    top: -20px;
-    right: -20px;
+    top: -20px !important;
+    left: -60px;
   }
 }
 
@@ -805,17 +805,17 @@ img.ant-image-preview-img {
 
   .stake-banner-stats{
     top: -15px;
-    right: 0px;
-    width: 66%;
+    left: -10px !important;
+    width: 66% !important;
   }
 
-  /* .stake-banner-stats-title{
+  .stake-banner-stats-title{
     font-size: 12px;
   }
 
   .stake-banner-stats-value{
     font-size: 24px;
-  } */
+  }
 
   .staking_banner_text {
     font-size: 28px;
@@ -946,7 +946,8 @@ img.ant-image-preview-img {
 
   .stake-banner-stats{
     width: 60%;
-    right: 0px;
+    left: -10px;
+    top: -10px !important;
   }
 
   .stake-banner-stats-title{
@@ -959,7 +960,7 @@ img.ant-image-preview-img {
   }
 
   .staking_banner_text {
-    font-size: 24px;
+    font-size: 34px;
     left: 7%;
     top: -7%;
     line-height: 36px;
@@ -1092,10 +1093,9 @@ img.ant-image-preview-img {
   }
 
   .stake-banner-stats {
-    flex-direction: column;
-    width: 30%;
-    right: -24px;
-    top: -120px;
+    width: 60%;
+    left: 25px;
+    top: -25px !important;
   }
 
   .stake-banner-stats-title{
@@ -1110,7 +1110,7 @@ img.ant-image-preview-img {
   .staking_banner_text {
     font-size: 20px;
     left: 4%;
-    top: -65%;
+    top: -30%;
     line-height: 24px;
   }
 
@@ -1251,9 +1251,9 @@ img.ant-image-preview-img {
   }
 
   .stake-banner-stats{
-    width: 25%;
-    flex-direction: column;
-    top: -150px;
+    width: 60%;
+    top: -20px !important;
+    left: 10px;
     height: 180px;
   }
 

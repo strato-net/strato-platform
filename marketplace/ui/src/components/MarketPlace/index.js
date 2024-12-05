@@ -118,16 +118,26 @@ const MarketPlace = ({ user, isAuthenticated }) => {
       </Button>
       <div className="stake-banner-stats md:gap-8 lg:gap-16">
         <div className="text-center">
-          <div className="stake-banner-stats-value font-bold text-white">$318.7M</div>
-          <div className="stake-banner-stats-title text-white">Total Value Locked (TVL)</div>
+          <div className="stake-banner-stats-value font-bold text-white">
+            $318.7M
+          </div>
+          <div className="stake-banner-stats-title text-white">
+            Total Value Locked (TVL)
+          </div>
         </div>
         <div className="text-center">
-          <div className="stake-banner-stats-value font-bold text-white">10%</div>
+          <div className="stake-banner-stats-value font-bold text-white">
+            10%
+          </div>
           <div className="stake-banner-stats-title text-white">Est. APY</div>
         </div>
         <div className="text-center">
-          <div className="stake-banner-stats-value font-bold text-white">478.7M</div>
-          <div className="stake-banner-stats-title text-white">Rewards Issued (CATA)</div>
+          <div className="stake-banner-stats-value font-bold text-white">
+            478.7M
+          </div>
+          <div className="stake-banner-stats-title text-white">
+            Rewards Issued (CATA)
+          </div>
         </div>
       </div>
     </div>

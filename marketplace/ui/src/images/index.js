@@ -1,5 +1,5 @@
 export const Images = {
-  strats: require('./resources/stratLight.png'),
+  strat: require('./resources/strat.png'),
   cata: require('./resources/cata.png'),
   logo: require('./resources/logo.png'),
   noProductSymbol: require('./resources/noProductSymbol.png'),
@@ -65,6 +65,9 @@ export const Images = {
   banner_arrow: require('./resources/banner_arrow.png'),
   carousel_arrow: require('./resources/carouselArrow.png'),
 
+  StakingX394: require('./resources/Banner/StakingX394.png'),
+  StakingX768: require('./resources/Banner/StakingX768.png'),
+  StakingX1440: require('./resources/Banner/StakingX1440.png'),
   StakingX1600: require('./resources/Banner/StakingX1600.png'),
 
   BatmanX394: require('./resources/Banner/BatmanX394.png'),

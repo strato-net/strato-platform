@@ -37,7 +37,7 @@ import { Images } from '../../images';
 import { useInventoryState } from '../../contexts/inventory';
 import RepayModal from './RepayModal';
 import BorrowModal from './BorrowModal';
-const StratsIcon = <img src={Images.strats} alt="STRATs" className="w-5 h-5" />;
+const StratsIcon = <img src={Images.strat} alt="STRATs" className="w-5 h-5" />;
 
 const InventoryCard = ({
   inventory,

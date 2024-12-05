@@ -19,7 +19,7 @@ import { Images } from '../../images';
 import { useLocation } from 'react-router-dom';
 
 const logo = (
-  <img src={Images.strats} alt={''} title={''} className="w-5 h-5" />
+  <img src={Images.strat} alt={''} title={''} className="w-5 h-5" />
 );
 
 const RepayModal = ({

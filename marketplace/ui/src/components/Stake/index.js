@@ -35,7 +35,7 @@ import { actions as categoryActions } from '../../contexts/category/actions';
 import { DollarOutlined, GiftOutlined } from '@ant-design/icons';
 
 const { Title } = Typography;
-const StratsIcon = <img src={Images.strats} alt="STRATS" className="w-4 h-4" />;
+const StratsIcon = <img src={Images.strat} alt="STRATS" className="w-4 h-4" />;
 
 const Stake = ({ user }) => {
   const inventoryDispatch = useInventoryDispatch();

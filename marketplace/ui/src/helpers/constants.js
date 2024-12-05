@@ -342,23 +342,32 @@ export const BANNER = [
     label: 'Staking',
     link: '/stake',
     text: (
-      <div className="staking_banner_text banner-text">
-        <h1 className='title'> RWA X DeFi </h1>
-        <h1 className=" w-5/6  mt-1 md:text-3xl"> Staking is Here! </h1>
-        <h1 className=" w-5/6 mt-1 md:text-3xl ">
-          Stake silver and gold to earn and gain access to CATA, our governance
-          token!
-        </h1>
+      <div className="staking_banner_text banner-text flex justify-between">
+        <div className="banner-text">
+          <h1 className="title"> RWA X DeFi </h1>
+          <h1 className="w-3/4 mt-1 md:text-3xl font-medium sm:text-2xl text-sm">
+            Stake silver and gold to earn and gain access to CATA, our
+            governance token!
+          </h1>
+        </div>
+        <div>
+          <img
+            src={Images.cata}
+            alt={'Cata...'}
+            title={'Cata'}
+            className="md:w-[160px] md:h-[160px] w-[120px] h-[120px] z-[11] relative md:mr-64 mr-48"
+          />
+        </div>
       </div>
     ),
-    desktopText: 'Stake now', // Stake now
+    desktopText: 'Stake now',
     mobileText: 'Stake',
     alt: metaImg,
     title: metaImg,
     desktopImg: Images.StakingX1600,
-    laptopImg: Images.StakingX1600,
-    tabletImg: Images.StakingX1600,
-    mobileImg: Images.StakingX1600,
+    laptopImg: Images.StakingX1440,
+    tabletImg: Images.StakingX768,
+    mobileImg: Images.StakingX394,
   },
   // {
   //   label: 'Batman',
