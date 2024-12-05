@@ -32,7 +32,7 @@ abstract contract Escrow is Utils {
         assetRootAddress = address(0);
         attachAssets(_assets, _collateralQuantity, _assetPrice, _loanToValueRatio);
         require(collateralQuantity > 0, "No collateral has been staked");
-        totalCataReward = 0.0; // Assuming the CATA reward rate is provided externally
+        totalCataReward = 0; // Assuming the CATA reward rate is provided externally
         isActive = true;
     }
 
