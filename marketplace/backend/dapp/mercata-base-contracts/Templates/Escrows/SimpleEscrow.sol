@@ -1,6 +1,6 @@
 pragma solidvm 11.5;
 
-import <BASE_CODE_COLLECTION>;
+import "Escrow.sol";
 
 contract SimpleEscrow is Escrow {
     constructor(

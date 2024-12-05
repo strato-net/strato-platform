@@ -5,6 +5,7 @@ import <509>;
 
 import "../Assets/Asset.sol";
 import "../Escrows/Escrow.sol";
+import "../Escrows/SimpleEscrow.sol";
 import "../Oracles/OracleService.sol";
 import "../Structs/Structs.sol";
 import "../Utils/Utils.sol";
@@ -99,12 +100,13 @@ abstract contract Reserve is Utils, Structs {
         Escrow escrow = Escrow(_escrowAddress);
         if (_escrowAddress == address(0)) {
             // Create Escrow with all required parameters
-            escrow = new Escrow(
+            SimpleEscrow simpleEscrow = new SimpleEscrow(
                 _assets,
                 _collateralQuantity,
                 _oraclePrice,
                 loanToValueRatio
             );
+            escrow = Escrow(simpleEscrow);
         } else {
             escrow.attachAssets(
                 _assets,
