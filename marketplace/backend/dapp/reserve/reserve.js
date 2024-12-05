@@ -61,46 +61,72 @@ function marshalOut(_args) {
  * @throws {Error} - Throws if no reserves are found.
  */
 async function get(user, address, options) {
-  // Define search options for active reserves
-  const searchOptions = {
+  const CREATOR = 'eq.BlockApps';
+  const IS_ACTIVE = 'eq.true';
+
+  // Fetch active reserves
+  const reserveSearchOptions = {
     ...options,
     query: {
-      creator: 'eq.BlockApps',
-      isActive: 'eq.true',
-      address: 'eq.' + address,
+      creator: CREATOR,
+      isActive: IS_ACTIVE,
+      address: `eq.${address}`,
     },
   };
 
-  // Fetch reserves from Cirrus
   const reserves = await rest.search(
     user,
     { name: contractName },
-    searchOptions
+    reserveSearchOptions
   );
-
   if (!reserves || reserves.length === 0) {
-    throw new Error('No reserves found');
+    throw new Error('No active reserves found for the given address');
   }
 
-  // Fetch asset information and attach it to the reserve
   const reserve = reserves[0];
 
-  const asset = await rest.search(
-    user,
-    { name: 'BlockApps-Mercata-Asset' },
-    {
-      ...options,
-      query: {
-        address: `eq.${reserve.assetRootAddress}`,
-        select: constants.attachImagesAndFiles,
-      },
-    }
+  // Fetch associated escrows
+  const escrowSearchOptions = {
+    ...options,
+    query: {
+      creator: CREATOR,
+      isActive: IS_ACTIVE,
+      reserve: `eq.${reserve.address}`,
+      select: 'collateralValue.sum()'
+    },
+  };
+
+  const escrows = await rest.search(
+    null, // Replace `null` with the appropriate token if needed
+    { name: 'BlockApps-Mercata-Escrow' },
+    escrowSearchOptions
   );
 
-  // Attach the first matching asset (or null) to the reserve
+  // Calculate TVL: Total Value Locked in Dollars
+  const tvl = escrows && escrows.length > 0 ? escrows[0].sum / 100 : 0;
+
+  // Fetch associated asset
+  const assetSearchOptions = {
+    ...options,
+    query: {
+      address: `eq.${reserve.assetRootAddress}`,
+      select: constants.attachImagesAndFiles,
+    },
+  };
+
+  const assets = await rest.search(
+    user,
+    { name: 'BlockApps-Mercata-Asset' },
+    assetSearchOptions
+  );
+
+  const asset = assets && assets.length > 0 ? marshalOut(assets[0]) : null;
+
+  // Return combined result
   return {
     ...reserve,
-    asset: asset && asset[0] ? marshalOut(asset[0]) : null,
+    asset,
+    tvl
   };
 }
 
@@ -132,9 +158,10 @@ async function getAll(user, options) {
     throw new Error('No reserves found');
   }
 
-  // Fetch asset information and attach it to each reserve
-  const reservesWithAssets = await Promise.all(
+  // Fetch asset information and TVL, and attach them to each reserve
+  const reservesWithAssetsAndTVL = await Promise.all(
     reserves.map(async (reserve) => {
+      // Fetch associated asset
       const asset = await rest.search(
         user,
         { name: 'BlockApps-Mercata-Asset' },
@@ -147,15 +174,36 @@ async function getAll(user, options) {
         }
       );
 
-      // Attach the first matching asset (or null) to the reserve
+      // Fetch associated escrows to calculate TVL
+      const escrowSearchOptions = {
+        ...options,
+        query: {
+          creator: 'eq.BlockApps',
+          isActive: 'eq.true',
+          reserve: `eq.${reserve.address}`,
+          select: 'collateralValue.sum()',
+        },
+      };
+
+      const escrows = await rest.search(
+        user,
+        { name: 'BlockApps-Mercata-Escrow' },
+        escrowSearchOptions
+      );
+
+      // Calculate TVL: Total Value Locked in Dollars
+      const tvl = escrows && escrows.length > 0 ? escrows[0].sum / 100 : 0;
+
+      // Attach the first matching asset (or null) and TVL to the reserve
       return {
         ...reserve,
         asset: asset && asset[0] ? marshalOut(asset[0]) : null,
+        tvl,
       };
     })
   );
 
-  return reservesWithAssets;
+  return reservesWithAssetsAndTVL;
 }
 
 /**

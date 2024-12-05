@@ -84,7 +84,7 @@ const StakeModal = ({
             description:
               'The total value of your staked assets, calculated as Quantity x Oracle Price.',
             value: `$${(
-              oracleData.consensusPrice.toFixed(2) * inventory?.quantity
+              matchedReserve?.lastUpdatedOraclePrice * inventory?.quantity
             ).toFixed(2)}`,
           },
           {
@@ -95,8 +95,8 @@ const StakeModal = ({
               <div className="flex -mr-1">
                 {(
                   (inventory?.quantity *
-                    oracleData.consensusPrice *
-                    matchedReserve?.cataAPYRate) /
+                    matchedReserve?.lastUpdatedOraclePrice *
+                    (matchedReserve?.cataAPYRate / 10)) /
                   365
                 ).toFixed(6)}
 
@@ -121,7 +121,7 @@ const StakeModal = ({
             label: `Market price (per unit)`,
             description:
               ' The current price of one unit of your RWA, as determined by the oracle.',
-            value: `$${oracleData.consensusPrice.toFixed(2)}`,
+            value: `$${matchedReserve?.lastUpdatedOraclePrice.toFixed(2)}`,
           },
         ]
       : [];
