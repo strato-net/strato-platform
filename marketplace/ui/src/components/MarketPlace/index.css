@@ -156,6 +156,27 @@ img.ant-image-preview-img {
   font-weight: 900;
 }
 
+.stake-banner-stats{
+  background-color: rgba(36, 33, 33, 0.293);
+  padding: 12px;
+  border-radius: 12px;
+  position: relative;
+  top: -20px;
+  right: -20px;
+  display: flex;
+  justify-content: space-between;
+}
+
+.stake-banner-stats-title{
+  font-size: 12px;
+  /* color: white; */
+}
+
+.stake-banner-stats-value{
+  font-size: 24px;
+  /* color: white; */
+}
+
 .clothing_banner_text {
   font-weight: 900;
 }
@@ -397,8 +418,17 @@ img.ant-image-preview-img {
   .staking_banner_text {
     font-size: 48px;
     left: 7%;
-    top: 7%;
+    top: -10%;
     line-height: 52px;
+  }
+
+  .staking_banner_text > h1:nth-child(3){
+    line-height: 30px;
+  }
+
+  .stake-banner-stats{
+    top: -20px;
+    right: -20px;
   }
 
   .clothing_banner_text {
@@ -482,8 +512,17 @@ img.ant-image-preview-img {
   .staking_banner_text {
     font-size: 48px;
     left: 7%;
-    top: 3%;
+    top: -13%;
     line-height: 52px;
+  }
+
+  .staking_banner_text > h1:nth-child(3){
+    line-height: 28px;
+  }
+
+  .stake-banner-stats{
+    top: -20px;
+    right: -20px;
   }
 
   .clothing_banner_text {
@@ -593,6 +632,49 @@ img.ant-image-preview-img {
   }
 }
 
+@media (min-width: 769px) and (max-width: 834px) {
+  .staking_banner_text {
+    font-size: 44px;
+    left: 7%;
+    top: -15%;
+    /* line-height: 22px; */
+  }
+
+  .staking_banner_text > h1:nth-child(3){
+    line-height: 28px;
+  }
+
+  .stake-banner-stats{
+    top: -20px;
+    right: -20px;
+  }
+
+  .stake-banner-stats-title{
+    font-size: 12px;
+  }
+
+  .stake-banner-stats-value{
+    font-size: 24px;
+  }
+
+}
+@media (min-width: 835px) and (max-width: 999px) {
+  .staking_banner_text {
+    font-size: 44px;
+    left: 7%;
+    top: -15%;
+  }
+
+  .staking_banner_text > h1:nth-child(3){
+    line-height: 32px;
+  }
+
+  .stake-banner-stats{
+    top: -20px;
+    right: -20px;
+  }
+}
+
 @media (min-width: 769px) and (max-width: 999px) {
   .collectible_banner_text {
     width: 360px;
@@ -602,12 +684,12 @@ img.ant-image-preview-img {
     line-height: 42px;
   }
 
-  .staking_banner_text {
+  /* .staking_banner_text {
     font-size: 44px;
     left: 7%;
-    top: 3%;
+    top: -5%;
     line-height: 42px;
-  }
+  } */
 
   .clothing_banner_text {
     width: 360px;
@@ -721,11 +803,33 @@ img.ant-image-preview-img {
     line-height: 44px;
   }
 
+  .stake-banner-stats{
+    top: -15px;
+    right: 0px;
+    width: 66%;
+  }
+
+  /* .stake-banner-stats-title{
+    font-size: 12px;
+  }
+
+  .stake-banner-stats-value{
+    font-size: 24px;
+  } */
+
   .staking_banner_text {
-    font-size: 40px;
+    font-size: 28px;
     left: 7%;
-    top: 8%;
-    line-height: 44px;
+    top: -10%;
+  }
+
+  .staking_banner_text > h1:nth-child(3){
+    line-height: 28px;
+  }
+
+  .staking_banner_text > .title {
+    font-size: 2.5rem;
+    font-weight: bold;
   }
 
   .clothing_banner_text {
@@ -840,11 +944,33 @@ img.ant-image-preview-img {
     line-height: 36px;
   }
 
+  .stake-banner-stats{
+    width: 60%;
+    right: 0px;
+  }
+
+  .stake-banner-stats-title{
+    font-size: 8px;
+    font-weight: 600;
+  }
+
+  .stake-banner-stats-value{
+    font-size: 20px;
+  }
+
   .staking_banner_text {
-    font-size: 32px;
+    font-size: 24px;
     left: 7%;
-    top: 10%;
+    top: -7%;
     line-height: 36px;
+  }
+
+  .staking_banner_text > h1:nth-child(3){
+    line-height: 24px;
+  }
+
+  .staking_banner_text > .title {
+    font-size: 40px;
   }
 
   .clothing_banner_text {
@@ -965,11 +1091,43 @@ img.ant-image-preview-img {
     line-height: 24px;
   }
 
+  .stake-banner-stats {
+    flex-direction: column;
+    width: 30%;
+    right: -24px;
+    top: -120px;
+  }
+
+  .stake-banner-stats-title{
+    font-size: 8px;
+    font-weight: 600;
+  }
+
+  .stake-banner-stats-value{
+    font-size: 16px;
+  }
+
   .staking_banner_text {
-    font-size: 24px;
+    font-size: 20px;
     left: 4%;
-    top: 5%;
+    top: -65%;
     line-height: 24px;
+  }
+
+  .staking_banner_text > .title{
+    font-size: 24px;
+  }
+
+  .staking_banner_text > h1:nth-child(2){
+    margin-top: 6px;
+    font-size: 16px;
+  }
+
+  .staking_banner_text > h1:nth-child(3){
+    margin-top: 6px;
+    font-size: 16px;
+    width: 68%;
+    line-height: 18px;
   }
 
   .clothing_banner_text {
@@ -1092,11 +1250,43 @@ img.ant-image-preview-img {
     line-height: 24px;
   }
 
+  .stake-banner-stats{
+    width: 25%;
+    flex-direction: column;
+    top: -150px;
+    height: 180px;
+  }
+
+  .stake-banner-stats-title{
+    font-size: 8px;
+    font-weight: 600;
+  }
+
+  .stake-banner-stats-value{
+    font-size: 16px;
+  }
+
   .staking_banner_text {
     font-size: 24px;
     left: 4%;
-    top: 10%;
+    top: -82%;
     line-height: 24px;
+  }
+
+  .staking_banner_text > .title{
+    font-size: 20px;
+  }
+
+  .staking_banner_text > h1:nth-child(2){
+    margin-top: 6px;
+    font-size: 14px;
+  }
+
+  .staking_banner_text > h1:nth-child(3){
+    margin-top: 6px;
+    font-size: 14px;
+    width: 68%;
+    line-height: 16px;
   }
 
   .clothing_banner_text {

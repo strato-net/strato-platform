@@ -343,12 +343,11 @@ export const BANNER = [
     link: '/stake',
     text: (
       <div className="staking_banner_text banner-text">
-        <h1> RWA X DeFi </h1>
-        <h1 className="text-base w-5/6 md:text-3xl"> Staking is Here! </h1>
-        <h1 className="text-base w-5/6 md:text-3xl">
-          {' '}
+        <h1 className='title'> RWA X DeFi </h1>
+        <h1 className=" w-5/6  mt-1 md:text-3xl"> Staking is Here! </h1>
+        <h1 className=" w-5/6 mt-1 md:text-3xl ">
           Stake silver and gold to earn and gain access to CATA, our governance
-          token!{' '}
+          token!
         </h1>
       </div>
     ),
