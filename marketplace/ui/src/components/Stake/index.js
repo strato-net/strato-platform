@@ -164,7 +164,7 @@ const Stake = ({ user }) => {
             </div>
             {isStakeable && (
               <>
-                <div> Borrowed Amount: ${borrowedAmount.toLocaleString('en-US',{minimumFractionDigits: 2})} </div>
+                <div> Borrowed Amount: ${borrowedAmount.toLocaleString('en-US',{maximumFractionDigits: 2, minimumFractionDigits: 2})} </div>
               </>
             )}
           </>
