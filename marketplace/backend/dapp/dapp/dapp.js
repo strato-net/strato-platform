@@ -2102,8 +2102,9 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
     const { assetRootAddress } = args;
     const queryArgs = { 
       select: '*,BlockApps-Mercata-Escrow-assets(*)',
-      ['assetRootAddress']: `like.${assetRootAddress}*`,
-      ['borrowerCommonName']: `eq.${userCommonName}`,
+      assetRootAddress: `like.${assetRootAddress}*`,
+      borrowerCommonName: `eq.${userCommonName}`,
+      isActive: 'eq.true',
     };
     return await escrowJs.searchEscrow(rawAdmin, queryArgs, options);
   };
