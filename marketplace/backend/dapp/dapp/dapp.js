@@ -2118,6 +2118,10 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
     return await escrowJs.searchEscrow(rawAdmin, queryArgs, options);
   };
 
+  contract.userCataRewards = async function (args, options = defaultOptions) {
+    return await escrowJs.userCataRewards(rawAdmin, args.userCommonName, options);
+  };
+
   contract.oraclePrice = async function (args, options = defaultOptions) {
     return await reserveJs.oraclePrice(rawAdmin, args, options);
   };
