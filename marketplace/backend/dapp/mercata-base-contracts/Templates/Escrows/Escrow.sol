@@ -121,7 +121,7 @@ abstract contract Escrow is Utils {
                                                + "\nMaximum loan amount after unstaking: "
                                                + showSTRATValue(maxLoanAmount));
         if (collateralQuantity == 0) {
-            closeEscrow();
+            isActive = false;
         }
     }
 
@@ -157,9 +157,4 @@ abstract contract Escrow is Utils {
         require(msg.sender == reserve, "Only the existing reserve can update the reserve address");
         reserve = _newReserve;
     }
-
-    function closeEscrow() internal {
-        isActive = false;
-    }
-
 }
