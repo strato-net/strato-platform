@@ -115,11 +115,11 @@ abstract contract Escrow is Utils {
                                                + string(quantityToUnlock)
                                                + " units would result in undercollateralization."
                                                + "\nCurrent loan balance: "
-                                               + showSTRATValue(borrowedAmount)
+                                               + showSTRATValue(uint(borrowedAmount))
                                                + "\nCollateral value after unstaking: "
-                                               + showSTRATValue(collateralValue)
+                                               + showSTRATValue(uint(collateralValue))
                                                + "\nMaximum loan amount after unstaking: "
-                                               + showSTRATValue(maxLoanAmount));
+                                               + showSTRATValue(uint(maxLoanAmount)));
         if (collateralQuantity == 0) {
             isActive = false;
         }
@@ -144,7 +144,8 @@ abstract contract Escrow is Utils {
     }
 
     function _updateOnPriceChange(decimal _newPrice, uint _loanToValueRatio) internal {
-        collateralValue = uint((decimal(collateralQuantity).truncate(4) * _newPrice * 10000.0000).truncate(0)); // 100 STRATs per dollar * 100 STRAT units per STRAT = 10000 
+        uint newCollateralValue = uint((decimal(collateralQuantity).truncate(4) * _newPrice * 10000.0000).truncate(0)); // 100 STRATs per dollar * 100 STRAT units per STRAT = 10000 
+        collateralValue = uint(newCollateralValue);
         maxLoanAmount = collateralValue * _loanToValueRatio;
     }
 
