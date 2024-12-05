@@ -18,9 +18,7 @@ import { useMarketplaceDispatch } from '../../contexts/marketplace';
 import { Images } from '../../images';
 import { useLocation } from 'react-router-dom';
 
-const logo = (
-  <img src={Images.strat} alt={''} title={''} className="w-5 h-5" />
-);
+const logo = <img src={Images.strat} alt={''} title={''} className="w-5 h-5" />;
 
 const RepayModal = ({
   open,
@@ -31,11 +29,9 @@ const RepayModal = ({
   limit,
   offset,
   productDetailPage,
-  reserves
+  reserves,
 }) => {
-  const {
-    isRepaying
-  } = useInventoryState();
+  const { isRepaying } = useInventoryState();
   // Dispatch
   const inventoryDispatch = useInventoryDispatch();
   const marketplaceDispatch = useMarketplaceDispatch();
@@ -67,7 +63,7 @@ const RepayModal = ({
       description: 'The amount of USD to pay off the loan',
       value: (
         <div className="flex -mr-1">
-          {parseFloat(inventory?.escrow?.borrowedAmount/10000).toFixed(2)}
+          {parseFloat(inventory?.escrow?.borrowedAmount / 10000).toFixed(2)}
         </div>
       ),
     },
@@ -76,9 +72,9 @@ const RepayModal = ({
   const dataForSummary = [];
 
   const handleSubmit = async () => {
-    const matchedReserve = reserves?.length ? reserves.find(
-      (reserve) => reserve.assetRootAddress === inventory.root
-    ) : null;
+    const matchedReserve = reserves?.length
+      ? reserves.find((reserve) => reserve.assetRootAddress === inventory.root)
+      : null;
     const body = {
       escrow: inventory?.sale,
       reserve: matchedReserve?.address,
@@ -98,7 +94,10 @@ const RepayModal = ({
           offset,
           debouncedSearchTerm,
           category && category !== 'All' ? category : undefined,
-          queryParams.get('st') === 'true' ? queryParams.get('st') === 'true' ? reserves.map(reserve => reserve.assetRootAddress) : '' : ''
+          queryParams.get('st') === 'true' ||
+            window.location.pathname === '/stake'
+            ? reserves.map((reserve) => reserve.assetRootAddress)
+            : ''
         );
       }
       await marketplaceActions.fetchStratsBalance(marketplaceDispatch);

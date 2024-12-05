@@ -90,8 +90,12 @@ const ListForSaleModal = ({
   useEffect(() => {
     if (
       inventory.saleAddress
-      ? quantity.gt(new BigNumber(inventory.quantity).minus(new BigNumber(inventory.totalLockedQuantity)))
-      : quantity.gt(new BigNumber(inventory.quantity))
+        ? quantity.gt(
+            new BigNumber(inventory.quantity).minus(
+              new BigNumber(inventory.totalLockedQuantity)
+            )
+          )
+        : quantity.gt(new BigNumber(inventory.quantity))
     ) {
       setCanList(false);
     } else if (
@@ -218,7 +222,12 @@ const ListForSaleModal = ({
             serviceName: availablePaymentServices[p].serviceName,
           };
         }),
-      price: pricePerUnit !== undefined && isStrat ? pricePerUnit / 100 : isCata ? pricePerUnit / Math.pow(10, 18) : pricePerUnit,
+      price:
+        pricePerUnit !== undefined && isStrat
+          ? pricePerUnit / 100
+          : isCata
+          ? pricePerUnit / Math.pow(10, 18)
+          : pricePerUnit,
     };
 
     // Ensure 'strats' is included in the submission
@@ -265,7 +274,10 @@ const ListForSaleModal = ({
         offset,
         debouncedSearchTerm,
         category && category !== 'All' ? category : undefined,
-        queryParams.get('st') === 'true' ? reserves.map(reserve => reserve.assetRootAddress) : ''
+        queryParams.get('st') === 'true' ||
+          window.location.pathname === '/stake'
+          ? reserves.map((reserve) => reserve.assetRootAddress)
+          : ''
       );
       handleCancel();
     }
@@ -326,9 +338,13 @@ const ListForSaleModal = ({
             controls={false}
             max={
               isStrat
-                ? new BigNumber(inventory.quantity).dividedBy(new BigNumber(100))
+                ? new BigNumber(inventory.quantity).dividedBy(
+                    new BigNumber(100)
+                  )
                 : isCata
-                ? new BigNumber(inventory.quantity).dividedBy(new BigNumber(10).pow(18))
+                ? new BigNumber(inventory.quantity).dividedBy(
+                    new BigNumber(10).pow(18)
+                  )
                 : inventory.quantity
             }
             onChange={(value) => setQuantity(new BigNumber(value))}
@@ -428,9 +444,13 @@ const ListForSaleModal = ({
             controls={false}
             max={
               isStrat
-                ? new BigNumber(inventory.quantity).dividedBy(new BigNumber(100))
+                ? new BigNumber(inventory.quantity).dividedBy(
+                    new BigNumber(100)
+                  )
                 : isCata
-                ? new BigNumber(inventory.quantity).dividedBy(new BigNumber(10).pow(18))
+                ? new BigNumber(inventory.quantity).dividedBy(
+                    new BigNumber(10).pow(18)
+                  )
                 : inventory.quantity
             }
             onChange={(value) => setQuantity(new BigNumber(value))}

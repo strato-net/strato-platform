@@ -16,7 +16,7 @@ const BridgeModal = ({
   debouncedSearchTerm,
   limit,
   offset,
-  reserves
+  reserves,
 }) => {
   const [data, setData] = useState([inventory]);
   const location = useLocation();
@@ -88,7 +88,10 @@ const BridgeModal = ({
           offset,
           debouncedSearchTerm,
           category && category !== 'All' ? category : undefined,
-          queryParams.get('st') === 'true' ? reserves.map(reserve => reserve.assetRootAddress) : ''
+          queryParams.get('st') === 'true' ||
+            window.location.pathname === '/stake'
+            ? reserves.map((reserve) => reserve.assetRootAddress)
+            : ''
         );
         await actions.fetchInventoryForUser(
           inventoryDispatch,

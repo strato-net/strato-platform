@@ -14,9 +14,7 @@ import {
 import { Images } from '../../images';
 import { useLocation } from 'react-router-dom';
 
-const logo = (
-  <img src={Images.strat} alt={''} title={''} className="w-5 h-5" />
-);
+const logo = <img src={Images.cata} alt={''} title={''} className="w-5 h-5" />;
 
 const StakeModal = ({
   open,
@@ -45,9 +43,12 @@ const StakeModal = ({
 
   const { paymentServices } = usePaymentServiceState();
   const isLoader =
-    isStaking || isUnstaking || isFetchingOracle || isReservesLoading || isEscrowLoading;
-  const isStaked =
-    inventory.escrow && inventory.escrow.isActive;
+    isStaking ||
+    isUnstaking ||
+    isFetchingOracle ||
+    isReservesLoading ||
+    isEscrowLoading;
+  const isStaked = inventory.escrow && inventory.escrow.isActive;
   const itemName = decodeURIComponent(inventory.name);
   const matchedReserve = reserves?.length
     ? reserves.find((reserve) => reserve.assetRootAddress === inventory.root)
@@ -129,7 +130,9 @@ const StakeModal = ({
   const handleSubmit = async () => {
     if (type === 'Stake') {
       const body = {
-        escrowAddress: escrow ? escrow.address : '0000000000000000000000000000000000000000',
+        escrowAddress: escrow
+          ? escrow.address
+          : '0000000000000000000000000000000000000000',
         collateralQuantity: inventory?.quantity,
         assets: inventory ? [inventory.address] : [],
         reserve: matchedReserve?.address,
@@ -152,10 +155,9 @@ const StakeModal = ({
             offset,
             debouncedSearchTerm,
             category && category !== 'All' ? category : undefined,
-            queryParams.get('st') === 'true'
-              ? queryParams.get('st') === 'true'
-                ? reserves.map((reserve) => reserve.assetRootAddress)
-                : ''
+            queryParams.get('st') === 'true' ||
+              window.location.pathname === '/stake'
+              ? reserves.map((reserve) => reserve.assetRootAddress)
               : ''
           );
         }
@@ -186,10 +188,9 @@ const StakeModal = ({
             offset,
             debouncedSearchTerm,
             category && category !== 'All' ? category : undefined,
-            queryParams.get('st') === 'true'
-              ? queryParams.get('st') === 'true'
-                ? reserves.map((reserve) => reserve.assetRootAddress)
-                : ''
+            queryParams.get('st') === 'true' ||
+              window.location.pathname === '/stake'
+              ? reserves.map((reserve) => reserve.assetRootAddress)
               : ''
           );
         }

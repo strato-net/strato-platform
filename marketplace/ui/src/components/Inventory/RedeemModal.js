@@ -132,7 +132,10 @@ const RedeemModal = ({
           offset,
           debouncedSearchTerm,
           category && category !== 'All' ? category : undefined,
-          queryParams.get('st') === 'true' ? reserves.map(reserve => reserve.assetRootAddress) : ''
+          queryParams.get('st') === 'true' ||
+            window.location.pathname === '/stake'
+            ? reserves.map((reserve) => reserve.assetRootAddress)
+            : ''
         );
         await actions.fetchInventoryForUser(
           inventoryDispatch,
