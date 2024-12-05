@@ -2101,9 +2101,9 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
   contract.getEscrowForAsset = async function (args, options = defaultOptions) {
     const { assetRootAddress } = args;
     const queryArgs = { 
-      select: '*,BlockApps-Mercata-Asset(*)',
-      ['BlockApps-Mercata-Asset.root']: `eq.${assetRootAddress}`,
-      ['BlockApps-Mercata-Asset.ownerCommonName']: `eq.${userCommonName}`,
+      select: '*,BlockApps-Mercata-Escrow(*)',
+      ['BlockApps-Mercata-Escrow.assetRootAddress']: `eq.${assetRootAddress}`,
+      ['BlockApps-Mercata-Escrow.borrowerCommonName']: `eq.${userCommonName}`,
     };
     return await escrowJs.getEscrowForAsset(rawAdmin, queryArgs, options);
   };
