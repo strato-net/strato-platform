@@ -74,6 +74,7 @@ const NewTrendingCard = ({
     color: '#989898',
     opacity: 0.4,
     maxHeight: '1.25rem',
+    maxWidth: '30rem',
     overflow: 'hidden',
   };
 
