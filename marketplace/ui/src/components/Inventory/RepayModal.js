@@ -90,6 +90,8 @@ const RepayModal = ({
             ? reserves.map((reserve) => reserve.assetRootAddress)
             : ''
         );
+        await inventoryActions.getAllReserve(inventoryDispatch);
+        await inventoryActions.getUserCataRewards(inventoryDispatch);
       }
       await marketplaceActions.fetchStratsBalance(marketplaceDispatch);
       handleCancel();

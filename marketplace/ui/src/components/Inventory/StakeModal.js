@@ -160,6 +160,8 @@ const StakeModal = ({
               ? reserves.map((reserve) => reserve.assetRootAddress)
               : ''
           );
+          await inventoryActions.getAllReserve(inventoryDispatch);
+          await inventoryActions.getUserCataRewards(inventoryDispatch);
         }
         handleCancel();
       }
@@ -193,6 +195,8 @@ const StakeModal = ({
               ? reserves.map((reserve) => reserve.assetRootAddress)
               : ''
           );
+          inventoryActions.getAllReserve(inventoryDispatch);
+          inventoryActions.getUserCataRewards(inventoryDispatch);
         }
         handleCancel();
       }
