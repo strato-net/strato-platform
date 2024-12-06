@@ -391,7 +391,9 @@ const Inventory = ({ user }) => {
           reserves.some(
             (reserve) => record.originAddress === reserve.assetRootAddress
           );
-        const borrowedAmount = (record?.escrow?.borrowedAmount || 0) / 100;
+        const borrowedAmount =
+          ((record?.escrow?.borrowedAmount * record?.quantity) /
+            record?.escrow?.collateralQuantity || 0) / 100;
         const callDetailPage = () => {
           navigate(
             `${naviroute
