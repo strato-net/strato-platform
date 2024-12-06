@@ -127,6 +127,12 @@ const ProductDetails = ({ user, users }) => {
       (reserve) => inventoryDetails?.root === reserve.assetRootAddress
     );
 
+  const matchingReserve = isStakeable
+    ? reserves?.find(
+        (reserve) => reserve.assetRootAddress === inventoryDetails?.root
+      )
+    : {};
+
   let isCalledFromInventory = false;
   if (state !== null && state !== undefined) {
     isCalledFromInventory = state.isCalledFromInventory;
@@ -656,9 +662,9 @@ const ProductDetails = ({ user, users }) => {
                               <>
                                 $
                                 {isStaked
-                                  ? (details.escrow?.maxLoanAmount / 100).toFixed(
-                                      2
-                                    )
+                                  ? (
+                                      details.escrow?.maxLoanAmount / 100
+                                    ).toFixed(2)
                                   : adjustedPrice}{' '}
                                 <span className="font-normal text-xs mr-2 text-primary">
                                   <b>
@@ -680,9 +686,11 @@ const ProductDetails = ({ user, users }) => {
                                 </span>
                                 {isStakeable && (
                                   <>
-                                    <div className="text-lg">Est. APY: 10%</div>
                                     <div className="text-lg">
-                                      TVL: $34,523,523
+                                      Est. APY: {matchingReserve?.cataAPYRate}%
+                                    </div>
+                                    <div className="text-lg">
+                                      TVL: ${matchingReserve?.tvl.toFixed(2)}
                                     </div>
                                   </>
                                 )}
