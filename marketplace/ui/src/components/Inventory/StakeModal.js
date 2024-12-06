@@ -261,17 +261,13 @@ const StakeModal = ({
           <br />
           {type === 'Stake' && (
             <div>
-              By staking your RWAs, you earn daily rewards in CATA tokens, our
-              governance token, generating passive income without needing to
-              sell your assets. Additionally, you have the option to
-              borrow(interest-free for a limited time!) up to 50% of the market
-              value of your staked RWAs in STRAT tokens, our stablecoin,
-              providing immediate liquidity while your assets remain staked and
-              continue to earn CATA rewards. If you prefer not to borrow, you
-              can simply stake your RWAs to benefit from the daily CATA rewards,
-              allowing you to tailor your strategy according to your financial
-              objectives—whether that's generating passive income, accessing
-              liquidity, or both.
+              By staking your RWAs, you earn daily rewards in the form of CATA,
+              our governance token. Additionally, you have the option to borrow
+              (interest-free for a limited time!) up to 50% of the market value
+              of your staked RWAs in STRAT tokens, our stablecoin, providing
+              immediate liquidity while your assets remain staked and continue
+              to earn CATA rewards. If you prefer not to borrow, you can simply
+              stake your RWAs to benefit from the daily CATA rewards.
             </div>
           )}
         </div>
