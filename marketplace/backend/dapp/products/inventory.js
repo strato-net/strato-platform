@@ -568,7 +568,8 @@ async function getAll(admin, args = {}, defaultOptions) {
         const inventory = inventories[i];
         if (
           inventory['BlockApps-Mercata-Sale'] &&
-          inventory['BlockApps-Mercata-Sale'].length > 0
+          inventory['BlockApps-Mercata-Sale'].length > 0 &&
+          inventory['BlockApps-Mercata-Sale'].some(item => item.isOpen === true)
         ) {
           let sales = inventory['BlockApps-Mercata-Sale'].filter(
             (sale) => sale.isOpen === true
