@@ -58,6 +58,8 @@ const Stake = ({ user }) => {
   const [offset, setOffset] = useState(0);
   const [page, setPage] = useState(1);
   const [queryValue, setQueryValue] = useState('');
+  const [totalCataRewardState, setTotalCataRewardState] = useState(0);
+  const [dailyCataRewardState, setDailyCataRewardState] = useState(0);
   const debouncedSearchTerm = useDebounce(queryValue, 1000);
   const navigate = useNavigate();
 
@@ -66,6 +68,11 @@ const Stake = ({ user }) => {
     setOffset((page - 1) * pageSize);
     setPage(page);
   };
+
+  useEffect(() => {
+    setTotalCataRewardState(totalCataReward);
+    setDailyCataRewardState(dailyCataReward);
+  }, [totalCataReward, dailyCataReward]);
 
   useEffect(() => {
     if (!reserves || reserves.length === 0) {

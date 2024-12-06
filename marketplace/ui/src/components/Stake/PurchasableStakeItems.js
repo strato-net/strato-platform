@@ -18,7 +18,7 @@ const PurchasableStakeItems = () => {
   const containerRef = useRef(null);
 
   const marketplaceDispatch = useMarketplaceDispatch();
-  const { reserves } = useInventoryState();
+  const { reserves, isReservesLoading } = useInventoryState();
   const { stakeableProducts, isStakeableProductsLoading } =
     useMarketplaceState();
 
@@ -40,9 +40,9 @@ const PurchasableStakeItems = () => {
           </Title>
         </div>
       </Fade>
-      {stakeableProducts?.length <= 0 ? (
+      {stakeableProducts?.length <= 0 || !reserves ? (
         <div className="h-52 flex justify-center items-center">
-          <Spin spinning={isStakeableProductsLoading} size="large" />
+          <Spin spinning={isStakeableProductsLoading || isReservesLoading} size="large" />
         </div>
       ) : (
         <Fade direction="right" triggerOnce>

@@ -79,6 +79,8 @@ const Inventory = ({ user }) => {
   const [limit, setLimit] = useState(10);
   const [offset, setOffset] = useState(0);
   const [page, setPage] = useState(1);
+  const [totalCataRewardState, setTotalCataRewardState] = useState(0);
+  const [dailyCataRewardState, setDailyCataRewardState] = useState(0);
   const [showPublished, setShowPublished] = useState(false);
   const dispatch = useInventoryDispatch();
   const [api, contextHolder] = notification.useNotification();
@@ -129,6 +131,11 @@ const Inventory = ({ user }) => {
     notOnboarded.some((n) => n.serviceName === service.serviceName);
 
   useEffect(() => {
+    setTotalCataRewardState(totalCataReward);
+    setDailyCataRewardState(dailyCataReward);
+  }, [totalCataReward, dailyCataReward]);
+
+  useEffect(() => {
     // Create a set of not onboarded service names for quick lookup
     const notOnboardedNames = new Set(notOnboarded.map((n) => n.serviceName));
 
@@ -173,6 +180,7 @@ const Inventory = ({ user }) => {
 
   useEffect(() => {
     actions.getAllReserve(dispatch);
+    actions.getUserCataRewards(dispatch);
     actions.fetchSupportedTokens(dispatch);
     categoryActions.fetchCategories(categoryDispatch);
   }, []);
