@@ -22,7 +22,7 @@ abstract contract Reserve is Utils, Structs {
     bool public isActive = true;
     address public assetRootAddress;
 
-    uint public loanToValueRatio = 50; // LTV ratio as percentage
+    uint public loanToValueRatio = 80; // LTV ratio as percentage
     uint public cataAPYRate = 10; // 10% APY for CATA rewards
     decimal public unitConversionRate = 1; // 1 oz of gold in grams
 
