@@ -34,6 +34,9 @@ const InventoriesProvider = ({ children }) => {
     escrow: null,
     isReserveLoading: false,
     oracle : null,
+    totalCataReward: 0,
+    dailyCataReward: 0,
+    isUserCataRewardsLoading: false,
     isBorrowing: false,
     isRepaying: false,
     //------------------------

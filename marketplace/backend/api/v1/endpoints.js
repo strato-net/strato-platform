@@ -214,5 +214,5 @@ export const Reserve = {
 export const Escrow = {
   prefix: "/escrow",
   getEscrowForAsset: "/:assetRootAddress",
-  getCataRewards: "/:userCommonName",
+  getCataRewards: "/reward",
 };

@@ -7,17 +7,17 @@ import loadDapp from '../../middleware/loadDappHandler';
 const router = express.Router();
 
 router.get(
-  Escrow.getEscrowForAsset,
-  authHandler.authorizeRequest(true),
-  loadDapp,
-  EscrowController.getEscrowForAsset
-);
-
-router.get(
   Escrow.getCataRewards,
   authHandler.authorizeRequest(true),
   loadDapp,
   EscrowController.getCataRewards
+);
+
+router.get(
+  Escrow.getEscrowForAsset,
+  authHandler.authorizeRequest(true),
+  loadDapp,
+  EscrowController.getEscrowForAsset
 );
 
 export default router;

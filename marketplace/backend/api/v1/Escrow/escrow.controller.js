@@ -12,7 +12,7 @@ class EscrowController {
       // Validate address presence and type
       EscrowController.validateGetForAssetArgs({ assetRootAddress });
 
-      const result = await dapp.getEscrowForAsset({assetRootAddress});
+      const result = await dapp.getEscrowForAsset({ assetRootAddress });
       rest.response.status200(res, result);
       next();
     } catch (e) {
@@ -23,13 +23,8 @@ class EscrowController {
   // Get CATA rewards for a user
   static async getCataRewards(req, res, next) {
     try {
-      const { dapp, params } = req;
-      const { userCommonName } = params;
-
-      // Validate address presence and type
-      EscrowController.validateGetCataRewardsArgs({ userCommonName });
-
-      const result = await dapp.userCataRewards({userCommonName});
+      const { dapp } = req;
+      const result = await dapp.userCataRewards();
       rest.response.status200(res, result);
       next();
     } catch (e) {

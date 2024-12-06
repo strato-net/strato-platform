@@ -407,7 +407,7 @@ const InventoryCard = ({
                   className="text-[#13188A]  text-left px-0 font-semibold text-sm h-6"
                   onClick={() => showStakeModal('Unstake')}
                   disabled={
-                    inventory?.escrow?.borrowedAmount && inventory?.escrow?.borrowedAmount > 0
+                    inventory?.escrow?.borrowedAmount > 0
                   }
                 >
                   <LogoutOutlined /> Unstake
@@ -417,7 +417,7 @@ const InventoryCard = ({
                   className="text-[#13188A]  text-left px-0 font-semibold text-sm h-6"
                   onClick={() => showBorrowModal('Unstake')}
                   disabled={
-                    inventory?.escrow?.borrowedAmount && inventory?.escrow?.borrowedAmount > 0
+                    inventory?.escrow?.borrowedAmount > 0
                   }
                 >
                   <BankOutlined /> Borrow
@@ -427,7 +427,7 @@ const InventoryCard = ({
                   className="text-[#13188A]  text-left px-0 font-semibold text-sm h-6"
                   onClick={() => showRepayModal('Unstake')}
                   disabled={
-                    inventory?.escrow?.borrowedAmount && inventory?.escrow?.borrowedAmount <= 0
+                    inventory?.escrow?.borrowedAmount <= 0
                   }
                 >
                   <SolutionOutlined />

@@ -16,6 +16,7 @@ import {
   useInventoryDispatch,
   useInventoryState,
 } from '../../contexts/inventory';
+import { Images } from '../../images';
 import { useMarketplaceState } from '../../contexts/marketplace';
 import ClickableCell from '../ClickableCell';
 import routes from '../../helpers/routes';
@@ -30,7 +31,9 @@ import StakeSteps from './StakeSteps';
 import InventoryCard from '../Inventory/InventoryCard';
 import { useCategoryState, useCategoryDispatch } from '../../contexts/category';
 import { actions as categoryActions } from '../../contexts/category/actions';
-import { DollarOutlined, GiftOutlined } from '@ant-design/icons';
+import { TrophyOutlined, GiftOutlined } from '@ant-design/icons';
+
+const logo = <img src={Images.cata} alt={''} title={''} className="w-5 h-5" />;
 
 const { Title } = Typography;
 
@@ -42,6 +45,8 @@ const Stake = ({ user }) => {
     inventories,
     isInventoriesLoading,
     inventoriesTotal,
+    totalCataReward,
+    dailyCataReward,
     message,
     success,
   } = useInventoryState();
@@ -65,6 +70,7 @@ const Stake = ({ user }) => {
   useEffect(() => {
     if (!reserves || reserves.length === 0) {
       inventoryActions.getAllReserve(inventoryDispatch);
+      inventoryActions.getUserCataRewards(inventoryDispatch);
     }
     categoryActions.fetchCategories(categoryDispatch);
   }, []);
@@ -164,7 +170,14 @@ const Stake = ({ user }) => {
             </div>
             {isStakeable && (
               <>
-                <div> Borrowed Amount: ${borrowedAmount.toLocaleString('en-US',{maximumFractionDigits: 2, minimumFractionDigits: 2})} </div>
+                <div>
+                  {' '}
+                  Borrowed Amount: $
+                  {borrowedAmount.toLocaleString('en-US', {
+                    maximumFractionDigits: 2,
+                    minimumFractionDigits: 2,
+                  })}{' '}
+                </div>
               </>
             )}
           </>
@@ -189,13 +202,7 @@ const Stake = ({ user }) => {
       title: 'Quantity Staked',
       align: 'center',
       render: (_, record) => {
-        const isStrats =
-          record.data.quantityIsDecimal &&
-          record.data.quantityIsDecimal === 'True';
-        const saleQuantity = isStrats
-          ? parseFloat((record.saleQuantity / 100).toFixed(2))
-          : record.saleQuantity;
-        return <div>{saleQuantity || 0}</div>;
+        return <div>{record.escrow ? 1 : 0}</div>;
       },
     },
     {
@@ -221,36 +228,15 @@ const Stake = ({ user }) => {
       align: 'center',
       render: (text, record) => (
         <div className="pt-[7px] lg:pt-0 items-center gap-[5px]">
-          {record.price || record?.maxStratsLoanAmount ? (
+          {record?.escrow ? (
             <div className="flex items-center justify-center gap-2 bg-[#1548C329] p-[6px] rounded-md">
               <div className="w-[7px] h-[7px] rounded-full bg-[#119B2D]"></div>
-              <p className="text-[#4D4D4D] text-[13px]">
-                {' '}
-                {record?.maxStratsLoanAmount ? 'Staked' : 'Published'}{' '}
-              </p>
-            </div>
-          ) : record.status == ASSET_STATUS.PENDING_REDEMPTION ? (
-            <div className="flex items-center justify-center gap-2 bg-[#FFA50029] p-[6px] rounded-md">
-              <div className="w-[8px] h-[7px] rounded-full bg-[#FFA500]"></div>
-              <p className="text-[#4D4D4D] text-[13px]">Pending Redemption</p>
-            </div>
-          ) : record.status == ASSET_STATUS.RETIRED ? (
-            <div className="flex items-center justify-center gap-2 bg-[#c3152129] p-[6px] rounded-md">
-              <div className="w-[7px] h-[7px] rounded-full bg-[#ff4d4f]"></div>
-              <p className="text-[#4D4D4D] text-[13px]">Retired</p>
-            </div>
-          ) : (record.data.isMint &&
-              record.data.isMint === 'False' &&
-              record.quantity === 0) ||
-            (!record.data.isMint && record.quantity === 0) ? (
-            <div className="flex items-center justify-center gap-2 bg-[#FFA50029] p-[6px] rounded-md">
-              <div className="w-[7px] h-[7px] rounded-full bg-[#FFA500]"></div>
-              <p className="text-[#4D4D4D] text-[13px]">Sold Out</p>
+              <p className="text-[#4D4D4D] text-[13px]"> {'Staked'} </p>
             </div>
           ) : (
             <div className="flex items-center justify-center gap-2 bg-[#1548C329] p-[6px] rounded-md">
               <div className="w-[7px] h-[7px] rounded-full bg-[#ff4d4f]"></div>
-              <p className="text-[#4D4D4D] text-[13px]">Unpublished</p>
+              <p className="text-[#4D4D4D] text-[13px]">Unstaked</p>
             </div>
           )}
         </div>
@@ -280,16 +266,16 @@ const Stake = ({ user }) => {
         <Row className="w-[95%] mt-10 mx-auto flex justify-start">
           <Col className="w-full sm:w-auto">
             <p className="flex items-center ml-4 font-semibold text-base md:text-lg bg-[#E6F0FF] border border-[#13188A] rounded-md px-3 py-1 text-[#13188A] shadow-sm">
-              <DollarOutlined className="!text-[#13188A] mr-2 text-lg" />
-              Total Rewards (CATA):
-              <span className="ml-2 font-bold">334,133</span>
+              <TrophyOutlined className="!text-[#13188A] mr-2 text-lg" />
+              Total Rewards: &nbsp;{logo}
+              <span className="ml-1 font-bold">{totalCataReward.toLocaleString('en-US', { maximumFractionDigits: 4, minimumFractionDigits: 0, })}</span>
             </p>
           </Col>
           <Col className="mt-5 sm:mt-0 w-full sm:w-auto">
             <p className="flex items-center ml-4 font-semibold text-base md:text-lg bg-[#FFE6E6] border border-[#D32F2F] rounded-md px-3 py-1 text-[#D32F2F] shadow-sm">
               <GiftOutlined className="!text-[#D32F2F] mr-2 text-lg" />
-              Est. Daily Reward (CATA):
-              <span className="ml-2 font-bold">1,321</span>
+              Est. Daily Reward: &nbsp;{logo}
+              <span className="ml-1 font-bold">{dailyCataReward.toLocaleString('en-US', { maximumFractionDigits: 4, minimumFractionDigits: 0, })}</span>
             </p>
           </Col>
         </Row>

@@ -276,6 +276,25 @@ const reducer = (state, action) => {
           error: action.error,
           isEscrowLoading: false
         };
+
+    case actionDescriptors.getUserCataRewards:
+        return {
+          ...state,
+          isUserCataRewardsLoading: true
+        };
+    case actionDescriptors.getUserCataRewardsSuccessful:
+        return {
+          ...state,
+          totalCataReward: action.payload.totalCataReward,
+          dailyCataReward: action.payload.dailyCataReward,
+          isUserCataRewardsLoading: false
+        };
+    case actionDescriptors.getUserCataRewardsFailed:
+        return {
+          ...state,
+          error: action.error,
+          isUserCataRewardsLoading: false
+        };
     
     case actionDescriptors.getOracle:
           return {

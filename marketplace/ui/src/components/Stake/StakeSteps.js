@@ -48,7 +48,7 @@ const StakeSteps = () => {
               >
                 Sign up
               </a>{' '}
-              for a Mercata account
+              for a Mercata account.
             </p>
           </div>
         </div>

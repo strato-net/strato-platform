@@ -216,7 +216,7 @@ async function userCataRewards(user, userCommonName, options) {
   const searchOptionsTotalCataReward = {
     ...options,
     query: {
-      borrower: `eq.${userCommonName}`,
+      borrowerCommonName: `eq.${userCommonName}`,
       select: `totalCataReward.sum()`,
     },
   };
@@ -238,7 +238,7 @@ async function userCataRewards(user, userCommonName, options) {
   const searchOptionsDailyCataReward = {
     ...options,
     query: {
-      borrower: `eq.${userCommonName}`,
+      borrowerCommonName: `eq.${userCommonName}`,
       isActive: 'eq.true',
       select: `collateralValue.sum()`,
     },
