@@ -267,13 +267,6 @@ const HeaderComponent = ({
                 {' '}
                 <p className="text-xs mt-1">CATA: {new BigNumber(cataBalance).toString()}</p>
               </Col>
-              <Col Col={24}>
-                {' '}
-                <p className="text-xs mt-3">
-                  Balance: $
-                  {(new BigNumber(cataBalance).dividedBy(new BigNumber(10))).toString()}
-                </p>
-              </Col>
             </Row>
           )}
         </>

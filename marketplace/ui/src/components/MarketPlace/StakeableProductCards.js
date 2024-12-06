@@ -87,17 +87,15 @@ const StakeableProductCards = () => {
               ref={containerRef}
               className="overflow-x-auto gap-6 px-1 py-2 flex trending_cards"
             >
-              {stakeableProducts
-                .filter((product) => product.saleQuantity > 0)
-                .map((topSellingProduct) => {
-                  return (
-                    <NewTrendingCard
-                      topSellingProduct={topSellingProduct}
-                      addItemToCart={addItemToCart}
-                      parent={'Marketplace'}
-                    />
-                  );
-                })}
+              {stakeableProducts.map((topSellingProduct) => {
+                return (
+                  <NewTrendingCard
+                    topSellingProduct={topSellingProduct}
+                    addItemToCart={addItemToCart}
+                    parent={'Marketplace'}
+                  />
+                );
+              })}
             </div>
             <Button
               type="primary"

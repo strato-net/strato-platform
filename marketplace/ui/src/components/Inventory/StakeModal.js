@@ -101,7 +101,7 @@ const StakeModal = ({
                     matchedReserve?.lastUpdatedOraclePrice *
                     (matchedReserve?.cataAPYRate / 10)) /
                   365
-                ).toFixed(6)}
+                ).toFixed(2)}
               </div>
             ),
           },

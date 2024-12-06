@@ -99,11 +99,8 @@ class MarketplaceController {
       const inventories = await dapp.getStakeableProducts({
         ...query,
       });
-      const productsWithImageUrl = inventories.sort((a, b) => {
-        return b.saleDate.localeCompare(a.saleDate);
-      });
 
-      rest.response.status200(res, productsWithImageUrl);
+      rest.response.status200(res, inventories);
 
       return next();
     } catch (e) {
