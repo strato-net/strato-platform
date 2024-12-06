@@ -93,9 +93,8 @@ const StakeModal = ({
             description:
               'The expected daily earnings in CATA tokens from staking your RWAs.',
             value: (
-              <div className="flex -mr-1">
-                {logo}
-
+              <div className="flex">
+                <div className="mx-1">{logo}</div>
                 {(
                   (inventory?.quantity *
                     matchedReserve?.lastUpdatedOraclePrice *

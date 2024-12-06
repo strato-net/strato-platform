@@ -82,7 +82,7 @@ const Stake = ({ user }) => {
       }
     }
     categoryActions.fetchCategories(categoryDispatch);
-  }, []);
+  }, [user]);
 
   useEffect(() => {
     if (user && reserves) {
