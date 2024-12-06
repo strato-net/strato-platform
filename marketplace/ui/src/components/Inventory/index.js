@@ -180,6 +180,7 @@ const Inventory = ({ user }) => {
 
   useEffect(() => {
     actions.getAllReserve(dispatch);
+    actions.getUserCataRewards(dispatch);
     actions.fetchSupportedTokens(dispatch);
     categoryActions.fetchCategories(categoryDispatch);
   }, []);
