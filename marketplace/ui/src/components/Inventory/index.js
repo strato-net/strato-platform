@@ -499,7 +499,12 @@ const Inventory = ({ user }) => {
                 new BigNumber(10).pow(18)
               )
             : new BigNumber(record.quantity)
-        ).toString();
+        )
+          .toNumber()
+          .toLocaleString('en-US', {
+            maximumFractionDigits: 4,
+            minimumFractionDigits: 0,
+          });
         return <div>{quantity || 0}</div>;
       },
     },

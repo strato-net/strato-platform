@@ -241,11 +241,15 @@ const GlobalTransactionResponsive = ({
                     )}
                     <p className="text-right">
                       Qty:{' '}
-                      {isStrat
-                        ? (quantity / 100).toString()
+                      {(isStrat
+                        ? quantity / 100
                         : isCata
-                        ? (quantity / Math.pow(10, 18)).toString()
-                        : quantity.toString()}
+                        ? quantity / Math.pow(10, 18)
+                        : quantity
+                      ).toLocaleString('en-US', {
+                        maximumFractionDigits: 4,
+                        minimumFractionDigits: 0,
+                      })}
                     </p>
                     <p className="text-right">
                       {moment(block_timestamp.replace(/-/g, '/')).format('lll')}
