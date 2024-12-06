@@ -40,9 +40,9 @@ const PurchasableStakeItems = () => {
           </Title>
         </div>
       </Fade>
-      {!stakeableProducts ? (
+      {stakeableProducts?.length <= 0 ? (
         <div className="h-52 flex justify-center items-center">
-          {/* <Spin spinning={isStakeableProductsLoading} size="large" /> */}
+          <Spin spinning={isStakeableProductsLoading} size="large" />
         </div>
       ) : (
         <Fade direction="right" triggerOnce>
@@ -51,8 +51,11 @@ const PurchasableStakeItems = () => {
               ref={containerRef}
               className="overflow-x-auto gap-6 px-1 py-2 flex trending_cards"
             >
-              {stakeableProducts.map((reserveItem) => {
-                return <NewVaultCard reserveItem={reserveItem} />;
+              {stakeableProducts.map((stakeableProduct) => {
+                const matchingReserve = reserves.find(
+                  (reserve) => reserve.assetRootAddress === stakeableProduct.root
+                );
+                return <NewVaultCard key={stakeableProduct.assetRootAddress} reserveItem={stakeableProduct} reserve={matchingReserve} />;
               })}
             </div>
           </div>
