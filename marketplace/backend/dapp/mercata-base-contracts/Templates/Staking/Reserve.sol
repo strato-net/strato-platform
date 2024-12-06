@@ -266,8 +266,8 @@ abstract contract Reserve is Utils, Structs {
         decimal livePriceOfCollateral,
         uint delta
     ) internal view returns (decimal) {
+        // Calculate the reward in CATA using the new formula
         decimal secondsPerYear = 31536000.0000000000000000000; // Number of seconds in a year
-        
         return (decimal(collateralQuantity) * livePriceOfCollateral * decimal(cataAPYRate)/100.0000000000000000000 * decimal(delta)) / 
                (priceOfCATA * secondsPerYear);
     }
