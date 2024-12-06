@@ -551,40 +551,57 @@ const InventoryCard = ({
               }) || 'N/A'}
             </p>
           </div>
-          <div className="flex justify-between  ">
-            <p className="text-[#6A6A6A]">Quantity Available for Sale </p>
-            <p className="text-[#202020] font-semibold">
-              {quantity
-                .minus(totalLockedQuantity)
-                .toNumber()
-                .toLocaleString('en-US', {
-                  maximumFractionDigits: 4,
-                  minimumFractionDigits: 0,
-                }) || 'N/A'}
-            </p>
-          </div>
-          <div className="flex justify-between  ">
-            <p className="text-[#6A6A6A]">Quantity Listed for Sale</p>
-            <p className="text-[#202020] font-semibold">
-              {saleQuantity ? saleQuantity.toString() : 'N/A'}
-            </p>
-          </div>
-          <div className="flex justify-between  ">
-            <p className="text-[#6A6A6A]">Price</p>
-            <p className="text-[#202020] font-semibold">
-              {price ? (
-                <p className="flex">
-                  <span>${price.toString()}</span>
-                  <p className="flex text-xs items-center">
-                    &nbsp;({price.multipliedBy(STRATS_CONVERSION).toString()}{' '}
-                    {StratsIcon})
-                  </p>
+          {stakeable ? (
+            <div className="flex justify-between  ">
+              <p className="text-[#6A6A6A]">Quantity Staked </p>
+              <p className="text-[#202020] font-semibold">
+                {inventory?.escrow
+                  ? quantity.toNumber().toLocaleString('en-US', {
+                      maximumFractionDigits: 4,
+                      minimumFractionDigits: 0,
+                    })
+                  : 0}
+              </p>
+            </div>
+          ) : (
+            <>
+              <div className="flex justify-between  ">
+                <p className="text-[#6A6A6A]">Quantity Available for Sale </p>
+                <p className="text-[#202020] font-semibold">
+                  {quantity
+                    .minus(totalLockedQuantity)
+                    .toNumber()
+                    .toLocaleString('en-US', {
+                      maximumFractionDigits: 4,
+                      minimumFractionDigits: 0,
+                    }) || 'N/A'}
                 </p>
-              ) : (
-                'N/A'
-              )}
-            </p>
-          </div>
+              </div>
+              <div className="flex justify-between  ">
+                <p className="text-[#6A6A6A]">Quantity Listed for Sale</p>
+                <p className="text-[#202020] font-semibold">
+                  {saleQuantity ? saleQuantity.toString() : 'N/A'}
+                </p>
+              </div>
+              <div className="flex justify-between  ">
+                <p className="text-[#6A6A6A]">Price</p>
+                <p className="text-[#202020] font-semibold">
+                  {price ? (
+                    <p className="flex">
+                      <span>${price.toString()}</span>
+                      <p className="flex text-xs items-center">
+                        &nbsp;(
+                        {price.multipliedBy(STRATS_CONVERSION).toString()}{' '}
+                        {StratsIcon})
+                      </p>
+                    </p>
+                  ) : (
+                    'N/A'
+                  )}
+                </p>
+              </div>
+            </>
+          )}
         </div>
       </div>
       {open && (
