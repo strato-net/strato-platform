@@ -251,15 +251,15 @@ const GlobalTransaction = ({ user, stratAddress, cataAddress }) => {
         <>
           <p className="text-base flex justify-end items-center">
             {price
-              ? (
-                  formattedNum(
-                    assetOriginAddress === stratAddress
+              ? formattedNum(
+                  (
+                    (assetOriginAddress === stratAddress
                       ? (price * 100).toFixed(2)
                       : assetOriginAddress === cataAddress
                       ? (price * Math.pow(10, 18)).toFixed(2)
-                      : price
-                  ) * 100
-                ).toFixed(0)
+                      : price) * 100
+                  ).toFixed(0)
+                )
               : '--'}{' '}
             <span>{price && StratsIcon}</span>
           </p>
