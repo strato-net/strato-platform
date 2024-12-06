@@ -67,7 +67,6 @@ const MarketPlace = ({ user, isAuthenticated }) => {
         (sum, reserves) => sum + reserves.totalCataRewardIssued,
         0
       );
-      console.log('totalCataRewards', totalCataRewards);
       setAverageApy(Math.floor(averageApy));
       setTotalTvl(Math.floor(totalTvl));
       setTotalCataRewards(Math.floor(totalCataRewards));
