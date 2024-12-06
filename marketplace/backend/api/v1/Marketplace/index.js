@@ -64,14 +64,14 @@ router.get(
 
 router.get(
   Marketplace.getStratsAddress,
-  authHandler.authorizeRequest(),
+  authHandler.authorizeRequest(true),
   loadDapp,
   MarketplaceController.getStratsAddress
 );
 
 router.get(
   Marketplace.getCataAddress,
-  authHandler.authorizeRequest(),
+  authHandler.authorizeRequest(true),
   loadDapp,
   MarketplaceController.getCataAddress
 );

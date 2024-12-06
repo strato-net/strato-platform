@@ -118,22 +118,22 @@ const GlobalTransactionResponsive = ({
 
               const handleDetailRedirection = () => {
                 let route;
-                if (type === 'Order' && from === user.commonName) {
+                if (type === 'Order' && from === user?.commonName) {
                   route = `${routes.SoldOrderDetails.url.replace(
                     ':id',
                     address ? transaction_hash : address
                   )}`;
-                } else if (type === 'Order' && from !== user.commonName) {
+                } else if (type === 'Order' && from !== user?.commonName) {
                   route = `${routes.BoughtOrderDetails.url.replace(
                     ':id',
                     address ? transaction_hash : address
                   )}`;
                 } else if (type === 'Transfer') {
-                } else if (type === 'Redemption' && to === user.commonName) {
+                } else if (type === 'Redemption' && to === user?.commonName) {
                   route = `${routes.RedemptionsIncomingDetails.url
                     .replace(':id', reference)
                     .replace(':redemptionService', redemptionService)}`;
-                } else if (type === 'Redemption' && from === user.commonName) {
+                } else if (type === 'Redemption' && from === user?.commonName) {
                   route = `${routes.RedemptionsOutgoingDetails.url
                     .replace(':id', reference)
                     .replace(':redemptionService', redemptionService)}`;
