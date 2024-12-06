@@ -58,6 +58,8 @@ const Stake = ({ user }) => {
   const [offset, setOffset] = useState(0);
   const [page, setPage] = useState(1);
   const [queryValue, setQueryValue] = useState('');
+  const [totalCataRewardState, setTotalCataRewardState] = useState(0);
+  const [dailyCataRewardState, setDailyCataRewardState] = useState(0);
   const debouncedSearchTerm = useDebounce(queryValue, 1000);
   const navigate = useNavigate();
 
@@ -66,6 +68,11 @@ const Stake = ({ user }) => {
     setOffset((page - 1) * pageSize);
     setPage(page);
   };
+
+  useEffect(() => {
+    setTotalCataRewardState(totalCataReward);
+    setDailyCataRewardState(dailyCataReward);
+  }, [totalCataReward, dailyCataReward]);
 
   useEffect(() => {
     if (!reserves || reserves.length === 0) {
@@ -268,14 +275,14 @@ const Stake = ({ user }) => {
             <p className="flex items-center ml-4 font-semibold text-base md:text-lg bg-[#E6F0FF] border border-[#13188A] rounded-md px-3 py-1 text-[#13188A] shadow-sm">
               <TrophyOutlined className="!text-[#13188A] mr-2 text-lg" />
               Total Rewards: &nbsp;{logo}
-              <span className="ml-1 font-bold">{totalCataReward.toLocaleString('en-US', { maximumFractionDigits: 4, minimumFractionDigits: 0, })}</span>
+              <span className="ml-1 font-bold">{totalCataRewardState.toLocaleString('en-US', { maximumFractionDigits: 4, minimumFractionDigits: 0, })}</span>
             </p>
           </Col>
           <Col className="mt-5 sm:mt-0 w-full sm:w-auto">
             <p className="flex items-center ml-4 font-semibold text-base md:text-lg bg-[#FFE6E6] border border-[#D32F2F] rounded-md px-3 py-1 text-[#D32F2F] shadow-sm">
               <GiftOutlined className="!text-[#D32F2F] mr-2 text-lg" />
               Est. Daily Reward: &nbsp;{logo}
-              <span className="ml-1 font-bold">{dailyCataReward.toLocaleString('en-US', { maximumFractionDigits: 4, minimumFractionDigits: 0, })}</span>
+              <span className="ml-1 font-bold">{dailyCataRewardState.toLocaleString('en-US', { maximumFractionDigits: 4, minimumFractionDigits: 0, })}</span>
             </p>
           </Col>
         </Row>

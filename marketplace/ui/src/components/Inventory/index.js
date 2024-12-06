@@ -79,6 +79,8 @@ const Inventory = ({ user }) => {
   const [limit, setLimit] = useState(10);
   const [offset, setOffset] = useState(0);
   const [page, setPage] = useState(1);
+  const [totalCataRewardState, setTotalCataRewardState] = useState(0);
+  const [dailyCataRewardState, setDailyCataRewardState] = useState(0);
   const [showPublished, setShowPublished] = useState(false);
   const dispatch = useInventoryDispatch();
   const [api, contextHolder] = notification.useNotification();
@@ -127,6 +129,11 @@ const Inventory = ({ user }) => {
 
   const isNotOnboarded = (service) =>
     notOnboarded.some((n) => n.serviceName === service.serviceName);
+
+  useEffect(() => {
+    setTotalCataRewardState(totalCataReward);
+    setDailyCataRewardState(dailyCataReward);
+  }, [totalCataReward, dailyCataReward]);
 
   useEffect(() => {
     // Create a set of not onboarded service names for quick lookup
@@ -584,13 +591,13 @@ const Inventory = ({ user }) => {
         <p className="flex items-center ml-4 font-semibold text-base xl:text-lg bg-[#E6F0FF] border border-[#13188A] rounded-md px-3 py-1 text-[#13188A] shadow-sm">
           <TrophyOutlined className="!text-[#13188A] mr-2 text-lg" />
           Total Rewards: &nbsp;{logo}
-          <span className="ml-1 font-bold">{totalCataReward.toLocaleString('en-US', { maximumFractionDigits: 4, minimumFractionDigits: 0, })}</span>
+          <span className="ml-1 font-bold">{totalCataRewardState.toLocaleString('en-US', { maximumFractionDigits: 4, minimumFractionDigits: 0, })}</span>
         </p>
 
         <p className="flex items-center ml-4 font-semibold text-base xl:text-lg bg-[#FFE6E6] border border-[#D32F2F] rounded-md px-3 py-1 text-[#D32F2F] shadow-sm">
           <GiftOutlined className="!text-[#D32F2F] mr-2 text-lg" />
           Est. Daily Reward: &nbsp;{logo}
-          <span className="ml-1 font-bold">{dailyCataReward.toLocaleString('en-US', { maximumFractionDigits: 4, minimumFractionDigits: 0, })}</span>
+          <span className="ml-1 font-bold">{dailyCataRewardState.toLocaleString('en-US', { maximumFractionDigits: 4, minimumFractionDigits: 0, })}</span>
         </p>
       </div>
     );
