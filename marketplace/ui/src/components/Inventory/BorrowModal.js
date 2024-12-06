@@ -65,7 +65,7 @@ const BorrowModal = ({
       value: (
         <div className="flex -mr-1">
           <div className="mx-1">{logo}</div>{' '}
-          {parseFloat(inventory?.escrow?.collateralValue / 200).toFixed(2)}
+          {parseFloat(Math.floor((inventory?.escrow?.collateralValue / 2) - inventory?.escrow?.borrowedAmount) / 100).toFixed(2)}
         </div>
       ),
     },
@@ -76,7 +76,7 @@ const BorrowModal = ({
   const handleSubmit = async () => {
     const body = {
       escrowAddress: inventory?.sale,
-      borrowAmount: Math.floor(inventory?.escrow?.collateralValue / 2),
+      borrowAmount: Math.floor((inventory?.escrow?.collateralValue / 2) - inventory?.escrow?.borrowedAmount),
       reserve: matchedReserve?.address,
     };
 
