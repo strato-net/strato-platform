@@ -1,6 +1,9 @@
 import React from 'react';
+import { useAuthenticateState } from '../../contexts/authentication';
 
 const StakeSteps = () => {
+  const { loginUrl } = useAuthenticateState();
+
   return (
     <div className="bg-[#f3f4f6] p-6 rounded-md">
       <h2 className="text-center text-2xl font-semibold mb-8">
@@ -39,7 +42,7 @@ const StakeSteps = () => {
               style={{ color: '#4b5563' }}
             >
               <a
-                href="#"
+                href={loginUrl}
                 style={{
                   color: '#84cc16',
                   textDecoration: 'none',
@@ -70,17 +73,7 @@ const StakeSteps = () => {
               className="text-center mt-2 text-sm"
               style={{ color: '#4b5563' }}
             >
-              <a
-                href="#"
-                style={{
-                  color: '#84cc16',
-                  textDecoration: 'none',
-                  fontWeight: 'bold',
-                }}
-              >
-                Purchase
-              </a>{' '}
-              securely vaulted gold and silver assets to begin staking!
+              Purchase securely vaulted gold and silver assets to begin staking!
             </p>
           </div>
         </div>
@@ -104,18 +97,8 @@ const StakeSteps = () => {
               className="text-center mt-2 text-sm"
               style={{ color: '#4b5563' }}
             >
-              <a
-                href="#"
-                style={{
-                  color: '#84cc16',
-                  textDecoration: 'none',
-                  fontWeight: 'bold',
-                }}
-              >
-                Stake
-              </a>{' '}
-              your gold and silver assets and begin earning daily rewards in the
-              form of CATA, our governance token (Est. APY 10%).
+              Stake your gold and silver assets and begin earning daily rewards
+              in the form of CATA, our governance token (Est. APY 10%).
             </p>
           </div>
         </div>
@@ -137,18 +120,8 @@ const StakeSteps = () => {
               className="text-center mt-2 text-sm"
               style={{ color: '#4b5563' }}
             >
-              <a
-                href="#"
-                style={{
-                  color: '#84cc16',
-                  textDecoration: 'none',
-                  fontWeight: 'bold',
-                }}
-              >
-                Borrow
-              </a>{' '}
-              (interest-free for a limited time!) STRATs up to 50% of the market
-              value of your staked assets.
+              Borrow (interest-free for a limited time!) STRATs up to 50% of the
+              market value of your staked assets.
             </p>
           </div>
         </div>

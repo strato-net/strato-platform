@@ -70,13 +70,15 @@ const Stake = ({ user }) => {
   useEffect(() => {
     if (!reserves || reserves.length === 0) {
       inventoryActions.getAllReserve(inventoryDispatch);
-      inventoryActions.getUserCataRewards(inventoryDispatch);
+      if (user) {
+        inventoryActions.getUserCataRewards(inventoryDispatch);
+      }
     }
     categoryActions.fetchCategories(categoryDispatch);
   }, []);
 
   useEffect(() => {
-    if (reserves) {
+    if (user && reserves) {
       inventoryActions.fetchInventory(
         inventoryDispatch,
         limit,
@@ -263,64 +265,80 @@ const Stake = ({ user }) => {
         </Breadcrumb.Item>
       </Breadcrumb>
       <div>
-        <Row className="w-[95%] mt-10 mx-auto flex justify-start">
-          <Col className="w-full sm:w-auto">
-            <p className="flex items-center ml-4 font-semibold text-base md:text-lg bg-[#E6F0FF] border border-[#13188A] rounded-md px-3 py-1 text-[#13188A] shadow-sm">
-              <TrophyOutlined className="!text-[#13188A] mr-2 text-lg" />
-              Total Rewards: &nbsp;{logo}
-              <span className="ml-1 font-bold">{totalCataReward.toLocaleString('en-US', { maximumFractionDigits: 4, minimumFractionDigits: 0, })}</span>
-            </p>
-          </Col>
-          <Col className="mt-5 sm:mt-0 w-full sm:w-auto">
-            <p className="flex items-center ml-4 font-semibold text-base md:text-lg bg-[#FFE6E6] border border-[#D32F2F] rounded-md px-3 py-1 text-[#D32F2F] shadow-sm">
-              <GiftOutlined className="!text-[#D32F2F] mr-2 text-lg" />
-              Est. Daily Reward: &nbsp;{logo}
-              <span className="ml-1 font-bold">{dailyCataReward.toLocaleString('en-US', { maximumFractionDigits: 4, minimumFractionDigits: 0, })}</span>
-            </p>
-          </Col>
-        </Row>
+        {user && (
+          <Row className="w-[95%] mt-10 mx-auto flex justify-start">
+            <Col className="w-full sm:w-auto">
+              <p className="flex items-center ml-4 font-semibold text-base md:text-lg bg-[#E6F0FF] border border-[#13188A] rounded-md px-3 py-1 text-[#13188A] shadow-sm">
+                <TrophyOutlined className="!text-[#13188A] mr-2 text-lg" />
+                Total Rewards: &nbsp;{logo}
+                <span className="ml-1 font-bold">
+                  {totalCataReward.toLocaleString('en-US', {
+                    maximumFractionDigits: 4,
+                    minimumFractionDigits: 0,
+                  })}
+                </span>
+              </p>
+            </Col>
+            <Col className="mt-5 sm:mt-0 w-full sm:w-auto">
+              <p className="flex items-center ml-4 font-semibold text-base md:text-lg bg-[#FFE6E6] border border-[#D32F2F] rounded-md px-3 py-1 text-[#D32F2F] shadow-sm">
+                <GiftOutlined className="!text-[#D32F2F] mr-2 text-lg" />
+                Est. Daily Reward: &nbsp;{logo}
+                <span className="ml-1 font-bold">
+                  {dailyCataReward.toLocaleString('en-US', {
+                    maximumFractionDigits: 4,
+                    minimumFractionDigits: 0,
+                  })}
+                </span>
+              </p>
+            </Col>
+          </Row>
+        )}
         <div className="pt-6 mx-6 md:mx-5 md:px-10 mb-5">
           <StakeSteps />
           <PurchasableStakeItems />
-          <div className="hidden md:block">
-            <Title className="px-3 !text-3xl !text-left mt-10">
-              My Stakeable Items
-            </Title>
-            <Table
-              columns={columns}
-              dataSource={inventories}
-              loading={isInventoriesLoading}
-              className="custom-table"
-              pagination={false}
-            />
-            <Pagination
-              current={page}
-              onChange={onPageChange}
-              total={inventoriesTotal}
-              showTotal={(total) => `Total ${total} items`}
-              className="flex justify-center my-5 custom-pagination"
-            />
-          </div>
-          <div className="md:hidden my-4 grid grid-cols-1 gap-6 sm:place-items-center inventoryCard max-w-full">
-            <Title className="px-3 !text-3xl !text-left mt-10">
-              My Stakeable Items
-            </Title>
-            {inventories.map((inventory, index) => (
-              <InventoryCard
-                id={index}
-                limit={limit}
-                offset={offset}
-                inventory={inventory}
-                key={index}
-                debouncedSearchTerm={debouncedSearchTerm}
-                allSubcategories={allSubcategories}
-                user={user}
-                reserves={reserves}
-                stratAddress={stratsAddress}
-                cataAddress={cataAddress}
-              />
-            ))}
-          </div>
+          {user && (
+            <>
+              <div className="hidden md:block">
+                <Title className="px-3 !text-3xl !text-left mt-10">
+                  My Stakeable Items
+                </Title>
+                <Table
+                  columns={columns}
+                  dataSource={inventories}
+                  loading={isInventoriesLoading}
+                  className="custom-table"
+                  pagination={false}
+                />
+                <Pagination
+                  current={page}
+                  onChange={onPageChange}
+                  total={inventoriesTotal}
+                  showTotal={(total) => `Total ${total} items`}
+                  className="flex justify-center my-5 custom-pagination"
+                />
+              </div>
+              <div className="md:hidden my-4 grid grid-cols-1 gap-6 sm:place-items-center inventoryCard max-w-full">
+                <Title className="px-3 !text-3xl !text-left mt-10">
+                  My Stakeable Items
+                </Title>
+                {inventories.map((inventory, index) => (
+                  <InventoryCard
+                    id={index}
+                    limit={limit}
+                    offset={offset}
+                    inventory={inventory}
+                    key={index}
+                    debouncedSearchTerm={debouncedSearchTerm}
+                    allSubcategories={allSubcategories}
+                    user={user}
+                    reserves={reserves}
+                    stratAddress={stratsAddress}
+                    cataAddress={cataAddress}
+                  />
+                ))}
+              </div>
+            </>
+          )}
         </div>
       </div>
       {message && openToast('bottom')}

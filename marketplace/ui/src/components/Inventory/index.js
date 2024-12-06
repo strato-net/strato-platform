@@ -431,7 +431,14 @@ const Inventory = ({ user }) => {
             </div>
             {isStakeable && (
               <>
-                <div> Borrowed Amount: ${borrowedAmount.toLocaleString('en-US',{minimumFractionDigits: 2})} </div>
+                <div>
+                  {' '}
+                  Borrowed Amount: $
+                  {borrowedAmount.toLocaleString('en-US', {
+                    maximumFractionDigits: 2,
+                    minimumFractionDigits: 2,
+                  })}{' '}
+                </div>
               </>
             )}
           </>
@@ -504,7 +511,9 @@ const Inventory = ({ user }) => {
         const isCata = record.originAddress === cataAddress;
         const saleQuantity = (
           isStrats
-            ? new BigNumber(record.saleQuantity || 0).dividedBy(new BigNumber(100))
+            ? new BigNumber(record.saleQuantity || 0).dividedBy(
+                new BigNumber(100)
+              )
             : isCata
             ? new BigNumber(record.saleQuantity || 0).dividedBy(
                 new BigNumber(10).pow(18)
@@ -584,13 +593,23 @@ const Inventory = ({ user }) => {
         <p className="flex items-center ml-4 font-semibold text-base xl:text-lg bg-[#E6F0FF] border border-[#13188A] rounded-md px-3 py-1 text-[#13188A] shadow-sm">
           <TrophyOutlined className="!text-[#13188A] mr-2 text-lg" />
           Total Rewards: &nbsp;{logo}
-          <span className="ml-1 font-bold">{totalCataReward.toLocaleString('en-US', { maximumFractionDigits: 4, minimumFractionDigits: 0, })}</span>
+          <span className="ml-1 font-bold">
+            {totalCataReward.toLocaleString('en-US', {
+              maximumFractionDigits: 4,
+              minimumFractionDigits: 0,
+            })}
+          </span>
         </p>
 
         <p className="flex items-center ml-4 font-semibold text-base xl:text-lg bg-[#FFE6E6] border border-[#D32F2F] rounded-md px-3 py-1 text-[#D32F2F] shadow-sm">
           <GiftOutlined className="!text-[#D32F2F] mr-2 text-lg" />
           Est. Daily Reward: &nbsp;{logo}
-          <span className="ml-1 font-bold">{dailyCataReward.toLocaleString('en-US', { maximumFractionDigits: 4, minimumFractionDigits: 0, })}</span>
+          <span className="ml-1 font-bold">
+            {dailyCataReward.toLocaleString('en-US', {
+              maximumFractionDigits: 4,
+              minimumFractionDigits: 0,
+            })}
+          </span>
         </p>
       </div>
     );

@@ -385,7 +385,6 @@ const actions = {
           type: actionDescriptors.fetchStakeableProductsFailed,
           error: 'Unauthorized while fetching trending items',
         });
-        window.location.href = body.error.loginUrl;
       }
       dispatch({
         type: actionDescriptors.fetchStakeableProductsFailed,

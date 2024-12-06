@@ -1022,7 +1022,6 @@ const actions = {
           type: actionDescriptors.getAllReserveFailed,
           error: 'Unauthorized while fetching the reserves',
         });
-        window.location.href = body.error.loginUrl;
       }
 
       dispatch({
@@ -1138,7 +1137,6 @@ const actions = {
           type: actionDescriptors.getUserCataRewardsFailed,
           error: 'Unauthorized while fetching the rewards',
         });
-        window.location.href = body.error.loginUrl;
       }
 
       dispatch({
