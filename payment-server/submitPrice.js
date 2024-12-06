@@ -69,6 +69,11 @@ async function fetchAndSubmitEscrowAddresses(oracleContract, token) {
 
     if (!escrows || escrows.length === 0) {
       console.log(`No escrows found for reserve ${reserveName}`);
+      await distributeRewards(
+        token,
+        { address: reserveAddress, name: reserveName },
+        { escrowAddresses: [] }
+        );
       continue;
     }
 
