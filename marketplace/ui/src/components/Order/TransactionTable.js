@@ -359,11 +359,15 @@ const TransactionTable = ({ user, download, stratAddress, cataAddress }) => {
       render: (data, { quantity, assetOriginAddress }) => (
         <span>
           {quantity
-            ? assetOriginAddress === stratAddress
-              ? (quantity / 100).toString()
-              : assetOriginAddress === cataAddress
-              ? (quantity / Math.pow(10, 18)).toString()
-              : quantity.toString()
+            ? (assetOriginAddress === stratAddress
+                ? quantity / 100
+                : assetOriginAddress === cataAddress
+                ? quantity / Math.pow(10, 18)
+                : quantity
+              ).toLocaleString('en-US', {
+                maximumFractionDigits: 4,
+                minimumFractionDigits: 0,
+              })
             : '--'}
         </span>
       ),

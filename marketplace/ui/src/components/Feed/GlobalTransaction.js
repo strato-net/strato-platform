@@ -221,17 +221,25 @@ const GlobalTransaction = ({ user, stratAddress, cataAddress }) => {
       key: 'quantity',
       align: 'right',
       width: '100px',
-      render: (data, { quantity, assetOriginAddress }) => (
-        <span>
-          {quantity
-            ? assetOriginAddress === stratAddress
-              ? (quantity / 100).toString()
+      render: (data, { quantity, assetOriginAddress }) => {
+        let formattedQuantity = '--';
+
+        if (quantity) {
+          const value =
+            assetOriginAddress === stratAddress
+              ? quantity / 100
               : assetOriginAddress === cataAddress
-              ? (quantity / Math.pow(10, 18)).toString()
-              : quantity.toString()
-            : '--'}
-        </span>
-      ),
+              ? quantity / Math.pow(10, 18)
+              : quantity;
+
+          formattedQuantity = value.toLocaleString('en-US', {
+            maximumFractionDigits: 4,
+            minimumFractionDigits: 0,
+          });
+        }
+
+        return <span>{formattedQuantity}</span>;
+      },
     },
     {
       title: 'Price',
@@ -243,15 +251,15 @@ const GlobalTransaction = ({ user, stratAddress, cataAddress }) => {
         <>
           <p className="text-base flex justify-end items-center">
             {price
-              ? (
-                  formattedNum(
-                    assetOriginAddress === stratAddress
+              ? formattedNum(
+                  (
+                    (assetOriginAddress === stratAddress
                       ? (price * 100).toFixed(2)
                       : assetOriginAddress === cataAddress
                       ? (price * Math.pow(10, 18)).toFixed(2)
-                      : price
-                  ) * 100
-                ).toFixed(0)
+                      : price) * 100
+                  ).toFixed(0)
+                )
               : '--'}{' '}
             <span>{price && StratsIcon}</span>
           </p>

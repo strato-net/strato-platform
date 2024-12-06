@@ -406,9 +406,7 @@ const InventoryCard = ({
                   type="link"
                   className="text-[#13188A]  text-left px-0 font-semibold text-sm h-6"
                   onClick={() => showStakeModal('Unstake')}
-                  disabled={
-                    inventory?.escrow?.borrowedAmount > 0
-                  }
+                  disabled={inventory?.escrow?.borrowedAmount > 0}
                 >
                   <LogoutOutlined /> Unstake
                 </Button>
@@ -416,9 +414,7 @@ const InventoryCard = ({
                   type="link"
                   className="text-[#13188A]  text-left px-0 font-semibold text-sm h-6"
                   onClick={() => showBorrowModal('Unstake')}
-                  disabled={
-                    inventory?.escrow?.borrowedAmount > 0
-                  }
+                  disabled={inventory?.escrow?.borrowedAmount > 0}
                 >
                   <BankOutlined /> Borrow
                 </Button>
@@ -426,9 +422,7 @@ const InventoryCard = ({
                   type="link"
                   className="text-[#13188A]  text-left px-0 font-semibold text-sm h-6"
                   onClick={() => showRepayModal('Unstake')}
-                  disabled={
-                    inventory?.escrow?.borrowedAmount <= 0
-                  }
+                  disabled={inventory?.escrow?.borrowedAmount <= 0}
                 >
                   <SolutionOutlined />
                   Repay
@@ -479,8 +473,7 @@ const InventoryCard = ({
                 <Button
                   type="link"
                   className={`text-[#13188A]  text-left px-0 font-semibold text-sm h-6 ${
-                    !isTokenSupported(inventory.root) ||
-                    inventory.escrow
+                    !isTokenSupported(inventory.root) || inventory.escrow
                       ? 'hidden'
                       : ''
                   }`}
@@ -551,12 +544,23 @@ const InventoryCard = ({
         <div className="flex flex-col justify-between gap-4 px-[18px] py-4 border border-[#E9E9E9] rounded-md w-full ">
           <div className="flex justify-between  ">
             <p className="text-[#6A6A6A]">Quantity Owned</p>
-            <p className="text-[#202020] font-semibold">{quantity.toString() || 'N/A'}</p>
+            <p className="text-[#202020] font-semibold">
+              {quantity.toNumber().toLocaleString('en-US', {
+                maximumFractionDigits: 4,
+                minimumFractionDigits: 0,
+              }) || 'N/A'}
+            </p>
           </div>
           <div className="flex justify-between  ">
             <p className="text-[#6A6A6A]">Quantity Available for Sale </p>
             <p className="text-[#202020] font-semibold">
-              {quantity.minus(totalLockedQuantity).toString() || 'N/A'}
+              {quantity
+                .minus(totalLockedQuantity)
+                .toNumber()
+                .toLocaleString('en-US', {
+                  maximumFractionDigits: 4,
+                  minimumFractionDigits: 0,
+                }) || 'N/A'}
             </p>
           </div>
           <div className="flex justify-between  ">
@@ -572,8 +576,8 @@ const InventoryCard = ({
                 <p className="flex">
                   <span>${price.toString()}</span>
                   <p className="flex text-xs items-center">
-                    &nbsp;({(price.multipliedBy(STRATS_CONVERSION)).toString()} {StratsIcon}
-                    )
+                    &nbsp;({price.multipliedBy(STRATS_CONVERSION).toString()}{' '}
+                    {StratsIcon})
                   </p>
                 </p>
               ) : (

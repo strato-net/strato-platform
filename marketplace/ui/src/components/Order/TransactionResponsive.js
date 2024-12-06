@@ -127,10 +127,16 @@ const TransactionResponsive = ({ data, user, stratAddress, cataAddress }) => {
             },
           ];
           if (assetOriginAddress === stratAddress) {
-            quantity = (quantity / 100).toString();
+            quantity = (quantity / 100).toLocaleString('en-US', {
+              maximumFractionDigits: 4,
+              minimumFractionDigits: 0,
+            });
             price = (price * 100).toFixed(2);
           } else if (assetOriginAddress === cataAddress) {
-            quantity = (quantity / Math.pow(10, 18)).toString();
+            quantity = (quantity / Math.pow(10, 18)).toLocaleString('en-US', {
+              maximumFractionDigits: 4,
+              minimumFractionDigits: 0,
+            });
             price = (price * Math.pow(10, 18)).toFixed(2);
           }
 

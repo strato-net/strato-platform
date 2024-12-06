@@ -83,7 +83,7 @@ async function get(user, address, options) {
     {
       ...options,
       query: {
-        address: `eq.${escrow.assetRootAddress}`,
+        address: `like.${escrow.assetRootAddress}*`,
         select: constants.attachImagesAndFiles,
       },
     }
@@ -213,11 +213,33 @@ async function searchEscrow(user, queryArgs, options) {
 
 // Get Total CATA Rewards for a user
 async function userCataRewards(user, userCommonName, options) {
+  // Get Active reseve addressess
+  const searchOptions = {
+    ...options,
+    query: {
+      isActive: 'eq.true',
+      select: `address`,
+    },
+  };
+
+  const reserves = await rest.search(
+    user,
+    { name: 'BlockApps-Mercata-Reserve' },
+    searchOptions
+  );
+
+  if (!reserves || reserves.length === 0) {
+    return undefined;
+  }
+
+  const reserveAddresses = reserves.map((reserve) => reserve.address);
+
   const searchOptionsTotalCataReward = {
     ...options,
     query: {
       borrowerCommonName: `eq.${userCommonName}`,
       select: `totalCataReward.sum()`,
+      reserve: `in.(${reserveAddresses.join(',')})`,
     },
   };
 
@@ -241,6 +263,7 @@ async function userCataRewards(user, userCommonName, options) {
       borrowerCommonName: `eq.${userCommonName}`,
       isActive: 'eq.true',
       select: `collateralValue.sum()`,
+      reserve: `in.(${reserveAddresses.join(',')})`,
     },
   };
 

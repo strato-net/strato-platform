@@ -34,6 +34,7 @@ import { actions as categoryActions } from '../../contexts/category/actions';
 import { TrophyOutlined, GiftOutlined } from '@ant-design/icons';
 
 const logo = <img src={Images.cata} alt={''} title={''} className="w-5 h-5" />;
+const StratsIcon = <img src={Images.strat} alt={''} title={''} className="w-4 h-4" />;
 
 const { Title } = Typography;
 
@@ -131,7 +132,7 @@ const Stake = ({ user }) => {
           reserves.some(
             (reserve) => record.originAddress === reserve.assetRootAddress
           );
-        const borrowedAmount = (record?.escrow?.borrowedAmount || 0) / 10000;
+        const borrowedAmount = (record?.escrow?.borrowedAmount || 0) / 100;
         const callDetailPage = () => {
           navigate(
             `${routes.InventoryDetail.url
@@ -172,13 +173,12 @@ const Stake = ({ user }) => {
             </div>
             {isStakeable && (
               <>
-                <div>
-                  {' '}
-                  Borrowed Amount: $
+                <div className="flex items-center gap-2">
+                  Borrowed Amount: {StratsIcon}
                   {borrowedAmount.toLocaleString('en-US', {
                     maximumFractionDigits: 2,
                     minimumFractionDigits: 2,
-                  })}{' '}
+                  })}
                 </div>
               </>
             )}

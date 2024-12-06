@@ -118,22 +118,22 @@ const GlobalTransactionResponsive = ({
 
               const handleDetailRedirection = () => {
                 let route;
-                if (type === 'Order' && from === user.commonName) {
+                if (type === 'Order' && from === user?.commonName) {
                   route = `${routes.SoldOrderDetails.url.replace(
                     ':id',
                     address ? transaction_hash : address
                   )}`;
-                } else if (type === 'Order' && from !== user.commonName) {
+                } else if (type === 'Order' && from !== user?.commonName) {
                   route = `${routes.BoughtOrderDetails.url.replace(
                     ':id',
                     address ? transaction_hash : address
                   )}`;
                 } else if (type === 'Transfer') {
-                } else if (type === 'Redemption' && to === user.commonName) {
+                } else if (type === 'Redemption' && to === user?.commonName) {
                   route = `${routes.RedemptionsIncomingDetails.url
                     .replace(':id', reference)
                     .replace(':redemptionService', redemptionService)}`;
-                } else if (type === 'Redemption' && from === user.commonName) {
+                } else if (type === 'Redemption' && from === user?.commonName) {
                   route = `${routes.RedemptionsOutgoingDetails.url
                     .replace(':id', reference)
                     .replace(':redemptionService', redemptionService)}`;
@@ -241,11 +241,15 @@ const GlobalTransactionResponsive = ({
                     )}
                     <p className="text-right">
                       Qty:{' '}
-                      {isStrat
-                        ? (quantity / 100).toString()
+                      {(isStrat
+                        ? quantity / 100
                         : isCata
-                        ? (quantity / Math.pow(10, 18)).toString()
-                        : quantity.toString()}
+                        ? quantity / Math.pow(10, 18)
+                        : quantity
+                      ).toLocaleString('en-US', {
+                        maximumFractionDigits: 4,
+                        minimumFractionDigits: 0,
+                      })}
                     </p>
                     <p className="text-right">
                       {moment(block_timestamp.replace(/-/g, '/')).format('lll')}

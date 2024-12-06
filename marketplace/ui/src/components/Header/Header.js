@@ -548,7 +548,7 @@ const HeaderComponent = ({
                   count={
                     parseFloat(cataBalance).toString().includes('.') &&
                     parseFloat(cataBalance).toString().split('.')[1].length > 4
-                      ? `${parseFloat(cataBalance).toFixed(4)}...`
+                      ? `${parseFloat(cataBalance).toFixed(4)}`
                       : parseFloat(cataBalance).toFixed(4).replace(/\.?0+$/, '')
                   }
                   overflowCount={9999999}
