@@ -268,16 +268,8 @@ abstract contract Reserve is Utils, Structs {
     ) internal view returns (decimal) {
         decimal secondsPerYear = 31536000.0000000000000000000; // Number of seconds in a year
         
-        // Calculate value of collateral in USD (divide by 10000 to adjust for extra zeros)
-        decimal collateralValue = (decimal(collateralQuantity) * livePriceOfCollateral) / 10000.0000000000000000000;
-        
-        // Calculate yearly reward in USD
-        decimal yearlyRewardUSD = collateralValue * decimal(cataAPYRate) / 100.0000000000000000000;
-        
-        // Convert to CATA tokens (multiply by 10^18 for token base units) and pro-rate for the time period
-        decimal rewardInCATA = (yearlyRewardUSD / priceOfCATA) * (decimal(delta) / secondsPerYear) * 1000000000000000000.0000000000000000000;
-        
-        return rewardInCATA;
+        return (decimal(collateralQuantity) * livePriceOfCollateral * decimal(cataAPYRate)/100.0000000000000000000 * decimal(delta)) / 
+               (priceOfCATA * secondsPerYear);
     }
     
     function migrateReserve(address _newReserve, address[] _escrows) external requireOwner("migrate the Reserve") {
