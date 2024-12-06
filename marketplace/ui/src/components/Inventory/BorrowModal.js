@@ -39,8 +39,8 @@ const BorrowModal = ({
   const location = useLocation();
   const queryParams = new URLSearchParams(location.search);
 
-  const loanableAmount = inventory?.escrow?.collateralValue / 2 >= inventory?.escrow?.borrowedAmount
-                       ? Math.floor(inventory?.escrow?.collateralValue / 2 - inventory?.escrow?.borrowedAmount)
+  const loanableAmount = Math.floor(inventory?.escrow?.collateralValue / 2) >= inventory?.escrow?.borrowedAmount
+                       ? Math.floor(inventory?.escrow?.collateralValue / 2) - inventory?.escrow?.borrowedAmount
                        : 0;
 
   useEffect(() => {
