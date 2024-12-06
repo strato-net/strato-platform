@@ -83,7 +83,7 @@ async function get(user, address, options) {
     {
       ...options,
       query: {
-        address: `eq.${escrow.assetRootAddress}`,
+        address: `like.${escrow.assetRootAddress}*`,
         select: constants.attachImagesAndFiles,
       },
     }
