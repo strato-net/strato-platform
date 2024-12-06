@@ -55,8 +55,8 @@ const BorrowModal = ({
     {
       label: 'Maximum loan percentage',
       description:
-        `Indicates you can borrow up to ${matchedReserve?.loanToValueRatio}% of the market value of your staked RWAs.`,
-      value: `${matchedReserve?.loanToValueRatio}%`,
+        `Indicates you can borrow up to 50% of the market value of your staked RWAs.`,
+      value: '50%',
     },
     {
       label: 'Estimated Loan (in STRATs)',
@@ -65,7 +65,7 @@ const BorrowModal = ({
       value: (
         <div className="flex -mr-1">
           <div className="mx-1">{logo}</div>{' '}
-          {parseFloat(inventory?.escrow?.maxLoanAmount / 100).toFixed(2)}
+          {parseFloat(inventory?.escrow?.collateralValue / 200).toFixed(2)}
         </div>
       ),
     },
@@ -76,7 +76,7 @@ const BorrowModal = ({
   const handleSubmit = async () => {
     const body = {
       escrowAddress: inventory?.sale,
-      borrowAmount: inventory?.escrow?.maxLoanAmount,
+      borrowAmount: Math.floor(inventory?.escrow?.collateralValue / 2),
       reserve: matchedReserve?.address,
     };
 
