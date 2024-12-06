@@ -18,7 +18,10 @@ import { SEO } from '../../helpers/seoConstant';
 import { BANNER } from '../../helpers/constants';
 import { bannerArrow } from '../../images/SVGComponents';
 import { actions as inventoryActions } from '../../contexts/inventory/actions';
-import { useInventoryDispatch, useInventoryState} from '../../contexts/inventory';
+import {
+  useInventoryDispatch,
+  useInventoryState,
+} from '../../contexts/inventory';
 
 // ----------------------------------------------------------
 
@@ -43,6 +46,8 @@ const MarketPlace = ({ user, isAuthenticated }) => {
   const { iscategorysLoading } = useCategoryState();
   const { reserves } = useInventoryState();
   const inventoryDispatch = useInventoryDispatch();
+  const formatter = new Intl.NumberFormat('en-US');
+  const formattedNum = (num) => formatter.format(num);
 
   const [totalTvl, setTotalTvl] = useState(0);
   const [averageApy, setAverageApy] = useState(0);
@@ -144,7 +149,7 @@ const MarketPlace = ({ user, isAuthenticated }) => {
       <div className="stake-banner-stats md:gap-8 lg:gap-16">
         <div className="text-center">
           <div className="stake-banner-stats-value font-bold text-white">
-            ${totalTvl}
+            ${formattedNum(totalTvl.toFixed(2))}
           </div>
           <div className="stake-banner-stats-title text-white">
             Total Value Locked (TVL)

@@ -52,7 +52,7 @@ const PurchasableStakeItems = () => {
               className="overflow-x-auto gap-6 px-1 py-2 flex trending_cards"
             >
               {stakeableProducts.map((stakeableProduct) => {
-                const matchingReserve = reserves.find(
+                const matchingReserve = reserves?.find(
                   (reserve) => reserve.assetRootAddress === stakeableProduct.root
                 );
                 return <NewVaultCard key={stakeableProduct.assetRootAddress} reserveItem={stakeableProduct} reserve={matchingReserve} />;
