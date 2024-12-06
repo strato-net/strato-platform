@@ -4,7 +4,7 @@ import TopSellingProductCard from './TopSellingProductCard';
 import StakeableProductCards from './StakeableProductCards';
 import TrendingVaultCard from './TrendingVaultCard';
 import { Images } from '../../images';
-import React, { useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import { actions } from '../../contexts/category/actions';
 import { useCategoryDispatch, useCategoryState } from '../../contexts/category';
 import useDebounce from '../UseDebounce';
@@ -18,7 +18,7 @@ import { SEO } from '../../helpers/seoConstant';
 import { BANNER } from '../../helpers/constants';
 import { bannerArrow } from '../../images/SVGComponents';
 import { actions as inventoryActions } from '../../contexts/inventory/actions';
-import { useInventoryDispatch } from '../../contexts/inventory';
+import { useInventoryDispatch, useInventoryState} from '../../contexts/inventory';
 
 // ----------------------------------------------------------
 
@@ -41,7 +41,33 @@ const MarketPlace = ({ user, isAuthenticated }) => {
   const dispatch = useCategoryDispatch();
   const debouncedSearchTerm = useDebounce('', 1000);
   const { iscategorysLoading } = useCategoryState();
+  const { reserves } = useInventoryState();
   const inventoryDispatch = useInventoryDispatch();
+
+  const [totalTvl, setTotalTvl] = useState(0);
+  const [averageApy, setAverageApy] = useState(0);
+  const [totalCataRewards, setTotalCataRewards] = useState(0);
+
+  useEffect(() => {
+    if (reserves) {
+      const totalTvl = reserves.reduce(
+        (sum, reserves) => sum + reserves.tvl,
+        0
+      );
+      const averageApy =
+        reserves.reduce((sum, reserves) => sum + reserves.cataAPYRate, 0) /
+        reserves.length;
+
+      const totalCataRewards = reserves.reduce(
+        (sum, reserves) => sum + reserves.totalCataRewardIssued,
+        0
+      );
+      console.log('totalCataRewards', totalCataRewards);
+      setAverageApy(Math.floor(averageApy));
+      setTotalTvl(Math.floor(totalTvl));
+      setTotalCataRewards(Math.floor(totalCataRewards));
+    }
+  }, [reserves]);
 
   useEffect(() => {
     inventoryActions.getAllReserve(inventoryDispatch);
@@ -119,7 +145,7 @@ const MarketPlace = ({ user, isAuthenticated }) => {
       <div className="stake-banner-stats md:gap-8 lg:gap-16">
         <div className="text-center">
           <div className="stake-banner-stats-value font-bold text-white">
-            $318.7M
+            ${totalTvl}
           </div>
           <div className="stake-banner-stats-title text-white">
             Total Value Locked (TVL)
@@ -127,13 +153,13 @@ const MarketPlace = ({ user, isAuthenticated }) => {
         </div>
         <div className="text-center">
           <div className="stake-banner-stats-value font-bold text-white">
-            10%
+            {averageApy}%
           </div>
           <div className="stake-banner-stats-title text-white">Est. APY</div>
         </div>
         <div className="text-center">
           <div className="stake-banner-stats-value font-bold text-white">
-            478.7M
+            {totalCataRewards}
           </div>
           <div className="stake-banner-stats-title text-white">
             Rewards Issued (CATA)

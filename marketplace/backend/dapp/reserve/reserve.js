@@ -86,24 +86,43 @@ async function get(user, address, options) {
   const reserve = reserves[0];
 
   // Fetch associated escrows
-  const escrowSearchOptions = {
+  const escrowTVLSearchOptions = {
     ...options,
     query: {
       creator: CREATOR,
       isActive: IS_ACTIVE,
       reserve: `eq.${reserve.address}`,
-      select: 'collateralValue.sum()'
+      select: 'collateralValue.sum()',
     },
   };
 
-  const escrows = await rest.search(
-    null, // Replace `null` with the appropriate token if needed
+  const activeEscrows = await rest.search(
+    user,
     { name: 'BlockApps-Mercata-Escrow' },
-    escrowSearchOptions
+    escrowTVLSearchOptions
   );
 
   // Calculate TVL: Total Value Locked in Dollars
-  const tvl = escrows && escrows.length > 0 ? escrows[0].sum / 100 : 0;
+  const tvl = activeEscrows && activeEscrows.length > 0 ? activeEscrows[0].sum / 10000 : 0;
+
+  // Total Cata Reward Issued in CATA
+  const escrowTotalCataRewardSearchOptions = {
+    ...options,
+    query: {
+      creator: CREATOR,
+      reserve: `eq.${reserve.address}`,
+      select: 'totalCataReward.sum()',
+    },
+  };
+
+  const allEscrows = await rest.search(
+    user,
+    { name: 'BlockApps-Mercata-Escrow' },
+    escrowTotalCataRewardSearchOptions
+  );
+
+  // Calculate total Cata reward issued
+  const totalCataRewardIssued = allEscrows && allEscrows.length > 0 ? allEscrows[0].sum / Math.pow(10, 18) : 0;
 
   // Fetch associated asset
   const assetSearchOptions = {
@@ -126,7 +145,8 @@ async function get(user, address, options) {
   return {
     ...reserve,
     asset,
-    tvl
+    tvl,
+    totalCataRewardIssued,
   };
 }
 
@@ -175,7 +195,7 @@ async function getAll(user, options) {
       );
 
       // Fetch associated escrows to calculate TVL
-      const escrowSearchOptions = {
+      const escrowTVLSearchOptions = {
         ...options,
         query: {
           creator: 'eq.BlockApps',
@@ -185,20 +205,43 @@ async function getAll(user, options) {
         },
       };
 
-      const escrows = await rest.search(
+      const activeEscrows = await rest.search(
         user,
         { name: 'BlockApps-Mercata-Escrow' },
-        escrowSearchOptions
+        escrowTVLSearchOptions
       );
 
-      // Calculate TVL: Total Value Locked in Dollars
-      const tvl = escrows && escrows.length > 0 ? escrows[0].sum / 100 : 0;
+      // Filter for active escrows and calculate TVL: Total Value Locked in Dollars
+      const tvl = activeEscrows && activeEscrows.length > 0 ? activeEscrows[0].sum / 10000 : 0;
+
+      // Total Cata Reward Issued in CATA
+      const escrowTotalCataRewardSearchOptions = {
+        ...options,
+        query: {
+          creator: 'eq.BlockApps',
+          reserve: `eq.${reserve.address}`,
+          select: 'totalCataReward.sum()',
+        },
+      };
+
+      const allEscrows = await rest.search(
+        user,
+        { name: 'BlockApps-Mercata-Escrow' },
+        escrowTotalCataRewardSearchOptions
+      );
+      
+      // Calculate total Cata reward issued
+      const totalCataRewardIssued =
+        allEscrows && allEscrows.length > 0
+          ? allEscrows[0].sum / Math.pow(10, 18)
+          : 0;
 
       // Attach the first matching asset (or null) and TVL to the reserve
       return {
         ...reserve,
         asset: asset && asset[0] ? marshalOut(asset[0]) : null,
         tvl,
+        totalCataRewardIssued,
       };
     })
   );
