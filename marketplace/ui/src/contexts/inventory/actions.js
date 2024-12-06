@@ -1111,7 +1111,6 @@ const actions = {
       });
 
       const body = await response.json();
-      console.log('body123', body);
       if (response.status === RestStatus.OK) {
         dispatch({
           type: actionDescriptors.getUserCataRewardsSuccessful,
