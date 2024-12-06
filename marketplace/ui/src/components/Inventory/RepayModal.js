@@ -1,6 +1,6 @@
 import { Button, Modal, Tooltip } from 'antd';
 import { QuestionCircleOutlined } from '@ant-design/icons';
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 
 import {
   usePaymentServiceDispatch,
@@ -14,7 +14,7 @@ import {
 
 import { actions as paymentServiceActions } from '../../contexts/payment/actions';
 import { actions as marketplaceActions } from '../../contexts/marketplace/actions';
-import { useMarketplaceDispatch } from '../../contexts/marketplace';
+import { useMarketplaceDispatch, useMarketplaceState } from '../../contexts/marketplace';
 import { Images } from '../../images';
 import { useLocation } from 'react-router-dom';
 
@@ -38,13 +38,26 @@ const RepayModal = ({
   const paymentServiceDispatch = usePaymentServiceDispatch();
 
   const { paymentServices } = usePaymentServiceState();
+  const { strats, isFetchingStrats } = useMarketplaceState();
   const isStaked = inventory.sale && inventory.price <= 0;
   const itemName = decodeURIComponent(inventory.name);
   const location = useLocation();
   const queryParams = new URLSearchParams(location.search);
+  const [repayAmount, setRepayAmount] = useState(0);
 
   useEffect(() => {
+    if (inventory?.escrow?.borrowedAmount && strats) {
+      const stratsBalance = Object.keys(strats).length > 0 ? strats : 0;
+      setRepayAmount(
+        inventory?.escrow?.borrowedAmount / 100 > stratsBalance
+          ? Number(stratsBalance)
+          : inventory?.escrow?.borrowedAmount / 100
+      );
+    }
+  }, [strats]);
+  useEffect(() => {
     paymentServiceActions.getPaymentServices(paymentServiceDispatch, true);
+    marketplaceActions.fetchStratsBalance(marketplaceDispatch);
   }, []);
 
   const dataForItems = [
@@ -54,7 +67,7 @@ const RepayModal = ({
       value: (
         <div className="flex -mr-1">
           {logo} &nbsp;
-          {(inventory?.escrow?.borrowedAmount / 100).toFixed(2)}
+          {repayAmount.toFixed(2)}
         </div>
       ),
     },
@@ -108,6 +121,7 @@ const RepayModal = ({
       width={600}
       centered
       footer={null}
+      loading={isFetchingStrats}
     >
       <div className="flex flex-col px-4 pt-4">
         <div className="flex flex-col gap-2">

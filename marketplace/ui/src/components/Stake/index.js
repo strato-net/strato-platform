@@ -34,7 +34,9 @@ import { actions as categoryActions } from '../../contexts/category/actions';
 import { TrophyOutlined, GiftOutlined } from '@ant-design/icons';
 
 const logo = <img src={Images.cata} alt={''} title={''} className="w-5 h-5" />;
-const StratsIcon = <img src={Images.strat} alt={''} title={''} className="w-4 h-4" />;
+const StratsIcon = (
+  <img src={Images.strat} alt={''} title={''} className="w-4 h-4" />
+);
 
 const { Title } = Typography;
 
@@ -204,7 +206,14 @@ const Stake = ({ user }) => {
       title: 'Quantity Staked',
       align: 'center',
       render: (_, record) => {
-        return <div>{record.escrow ? 1 : 0}</div>;
+        const isStrats = record.originAddress === stratsAddress;
+        const isCata = record.originAddress === cataAddress;
+        const quantity = isStrats
+          ? parseFloat((record.quantity / 100).toFixed(2))
+          : isCata
+          ? parseFloat((record.quantity / Math.pow(10, 18)).toFixed(18))
+          : record.quantity;
+        return <div>{record.escrow ? quantity : 0}</div>;
       },
     },
     {

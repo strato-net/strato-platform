@@ -39,6 +39,10 @@ const BorrowModal = ({
   const location = useLocation();
   const queryParams = new URLSearchParams(location.search);
 
+  const loanableAmount = Math.floor(inventory?.escrow?.collateralValue / 2) >= inventory?.escrow?.borrowedAmount
+                       ? Math.floor(inventory?.escrow?.collateralValue / 2) - inventory?.escrow?.borrowedAmount
+                       : 0;
+
   useEffect(() => {
     if (reserves && inventory.data && !isReservesLoading && isStaked) {
       inventoryActions.getOracle(inventoryDispatch, matchedReserve.oracle);
@@ -65,7 +69,7 @@ const BorrowModal = ({
       value: (
         <div className="flex -mr-1">
           <div className="mx-1">{logo}</div>{' '}
-          {parseFloat(inventory?.escrow?.collateralValue / 200).toFixed(2)}
+          {parseFloat(loanableAmount / 100).toFixed(2)}
         </div>
       ),
     },
@@ -76,7 +80,7 @@ const BorrowModal = ({
   const handleSubmit = async () => {
     const body = {
       escrowAddress: inventory?.sale,
-      borrowAmount: Math.floor(inventory?.escrow?.collateralValue / 2),
+      borrowAmount: loanableAmount,
       reserve: matchedReserve?.address,
     };
 
