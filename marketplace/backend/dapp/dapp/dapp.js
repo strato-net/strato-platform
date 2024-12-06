@@ -1823,7 +1823,7 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
             queryOptions: { select: 'address, quantity' },
             notEqualsField: 'quantity',
             notEqualsValue: '0',
-            order: 'block_timestamp.desc',
+            order: 'quantity.desc',
           },
           options
         );
