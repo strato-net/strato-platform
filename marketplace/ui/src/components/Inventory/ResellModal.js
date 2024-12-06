@@ -59,12 +59,11 @@ const ResellModal = ({
   const handleSubmit = async () => {
     let body = {
       assetAddress: inventory.address,
-      quantity:
-      isStrat
-      ? (quantity * 100).toFixed(0)
-      : isCata
-      ? (quantity * Math.pow(10, 18)).toFixed(0)
-      : quantity,
+      quantity: isStrat
+        ? (quantity * 100).toFixed(0)
+        : isCata
+        ? (quantity * Math.pow(10, 18)).toFixed(0)
+        : quantity,
     };
     let isDone = await actions.resellInventory(inventoryDispatch, body);
     if (isDone) {
@@ -74,7 +73,10 @@ const ResellModal = ({
         offset,
         debouncedSearchTerm,
         category && category !== 'All' ? category : undefined,
-        queryParams.get('st') === 'true' ? reserves.map(reserve => reserve.assetRootAddress) : ''
+        queryParams.get('st') === 'true' ||
+          window.location.pathname === '/stake'
+          ? reserves.map((reserve) => reserve.assetRootAddress)
+          : ''
       );
       await actions.fetchInventoryForUser(
         inventoryDispatch,

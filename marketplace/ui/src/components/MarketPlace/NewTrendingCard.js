@@ -16,7 +16,6 @@ import { setCookie } from '../../helpers/cookie';
 import { SEO } from '../../helpers/seoConstant';
 import routes from '../../helpers/routes';
 import LoginModal from './LoginModal';
-import { useInventoryState } from '../../contexts/inventory';
 
 const NewTrendingCard = ({
   topSellingProduct,
@@ -25,6 +24,7 @@ const NewTrendingCard = ({
   api,
   contextHolder,
   isUserProfile = false,
+  reserve,
 }) => {
   const navigate = useNavigate();
   const location = useLocation();
@@ -32,15 +32,19 @@ const NewTrendingCard = ({
   const { stratsAddress, cataAddress } = useMarketplaceState();
   const { hasChecked, isAuthenticated, loginUrl, user } =
     useAuthenticateState();
-  const { reserves } = useInventoryState();
-  const [isReserve, setIsReserve] = useState(false);
 
   const [isModalVisible, setIsModalVisible] = useState(false);
   const [isWishlisted, setIsWishlisted] = useState(false);
-  const isDecimal = topSellingProduct.data.quantityIsDecimal && topSellingProduct.data.quantityIsDecimal === 'True';
+  const isDecimal =
+    topSellingProduct.data.quantityIsDecimal &&
+    topSellingProduct.data.quantityIsDecimal === 'True';
   const isStrat = topSellingProduct.originAddress === stratsAddress;
   const isCata = topSellingProduct.originAddress === cataAddress;
-  const saleQuantity = isStrat ? topSellingProduct.saleQuantity / 100 : isCata ? topSellingProduct.saleQuantity / Math.pow(10, 18) : topSellingProduct.saleQuantity
+  const saleQuantity = isStrat
+    ? topSellingProduct.saleQuantity / 100
+    : isCata
+    ? topSellingProduct.saleQuantity / Math.pow(10, 18)
+    : topSellingProduct.saleQuantity;
   const [quantity, setQuantity] = useState(1);
 
   const ownerSameAsUser = () => {
@@ -80,14 +84,7 @@ const NewTrendingCard = ({
       (product) => product.address === topSellingProduct?.address
     );
     setIsWishlisted(productInWishlist);
-    if (reserves) {
-      setIsReserve(
-        reserves.some(
-          (reserve) => reserve.assetRootAddress === topSellingProduct.address
-        )
-      );
-    }
-  }, [topSellingProduct, reserves]);
+  }, [topSellingProduct]);
 
   const toggleWishlist = () => {
     if (!isAuthenticated || !user) {
@@ -210,7 +207,9 @@ const NewTrendingCard = ({
         <div style={{ display: 'flex', justifyContent: 'space-between' }}>
           {topSellingProduct?.price
             ? (() => {
-                const adjustedPrice = isDecimal ? (topSellingProduct.price * 100).toFixed(2) : topSellingProduct.price
+                const adjustedPrice = isDecimal
+                  ? (topSellingProduct.price * 100).toFixed(2)
+                  : topSellingProduct.price;
 
                 return (
                   <Typography className="font-semibold">
@@ -243,10 +242,10 @@ const NewTrendingCard = ({
             </Typography>
           )}
         </div>
-        {isReserve && (
+        {reserve && (
           <div className="flex justify-between">
-            <p>Est. APY: 10%</p>
-            <p>TVL: $34,523,523</p>
+            <p>Est. APY: {reserve?.cataAPYRate}%</p>
+            <p>TVL: ${reserve?.tvl.toFixed(2)} </p>
           </div>
         )}
         <div style={customStyle} className="custom-typography">

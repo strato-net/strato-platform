@@ -100,9 +100,6 @@ const HeaderComponent = ({
   const [categories, setCategories] = useState([]);
   const [selectedCategory, setSelectedCategory] = useState(categoryQueryValue);
   const [isModalVisible, setIsModalVisible] = useState(false);
-  // const [originAddress, setOriginAddress] = useState(stratsAddress);
-  const formatter = new Intl.NumberFormat('en-US');
-  const formattedNum = (num) => formatter.format(num);
   const stratsBalance = Object.keys(strats).length > 0 ? strats : 0;
   const cataBalance = Object.keys(cata).length > 0 ? cata : 0;
 
@@ -266,13 +263,6 @@ const HeaderComponent = ({
               <Col Col={24}>
                 {' '}
                 <p className="text-xs mt-1">CATA: {new BigNumber(cataBalance).toString()}</p>
-              </Col>
-              <Col Col={24}>
-                {' '}
-                <p className="text-xs mt-3">
-                  Balance: $
-                  {(new BigNumber(cataBalance).dividedBy(new BigNumber(10))).toString()}
-                </p>
               </Col>
             </Row>
           )}

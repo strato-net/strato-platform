@@ -14,9 +14,7 @@ import {
 import { Images } from '../../images';
 import { useLocation } from 'react-router-dom';
 
-const logo = (
-  <img src={Images.strat} alt={''} title={''} className="w-5 h-5" />
-);
+const logo = <img src={Images.cata} alt={''} title={''} className="w-5 h-5" />;
 
 const StakeModal = ({
   open,
@@ -45,9 +43,12 @@ const StakeModal = ({
 
   const { paymentServices } = usePaymentServiceState();
   const isLoader =
-    isStaking || isUnstaking || isFetchingOracle || isReservesLoading || isEscrowLoading;
-  const isStaked =
-    inventory.escrow && inventory.escrow.isActive;
+    isStaking ||
+    isUnstaking ||
+    isFetchingOracle ||
+    isReservesLoading ||
+    isEscrowLoading;
+  const isStaked = inventory.escrow && inventory.escrow.isActive;
   const itemName = decodeURIComponent(inventory.name);
   const matchedReserve = reserves?.length
     ? reserves.find((reserve) => reserve.assetRootAddress === inventory.root)
@@ -84,7 +85,7 @@ const StakeModal = ({
             description:
               'The total value of your staked assets, calculated as Quantity x Oracle Price.',
             value: `$${(
-              oracleData.consensusPrice.toFixed(2) * inventory?.quantity
+              matchedReserve?.lastUpdatedOraclePrice * inventory?.quantity
             ).toFixed(2)}`,
           },
           {
@@ -92,15 +93,14 @@ const StakeModal = ({
             description:
               'The expected daily earnings in CATA tokens from staking your RWAs.',
             value: (
-              <div className="flex -mr-1">
+              <div className="flex">
+                <div className="mx-1">{logo}</div>
                 {(
                   (inventory?.quantity *
-                    oracleData.consensusPrice *
-                    matchedReserve?.cataAPYRate) /
+                    matchedReserve?.lastUpdatedOraclePrice *
+                    (matchedReserve?.cataAPYRate / 10)) /
                   365
-                ).toFixed(6)}
-
-                {logo}
+                ).toFixed(2)}
               </div>
             ),
           },
@@ -121,7 +121,7 @@ const StakeModal = ({
             label: `Market price (per unit)`,
             description:
               ' The current price of one unit of your RWA, as determined by the oracle.',
-            value: `$${oracleData.consensusPrice.toFixed(2)}`,
+            value: `$${matchedReserve?.lastUpdatedOraclePrice.toFixed(2)}`,
           },
         ]
       : [];
@@ -129,7 +129,9 @@ const StakeModal = ({
   const handleSubmit = async () => {
     if (type === 'Stake') {
       const body = {
-        escrowAddress: escrow ? escrow.address : '0000000000000000000000000000000000000000',
+        escrowAddress: escrow
+          ? escrow.address
+          : '0000000000000000000000000000000000000000',
         collateralQuantity: inventory?.quantity,
         assets: inventory ? [inventory.address] : [],
         reserve: matchedReserve?.address,
@@ -152,12 +154,13 @@ const StakeModal = ({
             offset,
             debouncedSearchTerm,
             category && category !== 'All' ? category : undefined,
-            queryParams.get('st') === 'true'
-              ? queryParams.get('st') === 'true'
-                ? reserves.map((reserve) => reserve.assetRootAddress)
-                : ''
+            queryParams.get('st') === 'true' ||
+              window.location.pathname === '/stake'
+              ? reserves.map((reserve) => reserve.assetRootAddress)
               : ''
           );
+          await inventoryActions.getAllReserve(inventoryDispatch);
+          await inventoryActions.getUserCataRewards(inventoryDispatch);
         }
         handleCancel();
       }
@@ -186,12 +189,13 @@ const StakeModal = ({
             offset,
             debouncedSearchTerm,
             category && category !== 'All' ? category : undefined,
-            queryParams.get('st') === 'true'
-              ? queryParams.get('st') === 'true'
-                ? reserves.map((reserve) => reserve.assetRootAddress)
-                : ''
+            queryParams.get('st') === 'true' ||
+              window.location.pathname === '/stake'
+              ? reserves.map((reserve) => reserve.assetRootAddress)
               : ''
           );
+          inventoryActions.getAllReserve(inventoryDispatch);
+          inventoryActions.getUserCataRewards(inventoryDispatch);
         }
         handleCancel();
       }

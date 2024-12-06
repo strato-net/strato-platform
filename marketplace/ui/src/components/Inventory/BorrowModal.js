@@ -12,9 +12,7 @@ import { useMarketplaceDispatch } from '../../contexts/marketplace';
 import { Images } from '../../images';
 import { useLocation } from 'react-router-dom';
 
-const logo = (
-  <img src={Images.strat} alt={''} title={''} className="w-5 h-5" />
-);
+const logo = <img src={Images.strat} alt={''} title={''} className="w-5 h-5" />;
 
 const BorrowModal = ({
   open,
@@ -26,21 +24,17 @@ const BorrowModal = ({
   offset,
   productDetailPage,
 }) => {
-  const {
-    isReservesLoading,
-    reserves,
-    oracle,
-    isBorrowing
-  } = useInventoryState();
+  const { isReservesLoading, reserves, oracle, isBorrowing } =
+    useInventoryState();
   // Dispatch
   const inventoryDispatch = useInventoryDispatch();
   const marketplaceDispatch = useMarketplaceDispatch();
 
   const isStaked = inventory.sale && inventory.price <= 0;
   const itemName = decodeURIComponent(inventory.name);
-  const matchedReserve = reserves?.length ? reserves.find(
-    (reserve) => reserve.assetRootAddress === inventory.root
-  ) : null;
+  const matchedReserve = reserves?.length
+    ? reserves.find((reserve) => reserve.assetRootAddress === inventory.root)
+    : null;
   const oracleData = oracle ? oracle : { consensusPrice: 0 };
   const location = useLocation();
   const queryParams = new URLSearchParams(location.search);
@@ -50,50 +44,46 @@ const BorrowModal = ({
       inventoryActions.getOracle(inventoryDispatch, matchedReserve.oracle);
     }
   }, [matchedReserve]);
+
   const dataForItems = [
     {
-      label: `Quantity to Collateralize`,
-      description: 'The amount of Real World Assets (RWAs) you are collateralizing.',
-      value: `${inventory?.quantity}`,
+      label: `Market price (per unit)`,
+      description:
+        'The current price of one unit of your RWA, as determined by the oracle.',
+      value: `$${matchedReserve.lastUpdatedOraclePrice.toFixed(2)}`,
+    },
+    {
+      label: `Quantity`,
+      description:
+        'The amount of Real World Assets (RWAs) you are collateralizing.',
+      value: `x ${inventory?.escrow?.collateralQuantity}`,
     },
     {
       label: `Market Value`,
-      description: ' The total value of your staked assets, calculated as Quantity x Oracle Price.',
-      value: `$${(inventory?.escrow?.collateralValue / 10000).toFixed(2)}`,
-    },
-    {
-      label: 'Estimated Loan (in STRATs)',
-      description: "The projected amount of STRAT tokens you can borrow against your staked RWAs.",
-      value: (
-        <div className="flex -mr-1">
-          {parseFloat(inventory?.escrow?.maxLoanAmount/100).toFixed(2)}
-          {logo}
-        </div>
-      ),
-    },
-    {
-      label: 'Estimated Loan (in $)',
-      description: "The projected amount of USD you can borrow against your staked RWAs.",
-      value: (
-        <div className="flex -mr-1">
-          ${parseFloat(inventory?.escrow?.maxLoanAmount/10000).toFixed(2)}
-        </div>
-      ),
-    }
-  ];
-
-  const dataForSummary = [
-    {
-      label: `Market price (per unit)`,
-      description: 'The current price of one unit of your RWA, as determined by the oracle.',
-      value: `$${(inventory?.escrow?.collateralValue / 10000).toFixed(2)}`,
+      description:
+        ' The total value of your staked assets, calculated as Quantity x Oracle Price.',
+      value: ` = $${(inventory?.escrow?.collateralValue / 10000).toFixed(2)}`,
     },
     {
       label: 'Loan to Value Ratio',
-      description: 'Indicates you can borrow up to 50% of the market value of your staked RWAs.',
-      value: `${matchedReserve?.loanToValueRatio}%`,
+      description:
+        'Indicates you can borrow up to 50% of the market value of your staked RWAs.',
+      value: `x ${matchedReserve?.loanToValueRatio}%`,
+    },
+    {
+      label: 'Estimated Loan (in STRATs)',
+      description:
+        'The projected amount of STRAT tokens you can borrow against your staked RWAs.',
+      value: (
+        <div className="flex -mr-1">
+          =<div className="mx-1">{logo}</div>{' '}
+          {parseFloat(inventory?.escrow?.maxLoanAmount / 100).toFixed(2)}
+        </div>
+      ),
     },
   ];
+
+  const dataForSummary = [];
 
   const handleSubmit = async () => {
     const body = {
@@ -116,9 +106,14 @@ const BorrowModal = ({
           offset,
           debouncedSearchTerm,
           category && category !== 'All' ? category : undefined,
-          queryParams.get('st') === 'true' ? queryParams.get('st') === 'true' ? reserves.map(reserve => reserve.assetRootAddress) : '' : ''
+          queryParams.get('st') === 'true' ||
+            window.location.pathname === '/stake'
+            ? reserves.map((reserve) => reserve.assetRootAddress)
+            : ''
         );
       }
+      await inventoryActions.getAllReserve(inventoryDispatch);
+      await inventoryActions.getUserCataRewards(inventoryDispatch);
       await marketplaceActions.fetchStratsBalance(marketplaceDispatch);
       handleCancel();
     }

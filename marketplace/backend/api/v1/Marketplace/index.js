@@ -36,7 +36,7 @@ router.get(
 
 router.get(
   Marketplace.getStakeableProducts,
-  authHandler.authorizeRequest(),
+  authHandler.authorizeRequest(true),
   loadDapp,
   MarketplaceController.getStakeableProducts
 );

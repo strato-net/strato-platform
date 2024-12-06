@@ -14,7 +14,7 @@ import {
 } from 'antd';
 import {
   CheckCircleOutlined,
-  DollarOutlined,
+  TrophyOutlined,
   GiftOutlined,
 } from '@ant-design/icons';
 import BigNumber from 'bignumber.js';
@@ -69,6 +69,7 @@ import './index.css';
 
 const { Option } = Select;
 const StratsIcon = <img src={Images.strat} alt="STRATS" className="w-4 h-4" />;
+const logo = <img src={Images.cata} alt={''} title={''} className="w-5 h-5" />;
 
 const Inventory = ({ user }) => {
   const [open, setOpen] = useState(false);
@@ -111,6 +112,8 @@ const Inventory = ({ user }) => {
     isFetchingTokens,
     isReservesLoading,
     reserves,
+    totalCataReward,
+    dailyCataReward,
   } = useInventoryState();
 
   const {
@@ -170,6 +173,7 @@ const Inventory = ({ user }) => {
 
   useEffect(() => {
     actions.getAllReserve(dispatch);
+    actions.getUserCataRewards(dispatch);
     actions.fetchSupportedTokens(dispatch);
     categoryActions.fetchCategories(categoryDispatch);
   }, []);
@@ -387,6 +391,7 @@ const Inventory = ({ user }) => {
           reserves.some(
             (reserve) => record.originAddress === reserve.assetRootAddress
           );
+        const borrowedAmount = (record?.escrow?.borrowedAmount || 0) / 10000;
         const callDetailPage = () => {
           navigate(
             `${naviroute
@@ -427,7 +432,14 @@ const Inventory = ({ user }) => {
             </div>
             {isStakeable && (
               <>
-                <div> Borrowed Amount: $33,516 </div>
+                <div>
+                  {' '}
+                  Borrowed Amount: $
+                  {borrowedAmount.toLocaleString('en-US', {
+                    maximumFractionDigits: 2,
+                    minimumFractionDigits: 2,
+                  })}{' '}
+                </div>
               </>
             )}
           </>
@@ -500,12 +512,14 @@ const Inventory = ({ user }) => {
         const isCata = record.originAddress === cataAddress;
         const saleQuantity = (
           isStrats
-            ? new BigNumber(record.saleQuantity).dividedBy(new BigNumber(100))
+            ? new BigNumber(record.saleQuantity || 0).dividedBy(
+                new BigNumber(100)
+              )
             : isCata
-            ? new BigNumber(record.saleQuantity).dividedBy(
+            ? new BigNumber(record.saleQuantity || 0).dividedBy(
                 new BigNumber(10).pow(18)
               )
-            : new BigNumber(record.saleQuantity)
+            : new BigNumber(record.saleQuantity || 0)
         ).toString();
 
         return <div className="w-24">{saleQuantity}</div>;
@@ -578,15 +592,25 @@ const Inventory = ({ user }) => {
     return (
       <div className="flex flex-row">
         <p className="flex items-center ml-4 font-semibold text-base xl:text-lg bg-[#E6F0FF] border border-[#13188A] rounded-md px-3 py-1 text-[#13188A] shadow-sm">
-          <DollarOutlined className="!text-[#13188A] mr-2 text-lg" />
-          Total Rewards (CATA):
-          <span className="ml-2 font-bold">334,133</span>
+          <TrophyOutlined className="!text-[#13188A] mr-2 text-lg" />
+          Total Rewards: &nbsp;{logo}
+          <span className="ml-1 font-bold">
+            {totalCataReward.toLocaleString('en-US', {
+              maximumFractionDigits: 4,
+              minimumFractionDigits: 0,
+            })}
+          </span>
         </p>
 
         <p className="flex items-center ml-4 font-semibold text-base xl:text-lg bg-[#FFE6E6] border border-[#D32F2F] rounded-md px-3 py-1 text-[#D32F2F] shadow-sm">
           <GiftOutlined className="!text-[#D32F2F] mr-2 text-lg" />
-          Est. Daily Reward (CATA):
-          <span className="ml-2 font-bold">1,321</span>
+          Est. Daily Reward: &nbsp;{logo}
+          <span className="ml-1 font-bold">
+            {dailyCataReward.toLocaleString('en-US', {
+              maximumFractionDigits: 4,
+              minimumFractionDigits: 0,
+            })}
+          </span>
         </p>
       </div>
     );

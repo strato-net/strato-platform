@@ -11,7 +11,7 @@ import { SEO } from '../../helpers/seoConstant';
 import LoginModal from './LoginModal';
 import routes from '../../helpers/routes';
 
-const NewVaultCard = ({ reserveItem, parent = '', contextHolder }) => {
+const NewVaultCard = ({ reserveItem, reserve, parent = '', contextHolder }) => {
   const location = useLocation();
   const navigate = useNavigate();
   const { hasChecked, isAuthenticated, loginUrl, user } =
@@ -80,12 +80,12 @@ const NewVaultCard = ({ reserveItem, parent = '', contextHolder }) => {
             <div className="flex justify-between items-center w-full">
               {/* Interest */}
               <Typography className="font-semibold text-gray-600 overflow-hidden cursor-pointer whitespace-nowrap text-ellipsis">
-                TVL: $3.32M {/* TODO: Replace with actual data */}
+                TVL: ${reserve?.tvl.toFixed(2)} 
               </Typography>
 
               {/* CATA APY */}
               <Typography className="font-semibold text-gray-600 overflow-hidden cursor-pointer whitespace-nowrap text-ellipsis">
-                Est. APY: 10%
+                Est. APY: {reserve?.cataAPYRate}%
               </Typography>
             </div>
           </div>

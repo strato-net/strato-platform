@@ -52,6 +52,10 @@ const actionDescriptors = {
   getEscrowForAssetSuccessful: 'get_escrow_for_asset_successful',
   getEscrowForAssetFailed: 'get_escrow_for_asset_failed',
 
+  getUserCataRewards: 'get_user_cata_rewards',
+  getUserCataRewardsSuccessful: 'get_user_cata_rewards_successful',
+  getUserCataRewardsFailed: 'get_user_cata_rewards_failed',
+
   getOracle: 'get_oracle',
   getOracleSuccessful: 'get_oracle_successful',
   getOracleFailed: 'get_oracle_failed',
@@ -1018,7 +1022,6 @@ const actions = {
           type: actionDescriptors.getAllReserveFailed,
           error: 'Unauthorized while fetching the reserves',
         });
-        window.location.href = body.error.loginUrl;
       }
 
       dispatch({
@@ -1091,6 +1094,62 @@ const actions = {
         error: 'Error while fetching the escrow Address',
       });
       actions.setMessage(dispatch, 'Error while fetching the escrow Address');
+    }
+  },
+
+  getUserCataRewards: async (dispatch) => {
+    dispatch({ type: actionDescriptors.getUserCataRewards });
+
+    try {
+      const response = await fetch(`${apiUrl}/escrow/reward`, {
+        method: HTTP_METHODS.GET,
+        credentials: 'same-origin',
+        headers: {
+          Accept: 'application/json',
+          'Content-Type': 'application/json',
+        },
+      });
+
+      const body = await response.json();
+      if (response.status === RestStatus.OK) {
+        dispatch({
+          type: actionDescriptors.getUserCataRewardsSuccessful,
+          payload: body.data,
+        });
+        return true;
+      } else if (response.status === RestStatus.CONFLICT) {
+        dispatch({
+          type: actionDescriptors.getUserCataRewardsFailed,
+          error: body.error.message,
+        });
+        actions.setMessage(dispatch, body.error.message);
+        return false;
+      } else if (response.status === RestStatus.INTERNAL_SERVER_ERROR) {
+        dispatch({
+          type: actionDescriptors.getUserCataRewardsFailed,
+          error: 'Error while fetching the rewards',
+        });
+        actions.setMessage(dispatch, 'Errorwhile fetching the rewards');
+        return false;
+      } else if (response.status === RestStatus.UNAUTHORIZED) {
+        dispatch({
+          type: actionDescriptors.getUserCataRewardsFailed,
+          error: 'Unauthorized while fetching the rewards',
+        });
+      }
+
+      dispatch({
+        type: actionDescriptors.getUserCataRewardsFailed,
+        error: body.error,
+      });
+      actions.setMessage(dispatch, body.error);
+      return false;
+    } catch (err) {
+      dispatch({
+        type: actionDescriptors.getUserCataRewardsFailed,
+        error: 'Error while fetching the rewards',
+      });
+      actions.setMessage(dispatch, 'Error while fetching the rewards');
     }
   },
 
