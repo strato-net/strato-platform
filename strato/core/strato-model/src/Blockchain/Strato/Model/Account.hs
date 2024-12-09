@@ -204,7 +204,7 @@ explicitChain a cid = NamedAccount a (ExplicitChain cid)
 
 instance Show NamedAccount where
   show (NamedAccount a UnspecifiedChain) = printf "%040x" a
-  show (NamedAccount a MainChain) = printf "%040x:main" a
+  show (NamedAccount a MainChain) = printf "%040x" a
   show (NamedAccount a (ExplicitChain cid)) = (printf "%040x" a) ++ ":" ++ (printf "%064x" (toInteger cid))
 
 instance Read NamedAccount where

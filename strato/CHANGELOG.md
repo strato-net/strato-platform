@@ -28,7 +28,7 @@ so that they could be properly moved to their respective version's subsection.
 
 ### Removed
 - Removed private chain endpoints
-
+- Removed `:main` suffix from NamedAccount
 ## [12.2] - 10/28/2024 
 ### Added
 - Added block.proposer to SolidVM
