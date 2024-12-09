@@ -10,7 +10,6 @@ import {
   Col,
 } from 'antd';
 import image_placeholder from '../../images/resources/image_placeholder.png';
-import useDebounce from '../UseDebounce';
 import { actions as inventoryActions } from '../../contexts/inventory/actions';
 import {
   useInventoryDispatch,
@@ -23,7 +22,6 @@ import routes from '../../helpers/routes';
 import { useNavigate } from 'react-router-dom';
 import HelmetComponent from '../Helmet/HelmetComponent';
 import { SEO } from '../../helpers/seoConstant';
-import { ASSET_STATUS } from '../../helpers/constants';
 import StakeItemActions from '../Inventory/StakeItemActions';
 import '../Inventory/index.css';
 import PurchasableStakeItems from './PurchasableStakeItems';
@@ -60,9 +58,61 @@ const Stake = ({ user }) => {
   const [limit, setLimit] = useState(10);
   const [offset, setOffset] = useState(0);
   const [page, setPage] = useState(1);
-  const [queryValue, setQueryValue] = useState('');
-  const debouncedSearchTerm = useDebounce(queryValue, 1000);
   const navigate = useNavigate();
+
+  const combinedInventories = Object.values(
+    inventories.reduce((acc, item) => {
+      const root = item.root;
+      let entry = acc[root];
+      if (!entry) {
+        // Initialize a fresh entry
+        entry = { ...item, quantity: item.quantity || 0 };
+        entry.address = item.address
+          ? [{ address: item.address, sale: item.sale || null }]
+          : [];
+        delete entry.root; // Remove the duplicate root field if needed
+        acc[root] = entry;
+      } else {
+        // Merge logic
+        for (const key in item) {
+          const newVal = item[key];
+          const oldVal = entry[key];
+
+          if (key === 'quantity') {
+            // Sum quantities
+            entry[key] = (oldVal || 0) + (newVal || 0);
+          } else if (key === 'address') {
+            // Append unique address-sale pairs
+            const pair = { address: item.address, sale: item.sale || null };
+            if (
+              !entry.address.some(
+                (a) => a.address === pair.address && a.sale === pair.sale
+              )
+            ) {
+              entry.address.push(pair);
+            }
+          } else if (oldVal === undefined) {
+            // Just set if not present
+            entry[key] = newVal;
+          } else if (Array.isArray(oldVal)) {
+            // If old is array, push newVal if not already included
+            if (!oldVal.some((v) => v === newVal)) oldVal.push(newVal);
+          } else if (typeof oldVal === 'object' && typeof newVal === 'object') {
+            // If both objects differ, convert to array
+            if (JSON.stringify(oldVal) !== JSON.stringify(newVal)) {
+              entry[key] = [oldVal, newVal];
+            }
+          } else if (oldVal !== newVal) {
+            // Different primitive -> turn into array if not already
+            entry[key] = Array.isArray(oldVal)
+              ? [...oldVal, newVal]
+              : [oldVal, newVal];
+          }
+        }
+      }
+      return acc;
+    }, {})
+  );
 
   const onPageChange = (page, pageSize) => {
     setLimit(pageSize);
@@ -86,7 +136,7 @@ const Stake = ({ user }) => {
         inventoryDispatch,
         limit,
         offset,
-        debouncedSearchTerm,
+        '',
         undefined,
         reserves.map((reserve) => reserve.assetRootAddress)
       );
@@ -126,14 +176,7 @@ const Stake = ({ user }) => {
   const columns = [
     {
       title: 'Item',
-      render: (text, record) => {
-        const isStakeable =
-          record.originAddress &&
-          reserves &&
-          reserves.length > 0 &&
-          reserves.some(
-            (reserve) => record.originAddress === reserve.assetRootAddress
-          );
+      render: (_, record) => {
         const borrowedAmount = (record?.escrow?.borrowedAmount || 0) / 100;
         const callDetailPage = () => {
           navigate(
@@ -173,17 +216,13 @@ const Stake = ({ user }) => {
                 </span>
               </div>
             </div>
-            {isStakeable && (
-              <>
-                <div className="flex items-center gap-2">
-                  Borrowed Amount: {StratsIcon}
-                  {borrowedAmount.toLocaleString('en-US', {
-                    maximumFractionDigits: 2,
-                    minimumFractionDigits: 2,
-                  })}
-                </div>
-              </>
-            )}
+            <div className="flex items-center gap-2">
+              Borrowed Amount: {StratsIcon}
+              {borrowedAmount.toLocaleString('en-US', {
+                maximumFractionDigits: 2,
+                minimumFractionDigits: 2,
+              })}
+            </div>
           </>
         );
       },
@@ -192,28 +231,16 @@ const Stake = ({ user }) => {
       title: 'Owned',
       align: 'center',
       render: (_, record) => {
-        const isStrats = record.originAddress === stratsAddress;
-        const isCata = record.originAddress === cataAddress;
-        const quantity = isStrats
-          ? parseFloat((record.quantity / 100).toFixed(2))
-          : isCata
-          ? parseFloat((record.quantity / Math.pow(10, 18)).toFixed(18))
-          : record.quantity;
-        return <div>{quantity || 0}</div>;
+        return <div>{record.quantity || 0}</div>;
       },
     },
     {
       title: 'Quantity Staked',
       align: 'center',
       render: (_, record) => {
-        const isStrats = record.originAddress === stratsAddress;
-        const isCata = record.originAddress === cataAddress;
-        const quantity = isStrats
-          ? parseFloat((record.quantity / 100).toFixed(2))
-          : isCata
-          ? parseFloat((record.quantity / Math.pow(10, 18)).toFixed(18))
-          : record.quantity;
-        return <div>{record.escrow ? quantity : 0}</div>;
+        return (
+          <div>{record.escrow ? record.escrow.collateralQuantity : 0}</div>
+        );
       },
     },
     {
@@ -225,7 +252,7 @@ const Stake = ({ user }) => {
             inventory={record}
             limit={limit}
             offset={offset}
-            debouncedSearchTerm={debouncedSearchTerm}
+            debouncedSearchTerm={''}
             user={user}
             reserves={reserves}
             stratAddress={stratsAddress}
@@ -242,7 +269,7 @@ const Stake = ({ user }) => {
           {record?.escrow ? (
             <div className="flex items-center justify-center gap-2 bg-[#1548C329] p-[6px] rounded-md">
               <div className="w-[7px] h-[7px] rounded-full bg-[#119B2D]"></div>
-              <p className="text-[#4D4D4D] text-[13px]"> {'Staked'} </p>
+              <p className="text-[#4D4D4D] text-[13px]"> Staked </p>
             </div>
           ) : (
             <div className="flex items-center justify-center gap-2 bg-[#1548C329] p-[6px] rounded-md">
@@ -313,7 +340,7 @@ const Stake = ({ user }) => {
                 </Title>
                 <Table
                   columns={columns}
-                  dataSource={inventories}
+                  dataSource={combinedInventories}
                   loading={isInventoriesLoading}
                   className="custom-table"
                   pagination={false}
@@ -330,14 +357,14 @@ const Stake = ({ user }) => {
                 <Title className="px-3 !text-3xl !text-left mt-10">
                   My Stakeable Items
                 </Title>
-                {inventories.map((inventory, index) => (
+                {combinedInventories.map((inventory, index) => (
                   <InventoryCard
                     id={index}
                     limit={limit}
                     offset={offset}
                     inventory={inventory}
                     key={index}
-                    debouncedSearchTerm={debouncedSearchTerm}
+                    debouncedSearchTerm={''}
                     allSubcategories={allSubcategories}
                     user={user}
                     reserves={reserves}

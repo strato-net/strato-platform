@@ -32,8 +32,7 @@ const StakeItemActions = ({
   function isActive() {
     if (
       inventory.status == ASSET_STATUS.PENDING_REDEMPTION ||
-      inventory.status == ASSET_STATUS.RETIRED ||
-      inventory.escrow
+      inventory.status == ASSET_STATUS.RETIRED
     ) {
       return false;
     } else {
@@ -65,49 +64,44 @@ const StakeItemActions = ({
   const handleRepayModalClose = () => {
     setRepayModalOpen(false);
   };
-
+  console.log('inventory: ', inventory);
   return (
     <div className="flex justify-center w-full">
-      {!inventory?.escrow && stakeable && (
+      <div className="flex justify-center gap-3">
         <Button
           type="primary"
           className="font-semibold flex items-center justify-center"
           onClick={() => showStakeModal('Stake')}
-          disabled={inventory?.escrow || !isActive() || inventory.price}
+          disabled={inventory?.quantity <= inventory?.escrow?.collateralQuantity || !isActive() || inventory.price}
         >
           <RiseOutlined /> Stake
         </Button>
-      )}
-
-      {inventory?.escrow && stakeable && (
-        <div className="flex justify-center gap-3">
-          <Button
-            type="link"
-            className="text-[#13188A] font-semibold"
-            onClick={() => showStakeModal('Unstake')}
-            disabled={inventory?.escrow?.borrowedAmount > 0}
-          >
-            <LogoutOutlined /> Unstake
-          </Button>
-          <Button
-            type="link"
-            className="text-[#13188A] font-semibold"
-            onClick={() => showBorrowModal('Unstake')}
-            disabled={inventory?.escrow?.borrowedAmount > 0}
-          >
-            <BankOutlined /> Borrow
-          </Button>
-          <Button
-            type="link"
-            className="text-[#13188A] font-semibold"
-            onClick={() => showRepayModal('Unstake')}
-            disabled={inventory?.escrow?.borrowedAmount <= 0}
-          >
-            <SolutionOutlined />
-            Repay
-          </Button>
-        </div>
-      )}
+        <Button
+          type="link"
+          className="text-[#13188A] font-semibold"
+          onClick={() => showStakeModal('Unstake')}
+          disabled={!inventory?.escrow || inventory?.escrow?.borrowedAmount > 0}
+        >
+          <LogoutOutlined /> Unstake
+        </Button>
+        <Button
+          type="link"
+          className="text-[#13188A] font-semibold"
+          onClick={() => showBorrowModal('Unstake')}
+          disabled={!inventory?.escrow || inventory?.escrow?.borrowedAmount > 0}
+        >
+          <BankOutlined /> Borrow
+        </Button>
+        <Button
+          type="link"
+          className="text-[#13188A] font-semibold"
+          onClick={() => showRepayModal('Unstake')}
+          disabled={!inventory?.escrow || inventory?.escrow?.borrowedAmount <= 0}
+        >
+          <SolutionOutlined />
+          Repay
+        </Button>
+      </div>
       {stakeModalOpen && (
         <StakeModal
           open={stakeModalOpen}
