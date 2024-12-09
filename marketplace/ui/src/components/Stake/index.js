@@ -24,7 +24,7 @@ import { useNavigate } from 'react-router-dom';
 import HelmetComponent from '../Helmet/HelmetComponent';
 import { SEO } from '../../helpers/seoConstant';
 import { ASSET_STATUS } from '../../helpers/constants';
-import ItemActions from '../Inventory/ItemActions';
+import StakeItemActions from '../Inventory/StakeItemActions';
 import '../Inventory/index.css';
 import PurchasableStakeItems from './PurchasableStakeItems';
 import StakeSteps from './StakeSteps';
@@ -221,7 +221,7 @@ const Stake = ({ user }) => {
       align: 'center',
       render: (text, record) => (
         <div>
-          <ItemActions
+          <StakeItemActions
             inventory={record}
             limit={limit}
             offset={offset}
