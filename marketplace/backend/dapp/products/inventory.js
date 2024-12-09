@@ -12,6 +12,7 @@ import {
 import dayjs from 'dayjs';
 import constants from '../../helpers/constants';
 import saleJs from '../orders/sale';
+import escrowJs from '../escrow/escrow';
 
 const contractName = constants.assetTableName;
 const transferContractName = `${contractName}.ItemTransfers`;
@@ -418,6 +419,8 @@ async function get(user, args, options) {
     newOptions
   );
 
+  const escrow = await escrowJs.getEscrowForAsset(user, { value: `eq.${inventory.address}` }, options);
+
   if (sale) {
     inventory = {
       ...inventory,
@@ -429,6 +432,7 @@ async function get(user, args, options) {
           ? sale['BlockApps-Mercata-Sale-paymentServices']
           : null
         : null,
+      escrow
     };
   }
 
@@ -560,10 +564,12 @@ async function getAll(admin, args = {}, defaultOptions) {
     // Currently can't filter on second table, so filtering sales fields here.
     // Sales only has price and quantity fields to filter, so better to join sales on asset table (asset has multiple filters for each route).
     if (inventories) {
-      inventories.forEach((inventory) => {
+      for (let i=0; i < inventories.length; i++) {
+        const inventory = inventories[i];
         if (
           inventory['BlockApps-Mercata-Sale'] &&
-          inventory['BlockApps-Mercata-Sale'].length > 0
+          inventory['BlockApps-Mercata-Sale'].length > 0 &&
+          inventory['BlockApps-Mercata-Sale'].some(item => item.isOpen === true)
         ) {
           let sales = inventory['BlockApps-Mercata-Sale'].filter(
             (sale) => sale.isOpen === true
@@ -587,7 +593,7 @@ async function getAll(admin, args = {}, defaultOptions) {
 
           // Combine the inventories with sales data if there are valid sales for user profile route
           if (userProfile) {
-            if (sales.length > 0 && (sales.price !== null || undefined)) {
+            if (sales.length > 0 && sales.price !== null && sales.price !== undefined) {
               // Only combine if there are sales. We don't list unpublished items for this route.
               finalInventory.push({
                 ...inventory,
@@ -621,20 +627,32 @@ async function getAll(admin, args = {}, defaultOptions) {
               'BlockApps-Mercata-Sale': undefined, // Removing the nested sale data to avoid redundancy
             });
           }
-        } else if (isMarketplaceSearch && isNullPriceRange) {
-          finalInventory.push({
-            ...inventory,
-            price: null,
-            saleAddress: null,
-            saleQuantity: null,
-            saleDate: null,
-            totalLockedQuantity: null,
-            paymentServices: null,
-          });
         } else {
-          finalInventory.push(inventory);
+          let escrow;
+          if (inventory.sale && inventory.sale !== constants.zeroAddress) {
+            escrow = await escrowJs.getEscrowForAsset(
+              admin,
+              { value: `eq.${inventory.address}` },
+              options
+            );
+          }
+          if (isMarketplaceSearch && isNullPriceRange) {
+            if (!escrow) {
+              finalInventory.push({
+                ...inventory,
+                price: null,
+                saleAddress: null,
+                saleQuantity: null,
+                saleDate: null,
+                totalLockedQuantity: null,
+                paymentServices: null,
+              });
+            }
+          } else {
+            finalInventory.push({ escrow, ...inventory});
+          }
         }
-      });
+      }
     }
   }
   // Sort the images and files by their order

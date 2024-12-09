@@ -16,7 +16,7 @@ const Statistics = ({ priceHistory, isDecimal }) => {
         {/* Tile for Price Range */}
         <div className="tileWrapper p-2 flex-auto md:max-w-[calc(33.333%-1.5rem)] w-full">
           <div className="tile bg-gray-200 p-4 rounded-lg shadow-md text-center">
-            <p className="title text-2xl font-semibold">
+            <p className="statistics-title text-2xl font-semibold">
               ${isDecimal ? originFluctuation.min * 100 : originFluctuation.min}{' '}
               - $
               {isDecimal ? originFluctuation.max * 100 : originFluctuation.max}
@@ -28,7 +28,7 @@ const Statistics = ({ priceHistory, isDecimal }) => {
         {/* Tile for Number of Units Sold */}
         <div className="tileWrapper p-2 flex-auto md:max-w-[calc(33.333%-1.5rem)] w-full">
           <div className="tile bg-gray-200 p-4 rounded-lg shadow-md text-center">
-            <p className="title text-2xl font-semibold">{originVolume}</p>
+            <p className="statistics-title text-2xl font-semibold">{originVolume}</p>
             <p className="subtitle text-gray-600">Number Of Units Sold</p>
           </div>
         </div>
@@ -36,7 +36,7 @@ const Statistics = ({ priceHistory, isDecimal }) => {
         {/* Tile for Average Price */}
         <div className="tileWrapper p-2 flex-auto md:max-w-[calc(33.333%-1.5rem)] w-full">
           <div className="tile bg-gray-200 p-4 rounded-lg shadow-md text-center">
-            <p className="title text-2xl font-semibold">
+            <p className="statistics-title text-2xl font-semibold">
               ${originAveragePrice}
             </p>
             <p className="subtitle text-gray-600">Average Sale Price</p>

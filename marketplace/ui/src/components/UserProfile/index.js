@@ -70,6 +70,24 @@ const UserProfile = ({ user }) => {
     supportedTokens,
     isFetchingTokens,
   } = useInventoryState();
+  const [stratAddress, setStratAddress] = useState('');
+  const [cataAddress, setCataAddress] = useState('');
+
+  useEffect(() => {
+    const fetchAddresses = async () => {
+      const stratAddress = await marketplaceActions.fetchStratsAddress(
+        marketplaceDispatch
+      );
+      const cataAddress = await marketplaceActions.fetchCataAddress(
+        marketplaceDispatch
+      );
+      setStratAddress(stratAddress);
+      setCataAddress(cataAddress);
+    };
+
+    fetchAddresses();
+  }, []);
+
   let { hasChecked, isAuthenticated, loginUrl } = useAuthenticateState();
   const { TabPane } = Tabs;
   const orderDispatch = useOrderDispatch();
@@ -266,56 +284,6 @@ const UserProfile = ({ user }) => {
     }
   };
 
-  //helper
-  // const addItemToCart = async (product, quantity) => {
-  //   if (product.ownerCommonName === user?.commonName) {
-  //     openToast("bottom", false, "Cannot buy your own item");
-  //     return false;
-  //   }
-
-  //   // Search for the product in the cart
-  //   let foundIndex = cartList.findIndex((item) => item.product.address === product.address);
-  //   let items = [...cartList];
-
-  //   if (foundIndex === -1) {
-  //     // Product not found, check quantity before adding
-  //     const checkQuantity = await orderActions.fetchSaleQuantity(orderDispatch, [product.saleAddress], [quantity]);
-  //     if (checkQuantity === true) {
-  //       // Quantity check passed, add new item to the cart
-  //       // Adding single object to keep single product in cart
-  //       items = [{ product, qty: quantity }];
-  //       marketplaceActions.addItemToCart(marketplaceDispatch, items);
-  //       openToast("bottom", true, "Item added to cart");
-  //       return true;
-  //     } else {
-  //       // Not enough quantity, inform the user
-  //       openToast("bottom", false, `Currently available quantity for ${product.name}: ${checkQuantity[0].availableQuantity}. Try lowering the quantity to continue.`);
-  //       setTimeout(() => {
-  //         navigate('/checkout')
-  //       }, 2000);
-  //       return false;
-  //     }
-  //   } else {
-  //     // Product found, prepare to update quantity after check
-  //     const potentialNewQty = items[foundIndex].qty + quantity;
-  //     const checkQuantity = await orderActions.fetchSaleQuantity(orderDispatch, [product.saleAddress], [potentialNewQty]);
-  //     if (checkQuantity === true) {
-  //       // Quantity check passed, update item quantity in the cart
-  //       items[foundIndex].qty = potentialNewQty;
-  //       marketplaceActions.addItemToCart(marketplaceDispatch, items);
-  //       openToast("bottom", true, "Item updated in cart");
-  //       return true;
-  //     } else {
-  //       // Not enough quantity, inform the user
-  //       openToast("bottom", false, `Currently available quantity for ${product.name}: ${checkQuantity[0].availableQuantity}. Try lowering the quantity to continue.`);
-  //       setTimeout(() => {
-  //         navigate('/checkout')
-  //       }, 2000);
-  //       return false;
-  //     }
-  //   }
-  // };
-
   const addItemToCart = async (product, quantity) => {
     const items = [{ product, qty: quantity }];
     marketplaceActions.addItemToCart(marketplaceDispatch, items);
@@ -348,7 +316,9 @@ const UserProfile = ({ user }) => {
                 ) : (
                   // Last breadcrumb or if it has no path
                   <p
-                    className={`text-sm ${isLast ? 'text-black' : 'text-[#13188A]'} ${isLast ? 'font-normal' : 'font-semibold'}`}
+                    className={`text-sm ${
+                      isLast ? 'text-black' : 'text-[#13188A]'
+                    } ${isLast ? 'font-normal' : 'font-semibold'}`}
                   >
                     {breadcrumb.text}
                   </p>
@@ -397,32 +367,6 @@ const UserProfile = ({ user }) => {
         </Button>
       </div>
 
-      {/* Search Bar and Filter */}
-
-      {/* <div className="flex items-center justify-center ml-4 md:ml-14 mr-14 mt-6 lg:mt-8 gap-4">
-          <div className="border border-solid border-[#6A6A6A] rounded-md cursor-pointer p-1 md:p-2" 
-          // onClick={handleFilterClick}
-        >
-          <img
-            src={Images.filter}
-            alt="filter"
-            className=" w-5 h-5 md:w-6 md:h-6"
-          />
-        </div>
-
-          <div className={`flex-1 `}>
-            <Input
-              size="large"
-              // onChange={(e) => { (e) }}
-              placeholder="Search Assets For Sale"
-              prefix={<img src={Images.Header_Search} alt="search" className="w-[18px] h-[18px]" />}
-              className="bg-[#F6F6F6] border-none rounded-3xl p-[10px]"
-            />
-          </div>
-        </div> */}
-
-      {/* End of Search Bar */}
-
       {/* TABS Start */}
 
       <Tabs
@@ -458,6 +402,8 @@ const UserProfile = ({ user }) => {
                               allSubcategories={allSubcategories}
                               supportedTokens={supportedTokens}
                               user={user}
+                              stratAddress={stratAddress}
+                              cataAddress={cataAddress}
                             />
                           );
                         })
@@ -486,6 +432,8 @@ const UserProfile = ({ user }) => {
                               allSubcategories={allSubcategories}
                               supportedTokens={supportedTokens}
                               user={user}
+                              stratAddress={stratAddress}
+                              cataAddress={cataAddress}
                             />
                           );
                         })
@@ -514,6 +462,8 @@ const UserProfile = ({ user }) => {
                               allSubcategories={allSubcategories}
                               supportedTokens={supportedTokens}
                               user={user}
+                              stratAddress={stratAddress}
+                              cataAddress={cataAddress}
                             />
                           );
                         })

@@ -12,8 +12,6 @@ library:
     - SolidVM.Solidity.StaticAnalysis.Expressions.DivideBeforeMultiply
     - SolidVM.Solidity.StaticAnalysis.Pragmas.IncorrectSolidityVersion
     - SolidVM.Solidity.StaticAnalysis.Functions.ConstantFunctions
-    - SolidVM.Solidity.StaticAnalysis.Functions.Unimplemented.Continue
-    - SolidVM.Solidity.StaticAnalysis.Functions.Unimplemented.Modifiers
     - SolidVM.Solidity.StaticAnalysis.Optimizer
     - SolidVM.Solidity.StaticAnalysis.Statements.MultipleDeclarations
     - SolidVM.Solidity.StaticAnalysis.Statements.StateVariableShadowing

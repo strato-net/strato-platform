@@ -8,6 +8,7 @@ import {
   Table,
   Typography,
 } from 'antd';
+import BigNumber from 'bignumber.js';
 import { useEffect, useState } from 'react';
 import { actions } from '../../contexts/inventory/actions';
 import {
@@ -20,6 +21,7 @@ import {
 } from '../../contexts/payment';
 import { actions as paymentServiceActions } from '../../contexts/payment/actions';
 import { CheckCircleOutlined } from '@ant-design/icons';
+import { useLocation } from 'react-router-dom';
 
 const { Option } = Select;
 
@@ -33,31 +35,35 @@ const ListForSaleModal = ({
   user,
   debouncedSearchTerm,
   category,
+  reserves,
+  stratAddress,
+  cataAddress,
 }) => {
   const [data, setData] = useState([inventory]);
+  const location = useLocation();
+  const queryParams = new URLSearchParams(location.search);
+  const isStrat = inventory.originAddress === stratAddress;
+  const isCata = inventory.originAddress === cataAddress;
   const [quantity, setQuantity] = useState(() => {
-    const selectedQuantity = inventory.saleAddress
-      ? inventory.saleQuantity
-      : inventory.quantity;
-
-    return selectedQuantity !== undefined
-      ? inventory.data.quantityIsDecimal &&
-        inventory.data.quantityIsDecimal === 'True'
-        ? Math.floor(selectedQuantity / 100)
-        : selectedQuantity
-      : undefined;
+    const selectedQuantity = new BigNumber(
+      inventory.saleAddress ? inventory.saleQuantity : inventory.quantity
+    );
+    return isStrat
+      ? selectedQuantity.dividedBy(100)
+      : isCata
+      ? selectedQuantity.dividedBy(Math.pow(10, 18))
+      : selectedQuantity;
   });
   const [paymentTypes, setPaymentTypes] = useState([]);
   const [availablePaymentServices, setAvailablePaymentServices] = useState([]);
   const [pricePerUnit, setpricePerUnit] = useState(() => {
-    const selectedPrice = inventory.price
-      ? inventory.price
-      : inventory.pricePerUnit;
-
-    return selectedPrice !== undefined &&
-      inventory.data.quantityIsDecimal === 'True'
-      ? selectedPrice * 100
-      : selectedPrice;
+    return inventory.price
+      ? isStrat
+        ? inventory.price * 100
+        : isCata
+        ? inventory.price * Math.pow(10, 18)
+        : inventory.price
+      : 0.01;
   });
 
   const inventoryDispatch = useInventoryDispatch();
@@ -84,16 +90,20 @@ const ListForSaleModal = ({
   useEffect(() => {
     if (
       inventory.saleAddress
-        ? quantity > inventory.quantity - inventory.totalLockedQuantity
-        : quantity > inventory.quantity
+        ? quantity.gt(
+            new BigNumber(inventory.quantity).minus(
+              new BigNumber(inventory.totalLockedQuantity)
+            )
+          )
+        : quantity.gt(new BigNumber(inventory.quantity))
     ) {
       setCanList(false);
     } else if (
-      quantity < 1 ||
+      quantity.lte(0) ||
       pricePerUnit < 0.01 ||
       !pricePerUnit ||
       paymentTypes.length < 1 ||
-      (paymentTypes.length == 1 && paymentTypes[0] === -1)
+      (paymentTypes.length === 1 && paymentTypes[0] === -1)
     ) {
       setCanList(false);
     } else {
@@ -213,9 +223,10 @@ const ListForSaleModal = ({
           };
         }),
       price:
-        inventory.data.quantityIsDecimal &&
-        inventory.data.quantityIsDecimal === 'True'
+        pricePerUnit !== undefined && isStrat
           ? pricePerUnit / 100
+          : isCata
+          ? pricePerUnit / Math.pow(10, 18)
           : pricePerUnit,
     };
 
@@ -240,11 +251,12 @@ const ListForSaleModal = ({
 
     body = {
       ...body,
-      quantity:
-        inventory.data.quantityIsDecimal &&
-        inventory.data.quantityIsDecimal === 'True'
-          ? quantity * 100
-          : quantity,
+      quantity: (isStrat
+        ? quantity.multipliedBy(new BigNumber(100))
+        : isCata
+        ? quantity.multipliedBy(new BigNumber(10).pow(18))
+        : quantity
+      ).toFixed(0),
     };
 
     let isDone;
@@ -261,7 +273,11 @@ const ListForSaleModal = ({
         limit,
         offset,
         debouncedSearchTerm,
-        category && category !== 'All' ? category : undefined
+        category && category !== 'All' ? category : undefined,
+        queryParams.get('st') === 'true' ||
+          window.location.pathname === '/stake'
+          ? reserves.map((reserve) => reserve.assetRootAddress)
+          : ''
       );
       handleCancel();
     }
@@ -320,10 +336,19 @@ const ListForSaleModal = ({
           <InputNumber
             value={quantity}
             controls={false}
-            min={1}
-            max={inventory.quantity}
-            onChange={(value) => setQuantity(value)}
-            precision={0}
+            max={
+              isStrat
+                ? new BigNumber(inventory.quantity).dividedBy(
+                    new BigNumber(100)
+                  )
+                : isCata
+                ? new BigNumber(inventory.quantity).dividedBy(
+                    new BigNumber(10).pow(18)
+                  )
+                : inventory.quantity
+            }
+            onChange={(value) => setQuantity(new BigNumber(value))}
+            precision={isStrat ? 2 : isCata ? 18 : 0}
           />
         ),
       },
@@ -349,8 +374,10 @@ const ListForSaleModal = ({
     <Modal
       open={open}
       onCancel={handleCancel}
-      title={`${inventory.saleAddress ? 'Update' : 'List'} - ${decodeURIComponent(inventory.name)}`}
-      width={650}
+      title={`${
+        inventory.saleAddress ? 'Update' : 'List'
+      } - ${decodeURIComponent(inventory.name)}`}
+      width={800}
       footer={[
         <div className="flex justify-center md:block">
           <Button
@@ -415,15 +442,19 @@ const ListForSaleModal = ({
             className="w-full h-9"
             value={quantity}
             controls={false}
-            min={1}
             max={
-              inventory.data.quantityIsDecimal &&
-              inventory.data.quantityIsDecimal === 'True'
-                ? parseFloat(inventory.quantity / 100).toFixed(2)
+              isStrat
+                ? new BigNumber(inventory.quantity).dividedBy(
+                    new BigNumber(100)
+                  )
+                : isCata
+                ? new BigNumber(inventory.quantity).dividedBy(
+                    new BigNumber(10).pow(18)
+                  )
                 : inventory.quantity
             }
-            onChange={(value) => setQuantity(value)}
-            precision={0}
+            onChange={(value) => setQuantity(new BigNumber(value))}
+            precision={isStrat ? 2 : isCata ? 18 : 0}
           />
         </div>
         <div>

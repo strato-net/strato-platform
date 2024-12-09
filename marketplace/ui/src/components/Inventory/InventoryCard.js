@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Button, Typography, Tooltip } from 'antd';
+import { Button, Typography, Tooltip, Popover } from 'antd';
+import { BigNumber } from 'bignumber.js';
 import {
   DollarOutlined,
   EditOutlined,
@@ -8,6 +9,11 @@ import {
   StopOutlined,
   SwapOutlined,
   RetweetOutlined,
+  LogoutOutlined,
+  RiseOutlined,
+  SolutionOutlined,
+  BankOutlined,
+  MoreOutlined,
 } from '@ant-design/icons';
 import PreviewInventoryModal from './PreviewInventoryModal';
 import { useNavigate } from 'react-router-dom';
@@ -17,6 +23,7 @@ import ResellModal from './ResellModal';
 import TransferModal from './TransferModal';
 import RedeemModal from './RedeemModal';
 import BridgeModal from './BridgeModal';
+import StakeModal from './StakeModal';
 import routes from '../../helpers/routes';
 import {
   ASSET_STATUS,
@@ -26,6 +33,11 @@ import {
 import image_placeholder from '../../images/resources/image_placeholder.png';
 import 'react-responsive-carousel/lib/styles/carousel.min.css';
 import { SEO } from '../../helpers/seoConstant';
+import { Images } from '../../images';
+import { useInventoryState } from '../../contexts/inventory';
+import RepayModal from './RepayModal';
+import BorrowModal from './BorrowModal';
+const StratsIcon = <img src={Images.strat} alt="STRATs" className="w-5 h-5" />;
 
 const InventoryCard = ({
   inventory,
@@ -37,40 +49,69 @@ const InventoryCard = ({
   offset,
   user,
   supportedTokens,
+  stratAddress,
+  cataAddress,
 }) => {
   const textRef = useRef(null);
+  const { isReserveLoading, reserves } = useInventoryState();
   const [isOverflowing, setIsOverflowing] = useState(false);
   const [open, setOpen] = useState(false);
   const [listModalOpen, setListModalOpen] = useState(false);
   const [unlistModalOpen, setUnlistModalOpen] = useState(false);
+  const [stakeType, setStakeType] = useState('Stake');
+  const [borrowModalOpen, setBorrowModalOpen] = useState(false);
+  const [repayModalOpen, setRepayModalOpen] = useState(false);
   const [resellModalOpen, setResellModalOpen] = useState(false);
   const [transferModalOpen, setTransferModalOpen] = useState(false);
   const [redeemModalOpen, setRedeemModalOpen] = useState(false);
   const [bridgeModalOpen, setBridgeModalOpen] = useState(false);
+  const [stakeModalOpen, setStakeModalOpen] = useState(false);
+  const [popoverVisible, setPopoverVisible] = useState({});
+
   const navigate = useNavigate();
   const naviroute = routes.InventoryDetail.url;
   const imgMeta = category ? category : SEO.TITLE_META;
   const itemData = inventory.data;
-  const isStrats =
-    itemData.quantityIsDecimal && itemData.quantityIsDecimal === 'True';
-  const quantity = isStrats
-    ? parseFloat((inventory.quantity / 100).toFixed(2))
-    : inventory.quantity;
+  const isStrat = inventory.originAddress === stratAddress;
+  const isCata = inventory.originAddress === cataAddress;
+  const quantity = isStrat
+    ? new BigNumber(inventory.quantity).dividedBy(100)
+    : isCata
+    ? new BigNumber(inventory.quantity).dividedBy(new BigNumber(10).pow(18))
+    : new BigNumber(inventory.quantity);
   const price = inventory?.price
-    ? isStrats
-      ? parseFloat(inventory?.price * 100).toFixed(2)
-      : inventory?.price
+    ? isStrat
+      ? new BigNumber(inventory.price).multipliedBy(100)
+      : isCata
+      ? new BigNumber(inventory.quantity).multipliedBy(
+          new BigNumber(10).pow(18)
+        )
+      : new BigNumber(inventory.quantity)
     : undefined;
-  const saleQuantity = isStrats
-    ? inventory.saleQuantity !== undefined
-      ? parseFloat((inventory.saleQuantity / 100).toFixed(2))
-      : undefined
-    : inventory.saleQuantity;
+  const saleQuantity =
+    inventory.saleQuantity !== undefined
+      ? isStrat
+        ? new BigNumber(inventory.saleQuantity || 0).dividedBy(100)
+        : isCata
+        ? new BigNumber(inventory.saleQuantity || 0).dividedBy(
+            new BigNumber(10).pow(18)
+          )
+        : new BigNumber(inventory.saleQuantity || 0)
+      : undefined;
   const totalLockedQuantity = inventory.totalLockedQuantity
-    ? isStrats
-      ? (inventory.totalLockedQuantity / 100).toFixed(2)
-      : inventory.totalLockedQuantity
-    : 0;
+    ? isStrat
+      ? new BigNumber(inventory.totalLockedQuantity || 0).dividedBy(100)
+      : isCata
+      ? new BigNumber(inventory.totalLockedQuantity || 0).dividedBy(
+          new BigNumber(10).pow(18)
+        )
+      : new BigNumber(inventory.totalLockedQuantity || 0)
+    : new BigNumber(0);
+  const stakeable =
+    inventory.root &&
+    reserves &&
+    reserves.length > 0 &&
+    reserves.some((reserve) => inventory.root === reserve.assetRootAddress);
 
   const handleCancel = () => {
     setOpen(false);
@@ -86,6 +127,31 @@ const InventoryCard = ({
 
   const showUnlistModal = () => {
     setUnlistModalOpen(true);
+  };
+
+  const showStakeModal = (type) => {
+    setStakeModalOpen(true);
+    setStakeType(type);
+  };
+
+  const handleStakeModalClose = () => {
+    setStakeModalOpen(false);
+  };
+
+  const showBorrowModal = () => {
+    setBorrowModalOpen(true);
+  };
+
+  const handleBorrowModalClose = () => {
+    setBorrowModalOpen(false);
+  };
+
+  const showRepayModal = () => {
+    setRepayModalOpen(true);
+  };
+
+  const handleRepayModalClose = () => {
+    setRepayModalOpen(false);
   };
 
   const handleUnlistModalClose = () => {
@@ -126,7 +192,9 @@ const InventoryCard = ({
 
   const callDetailPage = () => {
     navigate(
-      `${naviroute.replace(':id', inventory.address).replace(':name', encodeURIComponent(inventory.name))}`,
+      `${naviroute
+        .replace(':id', inventory.address)
+        .replace(':name', encodeURIComponent(inventory.name))}`,
       {
         state: { isCalledFromInventory: true },
       }
@@ -175,15 +243,16 @@ const InventoryCard = ({
   function isTransferDisabled() {
     return !(
       quantity &&
-      quantity > 0 &&
-      (!inventory.saleAddress || (inventory.saleAddress && saleQuantity > 0))
+      quantity.gt(0) &&
+      (!inventory.saleAddress || (inventory.saleAddress && saleQuantity.gt(0)))
     );
   }
 
   function isActive() {
     if (
       inventory.status == ASSET_STATUS.PENDING_REDEMPTION ||
-      inventory.status == ASSET_STATUS.RETIRED
+      inventory.status == ASSET_STATUS.RETIRED ||
+      inventory.escrow
     ) {
       return false;
     } else {
@@ -269,14 +338,12 @@ const InventoryCard = ({
               )}
             </div>
           </div>
-          <div className="mt-3">
-            {((itemData.isMint === 'True' && quantity === 0) ||
-              quantity > 0) && (
-              <div className="grid grid-cols-3 gap-1 w-full">
+          <div className="mt-3 grid grid-cols-3 gap-1 w-full">
+            {(!stakeable || (!inventory.escrow && stakeable)) && (
+              <>
                 <Button
-                  id="sell-listing-btn"
                   type="link"
-                  className="text-[#13188A] text-left px-0 font-semibold text-sm h-6"
+                  className="text-[#13188A]  text-left px-0 font-semibold text-sm h-6"
                   onClick={showListModal}
                   disabled={
                     isEditSellDisabled() ||
@@ -295,19 +362,103 @@ const InventoryCard = ({
                   )}
                 </Button>
                 <Button
-                  id="asset-card-unlist-btn"
                   type="link"
-                  className="text-[#13188A] text-left px-0 font-semibold text-sm h-6"
-                  onClick={showUnlistModal}
-                  disabled={!inventory.price || !isActive()}
+                  className="text-[#13188A]  text-left px-0 font-semibold text-sm h-6"
+                  onClick={showTransferModal}
+                  disabled={isTransferDisabled() || !isActive()}
                 >
-                  <>
-                    <StopOutlined /> Unlist
-                  </>
+                  <SwapOutlined /> Transfer
+                </Button>
+              </>
+            )}
+            {!stakeable && (
+              <Button
+                type="link"
+                className="text-[#13188A]  text-left px-0 font-semibold text-sm h-6"
+                onClick={showRedeemModal}
+                disabled={
+                  inventory.price ||
+                  inventory.address === inventory.originAddress ||
+                  !isActive() ||
+                  disableSADDOGS(inventory) ||
+                  isStrat ||
+                  isCata
+                }
+              >
+                <SendOutlined /> Redeem
+              </Button>
+            )}
+
+            {!inventory.escrow && stakeable && (
+              <Button
+                type="primary"
+                className="font-semibold w-full flex items-center justify-center"
+                onClick={() => showStakeModal('Stake')}
+                disabled={inventory.price || !isActive()}
+              >
+                <RiseOutlined /> Stake
+              </Button>
+            )}
+
+            {inventory.escrow && stakeable && (
+              <>
+                <Button
+                  type="link"
+                  className="text-[#13188A]  text-left px-0 font-semibold text-sm h-6"
+                  onClick={() => showStakeModal('Unstake')}
+                  disabled={inventory?.escrow?.borrowedAmount > 0}
+                >
+                  <LogoutOutlined /> Unstake
                 </Button>
                 <Button
                   type="link"
-                  className="text-[#13188A] text-left px-0 font-semibold text-sm h-6"
+                  className="text-[#13188A]  text-left px-0 font-semibold text-sm h-6"
+                  onClick={() => showBorrowModal('Unstake')}
+                  disabled={inventory?.escrow?.borrowedAmount > 0}
+                >
+                  <BankOutlined /> Borrow
+                </Button>
+                <Button
+                  type="link"
+                  className="text-[#13188A]  text-left px-0 font-semibold text-sm h-6"
+                  onClick={() => showRepayModal('Unstake')}
+                  disabled={inventory?.escrow?.borrowedAmount <= 0}
+                >
+                  <SolutionOutlined />
+                  Repay
+                </Button>
+              </>
+            )}
+            {(!stakeable || (!inventory.escrow && stakeable)) && (
+              <>
+                {stakeable && (
+                  <Button
+                    type="link"
+                    className="text-[#13188A]  text-left px-0 font-semibold text-sm h-6"
+                    onClick={showRedeemModal}
+                    disabled={
+                      inventory.price ||
+                      inventory.address === inventory.originAddress ||
+                      !isActive() ||
+                      disableSADDOGS(inventory) ||
+                      isStrat ||
+                      isCata
+                    }
+                  >
+                    <SendOutlined /> Redeem
+                  </Button>
+                )}
+                <Button
+                  type="link"
+                  className="text-[#13188A]  text-left px-0 font-semibold text-sm h-6"
+                  onClick={showUnlistModal}
+                  disabled={!inventory.price || !isActive()}
+                >
+                  <StopOutlined /> Unlist
+                </Button>
+                <Button
+                  type="link"
+                  className="text-[#13188A]  text-left px-0 font-semibold text-sm h-6"
                   onClick={showResellModal}
                   disabled={
                     !(
@@ -317,45 +468,20 @@ const InventoryCard = ({
                     ) || !isActive()
                   }
                 >
-                  <>
-                    <PieChartOutlined /> Mint
-                  </>
+                  <PieChartOutlined /> Mint
                 </Button>
                 <Button
                   type="link"
-                  className="text-[#13188A] text-left px-0 font-semibold text-sm h-6"
-                  onClick={showTransferModal}
-                  disabled={isTransferDisabled() || !isActive()}
-                >
-                  <>
-                    <SwapOutlined /> Transfer
-                  </>
-                </Button>
-                <Button
-                  type="link"
-                  className="text-[#13188A] text-left px-0 font-semibold text-sm h-6"
-                  onClick={showRedeemModal}
-                  disabled={
-                    inventory.price ||
-                    inventory.address === inventory.originAddress ||
-                    !isActive() ||
-                    disableSADDOGS(inventory)
-                  }
-                >
-                  <>
-                    <SendOutlined /> Redeem
-                  </>
-                </Button>
-                <Button
-                  type="link"
-                  className={`text-[#13188A] text-left px-0 font-semibold text-sm h-6 ${!isTokenSupported(inventory.root) ? 'hidden' : ''}`}
+                  className={`text-[#13188A]  text-left px-0 font-semibold text-sm h-6 ${
+                    !isTokenSupported(inventory.root) || inventory.escrow
+                      ? 'hidden'
+                      : ''
+                  }`}
                   onClick={showBridgeModal}
                 >
-                  <>
-                    <RetweetOutlined /> Bridge
-                  </>
+                  <RetweetOutlined /> Bridge
                 </Button>
-              </div>
+              </>
             )}
           </div>
         </div>
@@ -364,7 +490,11 @@ const InventoryCard = ({
         <div className="inline-block text-center">
           <div>
             <img
-              className={`rounded-md w-[161px] ${inventory.status == ASSET_STATUS.PENDING_REDEMPTION ? 'h-[140px]' : 'h-[161px]'}  md:object-contain`}
+              className={`rounded-md w-[161px] ${
+                inventory.status == ASSET_STATUS.PENDING_REDEMPTION
+                  ? 'h-[140px]'
+                  : 'h-[161px]'
+              }  md:object-contain`}
               alt={imgMeta}
               title={imgMeta}
               src={
@@ -377,10 +507,12 @@ const InventoryCard = ({
           </div>
 
           <div className="pt-[7px] lg:pt-0 items-center gap-[5px]">
-            {inventory.price ? (
+            {inventory.price || inventory?.escrow ? (
               <div className="flex items-center justify-center gap-2 bg-[#1548C329] p-[6px] rounded-md">
                 <div className="w-[7px] h-[7px] rounded-full bg-[#119B2D]"></div>
-                <p className="text-[#4D4D4D] text-[13px]">Published</p>
+                <p className="text-[#4D4D4D] text-[13px]">
+                  {inventory?.escrow ? 'Staked' : 'Published'}
+                </p>
               </div>
             ) : inventory.status == ASSET_STATUS.PENDING_REDEMPTION ? (
               <div className="flex items-center justify-center gap-2 bg-[#FFA50029] p-[6px] rounded-md">
@@ -394,8 +526,8 @@ const InventoryCard = ({
               </div>
             ) : (inventory.data.isMint &&
                 inventory.data.isMint === 'False' &&
-                quantity === 0) ||
-              (!inventory.data.isMint && quantity === 0) ? (
+                quantity.eq(0)) ||
+              (!inventory.data.isMint && quantity.eq(0)) ? (
               <div className="flex items-center justify-center gap-2 bg-[#FFA50029] p-[6px] rounded-md">
                 <div className="w-[7px] h-[7px] rounded-full bg-[#FFA500]"></div>
                 <p className="text-[#4D4D4D] text-[13px]">Sold Out</p>
@@ -412,39 +544,64 @@ const InventoryCard = ({
         <div className="flex flex-col justify-between gap-4 px-[18px] py-4 border border-[#E9E9E9] rounded-md w-full ">
           <div className="flex justify-between  ">
             <p className="text-[#6A6A6A]">Quantity Owned</p>
-            <p className="text-[#202020] font-semibold">{quantity || 'N/A'}</p>
-          </div>{' '}
-          <div className="flex justify-between  ">
-            <p className="text-[#6A6A6A]">Quantity Available for Sale </p>
             <p className="text-[#202020] font-semibold">
-              {quantity - totalLockedQuantity || 'N/A'}
-            </p>
-          </div>{' '}
-          <div className="flex justify-between  ">
-            <p className="text-[#6A6A6A]">Quantity Listed for Sale</p>
-            <p className="text-[#202020] font-semibold">
-              {saleQuantity || 'N/A'}
+              {quantity.toNumber().toLocaleString('en-US', {
+                maximumFractionDigits: 4,
+                minimumFractionDigits: 0,
+              }) || 'N/A'}
             </p>
           </div>
-          <div className="flex justify-between  ">
-            <p className="text-[#6A6A6A]">Price</p>
-            <p className="text-[#202020] font-semibold">
-              {price ? (
-                <>
-                  ${price}{' '}
-                  <span className="text-xs">
-                    ({(price * STRATS_CONVERSION).toFixed(0)}{' '}
-                    {(price * STRATS_CONVERSION).toFixed(0) == 1
-                      ? 'STRAT'
-                      : 'STRATs'}
-                    )
-                  </span>
-                </>
-              ) : (
-                'N/A'
-              )}
-            </p>
-          </div>
+          {stakeable ? (
+            <div className="flex justify-between  ">
+              <p className="text-[#6A6A6A]">Quantity Staked </p>
+              <p className="text-[#202020] font-semibold">
+                {inventory?.escrow
+                  ? quantity.toNumber().toLocaleString('en-US', {
+                      maximumFractionDigits: 4,
+                      minimumFractionDigits: 0,
+                    })
+                  : 0}
+              </p>
+            </div>
+          ) : (
+            <>
+              <div className="flex justify-between  ">
+                <p className="text-[#6A6A6A]">Quantity Available for Sale </p>
+                <p className="text-[#202020] font-semibold">
+                  {quantity
+                    .minus(totalLockedQuantity)
+                    .toNumber()
+                    .toLocaleString('en-US', {
+                      maximumFractionDigits: 4,
+                      minimumFractionDigits: 0,
+                    }) || 'N/A'}
+                </p>
+              </div>
+              <div className="flex justify-between  ">
+                <p className="text-[#6A6A6A]">Quantity Listed for Sale</p>
+                <p className="text-[#202020] font-semibold">
+                  {saleQuantity ? saleQuantity.toString() : 'N/A'}
+                </p>
+              </div>
+              <div className="flex justify-between  ">
+                <p className="text-[#6A6A6A]">Price</p>
+                <p className="text-[#202020] font-semibold">
+                  {price ? (
+                    <p className="flex">
+                      <span>${price.toString()}</span>
+                      <p className="flex text-xs items-center">
+                        &nbsp;(
+                        {price.multipliedBy(STRATS_CONVERSION).toString()}{' '}
+                        {StratsIcon})
+                      </p>
+                    </p>
+                  ) : (
+                    'N/A'
+                  )}
+                </p>
+              </div>
+            </>
+          )}
         </div>
       </div>
       {open && (
@@ -464,6 +621,9 @@ const InventoryCard = ({
           inventory={inventory}
           categoryName={category}
           user={user}
+          reserves={reserves}
+          stratAddress={stratAddress}
+          cataAddress={cataAddress}
         />
       )}
       {unlistModalOpen && (
@@ -475,6 +635,32 @@ const InventoryCard = ({
           inventory={inventory}
           saleAddress={inventory.saleAddress}
           categoryName={category}
+          reserves={reserves}
+        />
+      )}
+      {borrowModalOpen && (
+        <BorrowModal
+          open={borrowModalOpen}
+          handleCancel={handleBorrowModalClose}
+          limit={limit}
+          offset={offset}
+          inventory={inventory}
+          debouncedSearchTerm={debouncedSearchTerm}
+          saleAddress={inventory.saleAddress}
+          category={category}
+        />
+      )}
+      {repayModalOpen && (
+        <RepayModal
+          open={repayModalOpen}
+          handleCancel={handleRepayModalClose}
+          limit={limit}
+          offset={offset}
+          inventory={inventory}
+          debouncedSearchTerm={debouncedSearchTerm}
+          saleAddress={inventory.saleAddress}
+          category={category}
+          reserves={reserves}
         />
       )}
       {resellModalOpen && (
@@ -485,6 +671,22 @@ const InventoryCard = ({
           offset={offset}
           inventory={inventory}
           categoryName={category}
+          reserves={reserves}
+        />
+      )}
+      {stakeModalOpen && (
+        <StakeModal
+          open={stakeModalOpen}
+          type={stakeType}
+          handleCancel={handleStakeModalClose}
+          limit={limit}
+          offset={offset}
+          inventory={inventory}
+          debouncedSearchTerm={debouncedSearchTerm}
+          saleAddress={inventory.saleAddress}
+          category={category}
+          stratAddress={stratAddress}
+          cataAddress={cataAddress}
         />
       )}
       {transferModalOpen && (
@@ -495,6 +697,9 @@ const InventoryCard = ({
           offset={offset}
           inventory={inventory}
           categoryName={category}
+          reserves={reserves}
+          stratAddress={stratAddress}
+          cataAddress={cataAddress}
         />
       )}
       {redeemModalOpen && (
@@ -505,6 +710,7 @@ const InventoryCard = ({
           offset={offset}
           inventory={inventory}
           categoryName={category}
+          reserves={reserves}
         />
       )}
       {bridgeModalOpen && (
@@ -515,6 +721,7 @@ const InventoryCard = ({
           offset={offset}
           inventory={inventory}
           categoryName={category}
+          reserves={reserves}
         />
       )}
     </div>

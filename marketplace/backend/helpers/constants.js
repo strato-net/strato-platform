@@ -4,8 +4,8 @@ dayjs.extend(utc);
 
 export default {
   baseUrl: `/api/v1`,
-  deployParamName: 'deploy',
-  governanceAddress: '0000000000000000000000000000000000000100',
+  deployParamName: "deploy",
+  reserve: '0000000000000000000000000000000000000100',
   zeroAddress: '0000000000000000000000000000000000000000',
   certificateRegistryContractName: 'OfficialCertificateRegistry',
   certificateContractName: 'Certificate',
@@ -37,10 +37,14 @@ export default {
   testnetNetworkId: '7596898649924658542',
   prodStratsAddress: 'd2810818e0401e85693f83107ed2b96faeed329c',
   testnetStratsAddress: '5375b8b1c691201acf16a72612d82ed438951a04',
+  prodCataAddress: '2680dc6693021cd3fefb84351570874fbef8332a',
+  testnetCataAddress: '051cb99bca7c437f4b17dc01bd4ff7c5e09db035',
   attachImagesAndFiles:
     '*,BlockApps-Mercata-Asset-files(*),BlockApps-Mercata-Asset-images(*),BlockApps-Mercata-Asset-fileNames(*)',
   attachSalesAndImagesAndFiles:
     '*,BlockApps-Mercata-Asset-files(*),BlockApps-Mercata-Asset-images(*),BlockApps-Mercata-Asset-fileNames(*),BlockApps-Mercata-Sale!BlockApps-Mercata-Sale_BlockApps-Mercata-Asset_fk(*,BlockApps-Mercata-Sale-paymentServices(*))',
+  attachSalesEscrowsAndImagesAndFiles:
+    '*,BlockApps-Mercata-Asset-files(*),BlockApps-Mercata-Asset-images(*),BlockApps-Mercata-Asset-fileNames(*),BlockApps-Mercata-Sale!BlockApps-Mercata-Sale_BlockApps-Mercata-Asset_fk(*,BlockApps-Mercata-Sale-paymentServices(*)),BlockApps-Mercata-Escrow-assets!BlockApps-Mercata-Escrow-assets_BlockApps-Mercata-Asset_fk(*,BlockApps-Mercata-Escrow(*))',
   attach_saleAddresses_Quantities_completedSales_onOrder:
     '*,BlockApps-Mercata-Order-saleAddresses(*),BlockApps-Mercata-Order-quantities(*),BlockApps-Mercata-Order-completedSales(*)',
   baUserNames: [
