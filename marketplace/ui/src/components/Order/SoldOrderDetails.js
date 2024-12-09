@@ -27,15 +27,14 @@ import dayjs from 'dayjs';
 import { US_DATE_FORMAT, STRATS_CONVERSION } from '../../helpers/constants';
 import ClickableCell from '../ClickableCell';
 import image_placeholder from '../../images/resources/image_placeholder.png';
-import BoughtOrdersTable from './BoughtOrdersTable';
-import TransfersTable from './TransfersTable';
-import RedemptionsOutgoingTable from './RedemptionsOutgoingTable';
-import RedemptionsIncomingTable from './RedemptionsIncomingTable';
 import { ResponsiveOrderDetailCard } from './ResponsiveOrderDetailCard';
 import { LeftArrow } from '../../images/SVGComponents';
 import { EyeOutlined } from '@ant-design/icons';
 
 const SoldOrderDetails = ({ user, users }) => {
+  const formatter = new Intl.NumberFormat('en-US');
+  const formattedNum = (num) => formatter.format(num);
+
   const [Id, setId] = useState(undefined);
   const [data, setdata] = useState([]);
   const dispatch = useOrderDispatch();
@@ -90,8 +89,8 @@ const SoldOrderDetails = ({ user, users }) => {
             (item) => item.value
           );
       orderDetails.assets.forEach((prod, index) => {
-        const quantityIsDecimal =
-          prod.data.quantityIsDecimal && prod.data.quantityIsDecimal === 'True';
+        // const quantityIsDecimal =
+        //   prod.data.quantityIsDecimal && prod.data.quantityIsDecimal === 'True';
         items.push({
           address: prod.address,
           chainId: prod.chainId,
@@ -103,24 +102,27 @@ const SoldOrderDetails = ({ user, users }) => {
           productName: prod,
           name: prod.name,
           unitPrice:
+          // formattedNum(
             orderDetails.order.currency === 'STRATS'
-              ? (
-                  prod.price *
-                  (quantityIsDecimal ? 100 : 1) *
-                  STRATS_CONVERSION
-                ).toFixed(0)
-              : (prod.price * (quantityIsDecimal ? 100 : 1)).toFixed(2),
-          quantity: quantityIsDecimal
-            ? orderQuantities[index] / 100
-            : parseInt(orderQuantities[index]),
-          amount:
+              ? (prod.price * STRATS_CONVERSION).toFixed(0)
+              : orderDetails.order.currency === 'CATA' ? (prod.price * Math.pow(10, 18)).toFixed(2)
+              : prod.price
+            // )
+            ,
+          quantity: orderQuantities[index]
+            ? formattedNum(
+                orderDetails.order.currency === 'STRATS'
+                  ? (orderQuantities[index] / 100).toFixed(2)
+                  : orderDetails.order.currency === 'CATA'
+                  ? (orderQuantities[index] / Math.pow(10, 18)).toFixed(2)
+                  : orderQuantities[index]
+              )
+            : '--',
+           amount:
             orderDetails.order.currency === 'STRATS'
-              ? (
-                  prod.price *
-                  STRATS_CONVERSION *
-                  parseInt(orderQuantities[index])
-                ).toFixed(0)
-              : (prod.price * parseInt(orderQuantities[index])).toFixed(2),
+              ? ( (prod.price * parseInt(orderQuantities[index]) )).toFixed(0)
+              : orderDetails.order.currency === 'CATA' ? ((prod.price * parseInt(orderQuantities[index])) / Math.pow(10, 18)).toFixed(2) 
+              : (prod.price * parseInt(orderQuantities[index])),
           serialNumber: prod,
           tax: prod.tax ? prod.tax : 0,
         });

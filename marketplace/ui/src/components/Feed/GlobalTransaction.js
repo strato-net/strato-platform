@@ -38,9 +38,9 @@ import GlobalTransactionResponsive from './GlobalTransactionResponsive';
 
 const { Title } = Typography;
 
-const GlobalTransaction = ({ user }) => {
+const GlobalTransaction = ({ user, stratAddress, cataAddress }) => {
   const StratsIcon = (
-    <img src={Images.strats} alt="STRATs" className="mx-1 w-4 h-4" />
+    <img src={Images.strat} alt="STRATs" className="mx-1 w-4 h-4" />
   );
   // Dispatch
   const transactionDispatch = useTransactionDispatch();
@@ -94,7 +94,9 @@ const GlobalTransaction = ({ user }) => {
 
   const Content = ({ data }) => {
     const price = data?.assetPrice || data?.price;
-    const quantityIsDecimal = data?.quantityIsDecimal;
+    const isStrat = data.assetOriginAddress === stratAddress;
+    const isCata = data.assetOriginAddress === cataAddress;
+
     return (
       <div className="min-h-44 h-full" style={{ width: '460px' }}>
         <Card>
@@ -133,13 +135,21 @@ const GlobalTransaction = ({ user }) => {
                 <p className="text-right flex justify-end items-center">
                   {' '}
                   <b>
-                    $ {quantityIsDecimal === 'True' ? price * 100 : price}{' '}
+                    ${' '}
+                    {isStrat
+                      ? (price * 100).toFixed(2)
+                      : isCata
+                      ? (price * Math.pow(10, 18)).toFixed(2)
+                      : price}{' '}
                   </b>{' '}
                   &nbsp;(
                   <span className="text-[#13188A] font-bold">
                     {' '}
-                    {(quantityIsDecimal === 'True' ? price * 100 : price) *
-                      STRATS_CONVERSION}{' '}
+                    {(isStrat
+                      ? (price * 100).toFixed(2)
+                      : isCata
+                      ? (price * Math.pow(10, 18)).toFixed(2)
+                      : price) * STRATS_CONVERSION}{' '}
                   </span>
                   {StratsIcon}){' '}
                 </p>
@@ -211,17 +221,25 @@ const GlobalTransaction = ({ user }) => {
       key: 'quantity',
       align: 'right',
       width: '100px',
-      render: (data, { quantity, quantityIsDecimal }) => (
-        <span>
-          {quantity
-            ? formattedNum(
-                quantityIsDecimal && quantityIsDecimal === 'True'
-                  ? quantity / 100
-                  : quantity
-              )
-            : '--'}
-        </span>
-      ),
+      render: (data, { quantity, assetOriginAddress }) => {
+        let formattedQuantity = '--';
+
+        if (quantity) {
+          const value =
+            assetOriginAddress === stratAddress
+              ? quantity / 100
+              : assetOriginAddress === cataAddress
+              ? quantity / Math.pow(10, 18)
+              : quantity;
+
+          formattedQuantity = value.toLocaleString('en-US', {
+            maximumFractionDigits: 4,
+            minimumFractionDigits: 0,
+          });
+        }
+
+        return <span>{formattedQuantity}</span>;
+      },
     },
     {
       title: 'Price',
@@ -229,25 +247,29 @@ const GlobalTransaction = ({ user }) => {
       key: 'price',
       align: 'right',
       width: '100px',
-      render: (data, { price, quantityIsDecimal }) => (
+      render: (data, { price, assetOriginAddress }) => (
         <>
           <p className="text-base flex justify-end items-center">
             {price
-              ? (
-                  formattedNum(
-                    quantityIsDecimal && quantityIsDecimal === 'True'
-                      ? price * 100
-                      : price
-                  ) * 100
-                ).toFixed(0)
+              ? formattedNum(
+                  (
+                    (assetOriginAddress === stratAddress
+                      ? (price * 100).toFixed(2)
+                      : assetOriginAddress === cataAddress
+                      ? (price * Math.pow(10, 18)).toFixed(2)
+                      : price) * 100
+                  ).toFixed(0)
+                )
               : '--'}{' '}
             <span>{price && StratsIcon}</span>
           </p>
           <p className="text-xs">
             {price
               ? `${formattedNum(
-                  quantityIsDecimal && quantityIsDecimal === 'True'
-                    ? price * 100
+                  assetOriginAddress === stratAddress
+                    ? (price * 100).toFixed(2)
+                    : assetOriginAddress === cataAddress
+                    ? (price * Math.pow(10, 18)).toFixed(2)
                     : price
                 )} $`
               : '--'}
@@ -429,6 +451,8 @@ const GlobalTransaction = ({ user }) => {
               data={list}
               user={user}
               isTransactionLoading={isTransactionLoading}
+              stratAddress={stratAddress}
+              cataAddress={cataAddress}
             />
           </Row>
         </div>

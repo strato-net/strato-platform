@@ -26,14 +26,17 @@ import { US_DATE_FORMAT, STRATS_CONVERSION } from '../../helpers/constants';
 import ClickableCell from '../ClickableCell';
 import image_placeholder from '../../images/resources/image_placeholder.png';
 import dayjs from 'dayjs';
-import TransfersTable from './TransfersTable';
-import SoldOrdersTable from './SoldOrdersTable';
-import RedemptionsOutgoingTable from './RedemptionsOutgoingTable';
-import RedemptionsIncomingTable from './RedemptionsIncomingTable';
 import { ResponsiveOrderDetailCard } from './ResponsiveOrderDetailCard';
 import { LeftArrow } from '../../images/SVGComponents';
+// import {
+//   useMarketplaceState,
+// } from '../../contexts/marketplace';
 
 const BoughtOrderDetails = ({ user, users }) => {
+  const formatter = new Intl.NumberFormat('en-US');
+  const formattedNum = (num) => formatter.format(num);
+
+  // const { stratsAddress, cataAddress } = useMarketplaceState();
   const [comment, setcomment] = useState('');
   const [Id, setId] = useState(undefined);
   const [data, setdata] = useState([]);
@@ -94,7 +97,7 @@ const BoughtOrderDetails = ({ user, users }) => {
     await actions.fetchOrderDetails(dispatch, Id);
   };
 
-  useEffect(() => {
+  useEffect(() => {    
     if (orderDetails) {
       const statusInt = parseInt(orderDetails.order.status);
       setStatus(getStatus(statusInt));
@@ -110,7 +113,7 @@ const BoughtOrderDetails = ({ user, users }) => {
             (item) => item.value
           );
       let items = [];
-      orderDetails.assets.forEach((prod, index) => {
+      orderDetails.assets.forEach((prod, index) => {        
         const quantityIsDecimal =
           prod.data.quantityIsDecimal && prod.data.quantityIsDecimal === 'True';
         items.push({
@@ -124,24 +127,27 @@ const BoughtOrderDetails = ({ user, users }) => {
           productName: prod,
           name: prod.name,
           unitPrice:
+          // formattedNum(
             orderDetails.order.currency === 'STRATS'
-              ? (
-                  prod.price *
-                  (quantityIsDecimal ? 100 : 1) *
-                  STRATS_CONVERSION
-                ).toFixed(0)
-              : (prod.price * (quantityIsDecimal ? 100 : 1)).toFixed(2),
-          quantity: quantityIsDecimal
-            ? orderQuantities[index] / 100
-            : parseInt(orderQuantities[index]),
-          amount:
+            ? (prod.price * STRATS_CONVERSION).toFixed(0)
+            : orderDetails.order.currency === 'CATA' ? (prod.price * Math.pow(10, 18)).toFixed(2)
+            : prod.price
+          // )
+          ,
+          quantity: orderQuantities[index]
+            ? formattedNum(
+                orderDetails.order.currency === 'STRATS'
+                  ? (orderQuantities[index] / 100).toFixed(2)
+                  : orderDetails.order.currency === 'CATA'
+                  ? (orderQuantities[index] / Math.pow(10, 18)).toFixed(2)
+                  : orderQuantities[index]
+              )
+            : '--',
+            amount:
             orderDetails.order.currency === 'STRATS'
-              ? (
-                  prod.price *
-                  STRATS_CONVERSION *
-                  parseInt(orderQuantities[index])
-                ).toFixed(0)
-              : (prod.price * parseInt(orderQuantities[index])).toFixed(2),
+              ? ((prod.price * parseInt(orderQuantities[index]) / 100)).toFixed(0)
+              : orderDetails.order.currency === 'CATA' ? ((prod.price * parseInt(orderQuantities[index])) / Math.pow(10, 18)).toFixed(2) 
+              : (prod.price * parseInt(orderQuantities[index])),
           serialNumber: prod,
           tax: prod.tax ? prod.tax : 0,
         });

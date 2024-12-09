@@ -73,7 +73,7 @@ class OrderController {
         orderEvent[0].status === '3' &&
         orderEvent[0].currency === 'STRATS'
       ) {
-        await sendEmail(body.email, 'Your Order Confirmation', htmlContents[0]);
+        await sendEmail(body.user, 'Your Order Confirmation', htmlContents[0]);
         console.log('*Buyer placed order*', orderEvent);
       }
       return next();
@@ -241,7 +241,6 @@ class OrderController {
       orderTotal: Joi.number().required(),
       tax: Joi.number().required(),
       user: Joi.string().required(),
-      email: Joi.string().required(),
     }).required();
 
     const validation = paymentSchema.validate(args);

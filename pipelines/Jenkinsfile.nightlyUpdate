@@ -16,7 +16,7 @@ pipeline {
           sh 'sudo ./strato --pull'
           sh 'sudo ./strato --wipe && sudo ./strato-run.sh'
         }
-        sh 'sudo docker image prune'
+        sh 'sudo docker image prune -fa'
       }
     }
 
@@ -38,7 +38,7 @@ pipeline {
           sh 'sudo docker cp nginx.conf strato_nginx_1:/usr/local/openresty/nginx/conf/nginx.conf'
           sh 'sudo docker exec strato_nginx_1 openresty -s reload'
         }
-        sh 'sudo docker image prune'
+        sh 'sudo docker image prune -fa'
       }
     }
 
@@ -57,7 +57,7 @@ pipeline {
           sh 'sudo ./payment-server --pull'
           sh 'sudo ./run-ps.sh'
         }
-        sh 'sudo docker image prune'
+        sh 'sudo docker image prune -fa'
       }
     }
 
@@ -74,7 +74,7 @@ pipeline {
           """
           }
         }
-        sh 'sudo docker image prune'
+        sh 'sudo docker image prune -fa'
       }
     }
 
@@ -93,7 +93,7 @@ pipeline {
           sh 'sudo ./notification-server --pull'
           sh 'sudo ./run-notification-server.sh'
         }
-        sh 'sudo docker image prune'
+        sh 'sudo docker image prune -fa'
       }
     }
   }

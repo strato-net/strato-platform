@@ -10,6 +10,8 @@ contract StratPaymentService is PaymentService {
 
     address public feeRecipient;
 
+    event LoanRepaid(address indexed user, address escrow, uint assetAmount, decimal repayment);
+
     constructor (
         address _stratAddress,
         decimal _stratsPerDollar,
@@ -221,7 +223,7 @@ contract StratPaymentService is PaymentService {
         return stratsPerDollar * 100;
     }
 
-    function updateStratsPerDollar(decimal _stratsPerDollar) requireOwner() public returns (uint) {
+    function updateStratsPerDollar(decimal _stratsPerDollar) requireOwner("updateStratsPerDollar") public returns (uint) {
       stratsPerDollar = _stratsPerDollar;
       return RestStatus.OK;
     }

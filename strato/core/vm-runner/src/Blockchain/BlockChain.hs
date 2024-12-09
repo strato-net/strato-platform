@@ -109,6 +109,7 @@ import qualified Data.Set as S
 import qualified Data.Text as T
 import Data.Time.Clock
 import Prometheus as P
+import SolidVM.Model.CodeCollection (invalidPragmasUsed)
 import qualified Text.Colors as CL
 import Text.Format
 import Text.Printf
@@ -377,14 +378,12 @@ mineTransactions' header remGas ran unran@(tx : txs) mSelfAddress = do
   trr <- setNewAddresses $ TxRunResult tx result time' beforeMap afterMap []
   case result of
     Right execResult ->
-      let supportedPragmas = [("es6", ""), ("strict", ""), ("builtinCreates", ""), ("safeExternalCalls", ""), ("solidvm", "11.4"), ("solidvm", "11.5")]
-          findInvalidPragmas pragma = if fst pragma == "solidity" || pragma `elem` supportedPragmas then id else (pragma :) -- include solidity pragma for backwards compatibility
-          invalidPragmasUsed = foldr findInvalidPragmas [] (erPragmas execResult)
-       in if not $ null invalidPragmasUsed
+      let invalidPragmas = invalidPragmasUsed $ erPragmas execResult
+       in if not $ null invalidPragmas
             then do
               putAddressStateTxDBMap M.empty
               putMemRawStorageTxMap M.empty
-              return $ Bagger.TxMiningResult (Just $ TFInvalidPragma invalidPragmasUsed tx) (DL.toList ran) unran remGas -- use invalidPragmasUsed here
+              return $ Bagger.TxMiningResult (Just $ TFInvalidPragma invalidPragmas tx) (DL.toList ran) unran remGas -- use invalidPragmasUsed here
             else do 
               case erException execResult of
                 Just (Left (TooMuchGas limit actual)) -> do

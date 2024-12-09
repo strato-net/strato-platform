@@ -14,8 +14,8 @@ import routes from '../../helpers/routes';
 import { useNavigate } from 'react-router-dom';
 import moment from 'moment';
 
-const TransactionResponsive = ({ data, user }) => {
-  const StratsIcon = <img src={Images.strats} alt="" className="w-5 h-5" />;
+const TransactionResponsive = ({ data, user, stratAddress, cataAddress }) => {
+  const StratsIcon = <img src={Images.strat} alt="" className="w-5 h-5" />;
   const navigate = useNavigate();
   const [expandedRows, setExpandedRows] = useState({});
 
@@ -105,7 +105,7 @@ const TransactionResponsive = ({ data, user }) => {
             price,
             redemptionService,
             block_timestamp,
-            quantityIsDecimal,
+            assetOriginAddress,
           },
           index
         ) => {
@@ -126,9 +126,18 @@ const TransactionResponsive = ({ data, user }) => {
               type,
             },
           ];
-          if (quantityIsDecimal && quantityIsDecimal === 'True') {
-            quantity /= 100;
-            price *= 100;
+          if (assetOriginAddress === stratAddress) {
+            quantity = (quantity / 100).toLocaleString('en-US', {
+              maximumFractionDigits: 4,
+              minimumFractionDigits: 0,
+            });
+            price = (price * 100).toFixed(2);
+          } else if (assetOriginAddress === cataAddress) {
+            quantity = (quantity / Math.pow(10, 18)).toLocaleString('en-US', {
+              maximumFractionDigits: 4,
+              minimumFractionDigits: 0,
+            });
+            price = (price * Math.pow(10, 18)).toFixed(2);
           }
 
           const handleDetailRedirection = () => {
@@ -227,7 +236,7 @@ const TransactionResponsive = ({ data, user }) => {
                     No Price Available
                   </p>
                 )}
-                <p className="text-right">Qty: {formattedNum(quantity)}</p>
+                <p className="text-right">Qty: {quantity}</p>
                 <p className="text-right">
                   {moment(block_timestamp.replace(/-/g, '/')).format('L')}
                 </p>

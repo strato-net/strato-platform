@@ -40,7 +40,7 @@ fullRouteEncoder ::
   Encoder (Either Text) Identity (R (FullRoute BackendRoute FrontendRoute)) PageName
 fullRouteEncoder =
   mkFullRouteEncoder
-    (FullRoute_Backend BackendRoute_Missing :/ ())
+    (FullRoute_Backend BackendRoute_Missing :/ ()) -- nobody will ever think to look here
     ( \case
         BackendRoute_Missing -> PathSegment "missing" $ unitEncoder mempty
     )

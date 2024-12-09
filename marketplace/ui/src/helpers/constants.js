@@ -339,188 +339,219 @@ const bannerConfig = [
 
 export const BANNER = [
   {
-    label: 'Batman',
-    link: '/c/Clothing?sc=Clothing',
+    label: 'Staking',
+    link: '/stake',
     text: (
-      <div className="clothing_banner_text banner-text">
-        <h1> The Official DC Drop </h1>
-        <h1> is Live </h1>
+      <div className="staking_banner_text banner-text flex justify-between">
+        <div className="banner-text">
+          <h1 className="title"> RWA X DeFi </h1>
+          <h1 className="w-3/4 mt-1 md:text-3xl font-medium sm:text-2xl text-sm">
+            Stake silver and gold to earn and gain access to CATA, our
+            governance token!
+          </h1>
+        </div>
+        <div>
+          <img
+            src={Images.cata}
+            alt={'Cata...'}
+            title={'Cata'}
+            className="md:w-[160px] md:h-[160px] w-[120px] h-[120px] z-[11] relative md:mr-64 mr-48"
+          />
+        </div>
       </div>
     ),
-    desktopText: 'Explore More',
-    mobileText: 'Explore',
+    desktopText: 'Stake now',
+    mobileText: 'Stake',
     alt: metaImg,
     title: metaImg,
-    desktopImg: Images.BatmanX1600,
-    laptopImg: Images.BatmanX1440,
-    tabletImg: Images.BatmanX768,
-    mobileImg: Images.BatmanX394,
+    desktopImg: Images.StakingX1600,
+    laptopImg: Images.StakingX1440,
+    tabletImg: Images.StakingX768,
+    mobileImg: Images.StakingX394,
   },
-  {
-    label: 'Rick and Morty',
-    link: '/c/Clothing?sc=Clothing',
-    text: (
-      <div className="clothing_banner_text banner-text">
-        <h1> Limited Release </h1>
-        <h1> Warner Bros Apparel </h1>
-      </div>
-    ),
-    desktopText: 'Explore More',
-    mobileText: 'Explore',
-    alt: metaImg,
-    title: metaImg,
-    desktopImg: Images.RickAndMortyX1600,
-    laptopImg: Images.RickAndMortyX1440,
-    tabletImg: Images.RickAndMortyX768,
-    mobileImg: Images.RickAndMortyX394,
-  },
-  {
-    label: 'Liquid Gold',
-    link: '/c/Spirits?sc=Spirits',
-    text: (
-      <div className="liquid_gold_text_box banner-text">
-        <h1> Liquid Gold </h1>
-        <h1> Whiskey Casks </h1>
-      </div>
-    ),
-    desktopText: 'Explore More',
-    mobileText: 'Explore',
-    alt: metaImg,
-    title: metaImg,
-    desktopImg: Images.LiquidGoldX1600,
-    laptopImg: Images.LiquidGoldX1440,
-    tabletImg: Images.LiquidGoldX768,
-    mobileImg: Images.LiquidGoldX394,
-  },
-  {
-    label: 'Collectibles',
-    link: '/c/Collectibles?sc=Collectibles',
-    text: (
-      <div className="collectible_banner_text banner-text ">
-        <h1> Own Digital </h1>
-        <h1>Tokenized Collectibles!</h1>
-      </div>
-    ),
-    desktopText: 'Explore More',
-    mobileText: 'Explore',
-    alt: metaImg,
-    title: metaImg,
-    desktopImg: Images.CollectiblesX1600,
-    laptopImg: Images.CollectiblesX1440,
-    tabletImg: Images.CollectiblesX768,
-    mobileImg: Images.CollectiblesX394,
-  },
-  {
-    label: 'Clothing',
-    link: '/c/Clothing?sc=Clothing',
-    text: (
-      <div className="clothing_banner_text banner-text">
-        <h1> Step into Future With Tokenized Clothing </h1>
-      </div>
-    ),
-    desktopText: 'Explore More',
-    mobileText: 'Explore',
-    alt: metaImg,
-    title: metaImg,
-    desktopImg: Images.ClothingX1600,
-    laptopImg: Images.ClothingX1440,
-    tabletImg: Images.ClothingX768,
-    mobileImg: Images.ClothingX394,
-  },
-  {
-    label: 'Metal',
-    link: '/c/Metals?sc=Metals',
-    text: (
-      <div className="metal_banner_text banner-text">
-        <h1>Tokenized Metals</h1>
-        <h1>Vault-Secure</h1>
-      </div>
-    ),
-    desktopText: 'Explore More',
-    mobileText: 'Explore',
-    alt: metaImg,
-    title: metaImg,
-    desktopImg: Images.MetalX1600,
-    laptopImg: Images.MetalX1440,
-    tabletImg: Images.MetalX768,
-    mobileImg: Images.MetalX394,
-  },
-  {
-    label: 'Token',
-    link: '/c/Tokens?sc=Tokens',
-    text: (
-      <div className="token_banner_text_box banner-text">
-        <h1 className="token_banner_text1">
-          The Coin with Real Stakes for{' '}
-          <span style={{ color: '#FFA011' }}>Real Dogs</span>{' '}
-        </h1>
-        <h1 className="token_banner_text2">
-          {' '}
-          Save Dog Lives with $SADDOGS Token{' '}
-        </h1>
-      </div>
-    ),
-    desktopText: 'Save Dogs Now',
-    mobileText: 'Save Dogs Now',
-    alt: metaImg,
-    title: metaImg,
-    desktopImg: Images.TokenX1600,
-    laptopImg: Images.TokenX1440,
-    tabletImg: Images.TokenX768,
-    mobileImg: Images.TokenX394,
-  },
-  {
-    label: 'How',
-    link: '/c/All',
-    text: (
-      <>
-        <Row style={{ width: '90%', margin: 'auto' }}>
-          <Col xs={24} md={24} lg={8}>
-            <h1 className="how_banner_text_box banner-text"> How It Works </h1>
-          </Col>
-          <Col xs={24} md={24} lg={16}>
-            <div className="banner-block-container">
-              {bannerConfig.map((item, index) => (
-                <>
-                  <div className="banner-block">
-                    <img
-                      src={item.icon}
-                      // style={{ width: '42px', height: '48px' }}
-                      className="flex banner-icons"
-                      alt={`icon-${index + 1}`}
-                    />
-                    <p className="banner-step">Step {index + 1}</p>
-                    <p
-                      className={`banner-step-description ${
-                        index === 2 && `rwa-class`
-                      }`}
-                    >
-                      {item.description}
-                    </p>
-                  </div>
-                  {index < bannerConfig.length - 1 && (
-                    <img
-                      src={Images.banner_arrow}
-                      className="banner-arrow"
-                      alt="arrow.."
-                    />
-                  )}
-                </>
-              ))}
-            </div>
-          </Col>
-        </Row>
-      </>
-    ),
-    desktopText: 'Explore More',
-    mobileText: 'Explore',
-    alt: metaImg,
-    title: metaImg,
-    desktopImg: Images.HowX1600,
-    laptopImg: Images.HowX1440,
-    tabletImg: Images.HowX768,
-    mobileImg: Images.HowX394,
-  },
+  // {
+  //   label: 'Batman',
+  //   link: '/c/Clothing?sc=Clothing',
+  //   text: (
+  //     <div className="clothing_banner_text banner-text">
+  //       <h1> The Official DC Drop </h1>
+  //       <h1> is Live </h1>
+  //     </div>
+  //   ),
+  //   desktopText: 'Explore More',
+  //   mobileText: 'Explore',
+  //   alt: metaImg,
+  //   title: metaImg,
+  //   desktopImg: Images.BatmanX1600,
+  //   laptopImg: Images.BatmanX1440,
+  //   tabletImg: Images.BatmanX768,
+  //   mobileImg: Images.BatmanX394,
+  // },
+  // {
+  //   label: 'Rick and Morty',
+  //   link: '/c/Clothing?sc=Clothing',
+  //   text: (
+  //     <div className="clothing_banner_text banner-text">
+  //       <h1> Limited Release </h1>
+  //       <h1> Warner Bros Apparel </h1>
+  //     </div>
+  //   ),
+  //   desktopText: 'Explore More',
+  //   mobileText: 'Explore',
+  //   alt: metaImg,
+  //   title: metaImg,
+  //   desktopImg: Images.RickAndMortyX1600,
+  //   laptopImg: Images.RickAndMortyX1440,
+  //   tabletImg: Images.RickAndMortyX768,
+  //   mobileImg: Images.RickAndMortyX394,
+  // },
+  // {
+  //   label: 'Liquid Gold',
+  //   link: '/c/Spirits?sc=Spirits',
+  //   text: (
+  //     <div className="liquid_gold_text_box banner-text">
+  //       <h1> Liquid Gold </h1>
+  //       <h1> Whiskey Casks </h1>
+  //     </div>
+  //   ),
+  //   desktopText: 'Explore More',
+  //   mobileText: 'Explore',
+  //   alt: metaImg,
+  //   title: metaImg,
+  //   desktopImg: Images.LiquidGoldX1600,
+  //   laptopImg: Images.LiquidGoldX1440,
+  //   tabletImg: Images.LiquidGoldX768,
+  //   mobileImg: Images.LiquidGoldX394,
+  // },
+  // {
+  //   label: 'Collectibles',
+  //   link: '/c/Collectibles?sc=Collectibles',
+  //   text: (
+  //     <div className="collectible_banner_text banner-text ">
+  //       <h1> Own Digital </h1>
+  //       <h1>Tokenized Collectibles!</h1>
+  //     </div>
+  //   ),
+  //   desktopText: 'Explore More',
+  //   mobileText: 'Explore',
+  //   alt: metaImg,
+  //   title: metaImg,
+  //   desktopImg: Images.CollectiblesX1600,
+  //   laptopImg: Images.CollectiblesX1440,
+  //   tabletImg: Images.CollectiblesX768,
+  //   mobileImg: Images.CollectiblesX394,
+  // },
+  // {
+  //   label: 'Clothing',
+  //   link: '/c/Clothing?sc=Clothing',
+  //   text: (
+  //     <div className="clothing_banner_text banner-text">
+  //       <h1> Step into Future With Tokenized Clothing </h1>
+  //     </div>
+  //   ),
+  //   desktopText: 'Explore More',
+  //   mobileText: 'Explore',
+  //   alt: metaImg,
+  //   title: metaImg,
+  //   desktopImg: Images.ClothingX1600,
+  //   laptopImg: Images.ClothingX1440,
+  //   tabletImg: Images.ClothingX768,
+  //   mobileImg: Images.ClothingX394,
+  // },
+  // {
+  //   label: 'Metal',
+  //   link: '/c/Metals?sc=Metals',
+  //   text: (
+  //     <div className="metal_banner_text banner-text">
+  //       <h1>Tokenized Metals</h1>
+  //       <h1>Vault-Secure</h1>
+  //     </div>
+  //   ),
+  //   desktopText: 'Explore More',
+  //   mobileText: 'Explore',
+  //   alt: metaImg,
+  //   title: metaImg,
+  //   desktopImg: Images.MetalX1600,
+  //   laptopImg: Images.MetalX1440,
+  //   tabletImg: Images.MetalX768,
+  //   mobileImg: Images.MetalX394,
+  // },
+  // {
+  //   label: 'Token',
+  //   link: '/c/Tokens?sc=Tokens',
+  //   text: (
+  //     <div className="token_banner_text_box banner-text">
+  //       <h1 className="token_banner_text1">
+  //         The Coin with Real Stakes for{' '}
+  //         <span style={{ color: '#FFA011' }}>Real Dogs</span>{' '}
+  //       </h1>
+  //       <h1 className="token_banner_text2">
+  //         {' '}
+  //         Save Dog Lives with $SADDOGS Token{' '}
+  //       </h1>
+  //     </div>
+  //   ),
+  //   desktopText: 'Save Dogs Now',
+  //   mobileText: 'Save Dogs Now',
+  //   alt: metaImg,
+  //   title: metaImg,
+  //   desktopImg: Images.TokenX1600,
+  //   laptopImg: Images.TokenX1440,
+  //   tabletImg: Images.TokenX768,
+  //   mobileImg: Images.TokenX394,
+  // },
+  // {
+  //   label: 'How',
+  //   link: '/c/All',
+  //   text: (
+  //     <>
+  //       <Row style={{ width: '90%', margin: 'auto' }}>
+  //         <Col xs={24} md={24} lg={8}>
+  //           <h1 className="how_banner_text_box banner-text"> How It Works </h1>
+  //         </Col>
+  //         <Col xs={24} md={24} lg={16}>
+  //           <div className="banner-block-container">
+  //             {bannerConfig.map((item, index) => (
+  //               <>
+  //                 <div className="banner-block">
+  //                   <img
+  //                     src={item.icon}
+  //                     // style={{ width: '42px', height: '48px' }}
+  //                     className="flex banner-icons"
+  //                     alt={`icon-${index + 1}`}
+  //                   />
+  //                   <p className="banner-step">Step {index + 1}</p>
+  //                   <p
+  //                     className={`banner-step-description ${
+  //                       index === 2 && `rwa-class`
+  //                     }`}
+  //                   >
+  //                     {item.description}
+  //                   </p>
+  //                 </div>
+  //                 {index < bannerConfig.length - 1 && (
+  //                   <img
+  //                     src={Images.banner_arrow}
+  //                     className="banner-arrow"
+  //                     alt="arrow.."
+  //                   />
+  //                 )}
+  //               </>
+  //             ))}
+  //           </div>
+  //         </Col>
+  //       </Row>
+  //     </>
+  //   ),
+  //   desktopText: 'Explore More',
+  //   mobileText: 'Explore',
+  //   alt: metaImg,
+  //   title: metaImg,
+  //   desktopImg: Images.HowX1600,
+  //   laptopImg: Images.HowX1440,
+  //   tabletImg: Images.HowX768,
+  //   mobileImg: Images.HowX394,
+  // },
 ];
 
 export const TRANSACTION_STATUS = {

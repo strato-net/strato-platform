@@ -305,12 +305,20 @@ pipeline {
             sh 'git checkout develop'
             sh 'git pull https://$GITHUB_USERNAME:$GITHUB_TOKEN@github.com/blockapps/strato-platform develop'
             sh "git merge ${env.RELEASE_TYPE}"
-          
-          
-          // The following step requires `cd-blockapps` user to be able to push directly to develop bypassing the required Status Check to pass ("continuous-integration/jenkins/pr-merge")
-          // This can't be bypassed based on the GitHub branch settings as it is done for pull requests. So we are manually temporary disabling that check ("Require status checks to pass before merging") for develop branch on Github to execute it.
-          // any ideas how to avoid that?
-          sh 'git push https://$GITHUB_USERNAME:$GITHUB_TOKEN@github.com/blockapps/strato-platform develop'
+            // The following step requires `cd-blockapps` user to be able to push directly to develop bypassing the required Status Check to pass ("continuous-integration/jenkins/pr-merge")
+            // This can't be bypassed based on the GitHub branch settings as it is done for pull requests. So we are manually temporary disabling that check ("Require status checks to pass before merging") for develop branch on Github to execute it.
+            // any ideas how to avoid that?
+            sh 'git push https://$GITHUB_USERNAME:$GITHUB_TOKEN@github.com/blockapps/strato-platform develop'
+            
+            script {
+              if(env.RELEASE_TYPE == 'master') {
+                // Merge changes into marketplace-master
+                sh 'git checkout marketplace-master'
+                sh 'git pull https://$GITHUB_USERNAME:$GITHUB_TOKEN@github.com/blockapps/strato-platform marketplace-master'
+                sh "git merge master"
+                sh 'git push https://$GITHUB_USERNAME:$GITHUB_TOKEN@github.com/blockapps/strato-platform marketplace-master'
+              }
+            }
           }
         }
       }
