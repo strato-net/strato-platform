@@ -34,6 +34,10 @@ const TransactionResponsive = ({ data, user, stratAddress, cataAddress }) => {
     const { textClass, bgClass } =
       data.type === 'Redemption'
         ? REDEMPTION_STATUS_CLASSES[status]
+        : data.type === 'Stake'
+        ? TRANSACTION_STATUS_CLASSES[3]
+        : data.type === 'Unstake'
+        ? TRANSACTION_STATUS_CLASSES[4]
         : TRANSACTION_STATUS_CLASSES[status] || {
             textClass: 'bg-[#FFF6EC]',
             bgClass: 'bg-[#119B2D]',
@@ -49,6 +53,10 @@ const TransactionResponsive = ({ data, user, stratAddress, cataAddress }) => {
         <p>
           {data.type === 'Redemption'
             ? REDEMPTION_STATUS[status]
+            : data.type === 'Stake'
+            ? 'Staked'
+            : data.type === 'Unstake'
+            ? 'Unstaked'
             : TRANSACTION_STATUS[status]}
         </p>
       </div>
@@ -143,9 +151,15 @@ const TransactionResponsive = ({ data, user, stratAddress, cataAddress }) => {
           const handleDetailRedirection = () => {
             let route;
             if (type === 'Order' && from === user.commonName) {
-              route = `${routes.SoldOrderDetails.url.replace(':id', address ? transaction_hash : address)}`;
+              route = `${routes.SoldOrderDetails.url.replace(
+                ':id',
+                address ? transaction_hash : address
+              )}`;
             } else if (type === 'Order' && from !== user.commonName) {
-              route = `${routes.BoughtOrderDetails.url.replace(':id', address ? transaction_hash : address)}`;
+              route = `${routes.BoughtOrderDetails.url.replace(
+                ':id',
+                address ? transaction_hash : address
+              )}`;
             } else if (type === 'Transfer') {
             } else if (type === 'Redemption' && to === user.commonName) {
               route = `${routes.RedemptionsIncomingDetails.url
@@ -170,7 +184,9 @@ const TransactionResponsive = ({ data, user, stratAddress, cataAddress }) => {
           return (
             <Row
               key={index}
-              className={`bg-red-300 w-full ${isExpanded ? '' : 'h-36'} rounded-xl px-2 py-2 shadow-2xl border-2 `}
+              className={`bg-red-300 w-full ${
+                isExpanded ? '' : 'h-36'
+              } rounded-xl px-2 py-2 shadow-2xl border-2 `}
             >
               <Col span={6} className="flex justify-center bg-grey-400">
                 <img
@@ -195,7 +211,9 @@ const TransactionResponsive = ({ data, user, stratAddress, cataAddress }) => {
                 </p>
                 <p
                   style={{ color: '#13188A' }}
-                  className={`font-semibold ${type === 'Transfer' ? 'cursor-default' : 'cursor-pointer'}`}
+                  className={`font-semibold ${
+                    type === 'Transfer' ? 'cursor-default' : 'cursor-pointer'
+                  }`}
                   onClick={() => {
                     handleDetailRedirection();
                   }}

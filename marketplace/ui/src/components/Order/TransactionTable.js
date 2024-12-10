@@ -66,7 +66,7 @@ const TransactionTable = ({ user, download, stratAddress, cataAddress }) => {
   const urlType = searchParams.get('type');
   const urlDate = searchParams.get('date');
 
-  const limit = 20;
+  const limit = 200;
   const pageSize = 10;
   const [offset, setOffset] = useState(0);
   const [currentPage, setCurrentPage] = useState(1);
