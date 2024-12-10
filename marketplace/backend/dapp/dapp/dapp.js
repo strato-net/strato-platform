@@ -2209,13 +2209,22 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
       options
     );
 
-    const stakeCreatedEventAddresses = stakeCreatedEvents.stakeCreatedEvents.map(
-      (event) => event.escrow
-    );
+    const stakeCreatedEventAddresses =
+      stakeCreatedEvents.stakeCreatedEvents.map((event) => event.escrow);
 
     const escrows = await escrowJs.getEscrowsForStakeTransactions(
       rawAdmin,
       { ...restArgs, address: stakeCreatedEventAddresses },
+      options
+    );
+
+    const assetAddresses = escrows.escrows.map(
+      (escrow) => escrow.assetRootAddress.split(':')[0]
+    );
+
+    const sales = await saleJs.getAll(
+      rawAdmin,
+      { assetToBeSold: assetAddresses, isOpen: true },
       options
     );
 
@@ -2229,6 +2238,10 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
           return;
         }
 
+        const sale = sales.find(
+          (sale) => sale.assetToBeSold === escrow.assetRootAddress.split(':')[0]
+        );
+
         const date = new Date(record.block_timestamp);
         const unixTimestamp = Math.floor(date.getTime() / 1000);
 
@@ -2240,6 +2253,7 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
           createdDate: unixTimestamp,
           quantity: record.assetAmount,
           transaction_hash: record.transaction_hash,
+          price: sale?.price,
         };
       })
       .filter(Boolean);
@@ -2247,6 +2261,74 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
     return {
       stakeTransactions: stakeTransactions,
       total: stakeTransactions.length,
+    };
+  };
+
+  contract.getUnstakeTransactions = async function (
+    args,
+    options = defaultOptions
+  ) {
+    const { userAddress, ...restArgs } = args;
+
+    const unstakeEvents = await reserveJs.getUnstakeEvents(
+      rawAdmin,
+      { user: userAddress },
+      options
+    );
+
+    const unstakeEventAddresses = unstakeEvents.unstakeEvents.map(
+      (event) => event.escrow
+    );
+
+    const escrows = await escrowJs.getEscrowsForStakeTransactions(
+      rawAdmin,
+      { ...restArgs, address: unstakeEventAddresses },
+      options
+    );
+
+    const assetAddresses = escrows.escrows.map(
+      (escrow) => escrow.assetRootAddress.split(':')[0]
+    );
+
+    const sales = await saleJs.getAll(
+      rawAdmin,
+      { assetToBeSold: assetAddresses, isOpen: true },
+      options
+    );
+
+    const unstakeTransactions = unstakeEvents.unstakeEvents
+      .map((record) => {
+        const escrow = escrows.escrows.find(
+          (escrow) => escrow.address === record.escrow
+        );
+
+        if (!escrow) {
+          return;
+        }
+
+        const sale = sales.find(
+          (sale) => sale.assetToBeSold === escrow.assetRootAddress.split(':')[0]
+        );
+
+        const date = new Date(record.block_timestamp);
+        const unixTimestamp = Math.floor(date.getTime() / 1000);
+
+        return {
+          ...escrow,
+          assetAddress: escrow.assetRootAddress.split(':')[0],
+          type: 'Unstake',
+          stakeId: record.id,
+          createdDate: unixTimestamp,
+          quantity: record.quantity,
+          transaction_hash: record.transaction_hash,
+          price: sale?.price,
+        };
+      })
+      .filter(Boolean);
+
+    return {
+      unstakeTransactions: unstakeTransactions,
+      total: unstakeTransactions.length,
     };
   };
   // ---------------------------- Reserve END   -------------------------------

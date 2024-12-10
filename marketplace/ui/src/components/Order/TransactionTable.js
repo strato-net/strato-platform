@@ -453,6 +453,8 @@ const TransactionTable = ({ user, download, stratAddress, cataAddress }) => {
         ? REDEMPTION_STATUS_CLASSES[status]
         : data.type === 'Stake'
         ? TRANSACTION_STATUS_CLASSES[3]
+        : data.type === 'Unstake'
+        ? TRANSACTION_STATUS_CLASSES[4]
         : TRANSACTION_STATUS_CLASSES[status] || {
             textClass: 'bg-[#FFF6EC]',
             bgClass: 'bg-[#119B2D]',
@@ -470,6 +472,8 @@ const TransactionTable = ({ user, download, stratAddress, cataAddress }) => {
             ? REDEMPTION_STATUS[status]
             : data.type === 'Stake'
             ? 'Staked'
+            : data.type === 'Unstake'
+            ? 'Unstaked'
             : TRANSACTION_STATUS[status]}
         </p>
       </div>

@@ -54,6 +54,13 @@ class TransactionController {
         userAddress: userAddress,
       };
 
+      const unstakeQuery = {
+        limit: limit,
+        offset: offset,
+        borrowerCommonName: user,
+        userAddress: userAddress,
+      };
+
       if (startDate && endDate) {
         transactionQuery['range'] = [`createdDate,${startDate},${endDate}`];
         redemptionQuery['range'] = [`redemptionDate,${startDate},${endDate}`];
@@ -83,6 +90,13 @@ class TransactionController {
           stakeQuery
         );
         data = [...data, ...stakeTransactions];
+        count = count + total;
+      }
+      if (type === 'Unstake' || !type) {
+        const { unstakeTransactions, total } = await dapp.getUnstakeTransactions(
+          stakeQuery
+        );
+        data = [...data, ...unstakeTransactions];
         count = count + total;
       }
       if (type === 'Redemption' || !type) {

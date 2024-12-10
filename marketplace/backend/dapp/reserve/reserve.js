@@ -3,8 +3,12 @@ import constants from '../../helpers/constants';
 import { searchAllWithQueryArgs } from '/helpers/utils';
 
 const contractName = 'BlockApps-Mercata-Reserve';
+const contractTable = 'Reserve';
 const OracleContractName = 'BlockApps-Mercata-OracleService';
-const contractEvents = { STAKE_CREATED: 'StakeCreated' };
+const contractEvents = {
+  STAKE_CREATED: 'StakeCreated',
+  STAKE_UNLOCKED: 'StakeUnlocked',
+};
 
 /**
  * Augment contract arguments before they are used to post a contract.
@@ -399,19 +403,19 @@ async function repay(user, args, options) {
 }
 
 /**
- * Fetch Stake Transactions
+ * Fetch StakeCreated Events
  */
 async function getStakeCreatedEvents(admin, args = {}, defaultOptions) {
   const options = { ...defaultOptions, org: 'BlockApps', app: 'Mercata' };
-  let stakeCreatedEvents = await searchAllWithQueryArgs(
-    `Reserve.${contractEvents.STAKE_CREATED}`,
+  const stakeCreatedEvents = await searchAllWithQueryArgs(
+    `${contractTable}.${contractEvents.STAKE_CREATED}`,
     args,
     options,
     admin
   );
 
   const total = await searchAllWithQueryArgs(
-    `${contractName}.${contractEvents.STAKE_CREATED}`,
+    `${contractTable}.${contractEvents.STAKE_CREATED}`,
     {
       ...args,
       queryOptions: { select: 'count' },
@@ -426,11 +430,40 @@ async function getStakeCreatedEvents(admin, args = {}, defaultOptions) {
   };
 }
 
+/**
+ * Fetch StakeUnlocked Events
+ */
+async function getUnstakeEvents(admin, args = {}, defaultOptions) {
+  const options = { ...defaultOptions, org: 'BlockApps', app: 'Mercata' };
+  const unstakeEvents = await searchAllWithQueryArgs(
+    `${contractTable}.${contractEvents.STAKE_UNLOCKED}`,
+    args,
+    options,
+    admin
+  );
+
+  const total = await searchAllWithQueryArgs(
+    `${contractTable}.${contractEvents.STAKE_UNLOCKED}`,
+    {
+      ...args,
+      queryOptions: { select: 'count' },
+    },
+    options,
+    admin
+  );
+
+  return {
+    unstakeEvents: unstakeEvents.map(marshalOut),
+    total: total[0]?.count,
+  };
+}
+
 export default {
   contractName,
   get,
   getAll,
   getStakeCreatedEvents,
+  getUnstakeEvents,
   marshalIn,
   marshalOut,
   oraclePrice,
