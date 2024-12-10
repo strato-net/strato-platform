@@ -109,7 +109,7 @@ const StakeInventoryCard = ({
   const callDetailPage = () => {
     navigate(
       `${naviroute
-        .replace(':id', inventory.address)
+        .replace(':id', inventory.address[0].address)
         .replace(':name', encodeURIComponent(inventory.name))}`,
       {
         state: { isCalledFromInventory: true },
