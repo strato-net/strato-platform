@@ -100,10 +100,10 @@ const StakeModal = ({
         collateralQuantity: inventory?.quantity - collateralQuantity,
         assets:
           inventory && Array.isArray(inventory.address)
-            ? inventory.address
-                .filter((item) => !item.sale) // Keep only items without a sale
-                .map((item) => item.address) // Extract the address
-            : [],
+        ? inventory.address
+            .filter((item) => !item.sale) // Keep only items without a sale
+            .map((item) => item.address) // Extract the address
+        : [inventory.address], // Handle the case where address is not an array
         reserve: matchedReserve?.address,
       };
       console.log('body: ', body);

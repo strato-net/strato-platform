@@ -181,7 +181,7 @@ const Stake = ({ user }) => {
         const callDetailPage = () => {
           navigate(
             `${routes.InventoryDetail.url
-              .replace(':id', record.address)
+              .replace(':id', record.address[0].address)
               .replace(':name', encodeURIComponent(record.name))}`,
             {
               state: { isCalledFromInventory: true },
