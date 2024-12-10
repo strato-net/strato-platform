@@ -160,8 +160,7 @@ const ProductDetails = ({ user, users }) => {
   function isActive() {
     if (
       inventoryDetails.status == ASSET_STATUS.PENDING_REDEMPTION ||
-      inventoryDetails.status == ASSET_STATUS.RETIRED ||
-      inventoryDetails.escrow
+      inventoryDetails.status == ASSET_STATUS.RETIRED
     ) {
       return false;
     } else {
@@ -880,10 +879,7 @@ const ProductDetails = ({ user, users }) => {
                   <>
                     <div className="flex gap-4 justify-between lg:justify-start  pt-4 w-full">
                       <Button
-                        type="primary"
-                        className={`w-[100%]  h-9  ${
-                          !ownerSameAsUser() ? '!bg-[#808080]' : '!bg-[#13188A]'
-                        } !hover:bg-primaryHover !text-white`}
+                        className={`bg-[#13188A] text-white w-[100%] h-9`}
                         onClick={async () => {
                           if (isStakeable && ownerSameAsUser()) {
                             isStaked
@@ -897,7 +893,7 @@ const ProductDetails = ({ user, users }) => {
                           (!isStaked &&
                             (inventoryDetails.price || !isActive())) ||
                           (isStaked &&
-                            inventoryDetails?.escrow?.borrowedAmount &&
+                            inventoryDetails?.escrow &&
                             inventoryDetails?.escrow?.borrowedAmount > 0)
                         }
                       >
@@ -918,7 +914,7 @@ const ProductDetails = ({ user, users }) => {
                           className="bg-[#13188A] text-white w-48 h-10"
                           onClick={() => showBorrowModal()}
                           disabled={
-                            inventoryDetails?.escrow?.borrowedAmount &&
+                            inventoryDetails?.escrow &&
                             inventoryDetails?.escrow?.borrowedAmount > 0
                           }
                         >
@@ -929,7 +925,7 @@ const ProductDetails = ({ user, users }) => {
                           className="bg-[#13188A] text-white w-48 h-10"
                           onClick={() => showRepayModal()}
                           disabled={
-                            inventoryDetails?.escrow?.borrowedAmount &&
+                            inventoryDetails?.escrow &&
                             inventoryDetails?.escrow?.borrowedAmount <= 0
                           }
                         >
@@ -1100,6 +1096,7 @@ const ProductDetails = ({ user, users }) => {
           handleCancel={handleStakeModalClose}
           productDetailPage={Id}
           inventory={inventoryDetails}
+          reserves={reserves}
         />
       )}
       {borrowModalOpen && (
@@ -1108,6 +1105,7 @@ const ProductDetails = ({ user, users }) => {
           handleCancel={handleBorrowModalClose}
           productDetailPage={Id}
           inventory={inventoryDetails}
+          reserves={reserves}
         />
       )}
       {repayModalOpen && (
@@ -1116,6 +1114,7 @@ const ProductDetails = ({ user, users }) => {
           handleCancel={handleRepayModalClose}
           productDetailPage={Id}
           inventory={inventoryDetails}
+          reserves={reserves}
         />
       )}
       {message && openToastInventory('bottom')}

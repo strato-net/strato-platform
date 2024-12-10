@@ -10,6 +10,12 @@ import {
   useInventoryState,
   useInventoryDispatch,
 } from '../../contexts/inventory';
+import { Images } from '../../images';
+
+const logo = <img src={Images.cata} alt={''} title={''} className="w-4 h-4" />;
+const StratsIcon = (
+  <img src={Images.strat} alt={''} title={''} className="w-4 h-4" />
+);
 
 export default function AuthorizeIssuer() {
   const { changingIssuerStatus, changingAdminStatus, success, message } =
@@ -74,21 +80,34 @@ export default function AuthorizeIssuer() {
       inventoryActions.getAllReserve(inventoryDispatch);
     }
   }, [reserves]);
-  console.log('reserves', reserves);
 
   return (
     <>
       {contextHolder}
       <div className="flex flex-col items-center justify-center">
-        <h2 className="text-xl">Reserve Status</h2>
+        <h2 className="text-xl mb-4">Reserve Status</h2>
         <Spin spinning={isReservesLoading && !reserves} tip="Loading...">
           <div>
             <p>
-              <span className="font-bold">Total TVL:</span> ${totalTvl}
+              <span className="font-bold">Total TVL:</span> $
+              {totalTvl.toLocaleString('en-US', {
+                maximumFractionDigits: 2,
+                minimumFractionDigits: 0,
+              })}
             </p>
-            <p>
-              <span className="font-bold">Total CATA Rewards Issued:</span>{' '}
-              {totalCataRewards} CATA
+            <p className="flex items-center">
+              <span className="font-bold">Total CATA Rewards Issued:</span>
+              &nbsp;{logo} &nbsp;
+              {totalCataRewards.toLocaleString('en-US', {
+                maximumFractionDigits: 4,
+                minimumFractionDigits: 0,
+              })}{' '}
+              ($
+              {(totalCataRewards / 10).toLocaleString('en-US', {
+                maximumFractionDigits: 2,
+                minimumFractionDigits: 0,
+              })}
+              )
             </p>
             <p>
               <span className="font-bold">Reserve Count:</span>{' '}
@@ -102,34 +121,93 @@ export default function AuthorizeIssuer() {
                   key={index}
                   className="reserve-item p-4 border rounded shadow-md max-w-70"
                 >
-                  <h3>
-                    <span className="font-bold">Reserve:</span> {reserve.name}
+                  <h3 className="font-bold text-lg mb-2">
+                    Reserve: {reserve.name}
                   </h3>
-                  <p>
-                    <span className="font-bold">APY:</span>{' '}
-                    {reserve.cataAPYRate}%
-                  </p>
-                  <p>
-                    <span className="font-bold">Rewards Issued:</span>{' '}
-                    {reserve.totalCataRewardIssued?.toFixed(4)} CATA
-                  </p>
-                  <p>
-                    <span className="font-bold">TVL:</span> $
-                    {reserve.tvl?.toFixed(2)}
-                  </p>
-                  <p>
-                    <span className="font-bold">CATA Balance:</span>{' '}
-                    {(reserve.cataTokenObject.quantity / 10 ** 18)?.toFixed(4)}
-                  </p>
-                  <p>
-                    <span className="font-bold">STRATs Balance:</span>{' '}
-                    {(reserve.stratsTokenObject.quantity / 100)?.toFixed(2)}
-                  </p>
+                  <div className="grid grid-cols-2 gap-2">
+                    <div className="font-bold">APY:</div>
+                    <div>{reserve.cataAPYRate}%</div>
+                    <div className="font-bold">Rewards Issued:</div>
+                    <div className="flex items-center">
+                      {logo} &nbsp;
+                      {reserve.totalCataRewardIssued?.toLocaleString('en-US', {
+                        maximumFractionDigits: 4,
+                        minimumFractionDigits: 0,
+                      })}{' '}
+                      ($
+                      {(reserve.totalCataRewardIssued / 10).toLocaleString(
+                        'en-US',
+                        {
+                          maximumFractionDigits: 2,
+                          minimumFractionDigits: 0,
+                        }
+                      )}
+                      )
+                    </div>
+                    <div className="font-bold">TVL:</div>
+                    <div>
+                      $
+                      {reserve.tvl?.toLocaleString('en-US', {
+                        maximumFractionDigits: 2,
+                        minimumFractionDigits: 0,
+                      })}
+                    </div>
+                    <div className="font-bold">CATA Balance:</div>
+                    <div className="flex flex-col">
+                      <div className="flex items-center">
+                        {logo} &nbsp;
+                        {(
+                          reserve.cataTokenObject.quantity /
+                          10 ** 18
+                        ).toLocaleString('en-US', {
+                          maximumFractionDigits: 4,
+                          minimumFractionDigits: 0,
+                        })}
+                      </div>
+                      <div>
+                        ($
+                        {(
+                          reserve.cataTokenObject.quantity /
+                          10 ** 18 /
+                          10
+                        ).toLocaleString('en-US', {
+                          maximumFractionDigits: 2,
+                          minimumFractionDigits: 0,
+                        })}
+                        )
+                      </div>
+                    </div>
+                    <div className="font-bold">STRATs Balance:</div>
+                    <div className="flex flex-col">
+                      <div className="flex items-center">
+                        {StratsIcon} &nbsp;
+                        {(
+                          reserve.stratsTokenObject.quantity / 100
+                        )?.toLocaleString('en-US', {
+                          maximumFractionDigits: 2,
+                          minimumFractionDigits: 0,
+                        })}
+                      </div>
+                      <div>
+                        ($
+                        {(
+                          reserve.stratsTokenObject.quantity /
+                          100 /
+                          100
+                        ).toLocaleString('en-US', {
+                          maximumFractionDigits: 2,
+                          minimumFractionDigits: 0,
+                        })}
+                        )
+                      </div>
+                    </div>
+                  </div>
                 </div>
               ))}
           </div>
         </Spin>
       </div>
+
       <Form
         onFinish={onFinish}
         style={{
