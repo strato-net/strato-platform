@@ -132,29 +132,46 @@ async function get(user, address, options) {
       ? allEscrows[0].sum / Math.pow(10, 18)
       : 0;
 
-  // Fetch associated asset
-  const assetSearchOptions = {
+  // Fetch associated assets and tokens in one query
+  const combinedSearchOptions = {
     ...options,
     query: {
-      address: `eq.${reserve.assetRootAddress}`,
+      address: `in.(${[
+        reserve.assetRootAddress,
+        reserve.cataToken,
+        reserve.stratsToken,
+      ]
+        .filter(Boolean)
+        .join(',')})`,
       select: constants.attachImagesAndFiles,
     },
   };
 
-  const assets = await rest.search(
+  const results = await rest.search(
     user,
     { name: 'BlockApps-Mercata-Asset' },
-    assetSearchOptions
+    combinedSearchOptions
   );
 
-  const asset = assets && assets.length > 0 ? marshalOut(assets[0]) : null;
+  // Process the combined results
+  const asset = results.find(
+    (result) => result.address === reserve.assetRootAddress
+  );
+  const cataToken = results.find(
+    (result) => result.address === reserve.cataToken
+  );
+  const stratsToken = results.find(
+    (result) => result.address === reserve.stratsToken
+  );
 
   // Return combined result
   return {
     ...reserve,
-    asset,
+    asset: asset ? marshalOut(asset) : null,
     tvl,
     totalCataRewardIssued,
+    cataTokenObject: cataToken ? marshalOut(cataToken) : null,
+    stratsTokenObject: stratsToken ? marshalOut(stratsToken) : null,
   };
 }
 
@@ -166,16 +183,18 @@ async function get(user, address, options) {
  * @throws {Error} - Throws if no reserves are found.
  */
 async function getAll(user, options) {
-  // Define search options for active reserves
+  const CREATOR = 'eq.BlockApps';
+  const IS_ACTIVE = 'eq.true';
+
+  // Fetch all active reserves
   const searchOptions = {
     ...options,
     query: {
-      creator: 'eq.BlockApps',
-      isActive: 'eq.true',
+      creator: CREATOR,
+      isActive: IS_ACTIVE,
     },
   };
 
-  // Fetch reserves from Cirrus
   const reserves = await rest.search(
     user,
     { name: contractName },
@@ -186,78 +205,99 @@ async function getAll(user, options) {
     throw new Error('No reserves found');
   }
 
-  // Fetch asset information and TVL, and attach them to each reserve
-  const reservesWithAssetsAndTVL = await Promise.all(
-    reserves.map(async (reserve) => {
-      // Fetch associated asset
-      const asset = await rest.search(
-        user,
-        { name: 'BlockApps-Mercata-Asset' },
-        {
-          ...options,
-          query: {
-            address: `eq.${reserve.assetRootAddress}`,
-            select: constants.attachImagesAndFiles,
-          },
-        }
-      );
+  // Collect all related addresses for a combined query
+  const assetAndTokenAddresses = reserves
+    .flatMap((reserve) => [
+      reserve.assetRootAddress,
+      reserve.cataToken,
+      reserve.stratsToken,
+    ])
+    .filter(Boolean);
 
-      // Fetch associated escrows to calculate TVL
-      const escrowTVLSearchOptions = {
-        ...options,
-        query: {
-          creator: 'eq.BlockApps',
-          isActive: 'eq.true',
-          reserve: `eq.${reserve.address}`,
-          select: 'collateralValue.sum()',
-        },
-      };
+  const combinedSearchOptions = {
+    ...options,
+    query: {
+      address: `in.(${assetAndTokenAddresses.join(',')})`,
+      select: constants.attachImagesAndFiles,
+    },
+  };
 
-      const activeEscrows = await rest.search(
-        user,
-        { name: 'BlockApps-Mercata-Escrow' },
-        escrowTVLSearchOptions
-      );
-
-      // Filter for active escrows and calculate TVL: Total Value Locked in Dollars
-      const tvl =
-        activeEscrows && activeEscrows.length > 0
-          ? activeEscrows[0].sum / 10000
-          : 0;
-
-      // Total Cata Reward Issued in CATA
-      const escrowTotalCataRewardSearchOptions = {
-        ...options,
-        query: {
-          creator: 'eq.BlockApps',
-          reserve: `eq.${reserve.address}`,
-          select: 'totalCataReward.sum()',
-        },
-      };
-
-      const allEscrows = await rest.search(
-        user,
-        { name: 'BlockApps-Mercata-Escrow' },
-        escrowTotalCataRewardSearchOptions
-      );
-
-      // Calculate total Cata reward issued
-      const totalCataRewardIssued =
-        allEscrows && allEscrows.length > 0
-          ? allEscrows[0].sum / Math.pow(10, 18)
-          : 0;
-
-      // Attach the first matching asset (or null) and TVL to the reserve
-      return {
-        ...reserve,
-        asset: asset && asset[0] ? marshalOut(asset[0]) : null,
-        tvl,
-        totalCataRewardIssued,
-      };
-    })
+  const relatedAssetsAndTokens = await rest.search(
+    user,
+    { name: 'BlockApps-Mercata-Asset' },
+    combinedSearchOptions
   );
 
-  return reservesWithAssetsAndTVL;
+  // Fetch all TVL and total Cata rewards for reserves
+  const tvlAndCataRewardPromises = reserves.map(async (reserve) => {
+    const escrowTVLSearchOptions = {
+      ...options,
+      query: {
+        creator: CREATOR,
+        isActive: IS_ACTIVE,
+        reserve: `eq.${reserve.address}`,
+        select: 'collateralValue.sum()',
+      },
+    };
+
+    const activeEscrows = await rest.search(
+      user,
+      { name: 'BlockApps-Mercata-Escrow' },
+      escrowTVLSearchOptions
+    );
+
+    const tvl =
+      activeEscrows && activeEscrows.length > 0
+        ? activeEscrows[0].sum / 10000
+        : 0;
+
+    const escrowTotalCataRewardSearchOptions = {
+      ...options,
+      query: {
+        creator: CREATOR,
+        reserve: `eq.${reserve.address}`,
+        select: 'totalCataReward.sum()',
+      },
+    };
+
+    const allEscrows = await rest.search(
+      user,
+      { name: 'BlockApps-Mercata-Escrow' },
+      escrowTotalCataRewardSearchOptions
+    );
+
+    const totalCataRewardIssued =
+      allEscrows && allEscrows.length > 0
+        ? allEscrows[0].sum / Math.pow(10, 18)
+        : 0;
+
+    return { tvl, totalCataRewardIssued };
+  });
+
+  const tvlAndCataRewards = await Promise.all(tvlAndCataRewardPromises);
+
+  // Attach assets, tokens, TVL, and Cata rewards to reserves
+  const reservesWithDetails = reserves.map((reserve, index) => {
+    const asset = relatedAssetsAndTokens.find(
+      (item) => item.address === reserve.assetRootAddress
+    );
+    const cataToken = relatedAssetsAndTokens.find(
+      (item) => item.address === reserve.cataToken
+    );
+    const stratsToken = relatedAssetsAndTokens.find(
+      (item) => item.address === reserve.stratsToken
+    );
+
+    return {
+      ...reserve,
+      asset: asset ? marshalOut(asset) : null,
+      cataTokenObject: cataToken ? marshalOut(cataToken) : null,
+      stratsTokenObject: stratsToken ? marshalOut(stratsToken) : null,
+      ...tvlAndCataRewards[index],
+    };
+  });
+
+  return reservesWithDetails;
 }
 
 /**
