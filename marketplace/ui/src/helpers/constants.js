@@ -566,6 +566,7 @@ export const TRANSACTION_STATUS_COLOR = {
   Order: '#2A53FF',
   Transfer: '#FF0000',
   Redemption: '#001C76',
+  Stake: '#2A53FF',
 };
 
 export const TRANSACTION_STATUS_CLASSES = {

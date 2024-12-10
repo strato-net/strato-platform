@@ -2109,7 +2109,7 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
 
   contract.getEscrowForAsset = async function (args, options = defaultOptions) {
     const { assetRootAddress } = args;
-    const queryArgs = { 
+    const queryArgs = {
       select: '*,BlockApps-Mercata-Escrow-assets(*)',
       assetRootAddress: `like.${assetRootAddress}*`,
       borrowerCommonName: `eq.${userCommonName}`,
@@ -2118,8 +2118,12 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
     return await escrowJs.searchEscrow(rawAdmin, queryArgs, options);
   };
 
-  contract.userCataRewards = async function ( options = defaultOptions) {
-    return await escrowJs.userCataRewards(rawAdmin, userCert.commonName, options);
+  contract.userCataRewards = async function (options = defaultOptions) {
+    return await escrowJs.userCataRewards(
+      rawAdmin,
+      userCert.commonName,
+      options
+    );
   };
 
   contract.oraclePrice = async function (args, options = defaultOptions) {
@@ -2145,11 +2149,7 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
     const stratsOriginAddress = await STRATSJs.getStratsAddress();
 
     // Retrieve escrow data associated with the escrow address
-    const escrowData = await escrowJs.get(
-      rawAdmin,
-      escrow,
-      options
-    );
+    const escrowData = await escrowJs.get(rawAdmin, escrow, options);
     const orderTotal = escrowData ? escrowData.borrowedAmount : 0;
 
     // Get user's active STRATS assets with non-zero quantities
@@ -2195,6 +2195,59 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
       { stratsAssetAddresses: addressesToUse, escrowAddress: escrow, reserve },
       options
     );
+  };
+
+  contract.getStakeTransactions = async function (
+    args,
+    options = defaultOptions
+  ) {
+    const { userAddress, ...restArgs } = args;
+
+    const stakeCreatedEvents = await reserveJs.getStakeCreatedEvents(
+      rawAdmin,
+      { user: userAddress },
+      options
+    );
+
+    const stakeCreatedEventAddresses = stakeCreatedEvents.stakeCreatedEvents.map(
+      (event) => event.escrow
+    );
+
+    const escrows = await escrowJs.getEscrowsForStakeTransactions(
+      rawAdmin,
+      { ...restArgs, address: stakeCreatedEventAddresses },
+      options
+    );
+
+    const stakeTransactions = stakeCreatedEvents.stakeCreatedEvents
+      .map((record) => {
+        const escrow = escrows.escrows.find(
+          (escrow) => escrow.address === record.escrow
+        );
+
+        if (!escrow) {
+          return;
+        }
+
+        const date = new Date(record.block_timestamp);
+        const unixTimestamp = Math.floor(date.getTime() / 1000);
+
+        return {
+          ...escrow,
+          assetAddress: escrow.assetRootAddress.split(':')[0],
+          type: 'Stake',
+          stakeId: record.id,
+          createdDate: unixTimestamp,
+          quantity: record.assetAmount,
+          transaction_hash: record.transaction_hash,
+        };
+      })
+      .filter(Boolean);
+
+    return {
+      stakeTransactions: stakeTransactions,
+      total: stakeTransactions.length,
+    };
   };
   // ---------------------------- Reserve END   -------------------------------
   return contract;

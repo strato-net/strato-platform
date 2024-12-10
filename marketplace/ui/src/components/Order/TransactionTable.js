@@ -95,12 +95,13 @@ const TransactionTable = ({ user, download, stratAddress, cataAddress }) => {
   }, [marketplaceDispatch]);
 
   useEffect(() => {
-    if (user?.commonName && dateQuery) {
+    if (user?.commonName && user?.userAddress && dateQuery) {
       transactionAction.fetchUserTransaction(
         transactionDispatch,
         limit,
         offset,
         user?.commonName,
+        user?.userAddress,
         dateReturn(dateQuery)
       );
     }
@@ -109,7 +110,8 @@ const TransactionTable = ({ user, download, stratAddress, cataAddress }) => {
         transactionDispatch,
         limit,
         offset,
-        user?.commonName
+        user?.commonName,
+        user?.userAddress
       );
     }
   }, [user, dateQuery, offset]);
@@ -449,6 +451,8 @@ const TransactionTable = ({ user, download, stratAddress, cataAddress }) => {
     const { textClass, bgClass } =
       data.type === 'Redemption'
         ? REDEMPTION_STATUS_CLASSES[status]
+        : data.type === 'Stake'
+        ? TRANSACTION_STATUS_CLASSES[3]
         : TRANSACTION_STATUS_CLASSES[status] || {
             textClass: 'bg-[#FFF6EC]',
             bgClass: 'bg-[#119B2D]',
@@ -464,6 +468,8 @@ const TransactionTable = ({ user, download, stratAddress, cataAddress }) => {
         <p>
           {data.type === 'Redemption'
             ? REDEMPTION_STATUS[status]
+            : data.type === 'Stake'
+            ? 'Staked'
             : TRANSACTION_STATUS[status]}
         </p>
       </div>

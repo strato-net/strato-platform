@@ -1,8 +1,10 @@
 import { util, rest } from '/blockapps-rest-plus';
 import constants from '../../helpers/constants';
+import { searchAllWithQueryArgs } from '/helpers/utils';
 
 const contractName = 'BlockApps-Mercata-Reserve';
 const OracleContractName = 'BlockApps-Mercata-OracleService';
+const contractEvents = { STAKE_CREATED: 'StakeCreated' };
 
 /**
  * Augment contract arguments before they are used to post a contract.
@@ -103,7 +105,10 @@ async function get(user, address, options) {
   );
 
   // Calculate TVL: Total Value Locked in Dollars
-  const tvl = activeEscrows && activeEscrows.length > 0 ? activeEscrows[0].sum / 10000 : 0;
+  const tvl =
+    activeEscrows && activeEscrows.length > 0
+      ? activeEscrows[0].sum / 10000
+      : 0;
 
   // Total Cata Reward Issued in CATA
   const escrowTotalCataRewardSearchOptions = {
@@ -122,7 +127,10 @@ async function get(user, address, options) {
   );
 
   // Calculate total Cata reward issued
-  const totalCataRewardIssued = allEscrows && allEscrows.length > 0 ? allEscrows[0].sum / Math.pow(10, 18) : 0;
+  const totalCataRewardIssued =
+    allEscrows && allEscrows.length > 0
+      ? allEscrows[0].sum / Math.pow(10, 18)
+      : 0;
 
   // Fetch associated asset
   const assetSearchOptions = {
@@ -212,7 +220,10 @@ async function getAll(user, options) {
       );
 
       // Filter for active escrows and calculate TVL: Total Value Locked in Dollars
-      const tvl = activeEscrows && activeEscrows.length > 0 ? activeEscrows[0].sum / 10000 : 0;
+      const tvl =
+        activeEscrows && activeEscrows.length > 0
+          ? activeEscrows[0].sum / 10000
+          : 0;
 
       // Total Cata Reward Issued in CATA
       const escrowTotalCataRewardSearchOptions = {
@@ -229,7 +240,7 @@ async function getAll(user, options) {
         { name: 'BlockApps-Mercata-Escrow' },
         escrowTotalCataRewardSearchOptions
       );
-      
+
       // Calculate total Cata reward issued
       const totalCataRewardIssued =
         allEscrows && allEscrows.length > 0
@@ -292,7 +303,10 @@ async function stake(user, args, options) {
   const callArgs = {
     contract: { address: reserve },
     method: 'stakeAsset',
-    args: util.usc({ escrowAddress: escrowAddress || constants.zeroAddress, ...restArgs }),
+    args: util.usc({
+      escrowAddress: escrowAddress || constants.zeroAddress,
+      ...restArgs,
+    }),
   };
 
   const reponse = await rest.call(user, callArgs, options);
@@ -344,10 +358,39 @@ async function repay(user, args, options) {
   return reponse;
 }
 
+/**
+ * Fetch Stake Transactions
+ */
+async function getStakeCreatedEvents(admin, args = {}, defaultOptions) {
+  const options = { ...defaultOptions, org: 'BlockApps', app: 'Mercata' };
+  let stakeCreatedEvents = await searchAllWithQueryArgs(
+    `Reserve.${contractEvents.STAKE_CREATED}`,
+    args,
+    options,
+    admin
+  );
+
+  const total = await searchAllWithQueryArgs(
+    `${contractName}.${contractEvents.STAKE_CREATED}`,
+    {
+      ...args,
+      queryOptions: { select: 'count' },
+    },
+    options,
+    admin
+  );
+
+  return {
+    stakeCreatedEvents: stakeCreatedEvents.map(marshalOut),
+    total: total[0]?.count,
+  };
+}
+
 export default {
   contractName,
   get,
   getAll,
+  getStakeCreatedEvents,
   marshalIn,
   marshalOut,
   oraclePrice,
