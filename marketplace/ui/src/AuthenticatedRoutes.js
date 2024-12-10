@@ -147,7 +147,9 @@ const AuthenticatedRoutes = ({ user, users, isAuthenticated }) => {
           element={
             <UsersProvider>
               <IssuerStatusProvider>
-                <AuthorizeIssuer />
+                <InventoriesProvider>
+                  <AuthorizeIssuer />
+                </InventoriesProvider>
               </IssuerStatusProvider>
             </UsersProvider>
           }
