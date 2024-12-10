@@ -26,7 +26,7 @@ import StakeItemActions from '../Inventory/StakeItemActions';
 import '../Inventory/index.css';
 import PurchasableStakeItems from './PurchasableStakeItems';
 import StakeSteps from './StakeSteps';
-import InventoryCard from '../Inventory/InventoryCard';
+import StakeInventoryCard from '../Inventory/StakeInventoryCard';
 import { useCategoryState, useCategoryDispatch } from '../../contexts/category';
 import { actions as categoryActions } from '../../contexts/category/actions';
 import { TrophyOutlined, GiftOutlined } from '@ant-design/icons';
@@ -358,7 +358,7 @@ const Stake = ({ user }) => {
                   My Stakeable Items
                 </Title>
                 {combinedInventories.map((inventory, index) => (
-                  <InventoryCard
+                  <StakeInventoryCard
                     id={index}
                     limit={limit}
                     offset={offset}

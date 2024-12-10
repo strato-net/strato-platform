@@ -19,11 +19,6 @@ const StakeItemActions = ({
   category,
   reserves,
 }) => {
-  const stakeable =
-    inventory.root &&
-    reserves &&
-    reserves.length > 0 &&
-    reserves.some((reserve) => inventory.root === reserve.assetRootAddress);
   const [stakeType, setStakeType] = useState('Stake');
   const [stakeModalOpen, setStakeModalOpen] = useState(false);
   const [borrowModalOpen, setBorrowModalOpen] = useState(false);
@@ -64,7 +59,7 @@ const StakeItemActions = ({
   const handleRepayModalClose = () => {
     setRepayModalOpen(false);
   };
-  console.log('inventory: ', inventory);
+
   return (
     <div className="flex justify-center w-full">
       <div className="flex justify-center gap-3">

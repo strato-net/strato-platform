@@ -191,7 +191,7 @@ const StakeModal = ({
               className="w-full flex justify-between items-start"
             >
               <div className="flex items-center">
-                <p className="text-sm w-44 md:w-full text-gray-500">
+                <p className="text-sm text-gray-500">
                   <strong>{item.label}</strong>
                 </p>
                 <Tooltip title={item.description}>
