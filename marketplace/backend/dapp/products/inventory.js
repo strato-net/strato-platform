@@ -419,8 +419,6 @@ async function get(user, args, options) {
     newOptions
   );
 
-  const escrow = await escrowJs.getEscrowForAsset(user, { value: `eq.${inventory.address}` }, options);
-
   if (sale) {
     inventory = {
       ...inventory,
@@ -432,7 +430,15 @@ async function get(user, args, options) {
           ? sale['BlockApps-Mercata-Sale-paymentServices']
           : null
         : null,
-      escrow
+    };
+  }
+
+  const escrow = await escrowJs.getEscrowForAsset(user, { value: `eq.${inventory.address}` }, options);
+
+  if (escrow) {
+    inventory = {
+      ...inventory,
+      escrow,
     };
   }
 
