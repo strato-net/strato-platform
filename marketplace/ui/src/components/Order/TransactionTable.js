@@ -45,6 +45,7 @@ import {
   REDEMPTION_STATUS,
   REDEMPTION_STATUS_CLASSES,
   US_DATE_FORMAT,
+  TRANSACTION_STATUS_TEXT,
 } from '../../helpers/constants';
 import { SEO } from '../../helpers/seoConstant';
 import { getStringDate } from '../../helpers/utils';
@@ -320,7 +321,10 @@ const TransactionTable = ({ user, download, stratAddress, cataAddress }) => {
       width: '150px',
       render: (text) => (
         <p
-          style={{ background: TRANSACTION_STATUS_COLOR[text] }}
+          style={{
+            background: TRANSACTION_STATUS_COLOR[text],
+            color: TRANSACTION_STATUS_TEXT[text],
+          }}
           className={`bg-${TRANSACTION_STATUS_COLOR[text]} min-w-[80px] text-center cursor-default px-2 py-2 rounded-lg text-white`}
         >
           {text}
@@ -451,10 +455,8 @@ const TransactionTable = ({ user, download, stratAddress, cataAddress }) => {
     const { textClass, bgClass } =
       data.type === 'Redemption'
         ? REDEMPTION_STATUS_CLASSES[status]
-        : data.type === 'Stake'
+        : data.type === 'Stake' || data.type === 'Unstake'
         ? TRANSACTION_STATUS_CLASSES[3]
-        : data.type === 'Unstake'
-        ? TRANSACTION_STATUS_CLASSES[4]
         : TRANSACTION_STATUS_CLASSES[status] || {
             textClass: 'bg-[#FFF6EC]',
             bgClass: 'bg-[#119B2D]',
@@ -470,10 +472,8 @@ const TransactionTable = ({ user, download, stratAddress, cataAddress }) => {
         <p>
           {data.type === 'Redemption'
             ? REDEMPTION_STATUS[status]
-            : data.type === 'Stake'
-            ? 'Staked'
-            : data.type === 'Unstake'
-            ? 'Unstaked'
+            : data.type === 'Stake' || data.type === 'Unstake'
+            ? TRANSACTION_STATUS[3]
             : TRANSACTION_STATUS[status]}
         </p>
       </div>

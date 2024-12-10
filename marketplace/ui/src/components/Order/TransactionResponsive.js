@@ -9,6 +9,7 @@ import {
   TRANSACTION_STATUS,
   TRANSACTION_STATUS_CLASSES,
   TRANSACTION_STATUS_COLOR,
+  TRANSACTION_STATUS_TEXT,
 } from '../../helpers/constants';
 import routes from '../../helpers/routes';
 import { useNavigate } from 'react-router-dom';
@@ -34,10 +35,8 @@ const TransactionResponsive = ({ data, user, stratAddress, cataAddress }) => {
     const { textClass, bgClass } =
       data.type === 'Redemption'
         ? REDEMPTION_STATUS_CLASSES[status]
-        : data.type === 'Stake'
+        : data.type === 'Stake' || data.type === 'Unstake'
         ? TRANSACTION_STATUS_CLASSES[3]
-        : data.type === 'Unstake'
-        ? TRANSACTION_STATUS_CLASSES[4]
         : TRANSACTION_STATUS_CLASSES[status] || {
             textClass: 'bg-[#FFF6EC]',
             bgClass: 'bg-[#119B2D]',
@@ -53,10 +52,8 @@ const TransactionResponsive = ({ data, user, stratAddress, cataAddress }) => {
         <p>
           {data.type === 'Redemption'
             ? REDEMPTION_STATUS[status]
-            : data.type === 'Stake'
-            ? 'Staked'
-            : data.type === 'Unstake'
-            ? 'Unstaked'
+            : data.type === 'Stake' || data.type === 'Unstake'
+            ? TRANSACTION_STATUS[3]
             : TRANSACTION_STATUS[status]}
         </p>
       </div>
@@ -240,6 +237,7 @@ const TransactionResponsive = ({ data, user, stratAddress, cataAddress }) => {
                   size="middle"
                   style={{
                     backgroundColor: `${TRANSACTION_STATUS_COLOR[type]}`,
+                    color: `${TRANSACTION_STATUS_TEXT[type]}`,
                   }}
                 >
                   {type}

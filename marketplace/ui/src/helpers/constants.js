@@ -557,17 +557,25 @@ export const BANNER = [
 export const TRANSACTION_STATUS = {
   1: 'Awaiting Fulfillment',
   2: 'Payment Pending',
-  3: 'Closed',
+  3: 'Successful',
   4: 'Canceled',
   5: 'Discarded',
 };
 
 export const TRANSACTION_STATUS_COLOR = {
-  Order: '#2A53FF',
-  Transfer: '#FF0000',
-  Redemption: '#001C76',
-  Stake: '#008000',
-  Unstake: '#FFA500',
+  Order: '#E3F2FD',
+  Transfer: '#E0F7FA',
+  Redemption: '#FFF3E0',
+  Stake: '#E8F5E9',
+  Unstake: '#FFEBEE',
+};
+
+export const TRANSACTION_STATUS_TEXT= {
+  Order: '#1E88E5',
+  Transfer: '#00796B',
+  Redemption: '#F57C00',
+  Stake: '#388E3C',
+  Unstake: '#D32F2F',
 };
 
 export const TRANSACTION_STATUS_CLASSES = {

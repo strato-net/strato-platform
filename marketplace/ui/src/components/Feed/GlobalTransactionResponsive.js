@@ -1,14 +1,10 @@
 import React, { useEffect, useState } from 'react';
 import { Button, Row, Col, Table, Tag, Space, Spin } from 'antd';
-import classNames from 'classnames';
 import { Images } from '../../images';
 import './../Order/ordersTable.css';
 import {
-  REDEMPTION_STATUS,
-  REDEMPTION_STATUS_CLASSES,
-  TRANSACTION_STATUS,
-  TRANSACTION_STATUS_CLASSES,
   TRANSACTION_STATUS_COLOR,
+  TRANSACTION_STATUS_TEXT,
 } from '../../helpers/constants';
 import routes from '../../helpers/routes';
 import { useNavigate } from 'react-router-dom';
@@ -210,6 +206,7 @@ const GlobalTransactionResponsive = ({
                       size="middle"
                       style={{
                         backgroundColor: `${TRANSACTION_STATUS_COLOR[type]}`,
+                        color: `${TRANSACTION_STATUS_TEXT[type]}`,
                       }}
                     >
                       {type}
