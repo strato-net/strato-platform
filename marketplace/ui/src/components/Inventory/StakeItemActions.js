@@ -1,0 +1,142 @@
+import React, { useState } from 'react';
+import { Button } from 'antd';
+import {
+  RiseOutlined,
+  LogoutOutlined,
+  BankOutlined,
+  SolutionOutlined,
+} from '@ant-design/icons';
+import { ASSET_STATUS } from '../../helpers/constants';
+import StakeModal from './StakeModal';
+import BorrowModal from './BorrowModal';
+import RepayModal from './RepayModal';
+
+const StakeItemActions = ({
+  inventory,
+  limit,
+  offset,
+  debouncedSearchTerm,
+  category,
+  reserves,
+}) => {
+  const [stakeType, setStakeType] = useState('Stake');
+  const [stakeModalOpen, setStakeModalOpen] = useState(false);
+  const [borrowModalOpen, setBorrowModalOpen] = useState(false);
+  const [repayModalOpen, setRepayModalOpen] = useState(false);
+
+  function isActive() {
+    if (
+      inventory.status == ASSET_STATUS.PENDING_REDEMPTION ||
+      inventory.status == ASSET_STATUS.RETIRED
+    ) {
+      return false;
+    } else {
+      return true;
+    }
+  }
+
+  const showStakeModal = (type) => {
+    setStakeModalOpen(true);
+    setStakeType(type);
+  };
+
+  const handleStakeModalClose = () => {
+    setStakeModalOpen(false);
+  };
+
+  const showBorrowModal = () => {
+    setBorrowModalOpen(true);
+  };
+
+  const handleBorrowModalClose = () => {
+    setBorrowModalOpen(false);
+  };
+
+  const showRepayModal = () => {
+    setRepayModalOpen(true);
+  };
+
+  const handleRepayModalClose = () => {
+    setRepayModalOpen(false);
+  };
+
+  return (
+    <div className="flex justify-center w-full">
+      <div className="flex justify-center gap-3">
+        <Button
+          type="primary"
+          className="font-semibold flex items-center justify-center"
+          onClick={() => showStakeModal('Stake')}
+          disabled={inventory?.quantity <= inventory?.escrow?.collateralQuantity || !isActive() || inventory.price}
+        >
+          <RiseOutlined /> Stake
+        </Button>
+        <Button
+          type="link"
+          className="text-[#13188A] font-semibold"
+          onClick={() => showStakeModal('Unstake')}
+          disabled={!inventory?.escrow || inventory?.escrow?.borrowedAmount > 0}
+        >
+          <LogoutOutlined /> Unstake
+        </Button>
+        <Button
+          type="link"
+          className="text-[#13188A] font-semibold"
+          onClick={() => showBorrowModal('Unstake')}
+          disabled={!inventory?.escrow || inventory?.escrow?.borrowedAmount > 0}
+        >
+          <BankOutlined /> Borrow
+        </Button>
+        <Button
+          type="link"
+          className="text-[#13188A] font-semibold"
+          onClick={() => showRepayModal('Unstake')}
+          disabled={!inventory?.escrow || inventory?.escrow?.borrowedAmount <= 0}
+        >
+          <SolutionOutlined />
+          Repay
+        </Button>
+      </div>
+      {stakeModalOpen && (
+        <StakeModal
+          open={stakeModalOpen}
+          type={stakeType}
+          handleCancel={handleStakeModalClose}
+          limit={limit}
+          offset={offset}
+          inventory={inventory}
+          debouncedSearchTerm={debouncedSearchTerm}
+          saleAddress={inventory.saleAddress}
+          category={category}
+        />
+      )}
+      {borrowModalOpen && (
+        <BorrowModal
+          open={borrowModalOpen}
+          handleCancel={handleBorrowModalClose}
+          limit={limit}
+          offset={offset}
+          inventory={inventory}
+          debouncedSearchTerm={debouncedSearchTerm}
+          saleAddress={inventory.saleAddress}
+          category={category}
+        />
+      )}
+      {repayModalOpen && (
+        <RepayModal
+          open={repayModalOpen}
+          handleCancel={handleRepayModalClose}
+          limit={limit}
+          offset={offset}
+          inventory={inventory}
+          debouncedSearchTerm={debouncedSearchTerm}
+          saleAddress={inventory.saleAddress}
+          category={category}
+          reserves={reserves}
+        />
+      )}
+    </div>
+  );
+};
+
+export default StakeItemActions;
