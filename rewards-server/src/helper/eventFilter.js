@@ -49,7 +49,7 @@ async function filterMessages(msg) {
     fs.writeFileSync(filePath, JSON.stringify({ latestBlockNumber: currentBlockNumber }), 'utf-8');
 
     // List of allowed event names
-    const allowedEvents = ["CertificateRegistered", "Order"];
+    const allowedEvents = ["CertificateRegistered"];
 
     // Check if the event name is one of the allowed events
     if (!eventName || !allowedEvents.includes(eventName)) {
