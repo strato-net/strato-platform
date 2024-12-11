@@ -134,8 +134,8 @@ const Stake = ({ user }) => {
     if (user && reserves) {
       inventoryActions.fetchInventory(
         inventoryDispatch,
-        limit,
-        offset,
+        2000,
+        0,
         '',
         undefined,
         reserves.map((reserve) => reserve.assetRootAddress)
@@ -340,7 +340,7 @@ const Stake = ({ user }) => {
                 </Title>
                 <Table
                   columns={columns}
-                  dataSource={combinedInventories}
+                  dataSource={combinedInventories.slice(offset, offset + limit)}
                   loading={isInventoriesLoading}
                   className="custom-table"
                   pagination={false}
@@ -348,7 +348,7 @@ const Stake = ({ user }) => {
                 <Pagination
                   current={page}
                   onChange={onPageChange}
-                  total={inventoriesTotal}
+                  total={combinedInventories.length}
                   showTotal={(total) => `Total ${total} items`}
                   className="flex justify-center my-5 custom-pagination"
                 />
