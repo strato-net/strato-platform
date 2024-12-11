@@ -54,13 +54,6 @@ class TransactionController {
         userAddress: userAddress,
       };
 
-      const unstakeQuery = {
-        limit: limit,
-        offset: offset,
-        borrowerCommonName: user,
-        userAddress: userAddress,
-      };
-
       if (startDate && endDate) {
         transactionQuery['range'] = [`createdDate,${startDate},${endDate}`];
         redemptionQuery['range'] = [`redemptionDate,${startDate},${endDate}`];
@@ -93,9 +86,8 @@ class TransactionController {
         count = count + total;
       }
       if (type === 'Unstake' || !type) {
-        const { unstakeTransactions, total } = await dapp.getUnstakeTransactions(
-          stakeQuery
-        );
+        const { unstakeTransactions, total } =
+          await dapp.getUnstakeTransactions(stakeQuery);
         data = [...data, ...unstakeTransactions];
         count = count + total;
       }
@@ -246,6 +238,12 @@ class TransactionController {
         order: 'transferDate.desc',
         id: search,
       };
+
+      const stakeQuery = {
+        limit: limit,
+        offset: offset,
+      };
+
       if (startDate && endDate) {
         transactionQuery['range'] = [`createdDate,${startDate},${endDate}`];
         redemptionQuery['range'] = [`redemptionDate,${startDate},${endDate}`];
@@ -271,6 +269,19 @@ class TransactionController {
         );
         count = count + total;
         data = [...data, ...transfers];
+      }
+      if (type?.includes('Stake')) {
+        const { stakeTransactions, total } = await dapp.getStakeTransactions(
+          stakeQuery
+        );
+        count = count + total;
+        data = [...data, ...stakeTransactions];
+      }
+      if (type?.includes('Unstake')) {
+        const { unstakeTransactions, total } =
+          await dapp.getUnstakeTransactions(stakeQuery);
+        count = count + total;
+        data = [...data, ...unstakeTransactions];
       }
       if (type?.includes('Redemption')) {
         redemptions = await dapp.getAllRedemptionRequests(redemptionQuery);
@@ -332,24 +343,30 @@ class TransactionController {
           from:
             item.oldOwnerCommonName ||
             item.purchasersCommonName ||
-            item.ownerCommonName,
+            item.ownerCommonName ||
+            asset?.ownerCommonName,
           to:
             item.newOwnerCommonName ||
             item.sellersCommonName ||
             item.issuerCommonName ||
-            item.sellerCommonName,
+            item.sellerCommonName ||
+            item.borrowerCommonName,
           price: item.price || '',
           totalAmount:
             item.totalPrice ||
             (item.price ? item.price * getItemQuantity(item) : ''),
           status: item.status || '1',
-          reference: item.transferNumber || item.orderId || item.redemption_id,
+          reference:
+            item.transferNumber ||
+            item.orderId ||
+            item.redemption_id ||
+            item.stakeId,
           quantity: getItemQuantity(item),
           assetName: asset?.name || 'null',
           assetDescription: asset?.description || 'null',
           assetImage: getImage(asset),
           category: asset?.category || 'null',
-          assetPrice: item?.assetPrice,
+          assetPrice: item?.assetPrice || 0,
           assetAddress: asset?.address,
           assetOriginAddress: asset?.originAddress,
           assetContractName: asset?.contract_name,

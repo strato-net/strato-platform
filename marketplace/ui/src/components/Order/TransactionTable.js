@@ -44,7 +44,7 @@ import {
   DOWNLOAD_OPTIONS,
   REDEMPTION_STATUS,
   REDEMPTION_STATUS_CLASSES,
-  US_DATE_FORMAT,
+  DATE_TIME_FORMAT,
   TRANSACTION_STATUS_TEXT,
 } from '../../helpers/constants';
 import { SEO } from '../../helpers/seoConstant';
@@ -433,7 +433,7 @@ const TransactionTable = ({ user, download, stratAddress, cataAddress }) => {
       key: 'date',
       width: '150px',
       render: (text, { createdDate }) => (
-        <p>{getStringDate(createdDate, US_DATE_FORMAT)}</p>
+        <p>{getStringDate(createdDate, DATE_TIME_FORMAT)}</p>
       ),
       title: (
         <div style={{ display: 'flex' }}>
@@ -633,27 +633,29 @@ const TransactionTable = ({ user, download, stratAddress, cataAddress }) => {
         </Row>
       </Col>
       <Col span={22} className="mx-auto mt-5">
-        <div className="flex md:hidden order_responsive">
-          {isTransactionLoading ? (
-            <Spin className="mx-auto" />
-          ) : (
-            <div className="flex flex-col mx-auto">
-              <TransactionResponsive
-                data={paginatedTransactions}
-                user={user}
-                stratAddress={stratAddress}
-                cataAddress={cataAddress}
-              />
-              <Pagination
-                className="mx-auto mt-5"
-                total={transactions.length}
-                current={currentPage}
-                pageSize={pageSize}
-                onChange={handlePageChange}
-                showSizeChanger={false}
-              />
-            </div>
-          )}
+        <div className="w-full flex md:hidden order_responsive">
+          <Row className="w-full">
+            {isTransactionLoading ? (
+              <Spin className="mx-auto" />
+            ) : (
+              <div className="">
+                <TransactionResponsive
+                  data={paginatedTransactions}
+                  user={user}
+                  stratAddress={stratAddress}
+                  cataAddress={cataAddress}
+                />
+                <Pagination
+                  className="mx-auto mt-5"
+                  total={transactions.length}
+                  current={currentPage}
+                  pageSize={pageSize}
+                  onChange={handlePageChange}
+                  showSizeChanger={false}
+                />
+              </div>
+            )}
+          </Row>
         </div>
         <div className="hidden md:flex md:flex-col mx:auto">
           <DataTableComponent

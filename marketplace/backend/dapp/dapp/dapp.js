@@ -2205,7 +2205,7 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
 
     const stakeCreatedEvents = await reserveJs.getStakeCreatedEvents(
       rawAdmin,
-      { user: userAddress },
+      { user: userAddress || '' },
       options
     );
 
@@ -2272,7 +2272,7 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
 
     const unstakeEvents = await reserveJs.getUnstakeEvents(
       rawAdmin,
-      { user: userAddress },
+      { user: userAddress || '' },
       options
     );
 

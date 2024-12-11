@@ -181,11 +181,11 @@ const TransactionResponsive = ({ data, user, stratAddress, cataAddress }) => {
           return (
             <Row
               key={index}
-              className={`bg-red-300 w-full ${
+              className={`w-full ${
                 isExpanded ? '' : 'h-36'
               } rounded-xl px-2 py-2 shadow-2xl border-2 `}
             >
-              <Col span={6} className="flex justify-center bg-grey-400">
+              <Col span={6} className="flex justify-center">
                 <img
                   src={assetImage}
                   alt=""
@@ -209,7 +209,11 @@ const TransactionResponsive = ({ data, user, stratAddress, cataAddress }) => {
                 <p
                   style={{ color: '#13188A' }}
                   className={`font-semibold ${
-                    type === 'Transfer' ? 'cursor-default' : 'cursor-pointer'
+                    type === 'Transfer' ||
+                    type === 'Stake' ||
+                    type === 'Unstake'
+                      ? 'cursor-default'
+                      : 'cursor-pointer'
                   }`}
                   onClick={() => {
                     handleDetailRedirection();
@@ -244,7 +248,7 @@ const TransactionResponsive = ({ data, user, stratAddress, cataAddress }) => {
                 </Button>
                 {price ? (
                   <p className={`text-right flex justify-end items-center`}>
-                    $ {formattedNum(price)} ({formattedNum(price * 100)}{' '}
+                    ${formattedNum(price)} ({formattedNum(price * 100)}
                     {StratsIcon})
                   </p>
                 ) : (
@@ -254,13 +258,13 @@ const TransactionResponsive = ({ data, user, stratAddress, cataAddress }) => {
                 )}
                 <p className="text-right">Qty: {quantity}</p>
                 <p className="text-right">
-                  {moment(block_timestamp.replace(/-/g, '/')).format('L')}
+                  {moment(block_timestamp.replace(/-/g, '/')).format('lll')}
                 </p>
               </Col>
               {isExpanded && (
                 <Col span={24}>
                   <Table
-                    className="mt-6"
+                    className="mt-6 w-[90vw]"
                     columns={columns}
                     dataSource={tableData}
                     pagination={false}
