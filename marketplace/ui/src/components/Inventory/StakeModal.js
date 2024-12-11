@@ -1,12 +1,6 @@
 import { Button, Modal, Tooltip } from 'antd';
 import { QuestionCircleOutlined } from '@ant-design/icons';
-import { useEffect } from 'react';
-import {
-  usePaymentServiceDispatch,
-  usePaymentServiceState,
-} from '../../contexts/payment';
 import { actions as inventoryActions } from '../../contexts/inventory/actions';
-import { actions as paymentServiceActions } from '../../contexts/payment/actions';
 import {
   useInventoryDispatch,
   useInventoryState,
@@ -27,49 +21,19 @@ const StakeModal = ({
   type,
   productDetailPage,
 }) => {
-  const {
-    isStaking,
-    isUnstaking,
-    isReservesLoading,
-    isFetchingOracle,
-    isEscrowLoading,
-    reserves,
-    escrow,
-    oracle,
-  } = useInventoryState();
+  const { isStaking, isUnstaking, isReservesLoading, reserves } =
+    useInventoryState();
   // Dispatch
   const inventoryDispatch = useInventoryDispatch();
-  const paymentServiceDispatch = usePaymentServiceDispatch();
-
-  const { paymentServices } = usePaymentServiceState();
-  const isLoader =
-    isStaking ||
-    isUnstaking ||
-    isFetchingOracle ||
-    isReservesLoading ||
-    isEscrowLoading;
-  const isStaked = inventory.escrow && inventory.escrow.isActive;
-  const itemName = decodeURIComponent(inventory.name);
+  const isLoader = isStaking || isUnstaking || isReservesLoading;
   const matchedReserve = reserves?.length
     ? reserves.find((reserve) => reserve.assetRootAddress === inventory.root)
     : null;
-  const oracleData = oracle ? oracle : { consensusPrice: 0 };
   const location = useLocation();
   const queryParams = new URLSearchParams(location.search);
 
-  useEffect(() => {
-    paymentServiceActions.getPaymentServices(paymentServiceDispatch, true);
-  }, []);
-
-  useEffect(() => {
-    if (reserves && inventory.data && !isReservesLoading && !isStaked) {
-      inventoryActions.getOracle(inventoryDispatch, matchedReserve?.oracle);
-    }
-  }, [matchedReserve]);
-
-  useEffect(() => {
-    inventoryActions.getEscrowForAsset(inventoryDispatch, inventory.root);
-  }, [inventory]);
+  const escrow = inventory?.escrow;
+  const collateralQuantity = escrow?.collateralQuantity || 0;
 
   const dataForItems =
     type === 'Stake'
@@ -78,14 +42,15 @@ const StakeModal = ({
             label: `Quantity to Stake`,
             description:
               'The amount of Real World Assets (RWAs) you are staking.',
-            value: `${inventory?.quantity}`,
+            value: `${inventory?.quantity - collateralQuantity}`,
           },
           {
             label: `Market Value`,
             description:
               'The total value of your staked assets, calculated as Quantity x Oracle Price.',
             value: `$${(
-              matchedReserve?.lastUpdatedOraclePrice * inventory?.quantity
+              matchedReserve?.lastUpdatedOraclePrice *
+              (inventory?.quantity - collateralQuantity)
             ).toFixed(2)}`,
           },
           {
@@ -96,7 +61,7 @@ const StakeModal = ({
               <div className="flex">
                 <div className="mx-1">{logo}</div>
                 {(
-                  (inventory?.quantity *
+                  ((inventory?.quantity - collateralQuantity) *
                     matchedReserve?.lastUpdatedOraclePrice *
                     (matchedReserve?.cataAPYRate / 10)) /
                   365
@@ -110,7 +75,7 @@ const StakeModal = ({
             label: `Quantity to Unstake`,
             description:
               'The amount of Real World Assets (RWAs) you are unstaking.',
-            value: `${inventory?.quantity}`,
+            value: `${escrow.collateralQuantity}`,
           },
         ];
 
@@ -132,11 +97,15 @@ const StakeModal = ({
         escrowAddress: escrow
           ? escrow.address
           : '0000000000000000000000000000000000000000',
-        collateralQuantity: inventory?.quantity,
-        assets: inventory ? [inventory.address] : [],
+        collateralQuantity: inventory?.quantity - collateralQuantity,
+        assets:
+          inventory && Array.isArray(inventory.address)
+        ? inventory.address
+            .filter((item) => !item.sale) // Keep only items without a sale
+            .map((item) => item.address) // Extract the address
+        : [inventory.address], // Handle the case where address is not an array
         reserve: matchedReserve?.address,
       };
-
       const isStaked = await inventoryActions.stakeInventory(
         inventoryDispatch,
         body
@@ -168,8 +137,8 @@ const StakeModal = ({
 
     if (type === 'Unstake') {
       const body = {
-        quantity: inventory?.quantity,
-        escrowAddress: inventory?.sale,
+        quantity: escrow.collateralQuantity,
+        escrowAddress: inventory?.escrow?.address,
         reserve: matchedReserve?.address,
       };
       const isUnstaked = await inventoryActions.UnstakeInventory(
@@ -221,7 +190,7 @@ const StakeModal = ({
               className="w-full flex justify-between items-start"
             >
               <div className="flex items-center">
-                <p className="text-sm w-44 md:w-full text-gray-500">
+                <p className="text-sm text-gray-500">
                   <strong>{item.label}</strong>
                 </p>
                 <Tooltip title={item.description}>
