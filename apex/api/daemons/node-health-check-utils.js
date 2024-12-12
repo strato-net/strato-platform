@@ -463,7 +463,7 @@ async function checkSystemInfo() {
     const currentLoad = metadataLoad.currentLoad;
     const avgLoads = os.loadavg();
     //grab 15 min load
-    const avgLoad = (avgLoads == null || avgLoads.length < 3) ? 0 : (avgLoads[2] * 100);
+    const avgLoad = (avgLoads == null || avgLoads.length < 3) ? 0 : avgLoads[2];
     
     const previousCpuCurrentLoadAlert = prevSysInfo.cpu?.currentLoad?.isHealthy === false;
     const previousCpuAvgLoadAlert = prevSysInfo.cpu?.avgLoad?.isHealthy === false;
