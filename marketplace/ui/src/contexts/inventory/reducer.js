@@ -153,6 +153,167 @@ const reducer = (state, action) => {
         error: action.error,
         isUnlisting: false,
       };
+
+     // ------------------------------------------------------------------------------------------------------
+    case actionDescriptors.stakeInventory:
+      return {
+        ...state,
+        isStaking: true
+      };
+    case actionDescriptors.stakeInventorySuccessful:
+      return {
+        ...state,
+        isStaking: false
+      };
+    case actionDescriptors.stakeInventoryFailed:
+      return {
+        ...state,
+        error: action.error,
+        isStaking: false
+      };
+    
+    case actionDescriptors.unstakeInventory:
+      return {
+        ...state,
+        isUnstaking: true
+      };
+    case actionDescriptors.unstakeInventorySuccessful:
+      return {
+        ...state,
+        isUnstaking: false
+      };
+    case actionDescriptors.unstakeInventoryFailed:
+      return {
+        ...state,
+        error: action.error,
+        isUnstaking: false
+      };
+    
+    case actionDescriptors.borrow:
+      return {
+        ...state,
+        isBorrowing: true
+      };
+    case actionDescriptors.borrowSuccessful:
+      return {
+        ...state,
+        isBorrowing: false
+      };
+    case actionDescriptors.borrowFailed:
+      return {
+        ...state,
+        error: action.error,
+        isBorrowing: false
+      };
+    
+    case actionDescriptors.repay:
+      return {
+        ...state,
+        isRepaying: true
+      };
+    case actionDescriptors.repaySuccessful:
+      return {
+        ...state,
+        isRepaying: false
+      };
+    case actionDescriptors.repayFailed:
+        return {
+          ...state,
+          error: action.error,
+          isRepaying: false
+        };
+
+    case actionDescriptors.getReserve:
+        return {
+          ...state,
+          isReserveLoading: true
+        };
+    case actionDescriptors.getReserveSuccessful:
+        return {
+          ...state,
+          reserve: action.payload,
+          isReserveLoading: false
+        };
+    case actionDescriptors.getReserveFailed:
+        return {
+          ...state,
+          error: action.error,
+          isReserveLoading: false
+        };
+    
+    case actionDescriptors.getAllReserve:
+        return {
+          ...state,
+          isReservesLoading: true
+        };
+    case actionDescriptors.getAllReserveSuccessful:
+        return {
+          ...state,
+          reserves: action.payload,
+          isReservesLoading: false
+        };
+    case actionDescriptors.getAllReserveFailed:
+        return {
+          ...state,
+          error: action.error,
+          isReservesLoading: false
+        };
+    
+    case actionDescriptors.getEscrowForAsset:
+        return {
+          ...state,
+          isEscrowLoading: true
+        };
+    case actionDescriptors.getEscrowForAssetSuccessful:
+        return {
+          ...state,
+          escrow: action.payload,
+          isEscrowLoading: false
+        };
+    case actionDescriptors.getEscrowForAssetFailed:
+        return {
+          ...state,
+          error: action.error,
+          isEscrowLoading: false
+        };
+
+    case actionDescriptors.getUserCataRewards:
+        return {
+          ...state,
+          isUserCataRewardsLoading: true
+        };
+    case actionDescriptors.getUserCataRewardsSuccessful:
+        return {
+          ...state,
+          totalCataReward: action.payload.totalCataReward,
+          dailyCataReward: action.payload.dailyCataReward,
+          isUserCataRewardsLoading: false
+        };
+    case actionDescriptors.getUserCataRewardsFailed:
+        return {
+          ...state,
+          error: action.error,
+          isUserCataRewardsLoading: false
+        };
+    
+    case actionDescriptors.getOracle:
+          return {
+            ...state,
+            isFetchingOracle: true
+          };
+    case actionDescriptors.getOracleSuccessful:
+          return {
+            ...state,
+            oracle: action.payload,
+            isFetchingOracle: false
+          };
+    case actionDescriptors.getOracleFailed:
+          return {
+            ...state,
+            error: action.error,
+            isFetchingOracle: false
+          };    
+    // ------------------------------------------------------------------------------------------------------
     case actionDescriptors.resellInventory:
       return {
         ...state,

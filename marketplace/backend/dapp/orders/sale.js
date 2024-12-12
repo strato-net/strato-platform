@@ -241,6 +241,8 @@ async function fetchSaleHistoriesInBatches(
           {
             ...filter,
             assetToBeSold: address,
+            gtField: 'price',
+            gtValue: '0',
             queryOptions: {
               select:
                 'address,block_timestamp,price,assetToBeSold,quantity,totalLockedQuantity',
@@ -257,6 +259,8 @@ async function fetchSaleHistoriesInBatches(
             order: 'block_timestamp.asc',
             gtField: 'block_timestamp',
             gtValue: getOneYearAgoTime(),
+            notEqualsField: 'price',
+            notEqualsValue: '0',
             queryOptions: {
               select:
                 'address,block_timestamp,price,assetToBeSold,quantity,totalLockedQuantity',
@@ -314,6 +318,8 @@ async function fetchSalesInBatches(
             order: order || salesFilter.order,
             queryOptions: { select: 'block_timestamp,assetToBeSold,price' },
             ...salesFilter,
+            notEqualsField: 'price',
+            notEqualsValue: '0',
           },
           options
         );
@@ -324,6 +330,8 @@ async function fetchSalesInBatches(
             assetToBeSold: chunk,
             order: order || salesFilter.order,
             queryOptions: { select: 'block_timestamp,assetToBeSold,price' },
+            notEqualsField: 'price',
+            notEqualsValue: '0',
           },
           options
         );

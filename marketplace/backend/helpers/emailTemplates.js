@@ -4,15 +4,14 @@ export const TransferSender = (
   itemQuantity,
   itemValue,
   recipientCommonName,
-  isDecimal = false
 ) => {
   const htmlContent = `
   <p>Hello ${senderCommonName},</p>
   <p>We wanted to let you know that your recent item transfer has been successfully processed. Below are the details of your transfer:</p>
   <ul>
       <li><strong>Item:</strong> ${itemName}</li>
-      <li><strong>Quantity:</strong> ${isDecimal ? itemQuantity / 100 : itemQuantity}</li>
-      <li><strong>Total Value:</strong> ${isDecimal ? itemValue * 100 : itemValue}</li>
+      <li><strong>Quantity:</strong> ${itemQuantity}</li>
+      <li><strong>Total Value:</strong> ${itemValue}</li>
       <li><strong>Recipient:</strong> ${recipientCommonName}</li>
   </ul>
   <p>If you have any questions or need assistance with your transfer, please contact our customer support team at <a href="mailto:sales@blockapps.net">sales@blockapps.net</a>.</p>
@@ -29,15 +28,14 @@ export const TransferRecipient = (
   itemQuantity,
   itemValue,
   senderCommonName,
-  isDecimal = false
 ) => {
   const htmlContent = `
   <p>Hello ${recipientCommonName},</p>
   <p>We’re excited to inform you that you’ve received an item transfer! Below are the details of the transfer:</p>
   <ul>
       <li><strong>Item:</strong> ${itemName}</li>
-      <li><strong>Quantity:</strong> ${isDecimal ? itemQuantity / 100 : itemQuantity}</li>
-      <li><strong>Total Value:</strong> ${isDecimal ? itemValue * 100 : itemValue}</li>
+      <li><strong>Quantity:</strong> ${itemQuantity}</li>
+      <li><strong>Total Value:</strong> ${itemValue}</li>
       <li><strong>Sender:</strong> ${senderCommonName}</li>
   </ul>
   <p>If you have any questions or need assistance with your transfer, please contact our customer support team at <a href="mailto:sales@blockapps.net">sales@blockapps.net</a>.</p>

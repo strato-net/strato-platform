@@ -11,7 +11,7 @@ import { InventoriesProvider } from './contexts/inventory';
 import { PaymentServicesProvider } from './contexts/payment';
 import Item from './components/Item';
 import { ItemsProvider } from './contexts/item';
-import Order from './components/Order';
+import Stake from './components/Stake';
 import SoldOrderDetails from './components/Order/SoldOrderDetails';
 import BoughtOrderDetails from './components/Order/BoughtOrderDetails';
 import RedemptionsOutgoingDetails from './components/Order/RedemptionsOutgoingDetails';
@@ -22,6 +22,7 @@ import { UserActivityProvider } from './contexts/userActivity';
 import AuthorizeIssuer from './components/AuthorizeIssuer';
 import { IssuerStatusProvider } from './contexts/issuerStatus';
 import ProductDetails from './components/MarketPlace/ProductDetails';
+import VaultDetails from './components/MarketPlace/VaultDetails';
 import Checkout from './components/MarketPlace/Checkout';
 import ConfirmOrder from './components/MarketPlace/ConfirmOrder';
 import ProcessingOrder from './components/MarketPlace/ProcessingOrder';
@@ -45,11 +46,13 @@ const AuthenticatedRoutes = ({ user, users, isAuthenticated }) => {
           <UsersProvider>
             <CategorysProvider>
               <OrdersProvider>
-                <MarketPlace
-                  user={user}
-                  users={users}
-                  isAuthenticated={isAuthenticated}
-                />
+                <InventoriesProvider>
+                  <MarketPlace
+                    user={user}
+                    users={users}
+                    isAuthenticated={isAuthenticated}
+                  />
+                </InventoriesProvider>
               </OrdersProvider>
             </CategorysProvider>
           </UsersProvider>
@@ -127,7 +130,9 @@ const AuthenticatedRoutes = ({ user, users, isAuthenticated }) => {
               <SubCategorysProvider>
                 <ProductsProvider>
                   <OrdersProvider>
-                    <CategoryProductList user={user} users={users} />
+                    <InventoriesProvider>
+                      <CategoryProductList user={user} users={users} />
+                    </InventoriesProvider>
                   </OrdersProvider>
                 </ProductsProvider>
               </SubCategorysProvider>
@@ -142,7 +147,9 @@ const AuthenticatedRoutes = ({ user, users, isAuthenticated }) => {
           element={
             <UsersProvider>
               <IssuerStatusProvider>
-                <AuthorizeIssuer />
+                <InventoriesProvider>
+                  <AuthorizeIssuer />
+                </InventoriesProvider>
               </IssuerStatusProvider>
             </UsersProvider>
           }
@@ -155,13 +162,15 @@ const AuthenticatedRoutes = ({ user, users, isAuthenticated }) => {
           <UsersProvider>
             <CategorysProvider>
               <SubCategorysProvider>
-                <InventoriesProvider>
-                  <ItemsProvider>
-                    <OrdersProvider>
-                      <ProductDetails user={user} users={users} />
-                    </OrdersProvider>
-                  </ItemsProvider>
-                </InventoriesProvider>
+                <PaymentServicesProvider>
+                  <InventoriesProvider>
+                    <ItemsProvider>
+                      <OrdersProvider>
+                        <ProductDetails user={user} users={users} />
+                      </OrdersProvider>
+                    </ItemsProvider>
+                  </InventoriesProvider>
+                </PaymentServicesProvider>
               </SubCategorysProvider>
             </CategorysProvider>
           </UsersProvider>
@@ -209,18 +218,66 @@ const AuthenticatedRoutes = ({ user, users, isAuthenticated }) => {
       />
       <Route
         exact
+        path={routes.Stake.url}
+        element={
+          <UsersProvider>
+            <CategorysProvider>
+              <SubCategorysProvider>
+                <ItemsProvider>
+                  <ProductsProvider>
+                    <InventoriesProvider>
+                      <RedemptionsProvider>
+                        <PaymentServicesProvider>
+                          <IssuerStatusProvider>
+                            <Stake user={user} />
+                          </IssuerStatusProvider>
+                        </PaymentServicesProvider>
+                      </RedemptionsProvider>
+                    </InventoriesProvider>
+                  </ProductsProvider>
+                </ItemsProvider>
+              </SubCategorysProvider>
+            </CategorysProvider>
+          </UsersProvider>
+        }
+      />
+      <Route
+        exact
         path={routes.InventoryDetail.url}
         element={
           <UsersProvider>
             <CategorysProvider>
               <SubCategorysProvider>
-                <InventoriesProvider>
-                  <ItemsProvider>
-                    <OrdersProvider>
-                      <ProductDetails user={user} users={users} />
-                    </OrdersProvider>
-                  </ItemsProvider>
-                </InventoriesProvider>
+                <PaymentServicesProvider>
+                  <InventoriesProvider>
+                    <ItemsProvider>
+                      <OrdersProvider>
+                        <ProductDetails user={user} users={users} />
+                      </OrdersProvider>
+                    </ItemsProvider>
+                  </InventoriesProvider>
+                </PaymentServicesProvider>
+              </SubCategorysProvider>
+            </CategorysProvider>
+          </UsersProvider>
+        }
+      />
+      <Route
+        exact
+        path={routes.VaultDetail.url}
+        element={
+          <UsersProvider>
+            <CategorysProvider>
+              <SubCategorysProvider>
+                <PaymentServicesProvider>
+                  <InventoriesProvider>
+                    <ItemsProvider>
+                      <OrdersProvider>
+                        <VaultDetails user={user} users={users} />
+                      </OrdersProvider>
+                    </ItemsProvider>
+                  </InventoriesProvider>
+                </PaymentServicesProvider>
               </SubCategorysProvider>
             </CategorysProvider>
           </UsersProvider>
@@ -267,7 +324,6 @@ const AuthenticatedRoutes = ({ user, users, isAuthenticated }) => {
       <Route
         exact
         path={routes.Transactions.url}
-        // path={routes.Orders.url}
         element={
           <UsersProvider>
             <CategorysProvider>

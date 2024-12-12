@@ -156,6 +156,24 @@ const reducer = (state, action) => {
         isTopSellingProductsLoading: false,
       };
 
+    case actionDescriptors.fetchStakeableProducts:
+      return {
+        ...state,
+        isStakeableProductsLoading: true,
+      };
+    case actionDescriptors.fetchStakeableProductsSuccessful:
+      return {
+        ...state,
+        stakeableProducts: action.payload,
+        isStakeableProductsLoading: false,
+      };
+    case actionDescriptors.fetchStakeableProductsFailed:
+      return {
+        ...state,
+        error: action.error,
+        isStakeableProductsLoading: false,
+      };
+
     //shipping address adding
     case actionDescriptors.addShippingAddress:
       return {
@@ -224,6 +242,22 @@ const reducer = (state, action) => {
         ...state,
         isFetchingStrats: false,
       };
+    case actionDescriptors.fetchCataBalance:
+      return {
+        ...state,
+        isFetchingCata: true,
+      };
+    case actionDescriptors.fetchCataBalanceSuccessful:
+      return {
+        ...state,
+        isFetchingCata: false,
+        cata: action.payload,
+      };
+    case actionDescriptors.fetchCataBalanceFailed:
+      return {
+        ...state,
+        isFetchingCata: false,
+      };
     case actionDescriptors.fetchStratsAddress:
       return {
         ...state,
@@ -231,8 +265,22 @@ const reducer = (state, action) => {
     case actionDescriptors.fetchStratsAddressSuccessful:
       return {
         ...state,
+        stratsAddress: action.payload,
       };
     case actionDescriptors.fetchStratsAddressFailed:
+      return {
+        ...state,
+      };
+    case actionDescriptors.fetchCataAddress:
+      return {
+        ...state,
+      };
+    case actionDescriptors.fetchCataAddressSuccessful:
+      return {
+        ...state,
+        cataAddress: action.payload,
+      };
+    case actionDescriptors.fetchCataAddressFailed:
       return {
         ...state,
       };

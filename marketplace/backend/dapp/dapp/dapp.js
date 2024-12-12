@@ -26,6 +26,7 @@ import certificateJs from '/dapp/certificates/certificate';
 import artJs from '/dapp/items/art';
 import tokensJs from '/dapp/items/tokens';
 import STRATSJs from '/dapp/items/STRATS';
+import CATAJs from '/dapp/items/CATA';
 import carbonOffsetJs from '/dapp/items/carbonOffset';
 import metalsJs from '/dapp/items/metals';
 import spiritsJs from '/dapp/items/spirits';
@@ -41,6 +42,8 @@ import inventoryJs from '/dapp/products/inventory';
 import marketplaceJs from '/dapp/marketplace/marketplace.js';
 import paymentServiceJs from '/dapp/payments/paymentService';
 import redemptionServiceJs from '/dapp/redemptions/redemptionService';
+import reserveJs from '/dapp/reserve/reserve';
+import escrowJs from '/dapp/escrow/escrow';
 
 import strats from '../strats/strats';
 
@@ -895,7 +898,12 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
       notEqualsField: ['ownerCommonName', 'sale'],
       notEqualsValue: [constants.baUserNames, constants.zeroAddress],
     };
-    const all2 = await marketplaceJs.getAll(rawAdmin, newArgs1, getOptions);
+    let all2 = await marketplaceJs.getAll(rawAdmin, newArgs1, getOptions);
+    // filter out assets with price <= 0 (This works because we don't have an offset for number of assets)
+    all2.inventoryResults = all2.inventoryResults.filter(
+      ({ price }) => price > 0
+    );
+    all2.inventoryCount = all2.inventoryResults.length;
 
     return {
       inventoryResults: all.inventoryResults.concat(all2.inventoryResults),
@@ -922,7 +930,12 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
         constants.zeroAddress,
       ],
     };
-    const all2 = await marketplaceJs.getAll(rawAdmin, newArgs1, getOptions);
+    let all2 = await marketplaceJs.getAll(rawAdmin, newArgs1, getOptions);
+    // filter out assets with price <= 0 (This works because we don't have an offset for number of assets)
+    all2.inventoryResults = all2.inventoryResults.filter(
+      ({ price }) => price > 0
+    );
+    all2.inventoryCount = all2.inventoryResults.length;
     return {
       inventoryResults: all.inventoryResults.concat(all2.inventoryResults),
       inventoryCount: all.inventoryCount + all2.inventoryCount,
@@ -954,6 +967,15 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
       notEqualsValue: [constants.zeroAddress, userCommonName],
     };
     return marketplaceJs.getTopSellingProducts(rawAdmin, newArgs, getOptions);
+  };
+
+  contract.getStakeableProducts = async function (
+    args = {},
+    options = optionsNoChainIds
+  ) {
+    const getOptions = { ...options, app: contractName };
+
+    return inventoryJs.getAll(rawAdmin, args, getOptions);
   };
 
   contract.getPriceHistory = async function (args, options = defaultOptions) {
@@ -1610,8 +1632,9 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
       order: 'transferDate.desc',
       or: `(oldOwnerCommonName.eq.${userCommonName},newOwnerCommonName.eq.${userCommonName})`,
     };
-    const itemTransferEvents =
-      await getItemTransferEventsWithAssetInfo(transferArgs);
+    const itemTransferEvents = await getItemTransferEventsWithAssetInfo(
+      transferArgs
+    );
 
     return {
       soldOrders: soldOrders ? soldOrders : [],
@@ -1800,7 +1823,7 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
             queryOptions: { select: 'address, quantity' },
             notEqualsField: 'quantity',
             notEqualsValue: '0',
-            order: 'block_timestamp.desc',
+            order: 'quantity.desc',
           },
           options
         );
@@ -2042,6 +2065,20 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
     return balance[0].sum ? `${balance[0].sum / 100}` : 0;
   };
 
+  contract.getCataBalance = async function (args, options = defaultOptions) {
+    const CataOriginAddress = await CATAJs.getCataAddress();
+    const balance = await inventoryJs.getAll(
+      rawAdmin,
+      {
+        ownerCommonName: userCert.commonName,
+        originAddress: CataOriginAddress,
+        queryOptions: { select: 'quantity.sum()' },
+      },
+      options
+    );
+    return balance[0].sum ? `${balance[0].sum / Math.pow(10, 18)}` : 0;
+  };
+
   contract.getStratsTransactionHistory = async function (
     args,
     options = defaultOptions
@@ -2061,6 +2098,105 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
     return res;
   };
 
+  //----------------------------- Reserve START -------------------------------
+  contract.getReserve = async function (address, options = defaultOptions) {
+    return await reserveJs.get(rawAdmin, address, options);
+  };
+
+  contract.getAllReserve = async function (options = defaultOptions) {
+    return await reserveJs.getAll(rawAdmin, options);
+  };
+
+  contract.getEscrowForAsset = async function (args, options = defaultOptions) {
+    const { assetRootAddress } = args;
+    const queryArgs = { 
+      select: '*,BlockApps-Mercata-Escrow-assets(*)',
+      assetRootAddress: `like.${assetRootAddress}*`,
+      borrowerCommonName: `eq.${userCommonName}`,
+      isActive: 'eq.true',
+    };
+    return await escrowJs.searchEscrow(rawAdmin, queryArgs, options);
+  };
+
+  contract.userCataRewards = async function ( options = defaultOptions) {
+    return await escrowJs.userCataRewards(rawAdmin, userCert.commonName, options);
+  };
+
+  contract.oraclePrice = async function (args, options = defaultOptions) {
+    return await reserveJs.oraclePrice(rawAdmin, args, options);
+  };
+
+  contract.stake = async function (args, options = defaultOptions) {
+    return await reserveJs.stake(rawAdmin, args, options);
+  };
+
+  contract.unstake = async function (args, options = defaultOptions) {
+    return await reserveJs.unstake(rawAdmin, args, options);
+  };
+
+  contract.borrow = async function (args, options = defaultOptions) {
+    return await reserveJs.borrow(rawAdmin, args, options);
+  };
+
+  contract.repay = async function (args, options = defaultOptions) {
+    const { escrow, reserve } = args;
+
+    // Fetch user's STRATS asset origin address
+    const stratsOriginAddress = await STRATSJs.getStratsAddress();
+
+    // Retrieve escrow data associated with the escrow address
+    const escrowData = await escrowJs.get(
+      rawAdmin,
+      escrow,
+      options
+    );
+    const orderTotal = escrowData ? escrowData.borrowedAmount : 0;
+
+    // Get user's active STRATS assets with non-zero quantities
+    const userStratsAssets = await inventoryJs.getAll(
+      rawAdmin,
+      {
+        ownerCommonName: userCert.commonName,
+        originAddress: stratsOriginAddress,
+        status: ASSET_STATUS.ACTIVE,
+        queryOptions: { select: 'address, quantity' },
+        notEqualsField: 'quantity',
+        notEqualsValue: '0',
+        order: 'block_timestamp.desc',
+      },
+      options
+    );
+
+    // Accumulate STRATS asset addresses to cover the order total
+    const { addressesToUse, accumulatedTotal } = userStratsAssets.reduce(
+      (acc, asset) => {
+        if (acc.accumulatedTotal >= orderTotal) return acc;
+
+        acc.addressesToUse.push(asset.address);
+        acc.accumulatedTotal += asset.quantity / 100;
+
+        return acc;
+      },
+      { addressesToUse: [], accumulatedTotal: 0 }
+    );
+
+    // Allow partial repayment of loans
+    // Check if accumulated total meets the order requirement
+    // if (accumulatedTotal < orderTotal) {
+    //   throw new rest.RestError(
+    //     RestStatus.BAD_REQUEST,
+    //     'Insufficient STRATS balance to repay the loan.'
+    //   );
+    // }
+
+    // Proceed with unstake if sufficient assets are accumulated
+    return await reserveJs.repay(
+      rawAdmin,
+      { stratsAssetAddresses: addressesToUse, escrowAddress: escrow, reserve },
+      options
+    );
+  };
+  // ---------------------------- Reserve END   -------------------------------
   return contract;
 }
 
