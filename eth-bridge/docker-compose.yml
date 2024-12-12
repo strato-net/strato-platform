@@ -1,0 +1,18 @@
+version: '3'
+services:
+  backend:
+    build: .
+    image: eth-bridge:latest
+    volumes:
+      - ./.env:/usr/src/eth-bridge/.env:ro
+      - ./secrets.json:/usr/src/eth-bridge/secrets.json:ro
+      - ./src/config/latestBlock.json:/usr/src/eth-bridge/src/config/latestBlock.json
+    ports:
+      - 80:80
+      - 443:443
+    restart: unless-stopped
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "100m"
+        max-file: "3"
