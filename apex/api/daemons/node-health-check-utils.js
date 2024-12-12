@@ -485,14 +485,14 @@ async function checkSystemInfo() {
         isHealthy: !cpuCurrentLoadAlert
       },
       avgLoad: {
-        value: +((metadataLoad.avgLoad * 100) / cpudata.cores).toFixed(2),
+        value: +avgLoad.toFixed(2),
         isHealthy: !cpuAvgLoadAlert
       },
     };
     if (!sysInfoCollected.cpu.avgLoad.isHealthy) {
       isHealthy = false;
       additional_info.push(
-        `Average CPU load is high (${metadataLoad.avgLoad.toFixed(2)})`
+        `Average CPU load is high (${avgLoad.toFixed(2)})`
       );
     }
     if (!sysInfoCollected.cpu.currentLoad.isHealthy) {
