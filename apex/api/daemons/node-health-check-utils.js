@@ -8,6 +8,7 @@ const si = require("systeminformation");
 const config = require("../config/app.config");
 const getPbftData = require("../controllers/health")["getPbftData"];
 const findView = require("../controllers/health")["findView"];
+const os = require('os');
 
 // TODO: do the mass-refactoring of the daemon. Use the OOP! Really, don't even try refactoring this without the main Object (SingleCheck object with methods and shared params). Don't change any db data formats.
 
@@ -460,7 +461,9 @@ async function checkSystemInfo() {
     }
 
     const currentLoad = metadataLoad.currentLoad;
-    const avgLoad = (metadataLoad.avgLoad * 100) / cpudata.cores;
+    const avgLoads = os.loadavg();
+    //grab 15 min load
+    const avgLoad = (avgLoads == null || avgsLoads.length < 3) ? 0 : avgLoads[2] * 100;
     
     const previousCpuCurrentLoadAlert = prevSysInfo.cpu?.currentLoad?.isHealthy === false;
     const previousCpuAvgLoadAlert = prevSysInfo.cpu?.avgLoad?.isHealthy === false;
