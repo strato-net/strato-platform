@@ -359,11 +359,11 @@ async function stake(user, args, options) {
  * @throws {Error} - Throws if unstaking fails for any escrow.
  */
 async function unstake(user, args, options) {
-  const { reserve, quantity, escrowAddresses } = args;
+  const { reserve, quantity: requestedQuantity, escrowAddresses } = args;
 
   if (
     !reserve ||
-    !quantity ||
+    !requestedQuantity ||
     !escrowAddresses ||
     !Array.isArray(escrowAddresses)
   ) {
@@ -394,19 +394,30 @@ async function unstake(user, args, options) {
       throw new Error('No active escrows found for the provided addresses.');
     }
 
-    // Step 2: Prepare unstake transactions for each escrow
-    const unstakePromises = escrows.map((escrow) => {
-      const callArgs = {
-        contract: { address: reserve },
-        method: 'unstake',
-        args: util.usc({
-          escrowAddress: escrow.address,
-          quantity: escrow.collateralQuantity,
-        }),
-      };
+    let remainingQuantity = requestedQuantity;
+    const unstakePromises = [];
 
-      return rest.call(user, callArgs, options);
-    });
+    // Step 2: For each escrow, unstake the min between escrow.collateralQuantity and remainingQuantity
+    for (const escrow of escrows) {
+      if (remainingQuantity <= 0) break;
+
+      const unstakeAmount = Math.min(escrow.collateralQuantity, remainingQuantity);
+
+      // Only proceed if unstakeAmount is greater than 0
+      if (unstakeAmount > 0) {
+        const callArgs = {
+          contract: { address: reserve },
+          method: 'unstake',
+          args: util.usc({
+            escrowAddress: escrow.address,
+            quantity: unstakeAmount,
+          }),
+        };
+
+        unstakePromises.push(rest.call(user, callArgs, options));
+        remainingQuantity -= unstakeAmount;
+      }
+    }
 
     // Execute all unstake transactions concurrently
     await Promise.all(unstakePromises);

@@ -11,7 +11,7 @@ import StakeModal from './StakeModal';
 import BorrowModal from './BorrowModal';
 import RepayModal from './RepayModal';
 
-const StakeItemActions = ({
+const ChildStakeItemActions = ({
   inventory,
   limit,
   offset,
@@ -24,44 +24,13 @@ const StakeItemActions = ({
   const [borrowModalOpen, setBorrowModalOpen] = useState(false);
   const [repayModalOpen, setRepayModalOpen] = useState(false);
 
-  const uniqueEscrows = new Set();
-  const collateralQuantity = inventory?.inventories
-    ? inventory.inventories.reduce((sum, item) => {
-        const escrowAddress = item?.escrow?.address;
-        const escrowCollateral = item?.escrow?.collateralQuantity || 0;
+  const totalCollateralQuantity = inventory?.escrow?.collateralQuantity || 0;
+  const collateralQuantity = totalCollateralQuantity > inventory?.quantity ? inventory.quantity : totalCollateralQuantity;
+  const saleQuantity = inventory?.saleQuantity || 0;
+  const quantity = inventory?.quantity || 0;
+  const borrowAmount = inventory?.escrow?.borrowedAmount || 0;
 
-        // Add collateral only if the escrow address is unique
-        if (escrowAddress && !uniqueEscrows.has(escrowAddress)) {
-          uniqueEscrows.add(escrowAddress);
-          return sum + escrowCollateral;
-        }
-
-        return sum;
-      }, 0)
-    : inventory?.escrow?.collateralQuantity > inventory?.quantity
-    ? inventory?.quantity
-    : inventory?.escrow?.collateralQuantity || 0;
-  const quantityNotAvailable = inventory?.inventories
-    ? inventory.inventories.reduce((sum, item) => {
-        const status = Number(item.status);
-        if (status !== ASSET_STATUS.ACTIVE) {
-          return sum + (item.quantity || 0);
-        }
-        return sum;
-      }, 0) + inventory.totalSaleQuantity
-    : Number(inventory?.status) !== ASSET_STATUS.ACTIVE
-    ? inventory?.quantity + (inventory?.saleQuantity || 0)
-    : 0;
-  const quantity = inventory?.inventories
-    ? inventory.totalQuantity
-    : inventory?.quantity;
-  const stakeQuantity = quantity - collateralQuantity - quantityNotAvailable;
-  const borrowAmount = inventory?.inventories
-    ? inventory.inventories.reduce(
-        (sum, item) => sum + (item?.escrow?.borrowedAmount || 0),
-        0
-      )
-    : inventory?.escrow?.borrowedAmount || 0;
+  
   function isActive() {
     if (
       inventory.status == ASSET_STATUS.PENDING_REDEMPTION ||
@@ -105,7 +74,7 @@ const StakeItemActions = ({
           type="primary"
           className="font-semibold flex items-center justify-center"
           onClick={() => showStakeModal('Stake')}
-          disabled={stakeQuantity <= 0}
+          disabled={(saleQuantity > 0 ? true : collateralQuantity >= quantity) || !isActive()}
         >
           <RiseOutlined /> Stake
         </Button>
@@ -177,4 +146,4 @@ const StakeItemActions = ({
   );
 };
 
-export default StakeItemActions;
+export default ChildStakeItemActions;

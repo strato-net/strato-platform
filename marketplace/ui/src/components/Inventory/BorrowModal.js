@@ -37,12 +37,21 @@ const BorrowModal = ({
     : null;
   const location = useLocation();
   const queryParams = new URLSearchParams(location.search);
-  const collateralValue = Array.isArray(inventory.escrow)
+  const escrowCollateralQuantity = Array.isArray(inventory.escrow)
     ? inventory.escrow.reduce(
-        (sum, item) => sum + (item.collateralValue || 0),
+        (sum, item) => sum + (item.collateralQuantity || 0),
         0
       )
-    : inventory?.escrow?.collateralValue || 0;
+    : inventory?.escrow?.collateralQuantity || 0;
+  const collateralValue = Math.floor(
+    Array.isArray(inventory.escrow)
+      ? inventory.escrow.reduce(
+          (sum, item) => sum + (item.collateralValue || 0),
+          0
+        )
+      : (inventory?.escrow?.collateralValue || 0) *
+          (inventory?.quantity / escrowCollateralQuantity)
+  );
   const borrowedAmount = Array.isArray(inventory.escrow)
     ? inventory.escrow.reduce(
         (sum, item) => sum + (item.borrowedAmount || 0),

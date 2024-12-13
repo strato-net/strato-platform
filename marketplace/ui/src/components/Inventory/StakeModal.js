@@ -7,6 +7,7 @@ import {
 } from '../../contexts/inventory';
 import { Images } from '../../images';
 import { useLocation } from 'react-router-dom';
+import { ASSET_STATUS } from '../../helpers/constants';
 
 const logo = <img src={Images.cata} alt={''} title={''} className="w-5 h-5" />;
 
@@ -31,17 +32,66 @@ const StakeModal = ({
     : null;
   const location = useLocation();
   const queryParams = new URLSearchParams(location.search);
-  const escrows = Array.isArray(inventory?.escrow)
-    ? inventory.escrow.map((item) => item.address)
-    : [inventory?.escrow?.address];
-  const collateralQuantity = Array.isArray(inventory.escrow)
-    ? inventory.escrow.reduce(
-        (sum, item) => sum + (item.collateralQuantity || 0),
-        0
-      )
+
+  const escrows = inventory?.inventories
+    ? [
+        ...new Set(
+          inventory.inventories
+            .map((item) => item?.escrow?.address)
+            .filter(Boolean)
+        ),
+      ]
+    : inventory?.escrow?.address
+    ? [inventory.escrow.address]
+    : [];
+  const uniqueEscrows = new Set();
+  const collateralQuantity = inventory?.inventories
+    ? inventory.inventories.reduce((sum, item) => {
+        const escrowAddress = item?.escrow?.address;
+        const escrowCollateral = item?.escrow?.collateralQuantity || 0;
+
+        // Add collateral only if the escrow address is unique
+        if (escrowAddress && !uniqueEscrows.has(escrowAddress)) {
+          uniqueEscrows.add(escrowAddress);
+          return sum + escrowCollateral;
+        }
+
+        return sum;
+      }, 0)
+    : inventory?.escrow?.collateralQuantity > inventory?.quantity
+    ? inventory?.quantity
     : inventory?.escrow?.collateralQuantity || 0;
-  const saleQuantity = inventory?.saleQuantity || 0;
-  const stakeQuantity = inventory?.quantity - collateralQuantity - saleQuantity;
+  const quantityNotAvailable = inventory?.inventories
+    ? inventory.inventories.reduce((sum, item) => {
+        const status = Number(item.status);
+        if (status !== ASSET_STATUS.ACTIVE) {
+          return sum + (item.quantity || 0);
+        }
+        return sum;
+      }, 0) + inventory.totalSaleQuantity
+    : Number(inventory?.status) !== ASSET_STATUS.ACTIVE
+    ? inventory?.quantity + (inventory?.saleQuantity || 0)
+    : 0;
+  const quantity = inventory?.inventories
+    ? inventory.totalQuantity
+    : inventory?.quantity;
+  const stakeQuantity = quantity - collateralQuantity - quantityNotAvailable;
+  const allInventories = Array.isArray(inventory.inventories)
+    ? inventory.inventories
+    : [inventory];
+  const assets = allInventories
+    .filter((item) => {
+      const status = Number(item.status);
+      const saleQty = Number(item.saleQuantity) || 0;
+      const collatertal = item?.escrow?.[
+        'BlockApps-Mercata-Escrow-assets'
+      ]?.find((escrow) => escrow.value === item.address)
+        ? true
+        : false;
+      return status === ASSET_STATUS.ACTIVE && saleQty === 0 && !collatertal;
+    })
+    .map((item) => item.address)
+    .filter(Boolean);
 
   const dataForItems =
     type === 'Stake'
@@ -101,19 +151,13 @@ const StakeModal = ({
   const handleSubmit = async () => {
     if (type === 'Stake') {
       const body = {
-        escrowAddress: escrows
+        escrowAddress: escrows && escrows.length > 0
           ? escrows[0]
           : '0000000000000000000000000000000000000000',
-        collateralQuantity: inventory?.quantity - collateralQuantity,
-        assets:
-          inventory && Array.isArray(inventory.address)
-        ? inventory.address
-            .filter((item) => !item.sale) // Keep only items without a sale
-            .map((item) => item.address) // Extract the address
-        : [inventory.address], // Handle the case where address is not an array
+        collateralQuantity: stakeQuantity,
+        assets,
         reserve: matchedReserve?.address,
       };
-
       const isStaked = await inventoryActions.stakeInventory(
         inventoryDispatch,
         body
