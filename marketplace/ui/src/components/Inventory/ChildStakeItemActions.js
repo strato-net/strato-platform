@@ -28,6 +28,8 @@ const ChildStakeItemActions = ({
   const collateralQuantity = totalCollateralQuantity > inventory?.quantity ? inventory.quantity : totalCollateralQuantity;
   const saleQuantity = inventory?.saleQuantity || 0;
   const quantity = inventory?.quantity || 0;
+  const collateralValue = inventory?.escrow?.collateralValue;
+  const maxBorrowableAmount = Math.floor(collateralValue / 2);
   const borrowAmount = inventory?.escrow?.borrowedAmount || 0;
 
   
@@ -88,17 +90,17 @@ const ChildStakeItemActions = ({
         </Button>
         <Button
           type="link"
-          className="text-[#13188A] font-semibold"
+          className="text-[#13188A] font-semibold invisible"
           onClick={() => showBorrowModal('Unstake')}
-          disabled={borrowAmount > 0 || collateralQuantity <= 0}
+          disabled={true}
         >
           <BankOutlined /> Borrow
         </Button>
         <Button
           type="link"
-          className="text-[#13188A] font-semibold"
+          className="text-[#13188A] font-semibold invisible"
           onClick={() => showRepayModal('Unstake')}
-          disabled={borrowAmount <= 0}
+          disabled={true}
         >
           <SolutionOutlined />
           Repay

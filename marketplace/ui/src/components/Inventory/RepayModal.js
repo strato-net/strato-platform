@@ -14,7 +14,10 @@ import {
 
 import { actions as paymentServiceActions } from '../../contexts/payment/actions';
 import { actions as marketplaceActions } from '../../contexts/marketplace/actions';
-import { useMarketplaceDispatch, useMarketplaceState } from '../../contexts/marketplace';
+import {
+  useMarketplaceDispatch,
+  useMarketplaceState,
+} from '../../contexts/marketplace';
 import { Images } from '../../images';
 import { useLocation } from 'react-router-dom';
 
@@ -44,15 +47,51 @@ const RepayModal = ({
   const location = useLocation();
   const queryParams = new URLSearchParams(location.search);
   const [repayAmount, setRepayAmount] = useState(0);
+  const escrows = inventory?.inventories
+    ? [
+        ...new Set(
+          inventory.inventories
+            .map((item) => item?.escrow?.address)
+            .filter(Boolean)
+        ),
+      ]
+    : inventory?.escrow?.address
+    ? [inventory.escrow.address]
+    : [];
 
   useEffect(() => {
-    if (inventory?.escrow && strats) {
-      const borrowedAmount = Array.isArray(inventory.escrow)
-        ? inventory.escrow.reduce(
-            (sum, item) => sum + (item.borrowedAmount || 0),
-            0
-          )
-        : inventory?.escrow?.borrowedAmount || 0;
+    if (inventory && strats) {
+      const uniqueEscrowsPrime = new Set();
+      const totalCollateralQuantity = inventory?.inventories
+        ? inventory.inventories.reduce((sum, item) => {
+            const escrowAddress = item?.escrow?.address;
+            const escrowCollateral = item?.escrow?.collateralQuantity || 0;
+
+            // Add collateral only if the escrow address is unique
+            if (escrowAddress && !uniqueEscrowsPrime.has(escrowAddress)) {
+              uniqueEscrowsPrime.add(escrowAddress);
+              return sum + escrowCollateral;
+            }
+
+            return sum;
+          }, 0)
+        : inventory?.escrow?.collateralQuantity;
+      const uniqueBorrowedAddresses = new Set();
+      const borrowedAmount = inventory?.inventories
+        ? inventory.inventories.reduce((sum, item) => {
+            const escrowAddress = item?.escrow?.address;
+            const borrowedValue = item?.escrow?.borrowedAmount || 0;
+
+            // Add borrowed amount only if the escrow address is unique
+            if (escrowAddress && !uniqueBorrowedAddresses.has(escrowAddress)) {
+              uniqueBorrowedAddresses.add(escrowAddress);
+              return sum + borrowedValue;
+            }
+
+            return sum;
+          }, 0)
+        : inventory?.escrow?.borrowedAmount *
+          (inventory?.quantity / totalCollateralQuantity);
       const stratsBalance = Object.keys(strats).length > 0 ? strats : 0;
       setRepayAmount(
         borrowedAmount / 100 > stratsBalance
@@ -60,7 +99,8 @@ const RepayModal = ({
           : borrowedAmount / 100
       );
     }
-  }, [strats]);
+  }, [strats, inventory]);
+
   useEffect(() => {
     paymentServiceActions.getPaymentServices(paymentServiceDispatch, true);
     marketplaceActions.fetchStratsBalance(marketplaceDispatch);
@@ -86,9 +126,7 @@ const RepayModal = ({
       ? reserves.find((reserve) => reserve.assetRootAddress === inventory.root)
       : null;
     const body = {
-      escrows: Array.isArray(inventory?.escrow) 
-      ? inventory.escrow.map(item => item.address) 
-      : [inventory?.escrow?.address],
+      escrows,
       reserve: matchedReserve?.address,
     };
 

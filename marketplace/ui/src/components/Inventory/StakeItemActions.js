@@ -56,23 +56,37 @@ const StakeItemActions = ({
     ? inventory.totalQuantity
     : inventory?.quantity;
   const stakeQuantity = quantity - collateralQuantity - quantityNotAvailable;
-  const borrowAmount = inventory?.inventories
-    ? inventory.inventories.reduce(
-        (sum, item) => sum + (item?.escrow?.borrowedAmount || 0),
-        0
-      )
-    : inventory?.escrow?.borrowedAmount || 0;
-  function isActive() {
-    if (
-      inventory.status == ASSET_STATUS.PENDING_REDEMPTION ||
-      inventory.status == ASSET_STATUS.RETIRED
-    ) {
-      return false;
-    } else {
-      return true;
-    }
-  }
+  const uniqueEscrowsPrime = new Set();
+  const collateralValue = inventory?.inventories
+    ? inventory.inventories.reduce((sum, item) => {
+        const escrowAddress = item?.escrow?.address;
+        const escrowCollateral = item?.escrow?.collateralValue || 0;
 
+        // Add collateral only if the escrow address is unique
+        if (escrowAddress && !uniqueEscrowsPrime.has(escrowAddress)) {
+          uniqueEscrowsPrime.add(escrowAddress);
+          return sum + escrowCollateral;
+        }
+
+        return sum;
+      }, 0)
+    : 0;
+  const maxBorrowableAmount = Math.floor(collateralValue / 2);
+  const uniqueBorrowedAddresses = new Set();
+  const borrowAmount = inventory?.inventories
+    ? inventory.inventories.reduce((sum, item) => {
+        const escrowAddress = item?.escrow?.address;
+        const borrowedValue = item?.escrow?.borrowedAmount || 0;
+  
+        // Add borrowed amount only if the escrow address is unique
+        if (escrowAddress && !uniqueBorrowedAddresses.has(escrowAddress)) {
+          uniqueBorrowedAddresses.add(escrowAddress);
+          return sum + borrowedValue;
+        }
+  
+        return sum;
+      }, 0)
+    : inventory?.escrow?.borrowedAmount || 0;
   const showStakeModal = (type) => {
     setStakeModalOpen(true);
     setStakeType(type);
@@ -121,7 +135,7 @@ const StakeItemActions = ({
           type="link"
           className="text-[#13188A] font-semibold"
           onClick={() => showBorrowModal('Unstake')}
-          disabled={borrowAmount > 0 || collateralQuantity <= 0}
+          disabled={borrowAmount >= maxBorrowableAmount || collateralQuantity <= 0}
         >
           <BankOutlined /> Borrow
         </Button>

@@ -1,4 +1,4 @@
-import { Button, Modal, Tooltip } from 'antd';
+import { Button, Modal, Tooltip, InputNumber } from 'antd';
 import { QuestionCircleOutlined } from '@ant-design/icons';
 import { actions as inventoryActions } from '../../contexts/inventory/actions';
 import {
@@ -8,6 +8,7 @@ import {
 import { Images } from '../../images';
 import { useLocation } from 'react-router-dom';
 import { ASSET_STATUS } from '../../helpers/constants';
+import { useState } from 'react';
 
 const logo = <img src={Images.cata} alt={''} title={''} className="w-5 h-5" />;
 
@@ -32,6 +33,10 @@ const StakeModal = ({
     : null;
   const location = useLocation();
   const queryParams = new URLSearchParams(location.search);
+  const [inputQuantity, setInputQuantity] = useState(0);
+  const handleInputChange = (value) => {
+    setInputQuantity(value || 0); // Update the input value
+  };
 
   const escrows = inventory?.inventories
     ? [
@@ -76,6 +81,8 @@ const StakeModal = ({
     ? inventory.totalQuantity
     : inventory?.quantity;
   const stakeQuantity = quantity - collateralQuantity - quantityNotAvailable;
+  console.log('stakeQuantity', stakeQuantity);
+  console.log('inputQuantity', inputQuantity);
   const allInventories = Array.isArray(inventory.inventories)
     ? inventory.inventories
     : [inventory];
@@ -126,13 +133,41 @@ const StakeModal = ({
               </div>
             ),
           },
+          {
+            label: `Quantity to Stake`,
+            description: 'Enter the amount of RWAs you want to stake.',
+            value: (
+              <InputNumber
+                min={0}
+                max={stakeQuantity}
+                value={inputQuantity}
+                onChange={handleInputChange}
+                className="w-full"
+                controls={false}
+              />
+            ),
+          },
         ]
       : [
           {
-            label: `Quantity to Unstake`,
+            label: `Quantity Available to Unstake`,
             description:
-              'The amount of Real World Assets (RWAs) you are unstaking.',
+              'The amount of Real World Assets (RWAs) available for unstaking.',
             value: `${collateralQuantity}`,
+          },
+          {
+            label: `Quantity to Unstake`,
+            description: 'Enter the amount of RWAs you want to unstake.',
+            value: (
+              <InputNumber
+                min={0}
+                max={collateralQuantity}
+                value={inputQuantity}
+                onChange={handleInputChange}
+                className="w-full"
+                controls={false}
+              />
+            ),
           },
         ];
 
@@ -147,14 +182,14 @@ const StakeModal = ({
           },
         ]
       : [];
-
+        console.log("type === 'Stake' ? inputQuantity > stakeQuantity : inputQuantity > collateralQuantity: ", isLoader || inputQuantity === 0 || (type === 'Stake' ? inputQuantity > stakeQuantity : inputQuantity > collateralQuantity))
   const handleSubmit = async () => {
     if (type === 'Stake') {
       const body = {
         escrowAddress: escrows && escrows.length > 0
           ? escrows[0]
           : '0000000000000000000000000000000000000000',
-        collateralQuantity: stakeQuantity,
+        collateralQuantity: inputQuantity,
         assets,
         reserve: matchedReserve?.address,
       };
@@ -189,7 +224,7 @@ const StakeModal = ({
 
     if (type === 'Unstake') {
       const body = {
-        quantity: collateralQuantity,
+        quantity: inputQuantity,
         escrowAddresses: escrows,
         reserve: matchedReserve?.address,
       };
@@ -260,7 +295,7 @@ const StakeModal = ({
               type="primary"
               className="w-full px-6 h-10 font-bold"
               onClick={handleSubmit}
-              disabled={isLoader}
+              disabled={isLoader || inputQuantity === 0 || (type === 'Stake' ? inputQuantity > stakeQuantity : inputQuantity > collateralQuantity)}
               loading={isLoader}
             >
               {type}

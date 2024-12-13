@@ -27,12 +27,25 @@ export const aggregateStakeColumns = (
     {
       title: 'Item',
       render: (_, record) => {
+        const uniqueBorrowedAddresses = new Set();
+
         const borrowedAmount =
-          (Array.isArray(record.escrow)
-            ? record.escrow.reduce(
-                (sum, item) => sum + (item.borrowedAmount || 0),
-                0
-              )
+          (record?.inventories
+            ? record.inventories.reduce((sum, item) => {
+                const escrowAddress = item?.escrow?.address;
+                const borrowedValue = item?.escrow?.borrowedAmount || 0;
+
+                // Add borrowed amount only if the escrow address is unique
+                if (
+                  escrowAddress &&
+                  !uniqueBorrowedAddresses.has(escrowAddress)
+                ) {
+                  uniqueBorrowedAddresses.add(escrowAddress);
+                  return sum + borrowedValue;
+                }
+
+                return sum;
+              }, 0)
             : record?.escrow?.borrowedAmount || 0) / 100;
         return (
           <>
@@ -141,11 +154,19 @@ export const aggregateStakeColumns = (
     {
       title: 'Status',
       align: 'center',
-      render: (text, record) => {
-        const isStaked =
-          record?.escrow &&
-          (record?.escrow.length > 0 || record?.escrow.address);
-
+      render: (_, record) => {
+        const escrows = record?.inventories
+        ? [
+            ...new Set(
+              record.inventories
+                .map((item) => item?.escrow?.address)
+                .filter(Boolean)
+            ),
+          ]
+        : record?.escrow?.address
+        ? [record.escrow.address]
+        : [];
+        const isStaked = escrows.length > 0;
         return (
           <div className="pt-[7px] lg:pt-0 items-center gap-[5px]">
             {isStaked ? (
@@ -285,9 +306,12 @@ export const stakeColumns = (
       title: 'Status',
       align: 'center',
       render: (text, record) => {
-        const isStaked =
-          record?.escrow &&
-          (record?.escrow.length > 0 || record?.escrow.address);
+        const matchingQuantity = record?.escrow?.[
+          'BlockApps-Mercata-Escrow-assets'
+        ]?.find((item) => item.value === record.address)
+          ? record.quantity
+          : 0;
+        const isStaked = matchingQuantity > 0;
         const isPublished = !isStaked && record?.price > 0;
 
         return (
