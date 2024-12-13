@@ -95,18 +95,22 @@ export const aggregateStakeColumns = (
       align: 'center',
       render: (_, record) => {
         const uniqueEscrows = new Set();
-        const collateralQuantity = record.inventories.reduce((sum, item) => {
-          const escrowAddress = item?.escrow?.address;
-          const escrowCollateral = item?.escrow?.collateralQuantity || 0;
+        const collateralQuantity = record?.inventories
+          ? record.inventories.reduce((sum, item) => {
+              const escrowAddress = item?.escrow?.address;
+              const escrowCollateral = item?.escrow?.collateralQuantity || 0;
 
-          // Add collateral only if the escrow address is unique
-          if (escrowAddress && !uniqueEscrows.has(escrowAddress)) {
-            uniqueEscrows.add(escrowAddress);
-            return sum + escrowCollateral;
-          }
+              // Add collateral only if the escrow address is unique
+              if (escrowAddress && !uniqueEscrows.has(escrowAddress)) {
+                uniqueEscrows.add(escrowAddress);
+                return sum + escrowCollateral;
+              }
 
-          return sum;
-        }, 0);
+              return sum;
+            }, 0)
+          : record?.escrow?.collateralQuantity > record?.quantity
+          ? record?.quantity
+          : record?.escrow?.collateralQuantity || 0;
         const quantityNotAvailable =
           record.inventories.reduce((sum, item) => {
             const status = Number(item.status);
@@ -124,11 +128,22 @@ export const aggregateStakeColumns = (
       title: 'Quantity Staked',
       align: 'center',
       render: (_, record) => {
-        const collateralQuantity = Array.isArray(record.escrow)
-          ? record.escrow.reduce(
-              (sum, item) => sum + (item.collateralQuantity || 0),
-              0
-            )
+        const uniqueEscrows = new Set();
+        const collateralQuantity = record?.inventories
+          ? record.inventories.reduce((sum, item) => {
+              const escrowAddress = item?.escrow?.address;
+              const escrowCollateral = item?.escrow?.collateralQuantity || 0;
+      
+              // Add collateral only if the escrow address is unique
+              if (escrowAddress && !uniqueEscrows.has(escrowAddress)) {
+                uniqueEscrows.add(escrowAddress);
+                return sum + escrowCollateral;
+              }
+      
+              return sum;
+            }, 0)
+          : record?.escrow?.collateralQuantity > record?.quantity
+          ? record?.quantity
           : record?.escrow?.collateralQuantity || 0;
         return <div>{collateralQuantity}</div>;
       },
