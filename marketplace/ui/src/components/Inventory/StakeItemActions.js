@@ -44,12 +44,12 @@ const StakeItemActions = ({
   const quantityNotAvailable = inventory?.inventories
     ? inventory.inventories.reduce((sum, item) => {
         const status = Number(item.status);
-        if (status !== ASSET_STATUS.ACTIVE) {
+        if (status && status !== ASSET_STATUS.ACTIVE) {
           return sum + (item.quantity || 0);
         }
         return sum;
       }, 0) + inventory.totalSaleQuantity
-    : Number(inventory?.status) !== ASSET_STATUS.ACTIVE
+    : inventory?.status && Number(inventory?.status) !== ASSET_STATUS.ACTIVE
     ? inventory?.quantity + (inventory?.saleQuantity || 0)
     : 0;
   const quantity = inventory?.inventories

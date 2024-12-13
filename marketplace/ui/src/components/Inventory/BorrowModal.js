@@ -31,11 +31,6 @@ const BorrowModal = ({
 
   const isStaked = inventory.sale && inventory.price <= 0;
   const itemName = decodeURIComponent(inventory.name);
-  const [desiredLoanAmount, setDesiredLoanAmount] = useState(0);
-
-  const handleLoanAmountChange = (value) => {
-    setDesiredLoanAmount(value || 0);
-  };
   const escrows = inventory?.inventories
     ? [
         ...new Set(
@@ -118,6 +113,11 @@ const BorrowModal = ({
     maxBorrowableAmount >= borrowedAmount
       ? maxBorrowableAmount - borrowedAmount
       : 0;
+  const [desiredLoanAmount, setDesiredLoanAmount] = useState((loanableAmount || 0) / 100);
+
+  const handleLoanAmountChange = (value) => {
+    setDesiredLoanAmount(value || 0);
+  };
 
   useEffect(() => {
     if (reserves && inventory.data && !isReservesLoading && isStaked) {
@@ -133,7 +133,7 @@ const BorrowModal = ({
       value: `$${(collateralValue / 10000).toFixed(2)}`,
     },
     {
-      label: 'Maximum loan percentage',
+      label: 'Max LTV',
       description: `Indicates you can borrow up to 50% of the market value of your staked RWAs.`,
       value: '50%',
     },
@@ -250,6 +250,7 @@ const BorrowModal = ({
               className="w-full px-6 h-10 font-bold"
               onClick={handleSubmit}
               loading={isBorrowing}
+              disabled={desiredLoanAmount <= 0}
             >
               Borrow
             </Button>

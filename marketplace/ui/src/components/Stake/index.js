@@ -216,7 +216,7 @@ const Stake = ({ user }) => {
         dataSource={populatedInventories}
         loading={isInventoriesLoading}
         rowKey={(record) => record.address}
-        pagination={{ pageSize: 5 }}
+        pagination={false}
         className="custom-child-table"
       />
     );

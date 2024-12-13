@@ -33,10 +33,6 @@ const StakeModal = ({
     : null;
   const location = useLocation();
   const queryParams = new URLSearchParams(location.search);
-  const [inputQuantity, setInputQuantity] = useState(0);
-  const handleInputChange = (value) => {
-    setInputQuantity(value || 0); // Update the input value
-  };
 
   const escrows = inventory?.inventories
     ? [
@@ -69,26 +65,24 @@ const StakeModal = ({
   const quantityNotAvailable = inventory?.inventories
     ? inventory.inventories.reduce((sum, item) => {
         const status = Number(item.status);
-        if (status !== ASSET_STATUS.ACTIVE) {
+        if (status && status !== ASSET_STATUS.ACTIVE) {
           return sum + (item.quantity || 0);
         }
         return sum;
       }, 0) + inventory.totalSaleQuantity
-    : Number(inventory?.status) !== ASSET_STATUS.ACTIVE
+    : inventory?.status &&  Number(inventory?.status) !== ASSET_STATUS.ACTIVE
     ? inventory?.quantity + (inventory?.saleQuantity || 0)
     : 0;
   const quantity = inventory?.inventories
     ? inventory.totalQuantity
     : inventory?.quantity;
   const stakeQuantity = quantity - collateralQuantity - quantityNotAvailable;
-  console.log('stakeQuantity', stakeQuantity);
-  console.log('inputQuantity', inputQuantity);
   const allInventories = Array.isArray(inventory.inventories)
     ? inventory.inventories
     : [inventory];
   const assets = allInventories
     .filter((item) => {
-      const status = Number(item.status);
+      const status = item.status ? Number(item.status) : ASSET_STATUS.ACTIVE ;
       const saleQty = Number(item.saleQuantity) || 0;
       const collatertal = item?.escrow?.[
         'BlockApps-Mercata-Escrow-assets'
@@ -99,6 +93,10 @@ const StakeModal = ({
     })
     .map((item) => item.address)
     .filter(Boolean);
+  const [inputQuantity, setInputQuantity] = useState(type === 'Stake' ? stakeQuantity : collateralQuantity);
+  const handleInputChange = (value) => {
+    setInputQuantity(value || 0); // Update the input value
+  };
 
   const dataForItems =
     type === 'Stake'
@@ -182,13 +180,13 @@ const StakeModal = ({
           },
         ]
       : [];
-        console.log("type === 'Stake' ? inputQuantity > stakeQuantity : inputQuantity > collateralQuantity: ", isLoader || inputQuantity === 0 || (type === 'Stake' ? inputQuantity > stakeQuantity : inputQuantity > collateralQuantity))
   const handleSubmit = async () => {
     if (type === 'Stake') {
       const body = {
-        escrowAddress: escrows && escrows.length > 0
-          ? escrows[0]
-          : '0000000000000000000000000000000000000000',
+        escrowAddress:
+          escrows && escrows.length > 0
+            ? escrows[0]
+            : '0000000000000000000000000000000000000000',
         collateralQuantity: inputQuantity,
         assets,
         reserve: matchedReserve?.address,
@@ -295,7 +293,13 @@ const StakeModal = ({
               type="primary"
               className="w-full px-6 h-10 font-bold"
               onClick={handleSubmit}
-              disabled={isLoader || inputQuantity === 0 || (type === 'Stake' ? inputQuantity > stakeQuantity : inputQuantity > collateralQuantity)}
+              disabled={
+                isLoader ||
+                inputQuantity === 0 ||
+                (type === 'Stake'
+                  ? inputQuantity > stakeQuantity
+                  : inputQuantity > collateralQuantity)
+              }
               loading={isLoader}
             >
               {type}
