@@ -86,7 +86,9 @@ const RepayModal = ({
       ? reserves.find((reserve) => reserve.assetRootAddress === inventory.root)
       : null;
     const body = {
-      escrows: inventory?.escrow?.map(e => e.address),
+      escrows: Array.isArray(inventory?.escrow) 
+      ? inventory.escrow.map(item => item.address) 
+      : [inventory?.escrow?.address],
       reserve: matchedReserve?.address,
     };
 

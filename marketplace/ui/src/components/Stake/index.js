@@ -66,7 +66,11 @@ const Stake = ({ user }) => {
       let entry = acc[root];
       if (!entry) {
         // Initialize a fresh entry
-        entry = { ...item, quantity: item.quantity || 0, saleQuantity: item.saleQuantity ? item.quantity : 0 };
+        entry = {
+          ...item,
+          quantity: item.quantity || 0,
+          saleQuantity: item.saleQuantity ? item.quantity : 0,
+        };
         entry.address = item.address
           ? [{ address: item.address, sale: item.sale || null }]
           : [];
@@ -107,7 +111,6 @@ const Stake = ({ user }) => {
                 entry.escrow.push(newVal);
               }
             }
-              
           } else if (oldVal === undefined) {
             // Just set if not present
             entry[key] = newVal;
@@ -130,7 +133,7 @@ const Stake = ({ user }) => {
       return acc;
     }, {})
   );
-
+  console.log('combinedInventories', combinedInventories);
   const onPageChange = (page, pageSize) => {
     setLimit(pageSize);
     setOffset((page - 1) * pageSize);
@@ -194,7 +197,13 @@ const Stake = ({ user }) => {
     {
       title: 'Item',
       render: (_, record) => {
-        const borrowedAmount = (record?.escrow?.borrowedAmount || 0) / 100;
+        const borrowedAmount =
+          (Array.isArray(record.escrow)
+            ? record.escrow.reduce(
+                (sum, item) => sum + (item.borrowedAmount || 0),
+                0
+              )
+            : record?.escrow?.borrowedAmount || 0) / 100;
         const callDetailPage = () => {
           navigate(
             `${routes.InventoryDetail.url
@@ -250,24 +259,31 @@ const Stake = ({ user }) => {
       render: (_, record) => {
         return <div>{record.quantity || 0}</div>;
       },
-        },
-        {
+    },
+    {
       title: 'Quantity Stakeable',
       align: 'center',
       render: (_, record) => {
         const collateralQuantity = Array.isArray(record.escrow)
-          ? record.escrow.reduce((sum, item) => sum + (item.collateralQuantity || 0), 0)
+          ? record.escrow.reduce(
+              (sum, item) => sum + (item.collateralQuantity || 0),
+              0
+            )
           : record?.escrow?.collateralQuantity || 0;
-        const availableQuantity = record.quantity - collateralQuantity  - (record?.saleQuantity || 0);
+        const availableQuantity =
+          record.quantity - collateralQuantity - (record?.saleQuantity || 0);
         return <div>{availableQuantity > 0 ? availableQuantity : 0}</div>;
       },
-        },
-        {
+    },
+    {
       title: 'Quantity Staked',
       align: 'center',
       render: (_, record) => {
         const collateralQuantity = Array.isArray(record.escrow)
-          ? record.escrow.reduce((sum, item) => sum + (item.collateralQuantity || 0), 0)
+          ? record.escrow.reduce(
+              (sum, item) => sum + (item.collateralQuantity || 0),
+              0
+            )
           : record?.escrow?.collateralQuantity || 0;
         return <div>{collateralQuantity}</div>;
       },
@@ -293,23 +309,51 @@ const Stake = ({ user }) => {
     {
       title: 'Status',
       align: 'center',
-      render: (text, record) => (
-        <div className="pt-[7px] lg:pt-0 items-center gap-[5px]">
-          {record?.escrow ? (
-            <div className="flex items-center justify-center gap-2 bg-[#1548C329] p-[6px] rounded-md">
-              <div className="w-[7px] h-[7px] rounded-full bg-[#119B2D]"></div>
-              <p className="text-[#4D4D4D] text-[13px]"> Staked </p>
-            </div>
-          ) : (
-            <div className="flex items-center justify-center gap-2 bg-[#1548C329] p-[6px] rounded-md">
-              <div className="w-[7px] h-[7px] rounded-full bg-[#ff4d4f]"></div>
-              <p className="text-[#4D4D4D] text-[13px]">Unstaked</p>
-            </div>
-          )}
-        </div>
-      ),
+      render: (text, record) => {
+        const isStaked = record?.escrow && (record?.escrow.length > 0 || record?.escrow.address);
+        const isPublished = !isStaked && record?.price > 0;
+
+        return (
+          <div className="pt-[7px] lg:pt-0 items-center gap-[5px]">
+            {isStaked ? (
+              <div className="flex items-center justify-center gap-2 bg-[#1548C329] p-[6px] rounded-md">
+                <div className="w-[7px] h-[7px] rounded-full bg-[#119B2D]"></div>
+                <p className="text-[#4D4D4D] text-[13px]">Staked</p>
+              </div>
+            ) : isPublished ? (
+              <div className="flex items-center justify-center gap-2 bg-[#1548C329] p-[6px] rounded-md">
+                <div className="w-[7px] h-[7px] rounded-full bg-[#119B2D]"></div>
+                <p className="text-[#4D4D4D] text-[13px]">Published</p>
+              </div>
+            ) : (
+              <div className="flex items-center justify-center gap-2 bg-[#1548C329] p-[6px] rounded-md">
+                <div className="w-[7px] h-[7px] rounded-full bg-[#ff4d4f]"></div>
+                <p className="text-[#4D4D4D] text-[13px]">Unstaked</p>
+              </div>
+            )}
+          </div>
+        );
+      },
     },
   ];
+
+  const expandedRowRender = (parentRecord) => {
+    // Filter out the original, uncombined inventories that share the same root
+    const filteredInventories = inventories.filter(
+      (inv) => inv.root === parentRecord.root
+    );
+
+    return (
+      <Table
+        columns={columns}
+        dataSource={filteredInventories}
+        loading={isInventoriesLoading}
+        rowKey={(record) => record.address}
+        pagination={{ pageSize: 5 }}
+        className='custom-child-table'
+      />
+    );
+  };
 
   return (
     <>
@@ -373,6 +417,11 @@ const Stake = ({ user }) => {
                   loading={isInventoriesLoading}
                   className="custom-table"
                   pagination={false}
+                  expandable={{
+                    expandedRowRender,
+                    rowExpandable: (record) => true,
+                  }}
+                  rowKey={(record) => record.root}
                 />
                 <Pagination
                   current={page}

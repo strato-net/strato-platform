@@ -90,7 +90,9 @@ const BorrowModal = ({
 
   const handleSubmit = async () => {
     const body = {
-      escrowAddresses: inventory?.escrow?.map(item => item.address),
+      escrowAddresses: Array.isArray(inventory?.escrow) 
+      ? inventory.escrow.map(item => item.address) 
+      : [inventory?.escrow?.address],
       borrowAmount: loanableAmount,
       reserve: matchedReserve?.address,
     };

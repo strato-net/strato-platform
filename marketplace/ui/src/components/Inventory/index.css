@@ -5,6 +5,11 @@
   border: none !important;
 }
 
+.custom-table .ant-table-thead .ant-table-cell {
+  background-color: white !important;
+  border: none !important;
+}
+
 .wallet-gradient {
   background: linear-gradient(
     135deg,
@@ -51,4 +56,12 @@
 
 .custom-pagination .ant-select-selector {
   height: 32px !important;
+}
+
+.custom-child-table .ant-table-thead {
+  visibility: hidden !important;
+  height: -10px !important;
+  padding: 0 !important;
+  line-height: 0 !important;
+  overflow: hidden !important;
 }
