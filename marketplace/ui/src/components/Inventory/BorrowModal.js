@@ -24,7 +24,7 @@ const BorrowModal = ({
   offset,
   productDetailPage,
 }) => {
-  const { isReservesLoading, reserves, oracle, isBorrowing } =
+  const { isReservesLoading, reserves, isBorrowing } =
     useInventoryState();
   // Dispatch
   const inventoryDispatch = useInventoryDispatch();
@@ -35,13 +35,24 @@ const BorrowModal = ({
   const matchedReserve = reserves?.length
     ? reserves.find((reserve) => reserve.assetRootAddress === inventory.root)
     : null;
-  const oracleData = oracle ? oracle : { consensusPrice: 0 };
   const location = useLocation();
   const queryParams = new URLSearchParams(location.search);
-
-  const loanableAmount = Math.floor(inventory?.escrow?.collateralValue / 2) >= inventory?.escrow?.borrowedAmount
-                       ? Math.floor(inventory?.escrow?.collateralValue / 2) - inventory?.escrow?.borrowedAmount
-                       : 0;
+  const collateralValue = Array.isArray(inventory.escrow)
+    ? inventory.escrow.reduce(
+        (sum, item) => sum + (item.collateralValue || 0),
+        0
+      )
+    : inventory?.escrow?.collateralValue || 0;
+  const borrowedAmount = Array.isArray(inventory.escrow)
+    ? inventory.escrow.reduce(
+        (sum, item) => sum + (item.borrowedAmount || 0),
+        0
+      )
+    : inventory?.escrow?.borrowedAmount || 0;
+  const loanableAmount =
+    Math.floor(collateralValue / 2) >= borrowedAmount
+      ? Math.floor(collateralValue / 2) - borrowedAmount
+      : 0;
 
   useEffect(() => {
     if (reserves && inventory.data && !isReservesLoading && isStaked) {
@@ -54,7 +65,7 @@ const BorrowModal = ({
       label: `Market Value`,
       description:
         ' The total value of your staked assets, calculated as Quantity x Oracle Price.',
-      value: `$${(inventory?.escrow?.collateralValue / 10000).toFixed(2)}`,
+      value: `$${(collateralValue / 10000).toFixed(2)}`,
     },
     {
       label: 'Maximum loan percentage',
@@ -79,7 +90,7 @@ const BorrowModal = ({
 
   const handleSubmit = async () => {
     const body = {
-      escrowAddress: inventory?.escrow?.address,
+      escrowAddresses: inventory?.escrow?.map(item => item.address),
       borrowAmount: loanableAmount,
       reserve: matchedReserve?.address,
     };

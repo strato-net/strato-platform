@@ -46,12 +46,18 @@ const RepayModal = ({
   const [repayAmount, setRepayAmount] = useState(0);
 
   useEffect(() => {
-    if (inventory?.escrow?.borrowedAmount && strats) {
+    if (inventory?.escrow && strats) {
+      const borrowedAmount = Array.isArray(inventory.escrow)
+        ? inventory.escrow.reduce(
+            (sum, item) => sum + (item.borrowedAmount || 0),
+            0
+          )
+        : inventory?.escrow?.borrowedAmount || 0;
       const stratsBalance = Object.keys(strats).length > 0 ? strats : 0;
       setRepayAmount(
-        inventory?.escrow?.borrowedAmount / 100 > stratsBalance
+        borrowedAmount / 100 > stratsBalance
           ? Number(stratsBalance)
-          : inventory?.escrow?.borrowedAmount / 100
+          : borrowedAmount / 100
       );
     }
   }, [strats]);
@@ -80,12 +86,12 @@ const RepayModal = ({
       ? reserves.find((reserve) => reserve.assetRootAddress === inventory.root)
       : null;
     const body = {
-      escrow: inventory?.escrow?.address,
+      escrows: inventory?.escrow?.map(e => e.address),
       reserve: matchedReserve?.address,
     };
 
-    const borrowed = await inventoryActions.repay(inventoryDispatch, body);
-    if (borrowed) {
+    const repayed = await inventoryActions.repay(inventoryDispatch, body);
+    if (repayed) {
       if (productDetailPage) {
         await inventoryActions.fetchInventoryDetail(
           inventoryDispatch,

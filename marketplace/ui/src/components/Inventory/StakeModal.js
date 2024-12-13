@@ -31,9 +31,17 @@ const StakeModal = ({
     : null;
   const location = useLocation();
   const queryParams = new URLSearchParams(location.search);
-
-  const escrow = inventory?.escrow;
-  const collateralQuantity = escrow?.collateralQuantity || 0;
+  const escrows = Array.isArray(inventory?.escrow)
+    ? inventory.escrow.map((item) => item.address)
+    : [inventory?.escrow?.address];
+  const collateralQuantity = Array.isArray(inventory.escrow)
+    ? inventory.escrow.reduce(
+        (sum, item) => sum + (item.collateralQuantity || 0),
+        0
+      )
+    : inventory?.escrow?.collateralQuantity || 0;
+  const saleQuantity = inventory?.saleQuantity || 0;
+  const stakeQuantity = inventory?.quantity - collateralQuantity - saleQuantity;
 
   const dataForItems =
     type === 'Stake'
@@ -42,15 +50,14 @@ const StakeModal = ({
             label: `Quantity to Stake`,
             description:
               'The amount of Real World Assets (RWAs) you are staking.',
-            value: `${inventory?.quantity - collateralQuantity}`,
+            value: stakeQuantity,
           },
           {
             label: `Market Value`,
             description:
               'The total value of your staked assets, calculated as Quantity x Oracle Price.',
             value: `$${(
-              matchedReserve?.lastUpdatedOraclePrice *
-              (inventory?.quantity - collateralQuantity)
+              matchedReserve?.lastUpdatedOraclePrice * stakeQuantity
             ).toFixed(2)}`,
           },
           {
@@ -61,7 +68,7 @@ const StakeModal = ({
               <div className="flex">
                 <div className="mx-1">{logo}</div>
                 {(
-                  ((inventory?.quantity - collateralQuantity) *
+                  (stakeQuantity *
                     matchedReserve?.lastUpdatedOraclePrice *
                     (matchedReserve?.cataAPYRate / 10)) /
                   365
@@ -75,7 +82,7 @@ const StakeModal = ({
             label: `Quantity to Unstake`,
             description:
               'The amount of Real World Assets (RWAs) you are unstaking.',
-            value: `${escrow.collateralQuantity}`,
+            value: `${collateralQuantity}`,
           },
         ];
 
@@ -94,8 +101,8 @@ const StakeModal = ({
   const handleSubmit = async () => {
     if (type === 'Stake') {
       const body = {
-        escrowAddress: escrow
-          ? escrow.address
+        escrowAddress: escrows
+          ? escrows[0]
           : '0000000000000000000000000000000000000000',
         collateralQuantity: inventory?.quantity - collateralQuantity,
         assets:
@@ -106,7 +113,7 @@ const StakeModal = ({
         : [inventory.address], // Handle the case where address is not an array
         reserve: matchedReserve?.address,
       };
-      console.log('body: ', body);
+
       const isStaked = await inventoryActions.stakeInventory(
         inventoryDispatch,
         body
@@ -138,8 +145,8 @@ const StakeModal = ({
 
     if (type === 'Unstake') {
       const body = {
-        quantity: escrow.collateralQuantity,
-        escrowAddress: inventory?.escrow?.address,
+        quantity: collateralQuantity,
+        escrowAddresses: escrows,
         reserve: matchedReserve?.address,
       };
       const isUnstaked = await inventoryActions.UnstakeInventory(

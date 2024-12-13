@@ -23,7 +23,20 @@ const StakeItemActions = ({
   const [stakeModalOpen, setStakeModalOpen] = useState(false);
   const [borrowModalOpen, setBorrowModalOpen] = useState(false);
   const [repayModalOpen, setRepayModalOpen] = useState(false);
-
+  const collateralQuantity = Array.isArray(inventory.escrow)
+    ? inventory.escrow.reduce(
+        (sum, item) => sum + (item.collateralQuantity || 0),
+        0
+      )
+    : inventory?.escrow?.collateralQuantity || 0;
+  const saleQuantity = inventory?.saleQuantity || 0;
+  const quantity = inventory?.quantity || 0;
+  const borrowAmount = Array.isArray(inventory.escrow)
+    ? inventory.escrow.reduce(
+        (sum, item) => sum + (item.borrowedAmount || 0),
+        0
+      )
+    : inventory?.escrow?.borrowedAmount || 0;
   function isActive() {
     if (
       inventory.status == ASSET_STATUS.PENDING_REDEMPTION ||
@@ -67,7 +80,7 @@ const StakeItemActions = ({
           type="primary"
           className="font-semibold flex items-center justify-center"
           onClick={() => showStakeModal('Stake')}
-          disabled={inventory?.quantity <= inventory?.escrow?.collateralQuantity || !isActive() || inventory.price}
+          disabled={quantity <= collateralQuantity + saleQuantity}
         >
           <RiseOutlined /> Stake
         </Button>
@@ -75,7 +88,7 @@ const StakeItemActions = ({
           type="link"
           className="text-[#13188A] font-semibold"
           onClick={() => showStakeModal('Unstake')}
-          disabled={!inventory?.escrow || inventory?.escrow?.borrowedAmount > 0}
+          disabled={borrowAmount > 0 || collateralQuantity <= 0}
         >
           <LogoutOutlined /> Unstake
         </Button>
@@ -83,7 +96,7 @@ const StakeItemActions = ({
           type="link"
           className="text-[#13188A] font-semibold"
           onClick={() => showBorrowModal('Unstake')}
-          disabled={!inventory?.escrow || inventory?.escrow?.borrowedAmount > 0}
+          disabled={borrowAmount > 0 || collateralQuantity <= 0}
         >
           <BankOutlined /> Borrow
         </Button>
@@ -91,7 +104,7 @@ const StakeItemActions = ({
           type="link"
           className="text-[#13188A] font-semibold"
           onClick={() => showRepayModal('Unstake')}
-          disabled={!inventory?.escrow || inventory?.escrow?.borrowedAmount <= 0}
+          disabled={borrowAmount <= 0}
         >
           <SolutionOutlined />
           Repay

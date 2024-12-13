@@ -66,10 +66,11 @@ const Stake = ({ user }) => {
       let entry = acc[root];
       if (!entry) {
         // Initialize a fresh entry
-        entry = { ...item, quantity: item.quantity || 0 };
+        entry = { ...item, quantity: item.quantity || 0, saleQuantity: item.saleQuantity ? item.quantity : 0 };
         entry.address = item.address
           ? [{ address: item.address, sale: item.sale || null }]
           : [];
+        entry.escrow = item.escrow && item.escrow.address ? [item.escrow] : [];
         delete entry.root; // Remove the duplicate root field if needed
         acc[root] = entry;
       } else {
@@ -78,9 +79,13 @@ const Stake = ({ user }) => {
           const newVal = item[key];
           const oldVal = entry[key];
 
-          if (key === 'quantity') {
+          if (key === 'quantity' || key === 'saleQuantity') {
             // Sum quantities
-            entry[key] = (oldVal || 0) + (newVal || 0);
+            if (key === 'quantity') {
+              entry[key] = (oldVal || 0) + (newVal || 0);
+            } else if (key === 'saleQuantity') {
+              entry[key] = (oldVal || 0) + (item.quantity || 0);
+            }
           } else if (key === 'address') {
             // Append unique address-sale pairs
             const pair = { address: item.address, sale: item.sale || null };
@@ -91,6 +96,18 @@ const Stake = ({ user }) => {
             ) {
               entry.address.push(pair);
             }
+          } else if (key === 'escrow') {
+            if (newVal && newVal.address) {
+              const escrowAddress = newVal.address;
+              const existingEscrow = entry.escrow.find(
+                (e) => e.address === escrowAddress
+              );
+              if (!existingEscrow) {
+                // Add the new escrow if it doesn't exist
+                entry.escrow.push(newVal);
+              }
+            }
+              
           } else if (oldVal === undefined) {
             // Just set if not present
             entry[key] = newVal;
@@ -233,14 +250,26 @@ const Stake = ({ user }) => {
       render: (_, record) => {
         return <div>{record.quantity || 0}</div>;
       },
-    },
-    {
+        },
+        {
+      title: 'Quantity Stakeable',
+      align: 'center',
+      render: (_, record) => {
+        const collateralQuantity = Array.isArray(record.escrow)
+          ? record.escrow.reduce((sum, item) => sum + (item.collateralQuantity || 0), 0)
+          : record?.escrow?.collateralQuantity || 0;
+        const availableQuantity = record.quantity - collateralQuantity  - (record?.saleQuantity || 0);
+        return <div>{availableQuantity > 0 ? availableQuantity : 0}</div>;
+      },
+        },
+        {
       title: 'Quantity Staked',
       align: 'center',
       render: (_, record) => {
-        return (
-          <div>{record.escrow ? record.escrow.collateralQuantity : 0}</div>
-        );
+        const collateralQuantity = Array.isArray(record.escrow)
+          ? record.escrow.reduce((sum, item) => sum + (item.collateralQuantity || 0), 0)
+          : record?.escrow?.collateralQuantity || 0;
+        return <div>{collateralQuantity}</div>;
       },
     },
     {

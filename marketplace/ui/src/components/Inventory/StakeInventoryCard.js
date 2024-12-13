@@ -52,34 +52,20 @@ const StakeInventoryCard = ({
     : isCata
     ? new BigNumber(inventory.quantity).dividedBy(new BigNumber(10).pow(18))
     : new BigNumber(inventory.quantity);
-  const price = inventory?.price
-    ? isStrat
-      ? new BigNumber(inventory.price).multipliedBy(100)
-      : isCata
-      ? new BigNumber(inventory.quantity).multipliedBy(
-          new BigNumber(10).pow(18)
-        )
-      : new BigNumber(inventory.quantity)
-    : undefined;
-  const saleQuantity =
-    inventory.saleQuantity !== undefined
-      ? isStrat
-        ? new BigNumber(inventory.saleQuantity || 0).dividedBy(100)
-        : isCata
-        ? new BigNumber(inventory.saleQuantity || 0).dividedBy(
-            new BigNumber(10).pow(18)
-          )
-        : new BigNumber(inventory.saleQuantity || 0)
-      : undefined;
-  const totalLockedQuantity = inventory.totalLockedQuantity
-    ? isStrat
-      ? new BigNumber(inventory.totalLockedQuantity || 0).dividedBy(100)
-      : isCata
-      ? new BigNumber(inventory.totalLockedQuantity || 0).dividedBy(
-          new BigNumber(10).pow(18)
-        )
-      : new BigNumber(inventory.totalLockedQuantity || 0)
-    : new BigNumber(0);
+
+  const borrowAmount = Array.isArray(inventory.escrow)
+    ? inventory.escrow.reduce(
+        (sum, item) => sum + (item.borrowedAmount || 0),
+        0
+      )
+    : inventory?.escrow?.borrowedAmount || 0;
+
+  const collateralQuantity = Array.isArray(inventory.escrow)
+    ? inventory.escrow.reduce(
+        (sum, item) => sum + (item.collateralQuantity || 0),
+        0
+      )
+    : inventory?.escrow?.collateralQuantity || 0;
 
   const showStakeModal = (type) => {
     setStakeModalOpen(true);
@@ -182,7 +168,7 @@ const StakeInventoryCard = ({
             <div className="flex flex-row space-x-2 lg:justify-self-end whitespace-nowrap">
               <Typography className="lg:pt-1 flex gap-1">
                 Borrowed Amount: {StratsIcon}
-                {((inventory?.escrow?.borrowedAmount || 0) / 100).toLocaleString('en-US', {
+                {((borrowAmount) / 100).toLocaleString('en-US', {
                   maximumFractionDigits: 2,
                   minimumFractionDigits: 2,
                 })}
@@ -203,7 +189,7 @@ const StakeInventoryCard = ({
                 type="link"
                 className="text-[#13188A] px-0 font-semibold text-sm h-6"
                 onClick={() => showStakeModal('Unstake')}
-                disabled={!inventory?.escrow || inventory?.escrow?.borrowedAmount > 0}
+                disabled={borrowAmount > 0}
               >
                 <LogoutOutlined /> Unstake
               </Button>
@@ -211,7 +197,7 @@ const StakeInventoryCard = ({
                 type="link"
                 className="text-[#13188A] px-0 font-semibold text-sm h-6"
                 onClick={() => showBorrowModal('Unstake')}
-                disabled={!inventory?.escrow || inventory?.escrow?.borrowedAmount > 0}
+                disabled={borrowAmount > 0}
               >
                 <BankOutlined /> Borrow
               </Button>
@@ -219,7 +205,7 @@ const StakeInventoryCard = ({
                 type="link"
                 className="text-[#13188A] px-0 font-semibold text-sm h-6"
                 onClick={() => showRepayModal('Unstake')}
-                disabled={!inventory?.escrow || inventory?.escrow?.borrowedAmount <= 0}
+                disabled={borrowAmount <= 0}
               >
                 <SolutionOutlined />
                 Repay
@@ -276,15 +262,13 @@ const StakeInventoryCard = ({
           <div className="flex justify-between  ">
             <p className="text-[#6A6A6A]">Quantity Staked </p>
             <p className="text-[#202020] font-semibold">
-              {inventory?.escrow
-                ? inventory?.escrow?.collateralQuantity.toLocaleString(
+              {collateralQuantity.toLocaleString(
                     'en-US',
                     {
                       maximumFractionDigits: 4,
                       minimumFractionDigits: 0,
                     }
-                  )
-                : 0}
+                  )}
             </p>
           </div>
         </div>
