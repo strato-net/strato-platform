@@ -114,7 +114,7 @@ export const aggregateStakeColumns = (
         const quantityNotAvailable =
           record.inventories.reduce((sum, item) => {
             const status = Number(item.status);
-            if (status !== ASSET_STATUS.ACTIVE) {
+            if (status && status !== ASSET_STATUS.ACTIVE) {
               return sum + (item.quantity || 0);
             }
             return sum;
