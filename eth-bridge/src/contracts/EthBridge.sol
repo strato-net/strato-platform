@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 import "../marketplace/backend/dapp/items/contracts/Tokens.sol";
 
-contract MercataETHBridge is Tokens{
+contract MercataETHBridge{
     address  _owner;
     bool  _paused;
     mapping(address => uint256)  _reentrancyStatus;
@@ -14,7 +14,7 @@ contract MercataETHBridge is Tokens{
     event OwnershipTransferred(address indexed previousOwner, address indexed newOwner);
     event Paused(address account);
     event Unpaused(address account);
-    event ETHBridgeHashAdded(string commonName, string txhash, string amount);
+    event ETHBridgeHashAdded(address userAddress, string txhash, string amount);
     event MintedETHST(address user, string username, uint256 amount);
 
     modifier onlyOwner() {
@@ -73,10 +73,10 @@ contract MercataETHBridge is Tokens{
         emit MintedETHST(userAddress, "User", amount);
     }
 
-    function addHash(string commonName, string txHash, string amount) external returns (bool) {
+    function addHash(address userAddress, string txHash, string amount) external returns (bool) {
         require(!hashExists[txHash], "Hash already exists");
         hashExists[txHash] = true;
-        emit ETHBridgeHashAdded(commonName, txHash, amount);
+        emit ETHBridgeHashAdded(userAddress, txHash, amount);
         return true;
     }
 
