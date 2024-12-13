@@ -1,4 +1,4 @@
-import { Button, Modal, Tooltip, InputNumber } from 'antd';
+import { Button, Modal, Tooltip, InputNumber, Form } from 'antd';
 import { QuestionCircleOutlined } from '@ant-design/icons';
 import { actions as inventoryActions } from '../../contexts/inventory/actions';
 import {
@@ -102,17 +102,38 @@ const StakeModal = ({
     type === 'Stake'
       ? [
           {
-            label: `Quantity to Stake`,
+            label: `Quantity Available to Stake`,
             description:
-              'The amount of Real World Assets (RWAs) you are staking.',
+              'The amount of Real World Assets (RWAs) you have available for staking.',
             value: stakeQuantity,
+          },
+          {
+            label: `Quantity to Stake`,
+            description: 'Enter the amount of RWAs you want to stake.',
+            value: (
+              <>
+                <InputNumber
+                  min={0}
+                  value={inputQuantity}
+                  onChange={handleInputChange}
+                  className="w-full"
+                  controls={false}
+                />
+
+                {inputQuantity > stakeQuantity ? (
+                  <p className="text-xs" style={{ color: 'red' }}>
+                    *Quantity exceeds available quantity
+                  </p>
+                ) : null}
+              </>
+            ),
           },
           {
             label: `Market Value`,
             description:
               'The total value of your staked assets, calculated as Quantity x Oracle Price.',
             value: `$${(
-              matchedReserve?.lastUpdatedOraclePrice * stakeQuantity
+              matchedReserve?.lastUpdatedOraclePrice * inputQuantity
             ).toFixed(2)}`,
           },
           {
@@ -123,26 +144,12 @@ const StakeModal = ({
               <div className="flex">
                 <div className="mx-1">{logo}</div>
                 {(
-                  (stakeQuantity *
+                  (inputQuantity *
                     matchedReserve?.lastUpdatedOraclePrice *
                     (matchedReserve?.cataAPYRate / 10)) /
                   365
                 ).toFixed(2)}
               </div>
-            ),
-          },
-          {
-            label: `Quantity to Stake`,
-            description: 'Enter the amount of RWAs you want to stake.',
-            value: (
-              <InputNumber
-                min={0}
-                max={stakeQuantity}
-                value={inputQuantity}
-                onChange={handleInputChange}
-                className="w-full"
-                controls={false}
-              />
             ),
           },
         ]
@@ -157,14 +164,21 @@ const StakeModal = ({
             label: `Quantity to Unstake`,
             description: 'Enter the amount of RWAs you want to unstake.',
             value: (
-              <InputNumber
-                min={0}
-                max={collateralQuantity}
-                value={inputQuantity}
-                onChange={handleInputChange}
-                className="w-full"
-                controls={false}
-              />
+              <>
+                <InputNumber
+                  min={0}
+                  value={inputQuantity}
+                  onChange={handleInputChange}
+                  className="w-full"
+                  controls={false}
+                />
+
+                {inputQuantity > collateralQuantity ? (
+                  <p className="text-xs" style={{ color: 'red' }}>
+                    *Quantity exceeds available quantity
+                  </p>
+                ) : null}
+              </>
             ),
           },
         ];
@@ -282,7 +296,7 @@ const StakeModal = ({
                   <QuestionCircleOutlined className="ml-1 text-gray-400 cursor-pointer" />
                 </Tooltip>
               </div>
-              <p className="flex items-center">
+              <p className="flex items-center justify-end">
                 <strong>{item.value}</strong>
               </p>
             </div>
