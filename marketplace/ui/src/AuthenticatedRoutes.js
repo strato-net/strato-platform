@@ -22,6 +22,7 @@ import { UserActivityProvider } from './contexts/userActivity';
 import AuthorizeIssuer from './components/AuthorizeIssuer';
 import { IssuerStatusProvider } from './contexts/issuerStatus';
 import ProductDetails from './components/MarketPlace/ProductDetails';
+import EthstProductDetails from './components/MarketPlace/EthstProductDetails';
 import VaultDetails from './components/MarketPlace/VaultDetails';
 import Checkout from './components/MarketPlace/Checkout';
 import ConfirmOrder from './components/MarketPlace/ConfirmOrder';
@@ -33,6 +34,7 @@ import UserProfile from './components/UserProfile';
 import Error from './components/404';
 import FAQ from './components/FAQ/index';
 import { TransactionsProvider } from './contexts/transaction';
+import { EthProvider } from './contexts/eth';
 import Transaction from './components/Order/Transaction';
 import Feed from './components/Feed/Feed';
 
@@ -47,11 +49,13 @@ const AuthenticatedRoutes = ({ user, users, isAuthenticated }) => {
             <CategorysProvider>
               <OrdersProvider>
                 <InventoriesProvider>
-                  <MarketPlace
-                    user={user}
-                    users={users}
-                    isAuthenticated={isAuthenticated}
-                  />
+                  <EthProvider>
+                    <MarketPlace
+                      user={user}
+                      users={users}
+                      isAuthenticated={isAuthenticated}
+                    />
+                  </EthProvider>
                 </InventoriesProvider>
               </OrdersProvider>
             </CategorysProvider>
@@ -131,7 +135,9 @@ const AuthenticatedRoutes = ({ user, users, isAuthenticated }) => {
                 <ProductsProvider>
                   <OrdersProvider>
                     <InventoriesProvider>
-                      <CategoryProductList user={user} users={users} />
+                      <EthProvider>
+                        <CategoryProductList user={user} users={users} />
+                      </EthProvider>
                     </InventoriesProvider>
                   </OrdersProvider>
                 </ProductsProvider>
@@ -167,6 +173,29 @@ const AuthenticatedRoutes = ({ user, users, isAuthenticated }) => {
                     <ItemsProvider>
                       <OrdersProvider>
                         <ProductDetails user={user} users={users} />
+                      </OrdersProvider>
+                    </ItemsProvider>
+                  </InventoriesProvider>
+                </PaymentServicesProvider>
+              </SubCategorysProvider>
+            </CategorysProvider>
+          </UsersProvider>
+        }
+      />
+      <Route
+        exact
+        path={routes.EthstProductDetail.url}
+        element={
+          <UsersProvider>
+            <CategorysProvider>
+              <SubCategorysProvider>
+                <PaymentServicesProvider>
+                  <InventoriesProvider>
+                    <ItemsProvider>
+                      <OrdersProvider>
+                        <EthProvider>
+                          <EthstProductDetails user={user} users={users} />
+                        </EthProvider>
                       </OrdersProvider>
                     </ItemsProvider>
                   </InventoriesProvider>
@@ -297,7 +326,9 @@ const AuthenticatedRoutes = ({ user, users, isAuthenticated }) => {
                         <RedemptionsProvider>
                           <IssuerStatusProvider>
                             <UserActivityProvider>
-                              <UserProfile user={user} users={users} />
+                              <EthProvider>
+                                <UserProfile user={user} users={users} />
+                              </EthProvider>
                             </UserActivityProvider>
                           </IssuerStatusProvider>
                         </RedemptionsProvider>

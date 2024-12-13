@@ -62,8 +62,12 @@ import 'react-responsive-carousel/lib/styles/carousel.min.css'; // requires a lo
 import { SEO } from '../../helpers/seoConstant';
 import { STRATS_CONVERSION, ASSET_STATUS } from '../../helpers/constants';
 import { TOAST_MSG } from '../../helpers/msgConstants';
-
+import EthstSteps from './EthstSteps';
 import { Swiper, SwiperSlide } from 'swiper/react';
+import { Ethers5Adapter } from '@reown/appkit-adapter-ethers5';
+import { createAppKit, useAppKit, useAppKitAccount } from '@reown/appkit/react';
+import { base, baseSepolia } from '@reown/appkit/networks';
+import { ethers } from 'ethers';
 
 // Import Swiper styles
 import 'swiper/css';
@@ -84,8 +88,8 @@ const ProductDetails = ({ user, users }) => {
   const { hasChecked, isAuthenticated, loginUrl } = useAuthenticateState();
   // dispatch
   const dispatch = useInventoryDispatch();
-  const categoryDispatch = useCategoryDispatch();
   const orderDispatch = useOrderDispatch();
+  const categoryDispatch = useCategoryDispatch();
   const marketplaceDispatch = useMarketplaceDispatch();
   // state
   const { categorys, iscategorysLoading } = useCategoryState();
@@ -100,39 +104,27 @@ const ProductDetails = ({ user, users }) => {
     isFetchingPriceHistory,
     reserves,
   } = useInventoryState();
-  const { cartList, stratsAddress, cataAddress } = useMarketplaceState();
+  const { cartList } = useMarketplaceState();
 
   const [isModalVisible, setIsModalVisible] = useState(false);
   const [timeFilter, setTimeFilter] = useState('1');
   const [itemData, setItemData] = useState({});
   const [Id, setId] = useState(undefined);
-  const [qty, setQty] = useState(1);
   const [stakeModalOpen, setStakeModalOpen] = useState(false);
   const [stakeType, setStakeType] = useState(null);
   const [borrowModalOpen, setBorrowModalOpen] = useState(false);
   const [repayModalOpen, setRepayModalOpen] = useState(false);
   // For Wishlist Icon Rendering
   const [isWishlisted, setIsWishlisted] = useState(false);
-  const [availableQuantity, setAvailableQuantity] = useState(1);
 
   // Stakeable
   const isStaked =
     inventoryDetails?.escrow &&
     inventoryDetails?.escrow?.collateralQuantity > 0;
-  const isStakeable =
-    inventoryDetails?.root &&
-    reserves &&
-    reserves.length > 0 &&
-    reserves.some(
-      (reserve) => inventoryDetails?.root === reserve.assetRootAddress
-    );
 
-  const matchingReserve = isStakeable
-    ? reserves?.find(
-        (reserve) => reserve.assetRootAddress === inventoryDetails?.root
-      )
-    : {};
-
+  const matchingReserve = reserves?.find(
+    (reserve) => reserve.assetRootAddress === inventoryDetails?.root
+  );
   let isCalledFromInventory = false;
   if (state !== null && state !== undefined) {
     isCalledFromInventory = state.isCalledFromInventory;
@@ -141,7 +133,7 @@ const ProductDetails = ({ user, users }) => {
   }
 
   const routeMatch = useMatch({
-    path: routes.MarketplaceProductDetail.url,
+    path: routes.EthstProductDetail.url,
     strict: true,
   });
 
@@ -167,6 +159,37 @@ const ProductDetails = ({ user, users }) => {
       return true;
     }
   }
+
+  const projectId = '776a599eda93a02ba9c62ee8ca5f35af';
+  const ethers5Adapter = new Ethers5Adapter();
+
+  createAppKit({
+    adapters: [ethers5Adapter],
+    metadata: {
+      name: 'Mercata Marketplace',
+      description: 'Description',
+      url: 'https://marketplace.mercata-testnet2.blockapps.net/',
+      icons: ['https://avatars.githubusercontent.com/u/179229932?s=200&v=4'],
+    },
+    networks: [base, baseSepolia],
+    projectId,
+  });
+
+  const appKit = useAppKit();
+  const account = useAppKitAccount();
+
+  useEffect(() => {
+    const fetchBalance = async () => {
+      if (account?.address) {
+        const provider = new ethers.providers.Web3Provider(window.ethereum);
+        const balanceWei = await provider.getBalance(account.address);
+        console.log('Wallet Address:', account.address);
+        console.log(ethers.utils.formatEther('ETH Balance:', balanceWei));
+      }
+    };
+
+    fetchBalance();
+  }, [account]);
 
   useEffect(() => {
     if (isCalledFromInventory) setId(routeMatch1?.params?.id);
@@ -233,14 +256,6 @@ const ProductDetails = ({ user, users }) => {
       const prodCategory = categorys.find((c) => c.name === details.category);
       const detailsData = details.data;
       setItemData(detailsData);
-      if (details.saleQuantity) {
-        let saleQuantity =
-          details.data.quantityIsDecimal &&
-          details.data.quantityIsDecimal === 'True'
-            ? details.saleQuantity / 100
-            : details.saleQuantity;
-        setAvailableQuantity(saleQuantity || 1);
-      }
     }
   }, [categorys, details]);
 
@@ -311,21 +326,6 @@ const ProductDetails = ({ user, users }) => {
     setIsModalVisible(false);
   };
 
-  const subtract = () => {
-    if (!isStakeable || !ownerSameAsUser()) {
-      const value = Math.max(qty - 1, 1);
-      setQty(value);
-    }
-  };
-
-  const add = () => {
-    if (qty + 1 <= availableQuantity && (!isStakeable || !ownerSameAsUser())) {
-      let value = qty + 1;
-      setQty(value);
-    } else {
-    }
-  };
-
   const openToast = (placement, isError, msg) => {
     if (isError) {
       api.error({
@@ -358,13 +358,6 @@ const ProductDetails = ({ user, users }) => {
         key: 2,
       });
     }
-  };
-
-  const addItemToCart = async () => {
-    const items = [{ product: details, qty }];
-    marketPlaceActions.addItemToCart(marketplaceDispatch, items);
-    navigate('/checkout');
-    window.scrollTo(0, 0);
   };
 
   const ownershipDetailColumn = [
@@ -511,8 +504,9 @@ const ProductDetails = ({ user, users }) => {
               </Breadcrumb.Item>
             </Breadcrumb>
           </Row>
-          <div className="flex w-full flex-col lg:leading-12 px-4 sm:px-8 md:px-0  items-center lg:items-start  md:w-[750px] lg:w-[835px] xl:w-[858px]  md:mx-auto ">
-            <div className="flex md:justify-center gap-[15px] lg:gap-6 flex-col lg:flex-row   ">
+          <EthstSteps />
+          <div className="flex w-full flex-col lg:leading-12 px-4 sm:px-8 md:px-0 items-center md:w-[750px] lg:w-[835px] xl:w-[858px]  md:mx-auto mt-12">
+            <div className="flex md:justify-center gap-[15px] lg:gap-6 flex-col lg:flex-row">
               {details['BlockApps-Mercata-Asset-images'].length > 0 ? (
                 <Swiper
                   spaceBetween={30}
@@ -562,7 +556,7 @@ const ProductDetails = ({ user, users }) => {
                   />
                 </div>
               )}
-              <div className=" w-full lg:w-1/2">
+              <div className="w-72">
                 {!ownerSameAsUser() && (
                   <div className="flex justify-end">
                     {isWishlisted ? (
@@ -643,60 +637,22 @@ const ProductDetails = ({ user, users }) => {
                     </Text>
                   </div>
                 </div>
-                {(!isStakeable || !ownerSameAsUser()) && (
+
+                {!ownerSameAsUser() && (
                   <div className=" pt-4 lg:pt-[22px]">
                     <Paragraph
                       level={4}
                       id="price"
                       className=" text-[#13188A] text-xl font-bold lg:text-2xl lg:font-semibold"
                     >
-                      {details?.price || isStaked
-                        ? (() => {
-                            const adjustedPrice =
-                              details.data.quantityIsDecimal &&
-                              details.data.quantityIsDecimal === 'True'
-                                ? details.price * 100
-                                : details.price;
-                            return (
-                              <>
-                                $
-                                {isStaked
-                                  ? (
-                                      details.escrow?.maxLoanAmount / 100
-                                    ).toFixed(2)
-                                  : adjustedPrice}{' '}
-                                <span className="font-normal text-xs mr-2 text-primary">
-                                  <b>
-                                    (
-                                    {isStaked
-                                      ? details.escrow?.maxLoanAmount
-                                      : (
-                                          adjustedPrice * STRATS_CONVERSION
-                                        ).toFixed(0)}{' '}
-                                    {(isStaked
-                                      ? details.escrow?.maxLoanAmount
-                                      : (
-                                          adjustedPrice * STRATS_CONVERSION
-                                        ).toFixed(0)) == 1
-                                      ? 'STRAT'
-                                      : 'STRATs'}
-                                    )
-                                  </b>
-                                </span>
-                                {isStakeable && (
-                                  <>
-                                    <div className="text-lg">
-                                      Est. APY: {matchingReserve?.cataAPYRate}%
-                                    </div>
-                                    <div className="text-lg">
-                                      TVL: ${matchingReserve?.tvl.toFixed(2)}
-                                    </div>
-                                  </>
-                                )}
-                              </>
-                            );
-                          })()
-                        : 'No Price Available'}
+                      <div className="text-lg">
+                        {/* Est. APY: {matchingReserve?.cataAPYRate}% */}
+                        Est. APY: 10%
+                      </div>
+                      <div className="text-lg">
+                        TVL: $2953.43
+                        {/* TVL: ${matchingReserve?.tvl.toFixed(2)} */}
+                      </div>
                     </Paragraph>
                     {isAvailableForSale && (
                       <Text type="danger" strong>
@@ -706,182 +662,33 @@ const ProductDetails = ({ user, users }) => {
                     )}
                   </div>
                 )}
-                {availableQuantity !== 0 ? (
-                  <div
-                    className="flex justify-between lg:justify-start  w-full gap-3 lg:gap-[15px] pt-6 lg:pt-[18px]"
-                    id="quantity"
-                  >
-                    <div
-                      onClick={subtract}
-                      className={`h-9 w-11 md:h-10 md:w-12 lg:h-[46px] lg:w-[52px] rounded-lg flex justify-center items-center border border-[#00000029] text-center cursor-pointer ${
-                        qty > 1 && (!isStakeable || !ownerSameAsUser())
-                          ? ''
-                          : 'cursor-not-allowed opacity-50'
-                      }`}
-                    >
-                      <p className=" text-2xl md:text-3xl lg:text-4xl font-semibold lg:text-[#202020] text-[#989898]">
-                        -
-                      </p>
-                    </div>
-                    <InputNumber
-                      className="w-full md:w-[280px] h-9 md:h-10 lg:h-[46px] border text-[#6A6A6A] border-[#00000029] text-center flex flex-col justify-center font-semibold !rounded-lg"
-                      min={1}
-                      max={availableQuantity}
-                      disabled={isStakeable && ownerSameAsUser()}
-                      value={
-                        !isStakeable || !ownerSameAsUser()
-                          ? `${qty}`
-                          : inventoryDetails.quantity
-                      }
-                      defaultValue={`${qty}`}
-                      controls={false}
-                      onChange={(e) => {
-                        if (e < availableQuantity) {
-                          setQty(parseInt(e || 0));
+
+                {!ownerSameAsUser() && (
+                  <div className="flex gap-4 justify-between lg:justify-start  pt-4 w-full">
+                    <Button
+                      type="primary"
+                      className={`w-[100%]  h-9  ${
+                        isAvailableForSale ? '!bg-[#808080]' : '!bg-[#13188A]'
+                      } !hover:bg-primaryHover !text-white`}
+                      onClick={async () => {
+                        if (!isAuthenticated || !user) {
+                          setIsModalVisible(true);
                         } else {
-                          setQty(availableQuantity);
+                          appKit.open();
                         }
                       }}
-                    />
-                    <div
-                      onClick={add}
-                      className={`h-9 w-11 md:h-10 md:w-12 lg:h-[46px] lg:w-[52px] rounded-lg flex justify-center items-center border border-[#00000029] text-center cursor-pointer ${
-                        qty < availableQuantity &&
-                        (!isStakeable || !ownerSameAsUser())
-                          ? ''
-                          : 'cursor-not-allowed opacity-50'
-                      }`}
                     >
-                      <p className="text-2xl md:text-3xl lg:text-4xl font-semibold lg:text-[#202020] text-[#989898]">
-                        +
-                      </p>
-                    </div>
-                  </div>
-                ) : (
-                  <Paragraph
-                    style={{ color: 'red', fontSize: 14 }}
-                    className="!mt-0"
-                    id="prod-price"
-                  >
-                    If you are interested in purchasing this item, please
-                    contact our sales team at sales@blockapps.net
-                  </Paragraph>
-                )}
-
-                {(!isStakeable || !ownerSameAsUser()) && (
-                  <div>
-                    {availableQuantity !== 0 ? (
-                      <div className="flex gap-4 justify-between lg:justify-start  pt-4 w-full">
-                        <Button
-                          type="primary"
-                          className={`w-[100%]  h-9  ${
-                            isAvailableForSale
-                              ? '!bg-[#808080]'
-                              : '!bg-[#13188A]'
-                          } !hover:bg-primaryHover !text-white`}
-                          onClick={async () => {
-                            window.LOQ.push([
-                              'ready',
-                              async (LO) => {
-                                // Track an event
-                                await LO.$internal.ready('events');
-                                LO.events.track(
-                                  'Buy Now (from Product Details)',
-                                  {
-                                    product: details.name,
-                                    category: details.category,
-                                    productId: details.productId,
-                                  }
-                                );
-                              },
-                            ]);
-                            TagManager.dataLayer({
-                              dataLayer: {
-                                event: 'buy_now_from_product_details',
-                                product_name: details.name,
-                                category: details.category,
-                                productId: details.productId,
-                              },
-                            });
-
-                            const checkQuantity =
-                              await orderActions.fetchSaleQuantity(
-                                orderDispatch,
-                                [details.saleAddress],
-                                [qty]
-                              );
-                            if (checkQuantity === true) {
-                              addItemToCart();
-                            } else {
-                              if (checkQuantity[0].availableQuantity === 0) {
-                                openToast(
-                                  'bottom',
-                                  true,
-                                  TOAST_MSG.OUT_OF_STOCK(details)
-                                );
-                              } else {
-                                // Case 2: We are trying to add too much quantity
-                                openToast(
-                                  'bottom',
-                                  true,
-                                  TOAST_MSG.TOO_MUCH_QUANTITY(
-                                    checkQuantity,
-                                    details
-                                  )
-                                );
-                              }
-                            }
-                          }}
-                          disabled={ownerSameAsUser() || isAvailableForSale}
-                          id="buyNow"
-                        >
-                          Buy Now
-                        </Button>
-                      </div>
-                    ) : (
-                      <div className="flex ">
-                        <Button
-                          type="primary"
-                          className="w-[80%] md:w-[365px] h-9 m-3 mt-10 !bg-primary !hover:bg-primaryHover"
-                          href={`mailto:sales@blockapps.net`}
-                          onClick={() => {
-                            window.LOQ.push([
-                              'ready',
-                              async (LO) => {
-                                await LO.$internal.ready('events');
-                                LO.events.track(
-                                  'Contact Sales (from Product Details)',
-                                  {
-                                    product: details?.name,
-                                    category: details?.category,
-                                    productId: details?.productId,
-                                  }
-                                );
-                              },
-                            ]);
-                            TagManager.dataLayer({
-                              dataLayer: {
-                                event: 'contact_sales_from_product_details',
-                                product_name: details?.name,
-                                category: details?.category,
-                                productId: details?.productId,
-                              },
-                            });
-                          }}
-                        >
-                          Contact to Buy
-                        </Button>
-                      </div>
-                    )}
+                      Connect Wallet
+                    </Button>
                   </div>
                 )}
-                {isStakeable && ownerSameAsUser() && (
+                {ownerSameAsUser() && (
                   <>
                     <div className="flex gap-4 justify-between lg:justify-start  pt-4 w-full">
                       <Button
                         className={`bg-[#13188A] text-white w-[100%] h-9`}
                         onClick={async () => {
-                          if (isStakeable && ownerSameAsUser()) {
+                          if (ownerSameAsUser()) {
                             isStaked
                               ? showStakeModal('Unstake')
                               : showStakeModal('Stake');
