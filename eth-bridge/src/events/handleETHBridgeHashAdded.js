@@ -12,7 +12,8 @@ const { sendEmail, getUserName } = require("../helper/utils.js");
 
 async function verifyEthereumTransaction(txHash) {
   try {
-    const response = await axios.post(
+    // Get transaction receipt
+    const receiptResponse = await axios.post(
       `https://eth-mainnet.g.alchemy.com/v2/${ALCHEMY_API_KEY}`,
       {
         jsonrpc: "2.0",
@@ -22,10 +23,34 @@ async function verifyEthereumTransaction(txHash) {
       }
     );
 
-    if (response.data.result && response.data.result.status === "0x1") {
-      return true;
+    if (!receiptResponse.data.result) {
+      return false;
     }
-    return false;
+
+    // Check if transaction was successful
+    if (receiptResponse.data.result.status !== "0x1") {
+      return false;
+    }
+
+    // Get current block number
+    const blockNumberResponse = await axios.post(
+      `https://eth-mainnet.g.alchemy.com/v2/${ALCHEMY_API_KEY}`,
+      {
+        jsonrpc: "2.0",
+        id: 2,
+        method: "eth_blockNumber",
+        params: []
+      }
+    );
+
+    const currentBlock = parseInt(blockNumberResponse.data.result, 16);
+    const txBlock = parseInt(receiptResponse.data.result.blockNumber, 16);
+    const confirmations = currentBlock - txBlock;
+
+    // Require 12 block confirmations
+    const REQUIRED_CONFIRMATIONS = 12;
+    return confirmations >= REQUIRED_CONFIRMATIONS;
+
   } catch (error) {
     console.error("Error verifying transaction with Alchemy:", error);
     return false;
@@ -34,9 +59,10 @@ async function verifyEthereumTransaction(txHash) {
 
 async function handleETHBridgeHashAdded(event, token) {
   const baseUrl = NODE_ENV === "prod" ? prodMarketplaceUrl : testnetMarketplaceUrl;
+  const MAX_RETRIES = 20;
+  const RETRY_DELAY = 15000; // 15 seconds
 
   try {
-    // Get transaction hash from event
     const txHashEntry = event.eventEvent.eventArgs.find(
       (arg) => arg[0] === "hash"
     );
@@ -47,10 +73,21 @@ async function handleETHBridgeHashAdded(event, token) {
       return;
     }
 
-    // Verify transaction with Alchemy
-    const isVerified = await verifyEthereumTransaction(txHash);
+    // Retry verification until enough confirmations
+    let isVerified = false;
+    let retries = 0;
+
+    while (!isVerified && retries < MAX_RETRIES) {
+      isVerified = await verifyEthereumTransaction(txHash);
+      if (!isVerified) {
+        retries++;
+        console.log(`Waiting for confirmations... Attempt ${retries}/${MAX_RETRIES}`);
+        await new Promise(resolve => setTimeout(resolve, RETRY_DELAY));
+      }
+    }
+
     if (!isVerified) {
-      console.error("Transaction verification failed:", txHash);
+      console.error("Transaction verification failed after maximum retries:", txHash);
       return;
     }
 
@@ -95,6 +132,12 @@ async function handleETHBridgeHashAdded(event, token) {
     console.log("ETHST bridging successful for transaction:", txHash);
   } catch (error) {
     console.error("Error handling ETHBridgeHashAdded event:", error);
+    if (error.response) {
+      console.error("Response data:", error.response.data);
+      console.error("Response status:", error.response.status);
+    }
+    // You might want to implement some retry mechanism here
+    // or notify administrators about the failure
   }
 }
 
