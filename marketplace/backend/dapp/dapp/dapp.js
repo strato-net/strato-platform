@@ -2176,7 +2176,7 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
         if (acc.accumulatedTotal >= orderTotal) return acc;
 
         acc.addressesToUse.push(asset.address);
-        acc.accumulatedTotal += asset.quantity / 100;
+        acc.accumulatedTotal += asset.quantity;
 
         return acc;
       },
