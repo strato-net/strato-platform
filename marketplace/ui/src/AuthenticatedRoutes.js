@@ -22,7 +22,7 @@ import { UserActivityProvider } from './contexts/userActivity';
 import AuthorizeIssuer from './components/AuthorizeIssuer';
 import { IssuerStatusProvider } from './contexts/issuerStatus';
 import ProductDetails from './components/MarketPlace/ProductDetails';
-import EthstProductDetails from './components/MarketPlace/EthstProductDetails';
+import EthstProductDetails from './components/ETHST/EthstProductDetails';
 import VaultDetails from './components/MarketPlace/VaultDetails';
 import Checkout from './components/MarketPlace/Checkout';
 import ConfirmOrder from './components/MarketPlace/ConfirmOrder';

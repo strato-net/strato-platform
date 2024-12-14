@@ -5,9 +5,9 @@ const EthstSteps = () => {
   const { loginUrl } = useAuthenticateState();
 
   return (
-    <div className="bg-[#f3f4f6] p-6 rounded-md">
-      <h2 className="text-center text-2xl font-semibold mb-8">
-        How to stake RWAs in 4 simple steps
+    <div className="bg-[#f3f4f6] p-4 rounded-md mx-16">
+      <h2 className="text-center text-xl font-semibold mb-6">
+        How to stake ETHST in 4 simple steps
       </h2>
       <div className="relative flex flex-col md:flex-row items-center md:justify-between">
         {/* Green Line Connecting Circles */}
@@ -17,15 +17,15 @@ const EthstSteps = () => {
             backgroundColor: '#84cc16',
             top: '15%',
             transform: 'translateY(-50%)',
-            left: 'calc(12.5% + 20px)',
-            right: 'calc(12.5% + 20px)',
+            left: 'calc(12.5% + 16px)',
+            right: 'calc(12.5% + 16px)',
           }}
         ></div>
 
         {/* Step 1 */}
         <div className="flex flex-col items-center z-10 relative md:w-1/4">
           <div
-            className="w-12 h-12 flex items-center justify-center rounded-full text-lg font-bold"
+            className="w-10 h-10 flex items-center justify-center rounded-full text-base font-semibold"
             style={{
               backgroundColor: '#84cc16',
               color: '#ffffff',
@@ -33,12 +33,12 @@ const EthstSteps = () => {
           >
             1
           </div>
-          <div className="flex flex-col justify-start items-center h-32 mt-4">
-            <h3 className="text-lg font-semibold text-center">
+          <div className="flex flex-col justify-start items-center h-28 mt-3">
+            <h3 className="text-base font-semibold text-center">
               Create an account
             </h3>
             <p
-              className="text-center mt-2 text-sm"
+              className="text-center mt-1 text-sm"
               style={{ color: '#4b5563' }}
             >
               <a
@@ -59,7 +59,7 @@ const EthstSteps = () => {
         {/* Step 2 */}
         <div className="flex flex-col items-center z-10 relative md:w-1/4">
           <div
-            className="w-12 h-12 flex items-center justify-center rounded-full text-lg font-bold"
+            className="w-10 h-10 flex items-center justify-center rounded-full text-base font-semibold"
             style={{
               backgroundColor: '#84cc16',
               color: '#ffffff',
@@ -67,12 +67,10 @@ const EthstSteps = () => {
           >
             2
           </div>
-          <div className="flex flex-col justify-start items-center h-32 mt-4">
-            <h3 className="text-lg font-semibold text-center">
-              Connect Wallet
-            </h3>
+          <div className="flex flex-col justify-start items-center h-28 mt-3">
+            <h3 className="text-base font-semibold text-center">Connect Wallet</h3>
             <p
-              className="text-center mt-2 text-sm"
+              className="text-center mt-1 text-sm"
               style={{ color: '#4b5563' }}
             >
               Purchase securely vaulted gold and silver assets to begin staking!
@@ -83,7 +81,7 @@ const EthstSteps = () => {
         {/* Step 3 */}
         <div className="flex flex-col items-center z-10 relative md:w-1/4">
           <div
-            className="w-12 h-12 flex items-center justify-center rounded-full text-lg font-bold"
+            className="w-10 h-10 flex items-center justify-center rounded-full text-base font-semibold"
             style={{
               backgroundColor: '#84cc16',
               color: '#ffffff',
@@ -91,10 +89,10 @@ const EthstSteps = () => {
           >
             3
           </div>
-          <div className="flex flex-col justify-start items-center h-32 mt-4">
-            <h3 className="text-lg font-semibold text-center">Bridge Eth</h3>
+          <div className="flex flex-col justify-start items-center h-28 mt-3">
+            <h3 className="text-base font-semibold text-center">Bridge ETH</h3>
             <p
-              className="text-center mt-2 text-sm"
+              className="text-center mt-1 text-sm"
               style={{ color: '#4b5563' }}
             >
               Stake your gold and silver assets and begin earning daily rewards
@@ -106,7 +104,7 @@ const EthstSteps = () => {
         {/* Step 4 */}
         <div className="flex flex-col items-center z-10 relative md:w-1/4">
           <div
-            className="w-12 h-12 flex items-center justify-center rounded-full text-lg font-bold"
+            className="w-10 h-10 flex items-center justify-center rounded-full text-base font-semibold"
             style={{
               backgroundColor: '#84cc16',
               color: '#ffffff',
@@ -114,12 +112,10 @@ const EthstSteps = () => {
           >
             4
           </div>
-          <div className="flex flex-col justify-start items-center h-32 mt-4">
-            <h3 className="text-lg font-semibold text-center">
-              Stake and Earn
-            </h3>
+          <div className="flex flex-col justify-start items-center h-28 mt-3">
+            <h3 className="text-base font-semibold text-center">Stake and Earn</h3>
             <p
-              className="text-center mt-2 text-sm"
+              className="text-center mt-1 text-sm"
               style={{ color: '#4b5563' }}
             >
               Borrow (interest-free for a limited time!) STRATs up to 50% of the

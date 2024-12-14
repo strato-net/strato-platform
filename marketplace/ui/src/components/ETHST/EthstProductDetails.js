@@ -41,20 +41,23 @@ import { useAuthenticateState } from '../../contexts/authentication';
 // components
 import HelmetComponent from '../Helmet/HelmetComponent';
 import DataTableComponent from '../DataTableComponent';
-import ProductItemDetails from './ProductItemDetails';
-import PriceChartAndStats from './PriceChartAndStats';
+import ProductItemDetails from '../MarketPlace/ProductItemDetails';
+import PriceChartAndStats from '../MarketPlace/PriceChartAndStats';
 import PreviewMode from '../RichEditor/PreviewMode';
 import ClickableCell from '../ClickableCell';
-import TimeRangeTabs from './TimeRangeTabs';
-import Statistics from './Statistics';
-import LoginModal from './LoginModal';
+import TimeRangeTabs from '../MarketPlace/TimeRangeTabs';
+import Statistics from '../MarketPlace/Statistics';
+import EthstSteps from './EthstSteps';
+import LoginModal from '../MarketPlace/LoginModal';
 import StakeModal from '../Inventory/StakeModal';
 import BorrowModal from '../Inventory/BorrowModal';
 import RepayModal from '../Inventory/RepayModal';
+import BridgeWallet from './BridgeWallet';
+
 // other
 import { setCookie } from '../../helpers/cookie';
 import routes from '../../helpers/routes';
-import './index.css';
+import '../MarketPlace/index.css';
 
 import image_placeholder from '../../images/resources/image_placeholder.png';
 import 'react-responsive-carousel/lib/styles/carousel.min.css'; // requires a loader
@@ -62,11 +65,10 @@ import 'react-responsive-carousel/lib/styles/carousel.min.css'; // requires a lo
 import { SEO } from '../../helpers/seoConstant';
 import { STRATS_CONVERSION, ASSET_STATUS } from '../../helpers/constants';
 import { TOAST_MSG } from '../../helpers/msgConstants';
-import EthstSteps from './EthstSteps';
 import { Swiper, SwiperSlide } from 'swiper/react';
 import { Ethers5Adapter } from '@reown/appkit-adapter-ethers5';
 import { createAppKit, useAppKit, useAppKitAccount } from '@reown/appkit/react';
-import { base, baseSepolia } from '@reown/appkit/networks';
+import { base, baseSepolia, mainnet } from '@reown/appkit/networks';
 import { ethers } from 'ethers';
 
 // Import Swiper styles
@@ -88,7 +90,6 @@ const ProductDetails = ({ user, users }) => {
   const { hasChecked, isAuthenticated, loginUrl } = useAuthenticateState();
   // dispatch
   const dispatch = useInventoryDispatch();
-  const orderDispatch = useOrderDispatch();
   const categoryDispatch = useCategoryDispatch();
   const marketplaceDispatch = useMarketplaceDispatch();
   // state
@@ -110,6 +111,7 @@ const ProductDetails = ({ user, users }) => {
   const [timeFilter, setTimeFilter] = useState('1');
   const [itemData, setItemData] = useState({});
   const [Id, setId] = useState(undefined);
+  const [bridgeWalletModalOpen, setBridgeWalletModalOpen] = useState(false);
   const [stakeModalOpen, setStakeModalOpen] = useState(false);
   const [stakeType, setStakeType] = useState(null);
   const [borrowModalOpen, setBorrowModalOpen] = useState(false);
@@ -171,20 +173,20 @@ const ProductDetails = ({ user, users }) => {
       url: 'https://marketplace.mercata-testnet2.blockapps.net/',
       icons: ['https://avatars.githubusercontent.com/u/179229932?s=200&v=4'],
     },
-    networks: [base, baseSepolia],
+    networks: [base, baseSepolia, mainnet],
     projectId,
   });
 
   const appKit = useAppKit();
   const account = useAppKitAccount();
+  const [ethBalance, setEthBalance] = useState(0);
 
   useEffect(() => {
     const fetchBalance = async () => {
       if (account?.address) {
         const provider = new ethers.providers.Web3Provider(window.ethereum);
         const balanceWei = await provider.getBalance(account.address);
-        console.log('Wallet Address:', account.address);
-        console.log(ethers.utils.formatEther('ETH Balance:', balanceWei));
+        setEthBalance(ethers.utils.formatEther(balanceWei));
       }
     };
 
@@ -312,6 +314,14 @@ const ProductDetails = ({ user, users }) => {
 
   const handleRepayModalClose = () => {
     setRepayModalOpen(false);
+  };
+
+  const showBridgeWalletModal = () => {
+    setBridgeWalletModalOpen(true);
+  };
+
+  const handleBridgeWalletModalClose = () => {
+    setBridgeWalletModalOpen(false);
   };
 
   const handleCancel = () => {
@@ -664,23 +674,34 @@ const ProductDetails = ({ user, users }) => {
                 )}
 
                 {!ownerSameAsUser() && (
-                  <div className="flex gap-4 justify-between lg:justify-start  pt-4 w-full">
-                    <Button
-                      type="primary"
-                      className={`w-[100%]  h-9  ${
-                        isAvailableForSale ? '!bg-[#808080]' : '!bg-[#13188A]'
-                      } !hover:bg-primaryHover !text-white`}
-                      onClick={async () => {
-                        if (!isAuthenticated || !user) {
-                          setIsModalVisible(true);
-                        } else {
-                          appKit.open();
-                        }
-                      }}
-                    >
-                      Connect Wallet
-                    </Button>
-                  </div>
+                  <>
+                    <div className="flex gap-4 justify-between lg:justify-start  pt-4 w-full">
+                      <Button
+                        type="primary"
+                        className={`w-[100%]  h-9  ${
+                          isAvailableForSale ? '!bg-[#808080]' : '!bg-[#13188A]'
+                        } !hover:bg-primaryHover !text-white`}
+                        onClick={async () => {
+                          if (!isAuthenticated || !user) {
+                            setIsModalVisible(true);
+                          } else {
+                            if (account.address) {
+                              showBridgeWalletModal();
+                            } else {
+                              appKit.open();
+                            }
+                          }
+                        }}
+                      >
+                        {account.address ? 'Bridge' : 'Connect Wallet'}
+                      </Button>
+                    </div>
+                    {account.address && (
+                      <div className="bg-[#13188A] rounded-full mt-2">
+                        <appkit-account-button />
+                      </div>
+                    )}
+                  </>
                 )}
                 {ownerSameAsUser() && (
                   <>
@@ -904,6 +925,16 @@ const ProductDetails = ({ user, users }) => {
           productDetailPage={Id}
           inventory={inventoryDetails}
           reserves={reserves}
+        />
+      )}
+      {bridgeWalletModalOpen && (
+        <BridgeWallet
+          open={bridgeWalletModalOpen}
+          handleCancel={handleBridgeWalletModalClose}
+          accountDetails={{
+            walletAddress: account?.address,
+            ethBalance: ethBalance,
+          }}
         />
       )}
       {borrowModalOpen && (
