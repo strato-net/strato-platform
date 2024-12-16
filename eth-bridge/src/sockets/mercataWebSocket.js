@@ -1,59 +1,58 @@
 // src/sockets/marketplaceWebSocket.js
-const WebSocket = require('ws');
-const { getUserToken } = require('../auth/auth');
-const { NODE_ENV, prodMarketplaceUrl, testnetMarketplaceUrl } = require('../config/config');
+const WebSocket = require("ws");
+const { getUserToken } = require("../auth");
+const { marketplaceUrl } = require("../config");
 // const { handleMessage } = require('../events/handleMessage'); // Uncomment if needed
 // const { filterMessages } = require('../events/eventFilter'); // Uncomment if needed
 
-const connectMarketplaceWebSocket = async () => {
+const connectMercataWebSocket = async () => {
   let token = await getUserToken();
-  const wsUrl = NODE_ENV === 'prod' ? prodMarketplaceUrl : testnetMarketplaceUrl;
 
-  const ws = new WebSocket(`wss://${wsUrl}/eventstream`, {
+  const ws = new WebSocket(`wss://${marketplaceUrl}/eventstream`, {
     headers: {
       Authorization: `Bearer ${token}`,
     },
   });
 
   const reconnect = () => {
-    console.log('Reconnecting Marketplace WebSocket...');
-    setTimeout(connectMarketplaceWebSocket, 1000);
+    console.log("Reconnecting Marketplace WebSocket...");
+    setTimeout(connectMercataWebSocket, 1000);
   };
 
-  ws.on('open', () => {
-    console.log('Marketplace WebSocket connected');
+  ws.on("open", () => {
+    console.log("Marketplace WebSocket connected");
 
     const pingInterval = setInterval(async () => {
       try {
-        ws.send('ping');
+        ws.send("ping");
         token = await getUserToken();
       } catch (error) {
-        console.error('Ping error:', error);
+        console.error("Ping error:", error);
       }
     }, 50000);
 
-    ws.on('close', () => {
+    ws.on("close", () => {
       clearInterval(pingInterval);
       reconnect();
     });
   });
 
-  ws.on('message', async (data) => {
+  ws.on("message", async (data) => {
     try {
       const message = data.toString();
-      console.log('Message received:', message);
-    //   if (await filterMessages(message)) {
-        // await handleMessage(message, token);
-    //   }
+      console.log("Message received:", message);
+      //   if (await filterMessages(message)) {
+      // await handleMessage(message, token);
+      //   }
     } catch (error) {
-      console.error('Message handling error:', error);
+      console.error("Message handling error:", error);
     }
   });
 
-  ws.on('error', (error) => {
-    console.error('Marketplace WebSocket error:', error);
+  ws.on("error", (error) => {
+    console.error("Marketplace WebSocket error:", error);
     reconnect();
   });
 };
 
-module.exports = { connectMarketplaceWebSocket };
+module.exports = { connectMercataWebSocket };

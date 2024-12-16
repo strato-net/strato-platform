@@ -1,58 +1,66 @@
-const axios = require("axios");
+const { dbApiClient } = require("../helper/apiClient");
+const { mintAndTransfer } = require("../config");
+const { createTransactionPayload } = require("../helper/transaction");
 
+/**
+ * Handles the BridgeIn event by processing the transaction and interacting with the API.
+ * @param {Object} transaction - The transaction object containing `hash` and `value`.
+ */
 async function handleBridgeIn(transaction) {
   const { hash, value } = transaction;
+
   try {
-    // Fetch certificates based on transaction hash
-    const queryResponse = await axios.get(
-      `https://${baseUrl}/cirrus/search/BlockApps-Mercata-Asset-ETHBridgeHashAdded?hash=eq.${encodeURIComponent(
-        hash
-      )}`,
+    // Log the incoming transaction for better traceability
+    console.log("Processing BridgeIn transaction:", { hash, value });
+
+    // Fetch certificates based on the transaction hash
+    const queryResponse = await dbApiClient.get(
+      `/BlockApps-Mercata-Asset-ETHBridgeHashAdded`,
       {
-        headers: {
-          Accept: "application/json",
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
-        },
+        params: { hash: `eq.${encodeURIComponent(hash)}` },
       }
     );
-    // waitForAddress TODO
 
-    if (queryResponse.status !== 200) {
-      const errorText = await queryResponse.text();
-      console.error(
-        `Error: ${queryResponse.status} ${queryResponse.statusText}`
-      );
-      console.error(`Response body: ${errorText}`);
-      throw new Error(
-        `Request failed with status ${queryResponse.status}: ${queryResponse.statusText}`
-      );
-    }
+    const queryBody = queryResponse.data;
 
-    const queryBody = await queryResponse.data;
-    console.log("response:", queryBody);
-    if (!queryBody || queryBody.length <= 0) {
-      console.error("No certificates found in the marketplace.");
+    // Handle case where no data is returned
+    if (!queryBody || queryBody.length === 0) {
+      console.warn(
+        `No Bridge In events found for hash: ${hash} on the Mercata network.`
+      );
       return;
     }
 
-    // Create transaction payload
-    const transactions = [
-      { toAddress: queryBody[0].recieverCommonName, value }, // try to convert the hex to standart number
-    ];
-    const response = await createTransactionPayload(token, transactions);
+    console.log("Certificates retrieved successfully:", queryBody);
 
+    // Create transaction payload
+    // Convert the hex value to a standard number as a string
+    const standardValue = BigInt(value).toString();
+    const recieverAddress = queryBody[0].recieverAddress;
+    const response = await createTransactionPayload(
+      recieverAddress,
+      standardValue,
+      hash,
+      mintAndTransfer
+    );
+
+    // Handle response from the transaction payload creation
     if (response.status !== 200) {
-      const errorText = await response.text();
-      console.error(`Error: ${response.status} ${response.statusText}`);
-      console.error(`Response body: ${errorText}`);
+      console.error(
+        `Transaction creation failed with status: ${response.status}`
+      );
+      console.error("Response body:", response.data);
       throw new Error(
-        `Request failed with status ${response.status}: ${response.statusText}`
+        `Transaction creation failed with status ${response.status}: ${response.statusText}`
       );
     }
-    console.log("New registration reward successful:", body);
+
+    console.log("Transaction successfully created:", response.data);
   } catch (error) {
-    console.error("Error handling CertificateRegistered event:", error);
+    console.error("Error handling BridgeIn event:", error.message);
+
+    // Optionally log the stack trace for debugging purposes
+    console.error(error.stack);
   }
 }
 
