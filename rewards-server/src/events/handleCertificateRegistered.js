@@ -1,4 +1,4 @@
-const { createTransactionPayload } = require("../helper/transferSTRATS");
+const { createTransactionPayload } = require("../helper/transferUSDST");
 const {
   NODE_ENV,
   prodMarketplaceUrl,

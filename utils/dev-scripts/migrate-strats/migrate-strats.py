@@ -9,7 +9,7 @@ mercata_username  = os.getenv("MINTER_USERNAME")
 mercata_password  = os.getenv("MINTER_PASSWORD")
 mercata_node      = os.getenv("NODE_ENDPOINT") 
 keycloak_endpoint = os.getenv("KEYCLOAK_ENDPOINT")
-strat_address     = os.getenv("STRAT_ASSET_ADDRESS")
+usdst_address     = os.getenv("USDST_ASSET_ADDRESS")
 cirrus_endpoint   = "/cirrus/search/"
 
 
@@ -29,8 +29,8 @@ def transform_response_to_tuple_list(response_data):
 def generate_tx(address, balance):
     return {
         "payload": {
-            "contractName": "STRATSToken",
-            "contractAddress": strat_address,
+            "contractName": "USDSTToken",
+            "contractAddress": usdst_address,
             "method": "automaticTransfer",
             "args": {
                 "_newOwner": address,
@@ -43,7 +43,7 @@ def generate_tx(address, balance):
     }
 
 def main():
-    if None in (mercata_username, mercata_password, mercata_node, keycloak_endpoint, strat_address):
+    if None in (mercata_username, mercata_password, mercata_node, keycloak_endpoint, usdst_address):
         raise ValueError("One or more required environment variables are not set.")
 
     headers = {
@@ -67,7 +67,7 @@ def main():
     }
 
     # Get the balances and create a list of tuples that contains (address, balance)
-    balances_endpoint = mercata_node + cirrus_endpoint + "TestCompany-ERC20Dapp-balances"
+    balances_endpoint = mercata_node + cirrus_endpoint + "BlockApps-Mercata-Asset?name=eq.STRAT"
     response = requests.get(balances_endpoint, headers=headers)
     balances = transform_response_to_tuple_list(response.json())
 
