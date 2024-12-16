@@ -34,6 +34,21 @@ class TokensController {
     }
   }
 
+  static async addHash(req, res, next) {
+    try {
+      const { dapp, body } = req;
+
+      TokensController.validateAddHashArgs(body);
+
+      const result = await dapp.addHash(body);
+      rest.response.status200(res, result);
+
+      return next();
+    } catch (e) {
+      return next(e);
+    }
+  }
+
   // ----------------------- ARG VALIDATION ------------------------
 
   static validateCreateTokensArgs(args) {
@@ -62,6 +77,28 @@ class TokensController {
       );
     }
   }
+
+  static validateAddHashArgs(args) {
+    const addHashSchema = Joi.object({
+      userAddress: Joi.string().required(),
+      txHash: Joi.string().required(),
+      amount: Joi.string().required(),
+    });
+
+    const validation = addHashSchema.validate(args);
+
+    if (validation.error) {
+      console.log(validation.error.message);
+      throw new rest.RestError(
+        RestStatus.BAD_REQUEST,
+        'Add Hash Argument Validation Error',
+        {
+          message: `Missing args or bad format: ${validation.error.message}`,
+        }
+      );
+    }
+  }
+
 }
 
 export default TokensController;
