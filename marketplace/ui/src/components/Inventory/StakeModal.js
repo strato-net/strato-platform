@@ -122,7 +122,7 @@ const StakeModal = ({
 
                 {inputQuantity > stakeQuantity ? (
                   <p className="text-xs" style={{ color: 'red' }}>
-                    *Quantity exceeds available quantity
+                    *Quantity exceeds available quantity of {stakeQuantity}
                   </p>
                 ) : null}
               </>
@@ -175,7 +175,7 @@ const StakeModal = ({
 
                 {inputQuantity > collateralQuantity ? (
                   <p className="text-xs" style={{ color: 'red' }}>
-                    *Quantity exceeds available quantity
+                    *Quantity exceeds available quantity of {collateralQuantity}
                   </p>
                 ) : null}
               </>

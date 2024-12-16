@@ -163,16 +163,22 @@ const BorrowModal = ({
       label: 'Desired Loan Amount',
       description: 'Enter the amount of STRATs you want to borrow.',
       value: (
-        <InputNumber
-          prefix={logo}
-          min={0}
-          max={loanableAmount / 100}
-          step={0.01}
-          value={desiredLoanAmount}
-          onChange={handleLoanAmountChange}
-          className="w-full"
-          controls={false}
-        />
+        <>
+          <InputNumber
+            prefix={logo}
+            min={0}
+            step={0.01}
+            value={desiredLoanAmount}
+            onChange={handleLoanAmountChange}
+            className="w-full"
+            controls={false}
+          />
+          {desiredLoanAmount > loanableAmount / 100 ? (
+            <p className="text-xs" style={{ color: 'red' }}>
+              *Quantity exceeds available quantity of {loanableAmount / 100}
+            </p>
+          ) : null}
+        </>
       ),
     },
   ];
