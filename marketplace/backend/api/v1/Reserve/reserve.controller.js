@@ -77,7 +77,7 @@ class ReserveController {
     }
   }
 
-  // Borrow STRATs from reserve
+  // Borrow USDSTs from reserve
   static async borrow(req, res, next) {
     try {
       const { dapp, body } = req;
@@ -91,7 +91,7 @@ class ReserveController {
     }
   }
 
-  // Pay STRATs Loan to reserve
+  // Pay USDSTs Loan to reserve
   static async repay(req, res, next) {
     try {
       const { dapp, body } = req;

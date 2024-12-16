@@ -52,7 +52,7 @@ abstract contract PaymentService is Utils {
         decimal amount,               // Total price of the order
         decimal tax,                  // Tax
         decimal fee,                  // Fee payment (in dollar value)
-        decimal unitsPerDollar,       // Amount of units per dollar for the currency (Ex: STRAT is 100 units per dollar)
+        decimal unitsPerDollar,       // Amount of units per dollar for the currency (Ex: USDST is 100 units per dollar)
         string currency,              // The type of currency used for the purchase
         PaymentStatus status,         // Status of the payment
         uint createdDate,              // Date at the time of fresh order creation
@@ -163,7 +163,7 @@ abstract contract PaymentService is Utils {
     }
 
     function checkoutInitialized (
-        address[] _stratsAssetAddresses,
+        address[] _usdstAssetAddresses,
         string _checkoutId,
         address[] _saleAddresses,
         uint[] _quantities,
@@ -174,7 +174,7 @@ abstract contract PaymentService is Utils {
         string _purchasersCommonName = getCommonName(msg.sender);
         string checkoutHash = getOrderHash(_checkoutId, _purchasersCommonName, _saleAddresses, _quantities);
         return _checkoutInitialized(
-            _stratsAssetAddresses,
+            _usdstAssetAddresses,
             checkoutHash,
             _checkoutId,
             msg.sender,
@@ -187,7 +187,7 @@ abstract contract PaymentService is Utils {
     }
 
     function _checkoutInitialized (
-        address[] _stratsAssetAddresses,
+        address[] _usdstAssetAddresses,
         string _checkoutHash,
         string _checkoutId,
         address _purchaser,

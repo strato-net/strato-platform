@@ -53,8 +53,8 @@
           "contract": "Tokens"
         },
         {
-          "name": "STRATS",
-          "contract": "STRATSTokens"
+          "name": "USDST",
+          "contract": "USDSTTokens"
         }
       ]
     },

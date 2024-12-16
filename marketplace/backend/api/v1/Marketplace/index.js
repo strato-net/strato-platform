@@ -42,17 +42,17 @@ router.get(
 );
 
 router.post(
-  Marketplace.transferStrats,
+  Marketplace.transferUsdst,
   authHandler.authorizeRequest(),
   loadDapp,
-  MarketplaceController.transferStrats
+  MarketplaceController.transferUsdst
 );
 
 router.get(
-  Marketplace.getStratsBalance,
+  Marketplace.getUsdstBalance,
   authHandler.authorizeRequest(),
   loadDapp,
-  MarketplaceController.getStratsBalance
+  MarketplaceController.getUsdstsBalance
 );
 
 router.get(
@@ -63,10 +63,10 @@ router.get(
 );
 
 router.get(
-  Marketplace.getStratsAddress,
+  Marketplace.getUsdstAddress,
   authHandler.authorizeRequest(true),
   loadDapp,
-  MarketplaceController.getStratsAddress
+  MarketplaceController.getUsdstAddress
 );
 
 router.get(
@@ -77,10 +77,10 @@ router.get(
 );
 
 router.get(
-  Marketplace.getStratsTransactionHistory,
+  Marketplace.getUsdstTransactionHistory,
   authHandler.authorizeRequest(),
   loadDapp,
-  MarketplaceController.getStratsTransactionHistory
+  MarketplaceController.getUsdstTransactionHistory
 );
 
 export default router;

@@ -2,10 +2,10 @@ pragma es6;
 pragma strict;
 
 import "./Tokens.sol";
-import "../../mercata-base-contracts/Templates/Payments/StratPaymentService.sol";
+import "../../mercata-base-contracts/Templates/Payments/UsdstPaymentService.sol";
 
-/// @title A representation of STRATS assets
-contract STRATSTokens is Tokens {
+/// @title A representation of USDST assets
+contract USDSTTokens is Tokens {
     string public paymentServiceCreator;
     string public paymentServiceName;
 
@@ -30,16 +30,16 @@ contract STRATSTokens is Tokens {
     
     function mint(uint _quantity) internal override returns (UTXO) {
         require(_quantity > 0, "Quantity must be greater than 0");
-        STRATSTokens newSTRATS = new STRATSTokens(name, description, images, files, fileNames, createdDate, _quantity, status, address(redemptionService), paymentServiceCreator, paymentServiceName);
-        return UTXO(address(newSTRATS)); 
+        USDSTTokens newUSDST = new USDSTTokens(name, description, images, files, fileNames, createdDate, _quantity, status, address(redemptionService), paymentServiceCreator, paymentServiceName);
+        return UTXO(address(newUSDST)); 
     }
 
     modifier fromPaymentService(string action) {
-        StratPaymentService ps = StratPaymentService(msg.sender);
+        UsdstPaymentService ps = UsdstPaymentService(msg.sender);
         string err = "Only the current corresponding Payment Service contract can "
                        + action
                        + ".";
-        require(ps.stratAddress() == this.root && address(ps).creator == paymentServiceCreator && ps.serviceName() == paymentServiceName && ps.isActive(), err);
+        require(ps.usdstAddress() == this.root && address(ps).creator == paymentServiceCreator && ps.serviceName() == paymentServiceName && ps.isActive(), err);
         _;
     }
     

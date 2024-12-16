@@ -1,23 +1,23 @@
 import express from 'express';
-import STRATSController from './STRATS.controller';
-import { STRATS } from '../endpoints';
+import USDSTController from './USDST.controller';
+import { USDST } from '../endpoints';
 import authHandler from '../../middleware/authHandler';
 import loadDapp from '../../middleware/loadDappHandler';
 
 const router = express.Router();
 
 router.get(
-  STRATS.getAll, // Assuming this is the correct endpoint for getting all STRATS
+  USDST.getAll, // Assuming this is the correct endpoint for getting all USDST
   authHandler.authorizeRequest(true),
   loadDapp,
-  STRATSController.getAll
+  USDSTController.getAll
 );
 
 router.post(
-  STRATS.create, // Assuming this is the correct endpoint for creating STRATS
+  USDST.create, // Assuming this is the correct endpoint for creating USDST
   authHandler.authorizeRequest(),
   loadDapp,
-  STRATSController.create
+  USDSTController.create
 );
 
 export default router;

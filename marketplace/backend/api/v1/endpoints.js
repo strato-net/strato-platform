@@ -109,8 +109,8 @@ export const Tokens = {
   create: "/",
 };
 
-export const STRATS = {
-  prefix: "/STRATSTokens",
+export const USDST = {
+  prefix: "/USDSTTokens",
   getAll: "/",
   create: "/",
 };
@@ -180,12 +180,12 @@ export const Marketplace = {
   getAllLoggedIn: "/all",
   getTopSellingProducts: "/topselling",
   getTopSellingProductsLoggedIn: "/user/topselling",
-  transferStrats: "/strats/transfer",
-  getStratsBalance: "/strats",
+  transferUsdst: "/usdst/transfer",
+  getUsdstBalance: "/usdst/",
   getCataBalance: "/cata",
-  getStratsAddress: "/strats/address",
+  getUsdstAddress: "/usdst/address",
   getCataAddress: "/cata/address",
-  getStratsTransactionHistory: "/strats/history",
+  getUsdstTransactionHistory: "/usdst/history",
   getStakeableProducts: "/stake"
 };
 

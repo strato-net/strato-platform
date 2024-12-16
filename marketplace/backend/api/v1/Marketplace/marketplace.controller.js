@@ -1,6 +1,6 @@
 import { rest } from 'blockapps-rest';
 import constants from '../../../helpers/constants';
-import STRATSJs from '../../../dapp/items/STRATS';
+import USDSTJs from '../../../dapp/items/USDST';
 import CATAJs from '/dapp/items/CATA';
 
 class MarketplaceController {
@@ -108,14 +108,14 @@ class MarketplaceController {
     }
   }
 
-  static async getStratsBalance(req, res, next) {
+  static async getUsdstBalance(req, res, next) {
     try {
       const { dapp, address: userAddress } = req;
-      let stratsBalance = 0;
+      let usdstBalance = 0;
 
-      stratsBalance = await dapp.getStratsBalance({ userAddress: userAddress });
+      usdstBalance = await dapp.getUsdstBalance({ userAddress: userAddress });
 
-      return rest.response.status200(res, stratsBalance);
+      return rest.response.status200(res, usdstBalance);
     } catch (e) {
       return next(e);
     }
@@ -134,9 +134,9 @@ class MarketplaceController {
     }
   }
 
-  static async getStratsAddress(req, res, next) {
+  static async getUsdstAddress(req, res, next) {
     try {
-      const address = await STRATSJs.getStratsAddress();
+      const address = await USDSTJs.getUsdstAddress();
 
       return rest.response.status200(res, address);
     } catch (e) {
@@ -154,26 +154,26 @@ class MarketplaceController {
     }
   }
 
-  static async getStratsTransactionHistory(req, res, next) {
+  static async getUsdstTransactionHistory(req, res, next) {
     try {
       const { dapp, address: userAddress } = req;
 
-      const stratsTransactionHistory = await dapp.getStratsTransactionHistory({
+      const usdstTransactionHistory = await dapp.getUsdstTransactionHistory({
         userAddress: userAddress,
       });
 
-      return rest.response.status200(res, stratsTransactionHistory);
+      return rest.response.status200(res, usdstTransactionHistory);
     } catch (e) {
       return next(e);
     }
   }
 
-  static async transferStrats(req, res, next) {
+  static async transferUsdst(req, res, next) {
     try {
       const { dapp, body } = req;
       const { to, value } = body;
 
-      await dapp.transferStrats({ to, value });
+      await dapp.transferUsdst({ to, value });
 
       return rest.response.status200(res);
     } catch (e) {

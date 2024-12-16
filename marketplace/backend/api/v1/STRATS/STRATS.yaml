@@ -1,37 +1,37 @@
 paths:
-  /STRATS/:
+  /USDST/:
     get:
       security:
         - bearerAuth: []
       tags:
-        - STRATS
-      summary: Retrieve STRATS
+        - USDST
+      summary: Retrieve USDST
       produces:
         - application/json
       responses:
         200:
-          description: Array of STRATS
+          description: Array of USDST
     post:
       security:
         - bearerAuth: []
       tags:
-        - STRATS
-      summary: Create a STRATS
+        - USDST
+      summary: Create a USDST
       produces:
         - application/json
       requestBody:
-        description: It enables user to create STRATS
+        description: It enables user to create USDST
         required: true
         content:
           'application/json':
             schema:
-              $ref: '#/definitions/createSTRATS'
+              $ref: '#/definitions/createUSDST'
       responses:
         200:
-          description: Object of create STRATS
+          description: Object of create USDST
 
 definitions:
-  createSTRATS:
+  createUSDST:
     type: object
     properties:
       machineArgs:

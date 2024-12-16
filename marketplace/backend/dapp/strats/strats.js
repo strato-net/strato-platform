@@ -49,20 +49,20 @@ function marshalOut(_args) {
   return args;
 }
 
-async function getStratsBalance(admin, args = {}, options) {
-  const stratsBalance = await searchAllWithQueryArgs(
+async function getUsdstBalance(admin, args = {}, options) {
+  const usdstBalance = await searchAllWithQueryArgs(
     `ERC20Dapp-balances`,
     args,
     options,
     admin
   );
-  if (stratsBalance.length > 0) {
-    return parseFloat(stratsBalance[0].value / 100).toFixed(2);
+  if (usdstBalance.length > 0) {
+    return parseFloat(usdstBalance[0].value / 100).toFixed(2);
   }
   return 0;
 }
 
-async function getStratsTransactionHistory(admin, args = {}, options) {
+async function getUsdstTransactionHistory(admin, args = {}, options) {
   const { userAddress } = args;
   const baseFilters = [
     { key: ['_to', '_from'], value: userAddress, predicate: 'or' },
@@ -80,8 +80,8 @@ async function getStratsTransactionHistory(admin, args = {}, options) {
   return transactionHistory;
 }
 
-async function transferStrats(admin, args, options = defaultOptions) {
-  const address = getStratsAddress();
+async function transferUsdst(admin, args, options = defaultOptions) {
+  const address = getUsdstAddress();
   const contract = {
     name: contractName,
     address,
@@ -94,21 +94,21 @@ async function transferStrats(admin, args, options = defaultOptions) {
   return rest.call(admin, callArgs, options);
 }
 
-function getStratsAddress() {
+function getUsdstAddress() {
   if (process.env.networkID === constants.prodNetworkId) {
-    return constants.prodStratsAddress;
+    return constants.prodUsdstAddress;
   } else if (process.env.networkID === constants.testnetNetworkId) {
-    return constants.testnetStratsAddress;
+    return constants.testnetUsdstAddress;
   } else {
-    return constants.prodStratsAddress;
+    return constants.prodUsdstAddress;
   }
 }
 
 export default {
-  getStratsBalance,
-  getStratsTransactionHistory,
-  transferStrats,
-  getStratsAddress,
+  getUsdstBalance,
+  getUsdstTransactionHistory,
+  transferUsdst,
+  getUsdstAddress,
   marshalIn,
   marshalOut,
 };

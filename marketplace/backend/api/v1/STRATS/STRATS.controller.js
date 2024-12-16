@@ -5,13 +5,13 @@ import config from '../../../load.config';
 
 const options = { config, cacheNonce: true };
 
-class STRATSController {
+class USDSTController {
   static async getAll(req, res, next) {
     try {
       const { dapp, query } = req;
 
-      const STRATS = await dapp.getSTRATS({ ...query });
-      rest.response.status200(res, STRATS);
+      const USDST = await dapp.getUSDST({ ...query });
+      rest.response.status200(res, USDST);
 
       return next();
     } catch (e) {
@@ -23,9 +23,9 @@ class STRATSController {
     try {
       const { dapp, body } = req;
 
-      STRATSController.validateCreateSTRATSArgs(body);
+      USDSTController.validateCreateUSDSTArgs(body);
 
-      const result = await dapp.createSTRATS(body);
+      const result = await dapp.createUSDST(body);
       rest.response.status200(res, result);
 
       return next();
@@ -36,8 +36,8 @@ class STRATSController {
 
   // ----------------------- ARG VALIDATION ------------------------
 
-  static validateCreateSTRATSArgs(args) {
-    const createSTRATSSchema = Joi.object({
+  static validateCreateUSDSTArgs(args) {
+    const createUSDSTSchema = Joi.object({
       itemArgs: Joi.object({
         name: Joi.string().required(),
         description: Joi.string().required(),
@@ -51,13 +51,13 @@ class STRATSController {
       }).required(),
     });
 
-    const validation = createSTRATSSchema.validate(args);
+    const validation = createUSDSTSchema.validate(args);
 
     if (validation.error) {
       console.log(validation.error.message);
       throw new rest.RestError(
         RestStatus.BAD_REQUEST,
-        'Create STRATS Argument Validation Error',
+        'Create USDST Argument Validation Error',
         {
           message: `Missing args or bad format: ${validation.error.message}`,
         }
@@ -66,4 +66,4 @@ class STRATSController {
   }
 }
 
-export default STRATSController;
+export default USDSTController;

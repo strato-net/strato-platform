@@ -8,7 +8,7 @@ import "../items/contracts/Spirits.sol";
 import "../items/contracts/Tokens.sol";
 import "Templates/Escrows/SimpleEscrow.sol";
 import "Templates/Payments/ExternalPaymentService.sol";
-import "Templates/Payments/StratPaymentService.sol";
+import "Templates/Payments/UsdstPaymentService.sol";
 // import "Templates/Payments/TokenPaymentService.sol";
 import "Templates/Oracles/SimpleOracleService.sol";
 import "Templates/Redemptions/ExternalRedemptionService.sol";

@@ -12,12 +12,12 @@ import "../Utils/Utils.sol";
 
 abstract contract Reserve is Utils, Structs {
     OracleService public oracle; // Asset Oracle service for fetching price data
-    Asset public stratsToken;
+    Asset public usdstToken;
     Asset public cataToken;
 
     decimal public priceOfCATA = 0.10; //cata price in dollars
 
-    address public owner; // Owner (BlockApps) as source of STRATS tokens
+    address public owner; // Owner (BlockApps) as source of USDST tokens
     string public name;
     bool public isActive = true;
     address public assetRootAddress;
@@ -28,7 +28,7 @@ abstract contract Reserve is Utils, Structs {
 
     decimal public lastUpdatedOraclePrice = 0;
     
-    event StakeCreated(address indexed user, address escrow, uint assetAmount, decimal stratsLoan);
+    event StakeCreated(address indexed user, address escrow, uint assetAmount, decimal usdstLoan);
     event StakeUnlocked(address indexed user, address escrow, uint quantity);
     event CataTransferred(address indexed from, address indexed to, uint amount);
     event LoanRepaid(address indexed user, address escrow, uint assetAmount, decimal repayment);
@@ -126,8 +126,8 @@ abstract contract Reserve is Utils, Structs {
         
         uint transferNumber = (uint(block.number + 16)) % 1000000;
         
-        // Transfer STRATS from owner to borrower
-        stratsToken.transferOwnership(
+        // Transfer USDST from owner to borrower
+        usdstToken.transferOwnership(
             escrow.borrower(),
             _borrowAmount,
             true,
@@ -140,63 +140,63 @@ abstract contract Reserve is Utils, Structs {
     }
 
     function repayLoan(
-        address[] _stratsAssetAddresses,
+        address[] _usdstAssetAddresses,
         address _escrowAddress
     ) requireActive() external returns (uint) {
-        require(_stratsAssetAddresses.length > 0, "Pass at least one STRATs token address");
+        require(_usdstAssetAddresses.length > 0, "Pass at least one USDSTs token address");
         Escrow escrow = Escrow(_escrowAddress);
-        uint stratAmountOwed = escrow.borrowedAmount();
-        uint stratAmountNet = stratAmountOwed;
-        uint stratQuantity = 0;
+        uint usdstAmountOwed = escrow.borrowedAmount();
+        uint usdstAmountNet = usdstAmountOwed;
+        uint usdstQuantity = 0;
         uint transferNumber = 0;
         uint transferAmount = 0;
 
-        for (uint j = 0; j < _stratsAssetAddresses.length; j++) {
-            Asset stratAsset = Asset(_stratsAssetAddresses[j]);
-            require(stratAsset.root == stratsToken.root, "Asset is not a STRATS asset");
-            require(stratAsset.ownerCommonName() == getCommonName(msg.sender), "Purchaser doesn't own STRATS");
+        for (uint j = 0; j < _usdstAssetAddresses.length; j++) {
+            Asset usdstAsset = Asset(_usdstAssetAddresses[j]);
+            require(usdstAsset.root == usdstToken.root, "Asset is not a USDST asset");
+            require(usdstAsset.ownerCommonName() == getCommonName(msg.sender), "Purchaser doesn't own USDST");
 
-            stratQuantity = stratAsset.quantity();
+            usdstQuantity = usdstAsset.quantity();
             transferNumber = (uint(string(_escrowAddress), 16) + j + block.timestamp) % 1000000;
 
-            transferAmount = stratQuantity >= stratAmountNet ? stratAmountNet : stratQuantity;
-            stratAsset.attachSale();
-            if (stratQuantity > stratAmountNet) {
-                stratAsset.transferOwnership(owner, stratAmountNet, false, transferNumber, 0.0001);
-                stratAsset.closeSale();
-                stratAmountNet = 0;
+            transferAmount = usdstQuantity >= usdstAmountNet ? usdstAmountNet : usdstQuantity;
+            usdstAsset.attachSale();
+            if (usdstQuantity > usdstAmountNet) {
+                usdstAsset.transferOwnership(owner, usdstAmountNet, false, transferNumber, 0.0001);
+                usdstAsset.closeSale();
+                usdstAmountNet = 0;
             } else {
-                stratAsset.transferOwnership(owner, stratQuantity, false, transferNumber, 0.0001);
-                stratAmountNet -= stratQuantity;
+                usdstAsset.transferOwnership(owner, usdstQuantity, false, transferNumber, 0.0001);
+                usdstAmountNet -= usdstQuantity;
             }
 
-            if (stratAmountNet == 0) {
+            if (usdstAmountNet == 0) {
                 break;
             }
         }
-        // require(stratAmountNet == 0, "Your STRATS balance is not high enough to cover the repayment."); // Allow partial repayments
+        // require(usdstAmountNet == 0, "Your USDST balance is not high enough to cover the repayment."); // Allow partial repayments
 
         // Clear loan
-        uint stratAmountRepaid = stratAmountOwed - stratAmountNet;
-        escrow.updateBorrowedAmount(stratAmountRepaid, false);
+        uint usdstAmountRepaid = usdstAmountOwed - usdstAmountNet;
+        escrow.updateBorrowedAmount(usdstAmountRepaid, false);
 
-        emit LoanRepaid(msg.sender, _escrowAddress, escrow.collateralQuantity(), stratAmountRepaid);
+        emit LoanRepaid(msg.sender, _escrowAddress, escrow.collateralQuantity(), usdstAmountRepaid);
     }
 
-    function setStratsToken(address _newStratsToken) public requireOwner("update STRATS token") {
-        stratsToken = Asset(_newStratsToken);
+    function setUsdstToken(address _newUsdstToken) public requireOwner("update USDST token") {
+        usdstToken = Asset(_newUsdstToken);
     }
 
-    function setCATAToken(address _newCATAToken) public requireOwner("update STRATS token") {
+    function setCATAToken(address _newCATAToken) public requireOwner("update USDST token") {
         cataToken = Asset(_newCATAToken);
     }
 
-    function transferSTRATSbacktoOwner(uint _amount) public requireOwner("transfer STRATS back") {
-        stratsToken.transferOwnership(owner, _amount, false, 0, 0);
+    function transferUSDSTbacktoOwner(uint _amount) public requireOwner("transfer USDST back") {
+        usdstToken.transferOwnership(owner, _amount, false, 0, 0);
     }
 
-    function transferSTRATStoAnotherReserve(address _newOwner, uint _amount) public requireOwner("transfer STRATS to another reserve") {
-        stratsToken.transferOwnership(_newOwner, _amount, false, 0, 0);
+    function transferUSDSTtoAnotherReserve(address _newOwner, uint _amount) public requireOwner("transfer USDST to another reserve") {
+        usdstToken.transferOwnership(_newOwner, _amount, false, 0, 0);
     }
 
     function transferCATAbacktoOwner(uint _amount) public requireOwner("transfer CATA back") {
@@ -246,7 +246,7 @@ abstract contract Reserve is Utils, Structs {
     function unstake(address _escrowAddress, uint _quantity) public requireActive() {
         Escrow escrow = Escrow(_escrowAddress);
         require(escrow.borrower() == msg.sender, "Only the borrower can unstake");
-        // require(escrow.borrowedAmount() == 0, "Must repay borrowed STRATS before unstaking"); // The escrow function unstakeAssets() performs a check on the rebalanced collateralization ratio
+        // require(escrow.borrowedAmount() == 0, "Must repay borrowed USDST before unstaking"); // The escrow function unstakeAssets() performs a check on the rebalanced collateralization ratio
 
         (decimal _oraclePrice, uint _priceTimestamp) = oracle.getLatestPrice();
         _oraclePrice = _oraclePrice / unitConversionRate;

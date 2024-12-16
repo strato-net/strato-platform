@@ -59,8 +59,8 @@ class OrderController {
       const [checkoutHash, assets] = result;
       rest.response.status200(res, result);
       // check orderEvent.status is 3 and sendEmail
-      // Only send email if order is created successfully(STRATS Orders)
-      const orderEvent = await dapp.getStratsOrderEvent(
+      // Only send email if order is created successfully(USDST Orders)
+      const orderEvent = await dapp.getUsdstOrderEvent(
         {
           orderHash: checkoutHash,
           paymentService: restArgs.paymentService.address,
@@ -71,7 +71,7 @@ class OrderController {
         orderEvent &&
         orderEvent.length === 1 &&
         orderEvent[0].status === '3' &&
-        orderEvent[0].currency === 'STRATS'
+        orderEvent[0].currency === 'USDST'
       ) {
         await sendEmail(body.user, 'Your Order Confirmation', htmlContents[0]);
         console.log('*Buyer placed order*', orderEvent);

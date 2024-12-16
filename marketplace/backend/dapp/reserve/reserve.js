@@ -137,7 +137,7 @@ async function get(user, address, options) {
       address: `in.(${[
         reserve.assetRootAddress,
         reserve.cataToken,
-        reserve.stratsToken,
+        reserve.usdstToken,
       ]
         .filter(Boolean)
         .join(',')})`,
@@ -158,8 +158,8 @@ async function get(user, address, options) {
   const cataToken = results.find(
     (result) => result.address === reserve.cataToken
   );
-  const stratsToken = results.find(
-    (result) => result.address === reserve.stratsToken
+  const usdstToken = results.find(
+    (result) => result.address === reserve.usdstToken
   );
 
   // Return combined result
@@ -169,7 +169,7 @@ async function get(user, address, options) {
     tvl,
     totalCataRewardIssued,
     cataTokenObject: cataToken ? marshalOut(cataToken) : null,
-    stratsTokenObject: stratsToken ? marshalOut(stratsToken) : null,
+    usdstTokenObject: usdstToken ? marshalOut(usdstToken) : null,
   };
 }
 
@@ -208,7 +208,7 @@ async function getAll(user, options) {
     .flatMap((reserve) => [
       reserve.assetRootAddress,
       reserve.cataToken,
-      reserve.stratsToken,
+      reserve.usdstToken,
     ])
     .filter(Boolean);
 
@@ -282,15 +282,15 @@ async function getAll(user, options) {
     const cataToken = relatedAssetsAndTokens.find(
       (item) => item.address === reserve.cataToken
     );
-    const stratsToken = relatedAssetsAndTokens.find(
-      (item) => item.address === reserve.stratsToken
+    const usdstToken = relatedAssetsAndTokens.find(
+      (item) => item.address === reserve.usdstToken
     );
 
     return {
       ...reserve,
       asset: asset ? marshalOut(asset) : null,
       cataTokenObject: cataToken ? marshalOut(cataToken) : null,
-      stratsTokenObject: stratsToken ? marshalOut(stratsToken) : null,
+      usdstTokenObject: usdstToken ? marshalOut(usdstToken) : null,
       ...tvlAndCataRewards[index],
     };
   });

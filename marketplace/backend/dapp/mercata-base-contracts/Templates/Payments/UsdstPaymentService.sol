@@ -2,37 +2,37 @@ pragma es6;
 pragma strict;
 
 import <BASE_CODE_COLLECTION>;
-import "../../../items/contracts/STRATS.sol";
+import "../../../items/contracts/USDST.sol";
 
-contract StratPaymentService is PaymentService {
-    address public stratAddress;
-    decimal public stratsPerDollar;
+contract usdstPaymentService is PaymentService {
+    address public usdstAddress;
+    decimal public usdstPerDollar;
 
     address public feeRecipient;
 
     event LoanRepaid(address indexed user, address escrow, uint assetAmount, decimal repayment);
 
     constructor (
-        address _stratAddress,
-        decimal _stratsPerDollar,
+        address _usdstAddress,
+        decimal _usdstPerDollar,
         string _imageURL,
         decimal _primarySaleFeePercentage,
         decimal _secondarySaleFeePercentage,
         address _feeRecipient
     ) PaymentService(
-        "STRATS",
+        "USDST",
         _imageURL,
-        "Checkout with STRATS",
+        "Checkout with USDST",
         _primarySaleFeePercentage,
         _secondarySaleFeePercentage
     ) public {
-        stratAddress = _stratAddress;
-        stratsPerDollar = _stratsPerDollar;
+        usdstAddress = _usdstAddress;
+        usdstPerDollar = _usdstPerDollar;
         feeRecipient = _feeRecipient;
     }
 
     function _checkoutInitialized (
-        address[] _stratsAssetAddresses,
+        address[] _usdstAssetAddresses,
         string _checkoutHash,
         string _checkoutId,
         address _purchaser,
@@ -48,8 +48,8 @@ contract StratPaymentService is PaymentService {
         decimal totalFee = 0.0;
         string sellerCommonName;
         address sellerAddress;
-        string err = "Your STRATS balance is not high enough to cover the purchase.";
-        string feeErr = "Your STRATS balance is not high enough to cover the fee.";
+        string err = "Your USDST balance is not high enough to cover the purchase.";
+        string feeErr = "Your USDST balance is not high enough to cover the fee.";
         purchasersAddress = msg.sender; // Support for legacy sales
         purchasersCommonName = getCommonName(tx.origin);
 
@@ -98,41 +98,41 @@ contract StratPaymentService is PaymentService {
                 );
             }
 
-            // Calculate net and fee amounts in STRATS
-            uint stratAmountNet = uint(net * stratsPerDollar * 100);
-            uint stratFee = uint(fee * stratsPerDollar * 100);
+            // Calculate net and fee amounts in USDST
+            uint usdstAmountNet = uint(net * usdstPerDollar * 100);
+            uint usdstFee = uint(fee * usdstPerDollar * 100);
 
-            // Transfer STRATS
-            uint remainingStratsToTransfer = stratAmountNet;
-            uint remainingFeeToTransfer = stratFee;
-            uint stratQuantity = 0;
+            // Transfer USDST
+            uint remainingUsdstToTransfer = usdstAmountNet;
+            uint remainingFeeToTransfer = usdstFee;
+            uint usdstQuantity = 0;
             uint transferAmount = 0;
             uint transferFee = 0;
             uint transferNumber = 0;
-            for (uint j = 0; j < _stratsAssetAddresses.length; j++) {
-                STRATSTokens stratAsset = STRATSTokens(_stratsAssetAddresses[j]);
-                require(stratAsset.root == stratAddress, "Asset is not a STRATS asset");
-                require(stratAsset.ownerCommonName() == getCommonName(msg.sender), "Purchaser doesn't own STRATS");
-                stratQuantity = stratAsset.quantity();
+            for (uint j = 0; j < _usdstAssetAddresses.length; j++) {
+                USDSTTokens usdstAsset = USDSTTokens(_usdstAssetAddresses[j]);
+                require(usdstAsset.root == usdstAddress, "Asset is not a USDST asset");
+                require(usdstAsset.ownerCommonName() == getCommonName(msg.sender), "Purchaser doesn't own USDST");
+                usdstQuantity = usdstAsset.quantity();
                 transferNumber = (uint(_checkoutHash, 16) + j) % 1000000;
-                if (remainingStratsToTransfer > 0) {
-                    transferAmount = stratQuantity >= remainingStratsToTransfer ? remainingStratsToTransfer : stratQuantity;
-                    stratAsset.purchaseTransfer(sellerAddress, transferAmount, transferNumber, 0.0001);
-                    remainingStratsToTransfer -= transferAmount;
+                if (remainingUsdstToTransfer > 0) {
+                    transferAmount = usdstQuantity >= remainingUsdstToTransfer ? remainingUsdstToTransfer : usdstQuantity;
+                    usdstAsset.purchaseTransfer(sellerAddress, transferAmount, transferNumber, 0.0001);
+                    remainingUsdstToTransfer -= transferAmount;
                 }
-                stratQuantity = stratQuantity - transferAmount;
-                if (remainingFeeToTransfer > 0 && stratQuantity > 0) {
+                usdstQuantity = usdstQuantity - transferAmount;
+                if (remainingFeeToTransfer > 0 && usdstQuantity > 0) {
                     transferNumber = (uint(_checkoutHash, 16) + j + block.timestamp) % 1000000;
-                    transferFee = stratQuantity >= remainingFeeToTransfer ? remainingFeeToTransfer : stratQuantity;
-                    stratAsset.purchaseTransfer(feeRecipient, transferFee, transferNumber, 0.0001);
+                    transferFee = usdstQuantity >= remainingFeeToTransfer ? remainingFeeToTransfer : usdstQuantity;
+                    usdstAsset.purchaseTransfer(feeRecipient, transferFee, transferNumber, 0.0001);
                     remainingFeeToTransfer -= transferFee;
                 }
                 transferAmount = 0;
-                if (remainingStratsToTransfer == 0 && remainingFeeToTransfer == 0) {
+                if (remainingUsdstToTransfer == 0 && remainingFeeToTransfer == 0) {
                     break;
                 }
             }
-            require(remainingStratsToTransfer == 0, err);
+            require(remainingUsdstToTransfer == 0, err);
             require(remainingFeeToTransfer == 0, feeErr);
 
             // Transfer assets
@@ -159,7 +159,7 @@ contract StratPaymentService is PaymentService {
             0,
             totalFee,
             _unitsPerDollar(),
-            "STRATS",
+            "USDST",
             PaymentStatus.CLOSED,
             _createdDate,
             _comments
@@ -186,7 +186,7 @@ contract StratPaymentService is PaymentService {
         uint _createdDate,
         string _comments
     ) internal override returns (address[]) {
-        require(false, "Cannot call generateIntermediateOrder for STRATS payments.");
+        require(false, "Cannot call generateIntermediateOrder for USDST payments.");
         return [];
     }
 
@@ -201,7 +201,7 @@ contract StratPaymentService is PaymentService {
         uint _createdDate,
         string _comments
     ) internal override returns (address[]) {
-        require(false, "Cannot call completeOrder for STRATS payments.");
+        require(false, "Cannot call completeOrder for USDST payments.");
         return [];
     }
 
@@ -216,15 +216,15 @@ contract StratPaymentService is PaymentService {
         uint _createdDate,
         string _comments
     ) internal override {
-        require(false, "Cannot call cancelOrder for STRATS payments.");
+        require(false, "Cannot call cancelOrder for USDST payments.");
     }
 
     function _unitsPerDollar() internal override returns (decimal) {
-        return stratsPerDollar * 100;
+        return usdstPerDollar * 100;
     }
 
-    function updateStratsPerDollar(decimal _stratsPerDollar) requireOwner("updateStratsPerDollar") public returns (uint) {
-      stratsPerDollar = _stratsPerDollar;
+    function updateUsdstPerDollar(decimal _usdstPerDollar) requireOwner("updateUsdstPerDollar") public returns (uint) {
+      usdstPerDollar = _usdstPerDollar;
       return RestStatus.OK;
     }
 }
