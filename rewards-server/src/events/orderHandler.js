@@ -1,4 +1,4 @@
-const { createTransactionPayload } = require("../helper/transferSTRATS");
+const { createTransactionPayload } = require("../helper/transferUSDST");
 const {
   NODE_ENV,
   prodMarketplaceUrl,
@@ -112,8 +112,8 @@ async function handleOrderRewards(event, token) {
   let buyerReward = orderTotal * buyerRewardPercent;
   let sellerReward = orderTotal * sellerRewardPercent;
 
-  buyerReward *= 10000; // Multiply by 10000 to handle rounding errors (1000) and then STRATS conversion (100).
-  sellerReward *= 10000; // Multiply by 10000 to handle rounding errors (1000) and then STRATS conversion (100).
+  buyerReward *= 10000; // Multiply by 10000 to handle rounding errors (1000) and then USDST conversion (100).
+  sellerReward *= 10000; // Multiply by 10000 to handle rounding errors (1000) and then USDST conversion (100).
 
   // Round the reward amounts to ensure they're integers
   buyerReward = Math.round(buyerReward);
@@ -139,10 +139,10 @@ async function handleOrderReward(
 ) {
   try {
     console.log(
-      `Sending ${eventKey} reward to , ${purchaser.purchasersCommonName}, ${buyerReward / 100}STRATS`
+      `Sending ${eventKey} reward to , ${purchaser.purchasersCommonName}, ${buyerReward / 100}USDST`
     );
     console.log(
-      `Sending sale reward to , ${seller.sellersCommonName}, ${sellerReward / 100}STRATS`
+      `Sending sale reward to , ${seller.sellersCommonName}, ${sellerReward / 100}USDST`
     );
 
     const transactions = [
@@ -183,10 +183,10 @@ async function handleOrderReward(
     return response;
   } catch (error) {
     console.log(
-      `Failed to send ${eventKey} reward to ${purchaser.purchasersCommonName}, ${buyerReward / 100}STRATS`
+      `Failed to send ${eventKey} reward to ${purchaser.purchasersCommonName}, ${buyerReward / 100}USDST`
     );
     console.log(
-      `Failed to send sale reward to ${seller.sellersCommonName}, ${sellerReward / 100}STRATS`
+      `Failed to send sale reward to ${seller.sellersCommonName}, ${sellerReward / 100}USDST`
     );
     console.error("Error processing transaction:", error.message);
     throw error;

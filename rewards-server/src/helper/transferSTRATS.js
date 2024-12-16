@@ -2,8 +2,8 @@ const { parse } = require("dotenv");
 const {
   contractName,
   NODE_ENV,
-  prodStratsAddress,
-  testnetStratsAddress,
+  prodUsdstAddress,
+  testnetUsdstAddress,
   prodMarketplaceUrl,
   testnetMarketplaceUrl,
   baUsername
@@ -54,17 +54,17 @@ function createTransactionObject(contractAddress, toAddress, value) {
 
 async function createTransactionPayload(token, transactions) {
   try {
-    // Fetch STRATS contracts once outside the loop
-    let STRATSContracts;
+    // Fetch USDST contracts once outside the loop
+    let USDSTContracts;
     try {
-      STRATSContracts = await getAdminStratsContractAddress(token);
+      USDSTContracts = await getAdminUsdstContractAddress(token);
     } catch (error) {
-      console.error("Error fetching STRATS contracts:", error);
-      throw new Error("Failed to fetch STRATS contracts");
+      console.error("Error fetching USDST contracts:", error);
+      throw new Error("Failed to fetch USDST contracts");
     }
 
-    // Create a copy of STRATSContracts to track remaining quantities
-    const remainingAssets = STRATSContracts?.map((asset) => ({
+    // Create a copy of USDSTContracts to track remaining quantities
+    const remainingAssets = USDSTContracts?.map((asset) => ({
       address: asset.address,
       quantity: asset.quantity,
     }));
@@ -72,7 +72,7 @@ async function createTransactionPayload(token, transactions) {
     const txs = [];
 
     for (const transaction of transactions) {
-      const stratsAssetAddressesToUse = [];
+      const usdstAssetAddressesToUse = [];
       let remainingValue = transaction.value;
 
       for (const asset of remainingAssets) {
@@ -80,7 +80,7 @@ async function createTransactionPayload(token, transactions) {
 
         if (asset.quantity > 0) {
           const quantityToUse = Math.min(asset.quantity, remainingValue);
-          stratsAssetAddressesToUse.push({
+          usdstAssetAddressesToUse.push({
             address: asset.address,
             quantity: quantityToUse,
           });
@@ -93,16 +93,16 @@ async function createTransactionPayload(token, transactions) {
 
       if (remainingValue > 0) {
         throw new Error(
-          `Not enough STRATS to cover the transaction for ${transaction.toAddress}`
+          `Not enough USDST to cover the transaction for ${transaction.toAddress}`
         );
       }
 
       // Create transaction objects and add them to the txs array
-      const txObjects = stratsAssetAddressesToUse?.map((strats) =>
+      const txObjects = usdstAssetAddressesToUse?.map((usdst) =>
         createTransactionObject(
-          strats.address,
+          usdst.address,
           transaction.toAddress,
-          strats.quantity
+          usdst.quantity
         )
       );
 
@@ -143,9 +143,9 @@ async function createTransactionPayload(token, transactions) {
   }
 }
 
-async function getAdminStratsContractAddress(token) {
+async function getAdminUsdstContractAddress(token) {
   const domain = NODE_ENV === "prod" ? prodMarketplaceUrl : testnetMarketplaceUrl;
-  const originAddress = NODE_ENV === "prod" ? prodStratsAddress : testnetStratsAddress;
+  const originAddress = NODE_ENV === "prod" ? prodUsdstAddress : testnetUsdstAddress;
   const url = `https://${domain}/cirrus/search/BlockApps-Mercata-Asset`;
 
   const queryParams = new URLSearchParams({
@@ -175,7 +175,7 @@ async function getAdminStratsContractAddress(token) {
     const body = await response.data;
     return body;
   } catch (error) {
-    console.error("Error fetching admin STRATS contract addresses:", error);
+    console.error("Error fetching admin USDST contract addresses:", error);
     throw error;
   }
 }
