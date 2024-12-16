@@ -38,7 +38,12 @@ import GlobalTransactionResponsive from './GlobalTransactionResponsive';
 
 const { Title } = Typography;
 
-const GlobalTransaction = ({ user, stratAddress, cataAddress }) => {
+const GlobalTransaction = ({
+  user,
+  stratAddress,
+  cataAddress,
+  ethstAddress,
+}) => {
   const StratsIcon = (
     <img src={Images.strat} alt="STRATs" className="mx-1 w-4 h-4" />
   );
@@ -167,10 +172,18 @@ const GlobalTransaction = ({ user, stratAddress, cataAddress }) => {
   };
 
   const handleAssetRedirection = (data) => {
-    const url = routes.MarketplaceProductDetail.url
-      .replace(':address', data.assetAddress)
-      .replace(':name', data.assetName);
-    navigate(url);
+    const isEthst = data?.assetOriginAddress === ethstAddress;
+    if (isEthst) {
+      const url = routes.EthstProductDetail.url;
+      navigate(`${url.replace(':address', data.assetAddress)}`, {
+        state: { isCalledFromInventory: false },
+      });
+    } else {
+      const url = routes.MarketplaceProductDetail.url
+        .replace(':address', data.assetAddress)
+        .replace(':name', data.assetName);
+      navigate(url);
+    }
   };
 
   const column = [
@@ -453,6 +466,7 @@ const GlobalTransaction = ({ user, stratAddress, cataAddress }) => {
               isTransactionLoading={isTransactionLoading}
               stratAddress={stratAddress}
               cataAddress={cataAddress}
+              ethstAddress={ethstAddress}
             />
           </Row>
         </div>

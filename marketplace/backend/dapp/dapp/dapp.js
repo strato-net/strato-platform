@@ -1151,7 +1151,7 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
 
   // ------------------------------ Bridge STARTS ------------------------------
   contract.addHash = async function (args, options = defaultOptions) {
-    return bridgeJs.addHash(rawAdmin, args, options);
+    return tokensJs.addHash(rawAdmin, args, options);
   };
 
   // ------------------------------ TOKENS STARTS ------------------------------
@@ -2114,7 +2114,7 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
 
   contract.getEscrowForAsset = async function (args, options = defaultOptions) {
     const { assetRootAddress } = args;
-    const queryArgs = { 
+    const queryArgs = {
       select: '*,BlockApps-Mercata-Escrow-assets(*)',
       assetRootAddress: `like.${assetRootAddress}*`,
       borrowerCommonName: `eq.${userCommonName}`,
@@ -2123,8 +2123,12 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
     return await escrowJs.searchEscrow(rawAdmin, queryArgs, options);
   };
 
-  contract.userCataRewards = async function ( options = defaultOptions) {
-    return await escrowJs.userCataRewards(rawAdmin, userCert.commonName, options);
+  contract.userCataRewards = async function (options = defaultOptions) {
+    return await escrowJs.userCataRewards(
+      rawAdmin,
+      userCert.commonName,
+      options
+    );
   };
 
   contract.oraclePrice = async function (args, options = defaultOptions) {
@@ -2150,11 +2154,7 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
     const stratsOriginAddress = await STRATSJs.getStratsAddress();
 
     // Retrieve escrow data associated with the escrow address
-    const escrowData = await escrowJs.get(
-      rawAdmin,
-      escrow,
-      options
-    );
+    const escrowData = await escrowJs.get(rawAdmin, escrow, options);
     const orderTotal = escrowData ? escrowData.borrowedAmount : 0;
 
     // Get user's active STRATS assets with non-zero quantities
