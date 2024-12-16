@@ -1,3 +1,5 @@
+import { add } from "winston";
+
 export const Authentication = {
   prefix: "/authentication",
   callback: "/callback",
@@ -107,6 +109,7 @@ export const Tokens = {
   prefix: "/tokens",
   getAll: "/",
   create: "/",
+  addHash: "/addHash",
 };
 
 export const STRATS = {

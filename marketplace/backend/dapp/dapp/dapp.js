@@ -1149,6 +1149,11 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
 
   // ------------------------------ ART ENDS --------------------------------
 
+  // ------------------------------ Bridge STARTS ------------------------------
+  contract.addHash = async function (args, options = defaultOptions) {
+    return bridgeJs.addHash(rawAdmin, args, options);
+  };
+
   // ------------------------------ TOKENS STARTS ------------------------------
 
   contract.createTokens = async function (args, options = defaultOptions) {

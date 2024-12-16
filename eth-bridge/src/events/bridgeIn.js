@@ -17,7 +17,7 @@ async function handleBridgeIn(transaction) {
     const queryResponse = await dbApiClient.get(
       `/BlockApps-Mercata-Asset-ETHBridgeHashAdded`,
       {
-        params: { hash: `eq.${encodeURIComponent(hash)}` },
+        params: { txHash: `eq.${encodeURIComponent(hash)}` },
       }
     );
 
@@ -36,7 +36,7 @@ async function handleBridgeIn(transaction) {
     // Create transaction payload
     // Convert the hex value to a standard number as a string
     const standardValue = BigInt(value).toString();
-    const recieverAddress = queryBody[0].recieverAddress;
+    const recieverAddress = queryBody[0].userAddress;
     const response = await createTransactionPayload(
       recieverAddress,
       standardValue,
