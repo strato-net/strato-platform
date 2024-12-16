@@ -1,5 +1,4 @@
-const { networkApiClient } = require("./apiClient");
-const { contractName, contractAddress } = require("../config");
+const { networkApiClient, dbApiClient } = require("./apiClient");
 const logger = require("./logger");
 
 /**
@@ -15,7 +14,7 @@ const fetchParallelTransaction = async (payload) => {
       payload
     );
     logger.info("Parallel transaction executed successfully.");
-    return response.data;
+    return response;
   } catch (error) {
     logger.error(`Error in fetchParallelTransaction: ${error.message}`);
     throw new Error("Failed to execute parallel transaction.");
@@ -31,15 +30,34 @@ const fetchParallelTransaction = async (payload) => {
  * @param {string} txHash - The transaction hash.
  * @returns {Object} - The transaction object.
  */
-const createTransactionObject = (method, toAddress, value, txHash) => {
+const createTransactionObject = async (method, toAddress, value, txHash) => {
   if (!method || !toAddress || !value || !txHash) {
     throw new Error("Invalid transaction parameters.");
   }
 
+  // Fetch certificates based on the transaction hash
+  const queryResponse = await dbApiClient.get(
+    `/BlockApps-Mercata-MercataETHBridge`,
+    {
+      params: { isActive: `eq.true`, creator: `eq.BlockApps` },
+    }
+  );
+  console.log("queryResponse", queryResponse);
+
+  const queryBody = queryResponse.data;
+
+  // Handle case where no data is returned
+  if (!queryBody || queryBody.length === 0) {
+    console.warn(`No MercataETHBridge contracts found on the Mercata network.`);
+    return;
+  }
+
+  console.log("MercataETHBridge retrieved successfully:", queryBody);
+
   return {
     payload: {
-      contractName,
-      contractAddress,
+      contractName: "MercataETHBridge",
+      contractAddress: queryBody[0].address,
       method,
       args: {
         _userAddress: toAddress,
@@ -73,10 +91,12 @@ const createTransactionPayload = async (
 
     // Create transaction payload dynamically
     const payload = {
-      txs: [createTransactionObject(method, receiverAddress, value, txHash)],
+      txs: [
+        await createTransactionObject(method, receiverAddress, value, txHash),
+      ],
       txParams: {
-        gasLimit: "32100000000", // Ensure this is correctly formatted for the API
-        gasPrice: "1", // Ensure this is correctly formatted for the API
+        gasLimit: 32100000000,
+        gasPrice: 1,
       },
     };
 
