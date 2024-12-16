@@ -242,7 +242,7 @@ async function getAllOwnershipEvents(admin, args = {}, options) {
 }
 
 async function addHash(user, args, options) {
-  const CREATOR = 'eq.aariya50'; // change to blockapps ralter
+  const CREATOR = 'eq.BlockApps';
   const IS_ACTIVE = 'eq.true';
   const { txHash, userAddress, amount } = args;
   const contractName = 'MercataETHBridge';
