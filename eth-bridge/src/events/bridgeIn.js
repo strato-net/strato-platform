@@ -17,7 +17,7 @@ async function handleBridgeIn(transaction) {
     const queryResponse = await dbApiClient.get(
       `/BlockApps-Mercata-Asset-ETHBridgeHashAdded`,
       {
-        params: { txHash: `eq.${encodeURIComponent(hash)}` },
+        params: { txhash: `eq.${encodeURIComponent(hash)}` },
       }
     );
 

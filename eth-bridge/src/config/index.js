@@ -9,6 +9,7 @@ module.exports = {
   marketplaceUrl: process.env.MARKETPLACE_URL,
   ETHSTAddress: process.env.ETHST_ADDRESS,
   contractName: process.env.CONTRACT_NAME,
+  contractAddress: process.env.CONTRACT_ADDRESS,
   alchemyApiKey: process.env.ALCHEMY_API_KEY,
   alchemyNetwork: process.env.ALCHEMY_NETWORK,
   mintAndTransfer: "mintETHST",
