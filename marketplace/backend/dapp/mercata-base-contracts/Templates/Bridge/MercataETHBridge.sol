@@ -8,6 +8,7 @@ abstract contract MercataETHBridge{
     }
 
     address public owner;
+    address public burnerAddress = 0x6ec8bbe4a5b87be18d443408df43a45e5972fa1b; // burner account
     bool public isActive = true;
 
     address public ethSt;
@@ -16,6 +17,7 @@ abstract contract MercataETHBridge{
 
     event ETHBridgeHashAdded(address userAddress, string txhash, string amount);
     event MintedETHST(address user, string username, uint amount);
+    event BurnedETHST(address user, string username, string baseAddress, uint amount);
 
     modifier onlyOwner() {
         require(owner == msg.sender, "Ownable: caller is not the owner");
@@ -45,12 +47,52 @@ abstract contract MercataETHBridge{
         hashExists[_txHash] = 2;
         Mintable(ethSt).mintNewUnits(_amount);
         Asset(UTXO(Redeemable(Mintable(ethSt)))).automaticTransfer(_userAddress, 0.01, _amount, block.number);
-        emit MintedETHST(_userAddress, "User", _amount);
+        emit MintedETHST(_userAddress, getCommonName(_userAddress), _amount);
     }
 
     function addHash(address _userAddress, string _txHash, string _amount) external requireActive {
         require(hashExists[_txHash] == 0, "Hash already exists");
         hashExists[_txHash] = 1;
         emit ETHBridgeHashAdded(_userAddress, _txHash, _amount);
+    }
+
+    function burnETHST(
+        address[] _ethstAddresses,
+        uint _quantity,
+        string _baseAddress
+    ) requireActive() external returns (uint) {
+        require(_ethstAddresses.length > 0, "Pass at least one ETHST token address");
+        Escrow escrow = Escrow(_escrowAddress);
+        uint ethstAmountOwed = _quantity;
+        uint ethstAmountNet = ethstAmountOwed;
+        uint ethstQuantity = 0;
+        uint transferNumber = 0;
+
+        for (uint j = 0; j < _ethstAddresses.length; j++) {
+            Asset ethstAsset = Asset(_ethstAddresses[j]);
+            require(ethstAsset.root == ethSt.root, "Asset is not an ETHST asset");
+            require(ethstAsset.ownerCommonName() == getCommonName(msg.sender), "Purchaser doesn't own this ETHST asset");
+
+            ethstQuantity = ethstAsset.quantity();
+            transferNumber = (uint(string(_escrowAddress), 16) + j + block.timestamp) % 1000000;
+
+            ethstAsset.attachSale();
+            if (ethstQuantity > ethstAmountNet) {
+                ethstAsset.transferOwnership(burnerAddress, ethstAmountNet, false, transferNumber, 0.000000000000000001);
+                ethstAsset.closeSale();
+                ethstAmountNet = 0;
+            } else {
+                ethstAsset.transferOwnership(burnerAddress, ethstQuantity, false, transferNumber, 0.000000000000000001);
+                ethstAmountNet -= ethstQuantity;
+            }
+
+            if (ethstAmountNet == 0) {
+                break;
+            }
+        }
+        // require(ethstAmountNet == 0, "Your ethstS balance is not high enough to cover the repayment."); // Allow partial repayments
+
+        uint ethstAmountRepaid = ethstAmountOwed - ethstAmountNet;
+        emit BurnedETHST(_userAddress, getCommonName(_userAddress), _baseAddress, ethstAmountRepaid);
     }
 }
