@@ -233,7 +233,9 @@ const AuthenticatedRoutes = ({ user, users, isAuthenticated }) => {
                       <RedemptionsProvider>
                         <PaymentServicesProvider>
                           <IssuerStatusProvider>
-                            <Inventory user={user} users={users} />
+                            <EthProvider>
+                              <Inventory user={user} users={users} />
+                            </EthProvider>
                           </IssuerStatusProvider>
                         </PaymentServicesProvider>
                       </RedemptionsProvider>
@@ -363,7 +365,9 @@ const AuthenticatedRoutes = ({ user, users, isAuthenticated }) => {
                   <ItemsProvider>
                     <InventoriesProvider>
                       <RedemptionsProvider>
-                        <Transaction user={user} users={users} />
+                        <EthProvider>
+                          <Transaction user={user} users={users} />
+                        </EthProvider>
                       </RedemptionsProvider>
                     </InventoriesProvider>
                   </ItemsProvider>
@@ -384,7 +388,9 @@ const AuthenticatedRoutes = ({ user, users, isAuthenticated }) => {
                   <ItemsProvider>
                     <InventoriesProvider>
                       <RedemptionsProvider>
-                        <Feed user={user} users={users} />
+                        <EthProvider>
+                          <Feed user={user} users={users} />
+                        </EthProvider>
                       </RedemptionsProvider>
                     </InventoriesProvider>
                   </ItemsProvider>

@@ -109,7 +109,6 @@ export const Tokens = {
   prefix: '/tokens',
   getAll: '/',
   create: '/',
-  addHash: '/addHash',
 };
 
 export const STRATS = {
@@ -223,4 +222,5 @@ export const Escrow = {
 export const Eth = {
   prefix: '/eth',
   getETHSTAddress: '/address',
+  addHash: '/addHash',
 };

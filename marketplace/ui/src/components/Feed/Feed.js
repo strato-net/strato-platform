@@ -3,22 +3,27 @@ import React, { useEffect, useState } from 'react';
 import routes from '../../helpers/routes';
 import ClickableCell from '../ClickableCell';
 import { actions as marketplaceActions } from '../../contexts/marketplace/actions';
+import { actions as ethActions } from '../../contexts/eth/actions';
 import {
   useMarketplaceDispatch,
   useMarketplaceState,
 } from '../../contexts/marketplace';
+import { useEthDispatch, useEthState } from '../../contexts/eth';
 import GlobalTransaction from './GlobalTransaction';
 
 const Feed = ({ user }) => {
   const [api, contextHolder] = notification.useNotification();
   const { stratsAddress, cataAddress } = useMarketplaceState();
+  const { ethstAddress } = useEthState();
 
   const marketplaceDispatch = useMarketplaceDispatch();
+  const ethDispatch = useEthDispatch();
 
   useEffect(() => {
     const fetchAddresses = async () => {
       marketplaceActions.fetchStratsAddress(marketplaceDispatch);
       marketplaceActions.fetchCataAddress(marketplaceDispatch);
+      ethActions.fetchETHSTAddress(ethDispatch);
     };
 
     fetchAddresses();
@@ -42,6 +47,7 @@ const Feed = ({ user }) => {
           user={user}
           stratAddress={stratsAddress}
           cataAddress={cataAddress}
+          ethstAddress={ethstAddress}
         />
       )}
     </div>

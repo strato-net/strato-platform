@@ -16,12 +16,14 @@ import {
 import TransactionTable from './TransactionTable';
 import { useTransactionState } from '../../contexts/transaction';
 import { actions as marketplaceActions } from '../../contexts/marketplace/actions';
+import { actions as ethAcions } from '../../contexts/eth/actions';
+import { useEthDispatch } from '../../contexts/eth';
 import { useMarketplaceDispatch } from '../../contexts/marketplace';
 
 const Transaction = ({ user }) => {
   const categoryDispatch = useCategoryDispatch();
-
   const marketplaceDispatch = useMarketplaceDispatch();
+  const ethDispatch = useEthDispatch();
   const [stratAddress, setStratAddress] = useState('');
   const [cataAddress, setCataAddress] = useState('');
 
@@ -33,6 +35,7 @@ const Transaction = ({ user }) => {
       const cataAddress = await marketplaceActions.fetchCataAddress(
         marketplaceDispatch
       );
+      await ethAcions.fetchETHSTAddress(ethDispatch);
       setStratAddress(stratAddress);
       setCataAddress(cataAddress);
     };

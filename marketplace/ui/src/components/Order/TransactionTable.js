@@ -34,6 +34,7 @@ import {
   useTransactionDispatch,
   useTransactionState,
 } from '../../contexts/transaction';
+import { useEthState } from '../../contexts/eth';
 import { useMarketplaceDispatch } from '../../contexts/marketplace';
 // Utils & Constants
 import {
@@ -76,6 +77,7 @@ const TransactionTable = ({ user, download, stratAddress, cataAddress }) => {
   const [transactions, setTransactions] = useState(userTransactions);
   const [originAddress, setOriginAddress] = useState('');
   const [search, setSearch] = useState('');
+  const { ethstAddress } = useEthState();
 
   const formatter = new Intl.NumberFormat('en-US');
   const formattedNum = (num) => formatter.format(num);
@@ -285,10 +287,18 @@ const TransactionTable = ({ user, download, stratAddress, cataAddress }) => {
   };
 
   const handleAssetRedirection = (data) => {
-    const url = routes.MarketplaceProductDetail.url
-      .replace(':address', data.assetAddress)
-      .replace(':name', data.assetName);
-    navigate(url);
+    const isEthst = data?.assetOriginAddress === ethstAddress;
+    if (isEthst) {
+      const url = routes.EthstProductDetail.url;
+      navigate(`${url.replace(':address', data.assetAddress)}`, {
+        state: { isCalledFromInventory: false },
+      });
+    } else {
+      const url = routes.MarketplaceProductDetail.url
+        .replace(':address', data.assetAddress)
+        .replace(':name', data.assetName);
+      navigate(url);
+    }
   };
 
   const column = [

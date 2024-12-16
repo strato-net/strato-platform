@@ -24,6 +24,7 @@ import {
 import ActivityFeed from './ActivityFeed';
 import { actions as inventoryActions } from '../../contexts/inventory/actions';
 import { actions as marketplaceActions } from '../../contexts/marketplace/actions';
+import { actions as ethActions } from '../../contexts/eth/actions';
 import { useAuthenticateState } from '../../contexts/authentication';
 import { Link, useLocation, useMatch, useParams } from 'react-router-dom';
 import { useNavigate } from 'react-router-dom';
@@ -31,6 +32,7 @@ import {
   useInventoryDispatch,
   useInventoryState,
 } from '../../contexts/inventory';
+import { useEthDispatch } from '../../contexts/eth';
 import {
   useMarketplaceDispatch,
   useMarketplaceState,
@@ -55,6 +57,7 @@ const UserProfile = ({ user }) => {
   const [activeTab, setActiveTab] = useState('1');
   const dispatch = useInventoryDispatch();
   const categoryDispatch = useCategoryDispatch();
+  const ethDispatch = useEthDispatch();
   const [category, setCategory] = useState(undefined);
   const { cartList } = useMarketplaceState();
   const [api, contextHolder] = notification.useNotification();
@@ -81,6 +84,7 @@ const UserProfile = ({ user }) => {
       const cataAddress = await marketplaceActions.fetchCataAddress(
         marketplaceDispatch
       );
+      await ethActions.fetchETHSTAddress(ethDispatch);
       setStratAddress(stratAddress);
       setCataAddress(cataAddress);
     };

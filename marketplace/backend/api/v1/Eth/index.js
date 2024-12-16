@@ -20,5 +20,12 @@ router.get(
   EthController.getETHSTAddress
 );
 
+router.post(
+  Eth.addHash,
+  authHandler.authorizeRequest(),
+  loadDapp,
+  EthController.addHash
+)
+
 
 export default router;

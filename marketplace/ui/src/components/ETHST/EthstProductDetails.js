@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import {
   Row,
   Breadcrumb,
@@ -29,15 +29,15 @@ import {
 } from '../../contexts/inventory';
 import { actions as categoryActions } from '../../contexts/category/actions';
 import { actions as marketPlaceActions } from '../../contexts/marketplace/actions';
-import { actions as orderActions } from '../../contexts/order/actions';
+import { actions as ethActions } from '../../contexts/eth/actions';
 // dispatch & state
 import {
   useMarketplaceDispatch,
   useMarketplaceState,
 } from '../../contexts/marketplace';
-import { useOrderDispatch } from '../../contexts/order';
 import { useCategoryDispatch, useCategoryState } from '../../contexts/category';
 import { useAuthenticateState } from '../../contexts/authentication';
+import { useEthDispatch, useEthState } from '../../contexts/eth';
 // components
 import HelmetComponent from '../Helmet/HelmetComponent';
 import DataTableComponent from '../DataTableComponent';
@@ -63,12 +63,12 @@ import image_placeholder from '../../images/resources/image_placeholder.png';
 import 'react-responsive-carousel/lib/styles/carousel.min.css'; // requires a loader
 
 import { SEO } from '../../helpers/seoConstant';
-import { STRATS_CONVERSION, ASSET_STATUS } from '../../helpers/constants';
+import { ASSET_STATUS } from '../../helpers/constants';
 import { TOAST_MSG } from '../../helpers/msgConstants';
 import { Swiper, SwiperSlide } from 'swiper/react';
 import { Ethers5Adapter } from '@reown/appkit-adapter-ethers5';
-import { createAppKit, useAppKit, useAppKitAccount } from '@reown/appkit/react';
-import { base, baseSepolia, mainnet } from '@reown/appkit/networks';
+import { baseSepolia, base, mainnet } from '@reown/appkit/networks';
+import { useAppKit, useAppKitAccount, createAppKit } from '@reown/appkit/react';
 import { ethers } from 'ethers';
 
 // Import Swiper styles
@@ -92,11 +92,10 @@ const ProductDetails = ({ user, users }) => {
   const dispatch = useInventoryDispatch();
   const categoryDispatch = useCategoryDispatch();
   const marketplaceDispatch = useMarketplaceDispatch();
+  const ethDispatch = useEthDispatch();
   // state
   const { categorys, iscategorysLoading } = useCategoryState();
   const {
-    success,
-    message,
     inventoryDetails,
     isInventoryDetailsLoading,
     isInventoryOwnershipHistoryLoading,
@@ -106,6 +105,7 @@ const ProductDetails = ({ user, users }) => {
     reserves,
   } = useInventoryState();
   const { cartList } = useMarketplaceState();
+  const { success, message } = useEthState();
 
   const [isModalVisible, setIsModalVisible] = useState(false);
   const [timeFilter, setTimeFilter] = useState('1');
@@ -173,19 +173,26 @@ const ProductDetails = ({ user, users }) => {
       url: 'https://marketplace.mercata-testnet2.blockapps.net/',
       icons: ['https://avatars.githubusercontent.com/u/179229932?s=200&v=4'],
     },
-    networks: [base, baseSepolia, mainnet],
+    networks: [baseSepolia, base, mainnet],
     projectId,
   });
 
   const appKit = useAppKit();
-  const account = useAppKitAccount();
+  const rawAccount = useAppKitAccount();
   const [ethBalance, setEthBalance] = useState(0);
+  const [signer, setSigner] = useState({});
+
+  const account = useMemo(() => {
+    return rawAccount && rawAccount.address ? rawAccount : null;
+  }, [rawAccount?.address]);
 
   useEffect(() => {
     const fetchBalance = async () => {
       if (account?.address) {
         const provider = new ethers.providers.Web3Provider(window.ethereum);
         const balanceWei = await provider.getBalance(account.address);
+        const signer = provider.getSigner();
+        setSigner(signer);
         setEthBalance(ethers.utils.formatEther(balanceWei));
       }
     };
@@ -336,34 +343,18 @@ const ProductDetails = ({ user, users }) => {
     setIsModalVisible(false);
   };
 
-  const openToast = (placement, isError, msg) => {
-    if (isError) {
-      api.error({
-        message: msg,
-        placement,
-        key: 1,
-      });
-    } else {
-      api.success({
-        message: msg,
-        placement,
-        key: 1,
-      });
-    }
-  };
-
-  const openToastInventory = (placement) => {
+  const openToast = (placement) => {
     if (success) {
       api.success({
         message: message,
-        onClose: inventoryActions.resetMessage(dispatch),
+        onClose: ethActions.resetMessage(ethDispatch),
         placement,
         key: 1,
       });
     } else {
       api.error({
         message: message,
-        onClose: inventoryActions.resetMessage(dispatch),
+        onClose: ethActions.resetMessage(ethDispatch),
         placement,
         key: 2,
       });
@@ -515,8 +506,8 @@ const ProductDetails = ({ user, users }) => {
             </Breadcrumb>
           </Row>
           <EthstSteps />
-          <div className="flex w-full flex-col lg:leading-12 px-4 sm:px-8 md:px-0 items-center md:w-[750px] lg:w-[835px] xl:w-[858px]  md:mx-auto mt-12">
-            <div className="flex md:justify-center gap-[15px] lg:gap-6 flex-col lg:flex-row">
+          <div className="flex w-full flex-col md:leading-12 px-4 sm:px-8 md:px-0 items-center md:w-[750px] md:w-[835px] xl:w-[858px]  md:mx-auto mt-12">
+            <div className="flex md:justify-center gap-[15px] md:gap-6 flex-col md:flex-row items-center">
               {details['BlockApps-Mercata-Asset-images'].length > 0 ? (
                 <Swiper
                   spaceBetween={30}
@@ -685,7 +676,7 @@ const ProductDetails = ({ user, users }) => {
                           if (!isAuthenticated || !user) {
                             setIsModalVisible(true);
                           } else {
-                            if (account.address) {
+                            if (account?.address) {
                               showBridgeWalletModal();
                             } else {
                               appKit.open();
@@ -693,10 +684,10 @@ const ProductDetails = ({ user, users }) => {
                           }
                         }}
                       >
-                        {account.address ? 'Bridge' : 'Connect Wallet'}
+                        {account?.address ? 'Bridge' : 'Connect Wallet'}
                       </Button>
                     </div>
-                    {account.address && (
+                    {account?.address && (
                       <div className="bg-[#13188A] rounded-full mt-2">
                         <appkit-account-button />
                       </div>
@@ -931,6 +922,7 @@ const ProductDetails = ({ user, users }) => {
         <BridgeWallet
           open={bridgeWalletModalOpen}
           handleCancel={handleBridgeWalletModalClose}
+          signer={signer}
           accountDetails={{
             walletAddress: account?.address,
             ethBalance: ethBalance,
@@ -955,7 +947,7 @@ const ProductDetails = ({ user, users }) => {
           reserves={reserves}
         />
       )}
-      {message && openToastInventory('bottom')}
+      {message && openToast('bottom')}
     </>
   );
 };

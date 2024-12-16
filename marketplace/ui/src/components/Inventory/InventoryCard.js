@@ -35,6 +35,7 @@ import 'react-responsive-carousel/lib/styles/carousel.min.css';
 import { SEO } from '../../helpers/seoConstant';
 import { Images } from '../../images';
 import { useInventoryState } from '../../contexts/inventory';
+import { useEthState } from '../../contexts/eth';
 import RepayModal from './RepayModal';
 import BorrowModal from './BorrowModal';
 const StratsIcon = <img src={Images.strat} alt="STRATs" className="w-5 h-5" />;
@@ -67,9 +68,11 @@ const InventoryCard = ({
   const [bridgeModalOpen, setBridgeModalOpen] = useState(false);
   const [stakeModalOpen, setStakeModalOpen] = useState(false);
   const [popoverVisible, setPopoverVisible] = useState({});
+  const { ethstAddress } = useEthState();
 
   const navigate = useNavigate();
   const naviroute = routes.InventoryDetail.url;
+  const ethNaviroute = routes.EthstProductDetail.url;
   const imgMeta = category ? category : SEO.TITLE_META;
   const itemData = inventory.data;
   const isStrat = inventory.originAddress === stratAddress;
@@ -191,14 +194,20 @@ const InventoryCard = ({
   };
 
   const callDetailPage = () => {
-    navigate(
-      `${naviroute
-        .replace(':id', inventory.address)
-        .replace(':name', encodeURIComponent(inventory.name))}`,
-      {
-        state: { isCalledFromInventory: true },
-      }
-    );
+    if (inventory.originAddress === ethstAddress) {
+      navigate(`${ethNaviroute.replace(':address', inventory.address)}`, {
+        state: { isCalledFromInventory: false },
+      });
+    } else {
+      navigate(
+        `${naviroute
+          .replace(':id', inventory.address)
+          .replace(':name', encodeURIComponent(inventory.name))}`,
+        {
+          state: { isCalledFromInventory: true },
+        }
+      );
+    }
   };
 
   const getCategory = () => {

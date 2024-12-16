@@ -10,6 +10,7 @@ const EthProvider = ({ children }) => {
     success: false,
     message: null,
     ethstAddress: null,
+    isAddingHash: false,
   };
 
   const [state, dispatch] = useReducer(reducer, initialState);

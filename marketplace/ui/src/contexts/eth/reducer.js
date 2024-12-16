@@ -27,6 +27,21 @@ const reducer = (state, action) => {
       return {
         ...state,
       };
+    case actionDescriptors.addHash:
+      return {
+        ...state,
+        isAddingHash: true,
+      };
+    case actionDescriptors.addHashSuccessful:
+      return {
+        ...state,
+        isAddingHash: false,
+      };
+    case actionDescriptors.addHashFailed:
+      return {
+        ...state,
+        isAddingHash: false,
+      };
     default:
       throw new Error(`Unhandled action: '${action.type}'`);
   }

@@ -20,11 +20,4 @@ router.post(
   TokensController.create
 );
 
-router.post(
-  Tokens.addHash,
-  authHandler.authorizeRequest(),
-  loadDapp,
-  TokensController.addHash
-)
-
 export default router;

@@ -7,6 +7,9 @@ const actionDescriptors = {
   fetchETHSTAddress: 'fetch_ethst_address',
   fetchETHSTAddressSuccessful: 'fetch_ethst_address_successful',
   fetchETHSTAddressFailed: 'fetch_ethst_address_failed',
+  addHash: 'add_hash',
+  addHashSuccessful: 'add_hash_successful',
+  addHashFailed: 'add_hash_failed',
 };
 
 const actions = {
@@ -57,6 +60,66 @@ const actions = {
         payload: 'Error while fetching ETHST address',
       });
       return null;
+    }
+  },
+
+  addHash: async (dispatch, payload) => {
+    dispatch({ type: actionDescriptors.addHash });
+
+    try {
+      const response = await fetch(`${apiUrl}/eth/addHash`, {
+        method: HTTP_METHODS.POST,
+        credentials: 'same-origin',
+        headers: {
+          Accept: 'application/json',
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(payload),
+      });
+
+      const body = await response.json();
+
+      if (response.status === RestStatus.OK) {
+        dispatch({
+          type: actionDescriptors.addHashSuccessful,
+          payload: body.data,
+        });
+        actions.setMessage(dispatch, 'Hash added successfully', true);
+        return true;
+      } else if (response.status === RestStatus.CONFLICT) {
+        dispatch({
+          type: actionDescriptors.addHashFailed,
+          error: body.error.message,
+        });
+        actions.setMessage(dispatch, body.error.message);
+        return false;
+      } else if (response.status === RestStatus.INTERNAL_SERVER_ERROR) {
+        dispatch({
+          type: actionDescriptors.addHashFailed,
+          error: 'Error while adding Hash',
+        });
+        actions.setMessage(dispatch, 'Error while adding Hash');
+        return false;
+      } else if (response.status === RestStatus.UNAUTHORIZED) {
+        dispatch({
+          type: actionDescriptors.addHashFailed,
+          error: 'Unauthorized while adding Hash',
+        });
+        window.location.href = body.error.loginUrl;
+      }
+
+      dispatch({
+        type: actionDescriptors.addHashFailed,
+        error: body.error,
+      });
+      actions.setMessage(dispatch, body.error);
+      return false;
+    } catch (err) {
+      dispatch({
+        type: actionDescriptors.addHashFailed,
+        error: 'Error while adding Hash',
+      });
+      actions.setMessage(dispatch, 'Error while adding Hash');
     }
   },
 };

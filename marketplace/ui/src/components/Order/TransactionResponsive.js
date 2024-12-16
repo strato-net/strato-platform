@@ -13,11 +13,13 @@ import {
 import routes from '../../helpers/routes';
 import { useNavigate } from 'react-router-dom';
 import moment from 'moment';
+import { useEthState } from '../../contexts/eth';
 
 const TransactionResponsive = ({ data, user, stratAddress, cataAddress }) => {
   const StratsIcon = <img src={Images.strat} alt="" className="w-5 h-5" />;
   const navigate = useNavigate();
   const [expandedRows, setExpandedRows] = useState({});
+  const { ethstAddress } = useEthState();
 
   const formatter = new Intl.NumberFormat('en-US');
   const formattedNum = (num) => formatter.format(num);
@@ -143,9 +145,15 @@ const TransactionResponsive = ({ data, user, stratAddress, cataAddress }) => {
           const handleDetailRedirection = () => {
             let route;
             if (type === 'Order' && from === user.commonName) {
-              route = `${routes.SoldOrderDetails.url.replace(':id', address ? transaction_hash : address)}`;
+              route = `${routes.SoldOrderDetails.url.replace(
+                ':id',
+                address ? transaction_hash : address
+              )}`;
             } else if (type === 'Order' && from !== user.commonName) {
-              route = `${routes.BoughtOrderDetails.url.replace(':id', address ? transaction_hash : address)}`;
+              route = `${routes.BoughtOrderDetails.url.replace(
+                ':id',
+                address ? transaction_hash : address
+              )}`;
             } else if (type === 'Transfer') {
             } else if (type === 'Redemption' && to === user.commonName) {
               route = `${routes.RedemptionsIncomingDetails.url
@@ -161,16 +169,26 @@ const TransactionResponsive = ({ data, user, stratAddress, cataAddress }) => {
           };
 
           const handleAssetRedirection = () => {
-            const url = routes.MarketplaceProductDetail.url
-              .replace(':address', assetAddress)
-              .replace(':name', assetName);
-            navigate(url);
+            const isEthst = assetOriginAddress === ethstAddress;
+            if (isEthst) {
+              const url = routes.EthstProductDetail.url;
+              navigate(`${url.replace(':address', assetAddress)}`, {
+                state: { isCalledFromInventory: false },
+              });
+            } else {
+              const url = routes.MarketplaceProductDetail.url
+                .replace(':address', assetAddress)
+                .replace(':name', assetName);
+              navigate(url);
+            }
           };
 
           return (
             <Row
               key={index}
-              className={`bg-red-300 w-full ${isExpanded ? '' : 'h-36'} rounded-xl px-2 py-2 shadow-2xl border-2 `}
+              className={`bg-red-300 w-full ${
+                isExpanded ? '' : 'h-36'
+              } rounded-xl px-2 py-2 shadow-2xl border-2 `}
             >
               <Col span={6} className="flex justify-center bg-grey-400">
                 <img
@@ -195,7 +213,9 @@ const TransactionResponsive = ({ data, user, stratAddress, cataAddress }) => {
                 </p>
                 <p
                   style={{ color: '#13188A' }}
-                  className={`font-semibold ${type === 'Transfer' ? 'cursor-default' : 'cursor-pointer'}`}
+                  className={`font-semibold ${
+                    type === 'Transfer' ? 'cursor-default' : 'cursor-pointer'
+                  }`}
                   onClick={() => {
                     handleDetailRedirection();
                   }}

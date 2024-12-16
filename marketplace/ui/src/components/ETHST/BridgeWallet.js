@@ -1,7 +1,16 @@
 import { Button, Input, InputNumber, Modal, Table, Tabs } from 'antd';
 import { useState } from 'react';
+import { actions as ethActions } from '../../contexts/eth/actions';
+import { useEthDispatch, useEthState } from '../../contexts/eth';
+import { useAuthenticateState } from '../../contexts/authentication';
+import { ethers } from 'ethers';
 
-const BridgeWalletModal = ({ open, handleCancel, accountDetails }) => {
+const BridgeWalletModal = ({ open, handleCancel, accountDetails, signer }) => {
+  const [quantity, setQuantity] = useState(1);
+  const ethDispatch = useEthDispatch();
+  const { user } = useAuthenticateState();
+  const { isAddingHash } = useEthState();
+
   const ethToMercataColumns = [
     {
       title: 'ETH Available',
@@ -11,7 +20,12 @@ const BridgeWalletModal = ({ open, handleCancel, accountDetails }) => {
     {
       title: 'Set Quantity',
       align: 'center',
-      render: () => <InputNumber />,
+      render: () => (
+        <InputNumber
+          value={quantity}
+          onChange={(value) => setQuantity(value)}
+        />
+      ),
     },
     {
       title: 'Wallet Address',
@@ -31,7 +45,12 @@ const BridgeWalletModal = ({ open, handleCancel, accountDetails }) => {
     {
       title: 'Set Quantity',
       align: 'center',
-      render: () => <InputNumber />,
+      render: () => (
+        <InputNumber
+          value={quantity}
+          onChange={(value) => setQuantity(value)}
+        />
+      ),
     },
     {
       title: 'Wallet Address',
@@ -52,26 +71,34 @@ const BridgeWalletModal = ({ open, handleCancel, accountDetails }) => {
           pagination={false}
         />
       </div>
-      <div className="flex flex-col gap-[18px] md:hidden mt-5">
+      <div className="flex flex-col gap-[18px] md:hidden mt-2">
         <div>
           <p className="text-[#202020] font-medium text-sm">
             Quantity Available
           </p>
           <div className="border border-[#d9d9d9] h-[42px] rounded-md flex items-center justify-center">
-            <p>10</p>
+            <p>{accountDetails.ethBalance}</p>
           </div>
         </div>
         <div>
           <p className="text-[#202020] font-medium text-sm">Set Quantity</p>
           <div>
-            <InputNumber className="w-full h-9" />
+            <InputNumber
+              className="w-full h-9"
+              value={quantity}
+              onChange={(value) => setQuantity(value)}
+            />
           </div>
         </div>
         <div>
           <p className="text-[#202020] font-medium text-sm">
             Base Wallet Address
           </p>
-          <Input placeholder="Base Chain address" />
+          <Input
+            placeholder="Base Chain address"
+            value={accountDetails.walletAddress}
+            disabled={true}
+          />
         </div>
       </div>
     </>
@@ -98,7 +125,11 @@ const BridgeWalletModal = ({ open, handleCancel, accountDetails }) => {
         <div>
           <p className="text-[#202020] font-medium text-sm">Set Quantity</p>
           <div>
-            <InputNumber className="w-full h-9" />
+            <InputNumber
+              className="w-full h-9"
+              value={quantity}
+              onChange={(value) => setQuantity(value)}
+            />
           </div>
         </div>
         <div>
@@ -112,7 +143,22 @@ const BridgeWalletModal = ({ open, handleCancel, accountDetails }) => {
   );
 
   const handleSubmit = async () => {
-    console.log('body');
+    const tx = await signer.sendTransaction({
+      to: '0xBdAFaEBc08B94785dfE7Fc720Fbcd9aFc156454E',
+      value: ethers.utils.parseEther(quantity.toString()),
+    });
+
+    const body = {
+      userAddress: user.userAddress,
+      txHash: tx.hash,
+      amount: quantity.toString(),
+    };
+
+    let isDone = await ethActions.addHash(ethDispatch, body);
+
+    if (isDone) {
+      handleCancel();
+    }
   };
 
   return (
@@ -123,7 +169,12 @@ const BridgeWalletModal = ({ open, handleCancel, accountDetails }) => {
       width={1000}
       footer={[
         <div className="flex justify-center md:block">
-          <Button type="primary" className="w-32 h-9" onClick={handleSubmit}>
+          <Button
+            type="primary"
+            className="w-32 h-9"
+            onClick={handleSubmit}
+            loading={isAddingHash}
+          >
             Bridge
           </Button>
         </div>,
@@ -133,9 +184,9 @@ const BridgeWalletModal = ({ open, handleCancel, accountDetails }) => {
         <Tabs.TabPane tab="Bridge ETH to Mercata" key="1">
           {ethToMercata()}
         </Tabs.TabPane>
-        <Tabs.TabPane tab="Bridge ETH to Base" key="2">
+        {/* <Tabs.TabPane tab="Bridge ETH to Base" key="2">
           {ethToBase()}
-        </Tabs.TabPane>
+        </Tabs.TabPane> */}
       </Tabs>
     </Modal>
   );
