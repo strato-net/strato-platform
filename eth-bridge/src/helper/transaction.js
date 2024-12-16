@@ -75,8 +75,8 @@ const createTransactionPayload = async (
     const payload = {
       txs: [createTransactionObject(method, receiverAddress, value, txHash)],
       txParams: {
-        gasLimit: "32100000000", // Ensure this is correctly formatted for the API
-        gasPrice: "1", // Ensure this is correctly formatted for the API
+        gasLimit: 32100000000,
+        gasPrice: 1,
       },
     };
 

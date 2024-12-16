@@ -15,7 +15,7 @@ async function handleBridgeIn(transaction) {
 
     // Fetch certificates based on the transaction hash
     const queryResponse = await dbApiClient.get(
-      `/BlockApps-Mercata-Asset-ETHBridgeHashAdded`,
+      `/BlockApps-Mercata-MercataETHBridge-ETHBridgeHashAdded`,
       {
         params: { txhash: `eq.${encodeURIComponent(hash)}` },
       }
