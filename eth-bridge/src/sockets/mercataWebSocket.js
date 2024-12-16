@@ -2,8 +2,8 @@
 const WebSocket = require("ws");
 const { getUserToken } = require("../auth");
 const { marketplaceUrl } = require("../config");
-// const { handleMessage } = require('../events/handleMessage'); // Uncomment if needed
-// const { filterMessages } = require('../events/eventFilter'); // Uncomment if needed
+const { handleBridgeOut } = require("../events/bridgeOut");
+const { filterMessages } = require("../helper/eventFilter");
 
 const connectMercataWebSocket = async () => {
   let token = await getUserToken();
@@ -40,10 +40,10 @@ const connectMercataWebSocket = async () => {
   ws.on("message", async (data) => {
     try {
       const message = data.toString();
-      console.log("Message received:", message);
-      //   if (await filterMessages(message)) {
-      // await handleMessage(message, token);
-      //   }
+      if (await filterMessages(message)) {
+        const event = JSON.parse(message);
+        await handleBridgeOut(event);
+      }
     } catch (error) {
       console.error("Message handling error:", error);
     }

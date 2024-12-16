@@ -10,5 +10,6 @@ module.exports = {
   ETHSTAddress: process.env.ETHST_ADDRESS,
   alchemyApiKey: process.env.ALCHEMY_API_KEY,
   alchemyNetwork: process.env.ALCHEMY_NETWORK,
+  blockAppsPrivateKey: process.env.BLOCKAPPS_PRIVATE_KEY,
   mintAndTransfer: "mintETHST",
 };
