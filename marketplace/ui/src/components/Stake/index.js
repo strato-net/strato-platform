@@ -109,7 +109,7 @@ const Stake = ({ user }) => {
     success,
   } = useInventoryState();
   const { categorys } = useCategoryState();
-  const { stratsAddress, cataAddress } = useMarketplaceState();
+  const { stratsAddress, assetsWithEighteenDecimalPlaces } = useMarketplaceState();
   const linkUrl = window.location.href;
   const [api, contextHolder] = notification.useNotification();
   const [limit, setLimit] = useState(10);
@@ -210,7 +210,7 @@ const Stake = ({ user }) => {
           offset,
           reserves,
           stratsAddress,
-          cataAddress,
+          assetsWithEighteenDecimalPlaces,
           navigate
         )}
         dataSource={populatedInventories}
@@ -285,7 +285,7 @@ const Stake = ({ user }) => {
                     offset,
                     reserves,
                     stratsAddress,
-                    cataAddress
+                    assetsWithEighteenDecimalPlaces
                   )}
                   dataSource={combinedInventories.slice(offset, offset + limit)}
                   loading={isInventoriesLoading}
@@ -321,7 +321,7 @@ const Stake = ({ user }) => {
                     user={user}
                     reserves={reserves}
                     stratAddress={stratsAddress}
-                    cataAddress={cataAddress}
+                    assetsWithEighteenDecimalPlaces={assetsWithEighteenDecimalPlaces}
                   />
                 ))}
               </div>

@@ -18,7 +18,7 @@ import { CloseOutlined, DeleteOutlined } from '@ant-design/icons';
 // Actions
 import { actions as categoryActions } from '../../contexts/category/actions';
 import { actions as marketplaceActions } from '../../contexts/marketplace/actions';
-import { actions as orderActions } from '../../contexts/order/actions';
+import { actions as ethActions } from '../../contexts/eth/actions';
 // Dispatch and states
 import { useCategoryDispatch, useCategoryState } from '../../contexts/category';
 import {
@@ -26,7 +26,7 @@ import {
   useMarketplaceState,
 } from '../../contexts/marketplace';
 import { useAuthenticateState } from '../../contexts/authentication';
-import { useOrderDispatch } from '../../contexts/order';
+import { useEthDispatch } from '../../contexts/eth';
 // other
 import { MAX_PRICE, availabilityOptions } from '../../helpers/constants';
 import { TOAST_MSG } from '../../helpers/msgConstants';
@@ -73,7 +73,7 @@ const CategoryProductList = ({ user }) => {
   // Dispatch
   const categoryDispatch = useCategoryDispatch();
   const marketplaceDispatch = useMarketplaceDispatch();
-  const orderDispatch = useOrderDispatch();
+  const ethDispatch = useEthDispatch();
   // states
   const { marketplaceList, marketplaceListCount, isMarketplaceLoading } =
     useMarketplaceState();
@@ -81,6 +81,10 @@ const CategoryProductList = ({ user }) => {
   const { categorys } = useCategoryState();
   const { cartList } = useMarketplaceState();
   const isLoading = isMarketplaceLoading;
+
+  useEffect(() => {
+    ethActions.fetchETHSTAddress(ethDispatch);
+  });
 
   useEffect(() => {
     categoryActions.fetchCategories(categoryDispatch);
@@ -145,7 +149,9 @@ const CategoryProductList = ({ user }) => {
     setSelectedSubCategories(valuesChecked);
   };
 
-  const availabilityFilter = `&forSale=${selectedAvailability.includes('forSale')}&soldOut=${selectedAvailability.includes('soldOut')}`;
+  const availabilityFilter = `&forSale=${selectedAvailability.includes(
+    'forSale'
+  )}&soldOut=${selectedAvailability.includes('soldOut')}`;
   useEffect(() => {
     if (hasChecked && !isAuthenticated) {
       marketplaceActions.fetchMarketplace(
@@ -595,7 +601,11 @@ const CategoryProductList = ({ user }) => {
         link={linkUrl}
       />
       <div
-        className={`${mobileOpenFilter ? 'overflow-y-hidden h-[100vh] w-[100vw] bg-[#00000020] relative mt-0 md:bg-white md:mt-[auto] md:overflow-scroll trending_cards' : ' '}`}
+        className={`${
+          mobileOpenFilter
+            ? 'overflow-y-hidden h-[100vh] w-[100vw] bg-[#00000020] relative mt-0 md:bg-white md:mt-[auto] md:overflow-scroll trending_cards'
+            : ' '
+        }`}
       >
         <div className="fixed bg-white w-full top-7 z-10 md:static">
           {BreadCrumbComponent()}

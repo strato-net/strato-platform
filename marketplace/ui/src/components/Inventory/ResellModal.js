@@ -18,10 +18,10 @@ const ResellModal = ({
   offset,
   reserves,
   stratAddress,
-  cataAddress,
+  assetsWithEighteenDecimalPlaces,
 }) => {
   const isStrat = inventory.originAddress === stratAddress;
-  const isCata = inventory.originAddress === cataAddress;
+  const is18DecimalPlaces = assetsWithEighteenDecimalPlaces.includes(inventory.originAddress);
   const [quantity, setQuantity] = useState(1);
   const inventoryDispatch = useInventoryDispatch();
   const [canResell, setCanResell] = useState(true);
@@ -61,7 +61,7 @@ const ResellModal = ({
       assetAddress: inventory.address,
       quantity: isStrat
         ? (quantity * 100).toFixed(0)
-        : isCata
+        : is18DecimalPlaces
         ? (quantity * Math.pow(10, 18)).toFixed(0)
         : quantity,
     };

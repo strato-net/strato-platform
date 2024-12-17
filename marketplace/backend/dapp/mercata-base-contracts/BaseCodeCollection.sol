@@ -15,6 +15,7 @@ import "Templates/Sales/Sale.sol";
 import "Templates/Staking/Reserve.sol";
 import "Templates/Utils/Utils.sol";
 import "Templates/Structs/Structs.sol";
+import "Templates/Bridge/MercataETHBridge.sol";
 // Uncomment to test whether all non-base contracts typecheck
 // import "All.sol";
 

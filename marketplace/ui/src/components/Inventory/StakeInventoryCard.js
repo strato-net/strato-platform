@@ -31,7 +31,7 @@ const StakeInventoryCard = ({
   user,
   supportedTokens,
   stratAddress,
-  cataAddress,
+  assetsWithEighteenDecimalPlaces,
 }) => {
   const textRef = useRef(null);
   const { reserves } = useInventoryState();
@@ -46,7 +46,7 @@ const StakeInventoryCard = ({
   const imgMeta = category ? category : SEO.TITLE_META;
   const itemData = inventory.data;
   const isStrat = inventory.originAddress === stratAddress;
-  const isCata = inventory.originAddress === cataAddress;
+  const isCata = assetsWithEighteenDecimalPlaces.includes(inventory.originAddress);
 
   const uniqueEscrows = new Set();
   const collateralQuantity = inventory?.inventories
@@ -375,7 +375,7 @@ const StakeInventoryCard = ({
           saleAddress={inventory.saleAddress}
           category={category}
           stratAddress={stratAddress}
-          cataAddress={cataAddress}
+          assetsWithEighteenDecimalPlaces={assetsWithEighteenDecimalPlaces}
         />
       )}
     </div>

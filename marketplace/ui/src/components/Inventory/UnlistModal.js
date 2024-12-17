@@ -57,7 +57,7 @@ const UnlistModal = ({
       open={open}
       onCancel={handleCancel}
       title={`Unlist - ${decodeURIComponent(inventory.name)}`}
-      width={650}
+      width={450}
       footer={[
         <Button
           id="modal-unlist-btn"

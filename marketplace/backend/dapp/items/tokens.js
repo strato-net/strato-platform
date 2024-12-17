@@ -241,6 +241,41 @@ async function getAllOwnershipEvents(admin, args = {}, options) {
   return itemOwnershipEvents.map((item) => marshalOut(item));
 }
 
+async function addHash(user, args, options) {
+  const CREATOR = 'eq.BlockApps';
+  const IS_ACTIVE = 'eq.true';
+  const { txHash, userAddress, amount } = args;
+  const contractName = 'MercataETHBridge';
+  const mercataETHBridgeSearchOptions = {
+    ...options,
+    query: {
+      creator: CREATOR,
+      isActive: IS_ACTIVE,
+    },
+  };
+
+  const ethBridge = await rest.search(
+    user,
+    { name: 'BlockApps-Mercata-MercataETHBridge' },
+    mercataETHBridgeSearchOptions
+  );
+
+  if (!ethBridge || ethBridge.length === 0) {
+    throw new Error('No active escrows found for the given address');
+  }
+
+  const callArgs = {
+    contract: {
+      name: contractName,
+      address: ethBridge[0].address,
+    },
+    method: 'addHash',
+    args: util.usc({ userAddress, txHash, amount }),
+  };
+
+  return rest.call(user, callArgs, options);
+}
+
 export default {
   uploadContract,
   contractName,
@@ -253,4 +288,5 @@ export default {
   marshalIn,
   marshalOut,
   getHistory,
+  addHash,
 };

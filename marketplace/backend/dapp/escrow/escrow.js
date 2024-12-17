@@ -151,31 +151,53 @@ async function getAll(user, options) {
 }
 
 async function getEscrowsForStakeTransactions(user, args, options) {
-  // Fetch escrows from Cirrus
-  const escrows = await searchAllWithQueryArgs(
-    contractName,
-    args,
-    options,
-    user
-  );
+  const { address } = args;
+  const batchSize = 50;
 
-  const total = await searchAllWithQueryArgs(
-    contractName,
-    {
-      ...args,
-      queryOptions: { select: 'count' },
-    },
-    options,
-    user
-  );
+  if (!Array.isArray(address)) {
+    throw new Error('Address must be an array');
+  }
 
-  if (!escrows || escrows.length === 0) {
+  const batches = [];
+  for (let i = 0; i < address.length; i += batchSize) {
+    batches.push(address.slice(i, i + batchSize));
+  }
+
+  let allEscrows = [];
+  let totalCount = 0;
+
+  // Fetch each batch
+  for (const batch of batches) {
+    const batchArgs = { ...args, address: batch };
+    const escrows = await searchAllWithQueryArgs(
+      contractName,
+      batchArgs,
+      options,
+      user
+    );
+
+    const total = await searchAllWithQueryArgs(
+      contractName,
+      {
+        ...batchArgs,
+        queryOptions: { select: 'count' },
+      },
+      options,
+      user
+    );
+
+    // Append batch results
+    allEscrows = allEscrows.concat(escrows);
+    totalCount += total[0]?.count || 0;
+  }
+
+  if (allEscrows.length === 0) {
     throw new Error('No escrows found');
   }
 
   return {
-    escrows: escrows,
-    total: total[0]?.count,
+    escrows: allEscrows,
+    total: totalCount,
   };
 }
 

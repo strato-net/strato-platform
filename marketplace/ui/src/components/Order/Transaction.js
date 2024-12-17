@@ -16,25 +16,28 @@ import {
 import TransactionTable from './TransactionTable';
 import { useTransactionState } from '../../contexts/transaction';
 import { actions as marketplaceActions } from '../../contexts/marketplace/actions';
+import { actions as ethAcions } from '../../contexts/eth/actions';
+import { useEthDispatch } from '../../contexts/eth';
 import { useMarketplaceDispatch } from '../../contexts/marketplace';
 
 const Transaction = ({ user }) => {
   const categoryDispatch = useCategoryDispatch();
-
   const marketplaceDispatch = useMarketplaceDispatch();
+  const ethDispatch = useEthDispatch();
   const [stratAddress, setStratAddress] = useState('');
-  const [cataAddress, setCataAddress] = useState('');
+  const [assetsWithEighteenDecimalPlaces, setAssetsWithEighteenDecimalPlaces] = useState('');
 
   useEffect(() => {
     const fetchAddresses = async () => {
       const stratAddress = await marketplaceActions.fetchStratsAddress(
         marketplaceDispatch
       );
-      const cataAddress = await marketplaceActions.fetchCataAddress(
+      const assetsWithEighteenDecimalPlaces = await marketplaceActions.fetchAssetsWithEighteenDecimalPlaces(
         marketplaceDispatch
       );
+      await ethAcions.fetchETHSTAddress(ethDispatch);
       setStratAddress(stratAddress);
-      setCataAddress(cataAddress);
+      setAssetsWithEighteenDecimalPlaces(assetsWithEighteenDecimalPlaces);
     };
 
     fetchAddresses();
@@ -89,7 +92,7 @@ const Transaction = ({ user }) => {
           transaction.assetContractName
         );
         let isStrat = transaction.assetOriginAddress === stratAddress;
-        let isCata = transaction.assetOriginAddress === cataAddress;
+        let is18DecimalPlaces = assetsWithEighteenDecimalPlaces.includes(transaction.assetOriginAddress);
         return formatDataObject({
           reference: transaction?.reference,
           type: transaction?.type,
@@ -98,12 +101,12 @@ const Transaction = ({ user }) => {
           assetName: transaction?.assetName,
           Price: isStrat
             ? Number((transaction?.price * 100).toFixed(2))
-            : isCata
+            : is18DecimalPlaces
             ? Number((transaction?.price * Math.pow(10, 18)).toFixed(2))
             : transaction?.price,
           quantity: isStrat
             ? (transaction?.quantity / 100).toString()
-            : isCata
+            : is18DecimalPlaces
             ? (transaction?.quantity / Math.pow(10, 18)).toString()
             : transaction?.quantity.toString(),
           from: transaction.from,
@@ -239,7 +242,7 @@ const Transaction = ({ user }) => {
         user={user}
         download={download}
         stratAddress={stratAddress}
-        cataAddress={cataAddress}
+        assetsWithEighteenDecimalPlaces={assetsWithEighteenDecimalPlaces}
       />
     </div>
   );

@@ -40,21 +40,21 @@ const ItemActions = ({
   supportedTokens,
   reserves,
   stratAddress,
-  cataAddress,
+  assetsWithEighteenDecimalPlaces,
 }) => {
   const itemData = inventory.data;
   const isStrat = inventory.originAddress === stratAddress;
-  const isCata = inventory.originAddress === cataAddress;
+  const is18DecimalPlaces = assetsWithEighteenDecimalPlaces.includes(inventory.originAddress);
   const quantity = isStrat
     ? new BigNumber(inventory.quantity).dividedBy(100)
-    : isCata
+    : is18DecimalPlaces
     ? new BigNumber(inventory.quantity).dividedBy(new BigNumber(10).pow(18))
     : new BigNumber(inventory.quantity);
   const saleQuantity =
     inventory.saleQuantity !== undefined
       ? isStrat
         ? new BigNumber(inventory.saleQuantity).dividedBy(100)
-        : isCata
+        : is18DecimalPlaces
         ? new BigNumber(inventory.saleQuantity).dividedBy(new BigNumber(10).pow(18))
         : new BigNumber(inventory.saleQuantity)
       : undefined;  
@@ -255,7 +255,7 @@ const ItemActions = ({
             !isActive() ||
             disableSADDOGS(inventory) ||
             isStrat ||
-            isCata
+            is18DecimalPlaces
           }
         >
           <SendOutlined /> Redeem
@@ -326,7 +326,7 @@ const ItemActions = ({
                     !isActive() ||
                     disableSADDOGS(inventory) ||
                     isStrat ||
-                    isCata
+                    is18DecimalPlaces
                   }
                 >
                   <SendOutlined /> Redeem
@@ -385,7 +385,7 @@ const ItemActions = ({
           user={user}
           reserves={reserves}
           stratAddress={stratAddress}
-          cataAddress={cataAddress}
+          assetsWithEighteenDecimalPlaces={assetsWithEighteenDecimalPlaces}
         />
       )}
       {unlistModalOpen && (
@@ -450,7 +450,7 @@ const ItemActions = ({
           category={category}
           reserves={reserves}
           stratAddress={stratAddress}
-          cataAddress={cataAddress}
+          assetsWithEighteenDecimalPlaces={assetsWithEighteenDecimalPlaces}
         />
       )}
       {transferModalOpen && (
@@ -464,7 +464,7 @@ const ItemActions = ({
           category={category}
           reserves={reserves}
           stratAddress={stratAddress}
-          cataAddress={cataAddress}
+          assetsWithEighteenDecimalPlaces={assetsWithEighteenDecimalPlaces}
         />
       )}
       {redeemModalOpen && (

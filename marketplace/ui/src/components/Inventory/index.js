@@ -39,10 +39,12 @@ import { actions as itemActions } from '../../contexts/item/actions';
 import { actions as redemptionActions } from '../../contexts/redemption/actions';
 import { actions as issuerStatusActions } from '../../contexts/issuerStatus/actions';
 import { actions as marketplaceActions } from '../../contexts/marketplace/actions';
+import { actions as ethActions } from '../../contexts/eth/actions';
 import {
   useMarketplaceDispatch,
   useMarketplaceState,
 } from '../../contexts/marketplace';
+import { useEthDispatch, useEthState } from '../../contexts/eth';
 import {
   useRedemptionDispatch,
   useRedemptionState,
@@ -81,14 +83,16 @@ const Inventory = ({ user }) => {
   const [page, setPage] = useState(1);
   const [showPublished, setShowPublished] = useState(false);
   const dispatch = useInventoryDispatch();
+  const ethDispatch = useEthDispatch();
   const [api, contextHolder] = notification.useNotification();
   const [category, setCategory] = useState(undefined);
   const linkUrl = window.location.href;
   const metaImg = SEO.IMAGE_META;
   const navigate = useNavigate();
   const naviroute = routes.InventoryDetail.url;
+  const ethNaviroute = routes.EthstProductDetail.url;
   let { hasChecked, isAuthenticated, loginUrl } = useAuthenticateState();
-  const { stratsAddress, cataAddress } = useMarketplaceState();
+  const { stratsAddress, assetsWithEighteenDecimalPlaces } = useMarketplaceState();
   const formatter = new Intl.NumberFormat('en-US');
   const formattedNum = (num) => formatter.format(num);
 
@@ -115,6 +119,8 @@ const Inventory = ({ user }) => {
     totalCataReward,
     dailyCataReward,
   } = useInventoryState();
+
+  const { ethstAddress } = useEthState();
 
   const {
     paymentServices,
@@ -176,6 +182,7 @@ const Inventory = ({ user }) => {
     actions.getUserCataRewards(dispatch);
     actions.fetchSupportedTokens(dispatch);
     categoryActions.fetchCategories(categoryDispatch);
+    ethActions.fetchETHSTAddress(ethDispatch);
   }, []);
 
   useEffect(() => {
@@ -392,15 +399,23 @@ const Inventory = ({ user }) => {
             (reserve) => record.originAddress === reserve.assetRootAddress
           );
         const borrowedAmount = (record?.escrow?.borrowedAmount || 0) / 100;
+        console.log(record.originAddress, ethstAddress)
         const callDetailPage = () => {
-          navigate(
-            `${naviroute
-              .replace(':id', record.address)
-              .replace(':name', encodeURIComponent(record.name))}`,
-            {
-              state: { isCalledFromInventory: true },
-            }
-          );
+          if (record.originAddress === ethstAddress) {
+            navigate(
+              `${ethNaviroute.replace(':address', record.address)}`,
+              { state: { isCalledFromInventory: false } }
+            );
+          } else {
+            navigate(
+              `${naviroute
+                .replace(':id', record.address)
+                .replace(':name', encodeURIComponent(record.name))}`,
+              {
+                state: { isCalledFromInventory: true },
+              }
+            );
+          }
         };
         return (
           <>
@@ -460,11 +475,11 @@ const Inventory = ({ user }) => {
       align: 'center',
       render: (_, record) => {
         const isStrats = record.originAddress === stratsAddress;
-        const isCata = record.originAddress === cataAddress;
+        const is18DecimalPlaces = assetsWithEighteenDecimalPlaces.includes(record.originAddress);
         const price = record.price
           ? isStrats
             ? parseFloat(record.price * 100).toFixed(2)
-            : isCata
+            : is18DecimalPlaces
             ? parseFloat(record.price * 10 ** 18).toFixed(2)
             : record.price
           : 'N/A';
@@ -490,11 +505,11 @@ const Inventory = ({ user }) => {
       align: 'center',
       render: (_, record) => {
         const isStrats = record.originAddress === stratsAddress;
-        const isCata = record.originAddress === cataAddress;
+        const is18DecimalPlaces = assetsWithEighteenDecimalPlaces.includes(record.originAddress);
         const quantity = (
           isStrats
             ? new BigNumber(record.quantity).dividedBy(new BigNumber(100))
-            : isCata
+            : is18DecimalPlaces
             ? new BigNumber(record.quantity).dividedBy(
                 new BigNumber(10).pow(18)
               )
@@ -513,13 +528,13 @@ const Inventory = ({ user }) => {
       align: 'center',
       render: (_, record) => {
         const isStrats = record.originAddress === stratsAddress;
-        const isCata = record.originAddress === cataAddress;
+        const is18DecimalPlaces = assetsWithEighteenDecimalPlaces.includes(record.originAddress);
         const saleQuantity = (
           isStrats
             ? new BigNumber(record.saleQuantity || 0).dividedBy(
                 new BigNumber(100)
               )
-            : isCata
+            : is18DecimalPlaces
             ? new BigNumber(record.saleQuantity || 0).dividedBy(
                 new BigNumber(10).pow(18)
               )
@@ -545,7 +560,7 @@ const Inventory = ({ user }) => {
             supportedTokens={supportedTokens}
             reserves={reserves}
             stratAddress={stratsAddress}
-            cataAddress={cataAddress}
+            assetsWithEighteenDecimalPlaces={assetsWithEighteenDecimalPlaces}
           />
         </div>
       ),
@@ -809,7 +824,7 @@ const Inventory = ({ user }) => {
                         supportedTokens={supportedTokens}
                         reserves={reserves}
                         stratAddress={stratsAddress}
-                        cataAddress={cataAddress}
+                        assetsWithEighteenDecimalPlaces={assetsWithEighteenDecimalPlaces}
                       />
                     ))
                   ) : (
@@ -832,7 +847,7 @@ const Inventory = ({ user }) => {
                         supportedTokens={supportedTokens}
                         reserves={reserves}
                         stratAddress={stratsAddress}
-                        cataAddress={cataAddress}
+                        assetsWithEighteenDecimalPlaces={assetsWithEighteenDecimalPlaces}
                       />
                     ))
                   ) : (
