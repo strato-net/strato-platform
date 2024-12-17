@@ -499,12 +499,15 @@ async function checkSystemInfo() {
         `Average CPU load is high (${avgLoad.toFixed(2)})`
       );
     }
-    if (!sysInfoCollected.cpu.currentLoad.isHealthy) {
-      isHealthy = false;
-      additional_info.push(
-        `Current CPU load is high (${metadataLoad.currentLoad.toFixed(2)})`
-      );
-    }
+    
+
+    // 12/17/24 - comment out current CPU load alarm
+    // if (!sysInfoCollected.cpu.currentLoad.isHealthy) {
+    //   isHealthy = false;
+    //   additional_info.push(
+    //     `Current CPU load is high (${metadataLoad.currentLoad.toFixed(2)})`
+    //   );
+    // }
 
     // FILESYSTEM
     const fsData = [];
