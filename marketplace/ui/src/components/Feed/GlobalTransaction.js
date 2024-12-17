@@ -30,6 +30,7 @@ import {
   STRATS_CONVERSION,
   TRANSACTION_STATUS_COLOR,
   DATE_TIME_FORMAT,
+  TRANSACTION_STATUS_TEXT,
 } from '../../helpers/constants';
 import { SEO } from '../../helpers/seoConstant';
 import { getStringDate } from '../../helpers/utils';
@@ -58,6 +59,8 @@ const GlobalTransaction = ({ user, stratAddress, cataAddress }) => {
     'Order',
     'Transfer',
     'Redemption',
+    'Stake',
+    'Unstake',
   ]);
   const [isFilterActive, setIsFilterActive] = useState(false);
   const formatter = new Intl.NumberFormat('en-US');
@@ -181,7 +184,10 @@ const GlobalTransaction = ({ user, stratAddress, cataAddress }) => {
       width: '150px',
       render: (text) => (
         <p
-          style={{ background: TRANSACTION_STATUS_COLOR[text] }}
+          style={{
+            background: TRANSACTION_STATUS_COLOR[text],
+            color: TRANSACTION_STATUS_TEXT[text],
+          }}
           className={`
         bg-${TRANSACTION_STATUS_COLOR[text]} 
         min-w-[80px] text-center cursor-default px-2 py-2 rounded-lg text-white`}
@@ -337,7 +343,7 @@ const GlobalTransaction = ({ user, stratAddress, cataAddress }) => {
           Transaction Types
         </Title>
         <div className="flex flex-wrap">
-          {TRANSACTION_FILTER.slice(1, 4)?.map(({ label }) => {
+          {TRANSACTION_FILTER.slice(1, 6)?.map(({ label }) => {
             return (
               <span
                 onClick={() => {
