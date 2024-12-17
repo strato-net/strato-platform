@@ -1,4 +1,4 @@
-import { Button, Modal, Tooltip } from 'antd';
+import { Button, Modal, Tooltip, InputNumber, Form } from 'antd';
 import { QuestionCircleOutlined } from '@ant-design/icons';
 import { actions as inventoryActions } from '../../contexts/inventory/actions';
 import {
@@ -7,6 +7,8 @@ import {
 } from '../../contexts/inventory';
 import { Images } from '../../images';
 import { useLocation } from 'react-router-dom';
+import { ASSET_STATUS } from '../../helpers/constants';
+import { useState } from 'react';
 
 const logo = <img src={Images.cata} alt={''} title={''} className="w-5 h-5" />;
 
@@ -32,25 +34,106 @@ const StakeModal = ({
   const location = useLocation();
   const queryParams = new URLSearchParams(location.search);
 
-  const escrow = inventory?.escrow;
-  const collateralQuantity = escrow?.collateralQuantity || 0;
+  const escrows = inventory?.inventories
+    ? [
+        ...new Set(
+          inventory.inventories
+            .map((item) => item?.escrow?.address)
+            .filter(Boolean)
+        ),
+      ]
+    : inventory?.escrow?.address
+    ? [inventory.escrow.address]
+    : [];
+  const uniqueEscrows = new Set();
+  const collateralQuantity = inventory?.inventories
+    ? inventory.inventories.reduce((sum, item) => {
+        const escrowAddress = item?.escrow?.address;
+        const escrowCollateral = item?.escrow?.collateralQuantity || 0;
+
+        // Add collateral only if the escrow address is unique
+        if (escrowAddress && !uniqueEscrows.has(escrowAddress)) {
+          uniqueEscrows.add(escrowAddress);
+          return sum + escrowCollateral;
+        }
+
+        return sum;
+      }, 0)
+    : inventory?.escrow?.collateralQuantity > inventory?.quantity
+    ? inventory?.quantity
+    : inventory?.escrow?.collateralQuantity || 0;
+  const quantityNotAvailable = inventory?.inventories
+    ? inventory.inventories.reduce((sum, item) => {
+        const status = Number(item.status);
+        if (status && status !== ASSET_STATUS.ACTIVE) {
+          return sum + (item.quantity || 0);
+        }
+        return sum;
+      }, 0) + inventory.totalSaleQuantity
+    : inventory?.status &&  Number(inventory?.status) !== ASSET_STATUS.ACTIVE
+    ? inventory?.quantity + (inventory?.saleQuantity || 0)
+    : 0;
+  const quantity = inventory?.inventories
+    ? inventory.totalQuantity
+    : inventory?.quantity;
+  const stakeQuantity = quantity - collateralQuantity - quantityNotAvailable;
+  const allInventories = Array.isArray(inventory.inventories)
+    ? inventory.inventories
+    : [inventory];
+  const assets = allInventories
+    .filter((item) => {
+      const status = item.status ? Number(item.status) : ASSET_STATUS.ACTIVE ;
+      const saleQty = Number(item.saleQuantity) || 0;
+      const collatertal = item?.escrow?.[
+        'BlockApps-Mercata-Escrow-assets'
+      ]?.find((escrow) => escrow.value === item.address)
+        ? true
+        : false;
+      return status === ASSET_STATUS.ACTIVE && saleQty === 0 && !collatertal;
+    })
+    .map((item) => item.address)
+    .filter(Boolean);
+  const [inputQuantity, setInputQuantity] = useState(type === 'Stake' ? stakeQuantity : collateralQuantity);
+  const handleInputChange = (value) => {
+    setInputQuantity(value || 0); // Update the input value
+  };
 
   const dataForItems =
     type === 'Stake'
       ? [
           {
-            label: `Quantity to Stake`,
+            label: `Quantity Available to Stake`,
             description:
-              'The amount of Real World Assets (RWAs) you are staking.',
-            value: `${inventory?.quantity - collateralQuantity}`,
+              'The amount of Real World Assets (RWAs) you have available for staking.',
+            value: stakeQuantity,
+          },
+          {
+            label: `Quantity to Stake`,
+            description: 'Enter the amount of RWAs you want to stake.',
+            value: (
+              <>
+                <InputNumber
+                  min={0}
+                  value={inputQuantity}
+                  onChange={handleInputChange}
+                  className="w-full"
+                  controls={false}
+                />
+
+                {inputQuantity > stakeQuantity ? (
+                  <p className="text-xs" style={{ color: 'red' }}>
+                    *Quantity exceeds available quantity of {stakeQuantity}
+                  </p>
+                ) : null}
+              </>
+            ),
           },
           {
             label: `Market Value`,
             description:
               'The total value of your staked assets, calculated as Quantity x Oracle Price.',
             value: `$${(
-              matchedReserve?.lastUpdatedOraclePrice *
-              (inventory?.quantity - collateralQuantity)
+              matchedReserve?.lastUpdatedOraclePrice * inputQuantity
             ).toFixed(2)}`,
           },
           {
@@ -61,7 +144,7 @@ const StakeModal = ({
               <div className="flex">
                 <div className="mx-1">{logo}</div>
                 {(
-                  ((inventory?.quantity - collateralQuantity) *
+                  (inputQuantity *
                     matchedReserve?.lastUpdatedOraclePrice *
                     (matchedReserve?.cataAPYRate / 10)) /
                   365
@@ -72,10 +155,31 @@ const StakeModal = ({
         ]
       : [
           {
-            label: `Quantity to Unstake`,
+            label: `Quantity Available to Unstake`,
             description:
-              'The amount of Real World Assets (RWAs) you are unstaking.',
-            value: `${escrow.collateralQuantity}`,
+              'The amount of Real World Assets (RWAs) available for unstaking.',
+            value: `${collateralQuantity}`,
+          },
+          {
+            label: `Quantity to Unstake`,
+            description: 'Enter the amount of RWAs you want to unstake.',
+            value: (
+              <>
+                <InputNumber
+                  min={0}
+                  value={inputQuantity}
+                  onChange={handleInputChange}
+                  className="w-full"
+                  controls={false}
+                />
+
+                {inputQuantity > collateralQuantity ? (
+                  <p className="text-xs" style={{ color: 'red' }}>
+                    *Quantity exceeds available quantity of {collateralQuantity}
+                  </p>
+                ) : null}
+              </>
+            ),
           },
         ];
 
@@ -90,23 +194,17 @@ const StakeModal = ({
           },
         ]
       : [];
-
   const handleSubmit = async () => {
     if (type === 'Stake') {
       const body = {
-        escrowAddress: escrow
-          ? escrow.address
-          : '0000000000000000000000000000000000000000',
-        collateralQuantity: inventory?.quantity - collateralQuantity,
-        assets:
-          inventory && Array.isArray(inventory.address)
-        ? inventory.address
-            .filter((item) => !item.sale) // Keep only items without a sale
-            .map((item) => item.address) // Extract the address
-        : [inventory.address], // Handle the case where address is not an array
+        escrowAddress:
+          escrows && escrows.length > 0
+            ? escrows[0]
+            : '0000000000000000000000000000000000000000',
+        collateralQuantity: inputQuantity,
+        assets,
         reserve: matchedReserve?.address,
       };
-      console.log('body: ', body);
       const isStaked = await inventoryActions.stakeInventory(
         inventoryDispatch,
         body
@@ -138,8 +236,8 @@ const StakeModal = ({
 
     if (type === 'Unstake') {
       const body = {
-        quantity: escrow.collateralQuantity,
-        escrowAddress: inventory?.escrow?.address,
+        quantity: inputQuantity,
+        escrowAddresses: escrows,
         reserve: matchedReserve?.address,
       };
       const isUnstaked = await inventoryActions.UnstakeInventory(
@@ -198,7 +296,7 @@ const StakeModal = ({
                   <QuestionCircleOutlined className="ml-1 text-gray-400 cursor-pointer" />
                 </Tooltip>
               </div>
-              <p className="flex items-center">
+              <p className="flex items-center justify-end">
                 <strong>{item.value}</strong>
               </p>
             </div>
@@ -209,7 +307,13 @@ const StakeModal = ({
               type="primary"
               className="w-full px-6 h-10 font-bold"
               onClick={handleSubmit}
-              disabled={isLoader}
+              disabled={
+                isLoader ||
+                inputQuantity === 0 ||
+                (type === 'Stake'
+                  ? inputQuantity > stakeQuantity
+                  : inputQuantity > collateralQuantity)
+              }
               loading={isLoader}
             >
               {type}

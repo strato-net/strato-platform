@@ -2151,6 +2151,9 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
       options
     );
     const orderTotal = escrowData ? escrowData.borrowedAmount : 0;
+    if (orderTotal === 0) {
+      return
+    }
 
     // Get user's active STRATS assets with non-zero quantities
     const userStratsAssets = await inventoryJs.getAll(
@@ -2173,7 +2176,7 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
         if (acc.accumulatedTotal >= orderTotal) return acc;
 
         acc.addressesToUse.push(asset.address);
-        acc.accumulatedTotal += asset.quantity / 100;
+        acc.accumulatedTotal += asset.quantity;
 
         return acc;
       },
