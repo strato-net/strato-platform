@@ -2,6 +2,7 @@ import random
 import requests as requests
 import os
 from dotenv import load_dotenv
+from collections import defaultdict
 
 load_dotenv()
 
@@ -9,6 +10,7 @@ mercata_username  = os.getenv("MINTER_USERNAME")
 mercata_password  = os.getenv("MINTER_PASSWORD")
 mercata_node      = os.getenv("NODE_ENDPOINT") 
 keycloak_endpoint = os.getenv("KEYCLOAK_ENDPOINT")
+strat_root_address     = os.getenv("STRAT_ROOT_ADDRESS")
 usdst_address     = os.getenv("USDST_ASSET_ADDRESS")
 cirrus_endpoint   = "/cirrus/search/"
 
@@ -24,7 +26,14 @@ def uid(prefix=None, digits=6):
         return f"{prefix}_{random_number:0{digits}d}"
 
 def transform_response_to_tuple_list(response_data):
-    return [(item['key'], item['value']) for item in response_data]
+    owner_quantities = defaultdict(int)
+
+    for item in response_data:
+        owner = item['owner']
+        quantity = item['quantity']
+        owner_quantities[owner] += quantity
+
+    return [(owner, total_quantity) for owner, total_quantity in owner_quantities.items()]
 
 def generate_tx(address, balance):
     return {
@@ -34,8 +43,8 @@ def generate_tx(address, balance):
             "method": "automaticTransfer",
             "args": {
                 "_newOwner": address,
-                "_price": 0.0001,
-                "_quantity": balance * (10**18),
+                "_price": 0.000000000000000001,
+                "_quantity": balance * (10**14),
                 "_transferNumber": int(uid())
             }
         },
@@ -67,16 +76,26 @@ def main():
     }
 
     # Get the balances and create a list of tuples that contains (address, balance)
-    balances_endpoint = mercata_node + cirrus_endpoint + "BlockApps-Mercata-Asset?name=eq.STRAT"
+    balances_endpoint = mercata_node + cirrus_endpoint + "BlockApps-Mercata-Asset?select=owner,quantity&root=eq." + strat_root_address
     response = requests.get(balances_endpoint, headers=headers)
     balances = transform_response_to_tuple_list(response.json())
 
-    # print([generate_tx(a, b) for (a, b) in balances])
-    requests.post(
+    chunk_size = 25
+
+    # Loop through balances in chunks of 25
+    for i in range(0, len(balances), chunk_size):
+        chunk = balances[i:i + chunk_size]
+        post_response = requests.post(
             mercata_node + '/strato/v2.3/transaction?resolve=true',
             headers=headers,
-            json={ 'txs': [generate_tx(a, b) for (a, b) in balances] }
+            json={'txs': [generate_tx(a, b) for (a, b) in chunk]}
         )
+
+        # Handle the response if necessary
+        if post_response.status_code == 200:
+            print(f"Chunk {i // chunk_size + 1} posted successfully.")
+        else:
+            print(f"Error in chunk {i // chunk_size + 1}: {post_response.json()}")
 
 if __name__ == "__main__":
     main()
