@@ -1,8 +1,14 @@
 import { util, rest } from '/blockapps-rest-plus';
 import constants from '../../helpers/constants';
+import { searchAllWithQueryArgs } from '/helpers/utils';
 
 const contractName = 'BlockApps-Mercata-Reserve';
+const contractTable = 'Reserve';
 const OracleContractName = 'BlockApps-Mercata-OracleService';
+const contractEvents = {
+  STAKE_CREATED: 'StakeCreated',
+  STAKE_UNLOCKED: 'StakeUnlocked',
+};
 const CREATOR = 'eq.BlockApps';
 const IS_ACTIVE = 'eq.true';
 
@@ -530,10 +536,68 @@ async function repay(user, args, options) {
   return reponse;
 }
 
+/**
+ * Fetch StakeCreated Events
+ */
+async function getStakeCreatedEvents(admin, args = {}, defaultOptions) {
+  const options = { ...defaultOptions, org: 'BlockApps', app: 'Mercata' };
+  const stakeCreatedEvents = await searchAllWithQueryArgs(
+    `${contractTable}.${contractEvents.STAKE_CREATED}`,
+    args,
+    options,
+    admin
+  );
+
+  const total = await searchAllWithQueryArgs(
+    `${contractTable}.${contractEvents.STAKE_CREATED}`,
+    {
+      ...args,
+      queryOptions: { select: 'count' },
+    },
+    options,
+    admin
+  );
+
+  return {
+    stakeCreatedEvents: stakeCreatedEvents.map(marshalOut),
+    total: total[0]?.count,
+  };
+}
+
+/**
+ * Fetch StakeUnlocked Events
+ */
+async function getUnstakeEvents(admin, args = {}, defaultOptions) {
+  const options = { ...defaultOptions, org: 'BlockApps', app: 'Mercata' };
+  const unstakeEvents = await searchAllWithQueryArgs(
+    `${contractTable}.${contractEvents.STAKE_UNLOCKED}`,
+    args,
+    options,
+    admin
+  );
+
+  const total = await searchAllWithQueryArgs(
+    `${contractTable}.${contractEvents.STAKE_UNLOCKED}`,
+    {
+      ...args,
+      queryOptions: { select: 'count' },
+    },
+    options,
+    admin
+  );
+
+  return {
+    unstakeEvents: unstakeEvents.map(marshalOut),
+    total: total[0]?.count,
+  };
+}
+
 export default {
   contractName,
   get,
   getAll,
+  getStakeCreatedEvents,
+  getUnstakeEvents,
   marshalIn,
   marshalOut,
   oraclePrice,

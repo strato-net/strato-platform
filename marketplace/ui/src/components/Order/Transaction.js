@@ -118,6 +118,10 @@ const Transaction = ({ user }) => {
               ? 'Closed'
               : transaction?.type === 'Redemption'
               ? REDEMPTION_STATUS[transaction.status]
+              : transaction?.type === 'Stake'
+              ? 'Staked'
+              : transaction?.type === 'Unstake'
+              ? 'Unstaked'
               : TRANSACTION_STATUS[transaction.status],
         });
       });
@@ -129,7 +133,7 @@ const Transaction = ({ user }) => {
 
   useEffect(() => {
     const mappedData = mapTransactionData(userTransactions);
-    const { Order, Redemption, Transfer } = groupBy(
+    const { Order, Redemption, Transfer, Stake, Unstake } = groupBy(
       mappedData,
       ({ Type }) => Type
     );
@@ -140,11 +144,15 @@ const Transaction = ({ user }) => {
       const wsRedemption = XLSX.utils.json_to_sheet(
         Redemption ? Redemption : []
       );
+      const wsStake = XLSX.utils.json_to_sheet(Stake ? Stake : []);
+      const wsUnstake = XLSX.utils.json_to_sheet(Unstake ? Unstake : []);
 
       // Append each worksheet to the workbook
       XLSX.utils.book_append_sheet(wb, wsOrder, 'Order');
       XLSX.utils.book_append_sheet(wb, wsTransferred, 'Transfer');
       XLSX.utils.book_append_sheet(wb, wsRedemption, 'Redemption');
+      XLSX.utils.book_append_sheet(wb, wsStake, 'Stake');
+      XLSX.utils.book_append_sheet(wb, wsUnstake, 'Unstake');
 
       // Write the workbook to a binary string
       const wbout = XLSX.write(wb, { bookType: 'xls', type: 'binary' });
@@ -172,10 +180,16 @@ const Transaction = ({ user }) => {
         'Redemption'
       );
 
+      const stakeData = addTypeColumn(Stake ? Stake : [], 'Stake');
+
+      const unstakeData = addTypeColumn(Unstake ? Unstake : [], 'Unstake');
+
       const combinedData = [
         ...orderData,
         ...transferredData,
         ...redemptionData,
+        ...stakeData,
+        ...unstakeData,
       ];
       const ws = XLSX.utils.json_to_sheet(combinedData);
       const wb = XLSX.utils.book_new();

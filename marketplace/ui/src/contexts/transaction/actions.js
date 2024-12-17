@@ -26,6 +26,7 @@ const actions = {
     limit,
     offset,
     commonName,
+    userAddress,
     dateRange,
     type
   ) => {
@@ -41,6 +42,9 @@ const actions = {
     }
     if (commonName) {
       query += `&user=${encodedCommonName}`;
+    }
+    if (userAddress) {
+      query += `&userAddress=${userAddress}`;
     }
     if (dateRange) {
       query += `&startDate=${dateRange[0]}&endDate=${dateRange[1]}`;
