@@ -35,7 +35,7 @@ def generate_tx(address, balance):
             "args": {
                 "_newOwner": address,
                 "_price": 0.0001,
-                "_quantity": balance,
+                "_quantity": balance * (10**18),
                 "_transferNumber": int(uid())
             }
         },
