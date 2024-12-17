@@ -76,7 +76,7 @@ def main():
     }
 
     # Get the balances and create a list of tuples that contains (address, balance)
-    balances_endpoint = mercata_node + cirrus_endpoint + "BlockApps-Mercata-Asset?select=owner,quantity&root=eq." + strat_root_address
+    balances_endpoint = mercata_node + cirrus_endpoint + "BlockApps-Mercata-Asset?select=owner,quantity&root=eq." + strat_root_address + "&ownerCommonName=neq." + mercata_username
     response = requests.get(balances_endpoint, headers=headers)
     balances = transform_response_to_tuple_list(response.json())
 
