@@ -50,7 +50,7 @@ abstract contract MercataETHBridge is Utils {
         require(hashExists[_txHash] == 1, "Hash doesn't exists");
         hashExists[_txHash] = 2;
         Mintable(ethSt).mintNewUnits(_amount);
-        Asset(UTXO(Redeemable(Mintable(ethSt)))).automaticTransfer(_userAddress, 0.01, _amount, block.number);
+        Asset(UTXO(Redeemable(Mintable(ethSt)))).automaticTransfer(_userAddress, 0.000000000000000001, _amount, block.number);
         emit MintedETHST(_userAddress, getCommonName(_userAddress), _amount);
     }
 
