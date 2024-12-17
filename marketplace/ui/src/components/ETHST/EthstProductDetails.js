@@ -591,55 +591,11 @@ const ProductDetails = ({ user, users }) => {
                     <span className="text-xs  self-center">
                       Owned By:&nbsp;
                     </span>
-                    <div
-                      style={{
-                        cursor:
-                          details?.ownerCommonName &&
-                          details.ownerCommonName !== 'N/A'
-                            ? 'pointer'
-                            : 'default',
-                        color: 'black',
-                        textDecoration:
-                          details?.ownerCommonName &&
-                          details.ownerCommonName !== 'N/A'
-                            ? 'underline'
-                            : 'none',
-                      }}
-                      onClick={(e) => {
-                        if (
-                          details?.ownerCommonName &&
-                          details.ownerCommonName !== 'N/A'
-                        ) {
-                          e.preventDefault();
-                          const userProfileUrl = `/profile/${encodeURIComponent(
-                            details.ownerCommonName
-                          )}`;
-                          const fullUrl = `${window.location.origin}${userProfileUrl}`;
-
-                          if (e.ctrlKey || e.metaKey) {
-                            // Open in a new tab if Ctrl/Cmd is pressed
-                            window.open(fullUrl, '_blank');
-                          } else {
-                            // Use navigate for a normal click, without Ctrl/Cmd
-                            navigate(
-                              routes.MarketplaceUserProfile.url.replace(
-                                ':commonName',
-                                details?.ownerCommonName
-                              ),
-                              { state: { from: pathname } }
-                            );
-                          }
-                        }
-                      }}
-                    >
+                    <div>
                       <Text className="text-[#202020] text-xs font-medium  self-center">
-                        {details?.ownerCommonName || 'N/A'}
+                        {details?.creator || 'N/A'}
                       </Text>
                     </div>
-
-                    <Text className="text-[#202020] text-xs  font-medium">
-                      {details?.ownerOrganization}
-                    </Text>
                   </div>
                 </div>
 
@@ -659,12 +615,6 @@ const ProductDetails = ({ user, users }) => {
                         {/* TVL: ${matchingReserve?.tvl.toFixed(2)} */}
                       </div>
                     </Paragraph>
-                    {isAvailableForSale && (
-                      <Text type="danger" strong>
-                        {' '}
-                        Sold Out{' '}
-                      </Text>
-                    )}
                   </div>
                 )}
 
@@ -673,9 +623,7 @@ const ProductDetails = ({ user, users }) => {
                     <div className="flex gap-4 justify-between lg:justify-start  pt-4 w-full">
                       <Button
                         type="primary"
-                        className={`w-[100%]  h-9  ${
-                          isAvailableForSale ? '!bg-[#808080]' : '!bg-[#13188A]'
-                        } !hover:bg-primaryHover !text-white`}
+                        className={`w-[100%]  h-9 !bg-[#13188A] !hover:bg-primaryHover !text-white`}
                         onClick={async () => {
                           if (!isAuthenticated || !user) {
                             setIsModalVisible(true);
