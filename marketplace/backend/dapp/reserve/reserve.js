@@ -3,6 +3,8 @@ import constants from '../../helpers/constants';
 
 const contractName = 'BlockApps-Mercata-Reserve';
 const OracleContractName = 'BlockApps-Mercata-OracleService';
+const CREATOR = 'eq.BlockApps';
+const IS_ACTIVE = 'eq.true';
 
 /**
  * Augment contract arguments before they are used to post a contract.
@@ -61,9 +63,6 @@ function marshalOut(_args) {
  * @throws {Error} - Throws if no reserves are found.
  */
 async function get(user, address, options) {
-  const CREATOR = 'eq.BlockApps';
-  const IS_ACTIVE = 'eq.true';
-
   // Fetch active reserves
   const reserveSearchOptions = {
     ...options,
@@ -181,9 +180,6 @@ async function get(user, address, options) {
  * @throws {Error} - Throws if no reserves are found.
  */
 async function getAll(user, options) {
-  const CREATOR = 'eq.BlockApps';
-  const IS_ACTIVE = 'eq.true';
-
   // Fetch all active reserves
   const searchOptions = {
     ...options,
@@ -352,33 +348,171 @@ async function stake(user, args, options) {
 }
 
 /**
- * unstake
+ * Unstake assets from multiple escrows.
+ * @param {Object} user - User context for the request.
+ * @param {Object} args - Arguments for unstaking.
+ * @param {string} args.reserve - The reserve contract address.
+ * @param {number} args.quantity - The total quantity to unstake.
+ * @param {Array<string>} args.escrowAddresses - List of escrow contract addresses.
+ * @param {Object} options - Additional options for the request.
+ * @returns {Array} - Responses from each unstake transaction.
+ * @throws {Error} - Throws if unstaking fails for any escrow.
  */
 async function unstake(user, args, options) {
-  const { reserve, ...restArgs } = args;
-  const callArgs = {
-    contract: { address: reserve },
-    method: 'unstake',
-    args: util.usc({ ...restArgs }),
-  };
+  const { reserve, quantity: requestedQuantity, escrowAddresses } = args;
 
-  const reponse = await rest.call(user, callArgs, options);
-  return reponse;
+  if (
+    !reserve ||
+    !requestedQuantity ||
+    !escrowAddresses ||
+    !Array.isArray(escrowAddresses)
+  ) {
+    throw new Error(
+      'Invalid arguments: reserve, quantity, and escrowAddresses are required.'
+    );
+  }
+
+  try {
+    // Step 1: Fetch the escrows using the provided escrowAddresses
+    const escrowSearchOptions = {
+      ...options,
+      query: {
+        creator: CREATOR,
+        isActive: IS_ACTIVE,
+        select: 'address,collateralQuantity',
+        address: `in.(${escrowAddresses.join(',')})`,
+      },
+    };
+
+    const escrows = await rest.search(
+      user,
+      { name: 'BlockApps-Mercata-Escrow' },
+      escrowSearchOptions
+    );
+
+    if (escrows.length === 0) {
+      throw new Error('No active escrows found for the provided addresses.');
+    }
+
+    let remainingQuantity = requestedQuantity;
+    const unstakePromises = [];
+
+    // Step 2: For each escrow, unstake the min between escrow.collateralQuantity and remainingQuantity
+    for (const escrow of escrows) {
+      if (remainingQuantity <= 0) break;
+
+      const unstakeAmount = Math.min(escrow.collateralQuantity, remainingQuantity);
+
+      // Only proceed if unstakeAmount is greater than 0
+      if (unstakeAmount > 0) {
+        const callArgs = {
+          contract: { address: reserve },
+          method: 'unstake',
+          args: util.usc({
+            escrowAddress: escrow.address,
+            quantity: unstakeAmount,
+          }),
+        };
+
+        unstakePromises.push(rest.call(user, callArgs, options));
+        remainingQuantity -= unstakeAmount;
+      }
+    }
+
+    // Execute all unstake transactions concurrently
+    await Promise.all(unstakePromises);
+
+    return;
+  } catch (error) {
+    console.error('Error in unstake function:', error);
+    throw error;
+  }
 }
 
 /**
- * Borrow
+ * Borrow assets from multiple escrows.
+ * @param {Object} user - User context for the request.
+ * @param {Object} args - Arguments for borrowing.
+ * @param {string} args.reserve - The reserve contract address.
+ * @param {number} args.borrowAmount - The total amount to borrow.
+ * @param {Array<string>} args.escrowAddresses - List of escrow contract addresses.
+ * @param {Object} options - Additional options for the request.
+ * @returns {Array} - Responses from each borrow transaction.
+ * @throws {Error} - Throws if borrowing fails for any escrow or if validation fails.
  */
 async function borrow(user, args, options) {
-  const { reserve, ...restArgs } = args;
-  const callArgs = {
-    contract: { address: reserve },
-    method: 'borrow',
-    args: util.usc({ ...restArgs }),
-  };
+  const { reserve, borrowAmount, escrowAddresses } = args;
 
-  const reponse = await rest.call(user, callArgs, options);
-  return reponse;
+  if (escrowAddresses.length === 0) {
+    throw new Error('At least one escrow address must be provided.');
+  }
+  try {
+    // Step 1: Fetch the escrows using the provided escrowAddresses
+    const escrowSearchOptions = {
+      ...options,
+      query: {
+        creator: CREATOR,
+        isActive: IS_ACTIVE,
+        select: 'address,collateralQuantity',
+        address: `in.(${escrowAddresses.join(',')})`,
+      },
+    };
+
+    const escrows = await rest.search(
+      user,
+      { name: 'BlockApps-Mercata-Escrow' },
+      escrowSearchOptions
+    );
+
+    if (escrows.length === 0) {
+      throw new Error('No active escrows found for the provided addresses.');
+    }
+
+    // Step 2: Calculate total collateralQuantity
+    const totalCollateral = escrows.reduce((acc, escrow) => acc + Number(escrow.collateralQuantity || 0), 0);
+
+    if (totalCollateral <= 0) {
+      throw new Error('Total collateral quantity is zero or negative. Cannot proceed with borrowing.');
+    }
+
+    // Step 3: Distribute borrowAmount proportionally based on collateralQuantity
+    let distributedAmount = 0; // To keep track of the total distributed amount
+
+    for (let i = 0; i < escrows.length; i++) {
+      const escrow = escrows[i];
+      let amountToBorrow;
+
+      if (i < escrows.length - 1) {
+        // Calculate proportional amount and floor it to ensure integer value
+        amountToBorrow = Math.floor((Number(escrow.collateralQuantity) / totalCollateral) * borrowAmount);
+        distributedAmount += amountToBorrow;
+      } else {
+        // Assign the remaining amount to the last escrow to handle any remainder
+        amountToBorrow = borrowAmount - distributedAmount;
+      }
+
+      // Ensure that amountToBorrow is at least 0
+      amountToBorrow = Math.max(amountToBorrow, 0);
+
+      // Prepare callArgs
+      const callArgs = {
+        contract: { address: reserve },
+        method: 'borrow',
+        args: util.usc({
+          escrowAddress: escrow.address,
+          borrowAmount: amountToBorrow,
+        }),
+      };
+
+      // Execute the borrow call
+      await rest.call(user, callArgs, options);
+    }
+
+    return;
+  } catch (error) {
+    console.error('Error in borrow function:', error);
+    throw error;
+  }
 }
 
 /**

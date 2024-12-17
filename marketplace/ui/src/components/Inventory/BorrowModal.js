@@ -1,6 +1,6 @@
-import { Button, Modal, Tooltip } from 'antd';
+import { Button, Modal, Tooltip, InputNumber } from 'antd';
 import { QuestionCircleOutlined } from '@ant-design/icons';
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 
 import { actions as inventoryActions } from '../../contexts/inventory/actions';
 import {
@@ -24,24 +24,100 @@ const BorrowModal = ({
   offset,
   productDetailPage,
 }) => {
-  const { isReservesLoading, reserves, oracle, isBorrowing } =
-    useInventoryState();
+  const { isReservesLoading, reserves, isBorrowing } = useInventoryState();
   // Dispatch
   const inventoryDispatch = useInventoryDispatch();
   const marketplaceDispatch = useMarketplaceDispatch();
 
   const isStaked = inventory.sale && inventory.price <= 0;
   const itemName = decodeURIComponent(inventory.name);
+  const escrows = inventory?.inventories
+    ? [
+        ...new Set(
+          inventory.inventories
+            .map((item) => item?.escrow?.address)
+            .filter(Boolean)
+        ),
+      ]
+    : inventory?.escrow?.address
+    ? [inventory.escrow.address]
+    : [];
+  const uniqueEscrowsPrime = new Set();
+  const totalCollateralQuantity = inventory?.inventories
+    ? inventory.inventories.reduce((sum, item) => {
+        const escrowAddress = item?.escrow?.address;
+        const escrowCollateral = item?.escrow?.collateralQuantity || 0;
+
+        // Add collateral only if the escrow address is unique
+        if (escrowAddress && !uniqueEscrowsPrime.has(escrowAddress)) {
+          uniqueEscrowsPrime.add(escrowAddress);
+          return sum + escrowCollateral;
+        }
+
+        return sum;
+      }, 0)
+    : inventory?.escrow?.collateralQuantity;
+  const uniqueEscrowsThird = new Set();
+  const totalCollateralValue = inventory?.inventories
+    ? inventory.inventories.reduce((sum, item) => {
+        const escrowAddress = item?.escrow?.address;
+        const escrowCollateral = item?.escrow?.collateralValue || 0;
+
+        // Add collateral only if the escrow address is unique
+        if (escrowAddress && !uniqueEscrowsThird.has(escrowAddress)) {
+          uniqueEscrowsThird.add(escrowAddress);
+          return sum + escrowCollateral;
+        }
+
+        return sum;
+      }, 0)
+    : inventory?.escrow?.collateralValue || 0;
+  const uniqueEscrows = new Set();
+  const collateralValue = inventory?.inventories
+    ? inventory.inventories.reduce((sum, item) => {
+        const escrowAddress = item?.escrow?.address;
+        const escrowCollateral = item?.escrow?.collateralValue || 0;
+
+        // Add collateral only if the escrow address is unique
+        if (escrowAddress && !uniqueEscrows.has(escrowAddress)) {
+          uniqueEscrows.add(escrowAddress);
+          return sum + escrowCollateral;
+        }
+
+        return sum;
+      }, 0)
+    : inventory?.escrow?.collateralValue *
+        (inventory?.quantity / totalCollateralQuantity) || 0;
   const matchedReserve = reserves?.length
     ? reserves.find((reserve) => reserve.assetRootAddress === inventory.root)
     : null;
-  const oracleData = oracle ? oracle : { consensusPrice: 0 };
   const location = useLocation();
   const queryParams = new URLSearchParams(location.search);
+  const uniqueBorrowedAddresses = new Set();
+  const borrowedAmount = inventory?.inventories
+    ? inventory.inventories.reduce((sum, item) => {
+        const escrowAddress = item?.escrow?.address;
+        const borrowedValue = item?.escrow?.borrowedAmount || 0;
 
-  const loanableAmount = Math.floor(inventory?.escrow?.collateralValue / 2) >= inventory?.escrow?.borrowedAmount
-                       ? Math.floor(inventory?.escrow?.collateralValue / 2) - inventory?.escrow?.borrowedAmount
-                       : 0;
+        // Add borrowed amount only if the escrow address is unique
+        if (escrowAddress && !uniqueBorrowedAddresses.has(escrowAddress)) {
+          uniqueBorrowedAddresses.add(escrowAddress);
+          return sum + borrowedValue;
+        }
+
+        return sum;
+      }, 0)
+    : inventory?.escrow?.borrowedAmount || 0;
+  const maxBorrowableAmount = Math.floor(totalCollateralValue / 2);
+  const loanableAmount =
+    maxBorrowableAmount >= borrowedAmount
+      ? maxBorrowableAmount - borrowedAmount
+      : 0;
+  const [desiredLoanAmount, setDesiredLoanAmount] = useState((loanableAmount || 0) / 100);
+
+  const handleLoanAmountChange = (value) => {
+    setDesiredLoanAmount(value || 0);
+  };
 
   useEffect(() => {
     if (reserves && inventory.data && !isReservesLoading && isStaked) {
@@ -54,23 +130,55 @@ const BorrowModal = ({
       label: `Market Value`,
       description:
         ' The total value of your staked assets, calculated as Quantity x Oracle Price.',
-      value: `$${(inventory?.escrow?.collateralValue / 10000).toFixed(2)}`,
+      value: `$${(collateralValue / 10000).toFixed(2)}`,
     },
     {
-      label: 'Maximum loan percentage',
-      description:
-        `Indicates you can borrow up to 50% of the market value of your staked RWAs.`,
+      label: 'Max LTV',
+      description: `Indicates you can borrow up to 50% of the market value of your staked RWAs.`,
       value: '50%',
     },
     {
-      label: 'Estimated Loan (in STRATs)',
+      label: 'Outstanding Loan (in STRATs)',
+      description:
+        'The total amount of STRAT tokens you have borrowed against your staked RWAs.',
+      value: (
+        <div className="flex">
+          <div className="mx-1">{logo}</div>{' '}
+          {parseFloat(borrowedAmount / 100).toFixed(2)}
+        </div>
+      ),
+    },
+    {
+      label: 'Estimated Available Loan (in STRATs)',
       description:
         'The projected amount of STRAT tokens you can borrow against your staked RWAs.',
       value: (
-        <div className="flex -mr-1">
+        <div className="flex">
           <div className="mx-1">{logo}</div>{' '}
           {parseFloat(loanableAmount / 100).toFixed(2)}
         </div>
+      ),
+    },
+    {
+      label: 'Desired Loan Amount',
+      description: 'Enter the amount of STRATs you want to borrow.',
+      value: (
+        <>
+          <InputNumber
+            prefix={logo}
+            min={0}
+            step={0.01}
+            value={desiredLoanAmount}
+            onChange={handleLoanAmountChange}
+            className="w-full"
+            controls={false}
+          />
+          {desiredLoanAmount > loanableAmount / 100 ? (
+            <p className="text-xs" style={{ color: 'red' }}>
+              *Quantity exceeds available quantity of {loanableAmount / 100}
+            </p>
+          ) : null}
+        </>
       ),
     },
   ];
@@ -79,8 +187,8 @@ const BorrowModal = ({
 
   const handleSubmit = async () => {
     const body = {
-      escrowAddress: inventory?.escrow?.address,
-      borrowAmount: loanableAmount,
+      escrowAddresses: escrows,
+      borrowAmount: (desiredLoanAmount*100).toFixed(0),
       reserve: matchedReserve?.address,
     };
 
@@ -148,6 +256,7 @@ const BorrowModal = ({
               className="w-full px-6 h-10 font-bold"
               onClick={handleSubmit}
               loading={isBorrowing}
+              disabled={desiredLoanAmount <= 0}
             >
               Borrow
             </Button>
