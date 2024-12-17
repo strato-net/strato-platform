@@ -41,7 +41,7 @@ const { Title } = Typography;
 const GlobalTransaction = ({
   user,
   stratAddress,
-  cataAddress,
+  assetsWithEighteenDecimalPlaces,
   ethstAddress,
 }) => {
   const StratsIcon = (
@@ -100,7 +100,7 @@ const GlobalTransaction = ({
   const Content = ({ data }) => {
     const price = data?.assetPrice || data?.price;
     const isStrat = data.assetOriginAddress === stratAddress;
-    const isCata = data.assetOriginAddress === cataAddress;
+    const is18DecimalPlaces = assetsWithEighteenDecimalPlaces.includes(data.assetOriginAddress);
 
     return (
       <div className="min-h-44 h-full" style={{ width: '460px' }}>
@@ -143,7 +143,7 @@ const GlobalTransaction = ({
                     ${' '}
                     {isStrat
                       ? (price * 100).toFixed(2)
-                      : isCata
+                      : is18DecimalPlaces
                       ? (price * Math.pow(10, 18)).toFixed(2)
                       : price}{' '}
                   </b>{' '}
@@ -152,7 +152,7 @@ const GlobalTransaction = ({
                     {' '}
                     {(isStrat
                       ? (price * 100).toFixed(2)
-                      : isCata
+                      : is18DecimalPlaces
                       ? (price * Math.pow(10, 18)).toFixed(2)
                       : price) * STRATS_CONVERSION}{' '}
                   </span>
@@ -241,7 +241,7 @@ const GlobalTransaction = ({
           const value =
             assetOriginAddress === stratAddress
               ? quantity / 100
-              : assetOriginAddress === cataAddress
+              : assetsWithEighteenDecimalPlaces.includes(assetOriginAddress)
               ? quantity / Math.pow(10, 18)
               : quantity;
 
@@ -268,7 +268,7 @@ const GlobalTransaction = ({
                   (
                     (assetOriginAddress === stratAddress
                       ? (price * 100).toFixed(2)
-                      : assetOriginAddress === cataAddress
+                      : assetsWithEighteenDecimalPlaces.includes(assetOriginAddress)
                       ? (price * Math.pow(10, 18)).toFixed(2)
                       : price) * 100
                   ).toFixed(0)
@@ -281,7 +281,7 @@ const GlobalTransaction = ({
               ? `${formattedNum(
                   assetOriginAddress === stratAddress
                     ? (price * 100).toFixed(2)
-                    : assetOriginAddress === cataAddress
+                    : assetsWithEighteenDecimalPlaces.includes(assetOriginAddress)
                     ? (price * Math.pow(10, 18)).toFixed(2)
                     : price
                 )} $`
@@ -465,7 +465,7 @@ const GlobalTransaction = ({
               user={user}
               isTransactionLoading={isTransactionLoading}
               stratAddress={stratAddress}
-              cataAddress={cataAddress}
+              assetsWithEighteenDecimalPlaces={assetsWithEighteenDecimalPlaces}
               ethstAddress={ethstAddress}
             />
           </Row>

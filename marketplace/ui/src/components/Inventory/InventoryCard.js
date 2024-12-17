@@ -51,7 +51,7 @@ const InventoryCard = ({
   user,
   supportedTokens,
   stratAddress,
-  cataAddress,
+  assetsWithEighteenDecimalPlaces,
 }) => {
   const textRef = useRef(null);
   const { isReserveLoading, reserves } = useInventoryState();
@@ -76,16 +76,16 @@ const InventoryCard = ({
   const imgMeta = category ? category : SEO.TITLE_META;
   const itemData = inventory.data;
   const isStrat = inventory.originAddress === stratAddress;
-  const isCata = inventory.originAddress === cataAddress;
+  const is18DecimalPlaces = assetsWithEighteenDecimalPlaces.includes(inventory.originAddress);
   const quantity = isStrat
     ? new BigNumber(inventory.quantity).dividedBy(100)
-    : isCata
+    : is18DecimalPlaces
     ? new BigNumber(inventory.quantity).dividedBy(new BigNumber(10).pow(18))
     : new BigNumber(inventory.quantity);
   const price = inventory?.price
     ? isStrat
       ? new BigNumber(inventory.price).multipliedBy(100)
-      : isCata
+      : is18DecimalPlaces
       ? new BigNumber(inventory.quantity).multipliedBy(
           new BigNumber(10).pow(18)
         )
@@ -95,7 +95,7 @@ const InventoryCard = ({
     inventory.saleQuantity !== undefined
       ? isStrat
         ? new BigNumber(inventory.saleQuantity || 0).dividedBy(100)
-        : isCata
+        : is18DecimalPlaces
         ? new BigNumber(inventory.saleQuantity || 0).dividedBy(
             new BigNumber(10).pow(18)
           )
@@ -104,7 +104,7 @@ const InventoryCard = ({
   const totalLockedQuantity = inventory.totalLockedQuantity
     ? isStrat
       ? new BigNumber(inventory.totalLockedQuantity || 0).dividedBy(100)
-      : isCata
+      : is18DecimalPlaces
       ? new BigNumber(inventory.totalLockedQuantity || 0).dividedBy(
           new BigNumber(10).pow(18)
         )
@@ -391,7 +391,7 @@ const InventoryCard = ({
                   !isActive() ||
                   disableSADDOGS(inventory) ||
                   isStrat ||
-                  isCata
+                  is18DecimalPlaces
                 }
               >
                 <SendOutlined /> Redeem
@@ -451,7 +451,7 @@ const InventoryCard = ({
                       !isActive() ||
                       disableSADDOGS(inventory) ||
                       isStrat ||
-                      isCata
+                      is18DecimalPlaces
                     }
                   >
                     <SendOutlined /> Redeem
@@ -632,7 +632,7 @@ const InventoryCard = ({
           user={user}
           reserves={reserves}
           stratAddress={stratAddress}
-          cataAddress={cataAddress}
+          assetsWithEighteenDecimalPlaces={assetsWithEighteenDecimalPlaces}
         />
       )}
       {unlistModalOpen && (
@@ -695,7 +695,7 @@ const InventoryCard = ({
           saleAddress={inventory.saleAddress}
           category={category}
           stratAddress={stratAddress}
-          cataAddress={cataAddress}
+          assetsWithEighteenDecimalPlaces={assetsWithEighteenDecimalPlaces}
         />
       )}
       {transferModalOpen && (
@@ -708,7 +708,7 @@ const InventoryCard = ({
           categoryName={category}
           reserves={reserves}
           stratAddress={stratAddress}
-          cataAddress={cataAddress}
+          assetsWithEighteenDecimalPlaces={assetsWithEighteenDecimalPlaces}
         />
       )}
       {redeemModalOpen && (

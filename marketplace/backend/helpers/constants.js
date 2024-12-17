@@ -4,7 +4,7 @@ dayjs.extend(utc);
 
 export default {
   baseUrl: `/api/v1`,
-  deployParamName: "deploy",
+  deployParamName: 'deploy',
   reserve: '0000000000000000000000000000000000000100',
   zeroAddress: '0000000000000000000000000000000000000000',
   certificateRegistryContractName: 'OfficialCertificateRegistry',
@@ -40,6 +40,7 @@ export default {
   prodCataAddress: '2680dc6693021cd3fefb84351570874fbef8332a',
   testnetCataAddress: '051cb99bca7c437f4b17dc01bd4ff7c5e09db035',
   testnetETHSTAddress: 'fa251329090edfb053c01a50ac322c603c26b9b3',
+  prodETHSTAddress: '',
   attachImagesAndFiles:
     '*,BlockApps-Mercata-Asset-files(*),BlockApps-Mercata-Asset-images(*),BlockApps-Mercata-Asset-fileNames(*)',
   attachSalesAndImagesAndFiles:
@@ -56,6 +57,11 @@ export default {
     'blockapps_memberships',
     'blockapps_art',
     'blockapps_spirits',
+  ],
+  AssetsWithEighteenDecimalPlaces: [
+    '2680dc6693021cd3fefb84351570874fbef8332a',
+    '051cb99bca7c437f4b17dc01bd4ff7c5e09db035',
+    'fa251329090edfb053c01a50ac322c603c26b9b3',
   ],
   localHost: 'http://localhost',
   burnAddress: '6ec8bbe4a5b87be18d443408df43a45e5972fa1b',

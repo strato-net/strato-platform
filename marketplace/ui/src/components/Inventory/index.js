@@ -92,7 +92,7 @@ const Inventory = ({ user }) => {
   const naviroute = routes.InventoryDetail.url;
   const ethNaviroute = routes.EthstProductDetail.url;
   let { hasChecked, isAuthenticated, loginUrl } = useAuthenticateState();
-  const { stratsAddress, cataAddress } = useMarketplaceState();
+  const { stratsAddress, assetsWithEighteenDecimalPlaces } = useMarketplaceState();
   const formatter = new Intl.NumberFormat('en-US');
   const formattedNum = (num) => formatter.format(num);
 
@@ -475,11 +475,11 @@ const Inventory = ({ user }) => {
       align: 'center',
       render: (_, record) => {
         const isStrats = record.originAddress === stratsAddress;
-        const isCata = record.originAddress === cataAddress;
+        const is18DecimalPlaces = assetsWithEighteenDecimalPlaces.includes(record.originAddress);
         const price = record.price
           ? isStrats
             ? parseFloat(record.price * 100).toFixed(2)
-            : isCata
+            : is18DecimalPlaces
             ? parseFloat(record.price * 10 ** 18).toFixed(2)
             : record.price
           : 'N/A';
@@ -505,11 +505,11 @@ const Inventory = ({ user }) => {
       align: 'center',
       render: (_, record) => {
         const isStrats = record.originAddress === stratsAddress;
-        const isCata = record.originAddress === cataAddress;
+        const is18DecimalPlaces = assetsWithEighteenDecimalPlaces.includes(record.originAddress);
         const quantity = (
           isStrats
             ? new BigNumber(record.quantity).dividedBy(new BigNumber(100))
-            : isCata
+            : is18DecimalPlaces
             ? new BigNumber(record.quantity).dividedBy(
                 new BigNumber(10).pow(18)
               )
@@ -528,13 +528,13 @@ const Inventory = ({ user }) => {
       align: 'center',
       render: (_, record) => {
         const isStrats = record.originAddress === stratsAddress;
-        const isCata = record.originAddress === cataAddress;
+        const is18DecimalPlaces = assetsWithEighteenDecimalPlaces.includes(record.originAddress);
         const saleQuantity = (
           isStrats
             ? new BigNumber(record.saleQuantity || 0).dividedBy(
                 new BigNumber(100)
               )
-            : isCata
+            : is18DecimalPlaces
             ? new BigNumber(record.saleQuantity || 0).dividedBy(
                 new BigNumber(10).pow(18)
               )
@@ -560,7 +560,7 @@ const Inventory = ({ user }) => {
             supportedTokens={supportedTokens}
             reserves={reserves}
             stratAddress={stratsAddress}
-            cataAddress={cataAddress}
+            assetsWithEighteenDecimalPlaces={assetsWithEighteenDecimalPlaces}
           />
         </div>
       ),
@@ -824,7 +824,7 @@ const Inventory = ({ user }) => {
                         supportedTokens={supportedTokens}
                         reserves={reserves}
                         stratAddress={stratsAddress}
-                        cataAddress={cataAddress}
+                        assetsWithEighteenDecimalPlaces={assetsWithEighteenDecimalPlaces}
                       />
                     ))
                   ) : (
@@ -847,7 +847,7 @@ const Inventory = ({ user }) => {
                         supportedTokens={supportedTokens}
                         reserves={reserves}
                         stratAddress={stratsAddress}
-                        cataAddress={cataAddress}
+                        assetsWithEighteenDecimalPlaces={assetsWithEighteenDecimalPlaces}
                       />
                     ))
                   ) : (

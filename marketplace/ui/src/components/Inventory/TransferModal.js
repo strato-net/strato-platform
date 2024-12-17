@@ -27,15 +27,15 @@ const TransferModal = ({
   offset = 0,
   reserves,
   stratAddress,
-  cataAddress,
+  assetsWithEighteenDecimalPlaces,
 }) => {
   const location = useLocation();
   const queryParams = new URLSearchParams(location.search);
   const isStrat = inventory.originAddress === stratAddress;
-  const isCata = inventory.originAddress === cataAddress;
+  const is18DecimalPlaces = assetsWithEighteenDecimalPlaces.includes(inventory.originAddress);
   const availableQuantity = isStrat
     ? new BigNumber(inventory.quantity).dividedBy(100)
-    : isCata
+    : is18DecimalPlaces
     ? new BigNumber(inventory.quantity).dividedBy(new BigNumber(10).pow(18))
     : new BigNumber(inventory.quantity);
   // Get the inventory state and dispatch
@@ -291,7 +291,7 @@ const TransferModal = ({
             );
             return availableQuantity.minus(allocatedQuantity);
           })()}
-          precision={isStrat ? 2 : isCata ? 18 : 0}
+          precision={isStrat ? 2 : is18DecimalPlaces ? 18 : 0}
           onChange={(value) =>
             handleQuantityChange(record.id, new BigNumber(value))
           }
@@ -356,13 +356,13 @@ const TransferModal = ({
       newOwner: transfer.recipient,
       quantity: (isStrat
         ? transfer.quantity.multipliedBy(new BigNumber(100))
-        : isCata
+        : is18DecimalPlaces
         ? transfer.quantity.multipliedBy(new BigNumber(10).pow(18))
         : transfer.quantity
       ).toFixed(0),
       price: isStrat
         ? transfer.price / 100
-        : isCata
+        : is18DecimalPlaces
         ? transfer.price / Math.pow(10, 18)
         : transfer.price,
       senderCommonName: user.commonName,
@@ -370,7 +370,7 @@ const TransferModal = ({
       itemName,
       decimal: (isStrat
         ? new BigNumber(100)
-        : isCata
+        : is18DecimalPlaces
         ? new BigNumber(10).pow(18)
         : new BigNumber(10)
       ).toString(),

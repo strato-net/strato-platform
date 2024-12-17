@@ -30,7 +30,7 @@ const NewTrendingCard = ({
   const navigate = useNavigate();
   const location = useLocation();
   const { Text } = Typography;
-  const { stratsAddress, cataAddress } = useMarketplaceState();
+  const { stratsAddress, assetsWithEighteenDecimalPlaces } = useMarketplaceState();
   const { ethstAddress } = useEthState();
   const { hasChecked, isAuthenticated, loginUrl, user } =
     useAuthenticateState();
@@ -41,10 +41,10 @@ const NewTrendingCard = ({
     topSellingProduct.data.quantityIsDecimal &&
     topSellingProduct.data.quantityIsDecimal === 'True';
   const isStrat = topSellingProduct.originAddress === stratsAddress;
-  const isCata = topSellingProduct.originAddress === cataAddress;
+  const is18DecimalPlaces = assetsWithEighteenDecimalPlaces.includes(topSellingProduct.originAddress);
   const saleQuantity = isStrat
     ? topSellingProduct.saleQuantity / 100
-    : isCata
+    : is18DecimalPlaces
     ? topSellingProduct.saleQuantity / Math.pow(10, 18)
     : topSellingProduct.saleQuantity;
   const [quantity, setQuantity] = useState(1);

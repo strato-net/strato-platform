@@ -4,6 +4,7 @@ import { actions as ethActions } from '../../contexts/eth/actions';
 import { useEthDispatch, useEthState } from '../../contexts/eth';
 import { useAuthenticateState } from '../../contexts/authentication';
 import { ethers } from 'ethers';
+import { fileServerUrl } from '../../helpers/constants';
 
 const BridgeWalletModal = ({ open, handleCancel, accountDetails, signer }) => {
   const [quantity, setQuantity] = useState(1);
@@ -144,7 +145,9 @@ const BridgeWalletModal = ({ open, handleCancel, accountDetails, signer }) => {
 
   const handleSubmit = async () => {
     const tx = await signer.sendTransaction({
-      to: '0xBdAFaEBc08B94785dfE7Fc720Fbcd9aFc156454E',
+      to: fileServerUrl.includes('test')
+        ? '0xBdAFaEBc08B94785dfE7Fc720Fbcd9aFc156454E'
+        : '0x97C80e55CFb79f5198112112b7436b208Ca8e036',
       value: ethers.utils.parseEther(quantity.toString()),
     });
 

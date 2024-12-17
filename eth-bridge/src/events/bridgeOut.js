@@ -4,7 +4,6 @@ const {
   alchemyNetwork,
   blockAppsPrivateKey,
 } = require("../config");
-const { ethers, BigNumber } = require("ethers");
 
 // Alchemy SDK Configuration
 const alchemy = new Alchemy({

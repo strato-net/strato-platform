@@ -52,7 +52,7 @@ const Stake = ({ user }) => {
     success,
   } = useInventoryState();
   const { categorys } = useCategoryState();
-  const { stratsAddress, cataAddress } = useMarketplaceState();
+  const { stratsAddress, assetsWithEighteenDecimalPlaces } = useMarketplaceState();
   const linkUrl = window.location.href;
   const [api, contextHolder] = notification.useNotification();
   const [limit, setLimit] = useState(10);
@@ -256,7 +256,7 @@ const Stake = ({ user }) => {
             user={user}
             reserves={reserves}
             stratAddress={stratsAddress}
-            cataAddress={cataAddress}
+            assetsWithEighteenDecimalPlaces={assetsWithEighteenDecimalPlaces}
           />
         </div>
       ),
@@ -369,7 +369,7 @@ const Stake = ({ user }) => {
                     user={user}
                     reserves={reserves}
                     stratAddress={stratsAddress}
-                    cataAddress={cataAddress}
+                    assetsWithEighteenDecimalPlaces={assetsWithEighteenDecimalPlaces}
                   />
                 ))}
               </div>

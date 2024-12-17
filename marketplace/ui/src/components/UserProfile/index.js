@@ -74,19 +74,19 @@ const UserProfile = ({ user }) => {
     isFetchingTokens,
   } = useInventoryState();
   const [stratAddress, setStratAddress] = useState('');
-  const [cataAddress, setCataAddress] = useState('');
+  const [assetsWithEighteenDecimalPlaces, setAssetsWithEighteenDecimalPlaces] = useState('');
 
   useEffect(() => {
     const fetchAddresses = async () => {
       const stratAddress = await marketplaceActions.fetchStratsAddress(
         marketplaceDispatch
       );
-      const cataAddress = await marketplaceActions.fetchCataAddress(
+      const assetsWithEighteenDecimalPlaces = await marketplaceActions.fetchAssetsWithEighteenDecimalPlaces(
         marketplaceDispatch
       );
       await ethActions.fetchETHSTAddress(ethDispatch);
       setStratAddress(stratAddress);
-      setCataAddress(cataAddress);
+      setAssetsWithEighteenDecimalPlaces(assetsWithEighteenDecimalPlaces);
     };
 
     fetchAddresses();
@@ -407,7 +407,7 @@ const UserProfile = ({ user }) => {
                               supportedTokens={supportedTokens}
                               user={user}
                               stratAddress={stratAddress}
-                              cataAddress={cataAddress}
+                              assetsWithEighteenDecimalPlaces={assetsWithEighteenDecimalPlaces}
                             />
                           );
                         })
@@ -437,7 +437,7 @@ const UserProfile = ({ user }) => {
                               supportedTokens={supportedTokens}
                               user={user}
                               stratAddress={stratAddress}
-                              cataAddress={cataAddress}
+                              assetsWithEighteenDecimalPlaces={assetsWithEighteenDecimalPlaces}
                             />
                           );
                         })
@@ -467,7 +467,7 @@ const UserProfile = ({ user }) => {
                               supportedTokens={supportedTokens}
                               user={user}
                               stratAddress={stratAddress}
-                              cataAddress={cataAddress}
+                              assetsWithEighteenDecimalPlaces={assetsWithEighteenDecimalPlaces}
                             />
                           );
                         })

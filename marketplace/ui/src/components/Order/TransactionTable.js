@@ -50,7 +50,7 @@ import {
 import { SEO } from '../../helpers/seoConstant';
 import { getStringDate } from '../../helpers/utils';
 
-const TransactionTable = ({ user, download, stratAddress, cataAddress }) => {
+const TransactionTable = ({ user, download, stratAddress, assetsWithEighteenDecimalPlaces }) => {
   const StratsIcon = (
     <img src={Images.strat} alt="STRATs" className="mx-1 w-4 h-4" />
   );
@@ -186,7 +186,7 @@ const TransactionTable = ({ user, download, stratAddress, cataAddress }) => {
   const Content = ({ data }) => {
     const price = data?.assetPrice || data?.price;
     const isStrat = data?.assetOriginAddress === stratAddress;
-    const isCata = data?.assetOriginAddress === cataAddress;
+    const is18DecimalPlaces = assetsWithEighteenDecimalPlaces.includes(data?.assetOriginAddress);
 
     return (
       <div className="min-h-44 h-full" style={{ width: '460px' }}>
@@ -229,7 +229,7 @@ const TransactionTable = ({ user, download, stratAddress, cataAddress }) => {
                     ${' '}
                     {isStrat
                       ? (price * 100).toFixed(2)
-                      : isCata
+                      : is18DecimalPlaces
                       ? (price * Math.pow(10, 18)).toFixed(2)
                       : price}{' '}
                   </b>{' '}
@@ -238,7 +238,7 @@ const TransactionTable = ({ user, download, stratAddress, cataAddress }) => {
                     {' '}
                     {(isStrat
                       ? (price * 100).toFixed(2)
-                      : isCata
+                      : is18DecimalPlaces
                       ? (price * Math.pow(10, 18)).toFixed(2)
                       : price) * STRATS_CONVERSION}{' '}
                   </span>
@@ -371,7 +371,7 @@ const TransactionTable = ({ user, download, stratAddress, cataAddress }) => {
           {quantity
             ? (assetOriginAddress === stratAddress
                 ? quantity / 100
-                : assetOriginAddress === cataAddress
+                : assetsWithEighteenDecimalPlaces.includes(assetOriginAddress)
                 ? quantity / Math.pow(10, 18)
                 : quantity
               ).toLocaleString('en-US', {
@@ -394,7 +394,7 @@ const TransactionTable = ({ user, download, stratAddress, cataAddress }) => {
             ? formattedNum(
                 assetOriginAddress === stratAddress
                   ? (price * 100).toFixed(2)
-                  : assetOriginAddress === cataAddress
+                  : assetsWithEighteenDecimalPlaces.includes(assetOriginAddress)
                   ? (price * Math.pow(10, 18)).toFixed(2)
                   : price
               )
@@ -642,7 +642,7 @@ const TransactionTable = ({ user, download, stratAddress, cataAddress }) => {
                 data={paginatedTransactions}
                 user={user}
                 stratAddress={stratAddress}
-                cataAddress={cataAddress}
+                assetsWithEighteenDecimalPlaces={assetsWithEighteenDecimalPlaces}
               />
               <Pagination
                 className="mx-auto mt-5"

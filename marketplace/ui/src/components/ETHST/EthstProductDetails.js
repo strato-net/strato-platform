@@ -7,7 +7,6 @@ import {
   Tabs,
   Spin,
   notification,
-  InputNumber,
   List,
 } from 'antd';
 import {
@@ -20,7 +19,6 @@ import {
   RiseOutlined,
 } from '@ant-design/icons';
 import { useMatch, useNavigate, useLocation } from 'react-router-dom';
-import TagManager from 'react-gtm-module';
 //actions
 import { actions as inventoryActions } from '../../contexts/inventory/actions';
 import {
@@ -63,11 +61,10 @@ import image_placeholder from '../../images/resources/image_placeholder.png';
 import 'react-responsive-carousel/lib/styles/carousel.min.css'; // requires a loader
 
 import { SEO } from '../../helpers/seoConstant';
-import { ASSET_STATUS } from '../../helpers/constants';
-import { TOAST_MSG } from '../../helpers/msgConstants';
+import { ASSET_STATUS, fileServerUrl } from '../../helpers/constants';
 import { Swiper, SwiperSlide } from 'swiper/react';
 import { Ethers5Adapter } from '@reown/appkit-adapter-ethers5';
-import { baseSepolia, base, mainnet } from '@reown/appkit/networks';
+import { mainnet, sepolia } from '@reown/appkit/networks';
 import { useAppKit, useAppKitAccount, createAppKit } from '@reown/appkit/react';
 import { ethers } from 'ethers';
 
@@ -169,12 +166,19 @@ const ProductDetails = ({ user, users }) => {
     adapters: [ethers5Adapter],
     metadata: {
       name: 'Mercata Marketplace',
-      description: 'Description',
-      url: 'https://marketplace.mercata-testnet2.blockapps.net/',
+      description:
+        'STRATO Mercata marketplace for buying, selling, and investing in fractionalized assets.',
+      url: 'https://marketplace.mercata.blockapps.net/',
       icons: ['https://avatars.githubusercontent.com/u/179229932?s=200&v=4'],
     },
-    networks: [baseSepolia, base, mainnet],
+    networks: [fileServerUrl.includes('test') ? sepolia : mainnet],
     projectId,
+    enableWalletConnect: false,
+    features: {
+      email: false,
+      socials: [],
+      emailShowWallets: false,
+    },
   });
 
   const appKit = useAppKit();
