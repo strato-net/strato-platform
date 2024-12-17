@@ -46,7 +46,7 @@ const StakeInventoryCard = ({
   const imgMeta = category ? category : SEO.TITLE_META;
   const itemData = inventory.data;
   const isStrat = inventory.originAddress === stratAddress;
-  const isCata = inventory.originAddress === cataAddress;
+  const isCata = assetsWithEighteenDecimalPlaces.includes(inventory.originAddress);
 
   const uniqueEscrows = new Set();
   const collateralQuantity = inventory?.inventories
