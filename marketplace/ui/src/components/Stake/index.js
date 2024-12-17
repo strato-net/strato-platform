@@ -210,7 +210,7 @@ const Stake = ({ user }) => {
           offset,
           reserves,
           stratsAddress,
-          cataAddress,
+          assetsWithEighteenDecimalPlaces,
           navigate
         )}
         dataSource={populatedInventories}
@@ -285,7 +285,7 @@ const Stake = ({ user }) => {
                     offset,
                     reserves,
                     stratsAddress,
-                    cataAddress
+                    assetsWithEighteenDecimalPlaces
                   )}
                   dataSource={combinedInventories.slice(offset, offset + limit)}
                   loading={isInventoriesLoading}

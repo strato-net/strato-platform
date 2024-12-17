@@ -12,7 +12,7 @@ const StratsIcon = (
 );
 
 // Make sure you have any necessary variables or functions defined/imported
-// You may need to pass user, limit, offset, reserves, stratsAddress, cataAddress as params,
+// You may need to pass user, limit, offset, reserves, stratsAddress, assetsWithEighteenDecimalPlaces as params,
 // or handle them in the file where you call these columns.
 
 export const aggregateStakeColumns = (
@@ -21,7 +21,7 @@ export const aggregateStakeColumns = (
   offset,
   reserves,
   stratsAddress,
-  cataAddress
+  assetsWithEighteenDecimalPlaces
 ) => {
   return [
     {
@@ -161,7 +161,7 @@ export const aggregateStakeColumns = (
             user={user}
             reserves={reserves}
             stratAddress={stratsAddress}
-            cataAddress={cataAddress}
+            assetsWithEighteenDecimalPlaces={assetsWithEighteenDecimalPlaces}
           />
         </div>
       ),
@@ -208,7 +208,7 @@ export const stakeColumns = (
   offset,
   reserves,
   stratsAddress,
-  cataAddress,
+  assetsWithEighteenDecimalPlaces,
   navigate
 ) => {
   return [
@@ -313,7 +313,7 @@ export const stakeColumns = (
           user={user}
           reserves={reserves}
           stratAddress={stratsAddress}
-          cataAddress={cataAddress}
+          assetsWithEighteenDecimalPlaces={assetsWithEighteenDecimalPlaces}
         />
       ),
     },
