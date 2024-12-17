@@ -464,7 +464,7 @@ async function checkSystemInfo() {
     const cpuCount = os.cpus().length;
     
     //covert loads to percents
-    const avgLoads = os.loadavg()?.map(load => (load / cpuCount) * 100);
+    const avgLoads = os.loadavg()?.map(load => (load / cpuCount) * (100/2));
     
     //grab 15 min load
     const avgLoad = (avgLoads == null || avgLoads.length < 3) ? 0 : avgLoads[2];
