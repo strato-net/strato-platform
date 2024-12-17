@@ -36,7 +36,14 @@ def generate_tx(address, balance):
                 "_newOwner": address,
                 "_price": 0.0001,
                 "_quantity": balance * (10**18),
-                "_transferNumber": int(uid())
+                "_transferNumber": int(uid()),
+                "_description": "<p><strong>What is USDST</strong></p><p style=\"text-align: start\"></p><p style=\"text-align: start\"><strong><span style=\"font-size: 12px\">Loyalty Points</span></strong><span style=\"font-size: 12px\">: USDST are digital points that are roughly pegged to the US dollar and provided to customers for their participation and interactions on the STRATO Mercata Marketplace.</span></p><p style=\"text-align: start\"><strong><span style=\"font-size: 12px\">Reward Mechanism</span></strong><span style=\"font-size: 12px\">: USDST are part of our rewards system, designed to incentivize and recognize engagement and loyalty.</span></p><p style=\"text-align: start\"><strong><span style=\"font-size: 12px\">Redeemable Assets</span></strong><span style=\"font-size: 12px\">: Customers can use their USDST to redeem marketplace items, and access special offers.</span></p><p style=\"text-align: start\"><strong><span style=\"font-size: 12px\">Empowering the Community</span></strong><span style=\"font-size: 12px\">: By engaging with USDST, you’re not just earning rewards; you’re actively contributing to the development and success of the Mercata protocol, embodying the spirit of decentralized growth.</span></p><p style=\\\"text-align: start\\\"><span style=\\\"font-size: 12px\\\">For more information, please refer to the VIP Program Terms of Use found on the&nbsp;</span><a target=\\\"_blank\\\" rel=\\\"noopenernoreferrernofollow\\\" href="https://blockapps.net/"><span style=\\\"color: #0000ff;font-size: 12px;color: #0000ff\\\">BlockApps website</span></a><span style=\\\"font-size: 12px\\\">.</span></p>"
+                "_itemNumber": "",
+                "_name": "USDST",
+                "_ownerCommonName": "",
+                "_sale": null,
+                "_status": "1",
+                
             }
         },
         "type": "FUNCTION"
