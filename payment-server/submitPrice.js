@@ -196,7 +196,7 @@ async function fetchAndSubmitETHPrice(
 
     const currentTimestamp = Math.floor(currentTimeMs / 1000);
     await submitPrice(token, oracleContract, {
-      price: twap,
+      price: twap/1e18,
       timestamp: currentTimestamp,
     });
 
