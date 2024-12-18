@@ -45,29 +45,29 @@ const actionDescriptors = {
   fetchUserAddresses: 'fetch_user_addresses',
   fetchUserAddressesSuccessful: 'fetch_user_addresses_successful',
   fetchUserAddressesFailed: 'fetch_user_addresses_failed',
-  fetchStratsBalance: 'fetch_strats_balance',
-  fetchStratsBalanceSuccessful: 'fetch_strats_balance_successful',
-  fetchStratsBalanceFailed: 'fetch_strats_balance_failed',
+  fetchUsdstBalance: 'fetch_usdst_balance',
+  fetchUsdstBalanceSuccessful: 'fetch_usdst_balance_successful',
+  fetchUsdstBalanceFailed: 'fetch_usdst_balance_failed',
   fetchCataBalance: 'fetch_cata_balance',
   fetchCataBalanceSuccessful: 'fetch_cata_balance_successful',
   fetchCataBalanceFailed: 'fetch_cata_balance_failed',
-  fetchStratsAddress: 'fetch_strats_address',
-  fetchStratsAddressSuccessful: 'fetch_strats_address_successful',
-  fetchStratsAddressFailed: 'fetch_strats_address_failed',
+  fetchUsdstAddress: 'fetch_usdst_address',
+  fetchUsdstAddressSuccessful: 'fetch_usdst_address_successful',
+  fetchUsdstAddressFailed: 'fetch_usdst_address_failed',
   fetchAssetsWithEighteenDecimalPlaces: 'fetch_assets_with_eighteen_decimal_places',
   fetchAssetsWithEighteenDecimalPlacesSuccessful: 'fetch_assets_with_eighteen_decimal_places_successful',
   fetchAssetsWithEighteenDecimalPlacesFailed: 'fetch_assets_with_eighteen_decimal_places_failed',
   fetchCataAddress: 'fetch_cata_address',
   fetchCataAddressSuccessful: 'fetch_cata_address_successful',
   fetchCataAddressFailed: 'fetch_cata_address_failed',
-  fetchStratsTransactionHistory: 'fetch_strats_transaction_history',
-  fetchStratsTransactionHistorySuccessful:
-    'fetch_strats_transaction_history_successful',
-  fetchStratsTransactionHistoryFailed:
-    'fetch_strats_transaction_history_failed',
-  transferStrats: 'transfer_strats',
-  transferStratsSuccessful: 'transfer_strats_successful',
-  transferStratsFailed: 'transfer_strats_failed',
+  fetchUsdstTransactionHistory: 'fetch_usdst_transaction_history',
+  fetchUsdstTransactionHistorySuccessful:
+    'fetch_usdst_transaction_history_successful',
+  fetchUsdstTransactionHistoryFailed:
+    'fetch_usdst_transaction_history_failed',
+  transferUsdst: 'transfer_usdst',
+  transferUsdstSuccessful: 'transfer_usdst_successful',
+  transferUsdstFailed: 'transfer_usdst_failed',
 };
 
 const actions = {
@@ -550,10 +550,10 @@ const actions = {
       actions.setMessage(dispatch, 'Error while getting Shipping address');
     }
   },
-  fetchStratsBalance: async (dispatch) => {
-    dispatch({ type: actionDescriptors.fetchStratsBalance });
+  fetchUsdstBalance: async (dispatch) => {
+    dispatch({ type: actionDescriptors.fetchUsdstBalance });
     try {
-      let response = await fetch(`${apiUrl}/marketplace/strats`, {
+      let response = await fetch(`${apiUrl}/marketplace/usdst`, {
         method: HTTP_METHODS.GET,
         credentials: 'same-origin',
       });
@@ -563,25 +563,25 @@ const actions = {
         response.status === RestStatus.FORBIDDEN
       ) {
         dispatch({
-          type: actionDescriptors.fetchStratsBalanceFailed,
-          payload: 'Error while fetching STRATS',
+          type: actionDescriptors.fetchUsdstBalanceFailed,
+          payload: 'Error while fetching USDST',
         });
       }
       if (response.status === RestStatus.OK) {
         dispatch({
-          type: actionDescriptors.fetchStratsBalanceSuccessful,
+          type: actionDescriptors.fetchUsdstBalanceSuccessful,
           payload: body.data,
         });
         return;
       }
       dispatch({
-        type: actionDescriptors.fetchStratsBalanceFailed,
-        payload: 'Error while fetching STRATS',
+        type: actionDescriptors.fetchUsdstBalanceFailed,
+        payload: 'Error while fetching USDST',
       });
     } catch (err) {
       dispatch({
-        type: actionDescriptors.fetchStratsBalanceFailed,
-        payload: 'Error while fetching STRATS',
+        type: actionDescriptors.fetchUsdstBalanceFailed,
+        payload: 'Error while fetching USDST',
       });
     }
   },
@@ -620,10 +620,10 @@ const actions = {
       });
     }
   },
-  fetchStratsAddress: async (dispatch) => {
-    dispatch({ type: actionDescriptors.fetchStratsAddress });
+  fetchUsdstAddress: async (dispatch) => {
+    dispatch({ type: actionDescriptors.fetchUsdstAddress });
     try {
-      let response = await fetch(`${apiUrl}/marketplace/strats/address`, {
+      let response = await fetch(`${apiUrl}/marketplace/usdst/address`, {
         method: HTTP_METHODS.GET,
         credentials: 'same-origin',
       });
@@ -634,29 +634,29 @@ const actions = {
         response.status === RestStatus.FORBIDDEN
       ) {
         dispatch({
-          type: actionDescriptors.fetchStratsAddressFailed,
-          payload: 'Error while fetching STRATS address',
+          type: actionDescriptors.fetchUsdstAddressFailed,
+          payload: 'Error while fetching USDST address',
         });
         return null;
       }
 
       if (response.status === RestStatus.OK) {
         dispatch({
-          type: actionDescriptors.fetchStratsAddressSuccessful,
+          type: actionDescriptors.fetchUsdstAddressSuccessful,
           payload: body?.data,
         });
         return body.data;
       }
 
       dispatch({
-        type: actionDescriptors.fetchStratsAddressFailed,
-        payload: 'Error while fetching STRATS address',
+        type: actionDescriptors.fetchUsdstAddressFailed,
+        payload: 'Error while fetching USDST address',
       });
       return null;
     } catch (err) {
       dispatch({
-        type: actionDescriptors.fetchStratsAddressFailed,
-        payload: 'Error while fetching STRATS address',
+        type: actionDescriptors.fetchUsdstAddressFailed,
+        payload: 'Error while fetching USDST address',
       });
       return null;
     }
@@ -743,10 +743,10 @@ const actions = {
       return null;
     }
   },
-  fetchStratsTransactionHistory: async (dispatch) => {
-    dispatch({ type: actionDescriptors.fetchStratsTransactionHistory });
+  fetchUsdstTransactionHistory: async (dispatch) => {
+    dispatch({ type: actionDescriptors.fetchUsdstTransactionHistory });
     try {
-      let response = await fetch(`${apiUrl}/marketplace/strats/history`, {
+      let response = await fetch(`${apiUrl}/marketplace/usdst/history`, {
         method: HTTP_METHODS.GET,
         credentials: 'same-origin',
       });
@@ -756,33 +756,33 @@ const actions = {
         response.status === RestStatus.FORBIDDEN
       ) {
         dispatch({
-          type: actionDescriptors.fetchStratsTransactionHistoryFailed,
-          payload: 'Error while fetching STRATS Transaction History',
+          type: actionDescriptors.fetchUsdstTransactionHistoryFailed,
+          payload: 'Error while fetching USDST Transaction History',
         });
         window.location.href = body.error.loginUrl;
       }
       if (response.status === RestStatus.OK) {
         dispatch({
-          type: actionDescriptors.fetchStratsTransactionHistorySuccessful,
+          type: actionDescriptors.fetchUsdstTransactionHistorySuccessful,
           payload: body.data,
         });
         return;
       }
       dispatch({
-        type: actionDescriptors.fetchStratsTransactionHistoryFailed,
-        payload: 'Error while fetching STRATS Transaction History',
+        type: actionDescriptors.fetchUsdstTransactionHistoryFailed,
+        payload: 'Error while fetching USDST Transaction History',
       });
     } catch (err) {
       dispatch({
-        type: actionDescriptors.fetchStratsTransactionHistoryFailed,
-        payload: 'Error while fetching STRATS Transaction History',
+        type: actionDescriptors.fetchUsdstTransactionHistoryFailed,
+        payload: 'Error while fetching USDST Transaction History',
       });
     }
   },
-  transferStrats: async (dispatch, payload) => {
-    dispatch({ type: actionDescriptors.transferStrats });
+  transferUsdst: async (dispatch, payload) => {
+    dispatch({ type: actionDescriptors.transferUsdst });
     try {
-      let response = await fetch(`${apiUrl}/marketplace/strats/transfer`, {
+      let response = await fetch(`${apiUrl}/marketplace/usdst/transfer`, {
         method: HTTP_METHODS.POST,
         credentials: 'same-origin',
         headers: {
@@ -795,43 +795,43 @@ const actions = {
 
       if (response.status === RestStatus.OK) {
         dispatch({
-          type: actionDescriptors.transferStratsSuccessful,
+          type: actionDescriptors.transferUsdstSuccessful,
         });
-        actions.setMessage(dispatch, 'STRATS transferred successfully', true);
+        actions.setMessage(dispatch, 'USDST transferred successfully', true);
         return true;
       } else if (response.status === RestStatus.CONFLICT) {
         dispatch({
-          type: actionDescriptors.transferStratsFailed,
+          type: actionDescriptors.transferUsdstFailed,
           error: body.error.message,
         });
         actions.setMessage(dispatch, body.error.message);
         return false;
       } else if (response.status === RestStatus.INTERNAL_SERVER_ERROR) {
         dispatch({
-          type: actionDescriptors.transferStratsFailed,
+          type: actionDescriptors.transferUsdstFailed,
           error: 'Error while transferring Item',
         });
         actions.setMessage(dispatch, 'Error while transferring Item');
         return false;
       } else if (response.status === RestStatus.UNAUTHORIZED) {
         dispatch({
-          type: actionDescriptors.transferStratsFailed,
-          error: 'Unauthorized while transferring STRATS',
+          type: actionDescriptors.transferUsdstFailed,
+          error: 'Unauthorized while transferring USDST',
         });
         window.location.href = body.error.loginUrl;
       }
       dispatch({
-        type: actionDescriptors.transferStratsFailed,
+        type: actionDescriptors.transferUsdstFailed,
         error: body.error,
       });
       actions.setMessage(dispatch, body.error);
       return false;
     } catch (err) {
       dispatch({
-        type: actionDescriptors.transferStratsFailed,
-        error: 'Error while transferring STRATS',
+        type: actionDescriptors.transferUsdstFailed,
+        error: 'Error while transferring USDST',
       });
-      actions.setMessage(dispatch, 'Error while transferring STRATS');
+      actions.setMessage(dispatch, 'Error while transferring USDST');
     }
   },
 };

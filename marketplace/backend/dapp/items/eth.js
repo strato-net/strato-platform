@@ -11,12 +11,12 @@ import {
 import dayjs from 'dayjs';
 import constants from '../../helpers/constants';
 
-const contractName = 'STRATSTokens';
-const contractFilename = `${util.cwd}/dapp/items/contracts/STRATS.sol`;
+const contractName = 'USDSTTokens';
+const contractFilename = `${util.cwd}/dapp/items/contracts/USDST.sol`;
 const contractEvents = { OWNERSHIP_UPDATE: 'OwnershipUpdate' };
 
 /**
- * Uploads a new STRATS item
+ * Uploads a new USDST item
  * @param user User token (typically an admin)
  * @param _constructorArgs Arguments of Item's constructor
  * @param options  deployment options (found in _/config/*.config.yaml_ via _load.config.js_)
@@ -137,7 +137,7 @@ function bind(user, _contract, options) {
 }
 
 /**
- * Bind an existing STRATS contract to a new user token. Useful for having multiple users test
+ * Bind an existing USDST contract to a new user token. Useful for having multiple users test
  * the same contract.
  * @example <caption>Create an admin and user bound to the same new item contract.</caption>
  * const adminBoundContract = createArt(adminToken, args, options);
@@ -189,7 +189,7 @@ async function get(user, args, options) {
 async function getAll(admin, args = {}, options) {
   const inventories = await searchAllWithQueryArgs(
     constants.assetTableName,
-    { ...args, category: `['STRATS']` },
+    { ...args, category: `['USDST']` },
     options,
     admin
   );

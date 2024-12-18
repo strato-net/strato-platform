@@ -21,7 +21,7 @@ import {
 import { Images } from '../../images';
 import { useLocation } from 'react-router-dom';
 
-const logo = <img src={Images.strat} alt={''} title={''} className="w-5 h-5" />;
+const logo = <img src={Images.usdst} alt={''} title={''} className="w-5 h-5" />;
 
 const RepayModal = ({
   open,
@@ -41,7 +41,7 @@ const RepayModal = ({
   const paymentServiceDispatch = usePaymentServiceDispatch();
 
   const { paymentServices } = usePaymentServiceState();
-  const { strats, isFetchingStrats } = useMarketplaceState();
+  const { usdst, isFetchingUsdst } = useMarketplaceState();
   const isStaked = inventory.sale && inventory.price <= 0;
   const itemName = decodeURIComponent(inventory.name);
   const location = useLocation();
@@ -60,7 +60,7 @@ const RepayModal = ({
     : [];
 
   useEffect(() => {
-    if (inventory && strats) {
+    if (inventory && usdst) {
       const uniqueEscrowsPrime = new Set();
       const totalCollateralQuantity = inventory?.inventories
         ? inventory.inventories.reduce((sum, item) => {
@@ -92,24 +92,24 @@ const RepayModal = ({
           }, 0)
         : inventory?.escrow?.borrowedAmount *
           (inventory?.quantity / totalCollateralQuantity);
-      const stratsBalance = Object.keys(strats).length > 0 ? strats : 0;
+      const usdstBalance = Object.keys(usdst).length > 0 ? usdst : 0;
       setRepayAmount(
-        borrowedAmount / 100 > stratsBalance
-          ? Number(stratsBalance)
+        borrowedAmount / 100 > usdstBalance
+          ? Number(usdstBalance)
           : borrowedAmount / 100
       );
     }
-  }, [strats, inventory]);
+  }, [usdst, inventory]);
 
   useEffect(() => {
     paymentServiceActions.getPaymentServices(paymentServiceDispatch, true);
-    marketplaceActions.fetchStratsBalance(marketplaceDispatch);
+    marketplaceActions.fetchUsdstBalance(marketplaceDispatch);
   }, []);
 
   const dataForItems = [
     {
-      label: `Loan to pay off in STRATs`,
-      description: 'The amount of STRATs to pay off the loan',
+      label: `Loan to pay off in USDST`,
+      description: 'The amount of USDST to pay off the loan',
       value: (
         <div className="flex -mr-1">
           {logo} &nbsp;
@@ -152,7 +152,7 @@ const RepayModal = ({
         await inventoryActions.getAllReserve(inventoryDispatch);
         await inventoryActions.getUserCataRewards(inventoryDispatch);
       }
-      await marketplaceActions.fetchStratsBalance(marketplaceDispatch);
+      await marketplaceActions.fetchUsdstBalance(marketplaceDispatch);
       handleCancel();
     }
   };
@@ -167,7 +167,7 @@ const RepayModal = ({
       width={600}
       centered
       footer={null}
-      loading={isFetchingStrats}
+      loading={isFetchingUsdst}
     >
       <div className="flex flex-col px-4 pt-4">
         <div className="flex flex-col gap-2">

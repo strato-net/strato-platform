@@ -76,16 +76,16 @@ const HeaderComponent = ({
   const categoryDispatch = useCategoryDispatch();
   const userDispatch = useAuthenticateDispatch();
   //States
-  const { cartList, strats, cata, stratsAddress } =
+  const { cartList, usdst, cata, usdstAddress } =
     useMarketplaceState();
   const { categorys } = useCategoryState();
   let { isAuthenticated } = useAuthenticateState();
 
   useEffect(() => {
     if (user) {
-      marketplaceActions.fetchStratsBalance(marketplaceDispatch);
+      marketplaceActions.fetchUsdstBalance(marketplaceDispatch);
       marketplaceActions.fetchCataBalance(marketplaceDispatch);
-      marketplaceActions.fetchStratsAddress(marketplaceDispatch);
+      marketplaceActions.fetchUsdstAddress(marketplaceDispatch);
       marketplaceActions.fetchCataAddress(marketplaceDispatch);
       marketplaceActions.fetchAssetsWithEighteenDecimalPlaces(marketplaceDispatch);
     }
@@ -101,7 +101,7 @@ const HeaderComponent = ({
   const [categories, setCategories] = useState([]);
   const [selectedCategory, setSelectedCategory] = useState(categoryQueryValue);
   const [isModalVisible, setIsModalVisible] = useState(false);
-  const stratsBalance = Object.keys(strats).length > 0 ? strats : 0;
+  const usdstBalance = Object.keys(usdst).length > 0 ? usdst : 0;
   const cataBalance = Object.keys(cata).length > 0 ? cata : 0;
 
   useEffect(() => {
@@ -212,13 +212,13 @@ const HeaderComponent = ({
         },
       ];
 
-  const stratsItem = [
+  const usdstItem = [
     {
       key: '1',
       type: 'group',
       label: (
         <div>
-          {user && <p className="text-xs mt-1">STRATs: {stratsBalance}</p>}
+          {user && <p className="text-xs mt-1">USDST: {usdstBalance}</p>}
         </div>
       ),
       children: [
@@ -227,14 +227,14 @@ const HeaderComponent = ({
           onClick: async () => {
             navigate(
               `${routes.MarketplaceProductDetail.url
-                .replace(':address', stratsAddress)
-                .replace(':name', 'STRATS')}`
+                .replace(':address', usdstAddress)
+                .replace(':name', 'USDST')}`
             );
           },
           label: (
             <div>
-              {user && stratsAddress && (
-                <p className="text-xs mt-1">Buy STRATs</p>
+              {user && usdstAddress && (
+                <p className="text-xs mt-1">Buy USDST</p>
               )}
             </div>
           ),
@@ -242,7 +242,7 @@ const HeaderComponent = ({
         {
           key: '3',
           onClick: async () => {
-            navigate(`${routes.Transactions.url}?type=STRATS`);
+            navigate(`${routes.Transactions.url}?type=USDST`);
           },
           label: (
             <div>
@@ -541,7 +541,7 @@ const HeaderComponent = ({
             >
               <a
                 className="md:flex mx-1 text-base text-white"
-                id="strats-dropdown"
+                id="usdst-dropdown"
               >
                 <Badge
                   style={{ backgroundColor: '#13188A' }}
@@ -566,7 +566,7 @@ const HeaderComponent = ({
           )}
           {roleIndex !== undefined && roleIndex !== 1 && (
             <Dropdown
-              menu={{ items: stratsItem }}
+              menu={{ items: usdstItem }}
               placement="bottomRight"
               trigger={['click']}
               className="xs:mt-5 md:mt-0"
@@ -574,16 +574,16 @@ const HeaderComponent = ({
             >
               <a
                 className="md:flex mx-1 text-base text-white"
-                id="strats-dropdown"
+                id="usdst-dropdown"
               >
                 <Badge
                   style={{ backgroundColor: '#13188A' }}
                   className="cursor-pointer mt-7 md:mt-0 mx-2"
-                  count={stratsBalance}
+                  count={usdstBalance}
                   overflowCount={9999999}
                 >
                   <img
-                    src={Images.strat}
+                    src={Images.usdst}
                     alt={IMG_META}
                     title={IMG_META}
                     className="w-[35px] h-[35px] "

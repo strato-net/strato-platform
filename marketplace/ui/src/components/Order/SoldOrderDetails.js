@@ -24,7 +24,7 @@ import { useNavigate } from 'react-router-dom';
 import DataTableComponent from '../DataTableComponent';
 import { getStatus } from './constant';
 import dayjs from 'dayjs';
-import { US_DATE_FORMAT, STRATS_CONVERSION } from '../../helpers/constants';
+import { US_DATE_FORMAT, USDST_CONVERSION } from '../../helpers/constants';
 import ClickableCell from '../ClickableCell';
 import image_placeholder from '../../images/resources/image_placeholder.png';
 import { ResponsiveOrderDetailCard } from './ResponsiveOrderDetailCard';
@@ -103,15 +103,15 @@ const SoldOrderDetails = ({ user, users }) => {
           name: prod.name,
           unitPrice:
           // formattedNum(
-            orderDetails.order.currency === 'STRATS'
-              ? (prod.price * STRATS_CONVERSION).toFixed(0)
+            orderDetails.order.currency === 'USDST'
+              ? (prod.price * USDST_CONVERSION).toFixed(0)
               : orderDetails.order.currency === 'CATA' ? (prod.price * Math.pow(10, 18)).toFixed(2)
               : prod.price
             // )
             ,
           quantity: orderQuantities[index]
             ? formattedNum(
-                orderDetails.order.currency === 'STRATS'
+                orderDetails.order.currency === 'USDST'
                   ? (orderQuantities[index] / 100).toFixed(2)
                   : orderDetails.order.currency === 'CATA'
                   ? (orderQuantities[index] / Math.pow(10, 18)).toFixed(2)
@@ -119,7 +119,7 @@ const SoldOrderDetails = ({ user, users }) => {
               )
             : '--',
            amount:
-            orderDetails.order.currency === 'STRATS'
+            orderDetails.order.currency === 'USDST'
               ? ( (prod.price * parseInt(orderQuantities[index]) )).toFixed(0)
               : orderDetails.order.currency === 'CATA' ? ((prod.price * parseInt(orderQuantities[index])) / Math.pow(10, 18)).toFixed(2) 
               : (prod.price * parseInt(orderQuantities[index])),
@@ -438,8 +438,8 @@ const SoldOrderDetails = ({ user, users }) => {
                 <OrderData
                   title="Currency"
                   value={
-                    details.order.currency === 'STRATS'
-                      ? 'STRAT'
+                    details.order.currency === 'USDST'
+                      ? 'USDST'
                       : details.order.currency
                         ? details.order.currency
                         : 'USD'
@@ -449,8 +449,8 @@ const SoldOrderDetails = ({ user, users }) => {
                 <OrderData
                   title="Total"
                   value={
-                    details.order.currency === 'STRATS'
-                      ? (details.order.totalPrice * STRATS_CONVERSION).toFixed(
+                    details.order.currency === 'USDST'
+                      ? (details.order.totalPrice * USDST_CONVERSION).toFixed(
                           0
                         )
                       : details.order.totalPrice
@@ -587,9 +587,9 @@ const SoldOrderDetails = ({ user, users }) => {
                     className="w-2/4"
                     title="Total"
                     value={
-                      details.order.currency === 'STRATS'
+                      details.order.currency === 'USDST'
                         ? (
-                            details.order.totalPrice * STRATS_CONVERSION
+                            details.order.totalPrice * USDST_CONVERSION
                           ).toFixed(0)
                         : details.order.totalPrice
                     }

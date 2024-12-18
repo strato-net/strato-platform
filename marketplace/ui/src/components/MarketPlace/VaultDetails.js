@@ -43,7 +43,7 @@ import image_placeholder from '../../images/resources/image_placeholder.png';
 import 'react-responsive-carousel/lib/styles/carousel.min.css'; // requires a loader
 
 import { SEO } from '../../helpers/seoConstant';
-import { STRATS_CONVERSION } from '../../helpers/constants';
+import { USDST_CONVERSION } from '../../helpers/constants';
 import { TOAST_MSG } from '../../helpers/msgConstants';
 
 import { Swiper, SwiperSlide } from 'swiper/react';
@@ -78,7 +78,7 @@ const VaultDetails = ({ user, users }) => {
     isInventoryDetailsLoading,
     reserve,
   } = useInventoryState();
-  const { cartList, stratsAddress, assetsWithEighteenDecimalPlaces } = useMarketplaceState();
+  const { cartList, usdstAddress, assetsWithEighteenDecimalPlaces } = useMarketplaceState();
   const [isModalVisible, setIsModalVisible] = useState(false);
   const [timeFilter, setTimeFilter] = useState('1');
   const [itemData, setItemData] = useState({});
@@ -149,7 +149,7 @@ const VaultDetails = ({ user, users }) => {
 
   const details = reserve  && reserve.asset;
   const is18DecimalPlaces = assetsWithEighteenDecimalPlaces.includes(details.originAddress);
-  const isStrat = details.originAddress === stratsAddress;
+  const isUsdst = details.originAddress === usdstAddress;
   let fileValues = [];
   let fileNames = [];
   if (reserve && Array.isArray(reserve.asset['BlockApps-Mercata-Asset-fileNames'])) {
@@ -171,7 +171,7 @@ const VaultDetails = ({ user, users }) => {
       const detailsData = details.data;
       setItemData(detailsData);
       if (details.saleQuantity) {
-        let saleQuantity = isStrat ? details.saleQuantity / 100 : is18DecimalPlaces ? details.saleQuantity / Math.pow(10, 18) : details.saleQuantity;
+        let saleQuantity = isUsdst ? details.saleQuantity / 100 : is18DecimalPlaces ? details.saleQuantity / Math.pow(10, 18) : details.saleQuantity;
         setAvailableQuantity(saleQuantity || 1);
       }
     }
@@ -380,7 +380,7 @@ const VaultDetails = ({ user, users }) => {
                   >
                     {details?.price || isStaked
                       ? (() => {
-                          const adjustedPrice = isStrat ? details.price * 100 : is18DecimalPlaces ? details.price * Math.pow(10, 18) : details.price;
+                          const adjustedPrice = isUsdst ? details.price * 100 : is18DecimalPlaces ? details.price * Math.pow(10, 18) : details.price;
                           return (
                             <>
                               $
@@ -393,15 +393,15 @@ const VaultDetails = ({ user, users }) => {
                                   {isStaked
                                     ? details.escrow?.maxLoanAmount
                                     : (
-                                        adjustedPrice * STRATS_CONVERSION
+                                        adjustedPrice * USDST_CONVERSION
                                       ).toFixed(0)}{' '}
                                   {(isStaked
                                     ? details.escrow?.maxLoanAmount
                                     : (
-                                        adjustedPrice * STRATS_CONVERSION
+                                        adjustedPrice * USDST_CONVERSION
                                       ).toFixed(0)) == 1
-                                    ? 'STRAT'
-                                    : 'STRATs'}
+                                    ? 'USDST'
+                                    : 'USDST'}
                                   )
                                 </b>
                               </span>

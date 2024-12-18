@@ -1,5 +1,5 @@
 export const Images = {
-  strat: require('./resources/strat.png'),
+  usdst: require('./resources/strat.png'),
   cata: require('./resources/cata.png'),
   logo: require('./resources/logo.png'),
   noProductSymbol: require('./resources/noProductSymbol.png'),

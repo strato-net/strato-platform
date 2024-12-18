@@ -27,7 +27,7 @@ import StakeModal from './StakeModal';
 import routes from '../../helpers/routes';
 import {
   ASSET_STATUS,
-  STRATS_CONVERSION,
+  USDST_CONVERSION,
   OLD_SADDOG_ORIGIN_ADDRESS,
 } from '../../helpers/constants';
 import image_placeholder from '../../images/resources/image_placeholder.png';
@@ -38,7 +38,7 @@ import { useInventoryState } from '../../contexts/inventory';
 import { useEthState } from '../../contexts/eth';
 import RepayModal from './RepayModal';
 import BorrowModal from './BorrowModal';
-const StratsIcon = <img src={Images.strat} alt="STRATs" className="w-5 h-5" />;
+const UsdstIcon = <img src={Images.usdst} alt="USDST" className="w-5 h-5" />;
 
 const InventoryCard = ({
   inventory,
@@ -50,7 +50,7 @@ const InventoryCard = ({
   offset,
   user,
   supportedTokens,
-  stratAddress,
+  usdstAddress,
   assetsWithEighteenDecimalPlaces,
 }) => {
   const textRef = useRef(null);
@@ -75,15 +75,15 @@ const InventoryCard = ({
   const ethNaviroute = routes.EthstProductDetail.url;
   const imgMeta = category ? category : SEO.TITLE_META;
   const itemData = inventory.data;
-  const isStrat = inventory.originAddress === stratAddress;
+  const isUsdst = inventory.originAddress === usdstAddress;
   const is18DecimalPlaces = assetsWithEighteenDecimalPlaces.includes(inventory.originAddress);
-  const quantity = isStrat
+  const quantity = isUsdst
     ? new BigNumber(inventory.quantity).dividedBy(100)
     : is18DecimalPlaces
     ? new BigNumber(inventory.quantity).dividedBy(new BigNumber(10).pow(18))
     : new BigNumber(inventory.quantity);
   const price = inventory?.price
-    ? isStrat
+    ? isUsdst
       ? new BigNumber(inventory.price).multipliedBy(100)
       : is18DecimalPlaces
       ? new BigNumber(inventory.quantity).multipliedBy(
@@ -93,7 +93,7 @@ const InventoryCard = ({
     : undefined;
   const saleQuantity =
     inventory.saleQuantity !== undefined
-      ? isStrat
+      ? isUsdst
         ? new BigNumber(inventory.saleQuantity || 0).dividedBy(100)
         : is18DecimalPlaces
         ? new BigNumber(inventory.saleQuantity || 0).dividedBy(
@@ -102,7 +102,7 @@ const InventoryCard = ({
         : new BigNumber(inventory.saleQuantity || 0)
       : undefined;
   const totalLockedQuantity = inventory.totalLockedQuantity
-    ? isStrat
+    ? isUsdst
       ? new BigNumber(inventory.totalLockedQuantity || 0).dividedBy(100)
       : is18DecimalPlaces
       ? new BigNumber(inventory.totalLockedQuantity || 0).dividedBy(
@@ -217,7 +217,7 @@ const InventoryCard = ({
     let category = allSubcategories?.find(
       (c) => c.contract === contractName
     )?.name;
-    category = category === 'STRATS' ? 'STRAT' : category;
+    category = category === 'USDST' ? 'USDST' : category;
     return category;
   };
 
@@ -390,7 +390,7 @@ const InventoryCard = ({
                   inventory.address === inventory.originAddress ||
                   !isActive() ||
                   disableSADDOGS(inventory) ||
-                  isStrat ||
+                  isUsdst ||
                   is18DecimalPlaces
                 }
               >
@@ -450,7 +450,7 @@ const InventoryCard = ({
                       inventory.address === inventory.originAddress ||
                       !isActive() ||
                       disableSADDOGS(inventory) ||
-                      isStrat ||
+                      isUsdst ||
                       is18DecimalPlaces
                     }
                   >
@@ -600,8 +600,8 @@ const InventoryCard = ({
                       <span>${price.toString()}</span>
                       <p className="flex text-xs items-center">
                         &nbsp;(
-                        {price.multipliedBy(STRATS_CONVERSION).toString()}{' '}
-                        {StratsIcon})
+                        {price.multipliedBy(USDST_CONVERSION).toString()}{' '}
+                        {UsdstIcon})
                       </p>
                     </p>
                   ) : (
@@ -631,7 +631,7 @@ const InventoryCard = ({
           categoryName={category}
           user={user}
           reserves={reserves}
-          stratAddress={stratAddress}
+          usdstAddress={usdstAddress}
           assetsWithEighteenDecimalPlaces={assetsWithEighteenDecimalPlaces}
         />
       )}
@@ -694,7 +694,7 @@ const InventoryCard = ({
           debouncedSearchTerm={debouncedSearchTerm}
           saleAddress={inventory.saleAddress}
           category={category}
-          stratAddress={stratAddress}
+          usdstAddress={usdstAddress}
           assetsWithEighteenDecimalPlaces={assetsWithEighteenDecimalPlaces}
         />
       )}
@@ -707,7 +707,7 @@ const InventoryCard = ({
           inventory={inventory}
           categoryName={category}
           reserves={reserves}
-          stratAddress={stratAddress}
+          usdstAddress={usdstAddress}
           assetsWithEighteenDecimalPlaces={assetsWithEighteenDecimalPlaces}
         />
       )}

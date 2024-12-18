@@ -36,19 +36,19 @@ const ListForSaleModal = ({
   debouncedSearchTerm,
   category,
   reserves,
-  stratAddress,
+  usdstAddress,
   assetsWithEighteenDecimalPlaces,
 }) => {
   const [data, setData] = useState([inventory]);
   const location = useLocation();
   const queryParams = new URLSearchParams(location.search);
-  const isStrat = inventory.originAddress === stratAddress;
+  const isUsdst = inventory.originAddress === usdstAddress;
   const is18DecimalPlaces = assetsWithEighteenDecimalPlaces.includes(inventory.originAddress);
   const [quantity, setQuantity] = useState(() => {
     const selectedQuantity = new BigNumber(
       inventory.saleAddress ? inventory.saleQuantity : inventory.quantity
     );
-    return isStrat
+    return isUsdst
       ? selectedQuantity.dividedBy(100)
       : is18DecimalPlaces
       ? selectedQuantity.dividedBy(Math.pow(10, 18))
@@ -58,7 +58,7 @@ const ListForSaleModal = ({
   const [availablePaymentServices, setAvailablePaymentServices] = useState([]);
   const [pricePerUnit, setpricePerUnit] = useState(() => {
     return inventory.price
-      ? isStrat
+      ? isUsdst
         ? inventory.price * 100
         : is18DecimalPlaces
         ? inventory.price * Math.pow(10, 18)
@@ -125,29 +125,29 @@ const ListForSaleModal = ({
   };
 
   const handleSelect = (values) => {
-    const stratsIndex = availablePaymentServices.findIndex((service) =>
-      service.serviceName.toLowerCase().includes('strats')
+    const usdstIndex = availablePaymentServices.findIndex((service) =>
+      service.serviceName.toLowerCase().includes('usdst')
     );
 
-    // Ensure 'strats' service is always selected
-    if (stratsIndex !== -1 && !values.includes(stratsIndex)) {
-      values = [stratsIndex, ...values];
+    // Ensure 'usdst' service is always selected
+    if (usdstIndex !== -1 && !values.includes(usdstIndex)) {
+      values = [usdstIndex, ...values];
     }
     setPaymentTypes(values);
   };
 
   useEffect(() => {
-    const excludeStrats =
+    const excludeUsdst =
       inventory.contract_name &&
-      inventory.contract_name.toLowerCase().includes('strats');
+      inventory.contract_name.toLowerCase().includes('usdst');
 
     const diff = paymentServices.filter((ps) => {
       const isNotOnboarded = !notOnboarded.some(
         (x) => x.address === ps.address
       );
-      const isStratsService =
-        excludeStrats && ps.serviceName.toLowerCase().includes('strats');
-      return isNotOnboarded && !isStratsService;
+      const isUsdstService =
+        excludeUsdst && ps.serviceName.toLowerCase().includes('usdst');
+      return isNotOnboarded && !isUsdstService;
     });
 
     setAvailablePaymentServices(diff);
@@ -167,16 +167,16 @@ const ListForSaleModal = ({
         )
     );
 
-    const stratsIndex = diff.findIndex((ps) =>
-      ps.serviceName.toLowerCase().includes('strats')
+    const usdstIndex = diff.findIndex((ps) =>
+      ps.serviceName.toLowerCase().includes('usdst')
     );
 
-    // Auto-select 'strats' if it exists
+    // Auto-select 'usdst' if it exists
     if (
-      stratsIndex !== -1 &&
-      !selectedPaymentServiceIndices.includes(stratsIndex)
+      usdstIndex !== -1 &&
+      !selectedPaymentServiceIndices.includes(usdstIndex)
     ) {
-      selectedPaymentServiceIndices.push(stratsIndex);
+      selectedPaymentServiceIndices.push(usdstIndex);
     }
 
     setPaymentTypes(selectedPaymentServiceIndices);
@@ -185,9 +185,9 @@ const ListForSaleModal = ({
   const tagRender = (props) => {
     const { value, closable, onClose } = props;
     const service = availablePaymentServices[value];
-    const isStratsService = service?.serviceName
+    const isUsdstService = service?.serviceName
       .toLowerCase()
-      .includes('strats');
+      .includes('usdst');
     const onPreventMouseDown = (event) => {
       event.preventDefault();
       event.stopPropagation();
@@ -196,11 +196,11 @@ const ListForSaleModal = ({
     return service ? (
       <Tag
         onMouseDown={onPreventMouseDown}
-        closable={!isStratsService && closable} // prevent closing if it's 'strats'
+        closable={!isUsdstService && closable} // prevent closing if it's 'usdst'
         onClose={onClose}
         className="flex items-center mr-1"
       >
-        {service.serviceName === 'STRATS' ? 'STRAT' : service.serviceName}&nbsp;
+        {service.serviceName === 'USDST' ? 'USDST' : service.serviceName}&nbsp;
         {renderImg(service)}
       </Tag>
     ) : (
@@ -209,8 +209,8 @@ const ListForSaleModal = ({
   };
 
   const handleSubmit = async () => {
-    const stratsService = availablePaymentServices.find((service) =>
-      service.serviceName.toLowerCase().includes('strats')
+    const usdstService = availablePaymentServices.find((service) =>
+      service.serviceName.toLowerCase().includes('usdst')
     );
 
     let body = {
@@ -223,23 +223,23 @@ const ListForSaleModal = ({
           };
         }),
       price:
-        pricePerUnit !== undefined && isStrat
+        pricePerUnit !== undefined && isUsdst
           ? pricePerUnit / 100
           : is18DecimalPlaces
           ? pricePerUnit / Math.pow(10, 18)
           : pricePerUnit,
     };
 
-    // Ensure 'strats' is included in the submission
+    // Ensure 'usdst' is included in the submission
     if (
-      stratsService &&
+      usdstService &&
       !body.paymentServices.some((service) =>
-        service.serviceName.toLowerCase().includes('strats')
+        service.serviceName.toLowerCase().includes('usdst')
       )
     ) {
       body.paymentServices.push({
-        creator: stratsService.creator,
-        serviceName: stratsService.serviceName,
+        creator: usdstService.creator,
+        serviceName: usdstService.serviceName,
       });
     }
 
@@ -251,7 +251,7 @@ const ListForSaleModal = ({
 
     body = {
       ...body,
-      quantity: (isStrat
+      quantity: (isUsdst
         ? quantity.multipliedBy(new BigNumber(100))
         : is18DecimalPlaces
         ? quantity.multipliedBy(new BigNumber(10).pow(18))
@@ -307,11 +307,11 @@ const ListForSaleModal = ({
                 <Option
                   key={index}
                   value={index}
-                  disabled={e.serviceName.toLowerCase().includes('strats')}
+                  disabled={e.serviceName.toLowerCase().includes('usdst')}
                 >
                   <div className="flex items-center justify-between">
                     <div className="flex items-center">
-                      {e.serviceName === 'STRATS' ? 'STRAT' : e.serviceName}
+                      {e.serviceName === 'USDST' ? 'USDST' : e.serviceName}
                       &nbsp;
                       {renderImg(e)}
                     </div>
@@ -337,7 +337,7 @@ const ListForSaleModal = ({
             value={quantity}
             controls={false}
             max={
-              isStrat
+              isUsdst
                 ? new BigNumber(inventory.quantity).dividedBy(
                     new BigNumber(100)
                   )
@@ -348,7 +348,7 @@ const ListForSaleModal = ({
                 : inventory.quantity
             }
             onChange={(value) => setQuantity(new BigNumber(value))}
-            precision={isStrat ? 2 : is18DecimalPlaces ? 18 : 0}
+            precision={isUsdst ? 2 : is18DecimalPlaces ? 18 : 0}
           />
         ),
       },
@@ -418,11 +418,11 @@ const ListForSaleModal = ({
               <Option
                 key={index}
                 value={index}
-                disabled={e.serviceName.toLowerCase().includes('strats')}
+                disabled={e.serviceName.toLowerCase().includes('usdst')}
               >
                 <div className="flex items-center justify-between">
                   <div className="flex items-center">
-                    {e.serviceName === 'STRATS' ? 'STRAT' : e.serviceName}&nbsp;
+                    {e.serviceName === 'USDST' ? 'USDST' : e.serviceName}&nbsp;
                     {renderImg(e)}
                   </div>
 
@@ -443,7 +443,7 @@ const ListForSaleModal = ({
             value={quantity}
             controls={false}
             max={
-              isStrat
+              isUsdst
                 ? new BigNumber(inventory.quantity).dividedBy(
                     new BigNumber(100)
                   )
@@ -454,7 +454,7 @@ const ListForSaleModal = ({
                 : inventory.quantity
             }
             onChange={(value) => setQuantity(new BigNumber(value))}
-            precision={isStrat ? 2 : is18DecimalPlaces ? 18 : 0}
+            precision={isUsdst ? 2 : is18DecimalPlaces ? 18 : 0}
           />
         </div>
         <div>

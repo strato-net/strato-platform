@@ -7,11 +7,11 @@ class EthController {
   //   static async getETHSTBalance(req, res, next) {
   //     try {
   //       const { dapp, address: userAddress } = req;
-  //       let stratsBalance = 0;
+  //       let usdstBalance = 0;
 
-  //       stratsBalance = await dapp.getStratsBalance({ userAddress: userAddress });
+  //       usdstBalance = await dapp.getUsdstBalance({ userAddress: userAddress });
 
-  //       return rest.response.status200(res, stratsBalance);
+  //       return rest.response.status200(res, usdstBalance);
   //     } catch (e) {
   //       return next(e);
   //     }

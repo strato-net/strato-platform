@@ -15,7 +15,7 @@ import { useNavigate, Link, useParams, useLocation } from 'react-router-dom';
 import { actions } from '../../contexts/order/actions';
 import { useOrderDispatch, useOrderState } from '../../contexts/order';
 import useDebounce from '../UseDebounce';
-import { US_DATE_FORMAT, STRATS_CONVERSION } from '../../helpers/constants';
+import { US_DATE_FORMAT, USDST_CONVERSION } from '../../helpers/constants';
 import {
   Pagination,
   Button,
@@ -114,8 +114,8 @@ const SoldOrdersTable = ({
           orderNumber: order,
           buyersCommonName: order.purchasersCommonName,
           orderTotal:
-            order.currency === 'STRATS'
-              ? (order.totalPrice * STRATS_CONVERSION).toFixed(0)
+            order.currency === 'USDST'
+              ? (order.totalPrice * USDST_CONVERSION).toFixed(0)
               : order.totalPrice,
           date: getStringDate(order.createdDate, US_DATE_FORMAT),
           status: getStatus(parseInt(order.status)),

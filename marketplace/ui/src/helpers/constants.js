@@ -211,7 +211,7 @@ export const PAYMENT_TYPE = [
 
 export const PAYMENT_LABEL = {
   Stripe: 'Pay with Credit Card / ACH',
-  STRATS: 'Pay with STRATs (Express Checkout)',
+  USDST: 'Pay with USDST (Express Checkout)',
 };
 
 export const SIZES = {
@@ -304,7 +304,7 @@ export const availabilityOptions = [
 
 export const PAYMENT_LIST = ['card', 'us_bank_account'];
 
-export const STRATS_CONVERSION = 100;
+export const USDST_CONVERSION = 1;
 
 export const navItems = [
   { label: <div id="Transactions">My Transactions</div>, key: '1' },

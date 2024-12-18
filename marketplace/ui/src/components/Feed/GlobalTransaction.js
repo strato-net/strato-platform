@@ -27,7 +27,7 @@ import {
 } from '../../contexts/transaction';
 // Utils & Constants
 import {
-  STRATS_CONVERSION,
+  USDST_CONVERSION,
   TRANSACTION_STATUS_COLOR,
   DATE_TIME_FORMAT,
   TRANSACTION_STATUS_TEXT,
@@ -41,12 +41,12 @@ const { Title } = Typography;
 
 const GlobalTransaction = ({
   user,
-  stratAddress,
+  usdstAddress,
   assetsWithEighteenDecimalPlaces,
   ethstAddress,
 }) => {
-  const StratsIcon = (
-    <img src={Images.strat} alt="STRATs" className="mx-1 w-4 h-4" />
+  const UsdstIcon = (
+    <img src={Images.usdst} alt="USDST" className="mx-1 w-4 h-4" />
   );
   // Dispatch
   const transactionDispatch = useTransactionDispatch();
@@ -102,7 +102,7 @@ const GlobalTransaction = ({
 
   const Content = ({ data }) => {
     const price = data?.assetPrice || data?.price;
-    const isStrat = data.assetOriginAddress === stratAddress;
+    const isUsdst = data.assetOriginAddress === usdstAddress;
     const is18DecimalPlaces = assetsWithEighteenDecimalPlaces.includes(data.assetOriginAddress);
 
     return (
@@ -144,7 +144,7 @@ const GlobalTransaction = ({
                   {' '}
                   <b>
                     ${' '}
-                    {isStrat
+                    {isUsdst
                       ? (price * 100).toFixed(2)
                       : is18DecimalPlaces
                       ? (price * Math.pow(10, 18)).toFixed(2)
@@ -153,13 +153,13 @@ const GlobalTransaction = ({
                   &nbsp;(
                   <span className="text-[#13188A] font-bold">
                     {' '}
-                    {(isStrat
+                    {(isUsdst
                       ? (price * 100).toFixed(2)
                       : is18DecimalPlaces
                       ? (price * Math.pow(10, 18)).toFixed(2)
-                      : price) * STRATS_CONVERSION}{' '}
+                      : price) * USDST_CONVERSION}{' '}
                   </span>
-                  {StratsIcon}){' '}
+                  {UsdstIcon}){' '}
                 </p>
               ) : (
                 <p className="text-right text-[#13188A] font-bold text-sm">
@@ -245,7 +245,7 @@ const GlobalTransaction = ({
 
         if (quantity) {
           const value =
-            assetOriginAddress === stratAddress
+            assetOriginAddress === usdstAddress
               ? quantity / 100
               : assetsWithEighteenDecimalPlaces.includes(assetOriginAddress)
               ? quantity / Math.pow(10, 18)
@@ -272,7 +272,7 @@ const GlobalTransaction = ({
             {price
               ? formattedNum(
                   (
-                    (assetOriginAddress === stratAddress
+                    (assetOriginAddress === usdstAddress
                       ? (price * 100).toFixed(2)
                       : assetsWithEighteenDecimalPlaces.includes(assetOriginAddress)
                       ? (price * Math.pow(10, 18)).toFixed(2)
@@ -280,12 +280,12 @@ const GlobalTransaction = ({
                   ).toFixed(0)
                 )
               : '--'}{' '}
-            <span>{price && StratsIcon}</span>
+            <span>{price && UsdstIcon}</span>
           </p>
           <p className="text-xs">
             {price
               ? `${formattedNum(
-                  assetOriginAddress === stratAddress
+                  assetOriginAddress === usdstAddress
                     ? (price * 100).toFixed(2)
                     : assetsWithEighteenDecimalPlaces.includes(assetOriginAddress)
                     ? (price * Math.pow(10, 18)).toFixed(2)
@@ -470,7 +470,7 @@ const GlobalTransaction = ({
               data={list}
               user={user}
               isTransactionLoading={isTransactionLoading}
-              stratAddress={stratAddress}
+              usdstAddress={usdstAddress}
               assetsWithEighteenDecimalPlaces={assetsWithEighteenDecimalPlaces}
               ethstAddress={ethstAddress}
             />

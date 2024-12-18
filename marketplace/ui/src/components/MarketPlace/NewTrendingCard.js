@@ -12,7 +12,7 @@ import { useEthState } from '../../contexts/eth';
 import images_placeholder from '../../images/resources/image_placeholder.png';
 import { Images } from '../../images';
 // other
-import { STRATS_CONVERSION } from '../../helpers/constants';
+import { USDST_CONVERSION } from '../../helpers/constants';
 import { setCookie } from '../../helpers/cookie';
 import { SEO } from '../../helpers/seoConstant';
 import routes from '../../helpers/routes';
@@ -30,7 +30,7 @@ const NewTrendingCard = ({
   const navigate = useNavigate();
   const location = useLocation();
   const { Text } = Typography;
-  const { stratsAddress, assetsWithEighteenDecimalPlaces } = useMarketplaceState();
+  const { usdstAddress, assetsWithEighteenDecimalPlaces } = useMarketplaceState();
   const { ethstAddress } = useEthState();
   const { hasChecked, isAuthenticated, loginUrl, user } =
     useAuthenticateState();
@@ -40,9 +40,9 @@ const NewTrendingCard = ({
   const isDecimal =
     topSellingProduct.data.quantityIsDecimal &&
     topSellingProduct.data.quantityIsDecimal === 'True';
-  const isStrat = topSellingProduct.originAddress === stratsAddress;
+  const isUsdst = topSellingProduct.originAddress === usdstAddress;
   const is18DecimalPlaces = assetsWithEighteenDecimalPlaces.includes(topSellingProduct.originAddress);
-  const saleQuantity = isStrat
+  const saleQuantity = isUsdst
     ? topSellingProduct.saleQuantity / 100
     : is18DecimalPlaces
     ? topSellingProduct.saleQuantity / Math.pow(10, 18)
@@ -229,10 +229,10 @@ const NewTrendingCard = ({
                   <Typography className="font-semibold">
                     {`$${adjustedPrice} `}{' '}
                     <span className="font-normal text-xs mr-2 text-primary">
-                      <b>{`(${(adjustedPrice * STRATS_CONVERSION).toFixed(0)} ${
-                        (adjustedPrice * STRATS_CONVERSION).toFixed(0) == 1
-                          ? 'STRAT'
-                          : 'STRATs'
+                      <b>{`(${(adjustedPrice * USDST_CONVERSION).toFixed(0)} ${
+                        (adjustedPrice * USDST_CONVERSION).toFixed(0) == 1
+                          ? 'USDST'
+                          : 'USDST'
                       })`}</b>
                     </span>
                   </Typography>

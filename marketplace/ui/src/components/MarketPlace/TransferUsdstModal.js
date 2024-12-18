@@ -9,9 +9,9 @@ import { actions as userActions } from '../../contexts/users/actions';
 import { useUsersDispatch, useUsersState } from '../../contexts/users';
 import { useAuthenticateState } from '../../contexts/authentication';
 
-const TransferStratsModal = ({ visible, onCancel }) => {
+const TransferUsdstModal = ({ visible, onCancel }) => {
   const marketplaceDispatch = useMarketplaceDispatch();
-  const { isTransferringStrats, strats, message, success } =
+  const { isTransferringUsdst, usdst, message, success } =
     useMarketplaceState();
   const userDispatch = useUsersDispatch();
   const { user } = useAuthenticateState();
@@ -61,18 +61,18 @@ const TransferStratsModal = ({ visible, onCancel }) => {
 
   useEffect(() => {
     if (
-      amount > strats ||
-      strats <= 0 ||
+      amount > usdst ||
+      usdst <= 0 ||
       amount <= 0 ||
-      !strats ||
-      Object.keys(strats).length === 0 ||
+      !usdst ||
+      Object.keys(usdst).length === 0 ||
       !receiverAddress
     ) {
       setCanTransfer(false);
     } else {
       setCanTransfer(true);
     }
-  }, [strats, amount, receiverAddress]);
+  }, [usdst, amount, receiverAddress]);
 
   const onSearch = (value) => {
     setSearchInput(value);
@@ -94,11 +94,11 @@ const TransferStratsModal = ({ visible, onCancel }) => {
       value: amount !== undefined ? (amount * 100).toFixed(0) : 0,
     };
 
-    if (amount > 0 && amount <= strats && receiverAddress) {
-      let isDone = await actions.transferStrats(marketplaceDispatch, payload);
+    if (amount > 0 && amount <= usdst && receiverAddress) {
+      let isDone = await actions.transferUsdst(marketplaceDispatch, payload);
       if (isDone) {
         handleCancel();
-        await actions.fetchStratsBalance(marketplaceDispatch);
+        await actions.fetchUsdstBalance(marketplaceDispatch);
       }
     }
   };
@@ -120,7 +120,7 @@ const TransferStratsModal = ({ visible, onCancel }) => {
 
   return (
     <Modal
-      title="Transfer STRATs"
+      title="Transfer USDST"
       open={visible}
       onCancel={handleCancel}
       footer={[
@@ -128,7 +128,7 @@ const TransferStratsModal = ({ visible, onCancel }) => {
           key="submit"
           type="primary"
           onClick={handleSubmit}
-          loading={isTransferringStrats}
+          loading={isTransferringUsdst}
           disabled={!canTransfer}
         >
           Submit
@@ -180,4 +180,4 @@ const TransferStratsModal = ({ visible, onCancel }) => {
   );
 };
 
-export default TransferStratsModal;
+export default TransferUsdstModal;

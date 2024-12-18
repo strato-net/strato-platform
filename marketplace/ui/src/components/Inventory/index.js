@@ -62,7 +62,7 @@ import { SEO } from '../../helpers/seoConstant';
 import RequestBeAuthorizedIssuerModal from './RequestBeAuthorizedIssuerModal';
 import {
   ISSUER_STATUS,
-  STRATS_CONVERSION,
+  USDST_CONVERSION,
   ASSET_STATUS,
 } from '../../helpers/constants';
 import ItemActions from './ItemActions';
@@ -70,7 +70,7 @@ import InventoryCard from './InventoryCard';
 import './index.css';
 
 const { Option } = Select;
-const StratsIcon = <img src={Images.strat} alt="STRATS" className="w-4 h-4" />;
+const UsdstIcon = <img src={Images.usdst} alt="USDST" className="w-4 h-4" />;
 const logo = <img src={Images.cata} alt={''} title={''} className="w-5 h-5" />;
 
 const Inventory = ({ user }) => {
@@ -92,7 +92,7 @@ const Inventory = ({ user }) => {
   const naviroute = routes.InventoryDetail.url;
   const ethNaviroute = routes.EthstProductDetail.url;
   let { hasChecked, isAuthenticated, loginUrl } = useAuthenticateState();
-  const { stratsAddress, assetsWithEighteenDecimalPlaces } = useMarketplaceState();
+  const { usdstAddress, assetsWithEighteenDecimalPlaces } = useMarketplaceState();
   const formatter = new Intl.NumberFormat('en-US');
   const formattedNum = (num) => formatter.format(num);
 
@@ -147,7 +147,7 @@ const Inventory = ({ user }) => {
         ...service,
         isNotOnboarded: notOnboardedNames.has(service.serviceName),
         serviceName:
-          service?.serviceName === 'STRATS' ? 'STRAT' : service?.serviceName,
+          service?.serviceName === 'USDST' ? 'USDST' : service?.serviceName,
       }));
     setSortedPaymentServices(sortedServices);
   }, [paymentServices, notOnboarded]);
@@ -448,7 +448,7 @@ const Inventory = ({ user }) => {
             {isStakeable && (
               <>
                 <div className="flex items-center gap-2">
-                  Borrowed Amount: {StratsIcon}
+                  Borrowed Amount: {UsdstIcon}
                   {borrowedAmount.toLocaleString('en-US', {
                     maximumFractionDigits: 2,
                     minimumFractionDigits: 2,
@@ -466,7 +466,7 @@ const Inventory = ({ user }) => {
         const parts = record.contract_name.split('-');
         const contractName = parts[parts.length - 1];
         return (
-          <div>{contractName === 'STRATSTokens' ? 'STRAT' : contractName}</div>
+          <div>{contractName === 'USDSTTokens' ? 'USDST' : contractName}</div>
         );
       },
     },
@@ -474,10 +474,10 @@ const Inventory = ({ user }) => {
       title: 'Price',
       align: 'center',
       render: (_, record) => {
-        const isStrats = record.originAddress === stratsAddress;
+        const isUsdst = record.originAddress === usdstAddress;
         const is18DecimalPlaces = assetsWithEighteenDecimalPlaces.includes(record.originAddress);
         const price = record.price
-          ? isStrats
+          ? isUsdst
             ? parseFloat(record.price * 100).toFixed(2)
             : is18DecimalPlaces
             ? parseFloat(record.price * 10 ** 18).toFixed(2)
@@ -490,7 +490,7 @@ const Inventory = ({ user }) => {
                 <span>${price}</span>{' '}
                 <p className="flex text-xs items-center gap-1">
                   {' '}
-                  &nbsp;({(price * STRATS_CONVERSION).toFixed(0)} {StratsIcon}){' '}
+                  &nbsp;({(price * USDST_CONVERSION).toFixed(0)} {UsdstIcon}){' '}
                 </p>
               </>
             ) : (
@@ -504,10 +504,10 @@ const Inventory = ({ user }) => {
       title: 'Owned',
       align: 'center',
       render: (_, record) => {
-        const isStrats = record.originAddress === stratsAddress;
+        const isUsdst = record.originAddress === usdstAddress;
         const is18DecimalPlaces = assetsWithEighteenDecimalPlaces.includes(record.originAddress);
         const quantity = (
-          isStrats
+          isUsdst
             ? new BigNumber(record.quantity).dividedBy(new BigNumber(100))
             : is18DecimalPlaces
             ? new BigNumber(record.quantity).dividedBy(
@@ -527,10 +527,10 @@ const Inventory = ({ user }) => {
       title: 'Listed for Sale',
       align: 'center',
       render: (_, record) => {
-        const isStrats = record.originAddress === stratsAddress;
+        const isUsdst = record.originAddress === usdstAddress;
         const is18DecimalPlaces = assetsWithEighteenDecimalPlaces.includes(record.originAddress);
         const saleQuantity = (
-          isStrats
+          isUsdst
             ? new BigNumber(record.saleQuantity || 0).dividedBy(
                 new BigNumber(100)
               )
@@ -559,7 +559,7 @@ const Inventory = ({ user }) => {
             user={user}
             supportedTokens={supportedTokens}
             reserves={reserves}
-            stratAddress={stratsAddress}
+            usdstAddress={usdstAddress}
             assetsWithEighteenDecimalPlaces={assetsWithEighteenDecimalPlaces}
           />
         </div>
@@ -823,7 +823,7 @@ const Inventory = ({ user }) => {
                         user={user}
                         supportedTokens={supportedTokens}
                         reserves={reserves}
-                        stratAddress={stratsAddress}
+                        usdstAddress={usdstAddress}
                         assetsWithEighteenDecimalPlaces={assetsWithEighteenDecimalPlaces}
                       />
                     ))
@@ -846,7 +846,7 @@ const Inventory = ({ user }) => {
                         user={user}
                         supportedTokens={supportedTokens}
                         reserves={reserves}
-                        stratAddress={stratsAddress}
+                        usdstAddress={usdstAddress}
                         assetsWithEighteenDecimalPlaces={assetsWithEighteenDecimalPlaces}
                       />
                     ))

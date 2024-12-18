@@ -16,12 +16,12 @@ const GlobalTransactionResponsive = ({
   user,
   isTransactionLoading,
   fetchData,
-  stratAddress,
+  usdstAddress,
   assetsWithEighteenDecimalPlaces,
   ethstAddress,
 }) => {
-  const StratsIcon = (
-    <img src={Images.strat} alt="STRATs" className="w-5 h-5" />
+  const UsdstIcon = (
+    <img src={Images.usdst} alt="USDST" className="w-5 h-5" />
   );
   const navigate = useNavigate();
   const [expandedRows, setExpandedRows] = useState({});
@@ -110,7 +110,7 @@ const GlobalTransactionResponsive = ({
                   type,
                 },
               ];
-              const isStrat = assetOriginAddress === stratAddress;
+              const isUsdst = assetOriginAddress === usdstAddress;
               const is18DecimalPlaces = assetsWithEighteenDecimalPlaces.includes(assetOriginAddress);
 
               const handleDetailRedirection = () => {
@@ -226,7 +226,7 @@ const GlobalTransactionResponsive = ({
                       <p className={`text-right flex justify-end items-center`}>
                         $
                         {formattedNum(
-                          isStrat
+                          isUsdst
                             ? (price * 100).toFixed(2)
                             : is18DecimalPlaces
                             ? (price * Math.pow(10, 18)).toFixed(2)
@@ -234,13 +234,13 @@ const GlobalTransactionResponsive = ({
                         )}{' '}
                         (
                         {formattedNum(
-                          isStrat
+                          isUsdst
                             ? (price * 100 * 100).toFixed(2)
                             : is18DecimalPlaces
                             ? (price * Math.pow(10, 18) * 100).toFixed(2)
                             : price * 100
                         )}{' '}
-                        {StratsIcon})
+                        {UsdstIcon})
                       </p>
                     ) : (
                       <p className="text-right text-[#13188A] font-bold text-sm">
@@ -249,7 +249,7 @@ const GlobalTransactionResponsive = ({
                     )}
                     <p className="text-right">
                       Qty:{' '}
-                      {(isStrat
+                      {(isUsdst
                         ? quantity / 100
                         : is18DecimalPlaces
                         ? quantity / Math.pow(10, 18)

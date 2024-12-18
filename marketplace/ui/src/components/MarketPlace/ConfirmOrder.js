@@ -53,12 +53,12 @@ const ConfirmOrder = ({ paymentServices = [], data, columns }) => {
     paymentServices[0] !== undefined
       ? paymentServices.filter((paymentProvider) => paymentProvider?.isActive)
       : [];
-  const stratsIndex = activePaymentProviders.findIndex((service) =>
-    service.serviceName.toLowerCase().includes('strats')
+  const usdstIndex = activePaymentProviders.findIndex((service) =>
+    service.serviceName.toLowerCase().includes('usdst')
   );
-  if (stratsIndex > 0) {
-    const [stratsObject] = activePaymentProviders.splice(stratsIndex, 1);
-    activePaymentProviders.unshift(stratsObject);
+  if (usdstIndex > 0) {
+    const [usdstObject] = activePaymentProviders.splice(usdstIndex, 1);
+    activePaymentProviders.unshift(usdstObject);
   }
   const initialPaymentState =
     activePaymentProviders?.length !== 0 ? activePaymentProviders[0] : '';
@@ -137,13 +137,13 @@ const ConfirmOrder = ({ paymentServices = [], data, columns }) => {
       let itemTotal = (itemPrice * itemQty).toFixed(2);
 
       concatenatedOrderString += `${itemName}:\n`;
-      concatenatedOrderString = `$${itemTotal} (${(itemTotal * 100).toFixed(0)} ${(itemTotal * 100).toFixed(0) == 1 ? 'STRAT' : 'STRATs'})<br>`;
-      concatenatedOrderString += `Qty: ${itemQty} &nbsp; $${itemPrice} each (${(itemPrice * 100).toFixed(0)} ${(itemPrice * 100).toFixed(0) == 1 ? 'STRAT' : 'STRATs'} each)<br><br>`;
+      concatenatedOrderString = `$${itemTotal} (${(itemTotal * 100).toFixed(0)} ${(itemTotal * 100).toFixed(0) == 1 ? 'USDST' : 'USDST'})<br>`;
+      concatenatedOrderString += `Qty: ${itemQty} &nbsp; $${itemPrice} each (${(itemPrice * 100).toFixed(0)} ${(itemPrice * 100).toFixed(0) == 1 ? 'USDST' : 'USDST'} each)<br><br>`;
       orderTotal += parseFloat(itemTotal);
       if (i === cartData.length - 1) {
         concatenatedOrderString += `<hr style="border-top: 1px dotted #0A1B71; min-width: 80%; max-width: 80%; margin-left: 15px;">`;
         concatenatedOrderString += `Shipping Fee: <i><strong>Free</strong></i><br><br>`;
-        concatenatedOrderString += `Order Total: $${orderTotal.toFixed(2)} (${(orderTotal * 100).toFixed(0)} ${(orderTotal * 100).toFixed(0) == 1 ? 'STRAT' : 'STRATs'})<br>`;
+        concatenatedOrderString += `Order Total: $${orderTotal.toFixed(2)} (${(orderTotal * 100).toFixed(0)} ${(orderTotal * 100).toFixed(0) == 1 ? 'USDST' : 'USDST'})<br>`;
       }
     }
 
@@ -300,9 +300,9 @@ const ConfirmOrder = ({ paymentServices = [], data, columns }) => {
   };
 
   const totalAmount =
-    selectedProvider?.serviceName === 'STRATS' ||
-    selectedProvider?.serviceName?.includes('STRATS')
-      ? `${(subTotal * 100).toFixed(0)} ${(subTotal * 100).toFixed(0) == 1 ? 'STRAT' : 'STRATs'}`
+    selectedProvider?.serviceName === 'USDST' ||
+    selectedProvider?.serviceName?.includes('USDST')
+      ? `${(subTotal * 100).toFixed(0)} ${(subTotal * 100).toFixed(0) == 1 ? 'USDST' : 'USDST'}`
       : selectedProvider?.serviceName === 'Stripe'
         ? `${subTotal} USD`
         : `${subTotal} ${selectedProvider?.serviceName || 'USD'}`;

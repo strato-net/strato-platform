@@ -532,7 +532,7 @@ const CategoryProductList = ({ user }) => {
               className="m-0 Sub-Category"
               onChange={onChangeSubCategory}
             >
-              {name === 'STRATS' ? 'STRAT' : name}
+              {name === 'USDST' ? 'USDST' : name}
             </Checkbox>
           ))}
         </div>

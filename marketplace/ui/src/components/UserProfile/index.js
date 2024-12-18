@@ -73,19 +73,19 @@ const UserProfile = ({ user }) => {
     supportedTokens,
     isFetchingTokens,
   } = useInventoryState();
-  const [stratAddress, setStratAddress] = useState('');
+  const [usdstAddress, setUsdstAddress] = useState('');
   const [assetsWithEighteenDecimalPlaces, setAssetsWithEighteenDecimalPlaces] = useState('');
 
   useEffect(() => {
     const fetchAddresses = async () => {
-      const stratAddress = await marketplaceActions.fetchStratsAddress(
+      const usdstsAddress = await marketplaceActions.fetchUsdstAddress(
         marketplaceDispatch
       );
       const assetsWithEighteenDecimalPlaces = await marketplaceActions.fetchAssetsWithEighteenDecimalPlaces(
         marketplaceDispatch
       );
       await ethActions.fetchETHSTAddress(ethDispatch);
-      setStratAddress(stratAddress);
+      setUsdstAddress(usdstsAddress);
       setAssetsWithEighteenDecimalPlaces(assetsWithEighteenDecimalPlaces);
     };
 
@@ -406,7 +406,7 @@ const UserProfile = ({ user }) => {
                               allSubcategories={allSubcategories}
                               supportedTokens={supportedTokens}
                               user={user}
-                              stratAddress={stratAddress}
+                              usdstAddress={usdstAddress}
                               assetsWithEighteenDecimalPlaces={assetsWithEighteenDecimalPlaces}
                             />
                           );
@@ -436,7 +436,7 @@ const UserProfile = ({ user }) => {
                               allSubcategories={allSubcategories}
                               supportedTokens={supportedTokens}
                               user={user}
-                              stratAddress={stratAddress}
+                              usdstAddress={usdstAddress}
                               assetsWithEighteenDecimalPlaces={assetsWithEighteenDecimalPlaces}
                             />
                           );
@@ -466,7 +466,7 @@ const UserProfile = ({ user }) => {
                               allSubcategories={allSubcategories}
                               supportedTokens={supportedTokens}
                               user={user}
-                              stratAddress={stratAddress}
+                              usdstAddress={usdstAddress}
                               assetsWithEighteenDecimalPlaces={assetsWithEighteenDecimalPlaces}
                             />
                           );

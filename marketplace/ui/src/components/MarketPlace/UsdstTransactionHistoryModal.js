@@ -10,22 +10,22 @@ import { useUsersDispatch, useUsersState } from '../../contexts/users';
 import DataTableComponent from '../DataTableComponent';
 import moment from 'moment';
 
-const StratsTransactionHistoryModal = ({ visible, onCancel }) => {
+const UsdstTransactionHistoryModal = ({ visible, onCancel }) => {
   const marketplaceDispatch = useMarketplaceDispatch();
   const userDispatch = useUsersDispatch();
-  const { isFetchingStratsTransactionHistory, stratsTransactionHistory } =
+  const { isFetchingUsdstTransactionHistory, usdstTransactionHistory } =
     useMarketplaceState();
   const { users } = useUsersState();
 
   useEffect(() => {
-    actions.fetchStratsTransactionHistory(marketplaceDispatch);
+    actions.fetchUsdstTransactionHistory(marketplaceDispatch);
   }, [marketplaceDispatch]);
 
   useEffect(() => {
     userActions.fetchUsers(userDispatch);
   }, []);
 
-  const data = stratsTransactionHistory
+  const data = usdstTransactionHistory
     .map((r) => {
       const displayName = (addr) => {
         const user = users.find((u) => u.userAddress == addr);
@@ -76,18 +76,18 @@ const StratsTransactionHistoryModal = ({ visible, onCancel }) => {
 
   return (
     <Modal
-      title="STRATs Transaction History"
+      title="USDST Transaction History"
       open={visible}
       centered
       onCancel={onCancel}
       footer={false}
       width={900}
     >
-      <Spin spinning={isFetchingStratsTransactionHistory} size="large">
+      <Spin spinning={isFetchingUsdstTransactionHistory} size="large">
         <DataTableComponent
           columns={columns}
           data={data}
-          isLoading={isFetchingStratsTransactionHistory}
+          isLoading={isFetchingUsdstTransactionHistory}
           pagination={false}
           scrollX="100%"
         />
@@ -96,4 +96,4 @@ const StratsTransactionHistoryModal = ({ visible, onCancel }) => {
   );
 };
 
-export default StratsTransactionHistoryModal;
+export default UsdstTransactionHistoryModal;

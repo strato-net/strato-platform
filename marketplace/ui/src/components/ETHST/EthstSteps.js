@@ -118,7 +118,7 @@ const EthstSteps = () => {
               className="text-center mt-1 text-sm"
               style={{ color: '#4b5563' }}
             >
-              Borrow (interest-free for a limited time!) STRATs up to 50% of the
+              Borrow (interest-free for a limited time!) USDST up to 50% of the
               market value of your staked assets.
             </p>
           </div>

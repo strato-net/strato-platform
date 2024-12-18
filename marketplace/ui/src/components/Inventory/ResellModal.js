@@ -17,10 +17,10 @@ const ResellModal = ({
   limit,
   offset,
   reserves,
-  stratAddress,
+  usdstAddress,
   assetsWithEighteenDecimalPlaces,
 }) => {
-  const isStrat = inventory.originAddress === stratAddress;
+  const isUsdst = inventory.originAddress === usdstAddress;
   const is18DecimalPlaces = assetsWithEighteenDecimalPlaces.includes(inventory.originAddress);
   const [quantity, setQuantity] = useState(1);
   const inventoryDispatch = useInventoryDispatch();
@@ -59,7 +59,7 @@ const ResellModal = ({
   const handleSubmit = async () => {
     let body = {
       assetAddress: inventory.address,
-      quantity: isStrat
+      quantity: isUsdst
         ? (quantity * 100).toFixed(0)
         : is18DecimalPlaces
         ? (quantity * Math.pow(10, 18)).toFixed(0)

@@ -60,7 +60,7 @@ import image_placeholder from '../../images/resources/image_placeholder.png';
 import 'react-responsive-carousel/lib/styles/carousel.min.css'; // requires a loader
 
 import { SEO } from '../../helpers/seoConstant';
-import { STRATS_CONVERSION, ASSET_STATUS } from '../../helpers/constants';
+import { USDST_CONVERSION, ASSET_STATUS } from '../../helpers/constants';
 import { TOAST_MSG } from '../../helpers/msgConstants';
 
 import { Swiper, SwiperSlide } from 'swiper/react';
@@ -671,15 +671,15 @@ const ProductDetails = ({ user, users }) => {
                                     {isStaked
                                       ? details.escrow?.maxLoanAmount
                                       : (
-                                          adjustedPrice * STRATS_CONVERSION
+                                          adjustedPrice * USDST_CONVERSION
                                         ).toFixed(0)}{' '}
                                     {(isStaked
                                       ? details.escrow?.maxLoanAmount
                                       : (
-                                          adjustedPrice * STRATS_CONVERSION
+                                          adjustedPrice * USDST_CONVERSION
                                         ).toFixed(0)) == 1
-                                      ? 'STRAT'
-                                      : 'STRATs'}
+                                      ? 'USDST'
+                                      : 'USDST'}
                                     )
                                   </b>
                                 </span>

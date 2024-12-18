@@ -26,14 +26,14 @@ const TransferModal = ({
   limit = 0,
   offset = 0,
   reserves,
-  stratAddress,
+  usdstAddress,
   assetsWithEighteenDecimalPlaces,
 }) => {
   const location = useLocation();
   const queryParams = new URLSearchParams(location.search);
-  const isStrat = inventory.originAddress === stratAddress;
+  const isUsdst = inventory.originAddress === usdstAddress;
   const is18DecimalPlaces = assetsWithEighteenDecimalPlaces.includes(inventory.originAddress);
-  const availableQuantity = isStrat
+  const availableQuantity = isUsdst
     ? new BigNumber(inventory.quantity).dividedBy(100)
     : is18DecimalPlaces
     ? new BigNumber(inventory.quantity).dividedBy(new BigNumber(10).pow(18))
@@ -291,7 +291,7 @@ const TransferModal = ({
             );
             return availableQuantity.minus(allocatedQuantity);
           })()}
-          precision={isStrat ? 2 : is18DecimalPlaces ? 18 : 0}
+          precision={isUsdst ? 2 : is18DecimalPlaces ? 18 : 0}
           onChange={(value) =>
             handleQuantityChange(record.id, new BigNumber(value))
           }
@@ -354,13 +354,13 @@ const TransferModal = ({
     const body = transfers.map((transfer) => ({
       assetAddress: inventory.address,
       newOwner: transfer.recipient,
-      quantity: (isStrat
+      quantity: (isUsdst
         ? transfer.quantity.multipliedBy(new BigNumber(100))
         : is18DecimalPlaces
         ? transfer.quantity.multipliedBy(new BigNumber(10).pow(18))
         : transfer.quantity
       ).toFixed(0),
-      price: isStrat
+      price: isUsdst
         ? transfer.price / 100
         : is18DecimalPlaces
         ? transfer.price / Math.pow(10, 18)
@@ -368,7 +368,7 @@ const TransferModal = ({
       senderCommonName: user.commonName,
       recipientCommonName: transfer.recipientCommonName,
       itemName,
-      decimal: (isStrat
+      decimal: (isUsdst
         ? new BigNumber(100)
         : is18DecimalPlaces
         ? new BigNumber(10).pow(18)
@@ -390,7 +390,7 @@ const TransferModal = ({
           : ''
       );
       await actions.fetchInventoryForUser(inventoryDispatch, user.commonName);
-      await marketplaceActions.fetchStratsBalance(marketplaceDispatch);
+      await marketplaceActions.fetchUsdstBalance(marketplaceDispatch);
     }
 
     if (isDone) {

@@ -33,8 +33,8 @@ import { TrophyOutlined, GiftOutlined } from '@ant-design/icons';
 import { stakeColumns, aggregateStakeColumns } from './columns';
 
 const logo = <img src={Images.cata} alt={''} title={''} className="w-5 h-5" />;
-const StratsIcon = (
-  <img src={Images.strat} alt={''} title={''} className="w-4 h-4" />
+const UsdstIcon = (
+  <img src={Images.usdst} alt={'USDST'} title={''} className="w-4 h-4" />
 );
 
 function combineInventories(items) {
@@ -109,7 +109,7 @@ const Stake = ({ user }) => {
     success,
   } = useInventoryState();
   const { categorys } = useCategoryState();
-  const { stratsAddress, assetsWithEighteenDecimalPlaces } = useMarketplaceState();
+  const { usdstAddress, assetsWithEighteenDecimalPlaces } = useMarketplaceState();
   const linkUrl = window.location.href;
   const [api, contextHolder] = notification.useNotification();
   const [limit, setLimit] = useState(10);
@@ -209,7 +209,7 @@ const Stake = ({ user }) => {
           limit,
           offset,
           reserves,
-          stratsAddress,
+          usdstAddress,
           assetsWithEighteenDecimalPlaces,
           navigate
         )}
@@ -284,7 +284,7 @@ const Stake = ({ user }) => {
                     limit,
                     offset,
                     reserves,
-                    stratsAddress,
+                    usdstAddress,
                     assetsWithEighteenDecimalPlaces
                   )}
                   dataSource={combinedInventories.slice(offset, offset + limit)}
@@ -320,7 +320,7 @@ const Stake = ({ user }) => {
                     allSubcategories={allSubcategories}
                     user={user}
                     reserves={reserves}
-                    stratAddress={stratsAddress}
+                    usdstAddress={usdstAddress}
                     assetsWithEighteenDecimalPlaces={assetsWithEighteenDecimalPlaces}
                   />
                 ))}

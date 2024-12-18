@@ -31,17 +31,17 @@ const ResponsiveCart = ({
   removeCartList,
   openToastOrder,
 }) => {
-  // temporary fix to put STRATs as top payment option, will be updated in next release
+  // temporary fix to put USDST as top payment option, will be updated in next release
   const activePaymentProviders =
     paymentServices[0] !== undefined
       ? paymentServices.filter((paymentProvider) => paymentProvider?.isActive)
       : [];
-  const stratsIndex = activePaymentProviders.findIndex((service) =>
-    service.serviceName.toLowerCase().includes('strats')
+  const usdstIndex = activePaymentProviders.findIndex((service) =>
+    service.serviceName.toLowerCase().includes('usdst')
   );
-  if (stratsIndex > 0) {
-    const [stratsObject] = activePaymentProviders.splice(stratsIndex, 1);
-    activePaymentProviders.unshift(stratsObject);
+  if (usdstIndex > 0) {
+    const [usdstObject] = activePaymentProviders.splice(usdstIndex, 1);
+    activePaymentProviders.unshift(usdstObject);
   }
   const initialPaymentState =
     activePaymentProviders?.length !== 0 ? activePaymentProviders[0] : '';
@@ -103,7 +103,7 @@ const ResponsiveCart = ({
 
       concatenatedOrderString += `${itemName}:\n`;
       concatenatedOrderString += `$${itemTotal} <br>`;
-      concatenatedOrderString += `Qty: ${itemQty} &nbsp; $${itemPrice} each (${(itemPrice * 100).toFixed(0)} ${(itemPrice * 100).toFixed(0) == 1 ? 'STRAT' : 'STRATs'})<br><br>`;
+      concatenatedOrderString += `Qty: ${itemQty} &nbsp; $${itemPrice} each (${(itemPrice * 100).toFixed(0)} ${(itemPrice * 100).toFixed(0) == 1 ? 'USDST' : 'USDST'})<br><br>`;
       orderTotal += parseFloat(itemTotal);
       if (i === cartData.length - 1) {
         concatenatedOrderString += `<hr style="border-top: 1px dotted #0A1B71; min-width: 80%; max-width: 80%; margin-left: 15px;">`;
@@ -246,9 +246,9 @@ const ResponsiveCart = ({
   };
 
   const totalAmount =
-    selectedProvider?.serviceName === 'STRATS' ||
-    selectedProvider?.serviceName?.includes('STRATS')
-      ? `${(subTotal * 100).toFixed(0)} ${(subTotal * 100).toFixed(0) == 1 ? 'STRAT' : 'STRATs'}`
+    selectedProvider?.serviceName === 'USDST' ||
+    selectedProvider?.serviceName?.includes('USDST')
+      ? `${(subTotal * 100).toFixed(0)} ${(subTotal * 100).toFixed(0) == 1 ? 'USDST' : 'USDST'}`
       : selectedProvider?.serviceName === 'Stripe'
         ? `${subTotal} USD`
         : `${subTotal} ${selectedProvider?.serviceName || 'USD'}`;
