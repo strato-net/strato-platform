@@ -200,21 +200,21 @@ class InventoryController {
             const adjustedQuantity = new BigNumber(quantity)
               .dividedBy(new BigNumber(decimal))
               .toString();
-            const adjustedPrice = new BigNumber(price)
-              .multipliedBy(new BigNumber(decimal))
+            const adjustedTotalPrice = new BigNumber(price)
+              .multipliedBy(new BigNumber(quantity))
               .toString();
             const TransferSenderTemplate = TransferSender(
               senderCommonName,
               itemName,
               adjustedQuantity,
-              adjustedPrice,
+              adjustedTotalPrice,
               recipientCommonName
             );
             const TransferRecipientTemplate = TransferRecipient(
               recipientCommonName,
               itemName,
               adjustedQuantity,
-              adjustedPrice,
+              adjustedTotalPrice,
               senderCommonName
             );
             await sendEmail(
