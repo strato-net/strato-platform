@@ -5,6 +5,9 @@ import deployment from "./load.deploy.js";
 import oauthHelper from "./helpers/oauthHelper.js";
 import axios from "axios";
 
+// Global array to store all distributeRewards calls
+const distributeRewardsCallList = [];
+
 async function submitPrice(token, contract, args) {
   const callArgs = {
     contract,
@@ -14,13 +17,26 @@ async function submitPrice(token, contract, args) {
   await rest.call(token, callArgs, { config });
 }
 
+// Instead of calling rest.call directly, accumulate call arguments for distributeRewards
 async function distributeRewards(token, contract, args) {
   const callArgs = {
     contract,
     method: "distributeRewards",
     args: util.usc(args),
   };
-  await rest.call(token, callArgs, { config });
+  // Push call arguments into the global array
+  distributeRewardsCallList.push(callArgs);
+}
+
+// After all calls are collected, we run them at once
+async function runDistributeRewardsCalls(token) {
+  if (distributeRewardsCallList.length > 0) {
+    console.log("Executing batch callList for distributeRewards...");
+    await rest.callList(token, distributeRewardsCallList, { config });
+    console.log("Batch distributeRewards calls completed.");
+  } else {
+    console.log("No distributeRewards calls to execute.");
+  }
 }
 
 // Function to fetch all escrow addresses for a given reserve and call distributeRewards
@@ -50,7 +66,6 @@ async function fetchAndSubmitEscrowAddresses(oracleContract, token) {
     console.log(`Processing reserve: ${reserveName}`);
     console.log(`Reserve Address: ${reserveAddress}`);
 
-    // Define search options for active escrows
     const searchOptions = {
       config,
       query: {
@@ -69,6 +84,7 @@ async function fetchAndSubmitEscrowAddresses(oracleContract, token) {
 
     if (!escrows || escrows.length === 0) {
       console.log(`No escrows found for reserve ${reserveName}`);
+      // Collect callArgs for empty escrowAddresses to distributeRewards
       await distributeRewards(
         token,
         { address: reserveAddress, name: reserveName },
@@ -88,12 +104,14 @@ async function fetchAndSubmitEscrowAddresses(oracleContract, token) {
         }): ${JSON.stringify(escrowAddresses)}`
       );
 
+      // Collect callArgs instead of calling directly
       await distributeRewards(
         token,
         { address: reserveAddress, name: reserveName },
         { escrowAddresses }
       );
     }
+
     console.log(
       `Escrow Addresses submitted for ${reserveName} at ${new Date().toISOString()}`
     );
@@ -137,34 +155,31 @@ async function fetchAndSubmitETHPrice(
 
     // Define the request body
     const requestBody = {
-      symbol: metal, // Metal or token symbol (e.g., "ETH")
-      startTime: Math.floor((currentTimeMs - fetchInterval) / 1000), // Convert ms to seconds
-      endTime: Math.floor(currentTimeMs / 1000), // Convert ms to seconds
-      interval: "1h", // 5-minute intervals
+      symbol: metal,
+      startTime: Math.floor((currentTimeMs - fetchInterval) / 1000),
+      endTime: Math.floor(currentTimeMs / 1000),
+      interval: "1h",
     };
 
     // Make the POST request with the body
     const response = await axios.post(apiUrl, requestBody, {
-      headers: {
-        "Content-Type": "application/json",
-      },
+      headers: { "Content-Type": "application/json" },
     });
 
     const responseData = response.data;
 
-    // Validate the response data structure
     if (!responseData?.data || !Array.isArray(responseData.data)) {
       console.error("Invalid response format:", responseData);
       throw new Error("Invalid price data format from API");
     }
+
     console.log(`Received ${responseData.data.length} price points`);
-    // Parse the data and convert timestamps and prices
+
     const prices = responseData.data.map(({ value, timestamp }) => ({
-      price: parseFloat(value), // Convert string to float
-      timestamp: new Date(timestamp).getTime() / 1000, // Convert to seconds
+      price: parseFloat(value),
+      timestamp: new Date(timestamp).getTime() / 1000,
     }));
 
-    // Validate price data
     prices.forEach((point, index) => {
       if (!Number.isFinite(point.price) || point.price <= 0) {
         throw new Error(`Invalid price at index ${index}: ${point.price}`);
@@ -176,12 +191,9 @@ async function fetchAndSubmitETHPrice(
       }
     });
 
-    // Calculate TWAP
     const twap = calculateTWAP(prices);
-
     console.log(`Calculated TWAP: $${twap}`);
 
-    // Submit TWAP price to the Oracle contract
     const currentTimestamp = Math.floor(currentTimeMs / 1000);
     await submitPrice(token, oracleContract, {
       price: twap,
@@ -195,11 +207,10 @@ async function fetchAndSubmitETHPrice(
     );
   } catch (error) {
     console.error("ETH TWAP calculation and submission failed:", error);
-    throw error; // Re-throw for upstream handling
+    throw error;
   }
 }
 
-// Helper Function to Calculate TWAP
 function calculateTWAP(prices) {
   let totalWeightedPrice = 0;
   let totalWeight = 0;
@@ -219,8 +230,6 @@ function calculateTWAP(prices) {
   return totalWeightedPrice / totalWeight;
 }
 
-// ------------------------------------------------------------------------------------------------
-
 // Main function to handle periodic fetching and submission
 async function main() {
   assert.isDefined(
@@ -233,9 +242,7 @@ async function main() {
   );
 
   const { contracts } = deployment;
-
-  const fetchInterval = Number(config.fetchInterval) || 60000; // Default to 1 minute
-
+  const fetchInterval = Number(config.fetchInterval) || 60000; // Default: 1 minute
   const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
   const submitPricePeriodically = async () => {
@@ -244,7 +251,6 @@ async function main() {
     for (const [key, oracle] of Object.entries(contracts)) {
       console.log(`Processing oracle: ${key}`);
 
-      // Ensure the oracle contract has the necessary structure
       if (!oracle.metal || !oracle.address) {
         console.warn(`WARN: Skipping invalid oracle ${key}`);
         continue;
@@ -270,11 +276,15 @@ async function main() {
             token
           );
         }
+
         await fetchAndSubmitEscrowAddresses(oracle, token);
       } catch (error) {
         console.error(`ERROR: Failed to process oracle ${key}:`, error);
       }
     }
+
+    // After processing all oracles and collecting distributeRewards calls, run them at once
+    await runDistributeRewardsCalls(token);
   };
 
   while (true) {
