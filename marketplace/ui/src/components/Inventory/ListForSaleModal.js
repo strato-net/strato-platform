@@ -22,6 +22,7 @@ import {
 import { actions as paymentServiceActions } from '../../contexts/payment/actions';
 import { CheckCircleOutlined } from '@ant-design/icons';
 import { useLocation } from 'react-router-dom';
+import { USDST_CONVERSION } from '../../helpers/constants';
 
 const { Option } = Select;
 

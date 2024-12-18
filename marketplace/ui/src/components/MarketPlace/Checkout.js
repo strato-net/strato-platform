@@ -17,7 +17,7 @@ import { actions } from '../../contexts/marketplace/actions';
 import { Images } from '../../images';
 import { useState, useEffect, useMemo } from 'react';
 import './index.css';
-import { CHARGES } from '../../helpers/constants';
+import { CHARGES, USDST_CONVERSION } from '../../helpers/constants';
 import ClickableCell from '../ClickableCell';
 import routes from '../../helpers/routes';
 import ConfirmOrder from './ConfirmOrder';

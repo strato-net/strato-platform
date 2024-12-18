@@ -5,6 +5,7 @@ import './../Order/ordersTable.css';
 import {
   TRANSACTION_STATUS_COLOR,
   TRANSACTION_STATUS_TEXT,
+  USDST_CONVERSION,
 } from '../../helpers/constants';
 import routes from '../../helpers/routes';
 import { useNavigate } from 'react-router-dom';
