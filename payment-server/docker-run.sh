@@ -15,6 +15,7 @@ if [ "$ORACLE_MODE" = "true" ]; then
   export OAUTH_SCOPE=${OAUTH_SCOPE}
   export OAUTH_SERVICE_OAUTH_FLOW=${OAUTH_SERVICE_OAUTH_FLOW}
   export METALS_API_KEY=${METALS_API_KEY}
+  export ALCHEMY_API_KEY=${ALCHEMY_API_KEY}
   export SKIP_ORACLE_DEPLOYMENT=${SKIP_ORACLE_DEPLOYMENT:-false}
   export BASE_CODE_COLLECTION=${BASE_CODE_COLLECTION}
   export UPGRADE_ORACLE_CONTRACTS=${UPGRADE_ORACLE_CONTRACTS:-false}
@@ -22,7 +23,7 @@ if [ "$ORACLE_MODE" = "true" ]; then
   export ORACLE_FETCH_INTERVAL=${ORACLE_FETCH_INTERVAL:-60000}
   export SILVER_ORACLE_NAME_VALUE=${SILVER_ORACLE_NAME_VALUE:-'Silver'}
   export GOLD_ORACLE_NAME_VALUE=${GOLD_ORACLE_NAME_VALUE:-'Gold'}
-  export ETH_ORACLE_NAME_VALUE=${GOLD_ORACLE_NAME_VALUE:-'Eth'}
+  export ETH_ORACLE_NAME_VALUE=${GOLD_ORACLE_NAME_VALUE:-'ETH'}
 
   echo $OAUTH_DISCOVERY_URL
 
@@ -74,8 +75,10 @@ if [ "$ORACLE_MODE" = "true" ]; then
 
   if [ -z "$METALS_API_KEY" ]; then
     echo 'Error: METALS_API_KEY is not set. submit-price script will not run.'
+  elif [ -z "$ALCHEMY_API_KEY" ]; then
+    echo 'Error: ALCHEMY_API_KEY is not set. submit-price script will not run.'
   else
-    echo 'METALS_API_KEY is set.'
+    echo 'METALS_API_KEY and ALCHEMY_API_KEY are set.'
     echo 'Starting price submission script...'
     yarn submit-price
   fi
