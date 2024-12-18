@@ -140,7 +140,7 @@ async function fetchAndSubmitETHPrice(
       symbol: metal, // Metal or token symbol (e.g., "ETH")
       startTime: Math.floor((currentTimeMs - fetchInterval) / 1000), // Convert ms to seconds
       endTime: Math.floor(currentTimeMs / 1000), // Convert ms to seconds
-      interval: "5m", // 5-minute intervals
+      interval: "1h", // 5-minute intervals
     };
 
     // Make the POST request with the body
