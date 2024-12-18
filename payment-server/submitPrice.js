@@ -251,7 +251,7 @@ async function main() {
       }
 
       try {
-        const metal = oracle.metal.toLowerCase();
+        const metal = oracle.metal;
         console.log(`Fetching price for ${metal}`);
 
         if (metal === "ETH") {
@@ -264,7 +264,7 @@ async function main() {
           );
         } else {
           await fetchAndSubmitMetalPrice(
-            metal,
+            metal.toLowerCase(),
             process.env.METALS_API_KEY,
             oracle,
             token
