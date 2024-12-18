@@ -83,7 +83,6 @@ function combineInventories(items, assetsWithEighteenDecimalPlaces) {
     // Construct the combined object
     return {
       root,
-      originAddress,
       name,
       'BlockApps-Mercata-Asset-fileNames': assetFileNames,
       'BlockApps-Mercata-Asset-files': assetFiles,
