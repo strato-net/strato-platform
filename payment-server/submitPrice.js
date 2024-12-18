@@ -5,6 +5,9 @@ import deployment from "./load.deploy.js";
 import oauthHelper from "./helpers/oauthHelper.js";
 import axios from "axios";
 
+// Global array to store all distributeRewards calls
+const distributeRewardsCallList = [];
+
 async function submitPrice(token, contract, args) {
   const callArgs = {
     contract,
@@ -14,13 +17,26 @@ async function submitPrice(token, contract, args) {
   await rest.call(token, callArgs, { config });
 }
 
+// Instead of calling rest.call directly, accumulate call arguments for distributeRewards
 async function distributeRewards(token, contract, args) {
   const callArgs = {
     contract,
     method: "distributeRewards",
     args: util.usc(args),
   };
-  await rest.call(token, callArgs, { config });
+  // Push call arguments into the global array
+  distributeRewardsCallList.push(callArgs);
+}
+
+// After all calls are collected, we run them at once
+async function runDistributeRewardsCalls(token) {
+  if (distributeRewardsCallList.length > 0) {
+    console.log("Executing batch callList for distributeRewards...");
+    await rest.callList(token, distributeRewardsCallList, { config });
+    console.log("Batch distributeRewards calls completed.");
+  } else {
+    console.log("No distributeRewards calls to execute.");
+  }
 }
 
 // Function to fetch all escrow addresses for a given reserve and call distributeRewards
@@ -50,7 +66,6 @@ async function fetchAndSubmitEscrowAddresses(oracleContract, token) {
     console.log(`Processing reserve: ${reserveName}`);
     console.log(`Reserve Address: ${reserveAddress}`);
 
-    // Define search options for active escrows
     const searchOptions = {
       config,
       query: {
@@ -69,11 +84,12 @@ async function fetchAndSubmitEscrowAddresses(oracleContract, token) {
 
     if (!escrows || escrows.length === 0) {
       console.log(`No escrows found for reserve ${reserveName}`);
+      // Collect callArgs for empty escrowAddresses to distributeRewards
       await distributeRewards(
         token,
         { address: reserveAddress, name: reserveName },
         { escrowAddresses: [] }
-        );
+      );
       continue;
     }
 
@@ -82,14 +98,20 @@ async function fetchAndSubmitEscrowAddresses(oracleContract, token) {
     for (let i = 0; i < escrows.length; i += batchSize) {
       const batch = escrows.slice(i, i + batchSize);
       const escrowAddresses = batch.map((escrow) => escrow.address);
-      console.log(`Escrow Addresses for ${reserveName} (batch ${i / batchSize + 1}): ${JSON.stringify(escrowAddresses)}`);
+      console.log(
+        `Escrow Addresses for ${reserveName} (batch ${
+          i / batchSize + 1
+        }): ${JSON.stringify(escrowAddresses)}`
+      );
 
+      // Collect callArgs instead of calling directly
       await distributeRewards(
-      token,
-      { address: reserveAddress, name: reserveName },
-      { escrowAddresses }
+        token,
+        { address: reserveAddress, name: reserveName },
+        { escrowAddresses }
       );
     }
+
     console.log(
       `Escrow Addresses submitted for ${reserveName} at ${new Date().toISOString()}`
     );
@@ -97,7 +119,7 @@ async function fetchAndSubmitEscrowAddresses(oracleContract, token) {
 }
 
 // Function to fetch and submit price
-async function fetchAndSubmitPrice(metal, apiKey, oracleContract, token) {
+async function fetchAndSubmitMetalPrice(metal, apiKey, oracleContract, token) {
   try {
     const apiUrl = `https://api.metals.dev/v1/metal/spot?metal=${metal}&api_key=${apiKey}&currency=USD&unit=toz`;
     const response = await axios.get(apiUrl);
@@ -117,17 +139,110 @@ async function fetchAndSubmitPrice(metal, apiKey, oracleContract, token) {
   }
 }
 
+// Function to fetch and submit ETH price
+async function fetchAndSubmitETHPrice(
+  metal,
+  apiKey,
+  oracleContract,
+  token,
+  fetchInterval
+) {
+  try {
+    const apiUrl = `https://api.g.alchemy.com/prices/v1/${apiKey}/tokens/historical`;
+
+    // Current time in milliseconds
+    const currentTimeMs = Date.now();
+
+    // Define the request body
+    const requestBody = {
+      symbol: metal,
+      startTime: Math.floor((currentTimeMs - fetchInterval) / 1000),
+      endTime: Math.floor(currentTimeMs / 1000),
+      interval: "1h",
+    };
+
+    // Make the POST request with the body
+    const response = await axios.post(apiUrl, requestBody, {
+      headers: { "Content-Type": "application/json" },
+    });
+
+    const responseData = response.data;
+
+    if (!responseData?.data || !Array.isArray(responseData.data)) {
+      console.error("Invalid response format:", responseData);
+      throw new Error("Invalid price data format from API");
+    }
+
+    console.log(`Received ${responseData.data.length} price points`);
+
+    const prices = responseData.data.map(({ value, timestamp }) => ({
+      price: parseFloat(value),
+      timestamp: new Date(timestamp).getTime() / 1000,
+    }));
+
+    prices.forEach((point, index) => {
+      if (!Number.isFinite(point.price) || point.price <= 0) {
+        throw new Error(`Invalid price at index ${index}: ${point.price}`);
+      }
+      if (!Number.isFinite(point.timestamp) || point.timestamp <= 0) {
+        throw new Error(
+          `Invalid timestamp at index ${index}: ${point.timestamp}`
+        );
+      }
+    });
+
+    const twap = calculateTWAP(prices);
+    console.log(`Calculated TWAP: $${twap}`);
+
+    const currentTimestamp = Math.floor(currentTimeMs / 1000);
+    await submitPrice(token, oracleContract, {
+      price: twap,
+      timestamp: currentTimestamp,
+    });
+
+    console.log(
+      `TWAP submitted: $${twap.toFixed(2)} at ${new Date(
+        currentTimeMs
+      ).toISOString()}`
+    );
+  } catch (error) {
+    console.error("ETH TWAP calculation and submission failed:", error);
+    throw error;
+  }
+}
+
+function calculateTWAP(prices) {
+  let totalWeightedPrice = 0;
+  let totalWeight = 0;
+
+  for (let i = 1; i < prices.length; i++) {
+    const price = prices[i].price;
+    const timeDiff = prices[i].timestamp - prices[i - 1].timestamp;
+
+    totalWeightedPrice += price * timeDiff;
+    totalWeight += timeDiff;
+  }
+
+  if (totalWeight === 0) {
+    throw new Error("Invalid data for TWAP calculation");
+  }
+
+  return totalWeightedPrice / totalWeight;
+}
+
 // Main function to handle periodic fetching and submission
 async function main() {
   assert.isDefined(
     process.env.METALS_API_KEY,
     "API key for metals API is missing. Set in .env"
   );
+  assert.isDefined(
+    process.env.ALCHEMY_API_KEY,
+    "API key for Alchemy API is missing. Set in .env"
+  );
 
   const { contracts } = deployment;
-
-  const fetchInterval = Number(config.fetchInterval) || 60000; // Default to 1 minute
-
+  const fetchInterval = Number(config.fetchInterval) || 60000; // Default: 1 minute
   const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
   const submitPricePeriodically = async () => {
@@ -136,27 +251,40 @@ async function main() {
     for (const [key, oracle] of Object.entries(contracts)) {
       console.log(`Processing oracle: ${key}`);
 
-      // Ensure the oracle contract has the necessary structure
       if (!oracle.metal || !oracle.address) {
         console.warn(`WARN: Skipping invalid oracle ${key}`);
         continue;
       }
 
       try {
-        const metal = oracle.metal.toLowerCase();
+        const metal = oracle.metal;
         console.log(`Fetching price for ${metal}`);
-  
-        await fetchAndSubmitPrice(
-          metal,
-          process.env.METALS_API_KEY,
-          oracle,
-          token
-        );
+
+        if (metal === "ETH") {
+          await fetchAndSubmitETHPrice(
+            metal,
+            process.env.ALCHEMY_API_KEY,
+            oracle,
+            token,
+            fetchInterval
+          );
+        } else {
+          await fetchAndSubmitMetalPrice(
+            metal.toLowerCase(),
+            process.env.METALS_API_KEY,
+            oracle,
+            token
+          );
+        }
+
         await fetchAndSubmitEscrowAddresses(oracle, token);
       } catch (error) {
         console.error(`ERROR: Failed to process oracle ${key}:`, error);
       }
     }
+
+    // After processing all oracles and collecting distributeRewards calls, run them at once
+    await runDistributeRewardsCalls(token);
   };
 
   while (true) {
