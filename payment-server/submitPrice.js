@@ -134,8 +134,12 @@ async function fetchAndSubmitEthPrice(oracleContract, token) {
         {
           params: {
             vs_currency: 'usd',
-            days: '1',
-            interval: '5m'
+            days: '2' 
+            /* 2 days gets 48 entries for 1 hour intervals.
+            * We need coingecko enterprise plan to get 5 minute intervals.
+            * 2 day twap is slighlty more resistant to price spikes but still factors in the volatility of eth
+            * If we get enterpise plan, we can use 5 minute intervals and 1 day of data to get a more accurate twap but this is good for now.
+            */
           }
         }
       );
