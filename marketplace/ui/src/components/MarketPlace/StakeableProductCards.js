@@ -90,7 +90,7 @@ const StakeableProductCards = () => {
               {stakeableProducts.map((topSellingProduct) => {
                 const matchingReserve = reserves?.find(
                   (reserve) =>
-                    reserve.assetRootAddress === topSellingProduct.root
+                    reserve.assetRootAddress === topSellingProduct.address
                 );
                 return (
                   <NewTrendingCard
