@@ -281,7 +281,7 @@ async function main() {
         const metal = oracle.metal.toLowerCase();
         console.log(`Fetching price for ${metal}`);
   
-        if (metal === 'eth') {
+        if (metal === 'Eth') {
           await fetchAndSubmitEthPrice(oracle, token);
         } else {
           await fetchAndSubmitMetalPrice(
