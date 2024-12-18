@@ -399,7 +399,6 @@ const Inventory = ({ user }) => {
             (reserve) => record.originAddress === reserve.assetRootAddress
           );
         const borrowedAmount = (record?.escrow?.borrowedAmount || 0) / 100;
-        console.log(record.originAddress, ethstAddress)
         const callDetailPage = () => {
           if (record.originAddress === ethstAddress) {
             navigate(
