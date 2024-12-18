@@ -157,7 +157,7 @@ async function fetchAndSubmitETHPrice(
       console.error("Invalid response format:", responseData);
       throw new Error("Invalid price data format from API");
     }
-
+    console.log(`Received ${responseData.data.length} price points`);
     // Parse the data and convert timestamps and prices
     const prices = responseData.data.map(({ value, timestamp }) => ({
       price: parseFloat(value), // Convert string to float
