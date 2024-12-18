@@ -68,12 +68,13 @@ const EthstSteps = () => {
             2
           </div>
           <div className="flex flex-col justify-start items-center h-28 mt-3">
-            <h3 className="text-base font-semibold text-center">Connect Wallet</h3>
+            <h3 className="text-base font-semibold text-center">Bridge</h3>
             <p
               className="text-center mt-1 text-sm"
               style={{ color: '#4b5563' }}
             >
-              Purchase securely vaulted gold and silver assets to begin staking!
+              Connect to your Metamask wallet and bridge your ETH to Mercata’s
+              equivalent token ETHST to begin staking!
             </p>
           </div>
         </div>
@@ -90,13 +91,15 @@ const EthstSteps = () => {
             3
           </div>
           <div className="flex flex-col justify-start items-center h-28 mt-3">
-            <h3 className="text-base font-semibold text-center">Bridge ETH</h3>
+            <h3 className="text-base font-semibold text-center">
+              Stake and Earn
+            </h3>
             <p
               className="text-center mt-1 text-sm"
               style={{ color: '#4b5563' }}
             >
-              Stake your gold and silver assets and begin earning daily rewards
-              in the form of CATA, our governance token (Est. APY 10%).
+              Stake your ETHST tokens and begin earning daily rewards in the
+              form of CATA, our governance token (Est. APY 10%).
             </p>
           </div>
         </div>
@@ -113,13 +116,13 @@ const EthstSteps = () => {
             4
           </div>
           <div className="flex flex-col justify-start items-center h-28 mt-3">
-            <h3 className="text-base font-semibold text-center">Stake and Earn</h3>
+            <h3 className="text-base font-semibold text-center">Borrow</h3>
             <p
               className="text-center mt-1 text-sm"
               style={{ color: '#4b5563' }}
             >
-              Borrow (interest-free for a limited time!) STRATs up to 50% of the
-              market value of your staked assets.
+              Borrow (interest-free for a limited time!) USDST up to 50% of the
+              market value of your staked ETHST.
             </p>
           </div>
         </div>
