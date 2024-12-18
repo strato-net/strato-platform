@@ -2226,16 +2226,6 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
       options
     );
 
-    const assetAddresses = escrows.escrows.map(
-      (escrow) => escrow.assetRootAddress.split(':')[0]
-    );
-
-    const sales = await saleJs.getAll(
-      rawAdmin,
-      { assetToBeSold: assetAddresses, isOpen: true },
-      options
-    );
-
     const stakeTransactions = stakeCreatedEvents.stakeCreatedEvents
       .map((record) => {
         const escrow = escrows.escrows.find(
@@ -2245,10 +2235,6 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
         if (!escrow) {
           return;
         }
-
-        const sale = sales.find(
-          (sale) => sale.assetToBeSold === escrow.assetRootAddress.split(':')[0]
-        );
 
         const date = new Date(record.block_timestamp);
         const unixTimestamp = Math.floor(date.getTime() / 1000);
@@ -2261,7 +2247,7 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
           createdDate: unixTimestamp,
           quantity: record.assetAmount,
           transaction_hash: record.transaction_hash,
-          price: sale?.price,
+          price: null,
         };
       })
       .filter(Boolean);
@@ -2294,16 +2280,6 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
       options
     );
 
-    const assetAddresses = escrows.escrows.map(
-      (escrow) => escrow.assetRootAddress.split(':')[0]
-    );
-
-    const sales = await saleJs.getAll(
-      rawAdmin,
-      { assetToBeSold: assetAddresses, isOpen: true },
-      options
-    );
-
     const unstakeTransactions = unstakeEvents.unstakeEvents
       .map((record) => {
         const escrow = escrows.escrows.find(
@@ -2313,10 +2289,6 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
         if (!escrow) {
           return;
         }
-
-        const sale = sales.find(
-          (sale) => sale.assetToBeSold === escrow.assetRootAddress.split(':')[0]
-        );
 
         const date = new Date(record.block_timestamp);
         const unixTimestamp = Math.floor(date.getTime() / 1000);
@@ -2329,7 +2301,7 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
           createdDate: unixTimestamp,
           quantity: record.quantity,
           transaction_hash: record.transaction_hash,
-          price: sale?.price,
+          price: null,
         };
       })
       .filter(Boolean);

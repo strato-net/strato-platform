@@ -9,6 +9,7 @@ import { Images } from '../../images';
 import { useLocation } from 'react-router-dom';
 import { ASSET_STATUS } from '../../helpers/constants';
 import { useState, useMemo } from 'react';
+import BigNumber from 'bignumber.js';
 
 const logo = <img src={Images.cata} alt={''} title={''} className="w-5 h-5" />;
 
@@ -121,7 +122,8 @@ function prepareDataForItems(
   collateralQuantity,
   inputQuantity,
   matchedReserve,
-  logo
+  logo,
+  is18DecimalPlaces
 ) {
   if (type === 'Stake') {
     return [
@@ -139,7 +141,7 @@ function prepareDataForItems(
         label: 'Market Value',
         description:
           'The total value of your staked assets, calculated as Quantity x Oracle Price.',
-        value: `$${(matchedReserve?.lastUpdatedOraclePrice * inputQuantity).toFixed(2)}`,
+        value: `$${(matchedReserve?.lastUpdatedOraclePrice * (is18DecimalPlaces ? inputQuantity * 1e18 : inputQuantity)).toFixed(2)}`,
       },
       {
         label: 'Daily Estimated Reward (CATA)',
@@ -149,7 +151,7 @@ function prepareDataForItems(
           <div className="flex">
             <div className="mx-1">{logo}</div>
             {(
-              (inputQuantity *
+              ((is18DecimalPlaces ? inputQuantity * 1e18 : inputQuantity) *
                 matchedReserve?.lastUpdatedOraclePrice *
                 (matchedReserve?.cataAPYRate / 10)) /
               365
@@ -178,14 +180,14 @@ function prepareDataForItems(
 /**
  * Prepares the data for the summary section (applicable when staking).
  */
-function prepareDataForSummary(type, matchedReserve) {
+function prepareDataForSummary(type, matchedReserve, is18DecimalPlaces) {
   if (type === 'Stake') {
     return [
       {
         label: 'Market price (per unit)',
         description:
           'The current price of one unit of your RWA, as determined by the oracle.',
-        value: `$${matchedReserve?.lastUpdatedOraclePrice.toFixed(2)}`,
+        value: `$${(is18DecimalPlaces ? (matchedReserve?.lastUpdatedOraclePrice*1e18) : matchedReserve?.lastUpdatedOraclePrice).toFixed(2)}`,
       },
     ];
   }
@@ -267,10 +269,11 @@ const StakeModal = ({
     collateralQuantity,
     inputQuantity,
     matchedReserve,
-    logo
+    logo,
+    is18DecimalPlaces
   );
 
-  const dataForSummary = prepareDataForSummary(type, matchedReserve);
+  const dataForSummary = prepareDataForSummary(type, matchedReserve, is18DecimalPlaces);
 
   /**
    * Handles the stake or unstake action submission.
@@ -282,7 +285,10 @@ const StakeModal = ({
           escrows && escrows.length > 0
             ? escrows[0]
             : '0000000000000000000000000000000000000000',
-        collateralQuantity: is18DecimalPlaces ? inputQuantity * 1e18 : inputQuantity,
+        collateralQuantity: (is18DecimalPlaces
+          ? new BigNumber(inputQuantity).multipliedBy(new BigNumber(10).pow(18))
+          : new BigNumber(inputQuantity)
+        ).toFixed(0),
         assets,
         reserve: matchedReserve?.address,
       };
@@ -296,7 +302,10 @@ const StakeModal = ({
 
     if (type === 'Unstake') {
       const body = {
-        quantity: is18DecimalPlaces ? inputQuantity * 1e18 : inputQuantity,
+        quantity: (is18DecimalPlaces
+          ? new BigNumber(inputQuantity).multipliedBy(new BigNumber(10).pow(18))
+          : new BigNumber(inputQuantity)
+        ).toFixed(0),
         escrowAddresses: escrows,
         reserve: matchedReserve?.address,
       };

@@ -102,7 +102,6 @@ const StakeItemActions = ({
   if (requiresDivision) {
     collateralQuantity /= 1e18;
     quantityNotAvailable /= 1e18;
-    collateralValue /= 1e18;
   }
 
   // Recompute stakeQuantity after possible scaling

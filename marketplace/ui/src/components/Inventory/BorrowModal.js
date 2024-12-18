@@ -200,14 +200,14 @@ const BorrowModal = ({
   }, [reserves, inventory?.root]);
 
   // Apply scaling if needed (similar to StakeModal logic)
-  const scaledValues = useMemo(() => {
-    return applyDecimalScaling(inventory, assetsWithEighteenDecimalPlaces, {
-      collateralValue,
-      totalCollateralValue,
-    });
-  }, [inventory, assetsWithEighteenDecimalPlaces, collateralValue, totalCollateralValue]);
+  // const scaledValues = useMemo(() => {
+  //   return applyDecimalScaling(inventory, assetsWithEighteenDecimalPlaces, {
+  //     collateralValue,
+  //     totalCollateralValue,
+  //   });
+  // }, [inventory, assetsWithEighteenDecimalPlaces, collateralValue, totalCollateralValue]);
 
-  const { collateralValue: scaledCollateralValue, totalCollateralValue: scaledTotalCollateralValue } = scaledValues;
+  // const { collateralValue: scaledCollateralValue, totalCollateralValue: scaledTotalCollateralValue } = scaledValues;
 
   // Compute final displayed values after scaling:
   // The code divides these values by 100 or 10000 for display:
@@ -215,7 +215,7 @@ const BorrowModal = ({
   // borrowedAmount and loanableAmount as `... / 100`
   // We'll keep the same formatting after scaling by 1e18.
   
-  const maxBorrowableAmount = Math.floor(scaledTotalCollateralValue / 2);
+  const maxBorrowableAmount = Math.floor(collateralValue / 2);
   const loanableAmount = maxBorrowableAmount >= borrowedAmount
     ? maxBorrowableAmount - borrowedAmount
     : 0;
@@ -224,7 +224,7 @@ const BorrowModal = ({
   // `Market Value` = collateralValue / 10000
   // `borrowedAmount` and `loanableAmount` are displayed /100
 
-  const marketValueDisplay = (scaledCollateralValue / 10000).toFixed(2);
+  const marketValueDisplay = (collateralValue / 10000).toFixed(2);
   const borrowedAmountDisplay = (borrowedAmount / 100).toFixed(2);
   const loanableAmountDisplay = (loanableAmount / 100).toFixed(2);
 
