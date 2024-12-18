@@ -32,7 +32,9 @@ const TransferModal = ({
   const location = useLocation();
   const queryParams = new URLSearchParams(location.search);
   const isStrat = inventory.originAddress === stratAddress;
-  const is18DecimalPlaces = assetsWithEighteenDecimalPlaces.includes(inventory.originAddress);
+  const is18DecimalPlaces = assetsWithEighteenDecimalPlaces.includes(
+    inventory.originAddress
+  );
   const availableQuantity = isStrat
     ? new BigNumber(inventory.quantity).dividedBy(100)
     : is18DecimalPlaces

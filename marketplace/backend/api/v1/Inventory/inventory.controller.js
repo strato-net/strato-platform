@@ -9,6 +9,7 @@ import {
 } from '../../../helpers/emailTemplates';
 import sendEmail from '../../../helpers/email';
 import constants from '/helpers/constants';
+import BigNumber from 'bignumber.js';
 
 function getTokenServerUrl() {
   if (process.env.networkID === constants.prodNetworkId) {
@@ -191,26 +192,29 @@ class InventoryController {
           async ({
             recipientCommonName,
             itemName,
-            quantity = new BigNumber(quantity)
-              .dividedBy(new BigNumber(decimal))
-              .toString(),
-            price = new BigNumber(price)
-              .multipliedBy(new BigNumber(decimal))
-              .toString(),
+            quantity,
+            price,
             senderCommonName,
+            decimal,
           }) => {
+            const adjustedQuantity = new BigNumber(quantity)
+              .dividedBy(new BigNumber(decimal))
+              .toString();
+            const adjustedPrice = new BigNumber(price)
+              .multipliedBy(new BigNumber(decimal))
+              .toString();
             const TransferSenderTemplate = TransferSender(
               senderCommonName,
               itemName,
-              quantity,
-              price,
+              adjustedQuantity,
+              adjustedPrice,
               recipientCommonName
             );
             const TransferRecipientTemplate = TransferRecipient(
               recipientCommonName,
               itemName,
-              quantity,
-              price,
+              adjustedQuantity,
+              adjustedPrice,
               senderCommonName
             );
             await sendEmail(
