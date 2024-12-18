@@ -12,6 +12,7 @@ import {
   REDEMPTION_STATUS,
   TRANSACTION_STATUS,
   US_DATE_FORMAT,
+  USDST_CONVERSION,
 } from '../../helpers/constants';
 import TransactionTable from './TransactionTable';
 import { useTransactionState } from '../../contexts/transaction';
@@ -100,7 +101,7 @@ const Transaction = ({ user }) => {
           subCategory,
           assetName: transaction?.assetName,
           Price: isUsdst
-            ? Number((transaction?.price * 100).toFixed(2))
+            ? Number((transaction?.price * USDST_CONVERSION).toFixed(2))
             : is18DecimalPlaces
             ? Number((transaction?.price * Math.pow(10, 18)).toFixed(2))
             : transaction?.price,

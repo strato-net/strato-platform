@@ -59,7 +59,7 @@ const ListForSaleModal = ({
   const [pricePerUnit, setpricePerUnit] = useState(() => {
     return inventory.price
       ? isUsdst
-        ? inventory.price * 100
+        ? inventory.price * USDST_CONVERSION
         : is18DecimalPlaces
         ? inventory.price * Math.pow(10, 18)
         : inventory.price

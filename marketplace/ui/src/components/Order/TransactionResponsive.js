@@ -10,6 +10,7 @@ import {
   TRANSACTION_STATUS_CLASSES,
   TRANSACTION_STATUS_COLOR,
   TRANSACTION_STATUS_TEXT,
+  USDST_CONVERSION,
 } from '../../helpers/constants';
 import routes from '../../helpers/routes';
 import { useNavigate } from 'react-router-dom';
@@ -138,7 +139,7 @@ const TransactionResponsive = ({ data, user, usdstAddress, assetsWithEighteenDec
               maximumFractionDigits: 4,
               minimumFractionDigits: 0,
             });
-            price = (price * 100).toFixed(2);
+            price = (price * USDST_CONVERSION).toFixed(2);
           } else if (assetsWithEighteenDecimalPlaces.includes(assetOriginAddress)) {
             quantity = (quantity / Math.pow(10, 18)).toLocaleString('en-US', {
               maximumFractionDigits: 4,
@@ -258,7 +259,7 @@ const TransactionResponsive = ({ data, user, usdstAddress, assetsWithEighteenDec
                 </Button>
                 {price ? (
                   <p className={`text-right flex justify-end items-center`}>
-                    ${formattedNum(price)} ({formattedNum(price * 100)}
+                    ${formattedNum(price)} ({formattedNum(price * USDST_CONVERSION)}
                     {UsdstIcon})
                   </p>
                 ) : (

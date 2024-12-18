@@ -231,7 +231,7 @@ const TransactionTable = ({ user, download, usdstAddress, assetsWithEighteenDeci
                   <b>
                     ${' '}
                     {isUsdst
-                      ? (price * 100).toFixed(2)
+                      ? (price * USDST_CONVERSION).toFixed(2)
                       : is18DecimalPlaces
                       ? (price * Math.pow(10, 18)).toFixed(2)
                       : price}{' '}
@@ -240,7 +240,7 @@ const TransactionTable = ({ user, download, usdstAddress, assetsWithEighteenDeci
                   <span className="text-[#13188A] font-bold">
                     {' '}
                     {(isUsdst
-                      ? (price * 100).toFixed(2)
+                      ? (price * USDST_CONVERSION).toFixed(2)
                       : is18DecimalPlaces
                       ? (price * Math.pow(10, 18)).toFixed(2)
                       : price) * USDST_CONVERSION}{' '}
@@ -399,7 +399,7 @@ const TransactionTable = ({ user, download, usdstAddress, assetsWithEighteenDeci
           {price
             ? formattedNum(
                 assetOriginAddress === usdstAddress
-                  ? (price * 100).toFixed(2)
+                  ? (price * USDST_CONVERSION).toFixed(2)
                   : assetsWithEighteenDecimalPlaces.includes(assetOriginAddress)
                   ? (price * Math.pow(10, 18)).toFixed(2)
                   : price

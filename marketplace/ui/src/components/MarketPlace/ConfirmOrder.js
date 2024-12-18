@@ -24,7 +24,7 @@ import './index.css';
 import TagManager from 'react-gtm-module';
 import { setCookie } from '../../helpers/cookie';
 import { generateHtmlContent } from '../../helpers/emailTemplate';
-import { PAYMENT_LABEL } from '../../helpers/constants';
+import { PAYMENT_LABEL, USDST_CONVERSION } from '../../helpers/constants';
 
 const { Option } = Select;
 
@@ -137,13 +137,13 @@ const ConfirmOrder = ({ paymentServices = [], data, columns }) => {
       let itemTotal = (itemPrice * itemQty).toFixed(2);
 
       concatenatedOrderString += `${itemName}:\n`;
-      concatenatedOrderString = `$${itemTotal} (${(itemTotal * 100).toFixed(0)} ${(itemTotal * 100).toFixed(0) == 1 ? 'USDST' : 'USDST'})<br>`;
-      concatenatedOrderString += `Qty: ${itemQty} &nbsp; $${itemPrice} each (${(itemPrice * 100).toFixed(0)} ${(itemPrice * 100).toFixed(0) == 1 ? 'USDST' : 'USDST'} each)<br><br>`;
+      concatenatedOrderString = `$${itemTotal} (${(itemTotal * USDST_CONVERSION).toFixed(0)} 'USDST')<br>`;
+      concatenatedOrderString += `Qty: ${itemQty} &nbsp; $${itemPrice} each (${(itemPrice * USDST_CONVERSION).toFixed(0)} 'USDST' each)<br><br>`;
       orderTotal += parseFloat(itemTotal);
       if (i === cartData.length - 1) {
         concatenatedOrderString += `<hr style="border-top: 1px dotted #0A1B71; min-width: 80%; max-width: 80%; margin-left: 15px;">`;
         concatenatedOrderString += `Shipping Fee: <i><strong>Free</strong></i><br><br>`;
-        concatenatedOrderString += `Order Total: $${orderTotal.toFixed(2)} (${(orderTotal * 100).toFixed(0)} ${(orderTotal * 100).toFixed(0) == 1 ? 'USDST' : 'USDST'})<br>`;
+        concatenatedOrderString += `Order Total: $${orderTotal.toFixed(2)} (${(orderTotal * USDST_CONVERSION).toFixed(0)} 'USDST')<br>`;
       }
     }
 
@@ -302,7 +302,7 @@ const ConfirmOrder = ({ paymentServices = [], data, columns }) => {
   const totalAmount =
     selectedProvider?.serviceName === 'USDST' ||
     selectedProvider?.serviceName?.includes('USDST')
-      ? `${(subTotal * 100).toFixed(0)} ${(subTotal * 100).toFixed(0) == 1 ? 'USDST' : 'USDST'}`
+      ? `${(subTotal * USDST_CONVERSION).toFixed(0)} USDST`
       : selectedProvider?.serviceName === 'Stripe'
         ? `${subTotal} USD`
         : `${subTotal} ${selectedProvider?.serviceName || 'USD'}`;

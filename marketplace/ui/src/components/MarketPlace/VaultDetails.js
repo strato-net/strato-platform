@@ -380,7 +380,7 @@ const VaultDetails = ({ user, users }) => {
                   >
                     {details?.price || isStaked
                       ? (() => {
-                          const adjustedPrice = isUsdst ? details.price * 100 : is18DecimalPlaces ? details.price * Math.pow(10, 18) : details.price;
+                          const adjustedPrice = isUsdst ? details.price * USDST_CONVERSION : is18DecimalPlaces ? details.price * Math.pow(10, 18) : details.price;
                           return (
                             <>
                               $

@@ -227,7 +227,7 @@ const GlobalTransactionResponsive = ({
                         $
                         {formattedNum(
                           isUsdst
-                            ? (price * 100).toFixed(2)
+                            ? (price * USDST_CONVERSION).toFixed(2)
                             : is18DecimalPlaces
                             ? (price * Math.pow(10, 18)).toFixed(2)
                             : price
@@ -235,7 +235,7 @@ const GlobalTransactionResponsive = ({
                         (
                         {formattedNum(
                           isUsdst
-                            ? (price * 100 * 100).toFixed(2)
+                            ? (price * USDST_CONVERSION * 100).toFixed(2)
                             : is18DecimalPlaces
                             ? (price * Math.pow(10, 18) * 100).toFixed(2)
                             : price * 100

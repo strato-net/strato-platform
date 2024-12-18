@@ -478,7 +478,7 @@ const Inventory = ({ user }) => {
         const is18DecimalPlaces = assetsWithEighteenDecimalPlaces.includes(record.originAddress);
         const price = record.price
           ? isUsdst
-            ? parseFloat(record.price * 100).toFixed(2)
+            ? parseFloat(record.price * USDST_CONVERSION).toFixed(2)
             : is18DecimalPlaces
             ? parseFloat(record.price * 10 ** 18).toFixed(2)
             : record.price

@@ -17,7 +17,7 @@ import { actions } from '../../contexts/marketplace/actions';
 import { actions as orderActions } from '../../contexts/order/actions';
 import { useOrderDispatch, useOrderState } from '../../contexts/order';
 import { generateHtmlContent } from '../../helpers/emailTemplate';
-import { PAYMENT_LABEL } from '../../helpers/constants';
+import { PAYMENT_LABEL, USDST_CONVERSION } from '../../helpers/constants';
 
 const { Option } = Select;
 
@@ -103,7 +103,7 @@ const ResponsiveCart = ({
 
       concatenatedOrderString += `${itemName}:\n`;
       concatenatedOrderString += `$${itemTotal} <br>`;
-      concatenatedOrderString += `Qty: ${itemQty} &nbsp; $${itemPrice} each (${(itemPrice * 100).toFixed(0)} ${(itemPrice * 100).toFixed(0) == 1 ? 'USDST' : 'USDST'})<br><br>`;
+      concatenatedOrderString += `Qty: ${itemQty} &nbsp; $${itemPrice} each (${(itemPrice * USDST_CONVERSION).toFixed(0)} USDST)<br><br>`;
       orderTotal += parseFloat(itemTotal);
       if (i === cartData.length - 1) {
         concatenatedOrderString += `<hr style="border-top: 1px dotted #0A1B71; min-width: 80%; max-width: 80%; margin-left: 15px;">`;
@@ -248,7 +248,7 @@ const ResponsiveCart = ({
   const totalAmount =
     selectedProvider?.serviceName === 'USDST' ||
     selectedProvider?.serviceName?.includes('USDST')
-      ? `${(subTotal * 100).toFixed(0)} ${(subTotal * 100).toFixed(0) == 1 ? 'USDST' : 'USDST'}`
+      ? `${(subTotal * USDST_CONVERSION).toFixed(0)} USDST}`
       : selectedProvider?.serviceName === 'Stripe'
         ? `${subTotal} USD`
         : `${subTotal} ${selectedProvider?.serviceName || 'USD'}`;
