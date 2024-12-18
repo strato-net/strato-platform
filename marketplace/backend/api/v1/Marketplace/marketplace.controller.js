@@ -144,6 +144,15 @@ class MarketplaceController {
     }
   }
 
+  static async get18DecimalPlaces(_, res, next) {
+    try {
+      const addresses = constants.AssetsWithEighteenDecimalPlaces;
+      return rest.response.status200(res, addresses);
+    } catch (e) {
+      return next(e);
+    }
+  }
+
   static async getCataAddress(req, res, next) {
     try {
       const address = await CATAJs.getCataAddress();

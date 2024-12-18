@@ -36,7 +36,6 @@ const BoughtOrderDetails = ({ user, users }) => {
   const formatter = new Intl.NumberFormat('en-US');
   const formattedNum = (num) => formatter.format(num);
 
-  // const { stratsAddress, cataAddress } = useMarketplaceState();
   const [comment, setcomment] = useState('');
   const [Id, setId] = useState(undefined);
   const [data, setdata] = useState([]);

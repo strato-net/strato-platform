@@ -1,14 +1,10 @@
 import React, { useEffect, useState } from 'react';
 import { Button, Row, Col, Table, Tag, Space, Spin } from 'antd';
-import classNames from 'classnames';
 import { Images } from '../../images';
 import './../Order/ordersTable.css';
 import {
-  REDEMPTION_STATUS,
-  REDEMPTION_STATUS_CLASSES,
-  TRANSACTION_STATUS,
-  TRANSACTION_STATUS_CLASSES,
   TRANSACTION_STATUS_COLOR,
+  TRANSACTION_STATUS_TEXT,
 } from '../../helpers/constants';
 import routes from '../../helpers/routes';
 import { useNavigate } from 'react-router-dom';
@@ -21,7 +17,8 @@ const GlobalTransactionResponsive = ({
   isTransactionLoading,
   fetchData,
   stratAddress,
-  cataAddress,
+  assetsWithEighteenDecimalPlaces,
+  ethstAddress,
 }) => {
   const StratsIcon = (
     <img src={Images.strat} alt="STRATs" className="w-5 h-5" />
@@ -114,7 +111,7 @@ const GlobalTransactionResponsive = ({
                 },
               ];
               const isStrat = assetOriginAddress === stratAddress;
-              const isCata = assetOriginAddress === cataAddress;
+              const is18DecimalPlaces = assetsWithEighteenDecimalPlaces.includes(assetOriginAddress);
 
               const handleDetailRedirection = () => {
                 let route;
@@ -143,20 +140,28 @@ const GlobalTransactionResponsive = ({
               };
 
               const handleAssetRedirection = () => {
-                const url = routes.MarketplaceProductDetail.url
-                  .replace(':address', assetAddress)
-                  .replace(':name', assetName);
-                navigate(url);
+                const isEthst = assetOriginAddress === ethstAddress;
+                if (isEthst) {
+                  const url = routes.EthstProductDetail.url;
+                  navigate(`${url.replace(':address', assetAddress)}`, {
+                    state: { isCalledFromInventory: false },
+                  });
+                } else {
+                  const url = routes.MarketplaceProductDetail.url
+                    .replace(':address', assetAddress)
+                    .replace(':name', assetName);
+                  navigate(url);
+                }
               };
 
               return (
                 <Row
                   key={reference}
-                  className={`bg-red-300 w-full ${
+                  className={`w-full ${
                     isExpanded ? '' : 'h-36'
                   } rounded-xl px-2 py-2 shadow-2xl border-2 `}
                 >
-                  <Col span={6} className="flex justify-center bg-grey-400">
+                  <Col span={6} className="flex justify-center">
                     <img
                       src={assetImage}
                       alt=""
@@ -180,7 +185,9 @@ const GlobalTransactionResponsive = ({
                     <p
                       style={{ color: '#13188A' }}
                       className={`font-semibold ${
-                        type === 'Transfer'
+                        type === 'Transfer' ||
+                        type === 'Stake' ||
+                        type === 'Unstake'
                           ? 'cursor-default'
                           : 'cursor-pointer'
                       }`}
@@ -210,17 +217,18 @@ const GlobalTransactionResponsive = ({
                       size="middle"
                       style={{
                         backgroundColor: `${TRANSACTION_STATUS_COLOR[type]}`,
+                        color: `${TRANSACTION_STATUS_TEXT[type]}`,
                       }}
                     >
                       {type}
                     </Button>
                     {price ? (
                       <p className={`text-right flex justify-end items-center`}>
-                        ${' '}
+                        $
                         {formattedNum(
                           isStrat
                             ? (price * 100).toFixed(2)
-                            : isCata
+                            : is18DecimalPlaces
                             ? (price * Math.pow(10, 18)).toFixed(2)
                             : price
                         )}{' '}
@@ -228,9 +236,9 @@ const GlobalTransactionResponsive = ({
                         {formattedNum(
                           isStrat
                             ? (price * 100 * 100).toFixed(2)
-                            : isCata
+                            : is18DecimalPlaces
                             ? (price * Math.pow(10, 18) * 100).toFixed(2)
-                            : price
+                            : price * 100
                         )}{' '}
                         {StratsIcon})
                       </p>
@@ -243,7 +251,7 @@ const GlobalTransactionResponsive = ({
                       Qty:{' '}
                       {(isStrat
                         ? quantity / 100
-                        : isCata
+                        : is18DecimalPlaces
                         ? quantity / Math.pow(10, 18)
                         : quantity
                       ).toLocaleString('en-US', {
@@ -258,7 +266,7 @@ const GlobalTransactionResponsive = ({
                   {isExpanded && (
                     <Col span={24}>
                       <Table
-                        className="mt-6"
+                        className="mt-6 w-[90vw]"
                         columns={columns}
                         dataSource={tableData}
                         pagination={false}

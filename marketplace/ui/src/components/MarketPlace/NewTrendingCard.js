@@ -7,6 +7,7 @@ import DOMPurify from 'dompurify';
 // State
 import { useAuthenticateState } from '../../contexts/authentication';
 import { useMarketplaceState } from '../../contexts/marketplace';
+import { useEthState } from '../../contexts/eth';
 // Assets
 import images_placeholder from '../../images/resources/image_placeholder.png';
 import { Images } from '../../images';
@@ -29,7 +30,8 @@ const NewTrendingCard = ({
   const navigate = useNavigate();
   const location = useLocation();
   const { Text } = Typography;
-  const { stratsAddress, cataAddress } = useMarketplaceState();
+  const { stratsAddress, assetsWithEighteenDecimalPlaces } = useMarketplaceState();
+  const { ethstAddress } = useEthState();
   const { hasChecked, isAuthenticated, loginUrl, user } =
     useAuthenticateState();
 
@@ -39,10 +41,10 @@ const NewTrendingCard = ({
     topSellingProduct.data.quantityIsDecimal &&
     topSellingProduct.data.quantityIsDecimal === 'True';
   const isStrat = topSellingProduct.originAddress === stratsAddress;
-  const isCata = topSellingProduct.originAddress === cataAddress;
+  const is18DecimalPlaces = assetsWithEighteenDecimalPlaces.includes(topSellingProduct.originAddress);
   const saleQuantity = isStrat
     ? topSellingProduct.saleQuantity / 100
-    : isCata
+    : is18DecimalPlaces
     ? topSellingProduct.saleQuantity / Math.pow(10, 18)
     : topSellingProduct.saleQuantity;
   const [quantity, setQuantity] = useState(1);
@@ -55,6 +57,7 @@ const NewTrendingCard = ({
   };
 
   const naviroute = routes.MarketplaceProductDetail.url;
+  const ethNaviroute = routes.EthstProductDetail.url;
   const isAvailableForSale = !topSellingProduct.price || saleQuantity === 0;
 
   const queryParams = new URLSearchParams(location.search);
@@ -154,15 +157,25 @@ const NewTrendingCard = ({
               // Let the browser handle it natively to open in a new tab
             } else {
               e.preventDefault();
-              navigate(
-                `${naviroute
-                  .replace(':address', topSellingProduct.address)
-                  .replace(
-                    ':name',
-                    encodeURIComponent(topSellingProduct.name)
+              if (topSellingProduct.originAddress === ethstAddress) {
+                navigate(
+                  `${ethNaviroute.replace(
+                    ':address',
+                    topSellingProduct.address
                   )}`,
-                { state: { isCalledFromInventory: false } }
-              );
+                  { state: { isCalledFromInventory: false } }
+                );
+              } else {
+                navigate(
+                  `${naviroute
+                    .replace(':address', topSellingProduct.address)
+                    .replace(
+                      ':name',
+                      encodeURIComponent(topSellingProduct.name)
+                    )}`,
+                  { state: { isCalledFromInventory: false } }
+                );
+              }
               window.scrollTo(0, 0);
             }
           }}
@@ -348,13 +361,27 @@ const NewTrendingCard = ({
                   productId: topSellingProduct.productId,
                 },
               });
-              if ((await addItemToCart(topSellingProduct, quantity)) === true) {
-                navigate('/checkout');
-                window.scrollTo(0, 0);
+              if (topSellingProduct.originAddress === ethstAddress) {
+                navigate(
+                  `${ethNaviroute.replace(
+                    ':address',
+                    topSellingProduct.address
+                  )}`,
+                  { state: { isCalledFromInventory: false } }
+                );
+              } else {
+                if (
+                  (await addItemToCart(topSellingProduct, quantity)) === true
+                ) {
+                  navigate('/checkout');
+                  window.scrollTo(0, 0);
+                }
               }
             }}
           >
-            Buy Now
+            {topSellingProduct.originAddress === ethstAddress
+              ? 'Bridge'
+              : 'Buy Now'}
           </Button>
           {/* TODO:- Remove Comment to show the Add-to-Cart Button */}
           {/* <Button

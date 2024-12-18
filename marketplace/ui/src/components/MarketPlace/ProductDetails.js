@@ -100,7 +100,7 @@ const ProductDetails = ({ user, users }) => {
     isFetchingPriceHistory,
     reserves,
   } = useInventoryState();
-  const { cartList, stratsAddress, cataAddress } = useMarketplaceState();
+  const { cartList } = useMarketplaceState();
 
   const [isModalVisible, setIsModalVisible] = useState(false);
   const [timeFilter, setTimeFilter] = useState('1');
@@ -283,7 +283,7 @@ const ProductDetails = ({ user, users }) => {
     setStakeModalOpen(false);
   };
 
-  const showBorrowModal = (type) => {
+  const showBorrowModal = () => {
     setBorrowModalOpen(true);
   };
 
@@ -291,7 +291,7 @@ const ProductDetails = ({ user, users }) => {
     setBorrowModalOpen(false);
   };
 
-  const showRepayModal = (type) => {
+  const showRepayModal = () => {
     setRepayModalOpen(true);
   };
 

@@ -76,7 +76,7 @@ const HeaderComponent = ({
   const categoryDispatch = useCategoryDispatch();
   const userDispatch = useAuthenticateDispatch();
   //States
-  const { cartList, strats, cata, cataAddress, stratsAddress } =
+  const { cartList, strats, cata, stratsAddress } =
     useMarketplaceState();
   const { categorys } = useCategoryState();
   let { isAuthenticated } = useAuthenticateState();
@@ -87,6 +87,7 @@ const HeaderComponent = ({
       marketplaceActions.fetchCataBalance(marketplaceDispatch);
       marketplaceActions.fetchStratsAddress(marketplaceDispatch);
       marketplaceActions.fetchCataAddress(marketplaceDispatch);
+      marketplaceActions.fetchAssetsWithEighteenDecimalPlaces(marketplaceDispatch);
     }
   }, [user]);
 

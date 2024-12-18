@@ -1,5 +1,6 @@
 import { util, rest } from '/blockapps-rest-plus';
 import constants from '../../helpers/constants';
+import { searchAllWithQueryArgs } from '/helpers/utils';
 
 const contractName = 'BlockApps-Mercata-Escrow';
 const assetsArrayName = 'BlockApps-Mercata-Escrow-assets';
@@ -17,8 +18,7 @@ const assetsArrayName = 'BlockApps-Mercata-Escrow-assets';
  */
 
 function marshalIn(_args) {
-  const defaultArgs = {
-  };
+  const defaultArgs = {};
 
   const args = {
     ...defaultArgs,
@@ -150,6 +150,57 @@ async function getAll(user, options) {
   return escrowsWithAssets;
 }
 
+async function getEscrowsForStakeTransactions(user, args, options) {
+  const { address } = args;
+  const batchSize = 50;
+
+  if (!Array.isArray(address)) {
+    throw new Error('Address must be an array');
+  }
+
+  const batches = [];
+  for (let i = 0; i < address.length; i += batchSize) {
+    batches.push(address.slice(i, i + batchSize));
+  }
+
+  let allEscrows = [];
+  let totalCount = 0;
+
+  // Fetch each batch
+  for (const batch of batches) {
+    const batchArgs = { ...args, address: batch };
+    const escrows = await searchAllWithQueryArgs(
+      contractName,
+      batchArgs,
+      options,
+      user
+    );
+
+    const total = await searchAllWithQueryArgs(
+      contractName,
+      {
+        ...batchArgs,
+        queryOptions: { select: 'count' },
+      },
+      options,
+      user
+    );
+
+    // Append batch results
+    allEscrows = allEscrows.concat(escrows);
+    totalCount += total[0]?.count || 0;
+  }
+
+  if (allEscrows.length === 0) {
+    throw new Error('No escrows found');
+  }
+
+  return {
+    escrows: allEscrows,
+    total: totalCount,
+  };
+}
+
 /**
  * Retrieve contract state via Cirrus.
  * @param {Object} user - User context for the request.
@@ -162,7 +213,7 @@ async function getEscrowForAsset(user, queryArgs, options) {
   const searchOptions = {
     ...options,
     query: {
-      ...queryArgs
+      ...queryArgs,
     },
   };
 
@@ -192,16 +243,12 @@ async function searchEscrow(user, queryArgs, options) {
   const searchOptions = {
     ...options,
     query: {
-      ...queryArgs
+      ...queryArgs,
     },
   };
 
   // Fetch escrows from Cirrus
-  const assets = await rest.search(
-    user,
-    { name: contractName },
-    searchOptions
-  );
+  const assets = await rest.search(user, { name: contractName }, searchOptions);
 
   if (!assets || assets.length === 0) {
     return undefined;
@@ -209,7 +256,6 @@ async function searchEscrow(user, queryArgs, options) {
 
   return get(user, assets[0].address, options);
 }
-
 
 // Get Total CATA Rewards for a user
 async function userCataRewards(user, userCommonName, options) {
@@ -289,6 +335,7 @@ export default {
   contractName,
   get,
   getAll,
+  getEscrowsForStakeTransactions,
   getEscrowForAsset,
   searchEscrow,
   userCataRewards,

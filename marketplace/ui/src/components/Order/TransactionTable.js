@@ -34,6 +34,7 @@ import {
   useTransactionDispatch,
   useTransactionState,
 } from '../../contexts/transaction';
+import { useEthState } from '../../contexts/eth';
 import { useMarketplaceDispatch } from '../../contexts/marketplace';
 // Utils & Constants
 import {
@@ -44,12 +45,13 @@ import {
   DOWNLOAD_OPTIONS,
   REDEMPTION_STATUS,
   REDEMPTION_STATUS_CLASSES,
-  US_DATE_FORMAT,
+  DATE_TIME_FORMAT,
+  TRANSACTION_STATUS_TEXT,
 } from '../../helpers/constants';
 import { SEO } from '../../helpers/seoConstant';
 import { getStringDate } from '../../helpers/utils';
 
-const TransactionTable = ({ user, download, stratAddress, cataAddress }) => {
+const TransactionTable = ({ user, download, stratAddress, assetsWithEighteenDecimalPlaces }) => {
   const StratsIcon = (
     <img src={Images.strat} alt="STRATs" className="mx-1 w-4 h-4" />
   );
@@ -66,7 +68,7 @@ const TransactionTable = ({ user, download, stratAddress, cataAddress }) => {
   const urlType = searchParams.get('type');
   const urlDate = searchParams.get('date');
 
-  const limit = 20;
+  const limit = 200;
   const pageSize = 10;
   const [offset, setOffset] = useState(0);
   const [currentPage, setCurrentPage] = useState(1);
@@ -76,6 +78,7 @@ const TransactionTable = ({ user, download, stratAddress, cataAddress }) => {
   const [transactions, setTransactions] = useState(userTransactions);
   const [originAddress, setOriginAddress] = useState('');
   const [search, setSearch] = useState('');
+  const { ethstAddress } = useEthState();
 
   const formatter = new Intl.NumberFormat('en-US');
   const formattedNum = (num) => formatter.format(num);
@@ -95,12 +98,13 @@ const TransactionTable = ({ user, download, stratAddress, cataAddress }) => {
   }, [marketplaceDispatch]);
 
   useEffect(() => {
-    if (user?.commonName && dateQuery) {
+    if (user?.commonName && user?.userAddress && dateQuery) {
       transactionAction.fetchUserTransaction(
         transactionDispatch,
         limit,
         offset,
         user?.commonName,
+        user?.userAddress,
         dateReturn(dateQuery)
       );
     }
@@ -109,7 +113,8 @@ const TransactionTable = ({ user, download, stratAddress, cataAddress }) => {
         transactionDispatch,
         limit,
         offset,
-        user?.commonName
+        user?.commonName,
+        user?.userAddress
       );
     }
   }, [user, dateQuery, offset]);
@@ -184,7 +189,7 @@ const TransactionTable = ({ user, download, stratAddress, cataAddress }) => {
   const Content = ({ data }) => {
     const price = data?.assetPrice || data?.price;
     const isStrat = data?.assetOriginAddress === stratAddress;
-    const isCata = data?.assetOriginAddress === cataAddress;
+    const is18DecimalPlaces = assetsWithEighteenDecimalPlaces.includes(data?.assetOriginAddress);
 
     return (
       <div className="min-h-44 h-full" style={{ width: '460px' }}>
@@ -227,7 +232,7 @@ const TransactionTable = ({ user, download, stratAddress, cataAddress }) => {
                     ${' '}
                     {isStrat
                       ? (price * 100).toFixed(2)
-                      : isCata
+                      : is18DecimalPlaces
                       ? (price * Math.pow(10, 18)).toFixed(2)
                       : price}{' '}
                   </b>{' '}
@@ -236,7 +241,7 @@ const TransactionTable = ({ user, download, stratAddress, cataAddress }) => {
                     {' '}
                     {(isStrat
                       ? (price * 100).toFixed(2)
-                      : isCata
+                      : is18DecimalPlaces
                       ? (price * Math.pow(10, 18)).toFixed(2)
                       : price) * STRATS_CONVERSION}{' '}
                   </span>
@@ -285,10 +290,18 @@ const TransactionTable = ({ user, download, stratAddress, cataAddress }) => {
   };
 
   const handleAssetRedirection = (data) => {
-    const url = routes.MarketplaceProductDetail.url
-      .replace(':address', data.assetAddress)
-      .replace(':name', data.assetName);
-    navigate(url);
+    const isEthst = data?.assetOriginAddress === ethstAddress;
+    if (isEthst) {
+      const url = routes.EthstProductDetail.url;
+      navigate(`${url.replace(':address', data.assetAddress)}`, {
+        state: { isCalledFromInventory: false },
+      });
+    } else {
+      const url = routes.MarketplaceProductDetail.url
+        .replace(':address', data.assetAddress)
+        .replace(':name', data.assetName);
+      navigate(url);
+    }
   };
 
   const column = [
@@ -318,7 +331,10 @@ const TransactionTable = ({ user, download, stratAddress, cataAddress }) => {
       width: '150px',
       render: (text) => (
         <p
-          style={{ background: TRANSACTION_STATUS_COLOR[text] }}
+          style={{
+            background: TRANSACTION_STATUS_COLOR[text],
+            color: TRANSACTION_STATUS_TEXT[text],
+          }}
           className={`bg-${TRANSACTION_STATUS_COLOR[text]} min-w-[80px] text-center cursor-default px-2 py-2 rounded-lg text-white`}
         >
           {text}
@@ -361,7 +377,7 @@ const TransactionTable = ({ user, download, stratAddress, cataAddress }) => {
           {quantity
             ? (assetOriginAddress === stratAddress
                 ? quantity / 100
-                : assetOriginAddress === cataAddress
+                : assetsWithEighteenDecimalPlaces.includes(assetOriginAddress)
                 ? quantity / Math.pow(10, 18)
                 : quantity
               ).toLocaleString('en-US', {
@@ -384,7 +400,7 @@ const TransactionTable = ({ user, download, stratAddress, cataAddress }) => {
             ? formattedNum(
                 assetOriginAddress === stratAddress
                   ? (price * 100).toFixed(2)
-                  : assetOriginAddress === cataAddress
+                  : assetsWithEighteenDecimalPlaces.includes(assetOriginAddress)
                   ? (price * Math.pow(10, 18)).toFixed(2)
                   : price
               )
@@ -427,7 +443,7 @@ const TransactionTable = ({ user, download, stratAddress, cataAddress }) => {
       key: 'date',
       width: '150px',
       render: (text, { createdDate }) => (
-        <p>{getStringDate(createdDate, US_DATE_FORMAT)}</p>
+        <p>{getStringDate(createdDate, DATE_TIME_FORMAT)}</p>
       ),
       title: (
         <div style={{ display: 'flex' }}>
@@ -449,6 +465,8 @@ const TransactionTable = ({ user, download, stratAddress, cataAddress }) => {
     const { textClass, bgClass } =
       data.type === 'Redemption'
         ? REDEMPTION_STATUS_CLASSES[status]
+        : data.type === 'Stake' || data.type === 'Unstake'
+        ? TRANSACTION_STATUS_CLASSES[3]
         : TRANSACTION_STATUS_CLASSES[status] || {
             textClass: 'bg-[#FFF6EC]',
             bgClass: 'bg-[#119B2D]',
@@ -464,6 +482,8 @@ const TransactionTable = ({ user, download, stratAddress, cataAddress }) => {
         <p>
           {data.type === 'Redemption'
             ? REDEMPTION_STATUS[status]
+            : data.type === 'Stake' || data.type === 'Unstake'
+            ? TRANSACTION_STATUS[3]
             : TRANSACTION_STATUS[status]}
         </p>
       </div>
@@ -623,27 +643,29 @@ const TransactionTable = ({ user, download, stratAddress, cataAddress }) => {
         </Row>
       </Col>
       <Col span={22} className="mx-auto mt-5">
-        <div className="flex md:hidden order_responsive">
-          {isTransactionLoading ? (
-            <Spin className="mx-auto" />
-          ) : (
-            <div className="flex flex-col mx-auto">
-              <TransactionResponsive
-                data={paginatedTransactions}
-                user={user}
-                stratAddress={stratAddress}
-                cataAddress={cataAddress}
-              />
-              <Pagination
-                className="mx-auto mt-5"
-                total={transactions.length}
-                current={currentPage}
-                pageSize={pageSize}
-                onChange={handlePageChange}
-                showSizeChanger={false}
-              />
-            </div>
-          )}
+        <div className="w-full flex md:hidden order_responsive">
+          <Row className="w-full">
+            {isTransactionLoading ? (
+              <Spin className="mx-auto" />
+            ) : (
+              <div className="">
+                <TransactionResponsive
+                  data={paginatedTransactions}
+                  user={user}
+                  stratAddress={stratAddress}
+                  assetsWithEighteenDecimalPlaces={assetsWithEighteenDecimalPlaces}
+                />
+                <Pagination
+                  className="mx-auto mt-5"
+                  total={transactions.length}
+                  current={currentPage}
+                  pageSize={pageSize}
+                  onChange={handlePageChange}
+                  showSizeChanger={false}
+                />
+              </div>
+            )}
+          </Row>
         </div>
         <div className="hidden md:flex md:flex-col mx:auto">
           <DataTableComponent

@@ -24,17 +24,69 @@ const StakeItemActions = ({
   const [borrowModalOpen, setBorrowModalOpen] = useState(false);
   const [repayModalOpen, setRepayModalOpen] = useState(false);
 
-  function isActive() {
-    if (
-      inventory.status == ASSET_STATUS.PENDING_REDEMPTION ||
-      inventory.status == ASSET_STATUS.RETIRED
-    ) {
-      return false;
-    } else {
-      return true;
-    }
-  }
+  const uniqueEscrows = new Set();
+  const collateralQuantity = inventory?.inventories
+    ? inventory.inventories.reduce((sum, item) => {
+        const escrowAddress = item?.escrow?.address;
+        const escrowCollateral = item?.escrow?.collateralQuantity || 0;
 
+        // Add collateral only if the escrow address is unique
+        if (escrowAddress && !uniqueEscrows.has(escrowAddress)) {
+          uniqueEscrows.add(escrowAddress);
+          return sum + escrowCollateral;
+        }
+
+        return sum;
+      }, 0)
+    : inventory?.escrow?.collateralQuantity > inventory?.quantity
+    ? inventory?.quantity
+    : inventory?.escrow?.collateralQuantity || 0;
+  const quantityNotAvailable = inventory?.inventories
+    ? inventory.inventories.reduce((sum, item) => {
+        const status = Number(item.status);
+        if (status && status !== ASSET_STATUS.ACTIVE) {
+          return sum + (item.quantity || 0);
+        }
+        return sum;
+      }, 0) + inventory.totalSaleQuantity
+    : inventory?.status && Number(inventory?.status) !== ASSET_STATUS.ACTIVE
+    ? inventory?.quantity + (inventory?.saleQuantity || 0)
+    : 0;
+  const quantity = inventory?.inventories
+    ? inventory.totalQuantity
+    : inventory?.quantity;
+  const stakeQuantity = quantity - collateralQuantity - quantityNotAvailable;
+  const uniqueEscrowsPrime = new Set();
+  const collateralValue = inventory?.inventories
+    ? inventory.inventories.reduce((sum, item) => {
+        const escrowAddress = item?.escrow?.address;
+        const escrowCollateral = item?.escrow?.collateralValue || 0;
+
+        // Add collateral only if the escrow address is unique
+        if (escrowAddress && !uniqueEscrowsPrime.has(escrowAddress)) {
+          uniqueEscrowsPrime.add(escrowAddress);
+          return sum + escrowCollateral;
+        }
+
+        return sum;
+      }, 0)
+    : 0;
+  const maxBorrowableAmount = Math.floor(collateralValue / 2);
+  const uniqueBorrowedAddresses = new Set();
+  const borrowAmount = inventory?.inventories
+    ? inventory.inventories.reduce((sum, item) => {
+        const escrowAddress = item?.escrow?.address;
+        const borrowedValue = item?.escrow?.borrowedAmount || 0;
+  
+        // Add borrowed amount only if the escrow address is unique
+        if (escrowAddress && !uniqueBorrowedAddresses.has(escrowAddress)) {
+          uniqueBorrowedAddresses.add(escrowAddress);
+          return sum + borrowedValue;
+        }
+  
+        return sum;
+      }, 0)
+    : inventory?.escrow?.borrowedAmount || 0;
   const showStakeModal = (type) => {
     setStakeModalOpen(true);
     setStakeType(type);
@@ -67,7 +119,7 @@ const StakeItemActions = ({
           type="primary"
           className="font-semibold flex items-center justify-center"
           onClick={() => showStakeModal('Stake')}
-          disabled={inventory?.quantity <= inventory?.escrow?.collateralQuantity || !isActive() || inventory.price}
+          disabled={stakeQuantity <= 0}
         >
           <RiseOutlined /> Stake
         </Button>
@@ -75,7 +127,7 @@ const StakeItemActions = ({
           type="link"
           className="text-[#13188A] font-semibold"
           onClick={() => showStakeModal('Unstake')}
-          disabled={!inventory?.escrow || inventory?.escrow?.borrowedAmount > 0}
+          disabled={borrowAmount > 0 || collateralQuantity <= 0}
         >
           <LogoutOutlined /> Unstake
         </Button>
@@ -83,7 +135,7 @@ const StakeItemActions = ({
           type="link"
           className="text-[#13188A] font-semibold"
           onClick={() => showBorrowModal('Unstake')}
-          disabled={!inventory?.escrow || inventory?.escrow?.borrowedAmount > 0}
+          disabled={borrowAmount >= maxBorrowableAmount || collateralQuantity <= 0}
         >
           <BankOutlined /> Borrow
         </Button>
@@ -91,7 +143,7 @@ const StakeItemActions = ({
           type="link"
           className="text-[#13188A] font-semibold"
           onClick={() => showRepayModal('Unstake')}
-          disabled={!inventory?.escrow || inventory?.escrow?.borrowedAmount <= 0}
+          disabled={borrowAmount <= 0}
         >
           <SolutionOutlined />
           Repay

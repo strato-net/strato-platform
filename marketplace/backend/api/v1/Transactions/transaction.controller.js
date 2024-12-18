@@ -20,6 +20,7 @@ class TransactionController {
         search = '',
         type,
         user,
+        userAddress,
         startDate,
         endDate,
       } = query;
@@ -45,6 +46,14 @@ class TransactionController {
         order: 'transferDate.desc',
         id: search,
       };
+
+      const stakeQuery = {
+        limit: limit,
+        offset: offset,
+        borrowerCommonName: user,
+        userAddress: userAddress,
+      };
+
       if (startDate && endDate) {
         transactionQuery['range'] = [`createdDate,${startDate},${endDate}`];
         redemptionQuery['range'] = [`redemptionDate,${startDate},${endDate}`];
@@ -63,16 +72,32 @@ class TransactionController {
         count = count + total;
       }
       if (type === 'Transfer' || !type) {
-        const { transfers, total } =
-          await dapp.getAllItemTransferEvents(TransferQuery);
+        const { transfers, total } = await dapp.getAllItemTransferEvents(
+          TransferQuery
+        );
         data = [...data, ...transfers];
         count = count + total;
       }
+      if (type === 'Stake' || !type) {
+        const { stakeTransactions, total } = await dapp.getStakeTransactions(
+          stakeQuery
+        );
+        data = [...data, ...stakeTransactions];
+        count = count + total;
+      }
+      if (type === 'Unstake' || !type) {
+        const { unstakeTransactions, total } =
+          await dapp.getUnstakeTransactions(stakeQuery);
+        data = [...data, ...unstakeTransactions];
+        count = count + total;
+      }
       if (type === 'Redemption' || !type) {
-        outgoingRedemptions =
-          await dapp.getOutgoingRedemptionRequests(redemptionQuery);
-        incomingRedemptions =
-          await dapp.getIncomingRedemptionRequests(redemptionQuery);
+        outgoingRedemptions = await dapp.getOutgoingRedemptionRequests(
+          redemptionQuery
+        );
+        incomingRedemptions = await dapp.getIncomingRedemptionRequests(
+          redemptionQuery
+        );
         let redemptions = [
           ...outgoingRedemptions?.data,
           ...incomingRedemptions?.data,
@@ -137,24 +162,30 @@ class TransactionController {
           from:
             item.oldOwnerCommonName ||
             item.purchasersCommonName ||
-            item.ownerCommonName,
+            item.ownerCommonName ||
+            asset?.ownerCommonName,
           to:
             item.newOwnerCommonName ||
             item.sellersCommonName ||
             item.issuerCommonName ||
-            item.sellerCommonName,
+            item.sellerCommonName ||
+            item.borrowerCommonName,
           price: item.price || '',
           totalAmount:
             item.totalPrice ||
             (item.price ? item.price * getItemQuantity(item) : ''),
           status: item.status || '1',
-          reference: item.transferNumber || item.orderId || item.redemption_id,
+          reference:
+            item.transferNumber ||
+            item.orderId ||
+            item.redemption_id ||
+            item.stakeId,
           quantity: getItemQuantity(item),
           assetName: asset?.name || 'null',
           assetDescription: asset?.description || 'null',
           assetImage: getImage(asset),
           category: asset?.category || 'null',
-          assetPrice: item?.assetPrice,
+          assetPrice: item?.assetPrice || 0,
           assetAddress: asset?.address,
           assetOriginAddress: asset?.originAddress,
           assetContractName: asset?.contract_name,
@@ -162,14 +193,12 @@ class TransactionController {
         };
       });
 
-      res
-        .status(200)
-        .json({
-          success: true,
-          message: 'Fetched Transactions successfully',
-          data: newData,
-          count: count,
-        });
+      res.status(200).json({
+        success: true,
+        message: 'Fetched Transactions successfully',
+        data: newData,
+        count: count,
+      });
       return next();
     } catch (e) {
       return next(e);
@@ -209,6 +238,12 @@ class TransactionController {
         order: 'transferDate.desc',
         id: search,
       };
+
+      const stakeQuery = {
+        limit: limit,
+        offset: offset,
+      };
+
       if (startDate && endDate) {
         transactionQuery['range'] = [`createdDate,${startDate},${endDate}`];
         redemptionQuery['range'] = [`redemptionDate,${startDate},${endDate}`];
@@ -229,10 +264,24 @@ class TransactionController {
         data = [...data, ...orderlist];
       }
       if (type?.includes('Transfer')) {
-        const { transfers, total } =
-          await dapp.getAllItemTransferEvents(TransferQuery);
+        const { transfers, total } = await dapp.getAllItemTransferEvents(
+          TransferQuery
+        );
         count = count + total;
         data = [...data, ...transfers];
+      }
+      if (type?.includes('Stake')) {
+        const { stakeTransactions, total } = await dapp.getStakeTransactions(
+          stakeQuery
+        );
+        count = count + total;
+        data = [...data, ...stakeTransactions];
+      }
+      if (type?.includes('Unstake')) {
+        const { unstakeTransactions, total } =
+          await dapp.getUnstakeTransactions(stakeQuery);
+        count = count + total;
+        data = [...data, ...unstakeTransactions];
       }
       if (type?.includes('Redemption')) {
         redemptions = await dapp.getAllRedemptionRequests(redemptionQuery);
@@ -294,24 +343,30 @@ class TransactionController {
           from:
             item.oldOwnerCommonName ||
             item.purchasersCommonName ||
-            item.ownerCommonName,
+            item.ownerCommonName ||
+            asset?.ownerCommonName,
           to:
             item.newOwnerCommonName ||
             item.sellersCommonName ||
             item.issuerCommonName ||
-            item.sellerCommonName,
+            item.sellerCommonName ||
+            item.borrowerCommonName,
           price: item.price || '',
           totalAmount:
             item.totalPrice ||
             (item.price ? item.price * getItemQuantity(item) : ''),
           status: item.status || '1',
-          reference: item.transferNumber || item.orderId || item.redemption_id,
+          reference:
+            item.transferNumber ||
+            item.orderId ||
+            item.redemption_id ||
+            item.stakeId,
           quantity: getItemQuantity(item),
           assetName: asset?.name || 'null',
           assetDescription: asset?.description || 'null',
           assetImage: getImage(asset),
           category: asset?.category || 'null',
-          assetPrice: item?.assetPrice,
+          assetPrice: item?.assetPrice || 0,
           assetAddress: asset?.address,
           assetOriginAddress: asset?.originAddress,
           assetContractName: asset?.contract_name,
@@ -319,14 +374,12 @@ class TransactionController {
         };
       });
 
-      res
-        .status(200)
-        .json({
-          success: true,
-          message: 'Fetched Transactions successfully',
-          data: newData,
-          count,
-        });
+      res.status(200).json({
+        success: true,
+        message: 'Fetched Transactions successfully',
+        data: newData,
+        count,
+      });
       return next();
     } catch (e) {
       return next(e);

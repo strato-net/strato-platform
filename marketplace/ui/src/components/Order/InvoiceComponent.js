@@ -95,9 +95,6 @@ const styles = StyleSheet.create({
 const InvoiceComponent = ({ invoice }) => {
   const [subtotal, setSubtotal] = useState(0);
   const [totalTax, settotalTax] = useState(0);
-  // const { stratsAddress,cataAddress } = useMarketplaceState()
-  // const isStrat = {data:'tet'}?.assetOriginAddress === stratsAddress || true;
-  // const isCata = {data:"tes"}?.assetOriginAddress === cataAddress || true; 
 
   useEffect(() => {
     let tax = 0;

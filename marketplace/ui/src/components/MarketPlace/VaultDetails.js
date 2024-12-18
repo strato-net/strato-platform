@@ -78,7 +78,7 @@ const VaultDetails = ({ user, users }) => {
     isInventoryDetailsLoading,
     reserve,
   } = useInventoryState();
-  const { cartList, stratsAddress, cataAddress } = useMarketplaceState();
+  const { cartList, stratsAddress, assetsWithEighteenDecimalPlaces } = useMarketplaceState();
   const [isModalVisible, setIsModalVisible] = useState(false);
   const [timeFilter, setTimeFilter] = useState('1');
   const [itemData, setItemData] = useState({});
@@ -148,7 +148,7 @@ const VaultDetails = ({ user, users }) => {
   }, [marketplaceDispatch, cartList]);
 
   const details = reserve  && reserve.asset;
-  const isCata = details.originAddress === cataAddress;
+  const is18DecimalPlaces = assetsWithEighteenDecimalPlaces.includes(details.originAddress);
   const isStrat = details.originAddress === stratsAddress;
   let fileValues = [];
   let fileNames = [];
@@ -171,7 +171,7 @@ const VaultDetails = ({ user, users }) => {
       const detailsData = details.data;
       setItemData(detailsData);
       if (details.saleQuantity) {
-        let saleQuantity = isStrat ? details.saleQuantity / 100 : isCata ? details.saleQuantity / Math.pow(10, 18) : details.saleQuantity;
+        let saleQuantity = isStrat ? details.saleQuantity / 100 : is18DecimalPlaces ? details.saleQuantity / Math.pow(10, 18) : details.saleQuantity;
         setAvailableQuantity(saleQuantity || 1);
       }
     }
@@ -380,7 +380,7 @@ const VaultDetails = ({ user, users }) => {
                   >
                     {details?.price || isStaked
                       ? (() => {
-                          const adjustedPrice = isStrat ? details.price * 100 : isCata ? details.price * Math.pow(10, 18) : details.price;
+                          const adjustedPrice = isStrat ? details.price * 100 : is18DecimalPlaces ? details.price * Math.pow(10, 18) : details.price;
                           return (
                             <>
                               $
