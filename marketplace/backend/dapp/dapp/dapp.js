@@ -45,7 +45,7 @@ import redemptionServiceJs from '/dapp/redemptions/redemptionService';
 import reserveJs from '/dapp/reserve/reserve';
 import escrowJs from '/dapp/escrow/escrow';
 
-import usdst from '../usdst/usdst/';
+import usdst from '../usdst/usdst';
 
 const allAssetNames = [];
 dayjs.extend(utc);
