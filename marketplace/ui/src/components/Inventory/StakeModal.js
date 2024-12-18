@@ -78,11 +78,10 @@ function computeQuantityNotAvailable(inventory) {
  * Computes the total available stake quantity based on:
  * total quantity - collateralQuantity - quantityNotAvailable.
  */
-function computeStakeQuantity(inventory, collateralQuantity) {
+function computeStakeQuantity(inventory, collateralQuantity, is18DecimalPlaces) {
   const quantity = Array.isArray(inventory.inventories)
     ? inventory.totalQuantity
-    : inventory?.quantity || 0;
-
+    : is18DecimalPlaces ? inventory?.quantity/1e18 : inventory?.quantity || 0;
   return quantity - collateralQuantity - computeQuantityNotAvailable(inventory);
 }
 
@@ -231,7 +230,7 @@ const StakeModal = ({
 
   // Compute stake quantity (only relevant for staking)
   const stakeQuantity = useMemo(
-    () => computeStakeQuantity(inventory, collateralQuantity),
+    () => computeStakeQuantity(inventory, collateralQuantity, is18DecimalPlaces),
     [inventory, collateralQuantity]
   );
 

@@ -94,8 +94,11 @@ export const aggregateStakeColumns = (
       title: 'Quantity Stakeable',
       align: 'center',
       render: (_, record) => {
+        const requiresDivision = assetsWithEighteenDecimalPlaces.includes(
+          record.root
+        );
         const uniqueEscrows = new Set();
-        const collateralQuantity = record?.inventories
+        let collateralQuantity = record?.inventories
           ? record.inventories.reduce((sum, item) => {
               const escrowAddress = item?.escrow?.address;
               const escrowCollateral = item?.escrow?.collateralQuantity || 0;
@@ -111,6 +114,9 @@ export const aggregateStakeColumns = (
           : record?.escrow?.collateralQuantity > record?.quantity
           ? record?.quantity
           : record?.escrow?.collateralQuantity || 0;
+        collateralQuantity = requiresDivision
+          ? collateralQuantity / 1e18
+          : collateralQuantity;
         const quantityNotAvailable =
           record.inventories.reduce((sum, item) => {
             const status = Number(item.status);
@@ -128,6 +134,9 @@ export const aggregateStakeColumns = (
       title: 'Quantity Staked',
       align: 'center',
       render: (_, record) => {
+        const requiresDivision = assetsWithEighteenDecimalPlaces.includes(
+          record.root
+        );
         const uniqueEscrows = new Set();
         const collateralQuantity = record?.inventories
           ? record.inventories.reduce((sum, item) => {
@@ -145,7 +154,11 @@ export const aggregateStakeColumns = (
           : record?.escrow?.collateralQuantity > record?.quantity
           ? record?.quantity
           : record?.escrow?.collateralQuantity || 0;
-        return <div>{collateralQuantity}</div>;
+        return (
+          <div>
+            {requiresDivision ? collateralQuantity / 1e18 : collateralQuantity}
+          </div>
+        );
       },
     },
     {
@@ -329,7 +342,14 @@ export const stakeColumns = (
         ]?.find((item) => item.value === record.address)
           ? record.quantity
           : 0;
-        return <div>{matchingQuantity}</div>;
+        const requiresDivision = assetsWithEighteenDecimalPlaces.includes(
+          record.root
+        );
+        return (
+          <div>
+            {requiresDivision ? matchingQuantity / 1e18 : matchingQuantity}
+          </div>
+        );
       },
     },
     {

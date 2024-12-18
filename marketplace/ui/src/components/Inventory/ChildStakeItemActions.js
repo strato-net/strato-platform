@@ -18,6 +18,7 @@ const ChildStakeItemActions = ({
   debouncedSearchTerm,
   category,
   reserves,
+  assetsWithEighteenDecimalPlaces
 }) => {
   const [stakeType, setStakeType] = useState('Stake');
   const [stakeModalOpen, setStakeModalOpen] = useState(false);
@@ -117,6 +118,7 @@ const ChildStakeItemActions = ({
           debouncedSearchTerm={debouncedSearchTerm}
           saleAddress={inventory.saleAddress}
           category={category}
+          assetsWithEighteenDecimalPlaces={assetsWithEighteenDecimalPlaces}
         />
       )}
       {borrowModalOpen && (
@@ -129,6 +131,7 @@ const ChildStakeItemActions = ({
           debouncedSearchTerm={debouncedSearchTerm}
           saleAddress={inventory.saleAddress}
           category={category}
+          assetsWithEighteenDecimalPlaces={assetsWithEighteenDecimalPlaces}
         />
       )}
       {repayModalOpen && (

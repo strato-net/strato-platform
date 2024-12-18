@@ -25,69 +25,92 @@ const StakeItemActions = ({
   const [borrowModalOpen, setBorrowModalOpen] = useState(false);
   const [repayModalOpen, setRepayModalOpen] = useState(false);
 
+  // Calculate collateralQuantity
   const uniqueEscrows = new Set();
-  const collateralQuantity = inventory?.inventories
+  let collateralQuantity = inventory?.inventories
     ? inventory.inventories.reduce((sum, item) => {
         const escrowAddress = item?.escrow?.address;
         const escrowCollateral = item?.escrow?.collateralQuantity || 0;
-
-        // Add collateral only if the escrow address is unique
         if (escrowAddress && !uniqueEscrows.has(escrowAddress)) {
           uniqueEscrows.add(escrowAddress);
           return sum + escrowCollateral;
         }
-
         return sum;
       }, 0)
     : inventory?.escrow?.collateralQuantity > inventory?.quantity
     ? inventory?.quantity
     : inventory?.escrow?.collateralQuantity || 0;
-  const quantityNotAvailable = inventory?.inventories
+
+  // Calculate quantityNotAvailable
+  let quantityNotAvailable = inventory?.inventories
     ? inventory.inventories.reduce((sum, item) => {
         const status = Number(item.status);
         if (status && status !== ASSET_STATUS.ACTIVE) {
           return sum + (item.quantity || 0);
         }
         return sum;
-      }, 0) + inventory.totalSaleQuantity
+      }, 0) + (inventory.totalSaleQuantity || 0)
     : inventory?.status && Number(inventory?.status) !== ASSET_STATUS.ACTIVE
-    ? inventory?.quantity + (inventory?.saleQuantity || 0)
+    ? (inventory?.quantity || 0) + (inventory?.saleQuantity || 0)
     : 0;
-  const quantity = inventory?.inventories
+
+  // Calculate quantity
+  let quantity = inventory?.inventories
     ? inventory.totalQuantity
-    : inventory?.quantity;
-  const stakeQuantity = quantity - collateralQuantity - quantityNotAvailable;
+    : assetsWithEighteenDecimalPlaces.includes(inventory?.root || '')
+    ? inventory?.quantity / 1e18
+    : inventory?.quantity || 0;
+
+  // stakeQuantity = quantity - collateralQuantity - quantityNotAvailable (will recompute after scaling)
+  // Calculate collateralValue
   const uniqueEscrowsPrime = new Set();
-  const collateralValue = inventory?.inventories
+  let collateralValue = inventory?.inventories
     ? inventory.inventories.reduce((sum, item) => {
         const escrowAddress = item?.escrow?.address;
-        const escrowCollateral = item?.escrow?.collateralValue || 0;
-
-        // Add collateral only if the escrow address is unique
+        const escrowCollateralValue = item?.escrow?.collateralValue || 0;
         if (escrowAddress && !uniqueEscrowsPrime.has(escrowAddress)) {
           uniqueEscrowsPrime.add(escrowAddress);
-          return sum + escrowCollateral;
+          return sum + escrowCollateralValue;
         }
-
         return sum;
       }, 0)
     : 0;
-  const maxBorrowableAmount = Math.floor(collateralValue / 2);
+
+  // maxBorrowableAmount = floor(collateralValue / 2) (will recompute after scaling)
+  // Calculate borrowedAmount
   const uniqueBorrowedAddresses = new Set();
-  const borrowAmount = inventory?.inventories
+  let borrowAmount = inventory?.inventories
     ? inventory.inventories.reduce((sum, item) => {
         const escrowAddress = item?.escrow?.address;
         const borrowedValue = item?.escrow?.borrowedAmount || 0;
-  
-        // Add borrowed amount only if the escrow address is unique
         if (escrowAddress && !uniqueBorrowedAddresses.has(escrowAddress)) {
           uniqueBorrowedAddresses.add(escrowAddress);
           return sum + borrowedValue;
         }
-  
         return sum;
       }, 0)
     : inventory?.escrow?.borrowedAmount || 0;
+
+  /**
+   * If the inventory.root is in assetsWithEighteenDecimalPlaces, we need to scale down values by 1e18.
+   * This matches the logic used in StakeModal and BorrowModal.
+   */
+  const requiresDivision = assetsWithEighteenDecimalPlaces.includes(
+    inventory?.root || ''
+  );
+
+  if (requiresDivision) {
+    collateralQuantity /= 1e18;
+    quantityNotAvailable /= 1e18;
+    collateralValue /= 1e18;
+  }
+
+  // Recompute stakeQuantity after possible scaling
+  const stakeQuantity = quantity - collateralQuantity - quantityNotAvailable;
+
+  // Recompute maxBorrowableAmount after scaling
+  const maxBorrowableAmount = Math.floor(collateralValue / 2);
+
   const showStakeModal = (type) => {
     setStakeModalOpen(true);
     setStakeType(type);
@@ -135,15 +158,17 @@ const StakeItemActions = ({
         <Button
           type="link"
           className="text-[#13188A] font-semibold"
-          onClick={() => showBorrowModal('Unstake')}
-          disabled={borrowAmount >= maxBorrowableAmount || collateralQuantity <= 0}
+          onClick={() => showBorrowModal()}
+          disabled={
+            borrowAmount >= maxBorrowableAmount || collateralQuantity <= 0
+          }
         >
           <BankOutlined /> Borrow
         </Button>
         <Button
           type="link"
           className="text-[#13188A] font-semibold"
-          onClick={() => showRepayModal('Unstake')}
+          onClick={() => showRepayModal()}
           disabled={borrowAmount <= 0}
         >
           <SolutionOutlined />

@@ -868,6 +868,7 @@ const ProductDetails = ({ user, users }) => {
           productDetailPage={Id}
           inventory={inventoryDetails}
           reserves={reserves}
+          
         />
       )}
       {bridgeWalletModalOpen && (
