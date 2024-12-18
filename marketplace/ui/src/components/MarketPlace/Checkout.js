@@ -131,7 +131,7 @@ const Checkout = () => {
           sellersCommonName: item.product.ownerCommonName,
           unitOfMeasure: item.product.unitOfMeasurement,
           unitPrice: isUsdst ? item.product.price * USDST_CONVERSION : is18DecimalPlaces ? item.product.price * Math.pow(10, 18) : item.product.price,
-          quantity: isUsdst ? item.product.saleQuantity / 100 : is18DecimalPlaces ? item.product.saleQuantity / Math.pow(10, 18) : item.product.saleQuantity,
+          quantity: isUsdst ? item.product.saleQuantity / Math.pow(10, 14) : is18DecimalPlaces ? item.product.saleQuantity / Math.pow(10, 18) : item.product.saleQuantity,
           saleAddress: item.product.saleAddress,
           tax: calculateTax(item),
           amount: amount,

@@ -78,7 +78,7 @@ const InventoryCard = ({
   const isUsdst = inventory.originAddress === usdstAddress;
   const is18DecimalPlaces = assetsWithEighteenDecimalPlaces.includes(inventory.originAddress);
   const quantity = isUsdst
-    ? new BigNumber(inventory.quantity).dividedBy(100)
+    ? new BigNumber(inventory.quantity).dividedBy(10).pow(14)
     : is18DecimalPlaces
     ? new BigNumber(inventory.quantity).dividedBy(new BigNumber(10).pow(18))
     : new BigNumber(inventory.quantity);
@@ -94,7 +94,7 @@ const InventoryCard = ({
   const saleQuantity =
     inventory.saleQuantity !== undefined
       ? isUsdst
-        ? new BigNumber(inventory.saleQuantity || 0).dividedBy(100)
+        ? new BigNumber(inventory.saleQuantity || 0).dividedBy(10).pow(14)
         : is18DecimalPlaces
         ? new BigNumber(inventory.saleQuantity || 0).dividedBy(
             new BigNumber(10).pow(18)
@@ -103,7 +103,7 @@ const InventoryCard = ({
       : undefined;
   const totalLockedQuantity = inventory.totalLockedQuantity
     ? isUsdst
-      ? new BigNumber(inventory.totalLockedQuantity || 0).dividedBy(100)
+      ? new BigNumber(inventory.totalLockedQuantity || 0).dividedBy(10).pow(14)
       : is18DecimalPlaces
       ? new BigNumber(inventory.totalLockedQuantity || 0).dividedBy(
           new BigNumber(10).pow(18)

@@ -60,7 +60,7 @@ const ResellModal = ({
     let body = {
       assetAddress: inventory.address,
       quantity: isUsdst
-        ? (quantity * 100).toFixed(0)
+        ? (quantity * Math.pow(10, 14)).toFixed(0)
         : is18DecimalPlaces
         ? (quantity * Math.pow(10, 18)).toFixed(0)
         : quantity,

@@ -171,7 +171,7 @@ const VaultDetails = ({ user, users }) => {
       const detailsData = details.data;
       setItemData(detailsData);
       if (details.saleQuantity) {
-        let saleQuantity = isUsdst ? details.saleQuantity / 100 : is18DecimalPlaces ? details.saleQuantity / Math.pow(10, 18) : details.saleQuantity;
+        let saleQuantity = isUsdst ? details.saleQuantity / Math.pow(10, 14) : is18DecimalPlaces ? details.saleQuantity / Math.pow(10, 18) : details.saleQuantity;
         setAvailableQuantity(saleQuantity || 1);
       }
     }

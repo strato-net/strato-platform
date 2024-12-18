@@ -136,7 +136,7 @@ const BoughtOrderDetails = ({ user, users }) => {
           quantity: orderQuantities[index]
             ? formattedNum(
                 orderDetails.order.currency === 'USDST'
-                  ? (orderQuantities[index] / 100).toFixed(2)
+                  ? (orderQuantities[index] / Math.pow(10, 14)).toFixed(2)
                   : orderDetails.order.currency === 'CATA'
                   ? (orderQuantities[index] / Math.pow(10, 18)).toFixed(2)
                   : orderQuantities[index]
@@ -144,7 +144,7 @@ const BoughtOrderDetails = ({ user, users }) => {
             : '--',
             amount:
             orderDetails.order.currency === 'USDST'
-              ? ((prod.price * parseInt(orderQuantities[index]) / 100)).toFixed(0)
+              ? ((prod.price * parseInt(orderQuantities[index]) / Math.pow(10, 14))).toFixed(2)
               : orderDetails.order.currency === 'CATA' ? ((prod.price * parseInt(orderQuantities[index])) / Math.pow(10, 18)).toFixed(2) 
               : (prod.price * parseInt(orderQuantities[index])),
           serialNumber: prod,

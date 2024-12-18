@@ -106,7 +106,7 @@ const Transaction = ({ user }) => {
             ? Number((transaction?.price * Math.pow(10, 18)).toFixed(2))
             : transaction?.price,
           quantity: isUsdst
-            ? (transaction?.quantity / 100).toString()
+            ? (transaction?.quantity / Math.pow(10, 14)).toString()
             : is18DecimalPlaces
             ? (transaction?.quantity / Math.pow(10, 18)).toString()
             : transaction?.quantity.toString(),

@@ -508,7 +508,7 @@ const Inventory = ({ user }) => {
         const is18DecimalPlaces = assetsWithEighteenDecimalPlaces.includes(record.originAddress);
         const quantity = (
           isUsdst
-            ? new BigNumber(record.quantity).dividedBy(new BigNumber(100))
+            ? new BigNumber(record.quantity).dividedBy(new BigNumber(10).pow(14))
             : is18DecimalPlaces
             ? new BigNumber(record.quantity).dividedBy(
                 new BigNumber(10).pow(18)
@@ -532,7 +532,7 @@ const Inventory = ({ user }) => {
         const saleQuantity = (
           isUsdst
             ? new BigNumber(record.saleQuantity || 0).dividedBy(
-                new BigNumber(100)
+                new BigNumber(10).pow(14)
               )
             : is18DecimalPlaces
             ? new BigNumber(record.saleQuantity || 0).dividedBy(

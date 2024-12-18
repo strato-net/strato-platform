@@ -34,7 +34,7 @@ const TransferModal = ({
   const isUsdst = inventory.originAddress === usdstAddress;
   const is18DecimalPlaces = assetsWithEighteenDecimalPlaces.includes(inventory.originAddress);
   const availableQuantity = isUsdst
-    ? new BigNumber(inventory.quantity).dividedBy(100)
+    ? new BigNumber(inventory.quantity).dividedBy(10).pow(14)
     : is18DecimalPlaces
     ? new BigNumber(inventory.quantity).dividedBy(new BigNumber(10).pow(18))
     : new BigNumber(inventory.quantity);
@@ -355,7 +355,7 @@ const TransferModal = ({
       assetAddress: inventory.address,
       newOwner: transfer.recipient,
       quantity: (isUsdst
-        ? transfer.quantity.multipliedBy(new BigNumber(100))
+        ? transfer.quantity.multipliedBy(new BigNumber(10).pow(14))
         : is18DecimalPlaces
         ? transfer.quantity.multipliedBy(new BigNumber(10).pow(18))
         : transfer.quantity
@@ -369,7 +369,7 @@ const TransferModal = ({
       recipientCommonName: transfer.recipientCommonName,
       itemName,
       decimal: (isUsdst
-        ? new BigNumber(100)
+        ? new BigNumber(10).pow(14)
         : is18DecimalPlaces
         ? new BigNumber(10).pow(18)
         : new BigNumber(10)

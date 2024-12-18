@@ -46,14 +46,14 @@ const ItemActions = ({
   const isUsdst = inventory.originAddress === usdstAddress;
   const is18DecimalPlaces = assetsWithEighteenDecimalPlaces.includes(inventory.originAddress);
   const quantity = isUsdst
-    ? new BigNumber(inventory.quantity).dividedBy(100)
+    ? new BigNumber(inventory.quantity).dividedBy(10).pow(14)
     : is18DecimalPlaces
     ? new BigNumber(inventory.quantity).dividedBy(new BigNumber(10).pow(18))
     : new BigNumber(inventory.quantity);
   const saleQuantity =
     inventory.saleQuantity !== undefined
       ? isUsdst
-        ? new BigNumber(inventory.saleQuantity).dividedBy(100)
+        ? new BigNumber(inventory.saleQuantity).dividedBy(10).pow(14)
         : is18DecimalPlaces
         ? new BigNumber(inventory.saleQuantity).dividedBy(new BigNumber(10).pow(18))
         : new BigNumber(inventory.saleQuantity)

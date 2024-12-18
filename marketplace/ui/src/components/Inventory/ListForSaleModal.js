@@ -49,7 +49,7 @@ const ListForSaleModal = ({
       inventory.saleAddress ? inventory.saleQuantity : inventory.quantity
     );
     return isUsdst
-      ? selectedQuantity.dividedBy(100)
+      ? selectedQuantity.dividedBy(10).pow(14)
       : is18DecimalPlaces
       ? selectedQuantity.dividedBy(Math.pow(10, 18))
       : selectedQuantity;
@@ -252,7 +252,7 @@ const ListForSaleModal = ({
     body = {
       ...body,
       quantity: (isUsdst
-        ? quantity.multipliedBy(new BigNumber(100))
+        ? quantity.multipliedBy(new BigNumber(10).pow(14))
         : is18DecimalPlaces
         ? quantity.multipliedBy(new BigNumber(10).pow(18))
         : quantity
@@ -338,9 +338,7 @@ const ListForSaleModal = ({
             controls={false}
             max={
               isUsdst
-                ? new BigNumber(inventory.quantity).dividedBy(
-                    new BigNumber(100)
-                  )
+                ? new BigNumber(inventory.quantity).dividedBy(10).pow(14)
                 : is18DecimalPlaces
                 ? new BigNumber(inventory.quantity).dividedBy(
                     new BigNumber(10).pow(18)
@@ -444,9 +442,7 @@ const ListForSaleModal = ({
             controls={false}
             max={
               isUsdst
-                ? new BigNumber(inventory.quantity).dividedBy(
-                    new BigNumber(100)
-                  )
+                ? new BigNumber(inventory.quantity).dividedBy(10).pow(14)
                 : is18DecimalPlaces
                 ? new BigNumber(inventory.quantity).dividedBy(
                     new BigNumber(10).pow(18)

@@ -246,7 +246,7 @@ const GlobalTransaction = ({
         if (quantity) {
           const value =
             assetOriginAddress === usdstAddress
-              ? quantity / 100
+              ? quantity / Math.pow(10, 14)
               : assetsWithEighteenDecimalPlaces.includes(assetOriginAddress)
               ? quantity / Math.pow(10, 18)
               : quantity;
