@@ -143,7 +143,7 @@ abstract contract Reserve is Utils, Structs {
         address[] _usdstAssetAddresses,
         address _escrowAddress
     ) requireActive() external returns (uint) {
-        require(_usdstAssetAddresses.length > 0, "Pass at least one USDSTs token address");
+        require(_usdstAssetAddresses.length > 0, "Pass at least one USDST token address");
         Escrow escrow = Escrow(_escrowAddress);
         uint usdstAmountOwed = escrow.borrowedAmount();
         uint usdstAmountNet = usdstAmountOwed;

@@ -52,7 +52,7 @@ router.get(
   Marketplace.getUsdstBalance,
   authHandler.authorizeRequest(),
   loadDapp,
-  MarketplaceController.getUsdstsBalance
+  MarketplaceController.getUsdstBalance
 );
 
 router.get(
