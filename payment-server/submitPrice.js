@@ -97,7 +97,7 @@ async function fetchAndSubmitEscrowAddresses(oracleContract, token) {
 }
 
 // Function to fetch and submit price
-async function fetchAndSubmitPrice(metal, apiKey, oracleContract, token) {
+async function fetchAndSubmitMetalPrice(metal, apiKey, oracleContract, token) {
   try {
     const apiUrl = `https://api.metals.dev/v1/metal/spot?metal=${metal}&api_key=${apiKey}&currency=USD&unit=toz`;
     const response = await axios.get(apiUrl);
@@ -116,6 +116,137 @@ async function fetchAndSubmitPrice(metal, apiKey, oracleContract, token) {
     console.error(`ERROR: Failed to submit price for ${metal}:`, error);
   }
 }
+
+// ------------------------------------------------------------------------------------------------
+// ETH PRICE FUNCTIONS
+// ------------------------------------------------------------------------------------------------
+// Function to fetch ETH price every 5 minutes for the last 24 hours and calculate TWAP
+async function fetchAndSubmitEthPrice(oracleContract, token) {
+  try {
+    const currentTimestamp = Math.floor(Date.now() / 1000);
+    console.log('Fetching ETH price data from CoinGecko...');
+    
+    // Fetch 24h historical data from CoinGecko
+    let response;
+    try {
+      response = await axios.get(
+        'https://api.coingecko.com/api/v3/coins/ethereum/market_chart',
+        {
+          params: {
+            vs_currency: 'usd',
+            days: '1',
+            interval: '5m'
+          }
+        }
+      );
+    } catch (error) {
+      console.error('Failed to fetch from CoinGecko:', {
+        status: error.response?.status,
+        statusText: error.response?.statusText,
+        data: error.response?.data,
+        error: error.message
+      });
+      throw new Error('CoinGecko API request failed');
+    }
+
+    // Validate response data
+    if (!response.data?.prices || !Array.isArray(response.data.prices)) {
+      console.error('Invalid response format:', response.data);
+      throw new Error('Invalid price data format from CoinGecko');
+    }
+
+    if (response.data.prices.length === 0) {
+      throw new Error('No price data returned from CoinGecko');
+    }
+
+    console.log(`Received ${response.data.prices.length} price points from CoinGecko`);
+
+    // Convert prices to integer representation (cents) to avoid floating point issues
+    const prices = response.data.prices.map(([timestamp, price]) => ({
+      timestamp: Math.floor(timestamp / 1000),
+      // Convert to cents and round to nearest cent
+      price: Math.round(price * 100)
+    }));
+
+    // Validate price data points
+    prices.forEach((point, index) => {
+      if (!Number.isFinite(point.price) || point.price <= 0) {
+        console.error(`Invalid price at index ${index}:`, point);
+        throw new Error(`Invalid price value at index ${index}`);
+      }
+      if (!Number.isFinite(point.timestamp) || point.timestamp <= 0) {
+        console.error(`Invalid timestamp at index ${index}:`, point);
+        throw new Error(`Invalid timestamp at index ${index}`);
+      }
+    });
+
+    // Calculate TWAP (working with cents)
+    const twap = calculateTWAP(prices);
+    // Convert back to dollars with 2 decimal places
+    const twapInDollars = (twap / 100).toFixed(2);
+
+    console.log({
+      message: 'TWAP calculation completed',
+      dataPoints: prices.length,
+      firstTimestamp: new Date(prices[0].timestamp * 1000).toISOString(),
+      lastTimestamp: new Date(prices[prices.length - 1].timestamp * 1000).toISOString(),
+      calculatedTWAP: twapInDollars
+    });
+
+    // Submit TWAP price to the Oracle contract
+    await submitPrice(token, oracleContract, {
+      price: twapInDollars,
+      timestamp: currentTimestamp,
+    });
+
+    console.log(`TWAP Price submitted: $${twapInDollars} at ${new Date(currentTimestamp * 1000).toISOString()}`);
+  } catch (error) {
+    console.error('ETH TWAP calculation failed:', {
+      error: error.message,
+      stack: error.stack
+    });
+    throw error; // Re-throw to be handled by the caller
+  }
+}
+
+// Calculate TWAP given an array of prices and timestamps
+function calculateTWAP(priceData) {
+  try {
+    let totalWeightedPrice = 0n; // Use BigInt for precise integer arithmetic
+    let totalTime = 0n;
+
+    for (let i = 1; i < priceData.length; i++) {
+      const price = BigInt(priceData[i - 1].price);
+      const deltaTime = BigInt(priceData[i].timestamp - priceData[i - 1].timestamp);
+
+      if (deltaTime <= 0n) {
+        console.warn(`Invalid time delta at index ${i}:`, {
+          current: priceData[i].timestamp,
+          previous: priceData[i - 1].timestamp
+        });
+        continue;
+      }
+
+      totalWeightedPrice += price * deltaTime;
+      totalTime += deltaTime;
+    }
+
+    if (totalTime <= 0n) {
+      throw new Error('Invalid total time in TWAP calculation');
+    }
+
+    // Convert back to number for final calculation
+    return Number(totalWeightedPrice) / Number(totalTime);
+  } catch (error) {
+    console.error('TWAP calculation error:', {
+      error: error.message,
+      dataPoints: priceData.length
+    });
+    throw error;
+  }
+}
+
+// ------------------------------------------------------------------------------------------------
 
 // Main function to handle periodic fetching and submission
 async function main() {
@@ -146,12 +277,16 @@ async function main() {
         const metal = oracle.metal.toLowerCase();
         console.log(`Fetching price for ${metal}`);
   
-        await fetchAndSubmitPrice(
-          metal,
-          process.env.METALS_API_KEY,
-          oracle,
-          token
-        );
+        if (metal === 'eth') {
+          await fetchAndSubmitEthPrice(oracle, token);
+        } else {
+          await fetchAndSubmitMetalPrice(
+            metal,
+            process.env.METALS_API_KEY,
+            oracle,
+            token
+          );
+        }
         await fetchAndSubmitEscrowAddresses(oracle, token);
       } catch (error) {
         console.error(`ERROR: Failed to process oracle ${key}:`, error);
