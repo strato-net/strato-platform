@@ -100,9 +100,11 @@ const Transaction = ({ user }) => {
           category,
           subCategory,
           assetName: transaction?.assetName,
-          Price: isUsdst
-            ? Number((transaction?.price * USDST_CONVERSION).toFixed(2))
-            : is18DecimalPlaces
+          Price: 
+          // isUsdst
+          //   ? Number((transaction?.price * USDST_CONVERSION).toFixed(2))
+          //   : 
+            is18DecimalPlaces
             ? Number((transaction?.price * Math.pow(10, 18)).toFixed(2))
             : transaction?.price,
           quantity: isUsdst

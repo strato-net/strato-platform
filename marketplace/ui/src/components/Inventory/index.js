@@ -473,12 +473,10 @@ const Inventory = ({ user }) => {
       title: 'Price',
       align: 'center',
       render: (_, record) => {
-        const isUsdst = record.originAddress === usdstAddress;
+        // const isUsdst = record.originAddress === usdstAddress;
         const is18DecimalPlaces = assetsWithEighteenDecimalPlaces.includes(record.originAddress);
         const price = record.price
-          ? isUsdst
-            ? parseFloat(record.price * USDST_CONVERSION).toFixed(2)
-            : is18DecimalPlaces
+          ? is18DecimalPlaces
             ? parseFloat(record.price * 10 ** 18).toFixed(2)
             : record.price
           : 'N/A';

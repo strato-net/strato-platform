@@ -43,7 +43,7 @@ const NewTrendingCard = ({
   const isUsdst = topSellingProduct.originAddress === usdstAddress;
   const is18DecimalPlaces = assetsWithEighteenDecimalPlaces.includes(topSellingProduct.originAddress);
   const saleQuantity = isUsdst
-    ? topSellingProduct.saleQuantity / 100
+    ? topSellingProduct.saleQuantity / Math.pow(10, 14)
     : is18DecimalPlaces
     ? topSellingProduct.saleQuantity / Math.pow(10, 18)
     : topSellingProduct.saleQuantity;

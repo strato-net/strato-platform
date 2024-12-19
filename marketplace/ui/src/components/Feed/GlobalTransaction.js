@@ -102,7 +102,7 @@ const GlobalTransaction = ({
 
   const Content = ({ data }) => {
     const price = data?.assetPrice || data?.price;
-    const isUsdst = data.assetOriginAddress === usdstAddress;
+    // const isUsdst = data.assetOriginAddress === usdstAddress;
     const is18DecimalPlaces = assetsWithEighteenDecimalPlaces.includes(data.assetOriginAddress);
 
     return (
@@ -133,38 +133,29 @@ const GlobalTransaction = ({
                   placement="top"
                   title={data.assetDescription.replace(/<\/?[^>]+(>|$)/g, '')}
                 >
-                  {' '}
-                  {data?.assetDescription.replace(/<\/?[^>]+(>|$)/g, '')}{' '}
+                  {data?.assetDescription.replace(/<\/?[^>]+(>|$)/g, '')}
                 </Tooltip>
               </p>
             </Col>
             <Col span={8} offset={1}>
               {price ? (
                 <p className="text-right flex justify-end items-center">
-                  {' '}
                   <b>
-                    ${' '}
-                    {isUsdst
-                      ? (price * USDST_CONVERSION).toFixed(2)
-                      : is18DecimalPlaces
+                    $ { is18DecimalPlaces
                       ? (price * Math.pow(10, 18)).toFixed(2)
                       : price}
-                  </b>{' '}
+                  </b>
                   &nbsp;(
                   <span className="text-[#13188A] font-bold">
-                    {' '}
-                    {(isUsdst
-                      ? (price * USDST_CONVERSION).toFixed(2)
-                      : is18DecimalPlaces
+                    {(is18DecimalPlaces
                       ? (price * Math.pow(10, 18)).toFixed(2)
-                      : price) * USDST_CONVERSION}{' '}
+                      : price) * USDST_CONVERSION}
                   </span>
-                  {UsdstIcon}){' '}
+                  {UsdstIcon})
                 </p>
               ) : (
                 <p className="text-right text-[#13188A] font-bold text-sm">
-                  {' '}
-                  No Price Available{' '}
+                  No Price Available
                 </p>
               )}
             </Col>

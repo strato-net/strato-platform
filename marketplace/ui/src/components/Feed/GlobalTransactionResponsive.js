@@ -111,7 +111,7 @@ const GlobalTransactionResponsive = ({
                   type,
                 },
               ];
-              const isUsdst = assetOriginAddress === usdstAddress;
+              // const isUsdst = assetOriginAddress === usdstAddress;
               const is18DecimalPlaces = assetsWithEighteenDecimalPlaces.includes(assetOriginAddress);
 
               const handleDetailRedirection = () => {
@@ -154,7 +154,6 @@ const GlobalTransactionResponsive = ({
                   navigate(url);
                 }
               };
-
               return (
                 <Row
                   key={reference}
@@ -180,8 +179,7 @@ const GlobalTransactionResponsive = ({
                         handleAssetRedirection();
                       }}
                     >
-                      {' '}
-                      {assetName}{' '}
+                      {assetName}
                     </p>
                     <p
                       style={{ color: '#13188A' }}
@@ -227,20 +225,16 @@ const GlobalTransactionResponsive = ({
                       <p className={`text-right flex justify-end items-center`}>
                         $
                         {formattedNum(
-                          isUsdst
-                            ? (price * USDST_CONVERSION).toFixed(2)
-                            : is18DecimalPlaces
+                          is18DecimalPlaces
                             ? (price * Math.pow(10, 18)).toFixed(2)
                             : price
-                        )}{' '}
+                        )}
                         (
                         {formattedNum(
-                          isUsdst
-                            ? (price * USDST_CONVERSION * 100).toFixed(2)
-                            : is18DecimalPlaces
+                         is18DecimalPlaces
                             ? (price * Math.pow(10, 18) * 100).toFixed(2)
                             : price * 100
-                        )}{' '}
+                        )}
                         {UsdstIcon})
                       </p>
                     ) : (
@@ -249,10 +243,8 @@ const GlobalTransactionResponsive = ({
                       </p>
                     )}
                     <p className="text-right">
-                      Qty:{' '}
-                      {(isUsdst
-                        ? quantity / 100
-                        : is18DecimalPlaces
+                      Qty:
+                      {(is18DecimalPlaces
                         ? quantity / Math.pow(10, 18)
                         : quantity
                       ).toLocaleString('en-US', {

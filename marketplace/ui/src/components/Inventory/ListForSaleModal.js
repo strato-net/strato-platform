@@ -59,9 +59,11 @@ const ListForSaleModal = ({
   const [availablePaymentServices, setAvailablePaymentServices] = useState([]);
   const [pricePerUnit, setpricePerUnit] = useState(() => {
     return inventory.price
-      ? isUsdst
-        ? inventory.price * USDST_CONVERSION
-        : is18DecimalPlaces
+      ? 
+      // isUsdst
+      //   ? inventory.price * USDST_CONVERSION
+      //   : 
+        is18DecimalPlaces
         ? inventory.price * Math.pow(10, 18)
         : inventory.price
       : 0.01;
@@ -224,9 +226,11 @@ const ListForSaleModal = ({
           };
         }),
       price:
-        pricePerUnit !== undefined && isUsdst
-          ? pricePerUnit / 100
-          : is18DecimalPlaces
+        pricePerUnit !== undefined && 
+        // isUsdst
+        //   ? pricePerUnit / 100
+        //   :
+           is18DecimalPlaces
           ? pricePerUnit / Math.pow(10, 18)
           : pricePerUnit,
     };

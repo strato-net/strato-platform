@@ -83,9 +83,11 @@ const InventoryCard = ({
     ? new BigNumber(inventory.quantity).dividedBy(new BigNumber(10).pow(18))
     : new BigNumber(inventory.quantity);
   const price = inventory?.price
-    ? isUsdst
-      ? new BigNumber(inventory.price).multipliedBy(USDST_CONVERSION)
-      : is18DecimalPlaces
+    ? 
+    // isUsdst
+    //   ? new BigNumber(inventory.price).multipliedBy(USDST_CONVERSION)
+    //   :
+       is18DecimalPlaces
       ? new BigNumber(inventory.quantity).multipliedBy(
           new BigNumber(10).pow(18)
         )

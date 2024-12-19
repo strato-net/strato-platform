@@ -48,7 +48,9 @@ const Checkout = () => {
   const calculateTax = (item) => {
     const isUsdst = item.product.originAddress === usdstAddress;
     const is18DecimalPlaces = assetsWithEighteenDecimalPlaces.includes(item.product.originAddress);
-    let price = new Decimal( isUsdst ? item.product.price * USDST_CONVERSION : is18DecimalPlaces ? item.product.price * Math.pow(10, 18) : item.product.price);
+    let price = new Decimal(
+      //  isUsdst ? item.product.price * USDST_CONVERSION : 
+       is18DecimalPlaces ? item.product.price * Math.pow(10, 18) : item.product.price);
     let tax = new Decimal(CHARGES.TAX);
     let result = price.mul(tax).div(100);
 
@@ -58,7 +60,9 @@ const Checkout = () => {
   const calculateAmount = (item) => {
     const isUsdst = item.product.originAddress === usdstAddress;
     const is18DecimalPlaces = assetsWithEighteenDecimalPlaces.includes(item.product.originAddress);
-    let price = new Decimal(isUsdst ? item.product.price * USDST_CONVERSION : is18DecimalPlaces ? item.product.price * Math.pow(10, 18) : item.product.price);
+    let price = new Decimal(
+      // isUsdst ? item.product.price * USDST_CONVERSION : 
+      is18DecimalPlaces ? item.product.price * Math.pow(10, 18) : item.product.price);
     let tax = calculateTax(item);
     let result = price.mul(item.qty).plus(tax);
 
@@ -130,7 +134,9 @@ const Checkout = () => {
             item.product.address === item.product.originAddress ? true : false,
           sellersCommonName: item.product.ownerCommonName,
           unitOfMeasure: item.product.unitOfMeasurement,
-          unitPrice: isUsdst ? item.product.price * USDST_CONVERSION : is18DecimalPlaces ? item.product.price * Math.pow(10, 18) : item.product.price,
+          unitPrice: 
+          // isUsdst ? item.product.price * USDST_CONVERSION : 
+          is18DecimalPlaces ? item.product.price * Math.pow(10, 18) : item.product.price,
           quantity: isUsdst ? item.product.saleQuantity / Math.pow(10, 14) : is18DecimalPlaces ? item.product.saleQuantity / Math.pow(10, 18) : item.product.saleQuantity,
           saleAddress: item.product.saleAddress,
           tax: calculateTax(item),

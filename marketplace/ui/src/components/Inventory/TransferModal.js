@@ -360,9 +360,11 @@ const TransferModal = ({
         ? transfer.quantity.multipliedBy(new BigNumber(10).pow(18))
         : transfer.quantity
       ).toFixed(0),
-      price: isUsdst
-        ? transfer.price / 100
-        : is18DecimalPlaces
+      price: 
+      // isUsdst
+      //   ? transfer.price / 100
+      //   : 
+        is18DecimalPlaces
         ? transfer.price / Math.pow(10, 18)
         : transfer.price,
       senderCommonName: user.commonName,

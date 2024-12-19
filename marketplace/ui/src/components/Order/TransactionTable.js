@@ -230,18 +230,22 @@ const TransactionTable = ({ user, download, usdstAddress, assetsWithEighteenDeci
                   {' '}
                   <b>
                     ${' '}
-                    {isUsdst
-                      ? (price * USDST_CONVERSION).toFixed(2)
-                      : is18DecimalPlaces
+                    {
+                    // isUsdst
+                    //   ? (price * USDST_CONVERSION).toFixed(2)
+                    //   : 
+                      is18DecimalPlaces
                       ? (price * Math.pow(10, 18)).toFixed(2)
                       : price}{' '}
                   </b>{' '}
                   &nbsp;(
                   <span className="text-[#13188A] font-bold">
                     {' '}
-                    {(isUsdst
-                      ? (price * USDST_CONVERSION).toFixed(2)
-                      : is18DecimalPlaces
+                    {(
+                      // isUsdst
+                      // ? (price * USDST_CONVERSION).toFixed(2)
+                      // : 
+                      is18DecimalPlaces
                       ? (price * Math.pow(10, 18)).toFixed(2)
                       : price) * USDST_CONVERSION}{' '}
                   </span>
