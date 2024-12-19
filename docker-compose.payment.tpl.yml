@@ -37,35 +37,9 @@ services:
       options:
         max-size: "100m"
         max-file: "3"
-  payment-server-oracle:
-    environment:
-    - SERVER_HOST=${SERVER_HOST}
-    - STRIPE_SECRET_KEY=${STRIPE_SECRET_KEY}
-    - STRATO_HOST=${STRATO_HOST}
-    - OAUTH_DISCOVERY_URL=${OAUTH_DISCOVERY_URL}
-    - OAUTH_CLIENT_ID=${OAUTH_CLIENT_ID}
-    - OAUTH_CLIENT_SECRET=${OAUTH_CLIENT_SECRET}
-    - BASE_CODE_COLLECTION=${BASE_CODE_COLLECTION}
-    - ORACLE_MODE=${ORACLE_MODE}
-    - METALS_API_KEY=${METALS_API_KEY}
-    - ALCHEMY_API_KEY=${ALCHEMY_API_KEY}
-    - UPGRADE_ORACLE_CONTRACTS=${UPGRADE_ORACLE_CONTRACTS}
-    - SKIP_ORACLE_DEPLOYMENT=${SKIP_ORACLE_DEPLOYMENT}
-    - ORACLE_FETCH_INTERVAL=${ORACLE_FETCH_INTERVAL}
-    build: .
-    image: ${PAYMENT_SERVER_IMAGE:-<REPO_URL>payment-server:<VERSION>}
-    volumes:
-       - paymentserverconfig:/config:rw
-    restart: unless-stopped
-    logging:
-      driver: "json-file"
-      options:
-        max-size: "100m"
-        max-file: "3"
   nginx:
     depends_on:
     - payment-server
-    - payment-server-oracle
     environment:
     - OAUTH_CLIENT_ID=${OAUTH_CLIENT_ID}
     - OAUTH_CLIENT_SECRET=${OAUTH_CLIENT_SECRET}
