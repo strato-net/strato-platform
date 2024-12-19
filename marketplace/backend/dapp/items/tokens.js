@@ -251,6 +251,7 @@ async function addHash(user, args, options) {
     query: {
       creator: CREATOR,
       isActive: IS_ACTIVE,
+      ['data->>isMint']: 'eq.True',
     },
   };
 
