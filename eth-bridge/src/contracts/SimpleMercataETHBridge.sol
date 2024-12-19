@@ -1,29 +1,28 @@
 pragma es6;
 pragma strict;
+
 import <BASE_CODE_COLLECTION>;
 
-import "../../../items/contracts/Tokens.sol";
+/// @title A representation of Token assets
+contract SimpleMercataETHBridge is Tokens, MercataETHBridge {
 
-contract SimpleMercataETHBridge is MercataETHBridge {
-
-    function createEthSt(
-        string   _name,
-        string   _description,
-        string[] _images,
-        string[] _files,
-        string[] _fileNames
-    ) internal {
-        ethSt = address(new Tokens(_name, _description, _images, _files, _fileNames, block.timestamp, 1, AssetStatus.ACTIVE, address(0)));
-    }
     constructor(
-        string   _name,
-        string   _description,
+        string _name,
+        string _description,
         string[] _images,
         string[] _files,
-        string[] _fileNames
-    ) MercataETHBridge() {
-        createEthSt(_name, description, _images, _files, _fileNames);
+        string[] _fileNames,
+        uint _createdDate,
+        uint _quantity,
+        AssetStatus _status,
+        address _redemptionService
+    ) public Tokens(_name, _description, _images, _files, _fileNames, _createdDate, _quantity, _status, _redemptionService) MercataETHBridge() {
+        ethSt = address(this);
+    }
+
+    function mint(uint _quantity) internal override returns (UTXO) {
+        require(_quantity > 0, "Quantity must be greater than 0");
+        BridgeableTokens newToken = new BridgeableTokens(name, description, images, files, fileNames, createdDate, _quantity, status, address(redemptionService));
+        return UTXO(address(newToken)); 
     }
 }
-
-
