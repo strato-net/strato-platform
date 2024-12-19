@@ -13,7 +13,7 @@ import BigNumber from 'bignumber.js';
 
 const logo = <img src={Images.cata} alt={''} title={''} className="w-5 h-5" />;
 
-/** 
+/**
  * Helper function to compute the total collateral quantity.
  * If `inventory.inventories` exists, we sum up unique escrow collateral quantities.
  * Otherwise, we use `inventory.escrow.collateralQuantity` directly (capped at inventory.quantity if it exceeds).
@@ -24,11 +24,15 @@ function computeCollateralQuantity(inventory, is18DecimalPlaces) {
   let collateralQuantity = 0;
   const uniqueEscrows = new Set();
 
-  if (Array.isArray(inventory.inventories) && inventory.inventories.length > 0) {
+  if (
+    Array.isArray(inventory.inventories) &&
+    inventory.inventories.length > 0
+  ) {
     // Summation of unique escrow collateral from all inventories
     collateralQuantity = inventory.inventories.reduce((sum, item) => {
       const escrowAddress = item?.escrow?.address;
-      const escrowCollateral = parseFloat(item?.escrow?.collateralQuantity) || 0;
+      const escrowCollateral =
+        parseFloat(item?.escrow?.collateralQuantity) || 0;
 
       if (escrowAddress && !uniqueEscrows.has(escrowAddress)) {
         uniqueEscrows.add(escrowAddress);
@@ -38,9 +42,11 @@ function computeCollateralQuantity(inventory, is18DecimalPlaces) {
     }, 0);
   } else if (inventory?.escrow?.collateralQuantity) {
     // Fallback if inventories array doesn't exist
-    const escrowCollateral = parseFloat(inventory.escrow.collateralQuantity) || 0;
+    const escrowCollateral =
+      parseFloat(inventory.escrow.collateralQuantity) || 0;
     const invQuantity = parseFloat(inventory.quantity) || 0;
-    collateralQuantity = escrowCollateral > invQuantity ? invQuantity : escrowCollateral;
+    collateralQuantity =
+      escrowCollateral > invQuantity ? invQuantity : escrowCollateral;
   }
 
   // If root requires division by 1e18, normalize the collateral quantity
@@ -71,7 +77,9 @@ function computeQuantityNotAvailable(inventory) {
     const status = Number(inventory.status);
     const saleQuantity = inventory.saleQuantity || 0;
     // If single inventory is not active
-    return status && status !== ASSET_STATUS.ACTIVE ? (inventory.quantity || 0) + saleQuantity : 0;
+    return status && status !== ASSET_STATUS.ACTIVE
+      ? (inventory.quantity || 0) + saleQuantity
+      : 0;
   }
 }
 
@@ -79,10 +87,16 @@ function computeQuantityNotAvailable(inventory) {
  * Computes the total available stake quantity based on:
  * total quantity - collateralQuantity - quantityNotAvailable.
  */
-function computeStakeQuantity(inventory, collateralQuantity, is18DecimalPlaces) {
+function computeStakeQuantity(
+  inventory,
+  collateralQuantity,
+  is18DecimalPlaces
+) {
   const quantity = Array.isArray(inventory.inventories)
     ? inventory.totalQuantity
-    : is18DecimalPlaces ? inventory?.quantity/1e18 : inventory?.quantity || 0;
+    : is18DecimalPlaces
+    ? inventory?.quantity / 1e18
+    : inventory?.quantity || 0;
   return quantity - collateralQuantity - computeQuantityNotAvailable(inventory);
 }
 
@@ -129,7 +143,8 @@ function prepareDataForItems(
     return [
       {
         label: 'Quantity Available to Stake',
-        description: 'The amount of Real World Assets (RWAs) you have available for staking.',
+        description:
+          'The amount of Real World Assets (RWAs) you have available for staking.',
         value: stakeQuantity,
       },
       {
@@ -141,7 +156,10 @@ function prepareDataForItems(
         label: 'Market Value',
         description:
           'The total value of your staked assets, calculated as Quantity x Oracle Price.',
-        value: `$${(matchedReserve?.lastUpdatedOraclePrice * (is18DecimalPlaces ? inputQuantity * 1e18 : inputQuantity)).toFixed(2)}`,
+        value: `$${(
+          matchedReserve?.lastUpdatedOraclePrice *
+          (is18DecimalPlaces ? inputQuantity * 1e18 : inputQuantity)
+        ).toFixed(2)}`,
       },
       {
         label: 'Daily Estimated Reward (CATA)',
@@ -166,7 +184,8 @@ function prepareDataForItems(
   return [
     {
       label: 'Quantity Available to Unstake',
-      description: 'The amount of Real World Assets (RWAs) available for unstaking.',
+      description:
+        'The amount of Real World Assets (RWAs) available for unstaking.',
       value: `${collateralQuantity}`,
     },
     {
@@ -187,7 +206,10 @@ function prepareDataForSummary(type, matchedReserve, is18DecimalPlaces) {
         label: 'Market price (per unit)',
         description:
           'The current price of one unit of your RWA, as determined by the oracle.',
-        value: `$${(is18DecimalPlaces ? (matchedReserve?.lastUpdatedOraclePrice*1e18) : matchedReserve?.lastUpdatedOraclePrice).toFixed(2)}`,
+        value: `$${(is18DecimalPlaces
+          ? matchedReserve?.lastUpdatedOraclePrice * 1e18
+          : matchedReserve?.lastUpdatedOraclePrice
+        ).toFixed(2)}`,
       },
     ];
   }
@@ -213,14 +235,18 @@ const StakeModal = ({
     useInventoryState();
   const inventoryDispatch = useInventoryDispatch();
   const isLoader = isStaking || isUnstaking || isReservesLoading;
-  const is18DecimalPlaces = assetsWithEighteenDecimalPlaces?.includes(inventory.root);
+  const is18DecimalPlaces = assetsWithEighteenDecimalPlaces?.includes(
+    inventory.root
+  );
 
   const location = useLocation();
   const queryParams = new URLSearchParams(location.search);
 
   const matchedReserve = useMemo(() => {
     if (reserves?.length) {
-      return reserves.find((reserve) => reserve.assetRootAddress === inventory.root);
+      return reserves.find(
+        (reserve) => reserve.assetRootAddress === inventory.root
+      );
     }
     return null;
   }, [reserves, inventory.root]);
@@ -232,7 +258,8 @@ const StakeModal = ({
 
   // Compute stake quantity (only relevant for staking)
   const stakeQuantity = useMemo(
-    () => computeStakeQuantity(inventory, collateralQuantity, is18DecimalPlaces),
+    () =>
+      computeStakeQuantity(inventory, collateralQuantity, is18DecimalPlaces),
     [inventory, collateralQuantity]
   );
 
@@ -273,7 +300,11 @@ const StakeModal = ({
     is18DecimalPlaces
   );
 
-  const dataForSummary = prepareDataForSummary(type, matchedReserve, is18DecimalPlaces);
+  const dataForSummary = prepareDataForSummary(
+    type,
+    matchedReserve,
+    is18DecimalPlaces
+  );
 
   /**
    * Handles the stake or unstake action submission.
@@ -293,7 +324,10 @@ const StakeModal = ({
         reserve: matchedReserve?.address,
       };
 
-      const isStaked = await inventoryActions.stakeInventory(inventoryDispatch, body);
+      const isStaked = await inventoryActions.stakeInventory(
+        inventoryDispatch,
+        body
+      );
       if (isStaked) {
         await refreshDataAfterAction();
         handleCancel();
@@ -310,7 +344,10 @@ const StakeModal = ({
         reserve: matchedReserve?.address,
       };
 
-      const isUnstaked = await inventoryActions.UnstakeInventory(inventoryDispatch, body);
+      const isUnstaked = await inventoryActions.UnstakeInventory(
+        inventoryDispatch,
+        body
+      );
       if (isUnstaked) {
         await refreshDataAfterAction();
         handleCancel();
@@ -323,10 +360,14 @@ const StakeModal = ({
    */
   const refreshDataAfterAction = async () => {
     if (productDetailPage) {
-      await inventoryActions.fetchInventoryDetail(inventoryDispatch, productDetailPage);
+      await inventoryActions.fetchInventoryDetail(
+        inventoryDispatch,
+        productDetailPage
+      );
     } else {
       const isStakePage =
-        queryParams.get('st') === 'true' || window.location.pathname === '/stake';
+        queryParams.get('st') === 'true' ||
+        window.location.pathname === '/stake';
       await inventoryActions.fetchInventory(
         inventoryDispatch,
         limit,
@@ -340,22 +381,27 @@ const StakeModal = ({
     }
   };
 
-  const maxAllowedQuantity = type === 'Stake' ? stakeQuantity : collateralQuantity;
+  const maxAllowedQuantity =
+    type === 'Stake' ? stakeQuantity : collateralQuantity;
 
   return (
     <Modal
       open={open}
       onCancel={handleCancel}
-      title={<div className="text-2xl md:text-3xl font-bold pl-4">Collateral</div>}
+      title={
+        <div className="text-2xl md:text-3xl font-bold pl-4">Collateral</div>
+      }
       width={500}
       centered
       footer={null}
     >
       <div className="flex flex-col px-4 pt-4">
         <div className="flex flex-col gap-4">
-
           {dataForItems.map((item, index) => (
-            <div key={index} className="w-full flex justify-between items-start">
+            <div
+              key={index}
+              className="w-full flex justify-between items-start"
+            >
               <div className="flex items-center">
                 <p className="text-sm text-gray-500">
                   <strong>{item.label}</strong>
@@ -374,8 +420,9 @@ const StakeModal = ({
                     controls={false}
                   />
                   {inputQuantity > maxAllowedQuantity && (
-                    <p className="text-xs text-red-500">
-                      *Quantity exceeds available quantity of {maxAllowedQuantity}
+                    <p className="text-xs" style={{ color: '#f56565' }}>
+                      *Quantity exceeds available quantity of{' '}
+                      {maxAllowedQuantity}
                     </p>
                   )}
                 </div>
@@ -393,7 +440,9 @@ const StakeModal = ({
               className="w-full px-6 h-10 font-bold"
               onClick={handleSubmit}
               disabled={
-                isLoader || inputQuantity === 0 || inputQuantity > maxAllowedQuantity
+                isLoader ||
+                inputQuantity <= 0 ||
+                inputQuantity > maxAllowedQuantity
               }
               loading={isLoader}
             >

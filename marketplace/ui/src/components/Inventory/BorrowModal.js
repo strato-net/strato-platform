@@ -14,7 +14,7 @@ import { useLocation } from 'react-router-dom';
 
 const logo = <img src={Images.strat} alt={''} title={''} className="w-5 h-5" />;
 
-/** 
+/**
  * Helper to compute total collateral quantity from inventory.
  * Includes checking for unique escrow addresses and summing collateral.
  */
@@ -25,7 +25,8 @@ function computeTotalCollateralQuantity(inventory) {
   if (Array.isArray(inventory.inventories)) {
     return inventory.inventories.reduce((sum, item) => {
       const escrowAddress = item?.escrow?.address;
-      const escrowCollateral = parseFloat(item?.escrow?.collateralQuantity) || 0;
+      const escrowCollateral =
+        parseFloat(item?.escrow?.collateralQuantity) || 0;
       if (escrowAddress && !uniqueEscrowsPrime.has(escrowAddress)) {
         uniqueEscrowsPrime.add(escrowAddress);
         return sum + escrowCollateral;
@@ -47,7 +48,8 @@ function computeTotalCollateralValue(inventory) {
   if (Array.isArray(inventory.inventories)) {
     return inventory.inventories.reduce((sum, item) => {
       const escrowAddress = item?.escrow?.address;
-      const escrowCollateralValue = parseFloat(item?.escrow?.collateralValue) || 0;
+      const escrowCollateralValue =
+        parseFloat(item?.escrow?.collateralValue) || 0;
       if (escrowAddress && !uniqueEscrowsThird.has(escrowAddress)) {
         uniqueEscrowsThird.add(escrowAddress);
         return sum + escrowCollateralValue;
@@ -70,7 +72,8 @@ function computeCollateralValue(inventory, totalCollateralQuantity) {
   if (Array.isArray(inventory.inventories)) {
     return inventory.inventories.reduce((sum, item) => {
       const escrowAddress = item?.escrow?.address;
-      const escrowCollateralValue = parseFloat(item?.escrow?.collateralValue) || 0;
+      const escrowCollateralValue =
+        parseFloat(item?.escrow?.collateralValue) || 0;
       if (escrowAddress && !uniqueEscrows.has(escrowAddress)) {
         uniqueEscrows.add(escrowAddress);
         return sum + escrowCollateralValue;
@@ -80,7 +83,8 @@ function computeCollateralValue(inventory, totalCollateralQuantity) {
   }
 
   const invQuantity = parseFloat(inventory.quantity) || 0;
-  const escrowCollateralValue = parseFloat(inventory?.escrow?.collateralValue) || 0;
+  const escrowCollateralValue =
+    parseFloat(inventory?.escrow?.collateralValue) || 0;
   return escrowCollateralValue * (invQuantity / totalCollateralQuantity || 1);
 }
 
@@ -134,10 +138,7 @@ function applyDecimalScaling(
   assetsWithEighteenDecimalPlaces,
   values
 ) {
-  if (
-    inventory &&
-    assetsWithEighteenDecimalPlaces.includes(inventory.root)
-  ) {
+  if (inventory && assetsWithEighteenDecimalPlaces.includes(inventory.root)) {
     // If root requires division by 1e18, scale these values accordingly
     const scaled = {};
     for (const key in values) {
@@ -194,7 +195,9 @@ const BorrowModal = ({
 
   const matchedReserve = useMemo(() => {
     if (reserves?.length && inventory?.root) {
-      return reserves.find((reserve) => reserve.assetRootAddress === inventory.root);
+      return reserves.find(
+        (reserve) => reserve.assetRootAddress === inventory.root
+      );
     }
     return null;
   }, [reserves, inventory?.root]);
@@ -214,13 +217,14 @@ const BorrowModal = ({
   // collateralValue is displayed as `collateralValue / 10000`
   // borrowedAmount and loanableAmount as `... / 100`
   // We'll keep the same formatting after scaling by 1e18.
-  
-  const maxBorrowableAmount = Math.floor(collateralValue / 2);
-  const loanableAmount = maxBorrowableAmount >= borrowedAmount
-    ? maxBorrowableAmount - borrowedAmount
-    : 0;
 
-  // For display: 
+  const maxBorrowableAmount = Math.floor(collateralValue / 2);
+  const loanableAmount =
+    maxBorrowableAmount >= borrowedAmount
+      ? maxBorrowableAmount - borrowedAmount
+      : 0;
+
+  // For display:
   // `Market Value` = collateralValue / 10000
   // `borrowedAmount` and `loanableAmount` are displayed /100
 
@@ -238,10 +242,23 @@ const BorrowModal = ({
   };
 
   useEffect(() => {
-    if (reserves && inventory.data && !isReservesLoading && isStaked && matchedReserve) {
+    if (
+      reserves &&
+      inventory.data &&
+      !isReservesLoading &&
+      isStaked &&
+      matchedReserve
+    ) {
       inventoryActions.getOracle(inventoryDispatch, matchedReserve.oracle);
     }
-  }, [matchedReserve, reserves, inventory, isReservesLoading, isStaked, inventoryDispatch]);
+  }, [
+    matchedReserve,
+    reserves,
+    inventory,
+    isReservesLoading,
+    isStaked,
+    inventoryDispatch,
+  ]);
 
   const escrows = useMemo(() => computeEscrows(inventory), [inventory]);
 
@@ -294,7 +311,10 @@ const BorrowModal = ({
             controls={false}
           />
           {desiredLoanAmount > parseFloat(loanableAmountDisplay) && (
-            <p className="text-xs text-red-500">
+            <p
+              className="text-xs"
+              style={{color: '#f56565' }}
+            >
               *Quantity exceeds available quantity of {loanableAmountDisplay}
             </p>
           )}
@@ -315,10 +335,14 @@ const BorrowModal = ({
     const borrowed = await inventoryActions.borrow(inventoryDispatch, body);
     if (borrowed) {
       if (productDetailPage) {
-        await inventoryActions.fetchInventoryDetail(inventoryDispatch, productDetailPage);
+        await inventoryActions.fetchInventoryDetail(
+          inventoryDispatch,
+          productDetailPage
+        );
       } else {
         const isStakePage =
-          queryParams.get('st') === 'true' || window.location.pathname === '/stake';
+          queryParams.get('st') === 'true' ||
+          window.location.pathname === '/stake';
         await inventoryActions.fetchInventory(
           inventoryDispatch,
           limit,
@@ -372,7 +396,10 @@ const BorrowModal = ({
               className="w-full px-6 h-10 font-bold"
               onClick={handleSubmit}
               loading={isBorrowing}
-              disabled={desiredLoanAmount <= 0}
+              disabled={
+                desiredLoanAmount <= 0 ||
+                desiredLoanAmount > parseFloat(loanableAmountDisplay)
+              }
             >
               Borrow
             </Button>
