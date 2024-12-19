@@ -192,7 +192,10 @@ async function getEscrowsForStakeTransactions(user, args, options) {
   }
 
   if (allEscrows.length === 0) {
-    throw new Error('No escrows found');
+    return {
+      escrows: [],
+      total: 0,
+    };
   }
 
   return {
