@@ -1,9 +1,12 @@
 #!/bin/sh
 set -e
 
-# Check if running in Oracle mode
+ORACLE_MODE=${ORACLE_MODE:-false}
+
+# Checking the container mode (payment server or oracle service)
 if [ "$ORACLE_MODE" = "true" ]; then
-  # Oracle-specific configurations
+  echo "Running the container in Oracle service mode"
+  
   export DOCKERIZED="true"
 
   export CONFIG_DIR_PATH=/config
@@ -58,13 +61,11 @@ if [ "$ORACLE_MODE" = "true" ]; then
 
   ls dapp
 
-  echo 'ORACLE_MODE is true. Skipping payment server deployment.'
-
   if [ -f "${CONFIG_DIR_PATH}/oracle_deploy.yaml" ]; then
     echo 'oracle_deploy.yaml already exists for oracle.'
     cat ${CONFIG_DIR_PATH}/oracle_deploy.yaml
     if [ "${UPGRADE_ORACLE_CONTRACTS}" = "true" ]; then
-      echo 'Upgrading oracle contracts...'
+      echo 'Upgrading oracle contracts (deactivating old and deploying new ones)...'
       yarn deactivate-oracle
       yarn deploy-oracle
     fi
@@ -86,7 +87,7 @@ if [ "$ORACLE_MODE" = "true" ]; then
   fi
 
 else
-  # Payment server-specific configurations
+  echo "Running the container in Payment server mode"
   export DOCKERIZED="true"
 
   export CONFIG_DIR_PATH=/config
