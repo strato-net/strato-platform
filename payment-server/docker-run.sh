@@ -24,6 +24,7 @@ if [ "$ORACLE_MODE" = "true" ]; then
   export SILVER_ORACLE_NAME_VALUE=${SILVER_ORACLE_NAME_VALUE:-'Silver'}
   export GOLD_ORACLE_NAME_VALUE=${GOLD_ORACLE_NAME_VALUE:-'Gold'}
   export ETH_ORACLE_NAME_VALUE=${ETH_ORACLE_NAME_VALUE:-'ETH'}
+  export USD_ORACLE_NAME_VALUE=${USD_ORACLE_NAME_VALUE:-'USD'}
 
   echo $OAUTH_DISCOVERY_URL
 
@@ -34,6 +35,7 @@ if [ "$ORACLE_MODE" = "true" ]; then
   sed -i 's*<silver_oracle_name_value>*'"${SILVER_ORACLE_NAME_VALUE}"'*g' /tmp/tmp.oracle_config.yaml
   sed -i 's*<gold_oracle_name_value>*'"${GOLD_ORACLE_NAME_VALUE}"'*g' /tmp/tmp.oracle_config.yaml
   sed -i 's*<eth_oracle_name_value>*'"${ETH_ORACLE_NAME_VALUE}"'*g' /tmp/tmp.oracle_config.yaml
+  sed -i 's*<usd_oracle_name_value>*'"${USD_ORACLE_NAME_VALUE}"'*g' /tmp/tmp.oracle_config.yaml
 
   sed -i 's*<configDirPath_value>*'"${CONFIG_DIR_PATH}"'*g' /tmp/tmp.oracle_config.yaml
   sed -i 's*<serverHost_value>*'"${SERVER_HOST}"'*g' /tmp/tmp.oracle_config.yaml

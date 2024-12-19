@@ -61,6 +61,7 @@ describe("Payment Server - deploy contracts", function () {
   let silverOracle;
   let goldOracle;
   let ethOracle;
+  let usdOracle;
 
   before(async () => {
     assert.isDefined(
@@ -138,6 +139,11 @@ describe("Payment Server - deploy contracts", function () {
     ethOracle = await uploadContract(token, "Oracle", { name: ethOracleName });
   });
 
+  it("Deploy USD Oracle", async () => {
+    const usdOracleName = config.usdOracle.name;
+    usdOracle = await uploadContract(token, "Oracle", { name: usdOracleName });
+  });
+
   // Create oracle_deploy.yaml
   it("Create oracle_deploy.yaml", async () => {
     const deployArgs = {
@@ -145,6 +151,7 @@ describe("Payment Server - deploy contracts", function () {
       silverOracle,
       goldOracle,
       ethOracle,
+      usdOracle,
     };
     const deployment = deploy(deployArgs, config);
     assert.isDefined(deployment);

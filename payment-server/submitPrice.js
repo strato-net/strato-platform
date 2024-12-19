@@ -196,7 +196,7 @@ async function fetchAndSubmitETHPrice(
 
     const currentTimestamp = Math.floor(currentTimeMs / 1000);
     await submitPrice(token, oracleContract, {
-      price: twap/1e18,
+      price: twap / 1e18,
       timestamp: currentTimestamp,
     });
 
@@ -268,6 +268,11 @@ async function main() {
             token,
             fetchInterval
           );
+        } else if (metal === "USD") {
+          await submitPrice(token, oracle, {
+            price: 1,
+            timestamp: Math.floor(Date.now() / 1000),
+          });
         } else {
           await fetchAndSubmitMetalPrice(
             metal.toLowerCase(),
