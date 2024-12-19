@@ -8,6 +8,7 @@ const si = require("systeminformation");
 const config = require("../config/app.config");
 const getPbftData = require("../controllers/health")["getPbftData"];
 const findView = require("../controllers/health")["findView"];
+const os = require('os');
 
 // TODO: do the mass-refactoring of the daemon. Use the OOP! Really, don't even try refactoring this without the main Object (SingleCheck object with methods and shared params). Don't change any db data formats.
 
@@ -460,7 +461,13 @@ async function checkSystemInfo() {
     }
 
     const currentLoad = metadataLoad.currentLoad;
-    const avgLoad = (metadataLoad.avgLoad * 100) / cpudata.cores;
+    const cpuCount = os.cpus().length;
+    
+    //covert loads to percents
+    const avgLoads = os.loadavg()?.map(load => (load / cpuCount) * (100/2));
+    
+    //grab 15 min load
+    const avgLoad = (avgLoads == null || avgLoads.length < 3) ? 0 : avgLoads[2];
     
     const previousCpuCurrentLoadAlert = prevSysInfo.cpu?.currentLoad?.isHealthy === false;
     const previousCpuAvgLoadAlert = prevSysInfo.cpu?.avgLoad?.isHealthy === false;
@@ -482,22 +489,25 @@ async function checkSystemInfo() {
         isHealthy: !cpuCurrentLoadAlert
       },
       avgLoad: {
-        value: +((metadataLoad.avgLoad * 100) / cpudata.cores).toFixed(2),
+        value: +avgLoad.toFixed(2),
         isHealthy: !cpuAvgLoadAlert
       },
     };
     if (!sysInfoCollected.cpu.avgLoad.isHealthy) {
       isHealthy = false;
       additional_info.push(
-        `Average CPU load is high (${metadataLoad.avgLoad.toFixed(2)})`
+        `Average CPU load is high (${avgLoad.toFixed(2)})`
       );
     }
-    if (!sysInfoCollected.cpu.currentLoad.isHealthy) {
-      isHealthy = false;
-      additional_info.push(
-        `Current CPU load is high (${metadataLoad.currentLoad.toFixed(2)})`
-      );
-    }
+    
+
+    // 12/17/24 - comment out current CPU load alarm
+    // if (!sysInfoCollected.cpu.currentLoad.isHealthy) {
+    //   isHealthy = false;
+    //   additional_info.push(
+    //     `Current CPU load is high (${metadataLoad.currentLoad.toFixed(2)})`
+    //   );
+    // }
 
     // FILESYSTEM
     const fsData = [];
