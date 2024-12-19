@@ -270,7 +270,7 @@ async function main() {
           );
         } else if (metal === "USD") {
           await submitPrice(token, oracle, {
-            price: 1,
+            price: 1 / 1e18,
             timestamp: Math.floor(Date.now() / 1000),
           });
         } else {
