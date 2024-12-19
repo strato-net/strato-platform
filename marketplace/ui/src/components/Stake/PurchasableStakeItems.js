@@ -26,7 +26,9 @@ const PurchasableStakeItems = () => {
     if (reserves) {
       marketplaceActions.fetchStakeableProducts(
         marketplaceDispatch,
-        reserves.map((reserve) => reserve.assetRootAddress)
+        reserves
+          .filter((reserve) => !reserve.name.toLowerCase().includes('temp'))
+          .map((reserve) => reserve.assetRootAddress)
       );
     }
   }, [reserves]);
@@ -42,7 +44,10 @@ const PurchasableStakeItems = () => {
       </Fade>
       {stakeableProducts?.length <= 0 || !reserves ? (
         <div className="h-52 flex justify-center items-center">
-          <Spin spinning={isStakeableProductsLoading || isReservesLoading} size="large" />
+          <Spin
+            spinning={isStakeableProductsLoading || isReservesLoading}
+            size="large"
+          />
         </div>
       ) : (
         <Fade direction="right" triggerOnce>
@@ -53,9 +58,16 @@ const PurchasableStakeItems = () => {
             >
               {stakeableProducts.map((stakeableProduct) => {
                 const matchingReserve = reserves?.find(
-                  (reserve) => reserve.assetRootAddress === stakeableProduct.root
+                  (reserve) =>
+                    reserve.assetRootAddress === stakeableProduct.root
                 );
-                return <NewVaultCard key={stakeableProduct.assetRootAddress} reserveItem={stakeableProduct} reserve={matchingReserve} />;
+                return (
+                  <NewVaultCard
+                    key={stakeableProduct.assetRootAddress}
+                    reserveItem={stakeableProduct}
+                    reserve={matchingReserve}
+                  />
+                );
               })}
             </div>
           </div>

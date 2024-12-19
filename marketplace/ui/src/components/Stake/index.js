@@ -37,7 +37,7 @@ const StratsIcon = (
   <img src={Images.strat} alt={''} title={''} className="w-4 h-4" />
 );
 
-function combineInventories(items) {
+function combineInventories(items, assetsWithEighteenDecimalPlaces) {
   // Step 1: Group items by `root`
   const grouped = items.reduce((acc, item) => {
     const { root } = item;
@@ -58,15 +58,17 @@ function combineInventories(items) {
       'BlockApps-Mercata-Asset-images': assetImages,
     } = firstItem;
 
+    const requiresDivision = assetsWithEighteenDecimalPlaces.includes(root);
+
     // Step 3: Sum `quantity` and `saleQuantity` across the group
-    const totalQuantity = group.reduce(
-      (sum, item) => sum + (item.quantity || 0),
-      0
-    );
-    const totalSaleQuantity = group.reduce(
-      (sum, item) => sum + (item.saleQuantity ? item.quantity : 0),
-      0
-    );
+    const totalQuantity = group.reduce((sum, item) => {
+      const quantity = item.quantity || 0;
+      return sum + (requiresDivision ? quantity / 1e18 : quantity);
+    }, 0);
+    const totalSaleQuantity = group.reduce((sum, item) => {
+      const saleQuantity = item.saleQuantity ? item.quantity || 0 : 0;
+      return sum + (requiresDivision ? saleQuantity / 1e18 : saleQuantity);
+    }, 0);
 
     // Step 4: Aggregate varying fields into `inventories`
     const inventoriesArr = group.map((item) => {
@@ -117,7 +119,7 @@ const Stake = ({ user }) => {
   const [page, setPage] = useState(1);
   const navigate = useNavigate();
 
-  const combinedInventories = combineInventories(inventories);
+  const combinedInventories = combineInventories(inventories, assetsWithEighteenDecimalPlaces);
   const onPageChange = (page, pageSize) => {
     setLimit(pageSize);
     setOffset((page - 1) * pageSize);

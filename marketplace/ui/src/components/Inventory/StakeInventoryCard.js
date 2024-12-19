@@ -44,12 +44,10 @@ const StakeInventoryCard = ({
   const navigate = useNavigate();
   const naviroute = routes.InventoryDetail.url;
   const imgMeta = category ? category : SEO.TITLE_META;
-  const itemData = inventory.data;
-  const isStrat = inventory.originAddress === stratAddress;
-  const isCata = assetsWithEighteenDecimalPlaces.includes(inventory.originAddress);
+  const is18DecimalPlaces = assetsWithEighteenDecimalPlaces?.includes(inventory.root);
 
   const uniqueEscrows = new Set();
-  const collateralQuantity = inventory?.inventories
+  let collateralQuantity = inventory?.inventories
     ? inventory.inventories.reduce((sum, item) => {
         const escrowAddress = item?.escrow?.address;
         const escrowCollateral = item?.escrow?.collateralQuantity || 0;
@@ -65,6 +63,7 @@ const StakeInventoryCard = ({
     : inventory?.escrow?.collateralQuantity > inventory?.quantity
     ? inventory?.quantity
     : inventory?.escrow?.collateralQuantity || 0;
+  collateralQuantity = is18DecimalPlaces ? collateralQuantity / 1e18 : collateralQuantity;
   const quantityNotAvailable = inventory?.inventories
     ? inventory.inventories.reduce((sum, item) => {
         const status = Number(item.status);
@@ -78,7 +77,7 @@ const StakeInventoryCard = ({
     : 0;
   const quantity = inventory?.inventories
     ? inventory.totalQuantity
-    : inventory?.quantity;
+    : is18DecimalPlaces ? inventory?.quantity /1e18 : inventory?.quantity;
   const stakeQuantity = quantity - collateralQuantity - quantityNotAvailable;
   const uniqueEscrowsPrime = new Set();
   const collateralValue = inventory?.inventories
@@ -348,6 +347,7 @@ const StakeInventoryCard = ({
           debouncedSearchTerm={debouncedSearchTerm}
           saleAddress={inventory.saleAddress}
           category={category}
+          assetsWithEighteenDecimalPlaces={assetsWithEighteenDecimalPlaces}
         />
       )}
       {repayModalOpen && (
@@ -361,6 +361,7 @@ const StakeInventoryCard = ({
           saleAddress={inventory.saleAddress}
           category={category}
           reserves={reserves}
+          assetsWithEighteenDecimalPlaces={assetsWithEighteenDecimalPlaces}
         />
       )}
       {stakeModalOpen && (

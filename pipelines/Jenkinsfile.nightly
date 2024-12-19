@@ -232,7 +232,7 @@ pipeline {
                 
                 // Push docker-compose files to Jenkins artifacts and AWS S3
                 dir ('strato-worktree') {
-                  archiveArtifacts artifacts: "docker-compose.yml, docker-compose.vault.yml, docker-compose.identity.yml, docker-compose.highway.yml, docker-compose.payment.yml, docker-compose.notification.yml, docker-compose.ecr.yml, docker-compose.vault.ecr.yml, docker-compose.identity.ecr.yml, docker-compose.highway.ecr.yml, docker-compose.payment.ecr.yml, docker-compose.notification.ecr.yml, devops/**"
+                  archiveArtifacts artifacts: "docker-compose.yml, docker-compose.vault.yml, docker-compose.identity.yml, docker-compose.highway.yml, docker-compose.payment.yml, docker-compose.oracle.yml, docker-compose.notification.yml, docker-compose.ecr.yml, docker-compose.vault.ecr.yml, docker-compose.identity.ecr.yml, docker-compose.highway.ecr.yml, docker-compose.payment.ecr.yml, docker-compose.oracle.ecr.yml, docker-compose.notification.ecr.yml, devops/**"
                   withCredentials([
                       usernamePassword(credentialsId: 'block-apps-jenkins-s3',  passwordVariable: 'AWS_SECRET_ACCESS_KEY', usernameVariable: 'AWS_ACCESS_KEY_ID'),
                   ]) {
@@ -245,12 +245,14 @@ pipeline {
                       aws s3 cp docker-compose.identity.yml s3://blockapps-build-artifacts/${version}/
                       aws s3 cp docker-compose.highway.yml s3://blockapps-build-artifacts/${version}/
                       aws s3 cp docker-compose.payment.yml s3://blockapps-build-artifacts/${version}/
+                      aws s3 cp docker-compose.oracle.yml s3://blockapps-build-artifacts/${version}/
                       aws s3 cp docker-compose.notification.yml s3://blockapps-build-artifacts/${version}/
                       aws s3 cp docker-compose.ecr.yml s3://blockapps-build-artifacts/${version}/
                       aws s3 cp docker-compose.vault.ecr.yml s3://blockapps-build-artifacts/${version}/
                       aws s3 cp docker-compose.identity.ecr.yml s3://blockapps-build-artifacts/${version}/
                       aws s3 cp docker-compose.highway.ecr.yml s3://blockapps-build-artifacts/${version}/
                       aws s3 cp docker-compose.payment.ecr.yml s3://blockapps-build-artifacts/${version}/
+                      aws s3 cp docker-compose.oracle.ecr.yml s3://blockapps-build-artifacts/${version}/
                       aws s3 cp docker-compose.notification.ecr.yml s3://blockapps-build-artifacts/${version}/
 
                     '''

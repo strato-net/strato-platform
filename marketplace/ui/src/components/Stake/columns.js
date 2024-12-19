@@ -94,8 +94,11 @@ export const aggregateStakeColumns = (
       title: 'Quantity Stakeable',
       align: 'center',
       render: (_, record) => {
+        const requiresDivision = assetsWithEighteenDecimalPlaces.includes(
+          record.root
+        );
         const uniqueEscrows = new Set();
-        const collateralQuantity = record?.inventories
+        let collateralQuantity = record?.inventories
           ? record.inventories.reduce((sum, item) => {
               const escrowAddress = item?.escrow?.address;
               const escrowCollateral = item?.escrow?.collateralQuantity || 0;
@@ -111,6 +114,9 @@ export const aggregateStakeColumns = (
           : record?.escrow?.collateralQuantity > record?.quantity
           ? record?.quantity
           : record?.escrow?.collateralQuantity || 0;
+        collateralQuantity = requiresDivision
+          ? collateralQuantity / 1e18
+          : collateralQuantity;
         const quantityNotAvailable =
           record.inventories.reduce((sum, item) => {
             const status = Number(item.status);
@@ -128,24 +134,31 @@ export const aggregateStakeColumns = (
       title: 'Quantity Staked',
       align: 'center',
       render: (_, record) => {
+        const requiresDivision = assetsWithEighteenDecimalPlaces.includes(
+          record.root
+        );
         const uniqueEscrows = new Set();
         const collateralQuantity = record?.inventories
           ? record.inventories.reduce((sum, item) => {
               const escrowAddress = item?.escrow?.address;
               const escrowCollateral = item?.escrow?.collateralQuantity || 0;
-      
+
               // Add collateral only if the escrow address is unique
               if (escrowAddress && !uniqueEscrows.has(escrowAddress)) {
                 uniqueEscrows.add(escrowAddress);
                 return sum + escrowCollateral;
               }
-      
+
               return sum;
             }, 0)
           : record?.escrow?.collateralQuantity > record?.quantity
           ? record?.quantity
           : record?.escrow?.collateralQuantity || 0;
-        return <div>{collateralQuantity}</div>;
+        return (
+          <div>
+            {requiresDivision ? collateralQuantity / 1e18 : collateralQuantity}
+          </div>
+        );
       },
     },
     {
@@ -171,16 +184,16 @@ export const aggregateStakeColumns = (
       align: 'center',
       render: (_, record) => {
         const escrows = record?.inventories
-        ? [
-            ...new Set(
-              record.inventories
-                .map((item) => item?.escrow?.address)
-                .filter(Boolean)
-            ),
-          ]
-        : record?.escrow?.address
-        ? [record.escrow.address]
-        : [];
+          ? [
+              ...new Set(
+                record.inventories
+                  .map((item) => item?.escrow?.address)
+                  .filter(Boolean)
+              ),
+            ]
+          : record?.escrow?.address
+          ? [record.escrow.address]
+          : [];
         const isStaked = escrows.length > 0;
         return (
           <div className="pt-[7px] lg:pt-0 items-center gap-[5px]">
@@ -261,7 +274,13 @@ export const stakeColumns = (
       title: 'Owned',
       align: 'center',
       render: (_, record) => {
-        return <div>{record.quantity || 0}</div>;
+        const requiresDivision = assetsWithEighteenDecimalPlaces.includes(
+          record.root
+        );
+        const displayedQuantity = requiresDivision
+          ? record.quantity / 1e18
+          : record.quantity;
+        return <div>{displayedQuantity || 0}</div>;
       },
     },
     {
@@ -279,14 +298,39 @@ export const stakeColumns = (
             return true;
           }
         };
-        const matchingQuantity = record?.escrow?.[
-          'BlockApps-Mercata-Escrow-assets'
-        ]?.find((item) => item.value === record.address)
-          ? record.quantity
-          : 0;
-        return (
-          <div>{!isActive() ? 0 : record.quantity - matchingQuantity}</div>
+        const requiresDivision = assetsWithEighteenDecimalPlaces.includes(
+          record.root
         );
+        // Parse quantity safely
+        const parsedQuantity = parseFloat(record.quantity) || 0;
+        const displayedQuantity = requiresDivision
+          ? parsedQuantity / 1e18
+          : parsedQuantity;
+
+        // Extract escrow assets array safely
+        const escrowAssets =
+          record?.escrow?.['BlockApps-Mercata-Escrow-assets'] || [];
+
+        // Determine if there is a matching escrow asset
+        const hasMatchingEscrow = escrowAssets.some(
+          (item) => item.value === record.address
+        );
+
+        // Calculate matching quantity
+        const rawMatchingQuantity = hasMatchingEscrow ? parsedQuantity : 0;
+        const matchingQuantity = requiresDivision
+          ? rawMatchingQuantity / 1e18
+          : rawMatchingQuantity;
+
+        // Compute the stakeable quantity
+        const stakeableQuantity = isActive
+          ? displayedQuantity - matchingQuantity
+          : 0;
+
+        // Ensure the stakeable quantity is not negative
+        const finalStakeableQuantity =
+          stakeableQuantity > 0 ? stakeableQuantity : 0;
+        return <div>{finalStakeableQuantity}</div>;
       },
     },
     {
@@ -298,7 +342,14 @@ export const stakeColumns = (
         ]?.find((item) => item.value === record.address)
           ? record.quantity
           : 0;
-        return <div>{matchingQuantity}</div>;
+        const requiresDivision = assetsWithEighteenDecimalPlaces.includes(
+          record.root
+        );
+        return (
+          <div>
+            {requiresDivision ? matchingQuantity / 1e18 : matchingQuantity}
+          </div>
+        );
       },
     },
     {

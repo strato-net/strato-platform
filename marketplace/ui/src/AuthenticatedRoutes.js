@@ -260,7 +260,9 @@ const AuthenticatedRoutes = ({ user, users, isAuthenticated }) => {
                       <RedemptionsProvider>
                         <PaymentServicesProvider>
                           <IssuerStatusProvider>
-                            <Stake user={user} />
+                            <EthProvider>
+                              <Stake user={user} />
+                            </EthProvider>
                           </IssuerStatusProvider>
                         </PaymentServicesProvider>
                       </RedemptionsProvider>

@@ -251,6 +251,7 @@ async function addHash(user, args, options) {
     query: {
       creator: CREATOR,
       isActive: IS_ACTIVE,
+      ['data->>isMint']: 'eq.True',
     },
   };
 
@@ -261,7 +262,7 @@ async function addHash(user, args, options) {
   );
 
   if (!ethBridge || ethBridge.length === 0) {
-    throw new Error('No active escrows found for the given address');
+    throw new Error('No active ethBridge found for the given address');
   }
 
   const callArgs = {

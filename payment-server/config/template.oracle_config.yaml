@@ -12,6 +12,12 @@ silverOracle:
 goldOracle:
   name: <gold_oracle_name_value>
 
+ethOracle:
+  name: <eth_oracle_name_value>
+
+usdOracle:
+  name: <usd_oracle_name_value>
+
 nodes:
   - id: 0
     label: <node_label_value>
