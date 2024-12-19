@@ -439,6 +439,7 @@ const ItemActions = ({
           saleAddress={inventory.saleAddress}
           category={category}
           reserves={reserves}
+          assetsWithEighteenDecimalPlaces={assetsWithEighteenDecimalPlaces}
         />
       )}
       {resellModalOpen && (

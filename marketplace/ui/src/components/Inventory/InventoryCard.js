@@ -671,6 +671,7 @@ const InventoryCard = ({
           saleAddress={inventory.saleAddress}
           category={category}
           reserves={reserves}
+          assetsWithEighteenDecimalPlaces={assetsWithEighteenDecimalPlaces}
         />
       )}
       {resellModalOpen && (

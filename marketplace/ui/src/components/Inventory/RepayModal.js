@@ -33,6 +33,7 @@ const RepayModal = ({
   offset,
   productDetailPage,
   reserves,
+  assetsWithEighteenDecimalPlaces
 }) => {
   const { isRepaying } = useInventoryState();
   // Dispatch

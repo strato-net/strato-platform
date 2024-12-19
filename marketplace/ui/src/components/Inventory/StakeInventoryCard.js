@@ -361,6 +361,7 @@ const StakeInventoryCard = ({
           saleAddress={inventory.saleAddress}
           category={category}
           reserves={reserves}
+          assetsWithEighteenDecimalPlaces={assetsWithEighteenDecimalPlaces}
         />
       )}
       {stakeModalOpen && (
