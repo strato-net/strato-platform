@@ -59,9 +59,11 @@ export default {
     'blockapps_spirits',
   ],
   AssetsWithEighteenDecimalPlaces: [
-    '2680dc6693021cd3fefb84351570874fbef8332a',
-    '051cb99bca7c437f4b17dc01bd4ff7c5e09db035',
-    '49ac6e4c18cb4bc4232d9d1471041b3c269d7422',
+    '2680dc6693021cd3fefb84351570874fbef8332a', //2680dc6693021cd3fefb84351570874fbef8332a
+    '051cb99bca7c437f4b17dc01bd4ff7c5e09db035', //testnetCataAddress
+    '49ac6e4c18cb4bc4232d9d1471041b3c269d7422', //testnetETHSTAddress
+    '76372ee8d5a47c58cee4b0e63400858cf4f9ef13', //testnetBETHTEMP
+    '7f5c102390240f4a8f0e0d938d341bf1e3010adc', //testnetUSDTEMP
   ],
   localHost: 'http://localhost',
   burnAddress: '6ec8bbe4a5b87be18d443408df43a45e5972fa1b',

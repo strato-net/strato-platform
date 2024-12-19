@@ -24,7 +24,9 @@ const StakeableProductCards = () => {
     if (reserves) {
       actions.fetchStakeableProducts(
         marketplaceDispatch,
-        reserves.map((reserve) => reserve.assetRootAddress)
+        reserves
+          .filter((reserve) => !reserve.name.toLowerCase().includes('temp'))
+          .map((reserve) => reserve.assetRootAddress)
       );
     }
   }, [marketplaceDispatch, reserves]);
