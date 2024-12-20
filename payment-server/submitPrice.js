@@ -1,9 +1,12 @@
+import axios from "axios";
 import { assert } from "chai";
 import { rest, util } from "blockapps-rest";
+import http from "http";
+
 import config from "./load.config.js";
 import deployment from "./load.deploy.js";
 import oauthHelper from "./helpers/oauthHelper.js";
-import axios from "axios";
+
 
 // Global array to store all distributeRewards calls
 const distributeRewardsCallList = [];
@@ -291,7 +294,18 @@ async function main() {
     // After processing all oracles and collecting distributeRewards calls, run them at once
     await runDistributeRewardsCalls(token);
   };
-
+  
+  // Run the heartbeat ping-pong server for health check
+  // TODO: in future extend this to include more health checks, e.g. if one of oracles is failing (flag rules based on global vars)
+  const heartbeatServer = http.createServer((req, res) => {
+    res.writeHead(200, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify({success: true, message: 'pong'}));
+  });
+  const port = process.env.PORT || 8018
+  heartbeatServer.listen(port, () => {
+    console.log(`Heartbeat server started on port ${port}.`);
+  });
+  
   while (true) {
     await submitPricePeriodically(); // Immediate first run
     console.log(`Sleeping for ${fetchInterval} ms`);
