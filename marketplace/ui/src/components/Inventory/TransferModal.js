@@ -293,7 +293,6 @@ const TransferModal = ({
             );
             return availableQuantity.minus(allocatedQuantity);
           })()}
-          precision={isStrat ? 2 : is18DecimalPlaces ? 18 : 0}
           onChange={(value) =>
             handleQuantityChange(record.id, new BigNumber(value))
           }
