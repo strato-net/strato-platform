@@ -348,7 +348,6 @@ const ListForSaleModal = ({
                 : inventory.quantity
             }
             onChange={(value) => setQuantity(new BigNumber(value))}
-            precision={isStrat ? 2 : is18DecimalPlaces ? 18 : 0}
           />
         ),
       },
