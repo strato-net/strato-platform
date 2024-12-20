@@ -607,12 +607,10 @@ const ProductDetails = ({ user, users }) => {
                       className=" text-[#13188A] text-xl font-bold lg:text-2xl lg:font-semibold"
                     >
                       <div className="text-lg">
-                        {/* Est. APY: {matchingReserve?.cataAPYRate}% */}
-                        Est. APY: 10%
+                        Est. APY: {matchingReserve?.cataAPYRate}%
                       </div>
                       <div className="text-lg">
-                        TVL: $2953.43
-                        {/* TVL: ${matchingReserve?.tvl.toFixed(2)} */}
+                        TVL: ${matchingReserve?.tvl.toFixed(2)}
                       </div>
                     </Paragraph>
                   </div>
@@ -868,6 +866,7 @@ const ProductDetails = ({ user, users }) => {
           productDetailPage={Id}
           inventory={inventoryDetails}
           reserves={reserves}
+          
         />
       )}
       {bridgeWalletModalOpen && (

@@ -412,6 +412,7 @@ const ItemActions = ({
           debouncedSearchTerm={debouncedSearchTerm}
           saleAddress={inventory.saleAddress}
           category={category}
+          assetsWithEighteenDecimalPlaces={assetsWithEighteenDecimalPlaces}
         />
       )}
       {borrowModalOpen && (
@@ -424,6 +425,7 @@ const ItemActions = ({
           debouncedSearchTerm={debouncedSearchTerm}
           saleAddress={inventory.saleAddress}
           category={category}
+          assetsWithEighteenDecimalPlaces={assetsWithEighteenDecimalPlaces}
         />
       )}
       {repayModalOpen && (
@@ -437,6 +439,7 @@ const ItemActions = ({
           saleAddress={inventory.saleAddress}
           category={category}
           reserves={reserves}
+          assetsWithEighteenDecimalPlaces={assetsWithEighteenDecimalPlaces}
         />
       )}
       {resellModalOpen && (

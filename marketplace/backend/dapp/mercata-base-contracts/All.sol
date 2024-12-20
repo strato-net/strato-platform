@@ -1,4 +1,5 @@
 import "../items/contracts/Art.sol";
+import "../items/contracts/BridgeableTokens.sol";
 import "../items/contracts/CarbonDAO.sol";
 import "../items/contracts/CarbonOffset.sol";
 import "../items/contracts/Collectibles.sol";

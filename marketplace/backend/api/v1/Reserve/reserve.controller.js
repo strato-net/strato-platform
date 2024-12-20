@@ -143,10 +143,10 @@ class ReserveController {
 
   static validateStakeArgs(args) {
     const schema = Joi.object({
-      collateralQuantity: Joi.number().positive().required().messages({
-        'any.required': 'Amount is required and must be positive.',
-        'number.base': 'Amount must be a valid number.',
-        'number.positive': 'Amount must be positive.',
+      collateralQuantity: Joi.string().pattern(/^\d+$/).required().messages({
+        'any.required': 'Collateral Quantity is required and must be a string.',
+        'string.base': 'Collateral Quantity must be a valid string.',
+        'string.pattern.base': 'Collateral Quantity must be a valid number.',
       }),
       escrowAddress: Joi.string().optional(),
       assets: Joi.array().items(Joi.string()).required().messages({
@@ -163,10 +163,10 @@ class ReserveController {
 
   static validateUnstakeArgs(args) {
     const schema = Joi.object({
-      quantity: Joi.number().positive().required().messages({
-        'any.required': 'quantity is required and must be positive.',
-        'number.base': 'quantity must be a valid number.',
-        'number.positive': 'quantity must be positive.',
+      quantity: Joi.string().pattern(/^\d+$/).required().messages({
+        'any.required': 'Quantity is required and must be a string.',
+        'string.base': 'Quantity must be a valid string.',
+        'string.pattern.base': 'Quantity must be a valid number.',
       }),
       escrowAddresses: Joi.array().items(Joi.string()).required().messages({
         'array.base': 'escrowAddresses must be an array of strings.',

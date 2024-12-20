@@ -4,7 +4,7 @@ pragma strict;
 import <BASE_CODE_COLLECTION>;
 
 /// @title A representation of Token assets
-contract SimpleMercataETHBridge is Tokens, MercataETHBridge {
+contract BridgeableTokens is Tokens, MercataETHBridge {
 
     constructor(
         string _name,

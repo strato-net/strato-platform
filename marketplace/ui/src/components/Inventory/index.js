@@ -400,21 +400,14 @@ const Inventory = ({ user }) => {
           );
         const borrowedAmount = (record?.escrow?.borrowedAmount || 0) / 100;
         const callDetailPage = () => {
-          if (record.originAddress === ethstAddress) {
-            navigate(
-              `${ethNaviroute.replace(':address', record.address)}`,
-              { state: { isCalledFromInventory: false } }
-            );
-          } else {
-            navigate(
-              `${naviroute
-                .replace(':id', record.address)
-                .replace(':name', encodeURIComponent(record.name))}`,
-              {
-                state: { isCalledFromInventory: true },
-              }
-            );
-          }
+          navigate(
+            `${naviroute
+              .replace(':id', record.address)
+              .replace(':name', encodeURIComponent(record.name))}`,
+            {
+              state: { isCalledFromInventory: true },
+            }
+          );
         };
         return (
           <>

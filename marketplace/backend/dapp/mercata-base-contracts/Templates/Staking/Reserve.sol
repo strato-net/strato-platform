@@ -63,7 +63,7 @@ abstract contract Reserve is Utils, Structs {
             escrow.updateOnPriceChange(oraclePrice, loanToValueRatio);
             //get cata reward from escrow
             if (delta > 0) {
-                decimal cataRewardDecimal = calculateCATAReward(escrow.collateralQuantity(), oraclePrice.truncate(2), delta);
+                decimal cataRewardDecimal = calculateCATAReward(escrow.collateralQuantity(), oraclePrice.truncate(18), delta);
                 uint cataReward = uint(cataRewardDecimal * 10**18);
                 escrow.updateTotalCataReward(cataReward);
 

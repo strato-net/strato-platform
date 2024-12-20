@@ -59,7 +59,7 @@ const Transaction = ({ user }) => {
     for (const category of categorys) {
       for (const subCategory of category.subCategories) {
         // endsWith is used to match the contract name with the subcategory contract
-        if (contractName.endsWith(subCategory.contract)) {
+        if (contractName?.endsWith(subCategory.contract)) {
           return { category: category.name, subCategory: subCategory.name };
         }
       }

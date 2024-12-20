@@ -30,7 +30,8 @@ const NewTrendingCard = ({
   const navigate = useNavigate();
   const location = useLocation();
   const { Text } = Typography;
-  const { usdstAddress, assetsWithEighteenDecimalPlaces } = useMarketplaceState();
+  const { stratsAddress, assetsWithEighteenDecimalPlaces } =
+    useMarketplaceState();
   const { ethstAddress } = useEthState();
   const { hasChecked, isAuthenticated, loginUrl, user } =
     useAuthenticateState();
@@ -59,6 +60,9 @@ const NewTrendingCard = ({
   const naviroute = routes.MarketplaceProductDetail.url;
   const ethNaviroute = routes.EthstProductDetail.url;
   const isAvailableForSale = !topSellingProduct.price || saleQuantity === 0;
+  const isDisabled =
+    topSellingProduct.originAddress !== ethstAddress &&
+    (isAvailableForSale || ownerSameAsUser());
 
   const queryParams = new URLSearchParams(location.search);
   const categoryQueryValue = queryParams.get('category');
@@ -239,7 +243,7 @@ const NewTrendingCard = ({
                 );
               })()
             : 'No Price Available'}
-          {isAvailableForSale && (
+          {isDisabled && (
             <Text type="danger" strong>
               {' '}
               Sold Out{' '}
@@ -268,7 +272,7 @@ const NewTrendingCard = ({
             className="truncate-html-content"
           ></div>
         </div>
-        <div className="flex justify-between items-center bg-[#EEEFFA] p-2 rounded-[4px]">
+        <div className={`flex justify-between items-center bg-[#EEEFFA] p-2 rounded-[4px] ${topSellingProduct.originAddress === ethstAddress ? 'invisible' : ''}`}>
           <Typography>Quantity:</Typography>
           <div className="flex gap-3 p-1 bg-white">
             <Typography
@@ -328,12 +332,12 @@ const NewTrendingCard = ({
         <div className={`flex gap-4 mt-1`}>
           <Button
             id={`${topSellingProduct?.name?.replace(/ /g, '_')}-buy-now`}
-            disabled={isAvailableForSale || ownerSameAsUser()}
+            disabled={isDisabled}
             type="primary"
-            className={`flex-1 h-9 ${
-              isAvailableForSale ? '!bg-[#808080]' : '!bg-[#13188A]'
-            } !text-white ${
-              ownerSameAsUser() ? 'cursor-not-allowed' : 'cursor-pointer'
+            className={`flex-1 h-9 !text-white ${
+              isDisabled
+                ? '!bg-[#808080] cursor-not-allowed'
+                : '!bg-[#13188A] cursor-pointer'
             }`}
             onClick={async () => {
               const dataLayerEventName = isUserProfile

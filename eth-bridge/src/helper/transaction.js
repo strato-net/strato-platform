@@ -39,7 +39,7 @@ const createTransactionObject = async (method, toAddress, value, txHash) => {
   const queryResponse = await dbApiClient.get(
     `/BlockApps-Mercata-MercataETHBridge`,
     {
-      params: { isActive: `eq.true`, creator: `eq.BlockApps` },
+      params: { isActive: `eq.true`, creator: `eq.BlockApps`, ['data->>isMint']: `eq.True` },
     }
   );
   console.log("queryResponse", queryResponse);

@@ -659,6 +659,7 @@ const InventoryCard = ({
           debouncedSearchTerm={debouncedSearchTerm}
           saleAddress={inventory.saleAddress}
           category={category}
+          assetsWithEighteenDecimalPlaces={assetsWithEighteenDecimalPlaces}
         />
       )}
       {repayModalOpen && (
@@ -672,6 +673,7 @@ const InventoryCard = ({
           saleAddress={inventory.saleAddress}
           category={category}
           reserves={reserves}
+          assetsWithEighteenDecimalPlaces={assetsWithEighteenDecimalPlaces}
         />
       )}
       {resellModalOpen && (

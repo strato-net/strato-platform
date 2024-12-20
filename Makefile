@@ -212,6 +212,8 @@ docker-compose:
 	sed -e 's|<REPO_URL>|'"${REPO_AWS_ECR_URL}"'|g' -e 's|<VERSION>|'"${VERSION}"'|g' docker-compose.highway.tpl.yml > docker-compose.highway.push.ecr.yml
 	sed -e 's|<REPO_URL>|'"${REPO_URL}"'|g' -e 's|<VERSION>|'"${VERSION}"'|g' docker-compose.payment.tpl.yml > docker-compose.payment.push.yml
 	sed -e 's|<REPO_URL>|'"${REPO_AWS_ECR_URL}"'|g' -e 's|<VERSION>|'"${VERSION}"'|g' docker-compose.payment.tpl.yml > docker-compose.payment.push.ecr.yml
+	sed -e 's|<REPO_URL>|'"${REPO_URL}"'|g' -e 's|<VERSION>|'"${VERSION}"'|g' docker-compose.oracle.tpl.yml > docker-compose.oracle.push.yml
+	sed -e 's|<REPO_URL>|'"${REPO_AWS_ECR_URL}"'|g' -e 's|<VERSION>|'"${VERSION}"'|g' docker-compose.oracle.tpl.yml > docker-compose.oracle.push.ecr.yml
 	sed -e 's|<REPO_URL>|'"${REPO_URL}"'|g' -e 's|<VERSION>|'"${VERSION}"'|g' docker-compose.notification.tpl.yml > docker-compose.notification.push.yml
 	sed -e 's|<REPO_URL>|'"${REPO_AWS_ECR_URL}"'|g' -e 's|<VERSION>|'"${VERSION}"'|g' docker-compose.notification.tpl.yml > docker-compose.notification.push.ecr.yml
 
@@ -226,6 +228,10 @@ docker-compose:
 	awk '/build: ./{getline} 1' docker-compose.highway.push.ecr.yml > docker-compose.highway.ecr.yml
 	awk '/build: ./{getline} 1' docker-compose.payment.push.yml > docker-compose.payment.yml
 	awk '/build: ./{getline} 1' docker-compose.payment.push.ecr.yml > docker-compose.payment.ecr.yml
+	awk '/build: ./{getline} 1' docker-compose.oracle.push.yml > docker-compose.oracle.yml
+	awk '/build: ./{getline} 1' docker-compose.oracle.push.ecr.yml > docker-compose.oracle.ecr.yml
+    # Oracle uses the payment server docker image - not pushing oracle image separately
+	rm -rf docker-compose.oracle.push.yml docker-compose.oracle.push.ecr.yml
 	awk '/build: ./{getline} 1' docker-compose.notification.push.yml > docker-compose.notification.yml
 	awk '/build: ./{getline} 1' docker-compose.notification.push.ecr.yml > docker-compose.notification.ecr.yml
 
