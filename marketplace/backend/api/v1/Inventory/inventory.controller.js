@@ -500,7 +500,7 @@ class InventoryController {
   static validateResellItemArgs(args) {
     const resellItemSchema = Joi.object({
       assetAddress: Joi.string().required(),
-      quantity: Joi.number().integer().greater(0).required(),
+      quantity: Joi.string().pattern(/^\d+$/).required(),
     });
 
     const validation = resellItemSchema.validate(args);

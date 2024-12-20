@@ -7,6 +7,7 @@ import {
 } from '../../contexts/inventory';
 import { useAuthenticateState } from '../../contexts/authentication';
 import { useLocation } from 'react-router-dom';
+import BigNumber from 'bignumber.js';
 
 const ResellModal = ({
   open,
@@ -57,13 +58,11 @@ const ResellModal = ({
   };
 
   const handleSubmit = async () => {
-    let body = {
+    const body = {
       assetAddress: inventory.address,
-      quantity: isStrat
-        ? (quantity * 100).toFixed(0)
-        : is18DecimalPlaces
-        ? (quantity * Math.pow(10, 18)).toFixed(0)
-        : quantity,
+      quantity: new BigNumber(quantity)
+      .multipliedBy(isStrat ? 100 : is18DecimalPlaces ? 10 ** 18 : 1)
+      .toFixed(0),
     };
     let isDone = await actions.resellInventory(inventoryDispatch, body);
     if (isDone) {
