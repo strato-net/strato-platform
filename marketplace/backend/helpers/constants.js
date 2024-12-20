@@ -66,6 +66,7 @@ export default {
     '7f5c102390240f4a8f0e0d938d341bf1e3010adc', //testnetUSDTEMP
     'd6e292f2c9486ada24f6d5cf2e67f44c5f7f677a', //prodBETHTEMP
     '04d68c24ff359ab457c7b96810f85c51989fe8ed', //prodUSDTEMP
+    'bf9bf513e7308b5288e9fb9d5fe0f1d8422318ab' //testnetUSDST
   ],
   localHost: 'http://localhost',
   burnAddress: '6ec8bbe4a5b87be18d443408df43a45e5972fa1b',

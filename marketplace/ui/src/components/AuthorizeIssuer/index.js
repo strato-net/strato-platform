@@ -11,6 +11,7 @@ import {
   useInventoryDispatch,
 } from '../../contexts/inventory';
 import { Images } from '../../images';
+import BigNumber from 'bignumber.js';
 
 const logo = <img src={Images.cata} alt={''} title={''} className="w-4 h-4" />;
 const UsdstIcon = (
@@ -182,7 +183,7 @@ export default function AuthorizeIssuer() {
                       <div className="flex items-center">
                         {UsdstIcon} &nbsp;
                         {(
-                          reserve.usdstTokenObject.quantity / 100
+                          new BigNumber(reserve.usdstTokenObject.quantity).dividedBy(new BigNumber(10).pow(14))
                         )?.toLocaleString('en-US', {
                           maximumFractionDigits: 2,
                           minimumFractionDigits: 0,

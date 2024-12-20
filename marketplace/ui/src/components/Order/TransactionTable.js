@@ -379,8 +379,9 @@ const TransactionTable = ({ user, download, usdstAddress, assetsWithEighteenDeci
       render: (data, { quantity, assetOriginAddress }) => (
         <span>
           {quantity
-            ? (assetOriginAddress === usdstAddress
-                ? quantity / 100
+            ? (
+              assetOriginAddress === usdstAddress
+                ? quantity / Math.pow(10, 14)
                 : assetsWithEighteenDecimalPlaces.includes(assetOriginAddress)
                 ? quantity / Math.pow(10, 18)
                 : quantity
