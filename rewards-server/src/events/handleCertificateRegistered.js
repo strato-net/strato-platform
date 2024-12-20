@@ -8,6 +8,7 @@ const {
 const { getRewards } = require("../helper/googleSheet.js");
 const axios = require("axios");
 const { sendEmail, getUserName } = require("../helper/utils.js");
+const BigNumber = require("bignumber.js");
 
 async function handleCertificateRegistered(event, token) {
   const baseUrl = NODE_ENV === "prod" ? prodMarketplaceUrl : testnetMarketplaceUrl
@@ -91,7 +92,7 @@ async function handleCertificateRegistered(event, token) {
 
     // Create transaction payload
     const transactions = [
-      {toAddress: queryBody[0].userAddress, value: reward * 100}
+      {toAddress: queryBody[0].userAddress, value: new BigNumber(reward).multipliedBy(new BigNumber(10).pow(18))}
     ];
     const response = await createTransactionPayload(
       token,
