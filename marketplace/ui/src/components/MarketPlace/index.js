@@ -2,7 +2,6 @@ import { Button, Image, Typography, Spin, notification } from 'antd';
 import CategoryCard from './CategoryCard';
 import TopSellingProductCard from './TopSellingProductCard';
 import StakeableProductCards from './StakeableProductCards';
-import TrendingVaultCard from './TrendingVaultCard';
 import { Images } from '../../images';
 import React, { useEffect, useState } from 'react';
 import { actions } from '../../contexts/category/actions';
@@ -273,7 +272,6 @@ const MarketPlace = ({ user, isAuthenticated }) => {
         <>
           <div className="px-3 md:px-0 py-30 mt-6 md:mt-10 mb-10">
             {/* <CategoryCard /> */}
-            {/* <TrendingVaultCard /> */}
             <StakeableProductCards />
             <TopSellingProductCard />
           </div>

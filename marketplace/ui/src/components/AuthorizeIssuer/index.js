@@ -177,28 +177,17 @@ export default function AuthorizeIssuer() {
                         )
                       </div>
                     </div>
-                    <div className="font-bold">STRATs Balance:</div>
+                    <div className="font-bold">USDST Balance:</div>
                     <div className="flex flex-col">
                       <div className="flex items-center">
                         {StratsIcon} &nbsp;
                         {(
-                          reserve.stratsTokenObject.quantity / 100
+                          reserve.USDSTTokenObject.quantity /
+                          10 ** 18
                         )?.toLocaleString('en-US', {
                           maximumFractionDigits: 2,
                           minimumFractionDigits: 0,
                         })}
-                      </div>
-                      <div>
-                        ($
-                        {(
-                          reserve.stratsTokenObject.quantity /
-                          100 /
-                          100
-                        ).toLocaleString('en-US', {
-                          maximumFractionDigits: 2,
-                          minimumFractionDigits: 0,
-                        })}
-                        )
                       </div>
                     </div>
                   </div>

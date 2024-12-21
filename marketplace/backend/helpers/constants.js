@@ -35,8 +35,8 @@ export default {
   blockAppsOrg: 'BlockApps',
   prodNetworkId: '6909499098523985262',
   testnetNetworkId: '7596898649924658542',
-  prodStratsAddress: 'd2810818e0401e85693f83107ed2b96faeed329c',
-  testnetStratsAddress: '5375b8b1c691201acf16a72612d82ed438951a04',
+  prodUSDSTAddress: 'd2810818e0401e85693f83107ed2b96faeed329c',
+  testnetUSDSTAddress: '5375b8b1c691201acf16a72612d82ed438951a04',
   prodCataAddress: '2680dc6693021cd3fefb84351570874fbef8332a',
   testnetCataAddress: '051cb99bca7c437f4b17dc01bd4ff7c5e09db035',
   testnetETHSTAddress: '49ac6e4c18cb4bc4232d9d1471041b3c269d7422',
@@ -122,14 +122,6 @@ export const ISSUER_STATUS = {
   UNAUTHORIZED: '1',
   PENDING_REVIEW: '2',
   AUTHORIZED: '3',
-};
-
-export const PAYMENT_TYPES = {
-  amex: '1',
-  discover: '2',
-  mastercard: '3',
-  strat: '4',
-  visa: '5',
 };
 
 // Orders: No comments initially

@@ -553,7 +553,7 @@ const actions = {
   fetchStratsBalance: async (dispatch) => {
     dispatch({ type: actionDescriptors.fetchStratsBalance });
     try {
-      let response = await fetch(`${apiUrl}/marketplace/strats`, {
+      let response = await fetch(`${apiUrl}/marketplace/USDST`, {
         method: HTTP_METHODS.GET,
         credentials: 'same-origin',
       });
@@ -623,7 +623,7 @@ const actions = {
   fetchStratsAddress: async (dispatch) => {
     dispatch({ type: actionDescriptors.fetchStratsAddress });
     try {
-      let response = await fetch(`${apiUrl}/marketplace/strats/address`, {
+      let response = await fetch(`${apiUrl}/marketplace/USDST/address`, {
         method: HTTP_METHODS.GET,
         credentials: 'same-origin',
       });
@@ -746,7 +746,7 @@ const actions = {
   fetchStratsTransactionHistory: async (dispatch) => {
     dispatch({ type: actionDescriptors.fetchStratsTransactionHistory });
     try {
-      let response = await fetch(`${apiUrl}/marketplace/strats/history`, {
+      let response = await fetch(`${apiUrl}/marketplace/USDST/history`, {
         method: HTTP_METHODS.GET,
         credentials: 'same-origin',
       });
@@ -782,7 +782,7 @@ const actions = {
   transferStrats: async (dispatch, payload) => {
     dispatch({ type: actionDescriptors.transferStrats });
     try {
-      let response = await fetch(`${apiUrl}/marketplace/strats/transfer`, {
+      let response = await fetch(`${apiUrl}/marketplace/USDST/transfer`, {
         method: HTTP_METHODS.POST,
         credentials: 'same-origin',
         headers: {

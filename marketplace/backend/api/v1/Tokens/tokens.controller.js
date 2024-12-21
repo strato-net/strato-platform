@@ -1,23 +1,8 @@
 import { rest } from 'blockapps-rest';
 import Joi from '@hapi/joi';
 import RestStatus from 'http-status-codes';
-import config from '../../../load.config';
-
-const options = { config, cacheNonce: true };
 
 class TokensController {
-  static async getAll(req, res, next) {
-    try {
-      const { dapp, query } = req;
-
-      const tokens = await dapp.getTokens({ ...query });
-      rest.response.status200(res, tokens);
-
-      return next();
-    } catch (e) {
-      return next(e);
-    }
-  }
 
   static async create(req, res, next) {
     try {
@@ -26,6 +11,31 @@ class TokensController {
       TokensController.validateCreateTokensArgs(body);
 
       const result = await dapp.createTokens(body);
+      rest.response.status200(res, result);
+
+      return next();
+    } catch (e) {
+      return next(e);
+    }
+  }
+
+  static async getETHSTAddress(_, res, next) {
+    try {
+      const address = await tokensJs.getETHSTAddress();
+
+      return rest.response.status200(res, address);
+    } catch (e) {
+      return next(e);
+    }
+  }
+
+  static async addHash(req, res, next) {
+    try {
+      const { dapp, body } = req;
+
+      EthController.validateAddHashArgs(body);
+
+      const result = await dapp.addHash(body);
       rest.response.status200(res, result);
 
       return next();
@@ -46,6 +56,7 @@ class TokensController {
         files: Joi.array().items(Joi.string()).required(),
         fileNames: Joi.array().items(Joi.string()).required(),
         redemptionService: Joi.string().required(),
+        paymentServiceCreator: Joi.string().required(),
       }).required(),
     });
 
@@ -56,6 +67,27 @@ class TokensController {
       throw new rest.RestError(
         RestStatus.BAD_REQUEST,
         'Create Tokens Argument Validation Error',
+        {
+          message: `Missing args or bad format: ${validation.error.message}`,
+        }
+      );
+    }
+  }
+
+  static validateAddHashArgs(args) {
+    const addHashSchema = Joi.object({
+      userAddress: Joi.string().required(),
+      txHash: Joi.string().required(),
+      amount: Joi.string().required(),
+    });
+
+    const validation = addHashSchema.validate(args);
+
+    if (validation.error) {
+      console.log(validation.error.message);
+      throw new rest.RestError(
+        RestStatus.BAD_REQUEST,
+        'Add Hash Argument Validation Error',
         {
           message: `Missing args or bad format: ${validation.error.message}`,
         }

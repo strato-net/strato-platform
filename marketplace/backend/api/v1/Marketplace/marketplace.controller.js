@@ -1,7 +1,6 @@
 import { rest } from 'blockapps-rest';
 import constants from '../../../helpers/constants';
-import STRATSJs from '../../../dapp/items/STRATS';
-import CATAJs from '/dapp/items/CATA';
+import tokensJs from '../../../dapp/items/tokens';
 
 class MarketplaceController {
   static async getAll(req, res, next) {
@@ -108,14 +107,14 @@ class MarketplaceController {
     }
   }
 
-  static async getStratsBalance(req, res, next) {
+  static async getUSDSTBalance(req, res, next) {
     try {
       const { dapp, address: userAddress } = req;
-      let stratsBalance = 0;
+      let USDSTBalance = 0;
 
-      stratsBalance = await dapp.getStratsBalance({ userAddress: userAddress });
+      USDSTBalance = await dapp.getUSDSTBalance({ userAddress: userAddress });
 
-      return rest.response.status200(res, stratsBalance);
+      return rest.response.status200(res, USDSTBalance);
     } catch (e) {
       return next(e);
     }
@@ -134,9 +133,9 @@ class MarketplaceController {
     }
   }
 
-  static async getStratsAddress(req, res, next) {
+  static async getUSDSTAddress(req, res, next) {
     try {
-      const address = await STRATSJs.getStratsAddress();
+      const address = await tokensJs.getUSDSTAddress();
 
       return rest.response.status200(res, address);
     } catch (e) {
@@ -155,36 +154,9 @@ class MarketplaceController {
 
   static async getCataAddress(req, res, next) {
     try {
-      const address = await CATAJs.getCataAddress();
+      const address = await tokensJs.getCataAddress();
 
       return rest.response.status200(res, address);
-    } catch (e) {
-      return next(e);
-    }
-  }
-
-  static async getStratsTransactionHistory(req, res, next) {
-    try {
-      const { dapp, address: userAddress } = req;
-
-      const stratsTransactionHistory = await dapp.getStratsTransactionHistory({
-        userAddress: userAddress,
-      });
-
-      return rest.response.status200(res, stratsTransactionHistory);
-    } catch (e) {
-      return next(e);
-    }
-  }
-
-  static async transferStrats(req, res, next) {
-    try {
-      const { dapp, body } = req;
-      const { to, value } = body;
-
-      await dapp.transferStrats({ to, value });
-
-      return rest.response.status200(res);
     } catch (e) {
       return next(e);
     }

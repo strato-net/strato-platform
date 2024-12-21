@@ -10,7 +10,6 @@ import inventory from './Inventory';
 import item from './Item';
 import art from './Art';
 import tokens from './Tokens';
-import strats from './STRATS';
 import carbonOffset from './CarbonOffset';
 import metals from './Metals';
 import spirits from './Spirits';
@@ -29,7 +28,6 @@ import redemption from './Redemption';
 import transaction from './Transactions';
 import reserve from './Reserve';
 import escrow from './Escrow';
-import eth from './Eth';
 
 import {
   Authentication,
@@ -42,7 +40,6 @@ import {
   Item,
   Art,
   Tokens,
-  STRATS,
   CarbonOffset,
   Metals,
   Spirits,
@@ -73,7 +70,6 @@ router.use(Inventory.prefix, inventory);
 router.use(Item.prefix, item);
 router.use(Art.prefix, art);
 router.use(Tokens.prefix, tokens);
-router.use(STRATS.prefix, strats);
 router.use(CarbonOffset.prefix, carbonOffset);
 router.use(Clothing.prefix, clothing);
 router.use(Membership.prefix, membership);
@@ -89,7 +85,6 @@ router.use(Redemption.prefix, redemption);
 router.use(Transaction.prefix, transaction);
 router.use(Reserve.prefix, reserve);
 router.use(Escrow.prefix, escrow);
-router.use(Eth.prefix, eth);
 
 router.get(`/health`, (req, res) => {
   const deployment = req.app.get(deployParamName);

@@ -24,7 +24,7 @@ const actions = {
   fetchETHSTAddress: async (dispatch) => {
     dispatch({ type: actionDescriptors.fetchETHSTAddress });
     try {
-      let response = await fetch(`${apiUrl}/eth/address`, {
+      let response = await fetch(`${apiUrl}/tokens/address`, {
         method: HTTP_METHODS.GET,
         credentials: 'same-origin',
       });
@@ -67,7 +67,7 @@ const actions = {
     dispatch({ type: actionDescriptors.addHash });
 
     try {
-      const response = await fetch(`${apiUrl}/eth/addHash`, {
+      const response = await fetch(`${apiUrl}/tokens/addHash`, {
         method: HTTP_METHODS.POST,
         credentials: 'same-origin',
         headers: {
