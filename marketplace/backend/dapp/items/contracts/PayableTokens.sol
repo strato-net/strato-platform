@@ -2,10 +2,10 @@ pragma es6;
 pragma strict;
 
 import "./Tokens.sol";
-import "../../mercata-base-contracts/Templates/Payments/StratPaymentService.sol";
+import "../../mercata-base-contracts/Templates/Payments/TokenPaymentService.sol";
 
 /// @title A representation of STRATS assets
-contract STRATSTokens is Tokens {
+contract PayableTokens is Tokens {
     string public paymentServiceCreator;
     string public paymentServiceName;
 
@@ -21,21 +21,20 @@ contract STRATSTokens is Tokens {
         uint _quantity,
         AssetStatus _status,
         address _redemptionService,
-        string _paymentServiceCreator,
-        string _paymentServiceName
+        string _paymentServiceCreator
     ) public Tokens(_name, _description, _images, _files, _fileNames, _createdDate, _quantity, _status, _redemptionService) {
         paymentServiceCreator = _paymentServiceCreator;
-        paymentServiceName = _paymentServiceName;
+        paymentServiceName = _name;
     }
     
     function mint(uint _quantity) internal override returns (UTXO) {
         require(_quantity > 0, "Quantity must be greater than 0");
-        STRATSTokens newSTRATS = new STRATSTokens(name, description, images, files, fileNames, createdDate, _quantity, status, address(redemptionService), paymentServiceCreator, paymentServiceName);
+        PayableTokens newSTRATS = new PayableTokens(name, description, images, files, fileNames, createdDate, _quantity, status, address(redemptionService), paymentServiceCreator, paymentServiceName);
         return UTXO(address(newSTRATS)); 
     }
 
     modifier fromPaymentService(string action) {
-        StratPaymentService ps = StratPaymentService(msg.sender);
+        TokenPaymentService ps = TokenPaymentService(msg.sender);
         string err = "Only the current corresponding Payment Service contract can "
                        + action
                        + ".";

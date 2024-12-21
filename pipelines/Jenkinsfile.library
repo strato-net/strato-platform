@@ -1413,8 +1413,8 @@ def spinUpPaymentServer() {
         TABLE_PREFIX="Test-Mercata-" \\
         SKIP_CONTRACT_VALIDATION="true" \\
         SKIP_DEPLOYMENT="true" \\
-        STRAT_ADDRESS=488cd3909d94606051e0684cf6caa5763fb78613 \\
-        STRAT_FEE_RECIPIENT=4ec8dc980621032ef75cac175f02e8062e028aef \\
+        USDST_ADDRESS=488cd3909d94606051e0684cf6caa5763fb78613 \\
+        USDST_FEE_RECIPIENT=4ec8dc980621032ef75cac175f02e8062e028aef \\
         ./payment-server
     """
   }

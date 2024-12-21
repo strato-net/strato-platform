@@ -54,9 +54,7 @@ describe("Payment Server - deploy contracts", function () {
 
   let token
   let stripe
-  // TODO: Disabled for initial payment server release
-  // let metamask
-  let strat
+  let USDST
   let redemption
 
   before(async () => {
@@ -95,13 +93,8 @@ describe("Payment Server - deploy contracts", function () {
     stripe = await uploadContract(token, 'External', 'Payment', config.stripe)
   })
 
-  // TODO: Disabled for initial payment server release
-  // it('Deploy MetaMask ExternalPaymentService', async () => {
-  //   metamask = await uploadContract(token, 'Payment', config.metamask)
-  // })
-
-  it('Deploy STRATS StratPaymentService', async () => {
-    strat = await uploadContract(token, 'Strat', 'Payment', config.strat)
+  it('Deploy USDST TokenPaymentService', async () => {
+    USDST = await uploadContract(token, 'Token', 'Payment', config.USDST)
   })
 
   it('Deploy ExternalRedemptionService', async () => {
@@ -112,8 +105,7 @@ describe("Payment Server - deploy contracts", function () {
     const deployArgs = {
       deployFilePath: `${config.configDirPath}/deploy.yaml`,
       stripe,
-      // metamask, // TODO: Disabled for initial payment server release
-      strat,
+      USDST,
       redemption
     }
     const deployment = deploy(deployArgs, config)
