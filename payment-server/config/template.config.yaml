@@ -32,7 +32,7 @@ metamask:
   secondarySaleFeePercentage: <metamask_secondary_sale_fee_percentage_value>
 
 USDST:
-  USDSTAddress: <USDST_USDST_address_value>
+  tokenAddress: <USDST_USDST_address_value>
   serviceName: <USDST_service_name_value>
   imageURL: <USDST_image_url_value>
   primarySaleFeePercentage: <USDST_primary_sale_fee_percentage_value>

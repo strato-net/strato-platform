@@ -2,15 +2,15 @@ pragma es6;
 pragma strict;
 
 import <BASE_CODE_COLLECTION>;
-import "../../../items/contracts/PayableTokens.sol";
+import "../../../items/contracts/Tokens.sol";
 
 contract TokenPaymentService is PaymentService {
-    address public USDSTAddress;
+    address public tokenAddress;
 
     address public feeRecipient;
 
     constructor (
-        address _USDSTAddress,
+        address _tokenAddress,
         string _serviceName,
         string _imageURL,
         decimal _primarySaleFeePercentage,
@@ -23,12 +23,12 @@ contract TokenPaymentService is PaymentService {
         _primarySaleFeePercentage,
         _secondarySaleFeePercentage
     ) public {
-        USDSTAddress = _USDSTAddress;
+        tokenAddress = _tokenAddress;
         feeRecipient = _feeRecipient;
     }
 
     function _checkoutInitialized (
-        address[] _USDSTAssetAddresses,
+        address[] _tokenAssetAddresses,
         string _checkoutHash,
         string _checkoutId,
         address _purchaser,
@@ -94,41 +94,41 @@ contract TokenPaymentService is PaymentService {
                 );
             }
 
-            // Calculate net and fee amounts in USDST
-            uint USDSTAmountNet = uint(net * (10**18));
-            uint USDSTFee = uint(fee * (10**18));
+            // Calculate net and fee amounts in 18 decimal places
+            uint tokenAmountNet = uint(net * (10**18));
+            uint tokenFee = uint(fee * (10**18));
 
-            // Transfer USDST
-            uint remainingUSDSTToTransfer = USDSTAmountNet;
-            uint remainingFeeToTransfer = USDSTFee;
-            uint USDSTQuantity = 0;
+            // Transfer token
+            uint remainingTokenToTransfer = tokenAmountNet;
+            uint remainingFeeToTransfer = tokenFee;
+            uint tokenQuantity = 0;
             uint transferAmount = 0;
             uint transferFee = 0;
             uint transferNumber = 0;
-            for (uint j = 0; j < _USDSTAssetAddresses.length; j++) {
-                PayableTokens USDSTAsset = PayableTokens(_USDSTAssetAddresses[j]);
-                require(USDSTAsset.root == USDSTAddress, "Asset is not a " + serviceName  + " asset");
-                require(USDSTAsset.ownerCommonName() == getCommonName(msg.sender), "Purchaser doesn't own " + serviceName);
-                USDSTQuantity = USDSTAsset.quantity();
+            for (uint j = 0; j < _tokenAssetAddresses.length; j++) {
+                Tokens tokenAsset = Tokens(_tokenAssetAddresses[j]);
+                require(tokenAsset.root == tokenAddress, "Asset is not a " + serviceName  + " asset");
+                require(tokenAsset.ownerCommonName() == getCommonName(msg.sender), "Purchaser doesn't own " + serviceName);
+                tokenQuantity = tokenAsset.quantity();
                 transferNumber = (uint(_checkoutHash, 16) + j) % 1000000;
-                if (remainingUSDSTToTransfer > 0) {
-                    transferAmount = USDSTQuantity >= remainingUSDSTToTransfer ? remainingUSDSTToTransfer : USDSTQuantity;
-                    USDSTAsset.purchaseTransfer(sellerAddress, transferAmount, transferNumber, 1/(10**18));
-                    remainingUSDSTToTransfer -= transferAmount;
+                if (remainingTokenToTransfer > 0) {
+                    transferAmount = tokenQuantity >= remainingTokenToTransfer ? remainingTokenToTransfer : tokenQuantity;
+                    tokenAsset.purchaseTransfer(sellerAddress, transferAmount, transferNumber, 1/(10**18));
+                    remainingTokenToTransfer -= transferAmount;
                 }
-                USDSTQuantity = USDSTQuantity - transferAmount;
-                if (remainingFeeToTransfer > 0 && USDSTQuantity > 0) {
+                tokenQuantity = tokenQuantity - transferAmount;
+                if (remainingFeeToTransfer > 0 && tokenQuantity > 0) {
                     transferNumber = (uint(_checkoutHash, 16) + j + block.timestamp) % 1000000;
-                    transferFee = USDSTQuantity >= remainingFeeToTransfer ? remainingFeeToTransfer : USDSTQuantity;
-                    USDSTAsset.purchaseTransfer(feeRecipient, transferFee, transferNumber, 1/(10**18));
+                    transferFee = tokenQuantity >= remainingFeeToTransfer ? remainingFeeToTransfer : tokenQuantity;
+                    tokenAsset.purchaseTransfer(feeRecipient, transferFee, transferNumber, 1/(10**18));
                     remainingFeeToTransfer -= transferFee;
                 }
                 transferAmount = 0;
-                if (remainingUSDSTToTransfer == 0 && remainingFeeToTransfer == 0) {
+                if (remainingTokenToTransfer == 0 && remainingFeeToTransfer == 0) {
                     break;
                 }
             }
-            require(remainingUSDSTToTransfer == 0, err);
+            require(remainingTokenToTransfer == 0, err);
             require(remainingFeeToTransfer == 0, feeErr);
 
             // Transfer assets
