@@ -7,12 +7,12 @@ import ChildStakeItemActions from '../Inventory/ChildStakeItemActions';
 import { ASSET_STATUS } from '../../helpers/constants';
 
 const logo = <img src={Images.cata} alt={''} title={''} className="w-5 h-5" />;
-const StratsIcon = (
-  <img src={Images.strat} alt={''} title={''} className="w-4 h-4" />
+const USDSTIcon = (
+  <img src={Images.USDST} alt={''} title={''} className="w-4 h-4" />
 );
 
 // Make sure you have any necessary variables or functions defined/imported
-// You may need to pass user, limit, offset, reserves, stratsAddress, assetsWithEighteenDecimalPlaces as params,
+// You may need to pass user, limit, offset, reserves, USDSTAddress, assetsWithEighteenDecimalPlaces as params,
 // or handle them in the file where you call these columns.
 
 export const aggregateStakeColumns = (
@@ -20,7 +20,7 @@ export const aggregateStakeColumns = (
   limit,
   offset,
   reserves,
-  stratsAddress,
+  USDSTAddress,
   assetsWithEighteenDecimalPlaces
 ) => {
   return [
@@ -73,7 +73,7 @@ export const aggregateStakeColumns = (
               </div>
             </div>
             <div className="flex items-center gap-2">
-              Borrowed Amount: {StratsIcon}
+              Borrowed Amount: {USDSTIcon}
               {borrowedAmount.toLocaleString('en-US', {
                 maximumFractionDigits: 2,
                 minimumFractionDigits: 2,
@@ -173,7 +173,6 @@ export const aggregateStakeColumns = (
             debouncedSearchTerm={''}
             user={user}
             reserves={reserves}
-            stratAddress={stratsAddress}
             assetsWithEighteenDecimalPlaces={assetsWithEighteenDecimalPlaces}
           />
         </div>
@@ -220,7 +219,7 @@ export const stakeColumns = (
   limit,
   offset,
   reserves,
-  stratsAddress,
+  USDSTAddress,
   assetsWithEighteenDecimalPlaces,
   navigate
 ) => {
@@ -363,7 +362,6 @@ export const stakeColumns = (
           debouncedSearchTerm={''}
           user={user}
           reserves={reserves}
-          stratAddress={stratsAddress}
           assetsWithEighteenDecimalPlaces={assetsWithEighteenDecimalPlaces}
         />
       ),

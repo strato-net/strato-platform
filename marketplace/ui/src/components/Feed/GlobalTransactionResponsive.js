@@ -16,13 +16,10 @@ const GlobalTransactionResponsive = ({
   user,
   isTransactionLoading,
   fetchData,
-  stratAddress,
   assetsWithEighteenDecimalPlaces,
   ethstAddress,
 }) => {
-  const StratsIcon = (
-    <img src={Images.strat} alt="STRATs" className="w-5 h-5" />
-  );
+  const USDSTIcon = <img src={Images.USDST} alt="USDST" className="w-5 h-5" />;
   const navigate = useNavigate();
   const [expandedRows, setExpandedRows] = useState({});
 
@@ -110,8 +107,8 @@ const GlobalTransactionResponsive = ({
                   type,
                 },
               ];
-              const isStrat = assetOriginAddress === stratAddress;
-              const is18DecimalPlaces = assetsWithEighteenDecimalPlaces.includes(assetOriginAddress);
+              const is18DecimalPlaces =
+                assetsWithEighteenDecimalPlaces.includes(assetOriginAddress);
 
               const handleDetailRedirection = () => {
                 let route;
@@ -226,21 +223,17 @@ const GlobalTransactionResponsive = ({
                       <p className={`text-right flex justify-end items-center`}>
                         $
                         {formattedNum(
-                          isStrat
-                            ? (price * 100).toFixed(2)
-                            : is18DecimalPlaces
+                          is18DecimalPlaces
                             ? (price * Math.pow(10, 18)).toFixed(2)
                             : price
                         )}{' '}
                         (
                         {formattedNum(
-                          isStrat
-                            ? (price * 100 * 100).toFixed(2)
-                            : is18DecimalPlaces
+                          is18DecimalPlaces
                             ? (price * Math.pow(10, 18) * 100).toFixed(2)
-                            : price * 100
+                            : price
                         )}{' '}
-                        {StratsIcon})
+                        {USDSTIcon})
                       </p>
                     ) : (
                       <p className="text-right text-[#13188A] font-bold text-sm">
@@ -249,9 +242,7 @@ const GlobalTransactionResponsive = ({
                     )}
                     <p className="text-right">
                       Qty:{' '}
-                      {(isStrat
-                        ? quantity / 100
-                        : is18DecimalPlaces
+                      {(is18DecimalPlaces
                         ? quantity / Math.pow(10, 18)
                         : quantity
                       ).toLocaleString('en-US', {

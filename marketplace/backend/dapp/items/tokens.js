@@ -1,6 +1,7 @@
 import { util, rest, importer } from '/blockapps-rest-plus';
 import { waitForAddress } from '/helpers/utils';
 import constants from '../../helpers/constants';
+import BigNumber from 'bignumber.js';
 
 const contractName = 'Tokens';
 const contractFilename = `${util.cwd}/dapp/items/contracts/Tokens.sol`;
@@ -16,8 +17,8 @@ async function uploadContract(user, _constructorArgs, options) {
   const constructorArgs = marshalIn(_constructorArgs);
   const { quantity, ...restArgs } = constructorArgs;
 
-  // Adjust quantity safely
-  const adjustedQuantity = (quantity * Math.pow(10, 18)).toFixed(0);
+  // Adjust quantity safely using BigNumber
+  const adjustedQuantity = new BigNumber(quantity).multipliedBy(new BigNumber(10).pow(18)).toFixed(0);
   const updatedConstructorArgs = { ...restArgs, quantity: adjustedQuantity };
 
   const contractArgs = {

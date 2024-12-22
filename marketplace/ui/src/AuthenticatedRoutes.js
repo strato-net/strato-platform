@@ -23,7 +23,6 @@ import AuthorizeIssuer from './components/AuthorizeIssuer';
 import { IssuerStatusProvider } from './contexts/issuerStatus';
 import ProductDetails from './components/MarketPlace/ProductDetails';
 import EthstProductDetails from './components/ETHST/EthstProductDetails';
-import VaultDetails from './components/MarketPlace/VaultDetails';
 import Checkout from './components/MarketPlace/Checkout';
 import ConfirmOrder from './components/MarketPlace/ConfirmOrder';
 import ProcessingOrder from './components/MarketPlace/ProcessingOrder';
@@ -286,27 +285,6 @@ const AuthenticatedRoutes = ({ user, users, isAuthenticated }) => {
                     <ItemsProvider>
                       <OrdersProvider>
                         <ProductDetails user={user} users={users} />
-                      </OrdersProvider>
-                    </ItemsProvider>
-                  </InventoriesProvider>
-                </PaymentServicesProvider>
-              </SubCategorysProvider>
-            </CategorysProvider>
-          </UsersProvider>
-        }
-      />
-      <Route
-        exact
-        path={routes.VaultDetail.url}
-        element={
-          <UsersProvider>
-            <CategorysProvider>
-              <SubCategorysProvider>
-                <PaymentServicesProvider>
-                  <InventoriesProvider>
-                    <ItemsProvider>
-                      <OrdersProvider>
-                        <VaultDetails user={user} users={users} />
                       </OrdersProvider>
                     </ItemsProvider>
                   </InventoriesProvider>

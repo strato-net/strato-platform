@@ -39,22 +39,16 @@ const ItemActions = ({
   user,
   supportedTokens,
   reserves,
-  stratAddress,
   assetsWithEighteenDecimalPlaces,
 }) => {
   const itemData = inventory.data;
-  const isStrat = inventory.originAddress === stratAddress;
   const is18DecimalPlaces = assetsWithEighteenDecimalPlaces.includes(inventory.originAddress);
-  const quantity = isStrat
-    ? new BigNumber(inventory.quantity).dividedBy(100)
-    : is18DecimalPlaces
+  const quantity = is18DecimalPlaces
     ? new BigNumber(inventory.quantity).dividedBy(new BigNumber(10).pow(18))
     : new BigNumber(inventory.quantity);
   const saleQuantity =
     inventory.saleQuantity !== undefined
-      ? isStrat
-        ? new BigNumber(inventory.saleQuantity).dividedBy(100)
-        : is18DecimalPlaces
+      ? is18DecimalPlaces
         ? new BigNumber(inventory.saleQuantity).dividedBy(new BigNumber(10).pow(18))
         : new BigNumber(inventory.saleQuantity)
       : undefined;  
@@ -254,7 +248,6 @@ const ItemActions = ({
             inventory.address === inventory.originAddress ||
             !isActive() ||
             disableSADDOGS(inventory) ||
-            isStrat ||
             is18DecimalPlaces
           }
         >
@@ -325,7 +318,6 @@ const ItemActions = ({
                     inventory.address === inventory.originAddress ||
                     !isActive() ||
                     disableSADDOGS(inventory) ||
-                    isStrat ||
                     is18DecimalPlaces
                   }
                 >
@@ -384,7 +376,6 @@ const ItemActions = ({
           category={category}
           user={user}
           reserves={reserves}
-          stratAddress={stratAddress}
           assetsWithEighteenDecimalPlaces={assetsWithEighteenDecimalPlaces}
         />
       )}
@@ -452,7 +443,6 @@ const ItemActions = ({
           debouncedSearchTerm={debouncedSearchTerm}
           category={category}
           reserves={reserves}
-          stratAddress={stratAddress}
           assetsWithEighteenDecimalPlaces={assetsWithEighteenDecimalPlaces}
         />
       )}
@@ -466,7 +456,6 @@ const ItemActions = ({
           debouncedSearchTerm={debouncedSearchTerm}
           category={category}
           reserves={reserves}
-          stratAddress={stratAddress}
           assetsWithEighteenDecimalPlaces={assetsWithEighteenDecimalPlaces}
         />
       )}

@@ -1,6 +1,7 @@
 import { rest } from 'blockapps-rest';
 import Joi from '@hapi/joi';
 import RestStatus from 'http-status-codes';
+import tokensJs from '../../../dapp/items/tokens';
 
 class TokensController {
 

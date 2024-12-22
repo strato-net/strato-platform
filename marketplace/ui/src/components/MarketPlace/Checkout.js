@@ -40,13 +40,13 @@ const Checkout = () => {
     usePaymentServiceState();
   const paymentServiceDispatch = usePaymentServiceDispatch();
   const [api, contextHolder] = notification.useNotification();
-  const { cartList, stratsAddress, assetsWithEighteenDecimalPlaces } = useMarketplaceState();
+  const { cartList, USDSTAddress, assetsWithEighteenDecimalPlaces } = useMarketplaceState();
   const { isCreateOrderSubmitting, message, success } = useOrderState();
 
   const [mapData, setmapData] = useState([]);
 
   const calculateTax = (item) => {
-    const isStrat = item.product.originAddress === stratsAddress;
+    const isStrat = item.product.originAddress === USDSTAddress;
     const is18DecimalPlaces = assetsWithEighteenDecimalPlaces.includes(item.product.originAddress);
     let price = new Decimal( isStrat ? item.product.price * 100 : is18DecimalPlaces ? item.product.price * Math.pow(10, 18) : item.product.price);
     let tax = new Decimal(CHARGES.TAX);
@@ -56,7 +56,7 @@ const Checkout = () => {
   };
 
   const calculateAmount = (item) => {
-    const isStrat = item.product.originAddress === stratsAddress;
+    const isStrat = item.product.originAddress === USDSTAddress;
     const is18DecimalPlaces = assetsWithEighteenDecimalPlaces.includes(item.product.originAddress);
     let price = new Decimal(isStrat ? item.product.price * 100 : is18DecimalPlaces ? item.product.price * Math.pow(10, 18) : item.product.price);
     let tax = calculateTax(item);
@@ -109,7 +109,7 @@ const Checkout = () => {
       const { paymentServices, items } = value;
       let modifiedValue = [];
       items.forEach((item) => {
-        const isStrat = item.product.originAddress === stratsAddress;
+        const isStrat = item.product.originAddress === USDSTAddress;
         const is18DecimalPlaces = assetsWithEighteenDecimalPlaces.includes(item.product.originAddress);
         const parts = item.product.contract_name.split('-');
         let amount = calculateAmount(item);

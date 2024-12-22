@@ -8,7 +8,7 @@ import {
   Image,
 } from '@react-pdf/renderer';
 import { getStringDate } from '../../helpers/utils';
-import { US_DATE_FORMAT, STRATS_CONVERSION } from '../../helpers/constants';
+import { US_DATE_FORMAT } from '../../helpers/constants';
 import { Images } from '../../images';
 // import { useMarketplaceState } from '../../contexts/marketplace';
 
@@ -102,7 +102,7 @@ const InvoiceComponent = ({ invoice }) => {
     settotalTax(tax);
     if (invoice.order.currency === 'STRATS') {
       setSubtotal(
-        ((invoice.order.totalPrice - tax) * STRATS_CONVERSION).toFixed(0)
+        ((invoice.order.totalPrice - tax) * 100).toFixed(0)
       );
     } else {
       setSubtotal((invoice.order.totalPrice - tax).toFixed(2));
@@ -179,7 +179,7 @@ const InvoiceComponent = ({ invoice }) => {
               invoice.order.currency === 'STRATS'
                 ? (
                     asset.price *
-                    STRATS_CONVERSION *
+                    100 *
                     orderQuantities[index]
                   ).toFixed(0)
                 : (asset.price * orderQuantities[index]).toFixed(2);
@@ -193,7 +193,7 @@ const InvoiceComponent = ({ invoice }) => {
                 </Text>
                 <Text style={[styles.value, styles.tableRowColumn]}>
                      {invoice.order.currency === 'STRATS'
-                  ? (adjustedPrice * STRATS_CONVERSION).toFixed(0) 
+                  ? (adjustedPrice * 100).toFixed(0) 
                    : invoice.order.currency === 'CATA' ? (adjustedPrice * Math.pow(10, 18)).toFixed(2) 
                   : adjustedPrice.toFixed(2)}
                 </Text>
@@ -217,7 +217,7 @@ const InvoiceComponent = ({ invoice }) => {
               <Text style={styles.bottomLabel}>Total</Text>
               <Text style={styles.bottomLabel}>
                 {invoice.order.currency === 'STRATS'
-                  ? (invoice.order.totalPrice * STRATS_CONVERSION).toFixed(0) 
+                  ? (invoice.order.totalPrice * 100).toFixed(0) 
                    : invoice.order.currency === 'CATA' ? (invoice.order.totalPrice * Math.pow(10, 18)).toFixed(2) 
                   : invoice.order.totalPrice.toFixed(2)}
               </Text>

@@ -103,12 +103,16 @@ const ResponsiveCart = ({
 
       concatenatedOrderString += `${itemName}:\n`;
       concatenatedOrderString += `$${itemTotal} <br>`;
-      concatenatedOrderString += `Qty: ${itemQty} &nbsp; $${itemPrice} each (${(itemPrice * 100).toFixed(0)} ${(itemPrice * 100).toFixed(0) == 1 ? 'STRAT' : 'STRATs'})<br><br>`;
+      concatenatedOrderString += `Qty: ${itemQty} &nbsp; $${itemPrice} each (${(
+        itemPrice * 100
+      ).toFixed(0)} ' USDST'})<br><br>`;
       orderTotal += parseFloat(itemTotal);
       if (i === cartData.length - 1) {
         concatenatedOrderString += `<hr style="border-top: 1px dotted #0A1B71; min-width: 80%; max-width: 80%; margin-left: 15px;">`;
         concatenatedOrderString += `Shipping Fee: <i><strong>Free</strong></i><br><br>`;
-        concatenatedOrderString += `Order Total: $${orderTotal.toFixed(2)} <br>`;
+        concatenatedOrderString += `Order Total: $${orderTotal.toFixed(
+          2
+        )} <br>`;
       }
     }
 
@@ -248,10 +252,10 @@ const ResponsiveCart = ({
   const totalAmount =
     selectedProvider?.serviceName === 'STRATS' ||
     selectedProvider?.serviceName?.includes('STRATS')
-      ? `${(subTotal * 100).toFixed(0)} ${(subTotal * 100).toFixed(0) == 1 ? 'STRAT' : 'STRATs'}`
+      ? `${(subTotal * 100).toFixed(0)} USDST`
       : selectedProvider?.serviceName === 'Stripe'
-        ? `${subTotal} USD`
-        : `${subTotal} ${selectedProvider?.serviceName || 'USD'}`;
+      ? `${subTotal} USD`
+      : `${subTotal} ${selectedProvider?.serviceName || 'USD'}`;
 
   return (
     <div className=" rounded-md mt-3 flex flex-col gap-[18px] sm:w-[400px] md:w-[450px] items-center">
@@ -291,14 +295,20 @@ const ResponsiveCart = ({
               </div>
 
               <div className="flex justify-between ml-[20%] items-baseline">
-                <Typography className="font-semibold text-[#202020] text-sm">{`$${(element?.unitPrice).toFixed(2)}`}</Typography>
+                <Typography className="font-semibold text-[#202020] text-sm">{`$${(element?.unitPrice).toFixed(
+                  2
+                )}`}</Typography>
                 <div>
                   <div className="flex items-center justify-center mt-2">
                     <div
                       onClick={() => {
                         MinusQty(qty, product);
                       }}
-                      className={`w-6 h-6 bg-[#E9E9E9] flex justify-center items-center rounded-full ${qty === 1 ? 'cursor-not-allowed opacity-50' : 'cursor-pointer'}`}
+                      className={`w-6 h-6 bg-[#E9E9E9] flex justify-center items-center rounded-full ${
+                        qty === 1
+                          ? 'cursor-not-allowed opacity-50'
+                          : 'cursor-pointer'
+                      }`}
                     >
                       <p className="text-lg text-[#202020] font-medium">-</p>
                     </div>
@@ -316,7 +326,11 @@ const ResponsiveCart = ({
                       onClick={() => {
                         AddQty(product);
                       }}
-                      className={`w-6 h-6 bg-[#E9E9E9] flex justify-center items-center rounded-full ${qty >= product.quantity ? 'cursor-not-allowed opacity-50' : 'cursor-pointer'}`}
+                      className={`w-6 h-6 bg-[#E9E9E9] flex justify-center items-center rounded-full ${
+                        qty >= product.quantity
+                          ? 'cursor-not-allowed opacity-50'
+                          : 'cursor-pointer'
+                      }`}
                     >
                       <p className="text-lg text-[#202020] font-medium">+</p>
                     </div>
@@ -334,7 +348,9 @@ const ResponsiveCart = ({
                     <img
                       src={Images.Dropdown}
                       alt=""
-                      className={`w-5 h-5 transition-transform transform ${faqOpenState[index] ? 'rotate-180' : 'rotate-0'}`}
+                      className={`w-5 h-5 transition-transform transform ${
+                        faqOpenState[index] ? 'rotate-180' : 'rotate-0'
+                      }`}
                       onClick={() => {
                         toggleFaq(index);
                       }}
@@ -345,7 +361,11 @@ const ResponsiveCart = ({
 
               {faqOpenState[index] && (
                 <div
-                  className={`overflow-hidden ${faqOpenState[index] ? 'max-h-[145px] open' : 'max-h-0 faq-container'}`}
+                  className={`overflow-hidden ${
+                    faqOpenState[index]
+                      ? 'max-h-[145px] open'
+                      : 'max-h-0 faq-container'
+                  }`}
                 >
                   <div className="bg-[#F6F6F6] rounded-b-md flex flex-col gap-3 px-3 py-2">
                     <div className="w-full bg-[#BABABA] h-[1px]"></div>
@@ -361,7 +381,9 @@ const ResponsiveCart = ({
                       <Typography className="text-sm text-[#202020] font-medium">
                         Unit Price($):
                       </Typography>
-                      <Typography className="text-sm text-[#202020] font-semibold">{`$${(element?.unitPrice).toFixed(2)}`}</Typography>
+                      <Typography className="text-sm text-[#202020] font-semibold">{`$${(element?.unitPrice).toFixed(
+                        2
+                      )}`}</Typography>
                     </div>
                   </div>
                 </div>

@@ -24,7 +24,7 @@ import { useNavigate } from 'react-router-dom';
 import DataTableComponent from '../DataTableComponent';
 import { getStatus } from './constant';
 import dayjs from 'dayjs';
-import { US_DATE_FORMAT, STRATS_CONVERSION } from '../../helpers/constants';
+import { US_DATE_FORMAT } from '../../helpers/constants';
 import ClickableCell from '../ClickableCell';
 import image_placeholder from '../../images/resources/image_placeholder.png';
 import { ResponsiveOrderDetailCard } from './ResponsiveOrderDetailCard';
@@ -104,7 +104,7 @@ const SoldOrderDetails = ({ user, users }) => {
           unitPrice:
           // formattedNum(
             orderDetails.order.currency === 'STRATS'
-              ? (prod.price * STRATS_CONVERSION).toFixed(0)
+              ? (prod.price * 100).toFixed(0)
               : orderDetails.order.currency === 'CATA' ? (prod.price * Math.pow(10, 18)).toFixed(2)
               : prod.price
             // )
@@ -450,7 +450,7 @@ const SoldOrderDetails = ({ user, users }) => {
                   title="Total"
                   value={
                     details.order.currency === 'STRATS'
-                      ? (details.order.totalPrice * STRATS_CONVERSION).toFixed(
+                      ? (details.order.totalPrice * 100).toFixed(
                           0
                         )
                       : details.order.totalPrice
@@ -589,7 +589,7 @@ const SoldOrderDetails = ({ user, users }) => {
                     value={
                       details.order.currency === 'STRATS'
                         ? (
-                            details.order.totalPrice * STRATS_CONVERSION
+                            details.order.totalPrice * 100
                           ).toFixed(0)
                         : details.order.totalPrice
                     }

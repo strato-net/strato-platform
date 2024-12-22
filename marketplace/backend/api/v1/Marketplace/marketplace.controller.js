@@ -133,9 +133,9 @@ class MarketplaceController {
     }
   }
 
-  static async getUSDSTAddress(req, res, next) {
+  static async getUSDSTAddress(_, res, next) {
     try {
-      const address = await tokensJs.getUSDSTAddress();
+      const address = tokensJs.getUSDSTAddress();
 
       return rest.response.status200(res, address);
     } catch (e) {
@@ -152,9 +152,9 @@ class MarketplaceController {
     }
   }
 
-  static async getCataAddress(req, res, next) {
+  static async getCataAddress(__html, res, next) {
     try {
-      const address = await tokensJs.getCataAddress();
+      const address = tokensJs.getCataAddress();
 
       return rest.response.status200(res, address);
     } catch (e) {

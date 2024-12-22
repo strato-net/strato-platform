@@ -1174,7 +1174,7 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
       },
       options
     );
-    return balance[0].sum ? `${balance[0].sum / 100}` : 0;
+    return balance[0].sum ? `${balance[0].sum / Math.pow(10, 18)}` : 0;
   };
 
   contract.getCataBalance = async function (_, options = defaultOptions) {

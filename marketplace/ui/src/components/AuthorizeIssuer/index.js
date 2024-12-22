@@ -13,8 +13,8 @@ import {
 import { Images } from '../../images';
 
 const logo = <img src={Images.cata} alt={''} title={''} className="w-4 h-4" />;
-const StratsIcon = (
-  <img src={Images.strat} alt={''} title={''} className="w-4 h-4" />
+const USDSTIcon = (
+  <img src={Images.USDST} alt={''} title={''} className="w-4 h-4" />
 );
 
 export default function AuthorizeIssuer() {
@@ -180,7 +180,7 @@ export default function AuthorizeIssuer() {
                     <div className="font-bold">USDST Balance:</div>
                     <div className="flex flex-col">
                       <div className="flex items-center">
-                        {StratsIcon} &nbsp;
+                        {USDSTIcon} &nbsp;
                         {(
                           reserve.USDSTTokenObject.quantity /
                           10 ** 18

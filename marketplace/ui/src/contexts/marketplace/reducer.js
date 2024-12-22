@@ -226,21 +226,21 @@ const reducer = (state, action) => {
         error: action.error,
         isLoadingUserAddresses: false,
       };
-    case actionDescriptors.fetchStratsBalance:
+    case actionDescriptors.fetchUSDSTBalance:
       return {
         ...state,
-        isFetchingStrats: true,
+        isFetchingUSDST: true,
       };
-    case actionDescriptors.fetchStratsBalanceSuccessful:
+    case actionDescriptors.fetchUSDSTBalanceSuccessful:
       return {
         ...state,
-        isFetchingStrats: false,
-        strats: action.payload,
+        isFetchingUSDST: false,
+        USDST: action.payload,
       };
-    case actionDescriptors.fetchStratsBalanceFailed:
+    case actionDescriptors.fetchUSDSTBalanceFailed:
       return {
         ...state,
-        isFetchingStrats: false,
+        isFetchingUSDST: false,
       };
     case actionDescriptors.fetchCataBalance:
       return {
@@ -258,16 +258,16 @@ const reducer = (state, action) => {
         ...state,
         isFetchingCata: false,
       };
-    case actionDescriptors.fetchStratsAddress:
+    case actionDescriptors.fetchUSDSTAddress:
       return {
         ...state,
       };
-    case actionDescriptors.fetchStratsAddressSuccessful:
+    case actionDescriptors.fetchUSDSTAddressSuccessful:
       return {
         ...state,
-        stratsAddress: action.payload,
+        USDSTAddress: action.payload,
       };
-    case actionDescriptors.fetchStratsAddressFailed:
+    case actionDescriptors.fetchUSDSTAddressFailed:
       return {
         ...state,
       };
@@ -301,38 +301,6 @@ const reducer = (state, action) => {
     case actionDescriptors.fetchCataAddressFailed:
       return {
         ...state,
-      };
-    case actionDescriptors.fetchStratsTransactionHistory:
-      return {
-        ...state,
-        isFetchingStratsTransactionHistory: true,
-      };
-    case actionDescriptors.fetchStratsTransactionHistorySuccessful:
-      return {
-        ...state,
-        isFetchingStratsTransactionHistory: false,
-        stratsTransactionHistory: action.payload,
-      };
-    case actionDescriptors.fetchStratsTransactionHistoryFailed:
-      return {
-        ...state,
-        isFetchingStratsTransactionHistory: false,
-      };
-    case actionDescriptors.transferStrats:
-      return {
-        ...state,
-        isTransferringStrats: true,
-      };
-    case actionDescriptors.transferStratsSuccessful:
-      return {
-        ...state,
-        isTransferringStrats: false,
-      };
-    case actionDescriptors.transferStratsFailed:
-      return {
-        ...state,
-        isTransferringStrats: false,
-        error: action.error,
       };
     default:
       throw new Error(`Unhandled action: '${action.type}'`);

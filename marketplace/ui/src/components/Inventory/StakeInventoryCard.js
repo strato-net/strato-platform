@@ -18,7 +18,7 @@ import { Images } from '../../images';
 import { useInventoryState } from '../../contexts/inventory';
 import RepayModal from './RepayModal';
 import BorrowModal from './BorrowModal';
-const StratsIcon = <img src={Images.strat} alt="STRATs" className="w-5 h-5" />;
+const USDSTIcon = <img src={Images.USDST} alt="USDST" className="w-5 h-5" />;
 
 const StakeInventoryCard = ({
   inventory,
@@ -30,7 +30,6 @@ const StakeInventoryCard = ({
   offset,
   user,
   supportedTokens,
-  stratAddress,
   assetsWithEighteenDecimalPlaces,
 }) => {
   const textRef = useRef(null);
@@ -223,7 +222,7 @@ const StakeInventoryCard = ({
             </div>
             <div className="flex flex-row space-x-2 lg:justify-self-end whitespace-nowrap">
               <Typography className="lg:pt-1 flex gap-1">
-                Borrowed Amount: {StratsIcon}
+                Borrowed Amount: {USDSTIcon}
                 {(borrowAmount / 100).toLocaleString('en-US', {
                   maximumFractionDigits: 2,
                   minimumFractionDigits: 2,
@@ -375,7 +374,6 @@ const StakeInventoryCard = ({
           debouncedSearchTerm={debouncedSearchTerm}
           saleAddress={inventory.saleAddress}
           category={category}
-          stratAddress={stratAddress}
           assetsWithEighteenDecimalPlaces={assetsWithEighteenDecimalPlaces}
         />
       )}

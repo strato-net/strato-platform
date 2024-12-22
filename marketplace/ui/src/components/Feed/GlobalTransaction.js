@@ -27,7 +27,6 @@ import {
 } from '../../contexts/transaction';
 // Utils & Constants
 import {
-  STRATS_CONVERSION,
   TRANSACTION_STATUS_COLOR,
   DATE_TIME_FORMAT,
   TRANSACTION_STATUS_TEXT,
@@ -41,12 +40,12 @@ const { Title } = Typography;
 
 const GlobalTransaction = ({
   user,
-  stratAddress,
+  USDSTAddress,
   assetsWithEighteenDecimalPlaces,
   ethstAddress,
 }) => {
-  const StratsIcon = (
-    <img src={Images.strat} alt="STRATs" className="mx-1 w-4 h-4" />
+  const USDSTIcon = (
+    <img src={Images.USDST} alt="USDST" className="mx-1 w-4 h-4" />
   );
   // Dispatch
   const transactionDispatch = useTransactionDispatch();
@@ -102,7 +101,6 @@ const GlobalTransaction = ({
 
   const Content = ({ data }) => {
     const price = data?.assetPrice || data?.price;
-    const isStrat = data.assetOriginAddress === stratAddress;
     const is18DecimalPlaces = assetsWithEighteenDecimalPlaces.includes(data.assetOriginAddress);
 
     return (
@@ -144,22 +142,18 @@ const GlobalTransaction = ({
                   {' '}
                   <b>
                     ${' '}
-                    {isStrat
-                      ? (price * 100).toFixed(2)
-                      : is18DecimalPlaces
+                    {is18DecimalPlaces
                       ? (price * Math.pow(10, 18)).toFixed(2)
                       : price}{' '}
                   </b>{' '}
                   &nbsp;(
                   <span className="text-[#13188A] font-bold">
                     {' '}
-                    {(isStrat
-                      ? (price * 100).toFixed(2)
-                      : is18DecimalPlaces
+                    {is18DecimalPlaces
                       ? (price * Math.pow(10, 18)).toFixed(2)
-                      : price) * STRATS_CONVERSION}{' '}
+                      : price}{' '}
                   </span>
-                  {StratsIcon}){' '}
+                  {USDSTIcon}){' '}
                 </p>
               ) : (
                 <p className="text-right text-[#13188A] font-bold text-sm">
@@ -244,12 +238,11 @@ const GlobalTransaction = ({
         let formattedQuantity = '--';
 
         if (quantity) {
-          const value =
-            assetOriginAddress === stratAddress
-              ? quantity / 100
-              : assetsWithEighteenDecimalPlaces.includes(assetOriginAddress)
-              ? quantity / Math.pow(10, 18)
-              : quantity;
+          const value = assetsWithEighteenDecimalPlaces.includes(
+            assetOriginAddress
+          )
+            ? quantity / Math.pow(10, 18)
+            : quantity;
 
           formattedQuantity = value.toLocaleString('en-US', {
             maximumFractionDigits: 4,
@@ -271,23 +264,18 @@ const GlobalTransaction = ({
           <p className="text-base flex justify-end items-center">
             {price
               ? formattedNum(
-                  (
-                    (assetOriginAddress === stratAddress
-                      ? (price * 100).toFixed(2)
-                      : assetsWithEighteenDecimalPlaces.includes(assetOriginAddress)
-                      ? (price * Math.pow(10, 18)).toFixed(2)
-                      : price) * 100
-                  ).toFixed(0)
+                  (assetsWithEighteenDecimalPlaces.includes(assetOriginAddress)
+                    ? (price * Math.pow(10, 18)).toFixed(2)
+                    : price
+                  )
                 )
               : '--'}{' '}
-            <span>{price && StratsIcon}</span>
+            <span>{price && USDSTIcon}</span>
           </p>
           <p className="text-xs">
             {price
               ? `${formattedNum(
-                  assetOriginAddress === stratAddress
-                    ? (price * 100).toFixed(2)
-                    : assetsWithEighteenDecimalPlaces.includes(assetOriginAddress)
+                  assetsWithEighteenDecimalPlaces.includes(assetOriginAddress)
                     ? (price * Math.pow(10, 18)).toFixed(2)
                     : price
                 )} $`
@@ -470,7 +458,6 @@ const GlobalTransaction = ({
               data={list}
               user={user}
               isTransactionLoading={isTransactionLoading}
-              stratAddress={stratAddress}
               assetsWithEighteenDecimalPlaces={assetsWithEighteenDecimalPlaces}
               ethstAddress={ethstAddress}
             />

@@ -12,7 +12,6 @@ import { useEthState } from '../../contexts/eth';
 import images_placeholder from '../../images/resources/image_placeholder.png';
 import { Images } from '../../images';
 // other
-import { STRATS_CONVERSION } from '../../helpers/constants';
 import { setCookie } from '../../helpers/cookie';
 import { SEO } from '../../helpers/seoConstant';
 import routes from '../../helpers/routes';
@@ -30,7 +29,7 @@ const NewTrendingCard = ({
   const navigate = useNavigate();
   const location = useLocation();
   const { Text } = Typography;
-  const { stratsAddress, assetsWithEighteenDecimalPlaces } =
+  const { USDSTAddress, assetsWithEighteenDecimalPlaces } =
     useMarketplaceState();
   const { ethstAddress } = useEthState();
   const { hasChecked, isAuthenticated, loginUrl, user } =
@@ -41,13 +40,10 @@ const NewTrendingCard = ({
   const isDecimal =
     topSellingProduct.data.quantityIsDecimal &&
     topSellingProduct.data.quantityIsDecimal === 'True';
-  const isStrat = topSellingProduct.originAddress === stratsAddress;
   const is18DecimalPlaces = assetsWithEighteenDecimalPlaces.includes(
     topSellingProduct.originAddress
   );
-  const saleQuantity = isStrat
-    ? topSellingProduct.saleQuantity / 100
-    : is18DecimalPlaces
+  const saleQuantity = is18DecimalPlaces
     ? topSellingProduct.saleQuantity / Math.pow(10, 18)
     : topSellingProduct.saleQuantity;
   const [quantity, setQuantity] = useState(1);
@@ -227,19 +223,13 @@ const NewTrendingCard = ({
         <div style={{ display: 'flex', justifyContent: 'space-between' }}>
           {topSellingProduct?.price
             ? (() => {
-                const adjustedPrice = isDecimal
-                  ? (topSellingProduct.price * 100).toFixed(2)
-                  : topSellingProduct.price;
+                const adjustedPrice = topSellingProduct.price;
 
                 return (
                   <Typography className="font-semibold">
                     {`$${adjustedPrice} `}{' '}
                     <span className="font-normal text-xs mr-2 text-primary">
-                      <b>{`(${(adjustedPrice * STRATS_CONVERSION).toFixed(0)} ${
-                        (adjustedPrice * STRATS_CONVERSION).toFixed(0) == 1
-                          ? 'STRAT'
-                          : 'STRATs'
-                      })`}</b>
+                      <b>{`(${adjustedPrice?.toFixed(0)} ${'USDST'})`}</b>
                     </span>
                   </Typography>
                 );

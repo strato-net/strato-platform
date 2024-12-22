@@ -12,7 +12,7 @@ import { useMarketplaceDispatch } from '../../contexts/marketplace';
 import { Images } from '../../images';
 import { useLocation } from 'react-router-dom';
 
-const logo = <img src={Images.strat} alt={''} title={''} className="w-5 h-5" />;
+const logo = <img src={Images.USDST} alt={''} title={''} className="w-5 h-5" />;
 
 /**
  * Helper to compute total collateral quantity from inventory.
@@ -354,7 +354,7 @@ const BorrowModal = ({
       }
       await inventoryActions.getAllReserve(inventoryDispatch);
       await inventoryActions.getUserCataRewards(inventoryDispatch);
-      await marketplaceActions.fetchStratsBalance(marketplaceDispatch);
+      await marketplaceActions.fetchUSDSTBalance(marketplaceDispatch);
       handleCancel();
     }
   };

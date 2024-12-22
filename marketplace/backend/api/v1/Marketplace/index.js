@@ -63,6 +63,13 @@ router.get(
 );
 
 router.get(
+  Marketplace.getUSDSTAddress,
+  authHandler.authorizeRequest(true),
+  loadDapp,
+  MarketplaceController.getUSDSTAddress
+);
+
+router.get(
   Marketplace.getCataAddress,
   authHandler.authorizeRequest(true),
   loadDapp,
