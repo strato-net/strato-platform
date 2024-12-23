@@ -102,7 +102,7 @@ const SoldOrderDetails = ({ user, users }) => {
           unitPrice:
             // formattedNum(
             orderDetails.order.currency === 'STRATS'
-              ? (prod.price * STRATS_CONVERSION).toFixed(0)
+              ? (prod.price * 100).toFixed(0)
               : orderDetails.order.currency === 'CATA'
               ? (prod.price * Math.pow(10, 18)).toFixed(2)
               : prod.price,
@@ -112,7 +112,7 @@ const SoldOrderDetails = ({ user, users }) => {
             : '--',
           amount:
             (orderDetails.order.currency === 'STRATS'
-              ? (prod.price * STRATS_CONVERSION).toFixed(0)
+              ? (prod.price * 100).toFixed(0)
               : orderDetails.order.currency === 'CATA'
               ? (prod.price * Math.pow(10, 18)).toFixed(2)
               : prod.price) * parseInt(orderQuantities[index]),
