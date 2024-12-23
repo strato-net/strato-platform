@@ -831,7 +831,6 @@ const ProductDetails = ({ user, users }) => {
                       />
                       <PriceChartAndStats
                         priceHistory={priceHistory}
-                        isDecimal={details?.data?.quantityIsDecimal === 'True'}
                       />
                     </div>
                   )}
@@ -843,7 +842,6 @@ const ProductDetails = ({ user, users }) => {
                       </h2>
                       <Statistics
                         priceHistory={priceHistory}
-                        isDecimal={details?.data?.quantityIsDecimal === 'True'}
                       />
                     </>
                   )}

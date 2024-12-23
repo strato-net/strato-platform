@@ -163,17 +163,9 @@ const InvoiceComponent = ({ invoice }) => {
             <Text style={[styles.label, styles.tableHeaderColumn]}>Amount</Text>
           </View>
           {invoice.assets.map((asset, index) => {
-            const adjustedPrice =  asset.price;
-              // asset.data.quantityIsDecimal &&
-              // asset.data.quantityIsDecimal === 'True'
-              //   ? asset.price * 100
-              //   : asset.price;
+            const adjustedPrice = asset.price;
 
             const quantity = orderQuantities[index];
-              // asset.data.quantityIsDecimal &&
-              // asset.data.quantityIsDecimal === 'True'
-              //   ? orderQuantities[index] / 100
-              //   : orderQuantities[index];
 
             const totalPrice =
               invoice.order.currency === 'STRATS'

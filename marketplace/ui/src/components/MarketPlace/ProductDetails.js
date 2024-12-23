@@ -234,11 +234,7 @@ const ProductDetails = ({ user, users }) => {
       const detailsData = details.data;
       setItemData(detailsData);
       if (details.saleQuantity) {
-        let saleQuantity =
-          details.data.quantityIsDecimal &&
-          details.data.quantityIsDecimal === 'True'
-            ? details.saleQuantity / 100
-            : details.saleQuantity;
+        let saleQuantity = details.saleQuantity;
         setAvailableQuantity(saleQuantity || 1);
       }
     }
@@ -652,11 +648,7 @@ const ProductDetails = ({ user, users }) => {
                     >
                       {details?.price || isStaked
                         ? (() => {
-                            const adjustedPrice =
-                              details.data.quantityIsDecimal &&
-                              details.data.quantityIsDecimal === 'True'
-                                ? details.price * 100
-                                : details.price;
+                            const adjustedPrice = details.price;
                             return (
                               <>
                                 $
@@ -1057,7 +1049,6 @@ const ProductDetails = ({ user, users }) => {
                       />
                       <PriceChartAndStats
                         priceHistory={priceHistory}
-                        isDecimal={details?.data?.quantityIsDecimal === 'True'}
                       />
                     </div>
                   )}
@@ -1069,7 +1060,6 @@ const ProductDetails = ({ user, users }) => {
                       </h2>
                       <Statistics
                         priceHistory={priceHistory}
-                        isDecimal={details?.data?.quantityIsDecimal === 'True'}
                       />
                     </>
                   )}

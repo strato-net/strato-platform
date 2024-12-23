@@ -228,10 +228,10 @@ class OrderController {
         .min(1)
         .items(
           Joi.object({
-            quantity: Joi.number().required(),
+            quantity: Joi.string().pattern(/^\d+$/).required(),
             assetAddress: Joi.string().required(),
             firstSale: Joi.boolean().required(),
-            unitPrice: Joi.number().required(),
+            unitPrice: Joi.number().greater(0).precision(30).required(),
           })
         )
         .required(),

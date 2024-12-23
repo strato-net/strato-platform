@@ -112,9 +112,7 @@ const BoughtOrderDetails = ({ user, users }) => {
             (item) => item.value
           );
       let items = [];
-      orderDetails.assets.forEach((prod, index) => {        
-        const quantityIsDecimal =
-          prod.data.quantityIsDecimal && prod.data.quantityIsDecimal === 'True';
+      orderDetails.assets.forEach((prod, index) => {
         items.push({
           address: prod.address,
           chainId: prod.chainId,

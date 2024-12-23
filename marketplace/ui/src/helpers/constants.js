@@ -211,7 +211,7 @@ export const PAYMENT_TYPE = [
 
 export const PAYMENT_LABEL = {
   Stripe: 'Pay with Credit Card / ACH',
-  STRATS: 'Pay with STRATs (Express Checkout)',
+  USDST: 'Pay with USDST (Express Checkout)',
 };
 
 export const SIZES = {

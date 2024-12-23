@@ -1,3 +1,7 @@
+import {
+    USDST_CONTRACT_ADDRESS,
+  } from "./constants.js";
+
 // Define the function
 function generateHtmlContent(customerFirstName, concatenatedOrderString) {
     return `
@@ -164,11 +168,18 @@ function generateHtmlContent(customerFirstName, concatenatedOrderString) {
     let orderTotal = 0; 
     for (let i = 0; i < orderData.length; i++) {
       let orderItem = orderData[i];
-      let isDecimal = assetData[i].data.quantityIsDecimal && assetData[i].data.quantityIsDecimal === 'True';
+
+      const decimalPlaces =
+        assetContracts[i].root === USDST_CONTRACT_ADDRESS ? 18 : 0;
+
+      const unitPrice = new BigNumber(orderItem.unitPrice);
+      const quantity = new BigNumber(orderItem.qty);
+      const multiplier = new BigNumber(10).pow(decimalPlaces);
+    
       let itemName = decodeURIComponent(orderItem.name);
-      let itemPrice = parseFloat(orderItem.unitPrice * (isDecimal ? 100 : 1)).toFixed(2);
-      let itemQty = orderItem.qty / (isDecimal ? 100 : 1);
-      let itemTotal = (itemPrice * itemQty).toFixed(2); 
+      let itemPrice = unitPrice.multipliedBy(multiplier).toFixed(2);
+      let itemQty = quantity.dividedBy(multiplier).toString();
+      let itemTotal = (itemPrice.multipliedBy(itemQty)).toFixed(2); 
   
       concatenatedOrderString += `${itemName}:\n`; 
       concatenatedOrderString += `$${itemTotal} <br>`; 

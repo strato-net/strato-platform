@@ -29,7 +29,7 @@ const NewTrendingCard = ({
   const navigate = useNavigate();
   const location = useLocation();
   const { Text } = Typography;
-  const { USDSTAddress, assetsWithEighteenDecimalPlaces } =
+  const { assetsWithEighteenDecimalPlaces } =
     useMarketplaceState();
   const { ethstAddress } = useEthState();
   const { hasChecked, isAuthenticated, loginUrl, user } =
@@ -37,9 +37,7 @@ const NewTrendingCard = ({
 
   const [isModalVisible, setIsModalVisible] = useState(false);
   const [isWishlisted, setIsWishlisted] = useState(false);
-  const isDecimal =
-    topSellingProduct.data.quantityIsDecimal &&
-    topSellingProduct.data.quantityIsDecimal === 'True';
+
   const is18DecimalPlaces = assetsWithEighteenDecimalPlaces.includes(
     topSellingProduct.originAddress
   );
@@ -223,7 +221,10 @@ const NewTrendingCard = ({
         <div style={{ display: 'flex', justifyContent: 'space-between' }}>
           {topSellingProduct?.price
             ? (() => {
-                const adjustedPrice = topSellingProduct.price;
+                
+                const adjustedPrice = is18DecimalPlaces
+                  ? topSellingProduct.price * Math.pow(10, 18)
+                  : topSellingProduct.price;
 
                 return (
                   <Typography className="font-semibold">

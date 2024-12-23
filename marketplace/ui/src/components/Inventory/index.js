@@ -143,8 +143,6 @@ const Inventory = ({ user }) => {
       .map((service) => ({
         ...service,
         isNotOnboarded: notOnboardedNames.has(service.serviceName),
-        serviceName:
-          service?.serviceName === 'STRATS' ? 'STRAT' : service?.serviceName,
       }));
     setSortedPaymentServices(sortedServices);
   }, [paymentServices, notOnboarded]);
@@ -476,7 +474,7 @@ const Inventory = ({ user }) => {
                 <span>${price}</span>{' '}
                 <p className="flex text-xs items-center gap-1">
                   {' '}
-                  &nbsp;({price.toFixed(0)} {USDSTIcon}){' '}
+                  &nbsp;({price} {USDSTIcon}){' '}
                 </p>
               </>
             ) : (

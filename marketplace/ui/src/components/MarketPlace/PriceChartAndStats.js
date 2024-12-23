@@ -7,8 +7,7 @@ dayjs.extend(utc);
 
 const PriceChartAndStats = ({
   isFetchingPriceHistory,
-  priceHistory,
-  isDecimal,
+  priceHistory
 }) => {
   if (
     isFetchingPriceHistory ||
@@ -27,7 +26,7 @@ const PriceChartAndStats = ({
       const currentRecord = records[i];
       const isoDate = currentRecord.block_timestamp.replace(' UTC', 'Z');
       const date = dayjs(isoDate).utc();
-      const price = isDecimal ? currentRecord.price * 100 : currentRecord.price;
+      const price = currentRecord.price;
 
       // Set the last known price if it's null (first iteration) or update it to the current record's price
       if (lastKnownPrice === null || price !== lastKnownPrice) {

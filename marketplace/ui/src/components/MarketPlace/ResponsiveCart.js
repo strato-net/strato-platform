@@ -31,17 +31,17 @@ const ResponsiveCart = ({
   removeCartList,
   openToastOrder,
 }) => {
-  // temporary fix to put STRATs as top payment option, will be updated in next release
+  // temporary fix to put USDST as top payment option, will be updated in next release
   const activePaymentProviders =
     paymentServices[0] !== undefined
       ? paymentServices.filter((paymentProvider) => paymentProvider?.isActive)
       : [];
-  const stratsIndex = activePaymentProviders.findIndex((service) =>
-    service.serviceName.toLowerCase().includes('strats')
+  const USDSTIndex = activePaymentProviders.findIndex((service) =>
+    service.serviceName.toLowerCase().includes('usdst')
   );
-  if (stratsIndex > 0) {
-    const [stratsObject] = activePaymentProviders.splice(stratsIndex, 1);
-    activePaymentProviders.unshift(stratsObject);
+  if (USDSTIndex > 0) {
+    const [USDSTObject] = activePaymentProviders.splice(USDSTIndex, 1);
+    activePaymentProviders.unshift(USDSTObject);
   }
   const initialPaymentState =
     activePaymentProviders?.length !== 0 ? activePaymentProviders[0] : '';
@@ -126,16 +126,10 @@ const ResponsiveCart = ({
     let orderList = [];
     cartData.forEach((item) => {
       orderList.push({
-        quantity:
-          item.quantityIsDecimal && item.quantityIsDecimal === 'True'
-            ? item.qty * 100
-            : item.qty,
+        quantity: item.qty,
         assetAddress: item.key,
         firstSale: item.firstSale,
-        unitPrice:
-          item.quantityIsDecimal && item.quantityIsDecimal === 'True'
-            ? item.unitPrice / 100
-            : item.unitPrice,
+        unitPrice: item.unitPrice,
       });
     });
 
@@ -250,9 +244,9 @@ const ResponsiveCart = ({
   };
 
   const totalAmount =
-    selectedProvider?.serviceName === 'STRATS' ||
-    selectedProvider?.serviceName?.includes('STRATS')
-      ? `${(subTotal * 100).toFixed(0)} USDST`
+    selectedProvider?.serviceName === 'USDST' ||
+    selectedProvider?.serviceName?.includes('USDST')
+      ? `${subTotal} USDST`
       : selectedProvider?.serviceName === 'Stripe'
       ? `${subTotal} USD`
       : `${subTotal} ${selectedProvider?.serviceName || 'USD'}`;

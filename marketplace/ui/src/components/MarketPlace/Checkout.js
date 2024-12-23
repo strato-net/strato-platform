@@ -46,9 +46,8 @@ const Checkout = () => {
   const [mapData, setmapData] = useState([]);
 
   const calculateTax = (item) => {
-    const isStrat = item.product.originAddress === USDSTAddress;
     const is18DecimalPlaces = assetsWithEighteenDecimalPlaces.includes(item.product.originAddress);
-    let price = new Decimal( isStrat ? item.product.price * 100 : is18DecimalPlaces ? item.product.price * Math.pow(10, 18) : item.product.price);
+    let price = new Decimal( is18DecimalPlaces ? item.product.price * Math.pow(10, 18) : item.product.price);
     let tax = new Decimal(CHARGES.TAX);
     let result = price.mul(tax).div(100);
 
@@ -56,9 +55,8 @@ const Checkout = () => {
   };
 
   const calculateAmount = (item) => {
-    const isStrat = item.product.originAddress === USDSTAddress;
     const is18DecimalPlaces = assetsWithEighteenDecimalPlaces.includes(item.product.originAddress);
-    let price = new Decimal(isStrat ? item.product.price * 100 : is18DecimalPlaces ? item.product.price * Math.pow(10, 18) : item.product.price);
+    let price = new Decimal(is18DecimalPlaces ? item.product.price * Math.pow(10, 18) : item.product.price);
     let tax = calculateTax(item);
     let result = price.mul(item.qty).plus(tax);
 
@@ -109,7 +107,6 @@ const Checkout = () => {
       const { paymentServices, items } = value;
       let modifiedValue = [];
       items.forEach((item) => {
-        const isStrat = item.product.originAddress === USDSTAddress;
         const is18DecimalPlaces = assetsWithEighteenDecimalPlaces.includes(item.product.originAddress);
         const parts = item.product.contract_name.split('-');
         let amount = calculateAmount(item);
@@ -130,14 +127,13 @@ const Checkout = () => {
             item.product.address === item.product.originAddress ? true : false,
           sellersCommonName: item.product.ownerCommonName,
           unitOfMeasure: item.product.unitOfMeasurement,
-          unitPrice: isStrat ? item.product.price * 100 : is18DecimalPlaces ? item.product.price * Math.pow(10, 18) : item.product.price,
-          quantity: isStrat ? item.product.saleQuantity / 100 : is18DecimalPlaces ? item.product.saleQuantity / Math.pow(10, 18) : item.product.saleQuantity,
+          unitPrice: is18DecimalPlaces ? item.product.price * Math.pow(10, 18) : item.product.price,
+          quantity: is18DecimalPlaces ? item.product.saleQuantity / Math.pow(10, 18) : item.product.saleQuantity,
           saleAddress: item.product.saleAddress,
           tax: calculateTax(item),
           amount: amount,
           action: item.product.address,
           qty: item.qty,
-          quantityIsDecimal: item.product.data.quantityIsDecimal,
         });
       });
 

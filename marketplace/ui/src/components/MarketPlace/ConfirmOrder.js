@@ -13,7 +13,7 @@ import {
   useMarketplaceState,
   useMarketplaceDispatch,
 } from '../../contexts/marketplace';
-import { useMemo } from 'react';
+import BigNumber from "bignumber.js";
 import { useOrderState, useOrderDispatch } from '../../contexts/order';
 import { useAuthenticateState } from '../../contexts/authentication';
 import { actions } from '../../contexts/marketplace/actions';
@@ -44,7 +44,7 @@ const ConfirmOrder = ({ paymentServices = [], data, columns }) => {
   const [tax, setTax] = useState(0);
   const [subTotal, setSubTotal] = useState(0);
   const [total, setTotal] = useState(0);
-  const { success: marketplaceSuccess, message: marketplaceMessage } =
+  const { success: marketplaceSuccess, message: marketplaceMessage, assetsWithEighteenDecimalPlaces } =
     useMarketplaceState();
   const [modal, contextHolderForModal] = Modal.useModal();
   const [cartData, setCartData] = useState(data);
@@ -53,12 +53,12 @@ const ConfirmOrder = ({ paymentServices = [], data, columns }) => {
     paymentServices[0] !== undefined
       ? paymentServices.filter((paymentProvider) => paymentProvider?.isActive)
       : [];
-  const stratsIndex = activePaymentProviders.findIndex((service) =>
-    service.serviceName.toLowerCase().includes('strats')
+  const USDSTIndex = activePaymentProviders.findIndex((service) =>
+    service.serviceName.toLowerCase().includes('usdst')
   );
-  if (stratsIndex > 0) {
-    const [stratsObject] = activePaymentProviders.splice(stratsIndex, 1);
-    activePaymentProviders.unshift(stratsObject);
+  if (USDSTIndex > 0) {
+    const [USDSTObject] = activePaymentProviders.splice(USDSTIndex, 1);
+    activePaymentProviders.unshift(USDSTObject);
   }
   const initialPaymentState =
     activePaymentProviders?.length !== 0 ? activePaymentProviders[0] : '';
@@ -137,19 +137,15 @@ const ConfirmOrder = ({ paymentServices = [], data, columns }) => {
       let itemTotal = (itemPrice * itemQty).toFixed(2);
 
       concatenatedOrderString += `${itemName}:\n`;
-      concatenatedOrderString = `$${itemTotal} (${(itemTotal * 100).toFixed(
-        0
-      )} ' USDST'})<br>`;
-      concatenatedOrderString += `Qty: ${itemQty} &nbsp; $${itemPrice} each (${(
-        itemPrice * 100
-      ).toFixed(0)} ' USDST'} each)<br><br>`;
+      concatenatedOrderString = `$${itemTotal} (${itemTotal} ' USDST'})<br>`;
+      concatenatedOrderString += `Qty: ${itemQty} &nbsp; $${itemPrice} each (${itemPrice} ' USDST'} each)<br><br>`;
       orderTotal += parseFloat(itemTotal);
       if (i === cartData.length - 1) {
         concatenatedOrderString += `<hr style="border-top: 1px dotted #0A1B71; min-width: 80%; max-width: 80%; margin-left: 15px;">`;
         concatenatedOrderString += `Shipping Fee: <i><strong>Free</strong></i><br><br>`;
-        concatenatedOrderString += `Order Total: $${orderTotal.toFixed(2)} (${(
-          orderTotal * 100
-        ).toFixed(0)} ' USDST')<br>`;
+        concatenatedOrderString += `Order Total: $${orderTotal.toFixed(
+          2
+        )} (${orderTotal.toFixed(0)} ' USDST')<br>`;
       }
     }
 
@@ -180,17 +176,22 @@ const ConfirmOrder = ({ paymentServices = [], data, columns }) => {
     actions.addItemToConfirmOrder(marketplaceDispatch, cartData);
     let orderList = [];
     cartData.forEach((item) => {
+      const is18DecimalPlaces = assetsWithEighteenDecimalPlaces.includes(
+        item.key
+      );
+
+      const quantity = new BigNumber(item.qty);
+      const unitPrice = new BigNumber(item.unitPrice);
+
       orderList.push({
-        quantity:
-          item.quantityIsDecimal && item.quantityIsDecimal === 'True'
-            ? item.qty * 100
-            : item.qty,
+        quantity: is18DecimalPlaces
+          ? quantity.multipliedBy(new BigNumber(10).pow(18)).toString()
+          : quantity.toString(),
         assetAddress: item.key,
         firstSale: item.firstSale,
-        unitPrice:
-          item.quantityIsDecimal && item.quantityIsDecimal === 'True'
-            ? item.unitPrice / 100
-            : item.unitPrice,
+        unitPrice: is18DecimalPlaces
+          ? unitPrice.dividedBy(new BigNumber(10).pow(18)).toFixed(18)
+          : unitPrice.toFixed(18),
       });
     });
 
@@ -306,9 +307,9 @@ const ConfirmOrder = ({ paymentServices = [], data, columns }) => {
   };
 
   const totalAmount =
-    selectedProvider?.serviceName === 'STRATS' ||
-    selectedProvider?.serviceName?.includes('STRATS')
-      ? `${(subTotal * 100).toFixed(0)} USDST`
+    selectedProvider?.serviceName === 'USDST' ||
+    selectedProvider?.serviceName?.includes('USDST')
+      ? `${subTotal} USDST`
       : selectedProvider?.serviceName === 'Stripe'
       ? `${subTotal} USD`
       : `${subTotal} ${selectedProvider?.serviceName || 'USD'}`;

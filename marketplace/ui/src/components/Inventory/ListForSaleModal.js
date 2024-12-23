@@ -121,29 +121,29 @@ const ListForSaleModal = ({
   };
 
   const handleSelect = (values) => {
-    const stratsIndex = availablePaymentServices.findIndex((service) =>
-      service.serviceName.toLowerCase().includes('strats')
+    const USDSTIndex = availablePaymentServices.findIndex((service) =>
+      service.serviceName.toLowerCase().includes('usdst')
     );
 
-    // Ensure 'strats' service is always selected
-    if (stratsIndex !== -1 && !values.includes(stratsIndex)) {
-      values = [stratsIndex, ...values];
+    // Ensure 'usdst' service is always selected
+    if (USDSTIndex !== -1 && !values.includes(USDSTIndex)) {
+      values = [USDSTIndex, ...values];
     }
     setPaymentTypes(values);
   };
 
   useEffect(() => {
-    const excludeStrats =
-      inventory.contract_name &&
-      inventory.contract_name.toLowerCase().includes('strats');
+    const excludeUSDST =
+      inventory.name &&
+      inventory.name.toLowerCase().includes('usdst');
 
     const diff = paymentServices.filter((ps) => {
       const isNotOnboarded = !notOnboarded.some(
         (x) => x.address === ps.address
       );
-      const isStratsService =
-        excludeStrats && ps.serviceName.toLowerCase().includes('strats');
-      return isNotOnboarded && !isStratsService;
+      const isUSDSTService =
+        excludeUSDST && ps.serviceName.toLowerCase().includes('usdst');
+      return isNotOnboarded && !isUSDSTService;
     });
 
     setAvailablePaymentServices(diff);
@@ -163,16 +163,16 @@ const ListForSaleModal = ({
         )
     );
 
-    const stratsIndex = diff.findIndex((ps) =>
-      ps.serviceName.toLowerCase().includes('strats')
+    const USDSTIndex = diff.findIndex((ps) =>
+      ps.serviceName.toLowerCase().includes('usdst')
     );
 
-    // Auto-select 'strats' if it exists
+    // Auto-select 'usdst' if it exists
     if (
-      stratsIndex !== -1 &&
-      !selectedPaymentServiceIndices.includes(stratsIndex)
+      USDSTIndex !== -1 &&
+      !selectedPaymentServiceIndices.includes(USDSTIndex)
     ) {
-      selectedPaymentServiceIndices.push(stratsIndex);
+      selectedPaymentServiceIndices.push(USDSTIndex);
     }
 
     setPaymentTypes(selectedPaymentServiceIndices);
@@ -181,9 +181,9 @@ const ListForSaleModal = ({
   const tagRender = (props) => {
     const { value, closable, onClose } = props;
     const service = availablePaymentServices[value];
-    const isStratsService = service?.serviceName
+    const isUSDSTService = service?.serviceName
       .toLowerCase()
-      .includes('strats');
+      .includes('usdst');
     const onPreventMouseDown = (event) => {
       event.preventDefault();
       event.stopPropagation();
@@ -192,11 +192,11 @@ const ListForSaleModal = ({
     return service ? (
       <Tag
         onMouseDown={onPreventMouseDown}
-        closable={!isStratsService && closable} // prevent closing if it's 'strats'
+        closable={!isUSDSTService && closable} // prevent closing if it's 'usdst'
         onClose={onClose}
         className="flex items-center mr-1"
       >
-        {service.serviceName === 'STRATS' ? 'STRAT' : service.serviceName}&nbsp;
+        {service.serviceName}&nbsp;
         {renderImg(service)}
       </Tag>
     ) : (
@@ -205,8 +205,8 @@ const ListForSaleModal = ({
   };
 
   const handleSubmit = async () => {
-    const stratsService = availablePaymentServices.find((service) =>
-      service.serviceName.toLowerCase().includes('strats')
+    const USDSTService = availablePaymentServices.find((service) =>
+      service.serviceName.toLowerCase().includes('usdst')
     );
 
     let body = {
@@ -224,16 +224,16 @@ const ListForSaleModal = ({
           : pricePerUnit,
     };
 
-    // Ensure 'strats' is included in the submission
+    // Ensure 'usdst' is included in the submission
     if (
-      stratsService &&
+      USDSTService &&
       !body.paymentServices.some((service) =>
-        service.serviceName.toLowerCase().includes('strats')
+        service.serviceName.toLowerCase().includes('usdst')
       )
     ) {
       body.paymentServices.push({
-        creator: stratsService.creator,
-        serviceName: stratsService.serviceName,
+        creator: USDSTService.creator,
+        serviceName: USDSTService.serviceName,
       });
     }
 
@@ -299,11 +299,11 @@ const ListForSaleModal = ({
                 <Option
                   key={index}
                   value={index}
-                  disabled={e.serviceName.toLowerCase().includes('strats')}
+                  disabled={e.serviceName.toLowerCase().includes('usdst')}
                 >
                   <div className="flex items-center justify-between">
                     <div className="flex items-center">
-                      {e.serviceName === 'STRATS' ? 'STRAT' : e.serviceName}
+                      {e.serviceName}
                       &nbsp;
                       {renderImg(e)}
                     </div>
@@ -406,11 +406,11 @@ const ListForSaleModal = ({
               <Option
                 key={index}
                 value={index}
-                disabled={e.serviceName.toLowerCase().includes('strats')}
+                disabled={e.serviceName.toLowerCase().includes('usdst')}
               >
                 <div className="flex items-center justify-between">
                   <div className="flex items-center">
-                    {e.serviceName === 'STRATS' ? 'STRAT' : e.serviceName}&nbsp;
+                    {e.serviceName}&nbsp;
                     {renderImg(e)}
                   </div>
 

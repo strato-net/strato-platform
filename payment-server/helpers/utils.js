@@ -6,12 +6,14 @@ import {
   SELLER_ONBOARDED_TABLE,
   TABLE_PREFIX,
   STRIPE_CONTRACT_ADDRESS,
+  USDST_CONTRACT_ADDRESS,
 } from "./constants.js";
 import ADMIN from "./oauth.js";
 import lodash from "lodash";
 const { get } = lodash;
 import oauthHelper from "./oauthHelper.js";
 import axios from "axios";
+import BigNumber from "bignumber.js";
 
 // Fetches Asset Name based on sale address
 const getAsset = async(saleAddress)=>{
@@ -278,12 +280,19 @@ const validateAndGetOrderDetails = async (quantities, saleAddresses) => {
   if (openSaleCheck && sameOwnerCheck) {
     let orderDetails = [];
     for (let i = 0; i < quantities.length; i++) {
-      const isDecimal = assetContracts[i].data.quantityIsDecimal && (assetContracts[i].data.quantityIsDecimal === 'True' || assetContracts[i].data.quantityIsDecimal === true);
-      orderDetails.push({ 
-        productName: assetContracts[i].name, 
-        unitPrice: isDecimal ? saleContracts[i].price * 100 : saleContracts[i].price, 
-        quantity: isDecimal ? quantities[i] / 100 : quantities[i],
-        firstSale: assetContracts[i].address === assetContracts[i].originAddress ? true : false 
+      const decimalPlaces =
+        assetContracts[i].root === USDST_CONTRACT_ADDRESS ? 18 : 0;
+
+      const unitPrice = new BigNumber(saleContracts[i].price);
+      const quantity = new BigNumber(quantities[i]);
+      const multiplier = new BigNumber(10).pow(decimalPlaces);
+
+      orderDetails.push({
+        productName: assetContracts[i].name,
+        unitPrice: unitPrice.multipliedBy(multiplier).toFixed(2),
+        quantity: quantity.dividedBy(multiplier).toString(),
+        firstSale:
+          assetContracts[i].address === assetContracts[i].originAddress,
       });
     }
     return { sellerCommonName, orderDetails };

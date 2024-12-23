@@ -21,7 +21,7 @@ class StripeService {
                             product_data: {
                                 name: productName,
                             },
-                            unit_amount: (unitPrice * 100).toFixed(0),
+                            unit_amount: unitPrice,
                         },
                         quantity: quantity,
                     }

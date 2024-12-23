@@ -189,7 +189,6 @@ class TransactionController {
           assetAddress: asset?.address,
           assetOriginAddress: asset?.originAddress,
           assetContractName: asset?.contract_name,
-          quantityIsDecimal: asset?.data.quantityIsDecimal,
         };
       });
 
@@ -370,7 +369,6 @@ class TransactionController {
           assetAddress: asset?.address,
           assetOriginAddress: asset?.originAddress,
           assetContractName: asset?.contract_name,
-          quantityIsDecimal: asset?.data.quantityIsDecimal,
         };
       });
 
