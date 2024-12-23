@@ -6,6 +6,7 @@ class StripeService {
     // TODO implement orderDetail to create actual order line items 
     static initiatePayment(marketplaceUrl, checkoutHash, orderDetails, CONNECTED_ACCOUNT_ID = '') {
         try {
+            console.log('initiatePayment - orderDetails', orderDetails);
             // Create a checkout session with Stripe
             return stripe.checkout.sessions.create({
                 payment_method_types: [ 'card', 'us_bank_account' ],

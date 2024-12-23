@@ -286,7 +286,8 @@ const validateAndGetOrderDetails = async (quantities, saleAddresses) => {
       const unitPrice = new BigNumber(saleContracts[i].price);
       const quantity = new BigNumber(quantities[i]);
       const multiplier = new BigNumber(10).pow(decimalPlaces);
-
+      console.log("Unit Price: ", saleContracts[i].price);
+      console.log("Quantity: ", quantities[i]);
       orderDetails.push({
         productName: assetContracts[i].name,
         unitPrice: Number(unitPrice.multipliedBy(multiplier).toFixed(2)),
