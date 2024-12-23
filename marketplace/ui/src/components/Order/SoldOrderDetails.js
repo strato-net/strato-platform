@@ -102,27 +102,22 @@ const SoldOrderDetails = ({ user, users }) => {
           productName: prod,
           name: prod.name,
           unitPrice:
-          // formattedNum(
+            // formattedNum(
             orderDetails.order.currency === 'STRATS'
               ? (prod.price * STRATS_CONVERSION).toFixed(0)
-              : orderDetails.order.currency === 'CATA' ? (prod.price * Math.pow(10, 18)).toFixed(2)
-              : prod.price
-            // )
-            ,
+              : orderDetails.order.currency === 'CATA'
+              ? (prod.price * Math.pow(10, 18)).toFixed(2)
+              : prod.price,
+          // )
           quantity: orderQuantities[index]
-            ? formattedNum(
-                orderDetails.order.currency === 'STRATS'
-                  ? (orderQuantities[index] / 100).toFixed(2)
-                  : orderDetails.order.currency === 'CATA'
-                  ? (orderQuantities[index] / Math.pow(10, 18)).toFixed(2)
-                  : orderQuantities[index]
-              )
+            ? formattedNum(orderQuantities[index])
             : '--',
-           amount:
-            orderDetails.order.currency === 'STRATS'
-              ? ( (prod.price * parseInt(orderQuantities[index]) )).toFixed(0)
-              : orderDetails.order.currency === 'CATA' ? ((prod.price * parseInt(orderQuantities[index])) / Math.pow(10, 18)).toFixed(2) 
-              : (prod.price * parseInt(orderQuantities[index])),
+          amount:
+            (orderDetails.order.currency === 'STRATS'
+              ? (prod.price * STRATS_CONVERSION).toFixed(0)
+              : orderDetails.order.currency === 'CATA'
+              ? (prod.price * Math.pow(10, 18)).toFixed(2)
+              : prod.price) * parseInt(orderQuantities[index]),
           serialNumber: prod,
           tax: prod.tax ? prod.tax : 0,
         });
