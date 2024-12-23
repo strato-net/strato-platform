@@ -1,5 +1,5 @@
 import {
-    USDST_CONTRACT_ADDRESS,
+    USDST_ADDRESS,
   } from "./constants.js";
   import BigNumber from "bignumber.js";
   
@@ -171,7 +171,7 @@ function generateHtmlContent(customerFirstName, concatenatedOrderString) {
       let orderItem = orderData[i];
 
       const decimalPlaces =
-        assetContracts[i].root === USDST_CONTRACT_ADDRESS ? 18 : 0;
+        assetContracts[i].root === USDST_ADDRESS ? 18 : 0;
 
       const unitPrice = new BigNumber(orderItem.unitPrice);
       const quantity = new BigNumber(orderItem.qty);

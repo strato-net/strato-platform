@@ -6,7 +6,7 @@ import {
   SELLER_ONBOARDED_TABLE,
   TABLE_PREFIX,
   STRIPE_CONTRACT_ADDRESS,
-  USDST_CONTRACT_ADDRESS,
+  USDST_ADDRESS,
 } from "./constants.js";
 import ADMIN from "./oauth.js";
 import lodash from "lodash";
@@ -281,7 +281,7 @@ const validateAndGetOrderDetails = async (quantities, saleAddresses) => {
     let orderDetails = [];
     for (let i = 0; i < quantities.length; i++) {
       const decimalPlaces =
-        assetContracts[i].root === USDST_CONTRACT_ADDRESS ? 18 : 0;
+        assetContracts[i].root === USDST_ADDRESS ? 18 : 0;
 
       const unitPrice = new BigNumber(saleContracts[i].price);
       const quantity = new BigNumber(quantities[i]);
