@@ -1,7 +1,8 @@
 import {
     USDST_CONTRACT_ADDRESS,
   } from "./constants.js";
-
+  import BigNumber from "bignumber.js";
+  
 // Define the function
 function generateHtmlContent(customerFirstName, concatenatedOrderString) {
     return `
