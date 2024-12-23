@@ -17,6 +17,8 @@ import {
 import { Link, useLocation, useMatch } from 'react-router-dom';
 import { actions } from '../../contexts/order/actions';
 import { useOrderDispatch, useOrderState } from '../../contexts/order';
+import { actions as marketplaceActions } from '../../contexts/marketplace/actions';
+import { useMarketplaceDispatch } from '../../contexts/marketplace';
 import routes from '../../helpers/routes';
 import classNames from 'classnames';
 import { getStringDate } from '../../helpers/utils';
@@ -38,14 +40,29 @@ const SoldOrderDetails = ({ user, users }) => {
   const [Id, setId] = useState(undefined);
   const [data, setdata] = useState([]);
   const dispatch = useOrderDispatch();
+  const marketplaceDispatch = useMarketplaceDispatch();
   const { Text } = Typography;
   const [selectedDate, setSelectedDate] = useState('');
   const [status, setStatus] = useState(getStatus(1));
+  const [assetsWithEighteenDecimalPlaces, setAssetsWithEighteenDecimalPlaces] =
+    useState([]);
+
   const [paid, setPaid] = useState('Processing');
   const [comment, setComment] = useState('');
   const { TextArea } = Input;
   const [api, contextHolder] = notification.useNotification();
   const state = useLocation();
+
+  useEffect(() => {
+    const fetchAssets = async () => {
+      const assetsWithEighteenDecimalPlaces =
+        await marketplaceActions.fetchAssetsWithEighteenDecimalPlaces(
+          marketplaceDispatch
+        );
+      setAssetsWithEighteenDecimalPlaces(assetsWithEighteenDecimalPlaces);
+    };
+    fetchAssets();
+  }, [marketplaceDispatch]);
 
   const {
     orderDetails,
@@ -89,6 +106,17 @@ const SoldOrderDetails = ({ user, users }) => {
             (item) => item.value
           );
       orderDetails.assets.forEach((prod, index) => {
+
+        const is18DecimalPlaces = assetsWithEighteenDecimalPlaces.includes(
+          prod.root
+        );
+        const quantity = is18DecimalPlaces
+          ? orderQuantities[index] / Math.pow(10, 18)
+          : orderQuantities[index];
+        const unitPrice = is18DecimalPlaces
+          ? (prod.price * Math.pow(10, 18)).toFixed(2)
+          : prod.price;
+
         items.push({
           address: prod.address,
           chainId: prod.chainId,
@@ -102,14 +130,10 @@ const SoldOrderDetails = ({ user, users }) => {
           unitPrice:
             // formattedNum(
             orderDetails.order.currency === 'STRATS'
-              ? (prod.price * 100).toFixed(0)
-              : orderDetails.order.currency === 'CATA'
-              ? (prod.price * Math.pow(10, 18)).toFixed(2)
-              : prod.price,
+              ? (unitPrice * 100).toFixed(0)
+              : unitPrice,
           // )
-          quantity: orderQuantities[index]
-            ? formattedNum(orderQuantities[index])
-            : '--',
+          quantity: quantity ? formattedNum(quantity) : '--',
           amount:
             (orderDetails.order.currency === 'STRATS'
               ? (prod.price * 100).toFixed(0)
@@ -122,7 +146,7 @@ const SoldOrderDetails = ({ user, users }) => {
       });
       setdata(items);
     }
-  }, [orderDetails]);
+  }, [orderDetails, assetsWithEighteenDecimalPlaces]);
 
   useEffect(() => {
     setId(routeMatch?.params?.id);

@@ -14,7 +14,9 @@ import {
 } from 'antd';
 import { Link, useLocation, useMatch } from 'react-router-dom';
 import { actions } from '../../contexts/order/actions';
+import { actions as marketplaceActions } from '../../contexts/marketplace/actions';
 import { useOrderDispatch, useOrderState } from '../../contexts/order';
+import { useMarketplaceDispatch } from '../../contexts/marketplace';
 import routes from '../../helpers/routes';
 import classNames from 'classnames';
 import { EyeOutlined } from '@ant-design/icons';
@@ -40,6 +42,7 @@ const BoughtOrderDetails = ({ user, users }) => {
   const [Id, setId] = useState(undefined);
   const [data, setdata] = useState([]);
   const dispatch = useOrderDispatch();
+  const marketplaceDispatch = useMarketplaceDispatch();
   const { Text } = Typography;
   const [api, contextHolder] = notification.useNotification();
   const [status, setStatus] = useState(getStatus(0));
@@ -77,6 +80,9 @@ const BoughtOrderDetails = ({ user, users }) => {
     message,
   } = useOrderState();
 
+  const [assetsWithEighteenDecimalPlaces, setAssetsWithEighteenDecimalPlaces] =
+    useState([]);
+
   const routeMatch = useMatch({
     path: routes.BoughtOrderDetails.url,
     strict: true,
@@ -94,9 +100,14 @@ const BoughtOrderDetails = ({ user, users }) => {
 
   const getData = async () => {
     await actions.fetchOrderDetails(dispatch, Id);
+    const assetsWithEighteenDecimalPlaces =
+      await marketplaceActions.fetchAssetsWithEighteenDecimalPlaces(
+        marketplaceDispatch
+      );
+    setAssetsWithEighteenDecimalPlaces(assetsWithEighteenDecimalPlaces);
   };
 
-  useEffect(() => {    
+  useEffect(() => {
     if (orderDetails) {
       const statusInt = parseInt(orderDetails.order.status);
       setStatus(getStatus(statusInt));
@@ -113,6 +124,17 @@ const BoughtOrderDetails = ({ user, users }) => {
           );
       let items = [];
       orderDetails.assets.forEach((prod, index) => {
+
+        const is18DecimalPlaces = assetsWithEighteenDecimalPlaces.includes(
+          prod.root
+        );
+        const quantity = is18DecimalPlaces
+          ? orderQuantities[index] / Math.pow(10, 18)
+          : orderQuantities[index];
+        const unitPrice = is18DecimalPlaces
+          ? (prod.price * Math.pow(10, 18)).toFixed(2)
+          : prod.price;
+
         items.push({
           address: prod.address,
           chainId: prod.chainId,
@@ -126,19 +148,18 @@ const BoughtOrderDetails = ({ user, users }) => {
           unitPrice:
             // formattedNum(
             orderDetails.order.currency === 'STRATS'
-              ? (prod.price * 100).toFixed(0)
-              : orderDetails.order.currency === 'CATA'
-              ? (prod.price * Math.pow(10, 18)).toFixed(2)
-              : prod.price,
+              ? (unitPrice * 100).toFixed(0)
+              : unitPrice,
           // )
-          quantity: orderQuantities[index]
-            ? formattedNum(orderQuantities[index])
+          quantity: quantity
+            ? quantity.toLocaleString('en-US', {
+                maximumFractionDigits: 4,
+                minimumFractionDigits: 0,
+              })
             : '--',
           amount:
             (orderDetails.order.currency === 'STRATS'
               ? (prod.price * 100).toFixed(0)
-              : orderDetails.order.currency === 'CATA'
-              ? (prod.price * Math.pow(10, 18)).toFixed(2)
               : prod.price) * parseInt(orderQuantities[index]),
           serialNumber: prod,
           tax: prod.tax ? prod.tax : 0,
@@ -146,7 +167,7 @@ const BoughtOrderDetails = ({ user, users }) => {
       });
       setdata(items);
     }
-  }, [orderDetails]);
+  }, [orderDetails, assetsWithEighteenDecimalPlaces]);
 
   const details = orderDetails;
   const audits = ordersAudit;
@@ -298,7 +319,9 @@ const BoughtOrderDetails = ({ user, users }) => {
           className="text-primary text-[17px] cursor-pointer"
           onClick={() => {
             navigate(
-              `${routes.MarketplaceProductDetail.url.replace(':address', text.address).replace(':name', encodeURIComponent(text.name))}`
+              `${routes.MarketplaceProductDetail.url
+                .replace(':address', text.address)
+                .replace(':name', encodeURIComponent(text.name))}`
             );
           }}
         >
@@ -475,8 +498,8 @@ const BoughtOrderDetails = ({ user, users }) => {
                     details.order.currency === 'STRATS'
                       ? 'STRAT'
                       : details.order.currency
-                        ? details.order.currency
-                        : 'USD'
+                      ? details.order.currency
+                      : 'USD'
                   }
                 />
                 <Divider type="vertical" className="h-14 bg-secondryD" />
@@ -484,9 +507,7 @@ const BoughtOrderDetails = ({ user, users }) => {
                   title="Total"
                   value={
                     details.order.currency === 'STRATS'
-                      ? (details.order.totalPrice * 100).toFixed(
-                          0
-                        )
+                      ? (details.order.totalPrice * 100).toFixed(0)
                       : details.order.totalPrice
                   }
                 />
@@ -513,7 +534,10 @@ const BoughtOrderDetails = ({ user, users }) => {
                     <span>Invoice</span>
                     <button>
                       <Link
-                        to={`${routes.Invoice.url.replace(':id', routeMatch?.params?.id)}`}
+                        to={`${routes.Invoice.url.replace(
+                          ':id',
+                          routeMatch?.params?.id
+                        )}`}
                         target="_blank"
                       >
                         <div className="flex items-center cursor-pointer hover:text-primary">
@@ -556,9 +580,7 @@ const BoughtOrderDetails = ({ user, users }) => {
                     title="Total"
                     value={
                       details.order.currency === 'STRATS'
-                        ? (
-                            details.order.totalPrice * 100
-                          ).toFixed(0)
+                        ? (details.order.totalPrice * 100).toFixed(0)
                         : details.order.totalPrice
                     }
                   />

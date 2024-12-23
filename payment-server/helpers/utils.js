@@ -49,6 +49,7 @@ const prepareOrderData = (orderDetails, assetData) => {
   return orderDetails.map((order, index) => {
     const unitPrice = order.amount / order.quantitiesToBePurchased[0];
     return {
+      root: assetData[index].root,
       name: assetData[index].name,
       unitPrice: unitPrice,
       qty: order.quantitiesToBePurchased[0],

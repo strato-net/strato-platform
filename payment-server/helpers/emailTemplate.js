@@ -170,8 +170,7 @@ function generateHtmlContent(customerFirstName, concatenatedOrderString) {
     for (let i = 0; i < orderData.length; i++) {
       let orderItem = orderData[i];
 
-      const decimalPlaces =
-        assetContracts[i].root === USDST_ADDRESS ? 18 : 0;
+      const decimalPlaces = orderItem.root === USDST_ADDRESS ? 18 : 0;
 
       const unitPrice = new BigNumber(orderItem.unitPrice);
       const quantity = new BigNumber(orderItem.qty);

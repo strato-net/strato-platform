@@ -648,6 +648,7 @@ const ProductDetails = ({ user, users }) => {
                     >
                       {details?.price || isStaked
                         ? (() => {
+                            
                             const adjustedPrice = details.price;
                             return (
                               <>
