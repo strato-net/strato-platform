@@ -289,8 +289,8 @@ const validateAndGetOrderDetails = async (quantities, saleAddresses) => {
 
       orderDetails.push({
         productName: assetContracts[i].name,
-        unitPrice: unitPrice.multipliedBy(multiplier).toFixed(2),
-        quantity: quantity.dividedBy(multiplier).toString(),
+        unitPrice: Number(unitPrice.multipliedBy(multiplier).toFixed(2)),
+        quantity: Number(quantity.dividedBy(multiplier).toString()),
         firstSale:
           assetContracts[i].address === assetContracts[i].originAddress,
       });
