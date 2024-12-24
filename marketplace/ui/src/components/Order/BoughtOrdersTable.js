@@ -114,10 +114,7 @@ const BoughtOrdersTable = ({
           key: order.id ? order.transaction_hash : order.address,
           orderNumber: order,
           sellersCommonName: order.sellersCommonName,
-          orderTotal:
-            order.currency === 'STRATS'
-              ? (order.totalPrice * 100).toFixed(0)
-              : order.totalPrice,
+          orderTotal: order.totalPrice,
           date: getStringDate(order.createdDate, US_DATE_FORMAT),
           status: getStatus(parseInt(order.status)),
           invoice: order.id ? order.transaction_hash : order.address,

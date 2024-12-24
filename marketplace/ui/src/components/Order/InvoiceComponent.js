@@ -100,13 +100,7 @@ const InvoiceComponent = ({ invoice }) => {
     let tax = 0;
 
     settotalTax(tax);
-    if (invoice.order.currency === 'STRATS') {
-      setSubtotal(
-        ((invoice.order.totalPrice - tax) * 100).toFixed(0)
-      );
-    } else {
-      setSubtotal((invoice.order.totalPrice - tax).toFixed(2));
-    }
+    setSubtotal((invoice.order.totalPrice - tax).toFixed(2));
   }, [invoice]);
   const orderQuantities = invoice.order['BlockApps-Mercata-Order-quantities']
     ? invoice.order['BlockApps-Mercata-Order-quantities'].map(
@@ -167,26 +161,17 @@ const InvoiceComponent = ({ invoice }) => {
 
             const quantity = orderQuantities[index];
 
-            const totalPrice =
-              invoice.order.currency === 'STRATS'
-                ? (
-                    asset.price *
-                    100 *
-                    orderQuantities[index]
-                  ).toFixed(0)
-                : (asset.price * orderQuantities[index]).toFixed(2);
+            const totalPrice = (asset.price * orderQuantities[index]).toFixed(2)
             return (
               <View style={styles.tableRow} key={asset.address}>
                 <Text style={[styles.value, styles.tableRowColumn]}>
                   {decodeURIComponent(asset.name)}
                 </Text>
                 <Text style={[styles.value, styles.tableRowColumn]}>
-                  {invoice.order.currency ? 'STRAT' : 'USD'}
+                  {invoice.order.currency}
                 </Text>
                 <Text style={[styles.value, styles.tableRowColumn]}>
-                     {invoice.order.currency === 'STRATS'
-                  ? (adjustedPrice * 100).toFixed(0) 
-                   : invoice.order.currency === 'CATA' ? (adjustedPrice * Math.pow(10, 18)).toFixed(2) 
+                     {['USDST','CATA'].includes(invoice.order.currency) ? (adjustedPrice * Math.pow(10, 18)).toFixed(2) 
                   : adjustedPrice.toFixed(2)}
                 </Text>
                 <Text style={[styles.value, styles.tableRowColumn]}>
@@ -208,9 +193,7 @@ const InvoiceComponent = ({ invoice }) => {
             <View style={styles.textSection}>
               <Text style={styles.bottomLabel}>Total</Text>
               <Text style={styles.bottomLabel}>
-                {invoice.order.currency === 'STRATS'
-                  ? (invoice.order.totalPrice * 100).toFixed(0) 
-                   : invoice.order.currency === 'CATA' ? (invoice.order.totalPrice * Math.pow(10, 18)).toFixed(2) 
+                {['USDST','CATA'].includes(invoice.order.currency) ? (invoice.order.totalPrice * Math.pow(10, 18)).toFixed(2) 
                   : invoice.order.totalPrice.toFixed(2)}
               </Text>
             </View>

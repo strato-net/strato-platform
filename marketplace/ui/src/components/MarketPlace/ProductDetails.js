@@ -657,13 +657,13 @@ const ProductDetails = ({ user, users }) => {
                                   ? (
                                       details.escrow?.maxLoanAmount / 100
                                     ).toFixed(2)
-                                  : adjustedPrice}{' '}
+                                  : adjustedPrice}
                                 <span className="font-normal text-xs mr-2 text-primary">
                                   <b>
                                     (
                                     {isStaked
                                       ? details.escrow?.maxLoanAmount
-                                      : adjustedPrice.toFixed(0)}{' '}
+                                      : adjustedPrice.toFixed(0)}
                                     USDST )
                                   </b>
                                 </span>
@@ -684,8 +684,7 @@ const ProductDetails = ({ user, users }) => {
                     </Paragraph>
                     {isAvailableForSale && (
                       <Text type="danger" strong>
-                        {' '}
-                        Sold Out{' '}
+                        Sold Out
                       </Text>
                     )}
                   </div>
@@ -976,7 +975,7 @@ const ProductDetails = ({ user, users }) => {
                     ) : (
                       <div className="text-center p-4">
                         <p>
-                          Please{' '}
+                          Please
                           <span
                             className="text-blue hover:text-blue cursor-pointer hover:underline"
                             onClick={() => {
@@ -989,7 +988,7 @@ const ProductDetails = ({ user, users }) => {
                             }}
                           >
                             login
-                          </span>{' '}
+                          </span>
                           to view ownership history.
                         </p>
                       </div>

@@ -131,34 +131,31 @@ const GlobalTransaction = ({
                   placement="top"
                   title={data.assetDescription.replace(/<\/?[^>]+(>|$)/g, '')}
                 >
-                  {' '}
-                  {data?.assetDescription.replace(/<\/?[^>]+(>|$)/g, '')}{' '}
+                  {data?.assetDescription.replace(/<\/?[^>]+(>|$)/g, '')}
                 </Tooltip>
               </p>
             </Col>
             <Col span={8} offset={1}>
               {price ? (
                 <p className="text-right flex justify-end items-center">
-                  {' '}
                   <b>
-                    ${' '}
+                    $
                     {is18DecimalPlaces
                       ? (price * Math.pow(10, 18)).toFixed(2)
-                      : price}{' '}
-                  </b>{' '}
+                      : price}
+                  </b>
                   &nbsp;(
                   <span className="text-[#13188A] font-bold">
-                    {' '}
+
                     {is18DecimalPlaces
                       ? (price * Math.pow(10, 18)).toFixed(2)
-                      : price}{' '}
+                      : price}
                   </span>
-                  {USDSTIcon}){' '}
+                  {USDSTIcon})
                 </p>
               ) : (
                 <p className="text-right text-[#13188A] font-bold text-sm">
-                  {' '}
-                  No Price Available{' '}
+                  No Price Available
                 </p>
               )}
             </Col>
@@ -269,7 +266,7 @@ const GlobalTransaction = ({
                     : price
                   )
                 )
-              : '--'}{' '}
+              : '--'}
             <span>{price && USDSTIcon}</span>
           </p>
           <p className="text-xs">
@@ -355,8 +352,7 @@ const GlobalTransaction = ({
                 )} cursor-pointer`}
                 key={label}
               >
-                {' '}
-                {label}{' '}
+                {label}
               </span>
             );
           })}
@@ -375,7 +371,6 @@ const GlobalTransaction = ({
     return (
       selectedFilters?.length !== 0 && (
         <div className="h-auto w-full p-2 flex flex-wrap">
-          {' '}
           {selectedFilters?.map((item) => (
             <span
               onClick={() => {
@@ -384,19 +379,17 @@ const GlobalTransaction = ({
               className="p-2 m-2 rounded-lg bg-[#F6F6F6] cursor-pointer"
               key={item}
             >
-              {' '}
-              {item}{' '}
+              {item}
               <span className="font-semibold">
                 <CloseOutlined />
-              </span>{' '}
+              </span>
             </span>
           ))}
           <span
             onClick={handleClearFilter}
             className="p-2 m-2 rounded-lg bg-[#13188A] cursor-pointer text-white"
           >
-            {' '}
-            Clear All{' '}
+            Clear All
           </span>
         </div>
       )
@@ -427,7 +420,6 @@ const GlobalTransaction = ({
                 />
               }
             >
-              {' '}
               Activity Feed
             </Button>
           </Col>

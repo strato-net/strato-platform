@@ -145,22 +145,14 @@ const BoughtOrderDetails = ({ user, users }) => {
               : image_placeholder,
           productName: prod,
           name: prod.name,
-          unitPrice:
-            // formattedNum(
-            orderDetails.order.currency === 'STRATS'
-              ? (unitPrice * 100).toFixed(0)
-              : unitPrice,
-          // )
+          unitPrice: unitPrice,
           quantity: quantity
             ? quantity.toLocaleString('en-US', {
                 maximumFractionDigits: 4,
                 minimumFractionDigits: 0,
               })
             : '--',
-          amount:
-            (orderDetails.order.currency === 'STRATS'
-              ? (prod.price * 100).toFixed(0)
-              : prod.price) * parseInt(orderQuantities[index]),
+          amount: prod.price * parseInt(orderQuantities[index]),
           serialNumber: prod,
           tax: prod.tax ? prod.tax : 0,
         });
@@ -494,22 +486,12 @@ const BoughtOrderDetails = ({ user, users }) => {
                 <Divider type="vertical" className="h-14 bg-secondryD" />
                 <OrderData
                   title="Currency"
-                  value={
-                    details.order.currency === 'STRATS'
-                      ? 'STRAT'
-                      : details.order.currency
-                      ? details.order.currency
-                      : 'USD'
-                  }
+                  value={ details.order.currency || 'USD' }
                 />
                 <Divider type="vertical" className="h-14 bg-secondryD" />
                 <OrderData
                   title="Total"
-                  value={
-                    details.order.currency === 'STRATS'
-                      ? (details.order.totalPrice * 100).toFixed(0)
-                      : details.order.totalPrice
-                  }
+                  value={ details.order.totalPrice }
                 />
                 <Divider type="vertical" className="h-14 bg-secondryD" />
                 <OrderData
@@ -578,11 +560,7 @@ const BoughtOrderDetails = ({ user, users }) => {
                   <NewOrderData
                     className="w-2/4"
                     title="Total"
-                    value={
-                      details.order.currency === 'STRATS'
-                        ? (details.order.totalPrice * 100).toFixed(0)
-                        : details.order.totalPrice
-                    }
+                    value={ details.order.totalPrice }
                   />
                   <NewOrderData
                     className="w-2/4"

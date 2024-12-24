@@ -138,7 +138,7 @@ class TransactionController {
         const asset = inventoriesWithImageUrl.find((assetItem) => {
           return (
             assetItem.address ===
-            (item?.assetAddress || item?.assetAddresses[0])
+            (item?.assetAddress || (item?.assetAddresses[0] || ''))
           );
         });
 
