@@ -232,7 +232,7 @@ const BorrowModal = ({
   const borrowedAmountDisplay = (borrowedAmount / 100).toFixed(2);
   const loanableAmountDisplay = (loanableAmount / 100).toFixed(2);
 
-  // Desired loan amount in STRATs
+  // Desired loan amount in USDST
   const [desiredLoanAmount, setDesiredLoanAmount] = useState(
     (loanableAmount || 0) / 100
   );
@@ -275,9 +275,9 @@ const BorrowModal = ({
       value: '50%',
     },
     {
-      label: 'Outstanding Loan (in STRATs)',
+      label: 'Outstanding Loan (in USDST)',
       description:
-        'The total amount of STRAT tokens you have borrowed against your staked RWAs.',
+        'The total amount of USDST tokens you have borrowed against your staked RWAs.',
       value: (
         <div className="flex">
           <div className="mx-1">{logo}</div>
@@ -286,9 +286,9 @@ const BorrowModal = ({
       ),
     },
     {
-      label: 'Estimated Available Loan (in STRATs)',
+      label: 'Estimated Available Loan (in USDST)',
       description:
-        'The projected amount of STRAT tokens you can borrow against your staked RWAs.',
+        'The projected amount of USDST tokens you can borrow against your staked RWAs.',
       value: (
         <div className="flex">
           <div className="mx-1">{logo}</div>
@@ -298,7 +298,7 @@ const BorrowModal = ({
     },
     {
       label: 'Desired Loan Amount',
-      description: 'Enter the amount of STRATs you want to borrow.',
+      description: 'Enter the amount of USDST you want to borrow.',
       value: (
         <>
           <InputNumber

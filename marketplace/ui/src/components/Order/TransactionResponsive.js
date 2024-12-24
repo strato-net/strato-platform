@@ -256,7 +256,7 @@ const TransactionResponsive = ({
                 </Button>
                 {price ? (
                   <p className={`text-right flex justify-end items-center`}>
-                    ${formattedNum(price)} ({formattedNum(price * 100)}
+                    ${formattedNum(price)} ({formattedNum(price)}
                     {USDSTIcon})
                   </p>
                 ) : (

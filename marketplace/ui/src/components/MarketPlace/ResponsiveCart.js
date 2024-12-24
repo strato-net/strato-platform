@@ -104,8 +104,8 @@ const ResponsiveCart = ({
       concatenatedOrderString += `${itemName}:\n`;
       concatenatedOrderString += `$${itemTotal} <br>`;
       concatenatedOrderString += `Qty: ${itemQty} &nbsp; $${itemPrice} each (${(
-        itemPrice * 100
-      ).toFixed(0)} ' USDST'})<br><br>`;
+        itemPrice
+      )} ' USDST'})<br><br>`;
       orderTotal += parseFloat(itemTotal);
       if (i === cartData.length - 1) {
         concatenatedOrderString += `<hr style="border-top: 1px dotted #0A1B71; min-width: 80%; max-width: 80%; margin-left: 15px;">`;
