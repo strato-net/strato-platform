@@ -147,7 +147,7 @@ const BoughtOrderDetails = ({ user, users }) => {
               ? (productPrice * STRATS_CONVERSION).toFixed(0)
               : orderDetails.order.currency === 'CATA'
               ? (productPrice * Math.pow(10, 18)).toFixed(2)
-              : productPrice) * parseInt(orderQuantities[index]),
+              : productPrice) * parseInt(productQuantity),
           serialNumber: prod,
           tax: prod.tax ? prod.tax : 0,
         });
