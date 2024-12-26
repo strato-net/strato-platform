@@ -1,5 +1,5 @@
 const { Alchemy, Network, AlchemySubscription } = require("alchemy-sdk");
-const { alchemyApiKey, alchemyNetwork } = require("../config");
+const { alchemyApiKey, alchemyNetwork, blockAppsPublicKey } = require("../config");
 const { handleBridgeIn } = require("../events/bridgeIn");
 
 const setupAlchemyWebSocket = async () => {
@@ -12,7 +12,7 @@ const setupAlchemyWebSocket = async () => {
   alchemy.ws.on(
     {
       method: AlchemySubscription.MINED_TRANSACTIONS,
-      addresses: [{ to: "0xBdAFaEBc08B94785dfE7Fc720Fbcd9aFc156454E" }],
+      addresses: [{ to: blockAppsPublicKey }],
       includeRemoved: true,
       hashesOnly: false,
     },
