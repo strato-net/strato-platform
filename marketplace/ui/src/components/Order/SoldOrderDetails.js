@@ -91,9 +91,11 @@ const SoldOrderDetails = ({ user, users }) => {
       orderDetails.assets.forEach((prod, index) => {
         const quantityIsDecimal =
           prod.data.quantityIsDecimal && prod.data.quantityIsDecimal === 'True';
-        const productPrice = quantityIsDecimal ? prod.price * 100 : prod.price;
+        const productPrice = quantityIsDecimal
+          ? prod.price * STRATS_CONVERSION
+          : prod.price;
         const productQuantity = quantityIsDecimal
-          ? (orderQuantities[index] || 0) / 100
+          ? (orderQuantities[index] || 0) / STRATS_CONVERSION
           : orderQuantities[index];
         items.push({
           address: prod.address,
