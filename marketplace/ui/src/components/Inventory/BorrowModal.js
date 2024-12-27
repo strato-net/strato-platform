@@ -271,7 +271,7 @@ const BorrowModal = ({
     },
     {
       label: 'Max LTV',
-      description: `Indicates you can borrow up to 50% of the market value of your staked RWAs.`,
+      description: `Indicates you can borrow up to ${LTV*100}% of the market value of your staked RWAs.`,
       value: `${LTV*100}%`,
     },
     {
