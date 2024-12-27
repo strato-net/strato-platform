@@ -22,7 +22,8 @@ abstract contract Reserve is Utils, Structs {
     bool public isActive = true;
     address public assetRootAddress;
 
-    uint public loanToValueRatio = 80; // LTV ratio as percentage
+    uint public loanToValueRatio = 50; // LTV ratio as percentage
+    uint public liquidationRatio = 30; // Liquidation ratio as percentage
     uint public cataAPYRate = 10; // 10% APY for CATA rewards
     decimal public unitConversionRate = 1; // 1 oz of gold in grams
 
@@ -236,6 +237,11 @@ abstract contract Reserve is Utils, Structs {
     function setLoanToValueRatio(uint _newRatio) public requireOwner("update LTV ratio") {
         require(_newRatio > 0 && _newRatio <= 100, "LTV ratio must be between 1 and 100");
         loanToValueRatio = _newRatio;
+    }
+
+    function setLiquidationRatio(uint _newRatio) public requireOwner("update Liquidation ratio") {
+        require(_newRatio > 0 && _newRatio <= 100, "Liquidation ratio must be between 1 and 100");
+        liquidationRatio = _newRatio;
     }
 
     function setCataAPYRate(uint _newRate) public requireOwner("update CATA APY rate") {
