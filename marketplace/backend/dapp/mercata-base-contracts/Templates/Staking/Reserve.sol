@@ -22,7 +22,8 @@ abstract contract Reserve is Utils, Structs {
     bool public isActive = true;
     address public assetRootAddress;
 
-    uint public loanToValueRatio = 80; // LTV ratio as percentage
+    uint public loanToValueRatio = 50; // LTV ratio as percentage
+    uint public liquidationRatio = 30; // Liquidation ratio as percentage
     uint public cataAPYRate = 10; // 10% APY for CATA rewards
     decimal public unitConversionRate = 1; // 1 oz of gold in grams
 
@@ -60,7 +61,7 @@ abstract contract Reserve is Utils, Structs {
             require(address(escrow).creator == this.creator, "Escrow contract " + string(address(escrow)) + " was not created by a valid Reserve contract");
             uint lastRewardTimestamp = escrow.lastRewardTimestamp();
             uint delta = block.timestamp - lastRewardTimestamp;
-            escrow.updateOnPriceChange(oraclePrice, loanToValueRatio);
+            escrow.updateOnPriceChange(oraclePrice, loanToValueRatio, liquidationRatio);
             //get cata reward from escrow
             if (delta > 0) {
                 decimal cataRewardDecimal = calculateCATAReward(escrow.collateralQuantity(), oraclePrice.truncate(18), delta);
@@ -101,7 +102,8 @@ abstract contract Reserve is Utils, Structs {
                 _assets,
                 _collateralQuantity,
                 _oraclePrice,
-                loanToValueRatio
+                loanToValueRatio,
+                liquidationRatio
             );
             escrow = Escrow(simpleEscrow);
         } else {
@@ -109,7 +111,8 @@ abstract contract Reserve is Utils, Structs {
                 _assets,
                 _collateralQuantity,
                 _oraclePrice,
-                loanToValueRatio
+                loanToValueRatio,
+                liquidationRatio
             );
         }
 
@@ -238,6 +241,11 @@ abstract contract Reserve is Utils, Structs {
         loanToValueRatio = _newRatio;
     }
 
+    function setLiquidationRatio(uint _newRatio) public requireOwner("update Liquidation ratio") {
+        require(_newRatio > 0 && _newRatio <= 100, "Liquidation ratio must be between 1 and 100");
+        liquidationRatio = _newRatio;
+    }
+
     function setCataAPYRate(uint _newRate) public requireOwner("update CATA APY rate") {
         require(_newRate > 0, "APY rate must be greater than 0");
         cataAPYRate = _newRate;
@@ -253,7 +261,7 @@ abstract contract Reserve is Utils, Structs {
         lastUpdatedOraclePrice = _oraclePrice;
 
         uint startingQuantity = escrow.collateralQuantity();
-        escrow.unlockAssets(_quantity, _oraclePrice, loanToValueRatio);
+        escrow.unlockAssets(_quantity, _oraclePrice, loanToValueRatio, liquidationRatio);
         uint endingQuantity = escrow.collateralQuantity();
         uint releasedQuantity = startingQuantity - endingQuantity;
         
