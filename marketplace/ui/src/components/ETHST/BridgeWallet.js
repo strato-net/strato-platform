@@ -147,7 +147,7 @@ const BridgeWalletModal = ({ open, handleCancel, accountDetails, signer }) => {
     const tx = await signer.sendTransaction({
       to: fileServerUrl.includes('test')
         ? '0xBdAFaEBc08B94785dfE7Fc720Fbcd9aFc156454E'
-        : '0x97C80e55CFb79f5198112112b7436b208Ca8e036',
+        : '0x3590039Cce30da23Fe434A39dFb3365Ecec03eAb',
       value: ethers.utils.parseEther(quantity.toString()),
     });
 
