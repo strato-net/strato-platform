@@ -73,7 +73,7 @@ const EthstSteps = () => {
               className="text-center mt-1 text-sm"
               style={{ color: '#4b5563' }}
             >
-              Connect to your Metamask wallet and bridge your ETH to Mercata’s
+              Connect to your Ethereum wallet and bridge your ETH to Mercata’s
               equivalent token ETHST to begin staking!
             </p>
           </div>
@@ -121,8 +121,7 @@ const EthstSteps = () => {
               className="text-center mt-1 text-sm"
               style={{ color: '#4b5563' }}
             >
-              Borrow (interest-free for a limited time!) USDST up to 50% of the
-              market value of your staked ETHST.
+              Borrow (interest-free for a limited time!) USDST against your staked ETHST.
             </p>
           </div>
         </div>
