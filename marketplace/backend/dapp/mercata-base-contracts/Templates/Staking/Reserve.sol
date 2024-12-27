@@ -61,7 +61,7 @@ abstract contract Reserve is Utils, Structs {
             require(address(escrow).creator == this.creator, "Escrow contract " + string(address(escrow)) + " was not created by a valid Reserve contract");
             uint lastRewardTimestamp = escrow.lastRewardTimestamp();
             uint delta = block.timestamp - lastRewardTimestamp;
-            escrow.updateOnPriceChange(oraclePrice, loanToValueRatio);
+            escrow.updateOnPriceChange(oraclePrice, loanToValueRatio, liquidationRatio);
             //get cata reward from escrow
             if (delta > 0) {
                 decimal cataRewardDecimal = calculateCATAReward(escrow.collateralQuantity(), oraclePrice.truncate(18), delta);
@@ -102,7 +102,8 @@ abstract contract Reserve is Utils, Structs {
                 _assets,
                 _collateralQuantity,
                 _oraclePrice,
-                loanToValueRatio
+                loanToValueRatio,
+                liquidationRatio
             );
             escrow = Escrow(simpleEscrow);
         } else {
@@ -110,7 +111,8 @@ abstract contract Reserve is Utils, Structs {
                 _assets,
                 _collateralQuantity,
                 _oraclePrice,
-                loanToValueRatio
+                loanToValueRatio,
+                liquidationRatio
             );
         }
 
@@ -259,7 +261,7 @@ abstract contract Reserve is Utils, Structs {
         lastUpdatedOraclePrice = _oraclePrice;
 
         uint startingQuantity = escrow.collateralQuantity();
-        escrow.unlockAssets(_quantity, _oraclePrice, loanToValueRatio);
+        escrow.unlockAssets(_quantity, _oraclePrice, loanToValueRatio, liquidationRatio);
         uint endingQuantity = escrow.collateralQuantity();
         uint releasedQuantity = startingQuantity - endingQuantity;
         

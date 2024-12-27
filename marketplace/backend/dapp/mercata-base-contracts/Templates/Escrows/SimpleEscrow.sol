@@ -7,7 +7,8 @@ contract SimpleEscrow is Escrow {
         address[] _assets,
         uint _collateralQuantity,
         decimal _assetPrice,
-        uint _loanToValueRatio
-    ) Escrow(_assets, _collateralQuantity, _assetPrice, _loanToValueRatio) {
+        uint _loanToValueRatio,
+        uint _liquidationRatio
+    ) Escrow(_assets, _collateralQuantity, _assetPrice, _loanToValueRatio, _liquidationRatio) {
     }
 }
