@@ -46,7 +46,7 @@ export const aggregateStakeColumns = (
 
                 return sum;
               }, 0)
-            : record?.escrow?.borrowedAmount || 0) / 100;
+            : record?.escrow?.borrowedAmount || 0);
         return (
           <>
             <div className="flex items-center">

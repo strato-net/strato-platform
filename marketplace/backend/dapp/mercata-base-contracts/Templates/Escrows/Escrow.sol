@@ -77,11 +77,11 @@ abstract contract Escrow is Utils {
         _updateOnPriceChange(_assetPrice, _loanToValueRatio);
     }
 
-    function showSTRATValue(uint _value) internal returns (string) {
-        return string(_value / 100)
+    function showUSDSTValue(uint _value) internal returns (string) {
+        return string(_value)
              + "."
-             + string(_value % 100)
-             + " STRATS";
+             + string(_value)
+             + " USDST";
     }
 
     function unlockAssets(
@@ -117,11 +117,11 @@ abstract contract Escrow is Utils {
                                                + string(quantityToUnlock)
                                                + " units would result in undercollateralization."
                                                + "\nCurrent loan balance: "
-                                               + showSTRATValue(uint(borrowedAmount))
+                                               + showUSDSTValue(uint(borrowedAmount))
                                                + "\nCollateral value after unstaking: "
-                                               + showSTRATValue(uint(collateralValue))
+                                               + showUSDSTValue(uint(collateralValue))
                                                + "\nMaximum loan amount after unstaking: "
-                                               + showSTRATValue(uint(maxLoanAmount)));
+                                               + showUSDSTValue(uint(maxLoanAmount)));
         if (collateralQuantity == 0) {
             isActive = false;
         }
@@ -146,9 +146,9 @@ abstract contract Escrow is Utils {
     }
 
     function _updateOnPriceChange(decimal _newPrice, uint _loanToValueRatio) internal {
-        uint newCollateralValue = uint((decimal(collateralQuantity).truncate(4) * _newPrice * 10000.0000).truncate(0)); // 100 STRATs per dollar * 100 STRAT units per STRAT = 10000 
+        uint newCollateralValue = uint((decimal(collateralQuantity).truncate(4) * _newPrice * 1000000000000000000.0000).truncate(0)); // 1 USDST per dollar * 10^18 USDST units per USDST = 10^18.
         collateralValue = uint(newCollateralValue);
-        maxLoanAmount = uint(collateralValue * _loanToValueRatio / 100);
+        maxLoanAmount = uint(collateralValue * _loanToValueRatio);
     }
 
     function updateTotalCataReward(uint _newCataReward) external {

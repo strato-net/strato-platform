@@ -11,6 +11,7 @@ import { actions as marketplaceActions } from '../../contexts/marketplace/action
 import { useMarketplaceDispatch } from '../../contexts/marketplace';
 import { Images } from '../../images';
 import { useLocation } from 'react-router-dom';
+import BigNumber from 'bignumber.js';
 
 const logo = <img src={Images.USDST} alt={''} title={''} className="w-5 h-5" />;
 
@@ -228,14 +229,12 @@ const BorrowModal = ({
   // `Market Value` = collateralValue / 10000
   // `borrowedAmount` and `loanableAmount` are displayed /100
 
-  const marketValueDisplay = (collateralValue / 10000).toFixed(2);
-  const borrowedAmountDisplay = (borrowedAmount / 100).toFixed(2);
-  const loanableAmountDisplay = (loanableAmount / 100).toFixed(2);
+  const marketValueDisplay = new BigNumber(collateralValue).dividedBy(new BigNumber(10).pow(18))
+  const borrowedAmountDisplay = (borrowedAmount).toFixed(2);
+  const loanableAmountDisplay = (loanableAmount).toFixed(2);
 
   // Desired loan amount in USDST
-  const [desiredLoanAmount, setDesiredLoanAmount] = useState(
-    (loanableAmount || 0) / 100
-  );
+  const [desiredLoanAmount, setDesiredLoanAmount] = useState((loanableAmount || 0));
 
   const handleLoanAmountChange = (value) => {
     setDesiredLoanAmount(value || 0);

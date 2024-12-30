@@ -352,9 +352,9 @@ abstract contract PaymentService is Utils {
             decimal saleAmount = s.price() * _quantities[i];
             totalAmount += saleAmount;
             if (address(a) == address(a.root)) {
-                totalFee += (saleAmount * primarySaleFeePercentage) / 100;
+                totalFee += (saleAmount * primarySaleFeePercentage);
             } else {
-                totalFee += (saleAmount * secondarySaleFeePercentage) / 100;
+                totalFee += (saleAmount * secondarySaleFeePercentage);
             }
             try {
                 s.completeSale(_orderHash, _purchaser);

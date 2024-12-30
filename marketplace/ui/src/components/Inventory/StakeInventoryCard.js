@@ -223,7 +223,7 @@ const StakeInventoryCard = ({
             <div className="flex flex-row space-x-2 lg:justify-self-end whitespace-nowrap">
               <Typography className="lg:pt-1 flex gap-1">
                 Borrowed Amount: {USDSTIcon}
-                {(borrowAmount / 100).toLocaleString('en-US', {
+                {(borrowAmount).toLocaleString('en-US', {
                   maximumFractionDigits: 2,
                   minimumFractionDigits: 2,
                 })}

@@ -655,7 +655,7 @@ const ProductDetails = ({ user, users }) => {
                                 $
                                 {isStaked
                                   ? (
-                                      details.escrow?.maxLoanAmount / 100
+                                      details.escrow?.maxLoanAmount
                                     ).toFixed(2)
                                   : adjustedPrice}
                                 <span className="font-normal text-xs mr-2 text-primary">
