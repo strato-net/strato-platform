@@ -10,6 +10,7 @@ abstract contract Escrow is Utils {
     uint public collateralQuantity;
     uint public collateralValue;
     uint public maxLoanAmount;
+    uint public liquidationAmount;
     uint public totalCataReward;
     uint public borrowedAmount;
     uint public lastRewardTimestamp;
@@ -25,12 +26,13 @@ abstract contract Escrow is Utils {
         address[] _assets,
         uint _collateralQuantity,
         decimal _assetPrice,
-        uint _loanToValueRatio
+        uint _loanToValueRatio,
+        uint _liquidationRatio
     ) {
         reserve = msg.sender;
         borrower = address(0);
         assetRootAddress = address(0);
-        attachAssets(_assets, _collateralQuantity, _assetPrice, _loanToValueRatio);
+        attachAssets(_assets, _collateralQuantity, _assetPrice, _loanToValueRatio, _liquidationRatio);
         require(collateralQuantity > 0, "No collateral has been staked");
         totalCataReward = 0; // Assuming the CATA reward rate is provided externally
         isActive = true;
@@ -41,7 +43,8 @@ abstract contract Escrow is Utils {
         address[] _assets,
         uint _collateralQuantity,
         decimal _assetPrice,
-        uint _loanToValueRatio
+        uint _loanToValueRatio,
+        uint _liquidationRatio
     ) public {
         require(msg.sender == reserve, "Only the reserve can attach assets to the escrow");
         uint unallocatedQuantity = _collateralQuantity;
@@ -74,7 +77,7 @@ abstract contract Escrow is Utils {
         }
 
         collateralQuantity += _collateralQuantity - unallocatedQuantity;
-        _updateOnPriceChange(_assetPrice, _loanToValueRatio);
+        _updateOnPriceChange(_assetPrice, _loanToValueRatio, _liquidationRatio);
     }
 
     function showUSDSTValue(uint _value) internal returns (string) {
@@ -87,7 +90,8 @@ abstract contract Escrow is Utils {
     function unlockAssets(
         uint _quantity,
         decimal _assetPrice,
-        uint _loanToValueRatio
+        uint _loanToValueRatio,
+        uint _liquidationRatio
     ) public {
         require(msg.sender == reserve, "Only the reserve can unlock assets from the escrow");
         uint quantityToUnlock = _quantity;
@@ -112,7 +116,7 @@ abstract contract Escrow is Utils {
         }
 
         collateralQuantity -= quantityToUnlock - unallocatedQuantity;
-        _updateOnPriceChange(_assetPrice, _loanToValueRatio);
+        _updateOnPriceChange(_assetPrice, _loanToValueRatio, _liquidationRatio);
         require(borrowedAmount <= maxLoanAmount, "Invalid unstaking attempt: unstaking "
                                                + string(quantityToUnlock)
                                                + " units would result in undercollateralization."
@@ -139,16 +143,17 @@ abstract contract Escrow is Utils {
         }
     }
 
-    function updateOnPriceChange(decimal _newPrice, uint _loanToValueRatio) external {
+    function updateOnPriceChange(decimal _newPrice, uint _loanToValueRatio, uint _liquidationRatio) external {
         require(msg.sender == reserve, "Only reserve can update collateral price");
-        _updateOnPriceChange(_newPrice, _loanToValueRatio);
+        _updateOnPriceChange(_newPrice, _loanToValueRatio, _liquidationRatio);
         lastRewardTimestamp = block.timestamp;
     }
 
-    function _updateOnPriceChange(decimal _newPrice, uint _loanToValueRatio) internal {
+    function _updateOnPriceChange(decimal _newPrice, uint _loanToValueRatio, uint _liquidationRatio) internal {
         uint newCollateralValue = uint((decimal(collateralQuantity).truncate(4) * _newPrice * 1000000000000000000.0000).truncate(0)); // 1 USDST per dollar * 10^18 USDST units per USDST = 10^18.
         collateralValue = uint(newCollateralValue);
         maxLoanAmount = uint(collateralValue * _loanToValueRatio);
+        liquidationAmount = uint(collateralValue * _liquidationRatio);
     }
 
     function updateTotalCataReward(uint _newCataReward) external {

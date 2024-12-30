@@ -218,8 +218,8 @@ const BorrowModal = ({
   // collateralValue is displayed as `collateralValue / 10000`
   // borrowedAmount and loanableAmount as `... / 100`
   // We'll keep the same formatting after scaling by 1e18.
-
-  const maxBorrowableAmount = Math.floor(collateralValue / 2);
+  const LTV = matchedReserve.name.toLowerCase().includes('ethst') ? 0.3 : 0.5;
+  const maxBorrowableAmount = Math.floor(collateralValue * LTV);
   const loanableAmount =
     maxBorrowableAmount >= borrowedAmount
       ? maxBorrowableAmount - borrowedAmount
@@ -270,8 +270,8 @@ const BorrowModal = ({
     },
     {
       label: 'Max LTV',
-      description: `Indicates you can borrow up to 50% of the market value of your staked RWAs.`,
-      value: '50%',
+      description: `Indicates you can borrow up to ${LTV*100}% of the market value of your staked RWAs.`,
+      value: `${LTV*100}%`,
     },
     {
       label: 'Outstanding Loan (in USDST)',

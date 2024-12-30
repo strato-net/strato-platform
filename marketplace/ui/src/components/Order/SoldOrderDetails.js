@@ -110,10 +110,10 @@ const SoldOrderDetails = ({ user, users }) => {
         const is18DecimalPlaces = assetsWithEighteenDecimalPlaces.includes(
           prod.root
         );
-        const quantity = is18DecimalPlaces
+        const productQuantity = is18DecimalPlaces
           ? orderQuantities[index] / Math.pow(10, 18)
           : orderQuantities[index];
-        const unitPrice = is18DecimalPlaces
+        const productPrice = is18DecimalPlaces
           ? (prod.price * Math.pow(10, 18)).toFixed(2)
           : prod.price;
 
@@ -127,10 +127,10 @@ const SoldOrderDetails = ({ user, users }) => {
               : image_placeholder,
           productName: prod,
           name: prod.name,
-          unitPrice: unitPrice,
-          quantity: quantity ? formattedNum(quantity) : '--',
-          amount:
-            (['USDST','CATA'].includes(orderDetails.order.currency)
+          unitPrice: productPrice,
+          quantity: productQuantity ? formattedNum(productQuantity) : '--',
+          amount: 
+            (is18DecimalPlaces
               ? (prod.price * Math.pow(10, 18)).toFixed(2)
               : prod.price) * parseInt(orderQuantities[index]),
           serialNumber: prod,

@@ -123,18 +123,16 @@ const BoughtOrderDetails = ({ user, users }) => {
             (item) => item.value
           );
       let items = [];
-      orderDetails.assets.forEach((prod, index) => {
-
+      orderDetails.assets.forEach((prod, index) => {  
         const is18DecimalPlaces = assetsWithEighteenDecimalPlaces.includes(
           prod.root
-        );
-        const quantity = is18DecimalPlaces
-          ? orderQuantities[index] / Math.pow(10, 18)
-          : orderQuantities[index];
-        const unitPrice = is18DecimalPlaces
-          ? (prod.price * Math.pow(10, 18)).toFixed(2)
-          : prod.price;
-
+        );      
+        const productPrice = is18DecimalPlaces
+        ? (prod.price * Math.pow(10, 18)).toFixed(2)
+        : prod.price;
+        const productQuantity = is18DecimalPlaces
+        ? orderQuantities[index] / Math.pow(10, 18)
+        : orderQuantities[index];
         items.push({
           address: prod.address,
           chainId: prod.chainId,
@@ -145,14 +143,14 @@ const BoughtOrderDetails = ({ user, users }) => {
               : image_placeholder,
           productName: prod,
           name: prod.name,
-          unitPrice: unitPrice,
-          quantity: quantity
-            ? quantity.toLocaleString('en-US', {
+          unitPrice: productPrice,
+          quantity: productQuantity
+            ? productQuantity.toLocaleString('en-US', {
                 maximumFractionDigits: 4,
                 minimumFractionDigits: 0,
               })
             : '--',
-          amount: prod.price * parseInt(orderQuantities[index]),
+          amount: productPrice * parseInt(orderQuantities[index]),
           serialNumber: prod,
           tax: prod.tax ? prod.tax : 0,
         });

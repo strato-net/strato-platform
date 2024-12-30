@@ -7,6 +7,13 @@ const SLEEP_INCREMENT = 10;
 const DEFAULT_TIMEOUT = 120000;
 
 /**
+ * Pauses execution for the specified number of milliseconds.
+ * @param {number} ms - The number of milliseconds to sleep.
+ * @returns {Promise<void>} A promise that resolves after the specified time.
+ */
+const sleep = (ms) => new Promise(resolve => setTimeout(resolve, ms));
+
+/**
  * Waits until a condition is met or the timeout is reached.
  * @param {string} hash - The transaction hash to query.
  * @param {number} timeout - The maximum time (ms) to wait.
