@@ -143,6 +143,16 @@ class MarketplaceController {
     }
   }
 
+  static async getStratsAddress(_, res, next) {
+    try {
+      const address = tokensJs.getStratsAddress();
+
+      return rest.response.status200(res, address);
+    } catch (e) {
+      return next(e);
+    }
+  }
+
   static async get18DecimalPlaces(_, res, next) {
     try {
       const addresses = constants.AssetsWithEighteenDecimalPlaces;

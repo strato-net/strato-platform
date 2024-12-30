@@ -54,6 +54,9 @@ const actionDescriptors = {
   fetchUSDSTAddress: 'fetch_USDST_address',
   fetchUSDSTAddressSuccessful: 'fetch_USDST_address_successful',
   fetchUSDSTAddressFailed: 'fetch_USDST_address_failed',
+  fetchStratsAddress: 'fetch_strats_address',
+  fetchStratsAddressSuccessful: 'fetch_strats_address_successful',
+  fetchStratsAddressFailed: 'fetch_strats_address_failed',
   fetchAssetsWithEighteenDecimalPlaces: 'fetch_assets_with_eighteen_decimal_places',
   fetchAssetsWithEighteenDecimalPlacesSuccessful: 'fetch_assets_with_eighteen_decimal_places_successful',
   fetchAssetsWithEighteenDecimalPlacesFailed: 'fetch_assets_with_eighteen_decimal_places_failed',
@@ -649,6 +652,46 @@ const actions = {
       dispatch({
         type: actionDescriptors.fetchUSDSTAddressFailed,
         payload: 'Error while fetching USDST address',
+      });
+      return null;
+    }
+  },
+  fetchStratsAddress: async (dispatch) => {
+    dispatch({ type: actionDescriptors.fetchStratsAddress });
+    try {
+      let response = await fetch(`${apiUrl}/marketplace/strats/address`, {
+        method: HTTP_METHODS.GET,
+        credentials: 'same-origin',
+      });
+      const body = await response.json();
+      if (
+        response.status === RestStatus.UNAUTHORIZED ||
+        response.status === RestStatus.FORBIDDEN
+      ) {
+        dispatch({
+          type: actionDescriptors.fetchStratsAddressFailed,
+          payload: 'Error while fetching STRATS address',
+        });
+        return null;
+      }
+
+      if (response.status === RestStatus.OK) {
+        dispatch({
+          type: actionDescriptors.fetchStratsAddressSuccessful,
+          payload: body?.data,
+        });
+        return body.data;
+      }
+
+      dispatch({
+        type: actionDescriptors.fetchStratsAddressFailed,
+        payload: 'Error while fetching STRATS address',
+      });
+      return null;
+    } catch (err) {
+      dispatch({
+        type: actionDescriptors.fetchStratsAddressFailed,
+        payload: 'Error while fetching STRATS address',
       });
       return null;
     }
