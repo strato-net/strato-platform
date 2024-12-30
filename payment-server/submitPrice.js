@@ -7,21 +7,23 @@ import config from "./load.config.js";
 import deployment from "./load.deploy.js";
 import oauthHelper from "./helpers/oauthHelper.js";
 
-
-// Global array to store all distributeRewards calls
+// Global arrays to store all calls for each method
+const submitPriceCallList = [];
 const distributeRewardsCallList = [];
 
-async function submitPrice(token, contract, args) {
+// Helper function to collect arguments for submitPrice
+async function queueSubmitPrice(token, contract, args) {
   const callArgs = {
     contract,
     method: "submitPrice",
     args: util.usc(args),
   };
-  await rest.call(token, callArgs, { config });
+  // Push call arguments into the submitPriceCallList
+  submitPriceCallList.push(callArgs);
 }
 
-// Instead of calling rest.call directly, accumulate call arguments for distributeRewards
-async function distributeRewards(token, contract, args) {
+// Helper function to collect arguments for distributeRewards
+async function queueDistributeRewards(token, contract, args) {
   const callArgs = {
     contract,
     method: "distributeRewards",
@@ -31,12 +33,29 @@ async function distributeRewards(token, contract, args) {
   distributeRewardsCallList.push(callArgs);
 }
 
-// After all calls are collected, we run them at once
+// After collecting submitPrice calls, run them all at once
+async function runSubmitPriceCalls(token) {
+  if (submitPriceCallList.length > 0) {
+    console.log("Executing batch callList for submitPrice...");
+    await rest.callList(token, submitPriceCallList, { config });
+    console.log("Batch submitPrice calls completed.");
+
+    // Clear out the array if you want a fresh start next time
+    submitPriceCallList.length = 0;
+  } else {
+    console.log("No submitPrice calls to execute.");
+  }
+}
+
+// After collecting distributeRewards calls, run them all at once
 async function runDistributeRewardsCalls(token) {
   if (distributeRewardsCallList.length > 0) {
     console.log("Executing batch callList for distributeRewards...");
     await rest.callList(token, distributeRewardsCallList, { config });
     console.log("Batch distributeRewards calls completed.");
+
+    // Clear out the array if you want a fresh start next time
+    distributeRewardsCallList.length = 0;
   } else {
     console.log("No distributeRewards calls to execute.");
   }
@@ -87,8 +106,8 @@ async function fetchAndSubmitEscrowAddresses(oracleContract, token) {
 
     if (!escrows || escrows.length === 0) {
       console.log(`No escrows found for reserve ${reserveName}`);
-      // Collect callArgs for empty escrowAddresses to distributeRewards
-      await distributeRewards(
+      // Queue distributeRewards with empty array
+      await queueDistributeRewards(
         token,
         { address: reserveAddress, name: reserveName },
         { escrowAddresses: [] }
@@ -107,8 +126,8 @@ async function fetchAndSubmitEscrowAddresses(oracleContract, token) {
         }): ${JSON.stringify(escrowAddresses)}`
       );
 
-      // Collect callArgs instead of calling directly
-      await distributeRewards(
+      // Queue the distributeRewards call
+      await queueDistributeRewards(
         token,
         { address: reserveAddress, name: reserveName },
         { escrowAddresses }
@@ -116,12 +135,12 @@ async function fetchAndSubmitEscrowAddresses(oracleContract, token) {
     }
 
     console.log(
-      `Escrow Addresses submitted for ${reserveName} at ${new Date().toISOString()}`
+      `Escrow Addresses queued for ${reserveName} at ${new Date().toISOString()}`
     );
   }
 }
 
-// Function to fetch and submit price
+// Instead of calling rest.call directly in fetchAndSubmitMetalPrice, queue the call
 async function fetchAndSubmitMetalPrice(metal, apiKey, oracleContract, token) {
   try {
     const apiUrl = `https://api.metals.dev/v1/metal/spot?metal=${metal}&api_key=${apiKey}&currency=USD&unit=toz`;
@@ -132,11 +151,12 @@ async function fetchAndSubmitMetalPrice(metal, apiKey, oracleContract, token) {
     const timestampInSeconds = Math.floor(Date.now() / 1000);
     console.log(`Current Timestamp: ${timestampInSeconds}`);
 
-    await submitPrice(token, oracleContract, {
+    // Queue the submitPrice call
+    await queueSubmitPrice(token, oracleContract, {
       price: metalPrice,
       timestamp: timestampInSeconds,
     });
-    console.log(`Price submitted for ${metal} at ${new Date().toISOString()}`);
+    console.log(`Price queued for ${metal} at ${new Date().toISOString()}`);
   } catch (error) {
     console.error(`ERROR: Failed to submit price for ${metal}:`, error);
   }
@@ -198,15 +218,15 @@ async function fetchAndSubmitETHPrice(
     console.log(`Calculated TWAP: $${twap}`);
 
     const currentTimestamp = Math.floor(currentTimeMs / 1000);
-    await submitPrice(token, oracleContract, {
+
+    // Queue the submitPrice call
+    await queueSubmitPrice(token, oracleContract, {
       price: twap / 1e18,
       timestamp: currentTimestamp,
     });
 
     console.log(
-      `TWAP submitted: $${twap.toFixed(2)} at ${new Date(
-        currentTimeMs
-      ).toISOString()}`
+      `TWAP queued: $${twap.toFixed(2)} at ${new Date(currentTimeMs).toISOString()}`
     );
   } catch (error) {
     console.error("ETH TWAP calculation and submission failed:", error);
@@ -272,7 +292,7 @@ async function main() {
             fetchInterval
           );
         } else if (metal === "USD") {
-          await submitPrice(token, oracle, {
+          await queueSubmitPrice(token, oracle, {
             price: 1 / 1e18,
             timestamp: Math.floor(Date.now() / 1000),
           });
@@ -291,7 +311,8 @@ async function main() {
       }
     }
 
-    // After processing all oracles and collecting distributeRewards calls, run them at once
+    // After processing all oracles, run the queued calls
+    await runSubmitPriceCalls(token);
     await runDistributeRewardsCalls(token);
   };
   
