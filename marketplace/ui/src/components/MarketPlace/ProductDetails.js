@@ -663,7 +663,7 @@ const ProductDetails = ({ user, users }) => {
                                     (
                                     {isStaked
                                       ? details.escrow?.maxLoanAmount
-                                      : adjustedPrice.toFixed(0)}
+                                      : adjustedPrice.toFixed(2)}
                                     USDST )
                                   </b>
                                 </span>
