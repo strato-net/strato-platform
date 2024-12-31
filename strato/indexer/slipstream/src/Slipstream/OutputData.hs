@@ -612,7 +612,9 @@ createArrayTable (creator, a, n) (arr, arrType) c cc = do
       arrSqlType = fromMaybe "text" $ solidityTypeToSQLType False (Just c) cc arrType
   yield $ (createArrayTableQuery (creator, a, n, arr, arrSqlType))
   let fkeys1 = getDeferredForeignKeysForCollection tableName creator a
-      fkeys2 = getDeferredForeignKeysForArrayType tableName creator a arrSqlType
+      fkeys2 = case arrType of
+                (SVMType.UnknownLabel contractNameForFkey _) -> getDeferredForeignKeysForArrayType tableName creator a (T.pack $ contractNameForFkey)
+                _  -> []
   return $ fkeys1 ++ fkeys2
 
 createEventArrayTable ::
