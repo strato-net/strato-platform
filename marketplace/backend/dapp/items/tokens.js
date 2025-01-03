@@ -18,7 +18,9 @@ async function uploadContract(user, _constructorArgs, options) {
   const { quantity, ...restArgs } = constructorArgs;
 
   // Adjust quantity safely using BigNumber
-  const adjustedQuantity = new BigNumber(quantity).multipliedBy(new BigNumber(10).pow(18)).toFixed(0);
+  const adjustedQuantity = new BigNumber(quantity)
+    .multipliedBy(new BigNumber(10).pow(18))
+    .toFixed(0);
   const updatedConstructorArgs = { ...restArgs, quantity: adjustedQuantity };
 
   const contractArgs = {
@@ -199,6 +201,16 @@ function getETHSTAddress() {
   }
 }
 
+function getStratsAddress() {
+  if (process.env.networkID === constants.prodNetworkId) {
+    return constants.prodStratsAddress;
+  } else if (process.env.networkID === constants.testnetNetworkId) {
+    return constants.testnetStratsAddress;
+  } else {
+    return constants.prodStratsAddress;
+  }
+}
+
 export default {
   uploadContract,
   contractName,
@@ -210,4 +222,5 @@ export default {
   getUSDSTAddress,
   getCataAddress,
   getETHSTAddress,
+  getStratsAddress,
 };

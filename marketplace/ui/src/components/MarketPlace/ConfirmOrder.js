@@ -145,7 +145,7 @@ const ConfirmOrder = ({ paymentServices = [], data, columns }) => {
         concatenatedOrderString += `Shipping Fee: <i><strong>Free</strong></i><br><br>`;
         concatenatedOrderString += `Order Total: $${orderTotal.toFixed(
           2
-        )} (${orderTotal.toFixed(0)} ' USDST')<br>`;
+        )} (${orderTotal.toFixed(2)} ' USDST')<br>`;
       }
     }
 

@@ -19,6 +19,7 @@ import { useEthState } from '../../contexts/eth';
 const TransactionResponsive = ({
   data,
   user,
+  stratAddress,
   assetsWithEighteenDecimalPlaces,
 }) => {
   const USDSTIcon = <img src={Images.USDST} alt="" className="w-5 h-5" />;
@@ -137,7 +138,15 @@ const TransactionResponsive = ({
               type,
             },
           ];
-          if (assetsWithEighteenDecimalPlaces.includes(assetOriginAddress)) {
+          if (assetOriginAddress === stratAddress) {
+            quantity = (quantity / 100).toLocaleString('en-US', {
+              maximumFractionDigits: 4,
+              minimumFractionDigits: 0,
+            });
+            price = (price * 100).toFixed(2);
+          } else if (
+            assetsWithEighteenDecimalPlaces.includes(assetOriginAddress)
+          ) {
             quantity = (quantity / Math.pow(10, 18)).toLocaleString('en-US', {
               maximumFractionDigits: 4,
               minimumFractionDigits: 0,

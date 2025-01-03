@@ -53,6 +53,7 @@ import { getStringDate } from '../../helpers/utils';
 const TransactionTable = ({
   user,
   download,
+  stratAddress,
   assetsWithEighteenDecimalPlaces,
 }) => {
   const USDSTIcon = (
@@ -191,6 +192,7 @@ const TransactionTable = ({
 
   const Content = ({ data }) => {
     const price = data?.assetPrice || data?.price;
+    const isStrat = data?.assetOriginAddress === stratAddress;
     const is18DecimalPlaces = assetsWithEighteenDecimalPlaces.includes(
       data?.assetOriginAddress
     );
@@ -234,14 +236,18 @@ const TransactionTable = ({
                   {' '}
                   <b>
                     ${' '}
-                    {is18DecimalPlaces
+                    {isStrat
+                      ? (price * 100).toFixed(2)
+                      : is18DecimalPlaces
                       ? (price * Math.pow(10, 18)).toFixed(2)
                       : price}{' '}
                   </b>{' '}
                   &nbsp;(
                   <span className="text-[#13188A] font-bold">
                     {' '}
-                    {is18DecimalPlaces
+                    {isStrat
+                      ? (price * 100).toFixed(2)
+                      : is18DecimalPlaces
                       ? (price * Math.pow(10, 18)).toFixed(2)
                       : price}{' '}
                   </span>
@@ -375,7 +381,9 @@ const TransactionTable = ({
       render: (data, { quantity, assetOriginAddress }) => (
         <span>
           {quantity
-            ? (assetsWithEighteenDecimalPlaces.includes(assetOriginAddress)
+            ? (assetOriginAddress === stratAddress
+                ? quantity / 100
+                : assetsWithEighteenDecimalPlaces.includes(assetOriginAddress)
                 ? quantity / Math.pow(10, 18)
                 : quantity
               ).toLocaleString('en-US', {
@@ -396,7 +404,9 @@ const TransactionTable = ({
         <p>
           {price
             ? formattedNum(
-                assetsWithEighteenDecimalPlaces.includes(assetOriginAddress)
+                assetOriginAddress === stratAddress
+                  ? (price * 100).toFixed(2)
+                  : assetsWithEighteenDecimalPlaces.includes(assetOriginAddress)
                   ? (price * Math.pow(10, 18)).toFixed(2)
                   : price
               )
@@ -648,6 +658,7 @@ const TransactionTable = ({
                 <TransactionResponsive
                   data={paginatedTransactions}
                   user={user}
+                  stratAddress={stratAddress}
                   assetsWithEighteenDecimalPlaces={
                     assetsWithEighteenDecimalPlaces
                   }

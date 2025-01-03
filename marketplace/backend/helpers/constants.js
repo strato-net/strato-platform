@@ -35,6 +35,8 @@ export default {
   blockAppsOrg: 'BlockApps',
   prodNetworkId: '6909499098523985262',
   testnetNetworkId: '7596898649924658542',
+  prodStratsAddress: 'd2810818e0401e85693f83107ed2b96faeed329c',
+  testnetStratsAddress: '5375b8b1c691201acf16a72612d82ed438951a04',
   prodUSDSTAddress: '',
   testnetUSDSTAddress: '1e5b8b9686e7d73aeea9636caa7f24a1dfe4d522',
   prodCataAddress: '2680dc6693021cd3fefb84351570874fbef8332a',

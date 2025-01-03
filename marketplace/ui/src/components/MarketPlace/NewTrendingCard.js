@@ -230,7 +230,7 @@ const NewTrendingCard = ({
                   <Typography className="font-semibold">
                     {`$${adjustedPrice} `}{' '}
                     <span className="font-normal text-xs mr-2 text-primary">
-                      <b>{`(${adjustedPrice?.toFixed(0)} ${'USDST'})`}</b>
+                      <b>{`(${adjustedPrice?.toFixed(2)} ${'USDST'})`}</b>
                     </span>
                   </Typography>
                 );

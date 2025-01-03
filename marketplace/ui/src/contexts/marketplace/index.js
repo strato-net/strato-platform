@@ -32,6 +32,7 @@ const MarketplaceProvider = ({ children }) => {
     assetsWithEighteenDecimalPlaces: [],
     USDSTAddress:null,
     cataAddress:null,
+    stratsAddress:null,
     isFetchingStratsTransactionHistory: false,
   };
 

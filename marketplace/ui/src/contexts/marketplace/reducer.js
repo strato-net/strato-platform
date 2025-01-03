@@ -271,7 +271,19 @@ const reducer = (state, action) => {
       return {
         ...state,
       };
-
+    case actionDescriptors.fetchStratsAddress:
+      return {
+        ...state,
+      };
+    case actionDescriptors.fetchStratsAddressSuccessful:
+      return {
+        ...state,
+        stratsAddress: action.payload,
+      };
+    case actionDescriptors.fetchStratsAddressFailed:
+      return {
+        ...state,
+      };
     case actionDescriptors.fetchAssetsWithEighteenDecimalPlaces:
       return {
         ...state,

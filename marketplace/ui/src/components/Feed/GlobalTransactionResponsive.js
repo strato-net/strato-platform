@@ -16,6 +16,7 @@ const GlobalTransactionResponsive = ({
   user,
   isTransactionLoading,
   fetchData,
+  stratAddress,
   assetsWithEighteenDecimalPlaces,
   ethstAddress,
 }) => {
@@ -107,6 +108,7 @@ const GlobalTransactionResponsive = ({
                   type,
                 },
               ];
+              const isStrat = assetOriginAddress === stratAddress;
               const is18DecimalPlaces =
                 assetsWithEighteenDecimalPlaces.includes(assetOriginAddress);
 
@@ -223,13 +225,17 @@ const GlobalTransactionResponsive = ({
                       <p className={`text-right flex justify-end items-center`}>
                         $
                         {formattedNum(
-                          is18DecimalPlaces
+                          isStrat
+                            ? (price * 100).toFixed(2)
+                            : is18DecimalPlaces
                             ? (price * Math.pow(10, 18)).toFixed(2)
                             : price
                         )}{' '}
                         (
                         {formattedNum(
-                          is18DecimalPlaces
+                          isStrat
+                            ? (price * 100).toFixed(2)
+                            : is18DecimalPlaces
                             ? (price * Math.pow(10, 18)).toFixed(2)
                             : price
                         )}{' '}
@@ -242,7 +248,9 @@ const GlobalTransactionResponsive = ({
                     )}
                     <p className="text-right">
                       Qty:{' '}
-                      {(is18DecimalPlaces
+                      {(isStrat
+                        ? quantity / 100
+                        : is18DecimalPlaces
                         ? quantity / Math.pow(10, 18)
                         : quantity
                       ).toLocaleString('en-US', {

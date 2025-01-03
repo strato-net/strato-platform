@@ -24,6 +24,7 @@ const Transaction = ({ user }) => {
   const categoryDispatch = useCategoryDispatch();
   const marketplaceDispatch = useMarketplaceDispatch();
   const ethDispatch = useEthDispatch();
+  const [stratAddress, setStratAddress] = useState('');
   const [assetsWithEighteenDecimalPlaces, setAssetsWithEighteenDecimalPlaces] =
     useState('');
 
@@ -34,7 +35,11 @@ const Transaction = ({ user }) => {
           marketplaceDispatch
         );
       await ethAcions.fetchETHSTAddress(ethDispatch);
+      const stratAddress = await marketplaceActions.fetchStratsAddress(
+        marketplaceDispatch
+      );
       setAssetsWithEighteenDecimalPlaces(assetsWithEighteenDecimalPlaces);
+      setStratAddress(stratAddress);
     };
 
     fetchAddresses();
@@ -88,6 +93,7 @@ const Transaction = ({ user }) => {
         const { category, subCategory } = getCategoryAndSubcategory(
           transaction.assetContractName
         );
+        let isStrat = transaction.assetOriginAddress === stratAddress;
         let is18DecimalPlaces = assetsWithEighteenDecimalPlaces.includes(
           transaction.assetOriginAddress
         );
@@ -97,10 +103,14 @@ const Transaction = ({ user }) => {
           category,
           subCategory,
           assetName: transaction?.assetName,
-          Price: is18DecimalPlaces
+          Price: isStrat
+            ? Number((transaction?.price * 100).toFixed(2))
+            : is18DecimalPlaces
             ? Number((transaction?.price * Math.pow(10, 18)).toFixed(2))
             : transaction?.price,
-          quantity: is18DecimalPlaces
+          quantity: isStrat
+            ? (transaction?.quantity / 100).toString()
+            : is18DecimalPlaces
             ? (transaction?.quantity / Math.pow(10, 18)).toString()
             : transaction?.quantity.toString(),
           from: transaction.from,
@@ -235,6 +245,7 @@ const Transaction = ({ user }) => {
       <TransactionTable
         user={user}
         download={download}
+        stratAddress={stratAddress}
         assetsWithEighteenDecimalPlaces={assetsWithEighteenDecimalPlaces}
       />
     </div>
