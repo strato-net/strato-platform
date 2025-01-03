@@ -350,7 +350,7 @@ export const stakeColumns = (
 
         // Extract escrow assets array safely
         const escrowAssets =
-          record?.escrow?.['BlockApps-Mercata-Escrow-assets'] || [];
+          record?.['BlockApps-Mercata-Escrow-assets'] || [];
 
         // Determine if there is a matching escrow asset
         const hasMatchingEscrow = escrowAssets.some(
@@ -378,7 +378,7 @@ export const stakeColumns = (
       title: 'Quantity Staked',
       align: 'center',
       render: (_, record) => {
-        const matchingQuantity = record?.escrow?.[
+        const matchingQuantity = record?.[
           'BlockApps-Mercata-Escrow-assets'
         ]?.find((item) => item.value === record.address)
           ? record.quantity
@@ -454,7 +454,7 @@ export const stakeColumns = (
       title: 'Status',
       align: 'center',
       render: (text, record) => {
-        const matchingQuantity = record?.escrow?.[
+        const matchingQuantity = record?.[
           'BlockApps-Mercata-Escrow-assets'
         ]?.find((item) => item.value === record.address)
           ? record.quantity
