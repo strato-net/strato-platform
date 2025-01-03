@@ -180,9 +180,6 @@ function newnode {
   echo "Starting strato-p2p-indexer"
   runBackgroundProcess strato-p2p-indexer "${iFlag}" +RTS -N1 >> logs/strato-p2p-indexer 2>&1
 
-  echo "Starting strato-txr-indexer"
-  runBackgroundProcess strato-txr-indexer "${iFlag}" +RTS -N1 >> logs/strato-txr-indexer 2>&1
-
   if [ -n "${svmDev}" ]; then
     svdFlag="--svmDev=${svmDev}"
   fi
