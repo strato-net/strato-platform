@@ -150,7 +150,7 @@ const BoughtOrderDetails = ({ user, users }) => {
                 minimumFractionDigits: 0,
               })
             : '--',
-          amount: productPrice * parseInt(orderQuantities[index]),
+          amount: productPrice * (parseInt(orderQuantities[index]/10**18)),
           serialNumber: prod,
           tax: prod.tax ? prod.tax : 0,
         });

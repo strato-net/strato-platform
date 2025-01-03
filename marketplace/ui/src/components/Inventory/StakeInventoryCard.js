@@ -95,7 +95,7 @@ const StakeInventoryCard = ({
     : 0;
   const maxBorrowableAmount = Math.floor(collateralValue / 2);
   const uniqueBorrowedAddresses = new Set();
-  const borrowAmount = inventory?.inventories
+  let borrowAmount = inventory?.inventories
     ? inventory.inventories.reduce((sum, item) => {
         const escrowAddress = item?.escrow?.address;
         const borrowedValue = item?.escrow?.borrowedAmount || 0;
@@ -109,6 +109,8 @@ const StakeInventoryCard = ({
         return sum;
       }, 0)
     : inventory?.escrow?.borrowedAmount || 0;
+    
+    borrowAmount = borrowAmount / 100;
 
   const escrows = inventory?.inventories
     ? [

@@ -29,7 +29,7 @@ export const aggregateStakeColumns = (
       render: (_, record) => {
         const uniqueBorrowedAddresses = new Set();
 
-        const borrowedAmount =
+        let borrowedAmount =
           (record?.inventories
             ? record.inventories.reduce((sum, item) => {
                 const escrowAddress = item?.escrow?.address;
@@ -47,6 +47,9 @@ export const aggregateStakeColumns = (
                 return sum;
               }, 0)
             : record?.escrow?.borrowedAmount || 0);
+
+            borrowedAmount = borrowedAmount / 100;    
+
         return (
           <>
             <div className="flex items-center">

@@ -468,6 +468,10 @@ const ProductDetails = ({ user, users }) => {
     decodeURIComponent(details?.contract_name)
   );
   const linkUrl = window.location.href;
+  
+  const is18DecimalPlaces = assetsWithEighteenDecimalPlaces.includes(
+    details?.originAddress
+  );
 
   return (
     <>
@@ -657,13 +661,15 @@ const ProductDetails = ({ user, users }) => {
                                   ? (
                                       details.escrow?.maxLoanAmount
                                     ).toFixed(2)
-                                  : adjustedPrice}
+                                  : is18DecimalPlaces ? adjustedPrice * Math.pow(10, 18)
+                                   : adjustedPrice.toFixed(2)}
                                 <span className="font-normal text-xs mr-2 text-primary">
                                   <b>
                                     (
                                     {isStaked
                                       ? details.escrow?.maxLoanAmount
-                                      : adjustedPrice.toFixed(0)}
+                                      : is18DecimalPlaces ? adjustedPrice * Math.pow(10, 18) 
+                                      : adjustedPrice.toFixed(2)}
                                     USDST )
                                   </b>
                                 </span>
@@ -1060,6 +1066,7 @@ const ProductDetails = ({ user, users }) => {
                       </h2>
                       <Statistics
                         priceHistory={priceHistory}
+                        is18DecimalPlaces={is18DecimalPlaces}
                       />
                     </>
                   )}

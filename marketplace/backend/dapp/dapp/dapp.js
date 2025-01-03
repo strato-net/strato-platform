@@ -2146,7 +2146,7 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
         return acc;
       },
       { addressesToUse: [], accumulatedTotal: new BigNumber(0) }
-    ).addressesToUse;
+    ) //.addressesToUse; //Remove this...
 
     // Proceed with unstake if sufficient assets are accumulated
     return await reserveJs.repay(

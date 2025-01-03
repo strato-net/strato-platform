@@ -129,10 +129,7 @@ const SoldOrderDetails = ({ user, users }) => {
           name: prod.name,
           unitPrice: productPrice,
           quantity: productQuantity ? formattedNum(productQuantity) : '--',
-          amount: 
-            (is18DecimalPlaces
-              ? (prod.price * Math.pow(10, 18)).toFixed(2)
-              : prod.price) * parseInt(orderQuantities[index]),
+          amount: productPrice * (parseInt(productQuantity)),
           serialNumber: prod,
           tax: prod.tax ? prod.tax : 0,
         });
