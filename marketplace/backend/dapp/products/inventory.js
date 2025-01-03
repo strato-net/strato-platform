@@ -539,7 +539,7 @@ async function getAll(admin, args = {}, defaultOptions) {
           ownerCommonName: ownerCommonName,
           queryOptions: queryOptions
             ? queryOptions
-            : { select: constants.attachSalesAndImagesAndFiles },
+            : { select: constants.attachSalesEscrowsAndImagesAndFiles },
         },
         options,
         admin
@@ -550,7 +550,7 @@ async function getAll(admin, args = {}, defaultOptions) {
         {
           ...restArgs,
           address: assetAddresses,
-          queryOptions: { select: constants.attachSalesAndImagesAndFiles },
+          queryOptions: { select: constants.attachSalesEscrowsAndImagesAndFiles },
         },
         options,
         admin
@@ -560,7 +560,7 @@ async function getAll(admin, args = {}, defaultOptions) {
         contractName,
         {
           ...restArgs,
-          queryOptions: { select: constants.attachSalesAndImagesAndFiles },
+          queryOptions: { select: constants.attachSalesEscrowsAndImagesAndFiles },
         },
         options,
         admin
@@ -635,13 +635,14 @@ async function getAll(admin, args = {}, defaultOptions) {
           }
         } else {
           let escrow;
-          if (inventory.sale && inventory.sale !== constants.zeroAddress) {
-            escrow = await escrowJs.getEscrowForAsset(
-              admin,
-              { value: `eq.${inventory.address}` },
-              options
-            );
-          }
+            if (
+              inventory['BlockApps-Mercata-Escrow-assets'] &&
+              inventory['BlockApps-Mercata-Escrow-assets'].length > 0
+            ) {
+              escrow = inventory['BlockApps-Mercata-Escrow-assets'].filter(
+                (escrow) => escrow.isOpen === true
+              );
+            }
           if (isMarketplaceSearch && isNullPriceRange) {
             if (!escrow) {
               finalInventory.push({

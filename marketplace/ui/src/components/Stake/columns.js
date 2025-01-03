@@ -162,6 +162,44 @@ export const aggregateStakeColumns = (
       },
     },
     {
+      title: 'CATA Rewards Earned',
+      align: 'center',
+      render: (_, record) => {
+        // Sum totalCataRewardIssued from BlockApps-Mercata-Escrow-assets
+        const totalCataRewardsIssued = record?.inventories
+          ? record.inventories.reduce((sum, item) => {
+              const escrowAssets = item['BlockApps-Mercata-Escrow-assets'];
+
+              // Check if escrowAssets is an array
+              if (Array.isArray(escrowAssets)) {
+                const assetSum = escrowAssets.reduce((assetSum, asset) => {
+                  const escrow = asset['BlockApps-Mercata-Escrow'];
+                  const cataReward = escrow?.totalCataReward || 0;
+
+                  return assetSum + cataReward;
+                }, 0);
+
+                return sum + assetSum;
+              }
+
+              return sum;
+            }, 0)
+          : record?.escrow?.totalCataReward || 0;
+
+        // If these rewards also follow 18 decimals, apply division
+        const displayValue = totalCataRewardsIssued / 1e18;
+
+        return (
+          <div>
+            {displayValue.toLocaleString('en-US', {
+              maximumFractionDigits: 4,
+              minimumFractionDigits: 2,
+            })}
+          </div>
+        );
+      },
+    },
+    {
       title: 'Actions',
       align: 'center',
       render: (text, record) => (
