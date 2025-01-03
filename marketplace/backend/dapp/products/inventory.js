@@ -635,14 +635,14 @@ async function getAll(admin, args = {}, defaultOptions) {
           }
         } else {
           let escrow;
-            if (
-              inventory['BlockApps-Mercata-Escrow-assets'] &&
-              inventory['BlockApps-Mercata-Escrow-assets'].length > 0
-            ) {
-              escrow = inventory['BlockApps-Mercata-Escrow-assets'].filter(
-                (escrow) => escrow.isOpen === true
-              );
-            }
+          if (
+            inventory['BlockApps-Mercata-Escrow-assets'] &&
+            inventory['BlockApps-Mercata-Escrow-assets'].length > 0
+          ) {
+            escrow = inventory['BlockApps-Mercata-Escrow-assets'].find(
+              (asset) => asset['BlockApps-Mercata-Escrow']?.isActive === true
+            )?.['BlockApps-Mercata-Escrow'];
+          }
           if (isMarketplaceSearch && isNullPriceRange) {
             if (!escrow) {
               finalInventory.push({
@@ -656,7 +656,7 @@ async function getAll(admin, args = {}, defaultOptions) {
               });
             }
           } else {
-            finalInventory.push({ escrow, ...inventory});
+            finalInventory.push({ escrow, ...inventory });
           }
         }
       }
