@@ -640,7 +640,7 @@ async function getAll(admin, args = {}, defaultOptions) {
             inventory['BlockApps-Mercata-Escrow-assets'].length > 0
           ) {
             escrow = inventory['BlockApps-Mercata-Escrow-assets'].find(
-              (asset) => asset['BlockApps-Mercata-Escrow']?.isActive === true
+              (asset) => asset['BlockApps-Mercata-Escrow']?.isActive === true && asset.value === inventory.address
             )?.['BlockApps-Mercata-Escrow'];
           }
           if (isMarketplaceSearch && isNullPriceRange) {
