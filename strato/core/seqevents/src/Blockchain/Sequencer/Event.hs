@@ -161,10 +161,7 @@ data JsonRpcCommand
 data P2pEvent
   = P2pTx OutputTx
   | P2pBlock OutputBlock
-  | P2pGenesis OutputGenesis
-  | P2pGetChain [Word256]
   | P2pGetTx [Keccak256]
-  | P2pNewOrgName Word256 ChainMemberParsedSet
   | P2pBlockstanbul PBFT.WireMessage
   | -- Ask and push for inclusive ranges of blocks
     P2pAskForBlocks {askStart :: Integer, askEnd :: Integer, askPeer :: ChainMemberParsedSet}
@@ -176,10 +173,7 @@ data P2pEvent
 instance Format P2pEvent where
   format (P2pTx o) = format o
   format (P2pBlock o) = format o
-  format (P2pGenesis o) = show o
-  format (P2pGetChain cids) = "[" ++ (intercalate "," $ map (CL.yellow . format) cids) ++ "]"
   format (P2pGetTx shas) = "[" ++ (intercalate "," $ map format shas) ++ "]"
-  format (P2pNewOrgName c cm) = intercalate ", " [CL.yellow $ format c, show cm]
   format (P2pBlockstanbul o) = format o
   format (P2pGetMPNodes srs) = "[" ++ (intercalate "," $ map format srs) ++ "]"
   format (P2pMPNodesResponse o nds) = "Response to " ++ show o ++ ": [" ++ (intercalate "," $ map show nds) ++ "]"
@@ -188,10 +182,7 @@ instance Format P2pEvent where
 instance ShowConstructor P2pEvent where
   showConstructor P2pTx{} = "P2pTx"
   showConstructor P2pBlock{} = "P2pBlock"
-  showConstructor P2pGenesis{} = "P2pGenesis"
-  showConstructor P2pGetChain{} = "P2pGetChain"
   showConstructor P2pGetTx{} = "P2pGetTx"
-  showConstructor P2pNewOrgName{} = "P2pNewOrgName"
   showConstructor P2pBlockstanbul{} = "P2pBlockstanbul"
   showConstructor P2pAskForBlocks{} = "P2pAskForBlocks"
   showConstructor P2pPushBlocks{} = "P2pPushBlocks"

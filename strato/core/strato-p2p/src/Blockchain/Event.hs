@@ -28,7 +28,6 @@ import Blockchain.Context
 import Blockchain.Data.Block
 import Blockchain.Data.BlockHeader (BlockHeader)
 import qualified Blockchain.Data.BlockHeader as BlockHeader
-import Blockchain.Data.ChainInfo
 import Blockchain.Data.Control (P2PCNC (..))
 import Blockchain.Data.Enode
 import Blockchain.Data.PubKey
@@ -67,13 +66,11 @@ import Data.Map.Internal (WhenMatched (..), WhenMissing (..))
 import Data.Map.Merge.Strict
 import qualified Data.Map.Strict as M
 import Data.Maybe
-import Data.Ranged (rSetIntersection, rSetUnion)
 import qualified Data.Set as S
 import qualified Data.Text as T
 import Data.These
 import Data.Time.Clock
 import Debug.Trace (trace)
-import qualified Text.Colors as CL
 import Text.Format
 import Text.Printf
 import Text.Tools
@@ -396,36 +393,7 @@ handleEvents peer = awaitForever $ \case
             $logInfoS "handleEvents/P2pTx" $ T.pack $ "sending Transaction " ++ format (otHash tx) ++ " for chainID " ++ formatChainId mCid
             $logDebugS "handleEvents/P2pTx" . T.pack $ "the transaction was: " ++ format tx
             yieldR $ Transactions [otBaseTx tx]
-    P2pGenesis (OutputGenesis og (cId, cInfo@(ChainInfo uci _))) -> do
-      when (shouldSend peer og) $ do
-        $logInfoS "handleEvents/P2pGenesis" . T.pack $ "received new chain: " ++ formatChainId (Just cId) ++ " with " ++ show uci
-        peerX509 <- lift $ getPeerX509 peer
-        myX509 <- lift getMyX509
-        if checkPeerIsMember myX509 peerX509 (chainMembersToChainMemberRset (members uci))
-          then do
-            $logInfoS "handleEvents/P2pGenesis" $ T.pack $ "sending ChainDetails for chainID " ++ (formatChainId $ Just cId)
-            yieldR $ ChainDetails [(cId, cInfo)]
-          else do
-            $logInfoS "handleEvents/P2pGenesis" $
-              T.pack $
-                printf "peer is not authorized for received chainID %s" (formatChainId $ Just cId)
-            $logDebugLS "handleEvents/P2pGenesis/members" $ (unChainMembers (members uci))
-    P2pGetChain chainIds -> yieldR $ GetChainDetails chainIds
     P2pGetTx shas -> yieldR $ GetTransactions shas
-    P2pNewOrgName cId org -> do
-      let formatted = CL.yellow $ format cId
-          orgFormat = CL.blue $ show org
-      $logInfoS "handleEvents/P2pNewOrgName" $ T.pack $ "New organization associated with chain " ++ formatted ++ " for org " ++ orgFormat
-      peerX509 <- lift $ getPeerX509 peer
-      myX509 <- lift getMyX509
-      ChainMemberRSet mems <- lift $ selectWithDefault (Proxy @ChainMemberRSet) cId
-      let (hasAccess, ChainMemberRSet newMem) = chainMemberParsedSetToChainMemberRSet org
-          mems' = ChainMemberRSet $ (if hasAccess then rSetUnion else rSetIntersection) mems newMem
-      when (checkPeerIsMember myX509 peerX509 mems') $ do
-        $logInfoS "handleEvents/P2pNewOrgName" $ T.pack $ "Peer cleared for chain " ++ formatted
-        cInfo <- lift $ select (Proxy @ChainInfo) cId -- This should never be Nothing
-        when (isJust cInfo) $ do
-          yieldR $ ChainDetails [(cId, fromJust cInfo)]
     P2pBlockstanbul msg ->
       lift (fmap getChainMemberFromX509 <$> getPeerX509 peer) >>= \case
         Nothing ->
