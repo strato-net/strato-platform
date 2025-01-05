@@ -229,12 +229,12 @@ const BorrowModal = ({
   // `Market Value` = collateralValue / 10000
   // `borrowedAmount` and `loanableAmount` are displayed /100
 
-  const marketValueDisplay = (collateralValue / 10000).toFixed(2)
+  const marketValueDisplay = (collateralValue / Math.pow(10,18)).toFixed(2)
   const borrowedAmountDisplay = (borrowedAmount / 100).toFixed(2);
-  const loanableAmountDisplay = (loanableAmount / 10000).toFixed(2);
+  const loanableAmountDisplay = (loanableAmount / Math.pow(10,18)).toFixed(2);
 
   // Desired loan amount in USDST
-  const [desiredLoanAmount, setDesiredLoanAmount] = useState((loanableAmount/10000 || 0));
+  const [desiredLoanAmount, setDesiredLoanAmount] = useState((loanableAmount/Math.pow(10,18) || 0));
 
   const handleLoanAmountChange = (value) => {
     setDesiredLoanAmount(value || 0);

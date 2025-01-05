@@ -126,7 +126,7 @@ const ResponsiveCart = ({
     let orderList = [];
     cartData.forEach((item) => {
       orderList.push({
-        quantity: item.qty,
+        quantity: `${item.qty}`,
         assetAddress: item.key,
         firstSale: item.firstSale,
         unitPrice: item.unitPrice,
