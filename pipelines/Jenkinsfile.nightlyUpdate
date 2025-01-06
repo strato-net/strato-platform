@@ -20,28 +20,6 @@ pipeline {
       }
     }
 
-    stage('Update stratodemo node') {
-      agent { label "mercata-testnet2-stratodemo" }
-      steps {
-        copyArtifacts filter: 'docker-compose.yml', fingerprintArtifacts: true, projectName: 'STRATO_develop_nightly_build', selector: lastSuccessful()
-        
-        
-        dir ('/home/ec2-user/strato-getting-started') {
-          sh 'mv docker-compose.yml docker-compose.$(date \'+%Y%m%d\').yml || true'
-        }
-        sh 'mv docker-compose.yml /home/ec2-user/strato-getting-started'
-        
-        dir ('/home/ec2-user/strato-getting-started') {
-          sh 'sudo ./restart.sh'
-          sh 'sudo docker cp strato_nginx_1:/usr/local/openresty/nginx/conf/nginx.conf nginx.conf'
-          sh './insert_CORS2.sh nginx.conf'
-          sh 'sudo docker cp nginx.conf strato_nginx_1:/usr/local/openresty/nginx/conf/nginx.conf'
-          sh 'sudo docker exec strato_nginx_1 openresty -s reload'
-        }
-        sh 'sudo docker image prune -fa'
-      }
-    }
-
     stage('Update Testnet2 Payment Server') {
       agent { label "mercata-testnet2-payment" }
       steps {
