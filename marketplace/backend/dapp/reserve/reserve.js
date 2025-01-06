@@ -248,7 +248,7 @@ async function getAll(user, options) {
 
     const tvl =
       activeEscrows && activeEscrows.length > 0
-        ? activeEscrows[0].sum / 10000
+        ? activeEscrows[0].sum / Math.pow(10, 18)
         : 0;
 
     const escrowTotalCataRewardSearchOptions = {

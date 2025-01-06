@@ -329,7 +329,7 @@ async function userCataRewards(user, userCommonName, options) {
   const totalCurrentColleteralValue = dailyCataRewardResult[0].sum
     ? dailyCataRewardResult[0].sum
     : 0;
-  const dailyCataReward = totalCurrentColleteralValue / 10000 / 365;
+  const dailyCataReward = totalCurrentColleteralValue / Math.pow(10, 18) / 365;
 
   return { totalCataReward, dailyCataReward };
 }

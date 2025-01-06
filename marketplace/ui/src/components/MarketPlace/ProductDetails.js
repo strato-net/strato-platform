@@ -468,7 +468,7 @@ const ProductDetails = ({ user, users }) => {
     decodeURIComponent(details?.contract_name)
   );
   const linkUrl = window.location.href;
-  
+
   const is18DecimalPlaces = assetsWithEighteenDecimalPlaces.includes(
     details?.originAddress
   );
@@ -652,25 +652,24 @@ const ProductDetails = ({ user, users }) => {
                     >
                       {details?.price || isStaked
                         ? (() => {
-                            
                             const adjustedPrice = details.price;
                             return (
                               <>
                                 $
                                 {isStaked
-                                  ? (
-                                      details.escrow?.maxLoanAmount
-                                    ).toFixed(2)
-                                  : is18DecimalPlaces ? adjustedPrice * Math.pow(10, 18)
-                                   : adjustedPrice.toFixed(2)}
+                                  ? (details.escrow?.maxLoanAmount).toFixed(2)
+                                  : is18DecimalPlaces
+                                  ? adjustedPrice * Math.pow(10, 18)
+                                  : adjustedPrice.toFixed(2)}{' '}
                                 <span className="font-normal text-xs mr-2 text-primary">
                                   <b>
                                     (
                                     {isStaked
                                       ? details.escrow?.maxLoanAmount
-                                      : is18DecimalPlaces ? adjustedPrice * Math.pow(10, 18) 
-                                      : adjustedPrice.toFixed(2)}
-                                    USDST )
+                                      : is18DecimalPlaces
+                                      ? adjustedPrice * Math.pow(10, 18)
+                                      : adjustedPrice.toFixed(2)}{' '}
+                                    USDST)
                                   </b>
                                 </span>
                                 {isStakeable && (
@@ -1053,9 +1052,7 @@ const ProductDetails = ({ user, users }) => {
                         onChange={handleTimeFilterChange}
                         activeKey={timeFilter}
                       />
-                      <PriceChartAndStats
-                        priceHistory={priceHistory}
-                      />
+                      <PriceChartAndStats priceHistory={priceHistory} />
                     </div>
                   )}
                 <div>

@@ -474,7 +474,7 @@ const Inventory = ({ user }) => {
                 <span>${price}</span>{' '}
                 <p className="flex text-xs items-center gap-1">
                   {' '}
-                  &nbsp;({price} {USDSTIcon}){' '}
+                  &nbsp;({price} {USDSTIcon})
                 </p>
               </>
             ) : (
