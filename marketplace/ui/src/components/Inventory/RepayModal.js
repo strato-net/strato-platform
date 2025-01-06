@@ -93,11 +93,11 @@ const RepayModal = ({
           }, 0)
         : inventory?.escrow?.borrowedAmount *
           (inventory?.quantity / totalCollateralQuantity);
-      const USDSTBalance = Object.keys(USDST).length > 0 ? USDST : 0;
+      const USDSTBalance = Object.keys(USDST).length > 0 ? USDST * Math.pow(10,18) : 0;           
       setRepayAmount(
-        borrowedAmount / 100 > USDSTBalance
-          ? Number(USDSTBalance)
-          : borrowedAmount / 100
+        borrowedAmount  > USDSTBalance
+        ? Number(USDSTBalance)
+        : borrowedAmount
       );
     }
   }, [USDST, inventory]);
@@ -114,7 +114,7 @@ const RepayModal = ({
       value: (
         <div className="flex -mr-1">
           {logo} &nbsp;
-          {repayAmount.toFixed(2)}
+          {(repayAmount/100).toFixed(2)}
         </div>
       ),
     },

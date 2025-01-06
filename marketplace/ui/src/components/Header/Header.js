@@ -101,7 +101,7 @@ const HeaderComponent = ({
   const [categories, setCategories] = useState([]);
   const [selectedCategory, setSelectedCategory] = useState(categoryQueryValue);
   const [isModalVisible, setIsModalVisible] = useState(false);
-  const USDSTBalance = Object.keys(USDST).length > 0 ? USDST : 0;
+  const USDSTBalance = Object.keys(USDST).length > 0 ? USDST * Math.pow(10,18) : 0;
   const cataBalance = Object.keys(cata).length > 0 ? cata : 0;
 
   useEffect(() => {
