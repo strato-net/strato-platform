@@ -114,7 +114,7 @@ function computeAssets(inventory) {
       const saleQty = Number(item.saleQuantity) || 0;
 
       const hasCollateral = Boolean(
-        item?.escrow?.['BlockApps-Mercata-Escrow-assets']?.find(
+        item?.['BlockApps-Mercata-Escrow-assets']?.find(
           (escrow) => escrow.value === item.address
         )
       );
