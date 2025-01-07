@@ -230,7 +230,7 @@ const BorrowModal = ({
   // `borrowedAmount` and `loanableAmount` are displayed /100
 
   const marketValueDisplay = (collateralValue / Math.pow(10,18)).toFixed(2)
-  const borrowedAmountDisplay = (borrowedAmount / 100).toFixed(2);
+  const borrowedAmountDisplay = (borrowedAmount / Math.pow(10, 18)).toFixed(2);
   const loanableAmountDisplay = (loanableAmount / Math.pow(10,18)).toFixed(2);
 
   // Desired loan amount in USDST
@@ -326,9 +326,11 @@ const BorrowModal = ({
   const dataForSummary = [];
 
   const handleSubmit = async () => {
+    const loanAmount = new BigNumber(desiredLoanAmount);
+
     const body = {
       escrowAddresses: escrows,
-      borrowAmount: (desiredLoanAmount * 100).toFixed(0), // Converting back to raw format as before
+      borrowAmount: loanAmount.multipliedBy(new BigNumber(10).pow(18)).toString(),
       reserve: matchedReserve?.address,
     };
 

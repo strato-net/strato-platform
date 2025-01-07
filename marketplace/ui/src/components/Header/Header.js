@@ -76,8 +76,7 @@ const HeaderComponent = ({
   const categoryDispatch = useCategoryDispatch();
   const userDispatch = useAuthenticateDispatch();
   //States
-  const { cartList, USDST, cata, USDSTAddress } =
-    useMarketplaceState();
+  const { cartList, USDST, cata, USDSTAddress } = useMarketplaceState();
   const { categorys } = useCategoryState();
   let { isAuthenticated } = useAuthenticateState();
 
@@ -87,7 +86,9 @@ const HeaderComponent = ({
       marketplaceActions.fetchCataBalance(marketplaceDispatch);
       marketplaceActions.fetchUSDSTAddress(marketplaceDispatch);
       marketplaceActions.fetchCataAddress(marketplaceDispatch);
-      marketplaceActions.fetchAssetsWithEighteenDecimalPlaces(marketplaceDispatch);
+      marketplaceActions.fetchAssetsWithEighteenDecimalPlaces(
+        marketplaceDispatch
+      );
     }
   }, [user]);
 
@@ -101,7 +102,7 @@ const HeaderComponent = ({
   const [categories, setCategories] = useState([]);
   const [selectedCategory, setSelectedCategory] = useState(categoryQueryValue);
   const [isModalVisible, setIsModalVisible] = useState(false);
-  const USDSTBalance = Object.keys(USDST).length > 0 ? USDST * Math.pow(10,18) : 0;
+  const USDSTBalance = Object.keys(USDST).length > 0 ? USDST : 0;
   const cataBalance = Object.keys(cata).length > 0 ? cata : 0;
 
   useEffect(() => {
@@ -221,10 +222,13 @@ const HeaderComponent = ({
           {user && (
             <p className="text-xs mt-1">
               USDST:{' '}
-              {new BigNumber(USDSTBalance).toNumber().toLocaleString('en-US', {
-                maximumFractionDigits: 4,
-                minimumFractionDigits: 2,
-              })}
+              {new BigNumber(USDSTBalance)
+                .toNumber()
+                .toFixed(2)
+                .toLocaleString('en-US', {
+                  maximumFractionDigits: 4,
+                  minimumFractionDigits: 2,
+                })}
             </p>
           )}
         </div>
@@ -271,7 +275,9 @@ const HeaderComponent = ({
             <Row className="flex flex-col">
               <Col Col={24}>
                 {' '}
-                <p className="text-xs mt-1">CATA: {new BigNumber(cataBalance).toString()}</p>
+                <p className="text-xs mt-1">
+                  CATA: {new BigNumber(cataBalance).toString()}
+                </p>
               </Col>
             </Row>
           )}
@@ -306,9 +312,7 @@ const HeaderComponent = ({
           ),
         }
       : null,
-    user
-      ? { value: 'stake', path: routes.Stake.url, label: 'Stake' }
-      : null,
+    user ? { value: 'stake', path: routes.Stake.url, label: 'Stake' } : null,
     {
       value: 'activityFeed',
       path: routes.ActivityFeed.url,
@@ -520,7 +524,7 @@ const HeaderComponent = ({
           onClick={() => {
             window.scrollTo({ top: 0 });
             navigate(routes.Stake.url);
-            setSelectedTab(0)
+            setSelectedTab(0);
           }}
         >
           <RiseOutlined /> Stake
@@ -558,7 +562,9 @@ const HeaderComponent = ({
                     parseFloat(cataBalance).toString().includes('.') &&
                     parseFloat(cataBalance).toString().split('.')[1].length > 4
                       ? `${parseFloat(cataBalance).toFixed(4)}`
-                      : parseFloat(cataBalance).toFixed(4).replace(/\.?0+$/, '')
+                      : parseFloat(cataBalance)
+                          .toFixed(4)
+                          .replace(/\.?0+$/, '')
                   }
                   overflowCount={9999999}
                 >
@@ -587,7 +593,13 @@ const HeaderComponent = ({
                 <Badge
                   style={{ backgroundColor: '#13188A' }}
                   className="cursor-pointer mt-7 md:mt-0 mx-2"
-                  count={USDSTBalance}
+                  count={new BigNumber(USDSTBalance)
+                    .toNumber()
+                    .toFixed(2)
+                    .toLocaleString('en-US', {
+                      maximumFractionDigits: 4,
+                      minimumFractionDigits: 2,
+                    })}
                   overflowCount={9999999}
                 >
                   <img

@@ -29,26 +29,23 @@ export const aggregateStakeColumns = (
       render: (_, record) => {
         const uniqueBorrowedAddresses = new Set();
 
-        let borrowedAmount =
-          (record?.inventories
-            ? record.inventories.reduce((sum, item) => {
-                const escrowAddress = item?.escrow?.address;
-                const borrowedValue = item?.escrow?.borrowedAmount || 0;
+        let borrowedAmount = record?.inventories
+          ? record.inventories.reduce((sum, item) => {
+              const escrowAddress = item?.escrow?.address;
+              const borrowedValue = item?.escrow?.borrowedAmount || 0;
 
-                // Add borrowed amount only if the escrow address is unique
-                if (
-                  escrowAddress &&
-                  !uniqueBorrowedAddresses.has(escrowAddress)
-                ) {
-                  uniqueBorrowedAddresses.add(escrowAddress);
-                  return sum + borrowedValue;
-                }
+              // Add borrowed amount only if the escrow address is unique
+              if (
+                escrowAddress &&
+                !uniqueBorrowedAddresses.has(escrowAddress)
+              ) {
+                uniqueBorrowedAddresses.add(escrowAddress);
+                return sum + borrowedValue;
+              }
 
-                return sum;
-              }, 0)
-            : record?.escrow?.borrowedAmount || 0);
-
-            borrowedAmount = borrowedAmount / 100;    
+              return sum;
+            }, 0)
+          : record?.escrow?.borrowedAmount || 0;
 
         return (
           <>
@@ -77,10 +74,7 @@ export const aggregateStakeColumns = (
             </div>
             <div className="flex items-center gap-2">
               Borrowed Amount: {USDSTIcon}
-              {borrowedAmount.toLocaleString('en-US', {
-                maximumFractionDigits: 2,
-                minimumFractionDigits: 2,
-              })}
+              {borrowedAmount / Math.pow(10, 18)}
             </div>
           </>
         );
@@ -351,8 +345,7 @@ export const stakeColumns = (
           : parsedQuantity;
 
         // Extract escrow assets array safely
-        const escrowAssets =
-          record?.['BlockApps-Mercata-Escrow-assets'] || [];
+        const escrowAssets = record?.['BlockApps-Mercata-Escrow-assets'] || [];
 
         // Determine if there is a matching escrow asset
         const hasMatchingEscrow = escrowAssets.some(

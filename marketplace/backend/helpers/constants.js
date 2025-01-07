@@ -38,7 +38,7 @@ export default {
   prodStratsAddress: 'd2810818e0401e85693f83107ed2b96faeed329c',
   testnetStratsAddress: '5375b8b1c691201acf16a72612d82ed438951a04',
   prodUSDSTAddress: '',
-  testnetUSDSTAddress: 'f19d88d5b88d4948def06fcc12852d4b9e45caf2',
+  testnetUSDSTAddress: 'bbb0e060f3f43c533d5b5f0250ff473de831e5e4',
   prodCataAddress: '2680dc6693021cd3fefb84351570874fbef8332a',
   testnetCataAddress: '051cb99bca7c437f4b17dc01bd4ff7c5e09db035',
   testnetETHSTAddress: '921e3d0b4217c7e2bfe7e660cdc4f7edc621f9d5',
@@ -69,7 +69,7 @@ export default {
     '7f5c102390240f4a8f0e0d938d341bf1e3010adc', //testnetUSDTEMP
     'd6e292f2c9486ada24f6d5cf2e67f44c5f7f677a', //prodBETHTEMP
     '04d68c24ff359ab457c7b96810f85c51989fe8ed', //prodUSDTEMP
-    'f19d88d5b88d4948def06fcc12852d4b9e45caf2', //testnetUSDSTAddress
+    'bbb0e060f3f43c533d5b5f0250ff473de831e5e4', //testnetUSDSTAddress
   ],
   localHost: 'http://localhost',
   burnAddress: '6ec8bbe4a5b87be18d443408df43a45e5972fa1b',

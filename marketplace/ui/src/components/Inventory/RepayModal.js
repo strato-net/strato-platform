@@ -33,7 +33,7 @@ const RepayModal = ({
   offset,
   productDetailPage,
   reserves,
-  assetsWithEighteenDecimalPlaces
+  assetsWithEighteenDecimalPlaces,
 }) => {
   const { isRepaying } = useInventoryState();
   // Dispatch
@@ -48,6 +48,7 @@ const RepayModal = ({
   const location = useLocation();
   const queryParams = new URLSearchParams(location.search);
   const [repayAmount, setRepayAmount] = useState(0);
+  const [disableButton, setDisableButton] = useState(false);
   const escrows = inventory?.inventories
     ? [
         ...new Set(
@@ -80,8 +81,10 @@ const RepayModal = ({
       const uniqueBorrowedAddresses = new Set();
       const borrowedAmount = inventory?.inventories
         ? inventory.inventories.reduce((sum, item) => {
+            console.log(item);
             const escrowAddress = item?.escrow?.address;
-            const borrowedValue = item?.escrow?.borrowedAmount || 0;
+            const borrowedValue =
+              item?.escrow?.borrowedAmount / Math.pow(10, 18) || 0;
 
             // Add borrowed amount only if the escrow address is unique
             if (escrowAddress && !uniqueBorrowedAddresses.has(escrowAddress)) {
@@ -93,12 +96,12 @@ const RepayModal = ({
           }, 0)
         : inventory?.escrow?.borrowedAmount *
           (inventory?.quantity / totalCollateralQuantity);
-      const USDSTBalance = Object.keys(USDST).length > 0 ? USDST * Math.pow(10,18) : 0;           
-      setRepayAmount(
-        borrowedAmount  > USDSTBalance
-        ? Number(USDSTBalance)
-        : borrowedAmount
-      );
+      const USDSTBalance =
+        Object.keys(USDST).length > 0 ? USDST * Math.pow(10, 18) : 0;
+      setRepayAmount(borrowedAmount);
+      if (borrowedAmount > USDSTBalance) {
+        setDisableButton(true);
+      }
     }
   }, [USDST, inventory]);
 
@@ -114,7 +117,7 @@ const RepayModal = ({
       value: (
         <div className="flex -mr-1">
           {logo} &nbsp;
-          {(repayAmount/100).toFixed(2)}
+          {repayAmount.toFixed(2)}
         </div>
       ),
     },
@@ -194,6 +197,7 @@ const RepayModal = ({
               className="w-full px-6 h-10 font-bold"
               onClick={handleSubmit}
               loading={isRepaying}
+              disabled={disableButton}
             >
               Repay
             </Button>
