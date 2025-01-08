@@ -11,7 +11,11 @@ class UsersController {
       const { dapp, accessToken, decodedToken, address: userAddress } = req;
       const username = decodedToken.preferred_username;
       let user = null;
+      console.log("UsersController.me -> username: ", username)
+      console.log("UsersController.me -> userAddress: ", userAddress)
+      console.log("UsersController.me -> dapp: ", dapp)
       if (Object.hasOwn(dapp, 'hasCert')) user = dapp.hasCert;
+      console.log("UsersController.me -> after dapp.hasCert: ", user)
       if (user === null || user === undefined) {
         user = await pollingHelper(dapp.getCertificate, [{ userAddress }]);
         // user = await dapp.getCertificate({ userAddress })

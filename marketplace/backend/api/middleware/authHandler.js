@@ -64,10 +64,12 @@ class AuthHandler {
             return next(err);
           }
           try {
+            console.log('authorizeRequest -> decodedToken: ', decodedToken);
             address = await rest.createOrGetKey(
               { username: decodedToken.preferred_username, token },
               { config }
             );
+            console.log('authorizeRequest -> address: ', address);
           } catch (e) {
             console.error('STRATO API is unreachable or unhealthy. Error: ', e);
             return rest.response.status(
