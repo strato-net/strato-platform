@@ -18,23 +18,16 @@ module Blockchain.Context
     , IsValidator(..)
     , Context(..)
     , Config(..)
---    , ContextM
-    , P2pConduits(..)
     , peerSource
     , peerSink
     , seqSource
     , RunsClient(..)
     , RunsServer(..)
     , ActionTimestamp(..)
-    , emptyActionTimestamp
-    , RemainingBlockHeaders(..)
     , MaxReturnedHeaders(..)
     , ConnectionTimeout(..)
     , PeerAddress(..)
     , GenesisBlockHash(..)
-    , TrueOrgNameChains(..)
-    , FalseOrgNameChains(..)
-    , ChainInfo(..)
     , PeerRunner
     , initConfig
     , initContext
@@ -276,20 +269,6 @@ instance (MonadIO m, MonadLogger m) => Mod.Modifiable BestSequencedBlock (Reader
 instance MonadIO m => A.Selectable Integer (Canonical BlockHeader) (ReaderT Config m) where
   select _ i = fmap (fmap Canonical) . RBDB.withRedisBlockDB $ RBDB.getCanonicalHeader i
 
-instance MonadIO m => A.Selectable ChainMemberParsedSet TrueOrgNameChains (ReaderT Config m) where
-  select p ip = A.selectWithDefault p ip <&> toMaybe def
-  selectWithDefault _ =
-    fmap TrueOrgNameChains
-      . RBDB.withRedisBlockDB
-      . RBDB.getTrueOrgNameChainsFromSuperSets
-
-instance MonadIO m => A.Selectable ChainMemberParsedSet FalseOrgNameChains (ReaderT Config m) where
-  select p ip = A.selectWithDefault p ip <&> toMaybe def
-  selectWithDefault _ =
-    fmap FalseOrgNameChains
-      . RBDB.withRedisBlockDB
-      . RBDB.getFalseOrgNameChainsFromSuperSets
-
 instance MonadIO m => A.Selectable Keccak256 ChainTxsInBlock (ReaderT Config m) where
   select p sha = A.selectWithDefault p sha <&> toMaybe def
   selectWithDefault _ =
@@ -316,9 +295,6 @@ instance (MonadIO m, MonadLogger m) => A.Selectable Word256 ChainMemberRSet (Rea
           $logWarnS "Selectable ChainMemberRSet" "a member is added, and it is NOT a member of any ancestor chains"
         pure ancestorChains
 
-instance MonadIO m => A.Selectable Word256 ChainInfo (ReaderT Config m) where
-  select _ = RBDB.withRedisBlockDB . RBDB.getChainInfo
-
 instance MonadIO m => A.Selectable Keccak256 (Private (Word256, OutputTx)) (ReaderT Config m) where
   select _ = fmap (fmap Private) . RBDB.withRedisBlockDB . RBDB.getPrivateTransactions
 
@@ -335,13 +311,7 @@ instance MonadIO m => (Keccak256 `A.Alters` OutputBlock) (ReaderT Config m) wher
       . RBDB.getBlocks
   insertMany _ = void . RBDB.withRedisBlockDB . RBDB.insertBlocks
   deleteMany _ = void . RBDB.withRedisBlockDB . RBDB.deleteBlocks
-
-instance MonadIO m => (ChainMemberParsedSet `A.Selectable` X509CertInfoState) (ReaderT Config m) where
-  select _ = RBDB.withRedisBlockDB . RBDB.getCertFromParsedSet
-
-instance MonadIO m => A.Selectable ChainMemberParsedSet [ChainMemberParsedSet] (ReaderT Config m) where
-  select _ = RBDB.withRedisBlockDB . RBDB.getChainMembersFromSet
-
+  
 instance MonadIO m => A.Selectable ChainMemberParsedSet IsValidator (ReaderT Config m) where
   select _ = fmap (Just . IsValidator) . RBDB.withRedisBlockDB . RBDB.isValidator
 
@@ -394,11 +364,7 @@ instance
 instance MonadIO m => Mod.Modifiable Context (ReaderT Config m) where
   get _ = readIORef =<< asks configContext
   put _ c = asks configContext >>= flip atomicModifyIORef' (const (c, ()))
-
-instance MonadIO m => Mod.Modifiable KafkaEnv (ReaderT Config m) where
-  get _ = contextKafkaState <$> Mod.get (Proxy @Context)
-  put _ k = asks configContext >>= flip atomicModifyIORef' (\c -> (c {contextKafkaState = k}, ()))
-
+  
 instance MonadIO m => Mod.Modifiable ActionTimestamp (ReaderT Config m) where
   get _ = actionTimestamp <$> Mod.get (Proxy @Context)
   put _ k = asks configContext >>= flip atomicModifyIORef' (\c -> (c {actionTimestamp = k}, ()))
@@ -461,9 +427,6 @@ instance MonadIO m => Mod.Accessible ConnectionTimeout (ReaderT Config m) where
 instance MonadIO m => Mod.Accessible RBDB.RedisConnection (ReaderT Config m) where
   access _ = asks configRedisBlockDB
 
-instance MonadIO m => Mod.Accessible SQLDB (ReaderT Config m) where
-  access _ = asks configSQLDB
-
 instance {-# OVERLAPPING #-} MonadIO m => AccessibleEnv SQLDB (ReaderT Config m) where
   accessEnv = asks configSQLDB
 
@@ -485,7 +448,6 @@ instance MonadUnliftIO m => A.Selectable Point PPeer (ReaderT Config m) where
 
 instance MonadIO m => Mod.Outputs (ReaderT Config m) [IngestEvent] where
   output = void . runKafkaMConfigured "strato-p2p" . SK.writeUnseqEvents
-
 
 instance (MonadIO m, MonadLogger m) => HasVault (ReaderT Config m) where
   sign bs = do
@@ -548,18 +510,13 @@ type MonadP2P m =
     All2
       '[A.Selectable]
       '[ '(Integer, Canonical BlockHeader),
-         '(ChainMemberParsedSet, TrueOrgNameChains),
-         '(ChainMemberParsedSet, FalseOrgNameChains),
          '(Keccak256, ChainTxsInBlock),
          '(Word256, ChainMemberRSet),
-         '(Word256, ChainInfo),
          '(Keccak256, Private (Word256, OutputTx)),
          '(Address, X509CertInfoState),
          '((IPAsText, UDPPort, B.ByteString), Point),
          '(IPAsText, PPeer),
          '(Point, PPeer),
-         '(ChainMemberParsedSet, X509CertInfoState),
-         '(ChainMemberParsedSet, [ChainMemberParsedSet]),
          '(ChainMemberParsedSet, IsValidator)
        ]
       m,

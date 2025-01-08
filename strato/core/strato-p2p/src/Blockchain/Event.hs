@@ -27,7 +27,6 @@ import Blockchain.Data.Block
 import Blockchain.Data.BlockHeader (BlockHeader)
 import qualified Blockchain.Data.BlockHeader as BlockHeader
 import Blockchain.Data.Control (P2PCNC (..))
-import Blockchain.Data.Enode
 import Blockchain.Data.PubKey
 import qualified Blockchain.Data.TXOrigin as Origin
 import Blockchain.Data.Transaction
@@ -38,7 +37,6 @@ import Blockchain.Options
 import Blockchain.Sequencer.Event
 import Blockchain.Strato.Discovery.Data.Peer
 import Blockchain.Strato.Model.Address (Address)
-import Blockchain.Strato.Model.ChainMember
 import Blockchain.Strato.Model.Class
 import Blockchain.Strato.Model.ExtendedWord
 import Blockchain.Strato.Model.Keccak256
@@ -236,9 +234,7 @@ handleEvents peer = awaitForever $ \case
       yieldR . BlockBodies $ map (second (map morphBlockHeader) . toBody) bodies
     where
       getUntilMissing ::
-        ( (Keccak256 `Selectable` ChainTxsInBlock) m,
-          (Word256 `Selectable` ChainMemberRSet) m,
-          (Keccak256 `Alters` OutputBlock) m,
+        ( (Keccak256 `Alters` OutputBlock) m,
           (Address `Selectable` X509CertInfoState) m,
           Accessible PublicKey m
         ) =>

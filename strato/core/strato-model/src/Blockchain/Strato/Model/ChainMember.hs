@@ -13,30 +13,14 @@
 {-# OPTIONS_GHC -fno-warn-orphans #-}
 
 module Blockchain.Strato.Model.ChainMember
-  ( getTextFromIdentity,
-    getTextFromIdentity',
-    cmBoundedToRSet,
-    emptyChainMember,
-    removeChainMember,
-    getRangeFromBounds,
+  ( emptyChainMember,
     chainMembersToChainMemberRset,
     chainMemberParsedSetToChainMemberRSet,
-    isChainMemberInRangeSet,
-    getBoundsFromCMBounded,
-    rowToSet,
-    encodeChainMemberRSet,
-    decodeChainMemberRSet,
-    chainMemberParsedSetToString, -- chainMemberToChainMemberParsedSet,
     returnBoolOfChainMemberParsedSets,
-    getTrueChainMemberParsedSets,
-    getFalseChainMemberParsedSets,
     ChainMembers (..),
     ChainMemberRSet (..),
-    ChainMemberBounded,
     ChainMemberF (..),
     ChainMemberParsedSet (..),
-    TrueOrgNameChains (..),
-    FalseOrgNameChains (..),
     chainMemberParsedSetToValidator,
     validatorToChainMemberParsedSet
   )
@@ -51,10 +35,8 @@ import Data.Aeson hiding (Array, String)
 import qualified Data.Aeson as A (Value (..))
 import Data.Aeson.Casing.Internal (camelCase, dropFPrefix)
 import Data.Binary
-import qualified Data.ByteString.Lazy.Internal as BSLI
 import Data.Data
 import qualified Data.Default as D
-import Data.Function (on)
 import qualified Data.Functor.Identity as DFI
 import Data.List (foldl1')
 import Data.Maybe (fromMaybe)
@@ -107,9 +89,9 @@ instance Monoid ChainMembers where
 instance Format ChainMembers where
   format = show
 
-newtype TrueOrgNameChains = TrueOrgNameChains {unTrueOrgNameChains :: S.Set Word256} deriving (Eq)
+newtype TrueOrgNameChains = TrueOrgNameChains (S.Set Word256) deriving (Eq)
 
-newtype FalseOrgNameChains = FalseOrgNameChains {unFalseOrgNameChains :: S.Set Word256} deriving (Eq)
+newtype FalseOrgNameChains = FalseOrgNameChains (S.Set Word256) deriving (Eq)
 
 data ChainMemberParsedSet
   = Everyone Bool
@@ -163,13 +145,6 @@ type IText = DFI.Identity T.Text
 newtype MaybeIITTEXT = MaybeITexter MaybeIText
 
 type MaybeIText = DFI.Identity (Maybe T.Text)
-
-rowToSet :: (Maybe Text, Maybe Text, Maybe Text, Bool) -> ChainMemberParsedSet
-rowToSet (Nothing, _, _, a) = Everyone a
-rowToSet ((Just o), Nothing, Nothing, a) = Org o a
-rowToSet ((Just o), (Just u), Nothing, a) = OrgUnit o u a
-rowToSet ((Just o), (Just u), (Just n), a) = CommonName o u n a
-rowToSet ((Just o), Nothing, (Just n), a) = CommonName o "Nothing" n a
 
 chainMemberParsedSetToChainMemberRSet :: ChainMemberParsedSet -> (Bool, ChainMemberRSet)
 chainMemberParsedSetToChainMemberRSet (Everyone True) =
@@ -249,55 +224,8 @@ returnBoolOfChainMemberParsedSets (Org _ a) = a
 returnBoolOfChainMemberParsedSets (OrgUnit _ _ a) = a
 returnBoolOfChainMemberParsedSets (CommonName _ _ _ a) = a
 
-getTrueChainMemberParsedSets :: ChainMembers -> ChainMembers
-getTrueChainMemberParsedSets cms = ChainMembers $ S.fromList $ filter returnBoolOfChainMemberParsedSets (S.toList $ unChainMembers cms)
-
-getFalseChainMemberParsedSets :: ChainMembers -> ChainMembers
-getFalseChainMemberParsedSets cms = ChainMembers $ S.fromList $ filter (not . returnBoolOfChainMemberParsedSets) (S.toList $ unChainMembers cms)
-
-getTextFromIdentity :: IText -> T.Text
-getTextFromIdentity (DFI.Identity a) = a
-
-getTextFromIdentity' :: MaybeIText -> (Maybe T.Text)
-getTextFromIdentity' (DFI.Identity a) = a
-
-cmBoundedToRSet :: ChainMemberBounded -> ChainMemberRSet
-cmBoundedToRSet cm = ChainMemberRSet $ makeRangedSet [(getRangeFromBounds (fst (getBoundsFromCMBounded cm)) (snd (getBoundsFromCMBounded cm)))]
-
-isChainMemberInRangeSet :: ChainMemberRSet -> ChainMemberRSet -> Bool
-isChainMemberInRangeSet = rSetIsSubset `on` getChainMemberRSet
-
 getRangeFromBounds :: ChainMemberBounded -> ChainMemberBounded -> Range ChainMemberBounded
 getRangeFromBounds lb ub = (Range (BoundaryBelow lb) (BoundaryAbove ub))
-
-getBoundsFromCMBounded :: ChainMemberBounded -> (ChainMemberBounded, ChainMemberBounded)
-getBoundsFromCMBounded (ChainMemberF (Middle n) (Middle (Just u)) (Middle (Just c)) _) =
-  ((ChainMemberF (Middle n) (Middle $ Just u) (Middle $ Just c) LowerBound), (ChainMemberF (Middle n) (Middle (Just u)) (Middle $ Just c) UpperBound))
-getBoundsFromCMBounded (ChainMemberF (Middle n) (Middle (Just u)) _ _) =
-  ((ChainMemberF (Middle n) (Middle $ Just u) LowerBound LowerBound), (ChainMemberF (Middle n) (Middle (Just u)) UpperBound UpperBound))
-getBoundsFromCMBounded (ChainMemberF (Middle n) _ _ _) =
-  ((ChainMemberF (Middle n) LowerBound LowerBound LowerBound), (ChainMemberF (Middle n) UpperBound UpperBound UpperBound))
-getBoundsFromCMBounded (ChainMemberF _ _ _ _) =
-  ((ChainMemberF LowerBound LowerBound LowerBound LowerBound), (ChainMemberF UpperBound UpperBound UpperBound UpperBound))
-
-removeChainMember :: ChainMemberRSet -> ChainMemberBounded -> ChainMemberRSet
-removeChainMember rangeSet cm = ChainMemberRSet (rSetDifference (getChainMemberRSet rangeSet) (getChainMemberRSet $ cmBoundedToRSet cm))
-
-encodeChainMemberRSet :: ChainMemberRSet -> BSLI.ByteString
-encodeChainMemberRSet cmrset = Data.Binary.encode cmrset
-
-decodeChainMemberRSet :: BSLI.ByteString -> ChainMemberRSet
-decodeChainMemberRSet byteString = Data.Binary.decode byteString
-
-boolToString :: Bool -> String
-boolToString True = "True"
-boolToString False = "False"
-
-chainMemberParsedSetToString :: ChainMemberParsedSet -> String
-chainMemberParsedSetToString (Everyone a) = boolToString a
-chainMemberParsedSetToString (Org o a) = "Org Name: " ++ (T.unpack o) ++ "Access: " ++ (boolToString a)
-chainMemberParsedSetToString (OrgUnit o u a) = "Org Name: " ++ (T.unpack o) ++ "Org Unit: " ++ (T.unpack u) ++ "Access: " ++ (boolToString a)
-chainMemberParsedSetToString (CommonName o u c a) = "Org Name: " ++ (T.unpack o) ++ "Org Unit: " ++ (T.unpack u) ++ "Common Name: " ++ (T.unpack c) ++ "Access: " ++ (boolToString a)
 
 instance Ord a => Ord (BoundedData a) where
   LowerBound `compare` LowerBound = EQ
