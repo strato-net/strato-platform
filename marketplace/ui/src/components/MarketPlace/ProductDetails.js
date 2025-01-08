@@ -100,7 +100,7 @@ const ProductDetails = ({ user, users }) => {
     isFetchingPriceHistory,
     reserves,
   } = useInventoryState();
-  const { cartList, stratsAddress, cataAddress } = useMarketplaceState();
+  const { cartList, assetsWithEighteenDecimalPlaces } = useMarketplaceState();
 
   const [isModalVisible, setIsModalVisible] = useState(false);
   const [timeFilter, setTimeFilter] = useState('1');
@@ -283,7 +283,7 @@ const ProductDetails = ({ user, users }) => {
     setStakeModalOpen(false);
   };
 
-  const showBorrowModal = (type) => {
+  const showBorrowModal = () => {
     setBorrowModalOpen(true);
   };
 
@@ -291,7 +291,7 @@ const ProductDetails = ({ user, users }) => {
     setBorrowModalOpen(false);
   };
 
-  const showRepayModal = (type) => {
+  const showRepayModal = () => {
     setRepayModalOpen(true);
   };
 
@@ -731,6 +731,10 @@ const ProductDetails = ({ user, users }) => {
                       value={
                         !isStakeable || !ownerSameAsUser()
                           ? `${qty}`
+                          : assetsWithEighteenDecimalPlaces.includes(
+                              inventoryDetails.root
+                            )
+                          ? inventoryDetails.quantity / 1e18
                           : inventoryDetails.quantity
                       }
                       defaultValue={`${qty}`}
@@ -1097,6 +1101,7 @@ const ProductDetails = ({ user, users }) => {
           productDetailPage={Id}
           inventory={inventoryDetails}
           reserves={reserves}
+          assetsWithEighteenDecimalPlaces={assetsWithEighteenDecimalPlaces}
         />
       )}
       {borrowModalOpen && (
@@ -1106,6 +1111,7 @@ const ProductDetails = ({ user, users }) => {
           productDetailPage={Id}
           inventory={inventoryDetails}
           reserves={reserves}
+          assetsWithEighteenDecimalPlaces={assetsWithEighteenDecimalPlaces}
         />
       )}
       {repayModalOpen && (
@@ -1115,6 +1121,7 @@ const ProductDetails = ({ user, users }) => {
           productDetailPage={Id}
           inventory={inventoryDetails}
           reserves={reserves}
+          assetsWithEighteenDecimalPlaces={assetsWithEighteenDecimalPlaces}
         />
       )}
       {message && openToastInventory('bottom')}

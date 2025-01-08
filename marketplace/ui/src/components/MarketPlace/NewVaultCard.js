@@ -1,11 +1,13 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Typography } from 'antd';
 import { useLocation, useNavigate } from 'react-router-dom';
 // State
 import { useAuthenticateState } from '../../contexts/authentication';
+import { useEthDispatch, useEthState } from '../../contexts/eth';
 // Assets
 import images_placeholder from '../../images/resources/image_placeholder.png';
 // other
+import { actions as ethActions } from '../../contexts/eth/actions';
 import { setCookie } from '../../helpers/cookie';
 import { SEO } from '../../helpers/seoConstant';
 import LoginModal from './LoginModal';
@@ -14,8 +16,18 @@ import routes from '../../helpers/routes';
 const NewVaultCard = ({ reserveItem, reserve, parent = '', contextHolder }) => {
   const location = useLocation();
   const navigate = useNavigate();
+  const ethDispatch = useEthDispatch();
   const { hasChecked, isAuthenticated, loginUrl, user } =
     useAuthenticateState();
+  const { ethstAddress } = useEthState();
+
+  useEffect(() => {
+    const fetchAddresses = async () => {
+      ethActions.fetchETHSTAddress(ethDispatch);
+    };
+
+    fetchAddresses();
+  }, []);
 
   const [isModalVisible, setIsModalVisible] = useState(false);
 
@@ -42,11 +54,23 @@ const NewVaultCard = ({ reserveItem, reserve, parent = '', contextHolder }) => {
   };
 
   const handleCardClick = () => {
-    navigate(
-      `${routes.MarketplaceProductDetail.url
-        .replace(':address', reserveItem.address)
-        .replace(':name', reserveItem.name)}`
-    );
+    if (reserveItem.originAddress === ethstAddress) {
+      navigate(
+        `${routes.EthstProductDetail.url.replace(
+          ':address',
+          reserveItem.address
+        )}`,
+        {
+          state: { isCalledFromInventory: false },
+        }
+      );
+    } else {
+      navigate(
+        `${routes.MarketplaceProductDetail.url
+          .replace(':address', reserveItem.address)
+          .replace(':name', reserveItem.name)}`
+      );
+    }
   };
 
   return (
@@ -80,7 +104,7 @@ const NewVaultCard = ({ reserveItem, reserve, parent = '', contextHolder }) => {
             <div className="flex justify-between items-center w-full">
               {/* Interest */}
               <Typography className="font-semibold text-gray-600 overflow-hidden cursor-pointer whitespace-nowrap text-ellipsis">
-                TVL: ${reserve?.tvl.toFixed(2)} 
+                TVL: ${reserve?.tvl.toFixed(2)}
               </Typography>
 
               {/* CATA APY */}

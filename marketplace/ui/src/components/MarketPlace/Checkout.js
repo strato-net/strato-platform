@@ -40,15 +40,15 @@ const Checkout = () => {
     usePaymentServiceState();
   const paymentServiceDispatch = usePaymentServiceDispatch();
   const [api, contextHolder] = notification.useNotification();
-  const { cartList, stratsAddress, cataAddress } = useMarketplaceState();
+  const { cartList, stratsAddress, assetsWithEighteenDecimalPlaces } = useMarketplaceState();
   const { isCreateOrderSubmitting, message, success } = useOrderState();
 
   const [mapData, setmapData] = useState([]);
 
   const calculateTax = (item) => {
     const isStrat = item.product.originAddress === stratsAddress;
-    const isCata = item.product.originAddress === cataAddress;
-    let price = new Decimal( isStrat ? item.product.price * 100 : isCata ? item.product.price * Math.pow(10, 18) : item.product.price);
+    const is18DecimalPlaces = assetsWithEighteenDecimalPlaces.includes(item.product.originAddress);
+    let price = new Decimal( isStrat ? item.product.price * 100 : is18DecimalPlaces ? item.product.price * Math.pow(10, 18) : item.product.price);
     let tax = new Decimal(CHARGES.TAX);
     let result = price.mul(tax).div(100);
 
@@ -57,8 +57,8 @@ const Checkout = () => {
 
   const calculateAmount = (item) => {
     const isStrat = item.product.originAddress === stratsAddress;
-    const isCata = item.product.originAddress === cataAddress;
-    let price = new Decimal(isStrat ? item.product.price * 100 : isCata ? item.product.price * Math.pow(10, 18) : item.product.price);
+    const is18DecimalPlaces = assetsWithEighteenDecimalPlaces.includes(item.product.originAddress);
+    let price = new Decimal(isStrat ? item.product.price * 100 : is18DecimalPlaces ? item.product.price * Math.pow(10, 18) : item.product.price);
     let tax = calculateTax(item);
     let result = price.mul(item.qty).plus(tax);
 
@@ -110,7 +110,7 @@ const Checkout = () => {
       let modifiedValue = [];
       items.forEach((item) => {
         const isStrat = item.product.originAddress === stratsAddress;
-        const isCata = item.product.originAddress === cataAddress;
+        const is18DecimalPlaces = assetsWithEighteenDecimalPlaces.includes(item.product.originAddress);
         const parts = item.product.contract_name.split('-');
         let amount = calculateAmount(item);
 
@@ -130,8 +130,8 @@ const Checkout = () => {
             item.product.address === item.product.originAddress ? true : false,
           sellersCommonName: item.product.ownerCommonName,
           unitOfMeasure: item.product.unitOfMeasurement,
-          unitPrice: isStrat ? item.product.price * 100 : isCata ? item.product.price * Math.pow(10, 18) : item.product.price,
-          quantity: isStrat ? item.product.saleQuantity / 100 : isCata ? item.product.saleQuantity / Math.pow(10, 18) : item.product.saleQuantity,
+          unitPrice: isStrat ? item.product.price * 100 : is18DecimalPlaces ? item.product.price * Math.pow(10, 18) : item.product.price,
+          quantity: isStrat ? item.product.saleQuantity / 100 : is18DecimalPlaces ? item.product.saleQuantity / Math.pow(10, 18) : item.product.saleQuantity,
           saleAddress: item.product.saleAddress,
           tax: calculateTax(item),
           amount: amount,

@@ -89,8 +89,14 @@ const SoldOrderDetails = ({ user, users }) => {
             (item) => item.value
           );
       orderDetails.assets.forEach((prod, index) => {
-        // const quantityIsDecimal =
-        //   prod.data.quantityIsDecimal && prod.data.quantityIsDecimal === 'True';
+        const quantityIsDecimal =
+          prod.data.quantityIsDecimal && prod.data.quantityIsDecimal === 'True';
+        const productPrice = quantityIsDecimal
+          ? prod.price * STRATS_CONVERSION
+          : prod.price;
+        const productQuantity = quantityIsDecimal
+          ? (orderQuantities[index] || 0) / STRATS_CONVERSION
+          : orderQuantities[index];
         items.push({
           address: prod.address,
           chainId: prod.chainId,
@@ -102,27 +108,22 @@ const SoldOrderDetails = ({ user, users }) => {
           productName: prod,
           name: prod.name,
           unitPrice:
-          // formattedNum(
+            // formattedNum(
             orderDetails.order.currency === 'STRATS'
-              ? (prod.price * STRATS_CONVERSION).toFixed(0)
-              : orderDetails.order.currency === 'CATA' ? (prod.price * Math.pow(10, 18)).toFixed(2)
-              : prod.price
-            // )
-            ,
+              ? (productPrice * STRATS_CONVERSION).toFixed(0)
+              : orderDetails.order.currency === 'CATA'
+              ? (productPrice * Math.pow(10, 18)).toFixed(2)
+              : productPrice,
+          // )
           quantity: orderQuantities[index]
-            ? formattedNum(
-                orderDetails.order.currency === 'STRATS'
-                  ? (orderQuantities[index] / 100).toFixed(2)
-                  : orderDetails.order.currency === 'CATA'
-                  ? (orderQuantities[index] / Math.pow(10, 18)).toFixed(2)
-                  : orderQuantities[index]
-              )
+            ? formattedNum(productQuantity)
             : '--',
-           amount:
-            orderDetails.order.currency === 'STRATS'
-              ? ( (prod.price * parseInt(orderQuantities[index]) )).toFixed(0)
-              : orderDetails.order.currency === 'CATA' ? ((prod.price * parseInt(orderQuantities[index])) / Math.pow(10, 18)).toFixed(2) 
-              : (prod.price * parseInt(orderQuantities[index])),
+          amount:
+            (orderDetails.order.currency === 'STRATS'
+              ? (productPrice * STRATS_CONVERSION).toFixed(0)
+              : orderDetails.order.currency === 'CATA'
+              ? (productPrice * Math.pow(10, 18)).toFixed(2)
+              : productPrice) * parseInt(productQuantity),
           serialNumber: prod,
           tax: prod.tax ? prod.tax : 0,
         });

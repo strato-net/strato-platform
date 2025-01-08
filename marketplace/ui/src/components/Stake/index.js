@@ -30,12 +30,71 @@ import StakeInventoryCard from '../Inventory/StakeInventoryCard';
 import { useCategoryState, useCategoryDispatch } from '../../contexts/category';
 import { actions as categoryActions } from '../../contexts/category/actions';
 import { TrophyOutlined, GiftOutlined } from '@ant-design/icons';
+import { stakeColumns, aggregateStakeColumns } from './columns';
 
 const logo = <img src={Images.cata} alt={''} title={''} className="w-5 h-5" />;
 const StratsIcon = (
   <img src={Images.strat} alt={''} title={''} className="w-4 h-4" />
 );
 
+function combineInventories(items, assetsWithEighteenDecimalPlaces) {
+  // Step 1: Group items by `root`
+  const grouped = items.reduce((acc, item) => {
+    const { root } = item;
+    if (!acc[root]) acc[root] = [];
+    acc[root].push(item);
+    return acc;
+  }, {});
+
+  // Step 2: Process each group to create the combined structure
+  const combined = Object.values(grouped).map((group) => {
+    // Extract the first item to retrieve common fields
+    const [firstItem] = group;
+    const {
+      root,
+      name,
+      'BlockApps-Mercata-Asset-fileNames': assetFileNames,
+      'BlockApps-Mercata-Asset-files': assetFiles,
+      'BlockApps-Mercata-Asset-images': assetImages,
+    } = firstItem;
+
+    const requiresDivision = assetsWithEighteenDecimalPlaces.includes(root);
+
+    // Step 3: Sum `quantity` and `saleQuantity` across the group
+    const totalQuantity = group.reduce((sum, item) => {
+      const quantity = item.quantity || 0;
+      return sum + (requiresDivision ? quantity / 1e18 : quantity);
+    }, 0);
+    const totalSaleQuantity = group.reduce((sum, item) => {
+      const saleQuantity = item.saleQuantity ? item.quantity || 0 : 0;
+      return sum + (requiresDivision ? saleQuantity / 1e18 : saleQuantity);
+    }, 0);
+
+    // Step 4: Aggregate varying fields into `inventories`
+    const inventoriesArr = group.map((item) => {
+      const inventory = { ...item };
+      // Remove common top-level fields
+      delete inventory['BlockApps-Mercata-Asset-fileNames'];
+      delete inventory['BlockApps-Mercata-Asset-files'];
+      delete inventory['BlockApps-Mercata-Asset-images'];
+      return inventory;
+    });
+
+    // Construct the combined object
+    return {
+      root,
+      name,
+      'BlockApps-Mercata-Asset-fileNames': assetFileNames,
+      'BlockApps-Mercata-Asset-files': assetFiles,
+      'BlockApps-Mercata-Asset-images': assetImages,
+      totalQuantity,
+      totalSaleQuantity,
+      inventories: inventoriesArr,
+    };
+  });
+
+  return combined;
+}
 const { Title } = Typography;
 
 const Stake = ({ user }) => {
@@ -52,7 +111,7 @@ const Stake = ({ user }) => {
     success,
   } = useInventoryState();
   const { categorys } = useCategoryState();
-  const { stratsAddress, cataAddress } = useMarketplaceState();
+  const { stratsAddress, assetsWithEighteenDecimalPlaces } = useMarketplaceState();
   const linkUrl = window.location.href;
   const [api, contextHolder] = notification.useNotification();
   const [limit, setLimit] = useState(10);
@@ -60,60 +119,7 @@ const Stake = ({ user }) => {
   const [page, setPage] = useState(1);
   const navigate = useNavigate();
 
-  const combinedInventories = Object.values(
-    inventories.reduce((acc, item) => {
-      const root = item.root;
-      let entry = acc[root];
-      if (!entry) {
-        // Initialize a fresh entry
-        entry = { ...item, quantity: item.quantity || 0 };
-        entry.address = item.address
-          ? [{ address: item.address, sale: item.sale || null }]
-          : [];
-        delete entry.root; // Remove the duplicate root field if needed
-        acc[root] = entry;
-      } else {
-        // Merge logic
-        for (const key in item) {
-          const newVal = item[key];
-          const oldVal = entry[key];
-
-          if (key === 'quantity') {
-            // Sum quantities
-            entry[key] = (oldVal || 0) + (newVal || 0);
-          } else if (key === 'address') {
-            // Append unique address-sale pairs
-            const pair = { address: item.address, sale: item.sale || null };
-            if (
-              !entry.address.some(
-                (a) => a.address === pair.address && a.sale === pair.sale
-              )
-            ) {
-              entry.address.push(pair);
-            }
-          } else if (oldVal === undefined) {
-            // Just set if not present
-            entry[key] = newVal;
-          } else if (Array.isArray(oldVal)) {
-            // If old is array, push newVal if not already included
-            if (!oldVal.some((v) => v === newVal)) oldVal.push(newVal);
-          } else if (typeof oldVal === 'object' && typeof newVal === 'object') {
-            // If both objects differ, convert to array
-            if (JSON.stringify(oldVal) !== JSON.stringify(newVal)) {
-              entry[key] = [oldVal, newVal];
-            }
-          } else if (oldVal !== newVal) {
-            // Different primitive -> turn into array if not already
-            entry[key] = Array.isArray(oldVal)
-              ? [...oldVal, newVal]
-              : [oldVal, newVal];
-          }
-        }
-      }
-      return acc;
-    }, {})
-  );
-
+  const combinedInventories = combineInventories(inventories, assetsWithEighteenDecimalPlaces);
   const onPageChange = (page, pageSize) => {
     setLimit(pageSize);
     setOffset((page - 1) * pageSize);
@@ -173,114 +179,50 @@ const Stake = ({ user }) => {
 
   const allSubcategories = getAllSubcategories(categorys);
 
-  const columns = [
-    {
-      title: 'Item',
-      render: (_, record) => {
-        const borrowedAmount = (record?.escrow?.borrowedAmount || 0) / 100;
-        const callDetailPage = () => {
-          navigate(
-            `${routes.InventoryDetail.url
-              .replace(':id', record.address[0].address)
-              .replace(':name', encodeURIComponent(record.name))}`,
-            {
-              state: { isCalledFromInventory: true },
-            }
-          );
+  const expandedRowRender = (parentRecord) => {
+    const filteredInventories = inventories.filter(
+      (inv) => inv.root === parentRecord.root
+    );
+  
+    // Extract unique escrows from filtered inventories
+    const uniqueEscrows = [
+      ...new Set(
+        filteredInventories
+          .map((inv) => inv.escrow?.address)
+          .filter(Boolean) // Remove null/undefined addresses
+      ),
+    ];
+  
+    // Populate missing escrows
+    const populatedInventories = filteredInventories.map((inv) => {
+      if (!inv.escrow || !inv.escrow.address) {
+        // Assign a copy of the unique escrows
+        return {
+          ...inv,
+          escrow: { ...inv.escrow, address: uniqueEscrows[0] || null }, // Assign the first available escrow or null
         };
-        return (
-          <>
-            <div className="flex items-center">
-              <div className="mr-2 w-[74px] h-[52px] flex items-center justify-center">
-                <img
-                  src={
-                    record['BlockApps-Mercata-Asset-images'] &&
-                    record['BlockApps-Mercata-Asset-images'].length > 0
-                      ? record['BlockApps-Mercata-Asset-images'][0].value
-                      : image_placeholder
-                  }
-                  alt={'Asset image...'}
-                  className="rounded-md w-full h-full object-contain"
-                />
-              </div>
-              <div>
-                <span
-                  className="text-xs sm:text-sm text-[#13188A] hover:underline cursor-pointer"
-                  onClick={callDetailPage}
-                >
-                  <Tooltip title={record.name}>
-                    <span className="w-48 whitespace-nowrap overflow-hidden text-ellipsis block">
-                      {record.name}
-                    </span>
-                  </Tooltip>
-                </span>
-              </div>
-            </div>
-            <div className="flex items-center gap-2">
-              Borrowed Amount: {StratsIcon}
-              {borrowedAmount.toLocaleString('en-US', {
-                maximumFractionDigits: 2,
-                minimumFractionDigits: 2,
-              })}
-            </div>
-          </>
-        );
-      },
-    },
-    {
-      title: 'Owned',
-      align: 'center',
-      render: (_, record) => {
-        return <div>{record.quantity || 0}</div>;
-      },
-    },
-    {
-      title: 'Quantity Staked',
-      align: 'center',
-      render: (_, record) => {
-        return (
-          <div>{record.escrow ? record.escrow.collateralQuantity : 0}</div>
-        );
-      },
-    },
-    {
-      title: 'Actions',
-      align: 'center',
-      render: (text, record) => (
-        <div>
-          <StakeItemActions
-            inventory={record}
-            limit={limit}
-            offset={offset}
-            debouncedSearchTerm={''}
-            user={user}
-            reserves={reserves}
-            stratAddress={stratsAddress}
-            cataAddress={cataAddress}
-          />
-        </div>
-      ),
-    },
-    {
-      title: 'Status',
-      align: 'center',
-      render: (text, record) => (
-        <div className="pt-[7px] lg:pt-0 items-center gap-[5px]">
-          {record?.escrow ? (
-            <div className="flex items-center justify-center gap-2 bg-[#1548C329] p-[6px] rounded-md">
-              <div className="w-[7px] h-[7px] rounded-full bg-[#119B2D]"></div>
-              <p className="text-[#4D4D4D] text-[13px]"> Staked </p>
-            </div>
-          ) : (
-            <div className="flex items-center justify-center gap-2 bg-[#1548C329] p-[6px] rounded-md">
-              <div className="w-[7px] h-[7px] rounded-full bg-[#ff4d4f]"></div>
-              <p className="text-[#4D4D4D] text-[13px]">Unstaked</p>
-            </div>
-          )}
-        </div>
-      ),
-    },
-  ];
+      }
+      return inv;
+    });
+    return (
+      <Table
+        columns={stakeColumns(
+          user,
+          limit,
+          offset,
+          reserves,
+          stratsAddress,
+          assetsWithEighteenDecimalPlaces,
+          navigate
+        )}
+        dataSource={populatedInventories}
+        loading={isInventoriesLoading}
+        rowKey={(record) => record.address}
+        pagination={false}
+        className="custom-child-table"
+      />
+    );
+  };
 
   return (
     <>
@@ -339,11 +281,23 @@ const Stake = ({ user }) => {
                   My Stakeable Items
                 </Title>
                 <Table
-                  columns={columns}
+                  columns={aggregateStakeColumns(
+                    user,
+                    limit,
+                    offset,
+                    reserves,
+                    stratsAddress,
+                    assetsWithEighteenDecimalPlaces
+                  )}
                   dataSource={combinedInventories.slice(offset, offset + limit)}
                   loading={isInventoriesLoading}
                   className="custom-table"
                   pagination={false}
+                  expandable={{
+                    expandedRowRender,
+                    rowExpandable: (record) => true,
+                  }}
+                  rowKey={(record) => record.root}
                 />
                 <Pagination
                   current={page}
@@ -369,7 +323,7 @@ const Stake = ({ user }) => {
                     user={user}
                     reserves={reserves}
                     stratAddress={stratsAddress}
-                    cataAddress={cataAddress}
+                    assetsWithEighteenDecimalPlaces={assetsWithEighteenDecimalPlaces}
                   />
                 ))}
               </div>

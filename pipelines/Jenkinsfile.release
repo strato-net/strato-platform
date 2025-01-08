@@ -256,12 +256,14 @@ pipeline {
               github-release upload $STRATOGS_RELEASE_DETAILS_STABLE --name "docker-compose.identity.yml" --file ./docker-compose.identity.yml
               github-release upload $STRATOGS_RELEASE_DETAILS_STABLE --name "docker-compose.highway.yml" --file ./docker-compose.highway.yml
               github-release upload $STRATOGS_RELEASE_DETAILS_STABLE --name "docker-compose.payment.yml" --file ./docker-compose.payment.yml
+              github-release upload $STRATOGS_RELEASE_DETAILS_STABLE --name "docker-compose.oracle.yml" --file ./docker-compose.oracle.yml
               github-release upload $STRATOGS_RELEASE_DETAILS_STABLE --name "docker-compose.notification.yml" --file ./docker-compose.notification.yml
               github-release upload $STRATOGS_RELEASE_DETAILS_STABLE --name "docker-compose.ecr.yml" --file ./docker-compose.ecr.yml
               github-release upload $STRATOGS_RELEASE_DETAILS_STABLE --name "docker-compose.vault.ecr.yml" --file ./docker-compose.vault.ecr.yml
               github-release upload $STRATOGS_RELEASE_DETAILS_STABLE --name "docker-compose.identity.ecr.yml" --file ./docker-compose.identity.ecr.yml
               github-release upload $STRATOGS_RELEASE_DETAILS_STABLE --name "docker-compose.highway.ecr.yml" --file ./docker-compose.highway.ecr.yml
               github-release upload $STRATOGS_RELEASE_DETAILS_STABLE --name "docker-compose.payment.ecr.yml" --file ./docker-compose.payment.ecr.yml
+              github-release upload $STRATOGS_RELEASE_DETAILS_STABLE --name "docker-compose.oracle.ecr.yml" --file ./docker-compose.oracle.ecr.yml
               github-release upload $STRATOGS_RELEASE_DETAILS_STABLE --name "docker-compose.notification.ecr.yml" --file ./docker-compose.notification.ecr.yml
             '''
 

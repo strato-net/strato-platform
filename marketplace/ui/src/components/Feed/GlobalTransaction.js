@@ -30,6 +30,7 @@ import {
   STRATS_CONVERSION,
   TRANSACTION_STATUS_COLOR,
   DATE_TIME_FORMAT,
+  TRANSACTION_STATUS_TEXT,
 } from '../../helpers/constants';
 import { SEO } from '../../helpers/seoConstant';
 import { getStringDate } from '../../helpers/utils';
@@ -38,7 +39,12 @@ import GlobalTransactionResponsive from './GlobalTransactionResponsive';
 
 const { Title } = Typography;
 
-const GlobalTransaction = ({ user, stratAddress, cataAddress }) => {
+const GlobalTransaction = ({
+  user,
+  stratAddress,
+  assetsWithEighteenDecimalPlaces,
+  ethstAddress,
+}) => {
   const StratsIcon = (
     <img src={Images.strat} alt="STRATs" className="mx-1 w-4 h-4" />
   );
@@ -58,6 +64,8 @@ const GlobalTransaction = ({ user, stratAddress, cataAddress }) => {
     'Order',
     'Transfer',
     'Redemption',
+    'Stake',
+    'Unstake',
   ]);
   const [isFilterActive, setIsFilterActive] = useState(false);
   const formatter = new Intl.NumberFormat('en-US');
@@ -95,7 +103,7 @@ const GlobalTransaction = ({ user, stratAddress, cataAddress }) => {
   const Content = ({ data }) => {
     const price = data?.assetPrice || data?.price;
     const isStrat = data.assetOriginAddress === stratAddress;
-    const isCata = data.assetOriginAddress === cataAddress;
+    const is18DecimalPlaces = assetsWithEighteenDecimalPlaces.includes(data.assetOriginAddress);
 
     return (
       <div className="min-h-44 h-full" style={{ width: '460px' }}>
@@ -138,7 +146,7 @@ const GlobalTransaction = ({ user, stratAddress, cataAddress }) => {
                     ${' '}
                     {isStrat
                       ? (price * 100).toFixed(2)
-                      : isCata
+                      : is18DecimalPlaces
                       ? (price * Math.pow(10, 18)).toFixed(2)
                       : price}{' '}
                   </b>{' '}
@@ -147,7 +155,7 @@ const GlobalTransaction = ({ user, stratAddress, cataAddress }) => {
                     {' '}
                     {(isStrat
                       ? (price * 100).toFixed(2)
-                      : isCata
+                      : is18DecimalPlaces
                       ? (price * Math.pow(10, 18)).toFixed(2)
                       : price) * STRATS_CONVERSION}{' '}
                   </span>
@@ -167,10 +175,18 @@ const GlobalTransaction = ({ user, stratAddress, cataAddress }) => {
   };
 
   const handleAssetRedirection = (data) => {
-    const url = routes.MarketplaceProductDetail.url
-      .replace(':address', data.assetAddress)
-      .replace(':name', data.assetName);
-    navigate(url);
+    const isEthst = data?.assetOriginAddress === ethstAddress;
+    if (isEthst) {
+      const url = routes.EthstProductDetail.url;
+      navigate(`${url.replace(':address', data.assetAddress)}`, {
+        state: { isCalledFromInventory: false },
+      });
+    } else {
+      const url = routes.MarketplaceProductDetail.url
+        .replace(':address', data.assetAddress)
+        .replace(':name', data.assetName);
+      navigate(url);
+    }
   };
 
   const column = [
@@ -181,7 +197,10 @@ const GlobalTransaction = ({ user, stratAddress, cataAddress }) => {
       width: '150px',
       render: (text) => (
         <p
-          style={{ background: TRANSACTION_STATUS_COLOR[text] }}
+          style={{
+            background: TRANSACTION_STATUS_COLOR[text],
+            color: TRANSACTION_STATUS_TEXT[text],
+          }}
           className={`
         bg-${TRANSACTION_STATUS_COLOR[text]} 
         min-w-[80px] text-center cursor-default px-2 py-2 rounded-lg text-white`}
@@ -228,7 +247,7 @@ const GlobalTransaction = ({ user, stratAddress, cataAddress }) => {
           const value =
             assetOriginAddress === stratAddress
               ? quantity / 100
-              : assetOriginAddress === cataAddress
+              : assetsWithEighteenDecimalPlaces.includes(assetOriginAddress)
               ? quantity / Math.pow(10, 18)
               : quantity;
 
@@ -255,7 +274,7 @@ const GlobalTransaction = ({ user, stratAddress, cataAddress }) => {
                   (
                     (assetOriginAddress === stratAddress
                       ? (price * 100).toFixed(2)
-                      : assetOriginAddress === cataAddress
+                      : assetsWithEighteenDecimalPlaces.includes(assetOriginAddress)
                       ? (price * Math.pow(10, 18)).toFixed(2)
                       : price) * 100
                   ).toFixed(0)
@@ -268,7 +287,7 @@ const GlobalTransaction = ({ user, stratAddress, cataAddress }) => {
               ? `${formattedNum(
                   assetOriginAddress === stratAddress
                     ? (price * 100).toFixed(2)
-                    : assetOriginAddress === cataAddress
+                    : assetsWithEighteenDecimalPlaces.includes(assetOriginAddress)
                     ? (price * Math.pow(10, 18)).toFixed(2)
                     : price
                 )} $`
@@ -337,7 +356,7 @@ const GlobalTransaction = ({ user, stratAddress, cataAddress }) => {
           Transaction Types
         </Title>
         <div className="flex flex-wrap">
-          {TRANSACTION_FILTER.slice(1, 4)?.map(({ label }) => {
+          {TRANSACTION_FILTER.slice(1, 6)?.map(({ label }) => {
             return (
               <span
                 onClick={() => {
@@ -452,7 +471,8 @@ const GlobalTransaction = ({ user, stratAddress, cataAddress }) => {
               user={user}
               isTransactionLoading={isTransactionLoading}
               stratAddress={stratAddress}
-              cataAddress={cataAddress}
+              assetsWithEighteenDecimalPlaces={assetsWithEighteenDecimalPlaces}
+              ethstAddress={ethstAddress}
             />
           </Row>
         </div>

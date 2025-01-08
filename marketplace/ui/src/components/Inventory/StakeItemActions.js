@@ -18,22 +18,97 @@ const StakeItemActions = ({
   debouncedSearchTerm,
   category,
   reserves,
+  assetsWithEighteenDecimalPlaces,
 }) => {
   const [stakeType, setStakeType] = useState('Stake');
   const [stakeModalOpen, setStakeModalOpen] = useState(false);
   const [borrowModalOpen, setBorrowModalOpen] = useState(false);
   const [repayModalOpen, setRepayModalOpen] = useState(false);
 
-  function isActive() {
-    if (
-      inventory.status == ASSET_STATUS.PENDING_REDEMPTION ||
-      inventory.status == ASSET_STATUS.RETIRED
-    ) {
-      return false;
-    } else {
-      return true;
-    }
+  // Calculate collateralQuantity
+  const uniqueEscrows = new Set();
+  let collateralQuantity = inventory?.inventories
+    ? inventory.inventories.reduce((sum, item) => {
+        const escrowAddress = item?.escrow?.address;
+        const escrowCollateral = item?.escrow?.collateralQuantity || 0;
+        if (escrowAddress && !uniqueEscrows.has(escrowAddress)) {
+          uniqueEscrows.add(escrowAddress);
+          return sum + escrowCollateral;
+        }
+        return sum;
+      }, 0)
+    : inventory?.escrow?.collateralQuantity > inventory?.quantity
+    ? inventory?.quantity
+    : inventory?.escrow?.collateralQuantity || 0;
+
+  // Calculate quantityNotAvailable
+  let quantityNotAvailable = inventory?.inventories
+    ? inventory.inventories.reduce((sum, item) => {
+        const status = Number(item.status);
+        if (status && status !== ASSET_STATUS.ACTIVE) {
+          return sum + (item.quantity || 0);
+        }
+        return sum;
+      }, 0) + (inventory.totalSaleQuantity || 0)
+    : inventory?.status && Number(inventory?.status) !== ASSET_STATUS.ACTIVE
+    ? (inventory?.quantity || 0) + (inventory?.saleQuantity || 0)
+    : 0;
+
+  // Calculate quantity
+  let quantity = inventory?.inventories
+    ? inventory.totalQuantity
+    : assetsWithEighteenDecimalPlaces.includes(inventory?.root || '')
+    ? inventory?.quantity / 1e18
+    : inventory?.quantity || 0;
+
+  // stakeQuantity = quantity - collateralQuantity - quantityNotAvailable (will recompute after scaling)
+  // Calculate collateralValue
+  const uniqueEscrowsPrime = new Set();
+  let collateralValue = inventory?.inventories
+    ? inventory.inventories.reduce((sum, item) => {
+        const escrowAddress = item?.escrow?.address;
+        const escrowCollateralValue = item?.escrow?.collateralValue || 0;
+        if (escrowAddress && !uniqueEscrowsPrime.has(escrowAddress)) {
+          uniqueEscrowsPrime.add(escrowAddress);
+          return sum + escrowCollateralValue;
+        }
+        return sum;
+      }, 0)
+    : 0;
+
+  // maxBorrowableAmount = floor(collateralValue / 2) (will recompute after scaling)
+  // Calculate borrowedAmount
+  const uniqueBorrowedAddresses = new Set();
+  let borrowAmount = inventory?.inventories
+    ? inventory.inventories.reduce((sum, item) => {
+        const escrowAddress = item?.escrow?.address;
+        const borrowedValue = item?.escrow?.borrowedAmount || 0;
+        if (escrowAddress && !uniqueBorrowedAddresses.has(escrowAddress)) {
+          uniqueBorrowedAddresses.add(escrowAddress);
+          return sum + borrowedValue;
+        }
+        return sum;
+      }, 0)
+    : inventory?.escrow?.borrowedAmount || 0;
+
+  /**
+   * If the inventory.root is in assetsWithEighteenDecimalPlaces, we need to scale down values by 1e18.
+   * This matches the logic used in StakeModal and BorrowModal.
+   */
+  const requiresDivision = assetsWithEighteenDecimalPlaces.includes(
+    inventory?.root || ''
+  );
+
+  if (requiresDivision) {
+    collateralQuantity /= 1e18;
+    quantityNotAvailable /= 1e18;
   }
+
+  // Recompute stakeQuantity after possible scaling
+  const stakeQuantity = quantity - collateralQuantity - quantityNotAvailable;
+
+  // Recompute maxBorrowableAmount after scaling
+  const maxBorrowableAmount = Math.floor(collateralValue / 2);
 
   const showStakeModal = (type) => {
     setStakeModalOpen(true);
@@ -67,7 +142,7 @@ const StakeItemActions = ({
           type="primary"
           className="font-semibold flex items-center justify-center"
           onClick={() => showStakeModal('Stake')}
-          disabled={inventory?.quantity <= inventory?.escrow?.collateralQuantity || !isActive() || inventory.price}
+          disabled={stakeQuantity <= 0}
         >
           <RiseOutlined /> Stake
         </Button>
@@ -75,23 +150,25 @@ const StakeItemActions = ({
           type="link"
           className="text-[#13188A] font-semibold"
           onClick={() => showStakeModal('Unstake')}
-          disabled={!inventory?.escrow || inventory?.escrow?.borrowedAmount > 0}
+          disabled={borrowAmount > 0 || collateralQuantity <= 0}
         >
           <LogoutOutlined /> Unstake
         </Button>
         <Button
           type="link"
           className="text-[#13188A] font-semibold"
-          onClick={() => showBorrowModal('Unstake')}
-          disabled={!inventory?.escrow || inventory?.escrow?.borrowedAmount > 0}
+          onClick={() => showBorrowModal()}
+          disabled={
+            borrowAmount >= maxBorrowableAmount || collateralQuantity <= 0
+          }
         >
           <BankOutlined /> Borrow
         </Button>
         <Button
           type="link"
           className="text-[#13188A] font-semibold"
-          onClick={() => showRepayModal('Unstake')}
-          disabled={!inventory?.escrow || inventory?.escrow?.borrowedAmount <= 0}
+          onClick={() => showRepayModal()}
+          disabled={borrowAmount <= 0}
         >
           <SolutionOutlined />
           Repay
@@ -108,6 +185,7 @@ const StakeItemActions = ({
           debouncedSearchTerm={debouncedSearchTerm}
           saleAddress={inventory.saleAddress}
           category={category}
+          assetsWithEighteenDecimalPlaces={assetsWithEighteenDecimalPlaces}
         />
       )}
       {borrowModalOpen && (
@@ -120,6 +198,7 @@ const StakeItemActions = ({
           debouncedSearchTerm={debouncedSearchTerm}
           saleAddress={inventory.saleAddress}
           category={category}
+          assetsWithEighteenDecimalPlaces={assetsWithEighteenDecimalPlaces}
         />
       )}
       {repayModalOpen && (
@@ -133,6 +212,7 @@ const StakeItemActions = ({
           saleAddress={inventory.saleAddress}
           category={category}
           reserves={reserves}
+          assetsWithEighteenDecimalPlaces={assetsWithEighteenDecimalPlaces}
         />
       )}
     </div>

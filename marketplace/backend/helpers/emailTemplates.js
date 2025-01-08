@@ -35,7 +35,7 @@ export const TransferRecipient = (
   <ul>
       <li><strong>Item:</strong> ${itemName}</li>
       <li><strong>Quantity:</strong> ${itemQuantity}</li>
-      <li><strong>Total Value:</strong> ${itemValue}</li>
+      <li><strong>Total Value:</strong> $${itemValue}</li>
       <li><strong>Sender:</strong> ${senderCommonName}</li>
   </ul>
   <p>If you have any questions or need assistance with your transfer, please contact our customer support team at <a href="mailto:sales@blockapps.net">sales@blockapps.net</a>.</p>

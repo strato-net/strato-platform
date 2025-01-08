@@ -9,15 +9,18 @@ import {
   TRANSACTION_STATUS,
   TRANSACTION_STATUS_CLASSES,
   TRANSACTION_STATUS_COLOR,
+  TRANSACTION_STATUS_TEXT,
 } from '../../helpers/constants';
 import routes from '../../helpers/routes';
 import { useNavigate } from 'react-router-dom';
 import moment from 'moment';
+import { useEthState } from '../../contexts/eth';
 
-const TransactionResponsive = ({ data, user, stratAddress, cataAddress }) => {
+const TransactionResponsive = ({ data, user, stratAddress, assetsWithEighteenDecimalPlaces }) => {
   const StratsIcon = <img src={Images.strat} alt="" className="w-5 h-5" />;
   const navigate = useNavigate();
   const [expandedRows, setExpandedRows] = useState({});
+  const { ethstAddress } = useEthState();
 
   const formatter = new Intl.NumberFormat('en-US');
   const formattedNum = (num) => formatter.format(num);
@@ -34,6 +37,8 @@ const TransactionResponsive = ({ data, user, stratAddress, cataAddress }) => {
     const { textClass, bgClass } =
       data.type === 'Redemption'
         ? REDEMPTION_STATUS_CLASSES[status]
+        : data.type === 'Stake' || data.type === 'Unstake'
+        ? TRANSACTION_STATUS_CLASSES[3]
         : TRANSACTION_STATUS_CLASSES[status] || {
             textClass: 'bg-[#FFF6EC]',
             bgClass: 'bg-[#119B2D]',
@@ -49,6 +54,8 @@ const TransactionResponsive = ({ data, user, stratAddress, cataAddress }) => {
         <p>
           {data.type === 'Redemption'
             ? REDEMPTION_STATUS[status]
+            : data.type === 'Stake' || data.type === 'Unstake'
+            ? TRANSACTION_STATUS[3]
             : TRANSACTION_STATUS[status]}
         </p>
       </div>
@@ -132,7 +139,7 @@ const TransactionResponsive = ({ data, user, stratAddress, cataAddress }) => {
               minimumFractionDigits: 0,
             });
             price = (price * 100).toFixed(2);
-          } else if (assetOriginAddress === cataAddress) {
+          } else if (assetsWithEighteenDecimalPlaces.includes(assetOriginAddress)) {
             quantity = (quantity / Math.pow(10, 18)).toLocaleString('en-US', {
               maximumFractionDigits: 4,
               minimumFractionDigits: 0,
@@ -143,9 +150,15 @@ const TransactionResponsive = ({ data, user, stratAddress, cataAddress }) => {
           const handleDetailRedirection = () => {
             let route;
             if (type === 'Order' && from === user.commonName) {
-              route = `${routes.SoldOrderDetails.url.replace(':id', address ? transaction_hash : address)}`;
+              route = `${routes.SoldOrderDetails.url.replace(
+                ':id',
+                address ? transaction_hash : address
+              )}`;
             } else if (type === 'Order' && from !== user.commonName) {
-              route = `${routes.BoughtOrderDetails.url.replace(':id', address ? transaction_hash : address)}`;
+              route = `${routes.BoughtOrderDetails.url.replace(
+                ':id',
+                address ? transaction_hash : address
+              )}`;
             } else if (type === 'Transfer') {
             } else if (type === 'Redemption' && to === user.commonName) {
               route = `${routes.RedemptionsIncomingDetails.url
@@ -161,18 +174,28 @@ const TransactionResponsive = ({ data, user, stratAddress, cataAddress }) => {
           };
 
           const handleAssetRedirection = () => {
-            const url = routes.MarketplaceProductDetail.url
-              .replace(':address', assetAddress)
-              .replace(':name', assetName);
-            navigate(url);
+            const isEthst = assetOriginAddress === ethstAddress;
+            if (isEthst) {
+              const url = routes.EthstProductDetail.url;
+              navigate(`${url.replace(':address', assetAddress)}`, {
+                state: { isCalledFromInventory: false },
+              });
+            } else {
+              const url = routes.MarketplaceProductDetail.url
+                .replace(':address', assetAddress)
+                .replace(':name', assetName);
+              navigate(url);
+            }
           };
 
           return (
             <Row
               key={index}
-              className={`bg-red-300 w-full ${isExpanded ? '' : 'h-36'} rounded-xl px-2 py-2 shadow-2xl border-2 `}
+              className={`w-full ${
+                isExpanded ? '' : 'h-36'
+              } rounded-xl px-2 py-2 shadow-2xl border-2 `}
             >
-              <Col span={6} className="flex justify-center bg-grey-400">
+              <Col span={6} className="flex justify-center">
                 <img
                   src={assetImage}
                   alt=""
@@ -195,7 +218,13 @@ const TransactionResponsive = ({ data, user, stratAddress, cataAddress }) => {
                 </p>
                 <p
                   style={{ color: '#13188A' }}
-                  className={`font-semibold ${type === 'Transfer' ? 'cursor-default' : 'cursor-pointer'}`}
+                  className={`font-semibold ${
+                    type === 'Transfer' ||
+                    type === 'Stake' ||
+                    type === 'Unstake'
+                      ? 'cursor-default'
+                      : 'cursor-pointer'
+                  }`}
                   onClick={() => {
                     handleDetailRedirection();
                   }}
@@ -222,13 +251,14 @@ const TransactionResponsive = ({ data, user, stratAddress, cataAddress }) => {
                   size="middle"
                   style={{
                     backgroundColor: `${TRANSACTION_STATUS_COLOR[type]}`,
+                    color: `${TRANSACTION_STATUS_TEXT[type]}`,
                   }}
                 >
                   {type}
                 </Button>
                 {price ? (
                   <p className={`text-right flex justify-end items-center`}>
-                    $ {formattedNum(price)} ({formattedNum(price * 100)}{' '}
+                    ${formattedNum(price)} ({formattedNum(price * 100)}
                     {StratsIcon})
                   </p>
                 ) : (
@@ -238,13 +268,13 @@ const TransactionResponsive = ({ data, user, stratAddress, cataAddress }) => {
                 )}
                 <p className="text-right">Qty: {quantity}</p>
                 <p className="text-right">
-                  {moment(block_timestamp.replace(/-/g, '/')).format('L')}
+                  {moment(block_timestamp.replace(/-/g, '/')).format('lll')}
                 </p>
               </Col>
               {isExpanded && (
                 <Col span={24}>
                   <Table
-                    className="mt-6"
+                    className="mt-6 w-[90vw]"
                     columns={columns}
                     dataSource={tableData}
                     pagination={false}

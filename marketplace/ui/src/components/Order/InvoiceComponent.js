@@ -95,9 +95,6 @@ const styles = StyleSheet.create({
 const InvoiceComponent = ({ invoice }) => {
   const [subtotal, setSubtotal] = useState(0);
   const [totalTax, settotalTax] = useState(0);
-  // const { stratsAddress,cataAddress } = useMarketplaceState()
-  // const isStrat = {data:'tet'}?.assetOriginAddress === stratsAddress || true;
-  // const isCata = {data:"tes"}?.assetOriginAddress === cataAddress || true; 
 
   useEffect(() => {
     let tax = 0;
@@ -166,17 +163,17 @@ const InvoiceComponent = ({ invoice }) => {
             <Text style={[styles.label, styles.tableHeaderColumn]}>Amount</Text>
           </View>
           {invoice.assets.map((asset, index) => {
-            const adjustedPrice =  asset.price;
-              // asset.data.quantityIsDecimal &&
-              // asset.data.quantityIsDecimal === 'True'
-              //   ? asset.price * 100
-              //   : asset.price;
+            const adjustedPrice =
+              asset.data.quantityIsDecimal &&
+              asset.data.quantityIsDecimal === 'True'
+                ? asset.price * STRATS_CONVERSION
+                : asset.price;
 
-            const quantity = orderQuantities[index];
-              // asset.data.quantityIsDecimal &&
-              // asset.data.quantityIsDecimal === 'True'
-              //   ? orderQuantities[index] / 100
-              //   : orderQuantities[index];
+            const quantity =
+              asset.data.quantityIsDecimal &&
+              asset.data.quantityIsDecimal === 'True'
+                ? orderQuantities[index] / STRATS_CONVERSION
+                : orderQuantities[index];
 
             const totalPrice =
               invoice.order.currency === 'STRATS'

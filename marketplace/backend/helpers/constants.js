@@ -4,7 +4,7 @@ dayjs.extend(utc);
 
 export default {
   baseUrl: `/api/v1`,
-  deployParamName: "deploy",
+  deployParamName: 'deploy',
   reserve: '0000000000000000000000000000000000000100',
   zeroAddress: '0000000000000000000000000000000000000000',
   certificateRegistryContractName: 'OfficialCertificateRegistry',
@@ -39,6 +39,8 @@ export default {
   testnetStratsAddress: '5375b8b1c691201acf16a72612d82ed438951a04',
   prodCataAddress: '2680dc6693021cd3fefb84351570874fbef8332a',
   testnetCataAddress: '051cb99bca7c437f4b17dc01bd4ff7c5e09db035',
+  testnetETHSTAddress: '921e3d0b4217c7e2bfe7e660cdc4f7edc621f9d5',
+  prodETHSTAddress: '93fb7295859b2d70199e0a4883b7c320cf874e6c',
   attachImagesAndFiles:
     '*,BlockApps-Mercata-Asset-files(*),BlockApps-Mercata-Asset-images(*),BlockApps-Mercata-Asset-fileNames(*)',
   attachSalesAndImagesAndFiles:
@@ -55,6 +57,16 @@ export default {
     'blockapps_memberships',
     'blockapps_art',
     'blockapps_spirits',
+  ],
+  AssetsWithEighteenDecimalPlaces: [
+    '2680dc6693021cd3fefb84351570874fbef8332a', //prodCataAddress
+    '051cb99bca7c437f4b17dc01bd4ff7c5e09db035', //testnetCataAddress
+    '93fb7295859b2d70199e0a4883b7c320cf874e6c', //prodETHSTAddress
+    '921e3d0b4217c7e2bfe7e660cdc4f7edc621f9d5', //testnetETHSTAddress
+    '76372ee8d5a47c58cee4b0e63400858cf4f9ef13', //testnetBETHTEMP
+    '7f5c102390240f4a8f0e0d938d341bf1e3010adc', //testnetUSDTEMP
+    'd6e292f2c9486ada24f6d5cf2e67f44c5f7f677a', //prodBETHTEMP
+    '04d68c24ff359ab457c7b96810f85c51989fe8ed', //prodUSDTEMP
   ],
   localHost: 'http://localhost',
   burnAddress: '6ec8bbe4a5b87be18d443408df43a45e5972fa1b',

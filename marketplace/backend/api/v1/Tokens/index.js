@@ -7,14 +7,14 @@ import loadDapp from '../../middleware/loadDappHandler';
 const router = express.Router();
 
 router.get(
-  Tokens.getAll, // Assuming this is the correct endpoint for getting all tokens
+  Tokens.getAll,
   authHandler.authorizeRequest(true),
   loadDapp,
   TokensController.getAll
 );
 
 router.post(
-  Tokens.create, // Assuming this is the correct endpoint for creating an token
+  Tokens.create,
   authHandler.authorizeRequest(),
   loadDapp,
   TokensController.create

@@ -31,7 +31,7 @@ const StakeInventoryCard = ({
   user,
   supportedTokens,
   stratAddress,
-  cataAddress,
+  assetsWithEighteenDecimalPlaces,
 }) => {
   const textRef = useRef(null);
   const { reserves } = useInventoryState();
@@ -44,43 +44,85 @@ const StakeInventoryCard = ({
   const navigate = useNavigate();
   const naviroute = routes.InventoryDetail.url;
   const imgMeta = category ? category : SEO.TITLE_META;
-  const itemData = inventory.data;
-  const isStrat = inventory.originAddress === stratAddress;
-  const isCata = inventory.originAddress === cataAddress;
-  const quantity = isStrat
-    ? new BigNumber(inventory.quantity).dividedBy(100)
-    : isCata
-    ? new BigNumber(inventory.quantity).dividedBy(new BigNumber(10).pow(18))
-    : new BigNumber(inventory.quantity);
-  const price = inventory?.price
-    ? isStrat
-      ? new BigNumber(inventory.price).multipliedBy(100)
-      : isCata
-      ? new BigNumber(inventory.quantity).multipliedBy(
-          new BigNumber(10).pow(18)
-        )
-      : new BigNumber(inventory.quantity)
-    : undefined;
-  const saleQuantity =
-    inventory.saleQuantity !== undefined
-      ? isStrat
-        ? new BigNumber(inventory.saleQuantity || 0).dividedBy(100)
-        : isCata
-        ? new BigNumber(inventory.saleQuantity || 0).dividedBy(
-            new BigNumber(10).pow(18)
-          )
-        : new BigNumber(inventory.saleQuantity || 0)
-      : undefined;
-  const totalLockedQuantity = inventory.totalLockedQuantity
-    ? isStrat
-      ? new BigNumber(inventory.totalLockedQuantity || 0).dividedBy(100)
-      : isCata
-      ? new BigNumber(inventory.totalLockedQuantity || 0).dividedBy(
-          new BigNumber(10).pow(18)
-        )
-      : new BigNumber(inventory.totalLockedQuantity || 0)
-    : new BigNumber(0);
+  const is18DecimalPlaces = assetsWithEighteenDecimalPlaces?.includes(inventory.root);
 
+  const uniqueEscrows = new Set();
+  let collateralQuantity = inventory?.inventories
+    ? inventory.inventories.reduce((sum, item) => {
+        const escrowAddress = item?.escrow?.address;
+        const escrowCollateral = item?.escrow?.collateralQuantity || 0;
+
+        // Add collateral only if the escrow address is unique
+        if (escrowAddress && !uniqueEscrows.has(escrowAddress)) {
+          uniqueEscrows.add(escrowAddress);
+          return sum + escrowCollateral;
+        }
+
+        return sum;
+      }, 0)
+    : inventory?.escrow?.collateralQuantity > inventory?.quantity
+    ? inventory?.quantity
+    : inventory?.escrow?.collateralQuantity || 0;
+  collateralQuantity = is18DecimalPlaces ? collateralQuantity / 1e18 : collateralQuantity;
+  const quantityNotAvailable = inventory?.inventories
+    ? inventory.inventories.reduce((sum, item) => {
+        const status = Number(item.status);
+        if (status && status !== ASSET_STATUS.ACTIVE) {
+          return sum + (item.quantity || 0);
+        }
+        return sum;
+      }, 0) + inventory.totalSaleQuantity
+    : inventory?.status && Number(inventory?.status) !== ASSET_STATUS.ACTIVE
+    ? inventory?.quantity + (inventory?.saleQuantity || 0)
+    : 0;
+  const quantity = inventory?.inventories
+    ? inventory.totalQuantity
+    : is18DecimalPlaces ? inventory?.quantity /1e18 : inventory?.quantity;
+  const stakeQuantity = quantity - collateralQuantity - quantityNotAvailable;
+  const uniqueEscrowsPrime = new Set();
+  const collateralValue = inventory?.inventories
+    ? inventory.inventories.reduce((sum, item) => {
+        const escrowAddress = item?.escrow?.address;
+        const escrowCollateral = item?.escrow?.collateralValue || 0;
+
+        // Add collateral only if the escrow address is unique
+        if (escrowAddress && !uniqueEscrowsPrime.has(escrowAddress)) {
+          uniqueEscrowsPrime.add(escrowAddress);
+          return sum + escrowCollateral;
+        }
+
+        return sum;
+      }, 0)
+    : 0;
+  const maxBorrowableAmount = Math.floor(collateralValue / 2);
+  const uniqueBorrowedAddresses = new Set();
+  const borrowAmount = inventory?.inventories
+    ? inventory.inventories.reduce((sum, item) => {
+        const escrowAddress = item?.escrow?.address;
+        const borrowedValue = item?.escrow?.borrowedAmount || 0;
+
+        // Add borrowed amount only if the escrow address is unique
+        if (escrowAddress && !uniqueBorrowedAddresses.has(escrowAddress)) {
+          uniqueBorrowedAddresses.add(escrowAddress);
+          return sum + borrowedValue;
+        }
+
+        return sum;
+      }, 0)
+    : inventory?.escrow?.borrowedAmount || 0;
+
+  const escrows = inventory?.inventories
+    ? [
+        ...new Set(
+          inventory.inventories
+            .map((item) => item?.escrow?.address)
+            .filter(Boolean)
+        ),
+      ]
+    : inventory?.escrow?.address
+    ? [inventory.escrow.address]
+    : [];
+  const isStaked = escrows.length > 0;
   const showStakeModal = (type) => {
     setStakeModalOpen(true);
     setStakeType(type);
@@ -182,7 +224,7 @@ const StakeInventoryCard = ({
             <div className="flex flex-row space-x-2 lg:justify-self-end whitespace-nowrap">
               <Typography className="lg:pt-1 flex gap-1">
                 Borrowed Amount: {StratsIcon}
-                {((inventory?.escrow?.borrowedAmount || 0) / 100).toLocaleString('en-US', {
+                {(borrowAmount / 100).toLocaleString('en-US', {
                   maximumFractionDigits: 2,
                   minimumFractionDigits: 2,
                 })}
@@ -194,7 +236,7 @@ const StakeInventoryCard = ({
               type="primary"
               className="font-semibold w-full flex items-center justify-center"
               onClick={() => showStakeModal('Stake')}
-              disabled={inventory?.quantity <= inventory?.escrow?.collateralQuantity || inventory.price || !isActive()}
+              disabled={stakeQuantity <= 0}
             >
               <RiseOutlined /> Stake
             </Button>
@@ -203,7 +245,7 @@ const StakeInventoryCard = ({
                 type="link"
                 className="text-[#13188A] px-0 font-semibold text-sm h-6"
                 onClick={() => showStakeModal('Unstake')}
-                disabled={!inventory?.escrow || inventory?.escrow?.borrowedAmount > 0}
+                disabled={borrowAmount > 0 || collateralQuantity <= 0}
               >
                 <LogoutOutlined /> Unstake
               </Button>
@@ -211,7 +253,9 @@ const StakeInventoryCard = ({
                 type="link"
                 className="text-[#13188A] px-0 font-semibold text-sm h-6"
                 onClick={() => showBorrowModal('Unstake')}
-                disabled={!inventory?.escrow || inventory?.escrow?.borrowedAmount > 0}
+                disabled={
+                  borrowAmount >= maxBorrowableAmount || collateralQuantity <= 0
+                }
               >
                 <BankOutlined /> Borrow
               </Button>
@@ -219,7 +263,7 @@ const StakeInventoryCard = ({
                 type="link"
                 className="text-[#13188A] px-0 font-semibold text-sm h-6"
                 onClick={() => showRepayModal('Unstake')}
-                disabled={!inventory?.escrow || inventory?.escrow?.borrowedAmount <= 0}
+                disabled={borrowAmount <= 0}
               >
                 <SolutionOutlined />
                 Repay
@@ -249,7 +293,7 @@ const StakeInventoryCard = ({
           </div>
 
           <div className="pt-[7px] lg:pt-0 items-center gap-[5px]">
-            {inventory?.escrow ? (
+            {isStaked ? (
               <div className="flex items-center justify-center gap-2 bg-[#1548C329] p-[6px] rounded-md">
                 <div className="w-[7px] h-[7px] rounded-full bg-[#119B2D]"></div>
                 <p className="text-[#4D4D4D] text-[13px]">Staked</p>
@@ -267,7 +311,16 @@ const StakeInventoryCard = ({
           <div className="flex justify-between  ">
             <p className="text-[#6A6A6A]">Quantity Owned</p>
             <p className="text-[#202020] font-semibold">
-              {quantity.toNumber().toLocaleString('en-US', {
+              {quantity.toLocaleString('en-US', {
+                maximumFractionDigits: 4,
+                minimumFractionDigits: 0,
+              }) || 'N/A'}
+            </p>
+          </div>
+          <div className="flex justify-between  ">
+            <p className="text-[#6A6A6A]">Quantity Stakeable</p>
+            <p className="text-[#202020] font-semibold">
+              {stakeQuantity.toLocaleString('en-US', {
                 maximumFractionDigits: 4,
                 minimumFractionDigits: 0,
               }) || 'N/A'}
@@ -276,15 +329,10 @@ const StakeInventoryCard = ({
           <div className="flex justify-between  ">
             <p className="text-[#6A6A6A]">Quantity Staked </p>
             <p className="text-[#202020] font-semibold">
-              {inventory?.escrow
-                ? inventory?.escrow?.collateralQuantity.toLocaleString(
-                    'en-US',
-                    {
-                      maximumFractionDigits: 4,
-                      minimumFractionDigits: 0,
-                    }
-                  )
-                : 0}
+              {collateralQuantity.toLocaleString('en-US', {
+                maximumFractionDigits: 4,
+                minimumFractionDigits: 0,
+              })}
             </p>
           </div>
         </div>
@@ -299,6 +347,7 @@ const StakeInventoryCard = ({
           debouncedSearchTerm={debouncedSearchTerm}
           saleAddress={inventory.saleAddress}
           category={category}
+          assetsWithEighteenDecimalPlaces={assetsWithEighteenDecimalPlaces}
         />
       )}
       {repayModalOpen && (
@@ -312,6 +361,7 @@ const StakeInventoryCard = ({
           saleAddress={inventory.saleAddress}
           category={category}
           reserves={reserves}
+          assetsWithEighteenDecimalPlaces={assetsWithEighteenDecimalPlaces}
         />
       )}
       {stakeModalOpen && (
@@ -326,7 +376,7 @@ const StakeInventoryCard = ({
           saleAddress={inventory.saleAddress}
           category={category}
           stratAddress={stratAddress}
-          cataAddress={cataAddress}
+          assetsWithEighteenDecimalPlaces={assetsWithEighteenDecimalPlaces}
         />
       )}
     </div>

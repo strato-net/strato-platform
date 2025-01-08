@@ -17,6 +17,7 @@ export default {
     label: 'Marketplace Product Detail',
     url: '/dp/:address/:name',
   },
+  EthstProductDetail: { label: 'ETHST Product Detail', url: '/ethst/:address' },
   LoginRedirect: { label: 'LoginRedirect', url: '/login' },
   Checkout: { label: 'Checkout', url: '/checkout' },
   ConfirmOrder: { label: 'Confirm Order', url: '/confirmOrder' },

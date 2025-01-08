@@ -1,6 +1,6 @@
-import { Button, Modal, Tooltip } from 'antd';
+import { Button, Modal, Tooltip, InputNumber } from 'antd';
 import { QuestionCircleOutlined } from '@ant-design/icons';
-import { useEffect } from 'react';
+import { useEffect, useState, useMemo } from 'react';
 
 import { actions as inventoryActions } from '../../contexts/inventory/actions';
 import {
@@ -14,6 +14,145 @@ import { useLocation } from 'react-router-dom';
 
 const logo = <img src={Images.strat} alt={''} title={''} className="w-5 h-5" />;
 
+/**
+ * Helper to compute total collateral quantity from inventory.
+ * Includes checking for unique escrow addresses and summing collateral.
+ */
+function computeTotalCollateralQuantity(inventory) {
+  if (!inventory) return 0;
+
+  const uniqueEscrowsPrime = new Set();
+  if (Array.isArray(inventory.inventories)) {
+    return inventory.inventories.reduce((sum, item) => {
+      const escrowAddress = item?.escrow?.address;
+      const escrowCollateral =
+        parseFloat(item?.escrow?.collateralQuantity) || 0;
+      if (escrowAddress && !uniqueEscrowsPrime.has(escrowAddress)) {
+        uniqueEscrowsPrime.add(escrowAddress);
+        return sum + escrowCollateral;
+      }
+      return sum;
+    }, 0);
+  }
+
+  return parseFloat(inventory?.escrow?.collateralQuantity) || 0;
+}
+
+/**
+ * Computes total collateral value, ensuring uniqueness by escrow address.
+ */
+function computeTotalCollateralValue(inventory) {
+  if (!inventory) return 0;
+
+  const uniqueEscrowsThird = new Set();
+  if (Array.isArray(inventory.inventories)) {
+    return inventory.inventories.reduce((sum, item) => {
+      const escrowAddress = item?.escrow?.address;
+      const escrowCollateralValue =
+        parseFloat(item?.escrow?.collateralValue) || 0;
+      if (escrowAddress && !uniqueEscrowsThird.has(escrowAddress)) {
+        uniqueEscrowsThird.add(escrowAddress);
+        return sum + escrowCollateralValue;
+      }
+      return sum;
+    }, 0);
+  }
+
+  return parseFloat(inventory?.escrow?.collateralValue) || 0;
+}
+
+/**
+ * Computes collateralValue for display. If `inventories` exist, sum unique escrows.
+ * Otherwise, proportionally allocate based on (inventory.quantity / totalCollateralQuantity).
+ */
+function computeCollateralValue(inventory, totalCollateralQuantity) {
+  if (!inventory) return 0;
+
+  const uniqueEscrows = new Set();
+  if (Array.isArray(inventory.inventories)) {
+    return inventory.inventories.reduce((sum, item) => {
+      const escrowAddress = item?.escrow?.address;
+      const escrowCollateralValue =
+        parseFloat(item?.escrow?.collateralValue) || 0;
+      if (escrowAddress && !uniqueEscrows.has(escrowAddress)) {
+        uniqueEscrows.add(escrowAddress);
+        return sum + escrowCollateralValue;
+      }
+      return sum;
+    }, 0);
+  }
+
+  const invQuantity = parseFloat(inventory.quantity) || 0;
+  const escrowCollateralValue =
+    parseFloat(inventory?.escrow?.collateralValue) || 0;
+  return escrowCollateralValue * (invQuantity / totalCollateralQuantity || 1);
+}
+
+/**
+ * Computes borrowed amount, ensuring uniqueness by escrow address.
+ */
+function computeBorrowedAmount(inventory) {
+  if (!inventory) return 0;
+
+  const uniqueBorrowedAddresses = new Set();
+  if (Array.isArray(inventory.inventories)) {
+    return inventory.inventories.reduce((sum, item) => {
+      const escrowAddress = item?.escrow?.address;
+      const borrowedValue = parseFloat(item?.escrow?.borrowedAmount) || 0;
+      if (escrowAddress && !uniqueBorrowedAddresses.has(escrowAddress)) {
+        uniqueBorrowedAddresses.add(escrowAddress);
+        return sum + borrowedValue;
+      }
+      return sum;
+    }, 0);
+  }
+
+  return parseFloat(inventory?.escrow?.borrowedAmount) || 0;
+}
+
+/**
+ * Compute ESCROW addresses array.
+ */
+function computeEscrows(inventory) {
+  if (inventory?.inventories) {
+    return [
+      ...new Set(
+        inventory.inventories
+          .map((item) => item?.escrow?.address)
+          .filter(Boolean)
+      ),
+    ];
+  }
+  if (inventory?.escrow?.address) {
+    return [inventory.escrow.address];
+  }
+  return [];
+}
+
+/**
+ * Applies 1e18 scaling if the root is in the provided array.
+ * This matches the logic done in the StakeModal for 18 decimal places.
+ */
+function applyDecimalScaling(
+  inventory,
+  assetsWithEighteenDecimalPlaces,
+  values
+) {
+  if (inventory && assetsWithEighteenDecimalPlaces.includes(inventory.root)) {
+    // If root requires division by 1e18, scale these values accordingly
+    const scaled = {};
+    for (const key in values) {
+      // Divide the raw value by 1e18 to normalize
+      scaled[key] = values[key] / 1e18;
+    }
+    return scaled;
+  }
+  return values;
+}
+
+/**
+ * BorrowModal component
+ */
 const BorrowModal = ({
   open,
   handleCancel,
@@ -23,54 +162,163 @@ const BorrowModal = ({
   limit,
   offset,
   productDetailPage,
+  assetsWithEighteenDecimalPlaces,
 }) => {
-  const { isReservesLoading, reserves, oracle, isBorrowing } =
-    useInventoryState();
-  // Dispatch
+  const { isReservesLoading, reserves, isBorrowing } = useInventoryState();
   const inventoryDispatch = useInventoryDispatch();
   const marketplaceDispatch = useMarketplaceDispatch();
 
   const isStaked = inventory.sale && inventory.price <= 0;
-  const itemName = decodeURIComponent(inventory.name);
-  const matchedReserve = reserves?.length
-    ? reserves.find((reserve) => reserve.assetRootAddress === inventory.root)
-    : null;
-  const oracleData = oracle ? oracle : { consensusPrice: 0 };
+
   const location = useLocation();
   const queryParams = new URLSearchParams(location.search);
 
-  const loanableAmount = Math.floor(inventory?.escrow?.collateralValue / 2) >= inventory?.escrow?.borrowedAmount
-                       ? Math.floor(inventory?.escrow?.collateralValue / 2) - inventory?.escrow?.borrowedAmount
-                       : 0;
+  const totalCollateralQuantity = useMemo(
+    () => computeTotalCollateralQuantity(inventory),
+    [inventory]
+  );
+
+  const totalCollateralValue = useMemo(
+    () => computeTotalCollateralValue(inventory),
+    [inventory]
+  );
+
+  const collateralValue = useMemo(
+    () => computeCollateralValue(inventory, totalCollateralQuantity),
+    [inventory, totalCollateralQuantity]
+  );
+
+  const borrowedAmount = useMemo(
+    () => computeBorrowedAmount(inventory),
+    [inventory]
+  );
+
+  const matchedReserve = useMemo(() => {
+    if (reserves?.length && inventory?.root) {
+      return reserves.find(
+        (reserve) => reserve.assetRootAddress === inventory.root
+      );
+    }
+    return null;
+  }, [reserves, inventory?.root]);
+
+  // Apply scaling if needed (similar to StakeModal logic)
+  // const scaledValues = useMemo(() => {
+  //   return applyDecimalScaling(inventory, assetsWithEighteenDecimalPlaces, {
+  //     collateralValue,
+  //     totalCollateralValue,
+  //   });
+  // }, [inventory, assetsWithEighteenDecimalPlaces, collateralValue, totalCollateralValue]);
+
+  // const { collateralValue: scaledCollateralValue, totalCollateralValue: scaledTotalCollateralValue } = scaledValues;
+
+  // Compute final displayed values after scaling:
+  // The code divides these values by 100 or 10000 for display:
+  // collateralValue is displayed as `collateralValue / 10000`
+  // borrowedAmount and loanableAmount as `... / 100`
+  // We'll keep the same formatting after scaling by 1e18.
+  const LTV = matchedReserve.name.toLowerCase().includes('ethst') ? 0.3 : 0.5;
+  const maxBorrowableAmount = Math.floor(collateralValue * LTV);
+  const loanableAmount =
+    maxBorrowableAmount >= borrowedAmount
+      ? maxBorrowableAmount - borrowedAmount
+      : 0;
+
+  // For display:
+  // `Market Value` = collateralValue / 10000
+  // `borrowedAmount` and `loanableAmount` are displayed /100
+
+  const marketValueDisplay = (collateralValue / 10000).toFixed(2);
+  const borrowedAmountDisplay = (borrowedAmount / 100).toFixed(2);
+  const loanableAmountDisplay = (loanableAmount / 100).toFixed(2);
+
+  // Desired loan amount in STRATs
+  const [desiredLoanAmount, setDesiredLoanAmount] = useState(
+    (loanableAmount || 0) / 100
+  );
+
+  const handleLoanAmountChange = (value) => {
+    setDesiredLoanAmount(value || 0);
+  };
 
   useEffect(() => {
-    if (reserves && inventory.data && !isReservesLoading && isStaked) {
+    if (
+      reserves &&
+      inventory.data &&
+      !isReservesLoading &&
+      isStaked &&
+      matchedReserve
+    ) {
       inventoryActions.getOracle(inventoryDispatch, matchedReserve.oracle);
     }
-  }, [matchedReserve]);
+  }, [
+    matchedReserve,
+    reserves,
+    inventory,
+    isReservesLoading,
+    isStaked,
+    inventoryDispatch,
+  ]);
+
+  const escrows = useMemo(() => computeEscrows(inventory), [inventory]);
 
   const dataForItems = [
     {
       label: `Market Value`,
       description:
         ' The total value of your staked assets, calculated as Quantity x Oracle Price.',
-      value: `$${(inventory?.escrow?.collateralValue / 10000).toFixed(2)}`,
+      value: `$${marketValueDisplay}`,
     },
     {
-      label: 'Maximum loan percentage',
+      label: 'Max LTV',
+      description: `Indicates you can borrow up to ${LTV*100}% of the market value of your staked RWAs.`,
+      value: `${LTV*100}%`,
+    },
+    {
+      label: 'Outstanding Loan (in STRATs)',
       description:
-        `Indicates you can borrow up to 50% of the market value of your staked RWAs.`,
-      value: '50%',
+        'The total amount of STRAT tokens you have borrowed against your staked RWAs.',
+      value: (
+        <div className="flex">
+          <div className="mx-1">{logo}</div>
+          {borrowedAmountDisplay}
+        </div>
+      ),
     },
     {
-      label: 'Estimated Loan (in STRATs)',
+      label: 'Estimated Available Loan (in STRATs)',
       description:
         'The projected amount of STRAT tokens you can borrow against your staked RWAs.',
       value: (
-        <div className="flex -mr-1">
-          <div className="mx-1">{logo}</div>{' '}
-          {parseFloat(loanableAmount / 100).toFixed(2)}
+        <div className="flex">
+          <div className="mx-1">{logo}</div>
+          {loanableAmountDisplay}
         </div>
+      ),
+    },
+    {
+      label: 'Desired Loan Amount',
+      description: 'Enter the amount of STRATs you want to borrow.',
+      value: (
+        <>
+          <InputNumber
+            prefix={logo}
+            min={0}
+            step={0.01}
+            value={desiredLoanAmount}
+            onChange={handleLoanAmountChange}
+            className="w-full"
+            controls={false}
+          />
+          {desiredLoanAmount > parseFloat(loanableAmountDisplay) && (
+            <p
+              className="text-xs"
+              style={{color: '#f56565' }}
+            >
+              *Quantity exceeds available quantity of {loanableAmountDisplay}
+            </p>
+          )}
+        </>
       ),
     },
   ];
@@ -79,8 +327,8 @@ const BorrowModal = ({
 
   const handleSubmit = async () => {
     const body = {
-      escrowAddress: inventory?.escrow?.address,
-      borrowAmount: loanableAmount,
+      escrowAddresses: escrows,
+      borrowAmount: (desiredLoanAmount * 100).toFixed(0), // Converting back to raw format as before
       reserve: matchedReserve?.address,
     };
 
@@ -92,16 +340,16 @@ const BorrowModal = ({
           productDetailPage
         );
       } else {
+        const isStakePage =
+          queryParams.get('st') === 'true' ||
+          window.location.pathname === '/stake';
         await inventoryActions.fetchInventory(
           inventoryDispatch,
           limit,
           offset,
           debouncedSearchTerm,
           category && category !== 'All' ? category : undefined,
-          queryParams.get('st') === 'true' ||
-            window.location.pathname === '/stake'
-            ? reserves.map((reserve) => reserve.assetRootAddress)
-            : ''
+          isStakePage ? reserves.map((res) => res.assetRootAddress) : ''
         );
       }
       await inventoryActions.getAllReserve(inventoryDispatch);
@@ -148,6 +396,10 @@ const BorrowModal = ({
               className="w-full px-6 h-10 font-bold"
               onClick={handleSubmit}
               loading={isBorrowing}
+              disabled={
+                desiredLoanAmount <= 0 ||
+                desiredLoanAmount > parseFloat(loanableAmountDisplay)
+              }
             >
               Borrow
             </Button>
