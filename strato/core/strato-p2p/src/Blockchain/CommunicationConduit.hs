@@ -44,7 +44,6 @@ import qualified Data.Conduit.Binary as CB
 import Data.Conduit.TQueue
 import Data.List.Split
 import Data.Maybe
-import qualified Data.Set as S
 import qualified Data.Text as T
 import Text.Printf
 import UnliftIO.Exception
@@ -120,7 +119,6 @@ handleMsgClientConduit myId peer = do
       mrh <- lift $ unMaxReturnedHeaders <$> Mod.access (Mod.Proxy @MaxReturnedHeaders)
       yield . Right $ GetBlockHeaders (BlockNumber (max (lastBlockNumber - flags_syncBacktrackNumber) 0)) mrh 0 Forward
       yield . Right $ GetChainDetails []
-      handleGetChainDetails peer S.empty
       lift stampActionTimestamp
     other -> assertHandshake other
   handleEvents peer .| filterMC (either (const $ return True) checkOutbound)
@@ -176,7 +174,6 @@ handleMsgServerConduit myPubkey peer = do
       mrh <- lift $ unMaxReturnedHeaders <$> Mod.access (Mod.Proxy @MaxReturnedHeaders)
       yield . Right $ GetBlockHeaders (BlockNumber (max (lastBlockNumber - flags_syncBacktrackNumber) 0)) mrh 0 Forward
       yield . Right $ GetChainDetails []
-      handleGetChainDetails peer S.empty
       lift stampActionTimestamp
     other -> assertHandshake other
   handleEvents peer .| filterMC (either (const $ return True) checkOutbound)
