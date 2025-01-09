@@ -65,7 +65,6 @@ indexAPI idxEvents = do
     filterHelper (indxEv : xs) (indexTransactions, newChainInfos, ranBlocksLs) =
       case indxEv of
         IndexTransaction _ tx -> filterHelper xs (tx : indexTransactions, newChainInfos, ranBlocksLs)
-        NewChainInfo cId cInfo -> filterHelper xs (indexTransactions, (cId, cInfo) : newChainInfos, ranBlocksLs)
         RanBlock b -> filterHelper xs (indexTransactions, newChainInfos, b : ranBlocksLs)
         _ -> filterHelper xs (indexTransactions, newChainInfos, ranBlocksLs)
     filterHelper [] a = a

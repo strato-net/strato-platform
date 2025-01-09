@@ -52,7 +52,7 @@ data VmInEventBatch = InBatch
   { rpcCommands :: [JsonRpcCommand],
     txPairs :: [(Timestamp, OutputTx)],
     tLen :: {-# UNPACK #-} !Int,
-    blocksAndNewChains :: [Either OutputGenesis OutputBlock],
+    blocks :: [OutputBlock],
     bLen :: {-# UNPACK #-} !Int,
     createBlock :: !Bool,
     privateTxs :: [OutputTx],
@@ -67,12 +67,10 @@ newInBatch = InBatch [] [] 0 [] 0 False [] [] [] Nothing Nothing
 
 insertInBatch :: VmInEvent -> VmInEventBatch -> VmInEventBatch
 insertInBatch e b = case e of
-  VmGenesis og -> b {blocksAndNewChains = (Left og) : blocksAndNewChains b}
   VmJsonRpcCommand j -> b {rpcCommands = j : rpcCommands b}
   VmTx ts t -> b {txPairs = (ts, t) : txPairs b, tLen = tLen b + 1}
-  VmBlock ob -> b {blocksAndNewChains = (Right ob) : blocksAndNewChains b, bLen = bLen b + 1}
+  VmBlock ob -> b {blocks = ob : blocks b, bLen = bLen b + 1}
   VmCreateBlockCommand -> b {createBlock = True}
-  VmPrivateTx otx -> b {privateTxs = otx : privateTxs b}
   VmGetMPNodesRequest o srs -> b {mpNodesReqs = (o, srs) : mpNodesReqs b}
   VmMPNodesReceived nds -> b {mpNodesResps = nds : mpNodesResps b}
   VmRunPreprepare b' -> b {preprepareBlock = Just b'}

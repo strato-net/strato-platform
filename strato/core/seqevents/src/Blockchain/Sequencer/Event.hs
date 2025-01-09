@@ -192,10 +192,8 @@ instance ShowConstructor P2pEvent where
 data VmEvent
   = VmTx Timestamp OutputTx
   | VmBlock OutputBlock
-  | VmGenesis OutputGenesis
   | VmJsonRpcCommand JsonRpcCommand
   | VmCreateBlockCommand
-  | VmPrivateTx OutputTx
   | VmGetMPNodesRequest TO.TXOrigin [StateRoot]
   | VmMPNodesReceived [NodeData]
   | VmRunPreprepare BDB.Block
@@ -205,7 +203,6 @@ data VmEvent
 instance Format VmEvent where
   format (VmTx ts o) = show ts ++ " " ++ format o
   format (VmBlock o) = format o
-  format (VmGenesis o) = show o
   format (VmGetMPNodesRequest o srs) = show o ++ " requested: " ++ format srs
   format (VmMPNodesReceived nds) = show nds
   format x = show x
@@ -213,10 +210,8 @@ instance Format VmEvent where
 instance ShowConstructor VmEvent where
   showConstructor VmTx{} = "VmTx"
   showConstructor VmBlock{} = "VmBlock"
-  showConstructor VmGenesis{} = "VmGenesis"
   showConstructor VmJsonRpcCommand{} = "VmJsonRpcCommand"
   showConstructor VmCreateBlockCommand{} = "VmCreateBlockCommand"
-  showConstructor VmPrivateTx{} = "VmPrivateTx"
   showConstructor VmGetMPNodesRequest{} = "VmGetMPNodesRequest"
   showConstructor VmMPNodesReceived{} = "VmMPNodesReceived"
   showConstructor VmRunPreprepare{} = "VmRunPreprepare"

@@ -173,10 +173,8 @@ logEventSummaries evs = do
     getNames :: VmEvent -> String
     getNames (VmTx _ _) = "TX"
     getNames (VmBlock _) = "Block"
-    getNames (VmGenesis _) = "GenesisBlock"
     getNames (VmJsonRpcCommand _) = "JsonRpcCommand"
     getNames VmCreateBlockCommand = "CreateBlockCommand"
-    getNames (VmPrivateTx _) = "PrivateTx"
     getNames (VmGetMPNodesRequest _ _) = "GetMPNodesRequest"
     getNames (VmMPNodesReceived _) = "MPNodesReceived"
     getNames (VmRunPreprepare _) = "VmRunPreprepare"
