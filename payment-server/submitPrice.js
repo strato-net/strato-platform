@@ -89,7 +89,7 @@ async function fetchAndSubmitEscrowAddresses(oracleContract, token) {
     }
 
     // Extract escrow addresses in batches of 20
-    const batchSize = 20;
+    const batchSize = 10;
     for (let i = 0; i < escrows.length; i += batchSize) {
       const batch = escrows.slice(i, i + batchSize);
       const escrowAddresses = batch.map((escrow) => escrow.address);
