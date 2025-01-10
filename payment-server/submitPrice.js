@@ -23,9 +23,9 @@ async function distributeRewards(token, contract, args) {
     method: "distributeRewards",
     args: util.usc(args),
   };
-  console.log("Executing batch callList for distributeRewards...");
-  await rest.callList(token, callArgs, { config });
-  console.log("Batch distributeRewards calls completed.");
+  console.log("Executing call for distributeRewards...");
+  await rest.call(token, callArgs, { config });
+  console.log("DistributeRewards calls completed.");
 }
 
 // Function to fetch all escrow addresses for a given reserve and call distributeRewards
