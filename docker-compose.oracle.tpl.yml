@@ -22,8 +22,10 @@ services:
     - ORACLE_FETCH_INTERVAL=${ORACLE_FETCH_INTERVAL}
     build: .
     image: ${PAYMENT_SERVER_IMAGE:-<REPO_URL>payment-server:<VERSION>}
+    ports:
+      - 8080:8018 # healthcheck ping only
     volumes:
-       - oracleconfig:/config:rw
+      - oracleconfig:/config:rw
     restart: unless-stopped
     logging:
       driver: "json-file"
