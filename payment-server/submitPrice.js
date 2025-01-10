@@ -7,10 +7,6 @@ import config from "./load.config.js";
 import deployment from "./load.deploy.js";
 import oauthHelper from "./helpers/oauthHelper.js";
 
-
-// Global array to store all distributeRewards calls
-const distributeRewardsCallList = [];
-
 async function submitPrice(token, contract, args) {
   const callArgs = {
     contract,
@@ -27,19 +23,9 @@ async function distributeRewards(token, contract, args) {
     method: "distributeRewards",
     args: util.usc(args),
   };
-  // Push call arguments into the global array
-  distributeRewardsCallList.push(callArgs);
-}
-
-// After all calls are collected, we run them at once
-async function runDistributeRewardsCalls(token) {
-  if (distributeRewardsCallList.length > 0) {
-    console.log("Executing batch callList for distributeRewards...");
-    await rest.callList(token, distributeRewardsCallList, { config });
-    console.log("Batch distributeRewards calls completed.");
-  } else {
-    console.log("No distributeRewards calls to execute.");
-  }
+  console.log("Executing batch callList for distributeRewards...");
+  await rest.callList(token, callArgs, { config });
+  console.log("Batch distributeRewards calls completed.");
 }
 
 // Function to fetch all escrow addresses for a given reserve and call distributeRewards
@@ -96,8 +82,8 @@ async function fetchAndSubmitEscrowAddresses(oracleContract, token) {
       continue;
     }
 
-    // Extract escrow addresses in batches of 20
-    const batchSize = 20;
+    // Extract escrow addresses in batches of 10
+    const batchSize = 10;
     for (let i = 0; i < escrows.length; i += batchSize) {
       const batch = escrows.slice(i, i + batchSize);
       const escrowAddresses = batch.map((escrow) => escrow.address);
@@ -290,9 +276,6 @@ async function main() {
         console.error(`ERROR: Failed to process oracle ${key}:`, error);
       }
     }
-
-    // After processing all oracles and collecting distributeRewards calls, run them at once
-    await runDistributeRewardsCalls(token);
   };
   
   // Run the heartbeat ping-pong server for health check
