@@ -89,7 +89,7 @@ pipeline {
                 GLOBAL_ADMIN_PASSWORD='${GLOBAL_ADMIN_PASSWORD}' \\
                 MP_IS_BOOTNODE='true' \\
                 MP_DELAY_DEPLOYMENT='true' \\
-                accountNonceLimit=10000 \\
+                accountNonceLimit=20020 \\
                 ./strato --single
             """
           }
