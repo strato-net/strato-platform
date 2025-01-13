@@ -6,8 +6,12 @@ import "../Assets/Asset.sol";
 import "../Enums/RestStatus.sol";
 import "../Utils/Utils.sol";
 import "../Structs/Structs.sol";
+import "../Oracles/OracleService.sol";
 
 abstract contract Sale is Utils, Structs { 
+
+    OracleService public oracle;
+    decimal public markup;
 
     Asset public assetToBeSold;
     decimal public price;
@@ -33,6 +37,11 @@ abstract contract Sale is Utils, Structs {
         isOpen = true;
         _addPaymentServices(_paymentServices);
         assetToBeSold.attachSale();
+    }
+
+    modifier requireOracle(string action) {
+        string err = "Only the oracle can " + action + ".";
+        require(msg.sender == address(oracle), err);
     }
 
     modifier requireSeller(string action) {
@@ -161,6 +170,28 @@ abstract contract Sale is Utils, Structs {
     ) internal returns (uint) {
         unlockQuantity(orderHash, purchaser);
         return RestStatus.OK;
+    }
+
+    function setOracle(address _oracleAddress, uint _markup) external requireSeller("set oracle") {
+        require(_oracleAddress != address(0), "Invalid oracle address");
+        oracle = OracleService(_oracleAddress);
+        markup = (decimal(_markup) / 100) + 1;
+        require(oracle.isActive(), "Oracle must be active");
+    }
+
+    function subscribeToOracle() external requireSeller("subscribe to oracle") {
+        require(address(oracle) != address(0), "Oracle not set");
+        require(oracle.isActive(), "Oracle must be active");
+        oracle.subscribe();
+    }
+
+    function unSubscribeFromOracle() external requireSeller("unsubscribe from oracle") {
+        require(address(oracle) != address(0), "Oracle not set");
+        oracle.unsubscribe();
+    }
+
+    function updatePrice(decimal _consensusPrice) external requireOracle("submit price") {
+        price = _consensusPrice * markup;
     }
 
     function _update(

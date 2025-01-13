@@ -4,6 +4,7 @@ pragma strict;
 import <509>;
 import "../Enums/RestStatus.sol";
 import "../Utils/Utils.sol";
+import "../Sales/Sale.sol";
 
 abstract contract OracleService is Utils {
     decimal public consensusPrice;
@@ -15,6 +16,8 @@ abstract contract OracleService is Utils {
     string public name;
 
     bool public isActive;
+
+    Sale[] public subscribers;
 
     event PriceUpdated(decimal price, uint timestamp);
 
@@ -39,9 +42,10 @@ abstract contract OracleService is Utils {
         isActive = false;
     }
 
-    function _submitPrice(decimal _price, uint _timestamp) internal  requireActive("submit price") {
+    function _submitPrice(decimal _price, uint _timestamp) internal requireActive("submit price") {
         consensusPriceTimestamp = _timestamp;
     	consensusPrice = _price;
+        _updateSubscriberPrice(_price);
         emit PriceUpdated(_price, _timestamp);
     }
 
@@ -52,5 +56,25 @@ abstract contract OracleService is Utils {
 
     function getLatestPrice() public view requireActive("get latest price") returns (decimal, uint) {
         return (consensusPrice, consensusPriceTimestamp);
+    }
+
+    function subscribe() external requireActive("subscribe") {
+        subscribers.push(Sale(msg.sender));
+    }
+
+    function unsubscribe() external {
+        for (uint i = 0; i < subscribers.length; i++) {
+            if (subscribers[i] == Sale(msg.sender)) {
+                subscribers[i] = subscribers[subscribers.length - 1];
+                subscribers[i] = Sale(address(0));
+                break;
+            }
+        }
+    }
+
+    function _updateSubscriberPrice(decimal _price) internal {
+        for (uint i = 0; i < subscribers.length; i++) {
+            subscribers[i].updatePrice(_price);
+        }
     }
 }
