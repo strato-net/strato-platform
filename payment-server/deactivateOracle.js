@@ -12,7 +12,7 @@ async function deactivate(token, contract) {
     method: 'deactivate',
     args: {},
   };
-  await rest.call(token, callArgs, { config });
+  await rest.call(token, callArgs, {config, cacheNonce: true});
 }
 
 describe("Oracle - deactivate contracts", function () {
