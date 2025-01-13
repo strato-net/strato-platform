@@ -229,12 +229,12 @@ const BorrowModal = ({
   // `Market Value` = collateralValue / 10000
   // `borrowedAmount` and `loanableAmount` are displayed /100
 
-  const marketValueDisplay = new BigNumber(collateralValue).dividedBy(new BigNumber(10).pow(18))
-  const borrowedAmountDisplay = (borrowedAmount).toFixed(2);
-  const loanableAmountDisplay = (loanableAmount).toFixed(2);
+  const marketValueDisplay = (collateralValue / Math.pow(10,18)).toFixed(2)
+  const borrowedAmountDisplay = (borrowedAmount / Math.pow(10, 18)).toFixed(2);
+  const loanableAmountDisplay = (loanableAmount / Math.pow(10,18)).toFixed(2);
 
   // Desired loan amount in USDST
-  const [desiredLoanAmount, setDesiredLoanAmount] = useState((loanableAmount || 0));
+  const [desiredLoanAmount, setDesiredLoanAmount] = useState((loanableAmount/Math.pow(10,18) || 0));
 
   const handleLoanAmountChange = (value) => {
     setDesiredLoanAmount(value || 0);
@@ -303,10 +303,11 @@ const BorrowModal = ({
           <InputNumber
             prefix={logo}
             min={0}
-            step={0.01}
+            step={1}
             value={desiredLoanAmount}
             onChange={handleLoanAmountChange}
             className="w-full"
+            precision={2}
             controls={false}
           />
           {desiredLoanAmount > parseFloat(loanableAmountDisplay) && (
@@ -325,9 +326,11 @@ const BorrowModal = ({
   const dataForSummary = [];
 
   const handleSubmit = async () => {
+    const loanAmount = new BigNumber(desiredLoanAmount);
+
     const body = {
       escrowAddresses: escrows,
-      borrowAmount: (desiredLoanAmount * 100).toFixed(0), // Converting back to raw format as before
+      borrowAmount: loanAmount.multipliedBy(new BigNumber(10).pow(18)).toString(),
       reserve: matchedReserve?.address,
     };
 

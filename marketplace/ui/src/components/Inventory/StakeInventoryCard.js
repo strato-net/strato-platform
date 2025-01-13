@@ -43,7 +43,9 @@ const StakeInventoryCard = ({
   const navigate = useNavigate();
   const naviroute = routes.InventoryDetail.url;
   const imgMeta = category ? category : SEO.TITLE_META;
-  const is18DecimalPlaces = assetsWithEighteenDecimalPlaces?.includes(inventory.root);
+  const is18DecimalPlaces = assetsWithEighteenDecimalPlaces?.includes(
+    inventory.root
+  );
 
   const uniqueEscrows = new Set();
   let collateralQuantity = inventory?.inventories
@@ -62,7 +64,9 @@ const StakeInventoryCard = ({
     : inventory?.escrow?.collateralQuantity > inventory?.quantity
     ? inventory?.quantity
     : inventory?.escrow?.collateralQuantity || 0;
-  collateralQuantity = is18DecimalPlaces ? collateralQuantity / 1e18 : collateralQuantity;
+  collateralQuantity = is18DecimalPlaces
+    ? collateralQuantity / 1e18
+    : collateralQuantity;
   const quantityNotAvailable = inventory?.inventories
     ? inventory.inventories.reduce((sum, item) => {
         const status = Number(item.status);
@@ -76,7 +80,9 @@ const StakeInventoryCard = ({
     : 0;
   const quantity = inventory?.inventories
     ? inventory.totalQuantity
-    : is18DecimalPlaces ? inventory?.quantity /1e18 : inventory?.quantity;
+    : is18DecimalPlaces
+    ? inventory?.quantity / 1e18
+    : inventory?.quantity;
   const stakeQuantity = quantity - collateralQuantity - quantityNotAvailable;
   const uniqueEscrowsPrime = new Set();
   const collateralValue = inventory?.inventories
@@ -95,7 +101,7 @@ const StakeInventoryCard = ({
     : 0;
   const maxBorrowableAmount = Math.floor(collateralValue / 2);
   const uniqueBorrowedAddresses = new Set();
-  const borrowAmount = inventory?.inventories
+  let borrowAmount = inventory?.inventories
     ? inventory.inventories.reduce((sum, item) => {
         const escrowAddress = item?.escrow?.address;
         const borrowedValue = item?.escrow?.borrowedAmount || 0;
@@ -223,10 +229,7 @@ const StakeInventoryCard = ({
             <div className="flex flex-row space-x-2 lg:justify-self-end whitespace-nowrap">
               <Typography className="lg:pt-1 flex gap-1">
                 Borrowed Amount: {USDSTIcon}
-                {(borrowAmount).toLocaleString('en-US', {
-                  maximumFractionDigits: 2,
-                  minimumFractionDigits: 2,
-                })}
+                {borrowAmount / Math.pow(10, 18)}
               </Typography>
             </div>
           </div>

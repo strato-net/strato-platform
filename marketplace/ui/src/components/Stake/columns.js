@@ -29,24 +29,24 @@ export const aggregateStakeColumns = (
       render: (_, record) => {
         const uniqueBorrowedAddresses = new Set();
 
-        const borrowedAmount =
-          (record?.inventories
-            ? record.inventories.reduce((sum, item) => {
-                const escrowAddress = item?.escrow?.address;
-                const borrowedValue = item?.escrow?.borrowedAmount || 0;
+        let borrowedAmount = record?.inventories
+          ? record.inventories.reduce((sum, item) => {
+              const escrowAddress = item?.escrow?.address;
+              const borrowedValue = item?.escrow?.borrowedAmount || 0;
 
-                // Add borrowed amount only if the escrow address is unique
-                if (
-                  escrowAddress &&
-                  !uniqueBorrowedAddresses.has(escrowAddress)
-                ) {
-                  uniqueBorrowedAddresses.add(escrowAddress);
-                  return sum + borrowedValue;
-                }
+              // Add borrowed amount only if the escrow address is unique
+              if (
+                escrowAddress &&
+                !uniqueBorrowedAddresses.has(escrowAddress)
+              ) {
+                uniqueBorrowedAddresses.add(escrowAddress);
+                return sum + borrowedValue;
+              }
 
-                return sum;
-              }, 0)
-            : record?.escrow?.borrowedAmount || 0);
+              return sum;
+            }, 0)
+          : record?.escrow?.borrowedAmount || 0;
+
         return (
           <>
             <div className="flex items-center">
@@ -74,10 +74,7 @@ export const aggregateStakeColumns = (
             </div>
             <div className="flex items-center gap-2">
               Borrowed Amount: {USDSTIcon}
-              {borrowedAmount.toLocaleString('en-US', {
-                maximumFractionDigits: 2,
-                minimumFractionDigits: 2,
-              })}
+              {borrowedAmount / Math.pow(10, 18)}
             </div>
           </>
         );
@@ -157,6 +154,47 @@ export const aggregateStakeColumns = (
         return (
           <div>
             {requiresDivision ? collateralQuantity / 1e18 : collateralQuantity}
+          </div>
+        );
+      },
+    },
+    {
+      title: 'CATA Rewards Earned',
+      align: 'center',
+      render: (_, record) => {
+        // Function to sum CATA rewards from BlockApps-Mercata-Escrow-assets
+        const sumCataRewardsFromAssets = (assets) => {
+          if (!Array.isArray(assets)) return 0;
+          return assets.reduce((sum, asset) => {
+            const escrow = asset['BlockApps-Mercata-Escrow'];
+            const cataReward = escrow?.totalCataReward || 0;
+            return sum + cataReward;
+          }, 0);
+        };
+
+        // Sum totalCataRewardIssued
+        let totalCataRewardsIssued = 0;
+
+        if (record?.inventories) {
+          totalCataRewardsIssued = record.inventories.reduce((sum, item) => {
+            const escrowAssets = item['BlockApps-Mercata-Escrow-assets'];
+            return sum + sumCataRewardsFromAssets(escrowAssets);
+          }, 0);
+        } else {
+          // If no inventories, check record['BlockApps-Mercata-Escrow-assets']
+          const recordAssets = record['BlockApps-Mercata-Escrow-assets'];
+          totalCataRewardsIssued = sumCataRewardsFromAssets(recordAssets);
+        }
+
+        // If these rewards also follow 18 decimals, apply division
+        const displayValue = totalCataRewardsIssued / 1e18;
+
+        return (
+          <div>
+            {displayValue.toLocaleString('en-US', {
+              maximumFractionDigits: 4,
+              minimumFractionDigits: 2,
+            })}
           </div>
         );
       },
@@ -307,8 +345,7 @@ export const stakeColumns = (
           : parsedQuantity;
 
         // Extract escrow assets array safely
-        const escrowAssets =
-          record?.escrow?.['BlockApps-Mercata-Escrow-assets'] || [];
+        const escrowAssets = record?.['BlockApps-Mercata-Escrow-assets'] || [];
 
         // Determine if there is a matching escrow asset
         const hasMatchingEscrow = escrowAssets.some(
@@ -336,7 +373,7 @@ export const stakeColumns = (
       title: 'Quantity Staked',
       align: 'center',
       render: (_, record) => {
-        const matchingQuantity = record?.escrow?.[
+        const matchingQuantity = record?.[
           'BlockApps-Mercata-Escrow-assets'
         ]?.find((item) => item.value === record.address)
           ? record.quantity
@@ -347,6 +384,47 @@ export const stakeColumns = (
         return (
           <div>
             {requiresDivision ? matchingQuantity / 1e18 : matchingQuantity}
+          </div>
+        );
+      },
+    },
+    {
+      title: 'CATA Rewards Earned',
+      align: 'center',
+      render: (_, record) => {
+        // Function to sum CATA rewards from BlockApps-Mercata-Escrow-assets
+        const sumCataRewardsFromAssets = (assets) => {
+          if (!Array.isArray(assets)) return 0;
+          return assets.reduce((sum, asset) => {
+            const escrow = asset['BlockApps-Mercata-Escrow'];
+            const cataReward = escrow?.totalCataReward || 0;
+            return sum + cataReward;
+          }, 0);
+        };
+
+        // Sum totalCataRewardIssued
+        let totalCataRewardsIssued = 0;
+
+        if (record?.inventories) {
+          totalCataRewardsIssued = record.inventories.reduce((sum, item) => {
+            const escrowAssets = item['BlockApps-Mercata-Escrow-assets'];
+            return sum + sumCataRewardsFromAssets(escrowAssets);
+          }, 0);
+        } else {
+          // If no inventories, check record['BlockApps-Mercata-Escrow-assets']
+          const recordAssets = record['BlockApps-Mercata-Escrow-assets'];
+          totalCataRewardsIssued = sumCataRewardsFromAssets(recordAssets);
+        }
+
+        // If these rewards also follow 18 decimals, apply division
+        const displayValue = totalCataRewardsIssued / 1e18;
+
+        return (
+          <div>
+            {displayValue.toLocaleString('en-US', {
+              maximumFractionDigits: 4,
+              minimumFractionDigits: 2,
+            })}
           </div>
         );
       },
@@ -370,7 +448,7 @@ export const stakeColumns = (
       title: 'Status',
       align: 'center',
       render: (text, record) => {
-        const matchingQuantity = record?.escrow?.[
+        const matchingQuantity = record?.[
           'BlockApps-Mercata-Escrow-assets'
         ]?.find((item) => item.value === record.address)
           ? record.quantity

@@ -469,6 +469,10 @@ const ProductDetails = ({ user, users }) => {
   );
   const linkUrl = window.location.href;
 
+  const is18DecimalPlaces = assetsWithEighteenDecimalPlaces.includes(
+    details?.originAddress
+  );
+
   return (
     <>
       {contextHolder}
@@ -648,23 +652,24 @@ const ProductDetails = ({ user, users }) => {
                     >
                       {details?.price || isStaked
                         ? (() => {
-                            
                             const adjustedPrice = details.price;
                             return (
                               <>
                                 $
                                 {isStaked
-                                  ? (
-                                      details.escrow?.maxLoanAmount
-                                    ).toFixed(2)
-                                  : adjustedPrice}
+                                  ? (details.escrow?.maxLoanAmount).toFixed(2)
+                                  : is18DecimalPlaces
+                                  ? adjustedPrice * Math.pow(10, 18)
+                                  : adjustedPrice.toFixed(2)}{' '}
                                 <span className="font-normal text-xs mr-2 text-primary">
                                   <b>
                                     (
                                     {isStaked
                                       ? details.escrow?.maxLoanAmount
-                                      : adjustedPrice.toFixed(2)}
-                                    USDST )
+                                      : is18DecimalPlaces
+                                      ? adjustedPrice * Math.pow(10, 18)
+                                      : adjustedPrice.toFixed(2)}{' '}
+                                    USDST)
                                   </b>
                                 </span>
                                 {isStakeable && (
@@ -1047,9 +1052,7 @@ const ProductDetails = ({ user, users }) => {
                         onChange={handleTimeFilterChange}
                         activeKey={timeFilter}
                       />
-                      <PriceChartAndStats
-                        priceHistory={priceHistory}
-                      />
+                      <PriceChartAndStats priceHistory={priceHistory} />
                     </div>
                   )}
                 <div>
@@ -1060,6 +1063,7 @@ const ProductDetails = ({ user, users }) => {
                       </h2>
                       <Statistics
                         priceHistory={priceHistory}
+                        is18DecimalPlaces={is18DecimalPlaces}
                       />
                     </>
                   )}

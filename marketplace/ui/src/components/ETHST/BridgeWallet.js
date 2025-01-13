@@ -171,7 +171,6 @@ const BridgeWalletModal = ({ open, handleCancel, accountDetails, signer }) => {
     <Modal
       open={open}
       onCancel={handleCancel}
-      title={`Bridge Wallet`}
       width={1000}
       footer={[
         <div className="flex justify-center md:block">

@@ -393,7 +393,7 @@ const Inventory = ({ user }) => {
           reserves.some(
             (reserve) => record.originAddress === reserve.assetRootAddress
           );
-        const borrowedAmount = (record?.escrow?.borrowedAmount || 0) / 100;
+        const borrowedAmount = (record?.escrow?.borrowedAmount || 0);
         const callDetailPage = () => {
           navigate(
             `${naviroute
@@ -436,10 +436,7 @@ const Inventory = ({ user }) => {
               <>
                 <div className="flex items-center gap-2">
                   Borrowed Amount: {USDSTIcon}
-                  {borrowedAmount.toLocaleString('en-US', {
-                    maximumFractionDigits: 2,
-                    minimumFractionDigits: 2,
-                  })}
+                  {borrowedAmount / Math.pow(10, 18)}
                 </div>
               </>
             )}
@@ -474,7 +471,7 @@ const Inventory = ({ user }) => {
                 <span>${price}</span>{' '}
                 <p className="flex text-xs items-center gap-1">
                   {' '}
-                  &nbsp;({price} {USDSTIcon}){' '}
+                  &nbsp;({price} {USDSTIcon})
                 </p>
               </>
             ) : (

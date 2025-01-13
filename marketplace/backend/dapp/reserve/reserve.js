@@ -248,7 +248,7 @@ async function getAll(user, options) {
 
     const tvl =
       activeEscrows && activeEscrows.length > 0
-        ? activeEscrows[0].sum / 10000
+        ? activeEscrows[0].sum / Math.pow(10, 18)
         : 0;
 
     const escrowTotalCataRewardSearchOptions = {
@@ -525,11 +525,11 @@ async function borrow(user, args, options) {
  * Repay
  */
 async function repay(user, args, options) {
-  const { reserve, ...restArgs } = args;
+  const { reserve, escrowAddress, USDSTAssetAddresses } = args;
   const callArgs = {
     contract: { address: reserve },
     method: 'repayLoan',
-    args: util.usc({ ...args }),
+    args: util.usc({ escrowAddress, usdstAssetAddresses:USDSTAssetAddresses}),
   };
 
   const reponse = await rest.call(user, callArgs, options);

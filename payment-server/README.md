@@ -2,6 +2,43 @@
 
 Official BlockApps Credit Card and ACH Payment Server | Powered by Stripe
 
+## PlantUML for docker-run.sh
+Paste the following to planttext.com to see the sequence diagram of docker-run.sh logic
+```plantuml
+@startuml
+start
+:Container started (similar for ORACLE_MODE=true|false);
+if (config.yaml exists in docker volume?) then (yes)
+  if (deploy.yaml exists in docker volume?) then (yes)
+    if (.deployed file exists?) then (yes)
+    else (no)
+      if (UPGRADE_CONTRACTS=true?) then (yes)
+        :yarn deactivate;
+        :yarn deploy;
+        :create .deployed;
+      else (no)
+      endif
+    endif
+  else (no)
+    #pink:Unexpected case - exit 2;
+    kill
+  endif;
+else (no)
+  :Generate config.yaml;
+  if (deploy.yaml exists in docker volume?) then (yes)
+    #pink:Unexpected case - exit 2;
+    kill
+  else (no)
+    :yarn deploy;
+    :create .deployed;
+  endif
+endif;
+#palegreen:yarn start;
+
+stop
+@enduml
+```
+
 ## Endpoints
 
 ##### GET `/ping`

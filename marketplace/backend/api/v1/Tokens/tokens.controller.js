@@ -34,7 +34,7 @@ class TokensController {
     try {
       const { dapp, body } = req;
 
-      EthController.validateAddHashArgs(body);
+      TokensController.validateAddHashArgs(body);
 
       const result = await dapp.addHash(body);
       rest.response.status200(res, result);
