@@ -17,7 +17,7 @@ async function submitPrice(token, contract, args) {
     method: "submitPrice",
     args: util.usc(args),
   };
-  await rest.call(token, callArgs, { config });
+  await rest.call(token, callArgs, { config, cacheNonce: true });
 }
 
 // Instead of calling rest.call directly, accumulate call arguments for distributeRewards
@@ -35,8 +35,28 @@ async function distributeRewards(token, contract, args) {
 async function runDistributeRewardsCalls(token) {
   if (distributeRewardsCallList.length > 0) {
     console.log("Executing batch callList for distributeRewards...");
-    await rest.callList(token, distributeRewardsCallList, { config });
-    console.log("Batch distributeRewards calls completed.");
+    let res;
+    try {
+      res = await rest.callList(token, distributeRewardsCallList, {
+        config,
+        cacheNonce: true,
+        isAsync: true,
+      });
+      // wait until there are no more PENDING results
+      const predicate = (results) =>
+          results.filter((r) => r.status === rest.PENDING).length === 0;
+      const action = async () =>
+          rest.getBlocResults(
+              token,
+              res.map((r) => r.hash),
+              {config}
+          );
+      await util.until(predicate, action, {config}, 300000);
+      console.log("Batch distributeRewards calls completed.");
+    } catch (error) {
+      console.error("Error executing batch distributeRewards calls:", error);
+      console.log("The hashes of distribute rewards transactions in a failed batch:", res.map((r) => r.hash));
+    }
   } else {
     console.log("No distributeRewards calls to execute.");
   }
@@ -313,4 +333,4 @@ async function main() {
   }
 }
 
-main();
+await main();
