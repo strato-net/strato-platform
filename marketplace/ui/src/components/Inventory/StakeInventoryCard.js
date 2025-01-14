@@ -229,7 +229,7 @@ const StakeInventoryCard = ({
             <div className="flex flex-row space-x-2 lg:justify-self-end whitespace-nowrap">
               <Typography className="lg:pt-1 flex gap-1">
                 Borrowed Amount: {USDSTIcon}
-                {borrowAmount / Math.pow(10, 18)}
+                {(borrowAmount / Math.pow(10, 18)).toFixed(2)}
               </Typography>
             </div>
           </div>

@@ -436,7 +436,7 @@ const Inventory = ({ user }) => {
               <>
                 <div className="flex items-center gap-2">
                   Borrowed Amount: {USDSTIcon}
-                  {borrowedAmount / Math.pow(10, 18)}
+                  {(borrowedAmount / Math.pow(10, 18)).toFixed(2)}
                 </div>
               </>
             )}
