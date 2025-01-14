@@ -388,9 +388,12 @@ async function main() {
 
   const oracleInterval = Number(config.oracleInterval) || 60000; // Default: 1 minute
   const saleInterval = Number(config.saleInterval) || 60000; // Default: 1 minute
+  const totalRunInterval = 60 * 1000; // 1 minutes
   const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
-  // Health check server
+  let lastOracleRun = 0;
+  let lastSaleRun = 0;
+
   const heartbeatServer = http.createServer((_, res) => {
     res.writeHead(200, { "Content-Type": "application/json" });
     res.end(JSON.stringify({ success: true, message: "pong" }));
@@ -403,18 +406,33 @@ async function main() {
   // Periodically fetch prices and update
   const runTasks = async () => {
     while (true) {
-      await Promise.all([
-        (async () => {
+      try {
+        // Check if it's time to run the oracle update
+        if (Date.now() - lastOracleRun >= oracleInterval) {
+          console.log("[Oracle] Running submitOraclePricePeriodically...");
           await submitOraclePricePeriodically(oracleInterval);
-          console.log(`[Oracle] Sleeping for ${oracleInterval} ms`);
-          await sleep(oracleInterval);
-        })(),
-        (async () => {
+          lastOracleRun = Date.now();
+        } else {
+          console.log("[Oracle] Skipping since interval not reached.");
+        }
+
+        // Check if it's time to run the sale price update
+        if (Date.now() - lastSaleRun >= saleInterval) {
+          console.log("[Sale] Running updateSalePricePeriodically...");
           await updateSalePricePeriodically();
-          console.log(`[Sale] Sleeping for ${saleInterval} ms`);
-          await sleep(saleInterval);
-        })(),
-      ]);
+          lastSaleRun = Date.now();
+        } else {
+          console.log("[Sale] Skipping since interval not reached.");
+        }
+      } catch (error) {
+        console.error("Error in main loop:", error);
+      } finally {
+        // Sleep to ensure the loop runs approximately every 1 minutes
+        console.log(
+          `Sleeping for ${totalRunInterval / 1000} seconds until next cycle...`
+        );
+        await sleep(totalRunInterval);
+      }
     }
   };
 
