@@ -278,7 +278,7 @@ const ListForSaleModal = ({
   const columns = () => {
     let finalColumns = [
       {
-        title: 'Payment Type (s)',
+        title: 'Payment Type(s)',
         align: 'center',
         render: () => (
           <Select
