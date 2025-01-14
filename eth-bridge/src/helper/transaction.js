@@ -30,8 +30,8 @@ const fetchParallelTransaction = async (payload) => {
  * @param {string} txHash - The transaction hash.
  * @returns {Object} - The transaction object.
  */
-const createTransactionObject = async (method, toAddress, value, txHash) => {
-  if (!method || !toAddress || !value || !txHash) {
+const createTransactionObject = async (method, toAddress, value, txHash, contractAddress) => {
+  if (!method || !toAddress || !value || !txHash || !contractAddress) {
     throw new Error("Invalid transaction parameters.");
   }
 
@@ -39,7 +39,7 @@ const createTransactionObject = async (method, toAddress, value, txHash) => {
   const queryResponse = await dbApiClient.get(
     `/BlockApps-Mercata-MercataETHBridge`,
     {
-      params: { isActive: `eq.true`, creator: `eq.BlockApps`, ['data->>isMint']: `eq.True` },
+      params: { address: `eq.${contractAddress}` },
     }
   );
   console.log("queryResponse", queryResponse);
@@ -82,17 +82,18 @@ const createTransactionPayload = async (
   receiverAddress,
   value,
   txHash,
-  method
+  method,
+  contractAddress
 ) => {
   try {
-    if (!receiverAddress || !value || !txHash || !method) {
+    if (!receiverAddress || !value || !txHash || !method || !contractAddress) {
       throw new Error("Invalid transaction details.");
     }
 
     // Create transaction payload dynamically
     const payload = {
       txs: [
-        await createTransactionObject(method, receiverAddress, value, txHash),
+        await createTransactionObject(method, receiverAddress, value, txHash, contractAddress),
       ],
       txParams: {
         gasLimit: 32100000000,
