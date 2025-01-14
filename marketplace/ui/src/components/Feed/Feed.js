@@ -14,7 +14,7 @@ import GlobalTransaction from './GlobalTransaction';
 const Feed = ({ user }) => {
   const [api, contextHolder] = notification.useNotification();
   const { stratsAddress, assetsWithEighteenDecimalPlaces } = useMarketplaceState();
-  const { ethstAddress } = useEthState();
+  const { ethstAddress, wbtcstAddress } = useEthState();
 
   const marketplaceDispatch = useMarketplaceDispatch();
   const ethDispatch = useEthDispatch();
@@ -24,6 +24,7 @@ const Feed = ({ user }) => {
       marketplaceActions.fetchStratsAddress(marketplaceDispatch);
       marketplaceActions.fetchAssetsWithEighteenDecimalPlaces(marketplaceDispatch);
       ethActions.fetchETHSTAddress(ethDispatch);
+      ethActions.fetchWBTCSTAddress(ethDispatch);
     };
 
     fetchAddresses();
@@ -48,6 +49,7 @@ const Feed = ({ user }) => {
           stratAddress={stratsAddress}
           assetsWithEighteenDecimalPlaces={assetsWithEighteenDecimalPlaces}
           ethstAddress={ethstAddress}
+          wbtcstAddress={wbtcstAddress}
         />
       )}
     </div>

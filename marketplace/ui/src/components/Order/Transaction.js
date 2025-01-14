@@ -36,6 +36,7 @@ const Transaction = ({ user }) => {
         marketplaceDispatch
       );
       await ethAcions.fetchETHSTAddress(ethDispatch);
+      await ethAcions.fetchWBTCSTAddress(ethDispatch);
       setStratAddress(stratAddress);
       setAssetsWithEighteenDecimalPlaces(assetsWithEighteenDecimalPlaces);
     };

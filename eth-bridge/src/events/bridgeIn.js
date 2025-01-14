@@ -7,7 +7,7 @@ const SLEEP_INCREMENT = 10;
 const DEFAULT_TIMEOUT = 120000;
 const ERC20_TRANSFER_SIGNATURE = "0xa9059cbb"; // Function selector for transfer(address,uint256)
 const MAINNET_WBTC_CONTRACT_ADDRESS = "0x2260FAC5E5542a773Aa44fBCfeDf7C193bc2C599".toLowerCase(); // Mainnet WBTC contract address
-const TESTNET_WBTC_CONTRACT_ADDRESS = "0x577D296678535e4903D59A4C929B718e1D575e0A".toLowerCase(); // Testnet WBTC contract address
+const TESTNET_WBTC_CONTRACT_ADDRESS = "0x55bCEAd50aAC94E443BD3dfDF44396194f7aA1E4".toLowerCase(); // Testnet WBTC contract address
 
 /**
  * Decodes the ERC-20 transfer data from the input.

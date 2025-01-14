@@ -44,6 +44,7 @@ const GlobalTransaction = ({
   stratAddress,
   assetsWithEighteenDecimalPlaces,
   ethstAddress,
+  wbtcstAddress,
 }) => {
   const StratsIcon = (
     <img src={Images.strat} alt="STRATs" className="mx-1 w-4 h-4" />
@@ -176,8 +177,14 @@ const GlobalTransaction = ({
 
   const handleAssetRedirection = (data) => {
     const isEthst = data?.assetOriginAddress === ethstAddress;
+    const isWbtcst = data?.assetOriginAddress === wbtcstAddress;
     if (isEthst) {
       const url = routes.EthstProductDetail.url;
+      navigate(`${url.replace(':address', data.assetAddress)}`, {
+        state: { isCalledFromInventory: false },
+      });
+    } else if (isWbtcst) {
+      const url = routes.WbtcstProductDetail.url;
       navigate(`${url.replace(':address', data.assetAddress)}`, {
         state: { isCalledFromInventory: false },
       });
@@ -473,6 +480,7 @@ const GlobalTransaction = ({
               stratAddress={stratAddress}
               assetsWithEighteenDecimalPlaces={assetsWithEighteenDecimalPlaces}
               ethstAddress={ethstAddress}
+              wbtcstAddress={wbtcstAddress}
             />
           </Row>
         </div>

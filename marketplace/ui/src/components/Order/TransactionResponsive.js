@@ -20,7 +20,7 @@ const TransactionResponsive = ({ data, user, stratAddress, assetsWithEighteenDec
   const StratsIcon = <img src={Images.strat} alt="" className="w-5 h-5" />;
   const navigate = useNavigate();
   const [expandedRows, setExpandedRows] = useState({});
-  const { ethstAddress } = useEthState();
+  const { ethstAddress, wbtcstAddress } = useEthState();
 
   const formatter = new Intl.NumberFormat('en-US');
   const formattedNum = (num) => formatter.format(num);
@@ -175,8 +175,14 @@ const TransactionResponsive = ({ data, user, stratAddress, assetsWithEighteenDec
 
           const handleAssetRedirection = () => {
             const isEthst = assetOriginAddress === ethstAddress;
+            const isWbtcst = assetOriginAddress === wbtcstAddress;
             if (isEthst) {
               const url = routes.EthstProductDetail.url;
+              navigate(`${url.replace(':address', assetAddress)}`, {
+                state: { isCalledFromInventory: false },
+              });
+            } else if (isWbtcst) {
+              const url = routes.WbtcstProductDetail.url;
               navigate(`${url.replace(':address', assetAddress)}`, {
                 state: { isCalledFromInventory: false },
               });

@@ -23,6 +23,7 @@ import AuthorizeIssuer from './components/AuthorizeIssuer';
 import { IssuerStatusProvider } from './contexts/issuerStatus';
 import ProductDetails from './components/MarketPlace/ProductDetails';
 import EthstProductDetails from './components/ETHST/EthstProductDetails';
+import WbtcstProductDetails from './components/ETHST/WbtcstProductDetails';
 import VaultDetails from './components/MarketPlace/VaultDetails';
 import Checkout from './components/MarketPlace/Checkout';
 import ConfirmOrder from './components/MarketPlace/ConfirmOrder';
@@ -195,6 +196,29 @@ const AuthenticatedRoutes = ({ user, users, isAuthenticated }) => {
                       <OrdersProvider>
                         <EthProvider>
                           <EthstProductDetails user={user} users={users} />
+                        </EthProvider>
+                      </OrdersProvider>
+                    </ItemsProvider>
+                  </InventoriesProvider>
+                </PaymentServicesProvider>
+              </SubCategorysProvider>
+            </CategorysProvider>
+          </UsersProvider>
+        }
+      />
+            <Route
+        exact
+        path={routes.WbtcstProductDetail.url}
+        element={
+          <UsersProvider>
+            <CategorysProvider>
+              <SubCategorysProvider>
+                <PaymentServicesProvider>
+                  <InventoriesProvider>
+                    <ItemsProvider>
+                      <OrdersProvider>
+                        <EthProvider>
+                          <WbtcstProductDetails user={user} users={users} />
                         </EthProvider>
                       </OrdersProvider>
                     </ItemsProvider>

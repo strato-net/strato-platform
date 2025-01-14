@@ -223,5 +223,6 @@ export const Escrow = {
 export const Eth = {
   prefix: '/eth',
   getETHSTAddress: '/address',
+  getWBTCSTAddress: '/wbtcstAddress',
   addHash: '/addHash',
 };

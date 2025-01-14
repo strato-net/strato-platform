@@ -84,6 +84,7 @@ const CategoryProductList = ({ user }) => {
 
   useEffect(() => {
     ethActions.fetchETHSTAddress(ethDispatch);
+    ethActions.fetchWBTCSTAddress(ethDispatch);
   });
 
   useEffect(() => {

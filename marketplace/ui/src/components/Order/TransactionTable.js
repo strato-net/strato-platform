@@ -78,7 +78,7 @@ const TransactionTable = ({ user, download, stratAddress, assetsWithEighteenDeci
   const [transactions, setTransactions] = useState(userTransactions);
   const [originAddress, setOriginAddress] = useState('');
   const [search, setSearch] = useState('');
-  const { ethstAddress } = useEthState();
+  const { ethstAddress, wbtcstAddress } = useEthState();
 
   const formatter = new Intl.NumberFormat('en-US');
   const formattedNum = (num) => formatter.format(num);
@@ -291,8 +291,14 @@ const TransactionTable = ({ user, download, stratAddress, assetsWithEighteenDeci
 
   const handleAssetRedirection = (data) => {
     const isEthst = data?.assetOriginAddress === ethstAddress;
+    const isWbtcst = data?.assetOriginAddress === wbtcstAddress;
     if (isEthst) {
       const url = routes.EthstProductDetail.url;
+      navigate(`${url.replace(':address', data.assetAddress)}`, {
+        state: { isCalledFromInventory: false },
+      });
+    } else if (isWbtcst) {
+      const url = routes.WbtcstProductDetail.url;
       navigate(`${url.replace(':address', data.assetAddress)}`, {
         state: { isCalledFromInventory: false },
       });

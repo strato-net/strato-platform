@@ -19,6 +19,7 @@ const GlobalTransactionResponsive = ({
   stratAddress,
   assetsWithEighteenDecimalPlaces,
   ethstAddress,
+  wbtcstAddress,
 }) => {
   const StratsIcon = (
     <img src={Images.strat} alt="STRATs" className="w-5 h-5" />
@@ -141,8 +142,14 @@ const GlobalTransactionResponsive = ({
 
               const handleAssetRedirection = () => {
                 const isEthst = assetOriginAddress === ethstAddress;
+                const isWbtcst = assetOriginAddress === wbtcstAddress;
                 if (isEthst) {
                   const url = routes.EthstProductDetail.url;
+                  navigate(`${url.replace(':address', assetAddress)}`, {
+                    state: { isCalledFromInventory: false },
+                  });
+                } else if (isWbtcst) {
+                  const url = routes.WbtcstProductDetail.url;
                   navigate(`${url.replace(':address', assetAddress)}`, {
                     state: { isCalledFromInventory: false },
                   });

@@ -68,7 +68,7 @@ const InventoryCard = ({
   const [bridgeModalOpen, setBridgeModalOpen] = useState(false);
   const [stakeModalOpen, setStakeModalOpen] = useState(false);
   const [popoverVisible, setPopoverVisible] = useState({});
-  const { ethstAddress } = useEthState();
+  const { ethstAddress, wbtcstAddress } = useEthState();
 
   const navigate = useNavigate();
   const naviroute = routes.InventoryDetail.url;
@@ -195,6 +195,10 @@ const InventoryCard = ({
 
   const callDetailPage = () => {
     if (inventory.originAddress === ethstAddress) {
+      navigate(`${ethNaviroute.replace(':address', inventory.address)}`, {
+        state: { isCalledFromInventory: false },
+      });
+    } else if (inventory.originAddress === wbtcstAddress) {
       navigate(`${ethNaviroute.replace(':address', inventory.address)}`, {
         state: { isCalledFromInventory: false },
       });

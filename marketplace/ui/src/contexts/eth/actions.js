@@ -7,6 +7,9 @@ const actionDescriptors = {
   fetchETHSTAddress: 'fetch_ethst_address',
   fetchETHSTAddressSuccessful: 'fetch_ethst_address_successful',
   fetchETHSTAddressFailed: 'fetch_ethst_address_failed',
+  fetchWBTCSTAddress: 'fetch_wbtcst_address',
+  fetchWBTCSTAddressSuccessful: 'fetch_wbtcst_address_successful',
+  fetchWBTCSTAddressFailed: 'fetch_wbtcst_address_failed',
   addHash: 'add_hash',
   addHashSuccessful: 'add_hash_successful',
   addHashFailed: 'add_hash_failed',
@@ -58,6 +61,48 @@ const actions = {
       dispatch({
         type: actionDescriptors.fetchETHSTAddressFailed,
         payload: 'Error while fetching ETHST address',
+      });
+      return null;
+    }
+  },
+
+  fetchWBTCSTAddress: async (dispatch) => {
+    dispatch({ type: actionDescriptors.fetchWBTCSTAddress });
+    try {
+      let response = await fetch(`${apiUrl}/eth/wbtcstAddress`, {
+        method: HTTP_METHODS.GET,
+        credentials: 'same-origin',
+      });
+
+      const body = await response.json();
+      if (
+        response.status === RestStatus.UNAUTHORIZED ||
+        response.status === RestStatus.FORBIDDEN
+      ) {
+        dispatch({
+          type: actionDescriptors.fetchWBTCSTAddressFailed,
+          payload: 'Error while fetching WBTCST address',
+        });
+        return null;
+      }
+
+      if (response.status === RestStatus.OK) {
+        dispatch({
+          type: actionDescriptors.fetchWBTCSTAddressSuccessful,
+          payload: body?.data,
+        });
+        return body.data;
+      }
+
+      dispatch({
+        type: actionDescriptors.fetchWBTCSTAddressFailed,
+        payload: 'Error while fetching WBTCST address',
+      });
+      return null;
+    } catch (err) {
+      dispatch({
+        type: actionDescriptors.fetchWBTCSTAddressFailed,
+        payload: 'Error while fetching WBTCST address',
       });
       return null;
     }

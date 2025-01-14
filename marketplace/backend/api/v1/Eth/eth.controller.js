@@ -17,9 +17,19 @@ class EthController {
   //     }
   //   }
 
-  static async getETHSTAddress(req, res, next) {
+  static async getETHSTAddress(_, res, next) {
     try {
       const address = await EthJs.getETHSTAddress();
+
+      return rest.response.status200(res, address);
+    } catch (e) {
+      return next(e);
+    }
+  }
+
+  static async getWBTCSTAddress(_, res, next) {
+    try {
+      const address = await EthJs.getWBTCSTAddress();
 
       return rest.response.status200(res, address);
     } catch (e) {

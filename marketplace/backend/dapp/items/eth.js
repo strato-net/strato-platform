@@ -250,6 +250,26 @@ function getETHSTAddress() {
   }
 }
 
+function getETHSTAddress() {
+  if (process.env.networkID === constants.prodNetworkId) {
+    return constants.prodETHSTAddress;
+  } else if (process.env.networkID === constants.testnetNetworkId) {
+    return constants.testnetETHSTAddress;
+  } else {
+    return constants.prodETHSTAddress;
+  }
+}
+
+function getWBTCSTAddress() {
+  if (process.env.networkID === constants.prodNetworkId) {
+    return constants.prodWBTCSTAddress;
+  } else if (process.env.networkID === constants.testnetNetworkId) {
+    return constants.testnetWBTCAddress;
+  } else {
+    return constants.prodWBTCSTAddress;
+  }
+}
+
 export default {
   uploadContract,
   contractName,
@@ -263,4 +283,5 @@ export default {
   marshalOut,
   getHistory,
   getETHSTAddress,
+  getWBTCSTAddress,
 };

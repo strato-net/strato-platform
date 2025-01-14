@@ -183,6 +183,7 @@ const Inventory = ({ user }) => {
     actions.fetchSupportedTokens(dispatch);
     categoryActions.fetchCategories(categoryDispatch);
     ethActions.fetchETHSTAddress(ethDispatch);
+    ethActions.fetchWBTCSTAddress(ethDispatch);
   }, []);
 
   useEffect(() => {

@@ -78,6 +78,16 @@ import 'swiper/css/autoplay';
 // import required modules
 import { EffectFade, Navigation, Pagination, Autoplay } from 'swiper/modules';
 
+const ERC20_ABI = [
+  {
+    constant: true,
+    inputs: [{ name: "_owner", type: "address" }],
+    name: "balanceOf",
+    outputs: [{ name: "balance", type: "uint256" }],
+    type: "function",
+  },
+];
+
 const ProductDetails = ({ user, users }) => {
   const [api, contextHolder] = notification.useNotification();
   const { Text, Paragraph, Title } = Typography;
@@ -132,7 +142,7 @@ const ProductDetails = ({ user, users }) => {
   }
 
   const routeMatch = useMatch({
-    path: routes.EthstProductDetail.url,
+    path: routes.WbtcstProductDetail.url,
     strict: true,
   });
 
@@ -183,7 +193,7 @@ const ProductDetails = ({ user, users }) => {
 
   const appKit = useAppKit();
   const rawAccount = useAppKitAccount();
-  const [ethBalance, setEthBalance] = useState(0);
+  const [wbtcBalance, setWbtcBalance] = useState(0);
   const [signer, setSigner] = useState({});
 
   const account = useMemo(() => {
@@ -193,14 +203,31 @@ const ProductDetails = ({ user, users }) => {
   useEffect(() => {
     const fetchBalance = async () => {
       if (account?.address) {
+        const wbtcAddress = fileServerUrl.includes("test")
+          ? "0x55bCEAd50aAC94E443BD3dfDF44396194f7aA1E4" // WBTC testnet contract
+          : "0x2260FAC5E5542a773Aa44fBCfeDf7C193bc2C599"; // WBTC mainnet contract
+  
         const provider = new ethers.providers.Web3Provider(window.ethereum);
-        const balanceWei = await provider.getBalance(account.address);
         const signer = provider.getSigner();
         setSigner(signer);
-        setEthBalance(ethers.utils.formatEther(balanceWei));
+  
+        // Create WBTC contract instance
+        const wbtcContract = new ethers.Contract(wbtcAddress, ERC20_ABI, provider);
+  
+        try {
+          // Get WBTC balance
+          const wbtcBalance = await wbtcContract.balanceOf(account.address);
+  
+          // WBTC has 8 decimals (like BTC), format accordingly
+          const formattedBalance = ethers.utils.formatUnits(wbtcBalance, 8); // 8 decimals for WBTC
+          console.log(`WBTC Balance: ${formattedBalance}`);
+          setWbtcBalance(formattedBalance); // Set WBTC balance
+        } catch (error) {
+          console.error("Failed to fetch WBTC balance:", error);
+        }
       }
     };
-
+  
     fetchBalance();
   }, [account]);
 
@@ -876,9 +903,9 @@ const ProductDetails = ({ user, users }) => {
           signer={signer}
           accountDetails={{
             walletAddress: account?.address,
-            balance: ethBalance,
+            balance: wbtcBalance,
           }}
-          tokenName="ETH"
+          tokenName="WBTC"
         />
       )}
       {borrowModalOpen && (

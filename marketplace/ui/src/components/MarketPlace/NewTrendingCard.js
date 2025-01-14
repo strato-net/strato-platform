@@ -32,7 +32,7 @@ const NewTrendingCard = ({
   const { Text } = Typography;
   const { stratsAddress, assetsWithEighteenDecimalPlaces } =
     useMarketplaceState();
-  const { ethstAddress } = useEthState();
+  const { ethstAddress, wbtcstAddress } = useEthState();
   const { hasChecked, isAuthenticated, loginUrl, user } =
     useAuthenticateState();
 
@@ -63,7 +63,7 @@ const NewTrendingCard = ({
   const ethNaviroute = routes.EthstProductDetail.url;
   const isAvailableForSale = !topSellingProduct.price || saleQuantity === 0;
   const isDisabled =
-    topSellingProduct.originAddress !== ethstAddress &&
+    topSellingProduct.originAddress !== ethstAddress && topSellingProduct.originAddress !== wbtcstAddress &&
     (isAvailableForSale || ownerSameAsUser());
 
   const queryParams = new URLSearchParams(location.search);
@@ -166,6 +166,14 @@ const NewTrendingCard = ({
               if (topSellingProduct.originAddress === ethstAddress) {
                 navigate(
                   `${ethNaviroute.replace(
+                    ':address',
+                    topSellingProduct.address
+                  )}`,
+                  { state: { isCalledFromInventory: false } }
+                );
+              } else if (topSellingProduct.originAddress === wbtcstAddress) {
+                navigate(
+                  `${routes.WbtcstProductDetail.url.replace(
                     ':address',
                     topSellingProduct.address
                   )}`,
@@ -274,7 +282,14 @@ const NewTrendingCard = ({
             className="truncate-html-content"
           ></div>
         </div>
-        <div className={`flex justify-between items-center bg-[#EEEFFA] p-2 rounded-[4px] ${topSellingProduct.originAddress === ethstAddress ? 'invisible' : ''}`}>
+        <div
+          className={`flex justify-between items-center bg-[#EEEFFA] p-2 rounded-[4px] ${
+            topSellingProduct.originAddress === ethstAddress ||
+            topSellingProduct.originAddress === wbtcstAddress
+              ? 'invisible'
+              : ''
+          }`}
+        >
           <Typography>Quantity:</Typography>
           <div className="flex gap-3 p-1 bg-white">
             <Typography
@@ -375,6 +390,14 @@ const NewTrendingCard = ({
                   )}`,
                   { state: { isCalledFromInventory: false } }
                 );
+              } else if (topSellingProduct.originAddress === wbtcstAddress) {
+                navigate(
+                  `${routes.WbtcstProductDetail.url.replace(
+                    ':address',
+                    topSellingProduct.address
+                  )}`,
+                  { state: { isCalledFromInventory: false } }
+                );
               } else {
                 if (
                   (await addItemToCart(topSellingProduct, quantity)) === true
@@ -385,7 +408,7 @@ const NewTrendingCard = ({
               }
             }}
           >
-            {topSellingProduct.originAddress === ethstAddress
+            {topSellingProduct.originAddress === ethstAddress || topSellingProduct.originAddress === wbtcstAddress
               ? 'Bridge'
               : 'Buy Now'}
           </Button>

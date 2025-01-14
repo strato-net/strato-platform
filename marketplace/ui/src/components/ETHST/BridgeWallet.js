@@ -6,7 +6,20 @@ import { useAuthenticateState } from '../../contexts/authentication';
 import { ethers } from 'ethers';
 import { fileServerUrl } from '../../helpers/constants';
 
-const BridgeWalletModal = ({ open, handleCancel, accountDetails, signer }) => {
+const ERC20_ABI = [
+  {
+    constant: false,
+    inputs: [
+      { name: "_to", type: "address" },
+      { name: "_value", type: "uint256" },
+    ],
+    name: "transfer",
+    outputs: [{ name: "", type: "bool" }],
+    type: "function",
+  },
+];
+
+const BridgeWalletModal = ({ open, handleCancel, accountDetails, signer, tokenName}) => {
   const [quantity, setQuantity] = useState(1);
   const [ loader, setLoader ] = useState(false);
   const ethDispatch = useEthDispatch();
@@ -15,8 +28,8 @@ const BridgeWalletModal = ({ open, handleCancel, accountDetails, signer }) => {
 
   const ethToMercataColumns = [
     {
-      title: 'ETH Available',
-      dataIndex: 'ethBalance',
+      title: `${tokenName} Available`,
+      dataIndex: 'balance',
       align: 'center',
     },
     {
@@ -79,7 +92,7 @@ const BridgeWalletModal = ({ open, handleCancel, accountDetails, signer }) => {
             Quantity Available
           </p>
           <div className="border border-[#d9d9d9] h-[42px] rounded-md flex items-center justify-center">
-            <p>{accountDetails.ethBalance}</p>
+            <p>{accountDetails.balance}</p>
           </div>
         </div>
         <div>
@@ -146,25 +159,57 @@ const BridgeWalletModal = ({ open, handleCancel, accountDetails, signer }) => {
 
   const handleSubmit = async () => {
     setLoader(true);
-    const tx = await signer.sendTransaction({
-      to: fileServerUrl.includes('test')
-        ? '0xBdAFaEBc08B94785dfE7Fc720Fbcd9aFc156454E'
-        : '0x3590039Cce30da23Fe434A39dFb3365Ecec03eAb',
-      value: ethers.utils.parseEther(quantity.toString()),
-    });
-
-    const body = {
-      userAddress: user.userAddress,
-      txHash: tx.hash,
-      amount: quantity.toString(),
-    };
-
-    let isDone = await ethActions.addHash(ethDispatch, body);
-
-    if (isDone) {
-      handleCancel();
+    let tx;
+    try {
+      if (tokenName === "WBTC") {
+        // WBTC contract address based on environment
+        const wbtcAddress = fileServerUrl.includes("test")
+          ? "0x55bCEAd50aAC94E443BD3dfDF44396194f7aA1E4"
+          : "0x2260FAC5E5542a773Aa44fBCfeDf7C193bc2C599";
+  
+        // Create ERC-20 contract instance
+        const wbtcContract = new ethers.Contract(wbtcAddress, ERC20_ABI, signer);
+  
+        // Convert quantity to smallest WBTC unit (8 decimals)
+        const wbtcAmount = ethers.utils.parseUnits(quantity.toString(), 8);
+  
+        // Send ERC-20 token transfer
+        tx = await wbtcContract.transfer(
+          fileServerUrl.includes("test")
+            ? "0xBdAFaEBc08B94785dfE7Fc720Fbcd9aFc156454E"
+            : "0x3590039Cce30da23Fe434A39dFb3365Ecec03eAb",
+          wbtcAmount
+        );
+  
+        console.log("WBTC transfer transaction hash:", tx.hash);
+      } else {
+        // ETH transfer logic (native transfer)
+        tx = await signer.sendTransaction({
+          to: fileServerUrl.includes("test")
+            ? "0xBdAFaEBc08B94785dfE7Fc720Fbcd9aFc156454E"
+            : "0x3590039Cce30da23Fe434A39dFb3365Ecec03eAb",
+          value: ethers.utils.parseEther(quantity.toString()), // Convert ETH to wei
+        });
+  
+        console.log("ETH transfer transaction hash:", tx.hash);
+      }
+  
+      const body = {
+        userAddress: user.userAddress,
+        txHash: tx.hash,
+        amount: quantity.toString(),
+      };
+  
+      let isDone = await ethActions.addHash(ethDispatch, body);
+  
+      if (isDone) {
+        handleCancel();
+      }
+    } catch (error) {
+      console.error("Transaction failed:", error);
+    } finally {
+      setLoader(false);
     }
-    setLoader(false);
   };
 
   return (
@@ -186,7 +231,7 @@ const BridgeWalletModal = ({ open, handleCancel, accountDetails, signer }) => {
       ]}
     >
       <Tabs defaultActiveKey="1">
-        <Tabs.TabPane tab="Bridge ETH to Mercata" key="1">
+        <Tabs.TabPane tab={`Bridge ${tokenName} to Mercata`} key="1">
           {ethToMercata()}
         </Tabs.TabPane>
         {/* <Tabs.TabPane tab="Bridge ETH to Base" key="2">
