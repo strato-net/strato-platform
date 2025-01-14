@@ -234,11 +234,7 @@ const BorrowModal = ({
   const loanableAmountDisplay = (loanableAmount / Math.pow(10,18)).toFixed(2);
 
   // Desired loan amount in USDST
-  const [desiredLoanAmount, setDesiredLoanAmount] = useState((loanableAmount/Math.pow(10,18) || 0));
-
-  const handleLoanAmountChange = (value) => {
-    setDesiredLoanAmount(value || 0);
-  };
+  const [desiredLoanAmount, setDesiredLoanAmount] = useState(((loanableAmount/Math.pow(10,18)).toFixed(2) || 0));
 
   useEffect(() => {
     if (
@@ -305,7 +301,7 @@ const BorrowModal = ({
             min={0}
             step={1}
             value={desiredLoanAmount}
-            onChange={handleLoanAmountChange}
+            onChange={(value) => setDesiredLoanAmount(value || 0)}
             className="w-full"
             precision={2}
             controls={false}

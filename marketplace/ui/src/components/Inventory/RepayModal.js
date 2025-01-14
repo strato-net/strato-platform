@@ -81,7 +81,6 @@ const RepayModal = ({
       const uniqueBorrowedAddresses = new Set();
       const borrowedAmount = inventory?.inventories
         ? inventory.inventories.reduce((sum, item) => {
-            console.log(item);
             const escrowAddress = item?.escrow?.address;
             const borrowedValue =
               item?.escrow?.borrowedAmount / Math.pow(10, 18) || 0;
@@ -94,7 +93,7 @@ const RepayModal = ({
 
             return sum;
           }, 0)
-        : inventory?.escrow?.borrowedAmount *
+        : (inventory?.escrow?.borrowedAmount / Math.pow(10, 18)) *
           (inventory?.quantity / totalCollateralQuantity);
       const USDSTBalance =
         Object.keys(USDST).length > 0 ? USDST * Math.pow(10, 18) : 0;
