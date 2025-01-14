@@ -10,7 +10,7 @@ async function deactivate(token, contract) {
       method: 'deactivate',
       args: {},
   };
-  await rest.call(token, callArgs, { config });
+  await rest.call(token, callArgs, { config, cacheNonce: true });
 }
 
 describe("Payment Server - deactivate contracts", function () {
