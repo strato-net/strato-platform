@@ -7,15 +7,32 @@ import config from "./load.config.js";
 import deployment from "./load.deploy.js";
 import oauthHelper from "./helpers/oauthHelper.js";
 
-
 // Global array to store all distributeRewards calls
 const distributeRewardsCallList = [];
 
+// Function to submit price to the oracle contract
 async function submitPrice(token, contract, args) {
   const callArgs = {
     contract,
     method: "submitPrice",
     args: util.usc(args),
+  };
+  await rest.call(token, callArgs, { config, cacheNonce: true });
+}
+
+// Function to update the price of the Asset Sale price
+async function updateMetalPrice(token, contractAddress, price) {
+  const callArgs = {
+    contract: {
+      address: contractAddress,
+    },
+    method: "update",
+    args: {
+      _quantity: 0,
+      _price: price,
+      _paymentServices: [],
+      _scheme: 2,
+    },
   };
   await rest.call(token, callArgs, { config, cacheNonce: true });
 }
@@ -44,18 +61,21 @@ async function runDistributeRewardsCalls(token) {
       });
       // wait until there are no more PENDING results
       const predicate = (results) =>
-          results.filter((r) => r.status === rest.PENDING).length === 0;
+        results.filter((r) => r.status === rest.PENDING).length === 0;
       const action = async () =>
-          rest.getBlocResults(
-              token,
-              res.map((r) => r.hash),
-              {config}
-          );
-      await util.until(predicate, action, {config}, 300000);
+        rest.getBlocResults(
+          token,
+          res.map((r) => r.hash),
+          { config }
+        );
+      await util.until(predicate, action, { config }, 3600000);
       console.log("Batch distributeRewards calls completed.");
     } catch (error) {
       console.error("Error executing batch distributeRewards calls:", error);
-      console.log("The hashes of distribute rewards transactions in a failed batch:", res.map((r) => r.hash));
+      console.log(
+        "The hashes of distribute rewards transactions in a failed batch:",
+        res.map((r) => r.hash)
+      );
     }
   } else {
     console.log("No distributeRewards calls to execute.");
@@ -142,7 +162,7 @@ async function fetchAndSubmitEscrowAddresses(oracleContract, token) {
 }
 
 // Function to fetch and submit price
-async function fetchAndSubmitMetalPrice(metal, apiKey, oracleContract, token) {
+async function fetchMetalPrice(metal, apiKey) {
   try {
     const apiUrl = `https://api.metals.dev/v1/metal/spot?metal=${metal}&api_key=${apiKey}&currency=USD&unit=toz`;
     const response = await axios.get(apiUrl);
@@ -152,13 +172,9 @@ async function fetchAndSubmitMetalPrice(metal, apiKey, oracleContract, token) {
     const timestampInSeconds = Math.floor(Date.now() / 1000);
     console.log(`Current Timestamp: ${timestampInSeconds}`);
 
-    await submitPrice(token, oracleContract, {
-      price: metalPrice,
-      timestamp: timestampInSeconds,
-    });
-    console.log(`Price submitted for ${metal} at ${new Date().toISOString()}`);
+    return { price: metalPrice, timestampInSeconds };
   } catch (error) {
-    console.error(`ERROR: Failed to submit price for ${metal}:`, error);
+    console.error(`ERROR: Failed to fetch price for ${metal}:`, error);
   }
 }
 
@@ -168,7 +184,7 @@ async function fetchAndSubmitETHPrice(
   apiKey,
   oracleContract,
   token,
-  fetchInterval
+  oracleInterval
 ) {
   try {
     const apiUrl = `https://api.g.alchemy.com/prices/v1/${apiKey}/tokens/historical`;
@@ -179,7 +195,7 @@ async function fetchAndSubmitETHPrice(
     // Define the request body
     const requestBody = {
       symbol: metal,
-      startTime: Math.floor((currentTimeMs - fetchInterval) / 1000),
+      startTime: Math.floor((currentTimeMs - oracleInterval) / 1000),
       endTime: Math.floor(currentTimeMs / 1000),
       interval: "1h",
     };
@@ -253,7 +269,113 @@ function calculateTWAP(prices) {
   return totalWeightedPrice / totalWeight;
 }
 
-// Main function to handle periodic fetching and submission
+// Function to submit oracle prices periodically
+const submitOraclePricePeriodically = async (oracleInterval) => {
+  const token = await oauthHelper.getServiceToken();
+
+  for (const [key, oracle] of Object.entries(deployment.contracts)) {
+    console.log(`[Oracle Update] Processing oracle: ${key}`);
+
+    if (!oracle.metal || !oracle.address) {
+      console.warn(`[Oracle WARN] Skipping invalid oracle ${key}`);
+      continue;
+    }
+
+    try {
+      if (oracle.metal === "ETH") {
+        await fetchAndSubmitETHPrice(
+          oracle.metal,
+          process.env.ALCHEMY_API_KEY,
+          oracle,
+          token,
+          oracleInterval
+        );
+      } else if (oracle.metal === "USD") {
+        await submitPrice(token, oracle, {
+          price: 1 / 1e18,
+          timestamp: Math.floor(Date.now() / 1000),
+        });
+      } else {
+        const metalResult = await fetchMetalPrice(
+          oracle.metal.toLowerCase(),
+          process.env.METALS_API_KEY
+        );
+
+        if (metalResult) {
+          await submitPrice(token, oracle, {
+            price: metalResult.price,
+            timestamp: metalResult.timestampInSeconds,
+          });
+          console.log(
+            `[Oracle Update] Price submitted for ${
+              oracle.metal
+            } at ${new Date().toISOString()}`
+          );
+        }
+      }
+
+      await fetchAndSubmitEscrowAddresses(oracle, token);
+    } catch (error) {
+      console.error(`[Oracle ERROR] Failed to process oracle ${key}:`, error);
+    }
+  }
+
+  await runDistributeRewardsCalls(token);
+};
+
+// Function to update sale prices periodically
+const updateSalePricePeriodically = async () => {
+  const token = await oauthHelper.getMetalsServiceToken();
+  for (const asset of config.assets) {
+    const addresses = asset ? asset.addresses.split(",") : [];
+    for (const address of addresses) {
+      try {
+        const searchOptions = {
+          config,
+          query: {
+            address: "eq." + address,
+            select: "sale,name",
+          },
+        };
+
+        const assetResult = await rest.search(
+          token,
+          { name: "BlockApps-Mercata-Asset" },
+          searchOptions
+        );
+
+        if (!assetResult.sale) {
+          console.warn(`[Sale Update] Skipping invalid asset ${address}`);
+          continue;
+        }
+
+        const metalResult = await fetchMetalPrice(
+          asset.name.toLowerCase(),
+          process.env.METALS_API_KEY
+        );
+
+        await updateMetalPrice(
+          token,
+          assetResult.sale,
+          (assetResult.name.toLowerCase().includes("gm")
+            ? metalResult.price / 28.3495
+            : metalResult.price
+          ).toFixed(2)
+        );
+        console.log(
+          `[Sale Update] Price updated for asset: ${address} at ${new Date().toISOString()}`
+        );
+      } catch (error) {
+        console.error(
+          `[Sale ERROR] Failed to update sale price for asset ${address}:`,
+          error
+        );
+      }
+    }
+  }
+};
+
+// Main function to run the tasks concurrently
 async function main() {
   assert.isDefined(
     process.env.METALS_API_KEY,
@@ -264,73 +386,39 @@ async function main() {
     "API key for Alchemy API is missing. Set in .env"
   );
 
-  const { contracts } = deployment;
-  const fetchInterval = Number(config.fetchInterval) || 60000; // Default: 1 minute
+  const oracleInterval = Number(config.oracleInterval) || 60000; // Default: 1 minute
+  const saleInterval = Number(config.saleInterval) || 60000; // Default: 1 minute
   const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
-  const submitPricePeriodically = async () => {
-    const token = await oauthHelper.getServiceToken();
-
-    for (const [key, oracle] of Object.entries(contracts)) {
-      console.log(`Processing oracle: ${key}`);
-
-      if (!oracle.metal || !oracle.address) {
-        console.warn(`WARN: Skipping invalid oracle ${key}`);
-        continue;
-      }
-
-      try {
-        const metal = oracle.metal;
-        console.log(`Fetching price for ${metal}`);
-
-        if (metal === "ETH") {
-          await fetchAndSubmitETHPrice(
-            metal,
-            process.env.ALCHEMY_API_KEY,
-            oracle,
-            token,
-            fetchInterval
-          );
-        } else if (metal === "USD") {
-          await submitPrice(token, oracle, {
-            price: 1 / 1e18,
-            timestamp: Math.floor(Date.now() / 1000),
-          });
-        } else {
-          await fetchAndSubmitMetalPrice(
-            metal.toLowerCase(),
-            process.env.METALS_API_KEY,
-            oracle,
-            token
-          );
-        }
-
-        await fetchAndSubmitEscrowAddresses(oracle, token);
-      } catch (error) {
-        console.error(`ERROR: Failed to process oracle ${key}:`, error);
-      }
-    }
-
-    // After processing all oracles and collecting distributeRewards calls, run them at once
-    await runDistributeRewardsCalls(token);
-  };
-  
-  // Run the heartbeat ping-pong server for health check
-  // TODO: in future extend this to include more health checks, e.g. if one of oracles is failing (flag rules based on global vars)
-  const heartbeatServer = http.createServer((req, res) => {
-    res.writeHead(200, { 'Content-Type': 'application/json' });
-    res.end(JSON.stringify({success: true, message: 'pong'}));
+  // Health check server
+  const heartbeatServer = http.createServer((_, res) => {
+    res.writeHead(200, { "Content-Type": "application/json" });
+    res.end(JSON.stringify({ success: true, message: "pong" }));
   });
-  const port = process.env.PORT || 8018
+  const port = process.env.PORT || 8018;
   heartbeatServer.listen(port, () => {
     console.log(`Heartbeat server started on port ${port}.`);
   });
-  
-  while (true) {
-    await submitPricePeriodically(); // Immediate first run
-    console.log(`Sleeping for ${fetchInterval} ms`);
-    await sleep(fetchInterval);
-  }
+
+  // Periodically fetch prices and update
+  const runTasks = async () => {
+    while (true) {
+      await Promise.all([
+        (async () => {
+          await submitOraclePricePeriodically(oracleInterval);
+          console.log(`[Oracle] Sleeping for ${oracleInterval} ms`);
+          await sleep(oracleInterval);
+        })(),
+        (async () => {
+          await updateSalePricePeriodically();
+          console.log(`[Sale] Sleeping for ${saleInterval} ms`);
+          await sleep(saleInterval);
+        })(),
+      ]);
+    }
+  };
+
+  await runTasks();
 }
 
 await main();
