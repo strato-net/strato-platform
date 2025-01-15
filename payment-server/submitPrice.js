@@ -6,6 +6,7 @@ import http from "http";
 import config from "./load.config.js";
 import deployment from "./load.deploy.js";
 import oauthHelper from "./helpers/oauthHelper.js";
+import flagFile from "./helpers/flagFile.js";
 
 // Global array to store all distributeRewards calls
 const distributeRewardsCallList = [];
@@ -76,6 +77,7 @@ async function runDistributeRewardsCalls(token) {
         "The hashes of distribute rewards transactions in a failed batch:",
         res.map((r) => r.hash)
       );
+      await flagFile.appendToErrorFile(`Error executing batch distributeRewards calls: ${error}`);
     }
   } else {
     console.log("No distributeRewards calls to execute.");
@@ -175,6 +177,7 @@ async function fetchMetalPrice(metal, apiKey) {
     return { price: metalPrice, timestampInSeconds };
   } catch (error) {
     console.error(`ERROR: Failed to fetch price for ${metal}:`, error);
+    await flagFile.appendToErrorFile(`Failed to fetch price for ${metal}: ${error}`);
   }
 }
 
@@ -246,6 +249,7 @@ async function fetchAndSubmitETHPrice(
     );
   } catch (error) {
     console.error("ETH TWAP calculation and submission failed:", error);
+    await flagFile.appendToErrorFile(`ETH TWAP calculation and submission failed: ${error}`);
     throw error;
   }
 }
@@ -317,6 +321,7 @@ const submitOraclePricePeriodically = async (oracleInterval) => {
       await fetchAndSubmitEscrowAddresses(oracle, token);
     } catch (error) {
       console.error(`[Oracle ERROR] Failed to process oracle ${key}:`, error);
+      await flagFile.appendToErrorFile(`Failed to process oracle ${key}: ${error}`);
     }
   }
 
@@ -370,6 +375,7 @@ const updateSalePricePeriodically = async () => {
           `[Sale ERROR] Failed to update sale price for asset ${address}:`,
           error
         );
+        await flagFile.appendToErrorFile(`Failed to update sale price for asset ${address}: ${error}`);
       }
     }
   }
@@ -394,9 +400,16 @@ async function main() {
   let lastOracleRun = 0;
   let lastSaleRun = 0;
 
-  const heartbeatServer = http.createServer((_, res) => {
-    res.writeHead(200, { "Content-Type": "application/json" });
-    res.end(JSON.stringify({ success: true, message: "pong" }));
+  const heartbeatServer = http.createServer(async (_, res) => {
+    const errorFlagRaised = await flagFile.isErrorFlagRaised();
+    if (!errorFlagRaised) {
+      res.writeHead(200, { "Content-Type": "application/json" });
+      res.end(JSON.stringify({ success: true, message: "pong" }));
+    } else {
+      res.writeHead(500, { "Content-Type": "application/json" });
+      res.end(JSON.stringify({ success: false, message: "server error, check errors" }));
+    }
+    
   });
   const port = process.env.PORT || 8018;
   heartbeatServer.listen(port, () => {
@@ -426,6 +439,7 @@ async function main() {
         }
       } catch (error) {
         console.error("Error in main loop:", error);
+        await flagFile.appendToErrorFile(`Error in main loop: ${error}`);
       } finally {
         // Sleep to ensure the loop runs approximately every 1 minutes
         console.log(
