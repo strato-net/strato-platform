@@ -27,13 +27,20 @@ async function createStratoUser(accessToken) {
   }
 }
 
-const getMetalsServiceToken = async () => {
+const getUserToken = async (username, password) => {
   // Fetch a new token using Resource Owner Password Credentials
   const tokenObj = await oauth.getAccessTokenByResourceOwnerCredential(
-    process.env.METALS_USERNAME,
-    process.env.METALS_PASSWORD
+    username,
+    password
   );
-  return tokenObj.token[oauthInit.tokenField];
+  return {
+    token:
+      tokenObj.token[
+        config.nodes[0].oauth.tokenField
+          ? config.nodes[0].oauth.tokenField
+          : "access_token"
+      ],
+  };
 };
 
 const getServiceToken = async () => {
@@ -53,5 +60,5 @@ export default {
   getEmailIdFromToken,
   createStratoUser,
   getServiceToken,
-  getMetalsServiceToken,
+  getUserToken,
 };

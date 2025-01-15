@@ -31,7 +31,9 @@ async function updateMetalPrice(token, contractAddress, price) {
     args: {
       _quantity: 0,
       _price: price,
-      _paymentServices: [],
+      _paymentServices: [
+        { creator: "", serviceName: "" },
+      ],
       _scheme: 2,
     },
   };
@@ -330,7 +332,7 @@ const submitOraclePricePeriodically = async (oracleInterval) => {
 
 // Function to update sale prices periodically
 const updateSalePricePeriodically = async () => {
-  const token = await oauthHelper.getMetalsServiceToken();
+  const token = await oauthHelper.getUserToken(process.env.METALS_USERNAME, process.env.METALS_PASSWORD);
   for (const asset of config.assets) {
     const addresses = asset ? asset.addresses.split(",") : [];
     for (const address of addresses) {
@@ -349,7 +351,7 @@ const updateSalePricePeriodically = async () => {
           searchOptions
         );
 
-        if (!assetResult.sale) {
+        if (!assetResult[0]?.sale) {
           console.warn(`[Sale Update] Skipping invalid asset ${address}`);
           continue;
         }
@@ -361,8 +363,8 @@ const updateSalePricePeriodically = async () => {
 
         await updateMetalPrice(
           token,
-          assetResult.sale,
-          (assetResult.name.toLowerCase().includes("gm")
+          assetResult[0]?.sale,
+          (assetResult[0]?.name.toLowerCase().includes("gm")
             ? metalResult.price / 28.3495
             : metalResult.price
           ).toFixed(2)
