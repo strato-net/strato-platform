@@ -3,9 +3,7 @@ import {
   notification,
   Spin,
   Modal,
-  Select,
   Col,
-  Card,
   Radio,
   Button,
 } from 'antd';
@@ -25,8 +23,6 @@ import TagManager from 'react-gtm-module';
 import { setCookie } from '../../helpers/cookie';
 import { generateHtmlContent } from '../../helpers/emailTemplate';
 import { PAYMENT_LABEL } from '../../helpers/constants';
-
-const { Option } = Select;
 
 const ConfirmOrder = ({ paymentServices = [], data, columns }) => {
   const marketplaceDispatch = useMarketplaceDispatch();

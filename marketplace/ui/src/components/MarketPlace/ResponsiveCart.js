@@ -1,16 +1,10 @@
-import {
-  Button,
-  Row,
-  Typography,
-  InputNumber,
-  Select,
-  Spin,
-  Col,
-  Radio,
-} from 'antd';
+import { Button, Typography, InputNumber, Radio } from 'antd';
 import { useState, useEffect } from 'react';
 import { Images } from '../../images';
-import { useMarketplaceDispatch } from '../../contexts/marketplace';
+import {
+  useMarketplaceDispatch,
+  useMarketplaceState,
+} from '../../contexts/marketplace';
 import { useAuthenticateState } from '../../contexts/authentication';
 import TagManager from 'react-gtm-module';
 import { actions } from '../../contexts/marketplace/actions';
@@ -18,8 +12,7 @@ import { actions as orderActions } from '../../contexts/order/actions';
 import { useOrderDispatch, useOrderState } from '../../contexts/order';
 import { generateHtmlContent } from '../../helpers/emailTemplate';
 import { PAYMENT_LABEL } from '../../helpers/constants';
-
-const { Option } = Select;
+import BigNumber from 'bignumber.js';
 
 const ResponsiveCart = ({
   paymentServices,
@@ -47,13 +40,12 @@ const ResponsiveCart = ({
     activePaymentProviders?.length !== 0 ? activePaymentProviders[0] : '';
   const [selectedProvider, setSelectedProvider] = useState(initialPaymentState);
   const marketplaceDispatch = useMarketplaceDispatch();
+  const { assetsWithEighteenDecimalPlaces } = useMarketplaceState();
   const [tax, setTax] = useState(0);
   const [subTotal, setSubTotal] = useState(0);
   const [total, setTotal] = useState(0);
   const orderDispatch = useOrderDispatch();
   let { hasChecked, isAuthenticated, loginUrl, user } = useAuthenticateState();
-  const { isCreatePaymentSubmitting, isCreateOrderSubmitting } =
-    useOrderState();
   const userOrganization = user?.organization;
   const [cartData, setCartData] = useState(data);
   const [faqOpenState, setFaqOpenState] = useState(
@@ -103,9 +95,7 @@ const ResponsiveCart = ({
 
       concatenatedOrderString += `${itemName}:\n`;
       concatenatedOrderString += `$${itemTotal} <br>`;
-      concatenatedOrderString += `Qty: ${itemQty} &nbsp; $${itemPrice} each (${(
-        itemPrice
-      )} ' USDST'})<br><br>`;
+      concatenatedOrderString += `Qty: ${itemQty} &nbsp; $${itemPrice} each (${itemPrice} ' USDST'})<br><br>`;
       orderTotal += parseFloat(itemTotal);
       if (i === cartData.length - 1) {
         concatenatedOrderString += `<hr style="border-top: 1px dotted #0A1B71; min-width: 80%; max-width: 80%; margin-left: 15px;">`;
@@ -124,12 +114,24 @@ const ResponsiveCart = ({
   const handlePaymentConfirm = async (paymentService) => {
     actions.addItemToConfirmOrder(marketplaceDispatch, cartData);
     let orderList = [];
+
     cartData.forEach((item) => {
+      const is18DecimalPlaces = assetsWithEighteenDecimalPlaces.includes(
+        item.key
+      );
+
+      const quantity = new BigNumber(item.qty);
+      const unitPrice = new BigNumber(item.unitPrice);
+
       orderList.push({
-        quantity: `${item.qty}`,
+        quantity: is18DecimalPlaces
+          ? quantity.multipliedBy(new BigNumber(10).pow(18)).toString()
+          : quantity.toString(),
         assetAddress: item.key,
         firstSale: item.firstSale,
-        unitPrice: item.unitPrice,
+        unitPrice: is18DecimalPlaces
+          ? unitPrice.dividedBy(new BigNumber(10).pow(18)).toFixed(18)
+          : unitPrice.toFixed(18),
       });
     });
 

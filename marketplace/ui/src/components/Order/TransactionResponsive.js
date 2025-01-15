@@ -22,7 +22,7 @@ const TransactionResponsive = ({
   stratAddress,
   assetsWithEighteenDecimalPlaces,
 }) => {
-  const USDSTIcon = <img src={Images.USDST} alt="" className="w-5 h-5" />;
+  const USDSTIcon = <img src={Images.USDST} alt="" className="w-5 h-5 ml-1" />;
   const navigate = useNavigate();
   const [expandedRows, setExpandedRows] = useState({});
   const { ethstAddress } = useEthState();
@@ -265,8 +265,7 @@ const TransactionResponsive = ({
                 </Button>
                 {price ? (
                   <p className={`text-right flex justify-end items-center`}>
-                    ${formattedNum(price)} ({formattedNum(price)}
-                    {USDSTIcon})
+                    ${formattedNum(price)} ({formattedNum(price)} {USDSTIcon})
                   </p>
                 ) : (
                   <p className="text-right text-[#13188A] font-bold text-sm">

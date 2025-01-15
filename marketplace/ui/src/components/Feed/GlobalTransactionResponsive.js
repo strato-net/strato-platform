@@ -20,7 +20,7 @@ const GlobalTransactionResponsive = ({
   assetsWithEighteenDecimalPlaces,
   ethstAddress,
 }) => {
-  const USDSTIcon = <img src={Images.USDST} alt="USDST" className="w-5 h-5" />;
+  const USDSTIcon = <img src={Images.USDST} alt="USDST" className="w-5 h-5 ml-1" />;
   const navigate = useNavigate();
   const [expandedRows, setExpandedRows] = useState({});
 

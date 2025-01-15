@@ -326,7 +326,7 @@ const BorrowModal = ({
 
     const body = {
       escrowAddresses: escrows,
-      borrowAmount: loanAmount.multipliedBy(new BigNumber(10).pow(18)).toString(),
+      borrowAmount: loanAmount.multipliedBy(new BigNumber(10).pow(18)).toFixed(0),
       reserve: matchedReserve?.address,
     };
 
