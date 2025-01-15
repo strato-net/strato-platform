@@ -23,6 +23,8 @@ async function submitPrice(token, contract, args) {
 
 // Function to update the price of the Asset Sale price
 async function updateMetalPrice(token, contractAddress, price) {
+  const priceMarkup = process.env.METALS_PRICE_MARKUP || "1"; // Default to "1" if undefined
+  const parsedPriceMarkup = parseFloat(priceMarkup);
   const callArgs = {
     contract: {
       address: contractAddress,
@@ -30,10 +32,8 @@ async function updateMetalPrice(token, contractAddress, price) {
     method: "update",
     args: {
       _quantity: 0,
-      _price: price,
-      _paymentServices: [
-        { creator: "", serviceName: "" },
-      ],
+      _price: (price * parsedPriceMarkup).toFixed(2),
+      _paymentServices: [{ creator: "", serviceName: "" }],
       _scheme: 2,
     },
   };
@@ -364,10 +364,9 @@ const updateSalePricePeriodically = async () => {
         await updateMetalPrice(
           token,
           assetResult[0]?.sale,
-          (assetResult[0]?.name.toLowerCase().includes("gm")
+          assetResult[0]?.name.toLowerCase().includes("gm")
             ? metalResult.price / 28.3495
             : metalResult.price
-          ).toFixed(2)
         );
         console.log(
           `[Sale Update] Price updated for asset: ${address} at ${new Date().toISOString()}`
