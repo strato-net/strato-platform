@@ -135,6 +135,7 @@ const RepayModal = ({
 
     const repayed = await inventoryActions.repay(inventoryDispatch, body);
     if (repayed) {
+      handleCancel();
       if (productDetailPage) {
         await inventoryActions.fetchInventoryDetail(
           inventoryDispatch,
@@ -156,7 +157,6 @@ const RepayModal = ({
         await inventoryActions.getUserCataRewards(inventoryDispatch);
       }
       await marketplaceActions.fetchUSDSTBalance(marketplaceDispatch);
-      handleCancel();
     }
   };
 

@@ -218,7 +218,7 @@ const BorrowModal = ({
   // collateralValue is displayed as `collateralValue / 10000`
   // borrowedAmount and loanableAmount as `... / 100`
   // We'll keep the same formatting after scaling by 1e18.
-  const LTV = matchedReserve.name.toLowerCase().includes('ethst') ? 0.3 : 0.5;
+  const LTV = matchedReserve?.name.toLowerCase().includes('ethst') ? 0.3 : 0.5;
   const maxBorrowableAmount = Math.floor(collateralValue * LTV);
   const loanableAmount =
     maxBorrowableAmount >= borrowedAmount
@@ -332,6 +332,7 @@ const BorrowModal = ({
 
     const borrowed = await inventoryActions.borrow(inventoryDispatch, body);
     if (borrowed) {
+      handleCancel();
       if (productDetailPage) {
         await inventoryActions.fetchInventoryDetail(
           inventoryDispatch,
@@ -353,7 +354,6 @@ const BorrowModal = ({
       await inventoryActions.getAllReserve(inventoryDispatch);
       await inventoryActions.getUserCataRewards(inventoryDispatch);
       await marketplaceActions.fetchUSDSTBalance(marketplaceDispatch);
-      handleCancel();
     }
   };
 
