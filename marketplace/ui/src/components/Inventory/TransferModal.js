@@ -365,8 +365,8 @@ const TransferModal = ({
         ? transfer.quantity.multipliedBy(new BigNumber(10).pow(18))
         : transfer.quantity
       )
-        .integerValue(BigNumber.ROUND_DOWN)
-        .toFixed(0),
+        .decimalPlaces(0, BigNumber.ROUND_DOWN)
+        .toString(),
       price: isStrat
         ? transfer.price / 100
         : is18DecimalPlaces
