@@ -79,7 +79,7 @@ const TransferModal = ({
     // Calculate allocated quantity from previous transfers
     const allocatedQuantity = transfers.reduce(
       (total, transfer) =>
-        new BigNumber(total).plus(new BigNumber(transfer.quantity || 0)),
+        new BigNumber(total).plus(transfer.quantity || 0),
       new BigNumber(0)
     );
 
@@ -366,7 +366,7 @@ const TransferModal = ({
         : transfer.quantity
       )
         .decimalPlaces(0, BigNumber.ROUND_DOWN)
-        .toString(),
+        .toFixed(0),
       price: isStrat
         ? transfer.price / 100
         : is18DecimalPlaces
