@@ -135,7 +135,7 @@ abstract contract Reserve is Utils, Structs {
             _borrowAmount,
             true,
             transferNumber,
-            0.0001
+            1/(10**18)
         );
         
         // Update borrowed amount in escrow
@@ -165,11 +165,11 @@ abstract contract Reserve is Utils, Structs {
             transferAmount = usdstQuantity >= usdstAmountNet ? usdstAmountNet : usdstQuantity;
             usdstAsset.attachSale();
             if (usdstQuantity > usdstAmountNet) {
-                usdstAsset.transferOwnership(owner, usdstAmountNet, false, transferNumber, 0.0001);
+                usdstAsset.transferOwnership(owner, usdstAmountNet, false, transferNumber, 1/(10**18));
                 usdstAsset.closeSale();
                 usdstAmountNet = 0;
             } else {
-                usdstAsset.transferOwnership(owner, usdstQuantity, false, transferNumber, 0.0001);
+                usdstAsset.transferOwnership(owner, usdstQuantity, false, transferNumber, 1/(10**18));
                 usdstAmountNet -= usdstQuantity;
             }
 

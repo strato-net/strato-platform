@@ -81,14 +81,14 @@ const HeaderComponent = ({
   let { isAuthenticated } = useAuthenticateState();
 
   useEffect(() => {
+    marketplaceActions.fetchAssetsWithEighteenDecimalPlaces(
+      marketplaceDispatch
+    );
     if (user) {
       marketplaceActions.fetchUSDSTBalance(marketplaceDispatch);
       marketplaceActions.fetchCataBalance(marketplaceDispatch);
       marketplaceActions.fetchUSDSTAddress(marketplaceDispatch);
       marketplaceActions.fetchCataAddress(marketplaceDispatch);
-      marketplaceActions.fetchAssetsWithEighteenDecimalPlaces(
-        marketplaceDispatch
-      );
     }
   }, [user]);
 

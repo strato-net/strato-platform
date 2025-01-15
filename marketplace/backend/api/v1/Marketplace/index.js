@@ -85,7 +85,7 @@ router.get(
 
 router.get(
   Marketplace.get18DecimalPlaces,
-  authHandler.authorizeRequest(),
+  authHandler.authorizeRequest(true),
   loadDapp,
   MarketplaceController.get18DecimalPlaces
 );
