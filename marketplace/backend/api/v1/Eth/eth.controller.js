@@ -57,6 +57,7 @@ class EthController {
       userAddress: Joi.string().required(),
       txHash: Joi.string().required(),
       amount: Joi.string().required(),
+      tokenName: Joi.string().required(),
     });
 
     const validation = addHashSchema.validate(args);

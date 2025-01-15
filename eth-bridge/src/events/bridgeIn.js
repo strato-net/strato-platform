@@ -1,40 +1,36 @@
 const { dbApiClient } = require("../helper/apiClient");
-const { mintAndTransfer } = require("../config");
+const { mintAndTransfer, wbtcContractAddress, blockAppsPublicKey } = require("../config");
 const { createTransactionPayload } = require("../helper/transaction");
+const { ethers } = require("ethers");
 
 const INITIAL_SLEEP_INTERVAL = 500;
 const SLEEP_INCREMENT = 10;
 const DEFAULT_TIMEOUT = 120000;
-const ERC20_TRANSFER_SIGNATURE = "0xa9059cbb"; // Function selector for transfer(address,uint256)
-const MAINNET_WBTC_CONTRACT_ADDRESS = "0x2260FAC5E5542a773Aa44fBCfeDf7C193bc2C599".toLowerCase(); // Mainnet WBTC contract address
-const TESTNET_WBTC_CONTRACT_ADDRESS = "0x55bCEAd50aAC94E443BD3dfDF44396194f7aA1E4".toLowerCase(); // Testnet WBTC contract address
 
 /**
  * Decodes the ERC-20 transfer data from the input.
  * @param {string} input - The hex-encoded input data of the transaction.
  * @returns {Object|null} - Parsed transfer details or null if not an ERC-20 transfer.
  */
-const parseERC20Transfer = (input) => {
-  if (!input.startsWith(ERC20_TRANSFER_SIGNATURE)) return null;
+const parseERC20TransferLog = (log) => {
+  const { topics, data, address } = log;
 
-  const iface = new ethers.utils.Interface([
-    "function transfer(address to, uint256 value)",
-  ]);
-
-  try {
-    const decoded = iface.decodeFunctionData("transfer", input);
-    // Confirm the WBTC contract address
-    if (from.toLowerCase() === MAINNET_WBTC_CONTRACT_ADDRESS || from.toLowerCase() === TESTNET_WBTC_CONTRACT_ADDRESS) {
-      return {
-        to: decoded.to,
-        value: BigInt(decoded.value).toString(),
-        token: "WBTC",
-      };
-    }
-  } catch (error) {
-    console.error("Error parsing ERC-20 transfer input:", error.message);
+  if (topics[0] !== ethers.id("Transfer(address,address,uint256)")) {
+    console.error("Not a valid ERC-20 Transfer event.");
     return null;
   }
+
+  // Decode the "from" and "to" addresses
+  const from = ethers.getAddress(`0x${topics[1].slice(26)}`);
+  const to = ethers.getAddress(`0x${topics[2].slice(26)}`);
+  const value = BigInt(data).toString(); // Decode the transfer amount
+
+  // Confirm that this matches the WBTC contract address
+  if (address.toLowerCase() === wbtcContractAddress.toLowerCase()) {
+    return { from, to, value, token: "WBTC" };
+  }
+
+  return null; // Ignore non-WBTC transfers
 };
 
 /**
@@ -42,7 +38,7 @@ const parseERC20Transfer = (input) => {
  * @param {number} ms - The number of milliseconds to sleep.
  * @returns {Promise<void>} A promise that resolves after the specified time.
  */
-const sleep = (ms) => new Promise(resolve => setTimeout(resolve, ms));
+const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
 /**
  * Waits until a condition is met or the timeout is reached.
@@ -90,10 +86,13 @@ async function handleBridgeIn(transaction, timeout = DEFAULT_TIMEOUT) {
     let tokenType = "ETH";
     let transferValue = BigInt(value).toString(); // Default: ETH value
 
-    if (BigInt(value) === 0n && input) {
+    if (BigInt(value) === 0n && transaction.tx) {
       // Check for ERC-20 token transfer via input data
-      const erc20Transfer = parseERC20Transfer(input);
-      if (erc20Transfer && erc20Transfer.to.toLowerCase() === to.toLowerCase()) {
+      const erc20Transfer = parseERC20TransferLog(transaction.tx);
+      if (
+        erc20Transfer &&
+        erc20Transfer.to.toLowerCase() === blockAppsPublicKey.toLowerCase()
+      ) {
         tokenType = erc20Transfer.token; // We assume this is WBTC if valid ERC-20 `transfer` input
         transferValue = erc20Transfer.value; // ERC-20 transfer value
       } else {
@@ -102,7 +101,7 @@ async function handleBridgeIn(transaction, timeout = DEFAULT_TIMEOUT) {
       }
     }
 
-    console.log(`Detected ${tokenType} transfer:`, { to, transferValue });
+    console.log(`Detected ${tokenType} transfer:`, { blockAppsPublicKey, transferValue });
 
     // Wait until the condition is met or the timeout is reached
     const queryBody = await until(hash, timeout);
@@ -124,7 +123,11 @@ async function handleBridgeIn(transaction, timeout = DEFAULT_TIMEOUT) {
 
     // Handle response
     if (response.status !== 200) {
-      console.error("Transaction creation failed:", response.status, response.data);
+      console.error(
+        "Transaction creation failed:",
+        response.status,
+        response.data
+      );
       throw new Error(
         `Transaction creation failed with status ${response.status}: ${response.statusText}`
       );

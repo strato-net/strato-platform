@@ -42,7 +42,6 @@ const createTransactionObject = async (method, toAddress, value, txHash, contrac
       params: { address: `eq.${contractAddress}` },
     }
   );
-  console.log("queryResponse", queryResponse);
 
   const queryBody = queryResponse.data;
 

@@ -250,21 +250,11 @@ function getETHSTAddress() {
   }
 }
 
-function getETHSTAddress() {
-  if (process.env.networkID === constants.prodNetworkId) {
-    return constants.prodETHSTAddress;
-  } else if (process.env.networkID === constants.testnetNetworkId) {
-    return constants.testnetETHSTAddress;
-  } else {
-    return constants.prodETHSTAddress;
-  }
-}
-
 function getWBTCSTAddress() {
   if (process.env.networkID === constants.prodNetworkId) {
     return constants.prodWBTCSTAddress;
   } else if (process.env.networkID === constants.testnetNetworkId) {
-    return constants.testnetWBTCAddress;
+    return constants.testnetWBTCSTAddress;
   } else {
     return constants.prodWBTCSTAddress;
   }

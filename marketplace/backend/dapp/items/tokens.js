@@ -244,7 +244,7 @@ async function getAllOwnershipEvents(admin, args = {}, options) {
 async function addHash(user, args, options) {
   const CREATOR = 'eq.BlockApps';
   const IS_ACTIVE = 'eq.true';
-  const { txHash, userAddress, amount } = args;
+  const { txHash, userAddress, amount, tokenName } = args;
   const contractName = 'MercataETHBridge';
   const mercataETHBridgeSearchOptions = {
     ...options,
@@ -252,6 +252,7 @@ async function addHash(user, args, options) {
       creator: CREATOR,
       isActive: IS_ACTIVE,
       ['data->>isMint']: 'eq.True',
+      ['data->>name']: `ilike.%${tokenName}%`,
     },
   };
 

@@ -198,6 +198,7 @@ const BridgeWalletModal = ({ open, handleCancel, accountDetails, signer, tokenNa
         userAddress: user.userAddress,
         txHash: tx.hash,
         amount: quantity.toString(),
+        tokenName,
       };
   
       let isDone = await ethActions.addHash(ethDispatch, body);
