@@ -57,6 +57,9 @@ const actionDescriptors = {
   fetchAssetsWithEighteenDecimalPlaces: 'fetch_assets_with_eighteen_decimal_places',
   fetchAssetsWithEighteenDecimalPlacesSuccessful: 'fetch_assets_with_eighteen_decimal_places_successful',
   fetchAssetsWithEighteenDecimalPlacesFailed: 'fetch_assets_with_eighteen_decimal_places_failed',
+  fetchAssetsWithEightDecimalPlaces: 'fetch_assets_with_eight_decimal_places',
+  fetchAssetsWithEightDecimalPlacesSuccessful: 'fetch_assets_with_eight_decimal_places_successful',
+  fetchAssetsWithEightDecimalPlacesFailed: 'fetch_assets_with_eight_decimal_places_failed',
   fetchCataAddress: 'fetch_cata_address',
   fetchCataAddressSuccessful: 'fetch_cata_address_successful',
   fetchCataAddressFailed: 'fetch_cata_address_failed',
@@ -697,6 +700,47 @@ const actions = {
     } catch (err) {
       dispatch({
         type: actionDescriptors.fetchAssetsWithEighteenDecimalPlacesFailed,
+        payload: 'Error while fetching asset addresses',
+      });
+      return null;
+    }
+  },
+  fetchAssetsWithEightDecimalPlaces: async (dispatch) => {
+    dispatch({ type: actionDescriptors.fetchAssetsWithEightDecimalPlaces });
+    try {
+      let response = await fetch(`${apiUrl}/marketplace/8DecimalPlaces`, {
+        method: HTTP_METHODS.GET,
+        credentials: 'same-origin',
+      });
+
+      const body = await response.json();
+      if (
+        response.status === RestStatus.UNAUTHORIZED ||
+        response.status === RestStatus.FORBIDDEN
+      ) {
+        dispatch({
+          type: actionDescriptors.fetchAssetsWithEightDecimalPlacesFailed,
+          payload: 'Error while fetching asset addresses',
+        });
+        return null;
+      }
+
+      if (response.status === RestStatus.OK) {
+        dispatch({
+          type: actionDescriptors.fetchAssetsWithEightDecimalPlacesSuccessful,
+          payload: body?.data,
+        });
+        return body.data;
+      }
+
+      dispatch({
+        type: actionDescriptors.fetchAssetsWithEightDecimalPlacesFailed,
+        payload: 'Error while fetching asset addresses',
+      });
+      return null;
+    } catch (err) {
+      dispatch({
+        type: actionDescriptors.fetchAssetsWithEightDecimalPlacesFailed,
         payload: 'Error while fetching asset addresses',
       });
       return null;

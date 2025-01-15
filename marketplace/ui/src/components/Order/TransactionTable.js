@@ -51,7 +51,7 @@ import {
 import { SEO } from '../../helpers/seoConstant';
 import { getStringDate } from '../../helpers/utils';
 
-const TransactionTable = ({ user, download, stratAddress, assetsWithEighteenDecimalPlaces }) => {
+const TransactionTable = ({ user, download, stratAddress, assetsWithEighteenDecimalPlaces, assetsWithEightDecimalPlaces }) => {
   const StratsIcon = (
     <img src={Images.strat} alt="STRATs" className="mx-1 w-4 h-4" />
   );
@@ -190,6 +190,7 @@ const TransactionTable = ({ user, download, stratAddress, assetsWithEighteenDeci
     const price = data?.assetPrice || data?.price;
     const isStrat = data?.assetOriginAddress === stratAddress;
     const is18DecimalPlaces = assetsWithEighteenDecimalPlaces.includes(data?.assetOriginAddress);
+    const is8DecimalPlaces = assetsWithEightDecimalPlaces.includes(data?.assetOriginAddress);
 
     return (
       <div className="min-h-44 h-full" style={{ width: '460px' }}>
@@ -234,6 +235,8 @@ const TransactionTable = ({ user, download, stratAddress, assetsWithEighteenDeci
                       ? (price * 100).toFixed(2)
                       : is18DecimalPlaces
                       ? (price * Math.pow(10, 18)).toFixed(2)
+                      : is8DecimalPlaces
+                      ? (price * Math.pow(10, 8)).toFixed(2)
                       : price}{' '}
                   </b>{' '}
                   &nbsp;(
@@ -243,6 +246,8 @@ const TransactionTable = ({ user, download, stratAddress, assetsWithEighteenDeci
                       ? (price * 100).toFixed(2)
                       : is18DecimalPlaces
                       ? (price * Math.pow(10, 18)).toFixed(2)
+                      : is8DecimalPlaces
+                      ? (price * Math.pow(10, 8)).toFixed(2)
                       : price) * STRATS_CONVERSION}{' '}
                   </span>
                   {StratsIcon}){' '}
@@ -385,6 +390,8 @@ const TransactionTable = ({ user, download, stratAddress, assetsWithEighteenDeci
                 ? quantity / 100
                 : assetsWithEighteenDecimalPlaces.includes(assetOriginAddress)
                 ? quantity / Math.pow(10, 18)
+                : assetsWithEightDecimalPlaces.includes(assetOriginAddress)
+                ? quantity / Math.pow(10, 8)
                 : quantity
               ).toLocaleString('en-US', {
                 maximumFractionDigits: 4,
@@ -408,6 +415,8 @@ const TransactionTable = ({ user, download, stratAddress, assetsWithEighteenDeci
                   ? (price * 100).toFixed(2)
                   : assetsWithEighteenDecimalPlaces.includes(assetOriginAddress)
                   ? (price * Math.pow(10, 18)).toFixed(2)
+                  : assetsWithEightDecimalPlaces.includes(assetOriginAddress)
+                  ? (price * Math.pow(10, 8)).toFixed(2)
                   : price
               )
             : '--'}
@@ -660,6 +669,7 @@ const TransactionTable = ({ user, download, stratAddress, assetsWithEighteenDeci
                   user={user}
                   stratAddress={stratAddress}
                   assetsWithEighteenDecimalPlaces={assetsWithEighteenDecimalPlaces}
+                  assetsWithEightDecimalPlaces={assetsWithEightDecimalPlaces}
                 />
                 <Pagination
                   className="mx-auto mt-5"

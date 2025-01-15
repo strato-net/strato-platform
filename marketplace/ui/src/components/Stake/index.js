@@ -37,7 +37,7 @@ const StratsIcon = (
   <img src={Images.strat} alt={''} title={''} className="w-4 h-4" />
 );
 
-function combineInventories(items, assetsWithEighteenDecimalPlaces) {
+function combineInventories(items, assetsWithEighteenDecimalPlaces, assetsWithEightDecimalPlaces) {
   // Step 1: Group items by `root`
   const grouped = items.reduce((acc, item) => {
     const { root } = item;
@@ -58,16 +58,17 @@ function combineInventories(items, assetsWithEighteenDecimalPlaces) {
       'BlockApps-Mercata-Asset-images': assetImages,
     } = firstItem;
 
-    const requiresDivision = assetsWithEighteenDecimalPlaces.includes(root);
+    const is18DecimalPlaces = assetsWithEighteenDecimalPlaces.includes(root);
+    const is8DecimalPlaces = assetsWithEightDecimalPlaces.includes(root);
 
     // Step 3: Sum `quantity` and `saleQuantity` across the group
     const totalQuantity = group.reduce((sum, item) => {
       const quantity = item.quantity || 0;
-      return sum + (requiresDivision ? quantity / 1e18 : quantity);
+      return sum + (is18DecimalPlaces ? quantity / 1e18 : is8DecimalPlaces ? quantity / 1e8 : quantity);
     }, 0);
     const totalSaleQuantity = group.reduce((sum, item) => {
       const saleQuantity = item.saleQuantity ? item.quantity || 0 : 0;
-      return sum + (requiresDivision ? saleQuantity / 1e18 : saleQuantity);
+      return sum + (is18DecimalPlaces ? saleQuantity / 1e18 : is8DecimalPlaces ? saleQuantity / 1e8 : saleQuantity);
     }, 0);
 
     // Step 4: Aggregate varying fields into `inventories`
@@ -111,7 +112,7 @@ const Stake = ({ user }) => {
     success,
   } = useInventoryState();
   const { categorys } = useCategoryState();
-  const { stratsAddress, assetsWithEighteenDecimalPlaces } = useMarketplaceState();
+  const { stratsAddress, assetsWithEighteenDecimalPlaces, assetsWithEightDecimalPlaces } = useMarketplaceState();
   const linkUrl = window.location.href;
   const [api, contextHolder] = notification.useNotification();
   const [limit, setLimit] = useState(10);
@@ -119,7 +120,7 @@ const Stake = ({ user }) => {
   const [page, setPage] = useState(1);
   const navigate = useNavigate();
 
-  const combinedInventories = combineInventories(inventories, assetsWithEighteenDecimalPlaces);
+  const combinedInventories = combineInventories(inventories, assetsWithEighteenDecimalPlaces, assetsWithEightDecimalPlaces);
   const onPageChange = (page, pageSize) => {
     setLimit(pageSize);
     setOffset((page - 1) * pageSize);
@@ -213,6 +214,7 @@ const Stake = ({ user }) => {
           reserves,
           stratsAddress,
           assetsWithEighteenDecimalPlaces,
+          assetsWithEightDecimalPlaces,
           navigate
         )}
         dataSource={populatedInventories}
@@ -287,7 +289,8 @@ const Stake = ({ user }) => {
                     offset,
                     reserves,
                     stratsAddress,
-                    assetsWithEighteenDecimalPlaces
+                    assetsWithEighteenDecimalPlaces,
+                    assetsWithEightDecimalPlaces,
                   )}
                   dataSource={combinedInventories.slice(offset, offset + limit)}
                   loading={isInventoriesLoading}
@@ -324,6 +327,7 @@ const Stake = ({ user }) => {
                     reserves={reserves}
                     stratAddress={stratsAddress}
                     assetsWithEighteenDecimalPlaces={assetsWithEighteenDecimalPlaces}
+                    assetsWithEightDecimalPlaces={assetsWithEightDecimalPlaces}
                   />
                 ))}
               </div>

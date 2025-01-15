@@ -32,6 +32,7 @@ const StakeInventoryCard = ({
   supportedTokens,
   stratAddress,
   assetsWithEighteenDecimalPlaces,
+  assetsWithEightDecimalPlaces
 }) => {
   const textRef = useRef(null);
   const { reserves } = useInventoryState();
@@ -45,6 +46,7 @@ const StakeInventoryCard = ({
   const naviroute = routes.InventoryDetail.url;
   const imgMeta = category ? category : SEO.TITLE_META;
   const is18DecimalPlaces = assetsWithEighteenDecimalPlaces?.includes(inventory.root);
+  const is8DecimalPlaces = assetsWithEightDecimalPlaces?.includes(inventory.root);
 
   const uniqueEscrows = new Set();
   let collateralQuantity = inventory?.inventories
@@ -63,7 +65,11 @@ const StakeInventoryCard = ({
     : inventory?.escrow?.collateralQuantity > inventory?.quantity
     ? inventory?.quantity
     : inventory?.escrow?.collateralQuantity || 0;
-  collateralQuantity = is18DecimalPlaces ? collateralQuantity / 1e18 : collateralQuantity;
+  collateralQuantity = is18DecimalPlaces
+    ? collateralQuantity / 1e18
+    : is8DecimalPlaces
+    ? collateralQuantity / 1e8
+    : collateralQuantity;
   const quantityNotAvailable = inventory?.inventories
     ? inventory.inventories.reduce((sum, item) => {
         const status = Number(item.status);
@@ -77,7 +83,11 @@ const StakeInventoryCard = ({
     : 0;
   const quantity = inventory?.inventories
     ? inventory.totalQuantity
-    : is18DecimalPlaces ? inventory?.quantity /1e18 : inventory?.quantity;
+    : is18DecimalPlaces
+    ? inventory?.quantity / 1e18
+    : is8DecimalPlaces
+    ? inventory?.quantity / 1e8
+    : inventory?.quantity;
   const stakeQuantity = quantity - collateralQuantity - quantityNotAvailable;
   const uniqueEscrowsPrime = new Set();
   const collateralValue = inventory?.inventories
@@ -348,6 +358,7 @@ const StakeInventoryCard = ({
           saleAddress={inventory.saleAddress}
           category={category}
           assetsWithEighteenDecimalPlaces={assetsWithEighteenDecimalPlaces}
+          assetsWithEightDecimalPlaces={assetsWithEightDecimalPlaces}
         />
       )}
       {repayModalOpen && (
@@ -362,6 +373,7 @@ const StakeInventoryCard = ({
           category={category}
           reserves={reserves}
           assetsWithEighteenDecimalPlaces={assetsWithEighteenDecimalPlaces}
+          assetsWithEightDecimalPlaces={assetsWithEightDecimalPlaces}
         />
       )}
       {stakeModalOpen && (
@@ -377,6 +389,7 @@ const StakeInventoryCard = ({
           category={category}
           stratAddress={stratAddress}
           assetsWithEighteenDecimalPlaces={assetsWithEighteenDecimalPlaces}
+          assetsWithEightDecimalPlaces={assetsWithEightDecimalPlaces}
         />
       )}
     </div>

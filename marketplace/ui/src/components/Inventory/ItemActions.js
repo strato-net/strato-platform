@@ -41,14 +41,18 @@ const ItemActions = ({
   reserves,
   stratAddress,
   assetsWithEighteenDecimalPlaces,
+  assetsWithEightDecimalPlaces,
 }) => {
   const itemData = inventory.data;
   const isStrat = inventory.originAddress === stratAddress;
   const is18DecimalPlaces = assetsWithEighteenDecimalPlaces.includes(inventory.originAddress);
+  const is8DecimalPlaces = assetsWithEightDecimalPlaces.includes(inventory.originAddress);
   const quantity = isStrat
     ? new BigNumber(inventory.quantity).dividedBy(100)
     : is18DecimalPlaces
     ? new BigNumber(inventory.quantity).dividedBy(new BigNumber(10).pow(18))
+    : is8DecimalPlaces
+    ? new BigNumber(inventory.quantity).dividedBy(new BigNumber(10).pow(8))
     : new BigNumber(inventory.quantity);
   const saleQuantity =
     inventory.saleQuantity !== undefined
@@ -56,6 +60,8 @@ const ItemActions = ({
         ? new BigNumber(inventory.saleQuantity).dividedBy(100)
         : is18DecimalPlaces
         ? new BigNumber(inventory.saleQuantity).dividedBy(new BigNumber(10).pow(18))
+        : is8DecimalPlaces
+        ? new BigNumber(inventory.saleQuantity).dividedBy(new BigNumber(10).pow(8))
         : new BigNumber(inventory.saleQuantity)
       : undefined;  
   const stakeable =
@@ -255,7 +261,8 @@ const ItemActions = ({
             !isActive() ||
             disableSADDOGS(inventory) ||
             isStrat ||
-            is18DecimalPlaces
+            is18DecimalPlaces ||
+            is8DecimalPlaces
           }
         >
           <SendOutlined /> Redeem
@@ -326,7 +333,8 @@ const ItemActions = ({
                     !isActive() ||
                     disableSADDOGS(inventory) ||
                     isStrat ||
-                    is18DecimalPlaces
+                    is18DecimalPlaces ||
+                    is8DecimalPlaces
                   }
                 >
                   <SendOutlined /> Redeem
@@ -386,6 +394,7 @@ const ItemActions = ({
           reserves={reserves}
           stratAddress={stratAddress}
           assetsWithEighteenDecimalPlaces={assetsWithEighteenDecimalPlaces}
+          assetsWithEightDecimalPlaces={assetsWithEightDecimalPlaces}
         />
       )}
       {unlistModalOpen && (
@@ -413,6 +422,7 @@ const ItemActions = ({
           saleAddress={inventory.saleAddress}
           category={category}
           assetsWithEighteenDecimalPlaces={assetsWithEighteenDecimalPlaces}
+          assetsWithEightDecimalPlaces={assetsWithEightDecimalPlaces}
         />
       )}
       {borrowModalOpen && (
@@ -426,6 +436,7 @@ const ItemActions = ({
           saleAddress={inventory.saleAddress}
           category={category}
           assetsWithEighteenDecimalPlaces={assetsWithEighteenDecimalPlaces}
+          assetsWithEightDecimalPlaces={assetsWithEightDecimalPlaces}
         />
       )}
       {repayModalOpen && (
@@ -440,6 +451,7 @@ const ItemActions = ({
           category={category}
           reserves={reserves}
           assetsWithEighteenDecimalPlaces={assetsWithEighteenDecimalPlaces}
+          assetsWithEightDecimalPlaces={assetsWithEightDecimalPlaces}
         />
       )}
       {resellModalOpen && (
@@ -454,6 +466,7 @@ const ItemActions = ({
           reserves={reserves}
           stratAddress={stratAddress}
           assetsWithEighteenDecimalPlaces={assetsWithEighteenDecimalPlaces}
+          assetsWithEightDecimalPlaces={assetsWithEightDecimalPlaces}
         />
       )}
       {transferModalOpen && (
@@ -468,6 +481,7 @@ const ItemActions = ({
           reserves={reserves}
           stratAddress={stratAddress}
           assetsWithEighteenDecimalPlaces={assetsWithEighteenDecimalPlaces}
+          assetsWithEightDecimalPlaces={assetsWithEightDecimalPlaces}
         />
       )}
       {redeemModalOpen && (

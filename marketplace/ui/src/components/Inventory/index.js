@@ -92,7 +92,7 @@ const Inventory = ({ user }) => {
   const naviroute = routes.InventoryDetail.url;
   const ethNaviroute = routes.EthstProductDetail.url;
   let { hasChecked, isAuthenticated, loginUrl } = useAuthenticateState();
-  const { stratsAddress, assetsWithEighteenDecimalPlaces } = useMarketplaceState();
+  const { stratsAddress, assetsWithEighteenDecimalPlaces, assetsWithEightDecimalPlaces } = useMarketplaceState();
   const formatter = new Intl.NumberFormat('en-US');
   const formattedNum = (num) => formatter.format(num);
 
@@ -469,11 +469,14 @@ const Inventory = ({ user }) => {
       render: (_, record) => {
         const isStrats = record.originAddress === stratsAddress;
         const is18DecimalPlaces = assetsWithEighteenDecimalPlaces.includes(record.originAddress);
+        const is8DecimalPlaces = assetsWithEightDecimalPlaces.includes(record.originAddress);
         const price = record.price
           ? isStrats
             ? parseFloat(record.price * 100).toFixed(2)
             : is18DecimalPlaces
             ? parseFloat(record.price * 10 ** 18).toFixed(2)
+            : is8DecimalPlaces
+            ? parseFloat(record.price * 10 ** 8).toFixed(2)
             : record.price
           : 'N/A';
         return (
@@ -499,12 +502,17 @@ const Inventory = ({ user }) => {
       render: (_, record) => {
         const isStrats = record.originAddress === stratsAddress;
         const is18DecimalPlaces = assetsWithEighteenDecimalPlaces.includes(record.originAddress);
+        const is8DecimalPlaces = assetsWithEightDecimalPlaces.includes(record.originAddress);
         const quantity = (
           isStrats
             ? new BigNumber(record.quantity).dividedBy(new BigNumber(100))
             : is18DecimalPlaces
             ? new BigNumber(record.quantity).dividedBy(
                 new BigNumber(10).pow(18)
+              )
+            : is8DecimalPlaces
+            ? new BigNumber(record.quantity).dividedBy(
+                new BigNumber(10).pow(8)
               )
             : new BigNumber(record.quantity)
         )
@@ -522,6 +530,7 @@ const Inventory = ({ user }) => {
       render: (_, record) => {
         const isStrats = record.originAddress === stratsAddress;
         const is18DecimalPlaces = assetsWithEighteenDecimalPlaces.includes(record.originAddress);
+        const is8DecimalPlaces = assetsWithEightDecimalPlaces.includes(record.originAddress);
         const saleQuantity = (
           isStrats
             ? new BigNumber(record.saleQuantity || 0).dividedBy(
@@ -530,6 +539,10 @@ const Inventory = ({ user }) => {
             : is18DecimalPlaces
             ? new BigNumber(record.saleQuantity || 0).dividedBy(
                 new BigNumber(10).pow(18)
+              )
+            : is8DecimalPlaces
+            ? new BigNumber(record.saleQuantity || 0).dividedBy(
+                new BigNumber(10).pow(8)
               )
             : new BigNumber(record.saleQuantity || 0)
         ).toString();
@@ -554,6 +567,7 @@ const Inventory = ({ user }) => {
             reserves={reserves}
             stratAddress={stratsAddress}
             assetsWithEighteenDecimalPlaces={assetsWithEighteenDecimalPlaces}
+            assetsWithEightDecimalPlaces={assetsWithEightDecimalPlaces}
           />
         </div>
       ),
@@ -818,6 +832,7 @@ const Inventory = ({ user }) => {
                         reserves={reserves}
                         stratAddress={stratsAddress}
                         assetsWithEighteenDecimalPlaces={assetsWithEighteenDecimalPlaces}
+                        assetsWithEightDecimalPlaces={assetsWithEightDecimalPlaces}
                       />
                     ))
                   ) : (
@@ -841,6 +856,7 @@ const Inventory = ({ user }) => {
                         reserves={reserves}
                         stratAddress={stratsAddress}
                         assetsWithEighteenDecimalPlaces={assetsWithEighteenDecimalPlaces}
+                        assetsWithEightDecimalPlaces={assetsWithEightDecimalPlaces}
                       />
                     ))
                   ) : (

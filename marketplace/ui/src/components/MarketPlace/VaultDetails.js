@@ -78,7 +78,7 @@ const VaultDetails = ({ user, users }) => {
     isInventoryDetailsLoading,
     reserve,
   } = useInventoryState();
-  const { cartList, stratsAddress, assetsWithEighteenDecimalPlaces } = useMarketplaceState();
+  const { cartList, stratsAddress, assetsWithEighteenDecimalPlaces, assetsWithEightDecimalPlaces} = useMarketplaceState();
   const [isModalVisible, setIsModalVisible] = useState(false);
   const [timeFilter, setTimeFilter] = useState('1');
   const [itemData, setItemData] = useState({});
@@ -149,6 +149,7 @@ const VaultDetails = ({ user, users }) => {
 
   const details = reserve  && reserve.asset;
   const is18DecimalPlaces = assetsWithEighteenDecimalPlaces.includes(details.originAddress);
+  const is8DecimalPlaces = assetsWithEightDecimalPlaces.includes(details.originAddress);
   const isStrat = details.originAddress === stratsAddress;
   let fileValues = [];
   let fileNames = [];
@@ -171,7 +172,13 @@ const VaultDetails = ({ user, users }) => {
       const detailsData = details.data;
       setItemData(detailsData);
       if (details.saleQuantity) {
-        let saleQuantity = isStrat ? details.saleQuantity / 100 : is18DecimalPlaces ? details.saleQuantity / Math.pow(10, 18) : details.saleQuantity;
+        let saleQuantity = isStrat
+          ? details.saleQuantity / 100
+          : is18DecimalPlaces
+          ? details.saleQuantity / Math.pow(10, 18)
+          : is8DecimalPlaces
+          ? details.saleQuantity / Math.pow(10, 18)
+          : details.saleQuantity;
         setAvailableQuantity(saleQuantity || 1);
       }
     }
@@ -380,12 +387,20 @@ const VaultDetails = ({ user, users }) => {
                   >
                     {details?.price || isStaked
                       ? (() => {
-                          const adjustedPrice = isStrat ? details.price * 100 : is18DecimalPlaces ? details.price * Math.pow(10, 18) : details.price;
+                          const adjustedPrice = isStrat
+                            ? details.price * 100
+                            : is18DecimalPlaces
+                            ? details.price * Math.pow(10, 18)
+                            : is8DecimalPlaces
+                            ? details.price * Math.pow(10, 8)
+                            : details.price;
                           return (
                             <>
                               $
                               {isStaked
-                                ? (details.escrow?.maxLoanAmount / 100).toFixed(4)
+                                ? (details.escrow?.maxLoanAmount / 100).toFixed(
+                                    4
+                                  )
                                 : adjustedPrice}
                               <span className="font-normal text-xs mr-2 text-primary">
                                 <b>
@@ -592,7 +607,7 @@ const VaultDetails = ({ user, users }) => {
                         />
                       </div>
                     ),
-                  }
+                  },
                 ]}
               />
             </div>

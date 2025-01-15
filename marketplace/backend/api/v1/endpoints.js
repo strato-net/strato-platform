@@ -190,6 +190,7 @@ export const Marketplace = {
   getStratsTransactionHistory: '/strats/history',
   getStakeableProducts: '/stake',
   get18DecimalPlaces: '/18DecimalPlaces',
+  get8DecimalPlaces: '/8DecimalPlaces',
 };
 
 export const PaymentService = {

@@ -18,6 +18,7 @@ const GlobalTransactionResponsive = ({
   fetchData,
   stratAddress,
   assetsWithEighteenDecimalPlaces,
+  assetsWithEightDecimalPlaces,
   ethstAddress,
   wbtcstAddress,
 }) => {
@@ -113,6 +114,7 @@ const GlobalTransactionResponsive = ({
               ];
               const isStrat = assetOriginAddress === stratAddress;
               const is18DecimalPlaces = assetsWithEighteenDecimalPlaces.includes(assetOriginAddress);
+              const is8DecimalPlaces = assetsWithEightDecimalPlaces.includes(assetOriginAddress);
 
               const handleDetailRedirection = () => {
                 let route;
@@ -237,6 +239,8 @@ const GlobalTransactionResponsive = ({
                             ? (price * 100).toFixed(2)
                             : is18DecimalPlaces
                             ? (price * Math.pow(10, 18)).toFixed(2)
+                            : is8DecimalPlaces
+                            ? (price * Math.pow(10, 8)).toFixed(2)
                             : price
                         )}{' '}
                         (
@@ -245,6 +249,8 @@ const GlobalTransactionResponsive = ({
                             ? (price * 100 * 100).toFixed(2)
                             : is18DecimalPlaces
                             ? (price * Math.pow(10, 18) * 100).toFixed(2)
+                            : is8DecimalPlaces
+                            ? (price * Math.pow(10, 8) * 100).toFixed(2)
                             : price * 100
                         )}{' '}
                         {StratsIcon})
@@ -260,6 +266,8 @@ const GlobalTransactionResponsive = ({
                         ? quantity / 100
                         : is18DecimalPlaces
                         ? quantity / Math.pow(10, 18)
+                        : is8DecimalPlaces
+                        ? quantity / Math.pow(10, 8)
                         : quantity
                       ).toLocaleString('en-US', {
                         maximumFractionDigits: 4,

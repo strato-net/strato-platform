@@ -88,6 +88,7 @@ const HeaderComponent = ({
       marketplaceActions.fetchStratsAddress(marketplaceDispatch);
       marketplaceActions.fetchCataAddress(marketplaceDispatch);
       marketplaceActions.fetchAssetsWithEighteenDecimalPlaces(marketplaceDispatch);
+      marketplaceActions.fetchAssetsWithEightDecimalPlaces(marketplaceDispatch);
     }
   }, [user]);
 

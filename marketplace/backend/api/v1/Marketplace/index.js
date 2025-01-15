@@ -84,6 +84,13 @@ router.get(
 );
 
 router.get(
+  Marketplace.get8DecimalPlaces,
+  authHandler.authorizeRequest(),
+  loadDapp,
+  MarketplaceController.get8DecimalPlaces
+);
+
+router.get(
   Marketplace.getStratsTransactionHistory,
   authHandler.authorizeRequest(),
   loadDapp,

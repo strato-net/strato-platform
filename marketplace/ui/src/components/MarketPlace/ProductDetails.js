@@ -100,7 +100,7 @@ const ProductDetails = ({ user, users }) => {
     isFetchingPriceHistory,
     reserves,
   } = useInventoryState();
-  const { cartList, assetsWithEighteenDecimalPlaces } = useMarketplaceState();
+  const { cartList, assetsWithEighteenDecimalPlaces, assetsWithEightDecimalPlaces } = useMarketplaceState();
 
   const [isModalVisible, setIsModalVisible] = useState(false);
   const [timeFilter, setTimeFilter] = useState('1');
@@ -735,6 +735,10 @@ const ProductDetails = ({ user, users }) => {
                               inventoryDetails.root
                             )
                           ? inventoryDetails.quantity / 1e18
+                          : assetsWithEightDecimalPlaces.includes(
+                              inventoryDetails.root
+                            )
+                          ? inventoryDetails.quantity / 1e8
                           : inventoryDetails.quantity
                       }
                       defaultValue={`${qty}`}
@@ -1102,6 +1106,7 @@ const ProductDetails = ({ user, users }) => {
           inventory={inventoryDetails}
           reserves={reserves}
           assetsWithEighteenDecimalPlaces={assetsWithEighteenDecimalPlaces}
+          assetsWithEightDecimalPlaces={assetsWithEightDecimalPlaces}
         />
       )}
       {borrowModalOpen && (
@@ -1112,6 +1117,7 @@ const ProductDetails = ({ user, users }) => {
           inventory={inventoryDetails}
           reserves={reserves}
           assetsWithEighteenDecimalPlaces={assetsWithEighteenDecimalPlaces}
+          assetsWithEightDecimalPlaces={assetsWithEightDecimalPlaces}
         />
       )}
       {repayModalOpen && (
@@ -1122,6 +1128,7 @@ const ProductDetails = ({ user, users }) => {
           inventory={inventoryDetails}
           reserves={reserves}
           assetsWithEighteenDecimalPlaces={assetsWithEighteenDecimalPlaces}
+          assetsWithEightDecimalPlaces={assetsWithEightDecimalPlaces}
         />
       )}
       {message && openToastInventory('bottom')}

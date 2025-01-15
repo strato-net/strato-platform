@@ -52,6 +52,7 @@ const InventoryCard = ({
   supportedTokens,
   stratAddress,
   assetsWithEighteenDecimalPlaces,
+  assetsWithEightDecimalPlaces
 }) => {
   const textRef = useRef(null);
   const { isReserveLoading, reserves } = useInventoryState();
@@ -77,10 +78,13 @@ const InventoryCard = ({
   const itemData = inventory.data;
   const isStrat = inventory.originAddress === stratAddress;
   const is18DecimalPlaces = assetsWithEighteenDecimalPlaces.includes(inventory.originAddress);
+  const is8DecimalPlaces = assetsWithEightDecimalPlaces.includes(inventory.originAddress);
   const quantity = isStrat
     ? new BigNumber(inventory.quantity).dividedBy(100)
     : is18DecimalPlaces
     ? new BigNumber(inventory.quantity).dividedBy(new BigNumber(10).pow(18))
+    : is8DecimalPlaces
+    ? new BigNumber(inventory.quantity).dividedBy(new BigNumber(10).pow(8))
     : new BigNumber(inventory.quantity);
   const price = inventory?.price
     ? isStrat
@@ -88,6 +92,10 @@ const InventoryCard = ({
       : is18DecimalPlaces
       ? new BigNumber(inventory.quantity).multipliedBy(
           new BigNumber(10).pow(18)
+        )
+      : is8DecimalPlaces
+      ? new BigNumber(inventory.quantity).multipliedBy(
+          new BigNumber(10).pow(8)
         )
       : new BigNumber(inventory.quantity)
     : undefined;
@@ -99,6 +107,10 @@ const InventoryCard = ({
         ? new BigNumber(inventory.saleQuantity || 0).dividedBy(
             new BigNumber(10).pow(18)
           )
+        : is8DecimalPlaces
+        ? new BigNumber(inventory.saleQuantity || 0).dividedBy(
+            new BigNumber(10).pow(8)
+          )
         : new BigNumber(inventory.saleQuantity || 0)
       : undefined;
   const totalLockedQuantity = inventory.totalLockedQuantity
@@ -107,6 +119,10 @@ const InventoryCard = ({
       : is18DecimalPlaces
       ? new BigNumber(inventory.totalLockedQuantity || 0).dividedBy(
           new BigNumber(10).pow(18)
+        )
+      : is8DecimalPlaces
+      ? new BigNumber(inventory.totalLockedQuantity || 0).dividedBy(
+          new BigNumber(10).pow(8)
         )
       : new BigNumber(inventory.totalLockedQuantity || 0)
     : new BigNumber(0);
@@ -395,7 +411,8 @@ const InventoryCard = ({
                   !isActive() ||
                   disableSADDOGS(inventory) ||
                   isStrat ||
-                  is18DecimalPlaces
+                  is18DecimalPlaces ||
+                  is8DecimalPlaces
                 }
               >
                 <SendOutlined /> Redeem
@@ -455,7 +472,8 @@ const InventoryCard = ({
                       !isActive() ||
                       disableSADDOGS(inventory) ||
                       isStrat ||
-                      is18DecimalPlaces
+                      is18DecimalPlaces ||
+                      is8DecimalPlaces
                     }
                   >
                     <SendOutlined /> Redeem
@@ -637,6 +655,7 @@ const InventoryCard = ({
           reserves={reserves}
           stratAddress={stratAddress}
           assetsWithEighteenDecimalPlaces={assetsWithEighteenDecimalPlaces}
+          assetsWithEightDecimalPlaces={assetsWithEightDecimalPlaces}
         />
       )}
       {unlistModalOpen && (
@@ -662,6 +681,7 @@ const InventoryCard = ({
           saleAddress={inventory.saleAddress}
           category={category}
           assetsWithEighteenDecimalPlaces={assetsWithEighteenDecimalPlaces}
+          assetsWithEightDecimalPlaces={assetsWithEightDecimalPlaces}
         />
       )}
       {repayModalOpen && (
@@ -676,6 +696,7 @@ const InventoryCard = ({
           category={category}
           reserves={reserves}
           assetsWithEighteenDecimalPlaces={assetsWithEighteenDecimalPlaces}
+          assetsWithEightDecimalPlaces={assetsWithEightDecimalPlaces}
         />
       )}
       {resellModalOpen && (
@@ -702,6 +723,7 @@ const InventoryCard = ({
           category={category}
           stratAddress={stratAddress}
           assetsWithEighteenDecimalPlaces={assetsWithEighteenDecimalPlaces}
+          assetsWithEightDecimalPlaces={assetsWithEightDecimalPlaces}
         />
       )}
       {transferModalOpen && (
@@ -715,6 +737,7 @@ const InventoryCard = ({
           reserves={reserves}
           stratAddress={stratAddress}
           assetsWithEighteenDecimalPlaces={assetsWithEighteenDecimalPlaces}
+          assetsWithEightDecimalPlaces={assetsWithEightDecimalPlaces}
         />
       )}
       {redeemModalOpen && (

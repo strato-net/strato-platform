@@ -28,6 +28,7 @@ const TransferModal = ({
   reserves,
   stratAddress,
   assetsWithEighteenDecimalPlaces,
+  assetsWithEightDecimalPlaces
 }) => {
   const location = useLocation();
   const queryParams = new URLSearchParams(location.search);
@@ -35,10 +36,15 @@ const TransferModal = ({
   const is18DecimalPlaces = assetsWithEighteenDecimalPlaces.includes(
     inventory.originAddress
   );
+  const is8DecimalPlaces = assetsWithEightDecimalPlaces.includes(
+    inventory.originAddress
+  );
   const availableQuantity = isStrat
     ? new BigNumber(inventory.quantity).dividedBy(100)
     : is18DecimalPlaces
     ? new BigNumber(inventory.quantity).dividedBy(new BigNumber(10).pow(18))
+    : is8DecimalPlaces
+    ? new BigNumber(inventory.quantity).dividedBy(new BigNumber(10).pow(8))
     : new BigNumber(inventory.quantity);
   // Get the inventory state and dispatch
   const inventoryDispatch = useInventoryDispatch();
@@ -359,12 +365,16 @@ const TransferModal = ({
         ? transfer.quantity.multipliedBy(new BigNumber(100))
         : is18DecimalPlaces
         ? transfer.quantity.multipliedBy(new BigNumber(10).pow(18))
+        : is8DecimalPlaces
+        ? transfer.quantity.multipliedBy(new BigNumber(10).pow(8))
         : transfer.quantity
       ).toFixed(0),
       price: isStrat
         ? transfer.price / 100
         : is18DecimalPlaces
         ? transfer.price / Math.pow(10, 18)
+        : is8DecimalPlaces
+        ? transfer.price / Math.pow(10, 8)
         : transfer.price,
       senderCommonName: user.commonName,
       recipientCommonName: transfer.recipientCommonName,
@@ -373,6 +383,8 @@ const TransferModal = ({
         ? new BigNumber(100)
         : is18DecimalPlaces
         ? new BigNumber(10).pow(18)
+        : is8DecimalPlaces
+        ? new BigNumber(10).pow(8)
         : new BigNumber(10)
       ).toString(),
     }));

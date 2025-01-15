@@ -75,6 +75,7 @@ const UserProfile = ({ user }) => {
   } = useInventoryState();
   const [stratAddress, setStratAddress] = useState('');
   const [assetsWithEighteenDecimalPlaces, setAssetsWithEighteenDecimalPlaces] = useState('');
+  const [assetsWithEightDecimalPlaces, setAssetsWithEightDecimalPlaces] = useState('');
 
   useEffect(() => {
     const fetchAddresses = async () => {
@@ -84,9 +85,13 @@ const UserProfile = ({ user }) => {
       const assetsWithEighteenDecimalPlaces = await marketplaceActions.fetchAssetsWithEighteenDecimalPlaces(
         marketplaceDispatch
       );
+      const assetsWithEightDecimalPlaces = await marketplaceActions.fetchAssetsWithEightDecimalPlaces(
+        marketplaceDispatch
+      );
       await ethActions.fetchETHSTAddress(ethDispatch);
       setStratAddress(stratAddress);
       setAssetsWithEighteenDecimalPlaces(assetsWithEighteenDecimalPlaces);
+      setAssetsWithEightDecimalPlaces(assetsWithEightDecimalPlaces);
     };
 
     fetchAddresses();
@@ -408,6 +413,7 @@ const UserProfile = ({ user }) => {
                               user={user}
                               stratAddress={stratAddress}
                               assetsWithEighteenDecimalPlaces={assetsWithEighteenDecimalPlaces}
+                              assetsWithEightDecimalPlaces={assetsWithEightDecimalPlaces}
                             />
                           );
                         })
@@ -438,6 +444,7 @@ const UserProfile = ({ user }) => {
                               user={user}
                               stratAddress={stratAddress}
                               assetsWithEighteenDecimalPlaces={assetsWithEighteenDecimalPlaces}
+                              assetsWithEightDecimalPlaces={assetsWithEightDecimalPlaces}
                             />
                           );
                         })
@@ -468,6 +475,7 @@ const UserProfile = ({ user }) => {
                               user={user}
                               stratAddress={stratAddress}
                               assetsWithEighteenDecimalPlaces={assetsWithEighteenDecimalPlaces}
+                              assetsWithEightDecimalPlaces={assetsWithEightDecimalPlaces}
                             />
                           );
                         })

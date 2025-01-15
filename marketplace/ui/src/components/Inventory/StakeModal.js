@@ -18,7 +18,7 @@ const logo = <img src={Images.cata} alt={''} title={''} className="w-5 h-5" />;
  * If `inventory.inventories` exists, we sum up unique escrow collateral quantities.
  * Otherwise, we use `inventory.escrow.collateralQuantity` directly (capped at inventory.quantity if it exceeds).
  */
-function computeCollateralQuantity(inventory, is18DecimalPlaces) {
+function computeCollateralQuantity(inventory, is18DecimalPlaces, is8DecimalPlaces) {
   if (!inventory) return 0;
 
   let collateralQuantity = 0;
@@ -50,8 +50,8 @@ function computeCollateralQuantity(inventory, is18DecimalPlaces) {
   }
 
   // If root requires division by 1e18, normalize the collateral quantity
-  if (is18DecimalPlaces) {
-    collateralQuantity /= 1e18;
+  if (is18DecimalPlaces || is8DecimalPlaces) {
+    collateralQuantity /= is18DecimalPlaces ? 1e18 : 1e8;
   }
 
   return collateralQuantity;
@@ -90,12 +90,15 @@ function computeQuantityNotAvailable(inventory) {
 function computeStakeQuantity(
   inventory,
   collateralQuantity,
-  is18DecimalPlaces
+  is18DecimalPlaces,
+  is8DecimalPlaces
 ) {
   const quantity = Array.isArray(inventory.inventories)
     ? inventory.totalQuantity
     : is18DecimalPlaces
     ? inventory?.quantity / 1e18
+    : is8DecimalPlaces
+    ? inventory?.quantity / 1e8
     : inventory?.quantity || 0;
   return quantity - collateralQuantity - computeQuantityNotAvailable(inventory);
 }
@@ -137,7 +140,8 @@ function prepareDataForItems(
   inputQuantity,
   matchedReserve,
   logo,
-  is18DecimalPlaces
+  is18DecimalPlaces,
+  is8DecimalPlaces,
 ) {
   if (type === 'Stake') {
     return [
@@ -158,7 +162,11 @@ function prepareDataForItems(
           'The total value of your staked assets, calculated as Quantity x Oracle Price.',
         value: `$${(
           matchedReserve?.lastUpdatedOraclePrice *
-          (is18DecimalPlaces ? inputQuantity * 1e18 : inputQuantity)
+          (is18DecimalPlaces
+            ? inputQuantity * 1e18
+            : is8DecimalPlaces
+            ? inputQuantity * 1e8
+            : inputQuantity)
         ).toFixed(2)}`,
       },
       {
@@ -169,7 +177,11 @@ function prepareDataForItems(
           <div className="flex">
             <div className="mx-1">{logo}</div>
             {(
-              ((is18DecimalPlaces ? inputQuantity * 1e18 : inputQuantity) *
+              ((is18DecimalPlaces
+                ? inputQuantity * 1e18
+                : is8DecimalPlaces
+                ? inputQuantity * 1e8
+                : inputQuantity) *
                 matchedReserve?.lastUpdatedOraclePrice *
                 (matchedReserve?.cataAPYRate / 10)) /
               365
@@ -199,7 +211,7 @@ function prepareDataForItems(
 /**
  * Prepares the data for the summary section (applicable when staking).
  */
-function prepareDataForSummary(type, matchedReserve, is18DecimalPlaces) {
+function prepareDataForSummary(type, matchedReserve, is18DecimalPlaces, is8DecimalPlaces) {
   if (type === 'Stake') {
     return [
       {
@@ -208,6 +220,8 @@ function prepareDataForSummary(type, matchedReserve, is18DecimalPlaces) {
           'The current price of one unit of your RWA, as determined by the oracle.',
         value: `$${(is18DecimalPlaces
           ? matchedReserve?.lastUpdatedOraclePrice * 1e18
+          : is8DecimalPlaces
+          ? matchedReserve?.lastUpdatedOraclePrice * 1e8
           : matchedReserve?.lastUpdatedOraclePrice
         ).toFixed(2)}`,
       },
@@ -230,12 +244,16 @@ const StakeModal = ({
   type,
   productDetailPage,
   assetsWithEighteenDecimalPlaces,
+  assetsWithEightDecimalPlaces,
 }) => {
   const { isStaking, isUnstaking, isReservesLoading, reserves } =
     useInventoryState();
   const inventoryDispatch = useInventoryDispatch();
   const isLoader = isStaking || isUnstaking || isReservesLoading;
   const is18DecimalPlaces = assetsWithEighteenDecimalPlaces?.includes(
+    inventory.root
+  );
+  const is8DecimalPlaces = assetsWithEightDecimalPlaces?.includes(
     inventory.root
   );
 
@@ -252,14 +270,14 @@ const StakeModal = ({
   }, [reserves, inventory.root]);
   // Compute collateral quantity
   const collateralQuantity = useMemo(
-    () => computeCollateralQuantity(inventory, is18DecimalPlaces),
-    [inventory, is18DecimalPlaces]
+    () => computeCollateralQuantity(inventory, is18DecimalPlaces, is8DecimalPlaces),
+    [inventory, is18DecimalPlaces, is8DecimalPlaces]
   );
 
   // Compute stake quantity (only relevant for staking)
   const stakeQuantity = useMemo(
     () =>
-      computeStakeQuantity(inventory, collateralQuantity, is18DecimalPlaces),
+      computeStakeQuantity(inventory, collateralQuantity, is18DecimalPlaces, is8DecimalPlaces),
     [inventory, collateralQuantity]
   );
 
@@ -297,13 +315,15 @@ const StakeModal = ({
     inputQuantity,
     matchedReserve,
     logo,
-    is18DecimalPlaces
+    is18DecimalPlaces,
+    is8DecimalPlaces,
   );
 
   const dataForSummary = prepareDataForSummary(
     type,
     matchedReserve,
-    is18DecimalPlaces
+    is18DecimalPlaces,
+    is8DecimalPlaces,
   );
 
   /**
@@ -318,6 +338,8 @@ const StakeModal = ({
             : '0000000000000000000000000000000000000000',
         collateralQuantity: (is18DecimalPlaces
           ? new BigNumber(inputQuantity).multipliedBy(new BigNumber(10).pow(18))
+          : is8DecimalPlaces
+          ? new BigNumber(inputQuantity).multipliedBy(new BigNumber(10).pow(8))
           : new BigNumber(inputQuantity)
         ).toFixed(0),
         assets,
@@ -338,6 +360,8 @@ const StakeModal = ({
       const body = {
         quantity: (is18DecimalPlaces
           ? new BigNumber(inputQuantity).multipliedBy(new BigNumber(10).pow(18))
+          : is8DecimalPlaces
+          ? new BigNumber(inputQuantity).multipliedBy(new BigNumber(10).pow(8))
           : new BigNumber(inputQuantity)
         ).toFixed(0),
         escrowAddresses: escrows,

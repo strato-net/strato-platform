@@ -43,6 +43,7 @@ const GlobalTransaction = ({
   user,
   stratAddress,
   assetsWithEighteenDecimalPlaces,
+  assetsWithEightDecimalPlaces,
   ethstAddress,
   wbtcstAddress,
 }) => {
@@ -105,6 +106,7 @@ const GlobalTransaction = ({
     const price = data?.assetPrice || data?.price;
     const isStrat = data.assetOriginAddress === stratAddress;
     const is18DecimalPlaces = assetsWithEighteenDecimalPlaces.includes(data.assetOriginAddress);
+    const is8DecimalPlaces = assetsWithEightDecimalPlaces.includes(data.assetOriginAddress);
 
     return (
       <div className="min-h-44 h-full" style={{ width: '460px' }}>
@@ -149,6 +151,8 @@ const GlobalTransaction = ({
                       ? (price * 100).toFixed(2)
                       : is18DecimalPlaces
                       ? (price * Math.pow(10, 18)).toFixed(2)
+                      : is8DecimalPlaces
+                      ? (price * Math.pow(10, 8)).toFixed(2)
                       : price}{' '}
                   </b>{' '}
                   &nbsp;(
@@ -158,6 +162,8 @@ const GlobalTransaction = ({
                       ? (price * 100).toFixed(2)
                       : is18DecimalPlaces
                       ? (price * Math.pow(10, 18)).toFixed(2)
+                      : is8DecimalPlaces
+                      ? (price * Math.pow(10, 8)).toFixed(2)
                       : price) * STRATS_CONVERSION}{' '}
                   </span>
                   {StratsIcon}){' '}
@@ -256,6 +262,8 @@ const GlobalTransaction = ({
               ? quantity / 100
               : assetsWithEighteenDecimalPlaces.includes(assetOriginAddress)
               ? quantity / Math.pow(10, 18)
+              : assetsWithEightDecimalPlaces.includes(assetOriginAddress)
+              ? quantity / Math.pow(10, 8)
               : quantity;
 
           formattedQuantity = value.toLocaleString('en-US', {
@@ -283,6 +291,8 @@ const GlobalTransaction = ({
                       ? (price * 100).toFixed(2)
                       : assetsWithEighteenDecimalPlaces.includes(assetOriginAddress)
                       ? (price * Math.pow(10, 18)).toFixed(2)
+                      : assetsWithEightDecimalPlaces.includes(assetOriginAddress)
+                      ? (price * Math.pow(10, 8)).toFixed(2)
                       : price) * 100
                   ).toFixed(0)
                 )
@@ -296,6 +306,8 @@ const GlobalTransaction = ({
                     ? (price * 100).toFixed(2)
                     : assetsWithEighteenDecimalPlaces.includes(assetOriginAddress)
                     ? (price * Math.pow(10, 18)).toFixed(2)
+                    : assetsWithEightDecimalPlaces.includes(assetOriginAddress)
+                    ? (price * Math.pow(10, 8)).toFixed(2)
                     : price
                 )} $`
               : '--'}
@@ -479,6 +491,7 @@ const GlobalTransaction = ({
               isTransactionLoading={isTransactionLoading}
               stratAddress={stratAddress}
               assetsWithEighteenDecimalPlaces={assetsWithEighteenDecimalPlaces}
+              assetsWithEightDecimalPlaces={assetsWithEightDecimalPlaces}
               ethstAddress={ethstAddress}
               wbtcstAddress={wbtcstAddress}
             />

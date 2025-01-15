@@ -16,7 +16,7 @@ import { useNavigate } from 'react-router-dom';
 import moment from 'moment';
 import { useEthState } from '../../contexts/eth';
 
-const TransactionResponsive = ({ data, user, stratAddress, assetsWithEighteenDecimalPlaces }) => {
+const TransactionResponsive = ({ data, user, stratAddress, assetsWithEighteenDecimalPlaces, assetsWithEightDecimalPlaces }) => {
   const StratsIcon = <img src={Images.strat} alt="" className="w-5 h-5" />;
   const navigate = useNavigate();
   const [expandedRows, setExpandedRows] = useState({});
@@ -139,12 +139,22 @@ const TransactionResponsive = ({ data, user, stratAddress, assetsWithEighteenDec
               minimumFractionDigits: 0,
             });
             price = (price * 100).toFixed(2);
-          } else if (assetsWithEighteenDecimalPlaces.includes(assetOriginAddress)) {
+          } else if (
+            assetsWithEighteenDecimalPlaces.includes(assetOriginAddress)
+          ) {
             quantity = (quantity / Math.pow(10, 18)).toLocaleString('en-US', {
               maximumFractionDigits: 4,
               minimumFractionDigits: 0,
             });
             price = (price * Math.pow(10, 18)).toFixed(2);
+          } else if (
+            assetsWithEightDecimalPlaces.includes(assetOriginAddress)
+          ) {
+            quantity = (quantity / Math.pow(10, 8)).toLocaleString('en-US', {
+              maximumFractionDigits: 4,
+              minimumFractionDigits: 0,
+            });
+            price = (price * Math.pow(10, 8)).toFixed(2);
           }
 
           const handleDetailRedirection = () => {
