@@ -266,7 +266,12 @@ async function transferItem(user, argsArray, options) {
     const callArgsArray = argsArray.map((args) => ({
       contract: args.contract,
       method: 'automaticTransfer',
-      args: util.usc({ ...args, contract: undefined }),
+      args: JSON.parse(
+        JSON.stringify(util.usc({ ...args, contract: undefined })).replace(
+          /"_quantity":"(\d+)"/g,
+          '"_quantity":$1'
+        )
+      ),
     }));
 
     // Make the transfer requests
