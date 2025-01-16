@@ -32,7 +32,7 @@ async function updateMetalPrice(token, contractAddress, price) {
     method: "update",
     args: {
       _quantity: 0,
-      _price: (price * parsedPriceMarkup).toFixed(2),
+      _price: Math.round(price * parsedPriceMarkup * 100) / 100,
       _paymentServices: [{ creator: "", serviceName: "" }],
       _scheme: 2,
     },
@@ -79,7 +79,9 @@ async function runDistributeRewardsCalls(token) {
         "The hashes of distribute rewards transactions in a failed batch:",
         res.map((r) => r.hash)
       );
-      await flagFile.appendToErrorFile(`Error executing batch distributeRewards calls: ${error}`);
+      await flagFile.appendToErrorFile(
+        `Error executing batch distributeRewards calls: ${error}`
+      );
     }
   } else {
     console.log("No distributeRewards calls to execute.");
@@ -179,7 +181,9 @@ async function fetchMetalPrice(metal, apiKey) {
     return { price: metalPrice, timestampInSeconds };
   } catch (error) {
     console.error(`ERROR: Failed to fetch price for ${metal}:`, error);
-    await flagFile.appendToErrorFile(`Failed to fetch price for ${metal}: ${error}`);
+    await flagFile.appendToErrorFile(
+      `Failed to fetch price for ${metal}: ${error}`
+    );
   }
 }
 
@@ -251,7 +255,9 @@ async function fetchAndSubmitETHPrice(
     );
   } catch (error) {
     console.error("ETH TWAP calculation and submission failed:", error);
-    await flagFile.appendToErrorFile(`ETH TWAP calculation and submission failed: ${error}`);
+    await flagFile.appendToErrorFile(
+      `ETH TWAP calculation and submission failed: ${error}`
+    );
     throw error;
   }
 }
@@ -323,7 +329,9 @@ const submitOraclePricePeriodically = async (oracleInterval) => {
       await fetchAndSubmitEscrowAddresses(oracle, token);
     } catch (error) {
       console.error(`[Oracle ERROR] Failed to process oracle ${key}:`, error);
-      await flagFile.appendToErrorFile(`Failed to process oracle ${key}: ${error}`);
+      await flagFile.appendToErrorFile(
+        `Failed to process oracle ${key}: ${error}`
+      );
     }
   }
 
@@ -332,7 +340,10 @@ const submitOraclePricePeriodically = async (oracleInterval) => {
 
 // Function to update sale prices periodically
 const updateSalePricePeriodically = async () => {
-  const token = await oauthHelper.getUserToken(process.env.METALS_USERNAME, process.env.METALS_PASSWORD);
+  const token = await oauthHelper.getUserToken(
+    process.env.METALS_USERNAME,
+    process.env.METALS_PASSWORD
+  );
   for (const asset of config.assets) {
     const addresses = asset ? asset.addresses.split(",") : [];
     for (const address of addresses) {
@@ -376,7 +387,9 @@ const updateSalePricePeriodically = async () => {
           `[Sale ERROR] Failed to update sale price for asset ${address}:`,
           error
         );
-        await flagFile.appendToErrorFile(`Failed to update sale price for asset ${address}: ${error}`);
+        await flagFile.appendToErrorFile(
+          `Failed to update sale price for asset ${address}: ${error}`
+        );
       }
     }
   }
@@ -408,9 +421,13 @@ async function main() {
       res.end(JSON.stringify({ success: true, message: "pong" }));
     } else {
       res.writeHead(500, { "Content-Type": "application/json" });
-      res.end(JSON.stringify({ success: false, message: "server error, check errors" }));
+      res.end(
+        JSON.stringify({
+          success: false,
+          message: "server error, check errors",
+        })
+      );
     }
-    
   });
   const port = process.env.PORT || 8018;
   heartbeatServer.listen(port, () => {
