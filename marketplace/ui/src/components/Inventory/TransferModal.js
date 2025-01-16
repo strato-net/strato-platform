@@ -36,14 +36,10 @@ const TransferModal = ({
     inventory.originAddress
   );
   const availableQuantity = isStrat
-    ? new BigNumber(inventory.quantity)
-        .dividedBy(100)
-        .decimalPlaces(2, BigNumber.ROUND_DOWN)
+    ? new BigNumber(inventory.quantity).dividedBy(100)
     : is18DecimalPlaces
-    ? new BigNumber(inventory.quantity)
-        .dividedBy(new BigNumber(10).pow(18))
-        .decimalPlaces(18, BigNumber.ROUND_DOWN)
-    : new BigNumber(inventory.quantity).decimalPlaces(0, BigNumber.ROUND_DOWN);
+    ? new BigNumber(inventory.quantity).dividedBy(new BigNumber(10).pow(18))
+    : new BigNumber(inventory.quantity);
   // Get the inventory state and dispatch
   const inventoryDispatch = useInventoryDispatch();
   const marketplaceDispatch = useMarketplaceDispatch();
@@ -79,7 +75,7 @@ const TransferModal = ({
     // Calculate allocated quantity from previous transfers
     const allocatedQuantity = transfers.reduce(
       (total, transfer) =>
-        new BigNumber(total).plus(transfer.quantity || 0),
+        new BigNumber(total).plus(new BigNumber(transfer.quantity || 0)),
       new BigNumber(0)
     );
 
@@ -364,9 +360,7 @@ const TransferModal = ({
         : is18DecimalPlaces
         ? transfer.quantity.multipliedBy(new BigNumber(10).pow(18))
         : transfer.quantity
-      )
-        .decimalPlaces(0, BigNumber.ROUND_DOWN)
-        .toFixed(0),
+      ).toFixed(0),
       price: isStrat
         ? transfer.price / 100
         : is18DecimalPlaces
