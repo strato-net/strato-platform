@@ -345,7 +345,10 @@ const updateSalePricePeriodically = async () => {
     process.env.METALS_PASSWORD
   );
   for (const asset of config.assets) {
-    const addresses = asset ? asset.addresses.split(",") : [];
+    const addresses =
+      asset && typeof asset.addresses === "string" && asset.addresses.trim()
+        ? asset.addresses.split(",")
+        : [];
     for (const address of addresses) {
       try {
         const searchOptions = {
