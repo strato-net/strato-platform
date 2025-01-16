@@ -263,7 +263,6 @@ async function requestRedemption(user, contract, args, options) {
 async function transferItem(user, argsArray, options) {
   try {
     // Prepare transfer call arguments
-    console.log('transferItem - argsArray', argsArray);
     const callArgsArray = argsArray.map((args) => ({
       contract: args.contract,
       method: 'automaticTransfer',
