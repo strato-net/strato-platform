@@ -8,6 +8,7 @@ if [ "$ORACLE_MODE" = "true" ]; then
   echo "Running the container in Oracle service mode"
   
   export DOCKERIZED="true"
+  export SALE_UPDATE=${SALE_UPDATE:-false}
 
   export CONFIG_DIR_PATH=/config
   export SERVER_HOST=${SERVER_HOST}
@@ -51,13 +52,15 @@ if [ "$ORACLE_MODE" = "true" ]; then
       echo 'Error: ALCHEMY_API_KEY is not set. submit-price script will not run. Exiting'
       exit 12
     fi
-    if [ -z "$METALS_USERNAME" ]; then
-      echo 'Error: METALS_USERNAME is not set. submit-price script will not run. Exiting'
+    if [ "$SALE_UPDATE" = "true" ]; then
+      if [ -z "$METALS_USERNAME" ]; then
+      echo 'Error: METALS_USERNAME is not set. Metal Sale price update script will not run. Exiting'
       exit 13
-    fi
-    if [ -z "$METALS_PASSWORD" ]; then
-      echo 'Error: METALS_PASSWORD is not set. submit-price script will not run. Exiting'
+      fi
+      if [ -z "$METALS_PASSWORD" ]; then
+      echo 'Error: METALS_PASSWORD is not set. Metal Sale price update script will not run. Exiting'
       exit 14
+      fi
     fi
     # TODO: in future we can check the other env vars here
   

@@ -451,7 +451,10 @@ async function main() {
         }
 
         // Check if it's time to run the sale price update
-        if (Date.now() - lastSaleRun >= saleInterval) {
+        if (
+          Date.now() - lastSaleRun >= saleInterval &&
+          process.env.SALE_UPDATE === "true"
+        ) {
           console.log("[Sale] Running updateSalePricePeriodically...");
           await updateSalePricePeriodically();
           lastSaleRun = Date.now();
