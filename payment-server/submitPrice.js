@@ -188,7 +188,7 @@ async function fetchMetalPrice(metal, apiKey) {
 }
 
 // Function to fetch and submit ETH price
-async function fetchAndSubmitETHPrice(
+async function fetchAndSubmitERC20TokenPrice(
   metal,
   apiKey,
   oracleContract,
@@ -244,7 +244,7 @@ async function fetchAndSubmitETHPrice(
 
     const currentTimestamp = Math.floor(currentTimeMs / 1000);
     await submitPrice(token, oracleContract, {
-      price: twap / 1e18,
+      price: twap / (metal === "BTC" ? 1e8 : 1e18),
       timestamp: currentTimestamp,
     });
 
@@ -294,8 +294,8 @@ const submitOraclePricePeriodically = async (oracleInterval) => {
     }
 
     try {
-      if (oracle.metal === "ETH") {
-        await fetchAndSubmitETHPrice(
+      if (oracle.metal === "ETH" || oracle.metal === "BTC") {
+        await fetchAndSubmitERC20TokenPrice(
           oracle.metal,
           process.env.ALCHEMY_API_KEY,
           oracle,
