@@ -146,6 +146,10 @@ data X509CertInfoState = X509CertInfoState
   }
   deriving (Show, Eq, Generic)
 
+instance RLPSerializable X509CertInfoState where
+  rlpEncode = rlpEncode . C8.toStrict . Data.Binary.encode
+  rlpDecode = Data.Binary.decode . C8.fromStrict . rlpDecode
+
 instance Ord X509CertInfoState where
     compare a b = compare (certificate a) (certificate b)
 
