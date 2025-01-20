@@ -4,11 +4,11 @@
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE TypeSynonymInstances #-}
+{-# LANGUAGE UndecidableInstances #-}
 
 {-# OPTIONS -fno-warn-redundant-constraints #-}
 module Blockchain.Strato.RedisBlockDB.Models where
 
-import BlockApps.X509.Certificate
 import qualified Blockchain.Data.BlockHeader as BHD
 import Blockchain.Data.ChainInfo
 import Blockchain.Data.Enode
@@ -60,10 +60,9 @@ class RedisDBValuable v where
   toValue :: v -> S8.ByteString
   fromValue :: S8.ByteString -> v
 
-instance RedisDBValuable Bool where
-  toValue True = S8.singleton 't'
-  toValue False = S8.empty
-  fromValue = not . S8.null
+instance RLPSerializable a => RedisDBValuable a where
+  toValue = rlpSerialize . rlpEncode
+  fromValue = rlpDecode . rlpDeserialize
 
 instance RedisDBValuable Account where
   toValue = toStrict . encode
@@ -82,73 +81,23 @@ instance RedisDBKeyable (String, Maybe String, Maybe String) where
         Nothing -> ""
         Just a -> "/" ++ a
 
-instance RedisDBValuable S8.ByteString where
-  toValue = SB16.encode
-  fromValue x = case SB16.decode x of
-    Right v -> v
-    _ -> error "leftovers in base16 decode"
-
 instance RedisDBKeyable Keccak256 where
   toKey = S8.pack . keccak256ToHex
-
-instance RedisDBValuable ChainMemberParsedSet where
-    toValue = toStrict . encode
-    fromValue = decode . fromStrict
 
 instance RedisDBKeyable ChainMemberParsedSet where
   toKey = toStrict . encode
 
-instance RedisDBValuable Validator where
-    toValue = toStrict . encode
-    fromValue = decode . fromStrict
-
 instance RedisDBKeyable Validator where
   toKey = toStrict . encode
-
-instance RedisDBValuable Keccak256 where
-  toValue = S8.pack . keccak256ToHex
-  fromValue = keccak256FromHex . S8.unpack
 
 instance RedisDBKeyable Address where
   toKey = toStrict . encode
 
-instance RedisDBValuable Address where
-  toValue = toKey
-  fromValue = decode . fromStrict
-
-instance RedisDBValuable X509CertInfoState where
-  toValue = toStrict . encode
-  fromValue = decode . fromStrict
-
 instance RedisDBKeyable Word256 where
   toKey = word256ToBytes
 
-instance RedisDBValuable RedisChainInfo where
-  toValue = rlpSerialize . rlpEncode
-  fromValue = rlpDecode . rlpDeserialize
-
-instance RedisDBValuable RedisChainMemberRSet where
-  toValue (RedisChainMemberRSet c) = toStrict $ encode c
-  fromValue = RedisChainMemberRSet . decode . fromStrict
-
-instance RedisDBValuable RedisOrgUnits where
-  toValue = rlpSerialize . rlpEncode
-  fromValue = rlpDecode . rlpDeserialize
-
-instance RedisDBValuable RedisOrgUnitMembers where
-  toValue = rlpSerialize . rlpEncode
-  fromValue = rlpDecode . rlpDeserialize
-
-instance RedisDBValuable RedisChainTxsInBlocks where
-  toValue = rlpSerialize . rlpEncode
-  fromValue = rlpDecode . rlpDeserialize
-
 instance RedisDBKeyable IPAddress where
   toKey = S8.pack . showIP
-
-instance RedisDBValuable RedisOrgNameChains where
-  toValue = rlpSerialize . rlpEncode
-  fromValue = rlpDecode . rlpDeserialize
 
 instance RedisDBKeyable RedisValidator where
   toKey = rlpSerialize . rlpEncode
@@ -156,51 +105,13 @@ instance RedisDBKeyable RedisValidator where
 instance RedisDBKeyable Integer where
   toKey = S8.pack . show
 
-instance RedisDBValuable Integer where
-  fromValue v =
-    case S8.readInt v of
-      Just (num, _) -> toInteger num
-      Nothing -> error "Invalid number format"
-
-  toValue = S8.pack . show
-
-instance RedisDBValuable RedisHeader where
-  toValue = rlpSerialize . rlpEncode
-  fromValue = RedisHeader . rlpDecode . rlpDeserialize
-
-instance RedisDBValuable RedisTx where
-  toValue = rlpSerialize . rlpEncode
-  fromValue = rlpDecode . rlpDeserialize
-
-instance (RLPSerializable a) => RedisDBValuable [a] where
-  toValue = rlpSerialize . RLPArray . fmap rlpEncode
-
-  -- (RLPArray elems)
-  fromValue bytes =
-    let elems = case rlpDeserialize bytes of
-          (RLPArray elems') -> elems'
-          _ -> error "fromValue: not an RLPArray"
-     in rlpDecode <$> elems
-
-instance (RLPSerializable a, RLPSerializable b) => RedisDBValuable (a, b) where
-  toValue (a, b) = rlpSerialize $ RLPArray [rlpEncode a, rlpEncode b]
-
-  -- fromValue bytes = let (RLPArray [a,b]) = rlpDeserialize bytes in (rlpDecode a, rlpDecode b)
-  fromValue bytes =
-    let elems = case rlpDeserialize bytes of
-          (RLPArray elems') -> elems'
-          _ -> error "fromValue: not an RLPArray"
-     in case elems of
-          [a, b] -> (rlpDecode a, rlpDecode b)
-          _ -> error "fromValue: not a pair"
-
 newtype RedisHeader = RedisHeader BHD.BlockHeader deriving newtype (Eq, Show, RLPSerializable, HasIstanbulExtra, BlockHeaderLike)
 
 newtype RedisTx = RedisTx TXD.Transaction deriving newtype (Eq, Read, Show, RLPSerializable, TransactionLike)
 
-newtype RedisTxs = RedisTxs [RedisTx] deriving newtype (Eq, Read, Show, RedisDBValuable)
+newtype RedisTxs = RedisTxs [RedisTx] deriving newtype (Eq, Read, Show, RLPSerializable)
 
-newtype RedisUncles = RedisUncles [RedisHeader] deriving newtype (Eq, Show, RedisDBValuable)
+newtype RedisUncles = RedisUncles [RedisHeader] deriving newtype (Eq, Show, RLPSerializable)
 
 newtype RedisChainInfo = RedisChainInfo ChainInfo deriving newtype (Eq, Show, RLPSerializable)
 
@@ -219,10 +130,6 @@ newtype RedisOrgUnits = RedisOrgUnits [ChainMemberParsedSet] deriving (Eq, Show)
 newtype RedisOrgUnitMembers = RedisOrgUnitMembers [ChainMemberParsedSet] deriving (Eq, Show)
 
 newtype RedisValidator = RedisValidator ChainMemberParsedSet deriving (Eq, Show)
-
--- instance RLPSerializable RedisChainMemberRSet where
---   rlpEncode (RedisChainMemberRSet cmrs) = rlpEncode cmrs
---   rlpDecode = RedisChainMemberRSet . rlpDecode
 
 instance RLPSerializable RedisIPChains where
   rlpEncode (RedisIPChains s) = rlpEncode $ S.toList s
@@ -254,14 +161,10 @@ data RedisBestBlock = RedisBestBlock
   }
   deriving (Eq, Read, Show)
 
-instance RedisDBValuable RedisBestBlock where
-  toValue = rlpSerialize . wrap
-    where
-      wrap (RedisBestBlock sha num) = RLPArray [rlpEncode sha, rlpEncode num]
-  fromValue = unwrap . rlpDeserialize
-    where
-      unwrap (RLPArray [sha, num]) = RedisBestBlock (rlpDecode sha) (rlpDecode num)
-      unwrap _ = error "we are clearly incapable of humane exception handling"
+instance RLPSerializable RedisBestBlock where
+  rlpEncode (RedisBestBlock sha num) = RLPArray [rlpEncode sha, rlpEncode num]
+  rlpDecode (RLPArray [sha, num]) = RedisBestBlock (rlpDecode sha) (rlpDecode num)
+  rlpDecode _ = error "data in wrong format when trying to rlpDecode a RedisBestBlock"[
 
 displayForNamespace :: BlockDBNamespace -> S8.ByteString -> String
 displayForNamespace ns input = case ns of

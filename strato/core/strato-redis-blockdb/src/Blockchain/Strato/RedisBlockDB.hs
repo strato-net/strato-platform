@@ -14,60 +14,23 @@
 
 module Blockchain.Strato.RedisBlockDB
   ( RedisConnection (..),
-    inNamespace,
     findNamespace,
     runStratoRedisIO,
-    getSHAsByNumber,
     getChainInfo,
-    putChainInfo,
     isValidator,
     addValidators,
-    removeValidators,
-    getValidatorAddresses,
-    getChainMembers,
-    putChainMembers,
-    addChainMember,
-    removeChainMember,
+    getValidatorAddresses,  --remove
     registerCertificate,
-    revokeCertificate,
     getChainTxsInBlock,
-    putChainTxsInBlock,
-    addChainTxsInBlock,
-    getTrueOrgNameChainsFromSuperSets,
-    getFalseOrgNameChainsFromSuperSets,
-    getTrueOrgNameChains,
-    getFalseOrgNameChains,
-    addOrgNameChain,
-    removeOrgNameChain,
-    getOrgUnitsForOrg,
-    getMembersInOrgUnit,
-    getChainMembersFromSet,
-    getCertFromParsedSet,
-    modifyParsedSetFromCert,
-    removeCertFromParsedSet,
     getHeader,
     getHeaders,
-    getHeadersByNumber,
-    getHeadersByNumbers,
     getBlock,
     getBlocks,
-    getBlocksByNumber,
-    getBlocksByNumbers,
     getTransactions,
     getPrivateTransactions,
     addPrivateTransactions,
-    getUncles,
     getParent,
-    getParents,
-    getParentChain,
-    getHeaderChain,
-    getBlockChain,
-    getCanonical,
     getCanonicalHeader,
-    getCanonicalChain,
-    getCanonicalHeaderChain,
-    getChildren,
-    getGenesisHash,
     getCertificate,
     insertRootCertificate,
     putHeader,
@@ -77,7 +40,6 @@ module Blockchain.Strato.RedisBlockDB
     deleteHeader,
     deleteHeaders,
     putBlock,
-    putBlocks,
     insertBlock,
     insertBlocks,
     deleteBlock,
@@ -91,14 +53,8 @@ module Blockchain.Strato.RedisBlockDB
     commonAncestorHelper,
     getWorldBestBlockInfo,
     updateWorldBestBlockInfo,
-    acquireRedlock,
-    releaseRedlock,
-    defaultRedlockTTL,
     getSyncStatus,
-    putSyncStatus,
     getSyncStatusNow,
-    getVmGasCap,
-    putVmGasCap,
   )
 where
 
@@ -113,22 +69,18 @@ import Blockchain.Strato.Model.Address
 import qualified Blockchain.Strato.Model.ChainMember as CM
 import Blockchain.Strato.Model.Class
 import Blockchain.Strato.Model.ExtendedWord (Word256)
-import Blockchain.Strato.Model.Gas
 import Blockchain.Strato.Model.Keccak256
 import Blockchain.Strato.RedisBlockDB.Models as Models
 import Blockchain.Strato.Model.Validator (Validator(..))
-import Control.Arrow (second, (&&&), (***))
+import Control.Arrow ((&&&), (***))
 import Control.Concurrent (threadDelay)
 import Control.Monad
 import Control.Monad.Change.Modify hiding (get)
 import Control.Monad.Trans
 import qualified Data.ByteString.Char8 as S8
 import Data.Foldable (foldl')
-import Data.Functor ((<&>))
-import Data.Functor.Compose
 import qualified Data.Map.Strict as M
-import Data.Maybe (catMaybes, fromJust, fromMaybe, isJust, isNothing, listToMaybe)
-import Data.Ranged
+import Data.Maybe (catMaybes, fromJust, fromMaybe, isJust, isNothing)
 import qualified Data.Set as S
 import qualified Data.Text as T
 import Database.Redis
@@ -217,19 +169,6 @@ getChainInfo cId =
       let (RedisChainInfo cInfo) = fromValue rcInfo
        in return $ Just cInfo
 
-putChainInfo ::
-  Word256 ->
-  ChainInfo ->
-  Redis (Either Reply Status)
-putChainInfo cId cInfo = do
-  let rChain = RedisChainInfo cInfo
-
-  res <- multiExec $ setnx (inNamespace PrivateChainInfo cId) (toValue rChain)
-  case res of
-    TxSuccess _ -> pure $ Right Ok
-    TxAborted -> pure . Left $ SingleLine (S8.pack $ "putChainInfo - Aborted")
-    TxError e -> pure . Left $ SingleLine (S8.pack $ "putChainInfo - Error" ++ e)
-
 isValidator ::
   CM.ChainMemberParsedSet ->
   Redis Bool
@@ -253,79 +192,6 @@ addValidators vals =
   sadd (namespaceToKeyPrefix Validators) (toValue <$> vals) >>= \case
     Right _ -> pure $ Right Ok
     Left reply -> pure $ Left reply
-
-removeValidators ::
-  [Validator] ->
-  Redis (Either Reply Status)
-removeValidators [] = pure $ Right Ok
-removeValidators vals =
-  srem (namespaceToKeyPrefix Validators) (toValue <$> vals) >>= \case
-    Right _ -> pure $ Right Ok
-    Left reply -> pure $ Left reply
-
-getChainMembers ::
-  Word256 ->
-  Redis CM.ChainMemberRSet
-getChainMembers cId =
-  getInNamespace PrivateChainMembers cId >>= \case
-    Left _ -> return $ CM.ChainMemberRSet $ rSetEmpty
-    Right Nothing -> return $ CM.ChainMemberRSet $ rSetEmpty
-    Right (Just rmems) ->
-      let RedisChainMemberRSet mems = fromValue rmems
-       in return mems
-
-foldrA :: Applicative f => (a -> f b) -> b -> [a] -> f b
-foldrA _ z0 [] = pure z0
-foldrA f _ [x] = f x
-foldrA f z0 (x : xs) = f x *> foldrA f z0 xs
-
-putChainMembers ::
-  Word256 ->
-  CM.ChainMembers ->
-  Redis (Either Reply Status)
-putChainMembers cId mems = do
-  let rmems = RedisChainMemberRSet $ CM.chainMembersToChainMemberRset mems
-  res <- multiExec $ set (inNamespace PrivateChainMembers cId) (toValue rmems)
-  case res of
-    TxSuccess _ -> getCompose $ foldrA addOrRemove Ok (S.toList $ CM.unChainMembers mems)
-      where
-        addOrRemove mem =
-          Compose $
-            if CM.returnBoolOfChainMemberParsedSets mem
-              then addOrgNameChain mem cId
-              else removeOrgNameChain mem cId
-    TxAborted -> pure . Left $ SingleLine (S8.pack $ "putChainMembers - Aborted")
-    TxError e -> pure . Left $ SingleLine (S8.pack $ "putChainMembers - Error" ++ e)
-
-addChainMember ::
-  Word256 ->
-  CM.ChainMemberParsedSet ->
-  Redis (Either Reply Status)
-addChainMember cId newMem = do
-  CM.ChainMemberRSet mems <- getChainMembers cId
-  let CM.ChainMemberRSet newMemRset = CM.chainMembersToChainMemberRset . CM.ChainMembers $ S.singleton newMem
-      mems' = CM.ChainMemberRSet $ mems `rSetUnion` newMemRset
-      rmems = RedisChainMemberRSet mems'
-  res <- multiExec $ set (inNamespace PrivateChainMembers cId) (toValue rmems)
-  case res of
-    TxSuccess _ -> addOrgNameChain newMem cId
-    TxAborted -> pure . Left $ SingleLine (S8.pack $ "addChainMember - Aborted")
-    TxError e -> pure . Left $ SingleLine (S8.pack $ "addChainMember - Error" ++ e)
-
-removeChainMember ::
-  Word256 ->
-  CM.ChainMemberParsedSet ->
-  Redis (Either Reply Status)
-removeChainMember cId newMem = do
-  CM.ChainMemberRSet mems <- getChainMembers cId
-  let CM.ChainMemberRSet newMemRset = CM.chainMembersToChainMemberRset . CM.ChainMembers $ S.singleton newMem
-      mems' = CM.ChainMemberRSet $ mems `rSetIntersection` newMemRset
-      rmems = RedisChainMemberRSet mems'
-  res <- multiExec $ set (inNamespace PrivateChainMembers cId) (toValue rmems)
-  case res of
-    TxSuccess _ -> removeOrgNameChain newMem cId
-    TxAborted -> pure . Left $ SingleLine (S8.pack $ "removeChainMember - Aborted")
-    TxError e -> pure . Left $ SingleLine (S8.pack $ "removeChainMember - Error" ++ e)
 
 registerCertificate :: Address -> X509CertInfoState -> Redis (Either Reply Status)
 registerCertificate userAddr x509CertInfoState = do
@@ -355,22 +221,6 @@ registerCertificate userAddr x509CertInfoState = do
       TxSuccess _ -> Right Ok
       TxAborted -> Left . SingleLine $ "registerCertificate - Aborted registering cert"
       TxError e -> Left . SingleLine $ "registerCertificate - Error registering cert " <> S8.pack e
-
-revokeCertificate :: Address -> Redis (Either Reply Status)
-revokeCertificate userAddress = do
-  mCertInfoState <- getCertificate userAddress
-  case mCertInfoState of
-    Nothing -> pure . Left $ SingleLine (S8.pack "revokeCertificate - userAddress invalid")
-    Just certInfoState -> do
-      let newInfoState = certInfoState {isValid = False}
-      res <- multiExec $ set (inNamespace X509Certificates $ toKey userAddress) (toValue newInfoState)
-      case res of
-        TxSuccess _ -> do
-          res2 <- mapM revokeCertificate (children certInfoState)
-          _ <- removeCertFromParsedSet certInfoState
-          pure $ fmap (fromMaybe Ok . listToMaybe) (sequenceA res2)
-        TxAborted -> pure . Left $ SingleLine (S8.pack "revokeCertificate - Aborted revoking cert")
-        TxError e -> pure . Left $ SingleLine (S8.pack $ "revokeCertificate - Error revoking cert" <> e)
 
 getCertificate :: Address -> Redis (Maybe X509CertInfoState)
 getCertificate userAddress =
@@ -411,19 +261,6 @@ getChainTxsInBlock bHash =
       let RedisChainTxsInBlocks mems = fromValue rmems
        in return mems
 
-putChainTxsInBlock ::
-  Keccak256 ->
-  M.Map Word256 [Keccak256] ->
-  Redis (Either Reply Status)
-putChainTxsInBlock bHash chainIdTxHashMap = do
-  let rmems = RedisChainTxsInBlocks chainIdTxHashMap
-
-  res <- multiExec $ set (inNamespace PrivateTxsInBlocks bHash) (toValue rmems)
-  case res of
-    TxSuccess _ -> pure $ Right Ok
-    TxAborted -> pure . Left $ SingleLine (S8.pack $ "putChainTxsInBlock - Aborted")
-    TxError e -> pure . Left $ SingleLine (S8.pack $ "putChainTxsInBlock - Error" ++ e)
-
 addChainTxsInBlock ::
   Keccak256 ->
   Word256 ->
@@ -437,125 +274,6 @@ addChainTxsInBlock bHash cId shas = do
     TxSuccess _ -> pure $ Right Ok
     TxAborted -> pure . Left $ SingleLine (S8.pack $ "addChainTxsInBlock - Aborted")
     TxError e -> pure . Left $ SingleLine (S8.pack $ "addChainTxsInBlock - Error" ++ e)
-
-cleanedCMPS :: CM.ChainMemberParsedSet -> CM.ChainMemberParsedSet
-cleanedCMPS (CM.Everyone _) = CM.Everyone True
-cleanedCMPS (CM.Org o _) = CM.Org o True
-cleanedCMPS (CM.OrgUnit o u _) = CM.OrgUnit o u True
-cleanedCMPS (CM.CommonName o u c _) = CM.CommonName o u c True
-
-getChainMemberSuperSets :: CM.ChainMemberParsedSet -> [CM.ChainMemberParsedSet]
-getChainMemberSuperSets cm@(CM.Everyone _) = [cm]
-getChainMemberSuperSets cm@(CM.Org _ a) = cm : getChainMemberSuperSets (CM.Everyone a)
-getChainMemberSuperSets cm@(CM.OrgUnit o _ a) = cm : getChainMemberSuperSets (CM.Org o a)
-getChainMemberSuperSets cm@(CM.CommonName o u _ a) = cm : getChainMemberSuperSets (CM.OrgUnit o u a)
-
-getTrueOrgNameChainsFromSuperSets ::
-  CM.ChainMemberParsedSet ->
-  Redis (S.Set Word256)
-getTrueOrgNameChainsFromSuperSets cm =
-  S.unions <$> traverse getTrueOrgNameChains (getChainMemberSuperSets $ cleanedCMPS cm)
-
-getFalseOrgNameChainsFromSuperSets ::
-  CM.ChainMemberParsedSet ->
-  Redis (S.Set Word256)
-getFalseOrgNameChainsFromSuperSets cm =
-  S.unions <$> traverse getFalseOrgNameChains (getChainMemberSuperSets $ cleanedCMPS cm)
-
-getTrueOrgNameChains ::
-  CM.ChainMemberParsedSet ->
-  Redis (S.Set Word256)
-getTrueOrgNameChains cm =
-  getInNamespace PrivateTrueOrgNameChains (cleanedCMPS cm) <&> \case
-    Right (Just rchains) ->
-      let RedisOrgNameChains chains = fromValue rchains
-       in chains
-    _ -> S.empty
-
-getFalseOrgNameChains ::
-  CM.ChainMemberParsedSet ->
-  Redis (S.Set Word256)
-getFalseOrgNameChains cm =
-  getInNamespace PrivateFalseOrgNameChains (cleanedCMPS cm) <&> \case
-    Right (Just rchains) ->
-      let RedisOrgNameChains chains = fromValue rchains
-       in chains
-    _ -> S.empty
-
-addOrgNameChain ::
-  CM.ChainMemberParsedSet ->
-  Word256 ->
-  Redis (Either Reply Status)
-addOrgNameChain cm' cId = do
-  let cm = cleanedCMPS cm'
-  chainsTrue <- getTrueOrgNameChains cm
-  chainsFalse <- getFalseOrgNameChains cm
-  let chainsTrue' = RedisOrgNameChains $ S.insert cId chainsTrue
-      chainsFalse' = RedisOrgNameChains $ S.delete cId chainsFalse
-  res <- multiExec $ set (inNamespace PrivateTrueOrgNameChains cm) (toValue chainsTrue')
-  case res of
-    TxAborted -> pure . Left $ SingleLine (S8.pack $ "addOrgNameChain - Aborted")
-    TxError e -> pure . Left $ SingleLine (S8.pack $ "addOrgNameChain - Error" ++ e)
-    TxSuccess _ -> do
-      res' <- multiExec $ set (inNamespace PrivateFalseOrgNameChains cm) (toValue chainsFalse')
-      case res' of
-        TxSuccess _ -> pure $ Right Ok
-        TxAborted -> pure . Left $ SingleLine (S8.pack $ "addOrgNameChain - Aborted")
-        TxError e -> pure . Left $ SingleLine (S8.pack $ "addOrgNameChain - Error" ++ e)
-
-removeOrgNameChain ::
-  CM.ChainMemberParsedSet ->
-  Word256 ->
-  Redis (Either Reply Status)
-removeOrgNameChain cm' cId = do
-  let cm = cleanedCMPS cm'
-  chainsTrue <- getTrueOrgNameChains cm
-  chainsFalse <- getFalseOrgNameChains cm
-  let chainsTrue' = RedisOrgNameChains $ S.delete cId chainsTrue
-      chainsFalse' = RedisOrgNameChains $ S.insert cId chainsFalse
-  res <- multiExec $ set (inNamespace PrivateTrueOrgNameChains cm) (toValue chainsTrue')
-  case res of
-    TxAborted -> pure . Left $ SingleLine (S8.pack $ "removeOrgNameChain - Aborted")
-    TxError e -> pure . Left $ SingleLine (S8.pack $ "removeOrgNameChain - Error" ++ e)
-    TxSuccess _ -> do
-      res' <- multiExec $ set (inNamespace PrivateFalseOrgNameChains cm) (toValue chainsFalse')
-      case res' of
-        TxSuccess _ -> pure $ Right Ok
-        TxAborted -> pure . Left $ SingleLine (S8.pack $ "removeOrgNameChain - Aborted")
-        TxError e -> pure . Left $ SingleLine (S8.pack $ "removeOrgNameChain - Error" ++ e)
-
-getOrgUnitsForOrg :: CM.ChainMemberParsedSet -> Redis ([CM.ChainMemberParsedSet])
-getOrgUnitsForOrg (CM.Org o _) =
-  getInNamespace ParsedSetWhitePage (CM.Org o True) <&> \case
-    Right (Just runits) ->
-      let RedisOrgUnits units = fromValue runits
-       in units
-    _ -> []
-getOrgUnitsForOrg _ = pure $ []
-
-getMembersInOrgUnit :: CM.ChainMemberParsedSet -> Redis ([CM.ChainMemberParsedSet])
-getMembersInOrgUnit (CM.OrgUnit o u _) =
-  getInNamespace ParsedSetWhitePage (CM.OrgUnit o u True) <&> \case
-    Right (Just rmems) ->
-      let RedisOrgUnitMembers mems = fromValue rmems
-       in mems
-    _ -> []
-getMembersInOrgUnit _ = pure $ []
-
-getChainMembersFromSet :: CM.ChainMemberParsedSet -> Redis (Maybe [CM.ChainMemberParsedSet])
-getChainMembersFromSet cm =
-  case cm of
-    CM.CommonName _ _ _ _ -> do
-      pure $ Just [cm]
-    CM.OrgUnit _ _ _ -> do
-      mems <- getMembersInOrgUnit cm
-      pure $ Just mems
-    CM.Org _ _ -> do
-      units <- getOrgUnitsForOrg cm
-      mems <- traverse getMembersInOrgUnit units
-      pure $ Just $ concat mems
-    CM.Everyone _ ->
-      pure $ Nothing
 
 getCertFromParsedSet :: CM.ChainMemberParsedSet -> Redis (Maybe X509CertInfoState)
 getCertFromParsedSet (CM.CommonName o u c _) =
@@ -613,15 +331,6 @@ modifyParsedSetFromCert certInfo@(X509CertInfoState _ _ _ _ o u c) = do
     TxAborted -> pure . Left $ SingleLine (S8.pack $ "modifyParsedSetFromCert - Aborted")
     TxError e -> pure . Left $ SingleLine (S8.pack $ "modifyParsedSetFromCert - Error" ++ e)
 
-removeCertFromParsedSet :: X509CertInfoState -> Redis (Either Reply Status)
-removeCertFromParsedSet (X509CertInfoState addr cert _ children o u c) = do
-  let parsedSet = CM.CommonName (T.pack o) (T.pack $ fromMaybe "" u) (T.pack c) True
-  res <- multiExec $ set (inNamespace ParsedSetToX509 parsedSet) $ toValue (X509CertInfoState addr cert False children o u c)
-  case res of
-    TxSuccess _ -> pure $ Right Ok
-    TxAborted -> pure . Left $ SingleLine (S8.pack $ "revokeCertFromParsedSet - Aborted")
-    TxError e -> pure . Left $ SingleLine (S8.pack $ "revokeCertFromParsedSet - Error" ++ e)
-
 bestBlockInfoKey :: S8.ByteString
 bestBlockInfoKey = S8.pack "<best>"
 {-# INLINE bestBlockInfoKey #-}
@@ -630,32 +339,12 @@ bestSequencedBlockInfoKey :: S8.ByteString
 bestSequencedBlockInfoKey = S8.pack "<best_sequenced>"
 {-# INLINE bestSequencedBlockInfoKey #-}
 
-getGenesisHash :: Redis (Maybe Keccak256)
-getGenesisHash = getCanonical 0
-
 getInNamespace ::
   (RedisDBKeyable key) =>
   BlockDBNamespace ->
   key ->
   Redis (Either Reply (Maybe S8.ByteString))
 getInNamespace ns key = get $ inNamespace ns key
-
-getMembersInNamespace ::
-  (RedisDBKeyable key) =>
-  BlockDBNamespace ->
-  key ->
-  Redis (Either Reply [S8.ByteString])
-getMembersInNamespace ns = smembers . inNamespace ns
-
-getSHAsByNumber ::
-  Integer ->
-  Redis (Maybe [Keccak256])
-getSHAsByNumber n =
-  getMembersInNamespace Numbers n >>= \case
-    Left _ -> return Nothing
-    Right hs ->
-      let hashes = fromValue <$> hs
-       in return (Just hashes)
 
 getHeader ::
   Keccak256 ->
@@ -672,19 +361,6 @@ getHeaders ::
   [Keccak256] ->
   Redis [(Keccak256, Maybe BlockHeader)]
 getHeaders = zipMapM getHeader
-
-getHeadersByNumber ::
-  Integer ->
-  Redis [(Keccak256, Maybe BlockHeader)]
-getHeadersByNumber n =
-  getMembersInNamespace Numbers n >>= \case
-    Left _ -> return []
-    Right hashes -> getHeaders (fromValue <$> hashes)
-
-getHeadersByNumbers ::
-  [Integer] ->
-  Redis [(Integer, [(Keccak256, Maybe BlockHeader)])]
-getHeadersByNumbers = zipMapM getHeadersByNumber
 
 getTransactions ::
   Keccak256 ->
@@ -741,52 +417,6 @@ getParent sha =
     Right Nothing -> return Nothing
     Right (Just rps) -> return . Just $ fromValue rps
 
-getParents ::
-  (Traversable f) =>
-  f Keccak256 ->
-  Redis (f (Keccak256, Maybe Keccak256))
-getParents = zipMapM getParent
-
-getChain ::
-  (a -> Redis (Maybe a)) ->
-  a ->
-  Int ->
-  Redis [a]
-getChain getNext start limit = (start :) <$> helper start limit
-  where
-    helper h l
-      | l <= 0 = return []
-      | otherwise = getNext h >>= maybe (return []) chainDown
-    chainDown next = (next :) <$> helper next (limit - 1)
-
-getParentChain ::
-  Keccak256 ->
-  Int ->
-  Redis [Keccak256]
-getParentChain = getChain getParent
-
-getZippedParentChain ::
-  (Keccak256 -> Redis (Maybe t)) ->
-  Keccak256 ->
-  Int ->
-  Redis [(Keccak256, t)]
-getZippedParentChain mapper start limit = do
-  shaChain <- getParentChain start limit
-  mapChain <- zipMapM mapper shaChain
-  return $ second fromJust <$> takeWhile (isJust . snd) mapChain
-
-getHeaderChain ::
-  Keccak256 ->
-  Int ->
-  Redis [(Keccak256, BlockHeader)]
-getHeaderChain = getZippedParentChain getHeader
-
-getBlockChain ::
-  Keccak256 ->
-  Int ->
-  Redis [(Keccak256, OutputBlock)]
-getBlockChain = getZippedParentChain getBlock
-
 getCanonical ::
   Integer ->
   Redis (Maybe Keccak256)
@@ -803,38 +433,6 @@ getCanonicalHeader n =
   getCanonical n >>= \case
     Nothing -> return Nothing
     Just sha -> getHeader sha
-
-getCanonicalChain ::
-  Integer ->
-  Int ->
-  Redis [Keccak256]
-getCanonicalChain start limit = do
-  let chain = forM (take (limit) [start ..]) getCanonical
-  catMaybes <$> chain
-
-getZippedCanonicalChain ::
-  (Keccak256 -> Redis (Maybe t)) ->
-  Integer ->
-  Int ->
-  Redis [(Keccak256, t)]
-getZippedCanonicalChain mapper start limit = do
-  shaChain <- getCanonicalChain start limit
-  mapChain <- zipMapM mapper shaChain
-  return $ second fromJust <$> takeWhile (isJust . snd) mapChain
-
-getCanonicalHeaderChain ::
-  Integer ->
-  Int ->
-  Redis [(Keccak256, BlockHeader)]
-getCanonicalHeaderChain = getZippedCanonicalChain getHeader
-
-getChildren ::
-  Keccak256 ->
-  Redis (Maybe [Keccak256])
-getChildren sha =
-  getMembersInNamespace Children sha >>= \case
-    Left _ -> return Nothing
-    Right chs -> return . Just $ fromValue <$> chs
 
 getBlock ::
   Keccak256 ->
@@ -861,19 +459,6 @@ getBlocks ::
   [Keccak256] ->
   Redis [(Keccak256, Maybe OutputBlock)]
 getBlocks = zipMapM getBlock
-
-getBlocksByNumber ::
-  Integer ->
-  Redis [(Keccak256, Maybe OutputBlock)]
-getBlocksByNumber n =
-  getMembersInNamespace Numbers n >>= \case
-    Left _ -> return []
-    Right hashes -> getBlocks (fromValue <$> hashes)
-
-getBlocksByNumbers ::
-  [Integer] ->
-  Redis [(Integer, [(Keccak256, Maybe OutputBlock)])]
-getBlocksByNumbers = zipMapM getBlocksByNumber
 
 putHeader ::
   BlockHeader ->
@@ -928,12 +513,6 @@ putBlock ::
 putBlock b =
   let sha = blockHash b
    in insertBlock sha b
-
-putBlocks ::
-  Traversable t =>
-  t OutputBlock ->
-  Redis (t (Either Reply Status))
-putBlocks = mapM putBlock
 
 --partitionWith :: Ord k => (a -> k) -> [a] -> [(k, [a])]
 -- partitionWith f = map (fmap (map snd)) . indexedPartitionWith f
@@ -1164,29 +743,8 @@ worldBestBlockKey :: S8.ByteString
 worldBestBlockKey = "<worldbest>"
 {-# INLINE worldBestBlockKey #-}
 
-vmGasCapKey :: S8.ByteString
-vmGasCapKey = "<vmGasCap>"
-{-# INLINE vmGasCapKey #-}
-
 getWorldBestBlockInfo :: Redis (Maybe RedisBestBlock)
 getWorldBestBlockInfo = getBestBlockInfo' worldBestBlockKey
-
-getVmGasCap :: Redis (Maybe Gas)
-getVmGasCap =
-  get vmGasCapKey >>= \case
-    Left x -> do
-      liftLog $ $logErrorS "getVmGasCap" . T.pack $ "got Left " ++ show x
-      return Nothing
-    Right r -> case r of
-      Nothing -> return Nothing
-      Just g -> return . Just . Gas . fromValue $ g
-
-putVmGasCap :: Gas -> Redis (Maybe Gas)
-putVmGasCap g =
-  set vmGasCapKey (toValue . toInteger $ g)
-    >>= \case
-      Left _ -> return Nothing
-      Right _ -> return . Just $ g
 
 updateWorldBestBlockInfo :: Keccak256 -> Integer -> Redis (Either Reply Bool)
 updateWorldBestBlockInfo sha num = withRetryCount 0

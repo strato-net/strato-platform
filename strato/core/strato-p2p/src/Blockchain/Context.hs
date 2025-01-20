@@ -62,13 +62,11 @@ import           Crypto.Types.PubKey.ECC
 import qualified Data.ByteString                       as B
 import qualified Data.ByteString.Char8                 as BC
 import           Data.Conduit.Network
-import           Data.Default
 import qualified Data.Kind                             as DK
 import           Data.Foldable                         (toList)
 import qualified Data.Map.Strict                       as M
 import           Data.Maybe
 import           Data.Proxy
-import           Data.Ranged
 import qualified Data.Set.Ordered as S
 import           Data.String
 import qualified Data.Text                             as T
@@ -82,7 +80,6 @@ import           Blockchain.Blockstanbul               (WireMessage)
 import           Blockchain.Data.Block
 import           Blockchain.Data.BlockHeader
 import           Blockchain.Data.ChainInfo
-import           Blockchain.Data.Enode
 import           Blockchain.Data.PubKey
 import           Blockchain.DB.DetailsDB
 import           Blockchain.DB.SQLDB
@@ -103,7 +100,7 @@ import           Blockchain.Strato.Model.Secp256k1
 
 import qualified Blockchain.Strato.RedisBlockDB        as RBDB
 import           Blockchain.Strato.RedisBlockDB.Models (RedisBestBlock(..))
-import           Control.Monad                         (void, when)
+import           Control.Monad                         (void)
 import           Control.Monad.Composable.Base
 import qualified Database.Persist.Sql                  as SQL
 import qualified Database.Redis                        as Redis
@@ -269,31 +266,11 @@ instance (MonadIO m, MonadLogger m) => Mod.Modifiable BestSequencedBlock (Reader
 instance MonadIO m => A.Selectable Integer (Canonical BlockHeader) (ReaderT Config m) where
   select _ i = fmap (fmap Canonical) . RBDB.withRedisBlockDB $ RBDB.getCanonicalHeader i
 
-instance MonadIO m => A.Selectable Keccak256 ChainTxsInBlock (ReaderT Config m) where
-  select p sha = A.selectWithDefault p sha <&> toMaybe def
-  selectWithDefault _ =
-    fmap ChainTxsInBlock
-      . RBDB.withRedisBlockDB
-      . RBDB.getChainTxsInBlock
-
 instance MonadIO m => A.Selectable Word256 ParentChainIds (ReaderT Config m) where
   selectWithDefault p sha = A.select p sha <&> fromMaybe (ParentChainIds M.empty)
   select _ cId = do
     mCInfo <- RBDB.withRedisBlockDB $ RBDB.getChainInfo cId
     pure $ mCInfo <&> ParentChainIds . parentChains . chainInfo
-
-instance (MonadIO m, MonadLogger m) => A.Selectable Word256 ChainMemberRSet (ReaderT Config m) where
-  select p cid = Just <$> A.selectWithDefault p cid
-  selectWithDefault _ cid = do
-    ancestors <- toList <$> getAncestorChains cid
-    allRSets <- traverse (RBDB.withRedisBlockDB . RBDB.getChainMembers) ancestors
-    case allRSets of
-      [] -> pure $ ChainMemberRSet rSetEmpty
-      rsets -> do
-        let ancestorChains@(ChainMemberRSet rset) = foldr1 (\(ChainMemberRSet a) (ChainMemberRSet b) -> ChainMemberRSet $ rSetIntersection a b) rsets
-        when (rSetIsEmpty rset) $
-          $logWarnS "Selectable ChainMemberRSet" "a member is added, and it is NOT a member of any ancestor chains"
-        pure ancestorChains
 
 instance MonadIO m => A.Selectable Keccak256 (Private (Word256, OutputTx)) (ReaderT Config m) where
   select _ = fmap (fmap Private) . RBDB.withRedisBlockDB . RBDB.getPrivateTransactions
@@ -510,8 +487,6 @@ type MonadP2P m =
     All2
       '[A.Selectable]
       '[ '(Integer, Canonical BlockHeader),
-         '(Keccak256, ChainTxsInBlock),
-         '(Word256, ChainMemberRSet),
          '(Keccak256, Private (Word256, OutputTx)),
          '(Address, X509CertInfoState),
          '((IPAsText, UDPPort, B.ByteString), Point),
@@ -654,5 +629,3 @@ withActivePeer p = bracket a b . const
 withCertifiedPeer :: PPeer -> m (Maybe SomeException) -> m (Maybe SomeException)
 withCertifiedPeer = flip const
 
-toMaybe :: Eq a => a -> a -> Maybe a
-toMaybe a b = if a == b then Nothing else Just b
