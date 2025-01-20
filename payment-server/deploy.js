@@ -22,6 +22,7 @@ async function uploadContract(token, location, type, args) {
   const options = {
     config,
     history: [contractName],
+    cacheNonce: true,
   };
 
   const { address } = await createContract(token, contractArgs, options);

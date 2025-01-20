@@ -2,9 +2,9 @@ timeout: 600000
 VM: SolidVM
 configDirPath: <configDirPath_value>
 serverHost: <serverHost_value>
-cacheNonce: true
 dockerized: true
-fetchInterval: <oracleFetchInterval_value>
+oracleInterval: <oracleFetchInterval_value>
+saleInterval: <saleUpdateInterval_value>
 
 silverOracle:
   name: <silver_oracle_name_value>
@@ -17,6 +17,14 @@ ethOracle:
 
 usdOracle:
   name: <usd_oracle_name_value>
+
+assets:
+  - id: 0
+    name: <silver_oracle_name_value>
+    addresses: <silver_asset_addresses_value>
+  - id: 1
+    name: <gold_oracle_name_value>
+    addresses: <gold_asset_addresses_value>
 
 nodes:
   - id: 0
