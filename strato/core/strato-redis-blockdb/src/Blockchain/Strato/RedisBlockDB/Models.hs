@@ -164,7 +164,7 @@ data RedisBestBlock = RedisBestBlock
 instance RLPSerializable RedisBestBlock where
   rlpEncode (RedisBestBlock sha num) = RLPArray [rlpEncode sha, rlpEncode num]
   rlpDecode (RLPArray [sha, num]) = RedisBestBlock (rlpDecode sha) (rlpDecode num)
-  rlpDecode _ = error "data in wrong format when trying to rlpDecode a RedisBestBlock"[
+  rlpDecode _ = error "data in wrong format when trying to rlpDecode a RedisBestBlock"
 
 displayForNamespace :: BlockDBNamespace -> S8.ByteString -> String
 displayForNamespace ns input = case ns of
