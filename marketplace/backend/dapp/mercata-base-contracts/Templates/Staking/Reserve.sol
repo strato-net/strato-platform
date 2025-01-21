@@ -141,7 +141,6 @@ abstract contract Reserve is Utils, Structs {
     function borrow(address _escrowAddress, uint _borrowAmount) public requireActive() {
         Escrow escrow = Escrow(_escrowAddress);
         require(escrow.borrower() == msg.sender, "Only borrower can borrow against this escrow");
-        require(escrow.reserve() == address(this), "Escrow is not associated with this reserve");
         require(_borrowAmount <= escrow.maxLoanAmount(), "Cannot borrow more than max loan amount");
         
         mintUSDST(escrow.borrower(), _borrowAmount);
