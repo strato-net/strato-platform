@@ -118,14 +118,7 @@ namespaceToKeyPrefix ns = case ns of
   Parent -> "p:"
   Children -> "c:"
   Canonical -> "q:"
-  PrivateChainInfo -> "x:"
-  PrivateChainMembers -> "m:"
-  PrivateTransactions -> "pt:"
-  PrivateTxsInBlocks -> "pb:"
-  PrivateOrgNameChains -> "pnc:"
   Validators -> "validators"
-  PrivateTrueOrgNameChains -> "pnct:"
-  PrivateFalseOrgNameChains -> "pncf:"
   X509Certificates -> "x509:"
   ParsedSetWhitePage -> "potu:"
   ParsedSetToX509 -> "psx509:"
@@ -140,12 +133,6 @@ findNamespace key = case S8.takeWhile (/= ':') key of
   "c" -> Children
   "q" -> Canonical
   "validators" -> Validators
-  "x" -> PrivateChainInfo
-  "m" -> PrivateChainMembers
-  "pt" -> PrivateTransactions
-  "pb" -> PrivateTxsInBlocks
-  "pnct" -> PrivateTrueOrgNameChains
-  "pncf" -> PrivateFalseOrgNameChains
   "x509" -> X509Certificates
   "potu" -> ParsedSetWhitePage
   "psx509" -> ParsedSetToX509

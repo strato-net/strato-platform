@@ -6,17 +6,24 @@
 {-# LANGUAGE TypeSynonymInstances #-}
 {-# LANGUAGE UndecidableInstances #-}
 
-{-# OPTIONS -fno-warn-redundant-constraints #-}
-module Blockchain.Strato.RedisBlockDB.Models where
+module Blockchain.Strato.RedisBlockDB.Models (
+  RedisDBValuable(..),
+  RedisBestBlock(..),
+  RedisHeader(..),
+  RedisUncles(..),
+  RedisTx,
+  RedisTxs(..),
+  BlockDBNamespace(..),
+  RedisDBKeyable(..),
+  displayForNamespace
+  ) where
 
 import qualified Blockchain.Data.BlockHeader as BHD
 import Blockchain.Data.ChainInfo
 import Blockchain.Data.Enode
 import Blockchain.Data.RLP
 import qualified Blockchain.Data.Transaction as TXD
-import Blockchain.Data.TransactionDef (formatChainId)
 import Blockchain.Blockstanbul.Model.Authentication
-import Blockchain.Strato.Model.Account
 import Blockchain.Strato.Model.Address
 import Blockchain.Strato.Model.ChainMember
 import Blockchain.Strato.Model.Class
@@ -26,7 +33,7 @@ import Blockchain.Strato.Model.Validator (Validator)
 import Data.Binary
 import qualified Data.ByteString.Base16 as SB16
 import qualified Data.ByteString.Char8 as S8
-import Data.ByteString.Lazy (fromStrict, toStrict)
+import Data.ByteString.Lazy (toStrict)
 import Data.List (intercalate)
 import qualified Data.Map.Strict as M
 import qualified Data.Set as S
@@ -40,14 +47,7 @@ data BlockDBNamespace
   | Parent
   | Children
   | Canonical
-  | PrivateChainInfo
-  | PrivateChainMembers
-  | PrivateTransactions
-  | PrivateTxsInBlocks
-  | PrivateOrgNameChains
   | Validators
-  | PrivateTrueOrgNameChains
-  | PrivateFalseOrgNameChains
   | X509Certificates
   | ParsedSetWhitePage
   | ParsedSetToX509
@@ -63,10 +63,6 @@ class RedisDBValuable v where
 instance RLPSerializable a => RedisDBValuable a where
   toValue = rlpSerialize . rlpEncode
   fromValue = rlpDecode . rlpDeserialize
-
-instance RedisDBValuable Account where
-  toValue = toStrict . encode
-  fromValue = decode . fromStrict
 
 instance RedisDBKeyable S8.ByteString where
   toKey = SB16.encode
@@ -175,13 +171,6 @@ displayForNamespace ns input = case ns of
   Headers -> let RedisHeader hdr = fromValue input in format hdr
   Transactions -> let RedisTxs txs = fromValue input in intercalate "\n" [format tx | RedisTx tx <- txs]
   Uncles -> let RedisUncles us = fromValue input in show us
-  PrivateChainInfo -> let RedisChainInfo info = fromValue input in show info
-  PrivateChainMembers -> let RedisChainMemberRSet mems = fromValue input in show mems
-  PrivateTransactions -> let (anchor, RedisTx tx) = fromValue input in formatChainId (Just anchor) ++ format tx
-  PrivateTxsInBlocks -> let RedisChainTxsInBlocks ctibs = fromValue input in show ctibs
-  PrivateOrgNameChains -> let RedisOrgNameChains oncs = fromValue input in format (S.toList oncs)
-  PrivateTrueOrgNameChains -> let RedisOrgNameChains oncs = fromValue input in format (S.toList oncs)
-  PrivateFalseOrgNameChains -> let RedisOrgNameChains oncs = fromValue input in format (S.toList oncs)
   Validators -> format (fromValue input :: S8.ByteString)
   X509Certificates -> format (fromValue input :: Address)
   ParsedSetWhitePage -> let RedisOrgUnits units = fromValue input in show units
