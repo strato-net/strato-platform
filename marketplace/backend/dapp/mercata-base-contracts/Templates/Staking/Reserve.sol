@@ -12,7 +12,7 @@ import "../Utils/Utils.sol";
 
 abstract contract Reserve is Utils, Structs {
     OracleService public oracle; // Asset Oracle service for fetching price data
-    Asset public usdstToken;
+    address public usdstToken;
     Asset public cataToken;
 
     decimal public priceOfCATA = 0.10; //cata price in dollars
@@ -28,11 +28,15 @@ abstract contract Reserve is Utils, Structs {
     decimal public unitConversionRate = 1; // 1 oz of gold in grams
 
     decimal public lastUpdatedOraclePrice = 0;
+
+    address public burnerAddress = address(0x6ec8bbe4a5b87be18d443408df43a45e5972fa1b); // burner account
     
     event StakeCreated(address indexed user, address escrow, uint assetAmount, decimal usdstLoan);
     event StakeUnlocked(address indexed user, address escrow, uint quantity);
     event CataTransferred(address indexed from, address indexed to, uint amount);
     event LoanRepaid(address indexed user, address escrow, uint assetAmount, decimal repayment);
+    event MintedUSDST(address indexed user, string commonName, uint amount);
+    event BurnedUSDST(address indexed user, string commonName, uint amount);
 
     constructor(address _assetOracle, string _name, address _assetRootAddress, decimal _unitConversionRate) {
         oracle = OracleService(_assetOracle);
@@ -50,6 +54,52 @@ abstract contract Reserve is Utils, Structs {
     modifier requireOwner(string action) {
         require(msg.sender == owner, "Only owner can " + action + ".");
         _;
+    }
+
+    function mintUSDST(address _userAddress, uint _amount) internal requireActive {
+        require(_amount > 0, "Must mint some USDST");
+        Mintable(usdstToken).mintNewUnits(_amount);
+        Asset(UTXO(Redeemable(Mintable(usdstToken)))).automaticTransfer(_userAddress, 1.0000000000000000000 / 10**18, _amount, block.number);
+        emit MintedUSDST(_userAddress, getCommonName(_userAddress), _amount);
+    }
+
+    function burnUSDST(
+        address[] _usdstAddresses,
+        uint _quantity
+    ) requireActive() internal returns (uint) {
+        require(_usdstAddresses.length > 0, "Pass at least one USDST token address");
+        uint usdstAmountOwed = _quantity;
+        uint usdstAmountNet = usdstAmountOwed;
+        uint usdstQuantity = 0;
+        uint transferNumber = 0;
+
+        for (uint j = 0; j < _usdstAddresses.length; j++) {
+            address usdstAddress = _usdstAddresses[j];
+            Asset usdstAsset = Asset(usdstAddress);
+            require(usdstAsset.root == usdstToken.root, "Asset is not an USDST asset");
+            require(usdstAsset.ownerCommonName() == getCommonName(msg.sender), "Purchaser doesn't own this ETHST asset");
+
+            usdstQuantity = usdstAsset.quantity();
+            transferNumber = (uint(string(usdstAddress), 16) + j + block.timestamp) % 1000000;
+
+            usdstAsset.attachSale();
+            if (usdstQuantity > usdstAmountNet) {
+                usdstAsset.transferOwnership(burnerAddress, usdstAmountNet, true, transferNumber, 1.0000000000000000000 / 10**18);
+                usdstAsset.closeSale();
+                usdstAmountNet = 0;
+            } else {
+                usdstAsset.transferOwnership(burnerAddress, usdstQuantity, true, transferNumber, 1.0000000000000000000 / 10**18);
+                usdstAmountNet -= usdstQuantity;
+            }
+
+            if (usdstAmountNet == 0) {
+                break;
+            }
+        }
+        // require(usdstAmountNet == 0, "Your USDST balance is not high enough to cover the repayment."); // Allow partial repayments
+
+        uint usdstAmountRepaid = usdstAmountOwed - usdstAmountNet;
+        emit BurnedUSDST(msg.sender, getCommonName(msg.sender), usdstAmountRepaid);
     }
 
     function distributeRewards(address[] _escrowAddresses) external {
@@ -128,15 +178,8 @@ abstract contract Reserve is Utils, Structs {
         require(_borrowAmount <= escrow.maxLoanAmount(), "Cannot borrow more than max loan amount");
         
         uint transferNumber = (uint(block.number + 16)) % 1000000;
-        
-        // Transfer USDST from owner to borrower
-        usdstToken.transferOwnership(
-            escrow.borrower(),
-            _borrowAmount,
-            true,
-            transferNumber,
-            1.0000000000000000000 / 10**18
-        );
+
+        mintUSDST(escrow.borrower(), _borrowAmount);
         
         // Update borrowed amount in escrow
         escrow.updateBorrowedAmount(_borrowAmount, true);
@@ -154,29 +197,8 @@ abstract contract Reserve is Utils, Structs {
         uint transferNumber = 0;
         uint transferAmount = 0;
 
-        for (uint j = 0; j < _usdstAssetAddresses.length; j++) {
-            Asset usdstAsset = Asset(_usdstAssetAddresses[j]);
-            require(usdstAsset.root == usdstToken.root, "Asset is not a USDST asset");
-            require(usdstAsset.ownerCommonName() == getCommonName(msg.sender), "Purchaser doesn't own USDST");
+        burnUSDST(_usdstAssetAddresses, usdstAmountOwed);
 
-            usdstQuantity = usdstAsset.quantity();
-            transferNumber = (uint(string(_escrowAddress), 16) + j + block.timestamp) % 1000000;
-
-            transferAmount = usdstQuantity >= usdstAmountNet ? usdstAmountNet : usdstQuantity;
-            usdstAsset.attachSale();
-            if (usdstQuantity > usdstAmountNet) {
-                usdstAsset.transferOwnership(owner, usdstAmountNet, false, transferNumber, 1.0000000000000000000 / 10**18);
-                usdstAsset.closeSale();
-                usdstAmountNet = 0;
-            } else {
-                usdstAsset.transferOwnership(owner, usdstQuantity, false, transferNumber, 1.0000000000000000000 / 10**18);
-                usdstAmountNet -= usdstQuantity;
-            }
-
-            if (usdstAmountNet == 0) {
-                break;
-            }
-        }
         // require(usdstAmountNet == 0, "Your USDST balance is not high enough to cover the repayment."); // Allow partial repayments
 
         // Clear loan
@@ -186,20 +208,8 @@ abstract contract Reserve is Utils, Structs {
         emit LoanRepaid(msg.sender, _escrowAddress, escrow.collateralQuantity(), usdstAmountRepaid);
     }
 
-    function setUSDTSTToken(address _newUSDSTToken) public requireOwner("update USDST token") {
-        usdstToken = Asset(_newUSDSTToken);
-    }
-
     function setCATAToken(address _newCATAToken) public requireOwner("update USDST token") {
         cataToken = Asset(_newCATAToken);
-    }
-
-    function transferUSDSTbacktoOwner(uint _amount) public requireOwner("transfer USDST back") {
-        usdstToken.transferOwnership(owner, _amount, false, 0, 0);
-    }
-
-    function transferUSDSTtoAnotherReserve(address _newOwner, uint _amount) public requireOwner("transfer USDST to another reserve") {
-        usdstToken.transferOwnership(_newOwner, _amount, false, 0, 0);
     }
 
     function transferCATAbacktoOwner(uint _amount) public requireOwner("transfer CATA back") {
