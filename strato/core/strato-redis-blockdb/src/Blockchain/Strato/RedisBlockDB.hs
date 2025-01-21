@@ -58,16 +58,14 @@ import BlockApps.Logging
 import BlockApps.X509.Certificate
 import Blockchain.Data.BlockHeader
 import Blockchain.EthConf (lookupRedisBlockDBConfig)
-import Blockchain.Partitioner (partitionWith)
 import Blockchain.Sequencer.Event
 import Blockchain.Strato.Model.Address
 import qualified Blockchain.Strato.Model.ChainMember as CM
 import Blockchain.Strato.Model.Class
-import Blockchain.Strato.Model.ExtendedWord (Word256)
 import Blockchain.Strato.Model.Keccak256
 import Blockchain.Strato.RedisBlockDB.Models as Models
 import Blockchain.Strato.Model.Validator (Validator(..))
-import Control.Arrow ((&&&), (***))
+import Control.Arrow ((&&&))
 import Control.Concurrent (threadDelay)
 import Control.Monad
 import Control.Monad.Change.Modify hiding (get)
@@ -75,7 +73,7 @@ import Control.Monad.Trans
 import qualified Data.ByteString.Char8 as S8
 import Data.Foldable (foldl')
 import qualified Data.Map.Strict as M
-import Data.Maybe (catMaybes, fromJust, fromMaybe, isJust, isNothing)
+import Data.Maybe (catMaybes, fromJust, fromMaybe, isNothing)
 import qualified Data.Set as S
 import qualified Data.Text as T
 import Database.Redis
@@ -234,31 +232,6 @@ insertRootCertificate = do
       TxAborted -> Left . SingleLine $ "insertRootCertificate - Aborted"
       TxError e -> Left . SingleLine $ "insertRootCertificate - Error " <> S8.pack e
 
-getChainTxsInBlock ::
-  Keccak256 ->
-  Redis (M.Map Word256 [Keccak256])
-getChainTxsInBlock bHash =
-  getInNamespace PrivateTxsInBlocks bHash >>= \case
-    Left _ -> return M.empty
-    Right Nothing -> return M.empty
-    Right (Just rmems) ->
-      let RedisChainTxsInBlocks mems = fromValue rmems
-       in return mems
-
-addChainTxsInBlock ::
-  Keccak256 ->
-  Word256 ->
-  [Keccak256] ->
-  Redis (Either Reply Status)
-addChainTxsInBlock bHash cId shas = do
-  mems <- getChainTxsInBlock bHash
-  let mems' = RedisChainTxsInBlocks $ M.insertWith (++) cId shas mems
-  res <- multiExec $ set (inNamespace PrivateTxsInBlocks bHash) (toValue mems')
-  case res of
-    TxSuccess _ -> pure $ Right Ok
-    TxAborted -> pure . Left $ SingleLine (S8.pack $ "addChainTxsInBlock - Aborted")
-    TxError e -> pure . Left $ SingleLine (S8.pack $ "addChainTxsInBlock - Error" ++ e)
-
 getCertFromParsedSet :: CM.ChainMemberParsedSet -> Redis (Maybe X509CertInfoState)
 getCertFromParsedSet (CM.CommonName o u c _) =
   getInNamespace ParsedSetToX509 (CM.CommonName o u c True) >>= \case
@@ -356,19 +329,6 @@ getTransactions sha =
     Right (Just rtxs) ->
       let (RedisTxs txs) = fromValue rtxs
        in return . Just $ morphTx <$> txs
-
-addPrivateTransactions ::
-  [(Keccak256, (Word256, OutputTx))] ->
-  Redis (Either Reply Status)
-addPrivateTransactions ptxs = do
-  res <-
-    multiExec
-      . mset
-      $ map (inNamespace PrivateTransactions *** toValue) ptxs
-  case res of
-    TxSuccess _ -> pure $ Right Ok
-    TxAborted -> pure . Left $ SingleLine (S8.pack $ "addPrivateTransactions - Aborted")
-    TxError e -> pure . Left $ SingleLine (S8.pack $ "addPrivateTransactions - Error" ++ e)
 
 getUncles ::
   Keccak256 ->
@@ -500,22 +460,8 @@ insertBlock sha b = do
       parent = blockHeaderParentHash header
       header' = morphBlockHeader header :: RedisHeader
       txs = RedisTxs (morphTx <$> blockTransactions b :: [Models.RedisTx])
-      ptxs =
-        filter
-          (isJust . (txChainId <=< otPrivatePayload))
-          (obReceiptTransactions b)
-      swapPayload otx = case otPrivatePayload otx of
-        Nothing -> Nothing
-        Just p -> Just otx {otBaseTx = p}
-      fullPrivateTxs = catMaybes $ swapPayload <$> ptxs
       uncles = RedisUncles (morphBlockHeader <$> blockUncleHeaders b)
       inNS' = flip inNamespace sha
-  unless (null fullPrivateTxs) $ do
-    void . addPrivateTransactions $
-      map (txHash &&& ((fromJust . (txChainId <=< otPrivatePayload)) &&& id)) fullPrivateTxs
-    forM_ (partitionWith (txChainId <=< otPrivatePayload) fullPrivateTxs) $ \(cId, ptxs') ->
-      --  ^-- already filtered on (isJust . txChainId)
-      addChainTxsInBlock sha (fromJust cId) $ map txHash ptxs'
   res <- multiExec $ do
     void $ setnx (inNS' Headers) (toValue header')
     void $ setnx (inNS' Transactions) (toValue txs)
