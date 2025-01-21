@@ -79,7 +79,6 @@ handleVmEvents = awaitForever $ \InBatch {..} -> do
   yieldMany $! uncurry OutJSONRPC <$> rpcResps
 
   numPoolable <- uncurry (*>) . (yieldMany *** pure) =<< lift (processTransactions txPairs)
-  yieldMany $ outputPrivateTransactions privateTxs
   processBlocks blocks
 
 
@@ -241,9 +240,6 @@ getNumPoolable txPairs = do
 
 outputTransactions :: [(Timestamp, OutputTx)] -> [VmOutEvent]
 outputTransactions = map $ OutIndexEvent . uncurry IndexTransaction
-
-outputPrivateTransactions :: [OutputTx] -> [VmOutEvent]
-outputPrivateTransactions = map $ OutIndexEvent . IndexPrivateTx
 
 writeBlockSummary :: HasBlockSummaryDB m => OutputBlock -> m ()
 writeBlockSummary block =

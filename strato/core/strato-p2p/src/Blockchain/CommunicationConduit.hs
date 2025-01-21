@@ -240,7 +240,6 @@ messageToBytes = mapC serializeWithRespectToMaxMessageSize
               BlockBodies arr -> serializeWithRespectToMaxMessageSize . BlockBodies $ firstHalf arr
               GetChainDetails arr -> serializeWithRespectToMaxMessageSize . GetChainDetails $ firstHalf arr
               ChainDetails arr -> serializeWithRespectToMaxMessageSize . ChainDetails $ firstHalf arr
-              GetTransactions arr -> serializeWithRespectToMaxMessageSize . GetTransactions $ firstHalf arr
               _ ->
                 error $
                   printf

@@ -161,7 +161,6 @@ data JsonRpcCommand
 data P2pEvent
   = P2pTx OutputTx
   | P2pBlock OutputBlock
-  | P2pGetTx [Keccak256]
   | P2pBlockstanbul PBFT.WireMessage
   | -- Ask and push for inclusive ranges of blocks
     P2pAskForBlocks {askStart :: Integer, askEnd :: Integer, askPeer :: ChainMemberParsedSet}
@@ -173,7 +172,6 @@ data P2pEvent
 instance Format P2pEvent where
   format (P2pTx o) = format o
   format (P2pBlock o) = format o
-  format (P2pGetTx shas) = "[" ++ (intercalate "," $ map format shas) ++ "]"
   format (P2pBlockstanbul o) = format o
   format (P2pGetMPNodes srs) = "[" ++ (intercalate "," $ map format srs) ++ "]"
   format (P2pMPNodesResponse o nds) = "Response to " ++ show o ++ ": [" ++ (intercalate "," $ map show nds) ++ "]"
@@ -182,7 +180,6 @@ instance Format P2pEvent where
 instance ShowConstructor P2pEvent where
   showConstructor P2pTx{} = "P2pTx"
   showConstructor P2pBlock{} = "P2pBlock"
-  showConstructor P2pGetTx{} = "P2pGetTx"
   showConstructor P2pBlockstanbul{} = "P2pBlockstanbul"
   showConstructor P2pAskForBlocks{} = "P2pAskForBlocks"
   showConstructor P2pPushBlocks{} = "P2pPushBlocks"

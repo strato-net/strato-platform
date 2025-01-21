@@ -79,7 +79,6 @@ import           BlockApps.X509.Certificate
 import           Blockchain.Blockstanbul               (WireMessage)
 import           Blockchain.Data.Block
 import           Blockchain.Data.BlockHeader
-import           Blockchain.Data.ChainInfo
 import           Blockchain.Data.PubKey
 import           Blockchain.DB.DetailsDB
 import           Blockchain.DB.SQLDB
@@ -94,7 +93,6 @@ import           Blockchain.Strato.Discovery.Data.Peer
 import           Blockchain.Strato.Discovery.ContextLite ()
 import           Blockchain.Strato.Model.Address
 import           Blockchain.Strato.Model.ChainMember
-import           Blockchain.Strato.Model.ExtendedWord
 import           Blockchain.Strato.Model.Keccak256
 import           Blockchain.Strato.Model.Secp256k1
 
@@ -265,15 +263,6 @@ instance (MonadIO m, MonadLogger m) => Mod.Modifiable BestSequencedBlock (Reader
 
 instance MonadIO m => A.Selectable Integer (Canonical BlockHeader) (ReaderT Config m) where
   select _ i = fmap (fmap Canonical) . RBDB.withRedisBlockDB $ RBDB.getCanonicalHeader i
-
-instance MonadIO m => A.Selectable Word256 ParentChainIds (ReaderT Config m) where
-  selectWithDefault p sha = A.select p sha <&> fromMaybe (ParentChainIds M.empty)
-  select _ cId = do
-    mCInfo <- RBDB.withRedisBlockDB $ RBDB.getChainInfo cId
-    pure $ mCInfo <&> ParentChainIds . parentChains . chainInfo
-
-instance MonadIO m => A.Selectable Keccak256 (Private (Word256, OutputTx)) (ReaderT Config m) where
-  select _ = fmap (fmap Private) . RBDB.withRedisBlockDB . RBDB.getPrivateTransactions
 
 instance MonadIO m => A.Selectable Address X509CertInfoState (ReaderT Config m) where
   select _ = RBDB.withRedisBlockDB . RBDB.getCertificate
@@ -487,7 +476,6 @@ type MonadP2P m =
     All2
       '[A.Selectable]
       '[ '(Integer, Canonical BlockHeader),
-         '(Keccak256, Private (Word256, OutputTx)),
          '(Address, X509CertInfoState),
          '((IPAsText, UDPPort, B.ByteString), Point),
          '(IPAsText, PPeer),

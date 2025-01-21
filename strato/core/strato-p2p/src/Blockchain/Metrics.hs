@@ -86,7 +86,6 @@ recordMessage' msgVect msg = do
             PBFT.RoundChange {} -> "round_change"
         GetChainDetails _ -> "get_chain_details"
         ChainDetails _ -> "chain_details"
-        GetTransactions _ -> "get_transactions"
         GetMPNodes _ -> "get_mp_nodes"
         MPNodes _ -> "mp_nodes"
   liftIO $ withLabel msgVect label incCounter

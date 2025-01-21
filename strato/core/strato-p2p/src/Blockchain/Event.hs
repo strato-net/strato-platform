@@ -38,7 +38,6 @@ import Blockchain.Sequencer.Event
 import Blockchain.Strato.Discovery.Data.Peer
 import Blockchain.Strato.Model.Address (Address)
 import Blockchain.Strato.Model.Class
-import Blockchain.Strato.Model.ExtendedWord
 import Blockchain.Strato.Model.Keccak256
 import Blockchain.Strato.Model.MicroTime
 import Blockchain.Strato.Model.Secp256k1
@@ -311,16 +310,6 @@ handleEvents peer = awaitForever $ \case
   MsgEvt (ChainDetails _) -> return ()
 
   -- TODO: Optimize/do security checking (a peer can spam you with random hashes and keep you busy forever)
-  MsgEvt (GetTransactions trHashes) -> do
-    lift stampActionTimestamp
-    $logInfoS "handleEvents/GetTransactions" $
-      T.pack $
-        "requesting info for txHashes: "
-          ++ (intercalate "\n" (format <$> trHashes))
-          ++ " from peer "
-          ++ peerString peer
-    ptrs <- fmap (map unPrivate . M.elems) . lift $ selectMany (Proxy @(Private (Word256, OutputTx))) trHashes
-    yieldR . Transactions . map (morphTx . snd) $ ptrs
   MsgEvt (GetMPNodes srs) -> do
     let txo = Origin.PeerString (peerString peer)
     yieldL $ ToUnseq [IEGetMPNodesRequest txo srs]
@@ -343,7 +332,6 @@ handleEvents peer = awaitForever $ \case
         $logDebugS "handleEvents/P2pTx" . T.pack $ "the transaction was: " ++ format tx
         yieldR $ Transactions [otBaseTx tx]
         
-    P2pGetTx shas -> yieldR $ GetTransactions shas
     P2pBlockstanbul msg ->
       lift (fmap getChainMemberFromX509 <$> getPeerX509 peer) >>= \case
         Nothing ->

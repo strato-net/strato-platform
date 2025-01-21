@@ -10,7 +10,7 @@
 module Wiring where
 
 import Blockchain.DBM
-import Blockchain.Data.Block (BestBlock (..), Private (..))
+import Blockchain.Data.Block (BestBlock (..))
 import Blockchain.Data.BlockDB
 import Blockchain.Data.ChainInfo
 import Blockchain.Data.ChainInfoDB (putChainInfo)
@@ -54,17 +54,6 @@ instance HasSQLDB m => (Keccak256 `A.Alters` API OutputBlock) m where
 instance (MonadIO m, HasRedis m) => Mod.Modifiable (P2P BestBlock) m where
   get _ = liftIO . throwIO $ Lookup "P2P" "()" "BestBlock"
   put _ (P2P (BestBlock s n)) = void . execRedis $ RBDB.putBestBlockInfo s n
-
-instance (MonadIO m, HasRedis m) => (Keccak256 `A.Alters` P2P (Private (Word256, OutputTx))) m where
-  lookup _ _ = liftIO . throwIO $ Lookup "P2P" "Keccak256" "Private (Word256, OutputTx)"
-  delete _ _ = liftIO . throwIO $ Delete "P2P" "Keccak256" "Private (Word256, OutputTx)"
-  insert p k v = A.insertMany p $ M.fromList [(k, v)]
-  insertMany _ =
-    void
-      . execRedis
-      . RBDB.addPrivateTransactions
-      . map (fmap $ unPrivate . unP2P)
-      . M.toList
 
 instance (MonadIO m, HasRedis m) => (Keccak256 `A.Alters` P2P OutputBlock) m where
   lookup _ _ = liftIO . throwIO $ Lookup "P2P" "Keccak256" "OutputBlock"

@@ -16,19 +16,15 @@ module Blockchain.Strato.RedisBlockDB
   ( RedisConnection (..),
     findNamespace,
     runStratoRedisIO,
-    getChainInfo,
     isValidator,
     addValidators,
     getValidatorAddresses,  --remove
     registerCertificate,
-    getChainTxsInBlock,
     getHeader,
     getHeaders,
     getBlock,
     getBlocks,
     getTransactions,
-    getPrivateTransactions,
-    addPrivateTransactions,
     getParent,
     getCanonicalHeader,
     getCertificate,
@@ -61,7 +57,6 @@ where
 import BlockApps.Logging
 import BlockApps.X509.Certificate
 import Blockchain.Data.BlockHeader
-import Blockchain.Data.ChainInfo
 import Blockchain.EthConf (lookupRedisBlockDBConfig)
 import Blockchain.Partitioner (partitionWith)
 import Blockchain.Sequencer.Event
@@ -157,17 +152,6 @@ findNamespace key = case S8.takeWhile (/= ':') key of
   "potu" -> ParsedSetWhitePage
   "psx509" -> ParsedSetToX509
   wut -> error $ "unknown namespace: " ++ show wut
-
-getChainInfo ::
-  Word256 ->
-  Redis (Maybe ChainInfo)
-getChainInfo cId =
-  getInNamespace PrivateChainInfo cId >>= \case
-    Left _ -> return Nothing
-    Right Nothing -> return Nothing
-    Right (Just rcInfo) ->
-      let (RedisChainInfo cInfo) = fromValue rcInfo
-       in return $ Just cInfo
 
 isValidator ::
   CM.ChainMemberParsedSet ->
@@ -372,17 +356,6 @@ getTransactions sha =
     Right (Just rtxs) ->
       let (RedisTxs txs) = fromValue rtxs
        in return . Just $ morphTx <$> txs
-
-getPrivateTransactions ::
-  Keccak256 ->
-  Redis (Maybe (Word256, OutputTx))
-getPrivateTransactions sha =
-  getInNamespace PrivateTransactions sha >>= \case
-    Left _ -> return Nothing
-    Right Nothing -> return Nothing
-    Right (Just rtx) ->
-      let (anchor, RedisTx tx) = fromValue rtx
-       in return . Just $ (anchor, morphTx tx)
 
 addPrivateTransactions ::
   [(Keccak256, (Word256, OutputTx))] ->

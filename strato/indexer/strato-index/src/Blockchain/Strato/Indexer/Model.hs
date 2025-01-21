@@ -18,7 +18,6 @@ data IndexEvent
   | UpdateTxResult (Keccak256, Keccak256, Keccak256, Bool) -- Deprecated
   | IndexTransaction Timestamp OutputTx
   | EventDBEntry EventDB
-  | IndexPrivateTx OutputTx
   deriving (Eq, Show)
 
 instance Binary IndexEvent where
@@ -32,7 +31,6 @@ instance Binary IndexEvent where
       4 -> UpdateTxResult <$> get
       6 -> IndexTransaction <$> get <*> get
       7 -> EventDBEntry <$> get
-      8 -> IndexPrivateTx <$> get
       x -> error $ "Unknown IndexEvent tag in decode `" ++ show x ++ "`"
 
   put (RanBlock b) = putWord8 0 >> put b
@@ -42,4 +40,3 @@ instance Binary IndexEvent where
   put (UpdateTxResult s) = putWord8 4 >> put s
   put (IndexTransaction t x) = putWord8 6 >> put t >> put x
   put (EventDBEntry e) = putWord8 7 >> put e
-  put (IndexPrivateTx x) = putWord8 8 >> put x
