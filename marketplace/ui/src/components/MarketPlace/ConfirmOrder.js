@@ -181,7 +181,7 @@ const ConfirmOrder = ({ paymentServices = [], data, columns }) => {
 
       orderList.push({
         quantity: is18DecimalPlaces
-          ? quantity.multipliedBy(new BigNumber(10).pow(18)).toString()
+          ? quantity.multipliedBy(new BigNumber(10).pow(18)).toFixed(0)
           : quantity.toString(),
         assetAddress: item.key,
         firstSale: item.firstSale,

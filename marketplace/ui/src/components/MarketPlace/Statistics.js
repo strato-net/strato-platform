@@ -24,7 +24,7 @@ const Statistics = ({ priceHistory, is18DecimalPlaces }) => {
         {/* Tile for Number of Units Sold */}
         <div className="tileWrapper p-2 flex-auto md:max-w-[calc(33.333%-1.5rem)] w-full">
           <div className="tile bg-gray-200 p-4 rounded-lg shadow-md text-center">
-            <p className="statistics-title text-2xl font-semibold">{is18DecimalPlaces ? originVolume / Math.pow(10, 18) : originVolume }</p>
+            <p className="statistics-title text-2xl font-semibold">{is18DecimalPlaces ? (originVolume / Math.pow(10, 18)).toFixed(0) : originVolume.toFixed(0) }</p>
             <p className="subtitle text-gray-600">Number Of Units Sold</p>
           </div>
         </div>

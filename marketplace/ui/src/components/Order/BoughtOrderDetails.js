@@ -10,13 +10,11 @@ import {
   Input,
   Button,
   Spin,
-  Tabs,
 } from 'antd';
-import { Link, useLocation, useMatch } from 'react-router-dom';
+import { Link, useMatch } from 'react-router-dom';
 import { actions } from '../../contexts/order/actions';
-import { actions as marketplaceActions } from '../../contexts/marketplace/actions';
 import { useOrderDispatch, useOrderState } from '../../contexts/order';
-import { useMarketplaceDispatch } from '../../contexts/marketplace';
+import { useMarketplaceState } from '../../contexts/marketplace';
 import routes from '../../helpers/routes';
 import classNames from 'classnames';
 import { EyeOutlined } from '@ant-design/icons';
@@ -27,12 +25,8 @@ import { useNavigate } from 'react-router-dom';
 import { US_DATE_FORMAT } from '../../helpers/constants';
 import ClickableCell from '../ClickableCell';
 import image_placeholder from '../../images/resources/image_placeholder.png';
-import dayjs from 'dayjs';
 import { ResponsiveOrderDetailCard } from './ResponsiveOrderDetailCard';
 import { LeftArrow } from '../../images/SVGComponents';
-// import {
-//   useMarketplaceState,
-// } from '../../contexts/marketplace';
 
 const BoughtOrderDetails = ({ user, users }) => {
   const formatter = new Intl.NumberFormat('en-US');
@@ -42,14 +36,12 @@ const BoughtOrderDetails = ({ user, users }) => {
   const [Id, setId] = useState(undefined);
   const [data, setdata] = useState([]);
   const dispatch = useOrderDispatch();
-  const marketplaceDispatch = useMarketplaceDispatch();
   const { Text } = Typography;
   const [api, contextHolder] = notification.useNotification();
   const [status, setStatus] = useState(getStatus(0));
   const { TextArea } = Input;
   const [paid, setPaid] = useState('Processing');
-  const [selectedDate, setSelectedDate] = useState('');
-  const { state } = useLocation();
+  const { assetsWithEighteenDecimalPlaces } = useMarketplaceState();
 
   const navigate = useNavigate();
 
@@ -74,14 +66,11 @@ const BoughtOrderDetails = ({ user, users }) => {
   const {
     orderDetails,
     isorderDetailsLoading,
-    ordersAudit,
     isbuyerDetailsUpdating,
     success,
     message,
   } = useOrderState();
-
-  const [assetsWithEighteenDecimalPlaces, setAssetsWithEighteenDecimalPlaces] =
-    useState([]);
+  const details = orderDetails;
 
   const routeMatch = useMatch({
     path: routes.BoughtOrderDetails.url,
@@ -100,11 +89,6 @@ const BoughtOrderDetails = ({ user, users }) => {
 
   const getData = async () => {
     await actions.fetchOrderDetails(dispatch, Id);
-    const assetsWithEighteenDecimalPlaces =
-      await marketplaceActions.fetchAssetsWithEighteenDecimalPlaces(
-        marketplaceDispatch
-      );
-    setAssetsWithEighteenDecimalPlaces(assetsWithEighteenDecimalPlaces);
   };
 
   useEffect(() => {
@@ -123,16 +107,16 @@ const BoughtOrderDetails = ({ user, users }) => {
             (item) => item.value
           );
       let items = [];
-      orderDetails.assets.forEach((prod, index) => {  
+      orderDetails.assets.forEach((prod, index) => {
         const is18DecimalPlaces = assetsWithEighteenDecimalPlaces.includes(
           prod.root
-        );      
+        );
         const productPrice = is18DecimalPlaces
-        ? (prod.price * Math.pow(10, 18)).toFixed(2)
-        : prod.price;
+          ? (prod.price * Math.pow(10, 18)).toFixed(2)
+          : prod.price;
         const productQuantity = is18DecimalPlaces
-        ? orderQuantities[index] / Math.pow(10, 18)
-        : orderQuantities[index];
+          ? orderQuantities[index] / Math.pow(10, 18)
+          : orderQuantities[index];
         items.push({
           address: prod.address,
           chainId: prod.chainId,
@@ -145,12 +129,14 @@ const BoughtOrderDetails = ({ user, users }) => {
           name: prod.name,
           unitPrice: productPrice,
           quantity: productQuantity
-            ? productQuantity.toLocaleString('en-US', {
-                maximumFractionDigits: 4,
-                minimumFractionDigits: 0,
-              })
+            ? formattedNum(productQuantity.toFixed(0))
             : '--',
-          amount: productPrice * (parseInt(orderQuantities[index]/10**18)),
+          amount: formattedNum(
+            (
+              productPrice *
+              (orderQuantities[index] / Math.pow(10, 18))
+            ).toFixed(2)
+          ),
           serialNumber: prod,
           tax: prod.tax ? prod.tax : 0,
         });
@@ -158,25 +144,6 @@ const BoughtOrderDetails = ({ user, users }) => {
       setdata(items);
     }
   }, [orderDetails, assetsWithEighteenDecimalPlaces]);
-
-  const details = orderDetails;
-  const audits = ordersAudit;
-  if (audits && audits.length) {
-    audits.forEach((val) => {
-      if (users && users.length) {
-        const sender = users.find(
-          (data) => val['transaction_sender'] === data.userAdress
-        );
-        audits['sender'] = sender;
-      }
-    });
-  }
-
-  if (Id !== undefined && !isorderDetailsLoading && details !== null) {
-    if (details['ownerOrganizationalUnit'] === '') {
-      details['ownerOrganizationalUnit'] = 'N/A';
-    }
-  }
 
   const OrderData = ({ title, value }) => {
     return (
@@ -190,10 +157,6 @@ const BoughtOrderDetails = ({ user, users }) => {
         </Text>
       </Col>
     );
-  };
-
-  const onDateChange = (date) => {
-    setSelectedDate(date);
   };
 
   const statusComponent = (status) => {
@@ -484,13 +447,10 @@ const BoughtOrderDetails = ({ user, users }) => {
                 <Divider type="vertical" className="h-14 bg-secondryD" />
                 <OrderData
                   title="Currency"
-                  value={ details.order.currency || 'USD' }
+                  value={details.order.currency || 'USD'}
                 />
                 <Divider type="vertical" className="h-14 bg-secondryD" />
-                <OrderData
-                  title="Total"
-                  value={ details.order.totalPrice }
-                />
+                <OrderData title="Total" value={details.order.totalPrice} />
                 <Divider type="vertical" className="h-14 bg-secondryD" />
                 <OrderData
                   title="Date"
@@ -558,7 +518,7 @@ const BoughtOrderDetails = ({ user, users }) => {
                   <NewOrderData
                     className="w-2/4"
                     title="Total"
-                    value={ details.order.totalPrice }
+                    value={details.order.totalPrice}
                   />
                   <NewOrderData
                     className="w-2/4"

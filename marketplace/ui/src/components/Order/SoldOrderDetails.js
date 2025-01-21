@@ -14,11 +14,10 @@ import {
   notification,
   Tabs,
 } from 'antd';
-import { Link, useLocation, useMatch } from 'react-router-dom';
+import { Link, useMatch } from 'react-router-dom';
 import { actions } from '../../contexts/order/actions';
 import { useOrderDispatch, useOrderState } from '../../contexts/order';
-import { actions as marketplaceActions } from '../../contexts/marketplace/actions';
-import { useMarketplaceDispatch } from '../../contexts/marketplace';
+import { useMarketplaceState } from '../../contexts/marketplace';
 import routes from '../../helpers/routes';
 import classNames from 'classnames';
 import { getStringDate } from '../../helpers/utils';
@@ -40,39 +39,18 @@ const SoldOrderDetails = ({ user, users }) => {
   const [Id, setId] = useState(undefined);
   const [data, setdata] = useState([]);
   const dispatch = useOrderDispatch();
-  const marketplaceDispatch = useMarketplaceDispatch();
   const { Text } = Typography;
   const [selectedDate, setSelectedDate] = useState('');
   const [status, setStatus] = useState(getStatus(1));
-  const [assetsWithEighteenDecimalPlaces, setAssetsWithEighteenDecimalPlaces] =
-    useState([]);
+  const { assetsWithEighteenDecimalPlaces } = useMarketplaceState();
 
   const [paid, setPaid] = useState('Processing');
   const [comment, setComment] = useState('');
   const { TextArea } = Input;
   const [api, contextHolder] = notification.useNotification();
-  const state = useLocation();
 
-  useEffect(() => {
-    const fetchAssets = async () => {
-      const assetsWithEighteenDecimalPlaces =
-        await marketplaceActions.fetchAssetsWithEighteenDecimalPlaces(
-          marketplaceDispatch
-        );
-      setAssetsWithEighteenDecimalPlaces(assetsWithEighteenDecimalPlaces);
-    };
-    fetchAssets();
-  }, [marketplaceDispatch]);
-
-  const {
-    orderDetails,
-    isorderDetailsLoading,
-    ordersAudit,
-    message,
-    success,
-    isCreateOrderSubmitting,
-    isUpdatingOrderComment,
-  } = useOrderState();
+  const { orderDetails, isorderDetailsLoading, message, success } =
+    useOrderState();
   const routeMatch = useMatch({
     path: routes.SoldOrderDetails.url,
     strict: true,
@@ -106,7 +84,6 @@ const SoldOrderDetails = ({ user, users }) => {
             (item) => item.value
           );
       orderDetails.assets.forEach((prod, index) => {
-
         const is18DecimalPlaces = assetsWithEighteenDecimalPlaces.includes(
           prod.root
         );
@@ -129,7 +106,7 @@ const SoldOrderDetails = ({ user, users }) => {
           name: prod.name,
           unitPrice: productPrice,
           quantity: productQuantity ? formattedNum(productQuantity) : '--',
-          amount: productPrice * (parseInt(productQuantity)),
+          amount: formattedNum((productPrice * productQuantity).toFixed(2)),
           serialNumber: prod,
           tax: prod.tax ? prod.tax : 0,
         });
@@ -153,23 +130,6 @@ const SoldOrderDetails = ({ user, users }) => {
   };
 
   const details = orderDetails;
-  const audits = ordersAudit;
-  if (audits && audits.length) {
-    audits.forEach((val) => {
-      if (users && users.length) {
-        const sender = users.find(
-          (data) => val['transaction_sender'] === data.userAdress
-        );
-        audits['sender'] = sender;
-      }
-    });
-  }
-
-  if (Id !== undefined && !isorderDetailsLoading && details !== null) {
-    if (details['ownerOrganizationalUnit'] === '') {
-      details['ownerOrganizationalUnit'] = 'N/A';
-    }
-  }
 
   const OrderData = ({ title, value }) => {
     return (
@@ -308,7 +268,9 @@ const SoldOrderDetails = ({ user, users }) => {
           className="text-primary text-[17px] cursor-pointer"
           onClick={() => {
             navigate(
-              `${routes.MarketplaceProductDetail.url.replace(':address', text.address).replace(':name', encodeURIComponent(text.name))}`
+              `${routes.MarketplaceProductDetail.url
+                .replace(':address', text.address)
+                .replace(':name', encodeURIComponent(text.name))}`
             );
           }}
         >
@@ -442,15 +404,9 @@ const SoldOrderDetails = ({ user, users }) => {
                   value={details.order.sellersCommonName}
                 />
                 <Divider type="vertical" className="h-14 bg-secondryD" />
-                <OrderData
-                  title="Currency"
-                  value={ details.order.currency }
-                />
+                <OrderData title="Currency" value={details.order.currency} />
                 <Divider type="vertical" className="h-14 bg-secondryD" />
-                <OrderData
-                  title="Total"
-                  value={ details.order.totalPrice }
-                />
+                <OrderData title="Total" value={details.order.totalPrice} />
                 <Divider type="vertical" className="h-14 bg-secondryD" />
                 <OrderData
                   title="Date"
@@ -494,25 +450,25 @@ const SoldOrderDetails = ({ user, users }) => {
                                 },
                               ]
                             : status === getStatus(2)
-                              ? [
-                                  {
-                                    text: getStatus(2),
-                                    value: getStatus(2),
-                                  },
-                                ]
-                              : status === getStatus(4)
-                                ? [
-                                    {
-                                      text: getStatus(4),
-                                      value: getStatus(4),
-                                    },
-                                  ]
-                                : [
-                                    {
-                                      text: getStatus(3),
-                                      value: getStatus(3),
-                                    },
-                                  ]
+                            ? [
+                                {
+                                  text: getStatus(2),
+                                  value: getStatus(2),
+                                },
+                              ]
+                            : status === getStatus(4)
+                            ? [
+                                {
+                                  text: getStatus(4),
+                                  value: getStatus(4),
+                                },
+                              ]
+                            : [
+                                {
+                                  text: getStatus(3),
+                                  value: getStatus(3),
+                                },
+                              ]
                         }
                       />
                     </Row>
@@ -540,7 +496,10 @@ const SoldOrderDetails = ({ user, users }) => {
                     <span>Invoice</span>
                     <button>
                       <Link
-                        to={`${routes.Invoice.url.replace(':id', routeMatch?.params?.id)}`}
+                        to={`${routes.Invoice.url.replace(
+                          ':id',
+                          routeMatch?.params?.id
+                        )}`}
                         target="_blank"
                       >
                         <div className="flex items-center cursor-pointer hover:text-primary">
@@ -581,7 +540,7 @@ const SoldOrderDetails = ({ user, users }) => {
                   <NewOrderData
                     className="w-2/4"
                     title="Total"
-                    value={ details.order.totalPrice }
+                    value={details.order.totalPrice}
                   />
                   <NewOrderData
                     className="w-2/4"
