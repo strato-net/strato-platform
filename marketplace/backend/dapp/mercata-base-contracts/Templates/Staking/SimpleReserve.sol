@@ -3,7 +3,7 @@ pragma strict;
 
 import <BASE_CODE_COLLECTION>;
 
-contract SimpleReserve is Tokens, Reserve{
+contract SimpleReserve is Reserve{
     constructor(
         address _assetOracle, 
         string _name, 
