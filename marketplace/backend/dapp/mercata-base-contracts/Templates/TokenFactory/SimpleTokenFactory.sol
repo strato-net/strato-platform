@@ -1,16 +1,13 @@
-pragma es6;
-pragma strict;
+pragma solidvm 11.5;
 
 import <BASE_CODE_COLLECTION>;
-import "../../mercata-base-contracts/Templates/Payments/TokenPaymentService.sol";
 
-/// @title A representation of Token assets
-contract Tokens is Mintable, TokenFactory {
+contract SimpleTokenFactory is TokenFactory, Tokens {
+
     string public paymentServiceCreator;
     string public paymentServiceName;
 
-    constructor(
-        string _name,
+    constructor(string _name,
         string _description,
         string[] _images,
         string[] _files,
@@ -20,12 +17,11 @@ contract Tokens is Mintable, TokenFactory {
         AssetStatus _status,
         address _redemptionService,
         string _paymentServiceCreator
-    ) public Mintable(_name, _description, _images, _files, _fileNames, _createdDate, _quantity, _status, _redemptionService) TokenFactory(_name) {
-        paymentServiceCreator = _paymentServiceCreator;
-        paymentServiceName = _name;
+        address _redemptionService) Tokens(_name, _description, _images, _files, _fileNames, _createdDate, _quantity, _status, _redemptionService) TokenFactory(_name) public {
+            token = address(this);
     }
 
-    function mint(uint _quantity) internal override returns (UTXO) {
+        function mint(uint _quantity) internal override returns (UTXO) {
         require(_quantity > 0, "Quantity must be greater than 0");
         Tokens newToken = new Tokens(name, description, images, files, fileNames, createdDate, _quantity, status, address(redemptionService), paymentServiceCreator);
         return UTXO(address(newToken)); 

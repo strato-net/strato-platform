@@ -9,10 +9,11 @@ import "../Escrows/SimpleEscrow.sol";
 import "../Oracles/OracleService.sol";
 import "../Structs/Structs.sol";
 import "../Utils/Utils.sol";
+import "../TokenFactory/TokenFactory.sol";
 
 abstract contract Reserve is Utils, Structs {
     OracleService public oracle; // Asset Oracle service for fetching price data
-    address public usdstToken;
+    address public usdstTokenFactory;
     Asset public cataToken;
 
     decimal public priceOfCATA = 0.10; //cata price in dollars
@@ -38,12 +39,15 @@ abstract contract Reserve is Utils, Structs {
     event MintedUSDST(address indexed user, string commonName, uint amount);
     event BurnedUSDST(address indexed user, string commonName, uint amount);
 
-    constructor(address _assetOracle, string _name, address _assetRootAddress, decimal _unitConversionRate) {
+    constructor(address _assetOracle, string _name, address _assetRootAddress, decimal _unitConversionRate, address _usdstTokenFactory) {
         oracle = OracleService(_assetOracle);
         owner = msg.sender;
         name = _name;
         assetRootAddress = _assetRootAddress;
         unitConversionRate = _unitConversionRate;
+        usdstTokenFactory = _usdstTokenFactory;
+
+        TokenFactory(usdstTokenFactory).addReserveAsMinter();
     }
 
     modifier requireActive() {
@@ -56,50 +60,12 @@ abstract contract Reserve is Utils, Structs {
         _;
     }
 
-    function mintUSDST(address _userAddress, uint _amount) internal requireActive {
-        require(_amount > 0, "Must mint some USDST");
-        Mintable(usdstToken).mintNewUnits(_amount);
-        Asset(UTXO(Redeemable(Mintable(usdstToken)))).automaticTransfer(_userAddress, 1.0000000000000000000 / 10**18, _amount, block.number);
-        emit MintedUSDST(_userAddress, getCommonName(_userAddress), _amount);
+    function mintUSDST(address _userAddress, uint _amount) internal requireActive() {
+        TokenFactory(usdstTokenFactory).mintToken(_userAddress, _amount);
     }
 
-    function burnUSDST(
-        address[] _usdstAddresses,
-        uint _quantity
-    ) requireActive() internal returns (uint) {
-        require(_usdstAddresses.length > 0, "Pass at least one USDST token address");
-        uint usdstAmountOwed = _quantity;
-        uint usdstAmountNet = usdstAmountOwed;
-        uint usdstQuantity = 0;
-        uint transferNumber = 0;
-
-        for (uint j = 0; j < _usdstAddresses.length; j++) {
-            address usdstAddress = _usdstAddresses[j];
-            Asset usdstAsset = Asset(usdstAddress);
-            require(usdstAsset.root == usdstToken.root, "Asset is not an USDST asset");
-            require(usdstAsset.ownerCommonName() == getCommonName(msg.sender), "Purchaser doesn't own this ETHST asset");
-
-            usdstQuantity = usdstAsset.quantity();
-            transferNumber = (uint(string(usdstAddress), 16) + j + block.timestamp) % 1000000;
-
-            usdstAsset.attachSale();
-            if (usdstQuantity > usdstAmountNet) {
-                usdstAsset.transferOwnership(burnerAddress, usdstAmountNet, true, transferNumber, 1.0000000000000000000 / 10**18);
-                usdstAsset.closeSale();
-                usdstAmountNet = 0;
-            } else {
-                usdstAsset.transferOwnership(burnerAddress, usdstQuantity, true, transferNumber, 1.0000000000000000000 / 10**18);
-                usdstAmountNet -= usdstQuantity;
-            }
-
-            if (usdstAmountNet == 0) {
-                break;
-            }
-        }
-        // require(usdstAmountNet == 0, "Your USDST balance is not high enough to cover the repayment."); // Allow partial repayments
-
-        uint usdstAmountRepaid = usdstAmountOwed - usdstAmountNet;
-        emit BurnedUSDST(msg.sender, getCommonName(msg.sender), usdstAmountRepaid);
+    function burnUSDST(address[] _usdstAssetAddresses, uint _quantity) internal requireActive() {
+        TokenFactory(usdstTokenFactory).burnToken(_usdstAssetAddresses, _quantity);
     }
 
     function distributeRewards(address[] _escrowAddresses) external {
@@ -175,10 +141,9 @@ abstract contract Reserve is Utils, Structs {
     function borrow(address _escrowAddress, uint _borrowAmount) public requireActive() {
         Escrow escrow = Escrow(_escrowAddress);
         require(escrow.borrower() == msg.sender, "Only borrower can borrow against this escrow");
+        require(escrow.reserve() == address(this), "Escrow is not associated with this reserve");
         require(_borrowAmount <= escrow.maxLoanAmount(), "Cannot borrow more than max loan amount");
         
-        uint transferNumber = (uint(block.number + 16)) % 1000000;
-
         mintUSDST(escrow.borrower(), _borrowAmount);
         
         // Update borrowed amount in escrow
@@ -223,7 +188,9 @@ abstract contract Reserve is Utils, Structs {
     }
 
     function deactivate() public requireActive() requireOwner("deactivate reserve") {
+        TokenFactory(usdstTokenFactory).removeReserveAsMinter();
         isActive = false;
+
     }
 
     function setOracle(address _newOracle) public requireOwner("update oracle") {
@@ -244,6 +211,11 @@ abstract contract Reserve is Utils, Structs {
     function setAssetRootAddress(address _newAssetRootAddress) public requireOwner("update asset root address") {
         require(_newAssetRootAddress != address(0), "Invalid asset root address");
         assetRootAddress = _newAssetRootAddress;
+    }
+
+    function setUsdstTokenFactory(address _newUsdstTokenFactory) public requireOwner("update USDST token factory") {
+        require(_newUsdstTokenFactory != address(0), "Invalid USDST token factory address");
+        usdstTokenFactory = _newUsdstTokenFactory;
     }
 
     function setLoanToValueRatio(uint _newRatio) public requireOwner("update LTV ratio") {
