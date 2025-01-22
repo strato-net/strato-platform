@@ -276,7 +276,7 @@ const HeaderComponent = ({
               <Col Col={24}>
                 {' '}
                 <p className="text-xs mt-1">
-                  CATA: {new BigNumber(cataBalance).toString()}
+                  CATA: {new BigNumber(cataBalance).toFixed(4).toString()}
                 </p>
               </Col>
             </Row>
