@@ -468,7 +468,7 @@ const StakeModal = ({
               By staking your RWAs, you earn daily rewards in the form of CATA,
               our governance token. Additionally, you have the option to borrow
               (interest-free for a limited time!) up to 50% of the market value
-              of your staked RWAs in STRAT tokens, our stablecoin, providing
+              of your staked RWAs in USDST tokens, our stablecoin, providing
               immediate liquidity while your assets remain staked and continue
               to earn CATA rewards. If you prefer not to borrow, you can simply
               stake your RWAs to benefit from the daily CATA rewards.

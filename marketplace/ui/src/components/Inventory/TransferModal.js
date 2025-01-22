@@ -26,18 +26,14 @@ const TransferModal = ({
   limit = 0,
   offset = 0,
   reserves,
-  stratAddress,
   assetsWithEighteenDecimalPlaces,
 }) => {
   const location = useLocation();
   const queryParams = new URLSearchParams(location.search);
-  const isStrat = inventory.originAddress === stratAddress;
   const is18DecimalPlaces = assetsWithEighteenDecimalPlaces.includes(
     inventory.originAddress
   );
-  const availableQuantity = isStrat
-    ? new BigNumber(inventory.quantity).dividedBy(100)
-    : is18DecimalPlaces
+  const availableQuantity = is18DecimalPlaces
     ? new BigNumber(inventory.quantity).dividedBy(new BigNumber(10).pow(18))
     : new BigNumber(inventory.quantity);
   // Get the inventory state and dispatch
@@ -355,23 +351,17 @@ const TransferModal = ({
     const body = transfers.map((transfer) => ({
       assetAddress: inventory.address,
       newOwner: transfer.recipient,
-      quantity: (isStrat
-        ? transfer.quantity.multipliedBy(new BigNumber(100))
-        : is18DecimalPlaces
+      quantity: (is18DecimalPlaces
         ? transfer.quantity.multipliedBy(new BigNumber(10).pow(18))
         : transfer.quantity
       ).toFixed(0),
-      price: isStrat
-        ? transfer.price / 100
-        : is18DecimalPlaces
+      price: is18DecimalPlaces
         ? transfer.price / Math.pow(10, 18)
         : transfer.price,
       senderCommonName: user.commonName,
       recipientCommonName: transfer.recipientCommonName,
       itemName,
-      decimal: (isStrat
-        ? new BigNumber(100)
-        : is18DecimalPlaces
+      decimal: (is18DecimalPlaces
         ? new BigNumber(10).pow(18)
         : new BigNumber(10)
       ).toString(),
@@ -391,7 +381,7 @@ const TransferModal = ({
           : ''
       );
       await actions.fetchInventoryForUser(inventoryDispatch, user.commonName);
-      await marketplaceActions.fetchStratsBalance(marketplaceDispatch);
+      await marketplaceActions.fetchUSDSTBalance(marketplaceDispatch);
     }
 
     if (isDone) {

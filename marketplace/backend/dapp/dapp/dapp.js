@@ -21,12 +21,12 @@ import axios from 'axios';
 import dayjs from 'dayjs';
 import utc from 'dayjs/plugin/utc';
 import RestStatus from 'http-status-codes';
+import BigNumber from 'bignumber.js';
+
 import certificateJs from '/dapp/certificates/certificate';
 
 import artJs from '/dapp/items/art';
 import tokensJs from '/dapp/items/tokens';
-import STRATSJs from '/dapp/items/STRATS';
-import CATAJs from '/dapp/items/CATA';
 import carbonOffsetJs from '/dapp/items/carbonOffset';
 import metalsJs from '/dapp/items/metals';
 import spiritsJs from '/dapp/items/spirits';
@@ -44,8 +44,6 @@ import paymentServiceJs from '/dapp/payments/paymentService';
 import redemptionServiceJs from '/dapp/redemptions/redemptionService';
 import reserveJs from '/dapp/reserve/reserve';
 import escrowJs from '/dapp/escrow/escrow';
-
-import strats from '../strats/strats';
 
 const allAssetNames = [];
 dayjs.extend(utc);
@@ -1149,11 +1147,6 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
 
   // ------------------------------ ART ENDS --------------------------------
 
-  // ------------------------------ Bridge STARTS ------------------------------
-  contract.addHash = async function (args, options = defaultOptions) {
-    return tokensJs.addHash(rawAdmin, args, options);
-  };
-
   // ------------------------------ TOKENS STARTS ------------------------------
 
   contract.createTokens = async function (args, options = defaultOptions) {
@@ -1166,31 +1159,39 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
     return tokensJs.uploadContract(rawAdmin, newArgs, options);
   };
 
-  contract.getTokens = async function (args = {}, options = optionsNoChainIds) {
-    const getOptions = { ...options, app: contractName };
-    return tokensJs.getAll(rawAdmin, args, getOptions);
+  contract.addHash = async function (args, options = defaultOptions) {
+    return tokensJs.addHash(rawAdmin, args, options);
+  };
+
+  contract.getUSDSTBalance = async function (_, options = defaultOptions) {
+    const USDSTOriginAddress = await tokensJs.getUSDSTAddress();
+    const balance = await inventoryJs.getAll(
+      rawAdmin,
+      {
+        ownerCommonName: userCert.commonName,
+        originAddress: USDSTOriginAddress,
+        queryOptions: { select: 'quantity.sum()' },
+      },
+      options
+    );
+    return balance[0].sum ? `${balance[0].sum / Math.pow(10, 18)}` : 0;
+  };
+
+  contract.getCataBalance = async function (_, options = defaultOptions) {
+    const CataOriginAddress = await tokensJs.getCataAddress();
+    const balance = await inventoryJs.getAll(
+      rawAdmin,
+      {
+        ownerCommonName: userCert.commonName,
+        originAddress: CataOriginAddress,
+        queryOptions: { select: 'quantity.sum()' },
+      },
+      options
+    );
+    return balance[0].sum ? `${balance[0].sum / Math.pow(10, 18)}` : 0;
   };
 
   // ------------------------------ TOKENS ENDS --------------------------------
-
-  // ------------------------------ STRATS STARTS ------------------------------
-
-  contract.createSTRATS = async function (args, options = defaultOptions) {
-    const createdDate = Math.floor(Date.now() / 1000);
-    const newArgs = {
-      ...args.itemArgs,
-      createdDate,
-      status: ASSET_STATUS.ACTIVE,
-    };
-    return STRATSJs.uploadContract(rawAdmin, newArgs, options);
-  };
-
-  contract.getSTRATS = async function (args = {}, options = optionsNoChainIds) {
-    const getOptions = { ...options, app: contractName };
-    return STRATSJs.getAll(rawAdmin, args, getOptions);
-  };
-
-  // ------------------------------ STRATS ENDS --------------------------------
 
   // ------------------------------ CARBONOFFSET STARTS------------------------------
 
@@ -1755,17 +1756,9 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
     return paymentServices;
   };
 
-  contract.paymentCheckout = async function (
-    originUrl,
-    args,
-    options = defaultOptions
-  ) {
+  contract.paymentCheckout = async function (args, options = defaultOptions) {
     try {
-      const {
-        paymentService,
-        orderList,
-        orderTotal: recievedOrderTotal,
-      } = args;
+      const { paymentService, orderList } = args;
 
       const assetAddresses = orderList.map((o) => o.assetAddress);
       const quantities = orderList.map((o) => o.quantity);
@@ -1800,10 +1793,10 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
         }
       }
 
-      let stratsAssetAddressesToUse = [];
-      if (paymentService.serviceName.toLowerCase().includes('strats')) {
-        // Get User's STRATS Asset Address
-        const stratsOriginAddress = await STRATSJs.getStratsAddress();
+      let USDSTAssetAddressesToUse = [];
+      if (paymentService.serviceName.toLowerCase().includes('usdst')) {
+        // Get User's USDST Asset Address
+        const USDSTOriginAddress = await tokensJs.getUSDSTAddress();
 
         // Retrieve all sales data
         const salesData = await saleJs.getAll(
@@ -1818,12 +1811,12 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
           0
         );
 
-        // Retrieve the user's active STRATS asset addresses with non-zero quantities
-        const userStratsAssets = await inventoryJs.getAll(
+        // Retrieve the user's active USDST asset addresses with non-zero quantities
+        const userUSDSTAssets = await inventoryJs.getAll(
           rawAdmin,
           {
             ownerCommonName: userCert.commonName,
-            originAddress: stratsOriginAddress,
+            originAddress: USDSTOriginAddress,
             status: ASSET_STATUS.ACTIVE,
             queryOptions: { select: 'address, quantity' },
             notEqualsField: 'quantity',
@@ -1833,24 +1826,30 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
           options
         );
 
-        // Accumulate STRATS asset addresses to cover the order total
-        let accumulatedTotal = 0;
-        stratsAssetAddressesToUse = userStratsAssets.reduce(
+        // Accumulate USDST asset addresses to cover the order total
+        let accumulatedTotal = new BigNumber(0);
+        const bigOrderTotal = new BigNumber(orderTotal).multipliedBy(
+          new BigNumber(10).pow(18)
+        ); // Convert orderTotal to 18 decimal places
+
+        USDSTAssetAddressesToUse = userUSDSTAssets.reduce(
           (addresses, asset) => {
-            if (accumulatedTotal >= orderTotal) return addresses;
+            if (accumulatedTotal.gte(bigOrderTotal)) return addresses;
 
             addresses.push(asset.address);
-            accumulatedTotal += asset.quantity / 10000;
+
+            // Convert asset.quantity to BigNumber, then add to accumulatedTotal
+            accumulatedTotal = accumulatedTotal.plus(new BigNumber(asset.quantity));
 
             return addresses;
           },
           []
         );
 
-        if (accumulatedTotal < orderTotal) {
+        if (accumulatedTotal.isLessThan(bigOrderTotal)) {
           throw new rest.RestError(
             RestStatus.BAD_REQUEST,
-            "You don't have enough STRATS balance to make this purchase"
+            "You don't have enough USDST balance to make this purchase"
           );
         }
       }
@@ -1858,7 +1857,7 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
       const createdDate = Math.floor(Date.now() / 1000);
       const paymentParameters = {
         address: paymentService.address,
-        stratsAssetAddresses: stratsAssetAddressesToUse,
+        tokenAssetAddresses: USDSTAssetAddressesToUse,
         checkoutId: util.uid(),
         saleAddresses,
         quantities,
@@ -1887,7 +1886,7 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
     }
   };
 
-  contract.getStratsOrderEvent = async function (
+  contract.getUSDSTOrderEvent = async function (
     args,
     options = defaultOptions
   ) {
@@ -1897,7 +1896,7 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
       options
     );
     if (
-      currentPaymentService[0].contract_name.includes('StratPaymentService')
+      currentPaymentService[0].contract_name.includes('TokenPaymentService')
     ) {
       const orderEvent = await rest.searchUntil(
         rawAdmin,
@@ -1908,7 +1907,7 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
           query: {
             limit: 1,
             orderHash: `eq.${args.orderHash}`,
-            currency: 'eq.STRATS',
+            currency: 'eq.USDST',
           },
         }
       );
@@ -2056,53 +2055,6 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
     }
   };
 
-  contract.getStratsBalance = async function (args, options = defaultOptions) {
-    const stratsOriginAddress = await STRATSJs.getStratsAddress();
-    const balance = await inventoryJs.getAll(
-      rawAdmin,
-      {
-        ownerCommonName: userCert.commonName,
-        originAddress: stratsOriginAddress,
-        queryOptions: { select: 'quantity.sum()' },
-      },
-      options
-    );
-    return balance[0].sum ? `${balance[0].sum / 100}` : 0;
-  };
-
-  contract.getCataBalance = async function (args, options = defaultOptions) {
-    const CataOriginAddress = await CATAJs.getCataAddress();
-    const balance = await inventoryJs.getAll(
-      rawAdmin,
-      {
-        ownerCommonName: userCert.commonName,
-        originAddress: CataOriginAddress,
-        queryOptions: { select: 'quantity.sum()' },
-      },
-      options
-    );
-    return balance[0].sum ? `${balance[0].sum / Math.pow(10, 18)}` : 0;
-  };
-
-  contract.getStratsTransactionHistory = async function (
-    args,
-    options = defaultOptions
-  ) {
-    const getOptions = { ...options, org: 'TestCompany', app: '' };
-    const transactionHistory = await strats.getStratsTransactionHistory(
-      rawAdmin,
-      args,
-      getOptions
-    );
-
-    return transactionHistory;
-  };
-
-  contract.transferStrats = async function (args, options = defaultOptions) {
-    const res = await strats.transferStrats(rawAdmin, args, options);
-    return res;
-  };
-
   //----------------------------- Reserve START -------------------------------
   contract.getReserve = async function (address, options = defaultOptions) {
     return await reserveJs.get(rawAdmin, address, options);
@@ -2150,22 +2102,22 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
   contract.repay = async function (args, options = defaultOptions) {
     const { escrow, reserve } = args;
 
-    // Fetch user's STRATS asset origin address
-    const stratsOriginAddress = await STRATSJs.getStratsAddress();
+    // Fetch user's USDST asset origin address
+    const USDSTOriginAddress = await tokensJs.getUSDSTAddress();
 
     // Retrieve escrow data associated with the escrow address
     const escrowData = await escrowJs.get(rawAdmin, escrow, options);
     const orderTotal = escrowData ? escrowData.borrowedAmount : 0;
     if (orderTotal === 0) {
-      return
+      return;
     }
 
-    // Get user's active STRATS assets with non-zero quantities
-    const userStratsAssets = await inventoryJs.getAll(
+    // Get user's active USDST assets with non-zero quantities
+    const userUSDSTAssets = await inventoryJs.getAll(
       rawAdmin,
       {
         ownerCommonName: userCert.commonName,
-        originAddress: stratsOriginAddress,
+        originAddress: USDSTOriginAddress,
         status: ASSET_STATUS.ACTIVE,
         queryOptions: { select: 'address, quantity' },
         notEqualsField: 'quantity',
@@ -2175,32 +2127,31 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
       options
     );
 
-    // Accumulate STRATS asset addresses to cover the order total
-    const { addressesToUse, accumulatedTotal } = userStratsAssets.reduce(
+    // Accumulate USDST asset addresses to cover the order total
+    const { addressesToUse } = userUSDSTAssets.reduce(
       (acc, asset) => {
-        if (acc.accumulatedTotal >= orderTotal) return acc;
+        if (
+          acc.accumulatedTotal.isGreaterThanOrEqualTo(
+            new BigNumber(orderTotal).multipliedBy(new BigNumber(10).pow(18))
+          )
+        ) {
+          return acc;
+        }
 
         acc.addressesToUse.push(asset.address);
-        acc.accumulatedTotal += asset.quantity;
+        acc.accumulatedTotal = acc.accumulatedTotal.plus(
+          new BigNumber(asset.quantity)
+        );
 
         return acc;
       },
-      { addressesToUse: [], accumulatedTotal: 0 }
-    );
-
-    // Allow partial repayment of loans
-    // Check if accumulated total meets the order requirement
-    // if (accumulatedTotal < orderTotal) {
-    //   throw new rest.RestError(
-    //     RestStatus.BAD_REQUEST,
-    //     'Insufficient STRATS balance to repay the loan.'
-    //   );
-    // }
+      { addressesToUse: [], accumulatedTotal: new BigNumber(0) }
+    ) //.addressesToUse; //Remove this...
 
     // Proceed with unstake if sufficient assets are accumulated
     return await reserveJs.repay(
       rawAdmin,
-      { stratsAssetAddresses: addressesToUse, escrowAddress: escrow, reserve },
+      { USDSTAssetAddresses: addressesToUse, escrowAddress: escrow, reserve },
       options
     );
   };

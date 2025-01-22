@@ -73,19 +73,14 @@ const UserProfile = ({ user }) => {
     supportedTokens,
     isFetchingTokens,
   } = useInventoryState();
-  const [stratAddress, setStratAddress] = useState('');
   const [assetsWithEighteenDecimalPlaces, setAssetsWithEighteenDecimalPlaces] = useState('');
 
   useEffect(() => {
     const fetchAddresses = async () => {
-      const stratAddress = await marketplaceActions.fetchStratsAddress(
-        marketplaceDispatch
-      );
       const assetsWithEighteenDecimalPlaces = await marketplaceActions.fetchAssetsWithEighteenDecimalPlaces(
         marketplaceDispatch
       );
       await ethActions.fetchETHSTAddress(ethDispatch);
-      setStratAddress(stratAddress);
       setAssetsWithEighteenDecimalPlaces(assetsWithEighteenDecimalPlaces);
     };
 
@@ -406,7 +401,6 @@ const UserProfile = ({ user }) => {
                               allSubcategories={allSubcategories}
                               supportedTokens={supportedTokens}
                               user={user}
-                              stratAddress={stratAddress}
                               assetsWithEighteenDecimalPlaces={assetsWithEighteenDecimalPlaces}
                             />
                           );
@@ -436,7 +430,6 @@ const UserProfile = ({ user }) => {
                               allSubcategories={allSubcategories}
                               supportedTokens={supportedTokens}
                               user={user}
-                              stratAddress={stratAddress}
                               assetsWithEighteenDecimalPlaces={assetsWithEighteenDecimalPlaces}
                             />
                           );
@@ -466,7 +459,6 @@ const UserProfile = ({ user }) => {
                               allSubcategories={allSubcategories}
                               supportedTokens={supportedTokens}
                               user={user}
-                              stratAddress={stratAddress}
                               assetsWithEighteenDecimalPlaces={assetsWithEighteenDecimalPlaces}
                             />
                           );

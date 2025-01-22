@@ -38,5 +38,5 @@ export const TRANSACTION_FILTER = [
   { value: 'Redemption', label: 'Redemption' },
   { value: 'Stake', label: 'Stake' },
   { value: 'Unstake', label: 'Unstake' },
-  { value: 'STRATS', label: 'STRAT' },
+  { value: 'USDST', label: 'USDST' },
 ];

@@ -107,14 +107,9 @@ export const Art = {
 
 export const Tokens = {
   prefix: '/tokens',
-  getAll: '/',
   create: '/',
-};
-
-export const STRATS = {
-  prefix: '/STRATSTokens',
-  getAll: '/',
-  create: '/',
+  getETHSTAddress: '/address',
+  addHash: '/addHash',
 };
 
 export const CarbonOffset = {
@@ -182,12 +177,11 @@ export const Marketplace = {
   getAllLoggedIn: '/all',
   getTopSellingProducts: '/topselling',
   getTopSellingProductsLoggedIn: '/user/topselling',
-  transferStrats: '/strats/transfer',
-  getStratsBalance: '/strats',
+  getUSDSTBalance: '/USDST',
   getCataBalance: '/cata',
-  getStratsAddress: '/strats/address',
+  getUSDSTAddress: '/USDST/address',
   getCataAddress: '/cata/address',
-  getStratsTransactionHistory: '/strats/history',
+  getStratsAddress: '/strats/address',
   getStakeableProducts: '/stake',
   get18DecimalPlaces: '/18DecimalPlaces',
 };
@@ -218,10 +212,4 @@ export const Escrow = {
   prefix: '/escrow',
   getEscrowForAsset: '/:assetRootAddress',
   getCataRewards: '/reward',
-};
-
-export const Eth = {
-  prefix: '/eth',
-  getETHSTAddress: '/address',
-  addHash: '/addHash',
 };

@@ -2,92 +2,33 @@ pragma es6;
 pragma strict;
 
 import <BASE_CODE_COLLECTION>;
+import "../../../items/contracts/Tokens.sol";
 
-contract TokenPaymentService is PaymentService {   
-    // TODO: receipts for minting/removing?
-    enum ReceiptType { TRANSFER, PURCHASE, MINT }
-    event Receipt(ReceiptType type, string _from, string _to, uint _value, uint timestamp);
+contract TokenPaymentService is PaymentService {
+    address public tokenAddress;
 
-    event Transfer(string _from, string _to, uint _value);
-    event Approval(string _owner, string _spender, uint _value);
+    address public feeRecipient;
 
-    // token data
-    uint public reserve;
-    uint public decimals;
-    decimal public tokensPerDollar;
-    mapping (string => uint) public record balances;
-
-    string public feeRecipient;
-
-constructor (
+    constructor (
+        address _tokenAddress,
         string _serviceName,
-        uint _supply,
-        uint _decimals,
-        decimal _tokensPerDollar,
         string _imageURL,
-        string _checkoutText,
         decimal _primarySaleFeePercentage,
         decimal _secondarySaleFeePercentage,
-        string _feeRecipient
+        address _feeRecipient
     ) PaymentService(
         _serviceName,
         _imageURL,
-        _checkoutText,
+        "Checkout with " + _serviceName,
         _primarySaleFeePercentage,
         _secondarySaleFeePercentage
     ) public {
-        decimals = _decimals;
-        reserve = _supply * (10 ** decimals);
-        tokensPerDollar = _tokensPerDollar;
+        tokenAddress = _tokenAddress;
         feeRecipient = _feeRecipient;
-        emit Receipt(ReceiptType.MINT, "", "", _supply, block.timestamp);
-    }
-
-    function updateFeeRecipient(
-        string _feeRecipient
-    ) requireOwner("update fee recipient") external {
-        feeRecipient = _feeRecipient;
-    }
-
-    // OWNER/PROVIDER FUNCTIONS
-    function reserveBalance() requireOwner() external returns (uint) {
-      return _balanceOf(ownerCommonName);
-    }
-
-    function transfer(string _to, uint _value) public returns (bool) {
-        string senderCommonName = getCommonName(msg.sender);
-        if (senderCommonName == ownerCommonName) { // if provider, send balance from the reserve
-            if (reserve < _value) { return false; }
-            balances[_to] += _value;
-            reserve -= _value;
-            emit Receipt(ReceiptType.PURCHASE, "", _to, _value, block.timestamp);
-            return true;
-        }
-
-        if (balances[senderCommonName] < _value) { return false; }
-        balances[_to] += _value;
-        balances[senderCommonName] -= _value;
-        emit Receipt(ReceiptType.TRANSFER, senderCommonName, _to, _value, block.timestamp);
-        return true;
-    }
-
-    function balance() public returns (uint) {
-        return _balanceOf(getCommonName(msg.sender));
-    }
-    
-    function balanceOf(string _user) requireOwner() external returns (uint) {
-        return _balanceOf(_user);
-    }
-
-    function _balanceOf(string _user) internal returns (uint) {
-        if (_user == ownerCommonName) {
-            return reserve;
-        } else {
-            return balances[_user];
-        }
     }
 
     function _checkoutInitialized (
+        address[] _tokenAssetAddresses,
         string _checkoutHash,
         string _checkoutId,
         address _purchaser,
@@ -112,8 +53,8 @@ constructor (
             Sale s = Sale(_saleAddresses[i]);
             Asset a = s.assetToBeSold();
             assets.push(address(a));
-            sellerCommonName = getCommonName(a.owner());
             sellerAddress = a.owner();
+            sellerCommonName = getCommonName(sellerAddress);
             uint quantity = _quantities[i];
 
             // Lock assets
@@ -127,44 +68,72 @@ constructor (
                 }
             }
 
-
             // Calculate gross, net, and fee amounts in dollars
             decimal gross = s.price() * decimal(quantity); 
             decimal fee = 0.0;
-            totalAmountGross += gross;
             if (address(a) == address(a.root)) {
-                fee = (gross * primarySaleFeePercentage) / 100;
+                fee = (gross * (primarySaleFeePercentage / 100));
             } else {
-                fee = (gross * secondarySaleFeePercentage) / 100;
+                fee = (gross * (secondarySaleFeePercentage / 100));
             }
             decimal net = gross - fee;
+            totalAmountGross += gross;
             totalAmountNet += net;
             totalFee += fee;
 
-            emit Checkout(
-                _checkoutHash,
-                _checkoutId,
-                _purchaser,
-                _purchasersCommonName,
-                sellerCommonName,
-                _saleAddresses,
-                _quantities,
-                totalAmountGross
-            );
+            if(i == _saleAddresses.length -1)
+            {
+                emit Checkout(
+                    _checkoutHash,
+                    _checkoutId,
+                    _purchaser,
+                    _purchasersCommonName,
+                    _saleAddresses,
+                    _quantities,
+                    totalAmountGross
+                );
+            }
 
-            // Calculate net and fee amounts in tokens
-            uint tokenAmountNet = uint(net * tokensPerDollar * (10 ** decimals));
-            uint tokenFee = uint(fee * tokensPerDollar * (10 ** decimals));
+            // Calculate net and fee amounts in 18 decimal places
+            uint tokenAmountNet = uint(net * (10**18));
+            uint tokenFee = uint(fee * (10**18));
 
-            // Transfer tokens
-            bool success = transfer(seller, tokenAmountNet);
-            require(success, err);
-            success = transfer(feeRecipient, tokenFee);
-            require(success, feeErr);
+            // Transfer token
+            uint remainingTokenToTransfer = tokenAmountNet;
+            uint remainingFeeToTransfer = tokenFee;
+            uint tokenQuantity = 0;
+            uint transferAmount = 0;
+            uint transferFee = 0;
+            uint transferNumber = 0;
+            for (uint j = 0; j < _tokenAssetAddresses.length; j++) {
+                Tokens tokenAsset = Tokens(_tokenAssetAddresses[j]);
+                require(tokenAsset.root == tokenAddress, "Asset is not a " + serviceName  + " asset");
+                require(tokenAsset.ownerCommonName() == getCommonName(msg.sender), "Purchaser doesn't own " + serviceName);
+                tokenQuantity = tokenAsset.quantity();
+                transferNumber = (uint(_checkoutHash, 16) + j) % 1000000;
+                if (remainingTokenToTransfer > 0) {
+                    transferAmount = tokenQuantity >= remainingTokenToTransfer ? remainingTokenToTransfer : tokenQuantity;
+                    tokenAsset.purchaseTransfer(sellerAddress, transferAmount, transferNumber, 1/(10**18));
+                    remainingTokenToTransfer -= transferAmount;
+                }
+                tokenQuantity = tokenQuantity - transferAmount;
+                if (remainingFeeToTransfer > 0 && tokenQuantity > 0) {
+                    transferNumber = (uint(_checkoutHash, 16) + j + block.timestamp) % 1000000;
+                    transferFee = tokenQuantity >= remainingFeeToTransfer ? remainingFeeToTransfer : tokenQuantity;
+                    tokenAsset.purchaseTransfer(feeRecipient, transferFee, transferNumber, 1/(10**18));
+                    remainingFeeToTransfer -= transferFee;
+                }
+                transferAmount = 0;
+                if (remainingTokenToTransfer == 0 && remainingFeeToTransfer == 0) {
+                    break;
+                }
+            }
+            require(remainingTokenToTransfer == 0, err);
+            require(remainingFeeToTransfer == 0, feeErr);
 
             // Transfer assets
             try {
-                s.completeSale(_orderHash, _purchaser);
+                s.completeSale(_checkoutHash, _purchaser);
             } catch {
                 try {
                     address(s).call("completeSale", _purchaser);
@@ -185,7 +154,7 @@ constructor (
             totalAmountGross,
             0,
             totalFee,
-            _unitsPerDollar(),
+            1e18,
             serviceName,
             PaymentStatus.CLOSED,
             _createdDate,
@@ -196,18 +165,24 @@ constructor (
         return (_checkoutHash, assets);
     }
 
+    function updateFeeRecipient(
+        address _feeRecipient
+    ) requireOwner("update fee recipient") external {
+        feeRecipient = _feeRecipient;
+    }
+
     function _generateIntermediateOrder (
         string _checkoutHash,
-        string _checkoutId,
+        string _orderId,
         address _purchaser,
-        string _purchaserCommonName,
+        string _purchasersCommonName,
         address[] _saleAddresses,
         uint[] _quantities,
         string _currency,
         uint _createdDate,
         string _comments
     ) internal override returns (address[]) {
-        require(false, "Cannot call generateIntermediateOrder for token payments.");
+        require(false, "Cannot call generateIntermediateOrder for " + serviceName + " payments.");
         return [];
     }
 
@@ -222,7 +197,7 @@ constructor (
         uint _createdDate,
         string _comments
     ) internal override returns (address[]) {
-        require(false, "Cannot call completeOrder for token payments.");
+        require(false, "Cannot call completeOrder for " + serviceName + " payments.");
         return [];
     }
 
@@ -237,15 +212,6 @@ constructor (
         uint _createdDate,
         string _comments
     ) internal override {
-        require(false, "Cannot call cancelOrder for token payments.");
-    }
-
-    function _unitsPerDollar() internal override returns (decimal) {
-        return tokensPerDollar * (10 ** decimals);
-    }
-
-    function updateTokensPerDollar(decimal _tokensPerDollar) requireOwner() public returns (uint) {
-      tokensPerDollar = _tokensPerDollar;
-      return RestStatus.OK;
+        require(false, "Cannot call cancelOrder for " + serviceName + " payments.");
     }
 }

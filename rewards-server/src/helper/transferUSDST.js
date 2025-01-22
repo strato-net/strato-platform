@@ -1,14 +1,14 @@
-const { parse } = require("dotenv");
 const {
   contractName,
   NODE_ENV,
-  prodStratsAddress,
-  testnetStratsAddress,
+  prodUSDSTAddress,
+  testnetUSDSTAddress,
   prodMarketplaceUrl,
   testnetMarketplaceUrl,
   baUsername
 } = require("../config");
 const axios = require("axios");
+const BigNumber = require("bignumber.js");
 
 const baseUrl = NODE_ENV === "prod" ? prodMarketplaceUrl : testnetMarketplaceUrl
 
@@ -43,7 +43,7 @@ function createTransactionObject(contractAddress, toAddress, value) {
       method: "automaticTransfer",
       args: {
         _newOwner: toAddress,
-        _price: 0.0001,
+        _price: 1 / 1e18,
         _quantity: value,
         _transferNumber: parseInt(uid()),
       },
@@ -54,33 +54,35 @@ function createTransactionObject(contractAddress, toAddress, value) {
 
 async function createTransactionPayload(token, transactions) {
   try {
-    // Fetch STRATS contracts once outside the loop
-    let STRATSContracts;
+    // Fetch USDST contracts once outside the loop
+    let USDSTContracts;
     try {
-      STRATSContracts = await getAdminStratsContractAddress(token);
+      USDSTContracts = await getAdminUSDSTContractAddress(token);
     } catch (error) {
-      console.error("Error fetching STRATS contracts:", error);
-      throw new Error("Failed to fetch STRATS contracts");
+      console.error("Error fetching USDST contracts:", error);
+      throw new Error("Failed to fetch USDST contracts");
     }
 
-    // Create a copy of STRATSContracts to track remaining quantities
-    const remainingAssets = STRATSContracts?.map((asset) => ({
+    // Create a copy of USDSTContracts to track remaining quantities
+    const remainingAssets = USDSTContracts?.map((asset) => ({
       address: asset.address,
-      quantity: asset.quantity,
+      quantity: new BigNumber(asset.quantity),
     }));
 
     const txs = [];
 
     for (const transaction of transactions) {
-      const stratsAssetAddressesToUse = [];
+      const USDSTAssetAddressesToUse = [];
       let remainingValue = transaction.value;
 
       for (const asset of remainingAssets) {
-        if (remainingValue <= 0) break;
+        if (remainingValue.isLessThanOrEqualTo(new BigNumber(0))) break;
 
-        if (asset.quantity > 0) {
-          const quantityToUse = Math.min(asset.quantity, remainingValue);
-          stratsAssetAddressesToUse.push({
+        if (asset.quantity.isGreaterThan(new BigNumber(0))) {
+          const quantityToUse = asset.quantity.isLessThan(remainingValue)
+            ? asset.quantity
+            : remainingValue;
+          USDSTAssetAddressesToUse.push({
             address: asset.address,
             quantity: quantityToUse,
           });
@@ -91,18 +93,18 @@ async function createTransactionPayload(token, transactions) {
         }
       }
 
-      if (remainingValue > 0) {
+      if (remainingValue.isGreaterThan(new BigNumber(0))) {
         throw new Error(
-          `Not enough STRATS to cover the transaction for ${transaction.toAddress}`
+          `Not enough USDST to cover the transaction for ${transaction.toAddress}`
         );
       }
 
       // Create transaction objects and add them to the txs array
-      const txObjects = stratsAssetAddressesToUse?.map((strats) =>
+      const txObjects = USDSTAssetAddressesToUse?.map((USDST) =>
         createTransactionObject(
-          strats.address,
+          USDST.address,
           transaction.toAddress,
-          strats.quantity
+          USDST.quantity.toFixed(0)
         )
       );
 
@@ -143,9 +145,9 @@ async function createTransactionPayload(token, transactions) {
   }
 }
 
-async function getAdminStratsContractAddress(token) {
+async function getAdminUSDSTContractAddress(token) {
   const domain = NODE_ENV === "prod" ? prodMarketplaceUrl : testnetMarketplaceUrl;
-  const originAddress = NODE_ENV === "prod" ? prodStratsAddress : testnetStratsAddress;
+  const originAddress = NODE_ENV === "prod" ? prodUSDSTAddress : testnetUSDSTAddress;
   const url = `https://${domain}/cirrus/search/BlockApps-Mercata-Asset`;
 
   const queryParams = new URLSearchParams({
@@ -175,7 +177,7 @@ async function getAdminStratsContractAddress(token) {
     const body = await response.data;
     return body;
   } catch (error) {
-    console.error("Error fetching admin STRATS contract addresses:", error);
+    console.error("Error fetching admin USDST contract addresses:", error);
     throw error;
   }
 }

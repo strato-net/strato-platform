@@ -52,7 +52,7 @@ abstract contract PaymentService is Utils {
         decimal amount,               // Total price of the order
         decimal tax,                  // Tax
         decimal fee,                  // Fee payment (in dollar value)
-        decimal unitsPerDollar,       // Amount of units per dollar for the currency (Ex: STRAT is 100 units per dollar)
+        decimal unitsPerDollar,       // Amount of units per dollar for the currency (Ex: USDST is 1e18 units per dollar)
         string currency,              // The type of currency used for the purchase
         PaymentStatus status,         // Status of the payment
         uint createdDate,              // Date at the time of fresh order creation
@@ -163,7 +163,7 @@ abstract contract PaymentService is Utils {
     }
 
     function checkoutInitialized (
-        address[] _stratsAssetAddresses,
+        address[] _tokenAssetAddresses,
         string _checkoutId,
         address[] _saleAddresses,
         uint[] _quantities,
@@ -174,7 +174,7 @@ abstract contract PaymentService is Utils {
         string _purchasersCommonName = getCommonName(msg.sender);
         string checkoutHash = getOrderHash(_checkoutId, _purchasersCommonName, _saleAddresses, _quantities);
         return _checkoutInitialized(
-            _stratsAssetAddresses,
+            _tokenAssetAddresses,
             checkoutHash,
             _checkoutId,
             msg.sender,
@@ -187,7 +187,7 @@ abstract contract PaymentService is Utils {
     }
 
     function _checkoutInitialized (
-        address[] _stratsAssetAddresses,
+        address[] _tokenAssetAddresses,
         string _checkoutHash,
         string _checkoutId,
         address _purchaser,
@@ -352,9 +352,9 @@ abstract contract PaymentService is Utils {
             decimal saleAmount = s.price() * _quantities[i];
             totalAmount += saleAmount;
             if (address(a) == address(a.root)) {
-                totalFee += (saleAmount * primarySaleFeePercentage) / 100;
+                totalFee += (saleAmount * primarySaleFeePercentage);
             } else {
-                totalFee += (saleAmount * secondarySaleFeePercentage) / 100;
+                totalFee += (saleAmount * secondarySaleFeePercentage);
             }
             try {
                 s.completeSale(_orderHash, _purchaser);

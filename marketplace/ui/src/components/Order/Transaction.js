@@ -25,19 +25,21 @@ const Transaction = ({ user }) => {
   const marketplaceDispatch = useMarketplaceDispatch();
   const ethDispatch = useEthDispatch();
   const [stratAddress, setStratAddress] = useState('');
-  const [assetsWithEighteenDecimalPlaces, setAssetsWithEighteenDecimalPlaces] = useState('');
+  const [assetsWithEighteenDecimalPlaces, setAssetsWithEighteenDecimalPlaces] =
+    useState('');
 
   useEffect(() => {
     const fetchAddresses = async () => {
+      const assetsWithEighteenDecimalPlaces =
+        await marketplaceActions.fetchAssetsWithEighteenDecimalPlaces(
+          marketplaceDispatch
+        );
+      await ethAcions.fetchETHSTAddress(ethDispatch);
       const stratAddress = await marketplaceActions.fetchStratsAddress(
         marketplaceDispatch
       );
-      const assetsWithEighteenDecimalPlaces = await marketplaceActions.fetchAssetsWithEighteenDecimalPlaces(
-        marketplaceDispatch
-      );
-      await ethAcions.fetchETHSTAddress(ethDispatch);
-      setStratAddress(stratAddress);
       setAssetsWithEighteenDecimalPlaces(assetsWithEighteenDecimalPlaces);
+      setStratAddress(stratAddress);
     };
 
     fetchAddresses();
@@ -92,7 +94,9 @@ const Transaction = ({ user }) => {
           transaction.assetContractName
         );
         let isStrat = transaction.assetOriginAddress === stratAddress;
-        let is18DecimalPlaces = assetsWithEighteenDecimalPlaces.includes(transaction.assetOriginAddress);
+        let is18DecimalPlaces = assetsWithEighteenDecimalPlaces.includes(
+          transaction.assetOriginAddress
+        );
         return formatDataObject({
           reference: transaction?.reference,
           type: transaction?.type,

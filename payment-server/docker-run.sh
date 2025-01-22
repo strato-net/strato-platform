@@ -162,12 +162,12 @@ else
   # export METAMASK_IMAGE_URL_VALUE=${METAMASK_IMAGE_URL_VALUE:-'https://fileserver.mercata-testnet2.blockapps.net/highway/3fe266f64979ff185364131d9f6f3bc96eb272e98691bbc829ccf31f59d956c9.png'}
   # export METAMASK_PRIMARY_SALE_FEE_PERCENTAGE_VALUE=${METAMASK_PRIMARY_SALE_FEE_PERCENTAGE_VALUE:-10.0}
   # export METAMASK_SECONDARY_SALE_FEE_PERCENTAGE_VALUE=${METAMASK_SECONDARY_SALE_FEE_PERCENTAGE_VALUE:-3.0}
-  export STRAT_ADDRESS=${STRAT_ADDRESS}
-  export STRAT_STRATS_PER_DOLLAR=${STRAT_STRATS_PER_DOLLAR:-100}
-  export STRAT_IMAGE_URL_VALUE=${STRAT_IMAGE_URL_VALUE:-'https://blockapps-public-assets.s3.us-east-1.amazonaws.com/icons/stratFinished.png'}
-  export STRAT_PRIMARY_SALE_FEE_PERCENTAGE_VALUE=${STRAT_PRIMARY_SALE_FEE_PERCENTAGE_VALUE:-10.0}
-  export STRAT_SECONDARY_SALE_FEE_PERCENTAGE_VALUE=${STRAT_SECONDARY_SALE_FEE_PERCENTAGE_VALUE:-3.0}
-  export STRAT_FEE_RECIPIENT=${STRAT_FEE_RECIPIENT}
+  export USDST_ADDRESS=${USDST_ADDRESS}
+  export USDST_SERVICE_NAME_VALUE=${USDST_SERVICE_NAME_VALUE:-'USDST'}
+  export USDST_IMAGE_URL_VALUE=${USDST_IMAGE_URL_VALUE:-'https://blockapps-public-assets.s3.us-east-1.amazonaws.com/icons/stratFinished.png'}
+  export USDST_PRIMARY_SALE_FEE_PERCENTAGE_VALUE=${USDST_PRIMARY_SALE_FEE_PERCENTAGE_VALUE:-10.0}
+  export USDST_SECONDARY_SALE_FEE_PERCENTAGE_VALUE=${USDST_SECONDARY_SALE_FEE_PERCENTAGE_VALUE:-3.0}
+  export USDST_FEE_RECIPIENT=${USDST_FEE_RECIPIENT}
   export REDEMPTIONS_CLOSE_REDEMPTION_ROUTE_VALUE=${REDEMPTIONS_CLOSE_REDEMPTION_ROUTE_VALUE:-'/redemption/close'}
   export REDEMPTIONS_CREATE_CUSTOMER_ADDRESS_ROUTE_VALUE=${REDEMPTIONS_CREATE_CUSTOMER_ADDRESS_ROUTE_VALUE:-'/customer/address'}
   export REDEMPTIONS_CREATE_REDEMPTION_ROUTE_VALUE=${REDEMPTIONS_CREATE_REDEMPTION_ROUTE_VALUE:-'/redemption/create'}
@@ -208,13 +208,13 @@ else
       exit 16
     fi
   
-    if [ -z "${STRAT_ADDRESS}" ]; then
-      echo "STRAT_ADDRESS is empty but is a required value"
+    if [ -z "${USDST_ADDRESS}" ]; then
+      echo "USDST_ADDRESS is empty but is a required value"
       exit 17
     fi
-  
-    if [ -z "${STRAT_FEE_RECIPIENT}" ]; then
-      echo "STRAT_FEE_RECIPIENT is empty but is a required value"
+
+    if [ -z "${USDST_FEE_RECIPIENT}" ]; then
+      echo "USDST_FEE_RECIPIENT is empty but is a required value"
       exit 18
     fi
   
@@ -256,12 +256,12 @@ else
     # sed -i 's*<metamask_image_url_value>*'"${METAMASK_IMAGE_URL_VALUE}"'*g' /tmp/tmp.config.yaml
     # sed -i 's*<metamask_primary_sale_fee_percentage_value>*'"${METAMASK_PRIMARY_SALE_FEE_PERCENTAGE_VALUE}"'*g' /tmp/tmp.config.yaml
     # sed -i 's*<metamask_secondary_sale_fee_percentage_value>*'"${METAMASK_SECONDARY_SALE_FEE_PERCENTAGE_VALUE}"'*g' /tmp/tmp.config.yaml
-    sed -i 's*<strat_strat_address_value>*'"${STRAT_ADDRESS}"'*g' /tmp/tmp.config.yaml
-    sed -i 's*<strat_strats_per_dollar_value>*'"${STRAT_STRATS_PER_DOLLAR}"'*g' /tmp/tmp.config.yaml
-    sed -i 's*<strat_image_url_value>*'"${STRAT_IMAGE_URL_VALUE}"'*g' /tmp/tmp.config.yaml
-    sed -i 's*<strat_primary_sale_fee_percentage_value>*'"${STRAT_PRIMARY_SALE_FEE_PERCENTAGE_VALUE}"'*g' /tmp/tmp.config.yaml
-    sed -i 's*<strat_secondary_sale_fee_percentage_value>*'"${STRAT_SECONDARY_SALE_FEE_PERCENTAGE_VALUE}"'*g' /tmp/tmp.config.yaml
-    sed -i 's*<strat_fee_recipient_value>*'"${STRAT_FEE_RECIPIENT}"'*g' /tmp/tmp.config.yaml
+    sed -i 's*<USDST_USDST_address_value>*'"${USDST_ADDRESS}"'*g' /tmp/tmp.config.yaml
+    sed -i 's*<USDST_service_name_value>*'"${USDST_SERVICE_NAME_VALUE}"'*g' /tmp/tmp.config.yaml
+    sed -i 's*<USDST_image_url_value>*'"${USDST_IMAGE_URL_VALUE}"'*g' /tmp/tmp.config.yaml
+    sed -i 's*<USDST_primary_sale_fee_percentage_value>*'"${USDST_PRIMARY_SALE_FEE_PERCENTAGE_VALUE}"'*g' /tmp/tmp.config.yaml
+    sed -i 's*<USDST_secondary_sale_fee_percentage_value>*'"${USDST_SECONDARY_SALE_FEE_PERCENTAGE_VALUE}"'*g' /tmp/tmp.config.yaml
+    sed -i 's*<USDST_fee_recipient_value>*'"${USDST_FEE_RECIPIENT}"'*g' /tmp/tmp.config.yaml
     sed -i 's*<redemptions_close_redemption_route_value>*'"${REDEMPTIONS_CLOSE_REDEMPTION_ROUTE_VALUE}"'*g' /tmp/tmp.config.yaml
     sed -i 's*<redemptions_create_customer_address_route_value>*'"${REDEMPTIONS_CREATE_CUSTOMER_ADDRESS_ROUTE_VALUE}"'*g' /tmp/tmp.config.yaml
     sed -i 's*<redemptions_create_redemption_route_value>*'"${REDEMPTIONS_CREATE_REDEMPTION_ROUTE_VALUE}"'*g' /tmp/tmp.config.yaml
