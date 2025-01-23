@@ -69,7 +69,7 @@ const actions = {
   fetchWBTCSTAddress: async (dispatch) => {
     dispatch({ type: actionDescriptors.fetchWBTCSTAddress });
     try {
-      let response = await fetch(`${apiUrl}/eth/wbtcstAddress`, {
+      let response = await fetch(`${apiUrl}/tokens/wbtcstAddress`, {
         method: HTTP_METHODS.GET,
         credentials: 'same-origin',
       });

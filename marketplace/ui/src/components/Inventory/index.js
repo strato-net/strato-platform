@@ -821,9 +821,11 @@ const Inventory = ({ user }) => {
                         user={user}
                         supportedTokens={supportedTokens}
                         reserves={reserves}
-                        stratAddress={stratsAddress}
                         assetsWithEighteenDecimalPlaces={
                           assetsWithEighteenDecimalPlaces
+                        }
+                        assetsWithEightDecimalPlaces={
+                          assetsWithEightDecimalPlaces
                         }
                       />
                     ))

@@ -21,10 +21,10 @@ router.get(
 );
 
 router.get(
-  Eth.getWBTCSTAddress,
+  Tokens.getWBTCSTAddress,
   authHandler.authorizeRequest(true),
   loadDapp,
-  EthController.getWBTCSTAddress
+  TokensController.getWBTCSTAddress
 );
 
 router.post(
