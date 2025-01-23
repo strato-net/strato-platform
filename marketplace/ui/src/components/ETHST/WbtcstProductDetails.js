@@ -45,7 +45,7 @@ import PreviewMode from '../RichEditor/PreviewMode';
 import ClickableCell from '../ClickableCell';
 import TimeRangeTabs from '../MarketPlace/TimeRangeTabs';
 import Statistics from '../MarketPlace/Statistics';
-import EthstSteps from './EthstSteps';
+import WbtcstSteps from './WbtcstSteps';
 import LoginModal from '../MarketPlace/LoginModal';
 import StakeModal from '../Inventory/StakeModal';
 import BorrowModal from '../Inventory/BorrowModal';
@@ -536,7 +536,7 @@ const ProductDetails = ({ user, users }) => {
               </Breadcrumb.Item>
             </Breadcrumb>
           </Row>
-          <EthstSteps />
+          <WbtcstSteps />
           <div className="flex w-full flex-col md:leading-12 px-4 sm:px-8 md:px-0 items-center md:w-[750px] md:w-[835px] xl:w-[858px]  md:mx-auto mt-12">
             <div className="flex md:justify-center gap-[15px] md:gap-6 flex-col md:flex-row items-center">
               {details['BlockApps-Mercata-Asset-images'].length > 0 ? (
