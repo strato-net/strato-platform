@@ -18,7 +18,6 @@ module Blockchain.Sequencer.Event (
   OutputBlock(..),
   SequencedBlock(..),
   Timestamp,
-  OutputGenesis(..),
   SeqLoopEvent(..),
   JsonRpcCommand(..),
   outputBlockToBlockRetainPayloads,
@@ -37,7 +36,6 @@ module Blockchain.Sequencer.Event (
 import qualified Blockchain.Blockstanbul as PBFT
 import qualified Blockchain.Data.Block as BDB
 import Blockchain.Data.BlockHeader
-import Blockchain.Data.ChainInfo
 import Blockchain.Data.Json
 import Blockchain.Data.RLP
 import qualified Blockchain.Data.TXOrigin as TO
@@ -48,7 +46,6 @@ import Blockchain.Sequencer.DB.Witnessable
 import qualified Blockchain.Strato.Model.Address as A
 import Blockchain.Strato.Model.ChainMember
 import Blockchain.Strato.Model.Class
-import Blockchain.Strato.Model.ExtendedWord (Word256)
 import Blockchain.Strato.Model.Keccak256 (Keccak256)
 import Blockchain.Strato.Model.MicroTime
 import Blockchain.Strato.Model.StateRoot
@@ -134,12 +131,6 @@ data IngestBlock = IngestBlock
     ibBlockUncles :: [BlockHeader]
   }
   deriving (Eq, Show, GHCG.Generic)
-
-data IngestGenesis = IngestGenesis
-  { igOrigin :: TO.TXOrigin,
-    igGenesisInfo :: (Word256, ChainInfo)
-  }
-  deriving (Eq, Show, GHCG.Generic, Data)
 
 data SequencedBlock = SequencedBlock
   { sbOrigin :: TO.TXOrigin,
@@ -247,13 +238,13 @@ data OutputBlock' = OutputBlock'
     ob'BlockUncles :: [BlockData']
   }
   deriving (Eq, Show, GHCG.Generic)
-
+{-
 data OutputGenesis = OutputGenesis
   { ogOrigin :: TO.TXOrigin,
     ogGenesisInfo :: (Word256, ChainInfo)
   }
   deriving (Eq, Show, GHCG.Generic, Data)
-
+-}
 blockToIngestBlock :: TO.TXOrigin -> BDB.Block -> IngestBlock
 blockToIngestBlock origin BDB.Block {BDB.blockBlockData = bd, BDB.blockReceiptTransactions = txs, BDB.blockBlockUncles = us} =
   IngestBlock {ibOrigin = origin, ibBlockData = bd, ibReceiptTransactions = txs, ibBlockUncles = us}
@@ -375,15 +366,11 @@ instance Binary IngestTx
 
 instance Binary IngestBlock
 
-instance Binary IngestGenesis
-
 instance Binary SequencedBlock
 
 instance Binary OutputTx
 
 instance Binary OutputBlock
-
-instance Binary OutputGenesis
 
 instance Binary IngestEvent
 
@@ -508,9 +495,6 @@ instance Arbitrary IngestTx where
 instance Arbitrary IngestBlock where
   arbitrary = genericArbitrary
 
-instance Arbitrary IngestGenesis where
-  arbitrary = genericArbitrary
-
 instance Arbitrary SequencedBlock where
   arbitrary = genericArbitrary
 
@@ -524,9 +508,6 @@ instance Arbitrary OutputTx where
   arbitrary = genericArbitrary
 
 instance Arbitrary OutputBlock where
-  arbitrary = genericArbitrary
-
-instance Arbitrary OutputGenesis where
   arbitrary = genericArbitrary
 
 instance ToJSON OutputBlock'

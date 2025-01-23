@@ -11,14 +11,6 @@ import Data.Binary
 import Data.ByteString ()
 import GHC.Generics ()
 
-instance Binary CI.ChainSignature
-
-instance Binary CI.UnsignedChainInfo
-
-instance Binary CI.ChainInfo
-
-instance Binary CI.CodeInfo
-
 instance Binary CI.AccountInfo where
   put (CI.NonContract a n) = putWord8 0 >> put a >> put n
   put (CI.ContractNoStorage a n s) = putWord8 1 >> put a >> put n >> put s
