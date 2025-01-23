@@ -205,6 +205,8 @@ class MarketplaceController {
         // for non-ba sellers, get assets with valid sale & saleQty > 0 - display only For Sale records
         if (item.saleQuantity && item.saleQuantity !== 0) {
           return item;
+        }else{
+          unlisted.push(item);
         }
       }
     });
