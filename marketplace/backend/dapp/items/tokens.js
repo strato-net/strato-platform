@@ -1,19 +1,10 @@
 import { util, rest, importer } from '/blockapps-rest-plus';
-import config from '/load.config';
-import RestStatus from 'http-status-codes';
-import {
-  setSearchQueryOptions,
-  searchOne,
-  searchAll,
-  searchAllWithQueryArgs,
-  waitForAddress,
-} from '/helpers/utils';
-import dayjs from 'dayjs';
+import { waitForAddress } from '/helpers/utils';
 import constants from '../../helpers/constants';
+import BigNumber from 'bignumber.js';
 
 const contractName = 'Tokens';
 const contractFilename = `${util.cwd}/dapp/items/contracts/Tokens.sol`;
-const contractEvents = { OWNERSHIP_UPDATE: 'OwnershipUpdate' };
 
 /**
  * Uploads a new Tokens item
@@ -24,11 +15,18 @@ const contractEvents = { OWNERSHIP_UPDATE: 'OwnershipUpdate' };
  * */
 async function uploadContract(user, _constructorArgs, options) {
   const constructorArgs = marshalIn(_constructorArgs);
+  const { quantity, ...restArgs } = constructorArgs;
+
+  // Adjust quantity safely using BigNumber
+  const adjustedQuantity = new BigNumber(quantity)
+    .multipliedBy(new BigNumber(10).pow(18))
+    .toFixed(0);
+  const updatedConstructorArgs = { ...restArgs, quantity: adjustedQuantity };
 
   const contractArgs = {
     name: contractName,
     source: await importer.combine(contractFilename),
-    args: util.usc(constructorArgs),
+    args: util.usc(updatedConstructorArgs),
   };
 
   let error = [];
@@ -77,23 +75,6 @@ function marshalIn(_args) {
     ..._args,
   };
   return args;
-}
-
-async function getHistory(user, chainId, address, options) {
-  const contractArgs = {
-    name: `history@${contractName}`,
-  };
-
-  const copyOfOptions = {
-    ...options,
-    query: {
-      address: `eq.${address}`,
-    },
-    chainIds: [chainId],
-  };
-
-  const history = await rest.search(user, contractArgs, copyOfOptions);
-  return history;
 }
 
 /**
@@ -154,93 +135,6 @@ function bindAddress(user, address, options) {
   return bind(user, contract, options);
 }
 
-/**
- * Get contract state via cirrus. A proper chainId is typically already provided in options.
- * @param args Lookup with an address or uniqueItemID.
- * @returns Contract state in cirrus
- */
-
-async function get(user, args, options) {
-  const { uniqueItemID, address, ...restArgs } = args;
-  let item;
-
-  if (address) {
-    const searchArgs = setSearchQueryOptions(restArgs, {
-      key: 'address',
-      value: address,
-    });
-    item = await searchOne(constants.assetTableName, searchArgs, options, user);
-  } else {
-    const searchArgs = setSearchQueryOptions(restArgs, {
-      key: 'uniqueItemID',
-      value: uniqueItemID,
-    });
-    item = await searchOne(constants.assetTableName, searchArgs, options, user);
-  }
-  if (!item) {
-    return undefined;
-  }
-
-  return marshalOut({
-    ...item,
-  });
-}
-
-async function getAll(admin, args = {}, options) {
-  const inventories = await searchAllWithQueryArgs(
-    constants.assetTableName,
-    { ...args, category: `['Tokens']` },
-    options,
-    admin
-  );
-  return inventories.map((inventory) => marshalOut(inventory));
-}
-
-/**
- * Get contract state in bloc.
- * @deprecated Use {@link get `get`} instead.
- */
-async function getState(user, contract, options) {
-  const state = await rest.getState(user, contract, options);
-  return marshalOut(state);
-}
-
-/**
- * Transfer the ownership of a Item
- * @param newOwner The organization address of the new owner of the Item.
- */
-async function transferOwnership(user, contract, options, newOwner) {
-  // they may tell us they want this date entered by the user, but we'll see
-  const transferOwnershipDate = dayjs().unix();
-
-  const callArgs = {
-    contract,
-    method: 'transferOwnership',
-    args: util.usc({ addr: newOwner }), // could be transferOwnershipDate
-  };
-  const transferStatus = await rest.call(user, callArgs, options);
-
-  if (parseInt(transferStatus, 10) !== RestStatus.OK) {
-    throw new rest.RestError(
-      transferStatus,
-      "You cannot transfer the ownership of a Item you don't own",
-      { newOwner }
-    );
-  }
-
-  return transferStatus;
-}
-
-async function getAllOwnershipEvents(admin, args = {}, options) {
-  const itemOwnershipEvents = await searchAllWithQueryArgs(
-    `${contractName}.${contractEvents.OWNERSHIP_UPDATE}`,
-    args,
-    options,
-    admin
-  );
-  return itemOwnershipEvents.map((item) => marshalOut(item));
-}
-
 async function addHash(user, args, options) {
   const CREATOR = 'eq.BlockApps';
   const IS_ACTIVE = 'eq.true';
@@ -278,17 +172,67 @@ async function addHash(user, args, options) {
   return rest.call(user, callArgs, options);
 }
 
+function getUSDSTAddress() {
+  if (process.env.networkID === constants.prodNetworkId) {
+    return constants.prodUSDSTAddress;
+  } else if (process.env.networkID === constants.testnetNetworkId) {
+    return constants.testnetUSDSTAddress;
+  } else {
+    return constants.prodUSDSTAddress;
+  }
+}
+
+function getCataAddress() {
+  if (process.env.networkID === constants.prodNetworkId) {
+    return constants.prodCataAddress;
+  } else if (process.env.networkID === constants.testnetNetworkId) {
+    return constants.testnetCataAddress;
+  } else {
+    return constants.prodCataAddress;
+  }
+}
+
+function getETHSTAddress() {
+  if (process.env.networkID === constants.prodNetworkId) {
+    return constants.prodETHSTAddress;
+  } else if (process.env.networkID === constants.testnetNetworkId) {
+    return constants.testnetETHSTAddress;
+  } else {
+    return constants.prodETHSTAddress;
+  }
+}
+
+function getWBTCSTAddress() {
+  if (process.env.networkID === constants.prodNetworkId) {
+    return constants.prodWBTCSTAddress;
+  } else if (process.env.networkID === constants.testnetNetworkId) {
+    return constants.testnetWBTCSTAddress;
+  } else {
+    return constants.prodWBTCSTAddress;
+  }
+}
+
+function getStratsAddress() {
+  if (process.env.networkID === constants.prodNetworkId) {
+    return constants.prodStratsAddress;
+  } else if (process.env.networkID === constants.testnetNetworkId) {
+    return constants.testnetStratsAddress;
+  } else {
+    return constants.prodStratsAddress;
+  }
+}
+
 export default {
   uploadContract,
   contractName,
   contractFilename,
   bindAddress,
-  get,
-  getAll,
-  getAllOwnershipEvents,
-  transferOwnership,
   marshalIn,
   marshalOut,
-  getHistory,
   addHash,
+  getUSDSTAddress,
+  getCataAddress,
+  getETHSTAddress,
+  getStratsAddress,
+  getWBTCSTAddress,
 };

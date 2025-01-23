@@ -76,19 +76,20 @@ const HeaderComponent = ({
   const categoryDispatch = useCategoryDispatch();
   const userDispatch = useAuthenticateDispatch();
   //States
-  const { cartList, strats, cata, stratsAddress } =
-    useMarketplaceState();
+  const { cartList, USDST, cata, USDSTAddress } = useMarketplaceState();
   const { categorys } = useCategoryState();
   let { isAuthenticated } = useAuthenticateState();
 
   useEffect(() => {
+    marketplaceActions.fetchAssetsWithEighteenDecimalPlaces(
+      marketplaceDispatch
+    );
+    marketplaceActions.fetchAssetsWithEightDecimalPlaces(marketplaceDispatch);
     if (user) {
-      marketplaceActions.fetchStratsBalance(marketplaceDispatch);
+      marketplaceActions.fetchUSDSTBalance(marketplaceDispatch);
       marketplaceActions.fetchCataBalance(marketplaceDispatch);
-      marketplaceActions.fetchStratsAddress(marketplaceDispatch);
+      marketplaceActions.fetchUSDSTAddress(marketplaceDispatch);
       marketplaceActions.fetchCataAddress(marketplaceDispatch);
-      marketplaceActions.fetchAssetsWithEighteenDecimalPlaces(marketplaceDispatch);
-      marketplaceActions.fetchAssetsWithEightDecimalPlaces(marketplaceDispatch);
     }
   }, [user]);
 
@@ -102,7 +103,7 @@ const HeaderComponent = ({
   const [categories, setCategories] = useState([]);
   const [selectedCategory, setSelectedCategory] = useState(categoryQueryValue);
   const [isModalVisible, setIsModalVisible] = useState(false);
-  const stratsBalance = Object.keys(strats).length > 0 ? strats : 0;
+  const USDSTBalance = Object.keys(USDST).length > 0 ? USDST : 0;
   const cataBalance = Object.keys(cata).length > 0 ? cata : 0;
 
   useEffect(() => {
@@ -213,13 +214,24 @@ const HeaderComponent = ({
         },
       ];
 
-  const stratsItem = [
+  const USDSTItem = [
     {
       key: '1',
       type: 'group',
       label: (
         <div>
-          {user && <p className="text-xs mt-1">STRATs: {stratsBalance}</p>}
+          {user && (
+            <p className="text-xs mt-1">
+              USDST:{' '}
+              {new BigNumber(USDSTBalance)
+                .toNumber()
+                .toFixed(2)
+                .toLocaleString('en-US', {
+                  maximumFractionDigits: 4,
+                  minimumFractionDigits: 2,
+                })}
+            </p>
+          )}
         </div>
       ),
       children: [
@@ -228,14 +240,14 @@ const HeaderComponent = ({
           onClick: async () => {
             navigate(
               `${routes.MarketplaceProductDetail.url
-                .replace(':address', stratsAddress)
-                .replace(':name', 'STRATS')}`
+                .replace(':address', USDSTAddress)
+                .replace(':name', 'USDST')}`
             );
           },
           label: (
             <div>
-              {user && stratsAddress && (
-                <p className="text-xs mt-1">Buy STRATs</p>
+              {user && USDSTAddress && (
+                <p className="text-xs mt-1">Buy USDST</p>
               )}
             </div>
           ),
@@ -243,7 +255,7 @@ const HeaderComponent = ({
         {
           key: '3',
           onClick: async () => {
-            navigate(`${routes.Transactions.url}?type=STRATS`);
+            navigate(`${routes.Transactions.url}?type=USDST`);
           },
           label: (
             <div>
@@ -264,7 +276,9 @@ const HeaderComponent = ({
             <Row className="flex flex-col">
               <Col Col={24}>
                 {' '}
-                <p className="text-xs mt-1">CATA: {new BigNumber(cataBalance).toString()}</p>
+                <p className="text-xs mt-1">
+                  CATA: {new BigNumber(cataBalance).toFixed(4).toString()}
+                </p>
               </Col>
             </Row>
           )}
@@ -299,9 +313,7 @@ const HeaderComponent = ({
           ),
         }
       : null,
-    user
-      ? { value: 'stake', path: routes.Stake.url, label: 'Stake' }
-      : null,
+    user ? { value: 'stake', path: routes.Stake.url, label: 'Stake' } : null,
     {
       value: 'activityFeed',
       path: routes.ActivityFeed.url,
@@ -513,7 +525,7 @@ const HeaderComponent = ({
           onClick={() => {
             window.scrollTo({ top: 0 });
             navigate(routes.Stake.url);
-            setSelectedTab(0)
+            setSelectedTab(0);
           }}
         >
           <RiseOutlined /> Stake
@@ -542,7 +554,7 @@ const HeaderComponent = ({
             >
               <a
                 className="md:flex mx-1 text-base text-white"
-                id="strats-dropdown"
+                id="USDST-dropdown"
               >
                 <Badge
                   style={{ backgroundColor: '#13188A' }}
@@ -551,7 +563,9 @@ const HeaderComponent = ({
                     parseFloat(cataBalance).toString().includes('.') &&
                     parseFloat(cataBalance).toString().split('.')[1].length > 4
                       ? `${parseFloat(cataBalance).toFixed(4)}`
-                      : parseFloat(cataBalance).toFixed(4).replace(/\.?0+$/, '')
+                      : parseFloat(cataBalance)
+                          .toFixed(4)
+                          .replace(/\.?0+$/, '')
                   }
                   overflowCount={9999999}
                 >
@@ -567,7 +581,7 @@ const HeaderComponent = ({
           )}
           {roleIndex !== undefined && roleIndex !== 1 && (
             <Dropdown
-              menu={{ items: stratsItem }}
+              menu={{ items: USDSTItem }}
               placement="bottomRight"
               trigger={['click']}
               className="xs:mt-5 md:mt-0"
@@ -575,16 +589,22 @@ const HeaderComponent = ({
             >
               <a
                 className="md:flex mx-1 text-base text-white"
-                id="strats-dropdown"
+                id="USDST-dropdown"
               >
                 <Badge
                   style={{ backgroundColor: '#13188A' }}
                   className="cursor-pointer mt-7 md:mt-0 mx-2"
-                  count={stratsBalance}
+                  count={new BigNumber(USDSTBalance)
+                    .toNumber()
+                    .toFixed(2)
+                    .toLocaleString('en-US', {
+                      maximumFractionDigits: 4,
+                      minimumFractionDigits: 2,
+                    })}
                   overflowCount={9999999}
                 >
                   <img
-                    src={Images.strat}
+                    src={Images.USDST}
                     alt={IMG_META}
                     title={IMG_META}
                     className="w-[35px] h-[35px] "

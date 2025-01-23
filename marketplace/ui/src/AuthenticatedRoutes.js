@@ -24,7 +24,6 @@ import { IssuerStatusProvider } from './contexts/issuerStatus';
 import ProductDetails from './components/MarketPlace/ProductDetails';
 import EthstProductDetails from './components/ETHST/EthstProductDetails';
 import WbtcstProductDetails from './components/ETHST/WbtcstProductDetails';
-import VaultDetails from './components/MarketPlace/VaultDetails';
 import Checkout from './components/MarketPlace/Checkout';
 import ConfirmOrder from './components/MarketPlace/ConfirmOrder';
 import ProcessingOrder from './components/MarketPlace/ProcessingOrder';
@@ -35,6 +34,7 @@ import UserProfile from './components/UserProfile';
 import Error from './components/404';
 import FAQ from './components/FAQ/index';
 import { TransactionsProvider } from './contexts/transaction';
+import { MarketplaceProvider } from './contexts/marketplace';
 import { EthProvider } from './contexts/eth';
 import Transaction from './components/Order/Transaction';
 import Feed from './components/Feed/Feed';
@@ -121,7 +121,9 @@ const AuthenticatedRoutes = ({ user, users, isAuthenticated }) => {
         element={
           <UsersProvider>
             <OrdersProvider>
-              <Invoice user={user} users={users} />
+              <MarketplaceProvider>
+                <Invoice user={user} users={users} />
+              </MarketplaceProvider>
             </OrdersProvider>
           </UsersProvider>
         }
@@ -310,27 +312,6 @@ const AuthenticatedRoutes = ({ user, users, isAuthenticated }) => {
                     <ItemsProvider>
                       <OrdersProvider>
                         <ProductDetails user={user} users={users} />
-                      </OrdersProvider>
-                    </ItemsProvider>
-                  </InventoriesProvider>
-                </PaymentServicesProvider>
-              </SubCategorysProvider>
-            </CategorysProvider>
-          </UsersProvider>
-        }
-      />
-      <Route
-        exact
-        path={routes.VaultDetail.url}
-        element={
-          <UsersProvider>
-            <CategorysProvider>
-              <SubCategorysProvider>
-                <PaymentServicesProvider>
-                  <InventoriesProvider>
-                    <ItemsProvider>
-                      <OrdersProvider>
-                        <VaultDetails user={user} users={users} />
                       </OrdersProvider>
                     </ItemsProvider>
                   </InventoriesProvider>

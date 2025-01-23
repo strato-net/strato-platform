@@ -25,7 +25,8 @@ const Transaction = ({ user }) => {
   const marketplaceDispatch = useMarketplaceDispatch();
   const ethDispatch = useEthDispatch();
   const [stratAddress, setStratAddress] = useState('');
-  const [assetsWithEighteenDecimalPlaces, setAssetsWithEighteenDecimalPlaces] = useState('');
+  const [assetsWithEighteenDecimalPlaces, setAssetsWithEighteenDecimalPlaces] =
+    useState('');
   const [assetsWithEightDecimalPlaces, setAssetsWithEightDecimalPlaces] = useState('');
 
   useEffect(() => {
@@ -100,7 +101,9 @@ const Transaction = ({ user }) => {
           transaction.assetContractName
         );
         let isStrat = transaction.assetOriginAddress === stratAddress;
-        let is18DecimalPlaces = assetsWithEighteenDecimalPlaces.includes(transaction.assetOriginAddress);
+        let is18DecimalPlaces = assetsWithEighteenDecimalPlaces.includes(
+          transaction.assetOriginAddress
+        );
         let is8DecimalPlaces = assetsWithEightDecimalPlaces.includes(transaction.assetOriginAddress);
         return formatDataObject({
           reference: transaction?.reference,

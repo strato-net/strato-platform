@@ -138,7 +138,7 @@ class TransactionController {
         const asset = inventoriesWithImageUrl.find((assetItem) => {
           return (
             assetItem.address ===
-            (item?.assetAddress || item?.assetAddresses[0])
+            (item?.assetAddress || (item?.assetAddresses?.length ? item?.assetAddresses[0] : ''))
           );
         });
 
@@ -189,7 +189,6 @@ class TransactionController {
           assetAddress: asset?.address,
           assetOriginAddress: asset?.originAddress,
           assetContractName: asset?.contract_name,
-          quantityIsDecimal: asset?.data.quantityIsDecimal,
         };
       });
 
@@ -370,7 +369,6 @@ class TransactionController {
           assetAddress: asset?.address,
           assetOriginAddress: asset?.originAddress,
           assetContractName: asset?.contract_name,
-          quantityIsDecimal: asset?.data.quantityIsDecimal,
         };
       });
 

@@ -18,7 +18,7 @@ import { Images } from '../../images';
 import { useInventoryState } from '../../contexts/inventory';
 import RepayModal from './RepayModal';
 import BorrowModal from './BorrowModal';
-const StratsIcon = <img src={Images.strat} alt="STRATs" className="w-5 h-5" />;
+const USDSTIcon = <img src={Images.USDST} alt="USDST" className="w-5 h-5" />;
 
 const StakeInventoryCard = ({
   inventory,
@@ -30,7 +30,6 @@ const StakeInventoryCard = ({
   offset,
   user,
   supportedTokens,
-  stratAddress,
   assetsWithEighteenDecimalPlaces,
   assetsWithEightDecimalPlaces
 }) => {
@@ -45,7 +44,9 @@ const StakeInventoryCard = ({
   const navigate = useNavigate();
   const naviroute = routes.InventoryDetail.url;
   const imgMeta = category ? category : SEO.TITLE_META;
-  const is18DecimalPlaces = assetsWithEighteenDecimalPlaces?.includes(inventory.root);
+  const is18DecimalPlaces = assetsWithEighteenDecimalPlaces?.includes(
+    inventory.root
+  );
   const is8DecimalPlaces = assetsWithEightDecimalPlaces?.includes(inventory.root);
 
   const uniqueEscrows = new Set();
@@ -66,9 +67,11 @@ const StakeInventoryCard = ({
     ? inventory?.quantity
     : inventory?.escrow?.collateralQuantity || 0;
   collateralQuantity = is18DecimalPlaces
+   
     ? collateralQuantity / 1e18
     : is8DecimalPlaces
     ? collateralQuantity / 1e8
+   
     : collateralQuantity;
   const quantityNotAvailable = inventory?.inventories
     ? inventory.inventories.reduce((sum, item) => {
@@ -84,9 +87,11 @@ const StakeInventoryCard = ({
   const quantity = inventory?.inventories
     ? inventory.totalQuantity
     : is18DecimalPlaces
-    ? inventory?.quantity / 1e18
+   
+    ? inventory?.quantity /  1e18
     : is8DecimalPlaces
     ? inventory?.quantity / 1e8
+   
     : inventory?.quantity;
   const stakeQuantity = quantity - collateralQuantity - quantityNotAvailable;
   const uniqueEscrowsPrime = new Set();
@@ -106,7 +111,7 @@ const StakeInventoryCard = ({
     : 0;
   const maxBorrowableAmount = Math.floor(collateralValue / 2);
   const uniqueBorrowedAddresses = new Set();
-  const borrowAmount = inventory?.inventories
+  let borrowAmount = inventory?.inventories
     ? inventory.inventories.reduce((sum, item) => {
         const escrowAddress = item?.escrow?.address;
         const borrowedValue = item?.escrow?.borrowedAmount || 0;
@@ -233,11 +238,8 @@ const StakeInventoryCard = ({
             </div>
             <div className="flex flex-row space-x-2 lg:justify-self-end whitespace-nowrap">
               <Typography className="lg:pt-1 flex gap-1">
-                Borrowed Amount: {StratsIcon}
-                {(borrowAmount / 100).toLocaleString('en-US', {
-                  maximumFractionDigits: 2,
-                  minimumFractionDigits: 2,
-                })}
+                Borrowed Amount: {USDSTIcon}
+                {(borrowAmount / Math.pow(10, 18)).toFixed(2)}
               </Typography>
             </div>
           </div>
@@ -387,7 +389,6 @@ const StakeInventoryCard = ({
           debouncedSearchTerm={debouncedSearchTerm}
           saleAddress={inventory.saleAddress}
           category={category}
-          stratAddress={stratAddress}
           assetsWithEighteenDecimalPlaces={assetsWithEighteenDecimalPlaces}
           assetsWithEightDecimalPlaces={assetsWithEightDecimalPlaces}
         />

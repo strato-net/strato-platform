@@ -14,7 +14,7 @@ async function handleMessage(messageData, token) {
         break;
 
       case "Order":
-        await handleOrderRewards(event, token);
+        await handleOrderRewards(event, token); // TODO: THIS WILL NOT WORK WITH NEW USDST REWARDS
         break;
 
       default:

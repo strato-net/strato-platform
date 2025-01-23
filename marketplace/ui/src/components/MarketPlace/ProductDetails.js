@@ -60,7 +60,7 @@ import image_placeholder from '../../images/resources/image_placeholder.png';
 import 'react-responsive-carousel/lib/styles/carousel.min.css'; // requires a loader
 
 import { SEO } from '../../helpers/seoConstant';
-import { STRATS_CONVERSION, ASSET_STATUS } from '../../helpers/constants';
+import { ASSET_STATUS } from '../../helpers/constants';
 import { TOAST_MSG } from '../../helpers/msgConstants';
 
 import { Swiper, SwiperSlide } from 'swiper/react';
@@ -234,11 +234,7 @@ const ProductDetails = ({ user, users }) => {
       const detailsData = details.data;
       setItemData(detailsData);
       if (details.saleQuantity) {
-        let saleQuantity =
-          details.data.quantityIsDecimal &&
-          details.data.quantityIsDecimal === 'True'
-            ? details.saleQuantity / 100
-            : details.saleQuantity;
+        let saleQuantity = details.saleQuantity;
         setAvailableQuantity(saleQuantity || 1);
       }
     }
@@ -473,6 +469,10 @@ const ProductDetails = ({ user, users }) => {
   );
   const linkUrl = window.location.href;
 
+  const is18DecimalPlaces = assetsWithEighteenDecimalPlaces.includes(
+    details?.originAddress
+  );
+
   return (
     <>
       {contextHolder}
@@ -652,35 +652,24 @@ const ProductDetails = ({ user, users }) => {
                     >
                       {details?.price || isStaked
                         ? (() => {
-                            const adjustedPrice =
-                              details.data.quantityIsDecimal &&
-                              details.data.quantityIsDecimal === 'True'
-                                ? details.price * 100
-                                : details.price;
+                            const adjustedPrice = details.price;
                             return (
                               <>
                                 $
                                 {isStaked
-                                  ? (
-                                      details.escrow?.maxLoanAmount / 100
-                                    ).toFixed(2)
-                                  : adjustedPrice}{' '}
+                                  ? (details.escrow?.maxLoanAmount).toFixed(2)
+                                  : is18DecimalPlaces
+                                  ? adjustedPrice * Math.pow(10, 18)
+                                  : adjustedPrice.toFixed(2)}{' '}
                                 <span className="font-normal text-xs mr-2 text-primary">
                                   <b>
                                     (
                                     {isStaked
                                       ? details.escrow?.maxLoanAmount
-                                      : (
-                                          adjustedPrice * STRATS_CONVERSION
-                                        ).toFixed(0)}{' '}
-                                    {(isStaked
-                                      ? details.escrow?.maxLoanAmount
-                                      : (
-                                          adjustedPrice * STRATS_CONVERSION
-                                        ).toFixed(0)) == 1
-                                      ? 'STRAT'
-                                      : 'STRATs'}
-                                    )
+                                      : is18DecimalPlaces
+                                      ? adjustedPrice * Math.pow(10, 18)
+                                      : adjustedPrice.toFixed(2)}{' '}
+                                    USDST)
                                   </b>
                                 </span>
                                 {isStakeable && (
@@ -700,8 +689,7 @@ const ProductDetails = ({ user, users }) => {
                     </Paragraph>
                     {isAvailableForSale && (
                       <Text type="danger" strong>
-                        {' '}
-                        Sold Out{' '}
+                        Sold Out
                       </Text>
                     )}
                   </div>
@@ -996,7 +984,7 @@ const ProductDetails = ({ user, users }) => {
                     ) : (
                       <div className="text-center p-4">
                         <p>
-                          Please{' '}
+                          Please
                           <span
                             className="text-blue hover:text-blue cursor-pointer hover:underline"
                             onClick={() => {
@@ -1009,7 +997,7 @@ const ProductDetails = ({ user, users }) => {
                             }}
                           >
                             login
-                          </span>{' '}
+                          </span>
                           to view ownership history.
                         </p>
                       </div>
@@ -1068,10 +1056,7 @@ const ProductDetails = ({ user, users }) => {
                         onChange={handleTimeFilterChange}
                         activeKey={timeFilter}
                       />
-                      <PriceChartAndStats
-                        priceHistory={priceHistory}
-                        isDecimal={details?.data?.quantityIsDecimal === 'True'}
-                      />
+                      <PriceChartAndStats priceHistory={priceHistory} />
                     </div>
                   )}
                 <div>
@@ -1082,7 +1067,7 @@ const ProductDetails = ({ user, users }) => {
                       </h2>
                       <Statistics
                         priceHistory={priceHistory}
-                        isDecimal={details?.data?.quantityIsDecimal === 'True'}
+                        is18DecimalPlaces={is18DecimalPlaces}
                       />
                     </>
                   )}

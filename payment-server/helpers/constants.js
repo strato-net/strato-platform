@@ -15,6 +15,7 @@ const STRIPE_ENV = {
 const DEFAULT_OPTIONS = { ...OPTIONS, chainIds: [], cacheNonce: true };
 
 const STRIPE_CONTRACT_ADDRESS = deployment.contracts.stripe.address;
+const USDST_ADDRESS = process.env.USDST_ADDRESS;
 // TODO: Disabled for initial payment server release
 // const METAMASK_CONTRACT_ADDRESS = deployment.contracts.metamask.address;
 const REDEMPTION_CONTRACT_ADDRESS = deployment.contracts.redemption.address;
@@ -46,6 +47,7 @@ export {
   SERVER_CONFIRM_URL,
   SERVER_CANCEL_URL,
   STRIPE_CONTRACT_ADDRESS,
+  USDST_ADDRESS,
   // METAMASK_CONTRACT_ADDRESS, // TODO: Disabled for initial payment server release
   REDEMPTION_CONTRACT_ADDRESS,
   SERVER_URL,

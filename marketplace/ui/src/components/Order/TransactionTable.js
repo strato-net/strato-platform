@@ -38,7 +38,6 @@ import { useEthState } from '../../contexts/eth';
 import { useMarketplaceDispatch } from '../../contexts/marketplace';
 // Utils & Constants
 import {
-  STRATS_CONVERSION,
   TRANSACTION_STATUS,
   TRANSACTION_STATUS_CLASSES,
   TRANSACTION_STATUS_COLOR,
@@ -51,9 +50,15 @@ import {
 import { SEO } from '../../helpers/seoConstant';
 import { getStringDate } from '../../helpers/utils';
 
-const TransactionTable = ({ user, download, stratAddress, assetsWithEighteenDecimalPlaces, assetsWithEightDecimalPlaces }) => {
-  const StratsIcon = (
-    <img src={Images.strat} alt="STRATs" className="mx-1 w-4 h-4" />
+const TransactionTable = ({
+  user,
+  download,
+  stratAddress,
+  assetsWithEighteenDecimalPlaces,
+  assetsWithEightDecimalPlaces,
+}) => {
+  const USDSTIcon = (
+    <img src={Images.USDST} alt="USDST" className="mx-1 w-4 h-4" />
   );
   // Dispatch
   const transactionDispatch = useTransactionDispatch();
@@ -87,14 +92,14 @@ const TransactionTable = ({ user, download, stratAddress, assetsWithEighteenDeci
     : '';
 
   useEffect(() => {
-    async function fetchStratsAddress() {
-      const stratsAddress = await marketplaceActions.fetchStratsAddress(
+    async function fetchUSDSTAddress() {
+      const USDSTAddress = await marketplaceActions.fetchUSDSTAddress(
         marketplaceDispatch
       );
-      await marketplaceActions.fetchStratsBalance(marketplaceDispatch);
-      setOriginAddress(stratsAddress);
+      await marketplaceActions.fetchUSDSTBalance(marketplaceDispatch);
+      setOriginAddress(USDSTAddress);
     }
-    fetchStratsAddress();
+    fetchUSDSTAddress();
   }, [marketplaceDispatch]);
 
   useEffect(() => {
@@ -129,7 +134,7 @@ const TransactionTable = ({ user, download, stratAddress, assetsWithEighteenDeci
     let filteredData = userTransactions;
     // Type filter
     if (type) {
-      if (type === 'STRATS') {
+      if (type === 'USDST') {
         filteredData = filteredData.filter(
           (item) => item.assetOriginAddress === originAddress
         );
@@ -189,7 +194,9 @@ const TransactionTable = ({ user, download, stratAddress, assetsWithEighteenDeci
   const Content = ({ data }) => {
     const price = data?.assetPrice || data?.price;
     const isStrat = data?.assetOriginAddress === stratAddress;
-    const is18DecimalPlaces = assetsWithEighteenDecimalPlaces.includes(data?.assetOriginAddress);
+    const is18DecimalPlaces = assetsWithEighteenDecimalPlaces.includes(
+      data?.assetOriginAddress
+    );
     const is8DecimalPlaces = assetsWithEightDecimalPlaces.includes(data?.assetOriginAddress);
 
     return (
@@ -242,15 +249,15 @@ const TransactionTable = ({ user, download, stratAddress, assetsWithEighteenDeci
                   &nbsp;(
                   <span className="text-[#13188A] font-bold">
                     {' '}
-                    {(isStrat
+                    {isStrat
                       ? (price * 100).toFixed(2)
                       : is18DecimalPlaces
                       ? (price * Math.pow(10, 18)).toFixed(2)
                       : is8DecimalPlaces
                       ? (price * Math.pow(10, 8)).toFixed(2)
-                      : price) * STRATS_CONVERSION}{' '}
+                      : price}{' '}
                   </span>
-                  {StratsIcon}){' '}
+                  {USDSTIcon}){' '}
                 </p>
               ) : (
                 <p className="text-right text-[#13188A] font-bold text-sm">
@@ -668,7 +675,9 @@ const TransactionTable = ({ user, download, stratAddress, assetsWithEighteenDeci
                   data={paginatedTransactions}
                   user={user}
                   stratAddress={stratAddress}
-                  assetsWithEighteenDecimalPlaces={assetsWithEighteenDecimalPlaces}
+                  assetsWithEighteenDecimalPlaces={
+                    assetsWithEighteenDecimalPlaces
+                  }
                   assetsWithEightDecimalPlaces={assetsWithEightDecimalPlaces}
                 />
                 <Pagination

@@ -7,12 +7,12 @@ import ChildStakeItemActions from '../Inventory/ChildStakeItemActions';
 import { ASSET_STATUS } from '../../helpers/constants';
 
 const logo = <img src={Images.cata} alt={''} title={''} className="w-5 h-5" />;
-const StratsIcon = (
-  <img src={Images.strat} alt={''} title={''} className="w-4 h-4" />
+const USDSTIcon = (
+  <img src={Images.USDST} alt={''} title={''} className="w-4 h-4" />
 );
 
 // Make sure you have any necessary variables or functions defined/imported
-// You may need to pass user, limit, offset, reserves, stratsAddress, assetsWithEighteenDecimalPlaces as params,
+// You may need to pass user, limit, offset, reserves, USDSTAddress, assetsWithEighteenDecimalPlaces as params,
 // or handle them in the file where you call these columns.
 
 export const aggregateStakeColumns = (
@@ -20,7 +20,7 @@ export const aggregateStakeColumns = (
   limit,
   offset,
   reserves,
-  stratsAddress,
+  USDSTAddress,
   assetsWithEighteenDecimalPlaces,
   assetsWithEightDecimalPlaces,
 ) => {
@@ -30,24 +30,24 @@ export const aggregateStakeColumns = (
       render: (_, record) => {
         const uniqueBorrowedAddresses = new Set();
 
-        const borrowedAmount =
-          (record?.inventories
-            ? record.inventories.reduce((sum, item) => {
-                const escrowAddress = item?.escrow?.address;
-                const borrowedValue = item?.escrow?.borrowedAmount || 0;
+        let borrowedAmount = record?.inventories
+          ? record.inventories.reduce((sum, item) => {
+              const escrowAddress = item?.escrow?.address;
+              const borrowedValue = item?.escrow?.borrowedAmount || 0;
 
-                // Add borrowed amount only if the escrow address is unique
-                if (
-                  escrowAddress &&
-                  !uniqueBorrowedAddresses.has(escrowAddress)
-                ) {
-                  uniqueBorrowedAddresses.add(escrowAddress);
-                  return sum + borrowedValue;
-                }
+              // Add borrowed amount only if the escrow address is unique
+              if (
+                escrowAddress &&
+                !uniqueBorrowedAddresses.has(escrowAddress)
+              ) {
+                uniqueBorrowedAddresses.add(escrowAddress);
+                return sum + borrowedValue;
+              }
 
-                return sum;
-              }, 0)
-            : record?.escrow?.borrowedAmount || 0) / 100;
+              return sum;
+            }, 0)
+          : record?.escrow?.borrowedAmount || 0;
+
         return (
           <>
             <div className="flex items-center">
@@ -74,11 +74,8 @@ export const aggregateStakeColumns = (
               </div>
             </div>
             <div className="flex items-center gap-2">
-              Borrowed Amount: {StratsIcon}
-              {borrowedAmount.toLocaleString('en-US', {
-                maximumFractionDigits: 2,
-                minimumFractionDigits: 2,
-              })}
+              Borrowed Amount: {USDSTIcon}
+              {(borrowedAmount / Math.pow(10, 18)).toFixed(2)}
             </div>
           </>
         );
@@ -223,7 +220,6 @@ export const aggregateStakeColumns = (
             debouncedSearchTerm={''}
             user={user}
             reserves={reserves}
-            stratAddress={stratsAddress}
             assetsWithEighteenDecimalPlaces={assetsWithEighteenDecimalPlaces}
             assetsWithEightDecimalPlaces={assetsWithEightDecimalPlaces}
           />
@@ -271,7 +267,7 @@ export const stakeColumns = (
   limit,
   offset,
   reserves,
-  stratsAddress,
+  USDSTAddress,
   assetsWithEighteenDecimalPlaces,
   assetsWithEightDecimalPlaces,
   navigate
@@ -370,8 +366,7 @@ export const stakeColumns = (
           : parsedQuantity;
 
         // Extract escrow assets array safely
-        const escrowAssets =
-          record?.['BlockApps-Mercata-Escrow-assets'] || [];
+        const escrowAssets = record?.['BlockApps-Mercata-Escrow-assets'] || [];
 
         // Determine if there is a matching escrow asset
         const hasMatchingEscrow = escrowAssets.some(
@@ -471,7 +466,6 @@ export const stakeColumns = (
           debouncedSearchTerm={''}
           user={user}
           reserves={reserves}
-          stratAddress={stratsAddress}
           assetsWithEighteenDecimalPlaces={assetsWithEighteenDecimalPlaces}
           assetsWithEightDecimalPlaces={assetsWithEightDecimalPlaces}
         />

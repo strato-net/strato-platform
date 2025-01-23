@@ -27,7 +27,6 @@ import {
 } from '../../contexts/transaction';
 // Utils & Constants
 import {
-  STRATS_CONVERSION,
   TRANSACTION_STATUS_COLOR,
   DATE_TIME_FORMAT,
   TRANSACTION_STATUS_TEXT,
@@ -41,14 +40,14 @@ const { Title } = Typography;
 
 const GlobalTransaction = ({
   user,
-  stratAddress,
+  USDSTAddress,
   assetsWithEighteenDecimalPlaces,
   assetsWithEightDecimalPlaces,
   ethstAddress,
   wbtcstAddress,
 }) => {
-  const StratsIcon = (
-    <img src={Images.strat} alt="STRATs" className="mx-1 w-4 h-4" />
+  const USDSTIcon = (
+    <img src={Images.USDST} alt="USDST" className="mx-1 w-4 h-4" />
   );
   // Dispatch
   const transactionDispatch = useTransactionDispatch();
@@ -104,9 +103,12 @@ const GlobalTransaction = ({
 
   const Content = ({ data }) => {
     const price = data?.assetPrice || data?.price;
-    const isStrat = data.assetOriginAddress === stratAddress;
-    const is18DecimalPlaces = assetsWithEighteenDecimalPlaces.includes(data.assetOriginAddress);
-    const is8DecimalPlaces = assetsWithEightDecimalPlaces.includes(data.assetOriginAddress);
+    const is18DecimalPlaces = assetsWithEighteenDecimalPlaces.includes(
+      data.assetOriginAddress
+    );
+    const is8DecimalPlaces = assetsWithEightDecimalPlaces.includes(
+      data.assetOriginAddress
+    );
 
     return (
       <div className="min-h-44 h-full" style={{ width: '460px' }}>
@@ -136,42 +138,34 @@ const GlobalTransaction = ({
                   placement="top"
                   title={data.assetDescription.replace(/<\/?[^>]+(>|$)/g, '')}
                 >
-                  {' '}
-                  {data?.assetDescription.replace(/<\/?[^>]+(>|$)/g, '')}{' '}
+                  {data?.assetDescription.replace(/<\/?[^>]+(>|$)/g, '')}
                 </Tooltip>
               </p>
             </Col>
             <Col span={8} offset={1}>
               {price ? (
                 <p className="text-right flex justify-end items-center">
-                  {' '}
                   <b>
-                    ${' '}
-                    {isStrat
-                      ? (price * 100).toFixed(2)
-                      : is18DecimalPlaces
+                    $
+                    {is18DecimalPlaces
                       ? (price * Math.pow(10, 18)).toFixed(2)
                       : is8DecimalPlaces
                       ? (price * Math.pow(10, 8)).toFixed(2)
-                      : price}{' '}
-                  </b>{' '}
+                      : price}
+                  </b>
                   &nbsp;(
                   <span className="text-[#13188A] font-bold">
-                    {' '}
-                    {(isStrat
-                      ? (price * 100).toFixed(2)
-                      : is18DecimalPlaces
+                    {is18DecimalPlaces
                       ? (price * Math.pow(10, 18)).toFixed(2)
                       : is8DecimalPlaces
                       ? (price * Math.pow(10, 8)).toFixed(2)
-                      : price) * STRATS_CONVERSION}{' '}
+                      : price}
                   </span>
-                  {StratsIcon}){' '}
+                  {USDSTIcon})
                 </p>
               ) : (
                 <p className="text-right text-[#13188A] font-bold text-sm">
-                  {' '}
-                  No Price Available{' '}
+                  No Price Available
                 </p>
               )}
             </Col>
@@ -257,14 +251,13 @@ const GlobalTransaction = ({
         let formattedQuantity = '--';
 
         if (quantity) {
-          const value =
-            assetOriginAddress === stratAddress
-              ? quantity / 100
-              : assetsWithEighteenDecimalPlaces.includes(assetOriginAddress)
-              ? quantity / Math.pow(10, 18)
-              : assetsWithEightDecimalPlaces.includes(assetOriginAddress)
-              ? quantity / Math.pow(10, 8)
-              : quantity;
+          const value = assetsWithEighteenDecimalPlaces.includes(
+            assetOriginAddress
+          )
+            ? quantity / Math.pow(10, 18)
+            : assetsWithEightDecimalPlaces.includes(assetOriginAddress)
+            ? quantity / Math.pow(10, 8)
+            : quantity;
 
           formattedQuantity = value.toLocaleString('en-US', {
             maximumFractionDigits: 4,
@@ -286,30 +279,24 @@ const GlobalTransaction = ({
           <p className="text-base flex justify-end items-center">
             {price
               ? formattedNum(
-                  (
-                    (assetOriginAddress === stratAddress
-                      ? (price * 100).toFixed(2)
-                      : assetsWithEighteenDecimalPlaces.includes(assetOriginAddress)
-                      ? (price * Math.pow(10, 18)).toFixed(2)
-                      : assetsWithEightDecimalPlaces.includes(assetOriginAddress)
-                      ? (price * Math.pow(10, 8)).toFixed(2)
-                      : price) * 100
-                  ).toFixed(0)
-                )
-              : '--'}{' '}
-            <span>{price && StratsIcon}</span>
-          </p>
-          <p className="text-xs">
-            {price
-              ? `${formattedNum(
-                  assetOriginAddress === stratAddress
-                    ? (price * 100).toFixed(2)
-                    : assetsWithEighteenDecimalPlaces.includes(assetOriginAddress)
+                  assetsWithEighteenDecimalPlaces.includes(assetOriginAddress)
                     ? (price * Math.pow(10, 18)).toFixed(2)
                     : assetsWithEightDecimalPlaces.includes(assetOriginAddress)
                     ? (price * Math.pow(10, 8)).toFixed(2)
                     : price
-                )} $`
+                )
+              : '--'}
+            <span>{price && USDSTIcon}</span>
+          </p>
+          <p className="text-xs">
+            {price
+              ? `$ ${formattedNum(
+                  assetsWithEighteenDecimalPlaces.includes(assetOriginAddress)
+                    ? (price * Math.pow(10, 18)).toFixed(2)
+                    : assetsWithEightDecimalPlaces.includes(assetOriginAddress)
+                    ? (price * Math.pow(10, 8)).toFixed(2)
+                    : price
+                )}`
               : '--'}
           </p>
         </>
@@ -386,8 +373,7 @@ const GlobalTransaction = ({
                 )} cursor-pointer`}
                 key={label}
               >
-                {' '}
-                {label}{' '}
+                {label}
               </span>
             );
           })}
@@ -406,7 +392,6 @@ const GlobalTransaction = ({
     return (
       selectedFilters?.length !== 0 && (
         <div className="h-auto w-full p-2 flex flex-wrap">
-          {' '}
           {selectedFilters?.map((item) => (
             <span
               onClick={() => {
@@ -415,19 +400,17 @@ const GlobalTransaction = ({
               className="p-2 m-2 rounded-lg bg-[#F6F6F6] cursor-pointer"
               key={item}
             >
-              {' '}
-              {item}{' '}
+              {item}
               <span className="font-semibold">
                 <CloseOutlined />
-              </span>{' '}
+              </span>
             </span>
           ))}
           <span
             onClick={handleClearFilter}
             className="p-2 m-2 rounded-lg bg-[#13188A] cursor-pointer text-white"
           >
-            {' '}
-            Clear All{' '}
+            Clear All
           </span>
         </div>
       )
@@ -458,7 +441,6 @@ const GlobalTransaction = ({
                 />
               }
             >
-              {' '}
               Activity Feed
             </Button>
           </Col>
@@ -489,7 +471,6 @@ const GlobalTransaction = ({
               data={list}
               user={user}
               isTransactionLoading={isTransactionLoading}
-              stratAddress={stratAddress}
               assetsWithEighteenDecimalPlaces={assetsWithEighteenDecimalPlaces}
               assetsWithEightDecimalPlaces={assetsWithEightDecimalPlaces}
               ethstAddress={ethstAddress}

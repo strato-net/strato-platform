@@ -33,8 +33,8 @@ import { TrophyOutlined, GiftOutlined } from '@ant-design/icons';
 import { stakeColumns, aggregateStakeColumns } from './columns';
 
 const logo = <img src={Images.cata} alt={''} title={''} className="w-5 h-5" />;
-const StratsIcon = (
-  <img src={Images.strat} alt={''} title={''} className="w-4 h-4" />
+const USDSTIcon = (
+  <img src={Images.USDST} alt={''} title={''} className="w-4 h-4" />
 );
 
 function combineInventories(items, assetsWithEighteenDecimalPlaces, assetsWithEightDecimalPlaces) {
@@ -112,7 +112,7 @@ const Stake = ({ user }) => {
     success,
   } = useInventoryState();
   const { categorys } = useCategoryState();
-  const { stratsAddress, assetsWithEighteenDecimalPlaces, assetsWithEightDecimalPlaces } = useMarketplaceState();
+  const { USDSTAddress, assetsWithEighteenDecimalPlaces, assetsWithEightDecimalPlaces } = useMarketplaceState();
   const linkUrl = window.location.href;
   const [api, contextHolder] = notification.useNotification();
   const [limit, setLimit] = useState(10);
@@ -212,7 +212,7 @@ const Stake = ({ user }) => {
           limit,
           offset,
           reserves,
-          stratsAddress,
+          USDSTAddress,
           assetsWithEighteenDecimalPlaces,
           assetsWithEightDecimalPlaces,
           navigate
@@ -288,7 +288,7 @@ const Stake = ({ user }) => {
                     limit,
                     offset,
                     reserves,
-                    stratsAddress,
+                    USDSTAddress,
                     assetsWithEighteenDecimalPlaces,
                     assetsWithEightDecimalPlaces,
                   )}
@@ -325,7 +325,6 @@ const Stake = ({ user }) => {
                     allSubcategories={allSubcategories}
                     user={user}
                     reserves={reserves}
-                    stratAddress={stratsAddress}
                     assetsWithEighteenDecimalPlaces={assetsWithEighteenDecimalPlaces}
                     assetsWithEightDecimalPlaces={assetsWithEightDecimalPlaces}
                   />

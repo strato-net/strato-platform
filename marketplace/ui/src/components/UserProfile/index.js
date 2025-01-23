@@ -73,15 +73,11 @@ const UserProfile = ({ user }) => {
     supportedTokens,
     isFetchingTokens,
   } = useInventoryState();
-  const [stratAddress, setStratAddress] = useState('');
   const [assetsWithEighteenDecimalPlaces, setAssetsWithEighteenDecimalPlaces] = useState('');
   const [assetsWithEightDecimalPlaces, setAssetsWithEightDecimalPlaces] = useState('');
 
   useEffect(() => {
     const fetchAddresses = async () => {
-      const stratAddress = await marketplaceActions.fetchStratsAddress(
-        marketplaceDispatch
-      );
       const assetsWithEighteenDecimalPlaces = await marketplaceActions.fetchAssetsWithEighteenDecimalPlaces(
         marketplaceDispatch
       );
@@ -89,7 +85,6 @@ const UserProfile = ({ user }) => {
         marketplaceDispatch
       );
       await ethActions.fetchETHSTAddress(ethDispatch);
-      setStratAddress(stratAddress);
       setAssetsWithEighteenDecimalPlaces(assetsWithEighteenDecimalPlaces);
       setAssetsWithEightDecimalPlaces(assetsWithEightDecimalPlaces);
     };
@@ -411,7 +406,6 @@ const UserProfile = ({ user }) => {
                               allSubcategories={allSubcategories}
                               supportedTokens={supportedTokens}
                               user={user}
-                              stratAddress={stratAddress}
                               assetsWithEighteenDecimalPlaces={assetsWithEighteenDecimalPlaces}
                               assetsWithEightDecimalPlaces={assetsWithEightDecimalPlaces}
                             />
@@ -442,7 +436,6 @@ const UserProfile = ({ user }) => {
                               allSubcategories={allSubcategories}
                               supportedTokens={supportedTokens}
                               user={user}
-                              stratAddress={stratAddress}
                               assetsWithEighteenDecimalPlaces={assetsWithEighteenDecimalPlaces}
                               assetsWithEightDecimalPlaces={assetsWithEightDecimalPlaces}
                             />
@@ -473,7 +466,6 @@ const UserProfile = ({ user }) => {
                               allSubcategories={allSubcategories}
                               supportedTokens={supportedTokens}
                               user={user}
-                              stratAddress={stratAddress}
                               assetsWithEighteenDecimalPlaces={assetsWithEighteenDecimalPlaces}
                               assetsWithEightDecimalPlaces={assetsWithEightDecimalPlaces}
                             />

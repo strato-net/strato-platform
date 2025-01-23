@@ -41,18 +41,11 @@ router.get(
   MarketplaceController.getStakeableProducts
 );
 
-router.post(
-  Marketplace.transferStrats,
-  authHandler.authorizeRequest(),
-  loadDapp,
-  MarketplaceController.transferStrats
-);
-
 router.get(
-  Marketplace.getStratsBalance,
+  Marketplace.getUSDSTBalance,
   authHandler.authorizeRequest(),
   loadDapp,
-  MarketplaceController.getStratsBalance
+  MarketplaceController.getUSDSTBalance
 );
 
 router.get(
@@ -63,10 +56,17 @@ router.get(
 );
 
 router.get(
-  Marketplace.getStratsAddress,
+  Marketplace.getUSDSTBalance,
   authHandler.authorizeRequest(true),
   loadDapp,
-  MarketplaceController.getStratsAddress
+  MarketplaceController.getUSDSTBalance
+);
+
+router.get(
+  Marketplace.getUSDSTAddress,
+  authHandler.authorizeRequest(true),
+  loadDapp,
+  MarketplaceController.getUSDSTAddress
 );
 
 router.get(
@@ -77,8 +77,15 @@ router.get(
 );
 
 router.get(
+  Marketplace.getStratsAddress,
+  authHandler.authorizeRequest(true),
+  loadDapp,
+  MarketplaceController.getStratsAddress
+);
+
+router.get(
   Marketplace.get18DecimalPlaces,
-  authHandler.authorizeRequest(),
+  authHandler.authorizeRequest(true),
   loadDapp,
   MarketplaceController.get18DecimalPlaces
 );
@@ -88,13 +95,6 @@ router.get(
   authHandler.authorizeRequest(),
   loadDapp,
   MarketplaceController.get8DecimalPlaces
-);
-
-router.get(
-  Marketplace.getStratsTransactionHistory,
-  authHandler.authorizeRequest(),
-  loadDapp,
-  MarketplaceController.getStratsTransactionHistory
 );
 
 export default router;

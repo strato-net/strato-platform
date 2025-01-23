@@ -1,16 +1,10 @@
-import {
-  Button,
-  Row,
-  Typography,
-  InputNumber,
-  Select,
-  Spin,
-  Col,
-  Radio,
-} from 'antd';
+import { Button, Typography, InputNumber, Radio } from 'antd';
 import { useState, useEffect } from 'react';
 import { Images } from '../../images';
-import { useMarketplaceDispatch } from '../../contexts/marketplace';
+import {
+  useMarketplaceDispatch,
+  useMarketplaceState,
+} from '../../contexts/marketplace';
 import { useAuthenticateState } from '../../contexts/authentication';
 import TagManager from 'react-gtm-module';
 import { actions } from '../../contexts/marketplace/actions';
@@ -18,8 +12,7 @@ import { actions as orderActions } from '../../contexts/order/actions';
 import { useOrderDispatch, useOrderState } from '../../contexts/order';
 import { generateHtmlContent } from '../../helpers/emailTemplate';
 import { PAYMENT_LABEL } from '../../helpers/constants';
-
-const { Option } = Select;
+import BigNumber from 'bignumber.js';
 
 const ResponsiveCart = ({
   paymentServices,
@@ -31,29 +24,28 @@ const ResponsiveCart = ({
   removeCartList,
   openToastOrder,
 }) => {
-  // temporary fix to put STRATs as top payment option, will be updated in next release
+  // temporary fix to put USDST as top payment option, will be updated in next release
   const activePaymentProviders =
     paymentServices[0] !== undefined
       ? paymentServices.filter((paymentProvider) => paymentProvider?.isActive)
       : [];
-  const stratsIndex = activePaymentProviders.findIndex((service) =>
-    service.serviceName.toLowerCase().includes('strats')
+  const USDSTIndex = activePaymentProviders.findIndex((service) =>
+    service.serviceName.toLowerCase().includes('usdst')
   );
-  if (stratsIndex > 0) {
-    const [stratsObject] = activePaymentProviders.splice(stratsIndex, 1);
-    activePaymentProviders.unshift(stratsObject);
+  if (USDSTIndex > 0) {
+    const [USDSTObject] = activePaymentProviders.splice(USDSTIndex, 1);
+    activePaymentProviders.unshift(USDSTObject);
   }
   const initialPaymentState =
     activePaymentProviders?.length !== 0 ? activePaymentProviders[0] : '';
   const [selectedProvider, setSelectedProvider] = useState(initialPaymentState);
   const marketplaceDispatch = useMarketplaceDispatch();
+  const { assetsWithEighteenDecimalPlaces } = useMarketplaceState();
   const [tax, setTax] = useState(0);
   const [subTotal, setSubTotal] = useState(0);
   const [total, setTotal] = useState(0);
   const orderDispatch = useOrderDispatch();
   let { hasChecked, isAuthenticated, loginUrl, user } = useAuthenticateState();
-  const { isCreatePaymentSubmitting, isCreateOrderSubmitting } =
-    useOrderState();
   const userOrganization = user?.organization;
   const [cartData, setCartData] = useState(data);
   const [faqOpenState, setFaqOpenState] = useState(
@@ -103,12 +95,14 @@ const ResponsiveCart = ({
 
       concatenatedOrderString += `${itemName}:\n`;
       concatenatedOrderString += `$${itemTotal} <br>`;
-      concatenatedOrderString += `Qty: ${itemQty} &nbsp; $${itemPrice} each (${(itemPrice * 100).toFixed(0)} ${(itemPrice * 100).toFixed(0) == 1 ? 'STRAT' : 'STRATs'})<br><br>`;
+      concatenatedOrderString += `Qty: ${itemQty} &nbsp; $${itemPrice} each (${itemPrice} ' USDST'})<br><br>`;
       orderTotal += parseFloat(itemTotal);
       if (i === cartData.length - 1) {
         concatenatedOrderString += `<hr style="border-top: 1px dotted #0A1B71; min-width: 80%; max-width: 80%; margin-left: 15px;">`;
         concatenatedOrderString += `Shipping Fee: <i><strong>Free</strong></i><br><br>`;
-        concatenatedOrderString += `Order Total: $${orderTotal.toFixed(2)} <br>`;
+        concatenatedOrderString += `Order Total: $${orderTotal.toFixed(
+          2
+        )} <br>`;
       }
     }
 
@@ -120,18 +114,24 @@ const ResponsiveCart = ({
   const handlePaymentConfirm = async (paymentService) => {
     actions.addItemToConfirmOrder(marketplaceDispatch, cartData);
     let orderList = [];
+
     cartData.forEach((item) => {
+      const is18DecimalPlaces = assetsWithEighteenDecimalPlaces.includes(
+        item.key
+      );
+
+      const quantity = new BigNumber(item.qty);
+      const unitPrice = new BigNumber(item.unitPrice);
+
       orderList.push({
-        quantity:
-          item.quantityIsDecimal && item.quantityIsDecimal === 'True'
-            ? item.qty * 100
-            : item.qty,
+        quantity: is18DecimalPlaces
+          ? quantity.multipliedBy(new BigNumber(10).pow(18)).toFixed(0)
+          : quantity.toString(),
         assetAddress: item.key,
         firstSale: item.firstSale,
-        unitPrice:
-          item.quantityIsDecimal && item.quantityIsDecimal === 'True'
-            ? item.unitPrice / 100
-            : item.unitPrice,
+        unitPrice: is18DecimalPlaces
+          ? unitPrice.dividedBy(new BigNumber(10).pow(18)).toFixed(18)
+          : unitPrice.toFixed(18),
       });
     });
 
@@ -246,12 +246,12 @@ const ResponsiveCart = ({
   };
 
   const totalAmount =
-    selectedProvider?.serviceName === 'STRATS' ||
-    selectedProvider?.serviceName?.includes('STRATS')
-      ? `${(subTotal * 100).toFixed(0)} ${(subTotal * 100).toFixed(0) == 1 ? 'STRAT' : 'STRATs'}`
+    selectedProvider?.serviceName === 'USDST' ||
+    selectedProvider?.serviceName?.includes('USDST')
+      ? `${subTotal} USDST`
       : selectedProvider?.serviceName === 'Stripe'
-        ? `${subTotal} USD`
-        : `${subTotal} ${selectedProvider?.serviceName || 'USD'}`;
+      ? `${subTotal} USD`
+      : `${subTotal} ${selectedProvider?.serviceName || 'USD'}`;
 
   return (
     <div className=" rounded-md mt-3 flex flex-col gap-[18px] sm:w-[400px] md:w-[450px] items-center">
@@ -291,14 +291,20 @@ const ResponsiveCart = ({
               </div>
 
               <div className="flex justify-between ml-[20%] items-baseline">
-                <Typography className="font-semibold text-[#202020] text-sm">{`$${(element?.unitPrice).toFixed(2)}`}</Typography>
+                <Typography className="font-semibold text-[#202020] text-sm">{`$${(element?.unitPrice).toFixed(
+                  2
+                )}`}</Typography>
                 <div>
                   <div className="flex items-center justify-center mt-2">
                     <div
                       onClick={() => {
                         MinusQty(qty, product);
                       }}
-                      className={`w-6 h-6 bg-[#E9E9E9] flex justify-center items-center rounded-full ${qty === 1 ? 'cursor-not-allowed opacity-50' : 'cursor-pointer'}`}
+                      className={`w-6 h-6 bg-[#E9E9E9] flex justify-center items-center rounded-full ${
+                        qty === 1
+                          ? 'cursor-not-allowed opacity-50'
+                          : 'cursor-pointer'
+                      }`}
                     >
                       <p className="text-lg text-[#202020] font-medium">-</p>
                     </div>
@@ -316,7 +322,11 @@ const ResponsiveCart = ({
                       onClick={() => {
                         AddQty(product);
                       }}
-                      className={`w-6 h-6 bg-[#E9E9E9] flex justify-center items-center rounded-full ${qty >= product.quantity ? 'cursor-not-allowed opacity-50' : 'cursor-pointer'}`}
+                      className={`w-6 h-6 bg-[#E9E9E9] flex justify-center items-center rounded-full ${
+                        qty >= product.quantity
+                          ? 'cursor-not-allowed opacity-50'
+                          : 'cursor-pointer'
+                      }`}
                     >
                       <p className="text-lg text-[#202020] font-medium">+</p>
                     </div>
@@ -334,7 +344,9 @@ const ResponsiveCart = ({
                     <img
                       src={Images.Dropdown}
                       alt=""
-                      className={`w-5 h-5 transition-transform transform ${faqOpenState[index] ? 'rotate-180' : 'rotate-0'}`}
+                      className={`w-5 h-5 transition-transform transform ${
+                        faqOpenState[index] ? 'rotate-180' : 'rotate-0'
+                      }`}
                       onClick={() => {
                         toggleFaq(index);
                       }}
@@ -345,7 +357,11 @@ const ResponsiveCart = ({
 
               {faqOpenState[index] && (
                 <div
-                  className={`overflow-hidden ${faqOpenState[index] ? 'max-h-[145px] open' : 'max-h-0 faq-container'}`}
+                  className={`overflow-hidden ${
+                    faqOpenState[index]
+                      ? 'max-h-[145px] open'
+                      : 'max-h-0 faq-container'
+                  }`}
                 >
                   <div className="bg-[#F6F6F6] rounded-b-md flex flex-col gap-3 px-3 py-2">
                     <div className="w-full bg-[#BABABA] h-[1px]"></div>
@@ -361,7 +377,9 @@ const ResponsiveCart = ({
                       <Typography className="text-sm text-[#202020] font-medium">
                         Unit Price($):
                       </Typography>
-                      <Typography className="text-sm text-[#202020] font-semibold">{`$${(element?.unitPrice).toFixed(2)}`}</Typography>
+                      <Typography className="text-sm text-[#202020] font-semibold">{`$${(element?.unitPrice).toFixed(
+                        2
+                      )}`}</Typography>
                     </div>
                   </div>
                 </div>

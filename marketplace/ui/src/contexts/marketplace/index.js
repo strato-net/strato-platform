@@ -24,19 +24,18 @@ const MarketplaceProvider = ({ children }) => {
     isLoadingUserAddress: false,
     userAddresses: [],
     isLoadingUserAddresses: false,
-    isFetchingStrats: false,
+    isFetchingUSDST: false,
     isFetchingCata: false,
-    isTransferringStrats: false,
-    strats: 0,
+    USDST: 0,
     cata: 0,
     isFetchingAssetsWithEighteenDecimalPlaces: false,
     assetsWithEighteenDecimalPlaces: [],
     isFetchingAssetsWithEightDecimalPlaces: false,
     assetsWithEightDecimalPlaces: [],
-    stratsAddress:null,
+    USDSTAddress:null,
     cataAddress:null,
+    stratsAddress:null,
     isFetchingStratsTransactionHistory: false,
-    stratsTransactionHistory: [],
   };
 
   const [state, dispatch] = useReducer(reducer, initialState);

@@ -16,8 +16,14 @@ import { useNavigate } from 'react-router-dom';
 import moment from 'moment';
 import { useEthState } from '../../contexts/eth';
 
-const TransactionResponsive = ({ data, user, stratAddress, assetsWithEighteenDecimalPlaces, assetsWithEightDecimalPlaces }) => {
-  const StratsIcon = <img src={Images.strat} alt="" className="w-5 h-5" />;
+const TransactionResponsive = ({
+  data,
+  user,
+  stratAddress,
+  assetsWithEighteenDecimalPlaces,
+  assetsWithEightDecimalPlaces,
+}) => {
+  const USDSTIcon = <img src={Images.USDST} alt="" className="w-5 h-5 ml-1" />;
   const navigate = useNavigate();
   const [expandedRows, setExpandedRows] = useState({});
   const { ethstAddress, wbtcstAddress } = useEthState();
@@ -274,8 +280,7 @@ const TransactionResponsive = ({ data, user, stratAddress, assetsWithEighteenDec
                 </Button>
                 {price ? (
                   <p className={`text-right flex justify-end items-center`}>
-                    ${formattedNum(price)} ({formattedNum(price * 100)}
-                    {StratsIcon})
+                    ${formattedNum(price)} ({formattedNum(price)} {USDSTIcon})
                   </p>
                 ) : (
                   <p className="text-right text-[#13188A] font-bold text-sm">
