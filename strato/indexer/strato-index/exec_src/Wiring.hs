@@ -12,14 +12,10 @@ module Wiring where
 import Blockchain.DBM
 import Blockchain.Data.Block (BestBlock (..))
 import Blockchain.Data.BlockDB
-import Blockchain.Data.ChainInfo
-import Blockchain.Data.ChainInfoDB (putChainInfo)
 import Blockchain.Data.Transaction (insertTX)
 import Blockchain.DB.SQLDB
 import Blockchain.Sequencer.Event
 import Blockchain.Strato.Indexer.IContext
-import Blockchain.Strato.Model.ChainId
-import Blockchain.Strato.Model.ExtendedWord
 import Blockchain.Strato.Model.Keccak256
 import qualified Blockchain.Strato.RedisBlockDB as RBDB
 import Control.Exception
@@ -35,11 +31,6 @@ instance HasSQLDB m => (Keccak256 `A.Alters` API OutputTx) m where
   lookup _ _ = liftIO . throwIO $ Lookup "API" "Keccak256" "OutputTx"
   delete _ _ = liftIO . throwIO $ Delete "API" "Keccak256" "OutputTx"
   insert _ _ (API OutputTx {..}) = void $ insertTX Log otOrigin Nothing [otBaseTx]
-
-instance HasSQLDB m => (Word256 `A.Alters` API ChainInfo) m where
-  lookup _ _ = liftIO . throwIO $ Lookup "API" "Word256" "ChainInfo"
-  delete _ _ = liftIO . throwIO $ Delete "API" "Word256" "ChainInfo"
-  insert _ cId (API cInfo) = void $ putChainInfo (ChainId cId) cInfo
 
 instance HasSQLDB m => (Keccak256 `A.Alters` API OutputBlock) m where
   lookup _ _ = liftIO . throwIO $ Lookup "API" "Keccak256" "OutputBlock"
