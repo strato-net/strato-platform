@@ -36,7 +36,6 @@ data Options
   | AddGenesisFromFile {fileName :: String}
   | AddTxsFromFile {fileName :: String}
   | AskForBlocks {startBlock :: Integer, endBlock :: Integer, qOrg :: String, qOrgUnit :: String, qCommonName :: String}
-  | ChainHash
 --  | Checkpoints {service :: CheckpointService, operation :: CheckpointOperation, offset :: Maybe Int64, cp :: Maybe String}
   | Code {hash :: String}
   | DeleteDepBlock {valK :: String}
@@ -283,9 +282,6 @@ setParticipationModeOptions =
         += name "mode"
     ]
 
-chainHashOptions :: Annotate Ann
-chainHashOptions = record ChainHash []
-
 getPrivacyOptions :: Annotate Ann
 getPrivacyOptions =
   record
@@ -312,7 +308,6 @@ options =
       addTxsFromFileOptions,
       addTxOptions,
       askOptions,
-      chainHashOptions,
 --      checkpointOptions,
       codeOptions,
       dumpKafkaVMEventsOptions,
@@ -361,7 +356,6 @@ run AddTxsFromFile {..} = addTxsFromFile fileName
 run AskForBlocks {..} =
   let i = CommonName (T.pack qOrg) (T.pack qOrgUnit) (T.pack qCommonName) True
    in insertP2P (P2pAskForBlocks startBlock endBlock i)
-run ChainHash = error "strato-barometer: the chainhash tool has been deprecated."
 --run Checkpoints {..} = case operation of
 --  Get -> doCheckpointGet service
 --  Put -> doCheckpointPut service (fromIntegral <$> offset) cp
