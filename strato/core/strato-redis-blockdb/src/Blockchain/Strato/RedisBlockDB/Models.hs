@@ -19,7 +19,6 @@ module Blockchain.Strato.RedisBlockDB.Models (
   ) where
 
 import qualified Blockchain.Data.BlockHeader as BHD
-import Blockchain.Data.ChainInfo
 import Blockchain.Data.Enode
 import Blockchain.Data.RLP
 import qualified Blockchain.Data.Transaction as TXD
@@ -108,8 +107,6 @@ newtype RedisTx = RedisTx TXD.Transaction deriving newtype (Eq, Read, Show, RLPS
 newtype RedisTxs = RedisTxs [RedisTx] deriving newtype (Eq, Read, Show, RLPSerializable)
 
 newtype RedisUncles = RedisUncles [RedisHeader] deriving newtype (Eq, Show, RLPSerializable)
-
-newtype RedisChainInfo = RedisChainInfo ChainInfo deriving newtype (Eq, Show, RLPSerializable)
 
 newtype RedisChainMemberRSet = RedisChainMemberRSet ChainMemberRSet deriving newtype (Eq, Show, RLPSerializable)
 
