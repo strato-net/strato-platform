@@ -165,7 +165,7 @@ function newnode {
   runBackgroundProcess strato-sequencer \
     --blockstanbul=true \
     --blockstanbul_block_period_ms=${blockstanbulBlockPeriodMs:-1000} \
-    --blockstanbul_round_period_s=${blockstanbulRoundPeriodS:-10} \
+    --blockstanbul_round_period_s=${blockstanbulRoundPeriodS:-120} \
     --genesisBlockName=${genesis:-gettingStarted} \
     --minLogLevel=$seqMinLogLevel \
     --seq_max_events_per_iter=${seqMaxEventsPerIter:-500} \
