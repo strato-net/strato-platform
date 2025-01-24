@@ -55,6 +55,7 @@ import RepayModal from '../Inventory/RepayModal';
 import { setCookie } from '../../helpers/cookie';
 import routes from '../../helpers/routes';
 import './index.css';
+import BigNumber from 'bignumber.js';
 
 import image_placeholder from '../../images/resources/image_placeholder.png';
 import 'react-responsive-carousel/lib/styles/carousel.min.css'; // requires a loader
@@ -196,11 +197,18 @@ const ProductDetails = ({ user, users }) => {
 
   useEffect(() => {
     if (inventoryDetails) {
+      const minItemNumber = new BigNumber(
+        inventoryDetails.itemNumber
+      ).toFixed();
+      const maxItemNumber = new BigNumber(inventoryDetails.itemNumber)
+        .plus(inventoryDetails.quantity)
+        .minus(1)
+        .toFixed();
+
       inventoryActions.fetchInventoryOwnershipHistory(dispatch, {
         originAddress: inventoryDetails.originAddress,
-        minItemNumber: inventoryDetails.itemNumber,
-        maxItemNumber:
-          inventoryDetails.itemNumber + inventoryDetails.quantity - 1,
+        minItemNumber: minItemNumber,
+        maxItemNumber: maxItemNumber,
       });
     }
   }, [inventoryDetails, dispatch]);

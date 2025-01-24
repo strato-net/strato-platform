@@ -648,8 +648,8 @@ class InventoryController {
   static validateGetOwnershipHistoryArgs(args) {
     const getOwnershipHistorySchema = Joi.object({
       originAddress: Joi.string().required(),
-      minItemNumber: Joi.number().min(0).required(),
-      maxItemNumber: Joi.number().min(0).required(),
+      minItemNumber: Joi.string().pattern(/^\d+$/).required(),
+      maxItemNumber: Joi.string().pattern(/^\d+$/).required(),
     });
 
     const validation = getOwnershipHistorySchema.validate(args);

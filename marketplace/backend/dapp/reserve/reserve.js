@@ -210,7 +210,7 @@ async function getAll(user, options) {
     .flatMap((reserve) => [
       reserve.assetRootAddress,
       reserve.cataToken,
-      reserve.USDSTToken,
+      reserve.usdstToken,
     ])
     .filter(Boolean);
 
@@ -285,7 +285,7 @@ async function getAll(user, options) {
       (item) => item.address === reserve.cataToken
     );
     const USDSTToken = relatedAssetsAndTokens.find(
-      (item) => item.address === reserve.USDSTToken
+      (item) => item.address === reserve.usdstToken
     );
 
     return {
