@@ -382,7 +382,9 @@ const updateSalePricePeriodically = async () => {
           asset.name.toLowerCase(),
           token,
           assetResult[0]?.sale,
-          metalResult.price / 100
+          assetResult[0]?.name.toLowerCase().includes("gold")
+            ? metalResult.price / 100
+            : metalResult.price
         );
         console.log(
           `[Sale Update] Price updated for asset: ${address} at ${new Date().toISOString()}`

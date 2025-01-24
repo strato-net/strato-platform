@@ -50,14 +50,6 @@ if [ "$ORACLE_MODE" = "true" ]; then
       echo 'Error: ALCHEMY_API_KEY is not set. submit-price script will not run. Exiting'
       exit 12
     fi
-    if [ -z "$METALS_USERNAME" ]; then
-      echo 'Error: METALS_USERNAME is not set. submit-price script will not run. Exiting'
-      exit 13
-    fi
-    if [ -z "$METALS_PASSWORD" ]; then
-      echo 'Error: METALS_PASSWORD is not set. submit-price script will not run. Exiting'
-      exit 14
-    fi
     # TODO: in future we can check the other env vars here
   
     # Replace placeholders in Oracle config template
