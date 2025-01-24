@@ -27,9 +27,7 @@ import qualified Blockchain.DB.MemAddressStateDB as Mem
 import Blockchain.Data.AddressStateDB
 import Blockchain.Data.AddressStateRef (updateSQLBalanceAndNonce)
 import Blockchain.Data.BlockHeader
-import Blockchain.Data.GenesisBlock
 import qualified Blockchain.Data.TXOrigin as TO
-import qualified Blockchain.Database.MerklePatricia as MP
 import Blockchain.EthConf
 import Blockchain.Event
 import Blockchain.JsonRpcCommand
@@ -55,7 +53,6 @@ import Blockchain.Wiring
 import Conduit hiding (Flush)
 import Control.Lens hiding (Context)
 import Control.Monad
-import qualified Control.Monad.Change.Alter as A
 import Control.Monad.Composable.Kafka
 import Control.Monad.Composable.SQL
 import qualified Data.ByteString.Char8 as BC
@@ -186,11 +183,11 @@ logEventSummaries evs = do
 
 -- KAFKA
 
-routeOutEvent :: (MonadLogger m, HasKafka m, HasSQL m, HasContext m, (MP.StateRoot `A.Alters` MP.NodeData) m) => VmOutEvent -> m (Maybe [BlockVerificationFailure])
+routeOutEvent :: (MonadLogger m, HasKafka m, HasSQL m, HasContext m) => VmOutEvent -> m (Maybe [BlockVerificationFailure])
 routeOutEvent (OutBlockVerificationFailure bvf) = pure $ Just bvf
 routeOutEvent oev = Nothing <$ sendOutEvent oev
 
-sendOutEvent :: (MonadLogger m, HasKafka m, HasSQL m, HasContext m, (MP.StateRoot `A.Alters` MP.NodeData) m) => VmOutEvent -> m ()
+sendOutEvent :: (MonadLogger m, HasKafka m, HasSQL m, HasContext m) => VmOutEvent -> m ()
 sendOutEvent (OutAction act) = do
   let extractCodeCollectionAddedMessages :: Action -> Maybe VMEvent
       extractCodeCollectionAddedMessages a =
@@ -241,7 +238,6 @@ sendOutEvent (OutAction act) = do
       vmes = ccEvents ++ dcEvents ++ actionEvents
   void . produceVMEvents $ toList vmes
 sendOutEvent (OutIndexEvent e) = void $ produceIndexEvents [e]
-sendOutEvent (OutToStateDiff cId cInfo bHash cn app) = withCurrentBlockHash bHash $ initializeChainDBs (Just cId) cInfo cn app
 sendOutEvent (OutStateDiff diff) = commitSqlDiffs diff
 sendOutEvent (OutLog l) = loopTimeit "flushLogEntries" $ void $ produceIndexEvents [LogDBEntry l]
 sendOutEvent (OutEvent e) = loopTimeit "flushEventEntries" $ void $ produceIndexEvents (EventDBEntry <$> e)

@@ -16,15 +16,11 @@
 module Blockchain.Data.ChainInfo
   ( ParentChainIds (..),
     ChainInfo (..),
-    UnsignedChainInfo (..),
-    ChainSignature (..),
     AccountInfo (..),
     CodeInfo (..),
     isAncestorChainOf,
-    getAncestorChains,
     getAncestorChainByName,
     accountExtractor,
-    whoSignedThisChainInfo,
   )
 where
 
@@ -35,18 +31,14 @@ import Blockchain.Strato.Model.ChainMember
 import Blockchain.Strato.Model.CodePtr
 import Blockchain.Strato.Model.ExtendedWord
 import Blockchain.Strato.Model.Keccak256
-import qualified Blockchain.Strato.Model.Secp256k1 as EC
 import Control.Applicative (many)
 import qualified Control.Monad.Change.Alter as A
-import qualified Crypto.Secp256k1 as SEC
--- import           Blockchain.TypeLits
 
 import Data.Aeson
 import Data.Bifunctor (first)
 import qualified Data.ByteString as B
 import qualified Data.ByteString.Base16 as B16
 import qualified Data.ByteString.Char8 as C8
-import qualified Data.ByteString.Short as BSS
 import Data.Data
 import Data.Foldable
 import qualified Data.JsonStream.Parser as JS
@@ -463,10 +455,3 @@ accountExtractor = many ("accountInfo" JS..: JS.arrayOf acctInfo)
 
 acctInfo :: JS.Parser AccountInfo
 acctInfo = JS.value
-
-whoSignedThisChainInfo :: ChainInfo -> Maybe Address
-whoSignedThisChainInfo (ChainInfo u (ChainSignature r s v)) =
-  let intToBSS = BSS.toShort . word256ToBytes
-      sig = EC.Signature (SEC.CompactRecSig (intToBSS r) (intToBSS s) (v - 0x1b))
-      mesg = keccak256ToByteString $ rlpHash u
-   in fromPublicKey <$> EC.recoverPub sig mesg

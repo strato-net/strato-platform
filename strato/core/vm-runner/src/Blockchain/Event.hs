@@ -25,7 +25,6 @@ import BlockApps.X509.Certificate
 import Blockchain.Blockstanbul (PreprepareDecision(..))
 import Blockchain.DB.MemAddressStateDB
 import Blockchain.Data.Block (Block(..))
-import Blockchain.Data.ChainInfo
 import Blockchain.Data.DataDefs
 import Blockchain.Data.ExecResults
 import Blockchain.Database.MerklePatricia.NodeData (NodeData)
@@ -34,7 +33,6 @@ import Blockchain.Sequencer.Event
 import Blockchain.Strato.Indexer.Model (IndexEvent (..))
 import Blockchain.Strato.Model.Account
 import Blockchain.Strato.Model.Class (DummyCertRevocation(..))
-import Blockchain.Strato.Model.ExtendedWord
 import Blockchain.Strato.Model.Keccak256
 import Blockchain.Strato.Model.StateRoot
 import Blockchain.Strato.Model.Validator
@@ -44,7 +42,6 @@ import Blockchain.Stream.Action (Action)
 import qualified Data.ByteString as B
 import qualified Data.DList as DL
 import Data.Map (Map)
-import Data.Text (Text)
 
 type VmInEvent = VmEvent
 
@@ -101,7 +98,6 @@ data VmOutEvent
   = OutAction Action
   | OutBlock OutputBlock
   | OutIndexEvent IndexEvent
-  | OutToStateDiff Word256 ChainInfo Keccak256 Text Text
   | OutStateDiff StateDiff
   | OutLog LogDB
   | OutEvent [EventDB]
@@ -118,7 +114,6 @@ data VmOutEventBatch = OutBatch
     outExecResults :: DL.DList ExecResults,
     outBlocks :: DL.DList OutputBlock,
     outIndexEvents :: DL.DList IndexEvent,
-    outToStateDiffs :: DL.DList (Word256, ChainInfo, Keccak256, Text, Text),
     outStateDiffs :: DL.DList StateDiff,
     outLogs :: DL.DList LogDB,
     outEvents :: DL.DList EventDB,
@@ -144,7 +139,6 @@ newOutBatch =
     DL.empty
     DL.empty
     DL.empty
-    DL.empty
     []
     DL.empty
     DL.empty
@@ -155,7 +149,6 @@ insertOutBatch e b = case e of
   OutAction a -> b {outActions = outActions b `DL.snoc` a}
   OutBlock a -> b {outBlocks = outBlocks b `DL.snoc` a}
   OutIndexEvent a -> b {outIndexEvents = outIndexEvents b `DL.snoc` a}
-  OutToStateDiff v w x y z -> b {outToStateDiffs = outToStateDiffs b `DL.snoc` (v, w, x, y, z)}
   OutStateDiff a -> b {outStateDiffs = outStateDiffs b `DL.snoc` a}
   OutLog a -> b {outLogs = outLogs b `DL.snoc` a}
   OutEvent a -> b {outEvents = outEvents b `DL.append` DL.fromList a}
