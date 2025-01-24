@@ -195,10 +195,15 @@ const ProductDetails = ({ user, users }) => {
   const rawAccount = useAppKitAccount();
   const [wbtcBalance, setWbtcBalance] = useState(0);
   const [signer, setSigner] = useState({});
+  const [account, setAccount] = useState();
 
-  const account = useMemo(() => {
-    return rawAccount && rawAccount.address ? rawAccount : null;
-  }, [rawAccount?.address]);
+  // Monitor rawAccount for changes
+  useEffect(() => {
+    if (rawAccount && rawAccount.address) {
+      // Force refresh
+      setAccount(rawAccount);
+    }
+  }, [rawAccount]);
 
   useEffect(() => {
     const fetchBalance = async () => {
