@@ -14,10 +14,8 @@
 {-# OPTIONS_GHC -fno-warn-orphans #-}
 
 module Blockchain.DB.AddressStateDB
-  ( getAddressState,
-    getAddressStateMaybe,
+  ( getAddressStateMaybe,
     getAllAddressStates,
-    getAllAddressStatesFromStateRoot,
     putAddressState,
     deleteAddressState,
     addressStateExists,
@@ -43,21 +41,6 @@ import qualified Data.ByteString.Base16 as B16
 import qualified Data.ByteString.Char8 as BC
 import Data.Maybe
 import qualified Data.NibbleString as N
-
-getAddressState :: HasStateDB m => Account -> m AddressState
-getAddressState (Account address chainId) = do
-  sr <- getStateRoot chainId
-  states <- MP.getKeyVal sr $ addressAsNibbleString address
-
-  case states of
-    Nothing -> do
-      -- Querying an absent state counts as initializing it.
-      --TODO- decide if this is needed
-      --putAddressState address b
-      return b
-      where
-        b = blankAddressState
-    Just s -> return $ (rlpDecode . rlpDeserialize . rlpDecode) s
 
 getAddressStateMaybe :: HasStateDB m => Account -> m (Maybe AddressState)
 getAddressStateMaybe (Account address chainId) = do
