@@ -209,7 +209,7 @@ const ProductDetails = ({ user, users }) => {
     const fetchBalance = async () => {
       if (account?.address) {
         const wbtcAddress = fileServerUrl.includes("test")
-          ? "0x55bCEAd50aAC94E443BD3dfDF44396194f7aA1E4" // WBTC testnet contract
+          ? "0xA5D35764ae20Ba9042509C4B7Ba602C5889a2c97" // WBTC testnet contract
           : "0x2260FAC5E5542a773Aa44fBCfeDf7C193bc2C599"; // WBTC mainnet contract
   
         const provider = new ethers.providers.Web3Provider(window.ethereum);

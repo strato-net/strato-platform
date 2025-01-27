@@ -164,7 +164,7 @@ const BridgeWalletModal = ({ open, handleCancel, accountDetails, signer, tokenNa
       if (tokenName === "WBTC") {
         // WBTC contract address based on environment
         const wbtcAddress = fileServerUrl.includes("test")
-          ? "0x55bCEAd50aAC94E443BD3dfDF44396194f7aA1E4"
+          ? "0xA5D35764ae20Ba9042509C4B7Ba602C5889a2c97"
           : "0x2260FAC5E5542a773Aa44fBCfeDf7C193bc2C599";
   
         // Create ERC-20 contract instance
