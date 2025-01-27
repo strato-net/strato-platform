@@ -613,6 +613,7 @@ async function getAll(admin, args = {}, defaultOptions) {
               sales.length > 0 &&
               sales[0].price !== null &&
               sales[0].price !== undefined &&
+              sales[0].price !== 0 &&
               sales[0].saleType !== 'Escrow'
             ) {
               // Only combine if there are sales. We don't list unpublished items for this route.
@@ -673,7 +674,9 @@ async function getAll(admin, args = {}, defaultOptions) {
               });
             }
           } else {
-            finalInventory.push({ escrow, ...inventory });
+            if(!userProfile){
+              finalInventory.push({ escrow, ...inventory });
+            }
           }
         }
       }

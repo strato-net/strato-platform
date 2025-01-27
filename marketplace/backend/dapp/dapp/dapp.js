@@ -320,10 +320,11 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
     args,
     options = optionsNoChainIds
   ) {
+    const { user,...restArgs } = args;
     const getOptions = { ...options, app: contractName };
     const newArgs = {
-      ...args,
-      ownerCommonName: userCert.commonName,
+      ...restArgs,
+      ownerCommonName: user || userCert?.commonName,
       notEqualsField: 'sale',
       notEqualsValue: constants.zeroAddress,
       userProfile: true,
