@@ -157,7 +157,7 @@ export default function AuthorizeIssuer() {
                       <div className="flex items-center">
                         {logo} &nbsp;
                         {(
-                          reserve.cataTokenObject.quantity /
+                          reserve.cataTokenObject?.quantity /
                           10 ** 18
                         ).toLocaleString('en-US', {
                           maximumFractionDigits: 4,
@@ -167,7 +167,7 @@ export default function AuthorizeIssuer() {
                       <div>
                         ($
                         {(
-                          reserve.cataTokenObject.quantity /
+                          reserve.cataTokenObject?.quantity /
                           10 ** 18 /
                           10
                         ).toLocaleString('en-US', {
@@ -182,7 +182,7 @@ export default function AuthorizeIssuer() {
                       <div className="flex items-center">
                         {USDSTIcon} &nbsp;
                         {(
-                          reserve.USDSTTokenObject.quantity /
+                          reserve?.USDSTTokenObject?.quantity /
                           10 ** 18
                         )?.toLocaleString('en-US', {
                           maximumFractionDigits: 2,

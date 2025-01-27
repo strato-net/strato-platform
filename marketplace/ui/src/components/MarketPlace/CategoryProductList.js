@@ -58,8 +58,7 @@ const CategoryProductList = ({ user }) => {
   const [selectedSubCategories, setSelectedSubCategories] =
     useState(selectedSubCat);
   const [selectedAvailability, setSelectedAvailability] = useState([
-    'forSale',
-    'soldOut',
+    'forSale'
   ]);
   const [desktopOpenFilter, setDesktopOpenFilter] = useState(true);
   const [mobileOpenFilter, setMobileOpenFilter] = useState(false);
