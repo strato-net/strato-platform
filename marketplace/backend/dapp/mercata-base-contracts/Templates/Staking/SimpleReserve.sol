@@ -8,7 +8,7 @@ contract SimpleReserve is Reserve{
         address _assetOracle, 
         string _name, 
         address _assetRootAddress, 
-        address _usdstTokenFactory,
-        decimal _unitConversionRate) Reserve (_assetOracle, _name, _assetRootAddress, _unitConversionRate, _usdstTokenFactory) public {
+        address _usdstToken,
+        decimal _unitConversionRate) Reserve (_assetOracle, _name, _assetRootAddress, _unitConversionRate, _usdstToken) public {
     }
 }

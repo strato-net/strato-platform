@@ -5,7 +5,7 @@ import <BASE_CODE_COLLECTION>;
 import "../../mercata-base-contracts/Templates/Payments/TokenPaymentService.sol";
 
 /// @title A representation of Token assets
-contract Tokens is Mintable, TokenFactory {
+contract Tokens is LendingToken, ReserveMinterAuthorization {
     string public paymentServiceCreator;
     string public paymentServiceName;
 
@@ -20,7 +20,7 @@ contract Tokens is Mintable, TokenFactory {
         AssetStatus _status,
         address _redemptionService,
         string _paymentServiceCreator
-    ) public Mintable(_name, _description, _images, _files, _fileNames, _createdDate, _quantity, _status, _redemptionService) TokenFactory(_name) {
+    ) public LendingToken(_name, _description, _images, _files, _fileNames, _createdDate, _quantity, _status, _redemptionService) ReserveMinterAuthorization(_name) {
         paymentServiceCreator = _paymentServiceCreator;
         paymentServiceName = _name;
     }

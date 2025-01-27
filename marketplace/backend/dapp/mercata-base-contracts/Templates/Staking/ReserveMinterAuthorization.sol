@@ -4,19 +4,17 @@ import <509>;
 
 import "../Utils/Utils.sol";
 
-abstract contract TokenFactory is Utils {
+abstract contract ReserveMinterAuthorization is Utils {
     string public name;
     address public owner;
     bool public isActive;
 
     address public burnerAddress = address(0x6ec8bbe4a5b87be18d443408df43a45e5972fa1b); // burner account
 
-    address public token;
-
     mapping(address => bool) public record canMint;
 
-    event MintedToken(address indexed user, string tokenName, uint amount);
-    event BurnedToken(address indexed user, string tokenName, uint amount);
+    event MintedToken(address indexed user, uint amount);
+    event BurnedToken(address indexed user, uint amount);
     
     constructor(string _name) {
         owner = msg.sender;
@@ -30,16 +28,8 @@ abstract contract TokenFactory is Utils {
     }
 
     modifier requireActive() {
-        require(isActive, "TokenFactory is not active");
+        require(isActive, "ReserveMinterAuthorization is not active");
         _;
-    }
-
-    function stopFactory() public onlyOwner {
-        isActive = false;
-    }   
-
-    function startFactory() public onlyOwner {
-        isActive = true;
     }
 
     function addReserveAsMinter() public {
@@ -49,16 +39,17 @@ abstract contract TokenFactory is Utils {
 
     function removeReserveAsMinter() public {
         require(Reserve(msg.sender).owner() == owner, "Only owner can remove entities as minters");
-        canMint[msg.sender] = false;
         delete canMint[msg.sender];
     }
 
     function mintToken(address _userAddress, uint _amount) public requireActive() {
         require(canMint[msg.sender], "Only minters can mint tokens");
-        require(_amount > 0, "Must mint amount > 0 of token");
-        Mintable(token).mintNewUnits(_amount);
-        Asset(UTXO(Redeemable(Mintable(token)))).automaticTransfer(_userAddress, 1.0000000000000000000 / 10**18, _amount, block.number);
-        emit MintedToken(_userAddress, getCommonName(_userAddress), _amount);
+        require(_amount > 0, "Must mint some tokens");
+        LendingToken(address(this)).mintNewUnits(_amount);
+
+        LendingToken(address(this)).transferByReserve(_userAddress, _amount);
+
+        emit MintedToken(_userAddress, _amount);
     }
 
     function burnToken(
@@ -75,7 +66,7 @@ abstract contract TokenFactory is Utils {
         for (uint j = 0; j < _tokenAddresses.length; j++) {
             address tokenAddress = _tokenAddresses[j];
             Asset tokenAsset = Asset(tokenAddress);
-            require(tokenAsset.root == token.root, "Asset is not token");
+            require(tokenAsset.root == address(this).root, "Asset is not token");
             require(tokenAsset.ownerCommonName() == getCommonName(msg.sender), "Purchaser doesn't own this token asset");
 
             tokenQuantity = tokenAsset.quantity();
@@ -98,7 +89,7 @@ abstract contract TokenFactory is Utils {
         // require(tokenAmountNet == 0, "Your token balance is not high enough to cover the repayment."); // Allow partial repayments
 
         uint tokenAmountRepaid = tokenAmountOwed - tokenAmountNet;
-        emit BurnedToken(msg.sender, name, tokenAmountRepaid);
+        emit BurnedToken(msg.sender, tokenAmountRepaid);
     }
 
     function setOwner(address _newOwner) public onlyOwner{
@@ -107,6 +98,10 @@ abstract contract TokenFactory is Utils {
 
     function setBurnerAddress(address _newBurnerAddress) public onlyOwner {
         burnerAddress = _newBurnerAddress;
+    }
+
+    function isReserveMinter(address _reserve) public view returns (bool) {
+        return canMint[_reserve];
     }
 
 }

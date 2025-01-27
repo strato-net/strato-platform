@@ -1,11 +1,8 @@
-import "UTXO.sol";
-import "../Redemptions/RedemptionService.sol";
+pragma es6;
+pragma strict;
 
-abstract contract Redeemable is UTXO {
-    uint public redeemableMagicNumber = 0x52656465656d61626c65; // 'Redeemable'
-
-    RedemptionService public redemptionService;
-
+/// @title A representation of Token assets
+abstract contract LendingToken is Mintable, ReserveMinterAuthorization {
     constructor(
         string _name,
         string _description,
@@ -16,66 +13,40 @@ abstract contract Redeemable is UTXO {
         uint _quantity,
         AssetStatus _status,
         address _redemptionService
-    ) UTXO(
-        _name,
-        _description,
-        _images,
-        _files,
-        _fileNames,
-        _createdDate,
-        _quantity,
-        _status
-    ) {
-        redemptionService = RedemptionService(_redemptionService);
+    ) public Mintable(_name, _description, _images, _files, _fileNames, _createdDate, _quantity, _status, _redemptionService) ReserveMinterAuthorization(_name) {
     }
 
     function mint(uint _quantity) internal virtual override returns (UTXO) {
         require(_quantity > 0, "Quantity must be greater than 0");
-        return UTXO(new Redeemable(name, description, images, files, fileNames, createdDate, _quantity, status, address(redemptionService)));
+        LendingToken newToken = new LendingToken(name, description, images, files, fileNames, createdDate, _quantity, status, address(redemptionService));
+        return UTXO(address(newToken)); 
     }
 
-    function _callMint(address _newOwner, uint _quantity) internal virtual override {
-        require(_quantity > 0, "Quantity must be greater than 0");
-        UTXO newAsset = mint(_quantity);
-        Asset(newAsset).transferOwnership(_newOwner, _quantity, false, 0, 0);
-    }
-    
-    function checkCondition() internal virtual override returns (bool){
-        return true;   
-    }
-
-    function getRedemptionService() internal returns (RedemptionService) {
-        redemptionService = Redeemable(this.root).redemptionService();
-        return redemptionService;
-    }
-
-    function updateRedemptionService(address _redemptionService) public {
-        require(address(this) == this.root, "Only the root asset can have its redemption service updated.");
-        require(getCommonName(msg.sender) == this.creator, "Only the issuer can update the redemption service.");
-        redemptionService = RedemptionService(_redemptionService);
-    }
-
-    function requestRedemption(string _redemptionId, uint _quantity) requireOwner("request redemption") public returns (uint, address) {
+    function mintNewUnits(uint _quantity) public override returns (uint) {
+        require(isMint, "Only the mint contract can mint new units");
         require(status != AssetStatus.PENDING_REDEMPTION, "Asset is not in ACTIVE state.");
         require(status != AssetStatus.RETIRED, "Asset is not in ACTIVE state.");
         require(_quantity > 0, "Quantity must be greater than 0");
-
-        UTXO newAsset = mint(_quantity);
-        quantity -= _quantity;
-        uint restStatus = Redeemable(newAsset).issueRedemptionRequest(_redemptionId, owner);
-
-        return (restStatus, address(newAsset));
-    }
-
-    function issueRedemptionRequest(string _redemptionId, address _newOwner) requireOwner("issue redemption request") public returns (uint) {
-        require(status != AssetStatus.PENDING_REDEMPTION, "Asset is not in ACTIVE state.");
-        require(status != AssetStatus.RETIRED, "Asset is not in ACTIVE state.");
-
-        _transfer(_newOwner, quantity, false, 0, 0);
-        RedemptionService(getRedemptionService()).redemptionRequested(_redemptionId);
-        status = AssetStatus.PENDING_REDEMPTION;
-
+        require(ReserveMinterAuthorization(address(this)).isReserveMinter(msg.sender), "Only one of the minter can mint new units");
+        emit OwnershipTransfer(
+            originAddress,
+            address(0),
+            "",
+            owner,
+            ownerCommonName,
+            itemNumber + quantity,
+            itemNumber + quantity + _quantity - 1
+        );
+        quantity += _quantity;
         return RestStatus.OK;
+    }
+
+    function transferByReserve(address _userAddress, uint _quantity) public {
+        require(ReserveMinterAuthorization(address(this)).isReserveMinter(msg.sender), "Only one of the minter can mint new units");
+        
+        uint transferNumber = (uint(block.number + 16)) % 1000000;
+        
+        _transfer(_userAddress, _quantity, true, transferNumber, 0.000000000000000001);
     }
 
         // Quantity is already checked by transferOwnership function
@@ -83,7 +54,6 @@ abstract contract Redeemable is UTXO {
     //     require(status != AssetStatus.PENDING_REDEMPTION, "Asset is not in ACTIVE state.");
     //     require(status != AssetStatus.RETIRED, "Asset is not in ACTIVE state.");
     //     require(_quantity > 0, "Quantity must be greater than 0");
-    //     require(checkCondition(), "Condition is not met");
     //     // Create a new UTXO with a portion of the units
     //     try {
     //         // This is a hack to prevent the splitted UTXO from infinitely creating new UTXOs

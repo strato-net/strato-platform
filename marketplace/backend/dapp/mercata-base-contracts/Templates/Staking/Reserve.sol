@@ -9,11 +9,11 @@ import "../Escrows/SimpleEscrow.sol";
 import "../Oracles/OracleService.sol";
 import "../Structs/Structs.sol";
 import "../Utils/Utils.sol";
-import "../TokenFactory/TokenFactory.sol";
+import "ReserveMinterAuthorization.sol";
 
 abstract contract Reserve is Utils, Structs {
     OracleService public oracle; // Asset Oracle service for fetching price data
-    address public usdstTokenFactory;
+    address public usdstToken;
     Asset public cataToken;
 
     decimal public priceOfCATA = 0.10; //cata price in dollars
@@ -39,15 +39,15 @@ abstract contract Reserve is Utils, Structs {
     event MintedUSDST(address indexed user, string commonName, uint amount);
     event BurnedUSDST(address indexed user, string commonName, uint amount);
 
-    constructor(address _assetOracle, string _name, address _assetRootAddress, decimal _unitConversionRate, address _usdstTokenFactory) {
+    constructor(address _assetOracle, string _name, address _assetRootAddress, decimal _unitConversionRate, address _usdstToken) {
         oracle = OracleService(_assetOracle);
         owner = msg.sender;
         name = _name;
         assetRootAddress = _assetRootAddress;
         unitConversionRate = _unitConversionRate;
-        usdstTokenFactory = _usdstTokenFactory;
+        usdstToken = _usdstToken;
 
-        TokenFactory(usdstTokenFactory).addReserveAsMinter();
+        ReserveMinterAuthorization(usdstToken).addReserveAsMinter();
     }
 
     modifier requireActive() {
@@ -61,11 +61,11 @@ abstract contract Reserve is Utils, Structs {
     }
 
     function mintUSDST(address _userAddress, uint _amount) internal requireActive() {
-        TokenFactory(usdstTokenFactory).mintToken(_userAddress, _amount);
+        ReserveMinterAuthorization(usdstToken).mintToken(_userAddress, _amount);
     }
 
     function burnUSDST(address[] _usdstAssetAddresses, uint _quantity) internal requireActive() {
-        TokenFactory(usdstTokenFactory).burnToken(_usdstAssetAddresses, _quantity);
+        ReserveMinterAuthorization(usdstToken).burnToken(_usdstAssetAddresses, _quantity);
     }
 
     function distributeRewards(address[] _escrowAddresses) external {
@@ -187,7 +187,7 @@ abstract contract Reserve is Utils, Structs {
     }
 
     function deactivate() public requireActive() requireOwner("deactivate reserve") {
-        TokenFactory(usdstTokenFactory).removeReserveAsMinter();
+        ReserveMinterAuthorization(usdstToken).removeReserveAsMinter();
         isActive = false;
 
     }
@@ -212,9 +212,9 @@ abstract contract Reserve is Utils, Structs {
         assetRootAddress = _newAssetRootAddress;
     }
 
-    function setUsdstTokenFactory(address _newUsdstTokenFactory) public requireOwner("update USDST token factory") {
-        require(_newUsdstTokenFactory != address(0), "Invalid USDST token factory address");
-        usdstTokenFactory = _newUsdstTokenFactory;
+    function setUsdstReserveMinterAuthorization(address _newUsdstReserveMinterAuthorization) public requireOwner("update USDST token factory") {
+        require(_newUsdstReserveMinterAuthorization != address(0), "Invalid USDST token factory address");
+        usdstToken = _newUsdstReserveMinterAuthorization;
     }
 
     function setLoanToValueRatio(uint _newRatio) public requireOwner("update LTV ratio") {
