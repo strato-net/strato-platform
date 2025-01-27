@@ -65,7 +65,7 @@ import { ASSET_STATUS, fileServerUrl } from '../../helpers/constants';
 import { Swiper, SwiperSlide } from 'swiper/react';
 import { Ethers5Adapter } from '@reown/appkit-adapter-ethers5';
 import { mainnet, sepolia } from '@reown/appkit/networks';
-import { useAppKit, useAppKitAccount, createAppKit } from '@reown/appkit/react';
+import { useAppKit, useAppKitAccount, useAppKitNetwork, createAppKit } from '@reown/appkit/react';
 import { ethers } from 'ethers';
 
 // Import Swiper styles
@@ -192,7 +192,8 @@ const ProductDetails = ({ user, users }) => {
   });
 
   const appKit = useAppKit();
-  const { address } = useAppKitAccount()
+  const { address } = useAppKitAccount();
+  const { chainId } = useAppKitNetwork();
   const [wbtcBalance, setWbtcBalance] = useState(0);
   const [signer, setSigner] = useState({});
 
@@ -216,7 +217,6 @@ const ProductDetails = ({ user, users }) => {
   
           // WBTC has 8 decimals (like BTC), format accordingly
           const formattedBalance = ethers.utils.formatUnits(wbtcBalance, 8); // 8 decimals for WBTC
-          console.log(`WBTC Balance: ${formattedBalance}`);
           setWbtcBalance(formattedBalance); // Set WBTC balance
         } catch (error) {
           console.error("Failed to fetch WBTC balance:", error);
@@ -225,7 +225,7 @@ const ProductDetails = ({ user, users }) => {
     };
   
     fetchBalance();
-  }, [address]);
+  }, [address, chainId]);
 
   useEffect(() => {
     if (isCalledFromInventory) setId(routeMatch1?.params?.id);
@@ -889,7 +889,6 @@ const ProductDetails = ({ user, users }) => {
           productDetailPage={Id}
           inventory={inventoryDetails}
           reserves={reserves}
-          
         />
       )}
       {bridgeWalletModalOpen && (
