@@ -599,7 +599,13 @@ async function getAll(admin, args = {}, defaultOptions) {
 
           // Combine the inventories with sales data if there are valid sales for user profile route
           if (userProfile) {
-            if (sales.length > 0 && sales.price !== null && sales.price !== undefined) {
+            if (
+              sales.length > 0 &&
+              sales[0].price !== null &&
+              sales[0].price !== undefined &&
+              sales[0].price !== 0 &&
+              sales[0].saleType !== 'Escrow'
+            ) {
               // Only combine if there are sales. We don't list unpublished items for this route.
               finalInventory.push({
                 ...inventory,
@@ -655,7 +661,9 @@ async function getAll(admin, args = {}, defaultOptions) {
               });
             }
           } else {
-            finalInventory.push({ escrow, ...inventory});
+            if(!userProfile){
+              finalInventory.push({ escrow, ...inventory });
+            }
           }
         }
       }

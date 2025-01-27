@@ -53,7 +53,7 @@ import {
 } from '../../helpers/constants';
 
 const UserProfile = ({ user }) => {
-  const [commonName, setCommonName] = useState(undefined);
+  
   const [activeTab, setActiveTab] = useState('1');
   const dispatch = useInventoryDispatch();
   const categoryDispatch = useCategoryDispatch();
@@ -109,6 +109,7 @@ const UserProfile = ({ user }) => {
     path: routes.MarketplaceUserProfile.url,
     strict: true,
   });
+  const [commonName, setCommonName] = useState(routeMatch?.params?.commonName);
   const [breadcrumbs, setBreadcrumbs] = useState([
     { text: 'Home', path: homeUrl },
   ]);
@@ -198,7 +199,7 @@ const UserProfile = ({ user }) => {
 
   // Inventories For Sale fetch
   useEffect(() => {
-    inventoryActions.fetchInventoryForUser(dispatch, 10000, 0, '', undefined);
+    inventoryActions.fetchInventoryForUser(dispatch, 10000, 0, '', undefined, '', commonName);
   }, [dispatch, hasChecked, isAuthenticated, loginUrl, commonName]);
 
   // Tab selection
