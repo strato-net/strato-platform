@@ -192,22 +192,13 @@ const ProductDetails = ({ user, users }) => {
   });
 
   const appKit = useAppKit();
-  const rawAccount = useAppKitAccount();
+  const { address } = useAppKitAccount()
   const [wbtcBalance, setWbtcBalance] = useState(0);
   const [signer, setSigner] = useState({});
-  const [account, setAccount] = useState();
-
-  // Monitor rawAccount for changes
-  useEffect(() => {
-    if (rawAccount && rawAccount.address) {
-      // Force refresh
-      setAccount(rawAccount);
-    }
-  }, [rawAccount]);
 
   useEffect(() => {
     const fetchBalance = async () => {
-      if (account?.address) {
+      if (address) {
         const wbtcAddress = fileServerUrl.includes("test")
           ? "0xA5D35764ae20Ba9042509C4B7Ba602C5889a2c97" // WBTC testnet contract
           : "0x2260FAC5E5542a773Aa44fBCfeDf7C193bc2C599"; // WBTC mainnet contract
@@ -221,7 +212,7 @@ const ProductDetails = ({ user, users }) => {
   
         try {
           // Get WBTC balance
-          const wbtcBalance = await wbtcContract.balanceOf(account.address);
+          const wbtcBalance = await wbtcContract.balanceOf(address);
   
           // WBTC has 8 decimals (like BTC), format accordingly
           const formattedBalance = ethers.utils.formatUnits(wbtcBalance, 8); // 8 decimals for WBTC
@@ -234,7 +225,7 @@ const ProductDetails = ({ user, users }) => {
     };
   
     fetchBalance();
-  }, [account]);
+  }, [address]);
 
   useEffect(() => {
     if (isCalledFromInventory) setId(routeMatch1?.params?.id);
@@ -658,7 +649,7 @@ const ProductDetails = ({ user, users }) => {
                           if (!isAuthenticated || !user) {
                             setIsModalVisible(true);
                           } else {
-                            if (account?.address) {
+                            if (address) {
                               showBridgeWalletModal();
                             } else {
                               appKit.open();
@@ -666,10 +657,10 @@ const ProductDetails = ({ user, users }) => {
                           }
                         }}
                       >
-                        {account?.address ? 'Bridge' : 'Connect Wallet'}
+                        {address ? 'Bridge' : 'Connect Wallet'}
                       </Button>
                     </div>
-                    {account?.address && (
+                    {address && (
                       <div className="bg-[#13188A] rounded-full mt-2">
                         <appkit-account-button />
                       </div>
@@ -907,7 +898,7 @@ const ProductDetails = ({ user, users }) => {
           handleCancel={handleBridgeWalletModalClose}
           signer={signer}
           accountDetails={{
-            walletAddress: account?.address,
+            walletAddress: address,
             balance: wbtcBalance,
           }}
           tokenName="WBTC"
