@@ -193,10 +193,8 @@ const UserProfile = ({ user }) => {
   }, [routeMatch]);
 
   // Inventories For Sale fetch
-  useEffect(() => {
-    console.log("user", user);
-    
-    if(user?.commonName !== commonName){
+  useEffect(() => {    
+    if(user?.commonName === commonName){
       inventoryActions.fetchInventoryForUser(dispatch, 10000, 0, '', undefined, '', commonName);
     }
   }, [dispatch, hasChecked, isAuthenticated, loginUrl, commonName]);
