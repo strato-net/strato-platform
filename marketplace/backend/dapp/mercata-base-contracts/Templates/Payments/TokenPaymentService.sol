@@ -72,9 +72,9 @@ contract TokenPaymentService is PaymentService {
             decimal gross = s.price() * decimal(quantity); 
             decimal fee = 0.0000;
             if (address(a) == address(a.root)) {
-                fee = (gross * (primarySaleFeePercentage / 100.0000));
+                fee = (gross * (10.0000 / 100.0000));
             } else {
-                fee = (gross * (secondarySaleFeePercentage / 100.0000));
+                fee = (gross * (3.0000 / 100.0000));
             }
             decimal net = gross - fee;
             totalAmountGross += gross;
