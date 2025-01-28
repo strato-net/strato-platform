@@ -264,7 +264,7 @@ const GlobalTransactionResponsive = ({
                         ? quantity / Math.pow(10, 8)
                         : quantity
                       ).toLocaleString('en-US', {
-                        maximumFractionDigits: 4,
+                        maximumFractionDigits: 6,
                         minimumFractionDigits: 0,
                       })}
                     </p>

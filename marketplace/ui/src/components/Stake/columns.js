@@ -201,7 +201,7 @@ export const aggregateStakeColumns = (
         return (
           <div>
             {displayValue.toLocaleString('en-US', {
-              maximumFractionDigits: 4,
+              maximumFractionDigits: 6,
               minimumFractionDigits: 2,
             })}
           </div>
@@ -448,7 +448,7 @@ export const stakeColumns = (
         return (
           <div>
             {displayValue.toLocaleString('en-US', {
-              maximumFractionDigits: 4,
+              maximumFractionDigits: 6,
               minimumFractionDigits: 2,
             })}
           </div>

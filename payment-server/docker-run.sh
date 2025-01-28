@@ -52,7 +52,7 @@ if [ "$ORACLE_MODE" = "true" ]; then
       echo 'Error: ALCHEMY_API_KEY is not set. submit-price script will not run. Exiting'
       exit 12
     fi
-    if [ "$SALE_UPDATE" = "true" ]; then
+    if [ "${SALE_UPDATE}" = "true" ]; then
       if [ -z "$METALS_USERNAME" ]; then
       echo 'Error: METALS_USERNAME is not set. Metal Sale price update script will not run. Exiting'
       exit 13

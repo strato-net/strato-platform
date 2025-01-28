@@ -511,7 +511,7 @@ const Inventory = ({ user }) => {
         )
           .toNumber()
           .toLocaleString('en-US', {
-            maximumFractionDigits: 4,
+            maximumFractionDigits: 6,
             minimumFractionDigits: 0,
           });
         return <div>{quantity || 0}</div>;

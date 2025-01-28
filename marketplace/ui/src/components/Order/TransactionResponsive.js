@@ -141,7 +141,7 @@ const TransactionResponsive = ({
           ];
           if (assetOriginAddress === stratAddress) {
             quantity = (quantity / 100).toLocaleString('en-US', {
-              maximumFractionDigits: 4,
+              maximumFractionDigits: 6,
               minimumFractionDigits: 0,
             });
             price = (price * 100).toFixed(2);
@@ -149,7 +149,7 @@ const TransactionResponsive = ({
             assetsWithEighteenDecimalPlaces.includes(assetOriginAddress)
           ) {
             quantity = (quantity / Math.pow(10, 18)).toLocaleString('en-US', {
-              maximumFractionDigits: 4,
+              maximumFractionDigits: 6,
               minimumFractionDigits: 0,
             });
             price = (price * Math.pow(10, 18)).toFixed(2);
@@ -157,7 +157,7 @@ const TransactionResponsive = ({
             assetsWithEightDecimalPlaces.includes(assetOriginAddress)
           ) {
             quantity = (quantity / Math.pow(10, 8)).toLocaleString('en-US', {
-              maximumFractionDigits: 4,
+              maximumFractionDigits: 6,
               minimumFractionDigits: 0,
             });
             price = (price * Math.pow(10, 8)).toFixed(2);

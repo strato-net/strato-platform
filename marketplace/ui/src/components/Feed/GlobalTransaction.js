@@ -260,7 +260,7 @@ const GlobalTransaction = ({
             : quantity;
 
           formattedQuantity = value.toLocaleString('en-US', {
-            maximumFractionDigits: 4,
+            maximumFractionDigits: 6,
             minimumFractionDigits: 0,
           });
         }
