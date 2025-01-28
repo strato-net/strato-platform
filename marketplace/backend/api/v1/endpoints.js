@@ -183,6 +183,7 @@ export const Marketplace = {
   getCataAddress: '/cata/address',
   getStratsAddress: '/strats/address',
   getStakeableProducts: '/stake',
+  get2DecimalPlaces: '/2DecimalPlaces',
   get18DecimalPlaces: '/18DecimalPlaces',
 };
 

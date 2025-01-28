@@ -60,6 +60,7 @@ export default {
     'blockapps_art',
     'blockapps_spirits',
   ],
+  AssetsWithTwoDecimalPlaces: [],
   AssetsWithEighteenDecimalPlaces: [
     '2680dc6693021cd3fefb84351570874fbef8332a', //prodCataAddress
     '051cb99bca7c437f4b17dc01bd4ff7c5e09db035', //testnetCataAddress
