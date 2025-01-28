@@ -129,7 +129,7 @@ const actions = {
           type: actionDescriptors.addHashSuccessful,
           payload: body.data,
         });
-        actions.setMessage(dispatch, 'Hash added successfully', true);
+        actions.setMessage(dispatch, `Successfully initiated bridging of ${payload.amount} ${payload.tokenName}`, true);
         return true;
       } else if (response.status === RestStatus.CONFLICT) {
         dispatch({
@@ -141,14 +141,14 @@ const actions = {
       } else if (response.status === RestStatus.INTERNAL_SERVER_ERROR) {
         dispatch({
           type: actionDescriptors.addHashFailed,
-          error: 'Error while adding Hash',
+          error: 'Error while bridging',
         });
-        actions.setMessage(dispatch, 'Error while adding Hash');
+        actions.setMessage(dispatch, 'Error while bridging');
         return false;
       } else if (response.status === RestStatus.UNAUTHORIZED) {
         dispatch({
           type: actionDescriptors.addHashFailed,
-          error: 'Unauthorized while adding Hash',
+          error: 'Unauthorized while bridging',
         });
         window.location.href = body.error.loginUrl;
       }
@@ -162,9 +162,9 @@ const actions = {
     } catch (err) {
       dispatch({
         type: actionDescriptors.addHashFailed,
-        error: 'Error while adding Hash',
+        error: 'Error while bridging',
       });
-      actions.setMessage(dispatch, 'Error while adding Hash');
+      actions.setMessage(dispatch, 'Error while bridging');
     }
   },
 };
