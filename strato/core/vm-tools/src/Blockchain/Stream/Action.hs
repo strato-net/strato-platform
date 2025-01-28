@@ -8,14 +8,49 @@
 {-# LANGUAGE RankNTypes #-}
 {-# OPTIONS_GHC -fno-warn-orphans #-}
 
-module Blockchain.Stream.Action where
+module Blockchain.Stream.Action (
+  Action(..),
+  blockHash,
+  blockTimestamp,
+  blockNumber,
+  transactionHash,
+  transactionChainId,
+  transactionSender,
+  actionData,
+  metadata,
+  events,
+  delegatecalls,
 
--- import qualified Data.HashMap.Strict          as HM
+  ActionData(..),
+  actionDataCodeHash,
+  actionDataCodeCollection,
+  actionDataCreator,
+  actionDataCCCreator,
+  actionDataRoot,
+  actionDataApplication,
+  actionDataCodeKind,
+  actionDataStorageDiffs,
+  actionDataAbstracts,
+  actionDataMappings,
+  actionDataArrays,
+  actionDataCallTypes,
+  
+  CallType(..),
+  DataDiff(..),
+  Delegatecall(..),
+
+  omapAdjust,
+  omapInsertWith,
+  omapLens,
+  omapMap,
+  omapUnionWith,
+  mergeActionData
+
+  ) where
 
 import Blockchain.MiscJSON ()
 import Blockchain.SolidVM.Model
 import Blockchain.Strato.Model.Account
-import Blockchain.Strato.Model.Address
 import Blockchain.Strato.Model.CodePtr
 import Blockchain.Strato.Model.Event
 import Blockchain.Strato.Model.ExtendedWord (Word256, bytesToWord256)
@@ -74,8 +109,8 @@ data CallData = CallData
   }
   deriving (Eq, Show, Generic, NFData)
 
-makeLenses ''CallData
-
+--makeLenses ''CallData
+{-
 instance Format CallData where
   format CallData {..} =
     "callDataType: " ++ show _callDataType ++ "\n"
@@ -121,7 +156,8 @@ instance FromJSON CallData where
       <*> (o .: "input")
       <*> (o .:? "output")
   parseJSON o = fail $ "parseJSON CallData: Expected object, got: " ++ show o
-
+-}
+{-
 emptyCallData :: CallData
 emptyCallData =
   CallData
@@ -133,7 +169,7 @@ emptyCallData =
       _callDataInput = BSS.empty,
       _callDataOutput = Nothing
     }
-
+-}
 omapLens :: (Ord k) => k -> Lens' (OMap.OMap k v) (Maybe v)
 omapLens k = lens getter setter
   where
@@ -326,7 +362,7 @@ data Delegatecall = Delegatecall
   }
   deriving (Eq, Show, Generic, NFData)
 
-makeLenses ''Delegatecall
+--makeLenses ''Delegatecall
 
 instance Format Delegatecall where
   format Delegatecall {..} =
@@ -459,10 +495,10 @@ instance FromJSON Action where
 
 instance Arbitrary CallType where
   arbitrary = genericArbitrary
-
+{-
 instance Arbitrary CallData where
   arbitrary = genericArbitrary
-
+-}
 instance Arbitrary DataDiff where
   arbitrary = genericArbitrary
 
@@ -479,3 +515,4 @@ instance (Ord k, Arbitrary k, Arbitrary v) => Arbitrary (OMap.OMap k v) where
     arbitrary = do
         kvPairs <- listOf arbitrary -- Generate a list of key-value pairs
         return $ OMap.fromList kvPairs -- Convert list to OMap
+
