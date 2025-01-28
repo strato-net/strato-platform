@@ -287,13 +287,15 @@ const actions = {
     offset,
     queryValue,
     category,
-    originAddress
+    originAddress,
+    user
   ) => {
     const query = queryValue
       ? `&queryValue=${queryValue}&queryFields=name`
       : '';
 
     const categoryQuery = category ? `category[]=${category}` : '';
+    const userName = user ? `&user=${user}` : '';
 
     const originAddressQuery = originAddress
       ? `&originAddress[]=${originAddress}`
@@ -303,7 +305,7 @@ const actions = {
 
     try {
       const response = await fetch(
-        `${apiUrl}/inventory/user/inventories?${categoryQuery}&limit=${limit}&offset=${offset}${query}${originAddressQuery}&isMint=true`,
+        `${apiUrl}/inventory/user/inventories?${categoryQuery}&limit=${limit}&offset=${offset}${query}${originAddressQuery}&isMint=true${userName}`,
         {
           method: HTTP_METHODS.GET,
         }

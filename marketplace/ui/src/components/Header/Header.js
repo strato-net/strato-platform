@@ -186,7 +186,6 @@ const HeaderComponent = ({
           label: (
             <div>
               <p>{user == null ? '' : user.commonName}</p>
-              <p className="text-xs">{user == null ? '' : user.email}</p>
             </div>
           ),
         },
@@ -326,7 +325,6 @@ const HeaderComponent = ({
           label: (
             <div>
               <p className="text-gray">{user?.commonName}</p>
-              <p className="text-xs text-gray">{user?.email}</p>
               <p className="!mb-0">Logout</p>
             </div>
           ),
