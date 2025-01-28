@@ -354,6 +354,7 @@ const ProductDetails = ({ user, users }) => {
         onClose: ethActions.resetMessage(ethDispatch),
         placement,
         key: 1,
+        duration: 10,
       });
     } else {
       api.error({
@@ -361,6 +362,7 @@ const ProductDetails = ({ user, users }) => {
         onClose: ethActions.resetMessage(ethDispatch),
         placement,
         key: 2,
+        duration: 10,
       });
     }
   };

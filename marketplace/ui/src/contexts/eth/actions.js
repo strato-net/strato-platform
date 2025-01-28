@@ -129,7 +129,7 @@ const actions = {
           type: actionDescriptors.addHashSuccessful,
           payload: body.data,
         });
-        actions.setMessage(dispatch, `Successfully initiated bridging of ${payload.amount} ${payload.tokenName}`, true);
+        actions.setMessage(dispatch, `Successfully initiated the bridging of ${payload.amount} ${payload.tokenName} to ${payload.amount} ${payload.tokenName}ST.`, true);
         return true;
       } else if (response.status === RestStatus.CONFLICT) {
         dispatch({
