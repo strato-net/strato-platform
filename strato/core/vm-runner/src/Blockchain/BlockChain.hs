@@ -415,7 +415,6 @@ addTransaction chainId isRunningTests' b remainingBlockGas t@OutputTx {otSigner 
 
   let isHomestead = blockIsHomestead $ number b
       intrinsicGas' = intrinsicGas isHomestead t
-      tAcct = Account tAddr chainId
       bt = fromMaybe (otBaseTx t) (otPrivatePayload t)
 
   when flags_debug $ do
@@ -427,7 +426,7 @@ addTransaction chainId isRunningTests' b remainingBlockGas t@OutputTx {otSigner 
       realIG = fromIntegral intrinsicGas'
       maxGas = fromIntegral (maxBound :: Int)
 
-  acctNonce <- lift $ addressStateNonce <$> A.lookupWithDefault (Proxy @AddressState) tAcct
+  acctNonce <- lift $ addressStateNonce <$> A.lookupWithDefault (Proxy @AddressState) (Account tAddr Nothing)
 
   when (chainId /= txChainId bt) $ throwE $ TFChainIdMismatch chainId (txChainId bt) t
   when (realIG > transactionGasLimit bt) $ throwE $ TFIntrinsicGasExceedsTxLimit realIG (transactionGasLimit bt) t
@@ -439,12 +438,12 @@ addTransaction chainId isRunningTests' b remainingBlockGas t@OutputTx {otSigner 
     . throwE
     $ TFTXSizeLimitExceeded txSize (toInteger flags_txSizeLimit) t
 
-  lift $ incrementNonce (tAcct^.accountAddress)
+  lift $ incrementNonce tAddr
 
   when (otHash t `S.member` knownFailedTxs) . throwE $ TFKnownFailedTX t
 
   $logInfoS "addTx" . T.pack $ "gas is always off, so I'm giving the account enough balance for this TX"
-  faucetSuccess <- lift $ addToBalance tAcct txCost
+  faucetSuccess <- lift $ addToBalance tAddr txCost
   unless faucetSuccess $ error "failed to give balance to a gasOff account"
 
   when flags_debug $ $logDebugS "addTx" "running code"
@@ -454,7 +453,7 @@ addTransaction chainId isRunningTests' b remainingBlockGas t@OutputTx {otSigner 
       adjustedTxGasLimit = bool (transactionGasLimit bt) (flags_strictGasLimit) (flags_strictGas && not isKnownToBeSlow)
   when flags_strictGas $ $logInfoS "addTx" . T.pack $ "Strict Gas Mode is on. Adjusted transaction gas limit is " ++ show adjustedTxGasLimit
 
-  execResults <- runCodeForTransaction isRunningTests' isHomestead b (fromInteger (adjustedTxGasLimit) - intrinsicGas') tAcct t proposer
+  execResults <- runCodeForTransaction isRunningTests' isHomestead b (fromInteger (adjustedTxGasLimit) - intrinsicGas') tAddr t proposer
   lift $ P.incCounter vmTxsProcessed
 
   case erException execResults of
@@ -475,11 +474,11 @@ runCodeForTransaction ::
   Bool -> -- add address here
   BlockHeader ->
   Gas ->
-  Account ->
+  Address ->
   OutputTx ->
   Address ->
   ExceptT TransactionFailureCause m ExecResults
-runCodeForTransaction isRunningTests' isHomestead b availableGas tAcct t proposer =
+runCodeForTransaction isRunningTests' isHomestead b availableGas tAddr t proposer =
   let ut = fromMaybe (otBaseTx t) (otPrivatePayload t)
    in if isContractCreationTX ut
         then do
@@ -496,8 +495,8 @@ runCodeForTransaction isRunningTests' isHomestead b availableGas tAcct t propose
                       return $ evmErrorResults (toInteger ag) (UnsupportedVM vmName)
 
           --TODO- The new address state should be created in the VM itself....  Currently the EVM doesn't do this (and could be cleaned up by doing so), SolidVM does do this.  I will calculate this value here, but then ignore the value in SolidVM (and recalculate it there).  Eventually this should be moved into the EVM also
-          nonce <- lift $ addressStateNonce <$> A.lookupWithDefault (Proxy @AddressState) tAcct
-          let newAddress = getNewAddress_unsafe (tAcct ^. accountAddress) (nonce - 1) --nonce has already been incremented, so subtract 1 here to get the proper value (this is directly specified in the yellowpaper)
+          nonce <- lift $ addressStateNonce <$> A.lookupWithDefault (Proxy @AddressState) (Account tAddr Nothing)
+          let newAddress = getNewAddress_unsafe (tAddr) (nonce - 1) --nonce has already been incremented, so subtract 1 here to get the proper value (this is directly specified in the yellowpaper)
               newAccount = Account newAddress (txChainId ut)
 
           lift $
@@ -507,8 +506,8 @@ runCodeForTransaction isRunningTests' isHomestead b availableGas tAcct t propose
               S.empty
               b
               0
-              (tAcct^.accountAddress)
-              (tAcct^.accountAddress)
+              tAddr
+              tAddr
               proposer
               (transactionValue ut)
               (fromInteger $ transactionGasPrice ut)
@@ -519,7 +518,7 @@ runCodeForTransaction isRunningTests' isHomestead b availableGas tAcct t propose
               (txChainId ut)
               (txMetadata ut)
         else do
-          when flags_debug $ $logInfoS "runCodeForTransaction" $ T.pack $ "runCodeForTransaction: MessageTX caller: " ++ format tAcct ++ ", address: " ++ format (transactionTo ut)
+          when flags_debug $ $logInfoS "runCodeForTransaction" $ T.pack $ "runCodeForTransaction: MessageTX caller: " ++ format tAddr ++ ", address: " ++ format (transactionTo ut)
 
           let owner = Account (transactionTo ut) (txChainId ut)
 
@@ -550,13 +549,13 @@ runCodeForTransaction isRunningTests' isHomestead b availableGas tAcct t propose
                   0
                   (owner^.accountAddress)
                   (owner^.accountAddress)
-                  (tAcct^.accountAddress)
+                  tAddr
                   proposer
                   (fromInteger $ transactionValue ut)
                   (fromInteger $ transactionGasPrice ut)
                   (transactionData ut)
                   (fromIntegral availableGas)
-                  (tAcct^.accountAddress)
+                  tAddr
                   (txHash ut)
                   (txChainId ut)
                   (txMetadata ut)

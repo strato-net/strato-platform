@@ -695,7 +695,7 @@ runOperation SUICIDE = do
   let address = (accountAddress .~ address') owner
   A.adjustWithDefault_ (A.Proxy @AddressState) owner $ \addressState -> do
     let allFunds = addressStateBalance addressState
-    pay' "transferring all funds upon suicide" owner address allFunds
+    pay' "transferring all funds upon suicide" (owner^.accountAddress) (address^.accountAddress) allFunds
     return addressState {addressStateBalance = 0} --yellowpaper needs address emptied, in the case that the transfer address is the same as the suicide one
   addSuicideList owner
   setDone True
@@ -1132,7 +1132,7 @@ create
           --This next line will actually create the account addressState data....
           --In the extremely unlikely even that the address already exists, it will preserve
           --the existing balance.
-          pay "transfer value" (Account sender Nothing) (Account newAddress Nothing) $ fromIntegral value
+          pay "transfer value" sender newAddress $ fromIntegral value
         else return True
 
     execResults <-
@@ -1145,7 +1145,7 @@ create
       Just e -> do
         --if there was an error, addressStates were reverted, so the receiveAddress still should
         --have the value, and I can revert without checking for success.
-        _ <- pay "revert value transfer" (Account newAddress Nothing) (Account sender Nothing) (fromIntegral value)
+        _ <- pay "revert value transfer" newAddress sender (fromIntegral value)
 
         purgeStorageMap $ Account newAddress Nothing
         A.delete (A.Proxy @AddressState) (Account newAddress Nothing)
@@ -1284,7 +1284,7 @@ call' noValueTransfer = do
 
   --TODO- Deal with this return value
   unless noValueTransfer $ do
-    _ <- pay "call value transfer" sender receiveAddress (fromIntegral value)
+    _ <- pay "call value transfer" (sender^.accountAddress) (receiveAddress^.accountAddress) (fromIntegral value)
     return ()
 
   runCodeFromStart
@@ -1319,7 +1319,7 @@ callPrecompiled' noValueTransfer precompiled = do
 
   --TODO- Deal with this return value
   unless noValueTransfer $ do
-    _ <- pay "call value transfer" sender receiveAddress (fromIntegral value)
+    _ <- pay "call value transfer" (sender^.accountAddress) (receiveAddress^.accountAddress) (fromIntegral value)
     return ()
 
   runPrecompiled precompiled

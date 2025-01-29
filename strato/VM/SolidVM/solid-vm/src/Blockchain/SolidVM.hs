@@ -348,7 +348,7 @@ create' creator maybeCodePtr originAddress issuerAcct issuerName newAccount ch c
       parentName' = bool parentName "" (useWallet && parentName == "User")
       issuer = if shouldDoCreatorFork . blockHeaderBlockNumber $ Env.blockHeader env then issuerAcct else Env.origin env
   -- set creator
-  setCreator issuer (NamedAccount originAddress MainChain) newAccount contract' (BlockHeader.number $ Env.blockHeader env)
+  setCreator issuer originAddress newAccount contract' (BlockHeader.number $ Env.blockHeader env)
 
   -- Run the constructor
   runTheConstructors creator newAccount ch cc contractName' argExps
@@ -357,7 +357,7 @@ create' creator maybeCodePtr originAddress issuerAcct issuerName newAccount ch c
 
   void . withCallInfo (Account newAccount Nothing) contract' (stringToLabel $ labelToString contractName' ++ " constructor") ch cc M.empty False False $ do
     -- set creator again, in case the caller's cert changed during constructor execution
-    setCreator issuer (NamedAccount originAddress MainChain) newAccount contract' (BlockHeader.number $ Env.blockHeader env)
+    setCreator issuer originAddress newAccount contract' (BlockHeader.number $ Env.blockHeader env)
 
   Mod.modifyStatefully_ (Mod.Proxy @Action) $
     Action.actionData %= Action.omapAdjust (Action.actionDataCreator .~ (T.pack issuerName)) (Account newAccount Nothing)
@@ -537,7 +537,7 @@ call' from to' fnCalltype mContract functionName isRCC argExps = do
   Mod.modifyStatefully_ (Mod.Proxy @Action) $
     Action.actionData %= Action.omapAdjust (Action.actionDataCreator .~ (T.pack ctrName)) (Account to Nothing)
   when (isRCC) $
-    (\env -> setCreator ctr (NamedAccount to MainChain) to contract (BlockHeader.number $ Env.blockHeader env)) =<< getEnv
+    (\env -> setCreator ctr to to contract (BlockHeader.number $ Env.blockHeader env)) =<< getEnv
 
   let functionsIncludingConstructor =
         case contract ^. CC.constructor of
@@ -737,7 +737,7 @@ callWithResult :: MonadSM m => Address -> Address -> CC.FunctionCallType -> Mayb
 callWithResult from to fnCalltype mContract functionName isRCC argExps = snd <$> call' from to fnCalltype mContract functionName isRCC argExps
 
 -- set the hidden ":creator" field
-setCreator :: MonadSM m => Address -> NamedAccount -> Address -> CC.Contract -> Integer -> m ()
+setCreator :: MonadSM m => Address -> Address -> Address -> CC.Contract -> Integer -> m ()
 setCreator creator originAddress contract _ _ = do
   maybeCert <- A.select (A.Proxy @X509Certificate) creator
   blockNumber <- blockHeaderBlockNumber . Env.blockHeader <$> getEnv
@@ -763,7 +763,7 @@ setCreator creator originAddress contract _ _ = do
       $logDebugS "setCreator/versioning" . T.pack . C.red $ "Ignoring creator field for empty creator field"
   
   when forkYeah $ do
-    putSolidStorageKeyVal' contract (MS.StoragePath [MS.Field ":originAddress"]) (MS.BAccount originAddress)
+    putSolidStorageKeyVal' contract (MS.StoragePath [MS.Field ":originAddress"]) (MS.BAccount $ NamedAccount originAddress MainChain)
 
 getCreator :: MonadSM m => Address -> m (Address, Address, String) -- (creatorAddress, originAddress, creatorName)
 getCreator caller = do
@@ -2124,25 +2124,23 @@ expToVar' theFullExp@(CC.FunctionCall _ e args) _ = do
             -- TODO: When gas gets more implemented ensure that this function does not
             --       consume more than 2300 gas
             Constant (SContractItem address' "transfer") -> do
-              from <- getCurrentAccount
-              let address = namedAccountToAccount (from ^. accountChainId) address'
+              from <- getCurrentAddress
               case argVals of
                 OrderedVals [SInteger amount] -> do
-                  res <- pay "built-in transfer function" from address amount
+                  res <- pay "built-in transfer function" from (address' ^. namedAccountAddress) amount
                   case res of
                     True -> return $ Constant SNULL
-                    _ -> paymentError (show amount) (show address)
-                _ -> paymentError "unknown" (show address)
+                    _ -> paymentError (show amount) (show address')
+                _ -> paymentError "unknown" (show address')
 
             -- Send Wei return bool on failure or success
             -- TODO: When gas gets more implemented ensure that this function does not
             --       consume more than 2300 gas
             Constant (SContractItem address' "send") -> do
-              from <- getCurrentAccount
-              let address = namedAccountToAccount (from ^. accountChainId) address'
+              from <- getCurrentAddress
               success <- case argVals of
                 OrderedVals [SInteger amount] -> do
-                  res <- pay "built-in send function" from address amount
+                  res <- pay "built-in send function" from (address' ^. namedAccountAddress) amount
                   case res of
                     True -> return True
                     _ -> return False
@@ -2387,24 +2385,6 @@ evaluateAccountMember a _ "creator" = do
 evaluateAccountMember a _ "root" = do
   (_, originAddress, _) <- getCreator $ a ^. namedAccountAddress
   return $ Constant $ SAccount (NamedAccount originAddress MainChain) False
-evaluateAccountMember a _ "chainId" = do
-  case (a ^. namedAccountChainId) of
-    UnspecifiedChain -> do
-      curCid <- view accountChainId <$> getCurrentAccount
-      case curCid of
-        Nothing -> return $ Constant $ SInteger 0
-        Just cid -> return $ Constant $ SInteger $ fromIntegral cid
-    MainChain -> return $ Constant $ SInteger 0
-    ExplicitChain cid -> return $ Constant $ SInteger $ fromIntegral cid
-evaluateAccountMember a _ "chainIdString" = do
-  case (a ^. namedAccountChainId) of
-    UnspecifiedChain -> do
-      curCid <- view accountChainId <$> getCurrentAccount
-      case curCid of
-        Nothing -> return $ Constant $ SString $ replicate 64 '0'
-        Just cid -> return $ Constant $ SString $ format cid
-    MainChain -> return $ Constant $ SString $ replicate 64 '0'
-    ExplicitChain cid -> return $ Constant $ SString $ format cid
 -- evaluateAccountMember a _ "call" =
 evaluateAccountMember a True funcName = return $ Constant $ SContractFunction Nothing a funcName
 evaluateAccountMember a False itemName = do
@@ -2704,12 +2684,12 @@ callBuiltin ("blockhash") [SInteger blockNum] _ = do
   maybeTheHash <- getBlockHashWithNumber blockNum (BlockHeader.parentHash curBlock)
   maybe (invalidArguments "the block number given does not exist" [blockNum]) (return . SString . BC.unpack . keccak256ToByteString) maybeTheHash
 callBuiltin ("selfdestruct") [SAccount a _] _ = do
-  contract' <- getCurrentAccount
-  contractBalance <- addressStateBalance <$> A.lookupWithDefault (A.Proxy @AddressState) contract'
-  _destroyRes <- A.adjustWithDefault_ (A.Proxy @AddressState) contract' $ \newAddressState ->
+  contract' <- getCurrentAddress
+  contractBalance <- addressStateBalance <$> A.lookupWithDefault (A.Proxy @AddressState) (Account contract' Nothing)
+  _destroyRes <- A.adjustWithDefault_ (A.Proxy @AddressState) (Account contract' Nothing) $ \newAddressState ->
     pure newAddressState {addressStateCodeHash = SolidVMCode "Code_0" $ unsafeCreateKeccak256FromWord256 0}
-  sendRes <- pay "selfdestruct function" contract' (namedAccountToAccount Nothing a) contractBalance
-  _purgeRes <- purgeStorageMap contract'
+  sendRes <- pay "selfdestruct function" contract' (a^.namedAccountAddress) contractBalance
+  _purgeRes <- purgeStorageMap (Account contract' Nothing)
   return $ SBool sendRes
 callBuiltin "account" vs _ = typeError "account cast" vs
 callBuiltin "bool" [SBool b] _ = return $ SBool b

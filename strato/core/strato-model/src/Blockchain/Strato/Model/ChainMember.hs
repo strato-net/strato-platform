@@ -12,15 +12,17 @@
 {-# LANGUAGE NoDeriveAnyClass #-}
 {-# OPTIONS_GHC -fno-warn-orphans #-}
 
+{-# OPTIONS -fno-warn-unused-top-binds #-}
+
 module Blockchain.Strato.Model.ChainMember
-  ( emptyChainMember,
-    chainMemberParsedSetToChainMemberRSet,
-    ChainMembers (..),
-    ChainMemberRSet (..),
+  ( --emptyChainMember,
+    --chainMemberParsedSetToChainMemberRSet,
+    --ChainMembers (..),
+    --ChainMemberRSet (..),
     --ChainMemberF (..),
-    ChainMemberParsedSet (..),
-    chainMemberParsedSetToValidator,
-    validatorToChainMemberParsedSet
+    --ChainMemberParsedSet (..),
+    --chainMemberParsedSetToValidator,
+    --validatorToChainMemberParsedSet
   )
 where
 

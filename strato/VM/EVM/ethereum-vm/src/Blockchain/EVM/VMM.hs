@@ -368,7 +368,7 @@ addGas (Gas gas) = do
     then throwIO OutOfGasException
     else void . liftIO . atomicAddCounter gasref $ fromInteger gas
 
-pay' :: VMBase m => String -> Account -> Account -> Integer -> VMM m ()
+pay' :: VMBase m => String -> Address -> Address -> Integer -> VMM m ()
 pay' reason from to val = do
   success <- pay reason from to val
   unless success $ throwIO InsufficientFunds
