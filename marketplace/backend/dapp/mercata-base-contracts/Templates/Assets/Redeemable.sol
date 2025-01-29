@@ -14,6 +14,7 @@ abstract contract Redeemable is UTXO {
         string[] _fileNames,
         uint _createdDate,
         uint _quantity,
+        uint _decimals,
         AssetStatus _status,
         address _redemptionService
     ) UTXO(
@@ -24,6 +25,7 @@ abstract contract Redeemable is UTXO {
         _fileNames,
         _createdDate,
         _quantity,
+        _decimals,
         _status
     ) {
         redemptionService = RedemptionService(_redemptionService);

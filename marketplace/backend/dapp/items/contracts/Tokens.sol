@@ -17,17 +17,18 @@ contract Tokens is Mintable {
         string[] _fileNames,
         uint _createdDate,
         uint _quantity,
+        uint _decimals,
         AssetStatus _status,
         address _redemptionService,
         string _paymentServiceCreator
-    ) public Mintable(_name, _description, _images, _files, _fileNames, _createdDate, _quantity, _status, _redemptionService) {
+    ) public Mintable(_name, _description, _images, _files, _fileNames, _createdDate, _quantity, _decimals, _status, _redemptionService) {
         paymentServiceCreator = _paymentServiceCreator;
         paymentServiceName = _name;
     }
 
     function mint(uint _quantity) internal override returns (UTXO) {
         require(_quantity > 0, "Quantity must be greater than 0");
-        Tokens newToken = new Tokens(name, description, images, files, fileNames, createdDate, _quantity, status, address(redemptionService), paymentServiceCreator);
+        Tokens newToken = new Tokens(name, description, images, files, fileNames, createdDate, _quantity, _decimals, status, address(redemptionService), paymentServiceCreator);
         return UTXO(address(newToken)); 
     }
 

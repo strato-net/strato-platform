@@ -15,6 +15,7 @@ abstract contract Asset is Utils {
     string[] public fileNames;
     uint public createdDate;
     uint public quantity;
+    uint public decimals;
     uint public itemNumber;
 
     address public sale;
@@ -50,7 +51,8 @@ abstract contract Asset is Utils {
         string[] _files,
         string[] _fileNames,
         uint _createdDate,
-        uint _quantity
+        uint _quantity,
+        uint _decimals
     ) {
         // TODO: Get ownerCommonName by getting commonName field from on-chain wallet at that address
         owner  = msg.sender;
@@ -62,6 +64,7 @@ abstract contract Asset is Utils {
         fileNames = _fileNames;
         createdDate = _createdDate;
         quantity = _quantity;
+        decimals = _decimals;
         try {
             assert(Asset(msg.sender).assetMagicNumber() == assetMagicNumber);
             originAddress = Asset(msg.sender).originAddress();
@@ -203,7 +206,8 @@ abstract contract UTXO is Asset {
         string[] _files,
         string[] _fileNames,
         uint _createdDate,
-        uint _quantity
+        uint _quantity,
+        uint _decimals
     ) Asset(
         _name,
         _description,
@@ -211,12 +215,13 @@ abstract contract UTXO is Asset {
         _files,
         _fileNames,
         _createdDate,
-        _quantity
+        _quantity,
+        _decimals
     ) {
     }
 
     function mint(uint _quantity) internal virtual returns (UTXO) {
-        return new UTXO(name, description, images, files, fileNames, createdDate, _quantity);
+        return new UTXO(name, description, images, files, fileNames, createdDate, _quantity, decimals);
     }
 
     // Quantity is already checked by transferOwnership function
@@ -282,7 +287,8 @@ abstract contract SemiFungible is Mintable {
         string[] _files,
         string[] _fileNames,
         uint _createdDate,
-        uint _quantity
+        uint _quantity,
+        uint _decimals
     ) Mintable (
         _name,
         _description,
@@ -290,7 +296,8 @@ abstract contract SemiFungible is Mintable {
         _files,
         _fileNames,
         _createdDate,
-        _quantity
+        _quantity,
+        _decimals
     ) {
     }
 
@@ -301,7 +308,8 @@ abstract contract SemiFungible is Mintable {
                               files, 
                               fileNames,
                               createdDate, 
-                              splitQuantity);
+                              splitQuantity,
+                              decimals);
         return UTXO(address(sf)); // Typechecker won't let me cast directly to UTXO
     }
 
@@ -332,7 +340,8 @@ abstract contract Mintable is UTXO {
         string[] _files,
         string[] _fileNames,
         uint _createdDate,
-        uint _quantity
+        uint _quantity,
+        uint _decimals
     ) UTXO(
         _name,
         _description,
@@ -340,7 +349,8 @@ abstract contract Mintable is UTXO {
         _files,
         _fileNames,
         _createdDate,
-        _quantity
+        _quantity,
+        _decimals
     ) {
         try {
             assert(Mintable(msg.sender).mintableMagicNumber() == mintableMagicNumber);
@@ -356,7 +366,7 @@ abstract contract Mintable is UTXO {
     }
 
     function mint(uint _quantity) internal virtual override returns (UTXO) {
-        Mintable m = new Mintable(name, description, images, files, fileNames, createdDate, _quantity);
+        Mintable m = new Mintable(name, description, images, files, fileNames, createdDate, _quantity, decimals);
         return UTXO(m);
     }
 

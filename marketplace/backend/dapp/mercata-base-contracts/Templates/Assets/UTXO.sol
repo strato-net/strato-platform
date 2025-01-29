@@ -11,6 +11,7 @@ abstract contract UTXO is Asset {
         string[] _fileNames,
         uint _createdDate,
         uint _quantity,
+        uint _decimals,
         AssetStatus _status
     ) Asset(
         _name,
@@ -20,6 +21,7 @@ abstract contract UTXO is Asset {
         _fileNames,
         _createdDate,
         _quantity,
+        _decimals,
         _status
     ) {
     }
