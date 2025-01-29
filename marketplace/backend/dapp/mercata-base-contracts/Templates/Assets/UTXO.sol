@@ -28,7 +28,7 @@ abstract contract UTXO is Asset {
 
     function mint(uint _quantity) internal virtual returns (UTXO) {
         require(_quantity > 0, "Quantity must be greater than 0");
-        return new UTXO(name, description, images, files, fileNames, createdDate, _quantity, status);
+        return new UTXO(name, description, images, files, fileNames, createdDate, _quantity, decimals, status);
     }
 
     // Quantity is already checked by transferOwnership function

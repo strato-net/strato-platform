@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Form, Modal, Input, Select, Button, Upload, notification } from 'antd';
+import { Form, Modal, Input, InputNumber, Select, Button, Upload, notification } from 'antd';
 import TagManager from 'react-gtm-module';
 
 import {
@@ -401,6 +401,31 @@ const CreateInventoryModal = ({
                       : null
                   )}
                 </Select>
+              </Form.Item>
+              <Form.Item
+                label="Decimals"
+                name="decimals"
+                className="w-full sm:w-[200px] md:w-72"
+                rules={[
+                  {
+                    required: true,
+                    message: 'Enter number of decimal places',
+                  },
+                  {
+                    type: 'number',
+                    min: 0,
+                    max: 18,
+                    message: 'Decimals must be between 0 and 18',
+                  },
+                ]}
+                initialValue={0}
+              >
+                <InputNumber
+                  placeholder="Enter number of decimal places"
+                  min={0}
+                  max={18}
+                  style={{ width: '100%' }}
+                />
               </Form.Item>
             </div>
             {categoricalProperties(

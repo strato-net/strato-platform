@@ -33,7 +33,7 @@ abstract contract Redeemable is UTXO {
 
     function mint(uint _quantity) internal virtual override returns (UTXO) {
         require(_quantity > 0, "Quantity must be greater than 0");
-        return UTXO(new Redeemable(name, description, images, files, fileNames, createdDate, _quantity, status, address(redemptionService)));
+        return UTXO(new Redeemable(name, description, images, files, fileNames, createdDate, _quantity, decimals, status, address(redemptionService)));
     }
 
     function _callMint(address _newOwner, uint _quantity) internal virtual override {

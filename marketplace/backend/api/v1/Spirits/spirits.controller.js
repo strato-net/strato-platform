@@ -39,6 +39,7 @@ class SpiritsController {
         name: Joi.string().required(),
         description: Joi.string().required(),
         quantity: Joi.number().integer().min(1).required(),
+        decimals: Joi.number().integer().min(0).max(18).required(),
         spiritType: Joi.string().required(),
         unitOfMeasurement: Joi.number().integer().min(0).max(8).required(),
         images: Joi.array().items(Joi.string().allow(null)).required(),
