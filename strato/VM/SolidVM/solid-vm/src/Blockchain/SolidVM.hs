@@ -1702,9 +1702,9 @@ expToVar' x@(CC.MemberAccess _ expr name) _ = do
         ps -> do
           addr <- accountOnUnspecifiedChain <$> getCurrentAccount
           return $ Constant $ SContractFunction (Just $ CC._contractName $ last ps) addr method
-    (SAccount a _, n) -> evaluateAccountMember a False n
-    (SContractItem a _, n) -> evaluateAccountMember a False n
-    (SContract _ a, n) -> evaluateAccountMember a True n
+    (SAccount a _, n) -> evaluateAccountMember (a^.namedAccountAddress) False n
+    (SContractItem a _, n) -> evaluateAccountMember (a^.namedAccountAddress) False n
+    (SContract _ a, n) -> evaluateAccountMember (a^.namedAccountAddress) True n
     (r@(SReference _), "push") -> return $ Constant $ SPush r Nothing
     (a@(SArray _ _), "push") -> return $ Constant $ SPush a (Just var)
     (SArray _ theVector, "length") -> return $ Constant $ SInteger $ fromIntegral $ V.length theVector
@@ -2330,67 +2330,61 @@ expToVar' x _ = todo "expToVar/unhandled" x
 
 evaluateAccountMember ::
   MonadSM m =>
-  NamedAccount ->
+  Address ->
   Bool -> -- Is SContract
   SolidString ->
   m Variable
 evaluateAccountMember a _ "codehash" = do
   -- Get the chainId for the account
   cid <- _accountChainId <$> getCurrentAccount
-  let realAccount = namedAccountToAccount cid a
   -- Retreive and resolve the codehash
-  codeHash' <- addressStateCodeHash <$> A.lookupWithDefault (A.Proxy @AddressState) realAccount
+  codeHash' <- addressStateCodeHash <$> A.lookupWithDefault (A.Proxy @AddressState) (Account a Nothing)
   resolvedCodeHash <- resolveCodePtr cid codeHash'
   case resolvedCodeHash of
     Just (SolidVMCode _ ch') -> return (Constant $ SString . keccak256ToHex $ ch')
     Just cp -> missingCodeCollection "Account is not a SolidVM contract" (format cp)
-    Nothing -> missingCodeCollection "Could not resolve code pointer for account" (format realAccount)
+    Nothing -> missingCodeCollection "Could not resolve code pointer for address" (format a)
 --Get the whole code collection when nothing is supplied to the code function
 evaluateAccountMember a _ "code" = do
   -- Get the code at the address
   cid <- _accountChainId <$> getCurrentAccount
-  let realAccount = namedAccountToAccount cid a
   -- Retreive and resolve the codehash
-  codeHash' <- addressStateCodeHash <$> A.lookupWithDefault (A.Proxy @AddressState) realAccount
+  codeHash' <- addressStateCodeHash <$> A.lookupWithDefault (A.Proxy @AddressState) (Account a Nothing)
   resolvedCodeHash <- resolveCodePtr cid codeHash'
   let ch' = case resolvedCodeHash of
         Just (SolidVMCode _ ch1') -> ch1'
         Just cp -> missingCodeCollection "Account is not a SolidVM contract" (format cp)
-        Nothing -> missingCodeCollection "Could not resolve code pointer for account" (format realAccount)
+        Nothing -> missingCodeCollection "Could not resolve code pointer for address" (format a)
   -- Find the code using the codehash
   cd <- A.lookup (A.Proxy @DBCode) ch'
   let cd' = case cd of
         Just (_, bs) -> bs
-        Nothing -> missingCodeCollection "Could not locate SolidVM code collection at account" (format realAccount)
+        Nothing -> missingCodeCollection "Could not locate SolidVM code collection at address" (format a)
   let decodeCD = DT.decodeUtf8 cd'
   -- Format the result
   return $ Constant $ SString $ T.unpack decodeCD
 evaluateAccountMember a _ "nonce" = do
-  cid <- _accountChainId <$> getCurrentAccount
-  let realAccount = namedAccountToAccount cid a
-  mAddrSt <- A.lookup (A.Proxy @AddressState) realAccount
+  mAddrSt <- A.lookup (A.Proxy @AddressState) (Account a Nothing)
   case mAddrSt of
     Just as -> return $ Constant $ SInteger $ addressStateNonce as
     _ -> return $ Constant $ SInteger 0
 evaluateAccountMember a _ "balance" = do
-  cid <- _accountChainId <$> getCurrentAccount
-  let realAccount = namedAccountToAccount cid a
-  bal <- A.lookup (A.Proxy @AddressState) realAccount
+  bal <- A.lookup (A.Proxy @AddressState) (Account a Nothing)
   case bal of
     Just as -> return $ Constant $ SInteger $ addressStateBalance as
     _ -> return $ Constant $ SInteger 0
 evaluateAccountMember a _ "creator" = do
-  (_, _, issuerName) <- getCreator $ a ^. namedAccountAddress
+  (_, _, issuerName) <- getCreator a
   return $ Constant $ SString $ issuerName
 evaluateAccountMember a _ "root" = do
-  (_, originAddress, _) <- getCreator $ a ^. namedAccountAddress
+  (_, originAddress, _) <- getCreator a
   return $ Constant $ SAccount (NamedAccount originAddress MainChain) False
 -- evaluateAccountMember a _ "call" =
-evaluateAccountMember a True funcName = return $ Constant $ SContractFunction Nothing a funcName
+evaluateAccountMember a True funcName = return $ Constant $ SContractFunction Nothing (NamedAccount a UnspecifiedChain) funcName
 evaluateAccountMember a False itemName = do
   --return $ Constant $ SContractItem addr itemName
   from <- getCurrentAddress
-  result <- callWithResult from (a^.namedAccountAddress) CC.DefaultCall Nothing itemName False (CC.OrderedArgs [])
+  result <- callWithResult from a CC.DefaultCall Nothing itemName False (CC.OrderedArgs [])
   return . Constant . fromMaybe SNULL $ result
 
 expToVarAdd :: MonadSM m => CC.Expression -> CC.Expression -> m Variable
