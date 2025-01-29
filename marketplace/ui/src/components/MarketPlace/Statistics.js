@@ -1,6 +1,6 @@
 import React from 'react';
 import './Statistics.css';
-const Statistics = ({ priceHistory, is18DecimalPlaces }) => {
+const Statistics = ({ priceHistory, decimals }) => {
   // Origin Asset Statistics
   const originFluctuation = priceHistory.records.originFluctuation;
   const originVolume = priceHistory.records.originVolume;
@@ -13,9 +13,8 @@ const Statistics = ({ priceHistory, is18DecimalPlaces }) => {
         <div className="tileWrapper p-2 flex-auto md:max-w-[calc(33.333%-1.5rem)] w-full">
           <div className="tile bg-gray-200 p-4 rounded-lg shadow-md text-center">
             <p className="statistics-title text-2xl font-semibold">
-              ${is18DecimalPlaces ? originFluctuation.min * Math.pow(10, 18) : originFluctuation.min}
-              - $
-              {is18DecimalPlaces ? originFluctuation.max * Math.pow(10, 18): originFluctuation.max}
+              ${originFluctuation.min * Math.pow(10, decimals)}- $
+              {originFluctuation.max * Math.pow(10, decimals)}
             </p>
             <p className="subtitle text-gray-600">12-Month Price Range</p>
           </div>
@@ -24,7 +23,9 @@ const Statistics = ({ priceHistory, is18DecimalPlaces }) => {
         {/* Tile for Number of Units Sold */}
         <div className="tileWrapper p-2 flex-auto md:max-w-[calc(33.333%-1.5rem)] w-full">
           <div className="tile bg-gray-200 p-4 rounded-lg shadow-md text-center">
-            <p className="statistics-title text-2xl font-semibold">{is18DecimalPlaces ? (originVolume / Math.pow(10, 18)).toFixed(0) : originVolume.toFixed(0) }</p>
+            <p className="statistics-title text-2xl font-semibold">
+              {(originVolume / Math.pow(10, decimals)).toFixed(0)}
+            </p>
             <p className="subtitle text-gray-600">Number Of Units Sold</p>
           </div>
         </div>

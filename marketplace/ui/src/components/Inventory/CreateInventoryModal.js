@@ -418,7 +418,7 @@ const CreateInventoryModal = ({
                     message: 'Decimals must be between 0 and 18',
                   },
                 ]}
-                initialValue={0}
+                initialValue={18}
               >
                 <InputNumber
                   placeholder="Enter number of decimal places"

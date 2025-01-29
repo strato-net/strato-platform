@@ -18,7 +18,7 @@ const Invoice = () => {
   const marketplaceDispatch = useMarketplaceDispatch();
   const { orderDetails, isorderDetailsLoading } = useOrderState();
   const { assetsWithEighteenDecimalPlaces, isFetchingAssetsWithEighteenDecimalPlaces } = useMarketplaceState();
-  const [is18DecimalPlaces, setIs18DecimalPlaces] = useState(false);
+  const [decimals, setDecimals] = useState(false);
 
   const routeMatch = useMatch({
     path: routes.Invoice.url,
@@ -40,10 +40,10 @@ const Invoice = () => {
 
   useEffect(() => {
     if (orderDetails && assetsWithEighteenDecimalPlaces) {
-      const is18DecimalPlaces = assetsWithEighteenDecimalPlaces.includes(
+      const decimals = assetsWithEighteenDecimalPlaces.includes(
         orderDetails.assets[0].root
-      );
-      setIs18DecimalPlaces(is18DecimalPlaces);
+      ) ? 18 : orderDetails.assets[0].decimals || 0;
+      setDecimals(decimals);
     }
   }, [orderDetails, assetsWithEighteenDecimalPlaces]);
 
@@ -57,7 +57,7 @@ const Invoice = () => {
         <PDFViewer style={{ width: '100%', height: '90%' }}>
           <InvoiceComponent
             invoice={orderDetails}
-            is18DecimalPlaces={is18DecimalPlaces}
+            decimals={decimals}
           />
         </PDFViewer>
       )}

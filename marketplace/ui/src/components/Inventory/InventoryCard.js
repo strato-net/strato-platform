@@ -73,31 +73,29 @@ const InventoryCard = ({
   const ethNaviroute = routes.EthstProductDetail.url;
   const imgMeta = category ? category : SEO.TITLE_META;
   const itemData = inventory.data;
-  const is18DecimalPlaces = assetsWithEighteenDecimalPlaces.includes(inventory.originAddress);
-  const quantity = is18DecimalPlaces
-    ? new BigNumber(inventory.quantity).dividedBy(new BigNumber(10).pow(18))
-    : new BigNumber(inventory.quantity);
+  const decimals = assetsWithEighteenDecimalPlaces.includes(
+    inventory.originAddress
+  )
+    ? 18
+    : inventory.decimals || 0;
+  const quantity = new BigNumber(inventory.quantity).dividedBy(
+    new BigNumber(10).pow(decimals)
+  );
   const price = inventory?.price
-    ? is18DecimalPlaces
-      ? new BigNumber(inventory.quantity).multipliedBy(
-          new BigNumber(10).pow(18)
-        )
-      : new BigNumber(inventory.quantity)
+    ? new BigNumber(inventory.quantity).multipliedBy(
+        new BigNumber(10).pow(decimals)
+      )
     : undefined;
   const saleQuantity =
     inventory.saleQuantity !== undefined
-      ? is18DecimalPlaces
-        ? new BigNumber(inventory.saleQuantity || 0).dividedBy(
-            new BigNumber(10).pow(18)
-          )
-        : new BigNumber(inventory.saleQuantity || 0)
+      ? new BigNumber(inventory.saleQuantity || 0).dividedBy(
+          new BigNumber(10).pow(decimals)
+        )
       : undefined;
   const totalLockedQuantity = inventory.totalLockedQuantity
-    ? is18DecimalPlaces
-      ? new BigNumber(inventory.totalLockedQuantity || 0).dividedBy(
-          new BigNumber(10).pow(18)
-        )
-      : new BigNumber(inventory.totalLockedQuantity || 0)
+    ? new BigNumber(inventory.totalLockedQuantity || 0).dividedBy(
+        new BigNumber(10).pow(decimals)
+      )
     : new BigNumber(0);
   const stakeable =
     inventory.root &&
@@ -378,7 +376,7 @@ const InventoryCard = ({
                   inventory.address === inventory.originAddress ||
                   !isActive() ||
                   disableSADDOGS(inventory) ||
-                  is18DecimalPlaces
+                  decimals === 18
                 }
               >
                 <SendOutlined /> Redeem
@@ -437,7 +435,7 @@ const InventoryCard = ({
                       inventory.address === inventory.originAddress ||
                       !isActive() ||
                       disableSADDOGS(inventory) ||
-                      is18DecimalPlaces
+                      decimals === 18
                     }
                   >
                     <SendOutlined /> Redeem
@@ -586,8 +584,7 @@ const InventoryCard = ({
                       <span>${price.toString()}</span>
                       <p className="flex text-xs items-center">
                         &nbsp;(
-                        {price.toString()}{' '}
-                        {USDSTIcon})
+                        {price.toString()} {USDSTIcon})
                       </p>
                     </p>
                   ) : (

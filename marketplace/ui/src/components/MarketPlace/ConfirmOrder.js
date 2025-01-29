@@ -172,22 +172,18 @@ const ConfirmOrder = ({ paymentServices = [], data, columns }) => {
     actions.addItemToConfirmOrder(marketplaceDispatch, cartData);
     let orderList = [];
     cartData.forEach((item) => {
-      const is18DecimalPlaces = assetsWithEighteenDecimalPlaces.includes(
+      const decimals = assetsWithEighteenDecimalPlaces.includes(
         item.key
-      );
+      ) ? 18 : item.decimals || 0;
 
       const quantity = new BigNumber(item.qty);
       const unitPrice = new BigNumber(item.unitPrice);
 
       orderList.push({
-        quantity: is18DecimalPlaces
-          ? quantity.multipliedBy(new BigNumber(10).pow(18)).toFixed(0)
-          : quantity.toString(),
+        quantity: quantity.multipliedBy(new BigNumber(10).pow(decimals)).toFixed(0),
         assetAddress: item.key,
         firstSale: item.firstSale,
-        unitPrice: is18DecimalPlaces
-          ? unitPrice.dividedBy(new BigNumber(10).pow(18)).toFixed(18)
-          : unitPrice.toFixed(18),
+        unitPrice: unitPrice.dividedBy(new BigNumber(10).pow(decimals)).toFixed(decimals),
       });
     });
 
