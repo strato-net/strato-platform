@@ -212,10 +212,10 @@ solidVMBreakpoint ann = do
 
 -- end debugger-related code
 
-requireOriginCert :: MonadSM m => Account -> m ()
-requireOriginCert acct = unless (not flags_requireCerts || acct ^. accountAddress == fromPublicKey rootPubKey) $ do
-  originHasCert <- isJust <$> (A.select (A.Proxy @X509Certificate) $ acct ^. accountAddress)
-  unless originHasCert $ missingCertificate "Sender doesn't have a registered cert" acct
+requireOriginCert :: MonadSM m => Address -> m ()
+requireOriginCert address = unless (not flags_requireCerts || address == fromPublicKey rootPubKey) $ do
+  originHasCert <- isJust <$> (A.select (A.Proxy @X509Certificate) address)
+  unless originHasCert $ missingCertificate "Sender doesn't have a registered cert" address
 
 create ::
   SolidVMBase m =>
@@ -265,7 +265,7 @@ create _ _ _ blockData _ sender' origin' proposer' _ _ availableGas newAddress c
       fromMaybe "" . fmap snd . join <$> traverse getCode hsh
 
   fmap (either solidvmErrorResults id) . runSM (Just code) env' gasInfo' chainId' $ do
-    requireOriginCert $ Account origin' Nothing
+    requireOriginCert origin'
     let maybeContractName = M.lookup "name" =<< metadata
         !contractName' = textToLabel $ fromMaybe (missingField "TX is missing a metadata parameter called 'name'" $ show metadata) maybeContractName
 
@@ -278,13 +278,13 @@ create _ _ _ blockData _ sender' origin' proposer' _ _ availableGas newAddress c
     (issuerAcct, _, issuerName) <- getCreator origin'
     create' sender' (Just code) newAddress issuerAcct issuerName newAddress hsh cc contractName' args False
 
-getParentName :: MonadSM m => Account -> m String
-getParentName acc = fromMaybeM (return "") $
+getParentName :: MonadSM m => Address -> m String
+getParentName address = fromMaybeM (return "") $
                         runMaybeT $
-                          pure acc -- Code pointer's address
+                          pure (Account address Nothing) -- Code pointer's address
                             >>= MaybeT . A.lookup (A.Proxy @AddressState) -- Address's state
                             >>= pure . addressStateCodeHash -- state's Acodehash/CodePtr
-                            >>= MaybeT . resolveCodePtrParent (acc ^. accountChainId) -- CodePtr's parent
+                            >>= MaybeT . resolveCodePtrParent Nothing -- CodePtr's parent
                             >>= ( \case
                                     SolidVMCode name _ -> pure name -- Name of the parent
                                     _ -> pure ""
@@ -296,14 +296,14 @@ create' creator maybeCodePtr originAddress issuerAcct issuerName newAccount ch c
   -- Get parentName and cc_creator from maybeCodePtr or creator
   (parentName, cc_creator) <- case maybeCodePtr of
                   (Just(PtrToCode (CodeAtAccount codePtrAcc _))) -> do
-                      parentName <- getParentName codePtrAcc
-                      appCreator <- getSolidStorageKeyVal' codePtrAcc $ MS.StoragePath [MS.Field ":creator"]
+                      parentName <- getParentName (codePtrAcc^.accountAddress)
+                      appCreator <- getSolidStorageKeyVal' (codePtrAcc^.accountAddress) $ MS.StoragePath [MS.Field ":creator"]
                       let cc_creator = case appCreator of
                                         MS.BString cn' -> Just (BC.unpack cn')
                                         _ -> Nothing
                       return (parentName, cc_creator)
                   _ -> do
-                      parentName <- getParentName $ Account creator Nothing
+                      parentName <- getParentName creator
                       return (parentName, Nothing)
   
 
@@ -313,7 +313,7 @@ create' creator maybeCodePtr originAddress issuerAcct issuerName newAccount ch c
       !arrays = getArrayNamesFromContract contract'
   -- $logInfoS "create': contract' " . T.pack $ show $ contract'
   -- $logInfoS "create': abstracts1' " . T.pack $ show $ abstracts'
-  !abstracts <- M.fromList <$> traverse (resolveNameParts (Account newAccount Nothing) (T.pack issuerName) (T.pack parentName)) abstracts'
+  !abstracts <- M.fromList <$> traverse (resolveNameParts newAccount (T.pack issuerName) (T.pack parentName)) abstracts'
 
   let ptr2InitialContract = case maybeCodePtr of
         Just (PtrToCode (CodeAtAccount cp _)) -> cp
@@ -348,7 +348,7 @@ create' creator maybeCodePtr originAddress issuerAcct issuerName newAccount ch c
       parentName' = bool parentName "" (useWallet && parentName == "User")
       issuer = if shouldDoCreatorFork . blockHeaderBlockNumber $ Env.blockHeader env then issuerAcct else Env.origin env
   -- set creator
-  setCreator (Account issuer Nothing) (NamedAccount originAddress MainChain) (Account newAccount Nothing) contract' (BlockHeader.number $ Env.blockHeader env)
+  setCreator issuer (NamedAccount originAddress MainChain) newAccount contract' (BlockHeader.number $ Env.blockHeader env)
 
   -- Run the constructor
   runTheConstructors creator newAccount ch cc contractName' argExps
@@ -357,7 +357,7 @@ create' creator maybeCodePtr originAddress issuerAcct issuerName newAccount ch c
 
   void . withCallInfo (Account newAccount Nothing) contract' (stringToLabel $ labelToString contractName' ++ " constructor") ch cc M.empty False False $ do
     -- set creator again, in case the caller's cert changed during constructor execution
-    setCreator (Account issuer Nothing) (NamedAccount originAddress MainChain) (Account newAccount Nothing) contract' (BlockHeader.number $ Env.blockHeader env)
+    setCreator issuer (NamedAccount originAddress MainChain) newAccount contract' (BlockHeader.number $ Env.blockHeader env)
 
   Mod.modifyStatefully_ (Mod.Proxy @Action) $
     Action.actionData %= Action.omapAdjust (Action.actionDataCreator .~ (T.pack issuerName)) (Account newAccount Nothing)
@@ -444,7 +444,7 @@ call _ _ _ isRCC _ blockData _ _ codeAddress sender' proposer' _ _ _ availableGa
           }
 
   fmap (either solidvmErrorResults id) . runSM Nothing env' gasInfo' chainId' $ do
-    requireOriginCert $ Account origin' Nothing
+    requireOriginCert origin'
     let maybeFuncName = M.lookup "funcName" =<< metadata
         !funcName = textToLabel $ fromMaybe (missingField "TX is missing a metadata parameter called 'funcName'" $ show metadata) maybeFuncName
         maybeSrcLength = M.lookup "srcLength" =<< metadata
@@ -530,14 +530,14 @@ call' from to' fnCalltype mContract functionName isRCC argExps = do
           _ -> pure from
       else pure to
   (ctr, oAddr, ctrName) <- getCreator cnAccount
-  !abstracts <- M.fromList <$> traverse (resolveNameParts (Account to' Nothing) (T.pack ctrName) (T.pack parentName')) abstracts'
+  !abstracts <- M.fromList <$> traverse (resolveNameParts to' (T.pack ctrName) (T.pack parentName')) abstracts'
 
   initializeAction (Account to Nothing) (labelToString $ CC._contractName contract) (labelToString ctrName) Nothing (show oAddr) (labelToString parentName') hsh cc abstracts mappings arrays
 
   Mod.modifyStatefully_ (Mod.Proxy @Action) $
     Action.actionData %= Action.omapAdjust (Action.actionDataCreator .~ (T.pack ctrName)) (Account to Nothing)
   when (isRCC) $
-    (\env -> setCreator (Account ctr Nothing) (NamedAccount to MainChain) (Account to Nothing) contract (BlockHeader.number $ Env.blockHeader env)) =<< getEnv
+    (\env -> setCreator ctr (NamedAccount to MainChain) to contract (BlockHeader.number $ Env.blockHeader env)) =<< getEnv
 
   let functionsIncludingConstructor =
         case contract ^. CC.constructor of
@@ -712,7 +712,7 @@ call' from to' fnCalltype mContract functionName isRCC argExps = do
               _ -> markDiffForAction to (MS.StoragePath [MS.Field $ BC.pack $ labelToString n]) MS.BDefault
     )
   when (fnCalltype == CC.DelegateCall) $ addDelegatecall (Account from Nothing) (Account to' Nothing) (T.pack ctrName) (T.pack parentName')
-  ((ctrName, parentName'),) <$> logFunctionCall args (Account to Nothing) contract functionName f
+  ((ctrName, parentName'),) <$> logFunctionCall args to contract functionName f
   where
     flattenVals (x : xs) = [x] ++ flattenVals xs
     flattenVals x = x
@@ -737,10 +737,9 @@ callWithResult :: MonadSM m => Address -> Address -> CC.FunctionCallType -> Mayb
 callWithResult from to fnCalltype mContract functionName isRCC argExps = snd <$> call' from to fnCalltype mContract functionName isRCC argExps
 
 -- set the hidden ":creator" field
-setCreator :: MonadSM m => Account -> NamedAccount -> Account -> CC.Contract -> Integer -> m ()
+setCreator :: MonadSM m => Address -> NamedAccount -> Address -> CC.Contract -> Integer -> m ()
 setCreator creator originAddress contract _ _ = do
-  let creatorAddress = _accountAddress creator
-  maybeCert <- A.select (A.Proxy @X509Certificate) creatorAddress
+  maybeCert <- A.select (A.Proxy @X509Certificate) creator
   blockNumber <- blockHeaderBlockNumber . Env.blockHeader <$> getEnv
   let forkYeah = shouldDoCreatorFork blockNumber
       _cn = if forkYeah
@@ -753,7 +752,7 @@ setCreator creator originAddress contract _ _ = do
     Nothing -> $logDebugS "setCreator/versioning" . T.pack . C.red $ "No cert found for " ++ (format creator)
 
   $logDebugS "setCreator/address" . T.pack $ "Setting creatorAddress to: " ++ show creator
-  putSolidStorageKeyVal' contract (MS.StoragePath [MS.Field ":creatorAddress"]) (MS.BAccount (accountToNamedAccount' creator))
+  putSolidStorageKeyVal' contract (MS.StoragePath [MS.Field ":creatorAddress"]) (MS.BAccount (NamedAccount creator MainChain))
   let putCreatorField ctr = do
         $logDebugS "setCreator/versioning" . T.pack $ "setting the creator as " ++ (show ctr)
         putSolidStorageKeyVal' contract (MS.StoragePath [MS.Field ":creator"]) (MS.BString $ BC.pack ctr)
@@ -790,12 +789,12 @@ getCreator caller = do
         Nothing -> internalError "getCreator/versioning --> the app contract didn't have an AddressState, or was on an inaccessible chain" x
         Just acct -> do
           $logDebugS "getCreator/versioning" . T.pack $ "They are part of app contract " ++ (format acct)
-          appCreatorAddress <- getSolidStorageKeyVal' acct $ MS.StoragePath [MS.Field ":creatorAddress"]
-          appCreator <- getSolidStorageKeyVal' acct $ MS.StoragePath [MS.Field ":creator"]
+          appCreatorAddress <- getSolidStorageKeyVal' (acct^.accountAddress) $ MS.StoragePath [MS.Field ":creatorAddress"]
+          appCreator <- getSolidStorageKeyVal' (acct^.accountAddress) $ MS.StoragePath [MS.Field ":creator"]
           case (appCreatorAddress, appCreator)  of
             (MS.BAccount creatorAddress, MS.BString creator') -> do
               $logDebugS "getCreator/versioning" . T.pack $ "Its creator is " ++ show creator'
-              appOriginAddress <- getSolidStorageKeyVal' acct $ MS.StoragePath [MS.Field ":originAddress"]
+              appOriginAddress <- getSolidStorageKeyVal' (acct^.accountAddress) $ MS.StoragePath [MS.Field ":originAddress"]
               let originAddress = case appOriginAddress of
                     MS.BAccount oa -> oa^.namedAccountAddress
                     _ -> caller
@@ -812,7 +811,7 @@ shouldDoCreatorFork curBlockNo = case (flags_creatorForkBlockNumber, computeNetw
   (-1, 6909499098523985262) -> curBlockNo >= 6200 -- on mercata, switch at block 6,200
   (b, _) -> curBlockNo >= b -- do whatever the flag says
 
-logFunctionCall :: MonadSM m => ValList -> Account -> CC.Contract -> SolidString -> m (Maybe Value) -> m (Maybe Value)
+logFunctionCall :: MonadSM m => ValList -> Address -> CC.Contract -> SolidString -> m (Maybe Value) -> m (Maybe Value)
 logFunctionCall args address contract functionName f = do
   onTracedSM contract $ do
     argStrings <-

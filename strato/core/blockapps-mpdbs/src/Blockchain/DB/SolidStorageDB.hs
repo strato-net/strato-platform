@@ -26,6 +26,7 @@ import Blockchain.Data.AddressStateDB
 import Blockchain.Data.RLP
 import qualified Blockchain.Database.MerklePatricia as MP
 import Blockchain.Strato.Model.Account
+import Blockchain.Strato.Model.Address
 import Control.Monad.Change.Alter (Alters)
 import Data.Bifunctor (second)
 import SolidVM.Model.Storable
@@ -57,13 +58,13 @@ toVal bv =
 fromVal :: RawStorageValue -> BasicValue
 fromVal = rlpDecode . rlpDeserialize
 
-putSolidStorageKeyVal' :: HasSolidStorageDB m => Account -> StoragePath -> BasicValue -> m ()
-putSolidStorageKeyVal' acct key val = do
-  putRawStorageKeyVal' (toKey acct key) (toVal val)
+putSolidStorageKeyVal' :: HasSolidStorageDB m => Address -> StoragePath -> BasicValue -> m ()
+putSolidStorageKeyVal' address key val = do
+  putRawStorageKeyVal' (toKey (Account address Nothing) key) (toVal val)
 
-getSolidStorageKeyVal' :: HasSolidStorageDB m => Account -> StoragePath -> m BasicValue
-getSolidStorageKeyVal' acct key = do
-  v' <- fromVal <$> getRawStorageKeyVal' (toKey acct key)
+getSolidStorageKeyVal' :: HasSolidStorageDB m => Address -> StoragePath -> m BasicValue
+getSolidStorageKeyVal' address key = do
+  v' <- fromVal <$> getRawStorageKeyVal' (toKey (Account address Nothing) key)
   return v'
 
 deleteSolidStorageKeyVal' :: HasSolidStorageDB m => Account -> StoragePath -> m ()

@@ -847,10 +847,10 @@ checkStorage :: ContextM [(MP.Key, B.ByteString)]
 checkStorage = flushMemRawStorageDB >> getAllRawStorageKeyVals' (Account uploadAddress Nothing)
 
 getAll :: [[StoragePathPiece]] -> ContextM [BasicValue]
-getAll = mapM (getSolidStorageKeyVal' (Account uploadAddress Nothing) . MS.fromList)
+getAll = mapM (getSolidStorageKeyVal' uploadAddress . MS.fromList)
 
 getAll2 :: [[StoragePathPiece]] -> ContextM [BasicValue]
-getAll2 = mapM (getSolidStorageKeyVal' (Account secondAddress Nothing) . MS.fromList)
+getAll2 = mapM (getSolidStorageKeyVal' secondAddress . MS.fromList)
 
 getFields :: [BC.ByteString] -> ContextM [BasicValue]
 getFields = getAll . map (\t -> [Field t])
@@ -2815,8 +2815,8 @@ contract qq {
   }
 }|]
     [BContract "X" x] <- getFields ["x"]
-    getSolidStorageKeyVal' (namedAccountToAccount Nothing x) (singleton "i") `shouldReturn` BDefault
-    getSolidStorageKeyVal' (namedAccountToAccount Nothing x) (singleton "s") `shouldReturn` BDefault
+    getSolidStorageKeyVal' (x^.namedAccountAddress) (singleton "i") `shouldReturn` BDefault
+    getSolidStorageKeyVal' (x^.namedAccountAddress) (singleton "s") `shouldReturn` BDefault
 
   it "will create a sentinel for mappings" . runTest $ do
     liftIO $ pendingWith "deal with BMappingSentinel" --TODO- Jim
@@ -3164,7 +3164,7 @@ contract qq {
 }|]
     -- qq should become the `owner` in X
     getFields ["x"] `shouldReturn` [bContract "X" recursiveAddr]
-    getSolidStorageKeyVal' (Account recursiveAddr Nothing) (MS.singleton "owner")
+    getSolidStorageKeyVal' recursiveAddr (MS.singleton "owner")
       `shouldReturn` bAccount uploadAddress
 
   it "can cast from address" . runTest $ do
@@ -3496,7 +3496,7 @@ contract qq {
   }
 }|]
     getFields ["x"] `shouldReturn` [bContract "X" recursiveAddr]
-    mapM (getSolidStorageKeyVal' (Account recursiveAddr Nothing)) [MS.singleton "y", MS.singleton "z"]
+    mapM (getSolidStorageKeyVal' recursiveAddr) [MS.singleton "y", MS.singleton "z"]
       `shouldReturn` [BInteger 0x777777, BString "ok"]
 
   xit "can cast a struct from named arguments" . runTest $ do
@@ -6588,8 +6588,8 @@ contract qq {
                      ]
     [BContract "X" x] <- getFields ["x"]
     [BContract "Y" y] <- getFields ["y"]
-    getSolidStorageKeyVal' (namedAccountToAccount Nothing x) (singleton "xNum") `shouldReturn` BString "xNum"
-    getSolidStorageKeyVal' (namedAccountToAccount Nothing y) (singleton "yNum") `shouldReturn` BInteger 100
+    getSolidStorageKeyVal' (x^.namedAccountAddress) (singleton "xNum") `shouldReturn` BString "xNum"
+    getSolidStorageKeyVal' (y^.namedAccountAddress) (singleton "yNum") `shouldReturn` BInteger 100
 
   it "can deterministically create salted contract with multiple args" . runTest $ do
     let src =
@@ -6612,8 +6612,8 @@ contract qq {
     runBS src
     getFields ["x"] `shouldReturn` [bContract "User" $ deriveAddressWithSalt (stringAddress "e8279be14e9fe2ad2d8e52e42ca96fb33a813bbe") "Dustin Norwood" (Just . hash $ BC.pack src) (Just "OrderedVals [SString \"Dustin Norwood\",SString \"Thebestcertyoucangetfor$99.99\"]")]
     [BContract "User" x] <- getFields ["x"]
-    getSolidStorageKeyVal' (namedAccountToAccount Nothing x) (singleton "commonName") `shouldReturn` BString "Dustin Norwood"
-    getSolidStorageKeyVal' (namedAccountToAccount Nothing x) (singleton "cert") `shouldReturn` BString "Thebestcertyoucangetfor$99.99"
+    getSolidStorageKeyVal' (x^.namedAccountAddress) (singleton "commonName") `shouldReturn` BString "Dustin Norwood"
+    getSolidStorageKeyVal' (x^.namedAccountAddress) (singleton "cert") `shouldReturn` BString "Thebestcertyoucangetfor$99.99"
 
   it "can deterministically derive salted contract addresses with no args" . runTest $ do
     let src =
@@ -8328,9 +8328,9 @@ contract qq {
       `shouldReturn` [BAccount $ NamedAccount (deriveAddressWithSalt (stringAddress "e8279be14e9fe2ad2d8e52e42ca96fb33a813bbe") "salt" (Just . hash $ BC.pack "contract B {\n uint x = 2;\n constructor (uint _x) {\n  x = _x;\n }\n}") (Just "OrderedVals [SInteger 4]")) UnspecifiedChain]
     [BAccount a] <- getFields ["a"]
     [BAccount b] <- getFields ["b"]
-    getSolidStorageKeyVal' (namedAccountToAccount Nothing a) (singleton "x") `shouldReturn` BInteger 3
-    getSolidStorageKeyVal' (namedAccountToAccount Nothing a) (singleton "y") `shouldReturn` BString "hi"
-    getSolidStorageKeyVal' (namedAccountToAccount Nothing b) (singleton "x") `shouldReturn` BInteger 4
+    getSolidStorageKeyVal' (a^.namedAccountAddress) (singleton "x") `shouldReturn` BInteger 3
+    getSolidStorageKeyVal' (a^.namedAccountAddress) (singleton "y") `shouldReturn` BString "hi"
+    getSolidStorageKeyVal' (b^.namedAccountAddress) (singleton "x") `shouldReturn` BInteger 4
 
   it "should throw an error when using create built-in function call while missing a parameter" $
     runTest
@@ -9094,9 +9094,9 @@ contract qq {
       `shouldReturn` [BAccount $ NamedAccount (deriveAddressWithSalt (stringAddress "e8279be14e9fe2ad2d8e52e42ca96fb33a813bbe") "salt" (Just . hash $ BC.pack "contract B {\n uint x = 2;\n constructor (uint _x) {\n  x = _x;\n }\n}") (Just "OrderedVals [SInteger 4]")) UnspecifiedChain]
     [BAccount a] <- getFields ["a"]
     [BAccount b] <- getFields ["b"]
-    getSolidStorageKeyVal' (namedAccountToAccount Nothing a) (singleton "x") `shouldReturn` BInteger 3
-    getSolidStorageKeyVal' (namedAccountToAccount Nothing a) (singleton "y") `shouldReturn` BString "hi"
-    getSolidStorageKeyVal' (namedAccountToAccount Nothing b) (singleton "x") `shouldReturn` BInteger 4
+    getSolidStorageKeyVal' (a^.namedAccountAddress) (singleton "x") `shouldReturn` BInteger 3
+    getSolidStorageKeyVal' (a^.namedAccountAddress) (singleton "y") `shouldReturn` BString "hi"
+    getSolidStorageKeyVal' (b^.namedAccountAddress) (singleton "x") `shouldReturn` BInteger 4
 
   it "can error handle improperly referenced overloaded contracts using solidvm 11.4 pragma" $ runTest ( do 
     let getAddressFromResult :: ExecResults -> Maybe Address 

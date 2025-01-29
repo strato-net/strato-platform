@@ -998,7 +998,7 @@ getArrayNamesFromContract c =
 
 resolveNameParts ::
   MonadSM m =>
-  Account ->
+  Address ->
   T.Text ->
   T.Text ->
   CC.Contract ->
@@ -1006,7 +1006,7 @@ resolveNameParts ::
 resolveNameParts to' crtr app c = do
   let tName = T.pack . CC._contractName
   case c ^. CC.importedFrom of
-    Nothing -> pure ((to', tName c), (crtr, app, (map T.pack (M.keys $ CC._storageDefs c))))
+    Nothing -> pure ((Account to' Nothing, tName c), (crtr, app, (map T.pack (M.keys $ CC._storageDefs c))))
     Just acct ->
       A.select (A.Proxy @AddressState) acct >>= \case
         Nothing -> do
@@ -1014,9 +1014,9 @@ resolveNameParts to' crtr app c = do
             "Could not find address state for account " ++ show acct
           pure ((acct, tName c), (crtr, app, (map T.pack (M.keys $ CC._storageDefs c))))
         Just s ->
-          resolveCodePtr (acct ^. accountChainId) (addressStateCodeHash s) >>= \case
+          resolveCodePtr Nothing (addressStateCodeHash s) >>= \case
             Just (SolidVMCode appName _) -> do
-              appCreator <- getSolidStorageKeyVal' acct $ MS.StoragePath [MS.Field ":creator"]
+              appCreator <- getSolidStorageKeyVal' (_accountAddress acct) $ MS.StoragePath [MS.Field ":creator"]
               case appCreator of
                 MS.BString cn' -> pure ((acct, tName c), (T.pack $ BC.unpack cn', T.pack appName, (map T.pack (M.keys $ CC._storageDefs c))))
                 _ -> pure ((acct, tName c), (crtr, T.pack appName, (map T.pack (M.keys $ CC._storageDefs c))))

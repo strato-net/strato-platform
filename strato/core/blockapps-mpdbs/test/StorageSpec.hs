@@ -206,18 +206,18 @@ storageSpec = do
 
   describe "SolidStorageDB SolidVM=3.0" $ do
     it "should get its puts" . runStorM $ do
-      putSolidStorageKeyVal' (Account 0x99 Nothing) (MS.fromList [MS.Field "x", MS.ArrayIndex 99]) (MS.BString "txt")
-      getSolidStorageKeyVal' (Account 0x99 Nothing) (MS.fromList [MS.Field "x", MS.ArrayIndex 99])
+      putSolidStorageKeyVal' 0x99 (MS.fromList [MS.Field "x", MS.ArrayIndex 99]) (MS.BString "txt")
+      getSolidStorageKeyVal' 0x99 (MS.fromList [MS.Field "x", MS.ArrayIndex 99])
         `shouldReturn` MS.BString "txt"
 
     it "should be able to flush" . runStorM $ do
-      putSolidStorageKeyVal' (Account 0x342 Nothing) (MS.singleton "x") (MS.BBool True)
+      putSolidStorageKeyVal' 0x342 (MS.singleton "x") (MS.BBool True)
       flushMemSolidStorageDB
 
     let solidIdTest msg bv = it ("put " <> msg <> " in SolidStorage should not change the state root") . runStorM $ do
           want <- addressStateContractRoot <$> lookupWithDefault Proxy (Account 0x1234 Nothing)
           want `shouldBe` "V\232\US\ETB\ESC\204U\166\255\131E\230\146\192\248n[H\224\ESC\153l\173\192\SOHb/\181\227c\180!"
-          putSolidStorageKeyVal' (Account 0x1234 Nothing) (MS.fromList [MS.Field "x", MS.ArrayIndex 99]) bv
+          putSolidStorageKeyVal' 0x1234 (MS.fromList [MS.Field "x", MS.ArrayIndex 99]) bv
           flushMemStorageDB
           got <- addressStateContractRoot <$> lookupWithDefault Proxy (Account 0x1234 Nothing)
           want `shouldBe` got
@@ -232,7 +232,7 @@ storageSpec = do
 
     it "put 1 in SolidStorage should change the state root" . runStorM $ do
       want <- addressStateContractRoot <$> lookupWithDefault Proxy (Account 0x1234 Nothing)
-      putSolidStorageKeyVal' (Account 0x1234 Nothing) (MS.fromList [MS.Field "x", MS.ArrayIndex 99]) (MS.BInteger 1)
+      putSolidStorageKeyVal' 0x1234 (MS.fromList [MS.Field "x", MS.ArrayIndex 99]) (MS.BInteger 1)
       flushMemStorageDB
       got <- addressStateContractRoot <$> lookupWithDefault Proxy (Account 0x1234 Nothing)
       want `shouldNotBe` got
