@@ -396,7 +396,7 @@ runSM maybeCode env gi chainId' f = do
 
 -- When calling a remote contract, the new `msg.sender` is the contract
 -- that the call is initiated from.
-pushSender :: MonadSM m => Account -> m a -> m a
+pushSender :: MonadSM m => Address -> m a -> m a
 pushSender newSender mv = do
   oldSender <- Mod.get (Mod.Proxy @Env.Sender)
   Mod.put (Mod.Proxy @Env.Sender) (Env.Sender newSender)
@@ -412,7 +412,7 @@ startingAction maybeCode env' chainId' =
       _blockNumber = blockHeaderBlockNumber $ Env.blockHeader env',
       _transactionHash = Env.txHash env',
       _transactionChainId = chainId',
-      _transactionSender = Env.sender env',
+      _transactionSender = Account (Env.sender env') Nothing,
       _actionData = OMap.empty,
       _metadata =
         case maybeCode of
@@ -910,7 +910,7 @@ initializeAction acct name crtr cc_crtr root appName hsh cc ab maps arrs = do
   Mod.modifyStatefully_ (Mod.Proxy @Action) $
     Action.actionData %= Action.omapInsertWith Action.mergeActionData acct newData
 
-markDiffForAction :: Mod.Modifiable Action m => Account -> MS.StoragePath -> MS.BasicValue -> m ()
+markDiffForAction :: Mod.Modifiable Action m => Address -> MS.StoragePath -> MS.BasicValue -> m ()
 markDiffForAction owner key' val' = do
   let key = MS.unparsePath key'
       val = rlpSerialize $ rlpEncode val'
@@ -918,7 +918,7 @@ markDiffForAction owner key' val' = do
         Action.SolidVMDiff m -> Action.SolidVMDiff $ M.insert key val m
         e -> internalError "SolidVM Diff executing in EVM" $ show e
   Mod.modifyStatefully_ (Mod.Proxy @Action) $
-    Action.actionData . Action.omapLens owner . mapped . Action.actionDataStorageDiffs %= ins
+    Action.actionData . Action.omapLens (Account owner Nothing) . mapped . Action.actionDataStorageDiffs %= ins
 
 addEvent :: Mod.Modifiable (Q.Seq Event) m => Event -> m ()
 addEvent newEvent = Mod.modify_ (Mod.Proxy @(Q.Seq Event)) $ pure . (Q.|> newEvent)

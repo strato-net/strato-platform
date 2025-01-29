@@ -13,10 +13,10 @@ import Blockchain.Strato.Model.Keccak256
 import qualified Data.Map as M
 import qualified Data.Text as T
 
-newtype Sender = Sender {unSender :: Account}
+newtype Sender = Sender {unSender :: Address}
 
 data Environment = Environment
-  { sender :: Account,
+  { sender :: Address,
     origin :: Account,
     proposer :: Address,
     blockHeader :: BlockHeader,

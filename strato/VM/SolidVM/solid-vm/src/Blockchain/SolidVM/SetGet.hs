@@ -142,7 +142,7 @@ setVal dst@(SReference addressedPath@(AccountPath addr path)) src = do
   case basicSrc of
     Nothing -> typeError "non basic solidity type cannot be stored atomically" src
     Just b -> do
-      markDiffForAction addr path b
+      markDiffForAction (_accountAddress addr) path b
       putSolidStorageKeyVal' addr path b
 setVal (SInteger dst) (SInteger _) = immutableError "Cannot assign immutable or constants after assigned ->" dst -- typeError "Cannot assign immutables after assigned" ("src = " ++ show src ++ ", dst = " ++ show dst)
 setVal (SNULL) _ = return ()
@@ -247,7 +247,7 @@ deleteVar (Constant (SReference a@(AccountPath addr path))) = do
       -- TODO: handle other types
       ro <- readOnly <$> getCurrentCallInfo
       when ro $ invalidWrite "Invalid delete during read-only access" $ "addr: " ++ show addr ++ ", path: " ++ show path
-      markDiffForAction addr path $ MS.BDefault
+      markDiffForAction (_accountAddress addr) path $ MS.BDefault
       putSolidStorageKeyVal' addr path $ MS.BDefault
 deleteVar v = todo "deleteVar not yet supported for local variables" $ show v
 

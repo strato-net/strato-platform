@@ -243,7 +243,7 @@ create _ _ _ blockData _ sender' origin' proposer' _ _ availableGas newAddress c
   let env' =
         Env.Environment
           { Env.blockHeader = blockData,
-            Env.sender = Account sender' Nothing,
+            Env.sender = sender',
             Env.proposer = proposer',
             Env.origin = Account origin' Nothing,
             Env.txHash = txHash',
@@ -351,7 +351,7 @@ create' creator maybeCodePtr originAddress issuerAcct issuerName newAccount ch c
   setCreator (Account issuer Nothing) (NamedAccount originAddress MainChain) (Account newAccount Nothing) contract' (BlockHeader.number $ Env.blockHeader env)
 
   -- Run the constructor
-  runTheConstructors (Account creator Nothing) (Account newAccount Nothing) ch cc contractName' argExps
+  runTheConstructors creator newAccount ch cc contractName' argExps
 
   onTraced $ liftIO $ putStrLn $ C.green $ "Done Creating Contract: " ++ show newAccount ++ " of type " ++ labelToString contractName'
 
@@ -427,7 +427,7 @@ call _ _ _ isRCC _ blockData _ _ codeAddress sender' proposer' _ _ _ availableGa
   let env' =
         Env.Environment
           { Env.blockHeader = blockData,
-            Env.sender = Account sender' Nothing,
+            Env.sender = sender',
             Env.origin = Account origin' Nothing,
             Env.proposer = proposer',
             Env.txHash = txHash',
@@ -586,7 +586,7 @@ call' from to' fnCalltype mContract functionName isRCC argExps = do
         let ro = case mCallInfo of
               Nothing -> False
               Just ci -> readOnly ci
-            f' = (if from == to then id else pushSender (Account from Nothing)) $ runTheCall to contract functionName' hsh cc theFunction args' ro False
+            f' = (if from == to then id else pushSender from) $ runTheCall to contract functionName' hsh cc theFunction args' ro False
         return (f', args')
       -- Handles .call() and .delegatecall() logic
       (Just theFunction, _) -> do
@@ -642,7 +642,7 @@ call' from to' fnCalltype mContract functionName isRCC argExps = do
             let ro = case mCallInfo of
                   Nothing -> False
                   Just ci -> readOnly ci
-                f' = (if from == to then id else pushSender (Account from Nothing)) $ runTheCall to contract functionName' hsh cc theFunction' args' ro False
+                f' = (if from == to then id else pushSender from) $ runTheCall to contract functionName' hsh cc theFunction' args' ro False
             return (f', args')
           _ ->
             ( case M.lookup "fallback" functionsIncludingConstructor of
@@ -652,7 +652,7 @@ call' from to' fnCalltype mContract functionName isRCC argExps = do
                   let ro = case mCallInfo of
                         Nothing -> False
                         Just ci -> readOnly ci
-                      f' = (if from == to then id else pushSender (Account from Nothing)) $ runTheCall to contract "fallback" hsh cc fallbackFunc args' ro False
+                      f' = (if from == to then id else pushSender from) $ runTheCall to contract "fallback" hsh cc fallbackFunc args' ro False
                   return (f', args')
                 _ -> unknownFunction "logFunctionCall" (functionName, contract ^. CC.contractName)
             )
@@ -693,7 +693,7 @@ call' from to' fnCalltype mContract functionName isRCC argExps = do
                   let ro = case mCallInfo of
                         Nothing -> False
                         Just ci -> readOnly ci
-                      f' = (if from == to then id else pushSender (Account from Nothing)) $ runTheCall to contract "fallback" hsh cc fallbackFunc args' ro False
+                      f' = (if from == to then id else pushSender from) $ runTheCall to contract "fallback" hsh cc fallbackFunc args' ro False
                   return (f', args')
                 _ -> unknownFunction "logFunctionCall" (functionName, contract ^. CC.contractName)
             )
@@ -709,7 +709,7 @@ call' from to' fnCalltype mContract functionName isRCC argExps = do
             case theType of
               SVMType.Mapping _ _ _ -> return ()
               SVMType.Array _ _ -> return ()
-              _ -> markDiffForAction (Account to Nothing) (MS.StoragePath [MS.Field $ BC.pack $ labelToString n]) MS.BDefault
+              _ -> markDiffForAction to (MS.StoragePath [MS.Field $ BC.pack $ labelToString n]) MS.BDefault
     )
   when (fnCalltype == CC.DelegateCall) $ addDelegatecall (Account from Nothing) (Account to' Nothing) (T.pack ctrName) (T.pack parentName')
   ((ctrName, parentName'),) <$> logFunctionCall args (Account to Nothing) contract functionName f
@@ -1622,7 +1622,7 @@ expToVar' x@(CC.MemberAccess _ expr name) _ = do
         Just enumVals -> do
           let !num = maybe (missingType "Enum nonexistent member" (enumName, name)) fromIntegral (name `elemIndex` fst enumVals)
           return $ Constant $ SEnumVal enumName name num
-    (SBuiltinVariable "msg", "sender") -> (Constant . ((flip SAccount) False) . accountToNamedAccount chainId . Env.sender) <$> getEnv
+    (SBuiltinVariable "msg", "sender") -> (Constant . ((flip SAccount) False) . (\v -> NamedAccount v UnspecifiedChain) . Env.sender) <$> getEnv
     (SBuiltinVariable "msg", "data") -> do
       contract' <- getCurrentContract
       functionName <- getCurrentFunctionName
@@ -3009,7 +3009,7 @@ certificateMap maybeCert _ =
         }
 
 
-runTheConstructors :: MonadSM m => Account -> Account -> Keccak256 -> CC.CodeCollection -> SolidString -> CC.ArgList -> m ()
+runTheConstructors :: MonadSM m => Address -> Address -> Keccak256 -> CC.CodeCollection -> SolidString -> CC.ArgList -> m ()
 runTheConstructors from to hsh cc contractName' argExps = do
   let !contract' =
         fromMaybe (missingType "contract inherits from nonexistent parent" contractName') $
@@ -3069,11 +3069,11 @@ runTheConstructors from to hsh cc contractName' argExps = do
           var <- createVar correctedVal
           return (n, (t, var))
 
-  void . withCallInfo to contract' (stringToLabel $ labelToString contractName' ++ " constructor") hsh cc (M.fromList zipped) False False $ do
+  void . withCallInfo (Account to Nothing) contract' (stringToLabel $ labelToString contractName' ++ " constructor") hsh cc (M.fromList zipped) False False $ do
 
     forM_ [(n, e, theType) | (n, CC.VariableDecl theType _ (Just e) _ _ _) <- M.toList $ contract' ^. CC.storageDefs] $ \(n, e, theType) -> do
       v <- expToVar e $ Just theType
-      setVar (Constant (SReference (AccountPath to $ MS.StoragePath [MS.Field $ BC.pack $ labelToString n]))) =<< getVar v
+      setVar (Constant (SReference (AccountPath (Account to Nothing) $ MS.StoragePath [MS.Field $ BC.pack $ labelToString n]))) =<< getVar v
 
     forM_ [(n, theType) | (n, CC.VariableDecl theType _ Nothing _ _ _) <- M.toList $ contract' ^. CC.storageDefs] $ \(n, theType) -> do
       case theType of
