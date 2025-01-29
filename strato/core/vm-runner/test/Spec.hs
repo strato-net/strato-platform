@@ -76,12 +76,12 @@ spec = do
               S.empty
               blockData
               0
-              tAddr
-              tAddr
+              (_accountAddress tAddr)
+              (_accountAddress tAddr)
               txValue
               txGasPrice
               availableGas
-              newAddress
+              (_accountAddress newAddress)
               txInit
               (unsafeCreateKeccak256FromWord256 0)
               Nothing
@@ -109,14 +109,14 @@ spec = do
             S.empty
             blockData
             0
-            tAddr
-            newAddress
-            tAddr
+            (_accountAddress tAddr)
+            (_accountAddress newAddress)
+            (_accountAddress tAddr)
             (fromIntegral txValue)
             (fromIntegral txGasPrice)
             (LabeledError.b16Decode "vm-runner/Spec.hs" "ec630643")
             availableGas
-            tAddr
+            (_accountAddress tAddr)
             (unsafeCreateKeccak256FromWord256 0)
             Nothing
             Nothing

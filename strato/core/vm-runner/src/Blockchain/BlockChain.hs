@@ -439,7 +439,7 @@ addTransaction chainId isRunningTests' b remainingBlockGas t@OutputTx {otSigner 
     . throwE
     $ TFTXSizeLimitExceeded txSize (toInteger flags_txSizeLimit) t
 
-  lift $ incrementNonce tAcct
+  lift $ incrementNonce (tAcct^.accountAddress)
 
   when (otHash t `S.member` knownFailedTxs) . throwE $ TFKnownFailedTX t
 
@@ -507,13 +507,13 @@ runCodeForTransaction isRunningTests' isHomestead b availableGas tAcct t propose
               S.empty
               b
               0
-              tAcct
-              tAcct
+              (tAcct^.accountAddress)
+              (tAcct^.accountAddress)
               proposer
               (transactionValue ut)
               (fromInteger $ transactionGasPrice ut)
               availableGas
-              newAccount
+              (newAccount^.accountAddress)
               (transactionInit ut)
               (txHash ut)
               (txChainId ut)
@@ -548,15 +548,15 @@ runCodeForTransaction isRunningTests' isHomestead b availableGas tAcct t propose
                   S.empty
                   b
                   0
-                  owner
-                  owner
-                  tAcct
+                  (owner^.accountAddress)
+                  (owner^.accountAddress)
+                  (tAcct^.accountAddress)
                   proposer
                   (fromInteger $ transactionValue ut)
                   (fromInteger $ transactionGasPrice ut)
                   (transactionData ut)
                   (fromIntegral availableGas)
-                  tAcct
+                  (tAcct^.accountAddress)
                   (txHash ut)
                   (txChainId ut)
                   (txMetadata ut)

@@ -554,33 +554,33 @@ execContextM' ::
   m ContextState
 execContextM' ctx f = snd <$> runContextM' ctx f
 
-incrementNonce :: (Account `A.Alters` AddressState) f => Account -> f ()
-incrementNonce account = A.adjustWithDefault_ Mod.Proxy account $ \addressState ->
+incrementNonce :: (Account `A.Alters` AddressState) f => Address -> f ()
+incrementNonce address = A.adjustWithDefault_ Mod.Proxy (Account address Nothing) $ \addressState ->
   pure addressState {addressStateNonce = addressStateNonce addressState + 1}
 
-getNewAddress :: (MonadIO m, (Account `A.Alters` AddressState) m) => Account -> m Account
-getNewAddress account = do
-  nonce' <- addressStateNonce <$> A.lookupWithDefault Mod.Proxy account
-  when flags_debug $ liftIO $ putStrLn $ "Creating new account: owner=" ++ format account ++ ", nonce=" ++ show nonce'
-  let newAddress = getNewAddress_unsafe (account ^. accountAddress) nonce'
-  incrementNonce account
-  return $ (accountAddress .~ newAddress) account
+getNewAddress :: (MonadIO m, (Account `A.Alters` AddressState) m) => Address -> m Address
+getNewAddress address = do
+  nonce' <- addressStateNonce <$> A.lookupWithDefault Mod.Proxy (Account address Nothing)
+  when flags_debug $ liftIO $ putStrLn $ "Creating new address: owner=" ++ format address ++ ", nonce=" ++ show nonce'
+  let newAddress = getNewAddress_unsafe address nonce'
+  incrementNonce address
+  return newAddress
 
-getNewAddressWithSalt :: (MonadIO m, MonadLogger m, (Account `A.Alters` AddressState) m) => Account -> Value -> Keccak256 -> String -> m Account
-getNewAddressWithSalt account salt hsh args = do
-  nonce' <- addressStateNonce <$> A.lookupWithDefault Mod.Proxy account
-  when flags_debug $ liftIO $ putStrLn $ "Creating new account: owner=" ++ format account ++ ", nonce=" ++ show nonce'
+getNewAddressWithSalt :: (MonadIO m, MonadLogger m, (Account `A.Alters` AddressState) m) => Address -> Value -> Keccak256 -> String -> m Address
+getNewAddressWithSalt address salt hsh args = do
+  nonce' <- addressStateNonce <$> A.lookupWithDefault Mod.Proxy (Account address Nothing)
+  when flags_debug $ liftIO $ putStrLn $ "Creating new address: owner=" ++ format address ++ ", nonce=" ++ show nonce'
   let saltAsString = case salt of
         (SString s) -> s
         _ -> invalidArguments "big major bad" salt
-  let newAddress = getNewAddressWithSalt_unsafe (account ^. accountAddress) saltAsString (keccak256ToByteString hsh) args
-  $logDebugS "getNewAddressWithSalt" $ T.pack $ (show $ account ^. accountAddress) ++ " " ++ saltAsString ++ " " ++ (show $ keccak256ToByteString hsh) ++ " " ++ args
-  doesAddressAlreadyExist <- A.lookup (Mod.Proxy @AddressState) $ Account newAddress (_accountChainId account)
+  let newAddress = getNewAddressWithSalt_unsafe address saltAsString (keccak256ToByteString hsh) args
+  $logDebugS "getNewAddressWithSalt" $ T.pack $ show address ++ " " ++ saltAsString ++ " " ++ (show $ keccak256ToByteString hsh) ++ " " ++ args
+  doesAddressAlreadyExist <- A.lookup (Mod.Proxy @AddressState) $ Account newAddress Nothing
   case doesAddressAlreadyExist of
-    Just _ -> duplicateContract $ "The address " ++ (show newAddress) ++ " already exists. Try using a different salt or constructor arguments."
+    Just _ -> duplicateContract $ "The address " ++ show newAddress ++ " already exists. Try using a different salt or constructor arguments."
     Nothing -> do
-      incrementNonce account
-      return $ (accountAddress .~ newAddress) account
+      incrementNonce address
+      return newAddress
 
 purgeStorageMap :: HasMemStorageDB m => Account -> m ()
 purgeStorageMap account = do

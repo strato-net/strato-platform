@@ -472,7 +472,7 @@ runOperation CREATE = do
   result <-
     case (callDepth > 1023, debugCallCreates vmState) of
       (True, _) -> return Nothing
-      (_, Nothing) -> create_debugWrapper block owner value initCodeBytes
+      (_, Nothing) -> create_debugWrapper block (owner^.accountAddress) value initCodeBytes
       (_, Just _) -> do
         (nonce, balance) <-
           (addressStateNonce &&& addressStateBalance)
@@ -492,10 +492,10 @@ runOperation CREATE = do
                   ccGasLimit = gr,
                   ccValue = fromIntegral value
                 }
-            return . Just $ (accountAddress .~ newAddress) owner
+            return . Just $ newAddress
 
   case result of
-    Just account -> push $ account ^. accountAddress
+    Just account -> push account
     Nothing -> push (0 :: Word256)
 runOperation CALL = do
   gas' :: Word256 <- pop
@@ -533,7 +533,7 @@ runOperation CALL = do
         addGas $ fromIntegral $ gas + fromIntegral stipend
         return (0, Nothing)
       (_, _, Nothing) -> do
-        nestedRun_debugWrapper False (fromIntegral gas + stipend) to to owner value inputData
+        nestedRun_debugWrapper False (fromIntegral gas + stipend) (to^.accountAddress) (to^.accountAddress) (owner^.accountAddress) value inputData
       (_, _, Just _) -> do
         addGas $ fromIntegral stipend
         --addToBalance' owner (-fromIntegral value)
@@ -592,7 +592,7 @@ runOperation CALLCODE = do
         when flags_debug $ $logInfoS "runOp/CALLCODE" $ T.pack $ CL.red "Insufficient balance"
         return (0, Nothing)
       (_, _, Nothing) -> do
-        nestedRun_debugWrapper False (fromIntegral gas + stipend) owner to owner value inputData
+        nestedRun_debugWrapper False (fromIntegral gas + stipend) (owner^.accountAddress) (to^.accountAddress) (owner^.accountAddress) value inputData
       (_, _, Just _) -> do
         --addToBalance' owner (-fromIntegral value)
         addGas $ fromIntegral stipend
@@ -651,7 +651,7 @@ runOperation DELEGATECALL = do
             addGas $ fromIntegral gas
             return (0, Nothing)
           (_, Nothing) -> do
-            nestedRun_debugWrapper True (fromIntegral gas) owner to sender (fromIntegral value) inputData
+            nestedRun_debugWrapper True (fromIntegral gas) (owner^.accountAddress) (to^.accountAddress) (sender^.accountAddress) (fromIntegral value) inputData
           (_, Just _) -> do
             --addToBalance' owner (-fromIntegral value)
             addGas $ fromIntegral gas
@@ -1004,7 +1004,7 @@ runVMM ::
   EVMBase m =>
   Bool ->
   Bool ->
-  S.Set Account ->
+  S.Set Address ->
   Int ->
   Environment ->
   Gas ->
@@ -1018,7 +1018,7 @@ runVMM isRunningTests' isHomestead preExistingSuicideList cDepth env availableGa
           v
             { callDepth = cDepth,
               vmGasRemaining = gasref,
-              suicideList = preExistingSuicideList
+              suicideList = S.map (\v' -> Account v' Nothing) preExistingSuicideList
             }
     vmStateRef <- liftIO $ newIORef . fillIn =<< startingState isRunningTests' isHomestead env mdbs
     res <- try $ runReaderT f vmStateRef
@@ -1065,15 +1065,15 @@ create ::
   EVMBase m =>
   Bool ->
   Bool ->
-  S.Set Account ->
+  S.Set Address ->
   BlockHeader ->
   Int ->
-  Account ->
-  Account ->
+  Address ->
+  Address ->
   Integer ->
   Integer ->
   Gas ->
-  Account ->
+  Address ->
   Code ->
   Keccak256 ->
   Maybe Word256 ->
@@ -1105,10 +1105,10 @@ create
           Environment
             { envGasPrice = gasPrice,
               envBlockHeader = b,
-              envOwner = newAddress,
-              envOrigin = origin,
+              envOwner = Account newAddress Nothing,
+              envOrigin = Account origin Nothing,
               envInputData = B.empty,
-              envSender = sender,
+              envSender = Account sender Nothing,
               envValue = value,
               envCode = initCode,
               envJumpDests = getValidJUMPDESTs initCode,
@@ -1127,12 +1127,12 @@ create
           --an existing one, but the ethereum tests test this.  They want the VM to preserve balance
           --but clean out storage.
           --This will never actually matter, but I add it to pass the tests.
-          A.adjustWithDefault_ (A.Proxy @AddressState) newAddress $ \newAddressState ->
+          A.adjustWithDefault_ (A.Proxy @AddressState) (Account newAddress Nothing) $ \newAddressState ->
             pure newAddressState {addressStateContractRoot = MP.emptyTriePtr}
           --This next line will actually create the account addressState data....
           --In the extremely unlikely even that the address already exists, it will preserve
           --the existing balance.
-          pay "transfer value" sender newAddress $ fromIntegral value
+          pay "transfer value" (Account sender Nothing) (Account newAddress Nothing) $ fromIntegral value
         else return True
 
     execResults <-
@@ -1145,14 +1145,14 @@ create
       Just e -> do
         --if there was an error, addressStates were reverted, so the receiveAddress still should
         --have the value, and I can revert without checking for success.
-        _ <- pay "revert value transfer" newAddress sender (fromIntegral value)
+        _ <- pay "revert value transfer" (Account newAddress Nothing) (Account sender Nothing) (fromIntegral value)
 
-        purgeStorageMap newAddress
-        A.delete (A.Proxy @AddressState) newAddress
+        purgeStorageMap $ Account newAddress Nothing
+        A.delete (A.Proxy @AddressState) (Account newAddress Nothing)
         -- Need to zero gas in the case of an exception.
         return execResults {erRemainingTxGas = 0, erException = Just e}
       Nothing -> do
-        return execResults {erNewContractAccount = Just newAddress}
+        return execResults {erNewContractAccount = Just (Account newAddress Nothing)}
 
 create' :: EVMBase m => VMM m Code
 create' = do
@@ -1209,17 +1209,17 @@ call ::
   Bool ->
   Bool ->
   Bool ->
-  S.Set Account ->
+  S.Set Address ->
   BlockHeader ->
   Int ->
-  Account ->
-  Account ->
-  Account ->
+  Address ->
+  Address ->
+  Address ->
   Word256 ->
   Word256 ->
   B.ByteString ->
   Gas ->
-  Account ->
+  Address ->
   Keccak256 ->
   Maybe Word256 ->
   Maybe (M.Map T.Text T.Text) ->
@@ -1247,10 +1247,10 @@ call
           Environment
             { envGasPrice = fromIntegral gasPrice,
               envBlockHeader = b,
-              envOwner = receiveAddress,
-              envOrigin = origin,
+              envOwner = (Account receiveAddress Nothing),
+              envOrigin = (Account origin Nothing),
               envInputData = theData,
-              envSender = sender,
+              envSender = (Account sender Nothing),
               envValue = fromIntegral value,
               envCode = code,
               envJumpDests = getValidJUMPDESTs code,
@@ -1259,14 +1259,14 @@ call
               envMetadata = metadata
             }
 
-    case getPrecompiledCode (fromIntegral $ codeAddress ^. accountAddress) of
+    case getPrecompiledCode (fromIntegral $ codeAddress) of
       Just pc ->
         runVMM isRunningTests' isHomestead preExistingSuicideList callDepth (env $ Code "") availableGas $
           callPrecompiled' noValueTransfer pc
       Nothing -> do
         codeHash <-
           addressStateCodeHash
-            <$> A.lookupWithDefault (A.Proxy @AddressState) codeAddress
+            <$> A.lookupWithDefault (A.Proxy @AddressState) (Account codeAddress Nothing)
         code <- Code <$> getExternallyOwned' codeHash
         runVMM isRunningTests' isHomestead preExistingSuicideList callDepth (env code) availableGas $
           call' noValueTransfer
@@ -1333,9 +1333,9 @@ callPrecompiled' noValueTransfer precompiled = do
 
   return (fromMaybe B.empty $ returnVal vmState)
 
-create_debugWrapper :: EVMBase m => BlockHeader -> Account -> Word256 -> B.ByteString -> VMM m (Maybe Account)
+create_debugWrapper :: EVMBase m => BlockHeader -> Address -> Word256 -> B.ByteString -> VMM m (Maybe Address)
 create_debugWrapper block owner value initCodeBytes = do
-  balance <- addressStateBalance <$> A.lookupWithDefault (A.Proxy @AddressState) owner
+  balance <- addressStateBalance <$> A.lookupWithDefault (A.Proxy @AddressState) (Account owner Nothing)
 
   if fromIntegral value > balance
     then return Nothing
@@ -1363,11 +1363,11 @@ create_debugWrapper block owner value initCodeBytes = do
           create
             (isRunningTests currentVMState)
             (vmIsHomestead currentVMState)
-            (suicideList currentVMState)
+            (S.map (^. accountAddress) $ suicideList currentVMState)
             block
             (currentCallDepth + 1)
             owner
-            origin
+            (origin ^. accountAddress)
             (toInteger value)
             gasPrice
             gasRemaining
@@ -1397,7 +1397,7 @@ create_debugWrapper block owner value initCodeBytes = do
 
           return $ Just newAddress
 
-nestedRun_debugWrapper :: EVMBase m => Bool -> Gas -> Account -> Account -> Account -> Word256 -> B.ByteString -> VMM m (Int, Maybe BSS.ShortByteString)
+nestedRun_debugWrapper :: EVMBase m => Bool -> Gas -> Address -> Address -> Address -> Word256 -> B.ByteString -> VMM m (Int, Maybe BSS.ShortByteString)
 nestedRun_debugWrapper noValueTransfer gas receiveAddress owner sender value inputData = do
   currentCallDepth <- getCallDepth
 
@@ -1414,7 +1414,7 @@ nestedRun_debugWrapper noValueTransfer gas receiveAddress owner sender value inp
         (vmIsHomestead currentVMState)
         noValueTransfer
         False
-        (suicideList currentVMState)
+        (S.map (^. accountAddress) $ suicideList currentVMState)
         (envBlockHeader env)
         (currentCallDepth + 1)
         receiveAddress
@@ -1424,7 +1424,7 @@ nestedRun_debugWrapper noValueTransfer gas receiveAddress owner sender value inp
         (fromIntegral $ envGasPrice env)
         inputData
         gas
-        (envOrigin env)
+        (envOrigin env ^. accountAddress)
         (envTxHash env)
         (envChainId env)
         (envMetadata env)

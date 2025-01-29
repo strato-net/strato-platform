@@ -23,6 +23,7 @@ module Blockchain.SolidVM.SM
     action,
     runSM,
     getCurrentAccount,
+    getCurrentAddress,
     withCallInfo,
     withTempCallInfo,
     withUncheckedCallInfo,
@@ -728,6 +729,13 @@ getCurrentAccount = do
   cs <- Mod.get (Mod.Proxy @[CallInfo])
   case cs of
     (currentCallInfo : _) -> return $ currentAccount currentCallInfo
+    _ -> internalError "getCurrentAccount called with an empty stack" ()
+
+getCurrentAddress :: MonadSM m => m Address
+getCurrentAddress = do
+  cs <- Mod.get (Mod.Proxy @[CallInfo])
+  case cs of
+    (currentCallInfo : _) -> return $ (currentAccount currentCallInfo) ^. accountAddress
     _ -> internalError "getCurrentAccount called with an empty stack" ()
 
 getCurrentChainId :: MonadSM m => m (Maybe Word256)

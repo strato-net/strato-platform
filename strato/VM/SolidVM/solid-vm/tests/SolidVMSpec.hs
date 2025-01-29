@@ -205,8 +205,8 @@ failedAssertion :: Selector HandledException
 failedAssertion (HE Assert) = True
 failedAssertion _ = False
 
-sender :: Account
-sender = Account 0xdeadbeef Nothing
+sender :: Address
+sender = 0xdeadbeef
 
 proposer :: Address
 proposer = Address 0xdeadbeef2
@@ -214,8 +214,8 @@ proposer = Address 0xdeadbeef2
 privateChainAcc :: Account
 privateChainAcc = Account 0xdeadbeef (Just 0x776622233444)
 
-rootAcc :: Account
-rootAcc = Account (fromPublicKey X509.rootPubKey) Nothing
+rootAcc :: Address
+rootAcc = fromPublicKey X509.rootPubKey
 
 getCert :: X509Certificate
 getCert = fromMaybe (error $ "no idea what's happening") $ either (const Nothing) Just . bsToCert . BC.pack $ myCertString
@@ -247,17 +247,17 @@ myCertString =
       "-----END CERTIFICATE-----"
     ]
 
-origin :: Account
-origin = Account (userAddress $ x509CertToCertInfoState getCert) Nothing
+origin :: Address
+origin = userAddress $ x509CertToCertInfoState getCert
 
-uploadAddress :: Account
-uploadAddress = Account (getNewAddress_unsafe (sender ^. accountAddress) 0) Nothing
+uploadAddress :: Address
+uploadAddress = getNewAddress_unsafe sender 0
 
-secondAddress :: Account
-secondAddress = Account (getNewAddress_unsafe (sender ^. accountAddress) 1) Nothing
+secondAddress :: Address
+secondAddress = getNewAddress_unsafe sender 1
 
-recursiveAddr :: Account
-recursiveAddr = Account (getNewAddress_unsafe (uploadAddress ^. accountAddress) 0) Nothing
+recursiveAddr :: Address
+recursiveAddr = getNewAddress_unsafe uploadAddress 0
 
 devNull :: Loc -> LogSource -> LogLevel -> LogStr -> IO ()
 devNull _ _ _ _ = return ()
@@ -379,7 +379,7 @@ rethrowEx ExecResults {erException = Just ex} = either (liftIO . throwIO . HE) (
 rethrowEx _ = return ()
 
 --Adds a contract to the 0xfeedbeef chain
-runArgsWithSenderBeef :: Account -> T.Text -> String -> ContextM ExecResults
+runArgsWithSenderBeef :: Address -> T.Text -> String -> ContextM ExecResults
 runArgsWithSenderBeef acc args bs = do
   let code = Code $ UTF8.fromString bs
       isTest = error "TODO: isTest"
@@ -434,7 +434,7 @@ runArgsWithSenderBeef acc args bs = do
   return er
 
 --Adds contract to the "main chain"
-runArgsWithSender :: Account -> T.Text -> String -> ContextM ExecResults
+runArgsWithSender :: Address -> T.Text -> String -> ContextM ExecResults
 runArgsWithSender acc args bs = do
   let code = Code $ UTF8.fromString bs
       isTest = error "TODO: isTest"
@@ -490,7 +490,7 @@ runArgsWithSender acc args bs = do
   rethrowEx er
   return er
 
-runArgsWithOrigin :: Account -> Account -> T.Text -> String -> ContextM ExecResults
+runArgsWithOrigin :: Address -> Address -> T.Text -> String -> ContextM ExecResults
 runArgsWithOrigin orig acc args bs = do
   let code = Code $ UTF8.fromString bs
       isTest = error "TODO: isTest"
@@ -785,7 +785,7 @@ runCall' funcName callArgs bs = do
 lastN' :: Int -> [a] -> [a]
 lastN' n xs = L.foldl' (const . drop 1) xs (drop n xs)
 
-call2 :: T.Text -> T.Text -> Account -> ContextM (Maybe String)
+call2 :: T.Text -> T.Text -> Address -> ContextM (Maybe String)
 call2 funcName callArgs contractAddress = do
   let isTest = error "TODO: isTest"
       isHomestead = error "TODO: isHomestead"
@@ -844,13 +844,13 @@ call2 funcName callArgs contractAddress = do
   return $ erReturnVal er
 
 checkStorage :: ContextM [(MP.Key, B.ByteString)]
-checkStorage = flushMemRawStorageDB >> getAllRawStorageKeyVals' uploadAddress
+checkStorage = flushMemRawStorageDB >> getAllRawStorageKeyVals' (Account uploadAddress Nothing)
 
 getAll :: [[StoragePathPiece]] -> ContextM [BasicValue]
-getAll = mapM (getSolidStorageKeyVal' uploadAddress . MS.fromList)
+getAll = mapM (getSolidStorageKeyVal' (Account uploadAddress Nothing) . MS.fromList)
 
 getAll2 :: [[StoragePathPiece]] -> ContextM [BasicValue]
-getAll2 = mapM (getSolidStorageKeyVal' secondAddress . MS.fromList)
+getAll2 = mapM (getSolidStorageKeyVal' (Account secondAddress Nothing) . MS.fromList)
 
 getFields :: [BC.ByteString] -> ContextM [BasicValue]
 getFields = getAll . map (\t -> [Field t])
@@ -875,12 +875,9 @@ bContract' t a =
         then BDefault
         else BContract t u
 
-bAccount :: Account -> BasicValue
-bAccount a =
-  let u = accountOnUnspecifiedChain a
-   in if u == unspecifiedChain 0
-        then BDefault
-        else (BAccount u)
+bAccount :: Address -> BasicValue
+bAccount 0 = BDefault
+bAccount a = BAccount $ unspecifiedChain a
 
 iAddress :: Address -> IndexType
 iAddress = IAccount . unspecifiedChain
@@ -2325,10 +2322,10 @@ contract qq {
     getFields ["x", "num"] `shouldReturn` [bContract "qq" 0x0, BInteger 99]
 
     void $ runArgs (T.pack $ printf "(0x%s,400)" $ show uploadAddress) qq
-    getFields2 ["x", "num"] `shouldReturn` [bContract' "qq" uploadAddress, BInteger 400]
+    getFields2 ["x", "num"] `shouldReturn` [bContract "qq" uploadAddress, BInteger 400]
 
     call2 "a" "()" secondAddress `shouldReturn` Just "()"
-    getFields2 ["x", "num"] `shouldReturn` [bContract' "qq" uploadAddress, BInteger 100]
+    getFields2 ["x", "num"] `shouldReturn` [bContract "qq" uploadAddress, BInteger 100]
 
   it "can locally return locals" . runTest $ do
     runBS
@@ -2765,7 +2762,7 @@ contract qq {
 
   it "can return an address" . runTest $ do
     --works for address type
-    let want' = Numeric.showHex (sender ^. accountAddress) ""
+    let want' = Numeric.showHex sender ""
         want = replicate (40 - length want') '0' ++ want' --etherum address has 40 bytes followed by 0x, short byte string has 32 bytes
     runCall'
       "a"
@@ -2846,7 +2843,7 @@ contract qq {
 
   it "can return a contract" . runTest $ do
     --works for address type
-    let want' = Numeric.showHex (uploadAddress ^. accountAddress) ""
+    let want' = Numeric.showHex uploadAddress ""
         want = replicate (40 - length want') '0' ++ want'
     runCall'
       "self"
@@ -2884,13 +2881,13 @@ contract qq {
     diffs
       `shouldBe` Just
         ( OMap.fromList
-            [ ( uploadAddress,
+            [ ( Account uploadAddress Nothing,
                 Action.SolidVMDiff $
                   M.singleton
                     ".s"
-                    (rlpSerialize $ rlpEncode $ bContract' "Sub" recursiveAddr)
+                    (rlpSerialize $ rlpEncode $ bContract "Sub" recursiveAddr)
               ),
-              ( recursiveAddr,
+              ( Account recursiveAddr Nothing,
                 Action.SolidVMDiff $
                   M.fromList
                     [ (".x", rlpSerialize $ rlpEncode $ BInteger 20),
@@ -3166,8 +3163,8 @@ contract qq {
   }
 }|]
     -- qq should become the `owner` in X
-    getFields ["x"] `shouldReturn` [bContract' "X" recursiveAddr]
-    getSolidStorageKeyVal' recursiveAddr (MS.singleton "owner")
+    getFields ["x"] `shouldReturn` [bContract "X" recursiveAddr]
+    getSolidStorageKeyVal' (Account recursiveAddr Nothing) (MS.singleton "owner")
       `shouldReturn` bAccount uploadAddress
 
   it "can cast from address" . runTest $ do
@@ -3498,8 +3495,8 @@ contract qq {
     x = new X({_z: "ok", _y: 0x777777});
   }
 }|]
-    getFields ["x"] `shouldReturn` [bContract' "X" recursiveAddr]
-    mapM (getSolidStorageKeyVal' recursiveAddr) [MS.singleton "y", MS.singleton "z"]
+    getFields ["x"] `shouldReturn` [bContract "X" recursiveAddr]
+    mapM (getSolidStorageKeyVal' (Account recursiveAddr Nothing)) [MS.singleton "y", MS.singleton "z"]
       `shouldReturn` [BInteger 0x777777, BString "ok"]
 
   xit "can cast a struct from named arguments" . runTest $ do
@@ -4237,7 +4234,7 @@ contract qq{
     -- Set the balance
     adjust_ (Proxy @AddressState) (namedAccountToAccount Nothing a) (\as -> pure $ as {addressStateBalance = 13})
     -- Check return of balance
-    void $ call2 "myTransfer" "()" (namedAccountToAccount Nothing a)
+    void $ call2 "myTransfer" "()" (a^.namedAccountAddress)
     getFields ["bal"] `shouldReturn` [BInteger 13]
 
   it "will not over send (send when there is not enough gas)" . runTest $ do
@@ -4264,7 +4261,7 @@ contract qq{
     -- Set the balance
     adjust_ (Proxy @AddressState) (namedAccountToAccount Nothing a) (\as -> pure $ as {addressStateBalance = 7})
     -- Check return of balance
-    void $ call2 "mySend" "()" (namedAccountToAccount Nothing a)
+    void $ call2 "mySend" "()" (a^.namedAccountAddress)
     getFields ["success", "bal"] `shouldReturn` [BDefault, BInteger 7]
 
   it "will allow for sending to self" . runTest $ do
@@ -4291,7 +4288,7 @@ contract qq{
     -- Set the balance
     adjust_ (Proxy @AddressState) (namedAccountToAccount Nothing a) (\as -> pure $ as {addressStateBalance = 13})
     -- Check return of balance
-    void $ call2 "mySend" "()" (namedAccountToAccount Nothing a)
+    void $ call2 "mySend" "()" (a^.namedAccountAddress)
     getFields ["success", "bal"] `shouldReturn` [BBool True, BInteger 13]
 
   it "will not send when there is not anything to send between account" . runTest $ do
@@ -4318,7 +4315,7 @@ contract qq{
     -- Set the balance
     adjust_ (Proxy @AddressState) (namedAccountToAccount Nothing a) (\as -> pure $ as {addressStateBalance = 0})
     -- Check return of balance
-    void $ call2 "mySend" "()" (namedAccountToAccount Nothing a)
+    void $ call2 "mySend" "()" (a^.namedAccountAddress)
     getFields ["success", "bal"] `shouldReturn` [BDefault, BDefault]
 
   it "cannot send to a non account payable type" $
@@ -4345,7 +4342,7 @@ contract qq{
           -- Set the balance
           adjust_ (Proxy @AddressState) (namedAccountToAccount Nothing a) (\as -> pure $ as {addressStateBalance = 26})
           -- Check return of balance
-          (void $ call2 "mySend" "()" (namedAccountToAccount Nothing a))
+          (void $ call2 "mySend" "()" (a^.namedAccountAddress))
       )
       `shouldThrow` anyTypeError
 
@@ -4373,7 +4370,7 @@ contract qq{
           -- Set the balance
           adjust_ (Proxy @AddressState) (namedAccountToAccount Nothing a) (\as -> pure $ as {addressStateBalance = 26})
           -- Check return of balance
-          (void $ call2 "myTransfer" "()" (namedAccountToAccount Nothing a))
+          (void $ call2 "myTransfer" "()" (a^.namedAccountAddress))
       )
       `shouldThrow` anyTypeError
 
@@ -4418,7 +4415,7 @@ contract qq{
     adjust_ (Proxy @AddressState) (namedAccountToAccount Nothing c) (\cs -> pure $ cs {addressStateBalance = 13})
     adjust_ (Proxy @AddressState) (namedAccountToAccount Nothing b) (\bs -> pure $ bs {addressStateBalance = 13})
     -- Check return of balance
-    void $ call2 "myTransfer" "()" (namedAccountToAccount Nothing a)
+    void $ call2 "myTransfer" "()" (a^.namedAccountAddress)
     getFields ["bala", "balb", "balc"]
       `shouldReturn` [ BInteger 1,
                        BInteger 26,
@@ -4467,7 +4464,7 @@ contract qq{
     adjust_ (Proxy @AddressState) (namedAccountToAccount Nothing c) (\cs -> pure $ cs {addressStateBalance = 13})
     adjust_ (Proxy @AddressState) (namedAccountToAccount Nothing b) (\bs -> pure $ bs {addressStateBalance = 13})
     -- Check return of balance
-    void $ call2 "mySend" "()" (namedAccountToAccount Nothing a)
+    void $ call2 "mySend" "()" (a^.namedAccountAddress)
     getFields ["success", "bala", "balb", "balc"] `shouldReturn` [BBool True, BInteger 1, BInteger 26, BInteger 13]
 
   it "cannot over transfer from an account." $
@@ -4513,7 +4510,7 @@ contract qq{
           adjust_ (Proxy @AddressState) (namedAccountToAccount Nothing c) (\cs -> pure $ cs {addressStateBalance = 13})
           adjust_ (Proxy @AddressState) (namedAccountToAccount Nothing b) (\bs -> pure $ bs {addressStateBalance = 13})
           -- Check return of balance
-          (void $ call2 "myTransfer" "()" (namedAccountToAccount Nothing a))
+          (void $ call2 "myTransfer" "()" (a^.namedAccountAddress))
       )
       `shouldThrow` anyPaymentError
 
@@ -4559,7 +4556,7 @@ contract qq{
     adjust_ (Proxy @AddressState) (namedAccountToAccount Nothing c) (\cs -> pure $ cs {addressStateBalance = 13})
     adjust_ (Proxy @AddressState) (namedAccountToAccount Nothing b) (\bs -> pure $ bs {addressStateBalance = 13})
     -- Check return of balance
-    void $ call2 "mySend" "()" (namedAccountToAccount Nothing a)
+    void $ call2 "mySend" "()" (a^.namedAccountAddress)
     getFields ["success", "bala", "balb", "balc"]
       `shouldReturn` [ BDefault,
                        BInteger 14,
@@ -4634,7 +4631,7 @@ contract qq{
     -- Set the balance
     adjust_ (Proxy @AddressState) (namedAccountToAccount Nothing a) (\as -> pure $ as {addressStateBalance = 13})
     -- Check return of balance
-    void $ call2 "myBalance" "()" (namedAccountToAccount Nothing a)
+    void $ call2 "myBalance" "()" (a^.namedAccountAddress)
     getFields ["bal"] `shouldReturn` [BInteger 13]
   it "can get the codehash from an address" . runTest $ do
     let contract =
@@ -5307,7 +5304,7 @@ contract qq{
     adjust_ (Proxy @AddressState) (namedAccountToAccount Nothing b) (\bs -> pure $ bs {addressStateBalance = 0})
 
     -- Check return of balance
-    void $ call2 "myBalance" "()" (namedAccountToAccount Nothing a)
+    void $ call2 "myBalance" "()" (a^.namedAccountAddress)
     getFields ["bala", "balb"] `shouldReturn` [BInteger 1, BInteger 13]
 
   it "can't assign a value to an unallocated index in an array" $
@@ -6416,7 +6413,7 @@ contract qq {
     adjust_ (Proxy @AddressState) (namedAccountToAccount Nothing contract') (\as -> pure $ as {addressStateBalance = 14})
     adjust_ (Proxy @AddressState) (namedAccountToAccount Nothing owner) (\bs -> pure $ bs {addressStateBalance = 10})
     -- Check return of balance
-    void $ call2 "selfDestructThis" "()" (namedAccountToAccount Nothing contract')
+    void $ call2 "selfDestructThis" "()" (contract'^.namedAccountAddress)
     getFields ["contract'", "contractPay", "owner", "ownerPay"]
       `shouldReturn` [ BDefault,
                        BDefault,
