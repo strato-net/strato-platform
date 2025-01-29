@@ -245,7 +245,7 @@ create _ _ _ blockData _ sender' origin' proposer' _ _ availableGas newAddress c
           { Env.blockHeader = blockData,
             Env.sender = sender',
             Env.proposer = proposer',
-            Env.origin = Account origin' Nothing,
+            Env.origin = origin',
             Env.txHash = txHash',
             Env.metadata = metadata,
             Env.runningTests = isRunningTests
@@ -346,7 +346,7 @@ create' creator maybeCodePtr originAddress issuerAcct issuerName newAccount ch c
       maybeUseWallet = M.lookup "useWallet" =<< metadata
       !useWallet = maybe False (const True) maybeUseWallet
       parentName' = bool parentName "" (useWallet && parentName == "User")
-      issuer = if shouldDoCreatorFork . blockHeaderBlockNumber $ Env.blockHeader env then issuerAcct else Env.origin env ^. accountAddress
+      issuer = if shouldDoCreatorFork . blockHeaderBlockNumber $ Env.blockHeader env then issuerAcct else Env.origin env
   -- set creator
   setCreator (Account issuer Nothing) (NamedAccount originAddress MainChain) (Account newAccount Nothing) contract' (BlockHeader.number $ Env.blockHeader env)
 
@@ -428,7 +428,7 @@ call _ _ _ isRCC _ blockData _ _ codeAddress sender' proposer' _ _ _ availableGa
         Env.Environment
           { Env.blockHeader = blockData,
             Env.sender = sender',
-            Env.origin = Account origin' Nothing,
+            Env.origin = origin',
             Env.proposer = proposer',
             Env.txHash = txHash',
             Env.metadata = metadata,
@@ -1640,26 +1640,26 @@ expToVar' x@(CC.MemberAccess _ expr name) _ = do
           argString = labelToString functionName ++ "(" ++ intercalate "," (map unparseVarType argTypesList) ++ ")"
           calldataHash = fromMaybe emptyHash $ stringKeccak256 argString
       return . Constant . SString $ take 8 $ keccak256ToHex calldataHash
-    (SBuiltinVariable "tx", "origin") -> (Constant . ((flip SAccount) False) . accountToNamedAccount chainId . Env.origin) <$> getEnv
+    (SBuiltinVariable "tx", "origin") -> (Constant . ((flip SAccount) False) . (\v -> NamedAccount v UnspecifiedChain) . Env.origin) <$> getEnv
     (SBuiltinVariable "tx", "username") -> do
       env' <- getEnv
-      maybeCert <- A.select (A.Proxy @X509Certificate) $ Env.origin env' ^. accountAddress
+      maybeCert <- A.select (A.Proxy @X509Certificate) $ Env.origin env'
       return . Constant . SString . fromMaybe "" . fmap subCommonName $ getCertSubject =<< maybeCert
     (SBuiltinVariable "tx", "organization") -> do
       env' <- getEnv
-      maybeCert <- A.select (A.Proxy @X509Certificate) $ Env.origin env' ^. accountAddress
+      maybeCert <- A.select (A.Proxy @X509Certificate) $ Env.origin env'
       return . Constant . SString . fromMaybe "" . fmap subOrg $ getCertSubject =<< maybeCert
     (SBuiltinVariable "tx", "group") -> do
       env' <- getEnv
-      maybeCert <- A.select (A.Proxy @X509Certificate) $ Env.origin env' ^. accountAddress
+      maybeCert <- A.select (A.Proxy @X509Certificate) $ Env.origin env'
       return . Constant . SString . fromMaybe "" $ subUnit =<< getCertSubject =<< maybeCert
     (SBuiltinVariable "tx", "organizationalUnit") -> do
       env' <- getEnv
-      maybeCert <- A.select (A.Proxy @X509Certificate) $ Env.origin env' ^. accountAddress
+      maybeCert <- A.select (A.Proxy @X509Certificate) $ Env.origin env'
       return . Constant . SString . fromMaybe "" $ subUnit =<< getCertSubject =<< maybeCert
     (SBuiltinVariable "tx", "certificate") -> do
       env' <- getEnv
-      maybeCert <- A.select (A.Proxy @X509Certificate) $ Env.origin env' ^. accountAddress
+      maybeCert <- A.select (A.Proxy @X509Certificate) $ Env.origin env'
       return . Constant . SString . fromMaybe "" $ fmap (BC.unpack . certToBytes) maybeCert
     (SStruct _ theMap, fieldName) -> case M.lookup fieldName theMap of
       Nothing -> missingField "struct member access" fieldName
@@ -2890,7 +2890,7 @@ callBuiltin "create" args@[SString contractName', SString contractSrc, SString a
       isRunningTests = Env.runningTests theEnv
       maybeUseWallet = M.lookup "useWallet" =<< metadata
       !useWallet = maybe False (const True) maybeUseWallet
-  (ctr, _, ctrName) <- getCreator $ origin ^. accountAddress --not sure if this should be there instead
+  (ctr, _, ctrName) <- getCreator $ origin --not sure if this should be there instead
   execResults <- create' creator Nothing newAddress ctr ctrName newAddress hsh cc contractName' (CC.OrderedArgs constructorArgs) pragmaCheck
   case erNewContractAccount execResults of
     Just nca -> do
