@@ -19,12 +19,23 @@ const NewVaultCard = ({ reserveItem, reserve, parent = '', contextHolder }) => {
   const ethDispatch = useEthDispatch();
   const { hasChecked, isAuthenticated, loginUrl, user } =
     useAuthenticateState();
-  const { ethstAddress, wbtcstAddress } = useEthState();
+  const { ethstAddress, wbtcstAddress, usdtAddress, usdcAddress, paxgAddress } = useEthState();
+
+  const isEthst = reserveItem?.originAddress === ethstAddress;
+  const isWbtcst = reserveItem?.originAddress === wbtcstAddress;
+  const isUsdt = reserveItem?.originAddress === usdtAddress;
+  const isUsdc = reserveItem?.originAddress === usdcAddress;
+  const isPaxg = reserveItem?.originAddress === paxgAddress;
+
+  
 
   useEffect(() => {
     const fetchAddresses = async () => {
       ethActions.fetchETHSTAddress(ethDispatch);
       ethActions.fetchWBTCSTAddress(ethDispatch);
+      ethActions.fetchUSDTAddress(ethDispatch);
+      ethActions.fetchUSDCAddress(ethDispatch);
+      ethActions.fetchPAXGAddress(ethDispatch);
     };
 
     fetchAddresses();
@@ -55,7 +66,7 @@ const NewVaultCard = ({ reserveItem, reserve, parent = '', contextHolder }) => {
   };
 
   const handleCardClick = () => {
-    if (reserveItem.originAddress === ethstAddress) {
+    if (isEthst) {
       navigate(
         `${routes.EthstProductDetail.url.replace(
           ':address',
@@ -65,16 +76,26 @@ const NewVaultCard = ({ reserveItem, reserve, parent = '', contextHolder }) => {
           state: { isCalledFromInventory: false },
         }
       );
-    } else if (reserveItem.originAddress === wbtcstAddress) {
-      navigate(
-        `${routes.WbtcstProductDetail.url.replace(
-          ':address',
-          reserveItem.address
-        )}`,
-        {
-          state: { isCalledFromInventory: false },
-        }
-      );
+    }  else if (isWbtcst) {
+      const url = routes.WbtcstProductDetail.url;
+      navigate(`${url.replace(':address', reserveItem.address)}`, {
+        state: { isCalledFromInventory: false },
+      });
+    }else if (isUsdt) {
+      const url = routes.UsdtProductDetail.url;
+      navigate(`${url.replace(':address', reserveItem.address)}`, {
+        state: { isCalledFromInventory: false },
+      });
+    } else if (isUsdc) {
+      const url = routes.UsdcProductDetail.url;
+      navigate(`${url.replace(':address', reserveItem.address)}`, {
+        state: { isCalledFromInventory: false },
+      });
+    } else if (isPaxg) {
+      const url = routes.PaxgProductDetail.url;
+      navigate(`${url.replace(':address', reserveItem.address)}`, {
+        state: { isCalledFromInventory: false },
+      });
     } else {
       navigate(
         `${routes.MarketplaceProductDetail.url

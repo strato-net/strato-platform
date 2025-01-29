@@ -12,5 +12,9 @@ module.exports = {
   blockAppsPublicKey: process.env.BLOCKAPPS_PUBLIC_KEY,
   blockAppsPrivateKey: process.env.BLOCKAPPS_PRIVATE_KEY,
   wbtcContractAddress: process.env.WBTC_CONTRACT_ADDRESS,
+  
+  usdtContractAddress: process.env.USDT_CONTRACT_ADDRESS,
+  usdcContractAddress: process.env.USDC_CONTRACT_ADDRESS,
+  paxgContractAddress: process.env.PAXG_CONTRACT_ADDRESS,
   mintAndTransfer: "mintETHST",
 };

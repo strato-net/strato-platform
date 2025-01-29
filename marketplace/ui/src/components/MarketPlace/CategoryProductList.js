@@ -84,6 +84,9 @@ const CategoryProductList = ({ user }) => {
   useEffect(() => {
     ethActions.fetchETHSTAddress(ethDispatch);
     ethActions.fetchWBTCSTAddress(ethDispatch);
+    ethActions.fetchUSDTAddress(ethDispatch);
+    ethActions.fetchUSDCAddress(ethDispatch);
+    ethActions.fetchPAXGAddress(ethDispatch);
   });
 
   useEffect(() => {

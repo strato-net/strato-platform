@@ -15,7 +15,7 @@ const Feed = ({ user }) => {
   const [api, contextHolder] = notification.useNotification();
   const { USDSTAddress, assetsWithEighteenDecimalPlaces, assetsWithEightDecimalPlaces } =
     useMarketplaceState();
-  const { ethstAddress, wbtcstAddress } = useEthState();
+  const { ethstAddress, wbtcstAddress, usdtAddress, usdcAddress, paxgAddress } = useEthState();
 
   const marketplaceDispatch = useMarketplaceDispatch();
   const ethDispatch = useEthDispatch();
@@ -29,6 +29,9 @@ const Feed = ({ user }) => {
       await marketplaceActions.fetchAssetsWithEightDecimalPlaces(marketplaceDispatch);
       await ethActions.fetchETHSTAddress(ethDispatch);
       await ethActions.fetchWBTCSTAddress(ethDispatch);
+      // await ethActions.fetchUSDTAddress(ethDispatch);//TODO: uncomment
+      // await ethActions.fetchUSDCAddress(ethDispatch);
+      // await ethActions.fetchPAXGAddress(ethDispatch);
     };
 
     fetchAddresses();

@@ -31,7 +31,7 @@ const NewTrendingCard = ({
   const { Text } = Typography;
   const { assetsWithEighteenDecimalPlaces, assetsWithEightDecimalPlaces } =
     useMarketplaceState();
-  const { ethstAddress, wbtcstAddress } = useEthState();
+  const { ethstAddress, wbtcstAddress, usdtAddress, usdcAddress, paxgAddress } = useEthState();
   const { hasChecked, isAuthenticated, loginUrl, user } =
     useAuthenticateState();
 
@@ -62,8 +62,14 @@ const NewTrendingCard = ({
   const ethNaviroute = routes.EthstProductDetail.url;
   const isAvailableForSale = !topSellingProduct.price || saleQuantity === 0;
   const isDisabled =
-    topSellingProduct.originAddress !== ethstAddress && topSellingProduct.originAddress !== wbtcstAddress &&
+    topSellingProduct.originAddress !== ethstAddress && topSellingProduct.originAddress !== wbtcstAddress && //TODO: ? add logic for other assets
     (isAvailableForSale || ownerSameAsUser());
+
+  const isEthst = topSellingProduct.originAddress === ethstAddress;
+  const isWbtcst = topSellingProduct.originAddress === wbtcstAddress;
+  const isUsdt = topSellingProduct.originAddress === usdtAddress;  
+  const isUsdc = topSellingProduct.originAddress === usdcAddress;
+  const isPaxg = topSellingProduct.originAddress === paxgAddress;
 
   const queryParams = new URLSearchParams(location.search);
   const categoryQueryValue = queryParams.get('category');
@@ -162,7 +168,7 @@ const NewTrendingCard = ({
               // Let the browser handle it natively to open in a new tab
             } else {
               e.preventDefault();
-              if (topSellingProduct.originAddress === ethstAddress) {
+              if (isEthst) {
                 navigate(
                   `${ethNaviroute.replace(
                     ':address',
@@ -170,14 +176,26 @@ const NewTrendingCard = ({
                   )}`,
                   { state: { isCalledFromInventory: false } }
                 );
-              } else if (topSellingProduct.originAddress === wbtcstAddress) {
-                navigate(
-                  `${routes.WbtcstProductDetail.url.replace(
-                    ':address',
-                    topSellingProduct.address
-                  )}`,
-                  { state: { isCalledFromInventory: false } }
-                );
+              } else if (isWbtcst) {
+                const url = routes.WbtcstProductDetail.url;
+                navigate(`${url.replace(':address', topSellingProduct.assetAddress)}`, {
+                  state: { isCalledFromInventory: false },
+                });
+              }else if (isUsdt) {
+                const url = routes.UsdtProductDetail.url;
+                navigate(`${url.replace(':address', topSellingProduct.assetAddress)}`, {
+                  state: { isCalledFromInventory: false },
+                });
+              } else if (isUsdc) {
+                const url = routes.UsdcProductDetail.url;
+                navigate(`${url.replace(':address', topSellingProduct.assetAddress)}`, {
+                  state: { isCalledFromInventory: false },
+                });
+              } else if (isPaxg) {
+                const url = routes.PaxgProductDetail.url;
+                navigate(`${url.replace(':address', topSellingProduct.assetAddress)}`, {
+                  state: { isCalledFromInventory: false },
+                });
               } else {
                 navigate(
                   `${naviroute
@@ -280,8 +298,7 @@ const NewTrendingCard = ({
         </div>
         <div
           className={`flex justify-between items-center bg-[#EEEFFA] p-2 rounded-[4px] ${
-            topSellingProduct.originAddress === ethstAddress ||
-            topSellingProduct.originAddress === wbtcstAddress
+            isEthst || isWbtcst
               ? 'invisible'
               : ''
           }`}
@@ -378,7 +395,7 @@ const NewTrendingCard = ({
                   productId: topSellingProduct.productId,
                 },
               });
-              if (topSellingProduct.originAddress === ethstAddress) {
+              if (isEthst) {
                 navigate(
                   `${ethNaviroute.replace(
                     ':address',
@@ -386,14 +403,26 @@ const NewTrendingCard = ({
                   )}`,
                   { state: { isCalledFromInventory: false } }
                 );
-              } else if (topSellingProduct.originAddress === wbtcstAddress) {
-                navigate(
-                  `${routes.WbtcstProductDetail.url.replace(
-                    ':address',
-                    topSellingProduct.address
-                  )}`,
-                  { state: { isCalledFromInventory: false } }
-                );
+              } else if (isWbtcst) {
+                const url = routes.WbtcstProductDetail.url;
+                navigate(`${url.replace(':address', topSellingProduct.assetAddress)}`, {
+                  state: { isCalledFromInventory: false },
+                });
+              }else if (isUsdt) {
+                const url = routes.UsdtProductDetail.url;
+                navigate(`${url.replace(':address', topSellingProduct.assetAddress)}`, {
+                  state: { isCalledFromInventory: false },
+                });
+              } else if (isUsdc) {
+                const url = routes.UsdcProductDetail.url;
+                navigate(`${url.replace(':address', topSellingProduct.assetAddress)}`, {
+                  state: { isCalledFromInventory: false },
+                });
+              } else if (isPaxg) {
+                const url = routes.PaxgProductDetail.url;
+                navigate(`${url.replace(':address', topSellingProduct.assetAddress)}`, {
+                  state: { isCalledFromInventory: false },
+                });
               } else {
                 if (
                   (await addItemToCart(topSellingProduct, quantity)) === true
@@ -404,7 +433,7 @@ const NewTrendingCard = ({
               }
             }}
           >
-            {topSellingProduct.originAddress === ethstAddress || topSellingProduct.originAddress === wbtcstAddress
+            {isEthst || isWbtcst //TODO: ? add condition for other stakeable assets
               ? 'Bridge'
               : 'Buy Now'}
           </Button>

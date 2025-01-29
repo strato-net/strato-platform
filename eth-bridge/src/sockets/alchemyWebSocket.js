@@ -11,7 +11,8 @@ const setupAlchemyWebSocket = async () => {
   const alchemy = new Alchemy(settings);
 
   const erc20Filter = {
-    address: wbtcContractAddress, // Set to null to listen to all ERC-20 tokens, or set a specific token address
+    address: wbtcContractAddress, //TODO: add other stakeable asset address
+    // Set to null to listen to all ERC-20 tokens, or set a specific token address
     topics: [ethers.id("Transfer(address,address,uint256)")],
   };
 

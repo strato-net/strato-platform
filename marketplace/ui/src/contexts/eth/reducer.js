@@ -40,6 +40,45 @@ const reducer = (state, action) => {
       return {
         ...state,
       };
+    case actionDescriptors.fetchUSDTAddress:
+      return {
+        ...state,
+      };
+    case actionDescriptors.fetchUSDTAddressSuccessful:
+      return {
+        ...state,
+        usdtAddress: action.payload,
+      };
+    case actionDescriptors.fetchUSDTAddressFailed:
+      return {
+        ...state,
+      };
+      case actionDescriptors.fetchUSDCAddress:
+      return {
+        ...state,
+      };
+    case actionDescriptors.fetchUSDCAddressSuccessful:
+      return {
+        ...state,
+        usdcAddress: action.payload,
+      };
+    case actionDescriptors.fetchUSDCAddressFailed:
+      return {
+        ...state,
+      };
+      case actionDescriptors.fetchPAXGAddress:
+      return {
+        ...state,
+      };
+    case actionDescriptors.fetchPAXGAddressSuccessful:
+      return {
+        ...state,
+        paxgAddress: action.payload,
+      };
+    case actionDescriptors.fetchPAXGAddressFailed:
+      return {
+        ...state,
+      };
     case actionDescriptors.addHash:
       return {
         ...state,

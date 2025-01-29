@@ -45,6 +45,14 @@ export default {
   prodETHSTAddress: '93fb7295859b2d70199e0a4883b7c320cf874e6c',
   testnetWBTCSTAddress: '510e88e658b7bca8b08559f54ebf2f08a8f24855',
   prodWBTCSTAddress: '',
+// TODO: add these address
+  testnetUSDTAddress: '',
+  prodUSDTAddress: '',
+  testnetUSDCAddress: '',
+  prodUSDCAddress: '',
+  testnetPAXGAddress: '',
+  prodPAXGAddress: '',
+  // TODO: add these address
   attachImagesAndFiles:
     '*,BlockApps-Mercata-Asset-files(*),BlockApps-Mercata-Asset-images(*),BlockApps-Mercata-Asset-fileNames(*)',
   attachSalesAndImagesAndFiles:
@@ -74,7 +82,8 @@ export default {
     'bbb0e060f3f43c533d5b5f0250ff473de831e5e4', //testnetUSDSTAddress
   ],
   AssetsWithEightDecimalPlaces: [
-    '510e88e658b7bca8b08559f54ebf2f08a8f24855', //testnetWBTCSTAddress
+    '510e88e658b7bca8b08559f54ebf2f08a8f24855', //testnetWBTCSTAddress 
+    //TODO: add remaining address of the stakeable asset that have 18 decimal value
   ],
   localHost: 'http://localhost',
   burnAddress: '6ec8bbe4a5b87be18d443408df43a45e5972fa1b',

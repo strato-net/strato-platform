@@ -17,8 +17,13 @@ export default {
     label: 'Marketplace Product Detail',
     url: '/dp/:address/:name',
   },
+  
   EthstProductDetail: { label: 'ETHST Product Detail', url: '/ethst/:address' },
   WbtcstProductDetail: { label: 'WBTCST Product Detail', url: '/wbtcst/:address' },
+  UsdtProductDetail: { label: 'USDT Product Detail', url: '/usdt/:address' },
+  UsdcProductDetail: { label: 'USDC Product Detail', url: '/usdc/:address' },
+  PaxgProductDetail: { label: 'PAXG Product Detail', url: '/paxg/:address' },
+
   LoginRedirect: { label: 'LoginRedirect', url: '/login' },
   Checkout: { label: 'Checkout', url: '/checkout' },
   ConfirmOrder: { label: 'Confirm Order', url: '/confirmOrder' },

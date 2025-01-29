@@ -67,7 +67,7 @@ const InventoryCard = ({
   const [bridgeModalOpen, setBridgeModalOpen] = useState(false);
   const [stakeModalOpen, setStakeModalOpen] = useState(false);
   const [popoverVisible, setPopoverVisible] = useState({});
-  const { ethstAddress, wbtcstAddress } = useEthState();
+  const { ethstAddress, wbtcstAddress, usdtAddress, usdcAddress, paxgAddress } = useEthState();
 
   const navigate = useNavigate();
   const naviroute = routes.InventoryDetail.url;
@@ -122,6 +122,11 @@ const InventoryCard = ({
     reserves &&
     reserves.length > 0 &&
     reserves.some((reserve) => inventory.root === reserve.assetRootAddress);
+
+  const isWbtcst = inventory.originAddress === wbtcstAddress;
+  const isUsdt = inventory.originAddress === usdtAddress;
+  const isUsdc = inventory.originAddress === usdcAddress;
+  const isPaxg = inventory.originAddress === paxgAddress;
 
   const handleCancel = () => {
     setOpen(false);
@@ -205,8 +210,24 @@ const InventoryCard = ({
       navigate(`${ethNaviroute.replace(':address', inventory.address)}`, {
         state: { isCalledFromInventory: false },
       });
-    } else if (inventory.originAddress === wbtcstAddress) {
-      navigate(`${ethNaviroute.replace(':address', inventory.address)}`, {
+    }  else if (isWbtcst) {
+      const url = routes.WbtcstProductDetail.url;
+      navigate(`${url.replace(':address', inventory.address)}`, {
+        state: { isCalledFromInventory: false },
+      });
+    }else if (isUsdt) {
+      const url = routes.UsdtProductDetail.url;
+      navigate(`${url.replace(':address', inventory.address)}`, {
+        state: { isCalledFromInventory: false },
+      });
+    } else if (isUsdc) {
+      const url = routes.UsdcProductDetail.url;
+      navigate(`${url.replace(':address', inventory.address)}`, {
+        state: { isCalledFromInventory: false },
+      });
+    } else if (isPaxg) {
+      const url = routes.PaxgProductDetail.url;
+      navigate(`${url.replace(':address', inventory.address)}`, {
         state: { isCalledFromInventory: false },
       });
     } else {

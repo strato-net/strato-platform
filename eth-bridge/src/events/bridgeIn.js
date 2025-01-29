@@ -1,5 +1,5 @@
 const { dbApiClient } = require("../helper/apiClient");
-const { mintAndTransfer, wbtcContractAddress, blockAppsPublicKey } = require("../config");
+const { mintAndTransfer, wbtcContractAddress, blockAppsPublicKey, usdtContractAddress, usdcContractAddress, paxgContractAddress } = require("../config");
 const { createTransactionPayload } = require("../helper/transaction");
 const { ethers } = require("ethers");
 
@@ -28,6 +28,18 @@ const parseERC20TransferLog = (log) => {
   // Confirm that this matches the WBTC contract address
   if (address.toLowerCase() === wbtcContractAddress.toLowerCase()) {
     return { from, to, value, token: "WBTC" };
+  }
+
+  if (address.toLowerCase() === usdtContractAddress.toLowerCase()) {
+    return { from, to, value, token: "USDT" };
+  }
+
+  if (address.toLowerCase() === usdcContractAddress.toLowerCase()) {
+    return { from, to, value, token: "USDC" };
+  }
+
+  if (address.toLowerCase() === paxgContractAddress.toLowerCase()) {
+    return { from, to, value, token: "PAXG" };
   }
 
   return null; // Ignore non-WBTC transfers

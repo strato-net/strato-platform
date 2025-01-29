@@ -20,6 +20,9 @@ const GlobalTransactionResponsive = ({
   assetsWithEightDecimalPlaces,
   ethstAddress,
   wbtcstAddress,
+  usdtAddress,
+  usdcAddress,
+  paxgAddress
 }) => {
   const USDSTIcon = (
     <img src={Images.USDST} alt="USDST" className="w-5 h-5 ml-1" />
@@ -145,6 +148,9 @@ const GlobalTransactionResponsive = ({
               const handleAssetRedirection = () => {
                 const isEthst = assetOriginAddress === ethstAddress;
                 const isWbtcst = assetOriginAddress === wbtcstAddress;
+                const isUsdt = assetOriginAddress === usdtAddress;
+                const isUsdc = assetOriginAddress === usdcAddress;
+                const isPaxg = assetOriginAddress === paxgAddress;
                 if (isEthst) {
                   const url = routes.EthstProductDetail.url;
                   navigate(`${url.replace(':address', assetAddress)}`, {
@@ -153,6 +159,21 @@ const GlobalTransactionResponsive = ({
                 } else if (isWbtcst) {
                   const url = routes.WbtcstProductDetail.url;
                   navigate(`${url.replace(':address', assetAddress)}`, {
+                    state: { isCalledFromInventory: false },
+                  });
+                }else if (isUsdt) {
+                  const url = routes.UsdtProductDetail.url;
+                  navigate(`${url.replace(':address', data.assetAddress)}`, {
+                    state: { isCalledFromInventory: false },
+                  });
+                } else if (isUsdc) {
+                  const url = routes.UsdcProductDetail.url;
+                  navigate(`${url.replace(':address', data.assetAddress)}`, {
+                    state: { isCalledFromInventory: false },
+                  });
+                } else if (isPaxg) {
+                  const url = routes.PaxgProductDetail.url;
+                  navigate(`${url.replace(':address', data.assetAddress)}`, {
                     state: { isCalledFromInventory: false },
                   });
                 } else {

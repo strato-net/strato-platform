@@ -10,6 +10,19 @@ const actionDescriptors = {
   fetchWBTCSTAddress: 'fetch_wbtcst_address',
   fetchWBTCSTAddressSuccessful: 'fetch_wbtcst_address_successful',
   fetchWBTCSTAddressFailed: 'fetch_wbtcst_address_failed',
+
+  fetchUSDTAddress: 'fetch_usdt_address',
+  fetchUSDTAddressSuccessful: 'fetch_usdt_address_successful',
+  fetchUSDTAddressFailed: 'fetch_usdt_address_failed',
+
+  fetchUSDCAddress: 'fetch_usdc_address',
+  fetchUSDCAddressSuccessful: 'fetch_usdc_address_successful',
+  fetchUSDCAddressFailed: 'fetch_usdc_address_failed',
+
+  fetchPAXGAddress: 'fetch_paxg_address',
+  fetchPAXGAddressSuccessful: 'fetch_paxg_address_successful',
+  fetchPAXGAddressFailed: 'fetch_paxg_address_failed',
+
   addHash: 'add_hash',
   addHashSuccessful: 'add_hash_successful',
   addHashFailed: 'add_hash_failed',
@@ -103,6 +116,132 @@ const actions = {
       dispatch({
         type: actionDescriptors.fetchWBTCSTAddressFailed,
         payload: 'Error while fetching WBTCST address',
+      });
+      return null;
+    }
+  },
+
+  fetchUSDTAddress: async (dispatch) => {
+    dispatch({ type: actionDescriptors.fetchUSDTAddress });
+    try {
+      let response = await fetch(`${apiUrl}/tokens/usdtAddress`, {
+        method: HTTP_METHODS.GET,
+        credentials: 'same-origin',
+      });
+
+      const body = await response.json();
+      if (
+        response.status === RestStatus.UNAUTHORIZED ||
+        response.status === RestStatus.FORBIDDEN
+      ) {
+        dispatch({
+          type: actionDescriptors.fetchUSDTAddressFailed,
+          payload: 'Error while fetching USDT address',
+        });
+        return null;
+      }
+
+      if (response.status === RestStatus.OK) {
+        dispatch({
+          type: actionDescriptors.fetchUSDTAddressSuccessful,
+          payload: body?.data,
+        });
+        return body.data;
+      }
+
+      dispatch({
+        type: actionDescriptors.fetchUSDTAddressFailed,
+        payload: 'Error while fetching USDT address',
+      });
+      return null;
+    } catch (err) {
+      dispatch({
+        type: actionDescriptors.fetchUSDTAddressFailed,
+        payload: 'Error while fetching USDT address',
+      });
+      return null;
+    }
+  },
+
+  fetchUSDCAddress: async (dispatch) => {
+    dispatch({ type: actionDescriptors.fetchUSDCAddress });
+    try {
+      let response = await fetch(`${apiUrl}/tokens/usdcAddress`, {
+        method: HTTP_METHODS.GET,
+        credentials: 'same-origin',
+      });
+
+      const body = await response.json();
+      if (
+        response.status === RestStatus.UNAUTHORIZED ||
+        response.status === RestStatus.FORBIDDEN
+      ) {
+        dispatch({
+          type: actionDescriptors.fetchUSDCAddressFailed,
+          payload: 'Error while fetching USDC address',
+        });
+        return null;
+      }
+
+      if (response.status === RestStatus.OK) {
+        dispatch({
+          type: actionDescriptors.fetchUSDCAddressSuccessful,
+          payload: body?.data,
+        });
+        return body.data;
+      }
+
+      dispatch({
+        type: actionDescriptors.fetchUSDCAddressFailed,
+        payload: 'Error while fetching USDC address',
+      });
+      return null;
+    } catch (err) {
+      dispatch({
+        type: actionDescriptors.fetchUSDCAddressFailed,
+        payload: 'Error while fetching USDC address',
+      });
+      return null;
+    }
+  },
+
+  fetchPAXGAddress: async (dispatch) => {
+    dispatch({ type: actionDescriptors.fetchPAXGAddress });
+    try {
+      let response = await fetch(`${apiUrl}/tokens/paxgAddress`, {
+        method: HTTP_METHODS.GET,
+        credentials: 'same-origin',
+      });
+
+      const body = await response.json();
+      if (
+        response.status === RestStatus.UNAUTHORIZED ||
+        response.status === RestStatus.FORBIDDEN
+      ) {
+        dispatch({
+          type: actionDescriptors.fetchPAXGAddressFailed,
+          payload: 'Error while fetching PAXG address',
+        });
+        return null;
+      }
+
+      if (response.status === RestStatus.OK) {
+        dispatch({
+          type: actionDescriptors.fetchPAXGAddressSuccessful,
+          payload: body?.data,
+        });
+        return body.data;
+      }
+
+      dispatch({
+        type: actionDescriptors.fetchPAXGAddressFailed,
+        payload: 'Error while fetching PAXG address',
+      });
+      return null;
+    } catch (err) {
+      dispatch({
+        type: actionDescriptors.fetchPAXGAddressFailed,
+        payload: 'Error while fetching PAXG address',
       });
       return null;
     }

@@ -182,6 +182,69 @@ const BridgeWalletModal = ({ open, handleCancel, accountDetails, signer, tokenNa
         );
   
         console.log("WBTC transfer transaction hash:", tx.hash);
+      }else if (tokenName === "USDT") { //TODO: based on the decimal values change the value in the below conditions
+        // USDT contract address based on environment
+        const usdtAddress = fileServerUrl.includes("test")
+          ? "0x29f2D40B0605204364af54EC677bD022dA425d03"
+          : "0x2260FAC5E5542a773Aa44fBCfeDf7C193bc2C599";
+  
+        // Create ERC-20 contract instance
+        const usdtContract = new ethers.Contract(usdtAddress, ERC20_ABI, signer);
+  
+        // Convert quantity to smallest USDT unit (8 decimals)
+        const usdtAmount = ethers.utils.parseUnits(quantity.toString(), 8);
+  
+        // Send ERC-20 token transfer
+        tx = await usdtContract.transfer(
+          fileServerUrl.includes("test")
+            ? "0xBdAFaEBc08B94785dfE7Fc720Fbcd9aFc156454E"
+            : "0x3590039Cce30da23Fe434A39dFb3365Ecec03eAb",
+          usdtAmount
+        );
+  
+        console.log("usdt transfer transaction hash:", tx.hash);
+      }else if (tokenName === "USDC") {
+        // USDC contract address based on environment
+        const usdcAddress = fileServerUrl.includes("test")
+          ? "0x29f2D40B0605204364af54EC677bD022dA425d03"
+          : "0x2260FAC5E5542a773Aa44fBCfeDf7C193bc2C599";
+  
+        // Create ERC-20 contract instance
+        const usdcContract = new ethers.Contract(usdcAddress, ERC20_ABI, signer);
+  
+        // Convert quantity to smallest USDC unit (8 decimals)
+        const usdcAmount = ethers.utils.parseUnits(quantity.toString(), 8);
+  
+        // Send ERC-20 token transfer
+        tx = await usdcContract.transfer(
+          fileServerUrl.includes("test")
+            ? "0xBdAFaEBc08B94785dfE7Fc720Fbcd9aFc156454E"
+            : "0x3590039Cce30da23Fe434A39dFb3365Ecec03eAb",
+          usdcAmount
+        );
+  
+        console.log("usdc transfer transaction hash:", tx.hash);
+      }else if (tokenName === "PAXG") {
+        // PAXG contract address based on environment
+        const paxgAddress = fileServerUrl.includes("test")
+          ? "0x29f2D40B0605204364af54EC677bD022dA425d03"
+          : "0x2260FAC5E5542a773Aa44fBCfeDf7C193bc2C599";
+  
+        // Create ERC-20 contract instance
+        const paxgContract = new ethers.Contract(paxgAddress, ERC20_ABI, signer);
+  
+        // Convert quantity to smallest PAXG unit (8 decimals)
+        const paxgAmount = ethers.utils.parseUnits(quantity.toString(), 8);
+  
+        // Send ERC-20 token transfer
+        tx = await paxgContract.transfer(
+          fileServerUrl.includes("test")
+            ? "0xBdAFaEBc08B94785dfE7Fc720Fbcd9aFc156454E"
+            : "0x3590039Cce30da23Fe434A39dFb3365Ecec03eAb",
+          paxgAmount
+        );
+  
+        console.log("paxg transfer transaction hash:", tx.hash);
       } else {
         // ETH transfer logic (native transfer)
         tx = await signer.sendTransaction({

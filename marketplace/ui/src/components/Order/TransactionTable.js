@@ -83,7 +83,7 @@ const TransactionTable = ({
   const [transactions, setTransactions] = useState(userTransactions);
   const [originAddress, setOriginAddress] = useState('');
   const [search, setSearch] = useState('');
-  const { ethstAddress, wbtcstAddress } = useEthState();
+  const { ethstAddress, wbtcstAddress, usdtAddress, usdcAddress, paxgAddress } = useEthState();
 
   const formatter = new Intl.NumberFormat('en-US');
   const formattedNum = (num) => formatter.format(num);
@@ -304,6 +304,9 @@ const TransactionTable = ({
   const handleAssetRedirection = (data) => {
     const isEthst = data?.assetOriginAddress === ethstAddress;
     const isWbtcst = data?.assetOriginAddress === wbtcstAddress;
+    const isUsdt = data?.assetOriginAddres === usdtAddress;
+    const isUsdc = data?.assetOriginAddres === usdcAddress;
+    const isPaxg = data?.assetOriginAddres === paxgAddress;
     if (isEthst) {
       const url = routes.EthstProductDetail.url;
       navigate(`${url.replace(':address', data.assetAddress)}`, {
@@ -311,6 +314,21 @@ const TransactionTable = ({
       });
     } else if (isWbtcst) {
       const url = routes.WbtcstProductDetail.url;
+      navigate(`${url.replace(':address', data.assetAddress)}`, {
+        state: { isCalledFromInventory: false },
+      });
+    }else if (isUsdt) {
+      const url = routes.UsdtProductDetail.url;
+      navigate(`${url.replace(':address', data.assetAddress)}`, {
+        state: { isCalledFromInventory: false },
+      });
+    } else if (isUsdc) {
+      const url = routes.UsdcProductDetail.url;
+      navigate(`${url.replace(':address', data.assetAddress)}`, {
+        state: { isCalledFromInventory: false },
+      });
+    } else if (isPaxg) {
+      const url = routes.PaxgProductDetail.url;
       navigate(`${url.replace(':address', data.assetAddress)}`, {
         state: { isCalledFromInventory: false },
       });

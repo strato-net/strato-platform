@@ -86,6 +86,9 @@ const UserProfile = ({ user }) => {
       );
       await ethActions.fetchETHSTAddress(ethDispatch);
       await ethActions.fetchWBTCSTAddress(ethDispatch);
+      await ethActions.fetchUSDTAddress(ethDispatch);
+      await ethActions.fetchUSDCAddress(ethDispatch);
+      await ethActions.fetchPAXGAddress(ethDispatch);
       setAssetsWithEighteenDecimalPlaces(assetsWithEighteenDecimalPlaces);
       setAssetsWithEightDecimalPlaces(assetsWithEightDecimalPlaces);
     };

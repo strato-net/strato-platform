@@ -40,6 +40,36 @@ class TokensController {
     }
   }
 
+  static async getUSDTAddress(_, res, next) {
+    try {
+      const address = await tokensJs.getUSDTAddress();
+
+      return rest.response.status200(res, address);
+    } catch (e) {
+      return next(e);
+    }
+  }
+
+  static async getUSDCAddress(_, res, next) {
+    try {
+      const address = await tokensJs.getUSDCAddress();
+
+      return rest.response.status200(res, address);
+    } catch (e) {
+      return next(e);
+    }
+  }
+
+  static async getPAXGAddress(_, res, next) {
+    try {
+      const address = await tokensJs.getPAXGAddress();
+
+      return rest.response.status200(res, address);
+    } catch (e) {
+      return next(e);
+    }
+  }
+
   static async addHash(req, res, next) {
     try {
       const { dapp, body } = req;

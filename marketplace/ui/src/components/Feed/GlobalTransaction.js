@@ -45,6 +45,9 @@ const GlobalTransaction = ({
   assetsWithEightDecimalPlaces,
   ethstAddress,
   wbtcstAddress,
+  usdtAddress,
+  usdcAddress,
+  paxgAddress
 }) => {
   const USDSTIcon = (
     <img src={Images.USDST} alt="USDST" className="mx-1 w-4 h-4" />
@@ -178,6 +181,10 @@ const GlobalTransaction = ({
   const handleAssetRedirection = (data) => {
     const isEthst = data?.assetOriginAddress === ethstAddress;
     const isWbtcst = data?.assetOriginAddress === wbtcstAddress;
+    const isUsdt = data?.assetOriginAddress === usdtAddress;
+    const isUsdc = data?.assetOriginAddress === usdcAddress;
+    const isPaxg = data?.assetOriginAddress === paxgAddress;
+    //TODO: add redirection condition if required.
     if (isEthst) {
       const url = routes.EthstProductDetail.url;
       navigate(`${url.replace(':address', data.assetAddress)}`, {
@@ -185,6 +192,21 @@ const GlobalTransaction = ({
       });
     } else if (isWbtcst) {
       const url = routes.WbtcstProductDetail.url;
+      navigate(`${url.replace(':address', data.assetAddress)}`, {
+        state: { isCalledFromInventory: false },
+      });
+    }else if (isUsdt) {
+      const url = routes.UsdtProductDetail.url;
+      navigate(`${url.replace(':address', data.assetAddress)}`, {
+        state: { isCalledFromInventory: false },
+      });
+    } else if (isUsdc) {
+      const url = routes.UsdcProductDetail.url;
+      navigate(`${url.replace(':address', data.assetAddress)}`, {
+        state: { isCalledFromInventory: false },
+      });
+    } else if (isPaxg) {
+      const url = routes.PaxgProductDetail.url;
       navigate(`${url.replace(':address', data.assetAddress)}`, {
         state: { isCalledFromInventory: false },
       });
@@ -475,6 +497,9 @@ const GlobalTransaction = ({
               assetsWithEightDecimalPlaces={assetsWithEightDecimalPlaces}
               ethstAddress={ethstAddress}
               wbtcstAddress={wbtcstAddress}
+              usdtAddress={usdtAddress}
+              usdcAddress={usdcAddress}
+              paxgAddress={paxgAddress}
             />
           </Row>
         </div>
