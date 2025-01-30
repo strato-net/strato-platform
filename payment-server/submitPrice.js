@@ -247,7 +247,7 @@ async function fetchAndSubmitETHPrice(
 
     const currentTimestamp = Math.floor(currentTimeMs / 1000);
     await submitPrice(token, oracleContract, {
-      price: twap / 1e18,
+      price: twap / (metal === "USDT" ? 1e6 : 1e18),
       timestamp: currentTimestamp,
     });
 
@@ -297,7 +297,7 @@ const submitOraclePricePeriodically = async (oracleInterval) => {
     }
 
     try {
-      if (oracle.metal === "ETH") {
+      if (oracle.metal === "ETH" || oracle.metal === "USDT") {
         await fetchAndSubmitETHPrice(
           oracle.metal,
           process.env.ALCHEMY_API_KEY,

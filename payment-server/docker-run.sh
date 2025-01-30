@@ -58,6 +58,7 @@ if [ "$ORACLE_MODE" = "true" ]; then
     sed -i 's*<silver_oracle_name_value>*'"${SILVER_ORACLE_NAME_VALUE}"'*g' /tmp/tmp.oracle_config.yaml
     sed -i 's*<gold_oracle_name_value>*'"${GOLD_ORACLE_NAME_VALUE}"'*g' /tmp/tmp.oracle_config.yaml
     sed -i 's*<eth_oracle_name_value>*'"${ETH_ORACLE_NAME_VALUE}"'*g' /tmp/tmp.oracle_config.yaml
+    sed -i 's*<usdt_oracle_name_value>*'"${USDT_ORACLE_NAME_VALUE}"'*g' /tmp/tmp.oracle_config.yaml
     sed -i 's*<usd_oracle_name_value>*'"${USD_ORACLE_NAME_VALUE}"'*g' /tmp/tmp.oracle_config.yaml
     sed -i 's*<silver_asset_addresses_value>*'"${SILVER_ASSET_ADDRESSES}"'*g' /tmp/tmp.oracle_config.yaml
     sed -i 's*<gold_asset_addresses_value>*'"${GOLD_ASSET_ADDRESSES}"'*g' /tmp/tmp.oracle_config.yaml
