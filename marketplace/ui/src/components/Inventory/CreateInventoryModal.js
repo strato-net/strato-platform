@@ -422,8 +422,6 @@ const CreateInventoryModal = ({
               >
                 <InputNumber
                   placeholder="Enter number of decimal places"
-                  min={0}
-                  max={18}
                   style={{ width: '100%' }}
                 />
               </Form.Item>
