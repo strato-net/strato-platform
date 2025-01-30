@@ -22,7 +22,6 @@ module Blockchain.SolidVM.SM
     MonadSM,
     action,
     runSM,
-    getCurrentAccount,
     getCurrentAddress,
     withCallInfo,
     withTempCallInfo,
@@ -33,7 +32,6 @@ module Blockchain.SolidVM.SM
     getCurrentCallInfo,
     getCurrentCallInfoIfExists,
     getCurrentContract,
-    getCurrentChainId,
     getCurrentFunctionName,
     getCurrentCodeCollection,
     addFunctionToCurrentContractInCurrentCallInfo,
@@ -127,7 +125,7 @@ import qualified Prelude as Ordering (Ordering (..))
 
 data CallInfo = CallInfo
   { currentFunctionName :: SolidString,
-    currentAccount :: Account,
+    currentAddress :: Address,
     currentContract :: CC.Contract,
     codeCollection :: CC.CodeCollection,
     collectionHash :: Keccak256,
@@ -557,12 +555,12 @@ getVariableOfName name = do
           then
             Just . Constant . SReference $
               AccountPath
-                (currentAccount currentCallInfo)
+                (Account (currentAddress currentCallInfo) Nothing)
                 (MS.singleton $ BC.pack $ labelToString name)
           else Nothing
 
       maybeThis :: Maybe Variable
-      maybeThis = toMaybe (name == "this") . t "this" . Constant . (flip (SAccount . accountOnUnspecifiedChain) False) $ currentAccount currentCallInfo
+      maybeThis = toMaybe (name == "this") . t "this" . Constant $ SAccount (NamedAccount (currentAddress currentCallInfo) UnspecifiedChain) False
 
   --        M.lookup (currentAddress currentCallInfo) (accounts sstate) >>= M.lookup name . storage
 
@@ -614,7 +612,7 @@ getTypeOfName s = getTypeOfName' s . codeCollection <$> getCurrentCallInfo
 
 withCallInfo ::
   MonadSM m =>
-  Account ->
+  Address ->
   CC.Contract ->
   SolidString ->
   Keccak256 ->
@@ -634,7 +632,7 @@ withCallInfo a c fn hsh cc initialLocalVariables ro ff f = do
 
 addCallInfo ::
   MonadSM m =>
-  Account ->
+  Address ->
   CC.Contract ->
   SolidString ->
   Keccak256 ->
@@ -647,7 +645,7 @@ addCallInfo a c fn hsh cc initialLocalVariables ro ff = do
   let newCallInfo =
         CallInfo
           { currentFunctionName = fn,
-            currentAccount = a,
+            currentAddress = a,
             currentContract = c,
             codeCollection = cc,
             collectionHash = hsh,
@@ -723,28 +721,28 @@ getCurrentContract = do
   case cs of
     (currentCallInfo : _) -> return $ currentContract currentCallInfo
     _ -> internalError "getCurrentContract called with an empty stack" ()
-
+{-
 getCurrentAccount :: MonadSM m => m Account
 getCurrentAccount = do
   cs <- Mod.get (Mod.Proxy @[CallInfo])
   case cs of
-    (currentCallInfo : _) -> return $ currentAccount currentCallInfo
+    (currentCallInfo : _) -> return $ currentAddress currentCallInfo
     _ -> internalError "getCurrentAccount called with an empty stack" ()
-
+-}
 getCurrentAddress :: MonadSM m => m Address
 getCurrentAddress = do
   cs <- Mod.get (Mod.Proxy @[CallInfo])
   case cs of
-    (currentCallInfo : _) -> return $ (currentAccount currentCallInfo) ^. accountAddress
+    (currentCallInfo : _) -> return $ currentAddress currentCallInfo
     _ -> internalError "getCurrentAccount called with an empty stack" ()
-
+{-
 getCurrentChainId :: MonadSM m => m (Maybe Word256)
 getCurrentChainId = do
   cs <- Mod.get (Mod.Proxy @[CallInfo])
   case cs of
-    (currentCallInfo : _) -> return $ _accountChainId $ currentAccount currentCallInfo
+    (currentCallInfo : _) -> return $ _accountChainId $ currentAddress currentCallInfo
     _ -> internalError "getCurrentChainId called with an empty stack" ()
-
+-}
 getCurrentFunctionName :: MonadSM m => m SolidString
 getCurrentFunctionName = do
   cs <- Mod.get (Mod.Proxy @[CallInfo])
@@ -834,7 +832,7 @@ getXabiTypeFromContract field ctract =
     . CC._storageDefs
     $ ctract
 
-getXabiType :: MonadSM m => Account -> B.ByteString -> m (Maybe SVMType.Type)
+getXabiType :: MonadSM m => Address -> B.ByteString -> m (Maybe SVMType.Type)
 getXabiType acct field = do
   (ctract, _, _) <- getCodeAndCollection acct
   pure $ getXabiTypeFromContract field ctract
@@ -843,7 +841,7 @@ getXabiValueType :: MonadSM m => AccountPath -> m SVMType.Type
 getXabiValueType (AccountPath loc path) = do
   ccs' <- codeCollection <$> getCurrentCallInfo
   let field = MS.getField path
-  mType <- getXabiType loc field
+  mType <- getXabiType (loc^.accountAddress) field
   case mType of
     Nothing -> todo "getXabiValueType/unknown storage reference" field
     Just v -> return $!! loop ccs' (tail $ MS.toList path) v
@@ -940,12 +938,12 @@ getBSum bh =
   fromMaybe (error $ "missing value in block summary DB: " ++ format bh)
     <$> A.lookup (A.Proxy @BlockSummary) bh
 
-getCodeAndCollection :: MonadSM m => Account -> m (CC.Contract, Keccak256, CC.CodeCollection)
+getCodeAndCollection :: MonadSM m => Address -> m (CC.Contract, Keccak256, CC.CodeCollection)
 getCodeAndCollection address' = do
   callStack' <- Mod.get (Mod.Proxy @[CallInfo])
   let maybeAddress =
         case callStack' of
-          (current' : _) -> Just $ currentAccount current'
+          (current' : _) -> Just $ currentAddress current'
           _ -> Nothing
 
   -- $logDebugS "getCodeAndCollection" . T.pack $ "----------------- caller address: " ++ fromMaybe "Nothing" (fmap format maybeAddress)
@@ -956,9 +954,9 @@ getCodeAndCollection address' = do
       (hsh, cc') <- getCurrentCodeCollection
       return (c', hsh, cc')
     else do
-      codeHash <- addressStateCodeHash <$> A.lookupWithDefault (A.Proxy @AddressState) address'
+      codeHash <- addressStateCodeHash <$> A.lookupWithDefault (A.Proxy @AddressState) (Account address' Nothing)
 
-      resolvedCodeHash <- resolveCodePtr (address' ^. accountChainId) codeHash
+      resolvedCodeHash <- resolveCodePtr Nothing codeHash
       (contractName', ch, cc) <-
         case resolvedCodeHash of
           Just (SolidVMCode cn ch') -> do

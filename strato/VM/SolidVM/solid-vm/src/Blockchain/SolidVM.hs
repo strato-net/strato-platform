@@ -171,7 +171,7 @@ variableSet = do
         [] -> S.empty
         (ci : _) -> textSet $ localVariables ci
       locals = M.singleton "Local Variables" varNames
-  acct <- getCurrentAccount
+  acct <- getCurrentAddress
   ~(contract, _, _) <- getCodeAndCollection acct
   let stateVars = S.fromList $ M.keys $ contract ^. CC.storageDefs
       globals = M.singleton "State Variables" stateVars
@@ -291,7 +291,7 @@ getParentName address = fromMaybeM (return "") $
                             )
 
 create' :: MonadSM m => Address -> Maybe Code -> Address -> Address -> String -> Address -> Keccak256 -> CC.CodeCollection -> SolidString -> CC.ArgList -> Bool -> m ExecResults
-create' creator maybeCodePtr originAddress issuerAcct issuerName newAccount ch cc contractName' argExps createBuiltinCall = do
+create' creator maybeCodePtr originAddress issuerAcct issuerName newAddress ch cc contractName' argExps createBuiltinCall = do
   
   -- Get parentName and cc_creator from maybeCodePtr or creator
   (parentName, cc_creator) <- case maybeCodePtr of
@@ -313,15 +313,15 @@ create' creator maybeCodePtr originAddress issuerAcct issuerName newAccount ch c
       !arrays = getArrayNamesFromContract contract'
   -- $logInfoS "create': contract' " . T.pack $ show $ contract'
   -- $logInfoS "create': abstracts1' " . T.pack $ show $ abstracts'
-  !abstracts <- M.fromList <$> traverse (resolveNameParts newAccount (T.pack issuerName) (T.pack parentName)) abstracts'
+  !abstracts <- M.fromList <$> traverse (resolveNameParts newAddress (T.pack issuerName) (T.pack parentName)) abstracts'
 
   let ptr2InitialContract = case maybeCodePtr of
         Just (PtrToCode (CodeAtAccount cp _)) -> cp
         _ -> (Account creator Nothing)
 
-  initializeAction (Account newAccount Nothing) (labelToString contractName') issuerName cc_creator (show originAddress) parentName ch cc abstracts mappings arrays
+  initializeAction (Account newAddress Nothing) (labelToString contractName') issuerName cc_creator (show originAddress) parentName ch cc abstracts mappings arrays
 
-  A.adjustWithDefault_ (A.Proxy @AddressState) (Account newAccount Nothing) $ \newAddressState ->
+  A.adjustWithDefault_ (A.Proxy @AddressState) (Account newAddress Nothing) $ \newAddressState ->
     pure
       newAddressState
         { addressStateContractRoot = MP.emptyTriePtr,
@@ -333,13 +333,13 @@ create' creator maybeCodePtr originAddress issuerAcct issuerName newAccount ch c
   multilineLog "create'/contract" $
     boringBox
       [ "Creating contract: ",
-        "Account: " ++ (format newAccount),
+        "Account: " ++ (format newAddress),
         "Type: " ++ C.yellow (labelToString contractName'),
         "Gas allotment: " ++ (C.yellow $ show (_gasInitialAllotment gasInfo)),
         "Gas left: " ++ (C.red $ show (_gasLeft gasInfo))
       ]
 
-  void . withCallInfo (Account newAccount Nothing) contract' (stringToLabel $ labelToString contractName' ++ " constructor") ch cc M.empty False False $ pure ()
+  void . withCallInfo newAddress contract' (stringToLabel $ labelToString contractName' ++ " constructor") ch cc M.empty False False $ pure ()
 
   env <- getEnv
   let metadata = Env.metadata env
@@ -348,25 +348,25 @@ create' creator maybeCodePtr originAddress issuerAcct issuerName newAccount ch c
       parentName' = bool parentName "" (useWallet && parentName == "User")
       issuer = if shouldDoCreatorFork . blockHeaderBlockNumber $ Env.blockHeader env then issuerAcct else Env.origin env
   -- set creator
-  setCreator issuer originAddress newAccount contract' (BlockHeader.number $ Env.blockHeader env)
+  setCreator issuer originAddress newAddress contract' (BlockHeader.number $ Env.blockHeader env)
 
   -- Run the constructor
-  runTheConstructors creator newAccount ch cc contractName' argExps
+  runTheConstructors creator newAddress ch cc contractName' argExps
 
-  onTraced $ liftIO $ putStrLn $ C.green $ "Done Creating Contract: " ++ show newAccount ++ " of type " ++ labelToString contractName'
+  onTraced $ liftIO $ putStrLn $ C.green $ "Done Creating Contract: " ++ show newAddress ++ " of type " ++ labelToString contractName'
 
-  void . withCallInfo (Account newAccount Nothing) contract' (stringToLabel $ labelToString contractName' ++ " constructor") ch cc M.empty False False $ do
+  void . withCallInfo newAddress contract' (stringToLabel $ labelToString contractName' ++ " constructor") ch cc M.empty False False $ do
     -- set creator again, in case the caller's cert changed during constructor execution
-    setCreator issuer originAddress newAccount contract' (BlockHeader.number $ Env.blockHeader env)
+    setCreator issuer originAddress newAddress contract' (BlockHeader.number $ Env.blockHeader env)
 
   Mod.modifyStatefully_ (Mod.Proxy @Action) $
-    Action.actionData %= Action.omapAdjust (Action.actionDataCreator .~ (T.pack issuerName)) (Account newAccount Nothing)
+    Action.actionData %= Action.omapAdjust (Action.actionDataCreator .~ (T.pack issuerName)) (Account newAddress Nothing)
 
   Mod.modifyStatefully_ (Mod.Proxy @Action) $
-    Action.actionData %= Action.omapAdjust (Action.actionDataCCCreator .~ (fmap T.pack cc_creator)) (Account newAccount Nothing)
+    Action.actionData %= Action.omapAdjust (Action.actionDataCCCreator .~ (fmap T.pack cc_creator)) (Account newAddress Nothing)
     
   when (useWallet && parentName == "User") $ Mod.modifyStatefully_ (Mod.Proxy @Action) $
-    Action.actionData %= Action.omapAdjust (Action.actionDataApplication .~ (T.pack "")) (Account newAccount Nothing)
+    Action.actionData %= Action.omapAdjust (Action.actionDataApplication .~ (T.pack "")) (Account newAddress Nothing)
   -- I'm showing these strings because I like them to be in quotes in the logs :)
   multilineLog "create'/versioning" $ boringBox ["Contract Name: " ++ (C.yellow contractName'), "App: " ++ (C.yellow parentName'), "Creator: " ++ (C.yellow issuerName)]
 
@@ -382,7 +382,7 @@ create' creator maybeCodePtr originAddress issuerAcct issuerName newAccount ch c
         erTrace = [],
         erLogs = [],
         erEvents = toList finalEvs,
-        erNewContractAccount = Just $ Account newAccount Nothing,
+        erNewContractAccount = Just $ Account newAddress Nothing,
         erSuicideList = S.empty,
         erAction = Just finalAct,
         erException = Nothing,
@@ -501,7 +501,7 @@ call' from to' fnCalltype mContract functionName isRCC argExps = do
         CC.RawCall -> (to', to')
         CC.DelegateCall -> (from, to')
       toChain = Nothing
-  (contract', hsh, cc) <- getCodeAndCollection (Account ccToGet Nothing)
+  (contract', hsh, cc) <- getCodeAndCollection ccToGet
   parentName <-
     fromMaybeM (return "") $
       runMaybeT $
@@ -678,11 +678,11 @@ call' from to' fnCalltype mContract functionName isRCC argExps = do
             -- right now I just ignore this and allow anything to be called as a getter
             case null args' of
               False -> do
-                valPath' <- withCallInfo (Account to Nothing) contract (functionName ++ "()") hsh cc M.empty True False $ do
+                valPath' <- withCallInfo to contract (functionName ++ "()") hsh cc M.empty True False $ do
                   pure . Just $ SReference $ apSnocList (AccountPath (Account to Nothing) . MS.singleton $ BC.pack $ labelToString functionName) args'
                 return (pure valPath', OrderedVals [])
               True -> do
-                val <- withCallInfo (Account to Nothing) contract functionName hsh cc M.empty True False $ do
+                val <- withCallInfo to contract functionName hsh cc M.empty True False $ do
                   fmap Just $ getVar $ Constant $ SReference $ AccountPath (Account to Nothing) . MS.singleton $ BC.pack $ labelToString functionName
                 return (pure val, OrderedVals [])
           Nothing ->
@@ -701,7 +701,7 @@ call' from to' fnCalltype mContract functionName isRCC argExps = do
   when
     isRCC
     ( do
-        void . withCallInfo (Account to Nothing) contract' (stringToLabel $ labelToString (contract' ^. CC.contractName) ++ " constructor") hsh cc M.empty False False $ do
+        void . withCallInfo to contract' (stringToLabel $ labelToString (contract' ^. CC.contractName) ++ " constructor") hsh cc M.empty False False $ do
           forM_ [(n, e) | (n, CC.VariableDecl _ _ (Just e) _ _ _) <- M.toList $ contract' ^. CC.storageDefs] $ \(n, e) -> do
             v <- expToVar e Nothing
             setVar (Constant (SReference (AccountPath (Account to Nothing) $ MS.StoragePath [MS.Field $ BC.pack $ labelToString n]))) =<< getVar v
@@ -1118,7 +1118,7 @@ runStatement (CC.SimpleStatement (CC.ExpressionStatement (CC.Binary _ "=" dst sr
   solidVMBreakpoint pos
   dstVar <- expToVar dst Nothing
   dstType <- case dstVar of
-    Constant (SReference (AccountPath addr (MS.StoragePath (MS.Field field : _)))) -> getXabiType addr field
+    Constant (SReference (AccountPath addr (MS.StoragePath (MS.Field field : _)))) -> getXabiType (addr^.accountAddress) field
     _ -> pure $ Nothing
   srcVal <- getVar =<< expToVar src dstType
 
@@ -1340,15 +1340,15 @@ runStatement st@(CC.EmitStatement eventName exptups pos) = do
       if (length exptups) /= (length $ CC._eventLogs ev)
         then invalidArguments "arguments to statement are inconsistent with those declared" (unparseStatement st)
         else do
-          let account = currentAccount curInfo
-          (_, _, ctrName) <- getCreator $ account ^. accountAddress
+          let address = currentAddress curInfo
+          (_, _, ctrName) <- getCreator address
           parentName <-
             fromMaybeM (return "") $
               runMaybeT $
-                pure account
+                pure (Account address Nothing)
                   >>= MaybeT . A.lookup (A.Proxy @AddressState)
                   >>= pure . addressStateCodeHash
-                  >>= MaybeT . resolveCodePtrParent (account ^. accountChainId)
+                  >>= MaybeT . resolveCodePtrParent Nothing
                   >>= ( \case
                           SolidVMCode name _ | name /= (labelToString $ CC._contractName curCnct) -> pure name
                           _ -> pure ""
@@ -1374,7 +1374,7 @@ runStatement st@(CC.EmitStatement eventName exptups pos) = do
               ]
 
           bHash <- blockHeaderHash . Env.blockHeader <$> getEnv
-          addEvent $ Event bHash ctrName parentName (labelToString $ CC._contractName curCnct) account eventName evArgs
+          addEvent $ Event bHash ctrName parentName (labelToString $ CC._contractName curCnct) (Account address Nothing) eventName evArgs
           return Nothing
 runStatement (CC.UncheckedStatement code pos) = do
   solidVMBreakpoint pos
@@ -1419,7 +1419,7 @@ doWhile condition code = do
 getIndexType :: MonadSM m => AccountPath -> m IndexType
 getIndexType (AccountPath addr (MS.StoragePath path)) = case path of
   (MS.Field field : path') -> do
-    mType <- getXabiType addr field
+    mType <- getXabiType (addr^.accountAddress) field
     let loop :: MonadSM m => [MS.StoragePathPiece] -> SVMType.Type -> m IndexType
         loop [] t = case t of
           SVMType.Mapping {SVMType.key = SVMType.Int {}} -> return MapIntIndex
@@ -1459,7 +1459,7 @@ expToPath (CC.Variable _ x) = do
       case val of
         SReference apt -> return apt
         _ -> typeError "expToPath should never be called for a local variable" ((show x) ++ " = " ++ show val)
-    Nothing -> return $ AccountPath (currentAccount callInfo) path
+    Nothing -> return $ AccountPath (Account (currentAddress callInfo) Nothing) path
 expToPath x@(CC.IndexAccess _ parent mIndex) = do
   parPath <- do
     parvar <- expToVar parent Nothing
@@ -1606,7 +1606,6 @@ expToVar' (CC.MemberAccess _ (CC.Variable _ "string") "concat") _ = do
 expToVar' x@(CC.MemberAccess _ expr name) _ = do
   var <- expToVar expr Nothing
   val <- getVar var
-  chainId <- view accountChainId <$> getCurrentAccount
   case (val, name) of
     (SEnum enumName, _) -> do
       contract' <- getCurrentContract
@@ -1672,8 +1671,8 @@ expToVar' x@(CC.MemberAccess _ expr name) _ = do
       if constName `M.member` CC._functions cont
         then do
           -- TODO: Check that this contract actually is a contractName'
-          addr <- accountOnUnspecifiedChain <$> getCurrentAccount
-          return $ Constant $ SContractFunction (Just contractName') addr constName
+          addr <- getCurrentAddress
+          return $ Constant $ SContractFunction (Just contractName') (NamedAccount addr UnspecifiedChain) constName
         else case constName `M.lookup` CC._constants cont of
           Nothing -> case constName `M.lookup` (cc ^. CC.flConstants) of
             Just (CC.ConstantDecl _ _ constExp _) -> expToVar constExp Nothing
@@ -1688,7 +1687,7 @@ expToVar' x@(CC.MemberAccess _ expr name) _ = do
       return $ Constant $ SInteger $ round $ utcTimeToPOSIXSeconds $ BlockHeader.timestamp $ Env.blockHeader env'
     (SBuiltinVariable "block", "number") -> (Constant . SInteger . BlockHeader.number . Env.blockHeader) <$> getEnv
     (SBuiltinVariable "block", "coinbase") ->
-      pure . Constant . ((flip SAccount) True) . (accountToNamedAccount chainId) $ Account (Address 0) Nothing -- TODO: fix?
+      pure . Constant $ SAccount (NamedAccount (Address 0) UnspecifiedChain) True -- TODO: fix?
     (SBuiltinVariable "block", "difficulty") ->
       (Constant . SInteger . BlockHeader.difficulty . Env.blockHeader) <$> getEnv
     (SBuiltinVariable "block", "gaslimit") ->
@@ -1700,8 +1699,8 @@ expToVar' x@(CC.MemberAccess _ expr name) _ = do
       case filter (elem method . M.keys . CC._functions) parents' of
         [] -> typeError "cannot use super without a parent contract" (method, ctract)
         ps -> do
-          addr <- accountOnUnspecifiedChain <$> getCurrentAccount
-          return $ Constant $ SContractFunction (Just $ CC._contractName $ last ps) addr method
+          addr <- getCurrentAddress
+          return $ Constant $ SContractFunction (Just $ CC._contractName $ last ps) (NamedAccount addr UnspecifiedChain) method
     (SAccount a _, n) -> evaluateAccountMember (a^.namedAccountAddress) False n
     (SContractItem a _, n) -> evaluateAccountMember (a^.namedAccountAddress) False n
     (SContract _ a, n) -> evaluateAccountMember (a^.namedAccountAddress) True n
@@ -1786,16 +1785,14 @@ expToVar' (CC.Binary _ "!=" expr1 expr2) _ = do
   val1 <- getVar =<< expToVar expr1 Nothing
   val2 <- getVar =<< expToVar expr2 Nothing
   ctract <- getCurrentContract
-  acct <- getCurrentAccount
   onTraced $ liftIO $ putStrLn $ "            %%%% val1 = " ++ show val1 ++ "\n            %%%% val2 = " ++ show val2
-  return . Constant . SBool . not $ valEquals (acct ^. accountChainId) ctract val1 val2
+  return . Constant . SBool . not $ valEquals Nothing ctract val1 val2
 expToVar' (CC.Binary _ "==" expr1 expr2) _ = do
   val1 <- getVar =<< expToVar expr1 Nothing
   val2 <- getVar =<< expToVar expr2 Nothing
   ctract <- getCurrentContract
-  acct <- getCurrentAccount
   logVals val1 val2
-  return . Constant . SBool $ valEquals (acct ^. accountChainId) ctract val1 val2
+  return . Constant . SBool $ valEquals Nothing ctract val1 val2
 expToVar' (CC.Binary _ "<" expr1 expr2) _ = do
   val1 <- getVar =<< expToVar expr1 Nothing
   val2 <- getVar =<< expToVar expr2 Nothing
@@ -1956,7 +1953,7 @@ expToVar' theFullExp@(CC.FunctionCall _ e args) _ = do
             (CC.NamedArgs _) -> pure $ SNULL
           case (val1, name) of
             (SAccount (NamedAccount addr _) _, "derive") -> do
-              (_, hsh, _) <- getCodeAndCollection (Account addr Nothing)
+              (_, hsh, _) <- getCodeAndCollection addr
               args' <- case args of
                 (CC.OrderedArgs []) -> typeError "derive needs at least one argument, none were given " args
                 (CC.OrderedArgs (_ : as)) -> OrderedVals <$> mapM (getVar <=< flip expToVar Nothing) as
@@ -2147,24 +2144,15 @@ expToVar' theFullExp@(CC.FunctionCall _ e args) _ = do
                 _ -> return False
               return . Constant $ SBool success
             Constant (SContractItem address' "code") -> do
-              --Only get the items if they are in the same chain as the current contract, this will prevent leaks from private chains
-              from <- getCurrentAccount
               -- let namedFrom = accountToNamedAccount' from --convert to a namedAccount to verify everything is on the correct chain
               --If address' chainId is unset then we set to the current chainId
               -- Get the code at the address
               cid <- case (address' ^. namedAccountChainId) of
-                UnspecifiedChain -> do
-                  --Assume that the chainId is the same as the from chainId when it is unset
-                  cid1 <- view accountChainId <$> getCurrentAccount
-                  case cid1 of
-                    Nothing -> return Nothing
-                    Just cid2 -> return $ Just cid2
+                UnspecifiedChain -> return Nothing
                 MainChain -> return Nothing
                 ExplicitChain cid -> return $ Just cid
               let toAccount = namedAccountToAccount cid address'
-              --check that the from and to are on the same chain`
-              isRelated <- (from ^. accountChainId) `isAncestorChainOf` (toAccount ^. accountChainId)
-              unless (isRelated) $ inaccessibleChain (show from) (show toAccount <> " " <> show isRelated)
+
               -- Collect a potential item to search
               searchTerms <- case argVals of
                 -- catch only the SStrings
@@ -2174,7 +2162,7 @@ expToVar' theFullExp@(CC.FunctionCall _ e args) _ = do
                 --If nothing was given or something else, then just return the entire code
                 _ -> pure $ Nothing
               --get only the contract containing the sweet succulent ContractF definition
-              (!contract, _, _) <- getCodeAndCollection toAccount
+              (!contract, _, _) <- getCodeAndCollection (toAccount^.accountAddress)
               decrementGas 1000 -- Discourage creating/calling contract instances willy nilly
               let codeSnippets :: [String]
                   codeSnippets =
@@ -2336,10 +2324,9 @@ evaluateAccountMember ::
   m Variable
 evaluateAccountMember a _ "codehash" = do
   -- Get the chainId for the account
-  cid <- _accountChainId <$> getCurrentAccount
   -- Retreive and resolve the codehash
   codeHash' <- addressStateCodeHash <$> A.lookupWithDefault (A.Proxy @AddressState) (Account a Nothing)
-  resolvedCodeHash <- resolveCodePtr cid codeHash'
+  resolvedCodeHash <- resolveCodePtr Nothing codeHash'
   case resolvedCodeHash of
     Just (SolidVMCode _ ch') -> return (Constant $ SString . keccak256ToHex $ ch')
     Just cp -> missingCodeCollection "Account is not a SolidVM contract" (format cp)
@@ -2347,10 +2334,9 @@ evaluateAccountMember a _ "codehash" = do
 --Get the whole code collection when nothing is supplied to the code function
 evaluateAccountMember a _ "code" = do
   -- Get the code at the address
-  cid <- _accountChainId <$> getCurrentAccount
   -- Retreive and resolve the codehash
   codeHash' <- addressStateCodeHash <$> A.lookupWithDefault (A.Proxy @AddressState) (Account a Nothing)
-  resolvedCodeHash <- resolveCodePtr cid codeHash'
+  resolvedCodeHash <- resolveCodePtr Nothing codeHash'
   let ch' = case resolvedCodeHash of
         Just (SolidVMCode _ ch1') -> ch1'
         Just cp -> missingCodeCollection "Account is not a SolidVM contract" (format cp)
@@ -2604,7 +2590,7 @@ parseBaseInt s n =
 castToAncestor :: MonadSM m => NamedAccount -> String -> m Value
 castToAncestor a name = do
   cInfo <- Mod.get (Mod.Proxy @[CallInfo])
-  let mCurrentChainId = join $ _accountChainId . currentAccount <$> listToMaybe cInfo
+  let mCurrentChainId = join $ const Nothing <$> listToMaybe cInfo
   case a ^. namedAccountChainId of
     MainChain -> returnMainChain
     UnspecifiedChain -> case mCurrentChainId of
@@ -2645,11 +2631,7 @@ callBuiltin "account" [ss@(SString s)] _ =
 callBuiltin "account" [SInteger a, SInteger b] _ = return . ((flip SAccount) False) $ explicitChain (fromIntegral a) (fromInteger b)
 callBuiltin "account" [SInteger a, SString "main"] _ = return . ((flip SAccount) False) $ mainChain (fromIntegral a)
 callBuiltin "account" [SInteger a, SString "self"] _ = do
-  cInfo <- Mod.get (Mod.Proxy @[CallInfo])
-  let currentChainId = maybe Nothing (_accountChainId . currentAccount) $ listToMaybe cInfo
-  pure . ((flip SAccount) False) $ case currentChainId of
-    Nothing -> mainChain (fromIntegral a)
-    Just cid -> explicitChain (fromIntegral a) cid
+  pure . ((flip SAccount) False) $ mainChain (fromIntegral a)
 callBuiltin "account" [SInteger a, SString ('0' : 'x' : xs)] _ = do
   return . ((flip SAccount) False) $ explicitChain (fromIntegral a) (fromIntegral $ base16ToIntegral xs)
   where
@@ -2659,11 +2641,7 @@ callBuiltin "account" [SInteger a, SString name] _ = unspecifiedChain (fromInteg
 callBuiltin "account" [(SAccount a _), SInteger b] _ = return . ((flip SAccount) False) $ (namedAccountChainId .~ ExplicitChain (fromIntegral b)) a
 callBuiltin "account" [(SAccount a _), SString "main"] _ = return . ((flip SAccount) False) $ (namedAccountChainId .~ MainChain) a
 callBuiltin "account" [(SAccount a _), SString "self"] _ = do
-  cInfo <- Mod.get (Mod.Proxy @[CallInfo])
-  let currentChainId = maybe Nothing (_accountChainId . currentAccount) $ listToMaybe cInfo
-  pure . ((flip SAccount) False) $ case currentChainId of
-    Nothing -> (namedAccountChainId .~ MainChain) a
-    Just cid -> (namedAccountChainId .~ ExplicitChain cid) a
+  pure . ((flip SAccount) False) $ (namedAccountChainId .~ MainChain) a
 callBuiltin "account" [(SAccount a _), SString ('0' : 'x' : xs)] _ = return . ((flip SAccount) False) $ (namedAccountChainId .~ ExplicitChain (fromIntegral $ base16ToIntegral xs)) a
   where
     hexChar ch = fromMaybe (invalidArguments "illegal character in chainId hexstring" [ch]) $ elemIndex ch "0123456789ABCDEF"
@@ -3042,7 +3020,7 @@ runTheConstructors from to hsh cc contractName' argExps = do
           var <- createVar correctedVal
           return (n, (t, var))
 
-  void . withCallInfo (Account to Nothing) contract' (stringToLabel $ labelToString contractName' ++ " constructor") hsh cc (M.fromList zipped) False False $ do
+  void . withCallInfo to contract' (stringToLabel $ labelToString contractName' ++ " constructor") hsh cc (M.fromList zipped) False False $ do
 
     forM_ [(n, e, theType) | (n, CC.VariableDecl theType _ (Just e) _ _ _) <- M.toList $ contract' ^. CC.storageDefs] $ \(n, e, theType) -> do
       v <- expToVar e $ Just theType
@@ -3181,7 +3159,7 @@ runTheCall address' contract' funcName hsh cc theFunction argVals ro ff = do
       newVar <- liftIO $ fmap Variable $ newIORef v
       return (n, (t, newVar))
 
-  val' <- withCallInfo (Account address' Nothing) contract' funcName hsh cc (M.fromList localVars1) ro ff $ do -- [(n, (t, Constant v)) | (n, (t, v)) <- locals]
+  val' <- withCallInfo address' contract' funcName hsh cc (M.fromList localVars1) ro ff $ do -- [(n, (t, Constant v)) | (n, (t, v)) <- locals]
     matchedArgvals <- forM theModifiers $ \modi -> do
       let !margList =
             CC.OrderedArgs
