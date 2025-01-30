@@ -29,9 +29,9 @@ const Feed = ({ user }) => {
       await marketplaceActions.fetchAssetsWithEightDecimalPlaces(marketplaceDispatch);
       await ethActions.fetchETHSTAddress(ethDispatch);
       await ethActions.fetchWBTCSTAddress(ethDispatch);
-      // await ethActions.fetchUSDTAddress(ethDispatch);//TODO: uncomment
-      // await ethActions.fetchUSDCAddress(ethDispatch);
-      // await ethActions.fetchPAXGAddress(ethDispatch);
+      await ethActions.fetchUSDTAddress(ethDispatch);
+      await ethActions.fetchUSDCAddress(ethDispatch);
+      await ethActions.fetchPAXGAddress(ethDispatch);
     };
 
     fetchAddresses();

@@ -24,20 +24,25 @@ import { IssuerStatusProvider } from './contexts/issuerStatus';
 import ProductDetails from './components/MarketPlace/ProductDetails';
 import EthstProductDetails from './components/ETHST/EthstProductDetails';
 import WbtcstProductDetails from './components/ETHST/WbtcstProductDetails';
+import UsdtProductDetails from './components/ETHST/usdtProductDetails';
+import UsdcProductDetails from './components/ETHST/usdcProductDetails';
+import PaxgProductDetails from './components/ETHST/paxgProductDetails';
 import Checkout from './components/MarketPlace/Checkout';
 import ConfirmOrder from './components/MarketPlace/ConfirmOrder';
 import ProcessingOrder from './components/MarketPlace/ProcessingOrder';
 import Invoice from './components/Order/Invoice';
-import { RedemptionsProvider } from './contexts/redemption';
 import LoginRedirect from './components/LoginRedirect';
 import UserProfile from './components/UserProfile';
 import Error from './components/404';
 import FAQ from './components/FAQ/index';
+
 import { TransactionsProvider } from './contexts/transaction';
 import { MarketplaceProvider } from './contexts/marketplace';
 import { EthProvider } from './contexts/eth';
 import Transaction from './components/Order/Transaction';
 import Feed from './components/Feed/Feed';
+import { RedemptionsProvider } from './contexts/redemption';
+
 
 const AuthenticatedRoutes = ({ user, users, isAuthenticated }) => {
   return (
@@ -208,7 +213,7 @@ const AuthenticatedRoutes = ({ user, users, isAuthenticated }) => {
           </UsersProvider>
         }
       />
-            <Route
+      <Route
         exact
         path={routes.WbtcstProductDetail.url}
         element={
@@ -231,6 +236,79 @@ const AuthenticatedRoutes = ({ user, users, isAuthenticated }) => {
           </UsersProvider>
         }
       />
+
+      <Route
+        exact
+        path={routes.UsdtProductDetail.url}
+        element={
+          <UsersProvider>
+            <CategorysProvider>
+              <SubCategorysProvider>
+                <PaymentServicesProvider>
+                  <InventoriesProvider>
+                    <ItemsProvider>
+                      <OrdersProvider>
+                        <EthProvider>
+                          <UsdtProductDetails user={user} users={users} />
+                        </EthProvider>
+                      </OrdersProvider>
+                    </ItemsProvider>
+                  </InventoriesProvider>
+                </PaymentServicesProvider>
+              </SubCategorysProvider>
+            </CategorysProvider>
+          </UsersProvider>
+        }
+      />
+
+      <Route
+        exact
+        path={routes.UsdcProductDetail.url}
+        element={
+          <UsersProvider>
+            <CategorysProvider>
+              <SubCategorysProvider>
+                <PaymentServicesProvider>
+                  <InventoriesProvider>
+                    <ItemsProvider>
+                      <OrdersProvider>
+                        <EthProvider>
+                          <UsdcProductDetails user={user} users={users} />
+                        </EthProvider>
+                      </OrdersProvider>
+                    </ItemsProvider>
+                  </InventoriesProvider>
+                </PaymentServicesProvider>
+              </SubCategorysProvider>
+            </CategorysProvider>
+          </UsersProvider>
+        }
+      />
+
+      <Route
+        exact
+        path={routes.PaxgProductDetail.url}
+        element={
+          <UsersProvider>
+            <CategorysProvider>
+              <SubCategorysProvider>
+                <PaymentServicesProvider>
+                  <InventoriesProvider>
+                    <ItemsProvider>
+                      <OrdersProvider>
+                        <EthProvider>
+                          <PaxgProductDetails user={user} users={users} />
+                        </EthProvider>
+                      </OrdersProvider>
+                    </ItemsProvider>
+                  </InventoriesProvider>
+                </PaymentServicesProvider>
+              </SubCategorysProvider>
+            </CategorysProvider>
+          </UsersProvider>
+        }
+      />
+
       <Route
         exact
         path={routes.Products.url}
