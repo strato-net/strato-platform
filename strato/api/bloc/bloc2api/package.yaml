@@ -4,6 +4,7 @@ synopsis: Bloc microservice
 description: Bloc microservice
 category: Web
 build-type: Simple
+license: Apache-2.0
 
 ghc-options: -Wall -Werror
 

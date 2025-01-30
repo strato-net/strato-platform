@@ -5,7 +5,7 @@ maintainer:          ilya@blockapps.net
 copyright:           2016 BlockApps Inc
 category:            Blockchain
 build-type:          Simple
-
+license:             Apache-2.0
 
 dependencies:
   - base

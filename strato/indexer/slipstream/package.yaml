@@ -5,6 +5,7 @@ description: Solidity datatypes
 homepage: https://github.com/blockapps/blockapps-haskell/slipstream
 copyright: 2016 BlockApps
 category: Web
+license: Apache-2.0
 
 
 ghc-options: -Wall -Werror -rtsopts

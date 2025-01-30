@@ -3,6 +3,7 @@ version:             0.1.0.0
 author:              jamshid
 maintainer:          j
 build-type:          Simple
+license:             Apache-2.0
 
 library:
   source-dirs: src
