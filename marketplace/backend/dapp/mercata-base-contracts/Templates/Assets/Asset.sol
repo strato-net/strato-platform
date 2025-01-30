@@ -78,7 +78,7 @@ abstract contract Asset is Utils {
         files = _files;
         fileNames = _fileNames;
         createdDate = _createdDate;
-        quantity = _quantity * _decimals;
+        quantity = _quantity * (10**_decimals);
         decimals = _decimals;
         status = _status;
         try {

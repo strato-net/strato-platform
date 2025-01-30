@@ -113,6 +113,7 @@ const Checkout = () => {
           unitOfMeasure: item.product.unitOfMeasurement,
           unitPrice: item.product.price * Math.pow(10, decimals),
           quantity: item.product.saleQuantity / Math.pow(10, decimals),
+          decimals: decimals,
           saleAddress: item.product.saleAddress,
           tax: calculateTax(item),
           amount: amount,

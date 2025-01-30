@@ -28,7 +28,7 @@ contract Tokens is Mintable {
 
     function mint(uint _quantity) internal override returns (UTXO) {
         require(_quantity > 0, "Quantity must be greater than 0");
-        Tokens newToken = new Tokens(name, description, images, files, fileNames, createdDate, _quantity, _decimals, status, address(redemptionService), paymentServiceCreator);
+        Tokens newToken = new Tokens(name, description, images, files, fileNames, createdDate, _quantity, decimals, status, address(redemptionService), paymentServiceCreator);
         return UTXO(address(newToken)); 
     }
 
