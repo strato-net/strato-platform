@@ -4,6 +4,7 @@ github:              "githubuser/API"
 author:              "Author name here"
 maintainer:          "example@example.com"
 copyright:           "2018 Author name here"
+license:             Apache-2.0
 
 # Metadata used when publishing your package
 # synopsis:            Short description of your package

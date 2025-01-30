@@ -3,6 +3,7 @@ version:             0.0.1.0
 author:              dustin@blockapps.net
 maintainer:          dustin@blockapps.net
 build-type:          Simple
+license:             Apache-2.0
 
 library:
   source-dirs: src

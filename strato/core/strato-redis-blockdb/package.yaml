@@ -4,6 +4,7 @@ author:              BlockApps
 maintainer:          blockapps
 build-type:          Simple
 description:         Functions to operate against the Redis-backed BlockDB
+license:             Apache-2.0
 
 dependencies:
   - base

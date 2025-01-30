@@ -3,6 +3,7 @@ build-type: Simple
 author: Jamshid
 maintainer:    jamshidnh@gmail.com
 synopsis: a microservice that handles peer to peer connections for strato
+license: Apache-2.0
 
 dependencies:
   - base
