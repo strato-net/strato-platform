@@ -196,9 +196,14 @@ argValueToSimpleValue theType argVal = case theType of
     o -> Left . Text.pack $ "argValueToSimpleValue: Expected TypeString to be a string, but got " ++ show o
   TypeInt s b -> case argVal of
     ArgInt i -> Right $ ValueInt s b i
-    ArgString str -> case readMaybe (Text.unpack str) of
-      Just i -> Right $ ValueInt s b i
-      Nothing -> Left $ "argValueToSimpleValue: Could not parse integer value from string \"" <> str <> "\""
+    ArgString str -> case Text.unpack str of
+      [] -> Left "argValueToSimpleValue: Empty string cannot be parsed as integer"
+      xs | last xs == 'n' -> case readMaybe (init xs) of
+        Just i -> Right $ ValueInt s b i
+        Nothing -> Left $ "argValueToSimpleValue: Could not parse BigInt value from string \"" <> str <> "\""
+      xs -> case readMaybe xs of
+        Just i -> Right $ ValueInt s b i
+        Nothing -> Left $ "argValueToSimpleValue: Could not parse integer value from string \"" <> str <> "\""
     o -> Left . Text.pack $ "argValueToSimpleValue: Expected TypeInt to be an integer, but got " ++ show o
   TypeBytes (Just n) -> case argVal of
     ArgString str -> ValueBytes (Just n) <$> readBytes n str
