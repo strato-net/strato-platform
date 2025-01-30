@@ -555,7 +555,7 @@ getVariableOfName name = do
           then
             Just . Constant . SReference $
               AccountPath
-                (Account (currentAddress currentCallInfo) Nothing)
+                (currentAddress currentCallInfo)
                 (MS.singleton $ BC.pack $ labelToString name)
           else Nothing
 
@@ -841,7 +841,7 @@ getXabiValueType :: MonadSM m => AccountPath -> m SVMType.Type
 getXabiValueType (AccountPath loc path) = do
   ccs' <- codeCollection <$> getCurrentCallInfo
   let field = MS.getField path
-  mType <- getXabiType (loc^.accountAddress) field
+  mType <- getXabiType loc field
   case mType of
     Nothing -> todo "getXabiValueType/unknown storage reference" field
     Just v -> return $!! loop ccs' (tail $ MS.toList path) v

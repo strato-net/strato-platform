@@ -50,7 +50,7 @@ import Text.Printf
 data IndexType = ArrayIndex | MapBoolIndex | MapAccountIndex | MapIntIndex | MapStringIndex deriving (Show, Eq)
 
 data AccountPath = AccountPath
-  { apAccount :: Account,
+  { apAccount :: Address,
     apPath :: MS.StoragePath
   }
   deriving (Eq)

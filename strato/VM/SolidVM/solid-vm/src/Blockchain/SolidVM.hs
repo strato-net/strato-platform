@@ -679,11 +679,11 @@ call' from to' fnCalltype mContract functionName isRCC argExps = do
             case null args' of
               False -> do
                 valPath' <- withCallInfo to contract (functionName ++ "()") hsh cc M.empty True False $ do
-                  pure . Just $ SReference $ apSnocList (AccountPath (Account to Nothing) . MS.singleton $ BC.pack $ labelToString functionName) args'
+                  pure . Just $ SReference $ apSnocList (AccountPath to . MS.singleton $ BC.pack $ labelToString functionName) args'
                 return (pure valPath', OrderedVals [])
               True -> do
                 val <- withCallInfo to contract functionName hsh cc M.empty True False $ do
-                  fmap Just $ getVar $ Constant $ SReference $ AccountPath (Account to Nothing) . MS.singleton $ BC.pack $ labelToString functionName
+                  fmap Just $ getVar $ Constant $ SReference $ AccountPath to . MS.singleton $ BC.pack $ labelToString functionName
                 return (pure val, OrderedVals [])
           Nothing ->
             ( case M.lookup "fallback" functionsIncludingConstructor of
@@ -704,7 +704,7 @@ call' from to' fnCalltype mContract functionName isRCC argExps = do
         void . withCallInfo to contract' (stringToLabel $ labelToString (contract' ^. CC.contractName) ++ " constructor") hsh cc M.empty False False $ do
           forM_ [(n, e) | (n, CC.VariableDecl _ _ (Just e) _ _ _) <- M.toList $ contract' ^. CC.storageDefs] $ \(n, e) -> do
             v <- expToVar e Nothing
-            setVar (Constant (SReference (AccountPath (Account to Nothing) $ MS.StoragePath [MS.Field $ BC.pack $ labelToString n]))) =<< getVar v
+            setVar (Constant (SReference (AccountPath to $ MS.StoragePath [MS.Field $ BC.pack $ labelToString n]))) =<< getVar v
           forM_ [(n, theType) | (n, CC.VariableDecl theType _ Nothing _ _ _) <- M.toList $ contract' ^. CC.storageDefs] $ \(n, theType) -> do
             case theType of
               SVMType.Mapping _ _ _ -> return ()
@@ -1118,7 +1118,7 @@ runStatement (CC.SimpleStatement (CC.ExpressionStatement (CC.Binary _ "=" dst sr
   solidVMBreakpoint pos
   dstVar <- expToVar dst Nothing
   dstType <- case dstVar of
-    Constant (SReference (AccountPath addr (MS.StoragePath (MS.Field field : _)))) -> getXabiType (addr^.accountAddress) field
+    Constant (SReference (AccountPath addr (MS.StoragePath (MS.Field field : _)))) -> getXabiType addr field
     _ -> pure $ Nothing
   srcVal <- getVar =<< expToVar src dstType
 
@@ -1419,7 +1419,7 @@ doWhile condition code = do
 getIndexType :: MonadSM m => AccountPath -> m IndexType
 getIndexType (AccountPath addr (MS.StoragePath path)) = case path of
   (MS.Field field : path') -> do
-    mType <- getXabiType (addr^.accountAddress) field
+    mType <- getXabiType addr field
     let loop :: MonadSM m => [MS.StoragePathPiece] -> SVMType.Type -> m IndexType
         loop [] t = case t of
           SVMType.Mapping {SVMType.key = SVMType.Int {}} -> return MapIntIndex
@@ -1459,7 +1459,7 @@ expToPath (CC.Variable _ x) = do
       case val of
         SReference apt -> return apt
         _ -> typeError "expToPath should never be called for a local variable" ((show x) ++ " = " ++ show val)
-    Nothing -> return $ AccountPath (Account (currentAddress callInfo) Nothing) path
+    Nothing -> return $ AccountPath (currentAddress callInfo) path
 expToPath x@(CC.IndexAccess _ parent mIndex) = do
   parPath <- do
     parvar <- expToVar parent Nothing
@@ -3024,7 +3024,7 @@ runTheConstructors from to hsh cc contractName' argExps = do
 
     forM_ [(n, e, theType) | (n, CC.VariableDecl theType _ (Just e) _ _ _) <- M.toList $ contract' ^. CC.storageDefs] $ \(n, e, theType) -> do
       v <- expToVar e $ Just theType
-      setVar (Constant (SReference (AccountPath (Account to Nothing) $ MS.StoragePath [MS.Field $ BC.pack $ labelToString n]))) =<< getVar v
+      setVar (Constant (SReference (AccountPath to $ MS.StoragePath [MS.Field $ BC.pack $ labelToString n]))) =<< getVar v
 
     forM_ [(n, theType) | (n, CC.VariableDecl theType _ Nothing _ _ _) <- M.toList $ contract' ^. CC.storageDefs] $ \(n, theType) -> do
       case theType of
