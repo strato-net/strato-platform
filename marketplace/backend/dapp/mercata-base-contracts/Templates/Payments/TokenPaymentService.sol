@@ -35,6 +35,7 @@ contract TokenPaymentService is PaymentService {
         string _purchasersCommonName,
         address[] _saleAddresses,
         uint[] _quantities,
+        uint[] _decimals,
         uint _createdDate,
         string _comments
     ) internal override returns (string, address[]) {
@@ -92,6 +93,7 @@ contract TokenPaymentService is PaymentService {
                     _purchasersCommonName,
                     _saleAddresses,
                     _quantities,
+                    _decimals,
                     totalAmountGross
                 );
             }

@@ -229,6 +229,7 @@ class OrderController {
         .items(
           Joi.object({
             quantity: Joi.string().pattern(/^\d+$/).required(),
+            decimals: Joi.number().integer().min(0).max(18).required(),
             assetAddress: Joi.string().required(),
             firstSale: Joi.boolean().required(),
             unitPrice: Joi.number().greater(0).precision(30).required(),
