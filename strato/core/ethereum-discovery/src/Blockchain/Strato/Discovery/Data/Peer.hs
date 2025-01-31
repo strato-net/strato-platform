@@ -1,26 +1,54 @@
 {-# LANGUAGE ConstraintKinds #-}
-{-# LANGUAGE DataKinds #-}
-{-# LANGUAGE DerivingStrategies #-}
 {-# LANGUAGE FlexibleContexts #-}
-{-# LANGUAGE FlexibleInstances #-}
-{-# LANGUAGE GADTs #-}
-{-# LANGUAGE GeneralizedNewtypeDeriving #-}
-{-# LANGUAGE MultiParamTypeClasses #-}
-{-# LANGUAGE OverloadedStrings #-}
-{-# LANGUAGE QuasiQuotes #-}
 {-# LANGUAGE RecordWildCards #-}
-{-# LANGUAGE StandaloneDeriving #-}
-{-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE TypeApplications #-}
-{-# LANGUAGE TypeFamilies #-}
-{-# LANGUAGE TypeOperators #-}
-{-# LANGUAGE UndecidableInstances #-}
-{-# LANGUAGE NoDeriveAnyClass #-}
-{-# OPTIONS_GHC -fno-warn-orphans #-}
 
 module Blockchain.Strato.Discovery.Data.Peer
-  ( module Blockchain.Strato.Discovery.Metrics,
-    module Blockchain.Strato.Discovery.Data.Peer,
+  (
+    PPeer(..),
+    HasPeerDB,
+    TCPPort(..),
+    UDPPort(..),
+    NodeID(..),
+    PeerUdpDisable(..),
+    PeerDisable(..),
+    UdpEnableTime(..),
+    TcpEnableTime(..),
+    ActivePeers(..),
+    AvailablePeers(..),
+    PeerBondingState(..),
+    BondedPeers(..),
+    BondedPeersForUDP(..),
+    ClosestPeers(..),
+    UnbondedPeersForUDP(..),
+    IPAsText(..),
+    ValidatorAddresses(..),
+    createPeer,
+    pointToNodeID,
+    updateLastMessage,
+    nodeIDToPoint,
+    setPeerActiveState,
+    thisPeer,
+    lengthenPeerDisable',
+    resetPeerUdp,
+    storeDisableException,
+    setPeerBondingState,
+    getPeersClosestTo,
+    getUnbondedPeers,
+    getBondedPeersForUDP,
+    disableUDPPeerForSeconds,
+    getNumAvailablePeers,
+    parseEnode,
+    getActivePeers,
+    getBondedPeers,
+    jamshidBirth,
+    lengthenPeerDisable,
+    lengthenPeerDisableBy,
+    pPeerString,
+    nonviolentDisable,
+    resetPeers,
+    module Blockchain.Strato.Discovery.Metrics,
+    module Blockchain.Strato.Discovery.Data.PeerDefinition
   )
 where
 
@@ -30,6 +58,7 @@ import Blockchain.Data.PubKey
 import Blockchain.Data.RLP
 import Blockchain.MiscJSON ()
 import Blockchain.Strato.Discovery.Metrics
+import Blockchain.Strato.Discovery.Data.PeerDefinition
 import Blockchain.Strato.Model.Address (Address, fromPublicKey)
 import Blockchain.Strato.Model.ExtendedWord
 import Blockchain.Strato.Model.Keccak256
@@ -48,7 +77,6 @@ import qualified Data.Text as T
 import Data.Time
 import Data.Time.Clock.POSIX
 import qualified Database.Persist.Postgresql as SQL
-import Database.Persist.TH
 import GHC.Bits (xor)
 import qualified LabeledError
 import Network.URI (URI (..), URIAuth (..))
@@ -56,31 +84,6 @@ import qualified Network.URI as URI
 import Prometheus
 import Text.Format
 import UnliftIO
-
-share
-  [mkPersist sqlSettings, mkMigrate "migrateAll"]
-  [persistLowerCase|
-PPeer
-    pubkey Point Maybe
-    ip T.Text
-    tcpPort Int
-    udpPort Int
-    numSessions Int
-    lastMsg T.Text
-    lastMsgTime UTCTime
-    enableTime UTCTime
-    udpEnableTime UTCTime
-    lastTotalDifficulty Integer
-    lastBestBlockHash Keccak256
-    bondState Int
-    activeState Int
-    version T.Text
-    disableException T.Text
-    nextDisableWindowSeconds Int default=5
-    nextUdpDisableWindowSeconds Int default=5
-    disableExpiration UTCTime default=now()
-    deriving Show Read Eq
-|]
 
 newtype AvailablePeers = AvailablePeers {unAvailablePeers :: [PPeer]}
 
@@ -221,9 +224,6 @@ parseHostname uriAuth = filter (\ch -> ch /= '[' && ch /= ']') (URI.uriRegName u
 
 parsePort :: URIAuth -> Int
 parsePort uriAuth = LabeledError.read "Peer/parsePort" $ filter (/= ':') (URI.uriPort uriAuth)
-
-getAvailablePeers :: (MonadUnliftIO m, Mod.Accessible AvailablePeers m) => m (Either SomeException [PPeer])
-getAvailablePeers = try $ unAvailablePeers <$> Mod.access (Mod.Proxy @AvailablePeers)
 
 setPeerActiveState ::
   (MonadUnliftIO m, MonadMonitor m, HasPeerDB m) =>
