@@ -168,6 +168,7 @@ abstract contract PaymentService is Utils {
         string _checkoutId,
         address[] _saleAddresses,
         uint[] _quantities,
+        uint[] _decimals,
         uint _createdDate,
         string _comments
     ) requireActive("create ckeckout") external returns (string, address[]) {
@@ -182,6 +183,7 @@ abstract contract PaymentService is Utils {
             _purchasersCommonName,
             _saleAddresses,
             _quantities,
+            _decimals,
             _createdDate,
             _comments
         );
