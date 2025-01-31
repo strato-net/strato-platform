@@ -16,7 +16,7 @@ ethOracle:
   name: <eth_oracle_name_value>
 
 usdtOracle:
-  name: <eth_oracle_name_value>  
+  name: <usdt_oracle_name_value>  
 
 btcOracle:
   name: <btc_oracle_name_value>

@@ -247,7 +247,7 @@ async function fetchAndSubmitERC20TokenPrice(
 
     const currentTimestamp = Math.floor(currentTimeMs / 1000);
     await submitPrice(token, oracleContract, {
-      price: twap / (metal === "BTC" || metal === "USDT" ? 1e8 : 1e18),
+      price: twap / (metal === "BTC" ? 1e8 : metal === "USDT" ? 1e6 : 1e18),
       timestamp: currentTimestamp,
     });
 
