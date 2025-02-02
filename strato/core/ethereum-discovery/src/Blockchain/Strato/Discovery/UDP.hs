@@ -150,7 +150,7 @@ peerToNeighbor p = do
   pubKey <- note NoPublicKeyException (pPeerPubkey p)
   let endpoint =
         Endpoint
-          (stringToIAddr $ T.unpack $ pPeerIp p)
+          (stringToIAddr $ T.unpack $ pPeerHost p)
           (UDPPort . fromIntegral $ pPeerUdpPort p)
           (TCPPort . fromIntegral $ pPeerTcpPort p)
   return $ Neighbor endpoint $ pointToNodeID pubKey
@@ -226,14 +226,16 @@ sendPacket ::
   ( HasVault m
   , MonadLogger m
   , A.Replaceable SockAddr B.ByteString m
-  , A.Replaceable T.Text PPeer m
+  , HasPeerDB m
   , A.Selectable (Maybe IPAsText, UDPPort) SockAddr m ) =>
   PPeer ->
   NodeDiscoveryPacket ->
   m ()
 sendPacket thePeer packet = do
-  mPeerAddr <- A.select (A.Proxy @SockAddr) (Just $ IPAsText $ pPeerIp thePeer, UDPPort . fromIntegral $ pPeerUdpPort thePeer)
+  mPeerAddr <- A.select (A.Proxy @SockAddr) (Just $ IPAsText $ pPeerHost thePeer, UDPPort . fromIntegral $ pPeerUdpPort thePeer)
   forM_ mPeerAddr $ \addr -> do
+    let ip = addressIP addr
+    A.replace A.Proxy thePeer ip
     $logInfoS "sendPacket" $ T.pack $ CL.green "sending to" ++ " (" ++ show addr ++ ") " ++ format packet
     let (theType', theRLP) = ndPacketToRLP packet
         theData = rlpSerialize theRLP
@@ -284,12 +286,12 @@ getServerPubKey ::
   m (Either SomeException Point)
 getServerPubKey peer = do
   timestamp <- liftIO $ fmap round getPOSIXTime
-  let domain = IPAsText $ pPeerIp peer
+  let domain = IPAsText $ pPeerHost peer
       udpPort = UDPPort $ pPeerUdpPort peer
       tcpPort = TCPPort $ pPeerTcpPort peer
       (theType, theRLP) =
         ndPacketToRLP $
-          Ping 4 (Endpoint (stringToIAddr "127.0.0.1") udpPort tcpPort) (Endpoint (stringToIAddr . T.unpack $ pPeerIp peer) udpPort tcpPort) (timestamp + 50)
+          Ping 4 (Endpoint (stringToIAddr "127.0.0.1") udpPort tcpPort) (Endpoint (stringToIAddr . T.unpack $ pPeerHost peer) udpPort tcpPort) (timestamp + 50)
       theData = rlpSerialize theRLP
       theMsgHash = keccak256ToByteString $ hash $ B.singleton theType <> theData
 

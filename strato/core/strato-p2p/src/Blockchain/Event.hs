@@ -78,7 +78,7 @@ skipEntries n xs = if null xs then [] else head xs : helper (tail xs)
       [] -> []
 
 peerString :: PPeer -> String
-peerString peer = key ++ "@" ++ T.unpack (pPeerIp peer) ++ ":" ++ show (pPeerTcpPort peer)
+peerString peer = key ++ "@" ++ T.unpack (pPeerHost peer) ++ ":" ++ show (pPeerTcpPort peer)
   where
     key = p2s (pPeerPubkey peer)
     p2s (Just p) = BS8.unpack . BC16.encode $ pointToBytes p
@@ -285,7 +285,7 @@ handleEvents peer = awaitForever $ \case
       peerAddr <- unPeerAddress <$> access (Proxy @PeerAddress)
       $logInfoS "handleEvents/Blockstanbul" . T.pack $ "blockstanbulPeerAddr: " ++ show peerAddr
     let msgHash = rlpHash wm
-    lift $ insert (Proxy @(Proxy (Outbound WireMessage))) (pPeerIp peer, msgHash) Proxy
+    lift $ insert (Proxy @(Proxy (Outbound WireMessage))) (pPeerHost peer, msgHash) Proxy
     msgExists <- lift $ exists (Proxy @(Proxy (Inbound WireMessage))) msgHash
     if msgExists
       then
@@ -355,7 +355,7 @@ handleEvents peer = awaitForever $ \case
               $logDebugS "handleEvents/P2pBlockstanbul" . T.pack $ "Outgoing mesage: " ++ show outbound
               let !msgHash = rlpHash msg
               lift $ insert (Proxy @(Proxy (Inbound WireMessage))) msgHash Proxy
-              msgExists <- lift $ exists (Proxy @(Proxy (Outbound WireMessage))) (pPeerIp peer, msgHash)
+              msgExists <- lift $ exists (Proxy @(Proxy (Outbound WireMessage))) (pPeerHost peer, msgHash)
               if msgExists
                 then
                   $logInfoS "handleEvents/P2pBlockstanbul" $
@@ -363,7 +363,7 @@ handleEvents peer = awaitForever $ \case
                       [ "Already seen outbound wire message ",
                         T.pack (format msgHash),
                         ". Not forwarding to peer ",
-                        pPeerIp peer
+                        pPeerHost peer
                       ]
                 else do
                   $logInfoS "handleEvents/P2pBlockstanbul" $
@@ -371,9 +371,9 @@ handleEvents peer = awaitForever $ \case
                       [ "First time seeing outbound wire message ",
                         T.pack (format msgHash),
                         ". Forwarding to peer ",
-                        pPeerIp peer
+                        pPeerHost peer
                       ]
-                  let !ip = pPeerIp peer
+                  let !ip = pPeerHost peer
                   lift $ insert (Proxy @(Proxy (Outbound WireMessage))) (ip, msgHash) Proxy
                   yieldR outbound
     P2pAskForBlocks start _ _ -> do

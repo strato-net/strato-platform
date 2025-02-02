@@ -28,4 +28,4 @@ getPeers = do
   eActivePeers <- liftIO getActivePeers
   case eActivePeers of
     Left err -> throwIO . ServerError $ show err
-    Right ps -> return . object . map (\p -> DAK.fromText (pPeerIp p) .= pPeerTcpPort p) $ ps
+    Right ps -> return . object . map (\p -> DAK.fromText (pPeerHost p) .= pPeerTcpPort p) $ ps

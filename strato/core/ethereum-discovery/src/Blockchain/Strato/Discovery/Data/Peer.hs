@@ -33,6 +33,7 @@ module Blockchain.Strato.Discovery.Data.Peer
     resetPeerUdp,
     storeDisableException,
     setPeerBondingState,
+    setPeerPubkey,
     getPeersClosestTo,
     getUnbondedPeers,
     getBondedPeersForUDP,
@@ -47,6 +48,7 @@ module Blockchain.Strato.Discovery.Data.Peer
     pPeerString,
     nonviolentDisable,
     resetPeers,
+    addressIP,
     module Blockchain.Strato.Discovery.Metrics,
     module Blockchain.Strato.Discovery.Data.PeerDefinition
   )
@@ -70,15 +72,18 @@ import Crypto.Types.PubKey.ECC
 import qualified Data.ByteString as B
 import qualified Data.ByteString.Base16 as B16
 import qualified Data.ByteString.Char8 as BC
+import Data.IP
 import Data.List (sortBy)
 import Data.Maybe (fromJust)
 import qualified Data.Set as Set
+import Data.Text (Text)
 import qualified Data.Text as T
 import Data.Time
 import Data.Time.Clock.POSIX
 import qualified Database.Persist.Postgresql as SQL
 import GHC.Bits (xor)
 import qualified LabeledError
+import Network.Socket
 import Network.URI (URI (..), URIAuth (..))
 import qualified Network.URI as URI
 import Prometheus
@@ -124,9 +129,11 @@ type HasPeerDB m = (
   Mod.Accessible UnbondedPeersForUDP m,
   A.Selectable Point ClosestPeers m,
   A.Replaceable PPeer UdpEnableTime m,
+  A.Replaceable PPeer IP m,
   A.Replaceable PPeer TcpEnableTime m,
   A.Replaceable PPeer PeerDisable m,
   A.Replaceable PPeer PeerUdpDisable m,
+  A.Replaceable PPeer Point m,
   A.Replaceable PPeer T.Text m,
   A.Replaceable T.Text PPeer m
   )
@@ -165,7 +172,7 @@ instance Format NodeID where
   format (NodeID x) = BC.unpack (B16.encode $ B.take 10 x) ++ "...."
 
 pPeerString :: PPeer -> String
-pPeerString PPeer {..} = T.unpack pPeerIp ++ ":" ++ show pPeerTcpPort
+pPeerString PPeer {..} = T.unpack pPeerHost ++ ":" ++ show pPeerTcpPort
 
 jamshidBirth :: UTCTime
 jamshidBirth = posixSecondsToUTCTime 0
@@ -177,11 +184,12 @@ buildPeer :: (Maybe String, String, Int) -> PPeer
 buildPeer (mpk, ip, p) = buildPeerPoint (stringToPoint <$> mpk, ip, p)
 
 buildPeerPoint :: (Maybe Point, String, Int) -> PPeer
-buildPeerPoint (pubkeyMaybe, ip, p) =
+buildPeerPoint (pubkeyMaybe, host, p) =
   let peer =
         PPeer
           { pPeerPubkey = pubkeyMaybe,
-            pPeerIp = T.pack ip,
+            pPeerHost = T.pack host,
+            pPeerIp = Nothing,
             pPeerUdpPort = p,
             pPeerTcpPort = 30303,
             pPeerNumSessions = 0,
@@ -240,11 +248,16 @@ getActivePeers = try $ unActivePeers <$> Mod.access (Mod.Proxy @ActivePeers)
 
 setPeerBondingState ::
   (MonadUnliftIO m, A.Replaceable (IPAsText, Point) PeerBondingState m) =>
-  String ->
+  Text ->
   Point ->
   Int ->
   m (Either SomeException ())
-setPeerBondingState ip point state = try $ A.replace (A.Proxy @PeerBondingState) (IPAsText $ T.pack ip, point) (PeerBondingState state)
+setPeerBondingState host point state = do
+  try $ A.replace (A.Proxy @PeerBondingState) (IPAsText host, point) (PeerBondingState state)
+
+setPeerPubkey :: HasPeerDB m =>
+                 PPeer -> Point -> m ()
+setPeerPubkey peer point = A.replace (A.Proxy @Point) peer point
 
 getBondedPeers :: (MonadUnliftIO m, Mod.Accessible BondedPeers m) => m (Either SomeException [PPeer])
 getBondedPeers = try $ unBondedPeers <$> Mod.access (Mod.Proxy @BondedPeers)
@@ -256,7 +269,7 @@ getUnbondedPeers :: (MonadUnliftIO m, Mod.Accessible UnbondedPeersForUDP m) => m
 getUnbondedPeers = unUnbondedPeers <$> Mod.access (Mod.Proxy @UnbondedPeersForUDP)
 
 thisPeer :: PPeer -> [SQL.Filter PPeer]
-thisPeer peer = [PPeerIp SQL.==. pPeerIp peer, PPeerTcpPort SQL.==. pPeerTcpPort peer]
+thisPeer peer = [PPeerHost SQL.==. pPeerHost peer, PPeerTcpPort SQL.==. pPeerTcpPort peer]
 
 thisOr100Years :: Int -> Int
 thisOr100Years = min (100 * 365 * 24 * 60 * 60) -- there is no need to be disabling peers for > 100 years y'all
@@ -381,3 +394,9 @@ resetPeerUdp ::
   PPeer ->
   m (Either SomeException ())
 resetPeerUdp peer' = try $ A.replace (A.Proxy @PeerUdpDisable) peer' ResetPeerUdpDisable
+
+addressIP :: SockAddr -> IP
+addressIP (SockAddrInet _ addr)      = IPv4 (fromHostAddress addr)
+addressIP (SockAddrInet6 _ _ addr _) = IPv6 (fromHostAddress6 addr)
+addressIP _ = error "Unsupported address type"
+

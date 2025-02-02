@@ -402,7 +402,7 @@ instance MonadUnliftIO m => A.Selectable IPAsText PPeer (ReaderT Config m) where
       [] -> return Nothing
       lst -> return . Just . SQL.entityVal $ head lst
     where
-      actions = SQL.selectList [PPeerIp SQL.==. ip] []
+      actions = SQL.selectList [PPeerHost SQL.==. ip] []
 
 instance MonadUnliftIO m => A.Selectable Point PPeer (ReaderT Config m) where
   select _ pk =
@@ -611,8 +611,8 @@ withActivePeer ::
   m a
 withActivePeer p = bracket a b . const
   where
-    a = A.insert (Proxy @ActivityState) (IPAsText $ pPeerIp p, TCPPort $ pPeerTcpPort p) Active
-    b _ = A.insert (Proxy @ActivityState) (IPAsText $ pPeerIp p, TCPPort $ pPeerTcpPort p) Inactive
+    a = A.insert (Proxy @ActivityState) (IPAsText $ pPeerHost p, TCPPort $ pPeerTcpPort p) Active
+    b _ = A.insert (Proxy @ActivityState) (IPAsText $ pPeerHost p, TCPPort $ pPeerTcpPort p) Inactive
 
 withCertifiedPeer :: PPeer -> m (Maybe SomeException) -> m (Maybe SomeException)
 withCertifiedPeer = flip const

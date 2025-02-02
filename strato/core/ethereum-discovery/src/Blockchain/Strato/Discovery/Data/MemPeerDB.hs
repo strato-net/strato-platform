@@ -32,7 +32,7 @@ type HasMemPeerDB m = (MonadIO m, AccessibleEnv MemPeerDBEnv m)
 createMemPeerDBEnv :: MonadIO m =>
                       IPAsText -> [PPeer] -> m MemPeerDBEnv
 createMemPeerDBEnv me peers = do
-  peerMap <- newIORef $ M.fromList $ map (\p -> (T.unpack $ pPeerIp p, p)) peers
+  peerMap <- newIORef $ M.fromList $ map (\p -> (T.unpack $ pPeerHost p, p)) peers
 
   return $ MemPeerDBEnv me peerMap
                                  
@@ -48,7 +48,7 @@ instance HasMemPeerDB m => Mod.Accessible AvailablePeers m where
     currentTime <- liftIO getCurrentTime
     IPAsText ip <- accessEnvVar p2pMyIPAddress
     peerMap <- readIORef =<< fmap stringPPeerMap accessEnv
-    return $ AvailablePeers $ filter ((< currentTime) . pPeerUdpEnableTime) $ filter ((/= ip) . pPeerIp) $ M.elems peerMap
+    return $ AvailablePeers $ filter ((< currentTime) . pPeerUdpEnableTime) $ filter ((/= ip) . pPeerHost) $ M.elems peerMap
 
 instance A.Replaceable (IPAsText, TCPPort) ActivityState m where
   replace = error "'A.Replaceable (IPAsText, TCPPort) ActivityState m' not implemented"
@@ -84,7 +84,7 @@ instance HasMemPeerDB m => Mod.Accessible BondedPeers m where
   access _ = do
     currentTime <- liftIO getCurrentTime
     IPAsText ip <- accessEnvVar p2pMyIPAddress
-    let f p = pPeerBondState p == 2 && pPeerEnableTime p < currentTime && pPeerIp p /= ip
+    let f p = pPeerBondState p == 2 && pPeerEnableTime p < currentTime && pPeerHost p /= ip
     peerMap <- readIORef =<< fmap stringPPeerMap accessEnv
     return $ BondedPeers $ filter f $ M.elems peerMap
     
@@ -92,7 +92,7 @@ instance HasMemPeerDB m => Mod.Accessible BondedPeersForUDP m where
   access _ = do
     currentTime <- liftIO getCurrentTime
     IPAsText ip <- accessEnvVar p2pMyIPAddress
-    let f p = pPeerBondState p == 2 && pPeerUdpEnableTime p < currentTime && pPeerIp p /= ip
+    let f p = pPeerBondState p == 2 && pPeerUdpEnableTime p < currentTime && pPeerHost p /= ip
     peerMap <- readIORef =<< fmap stringPPeerMap accessEnv
     return $ BondedPeersForUDP $ filter f $ M.elems peerMap
 
@@ -100,7 +100,7 @@ instance HasMemPeerDB m => Mod.Accessible UnbondedPeersForUDP m where
   access _ = do
     currentTime <- liftIO getCurrentTime
     IPAsText ip <- accessEnvVar p2pMyIPAddress
-    let f p = pPeerBondState p == 0 && pPeerUdpEnableTime p < currentTime && pPeerIp p /= ip
+    let f p = pPeerBondState p == 0 && pPeerUdpEnableTime p < currentTime && pPeerHost p /= ip
     peerMap <- readIORef =<< fmap stringPPeerMap accessEnv
     return $ UnbondedPeersForUDP $ filter f $ M.elems $ peerMap
 
@@ -109,26 +109,26 @@ instance HasMemPeerDB m => A.Selectable IPAsText ClosestPeers m where
     peerMap <- readIORef =<< fmap stringPPeerMap accessEnv
     return $ Just $ ClosestPeers $ filter f $ M.elems peerMap
     where
-      f p = pPeerIp p /= t && pPeerPubkey p /= Nothing
+      f p = pPeerHost p /= t && pPeerPubkey p /= Nothing
 
 instance HasMemPeerDB m => A.Replaceable PPeer UdpEnableTime m where
   replace _ peer' (UdpEnableTime enableTime) = do
     peerMap <- fmap stringPPeerMap accessEnv
-    modifyIORef peerMap $ at (T.unpack $ pPeerIp peer') . _Just %~ (\p -> p {pPeerUdpEnableTime = enableTime})
+    modifyIORef peerMap $ at (T.unpack $ pPeerHost peer') . _Just %~ (\p -> p {pPeerUdpEnableTime = enableTime})
 
 instance HasMemPeerDB m => A.Replaceable PPeer TcpEnableTime m where
   replace _ peer' (TcpEnableTime enableTime) = do
     peerMap <- fmap stringPPeerMap accessEnv
-    modifyIORef peerMap $ at (T.unpack $ pPeerIp peer') . _Just %~ (\p -> p {pPeerEnableTime = enableTime})
+    modifyIORef peerMap $ at (T.unpack $ pPeerHost peer') . _Just %~ (\p -> p {pPeerEnableTime = enableTime})
 
 instance HasMemPeerDB m => A.Replaceable PPeer PeerDisable m where
   replace _ peer' d = do
     peerMap <- fmap stringPPeerMap accessEnv
     case d of
       ExtendPeerDisableTime (TcpEnableTime enableTime) nextDisableWindowFactor ->
-        modifyIORef peerMap $ at (T.unpack $ pPeerIp peer') . _Just %~ (\p -> p {pPeerEnableTime = enableTime, pPeerNextDisableWindowSeconds = pPeerNextDisableWindowSeconds p * nextDisableWindowFactor})
+        modifyIORef peerMap $ at (T.unpack $ pPeerHost peer') . _Just %~ (\p -> p {pPeerEnableTime = enableTime, pPeerNextDisableWindowSeconds = pPeerNextDisableWindowSeconds p * nextDisableWindowFactor})
       SetPeerDisableTime (TcpEnableTime enableTime) nextDisableWindow disableExpiration ->
-        modifyIORef peerMap $ at (T.unpack $ pPeerIp peer') . _Just %~ (\p -> p {pPeerEnableTime = enableTime, pPeerNextDisableWindowSeconds = nextDisableWindow, pPeerDisableExpiration = disableExpiration})
+        modifyIORef peerMap $ at (T.unpack $ pPeerHost peer') . _Just %~ (\p -> p {pPeerEnableTime = enableTime, pPeerNextDisableWindowSeconds = nextDisableWindow, pPeerDisableExpiration = disableExpiration})
 
 instance HasMemPeerDB m => A.Replaceable PPeer PeerUdpDisable m where
   replace _ peer' d = do
@@ -136,21 +136,21 @@ instance HasMemPeerDB m => A.Replaceable PPeer PeerUdpDisable m where
     peerMap <- fmap stringPPeerMap accessEnv    
     case d of
       ExtendPeerUdpDisableTime (UdpEnableTime enableTime) nextDisableWindowFactor ->
-        modifyIORef peerMap $ at (T.unpack $ pPeerIp peer') . _Just %~ (\p -> p {pPeerUdpEnableTime = enableTime, pPeerNextUdpDisableWindowSeconds = pPeerNextUdpDisableWindowSeconds p * nextDisableWindowFactor})
+        modifyIORef peerMap $ at (T.unpack $ pPeerHost peer') . _Just %~ (\p -> p {pPeerUdpEnableTime = enableTime, pPeerNextUdpDisableWindowSeconds = pPeerNextUdpDisableWindowSeconds p * nextDisableWindowFactor})
       SetPeerUdpDisableTime (UdpEnableTime enableTime) nextDisableWindow disableExpiration ->
-        modifyIORef peerMap $ at (T.unpack $ pPeerIp peer') . _Just %~ (\p -> p {pPeerUdpEnableTime = enableTime, pPeerNextUdpDisableWindowSeconds = nextDisableWindow, pPeerDisableExpiration = disableExpiration})
+        modifyIORef peerMap $ at (T.unpack $ pPeerHost peer') . _Just %~ (\p -> p {pPeerUdpEnableTime = enableTime, pPeerNextUdpDisableWindowSeconds = nextDisableWindow, pPeerDisableExpiration = disableExpiration})
       ResetPeerUdpDisable ->
-        modifyIORef peerMap $ at (T.unpack $ pPeerIp peer') . _Just %~ (\p -> p {pPeerUdpEnableTime = currentTime, pPeerNextUdpDisableWindowSeconds = 5, pPeerDisableExpiration = currentTime})
+        modifyIORef peerMap $ at (T.unpack $ pPeerHost peer') . _Just %~ (\p -> p {pPeerUdpEnableTime = currentTime, pPeerNextUdpDisableWindowSeconds = 5, pPeerDisableExpiration = currentTime})
 
 instance HasMemPeerDB m => A.Replaceable PPeer T.Text m where
   replace _ peer' e = do
     peerMap <- fmap stringPPeerMap accessEnv
-    modifyIORef peerMap $ at (T.unpack $ pPeerIp peer') . _Just %~ (\p -> p {pPeerDisableException = e})
+    modifyIORef peerMap $ at (T.unpack $ pPeerHost peer') . _Just %~ (\p -> p {pPeerDisableException = e})
 
 instance HasMemPeerDB m => A.Replaceable T.Text PPeer m where
   replace _ message peer' = do
     peerMap <- fmap stringPPeerMap accessEnv
-    modifyIORef peerMap $ at (T.unpack $ pPeerIp peer') . _Just %~ (\p -> p {pPeerLastMsg = message})
+    modifyIORef peerMap $ at (T.unpack $ pPeerHost peer') . _Just %~ (\p -> p {pPeerLastMsg = message})
 
 toActivityState :: Int -> ActivityState
 toActivityState 1 = Active

@@ -48,7 +48,10 @@ import Control.Monad.IO.Unlift
 import Control.Monad.Reader
 import Crypto.Types.PubKey.ECC
 import qualified Data.ByteString as B
+import Data.IP
+import Data.List
 import Data.Maybe (listToMaybe)
+import Data.Text (Text)
 import qualified Data.Text as T
 import qualified Database.Persist.Postgresql as SQL
 import qualified Database.Redis as Redis
@@ -59,6 +62,7 @@ import Servant.Client
 import qualified Strato.Strato23.API as VC
 import qualified Strato.Strato23.Client as VC
 import System.Timeout
+import Text.Read
 
 data ContextLite = ContextLite
   { liteSQLDB :: SQLDB,
@@ -106,25 +110,32 @@ instance MonadUnliftIO m => A.Replaceable IPAsText PPeer (ReaderT ContextLite m)
       getPeerByIP :: String -> ReaderT ContextLite m (Maybe (SQL.Entity PPeer))
       getPeerByIP ipStr = listToMaybe <$> sqlQuery actions'
         where
-          actions' = SQL.selectList [PPeerIp SQL.==. T.pack ipStr] []
+          actions' = SQL.selectList [PPeerHost SQL.==. T.pack ipStr] []
 
-instance MonadUnliftIO m => A.Selectable String PPeer (ReaderT ContextLite m) where
+isIP :: Text-> Bool
+isIP v =
+  case readMaybe $ T.unpack v :: Maybe IP of
+    Nothing -> False
+    Just _ -> True
+
+instance MonadUnliftIO m => A.Selectable IP PPeer (ReaderT ContextLite m) where
   select _ ip = getPeerByIP ip
     where
-      getPeerByIP :: String -> ReaderT ContextLite m (Maybe PPeer)
-      getPeerByIP ipStr =
+      getPeerByIP :: IP -> ReaderT ContextLite m (Maybe PPeer)
+      getPeerByIP ip' =
         sqlQuery actions >>= \case
           [] -> return Nothing
-          lst -> return . Just . SQL.entityVal $ head lst
+          --If multiple Hosts map to the same IP address, choose one arbitrarily, but prefer ones with domain names
+          lst -> return . Just . SQL.entityVal $ head $ sortOn (isIP . pPeerHost . SQL.entityVal) lst
         where
-          actions = SQL.selectList [PPeerIp SQL.==. T.pack ipStr] []
+          actions = SQL.selectList [PPeerIp SQL.==. Just ip'] []
 
 instance MonadIO m => A.Replaceable SockAddr B.ByteString (ReaderT ContextLite m) where
-  replace _ addr packet = do
+  replace _ addr' packet = do
     sock' <- asks sock
     liftIO $ catch 
-      (void $ NB.sendTo sock' packet addr) 
-      (\(err :: IOError) -> runLoggingT . $logErrorS "NB.sendTo" . T.pack $ "Could not send data to " <> show addr <> "; got error: " <> show err)
+      (void $ NB.sendTo sock' packet addr') 
+      (\(err :: IOError) -> runLoggingT . $logErrorS "NB.sendTo" . T.pack $ "Could not send data to " <> show addr' <> "; got error: " <> show err)
 
 instance A.Selectable (IPAsText, UDPPort, B.ByteString) Point IO where
   select _ (IPAsText domain, UDPPort udpPortNum, theMsg) = catch
@@ -194,7 +205,7 @@ type MonadDiscovery m =
     MonadThrow m,
     MonadLogger m,
     MonadUnliftIO m,
-    A.Selectable String PPeer m,
+    A.Selectable IP PPeer m,
     A.Selectable () (B.ByteString, SockAddr) m,
     A.Replaceable IPAsText PPeer m,
     A.Replaceable SockAddr B.ByteString m,
@@ -231,25 +242,25 @@ initContextLite vaultUrl udpPort tcpPort = do
       }
 
 addPeer :: A.Replaceable IPAsText PPeer m => PPeer -> m ()
-addPeer peer = A.replace (A.Proxy @PPeer) (IPAsText $ pPeerIp peer) peer
+addPeer peer = A.replace (A.Proxy @PPeer) (IPAsText $ pPeerHost peer) peer
 
 getPeerByIP' ::
-  (A.Selectable String PPeer m) =>
-  String ->
+  (A.Selectable IP PPeer m) =>
+  IP ->
   m (Maybe PPeer)
 getPeerByIP' ip = A.select (A.Proxy @PPeer) ip
 
 doPeersExist ::
-  (A.Selectable String PPeer m) =>
-  [String] ->
+  (A.Selectable IP PPeer m) =>
+  [IP] ->
   m (Bool)
 doPeersExist peers = do
   maybePeer <- traverse doesPeerExist peers
   pure $ all (== True) maybePeer
 
 doesPeerExist ::
-  (A.Selectable String PPeer m) =>
-  String ->
+  (A.Selectable IP PPeer m) =>
+  IP ->
   m (Bool)
 doesPeerExist peer = do
   maybePeer <- A.select (A.Proxy @PPeer) peer

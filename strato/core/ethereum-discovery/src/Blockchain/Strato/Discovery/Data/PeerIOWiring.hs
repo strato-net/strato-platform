@@ -29,6 +29,7 @@ import qualified Control.Monad.Change.Alter as A
 import qualified Control.Monad.Change.Modify as Mod
 import Control.Monad.Reader
 import Crypto.Types.PubKey.ECC (Point)
+import Data.IP
 import qualified Data.Text as T
 import Data.Time
 import qualified Database.Persist.Postgresql as SQL
@@ -54,7 +55,7 @@ instance MonadIO m => Mod.Accessible AvailablePeers m where
 instance MonadIO m => A.Replaceable (IPAsText, TCPPort) ActivityState m where
   replace _ (IPAsText ip, TCPPort port) state = liftIO $ withGlobalSQLPool . runSqlPool $ do
     SQL.updateWhere
-      [PPeerIp SQL.==. ip, PPeerTcpPort SQL.==. port]
+      [PPeerHost SQL.==. ip, PPeerTcpPort SQL.==. port]
       [PPeerActiveState SQL.=. fromEnum state]
 
 instance MonadIO m => Mod.Accessible ActivePeers m where
@@ -65,15 +66,20 @@ instance MonadIO m => Mod.Accessible ActivePeers m where
         SQL.selectList [PPeerActiveState SQL.==. fromEnum Active, PPeerEnableTime SQL.<. currentTime] []
 
 instance MonadIO m => (A.Replaceable (IPAsText, Point) PeerBondingState) m where
-  replace _ (IPAsText ip, point) (PeerBondingState state) = liftIO $ withGlobalSQLPool $ \sqldb -> do
+  replace _ (IPAsText host, point) (PeerBondingState state) = liftIO $ withGlobalSQLPool $ \sqldb -> do
     flip runSqlPool sqldb $
-      SQL.updateWhere [PPeerIp SQL.==. ip, PPeerPubkey SQL.==. Just point] [PPeerBondState SQL.=. state]
+      SQL.updateWhere [PPeerHost SQL.==. host, PPeerPubkey SQL.==. Just point] [PPeerBondState SQL.=. state]
+
+instance MonadIO m => (A.Replaceable PPeer Point) m where
+  replace _ peer point = liftIO $ withGlobalSQLPool $ \sqldb -> do
+    flip runSqlPool sqldb $
+      SQL.updateWhere [PPeerHost SQL.==. pPeerHost peer] [PPeerPubkey SQL.=. Just point]
 
 instance MonadIO m => (A.Selectable (IPAsText, Point) PeerBondingState) m where
   select _ (IPAsText ip, point) = liftIO $ withGlobalSQLPool $ \sqldb -> do
     fmap (fmap $ PeerBondingState . pPeerBondState . SQL.entityVal) $
       flip runSqlPool sqldb $
-        SQL.selectFirst [PPeerIp SQL.==. ip, PPeerPubkey SQL.==. Just point] []
+        SQL.selectFirst [PPeerHost SQL.==. ip, PPeerPubkey SQL.==. Just point] []
 
 instance MonadIO m => Mod.Accessible BondedPeers m where
   access _ = liftIO $ withGlobalSQLPool $ \sqldb -> do
@@ -106,6 +112,11 @@ instance MonadIO m => A.Replaceable PPeer UdpEnableTime m where
   replace _ peer (UdpEnableTime enableTime) = liftIO $ withGlobalSQLPool $ \sqldb -> do
     flip runSqlPool sqldb $
       SQL.updateWhere (thisPeer peer) [PPeerUdpEnableTime SQL.=. enableTime]
+
+instance MonadIO m => A.Replaceable PPeer IP m where
+  replace _ peer ip = liftIO $ withGlobalSQLPool $ \sqldb -> do
+    flip runSqlPool sqldb $
+      SQL.updateWhere (thisPeer peer) [PPeerIp SQL.=. Just ip]
 
 instance MonadIO m => A.Replaceable PPeer TcpEnableTime m where
   replace _ peer (TcpEnableTime enableTime) = liftIO $ withGlobalSQLPool $ \sqldb -> do

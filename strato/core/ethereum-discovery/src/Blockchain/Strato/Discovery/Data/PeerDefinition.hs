@@ -12,6 +12,7 @@
 {-# LANGUAGE UndecidableInstances #-}
 
 {-# OPTIONS -fno-warn-unused-top-binds #-}
+{-# OPTIONS -fno-warn-orphans #-}
 
 --This module has to be separated out because Template Haskell makes it hard to export the individual items created
 module Blockchain.Strato.Discovery.Data.PeerDefinition where
@@ -20,17 +21,21 @@ import Blockchain.Data.PersistTypes ()
 import Blockchain.MiscJSON ()
 import Blockchain.Strato.Model.Keccak256
 import Crypto.Types.PubKey.ECC
+import Data.IP
 import qualified Data.Text as T
 import Data.Time
 import qualified Database.Persist.Postgresql as SQL
 import Database.Persist.TH
 
+derivePersistField "IP"
+  
 share
   [mkPersist sqlSettings, mkMigrate "migrateAll"]
   [persistLowerCase|
 PPeer
     pubkey Point Maybe
-    ip T.Text
+    host T.Text
+    ip IP Maybe
     tcpPort Int
     udpPort Int
     numSessions Int

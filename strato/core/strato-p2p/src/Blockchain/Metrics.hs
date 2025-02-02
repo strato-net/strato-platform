@@ -115,7 +115,7 @@ recordException :: (Exception e, MonadIO m) => PPeer -> e -> m ()
 recordException PPeer {..} e =
   let ty = pack . show $ typeOf e
       port = pack $ show pPeerTcpPort
-   in liftIO $ withLabel exceptionCount (pPeerIp, port, ty) incCounter
+   in liftIO $ withLabel exceptionCount (pPeerHost, port, ty) incCounter
 
 {-# NOINLINE txQueueDepth #-}
 txQueueDepth :: Gauge
