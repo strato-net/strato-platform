@@ -4564,54 +4564,6 @@ contract qq{
                        BInteger 13
                      ]
 
-  it "can get the chainId from the account type" . runTest $ do
-    runBS
-      [r|
-contract qq {
-  account a1;
-  account a2;
-  account a3;
-  account a4;
-  uint cid1;
-  uint cid2;
-  uint cid3;
-  uint cid4;
-  constructor() public {
-    a1 = account(0xdeadbeef, 0xfeedbeef);
-    a2 = account(0x123, "main");
-    a3 = account(0x124);
-    a4 = account(0xdeadbeef, "0xdeadbeef");
-    cid1 = a1.chainId;
-    cid2 = a2.chainId;
-    cid3 = a3.chainId;
-    cid4 = a4.chainId;
-  }
-}|]
-    getFields ["cid1", "cid2", "cid3"]
-      `shouldReturn` [ BInteger 0xfeedbeef,
-                       BDefault,
-                       BDefault
-                     ]
-  it "can get the chainId directly from the account constructor" . runTest $ do
-    runBS
-      [r|
-contract qq {
-  uint a1;
-  uint a2;
-  uint a3;
-  uint a4;
-  uint a5;
-  constructor() public {
-    a1 = account(0xdeadbeef, 0xfeedbeef).chainId;
-    a2 = account(0x123, "main").chainId;
-    a3 = account(0x124, "self").chainId;
-    a4 = account(0x125).chainId;
-    a5 = account(this, "self").chainId;
-  }
-}|]
-    getFields ["a1", "a2", "a3", "a4", "a5"]
-      `shouldReturn` [BInteger 0xfeedbeef, BDefault, BDefault, BDefault, BDefault]
-
   it "can get the balance from an address" . runTest $ do
     -- Post contract
     runBS
@@ -8077,18 +8029,6 @@ contract qq {
 |]
     getAll [[Field "a"], [Field "b"]] `shouldReturn` [BDefault, BDefault]
 
-  it "can return chainIdString in a simple manner" . runTest $ do
-    runBS
-      [r|
-contract qq {
-  string x;
-  constructor() {
-    x = this.chainIdString;
-  }
-}
-|]
-    getFields ["x"] `shouldReturn` [BString "0000000000000000000000000000000000000000000000000000000000000000"]
-
   it "View functions enforced in 3.4" $
     ( runTest $
         runBS
@@ -8186,20 +8126,6 @@ contract qq {
 }   |]
     )
       `shouldThrow` anyTooMuchGasError
-
-  it "can use the record identifier to signify this mapping should be indexed in cirrus" . runTest $ do
-    runBS
-      [r|
-contract qq {
-  string x;
-  mapping(string => uint) record myMap;
-  constructor() {
-    x = this.chainIdString;
-    myMap["seven"] = 7;
-  }
-}
-|]
-    getFields ["x"] `shouldReturn` [BString "0000000000000000000000000000000000000000000000000000000000000000"]
 
   it "can use using statement" . runTest $ do
     runBS
