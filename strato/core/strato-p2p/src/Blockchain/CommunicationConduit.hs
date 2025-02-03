@@ -118,7 +118,6 @@ handleMsgClientConduit myId peer = do
       BestSequencedBlock (BestBlock _ lastBlockNumber) <- lift $ Mod.get (Mod.Proxy @BestSequencedBlock)
       mrh <- lift $ unMaxReturnedHeaders <$> Mod.access (Mod.Proxy @MaxReturnedHeaders)
       yield . Right $ GetBlockHeaders (BlockNumber (max (lastBlockNumber - flags_syncBacktrackNumber) 0)) mrh 0 Forward
-      yield . Right $ GetChainDetails []
       lift stampActionTimestamp
     other -> assertHandshake other
   handleEvents peer .| filterMC (either (const $ return True) checkOutbound)
@@ -173,7 +172,6 @@ handleMsgServerConduit myPubkey peer = do
       BestSequencedBlock (BestBlock _ lastBlockNumber) <- lift $ Mod.get (Mod.Proxy @BestSequencedBlock)
       mrh <- lift $ unMaxReturnedHeaders <$> Mod.access (Mod.Proxy @MaxReturnedHeaders)
       yield . Right $ GetBlockHeaders (BlockNumber (max (lastBlockNumber - flags_syncBacktrackNumber) 0)) mrh 0 Forward
-      yield . Right $ GetChainDetails []
       lift stampActionTimestamp
     other -> assertHandshake other
   handleEvents peer .| filterMC (either (const $ return True) checkOutbound)
