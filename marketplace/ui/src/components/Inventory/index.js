@@ -467,13 +467,13 @@ const Inventory = ({ user }) => {
         return (
           <div>
             {price !== 'N/A' ? (
-              <>
+              <div className="flex flex-col items-center">
                 <span>${price}</span>{' '}
                 <p className="flex text-xs items-center gap-1">
                   {' '}
                   &nbsp;({price} {USDSTIcon})
                 </p>
-              </>
+              </div>
             ) : (
               'N/A'
             )}
