@@ -20,6 +20,7 @@ import qualified Blockchain.Blockstanbul as PBFT
 import Blockchain.Data.Wire
 import Blockchain.Display (MsgDirection (..))
 import Blockchain.EventModel
+import Blockchain.Strato.Discovery.Data.Host
 import Blockchain.Strato.Discovery.Data.Peer (PPeer (..))
 import Control.Exception
 import Control.Monad.IO.Class
@@ -115,7 +116,7 @@ recordException :: (Exception e, MonadIO m) => PPeer -> e -> m ()
 recordException PPeer {..} e =
   let ty = pack . show $ typeOf e
       port = pack $ show pPeerTcpPort
-   in liftIO $ withLabel exceptionCount (pPeerHost, port, ty) incCounter
+   in liftIO $ withLabel exceptionCount (pack $ hostToString pPeerHost, port, ty) incCounter
 
 {-# NOINLINE txQueueDepth #-}
 txQueueDepth :: Gauge

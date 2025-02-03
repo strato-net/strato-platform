@@ -29,6 +29,7 @@ import Blockchain.Metrics
 import Blockchain.Options
 import Blockchain.RLPx
 import Blockchain.Sequencer.Event
+import Blockchain.Strato.Discovery.Data.Host
 import Blockchain.Strato.Discovery.Data.Peer
 import Blockchain.Strato.Model.Secp256k1
 import Blockchain.Threads
@@ -61,13 +62,13 @@ ethServerHandler ::
   ConduitM () B.ByteString m () ->
   ConduitM B.ByteString Void m () ->
   ConduitM () P2pEvent m () ->
-  IPAsText ->
+  Host ->
   m ()
-ethServerHandler pSource pSink seqSrc ipAsText@(IPAsText i) = do
-  let peerStr = "<" ++ T.unpack i
+ethServerHandler pSource pSink seqSrc host = do
+  let peerStr = "<" ++ hostToString host
   ender <- toIO . $logInfoS "runEthServer/exit" . T.pack . C.green $ " * Connection ended to " ++ C.yellow peerStr
   void $ register ender
-  getPeerByIP ipAsText >>= \case
+  getPeerByIP host >>= \case
     Nothing -> do
       $logErrorS "runEthServer" . T.pack $ "Didn't see peer in discovery at IP " ++ peerStr ++ ". rejecting violently."
     Just p -> do
@@ -88,7 +89,7 @@ ethServerHandler pSource pSink seqSrc ipAsText@(IPAsText i) = do
                       $logErrorLS "stratoP2PServer/runEthServer" theUDPErr
                     disErr <- storeDisableException p (T.pack "WrongGenesisBlock")
                     whenLeft disErr $ \err2 -> $logErrorS "stratoP2PClient/runEthServer" . T.pack $ "Unable to store disable exception: " ++ show err2
-                    A.replace (A.Proxy @PeerBondingState) (IPAsText $ pPeerHost p, pubkey) (PeerBondingState 3) -- 3 indicates wrong genesis block/networkID
+                    A.replace (A.Proxy @PeerBondingState) (pPeerHost p, pubkey) (PeerBondingState 3) -- 3 indicates wrong genesis block/networkID
                     lengthenPeerDisable p
                   e' | Just HeadMacIncorrect <- fromException e' -> do
                     disErr <- storeDisableException p (T.pack "HeadMacIncorrect")
@@ -100,7 +101,7 @@ ethServerHandler pSource pSink seqSrc ipAsText@(IPAsText i) = do
                       $logErrorLS "stratoP2PServer/runEthServer" theUDPErr
                     disErr <- storeDisableException p (T.pack "NetworkIDMismatch")
                     whenLeft disErr $ \err2 -> $logErrorS "stratoP2PClient/runEthServer" . T.pack $ "Unable to store disable exception: " ++ show err2
-                    A.replace (A.Proxy @PeerBondingState) (IPAsText $ pPeerHost p, pubkey) (PeerBondingState 3) -- 3 indicates wrong genesis block/networkID
+                    A.replace (A.Proxy @PeerBondingState) (pPeerHost p, pubkey) (PeerBondingState 3) -- 3 indicates wrong genesis block/networkID
                     lengthenPeerDisable p
                   e' | Just PeerDisconnected <- fromException e' -> do
                     disErr <- storeDisableException p (T.pack "PeerDisconnected")

@@ -21,7 +21,6 @@ module Blockchain.Strato.Discovery.Data.Peer
     BondedPeersForUDP(..),
     ClosestPeers(..),
     UnbondedPeersForUDP(..),
-    IPAsText(..),
     ValidatorAddresses(..),
     createPeer,
     pointToNodeID,
@@ -61,6 +60,7 @@ import Blockchain.Data.RLP
 import Blockchain.MiscJSON ()
 import Blockchain.Strato.Discovery.Metrics
 import Blockchain.Strato.Discovery.Data.PeerDefinition
+import Blockchain.Strato.Discovery.Data.Host
 import Blockchain.Strato.Model.Address (Address, fromPublicKey)
 import Blockchain.Strato.Model.ExtendedWord
 import Blockchain.Strato.Model.Keccak256
@@ -76,7 +76,7 @@ import Data.IP
 import Data.List (sortBy)
 import Data.Maybe (fromJust)
 import qualified Data.Set as Set
-import Data.Text (Text)
+import Data.String
 import qualified Data.Text as T
 import Data.Time
 import Data.Time.Clock.POSIX
@@ -91,8 +91,6 @@ import Text.Format
 import UnliftIO
 
 newtype AvailablePeers = AvailablePeers {unAvailablePeers :: [PPeer]}
-
-newtype IPAsText = IPAsText T.Text deriving (Eq, Ord)
 
 newtype TCPPort = TCPPort Int deriving (Show, Read, Eq, Ord)
 
@@ -120,10 +118,10 @@ newtype ValidatorAddresses = ValidatorAddresses {unValidatorAddresses :: [Addres
 
 type HasPeerDB m = (
   Mod.Accessible AvailablePeers m,
-  A.Replaceable (IPAsText, TCPPort) ActivityState m,
+  A.Replaceable (Host, TCPPort) ActivityState m,
   Mod.Accessible ActivePeers m,
-  A.Replaceable (IPAsText, Point) PeerBondingState m,
-  A.Selectable (IPAsText, Point) PeerBondingState m,
+  A.Replaceable (Host, Point) PeerBondingState m,
+  A.Selectable (Host, Point) PeerBondingState m,
   Mod.Accessible BondedPeers m,
   Mod.Accessible BondedPeersForUDP m,
   Mod.Accessible UnbondedPeersForUDP m,
@@ -172,7 +170,7 @@ instance Format NodeID where
   format (NodeID x) = BC.unpack (B16.encode $ B.take 10 x) ++ "...."
 
 pPeerString :: PPeer -> String
-pPeerString PPeer {..} = T.unpack pPeerHost ++ ":" ++ show pPeerTcpPort
+pPeerString PPeer {..} = hostToString pPeerHost ++ ":" ++ show pPeerTcpPort
 
 jamshidBirth :: UTCTime
 jamshidBirth = posixSecondsToUTCTime 0
@@ -180,15 +178,15 @@ jamshidBirth = posixSecondsToUTCTime 0
 createPeer :: String -> Either String PPeer
 createPeer peerString = buildPeer <$> parseEnode peerString
 
-buildPeer :: (Maybe String, String, Int) -> PPeer
-buildPeer (mpk, ip, p) = buildPeerPoint (stringToPoint <$> mpk, ip, p)
+buildPeer :: (Maybe String, Host, Int) -> PPeer
+buildPeer (mpk, host, p) = buildPeerPoint (stringToPoint <$> mpk, host, p)
 
-buildPeerPoint :: (Maybe Point, String, Int) -> PPeer
+buildPeerPoint :: (Maybe Point, Host, Int) -> PPeer
 buildPeerPoint (pubkeyMaybe, host, p) =
   let peer =
         PPeer
           { pPeerPubkey = pubkeyMaybe,
-            pPeerHost = T.pack host,
+            pPeerHost = host,
             pPeerIp = Nothing,
             pPeerUdpPort = p,
             pPeerTcpPort = 30303,
@@ -209,7 +207,7 @@ buildPeerPoint (pubkeyMaybe, host, p) =
           }
    in peer
 
-parseEnode :: String -> Either String (Maybe String, String, Int)
+parseEnode :: String -> Either String (Maybe String, Host, Int)
 parseEnode enode =
   case mUriAuth of
     Nothing -> Left $ "Invalid enode: " ++ enode
@@ -227,33 +225,33 @@ parsePublicKey uriAuth = case filter (/= '@') $ URI.uriUserInfo uriAuth of
   [] -> Nothing
   publicKey -> Just publicKey
 
-parseHostname :: URIAuth -> String
-parseHostname uriAuth = filter (\ch -> ch /= '[' && ch /= ']') (URI.uriRegName uriAuth)
+parseHostname :: URIAuth -> Host
+parseHostname uriAuth = fromString $ filter (\ch -> ch /= '[' && ch /= ']') (URI.uriRegName uriAuth)
 
 parsePort :: URIAuth -> Int
 parsePort uriAuth = LabeledError.read "Peer/parsePort" $ filter (/= ':') (URI.uriPort uriAuth)
 
 setPeerActiveState ::
   (MonadUnliftIO m, MonadMonitor m, HasPeerDB m) =>
-  T.Text ->
+  Host ->
   Int ->
   ActivityState ->
   m (Either SomeException ())
-setPeerActiveState ip port state = do
+setPeerActiveState host port state = do
   recordStateChange state
-  try $ A.replace (A.Proxy @ActivityState) (IPAsText ip, TCPPort port) state
+  try $ A.replace (A.Proxy @ActivityState) (host, TCPPort port) state
 
 getActivePeers :: (MonadUnliftIO m, Mod.Accessible ActivePeers m) => m (Either SomeException [PPeer])
 getActivePeers = try $ unActivePeers <$> Mod.access (Mod.Proxy @ActivePeers)
 
 setPeerBondingState ::
-  (MonadUnliftIO m, A.Replaceable (IPAsText, Point) PeerBondingState m) =>
-  Text ->
+  (MonadUnliftIO m, A.Replaceable (Host, Point) PeerBondingState m) =>
+  Host ->
   Point ->
   Int ->
   m (Either SomeException ())
 setPeerBondingState host point state = do
-  try $ A.replace (A.Proxy @PeerBondingState) (IPAsText host, point) (PeerBondingState state)
+  try $ A.replace (A.Proxy @PeerBondingState) (host, point) (PeerBondingState state)
 
 setPeerPubkey :: HasPeerDB m =>
                  PPeer -> Point -> m ()

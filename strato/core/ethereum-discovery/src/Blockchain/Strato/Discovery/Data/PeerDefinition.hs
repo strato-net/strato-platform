@@ -19,6 +19,7 @@ module Blockchain.Strato.Discovery.Data.PeerDefinition where
 
 import Blockchain.Data.PersistTypes ()
 import Blockchain.MiscJSON ()
+import Blockchain.Strato.Discovery.Data.Host
 import Blockchain.Strato.Model.Keccak256
 import Crypto.Types.PubKey.ECC
 import Data.IP
@@ -34,7 +35,7 @@ share
   [persistLowerCase|
 PPeer
     pubkey Point Maybe
-    host T.Text
+    host Host
     ip IP Maybe
     tcpPort Int
     udpPort Int

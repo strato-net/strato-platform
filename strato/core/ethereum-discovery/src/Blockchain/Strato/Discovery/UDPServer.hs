@@ -19,6 +19,7 @@ where
 import BlockApps.Logging
 import Blockchain.Data.PubKey
 import Blockchain.Strato.Discovery.ContextLite
+import Blockchain.Strato.Discovery.Data.Host
 import Blockchain.Strato.Discovery.Data.Peer
 import Blockchain.Strato.Discovery.P2PUtil
 import Blockchain.Strato.Discovery.UDP
@@ -99,7 +100,7 @@ attemptBond = do
   unbondedPeers <- getUnbondedPeers
   when (length unbondedPeers /= 0) . forM_ unbondedPeers $ \p -> do
     time <- liftIO $ round `fmap` getPOSIXTime
-    mServerAddr <- A.select (A.Proxy @SockAddr) (Nothing :: Maybe IPAsText, udpPort)
+    mServerAddr <- A.select (A.Proxy @SockAddr) (Nothing :: Maybe Host, udpPort)
     forM_ mServerAddr \serverAddr ->
       case getHostAddress serverAddr of
         Left err -> $logErrorS "attemptBond" $ T.pack . show $ err
@@ -113,7 +114,7 @@ attemptBond = do
               4
               (Endpoint hostAddress udpPort tcpPort)
               ( Endpoint
-                  (stringToIAddr $ T.unpack $ pPeerHost p)
+                  (stringToIAddr $ hostToString $ pPeerHost p)
                   (UDPPort . fromIntegral $ pPeerUdpPort p)
                   (TCPPort . fromIntegral $ pPeerTcpPort p)
               )
@@ -192,7 +193,7 @@ handleValidPacket addr otherUdpPort packet otherPubKey = case packet of
     getPeerByIP' ip >>= \case 
       Nothing -> $logInfoS "handleValidPacket/FindNeighbors" "Ignoring FindNeigbors request from unknown peer"
       Just peer -> do 
-        A.select (A.Proxy @PeerBondingState) (IPAsText $ T.pack $ show ip, otherPubKey) >>= \case
+        A.select (A.Proxy @PeerBondingState) (pPeerHost peer, otherPubKey) >>= \case
           Just (PeerBondingState b) | b > 1 -> do
             peers <- getPeersClosestTo targetPubkey otherPubKey
             let theNeighbors = (\p -> Neighbor (mkEndpoint p) (mkNodeId p)) <$> peers
@@ -201,12 +202,12 @@ handleValidPacket addr otherUdpPort packet otherPubKey = case packet of
             $logInfoS "handleValidPacket/FindNeighbors" "Recieved FindNeighbors request from a peer we are not bonded to; will attempt to bond first"
             udpPort <- Mod.access (Mod.Proxy @UDPPort)
             tcpPort <- Mod.access (Mod.Proxy @TCPPort)
-            mServerAddr <- A.select (A.Proxy @SockAddr) (Nothing :: Maybe IPAsText, udpPort)
+            mServerAddr <- A.select (A.Proxy @SockAddr) (Nothing :: Maybe Host, udpPort)
             case getHostAddress <$> mServerAddr of 
               Just (Right hostAddress) -> sendPacket (peer) $ Ping 4 (Endpoint hostAddress udpPort tcpPort) (mkEndpoint peer) nextTime
               _ -> $logErrorS "handleValidPacket/FindNeighbors" "Attempted to bond to peer but failed"
     where
-      mkEndpoint PPeer {..} = Endpoint (stringToIAddr $ T.unpack pPeerHost) (UDPPort pPeerUdpPort) (TCPPort pPeerTcpPort)
+      mkEndpoint PPeer {..} = Endpoint (stringToIAddr $ hostToString pPeerHost) (UDPPort pPeerUdpPort) (TCPPort pPeerTcpPort)
       mkNodeId = pointToNodeID . fromJust . pPeerPubkey
   Neighbors neighbors _ -> do
     let neighborIPs = ((\(Neighbor (Endpoint addr' _ _) _) -> format addr') <$> neighbors)
@@ -226,7 +227,7 @@ handleValidPacket addr otherUdpPort packet otherPubKey = case packet of
           let peer =
                 PPeer
                   { pPeerPubkey = Just $ nodeIDToPoint nodeID,
-                    pPeerHost = T.pack $ format addr',
+                    pPeerHost = Host $ T.pack $ format addr',
                     pPeerIp = Nothing,
                     pPeerUdpPort = udpPort,
                     pPeerTcpPort = tcpPort,
@@ -255,8 +256,8 @@ handleValidPacket addr otherUdpPort packet otherPubKey = case packet of
       let peer =
             PPeer
               { pPeerPubkey = Just otherPubKey,
-                pPeerHost = T.pack $ show ip,
-                pPeerIp = Nothing,
+                pPeerHost = Host $ T.pack $ show ip,
+                pPeerIp = Just ip,
                 pPeerUdpPort = fromIntegral peerUdpPort,
                 pPeerTcpPort = fromIntegral peerTcpPort,
                 pPeerNumSessions = 0,

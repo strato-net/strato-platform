@@ -65,7 +65,7 @@ runPeer ::
 runPeer peer sSource = do
   let pStr = ">" ++ pPeerString peer -- display string will show up as dns name
   labelPeerThreadM pStr "Peer Manager" (Just "CONNECTING...")
-  ender <- toIO . $logInfoS "runPeer/exit" . T.pack . C.green $ " * Connection ended to " ++ C.yellow (T.unpack (pPeerHost peer) ++ ":" ++ show (pPeerTcpPort peer))
+  ender <- toIO . $logInfoS "runPeer/exit" . T.pack . C.green $ " * Connection ended to " ++ C.yellow (format (pPeerHost peer) ++ ":" ++ show (pPeerTcpPort peer))
   void $ register ender
   myPublic <- getPub
   otherPubKey <- case (pPeerPubkey peer) of
@@ -83,11 +83,11 @@ runPeer peer sSource = do
 
   $logInfoS "runPeer" . T.pack . C.blue $ "Welcome to strato-p2p-client"
   $logInfoS "runPeer" . T.pack . C.blue $ "============================"
-  $logInfoS "runPeer" . T.pack . C.green $ " * " ++ "Attempting to connect to " ++ C.yellow (T.unpack (pPeerHost peer) ++ ":" ++ show (pPeerTcpPort peer))
+  $logInfoS "runPeer" . T.pack . C.green $ " * " ++ "Attempting to connect to " ++ C.yellow (format (pPeerHost peer) ++ ":" ++ show (pPeerTcpPort peer))
   $logInfoS "runPeer" . T.pack . C.green $ " * " ++ "my pubkey is: " ++ format myPublic
   $logInfoS "runPeer" . T.pack . C.green $ " * " ++ "server pubkey is: " ++ format otherPubKey 
   withActivePeer peer $
-    runClientConnection (IPAsText $ pPeerHost peer) (TCPPort . fromIntegral $ pPeerTcpPort peer) sSource $ \c -> do
+    runClientConnection (pPeerHost peer) (TCPPort . fromIntegral $ pPeerTcpPort peer) sSource $ \c -> do
       attempt :: (Maybe SomeException) <- 
         withCertifiedPeer peer $
           runEthClientConduit
@@ -204,14 +204,14 @@ stratoP2PClient runner = runner $ \_ -> labelTheThread "strato P2P Client main l
           e' | Just WrongGenesisBlock <- fromException e' -> do
             disableException thePeer "WrongGenesisBlock" Nothing True
             case pPeerPubkey thePeer of 
-              Just pubkey -> A.replace (A.Proxy @PeerBondingState) (IPAsText $ pPeerHost thePeer, pubkey) (PeerBondingState 3) -- 3 indicates wrong genesis block/networkID
+              Just pubkey -> A.replace (A.Proxy @PeerBondingState) (pPeerHost thePeer, pubkey) (PeerBondingState 3) -- 3 indicates wrong genesis block/networkID
               Nothing -> return ()
           e' | Just HeadMacIncorrect <- fromException e' -> do
             disableException thePeer "HeadMacIncorrect" (Just . fromIntegral $ 2 * flags_connectionTimeout) False
           e' | Just NetworkIDMismatch <- fromException e' -> do
             disableException thePeer "NetworkIDMismatch" Nothing True
             case pPeerPubkey thePeer of 
-              Just pubkey -> A.replace (A.Proxy @PeerBondingState) (IPAsText $ pPeerHost thePeer, pubkey) (PeerBondingState 3) -- 3 indicates wrong genesis block/networkID
+              Just pubkey -> A.replace (A.Proxy @PeerBondingState) (pPeerHost thePeer, pubkey) (PeerBondingState 3) -- 3 indicates wrong genesis block/networkID
               Nothing -> return ()
           e' | Just PeerDisconnected <- fromException e' -> do
             disableException thePeer "PeerDisconnected" (Just . fromIntegral $ 2 * flags_connectionTimeout) True

@@ -78,7 +78,7 @@ skipEntries n xs = if null xs then [] else head xs : helper (tail xs)
       [] -> []
 
 peerString :: PPeer -> String
-peerString peer = key ++ "@" ++ T.unpack (pPeerHost peer) ++ ":" ++ show (pPeerTcpPort peer)
+peerString peer = key ++ "@" ++ format (pPeerHost peer) ++ ":" ++ show (pPeerTcpPort peer)
   where
     key = p2s (pPeerPubkey peer)
     p2s (Just p) = BS8.unpack . BC16.encode $ pointToBytes p
@@ -363,7 +363,7 @@ handleEvents peer = awaitForever $ \case
                       [ "Already seen outbound wire message ",
                         T.pack (format msgHash),
                         ". Not forwarding to peer ",
-                        pPeerHost peer
+                        T.pack $ format $ pPeerHost peer
                       ]
                 else do
                   $logInfoS "handleEvents/P2pBlockstanbul" $
@@ -371,7 +371,7 @@ handleEvents peer = awaitForever $ \case
                       [ "First time seeing outbound wire message ",
                         T.pack (format msgHash),
                         ". Forwarding to peer ",
-                        pPeerHost peer
+                        T.pack $ format $ pPeerHost peer
                       ]
                   let !ip = pPeerHost peer
                   lift $ insert (Proxy @(Proxy (Outbound WireMessage))) (ip, msgHash) Proxy

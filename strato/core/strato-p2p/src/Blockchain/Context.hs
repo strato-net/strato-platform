@@ -89,6 +89,7 @@ import           Blockchain.P2PUtil
 import           Blockchain.Sequencer.Event
 import qualified Blockchain.Sequencer.Kafka            as SK
 
+import           Blockchain.Strato.Discovery.Data.Host
 import           Blockchain.Strato.Discovery.Data.Peer
 import           Blockchain.Strato.Discovery.ContextLite ()
 import           Blockchain.Strato.Model.Address
@@ -167,7 +168,7 @@ data Context = Context
   , remainingBlockHeaders    :: (RemainingBlockHeaders, UTCTime) -- keep track when last updated global headers cache
   , actionTimestamp          :: ActionTimestamp
   , _blockstanbulPeerAddr    :: PeerAddress
-  , _outboundWireMessages :: S.OSet (T.Text, Keccak256)
+  , _outboundWireMessages :: S.OSet (Host, Keccak256)
   }
 
 makeLenses ''Context
@@ -186,18 +187,18 @@ makeLenses ''P2pConduits
 
 class RunsClient m where
   runClientConnection ::
-    IPAsText ->
+    Host ->
     TCPPort ->
     ConduitM () P2pEvent m () ->
     (P2pConduits m -> m ()) ->
     m ()
 
 class RunsServer n m where
-  runServer :: TCPPort -> PeerRunner n m () -> (P2pConduits n -> IPAsText -> n ()) -> m ()
+  runServer :: TCPPort -> PeerRunner n m () -> (P2pConduits n -> Host -> n ()) -> m ()
 
 instance RunsClient ContextM where
-  runClientConnection (IPAsText ip) (TCPPort p) sSource handler = do
-    let peerAddress = BC.pack $ T.unpack ip
+  runClientConnection host' (TCPPort p) sSource handler = do
+    let peerAddress = BC.pack $ hostToString host'
     runGeneralTCPClient (clientSettings p peerAddress) $ \app -> do
       let pSource = appSource app
           pSink = appSink app
@@ -213,7 +214,7 @@ instance RunsServer ContextM (LoggingT IO) where
       let pSource = appSource app
           pSink = appSink app
           conduits = P2pConduits pSource pSink sSource
-          ip = IPAsText . T.pack . sockAddrToIP $ appSockAddr app
+          ip = fromString . sockAddrToIP $ appSockAddr app
       handler conduits ip
 
 instance MonadIO m => Mod.Accessible PublicKey (ReaderT Config m) where
@@ -305,7 +306,7 @@ instance MonadIO m => (Keccak256 `A.Alters` (Proxy (Inbound WireMessage))) (Read
              in (wms', ())
         )
 
-instance MonadIO m => ((T.Text, Keccak256) `A.Alters` (Proxy (Outbound WireMessage))) (ReaderT Config m) where
+instance MonadIO m => ((Host, Keccak256) `A.Alters` (Proxy (Outbound WireMessage))) (ReaderT Config m) where
   lookup _ k = do
     wms <- _outboundWireMessages <$> Mod.get (Mod.Proxy @Context)
     let b = S.member k wms
@@ -396,13 +397,13 @@ instance MonadIO m => Mod.Accessible RBDB.RedisConnection (ReaderT Config m) whe
 instance {-# OVERLAPPING #-} MonadIO m => AccessibleEnv SQLDB (ReaderT Config m) where
   accessEnv = asks configSQLDB
 
-instance MonadUnliftIO m => A.Selectable IPAsText PPeer (ReaderT Config m) where
-  select _ (IPAsText ip) =
+instance MonadUnliftIO m => A.Selectable Host PPeer (ReaderT Config m) where
+  select _ host' =
     sqlQuery actions >>= \case
       [] -> return Nothing
       lst -> return . Just . SQL.entityVal $ head lst
     where
-      actions = SQL.selectList [PPeerHost SQL.==. ip] []
+      actions = SQL.selectList [PPeerHost SQL.==. host'] []
 
 instance MonadUnliftIO m => A.Selectable Point PPeer (ReaderT Config m) where
   select _ pk =
@@ -428,7 +429,7 @@ instance (MonadIO m, MonadLogger m) => HasVault (ReaderT Config m) where
     $logInfoS "HasVault" "Calling vault-wrapper to get a shared key"
     waitOnVault $ liftIO $ runClientM (VC.getSharedKey Nothing pub) vc
 
-instance MonadIO m => A.Selectable (IPAsText, UDPPort, B.ByteString) Point (ReaderT Config m) where
+instance MonadIO m => A.Selectable (Host, UDPPort, B.ByteString) Point (ReaderT Config m) where
   select p = liftIO . A.select p
 
 waitOnVault :: (MonadLogger m, MonadIO m, Show a) => m (Either a b) -> m b
@@ -477,8 +478,8 @@ type MonadP2P m =
       '[A.Selectable]
       '[ '(Integer, Canonical BlockHeader),
          '(Address, X509CertInfoState),
-         '((IPAsText, UDPPort, B.ByteString), Point),
-         '(IPAsText, PPeer),
+         '((Host, UDPPort, B.ByteString), Point),
+         '(Host, PPeer),
          '(Point, PPeer),
          '(ChainMemberParsedSet, IsValidator)
        ]
@@ -489,7 +490,7 @@ type MonadP2P m =
          '(PPeer, UdpEnableTime),
          '(PPeer, PeerDisable),
          '(PPeer, T.Text),
-         '((IPAsText, Point), PeerBondingState)
+         '((Host, Point), PeerBondingState)
        ]
       m,
     All2
@@ -497,8 +498,8 @@ type MonadP2P m =
       '[ '(Keccak256, BlockHeader),
          '(Keccak256, OutputBlock),
          '(Keccak256, Proxy (Inbound WireMessage)),
-         '((T.Text, Keccak256), Proxy (Outbound WireMessage)),
-         '((IPAsText, TCPPort), ActivityState)
+         '((Host, Keccak256), Proxy (Outbound WireMessage)),
+         '((Host, TCPPort), ActivityState)
        ]
       m
   )
@@ -575,8 +576,8 @@ initContext = do
           }
 
 getPeerByIP ::
-  A.Selectable IPAsText PPeer m =>
-  IPAsText ->
+  A.Selectable Host PPeer m =>
+  Host ->
   m (Maybe PPeer)
 getPeerByIP = A.select (Proxy @PPeer)
 
@@ -604,15 +605,15 @@ shouldSendToPeer addr = maybe True zeroOrArg . unPeerAddress <$> Mod.access (Pro
 
 withActivePeer ::
   ( MonadUnliftIO m,
-    ((IPAsText, TCPPort) `A.Alters` ActivityState) m
+    ((Host, TCPPort) `A.Alters` ActivityState) m
   ) =>
   PPeer ->
   m a ->
   m a
 withActivePeer p = bracket a b . const
   where
-    a = A.insert (Proxy @ActivityState) (IPAsText $ pPeerHost p, TCPPort $ pPeerTcpPort p) Active
-    b _ = A.insert (Proxy @ActivityState) (IPAsText $ pPeerHost p, TCPPort $ pPeerTcpPort p) Inactive
+    a = A.insert (Proxy @ActivityState) (pPeerHost p, TCPPort $ pPeerTcpPort p) Active
+    b _ = A.insert (Proxy @ActivityState) (pPeerHost p, TCPPort $ pPeerTcpPort p) Inactive
 
 withCertifiedPeer :: PPeer -> m (Maybe SomeException) -> m (Maybe SomeException)
 withCertifiedPeer = flip const
