@@ -80,6 +80,7 @@ const GlobalTransactionResponsive = ({
                 assetAddress,
                 assetDescription,
                 quantity,
+                decimals,
                 from,
                 to,
                 status,
@@ -227,13 +228,13 @@ const GlobalTransactionResponsive = ({
                         {formattedNum(
                           is18DecimalPlaces
                             ? (price * Math.pow(10, 18)).toFixed(2)
-                            : price
+                            : (price * Math.pow(10, decimals || 0)).toFixed(2)
                         )}{' '}
                         (
                         {formattedNum(
                           is18DecimalPlaces
                             ? (price * Math.pow(10, 18)).toFixed(2)
-                            : price
+                            : (price * Math.pow(10, decimals || 0)).toFixed(2)
                         )}{' '}
                         {USDSTIcon})
                       </p>
@@ -246,7 +247,7 @@ const GlobalTransactionResponsive = ({
                       Qty:{' '}
                       {(is18DecimalPlaces
                         ? quantity / Math.pow(10, 18)
-                        : quantity
+                        : quantity / Math.pow(10, decimals || 0)
                       ).toLocaleString('en-US', {
                         maximumFractionDigits: 4,
                         minimumFractionDigits: 0,

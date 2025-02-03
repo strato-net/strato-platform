@@ -477,9 +477,9 @@ const ProductDetails = ({ user, users }) => {
   );
   const linkUrl = window.location.href;
 
-  const is18DecimalPlaces = assetsWithEighteenDecimalPlaces.includes(
+  const decimals = assetsWithEighteenDecimalPlaces.includes(
     details?.originAddress
-  );
+  ) ? 18 : details?.decimals || 0;
 
   return (
     <>
@@ -666,17 +666,14 @@ const ProductDetails = ({ user, users }) => {
                                 $
                                 {isStaked
                                   ? (details.escrow?.maxLoanAmount).toFixed(2)
-                                  : is18DecimalPlaces
-                                  ? adjustedPrice * Math.pow(10, 18)
-                                  : adjustedPrice.toFixed(2)}{' '}
+                                  : adjustedPrice * Math.pow(10, decimals)}{' '}
                                 <span className="font-normal text-xs mr-2 text-primary">
                                   <b>
                                     (
                                     {isStaked
                                       ? details.escrow?.maxLoanAmount
-                                      : is18DecimalPlaces
-                                      ? adjustedPrice * Math.pow(10, 18)
-                                      : adjustedPrice.toFixed(2)}{' '}
+                                      : adjustedPrice *
+                                        Math.pow(10, decimals)}{' '}
                                     USDST)
                                   </b>
                                 </span>
@@ -731,7 +728,8 @@ const ProductDetails = ({ user, users }) => {
                               inventoryDetails.root
                             )
                           ? inventoryDetails.quantity / 1e18
-                          : inventoryDetails.quantity
+                          : inventoryDetails.quantity /
+                            Math.pow(10, inventoryDetails.decimals || 0)
                       }
                       defaultValue={`${qty}`}
                       controls={false}
@@ -1071,7 +1069,7 @@ const ProductDetails = ({ user, users }) => {
                       </h2>
                       <Statistics
                         priceHistory={priceHistory}
-                        is18DecimalPlaces={is18DecimalPlaces}
+                        decimals={decimals}
                       />
                     </>
                   )}

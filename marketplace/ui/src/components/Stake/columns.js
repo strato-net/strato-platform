@@ -91,9 +91,9 @@ export const aggregateStakeColumns = (
       title: 'Quantity Stakeable',
       align: 'center',
       render: (_, record) => {
-        const requiresDivision = assetsWithEighteenDecimalPlaces.includes(
+        const decimals = assetsWithEighteenDecimalPlaces.includes(
           record.root
-        );
+        ) ? 18 : record.decimals || 0;
         const uniqueEscrows = new Set();
         let collateralQuantity = record?.inventories
           ? record.inventories.reduce((sum, item) => {
@@ -111,9 +111,7 @@ export const aggregateStakeColumns = (
           : record?.escrow?.collateralQuantity > record?.quantity
           ? record?.quantity
           : record?.escrow?.collateralQuantity || 0;
-        collateralQuantity = requiresDivision
-          ? collateralQuantity / 1e18
-          : collateralQuantity;
+        collateralQuantity =  collateralQuantity / Math.pow(10, decimals);
         const quantityNotAvailable =
           record.inventories.reduce((sum, item) => {
             const status = Number(item.status);
@@ -131,9 +129,9 @@ export const aggregateStakeColumns = (
       title: 'Quantity Staked',
       align: 'center',
       render: (_, record) => {
-        const requiresDivision = assetsWithEighteenDecimalPlaces.includes(
+        const decimals = assetsWithEighteenDecimalPlaces.includes(
           record.root
-        );
+        ) ? 18 : record.decimals || 0;
         const uniqueEscrows = new Set();
         const collateralQuantity = record?.inventories
           ? record.inventories.reduce((sum, item) => {
@@ -153,7 +151,7 @@ export const aggregateStakeColumns = (
           : record?.escrow?.collateralQuantity || 0;
         return (
           <div>
-            {requiresDivision ? collateralQuantity / 1e18 : collateralQuantity}
+            {collateralQuantity / Math.pow(10, decimals)}
           </div>
         );
       },
@@ -311,12 +309,10 @@ export const stakeColumns = (
       title: 'Owned',
       align: 'center',
       render: (_, record) => {
-        const requiresDivision = assetsWithEighteenDecimalPlaces.includes(
+        const decimals = assetsWithEighteenDecimalPlaces.includes(
           record.root
-        );
-        const displayedQuantity = requiresDivision
-          ? record.quantity / 1e18
-          : record.quantity;
+        ) ? 18 : record.decimals || 0;
+        const displayedQuantity = record.quantity / Math.pow(10, decimals)
         return <div>{displayedQuantity || 0}</div>;
       },
     },
@@ -335,14 +331,12 @@ export const stakeColumns = (
             return true;
           }
         };
-        const requiresDivision = assetsWithEighteenDecimalPlaces.includes(
+        const decimals = assetsWithEighteenDecimalPlaces.includes(
           record.root
-        );
+        ) ? 18 : record.decimals || 0;
         // Parse quantity safely
         const parsedQuantity = parseFloat(record.quantity) || 0;
-        const displayedQuantity = requiresDivision
-          ? parsedQuantity / 1e18
-          : parsedQuantity;
+        const displayedQuantity = parsedQuantity / Math.pow(10, decimals);
 
         // Extract escrow assets array safely
         const escrowAssets = record?.['BlockApps-Mercata-Escrow-assets'] || [];
@@ -354,9 +348,7 @@ export const stakeColumns = (
 
         // Calculate matching quantity
         const rawMatchingQuantity = hasMatchingEscrow ? parsedQuantity : 0;
-        const matchingQuantity = requiresDivision
-          ? rawMatchingQuantity / 1e18
-          : rawMatchingQuantity;
+        const matchingQuantity = rawMatchingQuantity / Math.pow(10, decimals);
 
         // Compute the stakeable quantity
         const stakeableQuantity = isActive
@@ -378,12 +370,12 @@ export const stakeColumns = (
         ]?.find((item) => item.value === record.address)
           ? record.quantity
           : 0;
-        const requiresDivision = assetsWithEighteenDecimalPlaces.includes(
+        const decimals = assetsWithEighteenDecimalPlaces.includes(
           record.root
-        );
+        ) ? 18 : record.decimals || 0;
         return (
           <div>
-            {requiresDivision ? matchingQuantity / 1e18 : matchingQuantity}
+            { matchingQuantity / Math.pow(10, decimals) }
           </div>
         );
       },

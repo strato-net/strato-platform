@@ -15,6 +15,7 @@ contract CarbonOffset is Mintable {
         string[] _fileNames,
         uint _createdDate,
         uint _quantity,
+        uint _decimals,
         AssetStatus _status,
         address _redemptionService
     ) Mintable (
@@ -25,6 +26,7 @@ contract CarbonOffset is Mintable {
         _fileNames,
         _createdDate,
         _quantity,
+        _decimals,
         _status,
         _redemptionService
     ) {
@@ -38,6 +40,7 @@ contract CarbonOffset is Mintable {
                               fileNames,
                               createdDate, 
                               splitQuantity,
+                              decimals,
                               status,
                               address(redemptionService)
                               );

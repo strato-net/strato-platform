@@ -36,6 +36,7 @@ abstract contract PaymentService is Utils {
         string purchasersCommonName,        // Purchaser common name for lookup purposes
         address[] saleAddresses,            // List of the sale contracts for the assets in the checkout
         uint[] quantitiesToBePurchased,     // List of quantities for each asset being bought
+        uint[] decimals,                    // List of decimal places for each asset being bought
         decimal amount                      // Total price of the checkout
     );
 
@@ -167,6 +168,7 @@ abstract contract PaymentService is Utils {
         string _checkoutId,
         address[] _saleAddresses,
         uint[] _quantities,
+        uint[] _decimals,
         uint _createdDate,
         string _comments
     ) requireActive("create ckeckout") external returns (string, address[]) {
@@ -181,6 +183,7 @@ abstract contract PaymentService is Utils {
             _purchasersCommonName,
             _saleAddresses,
             _quantities,
+            _decimals,
             _createdDate,
             _comments
         );
@@ -194,6 +197,7 @@ abstract contract PaymentService is Utils {
         string _purchasersCommonName,
         address[] _saleAddresses,
         uint[] _quantities,
+        uint[] _decimals,
         uint _createdDate,
         string _comments
     ) internal virtual returns (string, address[]) {
@@ -224,6 +228,7 @@ abstract contract PaymentService is Utils {
             _purchasersCommonName,
             _saleAddresses,
             _quantities,
+            _decimals,
             totalAmount
         );
         return (_checkoutHash, assets);

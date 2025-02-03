@@ -41,25 +41,21 @@ const ListForSaleModal = ({
   const [data, setData] = useState([inventory]);
   const location = useLocation();
   const queryParams = new URLSearchParams(location.search);
-  const is18DecimalPlaces = assetsWithEighteenDecimalPlaces.includes(
+  const decimals = assetsWithEighteenDecimalPlaces.includes(
     inventory.originAddress
-  );
+  )
+    ? 18
+    : inventory.decimals || 0;
   const [quantity, setQuantity] = useState(() => {
     const selectedQuantity = new BigNumber(
       inventory.saleAddress ? inventory.saleQuantity : inventory.quantity
     );
-    return is18DecimalPlaces
-      ? selectedQuantity.dividedBy(Math.pow(10, 18))
-      : selectedQuantity;
+    return selectedQuantity.dividedBy(Math.pow(10, decimals));
   });
   const [paymentTypes, setPaymentTypes] = useState([]);
   const [availablePaymentServices, setAvailablePaymentServices] = useState([]);
   const [pricePerUnit, setpricePerUnit] = useState(() => {
-    return inventory.price
-      ? is18DecimalPlaces
-        ? inventory.price * Math.pow(10, 18)
-        : inventory.price
-      : 0.01;
+    return inventory.price ? inventory.price * Math.pow(10, decimals) : 0.01;
   });
 
   const inventoryDispatch = useInventoryDispatch();
@@ -134,8 +130,7 @@ const ListForSaleModal = ({
 
   useEffect(() => {
     const excludeUSDST =
-      inventory.name &&
-      inventory.name.toLowerCase().includes('usdst');
+      inventory.name && inventory.name.toLowerCase().includes('usdst');
 
     const diff = paymentServices.filter((ps) => {
       const isNotOnboarded = !notOnboarded.some(
@@ -181,9 +176,7 @@ const ListForSaleModal = ({
   const tagRender = (props) => {
     const { value, closable, onClose } = props;
     const service = availablePaymentServices[value];
-    const isUSDSTService = service?.serviceName
-      .toLowerCase()
-      .includes('usdst');
+    const isUSDSTService = service?.serviceName.toLowerCase().includes('usdst');
     const onPreventMouseDown = (event) => {
       event.preventDefault();
       event.stopPropagation();
@@ -219,8 +212,8 @@ const ListForSaleModal = ({
           };
         }),
       price:
-        pricePerUnit !== undefined && is18DecimalPlaces
-          ? pricePerUnit / Math.pow(10, 18)
+        pricePerUnit !== undefined
+          ? pricePerUnit / Math.pow(10, decimals)
           : pricePerUnit,
     };
 
@@ -245,10 +238,9 @@ const ListForSaleModal = ({
 
     body = {
       ...body,
-      quantity: (is18DecimalPlaces
-        ? quantity.multipliedBy(new BigNumber(10).pow(18))
-        : quantity
-      ).toFixed(0),
+      quantity: quantity
+        .multipliedBy(new BigNumber(10).pow(decimals))
+        .toFixed(0),
     };
 
     let isDone;
@@ -329,13 +321,9 @@ const ListForSaleModal = ({
             value={quantity}
             controls={false}
             min={1}
-            max={
-              is18DecimalPlaces
-                ? new BigNumber(inventory.quantity).dividedBy(
-                    new BigNumber(10).pow(18)
-                  )
-                : inventory.quantity
-            }
+            max={new BigNumber(inventory.quantity).dividedBy(
+              new BigNumber(10).pow(decimals)
+            )}
             onChange={(value) => setQuantity(new BigNumber(value))}
           />
         ),
@@ -430,13 +418,9 @@ const ListForSaleModal = ({
             className="w-full h-9"
             value={quantity}
             controls={false}
-            max={
-              is18DecimalPlaces
-                ? new BigNumber(inventory.quantity).dividedBy(
-                    new BigNumber(10).pow(18)
-                  )
-                : inventory.quantity
-            }
+            max={new BigNumber(inventory.quantity).dividedBy(
+              new BigNumber(10).pow(decimals)
+            )}
             onChange={(value) => setQuantity(new BigNumber(value))}
           />
         </div>

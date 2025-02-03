@@ -43,9 +43,9 @@ const StakeInventoryCard = ({
   const navigate = useNavigate();
   const naviroute = routes.InventoryDetail.url;
   const imgMeta = category ? category : SEO.TITLE_META;
-  const is18DecimalPlaces = assetsWithEighteenDecimalPlaces?.includes(
-    inventory.root
-  );
+  const decimals = assetsWithEighteenDecimalPlaces?.includes(inventory.root)
+    ? 18
+    : inventory.decimals || 0;
 
   const uniqueEscrows = new Set();
   let collateralQuantity = inventory?.inventories
@@ -64,9 +64,7 @@ const StakeInventoryCard = ({
     : inventory?.escrow?.collateralQuantity > inventory?.quantity
     ? inventory?.quantity
     : inventory?.escrow?.collateralQuantity || 0;
-  collateralQuantity = is18DecimalPlaces
-    ? collateralQuantity / 1e18
-    : collateralQuantity;
+  collateralQuantity = collateralQuantity / Math.pow(10, decimals);
   const quantityNotAvailable = inventory?.inventories
     ? inventory.inventories.reduce((sum, item) => {
         const status = Number(item.status);
@@ -80,9 +78,7 @@ const StakeInventoryCard = ({
     : 0;
   const quantity = inventory?.inventories
     ? inventory.totalQuantity
-    : is18DecimalPlaces
-    ? inventory?.quantity / 1e18
-    : inventory?.quantity;
+    : inventory?.quantity / Math.pow(10, decimals);
   const stakeQuantity = quantity - collateralQuantity - quantityNotAvailable;
   const uniqueEscrowsPrime = new Set();
   const collateralValue = inventory?.inventories

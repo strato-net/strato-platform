@@ -46,8 +46,8 @@ const Checkout = () => {
   const [mapData, setmapData] = useState([]);
 
   const calculateTax = (item) => {
-    const is18DecimalPlaces = assetsWithEighteenDecimalPlaces.includes(item.product.originAddress);
-    let price = new Decimal( is18DecimalPlaces ? item.product.price * Math.pow(10, 18) : item.product.price);
+    const decimals = assetsWithEighteenDecimalPlaces.includes(item.product.originAddress) ? 18 : item.product.decimals || 0;
+    let price = new Decimal(item.product.price * Math.pow(10, decimals));
     let tax = new Decimal(CHARGES.TAX);
     let result = price.mul(tax).div(100);
 
@@ -55,8 +55,8 @@ const Checkout = () => {
   };
 
   const calculateAmount = (item) => {
-    const is18DecimalPlaces = assetsWithEighteenDecimalPlaces.includes(item.product.originAddress);
-    let price = new Decimal(is18DecimalPlaces ? item.product.price * Math.pow(10, 18) : item.product.price);
+    const decimals = assetsWithEighteenDecimalPlaces.includes(item.product.originAddress) ? 18 : item.product.decimals || 0;
+    let price = new Decimal(item.product.price * Math.pow(10, decimals));
     let tax = calculateTax(item);
     let result = price.mul(item.qty).plus(tax);
 
@@ -91,7 +91,7 @@ const Checkout = () => {
       const { paymentServices, items } = value;
       let modifiedValue = [];
       items.forEach((item) => {
-        const is18DecimalPlaces = assetsWithEighteenDecimalPlaces.includes(item.product.originAddress);
+        const decimals = assetsWithEighteenDecimalPlaces.includes(item.product.originAddress) ? 18 : item.product.decimals || 0;
         const parts = item.product.contract_name.split('-');
         let amount = calculateAmount(item);
 
@@ -111,8 +111,9 @@ const Checkout = () => {
             item.product.address === item.product.originAddress ? true : false,
           sellersCommonName: item.product.ownerCommonName,
           unitOfMeasure: item.product.unitOfMeasurement,
-          unitPrice: is18DecimalPlaces ? item.product.price * Math.pow(10, 18) : item.product.price,
-          quantity: is18DecimalPlaces ? item.product.saleQuantity / Math.pow(10, 18) : item.product.saleQuantity,
+          unitPrice: item.product.price * Math.pow(10, decimals),
+          quantity: item.product.saleQuantity / Math.pow(10, decimals),
+          decimals: decimals,
           saleAddress: item.product.saleAddress,
           tax: calculateTax(item),
           amount: amount,

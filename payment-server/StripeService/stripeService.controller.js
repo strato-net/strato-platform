@@ -145,7 +145,8 @@ class StripeServiceController {
       // Get and validate the order details
       const saleAddresses = checkoutEvent[0].saleAddresses;
       const quantities = checkoutEvent[0].quantitiesToBePurchased;
-      const { sellerCommonName, orderDetails } = await validateAndGetOrderDetails(quantities, saleAddresses);
+      const decimals = checkoutEvent[0].decimals;
+      const { sellerCommonName, orderDetails } = await validateAndGetOrderDetails(quantities, saleAddresses, decimals);
 
       // Seller account verification
       const sellerAccount = await getStripeAccountForUser(sellerCommonName);
