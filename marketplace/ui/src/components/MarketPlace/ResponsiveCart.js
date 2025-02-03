@@ -116,9 +116,9 @@ const ResponsiveCart = ({
     let orderList = [];
 
     cartData.forEach((item) => {
-      const decimals = assetsWithEighteenDecimalPlaces.includes(
-        item.key
-      ) ? 18 : item.decimals || 0;
+      const decimals = assetsWithEighteenDecimalPlaces.includes(item.key)
+        ? 18
+        : item.decimals || 0;
 
       const quantity = new BigNumber(item.qty);
       const unitPrice = new BigNumber(item.unitPrice);
@@ -127,6 +127,7 @@ const ResponsiveCart = ({
         quantity: quantity
           .multipliedBy(new BigNumber(10).pow(decimals))
           .toFixed(0),
+        decimals: decimals,
         assetAddress: item.key,
         firstSale: item.firstSale,
         unitPrice: unitPrice

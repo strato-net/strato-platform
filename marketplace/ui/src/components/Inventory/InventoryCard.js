@@ -37,7 +37,7 @@ import { useInventoryState } from '../../contexts/inventory';
 import { useEthState } from '../../contexts/eth';
 import RepayModal from './RepayModal';
 import BorrowModal from './BorrowModal';
-const USDSTIcon = <img src={Images.USDST} alt="USDST" className="w-5 h-5" />;
+const USDSTIcon = <img src={Images.USDST} alt="USDST" className="w-5 h-5 ml-1" />;
 
 const InventoryCard = ({
   inventory,
@@ -65,7 +65,6 @@ const InventoryCard = ({
   const [redeemModalOpen, setRedeemModalOpen] = useState(false);
   const [bridgeModalOpen, setBridgeModalOpen] = useState(false);
   const [stakeModalOpen, setStakeModalOpen] = useState(false);
-  const [popoverVisible, setPopoverVisible] = useState({});
   const { ethstAddress } = useEthState();
 
   const navigate = useNavigate();
@@ -82,9 +81,9 @@ const InventoryCard = ({
     new BigNumber(10).pow(decimals)
   );
   const price = inventory?.price
-    ? new BigNumber(inventory.quantity).multipliedBy(
-        new BigNumber(10).pow(decimals)
-      )
+    ? assetsWithEighteenDecimalPlaces.includes(inventory.originAddress)
+      ? parseFloat(inventory.price * 10 ** 18).toFixed(2)
+      : parseFloat(inventory.price * 10 ** (inventory.decimals || 0)).toFixed(2)
     : undefined;
   const saleQuantity =
     inventory.saleQuantity !== undefined
