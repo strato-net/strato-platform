@@ -1,7 +1,7 @@
 name:                blockapps-identity-provider-api
 version:             0.1.0.0
 github:              "githubuser/api"
-license:             BSD3
+license:             Apache-2.0
 author:              "Author name here"
 maintainer:          "example@example.com"
 copyright:           "2023 Author name here"

@@ -92,12 +92,9 @@ export const aggregateStakeColumns = (
       title: 'Quantity Stakeable',
       align: 'center',
       render: (_, record) => {
-        const is18DecimalPlaces = assetsWithEighteenDecimalPlaces.includes(
+        const decimals = assetsWithEighteenDecimalPlaces.includes(
           record.root
-        );
-        const is8DecimalPlaces = assetsWithEightDecimalPlaces.includes(
-          record.root
-        );
+        ) ? 18 : record.decimals || 0;
         const uniqueEscrows = new Set();
         let collateralQuantity = record?.inventories
           ? record.inventories.reduce((sum, item) => {
@@ -115,11 +112,7 @@ export const aggregateStakeColumns = (
           : record?.escrow?.collateralQuantity > record?.quantity
           ? record?.quantity
           : record?.escrow?.collateralQuantity || 0;
-        collateralQuantity = is18DecimalPlaces
-          ? collateralQuantity / 1e18
-          : is8DecimalPlaces
-          ? collateralQuantity / 1e8
-          : collateralQuantity;
+        collateralQuantity =  collateralQuantity / Math.pow(10, decimals);
         const quantityNotAvailable =
           record.inventories.reduce((sum, item) => {
             const status = Number(item.status);
@@ -137,12 +130,9 @@ export const aggregateStakeColumns = (
       title: 'Quantity Staked',
       align: 'center',
       render: (_, record) => {
-        const is18DecimalPlaces = assetsWithEighteenDecimalPlaces.includes(
+        const decimals = assetsWithEighteenDecimalPlaces.includes(
           record.root
-        );
-        const is8DecimalPlaces = assetsWithEightDecimalPlaces.includes(
-          record.root
-        );
+        ) ? 18 : record.decimals || 0;
         const uniqueEscrows = new Set();
         const collateralQuantity = record?.inventories
           ? record.inventories.reduce((sum, item) => {
@@ -162,7 +152,7 @@ export const aggregateStakeColumns = (
           : record?.escrow?.collateralQuantity || 0;
         return (
           <div>
-            {is18DecimalPlaces ? collateralQuantity / 1e18 : is8DecimalPlaces ? collateralQuantity / 1e8 : collateralQuantity}
+            {collateralQuantity / Math.pow(10, decimals)}
           </div>
         );
       },
@@ -322,17 +312,10 @@ export const stakeColumns = (
       title: 'Owned',
       align: 'center',
       render: (_, record) => {
-        const is18DecimalPlaces = assetsWithEighteenDecimalPlaces.includes(
+        const decimals = assetsWithEighteenDecimalPlaces.includes(
           record.root
-        );
-        const is8DecimalPlaces = assetsWithEightDecimalPlaces.includes(
-          record.root
-        );
-        const displayedQuantity = is18DecimalPlaces
-          ? record.quantity / 1e18
-          : is8DecimalPlaces
-          ? record.quantity / 1e8
-          : record.quantity;
+        ) ? 18 : record.decimals || 0;
+        const displayedQuantity = record.quantity / Math.pow(10, decimals)
         return <div>{displayedQuantity || 0}</div>;
       },
     },
@@ -351,19 +334,12 @@ export const stakeColumns = (
             return true;
           }
         };
-        const is18DecimalPlaces = assetsWithEighteenDecimalPlaces.includes(
+        const decimals = assetsWithEighteenDecimalPlaces.includes(
           record.root
-        );
-        const is8DecimalPlaces = assetsWithEightDecimalPlaces.includes(
-          record.root
-        );
+        ) ? 18 : record.decimals || 0;
         // Parse quantity safely
         const parsedQuantity = parseFloat(record.quantity) || 0;
-        const displayedQuantity = is18DecimalPlaces
-          ? parsedQuantity / 1e18
-          : is8DecimalPlaces
-          ? parsedQuantity / 1e8
-          : parsedQuantity;
+        const displayedQuantity = parsedQuantity / Math.pow(10, decimals);
 
         // Extract escrow assets array safely
         const escrowAssets = record?.['BlockApps-Mercata-Escrow-assets'] || [];
@@ -375,11 +351,7 @@ export const stakeColumns = (
 
         // Calculate matching quantity
         const rawMatchingQuantity = hasMatchingEscrow ? parsedQuantity : 0;
-        const matchingQuantity = is18DecimalPlaces
-          ? rawMatchingQuantity / 1e18
-          : is8DecimalPlaces
-          ? rawMatchingQuantity / 1e8
-          : rawMatchingQuantity;
+        const matchingQuantity = rawMatchingQuantity / Math.pow(10, decimals);
 
         // Compute the stakeable quantity
         const stakeableQuantity = isActive
@@ -401,15 +373,12 @@ export const stakeColumns = (
         ]?.find((item) => item.value === record.address)
           ? record.quantity
           : 0;
-        const is18DecimalPlaces = assetsWithEighteenDecimalPlaces.includes(
+        const decimals = assetsWithEighteenDecimalPlaces.includes(
           record.root
-        );
-        const is8DecimalPlaces = assetsWithEightDecimalPlaces.includes(
-          record.root
-        );
+        ) ? 18 : record.decimals || 0;
         return (
           <div>
-            {is18DecimalPlaces ? matchingQuantity / 1e18 : is8DecimalPlaces ? matchingQuantity / 1e8 : matchingQuantity}
+            { matchingQuantity / Math.pow(10, decimals) }
           </div>
         );
       },

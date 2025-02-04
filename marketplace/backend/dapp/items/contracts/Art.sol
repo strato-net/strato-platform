@@ -14,14 +14,15 @@ contract Art is Redeemable {
         string[] _files,
         string[] _fileNames,
         uint _createdDate,
+        uint _decimals,
         string _artist,
         AssetStatus _status,
         address _redemptionService
-    ) public Redeemable(_name, _description, _images, _files, _fileNames, _createdDate, 1, _status, _redemptionService) {
+    ) public Redeemable(_name, _description, _images, _files, _fileNames, _createdDate, 1, _decimals, _status, _redemptionService) {
         artist = _artist;
     }
     function mint(uint splitQuantity) internal override returns (UTXO) {
-        Art a = new Art(name, description, images, files, fileNames, createdDate, artist, status, address(redemptionService));
+        Art a = new Art(name, description, images, files, fileNames, createdDate, decimals, artist, status, address(redemptionService));
         return UTXO(address(a)); 
     }
 }

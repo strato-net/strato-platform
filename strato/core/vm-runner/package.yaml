@@ -5,6 +5,7 @@ author: Jamshid
 maintainer:    jamshidnh@gmail.com
 synopsis: The executable that runs VMs for transactions
 category:      Data Structures
+license: Apache-2.0
 
 dependencies:
   - base

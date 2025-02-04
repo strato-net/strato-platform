@@ -21,8 +21,7 @@ const ResellModal = ({
   assetsWithEighteenDecimalPlaces,
   assetsWithEightDecimalPlaces,
 }) => {
-  const is18DecimalPlaces = assetsWithEighteenDecimalPlaces.includes(inventory.originAddress);
-  const is8DecimalPlaces = assetsWithEightDecimalPlaces.includes(inventory.originAddress);
+  const decimals = assetsWithEighteenDecimalPlaces.includes(inventory.originAddress) ? 18 : inventory.decimals || 0;
   const [quantity, setQuantity] = useState(1);
   const inventoryDispatch = useInventoryDispatch();
   const [canResell, setCanResell] = useState(true);
@@ -61,7 +60,7 @@ const ResellModal = ({
     const body = {
       assetAddress: inventory.address,
       quantity: new BigNumber(quantity)
-        .multipliedBy(is18DecimalPlaces ? 10 ** 18 : is8DecimalPlaces ? 10 ** 8 : 1)
+        .multipliedBy(Math.pow(10, decimals))
         .toFixed(0),
     };
     let isDone = await actions.resellInventory(inventoryDispatch, body);

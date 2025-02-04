@@ -153,6 +153,15 @@ class MarketplaceController {
     }
   }
 
+  static async get2DecimalPlaces(_, res, next) {
+    try {
+      const addresses = constants.AssetsWithTwoDecimalPlaces;
+      return rest.response.status200(res, addresses);
+    } catch (e) {
+      return next(e);
+    }
+  }
+
   static async get18DecimalPlaces(_, res, next) {
     try {
       const addresses = constants.AssetsWithEighteenDecimalPlaces;

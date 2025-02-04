@@ -194,10 +194,9 @@ const TransactionTable = ({
   const Content = ({ data }) => {
     const price = data?.assetPrice || data?.price;
     const isStrat = data?.assetOriginAddress === stratAddress;
-    const is18DecimalPlaces = assetsWithEighteenDecimalPlaces.includes(
+    const decimals = assetsWithEighteenDecimalPlaces.includes(
       data?.assetOriginAddress
-    );
-    const is8DecimalPlaces = assetsWithEightDecimalPlaces.includes(data?.assetOriginAddress);
+    ) ? 18 : data?.decimals || 0;
 
     return (
       <div className="min-h-44 h-full" style={{ width: '460px' }}>
@@ -240,22 +239,14 @@ const TransactionTable = ({
                     ${' '}
                     {isStrat
                       ? (price * 100).toFixed(2)
-                      : is18DecimalPlaces
-                      ? (price * Math.pow(10, 18)).toFixed(2)
-                      : is8DecimalPlaces
-                      ? (price * Math.pow(10, 8)).toFixed(2)
-                      : price}{' '}
+                      : (price * Math.pow(10, decimals)).toFixed(2)}{' '}
                   </b>{' '}
                   &nbsp;(
                   <span className="text-[#13188A] font-bold">
                     {' '}
                     {isStrat
                       ? (price * 100).toFixed(2)
-                      : is18DecimalPlaces
-                      ? (price * Math.pow(10, 18)).toFixed(2)
-                      : is8DecimalPlaces
-                      ? (price * Math.pow(10, 8)).toFixed(2)
-                      : price}{' '}
+                      : (price * Math.pow(10, decimals)).toFixed(2)}{' '}
                   </span>
                   {USDSTIcon}){' '}
                 </p>
@@ -390,16 +381,14 @@ const TransactionTable = ({
       key: 'quantity',
       align: 'right',
       width: '100px',
-      render: (data, { quantity, assetOriginAddress }) => (
+      render: (_, { quantity, assetOriginAddress, decimals }) => (
         <span>
           {quantity
             ? (assetOriginAddress === stratAddress
                 ? quantity / 100
                 : assetsWithEighteenDecimalPlaces.includes(assetOriginAddress)
                 ? quantity / Math.pow(10, 18)
-                : assetsWithEightDecimalPlaces.includes(assetOriginAddress)
-                ? quantity / Math.pow(10, 8)
-                : quantity
+                : quantity / Math.pow(10, decimals)
               ).toLocaleString('en-US', {
                 maximumFractionDigits: 6,
                 minimumFractionDigits: 0,
@@ -414,7 +403,7 @@ const TransactionTable = ({
       key: 'price',
       align: 'right',
       width: '100px',
-      render: (data, { price, assetOriginAddress }) => (
+      render: (_, { price, assetOriginAddress, decimals }) => (
         <p>
           {price
             ? formattedNum(
@@ -422,9 +411,7 @@ const TransactionTable = ({
                   ? (price * 100).toFixed(2)
                   : assetsWithEighteenDecimalPlaces.includes(assetOriginAddress)
                   ? (price * Math.pow(10, 18)).toFixed(2)
-                  : assetsWithEightDecimalPlaces.includes(assetOriginAddress)
-                  ? (price * Math.pow(10, 8)).toFixed(2)
-                  : price
+                  : (price * Math.pow(10, decimals)).toFixed(2)
               )
             : '--'}
         </p>

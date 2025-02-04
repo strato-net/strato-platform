@@ -110,6 +110,7 @@ const TransactionResponsive = ({
             assetAddress,
             assetDescription,
             quantity,
+            decimals,
             from,
             to,
             status,
@@ -146,21 +147,14 @@ const TransactionResponsive = ({
             });
             price = (price * 100).toFixed(2);
           } else if (
-            assetsWithEighteenDecimalPlaces.includes(assetOriginAddress)
+            assetsWithEighteenDecimalPlaces.includes(assetOriginAddress) || decimals
           ) {
-            quantity = (quantity / Math.pow(10, 18)).toLocaleString('en-US', {
-              maximumFractionDigits: 6,
+            const assetDecimals = assetsWithEighteenDecimalPlaces.includes(assetOriginAddress) ? 18 : decimals || 0;
+            quantity = (quantity / Math.pow(10, assetDecimals)).toLocaleString('en-US', {
+              maximumFractionDigits: 4,
               minimumFractionDigits: 0,
             });
-            price = (price * Math.pow(10, 18)).toFixed(2);
-          } else if (
-            assetsWithEightDecimalPlaces.includes(assetOriginAddress)
-          ) {
-            quantity = (quantity / Math.pow(10, 8)).toLocaleString('en-US', {
-              maximumFractionDigits: 6,
-              minimumFractionDigits: 0,
-            });
-            price = (price * Math.pow(10, 8)).toFixed(2);
+            price = (price * Math.pow(10, assetDecimals)).toFixed(2);
           }
 
           const handleDetailRedirection = () => {

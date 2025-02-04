@@ -42,32 +42,21 @@ const ListForSaleModal = ({
   const [data, setData] = useState([inventory]);
   const location = useLocation();
   const queryParams = new URLSearchParams(location.search);
-  const is18DecimalPlaces = assetsWithEighteenDecimalPlaces.includes(
+  const decimals = assetsWithEighteenDecimalPlaces.includes(
     inventory.originAddress
-  );
-  const is8DecimalPlaces = assetsWithEightDecimalPlaces.includes(
-    inventory.originAddress
-  );
+  )
+    ? 18
+    : inventory.decimals || 0;
   const [quantity, setQuantity] = useState(() => {
     const selectedQuantity = new BigNumber(
       inventory.saleAddress ? inventory.saleQuantity : inventory.quantity
     );
-    return is18DecimalPlaces
-      ? selectedQuantity.dividedBy(Math.pow(10, 18))
-      : is8DecimalPlaces
-      ? selectedQuantity.dividedBy(Math.pow(10, 8))
-      : selectedQuantity;
+    return selectedQuantity.dividedBy(Math.pow(10, decimals));
   });
   const [paymentTypes, setPaymentTypes] = useState([]);
   const [availablePaymentServices, setAvailablePaymentServices] = useState([]);
   const [pricePerUnit, setpricePerUnit] = useState(() => {
-    return inventory.price
-      ? is18DecimalPlaces
-        ? inventory.price * Math.pow(10, 18)
-        : is8DecimalPlaces
-        ? inventory.price * Math.pow(10, 8)
-        : inventory.price
-      : 0.01;
+    return inventory.price ? inventory.price * Math.pow(10, decimals) : 0.01;
   });
 
   const inventoryDispatch = useInventoryDispatch();
@@ -224,10 +213,8 @@ const ListForSaleModal = ({
           };
         }),
       price:
-        pricePerUnit !== undefined && is18DecimalPlaces
-          ? pricePerUnit / Math.pow(10, 18)
-          : is8DecimalPlaces
-          ? pricePerUnit / Math.pow(10, 8)
+        pricePerUnit !== undefined
+          ? pricePerUnit / Math.pow(10, decimals)
           : pricePerUnit,
     };
 
@@ -252,12 +239,9 @@ const ListForSaleModal = ({
 
     body = {
       ...body,
-      quantity: (is18DecimalPlaces
-        ? quantity.multipliedBy(new BigNumber(10).pow(18))
-        : is8DecimalPlaces
-        ? quantity.multipliedBy(new BigNumber(10).pow(8))
-        : quantity
-      ).toFixed(0),
+      quantity: quantity
+        .multipliedBy(new BigNumber(10).pow(decimals))
+        .toFixed(0),
     };
 
     let isDone;
@@ -338,17 +322,9 @@ const ListForSaleModal = ({
             value={quantity}
             controls={false}
             min={1}
-            max={
-              is18DecimalPlaces
-                ? new BigNumber(inventory.quantity).dividedBy(
-                    new BigNumber(10).pow(18)
-                  )
-                : is8DecimalPlaces
-                ? new BigNumber(inventory.quantity).dividedBy(
-                    new BigNumber(10).pow(8)
-                  )
-                : inventory.quantity
-            }
+            max={new BigNumber(inventory.quantity).dividedBy(
+              new BigNumber(10).pow(decimals)
+            )}
             onChange={(value) => setQuantity(new BigNumber(value))}
           />
         ),
@@ -443,17 +419,9 @@ const ListForSaleModal = ({
             className="w-full h-9"
             value={quantity}
             controls={false}
-            max={
-              is18DecimalPlaces
-                ? new BigNumber(inventory.quantity).dividedBy(
-                    new BigNumber(10).pow(18)
-                  )
-                : is8DecimalPlaces
-                ? new BigNumber(inventory.quantity).dividedBy(
-                    new BigNumber(10).pow(8)
-                  )
-                : inventory.quantity
-            }
+            max={new BigNumber(inventory.quantity).dividedBy(
+              new BigNumber(10).pow(decimals)
+            )}
             onChange={(value) => setQuantity(new BigNumber(value))}
           />
         </div>

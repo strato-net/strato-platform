@@ -1,4 +1,6 @@
 name: fast-keccak256
+license: Apache-2.0
+
 ghc-options: -Wall -Werror
 
 dependencies:

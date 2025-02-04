@@ -29,7 +29,7 @@ const NewTrendingCard = ({
   const navigate = useNavigate();
   const location = useLocation();
   const { Text } = Typography;
-  const { assetsWithEighteenDecimalPlaces, assetsWithEightDecimalPlaces } =
+  const { assetsWithEighteenDecimalPlaces } =
     useMarketplaceState();
   const { ethstAddress, wbtcstAddress } = useEthState();
   const { hasChecked, isAuthenticated, loginUrl, user } =
@@ -38,17 +38,12 @@ const NewTrendingCard = ({
   const [isModalVisible, setIsModalVisible] = useState(false);
   const [isWishlisted, setIsWishlisted] = useState(false);
 
-  const is18DecimalPlaces = assetsWithEighteenDecimalPlaces.includes(
+  const decimals = assetsWithEighteenDecimalPlaces.includes(
     topSellingProduct.originAddress
-  );
-  const is8DecimalPlaces = assetsWithEightDecimalPlaces.includes(
-    topSellingProduct.originAddress
-  );
-  const saleQuantity = is18DecimalPlaces
-    ? topSellingProduct.saleQuantity / Math.pow(10, 18)
-    : is8DecimalPlaces
-    ? topSellingProduct.saleQuantity / Math.pow(10, 8)
-    : topSellingProduct.saleQuantity;
+  )
+    ? 19
+    : topSellingProduct.decimals || 0;
+  const saleQuantity = topSellingProduct.saleQuantity / Math.pow(10, decimals);
   const [quantity, setQuantity] = useState(1);
 
   const ownerSameAsUser = () => {
@@ -234,10 +229,8 @@ const NewTrendingCard = ({
         <div style={{ display: 'flex', justifyContent: 'space-between' }}>
           {topSellingProduct?.price
             ? (() => {
-                
-                const adjustedPrice = is18DecimalPlaces
-                  ? topSellingProduct.price * Math.pow(10, 18)
-                  : topSellingProduct.price;
+                const adjustedPrice =
+                  topSellingProduct.price * Math.pow(10, decimals);
 
                 return (
                   <Typography className="font-semibold">

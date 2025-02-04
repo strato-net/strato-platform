@@ -380,6 +380,7 @@ class InventoryController {
     const createInventorySchema = Joi.object({
       productAddress: Joi.string().required(),
       quantity: Joi.number().integer().min(0).required(),
+      decimals: Joi.number().integer().min(0).max(18).required(),
       pricePerUnit: Joi.number().greater(0).required(),
       batchId: Joi.string().required(),
       status: Joi.number().integer().min(1).max(2).required(),

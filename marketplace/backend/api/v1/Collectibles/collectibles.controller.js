@@ -47,6 +47,8 @@ class CollectibleController {
         fileNames: Joi.array().items(Joi.string().allow(null)).required(),
         redemptionService: Joi.string().required(),
         quantity: Joi.number().positive().required(),
+        quantity: Joi.number().integer().min(1).required(),
+        decimals: Joi.number().integer().min(0).max(18).required(),
       }).required(),
     });
 

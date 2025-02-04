@@ -4,6 +4,7 @@ github:              "githubuser/vault-wrapper"
 author:              "Author name here"
 maintainer:          "example@example.com"
 copyright:           "2018 Author name here"
+license:             Apache-2.0
 
 extra-source-files:
 - README.md
