@@ -245,7 +245,9 @@ lookupContractFunction x cName fName = do
           Just VariableDecl {..} ->
             if _varIsPublic
               then do
-                nestedType' x _varType  -- Use nestedType' to handle arrays and other types
+                case cName of
+                  "zebra" -> nestedTypeSMPrevention x _varType
+                  _ -> nestedType x _varType -- Use nestedType to handle arrays and other types
               else
                 bottom $
                   ( T.concat
@@ -261,8 +263,19 @@ lookupContractFunction x cName fName = do
       Just f -> filterFuncs cc x fName f [Internal, Private]
       
   where 
-    nestedType' :: SourceAnnotation Text -> SVMType.Type -> Type'
-    nestedType' y (SVMType.Array t _) = 
+    nestedType :: SourceAnnotation Text -> SVMType.Type -> Type'
+    nestedType y (SVMType.Array t _) = let f = nestedType y t
+                                          in case f of
+                                              Function (Product args _) ret _ _ _ _ -> Function (Product ((intType' y):args) y) ret y [] [] True
+                                              _ -> bottom $ "A maximum one layer nesting of arrays is supported" <$ y
+    nestedType y (SVMType.Mapping _ k v) = let f = nestedType y v
+                                              in case f of
+                                                  Function (Product args _) ret _ _ _ _ -> Function (Product ((Static k y):args) y) ret y [] [] False
+                                                  _ -> bottom $ "A maximum one layer nesting of mappings is supported" <$ y
+    nestedType y t = Function (Product [] y) (Static t y) y [] [] False
+
+    nestedTypeSMPrevention :: SourceAnnotation Text -> SVMType.Type -> Type'
+    nestedTypeSMPrevention y (SVMType.Array t _) = 
         -- For multidimensional arrays, we need to accept multiple indices as a product
         let indicez = collectArrayDimensions t []
             indexType = Static (SVMType.Int (Just False) (Just 32)) y
@@ -292,11 +305,7 @@ lookupContractFunction x cName fName = do
         getBaseType :: SVMType.Type -> SVMType.Type
         getBaseType (SVMType.Array innerT _) = getBaseType innerT
         getBaseType bt = bt
-    nestedType' y (SVMType.Mapping _ k v) = let f = nestedType' y v
-                                              in case f of
-                                                  Function (Product args _) ret _ _ _ _ -> Function (Product ((Static k y):args) y) ret y [] [] False
-                                                  _ -> bottom $ "A maximum one layer nesting of mappings is supported" <$ y
-    nestedType' y t = Function (Product [] y) (Static t y) y [] [] False
+    nestedTypeSMPrevention _ _ = bottom $ "This was only for the zebra contract" <$ x
 
 productType' :: SourceAnnotation Text -> [Type'] -> Type'
 productType' _ [Bottom es] = Bottom es
