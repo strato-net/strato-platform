@@ -14,6 +14,7 @@ import Blockchain.Data.Log
 import Blockchain.Data.Transaction
 import Blockchain.SolidVM.Model
 import Blockchain.Strato.Model.Account
+import Blockchain.Strato.Model.Address
 import Blockchain.Strato.Model.Class
 import Blockchain.Strato.Model.Event
 import Blockchain.Strato.Model.Validator
@@ -32,7 +33,7 @@ data ExecResults = ExecResults
     erLogs :: [Log],
     erEvents :: [Event],
     erNewContractAccount :: Maybe Account,
-    erSuicideList :: S.Set Account,
+    erSuicideList :: S.Set Address,
     erAction :: Maybe Action,
     erException :: Maybe (Either SolidException VMException),
     erKind :: CodeKind,

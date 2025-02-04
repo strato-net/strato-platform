@@ -85,7 +85,7 @@ runJsonRpcCommand' c@JRCGetTransactionCount {jrcAddress = address, jrcId = id} =
   return (id, BC.pack response)
 runJsonRpcCommand' c@JRCGetStorageAt {jrcAddress = address, jrcKey = key, jrcId = id} = do
   $logInfoS "runJsonRpcCommand'.JRCGetStorageAt" . T.pack $ "running command: " ++ show c
-  value <- getStorageKeyVal' (Account address Nothing) $ bytesToWord256 $ key
+  value <- getStorageKeyVal' address $ bytesToWord256 $ key
   $logInfoS "runJsonRpcCommand'.JRCGetStorageAt" . T.pack $ show value
   return (id, word256ToBytes value)
 runJsonRpcCommand' (JRCCall _ _ _) = error "unsupported RPC command call"

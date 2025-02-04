@@ -132,10 +132,10 @@ runStorM mv =
     (runLoggingTWithLevel LevelError . runResourceT . evalStateT mv . snd)
 
 getStorageKeyVal'' :: HasStorageDB m => Address -> Word256 -> m Word256
-getStorageKeyVal'' addr = getStorageKeyVal' (Account addr Nothing)
+getStorageKeyVal'' addr = getStorageKeyVal' addr
 
 putStorageKeyVal'' :: HasStorageDB m => Address -> Word256 -> Word256 -> m ()
-putStorageKeyVal'' addr key = putStorageKeyVal' (Account addr Nothing) key
+putStorageKeyVal'' addr key = putStorageKeyVal' addr key
 
 storageSpec :: Spec
 storageSpec = do
@@ -165,7 +165,7 @@ storageSpec = do
       putStorageKeyVal'' 0x1 0x3 0x4
       putStorageKeyVal'' 0x1 0x4 0x5
       putStorageKeyVal'' 0x1 0x3 0x6
-      getAllStorageKeyVals' (Account 0x1 Nothing) `shouldReturn` []
+      getAllStorageKeyVals' 0x1 `shouldReturn` []
 
     it "getAll puts after a flush" . runStorM $ do
       putStorageKeyVal'' 0x1 0x2 0x3
@@ -176,7 +176,7 @@ storageSpec = do
       use stx `shouldReturn` M.empty
       use sbs `shouldReturn` M.empty
       let toKey = N.EvenNibbleString . keccak256ToByteString . hash . word256ToBytes
-      kvs <- getAllStorageKeyVals' (Account 0x1 Nothing)
+      kvs <- getAllStorageKeyVals' 0x1
       kvs
         `shouldMatchList` [ (toKey 2, 3),
                             (toKey 3, 6),

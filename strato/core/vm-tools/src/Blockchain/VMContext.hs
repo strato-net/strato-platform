@@ -582,10 +582,10 @@ getNewAddressWithSalt address salt hsh args = do
       incrementNonce address
       return newAddress
 
-purgeStorageMap :: HasMemStorageDB m => Account -> m ()
-purgeStorageMap account = do
+purgeStorageMap :: HasMemStorageDB m => Address -> m ()
+purgeStorageMap address = do
   storageMap <- getMemRawStorageTxDB
-  putMemRawStorageTxMap $ M.filterWithKey (const . (/= account) . fst) storageMap
+  putMemRawStorageTxMap $ M.filterWithKey (const . (/= Account address Nothing) . fst) storageMap
 
 getContextBestBlockInfo :: (Functor m, Mod.Accessible ContextState m) => m ContextBestBlockInfo
 getContextBestBlockInfo = _bestBlockInfo <$> Mod.access Mod.Proxy

@@ -464,7 +464,7 @@ addTransaction chainId isRunningTests' b remainingBlockGas t@OutputTx {otSigner 
       when flags_debug $ $logDebugS "addTx" . T.pack $ "Removing accounts in suicideList: " ++ intercalate ", " (format <$> S.toList (erSuicideList execResults))
       forM_ (S.toList $ erSuicideList execResults) $ \address' -> do
         lift $ purgeStorageMap address'
-        lift $ A.delete (Proxy @AddressState) address'
+        lift $ A.delete (Proxy @AddressState) (Account address' Nothing)
       lift $ P.incCounter vmTxsSuccessful
   return execResults
 

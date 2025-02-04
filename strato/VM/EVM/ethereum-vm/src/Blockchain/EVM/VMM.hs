@@ -303,7 +303,7 @@ addDebugCallCreate callCreate = do
     Just x -> put state' {debugCallCreates = Just (callCreate : x)}
     Nothing -> throwIO NonDebugCallCreate -- "You are trying to add a call create during a non-debug run"
 
-addSuicideList :: MonadIO m => Account -> VMM m ()
+addSuicideList :: MonadIO m => Address -> VMM m ()
 addSuicideList acct = modify $ \st -> st {suicideList = acct `S.insert` suicideList st}
 
 getEnvVar :: MonadIO m => (Environment -> a) -> VMM m a

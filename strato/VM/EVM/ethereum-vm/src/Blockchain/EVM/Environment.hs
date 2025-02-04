@@ -4,7 +4,6 @@
 module Blockchain.EVM.Environment where
 
 import Blockchain.Data.BlockHeader
-import Blockchain.Strato.Model.Account
 import Blockchain.Strato.Model.Address
 import Blockchain.Strato.Model.Code
 import Blockchain.Strato.Model.ExtendedWord
@@ -17,8 +16,8 @@ import Data.Text (Text)
 import GHC.Generics
 
 data Environment = Environment
-  { envOwner :: Account,
-    envOrigin :: Account,
+  { envOwner :: Address,
+    envOrigin :: Address,
     envGasPrice :: Integer,
     envInputData :: B.ByteString,
     envSender :: Address,

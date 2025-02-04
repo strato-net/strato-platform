@@ -20,6 +20,7 @@ import Blockchain.Data.Log
 import Blockchain.EVM.Environment
 import qualified Blockchain.EVM.MutableStack as MS
 import Blockchain.Strato.Model.Account
+import Blockchain.Strato.Model.Address
 import Blockchain.Strato.Model.Class
 import Blockchain.Strato.Model.ExtendedWord
 import Blockchain.Strato.Model.Gas
@@ -80,7 +81,7 @@ data VMState = VMState
     stack :: MS.MutableStack Word256,
     callDepth :: Int,
     refund :: Counter,
-    suicideList :: S.Set Account,
+    suicideList :: S.Set Address,
     done :: Bool,
     returnVal :: Maybe B.ByteString,
     theTrace :: [String],

@@ -2661,7 +2661,7 @@ callBuiltin ("selfdestruct") [SAccount a _] _ = do
   _destroyRes <- A.adjustWithDefault_ (A.Proxy @AddressState) (Account contract' Nothing) $ \newAddressState ->
     pure newAddressState {addressStateCodeHash = SolidVMCode "Code_0" $ unsafeCreateKeccak256FromWord256 0}
   sendRes <- pay "selfdestruct function" contract' (a^.namedAccountAddress) contractBalance
-  _purgeRes <- purgeStorageMap (Account contract' Nothing)
+  _purgeRes <- purgeStorageMap contract'
   return $ SBool sendRes
 callBuiltin "account" vs _ = typeError "account cast" vs
 callBuiltin "bool" [SBool b] _ = return $ SBool b

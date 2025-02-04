@@ -169,8 +169,8 @@ initializeStateDBAndAccountInfos chainId addressInfo genesisBlockName = do
       case words $ BLC.unpack theLine of
         [] -> return ()
         ["s", a, k, v] -> do
-          let account = Account (Ad.Address $ parseHex a) chainId
-          putStorageKeyVal' account (parseHex k) (parseHex v)
+          let address = Ad.Address $ parseHex a
+          putStorageKeyVal' address (parseHex k) (parseHex v)
         ["a", a, b] -> do
           let account = Account (Ad.Address $ parseHex a) chainId
           $logInfoS "initializeStateDBAndAccountInfos" . T.pack $
