@@ -13,6 +13,7 @@
 module Slipstream.Data.Action where
 
 import Blockchain.Strato.Model.Account
+import Blockchain.Strato.Model.Address
 import Blockchain.Strato.Model.CodePtr
 import Blockchain.Strato.Model.Event
 import Blockchain.Strato.Model.Keccak256
@@ -47,7 +48,7 @@ data AggregateAction = AggregateAction
     actionCodeHash :: CodePtr,
     actionCodeCollection :: CodeCollection,
     actionStorage :: Action.DataDiff,
-    actionAbstracts :: Map (Account, Text) (Text, Text, [Text]),
+    actionAbstracts :: Map (Address, Text) (Text, Text, [Text]),
     actionMappings :: [Text],
     actionArrays :: [Text],
     actionType :: Action.CallType,
@@ -62,7 +63,7 @@ data AggregateEvent = AggregateEvent
     eventTxHash :: Keccak256,
     eventTxSender :: Account,
     eventIndex :: Int,
-    eventAbstracts :: Map (Account, Text) (Text, Text, [Text]),
+    eventAbstracts :: Map (Address, Text) (Text, Text, [Text]),
     eventEvent :: Event
   }
   deriving (Show, Generic, NFData, ToJSON, FromJSON)
@@ -97,7 +98,7 @@ flatten Action.Action {..} = flip map (OMap.assocs _actionData) $
             actionCodeHash = _actionDataCodeHash,
             actionCodeCollection = _actionDataCodeCollection,
             actionStorage = _actionDataStorageDiffs,
-            actionAbstracts = _actionDataAbstracts,
+            actionAbstracts = M.mapKeys (\(v1, v2) -> (_accountAddress v1, v2)) _actionDataAbstracts,
             actionMappings = _actionDataMappings,
             actionArrays = _actionDataArrays,
             actionType = t,

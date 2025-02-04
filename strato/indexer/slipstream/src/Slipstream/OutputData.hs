@@ -1612,7 +1612,7 @@ processParents ::
 processParents ae = createNewEvent <$> Map.toList (eventAbstracts ae)
   where
     createNewEvent :: 
-      ((Account, Text), (Text, Text, [Text])) -> AggregateEvent
+      ((Address, Text), (Text, Text, [Text])) -> AggregateEvent
     createNewEvent ((_, n'), (c, a, _)) =
       ae { eventEvent = (eventEvent ae) {
         Action.evContractCreator = T.unpack c,

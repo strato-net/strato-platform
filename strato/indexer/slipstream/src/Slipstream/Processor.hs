@@ -237,7 +237,7 @@ parseEvents = concatMap parseEvent
           eventBlockNumber = Action._blockNumber a,
           eventTxHash = Action._transactionHash a,
           eventTxSender = Action._transactionSender a,
-          eventAbstracts = maybe Map.empty Action._actionDataAbstracts . OMap.lookup (evContractAccount e) $ Action._actionData a,
+          eventAbstracts = Map.mapKeys (\(v1, v2) -> (_accountAddress v1, v2)) $ maybe Map.empty Action._actionDataAbstracts . OMap.lookup (evContractAccount e) $ Action._actionData a,
           eventEvent = e, 
           eventIndex = idx
         }
