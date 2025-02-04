@@ -37,16 +37,9 @@ describe("Payment Server - deactivate contracts", function () {
     }
   })
 
-  // TODO: Disabled for initial payment server release
-  // it('Deactivate MetaMask ExternalPaymentService', async () => {
-  //   if (deployment.contracts.metamask) {
-  //     await deactivate(token, deployment.contracts.metamask)
-  //   }
-  // })
-
-  it('Deactivate STRATS StratPaymentService', async () => {
-    if (deployment.contracts.strat) {
-      await deactivate(token, deployment.contracts.strat)
+  it('Deactivate USDST TokenPaymentService', async () => {
+    if (deployment.contracts.USDST) {
+      await deactivate(token, deployment.contracts.USDST)
     }
   })
 

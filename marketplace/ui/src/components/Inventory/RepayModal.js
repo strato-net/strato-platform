@@ -21,7 +21,7 @@ import {
 import { Images } from '../../images';
 import { useLocation } from 'react-router-dom';
 
-const logo = <img src={Images.strat} alt={''} title={''} className="w-5 h-5" />;
+const logo = <img src={Images.USDST} alt={''} title={''} className="w-5 h-5" />;
 
 const RepayModal = ({
   open,
@@ -33,7 +33,7 @@ const RepayModal = ({
   offset,
   productDetailPage,
   reserves,
-  assetsWithEighteenDecimalPlaces
+  assetsWithEighteenDecimalPlaces,
 }) => {
   const { isRepaying } = useInventoryState();
   // Dispatch
@@ -42,12 +42,13 @@ const RepayModal = ({
   const paymentServiceDispatch = usePaymentServiceDispatch();
 
   const { paymentServices } = usePaymentServiceState();
-  const { strats, isFetchingStrats } = useMarketplaceState();
+  const { USDST, isFetchingUSDST } = useMarketplaceState();
   const isStaked = inventory.sale && inventory.price <= 0;
   const itemName = decodeURIComponent(inventory.name);
   const location = useLocation();
   const queryParams = new URLSearchParams(location.search);
   const [repayAmount, setRepayAmount] = useState(0);
+  const [disableButton, setDisableButton] = useState(false);
   const escrows = inventory?.inventories
     ? [
         ...new Set(
@@ -61,7 +62,7 @@ const RepayModal = ({
     : [];
 
   useEffect(() => {
-    if (inventory && strats) {
+    if (inventory && USDST) {
       const uniqueEscrowsPrime = new Set();
       const totalCollateralQuantity = inventory?.inventories
         ? inventory.inventories.reduce((sum, item) => {
@@ -81,7 +82,8 @@ const RepayModal = ({
       const borrowedAmount = inventory?.inventories
         ? inventory.inventories.reduce((sum, item) => {
             const escrowAddress = item?.escrow?.address;
-            const borrowedValue = item?.escrow?.borrowedAmount || 0;
+            const borrowedValue =
+              item?.escrow?.borrowedAmount / Math.pow(10, 18) || 0;
 
             // Add borrowed amount only if the escrow address is unique
             if (escrowAddress && !uniqueBorrowedAddresses.has(escrowAddress)) {
@@ -91,26 +93,26 @@ const RepayModal = ({
 
             return sum;
           }, 0)
-        : inventory?.escrow?.borrowedAmount *
+        : (inventory?.escrow?.borrowedAmount / Math.pow(10, 18)) *
           (inventory?.quantity / totalCollateralQuantity);
-      const stratsBalance = Object.keys(strats).length > 0 ? strats : 0;
-      setRepayAmount(
-        borrowedAmount / 100 > stratsBalance
-          ? Number(stratsBalance)
-          : borrowedAmount / 100
-      );
+      const USDSTBalance =
+        Object.keys(USDST).length > 0 ? USDST * Math.pow(10, 18) : 0;
+      setRepayAmount(borrowedAmount);
+      if (borrowedAmount > USDSTBalance) {
+        setDisableButton(true);
+      }
     }
-  }, [strats, inventory]);
+  }, [USDST, inventory]);
 
   useEffect(() => {
     paymentServiceActions.getPaymentServices(paymentServiceDispatch, true);
-    marketplaceActions.fetchStratsBalance(marketplaceDispatch);
+    marketplaceActions.fetchUSDSTBalance(marketplaceDispatch);
   }, []);
 
   const dataForItems = [
     {
-      label: `Loan to pay off in STRATs`,
-      description: 'The amount of STRATs to pay off the loan',
+      label: `Loan to pay off in USDST`,
+      description: 'The amount of USDST to pay off the loan',
       value: (
         <div className="flex -mr-1">
           {logo} &nbsp;
@@ -133,6 +135,7 @@ const RepayModal = ({
 
     const repayed = await inventoryActions.repay(inventoryDispatch, body);
     if (repayed) {
+      handleCancel();
       if (productDetailPage) {
         await inventoryActions.fetchInventoryDetail(
           inventoryDispatch,
@@ -153,8 +156,7 @@ const RepayModal = ({
         await inventoryActions.getAllReserve(inventoryDispatch);
         await inventoryActions.getUserCataRewards(inventoryDispatch);
       }
-      await marketplaceActions.fetchStratsBalance(marketplaceDispatch);
-      handleCancel();
+      await marketplaceActions.fetchUSDSTBalance(marketplaceDispatch);
     }
   };
 
@@ -168,7 +170,7 @@ const RepayModal = ({
       width={600}
       centered
       footer={null}
-      loading={isFetchingStrats}
+      loading={isFetchingUSDST}
     >
       <div className="flex flex-col px-4 pt-4">
         <div className="flex flex-col gap-2">
@@ -194,6 +196,7 @@ const RepayModal = ({
               className="w-full px-6 h-10 font-bold"
               onClick={handleSubmit}
               loading={isRepaying}
+              disabled={disableButton}
             >
               Repay
             </Button>

@@ -36,6 +36,7 @@ abstract contract PaymentService is Utils {
         string purchasersCommonName,        // Purchaser common name for lookup purposes
         address[] saleAddresses,            // List of the sale contracts for the assets in the checkout
         uint[] quantitiesToBePurchased,     // List of quantities for each asset being bought
+        uint[] decimals,                    // List of decimal places for each asset being bought
         decimal amount                      // Total price of the checkout
     );
 
@@ -52,7 +53,7 @@ abstract contract PaymentService is Utils {
         decimal amount,               // Total price of the order
         decimal tax,                  // Tax
         decimal fee,                  // Fee payment (in dollar value)
-        decimal unitsPerDollar,       // Amount of units per dollar for the currency (Ex: STRAT is 100 units per dollar)
+        decimal unitsPerDollar,       // Amount of units per dollar for the currency (Ex: USDST is 1e18 units per dollar)
         string currency,              // The type of currency used for the purchase
         PaymentStatus status,         // Status of the payment
         uint createdDate,              // Date at the time of fresh order creation
@@ -163,10 +164,11 @@ abstract contract PaymentService is Utils {
     }
 
     function checkoutInitialized (
-        address[] _stratsAssetAddresses,
+        address[] _tokenAssetAddresses,
         string _checkoutId,
         address[] _saleAddresses,
         uint[] _quantities,
+        uint[] _decimals,
         uint _createdDate,
         string _comments
     ) requireActive("create ckeckout") external returns (string, address[]) {
@@ -174,26 +176,28 @@ abstract contract PaymentService is Utils {
         string _purchasersCommonName = getCommonName(msg.sender);
         string checkoutHash = getOrderHash(_checkoutId, _purchasersCommonName, _saleAddresses, _quantities);
         return _checkoutInitialized(
-            _stratsAssetAddresses,
+            _tokenAssetAddresses,
             checkoutHash,
             _checkoutId,
             msg.sender,
             _purchasersCommonName,
             _saleAddresses,
             _quantities,
+            _decimals,
             _createdDate,
             _comments
         );
     }
 
     function _checkoutInitialized (
-        address[] _stratsAssetAddresses,
+        address[] _tokenAssetAddresses,
         string _checkoutHash,
         string _checkoutId,
         address _purchaser,
         string _purchasersCommonName,
         address[] _saleAddresses,
         uint[] _quantities,
+        uint[] _decimals,
         uint _createdDate,
         string _comments
     ) internal virtual returns (string, address[]) {
@@ -224,6 +228,7 @@ abstract contract PaymentService is Utils {
             _purchasersCommonName,
             _saleAddresses,
             _quantities,
+            _decimals,
             totalAmount
         );
         return (_checkoutHash, assets);
@@ -352,9 +357,9 @@ abstract contract PaymentService is Utils {
             decimal saleAmount = s.price() * _quantities[i];
             totalAmount += saleAmount;
             if (address(a) == address(a.root)) {
-                totalFee += (saleAmount * primarySaleFeePercentage) / 100;
+                totalFee += (saleAmount * primarySaleFeePercentage);
             } else {
-                totalFee += (saleAmount * secondarySaleFeePercentage) / 100;
+                totalFee += (saleAmount * secondarySaleFeePercentage);
             }
             try {
                 s.completeSale(_orderHash, _purchaser);

@@ -60,17 +60,13 @@ import { useAuthenticateState } from '../../contexts/authentication';
 import HelmetComponent from '../Helmet/HelmetComponent';
 import { SEO } from '../../helpers/seoConstant';
 import RequestBeAuthorizedIssuerModal from './RequestBeAuthorizedIssuerModal';
-import {
-  ISSUER_STATUS,
-  STRATS_CONVERSION,
-  ASSET_STATUS,
-} from '../../helpers/constants';
+import { ISSUER_STATUS, ASSET_STATUS } from '../../helpers/constants';
 import ItemActions from './ItemActions';
 import InventoryCard from './InventoryCard';
 import './index.css';
 
 const { Option } = Select;
-const StratsIcon = <img src={Images.strat} alt="STRATS" className="w-4 h-4" />;
+const USDSTIcon = <img src={Images.USDST} alt="USDST" className="w-4 h-4" />;
 const logo = <img src={Images.cata} alt={''} title={''} className="w-5 h-5" />;
 
 const Inventory = ({ user }) => {
@@ -92,7 +88,8 @@ const Inventory = ({ user }) => {
   const naviroute = routes.InventoryDetail.url;
   const ethNaviroute = routes.EthstProductDetail.url;
   let { hasChecked, isAuthenticated, loginUrl } = useAuthenticateState();
-  const { stratsAddress, assetsWithEighteenDecimalPlaces } = useMarketplaceState();
+  const { USDSTAddress, assetsWithEighteenDecimalPlaces } =
+    useMarketplaceState();
   const formatter = new Intl.NumberFormat('en-US');
   const formattedNum = (num) => formatter.format(num);
 
@@ -146,8 +143,6 @@ const Inventory = ({ user }) => {
       .map((service) => ({
         ...service,
         isNotOnboarded: notOnboardedNames.has(service.serviceName),
-        serviceName:
-          service?.serviceName === 'STRATS' ? 'STRAT' : service?.serviceName,
       }));
     setSortedPaymentServices(sortedServices);
   }, [paymentServices, notOnboarded]);
@@ -398,7 +393,7 @@ const Inventory = ({ user }) => {
           reserves.some(
             (reserve) => record.originAddress === reserve.assetRootAddress
           );
-        const borrowedAmount = (record?.escrow?.borrowedAmount || 0) / 100;
+        const borrowedAmount = record?.escrow?.borrowedAmount || 0;
         const callDetailPage = () => {
           navigate(
             `${naviroute
@@ -440,11 +435,8 @@ const Inventory = ({ user }) => {
             {isStakeable && (
               <>
                 <div className="flex items-center gap-2">
-                  Borrowed Amount: {StratsIcon}
-                  {borrowedAmount.toLocaleString('en-US', {
-                    maximumFractionDigits: 2,
-                    minimumFractionDigits: 2,
-                  })}
+                  Borrowed Amount: {USDSTIcon}
+                  {(borrowedAmount / Math.pow(10, 18)).toFixed(2)}
                 </div>
               </>
             )}
@@ -457,34 +449,31 @@ const Inventory = ({ user }) => {
       render: (text, record) => {
         const parts = record.contract_name.split('-');
         const contractName = parts[parts.length - 1];
-        return (
-          <div>{contractName === 'STRATSTokens' ? 'STRAT' : contractName}</div>
-        );
+        return <div>{contractName}</div>;
       },
     },
     {
       title: 'Price',
       align: 'center',
       render: (_, record) => {
-        const isStrats = record.originAddress === stratsAddress;
-        const is18DecimalPlaces = assetsWithEighteenDecimalPlaces.includes(record.originAddress);
+        const is18DecimalPlaces = assetsWithEighteenDecimalPlaces.includes(
+          record.originAddress
+        );
         const price = record.price
-          ? isStrats
-            ? parseFloat(record.price * 100).toFixed(2)
-            : is18DecimalPlaces
+          ? is18DecimalPlaces
             ? parseFloat(record.price * 10 ** 18).toFixed(2)
-            : record.price
+            : parseFloat(record.price * 10 ** (record.decimals || 0)).toFixed(2)
           : 'N/A';
         return (
           <div>
             {price !== 'N/A' ? (
-              <>
+              <div className="flex flex-col items-center">
                 <span>${price}</span>{' '}
                 <p className="flex text-xs items-center gap-1">
                   {' '}
-                  &nbsp;({(price * STRATS_CONVERSION).toFixed(0)} {StratsIcon}){' '}
+                  &nbsp;({price} {USDSTIcon})
                 </p>
-              </>
+              </div>
             ) : (
               'N/A'
             )}
@@ -496,16 +485,17 @@ const Inventory = ({ user }) => {
       title: 'Owned',
       align: 'center',
       render: (_, record) => {
-        const isStrats = record.originAddress === stratsAddress;
-        const is18DecimalPlaces = assetsWithEighteenDecimalPlaces.includes(record.originAddress);
+        const is18DecimalPlaces = assetsWithEighteenDecimalPlaces.includes(
+          record.originAddress
+        );
         const quantity = (
-          isStrats
-            ? new BigNumber(record.quantity).dividedBy(new BigNumber(100))
-            : is18DecimalPlaces
+          is18DecimalPlaces
             ? new BigNumber(record.quantity).dividedBy(
                 new BigNumber(10).pow(18)
               )
-            : new BigNumber(record.quantity)
+            : new BigNumber(record.quantity).dividedBy(
+                new BigNumber(10).pow(record.decimals || 0)
+              )
         )
           .toNumber()
           .toLocaleString('en-US', {
@@ -519,18 +509,17 @@ const Inventory = ({ user }) => {
       title: 'Listed for Sale',
       align: 'center',
       render: (_, record) => {
-        const isStrats = record.originAddress === stratsAddress;
-        const is18DecimalPlaces = assetsWithEighteenDecimalPlaces.includes(record.originAddress);
+        const is18DecimalPlaces = assetsWithEighteenDecimalPlaces.includes(
+          record.originAddress
+        );
         const saleQuantity = (
-          isStrats
-            ? new BigNumber(record.saleQuantity || 0).dividedBy(
-                new BigNumber(100)
-              )
-            : is18DecimalPlaces
+          is18DecimalPlaces
             ? new BigNumber(record.saleQuantity || 0).dividedBy(
                 new BigNumber(10).pow(18)
               )
-            : new BigNumber(record.saleQuantity || 0)
+            : new BigNumber(record.saleQuantity || 0).dividedBy(
+                new BigNumber(10).pow(record.decimals || 0)
+              )
         ).toString();
 
         return <div className="w-24">{saleQuantity}</div>;
@@ -551,7 +540,6 @@ const Inventory = ({ user }) => {
             user={user}
             supportedTokens={supportedTokens}
             reserves={reserves}
-            stratAddress={stratsAddress}
             assetsWithEighteenDecimalPlaces={assetsWithEighteenDecimalPlaces}
           />
         </div>
@@ -815,8 +803,9 @@ const Inventory = ({ user }) => {
                         user={user}
                         supportedTokens={supportedTokens}
                         reserves={reserves}
-                        stratAddress={stratsAddress}
-                        assetsWithEighteenDecimalPlaces={assetsWithEighteenDecimalPlaces}
+                        assetsWithEighteenDecimalPlaces={
+                          assetsWithEighteenDecimalPlaces
+                        }
                       />
                     ))
                   ) : (
@@ -838,8 +827,9 @@ const Inventory = ({ user }) => {
                         user={user}
                         supportedTokens={supportedTokens}
                         reserves={reserves}
-                        stratAddress={stratsAddress}
-                        assetsWithEighteenDecimalPlaces={assetsWithEighteenDecimalPlaces}
+                        assetsWithEighteenDecimalPlaces={
+                          assetsWithEighteenDecimalPlaces
+                        }
                       />
                     ))
                   ) : (

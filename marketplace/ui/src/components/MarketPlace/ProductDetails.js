@@ -55,12 +55,13 @@ import RepayModal from '../Inventory/RepayModal';
 import { setCookie } from '../../helpers/cookie';
 import routes from '../../helpers/routes';
 import './index.css';
+import BigNumber from 'bignumber.js';
 
 import image_placeholder from '../../images/resources/image_placeholder.png';
 import 'react-responsive-carousel/lib/styles/carousel.min.css'; // requires a loader
 
 import { SEO } from '../../helpers/seoConstant';
-import { STRATS_CONVERSION, ASSET_STATUS } from '../../helpers/constants';
+import { ASSET_STATUS } from '../../helpers/constants';
 import { TOAST_MSG } from '../../helpers/msgConstants';
 
 import { Swiper, SwiperSlide } from 'swiper/react';
@@ -196,11 +197,18 @@ const ProductDetails = ({ user, users }) => {
 
   useEffect(() => {
     if (inventoryDetails) {
+      const minItemNumber = new BigNumber(
+        inventoryDetails.itemNumber
+      ).toFixed();
+      const maxItemNumber = new BigNumber(inventoryDetails.itemNumber)
+        .plus(inventoryDetails.quantity)
+        .minus(1)
+        .toFixed();
+
       inventoryActions.fetchInventoryOwnershipHistory(dispatch, {
         originAddress: inventoryDetails.originAddress,
-        minItemNumber: inventoryDetails.itemNumber,
-        maxItemNumber:
-          inventoryDetails.itemNumber + inventoryDetails.quantity - 1,
+        minItemNumber: minItemNumber,
+        maxItemNumber: maxItemNumber,
       });
     }
   }, [inventoryDetails, dispatch]);
@@ -234,11 +242,7 @@ const ProductDetails = ({ user, users }) => {
       const detailsData = details.data;
       setItemData(detailsData);
       if (details.saleQuantity) {
-        let saleQuantity =
-          details.data.quantityIsDecimal &&
-          details.data.quantityIsDecimal === 'True'
-            ? details.saleQuantity / 100
-            : details.saleQuantity;
+        let saleQuantity = details.saleQuantity;
         setAvailableQuantity(saleQuantity || 1);
       }
     }
@@ -473,6 +477,10 @@ const ProductDetails = ({ user, users }) => {
   );
   const linkUrl = window.location.href;
 
+  const decimals = assetsWithEighteenDecimalPlaces.includes(
+    details?.originAddress
+  ) ? 18 : details?.decimals || 0;
+
   return (
     <>
       {contextHolder}
@@ -652,35 +660,21 @@ const ProductDetails = ({ user, users }) => {
                     >
                       {details?.price || isStaked
                         ? (() => {
-                            const adjustedPrice =
-                              details.data.quantityIsDecimal &&
-                              details.data.quantityIsDecimal === 'True'
-                                ? details.price * 100
-                                : details.price;
+                            const adjustedPrice = details.price;
                             return (
                               <>
                                 $
                                 {isStaked
-                                  ? (
-                                      details.escrow?.maxLoanAmount / 100
-                                    ).toFixed(2)
-                                  : adjustedPrice}{' '}
+                                  ? (details.escrow?.maxLoanAmount).toFixed(2)
+                                  : adjustedPrice * Math.pow(10, decimals)}{' '}
                                 <span className="font-normal text-xs mr-2 text-primary">
                                   <b>
                                     (
                                     {isStaked
                                       ? details.escrow?.maxLoanAmount
-                                      : (
-                                          adjustedPrice * STRATS_CONVERSION
-                                        ).toFixed(0)}{' '}
-                                    {(isStaked
-                                      ? details.escrow?.maxLoanAmount
-                                      : (
-                                          adjustedPrice * STRATS_CONVERSION
-                                        ).toFixed(0)) == 1
-                                      ? 'STRAT'
-                                      : 'STRATs'}
-                                    )
+                                      : adjustedPrice *
+                                        Math.pow(10, decimals)}{' '}
+                                    USDST)
                                   </b>
                                 </span>
                                 {isStakeable && (
@@ -700,8 +694,7 @@ const ProductDetails = ({ user, users }) => {
                     </Paragraph>
                     {isAvailableForSale && (
                       <Text type="danger" strong>
-                        {' '}
-                        Sold Out{' '}
+                        Sold Out
                       </Text>
                     )}
                   </div>
@@ -735,7 +728,8 @@ const ProductDetails = ({ user, users }) => {
                               inventoryDetails.root
                             )
                           ? inventoryDetails.quantity / 1e18
-                          : inventoryDetails.quantity
+                          : inventoryDetails.quantity /
+                            Math.pow(10, inventoryDetails.decimals || 0)
                       }
                       defaultValue={`${qty}`}
                       controls={false}
@@ -992,7 +986,7 @@ const ProductDetails = ({ user, users }) => {
                     ) : (
                       <div className="text-center p-4">
                         <p>
-                          Please{' '}
+                          Please
                           <span
                             className="text-blue hover:text-blue cursor-pointer hover:underline"
                             onClick={() => {
@@ -1005,7 +999,7 @@ const ProductDetails = ({ user, users }) => {
                             }}
                           >
                             login
-                          </span>{' '}
+                          </span>
                           to view ownership history.
                         </p>
                       </div>
@@ -1064,10 +1058,7 @@ const ProductDetails = ({ user, users }) => {
                         onChange={handleTimeFilterChange}
                         activeKey={timeFilter}
                       />
-                      <PriceChartAndStats
-                        priceHistory={priceHistory}
-                        isDecimal={details?.data?.quantityIsDecimal === 'True'}
-                      />
+                      <PriceChartAndStats priceHistory={priceHistory} />
                     </div>
                   )}
                 <div>
@@ -1078,7 +1069,7 @@ const ProductDetails = ({ user, users }) => {
                       </h2>
                       <Statistics
                         priceHistory={priceHistory}
-                        isDecimal={details?.data?.quantityIsDecimal === 'True'}
+                        decimals={decimals}
                       />
                     </>
                   )}

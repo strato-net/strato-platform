@@ -287,13 +287,15 @@ const actions = {
     offset,
     queryValue,
     category,
-    originAddress
+    originAddress,
+    user
   ) => {
     const query = queryValue
       ? `&queryValue=${queryValue}&queryFields=name`
       : '';
 
     const categoryQuery = category ? `category[]=${category}` : '';
+    const userName = user ? `&user=${user}` : '';
 
     const originAddressQuery = originAddress
       ? `&originAddress[]=${originAddress}`
@@ -303,7 +305,7 @@ const actions = {
 
     try {
       const response = await fetch(
-        `${apiUrl}/inventory/user/inventories?${categoryQuery}&limit=${limit}&offset=${offset}${query}${originAddressQuery}&isMint=true`,
+        `${apiUrl}/inventory/user/inventories?${categoryQuery}&limit=${limit}&offset=${offset}${query}${originAddressQuery}&isMint=true${userName}`,
         {
           method: HTTP_METHODS.GET,
         }
@@ -1225,7 +1227,7 @@ const actions = {
 
       if (response.status === RestStatus.OK) {
         dispatch({ type: actionDescriptors.borrowSuccessful });
-        actions.setMessage(dispatch, 'STRATs successfully borrowed', true);
+        actions.setMessage(dispatch, 'USDST successfully borrowed', true);
         return true;
       } else if (response.status === RestStatus.CONFLICT) {
         dispatch({
@@ -1237,9 +1239,9 @@ const actions = {
       } else if (response.status === RestStatus.INTERNAL_SERVER_ERROR) {
         dispatch({
           type: actionDescriptors.borrowFailed,
-          error: 'Error while borrowing STRATs',
+          error: 'Error while borrowing USDST',
         });
-        actions.setMessage(dispatch, 'Error while borrowing STRATs');
+        actions.setMessage(dispatch, 'Error while borrowing USDST');
         return false;
       }
 
@@ -1252,9 +1254,9 @@ const actions = {
     } catch (err) {
       dispatch({
         type: actionDescriptors.borrowFailed,
-        error: 'Error while borrowing STRATs',
+        error: 'Error while borrowing USDST',
       });
-      actions.setMessage(dispatch, 'Error while borrowing STRATs');
+      actions.setMessage(dispatch, 'Error while borrowing USDST');
     }
   },
 
@@ -1276,7 +1278,7 @@ const actions = {
 
       if (response.status === RestStatus.OK) {
         dispatch({ type: actionDescriptors.repaySuccessful });
-        actions.setMessage(dispatch, 'STRATs successfully repaid', true);
+        actions.setMessage(dispatch, 'USDST successfully repaid', true);
         return true;
       } else if (response.status === RestStatus.CONFLICT) {
         dispatch({
@@ -1288,9 +1290,9 @@ const actions = {
       } else if (response.status === RestStatus.INTERNAL_SERVER_ERROR) {
         dispatch({
           type: actionDescriptors.repayFailed,
-          error: 'Error while repaying STRATs',
+          error: 'Error while repaying USDST',
         });
-        actions.setMessage(dispatch, 'Error while repaying STRATs');
+        actions.setMessage(dispatch, 'Error while repaying USDST');
         return false;
       }
 
@@ -1303,9 +1305,9 @@ const actions = {
     } catch (err) {
       dispatch({
         type: actionDescriptors.repayFailed,
-        error: 'Error while repaying STRATs',
+        error: 'Error while repaying USDST',
       });
-      actions.setMessage(dispatch, 'Error while repaying STRATs');
+      actions.setMessage(dispatch, 'Error while repaying USDST');
     }
   },
 

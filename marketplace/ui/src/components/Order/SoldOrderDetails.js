@@ -14,9 +14,10 @@ import {
   notification,
   Tabs,
 } from 'antd';
-import { Link, useLocation, useMatch } from 'react-router-dom';
+import { Link, useMatch } from 'react-router-dom';
 import { actions } from '../../contexts/order/actions';
 import { useOrderDispatch, useOrderState } from '../../contexts/order';
+import { useMarketplaceState } from '../../contexts/marketplace';
 import routes from '../../helpers/routes';
 import classNames from 'classnames';
 import { getStringDate } from '../../helpers/utils';
@@ -24,7 +25,7 @@ import { useNavigate } from 'react-router-dom';
 import DataTableComponent from '../DataTableComponent';
 import { getStatus } from './constant';
 import dayjs from 'dayjs';
-import { US_DATE_FORMAT, STRATS_CONVERSION } from '../../helpers/constants';
+import { US_DATE_FORMAT } from '../../helpers/constants';
 import ClickableCell from '../ClickableCell';
 import image_placeholder from '../../images/resources/image_placeholder.png';
 import { ResponsiveOrderDetailCard } from './ResponsiveOrderDetailCard';
@@ -41,21 +42,15 @@ const SoldOrderDetails = ({ user, users }) => {
   const { Text } = Typography;
   const [selectedDate, setSelectedDate] = useState('');
   const [status, setStatus] = useState(getStatus(1));
+  const { assetsWithEighteenDecimalPlaces } = useMarketplaceState();
+
   const [paid, setPaid] = useState('Processing');
   const [comment, setComment] = useState('');
   const { TextArea } = Input;
   const [api, contextHolder] = notification.useNotification();
-  const state = useLocation();
 
-  const {
-    orderDetails,
-    isorderDetailsLoading,
-    ordersAudit,
-    message,
-    success,
-    isCreateOrderSubmitting,
-    isUpdatingOrderComment,
-  } = useOrderState();
+  const { orderDetails, isorderDetailsLoading, message, success } =
+    useOrderState();
   const routeMatch = useMatch({
     path: routes.SoldOrderDetails.url,
     strict: true,
@@ -89,14 +84,12 @@ const SoldOrderDetails = ({ user, users }) => {
             (item) => item.value
           );
       orderDetails.assets.forEach((prod, index) => {
-        const quantityIsDecimal =
-          prod.data.quantityIsDecimal && prod.data.quantityIsDecimal === 'True';
-        const productPrice = quantityIsDecimal
-          ? prod.price * STRATS_CONVERSION
-          : prod.price;
-        const productQuantity = quantityIsDecimal
-          ? (orderQuantities[index] || 0) / STRATS_CONVERSION
-          : orderQuantities[index];
+        const decimals = assetsWithEighteenDecimalPlaces.includes(
+          prod.root
+        ) ? 18 : prod.decimals || 0;
+        const productQuantity = orderQuantities[index] / Math.pow(10, decimals);
+        const productPrice = (prod.price * Math.pow(10, decimals)).toFixed(2);
+
         items.push({
           address: prod.address,
           chainId: prod.chainId,
@@ -107,30 +100,16 @@ const SoldOrderDetails = ({ user, users }) => {
               : image_placeholder,
           productName: prod,
           name: prod.name,
-          unitPrice:
-            // formattedNum(
-            orderDetails.order.currency === 'STRATS'
-              ? (productPrice * STRATS_CONVERSION).toFixed(0)
-              : orderDetails.order.currency === 'CATA'
-              ? (productPrice * Math.pow(10, 18)).toFixed(2)
-              : productPrice,
-          // )
-          quantity: orderQuantities[index]
-            ? formattedNum(productQuantity)
-            : '--',
-          amount:
-            (orderDetails.order.currency === 'STRATS'
-              ? (productPrice * STRATS_CONVERSION).toFixed(0)
-              : orderDetails.order.currency === 'CATA'
-              ? (productPrice * Math.pow(10, 18)).toFixed(2)
-              : productPrice) * parseInt(productQuantity),
+          unitPrice: productPrice,
+          quantity: productQuantity ? formattedNum(productQuantity) : '--',
+          amount: formattedNum((productPrice * productQuantity).toFixed(2)),
           serialNumber: prod,
           tax: prod.tax ? prod.tax : 0,
         });
       });
       setdata(items);
     }
-  }, [orderDetails]);
+  }, [orderDetails, assetsWithEighteenDecimalPlaces]);
 
   useEffect(() => {
     setId(routeMatch?.params?.id);
@@ -147,23 +126,6 @@ const SoldOrderDetails = ({ user, users }) => {
   };
 
   const details = orderDetails;
-  const audits = ordersAudit;
-  if (audits && audits.length) {
-    audits.forEach((val) => {
-      if (users && users.length) {
-        const sender = users.find(
-          (data) => val['transaction_sender'] === data.userAdress
-        );
-        audits['sender'] = sender;
-      }
-    });
-  }
-
-  if (Id !== undefined && !isorderDetailsLoading && details !== null) {
-    if (details['ownerOrganizationalUnit'] === '') {
-      details['ownerOrganizationalUnit'] = 'N/A';
-    }
-  }
 
   const OrderData = ({ title, value }) => {
     return (
@@ -302,7 +264,9 @@ const SoldOrderDetails = ({ user, users }) => {
           className="text-primary text-[17px] cursor-pointer"
           onClick={() => {
             navigate(
-              `${routes.MarketplaceProductDetail.url.replace(':address', text.address).replace(':name', encodeURIComponent(text.name))}`
+              `${routes.MarketplaceProductDetail.url
+                .replace(':address', text.address)
+                .replace(':name', encodeURIComponent(text.name))}`
             );
           }}
         >
@@ -436,27 +400,9 @@ const SoldOrderDetails = ({ user, users }) => {
                   value={details.order.sellersCommonName}
                 />
                 <Divider type="vertical" className="h-14 bg-secondryD" />
-                <OrderData
-                  title="Currency"
-                  value={
-                    details.order.currency === 'STRATS'
-                      ? 'STRAT'
-                      : details.order.currency
-                        ? details.order.currency
-                        : 'USD'
-                  }
-                />
+                <OrderData title="Currency" value={details.order.currency} />
                 <Divider type="vertical" className="h-14 bg-secondryD" />
-                <OrderData
-                  title="Total"
-                  value={
-                    details.order.currency === 'STRATS'
-                      ? (details.order.totalPrice * STRATS_CONVERSION).toFixed(
-                          0
-                        )
-                      : details.order.totalPrice
-                  }
-                />
+                <OrderData title="Total" value={details.order.totalPrice} />
                 <Divider type="vertical" className="h-14 bg-secondryD" />
                 <OrderData
                   title="Date"
@@ -500,25 +446,25 @@ const SoldOrderDetails = ({ user, users }) => {
                                 },
                               ]
                             : status === getStatus(2)
-                              ? [
-                                  {
-                                    text: getStatus(2),
-                                    value: getStatus(2),
-                                  },
-                                ]
-                              : status === getStatus(4)
-                                ? [
-                                    {
-                                      text: getStatus(4),
-                                      value: getStatus(4),
-                                    },
-                                  ]
-                                : [
-                                    {
-                                      text: getStatus(3),
-                                      value: getStatus(3),
-                                    },
-                                  ]
+                            ? [
+                                {
+                                  text: getStatus(2),
+                                  value: getStatus(2),
+                                },
+                              ]
+                            : status === getStatus(4)
+                            ? [
+                                {
+                                  text: getStatus(4),
+                                  value: getStatus(4),
+                                },
+                              ]
+                            : [
+                                {
+                                  text: getStatus(3),
+                                  value: getStatus(3),
+                                },
+                              ]
                         }
                       />
                     </Row>
@@ -546,7 +492,10 @@ const SoldOrderDetails = ({ user, users }) => {
                     <span>Invoice</span>
                     <button>
                       <Link
-                        to={`${routes.Invoice.url.replace(':id', routeMatch?.params?.id)}`}
+                        to={`${routes.Invoice.url.replace(
+                          ':id',
+                          routeMatch?.params?.id
+                        )}`}
                         target="_blank"
                       >
                         <div className="flex items-center cursor-pointer hover:text-primary">
@@ -587,13 +536,7 @@ const SoldOrderDetails = ({ user, users }) => {
                   <NewOrderData
                     className="w-2/4"
                     title="Total"
-                    value={
-                      details.order.currency === 'STRATS'
-                        ? (
-                            details.order.totalPrice * STRATS_CONVERSION
-                          ).toFixed(0)
-                        : details.order.totalPrice
-                    }
+                    value={details.order.totalPrice}
                   />
                   <NewOrderData
                     className="w-2/4"

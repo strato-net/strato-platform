@@ -10,11 +10,11 @@ import {
   Input,
   Button,
   Spin,
-  Tabs,
 } from 'antd';
-import { Link, useLocation, useMatch } from 'react-router-dom';
+import { Link, useMatch } from 'react-router-dom';
 import { actions } from '../../contexts/order/actions';
 import { useOrderDispatch, useOrderState } from '../../contexts/order';
+import { useMarketplaceState } from '../../contexts/marketplace';
 import routes from '../../helpers/routes';
 import classNames from 'classnames';
 import { EyeOutlined } from '@ant-design/icons';
@@ -22,15 +22,11 @@ import DataTableComponent from '../DataTableComponent';
 import { getStringDate } from '../../helpers/utils';
 import { getStatus } from './constant';
 import { useNavigate } from 'react-router-dom';
-import { US_DATE_FORMAT, STRATS_CONVERSION } from '../../helpers/constants';
+import { US_DATE_FORMAT } from '../../helpers/constants';
 import ClickableCell from '../ClickableCell';
 import image_placeholder from '../../images/resources/image_placeholder.png';
-import dayjs from 'dayjs';
 import { ResponsiveOrderDetailCard } from './ResponsiveOrderDetailCard';
 import { LeftArrow } from '../../images/SVGComponents';
-// import {
-//   useMarketplaceState,
-// } from '../../contexts/marketplace';
 
 const BoughtOrderDetails = ({ user, users }) => {
   const formatter = new Intl.NumberFormat('en-US');
@@ -45,8 +41,7 @@ const BoughtOrderDetails = ({ user, users }) => {
   const [status, setStatus] = useState(getStatus(0));
   const { TextArea } = Input;
   const [paid, setPaid] = useState('Processing');
-  const [selectedDate, setSelectedDate] = useState('');
-  const { state } = useLocation();
+  const { assetsWithEighteenDecimalPlaces } = useMarketplaceState();
 
   const navigate = useNavigate();
 
@@ -71,11 +66,11 @@ const BoughtOrderDetails = ({ user, users }) => {
   const {
     orderDetails,
     isorderDetailsLoading,
-    ordersAudit,
     isbuyerDetailsUpdating,
     success,
     message,
   } = useOrderState();
+  const details = orderDetails;
 
   const routeMatch = useMatch({
     path: routes.BoughtOrderDetails.url,
@@ -96,7 +91,7 @@ const BoughtOrderDetails = ({ user, users }) => {
     await actions.fetchOrderDetails(dispatch, Id);
   };
 
-  useEffect(() => {    
+  useEffect(() => {
     if (orderDetails) {
       const statusInt = parseInt(orderDetails.order.status);
       setStatus(getStatus(statusInt));
@@ -112,15 +107,12 @@ const BoughtOrderDetails = ({ user, users }) => {
             (item) => item.value
           );
       let items = [];
-      orderDetails.assets.forEach((prod, index) => {        
-        const quantityIsDecimal =
-          prod.data.quantityIsDecimal && prod.data.quantityIsDecimal === 'True';
-        const productPrice = quantityIsDecimal
-          ? prod.price * STRATS_CONVERSION
-          : prod.price;
-        const productQuantity = quantityIsDecimal
-          ? (orderQuantities[index] || 0) / STRATS_CONVERSION
-          : orderQuantities[index];
+      orderDetails.assets.forEach((prod, index) => {
+        const decimals = assetsWithEighteenDecimalPlaces.includes(
+          prod.root
+        ) ? 18 : prod.decimals || 0;
+        const productPrice = (prod.price * Math.pow(10, decimals)).toFixed(2);
+        const productQuantity = orderQuantities[index] / Math.pow(10, decimals);
         items.push({
           address: prod.address,
           chainId: prod.chainId,
@@ -131,49 +123,23 @@ const BoughtOrderDetails = ({ user, users }) => {
               : image_placeholder,
           productName: prod,
           name: prod.name,
-          unitPrice:
-            // formattedNum(
-            orderDetails.order.currency === 'STRATS'
-              ? (productPrice * STRATS_CONVERSION).toFixed(0)
-              : orderDetails.order.currency === 'CATA'
-              ? (productPrice * Math.pow(10, 18)).toFixed(2)
-              : productPrice,
-          // )
-          quantity: orderQuantities[index]
-            ? formattedNum(productQuantity)
+          unitPrice: productPrice,
+          quantity: productQuantity
+            ? formattedNum(productQuantity.toFixed(0))
             : '--',
-          amount:
-            (orderDetails.order.currency === 'STRATS'
-              ? (productPrice * STRATS_CONVERSION).toFixed(0)
-              : orderDetails.order.currency === 'CATA'
-              ? (productPrice * Math.pow(10, 18)).toFixed(2)
-              : productPrice) * parseInt(productQuantity),
+          amount: formattedNum(
+            (
+              productPrice *
+              (orderQuantities[index] / Math.pow(10, 18))
+            ).toFixed(2)
+          ),
           serialNumber: prod,
           tax: prod.tax ? prod.tax : 0,
         });
       });
       setdata(items);
     }
-  }, [orderDetails]);
-
-  const details = orderDetails;
-  const audits = ordersAudit;
-  if (audits && audits.length) {
-    audits.forEach((val) => {
-      if (users && users.length) {
-        const sender = users.find(
-          (data) => val['transaction_sender'] === data.userAdress
-        );
-        audits['sender'] = sender;
-      }
-    });
-  }
-
-  if (Id !== undefined && !isorderDetailsLoading && details !== null) {
-    if (details['ownerOrganizationalUnit'] === '') {
-      details['ownerOrganizationalUnit'] = 'N/A';
-    }
-  }
+  }, [orderDetails, assetsWithEighteenDecimalPlaces]);
 
   const OrderData = ({ title, value }) => {
     return (
@@ -187,10 +153,6 @@ const BoughtOrderDetails = ({ user, users }) => {
         </Text>
       </Col>
     );
-  };
-
-  const onDateChange = (date) => {
-    setSelectedDate(date);
   };
 
   const statusComponent = (status) => {
@@ -306,7 +268,9 @@ const BoughtOrderDetails = ({ user, users }) => {
           className="text-primary text-[17px] cursor-pointer"
           onClick={() => {
             navigate(
-              `${routes.MarketplaceProductDetail.url.replace(':address', text.address).replace(':name', encodeURIComponent(text.name))}`
+              `${routes.MarketplaceProductDetail.url
+                .replace(':address', text.address)
+                .replace(':name', encodeURIComponent(text.name))}`
             );
           }}
         >
@@ -479,25 +443,10 @@ const BoughtOrderDetails = ({ user, users }) => {
                 <Divider type="vertical" className="h-14 bg-secondryD" />
                 <OrderData
                   title="Currency"
-                  value={
-                    details.order.currency === 'STRATS'
-                      ? 'STRAT'
-                      : details.order.currency
-                        ? details.order.currency
-                        : 'USD'
-                  }
+                  value={details.order.currency || 'USD'}
                 />
                 <Divider type="vertical" className="h-14 bg-secondryD" />
-                <OrderData
-                  title="Total"
-                  value={
-                    details.order.currency === 'STRATS'
-                      ? (details.order.totalPrice * STRATS_CONVERSION).toFixed(
-                          0
-                        )
-                      : details.order.totalPrice
-                  }
-                />
+                <OrderData title="Total" value={details.order.totalPrice} />
                 <Divider type="vertical" className="h-14 bg-secondryD" />
                 <OrderData
                   title="Date"
@@ -521,7 +470,10 @@ const BoughtOrderDetails = ({ user, users }) => {
                     <span>Invoice</span>
                     <button>
                       <Link
-                        to={`${routes.Invoice.url.replace(':id', routeMatch?.params?.id)}`}
+                        to={`${routes.Invoice.url.replace(
+                          ':id',
+                          routeMatch?.params?.id
+                        )}`}
                         target="_blank"
                       >
                         <div className="flex items-center cursor-pointer hover:text-primary">
@@ -562,13 +514,7 @@ const BoughtOrderDetails = ({ user, users }) => {
                   <NewOrderData
                     className="w-2/4"
                     title="Total"
-                    value={
-                      details.order.currency === 'STRATS'
-                        ? (
-                            details.order.totalPrice * STRATS_CONVERSION
-                          ).toFixed(0)
-                        : details.order.totalPrice
-                    }
+                    value={details.order.totalPrice}
                   />
                   <NewOrderData
                     className="w-2/4"

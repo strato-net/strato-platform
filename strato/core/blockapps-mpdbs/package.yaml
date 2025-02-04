@@ -6,6 +6,7 @@ maintainer: jamshidnh@gmail.com
 synopsis: A Haskell version of an Ethereum client
 category: Data Structures
 description: The client described in the Ethereum Yellowpaper
+license: Apache-2.0
 
 dependencies:
   - base

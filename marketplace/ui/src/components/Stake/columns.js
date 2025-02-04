@@ -7,12 +7,12 @@ import ChildStakeItemActions from '../Inventory/ChildStakeItemActions';
 import { ASSET_STATUS } from '../../helpers/constants';
 
 const logo = <img src={Images.cata} alt={''} title={''} className="w-5 h-5" />;
-const StratsIcon = (
-  <img src={Images.strat} alt={''} title={''} className="w-4 h-4" />
+const USDSTIcon = (
+  <img src={Images.USDST} alt={''} title={''} className="w-4 h-4" />
 );
 
 // Make sure you have any necessary variables or functions defined/imported
-// You may need to pass user, limit, offset, reserves, stratsAddress, assetsWithEighteenDecimalPlaces as params,
+// You may need to pass user, limit, offset, reserves, USDSTAddress, assetsWithEighteenDecimalPlaces as params,
 // or handle them in the file where you call these columns.
 
 export const aggregateStakeColumns = (
@@ -20,7 +20,7 @@ export const aggregateStakeColumns = (
   limit,
   offset,
   reserves,
-  stratsAddress,
+  USDSTAddress,
   assetsWithEighteenDecimalPlaces
 ) => {
   return [
@@ -29,24 +29,24 @@ export const aggregateStakeColumns = (
       render: (_, record) => {
         const uniqueBorrowedAddresses = new Set();
 
-        const borrowedAmount =
-          (record?.inventories
-            ? record.inventories.reduce((sum, item) => {
-                const escrowAddress = item?.escrow?.address;
-                const borrowedValue = item?.escrow?.borrowedAmount || 0;
+        let borrowedAmount = record?.inventories
+          ? record.inventories.reduce((sum, item) => {
+              const escrowAddress = item?.escrow?.address;
+              const borrowedValue = item?.escrow?.borrowedAmount || 0;
 
-                // Add borrowed amount only if the escrow address is unique
-                if (
-                  escrowAddress &&
-                  !uniqueBorrowedAddresses.has(escrowAddress)
-                ) {
-                  uniqueBorrowedAddresses.add(escrowAddress);
-                  return sum + borrowedValue;
-                }
+              // Add borrowed amount only if the escrow address is unique
+              if (
+                escrowAddress &&
+                !uniqueBorrowedAddresses.has(escrowAddress)
+              ) {
+                uniqueBorrowedAddresses.add(escrowAddress);
+                return sum + borrowedValue;
+              }
 
-                return sum;
-              }, 0)
-            : record?.escrow?.borrowedAmount || 0) / 100;
+              return sum;
+            }, 0)
+          : record?.escrow?.borrowedAmount || 0;
+
         return (
           <>
             <div className="flex items-center">
@@ -73,11 +73,8 @@ export const aggregateStakeColumns = (
               </div>
             </div>
             <div className="flex items-center gap-2">
-              Borrowed Amount: {StratsIcon}
-              {borrowedAmount.toLocaleString('en-US', {
-                maximumFractionDigits: 2,
-                minimumFractionDigits: 2,
-              })}
+              Borrowed Amount: {USDSTIcon}
+              {(borrowedAmount / Math.pow(10, 18)).toFixed(2)}
             </div>
           </>
         );
@@ -94,9 +91,9 @@ export const aggregateStakeColumns = (
       title: 'Quantity Stakeable',
       align: 'center',
       render: (_, record) => {
-        const requiresDivision = assetsWithEighteenDecimalPlaces.includes(
+        const decimals = assetsWithEighteenDecimalPlaces.includes(
           record.root
-        );
+        ) ? 18 : record.decimals || 0;
         const uniqueEscrows = new Set();
         let collateralQuantity = record?.inventories
           ? record.inventories.reduce((sum, item) => {
@@ -114,9 +111,7 @@ export const aggregateStakeColumns = (
           : record?.escrow?.collateralQuantity > record?.quantity
           ? record?.quantity
           : record?.escrow?.collateralQuantity || 0;
-        collateralQuantity = requiresDivision
-          ? collateralQuantity / 1e18
-          : collateralQuantity;
+        collateralQuantity =  collateralQuantity / Math.pow(10, decimals);
         const quantityNotAvailable =
           record.inventories.reduce((sum, item) => {
             const status = Number(item.status);
@@ -134,9 +129,9 @@ export const aggregateStakeColumns = (
       title: 'Quantity Staked',
       align: 'center',
       render: (_, record) => {
-        const requiresDivision = assetsWithEighteenDecimalPlaces.includes(
+        const decimals = assetsWithEighteenDecimalPlaces.includes(
           record.root
-        );
+        ) ? 18 : record.decimals || 0;
         const uniqueEscrows = new Set();
         const collateralQuantity = record?.inventories
           ? record.inventories.reduce((sum, item) => {
@@ -156,7 +151,7 @@ export const aggregateStakeColumns = (
           : record?.escrow?.collateralQuantity || 0;
         return (
           <div>
-            {requiresDivision ? collateralQuantity / 1e18 : collateralQuantity}
+            {collateralQuantity / Math.pow(10, decimals)}
           </div>
         );
       },
@@ -214,7 +209,6 @@ export const aggregateStakeColumns = (
             debouncedSearchTerm={''}
             user={user}
             reserves={reserves}
-            stratAddress={stratsAddress}
             assetsWithEighteenDecimalPlaces={assetsWithEighteenDecimalPlaces}
           />
         </div>
@@ -261,7 +255,7 @@ export const stakeColumns = (
   limit,
   offset,
   reserves,
-  stratsAddress,
+  USDSTAddress,
   assetsWithEighteenDecimalPlaces,
   navigate
 ) => {
@@ -315,12 +309,10 @@ export const stakeColumns = (
       title: 'Owned',
       align: 'center',
       render: (_, record) => {
-        const requiresDivision = assetsWithEighteenDecimalPlaces.includes(
+        const decimals = assetsWithEighteenDecimalPlaces.includes(
           record.root
-        );
-        const displayedQuantity = requiresDivision
-          ? record.quantity / 1e18
-          : record.quantity;
+        ) ? 18 : record.decimals || 0;
+        const displayedQuantity = record.quantity / Math.pow(10, decimals)
         return <div>{displayedQuantity || 0}</div>;
       },
     },
@@ -339,18 +331,15 @@ export const stakeColumns = (
             return true;
           }
         };
-        const requiresDivision = assetsWithEighteenDecimalPlaces.includes(
+        const decimals = assetsWithEighteenDecimalPlaces.includes(
           record.root
-        );
+        ) ? 18 : record.decimals || 0;
         // Parse quantity safely
         const parsedQuantity = parseFloat(record.quantity) || 0;
-        const displayedQuantity = requiresDivision
-          ? parsedQuantity / 1e18
-          : parsedQuantity;
+        const displayedQuantity = parsedQuantity / Math.pow(10, decimals);
 
         // Extract escrow assets array safely
-        const escrowAssets =
-          record?.['BlockApps-Mercata-Escrow-assets'] || [];
+        const escrowAssets = record?.['BlockApps-Mercata-Escrow-assets'] || [];
 
         // Determine if there is a matching escrow asset
         const hasMatchingEscrow = escrowAssets.some(
@@ -359,9 +348,7 @@ export const stakeColumns = (
 
         // Calculate matching quantity
         const rawMatchingQuantity = hasMatchingEscrow ? parsedQuantity : 0;
-        const matchingQuantity = requiresDivision
-          ? rawMatchingQuantity / 1e18
-          : rawMatchingQuantity;
+        const matchingQuantity = rawMatchingQuantity / Math.pow(10, decimals);
 
         // Compute the stakeable quantity
         const stakeableQuantity = isActive
@@ -383,12 +370,12 @@ export const stakeColumns = (
         ]?.find((item) => item.value === record.address)
           ? record.quantity
           : 0;
-        const requiresDivision = assetsWithEighteenDecimalPlaces.includes(
+        const decimals = assetsWithEighteenDecimalPlaces.includes(
           record.root
-        );
+        ) ? 18 : record.decimals || 0;
         return (
           <div>
-            {requiresDivision ? matchingQuantity / 1e18 : matchingQuantity}
+            { matchingQuantity / Math.pow(10, decimals) }
           </div>
         );
       },
@@ -445,7 +432,6 @@ export const stakeColumns = (
           debouncedSearchTerm={''}
           user={user}
           reserves={reserves}
-          stratAddress={stratsAddress}
           assetsWithEighteenDecimalPlaces={assetsWithEighteenDecimalPlaces}
         />
       ),

@@ -45,22 +45,19 @@ class OrderController {
 
   static async payment(req, res, next) {
     try {
-      const { dapp, body, accessToken } = req;
-      const originUrl = req.headers.origin || config.serverHost;
+      const { dapp, body } = req;
       const { htmlContents, ...restArgs } = body;
       OrderController.validatePaymentArgs(restArgs);
 
       const result = await dapp.paymentCheckout(
-        originUrl,
         restArgs,
-        options,
-        accessToken
+        options
       );
       const [checkoutHash, assets] = result;
       rest.response.status200(res, result);
       // check orderEvent.status is 3 and sendEmail
-      // Only send email if order is created successfully(STRATS Orders)
-      const orderEvent = await dapp.getStratsOrderEvent(
+      // Only send email if order is created successfully(USDST Orders)
+      const orderEvent = await dapp.getUSDSTOrderEvent(
         {
           orderHash: checkoutHash,
           paymentService: restArgs.paymentService.address,
@@ -71,7 +68,7 @@ class OrderController {
         orderEvent &&
         orderEvent.length === 1 &&
         orderEvent[0].status === '3' &&
-        orderEvent[0].currency === 'STRATS'
+        orderEvent[0].currency === 'USDST'
       ) {
         await sendEmail(body.user, 'Your Order Confirmation', htmlContents[0]);
         console.log('*Buyer placed order*', orderEvent);
@@ -231,10 +228,11 @@ class OrderController {
         .min(1)
         .items(
           Joi.object({
-            quantity: Joi.number().required(),
+            quantity: Joi.string().pattern(/^\d+$/).required(),
+            decimals: Joi.number().integer().min(0).max(18).required(),
             assetAddress: Joi.string().required(),
             firstSale: Joi.boolean().required(),
-            unitPrice: Joi.number().required(),
+            unitPrice: Joi.number().greater(0).precision(30).required(),
           })
         )
         .required(),

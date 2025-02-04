@@ -13,9 +13,10 @@ contract CarbonDAO is SemiFungible {
         string[] _fileNames,
         uint _createdDate,
         uint _quantity,
+        uint _decimals,
         AssetStatus _status,
         address _redemptionService
-    ) public SemiFungible(_name, _description, _images, _files, _fileNames, _createdDate, _quantity, _status, _redemptionService) {
+    ) public SemiFungible(_name, _description, _images, _files, _fileNames, _createdDate, _quantity,_decimals, _status, _redemptionService) {
     }
 
     function mint(uint _quantity) internal override returns (UTXO) {
@@ -28,6 +29,7 @@ contract CarbonDAO is SemiFungible {
             fileNames,
             createdDate,
             _quantity,
+            decimals,
             status,
             address(redemptionService)
         );

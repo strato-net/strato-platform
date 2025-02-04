@@ -38,7 +38,6 @@ import { useEthState } from '../../contexts/eth';
 import { useMarketplaceDispatch } from '../../contexts/marketplace';
 // Utils & Constants
 import {
-  STRATS_CONVERSION,
   TRANSACTION_STATUS,
   TRANSACTION_STATUS_CLASSES,
   TRANSACTION_STATUS_COLOR,
@@ -51,9 +50,14 @@ import {
 import { SEO } from '../../helpers/seoConstant';
 import { getStringDate } from '../../helpers/utils';
 
-const TransactionTable = ({ user, download, stratAddress, assetsWithEighteenDecimalPlaces }) => {
-  const StratsIcon = (
-    <img src={Images.strat} alt="STRATs" className="mx-1 w-4 h-4" />
+const TransactionTable = ({
+  user,
+  download,
+  stratAddress,
+  assetsWithEighteenDecimalPlaces,
+}) => {
+  const USDSTIcon = (
+    <img src={Images.USDST} alt="USDST" className="mx-1 w-4 h-4" />
   );
   // Dispatch
   const transactionDispatch = useTransactionDispatch();
@@ -87,14 +91,14 @@ const TransactionTable = ({ user, download, stratAddress, assetsWithEighteenDeci
     : '';
 
   useEffect(() => {
-    async function fetchStratsAddress() {
-      const stratsAddress = await marketplaceActions.fetchStratsAddress(
+    async function fetchUSDSTAddress() {
+      const USDSTAddress = await marketplaceActions.fetchUSDSTAddress(
         marketplaceDispatch
       );
-      await marketplaceActions.fetchStratsBalance(marketplaceDispatch);
-      setOriginAddress(stratsAddress);
+      await marketplaceActions.fetchUSDSTBalance(marketplaceDispatch);
+      setOriginAddress(USDSTAddress);
     }
-    fetchStratsAddress();
+    fetchUSDSTAddress();
   }, [marketplaceDispatch]);
 
   useEffect(() => {
@@ -129,7 +133,7 @@ const TransactionTable = ({ user, download, stratAddress, assetsWithEighteenDeci
     let filteredData = userTransactions;
     // Type filter
     if (type) {
-      if (type === 'STRATS') {
+      if (type === 'USDST') {
         filteredData = filteredData.filter(
           (item) => item.assetOriginAddress === originAddress
         );
@@ -189,7 +193,9 @@ const TransactionTable = ({ user, download, stratAddress, assetsWithEighteenDeci
   const Content = ({ data }) => {
     const price = data?.assetPrice || data?.price;
     const isStrat = data?.assetOriginAddress === stratAddress;
-    const is18DecimalPlaces = assetsWithEighteenDecimalPlaces.includes(data?.assetOriginAddress);
+    const decimals = assetsWithEighteenDecimalPlaces.includes(
+      data?.assetOriginAddress
+    ) ? 18 : data?.decimals || 0;
 
     return (
       <div className="min-h-44 h-full" style={{ width: '460px' }}>
@@ -232,20 +238,16 @@ const TransactionTable = ({ user, download, stratAddress, assetsWithEighteenDeci
                     ${' '}
                     {isStrat
                       ? (price * 100).toFixed(2)
-                      : is18DecimalPlaces
-                      ? (price * Math.pow(10, 18)).toFixed(2)
-                      : price}{' '}
+                      : (price * Math.pow(10, decimals)).toFixed(2)}{' '}
                   </b>{' '}
                   &nbsp;(
                   <span className="text-[#13188A] font-bold">
                     {' '}
-                    {(isStrat
+                    {isStrat
                       ? (price * 100).toFixed(2)
-                      : is18DecimalPlaces
-                      ? (price * Math.pow(10, 18)).toFixed(2)
-                      : price) * STRATS_CONVERSION}{' '}
+                      : (price * Math.pow(10, decimals)).toFixed(2)}{' '}
                   </span>
-                  {StratsIcon}){' '}
+                  {USDSTIcon}){' '}
                 </p>
               ) : (
                 <p className="text-right text-[#13188A] font-bold text-sm">
@@ -372,14 +374,14 @@ const TransactionTable = ({ user, download, stratAddress, assetsWithEighteenDeci
       key: 'quantity',
       align: 'right',
       width: '100px',
-      render: (data, { quantity, assetOriginAddress }) => (
+      render: (_, { quantity, assetOriginAddress, decimals }) => (
         <span>
           {quantity
             ? (assetOriginAddress === stratAddress
                 ? quantity / 100
                 : assetsWithEighteenDecimalPlaces.includes(assetOriginAddress)
                 ? quantity / Math.pow(10, 18)
-                : quantity
+                : quantity / Math.pow(10, decimals)
               ).toLocaleString('en-US', {
                 maximumFractionDigits: 4,
                 minimumFractionDigits: 0,
@@ -394,7 +396,7 @@ const TransactionTable = ({ user, download, stratAddress, assetsWithEighteenDeci
       key: 'price',
       align: 'right',
       width: '100px',
-      render: (data, { price, assetOriginAddress }) => (
+      render: (_, { price, assetOriginAddress, decimals }) => (
         <p>
           {price
             ? formattedNum(
@@ -402,7 +404,7 @@ const TransactionTable = ({ user, download, stratAddress, assetsWithEighteenDeci
                   ? (price * 100).toFixed(2)
                   : assetsWithEighteenDecimalPlaces.includes(assetOriginAddress)
                   ? (price * Math.pow(10, 18)).toFixed(2)
-                  : price
+                  : (price * Math.pow(10, decimals)).toFixed(2)
               )
             : '--'}
         </p>
@@ -653,7 +655,9 @@ const TransactionTable = ({ user, download, stratAddress, assetsWithEighteenDeci
                   data={paginatedTransactions}
                   user={user}
                   stratAddress={stratAddress}
-                  assetsWithEighteenDecimalPlaces={assetsWithEighteenDecimalPlaces}
+                  assetsWithEighteenDecimalPlaces={
+                    assetsWithEighteenDecimalPlaces
+                  }
                 />
                 <Pagination
                   className="mx-auto mt-5"

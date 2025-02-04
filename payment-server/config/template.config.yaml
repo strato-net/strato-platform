@@ -30,13 +30,13 @@ metamask:
   primarySaleFeePercentage: <metamask_primary_sale_fee_percentage_value>
   secondarySaleFeePercentage: <metamask_secondary_sale_fee_percentage_value>
 
-strat:
-  stratAddress: <strat_strat_address_value>
-  stratsPerDollar: <strat_strats_per_dollar_value>
-  imageURL: <strat_image_url_value>
-  primarySaleFeePercentage: <strat_primary_sale_fee_percentage_value>
-  secondarySaleFeePercentage: <strat_secondary_sale_fee_percentage_value>
-  feeRecipient: <strat_fee_recipient_value>
+USDST:
+  tokenAddress: <USDST_USDST_address_value>
+  serviceName: <USDST_service_name_value>
+  imageURL: <USDST_image_url_value>
+  primarySaleFeePercentage: <USDST_primary_sale_fee_percentage_value>
+  secondarySaleFeePercentage: <USDST_secondary_sale_fee_percentage_value>
+  feeRecipient: <USDST_fee_recipient_value>
 
 redemption:
   closeRedemptionRoute: <redemptions_close_redemption_route_value>

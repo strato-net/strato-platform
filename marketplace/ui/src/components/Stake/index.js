@@ -33,8 +33,8 @@ import { TrophyOutlined, GiftOutlined } from '@ant-design/icons';
 import { stakeColumns, aggregateStakeColumns } from './columns';
 
 const logo = <img src={Images.cata} alt={''} title={''} className="w-5 h-5" />;
-const StratsIcon = (
-  <img src={Images.strat} alt={''} title={''} className="w-4 h-4" />
+const USDSTIcon = (
+  <img src={Images.USDST} alt={''} title={''} className="w-4 h-4" />
 );
 
 function combineInventories(items, assetsWithEighteenDecimalPlaces) {
@@ -58,16 +58,18 @@ function combineInventories(items, assetsWithEighteenDecimalPlaces) {
       'BlockApps-Mercata-Asset-images': assetImages,
     } = firstItem;
 
-    const requiresDivision = assetsWithEighteenDecimalPlaces.includes(root);
+    const decimals = assetsWithEighteenDecimalPlaces.includes(root)
+      ? 18
+      : items[0].decimals || 0;
 
     // Step 3: Sum `quantity` and `saleQuantity` across the group
     const totalQuantity = group.reduce((sum, item) => {
       const quantity = item.quantity || 0;
-      return sum + (requiresDivision ? quantity / 1e18 : quantity);
+      return sum + quantity / Math.pow(10, decimals);
     }, 0);
     const totalSaleQuantity = group.reduce((sum, item) => {
       const saleQuantity = item.saleQuantity ? item.quantity || 0 : 0;
-      return sum + (requiresDivision ? saleQuantity / 1e18 : saleQuantity);
+      return sum + saleQuantity / Math.pow(10, decimals);
     }, 0);
 
     // Step 4: Aggregate varying fields into `inventories`
@@ -111,7 +113,8 @@ const Stake = ({ user }) => {
     success,
   } = useInventoryState();
   const { categorys } = useCategoryState();
-  const { stratsAddress, assetsWithEighteenDecimalPlaces } = useMarketplaceState();
+  const { USDSTAddress, assetsWithEighteenDecimalPlaces } =
+    useMarketplaceState();
   const linkUrl = window.location.href;
   const [api, contextHolder] = notification.useNotification();
   const [limit, setLimit] = useState(10);
@@ -119,7 +122,10 @@ const Stake = ({ user }) => {
   const [page, setPage] = useState(1);
   const navigate = useNavigate();
 
-  const combinedInventories = combineInventories(inventories, assetsWithEighteenDecimalPlaces);
+  const combinedInventories = combineInventories(
+    inventories,
+    assetsWithEighteenDecimalPlaces
+  );
   const onPageChange = (page, pageSize) => {
     setLimit(pageSize);
     setOffset((page - 1) * pageSize);
@@ -183,16 +189,14 @@ const Stake = ({ user }) => {
     const filteredInventories = inventories.filter(
       (inv) => inv.root === parentRecord.root
     );
-  
+
     // Extract unique escrows from filtered inventories
     const uniqueEscrows = [
       ...new Set(
-        filteredInventories
-          .map((inv) => inv.escrow?.address)
-          .filter(Boolean) // Remove null/undefined addresses
+        filteredInventories.map((inv) => inv.escrow?.address).filter(Boolean) // Remove null/undefined addresses
       ),
     ];
-  
+
     // Populate missing escrows
     const populatedInventories = filteredInventories.map((inv) => {
       if (!inv.escrow || !inv.escrow.address) {
@@ -211,7 +215,7 @@ const Stake = ({ user }) => {
           limit,
           offset,
           reserves,
-          stratsAddress,
+          USDSTAddress,
           assetsWithEighteenDecimalPlaces,
           navigate
         )}
@@ -286,7 +290,7 @@ const Stake = ({ user }) => {
                     limit,
                     offset,
                     reserves,
-                    stratsAddress,
+                    USDSTAddress,
                     assetsWithEighteenDecimalPlaces
                   )}
                   dataSource={combinedInventories.slice(offset, offset + limit)}
@@ -322,8 +326,9 @@ const Stake = ({ user }) => {
                     allSubcategories={allSubcategories}
                     user={user}
                     reserves={reserves}
-                    stratAddress={stratsAddress}
-                    assetsWithEighteenDecimalPlaces={assetsWithEighteenDecimalPlaces}
+                    assetsWithEighteenDecimalPlaces={
+                      assetsWithEighteenDecimalPlaces
+                    }
                   />
                 ))}
               </div>

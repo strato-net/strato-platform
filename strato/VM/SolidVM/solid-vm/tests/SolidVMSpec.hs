@@ -8361,7 +8361,7 @@ contract qq {
 |]
       getFields ["b"] `shouldReturn` [BInteger 1]
   
-  it "can't index access a contract array from the builtin getter" $ runTest ( do
+  it "can index access a contract array from the builtin getter" . runTest $ do
       runBS [r|
 contract SomeContract {
   uint[] public x;
@@ -8377,7 +8377,8 @@ contract qq {
       b = p.x()[0];
   }
 }
-|]) `shouldThrow` anyTypeError
+|]
+      getFields ["b"] `shouldReturn` [BInteger 8]
 
   it "can test array index access by passing in as a parameter" . runTest $ do
       runBS [r|
@@ -8436,7 +8437,7 @@ contract qq {
 }
 |]) `shouldThrow` anyTypeError
 
-  it "can't access a contract array without any parameters and also using braces" $ runTest ( do
+  it "can't access a contract array without any parameters and also using braces" . runTest $ do
       runBS [r|
 contract SomeContract {
   uint[] public x;
@@ -8453,7 +8454,8 @@ contract qq {
   }
 
 }
-|]) `shouldThrow` anyTypeError
+|]
+      getFields ["b"] `shouldReturn` [BInteger 8]
 
   it "can delete arrays and indexes values" $ runTest ( do
       runBS [r|

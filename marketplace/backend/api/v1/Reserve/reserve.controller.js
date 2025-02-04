@@ -77,7 +77,7 @@ class ReserveController {
     }
   }
 
-  // Borrow STRATs from reserve
+  // Borrow USDST from reserve
   static async borrow(req, res, next) {
     try {
       const { dapp, body } = req;
@@ -91,7 +91,7 @@ class ReserveController {
     }
   }
 
-  // Pay STRATs Loan to reserve
+  // Pay USDST Loan to reserve
   static async repay(req, res, next) {
     try {
       const { dapp, body } = req;
@@ -187,13 +187,7 @@ class ReserveController {
         'array.base': 'Escrow Addresses must be an array.',
         'string.base': 'Each Escrow Address must be a valid string.',
       }),
-      borrowAmount: Joi.number().positive().precision(2).required().messages({
-      'any.required':
-        'Borrow Amount is required and must be a positive number.',
-      'number.base': 'Borrow Amount must be a valid number.',
-      'number.positive': 'Borrow Amount must be positive.',
-      'number.precision': 'Borrow Amount can have up to two decimal places.',
-      }),
+      borrowAmount: Joi.string().pattern(/^\d+$/).required(),
       reserve: Joi.string().required().messages({
         'any.required': 'Reserve is required and must be a string.',
         'string.base': 'Reserve must be a valid string.',

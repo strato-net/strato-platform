@@ -11,8 +11,9 @@ import { actions as marketplaceActions } from '../../contexts/marketplace/action
 import { useMarketplaceDispatch } from '../../contexts/marketplace';
 import { Images } from '../../images';
 import { useLocation } from 'react-router-dom';
+import BigNumber from 'bignumber.js';
 
-const logo = <img src={Images.strat} alt={''} title={''} className="w-5 h-5" />;
+const logo = <img src={Images.USDST} alt={''} title={''} className="w-5 h-5" />;
 
 /**
  * Helper to compute total collateral quantity from inventory.
@@ -217,7 +218,7 @@ const BorrowModal = ({
   // collateralValue is displayed as `collateralValue / 10000`
   // borrowedAmount and loanableAmount as `... / 100`
   // We'll keep the same formatting after scaling by 1e18.
-  const LTV = matchedReserve.name.toLowerCase().includes('ethst') ? 0.3 : 0.5;
+  const LTV = matchedReserve?.name.toLowerCase().includes('ethst') ? 0.3 : 0.5;
   const maxBorrowableAmount = Math.floor(collateralValue * LTV);
   const loanableAmount =
     maxBorrowableAmount >= borrowedAmount
@@ -228,18 +229,12 @@ const BorrowModal = ({
   // `Market Value` = collateralValue / 10000
   // `borrowedAmount` and `loanableAmount` are displayed /100
 
-  const marketValueDisplay = (collateralValue / 10000).toFixed(2);
-  const borrowedAmountDisplay = (borrowedAmount / 100).toFixed(2);
-  const loanableAmountDisplay = (loanableAmount / 100).toFixed(2);
+  const marketValueDisplay = (collateralValue / Math.pow(10,18)).toFixed(2)
+  const borrowedAmountDisplay = (borrowedAmount / Math.pow(10, 18)).toFixed(2);
+  const loanableAmountDisplay = (loanableAmount / Math.pow(10,18)).toFixed(2);
 
-  // Desired loan amount in STRATs
-  const [desiredLoanAmount, setDesiredLoanAmount] = useState(
-    (loanableAmount || 0) / 100
-  );
-
-  const handleLoanAmountChange = (value) => {
-    setDesiredLoanAmount(value || 0);
-  };
+  // Desired loan amount in USDST
+  const [desiredLoanAmount, setDesiredLoanAmount] = useState(((loanableAmount/Math.pow(10,18)).toFixed(2) || 0));
 
   useEffect(() => {
     if (
@@ -275,9 +270,9 @@ const BorrowModal = ({
       value: `${LTV*100}%`,
     },
     {
-      label: 'Outstanding Loan (in STRATs)',
+      label: 'Outstanding Loan (in USDST)',
       description:
-        'The total amount of STRAT tokens you have borrowed against your staked RWAs.',
+        'The total amount of USDST tokens you have borrowed against your staked RWAs.',
       value: (
         <div className="flex">
           <div className="mx-1">{logo}</div>
@@ -286,9 +281,9 @@ const BorrowModal = ({
       ),
     },
     {
-      label: 'Estimated Available Loan (in STRATs)',
+      label: 'Estimated Available Loan (in USDST)',
       description:
-        'The projected amount of STRAT tokens you can borrow against your staked RWAs.',
+        'The projected amount of USDST tokens you can borrow against your staked RWAs.',
       value: (
         <div className="flex">
           <div className="mx-1">{logo}</div>
@@ -298,16 +293,17 @@ const BorrowModal = ({
     },
     {
       label: 'Desired Loan Amount',
-      description: 'Enter the amount of STRATs you want to borrow.',
+      description: 'Enter the amount of USDST you want to borrow.',
       value: (
         <>
           <InputNumber
             prefix={logo}
             min={0}
-            step={0.01}
+            step={1}
             value={desiredLoanAmount}
-            onChange={handleLoanAmountChange}
+            onChange={(value) => setDesiredLoanAmount(value || 0)}
             className="w-full"
+            precision={2}
             controls={false}
           />
           {desiredLoanAmount > parseFloat(loanableAmountDisplay) && (
@@ -326,14 +322,17 @@ const BorrowModal = ({
   const dataForSummary = [];
 
   const handleSubmit = async () => {
+    const loanAmount = new BigNumber(desiredLoanAmount);
+
     const body = {
       escrowAddresses: escrows,
-      borrowAmount: (desiredLoanAmount * 100).toFixed(0), // Converting back to raw format as before
+      borrowAmount: loanAmount.multipliedBy(new BigNumber(10).pow(18)).toFixed(0),
       reserve: matchedReserve?.address,
     };
 
     const borrowed = await inventoryActions.borrow(inventoryDispatch, body);
     if (borrowed) {
+      handleCancel();
       if (productDetailPage) {
         await inventoryActions.fetchInventoryDetail(
           inventoryDispatch,
@@ -354,8 +353,7 @@ const BorrowModal = ({
       }
       await inventoryActions.getAllReserve(inventoryDispatch);
       await inventoryActions.getUserCataRewards(inventoryDispatch);
-      await marketplaceActions.fetchStratsBalance(marketplaceDispatch);
-      handleCancel();
+      await marketplaceActions.fetchUSDSTBalance(marketplaceDispatch);
     }
   };
 

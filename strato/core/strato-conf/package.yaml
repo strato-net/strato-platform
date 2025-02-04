@@ -3,7 +3,7 @@ version:             0.1.0.0
 author:              Jamshid
 category:            Web
 build-type:          Simple
-
+license:             Apache-2.0
 
 
 

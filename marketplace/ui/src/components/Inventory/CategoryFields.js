@@ -31,65 +31,14 @@ export const categoricalProperties = (
       );
     case 'Tokens':
       return (
-        <div className="flex justify-between mt-4 ">
-          <Form.Item
-            label="Quantity"
-            name="quantity"
-            className="w-full md:w-72"
-            rules={[
-              {
-                required: true,
-                message: 'Please enter a quantity',
-              },
-              {
-                type: 'number',
-                min: 1,
-                message: 'Quantity must be greater than or equal to 1',
-              },
-              {
-                validator: (_, value) =>
-                  value && Number.isInteger(value)
-                    ? Promise.resolve()
-                    : Promise.reject(new Error('Quantity must be an integer')),
-              },
-            ]}
-          >
-            <InputNumber
-              style={{
-                width: '100%',
-                height: '42px',
-                display: 'flex',
-                alignItems: 'center',
-              }}
-              min={1}
-              placeholder="Enter Quantity"
-            />
-          </Form.Item>
-        </div>
-      );
-    case 'STRATSTokens':
-      return (
         <div className="flex justify-between gap-3 flex-wrap md:flex-nowrap mt-4">
-          <Form.Item
-            label="Payment Service Name"
-            name="paymentServiceName"
-            className="w-full md:w-[200px] "
-            rules={[
-              {
-                required: true,
-                message: 'Please enter a payment service name',
-              },
-            ]}
-          >
-            <Input placeholder="Payment service name" />
-          </Form.Item>
           <Form.Item
             label="Payment Service Creator"
             name="paymentServiceCreator"
             className=" w-full sm:w-[200px] md:w-30"
             rules={[
               {
-                required: true,
+                required: false,
                 message: 'Please enter the payment service creator',
               },
             ]}

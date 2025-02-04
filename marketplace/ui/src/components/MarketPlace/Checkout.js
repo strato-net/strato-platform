@@ -40,15 +40,14 @@ const Checkout = () => {
     usePaymentServiceState();
   const paymentServiceDispatch = usePaymentServiceDispatch();
   const [api, contextHolder] = notification.useNotification();
-  const { cartList, stratsAddress, assetsWithEighteenDecimalPlaces } = useMarketplaceState();
+  const { cartList, USDSTAddress, assetsWithEighteenDecimalPlaces } = useMarketplaceState();
   const { isCreateOrderSubmitting, message, success } = useOrderState();
 
   const [mapData, setmapData] = useState([]);
 
   const calculateTax = (item) => {
-    const isStrat = item.product.originAddress === stratsAddress;
-    const is18DecimalPlaces = assetsWithEighteenDecimalPlaces.includes(item.product.originAddress);
-    let price = new Decimal( isStrat ? item.product.price * 100 : is18DecimalPlaces ? item.product.price * Math.pow(10, 18) : item.product.price);
+    const decimals = assetsWithEighteenDecimalPlaces.includes(item.product.originAddress) ? 18 : item.product.decimals || 0;
+    let price = new Decimal(item.product.price * Math.pow(10, decimals));
     let tax = new Decimal(CHARGES.TAX);
     let result = price.mul(tax).div(100);
 
@@ -56,30 +55,13 @@ const Checkout = () => {
   };
 
   const calculateAmount = (item) => {
-    const isStrat = item.product.originAddress === stratsAddress;
-    const is18DecimalPlaces = assetsWithEighteenDecimalPlaces.includes(item.product.originAddress);
-    let price = new Decimal(isStrat ? item.product.price * 100 : is18DecimalPlaces ? item.product.price * Math.pow(10, 18) : item.product.price);
+    const decimals = assetsWithEighteenDecimalPlaces.includes(item.product.originAddress) ? 18 : item.product.decimals || 0;
+    let price = new Decimal(item.product.price * Math.pow(10, decimals));
     let tax = calculateTax(item);
     let result = price.mul(item.qty).plus(tax);
 
     return parseFloat(result);
   };
-
-  // const storedData = useMemo(() => {
-  //   const cartListData = window.localStorage.getItem("cartList");
-  //   let cartList = [];
-  //   try {
-  //     if (cartListData) {
-  //       // Attempt to parse the stored data as JSON
-  //       cartList = JSON.parse(cartListData);
-  //     }
-  //   } catch (error) {
-  //     // Handle JSON parsing error
-  //     console.error("Error parsing cartList data:", error);
-  //   }
-
-  //   return cartList;
-  // }, []);
 
   useEffect(() => {
     actions.fetchCartItems(marketplaceDispatch, cartList);
@@ -109,8 +91,7 @@ const Checkout = () => {
       const { paymentServices, items } = value;
       let modifiedValue = [];
       items.forEach((item) => {
-        const isStrat = item.product.originAddress === stratsAddress;
-        const is18DecimalPlaces = assetsWithEighteenDecimalPlaces.includes(item.product.originAddress);
+        const decimals = assetsWithEighteenDecimalPlaces.includes(item.product.originAddress) ? 18 : item.product.decimals || 0;
         const parts = item.product.contract_name.split('-');
         let amount = calculateAmount(item);
 
@@ -130,14 +111,14 @@ const Checkout = () => {
             item.product.address === item.product.originAddress ? true : false,
           sellersCommonName: item.product.ownerCommonName,
           unitOfMeasure: item.product.unitOfMeasurement,
-          unitPrice: isStrat ? item.product.price * 100 : is18DecimalPlaces ? item.product.price * Math.pow(10, 18) : item.product.price,
-          quantity: isStrat ? item.product.saleQuantity / 100 : is18DecimalPlaces ? item.product.saleQuantity / Math.pow(10, 18) : item.product.saleQuantity,
+          unitPrice: item.product.price * Math.pow(10, decimals),
+          quantity: item.product.saleQuantity / Math.pow(10, decimals),
+          decimals: decimals,
           saleAddress: item.product.saleAddress,
           tax: calculateTax(item),
           amount: amount,
           action: item.product.address,
           qty: item.qty,
-          quantityIsDecimal: item.product.data.quantityIsDecimal,
         });
       });
 

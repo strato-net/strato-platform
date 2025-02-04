@@ -39,25 +39,23 @@ const ItemActions = ({
   user,
   supportedTokens,
   reserves,
-  stratAddress,
   assetsWithEighteenDecimalPlaces,
 }) => {
   const itemData = inventory.data;
-  const isStrat = inventory.originAddress === stratAddress;
-  const is18DecimalPlaces = assetsWithEighteenDecimalPlaces.includes(inventory.originAddress);
-  const quantity = isStrat
-    ? new BigNumber(inventory.quantity).dividedBy(100)
-    : is18DecimalPlaces
-    ? new BigNumber(inventory.quantity).dividedBy(new BigNumber(10).pow(18))
-    : new BigNumber(inventory.quantity);
+  const decimals = assetsWithEighteenDecimalPlaces.includes(
+    inventory.originAddress
+  )
+    ? 18
+    : inventory.decimals || 0;
+  const quantity = new BigNumber(inventory.quantity).dividedBy(
+    new BigNumber(10).pow(decimals)
+  );
   const saleQuantity =
     inventory.saleQuantity !== undefined
-      ? isStrat
-        ? new BigNumber(inventory.saleQuantity).dividedBy(100)
-        : is18DecimalPlaces
-        ? new BigNumber(inventory.saleQuantity).dividedBy(new BigNumber(10).pow(18))
-        : new BigNumber(inventory.saleQuantity)
-      : undefined;  
+      ? new BigNumber(inventory.saleQuantity).dividedBy(
+          new BigNumber(10).pow(decimals)
+        )
+      : undefined;
   const stakeable =
     inventory.root &&
     reserves &&
@@ -254,8 +252,7 @@ const ItemActions = ({
             inventory.address === inventory.originAddress ||
             !isActive() ||
             disableSADDOGS(inventory) ||
-            isStrat ||
-            is18DecimalPlaces
+            decimals === 18
           }
         >
           <SendOutlined /> Redeem
@@ -279,9 +276,7 @@ const ItemActions = ({
             type="link"
             className="text-[#13188A] font-semibold"
             onClick={() => showStakeModal('Unstake')}
-            disabled={
-              inventory?.escrow?.borrowedAmount > 0
-            }
+            disabled={inventory?.escrow?.borrowedAmount > 0}
           >
             <LogoutOutlined /> Unstake
           </Button>
@@ -289,9 +284,7 @@ const ItemActions = ({
             type="link"
             className="text-[#13188A] font-semibold"
             onClick={() => showBorrowModal('Unstake')}
-            disabled={
-              inventory?.escrow?.borrowedAmount > 0
-            }
+            disabled={inventory?.escrow?.borrowedAmount > 0}
           >
             <BankOutlined /> Borrow
           </Button>
@@ -299,9 +292,7 @@ const ItemActions = ({
             type="link"
             className="text-[#13188A] font-semibold"
             onClick={() => showRepayModal('Unstake')}
-            disabled={
-              inventory?.escrow?.borrowedAmount <= 0
-            }
+            disabled={inventory?.escrow?.borrowedAmount <= 0}
           >
             <SolutionOutlined />
             Repay
@@ -325,8 +316,7 @@ const ItemActions = ({
                     inventory.address === inventory.originAddress ||
                     !isActive() ||
                     disableSADDOGS(inventory) ||
-                    isStrat ||
-                    is18DecimalPlaces
+                    decimals === 18
                   }
                 >
                   <SendOutlined /> Redeem
@@ -384,7 +374,6 @@ const ItemActions = ({
           category={category}
           user={user}
           reserves={reserves}
-          stratAddress={stratAddress}
           assetsWithEighteenDecimalPlaces={assetsWithEighteenDecimalPlaces}
         />
       )}
@@ -452,7 +441,6 @@ const ItemActions = ({
           debouncedSearchTerm={debouncedSearchTerm}
           category={category}
           reserves={reserves}
-          stratAddress={stratAddress}
           assetsWithEighteenDecimalPlaces={assetsWithEighteenDecimalPlaces}
         />
       )}
@@ -466,7 +454,6 @@ const ItemActions = ({
           debouncedSearchTerm={debouncedSearchTerm}
           category={category}
           reserves={reserves}
-          stratAddress={stratAddress}
           assetsWithEighteenDecimalPlaces={assetsWithEighteenDecimalPlaces}
         />
       )}

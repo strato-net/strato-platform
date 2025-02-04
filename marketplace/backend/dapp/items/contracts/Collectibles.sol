@@ -22,10 +22,11 @@ contract Collectibles is Mintable {
         string[] _fileNames,
         uint _createdDate,
         uint _quantity,
+        uint _decimals,
         string _condition,
         AssetStatus _status,
         address _redemptionService
-    ) public Mintable(_name, _description, _images, _files, _fileNames, _createdDate, _quantity, _status, _redemptionService) {
+    ) public Mintable(_name, _description, _images, _files, _fileNames, _createdDate, _quantity, _decimals, _status, _redemptionService) {
         condition = _condition;
     }
 
@@ -39,6 +40,7 @@ contract Collectibles is Mintable {
             fileNames,
             createdDate,
             _quantity,
+            decimals,
             condition,
             status,
             address(redemptionService)

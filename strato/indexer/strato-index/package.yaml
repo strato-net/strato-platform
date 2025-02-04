@@ -3,6 +3,7 @@ author:      Jamshid
 copyright:   2016 Blockapps
 description: Please see README.md
 version:     0.1.0.0
+license:     Apache-2.0
 
 ghc-options: -threaded -rtsopts -with-rtsopts=-N
 

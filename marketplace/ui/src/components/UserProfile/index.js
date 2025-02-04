@@ -53,7 +53,7 @@ import {
 } from '../../helpers/constants';
 
 const UserProfile = ({ user }) => {
-  const [commonName, setCommonName] = useState(undefined);
+  
   const [activeTab, setActiveTab] = useState('1');
   const dispatch = useInventoryDispatch();
   const categoryDispatch = useCategoryDispatch();
@@ -73,19 +73,14 @@ const UserProfile = ({ user }) => {
     supportedTokens,
     isFetchingTokens,
   } = useInventoryState();
-  const [stratAddress, setStratAddress] = useState('');
   const [assetsWithEighteenDecimalPlaces, setAssetsWithEighteenDecimalPlaces] = useState('');
 
   useEffect(() => {
     const fetchAddresses = async () => {
-      const stratAddress = await marketplaceActions.fetchStratsAddress(
-        marketplaceDispatch
-      );
       const assetsWithEighteenDecimalPlaces = await marketplaceActions.fetchAssetsWithEighteenDecimalPlaces(
         marketplaceDispatch
       );
       await ethActions.fetchETHSTAddress(ethDispatch);
-      setStratAddress(stratAddress);
       setAssetsWithEighteenDecimalPlaces(assetsWithEighteenDecimalPlaces);
     };
 
@@ -109,6 +104,7 @@ const UserProfile = ({ user }) => {
     path: routes.MarketplaceUserProfile.url,
     strict: true,
   });
+  const [commonName, setCommonName] = useState(routeMatch?.params?.commonName);
   const [breadcrumbs, setBreadcrumbs] = useState([
     { text: 'Home', path: homeUrl },
   ]);
@@ -197,8 +193,10 @@ const UserProfile = ({ user }) => {
   }, [routeMatch]);
 
   // Inventories For Sale fetch
-  useEffect(() => {
-    inventoryActions.fetchInventoryForUser(dispatch, 10000, 0, '', undefined);
+  useEffect(() => {    
+    if(user?.commonName === commonName){
+      inventoryActions.fetchInventoryForUser(dispatch, 10000, 0, '', undefined, '', commonName);
+    }
   }, [dispatch, hasChecked, isAuthenticated, loginUrl, commonName]);
 
   // Tab selection
@@ -406,7 +404,6 @@ const UserProfile = ({ user }) => {
                               allSubcategories={allSubcategories}
                               supportedTokens={supportedTokens}
                               user={user}
-                              stratAddress={stratAddress}
                               assetsWithEighteenDecimalPlaces={assetsWithEighteenDecimalPlaces}
                             />
                           );
@@ -436,7 +433,6 @@ const UserProfile = ({ user }) => {
                               allSubcategories={allSubcategories}
                               supportedTokens={supportedTokens}
                               user={user}
-                              stratAddress={stratAddress}
                               assetsWithEighteenDecimalPlaces={assetsWithEighteenDecimalPlaces}
                             />
                           );
@@ -466,7 +462,6 @@ const UserProfile = ({ user }) => {
                               allSubcategories={allSubcategories}
                               supportedTokens={supportedTokens}
                               user={user}
-                              stratAddress={stratAddress}
                               assetsWithEighteenDecimalPlaces={assetsWithEighteenDecimalPlaces}
                             />
                           );

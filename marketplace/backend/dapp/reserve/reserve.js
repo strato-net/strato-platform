@@ -142,7 +142,7 @@ async function get(user, address, options) {
       address: `in.(${[
         reserve.assetRootAddress,
         reserve.cataToken,
-        reserve.stratsToken,
+        reserve.USDSTToken,
       ]
         .filter(Boolean)
         .join(',')})`,
@@ -163,8 +163,8 @@ async function get(user, address, options) {
   const cataToken = results.find(
     (result) => result.address === reserve.cataToken
   );
-  const stratsToken = results.find(
-    (result) => result.address === reserve.stratsToken
+  const USDSTToken = results.find(
+    (result) => result.address === reserve.USDSTToken
   );
 
   // Return combined result
@@ -174,7 +174,7 @@ async function get(user, address, options) {
     tvl,
     totalCataRewardIssued,
     cataTokenObject: cataToken ? marshalOut(cataToken) : null,
-    stratsTokenObject: stratsToken ? marshalOut(stratsToken) : null,
+    USDSTTokenObject: USDSTToken ? marshalOut(USDSTToken) : null,
   };
 }
 
@@ -210,7 +210,7 @@ async function getAll(user, options) {
     .flatMap((reserve) => [
       reserve.assetRootAddress,
       reserve.cataToken,
-      reserve.stratsToken,
+      reserve.usdstToken,
     ])
     .filter(Boolean);
 
@@ -248,7 +248,7 @@ async function getAll(user, options) {
 
     const tvl =
       activeEscrows && activeEscrows.length > 0
-        ? activeEscrows[0].sum / 10000
+        ? activeEscrows[0].sum / Math.pow(10, 18)
         : 0;
 
     const escrowTotalCataRewardSearchOptions = {
@@ -284,15 +284,15 @@ async function getAll(user, options) {
     const cataToken = relatedAssetsAndTokens.find(
       (item) => item.address === reserve.cataToken
     );
-    const stratsToken = relatedAssetsAndTokens.find(
-      (item) => item.address === reserve.stratsToken
+    const USDSTToken = relatedAssetsAndTokens.find(
+      (item) => item.address === reserve.usdstToken
     );
 
     return {
       ...reserve,
       asset: asset ? marshalOut(asset) : null,
       cataTokenObject: cataToken ? marshalOut(cataToken) : null,
-      stratsTokenObject: stratsToken ? marshalOut(stratsToken) : null,
+      USDSTTokenObject: USDSTToken ? marshalOut(USDSTToken) : null,
       ...tvlAndCataRewards[index],
     };
   });
@@ -525,11 +525,11 @@ async function borrow(user, args, options) {
  * Repay
  */
 async function repay(user, args, options) {
-  const { reserve, ...restArgs } = args;
+  const { reserve, escrowAddress, USDSTAssetAddresses } = args;
   const callArgs = {
     contract: { address: reserve },
     method: 'repayLoan',
-    args: util.usc({ ...args }),
+    args: util.usc({ escrowAddress, usdstAssetAddresses:USDSTAssetAddresses}),
   };
 
   const reponse = await rest.call(user, callArgs, options);
