@@ -87,10 +87,10 @@ if [ "$ORACLE_MODE" = "true" ]; then
       exit 152
     else
       if [ "${SKIP_ORACLE_DEPLOYMENT}" != "true" ]; then
+        echo "creating the .deploy_attempted flag file"
+        touch .deploy_attempted
         echo 'oracle_deploy.yaml does not exist. Deploying oracle contracts...'
         yarn deploy-oracle
-        echo "creating the .deployed flag file"
-        touch .deployed
       else
         echo 'SKIP_ORACLE_DEPLOYMENT is true. Skipping oracle deployment...'
       fi
@@ -102,14 +102,14 @@ if [ "$ORACLE_MODE" = "true" ]; then
       exit 151
     fi
     echo "Found the existing oracle_deploy.yaml"
-    if [ ! -f ".deployed" ]; then
+    if [ ! -f ".deploy_attempted" ]; then
       echo "Starting a recreated container with likely updated env vars, but reusing the pre-existing oracle_config.yaml and oracle_deploy.yaml"
       if [ "${UPGRADE_ORACLE_CONTRACTS}" = "true" ]; then
+        echo "creating the .deploy_attempted flag file"
+        touch .deploy_attempted
         echo "UPGRADE_ORACLE_CONTRACTS=true - deactivating oracle contracts and deploying again..."
         yarn deactivate-oracle
         yarn deploy-oracle
-        echo "creating the .deployed flag file"
-        touch .deployed
       fi
     fi
   fi
@@ -275,10 +275,10 @@ else
       exit 52
     else
       if [ "${SKIP_ORACLE_DEPLOYMENT}" != "true" ]; then
+        echo "Creating the .deploy_attempted flag file"
+        touch .deploy_attempted
         echo 'deploy.yaml does not exist. Deploying payment server contracts...'
         yarn deploy
-        echo "Creating the .deployed flag file"
-        touch .deployed
       else
         echo 'SKIP_DEPLOYMENT is true. Skipping deployment...'
       fi
@@ -290,14 +290,14 @@ else
       exit 51
     fi
     echo "Found the existing deploy.yaml"
-    if [ ! -f ".deployed" ]; then
+    if [ ! -f ".deploy_attempted" ]; then
       echo "Starting a recreated container with likely updated env vars, but reusing the pre-existing config.yaml and deploy.yaml"
       if [ "${UPGRADE_CONTRACTS}" = "true" ]; then
-        echo '"UPGRADE_CONTRACTS=true - deactivating payment server contracts and deploying again...'
+        echo "Creating the .deploy_attempted flag file"
+        touch .deploy_attempted
+        echo '"UPGRADE_CONTRACTS=true - deactivating payment server contracts and deploying again...'=
         yarn deactivate
         yarn deploy
-        echo "Creating the .deployed flag file"
-        touch .deployed
       fi
     fi
   fi
