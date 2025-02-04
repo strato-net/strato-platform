@@ -78,13 +78,14 @@ abstract contract Asset is Utils {
         files = _files;
         fileNames = _fileNames;
         createdDate = _createdDate;
-        quantity = _quantity * (10**_decimals);
+        quantity = _quantity;
         decimals = _decimals;
         status = _status;
         try {
             assert(Asset(msg.sender).assetMagicNumber() == assetMagicNumber);
             originAddress = Asset(msg.sender).originAddress();
             itemNumber = Asset(msg.sender).itemNumber();
+            quantity = quantity * (10**_decimals);
         } catch {
             originAddress = address(this);
             itemNumber = 1;
