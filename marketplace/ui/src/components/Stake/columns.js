@@ -21,7 +21,7 @@ export const aggregateStakeColumns = (
   offset,
   reserves,
   USDSTAddress,
-  assetsWithEighteenDecimalPlaces,
+  assetsWithEighteenDecimalPlaces
 ) => {
   return [
     {

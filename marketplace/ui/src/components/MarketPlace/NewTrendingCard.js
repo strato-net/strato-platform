@@ -397,7 +397,8 @@ const NewTrendingCard = ({
               }
             }}
           >
-            {topSellingProduct.originAddress === ethstAddress || topSellingProduct.originAddress === wbtcstAddress
+            {topSellingProduct.originAddress === ethstAddress ||
+            topSellingProduct.originAddress === wbtcstAddress
               ? 'Bridge'
               : 'Buy Now'}
           </Button>

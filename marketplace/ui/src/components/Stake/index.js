@@ -291,7 +291,7 @@ const Stake = ({ user }) => {
                     offset,
                     reserves,
                     USDSTAddress,
-                    assetsWithEighteenDecimalPlaces,
+                    assetsWithEighteenDecimalPlaces
                   )}
                   dataSource={combinedInventories.slice(offset, offset + limit)}
                   loading={isInventoriesLoading}
