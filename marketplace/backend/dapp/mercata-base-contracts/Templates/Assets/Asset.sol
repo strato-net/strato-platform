@@ -89,6 +89,7 @@ abstract contract Asset is Utils {
         } catch {
             originAddress = address(this);
             itemNumber = 1;
+            quantity = quantity * (10**_decimals);
             emit OwnershipTransfer(
                 originAddress,
                 address(0),
