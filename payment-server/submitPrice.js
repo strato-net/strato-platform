@@ -358,7 +358,7 @@ const updateSalePricePeriodically = async () => {
           config,
           query: {
             address: "eq." + address,
-            select: "sale,name",
+            select: "sale,name,decimals",
           },
         };
 
@@ -378,11 +378,13 @@ const updateSalePricePeriodically = async () => {
           process.env.METALS_API_KEY
         );
 
+        const decimals = assetResult[0].decimals || 0;
+
         await updateMetalPrice(
           asset.name.toLowerCase(),
           token,
           assetResult[0]?.sale,
-          metalResult.price
+          metalResult.price / Math.pow(10, decimals)
         );
         console.log(
           `[Sale Update] Price updated for asset: ${address} at ${new Date().toISOString()}`
