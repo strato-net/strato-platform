@@ -24,7 +24,7 @@ abstract contract MercataETHBridge is Utils {
     event BurnedETHST(address user, string username, string baseAddress, uint amount);
 
     modifier onlyOwner() {
-        require(owner == msg.sender, "Ownable: caller is not the owner");
+        require(getCommonName(owner) == getCommonName(msg.sender), "Ownable: caller is not the owner");
         _;
     }
 
