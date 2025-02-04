@@ -12,9 +12,9 @@ abstract contract MercataETHBridge is Utils {
     }
 
     address public owner;
+    uint public decimals;
     address public burnerAddress = address(0x6ec8bbe4a5b87be18d443408df43a45e5972fa1b); // burner account
     bool public isActive = true;
-    decimal public decimals = 18;
 
     address public ethSt;
 
@@ -33,8 +33,9 @@ abstract contract MercataETHBridge is Utils {
         require(isActive, "MercataETHBridge is not active");
         _;
     }
-    constructor() {
+    constructor(uint _decimals) {
         owner = msg.sender;
+        decimals = _decimals;
     }
 
     function deactivate() public onlyOwner requireActive {
@@ -44,12 +45,6 @@ abstract contract MercataETHBridge is Utils {
     function activate() public onlyOwner {
         require(!isActive, "Cannot activate when active");
         isActive = true;
-    }
-
-    function setDecimals(decimal _decimals) public onlyOwner {
-        require(_decimals > 0, "Decimals must be greater than 0");
-        require(isActive, "MercataETHBridge is not active");
-        decimals = _decimals;
     }
 
     function mintETHST(address _userAddress, uint _amount, string _txHash) external onlyOwner requireActive {

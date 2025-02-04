@@ -185,7 +185,6 @@ export const Marketplace = {
   getStratsAddress: '/strats/address',
   getStakeableProducts: '/stake',
   get18DecimalPlaces: '/18DecimalPlaces',
-  get8DecimalPlaces: '/8DecimalPlaces',
 };
 
 export const PaymentService = {

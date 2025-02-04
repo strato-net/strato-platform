@@ -90,11 +90,4 @@ router.get(
   MarketplaceController.get18DecimalPlaces
 );
 
-router.get(
-  Marketplace.get8DecimalPlaces,
-  authHandler.authorizeRequest(),
-  loadDapp,
-  MarketplaceController.get8DecimalPlaces
-);
-
 export default router;

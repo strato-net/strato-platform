@@ -171,15 +171,6 @@ class MarketplaceController {
     }
   }
 
-  static async get8DecimalPlaces(_, res, next) {
-    try {
-      const addresses = constants.AssetsWithEightDecimalPlaces;
-      return rest.response.status200(res, addresses);
-    } catch (e) {
-      return next(e);
-    }
-  }
-
   static async getCataAddress(_, res, next) {
     try {
       const address = tokensJs.getCataAddress();
