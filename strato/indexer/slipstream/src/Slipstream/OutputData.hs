@@ -383,7 +383,7 @@ createExpandAbstractTable ::
   OutputM m =>
   ContractF () ->
   (Text, Text, Text) ->
-  Map.Map (Account, Text) (Text, Text, [Text]) ->
+  Map.Map (Address, Text) (Text, Text, [Text]) ->
   CodeCollectionF () ->
   ConduitM () Text m [ForeignKeyInfo]
 createExpandAbstractTable c nameParts abstracts cc = do
@@ -471,7 +471,7 @@ getDeferredForeignKeys tableName c (CodeCollection ccs _ _ _ _ _ _ _) creator a 
 
 getDeferredForeignKeysAbstract ::
   (MonadLogger m) =>
-  TableName -> ContractF () -> Text -> Text -> Map.Map (Account, Text) (Text, Text, [Text]) -> CodeCollectionF () -> m [ForeignKeyInfo]
+  TableName -> ContractF () -> Text -> Text -> Map.Map (Address, Text) (Text, Text, [Text]) -> CodeCollectionF () -> m [ForeignKeyInfo]
 getDeferredForeignKeysAbstract tableName c creator a abstracts' cc@(CodeCollection ccs _ _ _ _ _ _ _) = do
   result <- fmap catMaybes . for [(theName, x) | (theName, VariableDecl {_varType = SVMType.UnknownLabel x _}) <- Map.toList (c ^. storageDefs)] $ \(theName, x) -> do
       let contractF = Map.lookup x ccs
@@ -485,7 +485,7 @@ getDeferredForeignKeysAbstract tableName c creator a abstracts' cc@(CodeCollecti
                 Just c' -> do
                   let (creator', a', n') = case _importedFrom c' of
                                             Nothing -> (creator, a, _contractName c')
-                                            Just acct -> case Map.lookup (acct, T.pack $ _contractName c') abstracts' of
+                                            Just acct -> case Map.lookup (acct^.accountAddress, T.pack $ _contractName c') abstracts' of
                                               Nothing -> (creator, a, _contractName c')
                                               Just (creator'', a'', _) -> (creator'', a'', _contractName c')
                   pure $ Just $ ForeignKeyInfo
@@ -576,7 +576,7 @@ createAbstractTable ::
   OutputM m =>
   ContractF () ->
   (Text, Text, Text) ->
-  Map.Map (Account, Text) (Text, Text, [Text]) ->
+  Map.Map (Address, Text) (Text, Text, [Text]) ->
   CodeCollectionF () ->
   ConduitM () Text m [ForeignKeyInfo]
 createAbstractTable contract (creator, a, n) abstracts' cc = do
@@ -674,7 +674,7 @@ expandAbstractTable ::
   OutputM m =>
   ContractF () ->
   (Text, Text, Text) ->
-  Map.Map (Account, Text) (Text, Text, [Text]) ->
+  Map.Map (Address, Text) (Text, Text, [Text]) ->
   CodeCollectionF () ->
   ConduitM () Text m [ForeignKeyInfo]
 expandAbstractTable  contract (creator, a, n) abstracts' cc = do
@@ -747,7 +747,7 @@ expandAbstractContractTable ::
   OutputM m =>
   ContractF () ->
   TableName ->
-  Map.Map (Account, Text) (Text, Text, [Text]) ->
+  Map.Map (Address, Text) (Text, Text, [Text]) ->
   CodeCollectionF () ->
   ConduitM () Text m [ForeignKeyInfo]
 expandAbstractContractTable  contract tableName abstracts' cc = do

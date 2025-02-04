@@ -51,6 +51,7 @@ module Blockchain.Stream.Action (
 import Blockchain.MiscJSON ()
 import Blockchain.SolidVM.Model
 import Blockchain.Strato.Model.Account
+import Blockchain.Strato.Model.Address
 import Blockchain.Strato.Model.CodePtr
 import Blockchain.Strato.Model.Event
 import Blockchain.Strato.Model.ExtendedWord (Word256, bytesToWord256)
@@ -266,7 +267,7 @@ data ActionData = ActionData
     _actionDataApplication :: Text,
     _actionDataCodeKind :: CodeKind,
     _actionDataStorageDiffs :: DataDiff,
-    _actionDataAbstracts :: Map (Account, Text) (Text, Text, [Text]), -- (import address, contract name) -> (cn, app)
+    _actionDataAbstracts :: Map (Address, Text) (Text, Text, [Text]), -- (import address, contract name) -> (cn, app)
     _actionDataMappings :: [Text],
     _actionDataArrays :: [Text],
     _actionDataCallTypes :: [CallType]
