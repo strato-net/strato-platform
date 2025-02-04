@@ -224,7 +224,6 @@ const StakeModal = ({
   type,
   productDetailPage,
   assetsWithEighteenDecimalPlaces,
-  assetsWithEightDecimalPlaces,
 }) => {
   const { isStaking, isUnstaking, isReservesLoading, reserves } =
     useInventoryState();

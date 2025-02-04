@@ -50,7 +50,6 @@ const InventoryCard = ({
   user,
   supportedTokens,
   assetsWithEighteenDecimalPlaces,
-  assetsWithEightDecimalPlaces,
 }) => {
   const textRef = useRef(null);
   const { isReserveLoading, reserves } = useInventoryState();
@@ -619,7 +618,6 @@ const InventoryCard = ({
           user={user}
           reserves={reserves}
           assetsWithEighteenDecimalPlaces={assetsWithEighteenDecimalPlaces}
-          assetsWithEightDecimalPlaces={assetsWithEightDecimalPlaces}
         />
       )}
       {unlistModalOpen && (
@@ -645,7 +643,6 @@ const InventoryCard = ({
           saleAddress={inventory.saleAddress}
           category={category}
           assetsWithEighteenDecimalPlaces={assetsWithEighteenDecimalPlaces}
-          assetsWithEightDecimalPlaces={assetsWithEightDecimalPlaces}
         />
       )}
       {repayModalOpen && (
@@ -660,7 +657,6 @@ const InventoryCard = ({
           category={category}
           reserves={reserves}
           assetsWithEighteenDecimalPlaces={assetsWithEighteenDecimalPlaces}
-          assetsWithEightDecimalPlaces={assetsWithEightDecimalPlaces}
         />
       )}
       {resellModalOpen && (
@@ -686,7 +682,6 @@ const InventoryCard = ({
           saleAddress={inventory.saleAddress}
           category={category}
           assetsWithEighteenDecimalPlaces={assetsWithEighteenDecimalPlaces}
-          assetsWithEightDecimalPlaces={assetsWithEightDecimalPlaces}
         />
       )}
       {transferModalOpen && (
@@ -699,7 +694,6 @@ const InventoryCard = ({
           categoryName={category}
           reserves={reserves}
           assetsWithEighteenDecimalPlaces={assetsWithEighteenDecimalPlaces}
-          assetsWithEightDecimalPlaces={assetsWithEightDecimalPlaces}
         />
       )}
       {redeemModalOpen && (

@@ -84,7 +84,6 @@ const HeaderComponent = ({
     marketplaceActions.fetchAssetsWithEighteenDecimalPlaces(
       marketplaceDispatch
     );
-    marketplaceActions.fetchAssetsWithEightDecimalPlaces(marketplaceDispatch);
     if (user) {
       marketplaceActions.fetchUSDSTBalance(marketplaceDispatch);
       marketplaceActions.fetchCataBalance(marketplaceDispatch);

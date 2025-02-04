@@ -42,7 +42,6 @@ const GlobalTransaction = ({
   user,
   USDSTAddress,
   assetsWithEighteenDecimalPlaces,
-  assetsWithEightDecimalPlaces,
   ethstAddress,
   wbtcstAddress,
 }) => {
@@ -453,7 +452,6 @@ const GlobalTransaction = ({
               user={user}
               isTransactionLoading={isTransactionLoading}
               assetsWithEighteenDecimalPlaces={assetsWithEighteenDecimalPlaces}
-              assetsWithEightDecimalPlaces={assetsWithEightDecimalPlaces}
               ethstAddress={ethstAddress}
               wbtcstAddress={wbtcstAddress}
             />

@@ -27,7 +27,6 @@ const Transaction = ({ user }) => {
   const [stratAddress, setStratAddress] = useState('');
   const [assetsWithEighteenDecimalPlaces, setAssetsWithEighteenDecimalPlaces] =
     useState('');
-  const [assetsWithEightDecimalPlaces, setAssetsWithEightDecimalPlaces] = useState('');
 
   useEffect(() => {
     const fetchAddresses = async () => {
@@ -38,15 +37,10 @@ const Transaction = ({ user }) => {
         await marketplaceActions.fetchAssetsWithEighteenDecimalPlaces(
           marketplaceDispatch
         );
-      const assetsWithEightDecimalPlaces =
-        await marketplaceActions.fetchAssetsWithEightDecimalPlaces(
-          marketplaceDispatch
-        );
       await ethAcions.fetchETHSTAddress(ethDispatch);
       await ethAcions.fetchWBTCSTAddress(ethDispatch);
       setStratAddress(stratAddress);
       setAssetsWithEighteenDecimalPlaces(assetsWithEighteenDecimalPlaces);
-      setAssetsWithEightDecimalPlaces(assetsWithEightDecimalPlaces);
     };
 
     fetchAddresses();
@@ -250,7 +244,6 @@ const Transaction = ({ user }) => {
         download={download}
         stratAddress={stratAddress}
         assetsWithEighteenDecimalPlaces={assetsWithEighteenDecimalPlaces}
-        assetsWithEightDecimalPlaces={assetsWithEightDecimalPlaces}
       />
     </div>
   );

@@ -19,7 +19,6 @@ const StakeItemActions = ({
   category,
   reserves,
   assetsWithEighteenDecimalPlaces,
-  assetsWithEightDecimalPlaces,
 }) => {
   const [stakeType, setStakeType] = useState('Stake');
   const [stakeModalOpen, setStakeModalOpen] = useState(false);
@@ -187,7 +186,6 @@ const StakeItemActions = ({
           saleAddress={inventory.saleAddress}
           category={category}
           assetsWithEighteenDecimalPlaces={assetsWithEighteenDecimalPlaces}
-          assetsWithEightDecimalPlaces={assetsWithEightDecimalPlaces}
         />
       )}
       {borrowModalOpen && (
@@ -201,7 +199,6 @@ const StakeItemActions = ({
           saleAddress={inventory.saleAddress}
           category={category}
           assetsWithEighteenDecimalPlaces={assetsWithEighteenDecimalPlaces}
-          assetsWithEightDecimalPlaces={assetsWithEightDecimalPlaces}
         />
       )}
       {repayModalOpen && (
@@ -216,7 +213,6 @@ const StakeItemActions = ({
           category={category}
           reserves={reserves}
           assetsWithEighteenDecimalPlaces={assetsWithEighteenDecimalPlaces}
-          assetsWithEightDecimalPlaces={assetsWithEightDecimalPlaces}
         />
       )}
     </div>

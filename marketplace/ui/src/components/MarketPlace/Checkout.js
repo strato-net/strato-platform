@@ -40,7 +40,7 @@ const Checkout = () => {
     usePaymentServiceState();
   const paymentServiceDispatch = usePaymentServiceDispatch();
   const [api, contextHolder] = notification.useNotification();
-  const { cartList, USDSTAddress, assetsWithEighteenDecimalPlaces, assetsWithEightDecimalPlaces } = useMarketplaceState();
+  const { cartList, USDSTAddress, assetsWithEighteenDecimalPlaces } = useMarketplaceState();
   const { isCreateOrderSubmitting, message, success } = useOrderState();
 
   const [mapData, setmapData] = useState([]);

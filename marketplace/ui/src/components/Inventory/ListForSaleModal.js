@@ -37,7 +37,6 @@ const ListForSaleModal = ({
   category,
   reserves,
   assetsWithEighteenDecimalPlaces,
-  assetsWithEightDecimalPlaces,
 }) => {
   const [data, setData] = useState([inventory]);
   const location = useLocation();

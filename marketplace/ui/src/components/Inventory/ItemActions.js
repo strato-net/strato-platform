@@ -40,7 +40,6 @@ const ItemActions = ({
   supportedTokens,
   reserves,
   assetsWithEighteenDecimalPlaces,
-  assetsWithEightDecimalPlaces,
 }) => {
   const itemData = inventory.data;
   const decimals = assetsWithEighteenDecimalPlaces.includes(
@@ -376,7 +375,6 @@ const ItemActions = ({
           user={user}
           reserves={reserves}
           assetsWithEighteenDecimalPlaces={assetsWithEighteenDecimalPlaces}
-          assetsWithEightDecimalPlaces={assetsWithEightDecimalPlaces}
         />
       )}
       {unlistModalOpen && (
@@ -404,7 +402,6 @@ const ItemActions = ({
           saleAddress={inventory.saleAddress}
           category={category}
           assetsWithEighteenDecimalPlaces={assetsWithEighteenDecimalPlaces}
-          assetsWithEightDecimalPlaces={assetsWithEightDecimalPlaces}
         />
       )}
       {borrowModalOpen && (
@@ -418,7 +415,6 @@ const ItemActions = ({
           saleAddress={inventory.saleAddress}
           category={category}
           assetsWithEighteenDecimalPlaces={assetsWithEighteenDecimalPlaces}
-          assetsWithEightDecimalPlaces={assetsWithEightDecimalPlaces}
         />
       )}
       {repayModalOpen && (
@@ -433,7 +429,6 @@ const ItemActions = ({
           category={category}
           reserves={reserves}
           assetsWithEighteenDecimalPlaces={assetsWithEighteenDecimalPlaces}
-          assetsWithEightDecimalPlaces={assetsWithEightDecimalPlaces}
         />
       )}
       {resellModalOpen && (
@@ -447,7 +442,6 @@ const ItemActions = ({
           category={category}
           reserves={reserves}
           assetsWithEighteenDecimalPlaces={assetsWithEighteenDecimalPlaces}
-          assetsWithEightDecimalPlaces={assetsWithEightDecimalPlaces}
         />
       )}
       {transferModalOpen && (
@@ -461,7 +455,6 @@ const ItemActions = ({
           category={category}
           reserves={reserves}
           assetsWithEighteenDecimalPlaces={assetsWithEighteenDecimalPlaces}
-          assetsWithEightDecimalPlaces={assetsWithEightDecimalPlaces}
         />
       )}
       {redeemModalOpen && (

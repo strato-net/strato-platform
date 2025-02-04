@@ -27,7 +27,6 @@ const TransferModal = ({
   offset = 0,
   reserves,
   assetsWithEighteenDecimalPlaces,
-  assetsWithEightDecimalPlaces
 }) => {
   const location = useLocation();
   const queryParams = new URLSearchParams(location.search);

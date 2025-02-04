@@ -13,7 +13,7 @@ import GlobalTransaction from './GlobalTransaction';
 
 const Feed = ({ user }) => {
   const [api, contextHolder] = notification.useNotification();
-  const { USDSTAddress, assetsWithEighteenDecimalPlaces, assetsWithEightDecimalPlaces } =
+  const { USDSTAddress, assetsWithEighteenDecimalPlaces } =
     useMarketplaceState();
   const { ethstAddress, wbtcstAddress } = useEthState();
 
@@ -26,7 +26,6 @@ const Feed = ({ user }) => {
       await marketplaceActions.fetchAssetsWithEighteenDecimalPlaces(
         marketplaceDispatch
       );
-      await marketplaceActions.fetchAssetsWithEightDecimalPlaces(marketplaceDispatch);
       await ethActions.fetchETHSTAddress(ethDispatch);
       await ethActions.fetchWBTCSTAddress(ethDispatch);
     };
@@ -47,12 +46,11 @@ const Feed = ({ user }) => {
           <p className=" text-sm text-[#202020] font-medium">Activity Feed</p>
         </Breadcrumb.Item>
       </Breadcrumb>
-      {USDSTAddress && assetsWithEighteenDecimalPlaces?.length > 0 && assetsWithEightDecimalPlaces?.length > 0 && (
+      {USDSTAddress && assetsWithEighteenDecimalPlaces?.length > 0 && (
         <GlobalTransaction
           user={user}
           USDSTAddress={USDSTAddress}
           assetsWithEighteenDecimalPlaces={assetsWithEighteenDecimalPlaces}
-          assetsWithEightDecimalPlaces={assetsWithEightDecimalPlaces}
           ethstAddress={ethstAddress}
           wbtcstAddress={wbtcstAddress}
         />

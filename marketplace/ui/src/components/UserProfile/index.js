@@ -74,20 +74,15 @@ const UserProfile = ({ user }) => {
     isFetchingTokens,
   } = useInventoryState();
   const [assetsWithEighteenDecimalPlaces, setAssetsWithEighteenDecimalPlaces] = useState('');
-  const [assetsWithEightDecimalPlaces, setAssetsWithEightDecimalPlaces] = useState('');
 
   useEffect(() => {
     const fetchAddresses = async () => {
       const assetsWithEighteenDecimalPlaces = await marketplaceActions.fetchAssetsWithEighteenDecimalPlaces(
         marketplaceDispatch
       );
-      const assetsWithEightDecimalPlaces = await marketplaceActions.fetchAssetsWithEightDecimalPlaces(
-        marketplaceDispatch
-      );
       await ethActions.fetchETHSTAddress(ethDispatch);
       await ethActions.fetchWBTCSTAddress(ethDispatch);
       setAssetsWithEighteenDecimalPlaces(assetsWithEighteenDecimalPlaces);
-      setAssetsWithEightDecimalPlaces(assetsWithEightDecimalPlaces);
     };
 
     fetchAddresses();
@@ -411,7 +406,6 @@ const UserProfile = ({ user }) => {
                               supportedTokens={supportedTokens}
                               user={user}
                               assetsWithEighteenDecimalPlaces={assetsWithEighteenDecimalPlaces}
-                              assetsWithEightDecimalPlaces={assetsWithEightDecimalPlaces}
                             />
                           );
                         })
@@ -441,7 +435,6 @@ const UserProfile = ({ user }) => {
                               supportedTokens={supportedTokens}
                               user={user}
                               assetsWithEighteenDecimalPlaces={assetsWithEighteenDecimalPlaces}
-                              assetsWithEightDecimalPlaces={assetsWithEightDecimalPlaces}
                             />
                           );
                         })
@@ -471,7 +464,6 @@ const UserProfile = ({ user }) => {
                               supportedTokens={supportedTokens}
                               user={user}
                               assetsWithEighteenDecimalPlaces={assetsWithEighteenDecimalPlaces}
-                              assetsWithEightDecimalPlaces={assetsWithEightDecimalPlaces}
                             />
                           );
                         })

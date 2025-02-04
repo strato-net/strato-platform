@@ -22,7 +22,6 @@ export const aggregateStakeColumns = (
   reserves,
   USDSTAddress,
   assetsWithEighteenDecimalPlaces,
-  assetsWithEightDecimalPlaces,
 ) => {
   return [
     {
@@ -211,7 +210,6 @@ export const aggregateStakeColumns = (
             user={user}
             reserves={reserves}
             assetsWithEighteenDecimalPlaces={assetsWithEighteenDecimalPlaces}
-            assetsWithEightDecimalPlaces={assetsWithEightDecimalPlaces}
           />
         </div>
       ),
@@ -259,7 +257,6 @@ export const stakeColumns = (
   reserves,
   USDSTAddress,
   assetsWithEighteenDecimalPlaces,
-  assetsWithEightDecimalPlaces,
   navigate
 ) => {
   return [
@@ -436,7 +433,6 @@ export const stakeColumns = (
           user={user}
           reserves={reserves}
           assetsWithEighteenDecimalPlaces={assetsWithEighteenDecimalPlaces}
-          assetsWithEightDecimalPlaces={assetsWithEightDecimalPlaces}
         />
       ),
     },

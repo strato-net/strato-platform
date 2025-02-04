@@ -21,7 +21,6 @@ const TransactionResponsive = ({
   user,
   stratAddress,
   assetsWithEighteenDecimalPlaces,
-  assetsWithEightDecimalPlaces,
 }) => {
   const USDSTIcon = <img src={Images.USDST} alt="" className="w-5 h-5 ml-1" />;
   const navigate = useNavigate();

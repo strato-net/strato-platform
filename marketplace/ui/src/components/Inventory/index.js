@@ -91,7 +91,6 @@ const Inventory = ({ user }) => {
   const {
     USDSTAddress,
     assetsWithEighteenDecimalPlaces,
-    assetsWithEightDecimalPlaces,
   } = useMarketplaceState();
   const formatter = new Intl.NumberFormat('en-US');
   const formattedNum = (num) => formatter.format(num);
@@ -463,9 +462,6 @@ const Inventory = ({ user }) => {
         const is18DecimalPlaces = assetsWithEighteenDecimalPlaces.includes(
           record.originAddress
         );
-        const is8DecimalPlaces = assetsWithEightDecimalPlaces.includes(
-          record.originAddress
-        );
         const price = record.price
           ? is18DecimalPlaces
             ? parseFloat(record.price * 10 ** 18).toFixed(2)
@@ -495,9 +491,6 @@ const Inventory = ({ user }) => {
         const is18DecimalPlaces = assetsWithEighteenDecimalPlaces.includes(
           record.originAddress
         );
-        const is8DecimalPlaces = assetsWithEightDecimalPlaces.includes(
-          record.originAddress
-        );
         const quantity = (
           is18DecimalPlaces
             ? new BigNumber(record.quantity).dividedBy(
@@ -520,9 +513,6 @@ const Inventory = ({ user }) => {
       align: 'center',
       render: (_, record) => {
         const is18DecimalPlaces = assetsWithEighteenDecimalPlaces.includes(
-          record.originAddress
-        );
-        const is8DecimalPlaces = assetsWithEightDecimalPlaces.includes(
           record.originAddress
         );
         const saleQuantity = (
@@ -554,7 +544,6 @@ const Inventory = ({ user }) => {
             supportedTokens={supportedTokens}
             reserves={reserves}
             assetsWithEighteenDecimalPlaces={assetsWithEighteenDecimalPlaces}
-            assetsWithEightDecimalPlaces={assetsWithEightDecimalPlaces}
           />
         </div>
       ),
@@ -820,9 +809,6 @@ const Inventory = ({ user }) => {
                         assetsWithEighteenDecimalPlaces={
                           assetsWithEighteenDecimalPlaces
                         }
-                        assetsWithEightDecimalPlaces={
-                          assetsWithEightDecimalPlaces
-                        }
                       />
                     ))
                   ) : (
@@ -846,9 +832,6 @@ const Inventory = ({ user }) => {
                         reserves={reserves}
                         assetsWithEighteenDecimalPlaces={
                           assetsWithEighteenDecimalPlaces
-                        }
-                        assetsWithEightDecimalPlaces={
-                          assetsWithEightDecimalPlaces
                         }
                       />
                     ))

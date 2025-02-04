@@ -37,7 +37,7 @@ const USDSTIcon = (
   <img src={Images.USDST} alt={''} title={''} className="w-4 h-4" />
 );
 
-function combineInventories(items, assetsWithEighteenDecimalPlaces, assetsWithEightDecimalPlaces) {
+function combineInventories(items, assetsWithEighteenDecimalPlaces) {
   // Step 1: Group items by `root`
   const grouped = items.reduce((acc, item) => {
     const { root } = item;
@@ -217,7 +217,6 @@ const Stake = ({ user }) => {
           reserves,
           USDSTAddress,
           assetsWithEighteenDecimalPlaces,
-          assetsWithEightDecimalPlaces,
           navigate
         )}
         dataSource={populatedInventories}
@@ -293,7 +292,6 @@ const Stake = ({ user }) => {
                     reserves,
                     USDSTAddress,
                     assetsWithEighteenDecimalPlaces,
-                    assetsWithEightDecimalPlaces,
                   )}
                   dataSource={combinedInventories.slice(offset, offset + limit)}
                   loading={isInventoriesLoading}

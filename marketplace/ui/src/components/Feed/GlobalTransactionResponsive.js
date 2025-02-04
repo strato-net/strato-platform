@@ -17,7 +17,6 @@ const GlobalTransactionResponsive = ({
   isTransactionLoading,
   fetchData,
   assetsWithEighteenDecimalPlaces,
-  assetsWithEightDecimalPlaces,
   ethstAddress,
   wbtcstAddress,
 }) => {
@@ -114,8 +113,6 @@ const GlobalTransactionResponsive = ({
               ];
               const is18DecimalPlaces =
                 assetsWithEighteenDecimalPlaces.includes(assetOriginAddress);
-              const is8DecimalPlaces =
-                assetsWithEightDecimalPlaces.includes(assetOriginAddress);
 
               const handleDetailRedirection = () => {
                 let route;

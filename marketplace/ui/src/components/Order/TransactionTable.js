@@ -55,7 +55,6 @@ const TransactionTable = ({
   download,
   stratAddress,
   assetsWithEighteenDecimalPlaces,
-  assetsWithEightDecimalPlaces,
 }) => {
   const USDSTIcon = (
     <img src={Images.USDST} alt="USDST" className="mx-1 w-4 h-4" />
@@ -665,7 +664,6 @@ const TransactionTable = ({
                   assetsWithEighteenDecimalPlaces={
                     assetsWithEighteenDecimalPlaces
                   }
-                  assetsWithEightDecimalPlaces={assetsWithEightDecimalPlaces}
                 />
                 <Pagination
                   className="mx-auto mt-5"

@@ -31,7 +31,6 @@ const StakeInventoryCard = ({
   user,
   supportedTokens,
   assetsWithEighteenDecimalPlaces,
-  assetsWithEightDecimalPlaces
 }) => {
   const textRef = useRef(null);
   const { reserves } = useInventoryState();
@@ -347,7 +346,6 @@ const StakeInventoryCard = ({
           saleAddress={inventory.saleAddress}
           category={category}
           assetsWithEighteenDecimalPlaces={assetsWithEighteenDecimalPlaces}
-          assetsWithEightDecimalPlaces={assetsWithEightDecimalPlaces}
         />
       )}
       {repayModalOpen && (
@@ -362,7 +360,6 @@ const StakeInventoryCard = ({
           category={category}
           reserves={reserves}
           assetsWithEighteenDecimalPlaces={assetsWithEighteenDecimalPlaces}
-          assetsWithEightDecimalPlaces={assetsWithEightDecimalPlaces}
         />
       )}
       {stakeModalOpen && (
@@ -377,7 +374,6 @@ const StakeInventoryCard = ({
           saleAddress={inventory.saleAddress}
           category={category}
           assetsWithEighteenDecimalPlaces={assetsWithEighteenDecimalPlaces}
-          assetsWithEightDecimalPlaces={assetsWithEightDecimalPlaces}
         />
       )}
     </div>
