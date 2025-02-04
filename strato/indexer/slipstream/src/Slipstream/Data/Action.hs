@@ -44,7 +44,7 @@ data AggregateAction = AggregateAction
     actionCCCreator :: Maybe Text,
     actionRoot :: Text,
     actionApplication :: Text,
-    actionAccount :: Account,
+    actionAddress :: Address,
     actionCodeHash :: CodePtr,
     actionCodeCollection :: CodeCollection,
     actionStorage :: Action.DataDiff,
@@ -94,7 +94,7 @@ flatten Action.Action {..} = flip map (OMap.assocs _actionData) $
             actionCCCreator = _actionDataCCCreator,
             actionRoot = _actionDataRoot,
             actionApplication = _actionDataApplication,
-            actionAccount = account,
+            actionAddress = _accountAddress account,
             actionCodeHash = _actionDataCodeHash,
             actionCodeCollection = _actionDataCodeCollection,
             actionStorage = _actionDataStorageDiffs,
@@ -118,12 +118,8 @@ formatAction AggregateAction {..} =
       ", transactionHash: ",
       tshow actionTxHash,
       ", ",
-      ( case _accountChainId actionAccount of
-          Nothing -> ""
-          Just c -> T.concat ["in chain", tshow c]
-      ),
       " with account: ",
-      tshow (_accountAddress actionAccount),
+      tshow actionAddress,
       " with ",
       tshow
         ( case actionStorage of
