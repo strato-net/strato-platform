@@ -410,7 +410,7 @@ startingAction maybeCode env' chainId' =
       _blockNumber = blockHeaderBlockNumber $ Env.blockHeader env',
       _transactionHash = Env.txHash env',
       _transactionChainId = chainId',
-      _transactionSender = Account (Env.sender env') Nothing,
+      _transactionSender = Env.sender env',
       _actionData = OMap.empty,
       _metadata =
         case maybeCode of

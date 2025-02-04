@@ -101,7 +101,7 @@ instance FromJSON CallType
 
 data CallData = CallData
   { _callDataType :: CallType,
-    _callDataSender :: Account,
+    _callDataSender :: Address,
     _callDataOwner :: Account,
     _callDataGasPrice :: Integer,
     _callDataValue :: Integer,
@@ -403,7 +403,7 @@ data Action = Action
     _blockNumber :: Integer,
     _transactionHash :: Keccak256,
     _transactionChainId :: Maybe Word256,
-    _transactionSender :: Account,
+    _transactionSender :: Address,
     _actionData :: OMap.OMap Account ActionData,
     _metadata :: Maybe (Map Text Text),
     _events :: S.Seq Event,

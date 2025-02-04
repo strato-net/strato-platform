@@ -251,7 +251,7 @@ populateStorageDBs getMetadata genesisBlock genesisChainId = do
               A._blockNumber = blockHeaderBlockNumber $ blockHeader genesisBlock,
               A._transactionHash = unsafeCreateKeccak256FromWord256 $ fromMaybe 0 genesisChainId,
               A._transactionChainId = genesisChainId,
-              A._transactionSender = Ac.Account (Ad.Address 0) genesisChainId,
+              A._transactionSender = Ad.Address 0,
               A._actionData =
                 OMap.singleton (a,
                   A.ActionData

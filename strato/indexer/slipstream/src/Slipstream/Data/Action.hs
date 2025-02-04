@@ -39,7 +39,7 @@ data AggregateAction = AggregateAction
     actionBlockTimestamp :: UTCTime,
     actionBlockNumber :: Integer,
     actionTxHash :: Keccak256,
-    actionTxSender :: Account,
+    actionTxSender :: Address,
     actionCreator :: Text,
     actionCCCreator :: Maybe Text,
     actionRoot :: Text,
@@ -61,7 +61,7 @@ data AggregateEvent = AggregateEvent
     eventBlockTimestamp :: UTCTime,
     eventBlockNumber :: Integer,
     eventTxHash :: Keccak256,
-    eventTxSender :: Account,
+    eventTxSender :: Address,
     eventIndex :: Int,
     eventAbstracts :: Map (Address, Text) (Text, Text, [Text]),
     eventEvent :: Event

@@ -5,6 +5,7 @@ module Blockchain.EVM.Environment where
 
 import Blockchain.Data.BlockHeader
 import Blockchain.Strato.Model.Account
+import Blockchain.Strato.Model.Address
 import Blockchain.Strato.Model.Code
 import Blockchain.Strato.Model.ExtendedWord
 import Blockchain.Strato.Model.Keccak256
@@ -20,7 +21,7 @@ data Environment = Environment
     envOrigin :: Account,
     envGasPrice :: Integer,
     envInputData :: B.ByteString,
-    envSender :: Account,
+    envSender :: Address,
     envValue :: Integer,
     envCode :: Code,
     envJumpDests :: I.IntSet,

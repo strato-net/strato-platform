@@ -122,7 +122,7 @@ processedContract ABIID {..} state AggregateAction {..} =
       blockTimestamp = actionBlockTimestamp,
       blockNumber = actionBlockNumber,
       transactionHash = actionTxHash,
-      transactionSender = actionTxSender ^. accountAddress
+      transactionSender = actionTxSender
     }
 
 -- readPreviousSolidVMState ::
@@ -199,7 +199,7 @@ processedCollectionRow collection ttype AggregateAction {..} ABIID {..} cregator
       blockTimestamp = actionBlockTimestamp,
       blockNumber = actionBlockNumber,
       transactionHash = actionTxHash,
-      transactionSender = actionTxSender ^. accountAddress,
+      transactionSender = actionTxSender,
       collectionDataKey = k,
       collectionDataValue = v 
     }

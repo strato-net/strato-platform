@@ -269,7 +269,7 @@ runOperation BALANCE = do
       accountCreationHack account --needed hack to get the tests working
       push (0 :: Word256)
 runOperation ORIGIN = pushEnvVar $ _accountAddress . envOrigin
-runOperation CALLER = pushEnvVar $ _accountAddress . envSender
+runOperation CALLER = pushEnvVar envSender
 runOperation CALLVALUE = pushEnvVar envValue
 runOperation CALLDATALOAD = do
   p <- pop
@@ -651,7 +651,7 @@ runOperation DELEGATECALL = do
             addGas $ fromIntegral gas
             return (0, Nothing)
           (_, Nothing) -> do
-            nestedRun_debugWrapper True (fromIntegral gas) (owner^.accountAddress) (to^.accountAddress) (sender^.accountAddress) (fromIntegral value) inputData
+            nestedRun_debugWrapper True (fromIntegral gas) (owner^.accountAddress) (to^.accountAddress) sender (fromIntegral value) inputData
           (_, Just _) -> do
             --addToBalance' owner (-fromIntegral value)
             addGas $ fromIntegral gas
@@ -1108,7 +1108,7 @@ create
               envOwner = Account newAddress Nothing,
               envOrigin = Account origin Nothing,
               envInputData = B.empty,
-              envSender = Account sender Nothing,
+              envSender = sender,
               envValue = value,
               envCode = initCode,
               envJumpDests = getValidJUMPDESTs initCode,
@@ -1250,7 +1250,7 @@ call
               envOwner = (Account receiveAddress Nothing),
               envOrigin = (Account origin Nothing),
               envInputData = theData,
-              envSender = (Account sender Nothing),
+              envSender = sender,
               envValue = fromIntegral value,
               envCode = code,
               envJumpDests = getValidJUMPDESTs code,
@@ -1284,7 +1284,7 @@ call' noValueTransfer = do
 
   --TODO- Deal with this return value
   unless noValueTransfer $ do
-    _ <- pay "call value transfer" (sender^.accountAddress) (receiveAddress^.accountAddress) (fromIntegral value)
+    _ <- pay "call value transfer" sender (receiveAddress^.accountAddress) (fromIntegral value)
     return ()
 
   runCodeFromStart
@@ -1319,7 +1319,7 @@ callPrecompiled' noValueTransfer precompiled = do
 
   --TODO- Deal with this return value
   unless noValueTransfer $ do
-    _ <- pay "call value transfer" (sender^.accountAddress) (receiveAddress^.accountAddress) (fromIntegral value)
+    _ <- pay "call value transfer" sender (receiveAddress^.accountAddress) (fromIntegral value)
     return ()
 
   runPrecompiled precompiled

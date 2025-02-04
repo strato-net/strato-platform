@@ -31,7 +31,7 @@ emptySolidVMData :: Action.ActionData
 emptySolidVMData = Action.ActionData (SolidVMCode "ContractName" $ unsafeCreateKeccak256FromWord256 0) mempty "LambdaCorp2" Nothing "Clozure2" "Clozure2 address" SolidVM (Action.SolidVMDiff M.empty) M.empty [] [] []
 
 emptyAction :: Action
-emptyAction = Action.Action (unsafeCreateKeccak256FromWord256 0) (posixSecondsToUTCTime 0) 0 (unsafeCreateKeccak256FromWord256 0) Nothing (Account 0x0 Nothing) OMap.empty Nothing S.empty S.empty
+emptyAction = Action.Action (unsafeCreateKeccak256FromWord256 0) (posixSecondsToUTCTime 0) 0 (unsafeCreateKeccak256FromWord256 0) Nothing 0x0 OMap.empty Nothing S.empty S.empty
 
 spec :: Spec
 spec = describe "Action conversions" $ do
@@ -139,7 +139,7 @@ spec = describe "Action conversions" $ do
               Action._blockNumber = 9,
               Action._transactionHash = forceHash "3d5069c6b8f6e3922f8a98bef4f23c2d73794403172c12d6915d51ad47a9e827",
               Action._transactionChainId = Nothing,
-              Action._transactionSender = Account 0xc2191df3032cb8ee72e37ab6bbc4e83f92b9911c Nothing,
+              Action._transactionSender = 0xc2191df3032cb8ee72e37ab6bbc4e83f92b9911c,
               Action._actionData =
                 OMap.singleton ((Account 0x2f6ff9d4a35c07f7b630fe1ce039bc45559b5fb6 Nothing) ,
                   Action.ActionData
