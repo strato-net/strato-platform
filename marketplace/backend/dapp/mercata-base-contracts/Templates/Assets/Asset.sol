@@ -85,7 +85,6 @@ abstract contract Asset is Utils {
             assert(Asset(msg.sender).assetMagicNumber() == assetMagicNumber);
             originAddress = Asset(msg.sender).originAddress();
             itemNumber = Asset(msg.sender).itemNumber();
-            quantity = quantity * (10**_decimals);
         } catch {
             originAddress = address(this);
             itemNumber = 1;
