@@ -88,9 +88,10 @@ function computeQuantityNotAvailable(inventory) {
  * total quantity - collateralQuantity - quantityNotAvailable.
  */
 function computeStakeQuantity(inventory, collateralQuantity, decimals) {
-  const quantity = Array.isArray(inventory.inventories)
-    ? inventory.totalQuantity
-    : inventory?.quantity || 0 / Math.pow(10, decimals);
+  const quantity =
+    (Array.isArray(inventory.inventories)
+      ? inventory.totalQuantity
+      : inventory?.quantity || 0) / Math.pow(10, decimals);
   return quantity - collateralQuantity - computeQuantityNotAvailable(inventory);
 }
 
