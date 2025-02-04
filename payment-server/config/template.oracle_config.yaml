@@ -16,7 +16,13 @@ ethOracle:
   name: <eth_oracle_name_value>
 
 usdtOracle:
-  name: <usdt_oracle_name_value>  
+  name: <usdt_oracle_name_value> 
+
+usdcOracle:
+  name: <usdc_oracle_name_value> 
+
+paxgOracle:
+  name: <paxg_oracle_name_value>      
 
 usdOracle:
   name: <usd_oracle_name_value>
