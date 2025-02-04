@@ -396,7 +396,7 @@ runOperation SSTORE = do
   let ins = \case
         Action.EVMDiff m -> Action.EVMDiff $ M.insert p val m
         _ -> error "SolidVM Diff executing in EVM"
-  vmstateModify $ action . Action.actionData . Action.omapLens owner . mapped . Action.actionDataStorageDiffs %~ ins
+  vmstateModify $ action . Action.actionData . Action.omapLens (owner^.accountAddress) . mapped . Action.actionDataStorageDiffs %~ ins
 
 --TODO- refactor so that I don't have to use this -1 hack
 runOperation JUMP = do
@@ -1157,14 +1157,14 @@ create
 create' :: EVMBase m => VMM m Code
 create' = do
   owner <- getEnvVar envOwner
-  vmstateModify $ action . Action.actionData %~ OMap.alter insertFunc owner
+  vmstateModify $ action . Action.actionData %~ OMap.alter insertFunc (owner^.accountAddress)
 
   runCodeFromStart
 
   vmState <- vmstateGet
 
   let codeBytes = fromMaybe B.empty $ returnVal vmState
-  vmstateModify $ action . Action.actionData . Action.omapLens owner . mapped . Action.actionDataCodeHash .~ ExternallyOwned (hash codeBytes)
+  vmstateModify $ action . Action.actionData . Action.omapLens (owner^.accountAddress) . mapped . Action.actionDataCodeHash .~ ExternallyOwned (hash codeBytes)
   when flags_debug $ $logInfoS "create'" . T.pack $ "Result: " ++ show codeBytes
 
   -- this used to say "not enough ether, but im pretty sure it meant gas -io
@@ -1197,7 +1197,7 @@ create' = do
       vmState <- vmstateGet
       let Environment {..} = environment vmState
       vmstateModify $
-        action . Action.actionData . Action.omapLens envOwner . mapped . Action.actionDataCallTypes
+        action . Action.actionData . Action.omapLens (envOwner^.accountAddress) . mapped . Action.actionDataCallTypes
           %~ (:) Action.Create
 
     -- insertFunc :: Maybe Action.ActionData -> Maybe Action.ActionData
@@ -1280,7 +1280,7 @@ call' noValueTransfer = do
   let ch = case cp of
         ExternallyOwned x -> x
         _ -> error "internal error- the EVM was called for non-evm code"
-  vmstateModify $ action . Action.actionData %~ OMap.alter (insertFunc2 ch) receiveAddress
+  vmstateModify $ action . Action.actionData %~ OMap.alter (insertFunc2 ch) (receiveAddress^.accountAddress)
 
   --TODO- Deal with this return value
   unless noValueTransfer $ do
@@ -1298,7 +1298,7 @@ call' noValueTransfer = do
   --    --putStrLn $ show (pretty address) ++ ": " ++ format result
   let Environment {..} = environment vmState
   vmstateModify $
-    action . Action.actionData . Action.omapLens envOwner . mapped . Action.actionDataCallTypes
+    action . Action.actionData . Action.omapLens (envOwner^.accountAddress) . mapped . Action.actionDataCallTypes
       %~ (:) Action.Update
 
   return (fromMaybe B.empty $ returnVal vmState)
@@ -1315,7 +1315,7 @@ callPrecompiled' noValueTransfer precompiled = do
   value <- getEnvVar envValue
   receiveAddress <- getEnvVar envOwner
   sender <- getEnvVar envSender
-  vmstateModify $ action . Action.actionData %~ OMap.alter insertFunc receiveAddress
+  vmstateModify $ action . Action.actionData %~ OMap.alter insertFunc (receiveAddress ^. accountAddress)
 
   --TODO- Deal with this return value
   unless noValueTransfer $ do
@@ -1328,7 +1328,7 @@ callPrecompiled' noValueTransfer precompiled = do
 
   let Environment {..} = environment vmState
   vmstateModify $
-    action . Action.actionData . Action.omapLens envOwner . mapped . Action.actionDataCallTypes
+    action . Action.actionData . Action.omapLens (envOwner^.accountAddress) . mapped . Action.actionDataCallTypes
       %~ (:) Action.Update
 
   return (fromMaybe B.empty $ returnVal vmState)

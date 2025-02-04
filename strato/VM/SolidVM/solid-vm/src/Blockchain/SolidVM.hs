@@ -319,7 +319,7 @@ create' creator maybeCodePtr originAddress issuerAcct issuerName newAddress ch c
         Just (PtrToCode (CodeAtAccount cp _)) -> cp
         _ -> (Account creator Nothing)
 
-  initializeAction (Account newAddress Nothing) (labelToString contractName') issuerName cc_creator (show originAddress) parentName ch cc abstracts mappings arrays
+  initializeAction newAddress (labelToString contractName') issuerName cc_creator (show originAddress) parentName ch cc abstracts mappings arrays
 
   A.adjustWithDefault_ (A.Proxy @AddressState) (Account newAddress Nothing) $ \newAddressState ->
     pure
@@ -360,13 +360,13 @@ create' creator maybeCodePtr originAddress issuerAcct issuerName newAddress ch c
     setCreator issuer originAddress newAddress contract' (BlockHeader.number $ Env.blockHeader env)
 
   Mod.modifyStatefully_ (Mod.Proxy @Action) $
-    Action.actionData %= Action.omapAdjust (Action.actionDataCreator .~ (T.pack issuerName)) (Account newAddress Nothing)
+    Action.actionData %= Action.omapAdjust (Action.actionDataCreator .~ (T.pack issuerName)) newAddress
 
   Mod.modifyStatefully_ (Mod.Proxy @Action) $
-    Action.actionData %= Action.omapAdjust (Action.actionDataCCCreator .~ (fmap T.pack cc_creator)) (Account newAddress Nothing)
+    Action.actionData %= Action.omapAdjust (Action.actionDataCCCreator .~ (fmap T.pack cc_creator)) newAddress
     
   when (useWallet && parentName == "User") $ Mod.modifyStatefully_ (Mod.Proxy @Action) $
-    Action.actionData %= Action.omapAdjust (Action.actionDataApplication .~ (T.pack "")) (Account newAddress Nothing)
+    Action.actionData %= Action.omapAdjust (Action.actionDataApplication .~ (T.pack "")) newAddress
   -- I'm showing these strings because I like them to be in quotes in the logs :)
   multilineLog "create'/versioning" $ boringBox ["Contract Name: " ++ (C.yellow contractName'), "App: " ++ (C.yellow parentName'), "Creator: " ++ (C.yellow issuerName)]
 
@@ -532,10 +532,10 @@ call' from to' fnCalltype mContract functionName isRCC argExps = do
   (ctr, oAddr, ctrName) <- getCreator cnAccount
   !abstracts <- M.fromList <$> traverse (resolveNameParts to' (T.pack ctrName) (T.pack parentName')) abstracts'
 
-  initializeAction (Account to Nothing) (labelToString $ CC._contractName contract) (labelToString ctrName) Nothing (show oAddr) (labelToString parentName') hsh cc abstracts mappings arrays
+  initializeAction to (labelToString $ CC._contractName contract) (labelToString ctrName) Nothing (show oAddr) (labelToString parentName') hsh cc abstracts mappings arrays
 
   Mod.modifyStatefully_ (Mod.Proxy @Action) $
-    Action.actionData %= Action.omapAdjust (Action.actionDataCreator .~ (T.pack ctrName)) (Account to Nothing)
+    Action.actionData %= Action.omapAdjust (Action.actionDataCreator .~ (T.pack ctrName)) to
   when (isRCC) $
     (\env -> setCreator ctr to to contract (BlockHeader.number $ Env.blockHeader env)) =<< getEnv
 

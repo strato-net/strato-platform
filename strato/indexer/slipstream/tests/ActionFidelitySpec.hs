@@ -39,22 +39,22 @@ spec = describe "Action conversions" $ do
     convert emptyAction `shouldSatisfy` isRight
 
   it "should parse empty Word256 actions" $ do
-    convert emptyAction {Action._actionData = OMap.singleton ((Account 0x988 Nothing), emptyEVMData)}
+    convert emptyAction {Action._actionData = OMap.singleton (0x988, emptyEVMData)}
       `shouldSatisfy` isRight
 
   it "should parse empty ByteString actions" $ do
-    convert emptyAction {Action._actionData = OMap.singleton ((Account 0x988 Nothing), emptySolidVMData)}
+    convert emptyAction {Action._actionData = OMap.singleton (0x988, emptySolidVMData)}
       `shouldSatisfy` isRight
 
   it "should parse basic Word256 actions" $ do
     let diff = Action.EVMDiff $ M.singleton 0xffffffffff 0xeeeeeeeeeeeeeee
         daytuh = emptyEVMData {Action._actionDataStorageDiffs = diff}
-    convert emptyAction {Action._actionData = OMap.singleton ((Account 0x988 Nothing), daytuh)} `shouldSatisfy` isRight
+    convert emptyAction {Action._actionData = OMap.singleton (0x988, daytuh)} `shouldSatisfy` isRight
 
   it "should parse basic bytestring actions" $ do
     let diff = Action.SolidVMDiff $ M.singleton (B.replicate 34 0x6b) (B.replicate 33 0x76)
         daytuh = emptySolidVMData {Action._actionDataStorageDiffs = diff}
-    convert emptyAction {Action._actionData = OMap.singleton ((Account 0x988 Nothing), daytuh)} `shouldSatisfy` isRight
+    convert emptyAction {Action._actionData = OMap.singleton (0x988, daytuh)} `shouldSatisfy` isRight
 
   it "should convert bytestrings properly" $ do
     toJSON ("\x80\x60\x40" :: B.ByteString) `shouldBe` String "806040"
@@ -141,7 +141,7 @@ spec = describe "Action conversions" $ do
               Action._transactionChainId = Nothing,
               Action._transactionSender = 0xc2191df3032cb8ee72e37ab6bbc4e83f92b9911c,
               Action._actionData =
-                OMap.singleton ((Account 0x2f6ff9d4a35c07f7b630fe1ce039bc45559b5fb6 Nothing) ,
+                OMap.singleton (0x2f6ff9d4a35c07f7b630fe1ce039bc45559b5fb6 ,
                   Action.ActionData
                     { Action._actionDataStorageDiffs =
                         Action.EVMDiff . M.fromList $

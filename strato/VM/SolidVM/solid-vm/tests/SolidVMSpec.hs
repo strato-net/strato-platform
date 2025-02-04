@@ -2881,13 +2881,13 @@ contract qq {
     diffs
       `shouldBe` Just
         ( OMap.fromList
-            [ ( Account uploadAddress Nothing,
+            [ ( uploadAddress,
                 Action.SolidVMDiff $
                   M.singleton
                     ".s"
                     (rlpSerialize $ rlpEncode $ bContract "Sub" recursiveAddr)
               ),
-              ( Account recursiveAddr Nothing,
+              ( recursiveAddr,
                 Action.SolidVMDiff $
                   M.fromList
                     [ (".x", rlpSerialize $ rlpEncode $ BInteger 20),

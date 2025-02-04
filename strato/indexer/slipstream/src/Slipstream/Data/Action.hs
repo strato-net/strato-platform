@@ -12,7 +12,6 @@
 
 module Slipstream.Data.Action where
 
-import Blockchain.Strato.Model.Account
 import Blockchain.Strato.Model.Address
 import Blockchain.Strato.Model.CodePtr
 import Blockchain.Strato.Model.Event
@@ -81,7 +80,7 @@ instance Binary AggregateEvent where
 
 flatten :: Action -> [AggregateAction]
 flatten Action.Action {..} = flip map (OMap.assocs _actionData) $
-  \(account, Action.ActionData {..}) ->
+  \(address, Action.ActionData {..}) ->
     -- It's a Create because I said so
     let t = fromMaybe Action.Create $ listToMaybe _actionDataCallTypes
      in AggregateAction
@@ -94,7 +93,7 @@ flatten Action.Action {..} = flip map (OMap.assocs _actionData) $
             actionCCCreator = _actionDataCCCreator,
             actionRoot = _actionDataRoot,
             actionApplication = _actionDataApplication,
-            actionAddress = _accountAddress account,
+            actionAddress = address,
             actionCodeHash = _actionDataCodeHash,
             actionCodeCollection = _actionDataCodeCollection,
             actionStorage = _actionDataStorageDiffs,

@@ -891,7 +891,7 @@ getValueType :: MonadSM m => AccountPath -> m BasicType
 getValueType p = hintFromType =<< getXabiValueType p
 
 initializeAction :: MonadSM m
-                 => Account
+                 => Address
                  -> String
                  -> String
                  -> Maybe String
@@ -916,7 +916,7 @@ markDiffForAction owner key' val' = do
         Action.SolidVMDiff m -> Action.SolidVMDiff $ M.insert key val m
         e -> internalError "SolidVM Diff executing in EVM" $ show e
   Mod.modifyStatefully_ (Mod.Proxy @Action) $
-    Action.actionData . Action.omapLens (Account owner Nothing) . mapped . Action.actionDataStorageDiffs %= ins
+    Action.actionData . Action.omapLens owner . mapped . Action.actionDataStorageDiffs %= ins
 
 addEvent :: Mod.Modifiable (Q.Seq Event) m => Event -> m ()
 addEvent newEvent = Mod.modify_ (Mod.Proxy @(Q.Seq Event)) $ pure . (Q.|> newEvent)

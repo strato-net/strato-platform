@@ -236,7 +236,7 @@ populateStorageDBs getMetadata genesisBlock genesisChainId = do
     --For now, we are just clumsily filtering out any state changes for the Vitu vehicle manager,
     --since this contract has giant arrays that would choke strato
     --(yes, this temprary feature is hardcoded into the whole platform for one client)
-    let acct = Ac.Account address genesisChainId
+    let acct = address
         fullAddressState = rlpDecode . rlpDeserialize . rlpDecode $ value :: AddressState
         filteredAddressState =
           if (address /= Ad.Address 0x7000000000000000000000000000000000000000)
@@ -287,7 +287,7 @@ populateStorageDBs getMetadata genesisBlock genesisChainId = do
         squashMap f = map (uncurry f) . Map.toList
 
     fullAccountDiffs <- mapM eventualAccountState . Map.fromList $ fullAddrStates
-    filteredActions <- fmap (squashMap toAction) . mapM eventualAccountState $ Map.fromList filteredAddrStates
+    filteredActions <- fmap (squashMap toAction) . mapM eventualAccountState $ Map.fromList $ filteredAddrStates
 
     let statediff ad =
           StateDiff
@@ -295,7 +295,7 @@ populateStorageDBs getMetadata genesisBlock genesisChainId = do
               blockNumber = 0,
               StateDiff.blockHash = blockHash genesisBlock,
               StateDiff.stateRoot = MP.StateRoot . blockHeaderStateRoot $ blockHeader genesisBlock,
-              createdAccounts = ad,
+              createdAccounts = Map.mapKeys (\v -> Ac.Account v Nothing) ad,
               deletedAccounts = Map.empty,
               updatedAccounts = Map.empty
             }

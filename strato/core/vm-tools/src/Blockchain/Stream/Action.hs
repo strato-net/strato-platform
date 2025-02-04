@@ -404,7 +404,7 @@ data Action = Action
     _transactionHash :: Keccak256,
     _transactionChainId :: Maybe Word256,
     _transactionSender :: Address,
-    _actionData :: OMap.OMap Account ActionData,
+    _actionData :: OMap.OMap Address ActionData,
     _metadata :: Maybe (Map Text Text),
     _events :: S.Seq Event,
     _delegatecalls :: S.Seq Delegatecall
