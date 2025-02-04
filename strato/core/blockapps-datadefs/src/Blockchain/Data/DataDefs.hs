@@ -28,7 +28,6 @@ import Blockchain.Data.TXOrigin
 import Blockchain.Data.TransactionResultStatus
 import Blockchain.MiscJSON ()
 import Blockchain.SolidVM.Model
-import Blockchain.Strato.Model.Account
 import Blockchain.Strato.Model.Address
 import Blockchain.Strato.Model.ChainMember (ChainMemberParsedSet)
 import Blockchain.Strato.Model.CodePtr

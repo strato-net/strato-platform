@@ -172,7 +172,7 @@ LogDB
 
 EventDB
     blockHash Keccak256
-    contractAddress Account
+    contractAddress Address
     chainId Word256 Maybe
     name String
     args [String]

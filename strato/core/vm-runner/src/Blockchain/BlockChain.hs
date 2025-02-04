@@ -618,7 +618,7 @@ mkLogEntry :: Keccak256 -> Keccak256 -> Maybe Word256 -> Log -> LogDB
 mkLogEntry bHash tHash chainId Log {..} = LogDB bHash tHash chainId (account ^. accountAddress) (topics `indexMaybe` 0) (topics `indexMaybe` 1) (topics `indexMaybe` 2) (topics `indexMaybe` 3) logData bloom
 
 mkEventEntry :: Maybe Word256 -> Event -> EventDB
-mkEventEntry chainId Event {..} = EventDB evBlockHash evContractAccount chainId evName $ map (\(_,x,_) -> x) evArgs -- drop the field names, only slipstream needs them
+mkEventEntry chainId Event {..} = EventDB evBlockHash evContractAddress chainId evName $ map (\(_,x,_) -> x) evArgs -- drop the field names, only slipstream needs them
 
 outputTransactionResult ::
   VMBase m =>

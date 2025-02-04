@@ -32,7 +32,6 @@ import BlockApps.Solidity.Value
 import qualified BlockApps.SolidityVarReader as SVR
 import Blockchain.Data.AddressStateDB
 import Blockchain.Data.TransactionResult
-import Blockchain.Strato.Model.Account
 import Blockchain.Strato.Model.Address
 import Blockchain.Strato.Model.Event
 import Blockchain.Strato.Model.Keccak256
@@ -237,7 +236,7 @@ parseEvents = concatMap parseEvent
           eventBlockNumber = Action._blockNumber a,
           eventTxHash = Action._transactionHash a,
           eventTxSender = Action._transactionSender a,
-          eventAbstracts = maybe Map.empty Action._actionDataAbstracts . OMap.lookup ((evContractAccount e)^.accountAddress) $ Action._actionData a,
+          eventAbstracts = maybe Map.empty Action._actionDataAbstracts . OMap.lookup (evContractAddress e) $ Action._actionData a,
           eventEvent = e, 
           eventIndex = idx
         }

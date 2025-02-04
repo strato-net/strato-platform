@@ -1555,7 +1555,7 @@ aggEventToCollectionRows ae =
 aggEventToCollectionRow :: AggregateEvent -> Action.Event -> Text -> (Value, Value) -> ProcessedCollectionRow
 aggEventToCollectionRow ae ev arrayName (index, value) =
   ProcessedCollectionRow
-    { address = (_accountAddress . Action.evContractAccount) ev,
+    { address = Action.evContractAddress ev,
       creator = T.pack $ Action.evContractCreator ev,
       application = T.pack $ Action.evContractApplication ev,
       contractname = T.pack $ Action.evContractName ev,
@@ -1651,7 +1651,7 @@ insertEventTableQuery agEv@AggregateEvent {eventEvent = ev} =
       filledArgs = map fst . fillFirstEmptyEntries . map (\(aa, bb, _) -> (T.pack aa, bb)) $ Action.evArgs ev
       keySt = wrapAndEscapeDouble . map escapeQuotes $ baseTableColumnsForEvent ++ filledArgs
       baseVals =
-        [ tshow . _accountAddress . Action.evContractAccount . eventEvent,
+        [ tshow . Action.evContractAddress . eventEvent,
           T.pack . keccak256ToHex . eventBlockHash,
           tshow . eventBlockTimestamp,
           tshow . eventBlockNumber,
