@@ -15,7 +15,7 @@ contract SimpleOracleService is OracleService {
         string err = "Only the owner of the asset can "
                    + action
                    + ".";
-        require(msg.sender == owner, err);
+        require(getCommonName(msg.sender) == getCommonName(owner), err);
         _;
     }
 
