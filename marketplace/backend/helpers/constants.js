@@ -43,7 +43,7 @@ export default {
   testnetCataAddress: '051cb99bca7c437f4b17dc01bd4ff7c5e09db035',
   testnetETHSTAddress: '921e3d0b4217c7e2bfe7e660cdc4f7edc621f9d5',
   prodETHSTAddress: '93fb7295859b2d70199e0a4883b7c320cf874e6c',
-  testnetWBTCSTAddress: '70bca402dd332e43928a358bd622556f6ae6601d',
+  testnetWBTCSTAddress: '1bf2252f6ccdcfabeb96c372bec0b0fdc1809c36',
   prodWBTCSTAddress: '',
   attachImagesAndFiles:
     '*,BlockApps-Mercata-Asset-files(*),BlockApps-Mercata-Asset-images(*),BlockApps-Mercata-Asset-fileNames(*)',
