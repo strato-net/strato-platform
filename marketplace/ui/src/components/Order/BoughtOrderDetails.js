@@ -108,15 +108,11 @@ const BoughtOrderDetails = ({ user, users }) => {
           );
       let items = [];
       orderDetails.assets.forEach((prod, index) => {
-        const is18DecimalPlaces = assetsWithEighteenDecimalPlaces.includes(
+        const decimals = assetsWithEighteenDecimalPlaces.includes(
           prod.root
-        );
-        const productPrice = is18DecimalPlaces
-          ? (prod.price * Math.pow(10, 18)).toFixed(2)
-          : prod.price;
-        const productQuantity = is18DecimalPlaces
-          ? orderQuantities[index] / Math.pow(10, 18)
-          : orderQuantities[index];
+        ) ? 18 : prod.decimals || 0;
+        const productPrice = (prod.price * Math.pow(10, decimals)).toFixed(2);
+        const productQuantity = orderQuantities[index] / Math.pow(10, decimals);
         items.push({
           address: prod.address,
           chainId: prod.chainId,

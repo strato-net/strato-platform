@@ -7,6 +7,7 @@ synopsis: A Haskell version of an Ethereum client
 category:      Data Structures
 description:
               Tool to query the ethereum databases
+license: Apache-2.0
 
 dependencies:
   - base

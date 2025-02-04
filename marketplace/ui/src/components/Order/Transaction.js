@@ -94,9 +94,9 @@ const Transaction = ({ user }) => {
           transaction.assetContractName
         );
         let isStrat = transaction.assetOriginAddress === stratAddress;
-        let is18DecimalPlaces = assetsWithEighteenDecimalPlaces.includes(
+        let decimals = assetsWithEighteenDecimalPlaces.includes(
           transaction.assetOriginAddress
-        );
+        ) ? 18 : transaction.decimals || 0;
         return formatDataObject({
           reference: transaction?.reference,
           type: transaction?.type,
@@ -105,14 +105,10 @@ const Transaction = ({ user }) => {
           assetName: transaction?.assetName,
           Price: isStrat
             ? Number((transaction?.price * 100).toFixed(2))
-            : is18DecimalPlaces
-            ? Number((transaction?.price * Math.pow(10, 18)).toFixed(2))
-            : transaction?.price,
+            : Number((transaction?.price * Math.pow(10, decimals)).toFixed(2)),
           quantity: isStrat
             ? (transaction?.quantity / 100).toString()
-            : is18DecimalPlaces
-            ? (transaction?.quantity / Math.pow(10, 18)).toString()
-            : transaction?.quantity.toString(),
+            : (transaction?.quantity / Math.pow(10, decimals)).toString(),
           from: transaction.from,
           to: transaction.to,
           hash: transaction.transaction_hash,

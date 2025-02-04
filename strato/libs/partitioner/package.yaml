@@ -1,4 +1,5 @@
 name:                partitioner
+license:             Apache-2.0
 
 library:
   source-dirs: src

@@ -1,4 +1,5 @@
 name:                strato-networks
+license:             Apache-2.0
 
 dependencies:
 - base >= 4.7 && < 5

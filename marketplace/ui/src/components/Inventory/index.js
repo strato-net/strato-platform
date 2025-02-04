@@ -393,7 +393,7 @@ const Inventory = ({ user }) => {
           reserves.some(
             (reserve) => record.originAddress === reserve.assetRootAddress
           );
-        const borrowedAmount = (record?.escrow?.borrowedAmount || 0);
+        const borrowedAmount = record?.escrow?.borrowedAmount || 0;
         const callDetailPage = () => {
           navigate(
             `${naviroute
@@ -462,18 +462,18 @@ const Inventory = ({ user }) => {
         const price = record.price
           ? is18DecimalPlaces
             ? parseFloat(record.price * 10 ** 18).toFixed(2)
-            : record.price
+            : parseFloat(record.price * 10 ** (record.decimals || 0)).toFixed(2)
           : 'N/A';
         return (
           <div>
             {price !== 'N/A' ? (
-              <>
+              <div className="flex flex-col items-center">
                 <span>${price}</span>{' '}
                 <p className="flex text-xs items-center gap-1">
                   {' '}
                   &nbsp;({price} {USDSTIcon})
                 </p>
-              </>
+              </div>
             ) : (
               'N/A'
             )}
@@ -493,7 +493,9 @@ const Inventory = ({ user }) => {
             ? new BigNumber(record.quantity).dividedBy(
                 new BigNumber(10).pow(18)
               )
-            : new BigNumber(record.quantity)
+            : new BigNumber(record.quantity).dividedBy(
+                new BigNumber(10).pow(record.decimals || 0)
+              )
         )
           .toNumber()
           .toLocaleString('en-US', {
@@ -515,7 +517,9 @@ const Inventory = ({ user }) => {
             ? new BigNumber(record.saleQuantity || 0).dividedBy(
                 new BigNumber(10).pow(18)
               )
-            : new BigNumber(record.saleQuantity || 0)
+            : new BigNumber(record.saleQuantity || 0).dividedBy(
+                new BigNumber(10).pow(record.decimals || 0)
+              )
         ).toString();
 
         return <div className="w-24">{saleQuantity}</div>;

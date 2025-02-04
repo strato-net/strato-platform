@@ -1,5 +1,6 @@
 
 name: nibblestring
+license: Apache-2.0
 
 library:
   source-dirs: src

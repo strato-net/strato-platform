@@ -1,5 +1,6 @@
 name:                clockwork
 github:              "githubuser/clockwork"
+license: Apache-2.0
 
 
 dependencies:

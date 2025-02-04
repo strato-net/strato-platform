@@ -90,7 +90,7 @@ const styles = StyleSheet.create({
   },
 });
 
-const InvoiceComponent = ({ invoice, is18DecimalPlaces }) => {
+const InvoiceComponent = ({ invoice, decimals }) => {
   const [subtotal, setSubtotal] = useState(0);
   const [totalTax, settotalTax] = useState(0);
   const formatter = new Intl.NumberFormat('en-US');
@@ -174,17 +174,11 @@ const InvoiceComponent = ({ invoice, is18DecimalPlaces }) => {
                 </Text>
                 <Text style={[styles.value, styles.tableRowColumn]}>
                   {formattedNum(
-                    is18DecimalPlaces
-                      ? (adjustedPrice * Math.pow(10, 18)).toFixed(2)
-                      : adjustedPrice.toFixed(2)
+                    (adjustedPrice * Math.pow(10, decimals)).toFixed(2)
                   )}
                 </Text>
                 <Text style={[styles.value, styles.tableRowColumn]}>
-                  {formattedNum(
-                    is18DecimalPlaces
-                      ? (quantity / Math.pow(10, 18)).toFixed(2)
-                      : quantity
-                  )}
+                  {formattedNum((quantity / Math.pow(10, decimals)).toFixed(2))}
                 </Text>
                 <Text style={[styles.value, styles.tableRowColumn]}>
                   {totalPrice}

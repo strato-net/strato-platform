@@ -59,7 +59,7 @@ const StakeItemActions = ({
     ? inventory.totalQuantity
     : assetsWithEighteenDecimalPlaces.includes(inventory?.root || '')
     ? inventory?.quantity / 1e18
-    : inventory?.quantity || 0;
+    : inventory?.quantity / Math.pow(10, inventory?.decimals || 0);
 
   // stakeQuantity = quantity - collateralQuantity - quantityNotAvailable (will recompute after scaling)
   // Calculate collateralValue
@@ -95,13 +95,13 @@ const StakeItemActions = ({
    * If the inventory.root is in assetsWithEighteenDecimalPlaces, we need to scale down values by 1e18.
    * This matches the logic used in StakeModal and BorrowModal.
    */
-  const requiresDivision = assetsWithEighteenDecimalPlaces.includes(
+  const decimals = assetsWithEighteenDecimalPlaces.includes(
     inventory?.root || ''
-  );
+  ) ? 18 : inventory?.decimals || 0;
 
-  if (requiresDivision) {
-    collateralQuantity /= 1e18;
-    quantityNotAvailable /= 1e18;
+  if (decimals > 0) {
+    collateralQuantity /= Math.pow(10, decimals);
+    quantityNotAvailable /= Math.pow(10, decimals);
   }
 
   // Recompute stakeQuantity after possible scaling

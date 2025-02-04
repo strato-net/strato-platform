@@ -7,6 +7,7 @@ maintainer: eitan@blockapps.net
 copyright: 2016 BlockApps
 category: Web
 build-type: Simple
+license: Apache-2.0
 
 ghc-options: -Wall -Werror
 
