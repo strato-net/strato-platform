@@ -48,7 +48,7 @@ abstract contract Reserve is Utils, Structs {
     }
 
     modifier requireOwner(string action) {
-        require(msg.sender == owner, "Only owner can " + action + ".");
+        require(getCommonName(msg.sender) == getCommonName(owner), "Only owner can " + action + ".");
         _;
     }
 
