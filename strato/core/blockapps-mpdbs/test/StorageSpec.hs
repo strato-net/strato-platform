@@ -251,8 +251,8 @@ storageSpec = do
               ExternallyOwned $ unsafeCreateKeccak256FromWord256 0x456
             ]
       insertMany (Proxy @AddressState) . M.fromList $ zip accts $ map (\cp -> blankAddressState {addressStateCodeHash = cp}) codePtrs
-      resolveCodePtr (Just 0) (codePtrs !! 0) `shouldReturn` Just (codePtrs !! 0)
-      resolveCodePtr (Just 0) (codePtrs !! 1) `shouldReturn` Just (codePtrs !! 1)
+      resolveCodePtr (codePtrs !! 0) `shouldReturn` Just (codePtrs !! 0)
+      resolveCodePtr (codePtrs !! 1) `shouldReturn` Just (codePtrs !! 1)
     it "should resolve an ancestor code pointer" . runStorM $ do
       let chainRelationships =
             [ ((0 :: Word256), ParentChainIds M.empty),
@@ -265,10 +265,10 @@ storageSpec = do
             ]
       let codePtrs =
             [ SolidVMCode "Code_0" $ unsafeCreateKeccak256FromWord256 0x123,
-              CodeAtAccount (Account (accts !! 0) Nothing) "Ptr_0"
+              CodeAtAccount (accts !! 0) "Ptr_0"
             ]
       insertMany (Proxy @AddressState) . M.fromList $ zip accts $ map (\cp -> blankAddressState {addressStateCodeHash = cp}) codePtrs
-      resolveCodePtr (Just 1) (codePtrs !! 1) `shouldReturn` Just (SolidVMCode "Ptr_0" $ unsafeCreateKeccak256FromWord256 0x123)
+      resolveCodePtr (codePtrs !! 1) `shouldReturn` Just (SolidVMCode "Ptr_0" $ unsafeCreateKeccak256FromWord256 0x123)
     it "should detect cycles in codeptrs (pointer1 to pointer2, pointer2 to pointer1)" . runStorM $ do
       let chainRelationships =
             [ ((0 :: Word256), ParentChainIds M.empty),
@@ -281,9 +281,9 @@ storageSpec = do
               Address 0xfff
             ]
       let codePtrs =
-            [ CodeAtAccount (Account (accts !! 1) Nothing) "Ptr_0",
-              CodeAtAccount (Account (accts !! 0) Nothing) "Ptr_1",
-              CodeAtAccount (Account (accts !! 0) Nothing) "Ptr_2"
+            [ CodeAtAccount (accts !! 1) "Ptr_0",
+              CodeAtAccount (accts !! 0) "Ptr_1",
+              CodeAtAccount (accts !! 0) "Ptr_2"
             ]
       insertMany (Proxy @AddressState) . M.fromList $ zip accts $ map (\cp -> blankAddressState {addressStateCodeHash = cp}) codePtrs
-      resolveCodePtr (Just 1) (codePtrs !! 2) `shouldReturn` Nothing
+      resolveCodePtr (codePtrs !! 2) `shouldReturn` Nothing

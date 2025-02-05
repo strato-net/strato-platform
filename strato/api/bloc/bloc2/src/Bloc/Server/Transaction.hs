@@ -447,7 +447,7 @@ getMaybeCodeFromContractPayload p =
         Just contract -> 
           Just $ PtrToCode (
             CodeAtAccount
-              (Account p' Nothing)
+              p'
               (unpack contract)
           )
         Nothing -> Nothing
@@ -1146,10 +1146,10 @@ preparePostTx time from tx =
       Code bytes -> Just bytes
       _ -> Nothing
     cName = case transactionInitOrData tx of
-      PtrToCode (CodeAtAccount (Account _ _) codePtrName) -> Just codePtrName
+      PtrToCode (CodeAtAccount _ codePtrName) -> Just codePtrName
       _ -> Nothing
     cpa = case transactionInitOrData tx of
-      PtrToCode (CodeAtAccount (Account codePtrAddress _) _) -> Just codePtrAddress
+      PtrToCode (CodeAtAccount codePtrAddress _) -> Just codePtrAddress
       _ -> Nothing
     toAddr = transactionTo tx
     chainId = fromMaybe 0 . fmap (\(ChainId c) -> c) $ transactionChainId tx
@@ -1190,10 +1190,10 @@ preparePostUnsignedRawTx time tx md =
       Code bytes -> Just bytes
       _ -> Nothing
     cName = case unsignedTransactionInitOrData tx of
-      PtrToCode (CodeAtAccount (Account _ _) codePtrName) -> Just codePtrName
+      PtrToCode (CodeAtAccount _ codePtrName) -> Just codePtrName
       _ -> Nothing
     cpa = case unsignedTransactionInitOrData tx of
-      PtrToCode (CodeAtAccount (Account codePtrAddress _) _) -> Just codePtrAddress
+      PtrToCode (CodeAtAccount codePtrAddress _) -> Just codePtrAddress
       _ -> Nothing
     toAddr = unsignedTransactionTo tx
     chainId = fromMaybe 0 . fmap (\(ChainId c) -> c) $ unsignedTransactionChainId tx

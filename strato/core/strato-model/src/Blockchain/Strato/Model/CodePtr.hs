@@ -15,7 +15,7 @@ where
 
 import Blockchain.Data.RLP
 import Blockchain.SolidVM.Model (CodeKind (..))
-import Blockchain.Strato.Model.Account
+import Blockchain.Strato.Model.Address
 import Blockchain.Strato.Model.Keccak256
 import Control.DeepSeq
 import Control.Lens ((&), (?~))
@@ -38,7 +38,7 @@ import Text.Read (readEither)
 data CodePtr
   = ExternallyOwned Keccak256
   | SolidVMCode String Keccak256
-  | CodeAtAccount Account String
+  | CodeAtAccount Address String
   deriving (Show, Read, Eq, Ord, Generic, NFData, Hashable, Data)
 
 instance S.ToSchema CodePtr where

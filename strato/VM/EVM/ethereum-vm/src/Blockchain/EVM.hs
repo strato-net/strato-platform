@@ -1092,7 +1092,7 @@ create
       Code <$> case code of
         Code c -> pure c
         PtrToCode cp -> do
-          codeHash <- resolveCodePtr chainId cp
+          codeHash <- resolveCodePtr cp
           fromMaybe "" <$> traverse getExternallyOwned' codeHash
     let env =
           Environment

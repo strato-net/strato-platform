@@ -261,7 +261,7 @@ create _ _ _ blockData _ sender' origin' proposer' _ _ availableGas newAddress c
   initCode <- case code of
     Code c -> pure c
     PtrToCode cp -> do
-      hsh <- codePtrToSHA chainId' cp
+      hsh <- codePtrToSHA cp
       fromMaybe "" . fmap snd . join <$> traverse getCode hsh
 
   fmap (either solidvmErrorResults id) . runSM (Just code) env' gasInfo' chainId' $ do
@@ -284,7 +284,7 @@ getParentName address = fromMaybeM (return "") $
                           pure address -- Code pointer's address
                             >>= MaybeT . A.lookup (A.Proxy @AddressState) -- Address's state
                             >>= pure . addressStateCodeHash -- state's Acodehash/CodePtr
-                            >>= MaybeT . resolveCodePtrParent Nothing -- CodePtr's parent
+                            >>= MaybeT . resolveCodePtrParent -- CodePtr's parent
                             >>= ( \case
                                     SolidVMCode name _ -> pure name -- Name of the parent
                                     _ -> pure ""
@@ -296,8 +296,8 @@ create' creator maybeCodePtr originAddress issuerAcct issuerName newAddress ch c
   -- Get parentName and cc_creator from maybeCodePtr or creator
   (parentName, cc_creator) <- case maybeCodePtr of
                   (Just(PtrToCode (CodeAtAccount codePtrAcc _))) -> do
-                      parentName <- getParentName (codePtrAcc^.accountAddress)
-                      appCreator <- getSolidStorageKeyVal' (codePtrAcc^.accountAddress) $ MS.StoragePath [MS.Field ":creator"]
+                      parentName <- getParentName codePtrAcc
+                      appCreator <- getSolidStorageKeyVal' codePtrAcc $ MS.StoragePath [MS.Field ":creator"]
                       let cc_creator = case appCreator of
                                         MS.BString cn' -> Just (BC.unpack cn')
                                         _ -> Nothing
@@ -317,7 +317,7 @@ create' creator maybeCodePtr originAddress issuerAcct issuerName newAddress ch c
 
   let ptr2InitialContract = case maybeCodePtr of
         Just (PtrToCode (CodeAtAccount cp _)) -> cp
-        _ -> (Account creator Nothing)
+        _ -> creator
 
   initializeAction newAddress (labelToString contractName') issuerName cc_creator (show originAddress) parentName ch cc abstracts mappings arrays
 
@@ -500,7 +500,6 @@ call' from to' fnCalltype mContract functionName isRCC argExps = do
         CC.DefaultCall -> (to', to')
         CC.RawCall -> (to', to')
         CC.DelegateCall -> (from, to')
-      toChain = Nothing
   (contract', hsh, cc) <- getCodeAndCollection ccToGet
   parentName <-
     fromMaybeM (return "") $
@@ -508,7 +507,7 @@ call' from to' fnCalltype mContract functionName isRCC argExps = do
         pure ccToGet -- Contract's address
           >>= MaybeT . A.lookup (A.Proxy @AddressState) -- Address's state
           >>= pure . addressStateCodeHash -- state's codehash/CodePtr
-          >>= MaybeT . resolveCodePtrParent toChain -- CodePtr's parent
+          >>= MaybeT . resolveCodePtrParent -- CodePtr's parent
           >>= ( \case
                   SolidVMCode name _ -> pure $ stringToLabel name -- Name of the parent
                   _ -> pure ""
@@ -1348,7 +1347,7 @@ runStatement st@(CC.EmitStatement eventName exptups pos) = do
                 pure address
                   >>= MaybeT . A.lookup (A.Proxy @AddressState)
                   >>= pure . addressStateCodeHash
-                  >>= MaybeT . resolveCodePtrParent Nothing
+                  >>= MaybeT . resolveCodePtrParent
                   >>= ( \case
                           SolidVMCode name _ | name /= (labelToString $ CC._contractName curCnct) -> pure name
                           _ -> pure ""
@@ -2326,7 +2325,7 @@ evaluateAccountMember a _ "codehash" = do
   -- Get the chainId for the account
   -- Retreive and resolve the codehash
   codeHash' <- addressStateCodeHash <$> A.lookupWithDefault (A.Proxy @AddressState) a
-  resolvedCodeHash <- resolveCodePtr Nothing codeHash'
+  resolvedCodeHash <- resolveCodePtr codeHash'
   case resolvedCodeHash of
     Just (SolidVMCode _ ch') -> return (Constant $ SString . keccak256ToHex $ ch')
     Just cp -> missingCodeCollection "Account is not a SolidVM contract" (format cp)
@@ -2336,7 +2335,7 @@ evaluateAccountMember a _ "code" = do
   -- Get the code at the address
   -- Retreive and resolve the codehash
   codeHash' <- addressStateCodeHash <$> A.lookupWithDefault (A.Proxy @AddressState) a
-  resolvedCodeHash <- resolveCodePtr Nothing codeHash'
+  resolvedCodeHash <- resolveCodePtr codeHash'
   let ch' = case resolvedCodeHash of
         Just (SolidVMCode _ ch1') -> ch1'
         Just cp -> missingCodeCollection "Account is not a SolidVM contract" (format cp)

@@ -20,7 +20,7 @@ import qualified Database.Persist.Postgresql as SQL hiding (Update, get)
 addressStateRefCodePtr :: AddressStateRef -> Maybe CodePtr
 addressStateRefCodePtr AddressStateRef {..} = case addressStateRefContractName of
   Just name -> case addressStateRefCodePtrAddress of
-    Just a -> Just $ CodeAtAccount (Account a addressStateRefCodePtrChainId) name
+    Just a -> Just $ CodeAtAccount a name
     Nothing -> SolidVMCode name <$> addressStateRefCodeHash
   Nothing -> Nothing
 

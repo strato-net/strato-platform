@@ -170,7 +170,7 @@ resolveFile getCCFromHash expr (seen, resolved) =
             lift (A.select (A.Proxy @AddressState) (acct^.accountAddress)) >>= \case
               Nothing -> pure (seen, resolved)
               Just AddressState {..} ->
-                lift (runMainChainT $ resolveCodePtr Nothing addressStateCodeHash) >>= \case
+                lift (runMainChainT $ resolveCodePtr addressStateCodeHash) >>= \case
                   Just (SolidVMCode _ ch) -> do
                     rfu <- lift $ codeCollectionToFileUnits (Just acct) <$> getCCFromHash ch
                     pure (seen, M.insert (tShowExpr expr) (Right rfu) resolved)

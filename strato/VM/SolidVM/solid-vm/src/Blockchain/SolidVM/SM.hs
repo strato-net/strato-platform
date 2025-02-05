@@ -956,7 +956,7 @@ getCodeAndCollection address' = do
     else do
       codeHash <- addressStateCodeHash <$> A.lookupWithDefault (A.Proxy @AddressState) address'
 
-      resolvedCodeHash <- resolveCodePtr Nothing codeHash
+      resolvedCodeHash <- resolveCodePtr codeHash
       (contractName', ch, cc) <-
         case resolvedCodeHash of
           Just (SolidVMCode cn ch') -> do
@@ -1013,7 +1013,7 @@ resolveNameParts to' crtr app c = do
             "Could not find address state for address " ++ show address
           pure ((address, tName c), (crtr, app, (map T.pack (M.keys $ CC._storageDefs c))))
         Just s ->
-          resolveCodePtr Nothing (addressStateCodeHash s) >>= \case
+          resolveCodePtr (addressStateCodeHash s) >>= \case
             Just (SolidVMCode appName _) -> do
               appCreator <- getSolidStorageKeyVal' address $ MS.StoragePath [MS.Field ":creator"]
               case appCreator of

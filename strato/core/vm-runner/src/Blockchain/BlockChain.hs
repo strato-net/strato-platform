@@ -523,7 +523,7 @@ runCodeForTransaction isRunningTests' isHomestead b availableGas tAddr t propose
           let owner = transactionTo ut
 
           codeHash <- lift $ addressStateCodeHash <$> A.lookupWithDefault (Proxy @AddressState) owner
-          resolvedCodeHash <- lift $ resolveCodePtr Nothing codeHash
+          resolvedCodeHash <- lift $ resolveCodePtr codeHash
 
           let eCall =
                 case codeHash of

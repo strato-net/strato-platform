@@ -619,7 +619,7 @@ FOR EACH ROW EXECUTE PROCEDURE "insert_or_update_Vehicle2_history_table"();|]
         input =
            ( SE.ProcessedContract
                 { SE.address = testAdd,
-                  SE.codehash = CodeAtAccount (Account (Address 0x1234567890) Nothing) "SwissArmy", -- hash "<CODEHASH>",
+                  SE.codehash = CodeAtAccount (Address 0x1234567890) "SwissArmy", -- hash "<CODEHASH>",
                   SE.creator = "",
                   SE.cc_creator = Nothing,
                   SE.root = "",
@@ -825,7 +825,7 @@ FOR EACH ROW EXECUTE PROCEDURE "insert_or_update_Vehicle2_history_table"();|]
     let testAdd = Address 0x98eaddede
         input = (SE.ProcessedContract {
           SE.address = testAdd,
-          SE.codehash = CodeAtAccount (Account (Address 0x1234567890) Nothing) "SwissArmy", -- $ hash "<CODEHASH>",
+          SE.codehash = CodeAtAccount (Address 0x1234567890) "SwissArmy", -- $ hash "<CODEHASH>",
           SE.creator = "",
           SE.cc_creator = Nothing,
           SE.root = "",
@@ -845,7 +845,7 @@ FOR EACH ROW EXECUTE PROCEDURE "insert_or_update_Vehicle2_history_table"();|]
             ])
         inherited = [(SE.ProcessedContract {
           SE.address = testAdd,
-          SE.codehash = CodeAtAccount (Account (Address 0x1234567890) Nothing) "SwissArmyz", -- $ hash "<CODEHASH>",
+          SE.codehash = CodeAtAccount (Address 0x1234567890) "SwissArmyz", -- $ hash "<CODEHASH>",
           SE.creator = "",
           SE.cc_creator = Nothing,
           SE.root = "",

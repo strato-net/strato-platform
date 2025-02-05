@@ -10,7 +10,6 @@ import qualified Blockchain.Data.TransactionDef as TD
 import Blockchain.Data.TransactionResultStatus
 import Blockchain.Database.MerklePatricia (StateRoot (..))
 import Blockchain.Sequencer.Event (OutputTx (..))
-import Blockchain.Strato.Model.Account
 import Blockchain.Strato.Model.Address
 import Blockchain.Strato.Model.Class
 import Blockchain.Strato.Model.Delta
@@ -50,7 +49,7 @@ data TransactionFailureCause
   | TFBlockGasLimitExceeded Integer Integer OutputTx -- neededGas, actualGas
   | TFNonceMismatch Integer Integer OutputTx -- expectedNonce, actualNonce
   | TFChainIdMismatch (Maybe Word256) (Maybe Word256) OutputTx -- expectedChainId, actualChainId
-  | TFCodeCollectionNotFound Account String OutputTx
+  | TFCodeCollectionNotFound Address String OutputTx
   | TFInvalidPragma [(String, String)] OutputTx
   | TFNonceLimitExceeded Integer Integer OutputTx -- accountNonceLimit, actualNonce
   | TFTXSizeLimitExceeded Integer Integer OutputTx -- txSizeLimit, actualSize
@@ -82,7 +81,7 @@ data TxRejection
   | BalanceTooLow BaggerStage BaggerTxQueue Integer Integer OutputTx -- integers: needed balance, actual balance
   | GasLimitTooLow BaggerStage BaggerTxQueue Integer OutputTx -- queue should probably only be Validation, integer is intrinsic gas
   | LessLucrative BaggerStage BaggerTxQueue OutputTx OutputTx -- newTx, oldTx
-  | CodeNotFound BaggerStage BaggerTxQueue Account String OutputTx
+  | CodeNotFound BaggerStage BaggerTxQueue Address String OutputTx
   | InvalidPragma BaggerStage BaggerTxQueue [(String, String)] OutputTx
   | NonceLimitExceeded BaggerStage BaggerTxQueue Integer Integer OutputTx
   | TXSizeLimitExceeded BaggerStage BaggerTxQueue Integer Integer OutputTx

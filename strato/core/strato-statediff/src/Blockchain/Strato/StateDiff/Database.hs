@@ -96,7 +96,7 @@ createAccount blockNumber accountDiffs =
           addressStateRefCodeHash = codePtrHash $ codeHash diff,
           addressStateRefContractName = codePtrName $ codeHash diff,
           addressStateRefCodePtrAddress = codePtrAddress $ codeHash diff,
-          addressStateRefCodePtrChainId = codePtrChainId $ codeHash diff,
+          addressStateRefCodePtrChainId = Nothing,
           addressStateRefLatestBlockDataRefNumber = blockNumber,
           addressStateRefChainId = fromMaybe 0 $ account ^. accountChainId
         }
