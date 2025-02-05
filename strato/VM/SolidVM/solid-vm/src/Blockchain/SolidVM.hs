@@ -35,7 +35,6 @@ import Blockchain.Data.AddressStateDB
 import Blockchain.Data.BlockHeader (BlockHeader)
 -- import Blockchain.Blockstanbul.Model.Authentication
 import qualified Blockchain.Data.BlockHeader as BlockHeader
-import Blockchain.Data.ChainInfo
 import Blockchain.Data.ExecResults
 import Blockchain.Data.Transaction (whoSignedThisTransactionEcrecover)
 import qualified Blockchain.Database.MerklePatricia as MP
@@ -2587,22 +2586,8 @@ parseBaseInt s n =
     _ -> Left $ "Cannot convert string " <> s <> " to base " <> show n
 
 castToAncestor :: MonadSM m => NamedAccount -> String -> m Value
-castToAncestor a name = do
-  cInfo <- Mod.get (Mod.Proxy @[CallInfo])
-  let mCurrentChainId = join $ const Nothing <$> listToMaybe cInfo
-  case a ^. namedAccountChainId of
-    MainChain -> returnMainChain
-    UnspecifiedChain -> case mCurrentChainId of
-      Nothing -> returnMainChain
-      Just currentChainId -> resolveChain currentChainId
-    ExplicitChain specifiedChain -> resolveChain specifiedChain
-  where
-    returnMainChain = return . ((flip SAccount) False) $ (namedAccountChainId .~ MainChain) a
-    resolveChain cId = do
-      pChain <- getAncestorChainByName (T.pack name) cId
-      case pChain of
-        Nothing -> returnMainChain
-        Just b -> return . ((flip SAccount) False) $ (namedAccountChainId .~ ExplicitChain b) a
+castToAncestor a _ = 
+    return $ SAccount (NamedAccount (a^.namedAccountAddress) MainChain) False
 
 callBuiltin :: MonadSM m => SolidString -> [Value] -> Maybe Value -> m Value
 callBuiltin "string" [SString s] _ = return $ SString s
