@@ -27,7 +27,6 @@ import Blockchain.DB.StateDB
 import Blockchain.Data.AddressStateDB
 import qualified Blockchain.Database.MerklePatricia as MP
 import Blockchain.Init.Options (flags_vaultWrapperUrl)
-import Blockchain.Strato.Model.Account
 import Blockchain.Strato.Model.Address
 import Blockchain.Strato.Model.ExtendedWord
 import Blockchain.Strato.Model.Keccak256
@@ -55,10 +54,10 @@ data SetupDBs = SetupDBs
     hashDB :: HashDB,
     codeDB :: CodeDB,
     vaultDB :: ClientEnv,
-    localStorageTx :: IORef (M.Map (Account, B.ByteString) B.ByteString),
-    localStorageBlock :: IORef (M.Map (Account, B.ByteString) B.ByteString),
-    localAddressStateTx :: IORef (M.Map Account AddressStateModification),
-    localAddressStateBlock :: IORef (M.Map Account AddressStateModification)
+    localStorageTx :: IORef (M.Map (Address, B.ByteString) B.ByteString),
+    localStorageBlock :: IORef (M.Map (Address, B.ByteString) B.ByteString),
+    localAddressStateTx :: IORef (M.Map Address AddressStateModification),
+    localAddressStateBlock :: IORef (M.Map Address AddressStateModification)
   }
 
 type HasDBs m = Mod.Accessible SetupDBs m
@@ -130,12 +129,12 @@ instance (MonadIO m, HasDBs m) => HasMemAddressStateDB m where
     lasbref <- fmap localAddressStateBlock $ Mod.access Mod.Proxy
     liftIO $ atomicWriteIORef lasbref theMap
 
-instance (MonadIO m, MonadLogger m, HasDBs m) => (Account `A.Alters` AddressState) m where
+instance (MonadIO m, MonadLogger m, HasDBs m) => (Address `A.Alters` AddressState) m where
   lookup _ = getAddressStateMaybe
   insert _ = putAddressState
   delete _ = deleteAddressState
 
-instance (MonadIO m, MonadLogger m, HasDBs m) => (Account `A.Selectable` AddressState) m where
+instance (MonadIO m, MonadLogger m, HasDBs m) => (Address `A.Selectable` AddressState) m where
   select _ = getAddressStateMaybe
 
 instance (MonadIO m, MonadLogger m, HasDBs m) => (Keccak256 `A.Alters` DBCode) m where

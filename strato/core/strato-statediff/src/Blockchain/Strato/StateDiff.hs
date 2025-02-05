@@ -177,7 +177,7 @@ chainDiff ::
     Modifiable BlockHashRoot m,
     Modifiable GenesisRoot m,
     Modifiable BestBlockRoot m,
-    Selectable Account AddressState m
+    Selectable Address AddressState m
   ) =>
   Maybe Word256 ->
   Integer ->
@@ -197,7 +197,7 @@ stateDiff ::
     HasHashDB m,
     HasStateDB m,
     Modifiable BestBlockRoot m,
-    Selectable Account AddressState m
+    Selectable Address AddressState m
   ) =>
   Maybe Word256 ->
   Integer ->
@@ -217,7 +217,7 @@ stateDiff' ::
     HasCodeDB m,
     HasHashDB m,
     (MP.StateRoot `Alters` MP.NodeData) m,
-    Selectable Account AddressState m
+    Selectable Address AddressState m
   ) =>
   Maybe Word256 ->
   Integer ->
@@ -262,7 +262,7 @@ accountEnd ::
     HasHashDB m,
     HasCodeDB m,
     (MP.StateRoot `Alters` MP.NodeData) m,
-    Selectable Account AddressState m
+    Selectable Address AddressState m
   ) =>
   Maybe Word256 ->
   [N.Nibble] ->
@@ -280,7 +280,7 @@ accountUpdate ::
     HasHashDB m,
     HasCodeDB m,
     (MP.StateRoot `Alters` MP.NodeData) m,
-    Selectable Account AddressState m
+    Selectable Address AddressState m
   ) =>
   Maybe Word256 ->
   [N.Nibble] ->
@@ -301,7 +301,7 @@ eventualAccountState ::
     HasHashDB m,
     HasCodeDB m,
     (MP.StateRoot `Alters` MP.NodeData) m,
-    Selectable Account AddressState m
+    Selectable Address AddressState m
   ) =>
   AddressState ->
   m (AccountDiff 'Eventual)
@@ -331,7 +331,7 @@ incrementalAccountState ::
     HasHashDB m,
     HasCodeDB m,
     (MP.StateRoot `Alters` MP.NodeData) m,
-    Selectable Account AddressState m
+    Selectable Address AddressState m
   ) =>
   AddressState ->
   AddressState ->
@@ -427,7 +427,7 @@ decodeStorageKV k v = do
 lookupAddress :: (MonadLogger m, HasHashDB m) => [N.Nibble] -> m Address
 lookupAddress (N.pack -> addrHash) = fromMaybe (Address 0) <$> lookupInMPDB "address" getAddressFromHash addrHash
 
-lookupCode :: (MonadLogger m, HasHashDB m, HasCodeDB m, Selectable Account AddressState m) => CodePtr -> m (CodeKind, ByteString)
+lookupCode :: (MonadLogger m, HasHashDB m, HasCodeDB m, Selectable Address AddressState m) => CodePtr -> m (CodeKind, ByteString)
 lookupCode (ExternallyOwned ch) = fromMaybe (EVM, "") <$> lookupInMPDB "contract code" getCode ch
 lookupCode (SolidVMCode _ ch) = fromMaybe (SolidVM, "") <$> lookupInMPDB "contract code" getCode ch
 lookupCode cp@(CodeAtAccount _ _) = maybe (pure (SolidVM, "")) lookupCode =<< unsafeResolveCodePtr cp

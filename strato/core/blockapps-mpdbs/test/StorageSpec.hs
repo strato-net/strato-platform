@@ -45,9 +45,9 @@ import Test.Hspec.Expectations.Lifted
 import UnliftIO.Exception
 import Prelude hiding (abs, lookup)
 
-type SMap = M.Map (Account, B.ByteString) B.ByteString
+type SMap = M.Map (Address, B.ByteString) B.ByteString
 
-type AMap = M.Map Account AddressStateModification
+type AMap = M.Map Address AddressStateModification
 
 data CachedStorage = CS
   { _sdb :: DB.DB,
@@ -85,12 +85,12 @@ instance HasMemAddressStateDB StorM where
   getAddressStateBlockDBMap = use abs
   putAddressStateBlockDBMap = assign abs
 
-instance (Account `Alters` AddressState) StorM where
+instance (Address `Alters` AddressState) StorM where
   lookup _ = getAddressStateMaybe
   insert _ = putAddressState
   delete _ = deleteAddressState
 
-instance Selectable Account AddressState StorM where
+instance Selectable Address AddressState StorM where
   select _ = getAddressStateMaybe
 
 instance (MP.StateRoot `Alters` MP.NodeData) StorM where
@@ -184,25 +184,25 @@ storageSpec = do
                           ]
 
     it "put 0 should not change the state root" . runStorM $ do
-      want <- addressStateContractRoot <$> lookupWithDefault Proxy (Account 0x1234 Nothing)
+      want <- addressStateContractRoot <$> lookupWithDefault Proxy (Address 0x1234)
       want `shouldBe` "V\232\US\ETB\ESC\204U\166\255\131E\230\146\192\248n[H\224\ESC\153l\173\192\SOHb/\181\227c\180!"
       putStorageKeyVal'' 0x1234 0x3 0x0
       flushMemStorageDB
-      got <- addressStateContractRoot <$> lookupWithDefault Proxy (Account 0x1234 Nothing)
+      got <- addressStateContractRoot <$> lookupWithDefault Proxy (Address 0x1234)
       want `shouldBe` got
 
     it "put 1 should change the state root" . runStorM $ do
-      want <- addressStateContractRoot <$> lookupWithDefault Proxy (Account 0x1234 Nothing)
+      want <- addressStateContractRoot <$> lookupWithDefault Proxy (Address 0x1234)
       putStorageKeyVal'' 0x1234 0x3 0x44
       flushMemStorageDB
-      got <- addressStateContractRoot <$> lookupWithDefault Proxy (Account 0x1234 Nothing)
+      got <- addressStateContractRoot <$> lookupWithDefault Proxy (Address 0x1234)
       want `shouldNotBe` got
       got `shouldBe` "E\RS\164\USe\177\214\249m\186\SI\248\136\\\215\137\172\231\135q\224;\178TWg\SUB\147n\134. "
 
   describe "RawStorageDB" $ do
     it "should get its puts" . runStorM $ do
-      putRawStorageKeyVal' ((Account 0x888 Nothing), "aKey") "aValue"
-      getRawStorageKeyVal' ((Account 0x888 Nothing), "aKey") `shouldReturn` "aValue"
+      putRawStorageKeyVal' (0x888, "aKey") "aValue"
+      getRawStorageKeyVal' (0x888, "aKey") `shouldReturn` "aValue"
 
   describe "SolidStorageDB SolidVM=3.0" $ do
     it "should get its puts" . runStorM $ do
@@ -215,11 +215,11 @@ storageSpec = do
       flushMemSolidStorageDB
 
     let solidIdTest msg bv = it ("put " <> msg <> " in SolidStorage should not change the state root") . runStorM $ do
-          want <- addressStateContractRoot <$> lookupWithDefault Proxy (Account 0x1234 Nothing)
+          want <- addressStateContractRoot <$> lookupWithDefault Proxy (Address 0x1234)
           want `shouldBe` "V\232\US\ETB\ESC\204U\166\255\131E\230\146\192\248n[H\224\ESC\153l\173\192\SOHb/\181\227c\180!"
           putSolidStorageKeyVal' 0x1234 (MS.fromList [MS.Field "x", MS.ArrayIndex 99]) bv
           flushMemStorageDB
-          got <- addressStateContractRoot <$> lookupWithDefault Proxy (Account 0x1234 Nothing)
+          got <- addressStateContractRoot <$> lookupWithDefault Proxy (Address 0x1234)
           want `shouldBe` got
 
     solidIdTest "0" (MS.BInteger 0)
@@ -231,10 +231,10 @@ storageSpec = do
     solidIdTest "BDefault" (MS.BDefault)
 
     it "put 1 in SolidStorage should change the state root" . runStorM $ do
-      want <- addressStateContractRoot <$> lookupWithDefault Proxy (Account 0x1234 Nothing)
+      want <- addressStateContractRoot <$> lookupWithDefault Proxy (Address 0x1234)
       putSolidStorageKeyVal' 0x1234 (MS.fromList [MS.Field "x", MS.ArrayIndex 99]) (MS.BInteger 1)
       flushMemStorageDB
-      got <- addressStateContractRoot <$> lookupWithDefault Proxy (Account 0x1234 Nothing)
+      got <- addressStateContractRoot <$> lookupWithDefault Proxy (Address 0x1234)
       want `shouldNotBe` got
       got `shouldBe` "\223\231^\"\234'\233\249\208*D\163\210\237\147\ETXq\202\EM\208\195\140\223\&7J\SI\201\250\&9\165\177\141"
 
@@ -243,8 +243,8 @@ storageSpec = do
       let chainRelationships = [((0 :: Word256), ParentChainIds M.empty)]
       insertMany (Proxy @ParentChainIds) $ M.fromList chainRelationships
       let accts =
-            [ Account 0xabc (Just 0),
-              Account 0xdef (Just 0)
+            [ Address 0xabc,
+              Address 0xdef
             ]
       let codePtrs =
             [ SolidVMCode "Code_0" $ unsafeCreateKeccak256FromWord256 0x123,
@@ -260,12 +260,12 @@ storageSpec = do
             ]
       insertMany (Proxy @ParentChainIds) $ M.fromList chainRelationships
       let accts =
-            [ Account 0xabc (Just 0),
-              Account 0xdef (Just 1)
+            [ Address 0xabc,
+              Address 0xdef
             ]
       let codePtrs =
             [ SolidVMCode "Code_0" $ unsafeCreateKeccak256FromWord256 0x123,
-              CodeAtAccount (accts !! 0) "Ptr_0"
+              CodeAtAccount (Account (accts !! 0) Nothing) "Ptr_0"
             ]
       insertMany (Proxy @AddressState) . M.fromList $ zip accts $ map (\cp -> blankAddressState {addressStateCodeHash = cp}) codePtrs
       resolveCodePtr (Just 1) (codePtrs !! 1) `shouldReturn` Just (SolidVMCode "Ptr_0" $ unsafeCreateKeccak256FromWord256 0x123)
@@ -276,11 +276,11 @@ storageSpec = do
             ]
       insertMany (Proxy @ParentChainIds) $ M.fromList chainRelationships
       let accts =
-            [ Account 0xabc (Just 0),
-              Account 0xdef (Just 1)
+            [ Address 0xabc,
+              Address 0xdef
             ]
       let codePtrs =
-            [ CodeAtAccount (accts !! 1) "Ptr_0",
+            [ CodeAtAccount (Account (accts !! 1) Nothing) "Ptr_0",
               SolidVMCode "Code_0" $ unsafeCreateKeccak256FromWord256 0x123
             ]
       insertMany (Proxy @AddressState) . M.fromList $ zip accts $ map (\cp -> blankAddressState {addressStateCodeHash = cp}) codePtrs
@@ -293,12 +293,12 @@ storageSpec = do
             ]
       insertMany (Proxy @ParentChainIds) $ M.fromList chainRelationships
       let accts =
-            [ Account 0xabc (Just 1),
-              Account 0xdef (Just 2)
+            [ Address 0xabc,
+              Address 0xdef
             ]
       let codePtrs =
             [ SolidVMCode "Code_0" $ unsafeCreateKeccak256FromWord256 0x123,
-              CodeAtAccount (accts !! 0) "Ptr_0"
+              CodeAtAccount (Account (accts !! 0) Nothing) "Ptr_0"
             ]
       insertMany (Proxy @AddressState) . M.fromList $ zip accts $ map (\cp -> blankAddressState {addressStateCodeHash = cp}) codePtrs
       resolveCodePtr (Just 2) (codePtrs !! 1) `shouldReturn` Nothing
@@ -310,14 +310,14 @@ storageSpec = do
             ]
       insertMany (Proxy @ParentChainIds) $ M.fromList chainRelationships
       let accts =
-            [ Account 0xabc (Just 1),
-              Account 0xdef (Just 0),
-              Account 0xfff (Just 2)
+            [ Address 0xabc,
+              Address 0xdef,
+              Address 0xfff
             ]
       let codePtrs =
             [ SolidVMCode "Code_0" $ unsafeCreateKeccak256FromWord256 0x123,
-              CodeAtAccount (accts !! 0) "Ptr_0",
-              CodeAtAccount (accts !! 1) "Ptr_1"
+              CodeAtAccount (Account (accts !! 0) Nothing) "Ptr_0",
+              CodeAtAccount (Account (accts !! 1) Nothing) "Ptr_1"
             ]
       insertMany (Proxy @AddressState) . M.fromList $ zip accts $ map (\cp -> blankAddressState {addressStateCodeHash = cp}) codePtrs
       resolveCodePtr (Just 2) (codePtrs !! 2) `shouldReturn` Nothing
@@ -328,14 +328,14 @@ storageSpec = do
             ]
       insertMany (Proxy @ParentChainIds) $ M.fromList chainRelationships
       let accts =
-            [ Account 0xabc (Just 0),
-              Account 0xdef (Just 0),
-              Account 0xfff (Just 1)
+            [ Address 0xabc,
+              Address 0xdef,
+              Address 0xfff
             ]
       let codePtrs =
-            [ CodeAtAccount (accts !! 1) "Ptr_0",
-              CodeAtAccount (accts !! 0) "Ptr_1",
-              CodeAtAccount (accts !! 0) "Ptr_2"
+            [ CodeAtAccount (Account (accts !! 1) Nothing) "Ptr_0",
+              CodeAtAccount (Account (accts !! 0) Nothing) "Ptr_1",
+              CodeAtAccount (Account (accts !! 0) Nothing) "Ptr_2"
             ]
       insertMany (Proxy @AddressState) . M.fromList $ zip accts $ map (\cp -> blankAddressState {addressStateCodeHash = cp}) codePtrs
       resolveCodePtr (Just 1) (codePtrs !! 2) `shouldReturn` Nothing

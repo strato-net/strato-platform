@@ -19,7 +19,6 @@ import Blockchain.DB.SolidStorageDB
 import Blockchain.Data.AddressStateDB
 import Blockchain.SolidVM.CodeCollectionDB
 import Blockchain.SolidVM.Exception
-import qualified Blockchain.Strato.Model.Account as Ac
 import Blockchain.Strato.Model.Keccak256
 import Blockchain.VMContext
 import Control.Lens
@@ -95,7 +94,7 @@ filterValidCodeCollections :: [CodeCollection] -> [CodeCollection]
 filterValidCodeCollections arrCC = (map fst) $ (filter (([] ==) . snd)) $ zip arrCC $ TP.detector <$> arrCC
 
 getAllVars :: ContextM [BasicValue]
-getAllVars = (getAllSolidStorageKeyVals' (Ac.Account uploadAddress Nothing)) >>= (return . (\vals -> [y | (_, y) <- vals]))
+getAllVars = (getAllSolidStorageKeyVals' uploadAddress) >>= (return . (\vals -> [y | (_, y) <- vals]))
 
 evaluateContractsBatch :: [(String, String)] -> IO [Bool]
 evaluateContractsBatch = sequence . map (\(x, y) -> getOutContextM $ comparteContracts x y)

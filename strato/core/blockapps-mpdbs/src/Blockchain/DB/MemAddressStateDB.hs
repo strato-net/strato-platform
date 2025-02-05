@@ -26,6 +26,7 @@ import Blockchain.DB.HashDB
 import Blockchain.DB.StateDB
 import Blockchain.Data.AddressStateDB
 import Blockchain.Strato.Model.Account
+import Blockchain.Strato.Model.Address
 import Control.DeepSeq
 import Control.Monad
 import qualified Control.Monad.Change.Alter as A
@@ -36,21 +37,21 @@ import qualified Data.Map as M
 import GHC.Generics
 import Text.Format
 
-newtype MemAddressStateDB m a = MemAddressStateDB {unMemAddressStateDB :: StateT (M.Map Account AddressState) m a}
+newtype MemAddressStateDB m a = MemAddressStateDB {unMemAddressStateDB :: StateT (M.Map Address AddressState) m a}
   deriving (Functor, Applicative, Monad, MonadIO)
 
 instance MonadTrans MemAddressStateDB where
   lift = MemAddressStateDB . lift
 
-instance Monad m => (Account `A.Alters` AddressState) (MemAddressStateDB m) where
+instance Monad m => (Address `A.Alters` AddressState) (MemAddressStateDB m) where
   lookup _ = MemAddressStateDB . gets . M.lookup
   insert _ k = MemAddressStateDB . modify' . M.insert k
   delete _ = MemAddressStateDB . modify' . M.delete
 
-instance Monad m => A.Selectable Account AddressState (MemAddressStateDB m) where
+instance Monad m => A.Selectable Address AddressState (MemAddressStateDB m) where
   select = A.lookup
 
-runMemAddressStateDB :: Monad m => MemAddressStateDB m a -> M.Map Account AddressState -> m a
+runMemAddressStateDB :: Monad m => MemAddressStateDB m a -> M.Map Address AddressState -> m a
 runMemAddressStateDB f m = evalStateT (unMemAddressStateDB f) m
 
 runNewMemAddressStateDB :: Monad m => MemAddressStateDB m a -> m a
@@ -65,35 +66,35 @@ instance Format AddressStateModification where
   format ASDeleted = "Address Deleted"
 
 class HasMemAddressStateDB m where
-  getAddressStateTxDBMap :: m (M.Map Account AddressStateModification)
-  putAddressStateTxDBMap :: M.Map Account AddressStateModification -> m ()
-  getAddressStateBlockDBMap :: m (M.Map Account AddressStateModification)
-  putAddressStateBlockDBMap :: M.Map Account AddressStateModification -> m ()
+  getAddressStateTxDBMap :: m (M.Map Address AddressStateModification)
+  putAddressStateTxDBMap :: M.Map Address AddressStateModification -> m ()
+  getAddressStateBlockDBMap :: m (M.Map Address AddressStateModification)
+  putAddressStateBlockDBMap :: M.Map Address AddressStateModification -> m ()
 
 getAddressStateMaybe ::
   (HasMemAddressStateDB m, HasStateDB m, HasHashDB m) =>
-  Account ->
+  Address ->
   m (Maybe AddressState)
-getAddressStateMaybe account = do
+getAddressStateMaybe address = do
   theMap <- getAddressStateTxDBMap
-  case M.lookup account theMap of
+  case M.lookup address theMap of
     Just (ASModification addressState) -> return $ Just addressState
     Just ASDeleted -> return $ Just blankAddressState
     Nothing -> do
       theBMap <- getAddressStateBlockDBMap
-      case M.lookup account theBMap of
+      case M.lookup address theBMap of
         Just (ASModification addressState) -> return $ Just addressState
         Just ASDeleted -> return $ Just blankAddressState
-        Nothing -> DB.getAddressStateMaybe account
+        Nothing -> DB.getAddressStateMaybe address
 
 putAddressState ::
   (HasMemAddressStateDB m, HasStateDB m, HasHashDB m) =>
-  Account ->
+  Address ->
   AddressState ->
   m ()
-putAddressState account newState = do
+putAddressState address newState = do
   theMap <- getAddressStateTxDBMap
-  putAddressStateTxDBMap (M.insert account (ASModification newState) theMap)
+  putAddressStateTxDBMap (M.insert address (ASModification newState) theMap)
 
 flushMemAddressStateTxToBlockDB ::
   (HasMemAddressStateDB m, HasStateDB m, HasHashDB m) =>
@@ -110,16 +111,16 @@ flushMemAddressStateDB ::
 flushMemAddressStateDB = do
   flushMemAddressStateTxToBlockDB
   theMap <- getAddressStateBlockDBMap
-  forM_ (M.toList theMap) $ \(account, modification) -> do
+  forM_ (M.toList theMap) $ \(address, modification) -> do
     case modification of
-      ASModification addressState -> DB.putAddressState account addressState
-      ASDeleted -> DB.deleteAddressState account
+      ASModification addressState -> DB.putAddressState (Account address Nothing) addressState
+      ASDeleted -> DB.deleteAddressState address
   putAddressStateBlockDBMap M.empty
 
 deleteAddressState ::
   (HasMemAddressStateDB m, HasStateDB m) =>
-  Account ->
+  Address ->
   m ()
-deleteAddressState account = do
+deleteAddressState address = do
   theMap <- getAddressStateTxDBMap
-  putAddressStateTxDBMap (M.insert account ASDeleted theMap)
+  putAddressStateTxDBMap (M.insert address ASDeleted theMap)

@@ -239,10 +239,10 @@ data ContextDBs = ContextDBs
 makeLenses ''ContextDBs
 
 data MemDBs = MemDBs
-  { _stateTxMap :: !(M.Map Account AddressStateModification),
-    _stateBlockMap :: !(M.Map Account AddressStateModification),
-    _storageTxMap :: !(M.Map (Account, B.ByteString) B.ByteString),
-    _storageBlockMap :: !(M.Map (Account, B.ByteString) B.ByteString),
+  { _stateTxMap :: !(M.Map Address AddressStateModification),
+    _stateBlockMap :: !(M.Map Address AddressStateModification),
+    _storageTxMap :: !(M.Map (Address, B.ByteString) B.ByteString),
+    _storageBlockMap :: !(M.Map (Address, B.ByteString) B.ByteString),
     _stateRoots :: !(M.Map (Keccak256, Maybe Word256) MP.StateRoot),
     _currentBlock :: !(Maybe CurrentBlockHash)
   }
@@ -325,10 +325,10 @@ type VMBase m =
     Mod.Modifiable GasCap m,
     HasMemAddressStateDB m,
     A.Selectable Word256 ParentChainIds m,
-    A.Selectable Account AddressState m,
+    A.Selectable Address AddressState m,
     (Maybe Word256 `A.Alters` MP.StateRoot) m,
     (MP.StateRoot `A.Alters` MP.NodeData) m,
-    (Account `A.Alters` AddressState) m,
+    (Address `A.Alters` AddressState) m,
     (Keccak256 `A.Alters` DBCode) m,
     (N.NibbleString `A.Alters` N.NibbleString) m,
     HasMemRawStorageDB m,
@@ -346,7 +346,7 @@ withCurrentBlockHash ::
     HasMemAddressStateDB m,
     (Maybe Word256 `A.Alters` MP.StateRoot) m,
     (MP.StateRoot `A.Alters` MP.NodeData) m,
-    (Account `A.Alters` AddressState) m,
+    (Address `A.Alters` AddressState) m,
     (N.NibbleString `A.Alters` N.NibbleString) m,
     HasMemRawStorageDB m,
     (RawStorageKey `A.Alters` RawStorageValue) m
@@ -370,12 +370,12 @@ instance Show Context where
 
 lookupX509AddrFromCBHash ::
   ( MonadLogger m,
-    (A.Alters (Account, B.ByteString) B.ByteString) m
+    (A.Alters (Address, B.ByteString) B.ByteString) m
   ) =>
   Address ->
   m (Maybe Address)
 lookupX509AddrFromCBHash k = do
-  let certKey addr = ((Account addr Nothing),) . Text.encodeUtf8
+  let certKey addr = (addr,) . Text.encodeUtf8
       certRegistryKey = certKey (Address 0x509)
   mAccount <- fmap (rlpDecode . rlpDeserialize) <$> A.lookup (A.Proxy) (certRegistryKey . T.pack $ ".addressToCertMap<a:" <> show k <> ">")
   $logDebugS "lookupX509AddrFromCBHash" $ T.pack $ "Looking up certificate for address: " ++ (show mAccount)
@@ -554,28 +554,28 @@ execContextM' ::
   m ContextState
 execContextM' ctx f = snd <$> runContextM' ctx f
 
-incrementNonce :: (Account `A.Alters` AddressState) f => Address -> f ()
-incrementNonce address = A.adjustWithDefault_ Mod.Proxy (Account address Nothing) $ \addressState ->
+incrementNonce :: (Address `A.Alters` AddressState) f => Address -> f ()
+incrementNonce address = A.adjustWithDefault_ Mod.Proxy address $ \addressState ->
   pure addressState {addressStateNonce = addressStateNonce addressState + 1}
 
-getNewAddress :: (MonadIO m, (Account `A.Alters` AddressState) m) => Address -> m Address
+getNewAddress :: (MonadIO m, (Address `A.Alters` AddressState) m) => Address -> m Address
 getNewAddress address = do
-  nonce' <- addressStateNonce <$> A.lookupWithDefault Mod.Proxy (Account address Nothing)
+  nonce' <- addressStateNonce <$> A.lookupWithDefault Mod.Proxy address
   when flags_debug $ liftIO $ putStrLn $ "Creating new address: owner=" ++ format address ++ ", nonce=" ++ show nonce'
   let newAddress = getNewAddress_unsafe address nonce'
   incrementNonce address
   return newAddress
 
-getNewAddressWithSalt :: (MonadIO m, MonadLogger m, (Account `A.Alters` AddressState) m) => Address -> Value -> Keccak256 -> String -> m Address
+getNewAddressWithSalt :: (MonadIO m, MonadLogger m, (Address `A.Alters` AddressState) m) => Address -> Value -> Keccak256 -> String -> m Address
 getNewAddressWithSalt address salt hsh args = do
-  nonce' <- addressStateNonce <$> A.lookupWithDefault Mod.Proxy (Account address Nothing)
+  nonce' <- addressStateNonce <$> A.lookupWithDefault Mod.Proxy address
   when flags_debug $ liftIO $ putStrLn $ "Creating new address: owner=" ++ format address ++ ", nonce=" ++ show nonce'
   let saltAsString = case salt of
         (SString s) -> s
         _ -> invalidArguments "big major bad" salt
   let newAddress = getNewAddressWithSalt_unsafe address saltAsString (keccak256ToByteString hsh) args
   $logDebugS "getNewAddressWithSalt" $ T.pack $ show address ++ " " ++ saltAsString ++ " " ++ (show $ keccak256ToByteString hsh) ++ " " ++ args
-  doesAddressAlreadyExist <- A.lookup (Mod.Proxy @AddressState) $ Account newAddress Nothing
+  doesAddressAlreadyExist <- A.lookup (Mod.Proxy @AddressState) newAddress
   case doesAddressAlreadyExist of
     Just _ -> duplicateContract $ "The address " ++ show newAddress ++ " already exists. Try using a different salt or constructor arguments."
     Nothing -> do
@@ -585,7 +585,7 @@ getNewAddressWithSalt address salt hsh args = do
 purgeStorageMap :: HasMemStorageDB m => Address -> m ()
 purgeStorageMap address = do
   storageMap <- getMemRawStorageTxDB
-  putMemRawStorageTxMap $ M.filterWithKey (const . (/= Account address Nothing) . fst) storageMap
+  putMemRawStorageTxMap $ M.filterWithKey (const . (/= address) . fst) storageMap
 
 getContextBestBlockInfo :: (Functor m, Mod.Accessible ContextState m) => m ContextBestBlockInfo
 getContextBestBlockInfo = _bestBlockInfo <$> Mod.access Mod.Proxy

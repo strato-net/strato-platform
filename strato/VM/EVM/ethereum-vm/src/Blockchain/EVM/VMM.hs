@@ -66,7 +66,6 @@ import qualified Blockchain.Database.MerklePatricia as MP
 import Blockchain.EVM.Environment
 import qualified Blockchain.EVM.MutableStack as MS
 import Blockchain.EVM.VMState
-import Blockchain.Strato.Model.Account
 import Blockchain.Strato.Model.Address
 import Blockchain.Strato.Model.ExtendedWord
 import Blockchain.Strato.Model.Gas
@@ -156,7 +155,7 @@ instance
     (MP.StateRoot `A.Alters` MP.NodeData) m,
     (N.NibbleString `A.Alters` N.NibbleString) m
   ) =>
-  (Account `A.Alters` AddressState) (VMM m)
+  (Address `A.Alters` AddressState) (VMM m)
   where
   lookup _ = getAddressStateMaybe
   insert _ = putAddressState

@@ -170,8 +170,8 @@ makeLenses ''SState
 type SM m = ReaderT (IORef SState) m
 
 type MonadSM m =
-  ( (Account `A.Alters` AddressState) m,
-    A.Selectable Account AddressState m,
+  ( (Address `A.Alters` AddressState) m,
+    A.Selectable Address AddressState m,
     HasStateDB m,
     (Keccak256 `A.Alters` DBCode) m,
     (Keccak256 `A.Alters` BlockSummary) m,
@@ -241,7 +241,7 @@ instance
     (MP.StateRoot `A.Alters` MP.NodeData) m,
     (N.NibbleString `A.Alters` N.NibbleString) m
   ) =>
-  (Account `A.Alters` AddressState) (SM m)
+  (Address `A.Alters` AddressState) (SM m)
   where
   lookup _ = getAddressStateMaybe
   insert _ = putAddressState
@@ -254,7 +254,7 @@ instance
     (MP.StateRoot `A.Alters` MP.NodeData) m,
     (N.NibbleString `A.Alters` N.NibbleString) m
   ) =>
-  A.Selectable Account AddressState (SM m)
+  A.Selectable Address AddressState (SM m)
   where
   select _ = getAddressStateMaybe
 
@@ -954,7 +954,7 @@ getCodeAndCollection address' = do
       (hsh, cc') <- getCurrentCodeCollection
       return (c', hsh, cc')
     else do
-      codeHash <- addressStateCodeHash <$> A.lookupWithDefault (A.Proxy @AddressState) (Account address' Nothing)
+      codeHash <- addressStateCodeHash <$> A.lookupWithDefault (A.Proxy @AddressState) address'
 
       resolvedCodeHash <- resolveCodePtr Nothing codeHash
       (contractName', ch, cc) <-
@@ -1005,20 +1005,21 @@ resolveNameParts to' crtr app c = do
   let tName = T.pack . CC._contractName
   case c ^. CC.importedFrom of
     Nothing -> pure ((to', tName c), (crtr, app, (map T.pack (M.keys $ CC._storageDefs c))))
-    Just acct ->
-      A.select (A.Proxy @AddressState) acct >>= \case
+    Just acct -> do
+      let address = acct^.accountAddress
+      A.select (A.Proxy @AddressState) address >>= \case
         Nothing -> do
           $logWarnS "processTheMessages/resolveNameParts" . T.pack $
-            "Could not find address state for account " ++ show acct
-          pure ((acct^.accountAddress, tName c), (crtr, app, (map T.pack (M.keys $ CC._storageDefs c))))
+            "Could not find address state for address " ++ show address
+          pure ((address, tName c), (crtr, app, (map T.pack (M.keys $ CC._storageDefs c))))
         Just s ->
           resolveCodePtr Nothing (addressStateCodeHash s) >>= \case
             Just (SolidVMCode appName _) -> do
-              appCreator <- getSolidStorageKeyVal' (_accountAddress acct) $ MS.StoragePath [MS.Field ":creator"]
+              appCreator <- getSolidStorageKeyVal' address $ MS.StoragePath [MS.Field ":creator"]
               case appCreator of
-                MS.BString cn' -> pure ((acct^.accountAddress, tName c), (T.pack $ BC.unpack cn', T.pack appName, (map T.pack (M.keys $ CC._storageDefs c))))
-                _ -> pure ((acct^.accountAddress, tName c), (crtr, T.pack appName, (map T.pack (M.keys $ CC._storageDefs c))))
+                MS.BString cn' -> pure ((address, tName c), (T.pack $ BC.unpack cn', T.pack appName, (map T.pack (M.keys $ CC._storageDefs c))))
+                _ -> pure ((address, tName c), (crtr, T.pack appName, (map T.pack (M.keys $ CC._storageDefs c))))
             _ -> do
               $logWarnS "resolveNameParts" . T.pack $
-                "Could not resolve code for account " ++ show acct
-              pure ((acct^.accountAddress, tName c), (crtr, app, (map T.pack (M.keys $ CC._storageDefs c))))
+                "Could not resolve code for address " ++ show address
+              pure ((address, tName c), (crtr, app, (map T.pack (M.keys $ CC._storageDefs c))))

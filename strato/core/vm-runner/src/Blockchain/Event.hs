@@ -31,7 +31,6 @@ import Blockchain.Database.MerklePatricia.NodeData (NodeData)
 import Blockchain.Data.TXOrigin
 import Blockchain.Sequencer.Event
 import Blockchain.Strato.Indexer.Model (IndexEvent (..))
-import Blockchain.Strato.Model.Account
 import Blockchain.Strato.Model.Class (DummyCertRevocation(..))
 import Blockchain.Strato.Model.Keccak256
 import Blockchain.Strato.Model.StateRoot
@@ -102,7 +101,7 @@ data VmOutEvent
   | OutLog LogDB
   | OutEvent [EventDB]
   | OutTXR TransactionResult
-  | OutASM (Map Account AddressStateModification)
+  | OutASM (Map Address AddressStateModification)
   | OutJSONRPC String B.ByteString
   | OutBlockVerificationFailure [BlockVerificationFailure]
   | OutGetMPNodes [StateRoot]
@@ -118,7 +117,7 @@ data VmOutEventBatch = OutBatch
     outLogs :: DL.DList LogDB,
     outEvents :: DL.DList EventDB,
     outTXRs :: DL.DList TransactionResult,
-    outASMs :: DL.DList (Map Account AddressStateModification),
+    outASMs :: DL.DList (Map Address AddressStateModification),
     outJSONRPCs :: DL.DList (String, B.ByteString),
     outBlockVerificationFailure :: [BlockVerificationFailure],
     outGetMPNodes :: DL.DList [StateRoot],

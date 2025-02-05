@@ -48,7 +48,6 @@ import Blockchain.Data.BlockSummary
 import Blockchain.Data.ChainInfo
 import Blockchain.Data.RLP
 import qualified Blockchain.Database.MerklePatricia as MP
-import Blockchain.Strato.Model.Account
 import Blockchain.Strato.Model.Address
 import Blockchain.Strato.Model.ExtendedWord
 import Blockchain.Strato.Model.Keccak256
@@ -267,12 +266,12 @@ instance (MP.StateRoot `A.Alters` MP.NodeData) MemContextM where
   insert _ sr nd = dbsModify' $ stateDB . at sr ?~ nd
   delete _ sr = dbsModify' $ stateDB . at sr .~ Nothing
 
-instance (Account `A.Alters` AddressState) MemContextM where
+instance (Address `A.Alters` AddressState) MemContextM where
   lookup _ = getAddressStateMaybe
   insert _ = putAddressState
   delete _ = deleteAddressState
 
-instance A.Selectable Account AddressState MemContextM where
+instance A.Selectable Address AddressState MemContextM where
   select _ = getAddressStateMaybe
 
 instance (Maybe Word256 `A.Alters` MP.StateRoot) MemContextM where
@@ -308,14 +307,14 @@ instance (Keccak256 `A.Alters` DBCode) MemContextM where
 
 instance ((Address, T.Text) `A.Selectable` X509CertificateField) MemContextM where
   select _ (k, t) = do
-    let certKey addr = ((Account addr Nothing),) . Text.encodeUtf8
+    let certKey addr = (addr,) . Text.encodeUtf8
     mCertAddress <- lookupX509AddrFromCBHash k
     fmap join . for mCertAddress $ \certAddress ->
       maybe Nothing (readMaybe . T.unpack . Text.decodeUtf8) <$> A.lookup (A.Proxy) (certKey certAddress t)
 
 instance (Address `A.Selectable` X509Certificate) MemContextM where
   select _ k = do
-    let certKey addr = ((Account addr Nothing),) . Text.encodeUtf8
+    let certKey addr = (addr,) . Text.encodeUtf8
     mCertAddress <- lookupX509AddrFromCBHash k
     fmap join . for mCertAddress $ \certAddress -> do
       mBString <- fmap (rlpDecode . rlpDeserialize) <$> A.lookup (A.Proxy) (certKey certAddress ".certificateString")

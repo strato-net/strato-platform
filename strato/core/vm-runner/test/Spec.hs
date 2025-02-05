@@ -60,7 +60,7 @@ spec = do
               blockData = BDB.blockBlockData $ BML.makeBlock 0 0
               availableGas = 10000000
               tAddr = (Account 0xfeedbeef Nothing)
-              newAddress = (Account 0xdeadbeef Nothing)
+              newAddress = 0xdeadbeef
               txValue = 0
               txGasPrice = 10000000
               -- Right i = B16.decode "606060405234610000575b5b5b6101748061001b6000396000f30060606040526000357c0100000000000000000000000000000000000000000000000000000000900463ffffffff168063ec6306431461003e575b610000565b346100005761004b6100d4565b604051808060200182810382528381815181526020019150805190602001908083836000831461009a575b80518252602083111561009a57602082019150602081019050602083039250610076565b505050905090810190601f1680156100c65780820380516001836020036101000a031916815260200191505b509250505060405180910390f35b6020604051908101604052806000815250606060405190810160405280602f81526020017f636f6e7472616374204c6f7474657279207b0a0a0966756e6374696f6e204c6f81526020017f74746572792829207b0a097d0a0a7d000000000000000000000000000000000081525090505b905600a165627a7a72305820b42b9b4bfc4b8e1dca667748b387dad2822afdf716ae22a127a0150b31ce7a960029"
@@ -81,7 +81,7 @@ spec = do
               txValue
               txGasPrice
               availableGas
-              (_accountAddress newAddress)
+              newAddress
               txInit
               (unsafeCreateKeccak256FromWord256 0)
               Nothing
@@ -110,7 +110,7 @@ spec = do
             blockData
             0
             (_accountAddress tAddr)
-            (_accountAddress newAddress)
+            newAddress
             (_accountAddress tAddr)
             (fromIntegral txValue)
             (fromIntegral txGasPrice)

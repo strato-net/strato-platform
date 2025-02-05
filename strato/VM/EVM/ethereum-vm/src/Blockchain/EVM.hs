@@ -178,13 +178,13 @@ safe_rem x y = x `rem` y
 
 --For some strange reason, some ethereum tests (the VMTests) create an account when it doesn't
 --exist....  This is a hack to mimic this behavior.
-accountCreationHack :: EVMBase m => Account -> VMM m ()
-accountCreationHack account = do
-  exists <- isJust <$> A.lookup (A.Proxy @AddressState) account
+accountCreationHack :: EVMBase m => Address -> VMM m ()
+accountCreationHack address = do
+  exists <- isJust <$> A.lookup (A.Proxy @AddressState) address
   when (not exists) $ do
     vmState <- vmstateGet
     when (not $ isNothing $ debugCallCreates vmState) $
-      A.insert (A.Proxy @AddressState) account blankAddressState
+      A.insert (A.Proxy @AddressState) address blankAddressState
 
 getBlockHashWithNumber :: EVMBase m => Integer -> Keccak256 -> VMM m (Maybe Keccak256)
 getBlockHashWithNumber num h = do
@@ -259,14 +259,13 @@ runOperation SHA3 = do
 runOperation ADDRESS = pushEnvVar envOwner
 runOperation BALANCE = do
   address <- pop
-  account <- Account address <$> getEnvVar envChainId
-  exists <- isJust <$> A.lookup (A.Proxy @AddressState) account
+  exists <- isJust <$> A.lookup (A.Proxy @AddressState) address
   if exists
     then
       push =<< addressStateBalance
-        <$> A.lookupWithDefault (A.Proxy @AddressState) account
+        <$> A.lookupWithDefault (A.Proxy @AddressState) address
     else do
-      accountCreationHack account --needed hack to get the tests working
+      accountCreationHack address --needed hack to get the tests working
       push (0 :: Word256)
 runOperation ORIGIN = pushEnvVar envOrigin
 runOperation CALLER = pushEnvVar envSender
@@ -302,24 +301,22 @@ runOperation CODECOPY = do
 runOperation GASPRICE = pushEnvVar envGasPrice
 runOperation EXTCODESIZE = do
   address <- pop
-  account <- Account address <$> getEnvVar envChainId
-  accountCreationHack account --needed hack to get the tests working
+  accountCreationHack address --needed hack to get the tests working
   codeHash <-
     addressStateCodeHash
-      <$> A.lookupWithDefault (A.Proxy @AddressState) account
+      <$> A.lookupWithDefault (A.Proxy @AddressState) address
   code <- getExternallyOwned' codeHash
   push $ (fromIntegral (B.length code) :: Word256)
 runOperation EXTCODECOPY = do
   address <- pop
-  account <- Account address <$> getEnvVar envChainId
-  accountCreationHack account --needed hack to get the tests working
+  accountCreationHack address --needed hack to get the tests working
   memOffset <- pop
   codeOffset <- pop
   size <- pop
 
   codeHash <-
     addressStateCodeHash
-      <$> A.lookupWithDefault (A.Proxy @AddressState) account
+      <$> A.lookupWithDefault (A.Proxy @AddressState) address
   code <- getExternallyOwned' codeHash
   mStoreByteString memOffset (safeTake size $ safeDrop codeOffset $ code)
 runOperation RETURNDATASIZE = do
@@ -476,7 +473,7 @@ runOperation CREATE = do
       (_, Just _) -> do
         (nonce, balance) <-
           (addressStateNonce &&& addressStateBalance)
-            <$> A.lookupWithDefault (A.Proxy @AddressState) (Account owner Nothing)
+            <$> A.lookupWithDefault (A.Proxy @AddressState) owner
 
         let newAddress = getNewAddress_unsafe owner nonce
 
@@ -516,7 +513,7 @@ runOperation CALL = do
 
   let stipend = if value > 0 then fromIntegral gCALLSTIPEND else 0
 
-  balance <- addressStateBalance <$> A.lookupWithDefault (A.Proxy @AddressState) (Account owner Nothing)
+  balance <- addressStateBalance <$> A.lookupWithDefault (A.Proxy @AddressState) owner
 
   callDepth <- getCallDepth
 
@@ -575,7 +572,7 @@ runOperation CALLCODE = do
 
   --  useGas $ fromIntegral newAccountCost
 
-  balance <- addressStateBalance <$> A.lookupWithDefault (A.Proxy @AddressState) (Account owner Nothing)
+  balance <- addressStateBalance <$> A.lookupWithDefault (A.Proxy @AddressState) owner
 
   callDepth <- getCallDepth
 
@@ -689,7 +686,7 @@ runOperation SUICIDE = do
   guardStorage
   address <- pop
   owner <- getEnvVar envOwner
-  A.adjustWithDefault_ (A.Proxy @AddressState) (Account owner Nothing) $ \addressState -> do
+  A.adjustWithDefault_ (A.Proxy @AddressState) owner $ \addressState -> do
     let allFunds = addressStateBalance addressState
     pay' "transferring all funds upon suicide" owner address allFunds
     return addressState {addressStateBalance = 0} --yellowpaper needs address emptied, in the case that the transfer address is the same as the suicide one
@@ -738,7 +735,7 @@ opGasPriceAndRefund CALL = do
 
   let toAddr = Address $ fromIntegral to
 
-  toAccountExists <- isJust <$> A.lookup (A.Proxy @AddressState) (Account toAddr Nothing)
+  toAccountExists <- isJust <$> A.lookup (A.Proxy @AddressState) toAddr
 
   self <- getEnvVar envOwner -- if an account being created calls itself, the go client doesn't charge the gCALLNEWACCOUNT fee, so we need to check if that case is occurring here
   return $
@@ -1035,7 +1032,7 @@ runVMM isRunningTests' isHomestead preExistingSuicideList cDepth env availableGa
               erTrace = theTrace vmState,
               erLogs = [],
               erEvents = [],
-              erNewContractAccount = Nothing,
+              erNewContractAddress = Nothing,
               erSuicideList = suicideList vmState,
               erAction = Just $ _action vmState,
               erException = Just (Right e),
@@ -1123,7 +1120,7 @@ create
           --an existing one, but the ethereum tests test this.  They want the VM to preserve balance
           --but clean out storage.
           --This will never actually matter, but I add it to pass the tests.
-          A.adjustWithDefault_ (A.Proxy @AddressState) (Account newAddress Nothing) $ \newAddressState ->
+          A.adjustWithDefault_ (A.Proxy @AddressState) newAddress $ \newAddressState ->
             pure newAddressState {addressStateContractRoot = MP.emptyTriePtr}
           --This next line will actually create the account addressState data....
           --In the extremely unlikely even that the address already exists, it will preserve
@@ -1144,11 +1141,11 @@ create
         _ <- pay "revert value transfer" newAddress sender (fromIntegral value)
 
         purgeStorageMap  newAddress
-        A.delete (A.Proxy @AddressState) (Account newAddress Nothing)
+        A.delete (A.Proxy @AddressState) newAddress
         -- Need to zero gas in the case of an exception.
         return execResults {erRemainingTxGas = 0, erException = Just e}
       Nothing -> do
-        return execResults {erNewContractAccount = Just (Account newAddress Nothing)}
+        return execResults {erNewContractAddress = Just newAddress}
 
 create' :: EVMBase m => VMM m Code
 create' = do
@@ -1187,7 +1184,7 @@ create' = do
     assignCode :: EVMBase m => B.ByteString -> Address -> VMM m ()
     assignCode codeBytes address = do
       hsh <- addCode EVM codeBytes
-      A.adjustWithDefault_ (A.Proxy @AddressState) (Account address Nothing) $ \newAddressState ->
+      A.adjustWithDefault_ (A.Proxy @AddressState) address $ \newAddressState ->
         pure newAddressState {addressStateCodeHash = ExternallyOwned hsh}
     assignDetails = do
       vmState <- vmstateGet
@@ -1262,7 +1259,7 @@ call
       Nothing -> do
         codeHash <-
           addressStateCodeHash
-            <$> A.lookupWithDefault (A.Proxy @AddressState) (Account codeAddress Nothing)
+            <$> A.lookupWithDefault (A.Proxy @AddressState) codeAddress
         code <- Code <$> getExternallyOwned' codeHash
         runVMM isRunningTests' isHomestead preExistingSuicideList callDepth (env code) availableGas $
           call' noValueTransfer
@@ -1272,7 +1269,7 @@ call' noValueTransfer = do
   value <- getEnvVar envValue
   receiveAddress <- getEnvVar envOwner
   sender <- getEnvVar envSender
-  cp <- addressStateCodeHash <$> A.lookupWithDefault (A.Proxy @AddressState) (Account receiveAddress Nothing)
+  cp <- addressStateCodeHash <$> A.lookupWithDefault (A.Proxy @AddressState) receiveAddress
   let ch = case cp of
         ExternallyOwned x -> x
         _ -> error "internal error- the EVM was called for non-evm code"
@@ -1331,7 +1328,7 @@ callPrecompiled' noValueTransfer precompiled = do
 
 create_debugWrapper :: EVMBase m => BlockHeader -> Address -> Word256 -> B.ByteString -> VMM m (Maybe Address)
 create_debugWrapper block owner value initCodeBytes = do
-  balance <- addressStateBalance <$> A.lookupWithDefault (A.Proxy @AddressState) (Account owner Nothing)
+  balance <- addressStateBalance <$> A.lookupWithDefault (A.Proxy @AddressState) owner
 
   if fromIntegral value > balance
     then return Nothing
@@ -1475,7 +1472,7 @@ vmStateToExecResults vmState = do
         erLogs = logs vmState,
         erEvents = [],
         -- I think erNewContractAddress should be Nothing if there is an error
-        erNewContractAccount = Nothing,
+        erNewContractAddress = Nothing,
         erSuicideList = suicideList vmState,
         erAction = Just $ _action vmState,
         erException = Nothing,

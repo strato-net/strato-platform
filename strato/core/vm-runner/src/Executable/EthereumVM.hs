@@ -36,6 +36,7 @@ import Blockchain.Sequencer.Kafka
 import Blockchain.StateRootMismatch
 import Blockchain.Strato.Indexer.Kafka (produceIndexEvents)
 import Blockchain.Strato.Indexer.Model (IndexEvent (..))
+import Blockchain.Strato.Model.Account
 import Blockchain.Strato.Model.Class
 import qualified Blockchain.Strato.Model.Keccak256 as Keccak256
 import Blockchain.Strato.RedisBlockDB
@@ -246,7 +247,7 @@ sendOutEvent (OutASM asm) =
   when (not flags_sqlDiff) $
     timeit "updateSQLBalanceAndNonce" (Just vmBlockInsertionMined) $
       updateSQLBalanceAndNonce $
-        [ ( theAccount,
+        [ ( Account theAccount Nothing,
             (addressStateBalance asMod, addressStateNonce asMod)
           )
           | (theAccount, Mem.ASModification asMod) <- M.toList asm

@@ -44,6 +44,7 @@ import qualified Data.Text                            as T
 
 import           Blockchain.Data.AddressStateDB
 import           Blockchain.Strato.Model.Account
+import           Blockchain.Strato.Model.Address
 import           Blockchain.Strato.Model.Keccak256
 
 import           SolidVM.Model.CodeCollection
@@ -134,7 +135,7 @@ instance Monoid (FileUnitsF a) where
 type ImportMapF a = Map Text (Either (UnresolvedFileUnitsF a) (FileUnitsF a))
 
 resolveImports ::
-  ( A.Selectable Account AddressState m,
+  ( A.Selectable Address AddressState m,
     Show a,
     Ord a,
     Default a
@@ -150,7 +151,7 @@ resolveImports getCCFromHash m = do
   pure . foldMap fileUnitsToCodeCollection $ M.elems m''
 
 resolveFile ::
-  ( A.Selectable Account AddressState m,
+  ( A.Selectable Address AddressState m,
     Show a,
     Ord a,
     Default a
@@ -166,7 +167,7 @@ resolveFile getCCFromHash expr (seen, resolved) =
         if namedAcct ^. namedAccountChainId == MainChain || namedAcct ^. namedAccountChainId == UnspecifiedChain
           then do
             let acct = namedAccountToAccount Nothing namedAcct
-            lift (A.select (A.Proxy @AddressState) acct) >>= \case
+            lift (A.select (A.Proxy @AddressState) (acct^.accountAddress)) >>= \case
               Nothing -> pure (seen, resolved)
               Just AddressState {..} ->
                 lift (runMainChainT $ resolveCodePtr Nothing addressStateCodeHash) >>= \case
@@ -211,7 +212,7 @@ fileUnitsToCodeCollection (FileUnits ps us) =
     addUnit (n, (FUError e)) = flErrors . at n ?~ e
 
 doResolve ::
-  ( A.Selectable Account AddressState m,
+  ( A.Selectable Address AddressState m,
     Show a,
     Ord a,
     Default a

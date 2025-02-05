@@ -42,9 +42,9 @@ import qualified Data.ByteString.Char8 as BC
 import Data.Maybe
 import qualified Data.NibbleString as N
 
-getAddressStateMaybe :: HasStateDB m => Account -> m (Maybe AddressState)
-getAddressStateMaybe (Account address chainId) = do
-  sr <- getStateRoot chainId
+getAddressStateMaybe :: HasStateDB m => Address -> m (Maybe AddressState)
+getAddressStateMaybe address = do
+  sr <- getStateRoot Nothing
   mState <- MP.getKeyVal sr $ addressAsNibbleString address
   return $ rlpDecode . rlpDeserialize . rlpDecode <$> mState
 
@@ -79,13 +79,13 @@ putAddressState (Account address chainId) newState = do
   where
     addrNibbles = addressAsNibbleString address
 
-deleteAddressState :: HasStateDB m => Account -> m ()
-deleteAddressState (Account address chainId) = do
-  sr <- getStateRoot chainId
+deleteAddressState :: HasStateDB m => Address -> m ()
+deleteAddressState address = do
+  sr <- getStateRoot Nothing
   sr' <- MP.deleteKey sr (addressAsNibbleString address)
-  setStateDBStateRoot chainId sr'
+  setStateDBStateRoot Nothing sr'
 
-addressStateExists :: HasStateDB m => Account -> m Bool
-addressStateExists (Account address chainId) = do
-  sr <- getStateRoot chainId
+addressStateExists :: HasStateDB m => Address -> m Bool
+addressStateExists address = do
+  sr <- getStateRoot Nothing
   MP.keyExists sr (addressAsNibbleString address)

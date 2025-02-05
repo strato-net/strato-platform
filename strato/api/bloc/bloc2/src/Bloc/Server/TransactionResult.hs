@@ -47,6 +47,7 @@ import Blockchain.DB.CodeDB
 import Blockchain.Data.AddressStateDB
 import Blockchain.Data.DataDefs
 import Blockchain.Strato.Model.Account
+import Blockchain.Strato.Model.Address
 import Blockchain.Strato.Model.ChainId
 import Blockchain.Strato.Model.Keccak256
 import Control.Arrow
@@ -110,7 +111,7 @@ emptyBatchState = BatchState Map.empty
 getBlocTransactionResult' ::
   ( (Keccak256 `A.Selectable` SourceMap) m,
     HasCodeDB m,
-    A.Selectable Account AddressState m,
+    A.Selectable Address AddressState m,
     MonadLogger m,
     HasSQL m
   ) =>
@@ -133,7 +134,7 @@ getBlocTransactionResult' hashes@(txh : _) resolve =
 getBlocTransactionResult ::
   ( (Keccak256 `A.Selectable` SourceMap) m,
     HasCodeDB m,
-    A.Selectable Account AddressState m,
+    A.Selectable Address AddressState m,
     MonadLogger m,
     HasSQL m
   ) =>
@@ -145,7 +146,7 @@ getBlocTransactionResult txHash resolve = fmap head $ postBlocTransactionResults
 getBatchBlocTransactionResult' ::
   ( (Keccak256 `A.Selectable` SourceMap) m,
     HasCodeDB m,
-    A.Selectable Account AddressState m,
+    A.Selectable Address AddressState m,
     MonadLogger m,
     HasSQL m
   ) =>
@@ -160,7 +161,7 @@ getBatchBlocTransactionResult' hashes resolve =
 postBlocTransactionResults ::
   ( (Keccak256 `A.Selectable` SourceMap) m,
     HasCodeDB m,
-    A.Selectable Account AddressState m,
+    A.Selectable Address AddressState m,
     MonadLogger m,
     HasSQL m
   ) =>
@@ -238,7 +239,7 @@ rawTx2PostTx RawTransaction {..} =
 evalAndReturn ::
   ( (Keccak256 `A.Selectable` SourceMap) m,
     HasCodeDB m,
-    A.Selectable Account AddressState m,
+    A.Selectable Address AddressState m,
     MonadLogger m,
     HasSQL m
   ) =>
@@ -253,7 +254,7 @@ evalAndReturn list = forStateT emptyBatchState list $
       Just (r@RawTransaction {..}, txr) -> case (rawTransactionToAddress, rawTransactionCodeOrData) of
         (Nothing, _) -> contractResult i txHash txr (Map.fromList <$> rawTransactionMetadata)
         (_, Just bs) | bs == ByteString.empty -> return $ BlocTransactionResult Success txHash (Just txr) (Just . Send $ rawTx2PostTx r)
-        (Just addr, _) -> functionResult i txHash txr (Map.fromList <$> rawTransactionMetadata) (Account addr $ toMaybe 0 rawTransactionChainId)
+        (Just addr, _) -> functionResult i txHash txr (Map.fromList <$> rawTransactionMetadata) addr
 
 nth :: Integer -> Text
 nth n
@@ -295,8 +296,8 @@ contractResult i txHash txResult@TransactionResult {..} mmd = do
       details <- lift $ go acct name 0
       return $ BlocTransactionResult Success txHash (Just txResult) (Just $ Upload details)
   where
-    go :: HasSQL m => Account -> Text -> Integer -> m UploadContractDetails
-    go acct name num = do
+    go :: HasSQL m => Address -> Text -> Integer -> m UploadContractDetails
+    go address name num = do
       if num >= 100 
         then throwIO . UserError $ "Transaction succeeded, but contract was neither created, nor destroyed"
         else do
@@ -304,17 +305,17 @@ contractResult i txHash txResult@TransactionResult {..} mmd = do
           addressRefs <- 
             getAccount' 
               accountsFilterParams
-                { _qaAddress = Just $ _accountAddress acct,
+                { _qaAddress = Just address,
                   _qaContractName = Just name,
                   _qaIgnoreChain = Just True
                 }
           case addressRefs of
-            [] -> go acct name (num + 1)
-            _ -> return $ UploadContractDetails {contractName = name, contractAccount = Just $ acct}
+            [] -> go address name (num + 1)
+            _ -> return $ UploadContractDetails {contractName = name, contractAccount = Just $ Account address Nothing}
 
 
 functionResult ::
-  ( A.Selectable Account AddressState m,
+  ( A.Selectable Address AddressState m,
     HasCodeDB m,
     (Keccak256 `A.Selectable` SourceMap) m,
     MonadLogger m,
@@ -324,7 +325,7 @@ functionResult ::
   Keccak256 ->
   TransactionResult ->
   Maybe (Map Text Text) ->
-  Account ->
+  Address ->
   StateT BatchState m BlocTransactionResult
 functionResult i txHash txResult@TransactionResult {..} mmd toAccount = do
   case transactionResultKind of
@@ -345,7 +346,7 @@ functionResult i txHash txResult@TransactionResult {..} mmd toAccount = do
         Just md -> case Map.lookup "funcName" md of
           Nothing -> lift . throwIO . UserError $ "Could not get the name of the contract for the " <> nth i <> " transaction in the list: " <> Text.pack (format txHash)
           Just funcName -> pure funcName
-      mxabi <- use $ functionXabiMap . at (toAccount, funcName)
+      mxabi <- use $ functionXabiMap . at (Account toAccount Nothing, funcName)
       contract <- case mxabi of
         Just contract' -> return contract'
         Nothing -> do
@@ -357,7 +358,7 @@ functionResult i txHash txResult@TransactionResult {..} mmd toAccount = do
                 getContractDetailsByCodeHash ch >>= \case
                   Left e -> throwIO $ UserError e
                   Right d -> pure $ snd d
-          functionXabiMap . at (toAccount, funcName) <?= contract'
+          functionXabiMap . at (Account toAccount Nothing, funcName) <?= contract'
       let resultXabiTypes = maybe [] (map (indexedTypeToEvmIndexedType . snd) . _funcVals) . Map.lookup (Text.unpack funcName) $ _functions contract
           orderedResultIndexedXT = sortOn Xabi.indexedTypeIndex $ catMaybes resultXabiTypes
       orderedResultTypes <- lift $

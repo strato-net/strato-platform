@@ -118,7 +118,7 @@ mergeTxParams inner outer = inner <|> outer
 txWorker ::
   ( MonadLogger m,
     A.Selectable Account Contract m,
-    A.Selectable Account AddressState m,
+    A.Selectable Address AddressState m,
     A.Selectable Address Certificate m,
     HasCodeDB m,
     (Keccak256 `A.Selectable` SourceMap) m,
@@ -143,7 +143,7 @@ txWorker = forever $ do
 postBlocTransactionBody ::
   ( MonadLogger m,
     A.Selectable Account Contract m,
-    A.Selectable Account AddressState m,
+    A.Selectable Address AddressState m,
     HasCodeDB m,
     HasBlocEnv m,
     HasSQL m,
@@ -295,7 +295,7 @@ postBlocTransactionBody (Just jwt) cid (PostBlocTransactionRequest mAddr txList 
 postBlocTransactionUnsigned ::
   ( MonadLogger m,
     A.Selectable Account Contract m,
-    A.Selectable Account AddressState m,
+    A.Selectable Address AddressState m,
     HasCodeDB m,
     HasBlocEnv m,
     HasSQL m,
@@ -456,7 +456,7 @@ getMaybeCodeFromContractPayload p =
 postBlocTransactionParallel ::
   ( MonadLogger m,
     A.Selectable Account Contract m,
-    A.Selectable Account AddressState m,
+    A.Selectable Address AddressState m,
     A.Selectable Address Certificate m,
     HasCodeDB m,
     (Keccak256 `A.Selectable` SourceMap) m,
@@ -483,7 +483,7 @@ postBlocTransactionParallel jwtToken b mUseWallet resolve queue c =
 postBlocTransaction ::
   ( MonadLogger m,
     A.Selectable Account Contract m,
-    A.Selectable Account AddressState m,
+    A.Selectable Address AddressState m,
     A.Selectable Address Certificate m,
     HasCodeDB m,
     (Keccak256 `A.Selectable` SourceMap) m,
@@ -502,7 +502,7 @@ postBlocTransaction = postBlocTransaction' (Don't CacheNonce)
 postBlocTransactionParallelExternal ::
   ( MonadLogger m,
     A.Selectable Account Contract m,
-    A.Selectable Account AddressState m,
+    A.Selectable Address AddressState m,
     A.Selectable Address Certificate m,
     HasCodeDB m,
     (Keccak256 `A.Selectable` SourceMap) m,
@@ -522,7 +522,7 @@ postBlocTransactionParallelExternal bearerToken = postBlocTransactionParallel (T
 postBlocTransaction' ::
   ( MonadLogger m,
     A.Selectable Account Contract m,
-    A.Selectable Account AddressState m,
+    A.Selectable Address AddressState m,
     A.Selectable Address Certificate m,
     HasCodeDB m,
     (Keccak256 `A.Selectable` SourceMap) m,
@@ -819,7 +819,7 @@ data TransactionHeader = TransactionHeader
   }
 
 postUsersSend' ::
-  ( A.Selectable Account AddressState m,
+  ( A.Selectable Address AddressState m,
     (Keccak256 `A.Selectable` SourceMap) m,
     HasCodeDB m,
     MonadLogger m,
@@ -848,7 +848,7 @@ postUsersSend' cacheNonce TransferParameters {..} jwtToken = do
 
 postUsersContractSolidVM' ::
   ( MonadLogger m,
-    A.Selectable Account AddressState m,
+    A.Selectable Address AddressState m,
     (Keccak256 `A.Selectable` SourceMap) m,
     HasCodeDB m,
     HasBlocEnv m,
@@ -896,7 +896,7 @@ postUsersContractSolidVM' cacheNonce ContractParameters {..} jwtToken = do
 
 postUsersUploadListSolidVM' ::
   ( MonadLogger m,
-    A.Selectable Account AddressState m,
+    A.Selectable Address AddressState m,
     (Keccak256 `A.Selectable` SourceMap) m,
     HasCodeDB m,
     HasBlocEnv m,
@@ -945,7 +945,7 @@ postUsersUploadListSolidVM' cacheNonce ContractListParameters {..} jwtToken = do
 
 postUsersSendList' ::
   ( MonadLogger m,
-    A.Selectable Account AddressState m,
+    A.Selectable Address AddressState m,
     HasCodeDB m,
     (Keccak256 `A.Selectable` SourceMap) m,
     HasBlocEnv m,
@@ -980,7 +980,7 @@ postUsersSendList' cacheNonce TransferListParameters {..} jwtToken = do
 postUsersContractMethodList' ::
   ( MonadLogger m,
     A.Selectable Account Contract m,
-    A.Selectable Account AddressState m,
+    A.Selectable Address AddressState m,
     HasCodeDB m,
     (Keccak256 `A.Selectable` SourceMap) m,
     HasBlocEnv m,
@@ -1040,7 +1040,7 @@ postUsersContractMethodList' cacheNonce FunctionListParameters {..} jwtToken = d
 postUsersContractMethod' ::
   ( MonadLogger m,
     A.Selectable Account Contract m,
-    A.Selectable Account AddressState m,
+    A.Selectable Address AddressState m,
     HasCodeDB m,
     (Keccak256 `A.Selectable` SourceMap) m,
     HasBlocEnv m,
@@ -1435,7 +1435,7 @@ getSolidityType _ Xabi.Variadic = Right $ TypeVariadic
 getSolidityType _ Xabi.Decimal = Right . SimpleType $ TypeDecimal
 
 getResultAndRespond ::
-  ( A.Selectable Account AddressState m,
+  ( A.Selectable Address AddressState m,
     HasCodeDB m,
     (Keccak256 `A.Selectable` SourceMap) m,
     MonadLogger m,

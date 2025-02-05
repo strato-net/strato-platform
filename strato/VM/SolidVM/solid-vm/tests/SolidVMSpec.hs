@@ -334,7 +334,7 @@ runTestWithTimeout timeout f = do
       Mod.put (Mod.Proxy @BlockHashRoot) $ bhr
       processNewBestBlock genHash (blockBlockData $ blockCreated) [] -- bootstrap Bagger with genesis block
       withCurrentBlockHash genHash $ do
-        let certKey addr = ((Account addr Nothing),) . encodeUtf8
+        let certKey addr = (addr,) . encodeUtf8
             certRegistryKey = certKey (Address 0x509)
             rlpWrap = rlpSerialize . rlpEncode
             ua = userAddress $ x509CertToCertInfoState getCert
@@ -844,7 +844,7 @@ call2 funcName callArgs contractAddress = do
   return $ erReturnVal er
 
 checkStorage :: ContextM [(MP.Key, B.ByteString)]
-checkStorage = flushMemRawStorageDB >> getAllRawStorageKeyVals' (Account uploadAddress Nothing)
+checkStorage = flushMemRawStorageDB >> getAllRawStorageKeyVals' uploadAddress
 
 getAll :: [[StoragePathPiece]] -> ContextM [BasicValue]
 getAll = mapM (getSolidStorageKeyVal' uploadAddress . MS.fromList)
@@ -4232,7 +4232,7 @@ contract qq{
     -- Get the contract's account
     [BAccount a] <- getFields ["a"]
     -- Set the balance
-    adjust_ (Proxy @AddressState) (namedAccountToAccount Nothing a) (\as -> pure $ as {addressStateBalance = 13})
+    adjust_ (Proxy @AddressState) (a^.namedAccountAddress) (\as -> pure $ as {addressStateBalance = 13})
     -- Check return of balance
     void $ call2 "myTransfer" "()" (a^.namedAccountAddress)
     getFields ["bal"] `shouldReturn` [BInteger 13]
@@ -4259,7 +4259,7 @@ contract qq{
     -- Get the contract's account
     [BAccount a] <- getFields ["a"]
     -- Set the balance
-    adjust_ (Proxy @AddressState) (namedAccountToAccount Nothing a) (\as -> pure $ as {addressStateBalance = 7})
+    adjust_ (Proxy @AddressState) (a^.namedAccountAddress) (\as -> pure $ as {addressStateBalance = 7})
     -- Check return of balance
     void $ call2 "mySend" "()" (a^.namedAccountAddress)
     getFields ["success", "bal"] `shouldReturn` [BDefault, BInteger 7]
@@ -4286,7 +4286,7 @@ contract qq{
     -- Get the contract's account
     [BAccount a] <- getFields ["a"]
     -- Set the balance
-    adjust_ (Proxy @AddressState) (namedAccountToAccount Nothing a) (\as -> pure $ as {addressStateBalance = 13})
+    adjust_ (Proxy @AddressState) (a^.namedAccountAddress) (\as -> pure $ as {addressStateBalance = 13})
     -- Check return of balance
     void $ call2 "mySend" "()" (a^.namedAccountAddress)
     getFields ["success", "bal"] `shouldReturn` [BBool True, BInteger 13]
@@ -4313,7 +4313,7 @@ contract qq{
     -- Get the contract's account
     [BAccount a] <- getFields ["a"]
     -- Set the balance
-    adjust_ (Proxy @AddressState) (namedAccountToAccount Nothing a) (\as -> pure $ as {addressStateBalance = 0})
+    adjust_ (Proxy @AddressState) (a^.namedAccountAddress) (\as -> pure $ as {addressStateBalance = 0})
     -- Check return of balance
     void $ call2 "mySend" "()" (a^.namedAccountAddress)
     getFields ["success", "bal"] `shouldReturn` [BDefault, BDefault]
@@ -4340,7 +4340,7 @@ contract qq{
           -- Get the contract's account
           [BAccount a] <- getFields ["a"]
           -- Set the balance
-          adjust_ (Proxy @AddressState) (namedAccountToAccount Nothing a) (\as -> pure $ as {addressStateBalance = 26})
+          adjust_ (Proxy @AddressState) (a^.namedAccountAddress) (\as -> pure $ as {addressStateBalance = 26})
           -- Check return of balance
           (void $ call2 "mySend" "()" (a^.namedAccountAddress))
       )
@@ -4368,7 +4368,7 @@ contract qq{
           -- Get the contract's account
           [BAccount a] <- getFields ["a"]
           -- Set the balance
-          adjust_ (Proxy @AddressState) (namedAccountToAccount Nothing a) (\as -> pure $ as {addressStateBalance = 26})
+          adjust_ (Proxy @AddressState) (a^.namedAccountAddress) (\as -> pure $ as {addressStateBalance = 26})
           -- Check return of balance
           (void $ call2 "myTransfer" "()" (a^.namedAccountAddress))
       )
@@ -4411,9 +4411,9 @@ contract qq{
     -- Get the contract's accounts
     [BAccount a, BAccount b, BAccount c] <- getFields ["a", "b", "c"]
     -- Adjust the preset balances
-    adjust_ (Proxy @AddressState) (namedAccountToAccount Nothing a) (\as -> pure $ as {addressStateBalance = 14})
-    adjust_ (Proxy @AddressState) (namedAccountToAccount Nothing c) (\cs -> pure $ cs {addressStateBalance = 13})
-    adjust_ (Proxy @AddressState) (namedAccountToAccount Nothing b) (\bs -> pure $ bs {addressStateBalance = 13})
+    adjust_ (Proxy @AddressState) (a^.namedAccountAddress) (\as -> pure $ as {addressStateBalance = 14})
+    adjust_ (Proxy @AddressState) (c^.namedAccountAddress) (\cs -> pure $ cs {addressStateBalance = 13})
+    adjust_ (Proxy @AddressState) (b^.namedAccountAddress) (\bs -> pure $ bs {addressStateBalance = 13})
     -- Check return of balance
     void $ call2 "myTransfer" "()" (a^.namedAccountAddress)
     getFields ["bala", "balb", "balc"]
@@ -4460,9 +4460,9 @@ contract qq{
     -- Get the contract's accounts
     [BAccount a, BAccount b, BAccount c] <- getFields ["a", "b", "c"]
     -- Adjust the preset balances
-    adjust_ (Proxy @AddressState) (namedAccountToAccount Nothing a) (\as -> pure $ as {addressStateBalance = 14})
-    adjust_ (Proxy @AddressState) (namedAccountToAccount Nothing c) (\cs -> pure $ cs {addressStateBalance = 13})
-    adjust_ (Proxy @AddressState) (namedAccountToAccount Nothing b) (\bs -> pure $ bs {addressStateBalance = 13})
+    adjust_ (Proxy @AddressState) (a^.namedAccountAddress) (\as -> pure $ as {addressStateBalance = 14})
+    adjust_ (Proxy @AddressState) (c^.namedAccountAddress) (\cs -> pure $ cs {addressStateBalance = 13})
+    adjust_ (Proxy @AddressState) (b^.namedAccountAddress) (\bs -> pure $ bs {addressStateBalance = 13})
     -- Check return of balance
     void $ call2 "mySend" "()" (a^.namedAccountAddress)
     getFields ["success", "bala", "balb", "balc"] `shouldReturn` [BBool True, BInteger 1, BInteger 26, BInteger 13]
@@ -4506,9 +4506,9 @@ contract qq{
           -- Get the contract's accounts
           [BAccount a, BAccount b, BAccount c] <- getFields ["a", "b", "c"]
           -- Adjust the preset balances
-          adjust_ (Proxy @AddressState) (namedAccountToAccount Nothing a) (\as -> pure $ as {addressStateBalance = 14})
-          adjust_ (Proxy @AddressState) (namedAccountToAccount Nothing c) (\cs -> pure $ cs {addressStateBalance = 13})
-          adjust_ (Proxy @AddressState) (namedAccountToAccount Nothing b) (\bs -> pure $ bs {addressStateBalance = 13})
+          adjust_ (Proxy @AddressState) (a^.namedAccountAddress) (\as -> pure $ as {addressStateBalance = 14})
+          adjust_ (Proxy @AddressState) (c^.namedAccountAddress) (\cs -> pure $ cs {addressStateBalance = 13})
+          adjust_ (Proxy @AddressState) (b^.namedAccountAddress) (\bs -> pure $ bs {addressStateBalance = 13})
           -- Check return of balance
           (void $ call2 "myTransfer" "()" (a^.namedAccountAddress))
       )
@@ -4552,9 +4552,9 @@ contract qq{
     -- Get the contract's accounts
     [BAccount a, BAccount b, BAccount c] <- getFields ["a", "b", "c"]
     -- Adjust the preset balances
-    adjust_ (Proxy @AddressState) (namedAccountToAccount Nothing a) (\as -> pure $ as {addressStateBalance = 14})
-    adjust_ (Proxy @AddressState) (namedAccountToAccount Nothing c) (\cs -> pure $ cs {addressStateBalance = 13})
-    adjust_ (Proxy @AddressState) (namedAccountToAccount Nothing b) (\bs -> pure $ bs {addressStateBalance = 13})
+    adjust_ (Proxy @AddressState) (a^.namedAccountAddress) (\as -> pure $ as {addressStateBalance = 14})
+    adjust_ (Proxy @AddressState) (c^.namedAccountAddress) (\cs -> pure $ cs {addressStateBalance = 13})
+    adjust_ (Proxy @AddressState) (b^.namedAccountAddress) (\bs -> pure $ bs {addressStateBalance = 13})
     -- Check return of balance
     void $ call2 "mySend" "()" (a^.namedAccountAddress)
     getFields ["success", "bala", "balb", "balc"]
@@ -4581,7 +4581,7 @@ contract qq{
     -- Get the contract's account
     [BAccount a] <- getFields ["a"]
     -- Set the balance
-    adjust_ (Proxy @AddressState) (namedAccountToAccount Nothing a) (\as -> pure $ as {addressStateBalance = 13})
+    adjust_ (Proxy @AddressState) (a^.namedAccountAddress) (\as -> pure $ as {addressStateBalance = 13})
     -- Check return of balance
     void $ call2 "myBalance" "()" (a^.namedAccountAddress)
     getFields ["bal"] `shouldReturn` [BInteger 13]
@@ -5252,8 +5252,8 @@ contract qq{
     -- Set the balance and instantiate both of the accounts the accounts
     -- Account a should start with 13 and b should have 0 at the start.
     -- The transfer member should be able to send the balance of to account b
-    adjust_ (Proxy @AddressState) (namedAccountToAccount Nothing a) (\as -> pure $ as {addressStateBalance = 14})
-    adjust_ (Proxy @AddressState) (namedAccountToAccount Nothing b) (\bs -> pure $ bs {addressStateBalance = 0})
+    adjust_ (Proxy @AddressState) (a^.namedAccountAddress) (\as -> pure $ as {addressStateBalance = 14})
+    adjust_ (Proxy @AddressState) (b^.namedAccountAddress) (\bs -> pure $ bs {addressStateBalance = 0})
 
     -- Check return of balance
     void $ call2 "myBalance" "()" (a^.namedAccountAddress)
@@ -6362,8 +6362,8 @@ contract qq {
     -- Get the contract's accounts
     [BAccount contract', BAccount owner] <- getFields ["contract'", "owner"]
     -- Adjust the preset balances
-    adjust_ (Proxy @AddressState) (namedAccountToAccount Nothing contract') (\as -> pure $ as {addressStateBalance = 14})
-    adjust_ (Proxy @AddressState) (namedAccountToAccount Nothing owner) (\bs -> pure $ bs {addressStateBalance = 10})
+    adjust_ (Proxy @AddressState) (contract'^.namedAccountAddress) (\as -> pure $ as {addressStateBalance = 14})
+    adjust_ (Proxy @AddressState) (owner^.namedAccountAddress) (\bs -> pure $ bs {addressStateBalance = 10})
     -- Check return of balance
     void $ call2 "selfDestructThis" "()" (contract'^.namedAccountAddress)
     getFields ["contract'", "contractPay", "owner", "ownerPay"]
@@ -8939,7 +8939,7 @@ contract qq {
 
   it "can error handle improperly referenced overloaded contracts" $ runTest ( do 
     let getAddressFromResult :: ExecResults -> Maybe Address 
-        getAddressFromResult res = _accountAddress <$> erNewContractAccount res
+        getAddressFromResult res = erNewContractAddress res
 
     res <- runBS' [r|
 pragma safeExternalCalls;
@@ -9028,7 +9028,7 @@ contract qq {
 
   it "can error handle improperly referenced overloaded contracts using solidvm 11.4 pragma" $ runTest ( do 
     let getAddressFromResult :: ExecResults -> Maybe Address 
-        getAddressFromResult res = _accountAddress <$> erNewContractAccount res
+        getAddressFromResult res = erNewContractAddress res
 
     res <- runBS' [r|
 pragma solidvm 11.4;

@@ -32,7 +32,7 @@ import Blockchain.Data.ChainInfo
 import Blockchain.SolidVM.Exception hiding (assert)
 import Blockchain.SolidVM.ImportResolver
 import Blockchain.SolidVM.Metrics
-import Blockchain.Strato.Model.Account
+import Blockchain.Strato.Model.Address
 import Blockchain.Strato.Model.ExtendedWord
 import Blockchain.Strato.Model.Keccak256
 import Control.DeepSeq (force)
@@ -86,12 +86,12 @@ newtype MemCompilerT m a = MemCompilerT {unMemCompilerT :: MainChainT (MemAddres
 instance MonadTrans MemCompilerT where
   lift = MemCompilerT . MainChainT . MemAddressStateDB . lift . MemCodeDB . lift
 
-instance Monad m => (Account `A.Alters` AddressState) (MemCompilerT m) where
+instance Monad m => (Address `A.Alters` AddressState) (MemCompilerT m) where
   lookup p = MemCompilerT . MainChainT . A.lookup p
   insert p k = MemCompilerT . MainChainT . A.insert p k
   delete p = MemCompilerT . MainChainT . A.delete p
 
-instance Monad m => A.Selectable Account AddressState (MemCompilerT m) where
+instance Monad m => A.Selectable Address AddressState (MemCompilerT m) where
   select = A.lookup
 
 instance Monad m => (Keccak256 `A.Alters` DBCode) (MemCompilerT m) where
@@ -128,7 +128,7 @@ parseSourceWithAnnotations fileName = runIdentity . withAnnotations (Identity . 
 
 compileSourceNoInheritance ::
   ( HasCodeDB m,
-    A.Selectable Account AddressState m
+    A.Selectable Address AddressState m
   ) =>
   Bool ->
   Map T.Text T.Text ->
@@ -170,7 +170,7 @@ compileSourceNoInheritance typeCheck initCodeMap = runExceptT $ do
 --- Don't typecheck in Slipstream!!!
 compileSource ::
   ( HasCodeDB m,
-    A.Selectable Account AddressState m
+    A.Selectable Address AddressState m
   ) =>
   Bool ->
   Map T.Text T.Text ->
@@ -181,7 +181,7 @@ compileSource typeCheck mTT = do
 
 compileSource' ::
   ( HasCodeDB m,
-    A.Selectable Account AddressState m
+    A.Selectable Address AddressState m
   ) =>
   Bool ->
   Map T.Text T.Text ->
@@ -201,7 +201,7 @@ compileSource' typeCheck mTT = do
 
 compileSourceWithAnnotations ::
   ( HasCodeDB m,
-    A.Selectable Account AddressState m
+    A.Selectable Address AddressState m
   ) =>
   Bool ->
   Map T.Text T.Text ->
@@ -215,7 +215,7 @@ compileSourceWithAnnotationsWithoutImports typeCheck = runIdentity . runMemCompi
 codeCollectionFromSource ::
   ( MonadIO m,
     HasCodeDB m,
-    A.Selectable Account AddressState m
+    A.Selectable Address AddressState m
     -- , HasCodeCollectionDB m
   ) =>
   Bool ->
@@ -254,7 +254,7 @@ codeCollectionFromSource typeCheck initCode = do
 codeCollectionFromHash ::
   ( MonadIO m,
     HasCodeDB m,
-    A.Selectable Account AddressState m
+    A.Selectable Address AddressState m
     -- , HasCodeCollectionDB m
   ) =>
   Bool ->
@@ -275,7 +275,7 @@ codeCollectionFromHash typeCheck hsh = do
 
 codeCollectionFromHashNoCache ::
   ( HasCodeDB m,
-    A.Selectable Account AddressState m
+    A.Selectable Address AddressState m
   ) =>
   Bool ->
   Bool ->

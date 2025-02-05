@@ -117,7 +117,7 @@ getGenesisBlockAndPopulateInitialMPs ::
     HasStateDB m,
     HasStorageDB m,
     HasMemStorageDB m,
-    (Ac.Account `Alters` AddressState) m,
+    (Ad.Address `Alters` AddressState) m,
     HasRedis m
   ) =>
   String ->
@@ -162,8 +162,8 @@ initializeGenesisBlock ::
     HasStorageDB m,
     HasMemStorageDB m,
     MonadLogger m,
-    (Ac.Account `Alters` AddressState) m,
-    Selectable Ac.Account AddressState m
+    (Ad.Address `Alters` AddressState) m,
+    Selectable Ad.Address AddressState m
   ) =>
   String ->
   m ()
@@ -217,7 +217,7 @@ populateStorageDBs ::
     HasCodeDB m,
     HasStateDB m,
     HasHashDB m,
-    Selectable Ac.Account AddressState m
+    Selectable Ad.Address AddressState m
   ) =>
   (Keccak256 -> Maybe (Map Text Text)) ->
   Block ->

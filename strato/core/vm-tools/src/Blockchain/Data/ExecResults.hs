@@ -13,7 +13,6 @@ import BlockApps.X509.Certificate
 import Blockchain.Data.Log
 import Blockchain.Data.Transaction
 import Blockchain.SolidVM.Model
-import Blockchain.Strato.Model.Account
 import Blockchain.Strato.Model.Address
 import Blockchain.Strato.Model.Class
 import Blockchain.Strato.Model.Event
@@ -32,7 +31,7 @@ data ExecResults = ExecResults
     erTrace :: [String],
     erLogs :: [Log],
     erEvents :: [Event],
-    erNewContractAccount :: Maybe Account,
+    erNewContractAddress :: Maybe Address,
     erSuicideList :: S.Set Address,
     erAction :: Maybe Action,
     erException :: Maybe (Either SolidException VMException),
@@ -69,7 +68,7 @@ errorResults ck remainingGas e =
       erTrace = [],
       erLogs = [],
       erEvents = [],
-      erNewContractAccount = Nothing,
+      erNewContractAddress = Nothing,
       erSuicideList = S.empty,
       erAction = Nothing,
       erException = Just e,

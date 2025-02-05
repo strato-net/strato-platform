@@ -37,7 +37,7 @@ bloc ::
     HasVault m,
     HasSQL m,
     Selectable Account Contract m,
-    Selectable Account AddressState m,
+    Selectable Address AddressState m,
     Selectable Address Certificate m,
     HasCodeDB m,
     (Keccak256 `Selectable` SourceMap) m

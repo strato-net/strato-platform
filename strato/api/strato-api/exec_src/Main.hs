@@ -119,15 +119,15 @@ instance (Keccak256 `Alters` DBCode) m => (Keccak256 `Alters` DBCode) (ReaderT a
   insert p k = lift . insert p k
   delete p = lift . delete p
 
-instance {-# OVERLAPPING #-} MonadUnliftIO m => Selectable Account AddressState (SQLM m) where
+instance {-# OVERLAPPING #-} MonadUnliftIO m => Selectable Address AddressState (SQLM m) where
   select _ a = runMaybeT $ do
     (AddressStateRef' r _) <-
       MaybeT
         . fmap listToMaybe
         . Account.getAccount'
         $ Account.accountsFilterParams
-          & Account.qaAddress ?~ (a ^. accountAddress)
-          & Account.qaChainId .~ (fmap ChainId . maybeToList $ a ^. accountChainId)
+          & Account.qaAddress ?~ a
+          & Account.qaChainId .~ (fmap ChainId . maybeToList $ Nothing)
     codePtr <- MaybeT . pure $ addressStateRefCodePtr r
     pure $
       AddressState
@@ -137,7 +137,7 @@ instance {-# OVERLAPPING #-} MonadUnliftIO m => Selectable Account AddressState 
         codePtr
         (toMaybe 0 $ addressStateRefChainId r)
 
-instance Selectable Account AddressState m => Selectable Account AddressState (ReaderT a m) where
+instance Selectable Address AddressState m => Selectable Address AddressState (ReaderT a m) where
   select p = lift . select p
 
 instance {-# OVERLAPPING #-} MonadUnliftIO m => Selectable Address Certificate (CirrusM m) where
@@ -201,7 +201,7 @@ fullServer ::
     HasVault m,
     Accessible Metadata.UrlMap m,
     Selectable Account Contract m,
-    Selectable Account AddressState m,
+    Selectable Address AddressState m,
     Selectable Address Certificate m,
     HasCodeDB m,
     Selectable Keccak256 SourceMap m

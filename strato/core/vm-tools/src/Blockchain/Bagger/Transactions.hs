@@ -11,6 +11,7 @@ import Blockchain.Data.TransactionResultStatus
 import Blockchain.Database.MerklePatricia (StateRoot (..))
 import Blockchain.Sequencer.Event (OutputTx (..))
 import Blockchain.Strato.Model.Account
+import Blockchain.Strato.Model.Address
 import Blockchain.Strato.Model.Class
 import Blockchain.Strato.Model.Delta
 import Blockchain.Strato.Model.ExtendedWord
@@ -27,9 +28,9 @@ data TxRunResult = TxRunResult
   { trrTransaction :: OutputTx,
     trrResult :: Either TransactionFailureCause ExecResults,
     trrTime :: NominalDiffTime,
-    trrBeforeMap :: M.Map Account AddressStateModification,
-    trrAfterMap :: M.Map Account AddressStateModification,
-    trrNewAddresses :: [Account]
+    trrBeforeMap :: M.Map Address AddressStateModification,
+    trrAfterMap :: M.Map Address AddressStateModification,
+    trrNewAddresses :: [Address]
   }
   deriving (Show, Eq, Generic)
 

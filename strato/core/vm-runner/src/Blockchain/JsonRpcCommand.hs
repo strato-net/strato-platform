@@ -18,7 +18,7 @@ import Blockchain.Data.AddressStateDB
 import Blockchain.EthConf
 import Blockchain.KafkaTopics
 import Blockchain.Sequencer.Event
-import Blockchain.Strato.Model.Account
+import Blockchain.Strato.Model.Address
 import Blockchain.Strato.Model.ExtendedWord
 import Control.Monad ((<=<))
 import qualified Control.Monad.Change.Alter as A
@@ -43,7 +43,7 @@ runJsonRpcCommand ::
     MonadLogger m,
     HasCodeDB m,
     HasStorageDB m,
-    (Account `A.Alters` AddressState) m
+    (Address `A.Alters` AddressState) m
   ) =>
   JsonRpcCommand ->
   m ()
@@ -55,7 +55,7 @@ runJsonRpcCommand' ::
   ( MonadLogger m,
     HasCodeDB m,
     HasStorageDB m,
-    (Account `A.Alters` AddressState) m
+    (Address `A.Alters` AddressState) m
   ) =>
   JsonRpcCommand ->
   m (String, B.ByteString)
@@ -63,14 +63,14 @@ runJsonRpcCommand' c@JRCGetBalance {jrcAddress = address, jrcId = id} = do
   $logInfoS "runJsonRpcCommand.JRCGetBalance" . T.pack $ "running command: " ++ show c
   response <-
     show . addressStateBalance
-      <$> A.lookupWithDefault (A.Proxy @AddressState) (Account address Nothing)
+      <$> A.lookupWithDefault (A.Proxy @AddressState) address
   $logInfoS "runJsonRpcCommand'.JRCGetBalance" $ T.pack response
   return (id, BC.pack response)
 runJsonRpcCommand' c@JRCGetCode {jrcAddress = address, jrcId = id} = do
   $logInfoS "runJsonRpcCommand'.JRCGetCode" . T.pack $ "running command: " ++ show c
   codeHash <-
     addressStateCodeHash
-      <$> A.lookupWithDefault (A.Proxy @AddressState) (Account address Nothing)
+      <$> A.lookupWithDefault (A.Proxy @AddressState) address
   code <- getExternallyOwned $
     case codeHash of
       ExternallyOwned ch -> ch
@@ -80,7 +80,7 @@ runJsonRpcCommand' c@JRCGetTransactionCount {jrcAddress = address, jrcId = id} =
   $logInfoS "runJsonRpcCommand'.JRCGetTransactionCount" . T.pack $ "running command: " ++ show c
   response <-
     show . addressStateNonce
-      <$> A.lookupWithDefault (A.Proxy @AddressState) (Account address Nothing)
+      <$> A.lookupWithDefault (A.Proxy @AddressState) address
   $logInfoS "runJsonRpcCommand'.JRCGetTransactionCount" $ T.pack response
   return (id, BC.pack response)
 runJsonRpcCommand' c@JRCGetStorageAt {jrcAddress = address, jrcKey = key, jrcId = id} = do

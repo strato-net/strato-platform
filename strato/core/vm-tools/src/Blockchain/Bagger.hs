@@ -30,7 +30,6 @@ import qualified Blockchain.Data.TransactionDef as TD
 import Blockchain.Data.TransactionResult
 import Blockchain.Database.MerklePatricia (StateRoot (..))
 import Blockchain.Sequencer.Event (OutputBlock (..), OutputTx (..))
-import Blockchain.Strato.Model.Account
 import Blockchain.Strato.Model.Address
 import Blockchain.Strato.Model.Class
 import Blockchain.Strato.Model.Delta
@@ -538,7 +537,7 @@ removeFromSeen t = updateBaggerState (B.removeFromSeen t)
 
 getAddressNonceAndBalance :: MonadBagger m => Address -> m (Integer, Integer)
 getAddressNonceAndBalance addr = do
-  nonce <- DD.addressStateNonce <$> A.lookupWithDefault (A.Proxy @DD.AddressState) (Account addr Nothing)
+  nonce <- DD.addressStateNonce <$> A.lookupWithDefault (A.Proxy @DD.AddressState) addr
   return (nonce, 9999999999999999999999999999) -- gas off; fake a high balance, so all TXs are accepted
 
 addToPromotionCache :: MonadBagger m => OutputTx -> m ()
