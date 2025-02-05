@@ -123,7 +123,7 @@ spec = describe "Action conversions" $ do
              "eventContractRoot": "ClothingUTXO",
              "eventContractApplication": "LogisticsEngine2",
              "eventContractName" : "Vehicle",
-             "eventContractAccount" : "2e385b6a3aea46d4172df98617b5385c13b7100d",
+             "eventContractAddress" : "2e385b6a3aea46d4172df98617b5385c13b7100d",
              "eventName" : "Vehicle Event",
              "eventArgs" : [["field", "value", "String"], ["anotherField", "anotherValue","String"]]
            }

@@ -76,7 +76,7 @@ instance FromJSON Event where
       <*> (o .: "eventContractCreator")
       <*> (o .: "eventContractApplication")
       <*> (o .: "eventContractName")
-      <*> (o .: "eventContractAccount")
+      <*> (o .: "eventContractAddress")
       <*> (o .: "eventName")
       <*> (o .: "eventArgs")
   parseJSON o = error $ "parseJSON Event: Expected object, got:" ++ show o

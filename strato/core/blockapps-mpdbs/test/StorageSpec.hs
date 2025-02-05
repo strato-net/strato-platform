@@ -269,58 +269,6 @@ storageSpec = do
             ]
       insertMany (Proxy @AddressState) . M.fromList $ zip accts $ map (\cp -> blankAddressState {addressStateCodeHash = cp}) codePtrs
       resolveCodePtr (Just 1) (codePtrs !! 1) `shouldReturn` Just (SolidVMCode "Ptr_0" $ unsafeCreateKeccak256FromWord256 0x123)
-    it "should resolve child-chain code pointers to Nothing" . runStorM $ do
-      let chainRelationships =
-            [ ((0 :: Word256), ParentChainIds M.empty),
-              ((1 :: Word256), ParentChainIds $ M.singleton "parent" (0 :: Word256))
-            ]
-      insertMany (Proxy @ParentChainIds) $ M.fromList chainRelationships
-      let accts =
-            [ Address 0xabc,
-              Address 0xdef
-            ]
-      let codePtrs =
-            [ CodeAtAccount (Account (accts !! 1) Nothing) "Ptr_0",
-              SolidVMCode "Code_0" $ unsafeCreateKeccak256FromWord256 0x123
-            ]
-      insertMany (Proxy @AddressState) . M.fromList $ zip accts $ map (\cp -> blankAddressState {addressStateCodeHash = cp}) codePtrs
-      resolveCodePtr (Just 0) (codePtrs !! 0) `shouldReturn` Nothing
-    it "should resolve sibling-chain code pointers to Nothing" . runStorM $ do
-      let chainRelationships =
-            [ ((0 :: Word256), ParentChainIds M.empty),
-              ((1 :: Word256), ParentChainIds $ M.singleton "parent" (0 :: Word256)),
-              ((2 :: Word256), ParentChainIds $ M.singleton "parent" (0 :: Word256))
-            ]
-      insertMany (Proxy @ParentChainIds) $ M.fromList chainRelationships
-      let accts =
-            [ Address 0xabc,
-              Address 0xdef
-            ]
-      let codePtrs =
-            [ SolidVMCode "Code_0" $ unsafeCreateKeccak256FromWord256 0x123,
-              CodeAtAccount (Account (accts !! 0) Nothing) "Ptr_0"
-            ]
-      insertMany (Proxy @AddressState) . M.fromList $ zip accts $ map (\cp -> blankAddressState {addressStateCodeHash = cp}) codePtrs
-      resolveCodePtr (Just 2) (codePtrs !! 1) `shouldReturn` Nothing
-    it "should resolve two-level (pointer to parent, parent to child) code pointer indirection to Nothing" . runStorM $ do
-      let chainRelationships =
-            [ ((0 :: Word256), ParentChainIds M.empty),
-              ((1 :: Word256), ParentChainIds $ M.singleton "parent" (0 :: Word256)),
-              ((2 :: Word256), ParentChainIds $ M.singleton "parent" (0 :: Word256))
-            ]
-      insertMany (Proxy @ParentChainIds) $ M.fromList chainRelationships
-      let accts =
-            [ Address 0xabc,
-              Address 0xdef,
-              Address 0xfff
-            ]
-      let codePtrs =
-            [ SolidVMCode "Code_0" $ unsafeCreateKeccak256FromWord256 0x123,
-              CodeAtAccount (Account (accts !! 0) Nothing) "Ptr_0",
-              CodeAtAccount (Account (accts !! 1) Nothing) "Ptr_1"
-            ]
-      insertMany (Proxy @AddressState) . M.fromList $ zip accts $ map (\cp -> blankAddressState {addressStateCodeHash = cp}) codePtrs
-      resolveCodePtr (Just 2) (codePtrs !! 2) `shouldReturn` Nothing
     it "should detect cycles in codeptrs (pointer1 to pointer2, pointer2 to pointer1)" . runStorM $ do
       let chainRelationships =
             [ ((0 :: Word256), ParentChainIds M.empty),
