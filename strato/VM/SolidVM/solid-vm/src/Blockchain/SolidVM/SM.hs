@@ -921,7 +921,7 @@ markDiffForAction owner key' val' = do
 addEvent :: Mod.Modifiable (Q.Seq Event) m => Event -> m ()
 addEvent newEvent = Mod.modify_ (Mod.Proxy @(Q.Seq Event)) $ pure . (Q.|> newEvent)
 
-addDelegatecall :: Mod.Modifiable (Q.Seq Action.Delegatecall) m => Account -> Account -> T.Text -> T.Text -> m ()
+addDelegatecall :: Mod.Modifiable (Q.Seq Action.Delegatecall) m => Address -> Address -> T.Text -> T.Text -> m ()
 addDelegatecall s c o a = Mod.modify_ (Mod.Proxy @(Q.Seq Action.Delegatecall)) $ pure . (Q.|> Action.Delegatecall s c o a)
 
 getBlockHashWithNumber :: MonadSM m => Integer -> Keccak256 -> m (Maybe Keccak256)

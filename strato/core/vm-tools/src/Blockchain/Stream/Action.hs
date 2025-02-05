@@ -50,7 +50,6 @@ module Blockchain.Stream.Action (
 
 import Blockchain.MiscJSON ()
 import Blockchain.SolidVM.Model
-import Blockchain.Strato.Model.Account
 import Blockchain.Strato.Model.Address
 import Blockchain.Strato.Model.CodePtr
 import Blockchain.Strato.Model.Event
@@ -102,7 +101,7 @@ instance FromJSON CallType
 data CallData = CallData
   { _callDataType :: CallType,
     _callDataSender :: Address,
-    _callDataOwner :: Account,
+    _callDataOwner :: Address,
     _callDataGasPrice :: Integer,
     _callDataValue :: Integer,
     _callDataInput :: BSS.ShortByteString,
@@ -163,8 +162,8 @@ emptyCallData :: CallData
 emptyCallData =
   CallData
     { _callDataType = Create,
-      _callDataSender = Account (Address 0) Nothing,
-      _callDataOwner = Account (Address 0) Nothing,
+      _callDataSender = Address 0,
+      _callDataOwner = Address 0,
       _callDataGasPrice = 0,
       _callDataValue = 0,
       _callDataInput = BSS.empty,
@@ -356,8 +355,8 @@ instance FromJSON ActionData where
   parseJSON o = fail $ "parseJSON ActionData: Expected object, got: " ++ show o
 
 data Delegatecall = Delegatecall
-  { _delegatecallStorageAccount :: Account,
-    _delegatecallCodeAccount :: Account,
+  { _delegatecallStorageAddress :: Address,
+    _delegatecallCodeAddress :: Address,
     _delegatecallOrganization :: Text,
     _delegatecallApplication :: Text
   }
@@ -367,9 +366,9 @@ data Delegatecall = Delegatecall
 
 instance Format Delegatecall where
   format Delegatecall {..} =
-    "delegatecallStorageAccount: " ++ format _delegatecallStorageAccount ++ "\n"
-      ++ "delegatecallCodeAccount: "
-      ++ format _delegatecallCodeAccount
+    "delegatecallStorageAddress: " ++ format _delegatecallStorageAddress ++ "\n"
+      ++ "delegatecallCodeAddress: "
+      ++ format _delegatecallCodeAddress
       ++ "\n"
       ++ "delegatecallOrganization: "
       ++ T.unpack _delegatecallOrganization
@@ -382,16 +381,16 @@ instance Binary Delegatecall
 instance ToJSON Delegatecall where
   toJSON Delegatecall {..} =
     object
-      [ "storageAccount" .= _delegatecallStorageAccount,
-        "codeAccount" .= _delegatecallCodeAccount,
+      [ "storageAddress" .= _delegatecallStorageAddress,
+        "codeAddress" .= _delegatecallCodeAddress,
         "organization" .= _delegatecallOrganization,
         "application" .= _delegatecallApplication
       ]
 
 instance FromJSON Delegatecall where
   parseJSON (Object o) = do
-    s <- o .: "storageAccount"
-    c <- o .: "codeAccount"
+    s <- o .: "storageAddress"
+    c <- o .: "codeAddress"
     r <- o .: "organization"
     a <- o .: "application"
     pure $ Delegatecall s c r a

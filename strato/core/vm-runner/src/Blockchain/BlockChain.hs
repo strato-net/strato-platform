@@ -497,7 +497,6 @@ runCodeForTransaction isRunningTests' isHomestead b availableGas tAddr t propose
           --TODO- The new address state should be created in the VM itself....  Currently the EVM doesn't do this (and could be cleaned up by doing so), SolidVM does do this.  I will calculate this value here, but then ignore the value in SolidVM (and recalculate it there).  Eventually this should be moved into the EVM also
           nonce <- lift $ addressStateNonce <$> A.lookupWithDefault (Proxy @AddressState) tAddr
           let newAddress = getNewAddress_unsafe (tAddr) (nonce - 1) --nonce has already been incremented, so subtract 1 here to get the proper value (this is directly specified in the yellowpaper)
-              newAccount = Account newAddress (txChainId ut)
 
           lift $
             create
@@ -512,7 +511,7 @@ runCodeForTransaction isRunningTests' isHomestead b availableGas tAddr t propose
               (transactionValue ut)
               (fromInteger $ transactionGasPrice ut)
               availableGas
-              (newAccount^.accountAddress)
+              newAddress
               (transactionInit ut)
               (txHash ut)
               (txChainId ut)

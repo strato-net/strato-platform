@@ -710,7 +710,7 @@ call' from to' fnCalltype mContract functionName isRCC argExps = do
               SVMType.Array _ _ -> return ()
               _ -> markDiffForAction to (MS.StoragePath [MS.Field $ BC.pack $ labelToString n]) MS.BDefault
     )
-  when (fnCalltype == CC.DelegateCall) $ addDelegatecall (Account from Nothing) (Account to' Nothing) (T.pack ctrName) (T.pack parentName')
+  when (fnCalltype == CC.DelegateCall) $ addDelegatecall from to' (T.pack ctrName) (T.pack parentName')
   ((ctrName, parentName'),) <$> logFunctionCall args to contract functionName f
   where
     flattenVals (x : xs) = [x] ++ flattenVals xs
@@ -2328,7 +2328,7 @@ evaluateAccountMember a _ "codehash" = do
   resolvedCodeHash <- resolveCodePtr codeHash'
   case resolvedCodeHash of
     Just (SolidVMCode _ ch') -> return (Constant $ SString . keccak256ToHex $ ch')
-    Just cp -> missingCodeCollection "Account is not a SolidVM contract" (format cp)
+    Just cp -> missingCodeCollection "Address is not a SolidVM contract" (format cp)
     Nothing -> missingCodeCollection "Could not resolve code pointer for address" (format a)
 --Get the whole code collection when nothing is supplied to the code function
 evaluateAccountMember a _ "code" = do
@@ -2338,7 +2338,7 @@ evaluateAccountMember a _ "code" = do
   resolvedCodeHash <- resolveCodePtr codeHash'
   let ch' = case resolvedCodeHash of
         Just (SolidVMCode _ ch1') -> ch1'
-        Just cp -> missingCodeCollection "Account is not a SolidVM contract" (format cp)
+        Just cp -> missingCodeCollection "Address is not a SolidVM contract" (format cp)
         Nothing -> missingCodeCollection "Could not resolve code pointer for address" (format a)
   -- Find the code using the codehash
   cd <- A.lookup (A.Proxy @DBCode) ch'

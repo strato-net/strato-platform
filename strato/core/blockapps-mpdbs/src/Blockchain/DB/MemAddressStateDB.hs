@@ -25,7 +25,6 @@ import qualified Blockchain.DB.AddressStateDB as DB
 import Blockchain.DB.HashDB
 import Blockchain.DB.StateDB
 import Blockchain.Data.AddressStateDB
-import Blockchain.Strato.Model.Account
 import Blockchain.Strato.Model.Address
 import Control.DeepSeq
 import Control.Monad
@@ -113,7 +112,7 @@ flushMemAddressStateDB = do
   theMap <- getAddressStateBlockDBMap
   forM_ (M.toList theMap) $ \(address, modification) -> do
     case modification of
-      ASModification addressState -> DB.putAddressState (Account address Nothing) addressState
+      ASModification addressState -> DB.putAddressState address addressState
       ASDeleted -> DB.deleteAddressState address
   putAddressStateBlockDBMap M.empty
 

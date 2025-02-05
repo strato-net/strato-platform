@@ -31,7 +31,6 @@ import Blockchain.Data.AddressStateDB
 import Blockchain.Data.RLP
 import qualified Blockchain.Database.MerklePatricia as MP
 import qualified Blockchain.Database.MerklePatricia.Internal as MP
-import Blockchain.Strato.Model.Account
 import Blockchain.Strato.Model.Address
 import Blockchain.Strato.Model.ExtendedWord
 import Blockchain.Strato.Model.Util
@@ -48,17 +47,17 @@ getAddressStateMaybe address = do
   mState <- MP.getKeyVal sr $ addressAsNibbleString address
   return $ rlpDecode . rlpDeserialize . rlpDecode <$> mState
 
-getAllAddressStates :: (HasHashDB m, HasStateDB m) => Maybe Word256 -> m [(Account, AddressState)]
-getAllAddressStates chainId = getAllAddressStatesFromStateRoot chainId =<< getStateRoot chainId
+getAllAddressStates :: (HasHashDB m, HasStateDB m) => m [(Address, AddressState)]
+getAllAddressStates = getAllAddressStatesFromStateRoot =<< getStateRoot Nothing
 
-getAllAddressStatesFromStateRoot :: (HasHashDB m, HasStateDB m) => Maybe Word256 -> MP.StateRoot -> m [(Account, AddressState)]
-getAllAddressStatesFromStateRoot chainId sr = do
+getAllAddressStatesFromStateRoot :: (HasHashDB m, HasStateDB m) => MP.StateRoot -> m [(Address, AddressState)]
+getAllAddressStatesFromStateRoot sr = do
   mapM convert =<< MP.unsafeGetAllKeyVals sr
   where
-    convert :: (HasHashDB m) => (N.NibbleString, RLPObject) -> m (Account, AddressState)
+    convert :: (HasHashDB m) => (N.NibbleString, RLPObject) -> m (Address, AddressState)
     convert (k, v) = do
       k' <- fmap (fromMaybe (error $ "missing key value in hash table: " ++ BC.unpack (B16.encode $ nibbleString2ByteString k))) $ getAddressFromHash k
-      return ((Account k' chainId), rlpDecode . rlpDeserialize . rlpDecode $ v)
+      return (k', rlpDecode . rlpDeserialize . rlpDecode $ v)
 
 getAddressFromHash :: (HasHashDB m) => N.NibbleString -> m (Maybe Address)
 getAddressFromHash =
@@ -70,12 +69,12 @@ getStorageKeyFromHash = fmap (fmap bytesToWord256) . getRawStorageKeyFromHash
 getRawStorageKeyFromHash :: (HasHashDB m) => N.NibbleString -> m (Maybe B.ByteString)
 getRawStorageKeyFromHash = fmap (fmap nibbleString2ByteString) . hashDBGet
 
-putAddressState :: (HasStateDB m, HasHashDB m) => Account -> AddressState -> m ()
-putAddressState (Account address chainId) newState = do
+putAddressState :: (HasStateDB m, HasHashDB m) => Address -> AddressState -> m ()
+putAddressState address newState = do
   hashDBPut addrNibbles
-  sr <- getStateRoot chainId
+  sr <- getStateRoot Nothing
   sr' <- MP.putKeyVal sr addrNibbles $ rlpEncode $ rlpSerialize $ rlpEncode newState
-  setStateDBStateRoot chainId sr'
+  setStateDBStateRoot Nothing sr'
   where
     addrNibbles = addressAsNibbleString address
 
