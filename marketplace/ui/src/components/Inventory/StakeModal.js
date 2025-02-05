@@ -161,8 +161,9 @@ function prepareDataForItems(
         label: 'Market Value',
         description:
           'The total value of your staked assets, calculated as Quantity x Oracle Price.',
-        value: `$${new BigNumber(matchedReserve?.lastUpdatedOraclePrice)
-          .multipliedBy(inputQuantity.multipliedBy(decimalFactor))
+        value: `$${BigNumber(matchedReserve?.lastUpdatedOraclePrice)
+          .multipliedBy(inputQuantity)
+          .multipliedBy(decimalFactor)
           .toFixed(2)}`,
       },
       {
@@ -278,7 +279,7 @@ const StakeModal = ({
   );
 
   const handleInputChange = (value) => {
-    setInputQuantity(value || 0);
+    setInputQuantity(new BigNumber(value || 0));
   };
 
   const escrows = useMemo(() => {
