@@ -102,7 +102,7 @@ const SoldOrderDetails = ({ user, users }) => {
           name: prod.name,
           unitPrice: productPrice,
           quantity: productQuantity ? formattedNum(productQuantity) : '--',
-          amount: formattedNum((productPrice * productQuantity).toFixed(2)),
+          amount: formattedNum((productPrice * productQuantity).toFixed(decimals)),
           serialNumber: prod,
           tax: prod.tax ? prod.tax : 0,
         });
