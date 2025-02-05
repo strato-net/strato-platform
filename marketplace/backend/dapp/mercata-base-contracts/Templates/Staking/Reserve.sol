@@ -186,7 +186,7 @@ abstract contract Reserve is Utils, Structs {
         emit LoanRepaid(msg.sender, _escrowAddress, escrow.collateralQuantity(), usdstAmountRepaid);
     }
 
-    function setUSDTSTToken(address _newUSDSTToken) public requireOwner("update USDST token") {
+    function setUSDSTToken(address _newUSDSTToken) public requireOwner("update USDST token") {
         usdstToken = Asset(_newUSDSTToken);
     }
 
@@ -229,6 +229,11 @@ abstract contract Reserve is Utils, Structs {
 
     function setName(string _newName) public requireOwner("update name") {
         name = _newName;
+    }
+
+    function setUnitConversionRate(decimal _newRate) public requireOwner("update unit conversion rate") {
+        require(_newRate > 0, "Unit conversion rate must be greater than 0");
+        unitConversionRate = _newRate;
     }
 
     function setAssetRootAddress(address _newAssetRootAddress) public requireOwner("update asset root address") {
