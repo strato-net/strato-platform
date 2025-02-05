@@ -84,16 +84,13 @@ export const aggregateStakeColumns = (
       title: 'Owned',
       align: 'center',
       render: (_, record) => {
-        return <div>{record.totalQuantity || 0}</div>;
+        return <div>{(record.totalQuantity || 0) / Math.pow(10, record.decimals)}</div>;
       },
     },
     {
       title: 'Quantity Stakeable',
       align: 'center',
       render: (_, record) => {
-        const decimals = assetsWithEighteenDecimalPlaces.includes(
-          record.root
-        ) ? 18 : record.decimals || 0;
         const uniqueEscrows = new Set();
         let collateralQuantity = record?.inventories
           ? record.inventories.reduce((sum, item) => {
@@ -111,7 +108,6 @@ export const aggregateStakeColumns = (
           : record?.escrow?.collateralQuantity > record?.quantity
           ? record?.quantity
           : record?.escrow?.collateralQuantity || 0;
-        collateralQuantity =  collateralQuantity / Math.pow(10, decimals);
         const quantityNotAvailable =
           record.inventories.reduce((sum, item) => {
             const status = Number(item.status);
@@ -121,7 +117,7 @@ export const aggregateStakeColumns = (
             return sum;
           }, 0) + record.totalSaleQuantity;
         const stakeableQuantity =
-          record.totalQuantity - collateralQuantity - quantityNotAvailable;
+          (record.totalQuantity - collateralQuantity - quantityNotAvailable) / Math.pow(10, record.decimals);
         return <div>{stakeableQuantity}</div>;
       },
     },
