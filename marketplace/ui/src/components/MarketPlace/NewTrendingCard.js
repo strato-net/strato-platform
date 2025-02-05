@@ -54,7 +54,7 @@ const NewTrendingCard = ({
   };
 
   const naviroute = routes.MarketplaceProductDetail.url;
-  const ethNaviroute = routes.EthstProductDetail.url;
+  const ethNaviroute = routes.StakeableProductDetail.url;
   const isAvailableForSale = !topSellingProduct.price || saleQuantity === 0;
   const isDisabled =
     topSellingProduct.originAddress !== ethstAddress && topSellingProduct.originAddress !== wbtcstAddress &&
@@ -157,19 +157,13 @@ const NewTrendingCard = ({
               // Let the browser handle it natively to open in a new tab
             } else {
               e.preventDefault();
-              if (topSellingProduct.originAddress === ethstAddress) {
+              if (topSellingProduct.originAddress === ethstAddress
+                || topSellingProduct.originAddress === wbtcstAddress
+              ) {
                 navigate(
-                  `${ethNaviroute.replace(
-                    ':address',
-                    topSellingProduct.address
-                  )}`,
-                  { state: { isCalledFromInventory: false } }
-                );
-              } else if (topSellingProduct.originAddress === wbtcstAddress) {
-                navigate(
-                  `${routes.WbtcstProductDetail.url.replace(
-                    ':address',
-                    topSellingProduct.address
+                  `${ethNaviroute
+                    .replace(':address', topSellingProduct.address
+                    .replace(':productName', topSellingProduct.name)
                   )}`,
                   { state: { isCalledFromInventory: false } }
                 );
@@ -371,19 +365,13 @@ const NewTrendingCard = ({
                   productId: topSellingProduct.productId,
                 },
               });
-              if (topSellingProduct.originAddress === ethstAddress) {
+              if (topSellingProduct.originAddress === ethstAddress ||
+                topSellingProduct.originAddress === wbtcstAddress
+              ) {
                 navigate(
-                  `${ethNaviroute.replace(
-                    ':address',
-                    topSellingProduct.address
-                  )}`,
-                  { state: { isCalledFromInventory: false } }
-                );
-              } else if (topSellingProduct.originAddress === wbtcstAddress) {
-                navigate(
-                  `${routes.WbtcstProductDetail.url.replace(
-                    ':address',
-                    topSellingProduct.address
+                  `${ethNaviroute
+                    .replace(':address', topSellingProduct.address
+                    .replace(':productName', topSellingProduct.name)
                   )}`,
                   { state: { isCalledFromInventory: false } }
                 );

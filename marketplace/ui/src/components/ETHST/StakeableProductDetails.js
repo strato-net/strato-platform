@@ -18,7 +18,7 @@ import {
   SolutionOutlined,
   RiseOutlined,
 } from '@ant-design/icons';
-import { useMatch, useNavigate, useLocation } from 'react-router-dom';
+import { useMatch, useNavigate, useLocation, useParams } from 'react-router-dom';
 //actions
 import { actions as inventoryActions } from '../../contexts/inventory/actions';
 import {
@@ -45,7 +45,7 @@ import PreviewMode from '../RichEditor/PreviewMode';
 import ClickableCell from '../ClickableCell';
 import TimeRangeTabs from '../MarketPlace/TimeRangeTabs';
 import Statistics from '../MarketPlace/Statistics';
-import WbtcstSteps from './WbtcstSteps';
+import EthstSteps from './StakingSteps';
 import LoginModal from '../MarketPlace/LoginModal';
 import StakeModal from '../Inventory/StakeModal';
 import BorrowModal from '../Inventory/BorrowModal';
@@ -65,7 +65,7 @@ import { ASSET_STATUS, fileServerUrl } from '../../helpers/constants';
 import { Swiper, SwiperSlide } from 'swiper/react';
 import { Ethers5Adapter } from '@reown/appkit-adapter-ethers5';
 import { mainnet, sepolia } from '@reown/appkit/networks';
-import { useAppKit, useAppKitAccount, useAppKitNetwork, createAppKit } from '@reown/appkit/react';
+import { useAppKit, useAppKitAccount, createAppKit, useAppKitNetwork } from '@reown/appkit/react';
 import { ethers } from 'ethers';
 
 // Import Swiper styles
@@ -77,6 +77,7 @@ import 'swiper/css/autoplay';
 
 // import required modules
 import { EffectFade, Navigation, Pagination, Autoplay } from 'swiper/modules';
+import StakingSteps from './StakingSteps';
 
 const ERC20_ABI = [
   {
@@ -88,7 +89,7 @@ const ERC20_ABI = [
   },
 ];
 
-const ProductDetails = ({ user, users }) => {
+const StakeableProductDetails = ({ user, users }) => {
   const [api, contextHolder] = notification.useNotification();
   const { Text, Paragraph, Title } = Typography;
   const { state, pathname } = useLocation();
@@ -125,6 +126,9 @@ const ProductDetails = ({ user, users }) => {
   const [repayModalOpen, setRepayModalOpen] = useState(false);
   // For Wishlist Icon Rendering
   const [isWishlisted, setIsWishlisted] = useState(false);
+  const [wbtcBalance, setWbtcBalance] = useState(0);
+
+  const {productName} = useParams()
 
   // Stakeable
   const isStaked =
@@ -142,7 +146,7 @@ const ProductDetails = ({ user, users }) => {
   }
 
   const routeMatch = useMatch({
-    path: routes.WbtcstProductDetail.url,
+    path: routes.StakeableProductDetail.url,
     strict: true,
   });
 
@@ -192,40 +196,58 @@ const ProductDetails = ({ user, users }) => {
   });
 
   const appKit = useAppKit();
-  const { address } = useAppKitAccount();
-  const { chainId } = useAppKitNetwork();
-  const [wbtcBalance, setWbtcBalance] = useState(0);
+  const rawAccount = useAppKitAccount();
+  const { address, chainId } = useAppKitAccount();
+  const [ethBalance, setEthBalance] = useState(0);
   const [signer, setSigner] = useState({});
+
+  const account = useMemo(() => {
+    return rawAccount && rawAccount.address ? rawAccount : null;
+  }, [rawAccount?.address]);
+
+  const isEthRoute = productName.includes('eth');
+  const isWbtcRoute = productName.includes('wbtc');
 
   useEffect(() => {
     const fetchBalance = async () => {
-      if (address) {
-        const wbtcAddress = fileServerUrl.includes("test")
-          ? "0x29f2D40B0605204364af54EC677bD022dA425d03" // WBTC testnet contract
-          : "0x2260FAC5E5542a773Aa44fBCfeDf7C193bc2C599"; // WBTC mainnet contract
-  
+      //  WBTC
+      const addr = address || account.address;
+      if (addr) {
+        let balanceWei;
+        if (isEthRoute) {
+          balanceWei = await provider.getBalance(account.address);
+          setEthBalance(ethers.utils.formatEther(balanceWei));
+        }
+
+        if (isWbtcRoute) {
+          const wbtcAddress = fileServerUrl.includes("test")
+            ? "0x29f2D40B0605204364af54EC677bD022dA425d03" // WBTC testnet contract
+            : "0x2260FAC5E5542a773Aa44fBCfeDf7C193bc2C599"; // WBTC mainnet contract
+
+          // Create WBTC contract instance
+          const wbtcContract = new ethers.Contract(wbtcAddress, ERC20_ABI, provider);
+
+          try {
+            // Get WBTC balance
+            const wbtcBalance = await wbtcContract.balanceOf(addr);
+
+            // WBTC has 8 decimals (like BTC), format accordingly
+            const formattedBalance = ethers.utils.formatUnits(wbtcBalance, 8); // 8 decimals for WBTC
+            setWbtcBalance(formattedBalance); // Set WBTC balance
+          } catch (error) {
+            console.error("Failed to fetch WBTC balance:", error);
+          }
+
+        }
+
         const provider = new ethers.providers.Web3Provider(window.ethereum);
         const signer = provider.getSigner();
         setSigner(signer);
-  
-        // Create WBTC contract instance
-        const wbtcContract = new ethers.Contract(wbtcAddress, ERC20_ABI, provider);
-  
-        try {
-          // Get WBTC balance
-          const wbtcBalance = await wbtcContract.balanceOf(address);
-  
-          // WBTC has 8 decimals (like BTC), format accordingly
-          const formattedBalance = ethers.utils.formatUnits(wbtcBalance, 8); // 8 decimals for WBTC
-          setWbtcBalance(formattedBalance); // Set WBTC balance
-        } catch (error) {
-          console.error("Failed to fetch WBTC balance:", error);
-        }
-      }
-    };
-  
-    fetchBalance();
-  }, [address, chainId]);
+      };
+    }
+
+      fetchBalance();
+    }, [account, address, chainId]);
 
   useEffect(() => {
     if (isCalledFromInventory) setId(routeMatch1?.params?.id);
@@ -534,7 +556,7 @@ const ProductDetails = ({ user, users }) => {
               </Breadcrumb.Item>
             </Breadcrumb>
           </Row>
-          <WbtcstSteps />
+          <StakingSteps type={details.name} />
           <div className="flex w-full flex-col md:leading-12 px-4 sm:px-8 md:px-0 items-center md:w-[750px] md:w-[835px] xl:w-[858px]  md:mx-auto mt-12">
             <div className="flex md:justify-center gap-[15px] md:gap-6 flex-col md:flex-row items-center">
               {details['BlockApps-Mercata-Asset-images'].length > 0 ? (
@@ -651,7 +673,7 @@ const ProductDetails = ({ user, users }) => {
                           if (!isAuthenticated || !user) {
                             setIsModalVisible(true);
                           } else {
-                            if (address) {
+                            if (account?.address || address) {
                               showBridgeWalletModal();
                             } else {
                               appKit.open();
@@ -659,10 +681,10 @@ const ProductDetails = ({ user, users }) => {
                           }
                         }}
                       >
-                        {address ? 'Bridge' : 'Connect Wallet'}
+                        {(account?.address || address) ? 'Bridge' : 'Connect Wallet'}
                       </Button>
                     </div>
-                    {address && (
+                    {(account?.address || address) && (
                       <div className="bg-[#13188A] rounded-full mt-2">
                         <appkit-account-button />
                       </div>
@@ -856,7 +878,6 @@ const ProductDetails = ({ user, users }) => {
                       />
                       <PriceChartAndStats
                         priceHistory={priceHistory}
-                        isDecimal={details?.data?.quantityIsDecimal === 'True'}
                       />
                     </div>
                   )}
@@ -868,7 +889,6 @@ const ProductDetails = ({ user, users }) => {
                       </h2>
                       <Statistics
                         priceHistory={priceHistory}
-                        isDecimal={details?.data?.quantityIsDecimal === 'True'}
                       />
                     </>
                   )}
@@ -891,6 +911,7 @@ const ProductDetails = ({ user, users }) => {
           productDetailPage={Id}
           inventory={inventoryDetails}
           reserves={reserves}
+
         />
       )}
       {bridgeWalletModalOpen && (
@@ -899,10 +920,10 @@ const ProductDetails = ({ user, users }) => {
           handleCancel={handleBridgeWalletModalClose}
           signer={signer}
           accountDetails={{
-            walletAddress: address,
-            balance: wbtcBalance,
+            walletAddress: account?.address || address,
+            balance: ethBalance,
           }}
-          tokenName="WBTC"
+          tokenName={isEthRoute?'ETH':'WBTC'}
         />
       )}
       {borrowModalOpen && (
@@ -928,4 +949,4 @@ const ProductDetails = ({ user, users }) => {
   );
 };
 
-export default ProductDetails;
+export default StakeableProductDetails;

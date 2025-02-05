@@ -69,7 +69,7 @@ const InventoryCard = ({
 
   const navigate = useNavigate();
   const naviroute = routes.InventoryDetail.url;
-  const ethNaviroute = routes.EthstProductDetail.url;
+  const ethNaviroute = routes.StakeableProductDetail.url;
   const imgMeta = category ? category : SEO.TITLE_META;
   const itemData = inventory.data;
   const decimals = assetsWithEighteenDecimalPlaces.includes(
@@ -180,12 +180,14 @@ const InventoryCard = ({
   };
 
   const callDetailPage = () => {
-    if (inventory.originAddress === ethstAddress) {
-      navigate(`${ethNaviroute.replace(':address', inventory.address)}`, {
-        state: { isCalledFromInventory: false },
-      });
-    } else if (inventory.originAddress === wbtcstAddress) {
-      navigate(`${ethNaviroute.replace(':address', inventory.address)}`, {
+    if (inventory.originAddress === ethstAddress ||
+      inventory.originAddress === wbtcstAddress
+    ) {
+      navigate(`${ethNaviroute
+        .replace(':address', inventory.address)
+        .replace(':productName', inventory.name)
+      }
+        `, {
         state: { isCalledFromInventory: false },
       });
     } else {

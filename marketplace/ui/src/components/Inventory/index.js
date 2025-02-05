@@ -86,7 +86,7 @@ const Inventory = ({ user }) => {
   const metaImg = SEO.IMAGE_META;
   const navigate = useNavigate();
   const naviroute = routes.InventoryDetail.url;
-  const ethNaviroute = routes.EthstProductDetail.url;
+  const ethNaviroute = routes.StakeableProductDetail.url;
   let { hasChecked, isAuthenticated, loginUrl } = useAuthenticateState();
   const {
     USDSTAddress,

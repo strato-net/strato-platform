@@ -294,14 +294,12 @@ const TransactionTable = ({
   const handleAssetRedirection = (data) => {
     const isEthst = data?.assetOriginAddress === ethstAddress;
     const isWbtcst = data?.assetOriginAddress === wbtcstAddress;
-    if (isEthst) {
-      const url = routes.EthstProductDetail.url;
-      navigate(`${url.replace(':address', data.assetAddress)}`, {
-        state: { isCalledFromInventory: false },
-      });
-    } else if (isWbtcst) {
-      const url = routes.WbtcstProductDetail.url;
-      navigate(`${url.replace(':address', data.assetAddress)}`, {
+    if (isEthst || isWbtcst) {
+      const url = routes.StakeableProductDetail.url;
+      navigate(`${url
+        .replace(':address', data.assetAddress)
+        .replace(':productName', data.name)
+      }`, {
         state: { isCalledFromInventory: false },
       });
     } else {

@@ -22,8 +22,6 @@ import { UserActivityProvider } from './contexts/userActivity';
 import AuthorizeIssuer from './components/AuthorizeIssuer';
 import { IssuerStatusProvider } from './contexts/issuerStatus';
 import ProductDetails from './components/MarketPlace/ProductDetails';
-import EthstProductDetails from './components/ETHST/EthstProductDetails';
-import WbtcstProductDetails from './components/ETHST/WbtcstProductDetails';
 import Checkout from './components/MarketPlace/Checkout';
 import ConfirmOrder from './components/MarketPlace/ConfirmOrder';
 import ProcessingOrder from './components/MarketPlace/ProcessingOrder';
@@ -38,6 +36,7 @@ import { MarketplaceProvider } from './contexts/marketplace';
 import { EthProvider } from './contexts/eth';
 import Transaction from './components/Order/Transaction';
 import Feed from './components/Feed/Feed';
+import StakeableProductDetails from './components/ETHST/StakeableProductDetails';
 
 const AuthenticatedRoutes = ({ user, users, isAuthenticated }) => {
   return (
@@ -187,7 +186,7 @@ const AuthenticatedRoutes = ({ user, users, isAuthenticated }) => {
       />
       <Route
         exact
-        path={routes.EthstProductDetail.url}
+        path={routes.StakeableProductDetail.url}
         element={
           <UsersProvider>
             <CategorysProvider>
@@ -197,7 +196,7 @@ const AuthenticatedRoutes = ({ user, users, isAuthenticated }) => {
                     <ItemsProvider>
                       <OrdersProvider>
                         <EthProvider>
-                          <EthstProductDetails user={user} users={users} />
+                          <StakeableProductDetails user={user} users={users} />
                         </EthProvider>
                       </OrdersProvider>
                     </ItemsProvider>
@@ -208,29 +207,7 @@ const AuthenticatedRoutes = ({ user, users, isAuthenticated }) => {
           </UsersProvider>
         }
       />
-            <Route
-        exact
-        path={routes.WbtcstProductDetail.url}
-        element={
-          <UsersProvider>
-            <CategorysProvider>
-              <SubCategorysProvider>
-                <PaymentServicesProvider>
-                  <InventoriesProvider>
-                    <ItemsProvider>
-                      <OrdersProvider>
-                        <EthProvider>
-                          <WbtcstProductDetails user={user} users={users} />
-                        </EthProvider>
-                      </OrdersProvider>
-                    </ItemsProvider>
-                  </InventoriesProvider>
-                </PaymentServicesProvider>
-              </SubCategorysProvider>
-            </CategorysProvider>
-          </UsersProvider>
-        }
-      />
+
       <Route
         exact
         path={routes.Products.url}

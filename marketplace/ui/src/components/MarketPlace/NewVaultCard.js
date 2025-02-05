@@ -55,22 +55,13 @@ const NewVaultCard = ({ reserveItem, reserve, parent = '', contextHolder }) => {
   };
 
   const handleCardClick = () => {
-    if (reserveItem.originAddress === ethstAddress) {
+    console.log(reserveItem, 'reserveItem');
+    if (reserveItem.originAddress === ethstAddress || reserveItem.originAddress === wbtcstAddress) {
       navigate(
-        `${routes.EthstProductDetail.url.replace(
-          ':address',
-          reserveItem.address
-        )}`,
-        {
-          state: { isCalledFromInventory: false },
-        }
-      );
-    } else if (reserveItem.originAddress === wbtcstAddress) {
-      navigate(
-        `${routes.WbtcstProductDetail.url.replace(
-          ':address',
-          reserveItem.address
-        )}`,
+        `${routes.StakeableProductDetail.url
+          .replace(':productName', reserveItem.name)
+          .replace(':address', reserveItem.address)
+        }`,
         {
           state: { isCalledFromInventory: false },
         }
@@ -88,9 +79,8 @@ const NewVaultCard = ({ reserveItem, reserve, parent = '', contextHolder }) => {
     <>
       <div
         id="productCard"
-        className={`relative trending_cards_container_card bg-white p-3 ${
-          parent === 'Marketplace' ? 'min-w-[300px] w-auto' : 'min-w-[230px]'
-        }  min-w-[320px] md:min-w-[300px] rounded-md flex flex-col gap-2 md:gap-3 shadow-card_shadow h-max`}
+        className={`relative trending_cards_container_card bg-white p-3 ${parent === 'Marketplace' ? 'min-w-[300px] w-auto' : 'min-w-[230px]'
+          }  min-w-[320px] md:min-w-[300px] rounded-md flex flex-col gap-2 md:gap-3 shadow-card_shadow h-max`}
         onClick={handleCardClick}
       >
         {contextHolder}

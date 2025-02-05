@@ -1,13 +1,13 @@
 import React from 'react';
 import { useAuthenticateState } from '../../contexts/authentication';
 
-const EthstSteps = () => {
+const StakingSteps = ({type}) => {
   const { loginUrl } = useAuthenticateState();
 
   return (
     <div className="bg-[#f3f4f6] p-4 rounded-md mx-16">
       <h2 className="text-center text-xl font-semibold mb-6">
-        How to stake ETHST in 4 simple steps
+        How to stake {type} in 4 simple steps
       </h2>
       <div className="relative flex flex-col md:flex-row items-center md:justify-between">
         {/* Green Line Connecting Circles */}
@@ -73,8 +73,8 @@ const EthstSteps = () => {
               className="text-center mt-1 text-sm"
               style={{ color: '#4b5563' }}
             >
-              Connect to your Ethereum wallet and bridge your ETH to Mercata’s
-              equivalent token ETHST to begin staking!
+              Connect to your Ethereum wallet and bridge your {type} to Mercata’s
+              equivalent token {type} to begin staking!
             </p>
           </div>
         </div>
@@ -98,7 +98,7 @@ const EthstSteps = () => {
               className="text-center mt-1 text-sm"
               style={{ color: '#4b5563' }}
             >
-              Stake your ETHST tokens and begin earning daily rewards in the
+              Stake your {type} tokens and begin earning daily rewards in the
               form of CATA, our governance token (Est. APY 10%).
             </p>
           </div>
@@ -121,7 +121,7 @@ const EthstSteps = () => {
               className="text-center mt-1 text-sm"
               style={{ color: '#4b5563' }}
             >
-              Borrow (interest-free for a limited time!) USDST against your staked ETHST.
+              Borrow (interest-free for a limited time!) USDST against your staked {type}.
             </p>
           </div>
         </div>
@@ -130,4 +130,4 @@ const EthstSteps = () => {
   );
 };
 
-export default EthstSteps;
+export default StakingSteps;

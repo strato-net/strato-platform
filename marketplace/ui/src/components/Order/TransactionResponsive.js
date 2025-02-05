@@ -119,6 +119,7 @@ const TransactionResponsive = ({
             redemptionService,
             block_timestamp,
             assetOriginAddress,
+            name
           },
           index
         ) => {
@@ -185,14 +186,12 @@ const TransactionResponsive = ({
           const handleAssetRedirection = () => {
             const isEthst = assetOriginAddress === ethstAddress;
             const isWbtcst = assetOriginAddress === wbtcstAddress;
-            if (isEthst) {
-              const url = routes.EthstProductDetail.url;
-              navigate(`${url.replace(':address', assetAddress)}`, {
-                state: { isCalledFromInventory: false },
-              });
-            } else if (isWbtcst) {
-              const url = routes.WbtcstProductDetail.url;
-              navigate(`${url.replace(':address', assetAddress)}`, {
+            if (isEthst || isWbtcst) {
+              const url = routes.StakeableProductDetail.url;
+              navigate(`${url
+                .replace(':address', assetAddress)
+                .replace(':productName', name)
+              }`, {
                 state: { isCalledFromInventory: false },
               });
             } else {
