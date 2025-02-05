@@ -23,11 +23,13 @@ async function submitPrice(token, contract, args) {
 
 // Function to update the price of the Asset Sale price
 async function updateMetalPrice(assetName, token, contractAddress, price) {
-  const priceMarkup =
-    (assetName === "gold"
-      ? process.env.GOLD_PRICE_MARKUP
-      : process.env.SILVER_PRICE_MARKUP) || "1"; // Default to "1" if undefined
-  const parsedPriceMarkup = parseFloat(priceMarkup);
+  const parsedPriceMarkup = parseFloat(
+    process.env[
+      assetName.toLowerCase().includes("gold")
+        ? "GOLD_PRICE_MARKUP"
+        : "SILVER_PRICE_MARKUP"
+    ] || "1"
+  );
   const callArgs = {
     contract: {
       address: contractAddress,
