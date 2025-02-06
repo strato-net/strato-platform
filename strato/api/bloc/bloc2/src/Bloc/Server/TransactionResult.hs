@@ -289,7 +289,7 @@ contractResult i txHash txResult@TransactionResult {..} mmd = do
                 =<< (listToMaybe . Text.splitOn "," . Text.pack $ transactionResultContractsDeleted)
         case mDelAddr of
           Just _ -> lift . throwIO . UserError $ "Contract failed to upload, likely because the constructor threw"
-          Nothing -> lift . throwIO . UserError $ "Transaction succeeded, but contract was neither created, nor destroyed"
+          Nothing -> lift . throwIO . UserError $ Text.pack $ "Transaction succeeded, but contract was neither created, nor destroyed, transactionResultContractsDeleted=" ++ show transactionResultContractsDeleted
       stratoMsg -> lift . throwIO . UserError $ Text.pack stratoMsg
     Just acct -> do
       -- Checks if account exists in the address state ref table before returning results
@@ -299,7 +299,7 @@ contractResult i txHash txResult@TransactionResult {..} mmd = do
     go :: HasSQL m => Address -> Text -> Integer -> m UploadContractDetails
     go address name num = do
       if num >= 100 
-        then throwIO . UserError $ "Transaction succeeded, but contract was neither created, nor destroyed"
+        then throwIO . UserError $ Text.pack $ "Transaction succeeded, but contract was neither created, nor destroyed, num=" ++ show num
         else do
           void . liftIO $ threadDelay 100000
           addressRefs <- 
