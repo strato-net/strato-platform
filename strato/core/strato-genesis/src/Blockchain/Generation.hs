@@ -26,7 +26,6 @@ where
 
 import BlockApps.X509.Certificate
 import BlockApps.X509.Keys (pubToBytes, rootPubKey)
-import Blockchain.Data.ChainInfo
 import Blockchain.Data.GenesisInfo
 import Blockchain.Data.RLP
 import Blockchain.Strato.Model.Account

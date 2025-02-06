@@ -25,7 +25,6 @@ import Blockchain.Data.AddressStateDB
 import Blockchain.Data.Block
 import Blockchain.Data.BlockHeader
 import Blockchain.Data.BlockDB
-import Blockchain.Data.ChainInfo
 import Blockchain.Data.Extra
 import Blockchain.Data.GenesisBlock
 import Blockchain.Data.GenesisInfo

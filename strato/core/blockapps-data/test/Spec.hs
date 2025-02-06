@@ -6,7 +6,6 @@
 
 import Blockchain.Data.ArbitraryInstances ()
 import Blockchain.Data.BlockHeader
-import Blockchain.Data.ChainInfo
 import Blockchain.Data.Enode
 import Blockchain.Data.Json
 import Blockchain.Data.RLP
@@ -96,11 +95,7 @@ main = hspecWith (configAddFilter predicate defaultConfig) $ do
     codePtrJSON
     codeRLP
     codeJSON
-    accountInfoRLP
-    accountInfoJSON
     actionJSON
-    codeInfoRLP
-    codeInfoJSON
     transactionRLP
     transactionJSON
     transactionRLPBack
@@ -247,35 +242,11 @@ codeJSON = do
     property $
       (\x -> jsonCheck (x :: Code))
 
-accountInfoRLP :: Spec
-accountInfoRLP = do
-  it "should convert an AccountInfo to and from its RLP encoding" $
-    property $
-      (\x -> rlpCheck (x :: AccountInfo))
-
-accountInfoJSON :: Spec
-accountInfoJSON = do
-  it "should convert a AccountInfo to and from its JSON encoding" $
-    property $
-      (\x -> jsonCheck (x :: AccountInfo))
-
 actionJSON :: Spec
 actionJSON = do
   it "should convert an Action to and from its JSON encoding" $
     property $
       (\x -> jsonCheck (x :: Map Word256 Word256))
-
-codeInfoRLP :: Spec
-codeInfoRLP = do
-  it "should convert an CodeInfo to and from its RLP encoding" $
-    property $
-      (\x -> rlpCheck (x :: CodeInfo))
-
-codeInfoJSON :: Spec
-codeInfoJSON = do
-  it "should convert a CodeInfo to and from its JSON encoding" $
-    property $
-      (\x -> jsonCheck (x :: CodeInfo))
 
 transactionRLP :: Spec
 transactionRLP = do
