@@ -26,10 +26,6 @@ spec = parallel $ do
     it "should be serializable and deserializable" $
       property $
         \x -> binaryFidelity (x :: BlockHeader)
-  describe "AccountInfo" $ do
-    it "should be serializable and deserializable" $
-      property $
-        \x -> binaryFidelity (x :: CI.AccountInfo)
   describe "IngestTx" $ do
     it "should be serializable and deserializable" $
       property $ do

@@ -41,7 +41,6 @@ import Blockchain.Data.RLP
 import qualified Blockchain.Data.TXOrigin as TO
 import qualified Blockchain.Data.Transaction as TX
 import Blockchain.Database.MerklePatricia.NodeData (NodeData)
-import Blockchain.Sequencer.BinaryInstances ()
 import Blockchain.Sequencer.DB.Witnessable
 import qualified Blockchain.Strato.Model.Address as A
 import Blockchain.Strato.Model.ChainMember

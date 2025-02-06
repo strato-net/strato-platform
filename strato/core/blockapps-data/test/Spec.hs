@@ -101,8 +101,6 @@ main = hspecWith (configAddFilter predicate defaultConfig) $ do
     actionJSON
     codeInfoRLP
     codeInfoJSON
-    chainInfoRLP
-    chainInfoJSON
     transactionRLP
     transactionJSON
     transactionRLPBack
@@ -278,18 +276,6 @@ codeInfoJSON = do
   it "should convert a CodeInfo to and from its JSON encoding" $
     property $
       (\x -> jsonCheck (x :: CodeInfo))
-
-chainInfoRLP :: Spec
-chainInfoRLP = do
-  it "should convert a ChainInfo to and from its RLP encoding" $
-    property $
-      (\x -> rlpCheck (x :: ChainInfo))
-
-chainInfoJSON :: Spec
-chainInfoJSON = do
-  it "should convert a ChainInfo to and from its JSON encoding" $
-    property $
-      (\x -> jsonCheck (x :: ChainInfo))
 
 transactionRLP :: Spec
 transactionRLP = do
