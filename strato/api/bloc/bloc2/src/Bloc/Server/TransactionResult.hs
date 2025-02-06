@@ -285,7 +285,7 @@ contractResult i txHash txResult@TransactionResult {..} mmd = do
     Nothing -> case transactionResultMessage of
       "Success!" -> do
         let mDelAddr =
-              readMaybe @Account . Text.unpack
+              readMaybe @Address . Text.unpack
                 =<< (listToMaybe . Text.splitOn "," . Text.pack $ transactionResultContractsDeleted)
         case mDelAddr of
           Just _ -> lift . throwIO . UserError $ "Contract failed to upload, likely because the constructor threw"
