@@ -1,6 +1,5 @@
 import { STRIPE_ENV, SERVER_CONFIRM_URL, SERVER_CANCEL_URL, SERVER_URL } from '../helpers/constants.js';
 import Stripe from 'stripe';
-import BigNumber from "bignumber.js";
 const stripe = Stripe(STRIPE_ENV.CREDENTIALS.STRIPE_SECRET_KEY);
 
 class StripeService {
