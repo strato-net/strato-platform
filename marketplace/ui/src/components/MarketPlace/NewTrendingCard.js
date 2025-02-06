@@ -299,12 +299,12 @@ const NewTrendingCard = ({
               bordered={false}
               value={quantity}
               max={saleQuantity}
-              min={1}
+              min={1/Math.pow(10, topSellingProduct.decimals || 0)}
               onChange={(e) => {
-                setQuantity(parseInt(e || 0));
+                setQuantity(parseFloat(e || 0));
               }}
               onPressEnter={(e) => {
-                const newValue = parseInt(e.target.value, 10);
+                const newValue = parseFloat(e.target.value, 10);
                 if (newValue <= saleQuantity) {
                   setQuantity(newValue);
                 } else {
