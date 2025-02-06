@@ -181,7 +181,10 @@ function prepareDataForItems(
               .multipliedBy(
                 new BigNumber(matchedReserve?.cataAPYRate / 10) / 365
               )
-              .toFixed(2)}
+              .toLocaleString('en-US', {
+                maximumFractionDigits: 6,
+                minimumFractionDigits: 0,
+              })}
           </div>
         ),
       },
