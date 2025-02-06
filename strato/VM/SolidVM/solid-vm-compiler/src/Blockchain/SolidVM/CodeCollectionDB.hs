@@ -28,12 +28,10 @@ where
 import Blockchain.DB.CodeDB
 import Blockchain.DB.MemAddressStateDB
 import Blockchain.Data.AddressStateDB
-import Blockchain.Data.ChainInfo
 import Blockchain.SolidVM.Exception hiding (assert)
 import Blockchain.SolidVM.ImportResolver
 import Blockchain.SolidVM.Metrics
 import Blockchain.Strato.Model.Address
-import Blockchain.Strato.Model.ExtendedWord
 import Blockchain.Strato.Model.Keccak256
 import Control.DeepSeq (force)
 import Control.Exception
@@ -98,9 +96,6 @@ instance Monad m => (Keccak256 `A.Alters` DBCode) (MemCompilerT m) where
   lookup p = MemCompilerT . MainChainT . MemAddressStateDB . lift . A.lookup p
   insert p k = MemCompilerT . MainChainT . MemAddressStateDB . lift . A.insert p k
   delete p = MemCompilerT . MainChainT . MemAddressStateDB . lift . A.delete p
-
-instance Monad m => A.Selectable Word256 ParentChainIds (MemCompilerT m) where
-  select p = MemCompilerT . A.select p
 
 runMemCompilerT :: Monad m => MemCompilerT m a -> m a
 runMemCompilerT = runNewMemCodeDB . runNewMemAddressStateDB . runMainChainT . unMemCompilerT

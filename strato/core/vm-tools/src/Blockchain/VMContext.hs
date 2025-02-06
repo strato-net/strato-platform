@@ -86,7 +86,6 @@ import Blockchain.Data.AddressStateDB
 import Blockchain.Data.Block
 import Blockchain.Data.BlockHeader
 import Blockchain.Data.BlockSummary
-import Blockchain.Data.ChainInfo
 import Blockchain.Data.DataDefs
 import Blockchain.Data.RLP
 import qualified Blockchain.Database.MerklePatricia as MP
@@ -324,7 +323,6 @@ type VMBase m =
     Mod.Modifiable CurrentBlockHash m,
     Mod.Modifiable GasCap m,
     HasMemAddressStateDB m,
-    A.Selectable Word256 ParentChainIds m,
     A.Selectable Address AddressState m,
     (Maybe Word256 `A.Alters` MP.StateRoot) m,
     (MP.StateRoot `A.Alters` MP.NodeData) m,

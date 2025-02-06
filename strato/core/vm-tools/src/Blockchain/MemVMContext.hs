@@ -45,7 +45,6 @@ import Blockchain.DB.StateDB
 import Blockchain.Data.AddressStateDB
 import Blockchain.Data.Block
 import Blockchain.Data.BlockSummary
-import Blockchain.Data.ChainInfo
 import Blockchain.Data.RLP
 import qualified Blockchain.Database.MerklePatricia as MP
 import Blockchain.Strato.Model.Address
@@ -296,9 +295,6 @@ instance (Maybe Word256 `A.Alters` MP.StateRoot) MemContextM where
       Just (CurrentBlockHash bh) -> do
         modify $ memDBs . stateRoots %~ M.delete (bh, chainId)
         deleteChainStateRoot chainId bh
-
-instance A.Selectable Word256 ParentChainIds MemContextM where
-  select _ chainId = fmap (\(_, _, p) -> ParentChainIds p) <$> getChainGenesisInfo (Just chainId)
 
 instance (Keccak256 `A.Alters` DBCode) MemContextM where
   lookup _ k = dbsGets $ view (codeDB . at k)

@@ -37,7 +37,6 @@ import Blockchain.DB.SQLDB
 import Blockchain.Data.AddressStateDB
 import Blockchain.Data.Block
 import Blockchain.Data.BlockSummary
-import Blockchain.Data.ChainInfo
 import Blockchain.Data.DataDefs
 import Blockchain.Data.RLP
 import Blockchain.Data.TransactionResult
@@ -241,9 +240,6 @@ instance (MonadLogger m, HasContext m, (MP.StateRoot `A.Alters` MP.NodeData) m) 
       Just (CurrentBlockHash bh) -> do
         modify $ memDBs . stateRoots %~ M.delete (bh, chainId)
         deleteChainStateRoot chainId bh
-
-instance (HasContext m, (MP.StateRoot `A.Alters` MP.NodeData) m) => A.Selectable Word256 ParentChainIds m where
-  select _ chainId = fmap (\(_, _, p) -> ParentChainIds p) <$> getChainGenesisInfo (Just chainId)
 
 instance HasContext m => (Keccak256 `A.Alters` DBCode) m where
   lookup _ = genericLookupCodeDB $ getCodeDB

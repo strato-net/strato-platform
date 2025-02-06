@@ -20,7 +20,6 @@ import Blockchain.DB.RawStorageDB
 import Blockchain.DB.SolidStorageDB
 import Blockchain.DB.StorageDB
 import Blockchain.Data.AddressStateDB
-import Blockchain.Data.ChainInfo
 import qualified Blockchain.Database.MerklePatricia as MP
 import Blockchain.Strato.Model.Account
 import Blockchain.Strato.Model.Address
@@ -56,22 +55,13 @@ data CachedStorage = CS
     _sbs :: SMap,
     _atx :: AMap,
     _abs :: AMap,
-    _srm :: M.Map (Maybe Word256) MP.StateRoot,
-    _parentChainMap :: M.Map Word256 ParentChainIds
+    _srm :: M.Map (Maybe Word256) MP.StateRoot
   }
   deriving (Generic)
 
 makeLenses ''CachedStorage
 
 type StorM = StateT CachedStorage (ResourceT (LoggingT IO))
-
-instance (Word256 `Alters` ParentChainIds) StorM where
-  lookup _ k = use $ parentChainMap . at k
-  insert _ k v = parentChainMap . at k ?= v
-  delete _ k = parentChainMap . at k .= Nothing
-
-instance Selectable Word256 ParentChainIds StorM where
-  select = lookup
 
 instance HasMemRawStorageDB StorM where
   getMemRawStorageTxDB = use stx
@@ -121,7 +111,7 @@ initialEnv = do
       openDB b = DBB.open (tmpdir ++ b) ldbOptions
   s <- openDB "/state/"
   h <- HashDB <$> openDB "/hash/"
-  let st = CS s h M.empty M.empty M.empty M.empty M.empty M.empty
+  let st = CS s h M.empty M.empty M.empty M.empty M.empty
   fmap (tmpdir,) . runLoggingTWithLevel LevelError . runResourceT $ execStateT MP.initializeBlank st
 
 runStorM :: StorM a -> IO a
@@ -240,8 +230,6 @@ storageSpec = do
 
   describe "resolveCodePtr" $ do
     it "should resolve direct code pointers" . runStorM $ do
-      let chainRelationships = [((0 :: Word256), ParentChainIds M.empty)]
-      insertMany (Proxy @ParentChainIds) $ M.fromList chainRelationships
       let accts =
             [ Address 0xabc,
               Address 0xdef
@@ -253,28 +241,7 @@ storageSpec = do
       insertMany (Proxy @AddressState) . M.fromList $ zip accts $ map (\cp -> blankAddressState {addressStateCodeHash = cp}) codePtrs
       resolveCodePtr (codePtrs !! 0) `shouldReturn` Just (codePtrs !! 0)
       resolveCodePtr (codePtrs !! 1) `shouldReturn` Just (codePtrs !! 1)
-    it "should resolve an ancestor code pointer" . runStorM $ do
-      let chainRelationships =
-            [ ((0 :: Word256), ParentChainIds M.empty),
-              ((1 :: Word256), ParentChainIds $ M.singleton "parent" (0 :: Word256))
-            ]
-      insertMany (Proxy @ParentChainIds) $ M.fromList chainRelationships
-      let accts =
-            [ Address 0xabc,
-              Address 0xdef
-            ]
-      let codePtrs =
-            [ SolidVMCode "Code_0" $ unsafeCreateKeccak256FromWord256 0x123,
-              CodeAtAccount (accts !! 0) "Ptr_0"
-            ]
-      insertMany (Proxy @AddressState) . M.fromList $ zip accts $ map (\cp -> blankAddressState {addressStateCodeHash = cp}) codePtrs
-      resolveCodePtr (codePtrs !! 1) `shouldReturn` Just (SolidVMCode "Ptr_0" $ unsafeCreateKeccak256FromWord256 0x123)
     it "should detect cycles in codeptrs (pointer1 to pointer2, pointer2 to pointer1)" . runStorM $ do
-      let chainRelationships =
-            [ ((0 :: Word256), ParentChainIds M.empty),
-              ((1 :: Word256), ParentChainIds $ M.singleton "parent" (0 :: Word256))
-            ]
-      insertMany (Proxy @ParentChainIds) $ M.fromList chainRelationships
       let accts =
             [ Address 0xabc,
               Address 0xdef,

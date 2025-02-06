@@ -14,8 +14,7 @@
 {-# LANGUAGE TypeOperators #-}
 
 module Blockchain.Data.ChainInfo
-  ( ParentChainIds (..),
-    ChainInfo (..),
+  ( ChainInfo (..),
     AccountInfo (..),
     CodeInfo (..),
     accountExtractor,
@@ -56,8 +55,6 @@ import Test.QuickCheck.Instances.Text ()
 import qualified Text.Colors as CL
 import Text.Format
 import Text.Tools
-
-newtype ParentChainIds = ParentChainIds {unParentChainIds :: Map T.Text Word256}
 
 data CodeInfo = CodeInfo
   { codeInfoCode :: B.ByteString,

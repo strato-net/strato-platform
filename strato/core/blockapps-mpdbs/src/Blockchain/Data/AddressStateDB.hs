@@ -30,7 +30,6 @@ module Blockchain.Data.AddressStateDB
   )
 where
 
-import Blockchain.Data.ChainInfo (ParentChainIds)
 import Blockchain.Data.RLP
 import qualified Blockchain.Database.MerklePatricia as MP
 import Blockchain.Strato.Model.Address
@@ -79,9 +78,6 @@ instance (Address `Alters` AddressState) m => (Address `Alters` AddressState) (M
 
 instance Selectable Address AddressState m => Selectable Address AddressState (MainChainT m) where
   select p = lift . select p
-
-instance Monad m => Selectable Word256 ParentChainIds (MainChainT m) where
-  select _ _ = pure Nothing
 
 instance MonadUnliftIO m => MonadUnliftIO (MainChainT m) where
   {-# INLINE withRunInIO #-}
@@ -147,8 +143,7 @@ instance RLPSerializable AddressState where
     possible solution is to have a helper function that keeps track of all previously visited codepointers and termiantes if it visits the same one twice (aka cycle detection)
 --}
 resolveCodePtr' ::
-  ( Selectable Word256 ParentChainIds m,
-    Selectable Address AddressState m
+  ( Selectable Address AddressState m
   ) =>
   Set.Set CodePtr ->
   CodePtr ->
@@ -167,8 +162,7 @@ resolveCodePtr' visited (CodeAtAccount address name) = do
 resolveCodePtr' _ cp = resolveCodePtr cp
 
 resolveCodePtr ::
-  ( Selectable Word256 ParentChainIds m,
-    Selectable Address AddressState m
+  ( Selectable Address AddressState m
   ) =>
   CodePtr ->
   m (Maybe CodePtr)
@@ -199,8 +193,7 @@ resolveCodePtrParent (CodeAtAccount address _) =
 resolveCodePtrParent codePtr = pure $ Just codePtr
 
 codePtrToSHA ::
-  ( Selectable Word256 ParentChainIds m,
-    Selectable Address AddressState m
+  ( Selectable Address AddressState m
   ) =>
   CodePtr ->
   m (Maybe Keccak256)
@@ -216,8 +209,7 @@ resolvedCodePtrToSHA (SolidVMCode _ hsh) = hsh
 resolvedCodePtrToSHA _ = emptyHash
 
 codePtrToCodeKind ::
-  ( Selectable Word256 ParentChainIds m,
-    Selectable Address AddressState m
+  ( Selectable Address AddressState m
   ) =>
   CodePtr ->
   m CodeKind
@@ -233,8 +225,7 @@ unsafeCodePtrToCodeKind =
     _ -> pure SolidVM -- TODO: should this return (Maybe CodeKind)?
 
 getAppAccount ::
-  ( Selectable Word256 ParentChainIds m,
-    Selectable Address AddressState m
+  ( Selectable Address AddressState m
   ) =>
   Address ->
   m (Maybe Address)

@@ -71,7 +71,6 @@ import Blockchain.DB.SolidStorageDB
 import Blockchain.DB.StateDB
 import Blockchain.Data.AddressStateDB
 import Blockchain.Data.BlockSummary
-import Blockchain.Data.ChainInfo
 import Blockchain.Data.RLP
 import qualified Blockchain.Database.MerklePatricia as MP
 import qualified Blockchain.SolidVM.Environment as Env
@@ -177,7 +176,6 @@ type MonadSM m =
     (Keccak256 `A.Alters` BlockSummary) m,
     HasSelectX509CertDB m,
     HasSelectX509FieldDB m,
-    A.Selectable Word256 ParentChainIds m,
     A.Selectable (Address, T.Text) X509CertificateField m,
     HasRawStorageDB m,
     HasMemAddressStateDB m,
@@ -280,9 +278,6 @@ instance
 instance MonadUnliftIO m => Mod.Modifiable CurrentBlockHash (SM m) where
   get _ = fromMaybe (CurrentBlockHash $ unsafeCreateKeccak256FromWord256 0) . _currentBlock <$> Mod.get (Mod.Proxy @MemDBs)
   put _ md = Mod.modifyStatefully_ (Mod.Proxy @MemDBs) $ currentBlock ?= md
-
-instance A.Selectable Word256 ParentChainIds m => A.Selectable Word256 ParentChainIds (SM m) where
-  select p = lift . A.select p
 
 instance (Keccak256 `A.Alters` BlockSummary) m => (Keccak256 `A.Alters` BlockSummary) (SM m) where
   lookup p = lift . A.lookup p
