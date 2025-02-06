@@ -31,7 +31,6 @@ import Blockchain.Strato.Model.Keccak256
 import Control.Applicative (many)
 
 import Data.Aeson
-import Data.Bifunctor (first)
 import qualified Data.ByteString as B
 import qualified Data.ByteString.Base16 as B16
 import qualified Data.ByteString.Char8 as C8
@@ -39,7 +38,6 @@ import Data.Data
 import qualified Data.JsonStream.Parser as JS
 import Data.Map.Strict (Map)
 import qualified Data.Map.Strict as M
-import Data.Maybe (fromMaybe)
 import Data.Swagger hiding (Format, format, name)
 import qualified Data.Text as T
 import Data.Text.Encoding (decodeUtf8, encodeUtf8)
@@ -293,10 +291,7 @@ data UnsignedChainInfo = UnsignedChainInfo
     chainNonce :: Word256,
     chainMetadata :: (M.Map T.Text T.Text)
   }
-  deriving (Eq, GHCG.Generic, Data)
-
-instance Arbitrary UnsignedChainInfo where
-  arbitrary = genericArbitrary
+  deriving (Show, Eq, GHCG.Generic, Data)
 
 instance ToSchema CodeInfo where
   declareNamedSchema _ =
@@ -310,75 +305,11 @@ instance ToSchema AccountInfo where
 
 instance ToSchema ChainSignature
 
-instance ToSchema UnsignedChainInfo
-
-instance ToSchema ChainInfo
-
-instance Show UnsignedChainInfo where
-  show UnsignedChainInfo {..} =
-    unlines
-      [ "UnsignedChainInfo",
-        "-----------------",
-        tab' $ "SolidString:          " ++ show chainLabel,
-        tab' $ "Account info:   " ++ format accountInfo,
-        tab' $ "Code info:      " ++ show (codeInfoName <$> codeInfo),
-        tab' $ "Members:        " ++ show members,
-        tab' $ "Parent chains:  " ++ (show $ map (first T.unpack) $ M.toList parentChains),
-        tab' $ "Creation block: " ++ format creationBlock,
-        tab' $ "Nonce:          " ++ CL.yellow (format chainNonce),
-        tab' $ "Metadata:       " ++ show (M.keys chainMetadata)
-      ]
-
-instance Format UnsignedChainInfo where
-  format = show
-
 data ChainInfo = ChainInfo
   { chainInfo :: UnsignedChainInfo,
     chainSignature :: ChainSignature
   }
   deriving (Eq, Show, GHCG.Generic, Data)
-
-instance Format ChainInfo where
-  format ChainInfo {..} =
-    unlines
-      [ "ChainInfo",
-        "-----------------",
-        tab' $ format chainSignature,
-        tab' $ format chainInfo
-      ]
-
-instance FromJSON ChainInfo where
-  parseJSON (Object o) = do
-    l <- o .: "label"
-    as <- o .: "accountInfo"
-    cs <- o .: "codeInfo"
-    ms <- o .: "members"
-    pc <- o .:? "parentChain"
-    mPcs <- o .:? "parentChains"
-    cb <- o .: "creationBlock"
-    cn <- o .: "nonce"
-    md <- o .: "metadata"
-    sig <- o .: "signature"
-    let pcs = fromMaybe M.empty mPcs <> maybe M.empty (M.singleton "parent") pc
-    return $ ChainInfo (UnsignedChainInfo l as cs ms pcs cb cn md) sig
-  parseJSON x = error $ "couldn't parse JSON for chain info: " ++ show x
-
-instance ToJSON ChainInfo where
-  toJSON (ChainInfo (UnsignedChainInfo cl ai ci ms pcs cb cn md) sig) =
-    object
-      [ "label" .= cl,
-        "accountInfo" .= ai,
-        "codeInfo" .= ci,
-        "members" .= ms,
-        "parentChains" .= pcs,
-        "creationBlock" .= cb,
-        "nonce" .= cn,
-        "metadata" .= md,
-        "signature" .= sig
-      ]
-
-instance Arbitrary ChainInfo where
-  arbitrary = genericArbitrary
 
 instance RLPSerializable UnsignedChainInfo where
   rlpEncode UnsignedChainInfo {..} =
