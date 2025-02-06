@@ -15,6 +15,10 @@ class StripeService {
                   },
                 },
                 line_items: orderDetails.map(({ productName, unitPrice, quantity }) => {
+                    if (quantity < 1) {
+                        unitPrice *= quantity;
+                        quantity = 1;
+                    }
                     return {
                         price_data: {
                             currency: "usd",
