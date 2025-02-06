@@ -53,7 +53,7 @@ abstract contract Mintable is Redeemable {
         return UTXO(address(m));
     }
 
-    function mintNewUnits(uint _quantity) public returns (uint) {
+    function mintNewUnits(uint _quantity) public virtual returns (uint) {
         require(isMint, "Only the mint contract can mint new units");
         require(status != AssetStatus.PENDING_REDEMPTION, "Asset is not in ACTIVE state.");
         require(status != AssetStatus.RETIRED, "Asset is not in ACTIVE state.");
@@ -83,4 +83,6 @@ abstract contract Mintable is Redeemable {
     function checkCondition() internal virtual override returns (bool){
         return true;   
     }
+
+
 }
