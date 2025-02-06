@@ -26,6 +26,7 @@ contract Clothing is Mintable {
         string[] _fileNames,
         uint _createdDate,
         uint _quantity,
+        uint _decimals,
         string _clothingType,
         string _size,
         string _skuNumber,
@@ -33,7 +34,7 @@ contract Clothing is Mintable {
         string _brand,
         AssetStatus _status,
         address _redemptionService
-    ) public Mintable(_name, _description, _images, _files, _fileNames, _createdDate, _quantity, _status, _redemptionService) {
+    ) public Mintable(_name, _description, _images, _files, _fileNames, _createdDate, _quantity, _decimals, _status, _redemptionService) {
         clothingType = _clothingType;
         size = _size;
         skuNumber = _skuNumber;
@@ -51,6 +52,7 @@ contract Clothing is Mintable {
             fileNames,
             createdDate,
             _quantity,
+            decimals,
             clothingType,
             size,
             skuNumber,

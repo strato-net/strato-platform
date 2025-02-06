@@ -185,7 +185,6 @@ const HeaderComponent = ({
           label: (
             <div>
               <p>{user == null ? '' : user.commonName}</p>
-              <p className="text-xs">{user == null ? '' : user.email}</p>
             </div>
           ),
         },
@@ -276,7 +275,7 @@ const HeaderComponent = ({
               <Col Col={24}>
                 {' '}
                 <p className="text-xs mt-1">
-                  CATA: {new BigNumber(cataBalance).toString()}
+                  CATA: {new BigNumber(cataBalance).toFixed(4).toString()}
                 </p>
               </Col>
             </Row>
@@ -325,7 +324,6 @@ const HeaderComponent = ({
           label: (
             <div>
               <p className="text-gray">{user?.commonName}</p>
-              <p className="text-xs text-gray">{user?.email}</p>
               <p className="!mb-0">Logout</p>
             </div>
           ),

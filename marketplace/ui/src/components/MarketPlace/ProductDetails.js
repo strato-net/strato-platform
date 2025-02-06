@@ -55,6 +55,7 @@ import RepayModal from '../Inventory/RepayModal';
 import { setCookie } from '../../helpers/cookie';
 import routes from '../../helpers/routes';
 import './index.css';
+import BigNumber from 'bignumber.js';
 
 import image_placeholder from '../../images/resources/image_placeholder.png';
 import 'react-responsive-carousel/lib/styles/carousel.min.css'; // requires a loader
@@ -196,11 +197,18 @@ const ProductDetails = ({ user, users }) => {
 
   useEffect(() => {
     if (inventoryDetails) {
+      const minItemNumber = new BigNumber(
+        inventoryDetails.itemNumber
+      ).toFixed();
+      const maxItemNumber = new BigNumber(inventoryDetails.itemNumber)
+        .plus(inventoryDetails.quantity)
+        .minus(1)
+        .toFixed();
+
       inventoryActions.fetchInventoryOwnershipHistory(dispatch, {
         originAddress: inventoryDetails.originAddress,
-        minItemNumber: inventoryDetails.itemNumber,
-        maxItemNumber:
-          inventoryDetails.itemNumber + inventoryDetails.quantity - 1,
+        minItemNumber: minItemNumber,
+        maxItemNumber: maxItemNumber,
       });
     }
   }, [inventoryDetails, dispatch]);
@@ -469,9 +477,9 @@ const ProductDetails = ({ user, users }) => {
   );
   const linkUrl = window.location.href;
 
-  const is18DecimalPlaces = assetsWithEighteenDecimalPlaces.includes(
+  const decimals = assetsWithEighteenDecimalPlaces.includes(
     details?.originAddress
-  );
+  ) ? 18 : details?.decimals || 0;
 
   return (
     <>
@@ -658,17 +666,14 @@ const ProductDetails = ({ user, users }) => {
                                 $
                                 {isStaked
                                   ? (details.escrow?.maxLoanAmount).toFixed(2)
-                                  : is18DecimalPlaces
-                                  ? adjustedPrice * Math.pow(10, 18)
-                                  : adjustedPrice.toFixed(2)}{' '}
+                                  : adjustedPrice * Math.pow(10, decimals)}{' '}
                                 <span className="font-normal text-xs mr-2 text-primary">
                                   <b>
                                     (
                                     {isStaked
                                       ? details.escrow?.maxLoanAmount
-                                      : is18DecimalPlaces
-                                      ? adjustedPrice * Math.pow(10, 18)
-                                      : adjustedPrice.toFixed(2)}{' '}
+                                      : adjustedPrice *
+                                        Math.pow(10, decimals)}{' '}
                                     USDST)
                                   </b>
                                 </span>
@@ -723,7 +728,8 @@ const ProductDetails = ({ user, users }) => {
                               inventoryDetails.root
                             )
                           ? inventoryDetails.quantity / 1e18
-                          : inventoryDetails.quantity
+                          : inventoryDetails.quantity /
+                            Math.pow(10, inventoryDetails.decimals || 0)
                       }
                       defaultValue={`${qty}`}
                       controls={false}
@@ -1063,7 +1069,7 @@ const ProductDetails = ({ user, users }) => {
                       </h2>
                       <Statistics
                         priceHistory={priceHistory}
-                        is18DecimalPlaces={is18DecimalPlaces}
+                        decimals={decimals}
                       />
                     </>
                   )}

@@ -100,11 +100,12 @@ const GlobalTransaction = ({
   }, [globalTransactions]);
 
   const Content = ({ data }) => {
-    const price = data?.assetPrice || data?.price;
-    const is18DecimalPlaces = assetsWithEighteenDecimalPlaces.includes(
+    const decimals = assetsWithEighteenDecimalPlaces.includes(
       data.assetOriginAddress
-    );
-
+    )
+      ? 18
+      : data.decimals || 0;
+    const price = (data?.assetPrice || data?.price) * Math.pow(10, decimals);
     return (
       <div className="min-h-44 h-full" style={{ width: '460px' }}>
         <Card>
@@ -140,17 +141,10 @@ const GlobalTransaction = ({
             <Col span={8} offset={1}>
               {price ? (
                 <p className="text-right flex justify-end items-center">
-                  <b>
-                    $
-                    {is18DecimalPlaces
-                      ? (price * Math.pow(10, 18)).toFixed(2)
-                      : price}
-                  </b>
+                  <b>${price.toFixed(2)}</b>
                   &nbsp;(
                   <span className="text-[#13188A] font-bold">
-                    {is18DecimalPlaces
-                      ? (price * Math.pow(10, 18)).toFixed(2)
-                      : price}
+                    {price.toFixed(2)}
                   </span>
                   {USDSTIcon})
                 </p>
@@ -232,7 +226,7 @@ const GlobalTransaction = ({
       key: 'quantity',
       align: 'right',
       width: '100px',
-      render: (data, { quantity, assetOriginAddress }) => {
+      render: (_, { quantity, assetOriginAddress, decimals }) => {
         let formattedQuantity = '--';
 
         if (quantity) {
@@ -240,7 +234,7 @@ const GlobalTransaction = ({
             assetOriginAddress
           )
             ? quantity / Math.pow(10, 18)
-            : quantity;
+            : quantity / Math.pow(10, decimals || 0);
 
           formattedQuantity = value.toLocaleString('en-US', {
             maximumFractionDigits: 4,
@@ -257,14 +251,14 @@ const GlobalTransaction = ({
       key: 'price',
       align: 'right',
       width: '100px',
-      render: (data, { price, assetOriginAddress }) => (
+      render: (_, { price, assetOriginAddress, decimals }) => (
         <>
           <p className="text-base flex justify-end items-center">
             {price
               ? formattedNum(
                   assetsWithEighteenDecimalPlaces.includes(assetOriginAddress)
                     ? (price * Math.pow(10, 18)).toFixed(2)
-                    : price
+                    : (price * Math.pow(10, decimals || 0)).toFixed(2)
                 )
               : '--'}
             <span>{price && USDSTIcon}</span>
@@ -274,7 +268,7 @@ const GlobalTransaction = ({
               ? `$ ${formattedNum(
                   assetsWithEighteenDecimalPlaces.includes(assetOriginAddress)
                     ? (price * Math.pow(10, 18)).toFixed(2)
-                    : price
+                    : (price * Math.pow(10, decimals || 0)).toFixed(2)
                 )}`
               : '--'}
           </p>

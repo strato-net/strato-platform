@@ -30,12 +30,14 @@ const TransferModal = ({
 }) => {
   const location = useLocation();
   const queryParams = new URLSearchParams(location.search);
-  const is18DecimalPlaces = assetsWithEighteenDecimalPlaces.includes(
+  const decimals = assetsWithEighteenDecimalPlaces.includes(
     inventory.originAddress
+  )
+    ? 18
+    : inventory.decimals || 0;
+  const availableQuantity = new BigNumber(inventory.quantity).dividedBy(
+    new BigNumber(10).pow(decimals)
   );
-  const availableQuantity = is18DecimalPlaces
-    ? new BigNumber(inventory.quantity).dividedBy(new BigNumber(10).pow(18))
-    : new BigNumber(inventory.quantity);
   // Get the inventory state and dispatch
   const inventoryDispatch = useInventoryDispatch();
   const marketplaceDispatch = useMarketplaceDispatch();
@@ -293,6 +295,26 @@ const TransferModal = ({
             handleQuantityChange(record.id, new BigNumber(value))
           }
           disabled={index !== transfers.length - 1}
+          formatter={(val) => {
+            if (val === undefined || val === null) return record.quantity;
+            const strVal = val.toString();
+            // Remove trailing zeros and unnecessary decimal point
+            return strVal.replace(/\.?0+$/, '');
+          }}
+          // Parser to limit input to decimals
+          parser={(val) => {
+            if (!val) return record.quantity;
+            // Regex to allow up to decimals decimals
+            const regex = new RegExp(`^\\d*(\\.\\d{0,${decimals}})?$`);
+            if (regex.test(val)) {
+              return val;
+            }
+            // Truncate the input if it exceeds decimals
+            const truncated = val.match(
+              new RegExp(`^\\d*(\\.\\d{0,${decimals}})?`)
+            );
+            return truncated ? truncated[0] : '';
+          }}
         />
       ),
     },
@@ -351,20 +373,14 @@ const TransferModal = ({
     const body = transfers.map((transfer) => ({
       assetAddress: inventory.address,
       newOwner: transfer.recipient,
-      quantity: (is18DecimalPlaces
-        ? transfer.quantity.multipliedBy(new BigNumber(10).pow(18))
-        : transfer.quantity
-      ).toFixed(0),
-      price: is18DecimalPlaces
-        ? transfer.price / Math.pow(10, 18)
-        : transfer.price,
+      quantity: transfer.quantity
+        .multipliedBy(new BigNumber(10).pow(decimals))
+        .toFixed(0),
+      price: transfer.price / Math.pow(10, decimals),
       senderCommonName: user.commonName,
       recipientCommonName: transfer.recipientCommonName,
       itemName,
-      decimal: (is18DecimalPlaces
-        ? new BigNumber(10).pow(18)
-        : new BigNumber(10)
-      ).toString(),
+      decimal: new BigNumber(10).pow(decimals).toString(),
     }));
 
     isDone = await actions.transferInventory(inventoryDispatch, body);

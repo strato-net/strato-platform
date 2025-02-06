@@ -188,6 +188,7 @@ class TransactionController {
           assetPrice: item?.assetPrice || 0,
           assetAddress: asset?.address,
           assetOriginAddress: asset?.originAddress,
+          decimals: asset?.decimals,
           assetContractName: asset?.contract_name,
         };
       });
@@ -368,6 +369,7 @@ class TransactionController {
           assetPrice: item?.assetPrice || 0,
           assetAddress: asset?.address,
           assetOriginAddress: asset?.originAddress,
+          decimals: asset?.decimals,
           assetContractName: asset?.contract_name,
         };
       });

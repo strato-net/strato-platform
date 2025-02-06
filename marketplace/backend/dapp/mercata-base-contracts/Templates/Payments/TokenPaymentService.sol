@@ -35,6 +35,7 @@ contract TokenPaymentService is PaymentService {
         string _purchasersCommonName,
         address[] _saleAddresses,
         uint[] _quantities,
+        uint[] _decimals,
         uint _createdDate,
         string _comments
     ) internal override returns (string, address[]) {
@@ -70,11 +71,13 @@ contract TokenPaymentService is PaymentService {
 
             // Calculate gross, net, and fee amounts in dollars
             decimal gross = s.price() * decimal(quantity); 
-            decimal fee = 0.0;
+            decimal fee = 0.000000000000000000;
+            decimal primarySaleFee = 10.000000000000000000;
+            decimal secondarySaleFee = 3.000000000000000000;
             if (address(a) == address(a.root)) {
-                fee = (gross * (primarySaleFeePercentage / 100));
+                fee = (gross * (primarySaleFee / 100.000000000000000000));
             } else {
-                fee = (gross * (secondarySaleFeePercentage / 100));
+                fee = (gross * (secondarySaleFee / 100.000000000000000000));
             }
             decimal net = gross - fee;
             totalAmountGross += gross;
@@ -90,6 +93,7 @@ contract TokenPaymentService is PaymentService {
                     _purchasersCommonName,
                     _saleAddresses,
                     _quantities,
+                    _decimals,
                     totalAmountGross
                 );
             }

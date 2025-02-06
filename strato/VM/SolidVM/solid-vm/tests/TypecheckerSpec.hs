@@ -492,6 +492,30 @@ contract A {
 |]
 
     length anns `shouldBe` 1
+  it "can get copy an array from another contract" $ do
+    anns <-
+      liftIO $
+        runTypechecker
+          [r|
+contract A {
+  string[] myArray;
+
+  constructor() {
+    myArray = ["David", "Samuel", "Nallapu"];
+  }
+}
+
+contract B {
+  string[] myArray2;
+  function f() returns (string[]) {
+    A a = new A();
+    myArray2 = a.myArray();
+    return myArray2;
+  }
+}
+|]
+
+    length anns `shouldBe` 1
   it "can lookup value of mapping using correct key type" $ do
     anns <-
       liftIO $
@@ -2074,7 +2098,7 @@ contract qq {
   }
 }
 |]
-      length anns `shouldBe` 1
+      length anns `shouldBe` 0
     
     it "can index access a contract array returned from a function" $ do
       anns <-

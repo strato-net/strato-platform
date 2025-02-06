@@ -29,8 +29,7 @@ const NewTrendingCard = ({
   const navigate = useNavigate();
   const location = useLocation();
   const { Text } = Typography;
-  const { assetsWithEighteenDecimalPlaces } =
-    useMarketplaceState();
+  const { assetsWithEighteenDecimalPlaces } = useMarketplaceState();
   const { ethstAddress } = useEthState();
   const { hasChecked, isAuthenticated, loginUrl, user } =
     useAuthenticateState();
@@ -38,12 +37,12 @@ const NewTrendingCard = ({
   const [isModalVisible, setIsModalVisible] = useState(false);
   const [isWishlisted, setIsWishlisted] = useState(false);
 
-  const is18DecimalPlaces = assetsWithEighteenDecimalPlaces.includes(
+  const decimals = assetsWithEighteenDecimalPlaces.includes(
     topSellingProduct.originAddress
-  );
-  const saleQuantity = is18DecimalPlaces
-    ? topSellingProduct.saleQuantity / Math.pow(10, 18)
-    : topSellingProduct.saleQuantity;
+  )
+    ? 19
+    : topSellingProduct.decimals || 0;
+  const saleQuantity = topSellingProduct.saleQuantity / Math.pow(10, decimals);
   const [quantity, setQuantity] = useState(1);
 
   const ownerSameAsUser = () => {
@@ -221,10 +220,8 @@ const NewTrendingCard = ({
         <div style={{ display: 'flex', justifyContent: 'space-between' }}>
           {topSellingProduct?.price
             ? (() => {
-                
-                const adjustedPrice = is18DecimalPlaces
-                  ? topSellingProduct.price * Math.pow(10, 18)
-                  : topSellingProduct.price;
+                const adjustedPrice =
+                  topSellingProduct.price * Math.pow(10, decimals);
 
                 return (
                   <Typography className="font-semibold">
@@ -265,7 +262,11 @@ const NewTrendingCard = ({
             className="truncate-html-content"
           ></div>
         </div>
-        <div className={`flex justify-between items-center bg-[#EEEFFA] p-2 rounded-[4px] ${topSellingProduct.originAddress === ethstAddress ? 'invisible' : ''}`}>
+        <div
+          className={`flex justify-between items-center bg-[#EEEFFA] p-2 rounded-[4px] ${
+            topSellingProduct.originAddress === ethstAddress ? 'invisible' : ''
+          }`}
+        >
           <Typography>Quantity:</Typography>
           <div className="flex gap-3 p-1 bg-white">
             <Typography

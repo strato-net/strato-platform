@@ -53,6 +53,7 @@ class TokensController {
         name: Joi.string().required(),
         description: Joi.string().required(),
         quantity: Joi.number().integer().min(1).required(),
+        decimals: Joi.number().integer().min(0).max(18).required(),
         images: Joi.array().items(Joi.string()).required(),
         files: Joi.array().items(Joi.string()).required(),
         fileNames: Joi.array().items(Joi.string()).required(),

@@ -4,6 +4,7 @@ version:             0.1.0.0
 author:              jamshid
 maintainer:          jim
 build-type:          Simple
+license:             Apache-2.0
 
 dependencies:
   - base

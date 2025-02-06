@@ -32,11 +32,12 @@ contract Spirits is Mintable, UnitOfMeasurement {
         string[] _fileNames,
         uint _createdDate,
         uint _quantity,
+        uint _decimals
         string _spiritType,
         UnitOfMeasurement _unitOfMeasurement,
         AssetStatus _status,
         address _redemptionService
-    ) public Mintable(_name, _description, _images, _files, _fileNames, _createdDate, _quantity, _status, _redemptionService) {
+    ) public Mintable(_name, _description, _images, _files, _fileNames, _createdDate, _quantity, _decimals, _status, _redemptionService) {
         unitOfMeasurement = _unitOfMeasurement;
         spiritType = _spiritType;
     }
@@ -51,6 +52,7 @@ contract Spirits is Mintable, UnitOfMeasurement {
             fileNames,
             createdDate,
             _quantity,
+            decimals,
             spiritType,
             unitOfMeasurement, 
             status,
