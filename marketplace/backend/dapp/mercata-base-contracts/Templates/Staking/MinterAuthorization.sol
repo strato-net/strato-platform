@@ -4,7 +4,7 @@ import <509>;
 
 import "../Utils/Utils.sol";
 
-abstract contract ReserveMinterAuthorization is Utils {
+abstract contract MinterAuthorization is Utils {
     string public name;
     address public owner;
     bool public isActive;
@@ -28,7 +28,7 @@ abstract contract ReserveMinterAuthorization is Utils {
     }
 
     modifier requireActive() {
-        require(isActive, "ReserveMinterAuthorization is not active");
+        require(isActive, "MinterAuthorization is not active");
         _;
     }
 
@@ -54,7 +54,8 @@ abstract contract ReserveMinterAuthorization is Utils {
 
     function burnToken(
         address[] _tokenAddresses,
-        uint _quantity
+        uint _quantity,
+        string _ownerCommonName
     ) requireActive() public returns (uint) {
         require(canMint[msg.sender], "Only minters can mint tokens");
         require(_tokenAddresses.length > 0, "Pass at least one token address");
@@ -67,7 +68,7 @@ abstract contract ReserveMinterAuthorization is Utils {
             address tokenAddress = _tokenAddresses[j];
             Asset tokenAsset = Asset(tokenAddress);
             require(tokenAsset.root == address(this).root, "Asset is not token");
-            require(tokenAsset.ownerCommonName() == getCommonName(msg.sender), "Purchaser doesn't own this token asset");
+            require(tokenAsset.ownerCommonName() == _ownerCommonName, "Burner doesn't own this asset");
 
             tokenQuantity = tokenAsset.quantity();
             transferNumber = (uint(string(tokenAddress), 16) + j + block.timestamp) % 1000000;
@@ -90,6 +91,8 @@ abstract contract ReserveMinterAuthorization is Utils {
 
         uint tokenAmountRepaid = tokenAmountOwed - tokenAmountNet;
         emit BurnedToken(msg.sender, tokenAmountRepaid);
+
+        return tokenAmountRepaid;
     }
 
     function setOwner(address _newOwner) public onlyOwner{

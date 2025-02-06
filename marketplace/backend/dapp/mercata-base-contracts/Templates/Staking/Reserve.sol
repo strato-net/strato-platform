@@ -9,7 +9,7 @@ import "../Escrows/SimpleEscrow.sol";
 import "../Oracles/OracleService.sol";
 import "../Structs/Structs.sol";
 import "../Utils/Utils.sol";
-import "ReserveMinterAuthorization.sol";
+import "MinterAuthorization.sol";
 
 abstract contract Reserve is Utils, Structs {
     OracleService public oracle; // Asset Oracle service for fetching price data
@@ -46,8 +46,10 @@ abstract contract Reserve is Utils, Structs {
         assetRootAddress = _assetRootAddress;
         unitConversionRate = _unitConversionRate;
         usdstToken = _usdstToken;
-
-        ReserveMinterAuthorization(usdstToken).addReserveAsMinter();
+        (decimal oraclePrice, uint oracleTimestamp) = oracle.getLatestPrice();
+        oraclePrice = oraclePrice / unitConversionRate;
+        lastUpdatedOraclePrice = oraclePrice;
+        MinterAuthorization(usdstToken).addReserveAsMinter();
     }
 
     modifier requireActive() {
@@ -61,11 +63,12 @@ abstract contract Reserve is Utils, Structs {
     }
 
     function mintUSDST(address _userAddress, uint _amount) internal requireActive() {
-        ReserveMinterAuthorization(usdstToken).mintToken(_userAddress, _amount);
+        MinterAuthorization(usdstToken).mintToken(_userAddress, _amount);
     }
 
-    function burnUSDST(address[] _usdstAssetAddresses, uint _quantity) internal requireActive() {
-        ReserveMinterAuthorization(usdstToken).burnToken(_usdstAssetAddresses, _quantity);
+    function burnUSDST(address[] _usdstAssetAddresses, uint _quantity, string _ownerCommonName) internal requireActive() returns (uint) {
+        uint tokenAmountRepaid = MinterAuthorization(usdstToken).burnToken(_usdstAssetAddresses, _quantity, _ownerCommonName);
+        return tokenAmountRepaid;
     }
 
     function distributeRewards(address[] _escrowAddresses) external {
@@ -161,16 +164,16 @@ abstract contract Reserve is Utils, Structs {
         uint transferNumber = 0;
         uint transferAmount = 0;
 
-        burnUSDST(_usdstAssetAddresses, usdstAmountOwed);
+        uint usdstAmountRepaid = burnUSDST(_usdstAssetAddresses, usdstAmountOwed, escrow.borrowerCommonName());
 
         // require(usdstAmountNet == 0, "Your USDST balance is not high enough to cover the repayment."); // Allow partial repayments
 
         // Clear loan
-        uint usdstAmountRepaid = usdstAmountOwed - usdstAmountNet;
         escrow.updateBorrowedAmount(usdstAmountRepaid, false);
 
         emit LoanRepaid(msg.sender, _escrowAddress, escrow.collateralQuantity(), usdstAmountRepaid);
     }
+    
 
     function setCATAToken(address _newCATAToken) public requireOwner("update USDST token") {
         cataToken = Asset(_newCATAToken);
@@ -187,7 +190,7 @@ abstract contract Reserve is Utils, Structs {
     }
 
     function deactivate() public requireActive() requireOwner("deactivate reserve") {
-        ReserveMinterAuthorization(usdstToken).removeReserveAsMinter();
+        MinterAuthorization(usdstToken).removeReserveAsMinter();
         isActive = false;
 
     }
@@ -195,6 +198,9 @@ abstract contract Reserve is Utils, Structs {
     function setOracle(address _newOracle) public requireOwner("update oracle") {
         require(_newOracle != address(0), "Invalid oracle address");
         oracle = OracleService(_newOracle);
+        (decimal oraclePrice, uint oracleTimestamp) = oracle.getLatestPrice();
+        oraclePrice = oraclePrice / unitConversionRate;
+        lastUpdatedOraclePrice = oraclePrice;
     }
 
     //Setters for state variables
@@ -212,9 +218,9 @@ abstract contract Reserve is Utils, Structs {
         assetRootAddress = _newAssetRootAddress;
     }
 
-    function setUsdstReserveMinterAuthorization(address _newUsdstReserveMinterAuthorization) public requireOwner("update USDST token factory") {
-        require(_newUsdstReserveMinterAuthorization != address(0), "Invalid USDST token factory address");
-        usdstToken = _newUsdstReserveMinterAuthorization;
+    function setUsdstMinterAuthorization(address _newUsdstMinterAuthorization) public requireOwner("update USDST token factory") {
+        require(_newUsdstMinterAuthorization != address(0), "Invalid USDST token factory address");
+        usdstToken = _newUsdstMinterAuthorization;
     }
 
     function setLoanToValueRatio(uint _newRatio) public requireOwner("update LTV ratio") {

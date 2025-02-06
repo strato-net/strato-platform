@@ -2,7 +2,7 @@ pragma es6;
 pragma strict;
 
 /// @title A representation of Token assets
-abstract contract LendingToken is Mintable, ReserveMinterAuthorization {
+abstract contract LendingToken is Mintable, MinterAuthorization {
     constructor(
         string _name,
         string _description,
@@ -13,7 +13,7 @@ abstract contract LendingToken is Mintable, ReserveMinterAuthorization {
         uint _quantity,
         AssetStatus _status,
         address _redemptionService
-    ) public Mintable(_name, _description, _images, _files, _fileNames, _createdDate, _quantity, _status, _redemptionService) ReserveMinterAuthorization(_name) {
+    ) public Mintable(_name, _description, _images, _files, _fileNames, _createdDate, _quantity, _status, _redemptionService) MinterAuthorization(_name) {
     }
 
     function mint(uint _quantity) internal virtual override returns (UTXO) {
@@ -27,7 +27,7 @@ abstract contract LendingToken is Mintable, ReserveMinterAuthorization {
         require(status != AssetStatus.PENDING_REDEMPTION, "Asset is not in ACTIVE state.");
         require(status != AssetStatus.RETIRED, "Asset is not in ACTIVE state.");
         require(_quantity > 0, "Quantity must be greater than 0");
-        require(ReserveMinterAuthorization(address(this)).isReserveMinter(msg.sender), "Only one of the minter can mint new units");
+        require(MinterAuthorization(address(this)).isReserveMinter(msg.sender), "Only one of the minter can mint new units");
         emit OwnershipTransfer(
             originAddress,
             address(0),
@@ -42,7 +42,7 @@ abstract contract LendingToken is Mintable, ReserveMinterAuthorization {
     }
 
     function transferByReserve(address _userAddress, uint _quantity) public {
-        require(ReserveMinterAuthorization(address(this)).isReserveMinter(msg.sender), "Only one of the minter can mint new units");
+        require(MinterAuthorization(address(this)).isReserveMinter(msg.sender), "Only one of the minter can mint new units");
         
         uint transferNumber = (uint(block.number + 16)) % 1000000;
         

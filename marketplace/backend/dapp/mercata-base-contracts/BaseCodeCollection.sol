@@ -14,7 +14,7 @@ import "Templates/Oracles/OracleService.sol";
 import "Templates/Redemptions/RedemptionService.sol";
 import "Templates/Sales/Sale.sol";
 import "Templates/Staking/Reserve.sol";
-import "Templates/Staking/ReserveMinterAuthorization.sol";
+import "Templates/Staking/MinterAuthorization.sol";
 import "Templates/Utils/Utils.sol";
 import "Templates/Structs/Structs.sol";
 import "Templates/Bridge/MercataETHBridge.sol";
