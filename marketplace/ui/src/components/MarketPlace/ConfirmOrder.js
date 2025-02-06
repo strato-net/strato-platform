@@ -184,7 +184,7 @@ const ConfirmOrder = ({ paymentServices = [], data, columns }) => {
         decimals: decimals,
         assetAddress: item.key,
         firstSale: item.firstSale,
-        unitPrice: unitPrice.dividedBy(new BigNumber(10).pow(decimals)).toString(),
+        unitPrice: unitPrice.dividedBy(new BigNumber(10).pow(decimals)).toFixed(decimals),
       });
     });
 
