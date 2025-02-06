@@ -16,10 +16,8 @@ class StripeService {
                   },
                 },
                 line_items: orderDetails.map(({ productName, unitPrice, quantity }) => {
-                    unitPrice = new BigNumber(unitPrice).multipliedBy(100);
-                    
                     if (quantity < 1) {
-                        unitPrice = unitPrice.multipliedBy(quantity);
+                        unitPrice *= quantity;
                         quantity = 1;
                     }
                     return {
@@ -28,7 +26,7 @@ class StripeService {
                             product_data: {
                                 name: productName,
                             },
-                            unit_amount: unitPrice.toFixed(0),
+                            unit_amount: (unitPrice * 100).toFixed(0),
                         },
                         quantity: quantity,
                     }
