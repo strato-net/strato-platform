@@ -125,7 +125,10 @@ const BoughtOrderDetails = ({ user, users }) => {
           name: prod.name,
           unitPrice: productPrice,
           quantity: productQuantity
-            ? formattedNum(productQuantity.toFixed(0))
+            ? productQuantity.toLocaleString('en-US', {
+              maximumFractionDigits: decimals,
+              minimumFractionDigits: 0,
+            })
             : '--',
           amount: formattedNum(
             (

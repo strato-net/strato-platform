@@ -101,8 +101,15 @@ const SoldOrderDetails = ({ user, users }) => {
           productName: prod,
           name: prod.name,
           unitPrice: productPrice,
-          quantity: productQuantity ? formattedNum(productQuantity) : '--',
-          amount: formattedNum((productPrice * productQuantity).toFixed(2)),
+          quantity: productQuantity
+            ? productQuantity.toLocaleString('en-US', {
+                maximumFractionDigits: decimals,
+                minimumFractionDigits: 0,
+              })
+            : '--',
+          amount: formattedNum(
+            (productPrice * productQuantity).toFixed(2)
+          ),
           serialNumber: prod,
           tax: prod.tax ? prod.tax : 0,
         });
