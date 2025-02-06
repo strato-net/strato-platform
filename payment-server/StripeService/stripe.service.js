@@ -1,5 +1,6 @@
 import { STRIPE_ENV, SERVER_CONFIRM_URL, SERVER_CANCEL_URL, SERVER_URL } from '../helpers/constants.js';
 import Stripe from 'stripe';
+import BigNumber from "bignumber.js";
 const stripe = Stripe(STRIPE_ENV.CREDENTIALS.STRIPE_SECRET_KEY);
 
 class StripeService {
@@ -15,13 +16,19 @@ class StripeService {
                   },
                 },
                 line_items: orderDetails.map(({ productName, unitPrice, quantity }) => {
+                    unitPrice = new BigNumber(unitPrice).multipliedBy(100);
+                    
+                    if (quantity < 1) {
+                        unitPrice = unitPrice.multipliedBy(quantity);
+                        quantity = 1;
+                    }
                     return {
                         price_data: {
                             currency: "usd",
                             product_data: {
                                 name: productName,
                             },
-                            unit_amount: (unitPrice * 100).toFixed(0),
+                            unit_amount: unitPrice.toFixed(0),
                         },
                         quantity: quantity,
                     }
