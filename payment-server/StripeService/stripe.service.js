@@ -15,7 +15,7 @@ class StripeService {
                   },
                 },
                 line_items: orderDetails.map(({ productName, unitPrice, quantity }) => {
-                    if (quantity < 1) {
+                    if (quantity % 1 !== 0) {
                         unitPrice *= quantity;
                         quantity = 1;
                     }
