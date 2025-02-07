@@ -94,6 +94,7 @@ def main():
         # Handle the response if necessary
         if post_response.status_code == 200:
             print(f"Chunk {i // chunk_size + 1} posted successfully.")
+            print(chunk)
         else:
             print(f"Error in chunk {i // chunk_size + 1}: {post_response.json()}")
 
