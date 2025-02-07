@@ -1000,8 +1000,7 @@ resolveNameParts to' crtr app c = do
   let tName = T.pack . CC._contractName
   case c ^. CC.importedFrom of
     Nothing -> pure ((to', tName c), (crtr, app, (map T.pack (M.keys $ CC._storageDefs c))))
-    Just acct -> do
-      let address = acct^.accountAddress
+    Just address -> do
       A.select (A.Proxy @AddressState) address >>= \case
         Nothing -> do
           $logWarnS "processTheMessages/resolveNameParts" . T.pack $

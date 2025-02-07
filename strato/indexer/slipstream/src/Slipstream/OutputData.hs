@@ -485,7 +485,7 @@ getDeferredForeignKeysAbstract tableName c creator a abstracts' cc@(CodeCollecti
                 Just c' -> do
                   let (creator', a', n') = case _importedFrom c' of
                                             Nothing -> (creator, a, _contractName c')
-                                            Just acct -> case Map.lookup (acct^.accountAddress, T.pack $ _contractName c') abstracts' of
+                                            Just acct -> case Map.lookup (acct, T.pack $ _contractName c') abstracts' of
                                               Nothing -> (creator, a, _contractName c')
                                               Just (creator'', a'', _) -> (creator'', a'', _contractName c')
                   pure $ Just $ ForeignKeyInfo
