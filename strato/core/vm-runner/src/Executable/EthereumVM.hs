@@ -85,7 +85,7 @@ ethereumVM d = runResourceT $ do
     failures <- runConsume "evm/loop" consumerGroup seqVmEventsTopicName $ \_ seqEvents -> do
 
         let maybeSelfAddress = listToMaybe [ addr | VmSelfAddress addr <- toList seqEvents ]
-        $logInfoLS "ethereumVM/maybeSelfAddress" (show maybeSelfAddress)
+        $logInfoLS "ethereumVM/maybeSelfAddress" (format maybeSelfAddress)
         case maybeSelfAddress of
           Just x -> contextModify' $ \cs@(ContextState{}) -> cs{_selfAddress = x}
           Nothing -> pure ()

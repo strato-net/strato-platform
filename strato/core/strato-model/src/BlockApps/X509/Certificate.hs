@@ -96,6 +96,7 @@ import Servant.Docs
 import Test.QuickCheck
 import qualified Text.Colors as CL
 import Text.Format
+import Text.Tools
 import Time.System
 
 -- import           Blockchain.Data.PubKey
@@ -158,7 +159,16 @@ instance Binary X509CertInfoState where
     get = x509CertToCertInfoState <$> (fromRight (error "The certificate couldn't be decoded") . bsToCert) <$> (get :: Get C8.ByteString)
 
 instance Format X509CertInfoState where
-  format = show
+  format X509CertInfoState{..} =
+    "X509CertInfoState\n" ++ tab (
+    "userAddress: " ++ format userAddress ++ "\n"
+    ++ "certificate: " ++ show certificate ++ "\n"
+    ++ "isValid: " ++ show isValid ++ "\n"
+    ++ "children: " ++ format children ++ "\n"
+    ++ "orgName: " ++ orgName ++ "\n"
+    ++ "orgUnit: " ++ show orgUnit ++ "\n"
+    ++ "commonName: " ++ commonName
+    )
 
 instance Arbitrary X509Certificate where
   arbitrary = pure . X509Certificate $ CertificateChain []

@@ -33,6 +33,7 @@ import Network.Wai.Middleware.Prometheus
 import Servant.Client
 import qualified Strato.Strato23.API as VC
 import qualified Strato.Strato23.Client as VC
+import Text.Format
 
 waitOnVault :: (Show a) => IO (Either a b) -> IO b
 waitOnVault action = do
@@ -70,7 +71,7 @@ main = do
     addrAndKey <- waitOnVault $ runClientM (VC.getKey Nothing Nothing) clientEnv
     return $ VC.unAddress addrAndKey
   
-  putStrLn $ "strato-sequencer nodeAddress: " ++ show selfAddress
+  putStrLn $ "strato-sequencer nodeAddress: " ++ format selfAddress
   
   mCtx <-
     if not flags_blockstanbul

@@ -182,7 +182,7 @@ initializeStateDBAndAccountInfos addressInfo genesisBlockName = do
     Mem.flushMemAddressStateDB
 
   forM_ addressInfo $ \account -> do
-    $logInfoS "initializeStateDBAndAccountInfos" . T.pack $ show account
+    $logInfoS "initializeStateDBAndAccountInfos" . T.pack $ format account
     putAccount account
   Mem.flushMemAddressStateDB
 
