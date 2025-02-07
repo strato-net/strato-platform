@@ -38,7 +38,7 @@ export default {
   prodStratsAddress: 'd2810818e0401e85693f83107ed2b96faeed329c',
   testnetStratsAddress: '5375b8b1c691201acf16a72612d82ed438951a04',
   prodUSDSTAddress: '',
-  testnetUSDSTAddress: '82b64c5944c568f7dc784fb3699cd63377452f39',
+  testnetUSDSTAddress: '2f6c3848a75aa075d054fe84b780cbdebd77ec61',
   prodCataAddress: '2680dc6693021cd3fefb84351570874fbef8332a',
   testnetCataAddress: '051cb99bca7c437f4b17dc01bd4ff7c5e09db035',
   testnetETHSTAddress: '921e3d0b4217c7e2bfe7e660cdc4f7edc621f9d5',
