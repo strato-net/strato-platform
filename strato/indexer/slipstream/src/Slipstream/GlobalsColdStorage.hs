@@ -27,11 +27,8 @@ module Slipstream.GlobalsColdStorage
 where
 
 import BlockApps.Solidity.Value
-import Blockchain.Strato.Model.Account
 import Blockchain.Strato.Model.Address
-import Blockchain.Strato.Model.ChainId
 import ClassyPrelude hiding (Handle)
-import Control.Lens ((^.))
 import Data.Binary hiding (get)
 import Database.Persist
 import Database.Persist.Sql
@@ -49,9 +46,8 @@ share
   [persistLowerCase|
 ColdStorage
   address Address
-  chainId MChainId
   binaryValues ByteString
-  Primary address chainId
+  Primary address
   deriving Eq Show
 |]
 
@@ -66,13 +62,12 @@ storageWorker q = forever $ do
 
 serialize :: QueueElem -> Maybe (Key ColdStorage, ColdStorage)
 serialize SyncFlush = Nothing
-serialize (PreStorageEntry (Account a mc) vs) =
-  let mci = MChainId $ ChainId <$> mc
-   in Just (ColdStorageKey a mci, ColdStorage a mci . toStrict . encode $ vs)
+serialize (PreStorageEntry a vs) =
+  Just (ColdStorageKey a, ColdStorage a . toStrict . encode $ vs)
 
 deserialize :: Maybe ColdStorage -> Either Text [(Text, Value)]
 deserialize Nothing = Left "storage not found"
-deserialize (Just (ColdStorage _ _ bvs)) =
+deserialize (Just (ColdStorage _ bvs)) =
   case decodeOrFail (fromStrict bvs) of
     Left (_, _, err) -> Left $ "corrupted binary: " <> pack err
     Right (_, _, vs) -> Right vs
@@ -95,16 +90,15 @@ initStorage = do
 readStorage ::
   MonadUnliftIO m =>
   Handle ->
-  Account ->
+  Address ->
   m (Either Text [(Text, Value)])
 readStorage FakeHandle _ = recordStorageResult $! Left "fake handle"
-readStorage (Handle _ sql) acct =
+readStorage (Handle _ sql) address =
   recordStorageResult =<< do
     flip runReaderT sql
       . fmap deserialize
       . get
-      . ColdStorageKey (acct ^. accountAddress)
-      $ MChainId Nothing
+      $ ColdStorageKey address
 
 recordStorageResult :: (MonadIO m) => Either Text a -> m (Either Text a)
 recordStorageResult v = do
@@ -115,7 +109,7 @@ recordStorageResult v = do
 
 -- | Schedule the write of an accounts values. syncStorage can be used to check for completion
 --   of writes.
-asyncWriteToStorage :: MonadIO m => Handle -> Account -> [(Text, Value)] -> m ()
+asyncWriteToStorage :: MonadIO m => Handle -> Address -> [(Text, Value)] -> m ()
 asyncWriteToStorage FakeHandle _ _ = return ()
 asyncWriteToStorage (Handle q _) a vs = atomically . writeTQueue q $ PreStorageEntry a vs
 

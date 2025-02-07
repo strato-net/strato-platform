@@ -11,7 +11,7 @@ module Slipstream.Data.Globals
 where
 
 import BlockApps.Solidity.Value
-import Blockchain.Strato.Model.Account
+import Blockchain.Strato.Model.Address
 import Blockchain.Strato.Model.Keccak256
 import Control.DeepSeq
 import Data.Cache.LRU
@@ -39,9 +39,9 @@ data CirrusHandle
 
 data Globals = Globals
   { createdTables :: M.Map TableName TableColumns,
-    contractStates :: LRU Account [(T.Text, Value)],
+    contractStates :: LRU Address [(T.Text, Value)],
     ccMap :: LRU Keccak256 CodeCollection,
-    delegateMap :: LRU Account [Account],
+    delegateMap :: LRU Address [Address],
     coldStorageHandle :: Handle,
     cirrusHandle :: CirrusHandle
   }
