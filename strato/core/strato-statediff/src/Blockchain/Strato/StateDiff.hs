@@ -31,7 +31,6 @@ import Blockchain.Data.RLP
 import qualified Blockchain.Database.MerklePatricia.Diff as Diff
 import Blockchain.Database.MerklePatricia.Internal
 import qualified Blockchain.Database.MerklePatricia.Internal as MP
-import Blockchain.Strato.Model.Account
 import Blockchain.Strato.Model.Address
 import Blockchain.Strato.Model.ExtendedWord
 import Blockchain.Strato.Model.Keccak256
@@ -62,10 +61,10 @@ data StateDiff = StateDiff
     blockHash :: Keccak256,
     stateRoot :: StateRoot,
     -- | The 'Eventual value is the initial state of the contract
-    createdAccounts :: Map Account (AccountDiff 'Eventual),
+    createdAccounts :: Map Address (AccountDiff 'Eventual),
     -- | The 'Eventual value is the pre-deletion state of the contract
-    deletedAccounts :: Map Account (AccountDiff 'Eventual),
-    updatedAccounts :: Map Account (AccountDiff 'Incremental)
+    deletedAccounts :: Map Address (AccountDiff 'Eventual),
+    updatedAccounts :: Map Address (AccountDiff 'Incremental)
   }
   deriving (Generic)
 
@@ -238,13 +237,13 @@ stateDiff' chainId blockNumber blockHash oldRoot newRoot = do
       f c d u
     coll c d u [] = return (Map.fromList c, Map.fromList d, Map.fromList u)
     coll c d u (Diff.Create k v : rest) = do
-      createDiff <- lift $ accountEnd chainId k v
+      createDiff <- lift $ accountEnd k v
       coll (createDiff : c) d u rest
     coll c d u (Diff.Delete k v : rest) = do
-      deleteDiff <- lift $ accountEnd chainId k v
+      deleteDiff <- lift $ accountEnd k v
       coll c (deleteDiff : d) u rest
     coll c d u (Diff.Update k v1 v2 : rest) = do
-      updateDiff <- lift $ accountUpdate chainId k v1 v2
+      updateDiff <- lift $ accountUpdate k v1 v2
       coll c d (updateDiff : u) rest
     emitDiff createdAccounts deletedAccounts updatedAccounts =
       yield $
@@ -264,16 +263,15 @@ accountEnd ::
     (MP.StateRoot `Alters` MP.NodeData) m,
     Selectable Address AddressState m
   ) =>
-  Maybe Word256 ->
   [N.Nibble] ->
   Val ->
-  m (Account, AccountDiff 'Eventual)
-accountEnd chainId k v = do
+  m (Address, AccountDiff 'Eventual)
+accountEnd k v = do
   address <- lookupAddress k
   let addrState = retrieveMPDBValue v
   $logDebugS "accountEnd" . T.pack $ "End account state: " ++ show addrState
   accountDiff <- eventualAccountState addrState
-  return (Account address chainId, accountDiff)
+  return (address, accountDiff)
 
 accountUpdate ::
   ( MonadLogger m,
@@ -282,19 +280,18 @@ accountUpdate ::
     (MP.StateRoot `Alters` MP.NodeData) m,
     Selectable Address AddressState m
   ) =>
-  Maybe Word256 ->
   [N.Nibble] ->
   Val ->
   Val ->
-  m (Account, AccountDiff 'Incremental)
-accountUpdate chainId k vOld vNew = do
+  m (Address, AccountDiff 'Incremental)
+accountUpdate k vOld vNew = do
   address <- lookupAddress k
   let oldAddrState = retrieveMPDBValue vOld
       newAddrState = retrieveMPDBValue vNew
   $logDebugS "accountUpdate" . T.pack $ "Old account state: " ++ show oldAddrState
   $logDebugS "accountUpdate" . T.pack $ "New account state: " ++ show newAddrState
   accountDiff <- incrementalAccountState oldAddrState newAddrState
-  return (Account address chainId, accountDiff)
+  return (address, accountDiff)
 
 eventualAccountState ::
   ( MonadLogger m,

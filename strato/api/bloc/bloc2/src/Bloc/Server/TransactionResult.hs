@@ -304,7 +304,7 @@ contractResult i txHash txResult@TransactionResult {..} mmd = do
                 }
           case addressRefs of
             [] -> go address name (num + 1)
-            _ -> return $ UploadContractDetails {contractName = name, contractAccount = Just $ Account address Nothing}
+            _ -> return $ UploadContractDetails {contractName = name, contractAddress = Just address}
 
 
 functionResult ::

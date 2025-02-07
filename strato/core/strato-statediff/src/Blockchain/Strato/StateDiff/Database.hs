@@ -20,12 +20,11 @@ import Blockchain.DB.SQLDB
 import Blockchain.Data.DataDefs
 import Blockchain.Database.MerklePatricia.StateRoot (emptyTriePtr)
 import Blockchain.SolidVM.Model
-import Blockchain.Strato.Model.Account
+import Blockchain.Strato.Model.Address
 import Blockchain.Strato.Model.ExtendedWord
 import Blockchain.Strato.Model.Keccak256
 import Blockchain.Strato.StateDiff
 import Blockchain.Data.Transaction
-import Control.Lens ((^.))
 import Control.Monad
 import Control.Monad.IO.Class
 import qualified Data.ByteString as BS
@@ -49,7 +48,7 @@ commitSqlDiffs StateDiff {blockNumber, createdAccounts, deletedAccounts, updated
 createAccount ::
   (MonadUnliftIO m, MonadLogger m) =>
   Integer ->
-  [(Account, AccountDiff 'Eventual)] ->
+  [(Address, AccountDiff 'Eventual)] ->
   SQL.SqlPersistT m ()
 createAccount blockNumber accountDiffs =
   catch tryCreates $ \(e :: SomeException) -> $logErrorS "commitSqlDiffs/createAccount" . T.pack $ "Failed to create account: " ++ show e
@@ -88,7 +87,7 @@ createAccount blockNumber accountDiffs =
         }
     addrRef account diff =
       AddressStateRef
-        { addressStateRefAddress = account ^. accountAddress,
+        { addressStateRefAddress = account,
           addressStateRefNonce = getField (theError account "nonce") $ nonce diff,
           addressStateRefBalance = getField (theError account "balance") $ balance diff,
           addressStateRefContractRoot = getField (theError account "contractRoot") $ contractRoot diff,
@@ -98,9 +97,9 @@ createAccount blockNumber accountDiffs =
           addressStateRefCodePtrAddress = codePtrAddress $ codeHash diff,
           addressStateRefCodePtrChainId = Nothing,
           addressStateRefLatestBlockDataRefNumber = blockNumber,
-          addressStateRefChainId = fromMaybe 0 $ account ^. accountChainId
+          addressStateRefChainId = 0
         }
-    theError :: Account -> String -> a
+    theError :: Address -> String -> a
     theError account name =
       error $
         "Missing field '" ++ name
@@ -113,7 +112,7 @@ getField def field =
     Just (Value x) -> x
     Nothing -> def
 
-deleteAccount :: MonadIO m => Account -> SQL.SqlPersistT m ()
+deleteAccount :: MonadIO m => Address -> SQL.SqlPersistT m ()
 deleteAccount account = do
   mAddrID <- getAddressStateSQL account
   for_ mAddrID $ \addrID -> do
@@ -123,7 +122,7 @@ deleteAccount account = do
 updateAccount ::
   (MonadUnliftIO m, MonadLogger m) =>
   Integer ->
-  Account ->
+  Address ->
   AccountDiff 'Incremental ->
   SQL.SqlPersistT m ()
 updateAccount blockNumber account diff = do
@@ -201,12 +200,12 @@ commitSolidStorage addrID key v =
 
 getAddressStateSQL ::
   MonadIO m =>
-  Account ->
+  Address ->
   SqlDbM m (Maybe (SQL.Key AddressStateRef))
-getAddressStateSQL (Account addr' chainId) = do
+getAddressStateSQL addr' = do
   addrIDs <-
     SQL.selectKeysList
-      [AddressStateRefAddress SQL.==. addr', AddressStateRefChainId SQL.==. fromMaybe 0 chainId]
+      [AddressStateRefAddress SQL.==. addr', AddressStateRefChainId SQL.==. 0]
       [LimitTo 1]
   return $ listToMaybe addrIDs
 

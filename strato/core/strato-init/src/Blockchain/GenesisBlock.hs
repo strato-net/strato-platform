@@ -47,7 +47,6 @@ import Blockchain.SolidVM.CodeCollectionDB
 import qualified Blockchain.Strato.Indexer.ApiIndexer as ApiIndexer
 import qualified Blockchain.Strato.Indexer.Kafka as IdxKafka
 import qualified Blockchain.Strato.Indexer.Model as IdxModel
-import qualified Blockchain.Strato.Model.Account as Ac
 import qualified Blockchain.Strato.Model.Address as Ad
 import Blockchain.Strato.Model.ChainMember
 import Blockchain.Strato.Model.Class
@@ -294,7 +293,7 @@ populateStorageDBs getMetadata genesisBlock genesisChainId = do
               blockNumber = 0,
               StateDiff.blockHash = blockHash genesisBlock,
               StateDiff.stateRoot = MP.StateRoot . blockHeaderStateRoot $ blockHeader genesisBlock,
-              createdAccounts = Map.mapKeys (\v -> Ac.Account v Nothing) ad,
+              createdAccounts = ad,
               deletedAccounts = Map.empty,
               updatedAccounts = Map.empty
             }
