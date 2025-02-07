@@ -586,7 +586,6 @@ instance ToJSON LogDB where
     ( LogDB
         bh
         th
-        chainId
         x
         maybeTopic1
         maybeTopic2
@@ -606,7 +605,6 @@ instance ToJSON LogDB where
           "data" .= dataBS,
           "bloom" .= showHexSimple bloomW512
         ]
-          ++ (("chainid" .=) <$> maybeToList chainId)
 
 asrToAsrPrime :: (String, AddressStateRef) -> AddressStateRef'
 asrToAsrPrime (s, x) = AddressStateRef' x s

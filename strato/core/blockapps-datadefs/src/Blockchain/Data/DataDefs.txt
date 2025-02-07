@@ -157,7 +157,6 @@ Extra
 LogDB
     blockHash Keccak256
     transactionHash Keccak256
-    chainId Word256 Maybe
     address Address
     topic1 Word256 Maybe
     topic2 Word256 Maybe
@@ -170,20 +169,9 @@ LogDB
 EventDB
     blockHash Keccak256
     contractAddress Address
-    chainId Word256 Maybe
     name String
     args [String]
     deriving Eq Read Show Generic
-
-ChainInfoRef
-    chainId Word256
-    chainLabel String
-    creationBlock Keccak256
-    chainNonce Word256
-    r Integer
-    s Integer
-    v Word8
-    deriving Eq Generic Show
 
 AccountInfoRef
     address Address

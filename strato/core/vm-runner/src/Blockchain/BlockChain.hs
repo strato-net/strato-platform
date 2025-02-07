@@ -613,11 +613,11 @@ setNewAddresses trr@(TxRunResult _ result _ before after _) = do
       unseen <- filterM (fmap not . NoCache.addressStateExists) . moveToFront $ erNewContractAddress erResult
       return trr {trrNewAddresses = unseen}
 
-mkLogEntry :: Keccak256 -> Keccak256 -> Maybe Word256 -> Log -> LogDB
-mkLogEntry bHash tHash chainId Log {..} = LogDB bHash tHash chainId (account ^. accountAddress) (topics `indexMaybe` 0) (topics `indexMaybe` 1) (topics `indexMaybe` 2) (topics `indexMaybe` 3) logData bloom
+mkLogEntry :: Keccak256 -> Keccak256 -> Log -> LogDB
+mkLogEntry bHash tHash Log {..} = LogDB bHash tHash (account ^. accountAddress) (topics `indexMaybe` 0) (topics `indexMaybe` 1) (topics `indexMaybe` 2) (topics `indexMaybe` 3) logData bloom
 
-mkEventEntry :: Maybe Word256 -> Event -> EventDB
-mkEventEntry chainId Event {..} = EventDB evBlockHash evContractAddress chainId evName $ map (\(_,x,_) -> x) evArgs -- drop the field names, only slipstream needs them
+mkEventEntry :: Event -> EventDB
+mkEventEntry Event {..} = EventDB evBlockHash evContractAddress evName $ map (\(_,x,_) -> x) evArgs -- drop the field names, only slipstream needs them
 
 outputTransactionResult ::
   VMBase m =>
@@ -638,7 +638,6 @@ outputTransactionResult b hashFunction (TxRunResult ot@OutputTx {otHash = theHas
       gasUsed = fromInteger $ transactionGasLimit t - gasRemaining
       etherUsed = gasUsed * fromInteger (transactionGasPrice t)
 
-      chainId = txChainId t
       beforeAddresses = S.fromList [x | (x, ASModification _) <- M.toList beforeMap]
       beforeDeletes = S.fromList [x | (x, ASDeleted) <- M.toList beforeMap]
       afterAddresses = S.fromList [x | (x, ASModification _) <- M.toList afterMap]
@@ -650,8 +649,8 @@ outputTransactionResult b hashFunction (TxRunResult ot@OutputTx {otHash = theHas
           Right r ->
             (fromMaybe "" $ erReturnVal r, unlines $ reverse $ erTrace r, erLogs r, erEvents r)
 
-  yieldMany $ OutLog . mkLogEntry ranBlockHash theHash chainId <$> theLogs
-  yield . OutEvent $ mkEventEntry chainId <$> theEvents
+  yieldMany $ OutLog . mkLogEntry ranBlockHash theHash <$> theLogs
+  yield . OutEvent $ mkEventEntry <$> theEvents
   yield . OutTXR $
     TransactionResult
       { transactionResultBlockHash = ranBlockHash,
