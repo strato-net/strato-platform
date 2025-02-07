@@ -133,7 +133,6 @@ TransactionResult json
     newStorage String
     deletedStorage String
     status TransactionResultStatus Maybe
-    chainId Word256 Maybe
     kind CodeKind Maybe
     creator String
     appName String

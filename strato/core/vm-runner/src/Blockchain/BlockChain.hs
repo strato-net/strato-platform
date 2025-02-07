@@ -668,7 +668,6 @@ outputTransactionResult b hashFunction (TxRunResult ot@OutputTx {otHash = theHas
         transactionResultNewStorage = "",
         transactionResultDeletedStorage = "",
         transactionResultStatus = Just txrStatus,
-        transactionResultChainId = chainId,
         transactionResultKind = erKind <$> eitherToMaybe result,
         transactionResultCreator = creator,
         transactionResultAppName = appName

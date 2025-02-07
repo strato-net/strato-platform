@@ -70,8 +70,6 @@ instance Format TransactionResult where
       ++ "status: "
       ++ show transactionResultStatus
       ++ "\n"
-      ++ "chainId: "
-      ++ format transactionResultChainId
       ++ "\n"
       ++ "kind: "
       ++ show transactionResultKind
@@ -102,7 +100,6 @@ exampleTxResult =
     0.2321
     "New Storage"
     "Deleted Storage"
-    Nothing
     Nothing
     (Just SolidVM)
     "BlockApps"
