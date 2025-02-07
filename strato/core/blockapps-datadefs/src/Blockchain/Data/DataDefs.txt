@@ -185,19 +185,7 @@ ChainInfoRef
     v Word8
     deriving Eq Generic Show
 
-ParentChainRef
-    chainInfoId ChainInfoRefId
-    refName     String
-    refChainId  Word256
-    deriving Eq Generic Show
-
-ChainMemberParsedRef
-    chainInfoId ChainInfoRefId
-    chainMember ChainMemberParsedSet
-    deriving Eq Generic Show
-
 AccountInfoRef
-    chainInfoId ChainInfoRefId
     address Address
     balance Integer
     codeHash CodePtr Maybe
@@ -205,15 +193,7 @@ AccountInfoRef
     deriving Eq Generic Show
 
 CodeInfoRef
-    chainInfoId ChainInfoRefId
     evmByteCode BS.ByteString
     contractCode String
     contractName String Maybe
     deriving Eq Generic Show
-
-ChainMetadataRef
-    chainInfoId ChainInfoRefId
-    key String
-    value String
-    deriving Eq Generic Show
-
