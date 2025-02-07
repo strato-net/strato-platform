@@ -84,7 +84,6 @@ import SolidVM.Solidity.Parse.ParserTypes (initialParserState)
 import SolidVM.Solidity.Parse.Statement
 import Text.Format
 import Text.Parsec (runParser)
-import Text.Read (readMaybe)
 import UnliftIO
 
 --import           Debug.Trace
@@ -276,17 +275,11 @@ contractResult i txHash txResult@TransactionResult {..} mmd = do
     Just md -> case Map.lookup "name" md of
       Nothing -> lift . throwIO . UserError $ "Could not get the name of the contract for the " <> nth i <> " transaction in the list: " <> Text.pack (format txHash)
       Just n -> pure n
-  let accountMaybe = do
-        str <-
-          listToMaybe $
-            Text.splitOn "," (Text.pack $ transactionResultContractsCreated)
-        readMaybe (Text.unpack str)
+  let accountMaybe = listToMaybe transactionResultContractsCreated
   case accountMaybe of
     Nothing -> case transactionResultMessage of
       "Success!" -> do
-        let mDelAddr =
-              readMaybe @Address . Text.unpack
-                =<< (listToMaybe . Text.splitOn "," . Text.pack $ transactionResultContractsDeleted)
+        let mDelAddr = listToMaybe transactionResultContractsDeleted
         case mDelAddr of
           Just _ -> lift . throwIO . UserError $ "Contract failed to upload, likely because the constructor threw"
           Nothing -> lift . throwIO . UserError $ Text.pack $ "Transaction succeeded, but contract was neither created, nor destroyed, transactionResultContractsDeleted=" ++ show transactionResultContractsDeleted ++ ", transactionResultContractsCreated=" ++ show transactionResultContractsCreated

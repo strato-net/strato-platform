@@ -96,8 +96,8 @@ exampleTxResult =
     "I'm a tx trace"
     (21 :: Word256)
     (42 :: Word256)
-    "[MyNewContractA, MyNewContractB]"
-    "[MyOldContract]"
+    [0x1, 0x2]
+    [0x3]
     "I am a state Diff"
     0.2321
     "New Storage"

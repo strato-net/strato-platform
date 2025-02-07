@@ -128,8 +128,8 @@ TransactionResult json
     trace String
     gasUsed Word256
     etherUsed Word256
-    contractsCreated String
-    contractsDeleted String
+    contractsCreated [Address]
+    contractsDeleted [Address]
     stateDiff String
     time Double
     newStorage String
