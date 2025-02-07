@@ -95,9 +95,7 @@ createAccount blockNumber accountDiffs =
           addressStateRefCodeHash = codePtrHash $ codeHash diff,
           addressStateRefContractName = codePtrName $ codeHash diff,
           addressStateRefCodePtrAddress = codePtrAddress $ codeHash diff,
-          addressStateRefCodePtrChainId = Nothing,
-          addressStateRefLatestBlockDataRefNumber = blockNumber,
-          addressStateRefChainId = 0
+          addressStateRefLatestBlockDataRefNumber = blockNumber
         }
     theError :: Address -> String -> a
     theError account name =
@@ -205,7 +203,7 @@ getAddressStateSQL ::
 getAddressStateSQL addr' = do
   addrIDs <-
     SQL.selectKeysList
-      [AddressStateRefAddress SQL.==. addr', AddressStateRefChainId SQL.==. 0]
+      [AddressStateRefAddress SQL.==. addr']
       [LimitTo 1]
   return $ listToMaybe addrIDs
 

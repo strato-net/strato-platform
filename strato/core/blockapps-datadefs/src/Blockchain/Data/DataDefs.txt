@@ -79,10 +79,8 @@ AddressStateRef
     codeHash Keccak256 Maybe
     contractName String Maybe
     codePtrAddress Address Maybe
-    codePtrChainId Word256 Maybe
-    chainId Word256 default='0000000000000000000000000000000000000000000000000000000000000000'
     latestBlockDataRefNumber Integer
-    UniqueAddress address chainId
+    UniqueAddress address
     deriving Eq Read Show
 
 CodeRef

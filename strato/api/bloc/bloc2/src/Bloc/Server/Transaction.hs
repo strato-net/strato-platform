@@ -1355,7 +1355,6 @@ getAccountNonce addr chainIds = do
   let chainIds'' = map (\(ChainId c) -> c) chainIds'
   let actions = E.select . E.from $ \accStateRef -> do
         E.where_ (accStateRef E.^. AddressStateRefAddress E.==. E.val addr)
-        E.where_ (accStateRef E.^. AddressStateRefChainId `E.in_` E.valList chainIds'')
         return accStateRef
   mAccts <- SQLDB.sqlQuery actions
   $logInfoLS "getAccountNonce lookup" (chainIds'', addr)
@@ -1364,7 +1363,7 @@ getAccountNonce addr chainIds = do
     [] -> return $ Map.fromList [(Nothing, Nonce $ fromInteger 0)]
     accts -> do
       let acts = map E.entityVal accts
-      let mkCid AddressStateRef {..} = ChainId <$> toMaybe 0 addressStateRefChainId
+      let mkCid AddressStateRef {} = Just $ ChainId 0
           mkNonce AddressStateRef {..} = Nonce $ fromInteger addressStateRefNonce
       return . Map.fromList $ map (mkCid &&& mkNonce) acts
 

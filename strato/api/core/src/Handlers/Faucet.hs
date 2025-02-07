@@ -173,10 +173,8 @@ instance HasSQL m => Selectable Address Integer m where
   select _ addr = fmap (fmap (addressStateRefNonce . E.entityVal) . listToMaybe) . sqlQuery $
     E.select $
       E.from $ \accStateRef -> do
-        E.where_
-          ( (accStateRef E.^. AddressStateRefChainId) E.==. E.val 0
-              E.&&. accStateRef E.^. AddressStateRefAddress E.==. E.val addr
-          )
+        E.where_ $ accStateRef E.^. AddressStateRefAddress E.==. E.val addr
+
         return accStateRef
 
 lookupNonce :: Selectable Address Integer m => Address -> m Integer

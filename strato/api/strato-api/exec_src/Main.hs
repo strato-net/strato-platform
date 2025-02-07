@@ -18,7 +18,6 @@ import Bloc.API
 import Bloc.Database.Queries
 import Bloc.Monad
 import Bloc.Server
-import Bloc.Server.Utils (toMaybe)
 import BlockApps.Init
 import BlockApps.Logging
 import Blockchain.DB.CodeDB
@@ -135,7 +134,7 @@ instance {-# OVERLAPPING #-} MonadUnliftIO m => Selectable Address AddressState 
         (addressStateRefBalance r)
         (addressStateRefContractRoot r)
         codePtr
-        (toMaybe 0 $ addressStateRefChainId r)
+        (Just 0)
 
 instance Selectable Address AddressState m => Selectable Address AddressState (ReaderT a m) where
   select p = lift . select p
