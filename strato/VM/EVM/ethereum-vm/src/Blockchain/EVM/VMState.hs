@@ -117,7 +117,6 @@ startingAction Environment {..} =
       _blockTimestamp = blockHeaderTimestamp envBlockHeader,
       _blockNumber = blockHeaderBlockNumber envBlockHeader,
       _transactionHash = envTxHash,
-      _transactionChainId = envChainId,
       _transactionSender = envSender,
       _actionData = OMap.empty,
       _metadata = envMetadata,

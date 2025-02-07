@@ -352,10 +352,9 @@ runSM ::
   (Maybe Code) ->
   Env.Environment ->
   GasInfo ->
-  Maybe Word256 ->
   SM m a ->
   m (Either SolidException a)
-runSM maybeCode env gi chainId' f = do
+runSM maybeCode env gi f = do
   csMemDBs <- _memDBs <$> Mod.get (Mod.Proxy @ContextState)
   GasCap gasCap <- Mod.get (Mod.Proxy @GasCap)
   $logInfoS "runSM/GasCap/status" . T.pack $ "Current gas cap: " ++ CL.green (show gasCap)
@@ -364,7 +363,7 @@ runSM maybeCode env gi chainId' f = do
           { env = env,
             callStack = [],
             _ssMemDBs = csMemDBs,
-            _action = startingAction maybeCode env chainId',
+            _action = startingAction maybeCode env,
             _gasInfo = gi {_gasLeft = min (_gasLeft gi) gasCap} -- capping the transaction gas limit
           }
   startingStateRef <- newIORef startingState
@@ -397,14 +396,13 @@ pushSender newSender mv = do
   Mod.put (Mod.Proxy @Env.Sender) oldSender
   return $ ret
 
-startingAction :: Maybe Code -> Env.Environment -> Maybe Word256 -> Action
-startingAction maybeCode env' chainId' =
+startingAction :: Maybe Code -> Env.Environment -> Action
+startingAction maybeCode env' =
   Action.Action
     { _blockHash = blockHeaderHash $ Env.blockHeader env',
       _blockTimestamp = blockHeaderTimestamp $ Env.blockHeader env',
       _blockNumber = blockHeaderBlockNumber $ Env.blockHeader env',
       _transactionHash = Env.txHash env',
-      _transactionChainId = chainId',
       _transactionSender = Env.sender env',
       _actionData = OMap.empty,
       _metadata =

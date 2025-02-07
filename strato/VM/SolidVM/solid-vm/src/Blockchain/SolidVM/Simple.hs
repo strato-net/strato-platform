@@ -174,7 +174,6 @@ create s =
     ((s ^. createNewAddress) ^. accountAddress)
     (s ^. createCode)
     (s ^. createArgs . argsTxHash)
-    (s ^. createArgs . argsChainId)
     (s ^. createArgs . argsMetadata)
 
 call ::
@@ -200,5 +199,4 @@ call s =
     (Gas 100000000)
     ((s ^. callArgs . argsOrigin) ^. accountAddress)
     (s ^. callArgs . argsTxHash)
-    (s ^. callArgs . argsChainId)
     (s ^. callArgs . argsMetadata)

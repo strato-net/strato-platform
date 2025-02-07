@@ -62,7 +62,6 @@ import Blockchain.Sequencer.Event
 import qualified Blockchain.SolidVM as SolidVM
 -- import Blockchain.SolidVM.SM
 import Blockchain.Strato.Indexer.Model (IndexEvent (..))
-import Blockchain.Strato.Model.Account
 import Blockchain.Strato.Model.Address
 import Blockchain.Strato.Model.Class
 import Blockchain.Strato.Model.Code
@@ -86,7 +85,6 @@ import Blockchain.Blockstanbul.Model.Authentication
 import Blockchain.VMOptions
 import Blockchain.Verifier
 import Conduit
-import Control.Lens.Operators
 import Control.Monad
 import qualified Control.Monad.Change.Alter as A
 import qualified Control.Monad.Change.Modify as Mod
@@ -486,12 +484,12 @@ runCodeForTransaction isRunningTests' isHomestead b availableGas tAddr t propose
 
           let create =
                 case join $ fmap (M.lookup "VM") $ transactionMetadata ut of
-                  Just "EVM" -> (\a bro c d e f g _ i j k l m n o p -> EVM.create a bro c d e f g i j k l m n o p)
+                  Just "EVM" -> (\a bro c d e f g _ i j k l m n o -> EVM.create a bro c d e f g i j k l m n o)
                   Just "SolidVM" -> SolidVM.create
-                  Nothing -> (\a bro c d e f g _ i j k l m n o p -> EVM.create a bro c d e f g i j k l m n o p)
+                  Nothing -> (\a bro c d e f g _ i j k l m n o -> EVM.create a bro c d e f g i j k l m n o)
                   Just vmName ->
                     -- Return a dummy VM that just complains that the requested VM doesn't exist
-                    \_ _ _ _ _ _ _ _ _ _ ag _ _ _ _ _ ->
+                    \_ _ _ _ _ _ _ _ _ _ ag _ _ _ _ ->
                       return $ evmErrorResults (toInteger ag) (UnsupportedVM vmName)
 
           --TODO- The new address state should be created in the VM itself....  Currently the EVM doesn't do this (and could be cleaned up by doing so), SolidVM does do this.  I will calculate this value here, but then ignore the value in SolidVM (and recalculate it there).  Eventually this should be moved into the EVM also
@@ -514,7 +512,6 @@ runCodeForTransaction isRunningTests' isHomestead b availableGas tAddr t propose
               newAddress
               (transactionInit ut)
               (txHash ut)
-              (txChainId ut)
               (txMetadata ut)
         else do
           when flags_debug $ $logInfoS "runCodeForTransaction" $ T.pack $ "runCodeForTransaction: MessageTX caller: " ++ format tAddr ++ ", address: " ++ format (transactionTo ut)
@@ -556,7 +553,6 @@ runCodeForTransaction isRunningTests' isHomestead b availableGas tAddr t propose
                   (fromIntegral availableGas)
                   tAddr
                   (txHash ut)
-                  (txChainId ut)
                   (txMetadata ut)
 
 ----------------
@@ -614,7 +610,7 @@ setNewAddresses trr@(TxRunResult _ result _ before after _) = do
       return trr {trrNewAddresses = unseen}
 
 mkLogEntry :: Keccak256 -> Keccak256 -> Log -> LogDB
-mkLogEntry bHash tHash Log {..} = LogDB bHash tHash (account ^. accountAddress) (topics `indexMaybe` 0) (topics `indexMaybe` 1) (topics `indexMaybe` 2) (topics `indexMaybe` 3) logData bloom
+mkLogEntry bHash tHash Log {..} = LogDB bHash tHash address (topics `indexMaybe` 0) (topics `indexMaybe` 1) (topics `indexMaybe` 2) (topics `indexMaybe` 3) logData bloom
 
 mkEventEntry :: Event -> EventDB
 mkEventEntry Event {..} = EventDB evBlockHash evContractAddress evName $ map (\(_,x,_) -> x) evArgs -- drop the field names, only slipstream needs them

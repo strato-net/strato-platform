@@ -10,7 +10,6 @@ import Blockchain.Data.Enode
 import Blockchain.Data.Json
 import Blockchain.Data.RLP
 import Blockchain.Data.Transaction
-import Blockchain.Strato.Model.Account
 import Blockchain.Strato.Model.Address
 import Blockchain.Strato.Model.ChainMember
 import Blockchain.Strato.Model.Class
@@ -210,13 +209,13 @@ accountRLP :: Spec
 accountRLP = do
   it "should convert an Account to and from its RLP encoding" $
     property $
-      (\x -> rlpCheck (x :: Account))
+      (\x -> rlpCheck (x :: Address))
 
 accountJSON :: Spec
 accountJSON = do
   it "should convert an Account to and from its JSON encoding" $
     property $
-      (\x -> jsonCheck (x :: Account))
+      (\x -> jsonCheck (x :: Address))
 
 codePtrRLP :: Spec
 codePtrRLP = do

@@ -26,7 +26,7 @@ spec = do
       syncStorage h2
 
     it "can read writes" . runTest $ do
-      let acct = Account 0xdeadbeef (Just 87)
+      let acct = Account 0xdeadbeef Nothing
           vals =
             [ ("owner", ValueContract $ unspecifiedChain 0x888),
               ("distance", SimpleValue $ valueUInt 23)
@@ -44,7 +44,6 @@ spec = do
       syncStorage h
       readStorage h acct `shouldReturn` Right []
       readStorage h (Account 98 Nothing) `shouldReturn` Left "storage not found"
-      readStorage h (Account 99 (Just 17)) `shouldReturn` Left "storage not found"
 
     it "can update contracts" . runTest $ do
       let acct = Account 0x4 Nothing

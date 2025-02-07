@@ -408,7 +408,6 @@ runArgsWithSenderBeef acc args bs = do
       gasPrice = error "TODO: gasPrice"
       availableGas = Gas 99969480
       txHash = unsafeCreateKeccak256FromWord256 0x776622233444
-      chainId = Just 0xfeedbeef
       metadata = Just $ M.fromList [("name", "qq"), ("args", args)]
 
   newAddress <- getNewAddress acc
@@ -428,7 +427,6 @@ runArgsWithSenderBeef acc args bs = do
       newAddress
       code
       txHash
-      chainId
       metadata
   rethrowEx er
   return er
@@ -463,7 +461,6 @@ runArgsWithSender acc args bs = do
       gasPrice = error "TODO: gasPrice"
       availableGas = Gas 99969480
       txHash = unsafeCreateKeccak256FromWord256 0x776622233444
-      chainId = Nothing
       metadata = Just $ M.fromList [("name", "qq"), ("args", args)]
   
   insert (Proxy @BlockSummary) (unsafeCreateKeccak256FromWord256 0x0) (blockHeaderToBSum blockData 1)
@@ -485,7 +482,6 @@ runArgsWithSender acc args bs = do
       newAddress
       code
       txHash
-      chainId
       metadata
   rethrowEx er
   return er
@@ -519,7 +515,6 @@ runArgsWithOrigin orig acc args bs = do
       gasPrice = error "TODO: gasPrice"
       availableGas = Gas 99969480
       txHash = unsafeCreateKeccak256FromWord256 0x776622233444
-      chainId = Nothing
       metadata = Just $ M.fromList [("name", "qq"), ("args", args)]
 
   newAddress <- getNewAddress acc
@@ -539,7 +534,6 @@ runArgsWithOrigin orig acc args bs = do
       newAddress
       code
       txHash
-      chainId
       metadata
   rethrowEx er
   return er
@@ -640,7 +634,6 @@ runCall funcName callArgs bs = do
       gasPrice = error "TODO: gasPrice"
       availableGas = Gas 99969480
       txHash = unsafeCreateKeccak256FromWord256 0x234962
-      chainId = Nothing
       createMetadata = Just $ M.fromList [("name", "qq"), ("args", "()")]
       noValueTransfer = error "TODO: noValueTransfer"
       receiveAddress = error "TODO: receiveAddress"
@@ -664,7 +657,6 @@ runCall funcName callArgs bs = do
       newAddress
       code
       txHash
-      chainId
       createMetadata
   $logErrorS "runCall" "Returned from create"
   rethrowEx er1
@@ -688,7 +680,6 @@ runCall funcName callArgs bs = do
       availableGas
       origin
       txHash
-      chainId
       callMetadata
   $logErrorS "runCall" "Returned from call"
   rethrowEx er2
@@ -726,7 +717,6 @@ runCall' funcName callArgs bs = do
       gasPrice = error "TODO: gasPrice"
       availableGas = Gas 99969480
       txHash = unsafeCreateKeccak256FromWord256 0x234962
-      chainId = Nothing
       createMetadata = Just $ M.fromList [("name", "qq"), ("args", "()")]
       noValueTransfer = error "TODO: noValueTransfer"
       receiveAddress = error "TODO: receiveAddress"
@@ -750,7 +740,6 @@ runCall' funcName callArgs bs = do
       newAddress
       code
       txHash
-      chainId
       createMetadata
   $logErrorS "runCall" "Returned from create"
   rethrowEx er1
@@ -774,7 +763,6 @@ runCall' funcName callArgs bs = do
       availableGas
       origin
       txHash
-      chainId
       callMetadata
   $logErrorS "runCall" "Returned from call"
   rethrowEx er2
@@ -814,7 +802,6 @@ call2 funcName callArgs contractAddress = do
       gasPrice = error "TODO: gasPrice"
       availableGas = Gas 99969480
       txHash = unsafeCreateKeccak256FromWord256 0xddba11
-      chainId = Nothing
       noValueTransfer = error "TODO: noValueTransfer"
       receiveAddress = error "TODO: receiveAddress"
       theData = error "TODO: theData"
@@ -838,7 +825,6 @@ call2 funcName callArgs contractAddress = do
       availableGas
       origin
       txHash
-      chainId
       callMetadata
   rethrowEx er
   return $ erReturnVal er

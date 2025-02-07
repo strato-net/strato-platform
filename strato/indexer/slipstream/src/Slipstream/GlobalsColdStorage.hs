@@ -104,7 +104,7 @@ readStorage (Handle _ sql) acct =
       . fmap deserialize
       . get
       . ColdStorageKey (acct ^. accountAddress)
-      $ MChainId (fmap ChainId $ acct ^. accountChainId)
+      $ MChainId Nothing
 
 recordStorageResult :: (MonadIO m) => Either Text a -> m (Either Text a)
 recordStorageResult v = do

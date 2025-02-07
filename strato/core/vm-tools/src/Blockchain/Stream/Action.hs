@@ -14,7 +14,6 @@ module Blockchain.Stream.Action (
   blockTimestamp,
   blockNumber,
   transactionHash,
-  transactionChainId,
   transactionSender,
   actionData,
   metadata,
@@ -401,7 +400,6 @@ data Action = Action
     _blockTimestamp :: UTCTime,
     _blockNumber :: Integer,
     _transactionHash :: Keccak256,
-    _transactionChainId :: Maybe Word256,
     _transactionSender :: Address,
     _actionData :: OMap.OMap Address ActionData,
     _metadata :: Maybe (Map Text Text),
@@ -427,9 +425,6 @@ instance Format Action where
       ++ "\n"
       ++ "actionTransactionHash: "
       ++ format _transactionHash
-      ++ "\n"
-      ++ "actionTransactionChainId: "
-      ++ format _transactionChainId
       ++ "\n"
       ++ "actionTransactionSender: "
       ++ format _transactionSender
@@ -470,7 +465,6 @@ instance ToJSON Action where
         "blockTimestamp" .= _blockTimestamp,
         "blockNumber" .= _blockNumber,
         "transactionHash" .= _transactionHash,
-        "chainId" .= _transactionChainId,
         "sender" .= _transactionSender,
         "data" .= _actionData,
         "metadata" .= _metadata,
@@ -485,7 +479,6 @@ instance FromJSON Action where
       <*> (o .: "blockTimestamp")
       <*> (o .: "blockNumber")
       <*> (o .: "transactionHash")
-      <*> (o .:? "chainId")
       <*> (o .: "sender")
       <*> (o .: "data")
       <*> (o .: "metadata")

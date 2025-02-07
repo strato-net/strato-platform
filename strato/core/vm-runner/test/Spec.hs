@@ -85,7 +85,6 @@ spec = do
               txInit
               (unsafeCreateKeccak256FromWord256 0)
               Nothing
-              Nothing
           addressState <- A.lookupWithDefault A.Proxy newAddress
           addressState
             `L.shouldBe` AddressState
@@ -118,7 +117,6 @@ spec = do
             availableGas
             (_accountAddress tAddr)
             (unsafeCreateKeccak256FromWord256 0)
-            Nothing
             Nothing
       erException execResults `shouldSatisfy` isNothing
       erTrace execResults `shouldBe` []

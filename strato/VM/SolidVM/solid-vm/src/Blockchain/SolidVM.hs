@@ -232,12 +232,11 @@ create ::
   Address ->
   Code ->
   Keccak256 ->
-  Maybe Word256 ->
   Maybe (M.Map T.Text T.Text) ->
   m ExecResults
 --create isRunningTests' isHomestead preExistingSuicideList b callDepth sender origin
 --       value gasPrice availableGas newAddress initCode txHash chainId metadata =
-create _ _ _ blockData _ sender' origin' proposer' _ _ availableGas newAddress code txHash' chainId' metadata = do
+create _ _ _ blockData _ sender' origin' proposer' _ _ availableGas newAddress code txHash' metadata = do
   isRunningTests <- checkIfRunningTests
   let env' =
         Env.Environment
@@ -263,7 +262,7 @@ create _ _ _ blockData _ sender' origin' proposer' _ _ availableGas newAddress c
       hsh <- codePtrToSHA cp
       fromMaybe "" . fmap snd . join <$> traverse getCode hsh
 
-  fmap (either solidvmErrorResults id) . runSM (Just code) env' gasInfo' chainId' $ do
+  fmap (either solidvmErrorResults id) . runSM (Just code) env' gasInfo' $ do
     requireOriginCert origin'
     let maybeContractName = M.lookup "name" =<< metadata
         !contractName' = textToLabel $ fromMaybe (missingField "TX is missing a metadata parameter called 'name'" $ show metadata) maybeContractName
@@ -414,12 +413,11 @@ call ::
   Gas ->
   Address ->
   Keccak256 ->
-  Maybe Word256 ->
   Maybe (M.Map T.Text T.Text) ->
   m ExecResults
 --  call isRunningTests' isHomestead noValueTransfer preExistingSuicideList b callDepth receiveAddress
 --       (Address codeAddress) sender value gasPrice theData availableGas origin txHash chainId metadata =
-call _ _ _ isRCC _ blockData _ _ codeAddress sender' proposer' _ _ _ availableGas origin' txHash' chainId' metadata = do
+call _ _ _ isRCC _ blockData _ _ codeAddress sender' proposer' _ _ _ availableGas origin' txHash' metadata = do
   recordCall
 
   isRunningTests <- checkIfRunningTests
@@ -442,7 +440,7 @@ call _ _ _ isRCC _ blockData _ _ codeAddress sender' proposer' _ _ _ availableGa
             _gasMetadata = ""
           }
 
-  fmap (either solidvmErrorResults id) . runSM Nothing env' gasInfo' chainId' $ do
+  fmap (either solidvmErrorResults id) . runSM Nothing env' gasInfo' $ do
     requireOriginCert origin'
     let maybeFuncName = M.lookup "funcName" =<< metadata
         !funcName = textToLabel $ fromMaybe (missingField "TX is missing a metadata parameter called 'funcName'" $ show metadata) maybeFuncName
@@ -2145,11 +2143,7 @@ expToVar' theFullExp@(CC.FunctionCall _ e args) _ = do
               -- let namedFrom = accountToNamedAccount' from --convert to a namedAccount to verify everything is on the correct chain
               --If address' chainId is unset then we set to the current chainId
               -- Get the code at the address
-              cid <- case (address' ^. namedAccountChainId) of
-                UnspecifiedChain -> return Nothing
-                MainChain -> return Nothing
-                ExplicitChain cid -> return $ Just cid
-              let toAccount = namedAccountToAccount cid address'
+              let toAccount = namedAccountToAccount Nothing address'
 
               -- Collect a potential item to search
               searchTerms <- case argVals of
@@ -2843,7 +2837,7 @@ callBuiltin "create" args@[SString contractName', SString contractSrc, SString a
                                      M.empty
                                      []
                                    ]
-      pure $ ((flip SAccount) False) $ accountOnUnspecifiedChain (Account nca Nothing)
+      pure $ ((flip SAccount) False) $ NamedAccount nca UnspecifiedChain
     Nothing -> internalError "a call to create did not create an address" execResults
 callBuiltin "create2" args@[salt, SString contractName', SString contractSrc, SString argString] _ = do
   when (contractName' == "" || contractSrc == "") $
@@ -2888,7 +2882,7 @@ callBuiltin "create2" args@[salt, SString contractName', SString contractSrc, SS
                                       M.empty
                                       []
                                    ]
-      pure $ ((flip SAccount) False) $ accountOnUnspecifiedChain (Account nca Nothing)
+      pure $ ((flip SAccount) False) $ NamedAccount nca UnspecifiedChain
     Nothing -> internalError "a call to create did not create an address" execResults
 callBuiltin x args _ = unknownFunction ("callBuiltin " ++ show args) x
 

@@ -95,7 +95,6 @@ instance {-# OVERLAPPING #-} MonadUnliftIO m => Selectable Account Contract (SQL
         . Account.getAccount'
         $ Account.accountsFilterParams
           & Account.qaAddress ?~ (a ^. accountAddress)
-          & Account.qaChainId .~ (fmap ChainId . maybeToList $ a ^. accountChainId)
     codePtr <- MaybeT . pure $ addressStateRefCodePtr r
     MaybeT $ either (const Nothing) (Just . snd) <$> getContractDetailsByCodeHash codePtr
 

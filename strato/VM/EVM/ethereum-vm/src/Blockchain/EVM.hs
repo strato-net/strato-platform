@@ -139,7 +139,7 @@ logN n = do
   topics' <- sequence $ replicate n pop
 
   theData <- mLoadByteString offset theSize
-  addLog Log {account = Account owner Nothing, bloom = 0, logData = theData, topics = topics'} -- TODO(dustin): Fix bloom filter
+  addLog Log {address = owner, bloom = 0, logData = theData, topics = topics'} -- TODO(dustin): Fix bloom filter
 
 guardStorage :: EVMBase m => VMM m ()
 guardStorage = do
@@ -1069,7 +1069,6 @@ create ::
   Address ->
   Code ->
   Keccak256 ->
-  Maybe Word256 ->
   Maybe (M.Map T.Text T.Text) ->
   m ExecResults
 create
@@ -1086,7 +1085,6 @@ create
   newAddress
   code
   txHash
-  chainId
   metadata = do
     initCode <-
       Code <$> case code of
@@ -1106,7 +1104,7 @@ create
               envCode = initCode,
               envJumpDests = getValidJUMPDESTs initCode,
               envTxHash = txHash,
-              envChainId = chainId,
+              envChainId = Nothing,
               envMetadata = metadata
             }
 
@@ -1214,7 +1212,6 @@ call ::
   Gas ->
   Address ->
   Keccak256 ->
-  Maybe Word256 ->
   Maybe (M.Map T.Text T.Text) ->
   m ExecResults
 call
@@ -1234,7 +1231,6 @@ call
   availableGas
   origin
   txHash
-  chainId
   metadata = do
     let env code =
           Environment
@@ -1248,7 +1244,7 @@ call
               envCode = code,
               envJumpDests = getValidJUMPDESTs code,
               envTxHash = txHash,
-              envChainId = chainId,
+              envChainId = Nothing,
               envMetadata = metadata
             }
 
@@ -1340,7 +1336,6 @@ create_debugWrapper block owner value initCodeBytes = do
       origin <- getEnvVar envOrigin
       gasPrice <- getEnvVar envGasPrice
       txHash <- getEnvVar envTxHash
-      chainId <- getEnvVar envChainId
       metadata <- getEnvVar envMetadata
 
       gasRemaining <- getGasRemaining
@@ -1367,7 +1362,6 @@ create_debugWrapper block owner value initCodeBytes = do
             newAddress
             initCode
             txHash
-            chainId
             metadata
         mdbs' <- Mod.get (Mod.Proxy @MemDBs)
         Mod.put (Mod.Proxy @MemDBs) mdbs
@@ -1419,7 +1413,6 @@ nestedRun_debugWrapper noValueTransfer gas receiveAddress owner sender value inp
         gas
         (envOrigin env)
         (envTxHash env)
-        (envChainId env)
         (envMetadata env)
     mdbs' <- Mod.get (Mod.Proxy @MemDBs)
     Mod.put (Mod.Proxy @MemDBs) mdbs
