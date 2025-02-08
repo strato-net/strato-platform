@@ -93,7 +93,7 @@ const ConfirmOrder = ({ paymentServices = [], data, columns }) => {
       sum += item.amount;
     });
     setTax(t.toFixed(2));
-    setSubTotal(sum.toFixed(2));
+    setSubTotal(sum);
     setTotal((sum + t).toFixed(2));
   }, [marketplaceDispatch, cartData]);
 
@@ -304,7 +304,7 @@ const ConfirmOrder = ({ paymentServices = [], data, columns }) => {
     selectedProvider?.serviceName?.includes('USDST')
       ? `${subTotal} USDST`
       : selectedProvider?.serviceName === 'Stripe'
-      ? `${subTotal} USD`
+      ? `${(Math.ceil(subTotal * 100) / 100).toFixed(2)} USD`
       : `${subTotal} ${selectedProvider?.serviceName || 'USD'}`;
 
   return (
