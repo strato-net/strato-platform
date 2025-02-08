@@ -150,7 +150,7 @@ prop cName fName f = case (_funcVisibility f, _funcArgs f, _funcVals f) of
 runFuzzerOnce :: SourceAnnotation a -> FuzzerM FuzzerResult
 runFuzzerOnce ctx = do
   ~FuzzerArgs {..} <- ask
-  contractAddress <- liftIO $ flip Account Nothing <$> generate arbitrary
+  contractAddress <- liftIO $ generate arbitrary
   let svmErr (Left e) = e
       svmErr (Right e) = InternalError "SolidVM for non-solidvm code" (show e)
       txArgs =

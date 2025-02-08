@@ -331,7 +331,7 @@ create' creator maybeCodePtr originAddress issuerAcct issuerName newAddress ch c
   multilineLog "create'/contract" $
     boringBox
       [ "Creating contract: ",
-        "Account: " ++ (format newAddress),
+        "Address: " ++ (format newAddress),
         "Type: " ++ C.yellow (labelToString contractName'),
         "Gas allotment: " ++ (C.yellow $ show (_gasInitialAllotment gasInfo)),
         "Gas left: " ++ (C.red $ show (_gasLeft gasInfo))
@@ -1880,7 +1880,7 @@ expToVar' (CC.FunctionCall _ (CC.NewExpression _ (SVMType.UnknownLabel contractN
   return $
     Constant $
       SContract contractName' $
-        accountOnUnspecifiedChain $ (\v -> Account v Nothing) $
+        (\v -> NamedAccount v UnspecifiedChain) $
           fromMaybe (internalError "a call to create did not create an address" execResults) $
             erNewContractAddress execResults
 expToVar' (CC.FunctionCall _ (CC.NewExpression _ (SVMType.UnknownLabel contractName' (Just saltExpressionText))) args) _ = do
@@ -1910,7 +1910,7 @@ expToVar' (CC.FunctionCall _ (CC.NewExpression _ (SVMType.UnknownLabel contractN
   return $
     Constant $
       SContract contractName' $
-        accountOnUnspecifiedChain $ (\v -> Account v Nothing) $
+        (\v -> NamedAccount v UnspecifiedChain) $
           fromMaybe (internalError "a call to create did not create an address" execResults) $
             erNewContractAddress execResults
   where
@@ -2139,11 +2139,8 @@ expToVar' theFullExp@(CC.FunctionCall _ e args) _ = do
                     _ -> return False
                 _ -> return False
               return . Constant $ SBool success
-            Constant (SContractItem address' "code") -> do
+            Constant (SContractItem toAccount "code") -> do
               -- let namedFrom = accountToNamedAccount' from --convert to a namedAccount to verify everything is on the correct chain
-              --If address' chainId is unset then we set to the current chainId
-              -- Get the code at the address
-              let toAccount = namedAccountToAccount Nothing address'
 
               -- Collect a potential item to search
               searchTerms <- case argVals of
@@ -2154,7 +2151,7 @@ expToVar' theFullExp@(CC.FunctionCall _ e args) _ = do
                 --If nothing was given or something else, then just return the entire code
                 _ -> pure $ Nothing
               --get only the contract containing the sweet succulent ContractF definition
-              (!contract, _, _) <- getCodeAndCollection (toAccount^.accountAddress)
+              (!contract, _, _) <- getCodeAndCollection (toAccount^.namedAccountAddress)
               decrementGas 1000 -- Discourage creating/calling contract instances willy nilly
               let codeSnippets :: [String]
                   codeSnippets =

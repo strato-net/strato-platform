@@ -79,8 +79,8 @@ defaultBlockData =
 
 data SolidVMTxArgs = SolidVMTxArgs
   { _argsBlockData :: BlockHeader,
-    _argsSender :: Account,
-    _argsOrigin :: Account,
+    _argsSender :: Address,
+    _argsOrigin :: Address,
     _argsProposer :: Address,
     _argsTxHash :: Keccak256,
     _argsChainId :: Maybe Word256,
@@ -94,15 +94,15 @@ instance Default SolidVMTxArgs where
   def =
     SolidVMTxArgs
       defaultBlockData
-      (Account 0 Nothing)
-      (Account 0 Nothing)
+      0
+      0
       (Address 0)
       emptyHash
       Nothing
       Nothing
 
 data SolidVMCreateArgs = SolidVMCreateArgs
-  { _createNewAddress :: Account,
+  { _createNewAddress :: Address,
     _createCode :: Code,
     _createArgs :: SolidVMTxArgs
   }
@@ -113,12 +113,12 @@ makeLenses ''SolidVMCreateArgs
 instance Default SolidVMCreateArgs where
   def =
     SolidVMCreateArgs
-      (Account 0 Nothing)
+      0
       (Code "")
       def
 
 data SolidVMCallArgs = SolidVMCallArgs
-  { _callCodeAddress :: Account,
+  { _callCodeAddress :: Address,
     _callArgs :: SolidVMTxArgs
   }
   deriving (Eq, Show, Generic)
@@ -128,7 +128,7 @@ makeLenses ''SolidVMCallArgs
 instance Default SolidVMCallArgs where
   def =
     SolidVMCallArgs
-      (Account 0 Nothing)
+      0
       def
 
 data SolidVMTx
@@ -165,13 +165,13 @@ create s =
     (createErr "preExistingSuicideList")
     (s ^. createArgs . argsBlockData)
     (createErr "callDepth")
-    ((s ^. createArgs . argsSender) ^. accountAddress)
-    ((s ^. createArgs . argsOrigin) ^. accountAddress)
+    (s ^. createArgs . argsSender)
+    (s ^. createArgs . argsOrigin)
     (s ^. createArgs . argsProposer)
     (createErr "value")
     (createErr "gasPrice")
     (Gas 100000000)
-    ((s ^. createNewAddress) ^. accountAddress)
+    (s ^. createNewAddress)
     (s ^. createCode)
     (s ^. createArgs . argsTxHash)
     (s ^. createArgs . argsMetadata)
@@ -190,13 +190,13 @@ call s =
     (s ^. callArgs . argsBlockData)
     (callErr "callDepth")
     (callErr "receiveAddress")
-    ((s ^. callCodeAddress) ^. accountAddress)
-    ((s ^. callArgs . argsSender) ^. accountAddress)
+    (s ^. callCodeAddress)
+    (s ^. callArgs . argsSender)
     (s ^. callArgs . argsProposer)
     (callErr "value")
     (callErr "gasPrice")
     (callErr "theData")
     (Gas 100000000)
-    ((s ^. callArgs . argsOrigin) ^. accountAddress)
+    (s ^. callArgs . argsOrigin)
     (s ^. callArgs . argsTxHash)
     (s ^. callArgs . argsMetadata)

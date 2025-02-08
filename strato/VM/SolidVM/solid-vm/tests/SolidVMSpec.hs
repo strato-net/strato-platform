@@ -211,9 +211,6 @@ sender = 0xdeadbeef
 proposer :: Address
 proposer = Address 0xdeadbeef2
 
-privateChainAcc :: Account
-privateChainAcc = Account 0xdeadbeef (Just 0x776622233444)
-
 rootAcc :: Address
 rootAcc = fromPublicKey X509.rootPubKey
 
@@ -854,12 +851,9 @@ bContract t a =
         then BDefault
         else BContract t u
 
-bContract' :: SolidString -> Account -> BasicValue
-bContract' t a =
-  let u = accountOnUnspecifiedChain a
-   in if u == unspecifiedChain 0
-        then BDefault
-        else BContract t u
+bContract' :: SolidString -> Address -> BasicValue
+bContract' _ 0 = BDefault
+bContract' t a = BContract t $ NamedAccount a UnspecifiedChain
 
 bAccount :: Address -> BasicValue
 bAccount 0 = BDefault
