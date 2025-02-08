@@ -17,8 +17,6 @@ module Blockchain.Strato.Model.Account
     namedAccountChainId,
     namedAccountAddress,
     namedAccountToAccount,
-    accountToNamedAccount,
-    accountToNamedAccount',
     accountOnUnspecifiedChain,
     unspecifiedChain,
     mainChain,
@@ -177,15 +175,6 @@ namedAccountToAccount :: Maybe Word256 -> NamedAccount -> Account
 namedAccountToAccount cid (NamedAccount a UnspecifiedChain) = Account a cid
 namedAccountToAccount _ (NamedAccount a MainChain) = Account a Nothing
 namedAccountToAccount _ (NamedAccount a (ExplicitChain cid)) = Account a (Just cid)
-
-accountToNamedAccount :: Maybe Word256 -> Account -> NamedAccount
-accountToNamedAccount c (Account a c')
-  | c == c' = NamedAccount a UnspecifiedChain
-  | otherwise = NamedAccount a (maybe MainChain ExplicitChain c')
-
-accountToNamedAccount' :: Account -> NamedAccount
-accountToNamedAccount' (Account a Nothing) = NamedAccount a MainChain
-accountToNamedAccount' (Account a (Just cid)) = NamedAccount a (ExplicitChain cid)
 
 accountOnUnspecifiedChain :: Account -> NamedAccount
 accountOnUnspecifiedChain (Account a _) = NamedAccount a UnspecifiedChain
