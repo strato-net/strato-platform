@@ -1363,7 +1363,7 @@ getAccountNonce addr chainIds = do
     [] -> return $ Map.fromList [(Nothing, Nonce $ fromInteger 0)]
     accts -> do
       let acts = map E.entityVal accts
-      let mkCid AddressStateRef {} = Just $ ChainId 0
+      let mkCid AddressStateRef {} = Nothing
           mkNonce AddressStateRef {..} = Nonce $ fromInteger addressStateRefNonce
       return . Map.fromList $ map (mkCid &&& mkNonce) acts
 
