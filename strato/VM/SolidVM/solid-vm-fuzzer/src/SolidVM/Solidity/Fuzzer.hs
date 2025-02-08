@@ -104,8 +104,8 @@ generateArgString = fmap (\t -> "(" <> T.intercalate "," t <> ")") . traverse ge
     generateArg SVMType.Bool = bool "false" "true" <$> (generate arbitrary :: IO Bool)
     generateArg (SVMType.UserDefined _ a) = generateArg a
     generateArg (SVMType.Address _) = ("0x" <>) . T.pack . show <$> (generate arbitrary :: IO Address)
-    generateArg (SVMType.Account _) = ("0x" <>) . T.pack . show <$> (generate arbitrary :: IO Account)
-    generateArg (SVMType.UnknownLabel _ _) = ("0x" <>) . T.pack . show <$> (generate arbitrary :: IO Account)
+    generateArg (SVMType.Account _) = ("0x" <>) . T.pack . show <$> (generate arbitrary :: IO Address)
+    generateArg (SVMType.UnknownLabel _ _) = ("0x" <>) . T.pack . show <$> (generate arbitrary :: IO Address)
     generateArg (SVMType.Struct _ _) = pure "<struct>" -- haha lol
     generateArg (SVMType.Enum _ _ _) = T.pack . show . abs <$> (generate arbitrary :: IO Integer)
     generateArg (SVMType.Array t l) = do
@@ -114,7 +114,7 @@ generateArgString = fmap (\t -> "(" <> T.intercalate "," t <> ")") . traverse ge
         Nothing -> abs <$> generate arbitrary
       ts <- traverse (const $ generateArg t) [0 .. n]
       pure $ "[" <> T.intercalate "," ts <> "]"
-    generateArg (SVMType.Contract _) = ("0x" <>) . T.pack . show <$> (generate arbitrary :: IO Account)
+    generateArg (SVMType.Contract _) = ("0x" <>) . T.pack . show <$> (generate arbitrary :: IO Address)
     generateArg (SVMType.Mapping _ _ _) = pure "<mapping>" --haha lol
     generateArg (SVMType.Error _ _) = pure "<error>" -- haha xd
     generateArg (SVMType.Variadic) = pure "<variadic>"

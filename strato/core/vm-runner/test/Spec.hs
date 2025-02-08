@@ -14,7 +14,6 @@ import Blockchain.Database.MerklePatricia as MP
 import Blockchain.EVM
 import qualified Blockchain.EVM.MutableStack as MS
 import Blockchain.EVM.Opcodes
-import Blockchain.Strato.Model.Account
 import Blockchain.Strato.Model.Code
 import Blockchain.Strato.Model.ExtendedWord
 import Blockchain.Strato.Model.Keccak256
@@ -59,7 +58,7 @@ spec = do
               isHomestead = False
               blockData = BDB.blockBlockData $ BML.makeBlock 0 0
               availableGas = 10000000
-              tAddr = (Account 0xfeedbeef Nothing)
+              tAddr = 0xfeedbeef
               newAddress = 0xdeadbeef
               txValue = 0
               txGasPrice = 10000000
@@ -76,8 +75,8 @@ spec = do
               S.empty
               blockData
               0
-              (_accountAddress tAddr)
-              (_accountAddress tAddr)
+              tAddr
+              tAddr
               txValue
               txGasPrice
               availableGas
@@ -108,14 +107,14 @@ spec = do
             S.empty
             blockData
             0
-            (_accountAddress tAddr)
+            tAddr
             newAddress
-            (_accountAddress tAddr)
+            tAddr
             (fromIntegral txValue)
             (fromIntegral txGasPrice)
             (LabeledError.b16Decode "vm-runner/Spec.hs" "ec630643")
             availableGas
-            (_accountAddress tAddr)
+            tAddr
             (unsafeCreateKeccak256FromWord256 0)
             Nothing
       erException execResults `shouldSatisfy` isNothing

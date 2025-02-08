@@ -41,7 +41,6 @@ import Blockchain.EVM.Opcodes
 import Blockchain.EVM.PrecompiledContracts
 import Blockchain.EVM.VMM
 import Blockchain.EVM.VMState
-import Blockchain.Strato.Model.Account
 import Blockchain.Strato.Model.Address
 import Blockchain.Strato.Model.Code
 import Blockchain.Strato.Model.ExtendedWord
@@ -537,7 +536,7 @@ runOperation CALL = do
         addDebugCallCreate
           DebugCallCreate
             { ccData = inputData,
-              ccDestination = Just $ Account to Nothing,
+              ccDestination = Just to,
               ccGasLimit = fromIntegral gas + stipend,
               ccValue = fromIntegral value
             }
@@ -595,7 +594,7 @@ runOperation CALLCODE = do
         addDebugCallCreate
           DebugCallCreate
             { ccData = inputData,
-              ccDestination = Just $ Account owner Nothing,
+              ccDestination = Just owner,
               ccGasLimit = fromIntegral gas + stipend,
               ccValue = fromIntegral value
             }
@@ -652,7 +651,7 @@ runOperation DELEGATECALL = do
             addDebugCallCreate
               DebugCallCreate
                 { ccData = inputData,
-                  ccDestination = Just $ Account owner Nothing,
+                  ccDestination = Just owner,
                   ccGasLimit = fromIntegral gas,
                   ccValue = fromIntegral value
                 }

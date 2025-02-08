@@ -19,7 +19,6 @@ where
 import Blockchain.Data.Log
 import Blockchain.EVM.Environment
 import qualified Blockchain.EVM.MutableStack as MS
-import Blockchain.Strato.Model.Account
 import Blockchain.Strato.Model.Address
 import Blockchain.Strato.Model.Class
 import Blockchain.Strato.Model.ExtendedWord
@@ -65,7 +64,7 @@ newMemory = do
 
 data DebugCallCreate = DebugCallCreate
   { ccData :: B.ByteString,
-    ccDestination :: Maybe Account,
+    ccDestination :: Maybe Address,
     ccGasLimit :: Gas,
     ccValue :: Integer
   }
