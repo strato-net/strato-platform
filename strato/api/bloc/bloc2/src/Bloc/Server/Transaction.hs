@@ -1288,21 +1288,25 @@ cacheLookup c t k = do
   Cache.purgeExpiredSTM c t
   Cache.lookupSTM True k c t
 
-genNonces ::
-  (MonadLogger m, HasBlocEnv m, HasSQL m) =>
-  Show a =>
+genNonces :: forall a m.
+  (MonadLogger m, HasBlocEnv m, HasSQL m, Show a) =>
   Should CacheNonce ->
   Address ->
   Lens' a (Maybe ChainId) ->
   Lens' a (Maybe TxParams) ->
   [a] ->
   m [a]
-genNonces cacheNonce fromAddr chainLens l unindexedAs = do
-  let getChainId = view chainLens
-      chainIdsList = S.toList . S.fromList $ getChainId <$> unindexedAs
-      cacheKeys = Account fromAddr . fmap unChainId <$> chainIdsList
+genNonces cacheNonce fromAddr _ l unindexedAs = do
+  let getChainId :: a-> Maybe ChainId
+      getChainId = const Nothing -- view chainLens
+      chainIdsList :: [Maybe ChainId]
+      chainIdsList = [Nothing] -- S.toList . S.fromList $ getChainId <$> unindexedAs
+      cacheKeys :: [Account]
+      cacheKeys = map (Account fromAddr . fmap unChainId) chainIdsList
+      viewNonce :: a -> Maybe Nonce
       viewNonce = txparamsNonce <=< view l
-  let indexedByChainId = indexedPartitionWith getChainId unindexedAs
+  let indexedByChainId :: [(Maybe ChainId, [(Int, a)])]
+      indexedByChainId = indexedPartitionWith getChainId unindexedAs
   nonceCache <- fmap globalNonceCounter getBlocEnv
   now <- liftIO $ getTime Monotonic
   let lookupCached = case cacheNonce of
