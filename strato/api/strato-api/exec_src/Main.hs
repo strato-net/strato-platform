@@ -26,7 +26,6 @@ import Blockchain.Data.AddressStateRef
 import Blockchain.Data.CirrusDefs
 import Blockchain.Data.DataDefs
 import Blockchain.Data.Json
-import Blockchain.Strato.Model.Account
 import Blockchain.Strato.Model.Address
 import Blockchain.Strato.Model.ChainId
 import Blockchain.Strato.Model.Keccak256
@@ -87,18 +86,18 @@ import Text.Tools
 import UnliftIO hiding (Handler)
 import Prelude hiding (lookup)
 
-instance {-# OVERLAPPING #-} MonadUnliftIO m => Selectable Account Contract (SQLM m) where
+instance {-# OVERLAPPING #-} MonadUnliftIO m => Selectable Address Contract (SQLM m) where
   select _ a = runMaybeT $ do
     (AddressStateRef' r _) <-
       MaybeT
         . fmap listToMaybe
         . Account.getAccount'
         $ Account.accountsFilterParams
-          & Account.qaAddress ?~ (a ^. accountAddress)
+          & Account.qaAddress ?~ a
     codePtr <- MaybeT . pure $ addressStateRefCodePtr r
     MaybeT $ either (const Nothing) (Just . snd) <$> getContractDetailsByCodeHash codePtr
 
-instance Selectable Account Contract m => Selectable Account Contract (ReaderT a m) where
+instance Selectable Address Contract m => Selectable Address Contract (ReaderT a m) where
   select p = lift . select p
 
 instance {-# OVERLAPPING #-} MonadUnliftIO m => (Keccak256 `Selectable` SourceMap) (SQLM m) where
@@ -198,7 +197,7 @@ fullServer ::
     HasIdentity m,
     HasVault m,
     Accessible Metadata.UrlMap m,
-    Selectable Account Contract m,
+    Selectable Address Contract m,
     Selectable Address AddressState m,
     Selectable Address Certificate m,
     HasCodeDB m,

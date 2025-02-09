@@ -50,7 +50,6 @@ import Blockchain.Data.Json hiding (Contract)
 import Blockchain.Data.RLP (rlpSerialize, rlpEncode)
 import Blockchain.Data.TXOrigin
 import Blockchain.Data.Transaction (rawTX2TX, transactionHash)
-import Blockchain.Strato.Model.Account
 import Blockchain.Strato.Model.Address hiding (unAddress)
 import Blockchain.Strato.Model.ChainId
 import Blockchain.Strato.Model.Code
@@ -104,6 +103,8 @@ import qualified SolidVM.Model.Value as SMV
 import Strato.Strato23.API.Types
 import Strato.Strato23.Client
 import System.Clock
+import Text.Format
+
 import UnliftIO
 
 mergeTxParams :: Maybe TxParams -> Maybe TxParams -> Maybe TxParams
@@ -117,7 +118,7 @@ mergeTxParams inner outer = inner <|> outer
 
 txWorker ::
   ( MonadLogger m,
-    A.Selectable Account Contract m,
+    A.Selectable Address Contract m,
     A.Selectable Address AddressState m,
     A.Selectable Address Certificate m,
     HasCodeDB m,
@@ -142,7 +143,7 @@ txWorker = forever $ do
 -- | postBlocTransactionBody(jwt, chain ID, [Transactions])
 postBlocTransactionBody ::
   ( MonadLogger m,
-    A.Selectable Account Contract m,
+    A.Selectable Address Contract m,
     A.Selectable Address AddressState m,
     HasCodeDB m,
     HasBlocEnv m,
@@ -249,16 +250,15 @@ postBlocTransactionBody (Just jwt) cid (PostBlocTransactionRequest mAddr txList 
       txsWithParams <- genNonces (Don't CacheNonce) addr methodcallChainid methodcallTxParams txsWithChainids
       forStateT Map.empty txsWithParams $
         \MethodCall{..} -> do
-          let theAccount = Account methodcallContractAddress $ fmap unChainId _methodcallChainid
-          mContract <- use $ at theAccount
+          mContract <- use $ at methodcallContractAddress
           contract <- case mContract of
             Just x -> pure x
             Nothing -> do
-              mContract' <- lift $ A.select (A.Proxy @Contract) theAccount
+              mContract' <- lift $ A.select (A.Proxy @Contract) methodcallContractAddress
               x <- case mContract' of
-                Nothing -> lift $ throwIO . UserError $ "Could not find contract " <> Text.pack (show theAccount)
+                Nothing -> lift $ throwIO . UserError $ "Could not find contract " <> Text.pack (format methodcallContractAddress)
                 Just x -> pure x
-              at theAccount <?= x
+              at methodcallContractAddress <?= x
           sel <- case M.lookup (Text.unpack methodcallMethodName) (contract ^. functions) of
             Just _ -> return $ Text.encodeUtf8 methodcallMethodName
             Nothing -> throwIO . UserError $ "Contract doesn't have a method named '" <> methodcallMethodName <> "'"
@@ -294,7 +294,7 @@ postBlocTransactionBody (Just jwt) cid (PostBlocTransactionRequest mAddr txList 
 -- | postBlocTransactionUnsigned
 postBlocTransactionUnsigned ::
   ( MonadLogger m,
-    A.Selectable Account Contract m,
+    A.Selectable Address Contract m,
     A.Selectable Address AddressState m,
     HasCodeDB m,
     HasBlocEnv m,
@@ -397,16 +397,15 @@ postBlocTransactionUnsigned (Just jwt) cid (PostBlocTransactionRequest mAddr txL
       txsWithParams <- genNonces (Don't CacheNonce) addr methodcallChainid methodcallTxParams [txWithChainids]
       forStateT Map.empty txsWithParams $
         \MethodCall{..} -> do
-          let theAccount = Account methodcallContractAddress $ fmap unChainId _methodcallChainid
-          mContract <- use $ at theAccount
+          mContract <- use $ at methodcallContractAddress
           contract <- case mContract of
             Just x -> pure x
             Nothing -> do
-              mContract' <- lift $ A.select (A.Proxy @Contract) theAccount
+              mContract' <- lift $ A.select (A.Proxy @Contract) methodcallContractAddress
               x <- case mContract' of
-                Nothing -> lift $ throwIO . UserError $ "Could not find contract " <> Text.pack (show theAccount)
+                Nothing -> lift $ throwIO . UserError $ "Could not find contract " <> Text.pack (format methodcallContractAddress)
                 Just x -> pure x
-              at theAccount <?= x
+              at methodcallContractAddress <?= x
           sel <- case M.lookup (Text.unpack methodcallMethodName) (contract ^. functions) of
             Just _ -> return $ Text.encodeUtf8 methodcallMethodName
             Nothing -> throwIO . UserError $ "Contract doesn't have a method named '" <> methodcallMethodName <> "'"
@@ -455,7 +454,7 @@ getMaybeCodeFromContractPayload p =
 
 postBlocTransactionParallel ::
   ( MonadLogger m,
-    A.Selectable Account Contract m,
+    A.Selectable Address Contract m,
     A.Selectable Address AddressState m,
     A.Selectable Address Certificate m,
     HasCodeDB m,
@@ -482,7 +481,7 @@ postBlocTransactionParallel jwtToken b mUseWallet resolve queue c =
 
 postBlocTransaction ::
   ( MonadLogger m,
-    A.Selectable Account Contract m,
+    A.Selectable Address Contract m,
     A.Selectable Address AddressState m,
     A.Selectable Address Certificate m,
     HasCodeDB m,
@@ -501,7 +500,7 @@ postBlocTransaction = postBlocTransaction' (Don't CacheNonce)
 
 postBlocTransactionParallelExternal ::
   ( MonadLogger m,
-    A.Selectable Account Contract m,
+    A.Selectable Address Contract m,
     A.Selectable Address AddressState m,
     A.Selectable Address Certificate m,
     HasCodeDB m,
@@ -521,7 +520,7 @@ postBlocTransactionParallelExternal bearerToken = postBlocTransactionParallel (T
 
 postBlocTransaction' ::
   ( MonadLogger m,
-    A.Selectable Account Contract m,
+    A.Selectable Address Contract m,
     A.Selectable Address AddressState m,
     A.Selectable Address Certificate m,
     HasCodeDB m,
@@ -976,7 +975,7 @@ postUsersSendList' cacheNonce TransferListParameters {..} jwtToken = do
 
 postUsersContractMethodList' ::
   ( MonadLogger m,
-    A.Selectable Account Contract m,
+    A.Selectable Address Contract m,
     A.Selectable Address AddressState m,
     HasCodeDB m,
     (Keccak256 `A.Selectable` SourceMap) m,
@@ -997,16 +996,16 @@ postUsersContractMethodList' cacheNonce FunctionListParameters {..} jwtToken = d
       txSizeLimit <- fmap txSizeLimit getBlocEnv
       txsFuncNames <- forStateT Map.empty txsWithParams $
         \(MethodCall {..}) -> do
-          let theAccount = Account methodcallContractAddress $ fmap unChainId _methodcallChainid
-          mContract <- use $ at theAccount
+--          let theAccount = Account methodcallContractAddress $ fmap unChainId _methodcallChainid
+          mContract <- use $ at methodcallContractAddress
           contract <- case mContract of
             Just x -> pure x
             Nothing -> do
-              mContract' <- lift $ A.select (A.Proxy @Contract) theAccount
+              mContract' <- lift $ A.select (A.Proxy @Contract) methodcallContractAddress
               x <- case mContract' of
-                Nothing -> lift $ throwIO . UserError $ "Could not find contract " <> Text.pack (show theAccount)
+                Nothing -> lift $ throwIO . UserError $ "Could not find contract " <> Text.pack (show methodcallContractAddress)
                 Just x -> pure x
-              at theAccount <?= x
+              at methodcallContractAddress <?= x
           sel <- case M.lookup (Text.unpack methodcallMethodName) (contract ^. functions) of
             Just _ -> return $ Text.encodeUtf8 methodcallMethodName
             Nothing -> throwIO . UserError $ "Contract doesn't have a method named '" <> methodcallMethodName <> "'"
@@ -1036,7 +1035,7 @@ postUsersContractMethodList' cacheNonce FunctionListParameters {..} jwtToken = d
 
 postUsersContractMethod' ::
   ( MonadLogger m,
-    A.Selectable Account Contract m,
+    A.Selectable Address Contract m,
     A.Selectable Address AddressState m,
     HasCodeDB m,
     (Keccak256 `A.Selectable` SourceMap) m,
@@ -1060,9 +1059,7 @@ postUsersContractMethod' cacheNonce FunctionParameters {..} jwtToken = do
             ]
   contract <-
     maybe (throwIO err) pure
-      =<< A.select
-        (A.Proxy @Contract)
-        (Account contractAddr (unChainId <$> chainId))
+      =<< A.select (A.Proxy @Contract) contractAddr
   sel <- case M.lookup (Text.unpack funcName) (contract ^. functions) of
     Just _ -> return $ Text.encodeUtf8 funcName
     Nothing -> throwIO . UserError $ "Contract doesn't have a method named '" <> funcName <> "'"

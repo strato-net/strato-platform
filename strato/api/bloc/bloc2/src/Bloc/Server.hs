@@ -16,7 +16,6 @@ import Bloc.Server.TransactionResult
 import Blockchain.DB.CodeDB
 import Blockchain.Data.AddressStateDB
 import Blockchain.Data.CirrusDefs
-import Blockchain.Strato.Model.Account
 import Blockchain.Strato.Model.Address
 import Blockchain.Strato.Model.Keccak256
 import Control.Lens (makeLenses, over, (&), (.~), (?~))
@@ -36,7 +35,7 @@ bloc ::
     HasBlocEnv m,
     HasVault m,
     HasSQL m,
-    Selectable Account Contract m,
+    Selectable Address Contract m,
     Selectable Address AddressState m,
     Selectable Address Certificate m,
     HasCodeDB m,
