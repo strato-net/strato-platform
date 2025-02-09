@@ -11,18 +11,14 @@ module OutputDataSpec where
 
 import Conduit
 import Control.Monad
-import           Control.Monad.Change.Alter
--- import qualified Handlers.Storage as HS
 import qualified Data.ByteString as B
 import qualified Data.IntMap as I
 import qualified Data.Map as M
 import qualified Data.Text as T
 import Data.Time
--- import Data.Default
 import Numeric
 import Test.Hspec
 import Text.RawString.QQ
--- import UnliftIO.IORef
 
 import BlockApps.Logging
 import qualified BlockApps.Solidity.Value as V
@@ -31,19 +27,11 @@ import Blockchain.Strato.Model.Address
 import Blockchain.Strato.Model.CodePtr
 import Blockchain.Strato.Model.Keccak256 (hash)
 import qualified Slipstream.Events as SE
--- import Slipstream.Globals
--- import Slipstream.GlobalsColdStorage (fakeHandle)
 import Slipstream.OutputData
 import Slipstream.SolidityValue
 import SolidVM.Model.CodeCollection hiding (contractName, contracts)
 import SolidVM.Model.SolidString
 import qualified SolidVM.Model.Type as SVMType
-import Blockchain.Data.AddressStateDB
-
--- import Network.Haskoin.Crypto.BigWord
--- import Blockchain.Data.ChainInfo
--- import Blockchain.DB.CodeDB
--- import Blockchain.DB.MemAddressStateDB
 
 addr :: Address -> V.Value
 addr = V.SimpleValue . V.ValueAccount . unspecifiedChain
@@ -56,10 +44,6 @@ bytes = V.SimpleValue . V.valueBytes
 
 int :: Integer -> V.Value
 int = V.SimpleValue . V.valueInt
-
-instance Selectable Account AddressState (LoggingT IO) where
-  select _ _ = return Nothing
-
 
 createInserts :: OutputM m
               => (SE.ProcessedContract, ContractF())

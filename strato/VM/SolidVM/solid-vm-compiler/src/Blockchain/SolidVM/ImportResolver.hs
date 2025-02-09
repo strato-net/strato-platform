@@ -163,14 +163,13 @@ resolveFile getCCFromHash expr (seen, resolved) =
   if tShowExpr expr `S.member` seen
     then throwE . T.concat $ "Circular reference identified: " : S.toList seen
     else case expr of
-      AccountLiteral _ namedAcct -> do
-        let acct = namedAccountToAccount Nothing namedAcct
-        lift (A.select (A.Proxy @AddressState) (acct^.accountAddress)) >>= \case
+      AccountLiteral _ acct -> do
+        lift (A.select (A.Proxy @AddressState) (acct^.namedAccountAddress)) >>= \case
           Nothing -> pure (seen, resolved)
           Just AddressState {..} ->
             lift (runMainChainT $ resolveCodePtr addressStateCodeHash) >>= \case
               Just (SolidVMCode _ ch) -> do
-                rfu <- lift $ codeCollectionToFileUnits (Just $ acct^.accountAddress) <$> getCCFromHash ch
+                rfu <- lift $ codeCollectionToFileUnits (Just $ acct^.namedAccountAddress) <$> getCCFromHash ch
                 pure (seen, M.insert (tShowExpr expr) (Right rfu) resolved)
               Just (ExternallyOwned _) -> throwE . T.pack $ "Account referenced in import contains EVM code: " ++ show acct
               _ -> throwE . T.pack $ "Account referenced in import could not be resolved: " ++ show acct
