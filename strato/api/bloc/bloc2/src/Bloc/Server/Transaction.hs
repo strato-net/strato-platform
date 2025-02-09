@@ -996,7 +996,6 @@ postUsersContractMethodList' cacheNonce FunctionListParameters {..} jwtToken = d
       txSizeLimit <- fmap txSizeLimit getBlocEnv
       txsFuncNames <- forStateT Map.empty txsWithParams $
         \(MethodCall {..}) -> do
---          let theAccount = Account methodcallContractAddress $ fmap unChainId _methodcallChainid
           mContract <- use $ at methodcallContractAddress
           contract <- case mContract of
             Just x -> pure x
