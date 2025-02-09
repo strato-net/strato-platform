@@ -23,7 +23,6 @@ import Blockchain.Data.RLP
 import Blockchain.SolidVM.Exception
 import Blockchain.Strato.Model.Account
 import Blockchain.Strato.Model.Address
-import Blockchain.Strato.Model.ExtendedWord
 import Control.Lens ((.~), (^.))
 import Control.Monad (forM, when)
 import Control.Monad.IO.Class
@@ -203,9 +202,8 @@ coerceType ct xt = \case
     _ -> typeError "string literal must be string or bytes" (xt, s)
   v -> v
 
-valEquals :: Maybe Word256 -> CC.Contract -> Value -> Value -> Bool
---valEquals chainId ct lhs rhs = case (lhs, rhs) of
-valEquals _ ct lhs rhs = case (lhs, rhs) of
+valEquals :: CC.Contract -> Value -> Value -> Bool
+valEquals ct lhs rhs = case (lhs, rhs) of
   (SInteger i, _) -> coerceFromInt ct rhs i == rhs
   (_, SInteger i) -> coerceFromInt ct lhs i == lhs
   (SBool s1, SBool s2) -> s1 == s2
