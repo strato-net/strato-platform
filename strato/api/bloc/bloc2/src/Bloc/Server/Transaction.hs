@@ -560,11 +560,8 @@ postBlocTransaction' cacheNonce mJwtToken chainId mUseWallet resolve (PostBlocTr
             A.select (A.Proxy @Certificate) addr
           pure $ deriveAddressWithSalt (Just userRegistry) (certificateCommonName userCert) userRegistryHash (Just . show $ SMV.OrderedVals [SMV.SString $ certificateCommonName userCert])
         else pure addr
-      nonceMap <- getAccountNonce addr (S.singleton chainId)
-      accountNonce <- case Map.lookup chainId nonceMap of
-        Nothing -> pure $ 0
-        Just (Nonce n) -> pure $ toInteger n
-      when (accountNonce >= accountNonceLimit) $ throwIO NonceLimitExceededError
+      accountNonce <- getAccountNonce addr
+      when (accountNonce >= fromIntegral accountNonceLimit) $ throwIO NonceLimitExceededError
       let src' :: ContractPayload -> Maybe SourceMap
           src' p =
             if contractpayloadSrc p == mempty
@@ -832,7 +829,7 @@ postUsersSend' ::
   Text ->
   m BlocTransactionResult
 postUsersSend' cacheNonce TransferParameters {..} jwtToken = do
-  params <- getAccountTxParams cacheNonce fromAddress chainId txParams
+  params <- getAccountTxParams cacheNonce fromAddress txParams
   txSizeLimit <- fmap txSizeLimit getBlocEnv
   tx <-
     signAndPrepare jwtToken fromAddress metadata $
@@ -860,7 +857,7 @@ postUsersContractSolidVM' ::
   Text ->
   m BlocTransactionResult
 postUsersContractSolidVM' cacheNonce ContractParameters {..} jwtToken = do
-  params <- getAccountTxParams cacheNonce fromAddr chainId txParams
+  params <- getAccountTxParams cacheNonce fromAddr txParams
   txSizeLimit <- fmap txSizeLimit getBlocEnv
   --We might be able to get rid of the metadata for SolidVM, but that will require a change in the API, and needs to be discussed
   $logInfoLS "postUsersContractSolidVM'/args" args
@@ -1052,7 +1049,7 @@ postUsersContractMethod' ::
   Text ->
   m BlocTransactionResult
 postUsersContractMethod' cacheNonce FunctionParameters {..} jwtToken = do
-  params <- getAccountTxParams cacheNonce fromAddr chainId txParams
+  params <- getAccountTxParams cacheNonce fromAddr txParams
   txSizeLimit <- fmap txSizeLimit getBlocEnv
 
   let err =
@@ -1251,10 +1248,9 @@ getAccountTxParams ::
   (MonadLogger m, HasBlocEnv m, HasSQL m) =>
   Should CacheNonce ->
   Address ->
-  Maybe ChainId ->
   Maybe TxParams ->
   m TxParams
-getAccountTxParams cacheNonce addr chainId mTxParams = do
+getAccountTxParams cacheNonce addr mTxParams = do
   let params = fromMaybe emptyTxParams mTxParams
       cacheKey = addr
   nonceCache <- fmap globalNonceCounter getBlocEnv
@@ -1262,16 +1258,16 @@ getAccountTxParams cacheNonce addr chainId mTxParams = do
   mCachedNonce <- case cacheNonce of
     Do CacheNonce -> atomically $ cacheLookup nonceCache now cacheKey
     Don't CacheNonce -> pure Nothing
-  nonceMap <- case mCachedNonce of
-    Just n -> pure $ Map.singleton chainId n
-    Nothing -> getAccountNonce addr (S.singleton chainId)
+  theNonce <- case mCachedNonce of
+    Just n -> pure n
+    Nothing -> getAccountNonce addr
   liftIO . atomically $ do
     now' <- Cache.nowSTM
     mmNonce <- cacheLookup nonceCache now' cacheKey
     let mNonce = case cacheNonce of
           Do CacheNonce -> mmNonce
           Don't CacheNonce -> Nothing
-        sNonce = Map.lookup chainId nonceMap
+        sNonce = Just theNonce
         maxNonce = liftA2 max mNonce sNonce
         newNonce = fromMaybe 0 $ txparamsNonce params <|> maxNonce <|> mNonce <|> sNonce
         expTime = (now' +) <$> Cache.defaultExpiration nonceCache
@@ -1310,9 +1306,7 @@ genNonces cacheNonce fromAddr _ l items = do
 
   (sNonce :: Maybe Nonce) <-
     case cachedItem of
-      Nothing -> do
-        theMap <- getAccountNonce fromAddr (S.singleton Nothing)
-        return $ M.lookup Nothing theMap
+      Nothing -> fmap Just $ getAccountNonce fromAddr
       Just val -> return $ Just val
 
   liftIO . atomically $ do
@@ -1345,12 +1339,9 @@ genNonces cacheNonce fromAddr _ l items = do
       Cache.insertSTM fromAddr newCachedNonce nonceCache expTime
       pure txs
 
-getAccountNonce ::
-  (MonadLogger m, HasSQL m, HasBlocEnv m) =>
-  Address ->
-  S.Set (Maybe ChainId) ->
-  m (Map (Maybe ChainId) Nonce)
-getAccountNonce addr _ = do
+getAccountNonce :: (MonadLogger m, HasSQL m, HasBlocEnv m) =>
+                   Address -> m Nonce
+getAccountNonce addr = do
   let actions = E.select . E.from $ \accStateRef -> do
         E.where_ (accStateRef E.^. AddressStateRefAddress E.==. E.val addr)
         return accStateRef
@@ -1358,12 +1349,12 @@ getAccountNonce addr _ = do
   $logInfoLS "getAccountNonce lookup" addr
   $logInfoLS "getAccountNonce results" mAccts
   case mAccts of
-    [] -> return $ Map.fromList [(Nothing, Nonce $ fromInteger 0)]
-    accts -> do
-      let acts = map E.entityVal accts
-      let mkCid AddressStateRef {} = Nothing
-          mkNonce AddressStateRef {..} = Nonce $ fromInteger addressStateRefNonce
-      return . Map.fromList $ map (mkCid &&& mkNonce) acts
+    [] -> return $ Nonce $ fromInteger 0
+    [acct] -> do
+      let act = E.entityVal acct
+      let mkNonce AddressStateRef {..} = Nonce $ fromInteger addressStateRefNonce
+      return $ mkNonce act
+    _ -> error "returned more than one account with a single address in getAccountNonce"
 
 constructArgValues ::
   (MonadIO m, MonadLogger m) =>
