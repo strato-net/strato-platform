@@ -204,17 +204,18 @@ coerceType ct xt = \case
   v -> v
 
 valEquals :: Maybe Word256 -> CC.Contract -> Value -> Value -> Bool
-valEquals chainId ct lhs rhs = case (lhs, rhs) of
+--valEquals chainId ct lhs rhs = case (lhs, rhs) of
+valEquals _ ct lhs rhs = case (lhs, rhs) of
   (SInteger i, _) -> coerceFromInt ct rhs i == rhs
   (_, SInteger i) -> coerceFromInt ct lhs i == lhs
   (SBool s1, SBool s2) -> s1 == s2
   (SString s1, SString s2) -> s1 == s2
   (SDecimal v1, SDecimal v2) -> v1 == v2
-  (SAccount v1 b1, SAccount v2 b2) -> namedAccountToAccount chainId v1 == namedAccountToAccount chainId v2 && b1 == b2
+  (SAccount v1 b1, SAccount v2 b2) -> v1 == v2 && b1 == b2
   (SEnumVal e1 _ n1, SEnumVal e2 _ n2) -> e1 == e2 && n1 == n2
-  (SContract _ a1, SAccount a2 _) -> namedAccountToAccount chainId a1 == namedAccountToAccount chainId a2
-  (SAccount a1 _, SContract _ a2) -> namedAccountToAccount chainId a1 == namedAccountToAccount chainId a2
-  (SContract _ a1, SContract _ a2) -> namedAccountToAccount chainId a1 == namedAccountToAccount chainId a2
+  (SContract _ a1, SAccount a2 _) -> a1 == a2
+  (SAccount a1 _, SContract _ a2) -> a1 == a2
+  (SContract _ a1, SContract _ a2) -> a1 == a2
   (SBuiltinVariable v1, SBuiltinVariable v2) ->
     todo "comparison of builtin vars requires evaluation: " (v1, v2)
   _ -> todo "unsupported type combination in valEquals: " (lhs, rhs)
