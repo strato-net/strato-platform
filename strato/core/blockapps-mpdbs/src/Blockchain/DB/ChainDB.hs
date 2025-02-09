@@ -14,19 +14,17 @@ module Blockchain.DB.ChainDB
     BestBlockRoot (..),
     bootstrapChainDB,
     putBlockHeaderInChainDB,
-    putBlockHashInChainDB,
+    --putBlockHashInChainDB,
     migrateBlockHeader,
     getChainRoot,
     getChainStateRoot,
     putChainStateRoot,
     deleteChainStateRoot,
     getGenesisStateRoot,
-    getChainGenesisInfo,
-    putChainGenesisInfo,
-    deleteChainGenesisInfo,
+    --getChainGenesisInfo,
+    --putChainGenesisInfo,
     getChainBestBlock,
     putChainBestBlock,
-    deleteChainBestBlock,
   )
 where
 
@@ -275,17 +273,6 @@ putChainGenesisInfo chainId creationBlock stateRoot parent = do
   newGenesisRoot <- putkv gr (word256ToMPKey chainId) $ GenesisData (creationBlock, stateRoot, parent)
   put Proxy $ GenesisRoot newGenesisRoot
 
-deleteChainGenesisInfo ::
-  ( Modifiable GenesisRoot m,
-    (MP.StateRoot `Alters` MP.NodeData) m
-  ) =>
-  Maybe Word256 ->
-  m ()
-deleteChainGenesisInfo chainId = do
-  gr <- unGenesisRoot <$> get Proxy
-  newGenesisRoot <- MP.deleteKey gr (word256ToMPKey chainId)
-  put Proxy $ GenesisRoot newGenesisRoot
-
 getChainStateRoot ::
   ( MonadLogger m,
     Modifiable BlockHashRoot m,
@@ -370,15 +357,4 @@ putChainBestBlock ::
 putChainBestBlock chainId bHash ordering = do
   bbr <- unBestBlockRoot <$> get Proxy
   newBestBlockRoot <- putkv bbr (word256ToMPKey chainId) (bHash, ordering)
-  put Proxy $ BestBlockRoot newBestBlockRoot
-
-deleteChainBestBlock ::
-  ( Modifiable BestBlockRoot m,
-    (MP.StateRoot `Alters` MP.NodeData) m
-  ) =>
-  Maybe Word256 ->
-  m ()
-deleteChainBestBlock chainId = do
-  bbr <- unBestBlockRoot <$> get Proxy
-  newBestBlockRoot <- MP.deleteKey bbr (word256ToMPKey chainId)
   put Proxy $ BestBlockRoot newBestBlockRoot
