@@ -29,7 +29,6 @@ where
 
 import Bloc.API.Transaction
 import BlockApps.Logging
-import Blockchain.Strato.Model.Account
 import Blockchain.Strato.Model.Address
 import Blockchain.Strato.Model.ChainId
 import Blockchain.Strato.Model.Keccak256
@@ -57,7 +56,7 @@ data BlocEnv = BlocEnv
     txSizeLimit :: Int,
     accountNonceLimit :: Integer,
     gasLimit :: Integer,
-    globalNonceCounter :: Cache Account Nonce,
+    globalNonceCounter :: Cache Address Nonce,
     txTBQueue :: TBQueue (Maybe Text, Maybe ChainId, Maybe Bool, Bool, PostBlocTransactionRequest),
     userRegistryAddress :: Address,
     userRegistryCodeHash :: Maybe Keccak256,
