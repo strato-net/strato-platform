@@ -46,7 +46,6 @@ import BlockApps.XAbiConverter
 import Blockchain.DB.CodeDB
 import Blockchain.Data.AddressStateDB
 import Blockchain.Data.DataDefs
-import Blockchain.Strato.Model.Account
 import Blockchain.Strato.Model.Address
 import Blockchain.Strato.Model.ChainId
 import Blockchain.Strato.Model.Keccak256
@@ -96,7 +95,7 @@ data TRD = TRD -- transaction resolution data
   }
 
 data BatchState = BatchState
-  { _functionXabiMap :: Map.Map (Account, Text) Contract
+  { _functionXabiMap :: Map.Map (Address, Text) Contract
   }
 
 makeLenses ''BatchState
@@ -320,7 +319,7 @@ functionResult ::
   Maybe (Map Text Text) ->
   Address ->
   StateT BatchState m BlocTransactionResult
-functionResult i txHash txResult@TransactionResult {..} mmd toAccount = do
+functionResult i txHash txResult@TransactionResult {..} mmd toAddress = do
   case transactionResultKind of
     -- Check if it is a solidVm first
     -- If it is, we can reduce calls to get Contract
@@ -339,19 +338,19 @@ functionResult i txHash txResult@TransactionResult {..} mmd toAccount = do
         Just md -> case Map.lookup "funcName" md of
           Nothing -> lift . throwIO . UserError $ "Could not get the name of the contract for the " <> nth i <> " transaction in the list: " <> Text.pack (format txHash)
           Just funcName -> pure funcName
-      mxabi <- use $ functionXabiMap . at (Account toAccount Nothing, funcName)
+      mxabi <- use $ functionXabiMap . at (toAddress, funcName)
       contract <- case mxabi of
         Just contract' -> return contract'
         Nothing -> do
-          mch <- lift $ fmap addressStateCodeHash <$> A.select (A.Proxy @AddressState) toAccount
+          mch <- lift $ fmap addressStateCodeHash <$> A.select (A.Proxy @AddressState) toAddress
           contract' <- case mch of
-            Nothing -> lift . throwIO . UserError $ "Could not find contract at " <> Text.pack (format toAccount)
+            Nothing -> lift . throwIO . UserError $ "Could not find contract at " <> Text.pack (format toAddress)
             Just ch ->
               lift $
                 getContractDetailsByCodeHash ch >>= \case
                   Left e -> throwIO $ UserError e
                   Right d -> pure $ snd d
-          functionXabiMap . at (Account toAccount Nothing, funcName) <?= contract'
+          functionXabiMap . at (toAddress, funcName) <?= contract'
       let resultXabiTypes = maybe [] (map (indexedTypeToEvmIndexedType . snd) . _funcVals) . Map.lookup (Text.unpack funcName) $ _functions contract
           orderedResultIndexedXT = sortOn Xabi.indexedTypeIndex $ catMaybes resultXabiTypes
       orderedResultTypes <- lift $
