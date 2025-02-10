@@ -276,4 +276,9 @@ abstract contract Reserve is Utils, Structs {
             Escrow(_escrows[i]).updateReserve(_newReserve);
         }
     }
+
+    function updateEscrowNativeTokenPrice(address _escrowAddress, decimal _newPrice) public requireOwner("update escrow native token price") {
+        Escrow escrow = Escrow(_escrowAddress);
+        escrow.updateNativeTokenPrice(_newPrice);
+    }
 }
