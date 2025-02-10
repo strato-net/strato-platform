@@ -30,7 +30,7 @@ abstract contract Reserve is Utils, Structs {
 
     decimal public usdstPrice;
 
-    decimal public stratsPrice;
+    decimal public stratstoUSDSTFactor;
 
     decimal public lastUpdatedOraclePrice = 0;
 
@@ -43,7 +43,7 @@ abstract contract Reserve is Utils, Structs {
     event MintedUSDST(address indexed user, string commonName, uint amount);
     event BurnedUSDST(address indexed user, string commonName, uint amount);
 
-    constructor(address _assetOracle, string _name, address _assetRootAddress, decimal _unitConversionRate, address _usdstToken, decimal _usdstPrice, decimal _stratsPrice) {
+    constructor(address _assetOracle, string _name, address _assetRootAddress, decimal _unitConversionRate, address _usdstToken, decimal _usdstPrice, decimal _stratstoUSDSTFactor) {
         oracle = OracleService(_assetOracle);
         owner = msg.sender;
         name = _name;
@@ -55,7 +55,7 @@ abstract contract Reserve is Utils, Structs {
         lastUpdatedOraclePrice = oraclePrice;
         MinterAuthorization(usdstToken).addReserveAsMinter();
         usdstPrice = _usdstPrice; //1000000000000000000.0000
-        stratsPrice = _stratsPrice; //100000000000000.0000
+        stratstoUSDSTFactor = _stratstoUSDSTFactor; //100000000000000.0000
     }
 
     modifier requireActive() {
@@ -93,7 +93,7 @@ abstract contract Reserve is Utils, Structs {
                 }
             }
             catch {
-                escrow.updateOnPriceChange(oraclePrice * stratsPrice, loanToValueRatio, liquidationRatio);
+                escrow.updateOnPriceChange(oraclePrice * stratstoUSDSTFactor, loanToValueRatio, liquidationRatio);
             }
             
             //get cata reward from escrow
@@ -158,7 +158,7 @@ abstract contract Reserve is Utils, Structs {
                     escrow.attachAssets(
                         _assets,
                         _collateralQuantity,
-                        (_oraclePrice * stratsPrice),
+                        (_oraclePrice * stratstoUSDSTFactor),
                         loanToValueRatio,
                         liquidationRatio
                     );
@@ -289,7 +289,7 @@ abstract contract Reserve is Utils, Structs {
             }
         }
         catch {
-            escrow.unlockAssets(_quantity, (_oraclePrice * stratsPrice), loanToValueRatio, liquidationRatio);
+            escrow.unlockAssets(_quantity, (_oraclePrice * stratstoUSDSTFactor), loanToValueRatio, liquidationRatio);
         }
 
 
@@ -327,14 +327,26 @@ abstract contract Reserve is Utils, Structs {
                 string version = escrow.version();
             }
             catch{
-                uint currentBorrowedAmount = escrow.borrowedAmount();
-                uint newBorrowedAmount = currentBorrowedAmount * uint(stratsPrice);
-                uint diff = newBorrowedAmount - currentBorrowedAmount;
-                escrow.updateBorrowedAmount(diff, true);
-
                 (decimal _oraclePrice, uint _priceTimestamp) = oracle.getLatestPrice();
                 _oraclePrice = _oraclePrice / unitConversionRate;
-                escrow.updateOnPriceChange((_oraclePrice * usdstPrice), loanToValueRatio, liquidationRatio);    
+                escrow.updateOnPriceChange((_oraclePrice * stratstoUSDSTFactor), loanToValueRatio, liquidationRatio);    
+            }
+        }
+    }
+
+    //Called by New Reserve
+    function updateOldEscrowBorrowData(address[] _escrows) external requireOwner("migrate the Reserve") {
+        for (uint i = 0; i < _escrows.length; i++) {
+            Escrow escrow = Escrow(_escrows[i]);
+
+            try{
+                string version = escrow.version();
+            }
+            catch{
+                uint currentBorrowedAmount = escrow.borrowedAmount();
+                uint newBorrowedAmount = currentBorrowedAmount * uint(stratstoUSDSTFactor);
+                uint diff = newBorrowedAmount - currentBorrowedAmount;
+                escrow.updateBorrowedAmount(diff, true);
             }
         }
     }
@@ -343,8 +355,8 @@ abstract contract Reserve is Utils, Structs {
         usdstPrice = _newUSDSTPrice;
     }
 
-    function updateSTRATSPrice(decimal _newSTRATSPrice) external requireOwner("update STRATS price"){
-        stratsPrice = _newSTRATSPrice;
+    function updatestratstoUSDSTFactor(decimal _newstratstoUSDSTFactor) external requireOwner("update STRATS price"){
+        stratstoUSDSTFactor = _newstratstoUSDSTFactor;
     }
 
 }
