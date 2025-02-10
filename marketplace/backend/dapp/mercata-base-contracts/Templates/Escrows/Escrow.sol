@@ -18,7 +18,6 @@ abstract contract Escrow is Utils {
 
     address public borrower;
     string public borrowerCommonName;
-    decimal public usdstPrice;
     address public assetRootAddress;
     Asset[] public assets;
 
