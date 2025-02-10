@@ -81,9 +81,9 @@ abstract contract Reserve is Utils, Structs {
             uint lastRewardTimestamp = escrow.lastRewardTimestamp();
             uint delta = block.timestamp - lastRewardTimestamp;
             try {
-                if (escrow.nativeTokenPrice()){
+                if (escrow.version()){
                     escrow.updateOnPriceChange(
-                        oraclePrice,
+                        oraclePrice * usdtPrice,
                         loanToValueRatio,
                         liquidationRatio
                     );
