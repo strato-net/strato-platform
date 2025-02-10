@@ -42,6 +42,8 @@ const RepayModal = ({
   const [repayAmount, setRepayAmount] = useState(new BigNumber(0)); // outstanding loan amount (in tokens)
   const [repayValue, setRepayValue] = useState(new BigNumber(0)); // amount the user wants to repay (in tokens)
   const [disableButton, setDisableButton] = useState(false);
+  // Flag to set initial values only once per modal open.
+  const [initialized, setInitialized] = useState(false);
 
   // Determine escrow addresses.
   const escrows = inventory?.inventories
@@ -57,7 +59,7 @@ const RepayModal = ({
     : [];
 
   useEffect(() => {
-    if (inventory && USDST) {
+    if (inventory && USDST && !initialized && open) {
       // Use BigNumber throughout for precision.
       const uniqueEscrowsPrime = new Set();
       const totalCollateralQuantity = inventory?.inventories
@@ -113,9 +115,17 @@ const RepayModal = ({
       } else {
         setRepayValue(borrowedAmount);
       }
+      setInitialized(true);
       setDisableButton(USDSTBalance.lte(0));
     }
-  }, [USDST, inventory]);
+  }, [open, initialized, USDST, inventory]);
+
+  // Reset initialization flag when modal closes.
+  useEffect(() => {
+    if (!open) {
+      setInitialized(false);
+    }
+  }, [open]);
 
   useEffect(() => {
     marketplaceActions.fetchUSDSTBalance(marketplaceDispatch);
