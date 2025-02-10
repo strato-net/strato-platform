@@ -189,15 +189,9 @@ abstract contract Reserve is Utils, Structs {
         require(_usdstAssetAddresses.length > 0, "Pass at least one USDST token address");
         Escrow escrow = Escrow(_escrowAddress);
         uint usdstAmountOwed = escrow.borrowedAmount();
-        uint usdstAmountNet = usdstAmountOwed;
-        uint usdstQuantity = 0;
-        uint transferNumber = 0;
-        uint transferAmount = 0;
 
         uint usdstAmountRepaid = burnUSDST(_usdstAssetAddresses, usdstAmountOwed, escrow.borrowerCommonName());
-
-        // require(usdstAmountNet == 0, "Your USDST balance is not high enough to cover the repayment."); // Allow partial repayments
-
+        
         // Clear loan
         escrow.updateBorrowedAmount(usdstAmountRepaid, false); //change
 
