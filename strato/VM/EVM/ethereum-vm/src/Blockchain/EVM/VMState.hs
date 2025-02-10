@@ -19,7 +19,7 @@ where
 import Blockchain.Data.Log
 import Blockchain.EVM.Environment
 import qualified Blockchain.EVM.MutableStack as MS
-import Blockchain.Strato.Model.Account
+import Blockchain.Strato.Model.Address
 import Blockchain.Strato.Model.Class
 import Blockchain.Strato.Model.ExtendedWord
 import Blockchain.Strato.Model.Gas
@@ -64,7 +64,7 @@ newMemory = do
 
 data DebugCallCreate = DebugCallCreate
   { ccData :: B.ByteString,
-    ccDestination :: Maybe Account,
+    ccDestination :: Maybe Address,
     ccGasLimit :: Gas,
     ccValue :: Integer
   }
@@ -80,7 +80,7 @@ data VMState = VMState
     stack :: MS.MutableStack Word256,
     callDepth :: Int,
     refund :: Counter,
-    suicideList :: S.Set Account,
+    suicideList :: S.Set Address,
     done :: Bool,
     returnVal :: Maybe B.ByteString,
     theTrace :: [String],
@@ -116,7 +116,6 @@ startingAction Environment {..} =
       _blockTimestamp = blockHeaderTimestamp envBlockHeader,
       _blockNumber = blockHeaderBlockNumber envBlockHeader,
       _transactionHash = envTxHash,
-      _transactionChainId = envChainId,
       _transactionSender = envSender,
       _actionData = OMap.empty,
       _metadata = envMetadata,

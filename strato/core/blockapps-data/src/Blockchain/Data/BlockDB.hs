@@ -21,7 +21,7 @@ import Blockchain.Data.DataDefs
 import Blockchain.Data.TXOrigin
 import Blockchain.Data.Transaction
 import Blockchain.Strato.Model.Address
-import Blockchain.Strato.Model.ChainMember hiding (commonName)
+import Blockchain.Strato.Model.ChainMember
 import Blockchain.Strato.Model.Class
 import Blockchain.Strato.Model.ExtendedWord
 import Blockchain.Strato.Model.Keccak256

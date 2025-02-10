@@ -79,10 +79,8 @@ AddressStateRef
     codeHash Keccak256 Maybe
     contractName String Maybe
     codePtrAddress Address Maybe
-    codePtrChainId Word256 Maybe
-    chainId Word256 default='0000000000000000000000000000000000000000000000000000000000000000'
     latestBlockDataRefNumber Integer
-    UniqueAddress address chainId
+    UniqueAddress address
     deriving Eq Read Show
 
 CodeRef
@@ -128,14 +126,13 @@ TransactionResult json
     trace String
     gasUsed Word256
     etherUsed Word256
-    contractsCreated String
-    contractsDeleted String
+    contractsCreated [Address]
+    contractsDeleted [Address]
     stateDiff String
     time Double
     newStorage String
     deletedStorage String
     status TransactionResultStatus Maybe
-    chainId Word256 Maybe
     kind CodeKind Maybe
     creator String
     appName String
@@ -160,7 +157,6 @@ Extra
 LogDB
     blockHash Keccak256
     transactionHash Keccak256
-    chainId Word256 Maybe
     address Address
     topic1 Word256 Maybe
     topic2 Word256 Maybe
@@ -172,35 +168,12 @@ LogDB
 
 EventDB
     blockHash Keccak256
-    contractAddress Account
-    chainId Word256 Maybe
+    contractAddress Address
     name String
     args [String]
     deriving Eq Read Show Generic
 
-ChainInfoRef
-    chainId Word256
-    chainLabel String
-    creationBlock Keccak256
-    chainNonce Word256
-    r Integer
-    s Integer
-    v Word8
-    deriving Eq Generic Show
-
-ParentChainRef
-    chainInfoId ChainInfoRefId
-    refName     String
-    refChainId  Word256
-    deriving Eq Generic Show
-
-ChainMemberParsedRef
-    chainInfoId ChainInfoRefId
-    chainMember ChainMemberParsedSet
-    deriving Eq Generic Show
-
 AccountInfoRef
-    chainInfoId ChainInfoRefId
     address Address
     balance Integer
     codeHash CodePtr Maybe
@@ -208,15 +181,7 @@ AccountInfoRef
     deriving Eq Generic Show
 
 CodeInfoRef
-    chainInfoId ChainInfoRefId
     evmByteCode BS.ByteString
     contractCode String
     contractName String Maybe
     deriving Eq Generic Show
-
-ChainMetadataRef
-    chainInfoId ChainInfoRefId
-    key String
-    value String
-    deriving Eq Generic Show
-

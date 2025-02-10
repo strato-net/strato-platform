@@ -8,13 +8,47 @@
 {-# LANGUAGE RankNTypes #-}
 {-# OPTIONS_GHC -fno-warn-orphans #-}
 
-module Blockchain.Stream.Action where
+module Blockchain.Stream.Action (
+  Action(..),
+  blockHash,
+  blockTimestamp,
+  blockNumber,
+  transactionHash,
+  transactionSender,
+  actionData,
+  metadata,
+  events,
+  delegatecalls,
 
--- import qualified Data.HashMap.Strict          as HM
+  ActionData(..),
+  actionDataCodeHash,
+  actionDataCodeCollection,
+  actionDataCreator,
+  actionDataCCCreator,
+  actionDataRoot,
+  actionDataApplication,
+  actionDataCodeKind,
+  actionDataStorageDiffs,
+  actionDataAbstracts,
+  actionDataMappings,
+  actionDataArrays,
+  actionDataCallTypes,
+  
+  CallType(..),
+  DataDiff(..),
+  Delegatecall(..),
+
+  omapAdjust,
+  omapInsertWith,
+  omapLens,
+  omapMap,
+  omapUnionWith,
+  mergeActionData
+
+  ) where
 
 import Blockchain.MiscJSON ()
 import Blockchain.SolidVM.Model
-import Blockchain.Strato.Model.Account
 import Blockchain.Strato.Model.Address
 import Blockchain.Strato.Model.CodePtr
 import Blockchain.Strato.Model.Event
@@ -65,8 +99,8 @@ instance FromJSON CallType
 
 data CallData = CallData
   { _callDataType :: CallType,
-    _callDataSender :: Account,
-    _callDataOwner :: Account,
+    _callDataSender :: Address,
+    _callDataOwner :: Address,
     _callDataGasPrice :: Integer,
     _callDataValue :: Integer,
     _callDataInput :: BSS.ShortByteString,
@@ -74,8 +108,8 @@ data CallData = CallData
   }
   deriving (Eq, Show, Generic, NFData)
 
-makeLenses ''CallData
-
+--makeLenses ''CallData
+{-
 instance Format CallData where
   format CallData {..} =
     "callDataType: " ++ show _callDataType ++ "\n"
@@ -121,19 +155,20 @@ instance FromJSON CallData where
       <*> (o .: "input")
       <*> (o .:? "output")
   parseJSON o = fail $ "parseJSON CallData: Expected object, got: " ++ show o
-
+-}
+{-
 emptyCallData :: CallData
 emptyCallData =
   CallData
     { _callDataType = Create,
-      _callDataSender = Account (Address 0) Nothing,
-      _callDataOwner = Account (Address 0) Nothing,
+      _callDataSender = Address 0,
+      _callDataOwner = Address 0,
       _callDataGasPrice = 0,
       _callDataValue = 0,
       _callDataInput = BSS.empty,
       _callDataOutput = Nothing
     }
-
+-}
 omapLens :: (Ord k) => k -> Lens' (OMap.OMap k v) (Maybe v)
 omapLens k = lens getter setter
   where
@@ -230,7 +265,7 @@ data ActionData = ActionData
     _actionDataApplication :: Text,
     _actionDataCodeKind :: CodeKind,
     _actionDataStorageDiffs :: DataDiff,
-    _actionDataAbstracts :: Map (Account, Text) (Text, Text, [Text]), -- (import address, contract name) -> (cn, app)
+    _actionDataAbstracts :: Map (Address, Text) (Text, Text, [Text]), -- (import address, contract name) -> (cn, app)
     _actionDataMappings :: [Text],
     _actionDataArrays :: [Text],
     _actionDataCallTypes :: [CallType]
@@ -319,20 +354,20 @@ instance FromJSON ActionData where
   parseJSON o = fail $ "parseJSON ActionData: Expected object, got: " ++ show o
 
 data Delegatecall = Delegatecall
-  { _delegatecallStorageAccount :: Account,
-    _delegatecallCodeAccount :: Account,
+  { _delegatecallStorageAddress :: Address,
+    _delegatecallCodeAddress :: Address,
     _delegatecallOrganization :: Text,
     _delegatecallApplication :: Text
   }
   deriving (Eq, Show, Generic, NFData)
 
-makeLenses ''Delegatecall
+--makeLenses ''Delegatecall
 
 instance Format Delegatecall where
   format Delegatecall {..} =
-    "delegatecallStorageAccount: " ++ format _delegatecallStorageAccount ++ "\n"
-      ++ "delegatecallCodeAccount: "
-      ++ format _delegatecallCodeAccount
+    "delegatecallStorageAddress: " ++ format _delegatecallStorageAddress ++ "\n"
+      ++ "delegatecallCodeAddress: "
+      ++ format _delegatecallCodeAddress
       ++ "\n"
       ++ "delegatecallOrganization: "
       ++ T.unpack _delegatecallOrganization
@@ -345,16 +380,16 @@ instance Binary Delegatecall
 instance ToJSON Delegatecall where
   toJSON Delegatecall {..} =
     object
-      [ "storageAccount" .= _delegatecallStorageAccount,
-        "codeAccount" .= _delegatecallCodeAccount,
+      [ "storageAddress" .= _delegatecallStorageAddress,
+        "codeAddress" .= _delegatecallCodeAddress,
         "organization" .= _delegatecallOrganization,
         "application" .= _delegatecallApplication
       ]
 
 instance FromJSON Delegatecall where
   parseJSON (Object o) = do
-    s <- o .: "storageAccount"
-    c <- o .: "codeAccount"
+    s <- o .: "storageAddress"
+    c <- o .: "codeAddress"
     r <- o .: "organization"
     a <- o .: "application"
     pure $ Delegatecall s c r a
@@ -365,9 +400,8 @@ data Action = Action
     _blockTimestamp :: UTCTime,
     _blockNumber :: Integer,
     _transactionHash :: Keccak256,
-    _transactionChainId :: Maybe Word256,
-    _transactionSender :: Account,
-    _actionData :: OMap.OMap Account ActionData,
+    _transactionSender :: Address,
+    _actionData :: OMap.OMap Address ActionData,
     _metadata :: Maybe (Map Text Text),
     _events :: S.Seq Event,
     _delegatecalls :: S.Seq Delegatecall
@@ -391,9 +425,6 @@ instance Format Action where
       ++ "\n"
       ++ "actionTransactionHash: "
       ++ format _transactionHash
-      ++ "\n"
-      ++ "actionTransactionChainId: "
-      ++ format _transactionChainId
       ++ "\n"
       ++ "actionTransactionSender: "
       ++ format _transactionSender
@@ -434,7 +465,6 @@ instance ToJSON Action where
         "blockTimestamp" .= _blockTimestamp,
         "blockNumber" .= _blockNumber,
         "transactionHash" .= _transactionHash,
-        "chainId" .= _transactionChainId,
         "sender" .= _transactionSender,
         "data" .= _actionData,
         "metadata" .= _metadata,
@@ -449,7 +479,6 @@ instance FromJSON Action where
       <*> (o .: "blockTimestamp")
       <*> (o .: "blockNumber")
       <*> (o .: "transactionHash")
-      <*> (o .:? "chainId")
       <*> (o .: "sender")
       <*> (o .: "data")
       <*> (o .: "metadata")
@@ -459,10 +488,10 @@ instance FromJSON Action where
 
 instance Arbitrary CallType where
   arbitrary = genericArbitrary
-
+{-
 instance Arbitrary CallData where
   arbitrary = genericArbitrary
-
+-}
 instance Arbitrary DataDiff where
   arbitrary = genericArbitrary
 
@@ -479,3 +508,4 @@ instance (Ord k, Arbitrary k, Arbitrary v) => Arbitrary (OMap.OMap k v) where
     arbitrary = do
         kvPairs <- listOf arbitrary -- Generate a list of key-value pairs
         return $ OMap.fromList kvPairs -- Convert list to OMap
+

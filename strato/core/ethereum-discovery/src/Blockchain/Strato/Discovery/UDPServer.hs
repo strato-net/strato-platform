@@ -19,6 +19,7 @@ where
 import BlockApps.Logging
 import Blockchain.Data.PubKey
 import Blockchain.Strato.Discovery.ContextLite
+import Blockchain.Strato.Discovery.Data.Host
 import Blockchain.Strato.Discovery.Data.Peer
 import Blockchain.Strato.Discovery.P2PUtil
 import Blockchain.Strato.Discovery.UDP
@@ -99,7 +100,7 @@ attemptBond = do
   unbondedPeers <- getUnbondedPeers
   when (length unbondedPeers /= 0) . forM_ unbondedPeers $ \p -> do
     time <- liftIO $ round `fmap` getPOSIXTime
-    mServerAddr <- A.select (A.Proxy @SockAddr) (Nothing :: Maybe IPAsText, udpPort)
+    mServerAddr <- A.select (A.Proxy @SockAddr) (Nothing :: Maybe Host, udpPort)
     forM_ mServerAddr \serverAddr ->
       case getHostAddress serverAddr of
         Left err -> $logErrorS "attemptBond" $ T.pack . show $ err
@@ -113,7 +114,7 @@ attemptBond = do
               4
               (Endpoint hostAddress udpPort tcpPort)
               ( Endpoint
-                  (stringToIAddr $ T.unpack $ pPeerIp p)
+                  (stringToIAddr $ hostToString $ pPeerHost p)
                   (UDPPort . fromIntegral $ pPeerUdpPort p)
                   (TCPPort . fromIntegral $ pPeerTcpPort p)
               )
@@ -153,20 +154,36 @@ handleValidPacket ::
   m ()
 handleValidPacket addr otherUdpPort packet otherPubKey = case packet of
   Ping _ ep@(Endpoint _ otherUdpPort' otherTcpPort) _ _ -> do
-    addPeer' otherUdpPort' otherTcpPort
     time <- liftIO $ round `fmap` getPOSIXTime
     mPeer <- getPeerByIP' ip
-    sendPacket (fromJust mPeer) $ Pong ep 4 (time + 50)
-    eErr' <- setPeerBondingState ip otherPubKey 2
+    peer <-
+      case mPeer of
+        Nothing -> do
+          addPeer' otherUdpPort' otherTcpPort
+          fmap fromJust $ getPeerByIP' ip
+        Just p' -> do
+          setPeerPubkey p' otherPubKey
+          return p'
+    sendPacket peer $ Pong ep 4 (time + 50)
+    eErr' <- setPeerBondingState (pPeerHost peer) otherPubKey 2
     whenLeft eErr' $ \err -> do
       $logErrorS "handleValidPacket" . T.pack $ "Unable to set peer bonding state: " ++ show err
       throwM err
   Pong {} -> do
-    addPeer' otherUdpPort (TCPPort 30303) -- to update pubkey if needed
-    thePeer <- getPeerByIP' ip
-    eErr <- resetPeerUdp $ fromJust thePeer
+    mPeer <- getPeerByIP' ip
+    peer <-
+      case mPeer of
+        Nothing -> do
+          addPeer' otherUdpPort (TCPPort 30303)
+          fmap fromJust $ getPeerByIP' ip
+        Just p' -> do
+          setPeerPubkey p' otherPubKey
+          return p'
+
+    setPeerPubkey peer otherPubKey
+    eErr <- resetPeerUdp peer
     whenLeft eErr $ \err -> $logErrorS "handleValidPacket/Pong" . T.pack $ "Unable to reset peer disable: " ++ show err
-    eErr' <- setPeerBondingState ip otherPubKey 2
+    eErr' <- setPeerBondingState (pPeerHost peer) otherPubKey 2
     whenLeft eErr' $ \err -> do
       $logErrorS "handleValidPacket" . T.pack $ "Unable to set peer bonding state: " ++ show err
       throwM err
@@ -176,7 +193,7 @@ handleValidPacket addr otherUdpPort packet otherPubKey = case packet of
     getPeerByIP' ip >>= \case 
       Nothing -> $logInfoS "handleValidPacket/FindNeighbors" "Ignoring FindNeigbors request from unknown peer"
       Just peer -> do 
-        A.select (A.Proxy @PeerBondingState) (IPAsText $ T.pack ip, otherPubKey) >>= \case 
+        A.select (A.Proxy @PeerBondingState) (pPeerHost peer, otherPubKey) >>= \case
           Just (PeerBondingState b) | b > 1 -> do
             peers <- getPeersClosestTo targetPubkey otherPubKey
             let theNeighbors = (\p -> Neighbor (mkEndpoint p) (mkNodeId p)) <$> peers
@@ -185,17 +202,17 @@ handleValidPacket addr otherUdpPort packet otherPubKey = case packet of
             $logInfoS "handleValidPacket/FindNeighbors" "Recieved FindNeighbors request from a peer we are not bonded to; will attempt to bond first"
             udpPort <- Mod.access (Mod.Proxy @UDPPort)
             tcpPort <- Mod.access (Mod.Proxy @TCPPort)
-            mServerAddr <- A.select (A.Proxy @SockAddr) (Nothing :: Maybe IPAsText, udpPort)
+            mServerAddr <- A.select (A.Proxy @SockAddr) (Nothing :: Maybe Host, udpPort)
             case getHostAddress <$> mServerAddr of 
               Just (Right hostAddress) -> sendPacket (peer) $ Ping 4 (Endpoint hostAddress udpPort tcpPort) (mkEndpoint peer) nextTime
               _ -> $logErrorS "handleValidPacket/FindNeighbors" "Attempted to bond to peer but failed"
     where
-      mkEndpoint PPeer {..} = Endpoint (stringToIAddr $ T.unpack pPeerIp) (UDPPort pPeerUdpPort) (TCPPort pPeerTcpPort)
+      mkEndpoint PPeer {..} = Endpoint (stringToIAddr $ hostToString pPeerHost) (UDPPort pPeerUdpPort) (TCPPort pPeerTcpPort)
       mkNodeId = pointToNodeID . fromJust . pPeerPubkey
   Neighbors neighbors _ -> do
     let neighborIPs = ((\(Neighbor (Endpoint addr' _ _) _) -> format addr') <$> neighbors)
     thePeer <- getPeerByIP' ip
-    neighborsExist <- doPeersExist neighborIPs
+    neighborsExist <- doPeersExist $ map read neighborIPs
     if (neighborsExist == True)
       then do
         $logInfoS "handleValidPacket/Neighbors" . T.pack $ "Got duplicate neighbors from " ++ show addr ++ ", lengthening peer UDP disable." ++ "\n"
@@ -210,7 +227,8 @@ handleValidPacket addr otherUdpPort packet otherPubKey = case packet of
           let peer =
                 PPeer
                   { pPeerPubkey = Just $ nodeIDToPoint nodeID,
-                    pPeerIp = T.pack $ format addr',
+                    pPeerHost = Host $ T.pack $ format addr',
+                    pPeerIp = Nothing,
                     pPeerUdpPort = udpPort,
                     pPeerTcpPort = tcpPort,
                     pPeerNumSessions = 0,
@@ -232,13 +250,14 @@ handleValidPacket addr otherUdpPort packet otherPubKey = case packet of
         eErr <- resetPeerUdp $ fromJust thePeer
         whenLeft eErr $ \err -> $logErrorS "handleValidPacket/Neighbors" . T.pack $ "Unable to reset peer disable: " ++ show err
   where
-    ip = sockAddrToIP addr
+    ip = addressIP addr
     addPeer' (UDPPort peerUdpPort) (TCPPort peerTcpPort) = do
       curTime <- liftIO getCurrentTime
       let peer =
             PPeer
               { pPeerPubkey = Just otherPubKey,
-                pPeerIp = T.pack ip,
+                pPeerHost = Host $ T.pack $ show ip,
+                pPeerIp = Just ip,
                 pPeerUdpPort = fromIntegral peerUdpPort,
                 pPeerTcpPort = fromIntegral peerTcpPort,
                 pPeerNumSessions = 0,

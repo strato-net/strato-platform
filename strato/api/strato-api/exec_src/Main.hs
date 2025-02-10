@@ -18,7 +18,6 @@ import Bloc.API
 import Bloc.Database.Queries
 import Bloc.Monad
 import Bloc.Server
-import Bloc.Server.Utils (toMaybe)
 import BlockApps.Init
 import BlockApps.Logging
 import Blockchain.DB.CodeDB
@@ -27,7 +26,6 @@ import Blockchain.Data.AddressStateRef
 import Blockchain.Data.CirrusDefs
 import Blockchain.Data.DataDefs
 import Blockchain.Data.Json
-import Blockchain.Strato.Model.Account
 import Blockchain.Strato.Model.Address
 import Blockchain.Strato.Model.ChainId
 import Blockchain.Strato.Model.Keccak256
@@ -88,19 +86,18 @@ import Text.Tools
 import UnliftIO hiding (Handler)
 import Prelude hiding (lookup)
 
-instance {-# OVERLAPPING #-} MonadUnliftIO m => Selectable Account Contract (SQLM m) where
+instance {-# OVERLAPPING #-} MonadUnliftIO m => Selectable Address Contract (SQLM m) where
   select _ a = runMaybeT $ do
     (AddressStateRef' r _) <-
       MaybeT
         . fmap listToMaybe
         . Account.getAccount'
         $ Account.accountsFilterParams
-          & Account.qaAddress ?~ (a ^. accountAddress)
-          & Account.qaChainId .~ (fmap ChainId . maybeToList $ a ^. accountChainId)
+          & Account.qaAddress ?~ a
     codePtr <- MaybeT . pure $ addressStateRefCodePtr r
     MaybeT $ either (const Nothing) (Just . snd) <$> getContractDetailsByCodeHash codePtr
 
-instance Selectable Account Contract m => Selectable Account Contract (ReaderT a m) where
+instance Selectable Address Contract m => Selectable Address Contract (ReaderT a m) where
   select p = lift . select p
 
 instance {-# OVERLAPPING #-} MonadUnliftIO m => (Keccak256 `Selectable` SourceMap) (SQLM m) where
@@ -119,15 +116,15 @@ instance (Keccak256 `Alters` DBCode) m => (Keccak256 `Alters` DBCode) (ReaderT a
   insert p k = lift . insert p k
   delete p = lift . delete p
 
-instance {-# OVERLAPPING #-} MonadUnliftIO m => Selectable Account AddressState (SQLM m) where
+instance {-# OVERLAPPING #-} MonadUnliftIO m => Selectable Address AddressState (SQLM m) where
   select _ a = runMaybeT $ do
     (AddressStateRef' r _) <-
       MaybeT
         . fmap listToMaybe
         . Account.getAccount'
         $ Account.accountsFilterParams
-          & Account.qaAddress ?~ (a ^. accountAddress)
-          & Account.qaChainId .~ (fmap ChainId . maybeToList $ a ^. accountChainId)
+          & Account.qaAddress ?~ a
+          & Account.qaChainId .~ (fmap ChainId . maybeToList $ Nothing)
     codePtr <- MaybeT . pure $ addressStateRefCodePtr r
     pure $
       AddressState
@@ -135,9 +132,9 @@ instance {-# OVERLAPPING #-} MonadUnliftIO m => Selectable Account AddressState 
         (addressStateRefBalance r)
         (addressStateRefContractRoot r)
         codePtr
-        (toMaybe 0 $ addressStateRefChainId r)
+        (Just 0)
 
-instance Selectable Account AddressState m => Selectable Account AddressState (ReaderT a m) where
+instance Selectable Address AddressState m => Selectable Address AddressState (ReaderT a m) where
   select p = lift . select p
 
 instance {-# OVERLAPPING #-} MonadUnliftIO m => Selectable Address Certificate (CirrusM m) where
@@ -200,8 +197,8 @@ fullServer ::
     HasIdentity m,
     HasVault m,
     Accessible Metadata.UrlMap m,
-    Selectable Account Contract m,
-    Selectable Account AddressState m,
+    Selectable Address Contract m,
+    Selectable Address AddressState m,
     Selectable Address Certificate m,
     HasCodeDB m,
     Selectable Keccak256 SourceMap m

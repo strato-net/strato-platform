@@ -16,7 +16,6 @@ defineFlag "q:txdedupwindow" (2000 :: Int) "Transaction window to deduplicate an
 -- leveldb related flags
 defineFlag "b:depblockdbpath" (dbDir "h" ++ sequencerDependentBlockDBPath) "Where to store/load the dependent block db"
 defineFlag "c:depblockcachesize" (0 :: Int) "Cache size of LevelDB for dependent blocks db (in bytes, 0 = 8MB)"
-defineFlag "s:syncwrites" False "Whether or not to sync() all dependent block DB writes"
 
 -- kafka-related flags
 defineFlag "k:kafkaclientid" defaultKafkaClientId' "KafkaClientId (for runKafkaConfigured)"
@@ -52,7 +51,6 @@ exportFlagsAsMetrics = do
   set "txdedupwindow" $ show flags_txdedupwindow
   set "depblockdbpath" flags_depblockdbpath
   set "depblockdbcachesize" $ show flags_depblockcachesize
-  set "syncwrites" $ show flags_syncwrites
   set "kafkaclientid" $ show flags_kafkaclientid
   set "kafkaaddress" flags_kafkaaddress
   set "blockstanbul" $ show flags_blockstanbul

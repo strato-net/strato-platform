@@ -38,11 +38,9 @@ import Database.Persist.Postgresql
 import GHC.Generics
 import MaybeNamed
 import Numeric.Natural
-import SQLM
 import Servant
 import Servant.Client
 import Settings
-import UnliftIO
 
 type API =
   "storage" :> QueryParam "key" HexStorage
@@ -130,30 +128,12 @@ storage2StorageAddress stor addr = (StorageAddress (storageKey stor) (storageVal
 
 instance HasSQL m => Selectable StorageFilterParams [StorageAddress] m where
   select _ StorageFilterParams {..} = do
-    chainids <-
-      case (qsChainId, qsChainIds) of
-        (Nothing, v) -> case v of
-          [] -> pure MainChain
-          cids -> pure $ UnnamedChainIds cids
-        (Just c, []) -> case c of
-          Unnamed cid -> pure $ UnnamedChainIds [cid]
-          Named "main" -> pure MainChain
-          Named "all" -> pure AllChains
-          Named name -> throwIO . NamedChainError $ "Expected chainid to be named 'main' or 'all', but got '" <> name <> "'."
-        _ -> throwIO $ AmbiguousChainError "You can not use both the chainid and chainids parameters togther."
-
     addrs <- fmap (map (entityVal *** E.unValue)) . sqlQuery $
       E.select . E.distinct $
         E.from $ \(storage `E.InnerJoin` addrStRef) -> do
-          let matchChainId (ChainId cid) = ((addrStRef E.^. AddressStateRefChainId) E.==. (E.val cid))
-              chainCriteria = case chainids of
-                MainChain -> [addrStRef E.^. AddressStateRefChainId E.==. E.val 0]
-                UnnamedChainIds cids -> matchChainId <$> cids
-                AllChains -> [E.val True]
-
           let criteria = (storage E.^. StorageAddressStateRefId E.==. addrStRef E.^. AddressStateRefId)
 
-          E.on (foldl1 (E.||.) $ map (criteria E.&&.) chainCriteria)
+          E.on criteria
 
           let criteria2 =
                 catMaybes
@@ -177,11 +157,6 @@ instance HasSQL m => Selectable StorageFilterParams [StorageAddress] m where
           return (storage, addrStRef E.^. AddressStateRefAddress)
 
     pure . Just $ uncurry storage2StorageAddress <$> addrs
-
-data NamedChainId
-  = UnnamedChainIds [ChainId]
-  | MainChain
-  | AllChains
 
 getStorage ::
   Selectable StorageFilterParams [StorageAddress] m =>

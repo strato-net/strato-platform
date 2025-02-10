@@ -9,7 +9,6 @@ module Blockchain.GenesisBlockSetup
   )
 where
 
-import Blockchain.Data.ChainInfo
 import Blockchain.Data.GenesisInfo
 import Blockchain.Strato.Model.Address
 import Blockchain.Strato.Model.Secp256k1

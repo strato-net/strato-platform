@@ -12,8 +12,7 @@ import Blockchain.Data.BlockSummary
 import Blockchain.Data.RLP
 import Blockchain.Data.Transaction
 import Blockchain.Sequencer.Event
-import Blockchain.Strato.Model.Account
-import Blockchain.Strato.Model.Class
+import Blockchain.Strato.Model.Address
 import Blockchain.Strato.Model.Keccak256
 import Blockchain.Event 
 import qualified Control.Monad.Change.Alter as A
@@ -55,8 +54,8 @@ checkValidity parentBSum b = do
   let blockNumberVerified = checkParentChildValidity b parentBSum
   return $ catMaybes [ommersVerified, blockNumberVerified]
 
-isNonceValid :: (Account `A.Alters` AddressState) f => OutputTx -> f Bool
+isNonceValid :: (Address `A.Alters` AddressState) f => OutputTx -> f Bool
 isNonceValid ot@OutputTx {otSigner = txAddr} =
   let base = fromMaybe (otBaseTx ot) (otPrivatePayload ot)
       tNonce = transactionNonce base
-   in (== tNonce) . addressStateNonce <$> A.lookupWithDefault A.Proxy (Account txAddr (txChainId base))
+   in (== tNonce) . addressStateNonce <$> A.lookupWithDefault A.Proxy txAddr

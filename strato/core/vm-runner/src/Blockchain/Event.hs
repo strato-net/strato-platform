@@ -25,16 +25,13 @@ import BlockApps.X509.Certificate
 import Blockchain.Blockstanbul (PreprepareDecision(..))
 import Blockchain.DB.MemAddressStateDB
 import Blockchain.Data.Block (Block(..))
-import Blockchain.Data.ChainInfo
 import Blockchain.Data.DataDefs
 import Blockchain.Data.ExecResults
 import Blockchain.Database.MerklePatricia.NodeData (NodeData)
 import Blockchain.Data.TXOrigin
 import Blockchain.Sequencer.Event
 import Blockchain.Strato.Indexer.Model (IndexEvent (..))
-import Blockchain.Strato.Model.Account
 import Blockchain.Strato.Model.Class (DummyCertRevocation(..))
-import Blockchain.Strato.Model.ExtendedWord
 import Blockchain.Strato.Model.Keccak256
 import Blockchain.Strato.Model.StateRoot
 import Blockchain.Strato.Model.Validator
@@ -44,7 +41,6 @@ import Blockchain.Stream.Action (Action)
 import qualified Data.ByteString as B
 import qualified Data.DList as DL
 import Data.Map (Map)
-import Data.Text (Text)
 
 type VmInEvent = VmEvent
 
@@ -52,7 +48,7 @@ data VmInEventBatch = InBatch
   { rpcCommands :: [JsonRpcCommand],
     txPairs :: [(Timestamp, OutputTx)],
     tLen :: {-# UNPACK #-} !Int,
-    blocksAndNewChains :: [Either OutputGenesis OutputBlock],
+    blocks :: [OutputBlock],
     bLen :: {-# UNPACK #-} !Int,
     createBlock :: !Bool,
     privateTxs :: [OutputTx],
@@ -67,12 +63,10 @@ newInBatch = InBatch [] [] 0 [] 0 False [] [] [] Nothing Nothing
 
 insertInBatch :: VmInEvent -> VmInEventBatch -> VmInEventBatch
 insertInBatch e b = case e of
-  VmGenesis og -> b {blocksAndNewChains = (Left og) : blocksAndNewChains b}
   VmJsonRpcCommand j -> b {rpcCommands = j : rpcCommands b}
   VmTx ts t -> b {txPairs = (ts, t) : txPairs b, tLen = tLen b + 1}
-  VmBlock ob -> b {blocksAndNewChains = (Right ob) : blocksAndNewChains b, bLen = bLen b + 1}
+  VmBlock ob -> b {blocks = ob : blocks b, bLen = bLen b + 1}
   VmCreateBlockCommand -> b {createBlock = True}
-  VmPrivateTx otx -> b {privateTxs = otx : privateTxs b}
   VmGetMPNodesRequest o srs -> b {mpNodesReqs = (o, srs) : mpNodesReqs b}
   VmMPNodesReceived nds -> b {mpNodesResps = nds : mpNodesResps b}
   VmRunPreprepare b' -> b {preprepareBlock = Just b'}
@@ -103,12 +97,11 @@ data VmOutEvent
   = OutAction Action
   | OutBlock OutputBlock
   | OutIndexEvent IndexEvent
-  | OutToStateDiff Word256 ChainInfo Keccak256 Text Text
   | OutStateDiff StateDiff
   | OutLog LogDB
   | OutEvent [EventDB]
   | OutTXR TransactionResult
-  | OutASM (Map Account AddressStateModification)
+  | OutASM (Map Address AddressStateModification)
   | OutJSONRPC String B.ByteString
   | OutBlockVerificationFailure [BlockVerificationFailure]
   | OutGetMPNodes [StateRoot]
@@ -120,12 +113,11 @@ data VmOutEventBatch = OutBatch
     outExecResults :: DL.DList ExecResults,
     outBlocks :: DL.DList OutputBlock,
     outIndexEvents :: DL.DList IndexEvent,
-    outToStateDiffs :: DL.DList (Word256, ChainInfo, Keccak256, Text, Text),
     outStateDiffs :: DL.DList StateDiff,
     outLogs :: DL.DList LogDB,
     outEvents :: DL.DList EventDB,
     outTXRs :: DL.DList TransactionResult,
-    outASMs :: DL.DList (Map Account AddressStateModification),
+    outASMs :: DL.DList (Map Address AddressStateModification),
     outJSONRPCs :: DL.DList (String, B.ByteString),
     outBlockVerificationFailure :: [BlockVerificationFailure],
     outGetMPNodes :: DL.DList [StateRoot],
@@ -146,7 +138,6 @@ newOutBatch =
     DL.empty
     DL.empty
     DL.empty
-    DL.empty
     []
     DL.empty
     DL.empty
@@ -157,7 +148,6 @@ insertOutBatch e b = case e of
   OutAction a -> b {outActions = outActions b `DL.snoc` a}
   OutBlock a -> b {outBlocks = outBlocks b `DL.snoc` a}
   OutIndexEvent a -> b {outIndexEvents = outIndexEvents b `DL.snoc` a}
-  OutToStateDiff v w x y z -> b {outToStateDiffs = outToStateDiffs b `DL.snoc` (v, w, x, y, z)}
   OutStateDiff a -> b {outStateDiffs = outStateDiffs b `DL.snoc` a}
   OutLog a -> b {outLogs = outLogs b `DL.snoc` a}
   OutEvent a -> b {outEvents = outEvents b `DL.append` DL.fromList a}

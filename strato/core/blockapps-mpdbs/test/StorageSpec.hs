@@ -20,7 +20,6 @@ import Blockchain.DB.RawStorageDB
 import Blockchain.DB.SolidStorageDB
 import Blockchain.DB.StorageDB
 import Blockchain.Data.AddressStateDB
-import Blockchain.Data.ChainInfo
 import qualified Blockchain.Database.MerklePatricia as MP
 import Blockchain.Strato.Model.Account
 import Blockchain.Strato.Model.Address
@@ -45,9 +44,9 @@ import Test.Hspec.Expectations.Lifted
 import UnliftIO.Exception
 import Prelude hiding (abs, lookup)
 
-type SMap = M.Map (Account, B.ByteString) B.ByteString
+type SMap = M.Map (Address, B.ByteString) B.ByteString
 
-type AMap = M.Map Account AddressStateModification
+type AMap = M.Map Address AddressStateModification
 
 data CachedStorage = CS
   { _sdb :: DB.DB,
@@ -56,22 +55,13 @@ data CachedStorage = CS
     _sbs :: SMap,
     _atx :: AMap,
     _abs :: AMap,
-    _srm :: M.Map (Maybe Word256) MP.StateRoot,
-    _parentChainMap :: M.Map Word256 ParentChainIds
+    _srm :: M.Map (Maybe Word256) MP.StateRoot
   }
   deriving (Generic)
 
 makeLenses ''CachedStorage
 
 type StorM = StateT CachedStorage (ResourceT (LoggingT IO))
-
-instance (Word256 `Alters` ParentChainIds) StorM where
-  lookup _ k = use $ parentChainMap . at k
-  insert _ k v = parentChainMap . at k ?= v
-  delete _ k = parentChainMap . at k .= Nothing
-
-instance Selectable Word256 ParentChainIds StorM where
-  select = lookup
 
 instance HasMemRawStorageDB StorM where
   getMemRawStorageTxDB = use stx
@@ -85,12 +75,12 @@ instance HasMemAddressStateDB StorM where
   getAddressStateBlockDBMap = use abs
   putAddressStateBlockDBMap = assign abs
 
-instance (Account `Alters` AddressState) StorM where
+instance (Address `Alters` AddressState) StorM where
   lookup _ = getAddressStateMaybe
   insert _ = putAddressState
   delete _ = deleteAddressState
 
-instance Selectable Account AddressState StorM where
+instance Selectable Address AddressState StorM where
   select _ = getAddressStateMaybe
 
 instance (MP.StateRoot `Alters` MP.NodeData) StorM where
@@ -121,7 +111,7 @@ initialEnv = do
       openDB b = DBB.open (tmpdir ++ b) ldbOptions
   s <- openDB "/state/"
   h <- HashDB <$> openDB "/hash/"
-  let st = CS s h M.empty M.empty M.empty M.empty M.empty M.empty
+  let st = CS s h M.empty M.empty M.empty M.empty M.empty
   fmap (tmpdir,) . runLoggingTWithLevel LevelError . runResourceT $ execStateT MP.initializeBlank st
 
 runStorM :: StorM a -> IO a
@@ -132,10 +122,10 @@ runStorM mv =
     (runLoggingTWithLevel LevelError . runResourceT . evalStateT mv . snd)
 
 getStorageKeyVal'' :: HasStorageDB m => Address -> Word256 -> m Word256
-getStorageKeyVal'' addr = getStorageKeyVal' (Account addr Nothing)
+getStorageKeyVal'' addr = getStorageKeyVal' addr
 
 putStorageKeyVal'' :: HasStorageDB m => Address -> Word256 -> Word256 -> m ()
-putStorageKeyVal'' addr key = putStorageKeyVal' (Account addr Nothing) key
+putStorageKeyVal'' addr key = putStorageKeyVal' addr key
 
 storageSpec :: Spec
 storageSpec = do
@@ -165,7 +155,7 @@ storageSpec = do
       putStorageKeyVal'' 0x1 0x3 0x4
       putStorageKeyVal'' 0x1 0x4 0x5
       putStorageKeyVal'' 0x1 0x3 0x6
-      getAllStorageKeyVals' (Account 0x1 Nothing) `shouldReturn` []
+      getAllStorageKeyVals' 0x1 `shouldReturn` []
 
     it "getAll puts after a flush" . runStorM $ do
       putStorageKeyVal'' 0x1 0x2 0x3
@@ -176,7 +166,7 @@ storageSpec = do
       use stx `shouldReturn` M.empty
       use sbs `shouldReturn` M.empty
       let toKey = N.EvenNibbleString . keccak256ToByteString . hash . word256ToBytes
-      kvs <- getAllStorageKeyVals' (Account 0x1 Nothing)
+      kvs <- getAllStorageKeyVals' 0x1
       kvs
         `shouldMatchList` [ (toKey 2, 3),
                             (toKey 3, 6),
@@ -184,42 +174,42 @@ storageSpec = do
                           ]
 
     it "put 0 should not change the state root" . runStorM $ do
-      want <- addressStateContractRoot <$> lookupWithDefault Proxy (Account 0x1234 Nothing)
+      want <- addressStateContractRoot <$> lookupWithDefault Proxy (Address 0x1234)
       want `shouldBe` "V\232\US\ETB\ESC\204U\166\255\131E\230\146\192\248n[H\224\ESC\153l\173\192\SOHb/\181\227c\180!"
       putStorageKeyVal'' 0x1234 0x3 0x0
       flushMemStorageDB
-      got <- addressStateContractRoot <$> lookupWithDefault Proxy (Account 0x1234 Nothing)
+      got <- addressStateContractRoot <$> lookupWithDefault Proxy (Address 0x1234)
       want `shouldBe` got
 
     it "put 1 should change the state root" . runStorM $ do
-      want <- addressStateContractRoot <$> lookupWithDefault Proxy (Account 0x1234 Nothing)
+      want <- addressStateContractRoot <$> lookupWithDefault Proxy (Address 0x1234)
       putStorageKeyVal'' 0x1234 0x3 0x44
       flushMemStorageDB
-      got <- addressStateContractRoot <$> lookupWithDefault Proxy (Account 0x1234 Nothing)
+      got <- addressStateContractRoot <$> lookupWithDefault Proxy (Address 0x1234)
       want `shouldNotBe` got
       got `shouldBe` "E\RS\164\USe\177\214\249m\186\SI\248\136\\\215\137\172\231\135q\224;\178TWg\SUB\147n\134. "
 
   describe "RawStorageDB" $ do
     it "should get its puts" . runStorM $ do
-      putRawStorageKeyVal' ((Account 0x888 Nothing), "aKey") "aValue"
-      getRawStorageKeyVal' ((Account 0x888 Nothing), "aKey") `shouldReturn` "aValue"
+      putRawStorageKeyVal' (0x888, "aKey") "aValue"
+      getRawStorageKeyVal' (0x888, "aKey") `shouldReturn` "aValue"
 
   describe "SolidStorageDB SolidVM=3.0" $ do
     it "should get its puts" . runStorM $ do
-      putSolidStorageKeyVal' (Account 0x99 Nothing) (MS.fromList [MS.Field "x", MS.ArrayIndex 99]) (MS.BString "txt")
-      getSolidStorageKeyVal' (Account 0x99 Nothing) (MS.fromList [MS.Field "x", MS.ArrayIndex 99])
+      putSolidStorageKeyVal' 0x99 (MS.fromList [MS.Field "x", MS.ArrayIndex 99]) (MS.BString "txt")
+      getSolidStorageKeyVal' 0x99 (MS.fromList [MS.Field "x", MS.ArrayIndex 99])
         `shouldReturn` MS.BString "txt"
 
     it "should be able to flush" . runStorM $ do
-      putSolidStorageKeyVal' (Account 0x342 Nothing) (MS.singleton "x") (MS.BBool True)
+      putSolidStorageKeyVal' 0x342 (MS.singleton "x") (MS.BBool True)
       flushMemSolidStorageDB
 
     let solidIdTest msg bv = it ("put " <> msg <> " in SolidStorage should not change the state root") . runStorM $ do
-          want <- addressStateContractRoot <$> lookupWithDefault Proxy (Account 0x1234 Nothing)
+          want <- addressStateContractRoot <$> lookupWithDefault Proxy (Address 0x1234)
           want `shouldBe` "V\232\US\ETB\ESC\204U\166\255\131E\230\146\192\248n[H\224\ESC\153l\173\192\SOHb/\181\227c\180!"
-          putSolidStorageKeyVal' (Account 0x1234 Nothing) (MS.fromList [MS.Field "x", MS.ArrayIndex 99]) bv
+          putSolidStorageKeyVal' 0x1234 (MS.fromList [MS.Field "x", MS.ArrayIndex 99]) bv
           flushMemStorageDB
-          got <- addressStateContractRoot <$> lookupWithDefault Proxy (Account 0x1234 Nothing)
+          got <- addressStateContractRoot <$> lookupWithDefault Proxy (Address 0x1234)
           want `shouldBe` got
 
     solidIdTest "0" (MS.BInteger 0)
@@ -231,106 +221,31 @@ storageSpec = do
     solidIdTest "BDefault" (MS.BDefault)
 
     it "put 1 in SolidStorage should change the state root" . runStorM $ do
-      want <- addressStateContractRoot <$> lookupWithDefault Proxy (Account 0x1234 Nothing)
-      putSolidStorageKeyVal' (Account 0x1234 Nothing) (MS.fromList [MS.Field "x", MS.ArrayIndex 99]) (MS.BInteger 1)
+      want <- addressStateContractRoot <$> lookupWithDefault Proxy (Address 0x1234)
+      putSolidStorageKeyVal' 0x1234 (MS.fromList [MS.Field "x", MS.ArrayIndex 99]) (MS.BInteger 1)
       flushMemStorageDB
-      got <- addressStateContractRoot <$> lookupWithDefault Proxy (Account 0x1234 Nothing)
+      got <- addressStateContractRoot <$> lookupWithDefault Proxy (Address 0x1234)
       want `shouldNotBe` got
       got `shouldBe` "\223\231^\"\234'\233\249\208*D\163\210\237\147\ETXq\202\EM\208\195\140\223\&7J\SI\201\250\&9\165\177\141"
 
   describe "resolveCodePtr" $ do
     it "should resolve direct code pointers" . runStorM $ do
-      let chainRelationships = [((0 :: Word256), ParentChainIds M.empty)]
-      insertMany (Proxy @ParentChainIds) $ M.fromList chainRelationships
       let accts =
-            [ Account 0xabc (Just 0),
-              Account 0xdef (Just 0)
+            [ Address 0xabc,
+              Address 0xdef
             ]
       let codePtrs =
             [ SolidVMCode "Code_0" $ unsafeCreateKeccak256FromWord256 0x123,
               ExternallyOwned $ unsafeCreateKeccak256FromWord256 0x456
             ]
       insertMany (Proxy @AddressState) . M.fromList $ zip accts $ map (\cp -> blankAddressState {addressStateCodeHash = cp}) codePtrs
-      resolveCodePtr (Just 0) (codePtrs !! 0) `shouldReturn` Just (codePtrs !! 0)
-      resolveCodePtr (Just 0) (codePtrs !! 1) `shouldReturn` Just (codePtrs !! 1)
-    it "should resolve an ancestor code pointer" . runStorM $ do
-      let chainRelationships =
-            [ ((0 :: Word256), ParentChainIds M.empty),
-              ((1 :: Word256), ParentChainIds $ M.singleton "parent" (0 :: Word256))
-            ]
-      insertMany (Proxy @ParentChainIds) $ M.fromList chainRelationships
-      let accts =
-            [ Account 0xabc (Just 0),
-              Account 0xdef (Just 1)
-            ]
-      let codePtrs =
-            [ SolidVMCode "Code_0" $ unsafeCreateKeccak256FromWord256 0x123,
-              CodeAtAccount (accts !! 0) "Ptr_0"
-            ]
-      insertMany (Proxy @AddressState) . M.fromList $ zip accts $ map (\cp -> blankAddressState {addressStateCodeHash = cp}) codePtrs
-      resolveCodePtr (Just 1) (codePtrs !! 1) `shouldReturn` Just (SolidVMCode "Ptr_0" $ unsafeCreateKeccak256FromWord256 0x123)
-    it "should resolve child-chain code pointers to Nothing" . runStorM $ do
-      let chainRelationships =
-            [ ((0 :: Word256), ParentChainIds M.empty),
-              ((1 :: Word256), ParentChainIds $ M.singleton "parent" (0 :: Word256))
-            ]
-      insertMany (Proxy @ParentChainIds) $ M.fromList chainRelationships
-      let accts =
-            [ Account 0xabc (Just 0),
-              Account 0xdef (Just 1)
-            ]
-      let codePtrs =
-            [ CodeAtAccount (accts !! 1) "Ptr_0",
-              SolidVMCode "Code_0" $ unsafeCreateKeccak256FromWord256 0x123
-            ]
-      insertMany (Proxy @AddressState) . M.fromList $ zip accts $ map (\cp -> blankAddressState {addressStateCodeHash = cp}) codePtrs
-      resolveCodePtr (Just 0) (codePtrs !! 0) `shouldReturn` Nothing
-    it "should resolve sibling-chain code pointers to Nothing" . runStorM $ do
-      let chainRelationships =
-            [ ((0 :: Word256), ParentChainIds M.empty),
-              ((1 :: Word256), ParentChainIds $ M.singleton "parent" (0 :: Word256)),
-              ((2 :: Word256), ParentChainIds $ M.singleton "parent" (0 :: Word256))
-            ]
-      insertMany (Proxy @ParentChainIds) $ M.fromList chainRelationships
-      let accts =
-            [ Account 0xabc (Just 1),
-              Account 0xdef (Just 2)
-            ]
-      let codePtrs =
-            [ SolidVMCode "Code_0" $ unsafeCreateKeccak256FromWord256 0x123,
-              CodeAtAccount (accts !! 0) "Ptr_0"
-            ]
-      insertMany (Proxy @AddressState) . M.fromList $ zip accts $ map (\cp -> blankAddressState {addressStateCodeHash = cp}) codePtrs
-      resolveCodePtr (Just 2) (codePtrs !! 1) `shouldReturn` Nothing
-    it "should resolve two-level (pointer to parent, parent to child) code pointer indirection to Nothing" . runStorM $ do
-      let chainRelationships =
-            [ ((0 :: Word256), ParentChainIds M.empty),
-              ((1 :: Word256), ParentChainIds $ M.singleton "parent" (0 :: Word256)),
-              ((2 :: Word256), ParentChainIds $ M.singleton "parent" (0 :: Word256))
-            ]
-      insertMany (Proxy @ParentChainIds) $ M.fromList chainRelationships
-      let accts =
-            [ Account 0xabc (Just 1),
-              Account 0xdef (Just 0),
-              Account 0xfff (Just 2)
-            ]
-      let codePtrs =
-            [ SolidVMCode "Code_0" $ unsafeCreateKeccak256FromWord256 0x123,
-              CodeAtAccount (accts !! 0) "Ptr_0",
-              CodeAtAccount (accts !! 1) "Ptr_1"
-            ]
-      insertMany (Proxy @AddressState) . M.fromList $ zip accts $ map (\cp -> blankAddressState {addressStateCodeHash = cp}) codePtrs
-      resolveCodePtr (Just 2) (codePtrs !! 2) `shouldReturn` Nothing
+      resolveCodePtr (codePtrs !! 0) `shouldReturn` Just (codePtrs !! 0)
+      resolveCodePtr (codePtrs !! 1) `shouldReturn` Just (codePtrs !! 1)
     it "should detect cycles in codeptrs (pointer1 to pointer2, pointer2 to pointer1)" . runStorM $ do
-      let chainRelationships =
-            [ ((0 :: Word256), ParentChainIds M.empty),
-              ((1 :: Word256), ParentChainIds $ M.singleton "parent" (0 :: Word256))
-            ]
-      insertMany (Proxy @ParentChainIds) $ M.fromList chainRelationships
       let accts =
-            [ Account 0xabc (Just 0),
-              Account 0xdef (Just 0),
-              Account 0xfff (Just 1)
+            [ Address 0xabc,
+              Address 0xdef,
+              Address 0xfff
             ]
       let codePtrs =
             [ CodeAtAccount (accts !! 1) "Ptr_0",
@@ -338,4 +253,4 @@ storageSpec = do
               CodeAtAccount (accts !! 0) "Ptr_2"
             ]
       insertMany (Proxy @AddressState) . M.fromList $ zip accts $ map (\cp -> blankAddressState {addressStateCodeHash = cp}) codePtrs
-      resolveCodePtr (Just 1) (codePtrs !! 2) `shouldReturn` Nothing
+      resolveCodePtr (codePtrs !! 2) `shouldReturn` Nothing

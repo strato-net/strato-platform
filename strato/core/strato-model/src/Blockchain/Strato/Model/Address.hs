@@ -77,11 +77,18 @@ instance RLPSerializable Address where
 type AddressPayable = Address
 
 newtype Address = Address Word160
-  deriving (Eq, Read, Enum, Bounded, Ord, Generic, Data)
+  deriving (Eq, Enum, Bounded, Ord, Generic, Data)
   deriving newtype (Real, Num, Integral, Hashable)
 
 instance Show Address where
   show (Address a) = printf "%040x" a
+
+instance Read Address where
+  readsPrec _ input =
+    let (hexPart, rest) = splitAt 40 input
+    in case readHex hexPart of
+         [(num, "")] -> [(Address num, rest)]
+         _           -> []
 
 instance PrintfArg Address where
   formatArg (Address word) = formatArg word

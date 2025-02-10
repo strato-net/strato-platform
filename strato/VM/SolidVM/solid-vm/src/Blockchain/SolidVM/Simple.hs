@@ -79,8 +79,8 @@ defaultBlockData =
 
 data SolidVMTxArgs = SolidVMTxArgs
   { _argsBlockData :: BlockHeader,
-    _argsSender :: Account,
-    _argsOrigin :: Account,
+    _argsSender :: Address,
+    _argsOrigin :: Address,
     _argsProposer :: Address,
     _argsTxHash :: Keccak256,
     _argsChainId :: Maybe Word256,
@@ -94,15 +94,15 @@ instance Default SolidVMTxArgs where
   def =
     SolidVMTxArgs
       defaultBlockData
-      (Account 0 Nothing)
-      (Account 0 Nothing)
+      0
+      0
       (Address 0)
       emptyHash
       Nothing
       Nothing
 
 data SolidVMCreateArgs = SolidVMCreateArgs
-  { _createNewAddress :: Account,
+  { _createNewAddress :: Address,
     _createCode :: Code,
     _createArgs :: SolidVMTxArgs
   }
@@ -113,12 +113,12 @@ makeLenses ''SolidVMCreateArgs
 instance Default SolidVMCreateArgs where
   def =
     SolidVMCreateArgs
-      (Account 0 Nothing)
+      0
       (Code "")
       def
 
 data SolidVMCallArgs = SolidVMCallArgs
-  { _callCodeAddress :: Account,
+  { _callCodeAddress :: Address,
     _callArgs :: SolidVMTxArgs
   }
   deriving (Eq, Show, Generic)
@@ -128,7 +128,7 @@ makeLenses ''SolidVMCallArgs
 instance Default SolidVMCallArgs where
   def =
     SolidVMCallArgs
-      (Account 0 Nothing)
+      0
       def
 
 data SolidVMTx
@@ -174,7 +174,6 @@ create s =
     (s ^. createNewAddress)
     (s ^. createCode)
     (s ^. createArgs . argsTxHash)
-    (s ^. createArgs . argsChainId)
     (s ^. createArgs . argsMetadata)
 
 call ::
@@ -200,5 +199,4 @@ call s =
     (Gas 100000000)
     (s ^. callArgs . argsOrigin)
     (s ^. callArgs . argsTxHash)
-    (s ^. callArgs . argsChainId)
     (s ^. callArgs . argsMetadata)

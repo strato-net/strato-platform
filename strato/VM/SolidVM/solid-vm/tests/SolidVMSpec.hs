@@ -205,17 +205,14 @@ failedAssertion :: Selector HandledException
 failedAssertion (HE Assert) = True
 failedAssertion _ = False
 
-sender :: Account
-sender = Account 0xdeadbeef Nothing
+sender :: Address
+sender = 0xdeadbeef
 
 proposer :: Address
 proposer = Address 0xdeadbeef2
 
-privateChainAcc :: Account
-privateChainAcc = Account 0xdeadbeef (Just 0x776622233444)
-
-rootAcc :: Account
-rootAcc = Account (fromPublicKey X509.rootPubKey) Nothing
+rootAcc :: Address
+rootAcc = fromPublicKey X509.rootPubKey
 
 getCert :: X509Certificate
 getCert = fromMaybe (error $ "no idea what's happening") $ either (const Nothing) Just . bsToCert . BC.pack $ myCertString
@@ -247,17 +244,17 @@ myCertString =
       "-----END CERTIFICATE-----"
     ]
 
-origin :: Account
-origin = Account (userAddress $ x509CertToCertInfoState getCert) Nothing
+origin :: Address
+origin = userAddress $ x509CertToCertInfoState getCert
 
-uploadAddress :: Account
-uploadAddress = Account (getNewAddress_unsafe (sender ^. accountAddress) 0) Nothing
+uploadAddress :: Address
+uploadAddress = getNewAddress_unsafe sender 0
 
-secondAddress :: Account
-secondAddress = Account (getNewAddress_unsafe (sender ^. accountAddress) 1) Nothing
+secondAddress :: Address
+secondAddress = getNewAddress_unsafe sender 1
 
-recursiveAddr :: Account
-recursiveAddr = Account (getNewAddress_unsafe (uploadAddress ^. accountAddress) 0) Nothing
+recursiveAddr :: Address
+recursiveAddr = getNewAddress_unsafe uploadAddress 0
 
 devNull :: Loc -> LogSource -> LogLevel -> LogStr -> IO ()
 devNull _ _ _ _ = return ()
@@ -334,7 +331,7 @@ runTestWithTimeout timeout f = do
       Mod.put (Mod.Proxy @BlockHashRoot) $ bhr
       processNewBestBlock genHash (blockBlockData $ blockCreated) [] -- bootstrap Bagger with genesis block
       withCurrentBlockHash genHash $ do
-        let certKey addr = ((Account addr Nothing),) . encodeUtf8
+        let certKey addr = (addr,) . encodeUtf8
             certRegistryKey = certKey (Address 0x509)
             rlpWrap = rlpSerialize . rlpEncode
             ua = userAddress $ x509CertToCertInfoState getCert
@@ -379,7 +376,7 @@ rethrowEx ExecResults {erException = Just ex} = either (liftIO . throwIO . HE) (
 rethrowEx _ = return ()
 
 --Adds a contract to the 0xfeedbeef chain
-runArgsWithSenderBeef :: Account -> T.Text -> String -> ContextM ExecResults
+runArgsWithSenderBeef :: Address -> T.Text -> String -> ContextM ExecResults
 runArgsWithSenderBeef acc args bs = do
   let code = Code $ UTF8.fromString bs
       isTest = error "TODO: isTest"
@@ -408,7 +405,6 @@ runArgsWithSenderBeef acc args bs = do
       gasPrice = error "TODO: gasPrice"
       availableGas = Gas 99969480
       txHash = unsafeCreateKeccak256FromWord256 0x776622233444
-      chainId = Just 0xfeedbeef
       metadata = Just $ M.fromList [("name", "qq"), ("args", args)]
 
   newAddress <- getNewAddress acc
@@ -428,13 +424,12 @@ runArgsWithSenderBeef acc args bs = do
       newAddress
       code
       txHash
-      chainId
       metadata
   rethrowEx er
   return er
 
 --Adds contract to the "main chain"
-runArgsWithSender :: Account -> T.Text -> String -> ContextM ExecResults
+runArgsWithSender :: Address -> T.Text -> String -> ContextM ExecResults
 runArgsWithSender acc args bs = do
   let code = Code $ UTF8.fromString bs
       isTest = error "TODO: isTest"
@@ -463,7 +458,6 @@ runArgsWithSender acc args bs = do
       gasPrice = error "TODO: gasPrice"
       availableGas = Gas 99969480
       txHash = unsafeCreateKeccak256FromWord256 0x776622233444
-      chainId = Nothing
       metadata = Just $ M.fromList [("name", "qq"), ("args", args)]
   
   insert (Proxy @BlockSummary) (unsafeCreateKeccak256FromWord256 0x0) (blockHeaderToBSum blockData 1)
@@ -485,12 +479,11 @@ runArgsWithSender acc args bs = do
       newAddress
       code
       txHash
-      chainId
       metadata
   rethrowEx er
   return er
 
-runArgsWithOrigin :: Account -> Account -> T.Text -> String -> ContextM ExecResults
+runArgsWithOrigin :: Address -> Address -> T.Text -> String -> ContextM ExecResults
 runArgsWithOrigin orig acc args bs = do
   let code = Code $ UTF8.fromString bs
       isTest = error "TODO: isTest"
@@ -519,7 +512,6 @@ runArgsWithOrigin orig acc args bs = do
       gasPrice = error "TODO: gasPrice"
       availableGas = Gas 99969480
       txHash = unsafeCreateKeccak256FromWord256 0x776622233444
-      chainId = Nothing
       metadata = Just $ M.fromList [("name", "qq"), ("args", args)]
 
   newAddress <- getNewAddress acc
@@ -539,7 +531,6 @@ runArgsWithOrigin orig acc args bs = do
       newAddress
       code
       txHash
-      chainId
       metadata
   rethrowEx er
   return er
@@ -640,7 +631,6 @@ runCall funcName callArgs bs = do
       gasPrice = error "TODO: gasPrice"
       availableGas = Gas 99969480
       txHash = unsafeCreateKeccak256FromWord256 0x234962
-      chainId = Nothing
       createMetadata = Just $ M.fromList [("name", "qq"), ("args", "()")]
       noValueTransfer = error "TODO: noValueTransfer"
       receiveAddress = error "TODO: receiveAddress"
@@ -664,7 +654,6 @@ runCall funcName callArgs bs = do
       newAddress
       code
       txHash
-      chainId
       createMetadata
   $logErrorS "runCall" "Returned from create"
   rethrowEx er1
@@ -688,7 +677,6 @@ runCall funcName callArgs bs = do
       availableGas
       origin
       txHash
-      chainId
       callMetadata
   $logErrorS "runCall" "Returned from call"
   rethrowEx er2
@@ -726,7 +714,6 @@ runCall' funcName callArgs bs = do
       gasPrice = error "TODO: gasPrice"
       availableGas = Gas 99969480
       txHash = unsafeCreateKeccak256FromWord256 0x234962
-      chainId = Nothing
       createMetadata = Just $ M.fromList [("name", "qq"), ("args", "()")]
       noValueTransfer = error "TODO: noValueTransfer"
       receiveAddress = error "TODO: receiveAddress"
@@ -750,7 +737,6 @@ runCall' funcName callArgs bs = do
       newAddress
       code
       txHash
-      chainId
       createMetadata
   $logErrorS "runCall" "Returned from create"
   rethrowEx er1
@@ -774,7 +760,6 @@ runCall' funcName callArgs bs = do
       availableGas
       origin
       txHash
-      chainId
       callMetadata
   $logErrorS "runCall" "Returned from call"
   rethrowEx er2
@@ -785,7 +770,7 @@ runCall' funcName callArgs bs = do
 lastN' :: Int -> [a] -> [a]
 lastN' n xs = L.foldl' (const . drop 1) xs (drop n xs)
 
-call2 :: T.Text -> T.Text -> Account -> ContextM (Maybe String)
+call2 :: T.Text -> T.Text -> Address -> ContextM (Maybe String)
 call2 funcName callArgs contractAddress = do
   let isTest = error "TODO: isTest"
       isHomestead = error "TODO: isHomestead"
@@ -814,7 +799,6 @@ call2 funcName callArgs contractAddress = do
       gasPrice = error "TODO: gasPrice"
       availableGas = Gas 99969480
       txHash = unsafeCreateKeccak256FromWord256 0xddba11
-      chainId = Nothing
       noValueTransfer = error "TODO: noValueTransfer"
       receiveAddress = error "TODO: receiveAddress"
       theData = error "TODO: theData"
@@ -838,7 +822,6 @@ call2 funcName callArgs contractAddress = do
       availableGas
       origin
       txHash
-      chainId
       callMetadata
   rethrowEx er
   return $ erReturnVal er
@@ -868,19 +851,13 @@ bContract t a =
         then BDefault
         else BContract t u
 
-bContract' :: SolidString -> Account -> BasicValue
-bContract' t a =
-  let u = accountOnUnspecifiedChain a
-   in if u == unspecifiedChain 0
-        then BDefault
-        else BContract t u
+bContract' :: SolidString -> Address -> BasicValue
+bContract' _ 0 = BDefault
+bContract' t a = BContract t $ NamedAccount a UnspecifiedChain
 
-bAccount :: Account -> BasicValue
-bAccount a =
-  let u = accountOnUnspecifiedChain a
-   in if u == unspecifiedChain 0
-        then BDefault
-        else (BAccount u)
+bAccount :: Address -> BasicValue
+bAccount 0 = BDefault
+bAccount a = BAccount $ unspecifiedChain a
 
 iAddress :: Address -> IndexType
 iAddress = IAccount . unspecifiedChain
@@ -2325,10 +2302,10 @@ contract qq {
     getFields ["x", "num"] `shouldReturn` [bContract "qq" 0x0, BInteger 99]
 
     void $ runArgs (T.pack $ printf "(0x%s,400)" $ show uploadAddress) qq
-    getFields2 ["x", "num"] `shouldReturn` [bContract' "qq" uploadAddress, BInteger 400]
+    getFields2 ["x", "num"] `shouldReturn` [bContract "qq" uploadAddress, BInteger 400]
 
     call2 "a" "()" secondAddress `shouldReturn` Just "()"
-    getFields2 ["x", "num"] `shouldReturn` [bContract' "qq" uploadAddress, BInteger 100]
+    getFields2 ["x", "num"] `shouldReturn` [bContract "qq" uploadAddress, BInteger 100]
 
   it "can locally return locals" . runTest $ do
     runBS
@@ -2765,7 +2742,7 @@ contract qq {
 
   it "can return an address" . runTest $ do
     --works for address type
-    let want' = Numeric.showHex (sender ^. accountAddress) ""
+    let want' = Numeric.showHex sender ""
         want = replicate (40 - length want') '0' ++ want' --etherum address has 40 bytes followed by 0x, short byte string has 32 bytes
     runCall'
       "a"
@@ -2818,8 +2795,8 @@ contract qq {
   }
 }|]
     [BContract "X" x] <- getFields ["x"]
-    getSolidStorageKeyVal' (namedAccountToAccount Nothing x) (singleton "i") `shouldReturn` BDefault
-    getSolidStorageKeyVal' (namedAccountToAccount Nothing x) (singleton "s") `shouldReturn` BDefault
+    getSolidStorageKeyVal' (x^.namedAccountAddress) (singleton "i") `shouldReturn` BDefault
+    getSolidStorageKeyVal' (x^.namedAccountAddress) (singleton "s") `shouldReturn` BDefault
 
   it "will create a sentinel for mappings" . runTest $ do
     liftIO $ pendingWith "deal with BMappingSentinel" --TODO- Jim
@@ -2846,7 +2823,7 @@ contract qq {
 
   it "can return a contract" . runTest $ do
     --works for address type
-    let want' = Numeric.showHex (uploadAddress ^. accountAddress) ""
+    let want' = Numeric.showHex uploadAddress ""
         want = replicate (40 - length want') '0' ++ want'
     runCall'
       "self"
@@ -2888,7 +2865,7 @@ contract qq {
                 Action.SolidVMDiff $
                   M.singleton
                     ".s"
-                    (rlpSerialize $ rlpEncode $ bContract' "Sub" recursiveAddr)
+                    (rlpSerialize $ rlpEncode $ bContract "Sub" recursiveAddr)
               ),
               ( recursiveAddr,
                 Action.SolidVMDiff $
@@ -3166,7 +3143,7 @@ contract qq {
   }
 }|]
     -- qq should become the `owner` in X
-    getFields ["x"] `shouldReturn` [bContract' "X" recursiveAddr]
+    getFields ["x"] `shouldReturn` [bContract "X" recursiveAddr]
     getSolidStorageKeyVal' recursiveAddr (MS.singleton "owner")
       `shouldReturn` bAccount uploadAddress
 
@@ -3498,7 +3475,7 @@ contract qq {
     x = new X({_z: "ok", _y: 0x777777});
   }
 }|]
-    getFields ["x"] `shouldReturn` [bContract' "X" recursiveAddr]
+    getFields ["x"] `shouldReturn` [bContract "X" recursiveAddr]
     mapM (getSolidStorageKeyVal' recursiveAddr) [MS.singleton "y", MS.singleton "z"]
       `shouldReturn` [BInteger 0x777777, BString "ok"]
 
@@ -4235,9 +4212,9 @@ contract qq{
     -- Get the contract's account
     [BAccount a] <- getFields ["a"]
     -- Set the balance
-    adjust_ (Proxy @AddressState) (namedAccountToAccount Nothing a) (\as -> pure $ as {addressStateBalance = 13})
+    adjust_ (Proxy @AddressState) (a^.namedAccountAddress) (\as -> pure $ as {addressStateBalance = 13})
     -- Check return of balance
-    void $ call2 "myTransfer" "()" (namedAccountToAccount Nothing a)
+    void $ call2 "myTransfer" "()" (a^.namedAccountAddress)
     getFields ["bal"] `shouldReturn` [BInteger 13]
 
   it "will not over send (send when there is not enough gas)" . runTest $ do
@@ -4262,9 +4239,9 @@ contract qq{
     -- Get the contract's account
     [BAccount a] <- getFields ["a"]
     -- Set the balance
-    adjust_ (Proxy @AddressState) (namedAccountToAccount Nothing a) (\as -> pure $ as {addressStateBalance = 7})
+    adjust_ (Proxy @AddressState) (a^.namedAccountAddress) (\as -> pure $ as {addressStateBalance = 7})
     -- Check return of balance
-    void $ call2 "mySend" "()" (namedAccountToAccount Nothing a)
+    void $ call2 "mySend" "()" (a^.namedAccountAddress)
     getFields ["success", "bal"] `shouldReturn` [BDefault, BInteger 7]
 
   it "will allow for sending to self" . runTest $ do
@@ -4289,9 +4266,9 @@ contract qq{
     -- Get the contract's account
     [BAccount a] <- getFields ["a"]
     -- Set the balance
-    adjust_ (Proxy @AddressState) (namedAccountToAccount Nothing a) (\as -> pure $ as {addressStateBalance = 13})
+    adjust_ (Proxy @AddressState) (a^.namedAccountAddress) (\as -> pure $ as {addressStateBalance = 13})
     -- Check return of balance
-    void $ call2 "mySend" "()" (namedAccountToAccount Nothing a)
+    void $ call2 "mySend" "()" (a^.namedAccountAddress)
     getFields ["success", "bal"] `shouldReturn` [BBool True, BInteger 13]
 
   it "will not send when there is not anything to send between account" . runTest $ do
@@ -4316,9 +4293,9 @@ contract qq{
     -- Get the contract's account
     [BAccount a] <- getFields ["a"]
     -- Set the balance
-    adjust_ (Proxy @AddressState) (namedAccountToAccount Nothing a) (\as -> pure $ as {addressStateBalance = 0})
+    adjust_ (Proxy @AddressState) (a^.namedAccountAddress) (\as -> pure $ as {addressStateBalance = 0})
     -- Check return of balance
-    void $ call2 "mySend" "()" (namedAccountToAccount Nothing a)
+    void $ call2 "mySend" "()" (a^.namedAccountAddress)
     getFields ["success", "bal"] `shouldReturn` [BDefault, BDefault]
 
   it "cannot send to a non account payable type" $
@@ -4343,9 +4320,9 @@ contract qq{
           -- Get the contract's account
           [BAccount a] <- getFields ["a"]
           -- Set the balance
-          adjust_ (Proxy @AddressState) (namedAccountToAccount Nothing a) (\as -> pure $ as {addressStateBalance = 26})
+          adjust_ (Proxy @AddressState) (a^.namedAccountAddress) (\as -> pure $ as {addressStateBalance = 26})
           -- Check return of balance
-          (void $ call2 "mySend" "()" (namedAccountToAccount Nothing a))
+          (void $ call2 "mySend" "()" (a^.namedAccountAddress))
       )
       `shouldThrow` anyTypeError
 
@@ -4371,9 +4348,9 @@ contract qq{
           -- Get the contract's account
           [BAccount a] <- getFields ["a"]
           -- Set the balance
-          adjust_ (Proxy @AddressState) (namedAccountToAccount Nothing a) (\as -> pure $ as {addressStateBalance = 26})
+          adjust_ (Proxy @AddressState) (a^.namedAccountAddress) (\as -> pure $ as {addressStateBalance = 26})
           -- Check return of balance
-          (void $ call2 "myTransfer" "()" (namedAccountToAccount Nothing a))
+          (void $ call2 "myTransfer" "()" (a^.namedAccountAddress))
       )
       `shouldThrow` anyTypeError
 
@@ -4414,11 +4391,11 @@ contract qq{
     -- Get the contract's accounts
     [BAccount a, BAccount b, BAccount c] <- getFields ["a", "b", "c"]
     -- Adjust the preset balances
-    adjust_ (Proxy @AddressState) (namedAccountToAccount Nothing a) (\as -> pure $ as {addressStateBalance = 14})
-    adjust_ (Proxy @AddressState) (namedAccountToAccount Nothing c) (\cs -> pure $ cs {addressStateBalance = 13})
-    adjust_ (Proxy @AddressState) (namedAccountToAccount Nothing b) (\bs -> pure $ bs {addressStateBalance = 13})
+    adjust_ (Proxy @AddressState) (a^.namedAccountAddress) (\as -> pure $ as {addressStateBalance = 14})
+    adjust_ (Proxy @AddressState) (c^.namedAccountAddress) (\cs -> pure $ cs {addressStateBalance = 13})
+    adjust_ (Proxy @AddressState) (b^.namedAccountAddress) (\bs -> pure $ bs {addressStateBalance = 13})
     -- Check return of balance
-    void $ call2 "myTransfer" "()" (namedAccountToAccount Nothing a)
+    void $ call2 "myTransfer" "()" (a^.namedAccountAddress)
     getFields ["bala", "balb", "balc"]
       `shouldReturn` [ BInteger 1,
                        BInteger 26,
@@ -4463,11 +4440,11 @@ contract qq{
     -- Get the contract's accounts
     [BAccount a, BAccount b, BAccount c] <- getFields ["a", "b", "c"]
     -- Adjust the preset balances
-    adjust_ (Proxy @AddressState) (namedAccountToAccount Nothing a) (\as -> pure $ as {addressStateBalance = 14})
-    adjust_ (Proxy @AddressState) (namedAccountToAccount Nothing c) (\cs -> pure $ cs {addressStateBalance = 13})
-    adjust_ (Proxy @AddressState) (namedAccountToAccount Nothing b) (\bs -> pure $ bs {addressStateBalance = 13})
+    adjust_ (Proxy @AddressState) (a^.namedAccountAddress) (\as -> pure $ as {addressStateBalance = 14})
+    adjust_ (Proxy @AddressState) (c^.namedAccountAddress) (\cs -> pure $ cs {addressStateBalance = 13})
+    adjust_ (Proxy @AddressState) (b^.namedAccountAddress) (\bs -> pure $ bs {addressStateBalance = 13})
     -- Check return of balance
-    void $ call2 "mySend" "()" (namedAccountToAccount Nothing a)
+    void $ call2 "mySend" "()" (a^.namedAccountAddress)
     getFields ["success", "bala", "balb", "balc"] `shouldReturn` [BBool True, BInteger 1, BInteger 26, BInteger 13]
 
   it "cannot over transfer from an account." $
@@ -4509,11 +4486,11 @@ contract qq{
           -- Get the contract's accounts
           [BAccount a, BAccount b, BAccount c] <- getFields ["a", "b", "c"]
           -- Adjust the preset balances
-          adjust_ (Proxy @AddressState) (namedAccountToAccount Nothing a) (\as -> pure $ as {addressStateBalance = 14})
-          adjust_ (Proxy @AddressState) (namedAccountToAccount Nothing c) (\cs -> pure $ cs {addressStateBalance = 13})
-          adjust_ (Proxy @AddressState) (namedAccountToAccount Nothing b) (\bs -> pure $ bs {addressStateBalance = 13})
+          adjust_ (Proxy @AddressState) (a^.namedAccountAddress) (\as -> pure $ as {addressStateBalance = 14})
+          adjust_ (Proxy @AddressState) (c^.namedAccountAddress) (\cs -> pure $ cs {addressStateBalance = 13})
+          adjust_ (Proxy @AddressState) (b^.namedAccountAddress) (\bs -> pure $ bs {addressStateBalance = 13})
           -- Check return of balance
-          (void $ call2 "myTransfer" "()" (namedAccountToAccount Nothing a))
+          (void $ call2 "myTransfer" "()" (a^.namedAccountAddress))
       )
       `shouldThrow` anyPaymentError
 
@@ -4555,65 +4532,17 @@ contract qq{
     -- Get the contract's accounts
     [BAccount a, BAccount b, BAccount c] <- getFields ["a", "b", "c"]
     -- Adjust the preset balances
-    adjust_ (Proxy @AddressState) (namedAccountToAccount Nothing a) (\as -> pure $ as {addressStateBalance = 14})
-    adjust_ (Proxy @AddressState) (namedAccountToAccount Nothing c) (\cs -> pure $ cs {addressStateBalance = 13})
-    adjust_ (Proxy @AddressState) (namedAccountToAccount Nothing b) (\bs -> pure $ bs {addressStateBalance = 13})
+    adjust_ (Proxy @AddressState) (a^.namedAccountAddress) (\as -> pure $ as {addressStateBalance = 14})
+    adjust_ (Proxy @AddressState) (c^.namedAccountAddress) (\cs -> pure $ cs {addressStateBalance = 13})
+    adjust_ (Proxy @AddressState) (b^.namedAccountAddress) (\bs -> pure $ bs {addressStateBalance = 13})
     -- Check return of balance
-    void $ call2 "mySend" "()" (namedAccountToAccount Nothing a)
+    void $ call2 "mySend" "()" (a^.namedAccountAddress)
     getFields ["success", "bala", "balb", "balc"]
       `shouldReturn` [ BDefault,
                        BInteger 14,
                        BInteger 13,
                        BInteger 13
                      ]
-
-  it "can get the chainId from the account type" . runTest $ do
-    runBS
-      [r|
-contract qq {
-  account a1;
-  account a2;
-  account a3;
-  account a4;
-  uint cid1;
-  uint cid2;
-  uint cid3;
-  uint cid4;
-  constructor() public {
-    a1 = account(0xdeadbeef, 0xfeedbeef);
-    a2 = account(0x123, "main");
-    a3 = account(0x124);
-    a4 = account(0xdeadbeef, "0xdeadbeef");
-    cid1 = a1.chainId;
-    cid2 = a2.chainId;
-    cid3 = a3.chainId;
-    cid4 = a4.chainId;
-  }
-}|]
-    getFields ["cid1", "cid2", "cid3"]
-      `shouldReturn` [ BInteger 0xfeedbeef,
-                       BDefault,
-                       BDefault
-                     ]
-  it "can get the chainId directly from the account constructor" . runTest $ do
-    runBS
-      [r|
-contract qq {
-  uint a1;
-  uint a2;
-  uint a3;
-  uint a4;
-  uint a5;
-  constructor() public {
-    a1 = account(0xdeadbeef, 0xfeedbeef).chainId;
-    a2 = account(0x123, "main").chainId;
-    a3 = account(0x124, "self").chainId;
-    a4 = account(0x125).chainId;
-    a5 = account(this, "self").chainId;
-  }
-}|]
-    getFields ["a1", "a2", "a3", "a4", "a5"]
-      `shouldReturn` [BInteger 0xfeedbeef, BDefault, BDefault, BDefault, BDefault]
 
   it "can get the balance from an address" . runTest $ do
     -- Post contract
@@ -4632,9 +4561,9 @@ contract qq{
     -- Get the contract's account
     [BAccount a] <- getFields ["a"]
     -- Set the balance
-    adjust_ (Proxy @AddressState) (namedAccountToAccount Nothing a) (\as -> pure $ as {addressStateBalance = 13})
+    adjust_ (Proxy @AddressState) (a^.namedAccountAddress) (\as -> pure $ as {addressStateBalance = 13})
     -- Check return of balance
-    void $ call2 "myBalance" "()" (namedAccountToAccount Nothing a)
+    void $ call2 "myBalance" "()" (a^.namedAccountAddress)
     getFields ["bal"] `shouldReturn` [BInteger 13]
   it "can get the codehash from an address" . runTest $ do
     let contract =
@@ -5303,11 +5232,11 @@ contract qq{
     -- Set the balance and instantiate both of the accounts the accounts
     -- Account a should start with 13 and b should have 0 at the start.
     -- The transfer member should be able to send the balance of to account b
-    adjust_ (Proxy @AddressState) (namedAccountToAccount Nothing a) (\as -> pure $ as {addressStateBalance = 14})
-    adjust_ (Proxy @AddressState) (namedAccountToAccount Nothing b) (\bs -> pure $ bs {addressStateBalance = 0})
+    adjust_ (Proxy @AddressState) (a^.namedAccountAddress) (\as -> pure $ as {addressStateBalance = 14})
+    adjust_ (Proxy @AddressState) (b^.namedAccountAddress) (\bs -> pure $ bs {addressStateBalance = 0})
 
     -- Check return of balance
-    void $ call2 "myBalance" "()" (namedAccountToAccount Nothing a)
+    void $ call2 "myBalance" "()" (a^.namedAccountAddress)
     getFields ["bala", "balb"] `shouldReturn` [BInteger 1, BInteger 13]
 
   it "can't assign a value to an unallocated index in an array" $
@@ -6413,10 +6342,10 @@ contract qq {
     -- Get the contract's accounts
     [BAccount contract', BAccount owner] <- getFields ["contract'", "owner"]
     -- Adjust the preset balances
-    adjust_ (Proxy @AddressState) (namedAccountToAccount Nothing contract') (\as -> pure $ as {addressStateBalance = 14})
-    adjust_ (Proxy @AddressState) (namedAccountToAccount Nothing owner) (\bs -> pure $ bs {addressStateBalance = 10})
+    adjust_ (Proxy @AddressState) (contract'^.namedAccountAddress) (\as -> pure $ as {addressStateBalance = 14})
+    adjust_ (Proxy @AddressState) (owner^.namedAccountAddress) (\bs -> pure $ bs {addressStateBalance = 10})
     -- Check return of balance
-    void $ call2 "selfDestructThis" "()" (namedAccountToAccount Nothing contract')
+    void $ call2 "selfDestructThis" "()" (contract'^.namedAccountAddress)
     getFields ["contract'", "contractPay", "owner", "ownerPay"]
       `shouldReturn` [ BDefault,
                        BDefault,
@@ -6591,8 +6520,8 @@ contract qq {
                      ]
     [BContract "X" x] <- getFields ["x"]
     [BContract "Y" y] <- getFields ["y"]
-    getSolidStorageKeyVal' (namedAccountToAccount Nothing x) (singleton "xNum") `shouldReturn` BString "xNum"
-    getSolidStorageKeyVal' (namedAccountToAccount Nothing y) (singleton "yNum") `shouldReturn` BInteger 100
+    getSolidStorageKeyVal' (x^.namedAccountAddress) (singleton "xNum") `shouldReturn` BString "xNum"
+    getSolidStorageKeyVal' (y^.namedAccountAddress) (singleton "yNum") `shouldReturn` BInteger 100
 
   it "can deterministically create salted contract with multiple args" . runTest $ do
     let src =
@@ -6615,8 +6544,8 @@ contract qq {
     runBS src
     getFields ["x"] `shouldReturn` [bContract "User" $ deriveAddressWithSalt (stringAddress "e8279be14e9fe2ad2d8e52e42ca96fb33a813bbe") "Dustin Norwood" (Just . hash $ BC.pack src) (Just "OrderedVals [SString \"Dustin Norwood\",SString \"Thebestcertyoucangetfor$99.99\"]")]
     [BContract "User" x] <- getFields ["x"]
-    getSolidStorageKeyVal' (namedAccountToAccount Nothing x) (singleton "commonName") `shouldReturn` BString "Dustin Norwood"
-    getSolidStorageKeyVal' (namedAccountToAccount Nothing x) (singleton "cert") `shouldReturn` BString "Thebestcertyoucangetfor$99.99"
+    getSolidStorageKeyVal' (x^.namedAccountAddress) (singleton "commonName") `shouldReturn` BString "Dustin Norwood"
+    getSolidStorageKeyVal' (x^.namedAccountAddress) (singleton "cert") `shouldReturn` BString "Thebestcertyoucangetfor$99.99"
 
   it "can deterministically derive salted contract addresses with no args" . runTest $ do
     let src =
@@ -8080,18 +8009,6 @@ contract qq {
 |]
     getAll [[Field "a"], [Field "b"]] `shouldReturn` [BDefault, BDefault]
 
-  it "can return chainIdString in a simple manner" . runTest $ do
-    runBS
-      [r|
-contract qq {
-  string x;
-  constructor() {
-    x = this.chainIdString;
-  }
-}
-|]
-    getFields ["x"] `shouldReturn` [BString "0000000000000000000000000000000000000000000000000000000000000000"]
-
   it "View functions enforced in 3.4" $
     ( runTest $
         runBS
@@ -8189,20 +8106,6 @@ contract qq {
 }   |]
     )
       `shouldThrow` anyTooMuchGasError
-
-  it "can use the record identifier to signify this mapping should be indexed in cirrus" . runTest $ do
-    runBS
-      [r|
-contract qq {
-  string x;
-  mapping(string => uint) record myMap;
-  constructor() {
-    x = this.chainIdString;
-    myMap["seven"] = 7;
-  }
-}
-|]
-    getFields ["x"] `shouldReturn` [BString "0000000000000000000000000000000000000000000000000000000000000000"]
 
   it "can use using statement" . runTest $ do
     runBS
@@ -8331,9 +8234,9 @@ contract qq {
       `shouldReturn` [BAccount $ NamedAccount (deriveAddressWithSalt (stringAddress "e8279be14e9fe2ad2d8e52e42ca96fb33a813bbe") "salt" (Just . hash $ BC.pack "contract B {\n uint x = 2;\n constructor (uint _x) {\n  x = _x;\n }\n}") (Just "OrderedVals [SInteger 4]")) UnspecifiedChain]
     [BAccount a] <- getFields ["a"]
     [BAccount b] <- getFields ["b"]
-    getSolidStorageKeyVal' (namedAccountToAccount Nothing a) (singleton "x") `shouldReturn` BInteger 3
-    getSolidStorageKeyVal' (namedAccountToAccount Nothing a) (singleton "y") `shouldReturn` BString "hi"
-    getSolidStorageKeyVal' (namedAccountToAccount Nothing b) (singleton "x") `shouldReturn` BInteger 4
+    getSolidStorageKeyVal' (a^.namedAccountAddress) (singleton "x") `shouldReturn` BInteger 3
+    getSolidStorageKeyVal' (a^.namedAccountAddress) (singleton "y") `shouldReturn` BString "hi"
+    getSolidStorageKeyVal' (b^.namedAccountAddress) (singleton "x") `shouldReturn` BInteger 4
 
   it "should throw an error when using create built-in function call while missing a parameter" $
     runTest
@@ -9016,7 +8919,7 @@ contract qq {
 
   it "can error handle improperly referenced overloaded contracts" $ runTest ( do 
     let getAddressFromResult :: ExecResults -> Maybe Address 
-        getAddressFromResult res = _accountAddress <$> erNewContractAccount res
+        getAddressFromResult res = erNewContractAddress res
 
     res <- runBS' [r|
 pragma safeExternalCalls;
@@ -9099,13 +9002,13 @@ contract qq {
       `shouldReturn` [BAccount $ NamedAccount (deriveAddressWithSalt (stringAddress "e8279be14e9fe2ad2d8e52e42ca96fb33a813bbe") "salt" (Just . hash $ BC.pack "contract B {\n uint x = 2;\n constructor (uint _x) {\n  x = _x;\n }\n}") (Just "OrderedVals [SInteger 4]")) UnspecifiedChain]
     [BAccount a] <- getFields ["a"]
     [BAccount b] <- getFields ["b"]
-    getSolidStorageKeyVal' (namedAccountToAccount Nothing a) (singleton "x") `shouldReturn` BInteger 3
-    getSolidStorageKeyVal' (namedAccountToAccount Nothing a) (singleton "y") `shouldReturn` BString "hi"
-    getSolidStorageKeyVal' (namedAccountToAccount Nothing b) (singleton "x") `shouldReturn` BInteger 4
+    getSolidStorageKeyVal' (a^.namedAccountAddress) (singleton "x") `shouldReturn` BInteger 3
+    getSolidStorageKeyVal' (a^.namedAccountAddress) (singleton "y") `shouldReturn` BString "hi"
+    getSolidStorageKeyVal' (b^.namedAccountAddress) (singleton "x") `shouldReturn` BInteger 4
 
   it "can error handle improperly referenced overloaded contracts using solidvm 11.4 pragma" $ runTest ( do 
     let getAddressFromResult :: ExecResults -> Maybe Address 
-        getAddressFromResult res = _accountAddress <$> erNewContractAccount res
+        getAddressFromResult res = erNewContractAddress res
 
     res <- runBS' [r|
 pragma solidvm 11.4;

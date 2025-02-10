@@ -2,7 +2,6 @@
 
 module GenerationSpec where
 
-import Blockchain.Data.ChainInfo
 import Blockchain.Data.GenesisInfo
 import Blockchain.Generation
 import Blockchain.Strato.Model.Address

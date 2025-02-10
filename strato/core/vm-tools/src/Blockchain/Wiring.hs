@@ -37,12 +37,10 @@ import Blockchain.DB.SQLDB
 import Blockchain.Data.AddressStateDB
 import Blockchain.Data.Block
 import Blockchain.Data.BlockSummary
-import Blockchain.Data.ChainInfo
 import Blockchain.Data.DataDefs
 import Blockchain.Data.RLP
 import Blockchain.Data.TransactionResult
 import qualified Blockchain.Database.MerklePatricia as MP
-import Blockchain.Strato.Model.Account
 import Blockchain.Strato.Model.Address
 import Blockchain.Strato.Model.CodePtr ()
 import Blockchain.Strato.Model.ExtendedWord
@@ -212,12 +210,12 @@ instance MonadUnliftIO m => (MP.StateRoot `A.Alters` MP.NodeData) (ReaderT Conte
   insert _ = MP.genericInsertDB $ getStateDB
   delete _ = MP.genericDeleteDB $ getStateDB
 
-instance (MonadLogger m, HasContext m, (MP.StateRoot `A.Alters` MP.NodeData) m) => (Account `A.Alters` AddressState) m where
+instance (MonadLogger m, HasContext m, (MP.StateRoot `A.Alters` MP.NodeData) m) => (Address `A.Alters` AddressState) m where
   lookup _ = getAddressStateMaybe
   insert _ = putAddressState
   delete _ = deleteAddressState
 
-instance (MonadLogger m, HasContext m, (MP.StateRoot `A.Alters` MP.NodeData) m) => A.Selectable Account AddressState m where
+instance (MonadLogger m, HasContext m, (MP.StateRoot `A.Alters` MP.NodeData) m) => A.Selectable Address AddressState m where
   select _ = getAddressStateMaybe
 
 instance (MonadLogger m, HasContext m, (MP.StateRoot `A.Alters` MP.NodeData) m) => (Maybe Word256 `A.Alters` MP.StateRoot) m where
@@ -243,9 +241,6 @@ instance (MonadLogger m, HasContext m, (MP.StateRoot `A.Alters` MP.NodeData) m) 
         modify $ memDBs . stateRoots %~ M.delete (bh, chainId)
         deleteChainStateRoot chainId bh
 
-instance (HasContext m, (MP.StateRoot `A.Alters` MP.NodeData) m) => A.Selectable Word256 ParentChainIds m where
-  select _ chainId = fmap (\(_, _, p) -> ParentChainIds p) <$> getChainGenesisInfo (Just chainId)
-
 instance HasContext m => (Keccak256 `A.Alters` DBCode) m where
   lookup _ = genericLookupCodeDB $ getCodeDB
   insert _ = genericInsertCodeDB $ getCodeDB
@@ -253,14 +248,14 @@ instance HasContext m => (Keccak256 `A.Alters` DBCode) m where
 
 instance (MonadLogger m, HasContext m, (MP.StateRoot `A.Alters` MP.NodeData) m) => ((Address, T.Text) `A.Selectable` X509CertificateField) m where
   select _ (k, t) = do
-    let certKey addr = ((Account addr Nothing),) . Text.encodeUtf8
+    let certKey addr = (addr,) . Text.encodeUtf8
     mCertAddress <- lookupX509AddrFromCBHash k
     fmap join . for mCertAddress $ \certAddress -> do
       maybe Nothing (readMaybe . T.unpack . Text.decodeUtf8) <$> A.lookup (A.Proxy) (certKey certAddress t)
 
 instance (MonadLogger m, HasContext m, (MP.StateRoot `A.Alters` MP.NodeData) m) => (Address `A.Selectable` X509Certificate) m where
   select _ k = do
-    let certKey addr = ((Account addr Nothing),) . Text.encodeUtf8
+    let certKey addr = (addr,) . Text.encodeUtf8
     mCertAddress <- lookupX509AddrFromCBHash k
     fmap join . for mCertAddress $ \certAddress -> do
       mBString <- fmap (rlpDecode . rlpDeserialize) <$> A.lookup (A.Proxy) (certKey certAddress ".certificateString")

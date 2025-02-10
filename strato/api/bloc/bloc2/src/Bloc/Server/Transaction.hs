@@ -50,7 +50,6 @@ import Blockchain.Data.Json hiding (Contract)
 import Blockchain.Data.RLP (rlpSerialize, rlpEncode)
 import Blockchain.Data.TXOrigin
 import Blockchain.Data.Transaction (rawTX2TX, transactionHash)
-import Blockchain.Strato.Model.Account
 import Blockchain.Strato.Model.Address hiding (unAddress)
 import Blockchain.Strato.Model.ChainId
 import Blockchain.Strato.Model.Code
@@ -80,7 +79,7 @@ import Data.Conduit.TQueue
 import Data.Foldable
 import Data.Hashable hiding (hash)
 import Data.Int (Int32)
-import Data.List (partition, sortOn)
+import Data.List (sortOn)
 import qualified Data.Map as M
 import Data.Map.Strict (Map)
 import qualified Data.Map.Strict as Map
@@ -104,6 +103,8 @@ import qualified SolidVM.Model.Value as SMV
 import Strato.Strato23.API.Types
 import Strato.Strato23.Client
 import System.Clock
+import Text.Format
+
 import UnliftIO
 
 mergeTxParams :: Maybe TxParams -> Maybe TxParams -> Maybe TxParams
@@ -117,8 +118,8 @@ mergeTxParams inner outer = inner <|> outer
 
 txWorker ::
   ( MonadLogger m,
-    A.Selectable Account Contract m,
-    A.Selectable Account AddressState m,
+    A.Selectable Address Contract m,
+    A.Selectable Address AddressState m,
     A.Selectable Address Certificate m,
     HasCodeDB m,
     (Keccak256 `A.Selectable` SourceMap) m,
@@ -142,8 +143,8 @@ txWorker = forever $ do
 -- | postBlocTransactionBody(jwt, chain ID, [Transactions])
 postBlocTransactionBody ::
   ( MonadLogger m,
-    A.Selectable Account Contract m,
-    A.Selectable Account AddressState m,
+    A.Selectable Address Contract m,
+    A.Selectable Address AddressState m,
     HasCodeDB m,
     HasBlocEnv m,
     HasSQL m,
@@ -249,16 +250,15 @@ postBlocTransactionBody (Just jwt) cid (PostBlocTransactionRequest mAddr txList 
       txsWithParams <- genNonces (Don't CacheNonce) addr methodcallChainid methodcallTxParams txsWithChainids
       forStateT Map.empty txsWithParams $
         \MethodCall{..} -> do
-          let theAccount = Account methodcallContractAddress $ fmap unChainId _methodcallChainid
-          mContract <- use $ at theAccount
+          mContract <- use $ at methodcallContractAddress
           contract <- case mContract of
             Just x -> pure x
             Nothing -> do
-              mContract' <- lift $ A.select (A.Proxy @Contract) theAccount
+              mContract' <- lift $ A.select (A.Proxy @Contract) methodcallContractAddress
               x <- case mContract' of
-                Nothing -> lift $ throwIO . UserError $ "Could not find contract " <> Text.pack (show theAccount)
+                Nothing -> lift $ throwIO . UserError $ "Could not find contract " <> Text.pack (format methodcallContractAddress)
                 Just x -> pure x
-              at theAccount <?= x
+              at methodcallContractAddress <?= x
           sel <- case M.lookup (Text.unpack methodcallMethodName) (contract ^. functions) of
             Just _ -> return $ Text.encodeUtf8 methodcallMethodName
             Nothing -> throwIO . UserError $ "Contract doesn't have a method named '" <> methodcallMethodName <> "'"
@@ -294,8 +294,8 @@ postBlocTransactionBody (Just jwt) cid (PostBlocTransactionRequest mAddr txList 
 -- | postBlocTransactionUnsigned
 postBlocTransactionUnsigned ::
   ( MonadLogger m,
-    A.Selectable Account Contract m,
-    A.Selectable Account AddressState m,
+    A.Selectable Address Contract m,
+    A.Selectable Address AddressState m,
     HasCodeDB m,
     HasBlocEnv m,
     HasSQL m,
@@ -397,16 +397,15 @@ postBlocTransactionUnsigned (Just jwt) cid (PostBlocTransactionRequest mAddr txL
       txsWithParams <- genNonces (Don't CacheNonce) addr methodcallChainid methodcallTxParams [txWithChainids]
       forStateT Map.empty txsWithParams $
         \MethodCall{..} -> do
-          let theAccount = Account methodcallContractAddress $ fmap unChainId _methodcallChainid
-          mContract <- use $ at theAccount
+          mContract <- use $ at methodcallContractAddress
           contract <- case mContract of
             Just x -> pure x
             Nothing -> do
-              mContract' <- lift $ A.select (A.Proxy @Contract) theAccount
+              mContract' <- lift $ A.select (A.Proxy @Contract) methodcallContractAddress
               x <- case mContract' of
-                Nothing -> lift $ throwIO . UserError $ "Could not find contract " <> Text.pack (show theAccount)
+                Nothing -> lift $ throwIO . UserError $ "Could not find contract " <> Text.pack (format methodcallContractAddress)
                 Just x -> pure x
-              at theAccount <?= x
+              at methodcallContractAddress <?= x
           sel <- case M.lookup (Text.unpack methodcallMethodName) (contract ^. functions) of
             Just _ -> return $ Text.encodeUtf8 methodcallMethodName
             Nothing -> throwIO . UserError $ "Contract doesn't have a method named '" <> methodcallMethodName <> "'"
@@ -447,7 +446,7 @@ getMaybeCodeFromContractPayload p =
         Just contract -> 
           Just $ PtrToCode (
             CodeAtAccount
-              (Account p' Nothing)
+              p'
               (unpack contract)
           )
         Nothing -> Nothing
@@ -455,8 +454,8 @@ getMaybeCodeFromContractPayload p =
 
 postBlocTransactionParallel ::
   ( MonadLogger m,
-    A.Selectable Account Contract m,
-    A.Selectable Account AddressState m,
+    A.Selectable Address Contract m,
+    A.Selectable Address AddressState m,
     A.Selectable Address Certificate m,
     HasCodeDB m,
     (Keccak256 `A.Selectable` SourceMap) m,
@@ -482,8 +481,8 @@ postBlocTransactionParallel jwtToken b mUseWallet resolve queue c =
 
 postBlocTransaction ::
   ( MonadLogger m,
-    A.Selectable Account Contract m,
-    A.Selectable Account AddressState m,
+    A.Selectable Address Contract m,
+    A.Selectable Address AddressState m,
     A.Selectable Address Certificate m,
     HasCodeDB m,
     (Keccak256 `A.Selectable` SourceMap) m,
@@ -501,8 +500,8 @@ postBlocTransaction = postBlocTransaction' (Don't CacheNonce)
 
 postBlocTransactionParallelExternal ::
   ( MonadLogger m,
-    A.Selectable Account Contract m,
-    A.Selectable Account AddressState m,
+    A.Selectable Address Contract m,
+    A.Selectable Address AddressState m,
     A.Selectable Address Certificate m,
     HasCodeDB m,
     (Keccak256 `A.Selectable` SourceMap) m,
@@ -521,8 +520,8 @@ postBlocTransactionParallelExternal bearerToken = postBlocTransactionParallel (T
 
 postBlocTransaction' ::
   ( MonadLogger m,
-    A.Selectable Account Contract m,
-    A.Selectable Account AddressState m,
+    A.Selectable Address Contract m,
+    A.Selectable Address AddressState m,
     A.Selectable Address Certificate m,
     HasCodeDB m,
     (Keccak256 `A.Selectable` SourceMap) m,
@@ -560,11 +559,8 @@ postBlocTransaction' cacheNonce mJwtToken chainId mUseWallet resolve (PostBlocTr
             A.select (A.Proxy @Certificate) addr
           pure $ deriveAddressWithSalt (Just userRegistry) (certificateCommonName userCert) userRegistryHash (Just . show $ SMV.OrderedVals [SMV.SString $ certificateCommonName userCert])
         else pure addr
-      nonceMap <- getAccountNonce addr (S.singleton chainId)
-      accountNonce <- case Map.lookup chainId nonceMap of
-        Nothing -> pure $ 0
-        Just (Nonce n) -> pure $ toInteger n
-      when (accountNonce >= accountNonceLimit) $ throwIO NonceLimitExceededError
+      accountNonce <- getAccountNonce addr
+      when (accountNonce >= fromIntegral accountNonceLimit) $ throwIO NonceLimitExceededError
       let src' :: ContractPayload -> Maybe SourceMap
           src' p =
             if contractpayloadSrc p == mempty
@@ -819,7 +815,7 @@ data TransactionHeader = TransactionHeader
   }
 
 postUsersSend' ::
-  ( A.Selectable Account AddressState m,
+  ( A.Selectable Address AddressState m,
     (Keccak256 `A.Selectable` SourceMap) m,
     HasCodeDB m,
     MonadLogger m,
@@ -832,7 +828,7 @@ postUsersSend' ::
   Text ->
   m BlocTransactionResult
 postUsersSend' cacheNonce TransferParameters {..} jwtToken = do
-  params <- getAccountTxParams cacheNonce fromAddress chainId txParams
+  params <- getAccountTxParams cacheNonce fromAddress txParams
   txSizeLimit <- fmap txSizeLimit getBlocEnv
   tx <-
     signAndPrepare jwtToken fromAddress metadata $
@@ -848,7 +844,7 @@ postUsersSend' cacheNonce TransferParameters {..} jwtToken = do
 
 postUsersContractSolidVM' ::
   ( MonadLogger m,
-    A.Selectable Account AddressState m,
+    A.Selectable Address AddressState m,
     (Keccak256 `A.Selectable` SourceMap) m,
     HasCodeDB m,
     HasBlocEnv m,
@@ -860,7 +856,7 @@ postUsersContractSolidVM' ::
   Text ->
   m BlocTransactionResult
 postUsersContractSolidVM' cacheNonce ContractParameters {..} jwtToken = do
-  params <- getAccountTxParams cacheNonce fromAddr chainId txParams
+  params <- getAccountTxParams cacheNonce fromAddr txParams
   txSizeLimit <- fmap txSizeLimit getBlocEnv
   --We might be able to get rid of the metadata for SolidVM, but that will require a change in the API, and needs to be discussed
   $logInfoLS "postUsersContractSolidVM'/args" args
@@ -896,7 +892,7 @@ postUsersContractSolidVM' cacheNonce ContractParameters {..} jwtToken = do
 
 postUsersUploadListSolidVM' ::
   ( MonadLogger m,
-    A.Selectable Account AddressState m,
+    A.Selectable Address AddressState m,
     (Keccak256 `A.Selectable` SourceMap) m,
     HasCodeDB m,
     HasBlocEnv m,
@@ -945,7 +941,7 @@ postUsersUploadListSolidVM' cacheNonce ContractListParameters {..} jwtToken = do
 
 postUsersSendList' ::
   ( MonadLogger m,
-    A.Selectable Account AddressState m,
+    A.Selectable Address AddressState m,
     HasCodeDB m,
     (Keccak256 `A.Selectable` SourceMap) m,
     HasBlocEnv m,
@@ -979,8 +975,8 @@ postUsersSendList' cacheNonce TransferListParameters {..} jwtToken = do
 
 postUsersContractMethodList' ::
   ( MonadLogger m,
-    A.Selectable Account Contract m,
-    A.Selectable Account AddressState m,
+    A.Selectable Address Contract m,
+    A.Selectable Address AddressState m,
     HasCodeDB m,
     (Keccak256 `A.Selectable` SourceMap) m,
     HasBlocEnv m,
@@ -1000,16 +996,15 @@ postUsersContractMethodList' cacheNonce FunctionListParameters {..} jwtToken = d
       txSizeLimit <- fmap txSizeLimit getBlocEnv
       txsFuncNames <- forStateT Map.empty txsWithParams $
         \(MethodCall {..}) -> do
-          let theAccount = Account methodcallContractAddress $ fmap unChainId _methodcallChainid
-          mContract <- use $ at theAccount
+          mContract <- use $ at methodcallContractAddress
           contract <- case mContract of
             Just x -> pure x
             Nothing -> do
-              mContract' <- lift $ A.select (A.Proxy @Contract) theAccount
+              mContract' <- lift $ A.select (A.Proxy @Contract) methodcallContractAddress
               x <- case mContract' of
-                Nothing -> lift $ throwIO . UserError $ "Could not find contract " <> Text.pack (show theAccount)
+                Nothing -> lift $ throwIO . UserError $ "Could not find contract " <> Text.pack (show methodcallContractAddress)
                 Just x -> pure x
-              at theAccount <?= x
+              at methodcallContractAddress <?= x
           sel <- case M.lookup (Text.unpack methodcallMethodName) (contract ^. functions) of
             Just _ -> return $ Text.encodeUtf8 methodcallMethodName
             Nothing -> throwIO . UserError $ "Contract doesn't have a method named '" <> methodcallMethodName <> "'"
@@ -1039,8 +1034,8 @@ postUsersContractMethodList' cacheNonce FunctionListParameters {..} jwtToken = d
 
 postUsersContractMethod' ::
   ( MonadLogger m,
-    A.Selectable Account Contract m,
-    A.Selectable Account AddressState m,
+    A.Selectable Address Contract m,
+    A.Selectable Address AddressState m,
     HasCodeDB m,
     (Keccak256 `A.Selectable` SourceMap) m,
     HasBlocEnv m,
@@ -1052,7 +1047,7 @@ postUsersContractMethod' ::
   Text ->
   m BlocTransactionResult
 postUsersContractMethod' cacheNonce FunctionParameters {..} jwtToken = do
-  params <- getAccountTxParams cacheNonce fromAddr chainId txParams
+  params <- getAccountTxParams cacheNonce fromAddr txParams
   txSizeLimit <- fmap txSizeLimit getBlocEnv
 
   let err =
@@ -1063,9 +1058,7 @@ postUsersContractMethod' cacheNonce FunctionParameters {..} jwtToken = do
             ]
   contract <-
     maybe (throwIO err) pure
-      =<< A.select
-        (A.Proxy @Contract)
-        (Account contractAddr (unChainId <$> chainId))
+      =<< A.select (A.Proxy @Contract) contractAddr
   sel <- case M.lookup (Text.unpack funcName) (contract ^. functions) of
     Just _ -> return $ Text.encodeUtf8 funcName
     Nothing -> throwIO . UserError $ "Contract doesn't have a method named '" <> funcName <> "'"
@@ -1146,10 +1139,10 @@ preparePostTx time from tx =
       Code bytes -> Just bytes
       _ -> Nothing
     cName = case transactionInitOrData tx of
-      PtrToCode (CodeAtAccount (Account _ _) codePtrName) -> Just codePtrName
+      PtrToCode (CodeAtAccount _ codePtrName) -> Just codePtrName
       _ -> Nothing
     cpa = case transactionInitOrData tx of
-      PtrToCode (CodeAtAccount (Account codePtrAddress _) _) -> Just codePtrAddress
+      PtrToCode (CodeAtAccount codePtrAddress _) -> Just codePtrAddress
       _ -> Nothing
     toAddr = transactionTo tx
     chainId = fromMaybe 0 . fmap (\(ChainId c) -> c) $ transactionChainId tx
@@ -1190,10 +1183,10 @@ preparePostUnsignedRawTx time tx md =
       Code bytes -> Just bytes
       _ -> Nothing
     cName = case unsignedTransactionInitOrData tx of
-      PtrToCode (CodeAtAccount (Account _ _) codePtrName) -> Just codePtrName
+      PtrToCode (CodeAtAccount _ codePtrName) -> Just codePtrName
       _ -> Nothing
     cpa = case unsignedTransactionInitOrData tx of
-      PtrToCode (CodeAtAccount (Account codePtrAddress _) _) -> Just codePtrAddress
+      PtrToCode (CodeAtAccount codePtrAddress _) -> Just codePtrAddress
       _ -> Nothing
     toAddr = unsignedTransactionTo tx
     chainId = fromMaybe 0 . fmap (\(ChainId c) -> c) $ unsignedTransactionChainId tx
@@ -1251,27 +1244,26 @@ getAccountTxParams ::
   (MonadLogger m, HasBlocEnv m, HasSQL m) =>
   Should CacheNonce ->
   Address ->
-  Maybe ChainId ->
   Maybe TxParams ->
   m TxParams
-getAccountTxParams cacheNonce addr chainId mTxParams = do
+getAccountTxParams cacheNonce addr mTxParams = do
   let params = fromMaybe emptyTxParams mTxParams
-      cacheKey = Account addr (unChainId <$> chainId)
+      cacheKey = addr
   nonceCache <- fmap globalNonceCounter getBlocEnv
   now <- liftIO $ getTime Monotonic
   mCachedNonce <- case cacheNonce of
     Do CacheNonce -> atomically $ cacheLookup nonceCache now cacheKey
     Don't CacheNonce -> pure Nothing
-  nonceMap <- case mCachedNonce of
-    Just n -> pure $ Map.singleton chainId n
-    Nothing -> getAccountNonce addr (S.singleton chainId)
+  theNonce <- case mCachedNonce of
+    Just n -> pure n
+    Nothing -> getAccountNonce addr
   liftIO . atomically $ do
     now' <- Cache.nowSTM
     mmNonce <- cacheLookup nonceCache now' cacheKey
     let mNonce = case cacheNonce of
           Do CacheNonce -> mmNonce
           Don't CacheNonce -> Nothing
-        sNonce = Map.lookup chainId nonceMap
+        sNonce = Just theNonce
         maxNonce = liftA2 max mNonce sNonce
         newNonce = fromMaybe 0 $ txparamsNonce params <|> maxNonce <|> mNonce <|> sNonce
         expTime = (now' +) <$> Cache.defaultExpiration nonceCache
@@ -1288,48 +1280,46 @@ cacheLookup c t k = do
   Cache.purgeExpiredSTM c t
   Cache.lookupSTM True k c t
 
-genNonces ::
-  (MonadLogger m, HasBlocEnv m, HasSQL m) =>
-  Show a =>
+genNonces :: forall a m.
+  (MonadLogger m, HasBlocEnv m, HasSQL m, Show a) =>
   Should CacheNonce ->
   Address ->
   Lens' a (Maybe ChainId) ->
   Lens' a (Maybe TxParams) ->
   [a] ->
   m [a]
-genNonces cacheNonce fromAddr chainLens l unindexedAs = do
-  let getChainId = view chainLens
-      chainIdsList = S.toList . S.fromList $ getChainId <$> unindexedAs
-      cacheKeys = Account fromAddr . fmap unChainId <$> chainIdsList
+genNonces cacheNonce fromAddr _ l items = do
+  let cacheKey :: Address
+      cacheKey = fromAddr
+      viewNonce :: a -> Maybe Nonce
       viewNonce = txparamsNonce <=< view l
-  let indexedByChainId = indexedPartitionWith getChainId unindexedAs
+      
   nonceCache <- fmap globalNonceCounter getBlocEnv
   now <- liftIO $ getTime Monotonic
-  let lookupCached = case cacheNonce of
-        Do CacheNonce -> atomically (traverse (cacheLookup nonceCache now) cacheKeys)
-        Don't CacheNonce -> pure $ repeat Nothing
-  chainNonceVals <- zip chainIdsList <$> lookupCached
-  let ~(chainsWithNonces, chainsWithoutNonces) = partition (isJust . snd) chainNonceVals
-      cachedNonceMap = Map.fromList $ fmap fromJust <$> chainsWithNonces
-  fetchedNonceMap <- getAccountNonce fromAddr . S.fromList $ fst <$> chainsWithoutNonces
-  let nonceMap = Map.union cachedNonceMap fetchedNonceMap
-  liftIO . atomically $
-    fmap mergePartitions . forM indexedByChainId $ \(chainId, indexedAs) -> do
-      let noncesInUse = S.fromList $ mapMaybe (viewNonce . snd) indexedAs
+  cachedItem <- case cacheNonce of
+                  Do CacheNonce -> atomically $ cacheLookup nonceCache now cacheKey
+                  Don't CacheNonce -> pure $ Nothing
+
+  (sNonce :: Maybe Nonce) <-
+    case cachedItem of
+      Nothing -> fmap Just $ getAccountNonce fromAddr
+      Just val -> return $ Just val
+
+  liftIO . atomically $ do
+      let noncesInUse = S.fromList $ mapMaybe (viewNonce) items
       now' <- Cache.nowSTM
       nonce <-
-        if S.size noncesInUse == length indexedAs
+        if S.size noncesInUse == length items
           then
             pure . Nonce . error $
-              "internal error: unused nonce when already specified " ++ show indexedAs
+              "internal error: unused nonce when already specified " ++ show items
           else do
-            mmNonce <- cacheLookup nonceCache now' (Account fromAddr $ unChainId <$> chainId)
+            mmNonce <- cacheLookup nonceCache now' fromAddr
             let mNonce = case cacheNonce of
                   Do CacheNonce -> mmNonce
                   Don't CacheNonce -> Nothing
-                sNonce = Map.lookup chainId nonceMap
             pure . fromMaybe 0 $ liftA2 max mNonce sNonce <|> mNonce <|> sNonce
-      let txs = runIdentity . forStateT nonce indexedAs $ \(i, a) -> do
+      let txs = runIdentity . forStateT nonce items $ \a -> do
             let params' = fromMaybe emptyTxParams (a ^. l)
             newNonce <- case txparamsNonce params' of
               Just v -> return v
@@ -1339,34 +1329,28 @@ genNonces cacheNonce fromAddr chainLens l unindexedAs = do
                   when inUse $ id += 1
                   return inUse
                 id <<+= 1
-            return (i, (l .~ Just params' {txparamsNonce = Just newNonce}) a)
-          newCachedNonce = 1 + getMax (foldMap (Max . fromMaybe 0 . viewNonce . snd) txs)
+            return $ (l .~ Just params' {txparamsNonce = Just newNonce}) a
+          newCachedNonce = 1 + getMax (foldMap (Max . fromMaybe 0 . viewNonce) txs)
           expTime = (now' +) <$> Cache.defaultExpiration nonceCache
-      Cache.insertSTM (Account fromAddr $ unChainId <$> chainId) newCachedNonce nonceCache expTime
-      pure (chainId, txs)
+      Cache.insertSTM fromAddr newCachedNonce nonceCache expTime
+      pure txs
 
-getAccountNonce ::
-  (MonadLogger m, HasSQL m, HasBlocEnv m) =>
-  Address ->
-  S.Set (Maybe ChainId) ->
-  m (Map (Maybe ChainId) Nonce)
-getAccountNonce addr chainIds = do
-  let chainIds' = map (fromMaybe (ChainId 0)) $ S.toList chainIds
-  let chainIds'' = map (\(ChainId c) -> c) chainIds'
+getAccountNonce :: (MonadLogger m, HasSQL m, HasBlocEnv m) =>
+                   Address -> m Nonce
+getAccountNonce addr = do
   let actions = E.select . E.from $ \accStateRef -> do
         E.where_ (accStateRef E.^. AddressStateRefAddress E.==. E.val addr)
-        E.where_ (accStateRef E.^. AddressStateRefChainId `E.in_` E.valList chainIds'')
         return accStateRef
   mAccts <- SQLDB.sqlQuery actions
-  $logInfoLS "getAccountNonce lookup" (chainIds'', addr)
+  $logInfoLS "getAccountNonce lookup" addr
   $logInfoLS "getAccountNonce results" mAccts
   case mAccts of
-    [] -> return $ Map.fromList [(Nothing, Nonce $ fromInteger 0)]
-    accts -> do
-      let acts = map E.entityVal accts
-      let mkCid AddressStateRef {..} = ChainId <$> toMaybe 0 addressStateRefChainId
-          mkNonce AddressStateRef {..} = Nonce $ fromInteger addressStateRefNonce
-      return . Map.fromList $ map (mkCid &&& mkNonce) acts
+    [] -> return $ Nonce $ fromInteger 0
+    [acct] -> do
+      let act = E.entityVal acct
+      let mkNonce AddressStateRef {..} = Nonce $ fromInteger addressStateRefNonce
+      return $ mkNonce act
+    _ -> error "returned more than one account with a single address in getAccountNonce"
 
 constructArgValues ::
   (MonadIO m, MonadLogger m) =>
@@ -1435,7 +1419,7 @@ getSolidityType _ Xabi.Variadic = Right $ TypeVariadic
 getSolidityType _ Xabi.Decimal = Right . SimpleType $ TypeDecimal
 
 getResultAndRespond ::
-  ( A.Selectable Account AddressState m,
+  ( A.Selectable Address AddressState m,
     HasCodeDB m,
     (Keccak256 `A.Selectable` SourceMap) m,
     MonadLogger m,

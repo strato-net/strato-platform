@@ -31,6 +31,8 @@ docker-compose.notification.ecr.yml
 docker-compose.notification.push.ecr.yml
 docker-compose.notification.push.yml
 docker-compose.notification.yml
+docker-compose.oracle.ecr.yml
+docker-compose.oracle.yml
 strato-platform-manifest.yaml
 eks-vault-deployment.yaml
 eks-identity-deployment.yaml

@@ -12,7 +12,7 @@
 
 module Slipstream.Data.Action where
 
-import Blockchain.Strato.Model.Account
+import Blockchain.Strato.Model.Address
 import Blockchain.Strato.Model.CodePtr
 import Blockchain.Strato.Model.Event
 import Blockchain.Strato.Model.Keccak256
@@ -38,16 +38,16 @@ data AggregateAction = AggregateAction
     actionBlockTimestamp :: UTCTime,
     actionBlockNumber :: Integer,
     actionTxHash :: Keccak256,
-    actionTxSender :: Account,
+    actionTxSender :: Address,
     actionCreator :: Text,
     actionCCCreator :: Maybe Text,
     actionRoot :: Text,
     actionApplication :: Text,
-    actionAccount :: Account,
+    actionAddress :: Address,
     actionCodeHash :: CodePtr,
     actionCodeCollection :: CodeCollection,
     actionStorage :: Action.DataDiff,
-    actionAbstracts :: Map (Account, Text) (Text, Text, [Text]),
+    actionAbstracts :: Map (Address, Text) (Text, Text, [Text]),
     actionMappings :: [Text],
     actionArrays :: [Text],
     actionType :: Action.CallType,
@@ -60,9 +60,9 @@ data AggregateEvent = AggregateEvent
     eventBlockTimestamp :: UTCTime,
     eventBlockNumber :: Integer,
     eventTxHash :: Keccak256,
-    eventTxSender :: Account,
+    eventTxSender :: Address,
     eventIndex :: Int,
-    eventAbstracts :: Map (Account, Text) (Text, Text, [Text]),
+    eventAbstracts :: Map (Address, Text) (Text, Text, [Text]),
     eventEvent :: Event
   }
   deriving (Show, Generic, NFData, ToJSON, FromJSON)
@@ -80,7 +80,7 @@ instance Binary AggregateEvent where
 
 flatten :: Action -> [AggregateAction]
 flatten Action.Action {..} = flip map (OMap.assocs _actionData) $
-  \(account, Action.ActionData {..}) ->
+  \(address, Action.ActionData {..}) ->
     -- It's a Create because I said so
     let t = fromMaybe Action.Create $ listToMaybe _actionDataCallTypes
      in AggregateAction
@@ -93,7 +93,7 @@ flatten Action.Action {..} = flip map (OMap.assocs _actionData) $
             actionCCCreator = _actionDataCCCreator,
             actionRoot = _actionDataRoot,
             actionApplication = _actionDataApplication,
-            actionAccount = account,
+            actionAddress = address,
             actionCodeHash = _actionDataCodeHash,
             actionCodeCollection = _actionDataCodeCollection,
             actionStorage = _actionDataStorageDiffs,
@@ -117,12 +117,8 @@ formatAction AggregateAction {..} =
       ", transactionHash: ",
       tshow actionTxHash,
       ", ",
-      ( case _accountChainId actionAccount of
-          Nothing -> ""
-          Just c -> T.concat ["in chain", tshow c]
-      ),
       " with account: ",
-      tshow (_accountAddress actionAccount),
+      tshow actionAddress,
       " with ",
       tshow
         ( case actionStorage of

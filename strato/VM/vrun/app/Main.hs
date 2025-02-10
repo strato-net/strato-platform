@@ -16,7 +16,6 @@ import qualified Blockchain.Data.TXOrigin as TO
 import Blockchain.Data.Transaction
 import qualified Blockchain.Database.MerklePatricia as MP
 import Blockchain.Sequencer.Event
-import Blockchain.Strato.Model.Account
 import Blockchain.Strato.Model.Address
 import Blockchain.Strato.Model.ChainMember
 import Blockchain.Strato.Model.Code
@@ -121,7 +120,7 @@ main = do
       MP.initializeBlank
       setStateDBStateRoot Nothing MP.emptyTriePtr
 
-      let addr = Account 0xcf03dd0a894ef79cb5b601a43c4b25e3ae4c67ed Nothing
+      let addr = 0xcf03dd0a894ef79cb5b601a43c4b25e3ae4c67ed
       putAddressState
         addr
         AddressState

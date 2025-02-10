@@ -41,7 +41,6 @@ import Blockchain.EVM.Opcodes
 import Blockchain.EVM.PrecompiledContracts
 import Blockchain.EVM.VMM
 import Blockchain.EVM.VMState
-import Blockchain.Strato.Model.Account
 import Blockchain.Strato.Model.Address
 import Blockchain.Strato.Model.Code
 import Blockchain.Strato.Model.ExtendedWord
@@ -139,7 +138,7 @@ logN n = do
   topics' <- sequence $ replicate n pop
 
   theData <- mLoadByteString offset theSize
-  addLog Log {account = owner, bloom = 0, logData = theData, topics = topics'} -- TODO(dustin): Fix bloom filter
+  addLog Log {address = owner, bloom = 0, logData = theData, topics = topics'} -- TODO(dustin): Fix bloom filter
 
 guardStorage :: EVMBase m => VMM m ()
 guardStorage = do
@@ -178,13 +177,13 @@ safe_rem x y = x `rem` y
 
 --For some strange reason, some ethereum tests (the VMTests) create an account when it doesn't
 --exist....  This is a hack to mimic this behavior.
-accountCreationHack :: EVMBase m => Account -> VMM m ()
-accountCreationHack account = do
-  exists <- isJust <$> A.lookup (A.Proxy @AddressState) account
+accountCreationHack :: EVMBase m => Address -> VMM m ()
+accountCreationHack address = do
+  exists <- isJust <$> A.lookup (A.Proxy @AddressState) address
   when (not exists) $ do
     vmState <- vmstateGet
     when (not $ isNothing $ debugCallCreates vmState) $
-      A.insert (A.Proxy @AddressState) account blankAddressState
+      A.insert (A.Proxy @AddressState) address blankAddressState
 
 getBlockHashWithNumber :: EVMBase m => Integer -> Keccak256 -> VMM m (Maybe Keccak256)
 getBlockHashWithNumber num h = do
@@ -256,20 +255,19 @@ runOperation SHA3 = do
   theData <- unsafeSliceByteString p size
   let theHash = hash theData
   push $ keccak256ToWord256 theHash
-runOperation ADDRESS = pushEnvVar $ _accountAddress . envOwner
+runOperation ADDRESS = pushEnvVar envOwner
 runOperation BALANCE = do
   address <- pop
-  account <- Account address <$> getEnvVar envChainId
-  exists <- isJust <$> A.lookup (A.Proxy @AddressState) account
+  exists <- isJust <$> A.lookup (A.Proxy @AddressState) address
   if exists
     then
       push =<< addressStateBalance
-        <$> A.lookupWithDefault (A.Proxy @AddressState) account
+        <$> A.lookupWithDefault (A.Proxy @AddressState) address
     else do
-      accountCreationHack account --needed hack to get the tests working
+      accountCreationHack address --needed hack to get the tests working
       push (0 :: Word256)
-runOperation ORIGIN = pushEnvVar $ _accountAddress . envOrigin
-runOperation CALLER = pushEnvVar $ _accountAddress . envSender
+runOperation ORIGIN = pushEnvVar envOrigin
+runOperation CALLER = pushEnvVar envSender
 runOperation CALLVALUE = pushEnvVar envValue
 runOperation CALLDATALOAD = do
   p <- pop
@@ -302,24 +300,22 @@ runOperation CODECOPY = do
 runOperation GASPRICE = pushEnvVar envGasPrice
 runOperation EXTCODESIZE = do
   address <- pop
-  account <- Account address <$> getEnvVar envChainId
-  accountCreationHack account --needed hack to get the tests working
+  accountCreationHack address --needed hack to get the tests working
   codeHash <-
     addressStateCodeHash
-      <$> A.lookupWithDefault (A.Proxy @AddressState) account
+      <$> A.lookupWithDefault (A.Proxy @AddressState) address
   code <- getExternallyOwned' codeHash
   push $ (fromIntegral (B.length code) :: Word256)
 runOperation EXTCODECOPY = do
   address <- pop
-  account <- Account address <$> getEnvVar envChainId
-  accountCreationHack account --needed hack to get the tests working
+  accountCreationHack address --needed hack to get the tests working
   memOffset <- pop
   codeOffset <- pop
   size <- pop
 
   codeHash <-
     addressStateCodeHash
-      <$> A.lookupWithDefault (A.Proxy @AddressState) account
+      <$> A.lookupWithDefault (A.Proxy @AddressState) address
   code <- getExternallyOwned' codeHash
   mStoreByteString memOffset (safeTake size $ safeDrop codeOffset $ code)
 runOperation RETURNDATASIZE = do
@@ -478,7 +474,7 @@ runOperation CREATE = do
           (addressStateNonce &&& addressStateBalance)
             <$> A.lookupWithDefault (A.Proxy @AddressState) owner
 
-        let newAddress = getNewAddress_unsafe (owner ^. accountAddress) nonce
+        let newAddress = getNewAddress_unsafe owner nonce
 
         if balance < fromIntegral value
           then return Nothing
@@ -492,15 +488,15 @@ runOperation CREATE = do
                   ccGasLimit = gr,
                   ccValue = fromIntegral value
                 }
-            return . Just $ (accountAddress .~ newAddress) owner
+            return . Just $ newAddress
 
   case result of
-    Just account -> push $ account ^. accountAddress
+    Just account -> push account
     Nothing -> push (0 :: Word256)
 runOperation CALL = do
   gas' :: Word256 <- pop
   gas <- downcastGas gas'
-  to' <- pop
+  to <- pop
   value :: Word256 <- pop
   when (value /= 0) guardStorage
   inOffset <- pop
@@ -509,7 +505,6 @@ runOperation CALL = do
   outSize :: Word256 <- pop
 
   owner <- getEnvVar envOwner
-  let to = (accountAddress .~ to') owner
 
   inputData <- unsafeSliceByteString inOffset inSize
   _ <- unsafeSliceByteString outOffset outSize --needed to charge for memory
@@ -555,7 +550,7 @@ runOperation CALL = do
 runOperation CALLCODE = do
   gas' :: Word256 <- pop
   gas <- downcastGas gas'
-  to' <- pop
+  to <- pop
   value :: Word256 <- pop
   inOffset <- pop
   inSize <- pop
@@ -563,7 +558,6 @@ runOperation CALLCODE = do
   outSize :: Word256 <- pop
 
   owner <- getEnvVar envOwner
-  let to = (accountAddress .~ to') owner
 
   inputData <- unsafeSliceByteString inOffset inSize
   _ <- unsafeSliceByteString outOffset outSize --needed to charge for memory
@@ -626,14 +620,13 @@ runOperation DELEGATECALL = do
   if isHomestead
     then do
       gas :: Word256 <- pop
-      to' <- pop
+      to <- pop
       inOffset <- pop
       inSize <- pop
       outOffset <- pop
       outSize :: Word256 <- pop
 
       owner <- getEnvVar envOwner
-      let to = (accountAddress .~ to') owner
       sender <- getEnvVar envSender
 
       inputData <- unsafeSliceByteString inOffset inSize
@@ -658,7 +651,7 @@ runOperation DELEGATECALL = do
             addDebugCallCreate
               DebugCallCreate
                 { ccData = inputData,
-                  ccDestination = Just $ owner,
+                  ccDestination = Just owner,
                   ccGasLimit = fromIntegral gas,
                   ccValue = fromIntegral value
                 }
@@ -690,9 +683,8 @@ runOperation REVERT = do
 runOperation INVALID = throwIO InvalidInstruction
 runOperation SUICIDE = do
   guardStorage
-  address' <- pop
+  address <- pop
   owner <- getEnvVar envOwner
-  let address = (accountAddress .~ address') owner
   A.adjustWithDefault_ (A.Proxy @AddressState) owner $ \addressState -> do
     let allFunds = addressStateBalance addressState
     pay' "transferring all funds upon suicide" owner address allFunds
@@ -740,15 +732,15 @@ opGasPriceAndRefund CALL = do
   to :: Word256 <- getStackItem 1
   val :: Word256 <- getStackItem 2
 
-  toAcct <- Account (Address $ fromIntegral to) <$> getEnvVar envChainId
+  let toAddr = Address $ fromIntegral to
 
-  toAccountExists <- isJust <$> A.lookup (A.Proxy @AddressState) toAcct
+  toAccountExists <- isJust <$> A.lookup (A.Proxy @AddressState) toAddr
 
   self <- getEnvVar envOwner -- if an account being created calls itself, the go client doesn't charge the gCALLNEWACCOUNT fee, so we need to check if that case is occurring here
   return $
     ( fromIntegral gas
         + fromIntegral gCALL
-        + (if toAccountExists || toAcct == self then 0 else fromIntegral gCALLNEWACCOUNT)
+        + (if toAccountExists || toAddr == self then 0 else fromIntegral gCALLNEWACCOUNT)
         +
         --                       (if toAccountExists || to < 5 then 0 else gCALLNEWACCOUNT) +
         (if val > 0 then fromIntegral gCALLVALUETRANSFER else 0),
@@ -1004,7 +996,7 @@ runVMM ::
   EVMBase m =>
   Bool ->
   Bool ->
-  S.Set Account ->
+  S.Set Address ->
   Int ->
   Environment ->
   Gas ->
@@ -1039,7 +1031,7 @@ runVMM isRunningTests' isHomestead preExistingSuicideList cDepth env availableGa
               erTrace = theTrace vmState,
               erLogs = [],
               erEvents = [],
-              erNewContractAccount = Nothing,
+              erNewContractAddress = Nothing,
               erSuicideList = suicideList vmState,
               erAction = Just $ _action vmState,
               erException = Just (Right e),
@@ -1065,18 +1057,17 @@ create ::
   EVMBase m =>
   Bool ->
   Bool ->
-  S.Set Account ->
+  S.Set Address ->
   BlockHeader ->
   Int ->
-  Account ->
-  Account ->
+  Address ->
+  Address ->
   Integer ->
   Integer ->
   Gas ->
-  Account ->
+  Address ->
   Code ->
   Keccak256 ->
-  Maybe Word256 ->
   Maybe (M.Map T.Text T.Text) ->
   m ExecResults
 create
@@ -1093,13 +1084,12 @@ create
   newAddress
   code
   txHash
-  chainId
   metadata = do
     initCode <-
       Code <$> case code of
         Code c -> pure c
         PtrToCode cp -> do
-          codeHash <- resolveCodePtr chainId cp
+          codeHash <- resolveCodePtr cp
           fromMaybe "" <$> traverse getExternallyOwned' codeHash
     let env =
           Environment
@@ -1113,7 +1103,7 @@ create
               envCode = initCode,
               envJumpDests = getValidJUMPDESTs initCode,
               envTxHash = txHash,
-              envChainId = chainId,
+              envChainId = Nothing,
               envMetadata = metadata
             }
 
@@ -1147,12 +1137,12 @@ create
         --have the value, and I can revert without checking for success.
         _ <- pay "revert value transfer" newAddress sender (fromIntegral value)
 
-        purgeStorageMap newAddress
+        purgeStorageMap  newAddress
         A.delete (A.Proxy @AddressState) newAddress
         -- Need to zero gas in the case of an exception.
         return execResults {erRemainingTxGas = 0, erException = Just e}
       Nothing -> do
-        return execResults {erNewContractAccount = Just newAddress}
+        return execResults {erNewContractAddress = Just newAddress}
 
 create' :: EVMBase m => VMM m Code
 create' = do
@@ -1188,10 +1178,10 @@ create' = do
       assignDetails
       return $ Code codeBytes
   where
-    assignCode :: EVMBase m => B.ByteString -> Account -> VMM m ()
-    assignCode codeBytes account = do
+    assignCode :: EVMBase m => B.ByteString -> Address -> VMM m ()
+    assignCode codeBytes address = do
       hsh <- addCode EVM codeBytes
-      A.adjustWithDefault_ (A.Proxy @AddressState) account $ \newAddressState ->
+      A.adjustWithDefault_ (A.Proxy @AddressState) address $ \newAddressState ->
         pure newAddressState {addressStateCodeHash = ExternallyOwned hsh}
     assignDetails = do
       vmState <- vmstateGet
@@ -1209,19 +1199,18 @@ call ::
   Bool ->
   Bool ->
   Bool ->
-  S.Set Account ->
+  S.Set Address ->
   BlockHeader ->
   Int ->
-  Account ->
-  Account ->
-  Account ->
+  Address ->
+  Address ->
+  Address ->
   Word256 ->
   Word256 ->
   B.ByteString ->
   Gas ->
-  Account ->
+  Address ->
   Keccak256 ->
-  Maybe Word256 ->
   Maybe (M.Map T.Text T.Text) ->
   m ExecResults
 call
@@ -1241,7 +1230,6 @@ call
   availableGas
   origin
   txHash
-  chainId
   metadata = do
     let env code =
           Environment
@@ -1255,11 +1243,11 @@ call
               envCode = code,
               envJumpDests = getValidJUMPDESTs code,
               envTxHash = txHash,
-              envChainId = chainId,
+              envChainId = Nothing,
               envMetadata = metadata
             }
 
-    case getPrecompiledCode (fromIntegral $ codeAddress ^. accountAddress) of
+    case getPrecompiledCode (fromIntegral $ codeAddress) of
       Just pc ->
         runVMM isRunningTests' isHomestead preExistingSuicideList callDepth (env $ Code "") availableGas $
           callPrecompiled' noValueTransfer pc
@@ -1333,7 +1321,7 @@ callPrecompiled' noValueTransfer precompiled = do
 
   return (fromMaybe B.empty $ returnVal vmState)
 
-create_debugWrapper :: EVMBase m => BlockHeader -> Account -> Word256 -> B.ByteString -> VMM m (Maybe Account)
+create_debugWrapper :: EVMBase m => BlockHeader -> Address -> Word256 -> B.ByteString -> VMM m (Maybe Address)
 create_debugWrapper block owner value initCodeBytes = do
   balance <- addressStateBalance <$> A.lookupWithDefault (A.Proxy @AddressState) owner
 
@@ -1347,7 +1335,6 @@ create_debugWrapper block owner value initCodeBytes = do
       origin <- getEnvVar envOrigin
       gasPrice <- getEnvVar envGasPrice
       txHash <- getEnvVar envTxHash
-      chainId <- getEnvVar envChainId
       metadata <- getEnvVar envMetadata
 
       gasRemaining <- getGasRemaining
@@ -1374,7 +1361,6 @@ create_debugWrapper block owner value initCodeBytes = do
             newAddress
             initCode
             txHash
-            chainId
             metadata
         mdbs' <- Mod.get (Mod.Proxy @MemDBs)
         Mod.put (Mod.Proxy @MemDBs) mdbs
@@ -1397,7 +1383,7 @@ create_debugWrapper block owner value initCodeBytes = do
 
           return $ Just newAddress
 
-nestedRun_debugWrapper :: EVMBase m => Bool -> Gas -> Account -> Account -> Account -> Word256 -> B.ByteString -> VMM m (Int, Maybe BSS.ShortByteString)
+nestedRun_debugWrapper :: EVMBase m => Bool -> Gas -> Address -> Address -> Address -> Word256 -> B.ByteString -> VMM m (Int, Maybe BSS.ShortByteString)
 nestedRun_debugWrapper noValueTransfer gas receiveAddress owner sender value inputData = do
   currentCallDepth <- getCallDepth
 
@@ -1426,7 +1412,6 @@ nestedRun_debugWrapper noValueTransfer gas receiveAddress owner sender value inp
         gas
         (envOrigin env)
         (envTxHash env)
-        (envChainId env)
         (envMetadata env)
     mdbs' <- Mod.get (Mod.Proxy @MemDBs)
     Mod.put (Mod.Proxy @MemDBs) mdbs
@@ -1479,7 +1464,7 @@ vmStateToExecResults vmState = do
         erLogs = logs vmState,
         erEvents = [],
         -- I think erNewContractAddress should be Nothing if there is an error
-        erNewContractAccount = Nothing,
+        erNewContractAddress = Nothing,
         erSuicideList = suicideList vmState,
         erAction = Just $ _action vmState,
         erException = Nothing,

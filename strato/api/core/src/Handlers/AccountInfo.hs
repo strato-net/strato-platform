@@ -176,9 +176,6 @@ instance HasSQL m => Selectable AccountsFilterParams [AddressStateRef] m where
     | a == accountsFilterParams =
       throwIO . NoFilterError $ "Need one of: " ++ intercalate ", " accountQueryParams
     | otherwise = do
-      chainid <- case _qaChainId of
-        [] -> pure MainChainA
-        cids -> pure $ UnnamedChainIdsA cids
 
       fmap (Just . nub . map E.entityVal) . sqlQuery $
         E.select . E.distinct $
@@ -204,20 +201,10 @@ instance HasSQL m => Selectable AccountsFilterParams [AddressStateRef] m where
                       -- fmap (\v -> accStateRef E.^. AddressStateRefCode E.==. E.val (toCode v)) _qaCode,
                       fmap (\v -> accStateRef E.^. AddressStateRefCodeHash E.==. E.val (Just v)) _qaCodeHash,
                       fmap (\v -> accStateRef E.^. AddressStateRefContractName E.==. E.val (Just $ T.unpack v)) _qaContractName,
-                      fmap (\v -> accStateRef E.^. AddressStateRefCodePtrAddress E.==. E.val (Just v)) _qaCodePtrAddress,
-                      fmap (\v -> accStateRef E.^. AddressStateRefCodePtrChainId E.==. E.val (Just $ unChainId v)) _qaCodePtrChainId
+                      fmap (\v -> accStateRef E.^. AddressStateRefCodePtrAddress E.==. E.val (Just v)) _qaCodePtrAddress
                     ]
 
-            let matchChainId (ChainId cid) = (accStateRef E.^. AddressStateRefChainId) E.==. (E.val cid)
-            let chainCriteria = case chainid of
-                  MainChainA -> [accStateRef E.^. AddressStateRefChainId E.==. E.val 0]
-                  UnnamedChainIdsA cids -> matchChainId <$> cids
-            let allCriteria = case (_qaIgnoreChain, chainCriteria) of
-                  (Just True, _) -> [criteria]
-                  (_, []) -> [criteria]
-                  _ -> map (\cc -> cc : criteria) chainCriteria
-
-            E.where_ (foldl1 (E.||.) (map (foldl1 (E.&&.)) allCriteria))
+            E.where_ (foldl1 (E.&&.) criteria)
 
             E.offset . fromIntegral $ fromMaybe 0 _qaOffset
             E.limit $ maybe appFetchLimit (min appFetchLimit . fromIntegral) _qaLimit

@@ -26,7 +26,7 @@ module Slipstream.Globals
 where
 
 import BlockApps.Solidity.Value
-import Blockchain.Strato.Model.Account
+import Blockchain.Strato.Model.Address
 import Blockchain.Strato.Model.Keccak256
 import Control.DeepSeq
 import Control.Monad
@@ -143,27 +143,27 @@ scrapeFor globalsIORef tableName = do
       let t' = wrapSingleQuotes . wrap1 "%" . escapeUnderscores . escapeQuotes $ tableNameToTextPostgres t
        in encodeUtf8 $ "SELECT table_name from information_schema.tables WHERE table_name like " <> t' <> ";"
 
-getContractState :: MonadIO m => IORef Globals -> Account -> m (Maybe [(T.Text, Value)])
-getContractState globalsIORef account = do
+getContractState :: MonadIO m => IORef Globals -> Address -> m (Maybe [(T.Text, Value)])
+getContractState globalsIORef address = do
   g@Globals {..} <- readIORef globalsIORef
-  case LRU.lookup account contractStates of
+  case LRU.lookup address contractStates of
     (newCache, jv@Just {}) -> do
       recordCacheHit
       writeIORef globalsIORef g {contractStates = newCache}
       return jv
     (newCache, Nothing) -> do
       recordCacheMiss
-      mvs <- eitherToMaybe <$> liftIO (readStorage coldStorageHandle account)
+      mvs <- eitherToMaybe <$> liftIO (readStorage coldStorageHandle address)
       forM_ mvs $ \vs ->
-        let newCache' = LRU.insert account vs newCache
+        let newCache' = LRU.insert address vs newCache
          in writeIORef globalsIORef g {contractStates = newCache'}
       return mvs
 
-setContractState :: MonadIO m => IORef Globals -> Account -> [(T.Text, Value)] -> m ()
-setContractState gref account values = do
+setContractState :: MonadIO m => IORef Globals -> Address -> [(T.Text, Value)] -> m ()
+setContractState gref address values = do
   globals@Globals {..} <- readIORef gref
-  updateGlobals gref globals {contractStates = LRU.insert account values contractStates}
-  asyncWriteToStorage coldStorageHandle account values
+  updateGlobals gref globals {contractStates = LRU.insert address values contractStates}
+  asyncWriteToStorage coldStorageHandle address values
 
 getCCFromGlobals :: MonadIO m => IORef Globals -> Keccak256 -> m (Maybe CodeCollection)
 getCCFromGlobals globalsIORef codeHash = do
@@ -183,7 +183,7 @@ putCCIntoGlobals gref codeHash cc = do
   globals@Globals {..} <- readIORef gref
   updateGlobals gref globals {ccMap = LRU.insert codeHash cc ccMap}
 
-getDelegates :: MonadIO m => IORef Globals -> Account -> m [Account]
+getDelegates :: MonadIO m => IORef Globals -> Address -> m [Address]
 getDelegates globalsIORef acct = do
   g@Globals {..} <- readIORef globalsIORef
   case LRU.lookup acct delegateMap of
@@ -196,7 +196,7 @@ getDelegates globalsIORef acct = do
       writeIORef globalsIORef g {delegateMap = newCache}
       return []
 
-addDelegate :: MonadIO m => IORef Globals -> Account -> Account -> m ()
+addDelegate :: MonadIO m => IORef Globals -> Address -> Address -> m ()
 addDelegate gref acct delegate = do
   g@Globals {..} <- readIORef gref
   case LRU.lookup acct delegateMap of
