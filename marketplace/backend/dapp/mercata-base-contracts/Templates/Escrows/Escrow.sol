@@ -22,15 +22,12 @@ abstract contract Escrow is Utils {
     address public assetRootAddress;
     Asset[] public assets;
 
-    uint public nativeTokenPrice;
-
     constructor(
         address[] _assets,
         uint _collateralQuantity,
         decimal _assetPrice,
         uint _loanToValueRatio,
-        uint _liquidationRatio,
-        uint _nativeTokenPrice
+        uint _liquidationRatio
     ) {
         reserve = msg.sender;
         borrower = address(0);
@@ -40,7 +37,6 @@ abstract contract Escrow is Utils {
         totalCataReward = 0; // Assuming the CATA reward rate is provided externally
         isActive = true;
         lastRewardTimestamp = block.timestamp;
-        nativeTokenPrice = _nativeTokenPrice;
     }
 
     function attachAssets(
@@ -154,7 +150,7 @@ abstract contract Escrow is Utils {
     }
 
     function _updateOnPriceChange(decimal _newPrice, uint _loanToValueRatio, uint _liquidationRatio) internal {
-        uint newCollateralValue = uint((decimal(collateralQuantity).truncate(4) * _newPrice * decimal(nativeTokenPrice)).truncate(0)); // 1 USDST per dollar * 10^18 USDST units per USDST = 10^18.
+        uint newCollateralValue = uint((decimal(collateralQuantity).truncate(4) * _newPrice * 1000000000000000000.0000).truncate(0)); // 1 USDST per dollar * 10^18 USDST units per USDST = 10^18.
         collateralValue = uint(newCollateralValue);
         maxLoanAmount = uint(collateralValue * _loanToValueRatio);
         liquidationAmount = uint(collateralValue * _liquidationRatio);
@@ -168,10 +164,5 @@ abstract contract Escrow is Utils {
     function updateReserve(address _newReserve) external {
         require(msg.sender == reserve, "Only the existing reserve can update the reserve address");
         reserve = _newReserve;
-    }
-
-    function updateNativeTokenPrice(uint _newPrice) external {
-        require(msg.sender == reserve, "Only the reserve can update the native token price");
-        nativeTokenPrice = _newPrice;
     }
 }
