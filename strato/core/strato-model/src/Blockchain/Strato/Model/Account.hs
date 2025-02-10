@@ -5,6 +5,7 @@
 {-# LANGUAGE OverloadedLists #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE QuasiQuotes #-}
+{-# LANGUAGE StandaloneDeriving #-}
 {-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE TupleSections #-}
 
@@ -40,16 +41,33 @@ import Text.Printf
 import Text.Read (readMaybe)
 import Text.ShortDescription
 
+
 data OnNamedChain a = UnspecifiedChain | MainChain | ExplicitChain a
-  deriving (Read, Eq, Ord, Generic, Data, Hashable, Binary)
+  deriving (Read, Generic, Data, Binary)
 
 data NamedAccount = NamedAccount
   { _namedAccountAddress :: Address,
     _namedAccountChainId :: OnNamedChain Word256
   }
-  deriving (Eq, Ord, Generic, Data, Hashable, Binary)
+  deriving (Generic, Data, Binary)
 
 makeLenses ''NamedAccount
+
+instance Eq (OnNamedChain Word256) where
+  MainChain == MainChain = True
+  MainChain == UnspecifiedChain = True
+  UnspecifiedChain == MainChain = True
+  UnspecifiedChain == UnspecifiedChain = True
+
+  ExplicitChain v1 == ExplicitChain v2 = v1 == v2
+  _ == _ = False
+
+deriving instance Hashable (OnNamedChain Word256)
+deriving instance Ord (OnNamedChain Word256)
+
+deriving instance Eq NamedAccount
+deriving instance Ord NamedAccount
+deriving instance Hashable NamedAccount
 
 unspecifiedChain :: Address -> NamedAccount
 unspecifiedChain = flip NamedAccount UnspecifiedChain
