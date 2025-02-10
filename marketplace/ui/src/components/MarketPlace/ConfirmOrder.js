@@ -93,7 +93,7 @@ const ConfirmOrder = ({ paymentServices = [], data, columns }) => {
       sum += item.amount;
     });
     setTax(t.toFixed(2));
-    setSubTotal(sum.toFixed(2));
+    setSubTotal(sum);
     setTotal((sum + t).toFixed(2));
   }, [marketplaceDispatch, cartData]);
 
@@ -172,22 +172,19 @@ const ConfirmOrder = ({ paymentServices = [], data, columns }) => {
     actions.addItemToConfirmOrder(marketplaceDispatch, cartData);
     let orderList = [];
     cartData.forEach((item) => {
-      const is18DecimalPlaces = assetsWithEighteenDecimalPlaces.includes(
+      const decimals = assetsWithEighteenDecimalPlaces.includes(
         item.key
-      );
+      ) ? 18 : item.decimals || 0;
 
       const quantity = new BigNumber(item.qty);
       const unitPrice = new BigNumber(item.unitPrice);
 
       orderList.push({
-        quantity: is18DecimalPlaces
-          ? quantity.multipliedBy(new BigNumber(10).pow(18)).toFixed(0)
-          : quantity.toString(),
+        quantity: quantity.multipliedBy(new BigNumber(10).pow(decimals)).toFixed(0),
+        decimals: decimals,
         assetAddress: item.key,
         firstSale: item.firstSale,
-        unitPrice: is18DecimalPlaces
-          ? unitPrice.dividedBy(new BigNumber(10).pow(18)).toFixed(18)
-          : unitPrice.toFixed(18),
+        unitPrice: unitPrice.dividedBy(new BigNumber(10).pow(decimals)).toFixed(decimals),
       });
     });
 
@@ -305,9 +302,9 @@ const ConfirmOrder = ({ paymentServices = [], data, columns }) => {
   const totalAmount =
     selectedProvider?.serviceName === 'USDST' ||
     selectedProvider?.serviceName?.includes('USDST')
-      ? `${subTotal} USDST`
+      ? `${new BigNumber(subTotal).toString()} USDST`
       : selectedProvider?.serviceName === 'Stripe'
-      ? `${subTotal} USD`
+      ? `${(Math.ceil(subTotal * 100) / 100).toFixed(2)} USD`
       : `${subTotal} ${selectedProvider?.serviceName || 'USD'}`;
 
   return (

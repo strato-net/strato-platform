@@ -42,6 +42,7 @@ class ArtController {
         serialNumber: Joi.string().allow('').optional(),
         name: Joi.string().required(),
         description: Joi.string().required(),
+        decimals: Joi.number().integer().min(0).max(18).required(),
         artist: Joi.string().required(),
         images: Joi.array().items(Joi.string()).required(),
         files: Joi.array().items(Joi.string()).required(),

@@ -101,7 +101,7 @@ const ProductDetails = ({ user, users }) => {
     isFetchingPriceHistory,
     reserves,
   } = useInventoryState();
-  const { cartList, assetsWithEighteenDecimalPlaces, assetsWithEightDecimalPlaces } = useMarketplaceState();
+  const { cartList, assetsWithEighteenDecimalPlaces } = useMarketplaceState();
 
   const [isModalVisible, setIsModalVisible] = useState(false);
   const [timeFilter, setTimeFilter] = useState('1');
@@ -477,9 +477,9 @@ const ProductDetails = ({ user, users }) => {
   );
   const linkUrl = window.location.href;
 
-  const is18DecimalPlaces = assetsWithEighteenDecimalPlaces.includes(
+  const decimals = assetsWithEighteenDecimalPlaces.includes(
     details?.originAddress
-  );
+  ) ? 18 : details?.decimals || 0;
 
   return (
     <>
@@ -666,17 +666,14 @@ const ProductDetails = ({ user, users }) => {
                                 $
                                 {isStaked
                                   ? (details.escrow?.maxLoanAmount).toFixed(2)
-                                  : is18DecimalPlaces
-                                  ? adjustedPrice * Math.pow(10, 18)
-                                  : adjustedPrice.toFixed(2)}{' '}
+                                  : adjustedPrice * Math.pow(10, decimals)}{' '}
                                 <span className="font-normal text-xs mr-2 text-primary">
                                   <b>
                                     (
                                     {isStaked
                                       ? details.escrow?.maxLoanAmount
-                                      : is18DecimalPlaces
-                                      ? adjustedPrice * Math.pow(10, 18)
-                                      : adjustedPrice.toFixed(2)}{' '}
+                                      : adjustedPrice *
+                                        Math.pow(10, decimals)}{' '}
                                     USDST)
                                   </b>
                                 </span>
@@ -721,7 +718,7 @@ const ProductDetails = ({ user, users }) => {
                     </div>
                     <InputNumber
                       className="w-full md:w-[280px] h-9 md:h-10 lg:h-[46px] border text-[#6A6A6A] border-[#00000029] text-center flex flex-col justify-center font-semibold !rounded-lg"
-                      min={1}
+                      min={1/Math.pow(10, inventoryDetails.decimals || 0)}
                       max={availableQuantity}
                       disabled={isStakeable && ownerSameAsUser()}
                       value={
@@ -731,17 +728,14 @@ const ProductDetails = ({ user, users }) => {
                               inventoryDetails.root
                             )
                           ? inventoryDetails.quantity / 1e18
-                          : assetsWithEightDecimalPlaces.includes(
-                              inventoryDetails.root
-                            )
-                          ? inventoryDetails.quantity / 1e8
-                          : inventoryDetails.quantity
+                          : inventoryDetails.quantity /
+                            Math.pow(10, inventoryDetails.decimals || 0)
                       }
                       defaultValue={`${qty}`}
                       controls={false}
                       onChange={(e) => {
                         if (e < availableQuantity) {
-                          setQty(parseInt(e || 0));
+                          setQty(parseFloat(e || 0));
                         } else {
                           setQty(availableQuantity);
                         }
@@ -1075,7 +1069,7 @@ const ProductDetails = ({ user, users }) => {
                       </h2>
                       <Statistics
                         priceHistory={priceHistory}
-                        is18DecimalPlaces={is18DecimalPlaces}
+                        decimals={decimals}
                       />
                     </>
                   )}
@@ -1099,7 +1093,6 @@ const ProductDetails = ({ user, users }) => {
           inventory={inventoryDetails}
           reserves={reserves}
           assetsWithEighteenDecimalPlaces={assetsWithEighteenDecimalPlaces}
-          assetsWithEightDecimalPlaces={assetsWithEightDecimalPlaces}
         />
       )}
       {borrowModalOpen && (
@@ -1110,7 +1103,6 @@ const ProductDetails = ({ user, users }) => {
           inventory={inventoryDetails}
           reserves={reserves}
           assetsWithEighteenDecimalPlaces={assetsWithEighteenDecimalPlaces}
-          assetsWithEightDecimalPlaces={assetsWithEightDecimalPlaces}
         />
       )}
       {repayModalOpen && (
@@ -1121,7 +1113,6 @@ const ProductDetails = ({ user, users }) => {
           inventory={inventoryDetails}
           reserves={reserves}
           assetsWithEighteenDecimalPlaces={assetsWithEighteenDecimalPlaces}
-          assetsWithEightDecimalPlaces={assetsWithEightDecimalPlaces}
         />
       )}
       {message && openToastInventory('bottom')}

@@ -35,7 +35,7 @@ class Admin {
       this.expiration = tokenExpiration;
 
       // Schedule token refresh for 30 seconds before expiration
-      this._scheduleTokenRefresh((tokenExpiration - 30) * 1000);
+      await this._scheduleTokenRefresh((tokenExpiration - 30) * 1000);
     } else {
       throw new Error(`Admin was not created/does not exist. Please check your credential setup.`);
     }
@@ -53,14 +53,16 @@ class Admin {
       this.expiration = expiration;
       
       // Schedule new token refresh for 30 seconds before expiration
-      this._scheduleTokenRefresh((expiration - 30) * 1000);
+      await this._scheduleTokenRefresh((expiration - 30) * 1000);
     } catch(e) {
-      console.error("ERROR: Unable to update the token, check your OAuth settings in config", e);
-      throw e;
+      console.error("ERROR: Unable to update the token", e);
+      console.warn("Sleeping 2 seconds to retry refreshing the access token");
+      await new Promise(resolve => setTimeout(resolve, 2000)); // Sleep for 2 seconds
+      await this._refreshToken()
     }
   }
 
-  _scheduleTokenRefresh(t) {
+  async _scheduleTokenRefresh(t) {
     setTimeout(async () => {
       await this._refreshToken().catch(e => {
           console.log("Error updating token before expiration", e);

@@ -38,12 +38,12 @@ export default {
   prodStratsAddress: 'd2810818e0401e85693f83107ed2b96faeed329c',
   testnetStratsAddress: '5375b8b1c691201acf16a72612d82ed438951a04',
   prodUSDSTAddress: '',
-  testnetUSDSTAddress: 'bbb0e060f3f43c533d5b5f0250ff473de831e5e4',
+  testnetUSDSTAddress: '2f6c3848a75aa075d054fe84b780cbdebd77ec61',
   prodCataAddress: '2680dc6693021cd3fefb84351570874fbef8332a',
   testnetCataAddress: '051cb99bca7c437f4b17dc01bd4ff7c5e09db035',
   testnetETHSTAddress: '921e3d0b4217c7e2bfe7e660cdc4f7edc621f9d5',
   prodETHSTAddress: '93fb7295859b2d70199e0a4883b7c320cf874e6c',
-  testnetWBTCSTAddress: '510e88e658b7bca8b08559f54ebf2f08a8f24855',
+  testnetWBTCSTAddress: '1bf2252f6ccdcfabeb96c372bec0b0fdc1809c36',
   prodWBTCSTAddress: '',
 // TODO: add these address
   testnetUSDTAddress: '',
@@ -80,10 +80,6 @@ export default {
     'd6e292f2c9486ada24f6d5cf2e67f44c5f7f677a', //prodBETHTEMP
     '04d68c24ff359ab457c7b96810f85c51989fe8ed', //prodUSDTEMP
     'bbb0e060f3f43c533d5b5f0250ff473de831e5e4', //testnetUSDSTAddress
-  ],
-  AssetsWithEightDecimalPlaces: [
-    '510e88e658b7bca8b08559f54ebf2f08a8f24855', //testnetWBTCSTAddress 
-    //TODO: add remaining address of the stakeable asset that have 18 decimal value
   ],
   localHost: 'http://localhost',
   burnAddress: '6ec8bbe4a5b87be18d443408df43a45e5972fa1b',

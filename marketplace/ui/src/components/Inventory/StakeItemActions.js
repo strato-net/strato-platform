@@ -19,7 +19,6 @@ const StakeItemActions = ({
   category,
   reserves,
   assetsWithEighteenDecimalPlaces,
-  assetsWithEightDecimalPlaces,
 }) => {
   const [stakeType, setStakeType] = useState('Stake');
   const [stakeModalOpen, setStakeModalOpen] = useState(false);
@@ -57,12 +56,10 @@ const StakeItemActions = ({
 
   // Calculate quantity
   let quantity = inventory?.inventories
-    ? inventory.totalQuantity
+    ? inventory.totalQuantity / Math.pow(10, inventory?.decimals || 0)
     : assetsWithEighteenDecimalPlaces.includes(inventory?.root || '')
     ? inventory?.quantity / 1e18
-    : assetsWithEightDecimalPlaces.includes(inventory?.root || '')
-    ? inventory?.quantity / 1e8
-    : inventory?.quantity || 0;
+    : inventory?.quantity / Math.pow(10, inventory?.decimals || 0);
 
   // stakeQuantity = quantity - collateralQuantity - quantityNotAvailable (will recompute after scaling)
   // Calculate collateralValue
@@ -98,17 +95,13 @@ const StakeItemActions = ({
    * If the inventory.root is in assetsWithEighteenDecimalPlaces, we need to scale down values by 1e18.
    * This matches the logic used in StakeModal and BorrowModal.
    */
-  const is18DecimalPlaces = assetsWithEighteenDecimalPlaces.includes(
+  const decimals = assetsWithEighteenDecimalPlaces.includes(
     inventory?.root || ''
-  );
+  ) ? 18 : inventory?.decimals || 0;
 
-  const is8DecimalPlaces = assetsWithEightDecimalPlaces.includes(
-    inventory?.root || ''
-  );
-
-  if (is18DecimalPlaces || is8DecimalPlaces) {
-    collateralQuantity /= is18DecimalPlaces ? 1e18 : 1e8;
-    quantityNotAvailable /= is18DecimalPlaces ? 1e18 : 1e8;
+  if (decimals > 0) {
+    collateralQuantity /= Math.pow(10, decimals);
+    quantityNotAvailable /= Math.pow(10, decimals);
   }
 
   // Recompute stakeQuantity after possible scaling
@@ -193,7 +186,6 @@ const StakeItemActions = ({
           saleAddress={inventory.saleAddress}
           category={category}
           assetsWithEighteenDecimalPlaces={assetsWithEighteenDecimalPlaces}
-          assetsWithEightDecimalPlaces={assetsWithEightDecimalPlaces}
         />
       )}
       {borrowModalOpen && (
@@ -207,7 +199,6 @@ const StakeItemActions = ({
           saleAddress={inventory.saleAddress}
           category={category}
           assetsWithEighteenDecimalPlaces={assetsWithEighteenDecimalPlaces}
-          assetsWithEightDecimalPlaces={assetsWithEightDecimalPlaces}
         />
       )}
       {repayModalOpen && (
@@ -222,7 +213,6 @@ const StakeItemActions = ({
           category={category}
           reserves={reserves}
           assetsWithEighteenDecimalPlaces={assetsWithEighteenDecimalPlaces}
-          assetsWithEightDecimalPlaces={assetsWithEightDecimalPlaces}
         />
       )}
     </div>

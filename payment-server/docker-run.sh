@@ -102,10 +102,10 @@ if [ "$ORACLE_MODE" = "true" ]; then
       exit 152
     else
       if [ "${SKIP_ORACLE_DEPLOYMENT}" != "true" ]; then
+        echo "creating the .deploy_attempted flag file"
+        touch .deploy_attempted
         echo 'oracle_deploy.yaml does not exist. Deploying oracle contracts...'
         yarn deploy-oracle
-        echo "creating the .deployed flag file"
-        touch .deployed
       else
         echo 'SKIP_ORACLE_DEPLOYMENT is true. Skipping oracle deployment...'
       fi
@@ -117,14 +117,14 @@ if [ "$ORACLE_MODE" = "true" ]; then
       exit 151
     fi
     echo "Found the existing oracle_deploy.yaml"
-    if [ ! -f ".deployed" ]; then
+    if [ ! -f ".deploy_attempted" ]; then
       echo "Starting a recreated container with likely updated env vars, but reusing the pre-existing oracle_config.yaml and oracle_deploy.yaml"
       if [ "${UPGRADE_ORACLE_CONTRACTS}" = "true" ]; then
+        echo "creating the .deploy_attempted flag file"
+        touch .deploy_attempted
         echo "UPGRADE_ORACLE_CONTRACTS=true - deactivating oracle contracts and deploying again..."
         yarn deactivate-oracle
         yarn deploy-oracle
-        echo "creating the .deployed flag file"
-        touch .deployed
       fi
     fi
   fi
@@ -171,7 +171,7 @@ else
   # export METAMASK_SECONDARY_SALE_FEE_PERCENTAGE_VALUE=${METAMASK_SECONDARY_SALE_FEE_PERCENTAGE_VALUE:-3.0}
   export USDST_ADDRESS=${USDST_ADDRESS}
   export USDST_SERVICE_NAME_VALUE=${USDST_SERVICE_NAME_VALUE:-'USDST'}
-  export USDST_IMAGE_URL_VALUE=${USDST_IMAGE_URL_VALUE:-'https://blockapps-public-assets.s3.us-east-1.amazonaws.com/icons/stratFinished.png'}
+  export USDST_IMAGE_URL_VALUE=${USDST_IMAGE_URL_VALUE:-'https://blockapps-public-assets.s3.us-east-1.amazonaws.com/icons/USDST.png'}
   export USDST_PRIMARY_SALE_FEE_PERCENTAGE_VALUE=${USDST_PRIMARY_SALE_FEE_PERCENTAGE_VALUE:-10.0}
   export USDST_SECONDARY_SALE_FEE_PERCENTAGE_VALUE=${USDST_SECONDARY_SALE_FEE_PERCENTAGE_VALUE:-3.0}
   export USDST_FEE_RECIPIENT=${USDST_FEE_RECIPIENT}
@@ -290,10 +290,10 @@ else
       exit 52
     else
       if [ "${SKIP_ORACLE_DEPLOYMENT}" != "true" ]; then
+        echo "Creating the .deploy_attempted flag file"
+        touch .deploy_attempted
         echo 'deploy.yaml does not exist. Deploying payment server contracts...'
         yarn deploy
-        echo "Creating the .deployed flag file"
-        touch .deployed
       else
         echo 'SKIP_DEPLOYMENT is true. Skipping deployment...'
       fi
@@ -305,14 +305,14 @@ else
       exit 51
     fi
     echo "Found the existing deploy.yaml"
-    if [ ! -f ".deployed" ]; then
+    if [ ! -f ".deploy_attempted" ]; then
       echo "Starting a recreated container with likely updated env vars, but reusing the pre-existing config.yaml and deploy.yaml"
       if [ "${UPGRADE_CONTRACTS}" = "true" ]; then
-        echo '"UPGRADE_CONTRACTS=true - deactivating payment server contracts and deploying again...'
+        echo "Creating the .deploy_attempted flag file"
+        touch .deploy_attempted
+        echo '"UPGRADE_CONTRACTS=true - deactivating payment server contracts and deploying again...'=
         yarn deactivate
         yarn deploy
-        echo "Creating the .deployed flag file"
-        touch .deployed
       fi
     fi
   fi

@@ -84,15 +84,11 @@ const SoldOrderDetails = ({ user, users }) => {
             (item) => item.value
           );
       orderDetails.assets.forEach((prod, index) => {
-        const is18DecimalPlaces = assetsWithEighteenDecimalPlaces.includes(
+        const decimals = assetsWithEighteenDecimalPlaces.includes(
           prod.root
-        );
-        const productQuantity = is18DecimalPlaces
-          ? orderQuantities[index] / Math.pow(10, 18)
-          : orderQuantities[index];
-        const productPrice = is18DecimalPlaces
-          ? (prod.price * Math.pow(10, 18)).toFixed(2)
-          : prod.price;
+        ) ? 18 : prod.decimals || 0;
+        const productQuantity = orderQuantities[index] / Math.pow(10, decimals);
+        const productPrice = (prod.price * Math.pow(10, decimals)).toFixed(2);
 
         items.push({
           address: prod.address,
@@ -105,8 +101,15 @@ const SoldOrderDetails = ({ user, users }) => {
           productName: prod,
           name: prod.name,
           unitPrice: productPrice,
-          quantity: productQuantity ? formattedNum(productQuantity) : '--',
-          amount: formattedNum((productPrice * productQuantity).toFixed(2)),
+          quantity: productQuantity
+            ? productQuantity.toLocaleString('en-US', {
+                maximumFractionDigits: decimals,
+                minimumFractionDigits: 0,
+              })
+            : '--',
+          amount: formattedNum(
+            (productPrice * productQuantity).toFixed(2)
+          ),
           serialNumber: prod,
           tax: prod.tax ? prod.tax : 0,
         });

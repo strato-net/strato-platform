@@ -40,25 +40,14 @@ const Checkout = () => {
     usePaymentServiceState();
   const paymentServiceDispatch = usePaymentServiceDispatch();
   const [api, contextHolder] = notification.useNotification();
-  const { cartList, USDSTAddress, assetsWithEighteenDecimalPlaces, assetsWithEightDecimalPlaces } = useMarketplaceState();
+  const { cartList, USDSTAddress, assetsWithEighteenDecimalPlaces } = useMarketplaceState();
   const { isCreateOrderSubmitting, message, success } = useOrderState();
 
   const [mapData, setmapData] = useState([]);
 
   const calculateTax = (item) => {
-    const is18DecimalPlaces = assetsWithEighteenDecimalPlaces.includes(
-      item.product.originAddress
-    );
-    const is8DecimalPlaces = assetsWithEightDecimalPlaces.includes(
-      item.product.originAddress
-    );
-    let price = new Decimal(
-      is18DecimalPlaces
-        ? item.product.price * Math.pow(10, 18)
-        : is8DecimalPlaces
-        ? item.product.price * Math.pow(10, 8)
-        : item.product.price
-    );
+    const decimals = assetsWithEighteenDecimalPlaces.includes(item.product.originAddress) ? 18 : item.product.decimals || 0;
+    let price = new Decimal(item.product.price * Math.pow(10, decimals));
     let tax = new Decimal(CHARGES.TAX);
     let result = price.mul(tax).div(100);
 
@@ -66,19 +55,8 @@ const Checkout = () => {
   };
 
   const calculateAmount = (item) => {
-    const is18DecimalPlaces = assetsWithEighteenDecimalPlaces.includes(
-      item.product.originAddress
-    );
-    const is8DecimalPlaces = assetsWithEightDecimalPlaces.includes(
-      item.product.originAddress
-    );
-    let price = new Decimal(
-      is18DecimalPlaces
-        ? item.product.price * Math.pow(10, 18)
-        : is8DecimalPlaces
-        ? item.product.price * Math.pow(10, 8)
-        : item.product.price
-    );
+    const decimals = assetsWithEighteenDecimalPlaces.includes(item.product.originAddress) ? 18 : item.product.decimals || 0;
+    let price = new Decimal(item.product.price * Math.pow(10, decimals));
     let tax = calculateTax(item);
     let result = price.mul(item.qty).plus(tax);
 
@@ -113,8 +91,7 @@ const Checkout = () => {
       const { paymentServices, items } = value;
       let modifiedValue = [];
       items.forEach((item) => {
-        const is18DecimalPlaces = assetsWithEighteenDecimalPlaces.includes(item.product.originAddress);
-        const is8DecimalPlaces = assetsWithEightDecimalPlaces.includes(item.product.originAddress);
+        const decimals = assetsWithEighteenDecimalPlaces.includes(item.product.originAddress) ? 18 : item.product.decimals || 0;
         const parts = item.product.contract_name.split('-');
         let amount = calculateAmount(item);
 
@@ -134,16 +111,9 @@ const Checkout = () => {
             item.product.address === item.product.originAddress ? true : false,
           sellersCommonName: item.product.ownerCommonName,
           unitOfMeasure: item.product.unitOfMeasurement,
-          unitPrice: is18DecimalPlaces
-            ? item.product.price * Math.pow(10, 18)
-            : is8DecimalPlaces
-            ? item.product.price * Math.pow(10, 8)
-            : item.product.price,
-          quantity: is18DecimalPlaces
-            ? item.product.saleQuantity / Math.pow(10, 18)
-            : is8DecimalPlaces
-            ? item.product.saleQuantity / Math.pow(10, 8)
-            : item.product.saleQuantity,
+          unitPrice: item.product.price * Math.pow(10, decimals),
+          quantity: item.product.saleQuantity / Math.pow(10, decimals),
+          decimals: decimals,
           saleAddress: item.product.saleAddress,
           tax: calculateTax(item),
           amount: amount,
@@ -219,7 +189,7 @@ const Checkout = () => {
   };
 
   const ValueQty = (product, e) => {
-    e = parseInt(e || 0);
+    e = parseFloat(e || 0);
     let items = [...cartList];
     cartList.forEach((element, index) => {
       if (element.product.address === product.key) {
@@ -324,7 +294,7 @@ const Checkout = () => {
             </div>
             <InputNumber
               className="w-[100px] bg-[transparent] border-none text-[#202020]  font-semibold text-sm text-center flex flex-col justify-center"
-              min={1}
+              min={1/Math.pow(10, product.decimals)}
               value={qty}
               defaultValue={qty}
               controls={false}

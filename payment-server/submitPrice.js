@@ -23,11 +23,13 @@ async function submitPrice(token, contract, args) {
 
 // Function to update the price of the Asset Sale price
 async function updateMetalPrice(assetName, token, contractAddress, price) {
-  const priceMarkup =
-    (assetName === "gold"
-      ? process.env.GOLD_PRICE_MARKUP
-      : process.env.SILVER_PRICE_MARKUP) || "1"; // Default to "1" if undefined
-  const parsedPriceMarkup = parseFloat(priceMarkup);
+  const parsedPriceMarkup = parseFloat(
+    process.env[
+      assetName.toLowerCase().includes("gold")
+        ? "GOLD_PRICE_MARKUP"
+        : "SILVER_PRICE_MARKUP"
+    ] || "1"
+  );
   const callArgs = {
     contract: {
       address: contractAddress,
@@ -358,7 +360,7 @@ const updateSalePricePeriodically = async () => {
           config,
           query: {
             address: "eq." + address,
-            select: "sale,name",
+            select: "sale,name,decimals",
           },
         };
 
@@ -378,13 +380,13 @@ const updateSalePricePeriodically = async () => {
           process.env.METALS_API_KEY
         );
 
+        const decimals = assetResult[0].decimals || 0;
+
         await updateMetalPrice(
           asset.name.toLowerCase(),
           token,
           assetResult[0]?.sale,
-          assetResult[0]?.name.toLowerCase().includes("gold")
-            ? metalResult.price / 100
-            : metalResult.price
+          metalResult.price / Math.pow(10, decimals)
         );
         console.log(
           `[Sale Update] Price updated for asset: ${address} at ${new Date().toISOString()}`

@@ -17,7 +17,6 @@ const GlobalTransactionResponsive = ({
   isTransactionLoading,
   fetchData,
   assetsWithEighteenDecimalPlaces,
-  assetsWithEightDecimalPlaces,
   ethstAddress,
   wbtcstAddress,
   usdtAddress,
@@ -85,6 +84,7 @@ const GlobalTransactionResponsive = ({
                 assetAddress,
                 assetDescription,
                 quantity,
+                decimals,
                 from,
                 to,
                 status,
@@ -116,8 +116,6 @@ const GlobalTransactionResponsive = ({
               ];
               const is18DecimalPlaces =
                 assetsWithEighteenDecimalPlaces.includes(assetOriginAddress);
-              const is8DecimalPlaces =
-                assetsWithEightDecimalPlaces.includes(assetOriginAddress);
 
               const handleDetailRedirection = () => {
                 let route;
@@ -258,17 +256,13 @@ const GlobalTransactionResponsive = ({
                         {formattedNum(
                           is18DecimalPlaces
                             ? (price * Math.pow(10, 18)).toFixed(2)
-                            : is8DecimalPlaces
-                            ? (price * Math.pow(10, 8)).toFixed(2)
-                            : price
+                            : (price * Math.pow(10, decimals || 0)).toFixed(2)
                         )}{' '}
                         (
                         {formattedNum(
                           is18DecimalPlaces
                             ? (price * Math.pow(10, 18)).toFixed(2)
-                            : is8DecimalPlaces
-                            ? (price * Math.pow(10, 8) * 100).toFixed(2)
-                            : price
+                            : (price * Math.pow(10, decimals || 0)).toFixed(2)
                         )}{' '}
                         {USDSTIcon})
                       </p>
@@ -281,9 +275,7 @@ const GlobalTransactionResponsive = ({
                       Qty:{' '}
                       {(is18DecimalPlaces
                         ? quantity / Math.pow(10, 18)
-                        : is8DecimalPlaces
-                        ? quantity / Math.pow(10, 8)
-                        : quantity
+                        : quantity / Math.pow(10, decimals || 0)
                       ).toLocaleString('en-US', {
                         maximumFractionDigits: 6,
                         minimumFractionDigits: 0,

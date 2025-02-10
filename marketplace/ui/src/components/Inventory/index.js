@@ -91,7 +91,6 @@ const Inventory = ({ user }) => {
   const {
     USDSTAddress,
     assetsWithEighteenDecimalPlaces,
-    assetsWithEightDecimalPlaces,
   } = useMarketplaceState();
   const formatter = new Intl.NumberFormat('en-US');
   const formattedNum = (num) => formatter.format(num);
@@ -463,26 +462,21 @@ const Inventory = ({ user }) => {
         const is18DecimalPlaces = assetsWithEighteenDecimalPlaces.includes(
           record.originAddress
         );
-        const is8DecimalPlaces = assetsWithEightDecimalPlaces.includes(
-          record.originAddress
-        );
         const price = record.price
           ? is18DecimalPlaces
             ? parseFloat(record.price * 10 ** 18).toFixed(2)
-            : is8DecimalPlaces
-            ? parseFloat(record.price * 10 ** 8).toFixed(2)
-            : record.price
+            : parseFloat(record.price * 10 ** (record.decimals || 0)).toFixed(2)
           : 'N/A';
         return (
           <div>
             {price !== 'N/A' ? (
-              <>
+              <div className="flex flex-col items-center">
                 <span>${price}</span>{' '}
                 <p className="flex text-xs items-center gap-1">
                   {' '}
                   &nbsp;({price} {USDSTIcon})
                 </p>
-              </>
+              </div>
             ) : (
               'N/A'
             )}
@@ -497,17 +491,14 @@ const Inventory = ({ user }) => {
         const is18DecimalPlaces = assetsWithEighteenDecimalPlaces.includes(
           record.originAddress
         );
-        const is8DecimalPlaces = assetsWithEightDecimalPlaces.includes(
-          record.originAddress
-        );
         const quantity = (
           is18DecimalPlaces
             ? new BigNumber(record.quantity).dividedBy(
                 new BigNumber(10).pow(18)
               )
-            : is8DecimalPlaces
-            ? new BigNumber(record.quantity).dividedBy(new BigNumber(10).pow(8))
-            : new BigNumber(record.quantity)
+            : new BigNumber(record.quantity).dividedBy(
+                new BigNumber(10).pow(record.decimals || 0)
+              )
         )
           .toNumber()
           .toLocaleString('en-US', {
@@ -524,19 +515,14 @@ const Inventory = ({ user }) => {
         const is18DecimalPlaces = assetsWithEighteenDecimalPlaces.includes(
           record.originAddress
         );
-        const is8DecimalPlaces = assetsWithEightDecimalPlaces.includes(
-          record.originAddress
-        );
         const saleQuantity = (
           is18DecimalPlaces
             ? new BigNumber(record.saleQuantity || 0).dividedBy(
                 new BigNumber(10).pow(18)
               )
-            : is8DecimalPlaces
-            ? new BigNumber(record.saleQuantity || 0).dividedBy(
-                new BigNumber(10).pow(8)
+            : new BigNumber(record.saleQuantity || 0).dividedBy(
+                new BigNumber(10).pow(record.decimals || 0)
               )
-            : new BigNumber(record.saleQuantity || 0)
         ).toString();
 
         return <div className="w-24">{saleQuantity}</div>;
@@ -558,7 +544,6 @@ const Inventory = ({ user }) => {
             supportedTokens={supportedTokens}
             reserves={reserves}
             assetsWithEighteenDecimalPlaces={assetsWithEighteenDecimalPlaces}
-            assetsWithEightDecimalPlaces={assetsWithEightDecimalPlaces}
           />
         </div>
       ),
@@ -824,9 +809,6 @@ const Inventory = ({ user }) => {
                         assetsWithEighteenDecimalPlaces={
                           assetsWithEighteenDecimalPlaces
                         }
-                        assetsWithEightDecimalPlaces={
-                          assetsWithEightDecimalPlaces
-                        }
                       />
                     ))
                   ) : (
@@ -850,9 +832,6 @@ const Inventory = ({ user }) => {
                         reserves={reserves}
                         assetsWithEighteenDecimalPlaces={
                           assetsWithEighteenDecimalPlaces
-                        }
-                        assetsWithEightDecimalPlaces={
-                          assetsWithEightDecimalPlaces
                         }
                       />
                     ))

@@ -27,7 +27,6 @@ const Transaction = ({ user }) => {
   const [stratAddress, setStratAddress] = useState('');
   const [assetsWithEighteenDecimalPlaces, setAssetsWithEighteenDecimalPlaces] =
     useState('');
-  const [assetsWithEightDecimalPlaces, setAssetsWithEightDecimalPlaces] = useState('');
 
   useEffect(() => {
     const fetchAddresses = async () => {
@@ -38,10 +37,6 @@ const Transaction = ({ user }) => {
         await marketplaceActions.fetchAssetsWithEighteenDecimalPlaces(
           marketplaceDispatch
         );
-      const assetsWithEightDecimalPlaces =
-        await marketplaceActions.fetchAssetsWithEightDecimalPlaces(
-          marketplaceDispatch
-        );
       await ethAcions.fetchETHSTAddress(ethDispatch);
       await ethAcions.fetchWBTCSTAddress(ethDispatch);
       await ethAcions.fetchUSDTAddress(ethDispatch);
@@ -49,7 +44,6 @@ const Transaction = ({ user }) => {
       await ethAcions.fetchPAXGAddress(ethDispatch);
       setStratAddress(stratAddress);
       setAssetsWithEighteenDecimalPlaces(assetsWithEighteenDecimalPlaces);
-      setAssetsWithEightDecimalPlaces(assetsWithEightDecimalPlaces);
     };
 
     fetchAddresses();
@@ -104,10 +98,9 @@ const Transaction = ({ user }) => {
           transaction.assetContractName
         );
         let isStrat = transaction.assetOriginAddress === stratAddress;
-        let is18DecimalPlaces = assetsWithEighteenDecimalPlaces.includes(
+        let decimals = assetsWithEighteenDecimalPlaces.includes(
           transaction.assetOriginAddress
-        );
-        let is8DecimalPlaces = assetsWithEightDecimalPlaces.includes(transaction.assetOriginAddress);
+        ) ? 18 : transaction.decimals || 0;
         return formatDataObject({
           reference: transaction?.reference,
           type: transaction?.type,
@@ -116,18 +109,10 @@ const Transaction = ({ user }) => {
           assetName: transaction?.assetName,
           Price: isStrat
             ? Number((transaction?.price * 100).toFixed(2))
-            : is18DecimalPlaces
-            ? Number((transaction?.price * Math.pow(10, 18)).toFixed(2))
-            : is8DecimalPlaces
-            ? Number((transaction?.price * Math.pow(10, 8)).toFixed(2))
-            : transaction?.price,
+            : Number((transaction?.price * Math.pow(10, decimals)).toFixed(2)),
           quantity: isStrat
             ? (transaction?.quantity / 100).toString()
-            : is18DecimalPlaces
-            ? (transaction?.quantity / Math.pow(10, 18)).toString()
-            : is8DecimalPlaces
-            ? (transaction?.quantity / Math.pow(10, 8)).toString()
-            : transaction?.quantity.toString(),
+            : (transaction?.quantity / Math.pow(10, decimals)).toString(),
           from: transaction.from,
           to: transaction.to,
           hash: transaction.transaction_hash,
@@ -262,7 +247,6 @@ const Transaction = ({ user }) => {
         download={download}
         stratAddress={stratAddress}
         assetsWithEighteenDecimalPlaces={assetsWithEighteenDecimalPlaces}
-        assetsWithEightDecimalPlaces={assetsWithEightDecimalPlaces}
       />
     </div>
   );

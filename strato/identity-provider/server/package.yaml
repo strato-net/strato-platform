@@ -4,6 +4,7 @@ github:              "githubuser/blockapps-identity-provider-server"
 author:              "Author name here"
 maintainer:          "example@example.com"
 copyright:           "2023 Author name here"
+license:             Apache-2.0
 
 extra-source-files:
 - README.md

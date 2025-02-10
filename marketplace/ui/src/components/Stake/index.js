@@ -37,7 +37,7 @@ const USDSTIcon = (
   <img src={Images.USDST} alt={''} title={''} className="w-4 h-4" />
 );
 
-function combineInventories(items, assetsWithEighteenDecimalPlaces, assetsWithEightDecimalPlaces) {
+function combineInventories(items, assetsWithEighteenDecimalPlaces) {
   // Step 1: Group items by `root`
   const grouped = items.reduce((acc, item) => {
     const { root } = item;
@@ -58,17 +58,18 @@ function combineInventories(items, assetsWithEighteenDecimalPlaces, assetsWithEi
       'BlockApps-Mercata-Asset-images': assetImages,
     } = firstItem;
 
-    const is18DecimalPlaces = assetsWithEighteenDecimalPlaces.includes(root);
-    const is8DecimalPlaces = assetsWithEightDecimalPlaces.includes(root);
+    const decimals = assetsWithEighteenDecimalPlaces.includes(root)
+      ? 18
+      : firstItem.decimals || 0;
 
     // Step 3: Sum `quantity` and `saleQuantity` across the group
     const totalQuantity = group.reduce((sum, item) => {
       const quantity = item.quantity || 0;
-      return sum + (is18DecimalPlaces ? quantity / 1e18 : is8DecimalPlaces ? quantity / 1e8 : quantity);
+      return sum + quantity;
     }, 0);
     const totalSaleQuantity = group.reduce((sum, item) => {
       const saleQuantity = item.saleQuantity ? item.quantity || 0 : 0;
-      return sum + (is18DecimalPlaces ? saleQuantity / 1e18 : is8DecimalPlaces ? saleQuantity / 1e8 : saleQuantity);
+      return sum + saleQuantity;
     }, 0);
 
     // Step 4: Aggregate varying fields into `inventories`
@@ -88,6 +89,7 @@ function combineInventories(items, assetsWithEighteenDecimalPlaces, assetsWithEi
       'BlockApps-Mercata-Asset-fileNames': assetFileNames,
       'BlockApps-Mercata-Asset-files': assetFiles,
       'BlockApps-Mercata-Asset-images': assetImages,
+      decimals,
       totalQuantity,
       totalSaleQuantity,
       inventories: inventoriesArr,
@@ -112,7 +114,8 @@ const Stake = ({ user }) => {
     success,
   } = useInventoryState();
   const { categorys } = useCategoryState();
-  const { USDSTAddress, assetsWithEighteenDecimalPlaces, assetsWithEightDecimalPlaces } = useMarketplaceState();
+  const { USDSTAddress, assetsWithEighteenDecimalPlaces } =
+    useMarketplaceState();
   const linkUrl = window.location.href;
   const [api, contextHolder] = notification.useNotification();
   const [limit, setLimit] = useState(10);
@@ -120,7 +123,10 @@ const Stake = ({ user }) => {
   const [page, setPage] = useState(1);
   const navigate = useNavigate();
 
-  const combinedInventories = combineInventories(inventories, assetsWithEighteenDecimalPlaces, assetsWithEightDecimalPlaces);
+  const combinedInventories = combineInventories(
+    inventories,
+    assetsWithEighteenDecimalPlaces
+  );
   const onPageChange = (page, pageSize) => {
     setLimit(pageSize);
     setOffset((page - 1) * pageSize);
@@ -184,16 +190,14 @@ const Stake = ({ user }) => {
     const filteredInventories = inventories.filter(
       (inv) => inv.root === parentRecord.root
     );
-  
+
     // Extract unique escrows from filtered inventories
     const uniqueEscrows = [
       ...new Set(
-        filteredInventories
-          .map((inv) => inv.escrow?.address)
-          .filter(Boolean) // Remove null/undefined addresses
+        filteredInventories.map((inv) => inv.escrow?.address).filter(Boolean) // Remove null/undefined addresses
       ),
     ];
-  
+
     // Populate missing escrows
     const populatedInventories = filteredInventories.map((inv) => {
       if (!inv.escrow || !inv.escrow.address) {
@@ -214,7 +218,6 @@ const Stake = ({ user }) => {
           reserves,
           USDSTAddress,
           assetsWithEighteenDecimalPlaces,
-          assetsWithEightDecimalPlaces,
           navigate
         )}
         dataSource={populatedInventories}
@@ -289,8 +292,7 @@ const Stake = ({ user }) => {
                     offset,
                     reserves,
                     USDSTAddress,
-                    assetsWithEighteenDecimalPlaces,
-                    assetsWithEightDecimalPlaces,
+                    assetsWithEighteenDecimalPlaces
                   )}
                   dataSource={combinedInventories.slice(offset, offset + limit)}
                   loading={isInventoriesLoading}
@@ -325,8 +327,9 @@ const Stake = ({ user }) => {
                     allSubcategories={allSubcategories}
                     user={user}
                     reserves={reserves}
-                    assetsWithEighteenDecimalPlaces={assetsWithEighteenDecimalPlaces}
-                    assetsWithEightDecimalPlaces={assetsWithEightDecimalPlaces}
+                    assetsWithEighteenDecimalPlaces={
+                      assetsWithEighteenDecimalPlaces
+                    }
                   />
                 ))}
               </div>

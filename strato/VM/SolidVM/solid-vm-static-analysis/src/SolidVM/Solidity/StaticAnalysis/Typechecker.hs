@@ -244,8 +244,8 @@ lookupContractFunction x cName fName = do
                 <$ x
           Just VariableDecl {..} ->
             if _varIsPublic
-              then do 
-                nestedType' x _varType
+              then do
+                nestedType' x _varType  -- Use nestedType' to handle arrays and other types
               else
                 bottom $
                   ( T.concat
@@ -262,10 +262,36 @@ lookupContractFunction x cName fName = do
       
   where 
     nestedType' :: SourceAnnotation Text -> SVMType.Type -> Type'
-    nestedType' y (SVMType.Array t _) = let f = nestedType' y t
-                                          in case f of
-                                              Function (Product args _) ret _ _ _ _ -> Function (Product ((intType' y):args) y) ret y [] [] True
-                                              _ -> bottom $ "A maximum one layer nesting of arrays is supported" <$ y
+    nestedType' y (SVMType.Array t _) = 
+        -- For multidimensional arrays, we need to accept multiple indices as a product
+        let indicez = collectArrayDimensions t []
+            indexType = Static (SVMType.Int (Just False) (Just 32)) y
+            indexTypes = replicate (length indicez + 1) indexType
+            baseType = getBaseType t
+        in Function (Product [] y) 
+                   (Static (SVMType.Array t Nothing) y) 
+                   y 
+                   [ Function 
+                       (Product indexTypes y)  -- Accept all indices as a product
+                       (Static baseType y)     -- Return the base type
+                       y 
+                       [] 
+                       [] 
+                       False
+                   ]
+                   [] 
+                   False
+      where
+        -- Helper to collect all array dimensions
+        collectArrayDimensions :: SVMType.Type -> [SVMType.Type] -> [SVMType.Type]
+        collectArrayDimensions (SVMType.Array innerT _) acc = 
+            collectArrayDimensions innerT (innerT : acc)
+        collectArrayDimensions _ acc = acc
+
+        -- Helper to get the base (non-array) type
+        getBaseType :: SVMType.Type -> SVMType.Type
+        getBaseType (SVMType.Array innerT _) = getBaseType innerT
+        getBaseType bt = bt
     nestedType' y (SVMType.Mapping _ k v) = let f = nestedType' y v
                                               in case f of
                                                   Function (Product args _) ret _ _ _ _ -> Function (Product ((Static k y):args) y) ret y [] [] False

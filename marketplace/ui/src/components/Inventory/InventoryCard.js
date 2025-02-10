@@ -37,7 +37,7 @@ import { useInventoryState } from '../../contexts/inventory';
 import { useEthState } from '../../contexts/eth';
 import RepayModal from './RepayModal';
 import BorrowModal from './BorrowModal';
-const USDSTIcon = <img src={Images.USDST} alt="USDST" className="w-5 h-5" />;
+const USDSTIcon = <img src={Images.USDST} alt="USDST" className="w-5 h-5 ml-1" />;
 
 const InventoryCard = ({
   inventory,
@@ -50,7 +50,6 @@ const InventoryCard = ({
   user,
   supportedTokens,
   assetsWithEighteenDecimalPlaces,
-  assetsWithEightDecimalPlaces,
 }) => {
   const textRef = useRef(null);
   const { isReserveLoading, reserves } = useInventoryState();
@@ -74,48 +73,29 @@ const InventoryCard = ({
   const ethNaviroute = routes.EthstProductDetail.url;
   const imgMeta = category ? category : SEO.TITLE_META;
   const itemData = inventory.data;
-  const is18DecimalPlaces = assetsWithEighteenDecimalPlaces.includes(
+  const decimals = assetsWithEighteenDecimalPlaces.includes(
     inventory.originAddress
+  )
+    ? 18
+    : inventory.decimals || 0;
+  const quantity = new BigNumber(inventory.quantity).dividedBy(
+    new BigNumber(10).pow(decimals)
   );
-  const is8DecimalPlaces = assetsWithEightDecimalPlaces.includes(
-    inventory.originAddress
-  );
-  const quantity = is18DecimalPlaces
-    ? new BigNumber(inventory.quantity).dividedBy(new BigNumber(10).pow(18))
-    : is8DecimalPlaces
-    ? new BigNumber(inventory.quantity).dividedBy(new BigNumber(10).pow(8))
-    : new BigNumber(inventory.quantity);
   const price = inventory?.price
-    ? is18DecimalPlaces
-      ? new BigNumber(inventory.quantity).multipliedBy(
-          new BigNumber(10).pow(18)
-        )
-      : is8DecimalPlaces
-      ? new BigNumber(inventory.quantity).multipliedBy(new BigNumber(10).pow(8))
-      : new BigNumber(inventory.quantity)
+    ? assetsWithEighteenDecimalPlaces.includes(inventory.originAddress)
+      ? parseFloat(inventory.price * 10 ** 18).toFixed(2)
+      : parseFloat(inventory.price * 10 ** (inventory.decimals || 0)).toFixed(2)
     : undefined;
   const saleQuantity =
     inventory.saleQuantity !== undefined
-      ? is18DecimalPlaces
-        ? new BigNumber(inventory.saleQuantity || 0).dividedBy(
-            new BigNumber(10).pow(18)
-          )
-        : is8DecimalPlaces
-        ? new BigNumber(inventory.saleQuantity || 0).dividedBy(
-            new BigNumber(10).pow(8)
-          )
-        : new BigNumber(inventory.saleQuantity || 0)
+      ? new BigNumber(inventory.saleQuantity || 0).dividedBy(
+          new BigNumber(10).pow(decimals)
+        )
       : undefined;
   const totalLockedQuantity = inventory.totalLockedQuantity
-    ? is18DecimalPlaces
-      ? new BigNumber(inventory.totalLockedQuantity || 0).dividedBy(
-          new BigNumber(10).pow(18)
-        )
-      : is8DecimalPlaces
-      ? new BigNumber(inventory.totalLockedQuantity || 0).dividedBy(
-          new BigNumber(10).pow(8)
-        )
-      : new BigNumber(inventory.totalLockedQuantity || 0)
+    ? new BigNumber(inventory.totalLockedQuantity || 0).dividedBy(
+        new BigNumber(10).pow(decimals)
+      )
     : new BigNumber(0);
   const stakeable =
     inventory.root &&
@@ -421,8 +401,7 @@ const InventoryCard = ({
                   inventory.address === inventory.originAddress ||
                   !isActive() ||
                   disableSADDOGS(inventory) ||
-                  is18DecimalPlaces ||
-                  is8DecimalPlaces
+                  decimals === 18
                 }
               >
                 <SendOutlined /> Redeem
@@ -481,8 +460,7 @@ const InventoryCard = ({
                       inventory.address === inventory.originAddress ||
                       !isActive() ||
                       disableSADDOGS(inventory) ||
-                      is18DecimalPlaces ||
-                      is8DecimalPlaces
+                      decimals === 18
                     }
                   >
                     <SendOutlined /> Redeem
@@ -662,7 +640,6 @@ const InventoryCard = ({
           user={user}
           reserves={reserves}
           assetsWithEighteenDecimalPlaces={assetsWithEighteenDecimalPlaces}
-          assetsWithEightDecimalPlaces={assetsWithEightDecimalPlaces}
         />
       )}
       {unlistModalOpen && (
@@ -688,7 +665,6 @@ const InventoryCard = ({
           saleAddress={inventory.saleAddress}
           category={category}
           assetsWithEighteenDecimalPlaces={assetsWithEighteenDecimalPlaces}
-          assetsWithEightDecimalPlaces={assetsWithEightDecimalPlaces}
         />
       )}
       {repayModalOpen && (
@@ -703,7 +679,6 @@ const InventoryCard = ({
           category={category}
           reserves={reserves}
           assetsWithEighteenDecimalPlaces={assetsWithEighteenDecimalPlaces}
-          assetsWithEightDecimalPlaces={assetsWithEightDecimalPlaces}
         />
       )}
       {resellModalOpen && (
@@ -729,7 +704,6 @@ const InventoryCard = ({
           saleAddress={inventory.saleAddress}
           category={category}
           assetsWithEighteenDecimalPlaces={assetsWithEighteenDecimalPlaces}
-          assetsWithEightDecimalPlaces={assetsWithEightDecimalPlaces}
         />
       )}
       {transferModalOpen && (
@@ -742,7 +716,6 @@ const InventoryCard = ({
           categoryName={category}
           reserves={reserves}
           assetsWithEighteenDecimalPlaces={assetsWithEighteenDecimalPlaces}
-          assetsWithEightDecimalPlaces={assetsWithEightDecimalPlaces}
         />
       )}
       {redeemModalOpen && (
