@@ -192,7 +192,7 @@ abstract contract Reserve is Utils, Structs {
         Escrow escrow = Escrow(_escrowAddress);
         uint usdstAmountOwed = escrow.borrowedAmount();
 
-        require(amountToRepay > 0, "Repayment amount must be greater than zero");
+        require(_amountToRepay > 0, "Repayment amount must be greater than zero");
         uint actualRepayment = _amountToRepay > usdstAmountOwed ? usdstAmountOwed : _amountToRepay;
 
         uint usdstAmountRepaid = burnUSDST(_usdstAssetAddresses, actualRepayment, escrow.borrowerCommonName());
