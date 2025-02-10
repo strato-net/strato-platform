@@ -43,7 +43,7 @@ abstract contract Reserve is Utils, Structs {
     event MintedUSDST(address indexed user, string commonName, uint amount);
     event BurnedUSDST(address indexed user, string commonName, uint amount);
 
-    constructor(address _assetOracle, string _name, address _assetRootAddress, decimal _unitConversionRate, address _usdstToken, decimal _escrowConversionRate, decimal _usdstPrice, decimal _stratsPrice) {
+    constructor(address _assetOracle, string _name, address _assetRootAddress, decimal _unitConversionRate, address _usdstToken, decimal _usdstPrice, decimal _stratsPrice) {
         oracle = OracleService(_assetOracle);
         owner = msg.sender;
         name = _name;
