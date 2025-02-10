@@ -173,18 +173,19 @@ function prepareDataForItems(
         value: (
           <div className="flex">
             <div className="mx-1">{logo}</div>
-            {inputQuantity
-              .multipliedBy(decimalFactor)
-              .multipliedBy(
-                new BigNumber(matchedReserve?.lastUpdatedOraclePrice)
-              )
-              .multipliedBy(
-                new BigNumber(matchedReserve?.cataAPYRate / 10) / 365
-              )
-              .toLocaleString('en-US', {
-                maximumFractionDigits: 6,
-                minimumFractionDigits: 0,
-              })}
+            {Number(
+              inputQuantity
+                .multipliedBy(decimalFactor)
+                .multipliedBy(
+                  new BigNumber(matchedReserve?.lastUpdatedOraclePrice)
+                )
+                .multipliedBy(
+                  new BigNumber(matchedReserve?.cataAPYRate / 10) / 365
+                )
+            ).toLocaleString('en-US', {
+              maximumFractionDigits: 6,
+              minimumFractionDigits: 0,
+            })}
           </div>
         ),
       },
