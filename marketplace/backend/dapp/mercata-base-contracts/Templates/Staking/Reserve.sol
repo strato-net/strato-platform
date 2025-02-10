@@ -80,7 +80,21 @@ abstract contract Reserve is Utils, Structs {
             require(address(escrow).creator == this.creator, "Escrow contract " + string(address(escrow)) + " was not created by a valid Reserve contract");
             uint lastRewardTimestamp = escrow.lastRewardTimestamp();
             uint delta = block.timestamp - lastRewardTimestamp;
-            escrow.updateOnPriceChange(oraclePrice, loanToValueRatio, liquidationRatio);
+            try {
+                if (escrow.nativeTokenPrice()){
+                    escrow.updateOnPriceChange(
+                        oraclePrice,
+                        loanToValueRatio,
+                        liquidationRatio
+                    );
+                }
+            } catch {
+                escrow.updateOnPriceChange(
+                    oraclePrice * stratsPrice,
+                    loanToValueRatio,
+                    liquidationRatio
+                );
+            }
             //get cata reward from escrow
             if (delta > 0) {
                 decimal cataRewardDecimal = calculateCATAReward(escrow.collateralQuantity(), oraclePrice.truncate(18), delta);
@@ -275,5 +289,10 @@ abstract contract Reserve is Utils, Structs {
         for (uint i = 0; i < _escrows.length; i++) {
             Escrow(_escrows[i]).updateReserve(_newReserve);
         }
+    }
+
+    function updateEscrowNativeTokenPrice(address _escrowAddress, decimal _newPrice) public requireOwner("update escrow native token price") {
+        Escrow escrow = Escrow(_escrowAddress);
+        escrow.updateNativeTokenPrice(_newPrice);
     }
 }
