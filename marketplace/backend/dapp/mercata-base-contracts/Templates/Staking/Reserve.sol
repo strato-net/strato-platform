@@ -28,6 +28,10 @@ abstract contract Reserve is Utils, Structs {
     uint public cataAPYRate = 10; // 10% APY for CATA rewards
     decimal public unitConversionRate = 1; // 1 oz of gold in grams
 
+    decimal public usdstPrice;
+
+    decimal public stratstoUSDSTFactor;
+
     decimal public lastUpdatedOraclePrice = 0;
 
     address public burnerAddress = address(0x6ec8bbe4a5b87be18d443408df43a45e5972fa1b); // burner account
@@ -39,7 +43,7 @@ abstract contract Reserve is Utils, Structs {
     event MintedUSDST(address indexed user, string commonName, uint amount);
     event BurnedUSDST(address indexed user, string commonName, uint amount);
 
-    constructor(address _assetOracle, string _name, address _assetRootAddress, decimal _unitConversionRate, address _usdstToken) {
+    constructor(address _assetOracle, string _name, address _assetRootAddress, decimal _unitConversionRate, address _usdstToken, decimal _usdstPrice, decimal _stratstoUSDSTFactor) {
         oracle = OracleService(_assetOracle);
         owner = msg.sender;
         name = _name;
@@ -50,6 +54,8 @@ abstract contract Reserve is Utils, Structs {
         oraclePrice = oraclePrice / unitConversionRate;
         lastUpdatedOraclePrice = oraclePrice;
         MinterAuthorization(usdstToken).addReserveAsMinter();
+        usdstPrice = _usdstPrice; //1000000000000000000.0000
+        stratstoUSDSTFactor = _stratstoUSDSTFactor; //100000000000000.0000
     }
 
     modifier requireActive() {
@@ -80,7 +86,16 @@ abstract contract Reserve is Utils, Structs {
             require(address(escrow).creator == this.creator, "Escrow contract " + string(address(escrow)) + " was not created by a valid Reserve contract");
             uint lastRewardTimestamp = escrow.lastRewardTimestamp();
             uint delta = block.timestamp - lastRewardTimestamp;
-            escrow.updateOnPriceChange(oraclePrice, loanToValueRatio, liquidationRatio);
+            
+            try {
+                if (escrow.version() == "2.0") {
+                escrow.updateOnPriceChange(oraclePrice * usdstPrice, loanToValueRatio, liquidationRatio);
+                }
+            }
+            catch {
+                escrow.updateOnPriceChange(oraclePrice * stratstoUSDSTFactor, loanToValueRatio, liquidationRatio);
+            }
+            
             //get cata reward from escrow
             if (delta > 0) {
                 decimal cataRewardDecimal = calculateCATAReward(escrow.collateralQuantity(), oraclePrice.truncate(18), delta);
@@ -120,19 +135,34 @@ abstract contract Reserve is Utils, Structs {
             SimpleEscrow simpleEscrow = new SimpleEscrow(
                 _assets,
                 _collateralQuantity,
-                _oraclePrice,
+                (_oraclePrice * usdstPrice),
                 loanToValueRatio,
-                liquidationRatio
+                liquidationRatio,
+                "2.0"
             );
             escrow = Escrow(simpleEscrow);
         } else {
-            escrow.attachAssets(
-                _assets,
-                _collateralQuantity,
-                _oraclePrice,
-                loanToValueRatio,
-                liquidationRatio
-            );
+        try {
+            if (escrow.version() == "2.0") {
+                escrow.attachAssets(
+                    _assets,
+                    _collateralQuantity,
+                    (_oraclePrice * usdstPrice),
+                    loanToValueRatio,
+                    liquidationRatio
+                );
+                }
+            }
+            catch {
+                
+                    escrow.attachAssets(
+                        _assets,
+                        _collateralQuantity,
+                        (_oraclePrice * stratstoUSDSTFactor),
+                        loanToValueRatio,
+                        liquidationRatio
+                    );
+                }
         }
 
         uint escrowQuantity = escrow.collateralQuantity();
@@ -149,7 +179,7 @@ abstract contract Reserve is Utils, Structs {
         mintUSDST(escrow.borrower(), _borrowAmount);
         
         // Update borrowed amount in escrow
-        escrow.updateBorrowedAmount(_borrowAmount, true);
+        escrow.updateBorrowedAmount(_borrowAmount, true);//change
     }
 
     function repayLoan(
@@ -168,7 +198,7 @@ abstract contract Reserve is Utils, Structs {
         uint usdstAmountRepaid = burnUSDST(_usdstAssetAddresses, actualRepayment, escrow.borrowerCommonName());
 
         // Clear loan
-        escrow.updateBorrowedAmount(usdstAmountRepaid, false);
+        escrow.updateBorrowedAmount(usdstAmountRepaid, false); //change
 
         emit LoanRepaid(msg.sender, _escrowAddress, escrow.collateralQuantity(), usdstAmountRepaid);
     }
@@ -252,7 +282,17 @@ abstract contract Reserve is Utils, Structs {
         lastUpdatedOraclePrice = _oraclePrice;
 
         uint startingQuantity = escrow.collateralQuantity();
-        escrow.unlockAssets(_quantity, _oraclePrice, loanToValueRatio, liquidationRatio);
+
+        try {
+            if (escrow.version() == "2.0") {
+                escrow.unlockAssets(_quantity, (_oraclePrice * usdstPrice), loanToValueRatio, liquidationRatio);
+            }
+        }
+        catch {
+            escrow.unlockAssets(_quantity, (_oraclePrice * stratstoUSDSTFactor), loanToValueRatio, liquidationRatio);
+        }
+
+
         uint endingQuantity = escrow.collateralQuantity();
         uint releasedQuantity = startingQuantity - endingQuantity;
         
@@ -271,9 +311,52 @@ abstract contract Reserve is Utils, Structs {
                (priceOfCATA * secondsPerYear);
     }
     
+    //Called by Old Reserve oi.e creator of the escrow
     function migrateReserve(address _newReserve, address[] _escrows) external requireOwner("migrate the Reserve") {
         for (uint i = 0; i < _escrows.length; i++) {
             Escrow(_escrows[i]).updateReserve(_newReserve);
         }
     }
+
+    //Called by New Reserve
+    function updateOldEscrowData(address[] _escrows) external requireOwner("migrate the Reserve") {
+        for (uint i = 0; i < _escrows.length; i++) {
+            Escrow escrow = Escrow(_escrows[i]);
+
+            try{
+                string version = escrow.version();
+            }
+            catch{
+                (decimal _oraclePrice, uint _priceTimestamp) = oracle.getLatestPrice();
+                _oraclePrice = _oraclePrice / unitConversionRate;
+                escrow.updateOnPriceChange((_oraclePrice * stratstoUSDSTFactor), loanToValueRatio, liquidationRatio);    
+            }
+        }
+    }
+
+    //Called by New Reserve
+    function updateOldEscrowBorrowData(address[] _escrows) external requireOwner("migrate the Reserve") {
+        for (uint i = 0; i < _escrows.length; i++) {
+            Escrow escrow = Escrow(_escrows[i]);
+
+            try{
+                string version = escrow.version();
+            }
+            catch{
+                uint currentBorrowedAmount = escrow.borrowedAmount();
+                uint newBorrowedAmount = currentBorrowedAmount * uint(stratstoUSDSTFactor);
+                uint diff = newBorrowedAmount - currentBorrowedAmount;
+                escrow.updateBorrowedAmount(diff, true);
+            }
+        }
+    }
+
+    function updateUSDSTPrice(decimal _newUSDSTPrice) external requireOwner("update USDST price"){
+        usdstPrice = _newUSDSTPrice;
+    }
+
+    function updatestratstoUSDSTFactor(decimal _newstratstoUSDSTFactor) external requireOwner("update STRATS price"){
+        stratstoUSDSTFactor = _newstratstoUSDSTFactor;
+    }
+
 }

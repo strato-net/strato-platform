@@ -1,10 +1,10 @@
 # Define input parameters directly in the script
-USERNAME=""
-PASSWORD=""
-CATA_QUANTITY="1000000000000000000000000000000" #1000000000000000000000000000000
-USDST_TOKEN_ADDRESS="d7bcdef75fb6cf6c5d1fc08cd8f10ac8b0cc79a8"
+USERNAME="blockapps"
+PASSWORD="Bl0ck@pps"
+CATA_QUANTITY="1000000000000000000000000000000" 
+USDST_TOKEN_ADDRESS="2f6c3848a75aa075d054fe84b780cbdebd77ec61"
 BA_CATA_ADDRESS="e64fac120eef3e3551cfe914af7dfb58d4f0beef"
-BASE_CODE_COLLECTION="6ba95b680844b1b7d8ba925fbf497dfda0a4a3bc"
+BASE_CODE_COLLECTION="27c7bbec34b87578e32e68ad7eaae1f58f5d4d9d"
 ASSET_ROOT_ADDRESS=$ASSET_ROOT_ADDRESS
 NAME=$NAME
 ASSET_ORACLE_ADDRESS=$ASSET_ORACLE_ADDRESS
@@ -26,14 +26,14 @@ echo "Access token: $ACCESS_TOKEN"
 # Generate a random transfer number
 TRANSFER_NUMBER=$(shuf -i 1000-9999 -n 1)
 
-# Deploy the SimpleReserve contract
-SIMPLE_RESERVE_ADDRESS=$(curl -X POST "https://node1.mercata-testnet2.blockapps.net/bloc/v2.2/transaction?resolve=true" \
+# Deploy the SimpleReserve contract and capture the raw response
+RAW_RESPONSE=$(curl -X POST "https://node1.mercata-testnet2.blockapps.net/bloc/v2.2/transaction?resolve=true" \
   -H 'Content-Type: application/json' \
   -H "Authorization: Bearer $ACCESS_TOKEN" \
   -d '{
     "txs": [{
       "payload": {
-        "src": "pragma es6; pragma strict; import <'"$BASE_CODE_COLLECTION"'>; contract SimpleReserve is Reserve { constructor(address _assetOracle, string _name, address _assetRootAddress, decimal _unitConversionRate, address _usdstToken) Reserve (_assetOracle, _name, _assetRootAddress, _unitConversionRate, _usdstToken) {} }",
+        "src": "pragma es6; pragma strict; import <'"$BASE_CODE_COLLECTION"'>; contract SimpleReserve is Reserve { constructor(address _assetOracle, string _name, address _assetRootAddress, decimal _unitConversionRate, address _usdstToken, decimal _usdstPrice, decimal _stratsPrice ) Reserve (_assetOracle, _name, _assetRootAddress, _unitConversionRate, _usdstToken, _usdstPrice, _stratsPrice) {} }",
         "contract": "SimpleReserve",
         "function": "constructor",
         "args": {
@@ -41,7 +41,9 @@ SIMPLE_RESERVE_ADDRESS=$(curl -X POST "https://node1.mercata-testnet2.blockapps.
           "_name": "'"$NAME"'",
           "_assetRootAddress": "'"$ASSET_ROOT_ADDRESS"'",
           "_unitConversionRate": '"$UNIT_CONVERSION_RATE"',
-          "_usdstToken": "'"$USDST_TOKEN_ADDRESS"'"
+          "_usdstToken": "'"$USDST_TOKEN_ADDRESS"'",
+          "_usdstPrice": 1000000000000000000.0000,
+          "_stratsPrice": 100000000000000.0000
         }
       },
       "type": "CONTRACT"
@@ -50,7 +52,12 @@ SIMPLE_RESERVE_ADDRESS=$(curl -X POST "https://node1.mercata-testnet2.blockapps.
       "gasLimit": 10000000000,
       "gasPrice": 1
     }
-  }' | jq -r '.[0].data.contents.address')
+  }')
+
+echo "RAW_RESPONSE: $RAW_RESPONSE"
+
+# Parse the address from the raw response
+SIMPLE_RESERVE_ADDRESS=$(echo $RAW_RESPONSE | jq -r '.[0].data.contents.address')
 
 echo "SimpleReserve for $NAME contract deployed at address: $SIMPLE_RESERVE_ADDRESS"
 
