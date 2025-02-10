@@ -224,6 +224,12 @@ abstract contract Reserve is Utils, Structs {
 
     }
 
+    function activate() public requireOwner("activate reserve") {
+        MinterAuthorization(usdstToken).addReserveAsMinter();
+        isActive = true;
+
+    }
+
     function setOracle(address _newOracle) public requireOwner("update oracle") {
         require(_newOracle != address(0), "Invalid oracle address");
         oracle = OracleService(_newOracle);
