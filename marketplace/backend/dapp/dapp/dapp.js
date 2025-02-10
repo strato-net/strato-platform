@@ -1762,7 +1762,7 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
       const { paymentService, orderList } = args;
 
       const assetAddresses = orderList.map((o) => o.assetAddress);
-      const quantities = orderList.map((o) => o.quantity);
+      const quantities = orderList.map((o) => new BigNumber(o.quantity));
       const decimals = orderList.map((o) => o.decimals);
 
       const assets = await inventoryJs.getAll(
@@ -1809,8 +1809,8 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
 
         // Calculate the total order amount
         const orderTotal = salesData.reduce(
-          (acc, sale, index) => acc + sale.price * quantities[index],
-          0
+          (acc, sale, index) => acc.plus(new BigNumber(sale.price).multipliedBy(quantities[index])),
+          new BigNumber(0)
         );
 
         // Retrieve the user's active USDST asset addresses with non-zero quantities
@@ -1830,7 +1830,7 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
 
         // Accumulate USDST asset addresses to cover the order total
         let accumulatedTotal = new BigNumber(0);
-        const bigOrderTotal = new BigNumber(orderTotal).multipliedBy(
+        const bigOrderTotal = orderTotal.multipliedBy(
           new BigNumber(10).pow(18)
         ); // Convert orderTotal to 18 decimal places
 

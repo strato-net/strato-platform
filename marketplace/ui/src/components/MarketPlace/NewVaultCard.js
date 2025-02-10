@@ -19,11 +19,12 @@ const NewVaultCard = ({ reserveItem, reserve, parent = '', contextHolder }) => {
   const ethDispatch = useEthDispatch();
   const { hasChecked, isAuthenticated, loginUrl, user } =
     useAuthenticateState();
-  const { ethstAddress } = useEthState();
+  const { ethstAddress, wbtcstAddress } = useEthState();
 
   useEffect(() => {
     const fetchAddresses = async () => {
       ethActions.fetchETHSTAddress(ethDispatch);
+      ethActions.fetchWBTCSTAddress(ethDispatch);
     };
 
     fetchAddresses();
@@ -57,6 +58,16 @@ const NewVaultCard = ({ reserveItem, reserve, parent = '', contextHolder }) => {
     if (reserveItem.originAddress === ethstAddress) {
       navigate(
         `${routes.EthstProductDetail.url.replace(
+          ':address',
+          reserveItem.address
+        )}`,
+        {
+          state: { isCalledFromInventory: false },
+        }
+      );
+    } else if (reserveItem.originAddress === wbtcstAddress) {
+      navigate(
+        `${routes.WbtcstProductDetail.url.replace(
           ':address',
           reserveItem.address
         )}`,

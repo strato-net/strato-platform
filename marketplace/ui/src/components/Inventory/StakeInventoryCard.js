@@ -310,7 +310,7 @@ const StakeInventoryCard = ({
             <p className="text-[#6A6A6A]">Quantity Owned</p>
             <p className="text-[#202020] font-semibold">
               {quantity.toLocaleString('en-US', {
-                maximumFractionDigits: 4,
+                maximumFractionDigits: 6,
                 minimumFractionDigits: 0,
               }) || 'N/A'}
             </p>
@@ -319,7 +319,7 @@ const StakeInventoryCard = ({
             <p className="text-[#6A6A6A]">Quantity Stakeable</p>
             <p className="text-[#202020] font-semibold">
               {stakeQuantity.toLocaleString('en-US', {
-                maximumFractionDigits: 4,
+                maximumFractionDigits: 6,
                 minimumFractionDigits: 0,
               }) || 'N/A'}
             </p>
@@ -328,7 +328,7 @@ const StakeInventoryCard = ({
             <p className="text-[#6A6A6A]">Quantity Staked </p>
             <p className="text-[#202020] font-semibold">
               {collateralQuantity.toLocaleString('en-US', {
-                maximumFractionDigits: 4,
+                maximumFractionDigits: 6,
                 minimumFractionDigits: 0,
               })}
             </p>

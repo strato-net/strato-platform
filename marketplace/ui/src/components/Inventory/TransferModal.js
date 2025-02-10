@@ -298,8 +298,14 @@ const TransferModal = ({
           formatter={(val) => {
             if (val === undefined || val === null) return record.quantity;
             const strVal = val.toString();
-            // Remove trailing zeros and unnecessary decimal point
-            return strVal.replace(/\.?0+$/, '');
+            // Only modify the string if it contains a decimal point
+            if (strVal.includes('.')) {
+              // Remove trailing zeros and remove a trailing decimal point if it remains
+              return strVal.replace(/0+$/, '').replace(/\.$/, '');
+            }
+
+            // For whole numbers, return the string as is
+            return strVal;
           }}
           // Parser to limit input to decimals
           parser={(val) => {

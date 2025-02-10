@@ -103,12 +103,12 @@ const ProductItemDetails = ({ categoryName, itemData }) => {
               {getUnitNameByIndex(itemData?.unitOfMeasurement)}
             </Text>
           </Space>
-          <Space className="flex justify-between">
+          {/* <Space className="flex justify-between">
             <DescTitle text="Least Sellable Unit" />
             <Text className="text-[13px] text-[#202020] font-medium">
               {itemData?.leastSellableUnits}
             </Text>
-          </Space>
+          </Space> */}
         </Space>
       );
     case 'Membership':

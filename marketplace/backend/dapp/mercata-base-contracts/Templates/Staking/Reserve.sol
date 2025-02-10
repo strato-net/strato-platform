@@ -212,6 +212,11 @@ abstract contract Reserve is Utils, Structs {
         name = _newName;
     }
 
+    function setUnitConversionRate(decimal _newRate) public requireOwner("update unit conversion rate") {
+        require(_newRate > 0, "Unit conversion rate must be greater than 0");
+        unitConversionRate = _newRate;
+    }
+
     function setAssetRootAddress(address _newAssetRootAddress) public requireOwner("update asset root address") {
         require(_newAssetRootAddress != address(0), "Invalid asset root address");
         assetRootAddress = _newAssetRootAddress;
