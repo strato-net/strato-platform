@@ -16,12 +16,7 @@ import { useLocation } from 'react-router-dom';
 import { BigNumber } from 'bignumber.js';
 
 const logo = (
-  <img
-    src={Images.USDST}
-    alt="USDST Logo"
-    title="USDST"
-    className="w-5 h-5"
-  />
+  <img src={Images.USDST} alt="USDST Logo" title="USDST" className="w-5 h-5" />
 );
 
 const RepayModal = ({
@@ -69,7 +64,9 @@ const RepayModal = ({
         ? inventory.inventories.reduce((sum, item) => {
             const escrowAddress = item?.escrow?.address;
             // Wrap collateral quantity in BigNumber.
-            const escrowCollateral = new BigNumber(item?.escrow?.collateralQuantity || 0);
+            const escrowCollateral = new BigNumber(
+              item?.escrow?.collateralQuantity || 0
+            );
             if (escrowAddress && !uniqueEscrowsPrime.has(escrowAddress)) {
               uniqueEscrowsPrime.add(escrowAddress);
               return sum.plus(escrowCollateral);
@@ -83,8 +80,9 @@ const RepayModal = ({
         ? inventory.inventories.reduce((sum, item) => {
             const escrowAddress = item?.escrow?.address;
             // Convert borrowedAmount from its smallest unit to tokens (dividing by 10^18)
-            const borrowedValue = new BigNumber(item?.escrow?.borrowedAmount || 0)
-              .dividedBy(new BigNumber(10).pow(18));
+            const borrowedValue = new BigNumber(
+              item?.escrow?.borrowedAmount || 0
+            ).dividedBy(new BigNumber(10).pow(18));
             if (escrowAddress && !uniqueBorrowedAddresses.has(escrowAddress)) {
               uniqueBorrowedAddresses.add(escrowAddress);
               return sum.plus(borrowedValue);
@@ -95,13 +93,16 @@ const RepayModal = ({
           new BigNumber(inventory?.escrow?.borrowedAmount || 0)
             .dividedBy(new BigNumber(10).pow(18))
             .multipliedBy(
-              new BigNumber(inventory?.quantity || 0).dividedBy(totalCollateralQuantity)
+              new BigNumber(inventory?.quantity || 0).dividedBy(
+                totalCollateralQuantity
+              )
             );
 
       // Assume USDST is provided as a token balance (in tokens) and convert it to its smallest unit.
-      const USDSTBalance = Object.keys(USDST).length > 0
-        ? new BigNumber(USDST).multipliedBy(new BigNumber(10).pow(18))
-        : new BigNumber(0);
+      const USDSTBalance =
+        Object.keys(USDST).length > 0
+          ? new BigNumber(USDST).multipliedBy(new BigNumber(10).pow(18))
+          : new BigNumber(0);
 
       // Set the outstanding loan amount.
       setRepayAmount(borrowedAmount);
@@ -127,7 +128,10 @@ const RepayModal = ({
       value: (
         <div className="flex -mr-1">
           {logo} &nbsp;
-          {repayAmount.toFixed(2)}
+          {Number(repayAmount).toLocaleString('en-US', {
+            maximumFractionDigits: 6,
+            minimumFractionDigits: 2,
+          })}
         </div>
       ),
     },
@@ -139,7 +143,10 @@ const RepayModal = ({
           {logo} &nbsp;
           <InputNumber
             // Convert BigNumber to a native number for display.
-            value={repayValue.toString()}
+            value={Number(repayValue).toLocaleString('en-US', {
+              maximumFractionDigits: 6,
+              minimumFractionDigits: 2,
+            })}
             onChange={(value) => {
               if (value === null) {
                 setRepayValue(new BigNumber(0));
@@ -178,7 +185,10 @@ const RepayModal = ({
     if (repayed) {
       handleCancel();
       if (productDetailPage) {
-        await inventoryActions.fetchInventoryDetail(inventoryDispatch, productDetailPage);
+        await inventoryActions.fetchInventoryDetail(
+          inventoryDispatch,
+          productDetailPage
+        );
       } else {
         await inventoryActions.fetchInventory(
           inventoryDispatch,
