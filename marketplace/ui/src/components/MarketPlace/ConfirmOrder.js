@@ -6,12 +6,13 @@ import {
   Col,
   Radio,
   Button,
+  Tooltip,
 } from 'antd';
 import {
   useMarketplaceState,
   useMarketplaceDispatch,
 } from '../../contexts/marketplace';
-import BigNumber from "bignumber.js";
+import BigNumber from 'bignumber.js';
 import { useOrderState, useOrderDispatch } from '../../contexts/order';
 import { useAuthenticateState } from '../../contexts/authentication';
 import { actions } from '../../contexts/marketplace/actions';
@@ -24,7 +25,7 @@ import { setCookie } from '../../helpers/cookie';
 import { generateHtmlContent } from '../../helpers/emailTemplate';
 import { PAYMENT_LABEL } from '../../helpers/constants';
 
-const ConfirmOrder = ({ paymentServices = [], data, columns }) => {
+const ConfirmOrder = ({ paymentServices = [], reserve, data, columns }) => {
   const marketplaceDispatch = useMarketplaceDispatch();
   const orderDispatch = useOrderDispatch();
   const [api, contextHolder] = notification.useNotification();
@@ -40,8 +41,11 @@ const ConfirmOrder = ({ paymentServices = [], data, columns }) => {
   const [tax, setTax] = useState(0);
   const [subTotal, setSubTotal] = useState(0);
   const [total, setTotal] = useState(0);
-  const { success: marketplaceSuccess, message: marketplaceMessage, assetsWithEighteenDecimalPlaces } =
-    useMarketplaceState();
+  const {
+    success: marketplaceSuccess,
+    message: marketplaceMessage,
+    assetsWithEighteenDecimalPlaces,
+  } = useMarketplaceState();
   const [modal, contextHolderForModal] = Modal.useModal();
   const [cartData, setCartData] = useState(data);
 
@@ -168,23 +172,27 @@ const ConfirmOrder = ({ paymentServices = [], data, columns }) => {
     }
   };
 
-  const handlePaymentConfirm = async (paymentService) => {
+  const handlePaymentConfirm = async (paymentService, reserve, asset) => {
     actions.addItemToConfirmOrder(marketplaceDispatch, cartData);
     let orderList = [];
     cartData.forEach((item) => {
-      const decimals = assetsWithEighteenDecimalPlaces.includes(
-        item.key
-      ) ? 18 : item.decimals || 0;
+      const decimals = assetsWithEighteenDecimalPlaces.includes(item.key)
+        ? 18
+        : item.decimals || 0;
 
-      const quantity = new BigNumber(item.qty);
+      const quantity = new BigNumber(item.qty)
+        .multipliedBy(new BigNumber(10).pow(decimals))
+        .toFixed(0);
       const unitPrice = new BigNumber(item.unitPrice);
 
       orderList.push({
-        quantity: quantity.multipliedBy(new BigNumber(10).pow(decimals)).toFixed(0),
-        decimals: decimals,
+        quantity,
+        decimals,
         assetAddress: item.key,
         firstSale: item.firstSale,
-        unitPrice: unitPrice.dividedBy(new BigNumber(10).pow(decimals)).toFixed(decimals),
+        unitPrice: unitPrice
+          .dividedBy(new BigNumber(10).pow(decimals))
+          .toFixed(decimals),
       });
     });
 
@@ -233,11 +241,15 @@ const ConfirmOrder = ({ paymentServices = [], data, columns }) => {
         checkoutRoute &&
         checkoutRoute !== ''
       ) {
+        console.log('Redirecting to payment gateway: ', reserve);
         const url = `${serviceURL}${checkoutRoute}?checkoutHash=${checkoutHash}&redirectUrl=${window.location.protocol}//${window.location.host}/order/status`;
         window.location.replace(url);
       } else {
+        console.log('Redirecting to order status page: ', reserve);
         window.location.replace(
-          `/order/status?assets=${assets}&orderHash=${checkoutHash}`
+          `/order/status?assets=${assets}&orderHash=${checkoutHash}${
+            reserve ? `&stake=${reserve},${asset}` : ''
+          }`
         );
       }
     }
@@ -250,7 +262,7 @@ const ConfirmOrder = ({ paymentServices = [], data, columns }) => {
     setSelectedProvider(provider);
   };
 
-  const handlePlaceOrder = async () => {
+  const handlePlaceOrder = async (reserve = null, asset = null) => {
     if (hasChecked && !isAuthenticated && loginUrl !== undefined) {
       countDown();
     } else {
@@ -272,7 +284,7 @@ const ConfirmOrder = ({ paymentServices = [], data, columns }) => {
             'The minimum order amount is $0.50. Please increase the item quantity to account for this.'
           );
         } else {
-          await handlePaymentConfirm(selectedProvider);
+          await handlePaymentConfirm(selectedProvider, reserve, asset);
         }
       } else {
         let insufficientQuantityMessage = '';
@@ -394,6 +406,22 @@ const ConfirmOrder = ({ paymentServices = [], data, columns }) => {
                   >
                     Place Order
                   </Button>
+                  <Tooltip title={!reserve ? 'Asset not stakeable' : ''}>
+                    <span className="w-full">
+                      <Button
+                        type="primary"
+                        disabled={
+                          !activePaymentProviders ||
+                          activePaymentProviders?.length === 0 ||
+                          !reserve
+                        }
+                        className="w-full bg-blue-800 text-white h-10 text-lg my-4"
+                        onClick={() => handlePlaceOrder(reserve?.address, reserve?.assetRootAddress)}
+                      >
+                        Place Order & Stake Immediately
+                      </Button>
+                    </span>
+                  </Tooltip>
                 </div>
               </Col>
             </Row>

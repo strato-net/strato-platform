@@ -12,10 +12,15 @@ import {
   useMarketplaceState,
   useMarketplaceDispatch,
 } from '../../contexts/marketplace';
+import {
+  useInventoryState,
+  useInventoryDispatch,
+} from '../../contexts/inventory';
 import { useOrderState, useOrderDispatch } from '../../contexts/order';
 import { actions } from '../../contexts/marketplace/actions';
+import { actions as inventoryActions } from '../../contexts/inventory/actions';
 import { Images } from '../../images';
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect } from 'react';
 import './index.css';
 import { CHARGES } from '../../helpers/constants';
 import ClickableCell from '../ClickableCell';
@@ -36,11 +41,13 @@ const { Title, Text } = Typography;
 const Checkout = () => {
   const marketplaceDispatch = useMarketplaceDispatch();
   const orderDispatch = useOrderDispatch();
+  const inventoryDispatch = useInventoryDispatch();
   const { paymentServices, arePaymentServicesLoading } =
     usePaymentServiceState();
+  const { reserves, isReservesLoading } = useInventoryState();
   const paymentServiceDispatch = usePaymentServiceDispatch();
   const [api, contextHolder] = notification.useNotification();
-  const { cartList, USDSTAddress, assetsWithEighteenDecimalPlaces } = useMarketplaceState();
+  const { cartList, assetsWithEighteenDecimalPlaces } = useMarketplaceState();
   const { isCreateOrderSubmitting, message, success } = useOrderState();
 
   const [mapData, setmapData] = useState([]);
@@ -69,7 +76,8 @@ const Checkout = () => {
 
   useEffect(() => {
     paymentServiceActions.getPaymentServices(paymentServiceDispatch, true);
-  }, [paymentServiceDispatch]);
+    inventoryActions.getAllReserve(inventoryDispatch);
+  }, [paymentServiceDispatch, inventoryDispatch]);
 
   useEffect(() => {
     const map = new Map();
@@ -119,6 +127,7 @@ const Checkout = () => {
           amount: amount,
           action: item.product.address,
           qty: item.qty,
+          assetRootAddress: item.product.originAddress,
         });
       });
 
@@ -346,10 +355,22 @@ const Checkout = () => {
     return filteredPaymentServices;
   };
 
+  const filterReserve = (e) => {
+    for (const assetReserve of e) {
+      const reserve = reserves.find(
+        (reserve) => reserve.assetRootAddress === assetReserve.assetRootAddress
+      );
+      if (reserve) {
+        return reserve;
+      }
+    }
+    return null;
+  };
+
   return (
     <div className="mx-4 my-2 lg:mx-8 xl:mx-14">
       {contextHolder}
-      {isCreateOrderSubmitting || arePaymentServicesLoading ? (
+      {isCreateOrderSubmitting || arePaymentServicesLoading || isReservesLoading ? (
         <div className="flex justify-center items-center min-h-screen">
           <Spin spinning={isCreateOrderSubmitting} size="large" />
         </div>
@@ -388,6 +409,7 @@ const Checkout = () => {
                       paymentServices={filterPaymentServices(
                         e.value.paymentServices
                       )}
+                      reserve={filterReserve(e.value.items)}
                       data={e.value.items}
                       columns={columns}
                     />

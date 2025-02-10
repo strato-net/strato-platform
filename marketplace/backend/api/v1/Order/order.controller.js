@@ -82,9 +82,9 @@ class OrderController {
   static async waitForOrderEvent(req, res, next) {
     try {
       const { dapp, query } = req;
-      const { orderHash } = query;
+      const { orderHash, reserve, asset } = query;
       const orderEvent = await dapp.waitForOrderEvent(
-        { orderHash: orderHash },
+        { orderHash, reserve, asset },
         options
       );
       if (orderEvent && orderEvent.length === 1) {

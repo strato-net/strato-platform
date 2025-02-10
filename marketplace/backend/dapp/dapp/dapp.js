@@ -320,7 +320,7 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
     args,
     options = optionsNoChainIds
   ) {
-    const { user,...restArgs } = args;
+    const { user, ...restArgs } = args;
     const getOptions = { ...options, app: contractName };
     const newArgs = {
       ...restArgs,
@@ -1809,7 +1809,8 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
 
         // Calculate the total order amount
         const orderTotal = salesData.reduce(
-          (acc, sale, index) => acc.plus(new BigNumber(sale.price).multipliedBy(quantities[index])),
+          (acc, sale, index) =>
+            acc.plus(new BigNumber(sale.price).multipliedBy(quantities[index])),
           new BigNumber(0)
         );
 
@@ -1841,7 +1842,9 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
             addresses.push(asset.address);
 
             // Convert asset.quantity to BigNumber, then add to accumulatedTotal
-            accumulatedTotal = accumulatedTotal.plus(new BigNumber(asset.quantity));
+            accumulatedTotal = accumulatedTotal.plus(
+              new BigNumber(asset.quantity)
+            );
 
             return addresses;
           },
@@ -1919,6 +1922,9 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
   };
 
   contract.waitForOrderEvent = async function (args, options = defaultOptions) {
+    const { orderHash, reserve, asset } = args;
+
+    // Search until we find the order event
     const orderEvent = await rest.searchUntil(
       rawAdmin,
       { name: 'BlockApps-Mercata-PaymentService.Order' },
@@ -1927,10 +1933,73 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
         ...options,
         query: {
           limit: 1,
-          orderHash: `eq.${args.orderHash}`,
+          orderHash: `eq.${orderHash}`,
         },
       }
     );
+
+    console.log('Order event123:', orderEvent);
+
+    if (reserve) {
+      // Step 1: Find the escrow associated with the reserve (if any)
+      const escrowQueryArgs = {
+        select: 'address',
+        reserve: `eq.${reserve}*`,
+        borrowerCommonName: `eq.${userCommonName}`,
+        isActive: 'eq.true',
+      };
+      const escrows = await escrowJs.searchEscrow(
+        rawAdmin,
+        escrowQueryArgs,
+        options
+      );
+      const escrowAddress =
+        escrows && escrows.length > 0
+          ? escrows[0].address
+          : '0000000000000000000000000000000000000000';
+
+      // Step 2: Find the user's assets
+      const assetQueryArgs = {
+        ownerCommonName: userCert.commonName,
+        originAddress: asset,
+        status: ASSET_STATUS.ACTIVE,
+        queryOptions: { select: 'address, quantity' },
+        notEqualsField: 'quantity',
+        notEqualsValue: '0',
+        order: 'block_timestamp.desc',
+      };
+      const assets = await inventoryJs.getAll(
+        rawAdmin,
+        assetQueryArgs,
+        options
+      );
+
+      // Step 3: Calculate the total order quantity.
+      // Assumes orderEvent[0].quantities is an array of numeric or numeric-like values.
+      const orderQuantity = orderEvent[0].quantities.reduce(
+        (acc, qty) => acc + Number(qty),
+        0
+      );
+
+      // Step 4: Accumulate asset addresses until we cover the order quantity.
+      let accumulated = 0;
+      const assetAddresses = [];
+      for (const assetItem of assets) {
+        if (accumulated >= orderQuantity) break;
+        assetAddresses.push(assetItem.address);
+        accumulated += Number(assetItem.quantity);
+      }
+
+      // Stake the assets.
+      const stakeArgs = {
+        reserve,
+        escrowAddress,
+        assets: assetAddresses,
+        collateralQuantity: orderQuantity,
+      };
+      await reserveJs.stake(rawAdmin, stakeArgs, options);
+    }
+
     return orderEvent;
   };
 
@@ -2120,7 +2189,9 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
     const bnValue = new BigNumber(value);
 
     // Compute the actual repayment amount as the minimum of bnValue and bnOrderTotal.
-    const actualRepayment = bnValue.isGreaterThan(bnTotalLoan) ? bnTotalLoan : bnValue;
+    const actualRepayment = bnValue.isGreaterThan(bnTotalLoan)
+      ? bnTotalLoan
+      : bnValue;
 
     // Get user's active USDST assets with non-zero quantities
     const userUSDSTAssets = await inventoryJs.getAll(
@@ -2152,7 +2223,7 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
         return acc;
       },
       { addressesToUse: [], accumulatedTotal: new BigNumber(0) }
-    )
+    );
 
     // Proceed with unstake if sufficient assets are accumulated
     return await reserveJs.repay(

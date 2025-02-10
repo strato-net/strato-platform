@@ -28,6 +28,15 @@ const ProcessingOrder = () => {
     () => query.get('assets')?.split(',') || [],
     [query]
   );
+  const { reserve, asset } = useMemo(() => {
+    const reserveParam = query.get('stake');
+    if (!reserveParam) {
+      return { reserve: null, asset: null };
+    }
+    // Split the comma-separated values.
+    const [reserveValue, asssetValue] = reserveParam.split(',');
+    return { reserve: reserveValue, asset: asssetValue };
+  }, [query]);
 
   const storedConfirmList = useMemo(() => {
     const data = window.localStorage.getItem('confirmOrderList');
@@ -50,7 +59,7 @@ const ProcessingOrder = () => {
 
   useEffect(() => {
     if (orderHash && assetAddresses.length) {
-      orderActions.waitForOrderEvent(orderDispatch, orderHash);
+      orderActions.waitForOrderEvent(orderDispatch, orderHash, reserve, asset);
     } else {
       const timer = setTimeout(() => navigate(routes.Marketplace.url), 3000);
       return () => clearTimeout(timer); // Cleanup timeout
