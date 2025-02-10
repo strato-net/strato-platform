@@ -45,7 +45,6 @@ class MetalsController {
         quantity: Joi.number().integer().min(1).required(),
         decimals: Joi.number().integer().min(0).max(18).required(),
         unitOfMeasurement: Joi.number().integer().min(0).max(8).required(),
-        leastSellableUnits: Joi.number().integer().min(1).required(),
         purity: Joi.string().required(),
         images: Joi.array().items(Joi.string().allow(null)).required(),
         files: Joi.array().items(Joi.string().allow(null)).required(),

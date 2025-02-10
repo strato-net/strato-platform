@@ -320,7 +320,7 @@ const ListForSaleModal = ({
           <InputNumber
             value={quantity}
             controls={false}
-            min={1}
+            min={new BigNumber(10).pow(-decimals)}
             max={new BigNumber(inventory.quantity).dividedBy(
               new BigNumber(10).pow(decimals)
             )}

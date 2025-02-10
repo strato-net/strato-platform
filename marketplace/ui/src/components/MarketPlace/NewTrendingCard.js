@@ -29,8 +29,9 @@ const NewTrendingCard = ({
   const navigate = useNavigate();
   const location = useLocation();
   const { Text } = Typography;
-  const { assetsWithEighteenDecimalPlaces } = useMarketplaceState();
-  const { ethstAddress } = useEthState();
+  const { assetsWithEighteenDecimalPlaces } =
+    useMarketplaceState();
+  const { ethstAddress, wbtcstAddress } = useEthState();
   const { hasChecked, isAuthenticated, loginUrl, user } =
     useAuthenticateState();
 
@@ -56,7 +57,7 @@ const NewTrendingCard = ({
   const ethNaviroute = routes.EthstProductDetail.url;
   const isAvailableForSale = !topSellingProduct.price || saleQuantity === 0;
   const isDisabled =
-    topSellingProduct.originAddress !== ethstAddress &&
+    topSellingProduct.originAddress !== ethstAddress && topSellingProduct.originAddress !== wbtcstAddress &&
     (isAvailableForSale || ownerSameAsUser());
 
   const queryParams = new URLSearchParams(location.search);
@@ -164,6 +165,14 @@ const NewTrendingCard = ({
                   )}`,
                   { state: { isCalledFromInventory: false } }
                 );
+              } else if (topSellingProduct.originAddress === wbtcstAddress) {
+                navigate(
+                  `${routes.WbtcstProductDetail.url.replace(
+                    ':address',
+                    topSellingProduct.address
+                  )}`,
+                  { state: { isCalledFromInventory: false } }
+                );
               } else {
                 navigate(
                   `${naviroute
@@ -264,7 +273,10 @@ const NewTrendingCard = ({
         </div>
         <div
           className={`flex justify-between items-center bg-[#EEEFFA] p-2 rounded-[4px] ${
-            topSellingProduct.originAddress === ethstAddress ? 'invisible' : ''
+            topSellingProduct.originAddress === ethstAddress ||
+            topSellingProduct.originAddress === wbtcstAddress
+              ? 'invisible'
+              : ''
           }`}
         >
           <Typography>Quantity:</Typography>
@@ -287,12 +299,12 @@ const NewTrendingCard = ({
               bordered={false}
               value={quantity}
               max={saleQuantity}
-              min={1}
+              min={1/Math.pow(10, topSellingProduct.decimals || 0)}
               onChange={(e) => {
-                setQuantity(parseInt(e || 0));
+                setQuantity(parseFloat(e || 0));
               }}
               onPressEnter={(e) => {
-                const newValue = parseInt(e.target.value, 10);
+                const newValue = parseFloat(e.target.value, 10);
                 if (newValue <= saleQuantity) {
                   setQuantity(newValue);
                 } else {
@@ -367,6 +379,14 @@ const NewTrendingCard = ({
                   )}`,
                   { state: { isCalledFromInventory: false } }
                 );
+              } else if (topSellingProduct.originAddress === wbtcstAddress) {
+                navigate(
+                  `${routes.WbtcstProductDetail.url.replace(
+                    ':address',
+                    topSellingProduct.address
+                  )}`,
+                  { state: { isCalledFromInventory: false } }
+                );
               } else {
                 if (
                   (await addItemToCart(topSellingProduct, quantity)) === true
@@ -377,7 +397,8 @@ const NewTrendingCard = ({
               }
             }}
           >
-            {topSellingProduct.originAddress === ethstAddress
+            {topSellingProduct.originAddress === ethstAddress ||
+            topSellingProduct.originAddress === wbtcstAddress
               ? 'Bridge'
               : 'Buy Now'}
           </Button>

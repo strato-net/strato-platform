@@ -45,7 +45,7 @@ import PreviewMode from '../RichEditor/PreviewMode';
 import ClickableCell from '../ClickableCell';
 import TimeRangeTabs from '../MarketPlace/TimeRangeTabs';
 import Statistics from '../MarketPlace/Statistics';
-import EthstSteps from './EthstSteps';
+import WbtcstSteps from './WbtcstSteps';
 import LoginModal from '../MarketPlace/LoginModal';
 import StakeModal from '../Inventory/StakeModal';
 import BorrowModal from '../Inventory/BorrowModal';
@@ -65,7 +65,7 @@ import { ASSET_STATUS, fileServerUrl } from '../../helpers/constants';
 import { Swiper, SwiperSlide } from 'swiper/react';
 import { Ethers5Adapter } from '@reown/appkit-adapter-ethers5';
 import { mainnet, sepolia } from '@reown/appkit/networks';
-import { useAppKit, useAppKitAccount, createAppKit } from '@reown/appkit/react';
+import { useAppKit, useAppKitAccount, useAppKitNetwork, createAppKit } from '@reown/appkit/react';
 import { ethers } from 'ethers';
 
 // Import Swiper styles
@@ -77,6 +77,16 @@ import 'swiper/css/autoplay';
 
 // import required modules
 import { EffectFade, Navigation, Pagination, Autoplay } from 'swiper/modules';
+
+const ERC20_ABI = [
+  {
+    constant: true,
+    inputs: [{ name: "_owner", type: "address" }],
+    name: "balanceOf",
+    outputs: [{ name: "balance", type: "uint256" }],
+    type: "function",
+  },
+];
 
 const ProductDetails = ({ user, users }) => {
   const [api, contextHolder] = notification.useNotification();
@@ -132,7 +142,7 @@ const ProductDetails = ({ user, users }) => {
   }
 
   const routeMatch = useMatch({
-    path: routes.EthstProductDetail.url,
+    path: routes.WbtcstProductDetail.url,
     strict: true,
   });
 
@@ -182,27 +192,40 @@ const ProductDetails = ({ user, users }) => {
   });
 
   const appKit = useAppKit();
-  const rawAccount = useAppKitAccount();
-  const [ethBalance, setEthBalance] = useState(0);
+  const { address } = useAppKitAccount();
+  const { chainId } = useAppKitNetwork();
+  const [wbtcBalance, setWbtcBalance] = useState(0);
   const [signer, setSigner] = useState({});
-
-  const account = useMemo(() => {
-    return rawAccount && rawAccount.address ? rawAccount : null;
-  }, [rawAccount?.address]);
 
   useEffect(() => {
     const fetchBalance = async () => {
-      if (account?.address) {
+      if (address) {
+        const wbtcAddress = fileServerUrl.includes("test")
+          ? "0x29f2D40B0605204364af54EC677bD022dA425d03" // WBTC testnet contract
+          : "0x2260FAC5E5542a773Aa44fBCfeDf7C193bc2C599"; // WBTC mainnet contract
+  
         const provider = new ethers.providers.Web3Provider(window.ethereum);
-        const balanceWei = await provider.getBalance(account.address);
         const signer = provider.getSigner();
         setSigner(signer);
-        setEthBalance(ethers.utils.formatEther(balanceWei));
+  
+        // Create WBTC contract instance
+        const wbtcContract = new ethers.Contract(wbtcAddress, ERC20_ABI, provider);
+  
+        try {
+          // Get WBTC balance
+          const wbtcBalance = await wbtcContract.balanceOf(address);
+  
+          // WBTC has 8 decimals (like BTC), format accordingly
+          const formattedBalance = ethers.utils.formatUnits(wbtcBalance, 8); // 8 decimals for WBTC
+          setWbtcBalance(formattedBalance); // Set WBTC balance
+        } catch (error) {
+          console.error("Failed to fetch WBTC balance:", error);
+        }
       }
     };
-
+  
     fetchBalance();
-  }, [account]);
+  }, [address, chainId]);
 
   useEffect(() => {
     if (isCalledFromInventory) setId(routeMatch1?.params?.id);
@@ -511,7 +534,7 @@ const ProductDetails = ({ user, users }) => {
               </Breadcrumb.Item>
             </Breadcrumb>
           </Row>
-          <EthstSteps />
+          <WbtcstSteps />
           <div className="flex w-full flex-col md:leading-12 px-4 sm:px-8 md:px-0 items-center md:w-[750px] md:w-[835px] xl:w-[858px]  md:mx-auto mt-12">
             <div className="flex md:justify-center gap-[15px] md:gap-6 flex-col md:flex-row items-center">
               {details['BlockApps-Mercata-Asset-images'].length > 0 ? (
@@ -628,7 +651,7 @@ const ProductDetails = ({ user, users }) => {
                           if (!isAuthenticated || !user) {
                             setIsModalVisible(true);
                           } else {
-                            if (account?.address) {
+                            if (address) {
                               showBridgeWalletModal();
                             } else {
                               appKit.open();
@@ -636,10 +659,10 @@ const ProductDetails = ({ user, users }) => {
                           }
                         }}
                       >
-                        {account?.address ? 'Bridge' : 'Connect Wallet'}
+                        {address ? 'Bridge' : 'Connect Wallet'}
                       </Button>
                     </div>
-                    {account?.address && (
+                    {address && (
                       <div className="bg-[#13188A] rounded-full mt-2">
                         <appkit-account-button />
                       </div>
@@ -833,6 +856,7 @@ const ProductDetails = ({ user, users }) => {
                       />
                       <PriceChartAndStats
                         priceHistory={priceHistory}
+                        isDecimal={details?.data?.quantityIsDecimal === 'True'}
                       />
                     </div>
                   )}
@@ -844,6 +868,7 @@ const ProductDetails = ({ user, users }) => {
                       </h2>
                       <Statistics
                         priceHistory={priceHistory}
+                        isDecimal={details?.data?.quantityIsDecimal === 'True'}
                       />
                     </>
                   )}
@@ -866,7 +891,6 @@ const ProductDetails = ({ user, users }) => {
           productDetailPage={Id}
           inventory={inventoryDetails}
           reserves={reserves}
-          
         />
       )}
       {bridgeWalletModalOpen && (
@@ -875,10 +899,10 @@ const ProductDetails = ({ user, users }) => {
           handleCancel={handleBridgeWalletModalClose}
           signer={signer}
           accountDetails={{
-            walletAddress: account?.address,
-            balance: ethBalance,
+            walletAddress: address,
+            balance: wbtcBalance,
           }}
-          tokenName="ETH"
+          tokenName="WBTC"
         />
       )}
       {borrowModalOpen && (

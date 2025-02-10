@@ -10,7 +10,7 @@ mercata_username  = os.getenv("MINTER_USERNAME")
 mercata_password  = os.getenv("MINTER_PASSWORD")
 mercata_node      = os.getenv("NODE_ENDPOINT") 
 keycloak_endpoint = os.getenv("KEYCLOAK_ENDPOINT")
-strat_root_address     = os.getenv("STRAT_ROOT_ADDRESS")
+strat_asset_address     = os.getenv("STRAT_ASSET_ADDRESS")
 usdst_address     = os.getenv("USDST_ASSET_ADDRESS")
 cirrus_endpoint   = "/cirrus/search/"
 
@@ -38,16 +38,14 @@ def transform_response_to_tuple_list(response_data):
 def generate_tx(address, balance):
     return {
         "payload": {
-            "contractName": "USDSTToken",
+            "contractName": "Tokens",
             "contractAddress": usdst_address,
             "method": "automaticTransfer",
             "args": {
                 "_newOwner": address,
                 "_price": 0.000000000000000001,
                 "_quantity": balance * (10**14),
-                "_transferNumber": int(uid()),
-                "_description": "<p><strong>What is USDST</strong></p><p style=\"text-align: start\"></p><p style=\"text-align: start\"><strong><span style=\"font-size: 12px\">Loyalty Points</span></strong><span style=\"font-size: 12px\">: USDST are digital points that are roughly pegged to the US dollar and provided to customers for their participation and interactions on the STRATO Mercata Marketplace.</span></p><p style=\"text-align: start\"><strong><span style=\"font-size: 12px\">Reward Mechanism</span></strong><span style=\"font-size: 12px\">: USDST are part of our rewards system, designed to incentivize and recognize engagement and loyalty.</span></p><p style=\"text-align: start\"><strong><span style=\"font-size: 12px\">Redeemable Assets</span></strong><span style=\"font-size: 12px\">: Customers can use their USDST to redeem marketplace items, and access special offers.</span></p><p style=\"text-align: start\"><strong><span style=\"font-size: 12px\">Empowering the Community</span></strong><span style=\"font-size: 12px\">: By engaging with USDST, you're not just earning rewards; you're actively contributing to the development and success of the Mercata protocol, embodying the spirit of decentralized growth.</span></p><p style=\\\"text-align: start\\\"><span style=\\\"font-size: 12px\\\">For more information, please refer to the VIP Program Terms of Use found on the&nbsp;</span><a target=\\\"_blank\\\" rel=\\\"noopenernoreferrernofollow\\\" href="https://blockapps.net/"><span style=\\\"color: #0000ff;font-size: 12px;color: #0000ff\\\">BlockApps website</span></a><span style=\\\"font-size: 12px\\\">.</span></p>",
-                "_name": "USDST",
+                "_transferNumber": int(uid())
             }
         },
         "type": "FUNCTION"
@@ -78,7 +76,7 @@ def main():
     }
 
     # Get the balances and create a list of tuples that contains (address, balance)
-    balances_endpoint = mercata_node + cirrus_endpoint + "BlockApps-Mercata-Asset?select=owner,quantity&root=eq." + strat_root_address + "&ownerCommonName=neq." + mercata_username
+    balances_endpoint = mercata_node + cirrus_endpoint + "BlockApps-Mercata-Asset?select=owner,quantity&root=eq." + strat_asset_address + "&ownerCommonName=neq." + mercata_username
     response = requests.get(balances_endpoint, headers=headers)
     balances = transform_response_to_tuple_list(response.json())
 
@@ -96,6 +94,7 @@ def main():
         # Handle the response if necessary
         if post_response.status_code == 200:
             print(f"Chunk {i // chunk_size + 1} posted successfully.")
+            print(chunk)
         else:
             print(f"Error in chunk {i // chunk_size + 1}: {post_response.json()}")
 

@@ -388,7 +388,7 @@ export const categoricalProperties = (
                 ))}
               </Select>
             </Form.Item>
-            <Form.Item
+            {/* <Form.Item
               label="Least Sellable Unit(s)"
               name="leastSellableUnits"
               className="w-full sm:w-[200px] md:w-30"
@@ -423,7 +423,7 @@ export const categoricalProperties = (
                 min={1}
                 placeholder="Enter Least Sellable Units"
               />
-            </Form.Item>
+            </Form.Item> */}
             <Form.Item
               label="Quantity"
               name="quantity"

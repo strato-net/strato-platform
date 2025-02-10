@@ -208,6 +208,7 @@ class ReserveController {
         'any.required': 'Reserve is required and must be a string.',
         'string.base': 'Reserve must be a valid string.',
       }),
+      value: Joi.string().pattern(/^\d+$/).required()
     });
     ReserveController.validateArgs(args, schema, 'Repay');
   }

@@ -8,6 +8,7 @@ if [ "$ORACLE_MODE" = "true" ]; then
   echo "Running the container in Oracle service mode"
   
   export DOCKERIZED="true"
+  export SALE_UPDATE=${SALE_UPDATE:-false}
 
   export CONFIG_DIR_PATH=/config
   export SERVER_HOST=${SERVER_HOST}
@@ -30,6 +31,7 @@ if [ "$ORACLE_MODE" = "true" ]; then
   export SILVER_ORACLE_NAME_VALUE=${SILVER_ORACLE_NAME_VALUE:-'Silver'}
   export GOLD_ORACLE_NAME_VALUE=${GOLD_ORACLE_NAME_VALUE:-'Gold'}
   export ETH_ORACLE_NAME_VALUE=${ETH_ORACLE_NAME_VALUE:-'ETH'}
+  export BTC_ORACLE_NAME_VALUE=${BTC_ORACLE_NAME_VALUE:-'BTC'}
   export USD_ORACLE_NAME_VALUE=${USD_ORACLE_NAME_VALUE:-'USD'}
   export SILVER_ASSET_ADDRESSES=${SILVER_ASSET_ADDRESSES:-''}
   export GOLD_ASSET_ADDRESSES=${GOLD_ASSET_ADDRESSES:-''}
@@ -50,6 +52,16 @@ if [ "$ORACLE_MODE" = "true" ]; then
       echo 'Error: ALCHEMY_API_KEY is not set. submit-price script will not run. Exiting'
       exit 12
     fi
+    if [ "${SALE_UPDATE}" = "true" ]; then
+      if [ -z "$METALS_USERNAME" ]; then
+      echo 'Error: METALS_USERNAME is not set. Metal Sale price update script will not run. Exiting'
+      exit 13
+      fi
+      if [ -z "$METALS_PASSWORD" ]; then
+      echo 'Error: METALS_PASSWORD is not set. Metal Sale price update script will not run. Exiting'
+      exit 14
+      fi
+    fi
     # TODO: in future we can check the other env vars here
   
     # Replace placeholders in Oracle config template
@@ -58,6 +70,7 @@ if [ "$ORACLE_MODE" = "true" ]; then
     sed -i 's*<silver_oracle_name_value>*'"${SILVER_ORACLE_NAME_VALUE}"'*g' /tmp/tmp.oracle_config.yaml
     sed -i 's*<gold_oracle_name_value>*'"${GOLD_ORACLE_NAME_VALUE}"'*g' /tmp/tmp.oracle_config.yaml
     sed -i 's*<eth_oracle_name_value>*'"${ETH_ORACLE_NAME_VALUE}"'*g' /tmp/tmp.oracle_config.yaml
+    sed -i 's*<btc_oracle_name_value>*'"${BTC_ORACLE_NAME_VALUE}"'*g' /tmp/tmp.oracle_config.yaml
     sed -i 's*<usd_oracle_name_value>*'"${USD_ORACLE_NAME_VALUE}"'*g' /tmp/tmp.oracle_config.yaml
     sed -i 's*<silver_asset_addresses_value>*'"${SILVER_ASSET_ADDRESSES}"'*g' /tmp/tmp.oracle_config.yaml
     sed -i 's*<gold_asset_addresses_value>*'"${GOLD_ASSET_ADDRESSES}"'*g' /tmp/tmp.oracle_config.yaml
@@ -156,7 +169,7 @@ else
   # export METAMASK_SECONDARY_SALE_FEE_PERCENTAGE_VALUE=${METAMASK_SECONDARY_SALE_FEE_PERCENTAGE_VALUE:-3.0}
   export USDST_ADDRESS=${USDST_ADDRESS}
   export USDST_SERVICE_NAME_VALUE=${USDST_SERVICE_NAME_VALUE:-'USDST'}
-  export USDST_IMAGE_URL_VALUE=${USDST_IMAGE_URL_VALUE:-'https://blockapps-public-assets.s3.us-east-1.amazonaws.com/icons/stratFinished.png'}
+  export USDST_IMAGE_URL_VALUE=${USDST_IMAGE_URL_VALUE:-'https://blockapps-public-assets.s3.us-east-1.amazonaws.com/icons/USDST.png'}
   export USDST_PRIMARY_SALE_FEE_PERCENTAGE_VALUE=${USDST_PRIMARY_SALE_FEE_PERCENTAGE_VALUE:-10.0}
   export USDST_SECONDARY_SALE_FEE_PERCENTAGE_VALUE=${USDST_SECONDARY_SALE_FEE_PERCENTAGE_VALUE:-3.0}
   export USDST_FEE_RECIPIENT=${USDST_FEE_RECIPIENT}

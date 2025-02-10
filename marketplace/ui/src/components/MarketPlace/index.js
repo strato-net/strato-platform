@@ -78,6 +78,7 @@ const MarketPlace = ({ user, isAuthenticated }) => {
   useEffect(() => {
     inventoryActions.getAllReserve(inventoryDispatch);
     ethActions.fetchETHSTAddress(ethDispatch)
+    ethActions.fetchWBTCSTAddress(ethDispatch)
   }, []);
 
   useEffect(() => {

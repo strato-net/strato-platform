@@ -64,7 +64,7 @@ abstract contract Reserve is Utils, Structs {
     }
 
     modifier requireOwner(string action) {
-        require(msg.sender == owner, "Only owner can " + action + ".");
+        require(getCommonName(msg.sender) == getCommonName(owner), "Only owner can " + action + ".");
         _;
     }
 
@@ -184,14 +184,19 @@ abstract contract Reserve is Utils, Structs {
 
     function repayLoan(
         address[] _usdstAssetAddresses,
-        address _escrowAddress
+        address _escrowAddress,
+        uint amountToRepay
     ) requireActive() external returns (uint) {
         require(_usdstAssetAddresses.length > 0, "Pass at least one USDST token address");
+
         Escrow escrow = Escrow(_escrowAddress);
         uint usdstAmountOwed = escrow.borrowedAmount();
 
-        uint usdstAmountRepaid = burnUSDST(_usdstAssetAddresses, usdstAmountOwed, escrow.borrowerCommonName());
-        
+        require(amountToRepay > 0, "Repayment amount must be greater than zero");
+        uint actualRepayment = amountToRepay > usdstAmountOwed ? usdstAmountOwed : amountToRepay;
+
+        uint usdstAmountRepaid = burnUSDST(_usdstAssetAddresses, actualRepayment, escrow.borrowerCommonName());
+
         // Clear loan
         escrow.updateBorrowedAmount(usdstAmountRepaid, false); //change
 
@@ -235,6 +240,11 @@ abstract contract Reserve is Utils, Structs {
 
     function setName(string _newName) public requireOwner("update name") {
         name = _newName;
+    }
+
+    function setUnitConversionRate(decimal _newRate) public requireOwner("update unit conversion rate") {
+        require(_newRate > 0, "Unit conversion rate must be greater than 0");
+        unitConversionRate = _newRate;
     }
 
     function setAssetRootAddress(address _newAssetRootAddress) public requireOwner("update asset root address") {
