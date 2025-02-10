@@ -14,15 +14,11 @@ module Blockchain.DB.ChainDB
     BestBlockRoot (..),
     bootstrapChainDB,
     putBlockHeaderInChainDB,
-    --putBlockHashInChainDB,
     migrateBlockHeader,
     getChainRoot,
     getChainStateRoot,
     putChainStateRoot,
     deleteChainStateRoot,
-    getGenesisStateRoot,
-    --getChainGenesisInfo,
-    --putChainGenesisInfo,
     getChainBestBlock,
     putChainBestBlock,
   )
@@ -240,14 +236,6 @@ putChainBlockHashInfo h parentHash sr = do
   bhr <- unBlockHashRoot <$> get Proxy
   newBlockHashRoot <- putkv bhr (N.EvenNibbleString $ keccak256ToByteString h) (parentHash, sr)
   put Proxy $ BlockHashRoot newBlockHashRoot
-
-getGenesisStateRoot ::
-  ( Modifiable GenesisRoot m,
-    (MP.StateRoot `Alters` MP.NodeData) m
-  ) =>
-  Maybe Word256 ->
-  m (Maybe MP.StateRoot)
-getGenesisStateRoot = fmap (fmap (\(_, sr, _) -> sr)) . getChainGenesisInfo
 
 getChainGenesisInfo ::
   ( Modifiable GenesisRoot m,

@@ -165,7 +165,6 @@ addBlocks unfiltered = do
               ++ (show . number . obBlockData $ firstBlock)
           )
       didReplaceBest <- newIORef False
-      ranPrivateTxs <- newIORef M.empty
       replacedBest <- newIORef (error "addBlocks.replacedBest: evaluating uninitialized BestBlockInfo!")
       let go block = do
             let !blockNo = number $ obBlockData block
@@ -173,7 +172,7 @@ addBlocks unfiltered = do
             timeit (printf "Block #%d (%d TXs insertion)" blockNo txCount) timerToUse $ do
               failures <- lift $ addBlock block
               when (null failures) $ do
-                (didReplaceThisTime, ranPriv, replacedBits@(hsh, num)) <- lift . lift $ replaceBestIfBetter block
+                (didReplaceThisTime, replacedBits@(hsh, num)) <- lift . lift $ replaceBestIfBetter block
                 when didReplaceThisTime $ do
                   writeIORef didReplaceBest True
                   writeIORef replacedBest replacedBits
@@ -182,10 +181,6 @@ addBlocks unfiltered = do
                   -- of diffs. The number of blocks to skip between stateroots is determined by the cost of
                   -- the diff between them, which is estimated by the number of transactions.
                   State.put $! Just (stateRoot $ obBlockData block, hsh, num)
-                unless (M.null ranPriv) $
-                  modifyIORef' ranPrivateTxs $
-                    flip M.unionWith ranPriv $
-                      \(n1, s1) (n2, s2) -> if n1 > n2 then (n1, s1) else (n2, s2)
               pure failures
           loop [] = pure []
           loop (b:bs) = go b >>= \case
@@ -197,7 +192,6 @@ addBlocks unfiltered = do
         _ -> do
           $logDebugLS "addBlocks/srLog" srLog
           didReplaceBest' <- readIORef didReplaceBest
-          ranPrivateTxs' <- readIORef ranPrivateTxs
           when didReplaceBest' $ do
             $logInfoS "addBlocks" "done inserting, now will emit stateDiff if necessary"
             nbb <- readIORef replacedBest
@@ -205,7 +199,6 @@ addBlocks unfiltered = do
               timeit "calculateAndEmitStateDiffs" timerToUse $
                 calculateAndEmitStateDiffs srLog oldHeader
             yield . OutIndexEvent $ NewBestBlock nbb
-          when (flags_sqlDiff && not (M.null ranPrivateTxs')) $ calculateAndEmitChainDiffs ranPrivateTxs'
 
 setParentStateRoot ::
   (MonadFail m, MonadIO m, BSDB.HasBlockSummaryDB m) =>
@@ -715,9 +708,8 @@ indexMaybe (_ : rest) i = indexMaybe rest (i - 1)
 
 ----------------
 
-replaceBestIfBetter :: (Bagger.MonadBagger m) => OutputBlock -> m (Bool, M.Map Word256 (Integer, Keccak256), (Keccak256, Integer))
+replaceBestIfBetter :: (Bagger.MonadBagger m) => OutputBlock -> m (Bool, (Keccak256, Integer))
 replaceBestIfBetter b@OutputBlock {obBlockData = bd, obReceiptTransactions = txs} = do
-  let txPayloads = (\t -> fromMaybe (otBaseTx t) (otPrivatePayload t)) <$> txs
   bbi <- getContextBestBlockInfo
 
   case bbi of
@@ -735,7 +727,6 @@ replaceBestIfBetter b@OutputBlock {obBlockData = bd, obReceiptTransactions = txs
             newNumber == 0
               || (newNumber > oldNumber)
               || ((newNumber == oldNumber) && (newTxCount > oldTxCount))
-          ranPriv = M.fromSet (const (newNumber, bH)) . S.fromList . catMaybes $ map txChainId txPayloads
 
       $logInfoS "replaceBestIfBetter" . T.pack $ "shouldReplace = " ++ show shouldReplace ++ ", newNumber = " ++ show newNumber ++ ", oldBestNumber = " ++ show (number oldBestBlock)
 
@@ -761,7 +752,7 @@ replaceBestIfBetter b@OutputBlock {obBlockData = bd, obReceiptTransactions = txs
           bestSha = if shouldReplace then bH else oldBestSha
           bestNum = if shouldReplace then newNumber else oldNumber
 
-      return (shouldReplace, ranPriv, bbi')
+      return (shouldReplace, bbi')
 
 calculateAndEmitStateDiffs ::
   VMBase m =>
@@ -772,16 +763,6 @@ calculateAndEmitStateDiffs Nothing _ = pure ()
 calculateAndEmitStateDiffs (Just (next, hsh, num)) oldHeader =
   let base = MP.StateRoot $ blockHeaderStateRoot oldHeader
    in completeDiff base next hsh num
-
-calculateAndEmitChainDiffs :: VMBase m => M.Map Word256 (Integer, Keccak256) -> ConduitT a VmOutEvent m ()
-calculateAndEmitChainDiffs chainMap = do
-  let chainList = M.toList chainMap
-      chainIds = format . unsafeCreateKeccak256FromWord256 . fst <$> chainList
-  multilineLog "calculateAndEmitChainDiffs" $ "Calculating ChainDiffs for:\n" ++ boringBox chainIds
-  runConduit $
-    yieldMany chainList
-      .| awaitForever (\(cId, (newNumber, newHash)) -> withCurrentBlockHash newHash $ SD.chainDiff (Just cId) newNumber newHash)
-      .| mapM_C (yield . OutStateDiff)
 
 diffMaxCost :: Int
 diffMaxCost = 500

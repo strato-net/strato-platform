@@ -12,11 +12,9 @@ module Blockchain.Strato.StateDiff
     Diff (..),
     Detail (..),
     Detailed (..),
-    chainDiff,
     stateDiff,
     stateDiff',
     eventualAccountState,
-    incrementalAccountState,
   )
 where
 
@@ -35,8 +33,7 @@ import Blockchain.Strato.Model.Address
 import Blockchain.Strato.Model.ExtendedWord
 import Blockchain.Strato.Model.Keccak256
 import Conduit
-import Control.Applicative
-import Control.Monad (unless, when)
+import Control.Monad (when)
 import Control.Monad.Change (Alters, Modifiable, Selectable)
 import qualified Control.Monad.Change as A
 import Data.ByteString (ByteString)
@@ -167,28 +164,6 @@ instance Detailed (Diff Keccak256) where
 instance Detailed StorageDiff where
   incrementalToEventual (EVMDiff m) = EVMDiff $ Map.map incrementalToEventual m
   incrementalToEventual (SolidVMDiff m) = SolidVMDiff $ Map.map incrementalToEventual m
-
-chainDiff ::
-  ( MonadLogger m,
-    HasStateDB m,
-    HasCodeDB m,
-    HasHashDB m,
-    Modifiable BlockHashRoot m,
-    Modifiable GenesisRoot m,
-    Modifiable BestBlockRoot m,
-    Selectable Address AddressState m
-  ) =>
-  Maybe Word256 ->
-  Integer ->
-  Keccak256 ->
-  ConduitT i StateDiff m ()
-chainDiff chainId newBlockNum newBlockHash = do
-  newSR <- lift $ fromMaybe emptyTriePtr <$> getChainStateRoot chainId newBlockHash
-  ~(bHash, bNum) <- lift $ fromMaybe (unsafeCreateKeccak256FromWord256 0, 0) <$> getChainBestBlock chainId
-  unless (newBlockNum < bNum) $ do
-    mSR <- lift $ liftA2 (<|>) (getChainStateRoot chainId bHash) (getGenesisStateRoot chainId)
-    let sr = fromMaybe emptyTriePtr mSR
-    stateDiff chainId newBlockNum newBlockHash sr newSR
 
 stateDiff ::
   ( MonadLogger m,
