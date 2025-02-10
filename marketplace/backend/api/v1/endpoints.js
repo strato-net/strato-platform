@@ -109,6 +109,7 @@ export const Tokens = {
   prefix: '/tokens',
   create: '/',
   getETHSTAddress: '/address',
+  getWBTCSTAddress: '/wbtcstAddress',
   addHash: '/addHash',
 };
 

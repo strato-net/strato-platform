@@ -30,16 +30,17 @@ const Transaction = ({ user }) => {
 
   useEffect(() => {
     const fetchAddresses = async () => {
+      const stratAddress = await marketplaceActions.fetchStratsAddress(
+        marketplaceDispatch
+      );
       const assetsWithEighteenDecimalPlaces =
         await marketplaceActions.fetchAssetsWithEighteenDecimalPlaces(
           marketplaceDispatch
         );
       await ethAcions.fetchETHSTAddress(ethDispatch);
-      const stratAddress = await marketplaceActions.fetchStratsAddress(
-        marketplaceDispatch
-      );
-      setAssetsWithEighteenDecimalPlaces(assetsWithEighteenDecimalPlaces);
+      await ethAcions.fetchWBTCSTAddress(ethDispatch);
       setStratAddress(stratAddress);
+      setAssetsWithEighteenDecimalPlaces(assetsWithEighteenDecimalPlaces);
     };
 
     fetchAddresses();

@@ -60,16 +60,16 @@ function combineInventories(items, assetsWithEighteenDecimalPlaces) {
 
     const decimals = assetsWithEighteenDecimalPlaces.includes(root)
       ? 18
-      : items[0].decimals || 0;
+      : firstItem.decimals || 0;
 
     // Step 3: Sum `quantity` and `saleQuantity` across the group
     const totalQuantity = group.reduce((sum, item) => {
       const quantity = item.quantity || 0;
-      return sum + quantity / Math.pow(10, decimals);
+      return sum + quantity;
     }, 0);
     const totalSaleQuantity = group.reduce((sum, item) => {
       const saleQuantity = item.saleQuantity ? item.quantity || 0 : 0;
-      return sum + saleQuantity / Math.pow(10, decimals);
+      return sum + saleQuantity;
     }, 0);
 
     // Step 4: Aggregate varying fields into `inventories`
@@ -89,6 +89,7 @@ function combineInventories(items, assetsWithEighteenDecimalPlaces) {
       'BlockApps-Mercata-Asset-fileNames': assetFileNames,
       'BlockApps-Mercata-Asset-files': assetFiles,
       'BlockApps-Mercata-Asset-images': assetImages,
+      decimals,
       totalQuantity,
       totalSaleQuantity,
       inventories: inventoriesArr,

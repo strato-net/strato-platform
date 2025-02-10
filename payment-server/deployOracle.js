@@ -62,6 +62,7 @@ describe("Payment Server - deploy contracts", function () {
   let silverOracle;
   let goldOracle;
   let ethOracle;
+  let btcOracle;
   let usdOracle;
 
   before(async () => {
@@ -140,6 +141,11 @@ describe("Payment Server - deploy contracts", function () {
     ethOracle = await uploadContract(token, "Oracle", { name: ethOracleName });
   });
 
+  it("Deploy Btc Oracle", async () => {
+    const btcOracleName = config.btcOracle.name;
+    btcOracle = await uploadContract(token, "Oracle", { name: btcOracleName });
+  });
+
   it("Deploy USD Oracle", async () => {
     const usdOracleName = config.usdOracle.name;
     usdOracle = await uploadContract(token, "Oracle", { name: usdOracleName });
@@ -152,6 +158,7 @@ describe("Payment Server - deploy contracts", function () {
       silverOracle,
       goldOracle,
       ethOracle,
+      btcOracle,
       usdOracle,
     };
     const deployment = deploy(deployArgs, config);

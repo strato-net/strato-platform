@@ -27,6 +27,19 @@ const reducer = (state, action) => {
       return {
         ...state,
       };
+    case actionDescriptors.fetchWBTCSTAddress:
+      return {
+        ...state,
+      };
+    case actionDescriptors.fetchWBTCSTAddressSuccessful:
+      return {
+        ...state,
+        wbtcstAddress: action.payload,
+      };
+    case actionDescriptors.fetchWBTCSTAddressFailed:
+      return {
+        ...state,
+      };
     case actionDescriptors.addHash:
       return {
         ...state,

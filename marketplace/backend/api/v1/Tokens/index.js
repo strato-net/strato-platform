@@ -20,6 +20,13 @@ router.get(
   TokensController.getETHSTAddress
 );
 
+router.get(
+  Tokens.getWBTCSTAddress,
+  authHandler.authorizeRequest(true),
+  loadDapp,
+  TokensController.getWBTCSTAddress
+);
+
 router.post(
   Tokens.addHash,
   authHandler.authorizeRequest(),

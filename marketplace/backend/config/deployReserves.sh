@@ -1,11 +1,10 @@
 # Define input parameters directly in the script
 USERNAME="blockapps"
 PASSWORD="Bl0ck@pps"
-CATA_QUANTITY="1000000000000000000000000000000" #1000000000000000000000000000000
-STRATS_QUANTITY="1000000000" #100,000
-BA_STRATS_ADDRESS="185000c816bf9bdca97606b31e727f9fac9b50c3"
+CATA_QUANTITY="1000000000000000000000000000000" 
+USDST_TOKEN_ADDRESS="2f6c3848a75aa075d054fe84b780cbdebd77ec61"
 BA_CATA_ADDRESS="e64fac120eef3e3551cfe914af7dfb58d4f0beef"
-BASE_CODE_COLLECTION="9a9c2f5efceb3b0a4067d8e3acb3dea55df05158"
+BASE_CODE_COLLECTION="27c7bbec34b87578e32e68ad7eaae1f58f5d4d9d"
 ASSET_ROOT_ADDRESS=$ASSET_ROOT_ADDRESS
 NAME=$NAME
 ASSET_ORACLE_ADDRESS=$ASSET_ORACLE_ADDRESS
@@ -27,21 +26,24 @@ echo "Access token: $ACCESS_TOKEN"
 # Generate a random transfer number
 TRANSFER_NUMBER=$(shuf -i 1000-9999 -n 1)
 
-# Deploy the SimpleReserve contract
-SIMPLE_RESERVE_ADDRESS=$(curl -X POST "https://node1.mercata-testnet2.blockapps.net/bloc/v2.2/transaction?resolve=true" \
+# Deploy the SimpleReserve contract and capture the raw response
+RAW_RESPONSE=$(curl -X POST "https://node1.mercata-testnet2.blockapps.net/bloc/v2.2/transaction?resolve=true" \
   -H 'Content-Type: application/json' \
   -H "Authorization: Bearer $ACCESS_TOKEN" \
   -d '{
     "txs": [{
       "payload": {
-        "src": "pragma es6; pragma strict; import <'"$BASE_CODE_COLLECTION"'>; contract SimpleReserve is Reserve { constructor(address _assetOracle, string _name, address _assetRootAddress, decimal _unitConversionRate) Reserve (_assetOracle, _name, _assetRootAddress, _unitConversionRate) {} }",
+        "src": "pragma es6; pragma strict; import <'"$BASE_CODE_COLLECTION"'>; contract SimpleReserve is Reserve { constructor(address _assetOracle, string _name, address _assetRootAddress, decimal _unitConversionRate, address _usdstToken, decimal _usdstPrice, decimal _stratsPrice ) Reserve (_assetOracle, _name, _assetRootAddress, _unitConversionRate, _usdstToken, _usdstPrice, _stratsPrice) {} }",
         "contract": "SimpleReserve",
         "function": "constructor",
         "args": {
           "_assetOracle": "'"$ASSET_ORACLE_ADDRESS"'",
           "_name": "'"$NAME"'",
           "_assetRootAddress": "'"$ASSET_ROOT_ADDRESS"'",
-          "_unitConversionRate": '"$UNIT_CONVERSION_RATE"'
+          "_unitConversionRate": '"$UNIT_CONVERSION_RATE"',
+          "_usdstToken": "'"$USDST_TOKEN_ADDRESS"'",
+          "_usdstPrice": 1000000000000000000.0000,
+          "_stratsPrice": 100000000000000.0000
         }
       },
       "type": "CONTRACT"
@@ -50,24 +52,17 @@ SIMPLE_RESERVE_ADDRESS=$(curl -X POST "https://node1.mercata-testnet2.blockapps.
       "gasLimit": 10000000000,
       "gasPrice": 1
     }
-  }' | jq -r '.[0].data.contents.address')
+  }')
+
+echo "RAW_RESPONSE: $RAW_RESPONSE"
+
+# Parse the address from the raw response
+SIMPLE_RESERVE_ADDRESS=$(echo $RAW_RESPONSE | jq -r '.[0].data.contents.address')
 
 echo "SimpleReserve for $NAME contract deployed at address: $SIMPLE_RESERVE_ADDRESS"
 
 # if SKIP_TOKENS is not set, deploy STRATS and CATA tokens
 if [ "$SKIP_TOKENS" != "true" ]; then
-  # Use the access token to call purchaseTransfer for STRATS
-  NEW_STRATS_RESULT=$(curl -X POST "https://node1.mercata-testnet2.blockapps.net/bloc/v2.2/transaction?resolve=true" \
-    -H 'Content-Type: application/json' \
-    -H "Authorization: Bearer $ACCESS_TOKEN" \
-    -d '{"txs":[{"payload":{"contractAddress":"'"$BA_STRATS_ADDRESS"'","method":"automaticTransfer","args":{"_newOwner":"'"$SIMPLE_RESERVE_ADDRESS"'","_quantity":'"$STRATS_QUANTITY"',"_transferNumber":'"$TRANSFER_NUMBER"',"_price":0.01}},"type":"FUNCTION"}],"txParams":{"gasLimit":10000000000,"gasPrice":1}}')
-
-  echo "NEW_STRATS_RESULT: $NEW_STRATS_RESULT"
-
-  NEW_STRATS_ADDRESS=$(echo $NEW_STRATS_RESULT | jq -r '.[0].txResult.contractsCreated')
-
-  echo "NEW_STRATS_ADDRESS: $NEW_STRATS_ADDRESS"
-
   # Use the access token to call purchaseTransfer for CATA
   NEW_CATA_RESULT=$(curl -X POST "https://node1.mercata-testnet2.blockapps.net/bloc/v2.2/transaction?resolve=true" \
     -H 'Content-Type: application/json' \
@@ -79,20 +74,6 @@ if [ "$SKIP_TOKENS" != "true" ]; then
   NEW_CATA_ADDRESS=$(echo $NEW_CATA_RESULT | jq -r '.[0].txResult.contractsCreated')
 
   echo "NEW_CATA_ADDRESS: $NEW_CATA_ADDRESS"
-
-  # Fetch and parse the new STRATS address
-  # NEW_STRATS_ADDRESS=$(curl -s "https://node1.mercata-testnet2.blockapps.net/cirrus/search/BlockApps-Mercata-Asset?name=eq.STRATS&owner=eq.$SIMPLE_RESERVE_ADDRESS" | jq -r '.address')
-
-  # Fetch and parse the new CATA address
-  # NEW_CATA_ADDRESS=$(curl -s "https://node1.mercata-testnet2.blockapps.net/cirrus/search/BlockApps-Mercata-Asset?name=eq.CATA&owner=eq.$SIMPLE_RESERVE_ADDRESS" | jq -r '.address')
-
-  # Update STRATS token address
-  UPDATE_STRATS_RESULT=$(curl -X POST "https://node1.mercata-testnet2.blockapps.net/bloc/v2.2/transaction?resolve=true" \
-    -H 'Content-Type: application/json' \
-    -H "Authorization: Bearer $ACCESS_TOKEN" \
-    -d '{"txs":[{"payload":{"contractAddress":"'"$SIMPLE_RESERVE_ADDRESS"'","method":"setStratsToken","args":{"_newStratsToken":"'"$NEW_STRATS_ADDRESS"'"}},"type":"FUNCTION"}],"txParams":{"gasLimit":10000000000,"gasPrice":1}}')
-
-  echo "UPDATE_STRATS_RESULT: $UPDATE_STRATS_RESULT"
 
   # Update CATA token address
   UPDATE_CATA_RESULT=$(curl -X POST "https://node1.mercata-testnet2.blockapps.net/bloc/v2.2/transaction?resolve=true" \

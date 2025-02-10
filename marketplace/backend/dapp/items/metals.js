@@ -23,7 +23,10 @@ const contractEvents = { OWNERSHIP_UPDATE: 'OwnershipUpdate' };
  * @returns Contract object
  * */
 async function uploadContract(user, _constructorArgs, options) {
-  const constructorArgs = marshalIn(_constructorArgs);
+  const constructorArgs = {
+    ...marshalIn(_constructorArgs),
+    leastSellableUnits: 1,
+  };
 
   const contractArgs = {
     name: contractName,

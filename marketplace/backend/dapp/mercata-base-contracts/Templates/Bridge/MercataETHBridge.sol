@@ -12,6 +12,7 @@ abstract contract MercataETHBridge is Utils {
     }
 
     address public owner;
+    uint public decimals;
     address public burnerAddress = address(0x6ec8bbe4a5b87be18d443408df43a45e5972fa1b); // burner account
     bool public isActive = true;
 
@@ -32,8 +33,9 @@ abstract contract MercataETHBridge is Utils {
         require(isActive, "MercataETHBridge is not active");
         _;
     }
-    constructor() {
+    constructor(uint _decimals) {
         owner = msg.sender;
+        decimals = _decimals;
     }
 
     function deactivate() public onlyOwner requireActive {
@@ -50,7 +52,7 @@ abstract contract MercataETHBridge is Utils {
         require(hashExists[_txHash] == 1, "Hash doesn't exists");
         hashExists[_txHash] = 2;
         Mintable(ethSt).mintNewUnits(_amount);
-        Asset(UTXO(Redeemable(Mintable(ethSt)))).automaticTransfer(_userAddress, 0.000000000000000001, _amount, block.number);
+        Asset(UTXO(Redeemable(Mintable(ethSt)))).automaticTransfer(_userAddress, 1.0/(10**decimals), _amount, block.number);
         emit MintedETHST(_userAddress, getCommonName(_userAddress), _amount);
     }
 
@@ -82,11 +84,11 @@ abstract contract MercataETHBridge is Utils {
 
             ethstAsset.attachSale();
             if (ethstQuantity > ethstAmountNet) {
-                ethstAsset.transferOwnership(burnerAddress, ethstAmountNet, false, transferNumber, 0.000000000000000001);
+                ethstAsset.transferOwnership(burnerAddress, ethstAmountNet, false, transferNumber, 1.0/(10**decimals));
                 ethstAsset.closeSale();
                 ethstAmountNet = 0;
             } else {
-                ethstAsset.transferOwnership(burnerAddress, ethstQuantity, false, transferNumber, 0.000000000000000001);
+                ethstAsset.transferOwnership(burnerAddress, ethstQuantity, false, transferNumber, 1.0/(10**decimals));
                 ethstAmountNet -= ethstQuantity;
             }
 

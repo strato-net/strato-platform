@@ -189,7 +189,7 @@ const Checkout = () => {
   };
 
   const ValueQty = (product, e) => {
-    e = parseInt(e || 0);
+    e = parseFloat(e || 0);
     let items = [...cartList];
     cartList.forEach((element, index) => {
       if (element.product.address === product.key) {
@@ -294,7 +294,7 @@ const Checkout = () => {
             </div>
             <InputNumber
               className="w-[100px] bg-[transparent] border-none text-[#202020]  font-semibold text-sm text-center flex flex-col justify-center"
-              min={1}
+              min={1/Math.pow(10, product.decimals)}
               value={qty}
               defaultValue={qty}
               controls={false}

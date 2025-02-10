@@ -43,6 +43,7 @@ const GlobalTransaction = ({
   USDSTAddress,
   assetsWithEighteenDecimalPlaces,
   ethstAddress,
+  wbtcstAddress,
 }) => {
   const USDSTIcon = (
     <img src={Images.USDST} alt="USDST" className="mx-1 w-4 h-4" />
@@ -162,8 +163,14 @@ const GlobalTransaction = ({
 
   const handleAssetRedirection = (data) => {
     const isEthst = data?.assetOriginAddress === ethstAddress;
+    const isWbtcst = data?.assetOriginAddress === wbtcstAddress;
     if (isEthst) {
       const url = routes.EthstProductDetail.url;
+      navigate(`${url.replace(':address', data.assetAddress)}`, {
+        state: { isCalledFromInventory: false },
+      });
+    } else if (isWbtcst) {
+      const url = routes.WbtcstProductDetail.url;
       navigate(`${url.replace(':address', data.assetAddress)}`, {
         state: { isCalledFromInventory: false },
       });
@@ -237,7 +244,7 @@ const GlobalTransaction = ({
             : quantity / Math.pow(10, decimals || 0);
 
           formattedQuantity = value.toLocaleString('en-US', {
-            maximumFractionDigits: 4,
+            maximumFractionDigits: 6,
             minimumFractionDigits: 0,
           });
         }
@@ -446,6 +453,7 @@ const GlobalTransaction = ({
               isTransactionLoading={isTransactionLoading}
               assetsWithEighteenDecimalPlaces={assetsWithEighteenDecimalPlaces}
               ethstAddress={ethstAddress}
+              wbtcstAddress={wbtcstAddress}
             />
           </Row>
         </div>

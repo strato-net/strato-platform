@@ -65,7 +65,7 @@ const InventoryCard = ({
   const [redeemModalOpen, setRedeemModalOpen] = useState(false);
   const [bridgeModalOpen, setBridgeModalOpen] = useState(false);
   const [stakeModalOpen, setStakeModalOpen] = useState(false);
-  const { ethstAddress } = useEthState();
+  const { ethstAddress, wbtcstAddress } = useEthState();
 
   const navigate = useNavigate();
   const naviroute = routes.InventoryDetail.url;
@@ -181,6 +181,10 @@ const InventoryCard = ({
 
   const callDetailPage = () => {
     if (inventory.originAddress === ethstAddress) {
+      navigate(`${ethNaviroute.replace(':address', inventory.address)}`, {
+        state: { isCalledFromInventory: false },
+      });
+    } else if (inventory.originAddress === wbtcstAddress) {
       navigate(`${ethNaviroute.replace(':address', inventory.address)}`, {
         state: { isCalledFromInventory: false },
       });
@@ -538,7 +542,7 @@ const InventoryCard = ({
             <p className="text-[#6A6A6A]">Quantity Owned</p>
             <p className="text-[#202020] font-semibold">
               {quantity.toNumber().toLocaleString('en-US', {
-                maximumFractionDigits: 4,
+                maximumFractionDigits: 6,
                 minimumFractionDigits: 0,
               }) || 'N/A'}
             </p>
@@ -549,7 +553,7 @@ const InventoryCard = ({
               <p className="text-[#202020] font-semibold">
                 {inventory?.escrow
                   ? quantity.toNumber().toLocaleString('en-US', {
-                      maximumFractionDigits: 4,
+                      maximumFractionDigits: 6,
                       minimumFractionDigits: 0,
                     })
                   : 0}
@@ -564,7 +568,7 @@ const InventoryCard = ({
                     .minus(totalLockedQuantity)
                     .toNumber()
                     .toLocaleString('en-US', {
-                      maximumFractionDigits: 4,
+                      maximumFractionDigits: 6,
                       minimumFractionDigits: 0,
                     }) || 'N/A'}
                 </p>

@@ -15,6 +15,9 @@ goldOracle:
 ethOracle:
   name: <eth_oracle_name_value>
 
+btcOracle:
+  name: <btc_oracle_name_value>
+
 usdOracle:
   name: <usd_oracle_name_value>
 

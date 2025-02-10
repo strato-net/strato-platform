@@ -88,8 +88,10 @@ const Inventory = ({ user }) => {
   const naviroute = routes.InventoryDetail.url;
   const ethNaviroute = routes.EthstProductDetail.url;
   let { hasChecked, isAuthenticated, loginUrl } = useAuthenticateState();
-  const { USDSTAddress, assetsWithEighteenDecimalPlaces } =
-    useMarketplaceState();
+  const {
+    USDSTAddress,
+    assetsWithEighteenDecimalPlaces,
+  } = useMarketplaceState();
   const formatter = new Intl.NumberFormat('en-US');
   const formattedNum = (num) => formatter.format(num);
 
@@ -178,6 +180,7 @@ const Inventory = ({ user }) => {
     actions.fetchSupportedTokens(dispatch);
     categoryActions.fetchCategories(categoryDispatch);
     ethActions.fetchETHSTAddress(ethDispatch);
+    ethActions.fetchWBTCSTAddress(ethDispatch);
   }, []);
 
   useEffect(() => {
@@ -499,7 +502,7 @@ const Inventory = ({ user }) => {
         )
           .toNumber()
           .toLocaleString('en-US', {
-            maximumFractionDigits: 4,
+            maximumFractionDigits: 6,
             minimumFractionDigits: 0,
           });
         return <div>{quantity || 0}</div>;

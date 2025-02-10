@@ -56,7 +56,7 @@ const StakeItemActions = ({
 
   // Calculate quantity
   let quantity = inventory?.inventories
-    ? inventory.totalQuantity
+    ? inventory.totalQuantity / Math.pow(10, inventory?.decimals || 0)
     : assetsWithEighteenDecimalPlaces.includes(inventory?.root || '')
     ? inventory?.quantity / 1e18
     : inventory?.quantity / Math.pow(10, inventory?.decimals || 0);

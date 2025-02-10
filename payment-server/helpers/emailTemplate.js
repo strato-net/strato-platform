@@ -177,13 +177,13 @@ function generateHtmlContent(customerFirstName, concatenatedOrderString) {
       const multiplier = new BigNumber(10).pow(decimalPlaces);
     
       let itemName = decodeURIComponent(orderItem.name);
-      let itemPrice = unitPrice.multipliedBy(multiplier).toFixed(2);
-      let itemQty = quantity.dividedBy(multiplier).toString();
-      let itemTotal = (itemPrice.multipliedBy(itemQty)).toFixed(2); 
+      let itemPrice = unitPrice.multipliedBy(multiplier);
+      let itemQty = quantity.dividedBy(multiplier);
+      let itemTotal = (itemPrice.multipliedBy(itemQty)); 
   
       concatenatedOrderString += `${itemName}:\n`; 
-      concatenatedOrderString += `$${itemTotal} <br>`; 
-      concatenatedOrderString += `Qty: ${itemQty} &nbsp; $${itemPrice} each<br><br>`; 
+      concatenatedOrderString += `$${itemTotal.toFixed(2)} <br>`; 
+      concatenatedOrderString += `Qty: ${itemQty.toFixed(2)} &nbsp; $${itemPrice.toFixed(2)} each<br><br>`; 
       orderTotal += parseFloat(itemTotal); 
       if (i === orderData.length - 1) {
         concatenatedOrderString += `<hr style="border-top: 1px dotted #0A1B71; min-width: 80%; max-width: 80%; margin-left: 15px;">`;
