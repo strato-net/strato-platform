@@ -525,11 +525,11 @@ async function borrow(user, args, options) {
  * Repay
  */
 async function repay(user, args, options) {
-  const { reserve, escrowAddress, USDSTAssetAddresses } = args;
+  const { reserve, escrowAddress, USDSTAssetAddresses, amountToRepay } = args;
   const callArgs = {
     contract: { address: reserve },
     method: 'repayLoan',
-    args: util.usc({ escrowAddress, usdstAssetAddresses:USDSTAssetAddresses}),
+    args: util.usc({ escrowAddress, usdstAssetAddresses:USDSTAssetAddresses, amountToRepay }),
   };
 
   const reponse = await rest.call(user, callArgs, options);

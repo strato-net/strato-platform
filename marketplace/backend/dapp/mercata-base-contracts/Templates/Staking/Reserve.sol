@@ -185,7 +185,7 @@ abstract contract Reserve is Utils, Structs {
     function repayLoan(
         address[] _usdstAssetAddresses,
         address _escrowAddress,
-        uint amountToRepay
+        uint _amountToRepay
     ) requireActive() external returns (uint) {
         require(_usdstAssetAddresses.length > 0, "Pass at least one USDST token address");
 
@@ -193,7 +193,7 @@ abstract contract Reserve is Utils, Structs {
         uint usdstAmountOwed = escrow.borrowedAmount();
 
         require(amountToRepay > 0, "Repayment amount must be greater than zero");
-        uint actualRepayment = amountToRepay > usdstAmountOwed ? usdstAmountOwed : amountToRepay;
+        uint actualRepayment = _amountToRepay > usdstAmountOwed ? usdstAmountOwed : _amountToRepay;
 
         uint usdstAmountRepaid = burnUSDST(_usdstAssetAddresses, actualRepayment, escrow.borrowerCommonName());
 
