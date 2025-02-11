@@ -1944,7 +1944,7 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
       // Step 1: Find the escrow associated with the reserve (if any)
       const escrowQueryArgs = {
         select: 'address',
-        reserve: `eq.${reserve}*`,
+        reserve: `eq.${reserve}`,
         borrowerCommonName: `eq.${userCommonName}`,
         isActive: 'eq.true',
       };
@@ -1963,7 +1963,7 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
         ownerCommonName: userCert.commonName,
         originAddress: asset,
         status: ASSET_STATUS.ACTIVE,
-        queryOptions: { select: 'address, quantity' },
+        queryOptions: { select: 'address,quantity' },
         notEqualsField: 'quantity',
         notEqualsValue: '0',
         order: 'block_timestamp.desc',

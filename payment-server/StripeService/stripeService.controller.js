@@ -185,7 +185,7 @@ class StripeServiceController {
       const session = await stripeService.getPaymentSession(paymentDetails.paymentsessionid, paymentDetails.accountid);
 
       // Redirect back to marketplace
-      res.redirect(`${redirectUrl}?assets=[]&orderHash=${checkoutHash}`);
+      res.redirect(`${redirectUrl}`);
 
       // Verify payment and perform onchain transfer
       let returnStatus;
