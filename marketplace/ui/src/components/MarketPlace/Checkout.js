@@ -94,6 +94,7 @@ const Checkout = () => {
         const decimals = assetsWithEighteenDecimalPlaces.includes(item.product.originAddress) ? 18 : item.product.decimals || 0;
         const parts = item.product.contract_name.split('-');
         let amount = calculateAmount(item);
+        let quantity = item.product.saleQuantity / Math.pow(10, decimals);
 
         modifiedValue.push({
           key: item.product.address,
@@ -112,13 +113,13 @@ const Checkout = () => {
           sellersCommonName: item.product.ownerCommonName,
           unitOfMeasure: item.product.unitOfMeasurement,
           unitPrice: item.product.price * Math.pow(10, decimals),
-          quantity: item.product.saleQuantity / Math.pow(10, decimals),
-          decimals: decimals,
+          quantity,
+          decimals,
           saleAddress: item.product.saleAddress,
           tax: calculateTax(item),
           amount: amount,
           action: item.product.address,
-          qty: item.qty,
+          qty: Math.min(item.qty, quantity),
         });
       });
 
@@ -280,7 +281,7 @@ const Checkout = () => {
       ),
       dataIndex: 'quantity',
       align: 'center',
-      render: (text, product) => {
+      render: (_, product) => {
         let qty = product.qty;
         return (
           <div className="flex items-center justify-center mt-2">
