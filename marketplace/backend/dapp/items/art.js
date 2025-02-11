@@ -28,7 +28,7 @@ async function uploadContract(user, _constructorArgs, options) {
   const contractArgs = {
     name: contractName,
     source: await importer.combine(contractFilename),
-    args: util.usc(constructorArgs),
+    args: util.usc({...constructorArgs, quantity: 1}),
   };
 
   let error = [];
