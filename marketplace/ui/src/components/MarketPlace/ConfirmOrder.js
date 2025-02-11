@@ -321,7 +321,7 @@ const ConfirmOrder = ({ paymentServices = [], reserve, data, columns }) => {
   const totalAmount =
     selectedProvider?.serviceName === 'USDST' ||
     selectedProvider?.serviceName?.includes('USDST')
-      ? `${new BigNumber(subTotal).toString()} USDST`
+      ? `${new BigNumber(subTotal.toFixed(2)).toString()} USDST`
       : selectedProvider?.serviceName === 'Stripe'
       ? `${(Math.ceil(subTotal * 100) / 100).toFixed(2)} USD`
       : `${subTotal} ${selectedProvider?.serviceName || 'USD'}`;

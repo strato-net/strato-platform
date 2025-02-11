@@ -234,7 +234,7 @@ const NewTrendingCard = ({
 
                 return (
                   <Typography className="font-semibold">
-                    {`$${adjustedPrice} `}{' '}
+                    {`$${adjustedPrice.toFixed(2)} `}{' '}
                     <span className="font-normal text-xs mr-2 text-primary">
                       <b>{`(${adjustedPrice?.toFixed(2)} ${'USDST'})`}</b>
                     </span>

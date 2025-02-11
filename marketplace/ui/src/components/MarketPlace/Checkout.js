@@ -53,7 +53,11 @@ const Checkout = () => {
   const [mapData, setmapData] = useState([]);
 
   const calculateTax = (item) => {
-    const decimals = assetsWithEighteenDecimalPlaces.includes(item.product.originAddress) ? 18 : item.product.decimals || 0;
+    const decimals = assetsWithEighteenDecimalPlaces.includes(
+      item.product.originAddress
+    )
+      ? 18
+      : item.product.decimals || 0;
     let price = new Decimal(item.product.price * Math.pow(10, decimals));
     let tax = new Decimal(CHARGES.TAX);
     let result = price.mul(tax).div(100);
@@ -62,7 +66,11 @@ const Checkout = () => {
   };
 
   const calculateAmount = (item) => {
-    const decimals = assetsWithEighteenDecimalPlaces.includes(item.product.originAddress) ? 18 : item.product.decimals || 0;
+    const decimals = assetsWithEighteenDecimalPlaces.includes(
+      item.product.originAddress
+    )
+      ? 18
+      : item.product.decimals || 0;
     let price = new Decimal(item.product.price * Math.pow(10, decimals));
     let tax = calculateTax(item);
     let result = price.mul(item.qty).plus(tax);
@@ -99,9 +107,14 @@ const Checkout = () => {
       const { paymentServices, items } = value;
       let modifiedValue = [];
       items.forEach((item) => {
-        const decimals = assetsWithEighteenDecimalPlaces.includes(item.product.originAddress) ? 18 : item.product.decimals || 0;
+        const decimals = assetsWithEighteenDecimalPlaces.includes(
+          item.product.originAddress
+        )
+          ? 18
+          : item.product.decimals || 0;
         const parts = item.product.contract_name.split('-');
         let amount = calculateAmount(item);
+        let quantity = item.product.saleQuantity / Math.pow(10, decimals);
 
         modifiedValue.push({
           key: item.product.address,
@@ -120,13 +133,13 @@ const Checkout = () => {
           sellersCommonName: item.product.ownerCommonName,
           unitOfMeasure: item.product.unitOfMeasurement,
           unitPrice: item.product.price * Math.pow(10, decimals),
-          quantity: item.product.saleQuantity / Math.pow(10, decimals),
-          decimals: decimals,
+          quantity,
+          decimals,
           saleAddress: item.product.saleAddress,
           tax: calculateTax(item),
           amount: amount,
           action: item.product.address,
-          qty: item.qty,
+          qty: Math.min(item.qty, quantity),
           assetRootAddress: item.product.originAddress,
         });
       });
@@ -289,7 +302,7 @@ const Checkout = () => {
       ),
       dataIndex: 'quantity',
       align: 'center',
-      render: (text, product) => {
+      render: (_, product) => {
         let qty = product.qty;
         return (
           <div className="flex items-center justify-center mt-2">
@@ -297,13 +310,15 @@ const Checkout = () => {
               onClick={() => {
                 MinusQty(qty, product);
               }}
-              className={`w-6 h-6 text-[17px] text-[#202020] bg-[#E9E9E9] flex justify-center items-center rounded-full ${qty === 1 ? 'cursor-not-allowed opacity-50' : 'cursor-pointer'}`}
+              className={`w-6 h-6 text-[17px] text-[#202020] bg-[#E9E9E9] flex justify-center items-center rounded-full ${
+                qty === 1 ? 'cursor-not-allowed opacity-50' : 'cursor-pointer'
+              }`}
             >
               -
             </div>
             <InputNumber
               className="w-[100px] bg-[transparent] border-none text-[#202020]  font-semibold text-sm text-center flex flex-col justify-center"
-              min={1/Math.pow(10, product.decimals)}
+              min={1 / Math.pow(10, product.decimals)}
               value={qty}
               defaultValue={qty}
               controls={false}
@@ -315,7 +330,11 @@ const Checkout = () => {
               onClick={() => {
                 AddQty(product);
               }}
-              className={`w-6 h-6 text-[17px] text-[#202020] bg-[#E9E9E9] flex justify-center items-center rounded-full ${qty >= product.quantity ? 'cursor-not-allowed opacity-50' : 'cursor-pointer'}`}
+              className={`w-6 h-6 text-[17px] text-[#202020] bg-[#E9E9E9] flex justify-center items-center rounded-full ${
+                qty >= product.quantity
+                  ? 'cursor-not-allowed opacity-50'
+                  : 'cursor-pointer'
+              }`}
             >
               +
             </div>
@@ -370,7 +389,9 @@ const Checkout = () => {
   return (
     <div className="mx-4 my-2 lg:mx-8 xl:mx-14">
       {contextHolder}
-      {isCreateOrderSubmitting || arePaymentServicesLoading || isReservesLoading ? (
+      {isCreateOrderSubmitting ||
+      arePaymentServicesLoading ||
+      isReservesLoading ? (
         <div className="flex justify-center items-center min-h-screen">
           <Spin spinning={isCreateOrderSubmitting} size="large" />
         </div>
