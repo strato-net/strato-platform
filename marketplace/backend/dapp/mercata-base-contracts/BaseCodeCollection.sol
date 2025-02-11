@@ -5,6 +5,7 @@ import "Templates/Assets/Asset.sol";
 import "Templates/Assets/Mintable.sol";
 import "Templates/Assets/SemiFungible.sol";
 import "Templates/Assets/UTXO.sol";
+import "Templates/Assets/Redeemable.sol";
 import "Templates/Assets/LendingToken.sol";
 import "Templates/Enums/RestStatus.sol";
 import "Templates/Escrows/Escrow.sol";
