@@ -1,5 +1,11 @@
 import { Spin, notification } from 'antd';
-import React, { useEffect, useState, useMemo, useCallback } from 'react';
+import React, {
+  useEffect,
+  useState,
+  useMemo,
+  useCallback,
+  useRef,
+} from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import routes from '../../helpers/routes';
 import { actions as orderActions } from '../../contexts/order/actions';
@@ -21,6 +27,8 @@ const ProcessingOrder = () => {
   const [error, setError] = useState(null);
   const { message, success, isOrderEventLoading } = useOrderState();
   const [api, contextHolder] = notification.useNotification();
+
+  const effectCallCounter = useRef(0);
 
   // Memoized values for orderHash and assetAddresses
   const orderHash = useMemo(() => query.get('orderHash'), [query]);
@@ -58,10 +66,11 @@ const ProcessingOrder = () => {
   }, [storedConfirmList, assetAddresses, marketplaceDispatch, navigate]);
 
   useEffect(() => {
-    if (orderHash && assetAddresses.length) {
+    if (orderHash && assetAddresses.length && effectCallCounter.current < 1) {
+      effectCallCounter.current += 1;
       orderActions.waitForOrderEvent(orderDispatch, orderHash, reserve, asset);
     } else {
-      const timer = setTimeout(() => navigate(routes.Marketplace.url), 3000);
+      const timer = setTimeout(() => navigate(routes.Marketplace.url), 10000);
       return () => clearTimeout(timer); // Cleanup timeout
     }
   }, [orderHash, assetAddresses, orderDispatch, navigate]);

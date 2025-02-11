@@ -6,6 +6,7 @@ class StripeService {
     // TODO implement orderDetail to create actual order line items 
     static initiatePayment(marketplaceUrl, checkoutHash, orderDetails, CONNECTED_ACCOUNT_ID = '') {
         try {
+            const encodedMarketplaceUrl = encodeURIComponent(marketplaceUrl);
             // Create a checkout session with Stripe
             return stripe.checkout.sessions.create({
                 payment_method_types: [ 'card', 'us_bank_account' ],
@@ -40,8 +41,8 @@ class StripeService {
                     // },
                 },
                 mode: "payment",
-                success_url: `${SERVER_CONFIRM_URL}?checkoutHash=${checkoutHash}&redirectUrl=${marketplaceUrl}`,
-                cancel_url: `${SERVER_CANCEL_URL}?checkoutHash=${checkoutHash}&redirectUrl=${marketplaceUrl}`,
+                success_url: `${SERVER_CONFIRM_URL}?checkoutHash=${checkoutHash}&redirectUrl=${encodedMarketplaceUrl}`,
+                cancel_url: `${SERVER_CANCEL_URL}?checkoutHash=${checkoutHash}&redirectUrl=${encodedMarketplaceUrl}`,
             }, {
                 stripeAccount: CONNECTED_ACCOUNT_ID
             })

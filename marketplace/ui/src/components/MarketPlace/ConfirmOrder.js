@@ -241,11 +241,18 @@ const ConfirmOrder = ({ paymentServices = [], reserve, data, columns }) => {
         checkoutRoute &&
         checkoutRoute !== ''
       ) {
-        console.log('Redirecting to payment gateway: ', reserve);
-        const url = `${serviceURL}${checkoutRoute}?checkoutHash=${checkoutHash}&redirectUrl=${window.location.protocol}//${window.location.host}/order/status`;
+        const redirectUrlValue = `${window.location.protocol}//${
+          window.location.host
+        }/order/status?assets=${assets}&orderHash=${checkoutHash}${
+          reserve ? `&stake=${reserve},${asset}` : ''
+        }`;
+
+        // Encode the URL so it’s safe to pass as a query parameter
+        const encodedRedirectUrl = encodeURIComponent(redirectUrlValue);
+
+        const url = `${serviceURL}${checkoutRoute}?checkoutHash=${checkoutHash}&redirectUrl=${encodedRedirectUrl}`;
         window.location.replace(url);
       } else {
-        console.log('Redirecting to order status page: ', reserve);
         window.location.replace(
           `/order/status?assets=${assets}&orderHash=${checkoutHash}${
             reserve ? `&stake=${reserve},${asset}` : ''
@@ -416,7 +423,12 @@ const ConfirmOrder = ({ paymentServices = [], reserve, data, columns }) => {
                           !reserve
                         }
                         className="w-full bg-blue-800 text-white h-10 text-lg my-4"
-                        onClick={() => handlePlaceOrder(reserve?.address, reserve?.assetRootAddress)}
+                        onClick={() =>
+                          handlePlaceOrder(
+                            reserve?.address,
+                            reserve?.assetRootAddress
+                          )
+                        }
                       >
                         Place Order & Stake Immediately
                       </Button>
