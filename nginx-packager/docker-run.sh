@@ -31,7 +31,12 @@ STRATO_PORT_LOGS=${STRATO_PORT_LOGS:-7065}
 STRATO_PORT_VAULT_PROXY=${STRATO_PORT_VAULT_PROXY:-8013}
 
 MARKETPLACE_BACKEND_HOSTNAME=$(echo $MARKETPLACE_BACKEND_HOST | cut -d ':' -f 1)
-MARKETPLACE_BACKEND_IP=$(getent hosts $MARKETPLACE_BACKEND_HOSTNAME | awk '{ print $1 }')
+echo "Resolving the Marketplace backend IP. Waiting for dns name '$MARKETPLACE_BACKEND_HOSTNAME' to be resolvable..."
+while ! dig +short "$MARKETPLACE_BACKEND_HOSTNAME" >/dev/null; do
+    sleep 0.5
+done
+MARKETPLACE_BACKEND_IP=$(dig +short $MARKETPLACE_BACKEND_HOSTNAME)
+echo "Marketplace backend IP resolved: $MARKETPLACE_BACKEND_IP"
 
 # If container is running for the first time - generate config:
 if [ ! -f /usr/local/openresty/nginx/conf/nginx.conf ]; then
