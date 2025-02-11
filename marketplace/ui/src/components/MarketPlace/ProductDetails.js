@@ -666,14 +666,14 @@ const ProductDetails = ({ user, users }) => {
                                 $
                                 {isStaked
                                   ? (details.escrow?.maxLoanAmount).toFixed(2)
-                                  : adjustedPrice * Math.pow(10, decimals)}{' '}
+                                  : (adjustedPrice * Math.pow(10, decimals)).toFixed(2)}{' '}
                                 <span className="font-normal text-xs mr-2 text-primary">
                                   <b>
                                     (
                                     {isStaked
                                       ? details.escrow?.maxLoanAmount
-                                      : adjustedPrice *
-                                        Math.pow(10, decimals)}{' '}
+                                      : (adjustedPrice *
+                                        Math.pow(10, decimals)).toFixed(2)}{' '}
                                     USDST)
                                   </b>
                                 </span>
