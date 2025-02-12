@@ -65,7 +65,13 @@ import { ASSET_STATUS, fileServerUrl } from '../../helpers/constants';
 import { Swiper, SwiperSlide } from 'swiper/react';
 import { Ethers5Adapter } from '@reown/appkit-adapter-ethers5';
 import { mainnet, sepolia } from '@reown/appkit/networks';
-import { useAppKit, useAppKitAccount, useAppKitNetwork, createAppKit } from '@reown/appkit/react';
+import {
+  useAppKit,
+  useAppKitAccount,
+  useDisconnect,
+  useAppKitNetwork,
+  createAppKit,
+} from '@reown/appkit/react';
 import { ethers } from 'ethers';
 
 // Import Swiper styles
@@ -81,10 +87,10 @@ import { EffectFade, Navigation, Pagination, Autoplay } from 'swiper/modules';
 const ERC20_ABI = [
   {
     constant: true,
-    inputs: [{ name: "_owner", type: "address" }],
-    name: "balanceOf",
-    outputs: [{ name: "balance", type: "uint256" }],
-    type: "function",
+    inputs: [{ name: '_owner', type: 'address' }],
+    name: 'balanceOf',
+    outputs: [{ name: 'balance', type: 'uint256' }],
+    type: 'function',
   },
 ];
 
@@ -192,38 +198,65 @@ const ProductDetails = ({ user, users }) => {
   });
 
   const appKit = useAppKit();
+  const disconnect = useDisconnect();
   const { address } = useAppKitAccount();
   const { chainId } = useAppKitNetwork();
   const [wbtcBalance, setWbtcBalance] = useState(0);
   const [signer, setSigner] = useState({});
 
+  // *** New useEffect: Listen for wallet account changes ***
+  useEffect(() => {
+    const handleAccountsChanged = async (accounts) => {
+      if (!accounts || accounts.length === 0) {
+        await disconnect.disconnect();
+      }
+    };
+
+    if (window.ethereum && window.ethereum.on) {
+      window.ethereum.on('accountsChanged', handleAccountsChanged);
+    }
+
+    return () => {
+      if (window.ethereum && window.ethereum.removeListener) {
+        window.ethereum.removeListener(
+          'accountsChanged',
+          handleAccountsChanged
+        );
+      }
+    };
+  }, []);
+
   useEffect(() => {
     const fetchBalance = async () => {
       if (address) {
-        const wbtcAddress = fileServerUrl.includes("test")
-          ? "0x29f2D40B0605204364af54EC677bD022dA425d03" // WBTC testnet contract
-          : "0x2260FAC5E5542a773Aa44fBCfeDf7C193bc2C599"; // WBTC mainnet contract
-  
+        const wbtcAddress = fileServerUrl.includes('test')
+          ? '0x29f2D40B0605204364af54EC677bD022dA425d03' // WBTC testnet contract
+          : '0x2260FAC5E5542a773Aa44fBCfeDf7C193bc2C599'; // WBTC mainnet contract
+
         const provider = new ethers.providers.Web3Provider(window.ethereum);
         const signer = provider.getSigner();
         setSigner(signer);
-  
+
         // Create WBTC contract instance
-        const wbtcContract = new ethers.Contract(wbtcAddress, ERC20_ABI, provider);
-  
+        const wbtcContract = new ethers.Contract(
+          wbtcAddress,
+          ERC20_ABI,
+          provider
+        );
+
         try {
           // Get WBTC balance
           const wbtcBalance = await wbtcContract.balanceOf(address);
-  
+
           // WBTC has 8 decimals (like BTC), format accordingly
           const formattedBalance = ethers.utils.formatUnits(wbtcBalance, 8); // 8 decimals for WBTC
           setWbtcBalance(formattedBalance); // Set WBTC balance
         } catch (error) {
-          console.error("Failed to fetch WBTC balance:", error);
+          console.error('Failed to fetch WBTC balance:', error);
         }
       }
     };
-  
+
     fetchBalance();
   }, [address, chainId]);
 

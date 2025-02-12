@@ -65,7 +65,12 @@ import { ASSET_STATUS, fileServerUrl } from '../../helpers/constants';
 import { Swiper, SwiperSlide } from 'swiper/react';
 import { Ethers5Adapter } from '@reown/appkit-adapter-ethers5';
 import { mainnet, sepolia } from '@reown/appkit/networks';
-import { useAppKit, useAppKitAccount, createAppKit } from '@reown/appkit/react';
+import {
+  useAppKit,
+  useAppKitAccount,
+  useDisconnect,
+  createAppKit,
+} from '@reown/appkit/react';
 import { ethers } from 'ethers';
 
 // Import Swiper styles
@@ -183,12 +188,35 @@ const ProductDetails = ({ user, users }) => {
 
   const appKit = useAppKit();
   const rawAccount = useAppKitAccount();
+  const disconnect = useDisconnect();
   const [ethBalance, setEthBalance] = useState(0);
   const [signer, setSigner] = useState({});
 
   const account = useMemo(() => {
     return rawAccount && rawAccount.address ? rawAccount : null;
   }, [rawAccount?.address]);
+
+  // *** New useEffect: Listen for wallet account changes ***
+  useEffect(() => {
+    const handleAccountsChanged = async (accounts) => {
+      if (!accounts || accounts.length === 0) {
+        await disconnect.disconnect();
+      }
+    };
+
+    if (window.ethereum && window.ethereum.on) {
+      window.ethereum.on('accountsChanged', handleAccountsChanged);
+    }
+
+    return () => {
+      if (window.ethereum && window.ethereum.removeListener) {
+        window.ethereum.removeListener(
+          'accountsChanged',
+          handleAccountsChanged
+        );
+      }
+    };
+  }, []);
 
   useEffect(() => {
     const fetchBalance = async () => {
@@ -831,9 +859,7 @@ const ProductDetails = ({ user, users }) => {
                         onChange={handleTimeFilterChange}
                         activeKey={timeFilter}
                       />
-                      <PriceChartAndStats
-                        priceHistory={priceHistory}
-                      />
+                      <PriceChartAndStats priceHistory={priceHistory} />
                     </div>
                   )}
                 <div>
@@ -842,9 +868,7 @@ const ProductDetails = ({ user, users }) => {
                       <h2 className="w-full text-center font-bold text-2xl">
                         12-Month Historical Data
                       </h2>
-                      <Statistics
-                        priceHistory={priceHistory}
-                      />
+                      <Statistics priceHistory={priceHistory} />
                     </>
                   )}
                 </div>
@@ -866,7 +890,6 @@ const ProductDetails = ({ user, users }) => {
           productDetailPage={Id}
           inventory={inventoryDetails}
           reserves={reserves}
-          
         />
       )}
       {bridgeWalletModalOpen && (
