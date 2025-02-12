@@ -229,15 +229,14 @@ genesisInfoToGenesisBlock ::
   ) =>
   GenesisInfo ->
   String ->
-  [AccountInfo] ->
   m ([(AccountInfo, CodeInfo)], Block)
-genesisInfoToGenesisBlock gi gn as = do
+genesisInfoToGenesisBlock gi gn = do
   let codes = genesisInfoCodeInfo gi
   let accounts = genesisInfoAccountInfo gi
   initializeCodeDB "SolidVM" codes
   initializeStateDBAndAccountInfos accounts gn
   sr <- A.lookupWithDefault (Proxy @StateRoot) (Nothing :: Maybe Word256)
-  let sourceInfo = zipSourceInfo (accounts ++ as) codes
+  let sourceInfo = zipSourceInfo accounts codes
       bData =
         BlockHeader
           { parentHash = genesisInfoParentHash gi,

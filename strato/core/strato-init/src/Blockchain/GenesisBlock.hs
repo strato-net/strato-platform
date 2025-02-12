@@ -77,25 +77,7 @@ import qualified Data.Sequence as S
 import Data.Text (Text)
 import qualified Data.Text as T
 import SolidVM.Model.CodeCollection (emptyCodeCollection)
-import System.Directory
 import Text.Format
-
-readSupplementaryAccounts :: String -> IO [AccountInfo]
-readSupplementaryAccounts genesisBlockName = do
-  let accountInfoFilename = genesisBlockName ++ "AccountInfo"
-  exists <- doesFileExist accountInfoFilename
-  if not exists
-    then putStrLn "No AccountInfo file found" >> return []
-    else do
-      accountInfoString <- readFile $ accountInfoFilename
-      let parseAccounts :: String -> [AccountInfo]
-          parseAccounts line = case words line of
-            [] -> []
-            "s" : _ -> []
-            ["a", a, b] -> [NonContract (Ad.Address (parseHex a)) (read b)]
-            ["a", a, b, c] -> [ContractNoStorage (Ad.Address (parseHex a)) (read b) (ExternallyOwned $ unsafeCreateKeccak256FromWord256 (parseHex c))]
-            _ -> error $ "invalid AccountInfo line: " ++ line
-      return . concatMap parseAccounts . lines $ accountInfoString
 
 buildGenesisInfo :: [Ad.Address] -> [X509Certificate] -> [ChainMemberParsedSet] -> [ChainMemberParsedSet] -> GenesisInfo -> GenesisInfo
 buildGenesisInfo extraFaucets extraCerts validators admins gi =
@@ -124,7 +106,6 @@ getGenesisBlockAndPopulateInitialMPs genesisBlockName = do
   genesisInfo <- getGenesisInfoFromFile genesisBlockName
   let certs' = readCertsFromGenesisInfo genesisInfo
       validators = readValidatorsFromGenesisInfo genesisInfo
-  extraAccounts <- liftIO . readSupplementaryAccounts $ genesisBlockName
 
   -- Need to insert the X509 certificates INTO Redis
   void . execRedis $ RBDB.insertRootCertificate
@@ -148,7 +129,7 @@ getGenesisBlockAndPopulateInitialMPs genesisBlockName = do
     Right _ -> $logInfoS "Redis/certInsertion" $ T.pack "Certificate insertion was successful"
     Left e -> $logInfoS "Redis/certInsertion" $ T.pack $ "Certificate insertion failed: " ++ show e
 
-  (extraCertInfoStates,validators,) <$> genesisInfoToGenesisBlock genesisInfo genesisBlockName extraAccounts
+  (extraCertInfoStates,validators,) <$> genesisInfoToGenesisBlock genesisInfo genesisBlockName
 
 initializeGenesisBlock ::
   ( HasCodeDB m,
