@@ -129,7 +129,7 @@ async function main() {
         responseArray.map((r) => r.hash),
         { config }
       );
-    await util.until(predicate, action, { config }, 3600000);
+    const finalResults = await util.until(predicate, action, { config }, 3600000);
 
     // Extract the deployed contract's address from the polling result.
     const deployedAddress = finalResults[0].data.contents.address;
