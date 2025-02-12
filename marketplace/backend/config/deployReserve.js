@@ -129,12 +129,9 @@ async function main() {
         responseArray.map((r) => r.hash),
         { config }
       );
-    const finalResults = await util.until(predicate, action, { config }, 3600000);
-
-    // Extract the deployed contract's address from the polling result.
-    const deployedAddress = finalResults[0].data.contents.address;
+    await util.until(predicate, action, { config }, 3600000);
     console.log(
-      `New SimpleReserve contract deployed at address: ${deployedAddress}`
+      `New SimpleReserve contract deployed.`
     );
   } catch (error) {
     console.error('Fatal error in deployment:', error);
