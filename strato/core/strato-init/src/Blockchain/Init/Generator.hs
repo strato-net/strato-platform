@@ -21,7 +21,6 @@ import qualified Blockchain.Network as Net
 import Blockchain.Strato.Model.Options (flags_network)
 import Conduit
 import Control.Monad
-import Control.Monad.Catch
 import Control.Monad.Composable.Kafka
 import Control.Monad.Composable.Redis
 import Control.Monad.Composable.SQL
@@ -33,8 +32,6 @@ import Data.String
 import qualified Data.Text as T
 import qualified Text.Colors as CL
 import qualified Data.Map as M
-import Data.Text.Encoding (decodeUtf8)
-import qualified Data.Text.IO as TIO
 import qualified Data.Yaml as YAML
 import Database.Persist.Postgresql
 import qualified Executable.EthDiscoverySetup as EthDiscovery
@@ -43,12 +40,11 @@ import System.Exit
 import System.FilePath ((</>))
 import Turtle (chmod, roo)
 import UnliftIO.Directory
-import UnliftIO.IO hiding (withFile)
 
 genesisFiles :: [(FilePath, C8.ByteString)]
 genesisFiles = $(embedDir "genesisBlocks")
 
-mkAll :: (MonadLoggerIO m, MonadUnliftIO m, MonadFail m, MonadMask m, HasKafka m) =>
+mkAll :: (MonadLoggerIO m, MonadUnliftIO m, MonadFail m, HasKafka m) =>
          String -> m ()
 mkAll genesisBlockName = do
   ethconf <- liftIO genEthConf
@@ -103,10 +99,8 @@ mkAll genesisBlockName = do
   EthDiscovery.setup bootnodes
 
   let genesisFileName = genesisBlockName ++ "Genesis.json"
-      accountInfoFileName = genesisBlockName ++ "AccountInfo"
 
   sendGenesisJson genesisFileName
-  sendAccountInfo accountInfoFileName
 
   runResourceT . runSetupDBM . runRedisM UEC.lookupRedisBlockDBConfig . runSQLM $ do
     $logInfoS "runWorker" "Adding empty code"
@@ -131,30 +125,6 @@ sendGenesisJson genesisFilename = do
       let blockFile = "Genesis.json"
       liftIO $ Ae.encodeFile blockFile genInfo
       liftIO $ makeReadOnly blockFile
-
-sendAccountInfo :: (MonadMask m, HasKafka m) =>
-                   FilePath -> m ()
-sendAccountInfo accountInfoFileName = do
-  fsFile <- doesFileExist accountInfoFileName
-  if fsFile
-    then do
-      let sendChunks :: HasKafka m => Handle -> m ()
-          sendChunks h = do
-            acs <- liftIO $ TIO.hGetChunk h
-            unless (T.null acs) $ do
-
-              let accountFile = "AccountInfo"
-              liftIO $ TIO.appendFile accountFile acs
-
-              sendChunks h
-      bracket (openFile accountInfoFileName ReadMode) hClose $ \h -> do
-        hSetBuffering h (BlockBuffering (Just (1024 * 1024)))
-        sendChunks h
-    else case lookup accountInfoFileName genesisFiles of
-      Nothing -> liftIO $ putStrLn "No account info found, assuming it isn't needed"
-      Just acs -> do
-          let accountFile = "AccountInfo"
-          liftIO $ TIO.appendFile accountFile $ decodeUtf8 acs
 
 makeReadOnly :: FilePath -> IO ()
 makeReadOnly = void . chmod roo
