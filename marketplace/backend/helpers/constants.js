@@ -41,9 +41,9 @@ export default {
   testnetUSDSTAddress: '2f6c3848a75aa075d054fe84b780cbdebd77ec61',
   prodCataAddress: '2680dc6693021cd3fefb84351570874fbef8332a',
   testnetCataAddress: '051cb99bca7c437f4b17dc01bd4ff7c5e09db035',
-  testnetETHSTAddress: '921e3d0b4217c7e2bfe7e660cdc4f7edc621f9d5',
+  testnetETHSTAddress: 'fa4e951fdb86f10394a23efc89ddeef83a0b1c17',
   prodETHSTAddress: '93fb7295859b2d70199e0a4883b7c320cf874e6c',
-  testnetWBTCSTAddress: '1bf2252f6ccdcfabeb96c372bec0b0fdc1809c36',
+  testnetWBTCSTAddress: '65978aada9f5c2a1c462d1458f590bb54f447b7c',
   prodWBTCSTAddress: '',
   attachImagesAndFiles:
     '*,BlockApps-Mercata-Asset-files(*),BlockApps-Mercata-Asset-images(*),BlockApps-Mercata-Asset-fileNames(*)',
@@ -66,7 +66,7 @@ export default {
     '2680dc6693021cd3fefb84351570874fbef8332a', //prodCataAddress
     '051cb99bca7c437f4b17dc01bd4ff7c5e09db035', //testnetCataAddress
     '93fb7295859b2d70199e0a4883b7c320cf874e6c', //prodETHSTAddress
-    '921e3d0b4217c7e2bfe7e660cdc4f7edc621f9d5', //testnetETHSTAddress
+    'fa4e951fdb86f10394a23efc89ddeef83a0b1c17', //testnetETHSTAddress
     '76372ee8d5a47c58cee4b0e63400858cf4f9ef13', //testnetBETHTEMP
     '7f5c102390240f4a8f0e0d938d341bf1e3010adc', //testnetUSDTEMP
     'd6e292f2c9486ada24f6d5cf2e67f44c5f7f677a', //prodBETHTEMP

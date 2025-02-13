@@ -129,10 +129,17 @@ async function main() {
         responseArray.map((r) => r.hash),
         { config }
       );
-    await util.until(predicate, action, { config }, 3600000);
-    console.log(
-      `New SimpleReserve contract deployed.`
+    const finalResults = await util.until(
+      predicate,
+      action,
+      { config },
+      3600000
     );
+    const final = Array.isArray(finalResults) ? finalResults[0] : finalResults;
+    if (final.status !== 'Success') {
+      throw new Error(`Error: contract deployment failed.`);
+    }
+    console.log(`New SimpleReserve contract deployed.`);
   } catch (error) {
     console.error('Fatal error in deployment:', error);
   }
