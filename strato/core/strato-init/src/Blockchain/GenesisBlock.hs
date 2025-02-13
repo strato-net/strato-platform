@@ -100,10 +100,9 @@ getGenesisBlockAndPopulateInitialMPs ::
     (Ad.Address `Alters` AddressState) m,
     HasRedis m
   ) =>
-  String ->
   m ([(Ad.Address, X509CertInfoState)], [Validator], ([(AccountInfo, CodeInfo)], Block))
-getGenesisBlockAndPopulateInitialMPs genesisBlockName = do
-  genesisInfo <- getGenesisInfoFromFile genesisBlockName
+getGenesisBlockAndPopulateInitialMPs = do
+  genesisInfo <- getGenesisInfo
   let certs' = readCertsFromGenesisInfo genesisInfo
       validators = readValidatorsFromGenesisInfo genesisInfo
 
@@ -144,11 +143,10 @@ initializeGenesisBlock ::
     (Ad.Address `Alters` AddressState) m,
     Selectable Ad.Address AddressState m
   ) =>
-  String ->
   m ()
-initializeGenesisBlock genesisBlockName = do
+initializeGenesisBlock = do
   $logInfoS "initgen" "Begin of initgen"
-  (extraCertInfoStates, validators, (srcInfo, genesisBlock)) <- getGenesisBlockAndPopulateInitialMPs genesisBlockName
+  (extraCertInfoStates, validators, (srcInfo, genesisBlock)) <- getGenesisBlockAndPopulateInitialMPs
   obGB <- liftIO $ bootstrapSequencer extraCertInfoStates genesisBlock
   putGenesisHash $ blockHash genesisBlock
   $logInfoS "initgen" "Initial merkle patricia tries successfully created"

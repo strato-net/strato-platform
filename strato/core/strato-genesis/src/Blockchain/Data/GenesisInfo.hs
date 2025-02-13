@@ -11,7 +11,7 @@ module Blockchain.Data.GenesisInfo
   ( GenesisInfo (..),
     defaultGenesisInfo,
     genesisParser,
-    getGenesisInfoFromFile,
+    getGenesisInfo,
     module Blockchain.Data.AccountInfo,
     module Blockchain.Data.CodeInfo
   )
@@ -155,9 +155,9 @@ genesisParser =
     <*> "mixHash" JS..: JS.value
     <*> "nonce" JS..: JS.value
 
-getGenesisInfoFromFile :: MonadIO m => String -> m GenesisInfo
-getGenesisInfoFromFile genesisBlockName = do
-  theJSONString <- liftIO . BLC.readFile $ genesisBlockName ++ "Genesis.json"
+getGenesisInfo :: MonadIO m => m GenesisInfo
+getGenesisInfo = do
+  theJSONString <- liftIO $ BLC.readFile "genesis.json"
   let genesis = JS.parseLazyByteString genesisParser theJSONString
   case genesis of
     [x] -> pure x

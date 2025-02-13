@@ -9,6 +9,7 @@ module Blockchain.Init.Generator (
 
 import BlockApps.Logging
 import qualified Blockchain.Data.DataDefs as DataDefs
+import Blockchain.Data.GenesisInfo
 import qualified Blockchain.EthConf as UEC
 import qualified Blockchain.EthConf.Model as EC
 import Blockchain.DB.CodeDB
@@ -24,6 +25,9 @@ import Control.Monad.Composable.Kafka
 import Control.Monad.Composable.Redis
 import Control.Monad.Composable.SQL
 import Control.Monad.Trans.Reader
+import qualified Data.Aeson as JSON
+import qualified Data.ByteString as B
+import qualified Data.ByteString.Lazy as BL
 import Data.String
 import qualified Data.Text as T
 import qualified Text.Colors as CL
@@ -36,15 +40,25 @@ import System.FilePath ((</>))
 import Turtle (chmod, roo)
 import UnliftIO.Directory
 
+createGenesisInfo :: MonadIO m => String -> m ()
+createGenesisInfo _ = do
+  let gi' = buildGenesisInfo [] [] [] [] defaultGenesisInfo
+  liftIO $ B.writeFile "genesis.json" . BL.toStrict $ JSON.encode gi'
+  liftIO $ putStrLn $ "Done. Output genesis block info was written"
+
 mkAll :: (MonadLoggerIO m, MonadUnliftIO m, MonadFail m, HasKafka m) =>
          String -> m ()
-mkAll genesisBlockName = do
+mkAll network = do
   ethconf <- liftIO genEthConf
 
   let dir = ".ethereumH"
   liftIO $ createDirectoryIfMissing True dir
   liftIO $ YAML.encodeFile (dir </> "ethconf.yaml") ethconf
   liftIO $ makeReadOnly $ dir </> "ethconf.yaml"
+
+  genesisExists <- doesFileExist "genesis.json"
+
+  unless genesisExists $ createGenesisInfo network
 
   let pgconf = EC.sqlConfig ethconf
       rawConn = EC.postgreSQLConnectionString pgconf {EC.database = ""}
@@ -94,7 +108,7 @@ mkAll genesisBlockName = do
     $logInfoS "runWorker" "Adding empty code"
     void $ addCode EVM mempty -- blank code is the default for Accounts, but gets added nowhere else.
     $logInfoS "runWorker" "Processing genesis block"
-    initializeGenesisBlock genesisBlockName
+    initializeGenesisBlock
     $logInfoS "runWorker" "done. here I am once again"
 
 makeReadOnly :: FilePath -> IO ()
