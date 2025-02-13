@@ -1774,7 +1774,7 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
       const { paymentService, orderList } = args;
 
       const assetAddresses = orderList.map((o) => o.assetAddress);
-      const quantities = orderList.map((o) => new BigNumber(o.quantity));
+      const quantities = orderList.map((o) => new BigNumber(o.quantity).toFixed(0));
       const decimals = orderList.map((o) => o.decimals);
 
       const assets = await inventoryJs.getAll(
