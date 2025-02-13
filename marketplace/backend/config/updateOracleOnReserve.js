@@ -47,7 +47,7 @@ const updateOracle = async (reserveAddress, newOracleAddress, token) => {
     contract: { address: reserveAddress },
     method: "setOracle",
     args: util.usc({
-      _newOracle: newOracleAddress
+      newOracle: newOracleAddress
     })
   };
 
