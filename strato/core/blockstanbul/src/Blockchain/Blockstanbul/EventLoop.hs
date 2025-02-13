@@ -396,9 +396,16 @@ eventLoop ctx = execStateC ctx $
           ps <- prepared <%= M.insert (chainMemberParsedSetToValidator $ sender auth) di
           total <- poolSize
           let sameVoteCount = M.size . M.filter (== di) $ ps
+          let preparerList = M.keys . M.filter (== di) $ ps
+          $logInfoS "blockstanbul/prepare" . T.pack $
+            "Enough prepare messages received, proceeding to commit. Validators: " ++ show preparerList ++ 
+            " (" ++ show (length preparerList) ++ "/" ++ show total ++ 
+            "), Block Hash: " ++ show di
           sameHash <- hasSameHash di
           hasSent <- use hasPrepared
           when (3 * sameVoteCount > 2 * total && sameHash && not hasSent) $ do
+            $logInfoS "blockstanbul/prepare" . T.pack $
+              "Enough prepare messages received, proceeding to commit. Block Hash: " ++ show di
             hasPrepared .= True
             setLock
             seal <- commitmentSeal di

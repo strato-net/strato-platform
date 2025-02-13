@@ -233,7 +233,19 @@ getNumPoolable txPairs = do
 
   forM_ allNewTxs $ \(ts, _) ->
     $logInfoS "evm/getNumPoolable/allNewTxs" $ T.pack $ "math :: " ++ show currentMicrotime ++ " - " ++ show ts ++ " = " ++ show (currentMicrotime - ts) ++ "; <= " ++ show microtimeCutoff ++ "? " ++ show ((currentMicrotime - ts) <= microtimeCutoff)
+  -- Log timing calculations for all transactions with their hashes
+  forM_ txPairs $ \(ts, tx) ->
+    $logInfoS "evm/getNumPoolable/timing" $ T.pack $ 
+      "Transaction timing: " ++ 
+      "\n  hash: " ++ format (txHash $ otBaseTx tx) ++
+      "\n  timestamp: " ++ show ts ++ 
+      "\n  current time: " ++ show currentMicrotime ++
+      "\n  time diff: " ++ show (currentMicrotime - ts) ++ 
+      "\n  cutoff: " ++ show microtimeCutoff ++
+      "\n  within cutoff? " ++ show (abs (currentMicrotime - ts) <= microtimeCutoff)
+
   let !poolableNewTxs = [t | (ts, t) <- allNewTxs, abs (currentMicrotime - ts) <= microtimeCutoff]
+  $logInfoS "evm/poolableNewTxs" (T.pack $ show poolableNewTxs)
   $logInfoS "evm/loop" (T.pack ("adding " ++ show (length poolableNewTxs) ++ "/" ++ show (length allNewTxs) ++ " txs to mempool"))
   unless (null poolableNewTxs) $ Bagger.addTransactionsToMempool poolableNewTxs
   return $ length poolableNewTxs
