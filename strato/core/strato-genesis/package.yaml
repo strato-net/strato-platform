@@ -46,29 +46,6 @@ library:
       - lens
       - ordered-containers
 
-
-executables:
-  generate-genesis:
-    source-dirs: exec_src/
-    main: Main.hs
-    other-modules: []
-    dependencies:
-      - aeson
-      - blockapps-data
-      - bytestring
-      - hflags
-      - strato-genesis
-      - strato-model
-      - text
-
-  genesis-setup:
-    source-dirs: exec_src/
-    main: GenesisSetup.hs
-    other-modules: []
-    dependencies:
-      - strato-genesis
-      - hflags
-
 tests:
   strato-genesis-test:
     source-dirs: test
