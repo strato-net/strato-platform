@@ -11,7 +11,6 @@ import BlockApps.Logging
 import qualified Blockchain.Data.DataDefs as DataDefs
 import qualified Blockchain.EthConf as UEC
 import qualified Blockchain.EthConf.Model as EC
-import Blockchain.Data.GenesisInfo
 import Blockchain.DB.CodeDB
 import Blockchain.GenesisBlock
 import Blockchain.Init.EthConf
@@ -25,9 +24,6 @@ import Control.Monad.Composable.Kafka
 import Control.Monad.Composable.Redis
 import Control.Monad.Composable.SQL
 import Control.Monad.Trans.Reader
-import qualified Data.Aeson as Ae
-import qualified Data.ByteString.Char8 as C8
-import Data.FileEmbed
 import Data.String
 import qualified Data.Text as T
 import qualified Text.Colors as CL
@@ -36,13 +32,9 @@ import qualified Data.Yaml as YAML
 import Database.Persist.Postgresql
 import qualified Executable.EthDiscoverySetup as EthDiscovery
 import SelectAccessible ()
-import System.Exit
 import System.FilePath ((</>))
 import Turtle (chmod, roo)
 import UnliftIO.Directory
-
-genesisFiles :: [(FilePath, C8.ByteString)]
-genesisFiles = $(embedDir "genesisBlocks")
 
 mkAll :: (MonadLoggerIO m, MonadUnliftIO m, MonadFail m, HasKafka m) =>
          String -> m ()
@@ -98,33 +90,12 @@ mkAll genesisBlockName = do
   $logInfoLS "ethconf/bootnodes" bootnodes
   EthDiscovery.setup bootnodes
 
-  let genesisFileName = genesisBlockName ++ "Genesis.json"
-
-  sendGenesisJson genesisFileName
-
   runResourceT . runSetupDBM . runRedisM UEC.lookupRedisBlockDBConfig . runSQLM $ do
     $logInfoS "runWorker" "Adding empty code"
     void $ addCode EVM mempty -- blank code is the default for Accounts, but gets added nowhere else.
     $logInfoS "runWorker" "Processing genesis block"
     initializeGenesisBlock genesisBlockName
     $logInfoS "runWorker" "done. here I am once again"
-
-sendGenesisJson :: HasKafka m =>
-                   FilePath -> m ()
-sendGenesisJson genesisFilename = do
-  fsFile <- doesFileExist genesisFilename
-  eGenInfo <-
-    if fsFile
-      then liftIO $ Ae.eitherDecodeFileStrict' genesisFilename
-      else return $ do
-        contents <- maybe (Left "file not found") Right $ lookup genesisFilename genesisFiles
-        Ae.eitherDecodeStrict' contents
-  case (eGenInfo :: Either String GenesisInfo) of
-    Left err -> liftIO $ die err
-    Right genInfo -> do
-      let blockFile = "Genesis.json"
-      liftIO $ Ae.encodeFile blockFile genInfo
-      liftIO $ makeReadOnly blockFile
 
 makeReadOnly :: FilePath -> IO ()
 makeReadOnly = void . chmod roo
