@@ -79,6 +79,8 @@ export default {
   prodTokenServerUrl: 'https://campaigns.blockapps.net',
 };
 
+export const DECIMAL_FACTOR_18 = Math.pow(10, 18);
+
 export const unitOfMeasurement = {};
 unitOfMeasurement[(unitOfMeasurement['LB'] = 1)] = 'LB';
 unitOfMeasurement[(unitOfMeasurement['OZ'] = 2)] = 'OZ';

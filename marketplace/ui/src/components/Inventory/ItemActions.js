@@ -252,7 +252,7 @@ const ItemActions = ({
             inventory.address === inventory.originAddress ||
             !isActive() ||
             disableSADDOGS(inventory) ||
-            decimals === 18
+            inventory.name === 'USDST'
           }
         >
           <SendOutlined /> Redeem
@@ -316,7 +316,7 @@ const ItemActions = ({
                     inventory.address === inventory.originAddress ||
                     !isActive() ||
                     disableSADDOGS(inventory) ||
-                    decimals === 18
+                    inventory.name === 'USDST'
                   }
                 >
                   <SendOutlined /> Redeem

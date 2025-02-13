@@ -45,7 +45,6 @@ const RedemptionsIncomingDetails = ({ user }) => {
   const inventoryDispatch = useInventoryDispatch();
   const marketplaceDispatch = useMarketplaceDispatch();
   const { Text } = Typography;
-  const [selectedDate, setSelectedDate] = useState('');
   const navigate = useNavigate();
   const [comments, setComments] = useState('');
   const { TextArea } = Input;
@@ -181,7 +180,9 @@ const RedemptionsIncomingDetails = ({ user }) => {
           className="text-primary text-[17px] cursor-pointer"
           onClick={() => {
             navigate(
-              `${routes.MarketplaceProductDetail.url.replace(':address', record.address).replace(':name', encodeURIComponent(record.name))}`
+              `${routes.MarketplaceProductDetail.url
+                .replace(':address', record.address)
+                .replace(':name', encodeURIComponent(record.name))}`
             );
           }}
         >
@@ -194,7 +195,9 @@ const RedemptionsIncomingDetails = ({ user }) => {
       dataIndex: 'quantity',
       key: 'quantity',
       align: 'center',
-      render: (text) => <p>{text}</p>,
+      render: (text, record) => (
+        <p>{record.quantity / Math.pow(10, record.decimals)}</p>
+      ),
     },
   ];
 
@@ -227,7 +230,7 @@ const RedemptionsIncomingDetails = ({ user }) => {
       redeemerAddress: inventoryDetails.owner,
       issuerCommonName: user?.commonName,
       assetName: inventoryDetails.name,
-      quantity: inventoryDetails.quantity,
+      quantity: inventoryDetails.quantity / Math.pow(10, inventoryDetails.decimals),
       issuerCommonName: redemption.issuerCommonName,
     };
 

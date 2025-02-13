@@ -13,6 +13,7 @@ import constants, {
   ASSET_STATUS,
   REDEMPTION_STATUS,
   DEFAULT_COMMENT,
+  DECIMAL_FACTOR_18
 } from '/helpers/constants';
 import { yamlWrite, yamlSafeDumpSync, getYamlFile } from '/helpers/config';
 import { pollingHelper } from '/helpers/utils';
@@ -320,7 +321,7 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
     args,
     options = optionsNoChainIds
   ) {
-    const { user,...restArgs } = args;
+    const { user, ...restArgs } = args;
     const getOptions = { ...options, app: contractName };
     const newArgs = {
       ...restArgs,
@@ -408,11 +409,22 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
   };
 
   contract.requestRedemption = async function (args, options = defaultOptions) {
-    const { assetAddresses, redemptionService, quantity, ...restArgs } = args;
+    const {
+      assetAddresses,
+      redemptionService,
+      quantity,
+      decimals,
+      ...restArgs
+    } = args;
 
     const contract = { address: assetAddresses[0] };
     const redemptionId = util.uid();
-    const contractArgs = { quantity, redemptionId };
+    const contractArgs = {
+      redemptionId,
+      quantity: new BigNumber(quantity)
+        .multipliedBy(Math.pow(10, decimals))
+        .toFixed(0),
+    };
     const [requestRedemptionStatus, assetAddress] =
       await inventoryJs.requestRedemption(
         rawAdmin,
@@ -1175,7 +1187,7 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
       },
       options
     );
-    return balance[0].sum ? `${balance[0].sum / Math.pow(10, 18)}` : 0;
+    return balance[0].sum ? `${balance[0].sum / DECIMAL_FACTOR_18}` : 0;
   };
 
   contract.getCataBalance = async function (_, options = defaultOptions) {
@@ -1189,7 +1201,7 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
       },
       options
     );
-    return balance[0].sum ? `${balance[0].sum / Math.pow(10, 18)}` : 0;
+    return balance[0].sum ? `${balance[0].sum / DECIMAL_FACTOR_18}` : 0;
   };
 
   // ------------------------------ TOKENS ENDS --------------------------------
@@ -1809,7 +1821,8 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
 
         // Calculate the total order amount
         const orderTotal = salesData.reduce(
-          (acc, sale, index) => acc.plus(new BigNumber(sale.price).multipliedBy(quantities[index])),
+          (acc, sale, index) =>
+            acc.plus(new BigNumber(sale.price).multipliedBy(quantities[index])),
           new BigNumber(0)
         );
 
@@ -1841,7 +1854,9 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
             addresses.push(asset.address);
 
             // Convert asset.quantity to BigNumber, then add to accumulatedTotal
-            accumulatedTotal = accumulatedTotal.plus(new BigNumber(asset.quantity));
+            accumulatedTotal = accumulatedTotal.plus(
+              new BigNumber(asset.quantity)
+            );
 
             return addresses;
           },
@@ -2120,7 +2135,9 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
     const bnValue = new BigNumber(value);
 
     // Compute the actual repayment amount as the minimum of bnValue and bnOrderTotal.
-    const actualRepayment = bnValue.isGreaterThan(bnTotalLoan) ? bnTotalLoan : bnValue;
+    const actualRepayment = bnValue.isGreaterThan(bnTotalLoan)
+      ? bnTotalLoan
+      : bnValue;
 
     // Get user's active USDST assets with non-zero quantities
     const userUSDSTAssets = await inventoryJs.getAll(
@@ -2152,7 +2169,7 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
         return acc;
       },
       { addressesToUse: [], accumulatedTotal: new BigNumber(0) }
-    )
+    );
 
     // Proceed with unstake if sufficient assets are accumulated
     return await reserveJs.repay(

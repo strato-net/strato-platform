@@ -19,47 +19,48 @@ const logo = <img src={Images.USDST} alt={''} title={''} className="w-5 h-5" />;
  * Helper to compute total collateral quantity from inventory.
  * Includes checking for unique escrow addresses and summing collateral.
  */
-function computeTotalCollateralQuantity(inventory) {
-  if (!inventory) return 0;
+function computeTotalCollateralQuantity(inventory, decimalFactor) {
+  // If no inventory, return 0 as a BigNumber
+  if (!inventory) return new BigNumber(0);
 
-  const uniqueEscrowsPrime = new Set();
-  if (Array.isArray(inventory.inventories)) {
-    return inventory.inventories.reduce((sum, item) => {
+  let collateralQuantity = new BigNumber(0);
+  const uniqueEscrows = new Set();
+
+  if (
+    Array.isArray(inventory.inventories) &&
+    inventory.inventories.length > 0
+  ) {
+    // Sum unique escrow collateral quantities from all inventories
+    collateralQuantity = inventory.inventories.reduce((sum, item) => {
       const escrowAddress = item?.escrow?.address;
-      const escrowCollateral =
-        parseFloat(item?.escrow?.collateralQuantity) || 0;
-      if (escrowAddress && !uniqueEscrowsPrime.has(escrowAddress)) {
-        uniqueEscrowsPrime.add(escrowAddress);
-        return sum + escrowCollateral;
+      // Create a BigNumber from the collateral quantity (or 0 if missing)
+      const escrowCollateral = new BigNumber(
+        item?.escrow?.collateralQuantity || 0
+      );
+
+      if (escrowAddress && !uniqueEscrows.has(escrowAddress)) {
+        uniqueEscrows.add(escrowAddress);
+        return sum.plus(escrowCollateral);
       }
       return sum;
-    }, 0);
+    }, new BigNumber(0));
+  } else if (inventory?.escrow?.collateralQuantity) {
+    // Fallback if inventories array doesn't exist:
+    const escrowCollateral = new BigNumber(
+      inventory.escrow.collateralQuantity || 0
+    );
+    const invQuantity = new BigNumber(inventory.quantity || 0);
+    // Use the smaller of the two values:
+    collateralQuantity = escrowCollateral.gt(invQuantity)
+      ? invQuantity
+      : escrowCollateral;
   }
 
-  return parseFloat(inventory?.escrow?.collateralQuantity) || 0;
-}
-
-/**
- * Computes total collateral value, ensuring uniqueness by escrow address.
- */
-function computeTotalCollateralValue(inventory) {
-  if (!inventory) return 0;
-
-  const uniqueEscrowsThird = new Set();
-  if (Array.isArray(inventory.inventories)) {
-    return inventory.inventories.reduce((sum, item) => {
-      const escrowAddress = item?.escrow?.address;
-      const escrowCollateralValue =
-        parseFloat(item?.escrow?.collateralValue) || 0;
-      if (escrowAddress && !uniqueEscrowsThird.has(escrowAddress)) {
-        uniqueEscrowsThird.add(escrowAddress);
-        return sum + escrowCollateralValue;
-      }
-      return sum;
-    }, 0);
+  if (decimalFactor.gt(0)) {
+    collateralQuantity = collateralQuantity.dividedBy(decimalFactor);
   }
 
-  return parseFloat(inventory?.escrow?.collateralValue) || 0;
+  return collateralQuantity;
 }
 
 /**
@@ -67,26 +68,34 @@ function computeTotalCollateralValue(inventory) {
  * Otherwise, proportionally allocate based on (inventory.quantity / totalCollateralQuantity).
  */
 function computeCollateralValue(inventory, totalCollateralQuantity) {
-  if (!inventory) return 0;
+  if (!inventory) return new BigNumber(0);
 
   const uniqueEscrows = new Set();
+
   if (Array.isArray(inventory.inventories)) {
     return inventory.inventories.reduce((sum, item) => {
       const escrowAddress = item?.escrow?.address;
-      const escrowCollateralValue =
-        parseFloat(item?.escrow?.collateralValue) || 0;
+      const escrowCollateralValue = new BigNumber(
+        item?.escrow?.collateralValue || 0
+      );
+
       if (escrowAddress && !uniqueEscrows.has(escrowAddress)) {
         uniqueEscrows.add(escrowAddress);
-        return sum + escrowCollateralValue;
+        return sum.plus(escrowCollateralValue);
       }
       return sum;
-    }, 0);
+    }, new BigNumber(0));
   }
 
-  const invQuantity = parseFloat(inventory.quantity) || 0;
-  const escrowCollateralValue =
-    parseFloat(inventory?.escrow?.collateralValue) || 0;
-  return escrowCollateralValue * (invQuantity / totalCollateralQuantity || 1);
+  const invQuantity = new BigNumber(inventory.quantity || 0);
+  const escrowCollateralValue = new BigNumber(
+    inventory?.escrow?.collateralValue || 0
+  );
+  const totalCollateralBN = new BigNumber(totalCollateralQuantity || 1);
+
+  return escrowCollateralValue
+    .multipliedBy(invQuantity.dividedBy(totalCollateralBN))
+    .toString();
 }
 
 /**
@@ -131,27 +140,6 @@ function computeEscrows(inventory) {
 }
 
 /**
- * Applies 1e18 scaling if the root is in the provided array.
- * This matches the logic done in the StakeModal for 18 decimal places.
- */
-function applyDecimalScaling(
-  inventory,
-  assetsWithEighteenDecimalPlaces,
-  values
-) {
-  if (inventory && assetsWithEighteenDecimalPlaces.includes(inventory.root)) {
-    // If root requires division by 1e18, scale these values accordingly
-    const scaled = {};
-    for (const key in values) {
-      // Divide the raw value by 1e18 to normalize
-      scaled[key] = values[key] / 1e18;
-    }
-    return scaled;
-  }
-  return values;
-}
-
-/**
  * BorrowModal component
  */
 const BorrowModal = ({
@@ -170,17 +158,17 @@ const BorrowModal = ({
   const marketplaceDispatch = useMarketplaceDispatch();
 
   const isStaked = inventory.sale && inventory.price <= 0;
+  const decimalFactor = new BigNumber(10).pow(
+    assetsWithEighteenDecimalPlaces?.includes(inventory.root)
+      ? 18
+      : inventory.decimals || 0
+  );
 
   const location = useLocation();
   const queryParams = new URLSearchParams(location.search);
 
   const totalCollateralQuantity = useMemo(
-    () => computeTotalCollateralQuantity(inventory),
-    [inventory]
-  );
-
-  const totalCollateralValue = useMemo(
-    () => computeTotalCollateralValue(inventory),
+    () => computeTotalCollateralQuantity(inventory, decimalFactor),
     [inventory]
   );
 
@@ -203,16 +191,6 @@ const BorrowModal = ({
     return null;
   }, [reserves, inventory?.root]);
 
-  // Apply scaling if needed (similar to StakeModal logic)
-  // const scaledValues = useMemo(() => {
-  //   return applyDecimalScaling(inventory, assetsWithEighteenDecimalPlaces, {
-  //     collateralValue,
-  //     totalCollateralValue,
-  //   });
-  // }, [inventory, assetsWithEighteenDecimalPlaces, collateralValue, totalCollateralValue]);
-
-  // const { collateralValue: scaledCollateralValue, totalCollateralValue: scaledTotalCollateralValue } = scaledValues;
-
   // Compute final displayed values after scaling:
   // The code divides these values by 100 or 10000 for display:
   // collateralValue is displayed as `collateralValue / 10000`
@@ -225,16 +203,14 @@ const BorrowModal = ({
       ? maxBorrowableAmount - borrowedAmount
       : 0;
 
-  // For display:
-  // `Market Value` = collateralValue / 10000
-  // `borrowedAmount` and `loanableAmount` are displayed /100
-
-  const marketValueDisplay = (collateralValue / Math.pow(10,18)).toFixed(2)
+  const marketValueDisplay = (collateralValue / Math.pow(10, 18)).toFixed(2);
   const borrowedAmountDisplay = (borrowedAmount / Math.pow(10, 18)).toFixed(2);
-  const loanableAmountDisplay = (loanableAmount / Math.pow(10,18)).toFixed(2);
+  const loanableAmountDisplay = (loanableAmount / Math.pow(10, 18)).toFixed(2);
 
   // Desired loan amount in USDST
-  const [desiredLoanAmount, setDesiredLoanAmount] = useState(((loanableAmount/Math.pow(10,18)).toFixed(2) || 0));
+  const [desiredLoanAmount, setDesiredLoanAmount] = useState(
+    (loanableAmount / Math.pow(10, 18)).toFixed(2) || 0
+  );
 
   useEffect(() => {
     if (
@@ -266,8 +242,10 @@ const BorrowModal = ({
     },
     {
       label: 'Max LTV',
-      description: `Indicates you can borrow up to ${LTV*100}% of the market value of your staked RWAs.`,
-      value: `${LTV*100}%`,
+      description: `Indicates you can borrow up to ${
+        LTV * 100
+      }% of the market value of your staked RWAs.`,
+      value: `${LTV * 100}%`,
     },
     {
       label: 'Outstanding Loan (in USDST)',
@@ -307,10 +285,7 @@ const BorrowModal = ({
             controls={false}
           />
           {desiredLoanAmount > parseFloat(loanableAmountDisplay) && (
-            <p
-              className="text-xs"
-              style={{color: '#f56565' }}
-            >
+            <p className="text-xs" style={{ color: '#f56565' }}>
               *Quantity exceeds available quantity of {loanableAmountDisplay}
             </p>
           )}
@@ -326,7 +301,7 @@ const BorrowModal = ({
 
     const body = {
       escrowAddresses: escrows,
-      borrowAmount: loanAmount.multipliedBy(new BigNumber(10).pow(18)).toFixed(0),
+      borrowAmount: loanAmount.multipliedBy(new BigNumber(10).pow(18)),
       reserve: matchedReserve?.address,
     };
 
