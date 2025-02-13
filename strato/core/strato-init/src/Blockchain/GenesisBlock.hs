@@ -129,7 +129,7 @@ getGenesisBlockAndPopulateInitialMPs genesisBlockName = do
     Right _ -> $logInfoS "Redis/certInsertion" $ T.pack "Certificate insertion was successful"
     Left e -> $logInfoS "Redis/certInsertion" $ T.pack $ "Certificate insertion failed: " ++ show e
 
-  (extraCertInfoStates,validators,) <$> genesisInfoToGenesisBlock genesisInfo genesisBlockName
+  (extraCertInfoStates,validators,) <$> genesisInfoToGenesisBlock genesisInfo
 
 initializeGenesisBlock ::
   ( HasCodeDB m,
