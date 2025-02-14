@@ -38,7 +38,7 @@ if [ "$ORACLE_MODE" = "true" ]; then
 
   echo "OAuth OpenID discovery url: $OAUTH_DISCOVERY_URL"
 
-  if [ ! -f "${CONFIG_DIR_PATH}/oracle_config.yaml" ]; then
+  if [ ! -f "${CONFIG_DIR_PATH}/oracle_config.yaml" ] || [ "${UPGRADE_ORACLE_CONTRACTS}" = "true" ]; then
     # Running container for the first time
   
     cp ./config/template.oracle_config.yaml /tmp/tmp.oracle_config.yaml
@@ -96,18 +96,10 @@ if [ "$ORACLE_MODE" = "true" ]; then
   
     if [ -f "${CONFIG_DIR_PATH}/oracle_deploy.yaml" ]; then
       cat ${CONFIG_DIR_PATH}/oracle_deploy.yaml
-      echo 'oracle_deploy.yaml already exists for oracle but there is no config file. Exiting.'
-      exit 152
-    else
-      if [ "${SKIP_ORACLE_DEPLOYMENT}" != "true" ]; then
-        echo "creating the .deploy_attempted flag file"
-        touch .deploy_attempted
-        echo 'oracle_deploy.yaml does not exist. Deploying oracle contracts...'
-        yarn deploy-oracle
-      else
-        echo 'SKIP_ORACLE_DEPLOYMENT is true. Skipping oracle deployment...'
-      fi
+      echo 'oracle_deploy.yaml exists for oracle but there is no config file or user wanted to deploy new oracles. Deactivating the oracles inside oracle_deploy.yaml.'
+      yarn deactivate-oracle
     fi
+    yarn deploy-oracle
   else
     echo "Starting with pre-existing oracle_config.yaml"
     if [ ! -f "${CONFIG_DIR_PATH}/oracle_deploy.yaml" ]; then
@@ -115,16 +107,6 @@ if [ "$ORACLE_MODE" = "true" ]; then
       exit 151
     fi
     echo "Found the existing oracle_deploy.yaml"
-    if [ ! -f ".deploy_attempted" ]; then
-      echo "Starting a recreated container with likely updated env vars, but reusing the pre-existing oracle_config.yaml and oracle_deploy.yaml"
-      if [ "${UPGRADE_ORACLE_CONTRACTS}" = "true" ]; then
-        echo "creating the .deploy_attempted flag file"
-        touch .deploy_attempted
-        echo "UPGRADE_ORACLE_CONTRACTS=true - deactivating oracle contracts and deploying again..."
-        yarn deactivate-oracle
-        yarn deploy-oracle
-      fi
-    fi
   fi
   
   echo 'Starting the submit-price script...'
@@ -308,7 +290,7 @@ else
       if [ "${UPGRADE_CONTRACTS}" = "true" ]; then
         echo "Creating the .deploy_attempted flag file"
         touch .deploy_attempted
-        echo '"UPGRADE_CONTRACTS=true - deactivating payment server contracts and deploying again...'=
+        echo '"UPGRADE_CONTRACTS=true - deactivating payment server contracts and deploying again...'
         yarn deactivate
         yarn deploy
       fi
