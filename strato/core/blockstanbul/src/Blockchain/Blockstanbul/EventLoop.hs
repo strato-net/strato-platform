@@ -311,21 +311,26 @@ eventLoop ctx = execStateC ctx $
               $logInfoS "blockstanbul" . T.pack . printf "Accepting historical block #%d" $ blockNo
               commitBlock blk
         UnannouncedBlock blk' -> do
-          -- this is for sending out a new block,
-          -- may be a good candidtate for sending newCerts
+          $logInfoS "blockstanbul" "Received UnannouncedBlock"
           let blk = scrubConsensus blk'
           ppl <- use proposal
           leader <- use proposer
           self <- use selfCert
+          $logInfoS "blockstanbul" $ "Current leader: " <> T.pack (show leader)
           when (isNothing ppl && Just leader == fmap chainMemberParsedSetToValidator self) $ do
+            $logInfoS "blockstanbul" "No current proposal and self is the leader"
             vs <- use validators
+            $logInfoS "blockstanbul" $ "Validators: " <> T.pack (show vs)
             let blockWithVs = addValidators (ChainMembers $ S.map validatorToChainMemberParsedSet vs) blk
             pseal <- proposerSeal blockWithVs
+            $logInfoS "blockstanbul" $ "Got Proposer seal"
             let sealedBlk = addProposerSeal pseal blockWithVs
             mLocked <- use blockLock
+            $logInfoS "blockstanbul" $ "Block lock: " <> T.pack (show mLocked)
             let realSealed = fromMaybe sealedBlk mLocked
             wantParent <- use lastParent
             seqNo <- use (view . sequence)
+            $logInfoS "blockstanbul" $ "Sequence number: " <> T.pack (show seqNo)
             case assertChainConsistency seqNo wantParent realSealed of
               Left err -> do
                 $logWarnS "blockstanbul" $ "Retrying to build block: " <> err
@@ -336,11 +341,14 @@ eventLoop ctx = execStateC ctx $
                   $logErrorS "blockstanbul" "Lock has wrong block number; cannot commit"
                 yieldR MakeBlockCommand
               Right () -> do
+                $logInfoS "blockstanbul" "Block is consistent, proceeding with proposal"
                 hasPreprepared .= True
                 proposal .= Just realSealed
                 valB <- use validatorBehavior
+                $logInfoS "blockstanbul" $ "Validator behavior: " <> T.pack (show valB)
                 when (isJust self && valB) $ do
                   msg <- signMessage (Preprepare v realSealed)
+                  $logInfoS "blockstanbul" $ "Signed message: " <> T.pack (show msg)
                   yieldR msg
                   yieldR $ RunPreprepare realSealed
         PreprepareResponse decision -> case decision of 
@@ -516,7 +524,7 @@ sendAllMessages :: (MonadIO m, MonadLogger m, HasBlockstanbulContext m, HasVault
 sendAllMessages wms = do
   eout <- sendMessages' wms
   let out = fromE <$> eout
-  $logDebugS "sendAllMessages" . T.pack $ format out
+  $logInfoS "sendAllMessages" . T.pack $ format out
   case mapMaybe loopback eout of
     [] -> return out
     wms' -> (out ++) <$> sendAllMessages wms'

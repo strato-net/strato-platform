@@ -133,7 +133,7 @@ eventHandler = forever $ timeAction seqLoopTiming $ do
   maybeEvent <- await
   let event = fromMaybe (error "input stream to sequencer closed, this shouldn't happen") maybeEvent
 
-  $logDebugS "sequencer/events" . T.pack $ format event
+  $logInfoS "sequencer/events" . T.pack $ format event
 
   case event of
     TimerFire roundNumber -> do
@@ -226,20 +226,34 @@ blockstanbulSend' ::
   ) =>
   InEvent -> m ()
 blockstanbulSend' msg = do
+  $logInfoS "seq/pbft/send" . T.pack $ "Sending message: " ++ show msg
   resp <- sendAllMessages [msg]
+  $logInfoS "seq/pbft/send" . T.pack $ "Received response: " ++ show resp
+
   let blocks = [b | ToCommit b <- resp]
+  $logInfoS "seq/pbft/send" . T.pack $ "Blocks to commit: " ++ show (map blockHash blocks)
+
   for_ resp $ \case
-    ResetTimer rn -> createNewTimer rn
-    FailedHistoric blk -> A.delete (Proxy @DependentBlockEntry) (blockHash blk) -- First time using `delete`
+    ResetTimer rn -> do
+      $logInfoS "seq/pbft/send" . T.pack $ "Resetting timer for round: " ++ show rn
+      createNewTimer rn
+    FailedHistoric blk -> do
+      $logInfoS "seq/pbft/send" . T.pack $ "Failed historic block: " ++ show (blockHash blk)
+      A.delete (Proxy @DependentBlockEntry) (blockHash blk)
     _ -> pure ()
-  $logDebugS "seq/pbft/send" . T.pack $ "Pre-rewrite: " ++ format (blockHash <$> blocks)
+
+  $logInfoS "seq/pbft/send" . T.pack $ "Pre-rewrite: " ++ format (blockHash <$> blocks)
 
   let getSequencedBlock =
         ingestBlockToSequencedBlock
           . blockToIngestBlock TO.Blockstanbul
       creates = [VmCreateBlockCommand | MakeBlockCommand <- resp]
   let rBlocks = catMaybes (map getSequencedBlock blocks)
+  $logInfoS "seq/pbft/send" . T.pack $ "Sequenced blocks: " ++ show (map prettyBlock rBlocks)
+
   committedBlocks <- catMaybes <$> traverse insertEmitted rBlocks
+  $logInfoS "seq/pbft/send" . T.pack $ "Committed blocks: " ++ show (committedBlocks)
+
   let (vms, p2ps, ckpts) = vmEvenP2pCheckptFilterHelper resp
 
   let vmevs =
@@ -249,6 +263,9 @@ blockstanbulSend' msg = do
   let p2pevs =
         (P2pBlock <$> committedBlocks)
           ++ p2ps
+
+  $logInfoS "seq/pbft/send" . T.pack $ "VM events: " ++ show vmevs
+  $logInfoS "seq/pbft/send" . T.pack $ "P2P events: " ++ show p2pevs
 
   case committedBlocks of
     [] -> pure ()
@@ -349,23 +366,31 @@ runConsensus ::
   ) =>
   SequencedBlock -> m ()
 runConsensus sb = do
+  $logInfoS "runConsensus" . T.pack $ "Starting consensus for block: " ++ prettyBlock sb
   hasPBFT <- blockstanbulRunning
   if not hasPBFT
     then do
+      $logInfoS "runConsensus" "PBFT is not running, expanding block."
       obs <- expandBlock sb
       flip traverse_ obs $ \ob -> do
+        $logInfoS "runConsensus" . T.pack $ "Emitting P2P block: " ++ show ob
         _ <- writeSeqP2pEvents [P2pBlock ob]
         return ()
+      $logInfoS "runConsensus" "Emitting VM blocks."
       _ <- writeSeqVmEvents $ map VmBlock obs
       return ()
     else do
+      $logInfoS "runConsensus" "PBFT is running, processing block."
       let blk = sequencedBlockToBlock sb
       routed <-
         if isHistoricBlock blk
-          then map (PreviousBlock . outputBlockToBlock) <$> expandBlock sb
-          else pure [UnannouncedBlock blk]
-      -- Blockstanbul will check that the seals and validators match up before
-      -- announcing it to the network or forwarding to the EVM.
+          then do
+            $logInfoS "runConsensus" "Block is historic, expanding block."
+            map (PreviousBlock . outputBlockToBlock) <$> expandBlock sb
+          else do
+            $logInfoS "runConsensus" "Block is unannounced."
+            pure [UnannouncedBlock blk]
+      $logInfoS "runConsensus" "Sending blocks to Blockstanbul."
       traverse_ blockstanbulSend' routed
 
 transformBlocks ::
@@ -378,14 +403,18 @@ transformBlocks ::
   ) =>
   [IngestBlock] -> m ()
 transformBlocks ibs = do
-  forM_ ibs $ \ib ->
+  $logInfoS "transformBlocks" . T.pack $ "Starting to transform " ++ show (length ibs) ++ " blocks."
+  forM_ ibs $ \ib -> do
+    $logInfoS "transformBlocks" . T.pack $ "Processing block: " ++ prettyIBlock ib
     case (ingestBlockToSequencedBlock ib) of
       Nothing -> do
         $logWarnS "transformEvents/emitBlocks" . T.pack $
           "Could not ECRecover the pubkey of certain Txs in Block " ++ prettyIBlock ib ++ "; not emitting"
         P.incCounter seqBlocksEcrfail -- couldnt ecrecover some transactions in this block. block is likely garbage
       Just sb -> do
+        $logInfoS "transformBlocks" . T.pack $ "Successfully transformed block: " ++ prettyBlock sb
         runConsensus sb
+  $logInfoS "transformBlocks" "Finished transforming blocks."
 
 prettyIBlock :: IngestBlock -> String
 prettyIBlock IngestBlock {ibOrigin = o, ibBlockData = bd, ibReceiptTransactions = txs} = "Block #" ++ blockNonce ++ "/" ++ bHash ++ " (via " ++ format o ++ ", " ++ show (length txs) ++ " txs)"
