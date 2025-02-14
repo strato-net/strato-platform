@@ -19,7 +19,7 @@ const logo = <img src={Images.USDST} alt={''} title={''} className="w-5 h-5" />;
  * Helper to compute total collateral quantity from inventory.
  * Includes checking for unique escrow addresses and summing collateral.
  */
-function computeTotalCollateralQuantity(inventory, decimalFactor) {
+function computeTotalCollateralQuantity(inventory) {
   // If no inventory, return 0 as a BigNumber
   if (!inventory) return new BigNumber(0);
 
@@ -54,10 +54,6 @@ function computeTotalCollateralQuantity(inventory, decimalFactor) {
     collateralQuantity = escrowCollateral.gt(invQuantity)
       ? invQuantity
       : escrowCollateral;
-  }
-
-  if (decimalFactor.gt(0)) {
-    collateralQuantity = collateralQuantity.dividedBy(decimalFactor);
   }
 
   return collateralQuantity;
@@ -139,6 +135,38 @@ function computeEscrows(inventory) {
   return [];
 }
 
+function computeMaxLoanAmount(inventory) {
+  // If no inventory, return 0 as a BigNumber
+  if (!inventory) return new BigNumber(0);
+
+  let maxLoanAmount = new BigNumber(0);
+  const uniqueEscrows = new Set();
+
+  if (
+    Array.isArray(inventory.inventories) &&
+    inventory.inventories.length > 0
+  ) {
+    // Sum unique escrow maxLoanAmount quantities from all inventories
+    maxLoanAmount = inventory.inventories.reduce((sum, item) => {
+      const escrowAddress = item?.escrow?.address;
+      const escrowMaxLoanAmount = new BigNumber(
+        item?.escrow?.maxLoanAmount || 0
+      );
+
+      if (escrowAddress && !uniqueEscrows.has(escrowAddress)) {
+        uniqueEscrows.add(escrowAddress);
+        return sum.plus(escrowMaxLoanAmount);
+      }
+      return sum;
+    }, new BigNumber(0));
+  } else if (inventory?.escrow?.maxLoanAmount) {
+    // Fallback if inventories array doesn't exist:
+    maxLoanAmount = new BigNumber(inventory.escrow.maxLoanAmount || 0);
+  }
+
+  return maxLoanAmount;
+}
+
 /**
  * BorrowModal component
  */
@@ -158,17 +186,12 @@ const BorrowModal = ({
   const marketplaceDispatch = useMarketplaceDispatch();
 
   const isStaked = inventory.sale && inventory.price <= 0;
-  const decimalFactor = new BigNumber(10).pow(
-    assetsWithEighteenDecimalPlaces?.includes(inventory.root)
-      ? 18
-      : inventory.decimals || 0
-  );
 
   const location = useLocation();
   const queryParams = new URLSearchParams(location.search);
 
   const totalCollateralQuantity = useMemo(
-    () => computeTotalCollateralQuantity(inventory, decimalFactor),
+    () => computeTotalCollateralQuantity(inventory),
     [inventory]
   );
 
@@ -191,25 +214,29 @@ const BorrowModal = ({
     return null;
   }, [reserves, inventory?.root]);
 
-  // Compute final displayed values after scaling:
-  // The code divides these values by 100 or 10000 for display:
-  // collateralValue is displayed as `collateralValue / 10000`
-  // borrowedAmount and loanableAmount as `... / 100`
-  // We'll keep the same formatting after scaling by 1e18.
-  const LTV = matchedReserve?.name.toLowerCase().includes('ethst') ? 0.3 : 0.5;
-  const maxBorrowableAmount = Math.floor(collateralValue * LTV);
-  const loanableAmount =
-    maxBorrowableAmount >= borrowedAmount
-      ? maxBorrowableAmount - borrowedAmount
-      : 0;
+  const LTV =
+    matchedReserve?.name.toLowerCase().includes('ethst') ||
+    matchedReserve?.name.toLowerCase().includes('wbtcst')
+      ? 0.3
+      : 0.5;
+  const maxLoanAmount = useMemo(() => {
+    if (
+      matchedReserve?.name.toLowerCase().includes('ethst') ||
+      matchedReserve?.name.toLowerCase().includes('wbtcst')
+    ) {
+      return Math.floor(collateralValue ? collateralValue * LTV : 0);
+    } else {
+      return computeMaxLoanAmount(inventory);
+    }
+  }, [inventory, collateralValue]);
 
   const marketValueDisplay = (collateralValue / Math.pow(10, 18)).toFixed(2);
   const borrowedAmountDisplay = (borrowedAmount / Math.pow(10, 18)).toFixed(2);
-  const loanableAmountDisplay = (loanableAmount / Math.pow(10, 18)).toFixed(2);
+  const loanableAmountDisplay = ((Math.floor(maxLoanAmount / Math.pow(10, 18)).toFixed(2)) - borrowedAmountDisplay).toFixed(2);
 
   // Desired loan amount in USDST
   const [desiredLoanAmount, setDesiredLoanAmount] = useState(
-    (loanableAmount / Math.pow(10, 18)).toFixed(2) || 0
+    (Math.floor(maxLoanAmount / Math.pow(10, 18)).toFixed(2)) - borrowedAmountDisplay || 0
   );
 
   useEffect(() => {
@@ -301,7 +328,9 @@ const BorrowModal = ({
 
     const body = {
       escrowAddresses: escrows,
-      borrowAmount: loanAmount.multipliedBy(new BigNumber(10).pow(18)),
+      borrowAmount: loanAmount
+        .multipliedBy(new BigNumber(10).pow(18))
+        .toFixed(0),
       reserve: matchedReserve?.address,
     };
 

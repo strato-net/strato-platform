@@ -76,7 +76,6 @@ const StakeItemActions = ({
       }, 0)
     : 0;
 
-  // maxBorrowableAmount = floor(collateralValue / 2) (will recompute after scaling)
   // Calculate borrowedAmount
   const uniqueBorrowedAddresses = new Set();
   let borrowAmount = inventory?.inventories
@@ -91,13 +90,30 @@ const StakeItemActions = ({
       }, 0)
     : inventory?.escrow?.borrowedAmount || 0;
 
+  // Calculate maxLoanAmount
+  const uniqueEscrowsThree = new Set();
+  let maxLoanAmount = inventory?.inventories
+    ? inventory.inventories.reduce((sum, item) => {
+        const escrowAddress = item?.escrow?.address;
+        const maxLoanValue = item?.escrow?.maxLoanAmount || 0;
+        if (escrowAddress && !uniqueEscrowsThree.has(escrowAddress)) {
+          uniqueEscrowsThree.add(escrowAddress);
+          return sum + maxLoanValue;
+        }
+        return sum;
+      }, 0)
+    : inventory?.escrow?.maxLoanAmount || 0;
+    maxLoanAmount = Math.floor(maxLoanAmount / Math.pow(10, 18)) * Math.pow(10, 18);
+
   /**
    * If the inventory.root is in assetsWithEighteenDecimalPlaces, we need to scale down values by 1e18.
    * This matches the logic used in StakeModal and BorrowModal.
    */
   const decimals = assetsWithEighteenDecimalPlaces.includes(
     inventory?.root || ''
-  ) ? 18 : inventory?.decimals || 0;
+  )
+    ? 18
+    : inventory?.decimals || 0;
 
   if (decimals > 0) {
     collateralQuantity /= Math.pow(10, decimals);
@@ -106,9 +122,6 @@ const StakeItemActions = ({
 
   // Recompute stakeQuantity after possible scaling
   const stakeQuantity = quantity - collateralQuantity - quantityNotAvailable;
-
-  // Recompute maxBorrowableAmount after scaling
-  const maxBorrowableAmount = Math.floor(collateralValue / 2);
 
   const showStakeModal = (type) => {
     setStakeModalOpen(true);
@@ -159,7 +172,7 @@ const StakeItemActions = ({
           className="text-[#13188A] font-semibold"
           onClick={() => showBorrowModal()}
           disabled={
-            borrowAmount >= maxBorrowableAmount || collateralQuantity <= 0
+            borrowAmount >= maxLoanAmount || collateralQuantity <= 0
           }
         >
           <BankOutlined /> Borrow
