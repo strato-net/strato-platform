@@ -10,6 +10,7 @@ module Blockchain.Init.Generator (
 import BlockApps.Logging
 import qualified Blockchain.Data.DataDefs as DataDefs
 import Blockchain.Data.GenesisInfo
+import qualified Blockchain.Data.GenesisInfoOld as OLD
 import qualified Blockchain.EthConf as UEC
 import qualified Blockchain.EthConf.Model as EC
 import Blockchain.DB.CodeDB
@@ -18,6 +19,7 @@ import Blockchain.Init.EthConf
 import Blockchain.Init.Monad
 import Blockchain.Init.Options
 import qualified Blockchain.Network as Net
+import Blockchain.Strato.Model.Address
 import Blockchain.Strato.Model.Options (flags_network)
 import Conduit
 import Control.Monad
@@ -40,10 +42,33 @@ import System.FilePath ((</>))
 import Turtle (chmod, roo)
 import UnliftIO.Directory
 
+import BlockApps.X509
+import Blockchain.Strato.Model.ChainMember
+
+
+
+extraFaucets :: [Address]
+extraFaucets = []
+
+extraCerts :: [X509Certificate]
+extraCerts = []
+
+validators :: [ChainMemberParsedSet]
+validators = [CommonName "" "" "node1" True]
+
+admins :: [ChainMemberParsedSet]
+admins = [CommonName "" "" "node1" True]
+
 createGenesisInfo :: MonadIO m => String -> m ()
 createGenesisInfo _ = do
-  let gi' = buildGenesisInfo [] [] [] [] defaultGenesisInfo
+  let gi' = buildGenesisInfo extraFaucets extraCerts validators admins defaultGenesisInfo
   liftIO $ B.writeFile "genesis.json" . BL.toStrict $ JSON.encode gi'
+  liftIO $ putStrLn $ "Done. Output genesis block info was written"
+
+convertGenesisFromOld :: MonadIO m => m ()
+convertGenesisFromOld = do
+  oldGenesis <- OLD.getGenesisInfo
+  liftIO $ B.writeFile "genesis.json" . BL.toStrict $ JSON.encode $ convertFromOld oldGenesis
   liftIO $ putStrLn $ "Done. Output genesis block info was written"
 
 mkAll :: (MonadLoggerIO m, MonadUnliftIO m, MonadFail m, HasKafka m) =>
@@ -57,8 +82,19 @@ mkAll network = do
   liftIO $ makeReadOnly $ dir </> "ethconf.yaml"
 
   genesisExists <- doesFileExist "genesis.json"
+  genesisOldExists <- doesFileExist "genesisOld.json"
 
-  unless genesisExists $ createGenesisInfo network
+  case (genesisExists, genesisOldExists) of
+    (False, False) -> do
+      $logInfoS "mkAll" "Creating 'genesis.json' using network name"
+      createGenesisInfo network
+    (False, True) -> do
+      $logInfoS "mkAll" "Converting 'genesis.json' from old format 'genesisOld.json'"
+      convertGenesisFromOld
+    (True, _) -> do
+      $logInfoS "mkAll" "Using provided 'genesis.json'"
+      return ()
+
 
   let pgconf = EC.sqlConfig ethconf
       rawConn = EC.postgreSQLConnectionString pgconf {EC.database = ""}
