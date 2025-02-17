@@ -32,7 +32,6 @@ import Blockchain.Data.AddressStateRef
 import Blockchain.Data.DataDefs
 import Blockchain.Data.Json hiding (Contract)
 import Blockchain.SolidVM.Model
-import Blockchain.Strato.Model.Account
 import Blockchain.Strato.Model.Address
 import Blockchain.Strato.Model.ChainId
 import Blockchain.Strato.Model.ExtendedWord
@@ -108,7 +107,7 @@ getContractsData (ContractName cName) = do
   return $ (\(AddressStateRef' r _) -> addressStateRefAddress r) <$> svmRefs
 
 getContractsContract ::
-  ( A.Selectable Account AddressState m,
+  ( A.Selectable Address AddressState m,
     HasCodeDB m,
     (Keccak256 `A.Selectable` SourceMap) m,
     HasSQL m
@@ -156,7 +155,7 @@ translateStorageMap storage' =
 
 getContractsState ::
   ( MonadLogger m,
-    A.Selectable Account AddressState m,
+    A.Selectable Address AddressState m,
     HasCodeDB m,
     (Keccak256 `A.Selectable` SourceMap) m,
     HasSQL m
@@ -230,7 +229,7 @@ getContractsState _ address chainId mName mCount mOffset _ = do
 
 postContractsBatchStates ::
   ( MonadLogger m,
-    A.Selectable Account AddressState m,
+    A.Selectable Address AddressState m,
     HasCodeDB m,
     (Keccak256 `A.Selectable` SourceMap) m,
     HasSQL m
@@ -250,7 +249,7 @@ postContractsBatchStates = traverse flattenRequest
         (fromMaybe False postcontractsbatchstatesrequestLength)
 
 getContractsDetails' ::
-  ( A.Selectable Account AddressState m,
+  ( A.Selectable Address AddressState m,
     HasCodeDB m,
     (Keccak256 `A.Selectable` SourceMap) m,
     HasSQL m
@@ -286,7 +285,7 @@ getContractsDetails' contractAddress chainId = do
           Right contract -> pure $ snd contract
 
 getContractsDetails ::
-  ( A.Selectable Account AddressState m,
+  ( A.Selectable Address AddressState m,
     HasCodeDB m,
     (Keccak256 `A.Selectable` SourceMap) m,
     HasSQL m
@@ -297,7 +296,7 @@ getContractsDetails ::
 getContractsDetails = getContractsDetails'
 
 getContractsFunctions ::
-  ( A.Selectable Account AddressState m,
+  ( A.Selectable Address AddressState m,
     HasCodeDB m,
     (Keccak256 `A.Selectable` SourceMap) m,
     HasSQL m
@@ -311,7 +310,7 @@ getContractsFunctions _ contractId chainId = do
   pure . map (FunctionName . Text.pack) . Map.keys $ _functions contract
 
 getContractsSymbols ::
-  ( A.Selectable Account AddressState m,
+  ( A.Selectable Address AddressState m,
     HasCodeDB m,
     (Keccak256 `A.Selectable` SourceMap) m,
     HasSQL m
@@ -325,7 +324,7 @@ getContractsSymbols _ contractId chainId = do
   pure . map (SymbolName . Text.pack) . Map.keys $ _storageDefs contract
 
 getContractsEnum ::
-  ( A.Selectable Account AddressState m,
+  ( A.Selectable Address AddressState m,
     HasCodeDB m,
     (Keccak256 `A.Selectable` SourceMap) m,
     HasSQL m
@@ -388,7 +387,7 @@ getContractsStates _ = throwIO $ Unimplemented "getContractsStates"
 postContractsCompile ::
   ( MonadIO m,
     HasCodeDB m,
-    A.Selectable Account AddressState m
+    A.Selectable Address AddressState m
   ) =>
   [PostCompileRequest] ->
   m [PostCompileResponse]
@@ -425,10 +424,10 @@ completeXabi name xabi = do
 getSourceMapFromAddress :: 
   ( MonadIO m,
     (Keccak256 `A.Selectable` SourceMap) m, 
-    (Account `A.Selectable` AddressState) m
+    (Address `A.Selectable` AddressState) m
   ) => Address -> m SourceMap
 getSourceMapFromAddress cptr = do
-  addressState <- A.select (A.Proxy @AddressState) (Account cptr Nothing)
+  addressState <- A.select (A.Proxy @AddressState) cptr
   mCodeHash <- case addressState of
     Nothing -> throwIO $ UserError "Could not find code hash for contract"
     Just as -> return $ addressStateCodeHash as

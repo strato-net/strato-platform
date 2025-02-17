@@ -31,6 +31,7 @@ import Blockchain.DB.SQLDB
 import Blockchain.DBM
 import Blockchain.Data.PubKey (secPubKeyToPoint)
 import Blockchain.EthConf (lookupRedisBlockDBConfig)
+import Blockchain.Strato.Discovery.Data.Host
 import Blockchain.Strato.Discovery.Data.Peer
 import Blockchain.Strato.Discovery.UDP (processDataStream')
 import Blockchain.Strato.Model.Secp256k1
@@ -48,6 +49,8 @@ import Control.Monad.IO.Unlift
 import Control.Monad.Reader
 import Crypto.Types.PubKey.ECC
 import qualified Data.ByteString as B
+import Data.IP
+import Data.List
 import Data.Maybe (listToMaybe)
 import qualified Data.Text as T
 import qualified Database.Persist.Postgresql as SQL
@@ -90,9 +93,9 @@ instance Monad m => Accessible RBDB.RedisConnection (ReaderT ContextLite m) wher
 instance MonadIO m => Accessible ValidatorAddresses (ReaderT ContextLite m) where
   access _ = RBDB.withRedisBlockDB $ ValidatorAddresses <$> RBDB.getValidatorAddresses
 
-instance MonadUnliftIO m => A.Replaceable IPAsText PPeer (ReaderT ContextLite m) where
-  replace _ (IPAsText ip) peer = do
-    maybePeer <- getPeerByIP $ T.unpack ip
+instance MonadUnliftIO m => A.Replaceable Host PPeer (ReaderT ContextLite m) where
+  replace _ host peer = do
+    maybePeer <- getPeerByIP host
     void . sqlQuery $ actions maybePeer
     where
       actions mp = case mp of
@@ -103,31 +106,32 @@ instance MonadUnliftIO m => A.Replaceable IPAsText PPeer (ReaderT ContextLite m)
             [ PPeerPubkey SQL.=. pPeerPubkey peer
             ]
           return (SQL.entityKey peer')
-      getPeerByIP :: String -> ReaderT ContextLite m (Maybe (SQL.Entity PPeer))
-      getPeerByIP ipStr = listToMaybe <$> sqlQuery actions'
+      getPeerByIP :: Host -> ReaderT ContextLite m (Maybe (SQL.Entity PPeer))
+      getPeerByIP host' = listToMaybe <$> sqlQuery actions'
         where
-          actions' = SQL.selectList [PPeerIp SQL.==. T.pack ipStr] []
+          actions' = SQL.selectList [PPeerHost SQL.==. host'] []
 
-instance MonadUnliftIO m => A.Selectable String PPeer (ReaderT ContextLite m) where
+instance MonadUnliftIO m => A.Selectable IP PPeer (ReaderT ContextLite m) where
   select _ ip = getPeerByIP ip
     where
-      getPeerByIP :: String -> ReaderT ContextLite m (Maybe PPeer)
-      getPeerByIP ipStr =
+      getPeerByIP :: IP -> ReaderT ContextLite m (Maybe PPeer)
+      getPeerByIP ip' =
         sqlQuery actions >>= \case
           [] -> return Nothing
-          lst -> return . Just . SQL.entityVal $ head lst
+          --If multiple Hosts map to the same IP address, choose one arbitrarily, but prefer ones with domain names
+          lst -> return . Just . SQL.entityVal $ head $ sortOn (isIP . pPeerHost . SQL.entityVal) lst
         where
-          actions = SQL.selectList [PPeerIp SQL.==. T.pack ipStr] []
+          actions = SQL.selectList [PPeerIp SQL.==. Just ip'] []
 
 instance MonadIO m => A.Replaceable SockAddr B.ByteString (ReaderT ContextLite m) where
-  replace _ addr packet = do
+  replace _ addr' packet = do
     sock' <- asks sock
     liftIO $ catch 
-      (void $ NB.sendTo sock' packet addr) 
-      (\(err :: IOError) -> runLoggingT . $logErrorS "NB.sendTo" . T.pack $ "Could not send data to " <> show addr <> "; got error: " <> show err)
+      (void $ NB.sendTo sock' packet addr') 
+      (\(err :: IOError) -> runLoggingT . $logErrorS "NB.sendTo" . T.pack $ "Could not send data to " <> show addr' <> "; got error: " <> show err)
 
-instance A.Selectable (IPAsText, UDPPort, B.ByteString) Point IO where
-  select _ (IPAsText domain, UDPPort udpPortNum, theMsg) = catch
+instance A.Selectable (Host, UDPPort, B.ByteString) Point IO where
+  select _ (domain, UDPPort udpPortNum, theMsg) = catch
     (withSocketsDo $ bracket getSocket close (talk theMsg))
     (\(err :: IOError) -> runLoggingT ($logErrorS "withSocketsDo" . T.pack $ "Got error: " <> show err) >> return Nothing)
     where
@@ -135,7 +139,7 @@ instance A.Selectable (IPAsText, UDPPort, B.ByteString) Point IO where
       getSocket = do
         (serveraddr : _) <- getAddrInfo 
           (Just defaultHints {addrFlags = [AI_ALL]})
-          (Just $ T.unpack domain)
+          (Just $ hostToString domain)
           (Just $ show udpPortNum)
         s <- socket (addrFamily serveraddr) Datagram defaultProtocol
         _ <- connect s (addrAddress serveraddr)
@@ -148,22 +152,22 @@ instance A.Selectable (IPAsText, UDPPort, B.ByteString) Point IO where
         --use the Haskell timeout....  I did try setting socket options also, but that didn't work.
         timeout 5000000 $ secPubKeyToPoint . processDataStream' <$> NB.recv socket' 2000
 
-instance MonadIO m => A.Selectable (Maybe IPAsText, UDPPort) SockAddr (ReaderT ContextLite m) where
+instance MonadIO m => A.Selectable (Maybe Host, UDPPort) SockAddr (ReaderT ContextLite m) where
   select _ (Nothing, UDPPort udpPortNum) = do
     fmap (fmap addrAddress . listToMaybe) . liftIO $
       getAddrInfo
         (Just (defaultHints {addrFlags = [AI_PASSIVE]}))
         Nothing
         (Just (show udpPortNum))
-  select _ (Just (IPAsText ip), UDPPort udpPortNum) = do
+  select _ (Just ip, UDPPort udpPortNum) = do
     fmap (fmap addrAddress . listToMaybe) . liftIO $ catch
       (getAddrInfo
         (Just defaultHints {addrFlags = [AI_ALL]})
-        (Just $ T.unpack ip)
+        (Just $ hostToString ip)
         (Just $ show udpPortNum))
       ((\(err :: IOError) -> runLoggingT ($logErrorS "getAddrInfo" . T.pack $ "Got error: " <> show err) >> return []))
 
-instance MonadIO m => A.Selectable (IPAsText, UDPPort, B.ByteString) Point (ReaderT ContextLite m) where
+instance MonadIO m => A.Selectable (Host, UDPPort, B.ByteString) Point (ReaderT ContextLite m) where
   select p = liftIO . A.select p
 
 instance MonadIO m => A.Selectable () (B.ByteString, SockAddr) (ReaderT ContextLite m) where
@@ -194,14 +198,14 @@ type MonadDiscovery m =
     MonadThrow m,
     MonadLogger m,
     MonadUnliftIO m,
-    A.Selectable String PPeer m,
+    A.Selectable IP PPeer m,
     A.Selectable () (B.ByteString, SockAddr) m,
-    A.Replaceable IPAsText PPeer m,
+    A.Replaceable Host PPeer m,
     A.Replaceable SockAddr B.ByteString m,
     Mod.Accessible UDPPort m,
     Mod.Accessible TCPPort m,
     Mod.Accessible ValidatorAddresses m,
-    A.Selectable (Maybe IPAsText, UDPPort) SockAddr m
+    A.Selectable (Maybe Host, UDPPort) SockAddr m
   )
 
 waitOnVault :: (MonadIO m, MonadLogger m, Show a) => m (Either a b) -> m b
@@ -230,26 +234,26 @@ initContextLite vaultUrl udpPort tcpPort = do
         myTcpPort = tcpPort
       }
 
-addPeer :: A.Replaceable IPAsText PPeer m => PPeer -> m ()
-addPeer peer = A.replace (A.Proxy @PPeer) (IPAsText $ pPeerIp peer) peer
+addPeer :: A.Replaceable Host PPeer m => PPeer -> m ()
+addPeer peer = A.replace (A.Proxy @PPeer) (pPeerHost peer) peer
 
 getPeerByIP' ::
-  (A.Selectable String PPeer m) =>
-  String ->
+  (A.Selectable IP PPeer m) =>
+  IP ->
   m (Maybe PPeer)
 getPeerByIP' ip = A.select (A.Proxy @PPeer) ip
 
 doPeersExist ::
-  (A.Selectable String PPeer m) =>
-  [String] ->
+  (A.Selectable IP PPeer m) =>
+  [IP] ->
   m (Bool)
 doPeersExist peers = do
   maybePeer <- traverse doesPeerExist peers
   pure $ all (== True) maybePeer
 
 doesPeerExist ::
-  (A.Selectable String PPeer m) =>
-  String ->
+  (A.Selectable IP PPeer m) =>
+  IP ->
   m (Bool)
 doesPeerExist peer = do
   maybePeer <- A.select (A.Proxy @PPeer) peer

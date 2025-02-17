@@ -24,8 +24,6 @@ import qualified Blockchain.Database.MerklePatricia as MP
 import Blockchain.Participation
 import Blockchain.Sequencer.Event
 import Blockchain.Strato.Model.ChainMember
-import Blockchain.Strato.Model.Keccak256 hiding (hash)
-import qualified Data.ByteString as B
 import qualified Data.ByteString.Char8 as BC
 import qualified Data.Text as T
 import qualified LabeledError
@@ -38,8 +36,6 @@ data Options
   | AddGenesisFromFile {fileName :: String}
   | AddTxsFromFile {fileName :: String}
   | AskForBlocks {startBlock :: Integer, endBlock :: Integer, qOrg :: String, qOrgUnit :: String, qCommonName :: String}
-  | AskForTxs
-  | ChainHash
 --  | Checkpoints {service :: CheckpointService, operation :: CheckpointOperation, offset :: Maybe Int64, cp :: Maybe String}
   | Code {hash :: String}
   | DeleteDepBlock {valK :: String}
@@ -213,9 +209,6 @@ pushOptions =
       qCommonName := "" += typ "STRING" += explicit += name "commonName"
     ]
 
-askForTxOptions :: Annotate Ann
-askForTxOptions = record AskForTxs []
-
 redisOptions :: Annotate Ann
 redisOptions =
   record
@@ -289,9 +282,6 @@ setParticipationModeOptions =
         += name "mode"
     ]
 
-chainHashOptions :: Annotate Ann
-chainHashOptions = record ChainHash []
-
 getPrivacyOptions :: Annotate Ann
 getPrivacyOptions =
   record
@@ -318,8 +308,6 @@ options =
       addTxsFromFileOptions,
       addTxOptions,
       askOptions,
-      askForTxOptions,
-      chainHashOptions,
 --      checkpointOptions,
       codeOptions,
       dumpKafkaVMEventsOptions,
@@ -368,13 +356,6 @@ run AddTxsFromFile {..} = addTxsFromFile fileName
 run AskForBlocks {..} =
   let i = CommonName (T.pack qOrg) (T.pack qOrgUnit) (T.pack qCommonName) True
    in insertP2P (P2pAskForBlocks startBlock endBlock i)
-run AskForTxs =
-  insertP2P . P2pGetTx
-    . map (unsafeCreateKeccak256FromByteString . LabeledError.b16Decode "strato-barometer/askForTxs")
-    . filter (not . B.null)
-    . BC.split '\n'
-    =<< B.getContents
-run ChainHash = error "strato-barometer: the chainhash tool has been deprecated."
 --run Checkpoints {..} = case operation of
 --  Get -> doCheckpointGet service
 --  Put -> doCheckpointPut service (fromIntegral <$> offset) cp

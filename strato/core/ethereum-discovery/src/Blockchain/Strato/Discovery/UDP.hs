@@ -24,6 +24,7 @@ where
 
 import BlockApps.Logging
 import Blockchain.Data.RLP
+import Blockchain.Strato.Discovery.Data.Host
 import Blockchain.Strato.Discovery.Data.Peer
 import Blockchain.Strato.Discovery.P2PUtil (DiscoverException (..))
 import Blockchain.Strato.Model.ExtendedWord
@@ -150,7 +151,7 @@ peerToNeighbor p = do
   pubKey <- note NoPublicKeyException (pPeerPubkey p)
   let endpoint =
         Endpoint
-          (stringToIAddr $ T.unpack $ pPeerIp p)
+          (stringToIAddr $ hostToString $ pPeerHost p)
           (UDPPort . fromIntegral $ pPeerUdpPort p)
           (TCPPort . fromIntegral $ pPeerTcpPort p)
   return $ Neighbor endpoint $ pointToNodeID pubKey
@@ -226,14 +227,16 @@ sendPacket ::
   ( HasVault m
   , MonadLogger m
   , A.Replaceable SockAddr B.ByteString m
-  , A.Replaceable T.Text PPeer m
-  , A.Selectable (Maybe IPAsText, UDPPort) SockAddr m ) =>
+  , HasPeerDB m
+  , A.Selectable (Maybe Host, UDPPort) SockAddr m ) =>
   PPeer ->
   NodeDiscoveryPacket ->
   m ()
 sendPacket thePeer packet = do
-  mPeerAddr <- A.select (A.Proxy @SockAddr) (Just $ IPAsText $ pPeerIp thePeer, UDPPort . fromIntegral $ pPeerUdpPort thePeer)
+  mPeerAddr <- A.select (A.Proxy @SockAddr) (Just $ pPeerHost thePeer, UDPPort . fromIntegral $ pPeerUdpPort thePeer)
   forM_ mPeerAddr $ \addr -> do
+    let ip = addressIP addr
+    A.replace A.Proxy thePeer ip
     $logInfoS "sendPacket" $ T.pack $ CL.green "sending to" ++ " (" ++ show addr ++ ") " ++ format packet
     let (theType', theRLP) = ndPacketToRLP packet
         theData = rlpSerialize theRLP
@@ -278,18 +281,18 @@ instance Exception UDPException
 getServerPubKey ::
   ( HasVault m,
     MonadUnliftIO m,
-    A.Selectable (IPAsText, UDPPort, B.ByteString) Point m
+    A.Selectable (Host, UDPPort, BC.ByteString) Point m
   ) =>
   PPeer ->
   m (Either SomeException Point)
 getServerPubKey peer = do
   timestamp <- liftIO $ fmap round getPOSIXTime
-  let domain = IPAsText $ pPeerIp peer
+  let domain = pPeerHost peer
       udpPort = UDPPort $ pPeerUdpPort peer
       tcpPort = TCPPort $ pPeerTcpPort peer
       (theType, theRLP) =
         ndPacketToRLP $
-          Ping 4 (Endpoint (stringToIAddr "127.0.0.1") udpPort tcpPort) (Endpoint (stringToIAddr . T.unpack $ pPeerIp peer) udpPort tcpPort) (timestamp + 50)
+          Ping 4 (Endpoint (stringToIAddr "127.0.0.1") udpPort tcpPort) (Endpoint (stringToIAddr . hostToString $ pPeerHost peer) udpPort tcpPort) (timestamp + 50)
       theData = rlpSerialize theRLP
       theMsgHash = keccak256ToByteString $ hash $ B.singleton theType <> theData
 

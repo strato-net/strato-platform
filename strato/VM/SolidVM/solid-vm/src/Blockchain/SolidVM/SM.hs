@@ -22,7 +22,7 @@ module Blockchain.SolidVM.SM
     MonadSM,
     action,
     runSM,
-    getCurrentAccount,
+    getCurrentAddress,
     withCallInfo,
     withTempCallInfo,
     withUncheckedCallInfo,
@@ -32,7 +32,6 @@ module Blockchain.SolidVM.SM
     getCurrentCallInfo,
     getCurrentCallInfoIfExists,
     getCurrentContract,
-    getCurrentChainId,
     getCurrentFunctionName,
     getCurrentCodeCollection,
     addFunctionToCurrentContractInCurrentCallInfo,
@@ -72,7 +71,6 @@ import Blockchain.DB.SolidStorageDB
 import Blockchain.DB.StateDB
 import Blockchain.Data.AddressStateDB
 import Blockchain.Data.BlockSummary
-import Blockchain.Data.ChainInfo
 import Blockchain.Data.RLP
 import qualified Blockchain.Database.MerklePatricia as MP
 import qualified Blockchain.SolidVM.Environment as Env
@@ -126,7 +124,7 @@ import qualified Prelude as Ordering (Ordering (..))
 
 data CallInfo = CallInfo
   { currentFunctionName :: SolidString,
-    currentAccount :: Account,
+    currentAddress :: Address,
     currentContract :: CC.Contract,
     codeCollection :: CC.CodeCollection,
     collectionHash :: Keccak256,
@@ -171,14 +169,13 @@ makeLenses ''SState
 type SM m = ReaderT (IORef SState) m
 
 type MonadSM m =
-  ( (Account `A.Alters` AddressState) m,
-    A.Selectable Account AddressState m,
+  ( (Address `A.Alters` AddressState) m,
+    A.Selectable Address AddressState m,
     HasStateDB m,
     (Keccak256 `A.Alters` DBCode) m,
     (Keccak256 `A.Alters` BlockSummary) m,
     HasSelectX509CertDB m,
     HasSelectX509FieldDB m,
-    A.Selectable Word256 ParentChainIds m,
     A.Selectable (Address, T.Text) X509CertificateField m,
     HasRawStorageDB m,
     HasMemAddressStateDB m,
@@ -242,7 +239,7 @@ instance
     (MP.StateRoot `A.Alters` MP.NodeData) m,
     (N.NibbleString `A.Alters` N.NibbleString) m
   ) =>
-  (Account `A.Alters` AddressState) (SM m)
+  (Address `A.Alters` AddressState) (SM m)
   where
   lookup _ = getAddressStateMaybe
   insert _ = putAddressState
@@ -255,7 +252,7 @@ instance
     (MP.StateRoot `A.Alters` MP.NodeData) m,
     (N.NibbleString `A.Alters` N.NibbleString) m
   ) =>
-  A.Selectable Account AddressState (SM m)
+  A.Selectable Address AddressState (SM m)
   where
   select _ = getAddressStateMaybe
 
@@ -281,9 +278,6 @@ instance
 instance MonadUnliftIO m => Mod.Modifiable CurrentBlockHash (SM m) where
   get _ = fromMaybe (CurrentBlockHash $ unsafeCreateKeccak256FromWord256 0) . _currentBlock <$> Mod.get (Mod.Proxy @MemDBs)
   put _ md = Mod.modifyStatefully_ (Mod.Proxy @MemDBs) $ currentBlock ?= md
-
-instance A.Selectable Word256 ParentChainIds m => A.Selectable Word256 ParentChainIds (SM m) where
-  select p = lift . A.select p
 
 instance (Keccak256 `A.Alters` BlockSummary) m => (Keccak256 `A.Alters` BlockSummary) (SM m) where
   lookup p = lift . A.lookup p
@@ -358,10 +352,9 @@ runSM ::
   (Maybe Code) ->
   Env.Environment ->
   GasInfo ->
-  Maybe Word256 ->
   SM m a ->
   m (Either SolidException a)
-runSM maybeCode env gi chainId' f = do
+runSM maybeCode env gi f = do
   csMemDBs <- _memDBs <$> Mod.get (Mod.Proxy @ContextState)
   GasCap gasCap <- Mod.get (Mod.Proxy @GasCap)
   $logInfoS "runSM/GasCap/status" . T.pack $ "Current gas cap: " ++ CL.green (show gasCap)
@@ -370,7 +363,7 @@ runSM maybeCode env gi chainId' f = do
           { env = env,
             callStack = [],
             _ssMemDBs = csMemDBs,
-            _action = startingAction maybeCode env chainId',
+            _action = startingAction maybeCode env,
             _gasInfo = gi {_gasLeft = min (_gasLeft gi) gasCap} -- capping the transaction gas limit
           }
   startingStateRef <- newIORef startingState
@@ -395,7 +388,7 @@ runSM maybeCode env gi chainId' f = do
 
 -- When calling a remote contract, the new `msg.sender` is the contract
 -- that the call is initiated from.
-pushSender :: MonadSM m => Account -> m a -> m a
+pushSender :: MonadSM m => Address -> m a -> m a
 pushSender newSender mv = do
   oldSender <- Mod.get (Mod.Proxy @Env.Sender)
   Mod.put (Mod.Proxy @Env.Sender) (Env.Sender newSender)
@@ -403,14 +396,13 @@ pushSender newSender mv = do
   Mod.put (Mod.Proxy @Env.Sender) oldSender
   return $ ret
 
-startingAction :: Maybe Code -> Env.Environment -> Maybe Word256 -> Action
-startingAction maybeCode env' chainId' =
+startingAction :: Maybe Code -> Env.Environment -> Action
+startingAction maybeCode env' =
   Action.Action
     { _blockHash = blockHeaderHash $ Env.blockHeader env',
       _blockTimestamp = blockHeaderTimestamp $ Env.blockHeader env',
       _blockNumber = blockHeaderBlockNumber $ Env.blockHeader env',
       _transactionHash = Env.txHash env',
-      _transactionChainId = chainId',
       _transactionSender = Env.sender env',
       _actionData = OMap.empty,
       _metadata =
@@ -556,12 +548,12 @@ getVariableOfName name = do
           then
             Just . Constant . SReference $
               AccountPath
-                (currentAccount currentCallInfo)
+                (currentAddress currentCallInfo)
                 (MS.singleton $ BC.pack $ labelToString name)
           else Nothing
 
       maybeThis :: Maybe Variable
-      maybeThis = toMaybe (name == "this") . t "this" . Constant . (flip (SAccount . accountOnUnspecifiedChain) False) $ currentAccount currentCallInfo
+      maybeThis = toMaybe (name == "this") . t "this" . Constant $ SAccount (NamedAccount (currentAddress currentCallInfo) UnspecifiedChain) False
 
   --        M.lookup (currentAddress currentCallInfo) (accounts sstate) >>= M.lookup name . storage
 
@@ -613,7 +605,7 @@ getTypeOfName s = getTypeOfName' s . codeCollection <$> getCurrentCallInfo
 
 withCallInfo ::
   MonadSM m =>
-  Account ->
+  Address ->
   CC.Contract ->
   SolidString ->
   Keccak256 ->
@@ -633,7 +625,7 @@ withCallInfo a c fn hsh cc initialLocalVariables ro ff f = do
 
 addCallInfo ::
   MonadSM m =>
-  Account ->
+  Address ->
   CC.Contract ->
   SolidString ->
   Keccak256 ->
@@ -646,7 +638,7 @@ addCallInfo a c fn hsh cc initialLocalVariables ro ff = do
   let newCallInfo =
         CallInfo
           { currentFunctionName = fn,
-            currentAccount = a,
+            currentAddress = a,
             currentContract = c,
             codeCollection = cc,
             collectionHash = hsh,
@@ -722,21 +714,28 @@ getCurrentContract = do
   case cs of
     (currentCallInfo : _) -> return $ currentContract currentCallInfo
     _ -> internalError "getCurrentContract called with an empty stack" ()
-
+{-
 getCurrentAccount :: MonadSM m => m Account
 getCurrentAccount = do
   cs <- Mod.get (Mod.Proxy @[CallInfo])
   case cs of
-    (currentCallInfo : _) -> return $ currentAccount currentCallInfo
+    (currentCallInfo : _) -> return $ currentAddress currentCallInfo
     _ -> internalError "getCurrentAccount called with an empty stack" ()
-
+-}
+getCurrentAddress :: MonadSM m => m Address
+getCurrentAddress = do
+  cs <- Mod.get (Mod.Proxy @[CallInfo])
+  case cs of
+    (currentCallInfo : _) -> return $ currentAddress currentCallInfo
+    _ -> internalError "getCurrentAccount called with an empty stack" ()
+{-
 getCurrentChainId :: MonadSM m => m (Maybe Word256)
 getCurrentChainId = do
   cs <- Mod.get (Mod.Proxy @[CallInfo])
   case cs of
-    (currentCallInfo : _) -> return $ _accountChainId $ currentAccount currentCallInfo
+    (currentCallInfo : _) -> return $ _accountChainId $ currentAddress currentCallInfo
     _ -> internalError "getCurrentChainId called with an empty stack" ()
-
+-}
 getCurrentFunctionName :: MonadSM m => m SolidString
 getCurrentFunctionName = do
   cs <- Mod.get (Mod.Proxy @[CallInfo])
@@ -826,7 +825,7 @@ getXabiTypeFromContract field ctract =
     . CC._storageDefs
     $ ctract
 
-getXabiType :: MonadSM m => Account -> B.ByteString -> m (Maybe SVMType.Type)
+getXabiType :: MonadSM m => Address -> B.ByteString -> m (Maybe SVMType.Type)
 getXabiType acct field = do
   (ctract, _, _) <- getCodeAndCollection acct
   pure $ getXabiTypeFromContract field ctract
@@ -885,7 +884,7 @@ getValueType :: MonadSM m => AccountPath -> m BasicType
 getValueType p = hintFromType =<< getXabiValueType p
 
 initializeAction :: MonadSM m
-                 => Account
+                 => Address
                  -> String
                  -> String
                  -> Maybe String
@@ -893,7 +892,7 @@ initializeAction :: MonadSM m
                  -> String
                  -> Keccak256
                  -> CC.CodeCollection
-                 -> Map (Account, T.Text) (T.Text, T.Text, [T.Text])
+                 -> Map (Address, T.Text) (T.Text, T.Text, [T.Text])
                  -> [T.Text]
                  -> [T.Text]
                  -> m ()
@@ -902,7 +901,7 @@ initializeAction acct name crtr cc_crtr root appName hsh cc ab maps arrs = do
   Mod.modifyStatefully_ (Mod.Proxy @Action) $
     Action.actionData %= Action.omapInsertWith Action.mergeActionData acct newData
 
-markDiffForAction :: Mod.Modifiable Action m => Account -> MS.StoragePath -> MS.BasicValue -> m ()
+markDiffForAction :: Mod.Modifiable Action m => Address -> MS.StoragePath -> MS.BasicValue -> m ()
 markDiffForAction owner key' val' = do
   let key = MS.unparsePath key'
       val = rlpSerialize $ rlpEncode val'
@@ -915,7 +914,7 @@ markDiffForAction owner key' val' = do
 addEvent :: Mod.Modifiable (Q.Seq Event) m => Event -> m ()
 addEvent newEvent = Mod.modify_ (Mod.Proxy @(Q.Seq Event)) $ pure . (Q.|> newEvent)
 
-addDelegatecall :: Mod.Modifiable (Q.Seq Action.Delegatecall) m => Account -> Account -> T.Text -> T.Text -> m ()
+addDelegatecall :: Mod.Modifiable (Q.Seq Action.Delegatecall) m => Address -> Address -> T.Text -> T.Text -> m ()
 addDelegatecall s c o a = Mod.modify_ (Mod.Proxy @(Q.Seq Action.Delegatecall)) $ pure . (Q.|> Action.Delegatecall s c o a)
 
 getBlockHashWithNumber :: MonadSM m => Integer -> Keccak256 -> m (Maybe Keccak256)
@@ -932,12 +931,12 @@ getBSum bh =
   fromMaybe (error $ "missing value in block summary DB: " ++ format bh)
     <$> A.lookup (A.Proxy @BlockSummary) bh
 
-getCodeAndCollection :: MonadSM m => Account -> m (CC.Contract, Keccak256, CC.CodeCollection)
+getCodeAndCollection :: MonadSM m => Address -> m (CC.Contract, Keccak256, CC.CodeCollection)
 getCodeAndCollection address' = do
   callStack' <- Mod.get (Mod.Proxy @[CallInfo])
   let maybeAddress =
         case callStack' of
-          (current' : _) -> Just $ currentAccount current'
+          (current' : _) -> Just $ currentAddress current'
           _ -> Nothing
 
   -- $logDebugS "getCodeAndCollection" . T.pack $ "----------------- caller address: " ++ fromMaybe "Nothing" (fmap format maybeAddress)
@@ -950,7 +949,7 @@ getCodeAndCollection address' = do
     else do
       codeHash <- addressStateCodeHash <$> A.lookupWithDefault (A.Proxy @AddressState) address'
 
-      resolvedCodeHash <- resolveCodePtr (address' ^. accountChainId) codeHash
+      resolvedCodeHash <- resolveCodePtr codeHash
       (contractName', ch, cc) <-
         case resolvedCodeHash of
           Just (SolidVMCode cn ch') -> do
@@ -990,29 +989,29 @@ getArrayNamesFromContract c =
 
 resolveNameParts ::
   MonadSM m =>
-  Account ->
+  Address ->
   T.Text ->
   T.Text ->
   CC.Contract ->
-  m ((Account, T.Text), (T.Text, T.Text, [T.Text]))
+  m ((Address, T.Text), (T.Text, T.Text, [T.Text]))
 resolveNameParts to' crtr app c = do
   let tName = T.pack . CC._contractName
   case c ^. CC.importedFrom of
     Nothing -> pure ((to', tName c), (crtr, app, (map T.pack (M.keys $ CC._storageDefs c))))
-    Just acct ->
-      A.select (A.Proxy @AddressState) acct >>= \case
+    Just address -> do
+      A.select (A.Proxy @AddressState) address >>= \case
         Nothing -> do
           $logWarnS "processTheMessages/resolveNameParts" . T.pack $
-            "Could not find address state for account " ++ show acct
-          pure ((acct, tName c), (crtr, app, (map T.pack (M.keys $ CC._storageDefs c))))
+            "Could not find address state for address " ++ show address
+          pure ((address, tName c), (crtr, app, (map T.pack (M.keys $ CC._storageDefs c))))
         Just s ->
-          resolveCodePtr (acct ^. accountChainId) (addressStateCodeHash s) >>= \case
+          resolveCodePtr (addressStateCodeHash s) >>= \case
             Just (SolidVMCode appName _) -> do
-              appCreator <- getSolidStorageKeyVal' acct $ MS.StoragePath [MS.Field ":creator"]
+              appCreator <- getSolidStorageKeyVal' address $ MS.StoragePath [MS.Field ":creator"]
               case appCreator of
-                MS.BString cn' -> pure ((acct, tName c), (T.pack $ BC.unpack cn', T.pack appName, (map T.pack (M.keys $ CC._storageDefs c))))
-                _ -> pure ((acct, tName c), (crtr, T.pack appName, (map T.pack (M.keys $ CC._storageDefs c))))
+                MS.BString cn' -> pure ((address, tName c), (T.pack $ BC.unpack cn', T.pack appName, (map T.pack (M.keys $ CC._storageDefs c))))
+                _ -> pure ((address, tName c), (crtr, T.pack appName, (map T.pack (M.keys $ CC._storageDefs c))))
             _ -> do
               $logWarnS "resolveNameParts" . T.pack $
-                "Could not resolve code for account " ++ show acct
-              pure ((acct, tName c), (crtr, app, (map T.pack (M.keys $ CC._storageDefs c))))
+                "Could not resolve code for address " ++ show address
+              pure ((address, tName c), (crtr, app, (map T.pack (M.keys $ CC._storageDefs c))))

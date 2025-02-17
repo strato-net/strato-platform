@@ -29,7 +29,6 @@ module Blockchain.Data.Transaction
     whoSignedThisTransactionEcrecover,
     whoReallySignedThisTransactionEcrecover,
     getSigVals,
-    codePtrChainId,
     codePtrAddress,
     codePtrName,
     codePtrHash
@@ -47,14 +46,12 @@ import Blockchain.Strato.Model.Address
 import Blockchain.Strato.Model.Class
 import Blockchain.Strato.Model.CodePtr
 import Blockchain.Strato.Model.Code
-import Blockchain.Strato.Model.Account
 import Blockchain.Strato.Model.ExtendedWord
 import Blockchain.Strato.Model.Keccak256
 import qualified Blockchain.Strato.Model.Secp256k1 as EC
 -- import qualified Data.ByteString.Short as B (ShortByteString, toShort, fromShort)
 import Control.DeepSeq
 import Control.Monad.IO.Class
-import Control.Lens ((^.))
 import Control.Monad.IO.Unlift
 import Control.Monad.Trans.Reader
 import qualified Crypto.Secp256k1 as SEC
@@ -150,12 +147,8 @@ codePtrName (CodeAtAccount _ n) = Just n
 codePtrName _ = Nothing
 
 codePtrAddress :: CodePtr -> Maybe Address
-codePtrAddress (CodeAtAccount a _) = Just $ a ^. accountAddress
+codePtrAddress (CodeAtAccount a _) = Just a
 codePtrAddress _ = Nothing
-
-codePtrChainId :: CodePtr -> Maybe Word256
-codePtrChainId (CodeAtAccount a _) = a ^. accountChainId
-codePtrChainId _ = Nothing
 
 rawTX2TX :: RawTransaction -> Transaction
 rawTX2TX (RawTransaction _ _ nonce' gp gl (Just to') val (Just dat) _ _ cid r s v md _ _ _) =
@@ -166,7 +159,7 @@ rawTX2TX (RawTransaction _ _ 0 0 0 Nothing 0 (Just init') _ _ 0 h ch 0 Nothing _
 rawTX2TX (RawTransaction _ _ nonce' gp gl Nothing val (Just init') _ _ cid r s v md _ _ _) =
   ContractCreationTX nonce' gp gl val (Code init') (if (0 == cid) then Nothing else Just cid) r s v (M.fromList <$> md)
 rawTX2TX (RawTransaction _ _ nonce' gp gl Nothing val Nothing (Just contractName') (Just codePtrAddress') cid r s v md _ _ _) =
-  ContractCreationTX nonce' gp gl val(PtrToCode $ CodeAtAccount (Account codePtrAddress' Nothing) contractName') (if (0 == cid) then Nothing else Just cid) r s v (M.fromList <$> md)
+  ContractCreationTX nonce' gp gl val(PtrToCode $ CodeAtAccount codePtrAddress' contractName') (if (0 == cid) then Nothing else Just cid) r s v (M.fromList <$> md)
 rawTX2TX rt = error $ "rawTX2TX: " ++ show rt
 
 txAndTime2RawTX :: TXOrigin -> Transaction -> Integer -> UTCTime -> RawTransaction

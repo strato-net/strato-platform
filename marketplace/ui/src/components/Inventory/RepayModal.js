@@ -1,18 +1,11 @@
-import { Button, Modal, Tooltip } from 'antd';
+import { Button, Modal, Tooltip, InputNumber } from 'antd';
 import { QuestionCircleOutlined } from '@ant-design/icons';
 import { useEffect, useState } from 'react';
-
-import {
-  usePaymentServiceDispatch,
-  usePaymentServiceState,
-} from '../../contexts/payment';
 import { actions as inventoryActions } from '../../contexts/inventory/actions';
 import {
   useInventoryDispatch,
   useInventoryState,
 } from '../../contexts/inventory';
-
-import { actions as paymentServiceActions } from '../../contexts/payment/actions';
 import { actions as marketplaceActions } from '../../contexts/marketplace/actions';
 import {
   useMarketplaceDispatch,
@@ -20,8 +13,11 @@ import {
 } from '../../contexts/marketplace';
 import { Images } from '../../images';
 import { useLocation } from 'react-router-dom';
+import { BigNumber } from 'bignumber.js';
 
-const logo = <img src={Images.USDST} alt={''} title={''} className="w-5 h-5" />;
+const logo = (
+  <img src={Images.USDST} alt="USDST Logo" title="USDST" className="w-5 h-5" />
+);
 
 const RepayModal = ({
   open,
@@ -33,22 +29,23 @@ const RepayModal = ({
   offset,
   productDetailPage,
   reserves,
-  assetsWithEighteenDecimalPlaces,
 }) => {
   const { isRepaying } = useInventoryState();
-  // Dispatch
   const inventoryDispatch = useInventoryDispatch();
   const marketplaceDispatch = useMarketplaceDispatch();
-  const paymentServiceDispatch = usePaymentServiceDispatch();
 
-  const { paymentServices } = usePaymentServiceState();
   const { USDST, isFetchingUSDST } = useMarketplaceState();
-  const isStaked = inventory.sale && inventory.price <= 0;
-  const itemName = decodeURIComponent(inventory.name);
   const location = useLocation();
   const queryParams = new URLSearchParams(location.search);
-  const [repayAmount, setRepayAmount] = useState(0);
+
+  // Initialize state as BigNumber instances.
+  const [repayAmount, setRepayAmount] = useState(new BigNumber(0)); // outstanding loan amount (in tokens)
+  const [repayValue, setRepayValue] = useState(new BigNumber(0)); // amount the user wants to repay (in tokens)
   const [disableButton, setDisableButton] = useState(false);
+  // Flag to set initial values only once per modal open.
+  const [initialized, setInitialized] = useState(false);
+
+  // Determine escrow addresses.
   const escrows = inventory?.inventories
     ? [
         ...new Set(
@@ -62,61 +59,120 @@ const RepayModal = ({
     : [];
 
   useEffect(() => {
-    if (inventory && USDST) {
+    if (inventory && USDST && !initialized && open) {
+      // Use BigNumber throughout for precision.
       const uniqueEscrowsPrime = new Set();
       const totalCollateralQuantity = inventory?.inventories
         ? inventory.inventories.reduce((sum, item) => {
             const escrowAddress = item?.escrow?.address;
-            const escrowCollateral = item?.escrow?.collateralQuantity || 0;
-
-            // Add collateral only if the escrow address is unique
+            // Wrap collateral quantity in BigNumber.
+            const escrowCollateral = new BigNumber(
+              item?.escrow?.collateralQuantity || 0
+            );
             if (escrowAddress && !uniqueEscrowsPrime.has(escrowAddress)) {
               uniqueEscrowsPrime.add(escrowAddress);
-              return sum + escrowCollateral;
+              return sum.plus(escrowCollateral);
             }
-
             return sum;
-          }, 0)
-        : inventory?.escrow?.collateralQuantity;
+          }, new BigNumber(0))
+        : new BigNumber(inventory?.escrow?.collateralQuantity || 0);
+
       const uniqueBorrowedAddresses = new Set();
       const borrowedAmount = inventory?.inventories
         ? inventory.inventories.reduce((sum, item) => {
             const escrowAddress = item?.escrow?.address;
-            const borrowedValue =
-              item?.escrow?.borrowedAmount / Math.pow(10, 18) || 0;
-
-            // Add borrowed amount only if the escrow address is unique
+            // Convert borrowedAmount from its smallest unit to tokens (dividing by 10^18)
+            const borrowedValue = new BigNumber(
+              item?.escrow?.borrowedAmount || 0
+            ).dividedBy(new BigNumber(10).pow(18));
             if (escrowAddress && !uniqueBorrowedAddresses.has(escrowAddress)) {
               uniqueBorrowedAddresses.add(escrowAddress);
-              return sum + borrowedValue;
+              return sum.plus(borrowedValue);
             }
-
             return sum;
-          }, 0)
-        : (inventory?.escrow?.borrowedAmount / Math.pow(10, 18)) *
-          (inventory?.quantity / totalCollateralQuantity);
+          }, new BigNumber(0))
+        : // If not an inventory list, assume a single escrow.
+          new BigNumber(inventory?.escrow?.borrowedAmount || 0)
+            .dividedBy(new BigNumber(10).pow(18))
+            .multipliedBy(
+              new BigNumber(inventory?.quantity || 0).dividedBy(
+                totalCollateralQuantity
+              )
+            );
+
+      // Assume USDST is provided as a token balance (in tokens) and convert it to its smallest unit.
       const USDSTBalance =
-        Object.keys(USDST).length > 0 ? USDST * Math.pow(10, 18) : 0;
+        Object.keys(USDST).length > 0
+          ? new BigNumber(USDST).multipliedBy(new BigNumber(10).pow(18))
+          : new BigNumber(0);
+
+      // Set the outstanding loan amount.
       setRepayAmount(borrowedAmount);
-      if (borrowedAmount > USDSTBalance) {
-        setDisableButton(true);
+
+      // Set the repay amount to the lower of the outstanding loan or the user's USDST balance.
+      if (borrowedAmount.gt(USDSTBalance)) {
+        setRepayValue(USDSTBalance);
+      } else {
+        setRepayValue(borrowedAmount);
       }
+      setInitialized(true);
+      setDisableButton(USDSTBalance.lte(0));
     }
-  }, [USDST, inventory]);
+  }, [open, initialized, USDST, inventory]);
+
+  // Reset initialization flag when modal closes.
+  useEffect(() => {
+    if (!open) {
+      setInitialized(false);
+    }
+  }, [open]);
 
   useEffect(() => {
-    paymentServiceActions.getPaymentServices(paymentServiceDispatch, true);
     marketplaceActions.fetchUSDSTBalance(marketplaceDispatch);
   }, []);
 
   const dataForItems = [
     {
-      label: `Loan to pay off in USDST`,
-      description: 'The amount of USDST to pay off the loan',
+      label: `Outstanding Loan Amount in USDST`,
+      description: 'The amount of USDST needed to fully pay off the loan',
       value: (
         <div className="flex -mr-1">
           {logo} &nbsp;
-          {repayAmount.toFixed(2)}
+          {Number(repayAmount).toLocaleString('en-US', {
+            maximumFractionDigits: 6,
+            minimumFractionDigits: 2,
+          })}
+        </div>
+      ),
+    },
+    {
+      label: `Loan to pay off in USDST`,
+      description: 'The amount of USDST you want to pay toward the loan',
+      value: (
+        <div className="flex -mr-1 items-center">
+          {logo} &nbsp;
+          <InputNumber
+            // Convert BigNumber to a native number for display.
+            value={Number(repayValue).toLocaleString('en-US', {
+              maximumFractionDigits: 6,
+              minimumFractionDigits: 2,
+            })}
+            onChange={(value) => {
+              if (value === null) {
+                setRepayValue(new BigNumber(0));
+                return;
+              }
+              const newValue = new BigNumber(value);
+              // Prevent entering a value greater than the outstanding amount.
+              if (newValue.gt(repayAmount)) {
+                setRepayValue(repayAmount);
+              } else {
+                setRepayValue(newValue);
+              }
+            }}
+            min={0}
+            max={repayAmount.toNumber()}
+          />
         </div>
       ),
     },
@@ -128,9 +184,11 @@ const RepayModal = ({
     const matchedReserve = reserves?.length
       ? reserves.find((reserve) => reserve.assetRootAddress === inventory.root)
       : null;
+
     const body = {
       escrows,
       reserve: matchedReserve?.address,
+      value: repayValue.multipliedBy(new BigNumber(10).pow(18)).toFixed(0),
     };
 
     const repayed = await inventoryActions.repay(inventoryDispatch, body);

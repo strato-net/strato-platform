@@ -12,7 +12,7 @@ where
 import Blockchain.Data.TransactionResult
 import Blockchain.EthConf
 import Blockchain.KafkaTopics
-import Blockchain.Strato.Model.Account
+import Blockchain.Strato.Model.Address
 import Blockchain.Strato.Model.CodePtr
 import Blockchain.Stream.Action (Action, Delegatecall)
 import Conduit
@@ -34,7 +34,7 @@ data VMEvent
         creator :: Text,
         application :: Text,
         historyList :: [Text],
-        abstracts :: Map (Account, Text) (Text, Text, [Text]),
+        abstracts :: Map (Address, Text) (Text, Text, [Text]),
         recordMappings :: [Text]
       }
   | DelegatecallMade Delegatecall

@@ -32,7 +32,7 @@ contract Spirits is Mintable, UnitOfMeasurement {
         string[] _fileNames,
         uint _createdDate,
         uint _quantity,
-        uint _decimals
+        uint _decimals,
         string _spiritType,
         UnitOfMeasurement _unitOfMeasurement,
         AssetStatus _status,

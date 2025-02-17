@@ -232,7 +232,7 @@ pipeline {
                 
                 // Push docker-compose files to Jenkins artifacts and AWS S3
                 dir ('strato-worktree') {
-                  archiveArtifacts artifacts: "docker-compose.yml, docker-compose.vault.yml, docker-compose.identity.yml, docker-compose.highway.yml, docker-compose.payment.yml, docker-compose.oracle.yml, docker-compose.notification.yml, docker-compose.ecr.yml, docker-compose.vault.ecr.yml, docker-compose.identity.ecr.yml, docker-compose.highway.ecr.yml, docker-compose.payment.ecr.yml, docker-compose.oracle.ecr.yml, docker-compose.notification.ecr.yml, devops/**"
+                  archiveArtifacts artifacts: "docker-compose.yml, docker-compose.vault.yml, docker-compose.identity.yml, docker-compose.highway.yml, docker-compose.payment.yml, docker-compose.oracle.yml, docker-compose.notification.yml, docker-compose.ecr.yml, docker-compose.vault.ecr.yml, docker-compose.identity.ecr.yml, docker-compose.highway.ecr.yml, docker-compose.payment.ecr.yml, docker-compose.oracle.ecr.yml, docker-compose.notification.ecr.yml, k8s/**"
                   withCredentials([
                       usernamePassword(credentialsId: 'block-apps-jenkins-s3',  passwordVariable: 'AWS_SECRET_ACCESS_KEY', usernameVariable: 'AWS_ACCESS_KEY_ID'),
                   ]) {
@@ -372,7 +372,7 @@ pipeline {
                 set -x
                 # Re-cloning the repo might be redundant but we'll follow same approach as other tests. And the docker rebuild should be quick with docker layer caches.
                 rm -rf strato-api-tests
-                git clone -b bunny https://${GITHUB_USERNAME}:${GITHUB_TOKEN}@github.com/blockapps/strato-api-tests.git
+                git clone -b removePrivateChains https://${GITHUB_USERNAME}:${GITHUB_TOKEN}@github.com/blockapps/strato-api-tests.git
                 cd strato-api-tests
                 #git checkout develop # we must not checkout the custom branch for nightly builds - we must test with develop branch of strato-api-tests here as well as in release job.
                 docker build --tag strato-api-tests .

@@ -42,16 +42,6 @@ spec = do
         `shouldBe` toAns [Field "hashmap", MapIndex (IAccount $ unspecifiedChain 0xca35b7d915458ef540ade6068dfe2f44e8fa733c)]
       parsePath ".hashmap<a:ca35b7d915458ef540ade6068dfe2f44e8fa733c:main>"
         `shouldBe` toAns [Field "hashmap", MapIndex (IAccount $ mainChain 0xca35b7d915458ef540ade6068dfe2f44e8fa733c)]
-      parsePath ".hashmap<a:ca35b7d915458ef540ade6068dfe2f44e8fa733c:ca35b7d915458ef540ade6068dfe2f44e8fa733cca35b7d915458ef540ade606>"
-        `shouldBe` toAns
-          [ Field "hashmap",
-            MapIndex
-              ( IAccount $
-                  explicitChain
-                    0xca35b7d915458ef540ade6068dfe2f44e8fa733c
-                    0xca35b7d915458ef540ade6068dfe2f44e8fa733cca35b7d915458ef540ade606
-              )
-          ]
 
     it "should fail on badly formed paths" $ do
       let checkFail = (`shouldSatisfy` isLeft) . parsePath
@@ -77,15 +67,6 @@ spec = do
         `shouldBe` "<a:0000000000000000000000000000000000000400>"
       unparse [MapIndex (IAccount $ mainChain 0xca35b7d915458ef540ade6068dfe2f44e8fa733c)]
         `shouldBe` "<a:ca35b7d915458ef540ade6068dfe2f44e8fa733c:main>"
-      unparse
-        [ MapIndex
-            ( IAccount $
-                explicitChain
-                  0xca35b7d915458ef540ade6068dfe2f44e8fa733c
-                  0xca35b7d915458ef540ade6068dfe2f44e8fa733cca35b7d915458ef540ade606
-            )
-        ]
-        `shouldBe` "<a:ca35b7d915458ef540ade6068dfe2f44e8fa733c:ca35b7d915458ef540ade6068dfe2f44e8fa733cca35b7d915458ef540ade606>"
 
     it "should allow unbounded map indices" $ do
       parsePath (B.concat ["<1", B.replicate 100 0x30, ">"])
@@ -109,10 +90,8 @@ spec = do
               BBool True,
               BAccount (unspecifiedChain 0x23421421421341232341bbbb),
               BAccount (mainChain 0x23421421421341232341bbbb),
-              BAccount (explicitChain 0x23421421421341232341bbbb 0xdeadbeefd00d),
               BContract "Wings!" (unspecifiedChain 0xdeadbeef),
               BContract "Wings!" (mainChain 0xdeadbeef),
-              BContract "Wings!" (explicitChain 0xdeadbeef 0x1234567890),
               BEnumVal "type" "num" 4
             ]
       forM_ examples $ \bv -> rlpDecode (rlpEncode bv) `shouldBe` bv

@@ -666,14 +666,14 @@ const ProductDetails = ({ user, users }) => {
                                 $
                                 {isStaked
                                   ? (details.escrow?.maxLoanAmount).toFixed(2)
-                                  : adjustedPrice * Math.pow(10, decimals)}{' '}
+                                  : (adjustedPrice * Math.pow(10, decimals)).toFixed(2)}{' '}
                                 <span className="font-normal text-xs mr-2 text-primary">
                                   <b>
                                     (
                                     {isStaked
                                       ? details.escrow?.maxLoanAmount
-                                      : adjustedPrice *
-                                        Math.pow(10, decimals)}{' '}
+                                      : (adjustedPrice *
+                                        Math.pow(10, decimals)).toFixed(2)}{' '}
                                     USDST)
                                   </b>
                                 </span>
@@ -718,7 +718,7 @@ const ProductDetails = ({ user, users }) => {
                     </div>
                     <InputNumber
                       className="w-full md:w-[280px] h-9 md:h-10 lg:h-[46px] border text-[#6A6A6A] border-[#00000029] text-center flex flex-col justify-center font-semibold !rounded-lg"
-                      min={1}
+                      min={1/Math.pow(10, inventoryDetails.decimals || 0)}
                       max={availableQuantity}
                       disabled={isStakeable && ownerSameAsUser()}
                       value={
@@ -735,7 +735,7 @@ const ProductDetails = ({ user, users }) => {
                       controls={false}
                       onChange={(e) => {
                         if (e < availableQuantity) {
-                          setQty(parseInt(e || 0));
+                          setQty(parseFloat(e || 0));
                         } else {
                           setQty(availableQuantity);
                         }

@@ -66,7 +66,6 @@ import qualified Blockchain.Database.MerklePatricia as MP
 import Blockchain.EVM.Environment
 import qualified Blockchain.EVM.MutableStack as MS
 import Blockchain.EVM.VMState
-import Blockchain.Strato.Model.Account
 import Blockchain.Strato.Model.Address
 import Blockchain.Strato.Model.ExtendedWord
 import Blockchain.Strato.Model.Gas
@@ -156,7 +155,7 @@ instance
     (MP.StateRoot `A.Alters` MP.NodeData) m,
     (N.NibbleString `A.Alters` N.NibbleString) m
   ) =>
-  (Account `A.Alters` AddressState) (VMM m)
+  (Address `A.Alters` AddressState) (VMM m)
   where
   lookup _ = getAddressStateMaybe
   insert _ = putAddressState
@@ -303,7 +302,7 @@ addDebugCallCreate callCreate = do
     Just x -> put state' {debugCallCreates = Just (callCreate : x)}
     Nothing -> throwIO NonDebugCallCreate -- "You are trying to add a call create during a non-debug run"
 
-addSuicideList :: MonadIO m => Account -> VMM m ()
+addSuicideList :: MonadIO m => Address -> VMM m ()
 addSuicideList acct = modify $ \st -> st {suicideList = acct `S.insert` suicideList st}
 
 getEnvVar :: MonadIO m => (Environment -> a) -> VMM m a
@@ -368,7 +367,7 @@ addGas (Gas gas) = do
     then throwIO OutOfGasException
     else void . liftIO . atomicAddCounter gasref $ fromInteger gas
 
-pay' :: VMBase m => String -> Account -> Account -> Integer -> VMM m ()
+pay' :: VMBase m => String -> Address -> Address -> Integer -> VMM m ()
 pay' reason from to val = do
   success <- pay reason from to val
   unless success $ throwIO InsufficientFunds

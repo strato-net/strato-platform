@@ -25,7 +25,7 @@ where
 import Blockchain.DB.CodeDB
 import Blockchain.Data.AddressStateDB (AddressState, unsafeResolveCodePtr)
 import Blockchain.SolidVM.CodeCollectionDB
-import Blockchain.Strato.Model.Account
+import Blockchain.Strato.Model.Address
 import Blockchain.Strato.Model.CodePtr
 import Blockchain.Strato.Model.Keccak256
 import Control.DeepSeq
@@ -48,7 +48,7 @@ import UnliftIO
 getContractDetailsByCodeHash ::
   ( MonadIO m,
     HasCodeDB m,
-    A.Selectable Account AddressState m,
+    A.Selectable Address AddressState m,
     (Keccak256 `A.Selectable` SourceMap) m
   ) =>
   CodePtr ->
@@ -67,7 +67,7 @@ getContractDetailsByCodeHash codePtr = runExceptT $ do
 getCodeCollectionByCodePtr ::
   ( MonadIO m,
     HasCodeDB m,
-    A.Selectable Account AddressState m,
+    A.Selectable Address AddressState m,
     (Keccak256 `A.Selectable` SourceMap) m
   ) =>
   CodePtr ->
@@ -77,7 +77,7 @@ getCodeCollectionByCodePtr = runExceptT . fmap snd . getCodeHashAndCollection
 getCodeHashAndCollection ::
   ( MonadIO m,
     HasCodeDB m,
-    A.Selectable Account AddressState m,
+    A.Selectable Address AddressState m,
     (Keccak256 `A.Selectable` SourceMap) m
   ) =>
   CodePtr ->
@@ -107,7 +107,7 @@ evmContractSolidVMError =
 getContractDetailsForContract ::
   ( MonadIO m,
     HasCodeDB m,
-    A.Selectable Account AddressState m
+    A.Selectable Address AddressState m
   ) =>
   SourceMap ->
   Maybe Text ->
@@ -129,7 +129,7 @@ getContractDetailsForContract src mContract = do
 sourceToContractDetails ::
   ( MonadIO m,
     HasCodeDB m,
-    A.Selectable Account AddressState m
+    A.Selectable Address AddressState m
   ) =>
   SourceMap ->
   m (Either [SourceAnnotation Text] (Keccak256, CodeCollection))
@@ -139,7 +139,7 @@ sourceToContractDetails = createMetadataNoCompile
 createMetadataNoCompile ::
   ( MonadIO m,
     HasCodeDB m,
-    A.Selectable Account AddressState m
+    A.Selectable Address AddressState m
   ) =>
   SourceMap ->
   m (Either [SourceAnnotation Text] (Keccak256, CodeCollection))

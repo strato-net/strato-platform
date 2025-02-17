@@ -11,7 +11,7 @@ module Blockchain.Strato.Model.Event
 where
 
 import Blockchain.MiscJSON ()
-import Blockchain.Strato.Model.Account
+import Blockchain.Strato.Model.Address
 import Blockchain.Strato.Model.Keccak256
 import Control.DeepSeq
 import Data.Aeson
@@ -27,7 +27,7 @@ data Event = Event
     evContractCreator :: String,
     evContractApplication :: String,
     evContractName :: String,
-    evContractAccount :: Account,
+    evContractAddress :: Address,
     evName :: String,
     evArgs :: [(String, String, String)] -- TODO: probably should use Solidity values here?
   }
@@ -46,7 +46,7 @@ instance Format Event where
       ++ evContractName
       ++ "\n"
       ++ "evContractAccount: "
-      ++ format evContractAccount
+      ++ format evContractAddress
       ++ "\n"
       ++ "evName: "
       ++ evName
@@ -64,7 +64,7 @@ instance ToJSON Event where
         "eventContractCreator" .= evContractCreator,
         "eventContractApplication" .= evContractApplication,
         "eventContractName" .= evContractName,
-        "eventContractAccount" .= evContractAccount,
+        "eventContractAddress" .= evContractAddress,
         "eventName" .= evName,
         "eventArgs" .= evArgs
       ]
@@ -76,7 +76,7 @@ instance FromJSON Event where
       <*> (o .: "eventContractCreator")
       <*> (o .: "eventContractApplication")
       <*> (o .: "eventContractName")
-      <*> (o .: "eventContractAccount")
+      <*> (o .: "eventContractAddress")
       <*> (o .: "eventName")
       <*> (o .: "eventArgs")
   parseJSON o = error $ "parseJSON Event: Expected object, got:" ++ show o

@@ -3,7 +3,6 @@
 
 module ActionFidelitySpec where
 
-import Blockchain.Strato.Model.Account
 import Blockchain.Strato.Model.CodePtr
 import Blockchain.Strato.Model.Event
 import Blockchain.Strato.Model.Keccak256
@@ -31,7 +30,7 @@ emptySolidVMData :: Action.ActionData
 emptySolidVMData = Action.ActionData (SolidVMCode "ContractName" $ unsafeCreateKeccak256FromWord256 0) mempty "LambdaCorp2" Nothing "Clozure2" "Clozure2 address" SolidVM (Action.SolidVMDiff M.empty) M.empty [] [] []
 
 emptyAction :: Action
-emptyAction = Action.Action (unsafeCreateKeccak256FromWord256 0) (posixSecondsToUTCTime 0) 0 (unsafeCreateKeccak256FromWord256 0) Nothing (Account 0x0 Nothing) OMap.empty Nothing S.empty S.empty
+emptyAction = Action.Action (unsafeCreateKeccak256FromWord256 0) (posixSecondsToUTCTime 0) 0 (unsafeCreateKeccak256FromWord256 0) 0x0 OMap.empty Nothing S.empty S.empty
 
 spec :: Spec
 spec = describe "Action conversions" $ do
@@ -39,22 +38,22 @@ spec = describe "Action conversions" $ do
     convert emptyAction `shouldSatisfy` isRight
 
   it "should parse empty Word256 actions" $ do
-    convert emptyAction {Action._actionData = OMap.singleton ((Account 0x988 Nothing), emptyEVMData)}
+    convert emptyAction {Action._actionData = OMap.singleton (0x988, emptyEVMData)}
       `shouldSatisfy` isRight
 
   it "should parse empty ByteString actions" $ do
-    convert emptyAction {Action._actionData = OMap.singleton ((Account 0x988 Nothing), emptySolidVMData)}
+    convert emptyAction {Action._actionData = OMap.singleton (0x988, emptySolidVMData)}
       `shouldSatisfy` isRight
 
   it "should parse basic Word256 actions" $ do
     let diff = Action.EVMDiff $ M.singleton 0xffffffffff 0xeeeeeeeeeeeeeee
         daytuh = emptyEVMData {Action._actionDataStorageDiffs = diff}
-    convert emptyAction {Action._actionData = OMap.singleton ((Account 0x988 Nothing), daytuh)} `shouldSatisfy` isRight
+    convert emptyAction {Action._actionData = OMap.singleton (0x988, daytuh)} `shouldSatisfy` isRight
 
   it "should parse basic bytestring actions" $ do
     let diff = Action.SolidVMDiff $ M.singleton (B.replicate 34 0x6b) (B.replicate 33 0x76)
         daytuh = emptySolidVMData {Action._actionDataStorageDiffs = diff}
-    convert emptyAction {Action._actionData = OMap.singleton ((Account 0x988 Nothing), daytuh)} `shouldSatisfy` isRight
+    convert emptyAction {Action._actionData = OMap.singleton (0x988, daytuh)} `shouldSatisfy` isRight
 
   it "should convert bytestrings properly" $ do
     toJSON ("\x80\x60\x40" :: B.ByteString) `shouldBe` String "806040"
@@ -124,7 +123,7 @@ spec = describe "Action conversions" $ do
              "eventContractRoot": "ClothingUTXO",
              "eventContractApplication": "LogisticsEngine2",
              "eventContractName" : "Vehicle",
-             "eventContractAccount" : "2e385b6a3aea46d4172df98617b5385c13b7100d",
+             "eventContractAddress" : "2e385b6a3aea46d4172df98617b5385c13b7100d",
              "eventName" : "Vehicle Event",
              "eventArgs" : [["field", "value", "String"], ["anotherField", "anotherValue","String"]]
            }
@@ -138,10 +137,9 @@ spec = describe "Action conversions" $ do
               Action._blockTimestamp = posixSecondsToUTCTime 1550858759,
               Action._blockNumber = 9,
               Action._transactionHash = forceHash "3d5069c6b8f6e3922f8a98bef4f23c2d73794403172c12d6915d51ad47a9e827",
-              Action._transactionChainId = Nothing,
-              Action._transactionSender = Account 0xc2191df3032cb8ee72e37ab6bbc4e83f92b9911c Nothing,
+              Action._transactionSender = 0xc2191df3032cb8ee72e37ab6bbc4e83f92b9911c,
               Action._actionData =
-                OMap.singleton ((Account 0x2f6ff9d4a35c07f7b630fe1ce039bc45559b5fb6 Nothing) ,
+                OMap.singleton (0x2f6ff9d4a35c07f7b630fe1ce039bc45559b5fb6 ,
                   Action.ActionData
                     { Action._actionDataStorageDiffs =
                         Action.EVMDiff . M.fromList $
@@ -165,7 +163,7 @@ spec = describe "Action conversions" $ do
                       Action._actionDataCallTypes = [Action.Create]
                     }),
               Action._metadata = Just . M.fromList $ [("name", "Vehicle"), ("src", "contract Vehicle {}")],
-              Action._events = S.singleton $ Event zeroHash "BlockApps2" "LogisticsEngine2" "Vehicle" (Account 0x2e385b6a3aea46d4172df98617b5385c13b7100d Nothing) "Vehicle Event" [("field", "value", "String"), ("anotherField", "anotherValue", "String")],
+              Action._events = S.singleton $ Event zeroHash "BlockApps2" "LogisticsEngine2" "Vehicle" 0x2e385b6a3aea46d4172df98617b5385c13b7100d "Vehicle Event" [("field", "value", "String"), ("anotherField", "anotherValue", "String")],
               Action._delegatecalls = S.empty
             }
         )

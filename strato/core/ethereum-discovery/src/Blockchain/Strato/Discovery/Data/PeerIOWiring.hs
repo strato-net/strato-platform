@@ -23,12 +23,14 @@ module Blockchain.Strato.Discovery.Data.PeerIOWiring where
 import Blockchain.DB.SQLDB (runSqlPool, withGlobalSQLPool)
 import Blockchain.Data.PersistTypes ()
 import Blockchain.MiscJSON ()
+import Blockchain.Strato.Discovery.Data.Host
 import Blockchain.Strato.Discovery.Data.Peer
 import Control.Monad (void)
 import qualified Control.Monad.Change.Alter as A
 import qualified Control.Monad.Change.Modify as Mod
 import Control.Monad.Reader
 import Crypto.Types.PubKey.ECC (Point)
+import Data.IP
 import qualified Data.Text as T
 import Data.Time
 import qualified Database.Persist.Postgresql as SQL
@@ -51,10 +53,10 @@ instance MonadIO m => Mod.Accessible AvailablePeers m where
       flip runSqlPool sqldb $
         SQL.selectList [PPeerBondState SQL.==. 2, PPeerUdpEnableTime SQL.<. currentTime] []
 
-instance MonadIO m => A.Replaceable (IPAsText, TCPPort) ActivityState m where
-  replace _ (IPAsText ip, TCPPort port) state = liftIO $ withGlobalSQLPool . runSqlPool $ do
+instance MonadIO m => A.Replaceable (Host, TCPPort) ActivityState m where
+  replace _ (host, TCPPort port) state = liftIO $ withGlobalSQLPool . runSqlPool $ do
     SQL.updateWhere
-      [PPeerIp SQL.==. ip, PPeerTcpPort SQL.==. port]
+      [PPeerHost SQL.==. host, PPeerTcpPort SQL.==. port]
       [PPeerActiveState SQL.=. fromEnum state]
 
 instance MonadIO m => Mod.Accessible ActivePeers m where
@@ -64,16 +66,21 @@ instance MonadIO m => Mod.Accessible ActivePeers m where
       flip runSqlPool sqldb $
         SQL.selectList [PPeerActiveState SQL.==. fromEnum Active, PPeerEnableTime SQL.<. currentTime] []
 
-instance MonadIO m => (A.Replaceable (IPAsText, Point) PeerBondingState) m where
-  replace _ (IPAsText ip, point) (PeerBondingState state) = liftIO $ withGlobalSQLPool $ \sqldb -> do
+instance MonadIO m => (A.Replaceable (Host, Point) PeerBondingState) m where
+  replace _ (host, point) (PeerBondingState state) = liftIO $ withGlobalSQLPool $ \sqldb -> do
     flip runSqlPool sqldb $
-      SQL.updateWhere [PPeerIp SQL.==. ip, PPeerPubkey SQL.==. Just point] [PPeerBondState SQL.=. state]
+      SQL.updateWhere [PPeerHost SQL.==. host, PPeerPubkey SQL.==. Just point] [PPeerBondState SQL.=. state]
 
-instance MonadIO m => (A.Selectable (IPAsText, Point) PeerBondingState) m where
-  select _ (IPAsText ip, point) = liftIO $ withGlobalSQLPool $ \sqldb -> do
+instance MonadIO m => (A.Replaceable PPeer Point) m where
+  replace _ peer point = liftIO $ withGlobalSQLPool $ \sqldb -> do
+    flip runSqlPool sqldb $
+      SQL.updateWhere [PPeerHost SQL.==. pPeerHost peer] [PPeerPubkey SQL.=. Just point]
+
+instance MonadIO m => (A.Selectable (Host, Point) PeerBondingState) m where
+  select _ (host, point) = liftIO $ withGlobalSQLPool $ \sqldb -> do
     fmap (fmap $ PeerBondingState . pPeerBondState . SQL.entityVal) $
       flip runSqlPool sqldb $
-        SQL.selectFirst [PPeerIp SQL.==. ip, PPeerPubkey SQL.==. Just point] []
+        SQL.selectFirst [PPeerHost SQL.==. host, PPeerPubkey SQL.==. Just point] []
 
 instance MonadIO m => Mod.Accessible BondedPeers m where
   access _ = liftIO $ withGlobalSQLPool $ \sqldb -> do
@@ -106,6 +113,11 @@ instance MonadIO m => A.Replaceable PPeer UdpEnableTime m where
   replace _ peer (UdpEnableTime enableTime) = liftIO $ withGlobalSQLPool $ \sqldb -> do
     flip runSqlPool sqldb $
       SQL.updateWhere (thisPeer peer) [PPeerUdpEnableTime SQL.=. enableTime]
+
+instance MonadIO m => A.Replaceable PPeer IP m where
+  replace _ peer ip = liftIO $ withGlobalSQLPool $ \sqldb -> do
+    flip runSqlPool sqldb $
+      SQL.updateWhere (thisPeer peer) [PPeerIp SQL.=. Just ip]
 
 instance MonadIO m => A.Replaceable PPeer TcpEnableTime m where
   replace _ peer (TcpEnableTime enableTime) = liftIO $ withGlobalSQLPool $ \sqldb -> do
@@ -169,8 +181,8 @@ instance MonadIO m => A.Replaceable T.Text PPeer m where
       SQL.updateWhere (thisPeer peer) [PPeerLastMsg SQL.=. message]
 
 
-instance (MonadUnliftIO m, MonadMonitor m, HasPeerDB m) => ((IPAsText, TCPPort) `A.Alters` ActivityState) m where
+instance (MonadUnliftIO m, MonadMonitor m, HasPeerDB m) => ((Host, TCPPort) `A.Alters` ActivityState) m where
   lookup _ _ = error "lookup ActivityState undefined for ContextM"
-  insert _ (IPAsText i, TCPPort p) = void . setPeerActiveState i p
+  insert _ (i, TCPPort p) = void . setPeerActiveState i p
   delete _ _ = error "lookup ActivityState undefined for ContextM"
 

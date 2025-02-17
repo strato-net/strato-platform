@@ -1,17 +1,9 @@
-import {
-  Row,
-  notification,
-  Spin,
-  Modal,
-  Col,
-  Radio,
-  Button,
-} from 'antd';
+import { Row, notification, Spin, Modal, Col, Radio, Button } from 'antd';
 import {
   useMarketplaceState,
   useMarketplaceDispatch,
 } from '../../contexts/marketplace';
-import BigNumber from "bignumber.js";
+import BigNumber from 'bignumber.js';
 import { useOrderState, useOrderDispatch } from '../../contexts/order';
 import { useAuthenticateState } from '../../contexts/authentication';
 import { actions } from '../../contexts/marketplace/actions';
@@ -37,11 +29,14 @@ const ConfirmOrder = ({ paymentServices = [], data, columns }) => {
     success,
     isCreatePaymentSubmitting,
   } = useOrderState();
-  const [tax, setTax] = useState(0);
-  const [subTotal, setSubTotal] = useState(0);
-  const [total, setTotal] = useState(0);
-  const { success: marketplaceSuccess, message: marketplaceMessage, assetsWithEighteenDecimalPlaces } =
-    useMarketplaceState();
+  const [tax, setTax] = useState(new BigNumber(0));
+  const [subTotal, setSubTotal] = useState(new BigNumber(0));
+  const [total, setTotal] = useState(new BigNumber(0));
+  const {
+    success: marketplaceSuccess,
+    message: marketplaceMessage,
+    assetsWithEighteenDecimalPlaces,
+  } = useMarketplaceState();
   const [modal, contextHolderForModal] = Modal.useModal();
   const [cartData, setCartData] = useState(data);
 
@@ -86,15 +81,16 @@ const ConfirmOrder = ({ paymentServices = [], data, columns }) => {
   };
 
   useEffect(() => {
-    let t = 0;
-    let sum = 0;
+    let t = new BigNumber(0);
+    let sum = new BigNumber(0);
     cartData.forEach((item) => {
-      t += item.tax;
-      sum += item.amount;
+      t = t.plus(new BigNumber(item.tax));
+      sum = sum.plus(new BigNumber(item.amount));
     });
+
     setTax(t.toFixed(2));
-    setSubTotal(sum.toFixed(2));
-    setTotal((sum + t).toFixed(2));
+    setSubTotal(sum.toString());
+    setTotal(sum.plus(t).toFixed(2));
   }, [marketplaceDispatch, cartData]);
 
   const openToastOrder = (placement, message) => {
@@ -172,19 +168,23 @@ const ConfirmOrder = ({ paymentServices = [], data, columns }) => {
     actions.addItemToConfirmOrder(marketplaceDispatch, cartData);
     let orderList = [];
     cartData.forEach((item) => {
-      const decimals = assetsWithEighteenDecimalPlaces.includes(
-        item.key
-      ) ? 18 : item.decimals || 0;
+      const decimals = assetsWithEighteenDecimalPlaces.includes(item.key)
+        ? 18
+        : item.decimals || 0;
 
       const quantity = new BigNumber(item.qty);
       const unitPrice = new BigNumber(item.unitPrice);
 
       orderList.push({
-        quantity: quantity.multipliedBy(new BigNumber(10).pow(decimals)).toFixed(0),
+        quantity: quantity
+          .multipliedBy(new BigNumber(10).pow(decimals))
+          .toFixed(0),
         decimals: decimals,
         assetAddress: item.key,
         firstSale: item.firstSale,
-        unitPrice: unitPrice.dividedBy(new BigNumber(10).pow(decimals)).toFixed(decimals),
+        unitPrice: unitPrice
+          .dividedBy(new BigNumber(10).pow(decimals))
+          .toFixed(decimals),
       });
     });
 
@@ -302,9 +302,9 @@ const ConfirmOrder = ({ paymentServices = [], data, columns }) => {
   const totalAmount =
     selectedProvider?.serviceName === 'USDST' ||
     selectedProvider?.serviceName?.includes('USDST')
-      ? `${subTotal} USDST`
+      ? `${new BigNumber(subTotal).toString()} USDST`
       : selectedProvider?.serviceName === 'Stripe'
-      ? `${subTotal} USD`
+      ? `${(Math.ceil(subTotal * 100) / 100).toFixed(2)} USD`
       : `${subTotal} ${selectedProvider?.serviceName || 'USD'}`;
 
   return (

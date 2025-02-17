@@ -68,17 +68,16 @@ abstract contract Asset is Utils {
         AssetStatus _status
     ) {
         // TODO: Get ownerCommonName by getting commonName field from on-chain wallet at that address
-        require(_quantity > 0, "Quantity must be greater than 0");
-
+        require(_quantity >= 0, "Quantity must be greater than or equal to 0");
         owner  = msg.sender;
         ownerCommonName = getCommonName(msg.sender);
         name = _name;
         description = _description;
         images = _images;
-        files = _files;
+        files = _files; 
         fileNames = _fileNames;
         createdDate = _createdDate;
-        quantity = _quantity * (10**_decimals);
+        quantity = _quantity;
         decimals = _decimals;
         status = _status;
         try {
@@ -88,6 +87,7 @@ abstract contract Asset is Utils {
         } catch {
             originAddress = address(this);
             itemNumber = 1;
+            quantity = quantity * (10**_decimals);
             emit OwnershipTransfer(
                 originAddress,
                 address(0),

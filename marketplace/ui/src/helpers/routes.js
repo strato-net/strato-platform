@@ -18,6 +18,7 @@ export default {
     url: '/dp/:address/:name',
   },
   EthstProductDetail: { label: 'ETHST Product Detail', url: '/ethst/:address' },
+  WbtcstProductDetail: { label: 'WBTCST Product Detail', url: '/wbtcst/:address' },
   LoginRedirect: { label: 'LoginRedirect', url: '/login' },
   Checkout: { label: 'Checkout', url: '/checkout' },
   ConfirmOrder: { label: 'Confirm Order', url: '/confirmOrder' },

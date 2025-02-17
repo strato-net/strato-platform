@@ -2,7 +2,6 @@
 
 module JsonSpec where
 
-import Blockchain.Data.ChainInfo
 import Blockchain.Data.GenesisInfo
 import Blockchain.Database.MerklePatricia.StateRoot
 import Blockchain.Strato.Model.Address

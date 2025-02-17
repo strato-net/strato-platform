@@ -7,10 +7,10 @@ module.exports = {
   CLIENT_ID: process.env.CLIENT_ID,
   openIdDiscoveryUrl: process.env.OPENID_DISCOVERY_URL,
   marketplaceUrl: process.env.MARKETPLACE_URL,
-  ETHSTAddress: process.env.ETHST_ADDRESS,
   alchemyApiKey: process.env.ALCHEMY_API_KEY,
   alchemyNetwork: process.env.ALCHEMY_NETWORK,
   blockAppsPublicKey: process.env.BLOCKAPPS_PUBLIC_KEY,
   blockAppsPrivateKey: process.env.BLOCKAPPS_PRIVATE_KEY,
+  wbtcContractAddress: process.env.WBTC_CONTRACT_ADDRESS,
   mintAndTransfer: "mintETHST",
 };

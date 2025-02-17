@@ -8,6 +8,7 @@ if [ "$ORACLE_MODE" = "true" ]; then
   echo "Running the container in Oracle service mode"
   
   export DOCKERIZED="true"
+  export SALE_UPDATE=${SALE_UPDATE:-false}
 
   export CONFIG_DIR_PATH=/config
   export SERVER_HOST=${SERVER_HOST}
@@ -33,6 +34,7 @@ if [ "$ORACLE_MODE" = "true" ]; then
   export USDT_ORACLE_NAME_VALUE=${USDT_ORACLE_NAME_VALUE:-'USDT'}
   export USDC_ORACLE_NAME_VALUE=${USDC_ORACLE_NAME_VALUE:-'USDC'}
   export PAXG_ORACLE_NAME_VALUE=${PAXG_ORACLE_NAME_VALUE:-'PAXG'}
+  export BTC_ORACLE_NAME_VALUE=${BTC_ORACLE_NAME_VALUE:-'BTC'}
   export USD_ORACLE_NAME_VALUE=${USD_ORACLE_NAME_VALUE:-'USD'}
   export SILVER_ASSET_ADDRESSES=${SILVER_ASSET_ADDRESSES:-''}
   export GOLD_ASSET_ADDRESSES=${GOLD_ASSET_ADDRESSES:-''}
@@ -53,6 +55,16 @@ if [ "$ORACLE_MODE" = "true" ]; then
       echo 'Error: ALCHEMY_API_KEY is not set. submit-price script will not run. Exiting'
       exit 12
     fi
+    if [ "${SALE_UPDATE}" = "true" ]; then
+      if [ -z "$METALS_USERNAME" ]; then
+      echo 'Error: METALS_USERNAME is not set. Metal Sale price update script will not run. Exiting'
+      exit 13
+      fi
+      if [ -z "$METALS_PASSWORD" ]; then
+      echo 'Error: METALS_PASSWORD is not set. Metal Sale price update script will not run. Exiting'
+      exit 14
+      fi
+    fi
     # TODO: in future we can check the other env vars here
   
     # Replace placeholders in Oracle config template
@@ -64,6 +76,7 @@ if [ "$ORACLE_MODE" = "true" ]; then
     sed -i 's*<usdt_oracle_name_value>*'"${USDT_ORACLE_NAME_VALUE}"'*g' /tmp/tmp.oracle_config.yaml
     sed -i 's*<usdc_oracle_name_value>*'"${USDC_ORACLE_NAME_VALUE}"'*g' /tmp/tmp.oracle_config.yaml
     sed -i 's*<paxg_oracle_name_value>*'"${PAXG_ORACLE_NAME_VALUE}"'*g' /tmp/tmp.oracle_config.yaml
+    sed -i 's*<btc_oracle_name_value>*'"${BTC_ORACLE_NAME_VALUE}"'*g' /tmp/tmp.oracle_config.yaml
     sed -i 's*<usd_oracle_name_value>*'"${USD_ORACLE_NAME_VALUE}"'*g' /tmp/tmp.oracle_config.yaml
     sed -i 's*<silver_asset_addresses_value>*'"${SILVER_ASSET_ADDRESSES}"'*g' /tmp/tmp.oracle_config.yaml
     sed -i 's*<gold_asset_addresses_value>*'"${GOLD_ASSET_ADDRESSES}"'*g' /tmp/tmp.oracle_config.yaml
@@ -93,10 +106,10 @@ if [ "$ORACLE_MODE" = "true" ]; then
       exit 152
     else
       if [ "${SKIP_ORACLE_DEPLOYMENT}" != "true" ]; then
+        echo "creating the .deploy_attempted flag file"
+        touch .deploy_attempted
         echo 'oracle_deploy.yaml does not exist. Deploying oracle contracts...'
         yarn deploy-oracle
-        echo "creating the .deployed flag file"
-        touch .deployed
       else
         echo 'SKIP_ORACLE_DEPLOYMENT is true. Skipping oracle deployment...'
       fi
@@ -108,14 +121,14 @@ if [ "$ORACLE_MODE" = "true" ]; then
       exit 151
     fi
     echo "Found the existing oracle_deploy.yaml"
-    if [ ! -f ".deployed" ]; then
+    if [ ! -f ".deploy_attempted" ]; then
       echo "Starting a recreated container with likely updated env vars, but reusing the pre-existing oracle_config.yaml and oracle_deploy.yaml"
       if [ "${UPGRADE_ORACLE_CONTRACTS}" = "true" ]; then
+        echo "creating the .deploy_attempted flag file"
+        touch .deploy_attempted
         echo "UPGRADE_ORACLE_CONTRACTS=true - deactivating oracle contracts and deploying again..."
         yarn deactivate-oracle
         yarn deploy-oracle
-        echo "creating the .deployed flag file"
-        touch .deployed
       fi
     fi
   fi
@@ -162,7 +175,7 @@ else
   # export METAMASK_SECONDARY_SALE_FEE_PERCENTAGE_VALUE=${METAMASK_SECONDARY_SALE_FEE_PERCENTAGE_VALUE:-3.0}
   export USDST_ADDRESS=${USDST_ADDRESS}
   export USDST_SERVICE_NAME_VALUE=${USDST_SERVICE_NAME_VALUE:-'USDST'}
-  export USDST_IMAGE_URL_VALUE=${USDST_IMAGE_URL_VALUE:-'https://blockapps-public-assets.s3.us-east-1.amazonaws.com/icons/stratFinished.png'}
+  export USDST_IMAGE_URL_VALUE=${USDST_IMAGE_URL_VALUE:-'https://blockapps-public-assets.s3.us-east-1.amazonaws.com/icons/USDST.png'}
   export USDST_PRIMARY_SALE_FEE_PERCENTAGE_VALUE=${USDST_PRIMARY_SALE_FEE_PERCENTAGE_VALUE:-10.0}
   export USDST_SECONDARY_SALE_FEE_PERCENTAGE_VALUE=${USDST_SECONDARY_SALE_FEE_PERCENTAGE_VALUE:-3.0}
   export USDST_FEE_RECIPIENT=${USDST_FEE_RECIPIENT}
@@ -281,10 +294,10 @@ else
       exit 52
     else
       if [ "${SKIP_ORACLE_DEPLOYMENT}" != "true" ]; then
+        echo "Creating the .deploy_attempted flag file"
+        touch .deploy_attempted
         echo 'deploy.yaml does not exist. Deploying payment server contracts...'
         yarn deploy
-        echo "Creating the .deployed flag file"
-        touch .deployed
       else
         echo 'SKIP_DEPLOYMENT is true. Skipping deployment...'
       fi
@@ -296,14 +309,14 @@ else
       exit 51
     fi
     echo "Found the existing deploy.yaml"
-    if [ ! -f ".deployed" ]; then
+    if [ ! -f ".deploy_attempted" ]; then
       echo "Starting a recreated container with likely updated env vars, but reusing the pre-existing config.yaml and deploy.yaml"
       if [ "${UPGRADE_CONTRACTS}" = "true" ]; then
-        echo '"UPGRADE_CONTRACTS=true - deactivating payment server contracts and deploying again...'
+        echo "Creating the .deploy_attempted flag file"
+        touch .deploy_attempted
+        echo '"UPGRADE_CONTRACTS=true - deactivating payment server contracts and deploying again...'=
         yarn deactivate
         yarn deploy
-        echo "Creating the .deployed flag file"
-        touch .deployed
       fi
     fi
   fi

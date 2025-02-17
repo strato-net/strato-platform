@@ -15,13 +15,17 @@ class StripeService {
                   },
                 },
                 line_items: orderDetails.map(({ productName, unitPrice, quantity }) => {
+                    if (quantity % 1 !== 0) {
+                        unitPrice *= quantity;
+                        quantity = 1;
+                    }
                     return {
                         price_data: {
                             currency: "usd",
                             product_data: {
                                 name: productName,
                             },
-                            unit_amount: (unitPrice * 100).toFixed(0),
+                            unit_amount: Math.ceil(unitPrice * 100),
                         },
                         quantity: quantity,
                     }

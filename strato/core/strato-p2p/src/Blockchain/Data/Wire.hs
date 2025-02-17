@@ -189,7 +189,6 @@ data Message
   | -- private chains
     GetChainDetails [Word256]
   | ChainDetails [(Word256, ChainInfo)]
-  | GetTransactions [Keccak256]
   | GetMPNodes [StateRoot]
   | MPNodes [NodeData]
   deriving (Eq, Show)
@@ -267,8 +266,6 @@ instance Format Message where
           ++ "\n  chainInfo: "
           ++ show chInfo
           ++ formatPairs xs
-  format (GetTransactions txHashes) =
-    CL.blue "GetTransactions\n" ++ "requested transaction hashes: " ++ (intercalate "\n" (show <$> txHashes))
   format (GetMPNodes mpNodes) =
     CL.blue "GetMPNodes\n" ++ "requested MP nodes: " ++ (intercalate "\n" (format <$> mpNodes))
   format (MPNodes mpNodes) =
@@ -317,8 +314,6 @@ obj2WireMessage 0x1c (RLPArray cids) =
   GetChainDetails (rlpDecode <$> cids)
 obj2WireMessage 0x1d (RLPArray chDetPairs) =
   ChainDetails $ rlpDecode <$> chDetPairs
-obj2WireMessage 0x1e (RLPArray trHashes) =
-  GetTransactions $ rlpDecode <$> trHashes
 obj2WireMessage 0x1f (RLPArray (RLPScalar 0 : mpNodes)) =
   GetMPNodes $ rlpDecode <$> mpNodes
 obj2WireMessage 0x1f (RLPArray (RLPScalar 1 : mpNodes)) =
@@ -381,8 +376,6 @@ wireMessage2Obj (GetChainDetails cIds) =
   (0x1c, RLPArray $ rlpEncode <$> cIds)
 wireMessage2Obj (ChainDetails chpairs) =
   (0x1d, RLPArray $ rlpEncode <$> chpairs)
-wireMessage2Obj (GetTransactions trhashes) =
-  (0x1e, RLPArray $ rlpEncode <$> trhashes)
 wireMessage2Obj (GetMPNodes mpNodes) =
   (0x1f, RLPArray . (RLPScalar 0 :) $ rlpEncode <$> mpNodes)
 wireMessage2Obj (MPNodes mpNodes) =

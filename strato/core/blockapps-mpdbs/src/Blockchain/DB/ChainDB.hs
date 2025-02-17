@@ -14,19 +14,13 @@ module Blockchain.DB.ChainDB
     BestBlockRoot (..),
     bootstrapChainDB,
     putBlockHeaderInChainDB,
-    putBlockHashInChainDB,
     migrateBlockHeader,
     getChainRoot,
     getChainStateRoot,
     putChainStateRoot,
     deleteChainStateRoot,
-    getGenesisStateRoot,
-    getChainGenesisInfo,
-    putChainGenesisInfo,
-    deleteChainGenesisInfo,
     getChainBestBlock,
     putChainBestBlock,
-    deleteChainBestBlock,
   )
 where
 
@@ -243,14 +237,6 @@ putChainBlockHashInfo h parentHash sr = do
   newBlockHashRoot <- putkv bhr (N.EvenNibbleString $ keccak256ToByteString h) (parentHash, sr)
   put Proxy $ BlockHashRoot newBlockHashRoot
 
-getGenesisStateRoot ::
-  ( Modifiable GenesisRoot m,
-    (MP.StateRoot `Alters` MP.NodeData) m
-  ) =>
-  Maybe Word256 ->
-  m (Maybe MP.StateRoot)
-getGenesisStateRoot = fmap (fmap (\(_, sr, _) -> sr)) . getChainGenesisInfo
-
 getChainGenesisInfo ::
   ( Modifiable GenesisRoot m,
     (MP.StateRoot `Alters` MP.NodeData) m
@@ -273,17 +259,6 @@ putChainGenesisInfo ::
 putChainGenesisInfo chainId creationBlock stateRoot parent = do
   gr <- unGenesisRoot <$> get Proxy
   newGenesisRoot <- putkv gr (word256ToMPKey chainId) $ GenesisData (creationBlock, stateRoot, parent)
-  put Proxy $ GenesisRoot newGenesisRoot
-
-deleteChainGenesisInfo ::
-  ( Modifiable GenesisRoot m,
-    (MP.StateRoot `Alters` MP.NodeData) m
-  ) =>
-  Maybe Word256 ->
-  m ()
-deleteChainGenesisInfo chainId = do
-  gr <- unGenesisRoot <$> get Proxy
-  newGenesisRoot <- MP.deleteKey gr (word256ToMPKey chainId)
   put Proxy $ GenesisRoot newGenesisRoot
 
 getChainStateRoot ::
@@ -370,15 +345,4 @@ putChainBestBlock ::
 putChainBestBlock chainId bHash ordering = do
   bbr <- unBestBlockRoot <$> get Proxy
   newBestBlockRoot <- putkv bbr (word256ToMPKey chainId) (bHash, ordering)
-  put Proxy $ BestBlockRoot newBestBlockRoot
-
-deleteChainBestBlock ::
-  ( Modifiable BestBlockRoot m,
-    (MP.StateRoot `Alters` MP.NodeData) m
-  ) =>
-  Maybe Word256 ->
-  m ()
-deleteChainBestBlock chainId = do
-  bbr <- unBestBlockRoot <$> get Proxy
-  newBestBlockRoot <- MP.deleteKey bbr (word256ToMPKey chainId)
   put Proxy $ BestBlockRoot newBestBlockRoot

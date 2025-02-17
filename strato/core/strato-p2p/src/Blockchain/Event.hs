@@ -15,8 +15,6 @@
 module Blockchain.Event
   ( module Blockchain.EventModel,
     handleEvents,
-    handleGetChainDetails,
-    checkPeerIsMember,
   )
 where
 
@@ -28,13 +26,10 @@ import Blockchain.Context
 import Blockchain.Data.Block
 import Blockchain.Data.BlockHeader (BlockHeader)
 import qualified Blockchain.Data.BlockHeader as BlockHeader
-import Blockchain.Data.ChainInfo
 import Blockchain.Data.Control (P2PCNC (..))
-import Blockchain.Data.Enode
 import Blockchain.Data.PubKey
 import qualified Blockchain.Data.TXOrigin as Origin
 import Blockchain.Data.Transaction
-import Blockchain.Data.TransactionDef (formatChainId)
 import Blockchain.Data.Wire
 import Blockchain.EventException
 import Blockchain.EventModel
@@ -42,9 +37,7 @@ import Blockchain.Options
 import Blockchain.Sequencer.Event
 import Blockchain.Strato.Discovery.Data.Peer
 import Blockchain.Strato.Model.Address (Address)
-import Blockchain.Strato.Model.ChainMember
 import Blockchain.Strato.Model.Class
-import Blockchain.Strato.Model.ExtendedWord
 import Blockchain.Strato.Model.Keccak256
 import Blockchain.Strato.Model.MicroTime
 import Blockchain.Strato.Model.Secp256k1
@@ -59,21 +52,13 @@ import Control.Monad.State
 import qualified Data.ByteString.Base16 as BC16
 import qualified Data.ByteString.Char8 as BS8
 import Data.Conduit
-import qualified Data.DList as DL
-import Data.Default (def)
-import Data.Foldable (for_)
 import Data.List hiding (insert, lookup)
-import Data.Map.Internal (WhenMatched (..), WhenMissing (..))
-import Data.Map.Merge.Strict
 import qualified Data.Map.Strict as M
 import Data.Maybe
-import Data.Ranged (rSetIntersection, rSetUnion)
 import qualified Data.Set as S
 import qualified Data.Text as T
-import Data.These
 import Data.Time.Clock
 import Debug.Trace (trace)
-import qualified Text.Colors as CL
 import Text.Format
 import Text.Printf
 import Text.Tools
@@ -93,7 +78,7 @@ skipEntries n xs = if null xs then [] else head xs : helper (tail xs)
       [] -> []
 
 peerString :: PPeer -> String
-peerString peer = key ++ "@" ++ T.unpack (pPeerIp peer) ++ ":" ++ show (pPeerTcpPort peer)
+peerString peer = key ++ "@" ++ format (pPeerHost peer) ++ ":" ++ show (pPeerTcpPort peer)
   where
     key = p2s (pPeerPubkey peer)
     p2s (Just p) = BS8.unpack . BC16.encode $ pointToBytes p
@@ -244,44 +229,23 @@ handleEvents peer = awaitForever $ \case
     lift stampActionTimestamp
     mrh <- lift $ unMaxReturnedHeaders <$> access (Proxy @MaxReturnedHeaders)
     let shas = take mrh shas'
-    lift (getUntilMissing shas DL.empty DL.empty) >>= \(bodies, pshas) -> do
+    lift (getUntilMissing shas) >>= \bodies -> do
       yieldR . BlockBodies $ map (second (map morphBlockHeader) . toBody) bodies
-      ptxs <- fmap M.elems . lift $ selectMany (Proxy @(Private (Word256, OutputTx))) pshas
-      unless (null ptxs) . yieldR . Transactions $ morphTx . snd . unPrivate <$> ptxs
     where
       getUntilMissing ::
-        ( (Keccak256 `Selectable` ChainTxsInBlock) m,
-          (Word256 `Selectable` ChainMemberRSet) m,
-          (Keccak256 `Alters` OutputBlock) m,
+        ( (Keccak256 `Alters` OutputBlock) m,
           (Address `Selectable` X509CertInfoState) m,
           Accessible PublicKey m
         ) =>
         [Keccak256] ->
-        DL.DList OutputBlock ->
-        DL.DList Keccak256 ->
-        m ([OutputBlock], [Keccak256])
-      getUntilMissing [] bodies pshas = return (DL.toList bodies, DL.toList pshas)
-      getUntilMissing (h : hs) bodies pshas =
+        m [OutputBlock]
+      getUntilMissing [] = return []
+      getUntilMissing (h : hs) =
         lookup (Proxy @OutputBlock) h >>= \case
-          Nothing -> return (DL.toList bodies, DL.toList pshas)
+          Nothing -> return []
           Just body -> do
-            ChainTxsInBlock cIdTxsMap <- selectWithDefault (Proxy @ChainTxsInBlock) h
-            mems <- selectMany (Proxy @ChainMemberRSet) $ M.keys cIdTxsMap
-            peerX509 <- getPeerX509 peer
-            myX509 <- getMyX509
-            let whenMissing f = WhenMissing (pure . M.map f) (\_ x -> (pure . Just $ f x))
-                trMems =
-                  merge
-                    (whenMissing This)
-                    (whenMissing That)
-                    (WhenMatched $ \_ x y -> pure . Just $ These x y)
-                    cIdTxsMap
-                    mems
-                filtered =
-                  flip M.filter trMems $
-                    mergeTheseWith (const False) (checkPeerIsMember myX509 peerX509) (||)
-                pshas' = M.foldr (DL.append . DL.fromList . these id (const []) const) DL.empty filtered
-            getUntilMissing hs (bodies `DL.snoc` body) (pshas `DL.append` pshas')
+            rest <- getUntilMissing hs
+            return $ body:rest
 
       toBody :: OutputBlock -> ([Transaction], [BlockHeader])
       toBody = ((map otBaseTx . obReceiptTransactions) &&& obBlockUncles)
@@ -321,7 +285,7 @@ handleEvents peer = awaitForever $ \case
       peerAddr <- unPeerAddress <$> access (Proxy @PeerAddress)
       $logInfoS "handleEvents/Blockstanbul" . T.pack $ "blockstanbulPeerAddr: " ++ show peerAddr
     let msgHash = rlpHash wm
-    lift $ insert (Proxy @(Proxy (Outbound WireMessage))) (pPeerIp peer, msgHash) Proxy
+    lift $ insert (Proxy @(Proxy (Outbound WireMessage))) (pPeerHost peer, msgHash) Proxy
     msgExists <- lift $ exists (Proxy @(Proxy (Inbound WireMessage))) msgHash
     if msgExists
       then
@@ -342,24 +306,10 @@ handleEvents peer = awaitForever $ \case
         yieldL $ ToUnseq [IEBlockstanbul wm]
 
   -- private chains
-  MsgEvt (GetChainDetails cids') -> handleGetChainDetails peer $ S.fromList cids'
+  MsgEvt (GetChainDetails _) -> return ()
   MsgEvt (ChainDetails _) -> return ()
 
   -- TODO: Optimize/do security checking (a peer can spam you with random hashes and keep you busy forever)
-  MsgEvt (GetTransactions trHashes) -> do
-    lift stampActionTimestamp
-    $logInfoS "handleEvents/GetTransactions" $
-      T.pack $
-        "requesting info for txHashes: "
-          ++ (intercalate "\n" (format <$> trHashes))
-          ++ " from peer "
-          ++ peerString peer
-    ptrs <- fmap (map unPrivate . M.elems) . lift $ selectMany (Proxy @(Private (Word256, OutputTx))) trHashes
-    mems <- lift . selectMany (Proxy @ChainMemberRSet) $ map fst ptrs
-    peerX509 <- lift $ getPeerX509 peer
-    myX509 <- lift getMyX509
-    let peerCheck (cId, _) = checkPeerIsMember myX509 peerX509 . fromMaybe def $ M.lookup cId mems
-    yieldR . Transactions . map (morphTx . snd) $ filter peerCheck ptrs
   MsgEvt (GetMPNodes srs) -> do
     let txo = Origin.PeerString (peerString peer)
     yieldL $ ToUnseq [IEGetMPNodesRequest txo srs]
@@ -377,55 +327,11 @@ handleEvents peer = awaitForever $ \case
           $logInfoS "handleEvents/P2pBlock" . T.pack $ "yielding new block: " ++ show (BlockHeader.number . blockBlockData . outputBlockToBlock $ b)
           yieldR $ NewBlock (outputBlockToBlock b) 0
     P2pTx tx -> do
-      let mCid = txChainId tx
-      match <- case mCid of
-        Nothing -> return True
-        Just cId -> do
-          peerX509 <- lift $ getPeerX509 peer
-          myX509 <- lift getMyX509
-          mems <- lift $ selectWithDefault (Proxy @ChainMemberRSet) cId
-          return $ checkPeerIsMember myX509 peerX509 mems
-
       when (shouldSend peer $ otOrigin tx) $ do
-        if not match
-          then
-            $logInfoS "handleEvents/P2pTx" $
-              T.pack $
-                printf "peer is not authorized for chainID %s" (formatChainId mCid)
-          else do
-            $logInfoS "handleEvents/P2pTx" $ T.pack $ "sending Transaction " ++ format (otHash tx) ++ " for chainID " ++ formatChainId mCid
-            $logDebugS "handleEvents/P2pTx" . T.pack $ "the transaction was: " ++ format tx
-            yieldR $ Transactions [otBaseTx tx]
-    P2pGenesis (OutputGenesis og (cId, cInfo@(ChainInfo uci _))) -> do
-      when (shouldSend peer og) $ do
-        $logInfoS "handleEvents/P2pGenesis" . T.pack $ "received new chain: " ++ formatChainId (Just cId) ++ " with " ++ show uci
-        peerX509 <- lift $ getPeerX509 peer
-        myX509 <- lift getMyX509
-        if checkPeerIsMember myX509 peerX509 (chainMembersToChainMemberRset (members uci))
-          then do
-            $logInfoS "handleEvents/P2pGenesis" $ T.pack $ "sending ChainDetails for chainID " ++ (formatChainId $ Just cId)
-            yieldR $ ChainDetails [(cId, cInfo)]
-          else do
-            $logInfoS "handleEvents/P2pGenesis" $
-              T.pack $
-                printf "peer is not authorized for received chainID %s" (formatChainId $ Just cId)
-            $logDebugLS "handleEvents/P2pGenesis/members" $ (unChainMembers (members uci))
-    P2pGetChain chainIds -> yieldR $ GetChainDetails chainIds
-    P2pGetTx shas -> yieldR $ GetTransactions shas
-    P2pNewOrgName cId org -> do
-      let formatted = CL.yellow $ format cId
-          orgFormat = CL.blue $ show org
-      $logInfoS "handleEvents/P2pNewOrgName" $ T.pack $ "New organization associated with chain " ++ formatted ++ " for org " ++ orgFormat
-      peerX509 <- lift $ getPeerX509 peer
-      myX509 <- lift getMyX509
-      ChainMemberRSet mems <- lift $ selectWithDefault (Proxy @ChainMemberRSet) cId
-      let (hasAccess, ChainMemberRSet newMem) = chainMemberParsedSetToChainMemberRSet org
-          mems' = ChainMemberRSet $ (if hasAccess then rSetUnion else rSetIntersection) mems newMem
-      when (checkPeerIsMember myX509 peerX509 mems') $ do
-        $logInfoS "handleEvents/P2pNewOrgName" $ T.pack $ "Peer cleared for chain " ++ formatted
-        cInfo <- lift $ select (Proxy @ChainInfo) cId -- This should never be Nothing
-        when (isJust cInfo) $ do
-          yieldR $ ChainDetails [(cId, fromJust cInfo)]
+        $logInfoS "handleEvents/P2pTx" $ T.pack $ "sending Transaction " ++ format (otHash tx)
+        $logDebugS "handleEvents/P2pTx" . T.pack $ "the transaction was: " ++ format tx
+        yieldR $ Transactions [otBaseTx tx]
+        
     P2pBlockstanbul msg ->
       lift (fmap getChainMemberFromX509 <$> getPeerX509 peer) >>= \case
         Nothing ->
@@ -449,7 +355,7 @@ handleEvents peer = awaitForever $ \case
               $logDebugS "handleEvents/P2pBlockstanbul" . T.pack $ "Outgoing mesage: " ++ show outbound
               let !msgHash = rlpHash msg
               lift $ insert (Proxy @(Proxy (Inbound WireMessage))) msgHash Proxy
-              msgExists <- lift $ exists (Proxy @(Proxy (Outbound WireMessage))) (pPeerIp peer, msgHash)
+              msgExists <- lift $ exists (Proxy @(Proxy (Outbound WireMessage))) (pPeerHost peer, msgHash)
               if msgExists
                 then
                   $logInfoS "handleEvents/P2pBlockstanbul" $
@@ -457,7 +363,7 @@ handleEvents peer = awaitForever $ \case
                       [ "Already seen outbound wire message ",
                         T.pack (format msgHash),
                         ". Not forwarding to peer ",
-                        pPeerIp peer
+                        T.pack $ format $ pPeerHost peer
                       ]
                 else do
                   $logInfoS "handleEvents/P2pBlockstanbul" $
@@ -465,9 +371,9 @@ handleEvents peer = awaitForever $ \case
                       [ "First time seeing outbound wire message ",
                         T.pack (format msgHash),
                         ". Forwarding to peer ",
-                        pPeerIp peer
+                        T.pack $ format $ pPeerHost peer
                       ]
-                  let !ip = pPeerIp peer
+                  let !ip = pPeerHost peer
                   lift $ insert (Proxy @(Proxy (Outbound WireMessage))) (ip, msgHash) Proxy
                   yieldR outbound
     P2pAskForBlocks start _ _ -> do
@@ -511,51 +417,6 @@ handleEvents peer = awaitForever $ \case
     yieldR $ Disconnect AlreadyConnected
   event -> liftIO . error $ "unrecognized event: " ++ show event
 
-handleGetChainDetails ::
-  ( MonadIO m,
-    MonadLogger m,
-    (ChainMemberParsedSet `Selectable` TrueOrgNameChains) m,
-    (ChainMemberParsedSet `Selectable` FalseOrgNameChains) m,
-    (Word256 `Selectable` ChainMemberRSet) m,
-    (Word256 `Selectable` ChainInfo) m,
-    (Address `Selectable` X509CertInfoState) m,
-    Modifiable ActionTimestamp m,
-    Accessible PublicKey m
-  ) =>
-  PPeer ->
-  S.Set Word256 ->
-  ConduitM Event (Either P2PCNC Message) m ()
-handleGetChainDetails peer cids' = do
-  peerX509 <- lift $ getPeerX509 peer
-  myX509 <- lift getMyX509
-  cids <-
-    S.toList
-      <$> if S.null cids'
-        then do
-          TrueOrgNameChains trueChains <- case peerX509 of
-            Nothing -> return $ TrueOrgNameChains S.empty
-            Just cmps -> lift $ selectWithDefault (Proxy @TrueOrgNameChains) (x509CertInfoStateToCMPS cmps)
-          FalseOrgNameChains falseChains <- case peerX509 of
-            Nothing -> return $ FalseOrgNameChains S.empty
-            Just cmps -> lift $ selectWithDefault (Proxy @FalseOrgNameChains) (x509CertInfoStateToCMPS cmps)
-          return $ trueChains S.\\ falseChains
-        else return cids'
-  lift stampActionTimestamp
-  $logInfoS "handleGetChainDetails" $ T.pack $ "details requested for chainIDs " ++ intercalate "\n" (formatChainId . Just <$> cids)
-  mems <- lift $ selectMany (Proxy @ChainMemberRSet) cids
-  let filteredPairs = M.keys $ M.filter (checkPeerIsMember myX509 peerX509) mems
-
-  unless (null filteredPairs) $ do
-    -- chains that use X509 may not have ChainMembers with enode addresses,
-    -- so they will not have a Map in mems and their cInfos need to be queried separately
-    cInfos' <- fmap M.toList . lift $ selectMany (Proxy @ChainInfo) $ filteredPairs
-    for_ cInfos' $ yieldR . ChainDetails . (: [])
-    lift stampActionTimestamp
-    $logInfoS "handleGetChainDetails" $
-      T.pack $
-        "the following ChainIds were returned "
-          ++ (intercalate "\n" $ formatChainId . Just . fst <$> cInfos')
-
 numberFromBestBlock :: BestBlock -> Integer
 numberFromBestBlock (BestBlock _ n) = n
 
@@ -588,29 +449,6 @@ shouldSend peer txo = case txo of
     -- probably means it was converted, see if this is a problem
     trace "NewTx of type Morphism came in. Should this even happen?" True
   Origin.Blockstanbul -> True
-
-checkPeerIsMember :: Maybe X509CertInfoState -> Maybe X509CertInfoState -> ChainMemberRSet -> Bool
-checkPeerIsMember myCert pcert mems = case pcert of
-  Nothing -> False
-  Just (X509CertInfoState _ _ _ _ n (Just u) c) -> (fmap x509CertInfoStateToCMPS myCert == fmap x509CertInfoStateToCMPS pcert) || isChainMemberInRangeSet (snd $ chainMemberParsedSetToChainMemberRSet (CommonName (T.pack n) (T.pack u) (T.pack c) True)) mems
-  Just (X509CertInfoState _ _ _ _ n Nothing c) -> (fmap x509CertInfoStateToCMPS myCert == fmap x509CertInfoStateToCMPS pcert) || isChainMemberInRangeSet (snd $ chainMemberParsedSetToChainMemberRSet (CommonName (T.pack n) (T.pack "") (T.pack c) True)) mems
-
--- extract the organization name from the cert
-x509CertInfoStateToCMPS :: X509CertInfoState -> ChainMemberParsedSet
-x509CertInfoStateToCMPS (X509CertInfoState _ _ _ _ n u c) = CommonName (T.pack n) (maybe "" T.pack u) (T.pack c) True
-
-{- to reduce redundant computations on dividing block chunks under txsLimit
-splitNeededHeaders :: [BlockHeader] -> [[BlockHeader]]
-splitNeededHeaders x =
-  let txsLens = BlockHeader.extraData2TxsLen <$> extraData <$> neededHeaders
-      txsLensInLimit =  scanl (\x y -> if ((x+y)>flags_maxHeadersTxsLens) then y else x+y) 0 txsLens
-      indexToSplit :: Int -> [Int] -> [Int] -> [Int] -> [Int]
-      indexToSplit index li (x:xs) (y:ys) =  indexToSplit (index++) li' xs ys
-        where li = case (x==y) of
-          True -> li:index
-          False -> li
-      indexToSplit _ li [] [] = li
-  in splitAt -}
 
 splitNeededHeaders :: [BlockHeader] -> ([BlockHeader], [BlockHeader])
 splitNeededHeaders neededHeaders =

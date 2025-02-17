@@ -23,11 +23,13 @@ async function submitPrice(token, contract, args) {
 
 // Function to update the price of the Asset Sale price
 async function updateMetalPrice(assetName, token, contractAddress, price) {
-  const priceMarkup =
-    (assetName === "gold"
-      ? process.env.GOLD_PRICE_MARKUP
-      : process.env.SILVER_PRICE_MARKUP) || "1"; // Default to "1" if undefined
-  const parsedPriceMarkup = parseFloat(priceMarkup);
+  const parsedPriceMarkup = parseFloat(
+    process.env[
+      assetName.toLowerCase().includes("gold")
+        ? "GOLD_PRICE_MARKUP"
+        : "SILVER_PRICE_MARKUP"
+    ] || "1"
+  );
   const callArgs = {
     contract: {
       address: contractAddress,
@@ -191,7 +193,7 @@ async function fetchMetalPrice(metal, apiKey) {
 }
 
 // Function to fetch and submit ETH price
-async function fetchAndSubmitETHPrice(
+async function fetchAndSubmitERC20TokenPrice(
   metal,
   apiKey,
   oracleContract,
@@ -247,8 +249,10 @@ async function fetchAndSubmitETHPrice(
 
     const currentTimestamp = Math.floor(currentTimeMs / 1000);
     await submitPrice(token, oracleContract, {
-      price: twap / ((metal === "USDT" || metal === "USDC") ? 1e6 : 1e18),
-      timestamp: currentTimestamp,
+      price: twap / ((metal === "USDT" || metal === "USDC") ? 1e6 : (metal === "BTC" ? 1e8 : 1e18)),
+
+      
+timestamp: currentTimestamp,
     });
 
     console.log(
@@ -297,9 +301,9 @@ const submitOraclePricePeriodically = async (oracleInterval) => {
     }
 
     try {
-      if (oracle.metal === "ETH" || oracle.metal === "USDT" 
-        || oracle.metal === "USDC" || oracle.metal === "PAXG") {
-        await fetchAndSubmitETHPrice(
+      if (oracle.metal === "ETH" || oracle.metal === "BTC" || oracle.metal === "USDT" 
+        || oracle.metal === "USDC" || oracle.metal === "PAXG") { //TODO: check this logic
+        await fetchAndSubmitERC20TokenPrice(
           oracle.metal,
           process.env.ALCHEMY_API_KEY,
           oracle,
@@ -359,7 +363,7 @@ const updateSalePricePeriodically = async () => {
           config,
           query: {
             address: "eq." + address,
-            select: "sale,name",
+            select: "sale,name,decimals",
           },
         };
 
@@ -379,13 +383,13 @@ const updateSalePricePeriodically = async () => {
           process.env.METALS_API_KEY
         );
 
+        const decimals = assetResult[0].decimals || 0;
+
         await updateMetalPrice(
           asset.name.toLowerCase(),
           token,
           assetResult[0]?.sale,
-          assetResult[0]?.name.toLowerCase().includes("gold")
-            ? metalResult.price / 100
-            : metalResult.price
+          metalResult.price / Math.pow(10, decimals)
         );
         console.log(
           `[Sale Update] Price updated for asset: ${address} at ${new Date().toISOString()}`
@@ -456,7 +460,10 @@ async function main() {
         }
 
         // Check if it's time to run the sale price update
-        if (Date.now() - lastSaleRun >= saleInterval) {
+        if (
+          Date.now() - lastSaleRun >= saleInterval &&
+          process.env.SALE_UPDATE === "true"
+        ) {
           console.log("[Sale] Running updateSalePricePeriodically...");
           await updateSalePricePeriodically();
           lastSaleRun = Date.now();

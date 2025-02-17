@@ -30,6 +30,16 @@ class TokensController {
     }
   }
 
+  static async getWBTCSTAddress(_, res, next) {
+    try {
+      const address = await tokensJs.getWBTCSTAddress();
+
+      return rest.response.status200(res, address);
+    } catch (e) {
+      return next(e);
+    }
+  }
+
   static async addHash(req, res, next) {
     try {
       const { dapp, body } = req;
@@ -81,6 +91,7 @@ class TokensController {
       userAddress: Joi.string().required(),
       txHash: Joi.string().required(),
       amount: Joi.string().required(),
+      tokenName: Joi.string().required(),
     });
 
     const validation = addHashSchema.validate(args);

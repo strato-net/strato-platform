@@ -44,6 +44,7 @@ import qualified Data.Text                            as T
 
 import           Blockchain.Data.AddressStateDB
 import           Blockchain.Strato.Model.Account
+import           Blockchain.Strato.Model.Address
 import           Blockchain.Strato.Model.Keccak256
 
 import           SolidVM.Model.CodeCollection
@@ -134,7 +135,7 @@ instance Monoid (FileUnitsF a) where
 type ImportMapF a = Map Text (Either (UnresolvedFileUnitsF a) (FileUnitsF a))
 
 resolveImports ::
-  ( A.Selectable Account AddressState m,
+  ( A.Selectable Address AddressState m,
     Show a,
     Ord a,
     Default a
@@ -150,7 +151,7 @@ resolveImports getCCFromHash m = do
   pure . foldMap fileUnitsToCodeCollection $ M.elems m''
 
 resolveFile ::
-  ( A.Selectable Account AddressState m,
+  ( A.Selectable Address AddressState m,
     Show a,
     Ord a,
     Default a
@@ -162,20 +163,16 @@ resolveFile getCCFromHash expr (seen, resolved) =
   if tShowExpr expr `S.member` seen
     then throwE . T.concat $ "Circular reference identified: " : S.toList seen
     else case expr of
-      AccountLiteral _ namedAcct ->
-        if namedAcct ^. namedAccountChainId == MainChain || namedAcct ^. namedAccountChainId == UnspecifiedChain
-          then do
-            let acct = namedAccountToAccount Nothing namedAcct
-            lift (A.select (A.Proxy @AddressState) acct) >>= \case
-              Nothing -> pure (seen, resolved)
-              Just AddressState {..} ->
-                lift (runMainChainT $ resolveCodePtr Nothing addressStateCodeHash) >>= \case
-                  Just (SolidVMCode _ ch) -> do
-                    rfu <- lift $ codeCollectionToFileUnits (Just acct) <$> getCCFromHash ch
-                    pure (seen, M.insert (tShowExpr expr) (Right rfu) resolved)
-                  Just (ExternallyOwned _) -> throwE . T.pack $ "Account referenced in import contains EVM code: " ++ show acct
-                  _ -> throwE . T.pack $ "Account referenced in import could not be resolved: " ++ show acct
-          else throwE "Account imports can only come from the main chain"
+      AccountLiteral _ acct -> do
+        lift (A.select (A.Proxy @AddressState) (acct^.namedAccountAddress)) >>= \case
+          Nothing -> pure (seen, resolved)
+          Just AddressState {..} ->
+            lift (runMainChainT $ resolveCodePtr addressStateCodeHash) >>= \case
+              Just (SolidVMCode _ ch) -> do
+                rfu <- lift $ codeCollectionToFileUnits (Just $ acct^.namedAccountAddress) <$> getCCFromHash ch
+                pure (seen, M.insert (tShowExpr expr) (Right rfu) resolved)
+              Just (ExternallyOwned _) -> throwE . T.pack $ "Account referenced in import contains EVM code: " ++ show acct
+              _ -> throwE . T.pack $ "Account referenced in import could not be resolved: " ++ show acct
       StringLiteral _ fileName' ->
         let fileName = T.pack fileName'
          in case M.lookup fileName resolved of
@@ -188,7 +185,7 @@ resolveFile getCCFromHash expr (seen, resolved) =
                       Right r -> Right . FileUnits (r ^. fuPragmas) $ M.singleton Nothing (l ^. ufuUnits) <> (r ^. fuUnits)
       _ -> throwE . T.pack $ "Unsupported expression in import: " ++ unparseExpression expr
 
-codeCollectionToFileUnits :: Maybe Account -> CodeCollectionF a -> FileUnitsF a
+codeCollectionToFileUnits :: Maybe Address -> CodeCollectionF a -> FileUnitsF a
 codeCollectionToFileUnits from CodeCollection {..} =
   let units =
         (FUContract . (importedFrom %~ maybe from Just) <$> _contracts)
@@ -211,7 +208,7 @@ fileUnitsToCodeCollection (FileUnits ps us) =
     addUnit (n, (FUError e)) = flErrors . at n ?~ e
 
 doResolve ::
-  ( A.Selectable Account AddressState m,
+  ( A.Selectable Address AddressState m,
     Show a,
     Ord a,
     Default a

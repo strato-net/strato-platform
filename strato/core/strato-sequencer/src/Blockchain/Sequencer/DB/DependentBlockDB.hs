@@ -9,16 +9,12 @@
 module Blockchain.Sequencer.DB.DependentBlockDB (
   DependentBlockDB,
   DependentBlockEntry,
-  HasDependentBlockDB,
+  HasDependentBlockDB(..),
   EmissionReadiness(..),
   bootstrapGenesisBlock,
-  getDependentBlockDB,
-  getWriteOptions,
-  getReadOptions,
-  genericLookupDependentBlockDB,
-  genericBatchInsertDependentBlockDB,
-  genericBatchDeleteDependentBlockDB,
-  applyLDBBatchWrites,
+  lookupDependentBlockDB,
+  insertDependentBlockDB,
+  deleteDependentBlockDB,
   insertEmitted,
   enqueueIfParentNotEmitted,
   buildEmissionChain
@@ -56,26 +52,29 @@ data EmissionReadiness = NotReadyToEmit | ReadyToEmit
 
 class (MonadLogger m, MonadIO m) => HasDependentBlockDB m where
   getDependentBlockDB :: m DependentBlockDB
-  getWriteOptions :: m LDB.WriteOptions
-  getReadOptions :: m LDB.ReadOptions
 
   applyLDBBatchWrites :: [LDB.BatchOp] -> m ()
   applyLDBBatchWrites ops = do
     db <- getDependentBlockDB
-    writeOptions <- getWriteOptions
-    LDB.write db writeOptions ops
+    LDB.write db LDB.defaultWriteOptions ops
 
-genericLookupDependentBlockDB :: (HasDependentBlockDB m, Binary k, Binary a) => k -> m (Maybe a)
-genericLookupDependentBlockDB k = do
+lookupDependentBlockDB :: HasDependentBlockDB m =>
+                          Keccak256 -> m (Maybe DependentBlockEntry)
+lookupDependentBlockDB k = do
   db <- getDependentBlockDB
-  readOptions <- getReadOptions
-  fmap (decode . B.fromStrict) <$> LDB.get db readOptions (B.toStrict $ encode k)
+  fmap (fmap (decode . B.fromStrict)) $ LDB.get db LDB.defaultReadOptions (B.toStrict $ encode k)
 
-genericBatchInsertDependentBlockDB :: (Binary k, Binary a) => k -> a -> LDB.BatchOp
-genericBatchInsertDependentBlockDB k a = LDB.Put (B.toStrict $ encode k) (B.toStrict $ encode a)
+insertDependentBlockDB :: HasDependentBlockDB m =>
+                          Keccak256 -> DependentBlockEntry -> m ()
+insertDependentBlockDB k v = do
+  db <- getDependentBlockDB
+  LDB.put db LDB.defaultWriteOptions (B.toStrict $ encode k) (B.toStrict $ encode v)
 
-genericBatchDeleteDependentBlockDB :: Binary k => k -> LDB.BatchOp
-genericBatchDeleteDependentBlockDB k = LDB.Del (B.toStrict $ encode k)
+deleteDependentBlockDB :: HasDependentBlockDB m =>
+                          Keccak256 -> m ()
+deleteDependentBlockDB k = do
+  db <- getDependentBlockDB
+  LDB.delete db LDB.defaultWriteOptions (B.toStrict $ encode k)
 
 bootstrapGenesisBlock :: (Keccak256 `Alters` DependentBlockEntry) m => Keccak256 -> m ()
 bootstrapGenesisBlock hash' = insert Proxy hash' Emitted

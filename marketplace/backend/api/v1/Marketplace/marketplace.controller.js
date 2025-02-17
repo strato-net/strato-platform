@@ -171,7 +171,7 @@ class MarketplaceController {
     }
   }
 
-  static async getCataAddress(__html, res, next) {
+  static async getCataAddress(_, res, next) {
     try {
       const address = tokensJs.getCataAddress();
 

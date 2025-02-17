@@ -25,7 +25,7 @@ import Blockchain.DB.StateDB
 import Blockchain.Data.AddressStateDB
 import Blockchain.Data.RLP
 import qualified Blockchain.Database.MerklePatricia as MP
-import Blockchain.Strato.Model.Account
+import Blockchain.Strato.Model.Address
 import Control.Monad.Change.Alter (Alters)
 import Data.Bifunctor (second)
 import SolidVM.Model.Storable
@@ -40,10 +40,10 @@ type FullSolidStorage m =
     HasMemSolidStorageDB m,
     HasStateDB m,
     HasHashDB m,
-    (Account `Alters` AddressState) m
+    (Address `Alters` AddressState) m
   )
 
-toKey :: Account -> StoragePath -> RawStorageKey
+toKey :: Address -> StoragePath -> RawStorageKey
 toKey = curry $ fmap unparsePath
 
 toVal :: BasicValue -> RawStorageValue
@@ -57,19 +57,19 @@ toVal bv =
 fromVal :: RawStorageValue -> BasicValue
 fromVal = rlpDecode . rlpDeserialize
 
-putSolidStorageKeyVal' :: HasSolidStorageDB m => Account -> StoragePath -> BasicValue -> m ()
-putSolidStorageKeyVal' acct key val = do
-  putRawStorageKeyVal' (toKey acct key) (toVal val)
+putSolidStorageKeyVal' :: HasSolidStorageDB m => Address -> StoragePath -> BasicValue -> m ()
+putSolidStorageKeyVal' address key val = do
+  putRawStorageKeyVal' (toKey address key) (toVal val)
 
-getSolidStorageKeyVal' :: HasSolidStorageDB m => Account -> StoragePath -> m BasicValue
-getSolidStorageKeyVal' acct key = do
-  v' <- fromVal <$> getRawStorageKeyVal' (toKey acct key)
+getSolidStorageKeyVal' :: HasSolidStorageDB m => Address -> StoragePath -> m BasicValue
+getSolidStorageKeyVal' address key = do
+  v' <- fromVal <$> getRawStorageKeyVal' (toKey address key)
   return v'
 
-deleteSolidStorageKeyVal' :: HasSolidStorageDB m => Account -> StoragePath -> m ()
+deleteSolidStorageKeyVal' :: HasSolidStorageDB m => Address -> StoragePath -> m ()
 deleteSolidStorageKeyVal' acct key = deleteRawStorageKey' (toKey acct key)
 
-getAllSolidStorageKeyVals' :: FullSolidStorage m => Account -> m [(MP.Key, BasicValue)]
+getAllSolidStorageKeyVals' :: FullSolidStorage m => Address -> m [(MP.Key, BasicValue)]
 getAllSolidStorageKeyVals' acct = map (second fromVal) <$> getAllRawStorageKeyVals' acct
 
 flushMemSolidStorageTxDBToBlockDB :: FullSolidStorage m => m ()

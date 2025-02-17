@@ -383,7 +383,7 @@ createExpandAbstractTable ::
   OutputM m =>
   ContractF () ->
   (Text, Text, Text) ->
-  Map.Map (Account, Text) (Text, Text, [Text]) ->
+  Map.Map (Address, Text) (Text, Text, [Text]) ->
   CodeCollectionF () ->
   ConduitM () Text m [ForeignKeyInfo]
 createExpandAbstractTable c nameParts abstracts cc = do
@@ -471,7 +471,7 @@ getDeferredForeignKeys tableName c (CodeCollection ccs _ _ _ _ _ _ _) creator a 
 
 getDeferredForeignKeysAbstract ::
   (MonadLogger m) =>
-  TableName -> ContractF () -> Text -> Text -> Map.Map (Account, Text) (Text, Text, [Text]) -> CodeCollectionF () -> m [ForeignKeyInfo]
+  TableName -> ContractF () -> Text -> Text -> Map.Map (Address, Text) (Text, Text, [Text]) -> CodeCollectionF () -> m [ForeignKeyInfo]
 getDeferredForeignKeysAbstract tableName c creator a abstracts' cc@(CodeCollection ccs _ _ _ _ _ _ _) = do
   result <- fmap catMaybes . for [(theName, x) | (theName, VariableDecl {_varType = SVMType.UnknownLabel x _}) <- Map.toList (c ^. storageDefs)] $ \(theName, x) -> do
       let contractF = Map.lookup x ccs
@@ -576,7 +576,7 @@ createAbstractTable ::
   OutputM m =>
   ContractF () ->
   (Text, Text, Text) ->
-  Map.Map (Account, Text) (Text, Text, [Text]) ->
+  Map.Map (Address, Text) (Text, Text, [Text]) ->
   CodeCollectionF () ->
   ConduitM () Text m [ForeignKeyInfo]
 createAbstractTable contract (creator, a, n) abstracts' cc = do
@@ -674,7 +674,7 @@ expandAbstractTable ::
   OutputM m =>
   ContractF () ->
   (Text, Text, Text) ->
-  Map.Map (Account, Text) (Text, Text, [Text]) ->
+  Map.Map (Address, Text) (Text, Text, [Text]) ->
   CodeCollectionF () ->
   ConduitM () Text m [ForeignKeyInfo]
 expandAbstractTable  contract (creator, a, n) abstracts' cc = do
@@ -747,7 +747,7 @@ expandAbstractContractTable ::
   OutputM m =>
   ContractF () ->
   TableName ->
-  Map.Map (Account, Text) (Text, Text, [Text]) ->
+  Map.Map (Address, Text) (Text, Text, [Text]) ->
   CodeCollectionF () ->
   ConduitM () Text m [ForeignKeyInfo]
 expandAbstractContractTable  contract tableName abstracts' cc = do
@@ -1555,7 +1555,7 @@ aggEventToCollectionRows ae =
 aggEventToCollectionRow :: AggregateEvent -> Action.Event -> Text -> (Value, Value) -> ProcessedCollectionRow
 aggEventToCollectionRow ae ev arrayName (index, value) =
   ProcessedCollectionRow
-    { address = (_accountAddress . Action.evContractAccount) ev,
+    { address = Action.evContractAddress ev,
       creator = T.pack $ Action.evContractCreator ev,
       application = T.pack $ Action.evContractApplication ev,
       contractname = T.pack $ Action.evContractName ev,
@@ -1566,7 +1566,7 @@ aggEventToCollectionRow ae ev arrayName (index, value) =
       blockTimestamp = eventBlockTimestamp ae,
       blockNumber = eventBlockNumber ae,
       transactionHash = eventTxHash ae,
-      transactionSender = _accountAddress $ eventTxSender ae,
+      transactionSender = eventTxSender ae,
       collectionDataKey = index,
       collectionDataValue = value,
       root = "",
@@ -1612,7 +1612,7 @@ processParents ::
 processParents ae = createNewEvent <$> Map.toList (eventAbstracts ae)
   where
     createNewEvent :: 
-      ((Account, Text), (Text, Text, [Text])) -> AggregateEvent
+      ((Address, Text), (Text, Text, [Text])) -> AggregateEvent
     createNewEvent ((_, n'), (c, a, _)) =
       ae { eventEvent = (eventEvent ae) {
         Action.evContractCreator = T.unpack c,
@@ -1651,7 +1651,7 @@ insertEventTableQuery agEv@AggregateEvent {eventEvent = ev} =
       filledArgs = map fst . fillFirstEmptyEntries . map (\(aa, bb, _) -> (T.pack aa, bb)) $ Action.evArgs ev
       keySt = wrapAndEscapeDouble . map escapeQuotes $ baseTableColumnsForEvent ++ filledArgs
       baseVals =
-        [ tshow . _accountAddress . Action.evContractAccount . eventEvent,
+        [ tshow . Action.evContractAddress . eventEvent,
           T.pack . keccak256ToHex . eventBlockHash,
           tshow . eventBlockTimestamp,
           tshow . eventBlockNumber,

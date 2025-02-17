@@ -41,9 +41,9 @@ const ResponsiveCart = ({
   const [selectedProvider, setSelectedProvider] = useState(initialPaymentState);
   const marketplaceDispatch = useMarketplaceDispatch();
   const { assetsWithEighteenDecimalPlaces } = useMarketplaceState();
-  const [tax, setTax] = useState(0);
-  const [subTotal, setSubTotal] = useState(0);
-  const [total, setTotal] = useState(0);
+  const [tax, setTax] = useState(new BigNumber(0));
+  const [subTotal, setSubTotal] = useState(new BigNumber(0));
+  const [total, setTotal] = useState(new BigNumber(0));
   const orderDispatch = useOrderDispatch();
   let { hasChecked, isAuthenticated, loginUrl, user } = useAuthenticateState();
   const userOrganization = user?.organization;
@@ -57,15 +57,16 @@ const ResponsiveCart = ({
   }, [data]);
 
   useEffect(() => {
-    let t = 0;
-    let sum = 0;
+    let t = new BigNumber(0);
+    let sum = new BigNumber(0);
     cartData.forEach((item) => {
-      t += item.tax;
-      sum += item.amount;
+      t = t.plus(new BigNumber(item.tax));
+      sum = sum.plus(new BigNumber(item.amount));
     });
+
     setTax(t.toFixed(2));
-    setSubTotal(sum.toFixed(2));
-    setTotal((sum + t).toFixed(2));
+    setSubTotal(sum.toString());
+    setTotal(sum.plus(t).toFixed(2));
   }, [marketplaceDispatch, cartData]);
 
   const toggleFaq = (index) => {
