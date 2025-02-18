@@ -69,7 +69,7 @@ async function runDistributeRewardsCalls(token) {
       });
       // wait until there are no more PENDING results
       const predicate = (results) =>
-        results.filter((r) => r.status === "Pending).length === 0;
+        results.filter((r) => r.status === "Pending").length === 0;
       const action = async () =>
         rest.getBlocResults(
           token,
