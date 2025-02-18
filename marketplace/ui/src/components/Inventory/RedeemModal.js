@@ -48,7 +48,7 @@ const RedeemModal = ({
   const { userAddresses, isLoadingUserAddresses } = useMarketplaceState();
   const { TextArea } = Input;
 
-  const displayQuantity = inventory.quantity;
+  const displayQuantity = inventory.quantity / Math.pow(10, inventory.decimals);
 
   const closeAddressModel = () => {
     setshowModal(false);
@@ -113,6 +113,7 @@ const RedeemModal = ({
       assetName: inventory.name,
       status: REDEMPTION_STATUS.PENDING,
       quantity: quantity,
+      decimals: inventory.decimals,
       shippingAddressId: userAddresses[selectedAddress].address_id,
       ownerCommonName: user.commonName,
       issuerCommonName: inventory.creator,

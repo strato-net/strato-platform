@@ -95,7 +95,6 @@ const TransactionTable = ({
       const USDSTAddress = await marketplaceActions.fetchUSDSTAddress(
         marketplaceDispatch
       );
-      await marketplaceActions.fetchUSDSTBalance(marketplaceDispatch);
       setOriginAddress(USDSTAddress);
     }
     fetchUSDSTAddress();
@@ -380,11 +379,11 @@ const TransactionTable = ({
       key: 'quantity',
       align: 'right',
       width: '100px',
-      render: (_, { quantity, assetOriginAddress, decimals }) => (
+      render: (_, { quantity, assetOriginAddress, decimals, redemption_id }) => (
         <span>
           {quantity
-            ? (assetOriginAddress === stratAddress
-                ? quantity / 100
+            ? (redemption_id
+                ? quantity 
                 : assetsWithEighteenDecimalPlaces.includes(assetOriginAddress)
                 ? quantity / Math.pow(10, 18)
                 : quantity / Math.pow(10, decimals)
