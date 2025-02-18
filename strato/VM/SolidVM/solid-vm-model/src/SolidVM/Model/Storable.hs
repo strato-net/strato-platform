@@ -29,6 +29,7 @@ import Data.Char
 import Data.Hashable
 import Data.Maybe
 import Data.Scientific (isInteger, toBoundedInteger)
+import Data.String
 import Foreign.Ptr
 import Foreign.Storable
 import GHC.Generics
@@ -52,6 +53,9 @@ data BasicValue
     BMappingSentinel
   | BDefault -- Indicates a not present value
   deriving (Show, Read, Eq, Generic, NFData, Hashable, Binary)
+
+instance IsString BasicValue where
+  fromString s = BString $ C8.pack s
 
 instance JSON.ToJSON BasicValue where
   toJSON v = JSON.toJSON $ format v
