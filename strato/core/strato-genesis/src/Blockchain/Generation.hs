@@ -204,7 +204,7 @@ insertContracts slotss name src code start gi =
       addrsAndSlots = zip addrs slotss
    in gi
         { genesisInfoAccountInfo = initialAccounts ++ map mkContract addrsAndSlots,
-          genesisInfoCodeInfo = initialCode ++ [CodeInfo decoded src $ Just name]
+          genesisInfoCodeInfo = initialCode ++ [CodeInfo src $ Just name]
         }
 
 readCertsFromGenesisInfo :: GenesisInfo -> [X509Certificate]
@@ -234,7 +234,7 @@ insertCertRegistryContract :: [X509Certificate] -> GenesisInfo -> GenesisInfo
 insertCertRegistryContract certs gi =
   gi
     { genesisInfoAccountInfo = initialAccounts ++ registryAcct : rootAcct : certAccts,
-      genesisInfoCodeInfo = initialCode ++ [CodeInfo encodedRegistry certificateRegistryContract (Just "CertificateRegistry")]
+      genesisInfoCodeInfo = initialCode ++ [CodeInfo certificateRegistryContract (Just "CertificateRegistry")]
     }
   where
     initialAccounts = genesisInfoAccountInfo gi
@@ -439,7 +439,7 @@ insertMercataGovernanceContract :: [ChainMemberParsedSet] -> [ChainMemberParsedS
 insertMercataGovernanceContract validators admins gi =
   gi
     { genesisInfoAccountInfo = initialAccounts ++ govAcct : (validatorAccts ++ adminAccts),
-      genesisInfoCodeInfo = initialCode ++ [CodeInfo encodedGovernance governanceSrc (Just "MercataGovernance")]
+      genesisInfoCodeInfo = initialCode ++ [CodeInfo governanceSrc (Just "MercataGovernance")]
     }
   where
     initialAccounts = genesisInfoAccountInfo gi
@@ -888,7 +888,7 @@ insertUserRegistryContract :: [X509Certificate] -> GenesisInfo -> GenesisInfo
 insertUserRegistryContract certs gi =
   gi
     { genesisInfoAccountInfo = initialAccounts ++ [registryAcct, rootAcct] ++ userAccts,
-      genesisInfoCodeInfo = initialCode ++ [CodeInfo encodedRegistry userRegistryContract (Just "UserRegistry")]
+      genesisInfoCodeInfo = initialCode ++ [CodeInfo userRegistryContract (Just "UserRegistry")]
     }
   where
     initialAccounts = genesisInfoAccountInfo gi

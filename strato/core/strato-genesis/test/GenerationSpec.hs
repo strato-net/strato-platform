@@ -12,6 +12,7 @@ import qualified Data.Aeson as Ae
 import Data.Bits
 import qualified Data.ByteString as BS
 import qualified Data.Text as T
+import qualified Data.Text.Encoding as T
 import qualified Data.Vector as V
 import Test.Hspec
 
@@ -81,7 +82,7 @@ spec = do
 
     it "should add emptyContract to the contractInfo" $
       let input = defaultGenesisInfo
-          want = [CodeInfo emptyContract emptySource $ Just "x"]
+          want = [CodeInfo emptySource $ Just "x"]
           slots = replicate 10 []
           got = insertContracts slots "x" emptySource emptyContractB16 sharedStart input
        in genesisInfoCodeInfo got `shouldBe` want
@@ -92,7 +93,7 @@ spec = do
           slots = replicate 10 []
           got =
             map hash
-              . map (\(CodeInfo bin _ _) -> bin)
+              . map (\(CodeInfo source _) -> T.encodeUtf8 source)
               . genesisInfoCodeInfo
               . insertContracts slots "Vehicle" vehicleSource vehicleContractB16 sharedStart
               $ input

@@ -200,4 +200,4 @@ convertFromOld OLD.GenesisInfo{..} =
 
 
     convertFromOldCodeInfo :: OLD.CodeInfo -> CodeInfo
-    convertFromOldCodeInfo OLD.CodeInfo{..} = CodeInfo codeInfoCode codeInfoSource codeInfoName
+    convertFromOldCodeInfo OLD.CodeInfo{..} = CodeInfo codeInfoSource codeInfoName

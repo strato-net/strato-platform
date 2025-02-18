@@ -152,15 +152,15 @@ parseHex theString =
     _ -> error $ "parseHex: error parsing string: " ++ theString
 
 initializeCodeDB :: HasCodeDB m => String -> [CodeInfo] -> m ()
-initializeCodeDB "EVM" x = do
-  mapM_ (addCode EVM . (\(CodeInfo bin _ _) -> bin)) x
+--initializeCodeDB "EVM" x = do
+--  mapM_ (addCode EVM . (\(CodeInfo bin _ _) -> bin)) x
 initializeCodeDB "SolidVM" x = do
-  mapM_ (addCode SolidVM . (\(CodeInfo _ src _) -> T.encodeUtf8 src)) x
+  mapM_ (addCode SolidVM . (\(CodeInfo src _) -> T.encodeUtf8 src)) x
 initializeCodeDB invalidType _ = error $ "error, bad VM type: " ++ invalidType
 
 zipSourceInfo :: [AccountInfo] -> [CodeInfo] -> [(AccountInfo, CodeInfo)]
 zipSourceInfo accounts codes =
-  let hashPair c@(CodeInfo bs _ _) = (hash bs, c)
+  let hashPair c@(CodeInfo source _) = (hash $ T.encodeUtf8 source, c)
       codeMap = Map.fromList . map hashPair $ codes
       findCodeFor :: AccountInfo -> Maybe (AccountInfo, CodeInfo)
       findCodeFor (NonContract _ _) = Nothing

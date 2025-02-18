@@ -76,6 +76,7 @@ import Data.Maybe
 import qualified Data.Sequence as S
 import Data.Text (Text)
 import qualified Data.Text as T
+import qualified Data.Text.Encoding as T
 import SolidVM.Model.CodeCollection (emptyCodeCollection)
 import Text.Format
 
@@ -174,8 +175,8 @@ initializeGenesisBlock = do
   $logInfoS "initgen" "best block info inserted"
   liftIO $ bootstrapIndexer obGB
   $logInfoS "initgen" "indexer has been bootstrapped"
-  let rewrite (_, CodeInfo bin src name) =
-        ( hash bin,
+  let rewrite (_, CodeInfo src name) =
+        ( hash $ T.encodeUtf8 src,
           Map.fromList $
             [("src", src)]
               ++ case name of
