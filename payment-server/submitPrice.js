@@ -70,13 +70,13 @@ async function runDistributeRewardsCalls(token) {
       // wait until there are no more PENDING results
       const predicate = (results) =>
         results.filter((r) => r.status === "Pending").length === 0;
-      const action = async () =>
+      const action = async (options) =>
         rest.getBlocResults(
           token,
           res.map((r) => r.hash),
-          { config }
+          options
         );
-      await util.until(predicate, action, { config }, 3600000);
+      await util.until(predicate, action, { config, isAsync: true }, 3600000);
       console.log("Batch distributeRewards calls completed.");
     } catch (error) {
       console.error("Error executing batch distributeRewards calls:", error);
