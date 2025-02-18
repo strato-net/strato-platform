@@ -56,6 +56,9 @@ const Feed = ({ user }) => {
           assetsWithEighteenDecimalPlaces={assetsWithEighteenDecimalPlaces}
           ethstAddress={ethstAddress}
           wbtcstAddress={wbtcstAddress}
+          usdtAddress={usdtAddress}
+          usdcAddress={usdcAddress}
+          paxgAddress={paxgAddress}
         />
       )}
     </div>

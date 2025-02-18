@@ -46,7 +46,7 @@ export default {
   testnetWBTCSTAddress: '1bf2252f6ccdcfabeb96c372bec0b0fdc1809c36',
   prodWBTCSTAddress: '',
 // TODO: add these address
-  testnetUSDTAddress: '',
+  testnetUSDTAddress: '8c6715611dc8c72de354c13016318bf1009eea48',
   prodUSDTAddress: '',
   testnetUSDCAddress: '',
   prodUSDCAddress: '',
@@ -73,6 +73,7 @@ export default {
   AssetsWithEighteenDecimalPlaces: [
     '2680dc6693021cd3fefb84351570874fbef8332a', //prodCataAddress
     '051cb99bca7c437f4b17dc01bd4ff7c5e09db035', //testnetCataAddress
+    '8c6715611dc8c72de354c13016318bf1009eea48', //
     '93fb7295859b2d70199e0a4883b7c320cf874e6c', //prodETHSTAddress
     '921e3d0b4217c7e2bfe7e660cdc4f7edc621f9d5', //testnetETHSTAddress
     '76372ee8d5a47c58cee4b0e63400858cf4f9ef13', //testnetBETHTEMP

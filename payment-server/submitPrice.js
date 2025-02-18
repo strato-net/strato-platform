@@ -299,7 +299,7 @@ const submitOraclePricePeriodically = async (oracleInterval) => {
     }
 
     try {
-      if (oracle.metal === "ETH" || oracle.metal === "BTC" || oracle.metal === "USDT") {
+      if (oracle.metal === "ETH" || oracle.metal === "BTC" || oracle.metal === "USDT" || oracle.metal === "USDC" || oracle.metal === "PAXG") {
         await fetchAndSubmitERC20TokenPrice(
           oracle.metal,
           process.env.ALCHEMY_API_KEY,

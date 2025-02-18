@@ -95,7 +95,7 @@ async function handleBridgeIn(transaction, timeout = DEFAULT_TIMEOUT) {
   try {
     console.log("Processing BridgeIn transaction:", { hash, value });
 
-    let tokenType = "ETH";
+    let tokenType = "ETH"; //TODO: need to check this.
     let transferValue = BigInt(value).toString(); // Default: ETH value
 
     if (BigInt(value) === 0n && transaction.tx) {

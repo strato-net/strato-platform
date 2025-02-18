@@ -65,6 +65,8 @@ describe("Payment Server - deploy contracts", function () {
   let btcOracle;
   let usdtOracle;
   let usdOracle;
+  let usdcOracle;
+  let paxgOracle;
 
   before(async () => {
     assert.isDefined(
@@ -152,6 +154,16 @@ describe("Payment Server - deploy contracts", function () {
     usdtOracle = await uploadContract(token, "Oracle", { name: usdtOracleName });
   });
 
+  it("Deploy Usdc Oracle", async () => {
+    const usdcOracleName = config.usdcOracle.name;
+    usdcOracle = await uploadContract(token, "Oracle", { name: usdcOracleName });
+  });
+
+  it("Deploy Paxg Oracle", async () => {
+    const paxgOracleName = config.paxgOracle.name;
+    paxgOracle = await uploadContract(token, "Oracle", { name: paxgOracleName });
+  });
+
   it("Deploy USD Oracle", async () => {
     const usdOracleName = config.usdOracle.name;
     usdOracle = await uploadContract(token, "Oracle", { name: usdOracleName });
@@ -167,6 +179,8 @@ describe("Payment Server - deploy contracts", function () {
       btcOracle,
       usdtOracle,
       usdOracle,
+      usdcOracle,
+      paxgOracle
     };
     const deployment = deploy(deployArgs, config);
     assert.isDefined(deployment);

@@ -56,15 +56,16 @@ const NewTrendingCard = ({
   const naviroute = routes.MarketplaceProductDetail.url;
   const ethNaviroute = routes.EthstProductDetail.url;
   const isAvailableForSale = !topSellingProduct.price || saleQuantity === 0;
-  const isDisabled =
-    topSellingProduct.originAddress !== ethstAddress && topSellingProduct.originAddress !== wbtcstAddress && //TODO: ? add logic for other assets
-    (isAvailableForSale || ownerSameAsUser());
 
   const isEthst = topSellingProduct.originAddress === ethstAddress;
   const isWbtcst = topSellingProduct.originAddress === wbtcstAddress;
   const isUsdt = topSellingProduct.originAddress === usdtAddress;  
   const isUsdc = topSellingProduct.originAddress === usdcAddress;
   const isPaxg = topSellingProduct.originAddress === paxgAddress;
+
+  const isDisabled =
+  !isEthst && !isWbtcst && //TODO: ? add logic for other assets
+    (isAvailableForSale || ownerSameAsUser());
 
   const queryParams = new URLSearchParams(location.search);
   const categoryQueryValue = queryParams.get('category');
