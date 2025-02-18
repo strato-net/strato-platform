@@ -61,7 +61,7 @@ options =
               Nothing -> return opts
               Just is -> do
                 certBS <- B.readFile is
-                case bsToCert certBS of
+                case bytesToCert certBS of
                   Left err -> error $ "error reading issuer cert: " ++ err
                   Right crt -> return opts {optIssuerCert = Just crt}
           )

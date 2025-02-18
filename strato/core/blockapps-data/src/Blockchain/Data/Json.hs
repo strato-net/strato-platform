@@ -522,7 +522,7 @@ vdr2v _ _ = Nothing
 
 car2x509 :: CertificateAddedRef -> Maybe X509Certificate
 car2x509 (CertificateAddedRef _ _ _ cs) =
-  either (const Nothing) Just . bsToCert $ encodeUtf8 cs
+  either (const Nothing) Just . bytesToCert $ encodeUtf8 cs
 
 crr2dcr :: CertificateRevokedRef -> DummyCertRevocation
 crr2dcr (CertificateRevokedRef _ ua) = DummyCertRevocation ua

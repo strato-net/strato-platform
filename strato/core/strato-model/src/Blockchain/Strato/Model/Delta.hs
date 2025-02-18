@@ -76,7 +76,7 @@ getDeltasFromEvents = foldr go (mempty, mempty)
             _ -> ds
           _ -> ds
         extractCommonName = fmap (Validator . T.pack . second) . find (\(x, _, _) -> x == "commonName") . evArgs
-        registration      = either (const Nothing) Just . bsToCert . encodeUtf8 . T.pack <=< getFirstArg
+        registration      = either (const Nothing) Just . bytesToCert . encodeUtf8 . T.pack <=< getFirstArg
         revocation        = pure . DummyCertRevocation <=< stringAddress <=< getFirstArg
         getFirstArg       = pure . second . fst <=< uncons . evArgs
         second (_, y, _)  = y

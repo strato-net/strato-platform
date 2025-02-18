@@ -16,10 +16,10 @@ import qualified Blockchain.EthConf.Model as EC
 import Blockchain.DB.CodeDB
 import Blockchain.GenesisBlock
 import Blockchain.Init.EthConf
+import Blockchain.Init.ProductionGenesisBlock
 import Blockchain.Init.Monad
 import Blockchain.Init.Options
 import qualified Blockchain.Network as Net
-import Blockchain.Strato.Model.Address
 import Blockchain.Strato.Model.Options (flags_network)
 import Conduit
 import Control.Monad
@@ -42,27 +42,11 @@ import System.FilePath ((</>))
 import Turtle (chmod, roo)
 import UnliftIO.Directory
 
-import BlockApps.X509
-import Blockchain.Strato.Model.ChainMember
-
-
-
-extraFaucets :: [Address]
-extraFaucets = []
-
-extraCerts :: [X509Certificate]
-extraCerts = []
-
-validators :: [ChainMemberParsedSet]
-validators = [CommonName "" "" "node1" True]
-
-admins :: [ChainMemberParsedSet]
-admins = [CommonName "" "" "node1" True]
-
 createGenesisInfo :: MonadIO m => String -> m ()
 createGenesisInfo _ = do
-  let gi' = buildGenesisInfo extraFaucets extraCerts validators admins defaultGenesisInfo
-  liftIO $ B.writeFile "genesis.json" . BL.toStrict $ JSON.encode gi'
+  let genesisInfo = productionGenesisBlock
+
+  liftIO $ B.writeFile "genesis.json" . BL.toStrict $ JSON.encode genesisInfo
   liftIO $ putStrLn $ "Done. Output genesis block info was written"
 
 convertGenesisFromOld :: MonadIO m => m ()

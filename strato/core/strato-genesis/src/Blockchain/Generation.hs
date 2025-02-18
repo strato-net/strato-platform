@@ -213,7 +213,7 @@ readCertsFromGenesisInfo gi = catMaybes . flip map (genesisInfoAccountInfo gi) $
     let storageMap = M.fromList storage
     certStr <- M.lookup ".certificateString" storageMap
     case certStr of
-      BString certStr' -> either (const Nothing) Just $ bsToCert certStr'
+      BString certStr' -> either (const Nothing) Just $ bytesToCert certStr'
       _ -> Nothing
   _ -> Nothing
 

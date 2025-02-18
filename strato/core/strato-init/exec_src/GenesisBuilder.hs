@@ -148,6 +148,6 @@ main = do
   --------------------------------- GENERATE GENESIS INFO ------------------------------------
   --------------------------------------------------------------------------------------------
 
-  let gi' = buildGenesisInfo optFaucets optCerts optValidators optAdmins optInput
+  let gi' = buildGenesisInfo True optFaucets optCerts optValidators optAdmins optInput
   B.writeFile optOutputName . BL.toStrict $ Ae.encode gi'
   putStrLn $ "Done. Output genesis block info was written to " ++ optOutputName

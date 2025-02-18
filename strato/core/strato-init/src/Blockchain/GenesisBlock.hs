@@ -80,11 +80,11 @@ import qualified Data.Text.Encoding as T
 import SolidVM.Model.CodeCollection (emptyCodeCollection)
 import Text.Format
 
-buildGenesisInfo :: [Ad.Address] -> [X509Certificate] -> [ChainMemberParsedSet] -> [ChainMemberParsedSet] -> GenesisInfo -> GenesisInfo
-buildGenesisInfo extraFaucets extraCerts validators admins gi =
+buildGenesisInfo :: Bool -> [Ad.Address] -> [X509Certificate] -> [ChainMemberParsedSet] -> [ChainMemberParsedSet] -> GenesisInfo -> GenesisInfo
+buildGenesisInfo useRegistryContract extraFaucets extraCerts validators admins gi =
   let faucetBalance = 0x1000000000000000000000000000000000000000000000000000000000000
       faucetAccounts = map (flip NonContract faucetBalance) extraFaucets
-   in insertUserRegistryContract extraCerts
+   in (if useRegistryContract then insertUserRegistryContract extraCerts else id)
         . insertMercataGovernanceContract validators admins
         . insertCertRegistryContract extraCerts
         $ gi {genesisInfoAccountInfo = faucetAccounts ++ (genesisInfoAccountInfo gi)}

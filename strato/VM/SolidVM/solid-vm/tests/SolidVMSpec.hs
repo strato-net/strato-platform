@@ -215,7 +215,7 @@ rootAcc :: Address
 rootAcc = fromPublicKey X509.rootPubKey
 
 getCert :: X509Certificate
-getCert = fromMaybe (error $ "no idea what's happening") $ either (const Nothing) Just . bsToCert . BC.pack $ myCertString
+getCert = either (error $ "no idea what's happening") id . bytesToCert . BC.pack $ myCertString
 
 myCertString :: String
 myCertString =
@@ -319,7 +319,7 @@ runTestWithTimeout timeout f = do
           eInput = Ae.eitherDecodeStrict (BC.pack gi)
           !input = either error id eInput
           cert = getCert
-          gi' = buildGenesisInfo [] [cert] vals admins input
+          gi' = buildGenesisInfo True [] [cert] vals admins input
 
       (blockCreated, outputBlock) <- generateGBlock gi'
       MP.initializeBlank
