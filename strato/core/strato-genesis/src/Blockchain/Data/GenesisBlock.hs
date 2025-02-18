@@ -107,7 +107,7 @@ putAccount acc = case acc of
         { addressStateBalance = balance',
           addressStateCodeHash = codeHash'
         }
-    putStorageTrie address slots
+    putStorageTrie address $ map (\(k, v) -> (k, rlpSerialize $ rlpEncode v)) $ slots
 
 initializeStateDB ::
   ( MonadLogger m,

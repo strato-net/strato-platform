@@ -24,6 +24,7 @@ import Blockchain.Data.CodeInfo
 import qualified Blockchain.Data.AccountInfoOld as OLD
 import qualified Blockchain.Data.CodeInfoOld as OLD
 import qualified Blockchain.Data.GenesisInfoOld as OLD
+import Blockchain.Data.RLP
 import Blockchain.Database.MerklePatricia
 import Blockchain.Strato.Model.ChainMember
 import Blockchain.Strato.Model.Keccak256
@@ -194,7 +195,8 @@ convertFromOld OLD.GenesisInfo{..} =
     convertFromOldAccountInfo (OLD.ContractWithStorage address nonce codeHash storage) =
       ContractWithStorage address nonce codeHash storage
     convertFromOldAccountInfo (OLD.SolidVMContractWithStorage address nonce codeHash storage) =
-      SolidVMContractWithStorage address nonce codeHash storage
+      SolidVMContractWithStorage address nonce codeHash $
+                            map (\(k, v) ->  (k, rlpDecode $ rlpDeserialize v)) $ storage
 
 
     convertFromOldCodeInfo :: OLD.CodeInfo -> CodeInfo

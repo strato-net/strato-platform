@@ -27,7 +27,6 @@ where
 import BlockApps.X509.Certificate
 import BlockApps.X509.Keys (pubToBytes, rootPubKey)
 import Blockchain.Data.GenesisInfo
-import Blockchain.Data.RLP
 import Blockchain.Strato.Model.Account
 import Blockchain.Strato.Model.Address
 import Blockchain.Strato.Model.ChainMember
@@ -50,6 +49,7 @@ import qualified Data.List as List
 import qualified Data.Map.Strict as M
 import Data.Maybe
 import Data.Scientific (floatingOrInteger)
+import Data.String
 import Data.Text (Text)
 import Data.Text.Encoding
 import qualified Data.Vector as V
@@ -211,8 +211,7 @@ readCertsFromGenesisInfo :: GenesisInfo -> [X509Certificate]
 readCertsFromGenesisInfo gi = catMaybes . flip map (genesisInfoAccountInfo gi) $ \case
   SolidVMContractWithStorage _ _ (SolidVMCode "Certificate" _) storage -> do
     let storageMap = M.fromList storage
-        rlpUnwrap = rlpDecode . rlpDeserialize
-    certStr <- rlpUnwrap <$> M.lookup ".certificateString" storageMap
+    certStr <- M.lookup ".certificateString" storageMap
     case certStr of
       BString certStr' -> either (const Nothing) Just $ bsToCert certStr'
       _ -> Nothing
@@ -222,8 +221,7 @@ readValidatorsFromGenesisInfo :: GenesisInfo -> [Validator]
 readValidatorsFromGenesisInfo gi = catMaybes . flip map (genesisInfoAccountInfo gi) $ \case
   SolidVMContractWithStorage _ _ (SolidVMCode "MercataValidator" _) storage -> do
     let storageMap = M.fromList storage
-        rlpUnwrap = rlpDecode . rlpDeserialize
-    c <- rlpUnwrap <$> M.lookup ".commonName" storageMap
+    c <- M.lookup ".commonName" storageMap
     case c of
       BString c' -> do
         pure $ (Validator $ decodeUtf8 c')
@@ -242,11 +240,10 @@ insertCertRegistryContract certs gi =
     initialAccounts = genesisInfoAccountInfo gi
     initialCode = genesisInfoCodeInfo gi
 
-    rlpWrap = rlpSerialize . rlpEncode
     encodedRegistry = encodeUtf8 certificateRegistryContract
 
     rootAddress' = fromPublicKey rootPubKey
-    rootAddress = rlpWrap $ BAccount (NamedAccount rootAddress' UnspecifiedChain)
+    rootAddress = BAccount (NamedAccount rootAddress' UnspecifiedChain)
     rootSub = fromJust $ getCertSubject rootCert
 
     certSub' crt =
@@ -260,22 +257,22 @@ insertCertRegistryContract certs gi =
         0x1337
         1337
         (SolidVMCode "Certificate" (KECCAK256.hash encodedRegistry))
-        [ (".owner", rlpWrap $ BAccount (NamedAccount ((fromJust . stringAddress) "509") UnspecifiedChain)),
-          (".userAddress", rlpWrap $ BAccount (NamedAccount (fromPublicKey . subPub $ rootSub) UnspecifiedChain)),
-          (".commonName", rlpWrap . BString . BC.pack . subCommonName $ rootSub),
-          (".country", rlpWrap . BString . BC.pack . fromJust . subCountry $ rootSub),
-          (".organization", rlpWrap . BString . BC.pack . subOrg $ rootSub),
-          (".group", rlpWrap . BString . BC.pack . fromJust . subUnit $ rootSub),
-          (".organizationalUnit", rlpWrap . BString . BC.pack . fromJust . subUnit $ rootSub),
-          (".publicKey", rlpWrap . BString . pubToBytes . subPub $ rootSub),
-          (".certificateString", rlpWrap . BString $ certToBytes rootCert),
-          (".isValid", rlpWrap (BBool True)),
-          (".parent", rlpWrap $ BAccount (NamedAccount (Address 0x0) UnspecifiedChain))
+        [ (".owner", BAccount (NamedAccount ((fromJust . stringAddress) "509") UnspecifiedChain)),
+          (".userAddress", BAccount (NamedAccount (fromPublicKey . subPub $ rootSub) UnspecifiedChain)),
+          (".commonName", fromString $ subCommonName rootSub),
+          (".country", fromString $ fromJust $ subCountry rootSub),
+          (".organization", fromString $ subOrg rootSub),
+          (".group", fromString $ fromJust $ subUnit rootSub),
+          (".organizationalUnit", fromString $ fromJust $ subUnit rootSub),
+          (".publicKey", BString . pubToBytes . subPub $ rootSub),
+          (".certificateString", BString $ certToBytes rootCert),
+          (".isValid", BBool True),
+          (".parent", BAccount (NamedAccount (Address 0x0) UnspecifiedChain))
         ]
 
     -- Reversing the cert user address to create a placeholder Certificate contract address
     reverseAddr = Address . bytesToWord160 . reverse . word160ToBytes . unAddress . certUserAddress
-    addrToCertIdx ad = rlpWrap $ BAccount (NamedAccount (fromJust . stringAddress $ ad) UnspecifiedChain)
+    addrToCertIdx ad = BAccount (NamedAccount (fromJust . stringAddress $ ad) UnspecifiedChain)
     registryAcct =
       SolidVMContractWithStorage
         0x509
@@ -294,17 +291,17 @@ insertCertRegistryContract certs gi =
               (reverseAddr cert)
               0
               (SolidVMCode "Certificate" (KECCAK256.hash encodedRegistry))
-              [ (".owner", rlpWrap $ BAccount (NamedAccount ((fromJust . stringAddress) "509") UnspecifiedChain)),
-                (".userAddress", rlpWrap $ BAccount (NamedAccount (fromPublicKey . subPub $ certSub) UnspecifiedChain)),
-                (".commonName", rlpWrap . BString . BC.pack . subCommonName $ certSub),
-                (".country", rlpWrap . BString . BC.pack . maybeCertField . subCountry $ certSub),
-                (".organization", rlpWrap . BString . BC.pack . subOrg $ certSub),
-                (".group", rlpWrap . BString . BC.pack . maybeCertField . subUnit $ certSub),
-                (".organizationalUnit", rlpWrap . BString . BC.pack . maybeCertField . subUnit $ certSub),
-                (".publicKey", rlpWrap . BString . pubToBytes . subPub $ certSub),
-                (".certificateString", rlpWrap . BString $ certToBytes cert),
-                (".isValid", rlpWrap (BBool True)),
-                (".parent", rlpWrap $ BAccount (NamedAccount (fromMaybe (Address 0x0) $ getParentUserAddress cert) UnspecifiedChain))
+              [ (".owner", BAccount (NamedAccount ((fromJust . stringAddress) "509") UnspecifiedChain)),
+                (".userAddress", BAccount (NamedAccount (fromPublicKey . subPub $ certSub) UnspecifiedChain)),
+                (".commonName", fromString $ subCommonName certSub),
+                (".country", fromString $ maybeCertField $ subCountry certSub),
+                (".organization", fromString $ subOrg certSub),
+                (".group", fromString $ maybeCertField $ subUnit certSub),
+                (".organizationalUnit", fromString $ maybeCertField $ subUnit certSub),
+                (".publicKey", BString . pubToBytes . subPub $ certSub),
+                (".certificateString", BString $ certToBytes cert),
+                (".isValid", BBool True),
+                (".parent", BAccount (NamedAccount (fromMaybe (Address 0x0) $ getParentUserAddress cert) UnspecifiedChain))
               ]
         )
         certs
@@ -448,13 +445,12 @@ insertMercataGovernanceContract validators admins gi =
     initialAccounts = genesisInfoAccountInfo gi
     initialCode = genesisInfoCodeInfo gi
 
-    rlpWrap = rlpSerialize . rlpEncode
     governanceSrc = certificateRegistryContract <> "\n\n" <> mercataGovernanceContract
     encodedGovernance = encodeUtf8 governanceSrc
 
     rootAddress' = fromPublicKey rootPubKey
-    rootAddress = rlpWrap $ BAccount (NamedAccount rootAddress' MainChain)
-    addrToCertIdx ad = rlpWrap $ BAccount (NamedAccount (fromJust . stringAddress $ ad) MainChain)
+    rootAddress = BAccount (NamedAccount rootAddress' MainChain)
+    addrToCertIdx ad = BAccount (NamedAccount (fromJust . stringAddress $ ad) MainChain)
     valIx = zip [0 ..] validators
     adminIx = zip [0 ..] admins
     validatorOffset = 0x56616c696461746f7273
@@ -467,8 +463,8 @@ insertMercataGovernanceContract validators admins gi =
         0x426c6f636b61707073205374617274696e6672042616c616e6365
         (SolidVMCode "MercataGovernance" (KECCAK256.hash encodedGovernance))
         $ [ (".owner", rootAddress),
-            (".validatorCount", rlpWrap . BInteger . toInteger $ length validators),
-            (".adminCount", rlpWrap . BInteger . toInteger $ length admins)
+            (".validatorCount", BInteger . toInteger $ length validators),
+            (".adminCount", BInteger . toInteger $ length admins)
           ]
           -- ++ map (\(i, CommonName o u c True) ->
           --          ( encodeUtf8 $ ".validatorMap<\"" <> o <> "\"><\"" <> u <> "\"><\"" <> c <> "\">"
@@ -502,11 +498,11 @@ insertMercataGovernanceContract validators admins gi =
                 (validatorAddr i)
                 0
                 (SolidVMCode "MercataValidator" (KECCAK256.hash encodedGovernance))
-                [ (".owner", rlpWrap $ BAccount (NamedAccount ((fromJust . stringAddress) "100") MainChain)),
-                  (".org", rlpWrap . BString $ encodeUtf8 o),
-                  (".orgUnit", rlpWrap . BString $ encodeUtf8 u),
-                  (".commonName", rlpWrap . BString $ encodeUtf8 c),
-                  (".isActive", rlpWrap $ BBool True)
+                [ (".owner", BAccount (NamedAccount ((fromJust . stringAddress) "100") MainChain)),
+                  (".org", BString $ encodeUtf8 o),
+                  (".orgUnit", BString $ encodeUtf8 u),
+                  (".commonName", BString $ encodeUtf8 c),
+                  (".isActive", BBool True)
                 ]
             _ -> error "Invalid validator cert"
         )
@@ -519,11 +515,11 @@ insertMercataGovernanceContract validators admins gi =
                 (adminAddr i)
                 0
                 (SolidVMCode "MercataAdmin" (KECCAK256.hash encodedGovernance))
-                [ (".owner", rlpWrap $ BAccount (NamedAccount ((fromJust . stringAddress) "100") MainChain)),
-                  (".org", rlpWrap . BString $ encodeUtf8 o),
-                  (".orgUnit", rlpWrap . BString $ encodeUtf8 u),
-                  (".commonName", rlpWrap . BString $ encodeUtf8 c),
-                  (".isActive", rlpWrap $ BBool True)
+                [ (".owner", BAccount (NamedAccount ((fromJust . stringAddress) "100") MainChain)),
+                  (".org", BString $ encodeUtf8 o),
+                  (".orgUnit", BString $ encodeUtf8 u),
+                  (".commonName", BString $ encodeUtf8 c),
+                  (".isActive", BBool True)
                 ]
             _ -> error "Invalid admin cert"
         )
@@ -898,7 +894,6 @@ insertUserRegistryContract certs gi =
     initialAccounts = genesisInfoAccountInfo gi
     initialCode = genesisInfoCodeInfo gi
 
-    rlpWrap = rlpSerialize . rlpEncode
     encodedRegistry = encodeUtf8 userRegistryContract
 
     rootSub = fromJust $ getCertSubject rootCert
@@ -907,7 +902,7 @@ insertUserRegistryContract certs gi =
         (deriveAddressWithSalt Nothing (subCommonName rootSub) Nothing (Just . show $ OrderedVals [SString $ subCommonName rootSub]))
         123
         (SolidVMCode "User" (KECCAK256.hash encodedRegistry))
-        [ (".commonName", rlpWrap . BString . BC.pack . subCommonName $ rootSub)
+        [ (".commonName", fromString $ subCommonName rootSub)
         ]
 
     userAccts =
@@ -922,7 +917,7 @@ insertUserRegistryContract certs gi =
               (deriveAddressWithSalt Nothing (subCommonName certSub) Nothing (Just . show $ OrderedVals [SString $ subCommonName certSub]))
               0
               (SolidVMCode "User" (KECCAK256.hash encodedRegistry))
-              [ (".commonName", rlpWrap . BString . BC.pack . subCommonName $ certSub)
+              [ (".commonName", fromString $ subCommonName certSub)
               ]
         )
         certs
