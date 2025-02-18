@@ -357,6 +357,7 @@ const BorrowModal = ({
       }
       await inventoryActions.getAllReserve(inventoryDispatch);
       await inventoryActions.getUserCataRewards(inventoryDispatch);
+      await marketplaceActions.fetchUSDSTBalance(marketplaceDispatch);
     }
   };
 
