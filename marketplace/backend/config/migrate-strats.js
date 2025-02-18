@@ -1,8 +1,28 @@
 // Load environment variables from .env file.
 require('dotenv').config();
 
+const fs = require('fs');
 const { rest, util, fsUtil, oauthUtil } = require('blockapps-rest');
 const config = fsUtil.getYaml(`../config.yaml`);
+
+/**
+ * Append error details to a log file.
+ *
+ * @param {string} message - The error message or context.
+ * @param {Error|any} error - The error object or error details.
+ */
+function logError(message, error) {
+  let errorDetails;
+  try {
+    // Try to stringify the error object for a more detailed view.
+    errorDetails = JSON.stringify(error, null, 2);
+  } catch (jsonError) {
+    // Fallback in case JSON.stringify fails.
+    errorDetails = error.toString();
+  }
+  const errorLog = `[${new Date().toISOString()}] ${message}: ${errorDetails}\n`;
+  fs.appendFileSync('error.log', errorLog, { flag: 'a' });
+}
 
 /**
  * Generates a unique identifier.
@@ -202,6 +222,8 @@ async function main() {
 
       if (hasErrors) {
         console.error(`Error in chunk ${i + 1}:`, finalResults);
+        const errors = finalResults.filter(result => result.status !== 'Success');
+        logError(`Error in chunk ${i + 1}`, errors);
       } else {
         console.log(`Chunk ${i + 1} posted successfully.`);
         console.log(chunk);
@@ -209,6 +231,7 @@ async function main() {
     }
   } catch (error) {
     console.error('Fatal error:', error);
+    logError("Fatal error in main", error);
   }
 }
 
