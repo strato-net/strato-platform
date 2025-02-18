@@ -25,21 +25,6 @@ function logError(message, error) {
 }
 
 /**
- * Generates a unique identifier.
- *
- * @param {string|null} prefix - Optional prefix.
- * @param {number} digits - Number of digits (max 16).
- * @returns {string} - The unique ID.
- */
-function uid(prefix = null, digits = 6) {
-  digits = Math.max(1, Math.min(16, digits));
-  const max = Math.pow(10, digits);
-  const randomNumber = Math.floor(Math.random() * max);
-  const padded = randomNumber.toString().padStart(digits, '0');
-  return prefix ? `${prefix}_${padded}` : padded;
-}
-
-/**
  * Sums quantities by owner from a response array.
  *
  * @param {Array<Object>} responseData - Array of objects with owner and quantity.
@@ -127,7 +112,7 @@ function generateCallArgs(address, balance) {
       newOwner: address,
       price: 0.000000000000000001,
       quantity: (BigInt(balance) * BigInt(10 ** 14)).toString(),
-      transferNumber: parseInt(uid(null, 6), 10),
+      transferNumber: util.iuid(),
     }),
   };
 }
@@ -222,7 +207,9 @@ async function main() {
 
       if (hasErrors) {
         console.error(`Error in chunk ${i + 1}:`, finalResults);
-        const errors = finalResults.filter(result => result.status !== 'Success');
+        const errors = finalResults.filter(
+          (result) => result.status !== 'Success'
+        );
         logError(`Error in chunk ${i + 1}`, errors);
       } else {
         console.log(`Chunk ${i + 1} posted successfully.`);
@@ -231,7 +218,7 @@ async function main() {
     }
   } catch (error) {
     console.error('Fatal error:', error);
-    logError("Fatal error in main", error);
+    logError('Fatal error in main', error);
   }
 }
 
