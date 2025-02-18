@@ -1187,7 +1187,7 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
       },
       options
     );
-    return balance[0].sum ? `${balance[0].sum / DECIMAL_FACTOR_18}` : 0;
+    return balance[0].sum || 0;
   };
 
   contract.getCataBalance = async function (_, options = defaultOptions) {
@@ -1201,7 +1201,7 @@ async function bind(rawAdmin, _contract, _defaultOptions, serviceUser = false) {
       },
       options
     );
-    return balance[0].sum ? `${balance[0].sum / DECIMAL_FACTOR_18}` : 0;
+    return balance[0].sum || 0;
   };
 
   // ------------------------------ TOKENS ENDS --------------------------------

@@ -95,7 +95,6 @@ const TransactionTable = ({
       const USDSTAddress = await marketplaceActions.fetchUSDSTAddress(
         marketplaceDispatch
       );
-      await marketplaceActions.fetchUSDSTBalance(marketplaceDispatch);
       setOriginAddress(USDSTAddress);
     }
     fetchUSDSTAddress();
