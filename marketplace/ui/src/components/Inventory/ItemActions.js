@@ -81,7 +81,7 @@ const ItemActions = ({
     const parts = inventory.contract_name.split('-');
     const contractName = parts[parts.length - 1];
 
-    return allSubcategories?.find((c) => c.contract === contractName)?.name;
+    return contractName;
   };
 
   function isEditSellDisabled() {
@@ -252,7 +252,7 @@ const ItemActions = ({
             inventory.address === inventory.originAddress ||
             !isActive() ||
             disableSADDOGS(inventory) ||
-            inventory.name === 'USDST'
+            getCategory()?.includes('Tokens')
           }
         >
           <SendOutlined /> Redeem
@@ -316,7 +316,7 @@ const ItemActions = ({
                     inventory.address === inventory.originAddress ||
                     !isActive() ||
                     disableSADDOGS(inventory) ||
-                    inventory.name === 'USDST'
+                    getCategory()?.includes('Tokens')
                   }
                 >
                   <SendOutlined /> Redeem
