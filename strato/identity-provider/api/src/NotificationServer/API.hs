@@ -35,6 +35,8 @@ type PutSubscribe =
     "subscribe"
         :> Header' '[Required, Strict] "Authorization" Text
         :> ReqBody '[JSON] Username
+        :> QueryParam "telegramUsername" Text
+        :> QueryParam "referrerUsername" Text
         :> Put '[PlainText] Text
 type PostNotify =
     "notify"

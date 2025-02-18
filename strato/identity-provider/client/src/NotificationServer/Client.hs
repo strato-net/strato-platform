@@ -8,7 +8,7 @@ import Data.Text (Text)
 import NotificationServer.API
 import Servant.Client
 
-putSubscribe :: Text -> Username -> ClientM Text
+putSubscribe :: Text -> Username -> Maybe Text -> Maybe Text -> ClientM Text
 putSubscribe = client (Proxy @PutSubscribe)
 
 postNotify :: Text -> Maybe Text -> NotifyBody -> ClientM Text

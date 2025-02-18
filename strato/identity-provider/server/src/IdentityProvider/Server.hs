@@ -185,11 +185,13 @@ putIdentity ::
   Text ->
   Maybe Text ->
   Maybe Text ->
+  Maybe Text ->
+  Maybe Text ->
   Maybe Bool ->
   m Address
-putIdentity accessToken uuid idProv name mEmail mCo mSub = do
+putIdentity accessToken uuid idProv name mEmail mCo mTelegramUsername mReferrerUsername mSub = do
   time' <- liftIO getCurrentTime
-  $logInfoS "putIdentity" $ "User " <> uuid <> " called PUT /identity with username " <> name <> " and company " <> T.pack (show mCo)
+  $logInfoS "putIdentity" $ "User " <> uuid <> " called PUT /identity with username " <> name <> " and company " <> T.pack (show mCo) <> " and telegram username " <> fromMaybe (T.pack "None") mTelegramUsername <> " and referrer username " <> fromMaybe (T.pack "None") mReferrerUsername
   -- check if a user exists in vault
   let realm = extractRealmName $ T.unpack idProv
       name' = T.unpack name
@@ -202,7 +204,9 @@ putIdentity accessToken uuid idProv name mEmail mCo mSub = do
             T.pack realm,
             uuid,
             name,
-            T.pack org
+            T.pack org,
+            fromMaybe (T.pack "None") mTelegramUsername,
+            fromMaybe (T.pack "None") mReferrerUsername
           ]
   $logInfoS "putIdentity/csv" csvLogMsg
 
@@ -224,7 +228,7 @@ putIdentity accessToken uuid idProv name mEmail mCo mSub = do
                   registerUserWalletAsync realmToken rd name' realm uuid' a
                   -- subscribe if can and should
                   case (realmNoficicationServerUrl rd, fromMaybe True mSub) of 
-                    (Just url, True) -> void . async $ runNotificationM url $ subscribeUser accessToken (T.pack name')
+                    (Just url, True) -> void . async $ runNotificationM url $ subscribeUser accessToken (T.pack name') mTelegramUsername mReferrerUsername
                     (_, _) -> return ()
                 -- User has a cert but no wallet, create wallet using cert's common name. This is for backwards compatibility with existing users.
                 [cert] -> do
@@ -245,7 +249,7 @@ putIdentity accessToken uuid idProv name mEmail mCo mSub = do
               registerUserWalletAsync realmToken rd name' realm uuid' a
               -- subscribe if can and should
               _ <- case (realmNoficicationServerUrl rd, fromMaybe True mSub) of 
-                (Just url, True) -> void . async $ runNotificationM url $ subscribeUser accessToken (T.pack name')
+                (Just url, True) -> void . async $ runNotificationM url $ subscribeUser accessToken (T.pack name') mTelegramUsername mReferrerUsername
                 (_, _) -> return ()
               return a
         (_, Nothing) -> do
@@ -276,7 +280,7 @@ putIdentityExternal ::
   Text ->
   Maybe Bool ->
   m Address
-putIdentityExternal bearerToken = putIdentity (T.replace "Bearer " "" bearerToken) "" "" "" Nothing Nothing
+putIdentityExternal bearerToken = putIdentity (T.replace "Bearer " "" bearerToken) "" "" "" Nothing Nothing Nothing Nothing
 
 blocEndpoint :: String
 blocEndpoint = "/bloc/v2.2"

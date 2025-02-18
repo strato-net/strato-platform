@@ -22,6 +22,8 @@ type PutIdentity =
     :> Header' '[Required, Strict] "X-USER-UNIQUE-NAME" Text -- need for keycloak query
     :> Header' '[Required, Strict] "X-IDENTITY-PROVIDER-ID" Text
     :> Header' '[Required, Strict] "X-USER-COMMON-NAME" Text
+    :> Header' '[Optional, Strict] "X-TELEGRAM-USERNAME" Text
+    :> Header' '[Optional, Strict] "X-REFERRER-USERNAME" Text
     :> Header' '[Optional, Strict] "X-USER-EMAIL" Text
     :> QueryParam "company" Text
     :> QueryParam "subscribe" Bool
