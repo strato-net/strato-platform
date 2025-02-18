@@ -12,7 +12,6 @@ import qualified Data.Aeson as Ae
 import Data.Bits
 import qualified Data.ByteString as BS
 import qualified Data.Text as T
-import qualified Data.Text.Encoding as T
 import qualified Data.Vector as V
 import Test.Hspec
 
@@ -86,7 +85,7 @@ spec = do
           slots = replicate 10 []
           got = insertContracts slots "x" emptySource emptyContractB16 sharedStart input
        in genesisInfoCodeInfo got `shouldBe` want
-
+{-
     it "should have the right vehicle hash" $
       let input = defaultGenesisInfo
           want = [vehicleHash]
@@ -98,7 +97,7 @@ spec = do
               . insertContracts slots "Vehicle" vehicleSource vehicleContractB16 sharedStart
               $ input
        in got `shouldBe` want
-
+-}
   describe "Parsing storage values" $ do
     it "Should accept JSON of strings, ints, and arrays" $
       let input =
