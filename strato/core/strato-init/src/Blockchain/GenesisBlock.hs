@@ -7,8 +7,7 @@
 {-# LANGUAGE TypeOperators #-}
 
 module Blockchain.GenesisBlock
-  ( initializeGenesisBlock,
-    buildGenesisInfo,
+  ( initializeGenesisBlock
   )
 where
 
@@ -35,10 +34,7 @@ import qualified Blockchain.Database.MerklePatricia as MP
 import qualified Blockchain.Database.MerklePatricia.ForEach as MP
 import Blockchain.EthConf
 import Blockchain.Generation
-  ( insertCertRegistryContract,
-    insertMercataGovernanceContract,
-    insertUserRegistryContract,
-    readCertsFromGenesisInfo,
+  ( readCertsFromGenesisInfo,
     readValidatorsFromGenesisInfo,
   )
 import Blockchain.Sequencer.Bootstrap (bootstrapSequencer)
@@ -48,7 +44,6 @@ import qualified Blockchain.Strato.Indexer.ApiIndexer as ApiIndexer
 import qualified Blockchain.Strato.Indexer.Kafka as IdxKafka
 import qualified Blockchain.Strato.Indexer.Model as IdxModel
 import qualified Blockchain.Strato.Model.Address as Ad
-import Blockchain.Strato.Model.ChainMember
 import Blockchain.Strato.Model.Class
 import Blockchain.Strato.Model.ExtendedWord
 import Blockchain.Strato.Model.Keccak256
@@ -79,15 +74,6 @@ import qualified Data.Text as T
 import qualified Data.Text.Encoding as T
 import SolidVM.Model.CodeCollection (emptyCodeCollection)
 import Text.Format
-
-buildGenesisInfo :: Bool -> [Ad.Address] -> [X509Certificate] -> [ChainMemberParsedSet] -> [ChainMemberParsedSet] -> GenesisInfo -> GenesisInfo
-buildGenesisInfo useRegistryContract extraFaucets extraCerts validators admins gi =
-  let faucetBalance = 0x1000000000000000000000000000000000000000000000000000000000000
-      faucetAccounts = map (flip NonContract faucetBalance) extraFaucets
-   in (if useRegistryContract then insertUserRegistryContract extraCerts else id)
-        . insertMercataGovernanceContract validators admins
-        . insertCertRegistryContract extraCerts
-        $ gi {genesisInfoAccountInfo = faucetAccounts ++ (genesisInfoAccountInfo gi)}
 
 getGenesisBlockAndPopulateInitialMPs ::
   ( MonadIO m,

@@ -1,21 +1,21 @@
 {-# LANGUAGE OverloadedStrings #-}
 
-module Blockchain.Init.ProductionGenesisBlock (
+module Blockchain.GenesisBlocks.ProductionGenesisBlock (
   productionGenesisBlock
   ) where
 
 import BlockApps.X509
 import Blockchain.Data.GenesisInfo
-import Blockchain.GenesisBlock
-import Blockchain.Strato.Model.Address
+import Blockchain.Generation
 import Blockchain.Strato.Model.ChainMember
 import qualified Data.ByteString as B
 import qualified Data.ByteString.Char8 as BC
 
 productionGenesisBlock :: GenesisInfo
-productionGenesisBlock  = 
-  buildGenesisInfo False extraFaucets extraCerts validators admins
-            defaultGenesisInfo{
+productionGenesisBlock  =
+  insertMercataGovernanceContract validators admins
+  . insertCertRegistryContract extraCerts
+  $ defaultGenesisInfo{
         genesisInfoDifficulty=8192,
         genesisInfoLogBloom=B.replicate 256 0,
         genesisInfoGasLimit=22517998136852480000000000000000,
@@ -24,9 +24,6 @@ productionGenesisBlock  =
             NonContract 0xe1fd0d4a52b75a694de8b55528ad48e2e2cf7859 1809251394333065553493296640760748560207343510400633813116524750123642650624
             ]
         }
-
-extraFaucets :: [Address]
-extraFaucets = []
 
 certStrings :: [[String]]
 certStrings =

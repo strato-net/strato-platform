@@ -8,7 +8,7 @@
 
 import BlockApps.X509
 import Blockchain.Data.GenesisInfo
-import Blockchain.GenesisBlock
+import Blockchain.GenesisBlocks.Builder
 import Blockchain.Strato.Model.Address
 import Blockchain.Strato.Model.ChainMember
 import qualified Data.Aeson as Ae
@@ -148,6 +148,6 @@ main = do
   --------------------------------- GENERATE GENESIS INFO ------------------------------------
   --------------------------------------------------------------------------------------------
 
-  let gi' = buildGenesisInfo True optFaucets optCerts optValidators optAdmins optInput
+  let gi' = buildGenesisInfo optFaucets optCerts optValidators optAdmins optInput
   B.writeFile optOutputName . BL.toStrict $ Ae.encode gi'
   putStrLn $ "Done. Output genesis block info was written to " ++ optOutputName

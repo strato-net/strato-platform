@@ -16,7 +16,7 @@ import qualified Blockchain.EthConf.Model as EC
 import Blockchain.DB.CodeDB
 import Blockchain.GenesisBlock
 import Blockchain.Init.EthConf
-import Blockchain.Init.ProductionGenesisBlock
+import Blockchain.GenesisBlocks.ProductionGenesisBlock
 import Blockchain.Init.Monad
 import Blockchain.Init.Options
 import qualified Blockchain.Network as Net

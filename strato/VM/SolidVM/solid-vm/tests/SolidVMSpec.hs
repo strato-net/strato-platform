@@ -36,7 +36,7 @@ import Blockchain.Data.RLP
 import qualified Blockchain.Data.TXOrigin as TXO
 import Blockchain.Database.MerklePatricia as MP
 import Blockchain.DB.SQLDB
-import Blockchain.GenesisBlock
+import Blockchain.GenesisBlocks.Builder
 import Blockchain.Sequencer.Event
 import qualified Blockchain.SolidVM as SVM
 import Blockchain.SolidVM.Exception
@@ -319,7 +319,7 @@ runTestWithTimeout timeout f = do
           eInput = Ae.eitherDecodeStrict (BC.pack gi)
           !input = either error id eInput
           cert = getCert
-          gi' = buildGenesisInfo True [] [cert] vals admins input
+          gi' = buildGenesisInfo [] [cert] vals admins input
 
       (blockCreated, outputBlock) <- generateGBlock gi'
       MP.initializeBlank
