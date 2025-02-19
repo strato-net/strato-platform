@@ -103,7 +103,8 @@ const StakeItemActions = ({
         return sum;
       }, 0)
     : inventory?.escrow?.maxLoanAmount || 0;
-    maxLoanAmount = Math.floor(maxLoanAmount / Math.pow(10, 18)) * Math.pow(10, 18);
+  maxLoanAmount =
+    Math.floor(maxLoanAmount / Math.pow(10, 18)) * Math.pow(10, 18);
 
   /**
    * If the inventory.root is in assetsWithEighteenDecimalPlaces, we need to scale down values by 1e18.
@@ -171,9 +172,7 @@ const StakeItemActions = ({
           type="link"
           className="text-[#13188A] font-semibold"
           onClick={() => showBorrowModal()}
-          disabled={
-            borrowAmount >= maxLoanAmount || collateralQuantity <= 0
-          }
+          disabled={borrowAmount >= maxLoanAmount || collateralQuantity <= 0}
         >
           <BankOutlined /> Borrow
         </Button>
