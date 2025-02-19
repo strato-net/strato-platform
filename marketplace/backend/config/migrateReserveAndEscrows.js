@@ -174,6 +174,141 @@ const updateOldEscrowBorrowDataBatch = async (
   console.log(`updateOldEscrowBorrowData for batch succeeded.`);
 };
 
+/**
+ * Transfers the CATA token from the old reserve to the new reserve.
+ *
+ * This function performs the following steps:
+ * 1. Queries the old reserve for its associated CATA token address.
+ * 2. Retrieves the asset quantity and asset root for that CATA token.
+ * 3. Initiates the transfer of the CATA token to the new reserve.
+ * 4. Verifies the transfer by querying the new reserve's asset record.
+ * 5. Updates the new reserve with the new CATA token address.
+ *
+ * @param {Object} token - The token object.
+ * @param {string} OLD_RESERVE_ADDRESS - The old reserve address.
+ * @param {string} NEW_RESERVE_ADDRESS - The new reserve address.
+ * @returns {Promise<void>}
+ * @throws Will throw an error if any step fails.
+ */
+async function transferCATAToNewReserve(
+  token,
+  OLD_RESERVE_ADDRESS,
+  NEW_RESERVE_ADDRESS
+) {
+  // 1. Query the old reserve to obtain its CATA token address.
+  const reserveQuery = {
+    query: { address: 'eq.' + OLD_RESERVE_ADDRESS },
+    config,
+  };
+
+  const reserveResults = await rest.search(
+    token,
+    { name: 'BlockApps-Mercata-Reserve', select: 'cataToken' },
+    reserveQuery
+  );
+  if (!reserveResults || reserveResults.length === 0) {
+    throw new Error(`No reserve found for address ${OLD_RESERVE_ADDRESS}`);
+  }
+  const reserveRecord = reserveResults[0];
+  const cataAddress = reserveRecord.cataToken;
+  if (!cataAddress) {
+    throw new Error(
+      `No CATA token address found in reserve ${OLD_RESERVE_ADDRESS}`
+    );
+  }
+
+  // 2. Query the asset table for the asset corresponding to the CATA token.
+  const assetQuery = {
+    query: { address: 'eq.' + cataAddress, select: 'quantity::text,root' },
+    config,
+  };
+
+  const assetResults = await rest.search(
+    token,
+    { name: 'BlockApps-Mercata-Asset' },
+    assetQuery
+  );
+  if (!assetResults || assetResults.length === 0) {
+    throw new Error(`No asset found for CATA token address ${cataAddress}`);
+  }
+  const assetRecord = assetResults[0];
+  const assetQuantity = assetRecord.quantity;
+  const assetRoot = assetRecord.root;
+
+  // 3. Initiate the transfer of the CATA token to the new reserve.
+  const transferCallArgs = {
+    contract: { address: OLD_RESERVE_ADDRESS },
+    method: 'transferCATAtoAnotherReserve',
+    args: util.usc({ newOwner: NEW_RESERVE_ADDRESS, amount: assetQuantity }),
+  };
+
+  console.log(
+    `Initiating transferCATAToNewReserve with callArgs: ${JSON.stringify(
+      transferCallArgs
+    )}`
+  );
+
+  const transferRes = await callAndWait(token, transferCallArgs);
+  const transferFinal = Array.isArray(transferRes)
+    ? transferRes[0]
+    : transferRes;
+
+  if (transferFinal.status !== 'Success') {
+    const errorDetails = { transferCallArgs, result: transferFinal };
+    throw new Error(
+      `Error: transferCATAToNewReserve failed for callArgs: ${JSON.stringify(
+        errorDetails
+      )}`
+    );
+  }
+
+  // 4. Verify the transfer by querying the new reserve's asset record.
+  const newAssetQuery = {
+    query: {
+      owner: 'eq.' + NEW_RESERVE_ADDRESS,
+      root: 'eq.' + assetRoot,
+      select: 'address',
+    },
+    config,
+  };
+
+  const newAssetResults = await rest.search(
+    token,
+    { name: 'BlockApps-Mercata-Asset' },
+    newAssetQuery
+  );
+  if (!newAssetResults || newAssetResults.length === 0) {
+    throw new Error(`No asset found for new reserve ${NEW_RESERVE_ADDRESS}`);
+  }
+  const newAssetRecord = newAssetResults[0];
+  const newAssetAddress = newAssetRecord.address;
+
+  // 5. Update the new reserve with the new CATA token address.
+  const setCATACallArgs = {
+    contract: { address: NEW_RESERVE_ADDRESS },
+    method: 'setCataToken',
+    args: util.usc({ newCataToken: newAssetAddress }),
+  };
+
+  console.log(
+    `Setting CATA token address in new reserve with callArgs: ${JSON.stringify(
+      setCATACallArgs
+    )}`
+  );
+
+  const setCataRes = await callAndWait(token, setCATACallArgs);
+  const setCataFinal = Array.isArray(setCataRes) ? setCataRes[0] : setCataRes;
+
+  if (setCataFinal.status !== 'Success') {
+    const errorDetails = { setCATACallArgs, result: setCataFinal };
+    throw new Error(
+      `Error: setCataToken failed for callArgs: ${JSON.stringify(errorDetails)}`
+    );
+  }
+
+  console.log('transferCATAToNewReserve completed successfully.');
+}
+
 async function main() {
   try {
     // Validate required environment variables.
@@ -251,6 +386,13 @@ async function main() {
       // On the new reserve, update the escrow borrow data.
       await updateOldEscrowBorrowDataBatch(token, NEW_RESERVE_ADDRESS, batch);
     }
+
+    // On the old reserve, transfer CATA back to owner
+    await transferCATAToNewReserve(
+      token,
+      OLD_RESERVE_ADDRESS,
+      NEW_RESERVE_ADDRESS
+    );
 
     console.log('Reserve migration and updates completed successfully.');
   } catch (error) {
