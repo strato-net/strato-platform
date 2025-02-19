@@ -17,6 +17,7 @@ import Blockchain.DB.CodeDB
 import Blockchain.GenesisBlock
 import Blockchain.Init.EthConf
 import Blockchain.GenesisBlocks.ProductionGenesisBlock
+import Blockchain.GenesisBlocks.HeliumGenesisBlock as HELIUM
 import Blockchain.Init.Monad
 import Blockchain.Init.Options
 import qualified Blockchain.Network as Net
@@ -43,8 +44,11 @@ import Turtle (chmod, roo)
 import UnliftIO.Directory
 
 createGenesisInfo :: MonadIO m => String -> m ()
-createGenesisInfo _ = do
-  let genesisInfo = productionGenesisBlock
+createGenesisInfo network = do
+  let genesisInfo = 
+        case network of
+          "helium" -> HELIUM.genesisBlock
+          _ -> productionGenesisBlock
 
   liftIO $ B.writeFile "genesis.json" . BL.toStrict $ JSON.encode genesisInfo
   liftIO $ putStrLn $ "Done. Output genesis block info was written"
