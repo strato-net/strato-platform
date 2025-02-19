@@ -342,10 +342,10 @@ export const BANNER = [
     text: (
       <div className="staking_banner_text banner-text flex justify-between">
         <div className="banner-text">
-          <h1 className="title"> RWA X DeFi </h1>
-          <h1 className="w-3/4 mt-1 md:text-3xl font-medium sm:text-2xl text-sm">
-            Stake silver and gold to earn and gain access to CATA, our
-            governance token!
+          <h1 className="title"> RWA + DeFi = Unbanked, On-Chain Living </h1>
+          <h1 className="w-3/4 mt-1 md:text-3xl font-normal sm:text-2xl text-sm">
+            Stake Silver, Gold, ETH, Wrapped Bitcoin, and many more stakeable
+            assets to earn CATA, our Governance token!
           </h1>
         </div>
         <div>
@@ -353,7 +353,7 @@ export const BANNER = [
             src={Images.cata}
             alt={'Cata...'}
             title={'Cata'}
-            className="md:w-[160px] md:h-[160px] w-[120px] h-[120px] z-[11] relative md:mr-64 mr-48"
+            className="md:w-[160px] md:h-[160px] w-[120px] h-[120px] z-[11] relative md:mr-80 mr-48"
           />
         </div>
       </div>
@@ -568,7 +568,7 @@ export const TRANSACTION_STATUS_COLOR = {
   Unstake: '#FFEBEE',
 };
 
-export const TRANSACTION_STATUS_TEXT= {
+export const TRANSACTION_STATUS_TEXT = {
   Order: '#1E88E5',
   Transfer: '#00796B',
   Redemption: '#F57C00',
